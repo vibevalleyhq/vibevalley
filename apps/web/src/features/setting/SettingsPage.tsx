@@ -11,10 +11,10 @@ import { SkillsPage } from "#/features/runtime/index.ts";
 import { Account, Approvals, Devices } from "#/features/user/index.ts";
 import { MossPlayground, VoiceForm } from "#/features/voice/index.ts";
 import { Link as A, Navigate } from "#/infra/router.ts";
+import { SettingsPage as Page, SettingsSearch } from "#/ui/domain/settings.tsx";
 import { TextInput } from "#/ui/Field.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
-import { SettingsPage as Page, SettingsSearch } from "#/ui/settings.tsx";
 import { Splitter, usePaneWidth } from "#/ui/Splitter.tsx";
 
 import { AboutPage } from "./AboutPage";
@@ -23,7 +23,7 @@ import { GeneralPage } from "./GeneralPage";
 import { Readiness } from "./Readiness.tsx";
 import { GitHub, SettingsFile, SettingsForm } from "./SettingsForm";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   settingsPageDiv: {
     minHeight: "0",
     minWidth: "0",
@@ -40,27 +40,24 @@ const recipeStyles = stylex.create({
     animationPlayState: "running",
     animationTimeline: "scroll(self y)",
     overflowY: "auto",
-    padding: "calc(var(--spacing) * 5)",
+    padding: "1.25rem",
   },
-});
-
-const variantStyles = stylex.create({
   sectionLinkA: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2.5)",
+    gap: "0.625rem",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.375rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
-  sectionLinkAVariant: {
+  sectionLinkATone: {
     backgroundColor: "var(--color-selected)",
     fontWeight: "var(--font-weight-medium)",
     color: "var(--color-ink)",
   },
-  sectionLinkAVariant2: {
+  sectionLinkAAlt: {
     color: {
       default: "var(--color-muted)",
       "@media (hover:hover)": {
@@ -76,10 +73,7 @@ const variantStyles = stylex.create({
       },
     },
   },
-});
-
-const viewStyles = stylex.create({
-  settingsPageDiv: {
+  settingsPageDiv2: {
     display: "flex",
     height: "100%",
     minHeight: "0",
@@ -93,15 +87,15 @@ const viewStyles = stylex.create({
     display: "flex",
     flexShrink: "0",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
     borderColor: "var(--color-line)",
-    padding: "calc(var(--spacing) * 3)",
+    padding: "0.75rem",
     width: {
       default: null,
       "@media (width>=48rem)": "var(--pane-w)",
     },
     maxHeight: {
-      default: "calc(var(--spacing) * 56)",
+      default: "14rem",
       "@media (width>=48rem)": "none",
     },
     overflowY: "auto",
@@ -114,7 +108,7 @@ const viewStyles = stylex.create({
       "@media (width>=48rem)": "1px",
     },
   },
-  settingsPageDiv2: {
+  settingsPageDiv22: {
     display: {
       default: "none",
       "@media (width>=48rem)": "block",
@@ -123,13 +117,13 @@ const viewStyles = stylex.create({
   settingsPageDiv3: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
   },
   settingsPageSpan: {
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBottom: "var(--spacing)",
+    paddingInline: "0.5rem",
+    paddingBottom: "0.25rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-medium)",
     color: "var(--color-faint)",
   },
@@ -139,7 +133,7 @@ const viewStyles = stylex.create({
     borderTopStyle: "solid",
     borderTopWidth: "1px",
     borderColor: "var(--color-line)",
-    paddingTop: "calc(var(--spacing) * 3)",
+    paddingTop: "0.75rem",
     marginTop: {
       default: null,
       "@media (width>=48rem)": "auto",
@@ -192,14 +186,14 @@ export function SettingsPage(props: { rest: string }) {
     <Show when={section()} fallback={<Navigate href="/settings/general" />}>
       {(section) => (
         <SettingsSearch value={q}>
-          <div {...stylex.attrs(viewStyles.settingsPageDiv)}>
+          <div {...stylex.attrs(styles.settingsPageDiv2)}>
             <nav
               aria-label={t("web.setting.nav.label")}
               data-testid="settings-nav"
-              {...stylex.attrs(viewStyles.settingsNav)}
+              {...stylex.attrs(styles.settingsNav)}
               style={{ "--pane-w": `${navWidth()}px` }}
             >
-              <div {...stylex.attrs(viewStyles.settingsPageDiv2)}>
+              <div {...stylex.attrs(styles.settingsPageDiv22)}>
                 <Splitter pane="settingsNav" side="right" width={navWidth()} min={176} max={360} label={t("web.setting.nav.width")} />
               </div>
               <TextInput
@@ -213,8 +207,8 @@ export function SettingsPage(props: { rest: string }) {
               <For each={groups}>
                 {(g) => (
                   <Show when={shown(g).length > 0}>
-                    <div {...stylex.attrs(viewStyles.settingsPageDiv3)}>
-                      <span {...stylex.attrs(viewStyles.settingsPageSpan)}>{t(`web.setting.groups.${g}`)}</span>
+                    <div {...stylex.attrs(styles.settingsPageDiv3)}>
+                      <span {...stylex.attrs(styles.settingsPageSpan)}>{t(`web.setting.groups.${g}`)}</span>
                       <For each={shown(g)}>{(s) => <SectionLink section={s} current={s === section()} />}</For>
                     </div>
                   </Show>
@@ -222,13 +216,13 @@ export function SettingsPage(props: { rest: string }) {
               </For>
               <For each={shown("about")}>
                 {(s) => (
-                  <div {...stylex.attrs(viewStyles.settingsPageDiv4)}>
+                  <div {...stylex.attrs(styles.settingsPageDiv4)}>
                     <SectionLink section={s} current={s === section()} />
                   </div>
                 )}
               </For>
             </nav>
-            <div {...stylex.attrs(recipeStyles.settingsPageDiv)}>
+            <div {...stylex.attrs(styles.settingsPageDiv)}>
               <Switch>
                 <Match when={section().id === "general"}>
                   <GeneralPage />
@@ -308,7 +302,7 @@ function SectionLink(props: { section: Section; current: boolean }) {
       href={`/settings/${props.section.id}`}
       data-key={props.section.id}
       aria-current={props.current ? "page" : undefined}
-      {...stylex.attrs(variantStyles.sectionLinkA, props.current ? variantStyles.sectionLinkAVariant : variantStyles.sectionLinkAVariant2)}
+      {...stylex.attrs(styles.sectionLinkA, props.current ? styles.sectionLinkATone : styles.sectionLinkAAlt)}
     >
       <Icon name={props.section.icon} size={16} />
       {props.section.label}

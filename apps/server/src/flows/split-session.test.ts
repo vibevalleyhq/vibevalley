@@ -5,12 +5,13 @@ import { scriptedRuntime } from "@botiverse/oar/testing";
 import { it, expect } from "@effect/vitest";
 import { Effect } from "effect";
 
+import { BizCode } from "@vibevalley/protocol/api";
 import { assignedAgentOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 
-import { Agent } from "#/agent/agent.ts";
 import { user, worker as sessionActor } from "#/base/actor.ts";
-import { Issue } from "#/issue/issue.ts";
-import { Session } from "#/session/session.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { Issue } from "#/modules/issue/issue.ts";
+import { Session } from "#/modules/session/session.ts";
 import { gitIn } from "#/testing/git.ts";
 import { testIssues } from "#/testing/world.ts";
 
@@ -32,7 +33,7 @@ it.live("regression: splitting an in-place session cannot create children with a
     const hired = yield* issues.hire(lab(), "work in place", "in-place", { issue: parent.id, worktree: false });
     const helper = mustHire(hired);
     expect(helper.branch).toBeUndefined();
-    expect((yield* Effect.flip(service.split(parent.id, "", steps, sessionActor(helper.id))))._tag).toBe("Refused");
+    expect((yield* Effect.flip(service.split(parent.id, "", steps, sessionActor(helper.id)))).bizCode).toBe(BizCode.IssueRefused);
     expect((yield* issues.list()).filter((issue) => issue.parent === parent.id)).toEqual([]);
   }).pipe(Effect.scoped, Effect.provide(f.layer));
 });

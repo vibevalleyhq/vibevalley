@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { flatBlocks } from "@vibevalley/protocol/rules";
-
 import {
   backlinks,
   carryIds,
@@ -31,6 +29,7 @@ import {
   walk,
   wordDiff,
 } from "./index.ts";
+import { flatBlocks } from "./outline.ts";
 
 const samplePage = [
   "title:: Cetus Core Engine",

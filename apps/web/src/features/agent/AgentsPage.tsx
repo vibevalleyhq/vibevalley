@@ -13,8 +13,8 @@ import { useCore } from "#/infra/frame.ts";
 import { useQueryClient, ready, useRuntimes } from "#/infra/query.ts";
 import { Link as A } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
-import { hexColor } from "#/ui/cast.ts";
-import { AgentFace, OrchestratorFace } from "#/ui/Face.tsx";
+import { hexColor } from "#/ui/domain/cast.ts";
+import { AgentFace, OrchestratorFace } from "#/ui/domain/Face.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import { styleProps } from "#/ui/positioner.ts";
 
@@ -39,10 +39,10 @@ const cardStyles = stylex.create({
         ":hover": "var(--wb-side)",
       },
     },
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * .5)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.125rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-medium)",
     color: {
       default: "var(--wb-muted)",
@@ -62,7 +62,7 @@ const cardStyles = stylex.create({
   },
 });
 
-const recipeStyles2 = stylex.create({
+const styles = stylex.create({
   cardShellA: {
     display: "flex",
     height: "100%",
@@ -87,10 +87,10 @@ const recipeStyles2 = stylex.create({
         ":hover": "var(--color-page)",
       },
     },
-    padding: "calc(var(--spacing) * 4)",
-    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
-    transitionDuration: "var(--default-transition-duration)",
+    padding: "1rem",
+    transitionProperty: "color, background-color, border-color",
+    transitionTimingFunction: "var(--ease-out)",
+    transitionDuration: "180ms",
     outlineStyle: {
       default: null,
       ":focus-visible": "solid",
@@ -104,27 +104,24 @@ const recipeStyles2 = stylex.create({
       ":focus-visible": "var(--color-focus)",
     },
   },
-  cardShellAVariant1Case1: {
+  cardShellAPrimary: {
     borderStyle: "solid",
   },
-  cardShellAVariant1Case2: {
+  cardShellASecondary: {
     borderStyle: "dashed",
   },
-});
-
-const recipeStyles = stylex.create({
   agentsPageA: {
     display: "inline-flex",
-    height: "calc(var(--spacing) * 7)",
+    height: "1.75rem",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-line)",
-    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingInline: "0.625rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -135,9 +132,9 @@ const recipeStyles = stylex.create({
   },
   agentsPageA2: {
     display: "inline-flex",
-    height: "calc(var(--spacing) * 7)",
+    height: "1.75rem",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
@@ -149,18 +146,18 @@ const recipeStyles = stylex.create({
         ":hover": "var(--color-accent-hover)",
       },
     },
-    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingInline: "0.625rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-page)",
   },
   agentsPageA3: {
     display: "flex",
-    minHeight: "calc(var(--spacing) * 32)",
+    minHeight: "8rem",
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderRadius: "var(--radius-lg)",
     borderStyle: "dashed",
     borderWidth: "1px",
@@ -177,7 +174,7 @@ const recipeStyles = stylex.create({
       },
     },
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-medium)",
     color: {
       default: "var(--color-muted)",
@@ -205,11 +202,11 @@ const recipeStyles = stylex.create({
   },
   agentsPageA5: {
     display: "flex",
-    minHeight: "calc(var(--spacing) * 44)",
+    minHeight: "11rem",
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderRadius: "var(--radius-lg)",
     borderStyle: "dashed",
     borderWidth: "1px",
@@ -226,7 +223,7 @@ const recipeStyles = stylex.create({
       },
     },
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-medium)",
     color: {
       default: "var(--color-muted)",
@@ -240,45 +237,36 @@ const recipeStyles = stylex.create({
     marginTop: "auto",
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
     borderColor: "var(--color-line)",
-    paddingTop: "calc(var(--spacing) * 3)",
+    paddingTop: "0.75rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
-});
-
-const variantStyles2 = stylex.create({
   orchestratorCardSpan: {
     WebkitLineClamp: "2",
     WebkitBoxOrient: "vertical",
     display: "-webkit-box",
     overflow: "hidden",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
-});
-
-const variantStyles = stylex.create({
   agentCardSpan: {
     width: "7px",
     height: "7px",
     flexShrink: "0",
-    borderRadius: "2147483647px",
+    borderRadius: "9999px",
   },
-  agentCardSpanVariant: {
+  agentCardSpanTone: {
     backgroundColor: "var(--color-leaf)",
   },
-  agentCardSpanVariant2: {
+  agentCardSpanAlt: {
     backgroundColor: "var(--color-berry)",
   },
-});
-
-const viewStyles = stylex.create({
   agentsPageDiv: {
     height: "100%",
     overflowY: "auto",
@@ -286,33 +274,33 @@ const viewStyles = stylex.create({
   agentsPageDiv2: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 6)",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingTop: "calc(var(--spacing) * 4)",
-    paddingBottom: "calc(var(--spacing) * 8)",
+    gap: "1.5rem",
+    paddingInline: "1rem",
+    paddingTop: "1rem",
+    paddingBottom: "2rem",
   },
   agentsPageDiv3: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "flex-end",
     justifyContent: "flex-end",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   agentsPageSpan: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   agentsPageH2: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-semibold)",
     color: "var(--color-muted)",
   },
   agentsPageDiv4: {
     display: "grid",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
     gridTemplateColumns: {
       default: null,
       "@media (width>=40rem)": "repeat(2,minmax(0,1fr))",
@@ -322,50 +310,50 @@ const viewStyles = stylex.create({
   },
   agentsPageP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   cardShellDiv: {
     position: "absolute",
-    top: "calc(var(--spacing) * 3)",
-    right: "calc(var(--spacing) * 3)",
+    top: "0.75rem",
+    right: "0.75rem",
   },
-  orchestratorCardDiv: {
+  orchestratorCardDiv2: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 3)",
-    paddingBottom: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
+    paddingBottom: "0.75rem",
   },
-  orchestratorCardSpan: {
+  orchestratorCardSpan2: {
     display: "flex",
-    width: "calc(var(--spacing) * 20)",
-    height: "calc(var(--spacing) * 20)",
+    width: "5rem",
+    height: "5rem",
     flexShrink: "0",
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "var(--radius-lg)",
     backgroundColor: "var(--color-hover)",
   },
-  orchestratorCardSpan2: {
+  orchestratorCardSpan22: {
     display: "flex",
     minWidth: "0",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
   },
   orchestratorCardSpan3: {
     fontSize: "var(--text-base)",
-    lineHeight: "var(--text-base--line-height)",
+    lineHeight: "var(--leading-base)",
     fontWeight: "var(--font-weight-semibold)",
   },
   agentCardDiv: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
-  agentCardSpan: {
+  agentCardSpan2: {
     display: "flex",
-    width: "calc(var(--spacing) * 20)",
-    height: "calc(var(--spacing) * 20)",
+    width: "5rem",
+    height: "5rem",
     flexShrink: "0",
     alignItems: "center",
     justifyContent: "center",
@@ -373,36 +361,36 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-lg)",
     backgroundColor: "var(--color-hover)",
   },
-  agentCardSpan2: {
+  agentCardSpan22: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   agentCardSpan3: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-base)",
-    lineHeight: "var(--text-base--line-height)",
+    lineHeight: "var(--leading-base)",
     fontWeight: "var(--font-weight-semibold)",
   },
   agentCardSpan4: {
     flexShrink: "0",
     borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-hat)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.375rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-bark-900)",
   },
   agentCardSpan5: {
     display: "flex",
     minWidth: "0",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
-    paddingTop: "var(--spacing)",
+    gap: "0.375rem",
+    paddingTop: "0.25rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   agentCardSpan6: {
@@ -413,15 +401,15 @@ const viewStyles = stylex.create({
   agentCardDiv2: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "var(--spacing)",
-    paddingTop: "calc(var(--spacing) * 3)",
+    gap: "0.25rem",
+    paddingTop: "0.75rem",
   },
   agentCardSpan7: {
     borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-hover)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.375rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
   agentCardSpan8: {
     fontWeight: "var(--font-weight-medium)",
@@ -468,43 +456,43 @@ function AgentsPage() {
   const skills = createMemo(() => new Map(ready(allSkills, []).map((s) => [s.id, s.name])));
   const problems = useAgentProblems(agents);
   return (
-    <div {...stylex.attrs(viewStyles.agentsPageDiv)}>
-      <div {...stylex.attrs(viewStyles.agentsPageDiv2)}>
-        <div {...stylex.attrs(viewStyles.agentsPageDiv3)}>
-          <span {...stylex.attrs(viewStyles.agentsPageSpan)}>
-            <A href="/agents/templates" data-testid="open-templates" title={t("web.agent.templates.openLine")} {...stylex.attrs(recipeStyles.agentsPageA)}>
+    <div {...stylex.attrs(styles.agentsPageDiv)}>
+      <div {...stylex.attrs(styles.agentsPageDiv2)}>
+        <div {...stylex.attrs(styles.agentsPageDiv3)}>
+          <span {...stylex.attrs(styles.agentsPageSpan)}>
+            <A href="/agents/templates" data-testid="open-templates" title={t("web.agent.templates.openLine")} {...stylex.attrs(styles.agentsPageA)}>
               <Icon name="folder" size={14} />
               {t("web.agent.templates.open")}
             </A>
-            <A href="/agents/new" data-testid="new-agent" {...stylex.attrs(recipeStyles.agentsPageA2)}>
+            <A href="/agents/new" data-testid="new-agent" {...stylex.attrs(styles.agentsPageA2)}>
               <Icon name="add" size={14} />
               {t("web.agent.list.make")}
             </A>
           </span>
         </div>
-        <h2 {...stylex.attrs(viewStyles.agentsPageH2)}>{t("web.agent.list.orchestrators")}</h2>
-        <div {...stylex.attrs(viewStyles.agentsPageDiv4)}>
+        <h2 {...stylex.attrs(styles.agentsPageH2)}>{t("web.agent.list.orchestrators")}</h2>
+        <div {...stylex.attrs(styles.agentsPageDiv4)}>
           <For each={orchestrators()}>{(a) => <OrchestratorCard agent={a} />}</For>
           <A
             href="/agents/new?role=orchestrator"
             data-testid="new-orchestrator"
             aria-label={t("web.agent.list.makeOrchestrator")}
-            {...stylex.attrs(recipeStyles.agentsPageA3)}
+            {...stylex.attrs(styles.agentsPageA3)}
           >
             <Icon name="add" size={24} />
             {t("web.agent.list.makeOrchestrator")}
           </A>
         </div>
-        <h2 {...stylex.attrs(viewStyles.agentsPageH2)}>{t("web.agent.list.helpers")}</h2>
+        <h2 {...stylex.attrs(styles.agentsPageH2)}>{t("web.agent.list.helpers")}</h2>
         {/* The default orchestrator is always there: once it shows, the profiles are read. */}
         <Show when={orchestrators().length > 0 && agents().length === 0}>
-          <p {...stylex.attrs(viewStyles.agentsPageP)}>
-            <A href="/agents/templates" {...stylex.attrs(recipeStyles.agentsPageA4)}>
+          <p {...stylex.attrs(styles.agentsPageP)}>
+            <A href="/agents/templates" {...stylex.attrs(styles.agentsPageA4)}>
               {t("web.agent.templates.none")}
             </A>
           </p>
         </Show>
-        <div {...stylex.attrs(viewStyles.agentsPageDiv4)}>
+        <div {...stylex.attrs(styles.agentsPageDiv4)}>
           <For each={agents()}>
             {(a) => (
               <AgentCard
@@ -517,7 +505,7 @@ function AgentsPage() {
               />
             )}
           </For>
-          <A href="/agents/new" aria-label={t("web.agent.list.make")} {...stylex.attrs(recipeStyles.agentsPageA5)}>
+          <A href="/agents/new" aria-label={t("web.agent.list.make")} {...stylex.attrs(styles.agentsPageA5)}>
             <Icon name="add" size={24} />
             {t("web.agent.list.make")}
           </A>
@@ -539,12 +527,12 @@ function CardShell(props: { agent: Agent; to: string; label: string; muted?: boo
       <A
         href={props.to}
         aria-label={props.label}
-        {...stylex.attrs(recipeStyles2.cardShellA, !(props.muted !== true) ? recipeStyles2.cardShellAVariant1Case2 : recipeStyles2.cardShellAVariant1Case1)}
+        {...stylex.attrs(styles.cardShellA, !(props.muted !== true) ? styles.cardShellASecondary : styles.cardShellAPrimary)}
       >
         {props.children}
       </A>
       <Show when={props.corner}>
-        <div {...stylex.attrs(viewStyles.cardShellDiv)}>{props.corner}</div>
+        <div {...stylex.attrs(styles.cardShellDiv)}>{props.corner}</div>
       </Show>
     </div>
   );
@@ -554,16 +542,16 @@ function OrchestratorCard(props: { agent: Agent }) {
   const main = () => props.agent.id === defaultOrchestrator;
   return (
     <CardShell agent={props.agent} to={orchestratorHref(props.agent.id)} label={props.agent.name}>
-      <div {...stylex.attrs(viewStyles.orchestratorCardDiv)}>
-        <span {...stylex.attrs(viewStyles.orchestratorCardSpan)}>
+      <div {...stylex.attrs(styles.orchestratorCardDiv2)}>
+        <span {...stylex.attrs(styles.orchestratorCardSpan2)}>
           <OrchestratorFace size={68} agent={props.agent.id} />
         </span>
-        <span {...stylex.attrs(viewStyles.orchestratorCardSpan2)}>
-          <span {...stylex.attrs(viewStyles.orchestratorCardSpan3)}>{props.agent.name}</span>
-          <span {...stylex.attrs(variantStyles2.orchestratorCardSpan)}>{props.agent.duty || t("web.agent.list.orchestratorLine")}</span>
+        <span {...stylex.attrs(styles.orchestratorCardSpan22)}>
+          <span {...stylex.attrs(styles.orchestratorCardSpan3)}>{props.agent.name}</span>
+          <span {...stylex.attrs(styles.orchestratorCardSpan)}>{props.agent.duty || t("web.agent.list.orchestratorLine")}</span>
         </span>
       </div>
-      <div {...stylex.attrs(recipeStyles.orchestratorCardDiv)}>
+      <div {...stylex.attrs(styles.orchestratorCardDiv)}>
         <span>{t("web.agent.tab.memory")}</span>
         <span>{t("web.agent.list.ledger")}</span>
         <Show when={main()}>
@@ -618,43 +606,40 @@ export function AgentCard(props: {
         </button>
       }
     >
-      <div {...stylex.attrs(viewStyles.agentCardDiv)}>
-        <span {...styleProps([viewStyles.agentCardSpan, cardStyles.portrait(hexColor(props.agent.look.hat))])}>
+      <div {...stylex.attrs(styles.agentCardDiv)}>
+        <span {...styleProps([styles.agentCardSpan2, cardStyles.portrait(hexColor(props.agent.look.hat))])}>
           <AgentFace agentId={props.agent.id} runtime={props.agent.runtime} look={props.agent.look} size={68} muted={!props.agent.enabled} />
         </span>
-        <span {...stylex.attrs(viewStyles.orchestratorCardSpan2)}>
-          <span {...stylex.attrs(viewStyles.agentCardSpan2)}>
-            <span {...stylex.attrs(viewStyles.agentCardSpan3)}>{props.agent.name}</span>
+        <span {...stylex.attrs(styles.orchestratorCardSpan22)}>
+          <span {...stylex.attrs(styles.agentCardSpan22)}>
+            <span {...stylex.attrs(styles.agentCardSpan3)}>{props.agent.name}</span>
             <Show when={props.here > 0}>
-              <span {...stylex.attrs(viewStyles.agentCardSpan4)}>{t("web.agent.list.here", { n: props.here })}</span>
+              <span {...stylex.attrs(styles.agentCardSpan4)}>{t("web.agent.list.here", { n: props.here })}</span>
             </Show>
           </span>
-          <span {...stylex.attrs(variantStyles2.orchestratorCardSpan)}>{props.agent.duty}</span>
-          <span {...stylex.attrs(viewStyles.agentCardSpan5)}>
-            <span
-              {...stylex.attrs(variantStyles.agentCardSpan, available() ? variantStyles.agentCardSpanVariant : variantStyles.agentCardSpanVariant2)}
-              aria-hidden="true"
-            />
-            <span {...stylex.attrs(viewStyles.agentCardSpan6)}>
+          <span {...stylex.attrs(styles.orchestratorCardSpan)}>{props.agent.duty}</span>
+          <span {...stylex.attrs(styles.agentCardSpan5)}>
+            <span {...stylex.attrs(styles.agentCardSpan, available() ? styles.agentCardSpanTone : styles.agentCardSpanAlt)} aria-hidden="true" />
+            <span {...stylex.attrs(styles.agentCardSpan6)}>
               {[props.runtime?.preset.label ?? props.agent.runtime, props.agent.model, props.agent.effort].filter(Boolean).join(" · ")}
             </span>
           </span>
         </span>
       </div>
       <Show when={props.agent.skills.length > 0}>
-        <div {...stylex.attrs(viewStyles.agentCardDiv2)}>
-          <For each={props.agent.skills}>{(id) => <span {...stylex.attrs(viewStyles.agentCardSpan7)}>{props.skillName.get(id) ?? id}</span>}</For>
+        <div {...stylex.attrs(styles.agentCardDiv2)}>
+          <For each={props.agent.skills}>{(id) => <span {...stylex.attrs(styles.agentCardSpan7)}>{props.skillName.get(id) ?? id}</span>}</For>
         </div>
       </Show>
-      <div {...stylex.attrs(recipeStyles.orchestratorCardDiv)}>
+      <div {...stylex.attrs(styles.orchestratorCardDiv)}>
         <span title={t("web.agent.list.tallyHint")}>
-          {t("web.agent.list.hired")} <span {...stylex.attrs(viewStyles.agentCardSpan8)}>{Math.round(props.tally?.hired ?? 0)}</span>
+          {t("web.agent.list.hired")} <span {...stylex.attrs(styles.agentCardSpan8)}>{Math.round(props.tally?.hired ?? 0)}</span>
         </span>
         <span>
-          {t("web.agent.list.merged")} <span {...stylex.attrs(viewStyles.agentCardSpan9)}>{Math.round(props.tally?.harvested ?? 0)}</span>
+          {t("web.agent.list.merged")} <span {...stylex.attrs(styles.agentCardSpan9)}>{Math.round(props.tally?.harvested ?? 0)}</span>
         </span>
-        <Show when={props.errors.length > 0} fallback={<span {...stylex.attrs(viewStyles.agentCardSpan10)}>{props.agent.tags.slice(0, 4).join(" · ")}</span>}>
-          <span {...stylex.attrs(viewStyles.agentCardSpan11)} title={props.errors.join("\n")}>
+        <Show when={props.errors.length > 0} fallback={<span {...stylex.attrs(styles.agentCardSpan10)}>{props.agent.tags.slice(0, 4).join(" · ")}</span>}>
+          <span {...stylex.attrs(styles.agentCardSpan11)} title={props.errors.join("\n")}>
             {t("web.agent.cannot")}
             {props.errors[0]}
           </span>

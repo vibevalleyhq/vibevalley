@@ -40,7 +40,7 @@ function place(taken: readonly number[], seed: number): [number, number] {
   for (let c = 0; c < bugSnakeWidth * bugSnakeHeight; c++) if (!taken.includes(c)) free.push(c);
   if (free.length === 0) return [-1, seed];
   const [r, s] = nextRandom(seed);
-  return [free[Math.floor(r * free.length)]!, s];
+  return [free[Math.floor(r * free.length)] ?? -1, s];
 }
 
 export function newBugSnake(seed: number): BugSnake {
@@ -63,7 +63,7 @@ export function crawlBugSnake(g: BugSnake): BugSnake {
   if (g.over !== undefined) return g;
   const heading = g.turns[0] ?? g.heading;
   const turns = g.turns.slice(1);
-  const head = g.body[0]!;
+  const head = g.body[0] ?? 0;
   const [dx, dy] = step[heading];
   const x = (head % bugSnakeWidth) + dx;
   const y = Math.floor(head / bugSnakeWidth) + dy;

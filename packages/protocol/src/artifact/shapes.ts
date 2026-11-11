@@ -309,7 +309,7 @@ export interface BlockDelete {
 /** Reset is sent when the client falls too far behind the batch log. */
 export type ArtifactEvent = ArtifactEventBlocks | { readonly _tag: "Reset" };
 
-export interface ArtifactEventBlocks {
+interface ArtifactEventBlocks {
   readonly _tag: "Blocks";
   readonly seq: number;
   readonly blocks: Block[];

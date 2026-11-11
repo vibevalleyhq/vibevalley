@@ -3,8 +3,8 @@ import { Schema } from "effect";
 import { ArtifactCard, BlockRef, QuotedBlock } from "../artifact/schema";
 import { Attachment } from "../attachment/schema";
 import type { Codec } from "../codec";
-import { ActorKind, MessageId, Outcome, SessionId, Spent } from "../common/schema";
-import * as T from "../shapes";
+import { Actor, MessageId, Outcome, SessionId, Spent } from "../common/schema";
+import * as T from "./shapes";
 
 export const MessageKind: Codec<T.MessageKind> = Schema.Literals(T.MessageKindValues);
 
@@ -18,15 +18,14 @@ export const Embed: Codec<T.Embed> = Schema.Struct({
   image: Schema.String,
 });
 
-export const Reaction: Codec<T.Reaction> = Schema.Struct({ emoji: Schema.String, by: Schema.mutable(Schema.Array(Schema.String)) });
+const Reaction: Codec<T.Reaction> = Schema.Struct({ emoji: Schema.String, by: Schema.mutable(Schema.Array(Schema.String)) });
 
 export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   id: MessageId,
   number: Schema.Finite,
   channel: Schema.String,
   from: Schema.String,
-  fromKind: ActorKind,
-  fromRole: Schema.optionalKey(Schema.Literals(T.AgentRoleValues)),
+  actor: Actor,
   name: Schema.String,
   agent: Schema.optionalKey(Schema.String),
   kind: MessageKind,
@@ -83,7 +82,7 @@ export const Channel: Codec<T.Channel> = Schema.Struct({
   at: Schema.Finite,
 });
 
-export const UserMention: Codec<T.UserMention> = Schema.Struct({
+const UserMention: Codec<T.UserMention> = Schema.Struct({
   message: ChatMessage,
   channel: Schema.String,
   address: Schema.String,

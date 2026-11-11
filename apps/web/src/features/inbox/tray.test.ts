@@ -1,17 +1,18 @@
 import { describe, expect, test } from "vite-plus/test";
 
 import type { SpaceState, InboxItem, Session } from "@vibevalley/protocol";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 import { tabTitle, traySummary, waitingOnUser } from "./tray";
 
 const call = (id: string, kind: InboxItem["kind"], tray?: string): InboxItem => ({
   id,
   kind,
-  from: { kind: "session", id: "w1", name: "小吴", agent: "backend" },
+  from: { kind: "session", id: sessionId("w1"), name: "小吴", agent: "backend" },
   who: "小吴",
   text: "打卡写好了",
   at: 0,
-  target: { kind: "session", id: "w1" },
+  target: { kind: "session", id: sessionId("w1") },
   words: { label: "", title: "", body: "", tray: tray ?? "" },
 });
 

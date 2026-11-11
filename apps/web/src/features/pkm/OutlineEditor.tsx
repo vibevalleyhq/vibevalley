@@ -11,8 +11,8 @@ import { api } from "#/infra/api.ts";
 import { useLatest } from "#/state/atom.ts";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
+import { typeMarks } from "#/ui/markInput.ts";
 import { styleProps } from "#/ui/positioner.ts";
-import { typeMarks } from "#/ui/typedMarks.ts";
 
 import { Body } from "./Body";
 import { dayKey } from "./days";
@@ -40,12 +40,12 @@ const outlineStyles = stylex.create({
     position: "relative",
     display: "flex",
     alignItems: "flex-start",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     borderRadius: "var(--radius-sm)",
     paddingBlock: "1px",
-    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
-    transitionDuration: ".28s",
+    transitionProperty: "color, background-color, border-color",
+    transitionTimingFunction: "var(--ease-out)",
+    transitionDuration: "280ms",
   },
   picked: {
     backgroundColor: "var(--wb-selected)",
@@ -57,9 +57,9 @@ const outlineStyles = stylex.create({
     },
   },
   bullet: {
-    width: "calc(var(--spacing) * 1.5)",
-    height: "calc(var(--spacing) * 1.5)",
-    borderRadius: "2147483647px",
+    width: "0.375rem",
+    height: "0.375rem",
+    borderRadius: "9999px",
     backgroundColor: "var(--wb-muted)",
   },
   foldedBullet: {
@@ -75,10 +75,10 @@ const outlineStyles = stylex.create({
     },
   },
   marker: {
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
     display: "flex",
-    width: "calc(var(--spacing) * 4)",
-    height: "calc(var(--spacing) * 4)",
+    width: "1rem",
+    height: "1rem",
     flexShrink: "0",
     cursor: "pointer",
     alignItems: "center",
@@ -120,28 +120,25 @@ const outlineStyles = stylex.create({
   },
 });
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   rowDiv: {
-    minHeight: "calc(var(--spacing) * 6)",
+    minHeight: "1.5rem",
     cursor: "text",
     borderRadius: "var(--radius-sm)",
-    paddingInline: "var(--spacing)",
+    paddingInline: "0.25rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "calc(var(--spacing) * 6)",
+    lineHeight: "1.5rem",
   },
-  rowDivVariant1Case1: {
+  rowDivPrimary: {
     textDecorationLine: null,
     WebkitTextDecorationColor: null,
     textDecorationColor: null,
   },
-  rowDivVariant1Case2: {
+  rowDivSecondary: {
     textDecorationLine: "line-through",
     WebkitTextDecorationColor: "var(--wb-faint)",
     textDecorationColor: "var(--wb-faint)",
   },
-});
-
-const viewStyles = stylex.create({
   expandedChevron: {
     position: "absolute",
   },
@@ -149,8 +146,8 @@ const viewStyles = stylex.create({
     pointerEvents: "none",
     position: "absolute",
     right: "0",
-    height: "calc(var(--spacing) * .5)",
-    borderRadius: "2147483647px",
+    height: "0.125rem",
+    borderRadius: "9999px",
     backgroundColor: "var(--color-water)",
   },
   dropBefore: {
@@ -168,10 +165,10 @@ const viewStyles = stylex.create({
   },
   pkmBullet: {
     position: "relative",
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
     display: "flex",
-    width: "calc(var(--spacing) * 4)",
-    height: "calc(var(--spacing) * 4)",
+    width: "1rem",
+    height: "1rem",
     flexShrink: "0",
     cursor: {
       default: "pointer",
@@ -200,13 +197,13 @@ const viewStyles = stylex.create({
     color: "var(--color-faint)",
   },
   pkmBubble: {
-    marginTop: "calc(var(--spacing) * .5)",
+    marginTop: "0.125rem",
     display: "inline-flex",
-    height: "calc(var(--spacing) * 5)",
+    height: "1.25rem",
     flexShrink: "0",
     alignItems: "center",
-    gap: "calc(var(--spacing) * .5)",
-    borderRadius: "2147483647px",
+    gap: "0.125rem",
+    borderRadius: "9999px",
     backgroundColor: {
       default: "var(--color-wheat)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-wheat) 20%, transparent)",
@@ -219,9 +216,9 @@ const viewStyles = stylex.create({
         },
       },
     },
-    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.375rem",
     fontSize: "var(--text-2xs)",
-    lineHeight: "var(--text-2xs--line-height)",
+    lineHeight: "var(--leading-2xs)",
     color: "var(--color-warn-ink)",
   },
   editorDiv: {
@@ -229,15 +226,15 @@ const viewStyles = stylex.create({
   },
   pkmEditor: {
     display: "block",
-    minHeight: "calc(var(--spacing) * 6)",
+    minHeight: "1.5rem",
     width: "100%",
     resize: "none",
     overflow: "hidden",
     borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-hover)",
-    paddingInline: "var(--spacing)",
+    paddingInline: "0.25rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "calc(var(--spacing) * 6)",
+    lineHeight: "1.5rem",
     color: "var(--color-ink)",
     outlineStyle: "none",
   },
@@ -246,10 +243,10 @@ const viewStyles = stylex.create({
     top: "100%",
     left: "0",
     zIndex: "20",
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
     display: "flex",
-    maxHeight: "calc(var(--spacing) * 64)",
-    width: "calc(var(--spacing) * 80)",
+    maxHeight: "16rem",
+    width: "20rem",
     maxWidth: "100%",
     flexDirection: "column",
     overflowY: "auto",
@@ -258,19 +255,19 @@ const viewStyles = stylex.create({
     borderWidth: "1px",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-page)",
-    padding: "var(--spacing)",
+    padding: "0.25rem",
     boxShadow: "var(--shadow-float)",
   },
   editorLi: {
     display: "flex",
     cursor: "pointer",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "var(--spacing)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.25rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     backgroundColor: {
       default: null,
       ":is([aria-selected=true])": "var(--color-selected)",
@@ -289,14 +286,14 @@ const viewStyles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   pkmToolbar: {
     position: "sticky",
     bottom: "0",
     zIndex: "10",
-    marginTop: "calc(var(--spacing) * 2)",
+    marginTop: "0.5rem",
     display: {
       default: "flex",
       "@media (width>=48rem)": "none",
@@ -306,12 +303,12 @@ const viewStyles = stylex.create({
     borderTopWidth: "1px",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-page)",
-    paddingBlock: "var(--spacing)",
+    paddingBlock: "0.25rem",
   },
   toolbarButton: {
     display: "flex",
-    width: "calc(var(--spacing) * 9)",
-    height: "calc(var(--spacing) * 9)",
+    width: "2.25rem",
+    height: "2.25rem",
     cursor: "pointer",
     alignItems: "center",
     justifyContent: "center",
@@ -394,13 +391,13 @@ export function Row(props: {
             aria-hidden="true"
             data-testid="pkm-drop"
             data-at={at()}
-            {...stylex.attrs(viewStyles.dropLine, at() === "before" ? viewStyles.dropBefore : viewStyles.dropAfter)}
+            {...stylex.attrs(styles.dropLine, at() === "before" ? styles.dropBefore : styles.dropAfter)}
             style={{ left: `${(props.block.depth + (at() === "inside" ? 2 : 1)) * indentPx}px` }}
           />
         )}
       </Show>
       <For each={Array.from({ length: props.block.depth }, (_, i) => i)}>
-        {(i) => <span aria-hidden="true" {...stylex.attrs(viewStyles.rowSpan)} style={{ left: `${i * indentPx + 9}px` }} />}
+        {(i) => <span aria-hidden="true" {...stylex.attrs(styles.rowSpan)} style={{ left: `${i * indentPx + 9}px` }} />}
       </For>
       <button
         type="button"
@@ -412,11 +409,11 @@ export function Row(props: {
         onDragStart={(e) => props.onDrag(e)}
         onDragEnd={() => props.onDragEnd()}
         onClick={() => props.onToggle()}
-        {...stylex.attrs(viewStyles.pkmBullet)}
+        {...stylex.attrs(styles.pkmBullet)}
       >
         <span {...styleProps([outlineStyles.bullet, props.parent && (props.folded ? outlineStyles.foldedBullet : outlineStyles.expandedBullet)])} />
         <Show when={props.parent && !props.folded}>
-          <Icon name="choose" size={12} styles={viewStyles.expandedChevron} />
+          <Icon name="choose" size={12} styles={styles.expandedChevron} />
         </Show>
       </button>
       <Show when={props.block.marker && markerLook[props.block.marker]}>
@@ -435,7 +432,7 @@ export function Row(props: {
           </button>
         )}
       </Show>
-      <div {...stylex.attrs(viewStyles.rowBody, done() && viewStyles.rowDone)}>
+      <div {...stylex.attrs(styles.rowBody, done() && styles.rowDone)}>
         <Show
           when={props.focus}
           fallback={
@@ -449,9 +446,9 @@ export function Row(props: {
               // A Shift+click picks blocks; it does not select the words between.
               onMouseDown={(e) => e.shiftKey && e.preventDefault()}
               onKeyDown={(e) => e.key === "Enter" && props.onOpen("end", false)}
-              {...stylex.attrs(recipeStyles.rowDiv, done() ? recipeStyles.rowDivVariant1Case2 : recipeStyles.rowDivVariant1Case1)}
+              {...stylex.attrs(styles.rowDiv, done() ? styles.rowDivSecondary : styles.rowDivPrimary)}
             >
-              <Show when={props.block.body} fallback={<span {...stylex.attrs(viewStyles.rowSpan2)}>{"\u00a0"}</span>}>
+              <Show when={props.block.body} fallback={<span {...stylex.attrs(styles.rowSpan2)}>{"\u00a0"}</span>}>
                 <Body text={props.block.body} refs={props.refs} />
               </Show>
             </div>
@@ -465,7 +462,7 @@ export function Row(props: {
           href={`#comment-${props.block.id}`}
           data-testid="pkm-bubble"
           aria-label={t("web.pkm.comments.count", { n: props.comments })}
-          {...stylex.attrs(viewStyles.pkmBubble)}
+          {...stylex.attrs(styles.pkmBubble)}
         >
           <Icon name="thread" size={10} />
           {props.comments}
@@ -667,7 +664,7 @@ export function Editor(props: {
     return () => props.onWriting(undefined);
   });
   return (
-    <div {...stylex.attrs(viewStyles.editorDiv)}>
+    <div {...stylex.attrs(styles.editorDiv)}>
       <textarea
         ref={(t) => (el = t)}
         data-testid="pkm-editor"
@@ -712,10 +709,10 @@ export function Editor(props: {
           e.preventDefault();
           hand(a);
         }}
-        {...stylex.attrs(viewStyles.pkmEditor)}
+        {...stylex.attrs(styles.pkmEditor)}
       />
       <Show when={choices().length > 0}>
-        <ul role="listbox" data-testid="pkm-complete" {...stylex.attrs(viewStyles.pkmComplete)}>
+        <ul role="listbox" data-testid="pkm-complete" {...stylex.attrs(styles.pkmComplete)}>
           <For each={choices()} keyed={(c) => c.key}>
             {(c, i) => (
               <li
@@ -727,10 +724,10 @@ export function Editor(props: {
                   e.preventDefault();
                   c().pick();
                 }}
-                {...stylex.attrs(viewStyles.editorLi)}
+                {...stylex.attrs(styles.editorLi)}
               >
-                <span {...stylex.attrs(viewStyles.editorSpan)}>{c().label}</span>
-                <Show when={c().hint}>{(h) => <span {...stylex.attrs(viewStyles.editorSpan2)}>{h()}</span>}</Show>
+                <span {...stylex.attrs(styles.editorSpan)}>{c().label}</span>
+                <Show when={c().hint}>{(h) => <span {...stylex.attrs(styles.editorSpan2)}>{h()}</span>}</Show>
               </li>
             )}
           </For>
@@ -752,7 +749,7 @@ export function Toolbar(props: { writing: Writing }) {
     { id: "link", icon: "link", label: t("web.pkm.toolbar.link"), run: () => props.writing.insert("[[]]", 2) },
   ];
   return (
-    <div role="toolbar" aria-label={t("web.pkm.toolbar.label")} data-testid="pkm-toolbar" {...stylex.attrs(viewStyles.pkmToolbar)}>
+    <div role="toolbar" aria-label={t("web.pkm.toolbar.label")} data-testid="pkm-toolbar" {...stylex.attrs(styles.pkmToolbar)}>
       <For each={tools}>
         {(tool) => (
           <button
@@ -762,7 +759,7 @@ export function Toolbar(props: { writing: Writing }) {
             // The box keeps the focus, so the keyboard stays up.
             onPointerDown={(e) => e.preventDefault()}
             onClick={() => tool.run()}
-            {...stylex.attrs(viewStyles.toolbarButton)}
+            {...stylex.attrs(styles.toolbarButton)}
           >
             <Icon name={tool.icon} size={16} />
           </button>

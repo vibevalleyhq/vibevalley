@@ -57,8 +57,8 @@ export class Core extends Context.Service<
     readonly setCommits: (commits: T.CommitCount) => Effect.Effect<void>;
     /** The farm opens when the user starts it or says something: the call goes live unless it is already. */
     readonly open: () => Effect.Effect<void>;
-    readonly sessionEvent: (id: string, activity: T.SessionEvent) => Effect.Effect<void>;
-    readonly notice: (level: T.NoticeLevel, text: string) => Effect.Effect<void>;
+    readonly sessionEvent: (id: T.SessionId, activity: T.SessionEvent) => Effect.Effect<void>;
+    readonly notice: (level: Extract<T.LiveEvent, { type: "notice" }>["level"], text: string) => Effect.Effect<void>;
     readonly runtime: (info: T.RuntimeInfo) => Effect.Effect<void>;
     readonly did: (d: UserDid) => Effect.Effect<void>;
     /** The state now, then the transitions from here on. */
@@ -81,16 +81,14 @@ export class Core extends Context.Service<
   );
 }
 
-const liveOf = (e: T.ServerEvent): T.LiveEvent | undefined => {
+const isLive = (e: T.ServerEvent): e is T.LiveEvent => {
   switch (e.type) {
     case "event":
-      return { type: "event", at: e.at, id: e.id, activity: e.activity };
     case "notice":
-      return { type: "notice", at: e.at, level: e.level, text: e.text };
     case "runtime":
-      return { type: "runtime", at: e.at, info: e.info };
+      return true;
     default:
-      return undefined;
+      return false;
   }
 };
 
@@ -213,11 +211,8 @@ const make = Effect.gen(function* () {
       }),
     ),
     subscribe: Effect.map(PubSub.subscribe(events), Stream.fromSubscription),
-    facts: Stream.fromPubSub(events).pipe(Stream.filter(isFact)),
-    live: Stream.fromPubSub(events).pipe(
-      Stream.map(liveOf),
-      Stream.filter((e): e is T.LiveEvent => e !== undefined),
-    ),
+    facts: Stream.unwrap(Effect.map(PubSub.subscribe(events), (sub) => Stream.fromSubscription(sub).pipe(Stream.filter(isFact)))),
+    live: Stream.unwrap(Effect.map(PubSub.subscribe(events), (sub) => Stream.fromSubscription(sub).pipe(Stream.filter(isLive)))),
     user: Effect.map(PubSub.subscribe(user), Stream.fromSubscription),
     states,
   });

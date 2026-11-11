@@ -1,7 +1,7 @@
 # apps/island
 
 The island at the notch: a native macOS helper (Swift, AppKit, SwiftUI) that shows the issues in flight beside the
-camera and opens one on a click. The desktop app starts it and feeds it (`apps/desktop/src/island.ts`); why it is a
+camera and opens one on a click. The desktop app starts it and feeds it (`apps/desktop/src/infra/island.ts`); why it is a
 helper of its own and how it is placed: [the client](docs/subsystems/app.md).
 
 ```
@@ -12,7 +12,7 @@ Sources/VibeValleyIsland/Island.swift the panel, the hover that opens it, the ro
 Tests/IslandCoreTests/              the messages and the placement (Swift Testing)
 ```
 
-The shapes in `Messages.swift` are `Glance` and `IslandRow` in `apps/desktop/src/island.ts`: change both together.
+The shapes in `Messages.swift` are `Glance` and `IslandRow` in `apps/desktop/src/infra/island.ts`: change both together.
 
 ```bash
 vp run --filter @vibevalley/island test           # swift test; macOS only, run on the owner's Mac (CI does not run the island)

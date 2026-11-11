@@ -8,15 +8,14 @@ import { answer, toolCall } from "@vibevalley/ai/testing";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { orchestrator, worker } from "#/base/actor.ts";
-import { Channel } from "#/channel/channel.ts";
-import { Ingress } from "#/ingress/ingress.ts";
-import { Media } from "#/media/media.ts";
-import { Orchestrator } from "#/orchestrator/orchestrator.ts";
-import { Provider } from "#/provider/provider.ts";
+import { Channel } from "#/modules/channel/channel.ts";
+import { Media } from "#/modules/media/media.ts";
+import { Orchestrator } from "#/modules/orchestrator/orchestrator.ts";
+import { Provider } from "#/modules/provider/provider.ts";
+import { Tool } from "#/modules/tool/tool.ts";
 import { testConfig, until, waitFor } from "#/testing/layers.ts";
 import { network } from "#/testing/network.ts";
 import { world } from "#/testing/world.ts";
-import { Tool } from "#/tool/tool.ts";
 
 const dialogue = {
   id: "tool-speakers",
@@ -62,8 +61,8 @@ it.effect("user-directed audio tools create attributed dialogue and a preview wi
   return Effect.gen(function* () {
     yield* configured;
     const media = yield* Media;
-    const ingress = yield* Ingress;
-    yield* ingress.say("Create dialogue and a voice preview", {}, undefined, "");
+    const chat = yield* Channel;
+    yield* chat.say("Create dialogue and a voice preview", {}, undefined, "");
     yield* waitFor(
       media.list(),
       (jobs) => [dialogue.id, design.id].every((id) => jobs.some((job) => job.id === id && job.phase === "ready")),
@@ -74,14 +73,14 @@ it.effect("user-directed audio tools create attributed dialogue and a preview wi
     expect(speech.kind).toBe("speakers");
     expect(preview.kind).toBe("voiceDesign");
     if (speech.kind !== "speakers" || preview.kind !== "voiceDesign") return yield* Effect.die("Expected dialogue and voice design preview");
-    const source = { kind: "orchestrator", agent: defaultOrchestrator, channel: (yield* Channel).defaultChannel() };
+    const source = { kind: "orchestrator", agent: defaultOrchestrator, channel: chat.defaultChannel() };
     expect(speech.source).toEqual(source);
     expect(preview.source).toEqual(source);
     expect(preview.previewInput).not.toBeNull();
     expect(preview.result).toBeNull();
     expect(speech.attachment?.id).toMatch(/^[a-f0-9]{64}$/u);
     yield* until(() => requests.length >= 2, "audio creation acknowledged");
-    yield* ingress.say("Read both audio results", {}, undefined, "");
+    yield* chat.say("Read both audio results", {}, undefined, "");
     yield* until(() => requests.length >= 4, "audio results delivered");
     const results = requests.flatMap((request) => request.messages.filter((message) => message.role === "toolResult").map(messageText)).join("\n");
     expect(results).toContain(speech.attachment?.id);

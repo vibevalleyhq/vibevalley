@@ -5,8 +5,8 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { ArtifactId } from "@vibevalley/protocol/schema";
 
-import { ask, given, optionalText } from "#/farm.ts";
-import { show } from "#/format.ts";
+import { show } from "#/base/format.ts";
+import { ask, given, optionalText } from "#/infra/farm.ts";
 
 const artifactLine = (a: T.Artifact) =>
   [a.id, a.title, a.body, `@${a.byName}`, a.issue === undefined ? "" : `issue ${a.issue}`].filter((x) => x !== "").join("  ");

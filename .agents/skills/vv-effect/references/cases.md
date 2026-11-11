@@ -6,7 +6,7 @@
 
 「在这里」一栏：**已拦**是 `vp check` 或 `vp run effect:check` 会报的；**棘轮**是 `vp run health:verify` 只许减的；**审**是检查看不出来、要读代码的。
 
-目录：[服务和 layer](#服务和-layer) · [函数和追踪](#函数和追踪) · [错误](#错误) · [不信任的数据](#不信任的数据) · [Promise 和回调](#promise-和回调) · [资源和并发](#资源和并发) · [时间、重试、轮询](#时间重试轮询) · [配置和日志](#配置和日志) · [测试](#测试) · [Stream](#stream) · [观测、打断和性能](#观测打断和性能)
+目录：[服务和 layer](#服务和-layer) · [函数和追踪](#函数和追踪) · [错误](#错误) · [不信任的数据](#不信任的数据) · [Promise 和回调](#promise-和回调) · [资源和并发](#资源和并发) · [时间、重试、轮询](#时间重试轮询) · [配置和日志](#配置和日志) · [测试](#测试) · [Stream](#stream) · [观测、打断和性能](#观测打断和性能) · [官方 v4 指南补充](#官方-v4-指南补充)
 
 ## 服务和 layer
 
@@ -922,7 +922,7 @@ return runtime.installation({ env: { [`OAR_${runtime.id.toUpperCase()}_BIN`]: bi
 
 为什么：全局的环境是整个进程共享的，写进去再还原只在同步的那一小段里安全，改了库、加了一个 `await` 就串了；库已经收参数时，参数就是那个更高一层的写法。看着要「设好再还原」的地方，先看库现在给不给参数（这一处是 oar 早先只读环境变量时留下的）。
 
-在这里：`apps/server/src/runtime/runtime.ts` 的 `probeInstallation`；`process.env` 由 Effect 的诊断拦，审。
+在这里：`apps/server/src/modules/runtime/runtime.ts` 的 `probeInstallation`；`process.env` 由 Effect 的诊断拦，审。
 
 ### 41. 手写的单消费者队列
 
@@ -964,4 +964,229 @@ const tell = (t: Told) => Queue.offerUnsafe(told, t);
 
 为什么：数组、「有没有人在消费」的标志、按需 fork、出口处的复位，合起来就是一个队列和一个消费者；`Queue` 和归作用域的一个纤程把它们换成结构，标志就不会忘了复位。`takeAll` 等到至少一个、`clear` 不等，正好是「攒一会儿，一次说完」。
 
-在这里：`apps/server/src/voice/voice.ts` 的通话播报；审。
+在这里：`apps/server/src/gateway/voice/voice.ts` 的通话播报；审。
+
+## 官方 v4 指南补充
+
+这一组来自 [Effect v4 Getting Started](https://effect.website/docs/v4/getting-started) 全分节梳理（[official-guide.md](.agents/skills/vv-effect/references/official-guide.md#2-官网-v4-指南分节总览)），专门收拢编译器不报错、但运行时语义会偏掉的边界。
+
+### 42. 两个带标签的错误用了同一个 `_tag`
+
+不建议：
+
+```ts
+// In module A:
+export class InvalidRequest extends Schema.TaggedError<InvalidRequest, { readonly brand: unique symbol }>()("InvalidRequest", {
+  field: Schema.String,
+}) {}
+// In module B: same tag string, no compiler or runtime warning.
+export class VendorInvalidRequest extends Schema.TaggedError<VendorInvalidRequest, { readonly brand: unique symbol }>()("InvalidRequest", {
+  vendor: Schema.String,
+}) {}
+```
+
+建议：
+
+```ts
+export class VendorInvalidRequest extends Schema.TaggedError<VendorInvalidRequest, { readonly brand: unique symbol }>()("VendorInvalidRequest", {
+  vendor: Schema.String,
+}) {}
+```
+
+为什么：`Effect.catchTag`、`catchTags` 和 TypeScript 联合收窄只比对 `_tag` 字符串；两个错误类撞了同一个 `_tag` 时，编译器与运行时都不会报警，`catchTag("InvalidRequest", …)` 会把两个模块互不相干的错误一并吞掉（[Yieldable Errors](https://effect.website/docs/v4/error-management/yieldable-errors)）。类名和 `_tag` 字符串应保持同名且全仓唯一。
+
+在这里：已拦（`vibevalley/tagged-error-tag` 查类名与字面量 `_tag` 同名，`practice:check` 的 `duplicate-error-tag` 查全仓 `_tag` 唯一）。
+
+### 43. 要一次性报出全部输入问题时用了 `Effect.forEach`
+
+不建议：
+
+```ts
+// Fails on the first bad row: the caller fixes row 1, reruns, and only then sees row 2.
+const parsed = yield* Effect.forEach(rows, validateRow);
+```
+
+建议：
+
+```ts
+const parsed = yield* Effect.validate(rows, validateRow, { concurrency: 4 });
+// Keep both good and bad results instead of failing: const [bad, good] = yield* Effect.partition(rows, validateRow).
+```
+
+为什么：`Effect.all` 和 `Effect.forEach` 默认遇到第一个失败就短路；表单、配置或批量导入需要把每一项的问题一起收集成非空数组返回时，用 `Effect.validate`（只要校验不要返回值时加 `{ discard: true }`；[Error Accumulation](https://effect.website/docs/v4/error-management/error-accumulation)）。
+
+在这里：审。
+
+### 44. 局部多次 `Effect.provide` 同一个 Layer，或在 `ManagedRuntime` 外面才重试
+
+不建议：
+
+```ts
+for (const item of batch) {
+  // Local Effect.provide does not memoize: ClientLive is rebuilt and closed on every item.
+  yield* processItem(item).pipe(Effect.provide(ClientLive));
+}
+```
+
+建议：
+
+```ts
+// Stack once in services.ts, or share one MemoMap across dynamic builds:
+const memoMap = yield* Layer.makeMemoMap;
+const scope = yield* Effect.scope;
+const ctx = yield* Layer.buildWithMemoMap(ClientLive, memoMap, scope);
+yield* Effect.forEach(batch, (item) => Effect.provide(processItem(item), ctx));
+```
+
+为什么：全局依赖图按引用去重，但局部 `Effect.provide(eff, layer)` 每次调用都会重新初始化并释放该 layer（[Layer Memoization](https://effect.website/docs/v4/requirements-management/layer-memoization)）。反过来，`ManagedRuntime` 首次构建 layer 若失败会永久缓存该失败且不再重建，因此外部连接初始化的瞬时 `Effect.retry` 应写在 layer 内部（[Runtime](https://effect.website/docs/v4/runtime)）。
+
+在这里：`multipleEffectProvide` 拦连着 provide，`practice:check` 的 `provide-in-loop` 拦循环里的局部 provide；分支与 `ManagedRuntime` 重试边界审。
+
+### 45. 每次调用都重新跑一遍 `Effect.cached`
+
+不建议：
+
+```ts
+// Effect.cached(loadCatalog) builds a brand-new cache each time getCatalog() is yielded.
+const getCatalog = () => Effect.cached(loadCatalog);
+const catalog = yield* Effect.flatten(getCatalog());
+```
+
+建议：
+
+```ts
+// Inside the service's make: allocate the cached Effect once and reuse it.
+const cachedCatalog = yield* Effect.cached(loadCatalog);
+const catalog = yield* cachedCatalog;
+// With TTL and manual invalidation: const [get, invalidate] = yield* Effect.cachedInvalidateWithTTL(loadCatalog, "5 minutes").
+```
+
+为什么：`Effect.cached` 返回的是「创建一份独立缓存」的 Effect；不在服务构造期 `yield*` 一次存下来，每次调用都在新建空缓存（[Caching Effects](https://effect.website/docs/v4/caching/caching-effects)）。
+
+在这里：已拦（`practice:check` 的 `cached-per-call`）。
+
+### 46. 省略参数的 point-free 调用和 `flow`
+
+不建议：
+
+```ts
+const names = yield* loadUsers.pipe(Effect.map(Array.map(formatName)));
+const parse = flow(trim, decodeUser); // Erases generics on overloaded or optional-param functions.
+```
+
+建议：
+
+```ts
+const users = yield* loadUsers;
+const names = users.map((u) => formatName(u));
+const parse = (raw: string) => decodeUser(trim(raw));
+```
+
+为什么：把带可选参数或函数重载的函数直接塞进 `Effect.map(fn)` 或 `flow` 时，TypeScript 可能擦除泛型、吞掉类型错误或把多余参数传进去，报错堆栈也更难读（[Guidelines](https://effect.website/docs/v4/code-style/guidelines)）。
+
+在这里：`flow` 与单参 `Effect.map(fn)` 已拦（`vibevalley/effect-idioms`）；高阶嵌套审。
+
+### 47. `Match.withReturnType` 放在匹配分支后面
+
+不建议：
+
+```ts
+const label = Match.value(event).pipe(
+  Match.tag("Started", () => "running"),
+  Match.tag("Stopped", () => 0), // Not caught where written when withReturnType is placed after.
+  Match.withReturnType<string>(),
+  Match.exhaustive,
+);
+```
+
+建议：
+
+```ts
+const label = Match.value(event).pipe(
+  Match.withReturnType<string>(), // First step in the pipeline: constrains every branch below.
+  Match.tag("Started", () => "running"),
+  Match.tag("Stopped", () => "idle"),
+  Match.exhaustive,
+);
+```
+
+为什么：`Match.withReturnType<T>()` 只有紧跟 `Match.type` 或 `Match.value` 放在管道第一步时，才能约束后面每一个 `Match.when` / `Match.tag` 分支的返回类型（[Pattern Matching](https://effect.website/docs/v4/code-style/pattern-matching)）。
+
+在这里：已拦（`vibevalley/effect-idioms`）。
+
+### 48. 配置用 `Config.orElse` 当默认值，或用 `Config.Number` 读数字
+
+不建议：
+
+```ts
+// PORT=not-a-port silently falls back to 8787; Number accepts NaN and Infinity.
+const port = Config.Number("PORT").pipe(Config.orElse(() => Config.succeed(8787)));
+```
+
+建议（这里，`apps/server/src/infra/config.ts`）：
+
+```ts
+const port = Config.Port("PORT").pipe(Config.withDefault(8787));
+const ratio = Config.Finite("CNY_PER_USD").pipe(Config.withDefault(7.2));
+// Structured settings across env and YAML: Config.schema(MyStruct, "prefix"), combined via ConfigProvider.orElse.
+```
+
+为什么：`Config.withDefault` 和 `ConfigProvider.orElse` 只在配置缺失时回退，填错格式照常报错；`Config.orElse` 会连校验错误一起吞掉。普通数字用 `Config.Finite`、`Config.Int` 或 `Config.Port`；空字符串有业务含义时给 `fromEnv` / `fromUnknown` 传 `{ preserveEmptyStrings: true }`（[Configuration](https://effect.website/docs/v4/configuration)）。
+
+在这里：`Config.Number` 与 `Config.orElse(() => Config.succeed(…))` 已拦（`vibevalley/effect-idioms`）；空串配置审。
+
+### 49. 内部手拼加 `as` 造品牌值，或在 `decodeTo` 目标侧二次解码
+
+不建议：
+
+```ts
+const limit = 20 as PositiveLimit; // Skips checks and lies to the compiler.
+const UniqueTags = Schema.Array(TagSchema).pipe(
+  Schema.decodeTo(Schema.ReadonlySet(TagSchema), SchemaTransformation.transform({
+    decode: (items) => new Set(items), // TagSchema runs twice on every element.
+    encode: (set) => [...set],
+  })),
+);
+```
+
+建议：
+
+```ts
+const limit = PositiveLimit.make(20); // Or .makeOption / .makeEffect when invalid input is expected.
+const UniqueTags = Schema.Array(TagSchema).pipe(
+  Schema.decodeTo(Schema.toType(Schema.ReadonlySet(TagSchema)), SchemaTransformation.transform({
+    decode: (items) => new Set(items),
+    encode: (set) => [...set],
+  })),
+);
+```
+
+为什么：Schema 自带的 `.make` / `.makeOption` / `.makeEffect`（配 `Schema.withConstructorDefault`）把类型侧约束与品牌构造收在一处（[Default Constructors](https://effect.website/docs/v4/schema/default-constructors)、[类型驱动与进门解码](docs/style/module-design.md#类型驱动与进门解码)）；`Schema.decodeTo` 的源侧已经校验过元素时，目标侧包一层 `Schema.toType` 免掉二次解码（[Schema Transformations](https://effect.website/docs/v4/schema/transformations)）。
+
+在这里：`as` 在棘轮上，集合 `decodeTo` 漏包 `Schema.toType` 与 `Schema.Redacted` 漏配 `disallowJsonEncode: true` 已拦（`vibevalley/effect-idioms`、`scripts/audit/schema-audit.ts`）；其余审。
+
+### 50. 为去重手包 `Data`，或手写多级排序比较器
+
+不建议：
+
+```ts
+users.toSorted((a, b) => {
+  const byRole = a.role.localeCompare(b.role);
+  return byRole !== 0 ? byRole : a.createdAt - b.createdAt;
+});
+```
+
+建议：
+
+```ts
+const byRoleThenCreated = Order.combine(
+  Order.mapInput(Order.String, (u: User) => u.role),
+  Order.mapInput(Order.Number, (u: User) => u.createdAt),
+);
+const sorted = Array.sort(users, byRoleThenCreated);
+// Deduplicating decoded objects: HashSet uses Equal structural equality on plain objects automatically in v4.
+```
+
+为什么：v4 普通对象和经 Schema 解码的对象天然按结构实现 `Equal.equals`，放进 `HashSet` 直接按值去重（[HashSet](https://effect.website/docs/v4/data-types/hash-set)）；`Order.mapInput`、`Order.combine` 与 `Equivalence.mapInput` 把字段提取和比较方向拆成可组合的小块，不易写反正负号（[Order](https://effect.website/docs/v4/behaviour/order)、[Equivalence](https://effect.website/docs/v4/behaviour/equivalence)）。
+
+在这里：审。

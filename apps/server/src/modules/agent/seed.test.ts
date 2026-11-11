@@ -1,0 +1,34 @@
+import { Formatter } from "effect";
+import { describe, expect, it } from "vite-plus/test";
+
+import presetsEn from "#/modules/runtime/presets.en.json";
+import presetsZh from "#/modules/runtime/presets.json";
+
+import seedsEn from "./seeds.en.json";
+import seedsZh from "./seeds.json";
+import catalogEn from "./template_catalog.en.json";
+import catalogZh from "./template_catalog.json";
+
+/** Every leaf but the words: the two languages must agree on ids, numbers, flags, commands and the template holes. */
+function shape(v: unknown): unknown {
+  if (typeof v === "string") return [...v.matchAll(/\{\w+\}|〔/gu)].map((m) => m[0]).join("");
+  if (Array.isArray(v)) return v.map(shape);
+  if (typeof v === "object" && v !== null)
+    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, k === "id" || k === "runtime" || k === "model" ? x : shape(x)]));
+  return v;
+}
+
+describe("the seeds in each language", () => {
+  it("differ only in their words", () => {
+    expect(shape(seedsEn)).toEqual(shape(seedsZh));
+    expect(shape(catalogEn)).toEqual(shape(catalogZh));
+    expect(shape(presetsEn)).toEqual(shape(presetsZh));
+  });
+
+  it("the English ones are English", () => {
+    const han = /\p{Script=Han}/u;
+    expect(Formatter.formatJson(seedsEn)).not.toMatch(han);
+    expect(Formatter.formatJson(catalogEn)).not.toMatch(han);
+    expect(Formatter.formatJson(presetsEn)).not.toMatch(han);
+  });
+});

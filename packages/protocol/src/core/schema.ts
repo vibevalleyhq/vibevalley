@@ -2,6 +2,7 @@ import { Schema } from "effect";
 
 import { Chat, FactChannelChanged, FactChannelRemoved, FactMessageChanged, FactUserMentionsChanged } from "../channel/schema";
 import type { Codec } from "../codec";
+import { SessionId } from "../common/schema";
 import { ConnectorStatus, FactConnectorChanged } from "../connector/schema";
 import { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/schema";
 import { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress, SessionPlay } from "../game/schema";
@@ -20,8 +21,8 @@ import {
   SessionEvent,
   SessionView,
 } from "../session/schema";
-import * as T from "../shapes";
 import { CallState, FactCallChanged } from "../voice/schema";
+import * as T from "./shapes";
 
 const spaceFields = {
   call: CallState,
@@ -35,20 +36,20 @@ const spaceFields = {
   machines: Schema.mutable(Schema.Array(Machine)),
 };
 
-export const SpaceState: Codec<T.SpaceState> = Schema.Struct({
+const SpaceState: Codec<T.SpaceState> = Schema.Struct({
   ...spaceFields,
   sessions: Schema.mutable(Schema.Array(Session)),
   crons: Schema.mutable(Schema.Array(Cron)),
   plays: Schema.optionalKey(Schema.Record(Schema.String, SessionPlay)),
 });
 
-export const SpaceView: Codec<T.SpaceView> = Schema.Struct({
+const SpaceView: Codec<T.SpaceView> = Schema.Struct({
   ...spaceFields,
   sessions: Schema.mutable(Schema.Array(SessionView)),
   crons: Schema.mutable(Schema.Array(CronView)),
 });
 
-export const NoticeLevel: Codec<T.NoticeLevel> = Schema.Literals(T.NoticeLevelValues);
+const NoticeLevel: Codec<T.NoticeLevel> = Schema.Literals(T.NoticeLevelValues);
 
 export const StateFrame: Codec<T.StateFrame> = Schema.Struct({
   seq: Schema.Finite,
@@ -85,31 +86,33 @@ export const Fact: Codec<T.Fact> = Schema.Union([
   FactMediaChanged,
 ]);
 
-export const ServerEventSnapshot: Codec<T.ServerEventSnapshot> = Schema.Struct({
+const ServerEventSnapshot: Codec<T.ServerEventSnapshot> = Schema.Struct({
   type: Schema.Literal("snapshot"),
   at: Schema.Finite,
   state: SpaceState,
 });
 
-export const ServerEventStep: Codec<T.ServerEventStep> = Schema.Struct({
+const LiveEventSession: Codec<T.LiveEventSession> = Schema.Struct({
   type: Schema.Literal("event"),
   at: Schema.Finite,
-  id: Schema.String,
+  id: SessionId,
   activity: SessionEvent,
 });
 
-export const ServerEventNotice: Codec<T.ServerEventNotice> = Schema.Struct({
+const LiveEventNotice: Codec<T.LiveEventNotice> = Schema.Struct({
   type: Schema.Literal("notice"),
   at: Schema.Finite,
   level: NoticeLevel,
   text: Schema.String,
 });
 
-export const ServerEventRuntime: Codec<T.ServerEventRuntime> = Schema.Struct({
+const LiveEventRuntime: Codec<T.LiveEventRuntime> = Schema.Struct({
   type: Schema.Literal("runtime"),
   at: Schema.Finite,
   info: RuntimeInfo,
 });
+
+export const LiveEvent: Codec<T.LiveEvent> = Schema.Union([LiveEventSession, LiveEventNotice, LiveEventRuntime]);
 
 export const ServerEvent: Codec<T.ServerEvent> = Schema.Union([
   FactCallChanged,
@@ -132,29 +135,7 @@ export const ServerEvent: Codec<T.ServerEvent> = Schema.Union([
   FactMachineChanged,
   FactMediaChanged,
   ServerEventSnapshot,
-  ServerEventStep,
-  ServerEventNotice,
-  ServerEventRuntime,
+  LiveEventSession,
+  LiveEventNotice,
+  LiveEventRuntime,
 ]);
-
-export const LiveEventSession: Codec<T.LiveEventSession> = Schema.Struct({
-  type: Schema.Literal("event"),
-  at: Schema.Finite,
-  id: Schema.String,
-  activity: SessionEvent,
-});
-
-export const LiveEventNotice: Codec<T.LiveEventNotice> = Schema.Struct({
-  type: Schema.Literal("notice"),
-  at: Schema.Finite,
-  level: NoticeLevel,
-  text: Schema.String,
-});
-
-export const LiveEventRuntime: Codec<T.LiveEventRuntime> = Schema.Struct({
-  type: Schema.Literal("runtime"),
-  at: Schema.Finite,
-  info: RuntimeInfo,
-});
-
-export const LiveEvent: Codec<T.LiveEvent> = Schema.Union([LiveEventSession, LiveEventNotice, LiveEventRuntime]);

@@ -46,6 +46,14 @@
 
 显式不等于每个函数都收一个 Clock、每个对象都配一个接口。纯日期比较收 `now` 即可；只有跨越真实依赖边界时才需要端口。
 
+### 静态化、类型化与可分析化
+
+当代码主要由 agent 编写与演进时，口头约定与长文档最先失效。设计模块与接口时，应把不变量依次推进三道防线：
+
+- **类型化（让非法状态不可表达）**：用 `Schema`、品牌主键（`Brand`）、受约束标量（`Config.Port`、`Config.Finite`、`.make` 构造器）、判别联合（`_tag`、`kind`）和显式错误通道（`Schema.TaggedError`）把业务前提与输出承诺写进签名。不在模块间传递未区分的裸 `string` 主键，不用多个松散布尔拼状态，也不在成功返回值里夹带 `{ ok: boolean }`。
+- **静态化（让拓扑与归属在构建期确定）**：模块依赖次序（[modules.ts](apps/server/src/modules.ts)）、服务键与追踪标识（字面量 `Context.Service` id、`Effect.fn("服务.方法")`、与类名同名的字面量 `TaggedError` `_tag`）以及生命周期接线（`Layer` 在 `services.ts` 集中叠放、服务方法 `R = never`、`Effect.cached` 在构造期绑定）应保持静态词法结构。不应在运行期拼装标签、写擦除泛型的省略参数调用（`flow`、单参 `Effect.map(fn)`），或在循环体内局部 `Effect.provide` 重建资源。
+- **可分析化（让架构边界可由语法树与契约表对账）**：架构约束应写成单遍语法树或契约元数据即可判定的命题——跨模块服务调用收进 [service-paths.json](scripts/audit/service-paths.json)，根协议导出面收进 [protocol-surface.ratchet.json](scripts/audit/protocol-surface.ratchet.json)，SQL `CHECK` 与协议枚举由 [schema-audit.ts](scripts/audit/schema-audit.ts) 集合对账，跨文件重复 `_tag` 与生命周期误用由 [practice-audit.ts](scripts/audit/practice-audit.ts) 全仓扫描，无需启动运行时或通读上下文即可定位违规。
+
 ### 可控制、可观察、可关闭共同决定可测试性
 
 | 能力 | 含义 | 不意味着什么 |
@@ -93,13 +101,22 @@
 
 三者不必拆成三个服务。只有职责可独立命名且能降低耦合时才提取，保留在原业务模块内；不新建一个收集所有规则的技术层。
 
-以定时任务为例，[到期计算](apps/server/src/cron/when.ts)与[服务执行](apps/server/src/cron/cron.ts)应分别承担日期决定和持久化、投递责任。测试直接调用 tick 能验证一次执行，不能单独证明周期驱动已接好；测试拨钟能验证调度，不能替代事务失败与恢复测试。
+以定时任务为例，[到期计算](apps/server/src/modules/cron/when.ts)与[服务执行](apps/server/src/modules/cron/cron.ts)应分别承担日期决定和持久化、投递责任。测试直接调用 tick 能验证一次执行，不能单独证明周期驱动已接好；测试拨钟能验证调度，不能替代事务失败与恢复测试。
 
 提取纯决定时，应保留「读取、判断、提交」的并发边界。把判断挪到锁外可能引入过期快照；函数变纯不代表整个流程变正确。
 
+### 类型驱动与进门解码
+
+让不变量住进类型，在系统入口一次性完成解析（Parse, don't validate），不在业务内部散落防御性判断或裸字符串约定：
+
+- **进门一次解析，门内靠 `.make` 构造**：HTTP、CLI、工具参数、配置、落盘 JSON 与外部响应在边界经 `Schema`（配合 `Schema.check`、`Schema.decodeTo`、`Schema.fromJsonString`）一步窄化为带约束的领域值（如 [tool/schemas.ts](apps/server/src/modules/tool/schemas.ts) 将状态别名直接解码为 `S.IssueStatus`）；配置读取用 `Config.Port`、`Config.Int`、`Config.Finite` 配只兜底缺失的 `Config.withDefault`，不用放行 `NaN` / `Infinity` 的 `Config.Number` 或吞掉格式错误的 `Config.orElse`（`vibevalley/effect-idioms` 检查）。内部构造品牌或受约束值统一调 Schema 自带的 `.make` / `.makeOption` / `.makeEffect`（配 `Schema.withConstructorDefault`），不写 `as` 断言；`Schema.decodeTo` 源集合已校验元素时目标侧包 `Schema.toType` 免二次解码，含密钥的 `Schema.Redacted` 显式设 `{ disallowJsonEncode: true }` 防序列化外泄（[schema-audit.ts](scripts/audit/schema-audit.ts) 检查）。
+- **全栈共用 `Schema`，边界一律 Fail-Fast**：前后端均直接运行在 `Schema` 契约之上（SSE 流经 [stream.ts](packages/protocol/src/stream.ts) 解码，HTTP 客户端 [client.ts](packages/protocol/src/client.ts) 按 `Endpoint.result` 与 `ApiError` Schema 解码，SQL 查询经 `SqlSchema` 解码，工具与配置经 `Schema` / `Config` 进门窄化）。边界外进来的值直接解码、不符即错（同步边界用 `decodeUnknownSync` / `jsonOf`，Effect 内用 `decodeUnknownEffect`）；不在内部散落防御性守卫或 `Result` 绕行包装。`packages/protocol` 通过 `Codec<T.X>`（[codec.ts](packages/protocol/src/codec.ts)）锁死形状与解码器，其余模块直接用 `typeof X.Type` 派生编译期类型；闭合词集统一导出 `XValues`，不重复内联 `Schema.Literals([...])`。
+- **未解析引用与品牌主键分离**：持久实体主键使用 `Brand` 标称类型（如 `IssueId`、`SessionId`、`ChannelId`、`AgentId`），不应跨概念混传同为 `string` 的 ID。用户、CLI 或模型传入的名称、编号与地址（如 `#41`、频道名、`vv://`）按引用建模，在所属服务的入口（如 `Issue.idOf`、`Channel.placeOf`、`Agent.named`）一次性解析为品牌主键；服务内部与存储层只传递已解析的品牌主键。
+- **存储解码区分「缺省」与「损坏」**：库表 `CHECK` 枚举由 [pg-generate.ts](apps/server/scripts/pg-generate.ts) 生成字面量联合并经 [schema-audit.ts](scripts/audit/schema-audit.ts) 与协议枚举对账。服务端自有表的可空 JSON 列统一用 `storedJsonOrUndefined(Schema, "表.列")`（`null` 归 `undefined`，非空损坏立即抛 `Inconsistent` fail-fast），非空 JSON 列用 `jsonOf(Schema, "表.列")`，不用 `jsonOrNone` 把数据损坏静默吞成缺省；仅外部不可信 CLI / Webhook 载荷才用 `jsonOrNone` 容错。
+
 ### 显式状态
 
-一件事沿一条线走（签了、正在接、通话中；等着、就绪、关了），就用一个联合表示它：每个状态一个标签，只有这个状态才有的东西挂在这个状态上（失败的意图才有 `fault`，通话中的授权才有 agent id），存在一个 `let`、信号或 `Ref` 里。例子：[意图](apps/web/src/state/intent.ts)的 `IntentAt`、[语音](apps/server/src/voice/voice.ts)的 `GrantPhase` 与 `MossPhase`、[记性源](apps/server/src/memory/sources.ts)的 `Held`、帮工招人时的 `reached`（[帮工](apps/server/src/session/session.ts)）。
+一件事沿一条线走（签了、正在接、通话中；等着、就绪、关了），就用一个联合表示它：每个状态一个标签，只有这个状态才有的东西挂在这个状态上（失败的意图才有 `fault`，通话中的授权才有 agent id），存在一个 `let`、信号或 `Ref` 里。例子：[意图](apps/web/src/state/intent.ts)的 `IntentAt`、[语音](apps/server/src/gateway/voice/voice.ts)的 `GrantPhase` 与 `MossPhase`、[记性源](apps/server/src/modules/memory/sources.ts)的 `Held`、帮工招人时的 `startup.phase`（[帮工](apps/server/src/modules/session/session.ts)）。
 
 - **各管各的维度分开放。** 在任一状态下都可能为真的，不并进联合：表单的校验、提交、输入法组字（[表单](apps/web/src/infra/form/form.ts)）；MOSS 回答的音频发完、回答结束和被切断（[MOSS](packages/ai/src/realtime/moss.ts)）。硬并只会得到它们的乘积。
 - **永远同值的删掉副本。** 读源头：通话的「在结束」就是它 `life` 的 abort。
@@ -113,7 +130,7 @@
 ### 错误与回滚契约
 
 - **三层错误各走其道**：外部 I/O 失败在 `Effect.tryPromise({ try, catch })` 边界立即包成带 `cause: Schema.Defect()` 的 `Schema.TaggedError`；业务拒绝用协议 `ApiError`（可恢复时附带 `next: Next[]` 或 `settings: VoiceFix`）；内部数据自相矛盾用 `Inconsistent`（缺陷），绝不伪装成普通拒绝。
-- **内部失败走错误通道，资源回滚走 `Scope`**：服务内部方法遇到拒绝或故障时在 `Effect` 错误通道返回，不把 `{ refused?: string }` 塞进成功返回值，也不用 `let refusal = ""` 加 `Effect.tapError` / `Effect.option` 旁路捕获；多步资源获取用 `Effect.acquireRelease` 绑定作用域，失败或中断时自动逆序释放。
+- **内部失败走错误通道，资源移交走 `Scope.Closeable`**：服务内部方法遇到拒绝或故障时在 `Effect` 错误通道返回（如 `HireRefused`），不把 `{ refused?: string }` 塞进成功返回值，也不用 `let refusal = ""` 加 `Effect.tapError` / `Effect.option` 旁路捕获。多步获取且跨调用存活的资源先建 `Scope.make()`，经 `Scope.extend(Effect.acquireRelease(...))` 逐项挂入；失败或中断时关闭启动作用域逆序回滚，提交后将句柄作用域移交给在场对象。
 - **线上只暴露闭合 `ApiError`，客户端无损转 `UiFault`**：内部细粒度 `TaggedError` 在服务端边界按 `catchTag` 处理或转为 `ApiError`，不泄漏到 HTTP 契约；客户端 `faultOf`（[apps/web/src/infra/api.ts](apps/web/src/infra/api.ts)）将全部 `ApiError`（含 `502`/`503`）归类为明确的业务拒绝并保留 `next`、`settings` 与 `retryable`。
 
 ### 从测试困难诊断设计，避免先补工具
@@ -182,15 +199,15 @@ Clock 的读取不应推进时间；同刻事件的顺序应由业务已有的�
 
 | 要表达或验证的边界 | 已有工具 | 使用限制 |
 |---|---|---|
-| 形状与错误契约 | TypeScript 联合、Schema、带标签错误 | 类型不能独自表达事务、完成与取消语义 |
+| 形状、品牌与进门解码 | TypeScript 联合、`Schema`（`Brand`、`fromJsonString`、`decodeTo`）、`Codec<T.X>`、带标签错误、[schema-audit.ts](scripts/audit/schema-audit.ts) | 类型不能独自表达事务、完成与取消语义；页面主包不直接打包全量接口 `Schema` |
 | 依赖与组合 | Context.Service、Layer；[服务装配](apps/server/src/services.ts) | 在服务捕获依赖前替换；不另建一套测试业务装配 |
 | 业务时间 | Clock、TestClock、[timeHere](apps/server/src/infra/time.ts) | 固定起点先于会捕获或读取时间的构建；不负责外部 I/O 完成 |
 | 任务与资源 | Scope、acquireRelease、FiberSet、FiberMap | 关闭语义由业务定义，工具只实现归属与释放 |
 | 交错控制 | Deferred、[gate](packages/testkit/src/until.ts) | 挡住明确的一步；不靠缩短业务超时制造竞争 |
 | 状态与事件观察 | Stream、[whenState](apps/server/src/testing/layers.ts) | 确认订阅和匹配目标；不假设全系统能被 drain |
 | 真实边界等待 | [waitFor 与 within](packages/testkit/src/until.ts) | 有界等待和防挂死，不替代业务完成契约 |
-| 外部 agent 与模型 | oar 的 scriptedRuntime、[模型替身](packages/ai/src/testing.ts)、[agent 夹具](packages/agent/src/testing.ts) | 控制端口协议，不复制业务；意外调用应失败 |
+| 外部 agent 与模型 | oar 的 scriptedRuntime、[模型替身](packages/ai/src/testing/testing.ts)、[agent 夹具](packages/agent/src/testing/testing.ts) | 控制端口协议，不复制业务；意外调用应失败 |
 | 浏览器时间与交互 | Playwright Clock、组件与页面测试 | 浏览器时间独立于服务端；截图不证明动态行为 |
-| 边界防退化 | [模块检查](apps/server/src/modules.test.ts)、[lint](scripts/oxlint-plugin.ts)、测试与 health 棘轮 | 检查守住已确定的边界，不用指标代替设计判断 |
+| 边界防退化 | `effect:check`（`@effect/tsgo`）、[lint](scripts/audit/oxlint-plugin.ts)、[全仓实践审计](scripts/audit/practice-audit.ts)、[服务路径](scripts/audit/service-paths.ts)与[协议导出面](scripts/audit/protocol-surface.ts)棘轮、[模块检查](apps/server/src/modules.test.ts)与 health 棘轮 | 检查守住已确定的边界，不用行数或覆盖率指标代替设计判断 |
 
 工具使用中的失败也可能是架构反馈：大量 Layer 覆盖可能来自过宽依赖，持续增加 gate 可能来自过度耦合的流程，越来越复杂的观察器可能来自缺失的结果契约。应先回到边界审查，不继续堆工具。

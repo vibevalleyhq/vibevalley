@@ -1,0 +1,44 @@
+import { Effect, Layer } from "effect";
+import { type Headers, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
+import { RpcSerialization, RpcServer } from "effect/rpc";
+
+import { rpcPath, Subscriptions } from "@vibevalley/protocol/rpc";
+import * as S from "@vibevalley/protocol/schema";
+
+import { sameOrigin } from "#/gateway/lan/lan.ts";
+import { Artifact } from "#/modules/artifact/artifact.ts";
+import { Channel } from "#/modules/channel/channel.ts";
+
+const loopback = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/u;
+
+/** A WebSocket is not held back by CORS: any page the user opens could connect, so only the farm's own page may. */
+export const fromTheFarm = (headers: Headers.Headers): boolean => {
+  const host = headers.host ?? "";
+  return loopback.test(host) && sameOrigin(headers);
+};
+
+const handlers = Subscriptions.toLayer(
+  Effect.gen(function* () {
+    const chat = yield* Channel;
+    const artifacts = yield* Artifact;
+    return Subscriptions.of({
+      "channel.follow": ({ id, after }) => chat.follow(id, after),
+      "channel.reports": ({ after }) => chat.reports(after),
+      "artifact.follow": ({ id, after }) => artifacts.follow(S.artifactId(id), after),
+      "artifact.suggestion.follow": ({ id }) => artifacts.suggestionStream(S.artifactId(id)),
+    });
+  }),
+);
+
+export const subscriptions = HttpRouter.use((router) =>
+  Effect.gen(function* () {
+    const upgrade = yield* RpcServer.toHttpEffectWebsocket(Subscriptions);
+    yield* router.add(
+      "GET",
+      rpcPath,
+      Effect.flatMap(HttpServerRequest.HttpServerRequest, (request) =>
+        fromTheFarm(request.headers) ? upgrade : Effect.succeed(HttpServerResponse.text("not the farm's page", { status: 403 })),
+      ),
+    );
+  }),
+).pipe(Layer.provide(handlers), Layer.provide(RpcSerialization.layerJson));

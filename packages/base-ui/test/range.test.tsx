@@ -2,7 +2,7 @@ import { expect, test } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
 
 import { Meter, Progress, Radio, RadioGroup, Separator, Slider } from "../src/index";
-import { snap } from "../src/slider";
+import { snap } from "../src/primitives/slider";
 import { $, expectAccessible, mount, settle } from "./render";
 
 test("a radio group is one tab stop; arrows move and check, wrapping, past disabled radios", async () => {

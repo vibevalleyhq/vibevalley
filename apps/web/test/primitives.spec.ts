@@ -1,5 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 
+import { BizCode } from "@vibevalley/protocol/api";
+
 import { expect, settled, test } from "./fixtures";
 
 test.use({ farm: "owned-primitives", viewport: { width: 390, height: 844 } });
@@ -61,7 +63,11 @@ test("regression: a refused or lost key acknowledgement preserves input without 
   let calls = 0;
   await page.route("**/api/v1/setting/update", async (route) => {
     calls++;
-    await route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ _tag: "Refused", reason: "test refusal" }) });
+    await route.fulfill({
+      status: 409,
+      contentType: "application/json",
+      body: JSON.stringify({ bizCode: BizCode.SettingRefused, message: "test refusal" }),
+    });
   });
   await input.fill("test-key-refused-3333");
   await page.getByTestId("deepseek-form").getByTestId("save").click();

@@ -2,17 +2,20 @@ import { Schema } from "effect";
 
 import { Attachment } from "../attachment/schema";
 import type { Codec } from "../codec";
+import { MessageId, SessionId } from "../common/schema";
+import { MediaAudioKindValues } from "../media/audio-shapes";
 import * as T from "./shapes";
 
-const JobKind = Schema.Literals(["image", "understanding", "speech", "speakers", "voiceDesign", "clone", "transcription"]);
+const MediaJobKindValues = ["image", "understanding", "speech", ...MediaAudioKindValues] as const;
+const JobKind = Schema.Literals(MediaJobKindValues);
 
 export const LibraryOrigin: Codec<T.LibraryOrigin> = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("generated"), job: Schema.String, jobKind: JobKind }),
-  Schema.Struct({ kind: Schema.Literal("uploaded"), channel: Schema.optionalKey(Schema.String), message: Schema.optionalKey(Schema.String) }),
+  Schema.Struct({ kind: Schema.Literal("uploaded"), channel: Schema.optionalKey(Schema.String), message: Schema.optionalKey(MessageId) }),
   Schema.Struct({
     kind: Schema.Literal("fetched"),
     agent: Schema.String,
-    session: Schema.optionalKey(Schema.String),
+    session: Schema.optionalKey(SessionId),
     from: Schema.Union([Schema.Struct({ url: Schema.String }), Schema.Struct({ path: Schema.String })]),
   }),
 ]);

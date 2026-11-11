@@ -11,14 +11,14 @@ import { selfTools } from "@vibevalley/agent/self";
 import type { AssistantMessage, ToolCall } from "@vibevalley/ai/messages";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
-import { Agent } from "#/agent/agent.ts";
 import { orchestrator } from "#/base/actor.ts";
-import { Channel } from "#/channel/channel.ts";
-import { noResult, situationWords } from "#/orchestrator/prompts.ts";
-import { Repo } from "#/repo/repo.ts";
-import { channelLine } from "#/tool/prompts.ts";
-import { type Op, schemas, toolName } from "#/tool/schemas.ts";
-import { Tool as FarmTool } from "#/tool/tool.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { Channel } from "#/modules/channel/channel.ts";
+import { noResult, situationWords } from "#/modules/orchestrator/prompts.ts";
+import { Repo } from "#/modules/repo/repo.ts";
+import { channelLine } from "#/modules/tool/prompts.ts";
+import { type Op, schemas, toolName } from "#/modules/tool/schemas.ts";
+import { Tool as FarmTool } from "#/modules/tool/tool.ts";
 
 import { starter, testConfig } from "./layers.ts";
 import { world } from "./world.ts";
@@ -56,7 +56,7 @@ export const kinds = ["called", "notCalled", "silent", "says", "saysNot", "brief
 /** The orchestrator's tools by name, as its brain has them: the farm's and its own (no skills, subagents or crons). */
 export const orchestratorToolNames = () => [
   ...(Object.keys(schemas) as Op[]).map(toolName),
-  ...selfTools({ home: "", skills: () => Promise.resolve([]), memory: true, now: () => 0 }).map((t) => t.name),
+  ...selfTools({ home: "", skills: () => Effect.succeed([]), memory: true, now: () => 0 }).map((t) => t.name),
 ];
 
 type Checked =
@@ -155,7 +155,7 @@ export function casesIn(dir: string): { file: string; case: EvalCase }[] {
 
 export const isInput = (m: BrainMessage) => m.role === "custom" && (m as { customType?: string }).customType === "orchestratorInput";
 
-export const committed = join(import.meta.dirname, "..", "orchestrator", "testdata", "evals");
+export const committed = join(import.meta.dirname, "..", "modules", "orchestrator", "testdata", "evals");
 
 const encodeArgsKey = Schema.encodeOption(
   Schema.fromJsonString(Schema.Unknown, {

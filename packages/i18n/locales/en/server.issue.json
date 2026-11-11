@@ -39,7 +39,6 @@
   "pickHint": "Once picked: issue edit {n} --agent <profile>, then issue status {n} todo",
   "noAssignee": "No helper has been picked yet",
   "profileGone": "The profile {id} is gone",
-  "sendFailed": "It could not be sent",
   "queued": "{full}: queued, it starts as soon as there is room",
   "queuedStarted": "The queued \"{title}\" has started: {session}",
   "queuedStuck": "The queued \"{title}\" could not start: {why}; it could not go back to To do either, and stays in the queue",

@@ -3,10 +3,10 @@ import { t } from "@vibevalley/i18n";
 export interface Warehouse {
   readonly name: string;
   /** `#` wall, `.` goal, `$` box, `@` the player, space floor; every row the same length. */
-  readonly rows: readonly string[];
+  readonly rows: readonly [string, ...string[]];
 }
 
-export const warehouses: readonly Warehouse[] = [
+export const warehouses: readonly [Warehouse, ...Warehouse[]] = [
   { name: t("web.farm.phone.sokoban.levels.0"), rows: ["######", "#    #", "#@$. #", "#    #", "######"] },
   { name: t("web.farm.phone.sokoban.levels.1"), rows: ["#######", "#     #", "# .$  #", "#  #@ #", "#     #", "#######"] },
   { name: t("web.farm.phone.sokoban.levels.2"), rows: ["#######", "# . . #", "# $ $ #", "#  @  #", "#     #", "#######"] },
@@ -29,7 +29,7 @@ export interface WarehouseGame extends WarehousePosition {
   readonly history: readonly WarehousePosition[];
 }
 
-const cellsOf = (level: number) => warehouses[level]!.rows.join("");
+const cellsOf = (level: number) => (warehouses[level] ?? warehouses[0]).rows.join("");
 
 export function newWarehouse(level = 0): WarehouseGame {
   const chosen = level >= 0 && level < warehouses.length ? level : 0;
@@ -45,8 +45,8 @@ export const warehouseDone = (g: WarehouseGame) => {
 /** `g` itself when nothing moves. */
 export function moveWarehouse(g: WarehouseGame, direction: WarehouseDirection): WarehouseGame {
   if (warehouseDone(g)) return g;
-  const rows = warehouses[g.level]!.rows;
-  const width = rows[0]!.length;
+  const rows = (warehouses[g.level] ?? warehouses[0]).rows;
+  const width = rows[0].length;
   const cells = rows.join("");
   const offset = direction === "left" ? -1 : direction === "right" ? 1 : direction === "up" ? -width : width;
   const step = (from: number): number | undefined => {

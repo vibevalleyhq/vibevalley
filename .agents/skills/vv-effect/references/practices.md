@@ -1,14 +1,14 @@
 # Effect v4 的实践、反模式和 v3 → v4 的陷阱
 
-2026-10-31 的调研（官方文档、Effect-TS 的仓库和 skill、社区的文章和 skill）里，这个仓库用得上的部分。每个 API 名字都对过 effect 4.0.5 的 `node_modules/effect/src`；以后升级 effect，名字以那时的源码为准。入口见 [SKILL.md](.agents/skills/vv-effect/SKILL.md)。成对的代码（不建议和建议）见 [cases.md](.agents/skills/vv-effect/references/cases.md)。
+2026-10-31 与 2026-11-11 的调研（[Effect v4 官方文档](https://effect.website/docs/v4/getting-started)、Effect-TS 的仓库和 skill、社区的文章和 skill）里，这个仓库用得上的部分。每个 API 名字都对过当前安装的 effect 4.1.2；以后升级 effect，名字以那时的源码为准。入口见 [SKILL.md](.agents/skills/vv-effect/SKILL.md)，官方分节总览见 [official-guide.md](.agents/skills/vv-effect/references/official-guide.md)，成对的代码见 [cases.md](.agents/skills/vv-effect/references/cases.md)。
 
 目录：[资料信谁](#资料信谁) · [反模式](#反模式) · [策略](#策略) · [v3--v4](#v3--v4)
 
 ## 资料信谁
 
-- 最可信的是装好的包自带的 `node_modules/effect/AGENTS.md` 和 `ai-docs/src/**`：和版本一致。Effect-TS 官方的 skill 仓库也只是把 agent 指到这份文件（本仓库的 [effect-ts](.agents/skills/effect-ts/SKILL.md) 就是它）。
+- 最可信的是装好的包自带的 `node_modules/effect/AGENTS.md`、`ai-docs/src/**` 和官网 [Effect v4 指南](https://effect.website/docs/v4/getting-started)。Effect-TS 官方的 skill 仓库也只是把 agent 指到包内指南（本仓库的 [effect-ts](.agents/skills/effect-ts/SKILL.md) 就是它）。
 - effect-smol 仓库在 2026 年 7 月归档，v4 在 Effect-TS/effect 的 `main` 上。
-- 社区的 skill 和文章不少还停在 v4 测试版：`ServiceMap.Service`、`ServiceMap.Reference`、`Schema.TaggedErrorClass`、「http 和 sql 在 `effect/unstable/*`」，在 4.0.5 里都不对（4.0.5 是 `Context.*`、`Schema.TaggedError`、`effect/http`、`effect/sql`）。照着装或照着写之前，先在 `node_modules/effect/src` 里搜一遍。
+- 社区的 skill 和文章不少还停在 v4 测试版：`ServiceMap.Service`、`ServiceMap.Reference`、`Schema.TaggedErrorClass`、「http 和 sql 在 `effect/unstable/*`」，在 4.1.2 里都不对（4.1.2 是 `Context.*`、`Schema.TaggedError`、`effect/http`、`effect/sql`）。照着装或照着写之前，先在 `node_modules/effect/src` 里搜一遍。
 
 ## 反模式
 
@@ -35,6 +35,11 @@ agent 写 Effect 时最常见的错，为什么会写出来，和这个仓库里
 | `Layer.mergeAll` 里的 layer 互相依赖 | 以为 merge 会自动接线 | 已拦：`layerMergeAllWithDependencies` |
 | 服务带泛型参数 | 想做「通用仓库」 | 已拦：`genericEffectServices` |
 | Schema 用 v3 写法：`Schema.Literal("a", "b")`、`Schema.Union(A, B)`、`Schema.filter`、`Schema.transform` | 训练数据 | 已拦：类型、`schemaUnionOfLiterals` |
+| 两个 `TaggedError` 类写了同一个 `_tag` 字符串，或类名与 `_tag` 不一致 | 不同模块碰巧起了同名错误 | 已拦：`vibevalley/tagged-error-tag`、`practice:check` 的 `duplicate-error-tag`（[cases.md #42](.agents/skills/vv-effect/references/cases.md#42-两个带标签的错误用了同一个-_tag)） |
+| 要收集全部输入错误时写 `Effect.forEach` / `Effect.all` | 不熟悉 `Effect.validate` | 审：`forEach` 遇错即停，攒齐错误用 `Effect.validate`（[#43](.agents/skills/vv-effect/references/cases.md#43-要一次性报出全部输入问题时用了-effectforeach)） |
+| 循环里局部 `Effect.provide(eff, layer)`；`Effect.cached` 每次调用都重跑 | 以为局部 provide 和 `cached` 会自动全局共享 | 已拦：`practice:check` 的 `provide-in-loop`（[#44](.agents/skills/vv-effect/references/cases.md#44-局部多次-effectprovide-同一个-layer或在-managedruntime-外面才重试)）与 `cached-per-call`（[#45](.agents/skills/vv-effect/references/cases.md#45-每次调用都重新跑一遍-effectcached)）；分支里的局部 provide 审 |
+| 省略参数的 point-free 调用（`Effect.map(fn)`、`flow`）；`Match.withReturnType` 放在分支后 | 函数式缩写习惯 | 已拦：`vibevalley/effect-idioms`（[#46](.agents/skills/vv-effect/references/cases.md#46-省略参数的-point-free-调用和-flow)、[#47](.agents/skills/vv-effect/references/cases.md#47-matchwithreturntype-放在匹配分支后面)） |
+| 配置用 `Config.orElse` 给默认值，或用 `Config.Number` 读数字 | 把 `orElse` 当成 `withDefault` | 已拦：`vibevalley/effect-idioms`（[#48](.agents/skills/vv-effect/references/cases.md#48-配置用-configorelse-当默认值或用-confignumber-读数字)） |
 
 **页面的中间层（`apps/web/src/state/`）**
 
@@ -67,11 +72,11 @@ agent 写 Effect 时最常见的错，为什么会写出来，和这个仓库里
 
 ## v3 → v4
 
-只学过 v3 的 agent 最容易写错的地方。左边的写法在 4.0.5 里大多编不过；编得过的（语义变了的）更要注意。
+只学过 v3 的 agent 最容易写错的地方。左边的写法在 4.1.2 里大多编不过；编得过的（语义变了的）更要注意。
 
 **服务、layer、运行时**
 
-| v3 | v4（4.0.5） |
+| v3 | v4（4.1.2） |
 |---|---|
 | `class X extends Context.Tag("X")<X, S>() {}` | `class X extends Context.Service<X, S>()("X") {}`（id 挪到最后） |
 | `Effect.Service`、`X.Default`、accessors（`X.method(…)`） | 没有了：`Context.Service` 加 `static readonly layer`；用的时候 `yield* X` |

@@ -8,13 +8,13 @@ import { SqlClient } from "effect/sql";
 
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
-import { Agent } from "#/agent/agent.ts";
-import { Ingress } from "#/ingress/ingress.ts";
-import { explicitMandate } from "#/issue/creation.ts";
-import { Issue } from "#/issue/issue.ts";
-import { Repo } from "#/repo/repo.ts";
-import { repository } from "#/repo/repository.ts";
-import { Session } from "#/session/session.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { explicitMandate } from "#/modules/issue/creation.ts";
+import { Issue } from "#/modules/issue/issue.ts";
+import { Mailbox } from "#/modules/mailbox/mailbox.ts";
+import { Repo } from "#/modules/repo/repo.ts";
+import { repository } from "#/modules/repo/repository.ts";
+import { Session } from "#/modules/session/session.ts";
 import { testConfig } from "#/testing/layers.ts";
 
 import { await_, farm, git, lab, until } from "./farm.ts";
@@ -69,7 +69,7 @@ for (const submittedReport of [false, true]) {
     return Effect.gen(function* () {
       const issues = yield* Issue;
       const sessions = yield* Session;
-      const ingress = yield* Ingress;
+      const mailbox = yield* Mailbox;
       const sql = yield* SqlClient.SqlClient;
       yield* (yield* Agent).save(lab());
       git(config.workRoot, "init", "--bare", bare);
@@ -98,14 +98,14 @@ for (const submittedReport of [false, true]) {
       const event = (key: string) => ({
         source: "github" as const,
         key,
-        actor: { kind: "ci" as const, id: "checks" },
+        actor: { kind: "system" as const, id: "checks" },
         addressed: "thread_owner" as const,
         threads: [`issue:${issue.id}`],
         text: key,
         at: 1,
         meta: { kind: "ci" as const, failed: true },
       });
-      const ci = (yield* ingress.accept(event("fix-first-ci")))!;
+      const ci = (yield* mailbox.accept(event("fix-first-ci")))!;
       yield* until(() => inputs.length === 2, "CI automatically woke the helper");
       expect(inputs[1]).toContain("fix-first-ci");
       yield* await_(
@@ -117,7 +117,7 @@ for (const submittedReport of [false, true]) {
       reviewed.resolve();
       yield* until(() => sessions.sessionOf(id)?.phase._tag === "done", "explicit handoff");
       expect((yield* issues.get(issue.id)).stage.state).toBe("reviewing");
-      const held = (yield* ingress.accept(event("after-handoff-ci")))!;
+      const held = (yield* mailbox.accept(event("after-handoff-ci")))!;
       expect((yield* sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${held.id}`)[0]?.state).toBe("held");
       expect(inputs).toHaveLength(2);
     }).pipe(

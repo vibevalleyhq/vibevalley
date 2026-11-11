@@ -9,8 +9,6 @@ export * from "./plain";
 export * from "./omit";
 export * from "./oneOf";
 export * from "./cut";
-export * from "./artifact";
 export * from "./display";
 export * from "./channel";
-export * from "./pkm";
 export * from "./repo";

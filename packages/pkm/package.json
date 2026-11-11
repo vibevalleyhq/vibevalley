@@ -38,6 +38,10 @@
     "./writer": {
       "types": "./dist/writer.d.ts",
       "default": "./src/writer.ts"
+    },
+    "./outline": {
+      "types": "./dist/outline.d.ts",
+      "default": "./src/outline.ts"
     }
   },
   "dependencies": {

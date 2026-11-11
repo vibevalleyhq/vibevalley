@@ -8,10 +8,10 @@ import { storyFrame } from "./story.stylex";
 const viewStyles = stylex.create({
   indented: (marginLeft: number) => ({ marginLeft }),
   pxMarkdownStoriesDiv: {
-    width: "calc(var(--spacing) * 96)",
+    width: "24rem",
   },
   pxMarkdownStoriesDiv2: {
-    width: "calc(var(--spacing) * 64)",
+    width: "16rem",
   },
 });
 

@@ -40,6 +40,15 @@ export interface Validation {
 export const ActorKindValues = ["user", "agent", "system"] as const;
 export type ActorKind = (typeof ActorKindValues)[number];
 
+/** What a profile is: an orchestrator stays and coordinates; a worker is sent on an issue. */
+export const AgentRoleValues = ["orchestrator", "worker"] as const;
+export type AgentRole = (typeof AgentRoleValues)[number];
+
+export type Actor =
+  | { readonly kind: "user"; readonly id: string; readonly name?: string }
+  | { readonly kind: "agent"; readonly id: string; readonly role: AgentRole; readonly name?: string; readonly forUser?: boolean }
+  | { readonly kind: "system"; readonly id: string; readonly name?: string };
+
 export const OutcomeValues = ["completed", "failed", "interrupted"] as const;
 export type Outcome = (typeof OutcomeValues)[number];
 

@@ -7,17 +7,15 @@ import { answer } from "@vibevalley/ai/testing";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { Channel } from "#/channel/channel.ts";
 import { ServerConfig } from "#/infra/config.ts";
-import { Ingress } from "#/ingress/ingress.ts";
-import { Issue } from "#/issue/issue.ts";
-import { Mailbox } from "#/mailbox/mailbox.ts";
-import { ingress as ingressLayer } from "#/services.ts";
-import { Session } from "#/session/session.ts";
+import { Channel } from "#/modules/channel/channel.ts";
+import { Issue } from "#/modules/issue/issue.ts";
+import { Mailbox } from "#/modules/mailbox/mailbox.ts";
+import { Session } from "#/modules/session/session.ts";
 import { waitFor } from "#/testing/layers.ts";
-import { testIssues, worldBelowIngress } from "#/testing/world.ts";
+import { moduleWorld, testIssues } from "#/testing/world.ts";
 
-it.live("regression: an orchestrator assignment survives ingress startup and an acknowledgement retry without creating chat notices", () => {
+it.live("regression: an orchestrator assignment survives startup and an acknowledgement retry without creating chat notices", () => {
   let triggerId = "";
   let issueId = "";
   const prepared = Layer.effectDiscard(
@@ -32,13 +30,12 @@ it.live("regression: an orchestrator assignment survives ingress startup and an 
       triggerId = rows[0]?.id ?? "";
       issueId = item.id;
     }),
-  ).pipe(Layer.provideMerge(worldBelowIngress()));
+  ).pipe(Layer.provideMerge(moduleWorld()));
   return Effect.gen(function* () {
-    const ingress = yield* Ingress;
     const issues = yield* Issue;
     const mailbox = yield* Mailbox;
     const sql = yield* SqlClient.SqlClient;
-    const source = (yield* ingress.read(triggerId))!;
+    const source = (yield* mailbox.readTrigger(triggerId))!;
     expect(source.payload.text).toBe("durable assignment");
     const queued = yield* issues.get(issueId);
     expect(queued.status).toBe("todo");
@@ -91,5 +88,5 @@ it.live("regression: an orchestrator assignment survives ingress startup and an 
       outcome: string;
     }>`select started_at, ended_at, outcome from session_run where issue = ${issueId}`;
     expect(done.lastRun).toEqual({ startedAt: runs[0]!.started_at, endedAt: runs[0]!.ended_at, outcome: runs[0]!.outcome });
-  }).pipe(Effect.scoped, Effect.provide(prepared.pipe(ingressLayer)));
+  }).pipe(Effect.scoped, Effect.provide(prepared));
 });

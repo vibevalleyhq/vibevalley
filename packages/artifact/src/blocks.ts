@@ -1,5 +1,31 @@
 import { type BlockAttrs, type BlockType, BlockTypeValues, type SpanMarks, type TextSpan } from "@vibevalley/protocol";
-import { normalSpans } from "@vibevalley/protocol/rules";
+
+/** The marks as the wire has them: only those set. */
+function marksOf(m: SpanMarks | undefined): SpanMarks {
+  const out: SpanMarks = {};
+  if (m?.bold === true) out.bold = true;
+  if (m?.italic === true) out.italic = true;
+  if (m?.code === true) out.code = true;
+  if (m?.strike === true) out.strike = true;
+  if (m?.link !== undefined) out.link = m.link;
+  return out;
+}
+
+/** Equal for marks that read the same: a mark not set and a mark set false give the same key. */
+export const marksKey = (m: SpanMarks) =>
+  `${Number(m.bold === true)}${Number(m.italic === true)}${Number(m.code === true)}${Number(m.strike === true)}${m.link === undefined ? "" : `|${m.link}`}`;
+
+/** Drops empty spans and joins neighbours with the same marks, so one text has one way to be written. */
+export function normalSpans(spans: Iterable<TextSpan> | undefined): TextSpan[] {
+  const out: TextSpan[] = [];
+  for (const s of spans ?? []) {
+    if (s.t === "") continue;
+    const last = out.at(-1);
+    if (last !== undefined && marksKey(last.marks) === marksKey(s.marks)) out[out.length - 1] = { t: last.t + s.t, marks: last.marks };
+    else out.push({ t: s.t, marks: marksOf(s.marks) });
+  }
+  return out;
+}
 
 /** The server counts offsets in code points; a string's index is in UTF-16 units. */
 export const codePointOffset = (text: string, utf16: number) => [...text.slice(0, Math.min(Math.max(0, utf16), text.length))].length;

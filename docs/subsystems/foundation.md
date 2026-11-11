@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 工作区、依赖 catalog、构建与类型检查 | 各包的对外约定（各包 `README.md`） |
-| 服务端 13 个模块的划分、依赖方向与两阶段启动 | 各模块的业务行为（对应子系统文档） |
+| 服务端 11 个模块的划分、依赖方向与两阶段启动 | 各模块的业务行为（对应子系统文档） |
 | `packages/protocol` 的概念目录、Schema 与客户端生成 | 核心状态折叠与接口路由（[核心状态](docs/subsystems/core.md)） |
 | Postgres 基线表结构、SQL 代码生成、主键与命名规范 | 业务表含义（各子系统）与家目录文件（[架构](docs/architecture.md#存了什么)） |
 | 测试金字塔、虚拟时钟与脚本化帮工 | 页面分层与宿主打包（[客户端](docs/subsystems/app.md)） |
@@ -18,17 +18,18 @@
 | 位置 | 职责 |
 |---|---|
 | `pnpm-workspace.yaml`、`vite.config.ts` | 工作区包列表、依赖版本 catalog、oxfmt 与 oxlint 配置 |
-| `tsconfig.base.json`、`scripts/oxlint-plugin.ts` | TypeScript 严格选项、`@effect/tsgo` 插件与仓库自定义 lint 规则 |
-| `apps/server/src/base/` | 纯工具函数与基础定义（`ids.ts`、`json.ts`、`redact.ts`、`actor.ts`、`clip.ts`、`order.ts`、`errors.ts`、`assets.ts`、`prompts.ts`） |
-| `apps/server/src/infra/` | 系统适配（`config.ts`、`db.ts`、`baseline.ts`、`time.ts`、`log.ts`、`lease.ts`、`files.ts`） |
-| `apps/server/src/modules.ts`、`services.ts` | 13 个模块的归属表与两阶段服务组装 |
+| `scripts/{gen,audit,docs,release}/` | 按生命周期切分的工程脚本：`gen/`（生成物写出）、`audit/`（AST / lint / 类型 / 边界门禁）、`docs/`（笔记、链接、术语与旧名检查）、`release/`（打包与发版验证） |
+| `tsconfig.base.json`、`scripts/audit/effect-check.ts`、`scripts/audit/oxlint-plugin.ts` | TypeScript 严格选项、`@effect/tsgo` 诊断棘轮与仓库自定义 lint 规则 |
+| `scripts/audit/practice-audit.ts`、`service-paths.ts`、`protocol-surface.ts`、`schema-audit.ts` | 全仓语法树实践棘轮、服务调用矩阵与扇入检查、根协议导出面棘轮、SQL 枚举 / 品牌主键 / `Redacted` / `BizCode` 注册表边界审计 |
+| `apps/server/src/{base,infra,core}/` | 服务端纯地基、外部系统适配与核心状态投影底座 |
+| `apps/server/src/modules/<概念>/`、`gateway/`、`modules.ts`、`services.ts` | 22 个纵向领域模块、6 个对外协议与出帧网关、11 层归属表与两阶段服务组装 |
 | `packages/protocol/src/<概念>/` | 按概念划分的 `shapes.ts`、`schema.ts`、`api.ts` |
 | `packages/protocol/src/rules/` | 服务端与页面共用的纯函数规则 |
-| `packages/protocol/src/client.ts` | 由 `scripts/api-client.ts` 生成的 HTTP 客户端 `VibeValleyApi` |
+| `packages/protocol/src/client.ts` | 由 `scripts/gen/api-client.ts` 生成的 HTTP 客户端 `VibeValleyApi` |
 | `apps/server/db/migrations/0001_schema.up.sql` | 唯一的 Postgres 表结构基线 |
 | `apps/server/db/queries/<表>.sql`、`db/generated/` | 按表拆分的 SQL 查询与 `scripts/pg-generate.ts` 生成代码 |
 | `apps/server/src/testing/`、`packages/testkit/` | 测试农场组装、虚拟时钟等待与测试金字塔分级 |
-| `packages/i18n/`、`scripts/i18n.ts` | 中英双语词典 JSON、生成的 `src/catalogs.ts` 与词条检查工具 |
+| `packages/i18n/`、`scripts/gen/i18n.ts` | 中英双语词典 JSON、生成的 `src/catalogs.ts` 与词条检查工具 |
 
 共用原语清单见生成的 [primitives.md](docs/reference/primitives.md)。
 
@@ -37,37 +38,42 @@
 ### 仓库和包
 
 - **单一语言与运行器**：全仓使用 TypeScript，开发与测试用 `vpx` 直接运行源码，桌面版服务端用 `vp pack` 打包为 `dist/main.mjs`。
-- **依赖版本集中**：所有应用（含 `apps/site`）与共享包使用根 workspace 和同一份锁文件。版本集中在 `pnpm-workspace.yaml` 的 catalog 中，各包写 `catalog:` 或具名 catalog，由 `scripts/catalog.test.ts` 检查。Expo 的版本放在 `expo`；不保留应用自己的 workspace 或锁文件。
+- **依赖版本集中**：所有应用（含 `apps/site`）与共享包使用根 workspace 和同一份锁文件。版本集中在 `pnpm-workspace.yaml` 的 catalog 中，各包写 `catalog:` 或具名 catalog，由 `scripts/audit/catalog.test.ts` 检查。Expo 的版本放在 `expo`；不保留应用自己的 workspace 或锁文件。
 - **开启全局虚拟存储**：`enableGlobalVirtualStore` 让新 worktree 直接硬链全局包，几秒内完成安装。
-- **跨包走包名，包内跨目录走 `#/`**：跨包导入必须写 `@vibevalley/*`，`apps/server` 与 `apps/web` 跨目录导入写 `#/` 和 `#db/`（由 `no-cross-package-path` 与 `parent-import` 规则检查）。
-- **包导出分离类型与源码**：`packages/*` 的代码导出将 `types` 指向 `dist/*.d.ts`（`vp run packages:build` 生成，`scripts/built-types.ts` 检查），`default` 指向源码；`.css` 导出直接指向 `src/` 下存在的样式表，不伪造类型声明。
+- **跨包统一的二级目录语法**：超过 8 个生产文件的子包，`src/` 根目录仅放包入口与装配清单（`index.ts`、`main.ts`、`worker.ts`、`App.tsx`、`services.ts`、`modules.ts`），实现统一归入标准二级目录：`base/`（零 I/O 纯函数与数据结构，由 `vibevalley/subpackage-layers` 静态守住纯度）、`infra/`（外部系统与 SDK 适配）、`state/`（客户端状态中间层）、`ui/`（通用组件与样式令牌；跨模块业务展示件放 `ui/domain/`）、纵向能力域目录（`server` 的 `modules/<概念>/` 与 `gateway/`、`web` 的 `features/<概念>/`、`cli` 的 `commands/`、库包的能力子目录）以及 `testing/`。Electron 沙箱桥独立放入 `apps/desktop/src/preload/`，禁止导入主进程或 Node I/O 模块；`≤ 8` 个文件的微型单职责包保持 `src/` 扁平。
+- **跨包走包名，包内跨目录走 `#/`**：跨包导入应写 `@vibevalley/*`，`apps/server`、`apps/web` 与 `apps/cli` 跨目录导入写 `#/` 和 `#db/`（由 `no-cross-package-path` 与 `parent-import` 规则检查）。
+- **包导出分离类型与源码**：`packages/*` 的代码导出将 `types` 指向 `dist/*.d.ts`（`vp run packages:build` 生成，`scripts/audit/built-types.ts` 检查），`default` 指向源码；`.css` 导出直接指向 `src/` 下存在的样式表，不伪造类型声明。
 - **严格可选属性**：开启 `exactOptionalPropertyTypes`，对外对象用 `omitUndefined` 清理未定义键（[代码风格](docs/style/code.md#没有值)）。
 
 ### 模块和服务
 
 架构、边界与测试如何共同设计，见[模块设计](docs/style/module-design.md)；本节记录现行结构与门禁。
 
-- **13 个有序模块单向依赖**：模块顺序定义在 `apps/server/src/modules.ts`。下层不得 import 上层，不得直接读 `core.state()` 中其他模块的数据（`apps/server/src/modules.test.ts` 检查）。
+- **11 个有序模块单向依赖**：模块顺序定义在 `apps/server/src/modules.ts`。下层不得 import 上层，不得直接读 `core.state()` 中其他模块的数据（`apps/server/src/modules.test.ts` 检查）。
 - **门禁共享一次源码分析**：`modules.test.ts` 在第一次检查内读取生产文件并用 `@vibevalley/testkit/source` 的 `analyzeSource` 各解析一次，依赖方向、表所有权与状态读取复用结果；同路径不同源码不共用缓存。读取和解析时间计入测试，提速按完整运行耗时与解析次数验证。
-- **单数概念名，一模块一服务**：目录、表名和服务名均用单数概念词，协议同名类型统一写为 `T.Issue`（由 `singular-service` 与 `protocol-namespace` 规则检查）。
+- **单数概念名，拒绝单调用方顶层服务**：目录、表名和服务名均用单数概念词，协议同名类型统一写为 `T.Issue`（由 `singular-service` 与 `protocol-namespace` 规则检查）；仅有一个模块调用的内部设施留在调用方模块内（由 `scripts/audit/service-paths.ts` 扇入检查守住）。
 - **组装与启动分两阶段**：`services.ts` 先构建全部模块 layer 并完成流订阅，再按顺序执行各模块的 `start`/`ready` layer。HTTP 监听就绪后才将地址注入 `Session` 和 `Lan`。
-- **操作主体 `Actor` 由入口构造**：HTTP 为 `owner`，助手工具为 `agent` 带 `role: "orchestrator"` 与 `forUser`，`/mcp` 为 `agent` 带 `role: "worker"` 与会话 id，定时与巡查为 `system`（`base/actor.ts`）。落库只存 `owner`、`agent`、`system` 三种。
-- **模块之间的路径记成表**：`scripts/service-paths.ts` 按语法树读出哪个模块用了别的模块服务的哪个成员，存在 `scripts/service-paths.json`；`vp run paths:check` 在提交前的钩子里跑，多一条路就失败：要么走已有的门，要么 `vp run paths:write` 写下来并在 PR 里说明；少了的路由 `paths:write` 去掉，不能悄悄回来。一件事一条路：往频道写话只有 `Channel.post`（[频道](docs/subsystems/channel.md#模型和不变量)），到帮工只有 Mailbox。
+- **操作与发言主体统一用协议 `Actor`**：HTTP 与连接器入口构造 `user`（`base/actor.ts`），助手运行构造 `agent`（带 `role: "orchestrator"` 与 `forUser`），`/mcp` 构造 `agent`（带 `role: "worker"` 与会话 id），定时、巡查与 GitHub 轮询构造 `system`。协议消息、服务端 `Trigger` 与信箱共用同一个 `T.Actor`；落库列统一存 `ActorKind`（`user`、`agent`、`system`）与可选 `AgentRole`。
+- **模块之间的路径与服务扇入记成表**：`scripts/audit/service-paths.ts` 按语法树读出哪个模块用了别的模块服务的哪个成员（存在 `scripts/audit/service-paths.json`）并校验顶层服务扇入；`vp run paths:check` 与 `docs:verify` 一并检查，多一条路或新增单调用方顶层服务即失败。一件事一条路：往频道写话只有 `Channel.post`（[频道](docs/subsystems/channel.md#模型和不变量)），到帮工只有 Mailbox。
 - **单实例家目录租约**：`infra/lease.ts` 在 `$VIBEVALLEY_HOME/.vibevalley.lock` 写入进程 pid；若旧进程仍在运行则拒绝启动，已退出则接管。
 
 ### Effect 与错误处理
 
 - **服务方法具名追踪**：写成 `Effect.fn("<服务>.<方法>")`（`vibevalley/service-method-names` 检查）；高频热点用 `Effect.fnUntraced`。一个联合进、按种类分给处理函数的门（`Channel.post`），每个分支返回的处理函数都以这个方法的名字开 span，种类记在 span 的属性上。
-- **Promise 止步于外部库边界**：外部异步调用必须用 `Effect.tryPromise({ try, catch })` 包装并绑定 `AbortSignal`（`vibevalley/promise-boundary` 检查）。出站请求统一走 Effect `HttpClient`。
+- **Promise 止步于外部库边界**：`apps/server/src`、`apps/cli/src` 与 `packages/agent/src` 的外部异步调用均经 `Effect.tryPromise({ try, catch })` 包装并绑定 `AbortSignal`（`vibevalley/promise-boundary` 检查）。出站请求统一走 Effect `HttpClient`。
+- **服务缓存按实例隔离，广播流先订后返**：`Projection.layer` 在构建期创建实例级投影缓存，并发测试农场互不串用；`Core` 的事件流经 `PubSub.subscribe` 先完成订阅再返回 `Stream`。
+- **网关幂等与读接口错误边界**：`http/api.ts` 用 `Cache.makeWith` 加 `Effect.uninterruptible` 去重带 `X-Idempotency-Key` 的写请求，首请求断连不中断已开始的写操作；附件与 Artifact 路由只将缺文件（`NotFound`）或 `ApiError`（`status === 404`）转为 `404`，其余故障记日志回 `500`。
 - **时间与定时归属作用域**：
-  - 禁止在 `apps/server/src` 直接调 `Date.now()` 或 `setTimeout`（`vibevalley/no-wall-clock` 检查）。
-  - 延迟任务放入服务作用域的 `FiberMap`，周期任务用 `Schedule.spaced`；仅外部进程超时用 `infra/time.ts` 的 `afterRealTime`、`withinRealTime`、`wallTime`。
-- **错误使用 `Schema.TaggedError`**：包装外部异常时保留 `cause: Schema.Defect()`。禁止对 TaggedError 用 `instanceof`（`vibevalley/no-instanceof-tagged` 检查），统一用 `catchTag` 或 `Predicate.isTagged`。
+  - 禁止在 `apps/server/src` 与 `packages/agent/src` 直接调 `Date.now()` 或 `setTimeout`（`vibevalley/no-wall-clock` 检查）。
+  - 延迟任务放入服务作用域的 `FiberMap`，周期任务用 `Schedule.spaced`；仅外部进程超时用 `infra/time.ts` 或 `packages/agent/src/infra/realTime.ts`。
+- **错误使用 `Schema.TaggedError` 并直接 `yield*`**：包装外部异常时保留 `cause: Schema.Defect()`；每个错误类的字面量 `_tag` 与类名保持同名且全仓唯一（`vibevalley/tagged-error-tag` 与 `practice:check` 的 `duplicate-error-tag` 检查）。HTTP 业务拒绝与未找到统一使用单一可 yield 的 `ApiError`（由 `base/errors.ts` 的 `bizError`、`refuseIn(BizCode.<模块>Refused)` 与 `missing` 构造），在 `Effect.gen` 内直接写 `yield* refused(...)` / `yield* missing(...)`，不套 `Effect.fail(...)`，也不定义仅透传的模块级 `*Refused` 包装类。不应在带标签错误上用 `instanceof`（`vibevalley/no-instanceof-tagged` 检查），统一用 `catchTag` 或 `Predicate.isTagged`。
+- **静态可分析的 Effect 惯用法与不稳定子路径门面**：`vibevalley/effect-idioms` 拦截擦除泛型的 `flow` 与单参 `Effect.map(fn)`、放在分支后的 `Match.withReturnType`、放行 `NaN`/`Infinity` 的 `Config.Number`、吞掉格式错误的 `Config.orElse(() => Config.succeed(…))` 以及未包 `Schema.toType` 的集合 `decodeTo` 二次解码；`vibevalley/unstable-effect-door` 与 `vibevalley/atom-door` 将 `effect/unstable/*`、`effect/experimental/*`、`effect/rpc`、`effect/observability`、`effect/cli` 与 `effect/reactivity` 限制在指定门面目录内；`practice:check` 拦截循环内局部重建 layer 的 `provide-in-loop` 与每次调用重建缓存的 `cached-per-call`。
+- **数据库门面统一计量**：`Db.inTx` 与 `Db.attemptTx` 均要求内部每条 SQL 经 `db.run` 或 `db.attempt` 执行，逐条计入 `dbQueries` 指标与慢查询日志。
 - **文件原子写入**：`infra/files.ts` 的 `keptFile` 先写临时文件再原子改名，作用域关闭时自动 flush。
 
 ### 契约、规则和数据库
 
-- **按概念组织契约**：`packages/protocol/src/<概念>/` 包含 `shapes.ts`、`schema.ts`（`Codec<T.X>`）和 `api.ts`，由 `schema.test.ts` 校验字段一致。
+- **按概念组织契约，根桶只导出跨端契约**：`packages/protocol/src/<概念>/` 包含 `shapes.ts`、`schema.ts`（`Codec<T.X>`）和 `api.ts`，由 `schema.test.ts` 校验字段一致。根入口 `packages/protocol/src/{shapes,schema}.ts` 禁止 `export *`，仅显式重导出跨端真实引用的根契约与枚举；单点子字段用根契约索引类型（如 `T.AgentProblem["level"]`）表达，服务端私有持久化形状留在 `apps/server/src/` 内，由 `scripts/audit/protocol-surface.ts`（`docs:verify`）棘轮守住导出上限。
 - **生成文件不手改**：`db/generated/`、`packages/protocol/src/client.ts`、[capabilities.md](docs/reference/capabilities.md) 和 [primitives.md](docs/reference/primitives.md) 由脚本生成并由 `docs:verify` 校验。
 - **一种 SQL，两种驱动，单连接**：`infra/db.ts` 在配了 `database.url` 时连那个 Postgres（`@effect/sql-pg`），否则在 `db` 目录里跑 PGlite（`@effect/sql-pglite`，同一种方言，跑在进程里；`memory` 时从每个进程建一次的带表结构的模板拷一份，约 0.1 秒）。两种都只开一条连接：服务按一次一写写成。时间存毫秒 `double precision`，没有 `bigint` 列（Postgres 的驱动把它当字符串交回来），布尔是 `boolean`，枚举存 `text check (列 in (...))`，JSON 存成文本、查询里 `::jsonb` 了再看里面，新建行主键用 `base/ids.ts` 的 UUIDv7（`newId()`）。全文搜索经表结构里的 `term_vector`、`term_query` 两个函数和 GIN 索引：词由 `gse` 切好、只按空格分，词原样保留。
 - **SQL 按表隔离**：`db/queries/<表>.sql` 只写所属表，跨模块只读查询受 `modules.test.ts` 的 `foreignReads` 约束。服务通过 `Db` 服务调用生成函数（`vibevalley/db-door` 检查）。
@@ -75,11 +81,11 @@
 
 ### 边界审计
 
-- **传输层解析，契约层验证**：`JSON.parse` 可以把报文读成 `unknown`，再交给契约解码器；验证后的值才进入业务层。桥接的 socket 只拆包，`packages/bridge/src/index.ts` 验证调用入参、返回值与推送载荷，不在两层重复验证同一契约。
+- **传输层解析，契约层直接 Fail-Fast 验证**：`JSON.parse` 把报文读成 `unknown` 后立即交给契约 `Schema` 解码；验证通过的值才进入业务层（HTTP 服务端经 `wireJson` 编码全信封，生成的 `VibeValleyApi` 客户端经 `apiSuccessEnvelope`、`ApiVoidEnvelope` 与 `ApiErrorEnvelope` 解码，SSE 经 `stream.ts`，服务端自有表可空 JSON 列经 `storedJsonOrUndefined(schema, "table.column")` 区分 `null` 空值与损坏数据）。桥接的 socket 只拆包，`packages/bridge/src/index.ts` 验证调用入参、返回值与推送载荷，不在两层重复验证同一契约。
 - **按值对象复用 Schema**：数据库 JSON 列与线上字段代表同一个值对象时可共用 Schema；两者模型不同时才分开定义。是否直接调用解码器、是否先保存为变量，不改变这项判断。
-- **文本扫描只提供审计提示**：`vpx scripts/schema-audit.ts` 的 `[review]` 提示依赖命名和源码写法，不证明存在缺陷，也不证明验证覆盖完整。可选值、裸字符串、枚举转换与重复形状需要沿调用链判断，不设零命中门槛，不按文件名豁免 JSON 解析提示。
-- **已映射的 SQL 枚举有硬检查**：脚本的 `storedEnums` 指定「表.列 ↔ 协议枚举」，直接读取该协议枚举，按集合比较 SQL 的字面量 `IN CHECK`。丢失表、列或约束，以及成员增删，均产生 `[error]` 并使检查失败；取值顺序不影响结果。它不读取 SQL 生成物，也不用其他枚举的相同取值代替。存储专用枚举不必进入协议，新增共享枚举应补映射。
-- **检查自身有正反例**：`scripts/schema-audit.test.ts` 测最小源码和 SQL 样例，包括换行、提取解码器、注释、缺失约束与错误归属；仓库检查只阻断已确认的契约不一致。错误给出列、协议枚举、`Fix:` 与本节链接，审计提示给出 `Review:`。
+- **文本扫描只提供审计提示**：`vpx scripts/audit/schema-audit.ts` 的 `[review]` 提示依赖命名和源码写法，不证明存在缺陷，也不证明验证覆盖完整。可选值、枚举转换与重复形状需要沿调用链判断，不设零命中门槛，不按文件名豁免 JSON 解析提示。
+- **已映射的 SQL 枚举、协议品牌主键、`Schema.Redacted` 与 `BizCode` 注册表有硬检查**：脚本的 `storedEnums` 指定「表.列 ↔ 协议枚举」，直接读取该协议枚举，按集合比较 SQL 的字面量 `IN CHECK`；丢失表、列或约束以及成员增删均产生 `db-enum-mismatch` `[error]`（取值顺序不影响结果，不读 SQL 生成物，存储专用枚举不必进协议，新增共享枚举应补映射）。协议非 `*Request` / `*Input` 形状（含 `interface` 与联合 `type`）中若将已品牌化的核心实体主键退化为裸 `string` 均产生 `unbranded-id` `[error]`；凡未显式声明 `{ disallowJsonEncode: true }` 的 `Schema.Redacted(...)` 均产生 `redacted-json-exposure` `[error]`，阻断密钥经 JSON 编码外泄；`endpoint.ts` 中的 `BizCode` 若出现非六位编码、重复数值或与 `BizErrorCodeValues`、`bizCodeMeta` 成员失配，均产生 `bizcode-registry` `[error]`。
+- **检查自身有正反例**：`scripts/audit/schema-audit.test.ts` 测最小源码和 SQL 样例，包括换行、提取解码器、注释、缺失约束与错误归属；仓库检查只阻断已确认的契约不一致。错误给出列、协议枚举、`Fix:` 与本节链接，审计提示给出 `Review:`。
 
 ### 测试金字塔
 
@@ -121,7 +127,7 @@
 **新增或修改协议接口**
 
 1. 修改 `packages/protocol/src/<概念>/` 下的 `shapes.ts`、`schema.ts` 和 `api.ts`。
-2. 在 `apps/server/src/http/handlers/<概念>.ts` 实现接口。
+2. 在 `apps/server/src/gateway/http/handlers/<概念>.ts` 实现接口。
 3. 运行 `vp run api:client` 和 `vp run capabilities` 更新生成的客户端与能力表。
 
 **修改纯函数规则**
@@ -137,15 +143,15 @@
 
 ## 为什么这样
 
-- **按限界上下文切成 13 个单向模块**：消除平铺服务的隐式启动耦合与跨模块状态直读，用 `modules.test.ts` 守住边界；放弃平铺加 lint 或粗粒度并成 5 个大模块。
+- **按限界上下文切成 11 个单向模块**：消除平铺服务的隐式启动耦合与跨模块状态直读，用 `modules.test.ts` 守住边界；放弃平铺加 lint 或粗粒度并成 5 个大模块。
 - **契约按概念分目录，不拆多包**：消除单大文件合并冲突，同时避免拆成十几个子包的构建开销。
 - **Postgres，不再是 `node:sqlite`**：一个服务端要管多台机器（[一个服务端管多台机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)），库要能放在服务器上、被多台机器的活同时写；只在一台电脑上用时仍开箱即用，靠同一种方言的 PGlite。生成器 `scripts/pg-generate.ts` 让 Postgres 自己说每个参数和结果列的类型（Parse、Describe），不再从文本里猜。代价：PGlite 是数十 MB 的 WASM，新起一个要近一秒（测试从模板拷贝，约 0.1 秒），也比 `node:sqlite` 吃 CPU，服务端测试只开一半的核。
 - **单一表结构基线，内部不留兼容**：启动时按 `db.schema` 哈希自动归档旧库并重建，省去演进期的多步迁移负担。
 - **规则用手写的例子测，不录黄金数据**：录下的 `*.jsonl.gz` 有几十 MB，改了只看得到二进制，规则一改就整份重写，说不出哪里变对了、哪里变错了；拿不出它抓到过真问题的证据，就去掉了。
-- **话进 JSON 词典并生成类型，提示词保持中文**：由 `scripts/i18n.ts` 统一查漏翻与死键；提示词不翻，避免双份提示调优与评测漂移。
+- **话进 JSON 词典并生成类型，提示词保持中文**：由 `scripts/gen/i18n.ts` 统一查漏翻与死键；提示词不翻，避免双份提示调优与评测漂移。
 
 ## 怎么验证
 
-- `vp check`、`vp run effect:check`：检查格式、lint、类型与 Effect 诊断。
-- `vp test run apps/server/src/modules.test.ts apps/server/src/infra/schema.test.ts packages/protocol/src/schema.test.ts`：验证模块边界、表结构与 Schema 一致性。
-- `vp run docs:verify`：验证生成物、词典、旧名字与文档链接。
+- `vp check`、`vp run effect:check`、`vp run practice:check`、`vp run paths:check`：检查格式、带类型的 lint、Effect 诊断、全仓语法树实践棘轮与服务调用路径。
+- `vpx scripts/audit/schema-audit.ts`、`vp test run apps/server/src/modules.test.ts apps/server/src/infra/schema.test.ts packages/protocol/src/schema.test.ts`：验证模块边界、表结构、SQL 枚举与 `Redacted` 契约一致性。
+- `vp run docs:verify`：验证生成物、协议导出面、服务路径、词典、旧名字与文档链接。

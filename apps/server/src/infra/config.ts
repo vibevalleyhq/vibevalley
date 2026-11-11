@@ -89,8 +89,15 @@ export class ConfigError extends Schema.TaggedError<ConfigError, { readonly bran
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
 
+const PortNumber = Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 65535 }));
+const PositiveFinite = Schema.Finite.check(Schema.isGreaterThan(0));
+const isPortNumber = Schema.is(PortNumber);
+const isPositiveFinite = Schema.is(PositiveFinite);
+
+const expandHome = (path: string) => (path.startsWith("~/") ? join(homedir(), path.slice(2)) : path);
 const port = (name: string, value: number) => Keys.Int(name).pipe(Keys.withDefault(value));
 const text = (name: string, value: string) => Keys.String(name).pipe(Keys.withDefault(value));
+const pathText = (name: string, value: string) => text(name, value).pipe(Keys.map(expandHome));
 /** A key: redacted from the moment it is read; empty when not given. */
 const secret = (name: string, value: Redacted.Redacted) => Keys.Redacted(name).pipe(Keys.withDefault(value));
 const number = (name: string, value: number) => Keys.Finite(name).pipe(Keys.withDefault(value));
@@ -104,11 +111,11 @@ const list = (name: string) =>
 /** Every key but home and version, by its snake_case name, with its default (d). */
 const keys = (d: ServerConfig["Service"]) =>
   Keys.all({
-    workRoot: text("work_root", d.workRoot),
-    db: text("db", d.db),
+    workRoot: pathText("work_root", d.workRoot),
+    db: pathText("db", d.db),
     database: Keys.nested(Keys.all({ url: secret("url", d.database.url) }), "database"),
     port: port("port", d.port),
-    web: text("web", d.web),
+    web: pathText("web", d.web),
     agent: Keys.nested(Keys.all({ model: text("model", d.agent.model), starters: list("starters") }), "agent"),
     deepseek: Keys.nested(Keys.all({ apiKey: secret("api_key", d.deepseek.apiKey) }), "deepseek"),
     agora: Keys.nested(Keys.all({ appId: text("app_id", d.agora.appId), appCertificate: secret("app_certificate", d.agora.appCertificate) }), "agora"),
@@ -121,7 +128,7 @@ const keys = (d: ServerConfig["Service"]) =>
     ),
     lan: Keys.nested(Keys.all({ port: port("port", d.lan.port) }), "lan"),
     gitEmails: list("git_emails"),
-    tokei: text("tokei", d.tokei),
+    tokei: pathText("tokei", d.tokei),
     cnyPerUsd: number("cny_per_usd", d.cnyPerUsd),
     patrol: Keys.nested(Keys.all({ heartbeatMinutes: number("heartbeat_minutes", d.patrol.heartbeatMinutes) }), "patrol"),
     cron: Keys.nested(Keys.all({ tickMs: number("tick_ms", d.cron.tickMs) }), "cron"),
@@ -142,10 +149,8 @@ const keys = (d: ServerConfig["Service"]) =>
       "chat",
     ),
     otlp: Keys.nested(Keys.all({ url: text("url", d.otlp.url) }), "otlp"),
-    pkm: Keys.nested(Keys.all({ root: text("root", d.pkm.root) }), "pkm"),
+    pkm: Keys.nested(Keys.all({ root: pathText("root", d.pkm.root) }), "pkm"),
   });
-
-const expandHome = (path: string) => (path.startsWith("~/") ? join(homedir(), path.slice(2)) : path);
 
 /** The YAML file: a record of keys, or nothing when it is optional and not there. */
 const readFile = Effect.fnUntraced(function* (path: string, optional: boolean) {
@@ -185,18 +190,10 @@ export const loadConfig = Effect.fnUntraced(function* (
     ["voice.line.port", read.voice.line.port],
     ["lan.port", read.lan.port],
   ] as const) {
-    if (n < 0 || n > 65535) return yield* ConfigError.make({ message: t("server.base.notPort", { path, name, port: n }) });
+    if (!isPortNumber(n)) return yield* ConfigError.make({ message: t("server.base.notPort", { path, name, port: n }) });
   }
-  if (read.github.prPollSeconds <= 0) return yield* ConfigError.make({ message: t("server.base.prPoll") });
-  const c: ServerConfig["Service"] = { ...base, ...read, home };
-  return {
-    ...c,
-    workRoot: expandHome(c.workRoot),
-    tokei: expandHome(c.tokei),
-    web: expandHome(c.web),
-    db: expandHome(c.db),
-    pkm: { root: expandHome(c.pkm.root) },
-  };
+  if (!isPositiveFinite(read.github.prPollSeconds)) return yield* ConfigError.make({ message: t("server.base.prPoll") });
+  return { ...base, ...read, home };
 });
 
 export const pkmDir = (c: ServerConfig["Service"]) => c.pkm.root || join(c.workRoot, "pkm");

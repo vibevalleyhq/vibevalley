@@ -38,6 +38,10 @@ describe("the test pyramid", () => {
   });
 
   it("follows imports into the workspace's packages", () => {
-    expect(reach("src/runtime/vibevalley.ts")).toEqual(["src/runtime/vibevalley.ts", "../../packages/agent/src/coding.ts", "node:child_process"]);
+    expect(reach("src/modules/runtime/vibevalley.ts")).toEqual([
+      "src/modules/runtime/vibevalley.ts",
+      "../../packages/agent/src/tools/coding.ts",
+      "node:child_process",
+    ]);
   });
 });

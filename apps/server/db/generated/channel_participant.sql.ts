@@ -4,11 +4,12 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
-import { Words_channel_participant_kind } from "./types.js"
+import { Words_channel_participant_kind, Words_channel_participant_role } from "./types.js"
 
 export const UpsertParticipantParams = Schema.Struct({
   ["id"]: Schema.String,
   ["kind"]: Words_channel_participant_kind,
+  ["role"]: Schema.NullOr(Words_channel_participant_role),
   ["name"]: Schema.String,
   ["agent_id"]: Schema.NullOr(Schema.String),
   ["runtime"]: Schema.NullOr(Schema.String),
@@ -17,13 +18,13 @@ export const UpsertParticipantParams = Schema.Struct({
 export type UpsertParticipantParams = typeof UpsertParticipantParams.Type
 
 
-export const UpsertParticipantSql = "-- name: UpsertParticipant :exec\ninsert into channel_participant (id, kind, name, agent_id, runtime, joined_at)\nvalues ($1, $2, $3, $4, $5, $6)\non conflict (id) do update set name = excluded.name, agent_id = excluded.agent_id, runtime = excluded.runtime, left_at = null;"
+export const UpsertParticipantSql = "-- name: UpsertParticipant :exec\ninsert into channel_participant (id, kind, role, name, agent_id, runtime, joined_at)\nvalues ($1, $2, $3, $4, $5, $6, $7)\non conflict (id) do update set role = excluded.role, name = excluded.name, agent_id = excluded.agent_id, runtime = excluded.runtime, left_at = null;"
 
 export const upsertParticipant = Effect.fn("UpsertParticipant")(function* (params: UpsertParticipantParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: UpsertParticipantParams,
-    execute: (p) => sql.unsafe(UpsertParticipantSql, [p["id"], p["kind"], p["name"], p["agent_id"], p["runtime"], p["joined_at"]]),
+    execute: (p) => sql.unsafe(UpsertParticipantSql, [p["id"], p["kind"], p["role"], p["name"], p["agent_id"], p["runtime"], p["joined_at"]]),
   })(params)
 })
 
@@ -53,6 +54,7 @@ export type ParticipantsParams = typeof ParticipantsParams.Type
 export const ParticipantsResult = Schema.Struct({
   ["id"]: Schema.String,
   ["kind"]: Words_channel_participant_kind,
+  ["role"]: Schema.NullOr(Words_channel_participant_role),
   ["name"]: Schema.String,
   ["agent_id"]: Schema.NullOr(Schema.String),
   ["runtime"]: Schema.NullOr(Schema.String),
@@ -62,7 +64,7 @@ export const ParticipantsResult = Schema.Struct({
 export type ParticipantsResult = typeof ParticipantsResult.Type
 
 
-export const ParticipantsSql = "-- name: Participants :many\n-- bound: a row per participant: the user, the orchestrators, profiles and the sessions hired.\nselect id, kind, name, agent_id, runtime, joined_at, left_at from channel_participant order by joined_at, seq;"
+export const ParticipantsSql = "-- name: Participants :many\n-- bound: a row per participant: the user, the orchestrators, profiles and the sessions hired.\nselect id, kind, role, name, agent_id, runtime, joined_at, left_at from channel_participant order by joined_at, seq;"
 
 export const participants = Effect.fn("Participants")(function* () {
   const sql = yield* SqlClient.SqlClient

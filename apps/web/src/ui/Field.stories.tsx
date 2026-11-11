@@ -6,10 +6,10 @@ import { Field, Select, TextArea, TextInput } from "./Field";
 
 const styles = stylex.create({
   dynamicWidth: (width: number) => ({ maxWidth: width }),
-  states: { width: "calc(var(--spacing) * 48)" },
-  text: { width: "calc(var(--spacing) * 80)" },
-  longText: { width: "calc(var(--spacing) * 96)" },
-  select: { width: "calc(var(--spacing) * 64)" },
+  states: { width: "12rem" },
+  text: { width: "20rem" },
+  longText: { width: "24rem" },
+  select: { width: "16rem" },
 });
 
 const runtimes = [

@@ -21,8 +21,13 @@ import {
   steerBugSnake,
 } from "./bugSnake";
 
-const recipeStyles = stylex.create({
-  bugSnakeGameDiv: {
+const cell = 6;
+const zoom = 3;
+const width = bugSnakeWidth * cell;
+const height = bugSnakeHeight * cell;
+
+const styles = stylex.create({
+  overlay: {
     position: "absolute",
     inset: "0",
     display: "grid",
@@ -33,63 +38,56 @@ const recipeStyles = stylex.create({
     },
     textAlign: "center",
   },
-});
-
-const variantStyles = stylex.create({
-  bugSnakeGameDiv: {
+  root: {
     display: "flex",
     minHeight: "0",
     flex: "1",
     flexDirection: "column",
     alignItems: "center",
-    paddingInline: "var(--spacing)",
-    paddingTop: "calc(var(--spacing) * 3)",
+    paddingInline: "0.25rem",
+    paddingTop: "0.75rem",
   },
-});
-
-const viewStyles = stylex.create({
-  bugSnakeGameDiv: {
+  topRow: {
     display: "flex",
     width: "100%",
-    paddingInline: "calc(var(--spacing) * 2)",
+    paddingInline: "0.5rem",
   },
-  bugSnakeGameSpan: {
+  bestScore: {
     marginLeft: "auto",
     fontVariantNumeric: "tabular-nums",
   },
-  bugSnakeGameDiv2: {
-    marginTop: "var(--spacing)",
+  subRow: {
+    marginTop: "0.25rem",
     display: "flex",
     width: "100%",
-    paddingInline: "calc(var(--spacing) * 2)",
+    paddingInline: "0.5rem",
     fontVariantNumeric: "tabular-nums",
   },
-  bugSnakeGameSpan2: {
+  score: {
     marginLeft: "auto",
   },
-  bugSnakeGameDiv3: {
+  fieldFrame: {
     position: "relative",
-    marginTop: "calc(var(--spacing) * 2)",
+    marginTop: "0.5rem",
+    boxShadow: "0 0 0 2px var(--color-lcd-ink)",
   },
-  bugSnakeGameCanvas: {
+  canvas: (w: number, h: number) => ({
     display: "block",
+    width: w,
+    height: h,
     imageRendering: "pixelated",
-  },
-  bugSnakeGameP: {
+  }),
+  help: {
     marginTop: "auto",
-    marginBottom: "calc(var(--spacing) * 2)",
+    marginBottom: "0.5rem",
     textAlign: "center",
     lineHeight: "1.625",
+    color: "var(--color-lcd-dark)",
   },
 });
 
 const game = kept<BugSnake | undefined>(undefined);
 const best = kept(0);
-
-const cell = 6;
-const zoom = 3;
-const width = bugSnakeWidth * cell;
-const height = bugSnakeHeight * cell;
 
 /** The head looking right; the other ways are it turned. */
 const head = [" #### ", "####.#", "######", "######", "####.#", " #### "];
@@ -97,14 +95,14 @@ const head = [" #### ", "####.#", "######", "######", "####.#", " #### "];
 const segment = [
   [" #### ", "#++++#", "#++++#", "#++++#", "#++++#", " #### "],
   [" #### ", "#....#", "#....#", "#....#", "#....#", " #### "],
-];
+] as const;
 const tail = ["      ", "  ##  ", " #++# ", " #++# ", "  ##  ", "      "];
 const seed = ["   #  ", "  #+# ", " #++# ", " #++# ", "  ##  ", "      "];
 /** The bug, its legs in two frames. */
 const bug = [
   [" #  # ", "# ## #", " #### ", "######", " #### ", "#    #"],
   [" #  # ", "  ##  ", "######", " #### ", "######", "      "],
-];
+] as const;
 
 /** Rows turned a quarter clockwise. */
 const turned = (rows: readonly string[]) =>
@@ -151,7 +149,7 @@ export function BugSnakeGame() {
   };
 
   useTicks(
-    () => playing() && !!g() && g()!.over === undefined,
+    () => playing() && !!g() && g()?.over === undefined,
     (ms) => {
       const now = game.get();
       if (!now) return;
@@ -186,48 +184,50 @@ export function BugSnakeGame() {
     const draw = (picture: readonly string[], c: number) => drawPattern(ctx, picture, (c % bugSnakeWidth) * cell, Math.floor(c / bugSnakeWidth) * cell);
     draw(seed, state.food);
     // It blinks its last ten ticks, before it flies off.
-    if (state.bug !== undefined && (state.bugLeft > 10 || Math.floor(state.bugLeft / 2) % 2 === 0)) draw(bug[state.bugLeft % 2]!, state.bug);
-    state.body.forEach((c, i) => draw(i === 0 ? heads[state.heading] : i === state.body.length - 1 ? tail : segment[i % 2]!, c));
+    if (state.bug !== undefined && (state.bugLeft > 10 || Math.floor(state.bugLeft / 2) % 2 === 0)) draw(state.bugLeft % 2 === 0 ? bug[0] : bug[1], state.bug);
+    state.body.forEach((c, i) => draw(i === 0 ? heads[state.heading] : i === state.body.length - 1 ? tail : i % 2 === 0 ? segment[0] : segment[1], c));
   });
 
   const score = () => g()?.score ?? 0;
   return (
-    <div {...stylex.attrs(variantStyles.bugSnakeGameDiv)}>
-      <div {...stylex.attrs(viewStyles.bugSnakeGameDiv)}>
+    <div {...stylex.attrs(styles.root)}>
+      <div {...stylex.attrs(styles.topRow)}>
         <span>{t("web.farm.phone.game.bugs")}</span>
-        <span {...stylex.attrs(viewStyles.bugSnakeGameSpan)}>
+        <span {...stylex.attrs(styles.bestScore)}>
           {t("web.farm.phone.blocks.best")} {five(Math.max(top(), score()))}
         </span>
       </div>
-      <div {...stylex.attrs(viewStyles.bugSnakeGameDiv2)}>
+      <div {...stylex.attrs(styles.subRow)}>
         <span>{t("web.farm.phone.bugs.tally", { seeds: g()?.eaten ?? 0, bugs: g()?.bugs ?? 0 })}</span>
-        <span {...stylex.attrs(viewStyles.bugSnakeGameSpan2)}>{five(score())}</span>
+        <span {...stylex.attrs(styles.score)}>{five(score())}</span>
       </div>
-      <div {...stylex.attrs(viewStyles.bugSnakeGameDiv3)} style={{ "box-shadow": `0 0 0 2px ${lcd.ink}` }}>
+      <div {...stylex.attrs(styles.fieldFrame)}>
         <canvas
           ref={(el) => (canvas = el)}
           width={width}
           height={height}
           role="img"
           aria-label={t("web.farm.phone.bugs.field")}
-          {...stylex.attrs(viewStyles.bugSnakeGameCanvas)}
-          style={{ width: `${width * zoom}px`, height: `${height * zoom}px` }}
+          {...stylex.attrs(styles.canvas(width * zoom, height * zoom))}
         />
-        <Show when={!g() || g()!.over !== undefined || !playing()}>
-          <div {...stylex.attrs(recipeStyles.bugSnakeGameDiv)}>
+        <Show when={!g() || g()?.over !== undefined || !playing()}>
+          <div {...stylex.attrs(styles.overlay)}>
             <span>
-              {g()?.over ? ended[g()!.over!] : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.bugs")}
+              {(() => {
+                const over = g()?.over;
+                return over ? ended[over] : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.bugs");
+              })()}
               <br />
               <span {...styleProps(phoneAnimations.blink)}>
                 {t("web.farm.phone.pressA", {
-                  what: g() && g()!.over === undefined ? t("web.farm.phone.resume") : g() ? t("web.farm.phone.again") : t("web.farm.phone.start"),
+                  what: g() && g()?.over === undefined ? t("web.farm.phone.resume") : g() ? t("web.farm.phone.again") : t("web.farm.phone.start"),
                 })}
               </span>
             </span>
           </div>
         </Show>
       </div>
-      <p {...stylex.attrs(viewStyles.bugSnakeGameP)} style={{ color: lcd.dark }}>
+      <p {...stylex.attrs(styles.help)}>
         {t("web.farm.phone.bugs.help")}
         <br />
         {t("web.farm.phone.bugs.help2")}

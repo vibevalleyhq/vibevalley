@@ -4,8 +4,8 @@ import { Command, Flag } from "effect/cli";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { ask, change, given, nameArg } from "#/farm.ts";
-import { DryRunFlag, show } from "#/format.ts";
+import { DryRunFlag, show } from "#/base/format.ts";
+import { ask, change, given, nameArg } from "#/infra/farm.ts";
 
 const repoLine = (p: T.RepoSummary) => [p.name, p.path, p.git ? "git" : "", p.pullRequest.available ? "pr" : ""].filter((x) => x !== "").join("  ");
 

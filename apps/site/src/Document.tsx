@@ -2,17 +2,17 @@
 import { HydrationScript, type JSX } from "@solidjs/web";
 import * as stylex from "@stylexjs/stylex";
 
-import { backgrounds } from "./lib/images";
-import { page } from "./lib/page";
+import { backgrounds } from "./base/images";
+import { page } from "./i18n/page";
 
 const sceneStyles = stylex.create({
   lost: {
     display: "grid",
     minHeight: "100svh",
     placeItems: "center",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBlock: "calc(var(--spacing) * 8)",
-    backgroundColor: "var(--color-cream-100) !important",
+    paddingInline: "1rem",
+    paddingBlock: "2rem",
+    backgroundColor: "var(--color-cream-100)",
   },
 });
 

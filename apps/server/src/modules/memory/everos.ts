@@ -1,0 +1,227 @@
+import { createHash } from "node:crypto";
+
+import { Clock, Effect, Redacted, Schema } from "effect";
+import { type HttpClient, HttpClientRequest } from "effect/http";
+
+import { t } from "@vibevalley/i18n";
+import type { MemoryKind } from "@vibevalley/protocol";
+
+import { clip } from "#/base/clip.ts";
+import { newId } from "#/base/ids.ts";
+import { redact, type RedactedString, redactedHead } from "#/base/redact.ts";
+import type { MemorySourceConfig } from "#/modules/setting/memorySources.ts";
+
+import { everosWords, recallWords } from "./prompts.ts";
+import { recallCount, type MemoryScope } from "./recall.ts";
+import { prefetchTimeoutMs, type Source, SourceError, sourceError, sourceLife } from "./sources.ts";
+
+/** app_id on everything written, so its memories can be told from another app's. */
+const app = "vibevalley";
+const most = 100;
+const lineMost = 200;
+
+interface Message {
+  readonly sender_id: string;
+  readonly role: "user" | "assistant";
+  readonly timestamp: number;
+  readonly content: string;
+}
+
+/** What goes to EverOS: every message's words redacted. */
+type Sent = Omit<Message, "content"> & { readonly content: RedactedString };
+type Scoped = { readonly app_id: string; readonly repo_id: string };
+type Body =
+  | (Scoped & { readonly session_id: string; readonly messages: Sent[] })
+  | (Scoped & { readonly session_id: string })
+  | (Scoped & { readonly query: RedactedString; readonly top_k: number; readonly user_id?: string; readonly agent_id?: string });
+
+const Episode = Schema.Struct({
+  id: Schema.String,
+  subject: Schema.optionalKey(Schema.String),
+  summary: Schema.optionalKey(Schema.String),
+  episode: Schema.optionalKey(Schema.String),
+  score: Schema.optionalKey(Schema.Finite),
+  app_id: Schema.optionalKey(Schema.String),
+  repo_id: Schema.optionalKey(Schema.String),
+});
+const AgentCase = Schema.Struct({
+  id: Schema.String,
+  task_intent: Schema.optionalKey(Schema.String),
+  approach: Schema.optionalKey(Schema.String),
+  key_insight: Schema.optionalKey(Schema.String),
+  score: Schema.optionalKey(Schema.Finite),
+  app_id: Schema.optionalKey(Schema.String),
+  repo_id: Schema.optionalKey(Schema.String),
+});
+const FoundPayload = Schema.Struct({
+  data: Schema.optionalKey(Schema.Struct({ episodes: Schema.optionalKey(Schema.Array(Episode)), agent_cases: Schema.optionalKey(Schema.Array(AgentCase)) })),
+});
+const FoundBodySchema = Schema.fromJsonString(FoundPayload);
+
+// EverOS scope ids are ASCII and at most 128 characters; a real repo named "global" must stay separate from global notes.
+const scopeOf = (repo: string) => (repo ? "repo-" + createHash("sha256").update(repo).digest("hex") : "global");
+
+/** A farm's session ids (w1, w2…) are its own only: another farm on the same EverOS has a w1 too. */
+const sessionOf = (session: string) => `${app}-${session}`;
+const agentOf = (agent: string) => `${app}-${agent}`;
+
+/** http: the farm's client; interrupting a call aborts its request. */
+export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Source {
+  const life = sourceLife("EverOS");
+  const user = c.user || "owner";
+  /** Sessions given messages and not yet told to extract; flushed when the session ends, or when the farm stops. */
+  const pending = new Map<string, string>();
+  /** Sessions whose brief it was given already: a later run sends only what the helper said. */
+  const told = new Set<string>();
+
+  /** The answer's text; closing: the flush as it stops, which its stop does not cut short. */
+  const key = c.key === undefined ? "" : Redacted.value(c.key);
+  const post = (path: "add" | "flush" | "search", body: Body, closing = false) => {
+    const request = HttpClientRequest.post(`${c.url.replace(/\/+$/u, "")}/api/v2/memory/${path}`).pipe(
+      HttpClientRequest.bodyJsonUnsafe(body),
+      key ? HttpClientRequest.bearerToken(key) : (r) => r,
+    );
+    const answer = Effect.gen(function* () {
+      const res = yield* http.execute(request);
+      const text = (yield* res.text).slice(0, 4 << 20);
+      if (res.status < 200 || res.status >= 300) return yield* SourceError.make({ message: `memory/${path}: ${res.status} ${text.slice(0, 300)}` });
+      return text;
+    }).pipe(Effect.catchTag("HttpClientError", (e) => Effect.fail(sourceError(e))));
+    return closing ? answer : life.alive(answer);
+  };
+
+  const add = Effect.fnUntraced(function* (session: string, repo: string, messages: Message[]) {
+    const sent: Sent[] = messages.map((m) => ({ ...m, content: redact(m.content) }));
+    yield* post("add", { session_id: session, messages: sent, app_id: app, repo_id: scopeOf(repo) });
+    pending.set(session, repo);
+  });
+
+  const flush = (session: string, repo: string, closing = false) => post("flush", { session_id: session, app_id: app, repo_id: scopeOf(repo) }, closing);
+
+  /** A profile's cases, or with kind issue the user's episodes. */
+  const findIn = Effect.fnUntraced(function* (agent: string, query: string, limit: number, kind: MemoryKind, repo: string) {
+    const scope = scopeOf(repo);
+    const body = {
+      app_id: app,
+      repo_id: scope,
+      query: redactedHead(redact(query), 1000),
+      top_k: Math.max(1, Math.min(limit, most)),
+      ...(kind === "issue" ? { user_id: user } : { agent_id: agentOf(agent) }),
+    };
+    const text = yield* post("search", body);
+    const found = yield* Effect.mapError(Schema.decodeEffect(FoundBodySchema)(text), () =>
+      SourceError.make({ message: "memory/search answered what it should not: " + text.slice(0, 200) }),
+    );
+    const ownership = (hit: { app_id?: string; repo_id?: string }): MemoryScope =>
+      hit.app_id !== app || hit.repo_id !== scope ? { kind: "unknown" } : repo ? { kind: "repo", repo } : { kind: "global" };
+    const hits: { id: string; text: string; score: number; scope: MemoryScope }[] = [];
+    for (const k of found.data?.agent_cases ?? [])
+      hits.push({
+        id: `${scope}:${k.id}`,
+        text: recallWords.parts([k.task_intent, k.approach, k.key_insight].map((p) => (p ?? "").trim()).filter((p) => p !== "")),
+        score: k.score ?? 0,
+        scope: ownership(k),
+      });
+    for (const ep of found.data?.episodes ?? []) {
+      const item = ep.summary || ep.episode || "";
+      hits.push({ id: `${scope}:${ep.id}`, text: ep.subject ? recallWords.titled(ep.subject, item) : item, score: ep.score ?? 0, scope: ownership(ep) });
+    }
+    return hits;
+  });
+
+  const find = (agent: string, query: string, limit: number, kind: MemoryKind, repo: string) =>
+    Effect.map(
+      Effect.forEach(repo ? [repo, ""] : [""], (p) => findIn(agent, query, limit, kind, p), { concurrency: "unbounded" }),
+      (all) => all.flat().toSorted((a, b) => b.score - a.score),
+    );
+
+  return {
+    name: "everos",
+    unavailable: () => (c.url ? undefined : t("server.memory.noUrl")),
+    // What it was given and not told to extract yet is extracted now: EverOS only extracts on a flush.
+    stop: Effect.gen(function* () {
+      if (!(yield* life.stop)) return;
+      const all = [...pending];
+      pending.clear();
+      told.clear();
+      yield* Effect.forEach(
+        all,
+        ([session, repo]) =>
+          Effect.ignore(flush(session, repo, true), { log: "Warn", message: `vibevalley: everos: session ${session} was not flushed at stop` }),
+        { concurrency: "unbounded", discard: true },
+      ).pipe(Effect.timeoutOption(prefetchTimeoutMs));
+    }),
+    prefetch: Effect.fnUntraced(function* (cue) {
+      if (c.read !== true || cue.text.trim() === "") return [];
+      const hits = yield* find(cue.agent, cue.text, recallCount, "note", cue.repo);
+      return hits
+        .filter((h) => cue.skip?.has(h.id) !== true && h.text !== "" && h.scope.kind !== "unknown")
+        .slice(0, recallCount)
+        .map((h) => ({ id: h.id, line: recallWords.sourceLine("EverOS", clip(h.text, lineMost)), score: h.score }));
+    }),
+    // A search over every profile has no one user to ask with: it gives nothing here.
+    search: Effect.fnUntraced(function* (q) {
+      if (c.read !== true || q.text.trim() === "") return { found: [] };
+      if (q.repo === "") return { found: [], coverage: t("server.memory.coverage.everosAcross") };
+      if (q.agent === "" && q.kind !== "issue") return { found: [], coverage: t("server.memory.coverage.everosAgent") };
+      const kind: MemoryKind = q.kind || "note";
+      const hits = yield* find(q.agent, q.text, q.limit, kind, q.repo);
+      return {
+        found: hits
+          .filter((h) => h.text !== "")
+          .map((h) => ({
+            id: h.id,
+            agent: q.agent,
+            kind,
+            text: h.text,
+            author: "system",
+            at: 0,
+            recalled: 0,
+            fading: false,
+            source: "everos",
+            score: h.score,
+            scope: h.scope,
+          })),
+      };
+    }),
+    list: () => Effect.fail(SourceError.make({ message: t("server.memory.everosList") })),
+    // The brief once per session, then what the helper said. a failed run says so.
+    syncTurn: Effect.fnUntraced(function* (run) {
+      if (c.write !== true || run.outcome === "interrupted") return;
+      const at = yield* Clock.currentTimeMillis;
+      const messages: Message[] = [];
+      if (!told.has(run.session) && run.brief.trim() !== "") messages.push({ sender_id: user, role: "user", timestamp: at, content: run.brief });
+      let said = run.said.trim() === "" ? run.summary : run.said;
+      if (run.outcome === "failed") said = everosWords.failed + said;
+      if (said.trim() !== "") messages.push({ sender_id: agentOf(run.agent), role: "assistant", timestamp: at, content: said });
+      if (messages.length === 0) return;
+      yield* add(sessionOf(run.session), run.repo, messages);
+      told.add(run.session);
+    }),
+    sessionEnded: Effect.fnUntraced(function* (s) {
+      const session = sessionOf(s.session);
+      const repo = pending.get(session);
+      pending.delete(session);
+      told.delete(s.session);
+      if (repo !== undefined) yield* flush(session, repo);
+    }),
+    // A note written outside a run is a conversation of its own, extracted at once.
+    add: Effect.fnUntraced(function* (n) {
+      if (c.write !== true) return undefined;
+      const session = `vibevalley-note-${n.agent}-${newId()}`;
+      const repo = n.repo.trim();
+      const at = yield* Clock.currentTimeMillis;
+      yield* add(session, repo, [
+        { sender_id: user, role: "user", timestamp: at, content: everosWords.remember(repo, n.text) },
+        { sender_id: agentOf(n.agent), role: "assistant", timestamp: at, content: everosWords.noted(n.text) },
+      ]);
+      yield* Effect.ensuring(
+        flush(session, repo),
+        Effect.sync(() => pending.delete(session)),
+      );
+      return undefined;
+    }),
+    forget: () => Effect.fail(SourceError.make({ message: t("server.memory.everosForget") })),
+    can: { list: false, forget: false, transcripts: true },
+  };
+}

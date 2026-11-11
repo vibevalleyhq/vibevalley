@@ -1,5 +1,6 @@
 import type { PkmBlock, PkmBlockOp, PkmMarker } from "@vibevalley/protocol";
-import { applyBlockOps, flatBlocks, pkmTagTyped, treeOfBlocks } from "@vibevalley/protocol/rules";
+
+import { applyBlockOps, flatBlocks, pkmTagTyped, treeOfBlocks } from "./outline.ts";
 
 export type NoteMark = "[[" | "]]" | "((" | "))" | "/" | "#";
 

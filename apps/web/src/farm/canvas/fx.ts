@@ -120,7 +120,8 @@ export function plotFx(world: Container, texture: (name: string) => Texture, plo
       if (bed !== undefined) coins(bed, r.coins);
     }
     for (let i = flashes.length - 1; i >= 0; i--) {
-      const f = flashes[i]!;
+      const f = flashes[i];
+      if (f === undefined) continue;
       f.age += dt;
       if (f.age >= f.life) flashes.splice(i, 1);
     }

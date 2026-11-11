@@ -40,6 +40,7 @@ import {
 const trajectoryStyles = stylex.create({
   bar: {
     position: "absolute",
+    height: "0.75rem",
     cursor: "pointer",
     borderRadius: "var(--radius-sm)",
     backgroundColor: {
@@ -67,16 +68,16 @@ const trajectoryStyles = stylex.create({
     },
     cursor: "pointer",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--wb-line)",
     backgroundColor: "var(--wb-page)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * .5)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.125rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-medium)",
     textDecorationLine: {
       default: null,
@@ -88,26 +89,23 @@ const trajectoryStyles = stylex.create({
   },
 });
 
-const recipeStyles2 = stylex.create({
+const styles = stylex.create({
   toolDetailPre: {
     fontFamily: "var(--font-mono)",
     whiteSpace: "pre-wrap",
     WebkitUserSelect: "text",
     userSelect: "text",
   },
-});
-
-const recipeStyles = stylex.create({
   rowSpan: {
-    width: "calc(var(--spacing) * 15)",
+    width: "3.75rem",
     flexShrink: "0",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
-    paddingTop: "calc(var(--spacing) * .5)",
-    paddingLeft: "calc(var(--spacing) * 2)",
+    paddingTop: "0.125rem",
+    paddingLeft: "0.5rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   rowSpan2: {
@@ -117,60 +115,51 @@ const recipeStyles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     borderRadius: "var(--radius-sm)",
-    paddingInline: "var(--spacing)",
+    paddingInline: "0.25rem",
     paddingBlock: "1px",
     textAlign: "center",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-medium)",
   },
-  rowSpanVariant1Case1: {
-    width: "calc(var(--spacing) * 22)",
+  rowSpanPrimary: {
+    width: "5.5rem",
     marginLeft: null,
   },
-  rowSpanVariant1Case2: {
+  rowSpanSecondary: {
     width: "78px",
-    marginLeft: "calc(var(--spacing) * 2.5)",
+    marginLeft: "0.625rem",
   },
   waterfallViewDiv: {
     display: "flex",
-    width: "calc(var(--spacing) * 15)",
+    width: "3.75rem",
     flexShrink: "0",
     flexDirection: "column",
     justifyContent: "space-between",
-    paddingLeft: "calc(var(--spacing) * 2)",
+    paddingLeft: "0.5rem",
   },
-});
-
-const variantStyles3 = stylex.create({
   rowIcon: {
-    marginTop: "var(--spacing)",
-    marginRight: "var(--spacing)",
+    marginTop: "0.25rem",
+    marginRight: "0.25rem",
   },
-});
-
-const variantStyles2 = stylex.create({
   trajectoryTextInput: {
     width: {
-      default: "calc(var(--spacing) * 36)",
-      "@media (width>=40rem)": "calc(var(--spacing) * 56)",
+      default: "9rem",
+      "@media (width>=40rem)": "14rem",
     },
   },
-});
-
-const variantStyles = stylex.create({
   rowDiv: {
     borderRadius: "var(--radius-md)",
     paddingBlock: "3px",
-    paddingRight: "calc(var(--spacing) * 2)",
+    paddingRight: "0.5rem",
   },
-  rowDivVariant: {
+  rowDivTone: {
     backgroundColor: {
       default: "var(--color-wheat)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-wheat) 35%, transparent)",
     },
   },
-  rowDivVariant2: {
+  rowDivAlt: {
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -179,16 +168,16 @@ const variantStyles = stylex.create({
       },
     },
   },
-  rowSpan: {
+  rowSpan3: {
     minWidth: "0",
     flex: "1",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
-  rowSpanVariant: {
+  rowSpanTone: {
     color: "var(--color-berry)",
   },
-  rowSpanVariant2: {},
+  rowSpanAlt: {},
   toolLineSpan: {
     fontFamily: "var(--font-mono)",
   },
@@ -198,28 +187,25 @@ const variantStyles = stylex.create({
     cursor: "pointer",
     flexDirection: "column",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 2.5)",
-    paddingBlock: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.625rem",
+    paddingBlock: "0.375rem",
     textAlign: "left",
   },
-  trajectoryListButtonVariant: {
+  trajectoryListButtonTone: {
     backgroundColor: "var(--color-selected)",
   },
-});
-
-const viewStyles = stylex.create({
   headSpan: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-semibold)",
   },
   trajectoryLogDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   trajectoryDiv: {
     display: "flex",
@@ -230,33 +216,33 @@ const viewStyles = stylex.create({
   trajectoryDiv2: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 3)",
-    paddingBottom: "calc(var(--spacing) * 2)",
+    gap: "0.75rem",
+    paddingBottom: "0.5rem",
   },
   trajectoryDiv3: {
     minWidth: "0",
     flex: "1",
   },
   trajectoryDiv4: {
-    marginTop: "calc(var(--spacing) * 2)",
+    marginTop: "0.5rem",
     minHeight: "0",
     flex: "1",
     overflowY: "auto",
     borderBlockStyle: "solid",
     borderBlockWidth: "1px",
     borderColor: "var(--color-line)",
-    paddingBlock: "var(--spacing)",
+    paddingBlock: "0.25rem",
   },
   stepsEmpty: {
-    paddingTop: "calc(var(--spacing) * 2)",
+    paddingTop: "0.5rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   trajectoryP: {
-    paddingTop: "calc(var(--spacing) * 2)",
+    paddingTop: "0.5rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   rowButton: {
@@ -266,53 +252,54 @@ const viewStyles = stylex.create({
     alignItems: "flex-start",
     textAlign: "left",
   },
-  rowSpan: {
-    width: "calc(var(--spacing) * 2)",
+  rowSpan4: {
+    width: "0.5rem",
     flexShrink: "0",
   },
-  rowSpan2: {
+  rowSpan22: {
     display: "block",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
   },
-  rowSpan3: {
+  rowSpan32: {
     whiteSpace: "pre-wrap",
   },
-  rowSpan4: {
+  rowSpan42: {
     flexShrink: "0",
-    paddingTop: "calc(var(--spacing) * .5)",
-    paddingLeft: "calc(var(--spacing) * 2)",
+    paddingTop: "0.125rem",
+    paddingLeft: "0.5rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-faint)",
   },
-  toolLineSpan: {
+  toolLineSpan2: {
     fontFamily: "var(--font-mono)",
     color: "var(--color-muted)",
   },
   toolDetailDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "var(--spacing)",
-    paddingTop: "var(--spacing)",
-    paddingBottom: "calc(var(--spacing) * 1.5)",
+    gap: "0.25rem",
+    paddingTop: "0.25rem",
+    paddingBottom: "0.375rem",
     paddingLeft: "164px",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
   toolDetailSpan: {
     color: "var(--color-muted)",
   },
-  waterfallViewDiv: {
+  waterfallViewDiv2: {
     display: "flex",
+    height: "2.5rem",
   },
   waterfallViewSpan: {
     fontSize: "var(--text-2xs)",
     lineHeight: "1",
     color: "var(--color-muted)",
   },
-  waterfallViewDiv2: {
+  waterfallViewDiv22: {
     position: "relative",
     minWidth: "0",
     flex: "1",
@@ -321,43 +308,44 @@ const viewStyles = stylex.create({
   waterfallViewDiv3: {
     position: "absolute",
     insetInline: "0",
+    height: "0.75rem",
     borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-hover)",
   },
   markableDiv: {
-    marginBlock: "calc(var(--spacing) * .5)",
-    marginRight: "calc(var(--spacing) * 2)",
+    marginBlock: "0.125rem",
+    marginRight: "0.5rem",
     marginLeft: "164px",
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     borderRadius: "var(--radius-md)",
     backgroundColor: {
       default: "var(--color-berry)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-berry) 12%, transparent)",
     },
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "var(--spacing)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.25rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
   markableForm: {
-    marginBlock: "var(--spacing)",
-    marginRight: "calc(var(--spacing) * 2)",
+    marginBlock: "0.25rem",
+    marginRight: "0.5rem",
     marginLeft: "164px",
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   markSubmit: {
-    height: "calc(var(--spacing) * 7)",
+    height: "1.75rem",
     flexShrink: "0",
     cursor: "pointer",
     borderRadius: "var(--radius-md)",
     backgroundColor: "var(--color-accent)",
-    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingInline: "0.625rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-page)",
     opacity: {
       default: null,
@@ -365,16 +353,16 @@ const viewStyles = stylex.create({
     },
   },
   markableButton: {
-    height: "calc(var(--spacing) * 7)",
+    height: "1.75rem",
     flexShrink: "0",
     cursor: "pointer",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-line)",
-    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingInline: "0.625rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   trajectoryListDiv: {
     display: "flex",
@@ -384,45 +372,45 @@ const viewStyles = stylex.create({
       default: "column",
       "@media (width>=48rem)": "row",
     },
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   trajectoryListUl: {
     display: "flex",
     maxHeight: {
-      default: "calc(var(--spacing) * 33)",
+      default: "8.25rem",
       "@media (width>=48rem)": "none",
     },
     flexShrink: "0",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
     overflowY: "auto",
     width: {
       default: null,
-      "@media (width>=48rem)": "calc(var(--spacing) * 60)",
+      "@media (width>=48rem)": "15rem",
     },
   },
   trajectoryListSpan: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   trajectoryListSpan2: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-medium)",
   },
   trajectoryListSpan3: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   trajectoryListSpan4: {
     borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-hat)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.375rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-bark-900)",
   },
   trajectoryListSpan5: {
@@ -430,7 +418,7 @@ const viewStyles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
   trajectoryListDiv2: {
     minHeight: "0",
@@ -497,7 +485,7 @@ export function TrajectoryLog(props: { id: string; asked?: string; empty?: strin
   const now = useNow();
   const head = () =>
     props.title ? (
-      <span {...stylex.attrs(viewStyles.headSpan)} title={props.about}>
+      <span {...stylex.attrs(styles.headSpan)} title={props.about}>
         {props.title}
       </span>
     ) : undefined;
@@ -505,7 +493,7 @@ export function TrajectoryLog(props: { id: string; asked?: string; empty?: strin
     <Show
       when={steps().length > 0}
       fallback={
-        <div {...stylex.attrs(viewStyles.trajectoryLogDiv)}>
+        <div {...stylex.attrs(styles.trajectoryLogDiv)}>
           {head()}
           <Quiet>{props.empty ?? t("web.session.trajectory.quiet")}</Quiet>
         </div>
@@ -592,14 +580,14 @@ export function Trajectory(props: {
   const toggle = (n: number) => setOpen((o) => (o.has(n) ? new Set([...o].filter((x) => x !== n)) : new Set([...o, n])));
 
   return (
-    <div {...stylex.attrs(viewStyles.trajectoryDiv)}>
-      <div {...stylex.attrs(viewStyles.trajectoryDiv2)}>
-        <div {...stylex.attrs(viewStyles.trajectoryDiv3)}>{props.head}</div>
+    <div {...stylex.attrs(styles.trajectoryDiv)}>
+      <div {...stylex.attrs(styles.trajectoryDiv2)}>
+        <div {...stylex.attrs(styles.trajectoryDiv3)}>{props.head}</div>
         <TextInput
           data-testid="trajectory-search"
           aria-label={t("web.session.trajectory.search")}
           placeholder={t("web.session.trajectory.searchHint")}
-          styles={variantStyles2.trajectoryTextInput}
+          styles={styles.trajectoryTextInput}
           value={query()}
           onInput={(e) => setQuery(e.currentTarget.value)}
         />
@@ -609,13 +597,13 @@ export function Trajectory(props: {
         end={end()}
         colorOf={(seq) => {
           const s = bySeq().get(seq);
-          return s ? spanColor(s) : "#9b7550";
+          return s ? spanColor(s) : "var(--color-bark-400)";
         }}
         onPick={show}
       />
       <div
         ref={(el) => (scroller = el)}
-        {...stylex.attrs(viewStyles.trajectoryDiv4)}
+        {...stylex.attrs(styles.trajectoryDiv4)}
         onScroll={(e) => {
           const el = e.currentTarget;
           atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
@@ -624,7 +612,7 @@ export function Trajectory(props: {
         <Show
           when={rows().length > 0}
           fallback={
-            <p data-testid="steps-empty" {...stylex.attrs(viewStyles.stepsEmpty)}>
+            <p data-testid="steps-empty" {...stylex.attrs(styles.stepsEmpty)}>
               {t("web.session.trajectory.noMatch")}
             </p>
           }
@@ -660,7 +648,7 @@ export function Trajectory(props: {
           </For>
         </Show>
       </div>
-      <p {...stylex.attrs(viewStyles.trajectoryP)}>{summaryText(summaryOf(props.steps, end()))}</p>
+      <p {...stylex.attrs(styles.trajectoryP)}>{summaryText(summaryOf(props.steps, end()))}</p>
     </div>
   );
 }
@@ -676,28 +664,28 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
       ref={(el) => props.refTo(el)}
       data-testid="step"
       data-type={step().type}
-      {...stylex.attrs(variantStyles.rowDiv, props.marked ? variantStyles.rowDivVariant : variantStyles.rowDivVariant2)}
+      {...stylex.attrs(styles.rowDiv, props.marked ? styles.rowDivTone : styles.rowDivAlt)}
     >
       <button
         type="button"
         aria-label={`${props.spec.tag} ${oneLine(step().text).trim()}`}
         aria-expanded={aria(props.open)}
         onClick={() => props.onToggle()}
-        {...stylex.attrs(viewStyles.rowButton)}
+        {...stylex.attrs(styles.rowButton)}
       >
-        <span {...stylex.attrs(recipeStyles.rowSpan)}>{props.spec.gutter}</span>
+        <span {...stylex.attrs(styles.rowSpan)}>{props.spec.gutter}</span>
         <span
-          {...stylex.attrs(recipeStyles.rowSpan2, sub() ? recipeStyles.rowSpanVariant1Case2 : recipeStyles.rowSpanVariant1Case1)}
+          {...stylex.attrs(styles.rowSpan2, sub() ? styles.rowSpanSecondary : styles.rowSpanPrimary)}
           style={{ background: sub() && fill().startsWith("#") ? `${fill()}8c` : fill(), color: inkOn(fill()) }}
         >
           {props.spec.tag}
         </span>
-        <span {...stylex.attrs(viewStyles.rowSpan)} />
+        <span {...stylex.attrs(styles.rowSpan4)} />
         <Show when={failed() && tool()}>
-          <Icon name="cross" size={12} styles={[variantStyles3.rowIcon]} />
+          <Icon name="cross" size={12} styles={[styles.rowIcon]} />
         </Show>
-        <span {...stylex.attrs(variantStyles.rowSpan, failed() ? variantStyles.rowSpanVariant : variantStyles.rowSpanVariant2)}>
-          <Switch fallback={<span {...stylex.attrs(viewStyles.rowSpan2)}>{oneLine(step().text).trim()}</span>}>
+        <span {...stylex.attrs(styles.rowSpan3, failed() ? styles.rowSpanTone : styles.rowSpanAlt)}>
+          <Switch fallback={<span {...stylex.attrs(styles.rowSpan22)}>{oneLine(step().text).trim()}</span>}>
             <Match when={tool()}>
               <ToolLine step={step()} />
             </Match>
@@ -705,12 +693,12 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
               <Markdown text={step().text} />
             </Match>
             <Match when={props.open}>
-              <span {...stylex.attrs(viewStyles.rowSpan3)}>{step().text}</span>
+              <span {...stylex.attrs(styles.rowSpan32)}>{step().text}</span>
             </Match>
           </Switch>
         </span>
         <Show when={props.spec.when}>
-          <span {...stylex.attrs(viewStyles.rowSpan4)}>{props.spec.when}</span>
+          <span {...stylex.attrs(styles.rowSpan42)}>{props.spec.when}</span>
         </Show>
       </button>
       <Show when={props.open && tool()}>
@@ -725,19 +713,13 @@ function ToolLine(props: { step: SessionEvent }) {
   const args = () => oneLine(props.step.input ?? "").trim();
   const out = () => oneLine(props.step.output ?? "").trim();
   return (
-    <span {...stylex.attrs(viewStyles.rowSpan2)}>
+    <span {...stylex.attrs(styles.rowSpan22)}>
       {farmToolText(props.step.text) ?? props.step.text}
       <Show when={args()}>
-        <span {...stylex.attrs(viewStyles.toolLineSpan)}> {args()}</span>
+        <span {...stylex.attrs(styles.toolLineSpan2)}> {args()}</span>
       </Show>
       {" → "}
-      <Switch
-        fallback={
-          <span {...stylex.attrs(variantStyles.toolLineSpan, props.step.ok === false ? variantStyles.rowSpanVariant : variantStyles.rowSpanVariant2)}>
-            {out()}
-          </span>
-        }
-      >
+      <Switch fallback={<span {...stylex.attrs(styles.toolLineSpan, props.step.ok === false ? styles.rowSpanTone : styles.rowSpanAlt)}>{out()}</span>}>
         <Match when={props.step.ok === undefined}>{t("web.session.trajectory.pending")}</Match>
         <Match when={!out()}>{t("web.session.trajectory.noOutput")}</Match>
       </Switch>
@@ -748,8 +730,8 @@ function ToolLine(props: { step: SessionEvent }) {
 function ToolDetail(props: { step: SessionEvent }) {
   const input = () => readableInput(props.step);
   return (
-    <div {...stylex.attrs(viewStyles.toolDetailDiv)}>
-      <span {...stylex.attrs(viewStyles.toolDetailSpan)}>
+    <div {...stylex.attrs(styles.toolDetailDiv)}>
+      <span {...stylex.attrs(styles.toolDetailSpan)}>
         {[
           ...(props.step.tool ? [t("web.session.trajectory.tool", { name: props.step.tool })] : []),
           props.step.ok === undefined
@@ -760,19 +742,19 @@ function ToolDetail(props: { step: SessionEvent }) {
         ].join(" · ")}
       </span>
       <Show when={input()}>
-        <span {...stylex.attrs(viewStyles.toolDetailSpan)}>{t("web.session.trajectory.input")}</span>
-        <pre {...stylex.attrs(recipeStyles2.toolDetailPre)}>{input()}</pre>
+        <span {...stylex.attrs(styles.toolDetailSpan)}>{t("web.session.trajectory.input")}</span>
+        <pre {...stylex.attrs(styles.toolDetailPre)}>{input()}</pre>
       </Show>
-      <span {...stylex.attrs(viewStyles.toolDetailSpan)}>{t("web.session.trajectory.output")}</span>
+      <span {...stylex.attrs(styles.toolDetailSpan)}>{t("web.session.trajectory.output")}</span>
       <Show
         when={props.step.output}
         fallback={
-          <span {...stylex.attrs(viewStyles.toolDetailSpan)}>
+          <span {...stylex.attrs(styles.toolDetailSpan)}>
             {props.step.ok === undefined ? t("web.session.trajectory.pending") : t("web.session.trajectory.noOutput")}
           </span>
         }
       >
-        <pre {...stylex.attrs(recipeStyles2.toolDetailPre)}>{props.step.output}</pre>
+        <pre {...stylex.attrs(styles.toolDetailPre)}>{props.step.output}</pre>
       </Show>
     </div>
   );
@@ -823,19 +805,17 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
         width: Math.max(2, at(r, span.end) - left),
         top: lanes.indexOf(span.lane) * (lane + gap),
         label: `${laneNames[span.lane]} · ${secondsText(span.end - span.start)}`,
-        color: span.lane === "asked" ? "#e5a93c" : span.lane === "model" ? "#74a046" : props.colorOf(span.seq),
+        color: span.lane === "asked" ? "var(--color-wheat)" : span.lane === "model" ? "var(--color-leaf)" : props.colorOf(span.seq),
       };
     });
   });
   return (
-    <div {...stylex.attrs(viewStyles.waterfallViewDiv)} style={{ height: `${lane * 3 + gap * 2}px` }}>
-      <div {...stylex.attrs(recipeStyles.waterfallViewDiv)}>
-        <For each={lanes}>{(l) => <span {...stylex.attrs(viewStyles.waterfallViewSpan)}>{laneNames[l]}</span>}</For>
+    <div {...stylex.attrs(styles.waterfallViewDiv2)}>
+      <div {...stylex.attrs(styles.waterfallViewDiv)}>
+        <For each={lanes}>{(l) => <span {...stylex.attrs(styles.waterfallViewSpan)}>{laneNames[l]}</span>}</For>
       </div>
-      <div ref={(el) => (box = el)} {...stylex.attrs(viewStyles.waterfallViewDiv2)}>
-        <For each={[0, 1, 2]}>
-          {(i) => <div {...stylex.attrs(viewStyles.waterfallViewDiv3)} style={{ top: `${i * (lane + gap)}px`, height: `${lane}px` }} />}
-        </For>
+      <div ref={(el) => (box = el)} {...stylex.attrs(styles.waterfallViewDiv22)}>
+        <For each={[0, 1, 2]}>{(i) => <div {...stylex.attrs(styles.waterfallViewDiv3)} style={{ top: `${i * (lane + gap)}px` }} />}</For>
         <For each={bars()} keyed={false}>
           {(b) => (
             <button
@@ -844,7 +824,7 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
               aria-label={b().label}
               onClick={() => props.onPick(b().seq)}
               {...styleProps(trajectoryStyles.bar)}
-              style={{ left: `${b().left}px`, width: `${b().width - 1}px`, top: `${b().top}px`, height: `${lane}px`, "--timeline-color": b().color }}
+              style={{ left: `${b().left}px`, width: `${b().width - 1}px`, top: `${b().top}px`, "--timeline-color": b().color }}
             />
           )}
         </For>
@@ -879,14 +859,14 @@ function Markable(props: { step: number; send: MarkWrong; file?: string | undefi
         </button>
       </Show>
       <Show when={props.file}>
-        <div title={props.file} {...stylex.attrs(viewStyles.markableDiv)}>
+        <div title={props.file} {...stylex.attrs(styles.markableDiv)}>
           <Icon name="bug" size={12} />
           {t("web.session.trajectory.marked")}
         </div>
       </Show>
       <Show when={writing()}>
         <form
-          {...stylex.attrs(viewStyles.markableForm)}
+          {...stylex.attrs(styles.markableForm)}
           onSubmit={(e) => {
             e.preventDefault();
             void submit();
@@ -901,10 +881,10 @@ function Markable(props: { step: number; send: MarkWrong; file?: string | undefi
             value={want()}
             onInput={(e) => setWant(e.currentTarget.value)}
           />
-          <button type="submit" data-testid="mark-submit" disabled={busy() || !want().trim()} {...stylex.attrs(viewStyles.markSubmit)}>
+          <button type="submit" data-testid="mark-submit" disabled={busy() || !want().trim()} {...stylex.attrs(styles.markSubmit)}>
             {t("web.base.write")}
           </button>
-          <button type="button" disabled={busy()} onClick={() => setWriting(false)} {...stylex.attrs(viewStyles.markableButton)}>
+          <button type="button" disabled={busy()} onClick={() => setWriting(false)} {...stylex.attrs(styles.markableButton)}>
             {t("web.base.form.never")}
           </button>
         </form>
@@ -933,8 +913,8 @@ export function TrajectoryList(props: { agent: string }) {
     <Show when={list()} fallback={<Quiet>{heads.error() ? reasonOf(heads.error()) : t("web.base.reading")}</Quiet>}>
       {(all) => (
         <Show when={all().length > 0} fallback={<Quiet>{t("web.session.trajectory.neverSent")}</Quiet>}>
-          <div {...stylex.attrs(viewStyles.trajectoryListDiv)}>
-            <ul aria-label={t("web.session.trajectory.sent")} {...stylex.attrs(viewStyles.trajectoryListUl)}>
+          <div {...stylex.attrs(styles.trajectoryListDiv)}>
+            <ul aria-label={t("web.session.trajectory.sent")} {...stylex.attrs(styles.trajectoryListUl)}>
               <For each={all()} keyed={(h) => h.id}>
                 {(h) => {
                   const ended = () => {
@@ -953,23 +933,20 @@ export function TrajectoryList(props: { agent: string }) {
                         type="button"
                         aria-current={h().id === open()?.id ? "true" : undefined}
                         onClick={() => setPicked(h().id)}
-                        {...stylex.attrs(
-                          variantStyles.trajectoryListButton,
-                          h().id === open()?.id ? variantStyles.trajectoryListButtonVariant : variantStyles.rowDivVariant2,
-                        )}
+                        {...stylex.attrs(styles.trajectoryListButton, h().id === open()?.id ? styles.trajectoryListButtonTone : styles.rowDivAlt)}
                       >
-                        <span {...stylex.attrs(viewStyles.trajectoryListSpan)}>
-                          <span {...stylex.attrs(viewStyles.trajectoryListSpan2)}>{h().name}</span>
+                        <span {...stylex.attrs(styles.trajectoryListSpan)}>
+                          <span {...stylex.attrs(styles.trajectoryListSpan2)}>{h().name}</span>
                           <Show when={h().repo}>
-                            <span {...stylex.attrs(viewStyles.trajectoryListSpan3)}>{h().repo}</span>
+                            <span {...stylex.attrs(styles.trajectoryListSpan3)}>{h().repo}</span>
                           </Show>
                           <Show when={ended() === undefined}>
-                            <span {...stylex.attrs(viewStyles.trajectoryListSpan4)}>{t("web.session.trajectory.here")}</span>
+                            <span {...stylex.attrs(styles.trajectoryListSpan4)}>{t("web.session.trajectory.here")}</span>
                           </Show>
                         </span>
-                        <span {...stylex.attrs(viewStyles.trajectoryListSpan3)}>{sentText()}</span>
+                        <span {...stylex.attrs(styles.trajectoryListSpan3)}>{sentText()}</span>
                         <Show when={h().brief}>
-                          <span {...stylex.attrs(viewStyles.trajectoryListSpan5)}>{oneLine(h().brief).trim()}</span>
+                          <span {...stylex.attrs(styles.trajectoryListSpan5)}>{oneLine(h().brief).trim()}</span>
                         </Show>
                       </button>
                     </li>
@@ -977,7 +954,7 @@ export function TrajectoryList(props: { agent: string }) {
                 }}
               </For>
             </ul>
-            <div {...stylex.attrs(viewStyles.trajectoryListDiv2)}>
+            <div {...stylex.attrs(styles.trajectoryListDiv2)}>
               <Show when={open()} fallback={<Quiet>{t("web.session.trajectory.pick")}</Quiet>}>
                 {(o) => (
                   <Keyed key={o().id}>

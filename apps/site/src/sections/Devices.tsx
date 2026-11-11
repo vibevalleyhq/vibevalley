@@ -1,0 +1,204 @@
+import type { JSX } from "@solidjs/web";
+/** @jsxImportSource @solidjs/web */
+import * as stylex from "@stylexjs/stylex";
+
+import type { Copy } from "../i18n/zh";
+import { createReveal, createScrollAnimation } from "../ui/scroll";
+import { Section, domAttrs } from "../ui/ui";
+
+const viewStyles = stylex.create({
+  drift: { position: "relative" },
+  phone: {
+    width: { default: "42%", "@media (width >= 64rem)": "25%" },
+    maxWidth: "180px",
+    position: { default: "relative", "@media (width >= 64rem)": "absolute" },
+  },
+  chatPhone: {
+    right: { default: null, "@media (width >= 64rem)": "17%" },
+    bottom: { default: null, "@media (width >= 64rem)": "-4px" },
+  },
+  issuePhone: {
+    right: { default: null, "@media (width >= 64rem)": "-7%" },
+    bottom: { default: null, "@media (width >= 64rem)": "-44px" },
+  },
+  devicesDiv: {
+    display: "grid",
+    alignItems: "center",
+    gap: "3rem",
+    gridTemplateColumns: {
+      default: null,
+      "@media (width>=64rem)": "minmax(0,.85fr) minmax(0,1.15fr)",
+    },
+  },
+  devicesP: {
+    maxWidth: "36em",
+  },
+  devicesUl: {
+    marginTop: "1.5rem",
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "0.75rem",
+  },
+  devicesLi: {
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-cream-50)",
+    boxShadow: "inset 0 0 0 2px var(--color-rim), 4px 4px 0 var(--color-drop)",
+    paddingInline: "0.875rem",
+    paddingBlock: "0.5rem",
+    fontFamily: "var(--font-pixel)",
+    fontSize: "var(--text-lg)",
+    lineHeight: "1",
+  },
+  devicesP2: {
+    marginTop: "1.25rem",
+    fontSize: "15px",
+    color: "var(--color-bark-800)",
+  },
+  devicesDiv2: {
+    position: "relative",
+    marginInline: "auto",
+    width: "100%",
+    maxWidth: "640px",
+    paddingBottom: {
+      default: null,
+      "@media (width>=64rem)": "6rem",
+    },
+  },
+  devicesDiv3: {
+    marginTop: {
+      default: "2rem",
+      "@media (width>=64rem)": "0",
+    },
+    display: "flex",
+    justifyContent: "center",
+    gap: "1.5rem",
+  },
+  laptopDiv: {
+    borderStyle: "solid",
+    borderWidth: "6px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-bark-900)",
+    boxShadow: "4px 4px 0 var(--color-drop)",
+  },
+  laptopImg: {
+    display: "block",
+    height: "auto",
+    width: "100%",
+  },
+  laptopDiv2: {
+    marginInline: "-4%",
+    height: "0.75rem",
+    borderStyle: "solid",
+    borderWidth: "2px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-cream-300)",
+    boxShadow: "3px 3px 0 var(--color-drop)",
+  },
+  phoneDiv: {
+    borderRadius: "18px",
+    borderStyle: "solid",
+    borderWidth: "7px",
+    borderColor: "var(--color-bark-900)",
+    backgroundColor: "var(--color-bark-900)",
+    boxShadow: "4px 4px 0 var(--color-drop)",
+  },
+  phoneImg: {
+    display: "block",
+    height: "auto",
+    width: "100%",
+    borderRadius: "10px",
+  },
+});
+interface Shot {
+  src: string;
+  srcset: string;
+  width: number;
+  height: number;
+}
+interface Props {
+  copy: Copy["devices"];
+  mac: Shot;
+  phones: [Shot, Shot];
+}
+export default function Devices(props: Props) {
+  const root = createReveal<HTMLElement>();
+  return (
+    <Section ref={root.set} id="devices" title={props.copy.title}>
+      <div {...stylex.attrs(viewStyles.devicesDiv)}>
+        <div>
+          <p data-reveal {...stylex.attrs(viewStyles.devicesP)}>
+            {props.copy.text}
+          </p>
+          <ul role="list" data-reveal {...stylex.attrs(viewStyles.devicesUl)}>
+            {props.copy.platforms.map((p) => (
+              <li {...stylex.attrs(viewStyles.devicesLi)}>{p}</li>
+            ))}
+          </ul>
+          <p data-reveal {...stylex.attrs(viewStyles.devicesP2)}>
+            {props.copy.note}
+          </p>
+        </div>
+        <div {...stylex.attrs(viewStyles.devicesDiv2)}>
+          <Drift rate={0.03}>
+            <Laptop shot={props.mac} alt={props.copy.shots.mac} />
+          </Drift>
+          <div {...stylex.attrs(viewStyles.devicesDiv3)}>
+            <Drift rate={-0.06} styles={[viewStyles.phone, viewStyles.chatPhone]}>
+              <Phone shot={props.phones[0]} alt={props.copy.shots.chat} />
+            </Drift>
+            <Drift rate={-0.11} styles={[viewStyles.phone, viewStyles.issuePhone]}>
+              <Phone shot={props.phones[1]} alt={props.copy.shots.tickets} />
+            </Drift>
+          </div>
+        </div>
+      </div>
+    </Section>
+  );
+}
+function Drift(props: { rate: number; styles?: stylex.StyleXStyles; children: JSX.Element }) {
+  const ref = createScrollAnimation<HTMLDivElement>("self", ["start end", "end start"], () => [
+    { keyframes: { transform: [`translateY(${600 * props.rate}px)`, `translateY(${-600 * props.rate}px)`] } },
+  ]);
+  return (
+    <div ref={ref.set} {...domAttrs(viewStyles.drift, props.styles)}>
+      {props.children}
+    </div>
+  );
+}
+function Laptop(props: { shot: Shot; alt: string }) {
+  return (
+    <div>
+      <div {...stylex.attrs(viewStyles.laptopDiv)}>
+        <img
+          loading="lazy"
+          decoding="async"
+          src={props.shot.src}
+          srcset={props.shot.srcset}
+          sizes="(min-width: 1024px) 620px, calc(100vw - 48px)"
+          width={props.shot.width}
+          height={props.shot.height}
+          alt={props.alt}
+          {...stylex.attrs(viewStyles.laptopImg)}
+        />
+      </div>
+      <div {...stylex.attrs(viewStyles.laptopDiv2)} />
+    </div>
+  );
+}
+function Phone(props: { shot: Shot; alt: string }) {
+  return (
+    <div {...stylex.attrs(viewStyles.phoneDiv)}>
+      <img
+        loading="lazy"
+        decoding="async"
+        src={props.shot.src}
+        width={props.shot.width}
+        height={props.shot.height}
+        alt={props.alt}
+        {...stylex.attrs(viewStyles.phoneImg)}
+      />
+    </div>
+  );
+}

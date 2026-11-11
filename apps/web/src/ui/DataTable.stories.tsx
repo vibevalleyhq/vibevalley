@@ -14,8 +14,8 @@ const viewStyles = stylex.create({
   localDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
-    padding: "calc(var(--spacing) * 4)",
+    gap: "0.75rem",
+    padding: "1rem",
   },
 });
 

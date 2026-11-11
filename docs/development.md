@@ -31,7 +31,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
   - `alpha`：自用，功能可变、数据库可能重建。
   - `beta`：冻结功能只修缺陷，同一 `release/x.y` 线内表结构不变；修复先进 `main` 再 cherry-pick 到 `release/x.y`。
   - `final`：与最后一个 beta 使用同一份代码。
-- **发布脚本**（`scripts/release.ts`）：校验工作区干净、分支与 origin 一致，由已有 tag 推算下一版本号（`scripts/release-plan.ts`）；beta 与正式版先跑 `vp run release:verify` 并比对表结构，确认后打 tag 推送，由 `release.yml` 打包并建草稿 Release。
+- **发布脚本**（`scripts/release/release.ts`）：校验工作区干净、分支与 origin 一致，由已有 tag 推算下一版本号（`scripts/release/release-plan.ts`）；beta 与正式版先跑 `vp run release:verify` 并比对表结构，确认后打 tag 推送，由 `release.yml` 打包并建草稿 Release。
 - **打包流程**（`apps/desktop/scripts/package.ts`）：构建页面与桌面壳，用 `vp pack` 将服务端与 CLI 打成独立包放入 `dist/stage/`，由 electron-builder 封装进应用。未签名应用首次打开需在「系统设置 → 隐私与安全性」放行。
 
 ## 检查和测试
@@ -51,18 +51,18 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 `main` 仅经 PR 合入，CI（`.github/workflows/ci.yml`）的 `check`、`server`、`web`、`desktop`、`site` 全部通过方可 squash 合并（`vp check --deny-warnings` 零警告）。开、改、合 PR 遵循 [vv-pr](.agents/skills/vv-pr/SKILL.md)。
 
 - **分支**：`<类>/<主题>`，类别为 `feat`、`fix`、`docs`、`chore`、`refactor`、`test`，主题用英文小写连字符（如 `feat/issue-board-groups`）。
-- **提交**：英文单句陈述改后行为（如 `The board groups issues by helper`），界面中文词用「」包裹，代码与路径用反引号，不超过 100 码点、不加句号，不带 AI 署名，由 `scripts/commit-msg.ts` 校验。
+- **提交**：英文单句陈述改后行为（如 `The board groups issues by helper`），界面中文词用「」包裹，代码与路径用反引号，不超过 100 码点、不加句号，不带 AI 署名，由 `scripts/docs/commit-msg.ts` 校验。
 - **钩子**：`vp install` 自动配置 `.vite-hooks/`，pre-commit 对暂存文件跑 `vp check --fix`（编辑器使用带 Effect 插件的 tsrs，见 [packages/tsrs](packages/tsrs/README.md)）。
 - **PR 正文**：英文填写 `## What changed`、`## Checks`（附 [vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 证据）、`## Not verified`。
-- **回归测试**：缺陷修复测试以 `regression: ` 开头；修改或删除已有回归测试、或 `fix/` 分支无新回归测试时，须在 PR 正文加 `## Regression` 说明，由 `scripts/regression.ts` 检查。
-- **死代码**：`vp run deadcode` 调用 knip 检查未使用的文件、导出和依赖（配置在 `knip.ts`，说明见 `scripts/deadcode.ts`）。
+- **回归测试**：缺陷修复测试以 `regression: ` 开头；修改或删除已有回归测试、或 `fix/` 分支无新回归测试时，须在 PR 正文加 `## Regression` 说明，由 `scripts/release/regression.ts` 检查。
+- **死代码**：`vp run deadcode` 调用 knip 检查未使用的文件、导出和依赖（配置在 `knip.ts`，说明见 `scripts/audit/deadcode.ts`）。
 
 ## 改形状、规则和表
 
 - **形状**：改 `packages/protocol/src/<概念>/shapes.ts`、`schema.ts`（`Codec<T.X>`）和 `api.ts`；改接口后运行 `vp run api:client` 和 `vp run capabilities`。
 - **规则**：改所属包内的纯函数（跨端共用的放 `packages/protocol/src/rules`），在旁边的测试里用手写的例子写出改了的行为（[客户端问服务端](docs/subsystems/app.md)）。
 - **表和查询**：改 `apps/server/db/migrations/0001_schema.up.sql` 与 `apps/server/db/queries/<表>.sql`，运行 `vp run --filter @vibevalley/server db:generate`（`src/infra/schema.test.ts` 校验表名与索引）。
-- **旧名字**：`vp run names:verify` 检查代码与词典中的废弃命名；重命名后将旧名登记到 `scripts/stale-names.ts`。
+- **旧名字**：`vp run names:verify` 检查代码与词典中的废弃命名；重命名后将旧名登记到 `scripts/docs/stale-names.ts`。
 
 ## 调试台
 

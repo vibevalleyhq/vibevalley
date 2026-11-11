@@ -27,27 +27,27 @@ import { publicationKey } from "./publication.ts";
 import { ReleaseAssets } from "./ReleaseAssets.tsx";
 
 const viewStyles = stylex.create({
-  section: { display: "flex", minWidth: 0, flexDirection: "column", gap: "calc(var(--spacing) * 4)" },
-  notice: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", color: "var(--color-muted)" },
-  identifierDetail: { fontSize: "var(--text-xs)", lineHeight: "var(--text-xs--line-height)", wordBreak: "break-all", color: "var(--color-muted)" },
-  form: { display: "flex", minWidth: 0, flexDirection: "column", gap: "calc(var(--spacing) * 3)" },
-  actions: { display: "flex", flexWrap: "wrap", gap: "calc(var(--spacing) * 2)" },
-  error: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", color: "var(--color-berry)" },
-  stack: { display: "flex", minWidth: 0, flexDirection: "column", gap: "calc(var(--spacing) * 2)" },
-  detail: { fontSize: "var(--text-xs)", lineHeight: "var(--text-xs--line-height)", color: "var(--color-muted)" },
-  heading: { fontSize: "var(--text-base)", lineHeight: "var(--text-base--line-height)", fontWeight: "var(--font-weight-semibold)" },
+  section: { display: "flex", minWidth: 0, flexDirection: "column", gap: "1rem" },
+  notice: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", color: "var(--color-muted)" },
+  identifierDetail: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", wordBreak: "break-all", color: "var(--color-muted)" },
+  form: { display: "flex", minWidth: 0, flexDirection: "column", gap: "0.75rem" },
+  actions: { display: "flex", flexWrap: "wrap", gap: "0.5rem" },
+  error: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", color: "var(--color-berry)" },
+  stack: { display: "flex", minWidth: 0, flexDirection: "column", gap: "0.5rem" },
+  detail: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", color: "var(--color-muted)" },
+  heading: { fontSize: "var(--text-base)", lineHeight: "var(--leading-base)", fontWeight: "var(--font-weight-semibold)" },
   player: { width: "100%", maxWidth: "100%", minWidth: 0 },
-  source: { fontSize: "var(--text-xs)", lineHeight: "var(--text-xs--line-height)", overflowWrap: "break-word", color: "var(--color-muted)" },
+  source: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", overflowWrap: "break-word", color: "var(--color-muted)" },
   metadata: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
-  prose: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", overflowWrap: "break-word", whiteSpace: "pre-wrap" },
-  link: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", color: "var(--color-water)", textDecorationLine: "underline" },
+  prose: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", overflowWrap: "break-word", whiteSpace: "pre-wrap" },
+  link: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", color: "var(--color-water)", textDecorationLine: "underline" },
 });
 
 const voicesQuery = defineQuery({

@@ -17,7 +17,7 @@ const settingsQuery = defineQuery({
 const query = useQuery(settingsQuery, { enabled: () => props.open });
 ```
 
-生成的 `VibeValleyApi` 方法接受可选请求选项 `{ signal }`，无参数方法把它放在第一个参数，有输入的方法放在第二个参数；生成器是 `scripts/api-client.ts`。Query 把 signal 交给传输，同时用代次阻止不理会取消的读取回写。取消不表示服务端已经停止执行。
+生成的 `VibeValleyApi` 方法接受可选请求选项 `{ signal }`，无参数方法把它放在第一个参数，有输入的方法放在第二个参数；生成器是 `scripts/gen/api-client.ts`。Query 把 signal 交给传输，同时用代次阻止不理会取消的读取回写。取消不表示服务端已经停止执行。
 
 定义把 key、输入、结果 Schema、fetch 和缓存策略绑定在一起。Schema 必填，优先复用 protocol 的 Codec；fetch 返回 unknown，缓存和 data 类型取 Schema 的 Type。响应先解码再提交成功缓存，转换、异步解码与传输共用 signal 和代次；解码失败保留旧成功记录，不重试，也不在错误中保留可能含密钥的 actual 值或 issues。`setData` 校验 Type 侧，不重复执行 wire 转换。调用定义返回只读描述，不发请求。`useQuery` 持有订阅。定义时校验策略，执行时不反复创建 Query client。
 

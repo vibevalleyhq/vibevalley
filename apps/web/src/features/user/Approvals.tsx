@@ -12,8 +12,8 @@ import { ready, useQuery, useQueryClient } from "#/infra/query.ts";
 import { useSearch } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
+import { SettingsPage as Page } from "#/ui/domain/settings.tsx";
 import { Card, Quiet } from "#/ui/layout.tsx";
-import { SettingsPage as Page } from "#/ui/settings.tsx";
 
 import { approvalsQuery } from "./signIns";
 
@@ -22,7 +22,7 @@ const viewStyles = stylex.create({
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   text: {
     display: "flex",
@@ -32,35 +32,35 @@ const viewStyles = stylex.create({
   },
   name: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-medium)",
   },
   code: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-lg)",
-    lineHeight: "var(--text-lg--line-height)",
+    lineHeight: "var(--leading-lg)",
     letterSpacing: "0.08em",
   },
   when: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   warn: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-berry)",
   },
   page: {
     height: "100%",
     overflowY: "auto",
-    padding: "calc(var(--spacing) * 5)",
+    padding: "1.25rem",
   },
   body: {
     display: "flex",
     maxWidth: "var(--container-3xl)",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
 });
 

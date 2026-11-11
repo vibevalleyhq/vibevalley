@@ -13,18 +13,18 @@ const viewStyles = stylex.create({
   menuDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   menuDiv2: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   menuDiv3: {
     display: "grid",
     gridTemplateColumns: "repeat(2,minmax(0,1fr))",
-    columnGap: "calc(var(--spacing) * 3)",
-    rowGap: "var(--spacing)",
+    columnGap: "0.75rem",
+    rowGap: "0.25rem",
     fontSize: "12px",
     color: "var(--color-bark-800)",
   },

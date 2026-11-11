@@ -5,28 +5,32 @@ import { t } from "@vibevalley/i18n";
 
 import { toasts } from "./toasts";
 
+const popIn = stylex.keyframes({
+  from: { opacity: 0, scale: 0.98 },
+});
+
 const viewStyles = stylex.create({
   toasts: {
     pointerEvents: "none",
     position: "fixed",
     insetInline: "0",
-    bottom: "calc(var(--spacing) * 4)",
+    bottom: "1rem",
     zIndex: "40",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   toast: {
-    animationName: { default: "pop-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    animationName: { default: popIn, "@media (prefers-reduced-motion: reduce)": "none" },
     animationDuration: "280ms",
     animationTimingFunction: "var(--ease-out)",
     animationFillMode: "both",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.375rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-page)",
     boxShadow: "var(--shadow-float)",
   },

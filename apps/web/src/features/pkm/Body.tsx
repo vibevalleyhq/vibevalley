@@ -17,12 +17,12 @@ const bodyStyles = stylex.create({
   },
   heading: {
     fontSize: "var(--text-lg)",
-    lineHeight: "var(--text-lg--line-height)",
+    lineHeight: "var(--leading-lg)",
     fontWeight: "var(--font-weight-semibold)",
   },
   subheading: {
     fontSize: "var(--text-base)",
-    lineHeight: "var(--text-base--line-height)",
+    lineHeight: "var(--leading-base)",
     fontWeight: "var(--font-weight-semibold)",
   },
   minorHeading: {
@@ -30,7 +30,7 @@ const bodyStyles = stylex.create({
   },
 });
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   bodyA: {
     color: "var(--wb-water)",
     textDecorationLine: "underline",
@@ -87,10 +87,10 @@ const recipeStyles = stylex.create({
     textDecorationStyle: "dotted",
     textUnderlineOffset: "3px",
   },
-  bodySpanVariant1Case1: {
+  bodySpanPrimary: {
     color: null,
   },
-  bodySpanVariant1Case2: {
+  bodySpanSecondary: {
     color: "var(--wb-berry)",
   },
 });
@@ -111,7 +111,7 @@ export function Body(props: { text: string; refs: readonly PkmTransclusion[] }) 
             data-testid="pkm-link"
             // A hairline under it, not colour alone, tells it from the words around it (in the dark theme the colours are
             // too close); full under the pointer.
-            {...stylex.attrs(recipeStyles.bodyA)}
+            {...stylex.attrs(styles.bodyA)}
             onClick={(e: MouseEvent) => e.stopPropagation()}
           >
             {p.text}
@@ -119,7 +119,7 @@ export function Body(props: { text: string; refs: readonly PkmTransclusion[] }) 
         );
       case "remark":
         return (
-          <mark data-testid="pkm-remark" title={p.remark} {...stylex.attrs(recipeStyles.bodyMark)}>
+          <mark data-testid="pkm-remark" title={p.remark} {...stylex.attrs(styles.bodyMark)}>
             {p.text}
           </mark>
         );
@@ -129,7 +129,7 @@ export function Body(props: { text: string; refs: readonly PkmTransclusion[] }) 
           <span
             data-testid="pkm-ref"
             title={ref?.pageTitle ? t("web.pkm.page.refFrom", { page: ref.pageTitle }) : undefined}
-            {...stylex.attrs(recipeStyles.bodySpan, ref?.found === false ? recipeStyles.bodySpanVariant1Case2 : recipeStyles.bodySpanVariant1Case1)}
+            {...stylex.attrs(styles.bodySpan, ref?.found === false ? styles.bodySpanSecondary : styles.bodySpanPrimary)}
           >
             {ref?.body ?? t("web.pkm.page.missingRef")}
           </span>

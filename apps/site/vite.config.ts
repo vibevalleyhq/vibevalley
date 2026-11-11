@@ -2,15 +2,13 @@ import { fileURLToPath } from "node:url";
 
 import solid from "@solidjs/vite-plugin";
 import stylex from "@stylexjs/unplugin";
-import { styleMigrationGraph } from "vibevalley/style-migration";
 import { defineConfig, lazyPlugins } from "vite-plus";
 
 export default defineConfig({
   plugins:
     lazyPlugins(() => [
-      stylex.vite({ useCSSLayers: { before: ["theme", "base", "components"], after: ["utilities"], prefix: "stylex" }, sxPropName: false }),
+      stylex.vite({ useCSSLayers: { before: ["theme", "base", "components"], after: [], prefix: "stylex" }, sxPropName: false }),
       solid({ ssr: true, start: { renderMode: "async" } }),
-      styleMigrationGraph("site"),
     ]) ?? [],
   resolve: { alias: { "@game": fileURLToPath(new URL("../web/public", import.meta.url)) } },
   build: { assetsInlineLimit: 0 },

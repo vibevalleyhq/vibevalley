@@ -1,8 +1,8 @@
 # 概念在各层的名字
 
-一个概念在每一层叫什么：从农场里看到的，到页面、协议、HTTP、服务端、存储，最后到 oar。概念本身是什么见 [concepts.md](docs/concepts.md)，叫法见[用语表](docs/README.md#用语)。分层和存盘见[架构](docs/architecture.md#分层)与[存了什么](docs/architecture.md#存了什么)，Session、Run 和 oar 会话见[帮工](docs/subsystems/session.md#模型和不变量)。
+一个概念在每一层叫什么：从农场里看到的，到页面、协议、HTTP、服务端、存储，最后到 oar。概念定义以 [concepts.md](docs/concepts.md) 为单一真源，叫法与禁用词见[用语表](docs/README.md#用语)。分层和存盘见[架构](docs/architecture.md#分层)与[存了什么](docs/architecture.md#存了什么)，Session、Run 和 oar 会话见[帮工](docs/subsystems/session.md#模型和不变量)。
 
-这里只查名字，不补成完整的接口或存储清单。完整接口和权限见[能力表](docs/reference/capabilities.md)。
+本页只索引 [concepts.md](docs/concepts.md) 中的一级概念在各层的名字，不重复解释概念含义，也不列附属子字段。完整接口和权限见[能力表](docs/reference/capabilities.md)。
 
 ## 看得见的几层
 
@@ -10,35 +10,20 @@
 
 | 概念 | 农场里 | 页面 | 协议 | HTTP |
 |---|---|---|---|---|
-| Host | — | — | `ServerConfig` 的 `home`（`$VIBEVALLEY_HOME`，不进协议） | |
-| 空间 | 大地图 | `/repos` 的「全部」（`farm/map/RepoMap.tsx`，农场的皮，`app/` 交给仓库页） | `SpaceState`；目录是服务端 `ServerConfig` 的 `workRoot`（不进协议） | |
-| 仓库 | 大地图上的一座岛 | `/repos/:repo`（`features/repo`；岛的地和空位是 `farm/map/RepoMap.tsx` 的 `IslandDetail`） | `RepoSummary`、`RepoActivity`、`RepoLanguages`；帮工在哪个仓库、目录、分支是服务端的 `Workplace` | `/api/v1/repo/…` |
-| 档案 | 一种小动物（助手是田头的人） | `/agents`（`features/agent`） | `Agent`（`role` 是助手或帮工） | `/api/v1/agent/…` |
-| 档案模板 | — | `/agents/templates`（`features/agent/TemplatesPage.tsx`） | `AgentTemplate`、档案上的 `from` | `/api/v1/agent/template/…` |
+| Host | — | — | `ServerConfig` 的 `home`（`$VIBEVALLEY_HOME`，不进协议） | — |
+| 空间 | 大地图 | `/repos` 的「全部」（`farm/map/RepoMap.tsx`） | `SpaceState`；目录是服务端 `ServerConfig` 的 `workRoot` | `/api/v1/state`、`/api/v1/events` |
+| 仓库 | 大地图上的一座岛 | `/repos/:repo`（`features/repo`） | `RepoSummary`、`RepoActivity`、`RepoLanguages` | `/api/v1/repo/…` |
+| 助手 | 田头的助手 | `/orchestrator`、`/orchestrator/<档案 id>`（`features/orchestrator`） | `SpaceState.sessions`（`role: "orchestrator"`）、`Channel.orchestrator` | `/api/v1/channel/message/send`、`/api/v1/orchestrator/…` |
+| 档案、技能 | 小动物、技能书 | `/agents`（`features/agent`）、`/settings/skills`（`features/runtime/SkillsPage.tsx`） | `Agent`、`AgentTemplate`、`Skill` | `/api/v1/agent/…`、`/api/v1/skill/…` |
 | 农机 | 农具 | `/runtimes`（`features/runtime`） | `RuntimeInfo`、`RuntimeSettings` | `/api/v1/runtime/…` |
-| 技能 | 技能书 | `/settings/skills`（`features/runtime/SkillsPage.tsx`） | `Skill` | `/api/v1/skill/…` |
-| 记性 | 记性 | 档案页和助手页（`features/memory/Memory.tsx`） | `Memory`、`MemoryList` | `/api/v1/memory/…`（`agent` 是助手的档案时是那个助手的） |
-| 助手 | 助手 | `/orchestrator`、`/orchestrator/<档案 id>`（`features/orchestrator`） | `SpaceState.sessions`（`role: "orchestrator"` 的会话）、`Channel.orchestrator`（这里的助手：私聊的对面或频道成员里的助手）、`Channel.members`（频道里的成员） | `/api/v1/channel/message/send`、`/api/v1/orchestrator/…` |
-| 工单 | 看板上的卡片 | `/issues`（`features/issue`） | `Issue`、`Issue.assignments`（责任与执行历史） | `/api/v1/issue/…` |
-| 父子工单 | 图纸桌打开工单 | 工作台 `features/issue/FamilyDetail.tsx` | `Issue.parent`、`blockedBy`，父单与子单都是普通工单 | `/api/v1/issue/…` |
-| Artifact | — | `/artifacts`（`features/artifact`） | `Artifact`、`ArtifactBlock` | `/api/v1/artifact/…` |
+| 工单、父子工单 | 图纸桌卡片、一块地 | `/issues`（`features/issue`、`FamilyDetail.tsx`）、地块详情（`farm/issue/IssueView.tsx`） | `Issue`（`assignments`、`parent`、`blockedBy`）、`Changes`、`Landing` | `/api/v1/issue/…` |
+| 帮工、一轮 | 地里干活的小动物、一季庄稼 | 地块详情、`features/session/WorkLog.tsx`、`Trajectory.tsx` | `Session`、`Run`、`RunTrigger`、`SessionEvent` | `/api/v1/session/…`、`/api/v1/issue/run/list` |
+| 频道、私聊、工单串 | 田头、频道、工单串 | 田头窗（`farm/chat`）、`/chat`（`features/channel`） | `Channel`（`type`：`channel`、`direct`、`thread`）、`ChatMessage`（`actor: Actor`）、`Attachment` | `/api/v1/channel/…`、`/api/v1/attachment/…` |
+| Artifact | — | `/artifacts`（`features/artifact`） | `Artifact`、`Block`、`Suggestion` | `/api/v1/artifact/…` |
 | 笔记 | — | `/pkm`（`features/pkm`） | `PkmPage`、`PkmBlock` | `/api/v1/pkm/…` |
-| 帮工 | 在一块地上干活的小动物 | 地块和地块详情（`farm/issue/IssueView.tsx`） | `Session`（`SpaceState.sessions`） | `/api/v1/session/stop`；别的按工单：`/api/v1/issue/…` |
-| 一轮（run） | 一季庄稼 | 地里长什么（`Session.phase`）；工单详情的「每一轮」 | `Run`、`RunTrigger`；核心状态里是带着 `brief` 的 `sessionPhaseChanged` 到 `sessionReported` 两个事实、`Session.runs`、`lastRun` | `/api/v1/issue/run/list` |
-| 轨迹 | 轨迹 | `features/session/WorkLog.tsx`、`features/session/Trajectory.tsx` | `Session`（走了的阶段是 `closed`）、`SessionEvent`（它的日志） | `/api/v1/session/list`、`/api/v1/session/get`、`/api/v1/session/event/list` |
-| 改动、完成 | 收成清单、收获 | 农场 `farm/panels/Harvest.tsx`、工作台 `features/issue/CloseDialog.tsx` | `Changes` | `/api/v1/issue/diff/get`、`/api/v1/issue/status/update`（挪到 `done`） |
-| 验收、验收意见、问题 | 抽穗、长草、结果、缺肥 | 工单详情（规则 `features/issue/overview.ts`，农场 `farm/issue/IssueView.tsx`、工作台 `features/issue/IssueDetail.tsx`）的状态框、输入框里的验收、意见 | `Issue.review`、`reviewedAt`、`findings`、`questions`；地的样子是 `plotOf`（`apps/server/src/game/view.ts`） | `/api/v1/issue/review`（`pass` 是过没过，`findings` 是验收意见）；打回也可以是 `/api/v1/issue/status/update` 带话挪回待办；`questions` 来自帮工汇报（`sessionReported` 事实的 `questions`） |
-| 默认频道、频道、私聊 | 田头、频道 | 田头窗口和它的频道菜单（`farm/chat`）、`/chat`（`features/channel`） | `Channel`（`type`：`channel`、`direct`；默认的带 `default`，私聊带 `peer`）、`ChatMessage`、`SpaceState.chat` | `/api/v1/channel/…`、`/api/v1/channel/message/send`、`/api/v1/channel/message/list` |
-| 工单串、评论 | 工单串、浇水 | 派活消息下面的串；地块和工单详情里的「浇水：带句话」 | `Channel`（`type: thread`，挂在 `parent` 频道的 `root` 消息下）；评论是对整张工单说的，交给它最新的帮工，不挂在某一步上 | `/api/v1/channel/message/list`、`/api/v1/issue/comment/create` |
-| 定时任务 | 定时任务 | 频道菜单里；它的工单在看板上，带「定时任务」标签 | `Cron`；它的工单是 `Issue.cron` 指着它的那张 | `/api/v1/cron/…` |
-| 工单模板 | 播种袋里的种子 | 播种袋（`farm/panels/SeedForms.tsx`） | `RepoTemplates`、`TemplateKind`、`IssueTemplate`；目录是 `apps/server/src/agent/template_catalog.json` | `/api/v1/repo/template/list` |
-| 来电 | 手机来电 | `farm/phone/calls.ts` | `InboxItem`（`StateFrame.inbox`，`apps/server/src/inbox/items.ts` 从核心状态现算） | |
-| 连接器 | 连接器 | `/settings/chat`（`features/connector/ConnectorsPage.tsx`） | `ConnectorStatus` | `/api/v1/connector/…` |
-| （不画） | 连接到本机 | `/settings/devices`（`features/lan/LanPage.tsx`）、连进来的设备的 `/pair`（`features/lan/PairPage.tsx`） | `LanStatus`、`UserDevice` | `/api/v1/lan/…` |
-| 语音 | 麦克风 | `/settings/call`、`/settings/moss`、`/settings/dictation`（`features/voice/VoiceForm.tsx`）、`features/voice/` | `VoiceSettings` | `/api/v1/voice/...` |
-| 进度、成就 | 金币、连胜、任务与成就 | `farm/panels/Achievements.tsx` | `Progress`、`LedgerEntry`、`SpaceState.progress` | 帧里的 `progress` 和 `view.achievements`；成就的说法 `game.achievement.list` |
-| 等级 | 等级、经验 | 农场卡、任务与成就 | `CommitCount`、`FarmView.level` | |
-| 地 | 一块地：一张工单 | 像素村（`farm/canvas`）、地块详情（`farm/issue/IssueView.tsx`） | 干活地点是服务端 `Workplace`；开 worktree 时分支由 `issueBranch` 给出，目录是 `worktrees/<仓库>.<工单号>`，否则直接在仓库目录且 `branch` 为空；`FarmView.plots` 按工单的 id 做键（`plotKeyOf`，服务端 `game/view.ts` 的 `viewOf`）；帮工站在哪块地是 `SessionPlay.station` | `/api/v1/channel/message/send` 的 `station` |
+| 记性 | 记性 | 档案页与助手页（`features/memory/Memory.tsx`） | `Memory`、`MemoryList` | `/api/v1/memory/…` |
+| 定时任务 | 定时任务 | 频道菜单、看板带「定时任务」标签的工单 | `Cron`（`Issue.cron`） | `/api/v1/cron/…` |
+| 机器、「连接到本机」 | — | `/settings/devices`（`features/lan/LanPage.tsx`）、`/pair` | `Machine`、`LanStatus`、`UserDevice` | `/api/v1/lan/…` |
 
 ## 服务端以下
 
@@ -46,34 +31,19 @@
 
 | 概念 | 服务端 | 存储 | oar |
 |---|---|---|---|
-| Host | `infra/config.ts` 的 `ServerConfig` 的 `home`；`services.ts` 把全部服务叠起来 | `VIBEVALLEY_HOME` | |
-| 空间 | `infra/config.ts` 的 `ServerConfig` 的 `workRoot` | `VIBEVALLEY_WORK_ROOT` | |
-| 仓库 | `Repo`（`repo/repo.ts`、`git.ts`、`workplace.ts`） | Space 的 `repos/` 下的 git 仓库 | 会话的 `cwd` |
-| 档案、技能、档案模板 | `Agent`（模板的读法在 `agent/template.ts`） | `config.json`；内置模板 `apps/server/src/agent/templates/`，加进来的 `agent-templates/` | |
-| 农机 | `Runtime` | `config.json` 里每台农机的设置、`runtime_spend` 表 | `Runtime`、`RuntimeRegistry` |
-| 记性 | `Memory` | `memory` 表 | |
-| 助手 | `Orchestrator`（每个助手一个宿主） | `session` 表、`agent/<档案 id>/` | 不经 oar 的子会话：跑在 VibeValley 自己的 agent 上（`packages/agent`） |
-| 工单 | `Issue`（`issue/issue.ts`；派给助手的在 `orchestrator/orchestrator.ts`） | `issue`、`issue_assignment`（责任关系）、`issue_assignment_execution`（执行上下文） | |
-| 父子依赖 | `Issue`（`issue/dependencies.ts`） | `issue.parent`、`blocked_by`、`constraints` | 通用 DAG 算法在 `packages/agent/src/dag.ts` |
-| Artifact | `Artifact`（`artifact/artifact.ts`） | `artifact`、`artifact_version`、`artifact_block`、`artifact_block_revision`、`artifact_change`、`artifact_suggestion` 表；每一稿是一个附件 | |
-| 笔记 | `Pkm`（`pkm/pkm.ts`） | `pkm/` 下的 Markdown 页面、`pkm_comment`、`pkm_change` 表 | |
-| 执行上下文 | `Session`（`session/session.ts`），执行资源归 `Executor`；工单里的上下文画成帮工，私聊的通过 `channel` 关联频道 | `session` 表（工作目录、oar 会话 id、最后一轮原话、阶段和想起过的记性） | 一个帮工是一个 `Subagent`，包着一个 oar 的会话；每个帮工有自己的 `Subagents` |
-| 一轮（run） | `Session`（帮工的 run 在 `session/session.ts`；进程内 agent 的 run 在 `session/inProcessRun.ts`）；`session/reaction.ts` 把会话事件读成事实 | `session_run` 表 | 帮工的一次 run 包着一个 oar turn（开始到结束），结束时交一份 `SubagentReport` |
-| 轨迹 | `Session`（`session/journal.ts` 的 `Journal`） | `session` 表、`events/<id>.json`；原始记录在 `logs/` | oar 的事件：文字、思考、工具调用的开始和结束…… |
-| 改动、完成 | `Issue`（挪到 `done`、合并、提 PR；`repo/repo.ts` 管分支和 worktree） | 开 worktree 时的工单分支和 worktree；直接在仓库目录干活的没有这两项 | |
-| 默认频道、频道、工单串 | `Channel`（`channel/channel.ts`）；帮工在频道里说话经 `/mcp`（`Mcp`、`Tool`） | `channel`、`channel_message`、`channel_participant`、`mailbox_delivery`、`channel_read_cursor`、`channel_mention`、`channel_member` 表 | 送到 Agent Session 的话是 `Wake`、`Steer`、`Announce` |
-| 定时任务 | `Cron` | `cron` 表 | |
-| 巡查 | `Inbox`（`inbox/inbox.ts`；规则在 `inbox/patrol.ts`） | 不存：每轮从核心状态算 | |
-| 来电 | `Inbox`（`inbox/inbox.ts`、`inbox/items.ts`） | 不存：`StateFrame.inbox` 从核心状态现算 | |
-| 连接器 | `Connector`；三家的接口在 `connector/weixin.ts`、`feishu.ts`、`qq.ts` | `connector_account`、`connector_inbound`、`connector_outbox` 表 | |
-| 「连接到本机」 | `Lan` | `lan` 表 | |
-| 用户 | `User` | `user_account`、`user_device` 表 | |
-| 语音 | `Voice`（`voice/voice.ts`；声网的令牌和语音 agent 用 npm 的 `agora-token`、`agora-agents`） | `settings.json` | |
-| 钥匙和语音设置 | `Setting` | `settings.json`（只有你能读） | 会话的 `env` |
-| 进度、成就 | `Game`（`game/game.ts`、`progress.ts`） | `game_ledger` 表；进度从它折出来 | |
-| 等级 | `Game` | `game_ledger` 折出的 commit 数 | |
-| 地 | `Game`；规则在 `apps/server/src/game/view.ts` | `SpaceState.plays`（内存中按工具调用算出）和 `FarmView.plots` | |
-| 核心状态 | `Core` | 内存里的一份投影，从库里的 `session` 表和各模块表恢复 | |
+| Host、空间 | `infra/config.ts` 的 `ServerConfig`（`home`、`workRoot`）；`services.ts` 组装全部服务 | `$VIBEVALLEY_HOME`、`$VIBEVALLEY_WORK_ROOT` | — |
+| 仓库 | `Repo`（`repo/repo.ts`、`git.ts`、`workplace.ts`、`github.ts`） | Space 的 `repos/` 与工单检出 `worktrees/` | 会话的 `cwd` |
+| 助手 | `Orchestrator`（每个助手档案一个 `AgentHost`） | `session` 表、`agent/<档案 id>/` | 跑在进程内 agent（`packages/agent`） |
+| 档案、技能 | `Agent`（`agent/agent.ts`、`template.ts`） | `config.json`、`agent-templates/`、内置 `templates/` 与 `skills/` | — |
+| 农机 | `Runtime`（`runtime/runtime.ts`、`presets.ts`） | `config.json` 农机设置、`runtime_spend` 表 | `Runtime`、`RuntimeRegistry` |
+| 工单、父子工单 | `Issue`（`issue/issue.ts`、`lifecycle.ts`、`dependencies.ts`、`github.ts`） | `issue`、`issue_assignment`、`issue_assignment_execution`、`issue_github` 表 | 通用 DAG 在 `packages/agent/src/base/dag.ts` |
+| 帮工、一轮 | `Session`（`session/session.ts`、`inProcessRun.ts`、`journal.ts`），执行器在 `Machine`（`machine/executor.ts`） | `session`、`session_run` 表、`events/<id>.json` | 一个帮工是一个 `Subagent`，一轮对应一个 oar turn 与 `SubagentReport` |
+| 频道、附件、信箱 | `Channel`（`channel/channel.ts`）、`Attachment`（`attachment/attachment.ts`、`storage.ts`）、`Mailbox`（`mailbox/mailbox.ts`） | `channel`、`channel_participant`（`kind` + `role`）、`channel_message`、`attachment`、`mailbox_trigger`、`mailbox_delivery` 表 | 投递经 `Session` 送入执行实例 |
+| Artifact | `Artifact`（`artifact/artifact.ts`） | `artifact`、`artifact_version`、`artifact_block`、`artifact_block_revision`、`artifact_change`、`artifact_suggestion` 表 | — |
+| 笔记 | `Pkm`（`pkm/pkm.ts`） | `pkm/` 下的 Markdown 页面、`pkm_comment`、`pkm_change` 表 | — |
+| 记性 | `Memory`（`memory/memory.ts`） | `memory` 表 | — |
+| 定时任务 | `Cron`（`cron/cron.ts`） | `cron` 表 | — |
+| 机器、「连接到本机」 | `Machine`（`machine/machine.ts`、`executor.ts`）、`Lan`（`lan/lan.ts`） | `machine`、`lan`、`user_device` 表 | 本机或远端执行后端 |
 
 ## oar 那一层
 

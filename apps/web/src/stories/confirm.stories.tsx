@@ -8,7 +8,7 @@ import { Empty } from "#/ui/layout.tsx";
 import { ToastHost } from "#/ui/ToastHost.tsx";
 import { toast } from "#/ui/toasts.ts";
 
-const variantStyles = stylex.create({
+const styles = stylex.create({
   list: {
     display: "flex",
     width: "100%",
@@ -22,7 +22,7 @@ const variantStyles = stylex.create({
   confirmStoriesDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   confirmStoriesLi: {
     borderTopStyle: { default: null, ":not(:last-child)": "solid" },
@@ -33,9 +33,9 @@ const variantStyles = stylex.create({
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 3)",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBlock: "calc(var(--spacing) * 2.5)",
+    gap: "0.75rem",
+    paddingInline: "1rem",
+    paddingBlock: "0.625rem",
   },
   confirmStoriesSpan: {
     minWidth: "0",
@@ -44,7 +44,7 @@ const variantStyles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
 });
 
@@ -59,13 +59,13 @@ export default stories({
       render: () => {
         const [left, setLeft] = createSignal(all);
         return (
-          <div {...stylex.attrs(variantStyles.confirmStoriesDiv)}>
+          <div {...stylex.attrs(styles.confirmStoriesDiv)}>
             <Show when={left().length > 0} fallback={<Empty icon="issues">都删掉了。</Empty>}>
-              <ul {...stylex.attrs(variantStyles.list)}>
+              <ul {...stylex.attrs(styles.list)}>
                 <For each={left()}>
                   {(title) => (
-                    <li {...stylex.attrs(variantStyles.confirmStoriesLi)}>
-                      <span {...stylex.attrs(variantStyles.confirmStoriesSpan)}>{title}</span>
+                    <li {...stylex.attrs(styles.confirmStoriesLi)}>
+                      <span {...stylex.attrs(styles.confirmStoriesSpan)}>{title}</span>
                       <ConfirmButton
                         label="删除"
                         icon="delete"

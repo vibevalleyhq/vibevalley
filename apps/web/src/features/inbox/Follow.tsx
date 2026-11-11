@@ -22,13 +22,18 @@ export function Follow() {
     const news = freshOf(known, f.inbox);
     known = news.known;
     for (const call of news.fresh)
-      if (host.notify && !document.hasFocus()) void host.notify({ title: call.words.title, body: call.words.body }).catch(() => {});
+      if (host.notify && !document.hasFocus())
+        void host.notify({ title: call.words.title, body: call.words.body }).catch((e: unknown) => {
+          if (!(e instanceof Error)) throw e;
+        });
     if (!host.tray) return;
     const summary = traySummary(f.state, f.inbox);
     const said = JSON.stringify(summary);
     if (said === tray) return;
     tray = said;
-    void host.tray(summary).catch(() => {});
+    void host.tray(summary).catch(() => {
+      tray = "";
+    });
   });
   onSettled(() => currentHost().locale?.(currentLocale()));
   onSettled(() => currentHost().voiceShortcut?.on(() => void voiceCall.toggle()));

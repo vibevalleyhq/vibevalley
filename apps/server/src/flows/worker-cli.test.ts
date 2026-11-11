@@ -9,18 +9,18 @@ import { Context, Effect, Layer, Stream } from "effect";
 import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-import { Agent } from "#/agent/agent.ts";
-import { explicitMandate } from "#/issue/creation.ts";
-import { Issue } from "#/issue/issue.ts";
-import { Mcp } from "#/mcp/mcp.ts";
-import { Repo } from "#/repo/repo.ts";
-import { repository } from "#/repo/repository.ts";
-import { Session } from "#/session/session.ts";
-import { workerAccess } from "#/session/worker.ts";
+import { Mcp } from "#/gateway/mcp/mcp.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { explicitMandate } from "#/modules/issue/creation.ts";
+import { Issue } from "#/modules/issue/issue.ts";
+import { Repo } from "#/modules/repo/repo.ts";
+import { repository } from "#/modules/repo/repository.ts";
+import { Session } from "#/modules/session/session.ts";
+import { workerAccess } from "#/modules/session/worker.ts";
+import { Tool } from "#/modules/tool/tool.ts";
 import { gitIn } from "#/testing/git.ts";
 import { starter, testConfig, until, waitFor } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
-import { Tool } from "#/tool/tool.ts";
 
 const listen = Effect.fnUntraced(function* (mcp: Mcp["Service"]) {
   const node = createServer();

@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect";
 import { FetchHttpClient, HttpBody, HttpClient } from "effect/http";
 
-import { readMossResponse } from "./response.ts";
+import { MossErrorOutcome, MossErrorReason, readMossResponse } from "./response.ts";
 import { mossUnderstandingModels } from "./understanding-models.ts";
 
 const FileId = Schema.String.check(Schema.isBetweenCodePoints(1, 256), Schema.isPattern(/\S/u));
@@ -31,8 +31,8 @@ const Response = Schema.fromJsonString(
 );
 
 class MossUnderstandingError extends Schema.TaggedError<MossUnderstandingError, { readonly brand: unique symbol }>()("MossUnderstandingError", {
-  reason: Schema.Literals(["Credentials", "InvalidInput", "Network", "Timeout", "HttpStatus", "InvalidResponse", "TooLarge"]),
-  outcome: Schema.Literals(["NotSubmitted", "Rejected", "Unknown"]),
+  reason: MossErrorReason,
+  outcome: MossErrorOutcome,
   status: Schema.optionalKey(Schema.Int),
 }) {}
 

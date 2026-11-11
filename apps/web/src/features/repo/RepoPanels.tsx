@@ -11,7 +11,7 @@ import { api, reasonOf } from "#/infra/api.ts";
 import { type QueryResult, useQueryClient, ready } from "#/infra/query.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
-import { AgentFace } from "#/ui/Face.tsx";
+import { AgentFace } from "#/ui/domain/Face.tsx";
 import { Field, TextInput } from "#/ui/Field.tsx";
 import { Card, Quiet } from "#/ui/layout.tsx";
 import { SpriteIcon } from "#/ui/pixel/index.ts";
@@ -21,14 +21,17 @@ import { Segmented } from "#/ui/Segmented.tsx";
 import { calendarOf, type CalendarDay, dayText, streaksOf } from "./calendar";
 import { langIcon, languageShares, number, percent } from "./repos";
 
-const variantStyles = stylex.create({
+const tile = 12;
+const tileGap = 3;
+
+const styles = stylex.create({
   statSpan: {
     WebkitLineClamp: "2",
     WebkitBoxOrient: "vertical",
     display: "-webkit-box",
     overflow: "hidden",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-medium)",
   },
   languagesDiv: {
@@ -36,14 +39,8 @@ const variantStyles = stylex.create({
     minWidth: "0",
     flex: "1",
     flexDirection: "column",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
-});
-
-const tile = 12;
-const tileGap = 3;
-
-const viewStyles = stylex.create({
   calendarRows: { gap: tileGap },
   calendarDay: { height: tile },
   calendarWeek: { gap: tileGap, marginLeft: tileGap },
@@ -52,44 +49,44 @@ const viewStyles = stylex.create({
   calendarLoading: { opacity: 0.5 },
   statDiv: {
     display: "flex",
-    minWidth: "calc(var(--spacing) * 18)",
+    minWidth: "4.5rem",
     flexDirection: "column",
   },
-  statSpan: {
+  statSpan2: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   barSpan: {
     display: "block",
-    height: "calc(var(--spacing) * 1.5)",
+    height: "0.375rem",
     overflow: "hidden",
-    borderRadius: "2147483647px",
+    borderRadius: "9999px",
     backgroundColor: "var(--color-hover)",
   },
   barSpan2: {
     display: "block",
     height: "100%",
-    borderRadius: "2147483647px",
+    borderRadius: "9999px",
   },
-  languagesDiv: {
+  languagesDiv2: {
     display: "flex",
-    height: "calc(var(--spacing) * 14)",
+    height: "3.5rem",
     overflow: "hidden",
     borderRadius: "var(--radius-md)",
     backgroundColor: "var(--color-bark)",
-    padding: "var(--spacing)",
+    padding: "0.25rem",
   },
   languagesSpan: {
     display: "flex",
-    minWidth: "var(--spacing)",
+    minWidth: "0.25rem",
     alignItems: "center",
     justifyContent: "center",
   },
-  languagesDiv2: {
+  languagesDiv22: {
     display: "grid",
-    columnGap: "calc(var(--spacing) * 6)",
-    rowGap: "calc(var(--spacing) * 2)",
+    columnGap: "1.5rem",
+    rowGap: "0.5rem",
     gridTemplateColumns: {
       default: null,
       "@media (width>=40rem)": "repeat(2,minmax(0,1fr))",
@@ -98,12 +95,12 @@ const viewStyles = stylex.create({
   languagesDiv3: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   languagesSpan2: {
     display: "flex",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   languagesSpan3: {
     minWidth: "0",
@@ -117,63 +114,63 @@ const viewStyles = stylex.create({
     color: "var(--color-muted)",
   },
   languagesDiv4: {
-    height: "calc(var(--spacing) * 12)",
+    height: "3rem",
     borderRadius: "var(--radius-md)",
     backgroundColor: "var(--color-hover)",
   },
   codeCode: {
     borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-selected)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.375rem",
     paddingBlock: "1px",
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   notCountedDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderRadius: "var(--radius-lg)",
     backgroundColor: "var(--color-hover)",
-    padding: "calc(var(--spacing) * 3)",
+    padding: "0.75rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   commitCalendarP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   commitCalendarDiv: {
     display: "grid",
     gridTemplateColumns: "repeat(4,minmax(0,1fr))",
-    gap: "calc(var(--spacing) * 6)",
+    gap: "1.5rem",
   },
   commitCalendarDiv2: {
     overflowX: "auto",
-    paddingBottom: "var(--spacing)",
+    paddingBottom: "0.25rem",
   },
   commitCalendarDiv3: {
     minWidth: "704px",
   },
   commitCalendarDiv4: {
     position: "relative",
-    height: "calc(var(--spacing) * 4)",
+    height: "1rem",
   },
   commitCalendarSpan: {
     position: "absolute",
     top: "0",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   commitCalendarDiv5: {
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
     display: "flex",
   },
   commitCalendarDiv6: {
     display: "flex",
-    width: "calc(var(--spacing) * 5)",
+    width: "1.25rem",
     flexDirection: "column",
   },
   commitCalendarSpan2: {
@@ -192,19 +189,19 @@ const viewStyles = stylex.create({
     flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   commitCalendarSpan3: {
     display: "flex",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   handsDiv: {
     display: "grid",
-    gap: "calc(var(--spacing) * 2.5)",
+    gap: "0.625rem",
     gridTemplateColumns: {
       default: null,
       "@media (width>=40rem)": "repeat(2,minmax(0,1fr))",
@@ -212,37 +209,37 @@ const viewStyles = stylex.create({
   },
   handsSpan: {
     display: "flex",
-    width: "calc(var(--spacing) * 8)",
-    height: "calc(var(--spacing) * 8)",
+    width: "2rem",
+    height: "2rem",
     flexShrink: "0",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: "2147483647px",
+    borderRadius: "9999px",
     backgroundColor: "var(--color-selected)",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-medium)",
   },
   newRepoFormForm: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
   },
   newRepoFormP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-berry)",
   },
   newRepoFormP2: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   newRepoFormDiv: {
     display: "flex",
     justifyContent: "flex-end",
-    gap: "calc(var(--spacing) * 2)",
-    paddingTop: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
+    paddingTop: "0.5rem",
   },
 });
 
@@ -250,9 +247,9 @@ export type Asked<A> = QueryResult<A>;
 
 export function Stat(props: { label: string; value: string }) {
   return (
-    <div {...stylex.attrs(viewStyles.statDiv)}>
-      <span {...stylex.attrs(viewStyles.statSpan)}>{props.label}</span>
-      <span {...stylex.attrs(variantStyles.statSpan)}>{props.value}</span>
+    <div {...stylex.attrs(styles.statDiv)}>
+      <span {...stylex.attrs(styles.statSpan2)}>{props.label}</span>
+      <span {...stylex.attrs(styles.statSpan)}>{props.value}</span>
     </div>
   );
 }
@@ -260,8 +257,8 @@ export function Stat(props: { label: string; value: string }) {
 /** A thin rounded bar, filled to its share. */
 function Bar(props: { share: number; color: string }) {
   return (
-    <span {...stylex.attrs(viewStyles.barSpan)}>
-      <span {...stylex.attrs(viewStyles.barSpan2)} style={{ width: `${Math.min(1, Math.max(0, props.share)) * 100}%`, background: props.color }} />
+    <span {...stylex.attrs(styles.barSpan)}>
+      <span {...stylex.attrs(styles.barSpan2)} style={{ width: `${Math.min(1, Math.max(0, props.share)) * 100}%`, background: props.color }} />
     </span>
   );
 }
@@ -276,17 +273,17 @@ export function Languages(props: { languages: Asked<RepoLanguages> }) {
     return d ? languageShares(d.languages) : [];
   };
   return (
-    <Card title={t("web.repo.whatLanguages")} action={<span {...stylex.attrs(viewStyles.statSpan)}>{t("web.repo.byLines")}</span>}>
+    <Card title={t("web.repo.whatLanguages")} action={<span {...stylex.attrs(styles.statSpan2)}>{t("web.repo.byLines")}</span>}>
       <Switch
         fallback={
           <>
             {/* Bark, not a token: the pixel logos are drawn to sit on it. */}
-            <div role="img" aria-label={list(shares().map((s) => `${s.label} ${percent(s.share)}`))} {...stylex.attrs(viewStyles.languagesDiv)}>
+            <div role="img" aria-label={list(shares().map((s) => `${s.label} ${percent(s.share)}`))} {...stylex.attrs(styles.languagesDiv2)}>
               <For each={shares()}>
                 {(s) => (
                   <span
                     title={`${s.label} · ${percent(s.share)}`}
-                    {...stylex.attrs(viewStyles.languagesSpan)}
+                    {...stylex.attrs(styles.languagesSpan)}
                     style={{ "flex-grow": Math.max(1, Math.round(s.share * 10000)), background: s.color }}
                   >
                     <Show when={s.share >= logoInBar}>
@@ -296,18 +293,18 @@ export function Languages(props: { languages: Asked<RepoLanguages> }) {
                 )}
               </For>
             </div>
-            <div {...stylex.attrs(viewStyles.languagesDiv2)}>
+            <div {...stylex.attrs(styles.languagesDiv22)}>
               <For each={shares()}>
                 {(s) => (
-                  <div {...stylex.attrs(viewStyles.languagesDiv3)}>
+                  <div {...stylex.attrs(styles.languagesDiv3)}>
                     <SpriteIcon name={langIcon(s.id)} size={32} />
-                    <div {...stylex.attrs(variantStyles.languagesDiv)}>
-                      <span {...stylex.attrs(viewStyles.languagesSpan2)}>
-                        <span {...stylex.attrs(viewStyles.languagesSpan3)}>{s.label}</span>
-                        <span {...stylex.attrs(viewStyles.languagesSpan4)}>{percent(s.share)}</span>
+                    <div {...stylex.attrs(styles.languagesDiv)}>
+                      <span {...stylex.attrs(styles.languagesSpan2)}>
+                        <span {...stylex.attrs(styles.languagesSpan3)}>{s.label}</span>
+                        <span {...stylex.attrs(styles.languagesSpan4)}>{percent(s.share)}</span>
                       </span>
                       <Bar share={s.share < 0.02 ? 0.02 : s.share} color={s.color} />
-                      <span {...stylex.attrs(viewStyles.statSpan)}>{t("web.repo.linesAndFiles", { lines: number(s.lines), files: number(s.files) })}</span>
+                      <span {...stylex.attrs(styles.statSpan2)}>{t("web.repo.linesAndFiles", { lines: number(s.lines), files: number(s.files) })}</span>
                     </div>
                   </div>
                 )}
@@ -320,7 +317,7 @@ export function Languages(props: { languages: Asked<RepoLanguages> }) {
           <NotCounted reason={reasonOf(props.languages.error())} />
         </Match>
         <Match when={!data()}>
-          <div {...stylex.attrs(viewStyles.languagesDiv4)} />
+          <div {...stylex.attrs(styles.languagesDiv4)} />
         </Match>
         <Match when={shares().length === 0}>
           <Quiet>{t("web.repo.empty")}</Quiet>
@@ -332,12 +329,12 @@ export function Languages(props: { languages: Asked<RepoLanguages> }) {
 
 function NotCounted(props: { reason: string }) {
   const install = () => props.reason.includes("brew install tokei");
-  const code = (text: string) => <code {...stylex.attrs(viewStyles.codeCode)}>{text}</code>;
+  const code = (text: string) => <code {...stylex.attrs(styles.codeCode)}>{text}</code>;
   return (
-    <div {...stylex.attrs(viewStyles.notCountedDiv)}>
+    <div {...stylex.attrs(styles.notCountedDiv)}>
       <p>{install() ? t("web.repo.noTokei") : props.reason}</p>
       <Show when={install()}>
-        <p {...stylex.attrs(viewStyles.languagesSpan4)}>
+        <p {...stylex.attrs(styles.languagesSpan4)}>
           {t("web.repo.install")}
           {code("brew install tokei")}
           {t("web.repo.or")}
@@ -356,7 +353,7 @@ export function CommitCalendar(props: { activity: Asked<RepoActivity> }) {
   const worked = () => ready(props.activity, undefined);
   const calendar = createMemo(() => calendarOf(worked()?.days ?? [], new Date()));
   const streaks = createMemo(() => streaksOf(calendar()));
-  const aside = () => <span {...stylex.attrs(viewStyles.statSpan)}>{t("web.repo.year")}</span>;
+  const aside = () => <span {...stylex.attrs(styles.statSpan2)}>{t("web.repo.year")}</span>;
   const line = () => {
     const p = pointed();
     const busiest = streaks().busiest;
@@ -371,23 +368,23 @@ export function CommitCalendar(props: { activity: Asked<RepoActivity> }) {
       when={!(props.activity.error() && !worked())}
       fallback={
         <Card title={t("web.repo.calendar")} action={aside()}>
-          <p {...stylex.attrs(viewStyles.commitCalendarP)}>{reasonOf(props.activity.error())}</p>
+          <p {...stylex.attrs(styles.commitCalendarP)}>{reasonOf(props.activity.error())}</p>
         </Card>
       }
     >
       <Card title={t("web.repo.calendar")} action={aside()}>
-        <div {...stylex.attrs(viewStyles.commitCalendarDiv)}>
+        <div {...stylex.attrs(styles.commitCalendarDiv)}>
           <Stat label={t("web.repo.inYear")} value={worked() ? t("web.repo.commits", { n: number(streaks().total) }) : "…"} />
           <Stat label={t("web.repo.daysWorked")} value={worked() ? t("web.repo.days", { n: streaks().days }) : "…"} />
           <Stat label={t("web.repo.longest")} value={worked() ? t("web.repo.days", { n: streaks().longest }) : "…"} />
           <Stat label={t("web.repo.current")} value={worked() ? t("web.repo.days", { n: streaks().current }) : "…"} />
         </div>
-        <div {...stylex.attrs(viewStyles.commitCalendarDiv2)}>
-          <div {...stylex.attrs(viewStyles.commitCalendarDiv3)}>
-            <div {...stylex.attrs(viewStyles.commitCalendarDiv4)} style={{ width: `${20 + calendar().weeks.length * (tile + tileGap)}px` }}>
+        <div {...stylex.attrs(styles.commitCalendarDiv2)}>
+          <div {...stylex.attrs(styles.commitCalendarDiv3)}>
+            <div {...stylex.attrs(styles.commitCalendarDiv4)} style={{ width: `${20 + calendar().weeks.length * (tile + tileGap)}px` }}>
               <For each={calendar().months}>
                 {(m) => (
-                  <span {...stylex.attrs(viewStyles.commitCalendarSpan)} style={{ left: `${20 + tileGap + m.week * (tile + tileGap)}px` }}>
+                  <span {...stylex.attrs(styles.commitCalendarSpan)} style={{ left: `${20 + tileGap + m.week * (tile + tileGap)}px` }}>
                     {m.label}
                   </span>
                 )}
@@ -396,22 +393,22 @@ export function CommitCalendar(props: { activity: Asked<RepoActivity> }) {
             <div
               role="img"
               aria-label={worked() ? t("web.repo.yearLabel", { commits: streaks().total, days: streaks().days }) : t("web.repo.readingCommits")}
-              {...stylex.attrs(viewStyles.commitCalendarDiv5)}
+              {...stylex.attrs(styles.commitCalendarDiv5)}
               onMouseLeave={() => setPointed(undefined)}
             >
-              <div {...styleProps([viewStyles.commitCalendarDiv6, viewStyles.calendarRows])}>
+              <div {...styleProps([styles.commitCalendarDiv6, styles.calendarRows])}>
                 <For each={([0, 1, 2, 3, 4, 5, 6] as const).map((i) => t(`web.repo.rows.${i}`))}>
-                  {(d) => <span {...styleProps([viewStyles.commitCalendarSpan2, viewStyles.calendarDay])}>{d}</span>}
+                  {(d) => <span {...styleProps([styles.commitCalendarSpan2, styles.calendarDay])}>{d}</span>}
                 </For>
               </div>
               <For each={calendar().weeks}>
                 {(week) => (
-                  <div {...styleProps([viewStyles.commitCalendarDiv7, viewStyles.calendarWeek])}>
+                  <div {...styleProps([styles.commitCalendarDiv7, styles.calendarWeek])}>
                     <For each={week}>
                       {(d) => (
                         <span
                           onMouseEnter={() => setPointed(d)}
-                          {...styleProps(d.future ? viewStyles.calendarFuture : worked() ? viewStyles.calendarReady : viewStyles.calendarLoading)}
+                          {...styleProps(d.future ? styles.calendarFuture : worked() ? styles.calendarReady : styles.calendarLoading)}
                         >
                           <SpriteIcon name={`day-${d.level}`} size={tile} />
                         </span>
@@ -423,9 +420,9 @@ export function CommitCalendar(props: { activity: Asked<RepoActivity> }) {
             </div>
           </div>
         </div>
-        <div {...stylex.attrs(viewStyles.commitCalendarDiv8)}>
-          <span {...stylex.attrs(viewStyles.statSpan)}>{line()}</span>
-          <span {...stylex.attrs(viewStyles.commitCalendarSpan3)}>
+        <div {...stylex.attrs(styles.commitCalendarDiv8)}>
+          <span {...stylex.attrs(styles.statSpan2)}>{line()}</span>
+          <span {...stylex.attrs(styles.commitCalendarSpan3)}>
             {t("web.repo.fewer")}
             <For each={[0, 1, 2, 3, 4]}>
               {(l) => (
@@ -457,22 +454,22 @@ export function Hands(props: { activity?: RepoActivity | undefined }) {
       .reduce((n, a) => n + a.commits, 0);
   return (
     <Show when={authors().length > 0}>
-      <Card title={t("web.repo.who")} action={<span {...stylex.attrs(viewStyles.statSpan)}>{t("web.repo.whoWhen")}</span>}>
-        <div {...stylex.attrs(viewStyles.handsDiv)}>
+      <Card title={t("web.repo.who")} action={<span {...stylex.attrs(styles.statSpan2)}>{t("web.repo.whoWhen")}</span>}>
+        <div {...stylex.attrs(styles.handsDiv)}>
           <For each={authors().slice(0, hands)}>
             {(author) => {
               const agent = () => agents().find((a) => a.name === author.name);
               return (
-                <div {...stylex.attrs(viewStyles.languagesDiv3)}>
-                  <Show when={agent()} fallback={<span {...stylex.attrs(viewStyles.handsSpan)}>{[...author.name][0] ?? ""}</span>}>
+                <div {...stylex.attrs(styles.languagesDiv3)}>
+                  <Show when={agent()} fallback={<span {...stylex.attrs(styles.handsSpan)}>{[...author.name][0] ?? ""}</span>}>
                     {(a) => <AgentFace agentId={a().id} look={a().look} runtime={a().runtime} size={32} />}
                   </Show>
-                  <div {...stylex.attrs(variantStyles.languagesDiv)}>
-                    <span {...stylex.attrs(viewStyles.languagesSpan2)}>
-                      <span {...stylex.attrs(viewStyles.languagesSpan3)}>{author.name}</span>
-                      <span {...stylex.attrs(viewStyles.statSpan)}>{t("web.repo.times", { n: number(author.commits) })}</span>
+                  <div {...stylex.attrs(styles.languagesDiv)}>
+                    <span {...stylex.attrs(styles.languagesSpan2)}>
+                      <span {...stylex.attrs(styles.languagesSpan3)}>{author.name}</span>
+                      <span {...stylex.attrs(styles.statSpan2)}>{t("web.repo.times", { n: number(author.commits) })}</span>
                     </span>
-                    <Bar share={author.commits / top()} color="#74a046" />
+                    <Bar share={author.commits / top()} color="var(--color-leaf)" />
                   </div>
                 </div>
               );
@@ -480,7 +477,7 @@ export function Hands(props: { activity?: RepoActivity | undefined }) {
           </For>
         </div>
         <Show when={rest() > 0}>
-          <p {...stylex.attrs(viewStyles.statSpan)}>{t("web.repo.rest", { people: authors().length - hands, commits: number(rest()) })}</p>
+          <p {...stylex.attrs(styles.statSpan2)}>{t("web.repo.rest", { people: authors().length - hands, commits: number(rest()) })}</p>
         </Show>
       </Card>
     </Show>
@@ -517,7 +514,7 @@ export function NewRepoForm(props: { onDone: (made?: RepoSummary) => void }) {
   };
   return (
     <form
-      {...stylex.attrs(viewStyles.newRepoFormForm)}
+      {...stylex.attrs(styles.newRepoFormForm)}
       onSubmit={(e) => {
         e.preventDefault();
         void submit();
@@ -571,14 +568,14 @@ export function NewRepoForm(props: { onDone: (made?: RepoSummary) => void }) {
         />
       </Field>
       <Show when={error()}>
-        <p role="alert" {...stylex.attrs(viewStyles.newRepoFormP)}>
+        <p role="alert" {...stylex.attrs(styles.newRepoFormP)}>
           {error()}
         </p>
       </Show>
       <Show when={busy()}>
-        <p {...stylex.attrs(viewStyles.newRepoFormP2)}>{importing() === "github" ? t("web.repo.downloading") : t("web.repo.making")}</p>
+        <p {...stylex.attrs(styles.newRepoFormP2)}>{importing() === "github" ? t("web.repo.downloading") : t("web.repo.making")}</p>
       </Show>
-      <div {...stylex.attrs(viewStyles.newRepoFormDiv)}>
+      <div {...stylex.attrs(styles.newRepoFormDiv)}>
         <Button disabled={busy()} data-testid="cancel" onClick={() => props.onDone()}>
           {t("web.repo.cancel")}
         </Button>

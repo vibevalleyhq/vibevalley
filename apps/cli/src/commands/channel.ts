@@ -4,8 +4,8 @@ import { Command, Flag } from "effect/cli";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { ask, change, given, nameArg, words } from "#/farm.ts";
-import { show } from "#/format.ts";
+import { show } from "#/base/format.ts";
+import { ask, change, given, nameArg, words } from "#/infra/farm.ts";
 
 const nameOf = (c: T.Channel) => c.name ?? c.title;
 

@@ -9,28 +9,28 @@ import { Card, Empty, ListCard, ListRow, Quiet, SecretInput, Split, TextLink, To
 import { Dot } from "./Tag";
 
 const viewStyles = stylex.create({
-  splitExample: { height: "calc(var(--spacing) * 100)", width: "100%" },
+  splitExample: { height: "25rem", width: "100%" },
   dynamicCard: (width: number) => ({ width, maxWidth: width }),
   layoutStoriesDiv: {
-    width: "calc(var(--spacing) * 72)",
+    width: "18rem",
   },
   layoutStoriesDiv2: {
-    width: "calc(var(--spacing) * 96)",
+    width: "24rem",
   },
   layoutStoriesUl: {
-    width: "calc(var(--spacing) * 56)",
+    width: "14rem",
   },
   layoutStoriesDiv3: {
     display: "flex",
-    width: "calc(var(--spacing) * 96)",
+    width: "24rem",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   layoutStoriesDiv4: {
     display: "flex",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
 });
 

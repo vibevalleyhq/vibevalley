@@ -5,6 +5,7 @@ import { Effect, Formatter, Layer } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 
 import { VibeValleyApi } from "@vibevalley/protocol";
+import { BizCode } from "@vibevalley/protocol/api";
 import { tempDir } from "@vibevalley/testkit/temp";
 
 import { gitSync, repo } from "#/testing/git.ts";
@@ -49,7 +50,7 @@ it.live("the user previews an external checkout over HTTP and bearer callers are
     );
     expect(refused.status).toBe(409);
     const json2 = yield* refused.json;
-    expect(json2).toMatchObject({ _tag: "Refused" });
+    expect(json2).toMatchObject({ bizCode: BizCode.RepoRefused });
     expect(gitSync(cwd, "status", "--porcelain")).toBe("");
   }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer)),
 );

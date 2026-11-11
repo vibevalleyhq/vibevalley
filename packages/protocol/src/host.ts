@@ -44,7 +44,7 @@ export type Rtc = (grant: AgoraGrant, events: RtcEvents) => Promise<RtcLine>;
 /** Art-pixel dimensions and max fractional crop per edge when integer-scaled. */
 export const farmFraming = { picture: { w: 384, h: 256 }, cut: { across: 0.05, down: 0.08 } } as const;
 
-export const UpdateManualValues = ["diskImage", "translocated", "readOnly", "noBuild"] as const;
+const UpdateManualValues = ["diskImage", "translocated", "readOnly", "noBuild"] as const;
 export type UpdateManual = (typeof UpdateManualValues)[number];
 
 export type UpdateState =
@@ -86,7 +86,7 @@ export const CommandLineState: Schema.Codec<CommandLineState> = Schema.Struct({
   taken: Schema.Boolean,
 });
 
-export interface CommandLine {
+interface CommandLine {
   readonly state: () => Promise<CommandLineState>;
   readonly install: () => Promise<CommandLineState>;
   readonly remove: () => Promise<CommandLineState>;

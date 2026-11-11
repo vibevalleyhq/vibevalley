@@ -2,7 +2,6 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { sealSiteMigrationGraph } from "vibevalley/style-migration";
 import { createBuilder } from "vite-plus";
 
 import { prerender } from "./prerender";
@@ -28,4 +27,3 @@ await writeFile(
   resolve(output, "sitemap-index.xml"),
   `<?xml version="1.0" encoding="UTF-8"?><sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><sitemap><loc>${origin}/sitemap-0.xml</loc></sitemap></sitemapindex>`,
 );
-await sealSiteMigrationGraph(output);

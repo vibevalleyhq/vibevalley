@@ -9,42 +9,42 @@ import { Dialog } from "./Dialog";
 
 const viewStyles = stylex.create({
   kbdKbd: {
-    minWidth: "calc(var(--spacing) * 6)",
+    minWidth: "1.5rem",
     borderRadius: "var(--radius-xs)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-hover)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.375rem",
     textAlign: "center",
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-2xs)",
-    lineHeight: "calc(var(--spacing) * 5)",
+    lineHeight: "1.25rem",
     color: "var(--color-ink)",
   },
   shortcutsDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
   },
   shortcutPlace: {
     display: "flex",
     flexDirection: "column",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   shortcutsH3: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-semibold)",
     color: "var(--color-muted)",
   },
   shortcutsDiv2: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * .5)",
+    gap: "0.75rem",
+    paddingBlock: "0.125rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   shortcutsSpan: {
     flex: "1",
@@ -53,7 +53,7 @@ const viewStyles = stylex.create({
     display: "flex",
     flexShrink: "0",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
 });
 

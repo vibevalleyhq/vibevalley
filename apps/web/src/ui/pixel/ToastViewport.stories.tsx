@@ -10,7 +10,7 @@ const viewStyles = stylex.create({
   toastViewportStoriesDiv: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
 });
 

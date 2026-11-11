@@ -4,7 +4,7 @@
 
 - **做完即沉淀并删除**：计划上线后，将长期成立的模型、不变量与放弃的路沉淀进 [子系统文档](docs/subsystems/README.md)，并删除原 Note。
 - **当前现状归 `docs/`**：这里不复制现行接口、字段或清单（现行文档见 [文档地图](docs/README.md)）。
-- **中英混合约定**：正文写中文；供 [scripts/agent-notes.ts](scripts/agent-notes.ts) 机器校验的标记（`# Agent Note:`、`Status:` 与英文二级章节名）保持英文原样。
+- **中英混合约定**：正文写中文；供 [scripts/agent-notes.ts](scripts/docs/agent-notes.ts) 机器校验的标记（`# Agent Note:`、`Status:` 与英文二级章节名）保持英文原样。
 
 ## 位置和命名
 
@@ -18,13 +18,13 @@
 | `implemented/` | 刚上线、尚未沉淀进子系统的过渡态；沉淀进 `docs/subsystems/*.md` 后立即删除 |
 | `rejected/` | 考虑过但否决的提案；仅当其理由能防止诱人且实际的错误时保留，否则删除 |
 
-- **互相引用写仓库根路径**：写 `[题目](.agents/notes/proposed/architecture/2026-…-….md)`，以便 `scripts/doc-links.ts` 自动检查。
+- **互相引用写仓库根路径**：写 `[题目](.agents/notes/proposed/architecture/2026-…-….md)`，以便 `scripts/docs/doc-links.ts` 自动检查。
 - **被新决策取代时直接删除旧 Note**：把仍成立的部分并入新 Note，不留「已被取代」的横幅（历史留在 git 中）。
 - **目录清单自动生成**：[CATALOG.md](.agents/notes/CATALOG.md) 由 `vp run notes:catalog` 生成，并由 `vp run notes:verify` 校验，不手改。
 
 ### 类别（第二层目录）
 
-类别是封闭集合，以 [scripts/agent-notes.ts](scripts/agent-notes.ts) 为准：
+类别是封闭集合，以 [scripts/agent-notes.ts](scripts/docs/agent-notes.ts) 为准：
 
 | 类别 | 管什么 |
 |---|---|
@@ -43,7 +43,7 @@
 
 ## 文件格式
 
-每篇 Note 均由 `vp run notes:verify`（[scripts/agent-notes.ts](scripts/agent-notes.ts)）校验。
+每篇 Note 均由 `vp run notes:verify`（[scripts/agent-notes.ts](scripts/docs/agent-notes.ts)）校验。
 
 ### 开头
 

@@ -1,13 +1,13 @@
 # 工程流程
 
-管理代码库周边的工程约束：文档分层与 Agent Notes 沉淀、`docs:verify` 九项检查、代码体检与逃生口棘轮（`packages/health`）、验证 skill 规范，以及像素素材流水线。
+管理代码库周边的工程约束：文档分层与 Agent Notes 沉淀、`docs:verify` 十一项检查、多层静态与语法树门禁、代码体检与逃生口棘轮（`packages/health`）、验证 skill 规范，以及像素素材流水线。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
 | 「代码 → 静态检查 → 文字 → 人审」四层防错原则 | 根目录常驻规则条文（[AGENTS.md](AGENTS.md#规矩)） |
-| 文档分层、Agent Notes 沉淀流程与 `docs:verify` 九项检查 | 文档目录规矩（[docs/AGENTS.md](docs/AGENTS.md)）与 Note 格式（[.agents/notes/README.md](.agents/notes/README.md)） |
+| 文档分层、Agent Notes 沉淀流程与 `docs:verify` 十一项检查 | 文档目录规矩（[docs/AGENTS.md](docs/AGENTS.md)）与 Note 格式（[.agents/notes/README.md](.agents/notes/README.md)） |
 | 代码体检（`packages/health`）、逃生口棘轮、死代码检查与回归测试保护 | 服务端与前端业务测试（[地基](docs/subsystems/foundation.md)、[客户端](docs/subsystems/app.md)） |
 | 仓库 skill 结构（`.agents/skills/`）与验证 skill 六节规范 | 各 skill 的具体执行步骤（[.agents/skills/README.md](.agents/skills/README.md)） |
 | 像素素材生成（`design/pixel/gen.sh`）与切图流水线（`process.py`） | 页面贴图加载（[农场的皮](docs/subsystems/farm.md)）与命令速查（[开发](docs/development.md#素材音效和官网)） |
@@ -16,12 +16,13 @@
 
 | 位置 | 职责 |
 |---|---|
-| `scripts/agent-notes.ts`、`skills.ts`、`doc-links.ts` | 校验 Note 目录格式并生成 `CATALOG.md`、校验 skill 结构、校验文档链接与反引号路径 |
-| `scripts/stale-names.ts`、`glossary.ts`、`i18n.ts` | 拦截已废弃旧名字、校验用语表代码名、校验双语词典与 `catalogs.ts` |
-| `scripts/capabilities.ts`、`api-client.ts`、`primitives.ts` | 生成并校验 `capabilities.md`、`client.ts` 与 `primitives.md` |
-| `scripts/oxlint-plugin.ts`、`deadcode.ts`、`regression.ts` | 仓库自定义 lint 规则、`knip` 死代码检查、PR 回归测试修改门禁 |
-| `scripts/comment-review.ts`、`verify-server.ts` | 调用模型审查新增注释、启动隔离沙箱服务端 |
-| `packages/health/`、`scripts/health.config.ts`、`health.ratchet.json` | 热点分析与类型/错误逃生口棘轮检查 |
+| `scripts/docs/agent-notes.ts`、`skills.ts`、`doc-links.ts` | 校验 Note 目录格式并生成 `CATALOG.md`、校验 skill 结构、校验文档链接与反引号路径 |
+| `scripts/docs/stale-names.ts`、`glossary.ts`、`i18n.ts` | 拦截已废弃旧名字、校验用语表代码名、校验双语词典与 `catalogs.ts` |
+| `scripts/gen/capabilities.ts`、`api-client.ts`、`primitives.ts` | 生成并校验 `capabilities.md`、`client.ts` 与 `primitives.md` |
+| `scripts/audit/effect-check.ts`、`oxlint-plugin.ts`、`deadcode.ts`、`regression.ts` | `@effect/tsgo` 诊断与棘轮、仓库自定义 lint 规则、`knip` 死代码检查、PR 回归测试修改门禁 |
+| `scripts/audit/practice-audit.ts`、`service-paths.ts`、`protocol-surface.ts`、`schema-audit.ts` | 全仓语法树实践棘轮、服务调用矩阵与扇入检查、根协议导出面棘轮、SQL 枚举与 `Redacted` 契约审计 |
+| `scripts/audit/comment-review.ts`、`verify-server.ts` | 调用模型审查新增注释、启动隔离沙箱服务端 |
+| `packages/health/`、`scripts/audit/health.config.ts`、`health.ratchet.json` | 热点分析与类型/错误逃生口棘轮检查 |
 | `.agents/notes/`、`.agents/skills/` | Agent Notes 目录与仓库 skills（`.claude/skills` 软链至此） |
 | `design/pixel/gen.sh`、`process.py`、`design/art.sh` | 像素素材生成、去品红切格缩放脚本与原图仓库软链 |
 
@@ -29,10 +30,11 @@
 
 - **一个事实一个家**：常驻规则放根目录 `AGENTS.md`、当前架构与理由放 `docs/subsystems/*.md`、包接口放各包 `README.md`、未完成计划放 `.agents/notes/proposed/`。
 - **Note 做完即沉淀并删除**：计划上线后，将长期成立的模型、不变量与放弃的路写进对应子系统文档，删除原 Note，并运行 `vp run notes:catalog`。
-- **链接与反引号路径全校验**：文档链接从仓库根写起；反引号内含目录且扩展名为源码/配置的路径必须在仓库中存在（`scripts/doc-links.ts` 检查）。
-- **报错信息给出改法**：自定义 lint 规则与门禁报错必须包含原因、`Fix:` 改法与 `See` 参考文件路径（`scripts/oxlint-plugin.test.ts` 检查）。
-- **逃生口按区棘轮，只减不增**：`packages/health` 统计类型逃生口（`x!`、`as T`、lint disable）与错误逃生口并比对 `scripts/health.ratchet.json`；增加报错，减少也要求下调棘轮。
-- **死代码零容忍，回归测试受保护**：`vp run deadcode` 拦截未使用导出与依赖。修改或删除 `regression: ` 测试，或 `fix/` 分支未补回归测试，须在 PR 正文 `## Regression` 说明（`scripts/regression.ts` 检查）。
+- **链接与反引号路径全校验**：文档链接从仓库根写起；反引号内含目录且扩展名为源码/配置的路径必须在仓库中存在（`scripts/docs/doc-links.ts` 检查）。
+- **报错信息给出改法**：自定义 lint 规则与门禁报错应包含原因、`Fix:` 改法与 `See` 参考文件路径（`scripts/audit/oxlint-plugin.test.ts` 检查）。
+- **静态门禁分四层互补**：类型与 `@effect/tsgo` 守住签名与 Effect 语义（`effect:check`）；oxlint 插件守住单文件语法与导入门面（`vp check`）；全仓语法树工具守住跨文件不变量与拓扑（`practice-audit.ts`、`service-paths.ts`、`protocol-surface.ts`）；契约审计守住跨语言表结构与序列化安全（`schema-audit.ts`）。零命中规则直接报错，存量债务按区域进棘轮只减不增。
+- **逃生口按区棘轮，只减不增**：`packages/health` 统计类型逃生口（`x!`、`as T`、lint disable）与错误逃生口并比对 `scripts/audit/health.ratchet.json`；增加报错，减少也要求下调棘轮。
+- **死代码零容忍，回归测试受保护**：`vp run deadcode` 拦截未使用导出与依赖。修改或删除 `regression: ` 测试，或 `fix/` 分支未补回归测试，须在 PR 正文 `## Regression` 说明（`scripts/release/regression.ts` 检查）。
 - **命名一致**：展示名用 `VibeValley` / `码农场物语`；代码、目录、环境变量 `VIBEVALLEY_*` 和分支前缀 `vibevalley/` 统一用小写 `vibevalley`。
 
 ## 怎么走
@@ -61,7 +63,7 @@
 
 - **根目录 `AGENTS.md` 与 `docs/`**：由 `docs:verify` 校验链接、路径、用语表和生成文档同步。
 - **CI 与 Git Hooks**：提交前跑 `vp check --fix --deny-warnings`；CI 跑类型检查、测试金字塔、`health:verify`、`deadcode`、`docs:verify` 和 `regression.ts`。
-- **验收 Skill**：`.agents/skills/vv-acceptance/` 提供隔离服务端沙箱（`scripts/verify-server.ts`）与实机验证分册。
+- **验收 Skill**：`.agents/skills/vv-acceptance/` 提供隔离服务端沙箱（`scripts/release/verify-server.ts`）与实机验证分册。
 
 ## 为什么这样
 
@@ -79,6 +81,6 @@
 
 ## 怎么验证
 
-- `vp run docs:verify`：依次执行 9 项文档与生成物同步检查。
+- `vp run docs:verify`：依次执行 11 项文档、拓扑面与生成物同步检查。
 - `vp run health:verify`、`vp run deadcode`：逃生口棘轮测试与死代码扫描。
-- `vp test run scripts/oxlint-plugin.test.ts scripts/verify-server.test.ts scripts/comment-review.test.ts scripts/regression.test.ts`：验证 lint 报错格式、沙箱、注释审查与回归门禁。
+- `vp test run scripts/audit/oxlint-plugin.test.ts scripts/release/verify-server.test.ts scripts/audit/comment-review.test.ts scripts/release/regression.test.ts`：验证 lint 报错格式、沙箱、注释审查与回归门禁。

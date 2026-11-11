@@ -4,7 +4,7 @@ import { isBusy, phaseText, plotKeyOf, roomLeft } from "@vibevalley/protocol/rul
 
 import { compareText, or } from "#/base/search.ts";
 import { type Recency, recencyOf } from "#/features/repo/index.ts";
-import type { Pose } from "#/ui/cast.ts";
+import type { Pose } from "#/ui/domain/cast.ts";
 
 type Spot =
   | { readonly kind: "taken"; readonly session: Session; readonly plot: PlotView; readonly issue?: Issue }

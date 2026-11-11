@@ -21,21 +21,21 @@ import {
   searchParam,
 } from "#/infra/router.ts";
 
-const variantStyles = stylex.create({
+const styles = stylex.create({
   controlsDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   controlsNav: {
     display: "flex",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   routerStoriesDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
-    padding: "calc(var(--spacing) * 4)",
+    gap: "1rem",
+    padding: "1rem",
   },
 });
 
@@ -64,8 +64,8 @@ function Controls() {
   const [, update] = useSearchParams();
   const [prevented, setPrevented] = createSignal(0);
   return (
-    <div {...stylex.attrs(variantStyles.controlsDiv)}>
-      <nav aria-label="示例导航" {...stylex.attrs(variantStyles.controlsNav)}>
+    <div {...stylex.attrs(styles.controlsDiv)}>
+      <nav aria-label="示例导航" {...stylex.attrs(styles.controlsNav)}>
         <NavLink href="/demo/one" end data-testid="router-one">
           One
         </NavLink>
@@ -92,7 +92,7 @@ function Controls() {
           New tab
         </Link>
       </nav>
-      <div {...stylex.attrs(variantStyles.controlsNav)}>
+      <div {...stylex.attrs(styles.controlsNav)}>
         <button type="button" data-testid="router-back" onClick={() => router.history.back()}>
           Back
         </button>
@@ -183,7 +183,7 @@ export default stories({
     Navigation: story({
       render: () => (
         <Router history={memoryHistory("/demo/one")}>
-          <div {...stylex.attrs(variantStyles.routerStoriesDiv)}>
+          <div {...stylex.attrs(styles.routerStoriesDiv)}>
             <Controls />
             <Routes
               routes={[

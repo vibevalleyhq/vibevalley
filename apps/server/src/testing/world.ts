@@ -7,16 +7,16 @@ import { Context, Effect, Layer, Stream } from "effect";
 import type { AccountUsage, ChatMessage, IssueRequest } from "@vibevalley/protocol";
 
 import { Core } from "#/core/core.ts";
-import { Inbox } from "#/inbox/inbox.ts";
+import { Mcp } from "#/gateway/mcp/mcp.ts";
 import { type ServerConfig } from "#/infra/config.ts";
-import { explicitMandate } from "#/issue/creation.ts";
-import type { Issue } from "#/issue/issue.ts";
-import { Mcp } from "#/mcp/mcp.ts";
-import { type GitHubRun, type RepoHooks } from "#/repo/repo.ts";
-import { registryOf } from "#/runtime/runtime.ts";
-import { agentSessions, agents, collaboration, ingress, issues, mailbox, platform, resources, type ServiceOptions, sourceControl } from "#/services.ts";
-import { WorkerAccess, type workerAccess } from "#/session/worker.ts";
-import { Tool } from "#/tool/tool.ts";
+import { Inbox } from "#/modules/inbox/inbox.ts";
+import { explicitMandate } from "#/modules/issue/creation.ts";
+import type { Issue } from "#/modules/issue/issue.ts";
+import { type GitHubRun, type RepoHooks } from "#/modules/repo/repo.ts";
+import { registryOf } from "#/modules/runtime/runtime.ts";
+import { WorkerAccess, type workerAccess } from "#/modules/session/worker.ts";
+import { Tool } from "#/modules/tool/tool.ts";
+import { agentSessions, agents, collaboration, issues, mailbox, platform, type ServiceOptions, sourceControl } from "#/services.ts";
 
 import { repo } from "./git.ts";
 import { offlineNetwork, testConfig } from "./layers.ts";
@@ -46,8 +46,8 @@ export interface WorldOptions {
   readonly who?: (token: string) => string;
 }
 
-/** Services below Ingress for module tests. */
-export function worldBelowIngress(options: WorldOptions = {}) {
+/** Core domain services below Inbox/Tool/Mcp for module tests. */
+export function moduleWorld(options: WorldOptions = {}) {
   const base = options.config ?? testConfig();
   const config = options.stallMs !== undefined ? { ...base, session: { ...base.session, stallSeconds: options.stallMs / 1000 } } : base;
   for (const name of options.repos ?? []) {
@@ -87,7 +87,7 @@ export function worldBelowIngress(options: WorldOptions = {}) {
 /** The farm up to its inbox, with the tools and /mcp: no orchestrator, gateway or game, and no startup (farm.ts adds
  * it). */
 export function world(options: WorldOptions = {}) {
-  return worldBelowIngress(options).pipe(ingress, resources, on(Inbox.layer), on(Tool.layer), on(Mcp.layer(options.who ? { who: options.who } : {})));
+  return moduleWorld(options).pipe(on(Inbox.layer), on(Tool.layer), on(Mcp.layer(options.who ? { who: options.who } : {})));
 }
 
 const on =

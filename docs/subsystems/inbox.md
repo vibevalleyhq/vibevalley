@@ -18,9 +18,9 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/inbox/inbox.ts` | `Inbox` 服务：`news` 流、`toUser` 流、`patrol` 定时循环与启动 `prime` |
-| `apps/server/src/inbox/items.ts` | 纯函数 `inbox`、`inboxEntries` 与连接器外推资格 `forUser` |
-| `apps/server/src/inbox/patrol.ts` | 纯函数 `patrolStep`（宽限期与已读延期判定） |
+| `apps/server/src/modules/inbox/inbox.ts` | `Inbox` 服务：`news` 流、`toUser` 流、`patrol` 定时循环与启动 `prime` |
+| `apps/server/src/modules/inbox/items.ts` | 纯函数 `inbox`、`inboxEntries` 与连接器外推资格 `forUser` |
+| `apps/server/src/modules/inbox/patrol.ts` | 纯函数 `patrolStep`（宽限期与已读延期判定） |
 | `packages/protocol/src/rules/inbox.ts` | 前后端共用的新事项识别规则 `freshOf` |
 | `apps/web/src/farm/phone/calls.ts`、`features/inbox/` | 农场手机来电、系统通知（`Follow.tsx`）与菜单栏托盘摘要（`tray.ts`） |
 
@@ -67,5 +67,5 @@
 
 ## 怎么验证
 
-- `apps/server/src/inbox/*.test.ts`：8 种事项派生、宽限期计算与已读撤回测试。
+- `apps/server/src/modules/inbox/*.test.ts`：8 种事项派生、宽限期计算与已读撤回测试。
 - `apps/web/src/farm/phone/calls.test.ts`、`features/inbox/tray.test.ts`、`apps/web/test/farm-phone.spec.ts`：来电去重、托盘摘要与接听测试。

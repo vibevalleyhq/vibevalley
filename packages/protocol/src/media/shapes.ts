@@ -3,8 +3,11 @@ import type { MediaAudioJob } from "./audio-shapes";
 
 export const mediaInputContentPath = (id: string) => `/api/v1/media/input/${encodeURIComponent(id)}/content`;
 
+export const MediaInputKindValues = ["image", "video", "audio"] as const;
+type MediaInputKind = (typeof MediaInputKindValues)[number];
+
 export interface MediaInputRequest {
-  kind: "image" | "video" | "audio";
+  kind: MediaInputKind;
   name: string;
   mime: string;
   size: number;
@@ -22,10 +25,12 @@ export interface MediaInput extends MediaInputRequest {
   canDelete: boolean;
 }
 
+export const MediaImageFormatValues = ["text", "layout"] as const;
+
 export interface MediaImageRequest {
   id: string;
   prompt: string;
-  format: "text" | "layout";
+  format: (typeof MediaImageFormatValues)[number];
   width: number;
   height: number;
   seed?: number;
@@ -103,12 +108,14 @@ export const MediaUnderstandingPhaseValues = [
 ] as const;
 export type MediaUnderstandingPhase = (typeof MediaUnderstandingPhaseValues)[number];
 export const MediaCleanupValues = ["pending", "running", "done", "blocked", "unknown"] as const;
-export type MediaCleanup = (typeof MediaCleanupValues)[number];
+type MediaCleanup = (typeof MediaCleanupValues)[number];
+
+export const MediaUnderstandingStatusValues = ["completed", "incomplete"] as const;
 
 export interface MediaUnderstandingResult {
   model: string;
   text: string;
-  status: "completed" | "incomplete";
+  status: (typeof MediaUnderstandingStatusValues)[number];
   incompleteReason: "max_output_tokens" | null;
   usage: { inputTokens: number; outputTokens: number; totalTokens: number };
 }
@@ -139,8 +146,10 @@ export interface MediaUnderstandingJob {
 export const MediaAudioFormatValues = ["wav", "mp3", "flac", "aac", "opus", "pcm"] as const;
 export type MediaAudioFormat = (typeof MediaAudioFormatValues)[number];
 
+export const MediaAudioMetadataSourceValues = ["file", "provider"] as const;
+
 export interface MediaAudioMetadata {
-  source: "file" | "provider";
+  source: (typeof MediaAudioMetadataSourceValues)[number];
   sampleRate?: number;
   duration?: number;
   channels?: number;

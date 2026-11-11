@@ -22,23 +22,23 @@ const memoryStyles = stylex.create({
   card: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--wb-line)",
     backgroundColor: "var(--wb-page)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
   },
   forget: {
     flexShrink: "0",
     cursor: "pointer",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * .5)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.125rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: {
       default: "var(--wb-muted)",
       "@media (hover:hover)": {
@@ -64,24 +64,21 @@ const memoryStyles = stylex.create({
   },
 });
 
-const recipeStyles2 = stylex.create({
+const styles = stylex.create({
   archivePanelPre: {
-    maxHeight: "calc(var(--spacing) * 96)",
+    maxHeight: "24rem",
     overflowY: "auto",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
     borderColor: "var(--wb-line)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     whiteSpace: "pre-wrap",
     WebkitUserSelect: "text",
     userSelect: "text",
   },
-});
-
-const recipeStyles = stylex.create({
   memoryPanelDiv: {
     display: "flex",
     overflow: "hidden",
@@ -95,17 +92,17 @@ const recipeStyles = stylex.create({
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    columnGap: "calc(var(--spacing) * 2)",
-    rowGap: "calc(var(--spacing) * .5)",
+    columnGap: "0.5rem",
+    rowGap: "0.125rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-page)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   recallPreviewP: {
@@ -114,23 +111,23 @@ const recipeStyles = stylex.create({
     borderWidth: "1px",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-page)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     whiteSpace: "pre-wrap",
   },
   archivePanelDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-page)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
   },
   archivePanelDiv2: {
     overflow: "hidden",
@@ -140,28 +137,22 @@ const recipeStyles = stylex.create({
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-page)",
   },
-});
-
-const variantStyles2 = stylex.create({
   writeNoteTextInput: {
     fontFamily: "var(--font-mono)",
   },
-});
-
-const variantStyles = stylex.create({
   pillButton: {
-    height: "calc(var(--spacing) * 6)",
+    height: "1.5rem",
     cursor: "pointer",
-    borderRadius: "2147483647px",
-    paddingInline: "calc(var(--spacing) * 2.5)",
+    borderRadius: "9999px",
+    paddingInline: "0.625rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
-  pillButtonVariant: {
+  pillButtonTone: {
     backgroundColor: "var(--color-ink)",
     color: "var(--color-page)",
   },
-  pillButtonVariant2: {
+  pillButtonAlt: {
     backgroundColor: {
       default: "var(--color-hover)",
       "@media (hover:hover)": {
@@ -171,53 +162,50 @@ const variantStyles = stylex.create({
     },
   },
   sourcesSpan: {},
-  sourcesSpanVariant: {
+  sourcesSpanTone: {
     color: "var(--color-accent)",
   },
-  sourcesSpanVariant2: {
+  sourcesSpanAlt: {
     color: "var(--color-berry)",
   },
   memoryItemSpan: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
-  memoryItemSpanVariant: {
+  memoryItemSpanTone: {
     color: "var(--color-muted)",
   },
-});
-
-const viewStyles = stylex.create({
   sectionSection: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   sectionHeader: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   sectionH3: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-semibold)",
   },
   sectionSpan: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   sectionSpan2: {
     flex: "1",
   },
-  memoryPanelDiv: {
+  memoryPanelDiv2: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
   },
   memoryPanelP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   memoryPanelSpan: {
@@ -225,19 +213,19 @@ const viewStyles = stylex.create({
     flexShrink: "0",
     backgroundColor: "var(--color-leaf)",
   },
-  memoryPanelDiv2: {
+  memoryPanelDiv22: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    gap: "0.125rem",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
   },
   memoryPanelSpan2: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   memoryPanelSpan3: {
@@ -246,16 +234,16 @@ const viewStyles = stylex.create({
   },
   memoryPanelSpan4: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   memoryPanelDiv3: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
-  sourcesSpan: {
+  sourcesSpan2: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-medium)",
     color: "var(--color-ink)",
   },
@@ -265,16 +253,16 @@ const viewStyles = stylex.create({
       default: "column",
       "@media (width>=40rem)": "row",
     },
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   archivePanelForm: {
     display: "flex",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   archivePanelSpan: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   archivePanelButton: {
@@ -282,9 +270,9 @@ const viewStyles = stylex.create({
     width: "100%",
     cursor: "pointer",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
     textAlign: "left",
     backgroundColor: {
       default: null,
@@ -302,33 +290,33 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   writeNoteDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   writeNoteSpan: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-medium)",
     color: "var(--color-muted)",
   },
   writeNoteDiv2: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
-    paddingTop: "var(--spacing)",
+    gap: "0.5rem",
+    paddingTop: "0.25rem",
   },
   writeNoteSpan2: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-faint)",
   },
   writeNoteSpan3: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-berry)",
   },
   memoryItemDiv: {
@@ -336,17 +324,17 @@ const viewStyles = stylex.create({
     minWidth: "0",
     flex: "1",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
-  },
-  memoryItemSpan: {
-    display: "flex",
-    flexWrap: "wrap",
-    columnGap: "calc(var(--spacing) * 2)",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
-    color: "var(--color-muted)",
+    gap: "0.125rem",
   },
   memoryItemSpan2: {
+    display: "flex",
+    flexWrap: "wrap",
+    columnGap: "0.5rem",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--leading-xs)",
+    color: "var(--color-muted)",
+  },
+  memoryItemSpan22: {
     color: "var(--color-warn-ink)",
   },
 });
@@ -389,15 +377,15 @@ function createForget(agent: () => string) {
 /** A titled part of a panel, its count beside the title. */
 function Section(props: { title: string; count?: number; aside?: JSX.Element; testid?: string; children: JSX.Element }) {
   return (
-    <section aria-label={props.title} data-testid={props.testid} data-count={props.count} {...stylex.attrs(viewStyles.sectionSection)}>
-      <header {...stylex.attrs(viewStyles.sectionHeader)}>
-        <h3 {...stylex.attrs(viewStyles.sectionH3)}>{props.title}</h3>
+    <section aria-label={props.title} data-testid={props.testid} data-count={props.count} {...stylex.attrs(styles.sectionSection)}>
+      <header {...stylex.attrs(styles.sectionHeader)}>
+        <h3 {...stylex.attrs(styles.sectionH3)}>{props.title}</h3>
         <Show when={props.count !== undefined}>
-          <span {...stylex.attrs(viewStyles.sectionSpan)}>{props.count}</span>
+          <span {...stylex.attrs(styles.sectionSpan)}>{props.count}</span>
         </Show>
-        <span {...stylex.attrs(viewStyles.sectionSpan2)} />
+        <span {...stylex.attrs(styles.sectionSpan2)} />
         <Show when={props.aside}>
-          <span {...stylex.attrs(viewStyles.sectionSpan)}>{props.aside}</span>
+          <span {...stylex.attrs(styles.sectionSpan)}>{props.aside}</span>
         </Show>
       </header>
       {props.children}
@@ -418,7 +406,7 @@ function Pill(props: { label: string; on: boolean; onClick: () => void }) {
       type="button"
       aria-pressed={aria(props.on)}
       onClick={() => props.onClick()}
-      {...stylex.attrs(variantStyles.pillButton, props.on ? variantStyles.pillButtonVariant : variantStyles.pillButtonVariant2)}
+      {...stylex.attrs(styles.pillButton, props.on ? styles.pillButtonTone : styles.pillButtonAlt)}
     >
       {props.label}
     </button>
@@ -449,8 +437,8 @@ export function MemoryPanel(props: { agent: string }) {
           ? t("web.memory.memory.orchestrators")
           : t("web.memory.memory.own");
   return (
-    <div {...stylex.attrs(viewStyles.memoryPanelDiv)}>
-      <p {...stylex.attrs(viewStyles.memoryPanelP)}>{t("web.memory.memory.intro")}</p>
+    <div {...stylex.attrs(styles.memoryPanelDiv2)}>
+      <p {...stylex.attrs(styles.memoryPanelP)}>{t("web.memory.memory.intro")}</p>
       <Show when={sources().size > 1}>
         <Sources sources={[...sources().values()]} />
       </Show>
@@ -458,15 +446,15 @@ export function MemoryPanel(props: { agent: string }) {
         <Show when={done().length > 0} fallback={<Quiet>{t("web.memory.memory.noIssues")}</Quiet>}>
           <For each={done()} keyed={(m) => m.id}>
             {(m) => (
-              <div {...stylex.attrs(recipeStyles.memoryPanelDiv)}>
-                <span {...stylex.attrs(viewStyles.memoryPanelSpan)} />
-                <div {...stylex.attrs(viewStyles.memoryPanelDiv2)}>
-                  <span {...stylex.attrs(viewStyles.memoryPanelSpan2)}>
-                    <span {...stylex.attrs(viewStyles.memoryPanelSpan3)}>{sessionNameOf(m().session)}</span>
+              <div {...stylex.attrs(styles.memoryPanelDiv)}>
+                <span {...stylex.attrs(styles.memoryPanelSpan)} />
+                <div {...stylex.attrs(styles.memoryPanelDiv22)}>
+                  <span {...stylex.attrs(styles.memoryPanelSpan2)}>
+                    <span {...stylex.attrs(styles.memoryPanelSpan3)}>{sessionNameOf(m().session)}</span>
                     <span>{m().repo ?? t("web.memory.memory.allRepos")}</span>
                     <span>{ago(m().at, now())}</span>
                   </span>
-                  <span {...stylex.attrs(viewStyles.memoryPanelSpan4)}>{m().text}</span>
+                  <span {...stylex.attrs(styles.memoryPanelSpan4)}>{m().text}</span>
                 </div>
               </div>
             )}
@@ -477,7 +465,7 @@ export function MemoryPanel(props: { agent: string }) {
       <WriteNote agent={props.agent} withRepo />
       <Section title={t("web.memory.memory.notes")} count={notes().length}>
         <Show when={repos().length > 0}>
-          <div {...stylex.attrs(viewStyles.memoryPanelDiv3)}>
+          <div {...stylex.attrs(styles.memoryPanelDiv3)}>
             <For
               each={[["", t("web.memory.memory.all")] as const, [everywhere, t("web.memory.memory.allRepos")] as const, ...repos().map((p) => [p, p] as const)]}
             >
@@ -536,9 +524,9 @@ function Sources(props: { sources: MemorySourceInfo[] }) {
     <Section title={t("web.memory.memory.sources")} count={props.sources.filter((s) => s.on).length}>
       <For each={props.sources}>
         {(s) => (
-          <div {...stylex.attrs(recipeStyles.sourcesDiv)}>
-            <span {...stylex.attrs(viewStyles.sourcesSpan)}>{s.label}</span>
-            <span {...stylex.attrs(variantStyles.sourcesSpan, s.on ? variantStyles.sourcesSpanVariant : variantStyles.sourcesSpanVariant2)}>
+          <div {...stylex.attrs(styles.sourcesDiv)}>
+            <span {...stylex.attrs(styles.sourcesSpan2)}>{s.label}</span>
+            <span {...stylex.attrs(styles.sourcesSpan, s.on ? styles.sourcesSpanTone : styles.sourcesSpanAlt)}>
               {s.on ? t("web.memory.memory.on") : t("web.memory.memory.off", { why: s.off })}
             </span>
             <Show when={s.on}>
@@ -551,12 +539,12 @@ function Sources(props: { sources: MemorySourceInfo[] }) {
           </div>
         )}
       </For>
-      <p {...stylex.attrs(viewStyles.sectionSpan)}>{t("web.memory.memory.sourcesNote")}</p>
+      <p {...stylex.attrs(styles.sectionSpan)}>{t("web.memory.memory.sourcesNote")}</p>
     </Section>
   );
 }
 
-const selectStyles = stylex.create({ scope: { width: { default: null, "@media (width >= 40rem)": "calc(var(--spacing) * 40)" } } });
+const selectStyles = stylex.create({ scope: { width: { default: null, "@media (width >= 40rem)": "10rem" } } });
 
 /** The pick the server would make, without counting it (memory.recall). */
 function RecallPreview(props: { agent: string }) {
@@ -580,7 +568,7 @@ function RecallPreview(props: { agent: string }) {
           : undefined
       }
     >
-      <div {...stylex.attrs(viewStyles.recallPreviewDiv)}>
+      <div {...stylex.attrs(styles.recallPreviewDiv)}>
         <Select
           styles={selectStyles.scope}
           label={t("web.memory.memory.where")}
@@ -597,7 +585,7 @@ function RecallPreview(props: { agent: string }) {
         />
       </div>
       <Show when={lines().length > 0} fallback={<Quiet>{where() ? t("web.memory.memory.blank") : t("web.memory.memory.noRepos")}</Quiet>}>
-        <p {...stylex.attrs(recipeStyles.recallPreviewP)}>{lines().join("\n")}</p>
+        <p {...stylex.attrs(styles.recallPreviewP)}>{lines().join("\n")}</p>
       </Show>
     </Section>
   );
@@ -612,8 +600,8 @@ export function OrchestratorMemoryPanel(props: { agent: string }) {
   return (
     <Show when={view()} fallback={<Quiet>{t("web.memory.memory.orchestratorReading")}</Quiet>}>
       {(v) => (
-        <div {...stylex.attrs(viewStyles.memoryPanelDiv)}>
-          <p {...stylex.attrs(viewStyles.memoryPanelP)}>{t("web.memory.memory.orchestratorIntro")}</p>
+        <div {...stylex.attrs(styles.memoryPanelDiv2)}>
+          <p {...stylex.attrs(styles.memoryPanelP)}>{t("web.memory.memory.orchestratorIntro")}</p>
           <WriteNote agent={props.agent} />
           <Section title={t("web.memory.memory.notes")} count={v().memories.length} testid="notes">
             <Show when={v().memories.length > 0} fallback={<Quiet>{t("web.memory.memory.orchestratorNothing")}</Quiet>}>
@@ -654,10 +642,10 @@ export function ArchivePanel(props: { agent: string }) {
   const data = () => ready(listing, undefined);
   const hits = () => data()?.hits ?? [];
   return (
-    <div {...stylex.attrs(viewStyles.memoryPanelDiv)}>
-      <p {...stylex.attrs(viewStyles.memoryPanelP)}>{t("web.memory.memory.archiveIntro")}</p>
+    <div {...stylex.attrs(styles.memoryPanelDiv2)}>
+      <p {...stylex.attrs(styles.memoryPanelP)}>{t("web.memory.memory.archiveIntro")}</p>
       <form
-        {...stylex.attrs(viewStyles.archivePanelForm)}
+        {...stylex.attrs(styles.archivePanelForm)}
         onSubmit={(e) => {
           e.preventDefault();
           if (query().trim()) setAsked(query().trim());
@@ -677,11 +665,11 @@ export function ArchivePanel(props: { agent: string }) {
         <Section title={t("web.memory.memory.found")} count={hits().length}>
           <For each={hits()}>
             {(h) => (
-              <div {...stylex.attrs(recipeStyles.archivePanelDiv)}>
-                <span {...stylex.attrs(viewStyles.archivePanelSpan)}>
+              <div {...stylex.attrs(styles.archivePanelDiv)}>
+                <span {...stylex.attrs(styles.archivePanelSpan)}>
                   {h.file}:{Math.round(h.line)}
                 </span>
-                <span {...stylex.attrs(viewStyles.memoryPanelSpan4)}>{h.text}</span>
+                <span {...stylex.attrs(styles.memoryPanelSpan4)}>{h.text}</span>
               </div>
             )}
           </For>
@@ -693,20 +681,20 @@ export function ArchivePanel(props: { agent: string }) {
             <Show when={files().length > 0} fallback={<Quiet>{t("web.memory.memory.noArchive")}</Quiet>}>
               <For each={files()} keyed={(f) => f.name}>
                 {(f) => (
-                  <div {...stylex.attrs(recipeStyles.archivePanelDiv2)}>
+                  <div {...stylex.attrs(styles.archivePanelDiv2)}>
                     <button
                       type="button"
                       aria-expanded={aria(open()?.name === f().name)}
                       onClick={() => void show(f().name)}
-                      {...stylex.attrs(viewStyles.archivePanelButton)}
+                      {...stylex.attrs(styles.archivePanelButton)}
                     >
-                      <span {...stylex.attrs(viewStyles.archivePanelSpan2)}>{f().name}</span>
-                      <span {...stylex.attrs(viewStyles.sectionSpan)}>
+                      <span {...stylex.attrs(styles.archivePanelSpan2)}>{f().name}</span>
+                      <span {...stylex.attrs(styles.sectionSpan)}>
                         {ago(f().at, now())} · {t("web.memory.memory.chars", { n: Math.round(f().chars) })}
                       </span>
                     </button>
                     <Show when={open()?.name === f().name}>
-                      <pre {...stylex.attrs(recipeStyles2.archivePanelPre)}>{open()?.text}</pre>
+                      <pre {...stylex.attrs(styles.archivePanelPre)}>{open()?.text}</pre>
                     </Show>
                   </div>
                 )}
@@ -742,8 +730,8 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
     if (done === true) setText("");
   };
   return (
-    <div {...stylex.attrs(viewStyles.writeNoteDiv)}>
-      <span {...stylex.attrs(viewStyles.writeNoteSpan)}>{t("web.memory.memory.note")}</span>
+    <div {...stylex.attrs(styles.writeNoteDiv)}>
+      <span {...stylex.attrs(styles.writeNoteSpan)}>{t("web.memory.memory.note")}</span>
       <TextArea
         data-testid="note-input"
         aria-label={t("web.memory.memory.note")}
@@ -752,11 +740,11 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
         value={text()}
         onInput={(e) => setText(e.currentTarget.value)}
       />
-      <div {...stylex.attrs(viewStyles.writeNoteDiv2)}>
-        <Show when={props.withRepo} fallback={<span {...stylex.attrs(viewStyles.sectionSpan2)} />}>
+      <div {...stylex.attrs(styles.writeNoteDiv2)}>
+        <Show when={props.withRepo} fallback={<span {...stylex.attrs(styles.sectionSpan2)} />}>
           <TextInput
             aria-label={t("web.memory.memory.repo")}
-            styles={variantStyles2.writeNoteTextInput}
+            styles={styles.writeNoteTextInput}
             placeholder={t("web.memory.memory.repoHint")}
             list="memory-repos"
             value={repo()}
@@ -773,12 +761,12 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
       <Show
         when={error()}
         fallback={
-          <span {...stylex.attrs(viewStyles.writeNoteSpan2)}>
+          <span {...stylex.attrs(styles.writeNoteSpan2)}>
             {props.withRepo === true ? t("web.memory.memory.noteHintRepo") : t("web.memory.memory.noteHint")}
           </span>
         }
       >
-        <span {...stylex.attrs(viewStyles.writeNoteSpan3)}>{error()}</span>
+        <span {...stylex.attrs(styles.writeNoteSpan3)}>{error()}</span>
       </Show>
     </div>
   );
@@ -792,14 +780,12 @@ export function MemoryItem(props: { memory: Memory; onForget?: (() => void) | un
       {...styleProps([stylex.defaultMarker(), memoryStyles.card])}
       data-faded={props.faded === true ? "" : undefined}
     >
-      <div {...stylex.attrs(viewStyles.memoryItemDiv)}>
-        <span {...stylex.attrs(variantStyles.memoryItemSpan, !(props.faded !== true) ? variantStyles.memoryItemSpanVariant : variantStyles.sourcesSpan)}>
-          {props.memory.text}
-        </span>
-        <span {...stylex.attrs(viewStyles.memoryItemSpan)}>
+      <div {...stylex.attrs(styles.memoryItemDiv)}>
+        <span {...stylex.attrs(styles.memoryItemSpan, !(props.faded !== true) ? styles.memoryItemSpanTone : styles.sourcesSpan)}>{props.memory.text}</span>
+        <span {...stylex.attrs(styles.memoryItemSpan2)}>
           <For each={props.meta}>{(m) => <span>{m}</span>}</For>
           <Show when={props.warning}>
-            <span {...stylex.attrs(viewStyles.memoryItemSpan2)}>{props.warning}</span>
+            <span {...stylex.attrs(styles.memoryItemSpan22)}>{props.warning}</span>
           </Show>
         </span>
       </div>

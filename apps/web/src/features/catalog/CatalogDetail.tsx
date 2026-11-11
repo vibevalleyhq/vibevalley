@@ -35,35 +35,35 @@ const groundStyles = stylex.create({
   },
 });
 
-const variantStyles2 = stylex.create({
+const styles = stylex.create({
   detailSliderRoot: {
-    width: "calc(var(--spacing) * 24)",
+    width: "6rem",
   },
   detailSliderControl: {
     position: "relative",
     display: "flex",
-    height: "calc(var(--spacing) * 4)",
+    height: "1rem",
     cursor: "pointer",
     alignItems: "center",
   },
   detailSliderTrack: {
     position: "relative",
-    height: "var(--spacing)",
+    height: "0.25rem",
     width: "100%",
-    borderRadius: "2147483647px",
+    borderRadius: "9999px",
     backgroundColor: "var(--color-selected)",
   },
   detailSliderIndicator: {
     height: "100%",
-    borderRadius: "2147483647px",
+    borderRadius: "9999px",
     backgroundColor: "var(--color-leaf)",
   },
   detailSliderThumb: {
     top: "50%",
-    width: "calc(var(--spacing) * 3)",
-    height: "calc(var(--spacing) * 3)",
-    translate: "0 calc(calc(1 / 2 * 100%) * -1)",
-    borderRadius: "2147483647px",
+    width: "0.75rem",
+    height: "0.75rem",
+    translate: "0 -50%",
+    borderRadius: "9999px",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-leaf)",
@@ -82,26 +82,20 @@ const variantStyles2 = stylex.create({
       ":focus-visible": "var(--color-focus)",
     },
   },
-});
-
-const variantStyles = stylex.create({
   detailButton: {
     display: "flex",
-    width: "calc(var(--spacing) * 11)",
-    height: "calc(var(--spacing) * 11)",
+    width: "2.75rem",
+    height: "2.75rem",
     cursor: "pointer",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
     borderRadius: "var(--radius-sm)",
   },
-  detailButtonVariant: {
+  detailButtonTone: {
     boxShadow: "0 0 0 2px var(--color-focus)",
   },
-  detailButtonVariant2: {},
-});
-
-const viewStyles = stylex.create({
+  detailButtonAlt: {},
   imgImg: {
     maxWidth: "none",
     imageRendering: "pixelated",
@@ -111,12 +105,12 @@ const viewStyles = stylex.create({
     flexShrink: "0",
     cursor: "pointer",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     borderRadius: "var(--radius-sm)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
-    paddingBlock: "calc(var(--spacing) * .5)",
+    paddingInline: "0.375rem",
+    paddingBlock: "0.125rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
     backgroundColor: {
       default: null,
@@ -128,12 +122,12 @@ const viewStyles = stylex.create({
   },
   rowDiv: {
     display: "flex",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   rowSpan: {
-    width: "calc(var(--spacing) * 16)",
+    width: "4rem",
     flexShrink: "0",
     color: "var(--color-muted)",
   },
@@ -142,7 +136,7 @@ const viewStyles = stylex.create({
     minWidth: "0",
     flex: "1",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   codeCode: {
     minWidth: "0",
@@ -151,21 +145,21 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-hover)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.375rem",
     paddingBlock: "1px",
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-2xs)",
-    lineHeight: "var(--text-2xs--line-height)",
+    lineHeight: "var(--leading-2xs)",
   },
   detailDiv: {
     display: "flex",
-    maxHeight: "calc(var(--spacing) * 88)",
-    minHeight: "calc(var(--spacing) * 40)",
+    maxHeight: "22rem",
+    minHeight: "10rem",
     alignItems: "center",
     justifyContent: "center",
     overflow: "auto",
     borderRadius: "var(--radius-md)",
-    padding: "calc(var(--spacing) * 3)",
+    padding: "0.75rem",
   },
   detailSpan: {
     position: "relative",
@@ -191,62 +185,62 @@ const viewStyles = stylex.create({
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   detailDiv3: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     borderRadius: "var(--radius-lg)",
     backgroundColor: "var(--color-hover)",
-    padding: "calc(var(--spacing) * 2)",
+    padding: "0.5rem",
   },
   detailDiv4: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   detailSpan4: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   detailSpan5: {
     flex: "1",
   },
   detailSpan6: {
-    width: "calc(var(--spacing) * 14)",
+    width: "3.5rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   detailDiv5: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   detailDiv6: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   cursor: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: "var(--spacing)",
-    padding: "var(--spacing)",
+    gap: "0.25rem",
+    padding: "0.25rem",
   },
   cursorTileSpan: {
     display: "flex",
-    height: "calc(var(--spacing) * 16)",
+    height: "4rem",
     width: "100%",
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "var(--radius-md)",
   },
   cursorTileImg: {
-    height: "calc(var(--spacing) * 10)",
+    height: "2.5rem",
     imageRendering: "pixelated",
   },
   cursorTileImg2: {
@@ -254,9 +248,9 @@ const viewStyles = stylex.create({
   },
   cursorTileSpan2: {
     position: "absolute",
-    width: "calc(var(--spacing) * 2)",
-    height: "calc(var(--spacing) * 2)",
-    borderRadius: "2147483647px",
+    width: "0.5rem",
+    height: "0.5rem",
+    borderRadius: "9999px",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-bark-900)",
@@ -265,7 +259,7 @@ const viewStyles = stylex.create({
   cursorTileSpan3: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
 });
@@ -291,7 +285,7 @@ export function Img(props: { p: Picture; scale: number }) {
       src={`/pixel/${props.p.name}.png`}
       alt=""
       draggable="false"
-      {...stylex.attrs(viewStyles.imgImg)}
+      {...stylex.attrs(styles.imgImg)}
       style={{ width: `${Math.round(props.p.w * props.scale)}px`, height: `${Math.round(props.p.h * props.scale)}px` }}
     />
   );
@@ -308,12 +302,13 @@ function Copy(props: { text: string }) {
       await navigator.clipboard.writeText(text);
       setDone(true);
       later(() => setDone(false), 1200);
-    } catch {
+    } catch (e) {
       // No clipboard here: the text is on show to copy by hand.
+      if (!(e instanceof DOMException) && !(e instanceof TypeError)) throw e;
     }
   };
   return (
-    <button type="button" onClick={() => void copy(props.text)} {...stylex.attrs(viewStyles.copyButton)}>
+    <button type="button" onClick={() => void copy(props.text)} {...stylex.attrs(styles.copyButton)}>
       <Icon name={done() ? "check" : "copy"} size={12} />
       {done() ? t("web.catalog.copied") : t("web.catalog.copy")}
     </button>
@@ -322,9 +317,9 @@ function Copy(props: { text: string }) {
 
 function Row(props: { label: string; children: JSX.Element }) {
   return (
-    <div {...stylex.attrs(viewStyles.rowDiv)}>
-      <span {...stylex.attrs(viewStyles.rowSpan)}>{props.label}</span>
-      <span {...stylex.attrs(viewStyles.rowSpan2)}>{props.children}</span>
+    <div {...stylex.attrs(styles.rowDiv)}>
+      <span {...stylex.attrs(styles.rowSpan)}>{props.label}</span>
+      <span {...stylex.attrs(styles.rowSpan2)}>{props.children}</span>
     </div>
   );
 }
@@ -332,7 +327,7 @@ function Row(props: { label: string; children: JSX.Element }) {
 function Code(props: { text: string }) {
   return (
     <>
-      <code title={props.text} {...stylex.attrs(viewStyles.codeCode)}>
+      <code title={props.text} {...stylex.attrs(styles.codeCode)}>
         {props.text}
       </code>
       <Copy text={props.text} />
@@ -365,13 +360,13 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
   const scales = () => [...new Set([1, 2, 4, 8, scale()])].toSorted((a, b) => a - b);
   return (
     <Card title={props.picture.name} action={<Copy text={props.picture.name} />} testid="picture-detail" item={props.picture.name}>
-      <div {...styleProps([viewStyles.detailDiv, groundStyle(props.ground)])}>
-        <span {...stylex.attrs(viewStyles.detailSpan)} style={{ width: `${shown().w * scale()}px`, height: `${shown().h * scale()}px` }}>
+      <div {...styleProps([styles.detailDiv, groundStyle(props.ground)])}>
+        <span {...stylex.attrs(styles.detailSpan)} style={{ width: `${shown().w * scale()}px`, height: `${shown().h * scale()}px` }}>
           <Img p={shown()} scale={scale()} />
           <Show when={marks()}>
             <span
               title={t("web.catalog.anchor")}
-              {...stylex.attrs(viewStyles.detailSpan2)}
+              {...stylex.attrs(styles.detailSpan2)}
               style={{
                 left: `${shown().ax * scale() - 6}px`,
                 top: `${shown().ay * scale() - 6}px`,
@@ -381,7 +376,7 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
               {(head) => (
                 <span
                   title={t("web.catalog.head")}
-                  {...stylex.attrs(viewStyles.detailSpan3)}
+                  {...stylex.attrs(styles.detailSpan3)}
                   style={{ left: `${head().x * scale() - 5}px`, top: `${head().y * scale() - 5}px` }}
                 />
               )}
@@ -389,7 +384,7 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
           </Show>
         </span>
       </div>
-      <div {...stylex.attrs(viewStyles.detailDiv2)}>
+      <div {...stylex.attrs(styles.detailDiv2)}>
         <Segmented
           label={t("web.catalog.zoom")}
           value={String(scale())}
@@ -400,24 +395,24 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
       </div>
       <Show when={frames()}>
         {(f) => (
-          <div {...stylex.attrs(viewStyles.detailDiv3)}>
-            <div {...stylex.attrs(viewStyles.detailDiv4)}>
+          <div {...stylex.attrs(styles.detailDiv3)}>
+            <div {...stylex.attrs(styles.detailDiv4)}>
               <Button data-testid="play" aria-pressed={aria(playing())} onClick={() => setPlaying(!playing())}>
                 {playing() ? t("web.catalog.stop") : t("web.catalog.play")}
               </Button>
-              <span {...stylex.attrs(viewStyles.detailSpan4)}>{t("web.catalog.frames", { n: f().length })}</span>
-              <span {...stylex.attrs(viewStyles.detailSpan5)} />
-              <Slider.Root min={1} max={12} value={fps()} onValueChange={setFps} {...stylex.attrs(variantStyles2.detailSliderRoot)}>
-                <Slider.Control {...stylex.attrs(variantStyles2.detailSliderControl)}>
-                  <Slider.Track {...stylex.attrs(variantStyles2.detailSliderTrack)}>
-                    <Slider.Indicator {...stylex.attrs(variantStyles2.detailSliderIndicator)} />
-                    <Slider.Thumb aria-label={t("web.catalog.fps")} {...stylex.attrs(variantStyles2.detailSliderThumb)} />
+              <span {...stylex.attrs(styles.detailSpan4)}>{t("web.catalog.frames", { n: f().length })}</span>
+              <span {...stylex.attrs(styles.detailSpan5)} />
+              <Slider.Root min={1} max={12} value={fps()} onValueChange={setFps} {...stylex.attrs(styles.detailSliderRoot)}>
+                <Slider.Control {...stylex.attrs(styles.detailSliderControl)}>
+                  <Slider.Track {...stylex.attrs(styles.detailSliderTrack)}>
+                    <Slider.Indicator {...stylex.attrs(styles.detailSliderIndicator)} />
+                    <Slider.Thumb aria-label={t("web.catalog.fps")} {...stylex.attrs(styles.detailSliderThumb)} />
                   </Slider.Track>
                 </Slider.Control>
               </Slider.Root>
-              <span {...stylex.attrs(viewStyles.detailSpan6)}>{t("web.catalog.perSecond", { n: fps() })}</span>
+              <span {...stylex.attrs(styles.detailSpan6)}>{t("web.catalog.perSecond", { n: fps() })}</span>
             </div>
-            <div {...stylex.attrs(viewStyles.detailDiv5)}>
+            <div {...stylex.attrs(styles.detailDiv5)}>
               <For each={f()}>
                 {(name, i) => (
                   <Show when={props.byName.get(name)}>
@@ -428,8 +423,8 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
                         aria-label={name}
                         onClick={() => router.navigate(`/catalog/${encodeURIComponent(name)}`)}
                         {...styleProps([
-                          variantStyles.detailButton,
-                          playing() && i() === frame() % f().length ? variantStyles.detailButtonVariant : variantStyles.detailButtonVariant2,
+                          styles.detailButton,
+                          playing() && i() === frame() % f().length ? styles.detailButtonTone : styles.detailButtonAlt,
                           groundStyle(props.ground),
                         ])}
                       >
@@ -443,12 +438,12 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
           </div>
         )}
       </Show>
-      <div {...stylex.attrs(viewStyles.detailDiv6)}>
+      <div {...stylex.attrs(styles.detailDiv6)}>
         <Row label={t("web.catalog.size")}>{t("web.catalog.pixels", { w: numberText(props.picture.w), h: numberText(props.picture.h) })}</Row>
         <Row label={t("web.catalog.anchor")}>{`(${numberText(props.picture.ax)}, ${numberText(props.picture.ay)})`}</Row>
         <Show when={headOf(props.picture)}>{(head) => <Row label={t("web.catalog.head")}>{`(${numberText(head().x)}, ${numberText(head().y)})`}</Row>}</Show>
         <Row label={t("web.catalog.from")}>
-          <Show when={props.picture.sheet} fallback={<span {...stylex.attrs(viewStyles.detailSpan4)}>{t("web.catalog.unrecorded")}</span>}>
+          <Show when={props.picture.sheet} fallback={<span {...stylex.attrs(styles.detailSpan4)}>{t("web.catalog.unrecorded")}</span>}>
             {(sheet) => <Code text={sheet()} />}
           </Show>
         </Row>
@@ -482,29 +477,27 @@ export function CursorTile(props: { name: string; hx: number; hy: number; ground
     return n && ratio != null && ratio !== 0 ? n.w * ratio : height;
   };
   return (
-    <div data-testid="cursor" data-key={props.name} {...stylex.attrs(viewStyles.cursor)}>
-      <span {...styleProps([viewStyles.cursorTileSpan, groundStyle(props.ground)])}>
-        <span {...stylex.attrs(viewStyles.detailSpan)} style={{ height: `${height}px`, width: `${widthPx()}px` }}>
+    <div data-testid="cursor" data-key={props.name} {...stylex.attrs(styles.cursor)}>
+      <span {...styleProps([styles.cursorTileSpan, groundStyle(props.ground)])}>
+        <span {...stylex.attrs(styles.detailSpan)} style={{ height: `${height}px`, width: `${widthPx()}px` }}>
           <img
             src={`/cursors/${props.name}@2x.png`}
             alt=""
-            {...stylex.attrs(viewStyles.cursorTileImg)}
+            {...stylex.attrs(styles.cursorTileImg)}
             onError={(e) => (e.currentTarget.src = `/cursors/${props.name}.png`)}
           />
           <img
             src={`/cursors/${props.name}.png`}
             alt=""
-            {...stylex.attrs(viewStyles.cursorTileImg2)}
+            {...stylex.attrs(styles.cursorTileImg2)}
             onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
           />
           <Show when={k()}>
-            {(ratio) => (
-              <span {...stylex.attrs(viewStyles.cursorTileSpan2)} style={{ left: `${props.hx * ratio() - 4}px`, top: `${props.hy * ratio() - 4}px` }} />
-            )}
+            {(ratio) => <span {...stylex.attrs(styles.cursorTileSpan2)} style={{ left: `${props.hx * ratio() - 4}px`, top: `${props.hy * ratio() - 4}px` }} />}
           </Show>
         </span>
       </span>
-      <span {...stylex.attrs(viewStyles.cursorTileSpan3)}>{props.name}</span>
+      <span {...stylex.attrs(styles.cursorTileSpan3)}>{props.name}</span>
     </div>
   );
 }

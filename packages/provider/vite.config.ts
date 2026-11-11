@@ -5,7 +5,7 @@ export default defineConfig({
   test: { include: ["src/**/*.test.ts"], reporters: [...configDefaults.reporters, "@vibevalley/testkit/budgets"] },
   pack: {
     entry: [
-      "src/moss.ts",
+      "src/moss/index.ts",
       "src/moss/server.ts",
       "src/moss/models.ts",
       "src/moss/speech-models.ts",
@@ -31,7 +31,7 @@ export default defineConfig({
       "src/moss/files.ts",
       "src/agora/server.ts",
       "src/agora/captions.ts",
-      "src/transcription.ts",
+      "src/base/transcription.ts",
       "src/deepseek/models.ts",
       "src/deepseek/request.ts",
       "src/deepseek/response.ts",

@@ -9,12 +9,12 @@ import { TestClock } from "effect/testing";
 
 import { channelOf } from "@vibevalley/protocol/rules";
 
-import { Agent } from "#/agent/agent.ts";
-import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
 import { Db } from "#/infra/db.ts";
-import { Issue } from "#/issue/issue.ts";
-import { Session } from "#/session/session.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { Channel } from "#/modules/channel/channel.ts";
+import { Issue } from "#/modules/issue/issue.ts";
+import { Session } from "#/modules/session/session.ts";
 import { testConfig, waitFor } from "#/testing/layers.ts";
 import { Said } from "#/testing/world.ts";
 

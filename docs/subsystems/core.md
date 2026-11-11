@@ -16,10 +16,10 @@
 | 位置 | 职责 |
 |---|---|
 | `apps/server/src/core/core.ts` | `Core` 服务：持有状态、盖时间戳、发布事实与三条流 |
-| `apps/server/src/projection/` | `reduce.ts`、`frame.ts`、`projection.ts`：组装各模块规则注入 `Core` |
+| `apps/server/src/gateway/projection/` | `reduce.ts`、`frame.ts`、`projection.ts`：组装各模块规则注入 `Core` |
 | `packages/protocol/src/core/shapes.ts` | `SpaceState`、`Fact`、`StateFrame`、`ServerEvent`、`LiveEvent` |
-| `packages/protocol/src/api.ts`、`endpoint.ts` | 汇总各概念的 `endpoints`、`Handlers`、`Endpoint` 与 `errorStatus` |
-| `apps/server/src/http/` | `api.ts` 路由与 `requestKey` 去重、`streams.ts` 三条 SSE、`handlers/<概念>.ts` |
+| `packages/protocol/src/api.ts`、`endpoint.ts` | 汇总各概念的 `endpoints`、`Handlers`、`Endpoint`、六位业务码 `BizCode`、`bizCodeMeta`、全信封 Schema 与 `ApiError` |
+| `apps/server/src/gateway/http/` | `api.ts` 路由与 `requestKey` 去重、`streams.ts` 三条 SSE、`handlers/<概念>.ts` |
 | `apps/cli/src/main.ts`、`farm.ts`、`commands/` | CLI 入口、全局参数与按领域 1:1 拆分的子命令 |
 
 全部接口与权限矩阵见生成的 [capabilities.md](docs/reference/capabilities.md)。
@@ -51,13 +51,14 @@
 
 ### HTTP 接口与命令行
 
-- **统一 `POST /api/v1/<路径>`**：操作名中的 `.` 换为 `/` 即路径（如 `issue.status.update` → `/api/v1/issue/status/update`），参数统一放入 JSON 请求体。
-- **严格来源校验**：HTTP 与 WebSocket 要求 `Host` 为回环地址；若有浏览器 `Origin` 则须与 `Host` 同源，`Sec-Fetch-Site` 仅接受 `same-origin` 或 `none`，否则返回 `403`。
-- **请求幂等键 `requestKey`**：`issue.create`、`issue.status.update`、`channel.thread.create`、`memory.create` 接受 `requestKey`（最长 64 字符）。网关按操作缓存最近 500 个成功键的响应，失败不缓存。
+- **统一 `POST /api/v1/<路径>` 与全信封 JSON 响应**：操作名中的 `.` 换为 `/` 即路径（如 `issue.status.update` → `/api/v1/issue/status/update`），参数统一放入 JSON 请求体。所有 JSON 接口统一返回全信封：成功返回 HTTP `200` 与 `{ bizCode: 0, message: "ok", data? }`（无返回值接口省略 `data`）；网关拒绝与业务错误按 `bizCodeMeta` 映射标准 HTTP 状态码（`400`、`401`、`403`、`404`、`405`、`409`、`413`、`415`、`500`、`502`、`503`），响应体统一为 `{ bizCode, message, error?: { next?, settings? } }`。二进制下载、HTML 预览、SSE 与 NDJSON 流保持各自媒体类型。
+- **六位分段业务码 `BizCode`**：`endpoint.ts` 集中定义 `BizCode`（成功为 `0`；`100xxx` 网关与协议、`200xxx` 鉴权与局域网、`300xxx` 工单与仓库、`400xxx` 会话与助手、`500xxx` 频道与连接器、`600xxx` 产物与知识库、`700xxx` 语音与媒体配置），经 `bizCodeMeta` 静态绑定 HTTP 状态码、语义分类 `kind` 与可重试性 `retryable`。
+- **严格来源校验**：HTTP 与 WebSocket 要求 `Host` 为回环地址；若有浏览器 `Origin` 则须与 `Host` 同源，`Sec-Fetch-Site` 仅接受 `same-origin` 或 `none`，否则返回 `403`（`BizCode.Forbidden`）。
+- **请求幂等键 `requestKey`**：`issue.create`、`issue.status.update`、`channel.thread.create`、`memory.create` 接受 `requestKey`（最长 64 字符，超长返回 `409` `BizCode.RequestKeyTooLong`）。网关按操作缓存最近 500 个成功键的信封响应，失败不缓存。
 - **开关写成幂等设值**：回应、置顶、归档定义为带 `on: boolean` 的 `*.set` 接口，重复设置相同值不产生副作用。
 - **破坏性操作配对试跑 `dryRun`**：删除、合并、关单接口在 `endpoints` 中指向对应的 `preview<动词>` 接口。试跑与真做共用同一套前置判断函数，试跑不写库、不碰 git。
-- **拒绝响应附带下一步 `next`**：`Refused` 与 `Missing` 携带 `next: { say, run? }[]`，给出可直接运行的 CLI 命令或指引。
-- **CLI 是纯 HTTP 客户端**：`apps/cli` 不加载服务端、不直连数据库，通过 `--server`、`VIBEVALLEY_SERVER` 或 `$VIBEVALLEY_HOME/server.json` 连接服务端。
+- **拒绝响应附带下一步 `next`**：业务拒绝与未找到错误在 `error.next` 中携带 `{ say, run? }[]`，给出可直接运行的 CLI 命令或指引；语音配置问题另附 `error.settings`。
+- **CLI 是纯 HTTP 客户端**：`apps/cli` 不加载服务端、不直连数据库，通过 `--server`、`VIBEVALLEY_SERVER` 或 `$VIBEVALLEY_HOME/server.json` 连接服务端；失败时在 stderr JSON 中输出 `{ error: { bizCode, tag, message, status, next } }`。
 - **拥有者负责协调与身份分配**：处理器只传业务意图，由拥有者模块协调内部步骤并在锁内分配新实体 ID；查询缺失关联时列入 `missingSessions`，不伪造缺省对象。
 
 ## 怎么走
@@ -97,5 +98,5 @@
 ## 怎么验证
 
 - `apps/server/src/core/core.test.ts`：事实去重、`seq` 递增、批次原子提交与低调度预算下的同步回调测试。
-- `packages/protocol/src/api.test.ts`、`apps/server/src/http/api.test.ts`、`apps/server/src/flows/request.test.ts`：接口命名规范、`requestKey` 幂等与帧 `seq` 同步测试。
+- `packages/protocol/src/api.test.ts`、`apps/server/src/gateway/http/api.test.ts`、`apps/server/src/flows/request.test.ts`：接口命名规范、`requestKey` 幂等与帧 `seq` 同步测试。
 - `apps/cli/src/main.test.ts`：CLI 全接口覆盖、试跑与错误 `next` 测试。

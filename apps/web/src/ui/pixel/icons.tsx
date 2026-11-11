@@ -7,18 +7,14 @@ import type { Phase, SessionAction } from "@vibevalley/protocol";
 import { useInterval } from "#/base/timer.ts";
 import { styleProps } from "#/ui/positioner.ts";
 
-const variantStyles = stylex.create({
-  bobSpan: {
+const styles = stylex.create({
+  bob: {
     display: "inline-flex",
     flexShrink: "0",
   },
-  bobSpanVariant: {
+  bobUp: {
     translate: "0 -1px",
   },
-  bobSpanVariant2: {},
-});
-
-const viewStyles = stylex.create({
   sprite: {
     display: "inline-block",
     flexShrink: 0,
@@ -26,17 +22,20 @@ const viewStyles = stylex.create({
     imageRendering: "pixelated",
   },
   size: (size: number) => ({ width: size, height: size }),
-  phaseGlyphSpan: {
+  phasePlaceholder: {
     display: "inline-block",
     flexShrink: "0",
   },
-  markedSpan: {
+  marked: {
     display: "inline-flex",
     minWidth: "0",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
-  markedSpan2: {
+  markedIcon: (marginTop: number) => ({
+    marginTop,
+  }),
+  markedBody: {
     minWidth: "0",
   },
 });
@@ -51,7 +50,7 @@ export function SpriteIcon(props: { name: string; size: number; label?: string; 
       alt={props.label ?? ""}
       aria-hidden={props.label ? undefined : "true"}
       draggable="false"
-      {...styleProps([viewStyles.sprite, props.styles, viewStyles.size(props.size)], props.style)}
+      {...styleProps([styles.sprite, props.styles, styles.size(props.size)], props.style)}
     />
   );
 }
@@ -71,7 +70,7 @@ export function PhaseGlyph(props: { phase: Phase; size?: number }) {
   return (
     <Switch>
       <Match when={props.phase._tag === "working" && doing() === "none"}>
-        <span {...stylex.attrs(viewStyles.phaseGlyphSpan)} style={{ width: `${size()}px`, height: `${size()}px` }} />
+        <span {...styleProps([styles.phasePlaceholder, styles.size(size())])} />
       </Match>
       <Match when={props.phase._tag === "working"}>
         <Bob>
@@ -113,15 +112,15 @@ function Bob(props: { children: JSX.Element }) {
   const still = reducedMotion();
   const [up, setUp] = createSignal(false);
   useInterval(() => setUp((u) => !still() && !u), 450);
-  return <span {...stylex.attrs(variantStyles.bobSpan, up() ? variantStyles.bobSpanVariant : variantStyles.bobSpanVariant2)}>{props.children}</span>;
+  return <span {...stylex.attrs(styles.bob, up() && styles.bobUp)}>{props.children}</span>;
 }
 
 /** A sprite before a line, at its first line's height. */
 export function Marked(props: { mark: string; children: JSX.Element; size?: number; top?: number }) {
   return (
-    <span {...stylex.attrs(viewStyles.markedSpan)}>
-      <SpriteIcon name={props.mark} size={props.size ?? 12} style={{ "margin-top": `${props.top ?? 2}px` }} />
-      <span {...stylex.attrs(viewStyles.markedSpan2)}>{props.children}</span>
+    <span {...stylex.attrs(styles.marked)}>
+      <SpriteIcon name={props.mark} size={props.size ?? 12} styles={styles.markedIcon(props.top ?? 2)} />
+      <span {...stylex.attrs(styles.markedBody)}>{props.children}</span>
     </span>
   );
 }

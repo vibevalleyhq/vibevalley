@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 
-import { jsonText } from "../json.ts";
+import { jsonText } from "../base/json.ts";
 
 export const visionFrameBytes = 256 * 1024;
 export const visionFrameIntervalMs = 1000;

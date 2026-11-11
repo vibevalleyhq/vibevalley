@@ -2,7 +2,7 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "@effect/vitest";
-import { Cause, Effect, Exit, Layer } from "effect";
+import { Cause, Effect, Exit, Layer, Metric } from "effect";
 import { SqlClient } from "effect/sql";
 
 import { tempDir } from "@vibevalley/testkit/temp";
@@ -11,7 +11,7 @@ import { testDatabase } from "#/testing/layers.ts";
 import { lanOpen, setLanOpen } from "#db/lan.sql.ts";
 import { addUserDevice, seenUserDevice, userDevices } from "#db/user_device.sql.ts";
 
-import { Db, setAsideStale } from "./db.ts";
+import { Db, dbQueries, setAsideStale } from "./db.ts";
 
 describe("the database", () => {
   it.effect("has the schema, and the generated queries run on it", () =>
@@ -72,14 +72,62 @@ describe("the database", () => {
     }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
   );
 
-  it.effect("attemptTx keeps the database's failure as a value, and keeps none of the work", () =>
+  it.effect("attemptTx keeps the database's failure as a value, counts each query, and keeps none of the work", () =>
     Effect.gen(function* () {
       const db = yield* Db;
       const sql = yield* SqlClient.SqlClient;
-      const failed = yield* Effect.flip(db.attemptTx(Effect.andThen(setLanOpen({ open: true }), sql.unsafe("select * from nowhere"))));
+      const before = (yield* Metric.value(dbQueries)).count;
+      yield* db.attemptTx(
+        Effect.gen(function* () {
+          yield* db.attempt(addUserDevice({ id: "m1", name: "甲", came: "paired", key_hash: "a", added_at: 1 }));
+          yield* db.attempt(seenUserDevice({ last_seen: 2, id: "m1" }));
+        }),
+      );
+      const afterCommit = (yield* Metric.value(dbQueries)).count;
+      expect(afterCommit - before).toBe(2);
+      const failed = yield* Effect.flip(db.attemptTx(Effect.andThen(db.attempt(setLanOpen({ open: true })), sql.unsafe("select * from nowhere"))));
       expect(failed._tag).toBe("SqlError");
       const lanOpen2 = yield* db.one(lanOpen());
       expect(lanOpen2).toBeUndefined();
+    }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
+  );
+
+  it.effect("afterCommit runs once the outermost transaction commits, and drops hooks from rolled-back savepoints or transactions", () =>
+    Effect.gen(function* () {
+      const db = yield* Db;
+      const seen: string[] = [];
+      yield* db.inTx(
+        Effect.gen(function* () {
+          yield* db.run(addUserDevice({ id: "outer", name: "外层", came: "paired", key_hash: "a", added_at: 1 }));
+          yield* db.afterCommit(Effect.sync(() => void seen.push("outer")));
+          yield* Effect.exit(
+            db.attemptTx(
+              Effect.gen(function* () {
+                yield* db.attempt(addUserDevice({ id: "rolled", name: "回滚", came: "paired", key_hash: "b", added_at: 2 }));
+                yield* db.afterCommit(Effect.sync(() => void seen.push("rolled")));
+                return yield* Effect.fail("abort-inner");
+              }),
+            ),
+          );
+          yield* db.inTx(
+            Effect.gen(function* () {
+              yield* db.run(addUserDevice({ id: "inner", name: "内层", came: "paired", key_hash: "c", added_at: 3 }));
+              yield* db.afterCommit(Effect.sync(() => void seen.push("inner")));
+            }),
+          );
+          expect(seen).toEqual([]);
+        }),
+      );
+      expect(seen).toEqual(["outer", "inner"]);
+      yield* Effect.exit(
+        db.inTx(
+          Effect.gen(function* () {
+            yield* db.afterCommit(Effect.sync(() => void seen.push("aborted-outer")));
+            return yield* Effect.fail("abort-outer");
+          }),
+        ),
+      );
+      expect(seen).toEqual(["outer", "inner"]);
     }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
   );
 
@@ -127,19 +175,21 @@ describe("the database", () => {
 
 /** Where a failed query is a value, not a defect (Db.attempt, Db.attemptTx), and why. */
 const attempting: Readonly<Record<string, string>> = {
-  "channel/talk.ts": "a direct context whose initial delivery cannot be kept is refused as NotRecorded before its events are attached",
-  "connector/connector.ts": "a bridge write that fails is shown on the connector's status and tried again",
-  "cron/cron.ts": "a cron's run that is not kept is logged, and the next due cron goes on",
-  "game/game.ts": "a ledger entry that is not kept is logged, and the farm goes on",
-  "issue/lifecycle.ts": "an issue that is not saved, split, edited, or linked to its session or orchestrator is told as a refusal",
-  "mailbox/triggers.ts": "the source cursor and trigger commit together; a failed cron input is logged and retried without advancing its clock",
-  "mailbox/work.ts":
+  "modules/channel/store.ts": "a direct context whose initial delivery cannot be kept is refused as NotRecorded before its events are attached",
+  "gateway/connector/connector.ts": "a bridge write that fails is shown on the connector's status and tried again",
+  "modules/cron/cron.ts": "a cron's run that is not kept is logged, and the next due cron goes on",
+  "modules/game/game.ts": "a ledger entry that is not kept is logged, and the farm goes on",
+  "modules/issue/assignment.ts": "an assignment write inside an issue transaction hands its database failure up to the caller's refusal",
+  "modules/issue/store.ts": "an execution write inside an issue transaction hands its database failure up to the caller's refusal",
+  "modules/issue/lifecycle.ts": "an issue that is not saved, split, edited, or linked to its session or orchestrator is told as a refusal",
+  "modules/mailbox/triggers.ts": "the source cursor and trigger commit together; a failed cron input is logged and retried without advancing its clock",
+  "modules/mailbox/work.ts":
     "a Session's first direct deliveries are registered atomically; a failed insert is returned so Session startup can stop and report NotRecorded",
-  "media/inputs.ts": "a rejected input commit removes its newly published file; failed cleanup retains its tombstone for restart recovery",
-  "memory/memory.ts": "a memory read or write that fails is logged and taken as none",
-  "session/inProcessRun.ts": "a run write fails as NotRecorded so an in-process run retries its end before accepting another input",
-  "session/registry.ts": "a session's own record that is not kept is logged without discarding its live execution",
-  "session/session.ts": "a report handed in that cannot be kept is told as a refusal, and the turn does not take it",
+  "modules/media/inputs.ts": "a rejected input commit removes its newly published file; failed cleanup retains its tombstone for restart recovery",
+  "modules/memory/memory.ts": "a memory read or write that fails is logged and taken as none",
+  "modules/session/inProcessRun.ts": "a run write fails as NotRecorded so an in-process run retries its end before accepting another input",
+  "modules/session/registry.ts": "a session's own record that is not kept is logged without discarding its live execution",
+  "modules/session/session.ts": "a report handed in that cannot be kept is told as a refusal, and the turn does not take it",
 };
 
 it("attempt and attemptTx are used only where a failed query is told or retried, each with its reason", () => {

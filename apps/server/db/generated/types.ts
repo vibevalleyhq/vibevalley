@@ -25,8 +25,11 @@ export type Words_channel_message_kind = typeof Words_channel_message_kind.Type
 export const Words_channel_notify = Schema.Literals(["all","mentions","none"])
 export type Words_channel_notify = typeof Words_channel_notify.Type
 
-export const Words_channel_participant_kind = Schema.Literals(["user","orchestrator","session","profile","system"])
+export const Words_channel_participant_kind = Schema.Literals(["user","agent","system"])
 export type Words_channel_participant_kind = typeof Words_channel_participant_kind.Type
+
+export const Words_channel_participant_role = Schema.Literals(["orchestrator","worker"])
+export type Words_channel_participant_role = typeof Words_channel_participant_role.Type
 
 export const Words_channel_subject_kind = Schema.Literals(["issue","talk"])
 export type Words_channel_subject_kind = typeof Words_channel_subject_kind.Type

@@ -1,11 +1,11 @@
-import type { CheckResult, CriterionCheck, Question } from "@vibevalley/protocol";
+import type { CriterionCheck, Question } from "@vibevalley/protocol";
 
 const askLine = /^[\s>*#_-]*(?:\*\*)?要问用户(?:\*\*)?\s*[:：]\s*(?:\*\*)?(.+)$/u;
 const optionsTail = /\s*[（(]\s*选项\s*[:：]\s*(.+?)\s*[)）]\s*$/u;
 
 /** The questions a report's question lines ask, one per line; a line's options tail gives the options (at least two). */
 const checkLine = /^标准\s*(\d+)\s*[:：]\s*(做到了|没做到|不确定)(?:\s*——\s*(.*))?$/u;
-const results: Readonly<Record<string, CheckResult>> = { 做到了: "met", 没做到: "unmet", 不确定: "unsure" };
+const results: Readonly<Record<string, CriterionCheck["result"]>> = { 做到了: "met", 没做到: "unmet", 不确定: "unsure" };
 
 /** The helper's text checks, one per criterion line; explicit issue_report.checks still win. */
 export const checksFromText = (said: string): CriterionCheck[] =>

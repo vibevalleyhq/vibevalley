@@ -9,15 +9,15 @@ import { TrajectoryLog } from "#/features/session/index.ts";
 import { VoiceForm } from "#/features/voice/index.ts";
 import { useAgent } from "#/infra/agents.ts";
 import { useRouter, Link as A } from "#/infra/router.ts";
-import { OrchestratorFace } from "#/ui/Face.tsx";
+import { OrchestratorFace } from "#/ui/domain/Face.tsx";
 import { Tabs } from "#/ui/Tabs.tsx";
 
 import { markWrongOf, orchestratorLooks } from "./looks";
 
-const variantStyles = stylex.create({
+const styles = stylex.create({
   orchestratorOfA: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
     textDecorationLine: {
       default: null,
@@ -30,19 +30,16 @@ const variantStyles = stylex.create({
   orchestratorOfA2: {
     textDecorationLine: "underline",
   },
-});
-
-const viewStyles = stylex.create({
   headDiv: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 4)",
-    paddingTop: "calc(var(--spacing) * 4)",
+    gap: "1rem",
+    paddingTop: "1rem",
   },
   headSpan: {
     display: "flex",
-    width: "calc(var(--spacing) * 18)",
-    height: "calc(var(--spacing) * 18)",
+    width: "4.5rem",
+    height: "4.5rem",
     flexShrink: "0",
     alignItems: "center",
     justifyContent: "center",
@@ -53,16 +50,16 @@ const viewStyles = stylex.create({
     display: "flex",
     minWidth: "0",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
   },
   headH1: {
     fontSize: "var(--text-2xl)",
-    lineHeight: "var(--text-2xl--line-height)",
+    lineHeight: "var(--leading-2xl)",
     fontWeight: "var(--font-weight-semibold)",
   },
   headP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   orchestratorOfDiv: {
@@ -70,9 +67,9 @@ const viewStyles = stylex.create({
     height: "100%",
     minHeight: "0",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBottom: "calc(var(--spacing) * 4)",
+    gap: "1rem",
+    paddingInline: "1rem",
+    paddingBottom: "1rem",
   },
   orchestratorOfDiv2: {
     minHeight: "0",
@@ -81,19 +78,16 @@ const viewStyles = stylex.create({
   orchestratorOfDiv3: {
     height: "100%",
     overflowY: "auto",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBottom: "calc(var(--spacing) * 4)",
+    paddingInline: "1rem",
+    paddingBottom: "1rem",
   },
   orchestratorOfDiv4: {
     display: "flex",
     maxWidth: "var(--container-4xl)",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
   },
-});
-
-const styles = stylex.create({
-  tabs: { borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-line)", paddingBottom: "calc(var(--spacing) * 2)" },
+  tabs: { borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-line)", paddingBottom: "0.5rem" },
 });
 
 const tabs = [
@@ -134,19 +128,19 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
   const at = () => (shown().some((t) => t.id === props.tab) ? props.tab : "memory");
   const look = () => orchestratorLooks.find((l) => l.id === (profile()?.look.orchestrator ?? "farmer"));
   const head = () => (
-    <div {...stylex.attrs(viewStyles.headDiv)}>
-      <span {...stylex.attrs(viewStyles.headSpan)}>
+    <div {...stylex.attrs(styles.headDiv)}>
+      <span {...stylex.attrs(styles.headSpan)}>
         <OrchestratorFace size={64} agent={props.agent} />
       </span>
-      <div {...stylex.attrs(viewStyles.headDiv2)}>
-        <A href="/agents" {...stylex.attrs(variantStyles.orchestratorOfA)}>
+      <div {...stylex.attrs(styles.headDiv2)}>
+        <A href="/agents" {...stylex.attrs(styles.orchestratorOfA)}>
           {t("web.orchestrator.orchestrator.all")}
         </A>
-        <h1 {...stylex.attrs(viewStyles.headH1)}>{profile()?.name || t("web.orchestrator.orchestrator.title")}</h1>
-        <p {...stylex.attrs(viewStyles.headP)}>
+        <h1 {...stylex.attrs(styles.headH1)}>{profile()?.name || t("web.orchestrator.orchestrator.title")}</h1>
+        <p {...stylex.attrs(styles.headP)}>
           {t("web.orchestrator.orchestrator.intro")}
           {look() ? t("web.orchestrator.orchestrator.look", { name: look()?.name ?? "" }) : ""}{" "}
-          <A href={`/agents/${encodeURIComponent(props.agent)}`} {...stylex.attrs(variantStyles.orchestratorOfA2)}>
+          <A href={`/agents/${encodeURIComponent(props.agent)}`} {...stylex.attrs(styles.orchestratorOfA2)}>
             {t("web.orchestrator.orchestrator.profile")}
           </A>
         </p>
@@ -166,10 +160,10 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
   return (
     <Switch>
       <Match when={at() === "trajectory"}>
-        <div {...stylex.attrs(viewStyles.orchestratorOfDiv)}>
+        <div {...stylex.attrs(styles.orchestratorOfDiv)}>
           {head()}
           {bar()}
-          <div {...stylex.attrs(viewStyles.orchestratorOfDiv2)}>
+          <div {...stylex.attrs(styles.orchestratorOfDiv2)}>
             <TrajectoryLog
               id={props.agent}
               asked={t("web.orchestrator.orchestrator.heard")}
@@ -182,8 +176,8 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
         </div>
       </Match>
       <Match when={at() !== "trajectory"}>
-        <div {...stylex.attrs(viewStyles.orchestratorOfDiv3)}>
-          <div {...stylex.attrs(viewStyles.orchestratorOfDiv4)}>
+        <div {...stylex.attrs(styles.orchestratorOfDiv3)}>
+          <div {...stylex.attrs(styles.orchestratorOfDiv4)}>
             {head()}
             {bar()}
             <Switch>

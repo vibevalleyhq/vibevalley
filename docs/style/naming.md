@@ -31,7 +31,7 @@
 
 名字说性质，说的是写的人怎么实现、怎么测，读的人要找的却是哪件事；性质变了，名字也跟着错。位置本身就是约定、而且有检查守着的，可以用：`prompts.ts`（对模型说的话，lint 在这里放行中文）、`index.ts`（一个 feature 对外的入口，`page-layers` 查）、`packages/protocol/src/rules`（两边都跑的，`contract.test.ts` 查）、`testing/` 和 `testing.ts`（测试用的，金字塔认它们）。
 
-**起不出名字就先拆。** 一个文件或函数只能用「和」连起来说，或只能用上表左边的词概括，说明它管了不止一件事：拆成几份，每份再起名。左边这些名字 `scripts/file-names.test.ts` 拦下，`apps/`、`packages/` 里一个也没有。
+**起不出名字就先拆。** 一个文件或函数只能用「和」连起来说，或只能用上表左边的词概括，说明它管了不止一件事：拆成几份，每份再起名。左边这些名字 `scripts/audit/file-names.test.ts` 拦下，`apps/`、`packages/` 里一个也没有。
 
 ## 单数和复数
 
@@ -61,7 +61,7 @@
 | 只说会怎样、不改东西 | `previewX` | `previewDelete`、`previewForget` |
 | 改东西 | 动词 | `issues.edit`、`channels.react`、`lan.forget` |
 | 新建、删掉 | `create`、`delete`（和接口的动词同一个词；不用 `open`、`remove`） | `channels.create`、`agents.delete`、`previewDelete` |
-| 服务开机时做的事 | `boot`（layer 和服务的成员同名）；`start` 只指开始干一件事 | `Mailbox.boot`；`issues.start`、`executor.start` |
+| 服务开机时做的事 | `boot`（layer 和服务的成员同名）；`start` 只指开始干一件事 | `Mailbox.boot`；`issues.start`、`executions.start` |
 | 一个服务往外说发生了什么 | 一条流，叫 `news`，类型 `<概念>News`，成员按 `_tag` 用领域里的过去时（`Hired`、`Left`、`Consumed`） | `Session.news`、`Mailbox.news`（`DeliveryNews`） |
 
 两条容易犯的：
@@ -78,14 +78,14 @@
 
 | 什么 | 形状 | 例子 |
 |---|---|---|
-| 服务端的模块 | 单数，概念的词 | `apps/server/src/issue`、`channel` |
+| 服务端的模块 | 单数，概念的词 | `apps/server/src/modules/issue`、`channel` |
 | 页面的 feature | 和服务端的模块同名 | `apps/web/src/features/issue` |
-| 包 | `@vibevalley/<文件夹>`（`scripts/catalog.test.ts` 查） | `packages/health` 是 `@vibevalley/health` |
+| 包 | `@vibevalley/<文件夹>`（`scripts/audit/catalog.test.ts` 查） | `packages/health` 是 `@vibevalley/health` |
 | 组件 | 大驼峰，一个组件一个文件 | `Board.tsx`、`IssueDetail.tsx` |
 | 其他文件 | 小驼峰 | `moves.ts`、`pageTests.test.ts` |
 | 测试和故事 | 挨着被测的文件 | `moves.test.ts`、`Board.stories.tsx` |
 | 服务 | 概念的单数词，和模块的文件夹、表同一个词（照 Effect 自己的 `Database`）；照 Effect 的默认写法是类，接口写在类型参数里、不另起名，`layer` 是静态成员；它的类型是 `Issue["Service"]`（lint 的 `vibevalley/singular-service` 查） | `Issue`、`Channel`、`Session`；`Core`、`Orchestrator` |
-| 服务的标签和 `Effect.fn` 的名字 | 包名加文件的路径（`deterministicKeys` 查）；`<服务>.<方法>` | `"@vibevalley/server/issue/issue"`；`"Issue.edit"` |
+| 服务的标签和 `Effect.fn` 的名字 | 包名加文件的路径（`deterministicKeys` 查）；`<服务>.<方法>` | `"@vibevalley/server/modules/issue/issue"`；`"Issue.edit"` |
 | 服务端代码里和服务同名的线上形状 | 经命名空间读：`import type * as T from "@vibevalley/protocol"`，写 `T.Issue`；这样的文件里协议的类型都写成 `T.X`（lint 的 `vibevalley/protocol-namespace` 查） | `issue: T.Issue`、`(s: T.Session) => …` |
 | 带牌子的 id | `XId` | `IssueId`、`SessionId` |
 | 一组固定的取值 | 成员表 `XValues`，类型从它推；要每种都处理时用 `Record<X, …>` | `IssueStatusValues` |
@@ -105,14 +105,14 @@
 
 ## 现有的双关
 
-下面这些词在仓库里还指不止一样东西。新代码只用左列的那个意思；右列的意思各起各的名字（不靠上下文区分，也不带限定凑合），改完把旧名字写进 `scripts/stale-names.ts`。
+下面这些词在仓库里还指不止一样东西。新代码只用左列的那个意思；右列的意思各起各的名字（不靠上下文区分，也不带限定凑合），改完把旧名字写进 `scripts/docs/stale-names.ts`。
 
 | 词 | 指的是 | 也被用来指 |
 |---|---|---|
-| rules | 测试金字塔的规则层 | 业务的纯函数（按它决定的事起名，不叫 `rules.ts`）；lint 规则（`scripts/oxlint-plugin.ts`）；写给 agent 的规矩用「规矩」，不用 rules |
+| rules | 测试金字塔的规则层 | 业务的纯函数（按它决定的事起名，不叫 `rules.ts`）；lint 规则（`scripts/audit/oxlint-plugin.ts`）；写给 agent 的规矩用「规矩」，不用 rules |
 | changes | 代码的改动（用语表的「改动」：`Issue.changes`、`Repo.changes`、`T.Changes`） | 投递的变化流（`Mailbox.changes`）：改叫 `news` |
 | open | 形容词，还没了结（`openQuestions`、`openFindings`；`Lan.setOpen` 的开着） | 动词新建（`openChannel`、`openBranch`）：改叫 `create`；农场上线（`Core.open`）：改叫 `goLive`；一个帮工的投递（`openDeliveries`）：改叫 `deliveriesOf` |
-| start | 开始干一件事（`issue.start`、`Executor.start`、`Lan.startPairing`） | 服务开机（各模块的 `start` layer、`Channel.start`、`Mailbox.start`）：改叫 `boot` |
+| start | 开始干一件事（`issue.start`、`Executions.start`、`Lan.startPairing`） | 服务开机（各模块的 `start` layer、`Channel.start`、`Mailbox.start`）：改叫 `boot` |
 | input | 媒体的输入文件（`Media.inputs`、接口 `media.input.*`） | 交给帮工的信（`returnInput`）：改叫 envelope；喂给模型的文字（`wakeInput`）：改叫 prompt；一封信给模型看的上下文（`InputContext`）：改叫 `EnvelopeContext` |
 | present | — | 这个进程正拿着它、能交信（`Session.present`）：改叫 `isReachable`；核心状态里的帮工（`Session.presentSessions`）：改叫 `hired` |
 | orchestrator | 职务：助手能做什么、该做什么（`T.AgentRole`、`Agent.isOrchestrator`，工具和权限） | 会话怎么来（一直当值）：改问 `isOnDuty`，雇来的问 `isHired`；在哪干：改问 `Agent.isHosted`；频道没有负责人：频道和串都有成员（`members`，记在 `channel_member`），这里的助手问 `orchestratorIn`；话是谁说的：actor 是 `agent`，带 `role`（[角色只管职责](docs/subsystems/agent.md#模型和不变量)） |
@@ -121,6 +121,6 @@
 
 ## 改名
 
-- 改名是一个决定：理由写进提交或 Note，旧名字写进 `scripts/stale-names.ts`，不让它回来（[地基](docs/subsystems/foundation.md#为什么这样)）。
+- 改名是一个决定：理由写进提交或 Note，旧名字写进 `scripts/docs/stale-names.ts`，不让它回来（[地基](docs/subsystems/foundation.md#为什么这样)）。
 - 只在名字不能区分、在调用处不够用或成了双关时改；换一个同义词不算理由。
 - 标识符用编辑器的重命名和类型检查改，字符串、SQL、Markdown 逐处改，不全局替换。

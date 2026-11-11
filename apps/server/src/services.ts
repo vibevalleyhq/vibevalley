@@ -3,40 +3,37 @@ import { Layer } from "effect";
 
 import { Llm } from "@vibevalley/ai/llm";
 
-import { Agent } from "./agent/agent.ts";
-import { Artifact } from "./artifact/artifact.ts";
-import { Attachment } from "./attachment/attachment.ts";
-import { Channel, start as channelStart } from "./channel/channel.ts";
-import { Connector, type ConnectorOptions } from "./connector/connector.ts";
+import { Connector, type ConnectorOptions } from "#/gateway/connector/connector.ts";
+import { Lan, type LanOptions } from "#/gateway/lan/lan.ts";
+import { Mcp, type McpOptions } from "#/gateway/mcp/mcp.ts";
+import { layer as projection } from "#/gateway/projection/frame.ts";
+import { Voice, type VoiceOptions } from "#/gateway/voice/voice.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { Artifact } from "#/modules/artifact/artifact.ts";
+import { Attachment } from "#/modules/attachment/attachment.ts";
+import { Channel, start as channelStart } from "#/modules/channel/channel.ts";
+import { Cron, start as cronStart } from "#/modules/cron/cron.ts";
+import { Game, start as gameStart } from "#/modules/game/game.ts";
+import { Inbox, start as inboxReady } from "#/modules/inbox/inbox.ts";
+import { Issue, start as issueStart } from "#/modules/issue/issue.ts";
+import { Library } from "#/modules/library/library.ts";
+import { Machine } from "#/modules/machine/machine.ts";
+import { Mailbox, start as mailboxStart } from "#/modules/mailbox/mailbox.ts";
+import { Media, start as mediaStart } from "#/modules/media/media.ts";
+import { Memory } from "#/modules/memory/memory.ts";
+import { Orchestrator, type OrchestratorOptions } from "#/modules/orchestrator/orchestrator.ts";
+import { Pkm } from "#/modules/pkm/pkm.ts";
+import { Provider } from "#/modules/provider/provider.ts";
+import { Repo, type RepoHooks, start as repoStart } from "#/modules/repo/repo.ts";
+import { type RuntimeOptions, Runtime } from "#/modules/runtime/runtime.ts";
+import { Session, ready as sessionReady } from "#/modules/session/session.ts";
+import { Setting } from "#/modules/setting/setting.ts";
+import { Tool } from "#/modules/tool/tool.ts";
+import { User } from "#/modules/user/user.ts";
+
 import { Core } from "./core/core.ts";
-import { Cron, start as cronStart } from "./cron/cron.ts";
-import { Executor } from "./executor/executor.ts";
-import { Game, start as gameStart } from "./game/game.ts";
-import { Inbox, start as inboxReady } from "./inbox/inbox.ts";
 import { ServerConfig } from "./infra/config.ts";
 import { Database, Db } from "./infra/db.ts";
-import { Ingress, start as ingressStart } from "./ingress/ingress.ts";
-import { Issue, start as issueStart } from "./issue/issue.ts";
-import { Lan, type LanOptions } from "./lan/lan.ts";
-import { Library } from "./library/library.ts";
-import { Machine } from "./machine/machine.ts";
-import { Mailbox, start as mailboxStart } from "./mailbox/mailbox.ts";
-import { Mcp, type McpOptions } from "./mcp/mcp.ts";
-import { Media, start as mediaStart } from "./media/media.ts";
-import { Memory } from "./memory/memory.ts";
-import { Orchestrator, type OrchestratorOptions } from "./orchestrator/orchestrator.ts";
-import { Pkm } from "./pkm/pkm.ts";
-import { layer as projection } from "./projection/frame.ts";
-import { Provider } from "./provider/provider.ts";
-import { Repo, type RepoHooks, start as repoStart } from "./repo/repo.ts";
-import { Resource } from "./resource/resource.ts";
-import { type RuntimeOptions, Runtime } from "./runtime/runtime.ts";
-import { Session, ready as sessionReady } from "./session/session.ts";
-import { Setting } from "./setting/setting.ts";
-import { Storage } from "./storage/storage.ts";
-import { Tool } from "./tool/tool.ts";
-import { User } from "./user/user.ts";
-import { Voice, type VoiceOptions } from "./voice/voice.ts";
 
 /** Builds layer on what is below it, keeping what is below. */
 const on =
@@ -65,7 +62,6 @@ export const platform = (config: ServerConfig["Service"]) =>
     on(Core.layer),
     on(Setting.layer),
     on(User.layer),
-    on(Storage.layer),
     on(Attachment.layer),
     on(Provider.layer),
     on(Llm.layer),
@@ -84,22 +80,16 @@ export const sourceControl =
     below.pipe(on(Repo.layer(o.repo)));
 
 /** Agent Sessions: an agent at work on an issue in a workplace. */
-export const agentSessions = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Executor.layer), on(Machine.layer), on(Session.layer));
+export const agentSessions = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Machine.layer), on(Session.layer));
 
 /** Collaboration: channels, threads, messages, documents, the user's notes; the sessions register as its helpers. */
 export const collaboration = <B, E, R>(below: Layer.Layer<B, E, R>) =>
   below.pipe(on(Channel.layer), on(Media.layer), on(Library.layer), on(Artifact.layer), on(Pkm.layer));
 
-/** Mailbox: delivery priority, durable per-Session input and the execution pump. */
+/** Mailbox: immutable source triggers, delivery priority, durable per-Session input and the execution pump. */
 export const mailbox = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Mailbox.layer));
 
 export const issues = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Issue.layer), on(Cron.layer));
-
-/** Ingress: immutable source events and their compact cards. */
-export const ingress = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Ingress.layer));
-
-/** Resource: authorized, paged reads over stable per-session snapshots. */
-export const resources = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Resource.layer));
 
 /** Inbox: what in it is news to the user, and the patrol. */
 const inbox = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(Inbox.layer));
@@ -142,8 +132,6 @@ export const services = (config: ServerConfig["Service"], options: ServiceOption
     mailbox,
     collaboration,
     issues,
-    ingress,
-    resources,
     inbox,
     orchestrator(options),
     gamification,
@@ -152,7 +140,6 @@ export const services = (config: ServerConfig["Service"], options: ServiceOption
     agentSessionsStart,
     mailboxReady,
     collaborationStart,
-    on(ingressStart),
     issuesStart,
     inboxStart,
     gamificationStart,

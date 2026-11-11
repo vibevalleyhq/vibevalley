@@ -8,10 +8,10 @@ export const PkmPriorityValues = ["A", "B", "C"] as const;
 export type PkmPriority = (typeof PkmPriorityValues)[number];
 
 export const PkmMoveDirectionValues = ["up", "down"] as const;
-export type PkmMoveDirection = (typeof PkmMoveDirectionValues)[number];
+type PkmMoveDirection = (typeof PkmMoveDirectionValues)[number];
 
 export const PkmMoveAtValues = ["before", "after", "inside"] as const;
-export type PkmMoveAt = (typeof PkmMoveAtValues)[number];
+type PkmMoveAt = (typeof PkmMoveAtValues)[number];
 
 export interface PkmBlock {
   id: string;
@@ -82,7 +82,7 @@ export interface PkmBacklinks {
 }
 
 export const PkmCommentStatusValues = ["open", "suggested", "accepted", "rejected"] as const;
-export type PkmCommentStatus = (typeof PkmCommentStatusValues)[number];
+type PkmCommentStatus = (typeof PkmCommentStatusValues)[number];
 
 export interface PkmComment {
   id: string;
