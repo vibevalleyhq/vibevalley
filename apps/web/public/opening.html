@@ -109,6 +109,19 @@
       #opening[data-mood="happy"] .sprite { background-position-x: 75%; animation: opening-jump 240ms steps(4); }
       #opening[data-mood="confused"] .sprite { background-position-x: 100%; animation: none; }
       #opening .words { text-shadow: 1px 1px 0 #2f1f13; }
+      #opening .note {
+        margin-top: -8px;
+        text-align: center;
+        color: #eedcb2;
+        text-shadow: 1px 1px 0 #2f1f13;
+      }
+      #opening .download {
+        color: #f7e8c4;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        text-shadow: 1px 1px 0 #2f1f13;
+      }
+      #opening [hidden] { display: none; }
       #opening .problem {
         box-sizing: border-box;
         width: 100%;
@@ -150,6 +163,8 @@
           <div class="bar" role="progressbar"><div class="fill"></div></div>
         </div>
         <span class="words"></span>
+        <span class="note" hidden></span>
+        <a class="download" target="_blank" rel="noreferrer" data-testid="update-download" hidden></a>
       </div>
     </div>
     <script>
@@ -164,6 +179,10 @@
         const bar = cover.querySelector(".bar");
         const words = cover.querySelector(".words");
         const runway = cover.querySelector(".runway");
+        const note = cover.querySelector(".note");
+        const download = cover.querySelector(".download");
+        // The desktop app's update (apps/desktop src/window.ts updating): the steps of a restart into a new version.
+        const updateSteps = ["stopping", "swapping", "updateFailed"];
         cover.querySelector(".brand").textContent = said.name;
         document.title = said.name;
         bar.setAttribute("aria-label", said.label);
@@ -182,12 +201,12 @@
           cover.removeEventListener("opening-update", paint);
           window.removeEventListener("pagehide", dispose);
         };
-        const terminal = () => Boolean(cover.dataset.problem) || ["ready", "waiting", "failed"].includes(cover.dataset.phase);
+        const terminal = () => Boolean(cover.dataset.problem) || ["ready", "waiting", "failed", "updateFailed"].includes(cover.dataset.phase);
         const render = () => {
           const phase = cover.dataset.phase;
           runway.style.setProperty("--progress", displayed + "%");
           cover.dataset.displayProgress = String(displayed);
-          cover.dataset.mood = phase === "failed" || phase === "waiting" ? "confused" : phase === "ready" ? "happy" : displayed >= 70 ? "excited" : displayed > 0 ? "working" : "sleepy";
+          cover.dataset.mood = phase === "failed" || phase === "waiting" || phase === "updateFailed" ? "confused" : phase === "ready" ? "happy" : displayed >= 70 ? "excited" : displayed > 0 ? "working" : "sleepy";
           bar.setAttribute("aria-valuemin", "0");
           bar.setAttribute("aria-valuemax", "100");
           bar.setAttribute("aria-valuenow", String(displayed));
@@ -219,8 +238,22 @@
             if (phase === "ready") displayed = 100;
             render();
           } else advance();
-          if (phase === "failed") bar.removeAttribute("role");
-          words.textContent = problem ? said.cannotStart.replace("{why}", problem) : said[phase] ?? said.waking;
+          const failed = phase === "failed" || phase === "updateFailed";
+          if (failed) bar.removeAttribute("role");
+          if (updateSteps.includes(phase)) {
+            const updating = said.updating.replace("{next}", cover.dataset.next ?? "");
+            const step = phase === "updateFailed" ? said.updateFailed.replace("{why}", cover.dataset.why ?? "") : said[phase];
+            words.textContent = updating + " · " + step;
+            bar.setAttribute("aria-label", updating);
+            note.textContent = cover.dataset.newFarm === "true" ? said.keptNewFarm : said.kept;
+            note.hidden = false;
+            download.hidden = phase !== "updateFailed" || !cover.dataset.page;
+            if (!download.hidden) {
+              download.href = cover.dataset.page;
+              download.textContent = said.download;
+            }
+          } else words.textContent = problem ? said.cannotStart.replace("{why}", problem) : said[phase] ?? said.waking;
+          if (phase === "updateFailed") words.setAttribute("role", "alert");
           if (problem) {
             words.className = "problem";
             words.setAttribute("role", "alert");

@@ -141,7 +141,7 @@ export function updater(o: {
       const problem = bundle === undefined ? "readOnly" : placeProblem(bundle, writable(bundle) && writable(dirname(bundle)));
       if (bundle === undefined || problem !== undefined) return manual(problem ?? "readOnly");
       staged = await download(release, build, bundle, feed);
-      set({ _tag: "ready", version: o.version, next: release.version, notes: release.notes, newFarm: staged.newFarm });
+      set({ _tag: "ready", version: o.version, next: release.version, notes: release.notes, newFarm: staged.newFarm, page: release.page });
     } catch (e) {
       set({ _tag: "failed", version: o.version, why: reasonOf(e) });
     }

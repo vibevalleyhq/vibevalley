@@ -10,6 +10,13 @@
     "loading": "Loading…",
     "ready": "Ready",
     "waiting": "Still waiting for a connection…",
-    "failed": "Unable to finish loading"
+    "failed": "Unable to finish loading",
+    "updating": "Updating to {next}",
+    "stopping": "Stopping helpers and saving the farm…",
+    "swapping": "Putting the new version in place…",
+    "kept": "Your farm's data stays; a helper cut off mid-task waits where it stopped, and one message sets it going again",
+    "keptNewFarm": "The new version starts from new data; the old data stays in your home folder",
+    "updateFailed": "Not installed: {why}",
+    "download": "Download the latest version"
   }
 }
