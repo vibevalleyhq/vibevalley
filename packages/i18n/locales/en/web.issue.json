@@ -185,7 +185,14 @@
     "evidence": "Evidence",
     "unsure": "Not sure about",
     "next": "Suggested next",
-    "conflict": "Merging into {base} would conflict: {files}"
+    "conflict": "Merging into {base} would conflict: {files}",
+    "properties": "Properties",
+    "status": "Status",
+    "priority": "Priority",
+    "repo": "Repo",
+    "noRepo": "No repo",
+    "rename": "Rename",
+    "trail": "Where the issue is"
   },
   "task": {
     "repo": "Repo",

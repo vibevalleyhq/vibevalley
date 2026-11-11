@@ -3355,6 +3355,13 @@ export const catalogs = {
         unsure: "拿不准的",
         next: "建议接着做",
         conflict: "合进 {base} 会冲突：{files}",
+        properties: "属性",
+        status: "状态",
+        priority: "优先级",
+        repo: "仓库",
+        noRepo: "没有仓库",
+        rename: "改标题",
+        trail: "工单在哪",
       },
       task: { repo: "仓库", written: "写于" },
       todo: {
@@ -8235,6 +8242,13 @@ export const catalogs = {
         unsure: "Not sure about",
         next: "Suggested next",
         conflict: "Merging into {base} would conflict: {files}",
+        properties: "Properties",
+        status: "Status",
+        priority: "Priority",
+        repo: "Repo",
+        noRepo: "No repo",
+        rename: "Rename",
+        trail: "Where the issue is",
       },
       task: { repo: "Repo", written: "Written" },
       todo: {
@@ -12869,16 +12883,21 @@ export interface Messages {
   "web.issue.detail.noAnswer": undefined;
   "web.issue.detail.noChanges": undefined;
   "web.issue.detail.noCriteria": { readonly answer: boolean };
+  "web.issue.detail.noRepo": undefined;
   "web.issue.detail.noRuns": undefined;
   "web.issue.detail.nothingToSee": undefined;
   "web.issue.detail.now": undefined;
   "web.issue.detail.opened": undefined;
   "web.issue.detail.orchestratorStuck": undefined;
+  "web.issue.detail.priority": undefined;
   "web.issue.detail.profile": undefined;
   "web.issue.detail.progress": undefined;
+  "web.issue.detail.properties": undefined;
   "web.issue.detail.rejectLabel": undefined;
   "web.issue.detail.rejectWhere": undefined;
   "web.issue.detail.rejected": undefined;
+  "web.issue.detail.rename": undefined;
+  "web.issue.detail.repo": undefined;
   "web.issue.detail.resolved": undefined;
   "web.issue.detail.result.met": undefined;
   "web.issue.detail.result.unmet": undefined;
@@ -12889,6 +12908,7 @@ export interface Messages {
   "web.issue.detail.sayIt": undefined;
   "web.issue.detail.since": { readonly clock: string | number };
   "web.issue.detail.started": undefined;
+  "web.issue.detail.status": undefined;
   "web.issue.detail.step.assistant/message": undefined;
   "web.issue.detail.step.assistant/thinking": undefined;
   "web.issue.detail.step.llm/retry": undefined;
@@ -12909,6 +12929,7 @@ export interface Messages {
   "web.issue.detail.ticked": { readonly criterion: string | number };
   "web.issue.detail.time": undefined;
   "web.issue.detail.took": undefined;
+  "web.issue.detail.trail": undefined;
   "web.issue.detail.unread": undefined;
   "web.issue.detail.unsaid": undefined;
   "web.issue.detail.unsure": undefined;

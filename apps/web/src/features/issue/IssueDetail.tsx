@@ -1,8 +1,9 @@
 import * as stylex from "@stylexjs/stylex";
+import { Array as Arr, String as Str } from "effect";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { list, t } from "@vibevalley/i18n";
-import { DeliverableValues, type Issue, type IssueAct, type Session, type SessionView } from "@vibevalley/protocol";
+import { DeliverableValues, type Issue, type IssueAct, PriorityValues, type Session, type SessionView } from "@vibevalley/protocol";
 import { closedText, plainText } from "@vibevalley/protocol/rules";
 
 import { useNow } from "#/base/dom.tsx";
@@ -11,10 +12,10 @@ import { IssueArtifacts } from "#/features/artifact/index.ts";
 import { createSessionEvents } from "#/features/session/index.ts";
 import { useAgent } from "#/infra/agents.ts";
 import { ready } from "#/infra/query.ts";
-import { sendReplacing, useIntents } from "#/state/intent.ts";
+import { useIntents } from "#/state/intent.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
-import { TextArea } from "#/ui/Field.tsx";
+import { TextArea, TextInput } from "#/ui/Field.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import { Markdown } from "#/ui/Markdown.tsx";
 import { Dot } from "#/ui/Tag.tsx";
@@ -30,7 +31,7 @@ import { IssueThread } from "./IssueThread";
 import { issueMove, movedIssue } from "./moves";
 import { issueState, noStepsText, stageTone } from "./overview";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
-import { issueDeliver, shownDeliver } from "./write";
+import { issueSet, labeledIssue, sendLabel } from "./write";
 
 const recipeStyles2 = stylex.create({
   issueDetailSpan: {
@@ -42,19 +43,6 @@ const recipeStyles2 = stylex.create({
     wordBreak: "break-all",
     WebkitUserSelect: "text",
     userSelect: "text",
-  },
-});
-
-const recipeStyles = stylex.create({
-  issueDetailSpan: {
-    flexShrink: "0",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
-    color: "var(--color-muted)",
-    flexBasis: {
-      default: null,
-      "@container not (width>=560px)": "100%",
-    },
   },
 });
 
@@ -103,12 +91,50 @@ const variantStyles = stylex.create({
   },
 });
 
+const titleStyles = stylex.create({
+  button: {
+    cursor: "text",
+    borderRadius: "var(--radius-sm)",
+    marginInline: "calc(var(--spacing) * -1)",
+    paddingInline: "var(--spacing)",
+    textAlign: "start",
+    font: "inherit",
+    color: "inherit",
+    backgroundColor: {
+      default: null,
+      "@media (hover:hover)": {
+        default: null,
+        ":hover": "var(--color-hover)",
+      },
+    },
+  },
+  input: {
+    minWidth: "0",
+    flex: "1",
+    fontSize: "var(--text-lg)",
+    lineHeight: "var(--text-lg--line-height)",
+    fontWeight: "var(--font-weight-semibold)",
+  },
+  pending: {
+    opacity: "0.7",
+  },
+});
+
 const viewStyles = stylex.create({
   issueDetailDiv: {
     paddingRight: "calc(var(--spacing) * 10)",
   },
-  parentIssue: {
+  trail: {
     marginBottom: "calc(var(--spacing) * 1.5)",
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "var(--spacing)",
+    fontSize: "var(--text-xs)",
+    lineHeight: "var(--text-xs--line-height)",
+    color: "var(--color-muted)",
+  },
+  parentIssue: {
     cursor: "pointer",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--text-xs--line-height)",
@@ -240,7 +266,7 @@ const viewStyles = stylex.create({
     color: "var(--color-muted)",
   },
   issueDetailDiv14: {
-    marginBottom: "calc(var(--spacing) * 3)",
+    marginBlock: "calc(var(--spacing) * 3)",
     display: "flex",
     flexWrap: "wrap",
     gap: "calc(var(--spacing) * 2)",
@@ -289,7 +315,9 @@ export function IssueDetail(props: {
   const issues = useIssues();
   const now = useNow();
   const moves = useIntents(issueMove);
-  const live = () => issues().find((item) => item.id === props.issue.id) ?? props.issue;
+  const sets = useIntents(issueSet);
+  const labeled = () => labeledIssue(issues().find((item) => item.id === props.issue.id) ?? props.issue, sets.list());
+  const live = () => labeled().issue;
   const s = createMemo(() => issueState(movedIssue(live(), moves.list()), props.sessions, props.session, issues()));
   const head = () => s().head;
   // The box under the block holds an answer, the findings of reject, a word to the helper, or what a reopen asks for.
@@ -300,8 +328,7 @@ export function IssueDetail(props: {
     told: (title, description) => toast(t("shared.join.labeled", { label: title, text: description })),
   });
   const { busy, text, setText, box, setBox, go } = acts;
-  const delivers = useIntents(issueDeliver);
-  const deliver = () => shownDeliver(props.issue.id, props.issue.deliver, delivers.list());
+  const setLabel = (label: Omit<Parameters<typeof sendLabel>[1], "id">) => void sendLabel(sets, { id: props.issue.id, ...label });
   const doAct = acts.send;
   const sayAct = acts.say;
   const agent = useAgent(() => head().agent);
@@ -329,23 +356,27 @@ export function IssueDetail(props: {
   const tone = () => stageTone[s().stage.state];
   const heading = (
     <div {...stylex.attrs(viewStyles.issueDetailDiv)}>
-      <Show when={s().inFamily ? props.onParent : undefined}>
-        {(onParent) => (
-          <button type="button" data-testid="parent-issue" onClick={() => onParent()()} {...stylex.attrs(viewStyles.parentIssue)}>
-            ‹ {parent()?.title ?? t("web.issue.family.parent")}
-          </button>
-        )}
-      </Show>
-      <div {...stylex.attrs(viewStyles.issueDetailDiv2)}>
+      <nav aria-label={t("web.issue.detail.trail")} data-testid="issue-trail" {...stylex.attrs(viewStyles.trail)}>
+        <span>{s().repo || t("web.issue.detail.noRepo")}</span>
+        <Show when={s().inFamily ? props.onParent : undefined}>
+          {(onParent) => (
+            <>
+              <Icon name="next" size={12} />
+              <button type="button" data-testid="parent-issue" onClick={() => onParent()()} {...stylex.attrs(viewStyles.parentIssue)}>
+                {parent()?.title ?? t("web.issue.family.parent")}
+              </button>
+            </>
+          )}
+        </Show>
+        <Icon name="next" size={12} />
         <span {...stylex.attrs(viewStyles.issueDetailSpan)}>#{props.issue.number}</span>
-        <h1 {...stylex.attrs(variantStyles.issueDetailH1)} title={s().title}>
-          {s().title}
-        </h1>
-        <span {...stylex.attrs(recipeStyles.issueDetailSpan)}>{[s().repo, t(`shared.priority.${props.issue.priority}`)].filter(Boolean).join(" · ")}</span>
+      </nav>
+      <div {...stylex.attrs(viewStyles.issueDetailDiv2)}>
+        <IssueTitle shown={s().title} full={live().title} editable={s().open} state={labeled().state("title")} onSave={(title) => setLabel({ title })} />
       </div>
       <div {...stylex.attrs(viewStyles.issueNow)} aria-label={t("web.issue.detail.now")} data-testid="issue-now" data-state={s().stage.state}>
         <Dot tone={tone()} size={8} ring={false} />
-        <span>{t(`shared.status.${props.issue.status}`)} ·</span>
+        <span>{t(`shared.status.${live().status}`)} ·</span>
         <span
           {...stylex.attrs(variantStyles.issueDetailSpan, tone() === "berry" ? variantStyles.issueDetailSpanVariant : variantStyles.issueDetailSpanVariant2)}
         >
@@ -462,7 +493,7 @@ export function IssueDetail(props: {
         </Show>
         <Show
           when={s().criteria.length > 0}
-          fallback={<p {...stylex.attrs(viewStyles.issueDetailP)}>{t("web.issue.detail.noCriteria", { answer: props.issue.deliver === "answer" })}</p>}
+          fallback={<p {...stylex.attrs(viewStyles.issueDetailP)}>{t("web.issue.detail.noCriteria", { answer: live().deliver === "answer" })}</p>}
         >
           <Criteria rows={s().criteria} checking={s().stage.state === "reviewing" && props.issue.reviewedAt === undefined} />
         </Show>
@@ -483,7 +514,7 @@ export function IssueDetail(props: {
             </p>
           }
         >
-          <Match when={props.issue.deliver === "answer"}>
+          <Match when={live().deliver === "answer"}>
             <Show when={props.issue.answer} fallback={<p {...stylex.attrs(viewStyles.issueDetailP)}>{t("web.issue.detail.noAnswer")}</p>}>
               {(a) => <AnswerView answer={a()} />}
             </Show>
@@ -562,8 +593,60 @@ export function IssueDetail(props: {
     const all = s().stage.acts.map((a) => a.act);
     return s().ask ? all.filter((a) => a === "close" || a === "stop") : all;
   };
+  // Each status the issue can move to is one of its acts: picking it runs that act, with its dialog or its box.
+  const statusMoves = () => Arr.flatMap(s().stage.acts, (a) => (a.does === "move" ? [{ act: a.act, status: a.status }] : []));
+  // Two acts to one status (reject and resume both go back to work) say which act each is.
+  const statusOptions = () => {
+    const moves = statusMoves();
+    const options: { value: IssueAct | "now"; label: string }[] = [{ value: "now", label: t(`shared.status.${live().status}`) }];
+    for (const m of moves) {
+      const status = t(`shared.status.${m.status}`);
+      const shared = Arr.countBy(moves, (o) => o.status === m.status) > 1;
+      options.push({ value: m.act, label: shared ? t("shared.join.aside", { text: status, aside: acts.label(m.act) }) : status });
+    }
+    return options;
+  };
   const side = (
     <>
+      <SheetLabel>{t("web.issue.detail.properties")}</SheetLabel>
+      <Property label={t("web.issue.detail.status")}>
+        <Pick<IssueAct | "now">
+          label={t("web.issue.detail.status")}
+          testid="issue-status"
+          value="now"
+          state={acts.moving()}
+          disabled={busy() || statusMoves().length === 0}
+          onChange={(a) => a !== "now" && go(a)}
+          options={statusOptions()}
+        />
+      </Property>
+      <Property label={t("web.issue.detail.priority")}>
+        <Pick
+          label={t("web.issue.detail.priority")}
+          testid="issue-priority"
+          value={live().priority}
+          state={labeled().state("priority")}
+          disabled={!s().open}
+          onChange={(priority) => setLabel({ priority })}
+          options={Arr.map(PriorityValues, (v) => ({ value: v, label: t(`shared.priority.${v}`) }))}
+        />
+      </Property>
+      <Show when={!s().inFamily}>
+        <Property label={t("web.issue.detail.deliver")}>
+          <Pick
+            label={t("web.issue.detail.deliver")}
+            testid="issue-deliver"
+            value={live().deliver}
+            state={labeled().state("deliver")}
+            disabled={busy() || !s().open}
+            onChange={(deliver) => setLabel({ deliver })}
+            options={DeliverableValues.map((v) => ({ value: v, label: t(`shared.deliverable.${v}`) }))}
+          />
+        </Property>
+      </Show>
+      <Property label={t("web.issue.detail.repo")}>{s().repo || t("web.issue.detail.noRepo")}</Property>
+      <Property label={t("web.issue.detail.helper")}>{s().whoLine}</Property>
+      <Show when={agent()?.model}>{(model) => <Property label={t("web.issue.detail.model")}>{model()}</Property>}</Show>
       <Show when={sideActs().length > 0}>
         <div {...stylex.attrs(viewStyles.issueDetailDiv14)}>
           <For each={sideActs()}>{(a) => button(a, () => !s().ask && a === s().lead)}</For>
@@ -583,25 +666,6 @@ export function IssueDetail(props: {
         )}
       </Show>
       <Show when={props.issue.closedAt}>{(at) => <Property label={t("web.issue.detail.closedAt")}>{wallClockText(at())}</Property>}</Show>
-      <SheetLabel>{t("web.issue.detail.who")}</SheetLabel>
-      <Property label={t("web.issue.detail.helper")}>{s().whoLine}</Property>
-      <Show when={agent()?.model}>{(model) => <Property label={t("web.issue.detail.model")}>{model()}</Property>}</Show>
-      <Show when={!s().inFamily}>
-        <Property label={t("web.issue.detail.deliver")}>
-          <Pick
-            label={t("web.issue.detail.deliver")}
-            testid="issue-deliver"
-            value={deliver().value}
-            state={deliver().state}
-            disabled={busy() || !s().open}
-            onChange={(v) => {
-              const id = props.issue.id;
-              sendReplacing(delivers, { id, deliver: v }, (a, b) => a.id === b.id);
-            }}
-            options={DeliverableValues.map((v) => ({ value: v, label: t(`shared.deliverable.${v}`) }))}
-          />
-        </Property>
-      </Show>
       <More>
         <Show when={s().crewLine}>
           <Property label={t("web.issue.detail.crew")}>{s().crewLine}</Property>
@@ -640,4 +704,59 @@ export function IssueDetail(props: {
     </>
   );
   return <IssueSheet heading={heading} main={main} side={side} />;
+}
+
+/** The issue's title, renamed in place while the issue is open: Enter or leaving the field keeps it, Escape lets it go. */
+function IssueTitle(props: { shown: string; full: string; editable: boolean; state: "pending" | "failed" | undefined; onSave: (title: string) => void }) {
+  const [editing, setEditing] = createSignal(false);
+  const finish = (field: HTMLInputElement, keep: boolean) => {
+    if (!editing()) return;
+    setEditing(false);
+    const title = Str.trim(field.value);
+    if (keep && title !== "" && title !== props.full) props.onSave(title);
+  };
+  return (
+    <Show
+      when={editing()}
+      fallback={
+        <h1
+          data-testid="issue-title"
+          data-state={props.state}
+          title={props.full}
+          {...stylex.attrs(variantStyles.issueDetailH1, props.state === "pending" && titleStyles.pending)}
+        >
+          <Show when={props.editable} fallback={props.shown}>
+            <button type="button" title={t("web.issue.detail.rename")} onClick={() => setEditing(true)} {...stylex.attrs(titleStyles.button)}>
+              {props.shown}
+            </button>
+          </Show>
+        </h1>
+      }
+    >
+      <TextInput
+        ref={(field) =>
+          queueMicrotask(() => {
+            field.focus();
+            field.select();
+          })
+        }
+        data-testid="issue-title-input"
+        aria-label={t("web.issue.detail.rename")}
+        value={props.full}
+        styles={titleStyles.input}
+        onKeyDown={(e) => {
+          if (e.isComposing) return;
+          if (e.key === "Enter") {
+            e.preventDefault();
+            finish(e.currentTarget, true);
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            e.stopPropagation();
+            finish(e.currentTarget, false);
+          }
+        }}
+        onBlur={(e) => finish(e.currentTarget, true)}
+      />
+    </Show>
+  );
 }

@@ -1,8 +1,11 @@
-import { type Applied, type AppliedIssue, type Deliverable, type Issue, VibeValleyApiError } from "@vibevalley/protocol";
+import { Array as Arr, Option } from "effect";
+import { dual } from "effect/Function";
+
+import { type Applied, type AppliedIssue, type Issue, type IssueUpdate, VibeValleyApiError } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 import { api, newSendKey } from "#/infra/api.ts";
-import { bySeq, defineIntent, type Intent } from "#/state/intent.ts";
+import { bySeq, defineIntent, type Intent, type Intents, sendReplacing } from "#/state/intent.ts";
 import { prefsNow } from "#/state/prefs.ts";
 
 import { newIssueTitle } from "./issue";
@@ -34,31 +37,53 @@ export async function writeIssue(text: string, agent: string, repo: string, requ
   }
 }
 
-// What an issue delivers, picked by the user on its page: an intent (state/intent.ts) on issue.update, settled by the frame whose seq is the reply's.
+// An issue's labels set by the user on its page (title, priority, what it delivers): an intent (state/intent.ts) on issue.update,
+// settled by the frame whose seq is the reply's. The server takes them while the issue is open, sent or not.
 
-export interface DeliverPick {
-  readonly id: string;
-  readonly deliver: Deliverable;
-}
+export type IssueLabels = Pick<IssueUpdate, "title" | "priority" | "deliver">;
+export type IssueLabel = keyof IssueLabels;
 
-export const issueDeliver = defineIntent<DeliverPick, AppliedIssue>({
+export type IssueSet = { readonly id: string } & IssueLabels;
+
+export const issueSet = defineIntent<IssueSet, AppliedIssue>({
   // A set: sent twice, it is set once, so it needs no request key.
-  send: (p) => api.issue.update({ id: p.id, deliver: p.deliver }),
+  send: (p) => api.issue.update(p),
   confirmed: bySeq,
   whileLost: "queue",
   timeoutMs: 20_000,
 });
 
-/** The deliverable the pick shows, and whether the user's choice is on its way or was refused. */
-export function shownDeliver(
-  id: string,
-  frame: Deliverable,
-  picks: readonly Intent<DeliverPick, AppliedIssue>[],
-): { readonly value: Deliverable; readonly state?: "pending" | "failed" } {
-  const p = picks.findLast((x) => x.input.id === id);
-  if (!p) return { value: frame };
-  return p.phase === "failed" ? { value: frame, state: "failed" } : { value: p.input.deliver, state: "pending" };
-}
+type LabelSets = readonly Intent<IssueSet, AppliedIssue>[];
+
+const labelsOf = (p: IssueSet) => Arr.filter(["title", "priority", "deliver"] as const, (k) => p[k] !== undefined);
+const newestSet = (sets: LabelSets, id: string, label: IssueLabel) =>
+  Option.getOrUndefined(Arr.findLast(sets, (p) => p.input.id === id && p.input[label] !== undefined));
+
+/** A newer set of the same label of the same issue replaces the one still on its way. */
+export const sendLabel = (sets: Intents<IssueSet, AppliedIssue>, set: IssueSet) =>
+  sendReplacing(sets, set, (a, b) => a.id === b.id && Arr.every(labelsOf(a), (k) => Arr.contains(labelsOf(set), k)));
+
+const labeled = (issue: Issue, sets: LabelSets) => {
+  const kept = (label: IssueLabel) => {
+    const p = newestSet(sets, issue.id, label);
+    return p?.phase === "failed" ? undefined : p?.input;
+  };
+  const state = (label: IssueLabel) => {
+    const p = newestSet(sets, issue.id, label);
+    return p === undefined ? undefined : p.phase === "failed" ? ("failed" as const) : ("pending" as const);
+  };
+  const labels = omitUndefined({ title: kept("title")?.title, priority: kept("priority")?.priority, deliver: kept("deliver")?.deliver });
+  return { issue: { ...issue, ...labels }, state };
+};
+
+/**
+ * The issue as its page shows it, with the labels the user set and the frame has not caught up with yet,
+ * and whether each label's newest choice is on its way or was refused (the value shown is then the frame's again).
+ */
+export const labeledIssue: {
+  (sets: LabelSets): (issue: Issue) => ReturnType<typeof labeled>;
+  (issue: Issue, sets: LabelSets): ReturnType<typeof labeled>;
+} = dual(2, labeled);
 
 // Words for the helper on an issue (an answer, reject's findings, a word mid-turn).
 
