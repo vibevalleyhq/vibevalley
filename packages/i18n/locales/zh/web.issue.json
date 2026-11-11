@@ -185,7 +185,14 @@
     "evidence": "依据",
     "unsure": "拿不准的",
     "next": "建议接着做",
-    "conflict": "合进 {base} 会冲突：{files}"
+    "conflict": "合进 {base} 会冲突：{files}",
+    "properties": "属性",
+    "status": "状态",
+    "priority": "优先级",
+    "repo": "仓库",
+    "noRepo": "没有仓库",
+    "rename": "改标题",
+    "trail": "工单在哪"
   },
   "task": {
     "repo": "仓库",

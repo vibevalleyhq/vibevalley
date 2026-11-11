@@ -112,6 +112,18 @@ test("a real round: the helper asks with options, one click answers, and it hand
   await expect(view.getByTestId("issue-ask").locator('[data-act="complete"]')).toBeVisible();
   await expect(view.getByTestId("issue-deliver")).toHaveAttribute("data-value", "change");
   await expect(view.getByTestId("issue-story").locator('[data-testid="milestone"][data-kind="told"]').first()).toBeVisible();
+
+  // A sent issue is renamed and reprioritized in place; the server keeps both while it is open.
+  await view.getByTestId("issue-title").getByRole("button").click();
+  const field = view.getByTestId("issue-title-input");
+  await field.fill("clock-in page");
+  await field.press("Enter");
+  await expect(view.getByTestId("issue-title")).toHaveText("clock-in page");
+  await view.getByTestId("issue-priority").click();
+  await page.locator('[role="option"][data-key="urgent"]').click();
+  await expect(view.getByTestId("issue-priority")).toHaveAttribute("data-value", "urgent");
+  await expect.poll(() => api.issue.get({ id: made.id }).then((i) => [i.title, i.priority])).toEqual(["clock-in page", "urgent"]);
+  await expect(view.getByTestId("issue-status")).toBeEnabled();
 });
 
 test("a helper waiting on a question: its options answer it, and nothing offers to complete it", async ({ page, server, api }) => {

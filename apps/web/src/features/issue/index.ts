@@ -1,7 +1,7 @@
 export { issueSearch } from "#/features/issue/model/navigation.ts";
 export { IssuesPage } from "#/features/issue/views/IssuesPage.tsx";
 export { actionOf, createIssueActs, perform } from "#/features/issue/model/acts.ts";
-export { issueDeliver, shownDeliver } from "#/features/issue/model/write.ts";
+export { issueSet, labeledIssue, sendLabel } from "#/features/issue/model/write.ts";
 export { issueMove, issueMoveOf, sendMove } from "#/features/issue/model/moves.ts";
 export { useIssueChanges, useIssueHistory, useIssueRuns, useIssueTimeline } from "#/features/issue/model/history.ts";
 export { issueTitle, runText } from "#/features/issue/model/issue.ts";

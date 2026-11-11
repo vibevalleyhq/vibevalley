@@ -457,17 +457,14 @@ const make = Effect.gen(function* () {
     }),
     create,
     chooseAgent,
-    /** Only `deliver` may change after dispatch; all other fields require `unsent`. */
+    /**
+     * The title, the priority and `deliver` may change while the issue is open; they are labels, not the work.
+     * The rest is what the helper was asked, so it requires `unsent`: changing it after dispatch is a word to the helper.
+     */
     edit: Effect.fn("Issue.edit")(function* (id, upd, by) {
       if (!actsForUser(by)) return yield* refused(needsUser);
       const whileOpen =
-        upd.title === undefined &&
-        upd.description === undefined &&
-        upd.repo === undefined &&
-        upd.agent === undefined &&
-        upd.priority === undefined &&
-        upd.criteria === undefined &&
-        upd.before === undefined;
+        upd.description === undefined && upd.repo === undefined && upd.agent === undefined && upd.criteria === undefined && upd.before === undefined;
       let was: T.Issue;
       if (whileOpen) {
         was = yield* get(id);

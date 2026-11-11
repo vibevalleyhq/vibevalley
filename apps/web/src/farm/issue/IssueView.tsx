@@ -27,11 +27,12 @@ import { issueThreadOf } from "#/features/channel/index.ts";
 import {
   createIssueActs,
   changesLine,
-  issueDeliver,
+  issueSet,
+  labeledIssue,
+  sendLabel,
   issueMove,
   issueMoveOf,
   sendMove,
-  shownDeliver,
   type CriterionRow,
   issueState,
   nothingChanged,
@@ -47,7 +48,7 @@ import { useAgent } from "#/infra/agents.ts";
 import { useCore, useFrames } from "#/infra/frame.ts";
 import { ready } from "#/infra/query.ts";
 import { useRouter } from "#/infra/router.ts";
-import { sendReplacing, useIntents } from "#/state/intent.ts";
+import { useIntents } from "#/state/intent.ts";
 import { castPrefix, outfitLabel, speciesLabel } from "#/ui/domain/cast.ts";
 import { createPixelAct, FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "#/ui/pixel/index.ts";
 import { styleProps } from "#/ui/positioner.ts";
@@ -532,9 +533,12 @@ function IssueBody(props: {
   const agent = useAgent(() => s().head.agent);
   const state = () => s().stage.state;
 
-  const delivers = useIntents(issueDeliver);
-  const deliver = () => shownDeliver(props.issue.id, props.issue.deliver, delivers.list());
-  const setDeliver = (d: Deliverable) => sendReplacing(delivers, { id: props.issue.id, deliver: d }, (a, b) => a.id === b.id);
+  const sets = useIntents(issueSet);
+  const deliver = () => {
+    const shown = labeledIssue(props.issue, sets.list());
+    return { value: shown.issue.deliver, state: shown.state("deliver") };
+  };
+  const setDeliver = (d: Deliverable) => sendLabel(sets, { id: props.issue.id, deliver: d });
   const moves = useIntents(issueMove);
   const move = () => issueMoveOf(props.issue.id, moves.list()); /** lead is read as it renders: the lead changes as the issue moves on. */
   const button = (a: IssueAct, lead: () => boolean) => (
