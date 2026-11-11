@@ -7,7 +7,7 @@ import { AgentCard } from "./AgentsPage";
 
 const viewStyles = stylex.create({
   agentsPageStoriesDiv: {
-    width: "calc(var(--spacing) * 72)",
+    width: "18rem",
   },
 });
 

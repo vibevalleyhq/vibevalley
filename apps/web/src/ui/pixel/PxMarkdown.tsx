@@ -28,7 +28,7 @@ const styles = stylex.create({
     WebkitTextDecorationColor: { default: null, "@supports (color: color-mix(in lab, red, red))": "color-mix(in oklab, currentColor 45%, transparent)" },
   },
   rule: {
-    marginBlock: "calc(var(--spacing) * 2)",
+    marginBlock: "0.5rem",
     height: "1.5px",
     backgroundImage: "repeating-linear-gradient(90deg,currentColor 0 3px,transparent 3px 6px)",
     opacity: 0.4,

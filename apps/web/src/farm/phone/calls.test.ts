@@ -1,17 +1,18 @@
 import { expect, test } from "vite-plus/test";
 
 import type { InboxItem } from "@vibevalley/protocol";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 import { missedOf, PhoneCalls, ringEvery, ringFor } from "./calls";
 
 const call = (id: string): InboxItem => ({
   id,
   kind: "review",
-  from: { kind: "session", id: "s1", name: "阿狐", agent: "fox" },
+  from: { kind: "session", id: sessionId("s1"), name: "阿狐", agent: "fox" },
   who: "阿狐",
   text: "做完了",
   at: 0,
-  target: { kind: "session", id: "s1" },
+  target: { kind: "session", id: sessionId("s1") },
   words: { label: "活熟了", title: "阿狐 做完了", body: "做完了", tray: "" },
 });
 

@@ -7,10 +7,10 @@ import { storyFrame } from "./story.stylex";
 
 const viewStyles = stylex.create({
   choiceStoriesDiv: {
-    width: "calc(var(--spacing) * 64)",
+    width: "16rem",
   },
   choiceStoriesDiv2: {
-    width: "calc(var(--spacing) * 72)",
+    width: "18rem",
   },
 });
 

@@ -181,6 +181,42 @@ describe("an agent's loop", () => {
     }),
   );
 
+  it.effect("caps how many tools run at once in one turn, and still keeps their results in call order", () =>
+    Effect.gen(function* () {
+      let inFlight = 0;
+      let peak = 0;
+      const firstWave = yield* Deferred.make<void>();
+      const releaseFirst = yield* Deferred.make<void>();
+      const gated = (name: string, hold: boolean): Tool => ({
+        name,
+        description: "",
+        parameters: objectSchema(),
+        execute: () =>
+          Effect.gen(function* () {
+            inFlight += 1;
+            if (inFlight > peak) peak = inFlight;
+            if (inFlight === 2) yield* Deferred.succeed(firstWave, undefined);
+            if (hold) yield* Deferred.await(releaseFirst);
+            inFlight -= 1;
+            return { content: [text(name)] };
+          }),
+      });
+      const r = yield* rig(
+        [answer([toolCall("t1", {}), toolCall("t2", {}), toolCall("t3", {}), toolCall("t4", {})]), answer("齐了")],
+        [gated("t1", true), gated("t2", true), gated("t3", false), gated("t4", false)],
+        { toolConcurrency: 2 },
+      );
+      yield* r.agent.prompt([user("四个")]);
+      yield* Deferred.await(firstWave);
+      expect(peak).toBe(2);
+      yield* Deferred.succeed(releaseFirst, undefined);
+      yield* r.agent.idle;
+      expect(peak).toBe(2);
+      const said2 = yield* r.said;
+      expect(said2).toEqual(["user:四个", "assistant:", "toolResult:t1", "toolResult:t2", "toolResult:t3", "toolResult:t4", "assistant:齐了"]);
+    }),
+  );
+
   it.effect("stopped while the model answers, keeps what had come, aborted", () =>
     Effect.gen(function* () {
       const r = yield* rig([answer("说到一半就停", { hangAfter: 3 })], [], {}, undefined, "说到一");

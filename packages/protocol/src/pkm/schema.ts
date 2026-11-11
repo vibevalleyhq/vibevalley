@@ -1,15 +1,15 @@
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";
-import * as T from "../shapes";
+import * as T from "./shapes";
 import { PkmMoveAtValues, PkmMoveDirectionValues } from "./shapes";
 
 const pkmProps = Schema.Record(Schema.String, Schema.String);
-export const PkmTier: Codec<T.PkmTier> = Schema.Literals(T.PkmTierValues);
-export const PkmMarker: Codec<T.PkmMarker> = Schema.Literals(T.PkmMarkerValues);
-export const PkmPriority: Codec<T.PkmPriority> = Schema.Literals(T.PkmPriorityValues);
+const PkmTier: Codec<T.PkmTier> = Schema.Literals(T.PkmTierValues);
+const PkmMarker: Codec<T.PkmMarker> = Schema.Literals(T.PkmMarkerValues);
+const PkmPriority: Codec<T.PkmPriority> = Schema.Literals(T.PkmPriorityValues);
 
-export const PkmBlock: Codec<T.PkmBlock> = Schema.Struct({
+const PkmBlock: Codec<T.PkmBlock> = Schema.Struct({
   id: Schema.String,
   parent: Schema.optionalKey(Schema.String),
   depth: Schema.Int,
@@ -20,7 +20,7 @@ export const PkmBlock: Codec<T.PkmBlock> = Schema.Struct({
   path: Schema.String,
 });
 
-export const PkmPageSummary: Codec<T.PkmPageSummary> = Schema.Struct({
+const PkmPageSummary: Codec<T.PkmPageSummary> = Schema.Struct({
   slug: Schema.String,
   title: Schema.String,
   tier: PkmTier,
@@ -47,7 +47,7 @@ export const PkmPage: Codec<T.PkmPage> = Schema.Struct({
   updated: Schema.Finite,
 });
 
-export const PkmTransclusion: Codec<T.PkmTransclusion> = Schema.Struct({
+const PkmTransclusion: Codec<T.PkmTransclusion> = Schema.Struct({
   block: Schema.String,
   found: Schema.Boolean,
   circular: Schema.Boolean,
@@ -56,7 +56,7 @@ export const PkmTransclusion: Codec<T.PkmTransclusion> = Schema.Struct({
   body: Schema.String,
 });
 
-export const PkmBacklink: Codec<T.PkmBacklink> = Schema.Struct({
+const PkmBacklink: Codec<T.PkmBacklink> = Schema.Struct({
   block: Schema.String,
   page: Schema.String,
   pageTitle: Schema.String,
@@ -66,7 +66,7 @@ export const PkmBacklink: Codec<T.PkmBacklink> = Schema.Struct({
 });
 
 const pkmBacklinks = Schema.mutable(Schema.Array(PkmBacklink));
-export const PkmBacklinks: Codec<T.PkmBacklinks> = Schema.Struct({
+const PkmBacklinks: Codec<T.PkmBacklinks> = Schema.Struct({
   projects: pkmBacklinks,
   journals: pkmBacklinks,
   areas: pkmBacklinks,
@@ -113,7 +113,7 @@ const pkmNewBlock = {
   props: Schema.optionalKey(pkmProps),
 };
 const pkmOn = { block: Schema.String };
-export const PkmBlockOp: Codec<T.PkmBlockOp> = Schema.Union([
+const PkmBlockOp: Codec<T.PkmBlockOp> = Schema.Union([
   Schema.Struct({ op: Schema.tag("append"), ...pkmNewBlock }),
   Schema.Struct({ op: Schema.tag("insert_before"), ...pkmOn, ...pkmNewBlock }),
   Schema.Struct({ op: Schema.tag("insert_after"), ...pkmOn, ...pkmNewBlock }),
@@ -165,7 +165,7 @@ export const PkmSourceUpdate: Codec<T.PkmSourceUpdate> = Schema.Struct({ page: S
 
 export const PkmJournalRequest: Codec<T.PkmJournalRequest> = Schema.Struct({ day: Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/u)) });
 
-export const PkmStaleProject: Codec<T.PkmStaleProject> = Schema.Struct({
+const PkmStaleProject: Codec<T.PkmStaleProject> = Schema.Struct({
   slug: Schema.String,
   title: Schema.String,
   days: Schema.Int,
@@ -175,7 +175,7 @@ export const PkmStaleProject: Codec<T.PkmStaleProject> = Schema.Struct({
   done: Schema.Int,
 });
 
-export const PkmOverdue: Codec<T.PkmOverdue> = Schema.Struct({
+const PkmOverdue: Codec<T.PkmOverdue> = Schema.Struct({
   block: Schema.String,
   page: Schema.String,
   body: Schema.String,

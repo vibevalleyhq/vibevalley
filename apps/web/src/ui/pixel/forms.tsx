@@ -7,14 +7,14 @@ import { splitChips } from "./cells";
 import { SpriteIcon } from "./icons";
 import { pxStyle } from "./style";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   pxChipsInputButton: {
     cursor: {
       default: "pointer",
       ":disabled": "default",
     },
-    paddingInline: "var(--spacing)",
-    paddingBlock: "calc(var(--spacing) * .5)",
+    paddingInline: "0.25rem",
+    paddingBlock: "0.125rem",
     opacity: {
       default: ".7",
       "@media (hover:hover)": {
@@ -39,17 +39,14 @@ const recipeStyles = stylex.create({
       ":focus-visible": "var(--color-leaf-500)",
     },
   },
-});
-
-const viewStyles = stylex.create({
   box: {
     display: "flex",
-    minHeight: "calc(var(--spacing) * 9)",
+    minHeight: "2.25rem",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     backgroundColor: "var(--color-cream-100)",
-    padding: "calc(var(--spacing) * 1.5)",
+    padding: "0.375rem",
   },
   disabled: {
     opacity: ".5",
@@ -57,17 +54,17 @@ const viewStyles = stylex.create({
   chip: {
     display: "inline-flex",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     backgroundColor: "var(--color-cream-300)",
-    paddingBlock: "calc(var(--spacing) * .5)",
-    paddingRight: "var(--spacing)",
-    paddingLeft: "calc(var(--spacing) * 2)",
+    paddingBlock: "0.125rem",
+    paddingRight: "0.25rem",
+    paddingLeft: "0.5rem",
     color: "var(--color-bark-800)",
   },
   input: {
-    height: "calc(var(--spacing) * 6)",
+    height: "1.5rem",
     backgroundColor: "transparent",
-    paddingInline: "var(--spacing)",
+    paddingInline: "0.25rem",
     color: {
       default: "var(--color-bark-900)",
       "::placeholder": "var(--color-bark-500)",
@@ -76,7 +73,7 @@ const viewStyles = stylex.create({
     outlineStyle: "none",
   },
   inputAfterChips: {
-    width: "calc(var(--spacing) * 24)",
+    width: "6rem",
     flexGrow: "1",
   },
   inputEmpty: {
@@ -101,17 +98,17 @@ export function PxChipsInput(props: {
     setDraft("");
   };
   return (
-    <div {...stylex.attrs(pxStyle.ring, viewStyles.box, props.disabled === true && viewStyles.disabled)}>
+    <div {...stylex.attrs(pxStyle.ring, styles.box, props.disabled === true && styles.disabled)}>
       <For each={props.value}>
         {(chip) => (
-          <span {...stylex.attrs(pxStyle.xs, viewStyles.chip)}>
+          <span {...stylex.attrs(pxStyle.xs, styles.chip)}>
             {chip}
             <button
               type="button"
               aria-label={t("web.ui.pixel.drop", { chip })}
               disabled={props.disabled}
               onClick={() => props.onChange(props.value.filter((c) => c !== chip))}
-              {...stylex.attrs(recipeStyles.pxChipsInputButton)}
+              {...stylex.attrs(styles.pxChipsInputButton)}
             >
               <SpriteIcon name="button-close" size={10} />
             </button>
@@ -137,7 +134,7 @@ export function PxChipsInput(props: {
           }
         }}
         // The box takes the whole row while there are no chips (room for the placeholder) and 96 px after them.
-        {...stylex.attrs(pxStyle.sm, viewStyles.input, props.value.length === 0 ? viewStyles.inputEmpty : viewStyles.inputAfterChips)}
+        {...stylex.attrs(pxStyle.sm, styles.input, props.value.length === 0 ? styles.inputEmpty : styles.inputAfterChips)}
       />
     </div>
   );

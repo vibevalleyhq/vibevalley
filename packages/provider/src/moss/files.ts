@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect";
 import { FetchHttpClient, HttpBody, HttpClient, HttpClientRequest } from "effect/http";
 
-import { readMossResponse } from "./response.ts";
+import { MossErrorOutcome, MossErrorReason, readMossResponse } from "./response.ts";
 
 const Id = Schema.String.check(
   Schema.isBetweenCodePoints(1, 256),
@@ -29,8 +29,8 @@ const Page = Schema.Struct({
 });
 
 class MossFileError extends Schema.TaggedError<MossFileError, { readonly brand: unique symbol }>()("MossFileError", {
-  reason: Schema.Literals(["Credentials", "InvalidInput", "Network", "Timeout", "HttpStatus", "InvalidResponse", "TooLarge"]),
-  outcome: Schema.Literals(["NotSubmitted", "Rejected", "Unknown"]),
+  reason: MossErrorReason,
+  outcome: MossErrorOutcome,
   status: Schema.optionalKey(Schema.Int),
 }) {}
 

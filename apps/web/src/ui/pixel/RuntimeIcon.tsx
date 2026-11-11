@@ -1,17 +1,20 @@
 import * as stylex from "@stylexjs/stylex";
 import { Show } from "solid-js";
 
-import { RuntimeBadge } from "#/ui/RuntimeBadge.tsx";
+import { RuntimeBadge } from "#/ui/domain/RuntimeBadge.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 
 import { SpriteIcon } from "./icons";
 
-const viewStyles = stylex.create({
-  runtimeIconSpan: {
+const styles = stylex.create({
+  box: (size: number) => ({
     position: "relative",
     display: "inline-block",
+    width: size,
+    height: size,
     flexShrink: "0",
-  },
-  runtimeIconSpan2: {
+  }),
+  fallback: {
     display: "block",
     height: "100%",
     width: "100%",
@@ -21,8 +24,8 @@ const viewStyles = stylex.create({
 
 export function RuntimeIcon(props: { runtime: string; size: number }) {
   return (
-    <span {...stylex.attrs(viewStyles.runtimeIconSpan)} style={{ width: `${props.size}px`, height: `${props.size}px` }}>
-      <Show when={machineOf(props.runtime)} fallback={<span {...stylex.attrs(viewStyles.runtimeIconSpan2)} />}>
+    <span {...styleProps(styles.box(props.size))}>
+      <Show when={machineOf(props.runtime)} fallback={<span {...stylex.attrs(styles.fallback)} />}>
         {(machine) => <SpriteIcon name={machine()} size={props.size} />}
       </Show>
       <RuntimeBadge runtime={props.runtime} size={Math.max(10, Math.round(props.size * 0.46))} />

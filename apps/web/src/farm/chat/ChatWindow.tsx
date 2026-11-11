@@ -3,7 +3,7 @@ import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import { type Agent, type ChatMessage, type Channel, type SpaceState } from "@vibevalley/protocol";
-import { channelOf, defaultOf } from "@vibevalley/protocol/rules";
+import { actorRoleOf, channelOf, defaultOf } from "@vibevalley/protocol/rules";
 
 import { useNow } from "#/base/dom.tsx";
 import { farm, farmChannelLabel, useFarm } from "#/farm/store.ts";
@@ -29,7 +29,7 @@ import { orchestratorMood, useCore } from "#/infra/frame.ts";
 import { ready, useAgents } from "#/infra/query.ts";
 import { useRouter } from "#/infra/router.ts";
 import { sendOnce, useIntents } from "#/state/intent.ts";
-import { OrchestratorFace } from "#/ui/Face.tsx";
+import { OrchestratorFace } from "#/ui/domain/Face.tsx";
 import { noticeTitle, PxButton, SpriteIcon, ToastType, toasts } from "#/ui/pixel/index.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
 
@@ -527,7 +527,7 @@ export function ChatWindow() {
     if (c.phase !== "live" || here?.default !== true) return [];
     const spoken: SpokenLine[] = said()
       .messages.filter((m) => m.spoken)
-      .map((m) => ({ speaker: m.fromKind === "user" ? "you" : "orchestrator", text: m.text }));
+      .map((m) => ({ speaker: m.actor.kind === "user" ? "you" : "orchestrator", text: m.text }));
     return liveCaptions(c.captions.turns, spoken, tick()).map((turn) => ({ ...turn }));
   });
   // On a call the captions show what is being said; the dots are for the chat.
@@ -596,8 +596,8 @@ export function ChatWindow() {
                   data-testid="message"
                   data-key={item().message.id}
                   data-from={item().message.from}
-                  data-from-kind={item().message.fromKind}
-                  data-from-role={item().message.fromRole}
+                  data-from-kind={item().message.actor.kind}
+                  data-from-role={actorRoleOf(item().message.actor)}
                   data-kind={item().message.kind}
                   data-deleted={item().message.deleted !== undefined ? "" : undefined}
                   data-edited={item().message.edited !== undefined ? "" : undefined}
@@ -795,7 +795,9 @@ function Item(props: { m: ChatMessage; thread?: Channel | undefined; first: bool
   };
   // The dispatch note is the farm's, under the orchestrator's name: its words say the same turn.
   const turn = () =>
-    props.m.fromRole === "orchestrator" && props.m.kind !== "dispatch" ? <RunSteps session={props.m.from} run={props.m.run} orchestrator /> : undefined;
+    actorRoleOf(props.m.actor) === "orchestrator" && props.m.kind !== "dispatch" ? (
+      <RunSteps session={props.m.from} run={props.m.run} orchestrator />
+    ) : undefined;
   return (
     <Switch
       fallback={
@@ -815,7 +817,7 @@ function Item(props: { m: ChatMessage; thread?: Channel | undefined; first: bool
         />
       }
     >
-      <Match when={props.m.kind === "notice" || props.m.fromKind === "system"}>
+      <Match when={props.m.kind === "notice" || props.m.actor.kind === "system"}>
         <p {...stylex.attrs(recipeStyles.itemP)}>{props.m.text}</p>
       </Match>
       <Match when={props.m.kind === "report"}>
@@ -823,10 +825,10 @@ function Item(props: { m: ChatMessage; thread?: Channel | undefined; first: bool
           m={props.m}
           first={props.first}
           face={face()}
-          steps={props.m.fromRole === "worker" ? <RunSteps session={props.m.from} run={props.m.run} /> : undefined}
+          steps={actorRoleOf(props.m.actor) === "worker" ? <RunSteps session={props.m.from} run={props.m.run} /> : undefined}
         />
       </Match>
-      <Match when={props.m.fromKind === "user"}>
+      <Match when={props.m.actor.kind === "user"}>
         <ChatBubble m={props.m} mine first={props.first} after={chip()} />
       </Match>
     </Switch>

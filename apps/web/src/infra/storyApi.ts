@@ -1,3 +1,5 @@
+import { BizCode } from "@vibevalley/protocol/api";
+
 type Answer = (input: unknown) => unknown;
 
 let answers: Readonly<Record<string, Answer>> = {};
@@ -14,9 +16,9 @@ export function fakeFetch(real: typeof fetch): typeof fetch {
     if (new Headers(init?.headers).get("accept") === "text/event-stream") return new Response(new ReadableStream(), { status: 200 });
     const path = url.pathname.slice("/api/v1/".length);
     const at = answers[path];
-    if (!at) return Response.json({ reason: `stories: ${path} is not answered here` }, { status: 503 });
+    if (!at) return Response.json({ bizCode: BizCode.ServiceUnavailable, message: `stories: ${path} is not answered here` }, { status: 503 });
     const body = typeof init?.body === "string" ? (JSON.parse(init.body) as unknown) : undefined;
     const value = await at(body);
-    return value === undefined ? new Response("", { status: 200 }) : Response.json(value);
+    return Response.json(value === undefined ? { bizCode: 0, message: "ok" } : { bizCode: 0, message: "ok", data: value });
   };
 }

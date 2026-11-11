@@ -1,0 +1,266 @@
+import { describe, expect, it } from "vite-plus/test";
+
+import { type Issue, defaultOrchestrator, type RepoStack, type Run } from "@vibevalley/protocol";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
+
+import { templateCatalog } from "#/modules/agent/seed.ts";
+
+import { pullRequestConclusion, issueBrief, milestonesOf, splitBrief } from "./brief.ts";
+import { filledKinds, filledTemplate, mandateNoteFits, sentTitles } from "./creation.ts";
+import { answerOpening, criteriaHead, refinementBrief, refinementOpening } from "./prompts.ts";
+import { refinementDescription, kept, parseRefinement } from "./refinement.ts";
+import { pickIssues } from "./status.ts";
+
+describe("an issue as a brief", () => {
+  it("title and brief", () => {
+    expect(splitBrief("\n  写打卡  \n\n细节在 README\n还有测试\n")).toEqual(["写打卡", "细节在 README\n还有测试"]);
+    expect(issueBrief({ title: "写打卡", description: "细节在 README\n还有测试", criteria: [] })).toBe("写打卡\n\n细节在 README\n还有测试");
+    expect(issueBrief({ title: "只有标题", description: "", criteria: [] })).toBe("只有标题");
+    expect(splitBrief("  ")).toEqual(["", ""]);
+  });
+
+  it("an answer issue's brief is read only and ends with the block its conclusion comes back in", () => {
+    const brief = issueBrief({ title: "查一下打卡为什么慢", description: "用户觉得最近慢了", deliver: "answer", criteria: [] });
+    expect(brief.startsWith(answerOpening + "\n\n查一下打卡为什么慢\n\n用户觉得最近慢了\n\n")).toBe(true);
+    expect(brief).toContain('"conclusion"');
+    expect(brief).toContain('"evidence"');
+    expect(issueBrief({ title: "写打卡", description: "", deliver: "change", criteria: [] })).toBe("写打卡");
+  });
+
+  it("a brief written as one long line keeps a short title and all of it as the description", () => {
+    const brief = "通读 vibevalley 仓库，给用户一份整体架构和当前进度的评估。1）技术栈 2）模块 3）测试 4）最该推进的三件事";
+    expect(splitBrief(brief)).toEqual(["通读 vibevalley 仓库，给用户一份整体架构和当前进度的评估", brief]);
+  });
+
+  it("the story of an issue, newest first", () => {
+    const issue = {
+      id: issueId("t1"),
+      number: 1,
+      title: "评估",
+      priority: "medium",
+      deliver: "change",
+      mandate: { strength: "explicit", maxBotReviewRounds: 3, autoSubmitPr: false },
+      createdAt: 100,
+      assignments: [
+        {
+          id: "a1",
+          issue: issueId("t1"),
+          agent: "lab",
+          assignedAt: 150,
+          executions: [{ kind: "worker", session: sessionId("w1"), startedAt: 200 }],
+        },
+      ],
+      status: "in_review",
+      moves: [],
+      findings: [{ id: "f1", text: "少了测试", at: 400, resolved: false }],
+      questions: [{ question: "全交给 w3 还是分着做？", options: ["全交给 w3", "分着做"] }],
+      description: "",
+      blockedBy: [],
+      criteria: [],
+      checks: [],
+      stage: { state: "asking", acts: [] },
+    } satisfies Issue;
+    const runs: Run[] = [
+      {
+        id: "r1",
+        session: sessionId("w1"),
+        triggeredBy: { kind: "issue" },
+        heard: [],
+        startedAt: 200,
+        endedAt: 300,
+        outcome: "completed",
+        summary: "写好了",
+        spent: { tokens: 10, cny: 0.5 },
+      },
+      {
+        id: "r2",
+        session: sessionId("w1"),
+        triggeredBy: { kind: "comment" },
+        heard: [],
+        startedAt: 410,
+        endedAt: 500,
+        outcome: "completed",
+        summary: "补了",
+        spent: { tokens: 5 },
+      },
+    ];
+    const { milestones, spent } = milestonesOf(issue, runs, new Map([["w1", "Claude 师傅"]]));
+    expect(milestones.map((m) => [m.at, m.kind, m.who ?? "", m.text])).toEqual([
+      [500, "asked", "Claude 师傅", "问你：全交给 w3 还是分着做？"],
+      [410, "told", "Claude 师傅", "你带了话，接着做一轮"],
+      [400, "rejected", "", "打回：少了测试"],
+      [300, "reported", "Claude 师傅", "交回来了：写好了"],
+      [200, "started", "Claude 师傅", "开工"],
+      [100, "opened", "", "开单"],
+    ]);
+    expect(spent).toEqual({ tokens: 15, cny: 0.5 });
+  });
+
+  it("the brief carries its criteria", () => {
+    expect(issueBrief({ title: "改拖卡", description: "为什么：\n旧接口", criteria: ["拖到待办就开工", "测试通过"] })).toBe(
+      "改拖卡\n\n为什么：\n旧接口\n\n" + criteriaHead + "\n1. 拖到待办就开工\n2. 测试通过",
+    );
+  });
+});
+
+describe("a pull request", () => {
+  it("a pull request's conclusion", () => {
+    expect(pullRequestConclusion("开场白\n\n**结论：** 已完成 abc123\n第二行\n\n补充说明")).toBe("开场白\n\n**结论：** 已完成 abc123\n第二行\n\n补充说明");
+    const text = "完整的最后一轮回复。".repeat(20) + "\n\n最后一段";
+    expect(pullRequestConclusion(text)).toBe(text);
+  });
+});
+
+describe("drafts", () => {
+  it("are read from the last block", () => {
+    const said =
+      '看过了。\n\n```json\n{"title": "旧的"}\n```\n\n要问用户：端口用哪个？\n\n```json\n' +
+      `{"title": " 看板拖卡改用 issue.status ", "why": "旧接口收不了", "todo": ["改 board.dart", " "], "criteria": "拖到待办就开工", "notDoing": [], "files": ["app/lib/workbench/issues/board.dart"]}` +
+      "\n```\n\n结论：写好了";
+    const { draft, problem } = parseRefinement(said);
+    expect(problem).toBe("");
+    expect(draft!.title).toBe("看板拖卡改用 issue.status");
+    expect(kept(draft!.criteria)).toEqual(["拖到待办就开工"]);
+    expect(refinementDescription(draft!)).toBe("为什么：\n旧接口收不了\n\n要做的：\n- 改 board.dart\n\n可能涉及：\n- app/lib/workbench/issues/board.dart");
+    for (const [said, problem] of [
+      ["草稿写好了", "没找到草稿"],
+      ["```json\n{title: 1}\n```", "json 读不了"],
+      ['```json\n{"why": "x"}\n```', "草稿没有标题"],
+      ['```json\n{"title": "x", "todo": [1]}\n```', "json 读不了"],
+    ])
+      expect(parseRefinement(said!).problem.startsWith(problem!)).toBe(true);
+    const later = parseRefinement('```json\n{"title": "x"}\n```\n```\n不是 json\n```');
+    expect([later.draft?.title, later.problem]).toEqual(["x", ""]);
+  });
+
+  it("briefs", () => {
+    const first = refinementBrief({ title: "新工单", description: "", criteria: [] }, "看板拖卡还在调旧接口", "board");
+    for (const want of [refinementOpening, "仓库：board", "用户想做的：看板拖卡还在调旧接口", "```json", '"criteria"', "要问用户："])
+      expect(first).toContain(want);
+    expect(first).not.toContain("上一版草稿");
+    const refined = {
+      title: "看板拖卡改用 issue.status",
+      description: "为什么：\n旧接口",
+      criteria: ["拖到待办就开工"],
+      questions: [{ question: "端口用哪个？", options: [] }],
+    };
+    const answer = refinementBrief(refined, "用 8797", "board");
+    for (const want of [
+      "上一版草稿",
+      "标题：看板拖卡改用 issue.status",
+      "为什么：\n旧接口",
+      "- 拖到待办就开工",
+      "你上一版问用户的：\n- 端口用哪个？",
+      "用户的回答：用 8797",
+    ])
+      expect(answer).toContain(want);
+    const again = refinementBrief({ ...refined, questions: [] }, "也改测试", "board");
+    expect(again).toContain("用户这次说：也改测试");
+    expect(again).not.toContain("用户的回答");
+  });
+});
+
+describe("templates", () => {
+  const goStack: RepoStack = { name: "go", label: "Go", test: "go test ./...", lint: "go vet ./...", build: "go build ./..." };
+
+  it("the catalog is well formed", () => {
+    const kinds = templateCatalog();
+    expect(kinds.length).toBeGreaterThan(0);
+    const kindIds = new Set<string>();
+    for (const k of kinds) {
+      expect(k.id && k.name && k.icon.startsWith("plot-") && k.templates.length > 0 && !kindIds.has(k.id)).toBeTruthy();
+      kindIds.add(k.id);
+      const ids = new Set<string>();
+      for (const s of k.templates) {
+        expect(s.id && !ids.has(s.id) && s.title && s.done).toBeTruthy();
+        ids.add(s.id);
+        for (const hole of (s.title + s.done).match(/\{[^}]*\}/gu) ?? []) expect(["{test}", "{lint}", "{build}"]).toContain(hole);
+      }
+    }
+  });
+
+  it("a template is filled for the stack", () => {
+    const template = { id: "x", title: "修一个 bug：〔现象〕", done: "{build} 不再报错；跑一遍 {test}，再看（{lint}）", text: "" };
+    const got = filledTemplate(template, goStack);
+    expect(got.done).toBe("`go build ./...` 不再报错；跑一遍 `go test ./...`，再看（`go vet ./...`）");
+    expect(got.text).toBe("修一个 bug：〔现象〕\n做到什么程度算完：" + got.done);
+    expect(got.blank).toEqual({ start: 8, end: 12 });
+    expect(got.text.slice(got.blank!.start, got.blank!.end)).toBe("〔现象〕");
+    expect(filledTemplate(template, {}).done).toBe("构建不再报错；跑一遍测试，再看（代码检查）");
+    const partly = filledTemplate({ id: "", title: "测试挂了就修", done: "{build} 和 {test} 都通过" }, { name: "node", test: "bun run test" });
+    expect([partly.done, partly.blank]).toEqual(["构建和 `bun run test` 都通过", undefined]);
+  });
+
+  it("every catalog template fills without holes", () => {
+    for (const stack of [goStack, {}])
+      for (const k of filledKinds(templateCatalog(), stack))
+        for (const s of k.templates) {
+          expect(/[{}]/u.test(s.text)).toBe(false);
+          expect(s.text).toContain("\n做到什么程度算完：");
+          expect(s.title.includes("〔")).toBe(s.blank !== undefined);
+        }
+  });
+
+  it("issue.list's filter keeps the open ones by default, and what waits on the user the longest waiting first", () => {
+    const issue = (title: string, status: Issue["status"], more: Partial<Issue> = {}) =>
+      ({ title, status, repo: "app", stage: { state: "working", acts: [] }, ...more }) as Issue;
+    const waiting = (since: number) => ({ stage: { state: "reviewing" as const, acts: [], since } });
+    const all = [
+      issue("修登录 按钮", "in_review", waiting(5)),
+      issue("加打卡", "todo"),
+      issue("修登录 页面", "in_review", waiting(2)),
+      issue("老的", "done"),
+      issue("别处的", "todo", { repo: "web" }),
+    ];
+    const titles = (f: Parameters<typeof pickIssues>[1]) => pickIssues(all, f, 10).map((t) => t.title);
+    expect(titles({})).toEqual(["修登录 按钮", "加打卡", "修登录 页面", "别处的"]);
+    expect(titles({ closed: true, limit: 2 })).toEqual(["修登录 按钮", "加打卡"]);
+    expect(titles({ status: "done" })).toEqual(["老的"]);
+    expect(titles({ text: "修登录 页面" })).toEqual(["修登录 页面"]);
+    expect(titles({ repo: "web" })).toEqual(["别处的"]);
+    expect(titles({ wantsUser: true })).toEqual(["修登录 页面", "修登录 按钮"]);
+  });
+
+  it("recent titles are the repo's own sent issues", () => {
+    const issue = (title: string, repo: string, at: number, more: Partial<Issue> & { readonly sent?: boolean; readonly agent?: string } = {}) => {
+      const { sent = true, agent = "lab", ...fields } = more;
+      const id = issueId(`i-${at}-${title}`);
+      return {
+        title,
+        repo,
+        createdAt: at,
+        assignments: sent
+          ? [{ id: `a-${at}-${title}`, issue: id, agent, assignedAt: at, executions: [{ kind: "worker", session: sessionId("s"), startedAt: at }] }]
+          : [],
+        ...fields,
+      } as Issue;
+    };
+    const all = [
+      issue("修登录", "app", 1),
+      issue("  加  打卡 ", "app", 5),
+      issue("修登录", "app", 4),
+      issue("别的仓库", "web", 9),
+      issue("没派过", "app", 8, { sent: false }),
+      issue("计划里的一步", "app", 8, { parent: issueId("g") }),
+      issue("定时任务", "app", 8, { cron: "s1" }),
+      issue("给助手", "app", 8, { agent: defaultOrchestrator }),
+      issue("长".repeat(61), "app", 8),
+      issue("三", "app", 3),
+      issue("二", "app", 2),
+      issue("零", "app", 0),
+      issue("负", "app", -1),
+    ];
+    expect(sentTitles(all, "app", (id) => id === defaultOrchestrator)).toEqual(["加 打卡", "修登录", "三", "二", "零"]);
+    expect(sentTitles(all, "none", (id) => id === defaultOrchestrator)).toEqual([]);
+  });
+});
+
+describe("a mandate", () => {
+  it("limits manager notes by words across English and Chinese", () => {
+    expect(mandateNoteFits("word ".repeat(30))).toBe(true);
+    expect(mandateNoteFits("word ".repeat(31))).toBe(false);
+    expect(mandateNoteFits("工作，".repeat(30))).toBe(true);
+    expect(mandateNoteFits("工作，".repeat(31))).toBe(false);
+    expect(mandateNoteFits(" \n … ")).toBe(true);
+  });
+});

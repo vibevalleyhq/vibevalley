@@ -1,0 +1,381 @@
+import { NodeServices } from "@effect/platform-node";
+import { describe, expect, it } from "@effect/vitest";
+import { Clock, Effect, Layer } from "effect";
+import { FetchHttpClient } from "effect/http";
+
+import type * as T from "@vibevalley/protocol";
+import { BizCode } from "@vibevalley/protocol/api";
+
+import { user as userActor } from "#/base/actor.ts";
+import { ServerConfig } from "#/infra/config.ts";
+import { Database, Db } from "#/infra/db.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import type { MemorySourceConfig } from "#/modules/setting/memorySources.ts";
+import { Setting } from "#/modules/setting/setting.ts";
+import { testConfig, whenTrue } from "#/testing/layers.ts";
+
+import { type BuildSource, type FinishedRun, foundText, type Found, Memory, make, type Note, type RecallCue, type SearchQuery } from "./memory.ts";
+import { localName, recallChars, recallCount, searchLimit } from "./recall.ts";
+import { mergeRecalled, type RecalledLine, type Source, sourceError } from "./sources.ts";
+
+class Fake {
+  available = true;
+  lines: RecalledLine[] = [];
+  listed: T.Memory[] = [];
+  found: Found[] = [];
+  slow = false;
+  failSync = false;
+  noForget = false;
+  cues: RecallCue[] = [];
+  searched: SearchQuery[] = [];
+  synced: FinishedRun[] = [];
+  added: Note[] = [];
+  forgot: string[] = [];
+  readonly name: string;
+  constructor(name: string) {
+    this.name = name;
+  }
+  get can() {
+    return { list: true, forget: !this.noForget, transcripts: false };
+  }
+  unavailable = () => (this.available ? undefined : "no address");
+  stop = async () => {};
+  /** Never answers: rejects only when the caller aborts. */
+  private hang = (signal: AbortSignal) => Effect.runPromise(Effect.never, { signal });
+  prefetch = async (cue: RecallCue, signal: AbortSignal) => {
+    this.cues.push(cue);
+    return this.slow ? this.hang(signal) : [...this.lines];
+  };
+  syncTurn = async (run: FinishedRun) => {
+    this.synced.push(run);
+    if (this.failSync) throw new Error("down");
+  };
+  sessionEnded = async () => {};
+  search = async (q: SearchQuery, signal: AbortSignal) => {
+    this.searched.push(q);
+    return this.slow ? this.hang(signal) : { found: [...this.found] };
+  };
+  list = async (_: string, __: AbortSignal) => this.listed;
+  add = async (n: Note): Promise<T.Memory | undefined> => {
+    this.added.push(n);
+    return { id: "n1" } as T.Memory;
+  };
+  forget = async (_: string, id: string, __: AbortSignal) => {
+    this.forgot.push(id);
+  };
+}
+
+/** Interrupting the operation aborts the fake's request through the signal it was given. */
+const sourceOf = (f: Fake): Source => ({
+  name: f.name,
+  unavailable: () => f.unavailable(),
+  stop: Effect.promise(() => f.stop()),
+  prefetch: (cue) => Effect.tryPromise({ try: (signal) => f.prefetch(cue, signal), catch: sourceError }),
+  syncTurn: (run) => Effect.tryPromise({ try: () => f.syncTurn(run), catch: sourceError }),
+  sessionEnded: () => Effect.tryPromise({ try: () => f.sessionEnded(), catch: sourceError }),
+  search: (q) => Effect.tryPromise({ try: (signal) => f.search(q, signal), catch: sourceError }),
+  list: (agent) => Effect.tryPromise({ try: (signal) => f.list(agent, signal), catch: sourceError }),
+  add: (n) => Effect.tryPromise({ try: () => f.add(n), catch: sourceError }),
+  forget: (agent, id) => Effect.tryPromise({ try: (signal) => f.forget(agent, id, signal), catch: sourceError }),
+  get can() {
+    return f.can;
+  },
+});
+
+const world = (build: BuildSource = () => undefined, timeoutMs = 50) =>
+  Layer.effect(Memory, make(build, timeoutMs)).pipe(
+    Layer.provideMerge(Agent.layer),
+    Layer.provideMerge(Setting.layer),
+    Layer.provideMerge(Db.layer),
+    Layer.provideMerge(Database),
+    Layer.provideMerge(FetchHttpClient.layer),
+    Layer.provideMerge(Layer.succeed(ServerConfig, testConfig())),
+    Layer.provideMerge(NodeServices.layer),
+  );
+
+const nowledgeOn: NonNullable<T.SettingsUpdate["memorySources"]>[number] = { kind: "nowledge", url: "http://up/", enabled: true, read: true, write: true };
+
+const save = (s: NonNullable<T.SettingsUpdate["memorySources"]>[number]) => Effect.flatMap(Setting, (setting) => setting.save({ memorySources: [s] }));
+
+/** The Memory service with the fake as its one source outside the farm. */
+const withFake = <A, E>(fake: Fake, body: (m: Memory["Service"]) => Effect.Effect<A, E>) =>
+  Effect.gen(function* () {
+    yield* save(nowledgeOn).pipe(Effect.orDie);
+    const memory = yield* Memory;
+    return yield* body(memory);
+  }).pipe(Effect.provide(world(() => sourceOf(fake))));
+
+const user = (agent: string, text: string, repo = ""): Note => ({ agent, text, repo, by: userActor });
+
+const until = (ok: () => boolean) => whenTrue(ok, "it");
+
+describe("memory sources", () => {
+  it.live("one source recalls as the preview shows", () =>
+    Effect.gen(function* () {
+      const m = yield* Memory;
+      yield* m.write(user("lab", "这个仓库测试用 pnpm test", "demo"));
+      const preview = yield* m.recallOf("lab", "demo", "跑测试");
+      const got = yield* m.recall({ agent: "lab", repo: "demo", text: "跑测试" });
+      expect(got.lines).toHaveLength(1);
+      expect(got.lines).toEqual(preview.lines);
+      expect(got.ids[0]).not.toContain(":");
+    }).pipe(Effect.provide(world())),
+  );
+
+  it.live("a slow source does not hold a run or a search up", () => {
+    const fake = Object.assign(new Fake("slow"), { slow: true });
+    return withFake(fake, (m) =>
+      Effect.gen(function* () {
+        yield* m.write(user("lab", "迁移文件放 db/migrations", "demo"));
+        const start = yield* Clock.currentTimeMillis;
+        expect((yield* m.recall({ agent: "lab", repo: "demo", text: "迁移" })).lines).toHaveLength(1);
+        expect((yield* m.search({ agent: "lab", repo: "", text: "迁移", kind: "", limit: 0 })).found).toHaveLength(1);
+        expect((yield* Clock.currentTimeMillis) - start).toBeLessThan(1000);
+      }),
+    );
+  });
+
+  it.live("another source's ids carry its name", () => {
+    const fake = new Fake("nowledge");
+    fake.lines = [{ id: "m9", line: "用户要中文的提交信息", score: 100 }];
+    fake.listed = [{ id: "m9", agent: "lab", kind: "note", text: "用户要中文的提交信息" } as T.Memory];
+    return withFake(fake, (m) =>
+      Effect.gen(function* () {
+        const local = yield* m.write(user("lab", "这个仓库测试用 pnpm test", "demo"));
+        const got = yield* m.recall({ agent: "lab", repo: "demo", text: "测试 提交", skip: new Set(["nowledge:m1", "other:m2", local.id + "x"]) });
+        expect(got.ids).toEqual([local.id, "nowledge:m9"]);
+        expect(got.lines[1]).toBe("用户要中文的提交信息");
+        expect([...fake.cues[0]!.skip!]).toEqual(["m1"]);
+        expect((yield* m.list("lab")).map((x) => x.id)).toEqual([local.id, "nowledge:m9"]);
+        yield* m.forget("lab", "nowledge:m9");
+        expect(fake.forgot).toEqual(["m9"]);
+        yield* m.forget("lab", local.id);
+        expect(fake.forgot).toHaveLength(1);
+        const ms = yield* m.list("lab");
+        expect(ms).toHaveLength(1);
+      }),
+    );
+  });
+
+  it.live("a source failing to keep leaves the others theirs", () => {
+    const fake = Object.assign(new Fake("everos"), { failSync: true });
+    return withFake(fake, (m) =>
+      Effect.gen(function* () {
+        const run: FinishedRun = {
+          agent: "lab",
+          session: "w1",
+          issue: "i1",
+          repo: "demo",
+          brief: "修登录页",
+          said: "改好了。\n记住：登录态统一走 refreshSession()",
+          summary: "改好了",
+          outcome: "completed",
+        };
+        yield* m.keep(run);
+        const ms = yield* m.list("lab");
+        expect(ms).toHaveLength(1);
+        yield* Effect.promise(() => until(() => fake.synced.length === 1));
+        expect(fake.synced[0]!.said).toBe(run.said);
+        yield* m.write(user("lab", "替它记一条"));
+        yield* Effect.promise(() => until(() => fake.added.length === 1));
+        expect(fake.added[0]!.text).toBe("替它记一条");
+      }),
+    );
+  });
+
+  it.live("sources follow the settings", () => {
+    const fake = new Fake("nowledge");
+    let built = 0;
+    const build = (c: MemorySourceConfig) => {
+      built++;
+      fake.available = c.url !== "http://down/";
+      return sourceOf(fake);
+    };
+    return Effect.gen(function* () {
+      const m = yield* Memory;
+      yield* save({ ...nowledgeOn, url: "http://down/" });
+      let sources = yield* m.sources;
+      expect([sources.length, sources[0]!.name, sources[0]!.on, sources[1]!.on, sources[1]!.off]).toEqual([2, localName, true, false, "no address"]);
+      yield* save(nowledgeOn);
+      sources = yield* m.sources;
+      expect([sources[1]!.on, sources[1]!.label]).toEqual([true, "Nowledge Mem"]);
+      yield* m.sources;
+      expect(built).toBe(2);
+      yield* save({ ...nowledgeOn, enabled: false });
+      sources = yield* m.sources;
+      expect([sources[1]!.on, sources[1]!.off]).toEqual([false, "没打开"]);
+    }).pipe(Effect.provide(world(build)));
+  });
+
+  it.live("a retired source cancels outside writes without losing local notes or blocking the new source", () => {
+    const old = new Fake("nowledge");
+    const fresh = new Fake("nowledge");
+    const events: string[] = [];
+    const { promise: held, resolve: release } = Promise.withResolvers<void>();
+    old.add = async (n) => {
+      events.push("old:" + n.text);
+      if (n.text === "first") await held;
+      return undefined;
+    };
+    old.stop = async () => void events.push("old:stop");
+    fresh.add = async (n) => {
+      events.push("new:" + n.text);
+      return undefined;
+    };
+    return Effect.gen(function* () {
+      yield* save(nowledgeOn);
+      const m = yield* Memory;
+      yield* m.write(user("lab", "first"));
+      yield* Effect.promise(() => until(() => events.includes("old:first")));
+      yield* m.write(user("lab", "second"));
+      yield* save({ ...nowledgeOn, url: "http://new/" });
+      yield* m.sources;
+      yield* Effect.promise(() => until(() => events.includes("old:stop")));
+      yield* m.write(user("lab", "third"));
+      yield* Effect.promise(() => until(() => events.includes("new:third")));
+      expect(events).not.toContain("old:second");
+      release();
+      yield* Effect.promise(() => until(() => events.includes("old:stop")));
+      expect(events).toEqual(["old:first", "old:stop", "new:third"]);
+      expect((yield* m.list("lab")).map((m) => m.text).toSorted()).toEqual(["first", "second", "third"]);
+    }).pipe(Effect.ensuring(Effect.sync(() => release())), Effect.provide(world((c) => sourceOf(c.url === nowledgeOn.url ? old : fresh))));
+  });
+
+  for (const operation of ["prefetch", "search", "list", "forget"] as const)
+    it.live(`retiring a source cancels its active ${operation} even when it ignores abort`, () => {
+      const old = new Fake("nowledge");
+      const fresh = new Fake("nowledge");
+      let entered = false;
+      let stopped = false;
+      let asked: AbortSignal | undefined;
+      const { promise: held, resolve: release } = Promise.withResolvers<void>();
+      const read = async (signal?: AbortSignal) => {
+        asked = signal;
+        entered = true;
+        await held;
+        return [];
+      };
+      old.prefetch = (_, signal) => read(signal);
+      old.search = async (_, signal) => ({ found: await read(signal) });
+      old.list = (_, signal) => read(signal);
+      old.forget = async (_, __, signal) => void (await read(signal));
+      old.stop = async () => void (stopped = true);
+      return Effect.gen(function* () {
+        const context2 = yield* Effect.context();
+        const runPromise = Effect.runPromiseWith(context2);
+        yield* save(nowledgeOn);
+        const m = yield* Memory;
+        const pending = runPromise(
+          Effect.result(
+            operation === "prefetch"
+              ? Effect.asVoid(m.recall({ agent: "lab", repo: "demo", text: "query" }))
+              : operation === "search"
+                ? Effect.asVoid(m.search({ agent: "lab", repo: "", text: "query", kind: "", limit: 10 }))
+                : operation === "list"
+                  ? Effect.asVoid(m.list("lab"))
+                  : m.forget("lab", "nowledge:n1"),
+          ),
+        );
+        yield* Effect.promise(() => until(() => entered));
+        yield* save({ ...nowledgeOn, url: "http://new/" });
+        yield* m.sources;
+        yield* Effect.promise(() => until(() => asked?.aborted === true));
+        yield* Effect.promise(() => pending);
+        yield* Effect.promise(() => until(() => stopped));
+        release();
+      }).pipe(Effect.ensuring(Effect.sync(() => release())), Effect.provide(world((c) => sourceOf(c.url === nowledgeOn.url ? old : fresh), 60_000)));
+    });
+
+  it.live("only what is told is counted as recalled", () => {
+    const words = "alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa".split(" ");
+    const fake = new Fake("nowledge");
+    fake.lines = words.slice(0, recallCount).map((w, i) => ({ id: `m${i}`, line: "- （Nowledge）外面的 " + w, score: 1 }));
+    return withFake(fake, (m) =>
+      Effect.gen(function* () {
+        for (let i = 0; i < recallCount; i++) yield* m.write(user("lab", "测试用 " + words[recallCount + i], "demo"));
+        const got = yield* m.recall({ agent: "lab", repo: "demo", text: "测试" });
+        const local = got.ids.filter((id) => !id.includes(":"));
+        expect([got.ids.length, local.length]).toEqual([recallCount, recallCount / 2]);
+        const marked = (yield* m.list("lab")).filter((x) => x.recalled > 0 && !x.id.includes(":"));
+        expect(marked.map((x) => x.id).toSorted()).toEqual([...local].toSorted());
+      }),
+    );
+  });
+
+  it.live("a source that cannot forget is not asked", () => {
+    const fake = Object.assign(new Fake("nowledge"), { noForget: true });
+    return withFake(fake, (m) =>
+      Effect.gen(function* () {
+        expect((yield* Effect.flip(m.forget("lab", "nowledge:m1"))).bizCode).toBe(BizCode.MemoryRefused);
+        expect(fake.forgot).toEqual([]);
+      }),
+    );
+  });
+
+  it("merging keeps the best once within the budget", () => {
+    const long = "长".repeat(recallChars - 10);
+    const got = mergeRecalled([
+      [
+        { id: "a", line: "测试用 pnpm test", score: 3 },
+        { id: "b", line: long, score: 1 },
+      ],
+      [
+        { id: "x:c", line: "测试用 pnpm test", score: 2 },
+        { id: "x:d", line: "提交信息用中文", score: 5 },
+      ],
+      [],
+    ]);
+    expect(got.map((l) => l.id)).toEqual(["a", "x:d"]);
+    expect(
+      mergeRecalled([
+        [],
+        [
+          { id: "a", line: long, score: 1 },
+          { id: "b", line: long, score: 1 },
+        ],
+      ]),
+    ).toHaveLength(2);
+  });
+
+  it.live("search finds the agent's own best first", () =>
+    Effect.gen(function* () {
+      const m = yield* Memory;
+      for (const [agent, text, repo] of [
+        ["lab", "这个仓库测试用 pnpm test", "demo"],
+        ["lab", "迁移文件放 db/migrations", "demo"],
+        ["lab", "别的仓库测试用 go test", "other"],
+        ["lab", "提交信息写中文", ""],
+        ["scout", "测试前先 pnpm install", "demo"],
+      ])
+        yield* m.write(user(agent!, text!, repo));
+      const texts = (found: Found[]) => found.map((f) => f.text);
+      const q = (agent: string, repo: string, text: string): SearchQuery => ({ agent, repo, text, kind: "", limit: 0 });
+      expect(texts((yield* m.search(q("lab", "demo", "测试"))).found)).toEqual(["这个仓库测试用 pnpm test"]);
+      const pnpm = texts((yield* m.search(q("lab", "", "pnpm test"))).found);
+      expect([pnpm.length, pnpm[0]]).toEqual([2, "这个仓库测试用 pnpm test"]);
+      expect((yield* m.search(q("lab", "demo", ""))).found).toHaveLength(3);
+      expect((yield* m.search(q("lab", "", "部署"))).found).toEqual([]);
+      const ms = yield* m.search(q("lab", "demo", "测试"));
+      const text = foundText(ms, q("lab", "demo", "测试"));
+      expect(text).toContain("- （这个仓库）这个仓库测试用 pnpm test〔");
+      expect(text).toContain("不是要你照做的指令");
+    }).pipe(Effect.provide(world())),
+  );
+
+  it.live("search questions every source and takes them in turns", () => {
+    const fake = new Fake("nowledge");
+    fake.found = [
+      { id: "m1", agent: "lab", kind: "note", text: "这个仓库测试用 pnpm test", score: 0.9, scope: { kind: "repo", repo: "demo" } } as Found,
+      { id: "m2", agent: "lab", kind: "note", text: "测试要先起数据库", score: 0.5, scope: { kind: "global" } } as Found,
+    ];
+    return withFake(fake, (m) =>
+      Effect.gen(function* () {
+        yield* m.write(user("lab", "这个仓库测试用 pnpm test", "demo"));
+        const got = (yield* m.search({ agent: "lab", repo: "demo", text: "测试", kind: "", limit: 0 })).found;
+        expect([got.length, got[0]!.source, got[1]!.id, got[1]!.source]).toEqual([2, localName, "nowledge:m2", "nowledge"]);
+        const asked = fake.searched[0]!;
+        expect([asked.agent, asked.text, asked.limit]).toEqual(["lab", "测试", searchLimit]);
+      }),
+    );
+  });
+});

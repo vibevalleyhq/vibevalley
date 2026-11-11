@@ -19,7 +19,7 @@ import { playSound, SOUND_GROUPS, SOUND_LABEL } from "#/ui/pixel/sound.ts";
 import { styleProps } from "#/ui/positioner.ts";
 
 const buttonStyles = stylex.create({
-  base: { height: "calc(var(--spacing) * 7)", cursor: "pointer", paddingInline: "calc(var(--spacing) * 2.5)", fontSize: "12px" },
+  base: { height: "1.75rem", cursor: "pointer", paddingInline: "0.625rem", fontSize: "12px" },
   plain: {
     backgroundColor: { default: "var(--color-ink-800)", "@media (hover:hover)": { default: null, ":hover": "var(--color-ink-700)" } },
     color: "var(--color-paper)",
@@ -43,55 +43,49 @@ const buttonStyles = stylex.create({
   },
 });
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   panelAside: {
     position: "absolute",
-    top: "calc(var(--spacing) * 2)",
-    right: "calc(var(--spacing) * 2)",
-    bottom: "calc(var(--spacing) * 2)",
+    top: "0.5rem",
+    right: "0.5rem",
+    bottom: "0.5rem",
     zIndex: "50",
     display: "flex",
     width: "380px",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     overflow: "hidden",
     backgroundColor: {
       default: "var(--color-px-debug-surface)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink-950) 96%, transparent)",
     },
-    padding: "calc(var(--spacing) * 3)",
+    padding: "0.75rem",
     fontFamily: "var(--font-mono)",
     fontSize: "12px",
     color: "var(--color-paper)",
     boxShadow: "var(--shadow-px)",
   },
-});
-
-const variantStyles = stylex.create({
   panelDiv: {
     display: "flex",
     minHeight: "0",
     flex: "1",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     overflowY: "auto",
   },
-});
-
-const viewStyles = stylex.create({
   sectionSection: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
     borderColor: "var(--color-ink-700)",
-    paddingTop: "calc(var(--spacing) * 2)",
+    paddingTop: "0.5rem",
   },
   sectionHeader: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     fontSize: "11px",
     letterSpacing: "var(--tracking-wide)",
     color: "var(--color-ink-300)",
@@ -102,23 +96,23 @@ const viewStyles = stylex.create({
   panelHeader: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   panelSpan: {
     flex: "1",
     fontSize: "13px",
     color: "var(--color-hat)",
   },
-  panelDiv: {
+  panelDiv2: {
     display: "flex",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   panelInput: {
     accentColor: "var(--color-hat)",
   },
-  panelDiv2: {
+  panelDiv22: {
     display: "flex",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   panelSpan2: {
     color: "var(--color-ink-300)",
@@ -127,7 +121,7 @@ const viewStyles = stylex.create({
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   panelButton: {
     minWidth: "0",
@@ -148,25 +142,25 @@ const viewStyles = stylex.create({
   panelDiv4: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   panelOl: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
   },
   debugFrame: {
     display: "flex",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   panelSpan3: {
-    width: "calc(var(--spacing) * 8)",
+    width: "2rem",
     flexShrink: "0",
     textAlign: "right",
     color: "var(--color-ink-500)",
   },
   panelSpan4: {
-    width: "calc(var(--spacing) * 12)",
+    width: "3rem",
     flexShrink: "0",
     color: "var(--color-hat)",
   },
@@ -235,9 +229,9 @@ const btn = (tone: "plain" | "hat" | "bad" = "plain") => styleProps([buttonStyle
 
 function Section(props: { title: string; aside?: JSX.Element; children: JSX.Element }) {
   return (
-    <section aria-label={props.title} {...stylex.attrs(viewStyles.sectionSection)}>
-      <header {...stylex.attrs(viewStyles.sectionHeader)}>
-        <span {...stylex.attrs(viewStyles.sectionSpan)}>{props.title}</span>
+    <section aria-label={props.title} {...stylex.attrs(styles.sectionSection)}>
+      <header {...stylex.attrs(styles.sectionHeader)}>
+        <span {...stylex.attrs(styles.sectionSpan)}>{props.title}</span>
         {props.aside}
       </header>
       {props.children}
@@ -263,14 +257,14 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
     });
   const level = () => Math.round(frames.frame?.view.level.level ?? 1);
   return (
-    <aside aria-label={t("web.farm.debug.title")} data-testid="debug" {...stylex.attrs(recipeStyles.panelAside)}>
-      <header {...stylex.attrs(viewStyles.panelHeader)}>
-        <span {...stylex.attrs(viewStyles.panelSpan)}>{t("web.farm.debug.title")}</span>
+    <aside aria-label={t("web.farm.debug.title")} data-testid="debug" {...stylex.attrs(styles.panelAside)}>
+      <header {...stylex.attrs(styles.panelHeader)}>
+        <span {...stylex.attrs(styles.panelSpan)}>{t("web.farm.debug.title")}</span>
         <button type="button" data-testid="debug-close" {...btn()} onClick={() => props.onClose()}>
           {t("web.farm.debug.close")}
         </button>
       </header>
-      <div {...stylex.attrs(variantStyles.panelDiv)}>
+      <div {...stylex.attrs(styles.panelDiv)}>
         <Section
           title={t("web.farm.debug.call")}
           aside={
@@ -279,7 +273,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
             </span>
           }
         >
-          <div {...stylex.attrs(viewStyles.panelDiv)}>
+          <div {...stylex.attrs(styles.panelDiv2)}>
             <button type="button" {...btn("hat")} onClick={() => void act.run(() => api.orchestrator.open())}>
               {t("web.farm.debug.open")}
             </button>
@@ -297,9 +291,9 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
             step={0.005}
             value={day().tod}
             onInput={(e) => clock.setTimeOfDay(Number(e.currentTarget.value))}
-            {...stylex.attrs(viewStyles.panelInput)}
+            {...stylex.attrs(styles.panelInput)}
           />
-          <div {...stylex.attrs(viewStyles.panelDiv2)}>
+          <div {...stylex.attrs(styles.panelDiv22)}>
             <For
               each={
                 [
@@ -325,7 +319,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
           </div>
         </Section>
         <Section title={t("web.farm.debug.progress")} aside={<span>Lv.{level()}</span>}>
-          <div {...stylex.attrs(viewStyles.panelDiv)}>
+          <div {...stylex.attrs(styles.panelDiv2)}>
             <button type="button" data-testid="debug-level-up" {...btn()} onClick={() => localEffects.add({ kind: "levelUp", level: level() + 1 })}>
               {t("web.farm.debug.levelUp")}
             </button>
@@ -335,8 +329,9 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
               disabled={achievements().length === 0}
               onClick={() => {
                 const all = achievements();
-                const a = all[next() % all.length]!;
-                const t = a.tiers[0]!;
+                const a = all[next() % all.length];
+                const t = a?.tiers[0];
+                if (a === undefined || t === undefined) return;
                 setNext(next() + 1);
                 localEffects.add({
                   kind: "achievement",
@@ -356,12 +351,12 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
         </Section>
         <Section title={t("web.farm.debug.helpers", { n: sessions().length })}>
           <Show when={sessions().length === 0}>
-            <span {...stylex.attrs(viewStyles.panelSpan2)}>{t("web.farm.debug.nobody")}</span>
+            <span {...stylex.attrs(styles.panelSpan2)}>{t("web.farm.debug.nobody")}</span>
           </Show>
           <For each={sessions()}>
             {(h) => (
-              <div {...stylex.attrs(viewStyles.panelDiv3)}>
-                <button type="button" {...stylex.attrs(viewStyles.panelButton)} onClick={() => farm.select(h.id)}>
+              <div {...stylex.attrs(styles.panelDiv3)}>
+                <button type="button" {...stylex.attrs(styles.panelButton)} onClick={() => farm.select(h.id)}>
                   {h.id} {h.name} · {h.phase._tag}
                 </button>
                 <Show when={h.phase._tag === "done"}>
@@ -380,7 +375,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
           </For>
         </Section>
         <Section title={t("web.farm.debug.all")}>
-          <div {...stylex.attrs(viewStyles.panelDiv)}>
+          <div {...stylex.attrs(styles.panelDiv2)}>
             <button type="button" {...btn()} onClick={() => void everyone("stop")}>
               {t("web.farm.debug.haltAll")}
             </button>
@@ -392,7 +387,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
         <For each={SOUND_GROUPS}>
           {(g) => (
             <Section title={g.title}>
-              <div {...stylex.attrs(viewStyles.panelDiv4)}>
+              <div {...stylex.attrs(styles.panelDiv4)}>
                 <For each={g.names}>
                   {(n) => (
                     <button type="button" title={n} {...btn()} onClick={() => playSound(n)}>
@@ -407,7 +402,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
         <Section
           title={t("web.farm.debug.frames", { n: props.log.entries().length })}
           aside={
-            <span {...stylex.attrs(viewStyles.panelDiv2)}>
+            <span {...stylex.attrs(styles.panelDiv22)}>
               <button type="button" {...btn()} onClick={() => props.log.setPaused(!props.log.paused())}>
                 {props.log.paused() ? t("web.farm.debug.resume") : t("web.farm.debug.pause")}
               </button>
@@ -417,29 +412,26 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
               <button
                 type="button"
                 {...btn()}
-                onClick={() =>
-                  void navigator.clipboard
-                    .writeText(
-                      props.log
-                        .entries()
-                        .map((e) => JSON.stringify(e.json))
-                        .join("\n"),
-                    )
-                    .catch(() => undefined)
-                }
+                onClick={() => {
+                  const text = props.log
+                    .entries()
+                    .map((e) => JSON.stringify(e.json))
+                    .join("\n");
+                  void act.run(() => navigator.clipboard.writeText(text));
+                }}
               >
                 {t("web.farm.debug.copy")}
               </button>
             </span>
           }
         >
-          <ol {...stylex.attrs(viewStyles.panelOl)}>
+          <ol {...stylex.attrs(styles.panelOl)}>
             <For each={props.log.entries().slice(-200).toReversed()} keyed={(e) => e.seq}>
               {(e) => (
-                <li data-testid="debug-frame" data-type={e().type} {...stylex.attrs(viewStyles.debugFrame)}>
-                  <span {...stylex.attrs(viewStyles.panelSpan3)}>{e().seq}</span>
-                  <span {...stylex.attrs(viewStyles.panelSpan4)}>{e().type}</span>
-                  <span {...stylex.attrs(viewStyles.panelSpan5)}>{e().summary}</span>
+                <li data-testid="debug-frame" data-type={e().type} {...stylex.attrs(styles.debugFrame)}>
+                  <span {...stylex.attrs(styles.panelSpan3)}>{e().seq}</span>
+                  <span {...stylex.attrs(styles.panelSpan4)}>{e().type}</span>
+                  <span {...stylex.attrs(styles.panelSpan5)}>{e().summary}</span>
                 </li>
               )}
             </For>

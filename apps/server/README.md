@@ -36,7 +36,7 @@ Runtime assets resolve from the package root through `#package` in both source a
   outside the command line.
 - **Facts are read typed**: a subscriber switches on `ServerEvent`'s `type`, without casting its fields.
 - **Tests never reach a model or this machine's runtimes**: oar's `scriptedRuntime` plays the helpers, a scripted `Llm`
-  (`packages/ai/src/testing.ts`) the model, `gh` answers that it is not there.
+  (`packages/ai/src/testing/testing.ts`) the model, `gh` answers that it is not there.
 
 ## Commands
 

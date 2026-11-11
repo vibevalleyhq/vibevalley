@@ -11,13 +11,13 @@ import { Button } from "#/ui/Button.tsx";
 import { playFlashStream, type FlashPlaybackProgress } from "./flash-stream.ts";
 
 const viewStyles = stylex.create({
-  form: { display: "flex", minWidth: 0, flexDirection: "column", gap: "calc(var(--spacing) * 3)" },
-  notice: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", color: "var(--color-muted)" },
-  text: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)" },
-  detail: { fontSize: "var(--text-xs)", lineHeight: "var(--text-xs--line-height)", color: "var(--color-muted)" },
-  error: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", color: "var(--color-berry)" },
-  actions: { display: "flex", flexWrap: "wrap", gap: "calc(var(--spacing) * 2)" },
-  errorText: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", overflowWrap: "break-word", color: "var(--color-berry)" },
+  form: { display: "flex", minWidth: 0, flexDirection: "column", gap: "0.75rem" },
+  notice: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", color: "var(--color-muted)" },
+  text: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)" },
+  detail: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", color: "var(--color-muted)" },
+  error: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", color: "var(--color-berry)" },
+  actions: { display: "flex", flexWrap: "wrap", gap: "0.5rem" },
+  errorText: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", overflowWrap: "break-word", color: "var(--color-berry)" },
 });
 
 type PlaybackPhase = "idle" | "connecting" | "playing" | "draining" | "done" | "stopped" | "failed";

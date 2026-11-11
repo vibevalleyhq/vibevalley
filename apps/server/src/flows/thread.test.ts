@@ -6,14 +6,14 @@ import { SqlClient } from "effect/sql";
 import type * as T from "@vibevalley/protocol";
 import { channelOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
-import { Agent } from "#/agent/agent.ts";
 import { user } from "#/base/actor.ts";
-import { Channel } from "#/channel/channel.ts";
 import { Core } from "#/core/core.ts";
-import { Inbox } from "#/inbox/inbox.ts";
-import { Issue } from "#/issue/issue.ts";
-import { Mailbox } from "#/mailbox/mailbox.ts";
-import { Session } from "#/session/session.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { Channel } from "#/modules/channel/channel.ts";
+import { Inbox } from "#/modules/inbox/inbox.ts";
+import { Issue } from "#/modules/issue/issue.ts";
+import { Mailbox } from "#/modules/mailbox/mailbox.ts";
+import { Session } from "#/modules/session/session.ts";
 import { Said, testIssues } from "#/testing/world.ts";
 
 import { await_, farm, lab, until } from "./farm.ts";

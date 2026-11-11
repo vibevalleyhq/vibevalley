@@ -16,25 +16,25 @@ const viewStyles = stylex.create({
     display: "flex",
     minWidth: "0",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   dataTableDiv2: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   dataTableSpan: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   dataTableP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   dataTableDiv3: {
@@ -49,7 +49,7 @@ const viewStyles = stylex.create({
     minWidth: "100%",
     textAlign: "left",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   dataTableCaption: {
     clipPath: "inset(50%)",
@@ -65,16 +65,16 @@ const viewStyles = stylex.create({
   dataTableThead: {
     backgroundColor: "var(--color-hover)",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   dataTableTh: {
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
   },
   dataTableTh2: {
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
     fontWeight: "var(--font-weight-medium)",
   },
   dataTableTbodyStale: {
@@ -86,16 +86,16 @@ const viewStyles = stylex.create({
     borderColor: "var(--color-line)",
   },
   dataTableTd: {
-    padding: "calc(var(--spacing) * 3)",
+    padding: "0.75rem",
     color: "var(--color-muted)",
   },
   dataTableDiv4: {
     display: "flex",
     alignItems: "center",
     justifyContent: "flex-end",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
 });

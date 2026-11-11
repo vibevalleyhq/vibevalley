@@ -3,7 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { mossAudioTag, mossFrameSamples, mossTaggedFrameBytes, packTaggedAudio, unpackPcm16 } from "@vibevalley/provider/moss";
 
-import { jsonText, parsedJson } from "../json.ts";
+import { jsonText, parsedJson } from "../base/json.ts";
 import { heard, levelOf, type MossTurn } from "./moss-session.ts";
 import { MossEngine } from "./moss.ts";
 import { Playback } from "./playback.ts";

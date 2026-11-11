@@ -12,7 +12,7 @@ import { styleProps } from "./positioner";
 import { fragmentOf, remarkIssueRefs, remarkMentions, richen } from "./richText";
 
 const styles = stylex.create({
-  text: { minWidth: 0, fontSize: "var(--text-base)", lineHeight: "var(--text-base--line-height)", overflowWrap: "break-word" },
+  text: { minWidth: 0, fontSize: "var(--text-base)", lineHeight: "var(--leading-base)", overflowWrap: "break-word" },
 });
 
 // Raw HTML in the text is dropped (remark-rehype's default); the tree becomes DOM nodes directly, without innerHTML.

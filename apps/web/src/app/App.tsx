@@ -34,26 +34,23 @@ import { places } from "./places";
 import { Root } from "./Root";
 import { Shell } from "./Shell";
 
-const variantStyles = stylex.create({
+const styles = stylex.create({
   missingPageLink: {
     color: "var(--color-accent)",
     textDecorationLine: "underline",
   },
-});
-
-const viewStyles = stylex.create({
   routeMissing: {
     display: "grid",
     height: "100%",
     placeContent: "center",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
     backgroundColor: "var(--color-page)",
-    padding: "calc(var(--spacing) * 6)",
+    padding: "1.5rem",
     color: "var(--color-ink)",
   },
   missingPageH1: {
     fontSize: "var(--text-lg)",
-    lineHeight: "var(--text-lg--line-height)",
+    lineHeight: "var(--leading-lg)",
     fontWeight: "var(--font-weight-semibold)",
   },
   appDiv: {
@@ -98,9 +95,9 @@ function RepoFarm() {
 
 function MissingPage(props: { invalid?: boolean }) {
   return (
-    <main data-testid="route-missing" {...stylex.attrs(viewStyles.routeMissing)}>
-      <h1 {...stylex.attrs(viewStyles.missingPageH1)}>{props.invalid === true ? t("web.base.route.invalid") : t("web.base.route.missing")}</h1>
-      <Link href="/" {...stylex.attrs(variantStyles.missingPageLink)}>
+    <main data-testid="route-missing" {...stylex.attrs(styles.routeMissing)}>
+      <h1 {...stylex.attrs(styles.missingPageH1)}>{props.invalid === true ? t("web.base.route.invalid") : t("web.base.route.missing")}</h1>
+      <Link href="/" {...stylex.attrs(styles.missingPageLink)}>
         {t("web.base.route.home")}
       </Link>
     </main>
@@ -121,7 +118,7 @@ const routes: readonly RouteDefinition[] = [
       { path: farmRoute, meta: { skin: "farm" }, component: RepoFarm },
       page("/issues", "issues", (rest) => <IssuesPage rest={rest()} />, issueSearch),
       page("/chat", "chat", () => (
-        <div {...stylex.attrs(viewStyles.appDiv)}>
+        <div {...stylex.attrs(styles.appDiv)}>
           <ChatPage />
         </div>
       )),

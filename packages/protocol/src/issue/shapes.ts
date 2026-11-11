@@ -38,7 +38,7 @@ export interface IssueMandate {
 }
 
 export const IssueReportMemoryScopeValues = ["repo", "all"] as const;
-export type IssueReportMemoryScope = (typeof IssueReportMemoryScopeValues)[number];
+type IssueReportMemoryScope = (typeof IssueReportMemoryScopeValues)[number];
 
 export interface IssueReportMemory {
   text: string;
@@ -76,7 +76,7 @@ export interface Issue {
   createdAt: number;
   queuedAt?: number;
   closedAt?: number;
-  delivered?: Delivery;
+  delivered?: Landing;
   canceled?: IssueCanceled;
   parent?: IssueId;
   blockedBy: IssueId[];
@@ -227,8 +227,8 @@ export interface IssueRequest {
 export const DeliverableValues = ["change", "branch", "answer", "pull_request"] as const;
 export type Deliverable = (typeof DeliverableValues)[number];
 
-export const DeliveryValues = ["merged", "merged_into_parent", "pull_request", "submitted", "kept", "none"] as const;
-export type Delivery = (typeof DeliveryValues)[number];
+export const LandingValues = ["merged", "merged_into_parent", "pull_request", "submitted", "kept", "none"] as const;
+export type Landing = (typeof LandingValues)[number];
 
 export const IssueCanceledValues = ["dismissed", "lost"] as const;
 export type IssueCanceled = (typeof IssueCanceledValues)[number];
@@ -312,8 +312,8 @@ export interface FactIssueRemoved {
 }
 
 export type IssueWatch =
-  | { kind: "history"; session: string; events: SessionEvent[] }
-  | { kind: "state"; issue: Issue; sessions: Session[]; sessionIds: string[]; settled: boolean; omittedSessions: number }
-  | { kind: "event"; session: string; event: SessionEvent }
-  | { kind: "gap"; session: string; before?: number }
-  | { kind: "missing"; issue: string };
+  | { kind: "history"; session: SessionId; events: SessionEvent[] }
+  | { kind: "state"; issue: Issue; sessions: Session[]; sessionIds: SessionId[]; settled: boolean; omittedSessions: number }
+  | { kind: "event"; session: SessionId; event: SessionEvent }
+  | { kind: "gap"; session: SessionId; before?: number }
+  | { kind: "missing"; issue: IssueId };

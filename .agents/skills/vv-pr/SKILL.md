@@ -5,7 +5,7 @@ description: 给 VibeValley 开、改、合 PR：默认把同一批工作的改�
 
 # 开 PR
 
-能查的已经由 `scripts/commit-msg.ts` 查了（本机的 commit-msg hook、CI 的 `check`）：标题英文、最多 100 字、不带句号；正文有三段、是英文；分支名 `<类>/<主题>`；不带 agent 的署名。规矩的家在 [docs/development.md](docs/development.md#分支提交和-pr)。这里只写要判断的：同批改动怎样合在一个 PR、标题和正文写什么、合之前看什么。
+能查的已经由 `scripts/docs/commit-msg.ts` 查了（本机的 commit-msg hook、CI 的 `check`）：标题英文、最多 100 字、不带句号；正文有三段、是英文；分支名 `<类>/<主题>`；不带 agent 的署名。规矩的家在 [docs/development.md](docs/development.md#分支提交和-pr)。这里只写要判断的：同批改动怎样合在一个 PR、标题和正文写什么、合之前看什么。
 
 ## 1. 尽量少 PR
 
@@ -35,7 +35,7 @@ description: 给 VibeValley 开、改、合 PR：默认把同一批工作的改�
 - `## What changed`：现在的行为和为什么；一处问题一条，说清以前会怎样（输入、结果），现在怎样。链接 Agent Note 或 issue。看过、决定不改的，也写一句和理由，下一个人不用再查一遍。
 - `## Checks`：跑了的命令和它们打出的结果（`vp check`、`server:check` 的通过数）。先写测试的，写修之前它报什么（`expected 'still waiting' to contain …`）；改了接口、服务、页面，附 [vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 要的证据。
 - `## Not verified`：没验的和原因（真机、花钱的评测、真的厂商）。都验了写 `None.`。
-- `## Regression`（要的时候才有）：这个 PR 删了或改了名字以 `regression: ` 开头的测试，逐个写出测试名和为什么（行为有意改了、挪了地方）；`fix/` 没补回归测试时写为什么补不了。CI 的 `scripts/regression.ts` 查。
+- `## Regression`（要的时候才有）：这个 PR 删了或改了名字以 `regression: ` 开头的测试，逐个写出测试名和为什么（行为有意改了、挪了地方）；`fix/` 没补回归测试时写为什么补不了。CI 的 `scripts/release/regression.ts` 查。
 
 `fix/` 先写回归测试：名字 `regression: <修好以后一直成立的事>`，修之前跑一次看它失败，把失败的输出写进 `## Checks`，再修。被改动牵连到别的回归测试时，先想是不是代码改错了：测试守的是一个修过的缺陷，改它要有行为上的理由，不是为了变绿。
 

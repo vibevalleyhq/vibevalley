@@ -8,8 +8,8 @@
       "default": "./src/realtime/turns.ts"
     },
     "./audio": {
-      "types": "./dist/audio.d.ts",
-      "default": "./src/audio.ts"
+      "types": "./dist/audio/audio.d.ts",
+      "default": "./src/audio/audio.ts"
     },
     "./realtime/moss": {
       "types": "./dist/realtime/moss.d.ts",
@@ -24,36 +24,36 @@
       "default": "./src/realtime/playback.ts"
     },
     "./transcription": {
-      "types": "./dist/transcription.d.ts",
-      "default": "./src/transcription.ts"
+      "types": "./dist/audio/transcription.d.ts",
+      "default": "./src/audio/transcription.ts"
     },
     "./client": {
-      "types": "./dist/client.d.ts",
-      "default": "./src/client.ts"
+      "types": "./dist/llm/client.d.ts",
+      "default": "./src/llm/client.ts"
     },
     "./llm": {
-      "types": "./dist/llm.d.ts",
-      "default": "./src/llm.ts"
+      "types": "./dist/llm/llm.d.ts",
+      "default": "./src/llm/llm.ts"
     },
     "./messages": {
-      "types": "./dist/messages.d.ts",
-      "default": "./src/messages.ts"
+      "types": "./dist/base/messages.d.ts",
+      "default": "./src/base/messages.ts"
     },
     "./models": {
-      "types": "./dist/models.d.ts",
-      "default": "./src/models.ts"
+      "types": "./dist/base/models.d.ts",
+      "default": "./src/base/models.ts"
     },
     "./response": {
-      "types": "./dist/response.d.ts",
-      "default": "./src/response.ts"
+      "types": "./dist/llm/response.d.ts",
+      "default": "./src/llm/response.ts"
     },
     "./testing": {
-      "types": "./dist/testing.d.ts",
-      "default": "./src/testing.ts"
+      "types": "./dist/testing/testing.d.ts",
+      "default": "./src/testing/testing.ts"
     },
     "./tools": {
-      "types": "./dist/tools.d.ts",
-      "default": "./src/tools.ts"
+      "types": "./dist/base/tools.d.ts",
+      "default": "./src/base/tools.ts"
     }
   },
   "dependencies": {

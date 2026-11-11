@@ -1,8 +1,8 @@
 import { t } from "@vibevalley/i18n";
 
 import { setStart, StartValues, usePrefs } from "#/state/prefs.ts";
+import { SettingRow, SettingsGroup, SettingsPage } from "#/ui/domain/settings.tsx";
 import { Segmented } from "#/ui/Segmented.tsx";
-import { SettingRow, SettingsGroup, SettingsPage } from "#/ui/settings.tsx";
 
 import { LanguageChoice } from "./SettingsForm";
 

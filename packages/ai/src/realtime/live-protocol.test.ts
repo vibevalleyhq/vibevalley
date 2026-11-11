@@ -3,7 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { mossTaggedFrameBytes } from "@vibevalley/provider/moss";
 
-import { jsonText, parsedJson } from "../json.ts";
+import { jsonText, parsedJson } from "../base/json.ts";
 import { MossEngine } from "./moss.ts";
 import { Playback } from "./playback.ts";
 

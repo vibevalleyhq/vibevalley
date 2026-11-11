@@ -3,66 +3,63 @@ import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import type { ChatMessage, SpaceState, Issue, Outcome } from "@vibevalley/protocol";
-import { defaultOf, sessionIdsOf } from "@vibevalley/protocol/rules";
+import { actorRoleOf, defaultOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 
 import { spentText } from "#/base/format.ts";
 import { useFollowed, useReports } from "#/features/channel/index.ts";
 import { useAgent } from "#/infra/agents.ts";
 import { useCore } from "#/infra/frame.ts";
-import { AgentFace, OrchestratorFace } from "#/ui/Face.tsx";
+import { AgentFace, OrchestratorFace } from "#/ui/domain/Face.tsx";
 import { DashedLine, PxMarkdown } from "#/ui/pixel/index.ts";
 
 import { clockOf, FarmEmpty, FarmTag } from "./rows";
 
-const variantStyles = stylex.create({
-  saidDiv: {
-    marginTop: "calc(var(--spacing) * .5)",
+const styles = stylex.create({
+  saidBody: {
+    marginTop: "0.125rem",
     fontSize: "13px",
   },
-  saidDivVariant: {
+  saidYou: {
     color: "var(--color-bark-900)",
   },
-  saidDivVariant2: {
+  saidOrchestrator: {
     color: "var(--color-bark-800)",
   },
-  reportP: {
+  reportSummary: {
     WebkitLineClamp: "4",
     WebkitBoxOrient: "vertical",
     display: "-webkit-box",
     overflow: "hidden",
     fontSize: "12px",
   },
-  reportPVariant: {
+  reportFailed: {
     color: "var(--color-berry)",
   },
-  reportPVariant2: {
+  reportNormal: {
     color: "var(--color-bark-600)",
   },
-});
-
-const viewStyles = stylex.create({
-  farmLogDiv: {
+  list: {
     display: "flex",
     flexDirection: "column",
   },
-  farmLogDiv2: {
+  row: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 2.5)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    gap: "0.625rem",
+    paddingBlock: "0.5rem",
   },
-  farmLogSpan: {
-    width: "calc(var(--spacing) * 11)",
+  clock: {
+    width: "2.75rem",
     flexShrink: "0",
-    paddingTop: "calc(var(--spacing) * 1.5)",
+    paddingTop: "0.375rem",
     textAlign: "right",
     fontSize: "12px",
     color: "var(--color-bark-400)",
   },
-  saidSpan: {
+  youBadge: {
     display: "flex",
-    height: "calc(var(--spacing) * 8)",
-    width: "calc(var(--spacing) * 8)",
+    height: "2rem",
+    width: "2rem",
     flexShrink: "0",
     alignItems: "center",
     justifyContent: "center",
@@ -70,32 +67,47 @@ const viewStyles = stylex.create({
     fontSize: "12px",
     color: "var(--color-bark-900)",
   },
-  saidDiv: {
+  content: {
     minWidth: "0",
     flex: "1",
   },
-  saidDiv2: {
+  header: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
-  saidSpan2: {
+  author: {
     fontSize: "13px",
   },
-  reportP: {
-    marginTop: "calc(var(--spacing) * .5)",
+  saidTag: {
+    color: "var(--color-bark-600)",
+  },
+  tagCompleted: {
+    backgroundColor: "var(--color-log-ok-fill)",
+    color: "var(--color-bark-900)",
+  },
+  tagFailed: {
+    backgroundColor: "var(--color-log-fail-fill)",
+    color: "var(--color-berry-500)",
+  },
+  tagInterrupted: {
+    backgroundColor: "var(--color-cream-200)",
+    color: "var(--color-bark-600)",
+  },
+  issueTitle: {
+    marginTop: "0.125rem",
     fontSize: "13px",
   },
-  reportP2: {
+  spent: {
     fontSize: "12px",
     color: "var(--color-bark-400)",
   },
 });
 
-const outcomeTag: Record<Outcome, [text: string, fill: string, ink: string]> = {
-  completed: [t("shared.outcome.completed"), "#efcf92", "#2f1f13"],
-  failed: [t("shared.outcome.failed"), "#f0cda6", "#c84a3a"],
-  interrupted: [t("shared.outcome.interrupted"), "#e2c995", "#67482d"],
+const outcomeTag: Record<Outcome, [text: string, look: stylex.StyleXStyles]> = {
+  completed: [t("shared.outcome.completed"), styles.tagCompleted],
+  failed: [t("shared.outcome.failed"), styles.tagFailed],
+  interrupted: [t("shared.outcome.interrupted"), styles.tagInterrupted],
 };
 
 const issueOfSession = (s: SpaceState | undefined, session: string): Issue | undefined =>
@@ -110,21 +122,21 @@ export function FarmLog() {
   const rows = (): Row[] =>
     [
       ...general()
-        .messages.filter((m) => m.kind === "chat" && (m.fromKind === "user" || m.fromRole === "orchestrator"))
+        .messages.filter((m) => m.kind === "chat" && (m.actor.kind === "user" || actorRoleOf(m.actor) === "orchestrator"))
         .map((message) => ({ kind: "said" as const, message })),
       ...reports().map((message) => ({ kind: "report" as const, message })),
     ].toSorted((a, b) => b.message.at - a.message.at);
   return (
     <Show when={rows().length > 0} fallback={<FarmEmpty text={t("web.farm.log.empty")} />}>
-      <div {...stylex.attrs(viewStyles.farmLogDiv)}>
+      <div {...stylex.attrs(styles.list)}>
         <For each={rows().slice(0, 80)} keyed={(row) => row.message.id}>
           {(row, i) => (
             <div>
               <Show when={i() > 0}>
                 <DashedLine />
               </Show>
-              <div {...stylex.attrs(viewStyles.farmLogDiv2)}>
-                <span {...stylex.attrs(viewStyles.farmLogSpan)}>{clockOf(row().message.at)}</span>
+              <div {...stylex.attrs(styles.row)}>
+                <span {...stylex.attrs(styles.clock)}>{clockOf(row().message.at)}</span>
                 <Show
                   when={row().kind === "said"}
                   fallback={<Report r={row().message} issue={issueOfSession(core(), row().message.session ?? row().message.from)} />}
@@ -141,18 +153,18 @@ export function FarmLog() {
 }
 
 function Said(props: { m: ChatMessage }) {
-  const you = () => props.m.fromKind === "user";
+  const you = () => props.m.actor.kind === "user";
   return (
     <>
       <Show when={you()} fallback={<OrchestratorFace size={32} agent={props.m.from} />}>
-        <span {...stylex.attrs(viewStyles.saidSpan)}>{t("web.farm.log.you")}</span>
+        <span {...stylex.attrs(styles.youBadge)}>{t("web.farm.log.you")}</span>
       </Show>
-      <div {...stylex.attrs(viewStyles.saidDiv)}>
-        <div {...stylex.attrs(viewStyles.saidDiv2)}>
-          <span {...stylex.attrs(viewStyles.saidSpan2)}>{you() ? t("web.farm.log.you") : t("web.farm.orchestrator")}</span>
-          <FarmTag text={you() ? t("web.farm.log.said") : t("web.farm.log.answered")} ink="#67482d" />
+      <div {...stylex.attrs(styles.content)}>
+        <div {...stylex.attrs(styles.header)}>
+          <span {...stylex.attrs(styles.author)}>{you() ? t("web.farm.log.you") : t("web.farm.orchestrator")}</span>
+          <FarmTag text={you() ? t("web.farm.log.said") : t("web.farm.log.answered")} styles={styles.saidTag} />
         </div>
-        <div {...stylex.attrs(variantStyles.saidDiv, you() ? variantStyles.saidDivVariant : variantStyles.saidDivVariant2)}>
+        <div {...stylex.attrs(styles.saidBody, you() ? styles.saidYou : styles.saidOrchestrator)}>
           <PxMarkdown text={props.m.text} />
         </div>
       </div>
@@ -169,16 +181,14 @@ function Report(props: { r: ChatMessage; issue?: Issue | undefined }) {
   return (
     <>
       <AgentFace agentId={agentId() ?? ""} look={agent()?.look} runtime={session()?.runtime ?? agent()?.runtime} size={32} />
-      <div {...stylex.attrs(viewStyles.saidDiv)}>
-        <div {...stylex.attrs(viewStyles.saidDiv2)}>
-          <span {...stylex.attrs(viewStyles.saidSpan2)}>{props.r.name}</span>
-          <FarmTag text={outcomeTag[outcome()][0]} fill={outcomeTag[outcome()][1]} ink={outcomeTag[outcome()][2]} />
+      <div {...stylex.attrs(styles.content)}>
+        <div {...stylex.attrs(styles.header)}>
+          <span {...stylex.attrs(styles.author)}>{props.r.name}</span>
+          <FarmTag text={outcomeTag[outcome()][0]} styles={outcomeTag[outcome()][1]} />
         </div>
-        <Show when={props.issue}>
-          <p {...stylex.attrs(viewStyles.reportP)}>{props.issue!.title}</p>
-        </Show>
-        <p {...stylex.attrs(variantStyles.reportP, outcome() === "failed" ? variantStyles.reportPVariant : variantStyles.reportPVariant2)}>{props.r.text}</p>
-        <Show when={props.r.spent}>{(spent) => <p {...stylex.attrs(viewStyles.reportP2)}>{t("web.farm.log.spent", { spent: spentText(spent()) })}</p>}</Show>
+        <Show when={props.issue}>{(issue) => <p {...stylex.attrs(styles.issueTitle)}>{issue().title}</p>}</Show>
+        <p {...stylex.attrs(styles.reportSummary, outcome() === "failed" ? styles.reportFailed : styles.reportNormal)}>{props.r.text}</p>
+        <Show when={props.r.spent}>{(spent) => <p {...stylex.attrs(styles.spent)}>{t("web.farm.log.spent", { spent: spentText(spent()) })}</p>}</Show>
       </div>
     </>
   );

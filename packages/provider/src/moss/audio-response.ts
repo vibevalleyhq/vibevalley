@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 
-import { readMossResponse } from "./response.ts";
+import { MossErrorOutcome, MossErrorReason, readMossResponse } from "./response.ts";
 import { mossSpeechFormats } from "./speech-models.ts";
 
 export const AudioId = Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9_-]{1,256}$/u));
@@ -18,8 +18,8 @@ const ErrorCode = Schema.Literals([
 ]);
 const ErrorBody = Schema.fromJsonString(Schema.Struct({ error: Schema.Struct({ code: ErrorCode }) }));
 export class MossAudioError extends Schema.TaggedError<MossAudioError, { readonly brand: unique symbol }>()("MossAudioError", {
-  reason: Schema.Literals(["Credentials", "InvalidInput", "Network", "Timeout", "HttpStatus", "InvalidResponse", "TooLarge"]),
-  outcome: Schema.Literals(["NotSubmitted", "Rejected", "Unknown"]),
+  reason: MossErrorReason,
+  outcome: MossErrorOutcome,
   status: Schema.optionalKey(Schema.Int),
   code: Schema.optionalKey(ErrorCode),
 }) {}

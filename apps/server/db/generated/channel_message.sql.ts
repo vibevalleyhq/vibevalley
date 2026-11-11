@@ -4,7 +4,7 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
-import { Words_channel_message_kind, Words_channel_participant_kind, Words_channel_subject_kind, Words_channel_type } from "./types.js"
+import { Words_channel_message_kind, Words_channel_participant_kind, Words_channel_participant_role, Words_channel_subject_kind, Words_channel_type } from "./types.js"
 
 export const InsertMessageParams = Schema.Struct({
   ["id"]: Schema.String,
@@ -79,12 +79,13 @@ export const MessageByIDResult = Schema.Struct({
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Words_channel_participant_kind,
+  ["sender_role"]: Schema.NullOr(Words_channel_participant_role),
   ["sender_agent"]: Schema.NullOr(Schema.String),
 })
 export type MessageByIDResult = typeof MessageByIDResult.Type
 
 
-export const MessageByIDSql = "-- name: MessageByID :one\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.id = $1;"
+export const MessageByIDSql = "-- name: MessageByID :one\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.id = $1;"
 
 export const messageByID = Effect.fn("MessageByID")(function* (params: MessageByIDParams) {
   const sql = yield* SqlClient.SqlClient
@@ -120,12 +121,13 @@ export const MessageBySendKeyResult = Schema.Struct({
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Words_channel_participant_kind,
+  ["sender_role"]: Schema.NullOr(Words_channel_participant_role),
   ["sender_agent"]: Schema.NullOr(Schema.String),
 })
 export type MessageBySendKeyResult = typeof MessageBySendKeyResult.Type
 
 
-export const MessageBySendKeySql = "-- name: MessageBySendKey :one\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.sender_id = $1 and m.send_key = $2;"
+export const MessageBySendKeySql = "-- name: MessageBySendKey :one\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.sender_id = $1 and m.send_key = $2;"
 
 export const messageBySendKey = Effect.fn("MessageBySendKey")(function* (params: MessageBySendKeyParams) {
   const sql = yield* SqlClient.SqlClient
@@ -160,6 +162,7 @@ export const UserMentionsResult = Schema.Struct({
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Words_channel_participant_kind,
+  ["sender_role"]: Schema.NullOr(Words_channel_participant_role),
   ["sender_agent"]: Schema.NullOr(Schema.String),
   ["channel_type"]: Words_channel_type,
   ["root_number"]: Schema.NullOr(Schema.Int),
@@ -169,7 +172,7 @@ export const UserMentionsResult = Schema.Struct({
 export type UserMentionsResult = typeof UserMentionsResult.Type
 
 
-export const UserMentionsSql = "-- name: UserMentions :many\n-- bound: only the user's unread mentions; reading or replying in the channel completes them.\n-- The user's unresolved mentions, independently of the history window. Reading or replying in that channel completes them.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,\n       c.type as channel_type, c.root_number, coalesce(c.parent_id, c.id)::text as top_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_mention n\njoin channel_message m on m.id = n.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nleft join channel_read_cursor r on r.participant_id = 'user' and r.channel_id = c.id\nwhere n.target_id = 'user' and m.sender_id <> 'user'\n  and m.number > coalesce(r.read_number, 0)\n  and not exists (select 1 from channel_message reply where reply.channel_id = c.id and reply.sender_id = 'user' and reply.number > m.number)\norder by m.id;"
+export const UserMentionsSql = "-- name: UserMentions :many\n-- bound: only the user's unread mentions; reading or replying in the channel completes them.\n-- The user's unresolved mentions, independently of the history window. Reading or replying in that channel completes them.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent,\n       c.type as channel_type, c.root_number, coalesce(c.parent_id, c.id)::text as top_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_mention n\njoin channel_message m on m.id = n.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nleft join channel_read_cursor r on r.participant_id = 'user' and r.channel_id = c.id\nwhere n.target_id = 'user' and m.sender_id <> 'user'\n  and m.number > coalesce(r.read_number, 0)\n  and not exists (select 1 from channel_message reply where reply.channel_id = c.id and reply.sender_id = 'user' and reply.number > m.number)\norder by m.id;"
 
 export const userMentions = Effect.fn("UserMentions")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -206,12 +209,13 @@ export const MessagesBeforeResult = Schema.Struct({
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Words_channel_participant_kind,
+  ["sender_role"]: Schema.NullOr(Words_channel_participant_role),
   ["sender_agent"]: Schema.NullOr(Schema.String),
 })
 export type MessagesBeforeResult = typeof MessagesBeforeResult.Type
 
 
-export const MessagesBeforeSql = "-- name: MessagesBefore :many\n-- Newest first.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number < $2 order by m.number desc limit $3::int;"
+export const MessagesBeforeSql = "-- name: MessagesBefore :many\n-- Newest first.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number < $2 order by m.number desc limit $3::int;"
 
 export const messagesBefore = Effect.fn("MessagesBefore")(function* (params: MessagesBeforeParams) {
   const sql = yield* SqlClient.SqlClient
@@ -248,12 +252,13 @@ export const MessagesAfterResult = Schema.Struct({
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Words_channel_participant_kind,
+  ["sender_role"]: Schema.NullOr(Words_channel_participant_role),
   ["sender_agent"]: Schema.NullOr(Schema.String),
 })
 export type MessagesAfterResult = typeof MessagesAfterResult.Type
 
 
-export const MessagesAfterSql = "-- name: MessagesAfter :many\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number > $2 order by m.number limit $3::int;"
+export const MessagesAfterSql = "-- name: MessagesAfter :many\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number > $2 order by m.number limit $3::int;"
 
 export const messagesAfter = Effect.fn("MessagesAfter")(function* (params: MessagesAfterParams) {
   const sql = yield* SqlClient.SqlClient
@@ -290,12 +295,13 @@ export const MissingDirectDeliveriesResult = Schema.Struct({
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Words_channel_participant_kind,
+  ["sender_role"]: Schema.NullOr(Words_channel_participant_role),
   ["sender_agent"]: Schema.NullOr(Schema.String),
 })
 export type MissingDirectDeliveriesResult = typeof MissingDirectDeliveriesResult.Type
 
 
-export const MissingDirectDeliveriesSql = "-- name: MissingDirectDeliveries :many\n-- bound: user messages committed after a direct session's startup snapshot, without a delivery to that session.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent\nfrom channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number > $2\n  and m.sender_id = 'user' and m.kind = 'chat' and m.deleted_at is null\n  and not exists (select 1 from mailbox_delivery d where d.session_id = $3 and d.message_id = m.id)\norder by m.number;"
+export const MissingDirectDeliveriesSql = "-- name: MissingDirectDeliveries :many\n-- bound: user messages committed after a direct session's startup snapshot, without a delivery to that session.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent\nfrom channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number > $2\n  and m.sender_id = 'user' and m.kind = 'chat' and m.deleted_at is null\n  and not exists (select 1 from mailbox_delivery d where d.session_id = $3 and d.message_id = m.id)\norder by m.number;"
 
 export const missingDirectDeliveries = Effect.fn("MissingDirectDeliveries")(function* (params: MissingDirectDeliveriesParams) {
   const sql = yield* SqlClient.SqlClient
@@ -330,12 +336,13 @@ export const RecentReportsResult = Schema.Struct({
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Words_channel_participant_kind,
+  ["sender_role"]: Schema.NullOr(Words_channel_participant_role),
   ["sender_agent"]: Schema.NullOr(Schema.String),
 })
 export type RecentReportsResult = typeof RecentReportsResult.Type
 
 
-export const RecentReportsSql = "-- name: RecentReports :many\n-- Newest first: the turn reports anywhere on the farm, for its log.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.kind = 'report' order by m.id desc limit $1::int;"
+export const RecentReportsSql = "-- name: RecentReports :many\n-- Newest first: the turn reports anywhere on the farm, for its log.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.kind = 'report' order by m.id desc limit $1::int;"
 
 export const recentReports = Effect.fn("RecentReports")(function* (params: RecentReportsParams) {
   const sql = yield* SqlClient.SqlClient
@@ -371,12 +378,13 @@ export const ReportsAfterResult = Schema.Struct({
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Words_channel_participant_kind,
+  ["sender_role"]: Schema.NullOr(Words_channel_participant_role),
   ["sender_agent"]: Schema.NullOr(Schema.String),
 })
 export type ReportsAfterResult = typeof ReportsAfterResult.Type
 
 
-export const ReportsAfterSql = "-- name: ReportsAfter :many\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.kind = 'report' and m.id > $1 order by m.id limit $2::int;"
+export const ReportsAfterSql = "-- name: ReportsAfter :many\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.kind = 'report' and m.id > $1 order by m.id limit $2::int;"
 
 export const reportsAfter = Effect.fn("ReportsAfter")(function* (params: ReportsAfterParams) {
   const sql = yield* SqlClient.SqlClient
@@ -497,7 +505,7 @@ export const CalledByResult = Schema.Struct({
 export type CalledByResult = typeof CalledByResult.Type
 
 
-export const CalledBySql = "-- name: CalledBy :one\n-- The session who last @-ed the speaker here since the speaker last spoke.\nselect m.sender_id\nfrom channel_message m\njoin channel_mention n on n.message_id = m.id and n.target_id = $1\njoin channel_participant p on p.id = m.sender_id and p.kind = 'session'\nwhere m.channel_id = $2 and m.sender_id <> $1 and m.id < $3\n  and m.id > coalesce((select max(s.id) from channel_message s where s.channel_id = $2 and s.sender_id = $1 and s.id < $3), '')\norder by m.id desc\nlimit 1;"
+export const CalledBySql = "-- name: CalledBy :one\n-- The session who last @-ed the speaker here since the speaker last spoke.\nselect m.sender_id\nfrom channel_message m\njoin channel_mention n on n.message_id = m.id and n.target_id = $1\njoin channel_participant p on p.id = m.sender_id and p.role = 'worker' and p.runtime is not null\nwhere m.channel_id = $2 and m.sender_id <> $1 and m.id < $3\n  and m.id > coalesce((select max(s.id) from channel_message s where s.channel_id = $2 and s.sender_id = $1 and s.id < $3), '')\norder by m.id desc\nlimit 1;"
 
 export const calledBy = Effect.fn("CalledBy")(function* (params: CalledByParams) {
   const sql = yield* SqlClient.SqlClient
@@ -580,12 +588,13 @@ export const MessageByNumberResult = Schema.Struct({
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Words_channel_participant_kind,
+  ["sender_role"]: Schema.NullOr(Words_channel_participant_role),
   ["sender_agent"]: Schema.NullOr(Schema.String),
 })
 export type MessageByNumberResult = typeof MessageByNumberResult.Type
 
 
-export const MessageByNumberSql = "-- name: MessageByNumber :one\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number = $2;"
+export const MessageByNumberSql = "-- name: MessageByNumber :one\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number = $2;"
 
 export const messageByNumber = Effect.fn("MessageByNumber")(function* (params: MessageByNumberParams) {
   const sql = yield* SqlClient.SqlClient
@@ -622,12 +631,13 @@ export const MessagesChangedAfterResult = Schema.Struct({
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Words_channel_participant_kind,
+  ["sender_role"]: Schema.NullOr(Words_channel_participant_role),
   ["sender_agent"]: Schema.NullOr(Schema.String),
 })
 export type MessagesChangedAfterResult = typeof MessagesChangedAfterResult.Type
 
 
-export const MessagesChangedAfterSql = "-- name: MessagesChangedAfter :many\n-- What changed in a channel after a revision, in the order it changed: a follower's catch-up.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.revision > $2 order by m.revision limit $3::int;"
+export const MessagesChangedAfterSql = "-- name: MessagesChangedAfter :many\n-- What changed in a channel after a revision, in the order it changed: a follower's catch-up.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.revision > $2 order by m.revision limit $3::int;"
 
 export const messagesChangedAfter = Effect.fn("MessagesChangedAfter")(function* (params: MessagesChangedAfterParams) {
   const sql = yield* SqlClient.SqlClient
@@ -735,12 +745,13 @@ export const PinnedInResult = Schema.Struct({
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Words_channel_participant_kind,
+  ["sender_role"]: Schema.NullOr(Words_channel_participant_role),
   ["sender_agent"]: Schema.NullOr(Schema.String),
 })
 export type PinnedInResult = typeof PinnedInResult.Type
 
 
-export const PinnedInSql = "-- name: PinnedIn :many\n-- bound: one channel's pins, each one pinned by hand.\n-- Newest pinned first.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.pinned_at is not null order by m.pinned_at desc;"
+export const PinnedInSql = "-- name: PinnedIn :many\n-- bound: one channel's pins, each one pinned by hand.\n-- Newest pinned first.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.pinned_at is not null order by m.pinned_at desc;"
 
 export const pinnedIn = Effect.fn("PinnedIn")(function* (params: PinnedInParams) {
   const sql = yield* SqlClient.SqlClient
@@ -783,6 +794,7 @@ export const SearchMessagesResult = Schema.Struct({
   ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Words_channel_participant_kind,
+  ["sender_role"]: Schema.NullOr(Words_channel_participant_role),
   ["sender_agent"]: Schema.NullOr(Schema.String),
   ["channel_type"]: Words_channel_type,
   ["root_number"]: Schema.NullOr(Schema.Int),
@@ -792,7 +804,7 @@ export const SearchMessagesResult = Schema.Struct({
 export type SearchMessagesResult = typeof SearchMessagesResult.Type
 
 
-export const SearchMessagesSql = "-- name: SearchMessages :many\n-- Newest first: messages with these words, anywhere on the farm or in one channel and its threads.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,\n       c.type as channel_type, c.root_number, coalesce(c.parent_id, c.id)::text as top_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_message m\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nwhere m.deleted_at is null and m.kind <> 'notice'\n  and ($1::text = '' or strpos(lower(m.body), lower($1)) > 0)\n  and ($2::text = '' or c.id = $2 or c.parent_id = $2)\n  and ($3::text = '' or m.sender_id = $3 or lower(p.name) = lower($3))\n  and (not $4::boolean or strpos(coalesce(m.meta, ''), '\"attachments\"') > 0)\n  and (not $5::boolean or strpos(coalesce(m.meta, ''), '\"type\":\"image/') > 0)\n  and (not $6::boolean or strpos(m.body, 'http://') > 0 or strpos(m.body, 'https://') > 0)\n  and m.created_at >= $7::float8 and m.created_at < $8::float8\norder by m.id desc limit $9::int;"
+export const SearchMessagesSql = "-- name: SearchMessages :many\n-- Newest first: messages with these words, anywhere on the farm or in one channel and its threads.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent,\n       c.type as channel_type, c.root_number, coalesce(c.parent_id, c.id)::text as top_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_message m\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nwhere m.deleted_at is null and m.kind <> 'notice'\n  and ($1::text = '' or strpos(lower(m.body), lower($1)) > 0)\n  and ($2::text = '' or c.id = $2 or c.parent_id = $2)\n  and ($3::text = '' or m.sender_id = $3 or lower(p.name) = lower($3))\n  and (not $4::boolean or strpos(coalesce(m.meta, ''), '\"attachments\"') > 0)\n  and (not $5::boolean or strpos(coalesce(m.meta, ''), '\"type\":\"image/') > 0)\n  and (not $6::boolean or strpos(m.body, 'http://') > 0 or strpos(m.body, 'https://') > 0)\n  and m.created_at >= $7::float8 and m.created_at < $8::float8\norder by m.id desc limit $9::int;"
 
 export const searchMessages = Effect.fn("SearchMessages")(function* (params: SearchMessagesParams) {
   const sql = yield* SqlClient.SqlClient
@@ -921,6 +933,7 @@ export const UnroutedChannelMessagesResult = Schema.Struct({
   ["created_at"]: Schema.Number,
   ["name"]: Schema.String,
   ["sender_kind"]: Words_channel_participant_kind,
+  ["sender_role"]: Schema.NullOr(Words_channel_participant_role),
   ["channel_type"]: Words_channel_type,
   ["root_id"]: Schema.NullOr(Schema.String),
   ["root_number"]: Schema.NullOr(Schema.Int),
@@ -931,7 +944,7 @@ export const UnroutedChannelMessagesResult = Schema.Struct({
 export type UnroutedChannelMessagesResult = typeof UnroutedChannelMessagesResult.Type
 
 
-export const UnroutedChannelMessagesSql = "-- name: UnroutedChannelMessages :many\nselect m.id as envelope_id, m.number, m.channel_id, m.sender_id, m.kind, m.body, m.meta, m.reply_number, m.created_at,\n       p.name, p.kind as sender_kind, c.type as channel_type, c.root_id, c.root_number, c.subject_kind, c.subject_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_message m\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nleft join mailbox_trigger r on r.id = m.id\nwhere r.routed_at is null and m.deleted_at is null\n  and (m.channel_id, m.number) > ($1::text, $2::int)\norder by m.channel_id, m.number\nlimit 1000;"
+export const UnroutedChannelMessagesSql = "-- name: UnroutedChannelMessages :many\nselect m.id as envelope_id, m.number, m.channel_id, m.sender_id, m.kind, m.body, m.meta, m.reply_number, m.created_at,\n       p.name, p.kind as sender_kind, p.role as sender_role, c.type as channel_type, c.root_id, c.root_number, c.subject_kind, c.subject_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_message m\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nleft join mailbox_trigger r on r.id = m.id\nwhere r.routed_at is null and m.deleted_at is null\n  and (m.channel_id, m.number) > ($1::text, $2::int)\norder by m.channel_id, m.number\nlimit 1000;"
 
 export const unroutedChannelMessages = Effect.fn("UnroutedChannelMessages")(function* (params: UnroutedChannelMessagesParams) {
   const sql = yield* SqlClient.SqlClient

@@ -15,11 +15,11 @@ import type { IconName } from "./icons";
 import { styleProps } from "./positioner";
 import { Hint } from "./Tip";
 
-const viewStyles = stylex.create({
+const styles = stylex.create({
   toggleLabel: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   toggleDisabled: {
     opacity: ".5",
@@ -28,42 +28,42 @@ const viewStyles = stylex.create({
     cursor: "pointer",
   },
   switchRoot: {
-    marginTop: "calc(var(--spacing) * 0.5)",
+    marginTop: "0.125rem",
     display: "flex",
-    height: "calc(var(--spacing) * 4)",
-    width: "calc(var(--spacing) * 7)",
+    height: "1rem",
+    width: "1.75rem",
     flexShrink: 0,
     alignItems: "center",
-    borderRadius: "2147483647px",
-    padding: "calc(var(--spacing) * 0.5)",
+    borderRadius: "9999px",
+    padding: "0.125rem",
     backgroundColor: { default: "var(--color-selected)", ":is([data-checked])": "var(--color-accent)" },
-    transitionProperty: "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke",
-    transitionDuration: "var(--default-transition-duration)",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionProperty: "color, background-color, border-color",
+    transitionDuration: "180ms",
+    transitionTimingFunction: "var(--ease-out)",
   },
   switchThumb: {
     display: "block",
-    width: "calc(var(--spacing) * 3)",
-    height: "calc(var(--spacing) * 3)",
-    borderRadius: "2147483647px",
+    width: "0.75rem",
+    height: "0.75rem",
+    borderRadius: "9999px",
     backgroundColor: "var(--color-page)",
     boxShadow: "var(--shadow-toggle-thumb)",
-    transitionProperty: "transform, translate, scale, rotate",
-    transitionDuration: "var(--default-transition-duration)",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
-    translate: { default: null, ":is([data-checked])": "calc(var(--spacing) * 3) 0" },
+    transitionProperty: "translate",
+    transitionDuration: "180ms",
+    transitionTimingFunction: "var(--ease-out)",
+    translate: { default: null, ":is([data-checked])": "0.75rem 0" },
   },
   textLink: {
     cursor: "pointer",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     textDecorationLine: "underline",
     textDecorationColor: { default: "currentcolor", "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, currentcolor 50%, transparent)" },
   },
   quietLink: { color: { default: "var(--color-muted)", "@media (hover: hover)": { default: null, ":hover": "var(--color-ink)" } } },
   dangerLink: { color: { default: "var(--color-berry)", "@media (hover: hover)": { default: null, ":hover": "var(--color-ink)" } } },
-  windowStrip: { pointerEvents: "none", position: "fixed", insetInline: 0, top: 0 },
-  secretInput: { paddingRight: "calc(var(--spacing) * 9)", fontFamily: "var(--font-mono)" },
+  windowStrip: (height: number) => ({ pointerEvents: "none", position: "fixed", insetInline: 0, top: 0, height }),
+  secretInput: { paddingRight: "2.25rem", fontFamily: "var(--font-mono)" },
   split: {
     display: "flex",
     height: "100%",
@@ -72,10 +72,10 @@ const viewStyles = stylex.create({
     overflowX: { default: null, "@media (width >= 48rem)": "hidden" },
     overflowY: { default: "auto", "@media (width >= 48rem)": "hidden" },
   },
-  splitGap: { gap: "calc(var(--spacing) * 3)" },
+  splitGap: { gap: "0.75rem" },
   splitList: {
     flexShrink: 0,
-    width: { default: null, "@media (width >= 48rem)": "calc(var(--spacing) * 70)" },
+    width: { default: null, "@media (width >= 48rem)": "17.5rem" },
     overflowY: { default: null, "@media (width >= 48rem)": "auto" },
   },
   splitEdge: {
@@ -85,38 +85,38 @@ const viewStyles = stylex.create({
     borderRightStyle: "solid",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-side)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * 3)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.75rem",
   },
   splitBody: { minWidth: 0, flex: "1", overflowY: { default: null, "@media (width >= 48rem)": "auto" } },
-  splitBodyEdge: { padding: "calc(var(--spacing) * 3)" },
+  splitBodyEdge: { padding: "0.75rem" },
   column: { display: "flex", flexDirection: "column" },
-  listHeader: { display: "flex", flexShrink: 0, alignItems: "center", gap: "calc(var(--spacing) * 2)" },
-  listHeaderBare: { height: "calc(var(--spacing) * 8)", paddingInline: "calc(var(--spacing) * 2)" },
+  listHeader: { display: "flex", flexShrink: 0, alignItems: "center", gap: "0.5rem" },
+  listHeaderBare: { height: "2rem", paddingInline: "0.5rem" },
   listHeaderBox: {
-    height: "calc(var(--spacing) * 10)",
+    height: "2.5rem",
     borderBottomWidth: 1,
     borderBottomStyle: "solid",
     borderColor: "var(--color-line)",
-    paddingInline: "calc(var(--spacing) * 3)",
+    paddingInline: "0.75rem",
   },
   listTitle: { flex: "1", textOverflow: "ellipsis", whiteSpace: "nowrap", overflow: "hidden" },
   listTitleBare: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-medium)",
     color: "var(--color-faint)",
   },
-  listTitleBox: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", fontWeight: "var(--font-weight-semibold)" },
+  listTitleBox: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", fontWeight: "var(--font-weight-semibold)" },
   listBare: { gap: "1px" },
-  listBox: { padding: "var(--spacing)" },
+  listBox: { padding: "0.25rem" },
   listRow: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2.5)",
+    gap: "0.625rem",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 2.5)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.625rem",
+    paddingBlock: "0.5rem",
     backgroundColor: {
       default: null,
       ':where([aria-current="page"])': "var(--color-selected)",
@@ -136,104 +136,104 @@ const viewStyles = stylex.create({
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-page)",
   },
-  listRowSpan: {
+  rowTitle: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-medium)",
   },
-  listRowSpan2: {
+  rowLine: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   cardHeader: {
     display: "flex",
-    minHeight: "calc(var(--spacing) * 12)",
+    minHeight: "3rem",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderBottomStyle: "solid",
     borderBottomWidth: "1px",
     borderColor: "var(--color-line)",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "1rem",
+    paddingBlock: "0.5rem",
   },
-  cardH2: {
+  cardTitle: {
     minWidth: "0",
     flex: "1",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-base)",
-    lineHeight: "var(--text-base--line-height)",
+    lineHeight: "var(--leading-base)",
     fontWeight: "var(--font-weight-semibold)",
   },
-  cardDiv: {
+  cardBody: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
-    padding: "calc(var(--spacing) * 4)",
+    gap: "1rem",
+    padding: "1rem",
   },
-  quietP: {
+  quiet: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
-  emptyDiv: {
+  empty: {
     display: "flex",
     height: "100%",
-    minHeight: "calc(var(--spacing) * 48)",
+    minHeight: "12rem",
     alignItems: "center",
     justifyContent: "center",
-    padding: "calc(var(--spacing) * 6)",
+    padding: "1.5rem",
   },
-  emptyDiv2: {
+  emptyBody: {
     display: "flex",
-    maxWidth: "calc(var(--spacing) * 96)",
+    maxWidth: "24rem",
     flexDirection: "column",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
     textAlign: "center",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   emptyIcon: {
     color: "var(--color-faint)",
   },
-  toggleSpan: {
+  toggleBody: {
     display: "flex",
     flexDirection: "column",
   },
-  toggleSpan2: {
+  toggleTitle: {
     display: "flex",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
-  toggleSpan3: {
+  toggleHint: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
-  secretInputSpan: {
+  secretBox: {
     position: "relative",
     display: "flex",
   },
   reveal: {
     position: "absolute",
     insetBlock: "0",
-    right: "var(--spacing)",
+    right: "0.25rem",
     marginBlock: "auto",
     display: "inline-flex",
-    width: "calc(var(--spacing) * 7)",
-    height: "calc(var(--spacing) * 7)",
+    width: "1.75rem",
+    height: "1.75rem",
     cursor: "pointer",
     alignItems: "center",
     justifyContent: "center",
@@ -258,9 +258,9 @@ const viewStyles = stylex.create({
 /** edge: a page's own list as a side column against the rail (its ListCard bare), not a card in a page that already has one. */
 export function Split(props: { list: JSX.Element; children: JSX.Element; edge?: boolean }) {
   return (
-    <div {...stylex.attrs(viewStyles.split, props.edge !== true && viewStyles.splitGap)}>
-      <div {...stylex.attrs(viewStyles.splitList, props.edge === true && viewStyles.splitEdge)}>{props.list}</div>
-      <div {...stylex.attrs(viewStyles.splitBody, props.edge === true && viewStyles.splitBodyEdge)}>{props.children}</div>
+    <div {...stylex.attrs(styles.split, props.edge !== true && styles.splitGap)}>
+      <div {...stylex.attrs(styles.splitList, props.edge === true && styles.splitEdge)}>{props.list}</div>
+      <div {...stylex.attrs(styles.splitBody, props.edge === true && styles.splitBodyEdge)}>{props.children}</div>
     </div>
   );
 }
@@ -269,12 +269,12 @@ export function Split(props: { list: JSX.Element; children: JSX.Element; edge?: 
 export function ListCard(props: { title: string; label?: string; action?: JSX.Element; children: JSX.Element; testid?: string; bare?: boolean }) {
   const bare = () => props.bare === true;
   return (
-    <section aria-label={props.label ?? props.title} data-testid={props.testid} {...stylex.attrs(bare() ? viewStyles.column : viewStyles.card)}>
-      <header {...stylex.attrs(viewStyles.listHeader, bare() ? viewStyles.listHeaderBare : viewStyles.listHeaderBox)}>
-        <h2 {...stylex.attrs(viewStyles.listTitle, bare() ? viewStyles.listTitleBare : viewStyles.listTitleBox)}>{props.title}</h2>
+    <section aria-label={props.label ?? props.title} data-testid={props.testid} {...stylex.attrs(bare() ? styles.column : styles.card)}>
+      <header {...stylex.attrs(styles.listHeader, bare() ? styles.listHeaderBare : styles.listHeaderBox)}>
+        <h2 {...stylex.attrs(styles.listTitle, bare() ? styles.listTitleBare : styles.listTitleBox)}>{props.title}</h2>
         {props.action}
       </header>
-      <ul {...stylex.attrs(viewStyles.column, bare() ? viewStyles.listBare : viewStyles.listBox)}>{props.children}</ul>
+      <ul {...stylex.attrs(styles.column, bare() ? styles.listBare : styles.listBox)}>{props.children}</ul>
     </section>
   );
 }
@@ -288,13 +288,13 @@ export function ListRow(props: { to: string; item?: string; active?: boolean; ti
         data-testid="list-row"
         data-key={props.item}
         aria-current={props.active === true ? "page" : undefined}
-        {...stylex.attrs(viewStyles.listRow)}
+        {...stylex.attrs(styles.listRow)}
       >
         {props.leading}
-        <span {...stylex.attrs(viewStyles.rowText)}>
-          <span {...stylex.attrs(viewStyles.listRowSpan)}>{props.title}</span>
+        <span {...stylex.attrs(styles.rowText)}>
+          <span {...stylex.attrs(styles.rowTitle)}>{props.title}</span>
           <Show when={props.line}>
-            <span {...stylex.attrs(viewStyles.listRowSpan2)}>{props.line}</span>
+            <span {...stylex.attrs(styles.rowLine)}>{props.line}</span>
           </Show>
         </span>
         {props.trailing}
@@ -313,29 +313,29 @@ export function Card(props: {
   item?: string;
 }) {
   return (
-    <section data-testid={props.testid} data-key={props.item} {...styleProps([viewStyles.card, props.styles])}>
+    <section data-testid={props.testid} data-key={props.item} {...styleProps([styles.card, props.styles])}>
       <Show when={props.title !== undefined}>
-        <header {...stylex.attrs(viewStyles.cardHeader)}>
-          <h2 {...stylex.attrs(viewStyles.cardH2)}>{props.title}</h2>
+        <header {...stylex.attrs(styles.cardHeader)}>
+          <h2 {...stylex.attrs(styles.cardTitle)}>{props.title}</h2>
           {props.action}
         </header>
       </Show>
-      <div {...stylex.attrs(viewStyles.cardDiv)}>{props.children}</div>
+      <div {...stylex.attrs(styles.cardBody)}>{props.children}</div>
     </section>
   );
 }
 
 /** Nothing to show yet, in words. */
 export function Quiet(props: { children: JSX.Element }) {
-  return <p {...stylex.attrs(viewStyles.quietP)}>{props.children}</p>;
+  return <p {...stylex.attrs(styles.quiet)}>{props.children}</p>;
 }
 
 /** A place with nothing in it yet (docs/style/design.md): its icon, why it is empty, and the next step if there is one. */
 export function Empty(props: { icon: IconName; children: JSX.Element; action?: JSX.Element; testid?: string }) {
   return (
-    <div data-testid={props.testid ?? "empty"} {...stylex.attrs(viewStyles.emptyDiv)}>
-      <div {...stylex.attrs(viewStyles.emptyDiv2)}>
-        <Icon name={props.icon} size={48} styles={viewStyles.emptyIcon} />
+    <div data-testid={props.testid ?? "empty"} {...stylex.attrs(styles.empty)}>
+      <div {...stylex.attrs(styles.emptyBody)}>
+        <Icon name={props.icon} size={48} styles={styles.emptyIcon} />
         <p>{props.children}</p>
         {props.action}
       </div>
@@ -356,24 +356,24 @@ export function Toggle(props: {
   testid?: string;
 }) {
   return (
-    <label {...stylex.attrs(viewStyles.toggleLabel, props.disabled === true ? viewStyles.toggleDisabled : viewStyles.toggleEnabled)}>
+    <label {...stylex.attrs(styles.toggleLabel, props.disabled === true ? styles.toggleDisabled : styles.toggleEnabled)}>
       <Switch.Root
         data-testid={props.testid}
         checked={props.checked}
         onCheckedChange={props.onChange}
         aria-label={props.ariaLabel ?? props.label}
         disabled={props.disabled}
-        {...stylex.attrs(viewStyles.switchRoot)}
+        {...stylex.attrs(styles.switchRoot)}
       >
-        <Switch.Thumb {...stylex.attrs(viewStyles.switchThumb)} />
+        <Switch.Thumb {...stylex.attrs(styles.switchThumb)} />
       </Switch.Root>
-      <span {...stylex.attrs(viewStyles.toggleSpan)}>
-        <span {...stylex.attrs(viewStyles.toggleSpan2)}>
+      <span {...stylex.attrs(styles.toggleBody)}>
+        <span {...stylex.attrs(styles.toggleTitle)}>
           {props.label}
           <Show when={props.tip}>{(t) => <Hint text={t()} />}</Show>
         </span>
         <Show when={props.hint}>
-          <span {...stylex.attrs(viewStyles.toggleSpan3)}>{props.hint}</span>
+          <span {...stylex.attrs(styles.toggleHint)}>{props.hint}</span>
         </Show>
       </span>
     </label>
@@ -385,13 +385,13 @@ export function SecretInput(props: TextInputProps) {
   const [shown, setShown] = createSignal(false);
   const rest = omit(props, "styles");
   return (
-    <span {...stylex.attrs(viewStyles.secretInputSpan)}>
-      <TextInput {...rest} type={shown() ? "text" : "password"} autocomplete="off" spellcheck="false" styles={[viewStyles.secretInput, props.styles]} />
+    <span {...stylex.attrs(styles.secretBox)}>
+      <TextInput {...rest} type={shown() ? "text" : "password"} autocomplete="off" spellcheck="false" styles={[styles.secretInput, props.styles]} />
       <button
         type="button"
         data-testid="reveal"
         aria-pressed={aria(shown())}
-        {...stylex.attrs(viewStyles.reveal)}
+        {...stylex.attrs(styles.reveal)}
         aria-label={shown() ? t("web.base.secret.hide") : t("web.base.secret.peek")}
         title={shown() ? t("web.base.secret.hide") : t("web.base.secret.peek")}
         onClick={() => setShown(!shown())}
@@ -404,7 +404,7 @@ export function SecretInput(props: TextInputProps) {
 
 /** A quiet underlined word: a page to open in the browser, or onClick. */
 export function TextLink(props: { children: JSX.Element; href?: string; onClick?: () => void; danger?: boolean }) {
-  const look = () => stylex.attrs(viewStyles.textLink, props.danger === true ? viewStyles.dangerLink : viewStyles.quietLink);
+  const look = () => stylex.attrs(styles.textLink, props.danger === true ? styles.dangerLink : styles.quietLink);
   return (
     <Show
       when={props.href}
@@ -437,7 +437,7 @@ export const titleBar = {
 export function WindowStrip() {
   return (
     <Show when={titleBar.top > 0}>
-      <div aria-hidden="true" class={["window-drag", stylex.attrs(viewStyles.windowStrip).class]} style={{ height: `${titleBar.top}px` }} />
+      <div aria-hidden="true" data-window-drag="" {...styleProps(styles.windowStrip(titleBar.top))} />
     </Show>
   );
 }

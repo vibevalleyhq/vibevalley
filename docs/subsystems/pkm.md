@@ -8,7 +8,7 @@
 |---|---|
 | 笔记库目录管理、Markdown 与大纲树互转（`parse` / `print`） | 帮工和助手交付的文档与网页（[Artifact](docs/subsystems/artifact.md)） |
 | 块操作（`PkmBlockOp`）、双链、标签、块引用、反链与 FTS5 检索 | 档案的经验记忆存储（[记性](docs/subsystems/memory.md)） |
-| 闪念捕获、网页剪藏、话题聚类、改名合并、导出与按文件撤销 | 助手与帮工的 `pkm_*` 工具封装（`apps/server/src/tool/pkm.ts`） |
+| 闪念捕获、网页剪藏、话题聚类、改名合并、导出与按文件撤销 | 助手与帮工的 `pkm_*` 工具封装（`apps/server/src/modules/tool/pkm.ts`） |
 | 行内批注与改写建议（`pkm_comment`）的创建、接受与拒绝 | |
 
 ## 在哪
@@ -16,9 +16,9 @@
 | 位置 | 职责 |
 |---|---|
 | [`packages/pkm/`](packages/pkm/README.md) | 独立 PKM 与双链大纲纯领域包（`@vibevalley/pkm`）：Logseq 式 Markdown 解析与打印（`markdown.ts`）、PARA 目录映射（`para.ts`）、双链反链与块引用图谱（`graph.ts`）、前端大纲视图与行内切片（`view.ts`）、键盘编辑与补全状态机（`editing.ts`）、多块框选与拖拽（`selection.ts`）、日历日期（`days.ts`）与乐观写入队列（`writer.ts`） |
-| `apps/server/src/pkm/pkm.ts` | 文件读写、单写锁、批注表（`pkm_comment`）与撤销表（`pkm_change`） |
-| `apps/server/src/pkm/outline.ts`、`ops.ts`、`para.ts`、`graph.ts` | 服务端薄适配层：消费 `@vibevalley/pkm` 并绑定 `memory/recall.ts` 的 `termsList` 分词 |
-| `packages/protocol/src/pkm/`、`rules/pkm.ts` | 笔记契约与前后端共用的 `applyBlockOps`、`flatBlocks` |
+| `apps/server/src/modules/pkm/pkm.ts` | 文件读写、单写锁、批注表（`pkm_comment`）与撤销表（`pkm_change`） |
+| `apps/server/src/modules/pkm/outline.ts`、`ops.ts`、`para.ts`、`graph.ts` | 服务端薄适配层：消费 `@vibevalley/pkm` 并绑定 `memory/recall.ts` 的 `termsList` 分词 |
+| `packages/protocol/src/pkm/`、`packages/pkm/src/outline.ts` | 笔记契约与前后端共用的 `applyBlockOps`、`flatBlocks`、`slugOf` |
 | `$VIBEVALLEY_WORK_ROOT/pkm/` | 默认笔记根目录（`00_Inbox`–`04_Archives`、`journals/`、`.pkm/snapshots/`） |
 | `apps/web/src/features/pkm/` | 工作台笔记页、大纲编辑器组件（消费 `@vibevalley/pkm`） |
 
@@ -67,5 +67,5 @@
 
 ## 怎么验证
 
-- `packages/protocol/src/rules/pkm.test.ts`、`apps/server/src/pkm/*.test.ts`：大纲无损往返、按需 `id::`、反链展开、FTS5 权重与批注保留链接测试。
+- `packages/pkm/src/outline.test.ts`、`apps/server/src/modules/pkm/*.test.ts`：大纲无损往返、按需 `id::`、反链展开、FTS5 权重与批注保留链接测试。
 - `apps/web/src/features/pkm/*.test.ts`、`apps/web/test/pkm.spec.ts`：键盘大纲编辑、多块选择与拖拽、搜索跳转与日记视图测试。

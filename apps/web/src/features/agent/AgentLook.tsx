@@ -8,75 +8,72 @@ import { type Agent, OutfitValues, SpeciesValues } from "@vibevalley/protocol";
 import { aria } from "#/base/dom.tsx";
 import { ready, useSprites } from "#/infra/query.ts";
 import { Button } from "#/ui/Button.tsx";
-import { castOf, castPrefix, cropSprite, outfitLabel, type Pose, randomLook, speciesLabel, stagePoses } from "#/ui/cast.ts";
-import { AgentFace } from "#/ui/Face.tsx";
-import { PoseSprite } from "#/ui/PoseSprite.tsx";
+import { castOf, castPrefix, cropSprite, outfitLabel, type Pose, randomLook, speciesLabel, stagePoses } from "#/ui/domain/cast.ts";
+import { AgentFace } from "#/ui/domain/Face.tsx";
+import { PoseSprite } from "#/ui/domain/PoseSprite.tsx";
 import { Hint } from "#/ui/Tip.tsx";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   stageSpan: {
     borderRadius: "var(--radius-md)",
     backgroundColor: {
       default: "var(--color-avatar-paper)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-paper) 92%, transparent)",
     },
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * .5)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.125rem",
     fontSize: "var(--text-lg)",
-    lineHeight: "var(--text-lg--line-height)",
+    lineHeight: "var(--leading-lg)",
   },
   stageSpan2: {
-    maxWidth: "calc(var(--spacing) * 96)",
+    maxWidth: "24rem",
     borderRadius: "var(--radius-sm)",
     backgroundColor: {
       default: "var(--color-avatar-soft-paper)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-paper) 75%, transparent)",
     },
-    paddingInline: "calc(var(--spacing) * 2)",
+    paddingInline: "0.5rem",
     paddingBlock: "1px",
     textAlign: "center",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
   stageSpan3: {
     pointerEvents: "none",
     position: "absolute",
-    top: "calc(var(--spacing) * 3)",
-    right: "calc(var(--spacing) * 4)",
+    top: "0.75rem",
+    right: "1rem",
     borderRadius: "var(--radius-sm)",
     backgroundColor: {
       default: "var(--color-avatar-soft-paper)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-paper) 75%, transparent)",
     },
-    paddingInline: "calc(var(--spacing) * 2)",
+    paddingInline: "0.5rem",
     paddingBlock: "1px",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
-});
-
-const variantStyles = stylex.create({
   tileButton: {
     display: "flex",
     cursor: "pointer",
     flexDirection: "column",
     alignItems: "center",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    paddingInline: "var(--spacing)",
-    paddingTop: "var(--spacing)",
-    paddingBottom: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.25rem",
+    paddingTop: "0.25rem",
+    paddingBottom: "0.375rem",
   },
-  tileButtonVariant: {
+  tileButtonTone: {
     borderColor: {
       default: "var(--color-ink)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink) 40%, transparent)",
     },
     backgroundColor: "var(--color-selected)",
   },
-  tileButtonVariant2: {
+  tileButtonAlt: {
     borderColor: "var(--color-line)",
     backgroundColor: {
       default: null,
@@ -88,30 +85,27 @@ const variantStyles = stylex.create({
   },
   tileSpan: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
-  tileSpanVariant: {
+  tileSpanTone: {
     fontWeight: "var(--font-weight-semibold)",
   },
-  tileSpanVariant2: {
+  tileSpanAlt: {
     color: "var(--color-muted)",
   },
-});
-
-const viewStyles = stylex.create({
   labeledDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   labeledDiv2: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   labeledSpan: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-medium)",
     color: "var(--color-muted)",
   },
@@ -120,27 +114,27 @@ const viewStyles = stylex.create({
   },
   labeledSpan3: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-berry)",
   },
   lookPanelDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 5)",
+    gap: "1.25rem",
   },
   lookPanelDiv2: {
     display: "grid",
     gridTemplateColumns: "repeat(4,minmax(0,1fr))",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   lookPanelSpan: {
     display: "flex",
-    height: "calc(var(--spacing) * 16)",
+    height: "4rem",
     alignItems: "center",
     justifyContent: "center",
   },
   lookPanelImg: {
-    height: "calc(var(--spacing) * 16)",
+    height: "4rem",
     objectFit: "contain",
     imageRendering: "pixelated",
   },
@@ -155,32 +149,32 @@ const viewStyles = stylex.create({
   },
   stageDiv2: {
     position: "relative",
-    height: "calc(var(--spacing) * 72)",
-    width: "calc(var(--spacing) * 96)",
+    height: "18rem",
+    width: "24rem",
     maxWidth: "100%",
   },
   stageImg: {
     left: 192 - 288 * 0.62,
     position: "absolute",
-    bottom: "calc(var(--spacing) * 6)",
-    width: "calc(var(--spacing) * 72)",
+    bottom: "1.5rem",
+    width: "18rem",
     imageRendering: "pixelated",
   },
   stageDiv3: {
     position: "absolute",
-    right: "calc(var(--spacing) * 24)",
-    bottom: "calc(var(--spacing) * 2)",
-    translate: "calc(1 / 2 * 100%) 0",
+    right: "6rem",
+    bottom: "0.5rem",
+    translate: "50% 0",
   },
   stageDiv4: {
     pointerEvents: "none",
     position: "absolute",
     insetInline: "0",
-    bottom: "calc(var(--spacing) * 4)",
+    bottom: "1rem",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
 });
 
@@ -194,16 +188,16 @@ export function Labeled(props: {
   children: JSX.Element;
 }) {
   return (
-    <div {...stylex.attrs(viewStyles.labeledDiv)}>
-      <div {...stylex.attrs(viewStyles.labeledDiv2)}>
-        <span {...stylex.attrs(viewStyles.labeledSpan)}>{props.label}</span>
+    <div {...stylex.attrs(styles.labeledDiv)}>
+      <div {...stylex.attrs(styles.labeledDiv2)}>
+        <span {...stylex.attrs(styles.labeledSpan)}>{props.label}</span>
         <Show when={props.hint ?? props.tip}>{(h) => <Hint text={h()} />}</Show>
-        <span {...stylex.attrs(viewStyles.labeledSpan2)} />
+        <span {...stylex.attrs(styles.labeledSpan2)} />
         {props.aside}
       </div>
       {props.children}
       <Show when={props.error}>
-        <span {...stylex.attrs(viewStyles.labeledSpan3)}>{props.error}</span>
+        <span {...stylex.attrs(styles.labeledSpan3)}>{props.error}</span>
       </Show>
     </div>
   );
@@ -213,14 +207,14 @@ export function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"])
   const cast = () => castOf(props.draft.look, props.draft.id);
   const sprites = useSprites();
   return (
-    <div {...stylex.attrs(viewStyles.lookPanelDiv)}>
+    <div {...stylex.attrs(styles.lookPanelDiv)}>
       <div>
         <Button icon="shuffle" onClick={() => props.onChange(randomLook())}>
           {t("web.agent.random")}
         </Button>
       </div>
       <Labeled label={t("web.agent.looksAs")} hint={t("web.agent.looksHint")}>
-        <div {...stylex.attrs(viewStyles.lookPanelDiv2)}>
+        <div {...stylex.attrs(styles.lookPanelDiv2)}>
           <For each={SpeciesValues}>
             {(species) => (
               <Tile active={cast().species === species} label={speciesLabel[species]} onClick={() => props.onChange({ ...props.draft.look, species })}>
@@ -231,7 +225,7 @@ export function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"])
         </div>
       </Labeled>
       <Labeled label={t("web.agent.wears")}>
-        <div {...stylex.attrs(viewStyles.lookPanelDiv2)}>
+        <div {...stylex.attrs(styles.lookPanelDiv2)}>
           <For each={OutfitValues}>
             {(outfit) => {
               const name = () => {
@@ -240,8 +234,8 @@ export function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"])
               };
               return (
                 <Tile active={cast().outfit === outfit} label={outfitLabel[outfit]} onClick={() => props.onChange({ ...props.draft.look, outfit })}>
-                  <span {...stylex.attrs(viewStyles.lookPanelSpan)}>
-                    <Show when={name()}>{(n) => <img src={`/pixel/${n()}.png`} alt="" {...stylex.attrs(viewStyles.lookPanelImg)} />}</Show>
+                  <span {...stylex.attrs(styles.lookPanelSpan)}>
+                    <Show when={name()}>{(n) => <img src={`/pixel/${n()}.png`} alt="" {...stylex.attrs(styles.lookPanelImg)} />}</Show>
                   </span>
                 </Tile>
               );
@@ -261,10 +255,10 @@ function Tile(props: { active: boolean; label: string; onClick: () => void; chil
       aria-label={props.label}
       aria-pressed={aria(props.active)}
       onClick={() => props.onClick()}
-      {...stylex.attrs(variantStyles.tileButton, props.active ? variantStyles.tileButtonVariant : variantStyles.tileButtonVariant2)}
+      {...stylex.attrs(styles.tileButton, props.active ? styles.tileButtonTone : styles.tileButtonAlt)}
     >
       {props.children}
-      <span {...stylex.attrs(variantStyles.tileSpan, props.active ? variantStyles.tileSpanVariant : variantStyles.tileSpanVariant2)}>{props.label}</span>
+      <span {...stylex.attrs(styles.tileSpan, props.active ? styles.tileSpanTone : styles.tileSpanAlt)}>{props.label}</span>
     </button>
   );
 }
@@ -274,20 +268,20 @@ export function Stage(props: { draft: Agent; pose: Pose }) {
   const cast = () => castOf(props.draft.look, props.draft.id);
   const crop = () => stagePoses.find((p) => p.pose === props.pose)?.crop ?? "empty";
   return (
-    <div {...stylex.attrs(viewStyles.stageDiv)}>
-      <div {...stylex.attrs(viewStyles.stageDiv2)}>
-        <img src={`/pixel/${cropSprite(crop())}.png`} alt="" {...stylex.attrs(viewStyles.stageImg)} onError={(e) => (e.currentTarget.style.display = "none")} />
-        <div {...stylex.attrs(viewStyles.stageDiv3)}>
+    <div {...stylex.attrs(styles.stageDiv)}>
+      <div {...stylex.attrs(styles.stageDiv2)}>
+        <img src={`/pixel/${cropSprite(crop())}.png`} alt="" {...stylex.attrs(styles.stageImg)} onError={(e) => (e.currentTarget.style.display = "none")} />
+        <div {...stylex.attrs(styles.stageDiv3)}>
           <PoseSprite cast={cast()} pose={props.pose} height={224} />
         </div>
       </div>
-      <div {...stylex.attrs(viewStyles.stageDiv4)}>
-        <span {...stylex.attrs(recipeStyles.stageSpan)}>{props.draft.name || t("web.agent.unnamedAgent")}</span>
+      <div {...stylex.attrs(styles.stageDiv4)}>
+        <span {...stylex.attrs(styles.stageSpan)}>{props.draft.name || t("web.agent.unnamedAgent")}</span>
         <Show when={props.draft.duty}>
-          <span {...stylex.attrs(recipeStyles.stageSpan2)}>{props.draft.duty}</span>
+          <span {...stylex.attrs(styles.stageSpan2)}>{props.draft.duty}</span>
         </Show>
       </div>
-      <span {...stylex.attrs(recipeStyles.stageSpan3)}>
+      <span {...stylex.attrs(styles.stageSpan3)}>
         {speciesLabel[cast().species]} · {outfitLabel[cast().outfit]}
       </span>
     </div>

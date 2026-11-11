@@ -2,7 +2,6 @@ import type { Attachment } from "../attachment/shapes";
 import type { MediaAudioFormat, MediaAudioMetadata, MediaInputReference, MediaPhase, MediaSource, MediaAudioUsage } from "./shapes";
 
 export const MediaAudioKindValues = ["speakers", "voiceDesign", "clone", "transcription"] as const;
-export type MediaAudioKind = (typeof MediaAudioKindValues)[number];
 
 export interface MediaAudioAccountRequest {
   id: string;

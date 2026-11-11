@@ -16,11 +16,11 @@ import { type Llm, make } from "@vibevalley/ai/llm";
 import { homeOf } from "@vibevalley/home";
 import { t, currentLocale } from "@vibevalley/i18n";
 
-import { modelClient } from "#/agent/agent.ts";
 import { messageOf } from "#/base/errors.ts";
 import { loadConfig } from "#/infra/config.ts";
-import { dshRuntime } from "#/runtime/dsh.ts";
-import { registryOf } from "#/runtime/runtime.ts";
+import { modelClient } from "#/modules/agent/agent.ts";
+import { dshRuntime } from "#/modules/runtime/dsh.ts";
+import { registryOf } from "#/modules/runtime/runtime.ts";
 
 import { instructions } from "./prompts.ts";
 
@@ -114,7 +114,7 @@ export const ownChat = (values: OwnChat) =>
     const llm = modelClient(values.model || config.agent.model, config.deepseek.apiKey, standaloneLlm());
     const cwd = values.cwd ? resolve(values.cwd) : process.cwd();
     const home = join(homeOf(), "agent", values.name);
-    const servers = yield* Effect.tryPromise({ try: () => readMcpConfig(values.mcp || join(home, "mcp.json")), catch: messageOf });
+    const servers = yield* Effect.mapError(readMcpConfig(values.mcp || join(home, "mcp.json")), messageOf);
     const asked = values.p !== undefined;
     // A one-off question keeps no reminders running.
     const agent = yield* makeBrain({

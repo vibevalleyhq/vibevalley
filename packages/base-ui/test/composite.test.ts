@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 
-import { moveIndex, typeahead } from "../src/internal/composite";
+import { moveIndex, typeahead } from "../src/base/composite";
 
 test("arrows follow the orientation, Home and End go to the ends, and only a loop wraps", () => {
   const o = { orientation: "horizontal" as const, loop: false };

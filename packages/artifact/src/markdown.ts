@@ -1,7 +1,7 @@
 import type { Block, BlockAttrs, BlockType, SpanMarks, TextSpan } from "@vibevalley/protocol";
-import { normalSpans } from "@vibevalley/protocol/rules";
 import { issueId } from "@vibevalley/protocol/schema";
 
+import { normalSpans } from "./blocks.ts";
 import { ordered, plain, textFor, unmarked } from "./ops.ts";
 
 /** A block as Markdown says it: its place is its depth under the block before it. */

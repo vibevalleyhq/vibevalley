@@ -1,0 +1,84 @@
+import { rmSync } from "node:fs";
+
+import { expect, it } from "@effect/vitest";
+import { Effect } from "effect";
+
+import { Core } from "#/core/core.ts";
+import { frameOf } from "#/gateway/projection/frame.ts";
+import { emptyPatrol, patrolStep } from "#/modules/inbox/patrol.ts";
+import { testConfig } from "#/testing/layers.ts";
+import { world } from "#/testing/world.ts";
+
+import { Channel } from "./channel.ts";
+const mentionIds = (core: Core["Service"]) =>
+  frameOf(core.state())
+    .inbox.filter((item) => item.kind === "mention")
+    .map((item) => item.id);
+
+it.live("an unresolved user mention survives both history windows and restart until read", () => {
+  const config = testConfig({ db: "" });
+  let thread = "";
+  let message = "";
+  let at = 0;
+  let number = 0;
+  const standing = Effect.gen(function* () {
+    const core = yield* Core;
+    expect(core.state().chat?.channels.some((c) => c.id === thread)).toBe(false);
+    expect(mentionIds(core)).toEqual([message]);
+    expect(patrolStep(core.state(), at + 16 * 60_000, emptyPatrol())[0].map((item) => item.key)).toEqual([message]);
+  });
+  return Effect.gen(function* () {
+    yield* Effect.gen(function* () {
+      const chat = yield* Channel;
+      const core = yield* Core;
+      const parent = (yield* chat.post({ _tag: "User", text: "需要确认的话题", sendKey: "" })).message;
+      const written = (yield* chat.post({
+        _tag: "Agent",
+        from: "orchestrator",
+        text: "@用户 请确认这份变更",
+        target: `#general:${parent.number}`,
+        anyway: true,
+      })).message!;
+      ({ channel: thread, id: message, at, number } = written);
+      expect(mentionIds(core)).toEqual([message]);
+      for (let i = 0; i < 101; i++) {
+        const other = (yield* chat.post({ _tag: "User", text: `其他话题 ${i}`, sendKey: "" })).message;
+        const fresh = (yield* chat.post({ _tag: "Agent", from: "orchestrator", text: "其他答复", target: `#general:${other.number}`, anyway: true })).message!
+          .channel;
+        yield* chat.post({ _tag: "Notice", channel: fresh, text: "动静一", code: "history" });
+        yield* chat.post({ _tag: "Notice", channel: fresh, text: "动静二", code: "history" });
+      }
+      yield* standing;
+    }).pipe(Effect.scoped, Effect.provide(world({ config })));
+    yield* Effect.gen(function* () {
+      const chat = yield* Channel;
+      const core = yield* Core;
+      yield* standing;
+      yield* chat.markRead(thread, number);
+      expect(mentionIds(core)).toEqual([]);
+      expect(patrolStep(core.state(), at + 16 * 60_000, emptyPatrol())[0]).toEqual([]);
+    }).pipe(Effect.scoped, Effect.provide(world({ config })));
+  }).pipe(Effect.ensuring(Effect.sync(() => rmSync(config.home, { recursive: true, force: true }))));
+});
+
+it.live("only reading or replying in the mentioned channel completes a user mention", () => {
+  const config = testConfig();
+  return Effect.gen(function* () {
+    const chat = yield* Channel;
+    const core = yield* Core;
+    const channel = yield* chat.openChannel("review", "", "");
+    const first = (yield* chat.post({ _tag: "Agent", from: "orchestrator", text: "@用户 第一份变更", target: "#review", anyway: true })).message!;
+    yield* chat.post({ _tag: "User", text: "默认频道的另一件事", sendKey: "" });
+    expect(mentionIds(core)).toEqual([first.id]);
+    yield* chat.post({ _tag: "User", text: "确认了", channel: channel.id, sendKey: "" });
+    expect(mentionIds(core)).toEqual([]);
+    const second = (yield* chat.post({ _tag: "Agent", from: "orchestrator", text: "@用户 第二份变更", target: "#review", anyway: true })).message!;
+    expect(mentionIds(core)).toEqual([second.id]);
+    yield* chat.markRead(channel.id, second.number);
+    expect(mentionIds(core)).toEqual([]);
+    const third = (yield* chat.post({ _tag: "Agent", from: "orchestrator", text: "@用户 第三份变更", target: "#review", anyway: true })).message!;
+    expect(mentionIds(core)).toEqual([third.id]);
+    yield* chat.read("user", { target: "#review" });
+    expect(mentionIds(core)).toEqual([]);
+  }).pipe(Effect.scoped, Effect.provide(world({ config })), Effect.ensuring(Effect.sync(() => rmSync(config.home, { recursive: true, force: true }))));
+});

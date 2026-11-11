@@ -4,8 +4,8 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { t } from "@vibevalley/i18n";
 
-import { appStatus, askApp, farmHome, launchedFrom, notOpen } from "#/farm.ts";
-import { jsonText, printBody } from "#/output.ts";
+import { jsonText, printBody } from "#/base/output.ts";
+import { appStatus, askApp, farmHome, launchedFrom, notOpen } from "#/infra/farm.ts";
 
 const printed = (value: unknown) => Effect.flatMap(jsonText(value ?? { ok: true }), printBody);
 

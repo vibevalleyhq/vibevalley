@@ -19,18 +19,18 @@ const viewStyles = stylex.create({
     display: "flex",
     flexWrap: "wrap",
     alignItems: "flex-end",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
-  grow: { minWidth: "calc(var(--spacing) * 48)", flex: "1" },
+  grow: { minWidth: "12rem", flex: "1" },
   note: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   body: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
   },
 });
 

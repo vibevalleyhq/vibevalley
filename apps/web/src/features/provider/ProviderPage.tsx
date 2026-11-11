@@ -12,38 +12,38 @@ import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Checkbox } from "#/ui/Checkbox.tsx";
 import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
+import { SettingsPage } from "#/ui/domain/settings.tsx";
 import { Field, Select, TextInput } from "#/ui/Field.tsx";
 import { OutLink } from "#/ui/IconButton.tsx";
 import { KeyField, SaveBar } from "#/ui/KeyField.tsx";
 import { Card, Quiet, SecretInput } from "#/ui/layout.tsx";
-import { SettingsPage } from "#/ui/settings.tsx";
 import { Hint } from "#/ui/Tip.tsx";
 
 const viewStyles = stylex.create({
-  content: { display: "flex", maxWidth: "var(--container-3xl)", minWidth: 0, flexDirection: "column", gap: "calc(var(--spacing) * 6)" },
-  section: { display: "flex", minWidth: 0, flexDirection: "column", gap: "calc(var(--spacing) * 3)" },
-  sectionHead: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "calc(var(--spacing) * 2)" },
-  sectionTitle: { flex: "1", fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", fontWeight: 600 },
-  toolbar: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "calc(var(--spacing) * 2)" },
+  content: { display: "flex", maxWidth: "var(--container-3xl)", minWidth: 0, flexDirection: "column", gap: "1.5rem" },
+  section: { display: "flex", minWidth: 0, flexDirection: "column", gap: "0.75rem" },
+  sectionHead: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem" },
+  sectionTitle: { flex: "1", fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", fontWeight: 600 },
+  toolbar: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem" },
   minimumWidth: { minWidth: 0 },
-  form: { display: "flex", minWidth: 0, flexDirection: "column", gap: "calc(var(--spacing) * 3)" },
-  nameRow: { display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: "calc(var(--spacing) * 3)" },
-  nameField: { minWidth: "calc(var(--spacing) * 48)", flex: "1" },
-  row: { display: "flex", height: "calc(var(--spacing) * 7)", alignItems: "center", gap: "calc(var(--spacing) * 2)" },
-  text: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)" },
-  detail: { fontSize: "var(--text-xs)", lineHeight: "var(--text-xs--line-height)", color: "var(--color-muted)" },
-  modelList: { maxHeight: "calc(var(--spacing) * 48)", overflowY: "auto", fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)" },
-  list: { display: "flex", flexDirection: "column", gap: "var(--spacing)" },
+  form: { display: "flex", minWidth: 0, flexDirection: "column", gap: "0.75rem" },
+  nameRow: { display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: "0.75rem" },
+  nameField: { minWidth: "12rem", flex: "1" },
+  row: { display: "flex", height: "1.75rem", alignItems: "center", gap: "0.5rem" },
+  text: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)" },
+  detail: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", color: "var(--color-muted)" },
+  modelList: { maxHeight: "12rem", overflowY: "auto", fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)" },
+  list: { display: "flex", flexDirection: "column", gap: "0.25rem" },
   model: { fontFamily: "var(--font-mono)", wordBreak: "break-all" },
-  link: { fontSize: "var(--text-xs)", lineHeight: "var(--text-xs--line-height)", color: "var(--color-water)", textDecorationLine: "underline" },
+  link: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", color: "var(--color-water)", textDecorationLine: "underline" },
   errorColor: { color: "var(--color-berry)" },
   // One use a line: its name, then its connection and model side by side, wrapping under the name when narrow.
   uses: { display: "flex", minWidth: 0, flexDirection: "column" },
   group: {
-    paddingTop: "calc(var(--spacing) * 3)",
-    paddingBottom: "var(--spacing)",
+    paddingTop: "0.75rem",
+    paddingBottom: "0.25rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: 600,
     color: "var(--color-muted)",
   },
@@ -52,22 +52,22 @@ const viewStyles = stylex.create({
     minWidth: 0,
     flexWrap: "wrap",
     alignItems: "center",
-    columnGap: "calc(var(--spacing) * 3)",
-    rowGap: "var(--spacing)",
+    columnGap: "0.75rem",
+    rowGap: "0.25rem",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
     borderColor: "var(--color-line)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingBlock: "0.5rem",
   },
   useName: {
     display: "flex",
-    width: "calc(var(--spacing) * 32)",
+    width: "8rem",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
-  usePicks: { display: "grid", minWidth: "calc(var(--spacing) * 60)", flex: "1", gridTemplateColumns: "1fr 1fr", gap: "calc(var(--spacing) * 2)" },
+  usePicks: { display: "grid", minWidth: "15rem", flex: "1", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" },
 });
 
 /** The uses a connection serves, in the groups the page shows them in; each one's words where it needs some. */

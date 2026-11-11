@@ -21,7 +21,6 @@
     "opentype.js": "catalog:",
     "sharp": "catalog:",
     "subset-font": "catalog:",
-    "vibevalley": "workspace:*",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   }

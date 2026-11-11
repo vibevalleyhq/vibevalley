@@ -2,6 +2,7 @@ import { Array as Arr } from "effect";
 import { expect, test } from "vite-plus/test";
 
 import type { LibraryItem, MediaJob } from "@vibevalley/protocol";
+import { messageId, sessionId } from "@vibevalley/protocol/schema";
 
 import { between, countsOf, durationText, extOf, justify, kindOf, making, neighbor, originLine, shown, understoodText, whereKey } from "./items.ts";
 
@@ -14,7 +15,7 @@ const item = (id: string, type: string, origin: LibraryItem["origin"]): LibraryI
 const picture = item("a", "image/png", { kind: "generated", job: "j1", jobKind: "image" });
 const song = item("b", "audio/mpeg", { kind: "uploaded" });
 const page = item("c", "text/html", { kind: "fetched", agent: "lab", from: { url: "https://example.com/a.html" } });
-const said = item("d", "image/jpeg", { kind: "uploaded", channel: "c1", message: "m1" });
+const said = item("d", "image/jpeg", { kind: "uploaded", channel: "c1", message: messageId("m1") });
 const names = { agent: (id: string) => (id === "lab" ? "实验员" : id), channel: (id: string) => (id === "c1" ? "#general" : id) };
 
 test("a file's kind is read off its media type", () => {
@@ -104,9 +105,9 @@ test("a file without a picture shows its extension and a sound its length", () =
 test("the origin line says who and from where", () => {
   expect(originLine(names)(picture.origin)).toBe("生成的 · 生图");
   expect(originLine(names)(song.origin)).toBe("你在素材库上传的");
-  expect(originLine(names)({ kind: "uploaded", channel: "c1", message: "m" })).toBe("你在 #general 发的");
+  expect(originLine(names)({ kind: "uploaded", channel: "c1", message: messageId("m") })).toBe("你在 #general 发的");
   expect(originLine(names)(page.origin)).toBe("实验员 从 https://example.com/a.html 拿回来的");
-  expect(originLine(names)({ kind: "fetched", agent: "x", session: "w1", from: { path: "out/a.png" } })).toBe("x 从工作目录的 out/a.png 拿回来的");
+  expect(originLine(names)({ kind: "fetched", agent: "x", session: sessionId("w1"), from: { path: "out/a.png" } })).toBe("x 从工作目录的 out/a.png 拿回来的");
 });
 
 const job = (more: Partial<MediaJob> & Pick<MediaJob, "kind" | "phase">) => ({ id: "j", updatedAt: 0, ...more }) as MediaJob;

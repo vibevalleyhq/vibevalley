@@ -6,20 +6,24 @@ import { t } from "@vibevalley/i18n";
 import { Button } from "./Button";
 import type { IconName } from "./icons";
 
+const fadeIn = stylex.keyframes({
+  from: { opacity: 0 },
+});
+
 const viewStyles = stylex.create({
   group: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
-    animationName: { default: "fade-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    gap: "0.5rem",
+    animationName: { default: fadeIn, "@media (prefers-reduced-motion: reduce)": "none" },
     animationDuration: "180ms",
     animationTimingFunction: "var(--ease-out)",
     animationFillMode: "both",
   },
   confirmButtonSpan: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
 });

@@ -3,7 +3,6 @@ import { join } from "node:path";
 
 import solid from "@solidjs/vite-plugin";
 import stylex from "@stylexjs/unplugin";
-import { styleMigrationGraph } from "vibevalley/style-migration";
 import { defineConfig, lazyPlugins } from "vite-plus";
 import type { Plugin } from "vite-plus";
 
@@ -66,13 +65,12 @@ export default defineConfig({
   plugins:
     lazyPlugins(() => [
       stylex.vite({
-        useCSSLayers: { before: ["theme", "base", "components"], after: ["utilities"], prefix: "stylex" },
+        useCSSLayers: { before: ["theme", "base", "components"], after: [], prefix: "stylex" },
         sxPropName: false,
         aliases: { "#/*": [join(import.meta.dirname, "src/*")] },
       }),
       solid(),
       opening(),
-      styleMigrationGraph("app"),
     ]) ?? [],
   server: { proxy: { "/api": { target: "http://127.0.0.1:8787", ws: true } } },
   // *.test.ts runs without a DOM; Playwright alone collects *.spec.ts.

@@ -2,7 +2,7 @@ import { NodeServices } from "@effect/platform-node";
 import { expect, it } from "@effect/vitest";
 import { Effect, FileSystem, Schema } from "effect";
 
-import { cli, farm } from "./testing.ts";
+import { cli, farm } from "#/testing/testing.ts";
 
 it.effect("regression: worker commands refuse missing credentials without user fallback", () =>
   Effect.gen(function* () {

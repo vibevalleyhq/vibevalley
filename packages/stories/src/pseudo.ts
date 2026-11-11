@@ -82,8 +82,9 @@ export function forceStates(doc: Document = document) {
     if (sheet.ownerNode instanceof HTMLElement && sheet.ownerNode.id === pseudoStyleId) continue;
     try {
       css += forcedRules(sheet.cssRules);
-    } catch {
-      // A sheet from another origin cannot be read; the page's own are all same-origin.
+    } catch (e) {
+      // A sheet from another origin throws SecurityError; the page's own are all same-origin.
+      if (!(e instanceof DOMException)) throw e;
     }
   }
   let el = doc.getElementById(pseudoStyleId);

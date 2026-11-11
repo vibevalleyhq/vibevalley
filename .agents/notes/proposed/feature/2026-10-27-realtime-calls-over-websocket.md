@@ -6,7 +6,7 @@ Status: proposed
 
 MOSS Live 已打通经本机 WebSocket（`/api/v1/voice/moss/line`）免声网凭据与隧道接听农场电话（[语音](docs/subsystems/voice.md)），但还剩两处待补齐：
 - 已有 OpenAI Realtime 兼容接口密钥的用户尚不能用通用 `wss://.../v1/realtime` 模型接听电话。
-- `apps/server/src/voice/voice.ts` 与前端 `apps/web/src/features/voice/call.ts` 仍按 `agora` / `moss` 分支内联编排，需抽出统一通话通道接口再接入第三种实时协议。
+- `apps/server/src/gateway/voice/voice.ts` 与前端 `apps/web/src/features/voice/model/call.ts` 仍按 `agora` / `moss` 分支内联编排，需抽出统一通话通道接口再接入第三种实时协议。
 
 ## Proposal
 

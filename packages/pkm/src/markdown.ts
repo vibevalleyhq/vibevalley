@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 
 import { PkmMarkerValues } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
-import { applyBlockOps, pkmTag, slugOf } from "@vibevalley/protocol/rules";
 
+import { applyBlockOps, pkmTag, slugOf } from "./outline.ts";
 import { tierOfFile, titleOfFile } from "./para.ts";
 
 /** A block as the server holds it: the page's outline is a tree of these. */

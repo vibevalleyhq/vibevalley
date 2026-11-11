@@ -54,8 +54,8 @@ const viewStyles = stylex.create({
   },
   pixelCardOuter: {
     display: "inline-block",
-    paddingRight: "calc(var(--spacing) * .5)",
-    paddingBottom: "calc(var(--spacing) * .5)",
+    paddingRight: "0.125rem",
+    paddingBottom: "0.125rem",
   },
   pixelCardBox: {
     boxSizing: "border-box",
@@ -85,22 +85,22 @@ const viewStyles = stylex.create({
 });
 
 export const CardColors = {
-  ink: "#3a2a18",
-  paper: "#f3e2b8",
-  muted: "#776046",
-  good: "#3f6b2a",
-  lightInk: "#fff3dc",
-  wood: "#b07a45",
-  held: "#b4cb7c",
-  slot: "#eedcb2",
-  ripe: "#e8b84a",
-  bug: "#b44b36",
-  stuck: "#4a728c",
-  rest: "#cdbb92",
+  ink: "var(--color-bark-850)",
+  paper: "var(--color-glow-soft)",
+  muted: "var(--color-card-muted)",
+  good: "var(--color-card-good)",
+  lightInk: "var(--color-card-light-ink)",
+  wood: "var(--color-card-wood)",
+  held: "var(--color-leaf-300)",
+  slot: "var(--color-cream-100)",
+  ripe: "var(--color-card-ripe)",
+  bug: "var(--color-card-bug)",
+  stuck: "var(--color-card-stuck)",
+  rest: "var(--color-card-rest)",
   // Handed back and waiting: on its acceptance, or on the user's answer.
-  wait: "#b4cb7c",
-  barFill: "#7ea64f",
-  barTrack: "#e2c995",
+  wait: "var(--color-leaf-300)",
+  barFill: "var(--color-agent-stage-edge)",
+  barTrack: "var(--color-cream-200)",
 } as const;
 
 /** A cell of a glyph: x, y, w, h on its grid, and a CSS colour. */

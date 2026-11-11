@@ -13,23 +13,20 @@ import { useRouter, Link as A } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
-import { AgentFace, OrchestratorFace } from "#/ui/Face.tsx";
+import { AgentFace, OrchestratorFace } from "#/ui/domain/Face.tsx";
+import { runtimeName } from "#/ui/domain/RuntimeBadge.tsx";
 import { TextInput } from "#/ui/Field.tsx";
-import { runtimeName } from "#/ui/RuntimeBadge.tsx";
 import { Hint } from "#/ui/Tip.tsx";
 import { toast } from "#/ui/toasts.ts";
 
-const variantStyles3 = stylex.create({
+const styles = stylex.create({
   templatesPageTextInput: {
     minWidth: "0",
     flex: "1",
   },
-});
-
-const variantStyles2 = stylex.create({
   templatesPageA: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
     textDecorationLine: {
       default: null,
@@ -39,15 +36,12 @@ const variantStyles2 = stylex.create({
       },
     },
   },
-});
-
-const variantStyles = stylex.create({
   templateCardSpan: {
     display: "flex",
     minWidth: "0",
     flex: "1",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
   },
   templateCardSpan2: {
     WebkitLineClamp: "2",
@@ -55,22 +49,19 @@ const variantStyles = stylex.create({
     display: "-webkit-box",
     overflow: "hidden",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   templateCardSpan3: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
-  templateCardSpanVariant: {
+  templateCardSpanTone: {
     color: "var(--color-muted)",
   },
-  templateCardSpanVariant2: {
+  templateCardSpanAlt: {
     color: "var(--color-warn-ink)",
   },
-});
-
-const viewStyles = stylex.create({
   templatesPageDiv: {
     height: "100%",
     overflowY: "auto",
@@ -78,34 +69,34 @@ const viewStyles = stylex.create({
   templatesPageDiv2: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 6)",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingTop: "calc(var(--spacing) * 4)",
-    paddingBottom: "calc(var(--spacing) * 8)",
+    gap: "1.5rem",
+    paddingInline: "1rem",
+    paddingTop: "1rem",
+    paddingBottom: "2rem",
   },
   templatesPageDiv3: {
     display: "flex",
     flexDirection: "column",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   templatesPageDiv4: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   templatesPageH1: {
     fontSize: "var(--text-2xl)",
-    lineHeight: "var(--text-2xl--line-height)",
+    lineHeight: "var(--leading-2xl)",
     fontWeight: "var(--font-weight-semibold)",
   },
   templatesPageForm: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   templatesPageDiv5: {
     display: "grid",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
     gridTemplateColumns: {
       default: null,
       "@media (width>=40rem)": "repeat(2,minmax(0,1fr))",
@@ -116,62 +107,62 @@ const viewStyles = stylex.create({
   template: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-page)",
-    padding: "calc(var(--spacing) * 4)",
+    padding: "1rem",
   },
   templateCardDiv: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
-  templateCardSpan: {
+  templateCardSpan4: {
     display: "flex",
-    width: "calc(var(--spacing) * 16)",
-    height: "calc(var(--spacing) * 16)",
+    width: "4rem",
+    height: "4rem",
     flexShrink: "0",
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "var(--radius-lg)",
     backgroundColor: "var(--color-hover)",
   },
-  templateCardSpan2: {
+  templateCardSpan22: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-base)",
-    lineHeight: "var(--text-base--line-height)",
+    lineHeight: "var(--leading-base)",
     fontWeight: "var(--font-weight-semibold)",
   },
-  templateCardSpan3: {
+  templateCardSpan32: {
     flexShrink: "0",
     borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-hover)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.375rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   templatePersona: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderRadius: "var(--radius-md)",
     backgroundColor: "var(--color-hover)",
-    padding: "calc(var(--spacing) * 3)",
+    padding: "0.75rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   templateCardP: {
     color: "var(--color-muted)",
   },
   templateCardP2: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-medium)",
     color: "var(--color-muted)",
   },
@@ -183,16 +174,16 @@ const viewStyles = stylex.create({
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
     borderColor: "var(--color-line)",
-    paddingTop: "calc(var(--spacing) * 3)",
+    paddingTop: "0.75rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
-  templateCardSpan4: {
+  templateCardSpan42: {
     flex: "1",
   },
 });
@@ -214,19 +205,19 @@ export function TemplatesPage() {
     });
   };
   return (
-    <div {...stylex.attrs(viewStyles.templatesPageDiv)}>
-      <div {...stylex.attrs(viewStyles.templatesPageDiv2)}>
-        <div {...stylex.attrs(viewStyles.templatesPageDiv3)}>
-          <A href="/agents" {...stylex.attrs(variantStyles2.templatesPageA)}>
+    <div {...stylex.attrs(styles.templatesPageDiv)}>
+      <div {...stylex.attrs(styles.templatesPageDiv2)}>
+        <div {...stylex.attrs(styles.templatesPageDiv3)}>
+          <A href="/agents" {...stylex.attrs(styles.templatesPageA)}>
             {t("web.agent.all")}
           </A>
-          <div {...stylex.attrs(viewStyles.templatesPageDiv4)}>
-            <h1 {...stylex.attrs(viewStyles.templatesPageH1)}>{t("web.agent.templates.title")}</h1>
+          <div {...stylex.attrs(styles.templatesPageDiv4)}>
+            <h1 {...stylex.attrs(styles.templatesPageH1)}>{t("web.agent.templates.title")}</h1>
             <Hint text={t("web.agent.templates.intro")} />
           </div>
         </div>
         <form
-          {...stylex.attrs(viewStyles.templatesPageForm)}
+          {...stylex.attrs(styles.templatesPageForm)}
           onSubmit={(e) => {
             e.preventDefault();
             if (path().trim()) void add();
@@ -238,13 +229,13 @@ export function TemplatesPage() {
             placeholder={t("web.agent.templates.folderHint")}
             value={path()}
             onInput={(e) => setPath(e.currentTarget.value)}
-            styles={variantStyles3.templatesPageTextInput}
+            styles={styles.templatesPageTextInput}
           />
           <Button type="submit" data-testid="template-add" disabled={adding.busy() || !path().trim()}>
             {t("web.agent.templates.add")}
           </Button>
         </form>
-        <div {...stylex.attrs(viewStyles.templatesPageDiv5)}>
+        <div {...stylex.attrs(styles.templatesPageDiv5)}>
           <For each={sorted()} keyed={(template) => template.id}>
             {(template) => (
               <TemplateCard template={template()} runtime={ready(runtimes, []).find((r) => r.id === template().runtime)} runtimes={ready(runtimes, [])} />
@@ -296,26 +287,26 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | 
       data-key={template().id}
       data-installed={template().installed.length}
       data-source={template().source}
-      {...stylex.attrs(viewStyles.template)}
+      {...stylex.attrs(styles.template)}
     >
-      <div {...stylex.attrs(viewStyles.templateCardDiv)}>
-        <span {...stylex.attrs(viewStyles.templateCardSpan)}>
+      <div {...stylex.attrs(styles.templateCardDiv)}>
+        <span {...stylex.attrs(styles.templateCardSpan4)}>
           <Show when={orchestrator()} fallback={<AgentFace agentId={template().id} runtime={template().runtime} look={template().look} size={56} />}>
             <OrchestratorFace size={56} look={template().look.orchestrator ?? "farmer"} />
           </Show>
         </span>
-        <span {...stylex.attrs(variantStyles.templateCardSpan)}>
-          <span {...stylex.attrs(viewStyles.templatesPageForm)}>
-            <span {...stylex.attrs(viewStyles.templateCardSpan2)}>{template().name}</span>
-            <span {...stylex.attrs(viewStyles.templateCardSpan3)}>{t(`web.agent.role.${template().role}`)}</span>
+        <span {...stylex.attrs(styles.templateCardSpan)}>
+          <span {...stylex.attrs(styles.templatesPageForm)}>
+            <span {...stylex.attrs(styles.templateCardSpan22)}>{template().name}</span>
+            <span {...stylex.attrs(styles.templateCardSpan32)}>{t(`web.agent.role.${template().role}`)}</span>
           </span>
-          <span {...stylex.attrs(variantStyles.templateCardSpan2)}>{template().duty}</span>
+          <span {...stylex.attrs(styles.templateCardSpan2)}>{template().duty}</span>
           <Show when={skills().length > 0}>
-            <span data-testid="template-skills" {...stylex.attrs(variantStyles.templateCardSpan2)}>
+            <span data-testid="template-skills" {...stylex.attrs(styles.templateCardSpan2)}>
               {t("web.agent.templates.skills", { skills: list(Arr.map(skills(), (s) => s.name)) })}
             </span>
           </Show>
-          <span {...stylex.attrs(variantStyles.templateCardSpan3, here() ? variantStyles.templateCardSpanVariant : variantStyles.templateCardSpanVariant2)}>
+          <span {...stylex.attrs(styles.templateCardSpan3, here() ? styles.templateCardSpanTone : styles.templateCardSpanAlt)}>
             {orchestrator()
               ? t("web.agent.templates.onServer")
               : here()
@@ -325,9 +316,9 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | 
         </span>
       </div>
       <Show when={open()}>
-        <div data-testid="template-persona" {...stylex.attrs(viewStyles.templatePersona)}>
+        <div data-testid="template-persona" {...stylex.attrs(styles.templatePersona)}>
           <Show when={template().tags.length > 0}>
-            <p {...stylex.attrs(viewStyles.templateCardP)}>
+            <p {...stylex.attrs(styles.templateCardP)}>
               {t("web.agent.tags")}
               {t("web.agent.colon")}
               {list(template().tags)}
@@ -335,17 +326,17 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | 
           </Show>
           <For each={skills()}>
             {(s) => (
-              <p data-testid="template-skill" {...stylex.attrs(viewStyles.templateCardP)}>
+              <p data-testid="template-skill" {...stylex.attrs(styles.templateCardP)}>
                 {t("web.agent.templates.skill", { name: s.name, description: s.description })}
               </p>
             )}
           </For>
-          <p {...stylex.attrs(viewStyles.templateCardP2)}>{t("web.agent.personaLabel")}</p>
-          <p {...stylex.attrs(viewStyles.templateCardP3)}>{template().persona || t("web.agent.templates.noPersona")}</p>
+          <p {...stylex.attrs(styles.templateCardP2)}>{t("web.agent.personaLabel")}</p>
+          <p {...stylex.attrs(styles.templateCardP3)}>{template().persona || t("web.agent.templates.noPersona")}</p>
         </div>
       </Show>
-      <div {...stylex.attrs(viewStyles.templateCardDiv2)}>
-        <span {...stylex.attrs(viewStyles.templateCardSpan4)}>
+      <div {...stylex.attrs(styles.templateCardDiv2)}>
+        <span {...stylex.attrs(styles.templateCardSpan42)}>
           {template().installed.length > 0 ? t("web.agent.templates.installed", { n: template().installed.length }) : ""}
           {template().source === "added" ? t("web.agent.templates.addedHere") : ""}
         </span>

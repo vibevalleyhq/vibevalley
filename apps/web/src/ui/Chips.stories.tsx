@@ -7,10 +7,10 @@ import { ChipsInput, KeyValueEditor } from "./Chips";
 
 const viewStyles = stylex.create({
   chipsStoriesDiv: {
-    width: "calc(var(--spacing) * 80)",
+    width: "20rem",
   },
   chipsStoriesDiv2: {
-    width: "calc(var(--spacing) * 96)",
+    width: "24rem",
   },
 });
 

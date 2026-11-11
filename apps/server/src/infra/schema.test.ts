@@ -11,7 +11,7 @@ const indexes = [...schema.matchAll(/create (?:unique )?index (?:if not exists )
   name: m[1]!.toLowerCase(),
   table: m[2]!.toLowerCase(),
 }));
-const modules = readdirSync(src).filter((d) => statSync(join(src, d)).isDirectory());
+const modules = ["modules", "gateway"].flatMap((g) => readdirSync(join(src, g)).filter((d) => statSync(join(src, g, d)).isDirectory()));
 
 /** A plural ends in s; these words end in s and are singular. */
 const singularInS = new Set(["status", "alias", "ingress"]);

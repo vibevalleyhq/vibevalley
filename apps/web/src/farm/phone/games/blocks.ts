@@ -104,16 +104,22 @@ export function cellsOf(p: Falling): [number, number][] {
 }
 
 function draw(bag: readonly PieceKind[], seed: number): [PieceKind, PieceKind[], number] {
-  if (bag.length > 0) return [bag[0]!, bag.slice(1), seed];
+  const next = bag[0];
+  if (next !== undefined) return [next, bag.slice(1), seed];
   const fresh: PieceKind[] = [...pieceKinds];
   let s = seed;
   for (let i = fresh.length - 1; i > 0; i--) {
     const [r, n] = nextRandom(s);
     s = n;
     const j = Math.floor(r * (i + 1));
-    [fresh[i], fresh[j]] = [fresh[j]!, fresh[i]!];
+    const a = fresh[i];
+    const b = fresh[j];
+    if (a !== undefined && b !== undefined) {
+      fresh[i] = b;
+      fresh[j] = a;
+    }
   }
-  return [fresh[0]!, fresh.slice(1), s];
+  return [fresh[0] ?? "I", fresh.slice(1), s];
 }
 
 const spawn = (kind: PieceKind): Falling => ({ kind, turn: 0, x: Math.floor((blocksWidth - shapes[kind][0]) / 2), y: 0 });
@@ -195,7 +201,7 @@ function land(g: Blocks): Blocks {
     next: after,
     bag,
     seed,
-    score: g.score + linePoints[cleared]! * g.level,
+    score: g.score + (linePoints[cleared] ?? 0) * g.level,
     lines,
     level: 1 + Math.floor(lines / 10),
     over: above || !fits(settled, piece),

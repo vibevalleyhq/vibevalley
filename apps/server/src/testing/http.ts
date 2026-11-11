@@ -1,6 +1,6 @@
 import { Layer } from "effect";
 
-import { app as application } from "#/http/app.ts";
+import { app as application } from "#/gateway/http/app.ts";
 
 import { offlineNetwork } from "./layers.ts";
 

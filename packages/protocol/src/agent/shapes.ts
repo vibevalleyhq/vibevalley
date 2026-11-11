@@ -1,3 +1,7 @@
+import type { AgentRole } from "../common/shapes";
+
+export { AgentRoleValues, type AgentRole } from "../common/shapes";
+
 export const AgentIssueLevelValues = ["error", "warn"] as const;
 export type AgentProblemLevel = (typeof AgentIssueLevelValues)[number];
 
@@ -24,10 +28,6 @@ export interface Skill {
   /** Shipped with VibeValley (apps/server/src/agent/skills): read-only, changed only by updating VibeValley. */
   builtIn?: boolean;
 }
-
-/** What a profile is: an orchestrator (the orchestrator) stays and coordinates; a worker (worker) is sent on an issue. */
-export const AgentRoleValues = ["orchestrator", "worker"] as const;
-export type AgentRole = (typeof AgentRoleValues)[number];
 
 export interface Agent {
   id: string;

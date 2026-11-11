@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from "vite-plus/test";
 
 import { VibeValleyApiError } from "@vibevalley/protocol";
+import { BizCode } from "@vibevalley/protocol/api";
 
 import { frameAt, testFrames } from "#/infra/testing.ts";
 
@@ -38,10 +39,10 @@ test("a refused one fails with the server's reason and structured fault, and a r
   const { key, done } = intents.send({ id: "12" });
   expect(intents.all()).toMatchObject([{ key, phase: "sending" }]);
   const next = [{ say: "先叫停帮工", run: ["session", "stop", "w1"] }];
-  reply(0).reject(new VibeValleyApiError(409, "Refused", "进行中满了", { _tag: "Refused", reason: "进行中满了", next }));
+  reply(0).reject(new VibeValleyApiError(409, "Refused", "进行中满了", { next }, undefined, BizCode.IssueRefused));
   expect(await done).toMatchObject({
     phase: "failed",
-    fault: { tag: "Refused", reason: "进行中满了", next, retryable: false },
+    fault: { bizCode: BizCode.IssueRefused, tag: "Refused", reason: "进行中满了", next, retryable: false },
   });
   expect(intents.all()).toMatchObject([{ key, phase: "failed", fault: { reason: "进行中满了" } }]);
   const again = intents.retry(key);

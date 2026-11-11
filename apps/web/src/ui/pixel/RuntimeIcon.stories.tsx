@@ -10,7 +10,7 @@ const viewStyles = stylex.create({
   runtimeIconStoriesDiv: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
 });
 

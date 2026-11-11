@@ -15,8 +15,9 @@ CREATE FUNCTION term_query(words text[], prefix boolean) RETURNS tsquery LANGUAG
 
 CREATE TABLE channel_participant (
   id         text primary key,
-  -- A profile is a helper profile the user talks with alone (its id is profile:<agent>), not one of its sessions.
-  kind       text not null check (kind in ('user', 'orchestrator', 'session', 'profile', 'system')),
+  -- Direct-talk helper seats use id = profile:<agent> with runtime = null; hired sessions set runtime.
+  kind       text not null check (kind in ('user', 'agent', 'system')),
+  role       text check (role in ('orchestrator', 'worker')),
   name       text not null,
   agent_id   text,
   runtime    text,
@@ -24,7 +25,8 @@ CREATE TABLE channel_participant (
   left_at    double precision,
   -- The order they joined in, for those who joined at the same millisecond (numbered by channel_participant_seq).
   seq        integer not null default 0,
-  check ((kind in ('session', 'profile')) = (agent_id is not null))
+  check ((kind = 'agent') = (role is not null)),
+  check ((role = 'worker') = (agent_id is not null))
 );
 CREATE TABLE channel (
   id            text primary key,
@@ -219,7 +221,7 @@ CREATE TABLE mailbox_trigger (
          (routed_at is not null and routing_scope is not null and routing_position is not null)),
   unique (source, source_key)
 );
-CREATE TABLE ingress_github (
+CREATE TABLE issue_github (
   repo text not null,
   pr_number integer not null,
   check_fingerprint text not null default '',

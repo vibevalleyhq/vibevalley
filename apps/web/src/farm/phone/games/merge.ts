@@ -26,7 +26,8 @@ export interface Merge {
   readonly previous: Merge | undefined;
 }
 
-export const mergeStageName = (stage: number) => (stage <= mergeGoal ? mergeStages[stage - 1]! : t("web.farm.phone.merge.past", { n: stage - mergeGoal + 1 }));
+export const mergeStageName = (stage: number) =>
+  stage <= mergeGoal ? (mergeStages[stage - 1] ?? "") : t("web.farm.phone.merge.past", { n: stage - mergeGoal + 1 });
 
 export const mergeTop = (g: Merge) => Math.max(0, ...g.board);
 
@@ -34,7 +35,7 @@ function sow(board: readonly number[], seed: number): [number[], number, number]
   const empty = board.flatMap((v, i) => (v === 0 ? [i] : []));
   if (empty.length === 0) return [[...board], -1, seed];
   const [r, s] = nextRandom(seed);
-  const at = empty[Math.floor(r * empty.length)]!;
+  const at = empty[Math.floor(r * empty.length)] ?? 0;
   const next = [...board];
   next[at] = 1;
   return [next, at, s];
@@ -80,18 +81,20 @@ export function slideMerge(g: Merge, direction: MergeDirection): Merge {
   const grown: number[] = [];
   let gained = 0;
   for (const line of lines(direction)) {
-    const crops = line.map((i) => g.board[i]!).filter((v) => v !== 0);
+    const crops = line.map((i) => g.board[i] ?? 0).filter((v) => v !== 0);
     const out: number[] = [];
     for (let k = 0; k < crops.length; k++) {
-      if (k + 1 < crops.length && crops[k] === crops[k + 1]) {
-        const stage = crops[k]! + 1;
-        grown.push(line[out.length]!);
+      const cur = crops[k] ?? 0;
+      if (k + 1 < crops.length && cur === crops[k + 1]) {
+        const stage = cur + 1;
+        const target = line[out.length];
+        if (target !== undefined) grown.push(target);
         out.push(stage);
         gained += 2 ** stage;
         k++;
-      } else out.push(crops[k]!);
+      } else out.push(cur);
     }
-    line.forEach((cell, k) => (board[cell] = k < out.length ? out[k]! : 0));
+    line.forEach((cell, k) => (board[cell] = out[k] ?? 0));
   }
   if (board.every((v, i) => v === g.board[i])) return g;
   const [sown, at, seed] = sow(board, g.seed);

@@ -34,7 +34,7 @@ import { Hint } from "#/ui/Tip.tsx";
 
 import { bottleSprite, type Quota, quotaLevel, quotaOf, windowLabel } from "./quota";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   staminaSpan: {
     flex: "1",
     borderRadius: "var(--radius-xs)",
@@ -54,28 +54,12 @@ const recipeStyles = stylex.create({
   staminaSpanState5: {
     backgroundColor: "var(--wb-bark)",
   },
-});
-const recipeStylesChoices1 = {
-  plenty: recipeStyles.staminaSpanState2,
-  low: recipeStyles.staminaSpanState3,
-  gold: recipeStyles.staminaSpanState3,
-  empty: recipeStyles.staminaSpanState4,
-  unknown: recipeStyles.staminaSpanState5,
-};
-
-const variantStyles4 = stylex.create({
   supportCardIcon: {
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
   },
-});
-
-const variantStyles3 = stylex.create({
   numberInputTextInput: {
     fontFamily: "var(--font-mono)",
   },
-});
-
-const variantStyles2 = stylex.create({
   staminaMeterRoot: {
     display: "inline-flex",
     gap: "1px",
@@ -83,35 +67,32 @@ const variantStyles2 = stylex.create({
     backgroundColor: "var(--color-bark-800)",
     padding: "1px",
   },
-});
-
-const variantStyles = stylex.create({
   usageDiv: {
     display: "flex",
     minWidth: "0",
     flex: "1",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2.5)",
+    gap: "0.625rem",
   },
   usageP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
-  usagePVariant: {
+  usagePTone: {
     color: "var(--color-berry)",
   },
-  usagePVariant2: {},
+  usagePAlt: {},
   supportCardSpan: {
     borderRadius: "var(--radius-sm)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.375rem",
     paddingBlock: "1px",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
-  supportCardSpanVariant: {
+  supportCardSpanTone: {
     backgroundColor: "var(--color-selected)",
   },
-  supportCardSpanVariant2: {
+  supportCardSpanAlt: {
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-line)",
@@ -121,50 +102,47 @@ const variantStyles = stylex.create({
   inventoryCardSpan: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
-  inventoryCardSpanVariant: {
+  inventoryCardSpanTone: {
     color: "var(--color-muted)",
     textDecorationLine: "line-through",
   },
-});
-
-const viewStyles = stylex.create({
-  usageP: {
+  usageP2: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-warn-ink)",
   },
-  usageDiv: {
+  usageDiv2: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   usageSpan: {
     display: "flex",
-    width: "calc(var(--spacing) * 14)",
+    width: "3.5rem",
     flexShrink: "0",
     flexDirection: "column",
     alignItems: "center",
   },
   usageSpan2: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
-  usageP2: {
+  usageP22: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   windowDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   windowSpan: {
     display: "flex",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
   windowSpan2: {
     flex: "1",
@@ -172,25 +150,25 @@ const viewStyles = stylex.create({
   },
   windowSpan3: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   supportCardDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 1.5)",
-  },
-  supportCardSpan: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 1.5)",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    gap: "0.375rem",
   },
   supportCardSpan2: {
-    paddingTop: "calc(var(--spacing) * 2)",
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "0.375rem",
+    fontSize: "var(--text-sm)",
+    lineHeight: "var(--leading-sm)",
+  },
+  supportCardSpan22: {
+    paddingTop: "0.5rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-medium)",
     color: "var(--color-muted)",
   },
@@ -200,24 +178,24 @@ const viewStyles = stylex.create({
   supportCardDiv2: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   fieldSpan: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-medium)",
     color: "var(--color-muted)",
   },
   settingsCardSpan: {
     display: "flex",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   settingsCardDiv: {
     display: "grid",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
     gridTemplateColumns: {
       default: null,
       "@media (width>=48rem)": "repeat(2,minmax(0,1fr))",
@@ -225,36 +203,43 @@ const viewStyles = stylex.create({
   },
   settingsCardSpan2: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-faint)",
   },
   modelsCardSpan: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   modelsCardSpan2: {
-    marginLeft: "calc(var(--spacing) * 2)",
+    marginLeft: "0.5rem",
     borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-ok-soft)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.375rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-ok-ink)",
   },
   inventoryCardLi: {
     display: "flex",
     flexDirection: "column",
   },
-  inventoryCardSpan: {
+  inventoryCardSpan2: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
 });
+const toneChoices1 = {
+  plenty: styles.staminaSpanState2,
+  low: styles.staminaSpanState3,
+  gold: styles.staminaSpanState3,
+  empty: styles.staminaSpanState4,
+  unknown: styles.staminaSpanState5,
+};
 
 const capabilityLabel: Record<RuntimeCapability, string> = {
   listModels: t("web.runtime.capability.listModels"),
@@ -276,11 +261,11 @@ export function Stamina(props: { quota: Quota; cells?: number; width: number; he
     <Meter.Root
       value={Math.round(props.quota.fill * 100)}
       aria-label={props.quota.text}
-      {...stylex.attrs(variantStyles2.staminaMeterRoot)}
+      {...stylex.attrs(styles.staminaMeterRoot)}
       style={{ width: `${props.width}px`, height: `${props.height}px` }}
     >
       <For each={Array.from({ length: cells() }, (_, i) => i)}>
-        {(i) => <span {...stylex.attrs(recipeStyles.staminaSpan, i < lit() ? recipeStylesChoices1[props.quota.level] : recipeStyles.staminaSpanState)} />}
+        {(i) => <span {...stylex.attrs(styles.staminaSpan, i < lit() ? toneChoices1[props.quota.level] : styles.staminaSpanState)} />}
       </For>
     </Meter.Root>
   );
@@ -296,24 +281,24 @@ export function Usage(props: { info: RuntimeInfo }) {
       {(usage) => (
         <Switch>
           <Match when={usage().status === "login_required"}>
-            <p {...stylex.attrs(viewStyles.usageP)}>{t("web.runtime.signedOut", { runtime: props.info.preset.label })}</p>
+            <p {...stylex.attrs(styles.usageP2)}>{t("web.runtime.signedOut", { runtime: props.info.preset.label })}</p>
           </Match>
           <Match when={variant(usage(), "status", "unavailable")}>{(u) => <Quiet>{t("web.runtime.unreadable", { why: u().reason })}</Quiet>}</Match>
           <Match when={usage()}>
-            <div {...stylex.attrs(viewStyles.usageDiv)}>
-              <span {...stylex.attrs(viewStyles.usageSpan)}>
+            <div {...stylex.attrs(styles.usageDiv2)}>
+              <span {...stylex.attrs(styles.usageSpan)}>
                 <SpriteIcon name={bottleSprite(quota())} size={52} />
-                <span {...stylex.attrs(viewStyles.usageSpan2)}>{quota().short || "—"}</span>
+                <span {...stylex.attrs(styles.usageSpan2)}>{quota().short || "—"}</span>
               </span>
-              <div {...stylex.attrs(variantStyles.usageDiv)}>
+              <div {...stylex.attrs(styles.usageDiv)}>
                 <Switch>
                   <Match when={variant(usage(), "status", "balance")}>
                     {(u) => (
                       <>
-                        <p {...stylex.attrs(variantStyles.usageP, !u().available ? variantStyles.usagePVariant : variantStyles.usagePVariant2)}>
+                        <p {...stylex.attrs(styles.usageP, !u().available ? styles.usagePTone : styles.usagePAlt)}>
                           {t("web.runtime.balance", { provider: u().provider, enough: u().available })}
                         </p>
-                        <p {...stylex.attrs(viewStyles.usageP2)}>
+                        <p {...stylex.attrs(styles.usageP22)}>
                           {(props.info.settings.dailyBudget ?? 0) > 0
                             ? t("web.runtime.spentTodayBudget", { spent: yuan(props.info.spentToday ?? 0), budget: yuan(props.info.settings.dailyBudget ?? 0) })
                             : t("web.runtime.spentToday", { spent: yuan(props.info.spentToday ?? 0) })}
@@ -325,7 +310,7 @@ export function Usage(props: { info: RuntimeInfo }) {
                     {(u) => (
                       <>
                         <Show when={u().subscription}>
-                          <p {...stylex.attrs(viewStyles.usageP2)}>{t("web.runtime.subscription", { tier: u().subscription ?? "" })}</p>
+                          <p {...stylex.attrs(styles.usageP22)}>{t("web.runtime.subscription", { tier: u().subscription ?? "" })}</p>
                         </Show>
                         <For each={u().windows}>{(w) => <Window window={w} />}</For>
                       </>
@@ -347,9 +332,9 @@ function Window(props: { window: UsageWindow }) {
   const left = () => 100 - props.window.usedPercent;
   const label = () => windowLabel(props.window.label);
   return (
-    <div {...stylex.attrs(viewStyles.windowDiv)}>
-      <span {...stylex.attrs(viewStyles.windowSpan)}>
-        <span {...stylex.attrs(viewStyles.windowSpan2)}>{label()}</span>
+    <div {...stylex.attrs(styles.windowDiv)}>
+      <span {...stylex.attrs(styles.windowSpan)}>
+        <span {...stylex.attrs(styles.windowSpan2)}>{label()}</span>
         {t("web.runtime.left", { pct: pct(left()) })}
       </span>
       <Stamina
@@ -363,7 +348,7 @@ function Window(props: { window: UsageWindow }) {
         height={10}
       />
       <Show when={props.window.resetsAt}>
-        {(at) => <span {...stylex.attrs(viewStyles.windowSpan3)}>{t("web.runtime.resets", { moment: momentText(at()) })}</span>}
+        {(at) => <span {...stylex.attrs(styles.windowSpan3)}>{t("web.runtime.resets", { moment: momentText(at()) })}</span>}
       </Show>
     </div>
   );
@@ -374,32 +359,27 @@ export function SupportCard(props: { info: RuntimeInfo }) {
   const refused = () => Object.entries(support().refused);
   return (
     <Card title={t("web.runtime.can")}>
-      <div {...stylex.attrs(viewStyles.supportCardDiv)}>
-        <span {...stylex.attrs(viewStyles.supportCardSpan)}>
-          <Icon name={support().steer ? "check" : "cross"} size={12} styles={[variantStyles4.supportCardIcon]} />
+      <div {...stylex.attrs(styles.supportCardDiv)}>
+        <span {...stylex.attrs(styles.supportCardSpan2)}>
+          <Icon name={support().steer ? "check" : "cross"} size={12} styles={[styles.supportCardIcon]} />
           {support().steer ? t("web.runtime.steer") : t("web.runtime.noSteer")}
         </span>
-        <span {...stylex.attrs(viewStyles.usageSpan2)}>{support().inProcess ? t("web.runtime.inProcess") : t("web.runtime.ownProcess")}</span>
-        <span {...stylex.attrs(viewStyles.supportCardSpan2)}>{t("web.runtime.refused")}</span>
-        <Show when={refused().length > 0} fallback={<span {...stylex.attrs(viewStyles.usageSpan2)}>{t("web.runtime.acceptsAll")}</span>}>
+        <span {...stylex.attrs(styles.usageSpan2)}>{support().inProcess ? t("web.runtime.inProcess") : t("web.runtime.ownProcess")}</span>
+        <span {...stylex.attrs(styles.supportCardSpan22)}>{t("web.runtime.refused")}</span>
+        <Show when={refused().length > 0} fallback={<span {...stylex.attrs(styles.usageSpan2)}>{t("web.runtime.acceptsAll")}</span>}>
           <For each={refused()}>
             {([k, v]) => (
-              <span {...stylex.attrs(viewStyles.usageSpan2)}>
-                <span {...stylex.attrs(viewStyles.supportCardSpan3)}>{k}</span> <span {...stylex.attrs(viewStyles.windowSpan3)}>{v}</span>
+              <span {...stylex.attrs(styles.usageSpan2)}>
+                <span {...stylex.attrs(styles.supportCardSpan3)}>{k}</span> <span {...stylex.attrs(styles.windowSpan3)}>{v}</span>
               </span>
             )}
           </For>
         </Show>
-        <span {...stylex.attrs(viewStyles.supportCardSpan2)}>{t("web.runtime.queries")}</span>
-        <div {...stylex.attrs(viewStyles.supportCardDiv2)}>
+        <span {...stylex.attrs(styles.supportCardSpan22)}>{t("web.runtime.queries")}</span>
+        <div {...stylex.attrs(styles.supportCardDiv2)}>
           <For each={RuntimeCapabilityValues}>
             {(c) => (
-              <span
-                {...stylex.attrs(
-                  variantStyles.supportCardSpan,
-                  support().capabilities.includes(c) ? variantStyles.supportCardSpanVariant : variantStyles.supportCardSpanVariant2,
-                )}
-              >
+              <span {...stylex.attrs(styles.supportCardSpan, support().capabilities.includes(c) ? styles.supportCardSpanTone : styles.supportCardSpanAlt)}>
                 {capabilityLabel[c]}
               </span>
             )}
@@ -417,7 +397,7 @@ function NumberInput(props: { value?: number | undefined; onChange: (n: number |
     <TextInput
       data-testid={props.testid}
       aria-label={props.label}
-      styles={variantStyles3.numberInputTextInput}
+      styles={styles.numberInputTextInput}
       placeholder={props.placeholder}
       inputmode="decimal"
       value={text()}
@@ -433,8 +413,8 @@ function NumberInput(props: { value?: number | undefined; onChange: (n: number |
 
 function Field(props: { label: string; hint?: string | undefined; children: JSX.Element }) {
   return (
-    <div {...stylex.attrs(viewStyles.windowDiv)}>
-      <span {...stylex.attrs(viewStyles.fieldSpan)}>
+    <div {...stylex.attrs(styles.windowDiv)}>
+      <span {...stylex.attrs(styles.fieldSpan)}>
         {props.label}
         <Show when={props.hint}>{(h) => <Hint text={h()} />}</Show>
       </span>
@@ -469,7 +449,7 @@ export function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeI
       title={t("web.runtime.settings")}
       action={
         <Show when={dirty()}>
-          <span {...stylex.attrs(viewStyles.settingsCardSpan)}>
+          <span {...stylex.attrs(styles.settingsCardSpan)}>
             <Button data-testid="discard" onClick={() => setDraft(props.info.settings)}>
               {t("web.runtime.discard")}
             </Button>
@@ -480,7 +460,7 @@ export function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeI
         </Show>
       }
     >
-      <div {...stylex.attrs(viewStyles.settingsCardDiv)}>
+      <div {...stylex.attrs(styles.settingsCardDiv)}>
         <Toggle
           label={t("web.runtime.enabled")}
           tip={t("web.runtime.enabledHint")}
@@ -490,7 +470,7 @@ export function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeI
         <Field label={t("web.runtime.binPath")} hint={t("web.runtime.binPathHint", { id: props.info.id.toUpperCase() })}>
           <TextInput
             aria-label={t("web.runtime.binPath")}
-            styles={variantStyles3.numberInputTextInput}
+            styles={styles.numberInputTextInput}
             placeholder={t("web.runtime.auto")}
             value={draft().binPath}
             onInput={(e) => setDraft({ ...draft(), binPath: e.currentTarget.value })}
@@ -506,7 +486,7 @@ export function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeI
           />
         </Field>
         <Field label={t("web.runtime.defaultEffort")} hint={effortHint()}>
-          <Show when={(model()?.effortLevels.length ?? 0) > 0} fallback={<span {...stylex.attrs(viewStyles.settingsCardSpan2)}>—</span>}>
+          <Show when={(model()?.effortLevels.length ?? 0) > 0} fallback={<span {...stylex.attrs(styles.settingsCardSpan2)}>—</span>}>
             <Segmented
               label={t("web.runtime.defaultEffort")}
               value={draft().defaultEffort}
@@ -562,9 +542,9 @@ export function ModelsCard(props: { info: RuntimeInfo }) {
       () => t("web.runtime.models"),
       (value, model) => (
         <>
-          <span {...stylex.attrs(viewStyles.modelsCardSpan)}>{value()}</span>
+          <span {...stylex.attrs(styles.modelsCardSpan)}>{value()}</span>
           <Show when={model().isDefault}>
-            <span {...stylex.attrs(viewStyles.modelsCardSpan2)}>{t("web.runtime.default")}</span>
+            <span {...stylex.attrs(styles.modelsCardSpan2)}>{t("web.runtime.default")}</span>
           </Show>
         </>
       ),
@@ -572,15 +552,13 @@ export function ModelsCard(props: { info: RuntimeInfo }) {
     effort: tableCell(
       effort,
       () => t("web.runtime.effort"),
-      (value) => <span {...stylex.attrs(viewStyles.usageP2)}>{value() || "—"}</span>,
+      (value) => <span {...stylex.attrs(styles.usageP22)}>{value() || "—"}</span>,
     ),
   };
   return (
     <Card
       title={t("web.runtime.models")}
-      action={
-        <Show when={props.info.models}>{(m) => <span {...stylex.attrs(viewStyles.usageP2)}>{t("web.runtime.modelCount", { n: m().length })}</span>}</Show>
-      }
+      action={<Show when={props.info.models}>{(m) => <span {...stylex.attrs(styles.usageP22)}>{t("web.runtime.modelCount", { n: m().length })}</span>}</Show>}
     >
       <Show
         when={props.info.models}
@@ -594,23 +572,16 @@ export function ModelsCard(props: { info: RuntimeInfo }) {
 
 export function InventoryCard(props: { title: string; entries: InventoryEntry[] | null }) {
   return (
-    <Card title={props.title} action={<Show when={props.entries}>{(e) => <span {...stylex.attrs(viewStyles.usageP2)}>{e().length}</span>}</Show>}>
+    <Card title={props.title} action={<Show when={props.entries}>{(e) => <span {...stylex.attrs(styles.usageP22)}>{e().length}</span>}</Show>}>
       <Switch
         fallback={
-          <ul {...stylex.attrs(viewStyles.windowDiv)}>
+          <ul {...stylex.attrs(styles.windowDiv)}>
             <For each={props.entries}>
               {(e) => (
-                <li {...stylex.attrs(viewStyles.inventoryCardLi)}>
-                  <span
-                    {...stylex.attrs(
-                      variantStyles.inventoryCardSpan,
-                      e.enabled === false ? variantStyles.inventoryCardSpanVariant : variantStyles.usagePVariant2,
-                    )}
-                  >
-                    {e.name}
-                  </span>
+                <li {...stylex.attrs(styles.inventoryCardLi)}>
+                  <span {...stylex.attrs(styles.inventoryCardSpan, e.enabled === false ? styles.inventoryCardSpanTone : styles.usagePAlt)}>{e.name}</span>
                   <Show when={e.description}>
-                    <span {...stylex.attrs(viewStyles.inventoryCardSpan)}>{e.description}</span>
+                    <span {...stylex.attrs(styles.inventoryCardSpan2)}>{e.description}</span>
                   </Show>
                 </li>
               )}

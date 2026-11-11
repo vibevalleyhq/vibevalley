@@ -9,9 +9,9 @@ const viewStyles = stylex.create({
   checkboxStoriesLabel: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
 });
 

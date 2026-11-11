@@ -1,7 +1,7 @@
 import { Brand, Schema } from "effect";
 
 import type { Codec } from "../codec";
-import * as T from "../shapes";
+import * as T from "./shapes";
 
 export const IssueId: Codec<T.IssueId> = Schema.String.pipe(Schema.brand("IssueId"));
 export const SessionId: Codec<T.SessionId> = Schema.String.pipe(Schema.brand("SessionId"));
@@ -22,6 +22,28 @@ export const Validation: Codec<T.Validation> = Schema.Struct({
 });
 
 export const ActorKind: Codec<T.ActorKind> = Schema.Literals(T.ActorKindValues);
+
+const AgentRole: Codec<T.AgentRole> = Schema.Literals(T.AgentRoleValues);
+
+export const Actor: Codec<T.Actor> = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal("user"),
+    id: Schema.String,
+    name: Schema.optionalKey(Schema.String),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("agent"),
+    id: Schema.String,
+    role: AgentRole,
+    name: Schema.optionalKey(Schema.String),
+    forUser: Schema.optionalKey(Schema.Boolean),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("system"),
+    id: Schema.String,
+    name: Schema.optionalKey(Schema.String),
+  }),
+]);
 
 export const Outcome: Codec<T.Outcome> = Schema.Literals(T.OutcomeValues);
 

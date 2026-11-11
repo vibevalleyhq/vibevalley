@@ -9,13 +9,13 @@ import { SecretInput, Toggle } from "#/ui/layout.tsx";
 import { ToastHost } from "#/ui/ToastHost.tsx";
 import { toast } from "#/ui/toasts.ts";
 
-const variantStyles = stylex.create({
+const styles = stylex.create({
   formStoriesForm: {
     display: "flex",
     width: "100%",
     maxWidth: "var(--container-lg)",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
   },
   formStoriesSpan: {
     color: "var(--color-berry)",
@@ -61,7 +61,7 @@ export default stories({
           }, 600);
         };
         return (
-          <form {...stylex.attrs(variantStyles.formStoriesForm)} onSubmit={(e) => e.preventDefault()}>
+          <form {...stylex.attrs(styles.formStoriesForm)} onSubmit={(e) => e.preventDefault()}>
             <Field label="名字" hint="在田头和看板上叫它的">
               <TextInput value={draft().name} onInput={(e) => patch({ name: e.currentTarget.value })} />
             </Field>
@@ -87,7 +87,7 @@ export default stories({
               onUndo={() => setDraft(base())}
               left={
                 <Show when={problem()}>
-                  <span {...stylex.attrs(variantStyles.formStoriesSpan)}>{problem()}</span>
+                  <span {...stylex.attrs(styles.formStoriesSpan)}>{problem()}</span>
                 </Show>
               }
             />

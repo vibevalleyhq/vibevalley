@@ -238,8 +238,10 @@ export function playSound(name: SoundName) {
     // Makes the context on first use; before the first gesture it stays suspended and this play is silent.
     synth.unlock();
     synth.play(SOUNDS[name]);
-  } catch {
-    // No audio device: the farm goes on silently.
+  } catch (e) {
+    // No audio device: drop the broken synth and let the farm go on silently.
+    synth = undefined;
+    if (!(e instanceof DOMException) && !(e instanceof Error)) throw e;
   }
 }
 
@@ -249,7 +251,8 @@ export function unlockSound() {
   try {
     synth ??= createSynth({ volume: 0.55 });
     synth.unlock();
-  } catch {
-    // As in playSound.
+  } catch (e) {
+    synth = undefined;
+    if (!(e instanceof DOMException) && !(e instanceof Error)) throw e;
   }
 }

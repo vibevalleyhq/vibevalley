@@ -14,7 +14,7 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/lan/lan.ts` | 门的监听、配对状态机、请求守卫 `guard`、放行表 `remoteMay`、登录和退出时的 Cookie、HTTP/WS 代理转发 |
+| `apps/server/src/gateway/lan/lan.ts` | 门的监听、配对状态机、请求守卫 `guard`、放行表 `remoteMay`、登录和退出时的 Cookie、HTTP/WS 代理转发 |
 | `apps/web/src/features/lan/LanPage.tsx`、`PairPage.tsx` | 设置「设备」页里「连接到本机」的卡片与远端设备的 `/pair` 配对页 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`lan.*`）。
@@ -55,5 +55,5 @@
 
 ## 怎么验证
 
-- `apps/server/src/lan/lan.test.ts`、`apps/web/src/features/lan/device.test.ts`：配对审批、5 次错码作废、`remote` 权限拦截、登录来的设备的放行和 Cookie、WebSocket 转发与收回设备断流。
+- `apps/server/src/gateway/lan/lan.test.ts`、`apps/web/src/features/lan/device.test.ts`：配对审批、5 次错码作废、`remote` 权限拦截、登录来的设备的放行和 Cookie、WebSocket 转发与收回设备断流。
 - `apps/web/test/pair.spec.ts`：远端浏览器自动跳转 `/pair`、本机批准后进入工单页。

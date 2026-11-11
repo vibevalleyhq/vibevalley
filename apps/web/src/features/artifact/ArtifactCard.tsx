@@ -13,14 +13,14 @@ import { useRouter, Link as A } from "#/infra/router.ts";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   artifactCardA: {
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
     display: "flex",
     width: "100%",
     maxWidth: "var(--container-md)",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
@@ -32,19 +32,16 @@ const recipeStyles = stylex.create({
         ":hover": "var(--color-hover)",
       },
     },
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
-    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
-    transitionDuration: ".12s",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
+    transitionProperty: "color, background-color, border-color",
+    transitionTimingFunction: "var(--ease-out)",
+    transitionDuration: "120ms",
   },
-});
-
-const viewStyles = stylex.create({
   artifactCardSpan: {
     display: "flex",
-    width: "calc(var(--spacing) * 9)",
-    height: "calc(var(--spacing) * 9)",
+    width: "2.25rem",
+    height: "2.25rem",
     flexShrink: "0",
     alignItems: "center",
     justifyContent: "center",
@@ -62,7 +59,7 @@ const viewStyles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-semibold)",
   },
   artifactCardSpan4: {
@@ -70,7 +67,7 @@ const viewStyles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
 });
@@ -123,14 +120,14 @@ export function ArtifactCard(props: { card: Card }) {
       data-key={props.card.id}
       data-version={props.card.version}
       aria-label={t("web.artifact.card.open", { title: props.card.title })}
-      {...stylex.attrs(recipeStyles.artifactCardA)}
+      {...stylex.attrs(styles.artifactCardA)}
     >
-      <span {...stylex.attrs(viewStyles.artifactCardSpan)}>
+      <span {...stylex.attrs(styles.artifactCardSpan)}>
         <Icon name={bodyIcon[props.card.body]} size={20} />
       </span>
-      <span {...stylex.attrs(viewStyles.artifactCardSpan2)}>
-        <span {...stylex.attrs(viewStyles.artifactCardSpan3)}>{props.card.title}</span>
-        <span {...stylex.attrs(viewStyles.artifactCardSpan4)}>
+      <span {...stylex.attrs(styles.artifactCardSpan2)}>
+        <span {...stylex.attrs(styles.artifactCardSpan3)}>{props.card.title}</span>
+        <span {...stylex.attrs(styles.artifactCardSpan4)}>
           {kindLabel(props.card)}
           <Show when={props.card.body === "html"}> · {t("web.artifact.card.version", { version: props.card.version })}</Show>
           <Show when={props.card.note}>{(note) => <> · {note()}</>}</Show>

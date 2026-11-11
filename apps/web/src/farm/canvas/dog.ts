@@ -107,9 +107,8 @@ const QUICK_PATS = 3;
 export function villageDog(random: () => number = Math.random): Dog {
   const every = cadence(random);
   let act: { name: Act; at: number } | undefined = undefined;
-  /** Sitting up: after a pat or with you on a call, until it settles again. */
-  let up = false;
-  let upUntil = -Infinity;
+  /** Until when it stays sitting up after a pat (or -Infinity while only a live call holds it up); undefined while asleep. */
+  let awakeUntil: number | undefined = undefined;
   let pointed = false;
   let pressed = false;
   let turn = 0;
@@ -132,14 +131,14 @@ export function villageDog(random: () => number = Math.random): Dog {
         if (frame) return show(frame.picture, frame.lift, frame.grow);
         act = undefined;
       }
-      if (listening || t < upUntil) {
-        up = true;
+      if (listening || (awakeUntil !== undefined && t < awakeUntil)) {
+        awakeUntil ??= -Infinity;
         if (every.due("awake", 6, t)) act = { name: pick(random()), at: t };
         // Pointed at, it is pleased you are there.
         return pointed ? show(t % 0.24 < 0.12 ? "dog-wag-1" : "dog-wag-2") : show("dog-awake");
       }
-      if (up) {
-        up = false;
+      if (awakeUntil !== undefined) {
+        awakeUntil = undefined;
         act = { name: "settle", at: t };
         return show("dog-yawn");
       }
@@ -150,9 +149,8 @@ export function villageDog(random: () => number = Math.random): Dog {
     pet: (t) => {
       pats.push(t);
       while (pats.length > 0 && t - (pats[0] ?? t) > QUICK_S) pats.shift();
-      const asleep = !up;
-      upUntil = t + AWAKE_S;
-      up = true;
+      const asleep = awakeUntil === undefined;
+      awakeUntil = t + AWAKE_S;
       const trick: Trick = asleep ? "wake" : pats.length >= QUICK_PATS ? "belly" : (TRICKS[turn++ % TRICKS.length] ?? "wag");
       if (trick === "belly") pats.length = 0;
       act = { name: trick, at: t };

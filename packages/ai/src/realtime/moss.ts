@@ -1,6 +1,6 @@
 import { decodeMossFrame, mossOutRate, mossTaggedFrameBytes, packTaggedAudio, unpackPcm16 } from "@vibevalley/provider/moss";
 
-import { jsonText } from "../json.ts";
+import { jsonText } from "../base/json.ts";
 import { heard, levelOf, type MossEvent, type MossPhase, type MossQos, type MossSetup, type MossTurn, noQos, noisyMossActions } from "./moss-session.ts";
 import { type Piece, Playback, type PlaybackAction, type Queued } from "./playback.ts";
 

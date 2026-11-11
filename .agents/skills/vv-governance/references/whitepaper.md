@@ -34,19 +34,19 @@
 白皮书说，用了最好的模型，代码库照样两个月内变坏，原因在模型的工作方式。
 
 **一、局部缝合。** 机理：模型要在有限的上下文里用最少的改动让指令跑通；提炼公共抽象要改没加载的文件，在模型看来风险高。例子：微信通知里有 40 行截断和重试，加飞书、QQ 时原样抄了两份，一个月后改截断规则，只改了微信和飞书，漏了 QQ。
-在这里：connector 的重试、退避、暂停已经收在 `apps/server/src/connector/connector.ts`，各聊天软件实现 `connector/adapter.ts` 的 `Adapter`；但 adapter 仍各自写超时（10、20、25 秒）和登录的轮询。以后做：扩展点只填空（先做农场的工具）。评审时照 [SKILL.md](.agents/skills/vv-governance/SKILL.md#2-评审一块代码有没有在变坏) 查。
+在这里：connector 的重试、退避、暂停已经收在 `apps/server/src/gateway/connector/connector.ts`，各聊天软件实现 `connector/adapter.ts` 的 `Adapter`；但 adapter 仍各自写超时（10、20、25 秒）和登录的轮询。以后做：扩展点只填空（先做农场的工具）。评审时照 [SKILL.md](.agents/skills/vv-governance/SKILL.md#2-评审一块代码有没有在变坏) 查。
 
 **二、只加不删。** 机理：agent 不确定一个导出是不是还被反射或外部脚本用，为了编过，只加新的、不删旧的。例子：轮询改成 WebSocket 推送，新写了 streamStatus()，旧的 pollStatus() 连 5 个帮手、12 个测试都留着；半年后 40% 是没人调的僵尸代码，后来的 agent 把它当现行的照抄。
 在这里：已有「内部不留兼容」（改名、改形状直接改，不留兼容层）。已做：`vp run deadcode`（knip，零容忍，在 CI 里），接上时清出 130 个没人用的导出、12 个类型、24 处声明、两个整文件、一个依赖。
 
 **三、绕开约束。** 机理：类型检查（复杂的泛型、Effect 的错误通道）或测试挡住任务时，模型找阻力最小的路绕过去，不修根本的错。例子：修并发扣费，编译器说 InsufficientQuotaError 没处理，agent 塞了 Effect.orDie、用 as any 绕过类型；边界测试挂了，就把 expect(balance).toBe(0) 改成 toBe(-10)。
-在这里：已有：`typescript/no-explicit-any`、`no-unsafe-*`、`typescript/no-unsafe-type-assertion`，类型逃生口（`x!`、`as`、`as unknown as`、关 lint 的注释）的棘轮。已做：`Effect.orDie`、`Effect.ignore`、吞掉的 `catch` 进棘轮；修复补的测试以 `regression: ` 开头，删改要在 PR 里点名（`scripts/regression.ts`）。帮工那边已做：验收子工单先红、合入时冻结改动文件（[工单](docs/subsystems/issue.md#模型和不变量)）。
+在这里：已有：`typescript/no-explicit-any`、`no-unsafe-*`、`typescript/no-unsafe-type-assertion`，类型逃生口（`x!`、`as`、`as unknown as`、关 lint 的注释）的棘轮。已做：`Effect.orDie`、`Effect.ignore`、吞掉的 `catch` 进棘轮；修复补的测试以 `regression: ` 开头，删改要在 PR 里点名（`scripts/release/regression.ts`）。帮工那边已做：验收子工单先红、合入时冻结改动文件（[工单](docs/subsystems/issue.md#模型和不变量)）。
 
 **四、温室假设。** 机理：训练语料多是教学代码，默认内存无限、网络秒回、磁盘不锁、外部进程输出规整。例子：看板接口在 50 个工单的 .map() 里逐个跑 git diff --numstat（N+1）；收模型的流时每来一个字就把整个历史 JSON.stringify 写一次盘；两个工单时很顺，第三天八十个工单，CPU 和磁盘满了。
 在这里：已有：贵的东西归拥有它的模块管，刚写下的不再读回，一条消息的几次写在一个事务里，时间归 `Clock`、测试拨 `TestClock`（[地基](docs/subsystems/foundation.md)）。已做：`Db` 与 `git` 入口记录确定性 I/O 次数断言。以后做：流按任意切片测（出现第一个这类回归时）。
 
 **五、架构漂移和乱引依赖。** 机理：每个 agent 都是失忆的，看不见早先口头的约定；训练语料里有各个年代的库，各自按偏好引包。例子：约定只用内置的日期和 Schema，1 号 agent 装了 moment，2 号装了 dayjs，3 号在领域层 import 了最外层的飞书 UI 组件，领域层和 UI 层缠死，再也不能单独编译。
-在这里：已有：依赖的版本只写在 `pnpm-workspace.yaml` 的 catalog（`catalogMode: strict`，`scripts/catalog.test.ts` 查）；方向由 `apps/server/src/modules.test.ts`、`vibevalley/page-layers`、`import/no-cycle`、各包的 `no-restricted-imports`（`packages/ai` 不认识 agent，agent 不认识农场）守住；规矩写在 `AGENTS.md`，每次会话都在上下文里。
+在这里：已有：依赖的版本只写在 `pnpm-workspace.yaml` 的 catalog（`catalogMode: strict`，`scripts/audit/catalog.test.ts` 查）；方向由 `apps/server/src/modules.test.ts`、`vibevalley/page-layers`、`import/no-cycle`、各包的 `no-restricted-imports`（`packages/ai` 不认识 agent，agent 不认识农场）守住；规矩写在 `AGENTS.md`，每次会话都在上下文里。
 
 **六、认知赤字，审查破产。** 机理：人一小时读三五百行，六个 agent 一夜改八千行，人读不过来。例子：先坚持逐行审，分支积压；两周后看见 CI 绿就合；第二个月线上死锁，没人看得懂被改了十几遍的三千行异步调度。
 在这里：已有：一个 PR 讲一件事，正文写现在的行为和证据（[vv-pr](.agents/skills/vv-pr/SKILL.md)），改了接口和页面照 [vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 在真的程序上验证并附证据，子系统文档写「为什么这样」。回放（2026-10-30，`main` 最近 100 个 PR）：契约约占改动的 1/22，后来修掉的缺陷只有 1.5% 当初写在契约里：读契约挡不住缺陷，挡缺陷靠测试和验收。以后做：契约的 diff 进 CI 摘要。
@@ -55,8 +55,8 @@
 
 | 铁律 | 在这里 |
 |---|---|
-| 1. 机器能拦住的错，不花一个 token：架构规范写成毫秒级的类型检查和 AST 静态门禁，用退出码 1 代替说教 | 已有：四层手段的第 1、2 层；`vp check` 带类型的 lint、仓库自己的 oxlint 插件、结构测试、CI |
-| 2. 报错就是提示词：报错不只说不许做什么，印出标准写法的模板和参考文件的行号 | 已做：每个检查的话写错在哪、`Fix:`、`See`（`scripts/oxlint-plugin.ts` 的 `says`，测试查 `See` 的文件在不在）；改写：写文件不写行号（行号一改就错，文件挪了测试会报） |
+| 1. 机器能拦住的错，不花一个 token：架构规范写成毫秒级的类型检查和 AST 静态门禁，用退出码 1 代替说教 | 已有：四层手段的第 1、2 层；`vp check` 带类型的 lint、仓库自己的 oxlint 插件、`effect:check`、`practice:check` 全仓语法树审计、`paths:check`、`schema-audit.ts`、结构测试、CI |
+| 2. 报错就是提示词：报错不只说不许做什么，印出标准写法的模板和参考文件的行号 | 已做：每个检查的话写错在哪、`Fix:`、`See`（`scripts/audit/oxlint-plugin.ts` 的 `says`，测试查 `See` 的文件在不在）；改写：写文件不写行号（行号一改就错，文件挪了测试会报） |
 | 3. 收回公共控制流，只让 AI 填空：超时、重试、配额、事务回滚、子进程回收焊死在高阶函数里，AI 只写 50 行以内的业务插件 | 已有：帮工经 oar 驱动，核心状态只由 `Core.apply` 改，git 子进程在 `repo/git.ts` 杀整个进程组。以后做：扩展点只填空 |
 | 4. 物理锁死契约和验收测试：协议 Schema、核心接口签名、验收测试目录只读；修 bug 先锁定必败的红灯测试 | 改写：不锁目录（用户和 agent 是同一个用户，锁不住），让改动被看见：`regression: ` 测试删改要点名，生成的文件不手改（`docs:verify`、`server:check` 查）。帮工那边已有：验收先红、写好冻结 |
 | 5. 写新功能和做抽象拆成两张单：每合入 3 个功能单，插 1 个「不改行为、只减行数」的纯重构单 | 改写：功能和重构分成不同的 PR（`feat/`、`refactor/`），清哪里由体检的热点和 deadcode 决定，不按 3:1 的固定比例 |
@@ -83,19 +83,19 @@
 ### 第 1 层：物理环境与编译器铁笼
 
 **1.1 沙箱和命令防火墙。** 白皮书：每张编码工单在独立的 git worktree 和容器沙箱（Docker、MicroVM、macOS sandbox-exec）里开工；执行任何 shell 命令前，过一层用正则和语法树的确定性拦截（不让模型判断安全）：文件系统围栏（拒绝 worktree 之外的写，拦 .. 穿越、改 ~/.ssh、~/.zshrc）；特权文件写保护（普通功能单里 package.json、lockfile、go.mod、tsconfig.json、.eslintrc 只读，防私自装库、调低严格度）；进程组连坐回收（外部 CLI 子进程经绑定生命周期的受管服务起，超时或取消时向整个进程组发 SIGKILL，并 git worktree unlock）。
-在这里：已有：工单按档案在仓库目录或自己的 worktree 里干活；git 子进程超时杀整个进程组（`apps/server/src/repo/git.ts`）。不做：命令防火墙和特权文件只读：帮工没有权限确认是常驻规矩，边界是本机、工作目录和「连接到本机」（[帮工](docs/subsystems/session.md#为什么这样)）；依赖和配置的变化在 PR 的 diff 里看得见，放松检查的写法在逃生口的棘轮里。
+在这里：已有：工单按档案在仓库目录或自己的 worktree 里干活；git 子进程超时杀整个进程组（`apps/server/src/modules/repo/git.ts`）。不做：命令防火墙和特权文件只读：帮工没有权限确认是常驻规矩，边界是本机、工作目录和「连接到本机」（[帮工](docs/subsystems/session.md#为什么这样)）；依赖和配置的变化在 PR 的 diff 里看得见，放松检查的写法在逃生口的棘轮里。
 
 **1.2 自举的双核隔离。** 白皮书：用调度工具改它自己时，运行中的宿主（控制面）总从只读目录加载签过名的稳定版二进制；被改的源码只是工作区（目标面）。合入前在隔离端口起金丝雀版本，跑通「启动、建分支、跑假任务、存盘自检、零退出码关停」的自举冒烟，防止把自己改到脑死亡。
-在这里：已做：[发布渠道](docs/subsystems/app.md#发布渠道)与[工单合并检查](docs/subsystems/issue.md)：干活的农场和正在改的代码分开（渠道）、合并前跑检查。已有：验收起一个和用户数据隔开的服务端（`scripts/verify-server.ts`）。
+在这里：已做：[发布渠道](docs/subsystems/app.md#发布渠道)与[工单合并检查](docs/subsystems/issue.md)：干活的农场和正在改的代码分开（渠道）、合并前跑检查。已有：验收起一个和用户数据隔开的服务端（`scripts/release/verify-server.ts`）。
 
 **1.3 联合类型和名义类型。** 白皮书：接口或状态对象里不许有两个以上表示状态的布尔值，改成带 `_tag` 的联合，全仓开 switch 穷尽检查、禁用 default；跨模块不传裸 string 的 id、裸 number 的单位，用名义类型（TicketId、VerifiedWorktreePath、Millicents、Milliseconds）；模板里还有一个 assertNever，加一种状态时编译期报出要改的地方。
 在这里：已有：id 带 `Brand`（`packages/protocol/src/shapes.ts` 的 `IssueId`、`SessionId`）；时间和单位写进名字（`…Ms`，[命名](docs/style/naming.md)）；穷尽检查的 lint。改写：`default` 允许并说明。以后做：两个以上布尔字段的形状进体检的报告，作为「没写出来的状态」的候选（`shapes.ts` 现有 60 个布尔字段，很多是独立的开关）。
 
 **1.4 处方式报错。** 白皮书：用 ast-grep 写规则，每条的 message 写三样：为什么拦（危害）、正确写法的模板（能照抄）、仓库里标准范例的路径和行号。给了三条示例：拦裸调子进程（Bun.spawn、child_process.spawn/exec，导向受管进程原语）、拦常驻服务里的无界 new Map（导向带淘汰的有界容器）、拦没有删除日期的 @deprecated（要求 removeBy 日期）。
-在这里：已做：三样的格式（`says`、`refused`，测试查）；规则算得出改法的算出来（`no-cjk-literal` 给出词典文件和 `t()` 的键，`parent-import` 给出 `#/…` 并自动修复）；结构测试和体检的报错同一个格式。改写：用 oxlint 插件，不另加 ast-grep（已经在 `vp check` 里、带类型）。三条示例：子进程只在拥有它的模块里起，现在是约定（`repo/git.ts`、`runtime/dsh.ts`、`voice/voice.ts`），以后做成 import 限制；常驻集合由谁删，以后逐处清点（服务端 7 处 `new Map(`）；`@deprecated` 不做 removeBy，内部不留兼容，旧的直接删（`typescript/no-deprecated` 拦用到已弃用的 API）。
+在这里：已做：三样的格式（`says`、`refused`，测试查）；规则算得出改法的算出来（`no-cjk-literal` 给出词典文件和 `t()` 的键，`parent-import` 给出 `#/…` 并自动修复）；结构测试、全仓语法树审计（`scripts/audit/practice-audit.ts`）和体检的报错同一个格式。改写：单文件规则用 oxlint 插件（已经在 `vp check` 里、带类型），跨文件语法树规则收进 `practice-audit.ts` 与 `service-paths.ts`，不另加 ast-grep。三条示例：子进程已由 `vibevalley/child-process-door` 拦截；常驻集合由谁删，以后逐处清点（服务端 7 处 `new Map(`）；`@deprecated` 不做 removeBy，内部不留兼容，旧的直接删（`typescript/no-deprecated` 拦用到已弃用的 API）。
 
 **1.5 死代码断头台。** 白皮书：CI 里接 knip（TypeScript）或 deadcode（Go），零容忍；没人引用的导出、没用的类型、过了 removeBy 的废弃函数，直接挡住合并。
-在这里：已做：`vp run deadcode`（`knip.ts`、`scripts/deadcode.ts`），在 CI 的 check 里，零容忍。
+在这里：已做：`vp run deadcode`（`knip.ts`、`scripts/audit/deadcode.ts`），在 CI 的 check 里，零容忍。
 
 **第 1 层的要点。** 心法：不在评审里跟 AI 讲道理，它只听得懂退出码 1 和 stderr 里的模板。周一能做的：装上 ast-grep 和 knip，把三条规则塞进 pre-commit，半小时消灭八成低级破坏。自检：CI 放 `as any`、超过 60 行的函数、没人引用的导出进主干，代码库就在失控倒计时。
 在这里：已有：pre-commit 跑 `vp check --fix`；`as any` 由 lint 拦，全仓只剩 1 处。已做：knip。不做：函数行数上限（会被切开凑数；体检的函数级热点以后做）。
@@ -103,13 +103,13 @@
 ### 第 2 层：代码拓扑与架构骨架
 
 **2.1 垂直特性切片。** 白皮书：不要按技术角色分 controllers/、services/、models/、utils/（改一个功能要跨五个目录找，漏看约束、重复造轮子）；按业务特性切，每片一个文件夹，只经唯一的 index.ts 暴露最小的契约；示例目录有 contracts/（只读）、infra/（受管进程、有界集合、事件总线、假实现）、features/<切片>/（index.ts、state-machine.ts、harness-adapter.ts、就近的测试、30 行的 RULES.md）和生成的 PRIMITIVES.md。依赖硬锁：dependency-cruiser 拦绕过 index.ts 的引用和反向引用。
-在这里：已有：服务端一个概念一个文件夹、名字单数，模块的分层以 `apps/server/src/modules.ts` 为准，`modules.test.ts` 查只 import 前面的、只读自己那份核心状态；页面 `features/<概念>` 只经 `index.ts` 用（`vibevalley/page-layers`）；`rules`、`utils`、`helpers` 这类名字由 `scripts/file-names.test.ts` 拦；测试跟着模块走。不做：contracts/ 单独一个目录：契约在 `packages/protocol`，服务接口和实现在同一个模块里。
+在这里：已有：服务端一个概念一个文件夹、名字单数，模块的分层以 `apps/server/src/modules.ts` 为准，`modules.test.ts` 查只 import 前面的、只读自己那份核心状态；页面 `features/<概念>` 只经 `index.ts` 用（`vibevalley/page-layers`）；`rules`、`utils`、`helpers` 这类名字由 `scripts/audit/file-names.test.ts` 拦；测试跟着模块走。不做：contracts/ 单独一个目录：契约在 `packages/protocol`，服务接口和实现在同一个模块里。
 
 **2.2 高阶骨架。** 白皮书：资源获取和释放、超时熔断、重试退避、配额检查、异常包装，由架构师写成不可改的高阶函数；AI 加适配器时只实现纯数据映射。示例是 NarrowAgentPlugin（buildCliArgs、parseStdoutLine 两个纯函数）和 runWithAgentHarness（统一配额预检、申请带自动回收锁的 worktree、受管流绑定超时和计费）。收益：加第 5 种编码农机、第 4 种聊天机器人，AI 只写 30 行。
 在这里：已有：编码 agent 经 oar 驱动，农场不自己起它们的进程；connector 的重试和退避在 `connector.ts`，`Adapter` 是窄接口的雏形。以后做：扩展点只填空，先做农场的工具（和[工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)一起），connector 的超时和轮询等出问题时收。
 
 **2.3 单一状态机和事件总线。** 白皮书：核心业务状态只能由纯函数改：transition(state, cmd) 返回新状态和要发的领域事件，不做 I/O；外层执行器把新状态落盘，再把事件推进总线；通知、卡片、庄稼动画、成就统计都是订阅者。
-在这里：已有：oar 的会话事件经 `apps/server/src/session/reaction.ts`（纯函数）读成事实，`Core.apply` 用 `projection/reduce.ts` 的 `reduce` 折进核心状态，页面读折好的帧；农场的游戏规则只读事件、算画面，业务不调它（[农场的皮](docs/subsystems/farm.md)）；下层经 `Stream` 往上报。以后做：[状态先提交，副作用由 worker 在提交之后做](.agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md)。
+在这里：已有：oar 的会话事件经 `apps/server/src/modules/session/reaction.ts`（纯函数）读成事实，`Core.apply` 用 `projection/reduce.ts` 的 `reduce` 折进核心状态，页面读折好的帧；农场的游戏规则只读事件、算画面，业务不调它（[农场的皮](docs/subsystems/farm.md)）；下层经 `Stream` 往上报。以后做：[状态先提交，副作用由 worker 在提交之后做](.agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md)。
 
 **2.4 三级上下文和原语词典。** 白皮书：根级宪章（CLAUDE.md，150 行内，只写红线和命令入口）；目录级 RULES.md（50 行内，就近、按需加载）；代码里关键的防死锁、顺序敏感处标 // @invariant ADR-xxx，没在提交说明里写原因就删改的由 lint 拦；公共工具标 @primitive，CI 扫描生成 PRIMITIVES.md，不手写。
 在这里：已有：`CLAUDE.md` 只有一行 `@AGENTS.md`，`AGENTS.md` 写目录、命令和常驻规矩，每条链到它的家；子目录的规矩在子目录的 `AGENTS.md`（`docs/AGENTS.md`、`.agents/notes/README.md`）和各包的 README；注释只写为什么、顺序和锁、安全边界（[注释](docs/style/code.md#注释)）。已做：共用原语清单从导出与 JSDoc 自动生成（[primitives.md](docs/reference/primitives.md)，`docs:verify` 校验）。不做：`@invariant` 的 lint、`@primitive` 标记。以后做：原样重复代码 lint。
@@ -120,13 +120,13 @@
 ### 第 3 层：语义契约与确定性验证
 
 **3.1 三层只读契约墙。** 白皮书：仓库分契约区（编码时只读）和实现区。三道墙：协议和存盘的契约（前后端的结构、带版本号的表结构）、领域服务接口（函数签名、名义类型、错误联合）、不可变的验收测试。两阶段：先由架构师或「测试契约 agent」写出复现缺陷的验收测试，CI 确认它红，算契约区和验收区的 SHA-256 写进锁文件；再让编码 agent 在 worktree 里只改实现，pre-commit 和 CI 每次 git diff --exit-code 契约区和验收区，改了测试断言或放宽接口就拒绝提交、终止任务。
-在这里：已有：线上的形状只在 `packages/protocol`（`shapes.ts`、`schema.ts` 的 `Codec<T.X>` 对不上就编不过，`api.ts`）；表结构只有 `0001_schema.up.sql` 一个文件（`schema.test.ts` 查）；生成的文件不手改；帮工的验收先红、写好就冻结（[工单](docs/subsystems/issue.md#模型和不变量)）。改写：仓库自己的开发不锁目录：`regression: ` 测试删改要点名（`scripts/regression.ts`）。以后做：契约的 diff 进 CI 摘要；`refactor/` 不许动契约（契约稳定以后）。
+在这里：已有：线上的形状只在 `packages/protocol`（`shapes.ts`、`schema.ts` 的 `Codec<T.X>` 对不上就编不过，`api.ts`）；表结构只有 `0001_schema.up.sql` 一个文件（`schema.test.ts` 查）；生成的文件不手改；帮工的验收先红、写好就冻结（[工单](docs/subsystems/issue.md#模型和不变量)）。改写：仓库自己的开发不锁目录：`regression: ` 测试删改要点名（`scripts/release/regression.ts`）。以后做：契约的 diff 进 CI 摘要；`refactor/` 不许动契约（契约稳定以后）。
 
 **3.2 内存假实现和属性测试。** 白皮书：不用 vi.fn().mockReturnValue、jest.spyOn 绑死内部私有函数的调用次数和返回值（一重构就大片误报）；数据库、git 工作树、外部 CLI、时钟各有唯一一套带计数器的高保真内存实现；用属性测试生成 100 步乱序的并发操作，查状态机在任何交错下都不违反不变量（示例：同时跑的工作树不超过 6 个，已关闭的工单没有存活的进程）。
 在这里：已有：测试金字塔一层一个接缝，接缝以内是真的，外面的世界只在端口上换成假的（oar 的 `scriptedRuntime`、照脚本回答的 `Llm`），git 和库用真的（[地基](docs/subsystems/foundation.md)）；时间用 `TestClock`。已做：`Db` 与 `git` 的 I/O 次数计数器与断言。以后做：用属性测试查 `reduce` 的全局不变量。
 
 **3.3 确定性混沌和启动对账。** 白皮书：测试底座把外部 CLI 的 stdout 随机切成残缺的半包异步吐出，查解析器有没有行缓冲；模拟进程挂住不输出，用 TestClock.adjust("15 minutes") 查超时回收。系统每次启动先做三方对账：磁盘上的 worktree、活着的子进程、库里 Running 的工单；孤儿进程杀掉、残留目录回收、中断的任务置回可安全重试。
-在这里：已有：有时间窗口的（超时、冷却、重试的退避）用 `TestClock` 拨过去断言；开机接回帮工（`apps/server/src/runtime/runtime.ts`），`src/flows` 的流程测试覆盖重启。以后做：流按任意切片测（`packages/ai` 读 SSE、git 的输出），出现第一个这类问题时。
+在这里：已有：有时间窗口的（超时、冷却、重试的退避）用 `TestClock` 拨过去断言；开机接回帮工（`apps/server/src/modules/runtime/runtime.ts`），`src/flows` 的流程测试覆盖重启。以后做：流按任意切片测（`packages/ai` 读 SSE、git 的输出），出现第一个这类问题时。
 
 **3.4 历史存档的黄金快照。** 白皮书：不把内存里的领域对象直接序列化，经带版本号的存储 DTO 和双向转换器读写；每个发布版本的真实存档永久留在 tests/fixtures/storage-snapshots/，CI 逐个升级到最新，失败或丢字段就挡住合并。
 在这里：不做：内部不留兼容，表结构直接改，旧库在开机时挪到一边、新建一个，不写数据搬运（`AGENTS.md`「内部不留兼容」）；对外 HTTP 的 v1 是唯一例外。存盘的格式仍是契约：改表结构走 `db:generate`，`schema.test.ts` 查。
@@ -163,7 +163,7 @@
 在这里：不做（现在）：行数上限会被切文件凑数；模块的测试还不都是只经接口。以后做：体检加「模块的测试只经接口的比例」；一个模块在热点前列、30 天里被多个 `fix/` PR 修过、测试只经接口时，派重写而不是修补（契约稳定以后）。
 
 **5.3 三级模型成本路由。** 白皮书：治理自己的算力按 80/15/5 分：80% 给零成本的确定性工具（穷尽检查、处方报错、knip、I/O 计数器、快照升级测试，2 秒内、0 token）；15% 给轻量模型（日志摘要、原语检索、单模块的常规填充和格式化）；5% 给旗舰模型做异构的交叉对抗审计（只在需求拆解、契约设计、合并前的架构审计时用，写和审不能是同一个模型，比如 Codex 写的由挂着安全和架构清单的 Claude 审）。
-在这里：已有：检查都是确定性的、带缓存（`vp run` 的任务）；注释的初审交给另一个模型（`scripts/comment-review.ts` 用 DeepSeek），只报不改、提 PR 前在本机跑，不进 CI（模型的回答每次不一样，不该挡合并）。以后做：PR 评审的打分和合并门槛（提案还没进仓库）。
+在这里：已有：检查都是确定性的、带缓存（`vp run` 的任务）；注释的初审交给另一个模型（`scripts/audit/comment-review.ts` 用 DeepSeek），只报不改、提 PR 前在本机跑，不进 CI（模型的回答每次不一样，不该挡合并）。以后做：PR 评审的打分和合并门槛（提案还没进仓库）。
 
 **5.4 月度人工盲降和四个北极星指标。** 白皮书：每月最后一个周五，在测试环境往一个核心模块注入隐蔽故障、暂时停掉编码 agent，值班工程师只凭原语词典、状态机转换图和故障胶囊，15 分钟内定位并修好，检验系统的可理解性有没有腐化。每周自动统计四个指标：
 

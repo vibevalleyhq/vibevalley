@@ -11,23 +11,27 @@ import { NotesSearch } from "#/features/pkm/index.ts";
 import { useCore, useFrames } from "#/infra/frame.ts";
 import { Link as A, NavLink, useMatches } from "#/infra/router.ts";
 import { useUpdates } from "#/infra/settings.ts";
-import { OrchestratorFace } from "#/ui/Face.tsx";
+import { OrchestratorFace } from "#/ui/domain/Face.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
 import { titleBar } from "#/ui/layout.tsx";
+import { styleProps } from "#/ui/positioner.ts";
 import { ShortcutSheet } from "#/ui/ShortcutSheet.tsx";
 import { Hint } from "#/ui/Tip.tsx";
 
 import { type Place, places, settingsPlace } from "./places";
 
-const recipeStyles = stylex.create({
+/** The head's height, the rail's top slot's too. */
+const head = 66;
+
+const styles = stylex.create({
   slot: {
     position: "relative",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
     borderRadius: "var(--radius-lg)",
     color: {
       default: "var(--color-on-rail)",
@@ -48,39 +52,36 @@ const recipeStyles = stylex.create({
     outlineColor: { default: null, ":focus-visible": "var(--color-focus)" },
   },
   faceSlot: {
-    width: { default: "calc(var(--spacing) * 11)", "@media (width>=40rem)": "calc(var(--spacing) * 12)" },
-    height: { default: "calc(var(--spacing) * 11)", "@media (width>=40rem)": "calc(var(--spacing) * 12)" },
+    width: { default: "2.75rem", "@media (width>=40rem)": "3rem" },
+    height: { default: "2.75rem", "@media (width>=40rem)": "3rem" },
   },
   namedSlot: {
-    width: { default: "calc(var(--spacing) * 12)", "@media (width>=40rem)": "calc(var(--spacing) * 14)" },
-    height: { default: "calc(var(--spacing) * 12)", "@media (width>=40rem)": "calc(var(--spacing) * 14)" },
+    width: { default: "3rem", "@media (width>=40rem)": "3.5rem" },
+    height: { default: "3rem", "@media (width>=40rem)": "3.5rem" },
   },
   currentSlot: {
     backgroundColor: "color-mix(in srgb, var(--color-on-rail) 9%, transparent)",
   },
-  railSpan: {
+  linkDot: {
     display: "block",
-    height: "calc(var(--spacing) * 2)",
-    width: "calc(var(--spacing) * 2)",
-    borderRadius: "2147483647px",
+    height: "0.5rem",
+    width: "0.5rem",
+    borderRadius: "9999px",
   },
-  railSpanState: {
+  linkConnecting: {
     backgroundColor: "var(--wb-faint)",
   },
-  railSpanState2: {
+  linkLost: {
     backgroundColor: "var(--wb-berry)",
   },
-  railSpanState3: {
+  linkOpen: {
     backgroundColor: "var(--wb-leaf)",
   },
-});
-
-const variantStyles2 = stylex.create({
-  deskA: {
+  deskStatus: {
     display: "flex",
-    height: "calc(var(--spacing) * 7)",
+    height: "1.75rem",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
@@ -92,42 +93,35 @@ const variantStyles2 = stylex.create({
         ":hover": "var(--color-hover)",
       },
     },
-    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingInline: "0.625rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
-});
-
-const variantStyles = stylex.create({
-  deskSpan: {
-    height: "calc(var(--spacing) * 2)",
-    width: "calc(var(--spacing) * 2)",
-    borderRadius: "2147483647px",
+  deskDot: {
+    height: "0.5rem",
+    width: "0.5rem",
+    borderRadius: "9999px",
   },
-  deskSpanVariant: {
+  deskDotLive: {
     backgroundColor: "var(--color-leaf)",
   },
-  deskSpanVariant2: {
+  deskDotOff: {
     backgroundColor: "var(--color-faint)",
   },
-  shellDiv: {
+  shell: {
     display: "flex",
     height: "100%",
   },
-  shellDivVariant: {
+  shellZoomed: {
     zoom: "var(--workbench-zoom,1)",
   },
-  shellDivVariant2: {},
   shellMain: {
     display: "flex",
     minWidth: "0",
     flex: "1",
     flexDirection: "column",
   },
-});
-
-const viewStyles = stylex.create({
-  slotSpan: {
+  slotLabel: {
     display: {
       default: "none",
       "@media (width>=40rem)": "block",
@@ -138,27 +132,27 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     textAlign: "center",
     fontSize: "var(--text-xs)",
-    lineHeight: "calc(var(--spacing) * 4)",
+    lineHeight: "1rem",
   },
   railBadge: {
     position: "absolute",
-    top: "calc(var(--spacing) * .5)",
-    right: "var(--spacing)",
-    minWidth: "calc(var(--spacing) * 4)",
-    borderRadius: "2147483647px",
+    top: "0.125rem",
+    right: "0.25rem",
+    minWidth: "1rem",
+    borderRadius: "9999px",
     backgroundColor: "var(--color-wheat)",
-    paddingInline: "var(--spacing)",
+    paddingInline: "0.25rem",
     textAlign: "center",
     fontSize: "var(--text-2xs)",
-    lineHeight: "calc(var(--spacing) * 4)",
+    lineHeight: "1rem",
     fontWeight: "var(--font-weight-semibold)",
     color: "var(--color-ink)",
   },
   rail: {
     display: "flex",
     width: {
-      default: "calc(var(--spacing) * 14)",
-      "@media (width>=40rem)": "calc(var(--spacing) * 18)",
+      default: "3.5rem",
+      "@media (width>=40rem)": "4.5rem",
     },
     flexShrink: "0",
     flexDirection: "column",
@@ -168,46 +162,51 @@ const viewStyles = stylex.create({
     borderRightWidth: "1px",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-rail)",
-    paddingBottom: "calc(var(--spacing) * 3)",
+    paddingBottom: "0.75rem",
   },
-  railDiv: {
+  railMinWidth: (minWidth: number) => ({
+    minWidth,
+  }),
+  railTopInset: (height: number) => ({
+    height,
     flexShrink: "0",
-  },
-  railDiv2: {
+  }),
+  railHead: {
     display: "flex",
+    height: head,
     flexShrink: "0",
     alignItems: "center",
     justifyContent: "center",
   },
-  railDiv3: {
+  railGroups: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
-  railSpan: {
-    marginBlock: "var(--spacing)",
+  railDivider: {
+    marginBlock: "0.25rem",
     height: "1px",
-    width: "calc(var(--spacing) * 8)",
+    width: "2rem",
     backgroundColor: {
       default: "var(--color-on-rail)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-on-rail) 10%, transparent)",
     },
   },
-  railDiv4: {
+  railFooter: {
     marginTop: "auto",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: "var(--spacing)",
-    paddingTop: "calc(var(--spacing) * 2)",
+    gap: "0.25rem",
+    paddingTop: "0.5rem",
   },
-  link: {
+  linkStatus: {
     display: "flex",
-    height: "calc(var(--spacing) * 4)",
+    height: "1rem",
     alignItems: "center",
   },
-  railSpan2: {
+  srOnly: {
     clipPath: "inset(50%)",
     whiteSpace: "nowrap",
     borderWidth: "0",
@@ -220,41 +219,39 @@ const viewStyles = stylex.create({
   },
   desk: {
     display: "flex",
+    height: head,
     flexShrink: "0",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
     borderBottomStyle: "solid",
     borderBottomWidth: "1px",
     borderColor: "var(--color-line)",
-    paddingInline: "calc(var(--spacing) * 5)",
+    paddingInline: "1.25rem",
   },
-  deskSpan: {
+  deskSpacer: {
     flex: "1",
   },
-  deskDiv: {
+  deskTitleWrap: {
     display: "flex",
     minWidth: "0",
     flex: "1",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
-  deskH1: {
+  deskTitle: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-lg)",
-    lineHeight: "var(--text-lg--line-height)",
+    lineHeight: "var(--leading-lg)",
     fontWeight: "var(--font-weight-semibold)",
   },
-  shellDiv: {
+  shellBody: {
     position: "relative",
     minHeight: "0",
     flex: "1",
   },
 });
-
-/** The head's height, the rail's top slot's too. */
-const head = 66;
 
 const linkWords = { connecting: t("web.base.link.connecting"), open: t("web.base.link.open"), lost: t("web.base.link.lost") } as const;
 
@@ -272,18 +269,14 @@ function Slot(props: { to: string; place: string; label: string; name?: string; 
       aria-label={props.label}
       aria-current={props.current === true ? "page" : undefined}
       data-badge={props.badge !== undefined && props.badge > 0 ? props.badge : undefined}
-      {...stylex.attrs(
-        recipeStyles.slot,
-        props.name === undefined ? recipeStyles.faceSlot : recipeStyles.namedSlot,
-        props.current === true && recipeStyles.currentSlot,
-      )}
+      {...stylex.attrs(styles.slot, props.name === undefined ? styles.faceSlot : styles.namedSlot, props.current === true && styles.currentSlot)}
     >
       {props.children}
-      <Show when={props.name}>{(name) => <span {...stylex.attrs(viewStyles.slotSpan)}>{name()}</span>}</Show>
+      <Show when={props.name}>{(name) => <span {...stylex.attrs(styles.slotLabel)}>{name()}</span>}</Show>
       {/* How many wait on the user there: the place to go next, seen from anywhere. */}
       <Show when={props.badge}>
         {(n) => (
-          <span data-testid="rail-badge" {...stylex.attrs(viewStyles.railBadge)}>
+          <span data-testid="rail-badge" {...stylex.attrs(styles.railBadge)}>
             {n()}
           </span>
         )}
@@ -312,23 +305,22 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
     <nav
       aria-label={t("web.base.rail")}
       data-testid="rail"
-      {...stylex.attrs(viewStyles.rail)}
       // The window's buttons sit over the rail's top: it is at least as wide as they reach, and a little.
-      style={titleBar.left > 0 ? { "min-width": `${titleBar.left + 8}px` } : undefined}
+      {...styleProps([styles.rail, titleBar.left > 0 && styles.railMinWidth(titleBar.left + 8)])}
     >
       {/* Room for the desktop window's buttons over the rail's top. */}
-      <div {...stylex.attrs(viewStyles.railDiv)} style={{ height: `${titleBar.top}px` }} />
-      <div {...stylex.attrs(viewStyles.railDiv2)} style={{ height: `${head}px` }}>
+      <div {...styleProps(styles.railTopInset(titleBar.top))} />
+      <div {...stylex.attrs(styles.railHead)}>
         <Slot to="/farm" place="farm" label={t("web.base.farm")} current={props.farm}>
           <OrchestratorFace size={38} />
         </Slot>
       </div>
-      <div {...stylex.attrs(viewStyles.railDiv3)}>
+      <div {...stylex.attrs(styles.railGroups)}>
         <For each={railGroups}>
           {(group, i) => (
             <>
               <Show when={i() > 0}>
-                <span aria-hidden="true" {...stylex.attrs(viewStyles.railSpan)} />
+                <span aria-hidden="true" {...stylex.attrs(styles.railDivider)} />
               </Show>
               <For each={places.filter((p) => p.group === group && p.id !== "settings")}>
                 {(p) => (
@@ -348,7 +340,7 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
           )}
         </For>
       </div>
-      <div {...stylex.attrs(viewStyles.railDiv4)}>
+      <div {...stylex.attrs(styles.railFooter)}>
         <Show when={ready()}>
           {(r) => (
             <Slot to="/settings/about" place="update" label={t("web.base.updateReady", { next: r().next })} name={t("web.base.update")}>
@@ -362,15 +354,12 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
         <Slot to="/farm" place="farm" label={t("web.base.farm")} name={t("web.base.farmShort")} current={props.farm}>
           <RailIcon name="farm" />
         </Slot>
-        <span role="status" data-testid="link" data-state={frames.link} title={linkWords[frames.link]} {...stylex.attrs(viewStyles.link)}>
+        <span role="status" data-testid="link" data-state={frames.link} title={linkWords[frames.link]} {...stylex.attrs(styles.linkStatus)}>
           <span
-            {...stylex.attrs(
-              recipeStyles.railSpan,
-              frames.link === "open" ? recipeStyles.railSpanState3 : frames.link === "lost" ? recipeStyles.railSpanState2 : recipeStyles.railSpanState,
-            )}
+            {...stylex.attrs(styles.linkDot, frames.link === "open" ? styles.linkOpen : frames.link === "lost" ? styles.linkLost : styles.linkConnecting)}
             aria-hidden="true"
           />
-          <span {...stylex.attrs(viewStyles.railSpan2)}>{linkWords[frames.link]}</span>
+          <span {...stylex.attrs(styles.srOnly)}>{linkWords[frames.link]}</span>
         </span>
       </div>
     </nav>
@@ -384,21 +373,21 @@ function Desk(props: { place?: Place | undefined }) {
   const working = () => core()?.sessions.filter((s) => s.phase._tag === "working").length ?? 0;
   const status = () => (live() ? t("web.base.working", { n: working() }) : t("web.base.off"));
   return (
-    <div data-testid="desk" data-place={props.place?.id} {...stylex.attrs(viewStyles.desk)} style={{ height: `${head}px` }}>
-      <Show when={props.place} fallback={<span {...stylex.attrs(viewStyles.deskSpan)} />}>
+    <div data-testid="desk" data-place={props.place?.id} {...stylex.attrs(styles.desk)}>
+      <Show when={props.place} fallback={<span {...stylex.attrs(styles.deskSpacer)} />}>
         {(place) => (
           <>
             <PlaceIcon place={place()} />
             {/* What the place is goes beside its name, on hover: a sentence under every head was read once and then only took room. */}
-            <div {...stylex.attrs(viewStyles.deskDiv)}>
-              <h1 {...stylex.attrs(viewStyles.deskH1)}>{place().label}</h1>
+            <div {...stylex.attrs(styles.deskTitleWrap)}>
+              <h1 {...stylex.attrs(styles.deskTitle)}>{place().label}</h1>
               <Hint text={place().hint} />
             </div>
           </>
         )}
       </Show>
-      <A href="/farm" aria-label={status()} data-testid="desk-status" data-state={live() ? "live" : "off"} {...stylex.attrs(variantStyles2.deskA)}>
-        <span {...stylex.attrs(variantStyles.deskSpan, live() ? variantStyles.deskSpanVariant : variantStyles.deskSpanVariant2)} aria-hidden="true" />
+      <A href="/farm" aria-label={status()} data-testid="desk-status" data-state={live() ? "live" : "off"} {...stylex.attrs(styles.deskStatus)}>
+        <span {...stylex.attrs(styles.deskDot, live() ? styles.deskDotLive : styles.deskDotOff)} aria-hidden="true" />
         {status()}
       </A>
     </div>
@@ -409,7 +398,10 @@ export function Shell(props: { children: JSX.Element }) {
   const matches = useMatches();
   const meta = () => matches().at(-1)?.meta;
   const here = () => places.find((place) => place.id === meta()?.place);
-  const inFarm = () => meta()?.skin === "farm";
+  // A function declaration: StyleX evaluates an arrow used in `stylex.attrs` at build time and fails on its body.
+  function inFarm() {
+    return meta()?.skin === "farm";
+  }
   // Ctrl+K (⌘K on a Mac) anywhere in the workbench (base/shortcuts.ts).
   onSettled(() => {
     const key = (e: KeyboardEvent) => {
@@ -422,17 +414,17 @@ export function Shell(props: { children: JSX.Element }) {
   });
   return (
     // The farm keeps integer art pixels; only workbench pages follow the interface zoom.
-    <div {...stylex.attrs(variantStyles.shellDiv, !inFarm() ? variantStyles.shellDivVariant : variantStyles.shellDivVariant2)}>
+    <div {...stylex.attrs(styles.shell, !inFarm() && styles.shellZoomed)}>
       <QuickSwitcher />
       <NotesSearch />
       <ShortcutSheet />
       <Rail here={here()} farm={inFarm()} />
-      <main {...stylex.attrs(variantStyles.shellMain)}>
+      <main {...stylex.attrs(styles.shellMain)}>
         {/* The chat and the library draw their own one bar at the top: the place's name would be a second. */}
         <Show when={!inFarm() && here()?.id !== "chat" && here()?.id !== "library"}>
           <Desk place={here()} />
         </Show>
-        <div {...stylex.attrs(viewStyles.shellDiv)}>{props.children}</div>
+        <div {...stylex.attrs(styles.shellBody)}>{props.children}</div>
       </main>
     </div>
   );

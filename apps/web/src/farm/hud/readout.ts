@@ -1,5 +1,6 @@
 import { t } from "@vibevalley/i18n";
 import type { ChatMessage, SpaceState, Crop, Issue, Session, DoingView, SessionView } from "@vibevalley/protocol";
+import { actorRoleOf } from "@vibevalley/protocol/rules";
 
 import { beds, cropLabel, type Bed } from "#/farm/world/plots.ts";
 
@@ -31,6 +32,6 @@ export function plotTitle(bed: Bed, session: Session | undefined, crop: Crop) {
 
 /** The orchestrator's last typed line among the general channel's messages (voice lines are not on the web yet). */
 export function lastOrchestratorSaid(general: readonly ChatMessage[]) {
-  const typed = general.findLast((m) => m.fromRole === "orchestrator" && m.kind === "chat");
+  const typed = general.findLast((m) => actorRoleOf(m.actor) === "orchestrator" && m.kind === "chat");
   return typed && { key: `m${typed.id}`, text: typed.text, at: typed.at };
 }

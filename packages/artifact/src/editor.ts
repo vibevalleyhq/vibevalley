@@ -14,10 +14,10 @@ import {
   type TextSpan,
   type VibeValleyApi,
 } from "@vibevalley/protocol";
-import { keyBetween, normalSpans } from "@vibevalley/protocol/rules";
+import { keyBetween } from "@vibevalley/protocol/rules";
 import { blockId } from "@vibevalley/protocol/schema";
 
-import { codePointOffset, editSpans, hasText, knownTypes, listNumbers, listTypes, markdownShortcut, plainOf, splitSpans } from "./blocks.ts";
+import { normalSpans, codePointOffset, editSpans, hasText, knownTypes, listNumbers, listTypes, markdownShortcut, plainOf, splitSpans } from "./blocks.ts";
 
 const idleWaitMs = 500;
 const maxWaitMs = 2000;

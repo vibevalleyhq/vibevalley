@@ -18,7 +18,7 @@ import { feedPhoneCalls } from "./phone/calls";
 import { farm, useFarm } from "./store";
 import { farmKeys } from "./tools";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   farmPageDiv: {
     position: "relative",
     isolation: "isolate",
@@ -31,9 +31,6 @@ const recipeStyles = stylex.create({
     WebkitUserSelect: "none",
     userSelect: "none",
   },
-});
-
-const viewStyles = stylex.create({
   farmPageP: {
     position: "absolute",
     insetInline: "0",
@@ -69,7 +66,7 @@ export function FarmPage(props: { repo: string }) {
   });
   // Drawn: the workbench's dark theme does not reach in (style.css).
   return (
-    <div data-theme="light" {...stylex.attrs(recipeStyles.farmPageDiv)} data-testid="farm">
+    <div data-theme="light" {...stylex.attrs(styles.farmPageDiv)} data-testid="farm">
       <FarmSounds />
       <FramesContext value={scoped}>
         <VillageCanvas />
@@ -80,7 +77,7 @@ export function FarmPage(props: { repo: string }) {
         <Panels />
       </FramesContext>
       <Show when={!frames.frame}>
-        <p role="status" {...stylex.attrs(viewStyles.farmPageP)}>
+        <p role="status" {...stylex.attrs(styles.farmPageP)}>
           {frames.link === "lost" ? t("web.farm.page.lost") : t("web.farm.page.waiting")}
         </p>
       </Show>

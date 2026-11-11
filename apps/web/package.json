@@ -51,7 +51,6 @@
     "@types/node": "catalog:",
     "@vibevalley/testkit": "workspace:*",
     "typescript": "catalog:",
-    "vibevalley": "workspace:*",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   }

@@ -4,7 +4,7 @@
 
 ## 什么时候用
 
-- 改了 `apps/server/src/http/handlers.ts`、`apps/server/src/http`、`packages/protocol/src/api.ts`：新的或改过的接口。
+- 改了 `apps/server/src/gateway/http/handlers.ts`、`apps/server/src/gateway/http`、`packages/protocol/src/api.ts`：新的或改过的接口。
 - 改了某个服务的行为（`issue`、`channel`、`setting`、`cron`、`task`……），想看它经接口和 `/api/v1/state` 出来的样子。
 - 改了 `apps/server/db/migrations` 或 `apps/server/db/queries`：新库能建、能读写。
 - 改了开机的流程（`apps/server/src/main.ts`、`services.ts`、`http/app.ts`）。
@@ -48,13 +48,13 @@
    '
    ```
 
-   带 `--format json` 的命令，stdout 是一个 JSON 文档（不带是给人和 agent 读的短文字）：`issue status 1 todo` 派出去，`issue show --watch` 等帮工交回来（经过的状态在 stderr），`issue diff` 是改动，`--dry-run` 答复会做什么（`{"does":[…]}`）、什么都不动，真做以后 `status` 是 `done`、`delivered` 是 `merged`，`git log` 里有帮工的提交。帮工照标题里的字眼干活（「写打卡」写 `clock.ts` 并提交，别的字眼见 `helper.ts`）；档案要用不带思考力度的（`docs`、`night`），带了的（`lab`）会被它拒。被拒的命令退出码是 3，stderr 最后一行是带 `next` 的 JSON，`next` 里的 `run` 能原样接在 `vv` 后面跑；要断言失败，用 `|| true` 接住，再读那一行。`scripts/verify-server.test.ts` 跑着同样的一遍。
+   带 `--format json` 的命令，stdout 是一个 JSON 文档（不带是给人和 agent 读的短文字）：`issue status 1 todo` 派出去，`issue show --watch` 等帮工交回来（经过的状态在 stderr），`issue diff` 是改动，`--dry-run` 答复会做什么（`{"does":[…]}`）、什么都不动，真做以后 `status` 是 `done`、`delivered` 是 `merged`，`git log` 里有帮工的提交。帮工照标题里的字眼干活（「写打卡」写 `clock.ts` 并提交，别的字眼见 `helper.ts`）；档案要用不带思考力度的（`docs`、`night`），带了的（`lab`）会被它拒。被拒的命令退出码是 3，stderr 最后一行是带 `next` 的 JSON，`next` 里的 `run` 能原样接在 `vv` 后面跑；要断言失败，用 `|| true` 接住，再读那一行。`scripts/release/verify-server.test.ts` 跑着同样的一遍。
 
 4. 页面也改了的，在同一个子命令末尾接上 [page.md](.agents/skills/vv-acceptance/references/page.md) 的截图命令。
 
 ### 真实帮工的 CLI 与连接观测
 
-仅在用户已授权真实农机验收时执行；需要本机 Codex 登录，会消耗模型额度。普通规则先跑服务端的 `src/runtime/access.test.ts`、`src/session/worker.test.ts`、`src/flows/worker-cli.test.ts`、`src/issue/watch.test.ts`，以及 CLI 的 `src/issue-watch*.test.ts`、`src/worker.test.ts`。在各包目录运行 `env -u OAR_SUBAGENT_DEPTH vp test run <文件>`，根目录的测试配置只收集 scripts。
+仅在用户已授权真实农机验收时执行；需要本机 Codex 登录，会消耗模型额度。普通规则先跑服务端的 `src/modules/runtime/access.test.ts`、`src/modules/session/worker.test.ts`、`src/flows/worker-cli.test.ts`、`src/modules/issue/watch.test.ts`，以及 CLI 的 `src/issue-watch*.test.ts`、`src/worker.test.ts`。在各包目录运行 `env -u OAR_SUBAGENT_DEPTH vp test run <文件>`，根目录的测试配置只收集 scripts。
 
 1. 把下列脚本存到独立临时证据目录的 `worker.sh`。它只创建沙箱项目，凭证文件只写入假令牌，不读取真实令牌。
 
@@ -82,7 +82,7 @@ vv issue show 1 --format json
 vv session list --format json
 ```
 
-2. 在仓库根目录执行 `env -u NO_PROXY -u no_proxy -u OAR_SUBAGENT_DEPTH vpx scripts/verify-server.ts -- sh <证据目录>/worker.sh`，保存命令、HEAD、stdout、stderr 和退出码。沙箱独立分配服务端及语音端口，不复用桌面服务。清除代理例外变量只影响这条验收命令；需要既有代理条目的合并规则由最低层回归测试覆盖。
+2. 在仓库根目录执行 `env -u NO_PROXY -u no_proxy -u OAR_SUBAGENT_DEPTH vpx scripts/release/verify-server.ts -- sh <证据目录>/worker.sh`，保存命令、HEAD、stdout、stderr 和退出码。沙箱独立分配服务端及语音端口，不复用桌面服务。清除代理例外变量只影响这条验收命令；需要既有代理条目的合并规则由最低层回归测试覆盖。
 3. 核对输出：非法凭证退出码为 3；watch 的 `state.sessions[].toolConnections` 中 `acceptance-broken` 为 `failed`，对应 `run/error` 事件含 `connection.status: failed`；Codex 经绝对 CLI 的 doctor 和 report 都返回成功，两个代理例外变量都有三个回环地址，最后 `settled: true`。agent 只用 CLI 交活；可选 MCP 的失败不应阻塞该入口。没有连接事件时只能判 unknown。
 4. 核对 `result.json` 的 `code: 0`、`stopped: true` 和空 `cleanupErrors`。健康检查、agent 自述或单独的命令退出码不能替代上述轨迹与状态。日志留在临时目录，不放进会随 worktree 删除的 dist。
 

@@ -4,41 +4,33 @@ import { createEffect } from "solid-js";
 
 import { Dialog as Base } from "@vibevalley/base-ui";
 
-const recipeStyles = stylex.create({
-  dialogBasePopup: {
+const popIn = stylex.keyframes({
+  from: { opacity: 0, scale: 0.98 },
+});
+
+const fadeIn = stylex.keyframes({
+  from: { opacity: 0 },
+});
+
+const styles = stylex.create({
+  popup: {
     margin: "auto",
     animationName: {
-      default: "pop-in",
+      default: popIn,
       "@media (prefers-reduced-motion: reduce)": "none",
-      "::backdrop": "fade-in",
+      "::backdrop": fadeIn,
     },
     animationDuration: {
-      default: ".28s",
-      "::backdrop": ".18s",
-    },
-    animationDelay: {
-      default: "0s",
-      "::backdrop": "0s",
+      default: "280ms",
+      "::backdrop": "180ms",
     },
     animationTimingFunction: {
       default: "var(--ease-out)",
       "::backdrop": "var(--ease-out)",
     },
-    animationIterationCount: {
-      default: "1",
-      "::backdrop": "1",
-    },
-    animationDirection: {
-      default: "normal",
-      "::backdrop": "normal",
-    },
     animationFillMode: {
       default: "both",
       "::backdrop": "both",
-    },
-    animationPlayState: {
-      default: "running",
-      "::backdrop": "running",
     },
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
@@ -52,34 +44,31 @@ const recipeStyles = stylex.create({
     color: "var(--wb-ink)",
     boxShadow: "var(--shadow-float)",
   },
-  dialogBasePopupVariant1Case1: {
+  popupNarrow: {
     width: "min(480px,92vw)",
   },
-  dialogBasePopupVariant1Case2: {
+  popupWide: {
     width: "min(1080px,94vw)",
   },
-});
-
-const viewStyles = stylex.create({
-  dialogDiv: {
+  frame: {
     display: "flex",
     maxHeight: "86vh",
     flexDirection: "column",
   },
-  dialogBaseTitle: {
+  title: {
     borderBottomStyle: "solid",
     borderBottomWidth: "1px",
     borderColor: "var(--color-line)",
-    paddingInline: "calc(var(--spacing) * 5)",
-    paddingBlock: "calc(var(--spacing) * 3)",
+    paddingInline: "1.25rem",
+    paddingBlock: "0.75rem",
     fontSize: "var(--text-base)",
-    lineHeight: "var(--text-base--line-height)",
+    lineHeight: "var(--leading-base)",
     fontWeight: "var(--font-weight-semibold)",
   },
-  dialogDiv2: {
+  body: {
     overflowY: "auto",
-    paddingInline: "calc(var(--spacing) * 5)",
-    paddingBlock: "calc(var(--spacing) * 4)",
+    paddingInline: "1.25rem",
+    paddingBlock: "1rem",
   },
 });
 
@@ -106,16 +95,10 @@ export function createModal(open: () => boolean, onClose: () => void) {
 export function Dialog(props: { open: boolean; onClose: () => void; title: string; children: JSX.Element; wide?: boolean; testid?: string }) {
   return (
     <Base.Root open={props.open} onOpenChange={(open) => !open && props.onClose()}>
-      <Base.Popup
-        data-testid={props.testid}
-        {...stylex.attrs(
-          recipeStyles.dialogBasePopup,
-          props.wide === true ? recipeStyles.dialogBasePopupVariant1Case2 : recipeStyles.dialogBasePopupVariant1Case1,
-        )}
-      >
-        <div {...stylex.attrs(viewStyles.dialogDiv)}>
-          <Base.Title {...stylex.attrs(viewStyles.dialogBaseTitle)}>{props.title}</Base.Title>
-          <div {...stylex.attrs(viewStyles.dialogDiv2)}>{props.children}</div>
+      <Base.Popup data-testid={props.testid} {...stylex.attrs(styles.popup, props.wide === true ? styles.popupWide : styles.popupNarrow)}>
+        <div {...stylex.attrs(styles.frame)}>
+          <Base.Title {...stylex.attrs(styles.title)}>{props.title}</Base.Title>
+          <div {...stylex.attrs(styles.body)}>{props.children}</div>
         </div>
       </Base.Popup>
     </Base.Root>

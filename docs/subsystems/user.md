@@ -1,6 +1,6 @@
 # 用户和设备
 
-一个服务端只有一个用户（`User`，`apps/server/src/user/user.ts`）。在跑服务端的那台电脑上，来自本机的请求就是这个用户，不用登录；从别处来的只经[那道门](docs/subsystems/lan.md)进来，每台设备凭自己的一把钥匙。用户有名字（界面和提示词称呼他用它，能改）和一个密码（只在本机设）。
+一个服务端只有一个用户（`User`，`apps/server/src/modules/user/user.ts`）。在跑服务端的那台电脑上，来自本机的请求就是这个用户，不用登录；从别处来的只经[那道门](docs/subsystems/lan.md)进来，每台设备凭自己的一把钥匙。用户有名字（界面和提示词称呼他用它，能改）和一个密码（只在本机设）。
 
 ## 管什么，不管什么
 
@@ -15,8 +15,8 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/user/user.ts` | 服务 `User`：账号、设备、钥匙的哈希比对、登录请求；收回时发 `revoked` 流 |
-| `apps/server/src/http/handlers/user.ts` | `user.*` 接口；从门转来的请求头（`x-vibevalley-outside`、`x-vibevalley-lan-device`、`x-vibevalley-from`）读出 `Caller` |
+| `apps/server/src/modules/user/user.ts` | 服务 `User`：账号、设备、钥匙的哈希比对、登录请求；收回时发 `revoked` 流 |
+| `apps/server/src/gateway/http/handlers/user.ts` | `user.*` 接口；从门转来的请求头（`x-vibevalley-outside`、`x-vibevalley-lan-device`、`x-vibevalley-from`）读出 `Caller` |
 | `packages/protocol/src/user/` | 形状和接口（`UserStatus`、`UserDevice`、`Approval…`、`deviceKeyCookie`） |
 | `apps/web/src/features/user/` | `/login`、`/approve`、设置「设备」页里的名字和密码、等你同意的登录、全部设备；门外打开的页面先去哪（`entry.ts`） |
 | `apps/cli/src/commands/auth.ts` | `vibevalley auth login|status|logout` |
@@ -65,7 +65,7 @@
 
 ## 怎么验证
 
-- `apps/server/src/user/user.test.ts`：钥匙的前缀、90 天作废（测试时钟）、请求方的地址、`slow_down`。
-- `apps/server/src/lan/lan.test.ts`：经门的密码登录与锁定、Cookie、登录来的设备的放行、确认码登录与拒绝、请求上限。
-- `apps/cli/src/auth.test.ts`：`auth login` 等同意、照 `slow_down` 放慢、存钥匙、只带给那个服务端，`auth logout`。
+- `apps/server/src/modules/user/user.test.ts`：钥匙的前缀、90 天作废（测试时钟）、请求方的地址、`slow_down`。
+- `apps/server/src/gateway/lan/lan.test.ts`：经门的密码登录与锁定、Cookie、登录来的设备的放行、确认码登录与拒绝、请求上限。
+- `apps/cli/src/commands/auth.test.ts`：`auth login` 等同意、照 `slow_down` 放慢、存钥匙、只带给那个服务端，`auth logout`。
 - `apps/web/test/login.spec.ts`：本机设名字和密码，门外登录、回原处、退出，`/approve` 上同意一个终端。

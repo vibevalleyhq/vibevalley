@@ -1,4 +1,6 @@
 import { pathOf, type VibeValleyApi } from "@vibevalley/protocol";
+import { BizCode } from "@vibevalley/protocol/api";
+import { actorRoleOf } from "@vibevalley/protocol/rules";
 
 import { expect, gate, test } from "./fixtures";
 
@@ -16,12 +18,12 @@ test("a mark unread the server refuses gives the read back and says why in the e
   const helper = await api.agent.create({ ...template, id: "", name: "read receipt", effort: "" });
   const channel = await api.channel.direct.create({ agent: helper.id });
   await api.channel.message.send({ id: channel, text: "first" });
-  await expect.poll(async () => (await api.channel.message.list({ id: channel })).some((message) => message.fromRole === "worker")).toBe(true);
+  await expect.poll(async () => (await api.channel.message.list({ id: channel })).some((message) => actorRoleOf(message.actor) === "worker")).toBe(true);
   const first = await firstId(api, channel);
   const server = gate();
   await page.route(`**${pathOf("channel.markUnread")}`, async (route) => {
     await server.opened;
-    await route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ _tag: "Refused", reason: "not now" }) });
+    await route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ bizCode: BizCode.ChannelRefused, message: "not now" }) });
   });
   await page.goto(`/chat/${channel}`);
   const messages = page.getByTestId("messages");

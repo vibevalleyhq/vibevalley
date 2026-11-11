@@ -1,7 +1,7 @@
 import type { PkmBlock, PkmPageSummary, PkmTier } from "@vibevalley/protocol";
-import { pkmTag, slugOf } from "@vibevalley/protocol/rules";
 
 import { titleFor } from "./days.ts";
+import { pkmTag, slugOf } from "./outline.ts";
 
 /** The tiers in the list's order: what is worked on first, what is done with last. */
 export const tierOrder: readonly PkmTier[] = ["project", "area", "resource", "inbox", "journal", "archive"];
