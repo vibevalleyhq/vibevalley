@@ -17,7 +17,7 @@ const styles = stylex.create({
     cursor: { default: "pointer", ":disabled": "default" },
     alignItems: "center",
     justifyContent: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     whiteSpace: "nowrap",
     userSelect: "none",
     opacity: { default: null, ":disabled": 0.45 },
@@ -53,9 +53,9 @@ const styles = stylex.create({
     boxShadow: { default: "2px 2px 0 0 var(--color-px-drop)", ":enabled:active": "none" },
     translate: { default: null, ":enabled:active": "2px 2px" },
   },
-  md: { height: "calc(var(--spacing) * 9)", paddingInline: "calc(var(--spacing) * 4)" },
-  sm: { height: "calc(var(--spacing) * 7)", paddingInline: "calc(var(--spacing) * 2)" },
-  icon: { width: "calc(var(--spacing) * 9)", height: "calc(var(--spacing) * 9)" },
+  md: { height: "2.25rem", paddingInline: "1rem" },
+  sm: { height: "1.75rem", paddingInline: "0.5rem" },
+  icon: { width: "2.25rem", height: "2.25rem" },
 });
 
 const tones: Record<PxTone, stylex.StyleXStyles> = { plain: styles.plain, primary: styles.primary, danger: styles.danger, accent: styles.accent };

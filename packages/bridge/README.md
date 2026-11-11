@@ -7,7 +7,7 @@ The contracts themselves are in `packages/protocol/src/host.ts`; the links are e
 | Where | What |
 |---|---|
 | `src/index.ts` | `call({ input, output })` and `push(payload)` write a contract; `serve(contract, link, handlers)` answers its calls and sends its pushes; `connect(contract, link)` gives `call.<name>(input)` and `on(name, fn)`; `Link` and the messages on it |
-| `src/testing.ts` | `linkPair()`: two links joined in memory, through JSON |
+| `src/testing/testing.ts` | `linkPair()`: two links joined in memory, through JSON |
 
 - The answering side decodes each input by its call's Schema before the handler runs; one that does not decode is refused,
   and the caller gets a `BridgeError` with the reason. Outputs and pushes are encoded going out and decoded coming in.

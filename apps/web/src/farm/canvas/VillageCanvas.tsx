@@ -23,10 +23,10 @@ import { playSound } from "#/ui/pixel/sound.ts";
 import { startScene, type Scene } from "./scene";
 import { background, cssCursor, holdTimeOfDay, lightOn, screenOf } from "./screen";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   enteringDiv: {
-    height: "calc(var(--spacing) * 4)",
-    width: "calc(var(--spacing) * 64)",
+    height: "1rem",
+    width: "16rem",
     borderStyle: "solid",
     borderWidth: "2px",
     borderColor: "var(--color-bark-900)",
@@ -34,12 +34,9 @@ const recipeStyles = stylex.create({
       default: "var(--color-px-canvas-shade)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-bark-900) 60%, transparent)",
     },
-    padding: "calc(var(--spacing) * .5)",
+    padding: "0.125rem",
     boxShadow: "2px 2px 0 0 var(--color-px-shade)",
   },
-});
-
-const viewStyles = stylex.create({
   villageCanvasDiv: {
     position: "absolute",
     inset: "0",
@@ -65,17 +62,17 @@ const viewStyles = stylex.create({
     fontFamily: "var(--font-pixel)",
     color: "var(--color-cream-200)",
   },
-  enteringDiv: {
+  enteringDiv2: {
     position: "absolute",
     inset: "0",
     display: "grid",
     placeItems: "center",
   },
-  enteringDiv2: {
+  enteringDiv22: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     fontFamily: "var(--font-pixel)",
     fontSize: "12px",
     color: "var(--color-cream-100)",
@@ -84,7 +81,7 @@ const viewStyles = stylex.create({
     height: "100%",
     backgroundColor: "var(--color-leaf-500)",
     transitionProperty: "width",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionTimingFunction: "var(--ease-out)",
     transitionDuration: ".2s",
   },
 });
@@ -196,14 +193,14 @@ export function VillageCanvas() {
   );
 
   return (
-    <div {...stylex.attrs(viewStyles.villageCanvasDiv)} style={{ background }} aria-label={t("web.farm.canvas.label")} role="region">
+    <div {...stylex.attrs(styles.villageCanvasDiv)} style={{ background }} aria-label={t("web.farm.canvas.label")} role="region">
       <Show when={loaded().village}>
-        <div aria-hidden="true" {...stylex.attrs(viewStyles.villageCanvasDiv2)} style={{ "background-image": `url(${spriteUrl("map")})` }} />
+        <div aria-hidden="true" {...stylex.attrs(styles.villageCanvasDiv2)} style={{ "background-image": `url(${spriteUrl("map")})` }} />
       </Show>
-      <div ref={(el) => (host = el)} {...stylex.attrs(viewStyles.village)} data-testid="village" />
+      <div ref={(el) => (host = el)} {...stylex.attrs(styles.village)} data-testid="village" />
       <Show when={loaded().error ?? failed()} fallback={<Show when={!drawn()}>{<Entering mapped={!!loaded().village} />}</Show>}>
         {(why) => (
-          <p data-testid="village-error" data-opening="failed" {...stylex.attrs(viewStyles.villageError)}>
+          <p data-testid="village-error" data-opening="failed" {...stylex.attrs(styles.villageError)}>
             {t("web.farm.canvas.noMap", { why: why() })}
           </p>
         )}
@@ -226,8 +223,8 @@ function Entering(props: { mapped: boolean }) {
     return done < total ? t("web.farm.canvas.moving", { done, total }) : t("web.farm.canvas.lights");
   };
   return (
-    <div {...stylex.attrs(viewStyles.enteringDiv)} data-opening="pending" data-opening-progress={fill()}>
-      <div {...stylex.attrs(viewStyles.enteringDiv2)}>
+    <div {...stylex.attrs(styles.enteringDiv2)} data-opening="pending" data-opening-progress={fill()}>
+      <div {...stylex.attrs(styles.enteringDiv22)}>
         <div
           role="progressbar"
           data-testid="village-loading"
@@ -235,9 +232,9 @@ function Entering(props: { mapped: boolean }) {
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(fill() * 100)}
-          {...stylex.attrs(recipeStyles.enteringDiv)}
+          {...stylex.attrs(styles.enteringDiv)}
         >
-          <div {...stylex.attrs(viewStyles.enteringDiv3)} style={{ width: `${fill() * 100}%` }} />
+          <div {...stylex.attrs(styles.enteringDiv3)} style={{ width: `${fill() * 100}%` }} />
         </div>
         <span>{words()}</span>
       </div>

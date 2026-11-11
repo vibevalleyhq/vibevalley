@@ -9,16 +9,16 @@ import { SqlClient } from "effect/sql";
 import type * as T from "@vibevalley/protocol";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
-import { Agent } from "#/agent/agent.ts";
 import { user } from "#/base/actor.ts";
-import { Channel } from "#/channel/channel.ts";
-import { Ingress } from "#/ingress/ingress.ts";
-import { explicitMandate } from "#/issue/creation.ts";
-import { Issue } from "#/issue/issue.ts";
-import { Repo } from "#/repo/repo.ts";
-import { repository } from "#/repo/repository.ts";
-import { Resource } from "#/resource/resource.ts";
-import { Session } from "#/session/session.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { Channel } from "#/modules/channel/channel.ts";
+import { explicitMandate } from "#/modules/issue/creation.ts";
+import { Issue } from "#/modules/issue/issue.ts";
+import { Mailbox } from "#/modules/mailbox/mailbox.ts";
+import { Repo } from "#/modules/repo/repo.ts";
+import { repository } from "#/modules/repo/repository.ts";
+import { Session } from "#/modules/session/session.ts";
+import { Tool } from "#/modules/tool/tool.ts";
 import { gitIn } from "#/testing/git.ts";
 import { testConfig } from "#/testing/layers.ts";
 
@@ -83,7 +83,7 @@ describe("a pull request", () => {
             const query = args.find((arg) => arg.startsWith("query="))?.slice(6) ?? "";
             const author = (login: string) => ({ login, __typename: login.endsWith("[bot]") ? "Bot" : "User" });
             const pull = (key: string, nodes: unknown[]) => ({ data: { repository: { pullRequest: { [key]: { nodes } } } } });
-            if (query.startsWith("query IngressChecks("))
+            if (query.startsWith("query PullChecks("))
               return ok(
                 Formatter.formatJson([
                   {
@@ -99,7 +99,7 @@ describe("a pull request", () => {
                   },
                 ]),
               );
-            if (query.startsWith("query IngressReviews("))
+            if (query.startsWith("query PullReviews("))
               return ok(
                 Formatter.formatJson(
                   [
@@ -119,11 +119,11 @@ describe("a pull request", () => {
                   ),
                 ),
               );
-            if (query.startsWith("query IngressComments("))
+            if (query.startsWith("query PullComments("))
               return ok(
                 Formatter.formatJson([pull("comments", [{ id: "SELF", author: author("GARDENER"), body: "own", url: "", createdAt: "2026-11-01T00:00:00Z" }])]),
               );
-            if (query.startsWith("query IngressThreads(")) {
+            if (query.startsWith("query PullThreads(")) {
               const nodes = Array.from({ length: head === "head-8" ? 7 : 6 }, (_, i) => ({
                 id: `PRRC_${9 + i}`,
                 fullDatabaseId: String(9 + i),
@@ -262,19 +262,19 @@ describe("a pull request", () => {
           yield* (yield* Repo).refreshGitHub();
           const restored = yield* issues.get(issue!.id);
           expect(restored.pullRequest?.number).toBe(7);
-          const ingress = yield* Ingress;
-          yield* ingress.record({
+          const mailbox = yield* Mailbox;
+          yield* mailbox.record({
             source: "github",
             key: "clock#7:review:R1",
-            actor: { kind: "bot", id: "review-bot[bot]", name: "review-bot[bot]" },
+            actor: { kind: "system", id: "review-bot[bot]", name: "review-bot[bot]" },
             addressed: "thread_owner",
             threads: [`issue:${restored.id}`, "github:clock#7"],
             text: "review-bot[bot] CHANGES_REQUESTED\nround 1",
             at: 1,
             meta: { repo: "clock", pr: 7, kind: "review", botRound: 1, botRoundKey: "review-bot[bot]:review:R1" },
           });
-          yield* ingress.refreshGitHub;
-          yield* ingress.refreshGitHub;
+          yield* issues.pollGitHub;
+          yield* issues.pollGitHub;
           const sql = yield* SqlClient.SqlClient;
           const inputs = yield* sql<{ key: string; kind: string; reason: string | null }>`
             select t.source_key as key, t.trigger_json::jsonb->'meta'->>'kind' as kind, m.reason
@@ -293,26 +293,26 @@ describe("a pull request", () => {
             from mailbox_trigger t join mailbox_issue m on m.trigger_id = t.id where t.trigger_json::jsonb->'meta'->>'kind' = 'comment'`;
           expect(rounds).toHaveLength(6);
           expect(rounds.every((row) => row.round === 1 && row.reason === "human")).toBe(true);
-          const resource = yield* (yield* Resource).read(id, { uri: "vv://github/clock/pulls/7/thread/9", limit: 16_000 });
+          const resource = yield* (yield* Tool).readResource(id, { uri: "vv://github/clock/pulls/7/thread/9", limit: 16_000 });
           const thread = yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Struct({ threadId: Schema.String, comments: Schema.Array(Schema.Unknown) })))(
             resource.text,
           );
           expect(thread.threadId).toBe("PRRT_9");
           expect(thread.comments).toHaveLength(6);
           head = "head-8";
-          yield* ingress.refreshGitHub;
+          yield* issues.pollGitHub;
           const late = yield* sql<{
             round: number;
           }>`select (trigger_json::jsonb->'meta'->>'botRound')::int as round from mailbox_trigger where source_key = 'clock#7:comment:PRRC_15'`;
           expect(late[0]?.round).toBe(1);
           expect(resolvedThreads).toEqual([]);
           conclusion = "SUCCESS";
-          yield* ingress.refreshGitHub;
+          yield* issues.pollGitHub;
           conclusion = "FAILURE";
-          yield* ingress.refreshGitHub;
+          yield* issues.pollGitHub;
           expect((yield* sql<{ n: number }>`select count(*) as n from mailbox_trigger where trigger_json::jsonb->'meta'->>'kind' = 'ci'`)[0]?.n).toBe(4);
           expect(resolvedThreads).toEqual([]);
-          const released = (yield* ingress.accept({
+          const released = (yield* mailbox.accept({
             source: "connector",
             key: "user-review-release",
             actor: { kind: "user", id: "user" },

@@ -33,8 +33,8 @@ import {
 const logStyles = stylex.create({
   box: {
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
   },
   edge: {
     borderStyle: "solid",
@@ -47,16 +47,16 @@ const logStyles = stylex.create({
   line: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.375rem",
   },
   text: {
     minWidth: "0",
     flex: "1",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   user: {
     backgroundColor: {
@@ -111,79 +111,70 @@ const logStyles = stylex.create({
   },
 });
 
-const recipeStyles2 = stylex.create({
+const styles = stylex.create({
   foldedDiv: {
     width: "100%",
     overflow: "hidden",
   },
-  foldedDivVariant1Case1: {
+  foldedDivPrimary: {
     fontSize: null,
     lineHeight: null,
     whiteSpace: null,
   },
-  foldedDivVariant1Case2: {
+  foldedDivSecondary: {
     fontSize: "var(--text-base)",
-    lineHeight: "var(--text-base--line-height)",
+    lineHeight: "var(--leading-base)",
     whiteSpace: "pre-wrap",
   },
-  foldedDivVariant2Case1: {
+  foldedDivStateA: {
     WebkitMaskImage: null,
     maskImage: null,
   },
-  foldedDivVariant2Case2: {
+  foldedDivStateB: {
     WebkitMaskImage: "linear-gradient(black 70%,transparent)",
     maskImage: "linear-gradient(black 70%,transparent)",
   },
-});
-
-const recipeStyles = stylex.create({
   runStepsWorkLog: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+    marginTop: "0.375rem",
   },
-});
-
-const variantStyles2 = stylex.create({
   runStepsIcon: {
     opacity: ".6",
   },
   runFoldIcon: {
-    transitionProperty: "transform,translate,scale,rotate",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
-    transitionDuration: ".12s",
+    transitionProperty: "rotate",
+    transitionTimingFunction: "var(--ease-out)",
+    transitionDuration: "120ms",
   },
-  runFoldIconVariant: {
+  runFoldIconTone: {
     rotate: "90deg",
   },
-  runFoldIconVariant2: {},
+  runFoldIconAlt: {},
   lineIcon: {
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
   },
-});
-
-const variantStyles = stylex.create({
   runFoldDiv: {},
-  runFoldDivVariant: {
-    marginLeft: "calc(var(--spacing) * 5)",
+  runFoldDivTone: {
+    marginLeft: "1.25rem",
     borderLeftStyle: "solid",
     borderLeftWidth: "2px",
     borderColor: {
       default: "var(--color-leaf)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf) 50%, transparent)",
     },
-    paddingLeft: "calc(var(--spacing) * 2.5)",
+    paddingLeft: "0.625rem",
   },
   toolStepButton: {
     display: "flex",
     width: "100%",
     cursor: "pointer",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "var(--spacing)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.25rem",
     textAlign: "left",
   },
-  toolStepButtonVariant: {
+  toolStepButtonTone: {
     backgroundColor: {
       default: "var(--color-hover)",
       "@media (hover:hover)": {
@@ -192,7 +183,7 @@ const variantStyles = stylex.create({
       },
     },
   },
-  toolStepButtonVariant2: {
+  toolStepButtonAlt: {
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -201,9 +192,6 @@ const variantStyles = stylex.create({
       },
     },
   },
-});
-
-const viewStyles = stylex.create({
   workLog: {
     maxHeight: "352px",
     overflowY: "auto",
@@ -221,18 +209,18 @@ const viewStyles = stylex.create({
     borderColor: { default: null, ":not(:last-child)": "var(--color-line)" },
   },
   runStepsDiv: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+    marginTop: "0.375rem",
   },
   runStepsButton: {
     display: "inline-flex",
     cursor: "pointer",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
-    paddingBlock: "calc(var(--spacing) * .5)",
+    paddingInline: "0.375rem",
+    paddingBlock: "0.125rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-medium)",
     color: "var(--color-muted)",
     backgroundColor: {
@@ -243,22 +231,22 @@ const viewStyles = stylex.create({
       },
     },
   },
-  runFoldDiv: {
+  runFoldDiv2: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 1.5)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingTop: "calc(var(--spacing) * 2)",
-    paddingBottom: "calc(var(--spacing) * 2.5)",
+    gap: "0.375rem",
+    paddingInline: "0.5rem",
+    paddingTop: "0.5rem",
+    paddingBottom: "0.625rem",
   },
   runFoldButton: {
     display: "flex",
     cursor: "pointer",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
-    paddingBlock: "var(--spacing)",
+    paddingInline: "0.375rem",
+    paddingBlock: "0.25rem",
     textAlign: "left",
     backgroundColor: {
       default: null,
@@ -270,7 +258,7 @@ const viewStyles = stylex.create({
   },
   runFoldSpan: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-semibold)",
   },
   runFoldSpan2: {
@@ -280,24 +268,24 @@ const viewStyles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
-  runFoldDiv2: {
+  runFoldDiv22: {
     borderRadius: "var(--radius-md)",
     backgroundColor: {
       default: "var(--color-wheat)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-wheat) 15%, transparent)",
     },
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
   },
   runFoldButton2: {
     cursor: "pointer",
     alignSelf: "flex-start",
-    paddingLeft: "calc(var(--spacing) * 1.5)",
+    paddingLeft: "0.375rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-water)",
     textDecorationLine: {
       default: null,
@@ -309,7 +297,7 @@ const viewStyles = stylex.create({
   },
   timeBarDiv: {
     display: "flex",
-    height: "calc(var(--spacing) * 2)",
+    height: "0.5rem",
     gap: "1px",
     overflow: "hidden",
     borderRadius: "var(--radius-xs)",
@@ -317,19 +305,19 @@ const viewStyles = stylex.create({
   whenSpan: {
     flexShrink: "0",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
-  foldedDiv: {
+  foldedDiv2: {
     display: "flex",
     flexDirection: "column",
     alignItems: "flex-start",
   },
   foldedButton: {
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
     cursor: "pointer",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-water)",
     textDecorationLine: {
       default: null,
@@ -340,13 +328,13 @@ const viewStyles = stylex.create({
     },
   },
   boxDiv: {
-    marginBottom: "var(--spacing)",
+    marginBottom: "0.25rem",
     display: "flex",
     alignItems: "center",
   },
   boxSpan: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-semibold)",
     color: "var(--color-muted)",
   },
@@ -354,13 +342,13 @@ const viewStyles = stylex.create({
     flex: "1",
   },
   toolStepSpan: {
-    width: "calc(var(--spacing) * 16)",
+    width: "4rem",
     flexShrink: "0",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-medium)",
   },
   toolStepSpan2: {
@@ -371,7 +359,7 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   toolStepSpan3: {
@@ -379,46 +367,46 @@ const viewStyles = stylex.create({
   },
   toolStepSpan4: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-faint)",
   },
   toolStepDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 1.5)",
-    paddingTop: "var(--spacing)",
-    paddingRight: "calc(var(--spacing) * 2)",
-    paddingBottom: "calc(var(--spacing) * 2)",
-    paddingLeft: "calc(var(--spacing) * 8)",
+    gap: "0.375rem",
+    paddingTop: "0.25rem",
+    paddingRight: "0.5rem",
+    paddingBottom: "0.5rem",
+    paddingLeft: "2rem",
   },
   toolStepSpan5: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   toolStepPre: {
-    maxHeight: "calc(var(--spacing) * 40)",
+    maxHeight: "10rem",
     overflow: "auto",
     borderRadius: "var(--radius-md)",
     backgroundColor: "var(--color-code-bg)",
-    paddingInline: "calc(var(--spacing) * 2.5)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.625rem",
+    paddingBlock: "0.5rem",
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     whiteSpace: "pre-wrap",
     color: "var(--color-code-ink)",
   },
   toolStepPre2: {
-    maxHeight: "calc(var(--spacing) * 56)",
+    maxHeight: "14rem",
     overflow: "auto",
     borderRadius: "var(--radius-md)",
     backgroundColor: "var(--color-hover)",
-    paddingInline: "calc(var(--spacing) * 2.5)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.625rem",
+    paddingBlock: "0.5rem",
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     whiteSpace: "pre-wrap",
   },
 });
@@ -436,14 +424,14 @@ export function RunSteps(props: { session: string; run: string | undefined; orch
   return (
     <Show when={label()}>
       {(text) => (
-        <div {...stylex.attrs(viewStyles.runStepsDiv)}>
-          <button type="button" onClick={() => setOpen(!open())} aria-expanded={aria(open())} {...stylex.attrs(viewStyles.runStepsButton)}>
+        <div {...stylex.attrs(styles.runStepsDiv)}>
+          <button type="button" onClick={() => setOpen(!open())} aria-expanded={aria(open())} {...stylex.attrs(styles.runStepsButton)}>
             <Icon name="log" size={14} />
             {text()}
-            <Icon name={open() ? "collapse" : "enlarge"} size={10} styles={[variantStyles2.runStepsIcon]} />
+            <Icon name={open() ? "collapse" : "enlarge"} size={10} styles={[styles.runStepsIcon]} />
           </button>
           <Show when={open()}>
-            <WorkLog steps={steps()} now={now()} asked={t("web.session.log.heard")} styles={[recipeStyles.runStepsWorkLog]} />
+            <WorkLog steps={steps()} now={now()} asked={t("web.session.log.heard")} styles={[styles.runStepsWorkLog]} />
           </Show>
         </div>
       )}
@@ -457,7 +445,7 @@ export function WorkLog(props: { steps: SessionEvent[]; now: number; asked?: str
   const runs = () => runsOf(shown());
   const firstAsked = () => shown().find((s) => s.type === "user/message" && s.under === undefined)?.seq;
   return (
-    <div {...styleProps([viewStyles.workLog, props.styles])} aria-label={t("web.session.log.process")}>
+    <div {...styleProps([styles.workLog, props.styles])} aria-label={t("web.session.log.process")}>
       <For each={runs()} keyed={(r) => r.run ?? (r.asked ?? r.steps[0])?.seq ?? -1}>
         {(r, i) => (
           <RunFold
@@ -482,16 +470,16 @@ function RunFold(props: { run: RunView; last: boolean; live: boolean; now: numbe
     return open() ? props.run.steps : answer ? [answer] : [];
   };
   return (
-    <div {...stylex.attrs(viewStyles.runFoldDiv, viewStyles.runDivider)}>
+    <div {...stylex.attrs(styles.runFoldDiv2, styles.runDivider)}>
       <button
         type="button"
         onClick={() => setToggled(!open())}
         aria-label={open() ? t("web.session.log.fold") : t("web.session.log.unfold")}
-        {...stylex.attrs(viewStyles.runFoldButton)}
+        {...stylex.attrs(styles.runFoldButton)}
       >
-        <Icon name="expand" size={12} styles={[variantStyles2.runFoldIcon, open() ? variantStyles2.runFoldIconVariant : variantStyles2.runFoldIconVariant2]} />
-        <span {...stylex.attrs(viewStyles.runFoldSpan)}>{props.label}</span>
-        <span {...stylex.attrs(viewStyles.runFoldSpan2)}>
+        <Icon name="expand" size={12} styles={[styles.runFoldIcon, open() ? styles.runFoldIconTone : styles.runFoldIconAlt]} />
+        <span {...stylex.attrs(styles.runFoldSpan)}>{props.label}</span>
+        <span {...stylex.attrs(styles.runFoldSpan2)}>
           {t("web.session.log.steps", { n: props.run.steps.length, took: tookText(runMs(props.run, end())) })}
           {props.live ? t("web.session.log.live") : ""}
         </span>
@@ -499,7 +487,7 @@ function RunFold(props: { run: RunView; last: boolean; live: boolean; now: numbe
       </button>
       <Show when={props.run.asked}>
         {(asked) => (
-          <div {...stylex.attrs(viewStyles.runFoldDiv2)}>
+          <div {...stylex.attrs(styles.runFoldDiv22)}>
             <Folded text={asked().text} lines={4} />
           </div>
         )}
@@ -509,13 +497,13 @@ function RunFold(props: { run: RunView; last: boolean; live: boolean; now: numbe
       </Show>
       <For each={shown()} keyed={(s) => s.seq}>
         {(s) => (
-          <div {...stylex.attrs(variantStyles.runFoldDiv, s().under !== undefined ? variantStyles.runFoldDivVariant : variantStyles.runFoldDiv)}>
+          <div {...stylex.attrs(styles.runFoldDiv, s().under !== undefined ? styles.runFoldDivTone : styles.runFoldDiv)}>
             <Step step={s()} now={props.now} />
           </div>
         )}
       </For>
       <Show when={!open() && props.run.steps.length > shown().length}>
-        <button type="button" onClick={() => setToggled(true)} {...stylex.attrs(viewStyles.runFoldButton2)}>
+        <button type="button" onClick={() => setToggled(true)} {...stylex.attrs(styles.runFoldButton2)}>
           {t("web.session.log.see", { n: props.run.steps.length })}
         </button>
       </Show>
@@ -531,7 +519,7 @@ function TimeBar(props: { run: RunView; end: number }) {
     return total <= 0 ? 1 : total / 80;
   };
   return (
-    <div {...stylex.attrs(viewStyles.timeBarDiv)}>
+    <div {...stylex.attrs(styles.timeBarDiv)}>
       <For each={spans()} keyed={(s) => s.step.seq}>
         {(s) => (
           <span
@@ -546,7 +534,7 @@ function TimeBar(props: { run: RunView; end: number }) {
 }
 
 function When(props: { at: number; now: number }) {
-  return <span {...stylex.attrs(viewStyles.whenSpan)}>{ago(props.at, props.now)}</span>;
+  return <span {...stylex.attrs(styles.whenSpan)}>{ago(props.at, props.now)}</span>;
 }
 
 function Folded(props: { text: string; lines: number; markdown?: boolean }) {
@@ -554,19 +542,19 @@ function Folded(props: { text: string; lines: number; markdown?: boolean }) {
   const long = () => isLongText(props.text, props.lines);
   const clamp = () => long() && !open();
   return (
-    <div {...stylex.attrs(viewStyles.foldedDiv)}>
+    <div {...stylex.attrs(styles.foldedDiv2)}>
       <div
         {...stylex.attrs(
-          recipeStyles2.foldedDiv,
-          props.markdown !== true ? recipeStyles2.foldedDivVariant1Case2 : recipeStyles2.foldedDivVariant1Case1,
-          clamp() ? recipeStyles2.foldedDivVariant2Case2 : recipeStyles2.foldedDivVariant2Case1,
+          styles.foldedDiv,
+          props.markdown !== true ? styles.foldedDivSecondary : styles.foldedDivPrimary,
+          clamp() ? styles.foldedDivStateB : styles.foldedDivStateA,
         )}
         style={clamp() ? { "max-height": `${props.lines * 22}px` } : undefined}
       >
         {props.markdown === true ? <Markdown text={props.text} /> : props.text}
       </div>
       <Show when={long()}>
-        <button type="button" onClick={() => setOpen(!open())} {...stylex.attrs(viewStyles.foldedButton)}>
+        <button type="button" onClick={() => setOpen(!open())} {...stylex.attrs(styles.foldedButton)}>
           {open() ? t("web.session.log.less") : t("web.session.log.all")}
         </button>
       </Show>
@@ -577,9 +565,9 @@ function Folded(props: { text: string; lines: number; markdown?: boolean }) {
 function Box(props: { tint?: stylex.StyleXStyles; edge?: boolean; faint?: boolean; label: string; step: SessionEvent; now: number; children: JSX.Element }) {
   return (
     <div {...styleProps([logStyles.box, props.tint, props.edge === true && logStyles.edge, props.faint === true && logStyles.faint])}>
-      <div {...stylex.attrs(viewStyles.boxDiv)}>
-        <span {...stylex.attrs(viewStyles.boxSpan)}>{props.label}</span>
-        <span {...stylex.attrs(viewStyles.boxSpan2)} />
+      <div {...stylex.attrs(styles.boxDiv)}>
+        <span {...stylex.attrs(styles.boxSpan)}>{props.label}</span>
+        <span {...stylex.attrs(styles.boxSpan2)} />
         <When at={props.step.time} now={props.now} />
       </div>
       {props.children}
@@ -590,7 +578,7 @@ function Box(props: { tint?: stylex.StyleXStyles; edge?: boolean; faint?: boolea
 function Line(props: { mark: IconName; step: SessionEvent; now: number; tint: stylex.StyleXStyles; ink: stylex.StyleXStyles }) {
   return (
     <div {...styleProps([logStyles.line, props.tint])}>
-      <Icon name={props.mark} size={12} styles={[variantStyles2.lineIcon]} />
+      <Icon name={props.mark} size={12} styles={[styles.lineIcon]} />
       <span {...styleProps([logStyles.text, props.ink])}>{props.step.text}</span>
       <When at={props.step.time} now={props.now} />
     </div>
@@ -650,31 +638,29 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
         type="button"
         onClick={() => setOpen(!open())}
         aria-expanded={aria(open())}
-        {...stylex.attrs(variantStyles.toolStepButton, open() ? variantStyles.toolStepButtonVariant : variantStyles.toolStepButtonVariant2)}
+        {...stylex.attrs(styles.toolStepButton, open() ? styles.toolStepButtonTone : styles.toolStepButtonAlt)}
       >
         <Icon name={actionIcon[props.step.action ?? "other"]} size={16} />
-        <span {...stylex.attrs(viewStyles.toolStepSpan)}>{kind()}</span>
-        <span {...stylex.attrs(viewStyles.toolStepSpan2)}>{farm() ?? props.step.text}</span>
-        <span title={state()} {...stylex.attrs(viewStyles.toolStepSpan3)}>
-          <Show when={props.step.ok !== undefined} fallback={<span {...stylex.attrs(viewStyles.toolStepSpan4)}>…</span>}>
+        <span {...stylex.attrs(styles.toolStepSpan)}>{kind()}</span>
+        <span {...stylex.attrs(styles.toolStepSpan2)}>{farm() ?? props.step.text}</span>
+        <span title={state()} {...stylex.attrs(styles.toolStepSpan3)}>
+          <Show when={props.step.ok !== undefined} fallback={<span {...stylex.attrs(styles.toolStepSpan4)}>…</span>}>
             <Icon name={props.step.ok === true ? "check" : "cross"} size={12} label={state()} />
           </Show>
         </span>
         <When at={props.step.time} now={props.now} />
       </button>
       <Show when={open()}>
-        <div {...stylex.attrs(viewStyles.toolStepDiv)}>
-          {props.step.tool && <span {...stylex.attrs(viewStyles.toolStepSpan5)}>{t("web.session.log.tool", { name: props.step.tool })}</span>}
-          <Show when={input()}>{(text) => <pre {...stylex.attrs(viewStyles.toolStepPre)}>{text()}</pre>}</Show>
+        <div {...stylex.attrs(styles.toolStepDiv)}>
+          {props.step.tool && <span {...stylex.attrs(styles.toolStepSpan5)}>{t("web.session.log.tool", { name: props.step.tool })}</span>}
+          <Show when={input()}>{(text) => <pre {...stylex.attrs(styles.toolStepPre)}>{text()}</pre>}</Show>
           <Show
             when={props.step.output}
             fallback={
-              <span {...stylex.attrs(viewStyles.toolStepSpan5)}>
-                {props.step.ok === undefined ? t("web.session.log.pending") : t("web.session.log.noOutput")}
-              </span>
+              <span {...stylex.attrs(styles.toolStepSpan5)}>{props.step.ok === undefined ? t("web.session.log.pending") : t("web.session.log.noOutput")}</span>
             }
           >
-            {(out) => <pre {...stylex.attrs(viewStyles.toolStepPre2)}>{out()}</pre>}
+            {(out) => <pre {...stylex.attrs(styles.toolStepPre2)}>{out()}</pre>}
           </Show>
         </div>
       </Show>

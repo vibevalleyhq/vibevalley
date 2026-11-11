@@ -60,6 +60,8 @@ export interface AgentOptions<A> {
   readonly model: Model;
   readonly thinkingLevel?: ThinkingLevel;
   readonly tools: readonly Tool[];
+  /** Maximum tool calls executed concurrently within one turn; 8 when absent. */
+  readonly toolConcurrency?: number;
   readonly messages: readonly AgentMessage<A>[];
   /** Asked before each request, so a key changed meanwhile is used at once. */
   readonly apiKey: () => string;
@@ -90,6 +92,7 @@ const errorResult = (text: string): ToolResult => ({ content: [{ type: "text", t
 const truncated = (name: string) =>
   `Tool call "${name}" was not executed: the response hit the output token limit, so its arguments may be truncated. Re-issue the tool call with complete arguments.`;
 const operationAborted = "Operation aborted";
+const defaultToolConcurrency = 8;
 
 interface Run {
   readonly stop: Deferred.Deferred<void>;
@@ -250,7 +253,9 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
           );
           if (yield* Deferred.isDone(stop)) break;
         }
-        const outcomes = yield* Effect.forEach(entries, (e) => (Effect.isEffect(e) ? e : Effect.succeed(e)), { concurrency: "unbounded" });
+        const outcomes = yield* Effect.forEach(entries, (e) => (Effect.isEffect(e) ? e : Effect.succeed(e)), {
+          concurrency: options.toolConcurrency ?? defaultToolConcurrency,
+        });
         const results: ToolResultMessage[] = [];
         yield* Effect.forEach(
           outcomes,

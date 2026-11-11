@@ -9,7 +9,7 @@ const viewStyles = stylex.create({
   iconButtonStoriesDiv: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
 });
 

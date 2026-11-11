@@ -11,10 +11,10 @@ const styles = stylex.create({
   track: {
     position: "relative",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 0.5)",
+    gap: "0.125rem",
     borderRadius: "var(--radius-md)",
     backgroundColor: "var(--color-hover)",
-    padding: "calc(var(--spacing) * 0.5)",
+    padding: "0.125rem",
   },
   block: { display: "flex", width: "100%" },
   fitted: { display: "inline-flex", width: "fit-content" },
@@ -28,23 +28,23 @@ const styles = stylex.create({
     boxShadow: "var(--shadow-raise)",
   },
   place: (x: number, y: number, width: number, height: number) => ({ translate: `${x}px ${y}px`, width, height }),
-  moved: { transitionProperty: "translate, width", transitionDuration: "280ms", transitionTimingFunction: "var(--default-transition-timing-function)" },
+  moved: { transitionProperty: "translate, width", transitionDuration: "280ms", transitionTimingFunction: "var(--ease-out)" },
   option: {
     position: "relative",
     display: "inline-flex",
-    height: "calc(var(--spacing) * 6)",
+    height: "1.5rem",
     cursor: { default: "pointer", ":disabled": "default" },
     alignItems: "center",
     justifyContent: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     borderRadius: "var(--radius-sm)",
-    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingInline: "0.625rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     whiteSpace: "nowrap",
-    transitionProperty: "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke",
+    transitionProperty: "color, background-color, border-color",
     transitionDuration: "120ms",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionTimingFunction: "var(--ease-out)",
     opacity: { default: null, ":disabled": 0.5 },
   },
   stretched: { flex: 1 },
@@ -105,7 +105,7 @@ export function Segmented<T extends string>(props: {
       }}
       aria-label={props.label}
       data-testid={props.testid}
-      class={stylex.attrs(styles.track, props.block === true ? styles.block : styles.fitted).class}
+      {...stylex.attrs(styles.track, props.block === true ? styles.block : styles.fitted)}
     >
       <Show when={thumb()}>
         {(at) => <span aria-hidden="true" {...styleProps([styles.thumb, moved() && styles.moved, styles.place(at().x, at().y, at().w, at().h)])} />}
@@ -117,7 +117,7 @@ export function Segmented<T extends string>(props: {
             data-key={o.value}
             disabled={o.disabled}
             title={o.title}
-            class={stylex.attrs(styles.option, props.block === true && styles.stretched, o.value === props.value ? styles.selected : styles.idle).class}
+            {...stylex.attrs(styles.option, props.block === true && styles.stretched, o.value === props.value ? styles.selected : styles.idle)}
           >
             <Show when={o.icon}>{(name) => <Icon name={name()} size={14} />}</Show>
             {o.label}

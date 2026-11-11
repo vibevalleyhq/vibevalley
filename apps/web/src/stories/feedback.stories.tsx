@@ -8,7 +8,7 @@ import { Empty } from "#/ui/layout.tsx";
 import { ToastHost } from "#/ui/ToastHost.tsx";
 import { toast } from "#/ui/toasts.ts";
 
-const variantStyles = stylex.create({
+const styles = stylex.create({
   list: {
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
@@ -20,9 +20,9 @@ const variantStyles = stylex.create({
     flexDirection: "column",
   },
   feedbackStoriesP: {
-    padding: "calc(var(--spacing) * 4)",
+    padding: "1rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-faint)",
   },
   feedbackStoriesLi: {
@@ -31,10 +31,10 @@ const variantStyles = stylex.create({
     borderTopWidth: { default: null, ":not(:last-child)": 0 },
     borderBottomWidth: { default: null, ":not(:last-child)": 1 },
     borderColor: { default: null, ":not(:last-child)": "var(--color-line)" },
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBlock: "calc(var(--spacing) * 2.5)",
+    paddingInline: "1rem",
+    paddingBlock: "0.625rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
 });
 
@@ -49,7 +49,7 @@ export default stories({
       render: (a, set) => {
         const [rows, setRows] = createSignal<string[]>([]);
         return (
-          <div {...stylex.attrs(variantStyles.feedbackStoriesDiv)}>
+          <div {...stylex.attrs(styles.feedbackStoriesDiv)}>
             <Switch>
               <Match when={a.state === "empty"}>
                 <Empty
@@ -71,7 +71,7 @@ export default stories({
                 </Empty>
               </Match>
               <Match when={a.state === "loading"}>
-                <p {...stylex.attrs(variantStyles.feedbackStoriesP)} aria-busy="true">
+                <p {...stylex.attrs(styles.feedbackStoriesP)} aria-busy="true">
                   在读……
                 </p>
               </Match>
@@ -81,9 +81,9 @@ export default stories({
                 </Empty>
               </Match>
               <Match when={a.state === "full"}>
-                <ul {...stylex.attrs(variantStyles.list)}>
+                <ul {...stylex.attrs(styles.list)}>
                   <For each={rows().length > 0 ? rows() : ["修好登录", "补齐看板的测试"]}>
-                    {(r) => <li {...stylex.attrs(variantStyles.feedbackStoriesLi)}>{r}</li>}
+                    {(r) => <li {...stylex.attrs(styles.feedbackStoriesLi)}>{r}</li>}
                   </For>
                 </ul>
               </Match>

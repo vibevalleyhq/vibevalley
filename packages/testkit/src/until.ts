@@ -1,4 +1,8 @@
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
+
+class WaitTimedOut extends Schema.TaggedError<WaitTimedOut, { readonly brand: unique symbol }>()("WaitTimedOut", {
+  message: Schema.String,
+}) {}
 
 const gaps = [1, 2, 5, 15, 30];
 const aMoment = (asked: number) => new Promise<void>((r) => setTimeout(r, gaps[Math.min(asked, gaps.length - 1)]));
@@ -10,7 +14,7 @@ export const waitFor = <A, E, R>(get: Effect.Effect<A, E, R>, ok: (a: A) => bool
     for (let asked = 0; ; asked++) {
       const a = yield* get;
       if (ok(a)) return a;
-      if (performance.now() > until) return yield* Effect.die(new Error(`waited for ${typeof what === "string" ? what : what()}`));
+      if (performance.now() > until) return yield* Effect.die(WaitTimedOut.make({ message: `waited for ${typeof what === "string" ? what : what()}` }));
       yield* Effect.promise(() => aMoment(asked));
     }
   });

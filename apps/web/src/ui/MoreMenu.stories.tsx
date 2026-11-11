@@ -4,22 +4,19 @@ import { stories, story } from "@vibevalley/stories";
 
 import { MoreMenu } from "./MoreMenu";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   moreMenuStoriesDiv: {
     display: "flex",
     justifyContent: "flex-end",
-    paddingTop: "calc(var(--spacing) * 40)",
-    paddingRight: "calc(var(--spacing) * 4)",
-    paddingBottom: "calc(var(--spacing) * 4)",
-    paddingLeft: "calc(var(--spacing) * 4)",
+    paddingTop: "10rem",
+    paddingRight: "1rem",
+    paddingBottom: "1rem",
+    paddingLeft: "1rem",
   },
-});
-
-const viewStyles = stylex.create({
-  moreMenuStoriesDiv: {
+  moreMenuStoriesDiv2: {
     display: "flex",
     justifyContent: "flex-end",
-    padding: "calc(var(--spacing) * 4)",
+    padding: "1rem",
   },
 });
 
@@ -30,7 +27,7 @@ export default stories({
   stories: {
     "A place's other actions": story({
       render: () => (
-        <div {...stylex.attrs(viewStyles.moreMenuStoriesDiv)}>
+        <div {...stylex.attrs(styles.moreMenuStoriesDiv2)}>
           <MoreMenu
             label="更多"
             items={[
@@ -44,7 +41,7 @@ export default stories({
     }),
     "Opening upwards, from a toolbar": story({
       render: () => (
-        <div {...stylex.attrs(recipeStyles.moreMenuStoriesDiv)}>
+        <div {...stylex.attrs(styles.moreMenuStoriesDiv)}>
           <MoreMenu label="更多" side="top" items={[{ key: "copy-link", label: "复制链接", icon: "copy", onSelect: noop }]} />
         </div>
       ),
@@ -52,7 +49,7 @@ export default stories({
     "One choice of a kind, under its own icon": story({
       note: "发到哪个频道：触发的图标说是哪一类选择，不是 ⋯。",
       render: () => (
-        <div {...stylex.attrs(viewStyles.moreMenuStoriesDiv)}>
+        <div {...stylex.attrs(styles.moreMenuStoriesDiv2)}>
           <MoreMenu
             label="发到频道"
             icon="send"

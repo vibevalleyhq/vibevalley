@@ -1,6 +1,6 @@
 import { Effect, Layer } from "effect";
 
-import { registryOf } from "#/runtime/runtime.ts";
+import { registryOf } from "#/modules/runtime/runtime.ts";
 
 import { app } from "./http.ts";
 import { testConfig } from "./layers.ts";

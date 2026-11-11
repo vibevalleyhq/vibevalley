@@ -2,6 +2,7 @@ import type { Page, Route } from "@playwright/test";
 
 import type { Agent, Changes, Issue, IssueHistory, IssueStage, IssueTimeline, StateFrame, SessionView } from "@vibevalley/protocol";
 import { readStream, statePath, pathOf } from "@vibevalley/protocol";
+import { BizCode } from "@vibevalley/protocol/api";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { buttons, expect, test, withIssueSession } from "./fixtures";
@@ -13,7 +14,8 @@ async function firstFrame(url: string): Promise<StateFrame> {
   });
 }
 
-const json = (body: unknown) => (route: Route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+const json = (data: unknown) => (route: Route) =>
+  route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ bizCode: 0, message: "ok", data }) });
 
 const minute = 60_000;
 
@@ -143,7 +145,11 @@ test("a helper waiting on a question: its options answer it, and nothing offers 
   let said: unknown;
   await page.route(`**${pathOf("issue.comment.create")}`, async (route) => {
     said = route.request().postDataJSON();
-    await route.fulfill({ status: 200, headers: { "content-type": "application/json" }, body: JSON.stringify({ seq: 0 }) });
+    await route.fulfill({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ bizCode: 0, message: "ok", data: { seq: 0 } }),
+    });
   });
   await view.locator(`[data-testid="answer-option"][data-key="${options[1]}"]`).click();
   await expect.poll(() => said as { text?: string } | undefined).toMatchObject({ text: options[1] });
@@ -202,8 +208,9 @@ test("words for the helper leave the box at once; refused, they stay under it, a
   const sent: { sendKey?: string; text?: string }[] = [];
   await page.route(`**${pathOf("issue.comment.create")}`, async (route) => {
     sent.push(route.request().postDataJSON());
-    if (sent.length === 1) return route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ _tag: "Refused", reason: "busy" }) });
-    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ seq: 0 }) });
+    if (sent.length === 1)
+      return route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ bizCode: BizCode.IssueRefused, message: "busy" }) });
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ bizCode: 0, message: "ok", data: { seq: 0 } }) });
   });
   const ask = view.getByTestId("issue-ask");
   await ask.locator('[data-act="tell"]').click();

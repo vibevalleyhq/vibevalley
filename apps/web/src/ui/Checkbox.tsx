@@ -9,8 +9,8 @@ import { styleProps } from "./positioner";
 const styles = stylex.create({
   box: {
     display: "flex",
-    width: "calc(var(--spacing) * 4)",
-    height: "calc(var(--spacing) * 4)",
+    width: "1rem",
+    height: "1rem",
     flexShrink: 0,
     cursor: { default: "pointer", ":disabled": "default" },
     alignItems: "center",
@@ -25,9 +25,9 @@ const styles = stylex.create({
     },
     backgroundColor: { default: "var(--color-page)", ":is([data-checked], [data-indeterminate])": "var(--color-accent)" },
     color: "var(--color-page)",
-    transitionProperty: "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke",
+    transitionProperty: "color, background-color, border-color",
     transitionDuration: "120ms",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionTimingFunction: "var(--ease-out)",
     opacity: { default: null, ":disabled": 0.5 },
   },
   indicator: {

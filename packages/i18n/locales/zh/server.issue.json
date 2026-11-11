@@ -39,7 +39,6 @@
   "pickHint": "挑好以后：issue edit {n} --agent <档案>，再 issue status {n} todo",
   "noAssignee": "还没选派给哪个帮工",
   "profileGone": "档案 {id} 不在了",
-  "sendFailed": "派不出去",
   "queued": "{full}：排上队了，有空位就自动开工",
   "queuedStarted": "排队的「{title}」开工了：{session}",
   "queuedStuck": "排队的「{title}」开不了工：{why}；也没能退回待办，还在队里",

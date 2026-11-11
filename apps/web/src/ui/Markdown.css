@@ -1,8 +1,8 @@
 @layer components {
   .markdown .mention {
-    border-radius: 0.25rem;
+    border-radius: var(--radius-sm);
     background-color: var(--color-accent);
-    padding-inline: calc(var(--spacing) * 0.5);
+    padding-inline: 0.125rem;
     font-weight: var(--font-weight-medium);
     color: var(--color-accent);
   }
@@ -19,20 +19,20 @@
     border-left-style: solid;
     border-left-width: 2px;
     border-color: var(--color-line);
-    padding-left: calc(var(--spacing) * 3);
+    padding-left: 0.75rem;
     color: var(--color-muted);
   }
   .markdown code {
-    border-radius: 0.25rem;
+    border-radius: var(--radius-sm);
     background-color: var(--color-hover);
-    padding-inline: var(--spacing);
+    padding-inline: 0.25rem;
     font-family: var(--font-mono);
     font-size: var(--text-xs);
-    line-height: var(--text-xs--line-height);
+    line-height: var(--leading-xs);
   }
   .markdown h1 {
     font-size: var(--text-lg);
-    line-height: var(--text-lg--line-height);
+    line-height: var(--leading-lg);
     font-weight: var(--font-weight-semibold);
   }
   .markdown h2,
@@ -40,38 +40,38 @@
     font-weight: var(--font-weight-semibold);
   }
   .markdown li {
-    margin-block: calc(var(--spacing) * 0.5);
+    margin-block: 0.125rem;
   }
   .markdown ol {
     list-style-type: decimal;
-    padding-left: calc(var(--spacing) * 5);
+    padding-left: 1.25rem;
   }
   .markdown p {
-    margin-block: var(--spacing);
+    margin-block: 0.25rem;
   }
   .markdown pre {
-    margin-block: calc(var(--spacing) * 2);
+    margin-block: 0.5rem;
     overflow-x: auto;
     border-radius: var(--radius-md);
     background-color: var(--color-hover);
-    padding: calc(var(--spacing) * 3);
+    padding: 0.75rem;
   }
   .markdown pre code {
-    background-color: #0000;
+    background-color: transparent;
     padding: 0;
   }
   .markdown table {
-    margin-block: calc(var(--spacing) * 2);
+    margin-block: 0.5rem;
   }
   .markdown td,
   .markdown th {
     border-style: solid;
     border-width: 1px;
     border-color: var(--color-line);
-    padding-inline: calc(var(--spacing) * 2);
+    padding-inline: 0.5rem;
   }
   .markdown ul {
     list-style-type: disc;
-    padding-left: calc(var(--spacing) * 5);
+    padding-left: 1.25rem;
   }
 }

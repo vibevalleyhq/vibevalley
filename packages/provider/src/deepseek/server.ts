@@ -1,8 +1,11 @@
 import { Effect, Option, Predicate, Schema, Stream } from "effect";
-import { HttpClient, HttpClientRequest } from "effect/http";
+import { Sse } from "effect/encoding";
+import { HttpClient, type HttpClientError, HttpClientRequest } from "effect/http";
 
 import { type DeepSeekInput, encodeDeepSeekRequest } from "./request.ts";
-import { decodeDeepSeekChunk, SseData } from "./response.ts";
+import { decodeDeepSeekChunk } from "./response.ts";
+
+const maxEventSize = 4 << 20;
 
 class DeepSeekError extends Schema.TaggedError<DeepSeekError, { readonly brand: unique symbol }>()("DeepSeekError", {
   reason: Schema.Literals(["network", "status", "stream"]),
@@ -22,12 +25,13 @@ function statusMessage(status: number, text: string): string {
   return `${status} ${text.trim() || "status code (no body)"}`;
 }
 
-export const deepseekModel = Effect.fn("Provider.deepseekModel")(function* (connection: {
+export interface DeepSeekConnection {
   readonly model: string;
   readonly baseUrl: string;
   readonly key: string;
-}) {
-  const http = yield* HttpClient.HttpClient;
+}
+
+export function makeDeepSeekModel(http: HttpClient.HttpClient, connection: DeepSeekConnection) {
   const stream = Effect.fn("DeepSeek.stream")(function* (input: DeepSeekInput) {
     const request = HttpClientRequest.post(`${connection.baseUrl}/chat/completions`).pipe(
       HttpClientRequest.bearerToken(connection.key),
@@ -37,26 +41,34 @@ export const deepseekModel = Effect.fn("Provider.deepseekModel")(function* (conn
       .execute(request)
       .pipe(Effect.mapError((cause) => DeepSeekError.make({ reason: "network", message: `Connection error: ${cause.message}`, cause })));
     if (res.status >= 400) {
-      const text = yield* res.text.pipe(Effect.orElseSucceed(() => ""));
+      const text = yield* res.text.pipe(
+        Effect.tapError((e) => Effect.logDebug("DeepSeek error body could not be read", e)),
+        Effect.orElseSucceed(() => ""),
+      );
       return yield* DeepSeekError.make({ reason: "status", status: res.status, message: statusMessage(res.status, text) });
     }
-    const sse = new SseData();
     return res.stream.pipe(
-      Stream.mapError((e) => DeepSeekError.make({ reason: "stream", message: `The stream broke: ${e.message}` })),
       Stream.decodeText(),
-      Stream.splitLines,
-      Stream.map((line) => sse.line(line)),
-      Stream.filter(Predicate.isNotUndefined),
-      Stream.mapEffect((data) =>
-        decodeStreamChunk(data).pipe(
-          Effect.mapError(() => DeepSeekError.make({ reason: "stream", message: `Not JSON in the stream: ${data.slice(0, 200)}` })),
+      Stream.pipeThroughChannel(Sse.decode<DeepSeekError | HttpClientError.HttpClientError, unknown>({ maxEventSize })),
+      Stream.catchTags({
+        HttpClientError: (e) => Stream.fail(DeepSeekError.make({ reason: "stream", message: `The stream broke: ${e.message}`, cause: e })),
+        SseError: (e) => Stream.fail(DeepSeekError.make({ reason: "stream", message: `SSE frame too large: ${e.message}`, cause: e })),
+        Retry: () => Stream.empty,
+      }),
+      Stream.takeWhile((event) => !event.data.startsWith("[DONE]")),
+      Stream.mapEffect((event) =>
+        decodeStreamChunk(event.data).pipe(
+          Effect.mapError(() => DeepSeekError.make({ reason: "stream", message: `Not JSON in the stream: ${event.data.slice(0, 200)}` })),
           Effect.flatMap((chunk) => {
             const error: unknown = Predicate.hasProperty(chunk, "error") ? chunk.error : undefined;
             if (error === undefined || error === null) return Effect.succeed(decodeDeepSeekChunk(chunk));
             const message =
               Predicate.hasProperty(error, "message") && typeof error.message === "string"
                 ? Effect.succeed(error.message)
-                : encodeJson(error).pipe(Effect.orElseSucceed(() => "The stream reported an error that is not JSON"));
+                : encodeJson(error).pipe(
+                    Effect.tapError((e) => Effect.logDebug("DeepSeek stream error could not be serialized", e)),
+                    Effect.orElseSucceed(() => "The stream reported an error that is not JSON"),
+                  );
             return Effect.flatMap(message, (said) => Effect.fail(DeepSeekError.make({ reason: "stream", message: said })));
           }),
         ),
@@ -64,4 +76,9 @@ export const deepseekModel = Effect.fn("Provider.deepseekModel")(function* (conn
     );
   });
   return { stream };
+}
+
+export const deepseekModel = Effect.fn("Provider.deepseekModel")(function* (connection: DeepSeekConnection) {
+  const http = yield* HttpClient.HttpClient;
+  return makeDeepSeekModel(http, connection);
 });

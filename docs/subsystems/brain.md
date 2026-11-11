@@ -8,7 +8,7 @@
 |---|---|
 | DeepSeek 协议与连接（`@vibevalley/provider`）、agent 历史重放、工具 JSON Schema 生成与消息/参数修补（`@vibevalley/ai`） | 模型名称选择与 API Key 存储（[档案和农机](docs/subsystems/agent.md)、[设置和配置](docs/subsystems/setting.md)） |
 | 单轮模型⇄工具循环（`loop.ts`）：并发跑工具、插话（`steer`）、追问（`followUp`）与中断（`abort`） | 输入何时送入、是否含用户授权、回合如何记入 `session_run`（[助手](docs/subsystems/orchestrator.md)、[帮工](docs/subsystems/session.md)） |
-| 对话 `.jsonl` 持久化、三段式提示与前缀哈希校验、空闲/超限压缩、断点续跑 | 农场业务工具集（`apps/server/src/tool`）与跨档案数据库记忆（[记性](docs/subsystems/memory.md)） |
+| 对话 `.jsonl` 持久化、三段式提示与前缀哈希校验、空闲/超限压缩、断点续跑 | 农场业务工具集（`apps/server/src/modules/tool`）与跨档案数据库记忆（[记性](docs/subsystems/memory.md)） |
 | 内置工具：技能按需加载、`MemoryPort`、归档检索、子帮手、自身任务（`Todo`）、提醒与编码工具 | |
 
 ## 在哪
@@ -17,19 +17,19 @@
 
 | 位置 | 职责 |
 |---|---|
-| `packages/provider/src/deepseek/` | 模型目录、请求编码、SSE 分帧与厂商增量、显式 HTTP 连接 |
+| `packages/provider/src/deepseek/` | 模型目录、请求编码、`Sse.decode` 分帧与厂商增量、显式 `HttpClient` 连接 |
 | `packages/ai/src/` | `models.ts`、`client.ts`（`ModelClient`）、`llm.ts`（`Llm` 服务）、`request.ts`、`response.ts`、`tools.ts`、`testing.ts` |
-| `packages/agent/src/core/` | `loop.ts`（单轮纤程循环与取消竞态）、`tool.ts`（`schemaTool`、`effectTool`）、`prompts.ts` |
-| `packages/agent/src/brain.ts`、`session.ts`、`compaction.ts`、`prefix.ts` | `makeBrain` 入口、`.jsonl` 读写、上下文压缩与前缀分段 SHA-256 校验 |
-| `packages/agent/src/self.ts`、`skills.ts`、`memory.ts`、`mcp.ts`、`reminders.ts` | 自身内置工具、技能目录扫描、记忆接口、MCP 客户端与定时提醒 |
-| `packages/agent/src/todo.ts`、`todoTools.ts`、`coding.ts`、`dag.ts` | 自身任务图 `Todo`、本地文件/shell 编码工具与通用 DAG 算法 |
-| `apps/server/src/session/host.ts`、`runtime/vibevalley.ts`、`chat/main.ts` | 助手宿主 `AgentHost`、oar 农机适配（含 `runtime_todo` 表存储）与 CLI 终端对话 |
+| `packages/agent/src/core/` | `loop.ts`（单轮纤程循环、默认上限 `8` 的工具并发与取消竞态）、`tool.ts`（`schemaTool`、`effectTool`）、`prompts.ts` |
+| `packages/agent/src/brain/brain.ts`、`session.ts`、`fs.ts`、`compaction.ts`、`prefix.ts` | `makeBrain` 入口（显式 `BrainState`）、`TranscriptStore` `.jsonl` 端口、`AgentFs` 文件端口、上下文压缩与前缀分段 SHA-256 校验 |
+| `packages/agent/src/tools/self.ts`、`skills.ts`、`memory.ts`、`mcp.ts`、`reminders.ts` | 全链路 Effect 化的内置工具、技能目录扫描、`MemoryPort`、MCP 客户端与定时提醒 |
+| `packages/agent/src/tools/todo.ts`、`todoTools.ts`、`coding.ts`、`dag.ts` | 自身任务图 `Todo`、本地文件/shell 编码工具与通用 DAG 算法 |
+| `apps/server/src/modules/session/host.ts`、`runtime/vibevalley.ts`、`chat/main.ts` | 助手宿主 `AgentHost`、oar 农机适配（含 `runtime_todo` 表存储）与 CLI 终端对话 |
 
 ## 模型和不变量
 
 ### 模型边界
 
-- Provider 的 `deepseekModel` 只收显式 model/baseUrl/key，使用调用者的 Effect HttpClient；不读环境、登录或农场配置，不重试、不换供应商。返回 DeepSeek 增量和带标签错误，不依赖 agent 消息。
+- Provider 的 `makeDeepSeekModel` 只收显式 `model`、`baseUrl`、`key` 与调用者的 Effect `HttpClient`；不读环境、登录或农场配置，不重试、不换供应商。返回 DeepSeek 增量和带标签错误，不依赖 agent 消息。
 - AI 的 `Llm` 保留 `start`、thinking/text/tool 增量、`done/error`，失败保留已到达的内容；消费结束或打断时释放响应 reader。`ModelClient` 每次请求读取调用者提供的当前 key。
 - 历史重放、缺失工具结果补齐、图片降级、上下文预算、工具参数修补与成本计算留在 AI；模型目录、wire 字段、usage 和 finish reason 解码归 Provider。
 - 官方 `@ai-sdk/deepseek@3.0.80` 不是现有桥的等价替代：离线 fixture 中它将纯工具 assistant 的 `content: null` 编为 `""`，忽略 `reasoning_text` 与 choice 内 usage。现有流还接受迟到的工具 ID。为保持这些契约，语言保留单一专有适配器，不加 SDK 旁路；SDK Core 用于转写，不接管 agent 循环。
@@ -74,13 +74,13 @@
 - **子帮手与自身任务（`Todo`）**：
   - `spawn_agent` 在子作用域内跑最多 30 步。
   - `todo_add|update|list` 维护最多 30 节点的 DAG，标为 `subagent` 的节点在前置完成后自动并发派生子帮手（最多 3 并发，失败重试 1 次）。
-- **作用域生命周期**：`makeBrain` 绑定 Effect `Scope`；作用域关闭时自动中断模型流、子帮手、MCP 连接与压缩计时器。
+- **全链路 Effect 边界与作用域生命周期**：`packages/agent` 受 `vibevalley/promise-boundary` 约束，宿主可注入 `FileSystem`、`HttpClient` 与 `TranscriptStore`；`makeBrain` 绑定 Effect `Scope`，关闭时自动中断模型流、子帮手、MCP 连接与压缩计时器。
 
 ## 怎么走
 
 1. 宿主调 `send`（空闲开新轮，运行中在下一次模型请求前 `steer` 插入）或排入队尾 `later`。
 2. 循环执行 `prepare`：按需压缩，组装固定开头、历史消息与最新输入，校验前缀哈希。
-3. 调 `Llm.stream` 流式读输出并广播事件；若有工具调用则并发执行、追加 `.jsonl` 并继续下一轮请求，直至回答结束或达步数上限（默认 40 步），发出 `agent_settled`。
+3. 调 `Llm.stream` 流式读输出并广播事件；若有工具调用则按并发上限（默认 `8`）执行、追加 `.jsonl` 并继续下一轮请求，直至回答结束或达步数上限（默认 40 步），发出 `agent_settled`。
 
 ## 和谁打交道
 
@@ -100,6 +100,6 @@
 ## 怎么验证
 
 - `packages/provider/src/deepseek/deepseek.test.ts`：请求编码、SSE 与代理字段/usage 的独立解码。
-- `packages/ai/src/llm.test.ts`：UTF-8 分片、迟到工具 ID、密钥替换、单请求、错误部分内容与 reader 取消。
-- `packages/agent/src/loop.test.ts`、`core/loop.test.ts`、`brain.test.ts`、`todo.test.ts`：工具并发、插话/排队、前缀哈希、空闲压缩、断点续跑与子帮手 DAG 测试。
-- `apps/server/src/runtime/vibevalley.test.ts`、`orchestrator/openai.test.ts`：oar 农机适配、任务表持久化与 OpenAI 协议入口测试。
+- `packages/ai/src/llm/llm.test.ts`：UTF-8 分片、迟到工具 ID、密钥替换、单请求、错误部分内容与 reader 取消。
+- `packages/agent/src/brain/loop.test.ts`、`core/loop.test.ts`、`brain.test.ts`、`todo.test.ts`：工具并发、插话/排队、前缀哈希、空闲压缩、断点续跑与子帮手 DAG 测试。
+- `apps/server/src/modules/runtime/vibevalley.test.ts`、`orchestrator/openai.test.ts`：oar 农机适配、任务表持久化与 OpenAI 协议入口测试。

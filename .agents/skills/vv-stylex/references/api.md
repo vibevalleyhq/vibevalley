@@ -6,7 +6,7 @@
 
 `defineConsts()` 是编译期常量，不产生可切换的主题变量。可共享媒体查询字符串、静态尺寸以及已有 CSS 变量的引用；引用 `var(--color-...)` 并不会冻结该 CSS 变量的运行时值。
 
-官网的实际用法在 [tokens.stylex.ts](apps/site/src/styles/tokens.stylex.ts)。共享断点同样放在专用 `.stylex.ts` 文件中：
+官网的实际用法在 [tokens.stylex.ts](apps/site/src/ui/tokens.stylex.ts)。共享断点同样放在专用 `.stylex.ts` 文件中：
 
 ```tsx
 import * as stylex from "@stylexjs/stylex";

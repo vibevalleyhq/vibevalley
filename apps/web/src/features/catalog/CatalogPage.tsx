@@ -20,7 +20,7 @@ import { Tabs } from "#/ui/Tabs.tsx";
 import { CursorTile, Detail, fitScale, type Ground, grounds, groundStyle, Img } from "./CatalogDetail";
 import { framesOf, groupsOf, type Picture, pictureMatches, picturesOf, shelfOf, shelves } from "./shelves";
 
-const recipeStyles2 = stylex.create({
+const styles = stylex.create({
   layoutDiv: {
     display: "flex",
     height: "100%",
@@ -40,11 +40,11 @@ const recipeStyles2 = stylex.create({
   },
   layoutDiv2: {
     flexShrink: "0",
-    paddingTop: "calc(var(--spacing) * 3)",
-    paddingRight: "calc(var(--spacing) * 3)",
-    paddingBottom: "calc(var(--spacing) * 3)",
+    paddingTop: "0.75rem",
+    paddingRight: "0.75rem",
+    paddingBottom: "0.75rem",
     paddingLeft: {
-      default: "calc(var(--spacing) * 3)",
+      default: "0.75rem",
       "@media (width>=80rem)": "0",
     },
     order: {
@@ -53,47 +53,38 @@ const recipeStyles2 = stylex.create({
     },
     width: {
       default: null,
-      "@media (width>=80rem)": "calc(var(--spacing) * 88)",
+      "@media (width>=80rem)": "22rem",
     },
     overflowY: {
       default: null,
       "@media (width>=80rem)": "auto",
     },
   },
-});
-
-const recipeStyles = stylex.create({
   spritesSpan: {
     position: "absolute",
-    top: "calc(var(--spacing) * .5)",
-    right: "calc(var(--spacing) * .5)",
+    top: "0.125rem",
+    right: "0.125rem",
     borderRadius: "var(--radius-xs)",
     backgroundColor: {
       default: "var(--color-catalog-shade)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-bark-900) 70%, transparent)",
     },
-    paddingInline: "var(--spacing)",
+    paddingInline: "0.25rem",
     fontSize: "var(--text-2xs)",
     lineHeight: "14px",
     color: "var(--color-paper)",
   },
-});
-
-const variantStyles2 = stylex.create({
   searchTextInput: {
-    minWidth: "calc(var(--spacing) * 48)",
+    minWidth: "12rem",
     flex: "1",
   },
-});
-
-const variantStyles = stylex.create({
-  layoutDiv: {
+  layoutDiv3: {
     display: "flex",
     minWidth: "0",
     flex: "1",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
-    padding: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
+    padding: "0.75rem",
     overflowY: {
       default: null,
       "@media (width>=64rem)": "auto",
@@ -105,16 +96,16 @@ const variantStyles = stylex.create({
     cursor: "pointer",
     alignItems: "center",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.375rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
-  spritesButtonVariant: {
+  spritesButtonTone: {
     backgroundColor: "var(--color-selected)",
     fontWeight: "var(--font-weight-semibold)",
   },
-  spritesButtonVariant2: {
+  spritesButtonAlt: {
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -128,9 +119,9 @@ const variantStyles = stylex.create({
     cursor: "pointer",
     flexDirection: "column",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     borderRadius: "var(--radius-lg)",
-    padding: "var(--spacing)",
+    padding: "0.25rem",
     outlineStyle: {
       default: null,
       ":focus-visible": "solid",
@@ -144,21 +135,18 @@ const variantStyles = stylex.create({
       ":focus-visible": "var(--color-focus)",
     },
   },
-  spritesButtonVariant3: {
+  spritesButtonAccent: {
     backgroundColor: "var(--color-selected)",
   },
-});
-
-const viewStyles = stylex.create({
   catalogPageDiv: {
     height: "100%",
   },
   columnDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
-  layoutDiv: {
+  layoutDiv4: {
     flexShrink: "0",
     borderBottomStyle: {
       default: "solid",
@@ -170,11 +158,11 @@ const viewStyles = stylex.create({
     },
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-side)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * 3)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.75rem",
     width: {
       default: null,
-      "@media (width>=64rem)": "calc(var(--spacing) * 60)",
+      "@media (width>=64rem)": "15rem",
     },
     overflowY: {
       default: null,
@@ -193,7 +181,7 @@ const viewStyles = stylex.create({
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   shelfButtonSpan: {
     flex: "1",
@@ -201,51 +189,51 @@ const viewStyles = stylex.create({
   },
   shelfButtonSpan2: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-normal)",
     color: "var(--color-muted)",
   },
   catalogShelves: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
   },
   spritesP: {
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingTop: "var(--spacing)",
+    paddingInline: "0.5rem",
+    paddingTop: "0.25rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
-  spritesSpan: {
+  spritesSpan2: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   spritesDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
-  spritesSpan2: {
+  spritesSpan22: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-semibold)",
     color: "var(--color-muted)",
   },
   spritesDiv2: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill,minmax(88px,1fr))",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   spritesSpan3: {
     position: "relative",
     display: "flex",
-    width: "calc(var(--spacing) * 20)",
-    height: "calc(var(--spacing) * 20)",
+    width: "5rem",
+    height: "5rem",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
@@ -259,35 +247,35 @@ const viewStyles = stylex.create({
     textAlign: "center",
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-2xs)",
-    lineHeight: "var(--text-2xs--line-height)",
+    lineHeight: "var(--leading-2xs)",
     color: "var(--color-muted)",
   },
   cursorsP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   cursorsDiv: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill,minmax(104px,1fr))",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   soundsCode: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
   soundsDiv: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   sound: {
     display: "flex",
-    height: "calc(var(--spacing) * 8)",
+    height: "2rem",
     cursor: "pointer",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
@@ -300,18 +288,18 @@ const viewStyles = stylex.create({
       },
       ":active": "var(--color-selected)",
     },
-    paddingRight: "calc(var(--spacing) * 3)",
-    paddingLeft: "calc(var(--spacing) * 1.5)",
+    paddingRight: "0.75rem",
+    paddingLeft: "0.375rem",
   },
   soundsSpan: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-medium)",
   },
   soundsSpan2: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
 });
@@ -338,7 +326,7 @@ export function CatalogPage(props: { rest: string }) {
   const shelf = () => (props.rest === "cursors" || props.rest === "sounds" ? props.rest : "sprites");
   const tabs = () => <Tabs label={t("web.catalog.shelves")} value={shelf()} items={shelfTabs.map((s) => ({ value: s.id, label: s.label, href: s.to }))} />;
   return (
-    <div {...stylex.attrs(viewStyles.catalogPageDiv)}>
+    <div {...stylex.attrs(styles.catalogPageDiv)}>
       <Switch fallback={<Sprites id={props.rest ? decodeURIComponent(props.rest) : undefined} tabs={tabs()} />}>
         <Match when={shelf() === "cursors"}>
           <Cursors tabs={tabs()} />
@@ -354,7 +342,7 @@ export function CatalogPage(props: { rest: string }) {
 /** The column every shelf has, so switching shelves never moves the picker: the page's side column (Layout). */
 function Column(props: { tabs: JSX.Element; children: JSX.Element }) {
   return (
-    <div {...stylex.attrs(viewStyles.columnDiv)}>
+    <div {...stylex.attrs(styles.columnDiv)}>
       {props.tabs}
       {props.children}
     </div>
@@ -364,23 +352,23 @@ function Column(props: { tabs: JSX.Element; children: JSX.Element }) {
 function Layout(props: { left: JSX.Element; children: JSX.Element; right?: JSX.Element }) {
   return (
     // The shelves are the page's side column, against the rail as the chat's and the notes' are (ui/layout.tsx Split edge).
-    <div {...stylex.attrs(recipeStyles2.layoutDiv)}>
-      <div {...stylex.attrs(viewStyles.layoutDiv)}>{props.left}</div>
+    <div {...stylex.attrs(styles.layoutDiv)}>
+      <div {...stylex.attrs(styles.layoutDiv4)}>{props.left}</div>
       <Show when={props.right}>
-        <div {...stylex.attrs(recipeStyles2.layoutDiv2)}>{props.right}</div>
+        <div {...stylex.attrs(styles.layoutDiv2)}>{props.right}</div>
       </Show>
-      <div {...stylex.attrs(variantStyles.layoutDiv)}>{props.children}</div>
+      <div {...stylex.attrs(styles.layoutDiv3)}>{props.children}</div>
     </div>
   );
 }
 
 function Search(props: { query: string; onChange: (q: string) => void; placeholder: string; ground?: Ground; onGround?: (g: Ground) => void }) {
   return (
-    <div {...stylex.attrs(viewStyles.searchDiv)}>
+    <div {...stylex.attrs(styles.searchDiv)}>
       <TextInput
         data-testid="catalog-search"
         aria-label={t("web.catalog.find")}
-        styles={variantStyles2.searchTextInput}
+        styles={styles.searchTextInput}
         placeholder={props.placeholder}
         value={props.query}
         onInput={(e) => props.onChange(e.currentTarget.value)}
@@ -427,10 +415,10 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
       data-key={b.id}
       aria-pressed={aria(shelf() === b.id)}
       onClick={() => setShelf(b.id)}
-      {...stylex.attrs(variantStyles.spritesButton, shelf() === b.id ? variantStyles.spritesButtonVariant : variantStyles.spritesButtonVariant2)}
+      {...stylex.attrs(styles.spritesButton, shelf() === b.id ? styles.spritesButtonTone : styles.spritesButtonAlt)}
     >
-      <span {...stylex.attrs(viewStyles.shelfButtonSpan)}>{b.label}</span>
-      <span {...stylex.attrs(viewStyles.shelfButtonSpan2)}>{b.count}</span>
+      <span {...stylex.attrs(styles.shelfButtonSpan)}>{b.label}</span>
+      <span {...stylex.attrs(styles.shelfButtonSpan2)}>{b.count}</span>
     </button>
   );
   return (
@@ -439,11 +427,11 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
         <Layout
           left={
             <Column tabs={props.tabs}>
-              <nav aria-label={t("web.catalog.categories")} data-testid="catalog-shelves" {...stylex.attrs(viewStyles.catalogShelves)}>
+              <nav aria-label={t("web.catalog.categories")} data-testid="catalog-shelves" {...stylex.attrs(styles.catalogShelves)}>
                 <ShelfButton id="all" label={t("web.catalog.all")} count={pics().length} />
                 <For each={present()}>{(s) => <ShelfButton id={s.id} label={s.label} count={counts().get(s.id) ?? 0} />}</For>
               </nav>
-              <p {...stylex.attrs(viewStyles.spritesP)}>{t("web.catalog.count", { n: pics().length })}</p>
+              <p {...stylex.attrs(styles.spritesP)}>{t("web.catalog.count", { n: pics().length })}</p>
             </Column>
           }
           right={
@@ -463,15 +451,15 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
                 <Show when={groups().length > 0}>
                   <Card
                     title={`${s.label} · ${groups().reduce((n, g) => n + g.pictures.length, 0)}`}
-                    action={<span {...stylex.attrs(viewStyles.spritesSpan)}>{s.hint}</span>}
+                    action={<span {...stylex.attrs(styles.spritesSpan2)}>{s.hint}</span>}
                   >
                     <For each={groups()}>
                       {(g) => (
-                        <div {...stylex.attrs(viewStyles.spritesDiv)}>
+                        <div {...stylex.attrs(styles.spritesDiv)}>
                           <Show when={g.label}>
-                            <span {...stylex.attrs(viewStyles.spritesSpan2)}>{g.label}</span>
+                            <span {...stylex.attrs(styles.spritesSpan22)}>{g.label}</span>
                           </Show>
-                          <div {...stylex.attrs(viewStyles.spritesDiv2)}>
+                          <div {...stylex.attrs(styles.spritesDiv2)}>
                             <For each={g.pictures}>
                               {(p) => (
                                 <button
@@ -482,18 +470,15 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
                                   data-key={p.name}
                                   aria-current={selected()?.name === p.name ? "true" : undefined}
                                   onClick={() => router.navigate(`/catalog/${encodeURIComponent(p.name)}`)}
-                                  {...stylex.attrs(
-                                    variantStyles.spritesButton2,
-                                    selected()?.name === p.name ? variantStyles.spritesButtonVariant3 : variantStyles.spritesButtonVariant2,
-                                  )}
+                                  {...stylex.attrs(styles.spritesButton2, selected()?.name === p.name ? styles.spritesButtonAccent : styles.spritesButtonAlt)}
                                 >
-                                  <span {...styleProps([viewStyles.spritesSpan3, groundStyle(ground())])}>
+                                  <span {...styleProps([styles.spritesSpan3, groundStyle(ground())])}>
                                     <Img p={p} scale={fitScale(p, 72)} />
                                     <Show when={framesOf(p.name, has)}>
-                                      <span {...stylex.attrs(recipeStyles.spritesSpan)}>{t("web.catalog.moves")}</span>
+                                      <span {...stylex.attrs(styles.spritesSpan)}>{t("web.catalog.moves")}</span>
                                     </Show>
                                   </span>
-                                  <span {...stylex.attrs(viewStyles.spritesSpan4)}>{p.name}</span>
+                                  <span {...stylex.attrs(styles.spritesSpan4)}>{p.name}</span>
                                 </button>
                               )}
                             </For>
@@ -526,15 +511,15 @@ function Cursors(props: { tabs: JSX.Element }) {
     <Layout
       left={
         <Column tabs={props.tabs}>
-          <p {...stylex.attrs(viewStyles.spritesP)}>{t("web.catalog.cursorsIntro")}</p>
+          <p {...stylex.attrs(styles.spritesP)}>{t("web.catalog.cursorsIntro")}</p>
         </Column>
       }
     >
       <Search query={query()} onChange={setQuery} placeholder={t("web.catalog.cursorsFind")} ground={ground()} onGround={setGround} />
       <Card title={t("web.catalog.cursors", { n: all()?.length ?? 0 })}>
-        <p {...stylex.attrs(viewStyles.cursorsP)}>{t("web.catalog.cursorsNote")}</p>
+        <p {...stylex.attrs(styles.cursorsP)}>{t("web.catalog.cursorsNote")}</p>
         <Show when={data() !== null} fallback={<Quiet>{t("web.catalog.noCursors")}</Quiet>}>
-          <div {...stylex.attrs(viewStyles.cursorsDiv)}>
+          <div {...stylex.attrs(styles.cursorsDiv)}>
             <For each={all() ?? []}>{([name, hot]) => <CursorTile name={name} hx={hot.hx} hy={hot.hy} ground={ground()} />}</For>
           </div>
         </Show>
@@ -553,15 +538,15 @@ function Sounds(props: { tabs: JSX.Element }) {
     <Layout
       left={
         <Column tabs={props.tabs}>
-          <p {...stylex.attrs(viewStyles.spritesP)}>{t("web.catalog.soundsIntro")}</p>
+          <p {...stylex.attrs(styles.spritesP)}>{t("web.catalog.soundsIntro")}</p>
         </Column>
       }
     >
       <Search query={query()} onChange={setQuery} placeholder={t("web.catalog.soundsFind")} />
       <Card>
-        <p {...stylex.attrs(viewStyles.cursorsP)}>
-          {t("web.catalog.soundsRecipes")} <code {...stylex.attrs(viewStyles.soundsCode)}>apps/web/src/ui/pixel/sound.ts</code>
-          {t("web.catalog.soundsMusic")} <code {...stylex.attrs(viewStyles.soundsCode)}>design/music/suno-prompts.md</code>
+        <p {...stylex.attrs(styles.cursorsP)}>
+          {t("web.catalog.soundsRecipes")} <code {...stylex.attrs(styles.soundsCode)}>apps/web/src/ui/pixel/sound.ts</code>
+          {t("web.catalog.soundsMusic")} <code {...stylex.attrs(styles.soundsCode)}>design/music/suno-prompts.md</code>
           {t("web.catalog.period")}
         </p>
       </Card>
@@ -571,7 +556,7 @@ function Sounds(props: { tabs: JSX.Element }) {
           return (
             <Show when={names().length > 0}>
               <Card title={g.title}>
-                <div {...stylex.attrs(viewStyles.soundsDiv)}>
+                <div {...stylex.attrs(styles.soundsDiv)}>
                   <For each={names()}>
                     {(name) => (
                       <button
@@ -580,11 +565,11 @@ function Sounds(props: { tabs: JSX.Element }) {
                         data-key={name}
                         aria-label={t("web.catalog.playSound", { name: SOUND_LABEL[name] })}
                         onClick={() => playSound(name)}
-                        {...stylex.attrs(viewStyles.sound)}
+                        {...stylex.attrs(styles.sound)}
                       >
                         <Icon name="play" size={16} />
-                        <span {...stylex.attrs(viewStyles.soundsSpan)}>{SOUND_LABEL[name]}</span>
-                        <span {...stylex.attrs(viewStyles.soundsSpan2)}>{name}</span>
+                        <span {...stylex.attrs(styles.soundsSpan)}>{SOUND_LABEL[name]}</span>
+                        <span {...stylex.attrs(styles.soundsSpan2)}>{name}</span>
                       </button>
                     )}
                   </For>

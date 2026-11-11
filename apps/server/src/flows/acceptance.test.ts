@@ -5,9 +5,9 @@ import { scriptedRuntime } from "@botiverse/oar/testing";
 import { expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
-import { Agent } from "#/agent/agent.ts";
-import { Issue } from "#/issue/issue.ts";
-import { Repo } from "#/repo/repo.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { Issue } from "#/modules/issue/issue.ts";
+import { Repo } from "#/modules/repo/repo.ts";
 import { gitSync } from "#/testing/git.ts";
 import { testIssues } from "#/testing/world.ts";
 

@@ -22,9 +22,10 @@ src/state/          the middle layer on Effect's Atom: atom.ts (the page's regis
                     appearance.ts (this machine's choices and the look they give), intent.ts (what the owner asked for
                     until the frame shows it), the tests' registry
                     (testing.ts)
-src/ui/             the workbench's pieces: Icon, Face, Button, Field, Dialog, Markdown, ToastHost, Segmented, Tabs, Qr, Chips,
-                    an owner's act (act.ts), the window strip, the list-and-detail layout (layout.tsx), a
-                    helper's look (cast.ts); each with its X.stories.tsx beside it
+src/ui/             the workbench's domain-agnostic pieces: Icon, Button, Field, Dialog, Markdown, ToastHost, Segmented, Tabs,
+                    Qr, Chips, an owner's act (act.ts), the list-and-detail layout (layout.tsx); each with X.stories.tsx beside it
+src/ui/domain/      shared domain-aware pieces used across features: Face (and cast.ts), PoseSprite, RuntimeBadge,
+                    AttachmentTile, settings.tsx
 src/ui/pixel/       the pixel pieces every skin draws with (the farm, the tree, the repo map, the catalog): windows, buttons,
                     fields, toasts, the atlas (atlas.ts), the sounds (sound.ts), a runtime's machine
 src/features/<x>/   one folder per concept, named as the server's module: issue, channel, session, agent, memory,
@@ -46,14 +47,14 @@ test/               Playwright：组件（stories-fixtures.ts）、真实集成�
 - **The page does not fold facts.** It reads the folded `StateFrame` (`useCore()`, `useFrames()`); REST reads go through
   the owned, Schema-decoded Query client (`infra/query.ts`); a rule of the server (may this be dispatched, what a move means) is asked of the server,
   not rewritten here. Presentation rules (lanes, grouping, ordering, feed merging) are pure functions in the feature they
-  belong to (`features/issue/display.ts`, `features/channel/places.ts`), each with its test.
+  belong to (`features/issue/model/display.ts`, `features/channel/model/places.ts`), each with its test.
 - **What the owner does goes through the middle layer.** A change the page shows before the server has it is an
   intent (`state/intent.ts`): `defineIntent({ send, confirmed, watch?, whileLost, timeoutMs })`, kept by its request key
   in an atom family, so it outlives the component that made it. It settles when what the owner sees shows the change
   (`bySeq`: a frame whose `seq` is at least the reply's; or the kind's own check, as a line's `sendKey` in its channel),
   never on the reply or a timer; a timeout or a refusal leaves it `failed`, to retry with the same key or let go; while
   the state stream is lost a keyed kind queues and sends once it is back. A feature shows its intents through a pure
-  overlay of its own that sets only the field the owner set (`features/issue/moves.ts`'s `movedCards`), with its test.
+  overlay of its own that sets only the field the owner set (`features/issue/model/moves.ts`'s `movedCards`), with its test.
   A setting changed again before the first showed replaces it (`sendReplacing`). A change with nothing to show before
   the server has it is an Act (`createAct()` in `ui/act.ts`, `createPixelAct()` in `ui/pixel` for the skins): busy until
   it ends however it ends, a refusal in the error tone, and while the state stream is lost it is not sent but refused
@@ -77,9 +78,9 @@ test/               Playwright：组件（stories-fixtures.ts）、真实集成�
   and so is `localStorage` or `sessionStorage` anywhere but `state/stored.ts` (`vibevalley/stored-door`). What moves on
   its own (the state stream's source, the live stream, the day clock, the textures loading, the phone's calls, the
   call, dictation, the MOSS line, the block editor's queue) stays a framework-free store read through `createExternal`.
-- **Layers, one way.** `base` → `infra` → `state` → `ui` → `ui/pixel` → `features` → the skins (`farm`, `tree`) → `app`:
+- **Layers, one way.** `base` → `infra` → `state` → `ui` → `ui/domain` → `ui/pixel` → `features` → the skins (`farm`, `tree`) → `app`:
   a file imports from its own folder or a layer before it, never after (lint, `vibevalley/page-layers` in
-  `scripts/oxlint-plugin.ts`). A file goes by what it is: pure (no server, host, browser history or storage) in `base`;
+  `scripts/audit/oxlint-plugin.ts`). A file goes by what it is: pure (no server, host, browser history or storage) in `base`;
   talking to the outside in `infra`; standing on Atom in `state`. A `base` file that needs an `infra` one moves up, or
   what it needs moves down. A
   feature uses another only through its `index.ts`, named exports only, and the features' graph has no cycle
@@ -102,7 +103,7 @@ test/               Playwright：组件（stories-fixtures.ts）、真实集成�
   feature's view from made-up data, beside it in the feature). A part that answers the pointer has a `States` story
   with a `grid` (its variants × rest, hover, focus, pressed). There is no server behind the stories: a view that reads
   one is answered by the open story (`answer` in `infra/storyApi.ts`), and made-up data shared between stories is a
-  `*.samples.ts` beside them (`features/issue/issue.samples.ts`); neither is imported by the product. A view tied to a
+  `*.samples.ts` beside them (`features/issue/model/issue.samples.ts`); neither is imported by the product. A view tied to a
   device or a global (the microphone, a socket, the call) is split so its look takes props, and the stories draw that:
   `DictationMark`, `MossVerifyView`, `MossLineView`, `OrchestratorLine`. `vp run --filter
   @vibevalley/web stories` serves them; `build:stories` (in `web:check`) builds them to `dist-stories/`, never into
@@ -126,10 +127,10 @@ test/               Playwright：组件（stories-fixtures.ts）、真实集成�
     compares one frame with the one before (sounds, the canvas, the phone's calls) reads `rawFrame()`; the UI reads the
     store, reconciled by id, which updates only what changed.
   - A component runs once: what changes on its own (the window's size, the time) needs a signal (`useViewport`, `useNow`).
-- **Styles** use StyleX with the existing CSS tokens in `src/style.css`; typed composition and native-style ownership follow
-  [vv-stylex](.agents/skills/vv-stylex/SKILL.md). Reset, fonts and owned rich-text descendants remain in CSS imported through
-  the host stylesheet. Source ownership and build outputs are checked by `vp run migration:inventory`; the complete
-  comparison and host gate follows [migration acceptance](.agents/skills/vv-stylex/references/migration.md#运行最终验收).
+- **Styles** use StyleX with the CSS tokens in `src/style.css`; typed composition and native-style ownership follow
+  [vv-stylex](.agents/skills/vv-stylex/SKILL.md). Reset, fonts, `[data-window-drag]` and owned rich-text descendants remain in CSS imported through
+  the host stylesheet (`@layer theme, base, components, stylex`). JSX markup attaches styles only via `stylex.attrs` / `styleProps`
+  (lint: `vibevalley/stylex-only`, `vibevalley/no-hex-color`, `vibevalley/design-tokens`).
   Comments are in English, only for what the code cannot say.
 
 ## Commands

@@ -3,9 +3,10 @@ import { Cause, Effect, Exit, Schema } from "effect";
 import { Command } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
 
+import { DryRunFlag, FormatFlag } from "#/base/format.ts";
+import { exit, Failure, printFailure } from "#/base/output.ts";
+
 import { WorkerAccessFlag, workerCommand } from "./commands/worker.ts";
-import { DryRunFlag, FormatFlag } from "./format.ts";
-import { exit, Failure, printFailure } from "./output.ts";
 
 const root = workerCommand.pipe(Command.withGlobalFlags([WorkerAccessFlag, DryRunFlag, FormatFlag]));
 Command.runWith(root, { version: "0.1.0" })(process.argv.slice(2)).pipe(

@@ -30,7 +30,8 @@ export function drawPattern(ctx: CanvasRenderingContext2D, rows: readonly string
   const oy = Math.round(y);
   rows.forEach((row, dy) => {
     for (let dx = 0; dx < row.length; dx++) {
-      const c = fill[row[dx]!];
+      const ch = row[dx];
+      const c = ch === undefined ? undefined : fill[ch];
       if (!c) continue;
       ctx.fillStyle = c;
       ctx.fillRect(ox + dx, oy + dy, 1, 1);

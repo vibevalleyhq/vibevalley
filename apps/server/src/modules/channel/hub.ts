@@ -1,0 +1,355 @@
+import { Clock, Effect, PubSub } from "effect";
+
+import type * as T from "@vibevalley/protocol";
+import { userId } from "@vibevalley/protocol";
+import { oneLine } from "@vibevalley/protocol/rules";
+import * as S from "@vibevalley/protocol/schema";
+
+import { head } from "#/base/clip.ts";
+import { scopedPubSub } from "#/base/pubsub.ts";
+import { Core } from "#/core/core.ts";
+import { Db } from "#/infra/db.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { Attachment } from "#/modules/attachment/attachment.ts";
+import { type Envelope, orchestratorIn } from "#/modules/mailbox/envelope.ts";
+import { Mailbox } from "#/modules/mailbox/mailbox.ts";
+import { Session } from "#/modules/session/session.ts";
+import * as qc from "#db/channel.sql.ts";
+import * as qm from "#db/channel_message.sql.ts";
+
+import {
+  type MsgRow,
+  actorOfParticipant,
+  channelType,
+  subjectKind,
+  toMessage,
+  notifyOf,
+  envelopeMore,
+  type ThreadSubject,
+  subjectOf,
+  type ChannelEnvelopeRow,
+} from "./contracts.ts";
+import { keepChannels, targetOf } from "./messages.ts";
+import { messageMutations } from "./mutations.ts";
+import type { ChannelRow } from "./rooms.ts";
+import { makeChannelStore } from "./store.ts";
+
+/** A helper profile as the chat knows it: apart from the orchestrator and its sessions. */
+export const profileId = (agent: string) => `profile:${agent}`;
+/** A thread named by the message it hangs under shows this much of it. */
+export const threadTitleMax = 24;
+/** How much of a channel's newest message a list shows. */
+export const lastMax = 80;
+/** The first n units of text, on one line. */
+export const lineOf = (text: string, n: number) => head(oneLine(text).trim(), n);
+
+export const channelHub = Effect.gen(function* () {
+  const core = yield* Core;
+  const agents = yield* Agent;
+  const db = yield* Db;
+  const mailbox = yield* Mailbox;
+  const sessions = yield* Session;
+  const store = yield* makeChannelStore;
+  // Every message once written, for the rooms: each follower reads it through a bounded relay of its own.
+  const said = yield* scopedPubSub<T.ChatMessage>();
+  const userReadHub = yield* scopedPubSub<{ readonly channel: string; readonly number: number; readonly at: number }>();
+
+  const orchestratorIds = () => agents.orchestrators().map((a) => a.id);
+
+  /** A place's channel or direct channel: itself, or the one a thread hangs in. */
+  const topOfRow = (row: ChannelRow | undefined): ChannelRow | undefined =>
+    row?.type === "thread" ? topOfRow(row.parent_id !== null ? store.channel(row.parent_id) : undefined) : row;
+  /** Who is in the channel a place is in; a direct channel has its other one instead. */
+  const membersOfRow = (row: ChannelRow | undefined): string[] => {
+    const top = topOfRow(row);
+    return top === undefined || top.type === "direct" ? [] : store.membersOf(top.id);
+  };
+  const orchestratorInRow = (row: ChannelRow | undefined): string =>
+    orchestratorIn({ top: topOfRow(row), members: membersOfRow(row), isOrchestrator: agents.isOrchestrator });
+
+  /** A channel's name; none for a thread or what is not there. */
+  const channelName = (id: string) => {
+    const c = store.channel(id);
+    return c && c.type !== "thread" ? (c.name ?? undefined) : undefined;
+  };
+  const channelTags = () =>
+    store
+      .channels()
+      .flatMap((c) => (c.name !== null ? [c] : []))
+      .toSorted((a, b) => (a.id < b.id ? -1 : 1))
+      .map((c) => "#" + c.name);
+  const directOfSession = (h: T.Session) => {
+    const ch = h.channel ? store.channel(h.channel) : undefined;
+    return !h.issue && ch?.type === "direct" && ch.peer_id === profileId(h.agent) ? ch.id : undefined;
+  };
+  const sessionOf = (id: string) => sessions.sessionOf(id);
+  const hired = () => sessions.hired();
+  const talkSession = (channel: string) => hired().find((h) => directOfSession(h) === channel);
+  const channelOfSession = (h: T.Session) => directOfSession(h) ?? (h.channel && channelName(h.channel) !== undefined ? h.channel : store.defaultId());
+  const channelIdOf = (row: ChannelRow) => (row.type === "thread" ? (row.parent_id ?? row.id) : row.id);
+  /** Where the user talks with peer alone, from either side. */
+  const directWith = (who: string, other: string) => {
+    const peer = who === userId ? other : other === userId ? who : "";
+    return store.channels("direct").find((c) => c.peer_id === peer);
+  };
+
+  const targetOfRow = (type: string, rootNumber: number | null, name: string | null, channelId: string | null, channelNameOf: string | null) => {
+    const shown = name ?? channelNameOf;
+    const ch = {
+      type: channelType(type),
+      ...(rootNumber !== null ? { rootNumber } : {}),
+      ...(shown !== null ? { name: shown } : {}),
+    };
+    const channel = channelNameOf ?? (channelId ? channelName(channelId) : undefined) ?? undefined;
+    return targetOf(ch, channel ?? "");
+  };
+  const targetOfChannel = (row: ChannelRow) => targetOfRow(row.type, row.root_number, row.name, row.parent_id, null);
+
+  const toChannel = (row: ChannelRow, unread = 0, title = "", last?: MsgRow): T.Channel => {
+    const read = store.userReadIn(row.id);
+    const sk = subjectKind(row.subject_kind);
+    return {
+      id: row.id,
+      type: channelType(row.type),
+      default: row.is_default,
+      ...(row.peer_id !== null ? { peer: row.peer_id } : {}),
+      orchestrator: orchestratorInRow(row),
+      ...(row.type === "direct" ? {} : { members: store.membersOf(row.id) }),
+      category: row.category ?? "",
+      ...(row.position !== null ? { position: row.position } : {}),
+      ...(row.archived_at !== null ? { archived: row.archived_at } : {}),
+      notify: notifyOf(row.notify),
+      ...(row.root_id !== null ? { root: S.messageId(row.root_id) } : {}),
+      ...(row.root_number !== null ? { rootNumber: row.root_number } : {}),
+      ...(row.name !== null ? { name: row.name } : {}),
+      description: row.description ?? "",
+      ...(row.repo !== null ? { repo: row.repo } : {}),
+      ...(row.parent_id !== null ? { parent: row.parent_id } : {}),
+      subjectKind: sk ?? null,
+      ...(row.subject_id !== null ? { subjectId: row.subject_id } : {}),
+      ...(row.last_number !== null ? { lastNumber: row.last_number } : {}),
+      replies: row.reply_count,
+      ...(read !== undefined ? { read } : {}),
+      ...(unread > 0 ? { unread } : {}),
+      title: title,
+      ...(last ? { last: { from: last.sender_id, name: last.sender_name, text: lineOf(last.body, lastMax), at: last.created_at } } : {}),
+      at: row.created_at,
+    };
+  };
+
+  /** What a page lists a channel with: the user's unread there, and a thread's title when its subject does not
+   * name it (a page keeps no messages to name it by). */
+  const counted = Effect.fnUntraced(function* (row: ChannelRow) {
+    // Set to none it counts nothing; to mentions, only what names the user and is not handled yet.
+    const n =
+      row.notify === "none"
+        ? 0
+        : row.notify === "mentions"
+          ? (yield* db.run(qm.userMentions())).filter((m) => m.channel_id === row.id).length
+          : (yield* db.run(qm.userUnread({ channel_id: row.id, read_number: store.userReadIn(row.id) ?? 0 }))).n;
+    const sk = subjectKind(row.subject_kind);
+    let title = "";
+    if (row.type === "thread" && row.name) title = row.name;
+    else if (row.type === "direct" && row.peer_id) title = store.participant(row.peer_id)?.name ?? "";
+    else if (row.type === "thread" && sk === "talk" && row.subject_id) title = store.participant(row.subject_id)?.name ?? "";
+    // Any other thread (one opened under a message, with no session of its own) by the message it hangs under.
+    if (!title && row.type === "thread" && row.root_id) title = lineOf((yield* db.one(qm.messageByID({ id: row.root_id })))?.body ?? "", threadTitleMax);
+    const last =
+      row.last_number != null && row.last_number !== 0 ? yield* db.one(qm.messageByNumber({ channel_id: row.id, number: row.last_number })) : undefined;
+    return toChannel(row, n ?? 0, title, last);
+  });
+
+  const publishChannel = Effect.fnUntraced(function* (id: string) {
+    const row = store.channel(id);
+    if (row) {
+      const channel = yield* counted(row);
+      // A metadata change can read a message's number before the message's own fact is applied.
+      const published = store.publishedNumber(id);
+      const last = published !== undefined && (channel.lastNumber ?? 0) > published ? published : channel.lastNumber;
+      yield* core.apply({ type: "channelChanged", channel: { ...channel, ...(last === undefined ? {} : { lastNumber: last }) } });
+    }
+  });
+
+  const publishUserMentions = Effect.gen(function* () {
+    // A place set to none tells the user of nothing, its mentions included.
+    const quiet = (id: string | null) => id !== null && store.channel(id)?.notify === "none";
+    const rows = (yield* db.run(qm.userMentions())).filter((r) => !quiet(r.channel_id) && !quiet(r.top_id));
+    yield* core.apply({
+      type: "userMentionsChanged",
+      mentions: rows.map((r) => ({
+        message: toMessage(r),
+        channel: r.top_id ?? store.defaultId(),
+        address: targetOfRow(r.channel_type, r.root_number, null, r.top_id, r.channel_name),
+      })),
+    });
+  });
+
+  const publishMessage = Effect.fn("Channel.publishMessage")(function* (row: MsgRow, answers: T.SessionId | undefined) {
+    const ch = store.channel(row.channel_id);
+    const thread = ch?.type !== "channel" && ch?.subject_kind === "issue" && ch.subject_id ? ch.subject_id : undefined;
+    const message = toMessage(row);
+    yield* core.apply({ type: "messageChanged", message, ...(thread ? { thread } : {}), ...(answers ? { answers } : {}) });
+    store.notePublished(row.channel_id, row.number);
+    yield* PubSub.publish(said, message);
+  });
+
+  const threadOf = (subject: ThreadSubject) => Effect.sync(() => store.threadOfSubject(subject.kind, subject.id));
+
+  const threadOfSession = Effect.fnUntraced(function* (session: string) {
+    const h = sessionOf(session);
+    return h ? (directOfSession(h) ?? (yield* threadOf(subjectOf(h)))) : undefined;
+  });
+
+  /** Who a thread's words are for, worked out now rather than kept: the session on the issue, or a talk thread's own session. */
+  const ownerOf = (ch: ChannelRow): string => {
+    if (ch.type === "direct") return talkSession(ch.id)?.id ?? "";
+    if (ch.type === "channel" || !ch.subject_id) return "";
+    if (ch.subject_kind === "issue") return sessions.onIssue(ch.subject_id) ?? "";
+    if (ch.subject_kind === "talk") return sessionOf(ch.subject_id) ? ch.subject_id : "";
+    return "";
+  };
+
+  /** Tool reads advance the cursor; passive input consumption belongs to Session receipts. */
+  const readUpTo = Effect.fnUntraced(function* (who: string, channel: string, upto: number) {
+    const now = yield* Clock.currentTimeMillis;
+    yield* store.setRead(who, channel, upto, now);
+  });
+  const readThrough = Effect.fnUntraced(function* (who: string, channel: string, upto: number) {
+    yield* store.tx(readUpTo(who, channel, upto));
+    if (who === userId) {
+      yield* PubSub.publish(userReadHub, { channel, number: upto, at: yield* Clock.currentTimeMillis });
+      yield* publishUserMentions;
+    }
+  });
+
+  const { messageOf, change, reacting } = messageMutations(db, store.tx, said, publishChannel);
+
+  const channelEnvelope = (row: MsgRow): ChannelEnvelopeRow => {
+    const channel = store.channel(row.channel_id);
+    if (!channel) throw new Error(`no channel ${row.channel_id}`);
+    return {
+      envelope_id: row.id,
+      number: row.number,
+      channel_id: channel.id,
+      sender_id: row.sender_id,
+      kind: row.kind,
+      body: row.body,
+      meta: row.meta,
+      reply_number: row.reply_number,
+      created_at: row.created_at,
+      name: row.sender_name,
+      sender_kind: row.sender_kind,
+      sender_role: row.sender_role,
+      channel_type: channel.type,
+      root_id: channel.root_id,
+      root_number: channel.root_number,
+      subject_kind: channel.subject_kind,
+      subject_id: channel.subject_id,
+      channel_name: (channel.parent_id !== null ? store.channel(channel.parent_id)?.name : undefined) ?? channel.name ?? "",
+    };
+  };
+
+  const messageRow = (row: ChannelEnvelopeRow): MsgRow => ({
+    id: row.envelope_id,
+    channel_id: row.channel_id,
+    number: row.number,
+    sender_id: row.sender_id,
+    kind: row.kind,
+    body: row.body,
+    meta: row.meta,
+    send_key: null,
+    created_at: row.created_at,
+    sender_name: row.name,
+    sender_kind: row.sender_kind,
+    sender_role: row.sender_role,
+    sender_agent: store.participant(row.sender_id)?.agent_id ?? null,
+    revision: 0,
+    reply_number: row.reply_number,
+    edited_at: null,
+    deleted_at: null,
+    pinned_at: null,
+    reactions: null,
+  });
+
+  const files = yield* Attachment;
+  const filesAt = files.pathOf;
+  const attachmentsOf = files.of;
+  const deliveryTarget = (r: ChannelEnvelopeRow) => targetOfRow(r.channel_type, r.root_number, null, null, r.channel_name || null);
+  const asEnvelope = (r: ChannelEnvelopeRow): Envelope => ({
+    id: r.envelope_id,
+    number: r.number,
+    target: deliveryTarget(r),
+    from: r.sender_id,
+    actor: actorOfParticipant(r.sender_kind, r.sender_role, r.sender_id, r.name),
+    name: r.name,
+    text: r.body,
+    ...envelopeMore(r, filesAt),
+  });
+
+  const inboxRows = Effect.fn("Channel.deliveryUnread")(function* (who: string) {
+    const h = sessionOf(who);
+    const channel = h ? channelOfSession(h) : store.defaultId();
+    return yield* mailbox.unreadSummary(who, channel);
+  });
+
+  yield* store.locked(
+    Effect.gen(function* () {
+      const recent = yield* db.run(qc.recentChannels({ n: keepChannels }));
+      yield* Effect.forEach([...recent].toReversed(), (c) => Effect.flatMap(counted(c), (channel) => core.apply({ type: "channelChanged", channel })), {
+        discard: true,
+      });
+      yield* publishUserMentions;
+    }),
+  );
+
+  const envelopeOf = (row: MsgRow, target: string): Envelope => ({
+    id: S.messageId(row.id),
+    number: row.number,
+    target,
+    from: row.sender_id,
+    actor: actorOfParticipant(row.sender_kind, row.sender_role, row.sender_id, row.sender_name),
+    name: row.sender_name,
+    text: row.body,
+    ...envelopeMore(row, filesAt),
+  });
+  return {
+    store,
+    said,
+    userReadHub,
+    orchestratorIds,
+    orchestratorInRow,
+    membersOfRow,
+    channelTags,
+    directOfSession,
+    talkSession,
+    channelOfSession,
+    channelIdOf,
+    directWith,
+    sessionOf,
+    hired,
+    targetOfRow,
+    targetOfChannel,
+    toChannel,
+    counted,
+    publishChannel,
+    publishUserMentions,
+    publishMessage,
+    threadOf,
+    threadOfSession,
+    ownerOf,
+    readUpTo,
+    readThrough,
+    change,
+    messageOf,
+    reacting,
+    channelEnvelope,
+    messageRow,
+    attachmentsOf,
+    filesAt,
+    asEnvelope,
+    inboxRows,
+    envelopeOf,
+  };
+});
+
+export type ChannelHub = Effect.Success<typeof channelHub>;

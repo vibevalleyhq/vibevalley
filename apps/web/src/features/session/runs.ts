@@ -443,8 +443,9 @@ export class SessionLogs {
     try {
       const snapshot = await this.read(log.id);
       if (this.logs.get(log.id) === log) this.publish(log, mergeSteps(snapshot, reading.during));
-    } catch {
+    } catch (e) {
       // The query retries a failed read. Keep the received steps.
+      if (!(e instanceof Error)) throw e;
     } finally {
       log.reading = undefined;
       if (reading.again && this.logs.get(log.id) === log) void this.refresh(log);

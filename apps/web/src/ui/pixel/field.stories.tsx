@@ -7,10 +7,10 @@ import { storyFrame } from "./story.stylex";
 
 const viewStyles = stylex.create({
   fieldStoriesDiv: {
-    width: "calc(var(--spacing) * 72)",
+    width: "18rem",
   },
   fieldStoriesDiv2: {
-    width: "calc(var(--spacing) * 96)",
+    width: "24rem",
   },
   fieldStoriesSpan: {
     borderBottomStyle: "dotted",

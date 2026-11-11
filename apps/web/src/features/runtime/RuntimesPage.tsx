@@ -12,7 +12,7 @@ import { runtimesQuery, useQueryClient, ready, useRuntimes } from "#/infra/query
 import { Link as A } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
-import { AgentFace } from "#/ui/Face.tsx";
+import { AgentFace } from "#/ui/domain/Face.tsx";
 import { Card, ListCard, ListRow, Quiet, Split } from "#/ui/layout.tsx";
 import { RuntimeIcon } from "#/ui/pixel/RuntimeIcon.tsx";
 import { styleProps } from "#/ui/positioner.ts";
@@ -20,11 +20,11 @@ import { styleProps } from "#/ui/positioner.ts";
 import { quotaOf } from "./quota";
 import { InventoryCard, ModelsCard, SettingsCard, Stamina, SupportCard, Usage } from "./RuntimeCards";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   runtimesPageSpan: {
-    width: "calc(var(--spacing) * 2)",
-    height: "calc(var(--spacing) * 2)",
-    borderRadius: "2147483647px",
+    width: "0.5rem",
+    height: "0.5rem",
+    borderRadius: "9999px",
   },
   runtimesPageSpanState: {
     backgroundColor: "var(--wb-berry)",
@@ -35,12 +35,9 @@ const recipeStyles = stylex.create({
   runtimesPageSpanState3: {
     backgroundColor: "var(--wb-leaf)",
   },
-});
-
-const variantStyles2 = stylex.create({
   detailA: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: {
       default: "var(--color-muted)",
       "@media (hover:hover)": {
@@ -53,16 +50,16 @@ const variantStyles2 = stylex.create({
   detailA2: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-line)",
-    paddingBlock: "var(--spacing)",
-    paddingRight: "calc(var(--spacing) * 3)",
-    paddingLeft: "var(--spacing)",
+    paddingBlock: "0.25rem",
+    paddingRight: "0.75rem",
+    paddingLeft: "0.25rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -71,11 +68,8 @@ const variantStyles2 = stylex.create({
       },
     },
   },
-});
-
-const variantStyles = stylex.create({
-  runtimesPageSpan: {},
-  runtimesPageSpanVariant: {
+  runtimesPageSpan2: {},
+  runtimesPageSpanTone: {
     opacity: ".5",
     filter: "grayscale(100%)",
   },
@@ -84,53 +78,50 @@ const variantStyles = stylex.create({
     minWidth: "0",
     flex: "1",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
   },
-});
-
-const viewStyles = stylex.create({
   portrait: (hat: string) => ({ backgroundImage: `radial-gradient(70% 70% at 50% 70%, ${hat}33, var(--color-page))` }),
   runtimesPageP: {
-    padding: "calc(var(--spacing) * 8)",
+    padding: "2rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-berry)",
   },
   runtimesPageDiv: {
     height: "100%",
   },
   runtimesPageLi: {
-    paddingInline: "calc(var(--spacing) * 2.5)",
-    paddingTop: "var(--spacing)",
-    paddingBottom: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.625rem",
+    paddingTop: "0.25rem",
+    paddingBottom: "0.375rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
-  runtimesPageSpan: {
+  runtimesPageSpan3: {
     display: "flex",
     flexDirection: "column",
     alignItems: "flex-end",
-    gap: "var(--spacing)",
-  },
-  detailDiv: {
-    display: "flex",
-    maxWidth: "var(--container-4xl)",
-    flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.25rem",
   },
   detailDiv2: {
     display: "flex",
+    maxWidth: "var(--container-4xl)",
+    flexDirection: "column",
+    gap: "0.75rem",
+  },
+  detailDiv22: {
+    display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 4)",
-    paddingInline: "var(--spacing)",
-    paddingTop: "var(--spacing)",
-    paddingBottom: "calc(var(--spacing) * 2)",
+    gap: "1rem",
+    paddingInline: "0.25rem",
+    paddingTop: "0.25rem",
+    paddingBottom: "0.5rem",
   },
   detailSpan: {
     display: "flex",
-    width: "calc(var(--spacing) * 18)",
-    height: "calc(var(--spacing) * 18)",
+    width: "4.5rem",
+    height: "4.5rem",
     flexShrink: "0",
     alignItems: "center",
     justifyContent: "center",
@@ -141,28 +132,28 @@ const viewStyles = stylex.create({
   },
   detailH2: {
     fontSize: "var(--text-xl)",
-    lineHeight: "var(--text-xl--line-height)",
+    lineHeight: "var(--leading-xl)",
     fontWeight: "var(--font-weight-semibold)",
   },
   detailP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   detailDiv3: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
-    paddingTop: "var(--spacing)",
+    gap: "0.5rem",
+    paddingTop: "0.25rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   detailSpan2: {
     borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-ok-soft)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.375rem",
     color: "var(--color-ok-ink)",
   },
   detailSpan3: {
@@ -171,12 +162,12 @@ const viewStyles = stylex.create({
   detailSpan4: {
     borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-bad-soft)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.375rem",
     color: "var(--color-berry)",
   },
   detailDiv4: {
     display: "grid",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
     gridTemplateColumns: {
       default: null,
       "@media (width>=48rem)": "repeat(2,minmax(0,1fr))",
@@ -184,7 +175,7 @@ const viewStyles = stylex.create({
   },
   detailDiv5: {
     display: "grid",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
     gridTemplateColumns: {
       default: null,
       "@media (width>=48rem)": "repeat(3,minmax(0,1fr))",
@@ -193,7 +184,7 @@ const viewStyles = stylex.create({
   detailDiv6: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
 });
 
@@ -222,18 +213,18 @@ export function RuntimesPage(props: { rest: string }) {
     <Show
       when={!runtimes.error()}
       fallback={
-        <p {...stylex.attrs(viewStyles.runtimesPageP)}>
+        <p {...stylex.attrs(styles.runtimesPageP)}>
           {t("web.runtime.noRuntimes")}
           {reasonOf(runtimes.error())}
         </p>
       }
     >
-      <div {...stylex.attrs(viewStyles.runtimesPageDiv)}>
+      <div {...stylex.attrs(styles.runtimesPageDiv)}>
         <Split
           edge
           list={
             <ListCard bare title={t("web.runtime.title")} label={t("web.runtime.list")} testid="runtimes">
-              <li {...stylex.attrs(viewStyles.runtimesPageLi)}>{t("web.runtime.intro")}</li>
+              <li {...stylex.attrs(styles.runtimesPageLi)}>{t("web.runtime.intro")}</li>
               <For each={list()}>
                 {(r) => {
                   const ok = () => r.installation.status === "available";
@@ -247,20 +238,16 @@ export function RuntimesPage(props: { rest: string }) {
                       title={r.preset.label}
                       line={`${statusOf(r)}${using() > 0 ? t("web.runtime.usedBy", { n: using() }) : ""}`}
                       leading={
-                        <span {...stylex.attrs(variantStyles.runtimesPageSpan, !ok() ? variantStyles.runtimesPageSpanVariant : variantStyles.runtimesPageSpan)}>
+                        <span {...stylex.attrs(styles.runtimesPageSpan2, !ok() ? styles.runtimesPageSpanTone : styles.runtimesPageSpan2)}>
                           <RuntimeIcon runtime={r.id} size={36} />
                         </span>
                       }
                       trailing={
-                        <span {...stylex.attrs(viewStyles.runtimesPageSpan)}>
+                        <span {...stylex.attrs(styles.runtimesPageSpan3)}>
                           <span
                             {...stylex.attrs(
-                              recipeStyles.runtimesPageSpan,
-                              ok()
-                                ? r.settings.enabled
-                                  ? recipeStyles.runtimesPageSpanState3
-                                  : recipeStyles.runtimesPageSpanState2
-                                : recipeStyles.runtimesPageSpanState,
+                              styles.runtimesPageSpan,
+                              ok() ? (r.settings.enabled ? styles.runtimesPageSpanState3 : styles.runtimesPageSpanState2) : styles.runtimesPageSpanState,
                             )}
                             aria-hidden="true"
                           />
@@ -295,39 +282,34 @@ export function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
     return refreshing.run(async () => keep(await api.runtime.refresh({ id })));
   };
   return (
-    <div {...stylex.attrs(viewStyles.detailDiv)}>
-      <div {...stylex.attrs(viewStyles.detailDiv2)}>
-        <span {...styleProps([viewStyles.detailSpan, viewStyles.portrait(props.info.preset.look.hat)])}>
-          <span
-            {...stylex.attrs(
-              variantStyles.runtimesPageSpan,
-              inst().status !== "available" ? variantStyles.runtimesPageSpanVariant : variantStyles.runtimesPageSpan,
-            )}
-          >
+    <div {...stylex.attrs(styles.detailDiv2)}>
+      <div {...stylex.attrs(styles.detailDiv22)}>
+        <span {...styleProps([styles.detailSpan, styles.portrait(props.info.preset.look.hat)])}>
+          <span {...stylex.attrs(styles.runtimesPageSpan2, inst().status !== "available" ? styles.runtimesPageSpanTone : styles.runtimesPageSpan2)}>
             <RuntimeIcon runtime={props.info.id} size={60} />
           </span>
         </span>
-        <div {...stylex.attrs(variantStyles.detailDiv)}>
-          <h2 {...stylex.attrs(viewStyles.detailH2)}>{props.info.preset.label}</h2>
-          <p {...stylex.attrs(viewStyles.detailP)}>{props.info.preset.blurb}</p>
-          <div {...stylex.attrs(viewStyles.detailDiv3)}>
+        <div {...stylex.attrs(styles.detailDiv)}>
+          <h2 {...stylex.attrs(styles.detailH2)}>{props.info.preset.label}</h2>
+          <p {...stylex.attrs(styles.detailP)}>{props.info.preset.blurb}</p>
+          <div {...stylex.attrs(styles.detailDiv3)}>
             <Switch>
               <Match when={variant(inst(), "status", "available")}>
                 {(i) => (
                   <>
-                    <span {...stylex.attrs(viewStyles.detailSpan2)}>
+                    <span {...stylex.attrs(styles.detailSpan2)}>
                       {t("web.runtime.available")} {i().version ?? ""}
                     </span>
-                    <span {...stylex.attrs(viewStyles.detailSpan3)}>{i().command}</span>
+                    <span {...stylex.attrs(styles.detailSpan3)}>{i().command}</span>
                     <span>{i().via === "bundled" ? t("web.runtime.bundled") : t("web.runtime.commandLine")}</span>
                   </>
                 )}
               </Match>
               <Match when={variant(inst(), "status", "unsupported")}>
-                {(i) => <span {...stylex.attrs(viewStyles.detailSpan4)}>{t("web.runtime.unsupportedWhy", { why: i().reason })}</span>}
+                {(i) => <span {...stylex.attrs(styles.detailSpan4)}>{t("web.runtime.unsupportedWhy", { why: i().reason })}</span>}
               </Match>
               <Match when={inst().status === "not_found"}>
-                <span {...stylex.attrs(viewStyles.detailSpan4)}>{t("web.runtime.notHere")}</span>
+                <span {...stylex.attrs(styles.detailSpan4)}>{t("web.runtime.notHere")}</span>
               </Match>
             </Switch>
             <Show when={inst().status !== "checking"} fallback={<span>{t("web.runtime.checking")}</span>}>
@@ -339,7 +321,7 @@ export function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
           {refreshing.busy() ? t("web.runtime.checking") : t("web.runtime.recheck")}
         </Button>
       </div>
-      <div {...stylex.attrs(viewStyles.detailDiv4)}>
+      <div {...stylex.attrs(styles.detailDiv4)}>
         <Card title={t("web.runtime.account")}>
           <Usage info={props.info} />
         </Card>
@@ -347,7 +329,7 @@ export function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
       </div>
       <SettingsCard info={props.info} onSaved={keep} />
       <ModelsCard info={props.info} />
-      <div {...stylex.attrs(viewStyles.detailDiv5)}>
+      <div {...stylex.attrs(styles.detailDiv5)}>
         <InventoryCard title={t("web.runtime.skills")} entries={props.info.skills} />
         <InventoryCard title={t("web.runtime.mcp")} entries={props.info.mcpServers} />
         <InventoryCard title={t("web.runtime.tools")} entries={props.info.tools} />
@@ -355,16 +337,16 @@ export function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
       <Card
         title={t("web.runtime.agents")}
         action={
-          <A href={`/agents/new?runtime=${encodeURIComponent(props.info.id)}`} data-testid="new-agent" {...stylex.attrs(variantStyles2.detailA)}>
+          <A href={`/agents/new?runtime=${encodeURIComponent(props.info.id)}`} data-testid="new-agent" {...stylex.attrs(styles.detailA)}>
             {t("web.runtime.makeAgent")}
           </A>
         }
       >
         <Show when={props.agents.length > 0} fallback={<Quiet>{t("web.runtime.noneYet")}</Quiet>}>
-          <div {...stylex.attrs(viewStyles.detailDiv6)}>
+          <div {...stylex.attrs(styles.detailDiv6)}>
             <For each={props.agents}>
               {(a) => (
-                <A href={`/agents/${encodeURIComponent(a.id)}`} {...stylex.attrs(variantStyles2.detailA2)}>
+                <A href={`/agents/${encodeURIComponent(a.id)}`} {...stylex.attrs(styles.detailA2)}>
                   <AgentFace agentId={a.id} runtime={a.runtime} look={a.look} size={26} />
                   {a.name}
                 </A>

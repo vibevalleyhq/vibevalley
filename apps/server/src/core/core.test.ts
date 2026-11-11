@@ -10,12 +10,19 @@ import { vi } from "vite-plus/test";
 import type { SpaceState, Session, StateFrame } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { emptyProgress } from "#/game/progress.ts";
+import { layer as projection } from "#/gateway/projection/frame.ts";
 import { ServerConfig } from "#/infra/config.ts";
-import { layer as projection } from "#/projection/frame.ts";
+import { emptyProgress } from "#/modules/game/progress.ts";
 import { testConfig, whenState } from "#/testing/layers.ts";
 
 import { bounded, Core, emptySpaceState, stateEveryMs } from "./core.ts";
+
+const coreLayer = (config: ServerConfig["Service"]) =>
+  Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer));
+const withCore =
+  (config: ServerConfig["Service"]) =>
+  <A, E, R>(self: Effect.Effect<A, E, R>) =>
+    Effect.provide(self, coreLayer(config));
 
 const helper: Session = {
   id: sessionId("w1"),
@@ -58,12 +65,7 @@ describe("core", () => {
           yield* Effect.yieldNow;
           yield* core.open();
           return yield* Fiber.join(waiting);
-        }).pipe(
-          Effect.scoped,
-          Effect.provide(
-            Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer)),
-          ),
-        ),
+        }).pipe(Effect.scoped, withCore(testConfig())),
       );
       expect(found).toBe(true);
       expect(vi.getTimerCount()).toBe(0);
@@ -90,7 +92,7 @@ describe("core", () => {
       expect([s.progress, s.crons, s.issues]).toEqual([undefined, [], []]);
       expect(s.sessions).toEqual([]);
       expect(readFileSync(join(config.home, "state.json"), "utf8")).toBe(Formatter.formatJson(was));
-    }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer))));
+    }).pipe(withCore(config));
   });
 
   it.effect("regression: a legacy state file is neither decoded nor rewritten", () => {
@@ -101,9 +103,7 @@ describe("core", () => {
       yield* Effect.scoped(
         Effect.gen(function* () {
           expect((yield* Core).state()).toEqual(emptySpaceState());
-        }).pipe(
-          Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer))),
-        ),
+        }).pipe(withCore(config)),
       );
       const kept = readdirSync(config.home).filter((f) => f.startsWith("state.json.unreadable-"));
       expect(kept).toHaveLength(0);
@@ -121,7 +121,7 @@ describe("core", () => {
       expect(core.state().call).toBe("idle");
       yield* reopen;
       expect(core.state().call).toBe("live");
-    }).pipe(Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer))));
+    }).pipe(withCore(config));
   });
 
   it.effect("a fact is stamped and sent without creating a file snapshot", () => {
@@ -140,9 +140,7 @@ describe("core", () => {
           const got = yield* Fiber.join(seen);
           expect(got.map((e) => e.type)).toEqual(["snapshot", "sessionChanged", "sessionChanged", "sessionPhaseChanged", "progressChanged", "progressChanged"]);
           expect(got[2]!.at).toBeGreaterThan(0);
-        }).pipe(
-          Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer))),
-        ),
+        }).pipe(withCore(config)),
       );
       expect(existsSync(join(config.home, "state.json"))).toBe(false);
     });
@@ -168,9 +166,7 @@ describe("core", () => {
       yield* TestClock.adjust(stateEveryMs * 2);
       const size2 = yield* Queue.size(frames);
       expect(size2).toBe(0);
-    }).pipe(
-      Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
-    ),
+    }).pipe(withCore(testConfig())),
   );
 
   it.effect("seq goes up once per commit that changes the state, and a frame carries the seq of the state it shows", () =>
@@ -199,9 +195,7 @@ describe("core", () => {
       // What a reply read after its change says (replied) is no later than the first frame that shows the change.
       expect(next.seq).toBeGreaterThanOrEqual(replied);
       expect(next.state.commits?.total).toBe(3);
-    }).pipe(
-      Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
-    ),
+    }).pipe(withCore(testConfig())),
   );
 
   it.effect("an internal subscriber keeps a whole burst while it works", () =>
@@ -223,9 +217,7 @@ describe("core", () => {
       yield* TestClock.adjust(200);
       const seen2 = yield* Fiber.join(seen);
       expect(seen2).toBe(128);
-    }).pipe(
-      Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
-    ),
+    }).pipe(withCore(testConfig())),
   );
 
   it.effect("session phases update independently and keep their supplied run start", () =>
@@ -242,9 +234,7 @@ describe("core", () => {
       expect(core.session("orchestrator")).toMatchObject({ phase: { _tag: "resting" } });
       expect(core.session("orchestrator")?.channel).toBeUndefined();
       expect(core.session("lead")?.phase).toEqual(phaseOf("speaking", expect.any(Number)));
-    }).pipe(
-      Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
-    ),
+    }).pipe(withCore(testConfig())),
   );
 
   it.effect("regression: a scheduler yield cannot leave the core locked against a synchronous callback", () =>
@@ -263,9 +253,7 @@ describe("core", () => {
       );
       yield* Effect.all([writer, callbacks], { concurrency: "unbounded", discard: true });
       expect(core.seq()).toBe(rounds.length * 2);
-    }).pipe(
-      Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
-    ),
+    }).pipe(withCore(testConfig())),
   );
 
   it.effect("apply stays synchronous for oar callbacks", () =>
@@ -276,9 +264,7 @@ describe("core", () => {
       yield* core.apply({ type: "sessionChanged", session: helper });
       yield* Effect.sync(() => runSync(core.apply({ type: "sessionPhaseChanged", id: helper.id, phase: phaseOf("thinking") })));
       expect(core.session(helper.id)?.phase).toEqual(phaseOf("thinking"));
-    }).pipe(
-      Effect.provide(Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
-    ),
+    }).pipe(withCore(testConfig())),
   );
 });
 

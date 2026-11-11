@@ -19,32 +19,6 @@ export interface DeepSeekChunk {
   readonly calls: readonly { readonly index?: number; readonly id?: string; readonly name?: string; readonly arguments: string }[];
 }
 
-/** Server-sent events' data, one string an event. [DONE] ends them. */
-export class SseData {
-  private data: string[] = [];
-  done = false;
-
-  line(line: string): string | undefined {
-    if (this.done) return undefined;
-    const l = line.endsWith("\r") ? line.slice(0, -1) : line;
-    if (l === "") {
-      if (this.data.length === 0) return undefined;
-      const data = this.data.join("\n");
-      this.data = [];
-      if (data.startsWith("[DONE]")) {
-        this.done = true;
-        return undefined;
-      }
-      return data;
-    }
-    if (l.startsWith(":")) return undefined;
-    const colon = l.indexOf(":");
-    const field = colon < 0 ? l : l.slice(0, colon);
-    if (field === "data") this.data.push(colon < 0 ? "" : l.slice(colon + 1).replace(/^ /u, ""));
-    return undefined;
-  }
-}
-
 const reasoningFields = ["reasoning_content", "reasoning", "reasoning_text"] as const;
 
 // Optional wire fields remain independent: malformed metadata must not discard valid text or tool deltas.

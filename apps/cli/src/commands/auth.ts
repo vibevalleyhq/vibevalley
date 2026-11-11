@@ -7,9 +7,9 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { forgetSignIn, keepSignIn, signedIn } from "@vibevalley/home";
 import { t } from "@vibevalley/i18n";
 
-import { askAt, farmHome, ServerFlag, serverOf } from "#/farm.ts";
-import { show } from "#/format.ts";
-import { err } from "#/output.ts";
+import { show } from "#/base/format.ts";
+import { err } from "#/base/output.ts";
+import { askAt, farmHome, ServerFlag, serverOf } from "#/infra/farm.ts";
 
 /** What the server lists this computer as: its host name, without .local. */
 const deviceName = () => Str.replace(/\.local$/u, "")(hostname());

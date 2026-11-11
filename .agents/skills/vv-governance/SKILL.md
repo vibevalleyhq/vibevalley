@@ -20,7 +20,7 @@ agent 照着已有的代码抄、走最短的路，写在文字里的规矩会�
 
 1. 说清它挡的是哪一类问题，对上六种病里的哪一种（[六种病](.agents/skills/vv-governance/references/whitepaper.md#六种病)）。说不出一类、只是一次的事，不立规矩：规矩越多越容易漏读。
 2. 按顺序选手段，能用前面的就不用后面的：代码（类型、结构、边界，把这一类整个消掉）→ 检查（lint、测试、CI、棘轮）→ 文字（规矩、skill）→ 人看。
-3. 写成检查时，失败的话写三样：错在哪和为什么、`Fix:` 能照抄的改法、`See` 仓库里一个文件（[写法](docs/style/code.md#检查管着的写法)）。agent 读到的只有这句话，只说「不许」它就猜，猜的常常是绕过去。lint 规则用 `scripts/oxlint-plugin.ts` 的 `says`，`no-restricted-imports` 的话写进 `vite.config.ts` 的 `refused`；规则算得出改法的就算出来（`parent-import` 给出 `#/…`），能机械改对的给自动修复。
+3. 写成检查时，失败的话写三样：错在哪和为什么、`Fix:` 能照抄的改法、`See` 仓库里一个文件（[写法](docs/style/code.md#检查管着的写法)）。agent 读到的只有这句话，只说「不许」它就猜，猜的常常是绕过去。lint 规则用 `scripts/audit/oxlint-plugin.ts` 的 `says`，`no-restricted-imports` 的话写进 `vite.config.ts` 的 `refused`；规则算得出改法的就算出来（`parent-import` 给出 `#/…`），能机械改对的给自动修复。
 4. 只许减不许增、数得清、又没有动机去刷的，做成棘轮（`packages/health` 的逃生口，`escapeAdvice` 写每种该怎么改）；会被刷的读数（行数、测试数、覆盖率）只出报告，不做门槛，否则 agent 学会的是凑数。
 5. 给检查写测试：一个该拦的、一个不该拦的，加上报错的格式。
 6. 写不成检查的才进文字：一句规矩放进 `AGENTS.md` 并链到它的家，理由写进对应子系统的「为什么这样」。
@@ -31,7 +31,7 @@ agent 照着已有的代码抄、走最短的路，写在文字里的规矩会�
 
 | 病 | 问 | 怎么查 |
 |---|---|---|
-| 局部缝合 | 同一段逻辑是不是抄了第二份？加一个渠道、工具、runtime 时，有没有把超时、重试、清理又写一遍？ | 搜这段逻辑的关键调用；看扩展点（`apps/server/src/connector/` 下各聊天软件的 adapter、`apps/server/src/tool/`）有没有自己的 `AbortSignal.timeout`、`sleep`、重试循环 |
+| 局部缝合 | 同一段逻辑是不是抄了第二份？加一个渠道、工具、runtime 时，有没有把超时、重试、清理又写一遍？ | 搜这段逻辑的关键调用；看扩展点（`apps/server/src/gateway/connector/` 下各聊天软件的 adapter、`apps/server/src/modules/tool/`）有没有自己的 `AbortSignal.timeout`、`sleep`、重试循环 |
 | 只加不删 | 换了新写法，旧的删了没有？ | `vp run deadcode`；搜旧函数名；内部不留兼容：不留旧路、不写兜底 |
 | 绕开约束 | 有没有 `as`、`!`、关 lint 的注释、`Effect.orDie`、`Effect.ignore`、空的 `catch`？测试的断言是不是改松了？ | `vp run health:verify`（逃生口的棘轮）；diff 里的测试改动；`regression: ` 开头的测试被动了要在 `## Regression` 里点名 |
 | 温室假设 | 循环里有没有逐个查库、逐个起 git？流是不是假设一次到一整行？写盘是不是每来一点就写一次？ | 读循环体；`docs/subsystems/foundation.md`「贵的东西归拥有它的模块管」；测试里有没有大一点的数据 |
@@ -67,4 +67,4 @@ agent 加功能时只在局部补，不会顺手提炼；提炼要单独一道�
 - 改名用 TypeScript 的语言服务（编辑器的重命名）；去掉没人用的 `export` 用 `vpx knip --fix --fix-type exports,types`；结构性的改写用 ast-grep 或 ts-morph 写一次性的脚本，脚本放在临时目录，不进仓库（进了仓库会被当成代码检查、格式化）。
 - 先在一个文件上跑，看 diff 对了再全量跑；全量跑完立刻 `vp check`。脚本出过错的，把它碰过的文件从 `origin/main` 恢复，重新来，不在坏的结果上修补：坏在哪不一定看得出。
 - 每处不一样、要逐处判断的（删死代码、改调用方的逻辑），即使文件多也逐处看过再改。
-- 漏改由 `tsc` 和 `scripts/stale-names.ts` 兜底：改名是一个决定时，把旧名写进 `stale-names.ts`，旧名就回不来。
+- 漏改由 `tsc` 和 `scripts/docs/stale-names.ts` 兜底：改名是一个决定时，把旧名写进 `stale-names.ts`，旧名就回不来。

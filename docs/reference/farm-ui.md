@@ -18,7 +18,7 @@
 代码注释中的 `screen n` 对应以下编号：
 
 1. **农场主界面**：左上为助手、农场卡（等级、金币、经验）和「工作台」；右上为地图、频道、精力瓶和菜单；正下为工具栏；左下为手机和帮工栏（田头在手机内）。单仓库农场（`/farm/<仓库>`）立有仓库牌，仅展示该仓库帮工，点牌返回地图。按住 ⌥ 显示院内设施名称。
-2. **工单详情**（点地块或看板卡片）：农场为居中弹窗（`apps/web/src/farm/issue/IssueView.tsx`），工作台为独立页（`/issues/<id>`，`apps/web/src/features/issue/IssueDetail.tsx`），共用 `apps/web/src/features/issue/overview.ts`（基于服务端 `Issue.stage`，[工单](docs/subsystems/issue.md)「给用户看的状态」）。从上到下依次展示：
+2. **工单详情**（点地块或看板卡片）：农场为居中弹窗（`apps/web/src/farm/issue/IssueView.tsx`），工作台为独立页（`/issues/<id>`，`apps/web/src/features/issue/views/IssueDetail.tsx`），共用 `apps/web/src/features/issue/model/overview.ts`（基于服务端 `Issue.stage`，[工单](docs/subsystems/issue.md)「给用户看的状态」）。从上到下依次展示：
    - **这是什么**：`#号`、单行短标题（`shortTitle`）、仓库与优先级。
    - **现在怎样**：当前阶段、等待或运行耗时、帮工、轮次与花费（卡住标红）。
    - **要你做的**：仅在需用户操作时出现，只放一个主按钮（回答问题、验收通过/收获、打回、恢复卡住、重开）。

@@ -67,11 +67,11 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
   const call: InboxItem = {
     id: "merge-w1-1",
     kind: "review",
-    from: { kind: "session", id: "w1", name: "fox", agent: "fox" },
+    from: { kind: "session", id: sessionId("w1"), name: "fox", agent: "fox" },
     who: "fox",
     text: "remember-me is done, see if it can go in",
     at: Date.now(),
-    target: { kind: "session", id: "w1" },
+    target: { kind: "session", id: sessionId("w1") },
     words: { label: "for you", title: "fox is done", body: "remember-me is done", tray: "fox is done" },
   };
   const base: StateFrame = {

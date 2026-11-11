@@ -1,4 +1,4 @@
-// Written by `vpx scripts/i18n.ts gen` from packages/i18n/locales: do not edit.
+// Written by `vpx scripts/gen/i18n.ts gen` from packages/i18n/locales: do not edit.
 
 /** Each language's catalogs by namespace. */
 export const catalogs = {
@@ -991,7 +991,6 @@ export const catalogs = {
       pickHint: "挑好以后：issue edit {n} --agent <档案>，再 issue status {n} todo",
       noAssignee: "还没选派给哪个帮工",
       profileGone: "档案 {id} 不在了",
-      sendFailed: "派不出去",
       queued: "{full}：排上队了，有空位就自动开工",
       queuedStarted: "排队的「{title}」开工了：{session}",
       queuedStuck: "排队的「{title}」开不了工：{why}；也没能退回待办，还在队里",
@@ -5752,7 +5751,6 @@ export const catalogs = {
       pickHint: "Once picked: issue edit {n} --agent <profile>, then issue status {n} todo",
       noAssignee: "No helper has been picked yet",
       profileGone: "The profile {id} is gone",
-      sendFailed: "It could not be sent",
       queued: "{full}: queued, it starts as soon as there is room",
       queuedStarted: 'The queued "{title}" has started: {session}',
       queuedStuck: 'The queued "{title}" could not start: {why}; it could not go back to To do either, and stays in the queue',
@@ -10655,7 +10653,6 @@ export interface Messages {
   "server.issue.refinement.why": undefined;
   "server.issue.repoRef": { readonly name: string | number };
   "server.issue.roundNeedsWords": undefined;
-  "server.issue.sendFailed": undefined;
   "server.issue.senderGone": { readonly id: string | number };
   "server.issue.split.agent": { readonly agent: string | number };
   "server.issue.split.already": undefined;

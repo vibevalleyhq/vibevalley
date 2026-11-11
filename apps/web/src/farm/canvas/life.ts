@@ -96,7 +96,7 @@ const MEADOWS: readonly Box[] = [
 const YARD: Box = [40, 100, 330, 236];
 
 const rand = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
-const pick = <T>(xs: readonly T[]): T => xs[Math.floor(Math.random() * xs.length)]!;
+const pick = <T>(xs: readonly [T, ...T[]]): T => xs[Math.floor(Math.random() * xs.length)] ?? xs[0];
 const inside = (box: Box): Point => ({ x: rand(box[0], box[2]), y: rand(box[1], box[3]) });
 
 export function villageLife(layers: LifeLayers, v: LifeWorld): Life {

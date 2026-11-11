@@ -52,7 +52,7 @@ Host（~/.vibevalley：密钥、农机、全局模板）
 | 工作树 | `Workplace` | 一张工单在某个仓库上的检出：`<space>/worktrees/<仓库>.<工单号>`，分支 `vibevalley/issue-<工单号>`；档案不开 worktree 时不切 |
 | 工单 | `Issue` | 一件活，从写下到关上一个 id；状态由服务端给，用户挪状态就是派活；代码相关的开不开 worktree 由档案设置决定；每张都有验收，完成就是通过；关上的能重开 |
 | 派工关联 | `Assignment` | 工单由哪个档案负责；可以尚未开工，同人继续负责时跨执行上下文保留，换人或清空指派才结束 |
-| 执行器 | `Executor` | 管理 oar 执行实例的创建、投递、中断和释放；不替工单保存责任归属 |
+| 执行器 | `Executions`（`Machine.executions`） | 管理 oar 执行实例的创建、投递、中断和释放；不替工单保存责任归属 |
 | Session | `Session`（服务是 `Session`，派活是 `Issue` 的 `hire`） | 档案的执行上下文；工单使用仓库目录或工单 worktree，聊天使用独立目录并关联频道；跨多轮、休眠和重启保留身份 |
 | Run | `Run`（`session_run` 表）；核心状态里由带着 `brief` 的 `sessionPhaseChanged` 事实开始、`sessionReported` 事实结束 | 一轮：一次触发到一次汇报；帮工的一次 run 包着一个 oar turn，进程内 agent 的 loop 也记 Run |
 | 事件 | `SessionEvent`，一个 Session 的全部是它的日志 | 日志里的一条：收到的话、想、说、工具调用、重试、用量、出错，和 Run 的边界（`run/start`、`run/end`）；类型照 DeepSeek Harness 写成 `<主体>/<做了什么>` |

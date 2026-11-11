@@ -19,7 +19,7 @@ apps/cli/                  命令行（vibevalley）：照领域模型一条命�
                            guide 是给 agent 的用法（apps/cli/README.md）
 apps/web/                  页面（Solid 2 + Vite）：桌面、浏览器、手机三个宿主共用的一份，由服务端（--web）在 / 提供；/ 打开工作台，/farm 是像素农场
                            （src/farm，PixiJS），其余是工作台：一个概念一个 src/features/<概念>，名字和服务端的模块一样；分层
-                           base（纯的）→ infra（服务端、宿主、浏览器）→ state（中间层）→ ui → ui/pixel → features → 皮（farm、tree）→ app，lint 查；public/ 是全部的图、像素字、指针和样音
+                           base（纯的）→ infra（服务端、宿主、浏览器）→ state（中间层）→ ui → ui/domain → ui/pixel → features → 皮（farm、tree）→ app，lint 查；public/ 是全部的图、像素字、指针和样音
                            （apps/web/README.md）
 apps/desktop/              Electron 壳：用自己的 Node 带着服务端起来，打开它提供的页面；宿主能力经 preload 给页面
 apps/island/               刘海上的灵动岛（Swift、AppKit、SwiftUI）：桌面壳带起来的原生小程序，显示在做和等你的工单，点一行打开它
@@ -49,7 +49,7 @@ design/                    生图提示词、脚本和切图规则（写进 apps
 docs/                      当前的行为和约定；subsystems/ 是各子系统从架构角度沉淀下来的样子（docs/AGENTS.md）
 .agents/notes/             Agent Notes：具体的计划，做完沉淀进 docs/subsystems
 .agents/skills/            仓库自己的 skill：验收（vv-acceptance，入口加 references/ 下按块的分册）等；.claude/skills 链接到这里
-scripts/                   文档、Note、旧名字的检查，和验证服务端用的沙箱（verify-server.ts）
+scripts/                   按职责分为 gen/（生成物写出）、audit/（AST/lint/类型/棘轮门禁）、docs/（Note、链接、术语与旧名检查）、release/（打包、回归与 verify-server.ts）
 ```
 
 每个包的约定在它的 README。
@@ -92,14 +92,14 @@ vp run site:check && vp run site:build                          # 改完 apps/si
 
 Node 24（`.node-version` 定的那个，`vp` 和 CI 都照它；服务端、命令行和脚本都经 `vpx` 直接跑 `.ts`，桌面版的服务端是 `vp pack` 打的包），Vite+（`vp`：pnpm 12、格式、lint、类型、测试、任务），Electron 44。先跑和改动有关的最窄的检查。服务端不自动重载：改了 `apps/server` 要重启它。
 
-一件事的主线：oar 的会话事件 → `apps/server/src/session/reaction.ts`（纯函数）读成事实 → `Core.apply` 用 `projection/reduce.ts` 的 `reduce` 折进核心状态 → `GET /api/v1/state` 把折好的 `StateFrame` 经 SSE 推给页面；每个会话和助手的每一步由 `session/journal.ts` 记成轨迹（[architecture.md](docs/architecture.md)、[子系统](docs/subsystems/README.md)）。
+一件事的主线：oar 的会话事件 → `apps/server/src/modules/session/reaction.ts`（纯函数）读成事实 → `Core.apply` 用 `projection/reduce.ts` 的 `reduce` 折进核心状态 → `GET /api/v1/state` 把折好的 `StateFrame` 经 SSE 推给页面；每个会话和助手的每一步由 `session/journal.ts` 记成轨迹（[architecture.md](docs/architecture.md)、[子系统](docs/subsystems/README.md)）。
 
 ## 怎么让 agent 做对
 
 agent 照着已有的代码抄，走最短的路，所以要让容易的写法就是对的写法。挡住一类问题，按下面的顺序选手段，能用前面的就不用后面的（[理由](docs/subsystems/process.md)）：
 
-1. **代码**：更好的结构、更强的类型和不变量、清楚的边界；用代码把一类问题整个消掉，以后不用再想它。
-2. **静态检查**：lint 规则、测试、CI、形式化验证（如 TLA+）；花的 token 最少，问题在落地前就报出来。失败时说的话写清错在哪、`Fix:` 怎么改、`See` 哪个文件，agent 读了一次改对（[写法](docs/style/code.md#检查管着的写法)）。
+1. **代码（类型化与静态结构）**：清楚的模块边界、静态的拓扑与字面量标识、用 `Schema` / `Brand` / 判别联合表达的不变量；让非法状态不可编译，把一类问题整个消掉（[静态化、类型化与可分析化](docs/style/module-design.md#静态化类型化与可分析化)）。
+2. **静态检查（可分析化）**：编译器与 `@effect/tsgo`、带类型的 oxlint、全仓语法树与契约审计（`practice:check`、`paths:check`、`schema-audit.ts`、`health:verify`）、确定性测试与形式化验证；花的 token 最少，失败时写清错在哪、`Fix:` 怎么改、`See` 哪个文件，agent 读一次即可改对（[写法](docs/style/code.md#检查管着的写法)）。
 3. **文字**：注释、规矩、本文、skill，只写没法强制、要 agent 自己判断的；能少写就少写。只有跑起来才看得出对不对的，写成验证 skill（[.agents/skills](.agents/skills/README.md)，照 [create-verification-skill](.agents/skills/create-verification-skill/SKILL.md) 写）。
 4. **人看**：最难扩展。agent 落代码太快，每个 PR 都细看做不到；人的精力花在杠杆最大的地方：设计让 agent 默认就做对的环境。
 
@@ -121,7 +121,7 @@ list are in the [vv-effect](.agents/skills/vv-effect/SKILL.md) skill.
 ## 规矩
 
 - **先有概念，再有皮**：服务端按实际的概念分模块（工单、帮工、仓库、频道……，[概念](docs/concepts.md)）；农场只画它们，每个农场里的东西都对得上一件实际的事；游戏规则只读事件、算画面，业务不调它（[农场的皮](docs/subsystems/farm.md)）。
-- **核心状态只有一份**：帮工或农场的新状态，在 `packages/protocol/src/<概念>/shapes.ts` 里加字段、在 `core/shapes.ts` 加事实，在 `apps/server/src/projection/reduce.ts` 的 `reduce` 里折，只由服务端 `Core.apply` 施加。不要在服务端、页面里另存一份帮工的状态（[理由](docs/subsystems/core.md)）。
+- **核心状态只有一份**：帮工或农场的新状态，在 `packages/protocol/src/<概念>/shapes.ts` 里加字段、在 `core/shapes.ts` 加事实，在 `apps/server/src/gateway/projection/reduce.ts` 的 `reduce` 里折，只由服务端 `Core.apply` 施加。不要在服务端、页面里另存一份帮工的状态（[理由](docs/subsystems/core.md)）。
 - **`packages/protocol` 只放契约**：一个概念一个文件夹 `src/<概念>/`：线上的形状写在它的 `shapes.ts`，每个形状在同一个文件夹的 `schema.ts` 有一个由它定类型的 Schema（`Codec<T.X>`：两边对不上就编不过），接口写在它的 `api.ts`，`src/shapes.ts`、`schema.ts`、`api.ts` 只汇总；`src/rules` 只放页面和服务端都要跑的纯函数，只有服务端跑的规则归拥有它的模块（`apps/server/src/<模块>`），结论写进帧给页面，页面不为了展示去调规则（`rules/contract.test.ts` 查每个导出都有服务端以外的包在用）（[理由](docs/subsystems/foundation.md)）。
 - **生成的不手改**：`apps/server/db/generated` 由 `scripts/pg-generate.ts` 写（`vp run db:generate`），`server:check` 查它是不是最新；`packages/protocol/src/client.ts` 由 `vp run api:client` 写，`packages/i18n/src/catalogs.ts` 由 `vp run i18n:gen` 写，`docs:verify` 查它们（[理由](docs/subsystems/foundation.md)）。
 - **包之间只经包名**：用别的包写它的名字、经它 `package.json` 的 `exports`，不写穿出包的相对路径（lint 的 `no-cross-package-path` 查）；自己的文件出了文件夹写 `#/…`（`imports`）；库给别人的是 `dist/` 里打好的声明，代码照源码跑（[地基](docs/subsystems/foundation.md)）。
@@ -129,17 +129,18 @@ list are in the [vv-effect](.agents/skills/vv-effect/SKILL.md) skill.
 - **内部不留兼容**：架构还在成形，不为兼容少走一步：改名、改形状、改存盘的格式（库里的表、家目录的文件、环境变量、存下的取值）都直接改，不写兼容层，不在读的地方兜底旧数据，也不写数据搬运；表结构直接改 `db/migrations/0001_schema.up.sql`，不另加迁移（`schema.test.ts` 查这条），本机的旧库和旧文件作废（库由服务端开机时挪到一边、新建一个），旧文件删掉重建；启动时只认今天的名字（[理由](docs/subsystems/foundation.md)）。对外 HTTP 的版本是唯一例外，v1 留到用户的设备都升上来（[接口版本](docs/subsystems/core.md#为什么这样)）。
 - **页面不折事实**：它读 `GET /api/v1/state` 折好的 `StateFrame`（`useCore()`、`useFrames()`）；要新的数据就加进 protocol 的字段和 `reduce`，页面里只写跟着时钟走的画面和摆法（各 feature 里的纯函数）；服务端的规则（能不能派、下回想起什么、冲突怎么交代）不在页面里重写，加一个字段或接口问服务端（[理由](docs/subsystems/app.md)）。
 - **封闭的联合穷尽处理**：按 `_tag`、`kind`、`type` 分支的地方，`switch` 覆盖每一种，或用 `default` 说明其余的有意不管（lint 的 `switch-exhaustiveness-check` 查）；成员表（`XValues`）要每种都处理时用 `Record<X, …>`，加新成员时编不过。
-- **服务端的服务**：每个模块导出一个服务，名字是概念的单数词，和模块的文件夹、表同一个（`Issue`、`Session`，lint 的 `singular-service` 查），照 Effect 的默认写法（`node_modules/effect/AGENTS.md`）：类，接口写在类型参数里（频道的大接口放同模块 `contracts.ts`），layer 是它的静态成员（`class Issue extends Context.Service<Issue, { … }>()("@vibevalley/server/issue/issue") { static readonly layer = … }`，标签是包名加文件的路径，effect:check 的 `deterministicKeys` 查），别处要它的类型写 `Issue["Service"]`；一个 `make`（`Effect.gen` 里 `yield*` 它用到的服务，不拿整个农场，用 `Issue.of({ … })` 拼出服务）；`services.ts` 按次序把 `X.layer` 叠起来，模块只用排在它前面的，往上走流（`Stream`，新闻、变化）；开机就要做的放 `start`、`ready` 这类 layer，叠在最后；服务之间传的形状放在定义它的模块里；和服务同名的协议形状经 `import type * as T from "@vibevalley/protocol"` 写成 `T.Issue`（lint 的 `protocol-namespace` 查，[命名](docs/style/naming.md)）（[architecture.md](docs/architecture.md)）。
+- **类型驱动，全栈 Schema Fail-Fast**：前后端共用 `Schema` 契约（HTTP 出入口与 `VibeValleyApi` 客户端、SSE 流、`SqlSchema` 查询、落盘 JSON、配置与工具入参），在边界一次解码为品牌主键、受约束值与判别联合，不符当场 fail-fast（自有表可空 JSON 用 `storedJsonOrUndefined`，不用 `jsonOrNone` 吞损坏）；门内靠 `.make` 构造领域值，`Schema.Redacted` 设 `disallowJsonEncode: true`（[模块设计](docs/style/module-design.md#类型驱动与进门解码)）。
+- **服务端的服务**：每个模块导出一个服务，名字是概念的单数词，和模块的文件夹、表同一个（`Issue`、`Session`，lint 的 `singular-service` 查），照 Effect 的默认写法（`node_modules/effect/AGENTS.md`）：类，接口写在类型参数里（频道的大接口放同模块 `contracts.ts`），layer 是它的静态成员（`class Issue extends Context.Service<Issue, { … }>()("@vibevalley/server/modules/issue/issue") { static readonly layer = … }`，标签是包名加文件的路径，effect:check 的 `deterministicKeys` 查），别处要它的类型写 `Issue["Service"]`；一个 `make`（`Effect.gen` 里 `yield*` 它用到的服务，不拿整个农场，用 `Issue.of({ … })` 拼出服务）；`services.ts` 按次序把 `X.layer` 叠起来，模块只用排在它前面的，往上走流（`Stream`，新闻、变化）；开机就要做的放 `start`、`ready` 这类 layer，叠在最后；服务之间传的形状放在定义它的模块里；和服务同名的协议形状经 `import type * as T from "@vibevalley/protocol"` 写成 `T.Issue`（lint 的 `protocol-namespace` 查，[命名](docs/style/naming.md)）（[architecture.md](docs/architecture.md)）。
 - **处理函数要薄**：接口的处理（`http/handlers/<概念>.ts`、`http/`）和页面只做转发和展示，规则在拥有它的服务或纯函数里。
 - **帮工没有权限确认**：服务端只听 127.0.0.1，永远不要对外；帮工只在工作目录里开工（[理由](docs/subsystems/session.md)）。例外只有两个，都是单独的监听：语音线路只有一个接口、每通电话一把钥匙，经隧道给声网（[理由](docs/subsystems/voice.md)）；「连接到本机」默认关着，是从外面进来的唯一一道门：只放在本机点过头配对的设备（`remote` 那部分）和凭密码或确认码登录的设备（除了设密码），每台一把钥匙，不放 `/mcp`（[理由](docs/subsystems/lan.md)、[用户和设备](docs/subsystems/user.md)）。
 - **图标分两套**：工作台的按钮和标记用 reicon 的线条图标，一个意思一个图，写在 `apps/web/src/ui/icons.ts`，`<Icon name>` 只收表里的名字；像素皮（农场、记忆树、`ui/pixel`）用 `design/pixel` 生成的贴图（`SpriteIcon`；形状照 Hugeicons）；头像、农机的 logo 和插画在哪都是像素图；都不用 ▶、■、✓ 这类字符代替（[客户端](docs/subsystems/app.md)）。
 - **界面照田间工作台**：工作台的颜色、圆角、字号、阴影、动效和层都用 `apps/web/src/style.css` 的令牌，lint 的 `no-hex-color`、`design-tokens` 拦散值；挑哪一档、原子组件的样子和交之前的自查照 [界面怎么做](docs/style/design.md)，StyleX 的写法和批量迁移照 [vv-stylex](.agents/skills/vv-stylex/SKILL.md)。
 - **密钥**：写了钥匙的 `vibevalley.yaml`（`$VIBEVALLEY_HOME/vibevalley.yaml` 或 `--config` 给的）、`.agora/` 不进仓库；日志和文档里不出现密钥。
 - **工具链**：Vite+（`vp`）管装依赖、格式、lint、类型、测试和任务，配置在根目录 `vite.config.ts`（[Vite+ 的 monorepo 指南](https://viteplus.dev/guide/monorepo)）：格式和 lint 只在根目录配，包之间的差别写成 `overrides`，各包的 `vite.config.ts` 只放 Vite、Vitest 和任务；依赖的版本只写在 `pnpm-workspace.yaml` 的 catalog，`package.json` 写 `catalog:`（[地基](docs/subsystems/foundation.md)）；`vp check` 查格式（oxfmt，160 列；Markdown、生成的和数据不排）、oxlint（带类型的规则）和全部包的类型，`vp check --fix` 改格式，各包不另跑 `tsc`；别的包的类型读它打好的 `dist/`（`vp run packages:build`，各项检查先跑它），代码读源码（[地基](docs/subsystems/foundation.md)）。任务一律 `vp run`：检查（测试、构建、`server:check`、`docs:verify`）写成 `vite.config.ts` 的任务，带缓存，什么都没改时重放结果，先后用 `dependsOn`；会写文件或一直跑的（`api:client`、`desktop:dev`、`e2e`）留在 `package.json`，不缓存。测试用 `vp test`（vitest，跑在 Node 上，测试从 `vite-plus/test` import；服务端另用 `@effect/vitest`），每个包的 `vite.config.ts` 写它的 `test`（哪些文件、时区）；界面和整个应用用 Playwright（`e2e`）；脚本用 `vpx` 直接跑 `.ts`，都不带构建。
-- **话放在哪**：对用户说的话（界面、帧里的说法、通知、拒绝、田头的系统消息、命令行）写进词典 `packages/i18n/locales/{zh,en}/<宿主.模块>.json`，代码里写 `t("key")`，改完 `vp run i18n:gen`，键和参数有类型，`vpx scripts/i18n.ts check` 查漏翻、没人用的和占位；对模型说的写进模块的 `prompts.ts`，用中文，加一句用用户的语言回答；别处的中文由 lint `vibevalley/no-cjk-literal` 拦下（[话放在哪](docs/subsystems/foundation.md#话放在哪)）。
+- **话放在哪**：对用户说的话（界面、帧里的说法、通知、拒绝、田头的系统消息、命令行）写进词典 `packages/i18n/locales/{zh,en}/<宿主.模块>.json`，代码里写 `t("key")`，改完 `vp run i18n:gen`，键和参数有类型，`vpx scripts/gen/i18n.ts check` 查漏翻、没人用的和占位；对模型说的写进模块的 `prompts.ts`，用中文，加一句用用户的语言回答；别处的中文由 lint `vibevalley/no-cjk-literal` 拦下（[话放在哪](docs/subsystems/foundation.md#话放在哪)）。
 - **代码风格**：代码和接口用实际的概念，界面上的叫法照[用语表](docs/README.md#用语)；工单的状态和动作在哪里都用工单自己的词（完成、改动、问题、计划，词典的 `shared` 命名空间），种地的词（收获、缺肥、种植计划……）只在农场的皮里，`stale-names.ts` 查（[状态和用语](docs/subsystems/issue.md#状态和用语)）；名字站在领域的视角、说这里管什么事，不用 `rules`、`state`、`utils` 这类说性质的名字（[命名](docs/style/naming.md)）；注释用英文，只写不看就会写错或改错的：为什么、顺序和锁、安全边界、格式和取值、要和别处保持一致的，不复述代码、不写概述和历史（[建议和不建议的写法](docs/style/code.md)）。
-- **测试**：服务端的测试用 oar 的 `scriptedRuntime`（`@botiverse/oar/testing`）扮演帮工、用真的 git 仓库（`src/testing/git.ts`）、模型用照脚本回答的 `Llm`（`@vibevalley/ai/testing`，大脑经 `packages/agent/src/testing.ts`），不连网，`src/testing/world.ts` 搭一个整农场，跨好几个模块的流程写在 `src/flows`（帮工照工单的字眼干活，`src/testing/worker.ts`）；纯函数的规则直接测，页面里的判断抽成 `features/<概念>/*.ts` 的纯函数用 vitest 测；页面的 Playwright 只测接线和主线、不断言文案，按 `data-testid` 和状态属性找元素，不按界面上的字（lint `vibevalley/no-copy-selector` 查），可访问性每页一次 axe；它对着真的服务端，测试的服务端拿到的环境去掉了一切钥匙，`HOME` 也是临时的，不问这台机器上的编码 agent：pi 换成同一个照字眼干活的帮工、别的 runtime 都当没装（`VIBEVALLEY_TEST_RUNTIMES`），派活、提问、交活都能真走一遍，不用手搓帧。改了帮工、仓库、工单的状态和完成、核心状态或游戏规则的行为，补对应的测试；修缺陷补的测试名字以 `regression: ` 开头，之后删改它要在 PR 里点名说明（[规矩](docs/development.md#分支提交和-pr)）。测试按接缝分层（规则、模块、流程、浏览器组件、页面、宿主、真模型），每层有自己的入口和预算；高一层只测新增的接线风险，主题扫描与纯截图单独运行，行为在能看见它的最低一层测（[测试金字塔](docs/subsystems/foundation.md)）。
-- **边界和棘轮**：跨异步的状态用锁或 `SynchronizedRef`，可共享的快照和缓存用 `SubscriptionRef`、`Cache`；资源取得和释放成对，后台纤程归作用域；错误优先在错误通道回答，剩下的 `yield* Effect.result` 和类型断言由 `health:verify` 只减不增（[地基](docs/subsystems/foundation.md)）。
+- **测试**：服务端的测试用 oar 的 `scriptedRuntime`（`@botiverse/oar/testing`）扮演帮工、用真的 git 仓库（`src/testing/git.ts`）、模型用照脚本回答的 `Llm`（`@vibevalley/ai/testing`，大脑经 `packages/agent/src/testing/testing.ts`），不连网，`src/testing/world.ts` 搭一个整农场，跨好几个模块的流程写在 `src/flows`（帮工照工单的字眼干活，`src/testing/worker.ts`）；纯函数的规则直接测，页面里的判断抽成 `features/<概念>/*.ts` 的纯函数用 vitest 测；页面的 Playwright 只测接线和主线、不断言文案，按 `data-testid` 和状态属性找元素，不按界面上的字（lint `vibevalley/no-copy-selector` 查），可访问性每页一次 axe；它对着真的服务端，测试的服务端拿到的环境去掉了一切钥匙，`HOME` 也是临时的，不问这台机器上的编码 agent：pi 换成同一个照字眼干活的帮工、别的 runtime 都当没装（`VIBEVALLEY_TEST_RUNTIMES`），派活、提问、交活都能真走一遍，不用手搓帧。改了帮工、仓库、工单的状态和完成、核心状态或游戏规则的行为，补对应的测试；修缺陷补的测试名字以 `regression: ` 开头，之后删改它要在 PR 里点名说明（[规矩](docs/development.md#分支提交和-pr)）。测试按接缝分层（规则、模块、流程、浏览器组件、页面、宿主、真模型），每层有自己的入口和预算；高一层只测新增的接线风险，主题扫描与纯截图单独运行，行为在能看见它的最低一层测（[测试金字塔](docs/subsystems/foundation.md)）。
+- **边界和棘轮**：跨异步的状态用锁或 `SynchronizedRef`，可共享的快照和缓存用 `SubscriptionRef`、`Cache`（`Effect.cached` 只在构造期 `yield*` 一次）；资源取得和释放成对，后台纤程归作用域，不在循环里局部 `Effect.provide`；`Schema.TaggedError` 的 `_tag` 与类名同名且全仓唯一，错误优先在错误通道回答，存量语法债与逃生口由 `effect:check`、`practice:check`、`paths:check` 和 `health:verify` 单向棘轮锁死（[地基](docs/subsystems/foundation.md)）。
 - **改完要验证**：先跑最窄的检查；改了接口、服务、页面或手机壳，照 [vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 找到对应的分册，在真的程序上看一遍，汇报时附上它要的证据；一类改动没有分册，又花了工夫才验证完，就照 `create-verification-skill` 补一份（[.agents/skills](.agents/skills/README.md)）。
 - **分支、提交和 PR**：同一批工作的多个改动默认合成一个 PR，尽量少开 PR；`main` 只经 PR、squash 合并，CI 全过才能合；分支 `<类>/<主题>`，提交和 PR 的标题、正文用英文，标题一句话说改完以后的行为、最多 100 字，不带 agent 署名；commit-msg hook 和 CI 查，开、改、合照 [vv-pr](.agents/skills/vv-pr/SKILL.md)（[规矩](docs/development.md#分支提交和-pr)）。
 - **文档和 Note**：改了行为就在同一个改动里改文档；有子系统文档（`docs/subsystems/`）的，改它，不在 `reference/` 另写一份；非平凡的工作先写计划 Note（行为、模块边界、共享约定、持久化格式、流程、测试策略），做完把仍然成立的沉淀进子系统、删掉 Note；局部的、机械的改动和界面微调不用写（[规矩](.agents/notes/README.md#什么时候写)）。

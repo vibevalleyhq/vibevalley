@@ -44,7 +44,7 @@ import {
 import { orchestratorSprite } from "#/features/orchestrator/index.ts";
 import { orchestratorMood } from "#/infra/frame.ts";
 import { prefsNow } from "#/state/prefs.ts";
-import { castPrefix } from "#/ui/cast.ts";
+import { castPrefix } from "#/ui/domain/cast.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
 
 import { villageDog } from "./dog";

@@ -9,14 +9,14 @@ const viewStyles = stylex.create({
   tipStoriesDiv: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
   },
   tipStoriesSpan: {
     display: "flex",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
 });
 

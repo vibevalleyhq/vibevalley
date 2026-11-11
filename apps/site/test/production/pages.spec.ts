@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test as base } from "@playwright/test";
 
-import { COMMANDS } from "../../src/lib/links";
+import { COMMANDS } from "../../src/base/links";
 
 const types: Readonly<Record<string, string>> = {
   ".html": "text/html",

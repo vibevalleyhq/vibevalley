@@ -5,14 +5,13 @@ import { SqlClient } from "effect/sql";
 
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
-import { Agent } from "#/agent/agent.ts";
-import { Channel } from "#/channel/channel.ts";
-import { Ingress } from "#/ingress/ingress.ts";
-import { explicitMandate } from "#/issue/creation.ts";
-import { Issue } from "#/issue/issue.ts";
-import { Mailbox, type InsertDelivery } from "#/mailbox/mailbox.ts";
-import { Resource } from "#/resource/resource.ts";
-import { Session } from "#/session/session.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { Channel } from "#/modules/channel/channel.ts";
+import { explicitMandate } from "#/modules/issue/creation.ts";
+import { Issue } from "#/modules/issue/issue.ts";
+import { Mailbox, type InsertDelivery } from "#/modules/mailbox/mailbox.ts";
+import { Session } from "#/modules/session/session.ts";
+import { Tool } from "#/modules/tool/tool.ts";
 import { committedDelivery } from "#/testing/deliveries.ts";
 import { testIssues } from "#/testing/world.ts";
 
@@ -30,11 +29,11 @@ it.live("regression: the mandate grants its worker access to the original trigge
     }),
   });
   return Effect.gen(function* () {
-    const ingress = yield* Ingress;
+    const mailbox = yield* Mailbox;
     const issues = yield* Issue;
-    const resource = yield* Resource;
+    const tools = yield* Tool;
     yield* (yield* Agent).save(lab());
-    const source = (yield* ingress.record({
+    const source = (yield* mailbox.record({
       source: "workbench",
       key: "mandate-source",
       actor: { kind: "user", id: "user" },
@@ -46,10 +45,10 @@ it.live("regression: the mandate grants its worker access to the original trigge
     const item = yield* issues.add({ title: "authorized work", repo: "mandate", agent: "lab" }, explicitMandate(source.id));
     const started = yield* testIssues(issues).start(item.id, "");
     yield* until(() => inputs.some((input) => input.includes(source.card.readUri)), "the worker given the original source");
-    expect((yield* resource.read(started.session!, { uri: source.card.readUri })).text).toContain("original requirement");
+    expect((yield* tools.readResource(started.session!, { uri: source.card.readUri })).text).toContain("original requirement");
     const other = yield* issues.add({ title: "unrelated work", repo: "unrelated", agent: "lab" }, explicitMandate());
     const second = yield* testIssues(issues).start(other.id, "");
-    const resourceFailure = yield* Effect.flip(resource.read(second.session!, { uri: source.card.readUri }));
+    const resourceFailure = yield* Effect.flip(tools.readResource(second.session!, { uri: source.card.readUri }));
     expect(resourceFailure).toMatchObject({ _tag: "ResourceError" });
   }).pipe(Effect.scoped, Effect.provide(f.layer));
 });
@@ -58,11 +57,11 @@ it.live("regression: chat triggers keep their original payload through edits and
   const f = farm();
   return Effect.gen(function* () {
     const chat = yield* Channel;
-    const ingress = yield* Ingress;
     const mailbox = yield* Mailbox;
+    const tools = yield* Tool;
     const sql = yield* SqlClient.SqlClient;
     const before = yield* chat.post({ _tag: "User", text: "previous message", sendKey: "before" });
-    const current = yield* ingress.user({ source: "voice", text: "original voice input", envelope: "voice-source" });
+    const current = yield* chat.user({ source: "voice", text: "original voice input", envelope: "voice-source" });
     yield* chat.post({ _tag: "User", text: "next message", sendKey: "after" });
     yield* chat.edit(current.message.id, "edited voice input");
     yield* sql`update mailbox_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${current.message.id}`;
@@ -73,11 +72,11 @@ it.live("regression: chat triggers keep their original payload through edits and
     yield* mailbox.start;
     const registered3 = yield* mailbox.isRouted(current.message.id);
     expect(registered3).toBe(true);
-    const source = yield* ingress.read(current.message.id);
+    const source = yield* mailbox.readTrigger(current.message.id);
     expect(source?.trigger.source).toBe("voice");
     expect(source?.payload.text).toBe("original voice input");
     expect(source?.trigger.card.readUri).toBe(`vv://trigger/${current.message.id}`);
-    const resource = yield* (yield* Resource).read(defaultOrchestrator, { uri: source!.trigger.card.readUri });
+    const resource = yield* tools.readResource(defaultOrchestrator, { uri: source!.trigger.card.readUri });
     expect(resource.text).toContain("original voice input");
     expect(resource.text).toContain(before.message.id);
     expect(resource.text).toContain("next message");
@@ -111,10 +110,10 @@ it.live("regression: a persisted machine trigger reaches a worker without a chat
       (id) => id !== undefined,
       "the worker thread",
     ))!;
-    const trigger = (yield* (yield* Ingress).record({
+    const trigger = (yield* mailbox.record({
       source: "github",
       key: "ci:1",
-      actor: { kind: "ci", id: "checks" },
+      actor: { kind: "system", id: "checks" },
       addressed: "thread_owner",
       text: "machine-only-detail ".repeat(100),
       threads: [`issue:${issue.id}`],
@@ -144,7 +143,7 @@ it.live("regression: a persisted machine trigger reaches a worker without a chat
     expect(mailbox.deliveriesOf(session).find((row) => row.envelope_id === trigger.id)?.message_id).toBeNull();
     yield* mailbox.start;
     expect(inputs.some((input) => input.includes(trigger.card.readUri))).toBe(false);
-    yield* (yield* Ingress).accept({
+    yield* mailbox.accept({
       source: "connector",
       key: "resume-machine-work",
       actor: { kind: "user", id: "user" },
@@ -183,7 +182,7 @@ it.live("regression: issue input waits without a session and a user followup rel
     const issues = testIssues(issue2);
     const sessions = yield* Session;
     const mailbox = yield* Mailbox;
-    const ingress = yield* Ingress;
+    const tools = yield* Tool;
     const sql = yield* SqlClient.SqlClient;
     yield* (yield* Agent).save(lab());
     const issue = yield* issues.add({ title: "subscription work", repo: "source-routing", agent: "lab" });
@@ -197,17 +196,17 @@ it.live("regression: issue input waits without a session and a user followup rel
       addressed: "thread_owner" as const,
       at: 1,
     };
-    const queued = (yield* ingress.accept(userEvent))!;
+    const queued = (yield* mailbox.accept(userEvent))!;
     expect(sessions.hired()).toHaveLength(0);
     expect((yield* sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${queued.id}`)[0]?.state).toBe("held");
     const started = yield* issues.start(issue.id, "");
     yield* until(() => inputs.some((input) => input.includes("queued-user-detail")), "the queued input delivered");
     expect(inputs[0]).toContain("queued-user-detail");
     yield* until(() => sessions.sessionOf(started.session!)?.phase._tag === "done", "the worker handed back");
-    const automatic = (yield* ingress.accept({
+    const automatic = (yield* mailbox.accept({
       source: "github",
       key: "ci-failure",
-      actor: { kind: "ci", id: "checks" },
+      actor: { kind: "system", id: "checks" },
       text: "frozen-ci-detail",
       threads: ["github:source-routing#7"],
       addressed: "thread_owner",
@@ -218,12 +217,12 @@ it.live("regression: issue input waits without a session and a user followup rel
       reason: "human",
     });
     expect(inputs.some((input) => input.includes("frozen-ci-detail"))).toBe(false);
-    yield* ingress.accept(userEvent);
+    yield* mailbox.accept(userEvent);
     expect((yield* sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${automatic.id}`)[0]?.state).toBe("held");
-    yield* ingress.accept({ ...userEvent, key: "release-user", text: "release-user-detail", at: 3 });
+    yield* mailbox.accept({ ...userEvent, key: "release-user", text: "release-user-detail", at: 3 });
     yield* until(() => inputs.some((input) => input.includes("frozen-ci-detail")), "the frozen input released");
     expect((yield* issues.list()).map((item) => item.id)).toEqual([issue.id]);
     expect((yield* sql<{ session_id: string }>`select session_id from mailbox_issue where trigger_id = ${automatic.id}`)[0]?.session_id).toBe(started.session);
-    expect((yield* (yield* Resource).read(started.session!, { uri: automatic.card.readUri })).text).toContain("frozen-ci-detail");
+    expect((yield* tools.readResource(started.session!, { uri: automatic.card.readUri })).text).toContain("frozen-ci-detail");
   }).pipe(Effect.scoped, Effect.provide(f.layer));
 });

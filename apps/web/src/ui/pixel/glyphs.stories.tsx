@@ -11,12 +11,12 @@ const viewStyles = stylex.create({
   glyphsStoriesDiv: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
   },
   glyphsStoriesDiv2: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
 });
 

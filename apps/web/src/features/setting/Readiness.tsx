@@ -10,14 +10,14 @@ import { Icon } from "#/ui/Icon.tsx";
 import { TextLink } from "#/ui/layout.tsx";
 
 const styles = stylex.create({
-  lines: { display: "flex", flexDirection: "column", gap: "var(--spacing)" },
+  lines: { display: "flex", flexDirection: "column", gap: "0.25rem" },
   line: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   ready: { color: "var(--color-leaf)" },
   lacking: { color: "var(--color-berry)" },

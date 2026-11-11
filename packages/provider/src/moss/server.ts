@@ -1,9 +1,9 @@
 import { Effect } from "effect";
-import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
+import { type HttpClient, HttpClientRequest } from "effect/http";
 import { WebSocket } from "undici";
 
-import { jsonText } from "../json.ts";
-import { decodeMossFrame, mossErrorMessage, mossRealtimeUrl } from "../moss.ts";
+import { jsonText } from "../base/json.ts";
+import { decodeMossFrame, mossErrorMessage, mossRealtimeUrl } from "./index.ts";
 import { mossLiveModels } from "./live-models.ts";
 import { mossVisionModels } from "./vision-models.ts";
 
@@ -39,7 +39,7 @@ export interface MossTransport {
   readonly status: (key: string, model?: string) => Effect.Effect<{ readonly code: number; readonly body: string }, string>;
 }
 
-export const nodeMossTransport: MossTransport = {
+export const makeMossTransport = (http: HttpClient.HttpClient): MossTransport => ({
   connect: (key, on, model = "moss-live-1.0") => {
     if (!mossLiveModels.some((supported) => supported === model) && !mossVisionModels.some((supported) => supported === model))
       throw new Error("Unsupported MOSS realtime model");
@@ -58,17 +58,12 @@ export const nodeMossTransport: MossTransport = {
   },
   status: (key, model = "moss-live-1.0") =>
     Effect.gen(function* () {
-      const http = yield* HttpClient.HttpClient;
       const url = new URL(mossRealtimeUrl.replace(/^wss:/u, "https:"));
       url.searchParams.set("model", model);
       const r = yield* http.execute(HttpClientRequest.get(url.href).pipe(HttpClientRequest.bearerToken(key)));
       return { code: r.status, body: yield* r.text };
-    }).pipe(
-      Effect.timeoutOrElse({ duration: mossDeadlineMs, orElse: () => Effect.fail("timed out") }),
-      Effect.mapError(String),
-      Effect.provide(FetchHttpClient.layer),
-    ),
-};
+    }).pipe(Effect.timeoutOrElse({ duration: mossDeadlineMs, orElse: () => Effect.fail("timed out") }), Effect.mapError(String)),
+});
 
 const handshake = (key: string, transport: MossTransport, model: string) =>
   Effect.callback<"attached" | { readonly error: string } | { readonly down: string } | "silent">((resume) => {
@@ -107,7 +102,7 @@ const handshake = (key: string, transport: MossTransport, model: string) =>
 /** Whether MOSS Live takes key. */
 export const verifyMoss = Effect.fn("Moss.verify")(function* (
   key: string,
-  transport: MossTransport = nodeMossTransport,
+  transport: MossTransport,
   model: string = "moss-live-1.0",
 ): Effect.fn.Return<MossVerify> {
   const safe = (text: string) => (key ? text.replaceAll(key, "[redacted]") : text).slice(0, 200);

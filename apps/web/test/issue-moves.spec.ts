@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { type Agent, type IssueStatusRequest, pathOf, type VibeValleyApi } from "@vibevalley/protocol";
+import { BizCode } from "@vibevalley/protocol/api";
 
 import { expect, gate, test } from "./fixtures";
 
@@ -78,7 +79,7 @@ test("a refused move stays where it was dropped, failed, and a retry sends the s
   await page.route(`**${pathOf("issue.status.update")}`, async (route) => {
     if (!first) return route.continue();
     first = false;
-    await route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ _tag: "Refused", reason: "full" }) });
+    await route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ bizCode: BizCode.IssueRefused, message: "full" }) });
   });
   const sent = statusUpdates(page);
   await page.goto("/issues");
@@ -96,7 +97,7 @@ test("a refused move stays where it was dropped, failed, and a retry sends the s
 test("a failed move put back is the frame's card again", async ({ page, api }) => {
   const made = await startable(api, "putback");
   await page.route(`**${pathOf("issue.status.update")}`, (route) =>
-    route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ _tag: "Refused", reason: "full" }) }),
+    route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ bizCode: BizCode.IssueRefused, message: "full" }) }),
   );
   await page.goto("/issues");
   await card(page, "todo", made.id).dragTo(lane(page, "working"));

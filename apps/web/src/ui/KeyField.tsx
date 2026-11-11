@@ -14,10 +14,10 @@ const viewStyles = stylex.create({
     display: "inline-flex",
     flexShrink: "0",
     alignItems: "center",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
     borderRadius: "var(--radius-sm)",
     fontSize: "var(--text-2xs)",
-    lineHeight: "var(--text-2xs--line-height)",
+    lineHeight: "var(--leading-2xs)",
     whiteSpace: "nowrap",
     outlineStyle: {
       default: "none",
@@ -48,22 +48,22 @@ const viewStyles = stylex.create({
   keyFieldDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   keyFieldDiv2: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   keyFieldLabelSmall: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-medium)",
     color: "var(--color-muted)",
   },
   keyFieldLabelNormal: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-semibold)",
   },
   keyFieldSpan: {
@@ -72,7 +72,7 @@ const viewStyles = stylex.create({
   keyFieldDiv3: {
     display: "flex",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   keyFieldControlWrap: {
     minWidth: "0",
@@ -87,29 +87,29 @@ const viewStyles = stylex.create({
     bottom: "0",
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-page)",
-    paddingBlock: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "0.625rem",
   },
   saveBarDiv: {
     minWidth: "0",
     flex: "1",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   undo: {
     display: "inline-flex",
-    height: "calc(var(--spacing) * 7)",
+    height: "1.75rem",
     cursor: "pointer",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingInline: "0.625rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: {
       default: "var(--color-muted)",
       "@media (hover:hover)": {
@@ -127,7 +127,7 @@ const viewStyles = stylex.create({
   },
   save: {
     display: "inline-flex",
-    height: "calc(var(--spacing) * 7)",
+    height: "1.75rem",
     cursor: {
       default: "pointer",
       ":disabled": "default",
@@ -144,9 +144,9 @@ const viewStyles = stylex.create({
         ":hover": "var(--color-accent-hover)",
       },
     },
-    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingInline: "0.625rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-page)",
     opacity: {
       default: null,

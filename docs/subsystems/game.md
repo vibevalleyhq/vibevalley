@@ -19,10 +19,10 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/game/game.ts` | 账本持久化（`game_ledger`）、订阅 `Core`、commit 统计调度、称号设置与空地预约 |
-| `apps/server/src/game/progress.ts` | 账本条目提取（`entriesFor`）、进度折叠纯函数（`progressFold`）与成就文案组装 |
-| `apps/server/src/game/view.ts`、`play.ts` | 等级公式（`xpToNext`）、地块映射（`plotOf`）、帧视图（`viewOf`）、特效与地块分配 |
-| `apps/server/src/agent/seeds.json` | 内置成就定义（`achievements`） |
+| `apps/server/src/modules/game/game.ts` | 账本持久化（`game_ledger`）、订阅 `Core`、commit 统计调度、称号设置与空地预约 |
+| `apps/server/src/modules/game/progress.ts` | 账本条目提取（`entriesFor`）、进度折叠纯函数（`progressFold`）与成就文案组装 |
+| `apps/server/src/modules/game/view.ts`、`play.ts` | 等级公式（`xpToNext`）、地块映射（`plotOf`）、帧视图（`viewOf`）、特效与地块分配 |
+| `apps/server/src/modules/agent/seeds.json` | 内置成就定义（`achievements`） |
 | `apps/web/src/farm/panels/Achievements.tsx`、`hud/FxLayer.tsx` | 任务与成就面板、称号佩戴与画面特效层 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`game.achievement.list`、`game.title.set`）。
@@ -70,5 +70,5 @@
 
 ## 怎么验证
 
-- `apps/server/src/game/progress.test.ts`、`game.test.ts`：账本折叠、金币倍率、成就解锁与等级测试。
+- `apps/server/src/modules/game/progress.test.ts`、`game.test.ts`：账本折叠、金币倍率、成就解锁与等级测试。
 - `apps/web/test/farm-hud.spec.ts`：任务与成就面板、称号佩戴与仓库展示测试。

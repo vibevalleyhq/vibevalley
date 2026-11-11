@@ -2,7 +2,7 @@ import { Schema } from "effect";
 
 import { t } from "@vibevalley/i18n";
 import { VibeValleyApi, VibeValleyApiError } from "@vibevalley/protocol";
-import type { ApiError, Next, VoiceFix } from "@vibevalley/protocol/api";
+import { type ApiErrorKind, bizCodeMeta, type BizErrorCode, type Next, type VoiceFix } from "@vibevalley/protocol/api";
 
 import { messageOf } from "#/base/format.ts";
 
@@ -15,7 +15,8 @@ class ApiConnectionError extends Schema.TaggedError<ApiConnectionError, { readon
 }
 
 export interface UiFault {
-  readonly tag: ApiError["_tag"] | "Network" | "Client";
+  readonly bizCode?: BizErrorCode;
+  readonly tag: ApiErrorKind | "Network" | "Client";
   readonly reason: string;
   readonly next?: readonly Next[];
   readonly settings?: VoiceFix;
@@ -38,14 +39,14 @@ export const reasonOf = (e: unknown) => (e instanceof VibeValleyApiError ? e.rea
 /** The fault a refusal or connection failure carries. */
 export function faultOf(e: unknown): UiFault {
   if (e instanceof VibeValleyApiError) {
-    const err = e.error;
-    if (err) {
+    if (e.tag !== undefined) {
       return {
-        tag: err._tag,
+        ...(e.bizCode !== undefined ? { bizCode: e.bizCode } : {}),
+        tag: e.tag,
         reason: e.reason,
-        ...((err._tag === "Refused" || err._tag === "Missing") && err.next ? { next: err.next } : {}),
-        ...(err._tag === "VoiceUnavailable" && err.settings ? { settings: err.settings } : {}),
-        retryable: err._tag === "VoiceCallFailed",
+        ...(e.error?.next ? { next: e.error.next } : {}),
+        ...(e.error?.settings ? { settings: e.error.settings } : {}),
+        retryable: e.bizCode !== undefined ? bizCodeMeta[e.bizCode].retryable : e.tag === "VoiceCallFailed" || e.status >= 500,
       };
     }
     return {

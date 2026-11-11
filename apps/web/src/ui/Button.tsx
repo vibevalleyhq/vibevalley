@@ -5,46 +5,47 @@ import { omit } from "solid-js";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 import { styleProps } from "./positioner";
+import { colors, durations, easing, leading, media, radii, text } from "./tokens.stylex";
 
 export type Tone = "plain" | "primary" | "quiet" | "danger";
 
 const styles = stylex.create({
   button: {
     display: "inline-flex",
-    height: "calc(var(--spacing) * 7)",
+    height: "1.75rem",
     cursor: { default: "pointer", ":disabled": "default" },
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     borderWidth: 1,
     borderStyle: "solid",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 2.5)",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    borderRadius: radii.md,
+    paddingInline: "0.625rem",
+    fontSize: text.sm,
+    lineHeight: leading.sm,
     whiteSpace: "nowrap",
     transitionProperty: "background-color, border-color, translate",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
-    transitionDuration: "120ms",
+    transitionTimingFunction: easing.out,
+    transitionDuration: durations.pointer,
     translate: { default: null, ":active": { default: "0 1px", ":disabled": "0 0" } },
     opacity: { default: null, ":disabled": 0.5 },
   },
   plain: {
-    borderColor: "var(--color-line)",
-    backgroundColor: { default: "var(--color-page)", "@media (hover: hover)": { default: null, ":hover": "var(--color-hover)" } },
+    borderColor: colors.line,
+    backgroundColor: { default: colors.page, [media.hover]: { default: null, ":hover": colors.hover } },
   },
   primary: {
-    borderColor: "var(--color-accent)",
-    backgroundColor: { default: "var(--color-accent)", "@media (hover: hover)": { default: null, ":hover": "var(--color-accent-hover)" } },
-    color: "var(--color-page)",
+    borderColor: colors.accent,
+    backgroundColor: { default: colors.accent, [media.hover]: { default: null, ":hover": colors.accentHover } },
+    color: colors.page,
   },
   quiet: {
     borderColor: "transparent",
-    backgroundColor: { default: "transparent", "@media (hover: hover)": { default: null, ":hover": "var(--color-hover)" } },
+    backgroundColor: { default: "transparent", [media.hover]: { default: null, ":hover": colors.hover } },
   },
   danger: {
-    borderColor: "var(--color-line)",
-    backgroundColor: { default: "var(--color-page)", "@media (hover: hover)": { default: null, ":hover": "var(--color-hover)" } },
-    color: "var(--color-berry)",
+    borderColor: colors.line,
+    backgroundColor: { default: colors.page, [media.hover]: { default: null, ":hover": colors.hover } },
+    color: colors.berry,
   },
 });
 

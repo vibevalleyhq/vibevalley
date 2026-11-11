@@ -1,6 +1,6 @@
 # 仓库
 
-仓库（`Repo`）是空间 `$VIBEVALLEY_WORK_ROOT/repos/` 下的一个 git 仓库，在农场地图上画成一座岛。`apps/server/src/repo` 负责仓库新建与克隆、工单 worktree 与分支管理、冲突预检、`.vibevalley/check` 执行、分支合并、GitHub PR / GitLab.com MR 发布及提交统计。
+仓库（`Repo`）是空间 `$VIBEVALLEY_WORK_ROOT/repos/` 下的一个 git 仓库，在农场地图上画成一座岛。`apps/server/src/modules/repo` 负责仓库新建与克隆、工单 worktree 与分支管理、冲突预检、`.vibevalley/check` 执行、分支合并、GitHub PR / GitLab.com MR 发布及提交统计。
 
 ## 管什么，不管什么
 
@@ -16,10 +16,11 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/repo/repo.ts` | 对外 `Repo` 服务：新建/克隆、worktree、检查与合并、PR 提交、GitHub 检测与 commit 计数 |
-| `apps/server/src/repo/repository.ts`、`git.ts` | 底层 git 命令拼装（`merge-tree`、`commit-tree`、`update-ref`、清理）与子进程限时执行 |
-| `apps/server/src/repo/publish.ts`、`hosting.ts`、`check.ts` | 已有分支与工单共用的检查、按 SHA 推送、平台适配与检查脚本执行 |
-| `apps/server/src/repo/workplace.ts` | 仓库技术栈识别、PR 标题正文读取（`vibevalley-pr.md`）与对外形状（`Workplace`、`MergeFailure`） |
+| `apps/server/src/modules/repo/repo.ts` | 对外 `Repo` 服务：新建/克隆、worktree、检查与合并、PR 提交、GitHub 检测与 commit 计数 |
+| `apps/server/src/modules/repo/repository.ts`、`git.ts` | 底层 git 命令拼装（`merge-tree`、`commit-tree`、`update-ref`、清理）与子进程限时执行 |
+| `apps/server/src/modules/repo/publish.ts`、`hosting.ts`、`check.ts` | 已有分支与工单共用的检查、按 SHA 推送、平台适配与检查脚本执行 |
+| `apps/server/src/modules/repo/pullSnapshot.ts` | GitHub PR 检查、评审、评论与行内评审线程的 GraphQL/REST 分页快照（`Repo.githubSnapshot`）及失败 Actions 日志提取 |
+| `apps/server/src/modules/repo/workplace.ts` | 仓库技术栈识别、PR 标题正文读取（`vibevalley-pr.md`）与对外形状（`Workplace`、`MergeFailure`） |
 | `apps/web/src/features/repo/ReposPage.tsx` | 工作台仓库页（新建、概况、语言占比、提交日历） |
 | `apps/web/src/farm/map/RepoMap.tsx`、`islands.ts` | 像素农场群岛地图与岛屿空位计算 |
 
@@ -34,7 +35,7 @@
 - **冲突预检与合入父分支均不污染工作区**：
   - 冲突检测用 `git merge-tree --write-tree`；子工单合入父分支（`mergeInto`）用 `merge-tree` + `commit-tree` + 带旧值校验的 `update-ref`。
 - **合并和提 PR 前工作树必须干净**：`checkMerge` 先看 `git status --porcelain`；有未提交改动就以 `MergeFailure` 退回，让帮工按仓库自己的提交规范提交，不再代它生成不合规的提交说明。
-- **PR 能力只读检测缓存**：开机与调 `github.refresh` 时检测 `gh` 登录及各仓库 `origin` 写权限并缓存；判断 `usesPullRequests` 只读该缓存与 `github.pr_repos` 配置。
+- **PR 能力只读检测缓存与完整快照**：开机与调 `github.refresh` 时检测 `gh` 登录及各仓库 `origin` 写权限并缓存；判断 `usesPullRequests` 只读该缓存与 `github.pr_repos` 配置。`githubSnapshot` 拉取 PR 的检查、评审、评论与评审线程时，任一分页请求失败即放弃整次快照，不把残缺结果当成空列表；失败的 Actions 检查若带 job 链接，自动用 `gh run view --job <id> --log-failed` 取回末尾 40 行。
 
 ## 怎么走
 
@@ -65,15 +66,15 @@
 
 ## 和谁打交道
 
-- **工单与帮工（`issue`、`session`）**：提供 `workplace`、`release`、`reset`、`clear`、`Changes`、`merge`、`mergeInto`、`submitPullRequest` 与 `pullRequestState`。
-- **接入与游戏（`ingress`、`game`）**：向 Ingress 提供 `githubRemote` 与 `githubRequest`；向 Game 提供用户名下的 `contributions` commit 计数。
+- **工单与帮工（`issue`、`session`）**：提供 `workplace`、`release`、`reset`、`clear`、`Changes`、`merge`、`mergeInto`、`submitPullRequest`、`pullRequestState` 与 `githubSnapshot`。
+- **工具与游戏（`tool`、`game`）**：向 `tool/resource.ts` 提供 `vv://github/...` 评审线程快照读取；向 Game 提供用户名下的 `contributions` commit 计数。
 
 ## 为什么这样
 
 - **按工单隔离 git worktree，锁外跑检查、锁内验引用**：每个工单在独立目录修改互不踩踏；耗时测试放锁外，进锁复核 commit 未变再合并，兼顾并发开单与主分支质量。
 - **用 git 底层树操作实现无检出预检与父分支合入**：`merge-tree` 和 `commit-tree` 不碰工作区文件，父工单无需维持常驻 worktree 即可接收子工单合入。
 - **GitHub 检测与克隆收紧边界**：克隆仅收标准 GitHub 主页地址并禁用终端交互弹窗，PR 权限统一走后台缓存，避免网络抖动阻塞看板操作。
-- **不让服务端代写提交**：自动生成的单行提交说明过不了仓库自己的提交门禁（`scripts/commit-msg.ts`）；退回帮工自己提交，每个 commit 和 PR 才都符合仓库规范。
+- **不让服务端代写提交**：自动生成的单行提交说明过不了仓库自己的提交门禁（`scripts/docs/commit-msg.ts`）；退回帮工自己提交，每个 commit 和 PR 才都符合仓库规范。
 
 ## 还没做的
 
@@ -82,5 +83,5 @@
 
 ## 怎么验证
 
-- `apps/server/src/repo/repo.test.ts`、`github.test.ts`、`stack.test.ts`：仓库创建与克隆、worktree 复用与释放回执、未提交改动拒绝合并、`.vibevalley/check` 门禁、无检出合入父分支与 commit 统计测试。
+- `apps/server/src/modules/repo/repo.test.ts`、`github.test.ts`、`stack.test.ts`：仓库创建与克隆、worktree 复用与释放回执、未提交改动拒绝合并、`.vibevalley/check` 门禁、无检出合入父分支与 commit 统计测试。
 - `apps/server/src/flows/pull_request.test.ts`、`apps/server/src/flows/pr-follow.test.ts`、`apps/web/test/repos.spec.ts`：PR 提交与合入全流程、CI 回流、工作台仓库新建与群岛地图测试。

@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 20
     steps:
       # No job pushes, so the token is not left in the checkout's git config. Two commits deep: a pull request's merge
-      # commit and its first parent, the base scripts/regression.ts compares it with.
+      # commit and its first parent, the base scripts/release/regression.ts compares it with.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false, fetch-depth: 2 }
       # The Node of .node-version, Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
@@ -48,7 +48,7 @@ jobs:
         # Squash merging makes the title the commit's subject. Passed through the environment, never into the shell.
         env:
           TITLE: ${{ github.event.pull_request.title }}
-        run: vpx scripts/commit-msg.ts --title "$TITLE"
+        run: vpx scripts/docs/commit-msg.ts --title "$TITLE"
       - name: pull request body and branch
         # Dependabot writes its own body (release notes) and branch name; its titles pass the title check above.
         if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]'
@@ -57,19 +57,19 @@ jobs:
         env:
           BODY: ${{ github.event.pull_request.body }}
           BRANCH: ${{ github.head_ref }}
-        run: vpx scripts/commit-msg.ts --body "$BODY" && vpx scripts/commit-msg.ts --branch "$BRANCH"
+        run: vpx scripts/docs/commit-msg.ts --body "$BODY" && vpx scripts/docs/commit-msg.ts --branch "$BRANCH"
       - name: the contract this change touches
         # For the reviewer: the protocol, schema, and service interface lines it changes, in the summary.
         if: github.event_name == 'pull_request'
-        run: vpx scripts/contract-diff.ts --base HEAD^1 >> "$GITHUB_STEP_SUMMARY"
+        run: vpx scripts/release/contract-diff.ts --base HEAD^1 >> "$GITHUB_STEP_SUMMARY"
       - name: regression tests
         # A pull request that removes or changes a test named "regression: …" names it in its body, and a fix adds one
-        # (scripts/regression.ts). HEAD^1 is the base the merge commit was made on.
+        # (scripts/release/regression.ts). HEAD^1 is the base the merge commit was made on.
         if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]'
         env:
           BODY: ${{ github.event.pull_request.body }}
           BRANCH: ${{ github.head_ref }}
-        run: vpx scripts/regression.ts --base HEAD^1 --branch "$BRANCH" --body "$BODY"
+        run: vpx scripts/release/regression.ts --base HEAD^1 --branch "$BRANCH" --body "$BODY"
       # A warning fails too: none are let in to pile up.
       - run: vp check --deny-warnings
       - run: vp run docs:verify

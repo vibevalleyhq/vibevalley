@@ -6,28 +6,28 @@ import { t } from "@vibevalley/i18n";
 import { reasonOf } from "#/infra/api.ts";
 import { currentHost } from "#/infra/host.ts";
 import { ready, useSettings } from "#/infra/query.ts";
+import { SettingRow, SettingsGroup, SettingsPage } from "#/ui/domain/settings.tsx";
 import { IconButton } from "#/ui/IconButton.tsx";
 import { Quiet } from "#/ui/layout.tsx";
-import { SettingRow, SettingsGroup, SettingsPage } from "#/ui/settings.tsx";
 import { toast } from "#/ui/toasts.ts";
 
 import { CommandLineRow, UpdateRow } from "./UpdateRow";
 
 const viewStyles = stylex.create({
   pathRowSpan: {
-    maxWidth: "calc(var(--spacing) * 80)",
+    maxWidth: "20rem",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   aboutPageSpan: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
 });
 

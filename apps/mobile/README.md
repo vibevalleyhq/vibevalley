@@ -28,7 +28,7 @@ Agora's frameworks.
 The end-to-end script installs the app before opening API connections and starting pairing: synchronous installation
 can outlast HTTP keep-alive and leave the first pairing-status request using a stale connection.
 
-The entry loads `src/intl.ts` before `App`: the shared formatter constructs English cardinal and ordinal rules at
+The entry loads `src/base/intl.ts` before `App`: the shared formatter constructs English cardinal and ordinal rules at
 import time. The [FormatJS polyfills](https://formatjs.github.io/docs/polyfills/intl-pluralrules/) provide the same
 rules when Hermes lacks them; only English rule data is needed, independently of the selected catalog language.
 Agora's React Native entry imports `base64-js` without declaring it. The root package extension supplies that edge,

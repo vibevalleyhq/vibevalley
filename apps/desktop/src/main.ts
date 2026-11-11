@@ -6,20 +6,20 @@ import { app, dialog, globalShortcut, nativeImage } from "electron";
 import { t } from "@vibevalley/i18n";
 import { desktopVoiceShortcut } from "@vibevalley/protocol/host";
 
-import { channels, serverEnvOf } from "./channel";
-import { commandLine } from "./commandLine";
-import { serveControl } from "./control";
-import { devMode } from "./dev";
-import { serveHost } from "./host";
-import { startIsland } from "./island";
-import { reasonOf } from "./lines";
-import { claimMachine, releaseMachine } from "./machine";
-import { menuBar, setAppMenu } from "./menu";
-import { appPaths, currentChannel, farmHome, followSavedLocale } from "./paths";
-import { probe } from "./probe";
-import { shellPath, type ServerKeeper, serverKeeper } from "./server";
-import { type Updater, updater } from "./update";
-import { mainWindow } from "./window";
+import { channels, serverEnvOf } from "./base/channel";
+import { reasonOf } from "./base/lines";
+import { commandLine } from "./infra/commandLine";
+import { serveControl } from "./infra/control";
+import { startIsland } from "./infra/island";
+import { claimMachine, releaseMachine } from "./infra/machine";
+import { appPaths, currentChannel, farmHome, followSavedLocale } from "./infra/paths";
+import { probe } from "./infra/probe";
+import { shellPath, type ServerKeeper, serverKeeper } from "./infra/server";
+import { type Updater, updater } from "./infra/update";
+import { devMode } from "./ui/dev";
+import { serveHost } from "./ui/host";
+import { menuBar, setAppMenu } from "./ui/menu";
+import { mainWindow } from "./ui/window";
 
 // Each channel is its own app: its name, and so its userData and single-instance lock, before anything reads them. A
 // --user-data-dir given (the tests) wins.

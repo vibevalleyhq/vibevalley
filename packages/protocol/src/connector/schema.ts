@@ -1,11 +1,11 @@
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";
-import * as T from "../shapes";
+import * as T from "./shapes";
 
-export const ConnectorID: Codec<T.ConnectorID> = Schema.Literals(T.ConnectorIDValues);
+const ConnectorID: Codec<T.ConnectorID> = Schema.Literals(T.ConnectorIDValues);
 
-export const ConnectorState: Codec<T.ConnectorState> = Schema.Literals(T.ConnectorStateValues);
+const ConnectorState: Codec<T.ConnectorState> = Schema.Literals(T.ConnectorStateValues);
 
 export const ConnectorStatus: Codec<T.ConnectorStatus> = Schema.Struct({
   id: ConnectorID,

@@ -8,19 +8,23 @@ import type { IconName } from "./icons";
 import { positionerAttrs } from "./positioner";
 
 const delay = 300;
+const fadeIn = stylex.keyframes({
+  from: { opacity: 0 },
+});
+
 const styles = stylex.create({
   trigger: { display: "inline-flex" },
   bubble: {
     width: "max-content",
-    maxWidth: "calc(var(--spacing) * 72)",
-    animationName: { default: "fade-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    maxWidth: "18rem",
+    animationName: { default: fadeIn, "@media (prefers-reduced-motion: reduce)": "none" },
     animationDuration: "180ms",
     animationTimingFunction: "var(--ease-out)",
     animationFillMode: "both",
     borderRadius: "var(--radius-md)",
     backgroundColor: "var(--color-ink)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "var(--spacing)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.25rem",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--leading-snug)",
     fontWeight: "var(--font-weight-normal)",
@@ -36,7 +40,7 @@ const styles = stylex.create({
     opacity: { default: 0.5, "@media (hover: hover)": { default: null, ":hover": 1 }, ":focus-visible": 1 },
     transitionProperty: "opacity",
     transitionDuration: "120ms",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionTimingFunction: "var(--ease-out)",
     outlineStyle: "none",
     outlineWidth: { default: null, ":focus-visible": 2 },
     outlineColor: { default: null, ":focus-visible": "var(--color-focus)" },
@@ -47,7 +51,7 @@ function Bubble(props: { text: string }) {
   return (
     <Tooltip.Portal>
       <Tooltip.Positioner {...positionerAttrs()} sideOffset={6}>
-        <Tooltip.Popup class={stylex.attrs(styles.bubble).class}>{props.text}</Tooltip.Popup>
+        <Tooltip.Popup {...stylex.attrs(styles.bubble)}>{props.text}</Tooltip.Popup>
       </Tooltip.Positioner>
     </Tooltip.Portal>
   );
@@ -56,7 +60,7 @@ function Bubble(props: { text: string }) {
 export function Tip(props: { text: string; children: JSX.Element }) {
   return (
     <Tooltip.Root delay={delay}>
-      <Tooltip.Trigger render="span" class={stylex.attrs(styles.trigger).class}>
+      <Tooltip.Trigger render="span" {...stylex.attrs(styles.trigger)}>
         {props.children}
       </Tooltip.Trigger>
       <Bubble text={props.text} />
@@ -73,7 +77,7 @@ export function Hint(props: { text: string; icon?: IconName }) {
         render="span"
         tabindex={0}
         // A form of ten fields should not read as ten marks: help stays out of the way.
-        class={stylex.attrs(styles.hint).class}
+        {...stylex.attrs(styles.hint)}
       >
         <Icon name={props.icon ?? "info"} size={12} />
       </Tooltip.Trigger>

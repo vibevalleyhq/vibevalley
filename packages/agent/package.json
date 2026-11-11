@@ -4,12 +4,12 @@
   "type": "module",
   "exports": {
     "./brain": {
-      "types": "./dist/brain.d.ts",
-      "default": "./src/brain.ts"
+      "types": "./dist/brain/brain.d.ts",
+      "default": "./src/brain/brain.ts"
     },
     "./coding": {
-      "types": "./dist/coding.d.ts",
-      "default": "./src/coding.ts"
+      "types": "./dist/tools/coding.d.ts",
+      "default": "./src/tools/coding.ts"
     },
     "./core/errors": {
       "types": "./dist/core/errors.d.ts",
@@ -24,48 +24,48 @@
       "default": "./src/core/tool.ts"
     },
     "./dag": {
-      "types": "./dist/dag.d.ts",
-      "default": "./src/dag.ts"
+      "types": "./dist/base/dag.d.ts",
+      "default": "./src/base/dag.ts"
     },
     "./mcp": {
-      "types": "./dist/mcp.d.ts",
-      "default": "./src/mcp.ts"
+      "types": "./dist/infra/mcp.d.ts",
+      "default": "./src/infra/mcp.ts"
     },
     "./mcpTransport": {
-      "types": "./dist/mcpTransport.d.ts",
-      "default": "./src/mcpTransport.ts"
+      "types": "./dist/infra/mcpTransport.d.ts",
+      "default": "./src/infra/mcpTransport.ts"
     },
     "./memory": {
-      "types": "./dist/memory.d.ts",
-      "default": "./src/memory.ts"
+      "types": "./dist/tools/memory.d.ts",
+      "default": "./src/tools/memory.ts"
     },
     "./messages": {
-      "types": "./dist/messages.d.ts",
-      "default": "./src/messages.ts"
+      "types": "./dist/base/messages.d.ts",
+      "default": "./src/base/messages.ts"
     },
     "./self": {
-      "types": "./dist/self.d.ts",
-      "default": "./src/self.ts"
+      "types": "./dist/tools/self.d.ts",
+      "default": "./src/tools/self.ts"
     },
     "./session": {
-      "types": "./dist/session.d.ts",
-      "default": "./src/session.ts"
+      "types": "./dist/brain/session.d.ts",
+      "default": "./src/brain/session.ts"
     },
     "./skills": {
-      "types": "./dist/skills.d.ts",
-      "default": "./src/skills.ts"
+      "types": "./dist/tools/skills.d.ts",
+      "default": "./src/tools/skills.ts"
     },
     "./testing": {
-      "types": "./dist/testing.d.ts",
-      "default": "./src/testing.ts"
+      "types": "./dist/testing/testing.d.ts",
+      "default": "./src/testing/testing.ts"
     },
     "./todo": {
-      "types": "./dist/todo.d.ts",
-      "default": "./src/todo.ts"
+      "types": "./dist/tools/todo.d.ts",
+      "default": "./src/tools/todo.ts"
     },
     "./todoStore": {
-      "types": "./dist/todoStore.d.ts",
-      "default": "./src/todoStore.ts"
+      "types": "./dist/tools/todoStore.d.ts",
+      "default": "./src/tools/todoStore.ts"
     }
   },
   "dependencies": {

@@ -2,7 +2,7 @@
 
 为什么这样写。每条一句原则、为什么、落到哪些写法上（[cases.md](.agents/skills/vv-effect/references/cases.md) 的编号）。写法拿不准、两条原则打架、遇到案例里没有的情况时，回到这里判断。入口见 [SKILL.md](.agents/skills/vv-effect/SKILL.md)。
 
-来源：Effect 包自带的 `node_modules/effect/AGENTS.md`；[Effect Best Practices](https://ethanniser.com/blog/effect-best-practices/)（Ethan Niser）；[Effect Solutions](https://www.effect.solutions/services-and-layers)；[Kit Langton 的 Effect v4 skill](https://www.ui-skills.com/skills/kitlangton/effect)；[TS+ Post-Mortem](https://effect.website/blog/ts-plus-postmortem)（Effect 团队）；[EffectPatterns](https://github.com/PaulJPhilp/EffectPatterns)；[agent doctor](https://effect.doctor/) 的规则分类；2026-11-05 读的。
+来源：Effect 包自带的 `node_modules/effect/AGENTS.md`；[Effect v4 官方指南](https://effect.website/docs/v4/getting-started)；[Effect Best Practices](https://ethanniser.com/blog/effect-best-practices/)（Ethan Niser）；[Effect Solutions](https://www.effect.solutions/services-and-layers)；[Kit Langton 的 Effect v4 skill](https://www.ui-skills.com/skills/kitlangton/effect)；[TS+ Post-Mortem](https://effect.website/blog/ts-plus-postmortem)（Effect 团队）；[EffectPatterns](https://github.com/PaulJPhilp/EffectPatterns)；[agent doctor](https://effect.doctor/) 的规则分类；2026-11-05 与 2026-11-11 读的。
 
 ## 1. 一个 Effect 是一份说明书，不是正在跑的事
 
@@ -18,7 +18,7 @@
 
 为什么：`throw` 和 `Error` 让失败在类型里消失，调用方只能猜；把缺陷也当成预期的错误，又会到处 `catch` 掩盖 bug。分清两种，才知道哪个该接、哪个该让它炸。
 
-落到：#6–#11、#37、#39。
+落到：#6–#11、#37、#39、#42、#43。
 
 ## 3. 只接认得的错误，接之前留下记录
 
@@ -34,7 +34,7 @@
 
 为什么：契约先行，上层的服务能先写、先编过，叶子的实现后补；依赖只在一处接，依赖图清楚，测试换一个 layer 就能换掉实现，不会建出第二份连接池。
 
-落到：#1、#2、#35、#36；`leakingRequirements`、`multipleEffectProvide` 拦着。
+落到：#1、#2、#35、#36、#44；`leakingRequirements`、`multipleEffectProvide` 拦着。
 
 ## 5. 资源的取得和释放写在一起
 
@@ -50,7 +50,7 @@
 
 为什么：经过服务的东西，测试能换成确定的：`TestClock` 把一分钟拨过去，`ConfigProvider` 换配置，测试不慢也不时好时坏。直接 `Date.now()`、`setTimeout`、`process.env` 的代码测不准。
 
-落到：#21–#24、#26。
+落到：#21–#24、#26、#48。
 
 ## 7. 命名的函数就是 span
 
@@ -70,11 +70,11 @@
 
 ## 9. 不信任的数据在进门处解码
 
-原则：外面来的（请求、文件、库、模型的回答）在进门处用 Schema 解码，里面只处理解码过的类型；不 `as`、不手写守卫。
+原则：外面来的（请求、文件、库、模型的回答）在进门处用 Schema 解码，里面只收窄过的类型；内部造带约束或品牌的值走 Schema 的 `.make` / `.makeEffect`，不 `as`、不手写守卫（[类型驱动与进门解码](docs/style/module-design.md#类型驱动与进门解码)）。
 
-为什么：`as` 是对编译器说谎，坏数据在很远的地方才炸；在门口解码，错在哪个字段一眼就清楚，里面的代码可以相信类型。
+为什么：`as` 是对编译器说谎，坏数据在很远的地方才炸；在门口解码并让不变量住进类型，错在哪个字段一眼就清楚，里面的代码可以相信类型。
 
-落到：#12–#14、#39。
+落到：#12–#14、#39、#49。
 
 ## 10. 重试只给幂等的操作，策略有上限
 
@@ -90,15 +90,15 @@
 
 为什么：`Effect.all` 默认一个接一个，以为是并行的会慢；没上限的并发会把库和外面的服务打满；`Ref.get` 和 `Ref.set` 之间别的纤程可以插进来。
 
-落到：#19、#20、#32、#33、#41。
+落到：#19、#20、#32、#33、#41、#45。
 
 ## 12. 数据用数据类型，计算用 Effect
 
-原则：`Option`、`Result` 描述一个值（有没有、成不成）；会失败的计算是 Effect。`Option` 用 `Option.isSome` 判断，不当布尔值。
+原则：`Option`、`Result` 描述一个值（有没有、成不成）；会失败的计算是 Effect。`Option` 用 `Option.isSome` 判断，不当布尔值；判别联合分支和排序等价优先用 `Match`、`Order`、`Equivalence`。
 
 为什么：把会失败的计算写成返回 `Result` 的函数，错误就离开了 Effect 的追踪和组合；`if (option)` 永远为真。
 
-落到：#11、#29。
+落到：#11、#29、#47、#50。
 
 ## 13. 留在标准 TypeScript 里，用检查补足
 
@@ -106,7 +106,7 @@
 
 为什么：Effect 团队在 TS+ 上学到的：改语言的代价比带来的整洁大；IDE 和检查能给出同样的提示，又不分裂生态。这个仓库「挡住一类问题先选代码、再选检查、最后才写文字」（`AGENTS.md`）是同一个道理。
 
-落到：[tools.md](.agents/skills/vv-effect/references/tools.md)。
+落到：#46、[tools.md](.agents/skills/vv-effect/references/tools.md)。
 
 ## 14. 一次改一个边界
 

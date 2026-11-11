@@ -2,13 +2,44 @@ import { Option, Result, Schema, type SchemaIssue } from "effect";
 
 import { currentLocale } from "@vibevalley/i18n";
 
+import { Inconsistent, messageOf } from "./errors.ts";
+
 /** Read where unreadable JSON is already a defect: a value that does not fit the Schema is one too. */
-export const jsonOf = <T, E = T>(schema: Schema.Codec<T, E>) => Schema.decodeUnknownSync(Schema.fromJsonString(schema));
+export const jsonOf = <T, E = T>(schema: Schema.Codec<T, E>, where?: string) => {
+  const decode = Schema.decodeUnknownSync(Schema.fromJsonString(schema));
+  return where === undefined
+    ? decode
+    : (text: string): T => {
+        try {
+          return decode(text);
+        } catch (cause) {
+          throw Inconsistent.make({ message: `${where}: ${messageOf(cause)}` });
+        }
+      };
+};
+
+/** Read a nullable JSON column written by this server: null stays undefined, while corrupt JSON fails fast as Inconsistent. */
+export const storedJsonOrUndefined = <T, E = T>(schema: Schema.Codec<T, E>, where: string) => {
+  const decode = jsonOf(schema, where);
+  return (text: string | null | undefined): T | undefined => (text == null ? undefined : decode(text));
+};
+
+/** Validate an in-memory row or value that must fit schema; a mismatch fails fast as Inconsistent. */
+export const valueOf = <T, E = T>(schema: Schema.Codec<T, E>, where = "stored value") => {
+  const decode = Schema.decodeUnknownSync(schema);
+  return (value: unknown): T => {
+    try {
+      return decode(value);
+    } catch (cause) {
+      throw Inconsistent.make({ message: `${where}: ${messageOf(cause)}` });
+    }
+  };
+};
 
 /** As JSON.stringify writes it; a cycle or a bigint fails instead of throws. */
 export const jsonText = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 
-/** Read where unreadable JSON is taken as none: a value that does not fit the Schema is none too. */
+/** Read untrusted external JSON where unreadable or misfit input is taken as none. */
 export const jsonOrNone = <T, E = T>(schema: Schema.Codec<T, E>) => {
   const decode = Schema.decodeUnknownOption(Schema.fromJsonString(schema));
   return (text: string | null | undefined): T | undefined => (text == null ? undefined : Option.getOrUndefined(decode(text)));

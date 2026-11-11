@@ -11,28 +11,28 @@ import { Hint } from "./Tip";
 
 const viewStyles = stylex.create({
   formP: {
-    marginTop: "calc(var(--spacing) * 2)",
+    marginTop: "0.5rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-berry)",
   },
   formFieldDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   formFieldLabel: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-medium)",
     color: "var(--color-muted)",
   },
   formFieldP: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-berry)",
   },
 });

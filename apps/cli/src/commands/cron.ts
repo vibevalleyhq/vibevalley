@@ -4,9 +4,9 @@ import { Command, Flag } from "effect/cli";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { ask, change, given, nameArg, optionalText, words } from "#/farm.ts";
-import { show } from "#/format.ts";
-import { exit, Failure } from "#/output.ts";
+import { show } from "#/base/format.ts";
+import { exit, Failure } from "#/base/output.ts";
+import { ask, change, given, nameArg, optionalText, words } from "#/infra/farm.ts";
 
 const whenText = (w: T.CronWhen) => {
   switch (w.kind) {

@@ -124,6 +124,8 @@ export function causeMessage(e: unknown): string {
   return said;
 }
 
+class TxCommit extends Context.Service<TxCommit, (effect: Effect.Effect<void>) => void>()("@vibevalley/server/infra/db/TxCommit") {}
+
 /** The farm's database as the services use it: a generated query (db/generated) run against it. */
 export class Db extends Context.Service<
   Db,
@@ -132,10 +134,12 @@ export class Db extends Context.Service<
     readonly attempt: <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A, E>;
     /** The one row, or undefined when there is none. Only no row is none: a query that fails is still a defect. */
     readonly one: <A, E>(query: Effect.Effect<A, E | Cause.NoSuchElementError, SqlClient.SqlClient>) => Effect.Effect<A | undefined>;
+    /** Runs `effect` uninterruptibly right after the outermost surrounding transaction commits (or immediately when outside a transaction); dropped on rollback. */
+    readonly afterCommit: (effect: Effect.Effect<void>) => Effect.Effect<void>;
     /** work in one transaction; the database's own failure is a defect, work's other failures stay. */
     readonly inTx: <A, E>(work: Effect.Effect<A, E>) => Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
-    /** work in one transaction, its queries' failures and the commit's kept: what a caller tells as a refusal. */
-    readonly attemptTx: <A, E>(work: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A, E | SqlError.SqlError>;
+    /** work in one transaction, its queries' failures (via `db.attempt`) and the commit's kept: what a caller tells as a refusal. */
+    readonly attemptTx: <A, E>(work: Effect.Effect<A, E>) => Effect.Effect<A, E | SqlError.SqlError>;
   }
 >()("@vibevalley/server/infra/db") {
   static readonly layer = Layer.effect(
@@ -157,6 +161,28 @@ export class Db extends Context.Service<
           if (Duration.toMillis(took) > txLongMs) yield* Effect.logWarning(`vibevalley: a transaction held the database ${Duration.format(took)}`);
           return a;
         });
+      const commitTail = <A, E, R>(tx: Effect.Effect<A, E, R>, hooks: readonly Effect.Effect<void>[]) =>
+        Effect.uninterruptibleMask((restore) =>
+          Effect.gen(function* () {
+            const a = yield* restore(tx);
+            if (hooks.length > 0) yield* Effect.forEach(hooks, (hook) => hook, { discard: true });
+            return a;
+          }),
+        );
+      const withHooks = <A, E, R, E2, R2>(
+        runTx: (work: Effect.Effect<A, E, Exclude<R, TxCommit>>) => Effect.Effect<A, E2, R2>,
+        work: Effect.Effect<A, E, R>,
+      ): Effect.Effect<A, E2, R2> =>
+        Effect.gen(function* () {
+          const outer = yield* Effect.serviceOption(TxCommit);
+          const hooks: Effect.Effect<void>[] = [];
+          if (Option.isSome(outer)) {
+            const a = yield* runTx(Effect.provideService(work, TxCommit, (effect) => void hooks.push(effect)));
+            for (const hook of hooks) outer.value(hook);
+            return a;
+          }
+          return yield* commitTail(runTx(Effect.provideService(work, TxCommit, (effect) => void hooks.push(effect))), hooks);
+        });
       return Db.of({
         run,
         attempt,
@@ -164,12 +190,20 @@ export class Db extends Context.Service<
           const outcome = yield* run(Effect.catchNoSuchElement(query));
           return Option.getOrUndefined(outcome);
         }),
+        afterCommit: Effect.fnUntraced(function* (effect: Effect.Effect<void>): Effect.fn.Return<void> {
+          const queue = yield* Effect.serviceOption(TxCommit);
+          if (Option.isSome(queue)) queue.value(effect);
+          else yield* effect;
+        }),
         inTx: Effect.fnUntraced(function* <A, E>(work: Effect.Effect<A, E>): Effect.fn.Return<A, Exclude<E, { _tag: "SqlError" }>> {
           // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- catchTag takes SqlError out of E; TypeScript cannot work that out for a generic E
-          return yield* held(sql.withTransaction(work)).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
+          return yield* withHooks((w) => held(sql.withTransaction(w)), work).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<
+            A,
+            Exclude<E, { _tag: "SqlError" }>
+          >;
         }),
-        attemptTx: Effect.fnUntraced(function* <A, E>(work: Effect.Effect<A, E, SqlClient.SqlClient>): Effect.fn.Return<A, E | SqlError.SqlError> {
-          return yield* sql.withTransaction(work).pipe(held, attempt);
+        attemptTx: Effect.fnUntraced(function* <A, E>(work: Effect.Effect<A, E>): Effect.fn.Return<A, E | SqlError.SqlError> {
+          return yield* withHooks((w) => held(sql.withTransaction(w)), work);
         }),
       });
     }),

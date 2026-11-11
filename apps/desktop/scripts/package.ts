@@ -9,8 +9,8 @@ import { t } from "@vibevalley/i18n";
 import { serverFiles } from "@vibevalley/server/assets";
 import { baselineHash } from "@vibevalley/server/baseline";
 
-import { channelOf, channels } from "../src/channel.ts";
-import { isVersion, type Release, stageOf } from "../src/releases.ts";
+import { channelOf, channels } from "../src/base/channel.ts";
+import { isVersion, type Release, stageOf } from "../src/base/releases.ts";
 
 const desktop = join(import.meta.dirname, "..");
 const repo = join(desktop, "../..");

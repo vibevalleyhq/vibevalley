@@ -17,20 +17,21 @@ import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "#/ui/
 
 import { doingOf, harvestedOf, lastOrchestratorSaid, plotTitle } from "./readout";
 
-const recipeStyles = stylex.create({
-  pinViewSpan: {
+const hopKeyframes = stylex.keyframes({
+  "0%, 88%": { transform: "translateY(0)" },
+  "89%, 100%": { transform: "translateY(-3px)" },
+});
+
+const styles = stylex.create({
+  hop: {
     display: "block",
     animationName: {
       default: null,
-      "@media (prefers-reduced-motion:no-preference)": "hop",
+      "@media (prefers-reduced-motion: no-preference)": hopKeyframes,
     },
     animationDuration: {
       default: null,
       "@media (prefers-reduced-motion:no-preference)": "3.2s",
-    },
-    animationDelay: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "0s",
     },
     animationTimingFunction: {
       default: null,
@@ -40,35 +41,21 @@ const recipeStyles = stylex.create({
       default: null,
       "@media (prefers-reduced-motion:no-preference)": "infinite",
     },
-    animationDirection: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "normal",
-    },
-    animationFillMode: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "none",
-    },
-    animationPlayState: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "running",
-    },
   },
-});
-
-const viewStyles = stylex.create({
-  pinViewDiv: {
+  pin: {
     position: "absolute",
   },
-  overlayDiv: {
+  overlay: {
     pointerEvents: "none",
     position: "absolute",
     inset: "0",
     overflow: "hidden",
   },
-  headDiv: {
+  head: {
     position: "absolute",
     top: "0",
     left: "0",
+    visibility: "hidden",
   },
 });
 
@@ -130,12 +117,9 @@ function PinView(props: { pin: Pin }) {
     />
   );
   return (
-    <div
-      {...stylex.attrs(viewStyles.pinViewDiv)}
-      style={{ left: `${props.pin.x}px`, top: `${props.pin.y}px`, transform: `translate(-50%, ${-props.pin.ay * 100}%)` }}
-    >
+    <div {...stylex.attrs(styles.pin)} style={{ left: `${props.pin.x}px`, top: `${props.pin.y}px`, transform: `translate(-50%, ${-props.pin.ay * 100}%)` }}>
       <Show when={props.pin.hop !== undefined} fallback={card()}>
-        <span {...stylex.attrs(recipeStyles.pinViewSpan)} style={{ "animation-delay": `${props.pin.hop}s` }}>
+        <span {...stylex.attrs(styles.hop)} style={{ "animation-delay": `${props.pin.hop}s` }}>
           {card()}
         </span>
       </Show>
@@ -256,7 +240,7 @@ export function Overlay() {
   return (
     <Show when={pins()}>
       {(p) => (
-        <div {...stylex.attrs(viewStyles.overlayDiv)} aria-hidden="true">
+        <div {...stylex.attrs(styles.overlay)} aria-hidden="true">
           <For each={p().back} keyed={(pin) => pin.key}>
             {(pin) => <PinView pin={pin()} />}
           </For>
@@ -323,7 +307,7 @@ function Head(props: { session: SessionView; village: Village; placed: Map<strin
   return (
     <Show when={rows()}>
       {(r) => (
-        <div ref={(div) => (el = div)} {...stylex.attrs(viewStyles.headDiv)} style={{ visibility: "hidden" }} data-testid={`head-${props.session.id}`}>
+        <div ref={(div) => (el = div)} {...stylex.attrs(styles.head)} data-testid={`head-${props.session.id}`}>
           <PixelCard padX={3} padY={2} rows={[r()]} />
         </div>
       )}

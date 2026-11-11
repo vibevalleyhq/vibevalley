@@ -2,19 +2,19 @@ import { Schema } from "effect";
 
 import type { Codec } from "../codec";
 import { ActorKind } from "../common/schema";
-import type * as T from "../shapes";
+import type * as T from "./shapes";
 
-export const CronWhenOnce: Codec<T.CronWhenOnce> = Schema.Struct({
+const CronWhenOnce: Codec<T.CronWhenOnce> = Schema.Struct({
   kind: Schema.Literal("once"),
   at: Schema.Finite,
 });
 
-export const CronWhenEvery: Codec<T.CronWhenEvery> = Schema.Struct({
+const CronWhenEvery: Codec<T.CronWhenEvery> = Schema.Struct({
   kind: Schema.Literal("every"),
   minutes: Schema.Finite,
 });
 
-export const CronWhenDaily: Codec<T.CronWhenDaily> = Schema.Struct({
+const CronWhenDaily: Codec<T.CronWhenDaily> = Schema.Struct({
   kind: Schema.Literal("daily"),
   time: Schema.String,
 });
@@ -25,7 +25,7 @@ export const CronWhenWeekly: Codec<T.CronWhenWeekly> = Schema.Struct({
   time: Schema.String,
 });
 
-export const CronWhenExpr: Codec<T.CronWhenExpr> = Schema.Struct({
+const CronWhenExpr: Codec<T.CronWhenExpr> = Schema.Struct({
   kind: Schema.Literal("cron"),
   expr: Schema.String,
 });

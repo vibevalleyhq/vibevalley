@@ -4,15 +4,15 @@ import type { Codec } from "../codec";
 import { KeyStatus } from "../common/schema";
 import type * as T from "./shapes";
 
-export const ProviderModel: Codec<T.ProviderModel> = Schema.Struct({ id: Schema.String, owner: Schema.String });
-export const ProviderConnection: Codec<T.ProviderConnection> = Schema.Struct({
+const ProviderModel: Codec<T.ProviderModel> = Schema.Struct({ id: Schema.String, owner: Schema.String });
+const ProviderConnection: Codec<T.ProviderConnection> = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   adapter: Schema.Literal("moss"),
   enabled: Schema.Boolean,
   key: KeyStatus,
 });
-export const ProviderBinding: Codec<T.ProviderBinding> = Schema.Struct({ connection: Schema.String, model: Schema.String });
+const ProviderBinding: Codec<T.ProviderBinding> = Schema.Struct({ connection: Schema.String, model: Schema.String });
 export const ProviderStatus: Codec<T.ProviderStatus> = Schema.Struct({
   revision: Schema.Int,
   connections: Schema.mutable(Schema.Array(ProviderConnection)),
@@ -35,7 +35,7 @@ export const ProviderStatus: Codec<T.ProviderStatus> = Schema.Struct({
   speech: Schema.NullOr(ProviderBinding),
   speechModels: Schema.mutable(Schema.Array(Schema.String)),
 });
-export const ProviderConnectionUpdate: Codec<T.ProviderConnectionUpdate> = Schema.Struct({
+const ProviderConnectionUpdate: Codec<T.ProviderConnectionUpdate> = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   adapter: Schema.Literal("moss"),

@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";
-import * as T from "../shapes";
+import * as T from "./shapes";
 
 export const GitHubStatus: Codec<T.GitHubStatus> = Schema.Struct({
   installed: Schema.Boolean,
@@ -12,12 +12,12 @@ export const GitHubStatus: Codec<T.GitHubStatus> = Schema.Struct({
   checkedAt: Schema.Finite,
 });
 
-export const DayCount: Codec<T.DayCount> = Schema.Struct({
+const DayCount: Codec<T.DayCount> = Schema.Struct({
   day: Schema.String,
   commits: Schema.Finite,
 });
 
-export const Author: Codec<T.Author> = Schema.Struct({
+const Author: Codec<T.Author> = Schema.Struct({
   name: Schema.String,
   commits: Schema.Finite,
 });
@@ -32,7 +32,7 @@ export const RepoActivity: Codec<T.RepoActivity> = Schema.Struct({
   last: Schema.optionalKey(Schema.Finite),
 });
 
-export const LanguageCount: Codec<T.LanguageCount> = Schema.Struct({
+const LanguageCount: Codec<T.LanguageCount> = Schema.Struct({
   name: Schema.String,
   files: Schema.Finite,
   code: Schema.Finite,
@@ -46,7 +46,7 @@ export const RepoLanguages: Codec<T.RepoLanguages> = Schema.Struct({
   languages: Schema.mutable(Schema.Array(LanguageCount)),
 });
 
-export const RepoStack: Codec<T.RepoStack> = Schema.Struct({
+const RepoStack: Codec<T.RepoStack> = Schema.Struct({
   name: Schema.String,
   label: Schema.String,
   test: Schema.optionalKey(Schema.String),
@@ -54,12 +54,12 @@ export const RepoStack: Codec<T.RepoStack> = Schema.Struct({
   build: Schema.optionalKey(Schema.String),
 });
 
-export const TemplateBlank: Codec<T.TemplateBlank> = Schema.Struct({
+const TemplateBlank: Codec<T.TemplateBlank> = Schema.Struct({
   start: Schema.Finite,
   end: Schema.Finite,
 });
 
-export const IssueTemplate: Codec<T.IssueTemplate> = Schema.Struct({
+const IssueTemplate: Codec<T.IssueTemplate> = Schema.Struct({
   id: Schema.String,
   title: Schema.String,
   done: Schema.String,
@@ -67,7 +67,7 @@ export const IssueTemplate: Codec<T.IssueTemplate> = Schema.Struct({
   blank: Schema.optionalKey(TemplateBlank),
 });
 
-export const TemplateKind: Codec<T.TemplateKind> = Schema.Struct({
+const TemplateKind: Codec<T.TemplateKind> = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   icon: Schema.String,
@@ -81,7 +81,7 @@ export const RepoTemplates: Codec<T.RepoTemplates> = Schema.Struct({
   kinds: Schema.mutable(Schema.Array(TemplateKind)),
 });
 
-export const PullRequestCapability: Codec<T.PullRequestCapability> = Schema.Struct({
+const PullRequestCapability: Codec<T.PullRequestCapability> = Schema.Struct({
   available: Schema.Boolean,
   reason: Schema.String,
 });
@@ -100,13 +100,13 @@ export const NewRepo: Codec<T.NewRepo> = Schema.Struct({
   github: Schema.optionalKey(Schema.String),
 });
 
-export const Commit: Codec<T.Commit> = Schema.Struct({
+const Commit: Codec<T.Commit> = Schema.Struct({
   hash: Schema.String,
   subject: Schema.String,
   at: Schema.Finite,
 });
 
-export const UncommittedItem: Codec<T.UncommittedItem> = Schema.Struct({
+const UncommittedItem: Codec<T.UncommittedItem> = Schema.Struct({
   path: Schema.String,
   status: Schema.String,
 });
@@ -132,7 +132,7 @@ export const BranchPublication: Codec<T.BranchPublication> = Schema.Struct({
   url: Schema.optionalKey(Schema.String),
   number: Schema.optionalKey(Schema.Int),
   reused: Schema.optionalKey(Schema.Boolean),
-  state: Schema.optionalKey(Schema.Literals(["open"])),
+  state: Schema.optionalKey(Schema.Literals(T.BranchPublicationStateValues)),
 });
 export const Repo: Codec<T.Repo> = Schema.Struct({
   path: Schema.String,
@@ -142,7 +142,7 @@ export const Conflict: Codec<T.Conflict> = Schema.Struct({
   base: Schema.String,
   files: Schema.mutable(Schema.Array(Schema.String)),
 });
-export const ChangedFile: Codec<T.ChangedFile> = Schema.Struct({
+const ChangedFile: Codec<T.ChangedFile> = Schema.Struct({
   path: Schema.String,
   status: Schema.String,
   added: Schema.Finite,

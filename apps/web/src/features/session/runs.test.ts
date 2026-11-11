@@ -1,6 +1,7 @@
 import { expect, test } from "vite-plus/test";
 
 import type { EventTokens, LiveEvent, SessionEvent, SessionEventType } from "@vibevalley/protocol";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 import { cacheHit, mergeSteps, runLabel, runsOf, runTitle, secondsText, SessionLogs, shownEvents, stepLimit, summaryOf, tokensText, waterfallOf } from "./runs";
 
@@ -130,7 +131,7 @@ function source() {
   return {
     logs,
     reads,
-    send: (id: string, activity: SessionEvent) => event({ type: "event", at: 0, id, activity }),
+    send: (id: string, activity: SessionEvent) => event({ type: "event", at: 0, id: sessionId(id), activity }),
     connect: () => connected(),
     subscriptions: () => subscriptions,
     stopped: () => stopped,

@@ -1,7 +1,10 @@
+import { Effect, Stream } from "effect";
+import { HttpClient, HttpClientResponse } from "effect/http";
 import { describe, expect, it } from "vite-plus/test";
 
 import { encodeDeepSeekRequest } from "./request.ts";
-import { decodeDeepSeekChunk, SseData } from "./response.ts";
+import { decodeDeepSeekChunk } from "./response.ts";
+import { deepseekModel } from "./server.ts";
 
 describe("DeepSeek protocol", () => {
   it("encodes tool history and explicit thinking without an agent message contract", () => {
@@ -68,10 +71,24 @@ describe("DeepSeek protocol", () => {
     expect(chunk.finish).toEqual({ raw: "blocked", reason: "error", error: "Provider finish_reason: blocked" });
   });
 
-  it("joins CRLF multiline data, skips comments and ignores events after DONE", () => {
-    const sse = new SseData();
-    const events = [": ping\r", "data: {\r", "data: }\r", "\r", "data: [DONE]\r", "\r", "data: ignored", ""].map((line) => sse.line(line));
-    expect(events.filter((event) => event !== undefined)).toEqual(["{\n}"]);
-    expect(sse.done).toBe(true);
+  it("decodes CRLF multiline SSE frames, skips comments, and stops at [DONE]", () => {
+    const wire = [
+      ": ping\r\n\r\n",
+      'data: {"choices":[{"delta":\r\n',
+      'data: {"content":"hi"}}]}\r\n\r\n',
+      "data: [DONE]\r\n\r\n",
+      "data: not-json-after-done\r\n\r\n",
+    ].join("");
+    const client = HttpClient.make((request) =>
+      Effect.succeed(HttpClientResponse.fromWeb(request, new Response(wire, { status: 200, headers: { "content-type": "text/event-stream" } }))),
+    );
+    return Effect.runPromise(
+      Effect.gen(function* () {
+        const model = yield* deepseekModel({ model: "deepseek-chat", baseUrl: "https://api.deepseek.com", key: "test-key" });
+        const stream = yield* model.stream({ messages: [], maxTokens: 1024, reasoning: false });
+        const chunks = yield* Stream.runCollect(stream);
+        expect(chunks).toEqual([{ text: "hi", calls: [] }]);
+      }).pipe(Effect.provideService(HttpClient.HttpClient, client)),
+    );
   });
 });

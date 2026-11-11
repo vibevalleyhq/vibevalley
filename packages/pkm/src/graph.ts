@@ -1,7 +1,8 @@
 import type * as T from "@vibevalley/protocol";
-import { flatBlocks, plainText, slugOf } from "@vibevalley/protocol/rules";
+import { plainText } from "@vibevalley/protocol/rules";
 
 import { blockRef, type Edge, edgesOf, find, type Node, type Page, walk, wikiLink, withoutSpans } from "./markdown.ts";
+import { flatBlocks, slugOf } from "./outline.ts";
 import { dayOf, journalDay, tierWeight } from "./para.ts";
 
 /** The pages by slug. */

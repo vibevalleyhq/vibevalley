@@ -11,7 +11,7 @@ import { bodyIcon, kindLabel, useArtifact } from "./ArtifactCard";
 import { BlocksView, type QuoteTarget } from "./BlocksView";
 import { HtmlFrame } from "./HtmlFrame";
 
-const variantStyles = stylex.create({
+const styles = stylex.create({
   artifactCanvasSection: {
     display: "flex",
     minHeight: "0",
@@ -34,26 +34,23 @@ const variantStyles = stylex.create({
     minHeight: "0",
     flex: "1",
     flexDirection: "column",
-    padding: "calc(var(--spacing) * 3)",
+    padding: "0.75rem",
   },
-});
-
-const viewStyles = stylex.create({
   artifactCanvasHeader: {
     display: "flex",
     height: "66px",
     flexShrink: "0",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderBottomStyle: "solid",
     borderBottomWidth: "1px",
     borderColor: "var(--color-line)",
-    paddingInline: "calc(var(--spacing) * 3)",
+    paddingInline: "0.75rem",
   },
-  artifactCanvasSpan: {
+  artifactCanvasSpan2: {
     display: "flex",
-    width: "calc(var(--spacing) * 8)",
-    height: "calc(var(--spacing) * 8)",
+    width: "2rem",
+    height: "2rem",
     flexShrink: "0",
     alignItems: "center",
     justifyContent: "center",
@@ -61,12 +58,12 @@ const viewStyles = stylex.create({
     backgroundColor: "var(--color-hover)",
     color: "var(--color-muted)",
   },
-  artifactCanvasSpan2: {
+  artifactCanvasSpan22: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-semibold)",
   },
   artifactCanvasSpan3: {
@@ -74,15 +71,15 @@ const viewStyles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   artifactCanvasPage: {
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "var(--spacing)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.25rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: {
       default: "var(--color-muted)",
       "@media (hover:hover)": {
@@ -100,8 +97,8 @@ const viewStyles = stylex.create({
   },
   artifactCanvasClose: {
     display: "inline-flex",
-    width: "calc(var(--spacing) * 8)",
-    height: "calc(var(--spacing) * 8)",
+    width: "2rem",
+    height: "2rem",
     flexShrink: "0",
     cursor: "pointer",
     alignItems: "center",
@@ -116,9 +113,9 @@ const viewStyles = stylex.create({
     },
   },
   artifactCanvasP: {
-    padding: "calc(var(--spacing) * 3)",
+    padding: "0.75rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-berry)",
   },
   artifactCanvasIframe: {
@@ -130,9 +127,9 @@ const viewStyles = stylex.create({
     backgroundColor: "var(--color-page)",
   },
   artifactCanvasP2: {
-    padding: "calc(var(--spacing) * 3)",
+    padding: "0.75rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
 });
@@ -146,22 +143,17 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
   };
   const pageHref = () => `/artifacts/${encodeURIComponent(props.id)}${(pageVersion() ?? 0) > 0 ? `?v=${pageVersion()}` : ""}`;
   return (
-    <section
-      aria-label={t("web.artifact.canvas.label")}
-      data-testid="artifact-canvas"
-      data-key={props.id}
-      {...stylex.attrs(variantStyles.artifactCanvasSection)}
-    >
-      <header {...stylex.attrs(viewStyles.artifactCanvasHeader)}>
+    <section aria-label={t("web.artifact.canvas.label")} data-testid="artifact-canvas" data-key={props.id} {...stylex.attrs(styles.artifactCanvasSection)}>
+      <header {...stylex.attrs(styles.artifactCanvasHeader)}>
         <Show when={shown()}>
           {(a) => (
             <>
-              <span {...stylex.attrs(viewStyles.artifactCanvasSpan)}>
+              <span {...stylex.attrs(styles.artifactCanvasSpan2)}>
                 <Icon name={bodyIcon[a().body]} size={16} />
               </span>
-              <span {...stylex.attrs(variantStyles.artifactCanvasSpan)}>
-                <span {...stylex.attrs(viewStyles.artifactCanvasSpan2)}>{a().title}</span>
-                <span {...stylex.attrs(viewStyles.artifactCanvasSpan3)}>
+              <span {...stylex.attrs(styles.artifactCanvasSpan)}>
+                <span {...stylex.attrs(styles.artifactCanvasSpan22)}>{a().title}</span>
+                <span {...stylex.attrs(styles.artifactCanvasSpan3)}>
                   {kindLabel(a())}
                   <Show when={a().body === "html"}> · {t("web.artifact.card.version", { version: props.version ?? a().version })}</Show>
                 </span>
@@ -169,7 +161,7 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
             </>
           )}
         </Show>
-        <a data-testid="artifact-canvas-page" href={pageHref()} {...stylex.attrs(viewStyles.artifactCanvasPage)}>
+        <a data-testid="artifact-canvas-page" href={pageHref()} {...stylex.attrs(styles.artifactCanvasPage)}>
           {t("web.artifact.canvas.openPage")}
         </a>
         <Show when={props.onClose}>
@@ -178,7 +170,7 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
             data-testid="artifact-canvas-close"
             aria-label={t("web.artifact.canvas.close")}
             title={t("web.artifact.canvas.close")}
-            {...stylex.attrs(viewStyles.artifactCanvasClose)}
+            {...stylex.attrs(styles.artifactCanvasClose)}
             onClick={() => props.onClose?.()}
           >
             <Icon name="close" size={16} />
@@ -186,7 +178,7 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
         </Show>
       </header>
       <Show when={artifact.error()}>
-        <p {...stylex.attrs(viewStyles.artifactCanvasP)}>{reasonOf(artifact.error())}</p>
+        <p {...stylex.attrs(styles.artifactCanvasP)}>{reasonOf(artifact.error())}</p>
       </Show>
       <Show when={shown()}>
         {(a) => (
@@ -198,18 +190,18 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
                 version={props.version ?? a().version}
                 title={t("web.artifact.page.frame", { title: a().title, version: props.version ?? a().version })}
                 testId="artifact-canvas-frame"
-                frameStyle={viewStyles.artifactCanvasIframe}
+                frameStyle={styles.artifactCanvasIframe}
               />
             }
           >
-            <div {...stylex.attrs(variantStyles.artifactCanvasDiv)}>
+            <div {...stylex.attrs(styles.artifactCanvasDiv)}>
               <BlocksView id={a().id} {...(props.onQuote ? { onQuote: props.onQuote } : {})} />
             </div>
           </Show>
         )}
       </Show>
       <Show when={artifact.status() === "success" && artifact.data() === undefined}>
-        <p {...stylex.attrs(viewStyles.artifactCanvasP2)}>{t("web.artifact.page.gone")}</p>
+        <p {...stylex.attrs(styles.artifactCanvasP2)}>{t("web.artifact.page.gone")}</p>
       </Show>
     </section>
   );

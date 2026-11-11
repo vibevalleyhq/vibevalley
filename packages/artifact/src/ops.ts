@@ -14,8 +14,10 @@ import type {
   BlockOpUpdateText,
   TextSpan,
 } from "@vibevalley/protocol";
-import { isOneOf, keyBetween, normalSpans, sameMarks, validKey } from "@vibevalley/protocol/rules";
+import { isOneOf, keyBetween, validKey } from "@vibevalley/protocol/rules";
 import { artifactId } from "@vibevalley/protocol/schema";
+
+import { marksKey, normalSpans } from "./blocks.ts";
 
 const chars = (s: string) => Array.from(s);
 const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
@@ -33,7 +35,7 @@ export function sameText(a: readonly TextSpan[], b: readonly TextSpan[]): boolea
     x.length === y.length &&
     x.every((s, i) => {
       const other = y[i];
-      return other !== undefined && s.t === other.t && sameMarks(s.marks, other.marks);
+      return other !== undefined && s.t === other.t && marksKey(s.marks) === marksKey(other.marks);
     })
   );
 }

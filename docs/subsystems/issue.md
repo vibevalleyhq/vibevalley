@@ -6,7 +6,7 @@
 
 ## 状态和用语
 
-状态词条定义在 `packages/i18n/locales/{zh,en}/shared.json`，前后端共用（详见 [话放在哪](docs/subsystems/foundation.md#话放在哪)）。种地隐喻词仅用于像素农场与游戏模块，由 `scripts/stale-names.ts` 检查。
+状态词条定义在 `packages/i18n/locales/{zh,en}/shared.json`，前后端共用（详见 [话放在哪](docs/subsystems/foundation.md#话放在哪)）。种地隐喻词仅用于像素农场与游戏模块，由 `scripts/docs/stale-names.ts` 检查。
 
 | 层级 | 字段 | 取值与名称 | 来源 |
 |---|---|---|---|
@@ -35,13 +35,13 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/issue/issue.ts`、`lifecycle.ts` | 对外 `Issue` 服务、生命周期写操作、内存派工关联（`Assignments`）与事实发布 |
-| `apps/server/src/issue/dispatch.ts`、`settle.ts` | 派活、排队刷新、重开、定时触发、状态流转前置判定与试跑预览 |
-| `apps/server/src/issue/refinement.ts`、`split.ts`、`merge.ts` | 工单起草、原生父子拆单与合入父分支、本地合并与 PR 轮询 |
-| `apps/server/src/issue/status.ts`、`stage.ts`、`moves.ts` | 状态派生（`issueStatusOf`）、展示阶段（`issueStageOf`）与合法挪动（`statusMove`） |
-| `apps/server/src/issue/dependencies.ts`、`brief.ts`、`timeline.ts`、`rows.ts` | 依赖环检测与解锁、任务说明拼装、时间线与行转换 |
+| `apps/server/src/modules/issue/issue.ts`、`store.ts`、`lifecycle.ts` | 对外 `Issue` 服务、`IssueStore`（收拢工单表读写、家族子树级联删除与 `db.afterCommit` 下的 `Assignments` 内存同步）、生命周期写操作与事实发布 |
+| `apps/server/src/modules/issue/dispatch.ts`、`settle.ts` | 派活、排队刷新、重开、定时触发、状态流转前置判定与试跑预览 |
+| `apps/server/src/modules/issue/refinement.ts`、`split.ts`、`merge.ts`、`github.ts` | 工单起草、原生父子拆单与合入父分支、本地合并、PR 结局轮询与 CI/Review 增量观察（`Issue.pollGitHub`） |
+| `apps/server/src/modules/issue/status.ts`、`stage.ts`、`moves.ts` | 状态派生（`issueStatusOf`）、展示阶段（`issueStageOf`）与合法挪动（`statusMove`） |
+| `apps/server/src/modules/issue/dependencies.ts`、`brief.ts`、`timeline.ts`、`rows.ts` | 依赖环检测与解锁、任务说明拼装、时间线与行转换 |
 | `packages/protocol/src/rules/issues.ts`、`stage.ts` | 前后端共用的 `shortTitle`、`closedText` 与 `stageWantsUser` |
-| 表 `issue`、`issue_assignment`、`issue_assignment_execution` | 工单主表、档案责任关系与实际执行的 `Session` 关联 |
+| 表 `issue`、`issue_assignment`、`issue_assignment_execution`、`issue_github` | 工单主表、档案责任关系、实际执行的 `Session` 关联与 GitHub PR CI 指纹游标 |
 | `apps/web/src/features/issue/`、`apps/web/src/farm/issue/IssueView.tsx` | 工作台看板与工单详情、动作分发 `acts.ts`、农场工单详情 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`issue.*`），CLI 命令为 `vibevalley issue ...`。
@@ -50,17 +50,17 @@
 
 - **生命周期统一走 `setStatus` 状态机**：用户只能将工单移至 `backlog`、`todo`、`done`、`canceled`；`in_progress` 与 `in_review` 从在场会话实时派生。
 - **核心状态保留活跃与近期工单**：全量工单存 `issue` 表；`SpaceState.issues` 保留未关工单及最近关闭的 50 张工单（含子工单，`keepClosedIssues`）。
-- **责任关系与执行分离**：指派档案写 `issue_assignment`（换人或清空才写 `ended_at`）；实际运行的 `Session` 记在 `issue_assignment_execution`。
-- **写操作收敛为「挪状态」与「说话」**：流转调 `issue.status.update`，评论调 `issue.comment.create`。前端按钮（`stage.acts`）自带请求参数，不重写判断。
+- **责任关系与执行分离，内存索引由 `IssueStore` 经提交钩子同步**：指派档案写 `issue_assignment`（换人或清空才写 `ended_at`），实际运行的 `Session` 记在 `issue_assignment_execution`；`issue/store.ts` 将 `Assignments` 内存变更绑定在 `db.afterCommit`，删除工单时先在事务内查出家族子树 ID 并在提交后按集摘除，不向外暴露裸 `Assignments` 或触发全表重载。
+- **写操作收敛为「挪状态」与「说话」，建单与留言规则内聚在 `Issue`**：流转调 `issue.status.update`，评论调 `issue.comment.create`。`Issue.create`、`Issue.chooseAgent` 与带 `Actor` 的 `Issue.comment` 收拢仓库推导、父单继承、选人、派发与留言分流；工具与 HTTP 入口只做解码与格式化。
 - **引用解析统一在服务内完成**：接口支持传入 `#41`、`41`、工单 UUID 或曾执行该工单的 `Session` ID（`Issue.idOf`）。
-- **先建工单身份，再派帮工**：即时派活先写 `issue` 表拿编号再开 `Session`；启动失败且工作区干净时撤回新单，已有改动则保留现场。
+- **先建工单身份，再派帮工**：即时派活先写 `issue` 表拿编号再开 `Session`，派工拒绝统一走 `HireRefused` 错误通道；启动失败且工作区干净时撤回新单，已有改动则保留现场。
 - **授权边界 `Mandate`**：工单绑定不可变的 `originTriggerId`，助手建单附言硬限 30 词；仅当 `autoSubmitPr` 为真时允许自动提 PR，`maxBotReviewRounds` 限制自动响应评审轮数。
 - **单轮结局只认结构化 `issue_report`**：帮工通过 `issue_report` 提交状态、问题、`checks`、`answer`、记性与 `prSubmit`，不解析自由正文。
 - **执行情况与生命周期分开**：提问、失败、中断及未明确交回的休息会话保持 `in_progress`，`stage` 提供回答、重试、继续动作；有效交回且没有待答问题才进入 `in_review`。看板、详情与 CLI 都读取同一投影；CLI 的 `issue show --watch` 在提问或受阻阶段也返回，stderr 同时给出生命周期和阶段。
-- **PR 在途自动跟进**：当 PR 在途且无待答问题时，回合结束后会话进 `resting` 并释放槽位，工单保持 `in_progress` 等待 CI/评审；仅 `prSubmit=false` 显式交接才进 `in_review`。
+- **PR 在途自动跟进与同轮评审归并**：当 PR 在途且无待答问题时，回合结束后会话进 `resting` 并释放槽位，工单保持 `in_progress` 等待 CI/评审；`issue/github.ts` 按 `issue_github` 表比对 CI 指纹，且同一次 Review 及其附带的多条行内评论共享同一个 `botRoundKey`（只消耗一次 `maxBotReviewRounds` 额度）；仅 `prSubmit=false` 显式交接才进 `in_review`。
 - **交付物类型 `deliver` 事先声明**：分 `change`（要求合入）、`pull_request`（提交 PR/MR 即交付）、`branch`（留分支）与只读调研 `answer`；`answer` 单将结论写入 `Issue.answer`，完成后重置 worktree 并记 `delivered: none`。
 - **原生父子工单与 DAG 依赖**：通过 `parent` 与 `blockedBy` 表达归属与前置依赖。子工单从父分支 `vibevalley/issue-<父编号>` 切出 worktree，完成后经 `mergeInto` 合入父分支。
-- **验收子工单先判红并冻结文件**：标记 `constraints.acceptance` 的子工单必须先证明检查失败，合入父分支时将其改动文件记为 `frozen`；后继子工单不得修改冻结文件，且末端须通过全部祖先验收命令。
+- **验收子工单先判红并冻结文件**：标记 `constraints.acceptance` 的子工单应先证明检查失败，合入父分支时将其改动文件记为 `frozen`；后继子工单不得修改冻结文件，且末端须通过全部祖先验收命令。
 - **已完成只由用户点头**：单轮 `completed` 只进 `in_review`，助手 `issue_review` 通过只记 `reviewedAt`；最后一轮为 `failed` 时禁止挪到 `done`。
 
 ## 怎么走
@@ -99,10 +99,9 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 ## 和谁打交道
 
-- **帮工（`session`）**：调用 `send`、`deliver`、`handOver`、`dismiss`；订阅 `Session.news` 更新工单状态、问题与冲突。
-- **仓库（`repo`）**：管理 worktree、冲突预检、`.vibevalley/check`、分支合并与 `gh` PR 操作。
-- **信箱与频道（`mailbox`、`channel`）**：排队输入经 `Mailbox` 投递；用户发言经 `Channel.userInThread` 清空问题并作废旧验收标记。
-- **接入（`ingress`）**：轮询 GitHub PR 的 CI 与 Review 事件，转为 `Trigger` 投入工单信箱。
+- **帮工（`session`）**：经 `Mailbox.receive`（`Hire`）派工，调用 `withWorkplace`、`withIdleWorkplace`、`clearWorkplace`、`discardWork`、`handOver`、`dismiss`；订阅 `Session.news` 更新工单状态、问题与冲突。
+- **仓库（`repo`）**：管理 worktree、冲突预检、`.vibevalley/check`、分支合并、`gh` PR 操作与 `githubSnapshot` 快照拉取。
+- **信箱与频道（`mailbox`、`channel`）**：排队输入及轮询到的 GitHub PR CI/Review 事件经 `Mailbox` 投递；用户发言经 `Channel.userInThread` 清空问题并作废旧验收标记。
 
 ## 为什么这样
 
@@ -119,7 +118,7 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 ## 怎么验证
 
-- `apps/server/src/issue/issue.test.ts`、`apps/server/src/flows/issue.test.ts`、`apps/server/src/flows/refinement.test.ts`、`apps/server/src/flows/pull_request.test.ts`：派活、起草、父子拆单、检查与 PR 流程。
+- `apps/server/src/modules/issue/issue.test.ts`、`apps/server/src/flows/issue.test.ts`、`apps/server/src/flows/refinement.test.ts`、`apps/server/src/flows/pull_request.test.ts`：派活、起草、父子拆单、检查与 PR 流程。
 - `apps/web/test/issues.spec.ts`、`apps/web/test/farm-actions.spec.ts`：工作台看板与农场工单操作端到端测试。
 
 ## 观察执行

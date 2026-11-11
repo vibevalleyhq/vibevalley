@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 
 import type { Codec } from "../codec";
-import type * as T from "../shapes";
+import type * as T from "./shapes";
 
 export const LanPaired: Codec<T.LanPaired> = Schema.Struct({
   device: Schema.String,
@@ -14,7 +14,7 @@ export const LanPairRequest: Codec<T.LanPairRequest> = Schema.Struct({
   name: Schema.String,
 });
 
-export const LanPairing: Codec<T.LanPairing> = Schema.Struct({
+const LanPairing: Codec<T.LanPairing> = Schema.Struct({
   code: Schema.String,
   link: Schema.String,
   expiresAt: Schema.Finite,

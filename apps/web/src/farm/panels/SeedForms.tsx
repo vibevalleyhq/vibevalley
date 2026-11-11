@@ -18,20 +18,20 @@ import { useCore } from "#/infra/frame.ts";
 import { defineQuery, retryRead, ready, useRepos, useQuery } from "#/infra/query.ts";
 import { useRouter } from "#/infra/router.ts";
 import { usePrefs } from "#/state/prefs.ts";
-import { AgentFace } from "#/ui/Face.tsx";
+import { AgentFace } from "#/ui/domain/Face.tsx";
 import { createPixelAct, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "#/ui/pixel/index.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
 
-const recipeStyles2 = stylex.create({
+const styles = stylex.create({
   whoTileButton: {
     display: "flex",
-    width: "calc(var(--spacing) * 16)",
+    width: "4rem",
     cursor: "pointer",
     flexDirection: "column",
     alignItems: "center",
-    paddingBlock: "var(--spacing)",
+    paddingBlock: "0.25rem",
   },
-  whoTileButtonVariant1Case1: {
+  whoTileButtonPrimary: {
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -40,7 +40,7 @@ const recipeStyles2 = stylex.create({
       },
     },
   },
-  whoTileButtonVariant1Case2: {
+  whoTileButtonSecondary: {
     backgroundColor: {
       default: "var(--color-px-leaf-strong)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 70%, transparent)",
@@ -50,15 +50,15 @@ const recipeStyles2 = stylex.create({
     display: "flex",
     cursor: "pointer",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     borderStyle: "solid",
     borderWidth: "2px",
-    paddingBlock: "calc(var(--spacing) * .5)",
-    paddingRight: "calc(var(--spacing) * 2)",
-    paddingLeft: "var(--spacing)",
+    paddingBlock: "0.125rem",
+    paddingRight: "0.5rem",
+    paddingLeft: "0.25rem",
     fontSize: "12px",
   },
-  sowFormButtonVariant1Case1: {
+  sowFormButtonPrimary: {
     borderColor: "transparent",
     color: "var(--color-bark-800)",
     backgroundColor: {
@@ -69,7 +69,7 @@ const recipeStyles2 = stylex.create({
       },
     },
   },
-  sowFormButtonVariant1Case2: {
+  sowFormButtonSecondary: {
     borderColor: "var(--color-leaf-500)",
     color: "var(--color-bark-900)",
     backgroundColor: {
@@ -77,25 +77,22 @@ const recipeStyles2 = stylex.create({
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 60%, transparent)",
     },
   },
-});
-
-const recipeStyles = stylex.create({
   sowFormP: {
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
   sowFormSpan: {
-    marginLeft: "calc(var(--spacing) * 2)",
+    marginLeft: "0.5rem",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
   sowFormP2: {
-    marginTop: "calc(var(--spacing) * 2.5)",
+    marginTop: "0.625rem",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
   sowFormP3: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
@@ -106,24 +103,21 @@ const recipeStyles = stylex.create({
     color: "var(--color-bark-600)",
   },
   waterFormP: {
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
-});
-
-const variantStyles = stylex.create({
   chipButton: {
     cursor: "pointer",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "var(--spacing)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.25rem",
     fontSize: "12px",
   },
-  chipButtonVariant: {
+  chipButtonTone: {
     backgroundColor: "var(--color-leaf-500)",
     color: "var(--color-bark-900)",
   },
-  chipButtonVariant2: {
+  chipButtonAlt: {
     backgroundColor: {
       default: "var(--color-cream-200)",
       "@media (hover:hover)": {
@@ -133,11 +127,8 @@ const variantStyles = stylex.create({
     },
     color: "var(--color-bark-800)",
   },
-});
-
-const viewStyles = stylex.create({
   whoTileSpan: {
-    marginTop: "calc(var(--spacing) * .5)",
+    marginTop: "0.125rem",
     maxWidth: "60px",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
@@ -149,9 +140,9 @@ const viewStyles = stylex.create({
     display: "flex",
     flexDirection: "column",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 2.5)",
+    gap: "0.625rem",
   },
-  sowFormP: {
+  sowFormP5: {
     fontSize: "14px",
     color: "var(--color-bark-900)",
   },
@@ -162,9 +153,9 @@ const viewStyles = stylex.create({
   sowFormDiv: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
-  sowFormP2: {
+  sowFormP22: {
     minWidth: "0",
     flex: "1",
     textOverflow: "ellipsis",
@@ -174,40 +165,40 @@ const viewStyles = stylex.create({
     color: "var(--color-bark-900)",
   },
   sowFormDiv2: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
     display: "flex",
     flexDirection: "column",
   },
   sowFormDiv3: {
-    marginTop: "calc(var(--spacing) * 2.5)",
+    marginTop: "0.625rem",
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
-  sowFormP3: {
+  sowFormP32: {
     fontSize: "12px",
     color: "var(--color-berry)",
   },
   sowFormDiv4: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+    marginTop: "0.375rem",
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   seedKinds: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+    marginTop: "0.375rem",
     display: "flex",
     flexWrap: "wrap",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   sowFormDiv5: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+    marginTop: "0.375rem",
   },
-  sowFormSpan: {
+  sowFormSpan2: {
     display: "flex",
-    height: "calc(var(--spacing) * 11)",
-    width: "calc(var(--spacing) * 11)",
+    height: "2.75rem",
+    width: "2.75rem",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "var(--color-cream-200)",
@@ -215,37 +206,37 @@ const viewStyles = stylex.create({
     color: "var(--color-bark-600)",
   },
   sowFormDiv6: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
-  sowFormP4: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+  sowFormP42: {
+    marginTop: "0.375rem",
     fontSize: "12px",
     color: "var(--color-berry)",
   },
-  waterFormP: {
+  waterFormP2: {
     fontSize: "13px",
     color: "var(--color-bark-800)",
   },
   waterFormDiv: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   waterFormDiv2: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
     display: "flex",
     alignItems: "flex-end",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   waterFormDiv3: {
     flex: "1",
   },
-  waterFormP2: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+  waterFormP22: {
+    marginTop: "0.375rem",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
@@ -277,7 +268,7 @@ function Chip(props: { text: string; on: boolean; onClick: () => void; testid: s
       data-key={props.item}
       aria-pressed={aria(props.on)}
       onClick={() => props.onClick()}
-      {...stylex.attrs(variantStyles.chipButton, props.on ? variantStyles.chipButtonVariant : variantStyles.chipButtonVariant2)}
+      {...stylex.attrs(styles.chipButton, props.on ? styles.chipButtonTone : styles.chipButtonAlt)}
     >
       {props.text}
     </button>
@@ -291,10 +282,10 @@ function WhoTile(props: { active: boolean; label: string; onClick: () => void; c
       aria-pressed={aria(props.active)}
       aria-label={props.label}
       onClick={() => props.onClick()}
-      {...stylex.attrs(recipeStyles2.whoTileButton, props.active ? recipeStyles2.whoTileButtonVariant1Case2 : recipeStyles2.whoTileButtonVariant1Case1)}
+      {...stylex.attrs(styles.whoTileButton, props.active ? styles.whoTileButtonSecondary : styles.whoTileButtonPrimary)}
     >
       {props.children}
-      <span {...stylex.attrs(viewStyles.whoTileSpan)}>{props.label}</span>
+      <span {...stylex.attrs(styles.whoTileSpan)}>{props.label}</span>
     </button>
   );
 }
@@ -361,9 +352,9 @@ export function SowForm(props: { station: number; onDone: () => void }) {
     <Show
       when={repo()}
       fallback={
-        <div data-testid="sow-homeless" {...stylex.attrs(viewStyles.sowHomeless)}>
-          <p {...stylex.attrs(viewStyles.sowFormP)}>{t("web.farm.sow.homeless")}</p>
-          <p {...stylex.attrs(recipeStyles.sowFormP)}>{repos().length > 0 ? t("web.farm.sow.toMap") : t("web.farm.sow.noRepos")}</p>
+        <div data-testid="sow-homeless" {...stylex.attrs(styles.sowHomeless)}>
+          <p {...stylex.attrs(styles.sowFormP5)}>{t("web.farm.sow.homeless")}</p>
+          <p {...stylex.attrs(styles.sowFormP)}>{repos().length > 0 ? t("web.farm.sow.toMap") : t("web.farm.sow.noRepos")}</p>
           <PxButton tone="primary" data-testid="sow-to-map" onClick={() => (props.onDone(), router.navigate("/repos"))}>
             {repos().length > 0 ? t("web.farm.sow.map") : t("web.farm.sow.makeRepo")}
           </PxButton>
@@ -371,24 +362,22 @@ export function SowForm(props: { station: number; onDone: () => void }) {
       }
     >
       {(p) => (
-        <div data-testid="sow-form" data-repo={p()} {...stylex.attrs(viewStyles.sowForm)}>
-          <div {...stylex.attrs(viewStyles.sowFormDiv)}>
-            <p {...stylex.attrs(viewStyles.sowFormP2)}>
+        <div data-testid="sow-form" data-repo={p()} {...stylex.attrs(styles.sowForm)}>
+          <div {...stylex.attrs(styles.sowFormDiv)}>
+            <p {...stylex.attrs(styles.sowFormP22)}>
               {t("web.farm.sow.plantIn", { repo: p() })}
-              <Show when={bag()?.stack.label}>
-                <span {...stylex.attrs(recipeStyles.sowFormSpan)}>{bag()!.stack.label}</span>
-              </Show>
+              <Show when={bag()?.stack.label}>{(label) => <span {...stylex.attrs(styles.sowFormSpan)}>{label()}</span>}</Show>
             </p>
           </div>
-          <div {...stylex.attrs(viewStyles.sowFormDiv2)}>
+          <div {...stylex.attrs(styles.sowFormDiv2)}>
             <Switch>
               <Match when={templates.status() === "pending" && !!repo()}>
-                <p {...stylex.attrs(recipeStyles.sowFormP2)}>{t("web.farm.sow.rummaging")}</p>
+                <p {...stylex.attrs(styles.sowFormP2)}>{t("web.farm.sow.rummaging")}</p>
               </Match>
               <Match when={templates.error()}>
                 {(e) => (
-                  <div {...stylex.attrs(viewStyles.sowFormDiv3)}>
-                    <p role="alert" {...stylex.attrs(viewStyles.sowFormP3)}>
+                  <div {...stylex.attrs(styles.sowFormDiv3)}>
+                    <p role="alert" {...stylex.attrs(styles.sowFormP32)}>
                       {t("web.farm.sow.noSeeds")}
                       {reasonOf(e())}
                     </p>
@@ -400,15 +389,15 @@ export function SowForm(props: { station: number; onDone: () => void }) {
               </Match>
             </Switch>
             <Show when={seeds().recent.length > 0}>
-              <p {...stylex.attrs(recipeStyles.sowFormP2)}>{t("web.farm.sow.recent")}</p>
-              <div {...stylex.attrs(viewStyles.sowFormDiv4)}>
+              <p {...stylex.attrs(styles.sowFormP2)}>{t("web.farm.sow.recent")}</p>
+              <div {...stylex.attrs(styles.sowFormDiv4)}>
                 <For each={seeds().recent}>{(r) => <Chip testid="seed-recent" text={r} on={text() === r} onClick={() => take(r)} />}</For>
               </div>
             </Show>
             <Show when={seeds().kinds.length > 0}>
-              <p {...stylex.attrs(recipeStyles.sowFormP2)}>{t("web.farm.sow.kinds")}</p>
+              <p {...stylex.attrs(styles.sowFormP2)}>{t("web.farm.sow.kinds")}</p>
               {/* One kind at a time: its tab, then its seeds. */}
-              <div role="tablist" aria-label={t("web.farm.sow.kinds")} data-testid="seed-kinds" {...stylex.attrs(viewStyles.seedKinds)}>
+              <div role="tablist" aria-label={t("web.farm.sow.kinds")} data-testid="seed-kinds" {...stylex.attrs(styles.seedKinds)}>
                 <For each={seeds().kinds} keyed={(k) => k.kind.id}>
                   {(k) => (
                     <button
@@ -417,10 +406,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
                       data-key={k().kind.id}
                       aria-selected={aria(k().kind.id === kind()?.kind.id)}
                       onClick={() => setKindId(k().kind.id)}
-                      {...stylex.attrs(
-                        recipeStyles2.sowFormButton,
-                        k().kind.id === kind()?.kind.id ? recipeStyles2.sowFormButtonVariant1Case2 : recipeStyles2.sowFormButtonVariant1Case1,
-                      )}
+                      {...stylex.attrs(styles.sowFormButton, k().kind.id === kind()?.kind.id ? styles.sowFormButtonSecondary : styles.sowFormButtonPrimary)}
                     >
                       <SpriteIcon name={k().kind.icon} size={20} />
                       {k().kind.name}
@@ -430,7 +416,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
               </div>
               <Show when={kind()}>
                 {(k) => (
-                  <div role="tabpanel" aria-label={k().kind.name} {...stylex.attrs(viewStyles.sowFormDiv4)}>
+                  <div role="tabpanel" aria-label={k().kind.name} {...stylex.attrs(styles.sowFormDiv4)}>
                     <For each={k().templates} keyed={(s) => s.id}>
                       {(s) => <Chip testid="seed" item={s().id} text={s().title} on={text() === s().text} onClick={() => take(s().text, s().blank)} />}
                     </For>
@@ -438,8 +424,8 @@ export function SowForm(props: { station: number; onDone: () => void }) {
                 )}
               </Show>
             </Show>
-            <p {...stylex.attrs(recipeStyles.sowFormP2)}>{t("web.farm.sow.own")}</p>
-            <div {...stylex.attrs(viewStyles.sowFormDiv5)}>
+            <p {...stylex.attrs(styles.sowFormP2)}>{t("web.farm.sow.own")}</p>
+            <div {...stylex.attrs(styles.sowFormDiv5)}>
               <PxTextArea
                 ref={(el) => (words = el)}
                 value={text()}
@@ -450,10 +436,10 @@ export function SowForm(props: { station: number; onDone: () => void }) {
                 label={t("web.farm.sow.job")}
               />
             </div>
-            <p {...stylex.attrs(recipeStyles.sowFormP3)}>{t("web.farm.sow.who")}</p>
-            <div {...stylex.attrs(viewStyles.seedKinds)} role="group" aria-label={t("web.farm.sow.who")}>
+            <p {...stylex.attrs(styles.sowFormP3)}>{t("web.farm.sow.who")}</p>
+            <div {...stylex.attrs(styles.seedKinds)} role="group" aria-label={t("web.farm.sow.who")}>
               <WhoTile active={sower() === byOrchestrator} label={t("web.farm.sow.orchestratorPicks")} onClick={() => setWho(byOrchestrator)}>
-                <span {...stylex.attrs(viewStyles.sowFormSpan)}>?</span>
+                <span {...stylex.attrs(styles.sowFormSpan2)}>?</span>
               </WhoTile>
               <For each={agents()} keyed={(a) => a.id}>
                 {(a) => (
@@ -463,8 +449,8 @@ export function SowForm(props: { station: number; onDone: () => void }) {
                 )}
               </For>
             </div>
-            <div {...stylex.attrs(viewStyles.sowFormDiv6)}>
-              <p {...stylex.attrs(recipeStyles.sowFormP4)}>{t("web.farm.sow.how", { repo: p() })}</p>
+            <div {...stylex.attrs(styles.sowFormDiv6)}>
+              <p {...stylex.attrs(styles.sowFormP4)}>{t("web.farm.sow.how", { repo: p() })}</p>
               <PxButton data-testid="sow-draft" disabled={!canSow()} onClick={() => void write()}>
                 {t("web.farm.sow.draft")}
               </PxButton>
@@ -473,7 +459,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
               </PxButton>
             </div>
             <Show when={refused()}>
-              <p {...stylex.attrs(viewStyles.sowFormP4)}>{refused()}</p>
+              <p {...stylex.attrs(styles.sowFormP42)}>{refused()}</p>
             </Show>
           </div>
         </div>
@@ -503,15 +489,15 @@ export function WaterForm(props: { session: Session; onDone: () => void }) {
     }
   };
   return (
-    <div {...stylex.attrs(viewStyles.sowForm)}>
-      <p {...stylex.attrs(viewStyles.waterFormP)}>{props.session.phase._tag === "working" ? t("web.farm.water.working") : t("web.farm.water.idle")}</p>
-      <p {...stylex.attrs(recipeStyles.waterFormP)}>{t("web.farm.water.thread")}</p>
-      <p {...stylex.attrs(recipeStyles.waterFormP)}>{t("web.farm.water.job", { brief: props.session.brief })}</p>
-      <div {...stylex.attrs(viewStyles.waterFormDiv)}>
+    <div {...stylex.attrs(styles.sowForm)}>
+      <p {...stylex.attrs(styles.waterFormP2)}>{props.session.phase._tag === "working" ? t("web.farm.water.working") : t("web.farm.water.idle")}</p>
+      <p {...stylex.attrs(styles.waterFormP)}>{t("web.farm.water.thread")}</p>
+      <p {...stylex.attrs(styles.waterFormP)}>{t("web.farm.water.job", { brief: props.session.brief })}</p>
+      <div {...stylex.attrs(styles.waterFormDiv)}>
         <For each={dropsOfAdvice}>{(s) => <Chip testid="water-advice" text={s} on={text() === s} onClick={() => setText(s)} />}</For>
       </div>
-      <div {...stylex.attrs(viewStyles.waterFormDiv2)}>
-        <div {...stylex.attrs(viewStyles.waterFormDiv3)}>
+      <div {...stylex.attrs(styles.waterFormDiv2)}>
+        <div {...stylex.attrs(styles.waterFormDiv3)}>
           <PxTextArea
             value={text()}
             onChange={setText}
@@ -526,10 +512,10 @@ export function WaterForm(props: { session: Session; onDone: () => void }) {
         </PxButton>
       </div>
       <Show when={!canTell()}>
-        <p {...stylex.attrs(viewStyles.waterFormP2)}>{t("web.farm.water.moved")}</p>
+        <p {...stylex.attrs(styles.waterFormP22)}>{t("web.farm.water.moved")}</p>
       </Show>
       <Show when={refused()}>
-        <p {...stylex.attrs(viewStyles.sowFormP4)}>{refused()}</p>
+        <p {...stylex.attrs(styles.sowFormP42)}>{refused()}</p>
       </Show>
     </div>
   );

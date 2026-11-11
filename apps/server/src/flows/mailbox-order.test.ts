@@ -4,12 +4,11 @@ import { Effect } from "effect";
 
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
-import { Agent } from "#/agent/agent.ts";
-import { Channel } from "#/channel/channel.ts";
-import { Ingress, type SourceEvent } from "#/ingress/ingress.ts";
-import { Issue } from "#/issue/issue.ts";
-import { Mailbox } from "#/mailbox/mailbox.ts";
-import { Session } from "#/session/session.ts";
+import { Agent } from "#/modules/agent/agent.ts";
+import { Channel } from "#/modules/channel/channel.ts";
+import { Issue } from "#/modules/issue/issue.ts";
+import { Mailbox, type SourceEvent } from "#/modules/mailbox/mailbox.ts";
+import { Session } from "#/modules/session/session.ts";
 import { committedDelivery } from "#/testing/deliveries.ts";
 import { testIssues } from "#/testing/world.ts";
 
@@ -18,7 +17,7 @@ import { farm, lab, until } from "./farm.ts";
 const signal = (key: string, kind: "user" | "agent" = "agent", threads: readonly string[] = [], at = 0): SourceEvent => ({
   source: "channel",
   key,
-  actor: { kind, id: kind === "user" ? "user" : "other-session" },
+  actor: kind === "user" ? { kind: "user", id: "user" } : { kind: "agent", id: "other-session", role: "worker" },
   addressed: "mention",
   threads,
   text: key,
@@ -29,11 +28,10 @@ it.live("regression: concurrent mailbox writes and restoration leave every commi
   const f = farm();
   return Effect.gen(function* () {
     const mailbox = yield* Mailbox;
-    const ingress = yield* Ingress;
     const channel = (yield* Channel).defaultChannel();
     const inputs = (yield* Effect.forEach(
       Array.from({ length: 12 }, (_, n) => n),
-      (n) => ingress.record(signal(`concurrent-${n}`)),
+      (n) => mailbox.record(signal(`concurrent-${n}`)),
     )).filter((input) => input !== undefined);
     const writes = inputs.map((trigger) =>
       committedDelivery({
@@ -68,9 +66,8 @@ it.live("regression: concurrent mailbox writes and restoration leave every commi
 it.live("regression: independent input hops survive restore and only a new user receipt resets them", () => {
   const f = farm();
   return Effect.gen(function* () {
-    const ingress = yield* Ingress;
     const mailbox = yield* Mailbox;
-    const accept = (key: string, kind: "user" | "agent" = "agent") => ingress.accept(signal(key, kind));
+    const accept = (key: string, kind: "user" | "agent" = "agent") => mailbox.accept(signal(key, kind));
     for (const n of [1, 2, 3, 4, 5]) yield* accept(`before-user-${n}`);
     const rows = () => mailbox.deliveriesOf(defaultOrchestrator);
     expect(rows().map((row) => row.held_by)).toEqual([null, null, null, null, "hop_limit"]);
@@ -102,22 +99,22 @@ it.live("regression: queued triggers enter the first model request in receipt or
   return Effect.gen(function* () {
     const issue2 = yield* Issue;
     const issues = testIssues(issue2);
-    const ingress = yield* Ingress;
+    const mailbox = yield* Mailbox;
     yield* (yield* Agent).save(lab());
     const issue = yield* issues.add({ title: "work", agent: "lab", repo: "fifo" });
     const markers = ["FIFO_FIRST_CARD", "FIFO_SECOND_CARD", "FIFO_THIRD_CARD"];
     for (const [index, text] of markers.entries())
-      yield* ingress.record({
+      yield* mailbox.record({
         source: "github",
         key: text,
-        actor: { kind: "ci", id: "checks" },
+        actor: { kind: "system", id: "checks" },
         addressed: "thread_owner",
         threads: [`issue:${issue.id}`],
         text,
         at: [500, 1, 500][index]!,
         meta: { kind: "ci", failed: true },
       });
-    yield* (yield* Mailbox).replay;
+    yield* mailbox.replay;
     yield* issues.start(issue.id, "");
     yield* until(() => inputs.length === 1, "the queued batch in the initial request");
     const positions = markers.map((marker) => inputs[0]!.indexOf(marker));
@@ -145,31 +142,30 @@ it.live("regression: an independent agent wake restores cooldown using receipt t
     const issue2 = yield* Issue;
     const issues = testIssues(issue2);
     const mailbox = yield* Mailbox;
-    const ingress = yield* Ingress;
     yield* (yield* Agent).save(lab());
     const issue = yield* issues.add({ title: "work", agent: "lab", repo: "cooldown" });
     const started = yield* issues.start(issue.id, "");
     const threads = [`issue:${issue.id}`];
-    const first = (yield* ingress.accept(signal("first-wake", "agent", threads)))!;
+    const first = (yield* mailbox.accept(signal("first-wake", "agent", threads)))!;
     expect(mailbox.deliveriesOf(started.session!).find((row) => row.envelope_id === first.id)?.held_by).toBeNull();
     yield* until(
       () => steers().some((text) => text.includes("first-wake")) && !mailbox.deliveriesOf(started.session!).some((row) => row.envelope_id === first.id),
       "the first agent input consumed",
     );
     yield* mailbox.restore;
-    const second = (yield* ingress.accept(signal("future-source-clock", "agent", threads, 9_000_000_000_000)))!;
+    const second = (yield* mailbox.accept(signal("future-source-clock", "agent", threads, 9_000_000_000_000)))!;
     expect(mailbox.deliveriesOf(started.session!).find((row) => row.envelope_id === second.id)?.held_by).toBe("cooldown");
-    const queued = (yield* ingress.accept({
+    const queued = (yield* mailbox.accept({
       source: "github",
       key: "queued-ci",
-      actor: { kind: "ci", id: "checks" },
+      actor: { kind: "system", id: "checks" },
       addressed: "thread_owner",
       threads,
       text: "queued-ci",
       at: 0,
       meta: { kind: "ci", failed: true },
     }))!;
-    yield* ingress.accept(signal("user-authorized-wave", "user", threads));
+    yield* mailbox.accept(signal("user-authorized-wave", "user", threads));
     yield* until(() => !mailbox.deliveriesOf(started.session!).some((row) => row.envelope_id === second.id), "the held card consumed with a user steer");
     expect(steers().some((text) => text.includes("future-source-clock") && text.includes("user-authorized-wave"))).toBe(true);
     expect(steers().some((text) => text.includes("queued-ci"))).toBe(false);
@@ -177,7 +173,7 @@ it.live("regression: an independent agent wake restores cooldown using receipt t
     const sessions = yield* Session;
     gate.resolve();
     yield* until(() => sessions.sessionOf(started.session!)?.phase._tag === "done", "the original turn ended");
-    yield* ingress.accept(signal("user-next-run", "user", threads));
+    yield* mailbox.accept(signal("user-next-run", "user", threads));
     yield* until(() => turns.length === 2, "a new turn takes the queued input");
     expect(turns[1]).toContain("queued-ci");
   }).pipe(Effect.ensuring(Effect.sync(gate.resolve)), Effect.scoped, Effect.provide(f.layer));

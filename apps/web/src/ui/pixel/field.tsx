@@ -12,22 +12,19 @@ import { PxWindow } from "./base";
 import { SpriteIcon } from "./icons";
 import { pxStyle } from "./style";
 
-const recipeStyles = stylex.create({
+const styles = stylex.create({
   pxTextInputPxWindow: {
     position: "absolute",
     top: "100%",
     left: "-2px",
     zIndex: 20,
-    marginTop: "calc(var(--spacing) * 1.5)",
-    maxHeight: "calc(var(--spacing) * 60)",
-    maxWidth: "calc(var(--spacing) * 80)",
-    minWidth: "calc(var(--spacing) * 40)",
+    marginTop: "0.375rem",
+    maxHeight: "15rem",
+    maxWidth: "20rem",
+    minWidth: "10rem",
     overflowY: "auto",
-    padding: "var(--spacing)",
+    padding: "0.25rem",
   },
-});
-
-const viewStyles = stylex.create({
   tip: {
     cursor: "help",
     textDecorationLine: "underline",
@@ -45,15 +42,15 @@ const viewStyles = stylex.create({
   input: {
     position: "relative",
     display: "flex",
-    height: "calc(var(--spacing) * 9)",
+    height: "2.25rem",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
-    paddingInline: "calc(var(--spacing) * 3)",
+    gap: "0.5rem",
+    paddingInline: "0.75rem",
     color: "var(--color-bark-900)",
   },
   well: { backgroundColor: "var(--color-cream-100)" },
   disabled: { opacity: 0.5 },
-  area: { display: "flex", paddingInline: "calc(var(--spacing) * 3)", paddingBlock: "calc(var(--spacing) * 2)" },
+  area: { display: "flex", paddingInline: "0.75rem", paddingBlock: "0.5rem" },
   control: {
     minWidth: 0,
     flex: "1",
@@ -64,17 +61,17 @@ const viewStyles = stylex.create({
     "::placeholder": { color: "var(--color-bark-500)" },
   },
   areaControl: { resize: "none" },
-  suggestion: { cursor: "pointer", paddingInline: "calc(var(--spacing) * 2.5)", paddingBlock: "calc(var(--spacing) * 1.5)", color: "var(--color-bark-800)" },
+  suggestion: { cursor: "pointer", paddingInline: "0.625rem", paddingBlock: "0.375rem", color: "var(--color-bark-800)" },
   highlighted: { backgroundColor: "var(--color-cream-200)" },
   pxFieldDiv: {
     display: "flex",
     flexDirection: "column",
   },
   pxFieldDiv2: {
-    marginBottom: "calc(var(--spacing) * 1.5)",
+    marginBottom: "0.375rem",
     display: "flex",
     alignItems: "baseline",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   pxFieldLabel: {
     minWidth: "0",
@@ -91,7 +88,7 @@ const viewStyles = stylex.create({
     color: "var(--color-bark-500)",
   },
   pxFieldNote: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+    marginTop: "0.375rem",
   },
   pxFieldHint: {
     color: "var(--color-bark-500)",
@@ -105,7 +102,7 @@ const viewStyles = stylex.create({
 export function PxTip(props: { tip?: string | undefined; children: JSX.Element; styles?: stylex.StyleXStyles }) {
   return (
     <Show when={props.tip} fallback={<span {...styleProps(props.styles)}>{props.children}</span>}>
-      <span title={props.tip} {...styleProps([viewStyles.tip, props.styles])}>
+      <span title={props.tip} {...styleProps([styles.tip, props.styles])}>
         {props.children}
       </span>
     </Show>
@@ -133,27 +130,24 @@ export function PxField(props: {
   const bound = () => typeof props.children === "function" || props.id !== undefined;
   const note = () => (props.error ? props.error : props.hint);
   return (
-    <div {...stylex.attrs(viewStyles.pxFieldDiv)}>
-      <div {...stylex.attrs(viewStyles.pxFieldDiv2)}>
-        <label for={bound() ? target() : undefined} {...stylex.attrs(pxStyle.xs, viewStyles.pxFieldLabel)}>
+    <div {...stylex.attrs(styles.pxFieldDiv)}>
+      <div {...stylex.attrs(styles.pxFieldDiv2)}>
+        <label for={bound() ? target() : undefined} {...stylex.attrs(pxStyle.xs, styles.pxFieldLabel)}>
           <PxTip tip={props.tip}>{props.label}</PxTip>
           <Show when={props.required}>
-            <span {...stylex.attrs(viewStyles.pxFieldSpan)}> *</span>
+            <span {...stylex.attrs(styles.pxFieldSpan)}> *</span>
           </Show>
           <Show when={props.optional}>
-            <span {...stylex.attrs(viewStyles.pxFieldSpan2)}>{t("web.ui.pixel.optional")}</span>
+            <span {...stylex.attrs(styles.pxFieldSpan2)}>{t("web.ui.pixel.optional")}</span>
           </Show>
         </label>
         <Show when={props.aside != null}>
-          <div {...stylex.attrs(pxStyle.xs, viewStyles.pxFieldAside)}>{props.aside}</div>
+          <div {...stylex.attrs(pxStyle.xs, styles.pxFieldAside)}>{props.aside}</div>
         </Show>
       </div>
       {typeof props.children === "function" ? props.children(target()) : props.children}
       <Show when={note() != null && note() !== ""}>
-        <div
-          {...stylex.attrs(pxStyle.xs, viewStyles.pxFieldNote, props.error ? viewStyles.pxFieldError : viewStyles.pxFieldHint)}
-          role={props.error ? "alert" : undefined}
-        >
+        <div {...stylex.attrs(pxStyle.xs, styles.pxFieldNote, props.error ? styles.pxFieldError : styles.pxFieldHint)} role={props.error ? "alert" : undefined}>
           {note()}
         </div>
       </Show>
@@ -204,9 +198,9 @@ export function PxTextInput(props: {
   return (
     <div
       {...styleProps([
-        viewStyles.input,
-        props.well === true ? [viewStyles.well, pxStyle.ring] : viewStyles.inputBox,
-        props.disabled === true && viewStyles.disabled,
+        styles.input,
+        props.well === true ? [styles.well, pxStyle.ring] : styles.inputBox,
+        props.disabled === true && styles.disabled,
         props.styles,
       ])}
     >
@@ -248,10 +242,10 @@ export function PxTextInput(props: {
           } else return;
           e.preventDefault();
         }}
-        {...stylex.attrs(font(), viewStyles.control)}
+        {...stylex.attrs(font(), styles.control)}
       />
       <Show when={shown().length > 0}>
-        <PxWindow styles={[recipeStyles.pxTextInputPxWindow]}>
+        <PxWindow styles={[styles.pxTextInputPxWindow]}>
           <ul id={listId} role="listbox" aria-label={props.label}>
             <For each={shown()}>
               {(s, i) => (
@@ -265,7 +259,7 @@ export function PxTextInput(props: {
                     pick(s);
                   }}
                   onMouseEnter={() => setHighlight(i())}
-                  {...stylex.attrs(font(), viewStyles.suggestion, i() === highlight() && viewStyles.highlighted)}
+                  {...stylex.attrs(font(), styles.suggestion, i() === highlight() && styles.highlighted)}
                 >
                   {s}
                 </li>
@@ -312,7 +306,7 @@ export function PxTextArea(props: {
     if (props.autoFocus === true) area?.focus();
   });
   return (
-    <div {...styleProps([viewStyles.area, viewStyles.inputBox, props.disabled === true && viewStyles.disabled, props.styles])}>
+    <div {...styleProps([styles.area, styles.inputBox, props.disabled === true && styles.disabled, props.styles])}>
       <textarea
         ref={(t) => {
           area = t;
@@ -329,7 +323,7 @@ export function PxTextArea(props: {
           typed = e.currentTarget.value;
           props.onChange(e.currentTarget.value);
         }}
-        {...stylex.attrs(props.reading === true ? pxStyle.read : props.mono === true ? pxStyle.mono : pxStyle.sm, viewStyles.control, viewStyles.areaControl)}
+        {...stylex.attrs(props.reading === true ? pxStyle.read : props.mono === true ? pxStyle.mono : pxStyle.sm, styles.control, styles.areaControl)}
       />
     </div>
   );
