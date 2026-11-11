@@ -141,6 +141,11 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
 
   return {
     busy,
+    /** The move on its way, as a pick shows it: pending until the frame has it, failed with why until retried. */
+    moving: () => {
+      const m = move();
+      return m === undefined ? undefined : m.state === "moving" ? ("pending" as const) : ("failed" as const);
+    },
     text,
     setText,
     box,

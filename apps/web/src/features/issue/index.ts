@@ -1,7 +1,7 @@
 export { issueSearch } from "./navigation";
 export { IssuesPage } from "./IssuesPage";
 export { actionOf, createIssueActs, perform } from "./acts";
-export { issueDeliver, shownDeliver } from "./write";
+export { issueSet, labeledIssue, sendLabel } from "./write";
 export { issueMove, issueMoveOf, sendMove } from "./moves";
 export { useIssueChanges, useIssueHistory, useIssueRuns, useIssueTimeline } from "./history";
 export { issueTitle, runText } from "./issue";

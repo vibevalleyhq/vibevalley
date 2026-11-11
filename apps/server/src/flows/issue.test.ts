@@ -208,7 +208,10 @@ describe("an issue", () => {
       }, "the core state follows its run");
       const startedFailure2 = yield* Effect.flip(issues.start(issue.id, ""));
       refusedWith(startedFailure2);
-      const editedFailure = yield* Effect.flip(issues.edit(issue.id, { title: "改不了了" }, user));
+      const relabeled = yield* issues.edit(issue.id, { title: "写打卡", priority: "high" }, user);
+      expect([relabeled.title, relabeled.priority]).toEqual(["写打卡", "high"]);
+      expect((yield* sessions.get(got.session!))!.brief).toBe("写打卡并提交");
+      const editedFailure = yield* Effect.flip(issues.edit(issue.id, { description: "改不了了" }, user));
       refusedWith(editedFailure);
 
       const unsent = (all: T.Issue[]) => all.filter((i) => executionsOf(i).length === 0).map((i) => i.title);
