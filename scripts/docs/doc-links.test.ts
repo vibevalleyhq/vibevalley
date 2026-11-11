@@ -8,8 +8,8 @@ import { expect, test } from "vite-plus/test";
 function checkDocs(files: Record<string, string>) {
   const root = mkdtempSync(join(tmpdir(), "vibevalley-doc-links-"));
   try {
-    mkdirSync(join(root, "scripts"), { recursive: true });
-    const script = join(root, "scripts", "doc-links.ts");
+    mkdirSync(join(root, "scripts", "docs"), { recursive: true });
+    const script = join(root, "scripts", "docs", "doc-links.ts");
     copyFileSync(join(import.meta.dirname, "doc-links.ts"), script);
     for (const [file, text] of Object.entries(files)) {
       const path = join(root, file);

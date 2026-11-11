@@ -194,8 +194,10 @@ export async function runVerification(command: string[] = [], options: Verificat
           /* oxlint-disable eslint/no-await-in-loop -- a poll: each try waits for the one before */
           const response = await fetch(address + pathOf("server.health.get"), { method: "POST", signal: AbortSignal.timeout(1_000) });
           if (response.ok) {
-            const health = await response.json();
-            if (health.ok === true) {
+            const body: unknown = await response.json();
+            // Every JSON answer is the `{ bizCode, message, data }` envelope.
+            const health: unknown = typeof body === "object" && body !== null && "data" in body ? body.data : undefined;
+            if (typeof health === "object" && health !== null && "ok" in health && health.ok === true) {
               writeFileSync(join(evidence, "health.json"), JSON.stringify(health, null, 2));
               break;
             }

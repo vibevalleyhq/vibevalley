@@ -46,11 +46,13 @@ export const tokenAdvice: Record<TokenKind, string> = {
 
 /** URL fragments identify assets, not colours; content and arbitrary business strings are not paint. */
 export function hexColor(property: string | undefined, value: string): boolean {
+  // A JSX style object may name the property as CSS does (box-shadow); the list below is camelCase.
+  const name = property?.startsWith("--") === true ? property : property?.replace(/-([a-z])/gu, (_, c: string) => c.toUpperCase());
   if (
-    property !== undefined &&
-    !property.startsWith("--") &&
+    name !== undefined &&
+    !name.startsWith("--") &&
     !/^(?:.*Color|color|background(?:Image)?|maskImage|border(?:Top|Right|Bottom|Left|Block|Inline|BlockStart|BlockEnd|InlineStart|InlineEnd)?|outline|boxShadow|textShadow|fill|stroke|filter|backdropFilter|textDecoration|columnRule)$/u.test(
-      property,
+      name,
     )
   )
     return false;

@@ -20,9 +20,9 @@ interface Server {
 const secret = /KEY|TOKEN|SECRET|CERTIFICATE|PASSWORD|^AGORA_|^VIBEVALLEY_|^GIT_CONFIG_/u;
 const cleanEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !secret.test(k)));
 
-/** Every built-in template but the default orchestrator's (apps/server/src/agent/templates/index.json). */
+/** Every built-in template but the default orchestrator's (apps/server/src/modules/agent/templates/index.json). */
 const starters = () =>
-  (JSON.parse(readFileSync(join(import.meta.dirname, "..", "..", "server", "src", "agent", "templates", "index.json"), "utf8")) as string[])
+  (JSON.parse(readFileSync(join(import.meta.dirname, "..", "..", "server", "src", "modules", "agent", "templates", "index.json"), "utf8")) as string[])
     .filter((id) => id !== "orchestrator")
     .join(",");
 

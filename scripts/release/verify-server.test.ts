@@ -26,7 +26,7 @@ test("sandbox owns isolation, readiness, validation failure and cleanup", async 
     const server = process.env.VIBEVALLEY_SERVER;
     const created = await fetch(server + '/api/v1/issue/create', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({title:'sandbox fixture'})});
     if (!created.ok) throw new Error('create failed: ' + await created.text());
-    const issue = await created.json();
+    const issue = (await created.json()).data;
     const cli = spawnSync(process.env.VIBEVALLEY_VERIFY_CLI, ['issue', 'list', '--format', 'json'], {env:process.env, encoding:'utf8'});
     if (cli.status !== 0) throw new Error('issue list failed');
     const issues = JSON.parse(cli.stdout);

@@ -286,7 +286,7 @@ tester.run("parent-import", rule("parent-import"), {
   valid: [
     { code: "import { a } from './rules';", filename: page("features/issue/Board.tsx") },
     { code: "import { a } from '#/infra/router';", filename: page("ui/A.tsx") },
-    { code: "import { a } from '../../db/x.ts';", filename: "/repo/apps/server/src/modules/issue/issue.ts" },
+    { code: "import { a } from '../../../db/x.ts';", filename: "/repo/apps/server/src/modules/issue/issue.ts" },
     { code: "import { a } from '../x';", filename: "/repo/packages/agent/src/core/loop.ts" },
   ],
   invalid: [
@@ -324,10 +324,10 @@ tester.run("no-cross-package-path", rule("no-cross-package-path"), {
   valid: [
     { code: "import { a } from './api-client.ts';", filename: inRepo("scripts/gen/capabilities.ts") },
     { code: "import { a } from '../infra/lease.ts';", filename: inRepo("apps/server/src/chat/chat.ts") },
-    { code: "import { a } from '@vibevalley/protocol/api';", filename: inRepo("scripts/capabilities.ts") },
+    { code: "import { a } from '@vibevalley/protocol/api';", filename: inRepo("scripts/gen/capabilities.ts") },
   ],
   invalid: [
-    { code: "import { a } from '../../packages/protocol/src/api.ts';", filename: inRepo("scripts/capabilities.ts"), errors: [{ messageId: "cross" }] },
+    { code: "import { a } from '../../packages/protocol/src/api.ts';", filename: inRepo("scripts/gen/capabilities.ts"), errors: [{ messageId: "cross" }] },
     { code: "export * from '../../server/src/assets.ts';", filename: inRepo("apps/desktop/scripts/package.ts"), errors: [{ messageId: "cross" }] },
     { code: "const m = import('../../../packages/i18n/src/format.ts');", filename: inRepo("apps/web/src/base/x.ts"), errors: [{ messageId: "cross" }] },
   ],
@@ -694,21 +694,24 @@ tester.run("protocol-namespace", rule("protocol-namespace"), {
 
 tester.run("tagged-error-tag", rule("tagged-error-tag"), {
   valid: [
-    'export class HireRefused extends Schema.TaggedError<HireRefused>()("HireRefused", { reason: Schema.String }) {}',
-    'class LocalFailed extends S.TaggedError<LocalFailed>()("LocalFailed", {}) {}',
+    { code: 'export class HireRefused extends Schema.TaggedError<HireRefused>()("HireRefused", { reason: Schema.String }) {}', filename: "a.ts" },
+    { code: 'class LocalFailed extends S.TaggedError<LocalFailed>()("LocalFailed", {}) {}', filename: "a.ts" },
     "class PlainError extends Error {}",
   ],
   invalid: [
     {
       code: 'export class HireRefused extends Schema.TaggedError<HireRefused>()("WrongTag", { reason: Schema.String }) {}',
+      filename: "a.ts",
       errors: [{ messageId: "mismatch", data: { name: "HireRefused", tag: "WrongTag" } }],
     },
     {
       code: "const tag = 'HireRefused'; class HireRefused extends Schema.TaggedError<HireRefused>()(tag, {}) {}",
+      filename: "a.ts",
       errors: [{ messageId: "dynamic" }],
     },
     {
       code: 'const Anonymous = class extends Schema.TaggedError<never>()("Anonymous", {}) {};',
+      filename: "a.ts",
       errors: [{ messageId: "dynamic" }],
     },
   ],
@@ -717,11 +720,11 @@ tester.run("tagged-error-tag", rule("tagged-error-tag"), {
 tester.run("effect-idioms", rule("effect-idioms"), {
   valid: [
     'import { pipe, Effect, Config, Match, Schema } from "effect";',
-    'import type { flow } from "effect/Function";',
+    { code: 'import type { flow } from "effect/Function";', filename: "a.ts" },
     "work.pipe(Effect.map((x) => parse(x)))",
     "Effect.map(work, parse)",
     "function f(Effect) { return Effect.map(parse); }",
-    'Match.value(event).pipe(Match.withReturnType<string>(), Match.tag("Started", () => "ok"), Match.exhaustive)',
+    { code: 'Match.value(event).pipe(Match.withReturnType<string>(), Match.tag("Started", () => "ok"), Match.exhaustive)', filename: "a.ts" },
     'const port = Config.Port("PORT").pipe(Config.withDefault(8787));',
     'const count = Config.Int("COUNT").pipe(Config.orElse(() => Config.Int("FALLBACK_COUNT")));',
     "Schema.Array(Tag).pipe(Schema.decodeTo(Schema.toType(Schema.ReadonlySet(Tag)), tx))",
@@ -745,6 +748,7 @@ tester.run("effect-idioms", rule("effect-idioms"), {
     },
     {
       code: 'Match.value(event).pipe(Match.tag("Started", () => "ok"), Match.withReturnType<string>(), Match.exhaustive);',
+      filename: "a.ts",
       errors: [{ messageId: "matchReturnTypeLate" }],
     },
     {
