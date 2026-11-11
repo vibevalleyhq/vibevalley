@@ -20,7 +20,8 @@
 |---|---|
 | [`packages/provider/`](packages/provider/README.md) | 显式转写模型、MOSS 帧与鉴权连接、Agora SDK/RTC token、字幕分片；无应用设置、业务工具或 UI |
 | [`packages/ai/`](packages/ai/README.md) | Core 转写调用、WAV/RMS、MOSS 会话与 `Playback` 样本级打断对账；浏览器入口不加载服务端模型工厂 |
-| `apps/server/src/voice/voice.ts` | 农场侧薄消费层：绑定 `Setting`、`Orchestrator`、`Channel`、`Inbox`、`Ingress`、`Core`，管理 RTC 授予与通话内 `speak` |
+| `apps/server/src/voice/voice.ts` | 农场侧薄消费层：绑定 `Setting`、`Orchestrator`、`Channel`、`Inbox`、`Ingress`、`Core`，管理 RTC/MOSS 授予与通话内 `speak` |
+| `apps/server/src/voice/moss-relay.ts`、`moss-tools.ts` | MOSS Live WebSocket 双向透传、会话指令改写与 `ask_orchestrator` 工具提取 |
 | `apps/server/src/voice/line.ts` | 语音线路（`8788` 回环监听）与 `cloudflared` 隧道管理 |
 | `apps/server/src/setting/voice.ts` | 语音默认配置 `defaultVoice`、校验 `voiceProblem` 与差异提取 `voiceOverrides` |
 | `apps/web/src/features/voice/` | `call.ts`、`dictation.ts`、`moss-line.ts` 管设备与宿主，`moss-worker.ts`/`moss-worklets.ts` 保持 PCM 绕开 UI 主线程；`captions.ts` 管展示轮次，`contract.ts` 定义应用会话接口；表单与 playground 留在此处 |
@@ -33,10 +34,11 @@
 - **声网 SDK 严格收敛在三处**：
   - 服务端仅经 `packages/provider/src/agora/server.ts` 调 `agora-token` 与 `agora-agents`；应用 voice 管授予和通话编排。
   - Web 端仅在 `features/voice/call.ts` 动态加载 `agora-rtc-sdk-ng`；手机端仅在 `apps/mobile/src/rtc.ts` 调 `react-native-agora`。
-- **授予（`AgoraGrant`）绑定凭据快照与单次认领**：`voice.grant.create` 生成 `channel + uid`、签发 3600 秒令牌并快照当时的 Agora 凭据。同一份授予只能被 `voice.call.start` 认领一次，续期与挂断均使用该快照。
+- **授予（`AgoraGrant`）绑定凭据快照与单次认领**：`voice.grant.create` 生成 `channel + uid`、签发 3600 秒令牌并快照当时的 Agora 凭据（MOSS 模式签发本机占位授予）。同一份授予只能被 `voice.call.start` 认领一次，续期与挂断均使用该快照。
 - **一通电话固定建立时的接听模式**：
   - **助手直答模式（默认）**：启动独立回环监听 `8788` 和公网隧道（优先用 `voice.line.url`，未配则拉起临时 `cloudflared tunnel`），向声网提供只开放 `POST /llm/<通话>/chat/completions` 且校验单次 Bearer 钥匙的地址。
   - **快嘴模式（`quick`）**：声网直连托管模型、DeepSeek 或自定 LLM 先答，页面将用户字幕交 `voice.call.hear` 供助手后台派活，将快嘴回答交 `voice.call.say` 记入默认频道。
+  - **MOSS Live 本机模式（`vendor: "moss"`）**：无需声网凭据与 `8788` 隧道；通话复用 `/api/v1/voice/moss/line` 本机 WebSocket 中继（`MossLine`），服务端拦截页面 `session.update` 注入农场人设与 `ask_orchestrator` 工具（最多 4 并发、单通上限 64 次调用），通话内主动播报按 2000 字切段发 `session.commentary.append`（`session.updated` 就绪前暂存 `pending` 队列），字幕同走 `quick` 落库。
 - **挂断立即终止字幕资格**：调用 `voice.call.stop` 先撤销授予并将通话标为 `ending`，后续迟到的 `hear` / `say` 一律拒绝。
 - **助手来电与通话内播报串行排队**：
   - 通话中若 `Inbox.news` 出现新事项，先等 3 秒合并同批事项，经 `Orchestrator.brief` 生成口语摘要，再调声网 `session.say`（`APPEND` 排在当前话音后，按句切分为 480 字节以内）播报。

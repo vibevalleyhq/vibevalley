@@ -9,9 +9,7 @@ import { type JsonSchema, toolArguments } from "@vibevalley/ai/tools";
 
 import { AgentBusy, CannotContinue, messageOf, type ToolFailed } from "./errors.ts";
 
-/** What an answer's stream tells: an event, or, last, how it failed. */
 type Told = { readonly _tag: "event"; readonly event: AssistantMessageEvent } | { readonly _tag: "failed"; readonly failure: LlmError };
-/** An answer folded so far: the partial message last seen, and how it ended once it has. */
 interface Answered {
   readonly partial?: AssistantMessage;
   readonly end?: { readonly _tag: "ended"; readonly message: AssistantMessage } | { readonly _tag: "failed"; readonly failure: LlmError };
@@ -20,7 +18,7 @@ interface Answered {
 export interface ToolResult {
   readonly content: readonly (TextContent | ImageContent)[];
   readonly isError?: boolean;
-  /** Every call of a turn saying so ends the run after the turn. */
+  /** Ends the run after the turn when every tool call in the batch sets `terminate: true`. */
   readonly terminate?: boolean;
 }
 
@@ -28,11 +26,9 @@ export interface Tool {
   readonly name: string;
   readonly description: string;
   readonly parameters: JsonSchema;
-  /** args are coerced and checked against parameters first. A failure is a failed result with its message. */
   readonly execute: (args: unknown, call: { readonly id: string }) => Effect.Effect<ToolResult, ToolFailed>;
 }
 
-/** The model's messages and the agent's own (A), which toLlm turns into the model's. */
 export type AgentMessage<A> = Message | A;
 
 export type AgentEvent<A> =
@@ -55,7 +51,6 @@ export type AgentEvent<A> =
 export interface Turn<A> {
   readonly message: AssistantMessage;
   readonly toolResults: readonly ToolResultMessage[];
-  /** What the next request would be asked with. */
   readonly messages: readonly AgentMessage<A>[];
   readonly stopped: boolean;
 }
@@ -69,30 +64,23 @@ export interface AgentOptions<A> {
   /** Asked before each request, so a key changed meanwhile is used at once. */
   readonly apiKey: () => string;
   readonly toLlm: (messages: readonly AgentMessage<A>[]) => Context;
-  /** Before each request: what it is asked with instead (a fold, say), for the rest of the run. Stopping the run interrupts it. */
   readonly prepareRequest?: (messages: readonly AgentMessage<A>[], stopped: boolean) => Effect.Effect<readonly AgentMessage<A>[] | undefined>;
-  /** After each turn's tools: end ends the run, continue asks once more when nothing else would. */
+  /** `"end"` stops the run; `"continue"` forces another turn even with no tool calls. */
   readonly finishTurn?: (turn: Turn<A>) => Effect.Effect<"end" | "continue" | undefined>;
-  /** Each event, in order; the run goes on once it is done. */
   readonly onEvent: (event: AgentEvent<A>) => Effect.Effect<void>;
-  /** A tool's result when the run is stopped while it works. */
   readonly stoppedText: string;
 }
 
 export interface Agent<A> {
   /** Starts a run with these messages; the agent must be idle. */
   readonly prompt: (messages: readonly AgentMessage<A>[]) => Effect.Effect<void, AgentBusy>;
-  /** Starts a run from the transcript as it is (its last message the user's or a tool's), or from a queued line. */
   readonly continue: Effect.Effect<void, AgentBusy | CannotContinue>;
-  /** Taken before the next turn of the run under way, with every line waiting at that step boundary. */
   readonly steer: (message: AgentMessage<A>) => Effect.Effect<void>;
   /** Taken when the run would stop, one at a time. */
   readonly followUp: (message: AgentMessage<A>) => Effect.Effect<void>;
   readonly clearQueues: Effect.Effect<void>;
   readonly hasQueued: Effect.Effect<boolean>;
-  /** The run under way stops: its stream and tools are cut off, the turn is kept as it ended. */
   readonly abort: Effect.Effect<void>;
-  /** Until no run is under way. */
   readonly idle: Effect.Effect<void>;
   readonly running: Effect.Effect<boolean>;
   readonly messages: Ref.Ref<readonly AgentMessage<A>[]>;
@@ -108,7 +96,6 @@ interface Run {
   readonly done: Deferred.Deferred<void>;
 }
 
-/** An agent on the scope's fibers: closing the scope stops its run. */
 export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never, Scope.Scope> =>
   Effect.gen(function* () {
     const fibers = yield* FiberSet.make();
@@ -127,14 +114,13 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
         yield* options.onEvent(event);
       });
 
-    /** One request's answer, its stream told as message events; stopped, it ends aborted with what had come. */
     const answer = (asked: readonly AgentMessage<A>[], stop: Deferred.Deferred<void>) =>
       Effect.gen(function* () {
         const started = yield* Clock.currentTimeMillis;
         const thinkingLevel = reasoning ?? "off";
         const finished = (m: AssistantMessage) =>
           Effect.map(Clock.currentTimeMillis, (now): AssistantMessage => ({ ...m, thinkingLevel, durationMs: now - started }));
-        // A failure of the stream is its last element, so the fold keeps what had come before it.
+        // Convert stream failure into a terminal item so `runFoldEffect` retains partial output accumulated before the error.
         const told = options.llm.stream(options.model, options.toLlm(asked), { apiKey: options.apiKey(), ...(reasoning ? { reasoning } : {}) }).pipe(
           Stream.interruptWhen(Deferred.await(stop)),
           Stream.map((event): Told => ({ _tag: "event", event })),
@@ -145,7 +131,6 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
           (): Answered => ({}),
           (so, item): Effect.Effect<Answered> =>
             Effect.gen(function* () {
-              // An answer already ended stays as it ended.
               if (item._tag === "failed") return so.end === undefined ? { ...so, end: { _tag: "failed", failure: item.failure } } : so;
               const e = item.event;
               switch (e.type) {
@@ -216,7 +201,7 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
       readonly durationMs?: number;
     }
 
-    /** One answer's calls: each prepared in turn, then all run side by side; results in the order they were called. */
+    /** Validates arguments sequentially, executes valid calls concurrently, and emits results in call order. */
     const runTools = (calls: readonly ToolCall[], stop: Deferred.Deferred<void>) =>
       Effect.gen(function* () {
         const entries: (Outcome | Effect.Effect<Outcome>)[] = [];
@@ -281,7 +266,6 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
         return { results, terminate: outcomes.length > 0 && outcomes.every((o) => o.result.terminate === true) };
       });
 
-    /** The answer was cut off at its length: none of its calls run, each says why. */
     const refuseTruncated = (calls: readonly ToolCall[]) =>
       Effect.gen(function* () {
         const results: ToolResultMessage[] = [];
@@ -302,18 +286,16 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
         return { results, terminate: false };
       });
 
-    /** pi-agent-core's runLoop: turns until the model calls no tool and no line waits; follow-ups after that. */
     const loop = (context: AgentMessage<A>[], fresh: AgentMessage<A>[], stop: Deferred.Deferred<void>, steered: boolean) =>
       Effect.gen(function* () {
         let asked: readonly AgentMessage<A>[] = context;
-        // A run started from a steered line does not take another before its first request.
+        // Skip draining `steering` on the first turn when `continue` already consumed it to open the run.
         let pending = steered ? [] : yield* takeAll(steering);
         let first = true;
         let continuing = false;
         outer: while (true) {
           let more = true;
-          // asked grows by new arrays, not pushes.
-          // oxlint-disable-next-line oxc/no-accumulating-spread -- see above.
+          // oxlint-disable-next-line oxc/no-accumulating-spread -- immutable message snapshot passed to prepareRequest/toLlm each turn
           while (more || pending.length > 0) {
             if (!first) {
               if (pending.length === 0) pending = yield* takeAll(steering);
@@ -380,7 +362,6 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
         }
       });
 
-    /** A run on the agent's fibers; a defect in it ends it as pi-agent-core's does, with an empty failed answer. */
     const start = (prompts: readonly AgentMessage<A>[], steered = false) =>
       Effect.gen(function* () {
         const run: Run = { stop: yield* Deferred.make<void>(), done: yield* Deferred.make<void>() };

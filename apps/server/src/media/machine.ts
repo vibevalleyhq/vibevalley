@@ -13,7 +13,6 @@ import * as q from "#db/media_job.sql.ts";
 
 import { jobsOf, type MediaJobPhase, mediaJobPhases, type Row } from "./job.ts";
 
-/** What a job's run changes, column by column. */
 export type Patch = Partial<
   Pick<
     Row,
@@ -34,74 +33,58 @@ export type Patch = Partial<
   >
 >;
 
-/** A kind's words for how its jobs end. */
 export interface Words {
-  /** The vendor was asked and may or may not have done it. */
   readonly unknown: string;
   readonly rejected: string;
-  /** Asking after a vendor task stopped before it finished. */
   readonly paused: string;
   readonly downloadFailed: string;
   readonly accountChanged: string;
   readonly noResume: string;
 }
 
-/** What the vendor made, kept: the columns that make the job ready, and how to let it go when the job does not take it. */
 export interface Kept {
   readonly patch: Patch;
+  /** Releases what `keep` stored when the job fails to transition to ready. */
   readonly undo: Effect.Effect<void>;
 }
 
-/** A finished vendor task's answer. */
 export type DoneTask = Extract<AudioTask, { readonly status: "ready" }>;
 
-/** One kind's part: only what the machine does not do the same way for every kind. */
 export interface JobKind {
-  /** The media_job kinds it is. */
   readonly kinds: readonly string[];
   readonly words: Words;
   readonly view: (row: Row) => Effect.Effect<T.MediaJob, ApiError>;
-  /** Fetches and keeps what the vendor made at the job's result_url. */
   readonly keep?: (row: Row) => Effect.Effect<Kept, ApiError>;
-  /** After a download, kept or not (an image goes back to the channel that asked for it). */
+  /** Runs after download whether `keep` succeeded or failed. */
   readonly kept?: (id: string) => Effect.Effect<void>;
-  /** A vendor task this kind follows: which kind of task it is, and what a finished one makes of the job (ready, or
-   * downloading what it made). */
   readonly task?: {
     readonly kind: (row: Row) => AudioTask["kind"];
     readonly done: (row: Row, task: DoneTask) => Effect.Effect<Patch & { readonly phase: "ready" | "downloading" }, ApiError>;
   };
-  /** After each run, still in its slot (audio lets go of what it uploaded). */
+  /** Runs inside the execution slot right after work finishes. */
   readonly ran?: (id: string) => Effect.Effect<void, ApiError>;
-  /** Cancelling, inside the lock: more to write, and what to do once written. */
+  /** Runs inside `lock` before the fiber is interrupted. */
   readonly canceling?: (row: Row) => { readonly patch: Patch; readonly after: Effect.Effect<void, ApiError> };
-  /** Once cancelled and its run stopped. */
+  /** Runs outside `lock` after the fiber is interrupted. */
   readonly canceled?: (id: string) => Effect.Effect<void, ApiError>;
-  /** The phases a run cut short leaves unknown; generating when not given. */
+  /** Phases an interrupted run marks `unknown`; defaults to `["generating"]`. */
   readonly running?: readonly MediaJobPhase[];
-  /** On a restart, before the jobs are interrupted: its active jobs as they were. */
+  /** Runs on startup before `interruptMediaJobs` rewrites active rows. */
   readonly restarting?: (rows: readonly Row[]) => Effect.Effect<void, ApiError>;
-  /** On a restart, once the machine has picked its jobs up again. */
   readonly restarted?: () => Effect.Effect<void, ApiError>;
 }
 
 const allKinds = ["image", "understanding", "speech", "speakers", "voiceDesign", "clone", "transcription"] as const;
 const anyJob = jobsOf({ kinds: allKinds, phases: mediaJobPhases });
 const activePhases: ReadonlySet<string> = new Set<MediaJobPhase>(["authorized", "queued", "uploading", "generating", "downloading"]);
-/** At most this many jobs wait, run or clean up at once. */
 const admitted = 8;
 
-/** The one job machine every media kind runs on: admission, the lock, one slot at a time, a run cut short, downloading
- * what the vendor made, following a vendor task, cancel, retry, resume and a restart. Kinds register what differs. */
 export const makeMachine = Effect.gen(function* () {
   const db = yield* Db;
   const core = yield* Core;
   const provider = yield* Provider;
-  /** Every change to a job is made under it. */
   const lock = yield* Semaphore.make(1);
-  /** Runs take turns: one vendor call at a time. */
   const slots = yield* Semaphore.make(1);
-  /** Vendor-side cleanups take turns. */
   const cleaning = yield* Semaphore.make(1);
   const fibers = yield* FiberMap.make<string, void, ApiError>();
   const registry = new Map<string, JobKind>();
@@ -136,13 +119,12 @@ export const makeMachine = Effect.gen(function* () {
     return yield* view(row);
   });
 
-  /** Writes the job as it is plus the patch; the caller holds the lock. */
+  /** Caller must hold `lock`. */
   const write = Effect.fnUntraced(function* (row: Row, patch: Patch) {
     yield* db.run(q.changeMediaJob({ ...row, ...patch, now: yield* Clock.currentTimeMillis }));
     yield* publish();
   });
-  /** The job moves on only from one of the phases it is expected in; a result kept as an input is never written back
-   * once its assets were released. */
+  /** Never writes `result_input` back once `assets_released` is set. */
   const change = Effect.fnUntraced(
     function* (id: string, before: readonly MediaJobPhase[], patch: Patch) {
       const row = yield* found(id);
@@ -153,7 +135,6 @@ export const makeMachine = Effect.gen(function* () {
     lock.withPermits(1),
     Effect.uninterruptible,
   );
-  /** How a vendor's answer that it refused (or may not have done) ends the job. */
   const failed = (id: string, outcome: "Rejected" | "Unknown", words: Words, before: readonly MediaJobPhase[] = ["generating"]) =>
     change(id, before, { phase: outcome === "Unknown" ? "unknown" : "failed", problem: outcome === "Unknown" ? words.unknown : words.rejected });
 
@@ -162,8 +143,7 @@ export const makeMachine = Effect.gen(function* () {
   });
   const pending = (kinds: readonly string[]) => Effect.map(db.run(q.activeMediaJobs()), (rows) => Arr.filter(rows, (row) => kinds.includes(row.kind)).length);
 
-  /** A create's first step, under the lock: the same id asked the same way is that job; asked differently, or another
-   * kind's, is refused; a new one needs room. */
+  /** Caller must hold `lock`. */
   const admit = Effect.fnUntraced(function* (id: string, kinds: readonly string[], alike: (row: Row) => Effect.Effect<boolean, ApiError>) {
     const row = yield* read(id);
     if (row !== undefined) {
@@ -174,7 +154,6 @@ export const makeMachine = Effect.gen(function* () {
     return Option.none<Row>();
   });
 
-  /** The job's run, in a slot, owned by the machine: a run that dies leaves the job unknown. */
   const run = Effect.fnUntraced(function* (id: string, work: Effect.Effect<void, ApiError>) {
     const part = yield* Effect.flatMap(found(id), partOf);
     const after = part.ran;
@@ -191,7 +170,6 @@ export const makeMachine = Effect.gen(function* () {
     );
   });
 
-  /** Keeps what the vendor made; the job is ready only once it is kept, and what is kept goes again when the job does not take it. */
   const download = Effect.fnUntraced(function* (id: string) {
     const row = yield* found(id);
     if (row.phase !== "downloading" || row.result_url === null) return;
@@ -213,14 +191,12 @@ export const makeMachine = Effect.gen(function* () {
     if (part.kept !== undefined) yield* part.kept(id);
   });
 
-  /** The account the job was asked with: another key behind the same connection is refused. */
   const accountOf = Effect.fnUntraced(function* (row: Row, words: Words): Effect.fn.Return<Account, ApiError> {
     const account = yield* provider.account({ connection: row.connection, model: row.model });
     if (account.fingerprint !== row.fingerprint) return yield* Effect.fail(refused(words.accountChanged));
     return { ...account, revision: row.revision };
   });
 
-  /** Polls the vendor task every few seconds until it ends, for at most half an hour; then the job is paused. */
   const poll = Effect.fnUntraced(function* (id: string) {
     const part = yield* Effect.flatMap(found(id), partOf);
     const task = part.task;
@@ -255,8 +231,7 @@ export const makeMachine = Effect.gen(function* () {
     yield* change(id, ["generating"], { phase: "unknown", problem: part.words.paused });
   });
 
-  /** Requests a vendor task, then polls it. Only the request is interruptible: a task id it returns is written before
-   * a cancel or a poll can come between. */
+  /** Only `create` is interruptible, so a returned `remote_task` is persisted before cancel can interrupt. */
   const follow = Effect.fnUntraced(function* (id: string, create: Effect.Effect<string, AudioFailure | ApiError>) {
     yield* Effect.uninterruptibleMask((resume) =>
       resume(create).pipe(Effect.flatMap((task) => change(id, ["generating", "canceled", "unknown"], { remote_task: task }))),
@@ -296,7 +271,6 @@ export const makeMachine = Effect.gen(function* () {
     );
   });
 
-  /** Polls again a vendor task the job had when it was cancelled or lost track of it, with the same key. */
   const resume = Effect.fn("Media.resume")(function* (id: string, kinds: readonly string[]) {
     return yield* lock.withPermits(1)(
       Effect.gen(function* () {
@@ -314,7 +288,7 @@ export const makeMachine = Effect.gen(function* () {
     );
   });
 
-  /** A restart, first half: what was running when the server stopped is told apart (media_job.sql's InterruptMediaJobs). */
+  /** Must run before `pickUp` on startup. */
   const interrupt = Effect.fn("Media.interrupt")(function* () {
     const before = yield* Effect.map(db.run(q.activeMediaJobs()), anyJob.many);
     yield* Effect.forEach(
@@ -324,7 +298,6 @@ export const makeMachine = Effect.gen(function* () {
     );
     yield* db.run(q.interruptMediaJobs({ problem: t("server.media.restarted"), now: yield* Clock.currentTimeMillis }));
   });
-  /** A restart, second half: downloads start again and followed tasks are asked after again, with the same key. */
   const pickUp = Effect.fn("Media.pickUp")(function* () {
     yield* publish();
     const pendingRows = yield* Effect.map(db.run(q.activeMediaJobs()), anyJob.many);
@@ -372,9 +345,7 @@ export const makeMachine = Effect.gen(function* () {
     resume,
     interrupt,
     pickUp,
-    /** Whether a run of the job is going now. */
     running: (id: string) => Option.isSome(FiberMap.getUnsafe(fibers, id)),
-    /** Stops the job's run, if any. */
     stop: (id: string) => FiberMap.remove(fibers, id),
   };
 });

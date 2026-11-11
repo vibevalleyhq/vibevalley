@@ -15,12 +15,10 @@ import { PublicHttp, publicHttps } from "#/infra/publicHttp.ts";
 import { Session } from "#/session/session.ts";
 import * as q from "#db/library_item.sql.ts";
 
-/** Who puts a file in: the user, or a profile (with its helper's session when a helper). */
 export type AddedBy = { readonly kind: "user" } | { readonly kind: "agent"; readonly agent: string; readonly session?: string };
 
 const listMax = 500;
 
-// A fetched file's type when its source does not say one: what the library sorts by and the page shows it as.
 const typeByExtension: Readonly<Record<string, string>> = {
   png: "image/png",
   jpg: "image/jpeg",
@@ -47,7 +45,6 @@ const lastOf = (text: string, separator: string) => Arr.lastNonEmpty(Str.split(s
 const typeOfName = (name: string) => (Str.includes(".")(name) ? typeByExtension[Str.toLowerCase(lastOf(name, "."))] : undefined) ?? "application/octet-stream";
 const given = (text: string | undefined): text is string => text !== undefined && Str.trim(text) !== "";
 
-// Its own shape written plainly; originOf reads it back through its Schema.
 const originText = (origin: T.LibraryOrigin) => Formatter.formatJson(origin);
 const originOf = jsonOf(S.LibraryOrigin);
 
@@ -58,20 +55,17 @@ const itemOf = (row: q.LibraryItemResult): T.LibraryItem => ({
   lastAt: row.last_at,
 });
 
-/** The jobs whose made file is kept: ready, with an attachment. */
 const madeFiles = (jobs: readonly T.MediaJob[]) =>
   Arr.flatMap(jobs, (job) => ("attachment" in job && job.attachment !== undefined && job.phase === "ready" ? [{ job, attachment: job.attachment }] : []));
 
-/** An address's last segment that is not valid percent-encoding. */
 class MangledName extends Schema.TaggedError<MangledName, { readonly brand: unique symbol }>()("MangledName", {}) {}
 
 export class Library extends Context.Service<
   Library,
   {
     readonly list: (req: T.LibraryListRequest) => Effect.Effect<T.LibraryItem[]>;
-    /** Exactly one of attachment (the user's), url or path (a profile's fetch); the same bytes again only move lastAt. */
     readonly add: (req: T.LibraryAddRequest, by: AddedBy) => Effect.Effect<T.LibraryItem, ApiError>;
-    /** The item only: a message that has the file still opens it. */
+    /** Removes the library entry only; messages referencing the attachment still open it. */
     readonly remove: (id: string) => Effect.Effect<void, ApiError>;
     readonly previewRemove: (id: string) => Effect.Effect<T.Preview, ApiError>;
   }
@@ -97,7 +91,7 @@ const make = Effect.gen(function* () {
 
   const keep = (id: string, origin: T.LibraryOrigin, at: number) => db.run(q.addLibraryItem({ id, kind: origin.kind, origin: originText(origin), at }));
 
-  // A job's file goes in once: a later fact repeating the same ready job changes nothing.
+  // Deduplicate across repeated mediaChanged facts for already-ready jobs.
   const recordedJobs = new Set<string>();
   const recordMade = Effect.fnUntraced(function* (jobs: readonly T.MediaJob[]) {
     for (const { job, attachment } of madeFiles(jobs)) {
@@ -139,7 +133,6 @@ const make = Effect.gen(function* () {
       const header = response.headers["content-type"];
       const type = header === undefined ? "" : Str.trim(Arr.headNonEmpty(Str.split(";")(header)));
       const segment = lastOf(url.pathname, "/");
-      // A name the address mangled (a stray %) is kept as it was written.
       const named = yield* Effect.try({ try: () => decodeURIComponent(segment), catch: () => MangledName.make() }).pipe(
         Effect.catchTag("MangledName", () => Effect.succeed(segment)),
       );

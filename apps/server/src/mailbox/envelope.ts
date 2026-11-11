@@ -16,13 +16,11 @@ export interface Meta {
   outcome?: T.Outcome;
   spent?: T.Spent;
   code?: string;
-  /** Said on a call: the orchestrator heard it there, so it wakes no one here. */
+  /** Spoken on a voice call: already heard by the orchestrator, so do not wake again. */
   spoken?: boolean;
   attachments?: T.Attachment[];
   embeds?: T.Embed[];
-  /** The artifact it announces, as it was then (artifact/). */
   artifact?: T.ArtifactCard;
-  /** The blocks it points at, as they read when it was sent. */
   blocks?: readonly T.QuotedBlock[];
   picked?: Picked;
   ingressSource?: "issue" | "cron" | "patrol" | "connector" | "voice" | "github";
@@ -54,11 +52,10 @@ const MetaSchema: Schema.Codec<Meta, Wire<Meta>> = Schema.Struct({
   voiceMode: Schema.optionalKey(Schema.Literals(VoiceModeValues)),
 });
 
-/** Anything unreadable is no meta. */
 export const metaOf = (raw: unknown): Meta =>
   (typeof raw === "string" ? jsonOrNone(MetaSchema)(raw) : Option.getOrUndefined(Schema.decodeUnknownOption(MetaSchema)(raw))) ?? {};
 
-/** As Go's omitempty writes it: nothing empty kept. */
+/** Omits empty strings, false, and empty arrays to match Go omitempty snapshots. */
 export const metaText = (m: Meta | undefined) =>
   m === undefined
     ? null
@@ -66,7 +63,6 @@ export const metaText = (m: Meta | undefined) =>
         Object.fromEntries(Object.entries(m).filter(([, v]) => v !== undefined && v !== "" && v !== false && !(Array.isArray(v) && v.length === 0))),
       );
 
-/** Who said it, read from the kind its participant is stored as; an agent comes with its role. */
 export const speakerOf = (participant: string): { readonly fromKind: T.ActorKind; readonly fromRole?: T.AgentRole } => {
   switch (participant) {
     case "user":
@@ -80,7 +76,8 @@ export const speakerOf = (participant: string): { readonly fromKind: T.ActorKind
       return { fromKind: "system" };
   }
 };
-/** Who started a trigger, as a message's speaker: a collaborator, a bot or CI outside the farm is the farm's own doing. */
+
+/** External GitHub collaborators, bots, and CI map to "system". */
 export const actorKindOf = (kind: T.TriggerActorKind): T.ActorKind => {
   switch (kind) {
     case "user":
@@ -116,15 +113,12 @@ export const envelopeMore = (
   };
 };
 
-/** Where a message is: a channel by #name, a thread by its channel's name and the number of its root message, the
- * user's direct channel as @user. */
 export function targetOf(c: Pick<T.Channel, "type" | "rootNumber" | "name">, channelName: string): string {
   if (c.type === "direct") return "@" + userId;
   if (c.type === "thread" && c.rootNumber !== undefined) return "#" + channelName + ":" + c.rootNumber;
   return "#" + (c.name ?? channelName);
 }
 
-/** What the user picked beside a message in the farm's form: the profile and the repo the work is for. */
 export interface Picked {
   readonly agent?: string;
   readonly repo?: string;
@@ -149,12 +143,11 @@ export interface UnreadRow {
 
 export const summaryChannels = 20;
 
-/** The same words from the same sender in the same place this soon again are a retry, not a new message. */
+/** Identical text from the same sender and channel within this window is treated as a retry. */
 export const retryWindowMs = 60_000;
 
 export const heldShown = 3;
 
-/** The chat's stored message as the mailbox reads it: who said it, where, and when. */
 type StoredMessageKind = "chat" | "dispatch" | "report" | "notice";
 type StoredSenderKind = "user" | "orchestrator" | "session" | "profile" | "system";
 
@@ -178,10 +171,7 @@ export interface ChannelEnvelopeRow {
   readonly channel_name: string | null;
 }
 
-/** Collaboration facts from which Mailbox computes audience, brakes, urgency and the durable deliveries. */
-/** The orchestrator in a place, for what names no orchestrator in particular there (a machine's event, a generic @ of
- * one, work left to one): a direct channel's other one when it is an orchestrator; else, of the members of the channel
- * the place is in, the default orchestrator when it is one of them, else the first orchestrator; else the default one. */
+/** Direct channel peer if orchestrator; otherwise defaultOrchestrator if a member, first orchestrator member, or defaultOrchestrator. */
 export const orchestratorIn = (place: {
   readonly top: { readonly type: string; readonly peer_id: string | null } | undefined;
   readonly members: readonly string[];
@@ -199,21 +189,17 @@ export interface ChannelAudience {
   readonly kind: T.MessageKind;
   readonly mentions: readonly string[];
   readonly channel: Pick<T.Channel, "type" | "peer">;
-  /** The orchestrator in the place (orchestratorIn): who a generic @ of one names. */
   readonly orchestrator: string;
-  /** Who is in the channel the place is in: what is said there to no one in particular, and reports, go to them. */
   readonly channelMembers: readonly string[];
   readonly orchestrators: readonly string[];
   readonly threadOwner?: string;
   readonly sessions: readonly string[];
   readonly present?: readonly string[] | null;
-  /** A thread's members: what the user says there goes to them. Empty outside a thread. */
   readonly members: readonly string[];
   readonly outcome?: T.Outcome;
   readonly spoken?: boolean;
 }
 
-/** A channel message and who hears it: what Mailbox.receive routes a channel trigger to. */
 export interface ChannelHearers {
   readonly row: ChannelEnvelopeRow;
   readonly audience: ChannelAudience;
@@ -226,11 +212,8 @@ export interface ChannelRouteResult {
   readonly heldNotice: string;
 }
 
-/** What came to an orchestrator in one conversation, handed to it: the orchestrator module answers it (an
- * orchestrator is told, where a worker is woken through its session). */
 export interface Handed {
   readonly _tag: "Handed";
-  /** The orchestrator it came to, by its profile id. */
   readonly agent: string;
   readonly channel: string;
   readonly type: T.ChannelType;

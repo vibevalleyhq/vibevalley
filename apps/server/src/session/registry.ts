@@ -28,38 +28,33 @@ import { type Tracking } from "./reaction.ts";
 import { isOnDuty } from "./roster.ts";
 import type { DeliveryInput, Consumed, LaunchActivity, RunFinished, SessionIdentity, SessionNews } from "./signals.ts";
 
-/** A burst of changes is one write. */
 const saveAfterMs = 300;
 
 export interface Hand {
   readonly id: T.SessionId;
   readonly place: Workplace;
-  /** The issue it was opened for: the run keeps it even while the session is between assignments. */
+  /** Retained for run attribution even while the session is between assignments. */
   readonly issue: string;
   readonly access: Semaphore.Semaphore;
   readonly journal: Journal;
-  /** The oar session it is attached to; undefined between launches. */
+  /** `""` between launches. */
   oarSessionId: string;
   lastText: string;
   tracking: Tracking;
-  /** As the chat names it: <id>#<n>; "" when it has none. */
+  /** `<id>#<n>`, or `""` when detached. */
   launch: string;
   spoke: boolean;
-  /** What its tools carry to say whose they are. "" once it leaves. */
+  /** Cleared to `""` on leave. */
   token: string;
   recalled: Set<string>;
-  /** The inputs of the turns asked for and not opened yet, oldest first. */
   triggers: { readonly trigger: T.RunTrigger; readonly envelopeIds: readonly string[]; readonly inputId?: string }[];
-  /** Runtime input ids waiting for evidence that their envelopes entered or were returned. */
   readonly inputs: Map<string, readonly string[]>;
-  /** The open turn's run and what it heard. */
   run: string;
   heard: string[];
   report: T.IssueReport | undefined;
   settling?: { readonly report: SubagentReport; readonly completedBefore: number };
 }
 
-/** What inProcessRun.ts keeps runs with; a write that fails is an error the run retries. */
 export interface RunStore {
   readonly start: (id: string, session: string, issue: string, trigger: T.RunTrigger) => Effect.Effect<void, NotRecorded>;
   readonly link: (run: string, issue: string) => Effect.Effect<void, NotRecorded>;
@@ -81,7 +76,6 @@ export const sessionRegistry = Effect.gen(function* () {
   const clock = yield* Clock.Clock;
   const context2 = yield* Effect.context();
   const runSync = Effect.runSyncWith(context2);
-  // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
   const forkHere = yield* FiberSet.makeRuntime();
   const fire = <A, E>(e: Effect.Effect<A, E>) => void forkHere(e);
   const pendingRuns = yield* Queue.unbounded<Effect.Effect<void>>();
@@ -92,17 +86,14 @@ export const sessionRegistry = Effect.gen(function* () {
     recordRun(Effect.asVoid(Deferred.succeed(done, undefined)));
     yield* Deferred.await(done);
   });
-  // Waits started from callbacks (the save, each session's stall): one fiber per key, a new one replacing the last,
-  // all ended with the service.
   const timers = yield* FiberMap.make<string>();
   const later = yield* FiberMap.runtime(timers)();
-  // For oar's callbacks (a session's events, its report, a stall), which run outside any fiber and must land in the order oar gives them.
+  // Synchronous bridge for non-Effect `oar` observer callbacks so facts commit in callback order.
   const apply = (...facts: FactIn[]) => runSync(core.apply(...facts));
   const notice = (level: "info" | "warn" | "error", text: string) => runSync(core.notice(level, text));
-  /** Where sessions reach the farm's tools; the server says its real address once it listens (setAddress). */
   const mcpEndpoint = { url: `http://${serverAddress(config)}/mcp` };
   const trajectories = yield* makeTrajectories(config.home, (id, e) => runSync(core.sessionEvent(id, e)));
-  // A hand is acquired before admission; no path holding admission waits for a hand.
+  // Lock order: `hand.access` -> `admission`. Never wait for `hand.access` while holding `admission`.
   const admission = yield* Semaphore.make(1);
 
   const newsHub = yield* scopedPubSub<SessionNews>();
@@ -131,7 +122,6 @@ export const sessionRegistry = Effect.gen(function* () {
   };
   const who = (token: string) => tokens.get(token) ?? "";
 
-  // A session's own row keeps what taking it up again needs, so it goes with the database.
   const handRow = (h: Hand) =>
     Effect.map(
       Effect.all({ place: jsonText(h.place), recalled: h.recalled.size > 0 ? jsonText([...h.recalled].toSorted()) : Effect.succeed(null) }),
@@ -184,7 +174,6 @@ export const sessionRegistry = Effect.gen(function* () {
       machine: null,
     });
     const kept = core.session(session.id);
-    // An orchestrator renamed is the same session under its new name.
     if (kept === undefined || kept.name !== session.name)
       yield* core.apply({
         type: "sessionChanged",
@@ -195,9 +184,7 @@ export const sessionRegistry = Effect.gen(function* () {
       });
   });
 
-  /** An on-duty agent's session, kept before anything can record a Run or address its mailbox: written when there is
-   * none or its name changed, at startup and whenever a profile is kept. A profile hired per piece of work is left
-   * alone. */
+  // Ensure on-duty orchestrators have a persisted `session` row before any Run foreign key or mailbox delivery references them.
   const keepOnDuty = Effect.fn("Session.keepOnDuty")(function* (profile: T.Agent) {
     if (!isOnDuty(profile)) return;
     const name = Str.trim(profile.name) || t("server.channel.name.orchestrator");
@@ -227,15 +214,13 @@ export const sessionRegistry = Effect.gen(function* () {
 
   const forget = (id: string) => db.attempt(qs.forgetSession({ id })).pipe(bestEffort(`vibevalley: unstarted session ${id} not forgotten`));
 
-  /** The session kept, with its log. */
   const logOf = (s: T.Session, journal: Journal) => Effect.as(Effect.andThen(keep(s), db.run(Effect.flatMap(sessionState(s), qs.keepSessionState))), journal);
 
   const runs = yield* recording;
 
-  /** Called before the input goes out, so the turn it opens finds it. */
+  /** Queued before dispatching to the runtime so `startRun` finds it if the turn opens synchronously. */
   const expect = (h: Hand, input: DeliveryInput, inputId?: string) =>
     void h.triggers.push({ trigger: input.trigger, envelopeIds: input.envelopeIds, ...(inputId === undefined ? {} : { inputId }) });
-  /** Undoes expect when the input did not open a turn. */
   const unexpect = (h: Hand) => void h.triggers.pop();
 
   const startRun = (h: Hand) => {
@@ -243,7 +228,7 @@ export const sessionRegistry = Effect.gen(function* () {
     const by = expected?.trigger ?? { kind: "runtime" };
     const issue = core.session(h.id)?.issue ?? h.issue;
     const id = newId();
-    // Known at once, so a report that follows closely finds the run; its row follows.
+    // Assign `h.run` synchronously before async DB persistence so an immediate `report` finds it.
     h.run = id;
     h.heard = [];
     h.report = undefined;
@@ -301,7 +286,7 @@ export const sessionRegistry = Effect.gen(function* () {
 
   const closeExecution = (h: Hand) => executor.close(h.id);
 
-  // The sessions are let go first: a turn cut off by the shutdown is reported when the farm comes back, not on the way out.
+  // Flush recovery state and detach before executor shutdown so interrupted turns reconcile on next startup rather than mid-exit.
   yield* Effect.addFinalizer(() =>
     Effect.andThen(
       Effect.suspend(() => {

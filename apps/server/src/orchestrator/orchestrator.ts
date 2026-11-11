@@ -37,35 +37,27 @@ import { agentPrompt, identityNote, lineWords, situationWords, systemPrompt, voi
 import { makeResponses } from "./response.ts";
 import { deepseekModel, intake, orchestratorEnvelopeLines, quotaText, situationDelta, type Source } from "./situation.ts";
 
-/** VibeValley's own skills for its orchestrators (imagegen/SKILL.md…), shipped with the server. */
 export const orchestratorSkills = serverFile("src/orchestrator/skills");
 const keepEvents = 1000;
 const notesShown = 8;
 const notesRecalled = 3;
-/** A run cut off longer ago than this is left: what it was for has likely moved on. */
 const resumeWithinMs = 30 * 60_000;
 
-/** What the user chose beside the words (the sowing form, the chat's profile pick); empty for none. */
 export type Pick = Picked;
 
-/** Where an input's answer goes and what it is worth; kept with it in the transcript. */
 interface Route {
   readonly channel: string;
   readonly envelope: string;
-  /** The profile the user picked beside the words. */
   readonly agent?: string;
   readonly quiet?: boolean;
   readonly source: Source;
-  /** The issue handed to the orchestrator that this input is; its run ends when the orchestrator's settles. */
   readonly issue?: string;
-  /** The user's own words are in this input: only then may the orchestrator complete an issue or change one. */
+  /** True when user-authored messages are in the batch; required by `actsForUser` for issue mutations. */
   readonly user?: boolean;
 }
 
-/** One input as its producer gives it: the intake table fills in the rest by its source. */
 interface Intake {
   readonly envelopes: readonly string[];
-  /** The orchestrator it is for, by its profile id; the default one when none is named. */
   readonly to?: string;
   readonly source: Source;
   readonly line: string;
@@ -74,7 +66,6 @@ interface Intake {
   readonly user?: boolean;
   readonly issue?: string;
   readonly envelope?: string;
-  /** What started its run, when the producer knows better than its source (an issue's trigger, a missed cron). */
   readonly by?: RunTrigger;
   readonly caller?: Caller;
 }
@@ -82,8 +73,7 @@ interface Intake {
 export class Orchestrator extends Context.Service<
   Orchestrator,
   {
-    /** The lines waiting for an orchestrator (the default one when none is named) are dropped with its run; the sessions
-     * it sent keep working. */
+    /** Aborts the orchestrator's own turn and queued inputs without stopping helper sessions. */
     readonly stop: (agent?: string) => Effect.Effect<void>;
     readonly markWrong: (on: number, want: string, agent?: string) => Effect.Effect<OrchestratorEval, ApiError>;
     readonly answerer: (on: "api" | "phone") => (model: string) => Answer<NotAnswered> | undefined;
@@ -94,7 +84,6 @@ export class Orchestrator extends Context.Service<
 }
 
 export interface OrchestratorOptions {
-  /** The model; absent, DeepSeek with the key in settings. */
   readonly llm?: () => ModelClient;
   /** Whether it hears the farm; a test without a model does not, so nothing reaches a model. */
   readonly listen?: boolean;
@@ -117,7 +106,6 @@ const make = (options: OrchestratorOptions = {}) =>
     const ingress = yield* Ingress;
     const responses = makeResponses(ingress, chat);
 
-    // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
     const service = yield* Llm;
     const forkHere = yield* FiberSet.makeRuntime();
     const scope = yield* Effect.scope;
@@ -128,14 +116,12 @@ const make = (options: OrchestratorOptions = {}) =>
         return { agent: id, session: "", repo: "", here: at.channel, picked: at.agent ?? "", envelope: at.envelope, actor: orchestrator(at.user ?? false) };
       });
 
-    /** One orchestrator: its own host (conversation, queue, run), home, model, and what it was last shown and told. */
     interface Instance {
       readonly id: string;
       readonly home: string;
       readonly host: AgentHost<Route>;
       /** What it last said it cannot start for, per channel: said once, not to every line, until it starts. */
       readonly cannot: Map<string, string>;
-      /** The farm's situation as its model last saw it in an input; "" when it should see the whole of it next. */
       shown: string;
     }
     const instances = new Map<string, Instance>();
@@ -153,7 +139,6 @@ const make = (options: OrchestratorOptions = {}) =>
             // The key saved in settings, asked before each request: one saved while the orchestrator runs is used at once.
             return modelClient(deepseekModel(store.agent(id)?.model.trim() ?? "", defaultModel), settings.deepseekApiKey, service);
           };
-          // One of its own crons (not a helper's) comes due within that long: it will be woken then.
           const wakeSoon = (withinMs: number) => {
             const by = clock.currentTimeMillisUnsafe() + withinMs;
             return cron.list().some((s) => {
@@ -180,7 +165,7 @@ const make = (options: OrchestratorOptions = {}) =>
                 inputType: "orchestratorInput",
                 home,
                 cwd: reposDir(config),
-                // The default orchestrator's prefix is the one its evals hold; another says who it is after it.
+                // Append custom profile identity after the shared prefix so default orchestrator eval caches stay stable.
                 instructions: systemPrompt + agentPrompt + (id === defaultOrchestrator || !profile ? "" : identityNote(profile.name, profile.persona)),
                 llm: llmOf,
                 tools: toolsFor(id),
@@ -189,7 +174,6 @@ const make = (options: OrchestratorOptions = {}) =>
                 first: { channel: chat.defaultChannel(), envelope: "", source: "user" },
                 quiet: (r) => r.quiet ?? false,
                 say: (r, text, runId) => chat.post({ _tag: "Run", from: id, channel: r.channel, text: text, run: runId }),
-                // The chat shows where it thinks or writes; what it answers off the chat (the local chat/completions) shows nowhere.
                 channel: (r) => (r.quiet === true ? undefined : r.channel),
                 fresh: () => {
                   me.shown = "";
@@ -204,7 +188,6 @@ const make = (options: OrchestratorOptions = {}) =>
           return me;
         }),
       );
-    /** The orchestrator an input goes to: the one named while it is an orchestrator, else the default one. */
     const target = (id: string | undefined) => instanceOf(id && store.isOrchestrator(id) ? id : defaultOrchestrator);
 
     const agentLines = Effect.gen(function* () {
@@ -226,8 +209,7 @@ const make = (options: OrchestratorOptions = {}) =>
       return lines;
     });
 
-    // channel is where the input it goes with will be answered. Said last and on a line of its own, so that
-    // answering in another channel changes one line of it.
+    // Place target channel on the final line so switching channels invalidates only one line in `situationDelta`.
     const situation = (channel: string) =>
       Effect.gen(function* () {
         const sessions = yield* agentLines;
@@ -252,7 +234,6 @@ const make = (options: OrchestratorOptions = {}) =>
         );
       });
 
-    // The situation for the next input: the whole of it, or what changed since the input before.
     const situationNow = (me: Instance, busy: boolean, channel: string) =>
       Effect.map(situation(channel), (now) => {
         const shownNow = !busy && me.shown !== "" ? situationDelta(me.shown, now) : now;
@@ -287,7 +268,6 @@ const make = (options: OrchestratorOptions = {}) =>
           (busy, memoryNews) =>
             Effect.gen(function* () {
               const [heard, ids] = yield* news(me);
-              // The log shows the line; the model also gets the time, the farm and the news before it.
               const now = yield* Clock.currentTimeMillis;
               const text = [situationWords.now(localeMinute(now)), yield* situationNow(me, busy, i.channel), memoryNews, yield* recall(i), heard, asked]
                 .filter((p) => p !== "")
@@ -312,7 +292,6 @@ const make = (options: OrchestratorOptions = {}) =>
         return false;
       });
 
-    /** Every input comes in here. false: the orchestrator could not start, and the channel was told why, once. */
     const take = (i: Intake): Effect.Effect<boolean> =>
       taking(i).pipe(
         Effect.catchCause((cause) =>
@@ -337,7 +316,6 @@ const make = (options: OrchestratorOptions = {}) =>
       Effect.suspend(() => {
         const fromPerson = n.messages.every((m) => m.from === userId);
         const user = n.messages.some((m) => m.from === userId);
-        // The latest pick among them: it goes with its message.
         const picked: Pick = n.messages.findLast((m) => m.picked)?.picked ?? {};
         const response = n.messages.findLast((message) => message.responsePort);
         const voice = n.messages.findLast((message) => message.voiceMode);
@@ -381,11 +359,9 @@ const make = (options: OrchestratorOptions = {}) =>
         Effect.asVoid,
       );
 
-    // A test that gave the orchestrator no model hears nothing: the other services run as without it, and nothing reaches a model.
     if (options.listen ?? true) {
       const news = yield* mailbox.news;
       yield* Effect.forkScoped(Stream.runForEach(news, (n) => (n._tag === "Handed" ? logged("a line", heardInChat(n)) : Effect.void)));
-      // Each orchestrator goes on with the run a stop cut off.
       yield* Effect.forEach(
         store.orchestrators(),
         (a) =>

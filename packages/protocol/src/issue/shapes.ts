@@ -2,7 +2,7 @@ import type { IssueId, Outcome, SessionId, Spent } from "../common/shapes";
 import type { Conflict } from "../repo/shapes";
 import type { IssueAnswer, PhaseResting, Run, Session, SessionEvent } from "../session/shapes";
 
-/** Responsibility for an issue, retained across execution contexts and ended only by reassignment or unassignment. */
+/** Retained across execution contexts and ended only by reassignment or unassignment. */
 export interface Assignment {
   id: string;
   issue: IssueId;
@@ -38,7 +38,6 @@ export interface IssueMandate {
 }
 
 export const IssueReportMemoryScopeValues = ["repo", "all"] as const;
-/** Where a memory written from a report holds: this repo, or every repo. */
 export type IssueReportMemoryScope = (typeof IssueReportMemoryScopeValues)[number];
 
 export interface IssueReportMemory {
@@ -77,9 +76,7 @@ export interface Issue {
   createdAt: number;
   queuedAt?: number;
   closedAt?: number;
-  /** Done: what it delivered. Its verdict is the status. */
   delivered?: Delivery;
-  /** Canceled: why. */
   canceled?: IssueCanceled;
   parent?: IssueId;
   blockedBy: IssueId[];
@@ -94,19 +91,17 @@ export interface Issue {
   criteria: string[];
   checks: CriterionCheck[];
   refining?: IssueRefining;
-  /** Its latest run as the issue keeps it, for a run no session on the farm carries (an in-process agent's, the orchestrator's): going on while it has no end. */
+  /** Tracks runs executed without a worker session (e.g. in-process orchestrator); active while `endedAt` is absent. */
   lastRun?: Pick<Run, "startedAt" | "endedAt" | "outcome">;
-  /** An answer issue's conclusion, read from what its latest round handed back; none when that round gave none it could read. */
   answer?: IssueAnswer;
   stage: IssueStage;
 }
 
-/** An issue as a change left it (issue.create, issue.update, issue.status.update), with the seq of the core's fold that includes the change. */
+/** Includes the Core fold `seq` that applied the mutation so clients can await state convergence. */
 export interface AppliedIssue extends Issue {
   seq: number;
 }
 
-/** A question the helper is waiting on the user for; options are the answers it thought of, each one a reply as it is. */
 export interface Question {
   question: string;
   options: string[];
@@ -115,34 +110,32 @@ export interface Question {
 export const CheckResultValues = ["met", "unmet", "unsure"] as const;
 export type CheckResult = (typeof CheckResultValues)[number];
 
-/** The helper's own word on one of the criteria, as it handed the work back: criterion is its index in Issue.criteria. */
 export interface CriterionCheck {
+  /** 0-based index into `Issue.criteria`. */
   criterion: number;
   result: CheckResult;
   proof: string;
 }
 
-/** Where an issue stands for the user, the one set of states the board, the farm and the page all say. */
 export const IssueStageKindValues = ["draft", "queued", "working", "asking", "reviewing", "stuck", "done", "canceled"] as const;
 export type IssueStageKind = (typeof IssueStageKindValues)[number];
 
 export const StuckReasonValues = ["failed", "conflict", "interrupted", "quiet"] as const;
 export type StuckReason = (typeof StuckReasonValues)[number];
 
-/** A button on an issue's page, by what it says. tell is a word to the helper, answer the same to its question. */
 export const IssueActValues = ["start", "answer", "reject", "complete", "acknowledge", "resolve", "resume", "cure", "tell", "stop", "close", "reopen"] as const;
 export type IssueAct = (typeof IssueActValues)[number];
 
-/** since: when it came to stand so, when known. lead is the one thing the user is asked to do, if any. */
 export interface IssueStage {
   state: IssueStageKind;
   since?: number;
   stuck?: StuckReason;
+  /** Primary action highlighted for the user, if any. */
   lead?: IssueAct;
   acts: IssueAction[];
 }
 
-/** What pressing an issue's button sends: move is issue.status.update, say issue.comment.create, stop session.stop. */
+/** `move` dispatches `issue.status.update`, `say` dispatches `issue.comment.create`, `stop` dispatches `session.stop`. */
 export type IssueAction =
   | { readonly act: IssueAct; readonly does: "move"; readonly status: IssueStatus; readonly words: ActWords }
   | { readonly act: IssueAct; readonly does: "say" }
@@ -166,15 +159,14 @@ export const MilestoneKindValues = [
 ] as const;
 export type MilestoneKind = (typeof MilestoneKindValues)[number];
 
-/** One line of an issue's story; who is the session's name, or absent for the user and the farm. */
 export interface Milestone {
   at: number;
   kind: MilestoneKind;
+  /** Session name; absent for user or system milestones. */
   who?: string;
   text: string;
 }
 
-/** An issue's story newest first, and what all its runs cost. */
 export interface IssueTimeline {
   milestones: Milestone[];
   spent?: Spent;
@@ -187,7 +179,7 @@ export interface IssueRefining {
 
 export interface IssueRefineRequest {
   text?: string;
-  /** Fields the user changed and has not saved: saved first, so the act sees them. */
+  /** Unsaved field edits applied atomically before refining starts. */
   edit?: IssueUpdate;
 }
 
@@ -205,7 +197,7 @@ export interface IssueUpdate {
   priority?: Priority;
   criteria?: string[];
   deliver?: Deliverable;
-  /** Its place on the board: before this issue, or last when empty. Only while it is not sent. */
+  /** Board placement before this issue id; "" places it last. Valid only before dispatch. */
   before?: string;
 }
 
@@ -213,7 +205,6 @@ export interface Finding {
   id: string;
   text: string;
   at: number;
-  /** Settled: the next acceptance that passed after it was written. */
   resolved: boolean;
 }
 
@@ -228,21 +219,17 @@ export interface IssueRequest {
   priority?: Priority;
   deliver?: Deliverable;
   autoSubmitPr?: boolean;
-  /** What it must do to be accepted, each checked by whoever works it before handing back. */
   criteria?: string[];
-  /** The client's key for this request: the same key again within a while returns the first one's result and does it once (a retry after a lost reply). */
+  /** Idempotency key deduplicating retries after a lost response. */
   requestKey?: string;
 }
 
-/** What an issue delivers: a change, a change kept on its branch for the user to take in, or an answer (on the issue). */
 export const DeliverableValues = ["change", "branch", "answer", "pull_request"] as const;
 export type Deliverable = (typeof DeliverableValues)[number];
 
-/** What a completed issue delivered: its branch merged into the repo's main branch, into its parent issue's branch, by a pull request, its branch kept unmerged, or nothing (no change, or an answer). */
 export const DeliveryValues = ["merged", "merged_into_parent", "pull_request", "submitted", "kept", "none"] as const;
 export type Delivery = (typeof DeliveryValues)[number];
 
-/** Why an issue is not done: the user closed it, or its workplace was lost. */
 export const IssueCanceledValues = ["dismissed", "lost"] as const;
 export type IssueCanceled = (typeof IssueCanceledValues)[number];
 
@@ -251,38 +238,32 @@ export interface CommentRequest {
   sendKey?: string;
 }
 
-/** A verdict on what was handed back: passed, or not, with the findings (or words) it is mended by. */
 export interface IssueReviewRequest {
   pass: boolean;
   findings?: string[];
   text?: string;
 }
 
-/** Which issues issue.list gives: the open ones by default, the newest first. */
 export interface IssueFilter {
-  /** Only those in this status (closed ones included when it is done or canceled). */
+  /** Includes closed issues when set to `done` or `canceled`. */
   status?: IssueStatus;
-  /** Words that the title or description all contain. */
   text?: string;
   repo?: string;
-  /** At most this many; none is all. */
   limit?: number;
   closed?: boolean;
-  /** Only those waiting on the user, the longest waiting first. */
+  /** Filters to issues waiting on the user, ordered longest-waiting first. */
   wantsUser?: boolean;
 }
 
-/** One task of an issue split into several people's work: an issue under the graph the issue becomes. */
 export interface IssueChildDraft {
   id: string;
   title?: string;
   brief: string;
   needs?: string[];
-  /** A profile's id or name; empty is the farm's choice. */
+  /** Profile id or name; "" lets the server assign one. */
   agent?: string;
   check?: string;
   scope?: string[];
-  /** The task that checks the others' work against the whole. */
   acceptance?: boolean;
 }
 
@@ -293,13 +274,12 @@ export interface IssueSplitRequest {
 
 export interface IssueStatusRequest {
   status: IssueStatus;
-  /** Moving back to todo: another round with these words (findings, while it waits for acceptance), or, while it is stuck, none for the server's own. */
+  /** Follow-up instructions or review findings when moving back to `todo`. */
   text?: string;
-  /** Moving to todo: the profile that takes it on. */
   agent?: string;
-  /** Fields the user changed and has not saved: saved first, so the act sees them. */
+  /** Unsaved field edits applied atomically before the status transition. */
   edit?: IssueUpdate;
-  /** The client's key for this request: the same key again within a while returns the first one's result and does it once (a retry after a lost reply). */
+  /** Idempotency key deduplicating retries after a lost response. */
   requestKey?: string;
 }
 
@@ -309,7 +289,7 @@ export interface FactSessionReported {
   id: SessionId;
   run?: string;
   outcome: Outcome;
-  /** A successful turn can rest for external feedback without handing off to the user. */
+  /** Set when a turn rests waiting on external feedback without handing off to the user. */
   phase?: PhaseResting;
   summary: string;
   runs: number;

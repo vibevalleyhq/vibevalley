@@ -37,9 +37,9 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 
 - **页面只读 `StateFrame`，心跳超时主动重连**：`infra/frame.ts` 维护唯一 `/api/v1/state` 连接并按 id `reconcile` 进 Solid store；45 秒无数据或心跳即重连，断线时直接显示未连接。
 - **Atom 是唯一状态中间层**：跨组件状态 `defineAtom`、本地存储 `defineStored` 和乐观意图 `defineIntent` 统一建在 `state/` 的 `AtomRegistry` 上（由 `vibevalley/*-door` 规则检查）。
-- **乐观意图（`Intent`）等帧 `seq` 追上后才结算**：
-  - 写操作带 `requestKey` 或 `sendKey` 叠加到当前帧上，等到 `frame.seq >= reply.seq` 或频道出现对应消息时才结算。
-  - 失败意图保留在画面上供重试或放回；组件内禁止绕过 `act.run` 直接调写接口（`vibevalley/act-door` 检查）。
+- **乐观意图（`Intent`）按阶段联合建模，等帧 `seq` 追上后结算**：
+  - `Intent` 为按 `phase` 区分的判别联合（`IntentAt`），写操作带 `requestKey` 或 `sendKey` 叠加到当前帧上，等到 `frame.seq >= reply.seq` 或频道出现对应消息时才结算。
+  - 错误经 `infra/api.ts` 的 `faultOf` 转为结构化 `UiFault`（识别全部 `ApiError`，含 `502 VoiceCallFailed` 与 `503 VoiceUnavailable`，保留 `next`、`settings` 与 `retryable`），只挂在失败或降级分支上；组件内禁止绕过 `act.run` 直接调写接口（`vibevalley/act-door` 检查）。
 - **一次性读取走 `infra/query.ts`**：自有 Query client 管缓存与失效，结果先经 Schema 解码，状态流重连时自动 `refetchOnRelink`。会话轨迹经 `features/session/runs.ts` 的 `SessionLogs` 先订直播流、再读快照并按 `seq` 与 `revision` 合并。
 - **颜色收进语义调色板**：浅色/深色主题通过 `<html data-theme>` 切换，只用 `style.css` 语义色变量（`vibevalley/no-hex-color` 检查）；像素皮固定 `data-theme="light"`。
 - **组件样式由 StyleX 编译**：组件对外收有类型的 `styles`，不收 utility class 字符串；`styleProps` 在 DOM 边界组合样式。动态位置、Canvas 数据与第三方库写的值保持原来的单一所有者，不再由另一份声明覆盖。

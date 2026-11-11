@@ -2,29 +2,21 @@ import { parseSync } from "vite";
 
 const day = 86_400_000;
 
-/** A repository's say in its readings. */
 export interface Health {
-  /** The production code the readings look at: tests, stories, fixtures and generated files are the repository's to leave out. */
   readonly counted: (path: string) => boolean;
-  /** The area a file's counts are kept under (a module, a feature, a package). */
   readonly areaOf: (path: string) => string;
-  /** Files that are hot by design, each with the reason; one that no longer exists is a stale reason. */
+  /** Stale paths that no longer exist fail verification. */
   readonly hotByDesign: Readonly<Record<string, string>>;
-  /** The kept escape counts, relative to the repository's root. */
   readonly ratchet: string;
-  /** The hotspot window, days. */
   readonly days: number;
 }
 
-/** A commit as git log --name-status -M lists it, newest first. */
 export interface RawCommit {
   readonly sha: string;
-  /** Its commit time, ms. */
   readonly at: number;
   readonly entries: readonly { readonly path: string; readonly from?: string }[];
 }
 
-/** A commit with its files under today's names. */
 export interface Change {
   readonly sha: string;
   readonly at: number;
@@ -36,10 +28,10 @@ export interface Source {
   readonly text: string;
 }
 
-/** A change touching more files than this is mechanical (a format, a rewrite or rename across the tree): its files did not each get work. */
+/** Commits touching more files than this are ignored as tree-wide mechanical sweeps. */
 export const mechanicalFiles = 500;
 
-/** Each file under the name it has at the newest commit: newest first, a rename maps every older mention of the old name. */
+/** Expects `commits` newest-first so rename chains resolve to current paths. */
 export function underTodaysNames(commits: readonly RawCommit[]): Change[] {
   const today = new Map<string, string>();
   const nameOf = (path: string) => today.get(path) ?? path;
@@ -54,15 +46,12 @@ const lineCount = (text: string) => text.split("\n").length;
 
 export interface Hotspot {
   readonly path: string;
-  /** Changes in the window ending now, and in the window before it. */
   readonly changes: number;
   readonly before: number;
   readonly lines: number;
-  /** changes × lines: a big file that keeps changing is where a change most often goes wrong and a split pays most. */
   readonly score: number;
 }
 
-/** Each counted file's changes over the last `days` against the `days` before; mechanical changes are not counted. */
 export function hotspots(changes: readonly Change[], sources: readonly Source[], now: number, days: number, counted: Health["counted"]): Hotspot[] {
   const recent = new Map<string, number>();
   const earlier = new Map<string, number>();
@@ -81,23 +70,15 @@ export function hotspots(changes: readonly Change[], sources: readonly Source[],
     .toSorted((a, b) => (b.score !== a.score ? b.score - a.score : a.path.localeCompare(b.path)));
 }
 
-/** Where a check is turned off by hand. */
 export interface Escapes {
-  /** x!: the type checker is told a value is there. */
   readonly nonNull: number;
-  /** x as unknown as T: the type checker is told a value is another type. */
   readonly doubleCast: number;
-  /** x as T: the type checker takes a value as T unchecked (as const, as unknown and double casts aside). */
   readonly cast: number;
-  /** A comment that turns a lint rule off. */
   readonly lintOff: number;
-  /** Effect.orDie, Effect.orDieWith: an error the type declares is turned into a defect, out of the error channel. */
   readonly orDie: number;
-  /** Effect.ignore, Effect.ignoreCause without { log }: an error is dropped, and nobody hears of it. */
+  /** Excludes `Effect.ignore({ log })`, which logs dropped failures. */
   readonly ignored: number;
-  /** An empty catch {}, or a promise's .catch(() => {}) that returns nothing: the error is swallowed. */
   readonly swallowed: number;
-  /** yield* Effect.result(x) then a branch on its _tag: a failure answered by hand, its error's type no longer read. */
   readonly resultBranch: number;
 }
 
@@ -112,7 +93,6 @@ export const escapeKinds = [
   "resultBranch",
 ] as const satisfies readonly (keyof Escapes)[];
 
-/** What to do instead of each escape: what --check says when one is new. */
 export const escapeAdvice: Record<keyof Escapes, string> = {
   nonNull: "narrow the value (if (x === undefined) …, ?. or ??) so the type checker sees it is there",
   doubleCast: "decode the value (a Schema, a type guard) instead of telling the type checker it is another type",
@@ -125,7 +105,6 @@ export const escapeAdvice: Record<keyof Escapes, string> = {
 };
 
 type Node = { readonly type?: unknown; readonly [key: string]: unknown };
-/** Any object is a Node: every field is read as unknown. */
 const nodeOf = (v: unknown): Node => (typeof v === "object" && v !== null ? Object.fromEntries(Object.entries(v)) : {});
 
 const isEmpty = (fn: Node) => {
@@ -145,7 +124,7 @@ export function escapesIn(path: string, text: string): Escapes {
   let ignored = 0;
   let swallowed = 0;
   let resultBranch = 0;
-  // An ignore given { log } logs the failure it drops, so it is no escape: counted here and taken off below.
+  // Subtract `Effect.ignore({ log })` calls from raw `Effect.ignore` member hits.
   let logged = 0;
   const visit = (value: unknown): void => {
     if (Array.isArray(value)) return value.forEach(visit);
@@ -191,7 +170,6 @@ export function escapesIn(path: string, text: string): Escapes {
   return { nonNull, doubleCast, cast, lintOff, orDie, ignored: ignored - logged, swallowed, resultBranch };
 }
 
-/** The escapes of the counted sources, summed by area, areas in order. */
 export function escapesByArea(sources: readonly Source[], health: Pick<Health, "counted" | "areaOf">): Record<string, Escapes> {
   const out: Record<string, Record<keyof Escapes, number>> = {};
   for (const s of sources) {
@@ -203,7 +181,6 @@ export function escapesByArea(sources: readonly Source[], health: Pick<Health, "
   return Object.fromEntries(Object.entries(out).toSorted(([a], [b]) => a.localeCompare(b)));
 }
 
-/** A count off the ratchet: up is new escapes, down is a ratchet left loose. */
 export interface Drift {
   readonly area: string;
   readonly kind: keyof Escapes;
@@ -211,7 +188,6 @@ export interface Drift {
   readonly now: number;
 }
 
-/** Every count that differs from the kept one; an area that is gone counts zero now, a new one zero kept. */
 export function drift(kept: Readonly<Record<string, Escapes>>, now: Readonly<Record<string, Escapes>>): Drift[] {
   const areas = [...new Set([...Object.keys(kept), ...Object.keys(now)])].toSorted();
   return areas.flatMap((area) =>

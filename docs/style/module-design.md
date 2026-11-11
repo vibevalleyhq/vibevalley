@@ -108,7 +108,13 @@
 - **闭包里改的状态放进有类型的属性。** TypeScript 按初值收窄闭包外对 `let` 的读，看不到闭包里的赋值；放进标好类型的对象属性或有名字的类型（[闪播](apps/web/src/features/media/flash-stream.ts)）。
 - **页面的帧不拆。** 帧是 Solid 的 store，按 id 逐个 reconcile（[帧](apps/web/src/infra/frame.ts)）；为了联合改成按状态整个替换，会让每次换态重建整份画面。
 
-`practice:check` 的 `loose-flags` 拦一个函数里三个以上的 `let` 布尔：多半是一条没写出来的线；真是几个独立的维度，就照上面分开放、各自起名。
+`practice:check` 的 `loose-flags` 拦一个函数里三个以上的 `let` 布尔：多半是一条没写出来的线；真是几个独立的维度，就照上面分开放、各自起名。不用 XState 等外部状态机运行时：TypeScript 判别联合配合服务端 `SynchronizedRef`、客户端 `state/` 的 `Atom` 与组件内 `createSignal` 加 `variant()`，零额外依赖即可获得编译期穷尽检查并与 `Scope` 组合。
+
+### 错误与回滚契约
+
+- **三层错误各走其道**：外部 I/O 失败在 `Effect.tryPromise({ try, catch })` 边界立即包成带 `cause: Schema.Defect()` 的 `Schema.TaggedError`；业务拒绝用协议 `ApiError`（可恢复时附带 `next: Next[]` 或 `settings: VoiceFix`）；内部数据自相矛盾用 `Inconsistent`（缺陷），绝不伪装成普通拒绝。
+- **内部失败走错误通道，资源回滚走 `Scope`**：服务内部方法遇到拒绝或故障时在 `Effect` 错误通道返回，不把 `{ refused?: string }` 塞进成功返回值，也不用 `let refusal = ""` 加 `Effect.tapError` / `Effect.option` 旁路捕获；多步资源获取用 `Effect.acquireRelease` 绑定作用域，失败或中断时自动逆序释放。
+- **线上只暴露闭合 `ApiError`，客户端无损转 `UiFault`**：内部细粒度 `TaggedError` 在服务端边界按 `catchTag` 处理或转为 `ApiError`，不泄漏到 HTTP 契约；客户端 `faultOf`（[apps/web/src/infra/api.ts](apps/web/src/infra/api.ts)）将全部 `ApiError`（含 `502`/`503`）归类为明确的业务拒绝并保留 `next`、`settings` 与 `retryable`。
 
 ### 从测试困难诊断设计，避免先补工具
 

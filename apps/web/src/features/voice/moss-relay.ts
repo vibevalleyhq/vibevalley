@@ -1,7 +1,3 @@
-// The MOSS Live socket and the audio worklets' ports, as one relay: it runs in a worker (moss-relay.worker.ts) and, where
-// there is no worker, on the page, so both are the same code.
-
-/** What the page asks of the relay. */
 export type RelayCommand =
   | { readonly type: "connect"; readonly url: string }
   | { readonly type: "ports"; readonly capturePort: MessagePort; readonly playbackPort: MessagePort }
@@ -10,11 +6,10 @@ export type RelayCommand =
   | { readonly type: "send_binary"; readonly bytes: ArrayBuffer }
   | { readonly type: "enqueue"; readonly chunk: string; readonly run: string; readonly turn: string; readonly pcm: ArrayBuffer }
   | { readonly type: "cut_playback"; readonly run: string; readonly turn: string }
-  /** How full the socket is now: it drains with nothing said, so the page asks on its own tick. */
+  /** WebSocket drains bufferedAmount silently, so the page polls it on its own tick. */
   | { readonly type: "measure" }
   | { readonly type: "close" };
 
-/** What the relay tells the page. bufferedAmount is the socket's after the step it comes with. */
 export type RelayEvent =
   | { readonly type: "open" }
   | { readonly type: "text"; readonly data: string; readonly bufferedAmount: number }
@@ -26,13 +21,12 @@ export type RelayEvent =
   | { readonly type: "close"; readonly opened: boolean; readonly code: number; readonly reason: string }
   | { readonly type: "closed" };
 
-/** A microphone frame: 640 bytes of 16 kHz PCM and its sequence byte. */
+/** 640 bytes of 16 kHz PCM plus 1 sequence byte. */
 const micFrameBytes = 641;
-/** The socket's own buffer the microphone may fill; beyond it frames are dropped rather than queued late. */
+/** Drop mic frames past this threshold instead of queueing stale audio. */
 const micBufferMax = 65_536;
 const sendBufferMax = 524_288;
 
-/** Runs one relay; post carries its events out (with what they transfer). */
 export function mossRelay(post: (event: RelayEvent, transfer?: Transferable[]) => void): (command: RelayCommand) => void {
   let ws: WebSocket | undefined;
   let capturePort: MessagePort | undefined;

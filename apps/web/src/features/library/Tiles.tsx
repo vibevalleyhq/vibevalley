@@ -10,7 +10,6 @@ import { styleProps } from "#/ui/positioner.ts";
 
 import { durationText, extOf, justify, kindOf, type Placed } from "./items.ts";
 
-/** What the page learns of a file once its picture or sound has loaded: proportions, pixels, length. */
 export interface Seen {
   readonly ratio?: number;
   readonly width?: number;
@@ -18,7 +17,6 @@ export interface Seen {
   readonly seconds?: number;
 }
 
-/** Whether what was learnt says nothing new: each thing it tells is already known as that. */
 export const knows = ({ had, learnt }: { readonly had: Seen; readonly learnt: Seen }) =>
   (learnt.ratio === undefined || had.ratio === learnt.ratio) &&
   (learnt.width === undefined || had.width === learnt.width) &&
@@ -26,14 +24,12 @@ export const knows = ({ had, learnt }: { readonly had: Seen; readonly learnt: Se
   (learnt.seconds === undefined || had.seconds === learnt.seconds);
 
 export const tileGap = 12;
-/** The caption under a thumbnail: one line of text-xs and the space above it. */
 const captionPx = 22;
 
 const styles = stylex.create({
   rows: { display: "flex", flexDirection: "column", gap: tileGap },
   row: { display: "flex", gap: tileGap },
-  // The files' area is as high as its rows; each tile sits where the layout put it, so a tile keeps its element (and its
-  // loaded picture) when the rows around it change.
+  // Absolute coordinates inside a fixed-height container keep tile DOM nodes (and decoded images) intact across row reflows.
   field: (height: number) => ({ position: "relative", height }),
   at: (x: number, y: number) => ({ position: "absolute", left: x, top: y }),
   tile: (width: number, height: number) => ({
@@ -68,7 +64,6 @@ const styles = stylex.create({
   },
   picked: { outlineColor: "var(--color-accent)" },
   active: { outlineColor: { default: "var(--color-focus)", ":is([data-picked] > *)": "var(--color-accent)" } },
-  // A file with no picture stands on the faintest fill, so its tile still reads as one.
   plain: {
     flexDirection: "column",
     gap: "var(--spacing)",
@@ -83,7 +78,7 @@ const styles = stylex.create({
     right: "var(--spacing)",
     bottom: "var(--spacing)",
     borderRadius: "var(--radius-xs)",
-    // Dark under light in both themes, as code is: it sits on a picture, not on the page.
+    // High-contrast code tokens stay legible over bright or dark media in both themes.
     backgroundColor: "var(--color-code-bg)",
     paddingInline: "var(--spacing)",
     fontSize: "var(--text-2xs)",
@@ -100,7 +95,6 @@ const styles = stylex.create({
     color: "var(--color-muted)",
   },
   captionPicked: { color: "var(--color-ink)" },
-  // A job still making its file: dashed, in the colour of waiting.
   making: {
     flexDirection: "column",
     gap: "calc(var(--spacing) * 2)",
@@ -120,7 +114,6 @@ const styles = stylex.create({
 
 const kindIcon: Record<"audio" | "video" | "other", IconName> = { audio: "audio", video: "video", other: "file" };
 
-/** The proportions a tile is laid out by before its file has said: a sound is a wide strip, a film widescreen. */
 export const ratioOf = ({ item, seen }: { readonly item: LibraryItem; readonly seen: Seen | undefined }): number => {
   if (seen?.ratio !== undefined) return seen.ratio;
   switch (kindOf(item.attachment.type)) {
@@ -135,7 +128,6 @@ export const ratioOf = ({ item, seen }: { readonly item: LibraryItem; readonly s
   }
 };
 
-/** A width that follows the element's, for laying rows out to it. */
 export function useWidth() {
   const [el, setEl] = createSignal<HTMLElement>();
   const [width, setWidth] = createSignal(0);
@@ -179,8 +171,6 @@ export function MakingTiles(props: { jobs: readonly MediaJob[]; width: number; h
   );
 }
 
-/** The files, in justified rows at their own proportions: no frame or fill, the name one line below. */
-/** Where each tile goes: its row's top, from the rows the layout made, and the height of them all. */
 const stacked = ({
   rows,
   gap,
@@ -197,7 +187,6 @@ const stacked = ({
   return { at, height: y };
 };
 
-/** The files, in justified rows at their own proportions: no frame or fill, the name one line below. */
 export function Tiles(props: {
   items: readonly LibraryItem[];
   rows: readonly Placed[][];

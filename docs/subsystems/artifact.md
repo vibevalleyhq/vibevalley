@@ -69,9 +69,11 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档产�
 - **统一「文档」与「Artifact」，Markdown 入库即转块**：只读交付物与协作文档集中管理，Markdown 交上来即可逐段协同修改，无需维护两套工具。
 - **HTML 走独立路由 + CSP 沙箱 + 提交前静态检查**：不用 `srcdoc`，使 `iframe` 与新标签页共享响应头隔离；提交前拦截外链让帮工当场修好，避免用户打开破损页面。
 - **按块操作 + 服务端定序，不上 CRDT**：文档协作以段落分工为主，按块 `baseRev` 判冲突并配合用户块 `Suggestion` 机制，用纯函数即可杜绝静默覆盖。
+- **网页种类保持 HTML 优先加轻量外壳约定，不用自定义 Markdown/JSON 渲染器**：帮工写 HTML 表达力不受渲染器限制，外壳只通过 `postMessage` 读取页数、备注或时间轴并提供翻页、放映、打印和录制控制；放弃无约定自建翻页（每篇写法不一且外壳无法统一导出）。
 
 ## 还没做的
 
+- 网页 Artifact 动画时间轴（`display: "motion"`）与导出视频入素材库：[网页 Artifact 的 motion 动画时间轴与导出视频](.agents/notes/proposed/feature/2026-11-10-html-artifact-kinds.md)。
 - 网页 Artifact 元素锚点、锚点评论标记与自适应高度回报：[网页 Artifact 的元素锚点、锚点评论与高度回报](.agents/notes/proposed/feature/2026-11-04-html-artifact-display.md)。
 - 父子工单分节绑定与按节确认定稿：[几个帮工同时写一篇文章](.agents/notes/proposed/feature/2026-10-20-block-editor-ux.md)。
 - 块编辑器在线光标、块内三方合并（`merged`）与修订历史找回。

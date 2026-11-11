@@ -19,8 +19,8 @@
 | `packages/provider/src/moss/models.ts` | 官方模型目录的认证请求、响应解码和安全错误分类 |
 | `packages/provider/src/moss/image-models.ts` | 已适配的生图模型与快照；配置校验与生图协议共用唯一列表 |
 | `packages/provider/src/transcription.ts` | 支持的 MOSS 转写模型、官方地址、唯一的兼容转写客户端 |
-| `apps/server/src/provider/` | `Provider` 服务、连接变更规则、用途解析 |
-| `apps/server/src/setting/provider.ts` | `settings.json.providers` 的私有 Schema |
+| `apps/server/src/provider/` | `Provider` 服务、供应商目录 `vendors.ts`、连接变更规则与不认供应商的能力出口 |
+| `apps/server/src/setting/provider.ts` | `settings.json.providers` 的私有 Schema 与单一绑定规则 `bindingOf` |
 | `packages/protocol/src/provider/` | 公共形状、Schema 和接口权限 |
 | `apps/web/src/features/provider/` | `/settings/providers` 的连接与默认用途表单 |
 
@@ -56,6 +56,7 @@
 ## 为什么这样
 
 - **Provider 管选择，Setting 管存储**：目录与用途被多种能力使用，不放进 Voice；私有配置留在现有原子文件中，避免两个存储所有者互相同步。
+- **能力挂在单一 `Provider` 服务上，供应商作数据目录（`vendors.ts`）**：遵循一模块一服务，不为每个能力另起 `Context.Service`，也不在启动时定死供应商 `Layer`（绑定可在运行期切换）；调用方只拿不认供应商的 `Account` 快照（连接、revision、模型、Key 指纹和封着 `Provider` 自身 `HttpClient` 的调用）与能力自己的错误类型，Media 等模块不直接依赖 `@vibevalley/provider/moss/*`。
 - **整组配置加版本检查**：连接数量有上限，用户可在一次保存中解绑再删除，引用校验不会出现中间失效状态；不为小目录引入多表事务或事件流。
 - **不自动迁移散置凭据**：内部格式直接采用连接与用途，不保留两套 Key 的回退优先级。已有旧配置需由用户重新填写，开发和验收只使用隔离家目录。
 - **目录查询不复用实时握手验证**：查询账号模型不需要建立语音会话；MOSS Live 的握手检查留在语音页，只验证绑定的实时连接。

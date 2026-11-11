@@ -7,7 +7,6 @@ type ParticipantRow = qp.ParticipantsResult;
 
 const subjectKey = (kind: string, id: string) => kind + ":" + id;
 
-/** Who follows each thread and who is in each channel, told each change as the chat writes it and reloaded with the model. */
 export class Members {
   private members = new Map<string, Set<string>>();
 
@@ -16,25 +15,21 @@ export class Members {
     for (const f of follows) this.memberAdded(f.channel_id, f.participant_id);
   }
 
-  /** Follow: following again is following. */
   memberAdded(channel: string, participant: string) {
     const held = this.members.get(channel);
     if (held) held.add(participant);
     else this.members.set(channel, new Set([participant]));
   }
 
-  /** One taken out of a place. */
   memberRemoved(channel: string, participant: string) {
     const held = this.members.get(channel);
     if (held?.delete(participant) === true && held.size === 0) this.members.delete(channel);
   }
 
-  /** A Session that left follows nothing. */
   left(participant: string) {
     for (const [channel, held] of this.members) if (held.delete(participant) && held.size === 0) this.members.delete(channel);
   }
 
-  /** By id. */
   membersOf(channel: string): string[] {
     return [...(this.members.get(channel) ?? [])].toSorted();
   }
@@ -71,17 +66,15 @@ export class ChatModel {
     return this.byId.get(id);
   }
 
-  /** The thread under a message: there is one at most. */
   threadOfRoot(root: string): string | undefined {
     return this.threadByRoot.get(root);
   }
 
-  /** A subject's newest thread, as ids sort by when they were made. */
+  /** Relies on lexicographically monotonic thread ids to retain the newest thread per subject. */
   threadOfSubject(kind: string, id: string): string | undefined {
     return this.threadBySubject.get(subjectKey(kind, id));
   }
 
-  /** The default channel (is_default): where words with no channel named land. */
   defaultChannel(): ChannelRow | undefined {
     for (const c of this.byId.values()) if (c.is_default) return c;
     return undefined;
@@ -91,7 +84,7 @@ export class ChatModel {
     return this.defaultChannel()?.id ?? "";
   }
 
-  /** The top-level channel a room belongs to: a thread's parent channel, a channel itself, or the default channel for a direct room. */
+  /** Direct rooms fall back to `defaultChannel()` because they have no parent channel. */
   topChannel(id: string): ChannelRow | undefined {
     const row = this.byId.get(id);
     if (!row || row.type === "direct") return this.defaultChannel();
@@ -103,7 +96,6 @@ export class ChatModel {
     return undefined;
   }
 
-  /** The channels of a type in the sidebar's order: the default first, then by place, then as they were made. */
   channels(type: "channel" | "direct" = "channel"): ChannelRow[] {
     const all = [...this.byId.values()].filter((c) => c.type === type);
     const place = (c: ChannelRow) => c.position ?? Number.MAX_SAFE_INTEGER;
@@ -114,7 +106,6 @@ export class ChatModel {
     return [...this.byId.values()].filter((c) => c.parent_id === channel);
   }
 
-  /** CreateChannel, CreateDirect, CreateThread. */
   created(row: ChannelRow) {
     this.byId.set(row.id, { ...row });
     if (row.root_id !== null) this.threadByRoot.set(row.root_id, row.id);
@@ -125,19 +116,16 @@ export class ChatModel {
     }
   }
 
-  /** UpdateChannel. */
   channelUpdated(id: string, description: string | null, repo: string | null) {
     const c = this.byId.get(id);
     if (c && c.type !== "thread") this.byId.set(id, { ...c, description, repo });
   }
 
-  /** RenameChannel, SetCategory, PlaceChannel, SetArchived, SetNotify. */
   patched(id: string, change: Partial<Pick<ChannelRow, "name" | "category" | "position" | "archived_at" | "notify">>) {
     const c = this.byId.get(id);
     if (c) this.byId.set(id, { ...c, ...change });
   }
 
-  /** DeleteThreadsOf, DeleteChannel: the channel and its threads. */
   removed(id: string) {
     for (const c of [...this.byId.values()])
       if (c.id === id || c.parent_id === id) {
@@ -150,12 +138,11 @@ export class ChatModel {
       }
   }
 
-  /** MarkUnread for the user: it moves back too. */
+  /** Unlike `userReadTo`, `markUnread` moves the read cursor backward. */
   userReadBack(channel: string, number: number) {
     this.userRead.set(channel, number);
   }
 
-  /** ClearDefault, MakeDefault. */
   defaultMoved(from: string, to: string) {
     const a = this.byId.get(from);
     const b = this.byId.get(to);
@@ -163,7 +150,6 @@ export class ChatModel {
     if (b) this.byId.set(to, { ...b, is_default: true });
   }
 
-  /** TouchChannel. */
   touched(id: string, number: number) {
     const c = this.byId.get(id);
     if (c)
@@ -182,13 +168,12 @@ export class ChatModel {
     return this.people.get(id);
   }
 
-  /** UpsertParticipant: one already there keeps its kind and when it joined, and is back. */
+  /** Preserves original `kind` and `joined_at` when an existing participant rejoins. */
   joined(p: Omit<ParticipantRow, "left_at">) {
     const held = this.people.get(p.id);
     this.people.set(p.id, held ? { ...held, name: p.name, agent_id: p.agent_id, runtime: p.runtime, left_at: null } : { ...p, left_at: null });
   }
 
-  /** ParticipantLeft: their participant state, follows and read place go with them. */
   left(id: string, at: number) {
     this.members.left(id);
     this.lastRead.delete(id);
@@ -196,7 +181,6 @@ export class ChatModel {
     if (p && p.left_at === null) this.people.set(id, { ...p, left_at: at });
   }
 
-  /** Follow: following again is following. */
   memberAdded(channel: string, participant: string) {
     this.members.memberAdded(channel, participant);
   }
@@ -205,27 +189,22 @@ export class ChatModel {
     this.members.memberRemoved(channel, participant);
   }
 
-  /** Who follows a thread or is in a channel, by id. */
   membersOf(channel: string): string[] {
     return this.members.membersOf(channel);
   }
 
-  /** The newest number the chat published for a channel. */
   publishedNumber(channel: string): number | undefined {
     return this.publishedLast.get(channel);
   }
 
-  /** What the chat published for a channel only moves on. */
   notePublished(channel: string, number: number) {
     this.publishedLast.set(channel, Math.max(this.publishedLast.get(channel) ?? 0, number));
   }
 
-  /** ReadCursor for the user. */
   userReadIn(channel: string): number | undefined {
     return this.userRead.get(channel);
   }
 
-  /** SetReadCursor for the user: it only moves on. */
   userReadTo(channel: string, number: number) {
     this.userRead.set(channel, Math.max(this.userRead.get(channel) ?? number, number));
   }

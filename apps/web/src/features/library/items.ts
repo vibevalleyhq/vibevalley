@@ -5,14 +5,12 @@ import type { LibraryFileKind, LibraryItem, LibraryOrigin, LibraryOriginKind, Me
 
 export type KindFilter = LibraryFileKind | "all";
 
-/** What the rail's upper group narrows to: everything, one origin, the uploads said in one channel, or one profile's fetches. */
 export type Where =
   | { readonly by: "all" }
   | { readonly by: "origin"; readonly origin: LibraryOriginKind }
   | { readonly by: "channel"; readonly channel: string }
   | { readonly by: "agent"; readonly agent: string };
 
-/** A rail entry's key: what a test and the pressed state find it by. */
 export const whereKey = (where: Where): string => {
   switch (where.by) {
     case "all":
@@ -26,7 +24,6 @@ export const whereKey = (where: Where): string => {
   }
 };
 
-/** What a file is, by its media type, as the server files it (library.item.list's type). */
 export const kindOf = (type: string): LibraryFileKind =>
   Str.startsWith("image/")(type) ? "image" : Str.startsWith("audio/")(type) ? "audio" : Str.startsWith("video/")(type) ? "video" : "other";
 
@@ -48,21 +45,17 @@ const isIn = (where: Where) => (item: LibraryItem) => {
 
 const isKind = (kind: KindFilter) => (item: LibraryItem) => kind === "all" || kindOf(item.attachment.type) === kind;
 
-/** The items the rail lets through, in the order given. */
 export const shown = (given: { readonly items: readonly LibraryItem[]; readonly where: Where; readonly kind: KindFilter }): LibraryItem[] =>
   Arr.filter(given.items, (item) => isIn(given.where)(item) && isKind(given.kind)(item));
 
 export interface Counts {
-  /** By where's key, over the items of the chosen kind. */
   readonly where: ReadonlyMap<string, number>;
-  /** By kind, over the items the chosen where lets through. */
   readonly kind: ReadonlyMap<KindFilter, number>;
-  /** The channels uploads were said in and the profiles that fetched, each once, in the order first met. */
   readonly channels: readonly string[];
   readonly agents: readonly string[];
 }
 
-/** The rail's numbers: each group counted with the other group's choice applied, as a filter pane does. */
+/** Cross-filtered facet counts: each group applies the other group's active filter. */
 export const countsOf = (given: { readonly items: readonly LibraryItem[]; readonly where: Where; readonly kind: KindFilter }): Counts => {
   const { items, where, kind } = given;
   const byWhere = new Map<string, number>();
@@ -89,26 +82,24 @@ export const countsOf = (given: { readonly items: readonly LibraryItem[]; readon
   return { where: byWhere, kind: byKind, channels, agents };
 };
 
-/** A job still working towards its file: shown first as a placeholder tile. Understanding makes no file. */
+/** Excludes understanding jobs, which produce no file. */
 export const making = (jobs: readonly MediaJob[]): MediaJob[] =>
   Arr.filter(jobs, (job) => job.kind !== "understanding" && (job.phase === "queued" || job.phase === "generating" || job.phase === "downloading"));
 
 export interface Placed {
-  /** The tile's place in the list given. */
   readonly index: number;
   readonly x: number;
   readonly width: number;
   readonly height: number;
 }
 
-// A panorama or a sliver would leave a row of one strip: tiles keep to these proportions, the picture fits inside.
+// Clamp extreme aspect ratios so a panorama or sliver does not claim an entire row.
 const widest = 3;
 const narrowest = 0.5;
 
 const clamp = (r: number) => (Number.isFinite(r) && r > 0 ? Math.min(widest, Math.max(narrowest, r)) : 1);
 
-/** Justified rows, as a photo library lays them out: each row is scaled to fill the width exactly; the last keeps the
- * target height rather than stretching a few tiles across. ratios are width over height. */
+/** `ratios` are width / height; the final incomplete row keeps `height` rather than stretching across `width`. */
 export function justify(given: { readonly ratios: readonly number[]; readonly width: number; readonly height: number; readonly gap: number }): Placed[][] {
   const { ratios, width, height, gap } = given;
   if (width <= 0) return [];
@@ -138,8 +129,6 @@ export function justify(given: { readonly ratios: readonly number[]; readonly wi
   return rows;
 }
 
-/** The tile an arrow key moves to from index: left and right step through the order, up and down go to the tile in the
- * row above or below whose middle is nearest. Undefined: no tile that way. */
 export function neighbor(given: {
   readonly rows: readonly Placed[][];
   readonly index: number;
@@ -167,7 +156,6 @@ export function neighbor(given: {
   return best?.index;
 }
 
-/** The ids from one to the other in the shown order, both included: a shift-click's selection. */
 export const between = (given: { readonly ids: readonly string[]; readonly from: string; readonly to: string }): string[] => {
   const a = given.ids.indexOf(given.from);
   const b = given.ids.indexOf(given.to);
@@ -178,7 +166,6 @@ export const between = (given: { readonly ids: readonly string[]; readonly from:
   return out;
 };
 
-/** The name's extension in capitals, as the tile shows a file without a picture: "" when it has none. */
 export const extOf = (name: string): string => {
   const found = /[^./][^/]*\.([^./]+)$/u.exec(name);
   return found?.[1] === undefined ? "" : Str.toUpperCase(found[1]);
@@ -186,14 +173,12 @@ export const extOf = (name: string): string => {
 
 const pad = Str.padStart(2, "0");
 
-/** A sound's or a film's length as m:ss (h:mm:ss past an hour). */
 export const durationText = (seconds: number): string => {
   const s = Math.max(0, Math.round(seconds));
   const two = (n: number) => pad(String(n));
   return s >= 3600 ? `${Math.floor(s / 3600)}:${two(Math.floor((s % 3600) / 60))}:${two(s % 60)}` : `${Math.floor(s / 60)}:${two(s % 60)}`;
 };
 
-/** Names for ids an origin holds: a profile's and a channel's, the id itself when unknown. */
 export interface Names {
   readonly agent: (id: string) => string;
   readonly channel: (id: string) => string;
@@ -209,7 +194,6 @@ const jobWord: Record<MediaJob["kind"], () => string> = {
   understanding: () => t("web.library.job.understanding"),
 };
 
-/** Where an item came from, in a line: who and from where; the time is the caller's. */
 export const originLine =
   (names: Names) =>
   (origin: LibraryOrigin): string => {
@@ -227,7 +211,6 @@ export const originLine =
 
 const none = (): MediaUnderstandingJob | undefined => undefined;
 
-/** The newest finished understanding of a file, if any: what the inspector shows under it. */
 export const understoodText =
   (attachment: string) =>
   (jobs: readonly MediaJob[]): string | undefined =>

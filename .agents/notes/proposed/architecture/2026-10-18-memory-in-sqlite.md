@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-当前 SQLite `memory` 表（[记性](docs/subsystems/memory.md)）只有按档案隔离的 `note` 和 `issue` 两种条目，还缺两样：
+当前 Postgres `memory` 表（[记性](docs/subsystems/memory.md)）只有按档案隔离的 `note` 和 `issue` 两种条目，还缺两样：
 
 | 缺项 | 现状 | 问题 |
 |---|---|---|
@@ -15,7 +15,7 @@ Status: proposed
 
 | 新增 `kind` | 含义 | 范围 | 写入时机 |
 |---|---|---|---|
-| `profile` | 关于用户的事实与偏好 | 全农场共享（`scope = owner`） | 用户添加、助手或帮工提交用户偏好 |
+| `profile` | 关于用户的事实与偏好 | 全农场共享（`scope = user`） | 用户添加、助手或帮工提交用户偏好 |
 | `episode` | 单轮任务经过（说明、汇报、改动文件）及助手压缩归档切片 | 归属对应档案 | 会话收工时、助手上下文压缩时 |
 
 1. **表结构**：在 `0001_schema.up.sql` 的 `memory` 表扩展 `kind`（加入 `profile`、`episode`），增加 `title`、`importance`（0–3）与 `replaced_by`。
@@ -25,7 +25,7 @@ Status: proposed
 
 ## Alternatives considered
 
-- **本地接入向量检索（embedding）**：需额外部署本地模型或调用付费接口；外部记忆源已提供语义检索，本地保持 FTS5 分词检索。
+- **本地接入向量检索（embedding）**：需额外部署本地模型或调用付费接口；外部记忆源已提供语义检索，本地保持 Postgres `term_vector` / `term_query` 分词检索。
 - **检索 `episode` 时再调一次模型总结**：每次搜索多花一轮模型费用；直接返回命中位置前后的原文摘录已足够定位。
 
 ## Acceptance criteria

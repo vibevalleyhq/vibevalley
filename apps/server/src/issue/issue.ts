@@ -34,37 +34,28 @@ export class Issue extends Context.Service<
   Issue,
   {
     readonly list: () => Effect.Effect<T.Issue[]>;
-    /** The board's issues a filter picks (issue.list). */
     readonly query: (f: T.IssueFilter) => Effect.Effect<T.Issue[]>;
-    /** The issues the board holds now (open, and the latest closed). */
     readonly onBoard: () => readonly T.Issue[];
     readonly get: (id: string) => Effect.Effect<T.Issue, ApiError>;
     readonly add: (req: T.IssueRequest, mandate: T.IssueMandate) => Effect.Effect<T.Issue, ApiError>;
-    /** On the user's word only (actsForUser). */
     readonly edit: (id: string, upd: T.IssueUpdate, by: Actor) => Effect.Effect<T.Issue, ApiError>;
     readonly remove: (id: string) => Effect.Effect<void, ApiError>;
     readonly start: (id: string, channel: string) => Effect.Effect<Dispatched, ApiError>;
     readonly scheduled: (due: Due, input: T.Trigger) => Effect.Effect<T.Issue, ApiError>;
     readonly split: (id: string, title: string, drafts: readonly T.IssueChildDraft[], by: Actor) => Effect.Effect<string, ApiError>;
-    /** agent: moving to todo, the profile (id or name) that takes it on. another than its own hands it over. */
     readonly setStatus: (id: string, to: T.IssueStatus, text: string, channel: string, by: Actor, opt?: StatusOptions) => Effect.Effect<T.Issue, ApiError>;
-    /** Stops the turn of the session working it; the session stays, and a word starts the next. */
     readonly stop: (id: string) => Effect.Effect<void, ApiError>;
-    /** What setStatus would do with the same request, refused as it would be. nothing changes. */
     readonly previewStatus: (id: string, to: T.IssueStatus, text: string, opt?: StatusOptions, edit?: T.IssueUpdate) => Effect.Effect<T.Preview, ApiError>;
-    /** What remove would do, refused as it would be; nothing changes. */
     readonly previewRemove: (id: string) => Effect.Effect<T.Preview, ApiError>;
-    /** An issue's id from what the user and the orchestrator call it: #41 or 41, its id, or the id of a session that worked it. */
+    /** Resolves `#41`, `41`, an issue id, or the id of a session that worked it. */
     readonly idOf: (ref: string) => Effect.Effect<string, ApiError>;
     readonly comment: (id: string, text: string, sendKey?: string) => Effect.Effect<void, ApiError>;
-    /** The user's look counts for the game; anyone else's does not. */
     readonly changes: (id: string, by: Actor) => Effect.Effect<T.Changes, ApiError>;
     readonly review: (id: string, req: IssueReviewRequest) => Effect.Effect<T.Issue, ApiError>;
     readonly refine: (id: string, word: string, channel: string) => Effect.Effect<T.Issue, ApiError>;
     readonly history: () => Effect.Effect<T.IssueHistory[]>;
     readonly timeline: (id: string) => Effect.Effect<T.IssueTimeline, ApiError>;
     readonly templates: (repo: string) => Effect.Effect<T.RepoTemplates, ApiError>;
-    /** Sends a session for work that is not written down first (the orchestrator sending someone at once, a task's step): its issue is made from the brief. */
     readonly hire: (agent: T.Agent, brief: string, repo: string, opt?: HireOptions) => Effect.Effect<Hired>;
     readonly refreshPullRequests: Effect.Effect<void>;
     readonly refreshQueue: Effect.Effect<void>;
@@ -77,7 +68,6 @@ export class Issue extends Context.Service<
   );
 }
 
-/** A verdict on what was handed back: passed, or not, with the findings (or words) it is mended by. */
 export interface IssueReviewRequest {
   readonly pass: boolean;
   readonly findings?: readonly string[];
@@ -165,7 +155,6 @@ const make = Effect.gen(function* () {
     yield* chat.post({ _tag: "User", text: text, channel: thread, sendKey: sendKey });
   });
 
-  /** Its session, if one is on the farm, goes home; an issue no session works on has nobody to send. */
   const cancel = Effect.fn("Issue.cancel")(function* (id: string): Effect.fn.Return<void, ApiError> {
     const item = yield* get(id);
     yield* Effect.forEach(
@@ -219,11 +208,10 @@ const make = Effect.gen(function* () {
         yield* unqueue(n.issue);
         return;
       case "RunFinished":
-        // However the orchestrator's turn ended, the issue waits on the user: a turn that did not fail is not an answer yet.
+        // In-process orchestrator runs emit no `Reported`; move their issues to await user review when the turn ends.
         yield* Effect.forEach(n.issues, (id) => endRun(id).pipe(bestEffort(`vibevalley: run ${n.id} finished on issue ${id}`)), { discard: true });
         return;
       default:
-        // A hire is the channels' to follow; inputs and launches are Mailbox's.
         return;
     }
   });
@@ -239,7 +227,7 @@ const make = Effect.gen(function* () {
   yield* loadKept;
   const news = yield* sessions.news;
   const userWords = yield* chat.userInThread;
-  // One at a time: a report and the user's word on it do not cross.
+  // Serialize session reports and user thread replies on one stream so they cannot race.
   yield* Effect.forkScoped(
     Stream.runForEach(
       Stream.merge(
@@ -297,8 +285,7 @@ const make = Effect.gen(function* () {
     add: Effect.fn("Issue.add")(function* (req, mandate) {
       return yield* add(req, mandate);
     }),
-    /** The words and who does it only before it is sent; how it is accepted and what it delivers while it is open: the
-     * next round goes by them. */
+    /** Only `deliver` may change after dispatch; all other fields require `unsent`. */
     edit: Effect.fn("Issue.edit")(function* (id, upd, by) {
       if (!actsForUser(by)) return yield* Effect.fail(refused(needsUser));
       const whileOpen =
@@ -339,7 +326,6 @@ const make = Effect.gen(function* () {
       if (cleared.kept) return yield* Effect.fail(refused(t("server.issue.cannotDelete", { n: item.number, why: cleared.reason })));
       yield* remove(id);
     }),
-    // Untraced: it only drops the arguments the service does not take, and the call it makes is named Issue.start.
     start: Effect.fnUntraced(function* (id, channel) {
       return yield* start(id, channel);
     }),
@@ -351,7 +337,6 @@ const make = Effect.gen(function* () {
     setStatus: Effect.fn("Issue.setStatus")(function* (ref, to, text, channel, by, opt = {}) {
       if (!actsForUser(by)) return yield* Effect.fail(refused(needsUser));
       const item = yield* get(ref);
-      // Read by its number too: every write below goes by its id.
       const id = item.id;
       const { move, said, taker, delivery } = yield* settledMove(item, to, text, opt);
       switch (move) {
@@ -369,15 +354,14 @@ const make = Effect.gen(function* () {
         case "unqueue":
           yield* setQueued(id, false, chat.defaultChannel());
           break;
-        // Handed over: its session leaves first, so that one session at a time works the issue's branch.
         case "round":
           if (taker) {
+            // Dismiss the current helper first so at most one session owns the issue's branch.
             yield* cancel(id);
             yield* cancelAs(id, "dismissed");
             yield* reopen(id, said, channel, { kind: "comment" }, taker);
             break;
           }
-          // A session on the farm hears it in its thread. with none (the orchestrator's), its doer is asked again.
           if (sessionIdsOf(item).length === 0) yield* start(id, channel, { kind: "comment" }, said);
           else if (said && item.stage.state === "reviewing") yield* shape.review(id, { pass: false, findings: findingsOf(said) });
           else yield* comment(id, said || (yield* stuckWords(item)));
@@ -388,9 +372,7 @@ const make = Effect.gen(function* () {
         case "revive":
           yield* revive(id);
           break;
-        // What it delivers follows the issue: nothing to take in (no commits), or its branch kept by the user's choice, touches no git and opens no pull request.
         case "complete": {
-          // Completing is the acceptance: whatever it was sent back for is settled.
           const unresolved = item.findings.some((f) => !f.resolved);
           const settleFindings = () =>
             judged(
@@ -402,13 +384,12 @@ const make = Effect.gen(function* () {
           const acceptedDelivery = delivery === "submit" ? "submitted" : delivery;
           if (acceptedDelivery === "kept" || acceptedDelivery === "none" || acceptedDelivery === "submitted") {
             if (unresolved) yield* settleFindings();
-            // Written down before its session goes home, so that leaving does not take it for canceled.
+            // Record completion before dismissing the helper so `Left` does not mark the issue canceled.
             yield* complete(id, acceptedDelivery);
             const last = latestSessionIdOf(item);
             if (last !== undefined && sessions.isReachable(last)) yield* sessions.dismiss(last, "keep", "completed");
             break;
           }
-          // The session's leaving closes the issue too, but later: closed here, the answer already says so.
           yield* merge(id, true);
           const updated = yield* get(id);
           if (updated.pullRequest?.state !== "open") {
@@ -479,12 +460,10 @@ const make = Effect.gen(function* () {
       const at = yield* Clock.currentTimeMillis;
       const findings = [...item.findings, ...fresh.map((text) => ({ id: newId(), text, at, resolved: false }))];
       yield* judged(id, 0, findings);
-      // The findings go to whoever works it as the next round's words, like any comment.
       yield* comment(id, failedText(findings, text));
       return yield* get(id);
     }),
     refine: draft,
-    /** A session with no record is named as missing, not given a phase. */
     history: Effect.fn("Issue.history")(function* () {
       const all = yield* everyIssue;
       const byId = new Map((yield* sessions.list("")).map((s) => [s.id, s]));
@@ -510,14 +489,12 @@ const make = Effect.gen(function* () {
   return shape;
 });
 
-/** The queue and the pull requests are looked at again on their periods once every service is built. */
 export const start = Layer.effectDiscard(
   Effect.gen(function* () {
     const config = yield* ServerConfig;
     const issue = yield* Issue;
     yield* issue.refreshQueue;
     yield* Effect.forkScoped(issue.refreshQueue.pipe(Effect.repeat(Schedule.spaced(config.chat.retryWakeMs)), Effect.delay(config.chat.retryWakeMs)));
-    // Each waits a period before its first run, then runs every period.
     const pollEvery = config.github.prPollSeconds > 0 ? config.github.prPollSeconds * 1000 : 180_000;
     yield* Effect.forkScoped(
       issue.refreshPullRequests.pipe(bestEffort("vibevalley: refresh pull requests"), Effect.repeat(Schedule.spaced(pollEvery)), Effect.delay(pollEvery)),

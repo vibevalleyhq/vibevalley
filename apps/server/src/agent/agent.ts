@@ -25,7 +25,7 @@ interface Stored {
   readonly settings: Readonly<Record<string, T.RuntimeSettings>>;
 }
 
-// A profile's look may lack what withCast fills in (a build and a head): config.json from before those existed.
+// Backfill `build` and `head` before schema decoding for config.json files written prior to those fields.
 const readFile = Schema.decodeEffect(
   Schema.fromJsonString(
     Schema.Struct({
@@ -49,7 +49,7 @@ const readStored = Effect.fnUntraced(function* (text: string) {
   return { agents, skills: file.skills, settings: file.settings } satisfies Stored;
 });
 
-/** Over each code point's first UTF-16 unit, wrapping at 32 bits, as the client counts. */
+/** Hashes each code point's leading UTF-16 code unit (32-bit unsigned) to match client avatar selection. */
 function castHash(s: string): number {
   let h = 0;
   for (const ch of s) {
@@ -60,7 +60,6 @@ function castHash(s: string): number {
   return h;
 }
 
-/** Missing appearance fields are filled on load and save: no enum reaches a client as an empty string. */
 export function withCast(a: T.Agent): T.Agent {
   const look = { ...a.look };
   look.build ||= "biped";
@@ -74,36 +73,28 @@ export function withCast(a: T.Agent): T.Agent {
 export class Agent extends Context.Service<
   Agent,
   {
-    /** The profiles work is sent to: the helpers. */
+    /** Helper profiles only. */
     readonly agents: () => T.Agent[];
-    /** All the profiles, the orchestrators too. */
     readonly all: () => T.Agent[];
     readonly orchestrators: () => T.Agent[];
-    /** A profile with this id is an orchestrator. */
     readonly isOrchestrator: (id: string) => boolean;
-    /** A profile whose agent works in this server process (Session.host), handed its inputs there; the others are
-     * launched on a runtime. Today the role decides it, here alone (roleProblem keeps orchestrators on VibeValley's agent). */
+    /** True when the profile runs in-process via `Session.host` rather than on an external runtime. */
     readonly isHosted: (id: string) => boolean;
     readonly agent: (id: string) => T.Agent | undefined;
-    /** A profile work is sent to, by its id or its name, as a person or a model says it. */
     readonly named: (key: string) => T.Agent | undefined;
     readonly skills: () => T.Skill[];
     readonly settings: (runtime: string) => T.RuntimeSettings;
     readonly save: (a: T.Agent) => Effect.Effect<T.Agent, ApiError>;
     readonly create: (draft: T.Agent) => Effect.Effect<T.Agent, ApiError>;
     readonly remove: (id: string) => Effect.Effect<void, ApiError>;
-    /** What remove would do, refused as it would be; nothing changes. */
     readonly previewRemove: (id: string) => Effect.Effect<T.Preview, ApiError>;
     readonly saveSkill: (s: T.Skill) => Effect.Effect<T.Skill, ApiError>;
     readonly createSkill: (draft: T.Skill) => Effect.Effect<T.Skill, ApiError>;
     readonly removeSkill: (id: string) => Effect.Effect<void, ApiError>;
-    /** What removeSkill would do, refused as it would be; nothing changes. */
     readonly previewRemoveSkill: (id: string) => Effect.Effect<T.Preview, ApiError>;
     readonly saveSettings: (runtime: string, s: T.RuntimeSettings) => Effect.Effect<T.RuntimeSettings, ApiError>;
-    /** What has to hold for every profile kept from now on (an orchestrator's session), run before the write that
-     * kept it returns: a failure fails that write. */
+    /** Registers an invariant hook run before `save`/`create` returns; a failure aborts the call. */
     readonly whenKept: (keep: (agent: T.Agent) => Effect.Effect<void, ApiError>) => void;
-    /** The built-in templates, then those added on this machine, each with the profiles installed from it. */
     readonly templates: () => Effect.Effect<T.AgentTemplate[]>;
     readonly installTemplate: (id: string) => Effect.Effect<T.Agent, ApiError>;
     readonly updateFromTemplate: (agent: string) => Effect.Effect<T.Agent, ApiError>;
@@ -118,7 +109,6 @@ export class Agent extends Context.Service<
   );
 }
 
-/** An id or a name not yet taken: the one wanted, else it with -2, -3… (ids) or 2, 3… (names). */
 const free = (want: string, taken: readonly string[], join: string) => {
   if (!taken.includes(want)) return want;
   let n = 2;
@@ -126,7 +116,6 @@ const free = (want: string, taken: readonly string[], join: string) => {
   return `${want}${join}${n}`;
 };
 
-/** A template made into a new profile beside these: its own id and name when free. */
 const installed = (template: T.AgentTemplate, beside: readonly T.Agent[], id?: string): T.Agent =>
   profileOf(
     template,
@@ -143,9 +132,6 @@ const installed = (template: T.AgentTemplate, beside: readonly T.Agent[], id?: s
     ),
   );
 
-/** VibeValley's own skills, one folder each (<id>/SKILL.md, SKILL.en.md beside it in English), by folder name. They ship
- * inside the server (base/assets.ts): one that does not read is a broken build (agent.test.ts reads them all), not a
- * user's error. */
 const builtInSkillsDir = serverFile("src/agent/skills");
 const readBuiltInSkills = (fs: FileSystem.FileSystem) =>
   Effect.orDie(
@@ -182,7 +168,6 @@ const make = Effect.gen(function* () {
   for (const item of builtIn)
     for (const id of item.skills)
       if (!isBuiltInSkill(id)) return yield* Effect.die(Inconsistent.make({ message: `the built-in template ${item.id} names ${id}, not in agent/skills` }));
-  // A new farm: the starters the configuration names, in order; the default orchestrator is added below.
   const starters: T.Agent[] = [];
   yield* Effect.forEach(
     config.agent.starters,
@@ -232,13 +217,11 @@ const make = Effect.gen(function* () {
     return "";
   };
 
-  // The delete and its dry run judge by these, so the dry run is refused exactly when the delete would be.
   const deletableAgent = (id: string) => {
     if (id === defaultOrchestrator) return Effect.fail(refused(t("server.agent.orchestratorStays")));
     const a = s.agents.find((x) => x.id === id);
     return a ? Effect.succeed(a) : Effect.fail(missing(t("server.agent.noAgent", { id }), [lookIn.agent]));
   };
-  /** VibeValley's own skills change only with VibeValley: none of skill.* writes one. */
   const builtInRefusal = (id: string) =>
     Option.getOrUndefined(Option.map(builtInSkillOf(id), (k) => refused(t("server.agent.builtInSkill", { name: k.name }))));
   const notBuiltIn = (id: string) => {
@@ -252,7 +235,7 @@ const make = Effect.gen(function* () {
     return k ? Effect.succeed(k) : Effect.fail(missing(t("server.agent.noSkill", { id }), [lookIn.skill]));
   };
 
-  // Read again on every ask: an added template is a folder in the home, and copying one in or out changes the list.
+  // Re-read from disk on each call so templates added or removed directly in `home` appear immediately.
   const templates = Effect.fn("Agent.templates")(function* () {
     const added = yield* withFs(addedTemplates(config.home));
     yield* Effect.forEach(added.problems, (why) => Effect.logWarning(`vibevalley: an added template is left out: ${why}`), { discard: true });
@@ -276,7 +259,7 @@ const make = Effect.gen(function* () {
       const k = key.trim();
       return sendable().find((a) => a.id === k) ?? sendable().find((a) => a.name === k);
     },
-    // The built-in ones first; a skill of the user's under a built-in id (kept before it shipped) is the built-in one now.
+    // Built-in skills shadow any legacy user skill saved under the same id before the built-in shipped.
     skills: () => structuredClone([...ownSkills, ...Arr.filter(s.skills, (k) => !isBuiltInSkill(k.id))]),
     settings: (runtime) => structuredClone(s.settings[runtime]) ?? defaultSettings(),
     orchestrators: () => all().filter((a) => a.role === "orchestrator"),
@@ -395,10 +378,9 @@ const make = Effect.gen(function* () {
   return shape;
 });
 
-/** Where to put a key, in the user's words. */
 export const noDeepSeekKey = () => t("server.agent.noDeepSeekKey");
 
-/** A DeepSeek client; the key is read out of its redaction only as each request is sent. */
+/** Unwraps `Redacted` lazily per request so the plaintext key is not retained in closures. */
 export function modelClient(id: string, key: Redacted.Redacted | (() => Redacted.Redacted | undefined), service: Llm["Service"]): ModelClient {
   const plain = Redacted.isRedacted(key)
     ? () => Redacted.value(key)

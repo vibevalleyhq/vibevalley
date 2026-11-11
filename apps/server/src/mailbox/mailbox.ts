@@ -52,51 +52,41 @@ export interface QueuedInput {
   readonly trigger: T.Trigger;
 }
 
-/** A message already said in a direct channel, with what the reader sees of it, for the talk's first request. */
 export interface TalkRow {
   readonly row: ChannelEnvelopeRow;
   readonly context: InputContext;
 }
 
-/** What comes to the door: a recorded trigger, for those its threads reach, the hearers of a channel message, or one
- * session told straight; or the user's first words in a direct conversation with a profile that has no session yet. */
 export type Arrival =
   | { readonly _tag: "Trigger"; readonly trigger: T.Trigger; readonly to?: ChannelHearers | { readonly session: string } }
   | {
       readonly _tag: "Hire";
       readonly agent: T.Agent;
       readonly brief: string;
-      /** The repo or workdir it works in; empty for a direct conversation. */
+      /** Empty for a direct conversation. */
       readonly where: string;
-      /** How it is sent (its issue or channel, what its first run is for, its branch); the door adds the rest. */
       readonly options: Omit<SendOptions, "hiring" | "envelopeIds">;
-      /** What is handed with its first request: a conversation's recent messages, or an issue's queued triggers. */
       readonly envelopes: { readonly _tag: "Talk"; readonly rows: readonly TalkRow[] } | { readonly _tag: "Queued"; readonly triggers: readonly T.Trigger[] };
-      /** The caller's own rows, written with the session before anyone can see it. */
+      /** Runs inside the session hire transaction before the session is visible. */
       readonly hiring: (session: T.Session, launch: string, at: number) => Effect.Effect<void, NotRecorded>;
     };
 
 type SendOptions = Parameters<Session["Service"]["hire"]>[3];
 
-/** What the door did: a held notice for a channel; for a hire, the session hired or why none was, and who was
- * sent home to make room. */
 export interface Received extends ChannelRouteResult {
   readonly hired?: T.Session;
   readonly refused?: string;
   readonly evicted?: string;
-  /** A refused hire left work behind: its issue identity must be kept. */
+  /** Refused hire left work behind; the caller must keep its issue identity. */
   readonly retainedWork?: true;
 }
 
-/** What can be taken back before it is handed: everything for a session that left, or one deleted message. */
 export type Withdrawal =
   | { readonly _tag: "Session"; readonly session: string; readonly why: string }
   | { readonly _tag: "Envelope"; readonly envelope: string }
-  /** An issue's dispatches up to at, once it is closed or handed on: its own transaction, not the write lock. */
+  /** Runs in its own transaction, outside writeLock. */
   | { readonly _tag: "Issue"; readonly issue: string; readonly at: number };
 
-/** What happened to deliveries: a message taken into a model (its 👀), a session that failed every wake, or what came
- * for an orchestrator in one conversation, handed to it. */
 export type DeliveryNews =
   | { readonly _tag: "Consumed"; readonly session: string; readonly envelope: string }
   | { readonly _tag: "Braked"; readonly session: string; readonly failed: number }
@@ -110,9 +100,8 @@ export class Mailbox extends Context.Service<
     readonly knownGitHubEvents: (repo: string, pr: number) => Effect.Effect<readonly KnownGitHubEvent[]>;
     readonly replayCronTriggers: (consume: (trigger: T.Trigger, data: unknown) => Effect.Effect<void, ApiError | Schema.SchemaError>) => Effect.Effect<void>;
     readonly unreadSummary: (participant: string, channel: string) => Effect.Effect<UnreadRow[]>;
-    /** The triggers waiting in the issues' pool for one issue, in routed order. */
     readonly triggersOf: (issue: string) => Effect.Effect<readonly T.Trigger[]>;
-    /** The triggers of every queued, open issue: dispatches first, then in routed order. */
+    /** Dispatches first, then routed order. */
     readonly queuedTriggers: Effect.Effect<readonly QueuedInput[]>;
     readonly isRouted: (trigger: string) => Effect.Effect<boolean>;
     readonly receive: (arrival: Arrival) => Effect.Effect<Received, ApiError>;
@@ -293,7 +282,7 @@ export class Mailbox extends Context.Service<
         });
         const session = hired.session;
         if (session === undefined) return { heldNotice: "", refused: hired.refused ?? "", ...(hired.retainedWork ? { retainedWork: true as const } : {}) };
-        // A conversation's later messages may have come while it was hired: the pump looks for them now.
+        // Kick the pump in case messages arrived in the conversation while hiring was in flight.
         if (envelopes._tag === "Talk") yield* Effect.sync(() => later(`kick:${session.id}`, 0, () => pump.kick(session.id)));
         return { heldNotice: "", hired: session, ...(room.evicted ? { evicted: room.evicted } : {}) };
       });
@@ -477,7 +466,6 @@ export class Mailbox extends Context.Service<
             case "Compacting":
               return pumpLocked(pump.activity(news)).pipe(bestEffort(`mailbox: ${news.id} ${news._tag}`));
             default:
-              // The rest are the issues' and the channels' to follow.
               return Effect.void;
           }
         }),
