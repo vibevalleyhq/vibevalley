@@ -27,16 +27,16 @@ import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from
 
 const styles = stylex.create({
   todoDetailNote: {
-    marginTop: "calc(var(--spacing) * 2)",
-    padding: "calc(var(--spacing) * 2.5)",
+    marginTop: "0.5rem",
+    padding: "0.625rem",
   },
   todoDetailTextArea: {
-    marginTop: "calc(var(--spacing) * 2.5)",
+    marginTop: "0.625rem",
   },
   todoDetailSpan: {
-    width: "calc(var(--spacing) * 2)",
-    height: "calc(var(--spacing) * 2)",
-    borderRadius: "2147483647px",
+    width: "0.5rem",
+    height: "0.5rem",
+    borderRadius: "9999px",
   },
   todoDetailSpanTone: {
     backgroundColor: "var(--color-wheat)",
@@ -44,12 +44,12 @@ const styles = stylex.create({
   todoDetailSpanAlt: {
     backgroundColor: "var(--color-water)",
   },
-  unqueueAction: { marginTop: "calc(var(--spacing) * 1.5)" },
+  unqueueAction: { marginTop: "0.375rem" },
   parentIssue: {
-    marginBottom: "calc(var(--spacing) * 2)",
+    marginBottom: "0.5rem",
     cursor: "pointer",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-water)",
     textDecorationLine: {
       default: null,
@@ -60,8 +60,8 @@ const styles = stylex.create({
     },
   },
   todoDetailDiv: {
-    marginBottom: "calc(var(--spacing) * 4)",
-    paddingRight: "calc(var(--spacing) * 10)",
+    marginBottom: "1rem",
+    paddingRight: "2.5rem",
   },
   issueTitle: {
     width: "100%",
@@ -77,10 +77,10 @@ const styles = stylex.create({
       ":focus": "var(--color-focus)",
     },
     backgroundColor: "transparent",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "var(--spacing)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.25rem",
     fontSize: "var(--text-xl)",
-    lineHeight: "var(--text-xl--line-height)",
+    lineHeight: "var(--leading-xl)",
     fontWeight: "var(--font-weight-semibold)",
     outlineStyle: "none",
     color: {
@@ -90,36 +90,36 @@ const styles = stylex.create({
   },
   todoDetailDiv2: {
     fontSize: "var(--text-base)",
-    lineHeight: "var(--text-base--line-height)",
+    lineHeight: "var(--leading-base)",
     fontWeight: "var(--font-weight-semibold)",
   },
   todoDetailDiv3: {
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
   },
   todoDetailDiv4: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+    marginTop: "0.375rem",
   },
   todoDetailDiv5: {
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 1.5)",
-    paddingLeft: "calc(var(--spacing) * 3)",
+    gap: "0.375rem",
+    paddingLeft: "0.75rem",
   },
   todoDetailDiv6: {
-    marginTop: "calc(var(--spacing) * 2.5)",
+    marginTop: "0.625rem",
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   issueWriteOwn: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
     display: "block",
     cursor: "pointer",
     borderRadius: "var(--radius-sm)",
     textAlign: "left",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: {
       default: "var(--color-muted)",
       "@media (hover:hover)": {
@@ -150,10 +150,10 @@ const styles = stylex.create({
       ":focus": "var(--color-focus)",
     },
     backgroundColor: "transparent",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.375rem",
     fontSize: "var(--text-base)",
-    lineHeight: "var(--text-base--line-height)",
+    lineHeight: "var(--leading-base)",
     outlineStyle: "none",
     color: {
       default: null,
@@ -161,7 +161,7 @@ const styles = stylex.create({
     },
   },
   todoDetailDiv7: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
     borderColor: "var(--color-line)",
@@ -169,15 +169,15 @@ const styles = stylex.create({
   todoDetailSpan2: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   todoDetailButton: {
-    marginBottom: "var(--spacing)",
+    marginBottom: "0.25rem",
     marginLeft: "76px",
     cursor: "pointer",
     alignSelf: "flex-start",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-water)",
     textDecorationLine: {
       default: null,
@@ -188,18 +188,18 @@ const styles = stylex.create({
     },
   },
   todoDetailDiv8: {
-    marginTop: "calc(var(--spacing) * 4)",
+    marginTop: "1rem",
   },
   todoDetailDiv9: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   newRepoDialogDiv: {
-    marginTop: "calc(var(--spacing) * 5)",
+    marginTop: "1.25rem",
     display: "flex",
     justifyContent: "flex-end",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
 });
 

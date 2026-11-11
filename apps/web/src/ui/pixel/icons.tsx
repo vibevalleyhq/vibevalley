@@ -30,7 +30,7 @@ const styles = stylex.create({
     display: "inline-flex",
     minWidth: "0",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   markedIcon: (marginTop: number) => ({
     marginTop,

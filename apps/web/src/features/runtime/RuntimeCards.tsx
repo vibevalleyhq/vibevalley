@@ -55,7 +55,7 @@ const styles = stylex.create({
     backgroundColor: "var(--wb-bark)",
   },
   supportCardIcon: {
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
   },
   numberInputTextInput: {
     fontFamily: "var(--font-mono)",
@@ -72,11 +72,11 @@ const styles = stylex.create({
     minWidth: "0",
     flex: "1",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2.5)",
+    gap: "0.625rem",
   },
   usageP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   usagePTone: {
     color: "var(--color-berry)",
@@ -84,10 +84,10 @@ const styles = stylex.create({
   usagePAlt: {},
   supportCardSpan: {
     borderRadius: "var(--radius-sm)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.375rem",
     paddingBlock: "1px",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
   supportCardSpanTone: {
     backgroundColor: "var(--color-selected)",
@@ -102,7 +102,7 @@ const styles = stylex.create({
   inventoryCardSpan: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   inventoryCardSpanTone: {
     color: "var(--color-muted)",
@@ -110,39 +110,39 @@ const styles = stylex.create({
   },
   usageP2: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-warn-ink)",
   },
   usageDiv2: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   usageSpan: {
     display: "flex",
-    width: "calc(var(--spacing) * 14)",
+    width: "3.5rem",
     flexShrink: "0",
     flexDirection: "column",
     alignItems: "center",
   },
   usageSpan2: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   usageP22: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   windowDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   windowSpan: {
     display: "flex",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
   windowSpan2: {
     flex: "1",
@@ -150,25 +150,25 @@ const styles = stylex.create({
   },
   windowSpan3: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   supportCardDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   supportCardSpan2: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   supportCardSpan22: {
-    paddingTop: "calc(var(--spacing) * 2)",
+    paddingTop: "0.5rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-medium)",
     color: "var(--color-muted)",
   },
@@ -178,24 +178,24 @@ const styles = stylex.create({
   supportCardDiv2: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   fieldSpan: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-medium)",
     color: "var(--color-muted)",
   },
   settingsCardSpan: {
     display: "flex",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   settingsCardDiv: {
     display: "grid",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
     gridTemplateColumns: {
       default: null,
       "@media (width>=48rem)": "repeat(2,minmax(0,1fr))",
@@ -203,21 +203,21 @@ const styles = stylex.create({
   },
   settingsCardSpan2: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-faint)",
   },
   modelsCardSpan: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   modelsCardSpan2: {
-    marginLeft: "calc(var(--spacing) * 2)",
+    marginLeft: "0.5rem",
     borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-ok-soft)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.375rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-ok-ink)",
   },
   inventoryCardLi: {
@@ -229,7 +229,7 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
 });

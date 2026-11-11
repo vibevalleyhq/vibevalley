@@ -34,14 +34,14 @@ const styles = stylex.create({
     flex: "1",
     flexDirection: "column",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingTop: "calc(var(--spacing) * 2)",
+    gap: "0.375rem",
+    paddingInline: "0.5rem",
+    paddingTop: "0.5rem",
   },
   headerRow: {
     display: "flex",
     width: "100%",
-    paddingInline: "var(--spacing)",
+    paddingInline: "0.25rem",
   },
   bestScore: {
     marginLeft: "auto",
@@ -85,7 +85,7 @@ const styles = stylex.create({
   },
   stagesRow: {
     display: "flex",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
   },
   cropFaint: {
     opacity: 0.25,
@@ -95,7 +95,7 @@ const styles = stylex.create({
   },
   help: {
     marginTop: "auto",
-    marginBottom: "var(--spacing)",
+    marginBottom: "0.25rem",
     textAlign: "center",
     lineHeight: "1.625",
     color: "var(--color-lcd-dark)",

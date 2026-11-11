@@ -10,12 +10,12 @@ const viewStyles = stylex.create({
   dialogStoriesDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   dialogStoriesDiv2: {
     display: "flex",
     justifyContent: "flex-end",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
 });
 

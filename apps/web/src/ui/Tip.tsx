@@ -8,19 +8,23 @@ import type { IconName } from "./icons";
 import { positionerAttrs } from "./positioner";
 
 const delay = 300;
+const fadeIn = stylex.keyframes({
+  from: { opacity: 0 },
+});
+
 const styles = stylex.create({
   trigger: { display: "inline-flex" },
   bubble: {
     width: "max-content",
-    maxWidth: "calc(var(--spacing) * 72)",
-    animationName: { default: "fade-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    maxWidth: "18rem",
+    animationName: { default: fadeIn, "@media (prefers-reduced-motion: reduce)": "none" },
     animationDuration: "180ms",
     animationTimingFunction: "var(--ease-out)",
     animationFillMode: "both",
     borderRadius: "var(--radius-md)",
     backgroundColor: "var(--color-ink)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "var(--spacing)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.25rem",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--leading-snug)",
     fontWeight: "var(--font-weight-normal)",
@@ -36,7 +40,7 @@ const styles = stylex.create({
     opacity: { default: 0.5, "@media (hover: hover)": { default: null, ":hover": 1 }, ":focus-visible": 1 },
     transitionProperty: "opacity",
     transitionDuration: "120ms",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionTimingFunction: "var(--ease-out)",
     outlineStyle: "none",
     outlineWidth: { default: null, ":focus-visible": 2 },
     outlineColor: { default: null, ":focus-visible": "var(--color-focus)" },

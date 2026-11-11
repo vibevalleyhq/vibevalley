@@ -35,22 +35,22 @@ import { Labeled } from "./AgentLook";
 
 const styles = stylex.create({
   supportIcon: {
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
   },
   configTabsTextInput: {
     fontFamily: "var(--font-mono)",
   },
   toolsTextInput: {
-    width: "calc(var(--spacing) * 28)",
+    width: "7rem",
   },
   toolsTextInput2: {
-    minWidth: "calc(var(--spacing) * 40)",
+    minWidth: "10rem",
     flex: "1",
     fontFamily: "var(--font-mono)",
   },
   skillPickerA: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
     textDecorationLine: "underline",
   },
@@ -65,19 +65,19 @@ const styles = stylex.create({
     minHeight: "0",
     flex: "1",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
     overflowY: "auto",
-    padding: "calc(var(--spacing) * 4)",
+    padding: "1rem",
   },
   runtimeChoiceButton: {
     display: "flex",
     cursor: "pointer",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    padding: "calc(var(--spacing) * 2)",
+    padding: "0.5rem",
     textAlign: "left",
   },
   runtimeChoiceButtonTone: {
@@ -107,7 +107,7 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   runtimeChoiceSpanAlt: {
     fontWeight: "var(--font-weight-semibold)",
@@ -120,7 +120,7 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
   runtimeChoiceSpanMuted: {
     color: "var(--color-muted)",
@@ -132,18 +132,18 @@ const styles = stylex.create({
     display: "flex",
     cursor: "pointer",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 2.5)",
+    gap: "0.625rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
-    padding: "calc(var(--spacing) * 2.5)",
+    padding: "0.625rem",
     textAlign: "left",
   },
   skillPickerSpan: {
-    marginTop: "calc(var(--spacing) * .5)",
+    marginTop: "0.125rem",
     display: "flex",
-    width: "calc(var(--spacing) * 4)",
-    height: "calc(var(--spacing) * 4)",
+    width: "1rem",
+    height: "1rem",
     flexShrink: "0",
     alignItems: "center",
     justifyContent: "center",
@@ -164,7 +164,7 @@ const styles = stylex.create({
   toolsDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   toolsDivTone: {
     opacity: ".5",
@@ -172,7 +172,7 @@ const styles = stylex.create({
   inventorySpan: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   inventorySpanTone: {
     color: "var(--color-muted)",
@@ -180,12 +180,12 @@ const styles = stylex.create({
   },
   runtimeChoiceSpan4: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   runtimeChoiceDiv: {
     display: "grid",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     gridTemplateColumns: {
       default: null,
       "@media (width>=40rem)": "repeat(2,minmax(0,1fr))",
@@ -199,32 +199,32 @@ const styles = stylex.create({
   supportSection: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-line)",
-    padding: "calc(var(--spacing) * 3)",
+    padding: "0.75rem",
   },
   supportH3: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-semibold)",
   },
   supportSpan: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   supportSpan2: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   supportSpan3: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   supportSpan4: {
@@ -234,7 +234,7 @@ const styles = stylex.create({
   skillPickerDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   skillPickerSpan2: {
     display: "flex",
@@ -242,26 +242,26 @@ const styles = stylex.create({
   },
   skillPickerSpan22: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-medium)",
   },
   toolsDiv2: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-line)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
   },
   toolsSpan: {
     borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-selected)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.375rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
   toolsSpan2: {
     minWidth: "0",
@@ -271,13 +271,13 @@ const styles = stylex.create({
     overflow: "hidden",
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   toolsButton: {
     cursor: "pointer",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: {
       default: "var(--color-muted)",
       "@media (hover:hover)": {
@@ -290,13 +290,13 @@ const styles = stylex.create({
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   toolsDiv3: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "var(--spacing)",
-    paddingTop: "calc(var(--spacing) * 1.5)",
+    gap: "0.25rem",
+    paddingTop: "0.375rem",
   },
   toolsButton2: {
     cursor: "pointer",
@@ -311,11 +311,11 @@ const styles = stylex.create({
         ":hover": "var(--color-hover)",
       },
     },
-    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.375rem",
     paddingBlock: "1px",
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: {
       default: "var(--color-muted)",
       "@media (hover:hover)": {
@@ -327,12 +327,12 @@ const styles = stylex.create({
   inventoryUl: {
     display: "flex",
     flexDirection: "column",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   inventoryLi: {
     display: "flex",
     alignItems: "baseline",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   inventorySpan2: {
     minWidth: "0",
@@ -341,24 +341,24 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   inventorySpan22: {
-    maxWidth: "calc(var(--spacing) * 40)",
+    maxWidth: "10rem",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   tabs: {
     borderBottomWidth: 1,
     borderBottomStyle: "solid",
     borderColor: "var(--color-line)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
   },
 });
 

@@ -24,13 +24,13 @@ const blockStyles = stylex.create({
   row: {
     display: "flex",
     alignItems: "flex-start",
-    paddingBottom: "calc(var(--spacing) * .5)",
+    paddingBottom: "0.125rem",
   },
   headingRow: {
-    paddingTop: "calc(var(--spacing) * 2.5)",
+    paddingTop: "0.625rem",
   },
   bodyRow: {
-    paddingTop: "calc(var(--spacing) * .5)",
+    paddingTop: "0.125rem",
   },
   content: {
     display: "flex",
@@ -40,21 +40,21 @@ const blockStyles = stylex.create({
     borderLeftStyle: "solid",
     borderLeftWidth: "3px",
     borderColor: "var(--wb-line)",
-    paddingLeft: "calc(var(--spacing) * 3)",
+    paddingLeft: "0.75rem",
   },
   code: {
     borderRadius: "var(--radius-md)",
     backgroundColor: "var(--wb-code-bg)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
     color: "var(--wb-code-ink)",
   },
   quoteButton: {
-    marginTop: "calc(var(--spacing) * .5)",
-    marginLeft: "var(--spacing)",
+    marginTop: "0.125rem",
+    marginLeft: "0.25rem",
     display: "inline-flex",
-    width: "calc(var(--spacing) * 6)",
-    height: "calc(var(--spacing) * 6)",
+    width: "1.5rem",
+    height: "1.5rem",
     flexShrink: "0",
     cursor: "pointer",
     alignItems: "center",
@@ -79,38 +79,38 @@ const blockStyles = stylex.create({
   },
   title: {
     fontSize: "var(--text-2xl)",
-    lineHeight: "calc(var(--spacing) * 8)",
+    lineHeight: "2rem",
     fontWeight: "var(--font-weight-semibold)",
   },
   heading: {
     fontSize: "var(--text-xl)",
-    lineHeight: "calc(var(--spacing) * 7)",
+    lineHeight: "1.75rem",
     fontWeight: "var(--font-weight-semibold)",
   },
   subheading: {
     fontSize: "var(--text-lg)",
-    lineHeight: "calc(var(--spacing) * 7)",
+    lineHeight: "1.75rem",
     fontWeight: "var(--font-weight-semibold)",
   },
   codeText: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-sm)",
-    lineHeight: "calc(var(--spacing) * 6)",
+    lineHeight: "1.5rem",
   },
   quoteText: {
     fontSize: "var(--text-base)",
-    lineHeight: "calc(var(--spacing) * 6)",
+    lineHeight: "1.5rem",
     color: "var(--wb-muted)",
   },
   completeText: {
     fontSize: "var(--text-base)",
-    lineHeight: "calc(var(--spacing) * 6)",
+    lineHeight: "1.5rem",
     color: "var(--wb-muted)",
     textDecorationLine: "line-through",
   },
   bodyText: {
     fontSize: "var(--text-base)",
-    lineHeight: "calc(var(--spacing) * 6)",
+    lineHeight: "1.5rem",
   },
   bold: {
     fontWeight: "var(--font-weight-semibold)",
@@ -121,7 +121,7 @@ const blockStyles = stylex.create({
   inlineCode: {
     borderRadius: "var(--radius-xs)",
     backgroundColor: "var(--wb-hover)",
-    paddingInline: "calc(var(--spacing) * .5)",
+    paddingInline: "0.125rem",
     fontFamily: "var(--font-mono)",
   },
   strike: {
@@ -132,7 +132,7 @@ const blockStyles = stylex.create({
     textDecorationLine: "underline",
   },
   field: {
-    minHeight: "calc(var(--spacing) * 6)",
+    minHeight: "1.5rem",
     cursor: "text",
     overflowWrap: "break-word",
     whiteSpace: "pre-wrap",
@@ -154,8 +154,8 @@ const writingPulse = stylex.keyframes({ "50%": { opacity: 0.5 } });
 
 const viewStyles = stylex.create({
   blockRowSpan: {
-    marginTop: "calc(var(--spacing) * .5)",
-    marginRight: "calc(var(--spacing) * 2.5)",
+    marginTop: "0.125rem",
+    marginRight: "0.625rem",
     flexShrink: "0",
     borderRadius: "var(--radius-sm)",
   },
@@ -171,7 +171,7 @@ const viewStyles = stylex.create({
     animationPlayState: null,
   },
   blockRowSpanSecondary: {
-    width: "var(--spacing)",
+    width: "0.25rem",
     animationName: { default: writingPulse, "@media (prefers-reduced-motion: reduce)": "none" },
     animationDuration: "2s",
     animationDelay: "0s",
@@ -191,10 +191,10 @@ const viewStyles = stylex.create({
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
-    paddingBottom: "calc(var(--spacing) * 2)",
+    paddingBottom: "0.5rem",
     paddingLeft: "35px",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
   blocksViewPTone: {
     color: "var(--color-berry)",
@@ -202,46 +202,46 @@ const viewStyles = stylex.create({
   blocksViewPAlt: {
     color: "var(--color-muted)",
   },
-  taskCheckbox: { marginTop: "var(--spacing)" },
+  taskCheckbox: { marginTop: "0.25rem" },
   blocksViewDiv: {
     minHeight: "0",
     flex: "1",
     overflowY: "auto",
-    paddingRight: "calc(var(--spacing) * 3)",
+    paddingRight: "0.75rem",
   },
   artifactAppend: {
     display: "block",
-    height: "calc(var(--spacing) * 16)",
+    height: "4rem",
     width: "100%",
     cursor: "text",
     paddingLeft: "35px",
     textAlign: "left",
     fontSize: "var(--text-base)",
-    lineHeight: "var(--text-base--line-height)",
+    lineHeight: "var(--leading-base)",
     color: "var(--color-faint)",
   },
   artifactSuggestions: {
-    marginBottom: "calc(var(--spacing) * 2)",
+    marginBottom: "0.5rem",
     flexShrink: "0",
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-page)",
-    padding: "calc(var(--spacing) * 2)",
+    padding: "0.5rem",
   },
   suggestionsListH2: {
-    paddingInline: "var(--spacing)",
-    paddingBottom: "var(--spacing)",
+    paddingInline: "0.25rem",
+    paddingBottom: "0.25rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-semibold)",
     color: "var(--color-muted)",
   },
   artifactSuggestion: {
     display: "flex",
     flexDirection: "column",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     borderTopStyle: {
       default: "solid",
       ":first-child": "solid",
@@ -251,15 +251,15 @@ const viewStyles = stylex.create({
       ":first-child": "0",
     },
     borderColor: "var(--color-line)",
-    paddingInline: "var(--spacing)",
-    paddingBlock: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.25rem",
+    paddingBlock: "0.375rem",
   },
   suggestionsListDiv: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   suggestionsListSpan: {
@@ -270,16 +270,16 @@ const viewStyles = stylex.create({
     overflow: "hidden",
   },
   suggestionsListSpan2: {
-    marginLeft: "var(--spacing)",
+    marginLeft: "0.25rem",
   },
   suggestionsListP: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-berry)",
   },
   suggestionsListDiv2: {
     display: "flex",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   suggestionAccept: {
     cursor: {
@@ -288,10 +288,10 @@ const viewStyles = stylex.create({
     },
     borderRadius: "var(--radius-md)",
     backgroundColor: "var(--color-leaf)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * .5)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.125rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-page)",
     opacity: {
       default: null,
@@ -305,10 +305,10 @@ const viewStyles = stylex.create({
     },
     borderRadius: "var(--radius-md)",
     backgroundColor: "var(--color-hover)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * .5)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.125rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
     opacity: {
       default: null,
@@ -318,9 +318,9 @@ const viewStyles = stylex.create({
   suggestionDiffDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   suggestionDiffP: {
     whiteSpace: "pre-wrap",
@@ -333,12 +333,12 @@ const viewStyles = stylex.create({
   },
   suggestionDiffP3: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-berry)",
   },
   markSpan: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   blockRowSpan2: {
@@ -354,7 +354,7 @@ const viewStyles = stylex.create({
     flex: "1",
   },
   blockRowHr: {
-    marginBlock: "calc(var(--spacing) * 2)",
+    marginBlock: "0.5rem",
     borderColor: "var(--color-line)",
   },
   blockRowSpan3: {
@@ -365,10 +365,10 @@ const viewStyles = stylex.create({
   placeholderDiv: {
     borderRadius: "var(--radius-md)",
     backgroundColor: "var(--color-hover)",
-    paddingInline: "calc(var(--spacing) * 2.5)",
-    paddingBlock: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.625rem",
+    paddingBlock: "0.375rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   blockFieldSpan: {

@@ -53,20 +53,20 @@ import { createPixelAct, FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIc
 import { styleProps } from "#/ui/positioner.ts";
 
 const styles = stylex.create({
-  emptyCriterion: { height: "calc(var(--spacing) * 2.5)", width: "calc(var(--spacing) * 2.5)", borderStyle: "solid", borderWidth: "2px" },
+  emptyCriterion: { height: "0.625rem", width: "0.625rem", borderStyle: "solid", borderWidth: "2px" },
   criterion: {
     display: "flex",
     cursor: "pointer",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * .5)",
+    gap: "0.5rem",
+    paddingBlock: "0.125rem",
     textAlign: "left",
   },
   criterionBox: {
-    marginTop: "calc(var(--spacing) * .5)",
+    marginTop: "0.125rem",
     display: "flex",
-    height: "calc(var(--spacing) * 4)",
-    width: "calc(var(--spacing) * 4)",
+    height: "1rem",
+    width: "1rem",
     flexShrink: 0,
     alignItems: "center",
     justifyContent: "center",
@@ -83,8 +83,8 @@ const styles = stylex.create({
     width: "100%",
     cursor: "pointer",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    gap: "0.375rem",
+    paddingBlock: "0.5rem",
     textAlign: "left",
   },
   foldOpen: { rotate: "90deg" },
@@ -114,7 +114,7 @@ const styles = stylex.create({
     color: "var(--color-bark-600)",
   },
   issueBodyP: {
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
     WebkitLineClamp: "4",
     WebkitBoxOrient: "vertical",
     display: "-webkit-box",
@@ -196,7 +196,7 @@ const styles = stylex.create({
       default: "column",
       "@media (width>=40rem)": "row",
     },
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
     alignItems: {
       default: null,
       "@media (width>=40rem)": "flex-start",
@@ -205,7 +205,7 @@ const styles = stylex.create({
   issueBodyDiv22: {
     display: "flex",
     alignItems: "baseline",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   issueBodyH3: {
     minWidth: "0",
@@ -216,7 +216,7 @@ const styles = stylex.create({
     fontSize: "16px",
   },
   issueNow: {
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
     fontSize: "13px",
   },
   issueStuck: {
@@ -226,8 +226,8 @@ const styles = stylex.create({
     color: "var(--color-bark-700)",
   },
   issueBodyDiv3: {
-    marginTop: "calc(var(--spacing) * 3)",
-    padding: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
+    padding: "0.75rem",
   },
   askBerry: {
     backgroundColor: "color-mix(in srgb, var(--color-berry-500) 30%, var(--color-cream-50))",
@@ -251,32 +251,32 @@ const styles = stylex.create({
     fontSize: "14px",
   },
   issueBodyDiv4: {
-    marginTop: "calc(var(--spacing) * 2)",
+    marginTop: "0.5rem",
   },
   issueBodyDiv5: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+    marginTop: "0.375rem",
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   issueMove: {
-    marginTop: "calc(var(--spacing) * 2)",
+    marginTop: "0.5rem",
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     fontSize: "12px",
   },
   issueBodyDiv6: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   issueBodyDiv7: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+    marginTop: "0.375rem",
   },
   issueBodyDiv8: {
-    marginTop: "calc(var(--spacing) * 4)",
+    marginTop: "1rem",
   },
   issueBodyDiv9: {
     display: "flex",
@@ -299,7 +299,7 @@ const styles = stylex.create({
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   issueBodySpan4: {
     fontSize: "12px",
@@ -313,60 +313,60 @@ const styles = stylex.create({
   issueBodyDiv10: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   issueBodyDiv11: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   asideDiv: {
     display: "flex",
     width: {
       default: "100%",
-      "@media (width>=40rem)": "calc(var(--spacing) * 52)",
+      "@media (width>=40rem)": "13rem",
     },
     flexShrink: "0",
     flexDirection: "column",
     alignItems: "center",
     backgroundColor: "var(--color-cream-100)",
-    padding: "calc(var(--spacing) * 3)",
+    padding: "0.75rem",
   },
   asideDiv2: {
     position: "relative",
     display: "flex",
-    height: "calc(var(--spacing) * 44)",
-    width: "calc(var(--spacing) * 44)",
+    height: "11rem",
+    width: "11rem",
     alignItems: "flex-end",
     justifyContent: "center",
   },
   asideImg: {
     position: "absolute",
     bottom: "0",
-    width: "calc(var(--spacing) * 44)",
+    width: "11rem",
     opacity: ".9",
     imageRendering: "pixelated",
   },
   asideImg2: {
     position: "relative",
-    height: "calc(var(--spacing) * 36)",
+    height: "9rem",
     imageRendering: "pixelated",
   },
   asideP2: {
-    marginTop: "calc(var(--spacing) * 2)",
+    marginTop: "0.5rem",
     fontSize: "13px",
   },
   criteriaDiv: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * .5)",
+    gap: "0.5rem",
+    paddingBlock: "0.125rem",
   },
   criteriaSpan2: {
-    marginTop: "calc(var(--spacing) * .5)",
+    marginTop: "0.125rem",
     display: "flex",
-    height: "calc(var(--spacing) * 4)",
-    width: "calc(var(--spacing) * 4)",
+    height: "1rem",
+    width: "1rem",
     flexShrink: "0",
     alignItems: "center",
     justifyContent: "center",
@@ -381,17 +381,17 @@ const styles = stylex.create({
     borderColor: "var(--color-cream-300)",
   },
   foldDiv2: {
-    paddingBottom: "calc(var(--spacing) * 3)",
+    paddingBottom: "0.75rem",
   },
   foldP: {
     fontSize: "12px",
     color: "var(--color-bark-500)",
   },
   rowDiv: {
-    marginBottom: "calc(var(--spacing) * 2)",
+    marginBottom: "0.5rem",
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   rowSpan: {
     width: "72px",

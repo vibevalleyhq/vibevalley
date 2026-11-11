@@ -10,12 +10,12 @@ const viewStyles = stylex.create({
   faceStoriesDiv: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   faceStoriesDiv2: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
 });
 

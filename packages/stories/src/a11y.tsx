@@ -4,23 +4,23 @@ import { createEffect, createSignal, For, Show } from "solid-js";
 
 const styles = stylex.create({
   panel: {
-    maxHeight: "calc(var(--spacing) * 64)",
+    maxHeight: "16rem",
     flexShrink: "0",
     overflowY: "auto",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-side)",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBlock: "calc(var(--spacing) * 3)",
+    paddingInline: "1rem",
+    paddingBlock: "0.75rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
   header: {
-    marginBottom: "calc(var(--spacing) * 2)",
+    marginBottom: "0.5rem",
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   heading: {
     fontWeight: "var(--font-weight-semibold)",
@@ -36,8 +36,8 @@ const styles = stylex.create({
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-line)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * .5)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.125rem",
     color: {
       default: "var(--color-muted)",
       "@media (hover:hover)": {
@@ -49,17 +49,17 @@ const styles = stylex.create({
   list: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   item: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
   },
   itemHead: {
     display: "flex",
     alignItems: "baseline",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   impact: {
     fontFamily: "var(--font-mono)",
@@ -80,7 +80,7 @@ const styles = stylex.create({
     overflow: "hidden",
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-2xs)",
-    lineHeight: "var(--text-2xs--line-height)",
+    lineHeight: "var(--leading-2xs)",
     color: "var(--color-muted)",
   },
 });

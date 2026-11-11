@@ -12,15 +12,15 @@ const viewStyles = stylex.create({
     display: "grid",
     width: "100%",
     gridTemplateColumns: "repeat(auto-fill,minmax(6rem,1fr))",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   iconStoriesDiv2: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     borderRadius: "var(--radius-md)",
-    padding: "calc(var(--spacing) * 2)",
+    padding: "0.5rem",
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -36,24 +36,24 @@ const viewStyles = stylex.create({
     overflow: "hidden",
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-2xs)",
-    lineHeight: "var(--text-2xs--line-height)",
+    lineHeight: "var(--leading-2xs)",
     color: "var(--color-muted)",
   },
   iconStoriesDiv3: {
     display: "flex",
     alignItems: "flex-end",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
   },
   iconStoriesDiv4: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   iconStoriesSpan2: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-2xs)",
-    lineHeight: "var(--text-2xs--line-height)",
+    lineHeight: "var(--leading-2xs)",
     color: "var(--color-muted)",
   },
 });

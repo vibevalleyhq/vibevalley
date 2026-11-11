@@ -13,7 +13,7 @@ const styles = stylex.create({
   screen: {
     display: "flex",
     height: "25rem",
-    width: "calc(var(--spacing) * 60)",
+    width: "15rem",
     flexDirection: "column",
     backgroundColor: "var(--color-lcd-paper)",
     padding: "2px",

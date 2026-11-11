@@ -17,11 +17,11 @@ import { Tinted } from "./rows";
 
 const styles = stylex.create({
   medalFrame: { position: "absolute", inset: 0 },
-  doneStamp: { position: "absolute", right: "calc(var(--spacing) * -1.5)", bottom: "calc(var(--spacing) * -1)" },
+  doneStamp: { position: "absolute", right: "-0.375rem", bottom: "-0.25rem" },
   titlePickerButton: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderStyle: "solid",
     borderWidth: "2px",
     borderColor: "var(--color-cream-300)",
@@ -32,9 +32,9 @@ const styles = stylex.create({
         ":enabled:hover": "var(--color-cream-200)",
       },
     },
-    paddingBlock: "calc(var(--spacing) * 1.5)",
-    paddingRight: "calc(var(--spacing) * 3)",
-    paddingLeft: "calc(var(--spacing) * 1.5)",
+    paddingBlock: "0.375rem",
+    paddingRight: "0.75rem",
+    paddingLeft: "0.375rem",
     textAlign: "left",
     cursor: {
       default: null,
@@ -49,13 +49,13 @@ const styles = stylex.create({
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    columnGap: "calc(var(--spacing) * 6)",
-    rowGap: "calc(var(--spacing) * 3)",
+    columnGap: "1.5rem",
+    rowGap: "0.75rem",
   },
   starterTinted: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     backgroundColor: "color-mix(in srgb, var(--color-leaf-300) 40%, var(--color-cream-50))",
   },
   titlePickerMenu: {
@@ -63,12 +63,12 @@ const styles = stylex.create({
     top: "100%",
     right: "0",
     zIndex: "10",
-    marginTop: "calc(var(--spacing) * 2)",
-    maxHeight: "calc(var(--spacing) * 80)",
-    width: "calc(var(--spacing) * 64)",
+    marginTop: "0.5rem",
+    maxHeight: "20rem",
+    width: "16rem",
     overflowY: "auto",
     backgroundColor: "var(--color-cream-50)",
-    padding: "calc(var(--spacing) * 1.5)",
+    padding: "0.375rem",
     boxShadow: "var(--shadow-px)",
   },
   medalImg: {
@@ -88,8 +88,8 @@ const styles = stylex.create({
     color: "var(--color-leaf-700)",
   },
   starterImg: {
-    height: "calc(var(--spacing) * 9)",
-    width: "calc(var(--spacing) * 9)",
+    height: "2.25rem",
+    width: "2.25rem",
     objectFit: "contain",
     imageRendering: "pixelated",
   },
@@ -138,26 +138,26 @@ const styles = stylex.create({
     backgroundColor: "var(--color-leaf-500)",
   },
   heading: {
-    marginBottom: "calc(var(--spacing) * 1.5)",
+    marginBottom: "0.375rem",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
   page: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 5)",
+    gap: "1.25rem",
   },
   clearingList: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   clearingChip: {
     display: "flex",
     alignItems: "center",
-    gap: "var(--spacing)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "var(--spacing)",
+    gap: "0.25rem",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.25rem",
     fontSize: "12px",
   },
   clearingDone: {
@@ -170,7 +170,7 @@ const styles = stylex.create({
   },
   wallGrid: {
     display: "grid",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     gridTemplateColumns: {
       default: null,
       "@media (width>=40rem)": "repeat(2,minmax(0,1fr))",
@@ -186,7 +186,7 @@ const styles = stylex.create({
     display: "flex",
     flexWrap: "wrap",
     alignItems: "flex-end",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   levelNumber: {
     fontSize: "20px",
@@ -197,12 +197,12 @@ const styles = stylex.create({
     color: "var(--color-bark-600)",
   },
   standingBarWrap: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+    marginTop: "0.375rem",
   },
   standingCoins: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   coinsValue: {
     fontSize: "20px",
@@ -221,9 +221,9 @@ const styles = stylex.create({
     fontSize: "13px",
   },
   titlePickerHeading: {
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingTop: "var(--spacing)",
-    paddingBottom: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.5rem",
+    paddingTop: "0.25rem",
+    paddingBottom: "0.375rem",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
@@ -232,9 +232,9 @@ const styles = stylex.create({
     width: "100%",
     cursor: "pointer",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "var(--spacing)",
+    gap: "0.5rem",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.25rem",
     textAlign: "left",
     backgroundColor: {
       default: null,
@@ -247,8 +247,8 @@ const styles = stylex.create({
   titleClearButton: {
     width: "100%",
     cursor: "pointer",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.375rem",
     textAlign: "left",
     fontSize: "13px",
     color: "var(--color-bark-600)",
@@ -266,7 +266,7 @@ const styles = stylex.create({
   },
   starterGrid: {
     display: "grid",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     gridTemplateColumns: {
       default: null,
       "@media (width>=40rem)": "repeat(2,minmax(0,1fr))",
@@ -275,9 +275,9 @@ const styles = stylex.create({
   starterCard: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2.5)",
-    paddingInline: "calc(var(--spacing) * 2.5)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    gap: "0.625rem",
+    paddingInline: "0.625rem",
+    paddingBlock: "0.5rem",
   },
   starterCardDone: {
     backgroundColor: "color-mix(in srgb, var(--color-leaf-300) 35%, var(--color-cream-50))",
@@ -287,8 +287,8 @@ const styles = stylex.create({
   },
   starterIconBox: {
     position: "relative",
-    height: "calc(var(--spacing) * 9)",
-    width: "calc(var(--spacing) * 9)",
+    height: "2.25rem",
+    width: "2.25rem",
     flexShrink: "0",
   },
   cardBody: {
@@ -312,8 +312,8 @@ const styles = stylex.create({
   card: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 3)",
-    padding: "calc(var(--spacing) * 2.5)",
+    gap: "0.75rem",
+    padding: "0.625rem",
   },
   cardGold: {
     borderStyle: "solid",
@@ -332,9 +332,9 @@ const styles = stylex.create({
     display: "flex",
   },
   pip: {
-    marginLeft: "var(--spacing)",
-    height: "calc(var(--spacing) * 2)",
-    width: "calc(var(--spacing) * 2)",
+    marginLeft: "0.25rem",
+    height: "0.5rem",
+    width: "0.5rem",
   },
   pipBronze: {
     backgroundColor: "var(--color-medal-bronze)",
@@ -349,30 +349,30 @@ const styles = stylex.create({
     backgroundColor: "var(--color-cream-300)",
   },
   cardDetail: {
-    marginTop: "calc(var(--spacing) * .5)",
+    marginTop: "0.125rem",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
   cardProgress: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+    marginTop: "0.375rem",
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   cardProgressBar: {
     flex: "1",
   },
   cardEarned: {
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
     fontSize: "12px",
     color: "var(--color-bark-400)",
   },
   secretsCard: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
     backgroundColor: "var(--color-cream-100)",
-    padding: "calc(var(--spacing) * 2.5)",
+    padding: "0.625rem",
   },
   secretsTitle: {
     fontSize: "13px",

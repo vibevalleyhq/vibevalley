@@ -10,16 +10,16 @@ import { Button } from "#/ui/Button.tsx";
 import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
 
 const viewStyles = stylex.create({
-  stack: { display: "flex", minWidth: 0, flexDirection: "column", gap: "calc(var(--spacing) * 2)" },
+  stack: { display: "flex", minWidth: 0, flexDirection: "column", gap: "0.5rem" },
   preview: {
     listStylePosition: "inside",
     listStyleType: "disc",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   wrapText: { overflowWrap: "break-word" },
-  error: { fontSize: "var(--text-sm)", lineHeight: "var(--text-sm--line-height)", color: "var(--color-berry)" },
+  error: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", color: "var(--color-berry)" },
 });
 
 export function ReleaseAssets(props: { id: string }) {

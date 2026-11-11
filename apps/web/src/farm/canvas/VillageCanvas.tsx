@@ -25,8 +25,8 @@ import { background, cssCursor, holdTimeOfDay, lightOn, screenOf } from "./scree
 
 const styles = stylex.create({
   enteringDiv: {
-    height: "calc(var(--spacing) * 4)",
-    width: "calc(var(--spacing) * 64)",
+    height: "1rem",
+    width: "16rem",
     borderStyle: "solid",
     borderWidth: "2px",
     borderColor: "var(--color-bark-900)",
@@ -34,7 +34,7 @@ const styles = stylex.create({
       default: "var(--color-px-canvas-shade)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-bark-900) 60%, transparent)",
     },
-    padding: "calc(var(--spacing) * .5)",
+    padding: "0.125rem",
     boxShadow: "2px 2px 0 0 var(--color-px-shade)",
   },
   villageCanvasDiv: {
@@ -72,7 +72,7 @@ const styles = stylex.create({
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     fontFamily: "var(--font-pixel)",
     fontSize: "12px",
     color: "var(--color-cream-100)",
@@ -81,7 +81,7 @@ const styles = stylex.create({
     height: "100%",
     backgroundColor: "var(--color-leaf-500)",
     transitionProperty: "width",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionTimingFunction: "var(--ease-out)",
     transitionDuration: ".2s",
   },
 });

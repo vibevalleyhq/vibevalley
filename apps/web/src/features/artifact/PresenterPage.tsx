@@ -23,8 +23,8 @@ const viewStyles = stylex.create({
       default: "1fr",
       "@media (width>=48rem)": "minmax(0, 2fr) minmax(0, 1fr)",
     },
-    gap: "calc(var(--spacing) * 4)",
-    padding: "calc(var(--spacing) * 4)",
+    gap: "1rem",
+    padding: "1rem",
     backgroundColor: "var(--color-side)",
     color: "var(--color-ink)",
   },
@@ -32,7 +32,7 @@ const viewStyles = stylex.create({
     display: "flex",
     minHeight: "0",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   current: {
     width: "100%",
@@ -46,30 +46,30 @@ const viewStyles = stylex.create({
   bar: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   at: {
     fontVariantNumeric: "tabular-nums",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   clock: {
     marginLeft: "auto",
     fontVariantNumeric: "tabular-nums",
     fontSize: "var(--text-xl)",
-    lineHeight: "var(--text-xl--line-height)",
+    lineHeight: "var(--leading-xl)",
     fontWeight: "var(--font-weight-semibold)",
   },
   side: {
     display: "flex",
     minHeight: "0",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   label: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-faint)",
   },
   next: {
@@ -103,7 +103,7 @@ const viewStyles = stylex.create({
     lineHeight: "1.6",
   },
   missing: {
-    padding: "calc(var(--spacing) * 6)",
+    padding: "1.5rem",
     color: "var(--color-muted)",
   },
 });

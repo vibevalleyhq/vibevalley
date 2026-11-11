@@ -21,18 +21,18 @@ import { FarmEmpty, FarmTag, FileRow, PlusMinus, Tinted } from "./rows";
 
 const styles = stylex.create({
   noticeBox: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
   },
   conflictBox: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
     backgroundColor: "color-mix(in srgb, var(--color-berry-500) 12%, var(--color-cream-50))",
-    paddingBlock: "calc(var(--spacing) * 2.5)",
+    paddingBlock: "0.625rem",
   },
   errorTint: {
     backgroundColor: "color-mix(in srgb, var(--color-berry-500) 12%, var(--color-cream-50))",
   },
   uncommittedBox: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
     backgroundColor: "color-mix(in srgb, var(--color-wheat) 20%, var(--color-cream-50))",
   },
   repoTag: {
@@ -48,17 +48,17 @@ const styles = stylex.create({
     color: "var(--color-bark-600)",
   },
   resolveHint: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+    marginTop: "0.375rem",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
   statusHint: {
-    marginTop: "calc(var(--spacing) * 2)",
+    marginTop: "0.5rem",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
   warehouseMeta: {
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
     display: "block",
     fontSize: "12px",
     color: "var(--color-bark-600)",
@@ -74,14 +74,14 @@ const styles = stylex.create({
     display: "flex",
     flexDirection: "column",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   errorText: {
     fontSize: "13px",
     color: "var(--color-berry)",
   },
   reading: {
-    paddingBlock: "calc(var(--spacing) * 10)",
+    paddingBlock: "2.5rem",
     textAlign: "center",
     fontSize: "13px",
     color: "var(--color-bark-600)",
@@ -94,45 +94,45 @@ const styles = stylex.create({
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   emptyNote: {
     fontSize: "13px",
     color: "var(--color-bark-600)",
   },
   conflictList: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+    marginTop: "0.375rem",
     display: "flex",
     flexWrap: "wrap",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   uncommittedTitle: {
     fontSize: "12px",
     color: "var(--color-bark-800)",
   },
   uncommittedList: {
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
     display: "flex",
     flexWrap: "wrap",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   uncommittedChip: {
     backgroundColor: "var(--color-cream-50)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
-    paddingBlock: "calc(var(--spacing) * .5)",
+    paddingInline: "0.375rem",
+    paddingBlock: "0.125rem",
     fontFamily: "var(--font-mono)",
     fontSize: "12.5px",
   },
   actions: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   commitRow: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     paddingBlock: "1px",
   },
   commitHash: {
@@ -155,11 +155,11 @@ const styles = stylex.create({
   fileList: {
     display: "flex",
     flexDirection: "column",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   warehouseGrid: {
     display: "grid",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     gridTemplateColumns: {
       default: null,
       "@media (width>=40rem)": "repeat(2,minmax(0,1fr))",
@@ -169,7 +169,7 @@ const styles = stylex.create({
     display: "flex",
     cursor: "pointer",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
     backgroundColor: {
       default: "var(--color-cream-100)",
       "@media (hover:hover)": {
@@ -177,7 +177,7 @@ const styles = stylex.create({
         ":hover": "var(--color-cream-200)",
       },
     },
-    padding: "calc(var(--spacing) * 3)",
+    padding: "0.75rem",
     textAlign: "left",
   },
   warehouseBody: {

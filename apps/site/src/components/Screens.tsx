@@ -21,8 +21,8 @@ const sceneStyles = stylex.create({
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-shade) 80%, transparent)",
     },
     padding: {
-      default: "calc(var(--spacing) * 4)",
-      "@media (width>=40rem)": "calc(var(--spacing) * 8)",
+      default: "1rem",
+      "@media (width>=40rem)": "2rem",
     },
   },
 });
@@ -33,11 +33,11 @@ const viewStyles = stylex.create({
   screensDiv: {
     display: "grid",
     gridTemplateColumns: {
-      default: "repeat(1,minmax(0,1fr))",
+      default: "minmax(0, 1fr)",
       "@media (width>=64rem)": "minmax(0,1.4fr) minmax(0,1fr)",
     },
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 7)",
+    gap: "1.75rem",
   },
   screensFigure: {
     margin: "0",
@@ -45,8 +45,8 @@ const viewStyles = stylex.create({
     borderWidth: "2px",
     borderColor: "var(--color-bark-900)",
     backgroundColor: "var(--color-cream-50)",
-    boxShadow: "inset 0 0 0 2px var(--color-rim), 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
-    padding: "calc(var(--spacing) * 2.5)",
+    boxShadow: "inset 0 0 0 2px var(--color-rim), 4px 4px 0 var(--color-drop)",
+    padding: "0.625rem",
   },
   screensButton: {
     display: "block",
@@ -62,9 +62,9 @@ const viewStyles = stylex.create({
     borderColor: "var(--color-bark-900)",
   },
   screensFigcaption: {
-    paddingInline: "var(--spacing)",
-    paddingTop: "calc(var(--spacing) * 2.5)",
-    paddingBottom: "calc(var(--spacing) * .5)",
+    paddingInline: "0.25rem",
+    paddingTop: "0.625rem",
+    paddingBottom: "0.125rem",
     fontSize: "15px",
     color: "var(--color-bark-800)",
   },
@@ -75,8 +75,8 @@ const viewStyles = stylex.create({
     borderWidth: "2px",
     borderColor: "var(--color-bark-900)",
     backgroundColor: "var(--color-cream-50)",
-    boxShadow: "inset 0 0 0 2px var(--color-rim), 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
-    padding: "calc(var(--spacing) * 2.5)",
+    boxShadow: "inset 0 0 0 2px var(--color-rim), 4px 4px 0 var(--color-drop)",
+    padding: "0.625rem",
   },
   largeImg: {
     display: "block",
@@ -90,11 +90,11 @@ const viewStyles = stylex.create({
   },
   screenshotClose: {
     position: "absolute",
-    top: "calc(var(--spacing) * -4)",
-    right: "calc(var(--spacing) * -4)",
+    top: "-1rem",
+    right: "-1rem",
     display: "grid",
-    width: "calc(var(--spacing) * 11)",
-    height: "calc(var(--spacing) * 11)",
+    width: "2.75rem",
+    height: "2.75rem",
     cursor: "pointer",
     placeItems: "center",
     borderStyle: "solid",
@@ -107,11 +107,11 @@ const viewStyles = stylex.create({
         ":hover": "var(--color-cream-hover)",
       },
     },
-    boxShadow: "inset 2px 2px 0 var(--color-rim), 0 0 transparent, 0 0 transparent, 0 0 transparent, 3px 3px 0 var(--color-drop)",
+    boxShadow: "inset 2px 2px 0 var(--color-rim), 3px 3px 0 var(--color-drop)",
   },
   largeImg2: {
-    width: "calc(var(--spacing) * 6)",
-    height: "calc(var(--spacing) * 6)",
+    width: "1.5rem",
+    height: "1.5rem",
     imageRendering: "pixelated",
   },
 });

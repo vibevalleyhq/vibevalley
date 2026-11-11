@@ -19,7 +19,7 @@ import { playSound, SOUND_GROUPS, SOUND_LABEL } from "#/ui/pixel/sound.ts";
 import { styleProps } from "#/ui/positioner.ts";
 
 const buttonStyles = stylex.create({
-  base: { height: "calc(var(--spacing) * 7)", cursor: "pointer", paddingInline: "calc(var(--spacing) * 2.5)", fontSize: "12px" },
+  base: { height: "1.75rem", cursor: "pointer", paddingInline: "0.625rem", fontSize: "12px" },
   plain: {
     backgroundColor: { default: "var(--color-ink-800)", "@media (hover:hover)": { default: null, ":hover": "var(--color-ink-700)" } },
     color: "var(--color-paper)",
@@ -46,20 +46,20 @@ const buttonStyles = stylex.create({
 const styles = stylex.create({
   panelAside: {
     position: "absolute",
-    top: "calc(var(--spacing) * 2)",
-    right: "calc(var(--spacing) * 2)",
-    bottom: "calc(var(--spacing) * 2)",
+    top: "0.5rem",
+    right: "0.5rem",
+    bottom: "0.5rem",
     zIndex: "50",
     display: "flex",
     width: "380px",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     overflow: "hidden",
     backgroundColor: {
       default: "var(--color-px-debug-surface)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink-950) 96%, transparent)",
     },
-    padding: "calc(var(--spacing) * 3)",
+    padding: "0.75rem",
     fontFamily: "var(--font-mono)",
     fontSize: "12px",
     color: "var(--color-paper)",
@@ -70,22 +70,22 @@ const styles = stylex.create({
     minHeight: "0",
     flex: "1",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     overflowY: "auto",
   },
   sectionSection: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
     borderColor: "var(--color-ink-700)",
-    paddingTop: "calc(var(--spacing) * 2)",
+    paddingTop: "0.5rem",
   },
   sectionHeader: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     fontSize: "11px",
     letterSpacing: "var(--tracking-wide)",
     color: "var(--color-ink-300)",
@@ -96,7 +96,7 @@ const styles = stylex.create({
   panelHeader: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   panelSpan: {
     flex: "1",
@@ -105,14 +105,14 @@ const styles = stylex.create({
   },
   panelDiv2: {
     display: "flex",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   panelInput: {
     accentColor: "var(--color-hat)",
   },
   panelDiv22: {
     display: "flex",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   panelSpan2: {
     color: "var(--color-ink-300)",
@@ -121,7 +121,7 @@ const styles = stylex.create({
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   panelButton: {
     minWidth: "0",
@@ -142,25 +142,25 @@ const styles = stylex.create({
   panelDiv4: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   panelOl: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
   },
   debugFrame: {
     display: "flex",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   panelSpan3: {
-    width: "calc(var(--spacing) * 8)",
+    width: "2rem",
     flexShrink: "0",
     textAlign: "right",
     color: "var(--color-ink-500)",
   },
   panelSpan4: {
-    width: "calc(var(--spacing) * 12)",
+    width: "3rem",
     flexShrink: "0",
     color: "var(--color-hat)",
   },

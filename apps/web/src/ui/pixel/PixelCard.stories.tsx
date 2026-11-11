@@ -11,11 +11,11 @@ import { storyFrame } from "./story.stylex";
 const viewStyles = stylex.create({
   pixelCardStoriesDiv: {
     display: "flex",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   pixelCardStoriesDiv2: {
     display: "flex",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
 });
 

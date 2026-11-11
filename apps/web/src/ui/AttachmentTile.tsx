@@ -13,7 +13,7 @@ const styles = stylex.create({
     flexShrink: "0",
     cursor: "pointer",
     borderRadius: "var(--radius-sm)",
-    padding: "var(--spacing)",
+    padding: "0.25rem",
     color: {
       default: "var(--color-muted)",
       "@media (hover:hover)": {
@@ -21,9 +21,9 @@ const styles = stylex.create({
         ":hover": "var(--color-ink)",
       },
     },
-    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
-    transitionDuration: ".12s",
+    transitionProperty: "color, background-color, border-color",
+    transitionTimingFunction: "var(--ease-out)",
+    transitionDuration: "120ms",
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -34,24 +34,24 @@ const styles = stylex.create({
   },
   tile: {
     display: "flex",
-    maxWidth: "calc(var(--spacing) * 64)",
+    maxWidth: "16rem",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-page)",
-    paddingBlock: "var(--spacing)",
-    paddingRight: "var(--spacing)",
-    paddingLeft: "var(--spacing)",
+    paddingBlock: "0.25rem",
+    paddingRight: "0.25rem",
+    paddingLeft: "0.25rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
   preview: {
     display: "flex",
-    width: "calc(var(--spacing) * 8)",
-    height: "calc(var(--spacing) * 8)",
+    width: "2rem",
+    height: "2rem",
     flexShrink: "0",
     alignItems: "center",
     justifyContent: "center",
@@ -78,7 +78,7 @@ const styles = stylex.create({
   },
   size: {
     fontSize: "var(--text-2xs)",
-    lineHeight: "var(--text-2xs--line-height)",
+    lineHeight: "var(--leading-2xs)",
     color: "var(--color-muted)",
   },
 });

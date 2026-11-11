@@ -9,8 +9,8 @@ import { Tip } from "./Tip";
 const viewStyles = stylex.create({
   button: {
     display: "inline-flex",
-    width: "calc(var(--spacing) * 7)",
-    height: "calc(var(--spacing) * 7)",
+    width: "1.75rem",
+    height: "1.75rem",
     flexShrink: 0,
     cursor: { default: "pointer", ":disabled": "default" },
     alignItems: "center",
@@ -18,7 +18,7 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-md)",
     transitionProperty: "background-color, color, translate",
     transitionDuration: "120ms",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionTimingFunction: "var(--ease-out)",
     backgroundColor: { default: null, "@media (hover: hover)": { default: null, ":hover": "var(--color-selected)" } },
     translate: { default: null, ":active": { default: "0 1px", ":disabled": "0 0" } },
     opacity: { default: null, ":disabled": 0.5 },
@@ -28,8 +28,8 @@ const viewStyles = stylex.create({
   pressed: { backgroundColor: "var(--color-selected)" },
   iconLink: {
     display: "inline-flex",
-    width: "calc(var(--spacing) * 7)",
-    height: "calc(var(--spacing) * 7)",
+    width: "1.75rem",
+    height: "1.75rem",
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "var(--radius-md)",
@@ -52,10 +52,10 @@ const viewStyles = stylex.create({
     display: "inline-flex",
     flexShrink: "0",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     borderRadius: "var(--radius-sm)",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     whiteSpace: "nowrap",
     color: {
       default: "var(--color-muted)",

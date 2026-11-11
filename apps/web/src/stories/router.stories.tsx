@@ -25,17 +25,17 @@ const styles = stylex.create({
   controlsDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   controlsNav: {
     display: "flex",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   routerStoriesDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
-    padding: "calc(var(--spacing) * 4)",
+    gap: "1rem",
+    padding: "1rem",
   },
 });
 

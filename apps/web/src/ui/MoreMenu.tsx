@@ -7,11 +7,15 @@ import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 import { positionerAttrs } from "./positioner";
 
+const popIn = stylex.keyframes({
+  from: { opacity: 0, scale: 0.98 },
+});
+
 const styles = stylex.create({
   trigger: {
     display: "inline-flex",
-    width: "calc(var(--spacing) * 7)",
-    height: "calc(var(--spacing) * 7)",
+    width: "1.75rem",
+    height: "1.75rem",
     flexShrink: 0,
     cursor: "pointer",
     alignItems: "center",
@@ -27,14 +31,14 @@ const styles = stylex.create({
       "@media (hover: hover)": { default: null, ":hover": "var(--color-selected)" },
       ":is([data-popup-open])": "var(--color-selected)",
     },
-    transitionProperty: "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke",
+    transitionProperty: "color, background-color, border-color",
     transitionDuration: "120ms",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionTimingFunction: "var(--ease-out)",
   },
   popup: {
     display: "flex",
-    minWidth: "calc(var(--spacing) * 44)",
-    animationName: { default: "pop-in", "@media (prefers-reduced-motion: reduce)": "none" },
+    minWidth: "11rem",
+    animationName: { default: popIn, "@media (prefers-reduced-motion: reduce)": "none" },
     animationDuration: "280ms",
     animationTimingFunction: "var(--ease-out)",
     animationFillMode: "both",
@@ -44,23 +48,23 @@ const styles = stylex.create({
     borderStyle: "solid",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-page)",
-    padding: "var(--spacing)",
+    padding: "0.25rem",
     boxShadow: "var(--shadow-float)",
     outlineStyle: "none",
   },
   above: { transformOrigin: "bottom right" },
   below: { transformOrigin: "top right" },
-  separator: { marginBlock: "var(--spacing)", height: 1, backgroundColor: "var(--color-line)" },
+  separator: { marginBlock: "0.25rem", height: 1, backgroundColor: "var(--color-line)" },
   item: {
     display: "flex",
-    height: "calc(var(--spacing) * 7)",
+    height: "1.75rem",
     cursor: "pointer",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 2)",
+    paddingInline: "0.5rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     outlineStyle: "none",
     backgroundColor: { default: null, ":is([data-highlighted])": "var(--color-hover)" },
   },

@@ -20,9 +20,9 @@ const styles = stylex.create({
     flexDirection: "column",
   },
   feedbackStoriesP: {
-    padding: "calc(var(--spacing) * 4)",
+    padding: "1rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-faint)",
   },
   feedbackStoriesLi: {
@@ -31,10 +31,10 @@ const styles = stylex.create({
     borderTopWidth: { default: null, ":not(:last-child)": 0 },
     borderBottomWidth: { default: null, ":not(:last-child)": 1 },
     borderColor: { default: null, ":not(:last-child)": "var(--color-line)" },
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBlock: "calc(var(--spacing) * 2.5)",
+    paddingInline: "1rem",
+    paddingBlock: "0.625rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
 });
 

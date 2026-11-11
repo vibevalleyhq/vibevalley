@@ -16,7 +16,7 @@ import { clockOf, FarmEmpty, FarmTag } from "./rows";
 
 const styles = stylex.create({
   saidBody: {
-    marginTop: "calc(var(--spacing) * .5)",
+    marginTop: "0.125rem",
     fontSize: "13px",
   },
   saidYou: {
@@ -45,21 +45,21 @@ const styles = stylex.create({
   row: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 2.5)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    gap: "0.625rem",
+    paddingBlock: "0.5rem",
   },
   clock: {
-    width: "calc(var(--spacing) * 11)",
+    width: "2.75rem",
     flexShrink: "0",
-    paddingTop: "calc(var(--spacing) * 1.5)",
+    paddingTop: "0.375rem",
     textAlign: "right",
     fontSize: "12px",
     color: "var(--color-bark-400)",
   },
   youBadge: {
     display: "flex",
-    height: "calc(var(--spacing) * 8)",
-    width: "calc(var(--spacing) * 8)",
+    height: "2rem",
+    width: "2rem",
     flexShrink: "0",
     alignItems: "center",
     justifyContent: "center",
@@ -74,7 +74,7 @@ const styles = stylex.create({
   header: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   author: {
     fontSize: "13px",
@@ -95,7 +95,7 @@ const styles = stylex.create({
     color: "var(--color-bark-600)",
   },
   issueTitle: {
-    marginTop: "calc(var(--spacing) * .5)",
+    marginTop: "0.125rem",
     fontSize: "13px",
   },
   spent: {

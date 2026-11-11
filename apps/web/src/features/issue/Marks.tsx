@@ -19,7 +19,7 @@ const viewStyles = stylex.create({
   progressMarkSpan: {
     display: "inline-flex",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     fontSize: "var(--text-2xs)",
     lineHeight: "14px",
     color: "var(--color-muted)",
@@ -29,9 +29,9 @@ const viewStyles = stylex.create({
   },
   flagChipSpan: {
     borderRadius: "var(--radius-sm)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.375rem",
     fontSize: "var(--text-2xs)",
-    lineHeight: "calc(var(--spacing) * 4)",
+    lineHeight: "1rem",
     fontWeight: "var(--font-weight-medium)",
     whiteSpace: "nowrap",
   },

@@ -25,49 +25,49 @@ const viewStyles = stylex.create({
   formForm: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
   },
   formP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-berry)",
   },
   formDiv: {
     display: "flex",
     justifyContent: "flex-end",
-    gap: "calc(var(--spacing) * 3)",
-    paddingTop: "calc(var(--spacing) * 2)",
+    gap: "0.75rem",
+    paddingTop: "0.5rem",
   },
   channelSettingsFormDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 5)",
+    gap: "1.25rem",
   },
   channelDangerDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
     borderColor: "var(--color-line)",
-    paddingTop: "calc(var(--spacing) * 4)",
+    paddingTop: "1rem",
   },
   channelDangerDiv2: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   channelDangerDiv3: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   channelDangerP: {
     color: "var(--color-muted)",
   },
   channelDangerUl: {
     listStyleType: "disc",
-    paddingLeft: "calc(var(--spacing) * 5)",
+    paddingLeft: "1.25rem",
   },
 });
 

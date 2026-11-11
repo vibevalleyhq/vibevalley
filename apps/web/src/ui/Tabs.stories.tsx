@@ -9,7 +9,7 @@ import { Tabs, type TabsLook } from "./Tabs";
 type Tab = "chat" | "issues" | "crons" | "files";
 
 const styles = stylex.create({
-  line: { borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-line)", paddingInline: "calc(var(--spacing) * 3)" },
+  line: { borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-line)", paddingInline: "0.75rem" },
   width: (width: number) => ({ width }),
 });
 

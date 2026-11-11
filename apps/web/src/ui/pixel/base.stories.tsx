@@ -9,22 +9,22 @@ import { storyFrame } from "./story.stylex";
 
 const styles = stylex.create({
   baseStoriesPxCard: {
-    width: "calc(var(--spacing) * 72)",
+    width: "18rem",
   },
   baseStoriesDashedLine: {
-    marginBlock: "calc(var(--spacing) * 3)",
+    marginBlock: "0.75rem",
   },
   baseStoriesPxWindow: {
-    width: "calc(var(--spacing) * 64)",
-    padding: "calc(var(--spacing) * 4)",
+    width: "16rem",
+    padding: "1rem",
   },
   baseStoriesPxFrame: {
-    width: "calc(var(--spacing) * 56)",
+    width: "14rem",
   },
-  composedWindow: (width: number) => ({ width, marginLeft: "12px", padding: "calc(var(--spacing) * 3)" }),
+  composedWindow: (width: number) => ({ width, marginLeft: "12px", padding: "0.75rem" }),
   composedControl: (marginLeft: number) => ({ marginLeft, maxWidth: "240px" }),
   baseStoriesDiv: {
-    padding: "calc(var(--spacing) * 3)",
+    padding: "0.75rem",
   },
 });
 

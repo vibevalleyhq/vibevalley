@@ -10,7 +10,7 @@ const viewStyles = stylex.create({
     width: "30rem",
   },
   connectorsPageStoriesDiv2: {
-    width: "calc(var(--spacing) * 80)",
+    width: "20rem",
   },
 });
 

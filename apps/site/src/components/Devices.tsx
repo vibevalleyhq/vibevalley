@@ -24,7 +24,7 @@ const viewStyles = stylex.create({
   devicesDiv: {
     display: "grid",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 12)",
+    gap: "3rem",
     gridTemplateColumns: {
       default: null,
       "@media (width>=64rem)": "minmax(0,.85fr) minmax(0,1.15fr)",
@@ -34,25 +34,25 @@ const viewStyles = stylex.create({
     maxWidth: "36em",
   },
   devicesUl: {
-    marginTop: "calc(var(--spacing) * 6)",
+    marginTop: "1.5rem",
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   devicesLi: {
     borderStyle: "solid",
     borderWidth: "2px",
     borderColor: "var(--color-bark-900)",
     backgroundColor: "var(--color-cream-50)",
-    boxShadow: "inset 0 0 0 2px var(--color-rim), 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
-    paddingInline: "calc(var(--spacing) * 3.5)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    boxShadow: "inset 0 0 0 2px var(--color-rim), 4px 4px 0 var(--color-drop)",
+    paddingInline: "0.875rem",
+    paddingBlock: "0.5rem",
     fontFamily: "var(--font-pixel)",
     fontSize: "var(--text-lg)",
     lineHeight: "1",
   },
   devicesP2: {
-    marginTop: "calc(var(--spacing) * 5)",
+    marginTop: "1.25rem",
     fontSize: "15px",
     color: "var(--color-bark-800)",
   },
@@ -63,24 +63,24 @@ const viewStyles = stylex.create({
     maxWidth: "640px",
     paddingBottom: {
       default: null,
-      "@media (width>=64rem)": "calc(var(--spacing) * 24)",
+      "@media (width>=64rem)": "6rem",
     },
   },
   devicesDiv3: {
     marginTop: {
-      default: "calc(var(--spacing) * 8)",
+      default: "2rem",
       "@media (width>=64rem)": "0",
     },
     display: "flex",
     justifyContent: "center",
-    gap: "calc(var(--spacing) * 6)",
+    gap: "1.5rem",
   },
   laptopDiv: {
     borderStyle: "solid",
     borderWidth: "6px",
     borderColor: "var(--color-bark-900)",
     backgroundColor: "var(--color-bark-900)",
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
+    boxShadow: "4px 4px 0 var(--color-drop)",
   },
   laptopImg: {
     display: "block",
@@ -89,12 +89,12 @@ const viewStyles = stylex.create({
   },
   laptopDiv2: {
     marginInline: "-4%",
-    height: "calc(var(--spacing) * 3)",
+    height: "0.75rem",
     borderStyle: "solid",
     borderWidth: "2px",
     borderColor: "var(--color-bark-900)",
     backgroundColor: "var(--color-cream-300)",
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 3px 3px 0 var(--color-drop)",
+    boxShadow: "3px 3px 0 var(--color-drop)",
   },
   phoneDiv: {
     borderRadius: "18px",
@@ -102,7 +102,7 @@ const viewStyles = stylex.create({
     borderWidth: "7px",
     borderColor: "var(--color-bark-900)",
     backgroundColor: "var(--color-bark-900)",
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
+    boxShadow: "4px 4px 0 var(--color-drop)",
   },
   phoneImg: {
     display: "block",

@@ -8,15 +8,15 @@ const styles = stylex.create({
   moreMenuStoriesDiv: {
     display: "flex",
     justifyContent: "flex-end",
-    paddingTop: "calc(var(--spacing) * 40)",
-    paddingRight: "calc(var(--spacing) * 4)",
-    paddingBottom: "calc(var(--spacing) * 4)",
-    paddingLeft: "calc(var(--spacing) * 4)",
+    paddingTop: "10rem",
+    paddingRight: "1rem",
+    paddingBottom: "1rem",
+    paddingLeft: "1rem",
   },
   moreMenuStoriesDiv2: {
     display: "flex",
     justifyContent: "flex-end",
-    padding: "calc(var(--spacing) * 4)",
+    padding: "1rem",
   },
 });
 

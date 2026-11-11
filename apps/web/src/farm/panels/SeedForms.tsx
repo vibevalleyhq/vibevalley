@@ -25,11 +25,11 @@ import { playSound } from "#/ui/pixel/sound.ts";
 const styles = stylex.create({
   whoTileButton: {
     display: "flex",
-    width: "calc(var(--spacing) * 16)",
+    width: "4rem",
     cursor: "pointer",
     flexDirection: "column",
     alignItems: "center",
-    paddingBlock: "var(--spacing)",
+    paddingBlock: "0.25rem",
   },
   whoTileButtonPrimary: {
     backgroundColor: {
@@ -50,12 +50,12 @@ const styles = stylex.create({
     display: "flex",
     cursor: "pointer",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     borderStyle: "solid",
     borderWidth: "2px",
-    paddingBlock: "calc(var(--spacing) * .5)",
-    paddingRight: "calc(var(--spacing) * 2)",
-    paddingLeft: "var(--spacing)",
+    paddingBlock: "0.125rem",
+    paddingRight: "0.5rem",
+    paddingLeft: "0.25rem",
     fontSize: "12px",
   },
   sowFormButtonPrimary: {
@@ -82,17 +82,17 @@ const styles = stylex.create({
     color: "var(--color-bark-600)",
   },
   sowFormSpan: {
-    marginLeft: "calc(var(--spacing) * 2)",
+    marginLeft: "0.5rem",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
   sowFormP2: {
-    marginTop: "calc(var(--spacing) * 2.5)",
+    marginTop: "0.625rem",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
   sowFormP3: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
@@ -103,14 +103,14 @@ const styles = stylex.create({
     color: "var(--color-bark-600)",
   },
   waterFormP: {
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },
   chipButton: {
     cursor: "pointer",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "var(--spacing)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.25rem",
     fontSize: "12px",
   },
   chipButtonTone: {
@@ -128,7 +128,7 @@ const styles = stylex.create({
     color: "var(--color-bark-800)",
   },
   whoTileSpan: {
-    marginTop: "calc(var(--spacing) * .5)",
+    marginTop: "0.125rem",
     maxWidth: "60px",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
@@ -140,7 +140,7 @@ const styles = stylex.create({
     display: "flex",
     flexDirection: "column",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 2.5)",
+    gap: "0.625rem",
   },
   sowFormP5: {
     fontSize: "14px",
@@ -153,7 +153,7 @@ const styles = stylex.create({
   sowFormDiv: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   sowFormP22: {
     minWidth: "0",
@@ -165,40 +165,40 @@ const styles = stylex.create({
     color: "var(--color-bark-900)",
   },
   sowFormDiv2: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
     display: "flex",
     flexDirection: "column",
   },
   sowFormDiv3: {
-    marginTop: "calc(var(--spacing) * 2.5)",
+    marginTop: "0.625rem",
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   sowFormP32: {
     fontSize: "12px",
     color: "var(--color-berry)",
   },
   sowFormDiv4: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+    marginTop: "0.375rem",
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   seedKinds: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+    marginTop: "0.375rem",
     display: "flex",
     flexWrap: "wrap",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   sowFormDiv5: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+    marginTop: "0.375rem",
   },
   sowFormSpan2: {
     display: "flex",
-    height: "calc(var(--spacing) * 11)",
-    width: "calc(var(--spacing) * 11)",
+    height: "2.75rem",
+    width: "2.75rem",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "var(--color-cream-200)",
@@ -206,13 +206,13 @@ const styles = stylex.create({
     color: "var(--color-bark-600)",
   },
   sowFormDiv6: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   sowFormP42: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+    marginTop: "0.375rem",
     fontSize: "12px",
     color: "var(--color-berry)",
   },
@@ -221,22 +221,22 @@ const styles = stylex.create({
     color: "var(--color-bark-800)",
   },
   waterFormDiv: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   waterFormDiv2: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
     display: "flex",
     alignItems: "flex-end",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   waterFormDiv3: {
     flex: "1",
   },
   waterFormP22: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+    marginTop: "0.375rem",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },

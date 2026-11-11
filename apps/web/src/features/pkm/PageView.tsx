@@ -49,7 +49,7 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: {
       default: "var(--color-muted)",
       "@media (hover:hover)": {
@@ -82,11 +82,11 @@ const styles = stylex.create({
   pkmDay: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   shownH2: {
     fontSize: "var(--text-lg)",
-    lineHeight: "var(--text-lg--line-height)",
+    lineHeight: "var(--leading-lg)",
     fontWeight: "var(--font-weight-semibold)",
   },
   shownArticle: {
@@ -96,9 +96,9 @@ const styles = stylex.create({
     maxWidth: "var(--container-3xl)",
     minWidth: "0",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBlock: "calc(var(--spacing) * 4)",
+    gap: "1rem",
+    paddingInline: "1rem",
+    paddingBlock: "1rem",
   },
   pkmRail: {
     marginInline: {
@@ -108,11 +108,11 @@ const styles = stylex.create({
     display: "flex",
     width: {
       default: "100%",
-      "@media (width>=80rem)": "calc(var(--spacing) * 72)",
+      "@media (width>=80rem)": "18rem",
     },
     maxWidth: "var(--container-3xl)",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 5)",
+    gap: "1.25rem",
     borderTopStyle: {
       default: "solid",
       "@media (width>=80rem)": "solid",
@@ -122,8 +122,8 @@ const styles = stylex.create({
       "@media (width>=80rem)": "0",
     },
     borderColor: "var(--color-line)",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBlock: "calc(var(--spacing) * 4)",
+    paddingInline: "1rem",
+    paddingBlock: "1rem",
     position: {
       default: null,
       "@media (width>=80rem)": "sticky",
@@ -162,7 +162,7 @@ const styles = stylex.create({
   headerDiv2: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   pkmTitle: {
     minWidth: "0",
@@ -171,48 +171,48 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-xl)",
-    lineHeight: "calc(var(--spacing) * 8)",
+    lineHeight: "2rem",
     fontWeight: "var(--font-weight-semibold)",
   },
   headerP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   pkmProps: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   propsDiv: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    columnGap: "calc(var(--spacing) * 3)",
-    rowGap: "var(--spacing)",
+    columnGap: "0.75rem",
+    rowGap: "0.25rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   pkmProp: {
     display: "inline-flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   pkmProp2: {
     color: "var(--color-muted)",
   },
   pkmProp3: {
-    borderRadius: "2147483647px",
+    borderRadius: "9999px",
     backgroundColor: "var(--color-hover)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * .5)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.125rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
   pkmPropsMore: {
     cursor: "pointer",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: {
       default: "var(--color-muted)",
       "@media (hover:hover)": {
@@ -224,26 +224,26 @@ const styles = stylex.create({
   propsDl: {
     display: "grid",
     gridTemplateColumns: "auto 1fr",
-    columnGap: "calc(var(--spacing) * 3)",
-    rowGap: "calc(var(--spacing) * .5)",
+    columnGap: "0.75rem",
+    rowGap: "0.125rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
   commentsH2: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-semibold)",
     color: "var(--color-muted)",
   },
   pkmComment: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-line)",
-    padding: "calc(var(--spacing) * 2.5)",
+    padding: "0.625rem",
   },
   pkmCommentAt: {
     cursor: "pointer",
@@ -252,7 +252,7 @@ const styles = stylex.create({
     overflow: "hidden",
     textAlign: "left",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: {
       default: "var(--color-muted)",
       "@media (hover:hover)": {
@@ -263,11 +263,11 @@ const styles = stylex.create({
   },
   commentCardP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   pkmDiff: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     whiteSpace: "pre-wrap",
   },
   commentCardDel: {
@@ -281,30 +281,30 @@ const styles = stylex.create({
   },
   commentCardDiv: {
     display: "flex",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     alignSelf: "flex-end",
   },
   backlinksP: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-faint)",
   },
   backlinksDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
   },
   backlinksH3: {
     fontSize: "var(--text-2xs)",
-    lineHeight: "var(--text-2xs--line-height)",
+    lineHeight: "var(--leading-2xs)",
     color: "var(--color-faint)",
   },
   pkmBacklink: {
     display: "flex",
     flexDirection: "column",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.375rem",
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -319,10 +319,10 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * .5)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.125rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: {
       default: "var(--color-muted)",
       "@media (hover:hover)": {

@@ -9,13 +9,13 @@ const viewStyles = stylex.create({
   runtimeBadgeStoriesDiv: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
   },
   runtimeBadgeStoriesSpan: {
     position: "relative",
     display: "inline-block",
-    width: "calc(var(--spacing) * 10)",
-    height: "calc(var(--spacing) * 10)",
+    width: "2.5rem",
+    height: "2.5rem",
     borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-hover)",
   },

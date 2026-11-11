@@ -15,19 +15,19 @@ import { CommandLineRow, UpdateRow } from "./UpdateRow";
 
 const viewStyles = stylex.create({
   pathRowSpan: {
-    maxWidth: "calc(var(--spacing) * 80)",
+    maxWidth: "20rem",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   aboutPageSpan: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
 });
 

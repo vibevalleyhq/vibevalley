@@ -11,13 +11,13 @@ import { TextInput } from "./Field";
 import { Form, FormField, formControl, formMessages } from "./Form";
 
 const viewStyles = stylex.create({
-  form: { display: "flex", flexDirection: "column", gap: "calc(var(--spacing) * 3)" },
+  form: { display: "flex", flexDirection: "column", gap: "0.75rem" },
   editorDiv: {
     display: "flex",
     maxWidth: "var(--container-md)",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
-    padding: "calc(var(--spacing) * 4)",
+    gap: "0.75rem",
+    padding: "1rem",
   },
 });
 

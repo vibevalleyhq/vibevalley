@@ -18,35 +18,35 @@ import { SheetLabel } from "./Sheet";
 const styles = stylex.create({
   issueThreadMarkdown: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     overflowWrap: "break-word",
   },
   issueThreadP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-berry)",
   },
   issueThreadP2: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   issueThreadDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
   },
   issueMessage: {
     minWidth: "0",
   },
   issueThreadDiv2: {
-    marginBottom: "var(--spacing)",
+    marginBottom: "0.25rem",
     display: "flex",
     flexWrap: "wrap",
     alignItems: "baseline",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   issueThreadSpan: {

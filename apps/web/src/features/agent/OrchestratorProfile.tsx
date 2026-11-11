@@ -26,14 +26,14 @@ const profileStyles = stylex.create({
       default: "repeat(3,minmax(0,1fr))",
       "@media (width>=40rem)": "repeat(6,minmax(0,1fr))",
     },
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
 });
 
 const styles = stylex.create({
   orchestratorProfileA: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
     textDecorationLine: {
       default: null,
@@ -51,7 +51,7 @@ const styles = stylex.create({
     cursor: "pointer",
     flexDirection: "column",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
@@ -59,9 +59,9 @@ const styles = stylex.create({
       default: "var(--color-line)",
       ":is([data-checked])": "var(--color-leaf)",
     },
-    padding: "calc(var(--spacing) * 2)",
+    padding: "0.5rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -74,9 +74,9 @@ const styles = stylex.create({
   orchestratorProfileSpan: {
     flexShrink: "0",
     borderRadius: "var(--radius-sm)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.375rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
   orchestratorProfileSpanTone: {
     backgroundColor: "var(--color-hat)",
@@ -89,29 +89,29 @@ const styles = stylex.create({
   orchestratorProfileDiv: {
     height: "100%",
     overflowY: "auto",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBottom: "calc(var(--spacing) * 8)",
+    paddingInline: "1rem",
+    paddingBottom: "2rem",
   },
   orchestratorProfileDiv2: {
     display: "flex",
     maxWidth: "var(--container-3xl)",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
   },
   profileBar: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    columnGap: "calc(var(--spacing) * 3)",
-    rowGap: "calc(var(--spacing) * 2)",
+    columnGap: "0.75rem",
+    rowGap: "0.5rem",
     borderBottomStyle: "solid",
     borderBottomWidth: "1px",
     borderColor: "var(--color-line)",
-    paddingBlock: "calc(var(--spacing) * 3)",
+    paddingBlock: "0.75rem",
   },
   orchestratorProfileSpan2: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-faint)",
   },
   orchestratorProfileSpan22: {
@@ -119,39 +119,39 @@ const styles = stylex.create({
     minWidth: "0",
     flex: "1",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   orchestratorProfileSpan3: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-lg)",
-    lineHeight: "var(--text-lg--line-height)",
+    lineHeight: "var(--leading-lg)",
     fontWeight: "var(--font-weight-semibold)",
   },
   orchestratorProfileSpan4: {
     flexShrink: "0",
     borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-hover)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.375rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   orchestratorProfileSpan5: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   orchestratorProfileP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   orchestratorProfileDiv3: {
     display: "grid",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
     gridTemplateColumns: {
       default: null,
       "@media (width>=40rem)": "repeat(2,minmax(0,1fr))",
@@ -160,11 +160,11 @@ const styles = stylex.create({
   orchestratorProfileDiv4: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   orchestratorProfileSpan6: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-medium)",
     color: "var(--color-muted)",
   },

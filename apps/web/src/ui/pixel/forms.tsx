@@ -13,8 +13,8 @@ const styles = stylex.create({
       default: "pointer",
       ":disabled": "default",
     },
-    paddingInline: "var(--spacing)",
-    paddingBlock: "calc(var(--spacing) * .5)",
+    paddingInline: "0.25rem",
+    paddingBlock: "0.125rem",
     opacity: {
       default: ".7",
       "@media (hover:hover)": {
@@ -41,12 +41,12 @@ const styles = stylex.create({
   },
   box: {
     display: "flex",
-    minHeight: "calc(var(--spacing) * 9)",
+    minHeight: "2.25rem",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     backgroundColor: "var(--color-cream-100)",
-    padding: "calc(var(--spacing) * 1.5)",
+    padding: "0.375rem",
   },
   disabled: {
     opacity: ".5",
@@ -54,17 +54,17 @@ const styles = stylex.create({
   chip: {
     display: "inline-flex",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     backgroundColor: "var(--color-cream-300)",
-    paddingBlock: "calc(var(--spacing) * .5)",
-    paddingRight: "var(--spacing)",
-    paddingLeft: "calc(var(--spacing) * 2)",
+    paddingBlock: "0.125rem",
+    paddingRight: "0.25rem",
+    paddingLeft: "0.5rem",
     color: "var(--color-bark-800)",
   },
   input: {
-    height: "calc(var(--spacing) * 6)",
+    height: "1.5rem",
     backgroundColor: "transparent",
-    paddingInline: "var(--spacing)",
+    paddingInline: "0.25rem",
     color: {
       default: "var(--color-bark-900)",
       "::placeholder": "var(--color-bark-500)",
@@ -73,7 +73,7 @@ const styles = stylex.create({
     outlineStyle: "none",
   },
   inputAfterChips: {
-    width: "calc(var(--spacing) * 24)",
+    width: "6rem",
     flexGrow: "1",
   },
   inputEmpty: {

@@ -29,18 +29,18 @@ const styles = stylex.create({
     display: "flex",
     maxWidth: "var(--container-3xl)",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 5)",
-    paddingBottom: "calc(var(--spacing) * 6)",
+    gap: "1.25rem",
+    paddingBottom: "1.5rem",
   },
   header: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
-    paddingTop: "var(--spacing)",
+    gap: "0.5rem",
+    paddingTop: "0.25rem",
   },
   title: {
     fontSize: "var(--text-xl)",
-    lineHeight: "var(--text-xl--line-height)",
+    lineHeight: "var(--leading-xl)",
     fontWeight: "var(--font-weight-semibold)",
   },
   spacer: {
@@ -49,28 +49,28 @@ const styles = stylex.create({
   group: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   groupHeader: {
     display: "flex",
     alignItems: "baseline",
-    gap: "calc(var(--spacing) * 2)",
-    paddingInline: "var(--spacing)",
+    gap: "0.5rem",
+    paddingInline: "0.25rem",
   },
   groupTitle: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-semibold)",
   },
   note: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   row: {
     display: "flex",
-    columnGap: "calc(var(--spacing) * 6)",
-    rowGap: "calc(var(--spacing) * 2)",
+    columnGap: "1.5rem",
+    rowGap: "0.5rem",
     borderBottomStyle: {
       default: "solid",
       ":last-child": "none",
@@ -80,8 +80,8 @@ const styles = stylex.create({
       ":last-child": 0,
     },
     borderColor: "var(--color-line)",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBlock: "calc(var(--spacing) * 3)",
+    paddingInline: "1rem",
+    paddingBlock: "0.75rem",
   },
   rowInline: {
     flexWrap: "wrap",
@@ -101,16 +101,16 @@ const styles = stylex.create({
     minWidth: "0",
     flex: "1",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
   },
   rowLabelLine: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   rowLabel: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-medium)",
   },
   controls: {
@@ -118,7 +118,7 @@ const styles = stylex.create({
     maxWidth: "100%",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   controlsWide: {
     width: "100%",
@@ -127,7 +127,7 @@ const styles = stylex.create({
     flexShrink: "0",
   },
   keyBox: {
-    width: "calc(var(--spacing) * 64)",
+    width: "16rem",
     maxWidth: "100%",
   },
   removing: {

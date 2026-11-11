@@ -26,20 +26,20 @@ const styles = stylex.create({
       "@container (width>=760px)": "transparent",
     },
     paddingTop: {
-      default: "calc(var(--spacing) * 3)",
+      default: "0.75rem",
       "@container (width>=760px)": "0",
     },
     paddingRight: {
-      default: "calc(var(--spacing) * 3)",
+      default: "0.75rem",
       "@container (width>=760px)": "0",
     },
     paddingBottom: {
-      default: "calc(var(--spacing) * 3)",
+      default: "0.75rem",
       "@container (width>=760px)": "0",
     },
     paddingLeft: {
-      default: "calc(var(--spacing) * 3)",
-      "@container (width>=760px)": "calc(var(--spacing) * 5)",
+      default: "0.75rem",
+      "@container (width>=760px)": "1.25rem",
     },
     width: {
       default: null,
@@ -75,15 +75,15 @@ const styles = stylex.create({
     fontWeight: "var(--font-weight-semibold)",
   },
   issueSheetDiv: {
-    marginTop: "calc(var(--spacing) * 4)",
+    marginTop: "1rem",
     display: "flex",
     flexDirection: {
       default: "column",
       "@container (width>=760px)": "row",
     },
     gap: {
-      default: "calc(var(--spacing) * 4)",
-      "@container (width>=760px)": "calc(var(--spacing) * 6)",
+      default: "1rem",
+      "@container (width>=760px)": "1.5rem",
     },
     alignItems: {
       default: null,
@@ -91,9 +91,9 @@ const styles = stylex.create({
     },
   },
   foldIcon: {
-    transitionProperty: "transform,translate,scale,rotate",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
-    transitionDuration: "var(--default-transition-duration)",
+    transitionProperty: "rotate",
+    transitionTimingFunction: "var(--ease-out)",
+    transitionDuration: "180ms",
   },
   foldIconTone: {
     rotate: "90deg",
@@ -108,7 +108,7 @@ const styles = stylex.create({
   },
   stagesDivAlt: {},
   stagesDiv2: {
-    marginInline: "calc(var(--spacing) * 2)",
+    marginInline: "0.5rem",
     height: "1px",
     flex: "1",
   },
@@ -119,19 +119,19 @@ const styles = stylex.create({
     backgroundColor: "var(--color-line)",
   },
   stagesSpan: {
-    width: "calc(var(--spacing) * 2)",
-    height: "calc(var(--spacing) * 2)",
-    borderRadius: "2147483647px",
+    width: "0.5rem",
+    height: "0.5rem",
+    borderRadius: "9999px",
   },
   stagesSpanTone: {
     backgroundColor: "var(--color-wheat)",
   },
   note: {
     borderRadius: "var(--radius-lg)",
-    paddingInline: "calc(var(--spacing) * 3.5)",
-    paddingBlock: "calc(var(--spacing) * 3)",
+    paddingInline: "0.875rem",
+    paddingBlock: "0.75rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   issueSheetDiv2: {
     containerType: "inline-size",
@@ -144,15 +144,15 @@ const styles = stylex.create({
   },
   propertyDiv: {
     display: "flex",
-    minHeight: "calc(var(--spacing) * 8)",
+    minHeight: "2rem",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * .5)",
+    gap: "0.75rem",
+    paddingBlock: "0.125rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   propertySpan: {
-    width: "calc(var(--spacing) * 16)",
+    width: "4rem",
     flexShrink: "0",
     color: "var(--color-muted)",
   },
@@ -177,8 +177,8 @@ const styles = stylex.create({
     width: "100%",
     cursor: "pointer",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * 2.5)",
+    gap: "0.5rem",
+    paddingBlock: "0.625rem",
     textAlign: "left",
     backgroundColor: {
       default: null,
@@ -191,7 +191,7 @@ const styles = stylex.create({
   foldSpan: {
     flexShrink: "0",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-semibold)",
   },
   foldSpan2: {
@@ -200,24 +200,24 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   foldDiv2: {
-    paddingBottom: "calc(var(--spacing) * 3)",
-    paddingLeft: "calc(var(--spacing) * 5)",
+    paddingBottom: "0.75rem",
+    paddingLeft: "1.25rem",
   },
   moreDiv: {
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
   },
   moreButton: {
     display: "flex",
     cursor: "pointer",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
-    paddingBlock: "var(--spacing)",
+    gap: "0.375rem",
+    paddingBlock: "0.25rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: {
       default: "var(--color-muted)",
       "@media (hover:hover)": {
@@ -227,10 +227,10 @@ const styles = stylex.create({
     },
   },
   sheetLabelDiv: {
-    marginTop: "calc(var(--spacing) * 6)",
-    marginBottom: "calc(var(--spacing) * 1.5)",
+    marginTop: "1.5rem",
+    marginBottom: "0.375rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-semibold)",
     color: "var(--color-muted)",
   },
@@ -238,12 +238,12 @@ const styles = stylex.create({
     display: "flex",
     alignItems: "center",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   stagesSpan2: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     whiteSpace: "nowrap",
   },
 });
@@ -360,7 +360,7 @@ export function Stages(props: { at: Stage }) {
   );
 }
 
-const selectStyles = stylex.create({ property: { marginLeft: "calc(var(--spacing) * -2)", width: "calc(100% + 8px)" } });
+const selectStyles = stylex.create({ property: { marginLeft: "-0.5rem", width: "calc(100% + 8px)" } });
 
 export function Pick<V extends string>(props: {
   label: string;

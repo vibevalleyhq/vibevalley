@@ -12,18 +12,18 @@ const viewStyles = stylex.create({
     display: "flex",
     flexWrap: "wrap",
     alignItems: "flex-end",
-    gap: "calc(var(--spacing) * 6)",
+    gap: "1.5rem",
   },
   poseSpriteStoriesDiv2: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   poseSpriteStoriesSpan: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-2xs)",
-    lineHeight: "var(--text-2xs--line-height)",
+    lineHeight: "var(--leading-2xs)",
     color: "var(--color-muted)",
   },
 });

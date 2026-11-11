@@ -44,23 +44,23 @@ const styles = stylex.create({
     flex: "1",
     flexDirection: "column",
     alignItems: "center",
-    paddingInline: "var(--spacing)",
-    paddingTop: "calc(var(--spacing) * 3)",
+    paddingInline: "0.25rem",
+    paddingTop: "0.75rem",
   },
   topRow: {
     display: "flex",
     width: "100%",
-    paddingInline: "calc(var(--spacing) * 2)",
+    paddingInline: "0.5rem",
   },
   bestScore: {
     marginLeft: "auto",
     fontVariantNumeric: "tabular-nums",
   },
   subRow: {
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
     display: "flex",
     width: "100%",
-    paddingInline: "calc(var(--spacing) * 2)",
+    paddingInline: "0.5rem",
     fontVariantNumeric: "tabular-nums",
   },
   score: {
@@ -68,7 +68,7 @@ const styles = stylex.create({
   },
   fieldFrame: {
     position: "relative",
-    marginTop: "calc(var(--spacing) * 2)",
+    marginTop: "0.5rem",
     boxShadow: "0 0 0 2px var(--color-lcd-ink)",
   },
   canvas: {
@@ -79,7 +79,7 @@ const styles = stylex.create({
   },
   help: {
     marginTop: "auto",
-    marginBottom: "calc(var(--spacing) * 2)",
+    marginBottom: "0.5rem",
     textAlign: "center",
     lineHeight: "1.625",
     color: "var(--color-lcd-dark)",

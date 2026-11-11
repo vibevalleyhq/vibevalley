@@ -5,7 +5,7 @@
 ## 格式
 
 - 格式交给 oxfmt（`vp check --fix`，160 列，设置在根目录 `vite.config.ts`），lint 交给 oxlint（`vp check`），不手调；Markdown 不排，表格照写成 `|---|`。
-- import 由 oxfmt 排成五组，从远到近：Node、外面的包、`@vibevalley/*`、本 app 的 `#/`、同目录；Tailwind 的类照 Tailwind 自己的顺序（读 `apps/web/src/style.css`，`cx(…)` 里的也排）。文件开头的说明注释在 import 上面。
+- import 由 oxfmt 排成五组，从远到近：Node、外面的包、`@vibevalley/*`、本 app 的 `#/`、同目录；页面与官网样式一律用 StyleX（`stylex.create`、`.stylex.ts`），不写工具类字符串。文件开头的说明注释在 import 上面。
 - 提交钩子和 CI 一样跑 `vp check --fix --deny-warnings`：警告也挡提交。
 - 工具管不到的（文件里的先后、错误怎么说）照周围的代码；命名照 [naming.md](docs/style/naming.md)。
 - 注释里认得出来的交给 lint：分隔线和给一段代码起的标题（`vibevalley/no-comment-divider`）；认不出来的（换个说法复述名字、概述、测试里一步步讲），`vpx scripts/comment-review.ts` 让模型照下面「注释」一节审这个分支新加的注释（`--all <目录>` 审一块已有的），只报不改，怎么核实、删改照 [vv-comments](.agents/skills/vv-comments/SKILL.md)（[理由](docs/subsystems/process.md#为什么这样)）。

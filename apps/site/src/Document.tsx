@@ -10,8 +10,8 @@ const sceneStyles = stylex.create({
     display: "grid",
     minHeight: "100svh",
     placeItems: "center",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBlock: "calc(var(--spacing) * 8)",
+    paddingInline: "1rem",
+    paddingBlock: "2rem",
     backgroundColor: "var(--color-cream-100)",
   },
 });

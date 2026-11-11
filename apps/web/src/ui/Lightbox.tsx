@@ -7,6 +7,14 @@ import { createModal } from "./Dialog";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
 
+const popIn = stylex.keyframes({
+  from: { opacity: 0, scale: 0.98 },
+});
+
+const fadeIn = stylex.keyframes({
+  from: { opacity: 0 },
+});
+
 const styles = stylex.create({
   dialog: {
     margin: "auto",
@@ -15,37 +23,21 @@ const styles = stylex.create({
     maxHeight: "none",
     maxWidth: "none",
     animationName: {
-      default: "fade-in",
+      default: fadeIn,
       "@media (prefers-reduced-motion: reduce)": "none",
-      "::backdrop": "fade-in",
+      "::backdrop": fadeIn,
     },
     animationDuration: {
-      default: ".18s",
-      "::backdrop": ".18s",
-    },
-    animationDelay: {
-      default: "0s",
-      "::backdrop": "0s",
+      default: "180ms",
+      "::backdrop": "180ms",
     },
     animationTimingFunction: {
       default: "var(--ease-out)",
       "::backdrop": "var(--ease-out)",
     },
-    animationIterationCount: {
-      default: "1",
-      "::backdrop": "1",
-    },
-    animationDirection: {
-      default: "normal",
-      "::backdrop": "normal",
-    },
     animationFillMode: {
       default: "both",
       "::backdrop": "both",
-    },
-    animationPlayState: {
-      default: "running",
-      "::backdrop": "running",
     },
     backgroundColor: {
       default: "transparent",
@@ -65,22 +57,18 @@ const styles = stylex.create({
     pointerEvents: "auto",
     maxHeight: "calc(100% - 4rem)",
     maxWidth: "100%",
-    animationName: { default: "pop-in", "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: ".28s",
-    animationDelay: "0s",
+    animationName: { default: popIn, "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: "280ms",
     animationTimingFunction: "var(--ease-out)",
-    animationIterationCount: "1",
-    animationDirection: "normal",
     animationFillMode: "both",
-    animationPlayState: "running",
     borderRadius: "var(--radius-lg)",
     objectFit: "contain",
     boxShadow: "var(--shadow-float)",
   },
   openOriginal: {
     display: "inline-flex",
-    width: "calc(var(--spacing) * 7)",
-    height: "calc(var(--spacing) * 7)",
+    width: "1.75rem",
+    height: "1.75rem",
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "var(--radius-md)",
@@ -91,9 +79,9 @@ const styles = stylex.create({
         ":hover": "var(--color-ink)",
       },
     },
-    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
-    transitionDuration: ".12s",
+    transitionProperty: "color, background-color, border-color",
+    transitionTimingFunction: "var(--ease-out)",
+    transitionDuration: "120ms",
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -110,35 +98,35 @@ const styles = stylex.create({
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    gap: "calc(var(--spacing) * 3)",
-    padding: "calc(var(--spacing) * 6)",
+    gap: "0.75rem",
+    padding: "1.5rem",
   },
   toolbar: {
     pointerEvents: "auto",
     display: "flex",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     borderRadius: "var(--radius-lg)",
     backgroundColor: "var(--color-page)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "var(--spacing)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.25rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-ink)",
     boxShadow: "var(--shadow-float)",
   },
   counter: {
-    paddingInline: "var(--spacing)",
+    paddingInline: "0.25rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   caption: {
-    maxWidth: "calc(var(--spacing) * 72)",
+    maxWidth: "18rem",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
-    paddingInline: "var(--spacing)",
+    paddingInline: "0.25rem",
   },
 });
 

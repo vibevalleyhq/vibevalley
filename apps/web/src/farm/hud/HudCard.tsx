@@ -6,19 +6,19 @@ import { styleProps } from "#/ui/positioner.ts";
 const styles = stylex.create({
   outer: {
     display: "inline-block",
-    paddingRight: "calc(var(--spacing) * .5)",
-    paddingBottom: "calc(var(--spacing) * .5)",
+    paddingRight: "0.125rem",
+    paddingBottom: "0.125rem",
   },
   box: {
     boxSizing: "border-box",
     display: "flex",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     borderStyle: "solid",
     borderWidth: "2px",
     borderColor: "var(--color-bark-850)",
     backgroundColor: "var(--color-glow-soft)",
-    paddingInline: "calc(var(--spacing) * 2)",
+    paddingInline: "0.5rem",
     fontFamily: "var(--font-pixel)",
     fontSize: "12px",
     color: "var(--color-bark-850)",

@@ -63,11 +63,11 @@ const styles = stylex.create({
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
-    paddingRight: "calc(var(--spacing) * 2)",
-    paddingLeft: "var(--spacing)",
+    paddingRight: "0.5rem",
+    paddingLeft: "0.25rem",
     textAlign: "left",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   miniMaxVoicesButtonTone: {
     fontWeight: "var(--font-weight-semibold)",
@@ -83,7 +83,7 @@ const styles = stylex.create({
   },
   colsDiv: {
     display: "grid",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
     gridTemplateColumns: {
       default: null,
       "@media (width>=48rem)": "repeat(2,minmax(0,1fr))",
@@ -92,16 +92,16 @@ const styles = stylex.create({
   labeledDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   labeledDiv2: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   labeledSpan: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-medium)",
     color: "var(--color-muted)",
   },
@@ -112,11 +112,11 @@ const styles = stylex.create({
     display: "flex",
     maxWidth: "var(--container-4xl)",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   voiceAgentSectionP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   miniMaxVoicesDiv2: {
@@ -125,13 +125,13 @@ const styles = stylex.create({
       default: "repeat(2,minmax(0,1fr))",
       "@media (width>=40rem)": "repeat(3,minmax(0,1fr))",
     },
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   miniMaxVoicesButton2: {
-    marginLeft: "calc(var(--spacing) * .5)",
+    marginLeft: "0.125rem",
     display: "inline-flex",
-    width: "calc(var(--spacing) * 7)",
-    height: "calc(var(--spacing) * 7)",
+    width: "1.75rem",
+    height: "1.75rem",
     flexShrink: "0",
     cursor: {
       default: "pointer",

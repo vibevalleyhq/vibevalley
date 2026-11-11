@@ -21,15 +21,15 @@ interface TabItem<T extends string> {
 export type TabsLook = "pills" | "line";
 
 const styles = stylex.create({
-  pillList: { display: "flex", flexWrap: "wrap", gap: "calc(var(--spacing) * 0.5)" },
-  lineList: { display: "flex", gap: "var(--spacing)" },
+  pillList: { display: "flex", flexWrap: "wrap", gap: "0.125rem" },
+  lineList: { display: "flex", gap: "0.25rem" },
   tab: {
     display: "flex",
     cursor: "pointer",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: {
       default: "var(--color-muted)",
       "@media (hover: hover)": { default: null, ":hover": "var(--color-ink)" },
@@ -38,9 +38,9 @@ const styles = stylex.create({
     fontWeight: { default: null, ":is([data-selected])": "var(--font-weight-semibold)" },
   },
   pill: {
-    height: "calc(var(--spacing) * 7)",
+    height: "1.75rem",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 2.5)",
+    paddingInline: "0.625rem",
     backgroundColor: {
       default: null,
       "@media (hover: hover)": {
@@ -57,9 +57,9 @@ const styles = stylex.create({
     borderBottomWidth: 2,
     borderBottomStyle: "solid",
     borderColor: { default: "transparent", ":is([data-selected])": "var(--color-ink)" },
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingTop: "calc(var(--spacing) * 2)",
-    paddingBottom: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.5rem",
+    paddingTop: "0.5rem",
+    paddingBottom: "0.375rem",
   },
   icon: {
     opacity: {

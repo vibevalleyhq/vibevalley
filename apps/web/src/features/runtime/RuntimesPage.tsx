@@ -22,9 +22,9 @@ import { InventoryCard, ModelsCard, SettingsCard, Stamina, SupportCard, Usage } 
 
 const styles = stylex.create({
   runtimesPageSpan: {
-    width: "calc(var(--spacing) * 2)",
-    height: "calc(var(--spacing) * 2)",
-    borderRadius: "2147483647px",
+    width: "0.5rem",
+    height: "0.5rem",
+    borderRadius: "9999px",
   },
   runtimesPageSpanState: {
     backgroundColor: "var(--wb-berry)",
@@ -37,7 +37,7 @@ const styles = stylex.create({
   },
   detailA: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: {
       default: "var(--color-muted)",
       "@media (hover:hover)": {
@@ -50,16 +50,16 @@ const styles = stylex.create({
   detailA2: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-line)",
-    paddingBlock: "var(--spacing)",
-    paddingRight: "calc(var(--spacing) * 3)",
-    paddingLeft: "var(--spacing)",
+    paddingBlock: "0.25rem",
+    paddingRight: "0.75rem",
+    paddingLeft: "0.25rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -78,50 +78,50 @@ const styles = stylex.create({
     minWidth: "0",
     flex: "1",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
   },
   portrait: (hat: string) => ({ backgroundImage: `radial-gradient(70% 70% at 50% 70%, ${hat}33, var(--color-page))` }),
   runtimesPageP: {
-    padding: "calc(var(--spacing) * 8)",
+    padding: "2rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-berry)",
   },
   runtimesPageDiv: {
     height: "100%",
   },
   runtimesPageLi: {
-    paddingInline: "calc(var(--spacing) * 2.5)",
-    paddingTop: "var(--spacing)",
-    paddingBottom: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.625rem",
+    paddingTop: "0.25rem",
+    paddingBottom: "0.375rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   runtimesPageSpan3: {
     display: "flex",
     flexDirection: "column",
     alignItems: "flex-end",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   detailDiv2: {
     display: "flex",
     maxWidth: "var(--container-4xl)",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   detailDiv22: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 4)",
-    paddingInline: "var(--spacing)",
-    paddingTop: "var(--spacing)",
-    paddingBottom: "calc(var(--spacing) * 2)",
+    gap: "1rem",
+    paddingInline: "0.25rem",
+    paddingTop: "0.25rem",
+    paddingBottom: "0.5rem",
   },
   detailSpan: {
     display: "flex",
-    width: "calc(var(--spacing) * 18)",
-    height: "calc(var(--spacing) * 18)",
+    width: "4.5rem",
+    height: "4.5rem",
     flexShrink: "0",
     alignItems: "center",
     justifyContent: "center",
@@ -132,28 +132,28 @@ const styles = stylex.create({
   },
   detailH2: {
     fontSize: "var(--text-xl)",
-    lineHeight: "var(--text-xl--line-height)",
+    lineHeight: "var(--leading-xl)",
     fontWeight: "var(--font-weight-semibold)",
   },
   detailP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   detailDiv3: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
-    paddingTop: "var(--spacing)",
+    gap: "0.5rem",
+    paddingTop: "0.25rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   detailSpan2: {
     borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-ok-soft)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.375rem",
     color: "var(--color-ok-ink)",
   },
   detailSpan3: {
@@ -162,12 +162,12 @@ const styles = stylex.create({
   detailSpan4: {
     borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-bad-soft)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.375rem",
     color: "var(--color-berry)",
   },
   detailDiv4: {
     display: "grid",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
     gridTemplateColumns: {
       default: null,
       "@media (width>=48rem)": "repeat(2,minmax(0,1fr))",
@@ -175,7 +175,7 @@ const styles = stylex.create({
   },
   detailDiv5: {
     display: "grid",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
     gridTemplateColumns: {
       default: null,
       "@media (width>=48rem)": "repeat(3,minmax(0,1fr))",
@@ -184,7 +184,7 @@ const styles = stylex.create({
   detailDiv6: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
 });
 

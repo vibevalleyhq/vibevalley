@@ -5,7 +5,7 @@ import { stories, story } from "@vibevalley/stories";
 import { DictationMark, type DictationState } from "./DictationButton";
 
 const styles = stylex.create({
-  placement: (marginLeft: number) => ({ marginLeft, width: "calc(var(--spacing) * 7)", height: "calc(var(--spacing) * 7)", borderRadius: "var(--radius-md)" }),
+  placement: (marginLeft: number) => ({ marginLeft, width: "1.75rem", height: "1.75rem", borderRadius: "var(--radius-md)" }),
 });
 
 export default stories({

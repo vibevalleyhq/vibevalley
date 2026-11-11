@@ -27,21 +27,21 @@ const styles = stylex.create({
     display: "flex",
     minHeight: "0",
     flex: "1",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingTop: "calc(var(--spacing) * 2)",
+    paddingInline: "0.5rem",
+    paddingTop: "0.5rem",
   },
   rootBig: {
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
   },
   rootCompact: {
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   sidebar: {
     display: "flex",
     minWidth: "0",
     flex: "1",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   wellFrame: {
     position: "relative",
@@ -55,15 +55,15 @@ const styles = stylex.create({
   },
   help: {
     marginTop: "auto",
-    marginBottom: "var(--spacing)",
+    marginBottom: "0.25rem",
     lineHeight: "1.625",
     color: "var(--color-lcd-dark)",
   },
   nextSvg: {
-    marginTop: "var(--spacing)",
+    marginTop: "0.25rem",
     display: "block",
     backgroundColor: "var(--color-lcd-light)",
-    padding: "var(--spacing)",
+    padding: "0.25rem",
   },
   statRow: {
     display: "flex",

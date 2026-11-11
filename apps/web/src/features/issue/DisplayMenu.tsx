@@ -10,57 +10,57 @@ import { Segmented } from "#/ui/Segmented.tsx";
 
 import { type BoardLook, defaultLook, groupingLabel, groupings, orderingLabel, orderings } from "./display";
 
+const popIn = stylex.keyframes({
+  from: { opacity: 0, scale: 0.98 },
+});
+
 const styles = stylex.create({
   displayMenuPopoverPopup: {
     width: "min(340px,100vw - 24px)",
     transformOrigin: "100% 0",
-    animationName: { default: "pop-in", "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: ".28s",
-    animationDelay: "0s",
+    animationName: { default: popIn, "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: "280ms",
     animationTimingFunction: "var(--ease-out)",
-    animationIterationCount: "1",
-    animationDirection: "normal",
     animationFillMode: "both",
-    animationPlayState: "running",
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--wb-line)",
     backgroundColor: "var(--wb-page)",
-    padding: "calc(var(--spacing) * 3)",
+    padding: "0.75rem",
     boxShadow: "var(--shadow-float)",
     outlineStyle: "none",
   },
   displayMenuDiv: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   displayMenuSpan: {
-    width: "calc(var(--spacing) * 10)",
+    width: "2.5rem",
     flexShrink: "0",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   displayMenuDiv2: {
-    marginTop: "calc(var(--spacing) * 2.5)",
+    marginTop: "0.625rem",
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   displayMenuP: {
-    marginTop: "calc(var(--spacing) * 2.5)",
+    marginTop: "0.625rem",
     fontSize: "var(--text-xs)",
     lineHeight: "var(--leading-relaxed)",
     whiteSpace: "pre-line",
     color: "var(--color-muted)",
   },
   displayReset: {
-    marginTop: "calc(var(--spacing) * 2)",
+    marginTop: "0.5rem",
     cursor: "pointer",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-water)",
     textDecorationLine: {
       default: null,

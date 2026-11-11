@@ -43,14 +43,14 @@ const styles = stylex.create({
     display: "grid",
     height: "100%",
     placeContent: "center",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
     backgroundColor: "var(--color-page)",
-    padding: "calc(var(--spacing) * 6)",
+    padding: "1.5rem",
     color: "var(--color-ink)",
   },
   missingPageH1: {
     fontSize: "var(--text-lg)",
-    lineHeight: "var(--text-lg--line-height)",
+    lineHeight: "var(--leading-lg)",
     fontWeight: "var(--font-weight-semibold)",
   },
   appDiv: {

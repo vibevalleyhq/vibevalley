@@ -35,7 +35,7 @@ export function offTokens(property: string, value: string | number, disabled = f
 }
 
 export const tokenAdvice: Record<TokenKind, string> = {
-  radius: "a named corner such as borderRadius: 'var(--radius-md)' (xs/sm/md/lg/xl); 0 for square corners or 'calc(infinity * 1px)' for pills",
+  radius: "a named corner such as borderRadius: 'var(--radius-md)' (xs/sm/md/lg/xl); 0 for square corners or '9999px' for pills",
   type: "fontSize: 'var(--text-sm)' from the host's named type tokens (2xs through 3xl); reserve 2xl/3xl for document titles and pairing codes",
   motion:
     "transition longhands with 120ms (hover/press), 180ms (state), 280ms (panel), or 0; transitionTimingFunction: 'var(--ease-out)' (in/in-out/spring for other motion)",

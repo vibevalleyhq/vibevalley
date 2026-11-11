@@ -138,7 +138,10 @@ tester.run("no-hex-color", rule("no-hex-color"), {
 
 tester.run("stylex-only", rule("stylex-only"), {
   valid: [
-    { code: `${stylexImport} const s = sx.create({ box: { display: 'flex', content: '"!important"' } }); const v = <div {...sx.attrs(s.box)} />`, filename: "a.tsx" },
+    {
+      code: `${stylexImport} const s = sx.create({ box: { display: 'flex', gridTemplateColumns: 'minmax(0, 1fr)', transitionProperty: 'rotate', content: '"!important --tw-ring-shadow"' } }); const v = <div {...sx.attrs(s.box)} />`,
+      filename: "a.tsx",
+    },
     { code: "const v = <div {...styleProps(styles.box)} />", filename: "a.tsx" },
     { code: "const appearance = { class: ['markdown', composed.class] }; const v = <div {...appearance} />", filename: "a.tsx" },
   ],
@@ -148,6 +151,23 @@ tester.run("stylex-only", rule("stylex-only"), {
     { code: "const v = <div className='card' />", filename: "a.tsx", errors: [{ messageId: "classAttr" }] },
     { code: "const v = <div classList={{ open: true }} />", filename: "a.tsx", errors: [{ messageId: "classAttr" }] },
     { code: `${stylexImport} sx.create({ warn: { backgroundColor: 'var(--color-warn) !important' } })`, filename: "a.tsx", errors: [{ messageId: "important" }] },
+    { code: `${stylexImport} sx.create({ card: { boxShadow: 'var(--tw-ring-shadow)' } })`, filename: "a.tsx", errors: [{ messageId: "tailwindVar" }] },
+    { code: `${stylexImport} sx.create({ card: { '--tw-scale-x': '1' } })`, filename: "a.tsx", errors: [{ messageId: "tailwindVar" }] },
+    {
+      code: `${stylexImport} sx.create({ card: { boxShadow: '0 0 transparent, 0 0 transparent, var(--shadow-float)' } })`,
+      filename: "a.tsx",
+      errors: [{ messageId: "tailwindShadow" }],
+    },
+    {
+      code: `${stylexImport} sx.create({ grid: { gridTemplateColumns: 'repeat(1,minmax(0,1fr))' } })`,
+      filename: "a.tsx",
+      errors: [{ messageId: "tailwindGrid" }],
+    },
+    {
+      code: `${stylexImport} sx.create({ icon: { transitionProperty: 'transform, translate, scale, rotate' } })`,
+      filename: "a.tsx",
+      errors: [{ messageId: "tailwindTransform" }],
+    },
   ],
 });
 

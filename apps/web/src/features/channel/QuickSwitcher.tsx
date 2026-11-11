@@ -21,7 +21,7 @@ import { Count } from "./presence";
 
 const styles = stylex.create({
   switcherBodyComboboxInput: {
-    height: "calc(var(--spacing) * 10)",
+    height: "2.5rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
@@ -30,31 +30,31 @@ const styles = stylex.create({
       ":focus": "var(--color-focus)",
     },
     backgroundColor: "var(--color-page)",
-    paddingInline: "calc(var(--spacing) * 3)",
+    paddingInline: "0.75rem",
     fontSize: "var(--text-base)",
-    lineHeight: "var(--text-base--line-height)",
+    lineHeight: "var(--leading-base)",
     outlineStyle: "none",
   },
   switcherBodyComboboxPopup: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
   },
   switcherBodyComboboxEmpty: {
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.5rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   switcherBodyComboboxItem: {
     display: "flex",
     cursor: "pointer",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.375rem",
     backgroundColor: {
       default: null,
       ":is([data-highlighted])": "var(--color-selected)",
@@ -67,7 +67,7 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   switcherBodySpanTone: {
     fontWeight: "var(--font-weight-semibold)",
@@ -76,7 +76,7 @@ const styles = stylex.create({
   switcherBodyDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   switcherBodySpan2: {
     flexShrink: "0",
@@ -84,7 +84,7 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
 });

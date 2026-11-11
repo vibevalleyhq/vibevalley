@@ -30,7 +30,7 @@ const styles = stylex.create({
     alignItems: "center",
     borderStyle: "solid",
     borderWidth: "2px",
-    padding: "calc(var(--spacing) * 2.5)",
+    padding: "0.625rem",
     cursor: {
       default: null,
       ":enabled": "pointer",
@@ -63,19 +63,19 @@ const styles = stylex.create({
     color: "var(--color-bark-900)",
   },
   looksGrid: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
     display: "grid",
     gridTemplateColumns: {
       default: "repeat(2,minmax(0,1fr))",
       "@media (width>=40rem)": "repeat(3,minmax(0,1fr))",
     },
-    gap: "calc(var(--spacing) * 2.5)",
+    gap: "0.625rem",
   },
   lookPreview: {
-    height: "calc(var(--spacing) * 28)",
+    height: "7rem",
   },
   tileName: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+    marginTop: "0.375rem",
     fontSize: "13px",
   },
   tileBlurb: {
@@ -84,20 +84,20 @@ const styles = stylex.create({
     color: "var(--color-bark-600)",
   },
   petsHeading: {
-    marginTop: "calc(var(--spacing) * 2)",
+    marginTop: "0.5rem",
     fontSize: "13px",
   },
   petsRow: {
-    marginTop: "calc(var(--spacing) * 2)",
+    marginTop: "0.5rem",
     display: "flex",
-    gap: "calc(var(--spacing) * 2.5)",
+    gap: "0.625rem",
   },
   petSlot: {
     flex: "1",
     backgroundColor: "var(--color-cream-100)",
   },
   petPreview: {
-    height: "calc(var(--spacing) * 16)",
+    height: "4rem",
   },
   petDrawing: {
     fontSize: "12px",
@@ -108,17 +108,17 @@ const styles = stylex.create({
     color: "var(--color-bark-800)",
   },
   shopGrid: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
     display: "grid",
     gridTemplateColumns: "repeat(2,minmax(0,1fr))",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   shopCard: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     backgroundColor: "var(--color-cream-100)",
-    padding: "calc(var(--spacing) * 2.5)",
+    padding: "0.625rem",
     opacity: ".8",
   },
   shopBody: {

@@ -10,26 +10,26 @@ const viewStyles = stylex.create({
     position: "absolute",
     insetBlock: "0",
     zIndex: "10",
-    width: "calc(var(--spacing) * 2)",
+    width: "0.5rem",
     cursor: "col-resize",
     touchAction: "none",
     outlineStyle: "none",
   },
   left: {
-    left: "calc(var(--spacing) * -1)",
+    left: "-0.25rem",
   },
   right: {
-    right: "calc(var(--spacing) * -1)",
+    right: "-0.25rem",
   },
   line: {
     position: "absolute",
     insetBlock: "0",
     left: "50%",
-    width: "calc(var(--spacing) * 0.5)",
+    width: "0.125rem",
     translate: "-50% 0",
-    transitionProperty: "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke",
+    transitionProperty: "color, background-color, border-color",
     transitionDuration: "120ms",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionTimingFunction: "var(--ease-out)",
   },
   lineIdle: {
     backgroundColor: {

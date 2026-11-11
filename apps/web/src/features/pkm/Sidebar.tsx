@@ -20,17 +20,17 @@ import { pkmHref, usePkmRadar } from "./vault";
 const sidebarStyles = stylex.create({
   row: {
     display: "flex",
-    height: "calc(var(--spacing) * 7)",
+    height: "1.75rem",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderRadius: "var(--radius-md)",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
-    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
-    transitionDuration: ".12s",
-    paddingLeft: "calc(var(--spacing) * 2)",
-    paddingRight: "calc(var(--spacing) * 2)",
+    lineHeight: "var(--leading-sm)",
+    transitionProperty: "color, background-color, border-color",
+    transitionTimingFunction: "var(--ease-out)",
+    transitionDuration: "120ms",
+    paddingLeft: "0.5rem",
+    paddingRight: "0.5rem",
   },
   selected: {
     backgroundColor: "var(--wb-selected)",
@@ -47,7 +47,7 @@ const sidebarStyles = stylex.create({
     },
   },
   nested: {
-    paddingLeft: "calc(var(--spacing) * 7.5)",
+    paddingLeft: "1.875rem",
   },
   toggle: {
     cursor: "pointer",
@@ -55,7 +55,7 @@ const sidebarStyles = stylex.create({
   },
   count: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontVariantNumeric: "tabular-nums",
   },
   faint: {
@@ -68,7 +68,7 @@ const sidebarStyles = stylex.create({
 
 const styles = stylex.create({
   sidebarDiv: {
-    marginInline: "calc(var(--spacing) * -2)",
+    marginInline: "-0.5rem",
     display: "flex",
     minHeight: "0",
     WebkitMaskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
@@ -83,24 +83,24 @@ const styles = stylex.create({
     animationPlayState: "running",
     animationTimeline: "scroll(self y)",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
     overflowY: "auto",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBottom: "calc(var(--spacing) * 2)",
+    paddingInline: "0.5rem",
+    paddingBottom: "0.5rem",
   },
   sidebarRoot: {
     display: "flex",
     minHeight: "0",
     flex: "1",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
   },
   sidebarButton: {
     display: "flex",
-    height: "calc(var(--spacing) * 8)",
+    height: "2rem",
     cursor: "pointer",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
@@ -116,9 +116,9 @@ const styles = stylex.create({
       },
     },
     backgroundColor: "var(--color-page)",
-    paddingInline: "calc(var(--spacing) * 2)",
+    paddingInline: "0.5rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: {
       default: "var(--color-faint)",
       "@media (hover:hover)": {
@@ -126,9 +126,9 @@ const styles = stylex.create({
         ":hover": "var(--color-muted)",
       },
     },
-    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
-    transitionDuration: ".12s",
+    transitionProperty: "color, background-color, border-color",
+    transitionTimingFunction: "var(--ease-out)",
+    transitionDuration: "120ms",
   },
   sidebarIconActive: {
     color: "var(--color-ink)",
@@ -138,14 +138,14 @@ const styles = stylex.create({
   },
   tierHeading: {
     display: "flex",
-    height: "calc(var(--spacing) * 6)",
+    height: "1.5rem",
     cursor: "pointer",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 2)",
+    paddingInline: "0.5rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-medium)",
     color: { default: "var(--color-faint)", "@media (hover: hover)": { default: null, ":hover": "var(--color-muted)" } },
   },
@@ -157,7 +157,7 @@ const styles = stylex.create({
     },
     transitionProperty: "opacity",
     transitionDuration: "120ms",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionTimingFunction: "var(--ease-out)",
   },
   sidebarSpan: {
     flex: "1",
@@ -172,9 +172,9 @@ const styles = stylex.create({
     flex: "1",
   },
   sidebarP: {
-    paddingInline: "calc(var(--spacing) * 2)",
+    paddingInline: "0.5rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-berry)",
   },
   sidebarSpan3: {
@@ -187,7 +187,7 @@ const styles = stylex.create({
   sidebarSpan4: {
     flexShrink: "0",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-faint)",
     fontVariantNumeric: "tabular-nums",
   },
@@ -198,9 +198,9 @@ const styles = stylex.create({
     display: "flex",
     flexDirection: "column",
     borderRadius: "var(--radius-md)",
-    paddingBlock: "var(--spacing)",
-    paddingRight: "calc(var(--spacing) * 2)",
-    paddingLeft: "calc(var(--spacing) * 7.5)",
+    paddingBlock: "0.25rem",
+    paddingRight: "0.5rem",
+    paddingLeft: "1.875rem",
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -212,7 +212,7 @@ const styles = stylex.create({
   radarSpan: {
     flexShrink: "0",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-faint)",
   },
   radarSpan2: {
@@ -220,11 +220,11 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   radarSpan3: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-berry)",
   },
 });

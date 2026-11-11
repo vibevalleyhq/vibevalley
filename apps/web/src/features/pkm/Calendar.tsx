@@ -23,15 +23,15 @@ const styles = stylex.create({
     position: "relative",
     marginInline: "auto",
     display: "flex",
-    width: "calc(var(--spacing) * 7)",
-    height: "calc(var(--spacing) * 7)",
+    width: "1.75rem",
+    height: "1.75rem",
     cursor: "pointer",
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "var(--radius-md)",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
   monthButtonPrimary: {
     color: "var(--color-faint)",
@@ -62,15 +62,15 @@ const styles = stylex.create({
   pkmCalendar: {
     display: "flex",
     flexDirection: "column",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   pkmCalendarFold: {
     display: "flex",
     cursor: "pointer",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-semibold)",
     color: {
       default: "var(--color-muted)",
@@ -87,7 +87,7 @@ const styles = stylex.create({
   monthSpan: {
     flex: "1",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   monthDiv2: {
@@ -95,7 +95,7 @@ const styles = stylex.create({
     gridTemplateColumns: "repeat(7,minmax(0,1fr))",
     textAlign: "center",
     fontSize: "var(--text-2xs)",
-    lineHeight: "var(--text-2xs--line-height)",
+    lineHeight: "var(--leading-2xs)",
     color: "var(--color-faint)",
   },
   monthDiv3: {
@@ -115,10 +115,10 @@ const styles = stylex.create({
   },
   monthSpan3: {
     position: "absolute",
-    bottom: "calc(var(--spacing) * .5)",
-    width: "var(--spacing)",
-    height: "var(--spacing)",
-    borderRadius: "2147483647px",
+    bottom: "0.125rem",
+    width: "0.25rem",
+    height: "0.25rem",
+    borderRadius: "9999px",
     backgroundColor: "var(--color-accent)",
   },
 });

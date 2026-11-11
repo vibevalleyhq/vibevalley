@@ -4,41 +4,33 @@ import { createEffect } from "solid-js";
 
 import { Dialog as Base } from "@vibevalley/base-ui";
 
+const popIn = stylex.keyframes({
+  from: { opacity: 0, scale: 0.98 },
+});
+
+const fadeIn = stylex.keyframes({
+  from: { opacity: 0 },
+});
+
 const styles = stylex.create({
   popup: {
     margin: "auto",
     animationName: {
-      default: "pop-in",
+      default: popIn,
       "@media (prefers-reduced-motion: reduce)": "none",
-      "::backdrop": "fade-in",
+      "::backdrop": fadeIn,
     },
     animationDuration: {
-      default: ".28s",
-      "::backdrop": ".18s",
-    },
-    animationDelay: {
-      default: "0s",
-      "::backdrop": "0s",
+      default: "280ms",
+      "::backdrop": "180ms",
     },
     animationTimingFunction: {
       default: "var(--ease-out)",
       "::backdrop": "var(--ease-out)",
     },
-    animationIterationCount: {
-      default: "1",
-      "::backdrop": "1",
-    },
-    animationDirection: {
-      default: "normal",
-      "::backdrop": "normal",
-    },
     animationFillMode: {
       default: "both",
       "::backdrop": "both",
-    },
-    animationPlayState: {
-      default: "running",
-      "::backdrop": "running",
     },
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
@@ -67,16 +59,16 @@ const styles = stylex.create({
     borderBottomStyle: "solid",
     borderBottomWidth: "1px",
     borderColor: "var(--color-line)",
-    paddingInline: "calc(var(--spacing) * 5)",
-    paddingBlock: "calc(var(--spacing) * 3)",
+    paddingInline: "1.25rem",
+    paddingBlock: "0.75rem",
     fontSize: "var(--text-base)",
-    lineHeight: "var(--text-base--line-height)",
+    lineHeight: "var(--leading-base)",
     fontWeight: "var(--font-weight-semibold)",
   },
   body: {
     overflowY: "auto",
-    paddingInline: "calc(var(--spacing) * 5)",
-    paddingBlock: "calc(var(--spacing) * 4)",
+    paddingInline: "1.25rem",
+    paddingBlock: "1rem",
   },
 });
 

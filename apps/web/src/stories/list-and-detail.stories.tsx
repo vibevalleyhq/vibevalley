@@ -12,7 +12,7 @@ import { Dot, type DotTone } from "#/ui/Tag.tsx";
 const styles = stylex.create({
   listAndDetailStoriesP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
 });
 

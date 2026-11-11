@@ -11,7 +11,7 @@ const viewStyles = stylex.create({
     width: "100%",
     maxWidth: "var(--container-2xl)",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
 });
 

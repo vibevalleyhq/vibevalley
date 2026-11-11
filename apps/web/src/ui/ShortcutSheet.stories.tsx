@@ -11,7 +11,7 @@ const viewStyles = stylex.create({
   },
   shortcutSheetStoriesDiv2: {
     display: "flex",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
 });
 

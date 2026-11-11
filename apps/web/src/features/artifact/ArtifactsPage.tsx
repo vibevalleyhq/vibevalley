@@ -30,17 +30,21 @@ import type { BlockEditor } from "./editor";
 import { HtmlFrame } from "./HtmlFrame";
 import { PageWords } from "./PageWords";
 
+const fadeIn = stylex.keyframes({
+  from: { opacity: 0 },
+});
+
 const styles = stylex.create({
   artifactsPageA: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * 1.5)",
-    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
-    transitionDuration: ".12s",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.375rem",
+    transitionProperty: "color, background-color, border-color",
+    transitionTimingFunction: "var(--ease-out)",
+    transitionDuration: "120ms",
   },
   artifactsPageAState: {
     backgroundColor: {
@@ -82,43 +86,35 @@ const styles = stylex.create({
     },
   },
   artifactsPageDiv: {
-    marginInline: "calc(var(--spacing) * -2)",
+    marginInline: "-0.5rem",
     display: "flex",
     minHeight: "0",
     WebkitMaskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
     maskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
     animationName: "scroll-fade-y",
     animationDuration: "0s",
-    animationDelay: "0s",
     animationTimingFunction: "linear",
-    animationIterationCount: "1",
-    animationDirection: "normal",
     animationFillMode: "both",
-    animationPlayState: "running",
     animationTimeline: "scroll(self y)",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     overflowY: "auto",
-    paddingInline: "calc(var(--spacing) * 2)",
+    paddingInline: "0.5rem",
   },
   shownDiv2: {
-    marginTop: "calc(var(--spacing) * 2)",
+    marginTop: "0.5rem",
     display: "flex",
-    animationName: { default: "fade-in", "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: ".18s",
-    animationDelay: "0s",
+    animationName: { default: fadeIn, "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: "180ms",
     animationTimingFunction: "var(--ease-out)",
-    animationIterationCount: "1",
-    animationDirection: "normal",
     animationFillMode: "both",
-    animationPlayState: "running",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderRadius: "var(--radius-md)",
     backgroundColor: "var(--wb-bad-soft)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
   },
   shownButton: {
     display: "flex",
@@ -126,14 +122,14 @@ const styles = stylex.create({
     cursor: "pointer",
     flexDirection: "column",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 2.5)",
-    paddingBlock: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.625rem",
+    paddingBlock: "0.375rem",
     textAlign: "left",
-    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
-    transitionDuration: ".12s",
+    transitionProperty: "color, background-color, border-color",
+    transitionTimingFunction: "var(--ease-out)",
+    transitionDuration: "120ms",
   },
   shownButtonPrimary: {
     backgroundColor: {
@@ -152,7 +148,7 @@ const styles = stylex.create({
     color: "var(--color-muted)",
   },
   artifactsPageIcon2: {
-    marginTop: "calc(var(--spacing) * .5)",
+    marginTop: "0.125rem",
     flexShrink: "0",
     color: "var(--color-muted)",
   },
@@ -169,9 +165,9 @@ const styles = stylex.create({
   shownA2: {
     display: "inline-flex",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: {
       default: "var(--color-muted)",
       "@media (hover:hover)": {
@@ -184,13 +180,13 @@ const styles = stylex.create({
     minHeight: "0",
     flexShrink: "0",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-side)",
-    padding: "calc(var(--spacing) * 3)",
+    padding: "0.75rem",
     width: {
       default: null,
-      "@media (width>=64rem)": "calc(var(--spacing) * 64)",
+      "@media (width>=64rem)": "16rem",
     },
     borderRightStyle: {
       default: null,
@@ -215,7 +211,7 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
   artifactsPageSpanTone: {
     color: {
@@ -245,8 +241,8 @@ const styles = stylex.create({
       "@media (width>=80rem)": "1",
     },
     flexDirection: "column",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBlock: "calc(var(--spacing) * 4)",
+    paddingInline: "1rem",
+    paddingBlock: "1rem",
   },
   shownDiv3: {
     display: "flex",
@@ -254,7 +250,7 @@ const styles = stylex.create({
     width: "100%",
     flex: "1",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   shownDivTone: {},
   shownDivAlt: {
@@ -264,7 +260,7 @@ const styles = stylex.create({
   shownHeader: {
     display: "flex",
     flexDirection: "column",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   shownHeaderTone: {
     paddingLeft: {
@@ -284,15 +280,15 @@ const styles = stylex.create({
   },
   artifactsPageDiv22: {
     display: "flex",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   artifactsPageLabel: {
     display: "flex",
-    height: "calc(var(--spacing) * 8)",
+    height: "2rem",
     minWidth: "0",
     flex: "1",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
@@ -301,14 +297,14 @@ const styles = stylex.create({
       ":focus-within": "var(--color-focus)",
     },
     backgroundColor: "var(--color-page)",
-    paddingInline: "calc(var(--spacing) * 2)",
+    paddingInline: "0.5rem",
   },
   artifactSearch: {
     minWidth: "0",
     flex: "1",
     backgroundColor: "transparent",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     outlineStyle: "none",
     color: {
       default: null,
@@ -316,15 +312,15 @@ const styles = stylex.create({
     },
   },
   artifactsPageP: {
-    paddingInline: "calc(var(--spacing) * 2)",
+    paddingInline: "0.5rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-berry)",
   },
   artifactsPageP2: {
-    paddingInline: "calc(var(--spacing) * 2)",
+    paddingInline: "0.5rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
     display: {
       default: null,
@@ -332,25 +328,25 @@ const styles = stylex.create({
     },
   },
   artifactsPageP3: {
-    paddingInline: "calc(var(--spacing) * 2)",
+    paddingInline: "0.5rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   artifactGroup: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
   },
   artifactsPageButton: {
     display: "flex",
     cursor: "pointer",
     alignItems: "center",
-    gap: "var(--spacing)",
-    paddingInline: "var(--spacing)",
-    paddingTop: "var(--spacing)",
+    gap: "0.25rem",
+    paddingInline: "0.25rem",
+    paddingTop: "0.25rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-semibold)",
     color: {
       default: "var(--color-muted)",
@@ -374,11 +370,11 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-medium)",
   },
   artifactTitle: {
-    marginInline: "calc(var(--spacing) * -1)",
+    marginInline: "-0.25rem",
     minWidth: "0",
     flex: "1",
     textOverflow: "ellipsis",
@@ -393,9 +389,9 @@ const styles = stylex.create({
       },
       ":focus": "var(--color-hover)",
     },
-    paddingInline: "var(--spacing)",
+    paddingInline: "0.25rem",
     fontSize: "var(--text-xl)",
-    lineHeight: "calc(var(--spacing) * 8)",
+    lineHeight: "2rem",
     fontWeight: "var(--font-weight-semibold)",
     outlineStyle: "none",
   },
@@ -408,23 +404,23 @@ const styles = stylex.create({
   shownDiv22: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   shownDiv32: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    columnGap: "calc(var(--spacing) * 2)",
-    rowGap: "var(--spacing)",
+    columnGap: "0.5rem",
+    rowGap: "0.25rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   shownSpan: {
     minWidth: "0",
     flex: "1",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-berry)",
   },
   // Narrow, the page scrolls: the frame keeps its own height and the deck's controls stay under it.
@@ -453,14 +449,14 @@ const styles = stylex.create({
   },
   shownP: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-faint)",
   },
   artifactRail: {
     display: "flex",
     flexShrink: "0",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 5)",
+    gap: "1.25rem",
     borderTopStyle: {
       default: "solid",
       "@media (width>=80rem)": "solid",
@@ -470,11 +466,11 @@ const styles = stylex.create({
       "@media (width>=80rem)": "0",
     },
     borderColor: "var(--color-line)",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBlock: "calc(var(--spacing) * 4)",
+    paddingInline: "1rem",
+    paddingBlock: "1rem",
     width: {
       default: null,
-      "@media (width>=80rem)": "calc(var(--spacing) * 72)",
+      "@media (width>=80rem)": "18rem",
     },
     overflowY: {
       default: null,
@@ -498,28 +494,28 @@ const styles = stylex.create({
   shownDiv5: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   shownH2: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-semibold)",
     color: "var(--color-muted)",
   },
   shownSpan2: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-medium)",
   },
   shownSpan3: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-normal)",
     color: "var(--color-muted)",
   },
   shownSpan4: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   shownDiv6: {
@@ -530,7 +526,7 @@ const styles = stylex.create({
   replyForm: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
 });
 

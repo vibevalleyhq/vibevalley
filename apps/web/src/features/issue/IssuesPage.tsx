@@ -38,16 +38,16 @@ import { createWriteKey, writeIssue } from "./write";
 
 const styles = stylex.create({
   issueViewButton: {
-    marginBottom: "calc(var(--spacing) * 3)",
+    marginBottom: "0.75rem",
     display: "inline-flex",
     cursor: "pointer",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
-    paddingBlock: "calc(var(--spacing) * .5)",
+    paddingInline: "0.375rem",
+    paddingBlock: "0.125rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: {
       default: "var(--color-muted)",
       "@media (hover:hover)": {
@@ -55,9 +55,9 @@ const styles = stylex.create({
         ":hover": "var(--color-ink)",
       },
     },
-    transitionProperty: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
-    transitionTimingFunction: "var(--default-transition-timing-function)",
-    transitionDuration: ".12s",
+    transitionProperty: "color, background-color, border-color",
+    transitionTimingFunction: "var(--ease-out)",
+    transitionDuration: "120ms",
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {
@@ -72,7 +72,7 @@ const styles = stylex.create({
       default: "column-reverse",
       "@container (width>=760px)": "row",
     },
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     alignItems: {
       default: null,
       "@container (width>=760px)": "center",
@@ -85,37 +85,37 @@ const styles = stylex.create({
     flexDirection: "column",
   },
   issuesPageP: {
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingTop: "calc(var(--spacing) * 2)",
+    paddingInline: "0.75rem",
+    paddingTop: "0.5rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-berry)",
   },
   detailP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   detailH1: {
     fontSize: "var(--text-lg)",
-    lineHeight: "var(--text-lg--line-height)",
+    lineHeight: "var(--leading-lg)",
     fontWeight: "var(--font-weight-semibold)",
   },
   detailP2: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   detailH12: {
     fontSize: "var(--text-xl)",
-    lineHeight: "var(--text-xl--line-height)",
+    lineHeight: "var(--leading-xl)",
     fontWeight: "var(--font-weight-semibold)",
   },
   detailP3: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   issueViewDiv: {
     minHeight: "0",
@@ -126,15 +126,15 @@ const styles = stylex.create({
     marginInline: "auto",
     width: "100%",
     maxWidth: "1200px",
-    paddingInline: "calc(var(--spacing) * 6)",
-    paddingTop: "calc(var(--spacing) * 3)",
-    paddingBottom: "calc(var(--spacing) * 10)",
+    paddingInline: "1.5rem",
+    paddingTop: "0.75rem",
+    paddingBottom: "2.5rem",
   },
   toolbarDiv2: {
     containerType: "inline-size",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingTop: "calc(var(--spacing) * 3)",
-    paddingBottom: "calc(var(--spacing) * 2.5)",
+    paddingInline: "0.75rem",
+    paddingTop: "0.75rem",
+    paddingBottom: "0.625rem",
   },
   toolbarDiv22: {
     display: "flex",
@@ -142,14 +142,14 @@ const styles = stylex.create({
     flex: "1",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   toolbarLabel: {
     display: "flex",
-    height: "calc(var(--spacing) * 7)",
-    width: "calc(var(--spacing) * 60)",
+    height: "1.75rem",
+    width: "15rem",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
@@ -158,14 +158,14 @@ const styles = stylex.create({
       ":focus-within": "var(--color-focus)",
     },
     backgroundColor: "var(--color-page)",
-    paddingInline: "calc(var(--spacing) * 2)",
+    paddingInline: "0.5rem",
   },
   issueSearch: {
     minWidth: "0",
     flex: "1",
     backgroundColor: "transparent",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     outlineStyle: "none",
     color: {
       default: null,
@@ -174,13 +174,13 @@ const styles = stylex.create({
   },
   toolbarSpan: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   filterClear: {
     cursor: "pointer",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-water)",
     textDecorationLine: {
       default: null,
@@ -194,11 +194,11 @@ const styles = stylex.create({
     marginLeft: "auto",
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
 });
 
-const selectStyles = stylex.create({ filter: { maxWidth: "calc(var(--spacing) * 48)" } });
+const selectStyles = stylex.create({ filter: { maxWidth: "12rem" } });
 
 type Closing = { issue: Issue; session: Session | undefined; review: boolean; lane?: Lane };
 

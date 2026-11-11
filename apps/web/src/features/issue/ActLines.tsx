@@ -12,8 +12,8 @@ import type { PendingWords } from "./write";
 const styles = stylex.create({
   actLinesButton: {
     display: "inline-flex",
-    width: "calc(var(--spacing) * 6)",
-    height: "calc(var(--spacing) * 6)",
+    width: "1.5rem",
+    height: "1.5rem",
     cursor: "pointer",
     alignItems: "center",
     justifyContent: "center",
@@ -49,20 +49,20 @@ const styles = stylex.create({
   actLinesSpan2: {
     flexShrink: "0",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
   actLinesDiv: {
-    marginBottom: "calc(var(--spacing) * 4)",
+    marginBottom: "1rem",
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   issueMove: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   actLinesSpan3: {
     minWidth: "0",

@@ -21,10 +21,10 @@ import { Qr } from "#/ui/Qr.tsx";
 
 const connectorStyles = stylex.create({
   dot: {
-    width: "calc(var(--spacing) * 2)",
-    height: "calc(var(--spacing) * 2)",
+    width: "0.5rem",
+    height: "0.5rem",
     flexShrink: "0",
-    borderRadius: "2147483647px",
+    borderRadius: "9999px",
   },
   connected: {
     backgroundColor: "var(--wb-leaf)",
@@ -42,11 +42,11 @@ const styles = stylex.create({
     display: "inline-block",
     borderRadius: "var(--radius-lg)",
     backgroundColor: "var(--wb-hover)",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "1rem",
+    paddingBlock: "0.5rem",
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-3xl)",
-    lineHeight: "var(--text-3xl--line-height)",
+    lineHeight: "var(--leading-3xl)",
     fontWeight: "var(--font-weight-semibold)",
     letterSpacing: "4px",
     WebkitUserSelect: "all",
@@ -56,90 +56,90 @@ const styles = stylex.create({
     fontFamily: "var(--font-mono)",
   },
   connectorsPageLi: {
-    paddingInline: "calc(var(--spacing) * 2.5)",
-    paddingTop: "var(--spacing)",
-    paddingBottom: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.625rem",
+    paddingTop: "0.25rem",
+    paddingBottom: "0.375rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   connectorsPageDiv: {
     display: "flex",
     maxWidth: "var(--container-3xl)",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   connectorsPageUl: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   connectorsPageLi2: {
     display: "flex",
-    gap: "calc(var(--spacing) * 2.5)",
+    gap: "0.625rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   connectorsPageSpan: {
-    marginTop: "calc(var(--spacing) * 2)",
-    width: "var(--spacing)",
-    height: "var(--spacing)",
+    marginTop: "0.5rem",
+    width: "0.25rem",
+    height: "0.25rem",
     flexShrink: "0",
-    borderRadius: "2147483647px",
+    borderRadius: "9999px",
     backgroundColor: "var(--color-faint)",
   },
   rowDiv: {
     display: "flex",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   rowSpan: {
-    width: "calc(var(--spacing) * 28)",
+    width: "7rem",
     flexShrink: "0",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   rowDiv2: {
     minWidth: "0",
     flex: "1",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   connectorCardSpan2: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   connectorCardP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   connectorCardP2: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   connectorCardP3: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-berry)",
   },
   channelPickSpan: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   channelPickSpan2: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-berry)",
   },
   qqLoginForm: {
     display: "flex",
     maxWidth: "var(--container-md)",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   qqLoginA: {
     textDecorationLine: "underline",
@@ -147,12 +147,12 @@ const styles = stylex.create({
   loginCodeDiv: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 5)",
+    gap: "1.25rem",
   },
   loginCodeDiv2: {
     display: "flex",
-    width: "calc(var(--spacing) * 56)",
-    height: "calc(var(--spacing) * 56)",
+    width: "14rem",
+    height: "14rem",
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "var(--radius-md)",
@@ -160,18 +160,18 @@ const styles = stylex.create({
     borderWidth: "1px",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-white)",
-    padding: "calc(var(--spacing) * 2)",
+    padding: "0.5rem",
   },
   loginCodeDiv3: {
     display: "flex",
     maxWidth: "var(--container-md)",
-    minWidth: "calc(var(--spacing) * 50)",
+    minWidth: "12.5rem",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   loginCodeForm: {
     display: "flex",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
 });
 
@@ -356,7 +356,7 @@ export function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus 
   );
 }
 
-const selectStyles = stylex.create({ channel: { width: "calc(var(--spacing) * 50)" } });
+const selectStyles = stylex.create({ channel: { width: "12.5rem" } });
 
 function ChannelPick(props: { id: ConnectorID; current: string }) {
   const core = useCore();

@@ -7,7 +7,7 @@ import { storyFrame } from "./story.stylex";
 
 const viewStyles = stylex.create({
   formsStoriesDiv: {
-    width: "calc(var(--spacing) * 80)",
+    width: "20rem",
   },
 });
 

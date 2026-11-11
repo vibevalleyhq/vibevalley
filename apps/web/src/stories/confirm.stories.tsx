@@ -22,7 +22,7 @@ const styles = stylex.create({
   confirmStoriesDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   confirmStoriesLi: {
     borderTopStyle: { default: null, ":not(:last-child)": "solid" },
@@ -33,9 +33,9 @@ const styles = stylex.create({
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 3)",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBlock: "calc(var(--spacing) * 2.5)",
+    gap: "0.75rem",
+    paddingInline: "1rem",
+    paddingBlock: "0.625rem",
   },
   confirmStoriesSpan: {
     minWidth: "0",
@@ -44,7 +44,7 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
 });
 

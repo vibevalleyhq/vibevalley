@@ -34,9 +34,9 @@ import { DeepseekForm } from "./DeepseekForm";
 const styles = stylex.create({
   sourceMarkSpan: {
     display: "block",
-    width: "calc(var(--spacing) * 2)",
-    height: "calc(var(--spacing) * 2)",
-    borderRadius: "2147483647px",
+    width: "0.5rem",
+    height: "0.5rem",
+    borderRadius: "9999px",
   },
   sourceMarkSpanState: {
     backgroundColor: "var(--wb-faint)",
@@ -62,14 +62,14 @@ const styles = stylex.create({
   memoryFormForm: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
   },
   memoryFormP: {
     color: "var(--color-berry)",
   },
   sourceMark: {
     display: "inline-flex",
-    padding: "var(--spacing)",
+    padding: "0.25rem",
     outlineStyle: {
       default: "none",
       ":focus-visible": "none",
@@ -86,13 +86,13 @@ const styles = stylex.create({
   sourceFieldDiv: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBlock: "calc(var(--spacing) * 3)",
+    gap: "0.5rem",
+    paddingInline: "1rem",
+    paddingBlock: "0.75rem",
   },
   sourceFieldSpan: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-medium)",
   },
   sourceFieldSpan2: {
@@ -101,36 +101,36 @@ const styles = stylex.create({
   sourceFieldDiv2: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
     borderColor: "var(--color-line)",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBlock: "calc(var(--spacing) * 3)",
+    paddingInline: "1rem",
+    paddingBlock: "0.75rem",
   },
   sourceFieldDiv3: {
     display: "flex",
     flexWrap: "wrap",
-    columnGap: "calc(var(--spacing) * 6)",
-    rowGap: "calc(var(--spacing) * 2.5)",
+    columnGap: "1.5rem",
+    rowGap: "0.625rem",
   },
   gitHubDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   gitHubSpan: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   gitHubSpan2: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   gitHubP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-berry)",
   },
 });

@@ -11,7 +11,7 @@ const sceneStyles = stylex.create({
     maxWidth: "1120px",
     flexWrap: "wrap",
     alignItems: "center",
-    columnGap: "calc(var(--spacing) * 7)",
+    columnGap: "1.75rem",
     rowGap: "18px",
   },
   navigation: {
@@ -27,22 +27,22 @@ const viewStyles = stylex.create({
   footFooter: {
     backgroundColor: "var(--color-bark-900)",
     paddingInline: "clamp(16px,5vw,64px)",
-    paddingBlock: "calc(var(--spacing) * 10)",
+    paddingBlock: "2.5rem",
     fontSize: "15px",
     color: "var(--color-cream-100)",
   },
   footSpan: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2.5)",
+    gap: "0.625rem",
     fontFamily: "var(--font-pixel)",
     fontSize: "var(--text-2xl)",
     lineHeight: "1",
     color: "var(--color-cream-50)",
   },
   footImg: {
-    width: "calc(var(--spacing) * 10)",
-    height: "calc(var(--spacing) * 10)",
+    width: "2.5rem",
+    height: "2.5rem",
   },
 });
 

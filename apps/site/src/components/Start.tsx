@@ -6,157 +6,155 @@ import { createSignal, onCleanup } from "solid-js";
 import { Presence } from "../animation/Presence";
 import { createReveal } from "../animation/scroll";
 import type { Copy } from "../i18n/zh";
+import { colors, fonts, leading, media, text } from "../styles/tokens.stylex";
 import { Section } from "./ui";
 
-const sceneStyles = stylex.create({
-  warning: {
+const styles = stylex.create({
+  warningBanner: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 5)",
+    gap: "1.25rem",
     borderStyle: "solid",
     borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-warn)",
-    boxShadow: "inset 0 0 0 2px var(--color-rim), 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
-    padding: "calc(var(--spacing) * 6)",
+    borderColor: colors.bark,
+    backgroundColor: colors.warn,
+    boxShadow: "inset 0 0 0 2px var(--color-rim), 4px 4px 0 var(--color-drop)",
+    padding: "1.5rem",
   },
-});
-
-const styles = stylex.create({
-  startSpan: {
-    color: "var(--color-wheat)",
-    WebkitUserSelect: "none",
-    userSelect: "none",
-  },
-  startImg: {
-    width: "calc(var(--spacing) * 12)",
-    height: "calc(var(--spacing) * 12)",
+  warningIcon: {
+    width: "3rem",
+    height: "3rem",
     flex: "none",
     objectFit: "contain",
     imageRendering: "pixelated",
   },
-  startH3: {
-    marginBottom: "calc(var(--spacing) * 1.5)",
-    fontSize: "var(--text-2xl)",
-    lineHeight: "var(--text-2xl--line-height)",
-    color: "var(--color-berry)",
+  warningTitle: {
+    marginBottom: "0.375rem",
+    fontSize: text["2xl"],
+    lineHeight: leading["2xl"],
+    color: colors.berry,
   },
-  startP: {
-    fontSize: "var(--text-base)",
-    lineHeight: "var(--text-base--line-height)",
+  bodyText: {
+    fontSize: text.base,
+    lineHeight: leading.base,
   },
-  startP2: {
-    marginTop: "calc(var(--spacing) * 2)",
-    fontSize: "var(--text-base)",
-    lineHeight: "var(--text-base--line-height)",
+  followupText: {
+    marginTop: "0.5rem",
+    fontSize: text.base,
+    lineHeight: leading.base,
   },
-  startDiv: {
-    marginTop: "calc(var(--spacing) * 7)",
+  columns: {
+    marginTop: "1.75rem",
     display: "grid",
     gridTemplateColumns: {
-      default: "repeat(1,minmax(0,1fr))",
-      "@media (width>=64rem)": "minmax(0,1fr) minmax(0,1.3fr)",
+      default: "minmax(0, 1fr)",
+      [media.lg]: "minmax(0, 1fr) minmax(0, 1.3fr)",
     },
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 7)",
+    gap: "1.75rem",
   },
-  startDiv2: {
+  card: {
     borderStyle: "solid",
     borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-cream-50)",
-    boxShadow: "inset 0 0 0 2px var(--color-rim), 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
-    padding: "calc(var(--spacing) * 6)",
+    borderColor: colors.bark,
+    backgroundColor: colors.creamSoft,
+    boxShadow: "inset 0 0 0 2px var(--color-rim), 4px 4px 0 var(--color-drop)",
+    padding: "1.5rem",
   },
-  startH32: {
-    fontSize: "var(--text-2xl)",
-    lineHeight: "var(--text-2xl--line-height)",
+  cardTitle: {
+    fontSize: text["2xl"],
+    lineHeight: leading["2xl"],
   },
-  startUl: {
-    marginTop: "calc(var(--spacing) * 3)",
+  checklist: {
+    marginTop: "0.75rem",
   },
-  startLi: {
+  checklistItem: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 2.5)",
-    paddingBlock: "calc(var(--spacing) * 1.5)",
-    fontSize: "var(--text-base)",
-    lineHeight: "var(--text-base--line-height)",
+    gap: "0.625rem",
+    paddingBlock: "0.375rem",
+    fontSize: text.base,
+    lineHeight: leading.base,
   },
-  startImg2: {
+  checkIcon: {
     marginTop: "5px",
-    width: "calc(var(--spacing) * 5)",
-    height: "calc(var(--spacing) * 5)",
+    width: "1.25rem",
+    height: "1.25rem",
     flex: "none",
     objectFit: "contain",
     imageRendering: "pixelated",
   },
-  startDiv3: {
+  cardHeader: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
-  startPre: {
-    marginTop: "calc(var(--spacing) * 3.5)",
+  commandBlock: {
+    marginTop: "0.875rem",
     overflowX: "auto",
     borderStyle: "solid",
     borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-bark-900)",
-    paddingInline: "calc(var(--spacing) * 5)",
+    borderColor: colors.bark,
+    backgroundColor: colors.bark,
+    paddingInline: "1.25rem",
     paddingBlock: "18px",
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-sm)",
+    fontFamily: fonts.mono,
+    fontSize: text.sm,
     lineHeight: "1.8",
-    color: "var(--color-cream-50)",
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, inset 0 0 0 2px var(--color-bark-600)",
+    color: colors.creamSoft,
+    boxShadow: "inset 0 0 0 2px var(--color-bark-600)",
   },
-  startSpan2: {
+  commandLine: {
     display: "block",
   },
-  startP3: {
-    marginTop: "calc(var(--spacing) * 3.5)",
+  promptPrefix: {
+    color: colors.wheat,
+    WebkitUserSelect: "none",
+    userSelect: "none",
+  },
+  readmeNote: {
+    marginTop: "0.875rem",
     fontSize: "15px",
     color: "var(--color-bark-800)",
   },
-  startA: {
+  readmeLink: {
     textDecorationLine: "underline",
   },
-  copyCommands: {
+  copyButton: {
     display: "inline-flex",
-    height: "calc(var(--spacing) * 8)",
+    height: "2rem",
     cursor: "pointer",
     alignItems: "center",
     overflow: "hidden",
     borderStyle: "solid",
     borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
+    borderColor: colors.bark,
     backgroundColor: {
-      default: "var(--color-cream-50)",
-      "@media (hover:hover)": {
+      default: colors.creamSoft,
+      [media.hover]: {
         default: null,
-        ":hover": "var(--color-cream-hover)",
+        ":hover": colors.creamHover,
       },
     },
-    paddingInline: "calc(var(--spacing) * 2)",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "var(--text-sm)",
+    paddingInline: "0.5rem",
+    fontFamily: fonts.pixel,
+    fontSize: text.sm,
     lineHeight: "1",
-    color: "var(--color-bark-900)",
+    color: colors.bark,
   },
-  copyButtonSpan: {
+  copyLabel: {
     display: "inline-flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
-  copyButtonImg: {
-    width: "calc(var(--spacing) * 4)",
-    height: "calc(var(--spacing) * 4)",
+  copyIcon: {
+    width: "1rem",
+    height: "1rem",
     objectFit: "contain",
     imageRendering: "pixelated",
   },
-  copyButtonSpan2: {
+  srOnly: {
     clipPath: "inset(50%)",
     whiteSpace: "nowrap",
     borderWidth: "0",
@@ -184,29 +182,29 @@ export default function Start(props: Props) {
   return (
     <>
       <Section ref={root.set} id="start" alt title={props.copy.start.title}>
-        <div data-reveal role="note" {...stylex.attrs(sceneStyles.warning)}>
-          <img loading="lazy" src={props.icons.warn} alt="" {...stylex.attrs(styles.startImg)} />
+        <div data-reveal role="note" {...stylex.attrs(styles.warningBanner)}>
+          <img loading="lazy" src={props.icons.warn} alt="" {...stylex.attrs(styles.warningIcon)} />
           <div>
-            <h3 {...stylex.attrs(styles.startH3)}>{props.copy.safety.title}</h3>
-            <p {...stylex.attrs(styles.startP)}>{props.copy.safety.text}</p>
-            <p {...stylex.attrs(styles.startP2)}>{props.copy.safety.wip}</p>
+            <h3 {...stylex.attrs(styles.warningTitle)}>{props.copy.safety.title}</h3>
+            <p {...stylex.attrs(styles.bodyText)}>{props.copy.safety.text}</p>
+            <p {...stylex.attrs(styles.followupText)}>{props.copy.safety.wip}</p>
           </div>
         </div>
-        <div {...stylex.attrs(styles.startDiv)}>
-          <div data-reveal {...stylex.attrs(styles.startDiv2)}>
-            <h3 {...stylex.attrs(styles.startH32)}>{props.copy.start.needs}</h3>
-            <ul {...stylex.attrs(styles.startUl)}>
+        <div {...stylex.attrs(styles.columns)}>
+          <div data-reveal {...stylex.attrs(styles.card)}>
+            <h3 {...stylex.attrs(styles.cardTitle)}>{props.copy.start.needs}</h3>
+            <ul {...stylex.attrs(styles.checklist)}>
               {props.copy.start.list.map((item) => (
-                <li {...stylex.attrs(styles.startLi)}>
-                  <img loading="lazy" src={props.icons.check} alt="" {...stylex.attrs(styles.startImg2)} />
+                <li {...stylex.attrs(styles.checklistItem)}>
+                  <img loading="lazy" src={props.icons.check} alt="" {...stylex.attrs(styles.checkIcon)} />
                   {item}
                 </li>
               ))}
             </ul>
           </div>
-          <div data-reveal {...stylex.attrs(styles.startDiv2)}>
-            <div {...stylex.attrs(styles.startDiv3)}>
-              <h3 {...stylex.attrs(styles.startH32)}>{props.copy.start.build}</h3>
+          <div data-reveal {...stylex.attrs(styles.card)}>
+            <div {...stylex.attrs(styles.cardHeader)}>
+              <h3 {...stylex.attrs(styles.cardTitle)}>{props.copy.start.build}</h3>
               <CopyButton
                 text={props.commands.join("\n")}
                 icon={props.icons.copy}
@@ -215,17 +213,17 @@ export default function Start(props: Props) {
                 done={props.copy.start.copied}
               />
             </div>
-            <pre {...stylex.attrs(styles.startPre)}>
+            <pre {...stylex.attrs(styles.commandBlock)}>
               {props.commands.map((c) => (
-                <span {...stylex.attrs(styles.startSpan2)}>
-                  <span {...stylex.attrs(styles.startSpan)}>$ </span>
+                <span {...stylex.attrs(styles.commandLine)}>
+                  <span {...stylex.attrs(styles.promptPrefix)}>$ </span>
                   {c}
                 </span>
               ))}
             </pre>
-            <p {...stylex.attrs(styles.startP3)}>
+            <p {...stylex.attrs(styles.readmeNote)}>
               {props.copy.start.more}{" "}
-              <a href={props.readme} {...stylex.attrs(styles.startA)}>
+              <a href={props.readme} {...stylex.attrs(styles.readmeLink)}>
                 {props.copy.start.readme}
               </a>
             </p>
@@ -260,7 +258,7 @@ function CopyButton(props: { text: string; icon: string; check: string; label: s
       data-testid="copy-commands"
       data-copied={copied() ? "true" : "false"}
       onClick={() => void copy()}
-      {...stylex.attrs(styles.copyCommands)}
+      {...stylex.attrs(styles.copyButton)}
     >
       <Presence
         value={copied() ? "done" : "copy"}
@@ -270,13 +268,13 @@ function CopyButton(props: { text: string; icon: string; check: string; label: s
         transition={{ duration: 0.2, ease: steps(3) }}
       >
         {(value, ref) => (
-          <span ref={ref} {...stylex.attrs(styles.copyButtonSpan)}>
-            <img src={value === "done" ? props.check : props.icon} alt="" {...stylex.attrs(styles.copyButtonImg)} />
+          <span ref={ref} {...stylex.attrs(styles.copyLabel)}>
+            <img src={value === "done" ? props.check : props.icon} alt="" {...stylex.attrs(styles.copyIcon)} />
             {value === "done" ? props.done : props.label}
           </span>
         )}
       </Presence>
-      <span {...stylex.attrs(styles.copyButtonSpan2)} aria-live="polite">
+      <span {...stylex.attrs(styles.srOnly)} aria-live="polite">
         {copied() ? props.done : ""}
       </span>
     </button>

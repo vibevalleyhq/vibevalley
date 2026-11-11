@@ -12,25 +12,25 @@ const viewStyles = stylex.create({
   iconsStoriesDiv: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   iconsStoriesDiv2: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
   },
   iconsStoriesSpan: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   iconsStoriesSpan2: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-2xs)",
-    lineHeight: "var(--text-2xs--line-height)",
+    lineHeight: "var(--leading-2xs)",
   },
   iconsStoriesDiv3: {
-    width: "calc(var(--spacing) * 64)",
+    width: "16rem",
   },
 });
 

@@ -10,7 +10,7 @@ const viewStyles = stylex.create({
   attachmentTileStoriesDiv: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
 });
 

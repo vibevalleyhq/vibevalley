@@ -23,7 +23,7 @@ const styles = stylex.create({
     bottom: "54px",
     left: "0",
     height: "84px",
-    width: "calc(var(--spacing) * 12)",
+    width: "3rem",
     animationName: "walk-across",
     animationDuration: "30s",
     animationDelay: "0s",
@@ -58,7 +58,7 @@ const styles = stylex.create({
     display: "flex",
     width: "120%",
     alignItems: "flex-end",
-    gap: "calc(var(--spacing) * 6)",
+    gap: "1.5rem",
   },
   paradeImg2: {
     width: "102px",
@@ -68,7 +68,7 @@ const styles = stylex.create({
   paradeDiv22: {
     position: "absolute",
     bottom: "38px",
-    height: "calc(var(--spacing) * 16)",
+    height: "4rem",
     width: "100%",
     borderBlockStyle: "solid",
     borderBlockWidth: "2px",
@@ -100,9 +100,9 @@ const styles = stylex.create({
     borderWidth: "2px",
     borderColor: "var(--color-bark-900)",
     backgroundColor: "var(--color-cream-50)",
-    boxShadow: "inset 0 0 0 2px var(--color-rim), 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
+    boxShadow: "inset 0 0 0 2px var(--color-rim), 4px 4px 0 var(--color-drop)",
     paddingInline: "22px",
-    paddingBlock: "calc(var(--spacing) * 3.5)",
+    paddingBlock: "0.875rem",
     textAlign: "center",
   },
   paradeH2: {
@@ -110,17 +110,17 @@ const styles = stylex.create({
       default: "var(--text-2xl)",
       "@media (width>=40rem)": "30px",
     },
-    lineHeight: "var(--text-2xl--line-height)",
+    lineHeight: "var(--leading-2xl)",
   },
   paradeP: {
-    marginTop: "calc(var(--spacing) * 1.5)",
+    marginTop: "0.375rem",
     fontSize: {
       default: "var(--text-sm)",
       "@media (width>=40rem)": "var(--text-base)",
     },
     lineHeight: {
-      default: "var(--text-sm--line-height)",
-      "@media (width>=40rem)": "var(--text-base--line-height)",
+      default: "var(--leading-sm)",
+      "@media (width>=40rem)": "var(--leading-base)",
     },
   },
 });

@@ -6,55 +6,55 @@ import { t } from "@vibevalley/i18n";
 import { type ChatMessage, userId } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
 
+const popIn = stylex.keyframes({
+  from: { opacity: 0, scale: 0.98 },
+});
+
 const styles = stylex.create({
   emojiPickerDiv: {
     position: "fixed",
     zIndex: 30,
     display: "flex",
-    animationName: { default: "pop-in", "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: ".28s",
-    animationDelay: "0s",
+    animationName: { default: popIn, "@media (prefers-reduced-motion: reduce)": "none" },
+    animationDuration: "280ms",
     animationTimingFunction: "var(--ease-out)",
-    animationIterationCount: "1",
-    animationDirection: "normal",
     animationFillMode: "both",
-    animationPlayState: "running",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     overflowY: "auto",
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--wb-line)",
     backgroundColor: "var(--wb-page)",
-    padding: "calc(var(--spacing) * 2)",
+    padding: "0.5rem",
     color: "var(--wb-ink)",
     boxShadow: "var(--shadow-float)",
   },
   emojiPickerP: {
-    paddingInline: "var(--spacing)",
-    paddingBottom: "var(--spacing)",
+    paddingInline: "0.25rem",
+    paddingBottom: "0.25rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-semibold)",
     color: "var(--color-muted)",
   },
   emojiPickerDiv2: {
     display: "grid",
     gridTemplateColumns: "repeat(8,minmax(0,1fr))",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
   },
   emojiPickerButton: {
     display: "inline-flex",
-    width: "calc(var(--spacing) * 8)",
-    height: "calc(var(--spacing) * 8)",
+    width: "2rem",
+    height: "2rem",
     cursor: "pointer",
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "var(--radius-sm)",
     fontFamily: "var(--font-sans)",
     fontSize: "var(--text-lg)",
-    lineHeight: "var(--text-lg--line-height)",
+    lineHeight: "var(--leading-lg)",
     backgroundColor: {
       default: null,
       "@media (hover:hover)": {

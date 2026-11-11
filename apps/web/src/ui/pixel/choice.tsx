@@ -12,19 +12,19 @@ import { pxStyle } from "./style";
 const styles = stylex.create({
   pickChevron: { rotate: "90deg" },
   pxSegmentedButton: {
-    height: "calc(var(--spacing) * 7)",
+    height: "1.75rem",
     cursor: {
       default: "pointer",
       ":disabled": "default",
     },
-    paddingInline: "calc(var(--spacing) * 3)",
+    paddingInline: "0.75rem",
     fontFamily: "var(--font-pixel)",
     fontSize: "12px",
     lineHeight: "1.3333",
     fontWeight: "var(--font-weight-normal)",
     letterSpacing: "var(--tracking-normal)",
     whiteSpace: "nowrap",
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, inset 0 0 0 2px var(--color-cream-300)",
+    boxShadow: "inset 0 0 0 2px var(--color-cream-300)",
     outlineStyle: {
       default: "none",
       ":focus-visible": "solid",
@@ -88,15 +88,15 @@ const styles = stylex.create({
     top: "100%",
     left: "0",
     zIndex: 30,
-    marginTop: "calc(var(--spacing) * 1.5)",
+    marginTop: "0.375rem",
     minWidth: "100%",
     transformOrigin: "top",
-    padding: "var(--spacing)",
+    padding: "0.25rem",
     transitionProperty: {
       default: "opacity,scale",
       "@media (prefers-reduced-motion:reduce)": "none",
     },
-    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionTimingFunction: "var(--ease-out)",
     transitionDuration: ".1s",
     scale: {
       default: null,
@@ -109,9 +109,9 @@ const styles = stylex.create({
   },
   pxSegmented: {
     flexWrap: "wrap",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     backgroundColor: "var(--color-cream-200)",
-    padding: "var(--spacing)",
+    padding: "0.25rem",
   },
   pxSegmentedBlock: {
     display: "flex",
@@ -125,16 +125,16 @@ const styles = stylex.create({
   },
   pxPickButton: {
     display: "flex",
-    height: "calc(var(--spacing) * 9)",
+    height: "2.25rem",
     width: "100%",
     cursor: {
       default: "pointer",
       ":disabled": "default",
     },
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     backgroundColor: "var(--color-cream-100)",
-    paddingInline: "calc(var(--spacing) * 3)",
+    paddingInline: "0.75rem",
     textAlign: "left",
     opacity: {
       default: null,
@@ -162,9 +162,9 @@ const styles = stylex.create({
     display: "flex",
     cursor: "pointer",
     alignItems: "baseline",
-    gap: "calc(var(--spacing) * 3)",
-    paddingInline: "calc(var(--spacing) * 2.5)",
-    paddingBlock: "calc(var(--spacing) * 1.5)",
+    gap: "0.75rem",
+    paddingInline: "0.625rem",
+    paddingBlock: "0.375rem",
     whiteSpace: "nowrap",
   },
   pxPickLiActive: {
@@ -181,7 +181,7 @@ const styles = stylex.create({
       ":disabled": "default",
     },
     alignItems: "center",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
     textAlign: "left",
     color: "var(--color-bark-900)",
     opacity: {
@@ -191,17 +191,17 @@ const styles = stylex.create({
   },
   pxSwitchTrack: {
     display: "flex",
-    height: "calc(var(--spacing) * 6)",
-    width: "calc(var(--spacing) * 10)",
+    height: "1.5rem",
+    width: "2.5rem",
     flexShrink: "0",
     borderStyle: "solid",
     borderWidth: "2px",
     borderColor: "var(--color-cream-300)",
     transitionProperty: {
-      default: "color,background-color,border-color,outline-color,text-decoration-color,fill,stroke",
+      default: "color, background-color, border-color",
       "@media (prefers-reduced-motion:reduce)": "none",
     },
-    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionTimingFunction: "var(--ease-out)",
     transitionDuration: ".15s",
   },
   pxSwitchTrackOff: {
@@ -214,18 +214,18 @@ const styles = stylex.create({
     backgroundColor: "var(--color-leaf-500)",
   },
   pxSwitchThumb: {
-    width: "calc(var(--spacing) * 5)",
-    height: "calc(var(--spacing) * 5)",
+    width: "1.25rem",
+    height: "1.25rem",
     backgroundColor: "var(--color-cream-50)",
     transitionProperty: {
-      default: "transform,translate,scale,rotate",
+      default: "translate",
       "@media (prefers-reduced-motion:reduce)": "none",
     },
-    transitionTimingFunction: "var(--default-transition-timing-function)",
+    transitionTimingFunction: "var(--ease-out)",
     transitionDuration: ".15s",
   },
   pxSwitchThumbOn: {
-    translate: "calc(var(--spacing) * 4) 0",
+    translate: "1rem 0",
   },
   pxSwitchText: {
     display: "flex",

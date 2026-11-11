@@ -1,6 +1,6 @@
 # 界面怎么做：田间工作台
 
-VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的书桌，近乎中性的纸和墨，颜色只留给几样庄稼的意思；看和玩的地方是画出来的像素农场。本篇写工作台怎么做：审美、令牌、原子和模式、和那份八篇大纲的对照、给 agent 的清单。令牌的值以 `apps/web/src/style.css` 为准，本篇只说用途和挑法；写错了由 lint 拦（`vibevalley/no-hex-color`、`vibevalley/design-tokens`，`scripts/oxlint-plugin.ts`、`scripts/design-tokens.ts`）。像素皮怎么画见 [农场的皮](docs/subsystems/farm.md)，页面的分层和宿主见 [客户端](docs/subsystems/app.md)。整套的样子在零件的故事里（`vp run --filter @vibevalley/web stories`，[`packages/stories`](packages/stories/README.md)）：每个令牌和零件的每种状态，浅色、深色并排，换宽度看窄窗口，动效的曲线从样式表里读。
+VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的书桌，近乎中性的纸和墨，颜色只留给几样庄稼的意思；看和玩的地方是画出来的像素农场。本篇写工作台怎么做：审美、令牌、原子和模式、和那份八篇大纲的对照、给 agent 的清单。令牌的值以 `apps/web/src/style.css` 与 `apps/web/src/ui/tokens.stylex.ts` 为准，本篇只说用途和挑法；写错了由 lint 拦（`vibevalley/stylex-only`、`vibevalley/no-hex-color`、`vibevalley/design-tokens`，`scripts/oxlint-plugin.ts`、`scripts/design-tokens.ts`）。像素皮怎么画见 [农场的皮](docs/subsystems/farm.md)，页面的分层和宿主见 [客户端](docs/subsystems/app.md)。整套的样子在零件的故事里（`vp run --filter @vibevalley/web stories`，[`packages/stories`](packages/stories/README.md)）：每个令牌和零件的每种状态，浅色、深色并排，换宽度看窄窗口，动效的曲线从样式表里读。
 
 ## 审美
 
@@ -9,7 +9,7 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 - **三档字。** `ink` 读的、`muted` 说明、`faint` 旁注；三档在页面、侧栏、导航栏上都过 AA，彼此也拉得开（浅色里约 17、7、5 比 1）。不再用颜色当第四档。
 - **不甜也不脏。** 底和字都是近乎中性的暖灰，不用纯黑纯白，也不铺棕黄：满屏一种带色的底，看久了就是脏。深色主题是暗的石色，不是冷蓝灰。
 - **颜色只说状态。** 叶（`leaf`、`accent`）是好了、主操作；麦（`wheat`）是在等、在想、要你看；莓（`berry`）是坏了、危险；水（`water`）是信息和链接；`idle` 是没人在干。装饰不用颜色，用排版和留白。
-- **安静的密度。** 一屏放得下一天的活：正文 13px，控件 28px 高，留白按 4 的倍数。信息多的地方先收起（折叠、⋯ 菜单、悬停才出的工具条），不缩小字。
+- **安静的密度。** 一屏放得下一天的活：正文 13px，控件 28px 高，留白按 4px（`0.25rem`）的倍数。信息多的地方先收起（折叠、⋯ 菜单、悬停才出的工具条），不缩小字。
 - **层级靠表面，阴影只给浮起来的。** 侧栏、页面、浮层三层颜色分开；贴在表面上的东西不投影，只有浮在页面上的（菜单、对话框、toast）投影。
 - **一个块一圈线。** 线是 12% 的墨（`line`），一个块只有一圈；块里面再分区用留白、`hover` 色或一条分隔线，不再套一圈边。
 - **动效说因果，不表演。** 东西从哪来、去哪了、按没按下去；一次动效短到不用等。像素皮走帧（`steps()`），不走缓动。没有一直在动的装饰：会动的循环只给「活着」的状态（在想的点、在录音）。
@@ -20,12 +20,12 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 | | 工作台 | 像素皮（农场、记忆树、`ui/pixel`） |
 |---|---|---|
 | 在哪 | `apps/web/src/ui`、`features/*`、`app` | `farm`、`tree`、`ui/pixel` |
-| 字 | 系统的中文字体（`font-sans`），13px 正文 | FusionPixel（`font-pixel`），只在 12、24px 清楚 |
+| 字 | 系统的中文字体（`--font-sans`），13px 正文 | FusionPixel（`--font-pixel`），只在 12、24px 清楚 |
 | 图标 | reicon 的线条图标（`ui/Icon.tsx` 的 `<Icon name>`），跟着字的颜色 | `public/pixel` 的贴图（`SpriteIcon`） |
-| 线和影 | 1px 的 `line`，`shadow-raise`、`shadow-float` | 2px 的树皮色框，`shadow-px` 和 `ui/pixel/style.ts` 的 `pxStyle.window`、`pxStyle.frame` |
+| 线和影 | 1px 的 `--color-line`，`--shadow-raise`、`--shadow-float` | 2px 的树皮色框，`--shadow-px` 和 `ui/pixel/style.ts` 的 `pxStyle.window`、`pxStyle.frame` |
 | 动效 | 缓动和三档时长（下面「动效」） | `steps()` 走帧，一像素一像素地动 |
 | 主题 | 浅色、深色（设置 › 外观） | 只有画出来的那一套 |
-| 令牌的检查 | `no-hex-color`、`design-tokens` | `no-hex-color`：画出来的颜色也有名字；尺寸是画的一部分，不查 |
+| 令牌的检查 | `stylex-only`、`no-hex-color`、`design-tokens` | `stylex-only`、`no-hex-color`：画出来的颜色也有名字；尺寸是画的一部分，不查 |
 
 头像（`ui/Face.tsx`）、农机的 logo、仓库的岛、额度瓶在工作台里也是画，照像素皮。
 
@@ -38,28 +38,30 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 - **框和影**：`pxStyle.window`（窗）、`frame`（厚框）、`ring`（框里一圈 2px）、`drop`（浮在板子上的投影）、`shade`（地图上的牌子和卡片，更深一些，不然看不出来）。
 - **焦点**只有一种：`pxStyle.focus`，叶色的 2px 外框，离边一个像素。
 - **叶和麦上的字是树皮色**（`var(--color-bark-900)`）：奶油色的字在 `leaf-500` 上只有 2.5:1，读不清；只有 `berry` 和更深的叶（`leaf-700`）上用奶油色的字。
-- **动效**走帧：关键帧用 `steps()`，一个像素一个像素地动，每个动画写自己的减少动效的停法。
+- **动效**走帧：关键帧用 `stylex.keyframes()` 配合 `steps()`，一个像素一个像素地动，每个动画写自己的减少动效的停法。
 
 ## 令牌
+
+工作台常量集中在 `apps/web/src/ui/tokens.stylex.ts`（`colors`、`fonts`、`text`、`leading`、`radii`、`shadows`、`easing`、`durations`、`containers`、`media`），底层引用 `style.css` 的主题自定义属性。
 
 ### 表面
 
 | 令牌 | 用在 | 说明 |
 |---|---|---|
-| `bg-rail`、`text-on-rail` | 最左的导航栏 | 最安静的一层：浅色里比侧栏暗一档、右边一条线，深色里最暗；当前的地方是墨的 9% |
-| `bg-side` | 侧栏、成员栏、设置的导航 | 比页面暗半档 |
-| `bg-page` | 页面、卡片、浮层的底 | 卡片和页面同色，靠一圈 `line` 分开 |
-| `bg-hover`、`bg-selected` | 悬停、选中、块里分区 | 墨的 6%、10%，两个主题都对 |
-| `bg-scrim` | 对话框后面 | |
-| `bg-code-bg`、`text-code-ink` | 命令、代码、终端输出 | 两个主题里都是深的 |
+| `--color-rail`、`--color-on-rail` | 最左的导航栏 | 最安静的一层：浅色里比侧栏暗一档、右边一条线，深色里最暗；当前的地方是墨的 9% |
+| `--color-side` | 侧栏、成员栏、设置的导航 | 比页面暗半档 |
+| `--color-page` | 页面、卡片、浮层的底 | 卡片和页面同色，靠一圈 `--color-line` 分开 |
+| `--color-hover`、`--color-selected` | 悬停、选中、块里分区 | 墨的 6%、10%，两个主题都对 |
+| `--color-scrim` | 对话框后面 | |
+| `--color-code-bg`、`--color-code-ink` | 命令、代码、终端输出 | 两个主题里都是深的 |
 
 ### 状态色
 
 | 令牌 | 意思 | 浅底配字 |
 |---|---|---|
-| `leaf`、`accent` | 好了、主操作、选中；主按钮在指针下是 `accent-hover`（浅色里更深，字才读得清） | `bg-ok-soft` 配 `text-ok-ink` |
-| `wheat` | 在等、在想、要你看 | `bg-wheat/25` 配 `text-ink` |
-| `berry` | 坏了、危险、出错 | `bg-bad-soft` 配 `text-berry` |
+| `leaf`、`accent` | 好了、主操作、选中；主按钮在指针下是 `accent-hover`（浅色里更深，字才读得清） | `--color-ok-soft` 配 `--color-ok-ink` |
+| `wheat` | 在等、在想、要你看 | `color-mix(in oklab, var(--color-wheat) 25%, transparent)` 配 `--color-ink` |
+| `berry` | 坏了、危险、出错 | `--color-bad-soft` 配 `--color-berry` |
 | `water` | 信息、链接 | |
 | `idle` | 没人在干 | |
 | `muted`、`faint` | 次要的字、更次要的字 | |
@@ -72,12 +74,12 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 
 | 令牌 | 值 | 用在 |
 |---|---|---|
-| `--radius-xs` | 3px | 一行字里的标记：键帽、@ 名、角标、像素格 |
-| `--radius-sm` | 4px | 标签（`Tag`）、分段的选项 |
-| `--radius-md` | 6px | 控件：按钮、输入框、菜单项、小浮层 |
-| `--radius-lg` | 8px | 卡片、面板、看板的栏、对话框、菜单 |
-| `--radius-xl` | 12px | 大的浮层（工单详情）、栏上的格子 |
-| `calc(infinity * 1px)` | | 胶囊、头像、状态点、计数 |
+| `--radius-xs`（`radii.xs`） | 3px | 一行字里的标记：键帽、@ 名、角标、像素格 |
+| `--radius-sm`（`radii.sm`） | 4px | 标签（`Tag`）、分段的选项 |
+| `--radius-md`（`radii.md`） | 6px | 控件：按钮、输入框、菜单项、小浮层 |
+| `--radius-lg`（`radii.lg`） | 8px | 卡片、面板、看板的栏、对话框、菜单 |
+| `--radius-xl`（`radii.xl`） | 12px | 大的浮层（工单详情）、栏上的格子 |
+| `"9999px"`（`radii.pill`） | | 胶囊、头像、状态点、计数 |
 
 套在一起时里面的圆角小一档（卡片 `lg` 里的按钮 `md`）。
 
@@ -85,34 +87,34 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 
 | 高 | 用在 |
 |---|---|
-| 24px | 紧凑的：分段的选项、行内的小按钮 |
-| 28px | 默认：按钮（`Button`）、只有图标的按钮（`IconButton`） |
-| 32px | 输入框、选择框、带搜索的条 |
+| `1.5rem`（24px） | 紧凑的：分段的选项、行内的小按钮 |
+| `1.75rem`（28px） | 默认：按钮（`Button`）、只有图标的按钮（`IconButton`） |
+| `2rem`（32px） | 输入框、选择框、带搜索的条 |
 
-按钮里图标和字之间 6px，左右内边距 10px，按 `--spacing` 的倍数写。一组控件放在一行时高度一样。
+按钮里图标和字之间 `0.375rem`（6px），左右内边距 `0.625rem`（10px）。一组控件放在一行时高度一样。
 
 ### 线和阴影
 
 - 线只有一种：1px 的 `var(--color-line)`；焦点是 `focus` 色的 2px 外框（`style.css` 的 `:focus-visible`，全页一条，组件里不再写一遍）；选中的输入框是 `var(--color-focus)`。
-- 阴影只有两档：`var(--shadow-raise)`（贴着表面的一层：分段选中的那项、看板上悬停的卡片）和 `var(--shadow-float)`（浮在页面上：菜单、浮层、对话框、toast）。内描线或状态圈用调色板变量，沿用字色的圈用 `currentColor`。
+- 阴影只有两档：`var(--shadow-raise)`（贴着表面的一层：分段选中的那项、看板上悬停的卡片）和 `var(--shadow-float)`（浮在页面上：菜单、浮层、对话框、toast）。内描线或状态圈用调色板变量，沿用字色的圈用 `currentColor`，不写空的 `0 0 transparent` 占位层。
 
 ### 字
 
-| 令牌 | 大小 / 行高 | 用在 |
+| 字号 / 行高令牌 | 大小 / 行高 | 用在 |
 |---|---|---|
-| `--text-2xs` | 11 / 14 | 只给计数、角标、键帽 |
-| `--text-xs` | 12 / 16 | 时间、说明、栏名、次要的字 |
-| `--text-sm` | 13 / 20 | 正文、按钮、列表（页面默认） |
-| `--text-base` | 14 / 22 | 对话框和区块的标题 |
-| `--text-lg` | 16 / 24 | 页面里的大标题 |
-| `--text-xl` | 20 / 28 | 页面的名字 |
-| `--text-2xl` | 24 / 32 | 文档标题和已有的大标题 |
-| `--text-3xl` | 30 / 36 | 需要逐字辨认的配对码 |
+| `--text-2xs` / `--leading-2xs` | 11 / 14 | 只给计数、角标、键帽 |
+| `--text-xs` / `--leading-xs` | 12 / 16 | 时间、说明、栏名、次要的字 |
+| `--text-sm` / `--leading-sm` | 13 / 20 | 正文、按钮、列表（页面默认） |
+| `--text-base` / `--leading-base` | 14 / 22 | 对话框和区块的标题 |
+| `--text-lg` / `--leading-lg` | 16 / 24 | 页面里的大标题 |
+| `--text-xl` / `--leading-xl` | 20 / 28 | 页面的名字 |
+| `--text-2xl` / `--leading-2xl` | 24 / 32 | 文档标题和已有的大标题 |
+| `--text-3xl` / `--leading-3xl` | 30 / 36 | 需要逐字辨认的配对码 |
 
 - 粗细三种：400 正文，500（`--font-weight-medium`）选中、标签，600（`--font-weight-semibold`）标题和名字。
 - 数字默认等宽（`body` 的 `font-variant-numeric: tabular-nums`）：计数、时间、额度、钱对得齐，变的时候不跳。
 - 代码、id、分支、命令用 `var(--font-mono)`。
-- 中文的标点不挤压，一行的字不手动断；放不下用单行省略或两行截断，容器要有 `minWidth: 0`。
+- 中文的标点不挤压，一行的字不手动断；放不下用单行省略（`overflow: "hidden"`、`textOverflow: "ellipsis"`、`whiteSpace: "nowrap"`）或多行截断（`WebkitLineClamp`），弹性子容器要有 `minWidth: 0`。
 
 ### 图标
 
@@ -122,21 +124,21 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 
 | 令牌 | 值 | 用在 |
 |---|---|---|
-| `transitionDuration: "120ms"` | 120ms | 指针底下的：悬停、按下、展开的小箭头 |
-| `var(--default-transition-duration)` | 180ms | 状态变化：颜色、显示隐藏、选中 |
-| `transitionDuration: "280ms"` | 280ms | 面板、抽屉、对话框的进出 |
-| `--ease-out` | `cubic-bezier(0.2, 0, 0, 1)` | 进来的和大多数变化（默认） |
-| `--ease-in` | `cubic-bezier(0.4, 0, 1, 1)` | 离开的 |
-| `--ease-in-out` | `cubic-bezier(0.4, 0, 0.2, 1)` | 来回移动、变大小 |
-| `--ease-spring` | `cubic-bezier(0.34, 1.4, 0.64, 1)` | 只给弹出来的小东西（一个角标、一个新标记） |
-| `pop-in` 关键帧 | 280ms，98% 放大淡入 | 菜单、浮层、对话框、toast 进来 |
-| `fade-in` 关键帧 | 180ms 淡入 | 提示（`Tip`）、对话框后面的暗幕 |
+| `durations.pointer` | `"120ms"` | 指针底下的：悬停、按下、展开的小箭头 |
+| `durations.state` | `"180ms"` | 状态变化：颜色、显示隐藏、选中 |
+| `durations.panel` | `"280ms"` | 面板、抽屉、对话框的进出 |
+| `--ease-out`（`easing.out`） | `cubic-bezier(0.2, 0, 0, 1)` | 进来的和大多数变化（默认） |
+| `--ease-in`（`easing.in`） | `cubic-bezier(0.4, 0, 1, 1)` | 离开的 |
+| `--ease-in-out`（`easing.inOut`） | `cubic-bezier(0.4, 0, 0.2, 1)` | 来回移动、变大小 |
+| `--ease-spring`（`easing.spring`） | `cubic-bezier(0.34, 1.4, 0.64, 1)` | 只给弹出来的小东西（一个角标、一个新标记） |
+| `popIn`（`stylex.keyframes`） | 280ms，98% 放大淡入 | 菜单、浮层、对话框、toast 进来 |
+| `fadeIn`（`stylex.keyframes`） | 180ms 淡入 | 提示（`Tip`）、对话框后面的暗幕 |
 
-- `transitionProperty` 只列要动的属性，如 `"background-color, translate"`；时长和缓动显式引用令牌。
+- `transitionProperty` 只列真正要动的属性，如 `"background-color, border-color, translate"` 或 `"rotate"`；时长和缓动显式引用令牌。
 - 按钮按下时下沉一个像素，120ms。
 - 弹出来的东西从它出来的地方长出来：下拉菜单从右上，输入框上面的菜单从底部。
-- 系统要求减少动效时，工作台的过渡由 `style.css` 停下；组件与像素皮的循环动画各自声明停法。
-- 只动 `opacity`、`translate`、`scale`、颜色，不动会重新排版的属性（宽、高、`top`）。
+- 系统要求减少动效时，工作台的过渡由 `style.css` 停下；`stylex.keyframes` 入场与循环动画各自带 `"@media (prefers-reduced-motion: reduce)": "none"` 停法。
+- 只动 `opacity`、`translate`、`scale`、`rotate`、颜色，不动会重新排版的属性（宽、高、`top`）。
 
 ### 层
 
@@ -153,7 +155,7 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 
 - 滚动条和选中的字也取调色板（`style.css` 的 base 层）：细的、淡墨色、没有槽，深色主题里不是系统的浅灰条；选中的字是叶色。
 - 禁用一律在 `:disabled` 条件里写 `opacity: 0.5`、`cursor: "default"`；按下时不下沉。
-- 能滚的区域（不带边框和阴影的那一层）用滚动遮罩：还能往哪边滚，那边淡出 16px，滚到头就不淡；样式由组件声明，沿用 `style.css` 的滚动关键帧。遮罩会连边框和阴影一起遮，所以加在里面那层，不加在带边框的浮层上。折起来的长字最后三成淡出，看得出还有。
+- 能滚的区域（不带边框和阴影的那一层）用滚动遮罩：还能往哪边滚，那边淡出 16px，滚到头就不淡；样式由组件声明，沿用 `style.css` 的 `@property` 滚动关键帧。遮罩会连边框和阴影一起遮，所以加在里面那层，不加在带边框的浮层上。折起来的长字最后三成淡出，看得出还有。
 - 消息列表离开最新的一屏，底上出一个胶囊：这期间别人说了几条，或「回到最新」；点了滚回底（减少动效时直接跳）。
 
 ### 打开和刷新
@@ -168,28 +170,28 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 - **工单的一页和看板**：工单详情是它自己的一页（Linear 那样），不是盖在看板上的弹窗；右栏只有一个主动作，其余是普通按钮，不拉满一栏。新的草稿只有一个写字的地方：一句话 → 起草，说明和验收标准起草以后才出现，或者点「自己写说明」。看板的卡片只标和这一列默认不一样的：自己的状态（待办里的草稿靠「草稿」标签说）、高和紧急的优先级、有人在做时的头像、进度和标签；一列只有它装的那么高，空的就是列头和一个虚线的放置区，说明在列名旁的 ⓘ；待办只有一个加的入口：列头下一张虚线的占位卡片（一个加号和「新工单」），点开一个对话框，一个写字的框加两个安静的选择（仓库、帮工，从筛选或上次的选择填好），⌘ 回车或「记下」马上关掉，卡片留在看板上，起草在后面接着跑；待办列不再另画空的放置区。列表里每组头上的加号开同一个对话框，填好那一组的仓库或帮工。列表的分组头是一行字加一条线，空组只剩组头，按状态分组时行里不再画状态。筛选是 `ui/Field.tsx` 的 `Select`（`filter`：选了「全部」以外的值就染一层叶色），不用原生的下拉。
 - **等你的事看得见**：帮工在问你、等你验收、要你修的件数在左边栏「工单」上是一个麦色的数，窗口标题前面是「(2!)」，聊天的未读跟在后面（`features/inbox/tray.ts`）。派活的消息说「派谁去做哪张」并链到工单，给帮工的整段话收起来；预览里的 Markdown 先去掉记号（`plainText`）再截断。
 - **贴左，还是居中**：读的一栏居中（笔记的一页、日记流、一张工单、一起写的 Artifact），两边留白是给眼睛的；管的页面贴左（看板、列表、档案和模板的卡片、农机、仓库、设置），和页头的工具条从同一条边起，宽了就往右长、卡片多排几列。表单（助手的档案）有最大宽度，但也贴左，不在宽屏中间漂着。
-- **左边的导航栏**（`app/Shell.tsx` 的 `Rail`，地方的表在 `app/places.ts`）：最上面是农场（助手的脸），下面是工作台的地方，最下面是设置和回农场。一个地方一格：24px 的图标，下面一行 `text-xs` 的名字（悬停另说它是做什么的），放不下就截断；地方按组排（每天干活的、配置的、查阅的），组之间一条短线，新加的地方放进它的组，不另起一排；地方多到放不下时栏自己滚动。手机宽（`sm` 以下）只留图标、栏窄到 56px，名字在悬停和读屏里。等你的件数是格子右上角一个麦色的数。
+- **左边的导航栏**（`app/Shell.tsx` 的 `Rail`，地方的表在 `app/places.ts`）：最上面是农场（助手的脸），下面是工作台的地方，最下面是设置和回农场。一个地方一格：24px 的图标，下面一行 `--text-xs` 的名字（悬停另说它是做什么的），放不下就截断；地方按组排（每天干活的、配置的、查阅的），组之间一条短线，新加的地方放进它的组，不另起一排；地方多到放不下时栏自己滚动。手机宽（`< 40rem`）只留图标、栏窄到 56px，名字在悬停和读屏里。等你的件数是格子右上角一个麦色的数。
 - **说明放在哪**：一页、一处是什么，写在标题旁的 ⓘ（`Hint`）里，悬停才出；标题下面不放整段话，页头也不挂副标题句。同一处只有一个 ⓘ，别的事（设置存在哪个文件）用它自己的图标。
 - **链接**：站内只有图标的链接用 `IconLink`（地址只收 `/…`）；去别的网站的一律是 `OutLink`，写出去哪（「MOSS 开放平台 ↗」），不用一个光秃秃的箭头。
 - **钥匙和占位**：钥匙的状态写出来（「还没设」，或在用的最后四位），不只画一个点。输入框的示例值写成「比如：…」，不让它看着像已经填好的值。分段放在一列里时只有它的内容那么宽（`Segmented` 自己管）。
 - **按钮**（`ui/Button.tsx`）：`primary` 一个区域只有一个，是那里最要紧的一步；`plain` 是其余的；`quiet` 放在工具条和行里；`danger` 是字变莓色的 `plain`，不填满。只有图标的用 `IconButton`，它的名字就是悬停的提示和读屏的话。
-- **选择框和勾选框**（`ui/Field.tsx` 的 `Select`、`ui/Checkbox.tsx`，行为来自 `@vibevalley/base-ui`）：选择框是一个按钮，显示选中的那项、右边一个向下的小箭头，列表和菜单一个样子（`rounded-lg`、`shadow-float`、选中的那项后面一个勾），至少和按钮一样宽；`quiet` 是侧栏里平时不画框的那种，`size="control"` 是工具条上 28px 高的。勾选框是 16px 的 `rounded-xs` 方块，勾上了填 `accent`。单选、滑块用 base-ui 的 `RadioGroup`、`Slider`，样子照这两个配。系统自带的 `<select>`、勾选框、单选、滑块每台机器画得不一样，深色主题里还是浅的，工作台不用（lint `vibevalley/native-control`）；像素皮画自己的。
+- **选择框和勾选框**（`ui/Field.tsx` 的 `Select`、`ui/Checkbox.tsx`，行为来自 `@vibevalley/base-ui`）：选择框是一个按钮，显示选中的那项、右边一个向下的小箭头，列表和菜单一个样子（`--radius-lg`、`--shadow-float`、选中的那项后面一个勾），至少和按钮一样宽；`quiet` 是侧栏里平时不画框的那种，`size="control"` 是工具条上 28px 高的。勾选框是 16px 的 `--radius-xs` 方块，勾上了填 `--color-accent`。单选、滑块用 base-ui 的 `RadioGroup`、`Slider`，样子照这两个配。系统自带的 `<select>`、勾选框、单选、滑块每台机器画得不一样，深色主题里还是浅的，工作台不用（lint `vibevalley/native-control`）；像素皮画自己的。
 - **一行里的报告**（`packages/protocol/src/rules/plain.ts` 的 `plainText`，服务端和页面共用）：帮工的汇报、消息是 Markdown，放在只有一行、几行的地方（工单的「要你做的」、经过、串的预览、农场的气泡）时去掉 `#`、`**`、反引号、链接和列表的记号，连成一行，不露出原始的记号；整段看的地方才渲染 Markdown。
-- **标签页**（`ui/Tabs.tsx`）：一页里的几个视图。窗格里用 `pills`（选中的是 `bg-selected`），页面的头下面用 `line`（选中的下面一道墨色的线，可以带图标）；一个标签页是去一个地址时给它 `href`。
+- **标签页**（`ui/Tabs.tsx`）：一页里的几个视图。窗格里用 `pills`（选中的是 `--color-selected`），页面的头下面用 `line`（选中的下面一道墨色的线，可以带图标）；一个标签页是去一个地址时给它 `href`。
 - **更多**（`ui/MoreMenu.tsx`，base-ui 的 `Menu`）：一处不是主要的动作收进右上角的 ⋯（新标签页打开、复制链接、删掉……）；每项一个 16px 以内的图标加一句话，危险的放最后、前面一条分隔线、字是莓色。删掉这类收不回的，选了以后在原处问一遍（莓色的浅底一行、危险按钮、「算了」），不弹窗。
-- **分段**（`ui/Segmented.tsx`）：两到五个互斥的选项；槽是 `bg-hover`，页面色加 `shadow-raise` 的滑块垫在选中的那项下面，换选项时滑过去（280ms）。
+- **分段**（`ui/Segmented.tsx`）：两到五个互斥的选项；槽是 `--color-hover`，页面色加 `--shadow-raise` 的滑块垫在选中的那项下面，换选项时滑过去（280ms）。
 - **状态点**（`ui/Tag.tsx` 的 `Dot`，`features/channel/presence.tsx` 的 `PhaseGlyph`）：点的颜色照「状态色」那张表，画在头像、图上时带一圈页面色（`ring`）；会变的状态用 `PhaseGlyph`（图标），静的用点。
 - **对话框和确认**（`ui/Dialog.tsx`、`ui/ConfirmButton.tsx`）：对话框标题一行，下面是内容，Esc 和点暗幕关掉。两张皮的模态（`Dialog`、`Lightbox`、像素皮的 `PxDialog`、`FarmDialog`）都经 `ui/Dialog.tsx` 的 `createModal` 开关原生的 `<dialog>`：Esc 和点暗幕只是请调用的一方关，开没开由它的 `open` 说了算。删、合、关这种收不回的用 `ConfirmButton`：第一次点在原地问（「删掉 X？」、危险按钮、「算了」），Esc 或焦点离开就收回；或者先问服务端的预演（`--dry-run` 那一路）把会发生什么列出来。不用 `window.confirm`。消息上悬停的工具条地方小，删除是同一个按钮点两次。
-- **标签和计数**：`Tag`（`ui/Tag.tsx`）只取 `tone`（`ok`、`bad`、`wait`），自带字色；未读用 `Count`（`rounded-full`、`text-xs`）。
-- **附件**（`ui/AttachmentTile.tsx`、`ui/Lightbox.tsx`）：图片在消息里最多 `max-h-64`，一圈 `line`、`rounded-md`，点开是看图的浮层（← → 翻同一条消息的图，Esc 关，原图另开一个标签页）；文件和输入框里待发的附件是磁贴：图的缩略图或类型的图标、名字、大小，待发的能逐个去掉。
-- **消息**：一行一条，不画气泡（群聊里人多，靠头像和名字分人）；连着说的不重复头像；时间是 `text-xs text-faint`；悬停的工具条在右上，`z-10`。
+- **标签和计数**：`Tag`（`ui/Tag.tsx`）只取 `tone`（`ok`、`bad`、`wait`），自带字色；未读用 `Count`（`"9999px"`、`--text-xs`）。
+- **附件**（`ui/AttachmentTile.tsx`、`ui/Lightbox.tsx`）：图片在消息里最多 `16rem` 高，一圈 `--color-line`、`--radius-md`，点开是看图的浮层（← → 翻同一条消息的图，Esc 关，原图另开一个标签页）；文件和输入框里待发的附件是磁贴：图的缩略图或类型的图标、名字、大小，待发的能逐个去掉。
+- **消息**：一行一条，不画气泡（群聊里人多，靠头像和名字分人）；连着说的不重复头像；时间是 `--text-xs` 加 `--color-faint`；悬停的工具条在右上，`zIndex: 10`。
 - **在想和在写**：只在服务端说它在想、在写的那个频道里画三个点（`ThinkingDots`），带着是谁和这一轮过了多久（「在想… · 12 秒」，从服务端记的 `since` 起算，不猜）；侧栏底下这里的助手也写着过了多久。答完，回答下面折成一行「想了 40 秒 · 用了 3 个工具」，点开是干活的经过；没用工具的回答不加这一行。
 - **输入框**（`features/channel/Composer.tsx`）：回车发，Shift+回车换行，`@` 出名单，开头打 `/` 出命令（`features/channel/commands.ts`：`/issue` 记工单、`/remember` 让助手记住、`/stop` 叫停、`/dm` 私聊）；一条命令就是一个接口，成了在 toast 里说一句，没成那行字留在框里。拖文件进来整块变成落点。
 - **代码**（`ui/code/highlight.ts`）：补丁和代码块按文件的后缀或代码块的标记着色，在 Web Worker 里做，一种语言一个按需加载的包；颜色回来以前、认不得的语言、太长的块（3000 行以上）都是不着色的原样。
-- **干活的经过**（`features/session/WorkLog.tsx`）：每一步一个块，底色说它是什么（交给它的话 `bg-wheat/14`、想起的 `bg-leaf/15`、它说的 `bg-hover`、出错 `bg-berry/10`），长的先折起来。
-- **分栏**（`ui/Splitter.tsx`）：侧面板和导航的边能拖宽窄，指针放上去出一条 `focus` 色的线，← → 每次 16px，双击回默认；宽窄按面板记在本机的偏好里（`state/prefs.ts` 的 `widths`），有上下限。窄屏上面板盖住页面时不给拖。
-- **快捷键**（`base/shortcuts.ts`、`ui/ShortcutSheet.tsx`）：每个快捷键是那张表的一行，`?`（不在输入框里时）打开的一览照它画，壳听的组合键（`mod+K`、`?`）也照它认；加一个快捷键先加一行，键帽是 `rounded-xs`、`text-2xs` 的 `kbd`。
-- **空状态**（`ui/layout.tsx` 的 `Empty`）：一整块没有东西时（文档、技能的右边、频道的任务页签），一个 48px 的 `faint` 图标、一句为什么空、下一步的按钮（有就放）；一节里的空只写一行 `text-muted` 的字，不放大图标。
+- **干活的经过**（`features/session/WorkLog.tsx`）：每一步一个块，底色说它是什么（交给它的话麦色 14%、想起的叶色 15%、它说的 `--color-hover`、出错莓色 10%，用 `color-mix()` 调配），长的先折起来。
+- **分栏**（`ui/Splitter.tsx`）：侧面板和导航的边能拖宽窄，指针放上去出一条 `--color-focus` 色的线，← → 每次 16px，双击回默认；宽窄按面板记在本机的偏好里（`state/prefs.ts` 的 `widths`），有上下限。窄屏上面板盖住页面时不给拖。
+- **快捷键**（`base/shortcuts.ts`、`ui/ShortcutSheet.tsx`）：每个快捷键是那张表的一行，`?`（不在输入框里时）打开的一览照它画，壳听的组合键（`mod+K`、`?`）也照它认；加一个快捷键先加一行，键帽是 `--radius-xs`、`--text-2xs` 的 `kbd`。
+- **空状态**（`ui/layout.tsx` 的 `Empty`）：一整块没有东西时（文档、技能的右边、频道的任务页签），一个 48px 的 `faint` 图标、一句为什么空、下一步的按钮（有就放）；一节里的空只写一行 `--color-muted` 的字，不放大图标。
 - **出错和限流**：一次性的用 toast（坏的是莓色）；持续的写在它所在的地方（额度瓶、连接的小灯、工单的「卡住了」）；拒绝的话里带下一步。
 
 ## 和那份八篇大纲对照
@@ -214,9 +216,9 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 | 3.3 富文本输入框与指令引擎 | 回车、@、附件、拖进来；`/` 的命令，一条命令就是一个接口 | 有 |
 | 3.4 模型切换器与 Token 计量 | 模型属于档案（档案页里换），每次汇报带花费，额度瓶；不在输入框里换模型 | 有，不做输入框里的切换 |
 | 3.5 工具调用与 MCP 决策卡片 | 工具的每一步在干活的经过里；帮工没有权限确认（根目录 `AGENTS.md`），所以没有批准卡片 | 有，不做批准卡片 |
-| 4.1 动效引擎与关键帧 | 工作台的令牌加 `style.css` 里像素皮的关键帧 | 有 |
+| 4.1 动效引擎与关键帧 | `stylex.keyframes()` 自有关键帧加 `style.css` 的滚动时间轴关键帧 | 有 |
 | 4.2 光效着色器与推理氛围 | 农场有 PixiJS 的像素光照和昼夜；工作台是安静的工具，不放光效 | 有（农场），工作台不做 |
-| 4.3 滚动边缘渐变遮罩 | `scroll-fade-y`、`scroll-fade-x`、`fold-fade`，工作台和田头都用它们 | 有 |
+| 4.3 滚动边缘渐变遮罩 | `scroll-fade-y`、`scroll-fade-x`，工作台和田头都用它们 | 有 |
 | 5.1 语音模式与 Web Audio | 通话、听写、MOSS，农场的音效用 Web Audio 合成；工作台不出声 | 有 |
 | 5.2 媒体查看器与画廊转场 | `Lightbox`：从图上长出来，← → 翻，Esc 关 | 有 |
 | 5.3 双栏弹性分割 | 串的侧面板、设置的导航用 `Splitter` 拖宽窄，记在本机 | 有 |
@@ -238,29 +240,29 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 
 **挑动效**：
 
-1. 在指针底下（悬停、按下、小箭头转）→ `duration-120`。
-2. 一个状态变了（颜色、显示、选中）→ 默认（不写时长）。
-3. 一块东西进来或离开（面板、抽屉、对话框）→ 进来 `duration-280 ease-out` 或 `animate-pop-in`，离开更快、`ease-in`。
-4. 一个小东西冒出来要人注意（新的角标）→ `ease-spring`，只用这一处。
+1. 在指针底下（悬停、按下、小箭头转）→ `transitionDuration: "120ms"`。
+2. 一个状态变了（颜色、显示、选中）→ `transitionDuration: "180ms"`、`transitionTimingFunction: "var(--ease-out)"`。
+3. 一块东西进来或离开（面板、抽屉、对话框）→ 进来 `"280ms"` 加 `"var(--ease-out)"` 或 `popIn` 关键帧，离开更快、`"var(--ease-in)"`。
+4. 一个小东西冒出来要人注意（新的角标）→ `"var(--ease-spring)"`，只用这一处。
 
-**写一个新界面之前**：先在故事里看一眼，再找有没有现成的原子（`ui/` 下：`Button`、`IconButton`、`ConfirmButton`、`Segmented`、`Tabs`、`Dialog`、`Field`、`Select`、`Checkbox`、`Empty`、`MoreMenu`、`Tip`、`Icon`、`Dot`、`Tag`、`AttachmentTile`、`Lightbox`、`Splitter`），有就用，不另写一个长得差不多的。加了原子或一种 `tone`，在它旁边的 `X.stories.tsx` 写上（`src/stories.test.ts` 查 `ui/` 的每个零件都有）；加了令牌，加进 `ui/tokens.stories.tsx`。离开页面的数据就画不出来的零件，把画的部分拆成只吃参数的一块再写故事（`ShortcutSheet` 的 `Shortcuts`）。故事分四层（[客户端](docs/subsystems/app.md)）：设计体系、组件、交互、界面；几个零件一起完成的一件事（确认、保存、空状态）写成「交互」的故事，一个概念的一块界面用编出来的数据写成「界面」的故事。离开页面的数据就画不出来的零件，把画的部分拆成只吃参数的一块再写故事（`ShortcutSheet` 的 `Shortcuts`）。
+**写一个新界面之前**：先在故事里看一眼，再找有没有现成的原子（`ui/` 下：`Button`、`IconButton`、`ConfirmButton`、`Segmented`、`Tabs`、`Dialog`、`Field`、`Select`、`Checkbox`、`Empty`、`MoreMenu`、`Tip`、`Icon`、`Dot`、`Tag`、`AttachmentTile`、`Lightbox`、`Splitter`），有就用，不另写一个长得差不多的。加了原子或一种 `tone`，在它旁边的 `X.stories.tsx` 写上（`src/stories.test.ts` 查 `ui/` 的每个零件都有）；加了令牌，加进 `ui/tokens.stories.tsx`。离开页面的数据就画不出来的零件，把画的部分拆成只吃参数的一块再写故事（`ShortcutSheet` 的 `Shortcuts`）。故事分四层（[客户端](docs/subsystems/app.md)）：设计体系、组件、交互、界面；几个零件一起完成的一件事（确认、保存、空状态）写成「交互」的故事，一个概念的一块界面用编出来的数据写成「界面」的故事。
 
 **样式怎么拼**：
 
-- 普通 DOM 节点用 `stylex.attrs(styles.root, on && styles.active)`；不在消费文件里把共享皮肤原语（如 `ui/pixel/style.ts` 的 `pxStyle`）复制成私有的 `recipeStyles`，也不跨层引用 `--wb-*` 内部变量（一律用 `--color-*` 和 `--shadow-*`）。
+- 普通 DOM 节点用 `stylex.attrs(styles.root, on && styles.active)`；共享常量从 `ui/tokens.stylex.ts` 或 `ui/pixel/style.ts` 导入，不在消费文件里复制私有的皮肤块，也不跨层引用 `--wb-*` 内部变量（一律用 `--color-*` 和 `--shadow-*`）。
 - 接收外部 `styles?: stylex.StyleXStyles` 或需要合并原生 `style` 对象的原子零件，统一经 `ui/positioner.ts` 的 `styleProps(...)` 展开属性（内部单次调用 `stylex.props()`，把 `className` 映射成 `class` 并保留动态变量对象）。
 - 原子收的 `styles` 只管摆放（外边距、定位、宽、`flex`），它的样子（高、颜色、圆角、字号）由它自己的属性定（`tone`、`size`）；要一个新样子，给原子加一个属性，不在外面拿 `styles` 盖。
 
 **交之前自己查一遍**：
 
-- [ ] 颜色、圆角、字号、阴影、时长、层都是令牌（`vp check` 过了就是）。
+- [ ] 颜色、圆角、字号、阴影、时长、层都是令牌，且没有原生 `class`、`!important` 或编译期残留（`vp check` 过了就是）。
 - [ ] 深色主题下看一遍：浅色块上的字自带字色，没有写死的颜色（改了零件就在它的故事里两种主题并排看；`test/stories.spec.ts` 对每个故事跑 axe）。
-- [ ] 关着、停用、快忘掉、还没说完的东西，不靠整块降透明度表示（字会低于能读的对比度）：用虚线边、灰掉的头像、斜体或 `text-muted`，或者直接写出来。
+- [ ] 关着、停用、快忘掉、还没说完的东西，不靠整块降透明度表示（字会低于能读的对比度）：用虚线边、灰掉的头像、斜体或 `--color-muted`，或者直接写出来。
 - [ ] 指针下、键盘聚焦、按下各看一遍：会响应的零件有一个 `States` 故事，变体排成行、交互状态排成列，强制出来的悬停和聚焦也过 axe（主按钮悬停的对比度就是这样查出来的）。
 - [ ] 一个区域最多一个 `primary`；危险的操作不填满，收不回的先确认或预演。
-- [ ] 一个块一圈线，块里没有再套边；只有浮层有 `shadow-float`。
+- [ ] 一个块一圈线，块里没有再套边；只有浮层有 `--shadow-float`。
 - [ ] 每个只有图标的按钮有名字；键盘能走到、Esc 能关。
-- [ ] 长的字会截断或折叠（`min-w-0`、`truncate`、`line-clamp-*`），窄窗口不撑破（新的一处加进 `test/narrow.spec.ts` 的 `places`）。
+- [ ] 长的字会截断或折叠（`minWidth: 0`、`textOverflow: "ellipsis"`、`WebkitLineClamp`），窄窗口不撑破（新的一处加进 `test/narrow.spec.ts` 的 `places`）。
 - [ ] 空的、加载中、出错三种样子都有。
 - [ ] 动效有因果，减少动效时停得下。
 - [ ] 照 [验收](.agents/skills/vv-acceptance/SKILL.md) 的页面分册截图，浅色、深色各一张。

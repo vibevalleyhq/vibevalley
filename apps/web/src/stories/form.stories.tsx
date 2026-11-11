@@ -15,7 +15,7 @@ const styles = stylex.create({
     width: "100%",
     maxWidth: "var(--container-lg)",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
   },
   formStoriesSpan: {
     color: "var(--color-berry)",

@@ -10,8 +10,8 @@ import { styleProps } from "./positioner";
 const styles = stylex.create({
   badge: (size: number) => ({
     position: "absolute",
-    right: "calc(var(--spacing) * -0.5)",
-    bottom: "calc(var(--spacing) * -0.5)",
+    right: "-0.125rem",
+    bottom: "-0.125rem",
     zIndex: "10",
     display: "inline-flex",
     width: size,

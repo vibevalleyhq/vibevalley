@@ -17,7 +17,7 @@ import { markWrongOf, orchestratorLooks } from "./looks";
 const styles = stylex.create({
   orchestratorOfA: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
     textDecorationLine: {
       default: null,
@@ -33,13 +33,13 @@ const styles = stylex.create({
   headDiv: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 4)",
-    paddingTop: "calc(var(--spacing) * 4)",
+    gap: "1rem",
+    paddingTop: "1rem",
   },
   headSpan: {
     display: "flex",
-    width: "calc(var(--spacing) * 18)",
-    height: "calc(var(--spacing) * 18)",
+    width: "4.5rem",
+    height: "4.5rem",
     flexShrink: "0",
     alignItems: "center",
     justifyContent: "center",
@@ -50,16 +50,16 @@ const styles = stylex.create({
     display: "flex",
     minWidth: "0",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
   },
   headH1: {
     fontSize: "var(--text-2xl)",
-    lineHeight: "var(--text-2xl--line-height)",
+    lineHeight: "var(--leading-2xl)",
     fontWeight: "var(--font-weight-semibold)",
   },
   headP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   orchestratorOfDiv: {
@@ -67,9 +67,9 @@ const styles = stylex.create({
     height: "100%",
     minHeight: "0",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBottom: "calc(var(--spacing) * 4)",
+    gap: "1rem",
+    paddingInline: "1rem",
+    paddingBottom: "1rem",
   },
   orchestratorOfDiv2: {
     minHeight: "0",
@@ -78,16 +78,16 @@ const styles = stylex.create({
   orchestratorOfDiv3: {
     height: "100%",
     overflowY: "auto",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBottom: "calc(var(--spacing) * 4)",
+    paddingInline: "1rem",
+    paddingBottom: "1rem",
   },
   orchestratorOfDiv4: {
     display: "flex",
     maxWidth: "var(--container-4xl)",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
   },
-  tabs: { borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-line)", paddingBottom: "calc(var(--spacing) * 2)" },
+  tabs: { borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-line)", paddingBottom: "0.5rem" },
 });
 
 const tabs = [

@@ -382,12 +382,42 @@ const stylexOnly = defineRule({
         "remove `!important` and rely on `@layer stylex` ordering or conditional StyleX style arguments",
         "apps/web/src/ui/positioner.ts",
       ),
+      tailwindVar: says(
+        "Tailwind `--tw-*` internal variables have no runtime definition under StyleX",
+        "express the shadow, ring, gradient or transform directly in `stylex.create(...)` using host `--color-*` and `--shadow-*` tokens",
+        "docs/style/design.md",
+      ),
+      tailwindShadow: says(
+        "`0 0 transparent` is a compiled Tailwind ring-slot placeholder rather than a real shadow layer",
+        "keep only the active shadow layers such as `boxShadow: 'var(--shadow-float)'` or `'inset 0 0 0 2px var(--color-rim)'`",
+        "docs/style/design.md",
+      ),
+      tailwindGrid: says(
+        "`repeat(1, minmax(0, 1fr))` is compiled Tailwind `grid-cols-1` output",
+        "write `gridTemplateColumns: 'minmax(0, 1fr)'` directly",
+        "docs/style/design.md",
+      ),
+      tailwindTransform: says(
+        "`transform, translate, scale, rotate` is compiled Tailwind `transition-transform` output rather than the property that moves",
+        "list only the animated property such as `transitionProperty: 'rotate'` or `'translate'`",
+        "docs/style/design.md",
+      ),
     },
   },
   create(context) {
     return {
       ...stylexValues(context, ({ node, property, value }) => {
-        if (property !== "content" && typeof value === "string" && /!\s*important\b/iu.test(value)) context.report({ node, messageId: "important" });
+        if (property?.startsWith("--tw-") === true) {
+          context.report({ node, messageId: "tailwindVar" });
+          return;
+        }
+        if (property === "content" || typeof value !== "string") return;
+        if (/!\s*important\b/iu.test(value)) context.report({ node, messageId: "important" });
+        if (/--tw-[\w-]+/u.test(value)) context.report({ node, messageId: "tailwindVar" });
+        if (/\b0\s+0\s+transparent\b/u.test(value)) context.report({ node, messageId: "tailwindShadow" });
+        if (/repeat\(\s*1\s*,\s*minmax\(\s*0\s*,\s*1fr\s*\)\s*\)/u.test(value)) context.report({ node, messageId: "tailwindGrid" });
+        if (property === "transitionProperty" && /^transform,\s*translate,\s*scale,\s*rotate$/u.test(value.trim()))
+          context.report({ node, messageId: "tailwindTransform" });
       }),
       JSXAttribute(node) {
         if (node.name.type !== "JSXIdentifier" || !rawClassAttrs.has(node.name.name)) return;

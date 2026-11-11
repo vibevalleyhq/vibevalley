@@ -17,20 +17,21 @@ import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "#/ui/
 
 import { doingOf, harvestedOf, lastOrchestratorSaid, plotTitle } from "./readout";
 
+const hopKeyframes = stylex.keyframes({
+  "0%, 88%": { transform: "translateY(0)" },
+  "89%, 100%": { transform: "translateY(-3px)" },
+});
+
 const styles = stylex.create({
   hop: {
     display: "block",
     animationName: {
       default: null,
-      "@media (prefers-reduced-motion:no-preference)": "hop",
+      "@media (prefers-reduced-motion: no-preference)": hopKeyframes,
     },
     animationDuration: {
       default: null,
       "@media (prefers-reduced-motion:no-preference)": "3.2s",
-    },
-    animationDelay: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "0s",
     },
     animationTimingFunction: {
       default: null,
@@ -39,18 +40,6 @@ const styles = stylex.create({
     animationIterationCount: {
       default: null,
       "@media (prefers-reduced-motion:no-preference)": "infinite",
-    },
-    animationDirection: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "normal",
-    },
-    animationFillMode: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "none",
-    },
-    animationPlayState: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "running",
     },
   },
   pin: {

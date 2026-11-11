@@ -14,28 +14,28 @@ const viewStyles = stylex.create({
   newIssueForm: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   newIssueDiv: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   newIssueDiv2: {
     display: "flex",
     alignItems: "center",
     justifyContent: "flex-end",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
     borderColor: "var(--color-line)",
-    paddingTop: "calc(var(--spacing) * 3)",
+    paddingTop: "0.75rem",
   },
   newIssueSpan: {
     marginRight: "auto",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-faint)",
   },
 });

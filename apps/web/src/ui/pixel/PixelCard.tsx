@@ -54,8 +54,8 @@ const viewStyles = stylex.create({
   },
   pixelCardOuter: {
     display: "inline-block",
-    paddingRight: "calc(var(--spacing) * .5)",
-    paddingBottom: "calc(var(--spacing) * .5)",
+    paddingRight: "0.125rem",
+    paddingBottom: "0.125rem",
   },
   pixelCardBox: {
     boxSizing: "border-box",

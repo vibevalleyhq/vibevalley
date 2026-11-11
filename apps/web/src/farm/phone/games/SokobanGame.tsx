@@ -15,9 +15,9 @@ const styles = stylex.create({
     minHeight: "0",
     flex: "1",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
   },
   header: {
     display: "flex",
@@ -36,15 +36,15 @@ const styles = stylex.create({
     marginTop: "auto",
     display: "flex",
     justifyContent: "center",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
   },
   undoButton: {
     cursor: {
       default: "pointer",
       ":disabled": "default",
     },
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "var(--spacing)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.25rem",
     boxShadow: "inset 0 0 0 1px var(--color-lcd-ink)",
     opacity: {
       default: null,
@@ -53,8 +53,8 @@ const styles = stylex.create({
   },
   actionButton: {
     cursor: "pointer",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "var(--spacing)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.25rem",
     boxShadow: "inset 0 0 0 1px var(--color-lcd-ink)",
   },
   help: {

@@ -22,12 +22,12 @@ const styles = stylex.create({
   daysA: {
     display: "inline-flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "var(--spacing)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.25rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: {
       default: "var(--color-muted)",
       "@media (hover:hover)": {
@@ -49,10 +49,10 @@ const styles = stylex.create({
     flexDirection: "column",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-side)",
-    padding: "calc(var(--spacing) * 3)",
+    padding: "0.75rem",
     width: {
       default: null,
-      "@media (width>=64rem)": "calc(var(--spacing) * 64)",
+      "@media (width>=64rem)": "16rem",
     },
     borderRightStyle: {
       default: null,
@@ -108,9 +108,9 @@ const styles = stylex.create({
     maxWidth: "var(--container-3xl)",
     minWidth: "0",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 6)",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBlock: "calc(var(--spacing) * 4)",
+    gap: "1.5rem",
+    paddingInline: "1rem",
+    paddingBlock: "1rem",
   },
   daysDiv22: {
     display: {
@@ -125,7 +125,7 @@ const styles = stylex.create({
     },
     width: {
       default: "100%",
-      "@media (width>=80rem)": "calc(var(--spacing) * 72)",
+      "@media (width>=80rem)": "18rem",
     },
     maxWidth: "var(--container-3xl)",
     borderTopStyle: {
@@ -137,8 +137,8 @@ const styles = stylex.create({
       "@media (width>=80rem)": "0",
     },
     borderColor: "var(--color-line)",
-    paddingInline: "calc(var(--spacing) * 4)",
-    paddingBlock: "calc(var(--spacing) * 4)",
+    paddingInline: "1rem",
+    paddingBlock: "1rem",
     position: {
       default: null,
       "@media (width>=80rem)": "sticky",

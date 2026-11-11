@@ -13,7 +13,7 @@ const viewStyles = stylex.create({
   mossVerifyViewDiv: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
 });
 

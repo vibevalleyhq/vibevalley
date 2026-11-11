@@ -8,12 +8,12 @@ import { SecretInput } from "./layout";
 
 const viewStyles = stylex.create({
   keyFieldStoriesDiv: {
-    width: "calc(var(--spacing) * 96)",
+    width: "24rem",
   },
   keyFieldStoriesDiv2: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
   },
   keyFieldStoriesDiv3: {
     width: "32rem",

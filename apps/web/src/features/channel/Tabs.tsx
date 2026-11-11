@@ -20,23 +20,23 @@ const styles = stylex.create({
   sessionsDiv: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
     borderRadius: "var(--radius-lg)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-page)",
-    padding: "calc(var(--spacing) * 3)",
+    padding: "0.75rem",
   },
   cronCardDiv: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
     borderRadius: "var(--radius-lg)",
     borderWidth: "1px",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-page)",
-    padding: "calc(var(--spacing) * 3)",
+    padding: "0.75rem",
   },
   cronCardDivPrimary: {
     borderStyle: "solid",
@@ -45,7 +45,7 @@ const styles = stylex.create({
     borderStyle: "dashed",
   },
   cronCardIcon: {
-    marginTop: "calc(var(--spacing) * .5)",
+    marginTop: "0.125rem",
   },
   sessionsDiv2: {
     display: "flex",
@@ -56,31 +56,31 @@ const styles = stylex.create({
   sessionsDiv3: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
     overflowY: "auto",
-    padding: "calc(var(--spacing) * 4)",
+    padding: "1rem",
   },
   sessionsSpan: {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     overflow: "hidden",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   sessionsSpan2: {
     fontWeight: "var(--font-weight-semibold)",
   },
   sessionsSpan3: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   sessionsSpan4: {
     display: "flex",
     alignItems: "center",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   sessionsSpan5: {
@@ -90,11 +90,11 @@ const styles = stylex.create({
   },
   cronCardSpan: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   cronCardDiv2: {
     display: "flex",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
 });
 

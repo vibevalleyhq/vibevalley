@@ -50,7 +50,7 @@ const viewStyles = stylex.create({
     borderRadius: "var(--radius-sm)",
     backgroundColor: "var(--color-selected)",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-semibold)",
     color: "var(--color-muted)",
   },

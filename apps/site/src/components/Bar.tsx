@@ -9,7 +9,7 @@ const sceneStyles = stylex.create({
   brand: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2.5)",
+    gap: "0.625rem",
     fontFamily: "var(--font-pixel)",
     fontSize: "var(--text-2xl)",
     lineHeight: "1",
@@ -29,7 +29,7 @@ const sceneStyles = stylex.create({
         ":hover": "var(--color-wheat)",
       },
     },
-    paddingBlock: "var(--spacing)",
+    paddingBlock: "0.25rem",
     textShadow: "var(--text-shadow-soft)",
   },
   repositoryLink: {
@@ -42,7 +42,7 @@ const sceneStyles = stylex.create({
         ":hover": "var(--color-wheat)",
       },
     },
-    paddingBlock: "var(--spacing)",
+    paddingBlock: "0.25rem",
     textShadow: "var(--text-shadow-soft)",
   },
   header: {
@@ -52,9 +52,9 @@ const sceneStyles = stylex.create({
     zIndex: 20,
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 6)",
+    gap: "1.5rem",
     paddingInline: "clamp(16px,4vw,40px)",
-    paddingBlock: "calc(var(--spacing) * 3)",
+    paddingBlock: "0.75rem",
     color: "var(--color-cream-50)",
     transitionProperty: "background-color,box-shadow",
     transitionTimingFunction: "steps(3,end)",
@@ -65,14 +65,14 @@ const sceneStyles = stylex.create({
       default: "var(--color-bar-solid)",
       "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-bark-900) 92%, transparent)",
     },
-    boxShadow: "0 0 transparent, 0 0 transparent, 0 0 transparent, 0 0 transparent, 0 2px 0 var(--color-bark-900)",
+    boxShadow: "0 2px 0 var(--color-bark-900)",
   },
 });
 
 const viewStyles = stylex.create({
   barImg: {
-    width: "calc(var(--spacing) * 8)",
-    height: "calc(var(--spacing) * 8)",
+    width: "2rem",
+    height: "2rem",
     borderStyle: "solid",
     borderWidth: "2px",
     borderColor: "var(--color-bark-900)",
@@ -80,7 +80,7 @@ const viewStyles = stylex.create({
   barNav: {
     marginLeft: "auto",
     display: "flex",
-    gap: "calc(var(--spacing) * 5)",
+    gap: "1.25rem",
     fontFamily: "var(--font-pixel)",
     fontSize: "var(--text-lg)",
     lineHeight: "1",
@@ -89,8 +89,8 @@ const viewStyles = stylex.create({
     borderStyle: "solid",
     borderWidth: "2px",
     borderColor: "var(--color-cream-50)",
-    paddingInline: "calc(var(--spacing) * 2.5)",
-    paddingBlock: "calc(var(--spacing) * 1.5)",
+    paddingInline: "0.625rem",
+    paddingBlock: "0.375rem",
     fontFamily: "var(--font-pixel)",
     fontSize: "var(--text-lg)",
     lineHeight: "1",

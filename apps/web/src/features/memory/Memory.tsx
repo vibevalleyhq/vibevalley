@@ -22,23 +22,23 @@ const memoryStyles = stylex.create({
   card: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--wb-line)",
     backgroundColor: "var(--wb-page)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
   },
   forget: {
     flexShrink: "0",
     cursor: "pointer",
     borderRadius: "var(--radius-md)",
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "calc(var(--spacing) * .5)",
+    paddingInline: "0.5rem",
+    paddingBlock: "0.125rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: {
       default: "var(--wb-muted)",
       "@media (hover:hover)": {
@@ -66,15 +66,15 @@ const memoryStyles = stylex.create({
 
 const styles = stylex.create({
   archivePanelPre: {
-    maxHeight: "calc(var(--spacing) * 96)",
+    maxHeight: "24rem",
     overflowY: "auto",
     borderTopStyle: "solid",
     borderTopWidth: "1px",
     borderColor: "var(--wb-line)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     whiteSpace: "pre-wrap",
     WebkitUserSelect: "text",
     userSelect: "text",
@@ -92,17 +92,17 @@ const styles = stylex.create({
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    columnGap: "calc(var(--spacing) * 2)",
-    rowGap: "calc(var(--spacing) * .5)",
+    columnGap: "0.5rem",
+    rowGap: "0.125rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-page)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   recallPreviewP: {
@@ -111,23 +111,23 @@ const styles = stylex.create({
     borderWidth: "1px",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-page)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     whiteSpace: "pre-wrap",
   },
   archivePanelDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
     borderRadius: "var(--radius-md)",
     borderStyle: "solid",
     borderWidth: "1px",
     borderColor: "var(--color-line)",
     backgroundColor: "var(--color-page)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
   },
   archivePanelDiv2: {
     overflow: "hidden",
@@ -141,12 +141,12 @@ const styles = stylex.create({
     fontFamily: "var(--font-mono)",
   },
   pillButton: {
-    height: "calc(var(--spacing) * 6)",
+    height: "1.5rem",
     cursor: "pointer",
-    borderRadius: "2147483647px",
-    paddingInline: "calc(var(--spacing) * 2.5)",
+    borderRadius: "9999px",
+    paddingInline: "0.625rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
   },
   pillButtonTone: {
     backgroundColor: "var(--color-ink)",
@@ -170,7 +170,7 @@ const styles = stylex.create({
   },
   memoryItemSpan: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   memoryItemSpanTone: {
     color: "var(--color-muted)",
@@ -178,21 +178,21 @@ const styles = stylex.create({
   sectionSection: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   sectionHeader: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   sectionH3: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-semibold)",
   },
   sectionSpan: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   sectionSpan2: {
@@ -201,11 +201,11 @@ const styles = stylex.create({
   memoryPanelDiv2: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * 4)",
+    gap: "1rem",
   },
   memoryPanelP: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     color: "var(--color-muted)",
   },
   memoryPanelSpan: {
@@ -216,16 +216,16 @@ const styles = stylex.create({
   memoryPanelDiv22: {
     display: "flex",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    gap: "0.125rem",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
   },
   memoryPanelSpan2: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   memoryPanelSpan3: {
@@ -234,16 +234,16 @@ const styles = stylex.create({
   },
   memoryPanelSpan4: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   memoryPanelDiv3: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   sourcesSpan2: {
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-medium)",
     color: "var(--color-ink)",
   },
@@ -253,16 +253,16 @@ const styles = stylex.create({
       default: "column",
       "@media (width>=40rem)": "row",
     },
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   archivePanelForm: {
     display: "flex",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   archivePanelSpan: {
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   archivePanelButton: {
@@ -270,9 +270,9 @@ const styles = stylex.create({
     width: "100%",
     cursor: "pointer",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.5rem",
     textAlign: "left",
     backgroundColor: {
       default: null,
@@ -290,33 +290,33 @@ const styles = stylex.create({
     overflow: "hidden",
     fontFamily: "var(--font-mono)",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
   writeNoteDiv: {
     display: "flex",
     flexDirection: "column",
-    gap: "var(--spacing)",
+    gap: "0.25rem",
   },
   writeNoteSpan: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     fontWeight: "var(--font-weight-medium)",
     color: "var(--color-muted)",
   },
   writeNoteDiv2: {
     display: "flex",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
-    paddingTop: "var(--spacing)",
+    gap: "0.5rem",
+    paddingTop: "0.25rem",
   },
   writeNoteSpan2: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-faint)",
   },
   writeNoteSpan3: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-berry)",
   },
   memoryItemDiv: {
@@ -324,14 +324,14 @@ const styles = stylex.create({
     minWidth: "0",
     flex: "1",
     flexDirection: "column",
-    gap: "calc(var(--spacing) * .5)",
+    gap: "0.125rem",
   },
   memoryItemSpan2: {
     display: "flex",
     flexWrap: "wrap",
-    columnGap: "calc(var(--spacing) * 2)",
+    columnGap: "0.5rem",
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   memoryItemSpan22: {
@@ -544,7 +544,7 @@ function Sources(props: { sources: MemorySourceInfo[] }) {
   );
 }
 
-const selectStyles = stylex.create({ scope: { width: { default: null, "@media (width >= 40rem)": "calc(var(--spacing) * 40)" } } });
+const selectStyles = stylex.create({ scope: { width: { default: null, "@media (width >= 40rem)": "10rem" } } });
 
 /** The pick the server would make, without counting it (memory.recall). */
 function RecallPreview(props: { agent: string }) {

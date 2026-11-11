@@ -11,61 +11,53 @@ import { EarnedMedal, noticeTitle, type ToastData, ToastViewport, toasts, ToastT
 
 import { clearingLevels } from "./readout";
 
+const levelUpKeyframes = stylex.keyframes({
+  "0%": { opacity: 0, transform: "translateY(-16px) scale(0.9)" },
+  "9%": { opacity: 1, transform: "translateY(0) scale(1.04)" },
+  "15%": { transform: "translateY(0) scale(1)" },
+  "86%": { opacity: 1 },
+  "100%": { opacity: 0, transform: "translateY(-10px) scale(1)" },
+});
+
 const styles = stylex.create({
   fxLayerDiv: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     backgroundColor: "var(--color-cream-50)",
-    paddingInline: "calc(var(--spacing) * 7)",
+    paddingInline: "1.75rem",
     paddingTop: "0",
-    paddingBottom: "calc(var(--spacing) * 4)",
-    boxShadow: "0 0 transparent,0 0 transparent,0 0 transparent,0 0 transparent,var(--shadow-px)",
+    paddingBottom: "1rem",
+    boxShadow: "var(--shadow-px)",
     animationName: {
       default: null,
-      "@media (prefers-reduced-motion:no-preference)": "level-up",
+      "@media (prefers-reduced-motion: no-preference)": levelUpKeyframes,
     },
     animationDuration: {
       default: null,
       "@media (prefers-reduced-motion:no-preference)": "3.4s",
     },
-    animationDelay: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "0s",
-    },
     animationTimingFunction: {
       default: null,
       "@media (prefers-reduced-motion:no-preference)": "cubic-bezier(.2,.9,.2,1)",
     },
-    animationIterationCount: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "1",
-    },
-    animationDirection: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "normal",
-    },
     animationFillMode: {
       default: null,
       "@media (prefers-reduced-motion:no-preference)": "forwards",
-    },
-    animationPlayState: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "running",
     },
   },
   levelUp: {
     pointerEvents: "none",
     position: "absolute",
     insetInline: "0",
-    top: "calc(var(--spacing) * 24)",
+    top: "6rem",
     display: "flex",
     justifyContent: "center",
   },
   fxLayerSpan: {
     display: "flex",
-    height: "calc(var(--spacing) * 5)",
-    width: "calc(var(--spacing) * 14)",
+    height: "1.25rem",
+    width: "3.5rem",
     alignItems: "flex-end",
     justifyContent: "center",
     overflow: "visible",
@@ -73,13 +65,13 @@ const styles = stylex.create({
   fxLayerImg: {
     marginTop: "-36px",
     marginBottom: "0",
-    height: "calc(var(--spacing) * 14)",
-    width: "calc(var(--spacing) * 14)",
+    height: "3.5rem",
+    width: "3.5rem",
     flexShrink: "0",
     imageRendering: "pixelated",
   },
   fxLayerSpan2: {
-    marginTop: "calc(var(--spacing) * .5)",
+    marginTop: "0.125rem",
     fontSize: "12px",
     letterSpacing: ".3px",
     color: "var(--color-leaf-700)",
@@ -89,7 +81,7 @@ const styles = stylex.create({
     color: "var(--color-bark-900)",
   },
   fxLayerSpan4: {
-    marginTop: "calc(var(--spacing) * .5)",
+    marginTop: "0.125rem",
     fontSize: "12px",
     color: "var(--color-bark-600)",
   },

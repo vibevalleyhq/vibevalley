@@ -8,14 +8,14 @@ import { PixelLink } from "./ui";
 
 const sceneStyles = stylex.create({
   translation: {
-    marginTop: "calc(var(--spacing) * 7)",
+    marginTop: "1.75rem",
     borderTopStyle: "dashed",
     borderTopWidth: "2px",
     borderRightStyle: "dashed",
     borderBottomStyle: "dashed",
     borderLeftStyle: "dashed",
     borderColor: "var(--color-cream-300)",
-    paddingTop: "calc(var(--spacing) * 6)",
+    paddingTop: "1.5rem",
   },
 });
 
@@ -33,8 +33,8 @@ const styles = stylex.create({
     imageRendering: "pixelated",
   },
   notFoundP: {
-    marginTop: "calc(var(--spacing) * 2.5)",
-    marginBottom: "calc(var(--spacing) * 5)",
+    marginTop: "0.625rem",
+    marginBottom: "1.25rem",
     textWrap: "pretty",
     color: "var(--color-bark-800)",
   },
@@ -44,18 +44,18 @@ const styles = stylex.create({
     borderWidth: "2px",
     borderColor: "var(--color-bark-900)",
     backgroundColor: "var(--color-cream-50)",
-    boxShadow: "inset 0 0 0 2px var(--color-rim), 0 0 transparent, 0 0 transparent, 0 0 transparent, 4px 4px 0 var(--color-drop)",
+    boxShadow: "inset 0 0 0 2px var(--color-rim), 4px 4px 0 var(--color-drop)",
     paddingInline: "clamp(20px,6vw,48px)",
-    paddingTop: "calc(var(--spacing) * 9)",
-    paddingBottom: "calc(var(--spacing) * 10)",
+    paddingTop: "2.25rem",
+    paddingBottom: "2.5rem",
     textAlign: "center",
   },
   notFoundDiv: {
-    marginBottom: "calc(var(--spacing) * 6)",
+    marginBottom: "1.5rem",
     display: "flex",
     alignItems: "flex-end",
     justifyContent: "center",
-    gap: "calc(var(--spacing) * 1.5)",
+    gap: "0.375rem",
   },
   notFoundImg2: {
     width: "204px",

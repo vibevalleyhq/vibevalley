@@ -49,37 +49,37 @@ const viewStyles = stylex.create({
   familyDetailDiv: {
     display: "flex",
     alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 3)",
-    paddingRight: "calc(var(--spacing) * 10)",
+    gap: "0.75rem",
+    paddingRight: "2.5rem",
   },
   familyDetailH1: {
     flex: "1",
     fontSize: "var(--text-xl)",
-    lineHeight: "var(--text-xl--line-height)",
+    lineHeight: "var(--leading-xl)",
     fontWeight: "var(--font-weight-semibold)",
   },
   familyDetailSpan: {
     fontSize: "var(--text-xs)",
-    lineHeight: "var(--text-xs--line-height)",
+    lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
   },
   familyDetailDiv2: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
   },
   familyDetailDiv3: {
-    marginTop: "calc(var(--spacing) * 3)",
+    marginTop: "0.75rem",
     display: "flex",
     flexWrap: "wrap",
-    gap: "calc(var(--spacing) * 2)",
+    gap: "0.5rem",
   },
   familyDetailDiv4: {
-    marginTop: "calc(var(--spacing) * 4)",
+    marginTop: "1rem",
   },
   familyDetailH2: {
-    marginTop: "calc(var(--spacing) * 5)",
-    marginBottom: "calc(var(--spacing) * 2)",
+    marginTop: "1.25rem",
+    marginBottom: "0.5rem",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
     fontWeight: "var(--font-weight-semibold)",
   },
   childIssue: {
@@ -87,9 +87,9 @@ const viewStyles = stylex.create({
     width: "100%",
     cursor: "pointer",
     alignItems: "center",
-    gap: "calc(var(--spacing) * 3)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 3)",
+    gap: "0.75rem",
+    paddingInline: "0.75rem",
+    paddingBlock: "0.75rem",
     textAlign: "left",
     backgroundColor: {
       default: null,
@@ -103,7 +103,7 @@ const viewStyles = stylex.create({
     minWidth: "0",
     flex: "1",
     fontSize: "var(--text-sm)",
-    lineHeight: "var(--text-sm--line-height)",
+    lineHeight: "var(--leading-sm)",
   },
 });
 
