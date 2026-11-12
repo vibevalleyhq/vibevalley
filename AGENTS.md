@@ -6,11 +6,11 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 
 ```
 apps/server/               服务端（普通 TypeScript，Hono，Node 24；仓库里用 vpx 跑源码，桌面版带 vp pack 打的包）：src/modules 里一块业务一个文件夹，名字用单数，每个导出一个服务
-                           （接口加 make<服务>(deps)）：setting、user、attachment、provider、agent、memory、runtime、repo、machine、session、mailbox、channel、media、library、artifact、
+                           （接口加 make<服务>(deps)）：setting、user、attachment、provider、agent、memory、runtime、repo、machine、session、mailbox、channel、media（含素材库）、artifact、
                            pkm、issue、cron、inbox、tool、orchestrator、game；src/gateway 是对外的门：http、mcp、lan、voice、connector，projection 是核心状态的折法和拼帧（读各模块的
                            规则，组装时交给 core）；VibeValley 自己的 agent 跑在 pi-durable 上（runtime/durable.ts 开唯一的 Harness，
                            session/host.ts 是助手，runtime/vibevalley.ts 是 oar 的 vibevalley runtime）；base 是不碰外面的地基（id、JSON、排序、脱敏），infra 是和进程、机器打交道的
-                           （配置、库、文件、家目录的租约、日志、时间）；services.ts 按次序把它们组装起来，
+                           （配置、库、文件、家目录的租约、日志、时间）；services.ts 是一个函数，照模块次序一行一个 makeX({ 依赖写明 }) 把它们组装起来，
                            handlers.ts 把 http/handlers/<概念>.ts 合成全部接口的处理，http/ 是路由、流和 /mcp；chat/main.ts 是终端里的对话（和农机直接聊、
                            自己的 agent），由命令行交出终端来跑
 apps/server/db/            库（Postgres：database.url，或家目录里的 PGlite）：migrations/0001_schema.up.sql 是唯一的表结构，queries/<表>.sql 一张表一个文件，

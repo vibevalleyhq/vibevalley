@@ -23,7 +23,7 @@
 | `packages/async/` | 打断、后台任务、队列、广播、锁、重试与超时：服务端和各个包共用的异步原语 |
 | `scripts/audit/practice-audit.ts`、`service-paths.ts`、`protocol-surface.ts`、`schema-audit.ts` | 全仓语法树实践棘轮、服务调用矩阵与扇入检查、根协议导出面棘轮、SQL 枚举 / 品牌主键 / `Secret` / `BizCode` 注册表边界审计 |
 | `apps/server/src/{base,infra,core}/` | 服务端纯地基、外部系统适配与核心状态投影底座 |
-| `apps/server/src/modules/<概念>/`、`gateway/`、`modules.ts`、`services.ts` | 22 个纵向领域模块、6 个对外协议与出帧网关、11 层归属表与两阶段服务组装 |
+| `apps/server/src/modules/<概念>/`、`gateway/`、`modules.ts`、`services.ts` | 21 个纵向领域模块、6 个对外协议与出帧网关、11 层归属表与服务组装 |
 | `packages/protocol/src/<概念>/` | 按概念划分的 `shapes.ts`、`schema.ts`（Zod）、`api.ts` |
 | `packages/protocol/src/rules/` | 服务端与页面共用的纯函数规则 |
 | `packages/protocol/src/client.ts` | 由 `scripts/gen/api-client.ts` 生成的 HTTP 客户端 `VibeValleyApi` |
@@ -53,7 +53,7 @@
 - **11 个有序模块单向依赖**：模块顺序定义在 `apps/server/src/modules.ts`。下层不得 import 上层，不得直接读 `core.state()` 中其他模块的数据（`apps/server/src/modules.test.ts` 检查）。
 - **门禁共享一次源码分析**：`modules.test.ts` 在第一次检查内读取生产文件并用 `@vibevalley/testkit/source` 的 `analyzeSource` 各解析一次，依赖方向、表所有权与状态读取复用结果；同路径不同源码不共用缓存。读取和解析时间计入测试，提速按完整运行耗时与解析次数验证。
 - **单数概念名，拒绝单调用方顶层服务**：目录、表名和服务名均用单数概念词，协议同名类型统一写为 `T.Issue`（由 `singular-service` 与 `protocol-namespace` 规则检查）；仅有一个模块调用的内部设施留在调用方模块内（由 `scripts/audit/service-paths.ts` 扇入检查守住）。
-- **组装与启动分两阶段**：`services.ts` 照模块次序一个个 `await makeX(deps)` 拼成 `Farm` 并完成订阅，再按次序调各模块的 `start()`；`Farm` 是 `AsyncDisposable`，关的时候倒着调各服务的 `close()`，一个失败不挡别的。HTTP 监听就绪后才将地址注入 `Session` 和 `Lan`。
+- **组装与启动分两阶段**：`services.ts` 的 `makeFarm` 照模块次序一行一个 `await makeX({ … })`，每个服务的依赖在调用处按名字写明（没有分层的阶段类型，也不把「下面的全部」交给上面），拼成 `Farm` 并完成订阅，再按次序调各模块的 `boot()`；`Farm` 是 `AsyncDisposable`，关的时候倒着调各服务的 `close()`，一个失败不挡别的，建到一半失败也照此关掉已建的。测试的 `testing/world.ts` 照同样的次序和依赖建到工单（`moduleWorld`）或到 `/mcp`（`world`）。HTTP 监听就绪后才将地址注入 `Session` 和 `Lan`。
 - **操作与发言主体统一用协议 `Actor`**：HTTP 与连接器入口构造 `user`（`base/actor.ts`），助手运行构造 `agent`（带 `role: "orchestrator"` 与 `forUser`），`/mcp` 构造 `agent`（带 `role: "worker"` 与会话 id），定时、巡查与 GitHub 轮询构造 `system`。协议消息、服务端 `Trigger` 与信箱共用同一个 `T.Actor`；落库列统一存 `ActorKind`（`user`、`agent`、`system`）与可选 `AgentRole`。
 - **模块之间的路径与服务扇入记成表**：`scripts/audit/service-paths.ts` 按语法树、照名字声明的类型（`deps.agent.list()`、从 `deps` 解构出来的 `agent`）读出哪个模块用了别的模块服务的哪个成员（存在 `scripts/audit/service-paths.json`）并校验顶层服务扇入；`vp run paths:check` 与 `docs:verify` 一并检查，多一条路或新增单调用方顶层服务即失败。一件事一条路：往频道写话只有 `Channel.post`（[频道](docs/subsystems/channel.md#模型和不变量)），到帮工只有 Mailbox。
 - **单实例家目录租约**：`infra/lease.ts` 在 `$VIBEVALLEY_HOME/.vibevalley.lock` 写入进程 pid；若旧进程仍在运行则拒绝启动，已退出则接管。

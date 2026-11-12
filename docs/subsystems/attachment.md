@@ -8,7 +8,7 @@
 |---|---|
 | 表 `attachment` 记名字、类型、大小；内部存储实现（`attachment/storage.ts`）以 SHA-256 为键写入本机 `attachments/` 与 `scratch` 暂存目录 | 消息怎么带它、怎么画（[频道](docs/subsystems/channel.md)） |
 | 上传（`attachment.create`）：空的、超过上限的拒绝 | 生成和下载结果的任务（[媒体](docs/subsystems/media.md)） |
-| 按 id 读回字节和类型，经 `GET /api/v1/attachment/<id>` 带沙箱返回 | 素材的来路和列表（[素材库](docs/subsystems/library.md)，`apps/server/src/modules/library`） |
+| 按 id 读回字节和类型，经 `GET /api/v1/attachment/<id>` 带沙箱返回 | 素材的来路和列表（[素材库](docs/subsystems/library.md)，`apps/server/src/modules/media/library.ts`） |
 
 ## 在哪
 

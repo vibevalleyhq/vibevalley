@@ -11,7 +11,6 @@ import { type Cron, makeCron } from "#/modules/cron/cron.ts";
 import { type Game, makeGame } from "#/modules/game/game.ts";
 import { type Inbox, makeInbox } from "#/modules/inbox/inbox.ts";
 import { type Issue, makeIssue } from "#/modules/issue/issue.ts";
-import { type Library, makeLibrary } from "#/modules/library/library.ts";
 import { type Machine, makeMachine } from "#/modules/machine/machine.ts";
 import { type Mailbox, makeMailbox } from "#/modules/mailbox/mailbox.ts";
 import { makeMedia, type Media } from "#/modules/media/media.ts";
@@ -30,7 +29,7 @@ import { type Core, makeCore, type Projection } from "./core/core.ts";
 import type { ServerConfig } from "./infra/config.ts";
 import { type Db, openDb } from "./infra/db.ts";
 import { type Logger, makeLogger } from "./infra/log.ts";
-import { type PublicFetch, publicFetch } from "./infra/publicHttp.ts";
+import { type PublicFetch, publicFetch as publicFetchOf } from "./infra/publicHttp.ts";
 import { type Time, wallTime } from "./infra/time.ts";
 
 /** What a test changes in a module: the farm's own otherwise. */
@@ -56,8 +55,9 @@ export interface PlatformParts {
   readonly publicFetch?: PublicFetch;
 }
 
-/** Platform: the settings and secrets, the clock, the log, the network, the database, the core state. */
-export interface PlatformFarm {
+/** The whole farm, every module's service by name. Gateway: every way in from outside; the HTTP API is mounted on these
+ * services by http/app.ts. */
+export interface Farm extends AsyncDisposable {
   readonly config: ServerConfig;
   readonly clock: Time;
   readonly log: Logger;
@@ -70,63 +70,23 @@ export interface PlatformFarm {
   readonly user: User;
   readonly attachment: Attachment;
   readonly provider: Provider;
-}
-
-/** Agents: the profiles, their memory, the runtimes they run on. */
-export interface AgentsFarm extends PlatformFarm {
   readonly agent: Agent;
   readonly memory: Memory;
   readonly runtime: Runtime;
-}
-
-/** Source Control: repositories, worktrees, checks, merges and pull requests. */
-export interface SourceControlFarm extends AgentsFarm {
   readonly repo: Repo;
-}
-
-/** Agent Sessions: an agent at work on an issue in a workplace. */
-export interface AgentSessionsFarm extends SourceControlFarm {
   readonly machine: Machine;
   readonly session: Session;
-}
-
-/** Mailbox: immutable source triggers, delivery priority, durable per-Session input and the execution pump. */
-export interface MailboxFarm extends AgentSessionsFarm {
   readonly mailbox: Mailbox;
-}
-
-/** Collaboration: channels, threads, messages, documents, the user's notes; the sessions register as its helpers. */
-export interface CollaborationFarm extends MailboxFarm {
   readonly channel: Channel;
   readonly media: Media;
-  readonly library: Library;
   readonly artifact: Artifact;
   readonly pkm: Pkm;
-}
-
-export interface IssuesFarm extends CollaborationFarm {
   readonly issue: Issue;
   readonly cron: Cron;
-}
-
-/** Inbox: what in it is news to the user, and the patrol. */
-export interface InboxFarm extends IssuesFarm {
   readonly inbox: Inbox;
-}
-
-/** Orchestrator: the agent that hands the user's work to helpers, and its tools. */
-export interface OrchestratorFarm extends InboxFarm {
   readonly tool: Tool;
   readonly orchestrator: Orchestrator;
-}
-
-/** Gamification: the ledger, progress and achievements, from events only. */
-export interface GamificationFarm extends OrchestratorFarm {
   readonly game: Game;
-}
-
-/** The whole farm. Gateway: every way in from outside; the HTTP API is mounted on these services by http/app.ts. */
-export interface Farm extends GamificationFarm, AsyncDisposable {
   readonly mcp: Mcp;
   readonly lan: Lan;
   readonly voice: Voice;
@@ -135,166 +95,150 @@ export interface Farm extends GamificationFarm, AsyncDisposable {
   readonly close: () => Promise<void>;
 }
 
-/** What is built so far, and how to take it down: each stage below adds to it. */
-export interface Building {
-  /** The closes of what is built, in the order it was built. */
-  readonly closes: (() => Promise<void> | void)[];
-}
+export type Close = () => Promise<void> | void;
 
-/** Its close, when it has one: a service that holds nothing has none. */
-function closeOf(service: object): (() => Promise<void> | void) | undefined {
-  if (!("close" in service)) return undefined;
-  const close: unknown = service.close;
-  if (typeof close !== "function") return undefined;
-  return async () => {
-    await Reflect.apply(close, service, []);
+/** Keeps each service's close in closes, in the order they are built, and hands the service back. A service that holds
+ * nothing has no close. */
+export function owning(closes: Close[]): <A extends object>(service: A) => A {
+  return (service) => {
+    if ("close" in service) {
+      const close: unknown = service.close;
+      if (typeof close === "function")
+        closes.push(async () => {
+          await Reflect.apply(close, service, []);
+        });
+    }
+    return service;
   };
-}
-
-/** Adds the services to what is built, keeping their closes. */
-function add<B extends Building, A extends object>(below: B, added: A): B & A {
-  for (const service of Object.values(added) as unknown[]) {
-    if (typeof service !== "object" || service === null) continue;
-    const close = closeOf(service);
-    if (close) below.closes.push(close);
-  }
-  return Object.assign(below, added);
 }
 
 /** Calls every close, the last built first; one failing does not keep the others from closing, and the first failure
  * is thrown after. */
-export async function closeAll(built: Building): Promise<void> {
+export async function closeAll(closes: Close[]): Promise<void> {
   const failures: unknown[] = [];
-  for (const close of built.closes.toReversed()) {
+  for (const close of closes.toReversed()) {
     try {
       await close();
     } catch (e) {
       failures.push(e);
     }
   }
-  built.closes.length = 0;
+  closes.length = 0;
   if (failures.length === 1) throw failures[0];
   if (failures.length > 1) throw new AggregateError(failures, "the farm did not close cleanly");
 }
 
-/** Platform: the database first (closed last), then the core state and the services every module uses. */
-export async function platform(config: ServerConfig, parts: PlatformParts = {}): Promise<PlatformFarm & Building> {
+/** The whole farm: every module built in module order (modules.ts), each from the services before it, then every
+ * startup in module order. A failure closes what was built. */
+export async function makeFarm(config: ServerConfig, options: ServiceOptions = {}): Promise<Farm> {
+  const parts = options.platform ?? {};
   const clock = parts.clock ?? wallTime;
   const log = parts.log ?? makeLogger({ name: "vibevalley" });
-  const fetcher = parts.fetch ?? globalThis.fetch;
-  const built: Building = { closes: [] };
-  const db = await openDb(config, log.child("db"), clock);
-  built.closes.push(() => db.close());
+  const fetch = parts.fetch ?? globalThis.fetch;
+  const publicFetch = parts.publicFetch ?? publicFetchOf();
+  const closes: Close[] = [];
+  const own = owning(closes);
   try {
+    // Platform: the database first (closed last), then the core state and the services every module uses.
+    const db = own(await openDb(config, log.child("db"), clock));
     const projection = makeProjection();
-    const core = makeCore({ projection, clock });
-    built.closes.push(() => core.close());
-    const base = { config, clock, log, fetch: fetcher, publicFetch: parts.publicFetch ?? publicFetch(), db, projection, core, ...built };
-    const withSetting = add(base, { setting: await makeSetting(base) });
-    const withUser = add(withSetting, { user: await makeUser(withSetting) });
-    const withAttachment = add(withUser, { attachment: await makeAttachment(withUser) });
-    return add(withAttachment, { provider: await makeProvider(withAttachment) });
-  } catch (e) {
-    await closeAll(built);
-    throw e;
-  }
-}
-
-/** Each stage builds on what is below it and keeps it; a failure is the caller's to close (closeAll). */
-export const agents = async <B extends PlatformFarm & Building>(below: B, o: ServiceOptions = {}) => {
-  const withAgent = add(below, { agent: await makeAgent(below) });
-  const withMemory = add(withAgent, { memory: await makeMemory(withAgent, o.memory) });
-  return add(withMemory, { runtime: await makeRuntime(withMemory, o.runtime) });
-};
-
-export const sourceControl = async <B extends AgentsFarm & Building>(below: B, o: ServiceOptions = {}) => add(below, { repo: await makeRepo(below, o.repo) });
-
-export const agentSessions = async <B extends SourceControlFarm & Building>(below: B, o: ServiceOptions = {}) => {
-  const withMachine = add(below, { machine: await makeMachine(below) });
-  return add(withMachine, { session: await makeSession(withMachine, o.session) });
-};
-
-export const mailbox = async <B extends AgentSessionsFarm & Building>(below: B) => add(below, { mailbox: await makeMailbox(below) });
-
-export const collaboration = async <B extends MailboxFarm & Building>(below: B) => {
-  const withChannel = add(below, { channel: await makeChannel(below) });
-  const withMedia = add(withChannel, { media: await makeMedia(withChannel) });
-  const withLibrary = add(withMedia, { library: await makeLibrary(withMedia) });
-  const withArtifact = add(withLibrary, { artifact: await makeArtifact(withLibrary) });
-  return add(withArtifact, { pkm: await makePkm(withArtifact) });
-};
-
-export const issues = async <B extends CollaborationFarm & Building>(below: B) => {
-  const withIssue = add(below, { issue: await makeIssue(below) });
-  return add(withIssue, { cron: await makeCron(withIssue) });
-};
-
-const inbox = async <B extends IssuesFarm & Building>(below: B) => add(below, { inbox: await makeInbox(below) });
-
-const orchestrator = async <B extends InboxFarm & Building>(below: B, o: ServiceOptions = {}) => {
-  const withTool = add(below, { tool: await makeTool(below) });
-  return add(withTool, { orchestrator: await makeOrchestrator(withTool, o.orchestrator) });
-};
-
-export const gamification = async <B extends SourceControlFarm & Building>(below: B) => add(below, { game: await makeGame(below) });
-
-const gateway = async <B extends GamificationFarm & Building>(below: B, o: ServiceOptions = {}) => {
-  const withMcp = add(below, { mcp: await makeMcp(below, o.mcp) });
-  const withLan = add(withMcp, { lan: await makeLan(withMcp, o.lan) });
-  const withVoice = add(withLan, { voice: await makeVoice(withLan, o.voice) });
-  return add(withVoice, { connector: await makeConnector(withVoice, o.connector) });
-};
-
-/** Source Control's startup: the first look at GitHub. */
-const sourceControlBoot = (farm: SourceControlFarm) => farm.repo.boot();
-/** Agent Sessions' startup: the sessions on the farm when it stopped are taken up again, or let go. */
-export const agentSessionsBoot = (farm: AgentSessionsFarm) => farm.session.boot();
-/** Collaboration's startup, after the sessions came back: their threads, before the mailbox wakes anyone. */
-export const channelBoot = (farm: CollaborationFarm) => farm.channel.boot();
-/** Mailbox's startup: restore open deliveries, replay committed messages without a route receipt, then wake sessions. */
-export const mailboxBoot = (farm: MailboxFarm) => farm.mailbox.boot();
-/** The rest of Collaboration's startup, after the mailbox: what media waited for. */
-export const mediaBoot = (farm: CollaborationFarm) => farm.media.boot();
-const issuesBoot = async (farm: IssuesFarm) => {
-  await farm.issue.boot();
-  await farm.cron.boot();
-};
-/** Inbox's startup, after the sessions and issues came back: what stands is known, the patrol starts its rounds. */
-export const inboxBoot = (farm: InboxFarm) => farm.inbox.boot();
-/** Gamification's startup: commits start being counted. */
-const gamificationBoot = (farm: { readonly game: Game }) => farm.game.boot();
-
-/** The whole farm: every module built, then every startup in module order. A failure closes what was built. */
-async function makeFarm(config: ServerConfig, options: ServiceOptions = {}, base: PlatformParts = options.platform ?? {}): Promise<Farm> {
-  const below = await platform(config, base);
-  try {
-    const built = await gateway(
-      await gamification(
-        await orchestrator(
-          await inbox(
-            await issues(await collaboration(await mailbox(await agentSessions(await sourceControl(await agents(below, options), options), options)))),
-          ),
-          options,
-        ),
-      ),
-      options,
+    const core = own(makeCore({ projection, clock }));
+    const setting = own(await makeSetting({ config, clock, log }));
+    const user = own(await makeUser({ db, clock, log }));
+    const attachment = own(await makeAttachment({ config, clock, db }));
+    const provider = own(await makeProvider({ setting, fetch, clock, log }));
+    // Agents: the profiles, their memory, the runtimes they run on.
+    const agent = own(await makeAgent({ config, clock, log }));
+    const memory = own(await makeMemory({ clock, log, fetch, db, setting, agent }, options.memory));
+    const runtime = own(await makeRuntime({ config, clock, log, db, core, agent, setting, fetch }, options.runtime));
+    // Source Control: repositories, worktrees, checks, merges and pull requests.
+    const repo = own(await makeRepo({ config, clock, log }, options.repo));
+    // Agent Sessions: an agent at work on an issue in a workplace.
+    const machine = own(await makeMachine({ config, clock, log, db, core, runtime }));
+    const session = own(await makeSession({ config, clock, log, db, core, agent, memory, repo, machine, runtime }, options.session));
+    // Mailbox: source triggers, delivery priority, per-Session input and the execution pump.
+    const mailbox = own(await makeMailbox({ db, clock, log, config, core, agent, session }));
+    // Collaboration: channels, threads, messages, media and its library, documents, the user's notes.
+    const channel = own(await makeChannel({ clock, log, fetch, db, core, agent, attachment, session, mailbox }));
+    const media = own(await makeMedia({ db, core, clock, log, attachment, session, channel, provider, publicFetch }));
+    const artifact = own(await makeArtifact({ db, clock, log, attachment, channel }));
+    const pkm = own(await makePkm({ config, clock, log, db }));
+    // Issues: the issues and what runs on a schedule.
+    const issue = own(await makeIssue({ config, clock, log, db, core, agent, repo, runtime, session, channel, mailbox }));
+    const cron = own(await makeCron({ config, clock, log, db, core, agent, channel, issue, mailbox }));
+    // Inbox: what is news to the user, and the patrol.
+    const inbox = own(await makeInbox({ config, clock, log, db, core, channel, issue, session, mailbox }));
+    // Orchestrator: the agent that hands the user's work to helpers, and its tools.
+    const tool = own(await makeTool({ clock, log, agent, session, issue, mailbox, channel, cron, memory, media, pkm, artifact, repo }));
+    const orchestrator = own(
+      await makeOrchestrator({ clock, log, config, agent, runtime, repo, pkm, session, channel, mailbox, cron, tool }, options.orchestrator),
     );
-    await sourceControlBoot(built);
-    await agentSessionsBoot(built);
-    await channelBoot(built);
-    await mailboxBoot(built);
-    await mediaBoot(built);
-    await issuesBoot(built);
-    await inboxBoot(built);
-    await gamificationBoot(built);
+    // Gamification: the ledger, progress and achievements, from events only.
+    const game = own(await makeGame({ config, clock, log, db, core, repo }));
+    // Gateway: every way in from outside; http/app.ts mounts the HTTP API on these services.
+    const mcp = own(await makeMcp({ config, session, tool, log }, options.mcp));
+    const lan = own(await makeLan({ config, db, user, clock, log, fetch }, options.lan));
+    const voice = own(await makeVoice({ config, clock, log, fetch, core, inbox, setting, provider, channel, orchestrator }, options.voice));
+    const connector = own(await makeConnector({ clock, db, log, fetch, core, channel, inbox }, options.connector));
+
+    // The first look at GitHub.
+    await repo.boot();
+    // The sessions on the farm when it stopped are taken up again, or let go.
+    await session.boot();
+    // Their threads, before the mailbox wakes anyone.
+    await channel.boot();
+    // Open deliveries restored, committed messages without a route receipt replayed, then the sessions woken.
+    await mailbox.boot();
+    // What media waited for.
+    await media.boot();
+    await issue.boot();
+    await cron.boot();
+    // What stands is known: the patrol starts its rounds.
+    await inbox.boot();
+    // Commits start being counted.
+    await game.boot();
+
     let closing: Promise<void> | undefined;
-    const close = () => (closing ??= closeAll(built));
-    return Object.assign(built, { close, [Symbol.asyncDispose]: close });
+    const close = () => (closing ??= closeAll(closes));
+    return {
+      config,
+      clock,
+      log,
+      fetch,
+      publicFetch,
+      db,
+      projection,
+      core,
+      setting,
+      user,
+      attachment,
+      provider,
+      agent,
+      memory,
+      runtime,
+      repo,
+      machine,
+      session,
+      mailbox,
+      channel,
+      media,
+      artifact,
+      pkm,
+      issue,
+      cron,
+      inbox,
+      tool,
+      orchestrator,
+      game,
+      mcp,
+      lan,
+      voice,
+      connector,
+      close,
+      [Symbol.asyncDispose]: close,
+    };
   } catch (e) {
-    await closeAll(below);
+    await closeAll(closes);
     throw e;
   }
 }
-
-/** The whole farm, started: what http/app.ts serves. */
-export const services = makeFarm;

@@ -1,12 +1,12 @@
 # 素材库
 
-「素材库」（`Library`，`apps/server/src/modules/library/library.ts`，页面 `/library`）把用户关心的文件放在一处：生成的、用户上传的、帮工和助手拿回来的。一份素材是一个[附件](docs/subsystems/attachment.md)加上它的来路。页面照 Eagle 那样分三栏：左边按来路和种类筛，中间是按比例排满一行的缩略图，右边是选中的那一份；生成的表单收在「生成」对话框里，理解从选中的那一份发起。
+「素材库」（[媒体](docs/subsystems/media.md)模块的一部分，`apps/server/src/modules/media/library.ts`，页面 `/library`）把用户关心的文件放在一处：生成的、用户上传的、帮工和助手拿回来的。一份素材是一个[附件](docs/subsystems/attachment.md)加上它的来路。页面照 Eagle 那样分三栏：左边按来路和种类筛，中间是按比例排满一行的缩略图，右边是选中的那一份；生成的表单收在「生成」对话框里，理解从选中的那一份发起。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
-| 表 `library_item`：每个附件至多一条，记第一次的来路、加入和最近一次的时间 | 文件的字节、名字和类型（[附件](docs/subsystems/attachment.md)） |
+| 表 `media_library_item`：每个附件至多一条，记第一次的来路、加入和最近一次的时间 | 文件的字节、名字和类型（[附件](docs/subsystems/attachment.md)） |
 | 记下三种来路：任务做完的结果、用户在聊天里发的和在这页上传的、帮工和助手经 `library.item.add` 交来的 | 生成、理解任务本身（[媒体](docs/subsystems/media.md)） |
 | 帮工给的网址经公网下载、给的路径只认它工作目录里的文件 | 读帮工工作目录的检查（`Session.workFile`，[帮工](docs/subsystems/session.md)） |
 | 页面：筛选栏、缩略图、详情栏、按名字搜和排序、拖进来和粘贴上传、键盘、下载、发到频道、拿掉、生成对话框、理解对话框 | 发到频道的消息（[频道](docs/subsystems/channel.md)） |
@@ -17,10 +17,10 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/modules/library/library.ts` | 服务 `Library`：`list`、`add`、`delete`；听核心状态的变化记下生成的和聊天里发的 |
+| `apps/server/src/modules/media/library.ts` | `Media` 的 `libraryItems`、`addLibraryItem`、`removeLibraryItem`、`previewRemoveLibraryItem`；听核心状态的变化记下生成的和聊天里发的 |
 | `apps/server/src/gateway/http/handlers/library.ts`、`apps/server/src/modules/tool/library.ts` | `library.item.*` 接口；助手和帮工的 `library_item_add`、`library_item_list` 工具 |
 | `packages/protocol/src/library/` | `LibraryItem`、`LibraryOrigin`、`LibraryListRequest`、`LibraryAddRequest` |
-| `apps/server/db/queries/library_item.sql` | 表 `library_item` 的查询 |
+| `apps/server/db/queries/media_library_item.sql` | 表 `media_library_item` 的查询 |
 | `apps/web/src/features/library/` | `/library`：`Rail.tsx` 筛选栏、`Tiles.tsx` 缩略图、`Inspector.tsx` 详情栏、`LibraryPage.tsx` 工具条、上传、键盘和对话框（`?make=` 生成，`?understand=<附件 id>` 理解）；排法、计数、筛选和键盘的落点是 `items.ts` 的纯函数 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`library.*`）。
@@ -43,7 +43,7 @@
 
 ## 怎么走
 
-1. 用户在「生成」对话框里生图或合成语音；任务完成，Library 记一条 `generated`，网格里出现这张卡。
+1. 用户在「生成」对话框里生图或合成语音；任务完成，Media 记一条 `generated`，网格里出现这张卡。
 2. 用户在聊天里发一张图，或在这页点「上传」；各记一条 `uploaded`。
 3. 帮工做活时调 `library_item_add`，给一个网址或 `out/report.png`；服务端取到字节，记一条 `fetched`。
 4. 用户选中一张图或视频，在详情栏点「理解」：`media.input.adopt` 把附件当作输入（照上传一样检查），再发起理解；结果挂在卡上。
@@ -64,7 +64,7 @@
 
 ## 怎么验证
 
-- `apps/server/src/modules/library/library.test.ts`：三种来路、去重、筛选、拿掉不删附件；没有来源、两个来源、用户给网址、帮工给附件、内网和 `file:` 地址被拒。
+- `apps/server/src/modules/media/library.test.ts`：三种来路、去重、筛选、拿掉不删附件；没有来源、两个来源、用户给网址、帮工给附件、内网和 `file:` 地址被拒。
 - `apps/server/src/gateway/mcp/mcp.test.ts`：帮工经工具按路径放一个文件，工作目录外的路径和逃出去的符号链接被拒。
 - `apps/server/src/modules/media/inputs.test.ts`：附件当作理解的输入，不是图、视频、音频的被拒。
 - `apps/web/src/features/library/items.test.ts`：种类、筛选和两组计数、按比例排满一行、方向键的落点、Shift 选一段、扩展名和时长、来路的说法、在做的任务、理解的结果。

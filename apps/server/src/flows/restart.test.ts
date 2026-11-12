@@ -14,7 +14,6 @@ import { keptLog } from "#/infra/log.ts";
 import { makeOrchestrator } from "#/modules/orchestrator/orchestrator.ts";
 import { entryMessage, messageText } from "#/modules/runtime/durable.ts";
 import { helperInstructions, helperKey, vibevalleyRuntimeOf } from "#/modules/runtime/vibevalley.ts";
-import { agentSessionsBoot, mailboxBoot } from "#/services.ts";
 import { testConfig } from "#/testing/layers.ts";
 import { answer, lastUser, type Request, scriptedLLM, type Step } from "#/testing/model.ts";
 import { sqlOf } from "#/testing/sql.ts";
@@ -40,8 +39,8 @@ test("the assistant cut off mid-answer by a restart finishes it once the farm is
       below.deepseek.use(llm);
       const orchestrator = await makeOrchestrator(below);
       below.closes.push(() => orchestrator.close());
-      await agentSessionsBoot(below);
-      await mailboxBoot(below);
+      await below.session.boot();
+      await below.mailbox.boot();
       return below;
     } catch (e) {
       await below.close();
@@ -101,8 +100,8 @@ test("regression: the assistant and a helper both cut off mid-answer go on once 
       below.deepseek.use(script.llm);
       const orchestrator = await makeOrchestrator(below);
       below.closes.push(() => orchestrator.close());
-      await agentSessionsBoot(below);
-      await mailboxBoot(below);
+      await below.session.boot();
+      await below.mailbox.boot();
       return below;
     } catch (e) {
       await below.close();

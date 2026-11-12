@@ -139,6 +139,7 @@ export async function mediaFarm(options: MediaFarmOptions = {}) {
       clock,
       log,
       attachment: farm.attachment,
+      session: farm.session,
       channel: farm.channel,
       provider,
       publicFetch: options.publicFetch ?? offline,

@@ -8,10 +8,10 @@ import { answers } from "./prompts.ts";
 import { callerOf, sessionSchemaTool, tool, type Who } from "./schemas.ts";
 import type { ToolDeps } from "./tool.ts";
 
-export function libraryTools(deps: Pick<ToolDeps, "library">) {
-  const { library } = deps;
+export function libraryTools(deps: Pick<ToolDeps, "media">) {
+  const { media } = deps;
   const listed = async (req: T.LibraryListRequest) => {
-    const items = await library.list(req);
+    const items = await media.libraryItems(req);
     return items.length === 0 ? answers.library.none : items.map(answers.library.line).join("\n");
   };
   // A refused add is the answer; anything else fails the call.
@@ -28,7 +28,7 @@ export function libraryTools(deps: Pick<ToolDeps, "library">) {
       tool("library.item.list", (p) => listed(p)),
       tool("library.item.add", (p, signal) => {
         const c = callerOf(who);
-        return said(async () => answers.library.added(await library.add(p, { kind: "agent", agent: c.agent }, signal)));
+        return said(async () => answers.library.added(await media.addLibraryItem(p, { kind: "agent", agent: c.agent }, signal)));
       }),
     ],
     session: (who: Who) => [
@@ -36,7 +36,9 @@ export function libraryTools(deps: Pick<ToolDeps, "library">) {
       sessionSchemaTool("library.item.add", (p, signal) => {
         const c = callerOf(who);
         return said(async () =>
-          answers.library.added(await library.add(p, { kind: "agent", agent: c.agent, ...(c.session ? { session: S.sessionId(c.session) } : {}) }, signal)),
+          answers.library.added(
+            await media.addLibraryItem(p, { kind: "agent", agent: c.agent, ...(c.session ? { session: S.sessionId(c.session) } : {}) }, signal),
+          ),
         );
       }),
     ],

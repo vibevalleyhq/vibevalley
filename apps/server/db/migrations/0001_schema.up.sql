@@ -175,7 +175,7 @@ CREATE TABLE attachment (
   size        integer not null,
   created_at  double precision not null
 );
-CREATE TABLE library_item (
+CREATE TABLE media_library_item (
   -- A file in the library is a kept attachment: one item per file, however often it comes back.
   attachment_id text primary key references attachment (id),
   kind          text not null check (kind in ('generated', 'uploaded', 'fetched')),
@@ -184,7 +184,7 @@ CREATE TABLE library_item (
   added_at      double precision not null,
   last_at       double precision not null
 );
-CREATE INDEX library_item_recent on library_item (last_at desc, attachment_id);
+CREATE INDEX media_library_item_recent on media_library_item (last_at desc, attachment_id);
 CREATE TABLE channel_mention (
   message_id  text not null references channel_message (id) on delete cascade,
   target_id   text not null,

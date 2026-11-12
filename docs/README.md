@@ -116,7 +116,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 频道 | channel | channel（`Channel`） | 群（指频道时）、群聊 |
 | 串 | thread | thread | 子频道 |
 | 附件 | attachment | `Attachment`（`attachment` 表） |  |
-| 素材库 | library | `Library`（`library_item` 表） | 媒体（指这一页时） |
+| 素材库 | library | `Media` 的 `libraryItems` 等（`media_library_item` 表） | 媒体（指这一页时） |
 | 工作目录 | working folder | `Workplace`（`workdir`） | 工作区 |
 | 定时任务 | scheduled task | cron（`Cron`） | 定时（指定时任务时）、schedule（指定时任务时）、recurrence |
 | Inbox | inbox | `InboxItem`（`StateFrame.inbox`，服务是 `Inbox`） | 通知（指 Inbox 时）、来电（农场的皮里用） |

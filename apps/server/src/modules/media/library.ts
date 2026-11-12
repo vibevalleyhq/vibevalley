@@ -6,14 +6,11 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { ApiError, BizCode, lookIn, messageOf, missing, refuseIn } from "#/base/errors.ts";
 import { jsonOf } from "#/base/json.ts";
-import type { Core } from "#/core/core.ts";
-import type { Db } from "#/infra/db.ts";
-import type { Logger } from "#/infra/log.ts";
-import { type PublicFetch, publicHttps } from "#/infra/publicHttp.ts";
-import type { Time } from "#/infra/time.ts";
-import type { Attachment } from "#/modules/attachment/attachment.ts";
-import { NotWorkFile, type Session } from "#/modules/session/session.ts";
-import * as q from "#db/library_item.sql.ts";
+import { publicHttps } from "#/infra/publicHttp.ts";
+import { NotWorkFile } from "#/modules/session/session.ts";
+import * as q from "#db/media_library_item.sql.ts";
+
+import type { MediaDeps } from "./media.ts";
 
 const refused = refuseIn(BizCode.LibraryRefused);
 
@@ -60,29 +57,19 @@ const itemOf = (row: q.LibraryItemResult): T.LibraryItem => ({
 const madeFiles = (jobs: readonly T.MediaJob[]) =>
   jobs.flatMap((job) => ("attachment" in job && job.attachment !== undefined && job.phase === "ready" ? [{ job, attachment: job.attachment }] : []));
 
-export interface Library {
+/** The library: the attachments kept as material, what media made and what the user or a helper brought in. */
+interface Library {
   readonly list: (req: T.LibraryListRequest) => Promise<T.LibraryItem[]>;
   readonly add: (req: T.LibraryAddRequest, by: AddedBy, signal?: AbortSignal) => Promise<T.LibraryItem>;
-  /** Removes the library entry only; messages referencing the attachment still open it. */
   readonly remove: (id: string) => Promise<void>;
   readonly previewRemove: (id: string) => Promise<T.Preview>;
   /** Stops recording what the farm hears. */
   readonly close: () => Promise<void>;
 }
 
-export interface LibraryDeps {
-  readonly db: Db;
-  readonly core: Core;
-  readonly attachment: Attachment;
-  readonly session: Session;
-  readonly publicFetch: PublicFetch;
-  readonly clock: Time;
-  readonly log: Logger;
-}
-
 const downloadMs = 60_000;
 
-export async function makeLibrary(deps: LibraryDeps): Promise<Library> {
+export async function makeLibrary(deps: Pick<MediaDeps, "db" | "core" | "clock" | "log" | "attachment" | "session" | "publicFetch">): Promise<Library> {
   const { db, core, clock } = deps;
   const files = deps.attachment;
   const sessions = deps.session;

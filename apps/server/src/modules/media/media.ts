@@ -11,11 +11,13 @@ import type { Time } from "#/infra/time.ts";
 import type { Attachment } from "#/modules/attachment/attachment.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { Provider } from "#/modules/provider/provider.ts";
+import type { Session } from "#/modules/session/session.ts";
 import * as q from "#db/media_job.sql.ts";
 
 import { audioKinds, makeAudio } from "./audio.ts";
 import { makeImage } from "./image.ts";
 import { type Inputs, makeInputs } from "./inputs.ts";
+import { type AddedBy, makeLibrary } from "./library.ts";
 import { makeMachine } from "./machine.ts";
 import { makeRemoteFiles } from "./remoteFiles.ts";
 import { makeSpeech } from "./speech.ts";
@@ -53,9 +55,15 @@ export interface Media {
   readonly retryDownload: (id: string) => Promise<T.MediaJob>;
   readonly previewRelease: (id: string) => Promise<T.Preview>;
   readonly release: (id: string) => Promise<T.MediaJob>;
+  /** The library: what media made, what the user said with a file and what a helper brought in, kept as items. */
+  readonly libraryItems: (req: T.LibraryListRequest) => Promise<T.LibraryItem[]>;
+  readonly addLibraryItem: (req: T.LibraryAddRequest, by: AddedBy, signal?: AbortSignal) => Promise<T.LibraryItem>;
+  /** Removes the library entry only; messages referencing the attachment still open it. */
+  readonly removeLibraryItem: (id: string) => Promise<void>;
+  readonly previewRemoveLibraryItem: (id: string) => Promise<T.Preview>;
   /** At startup: jobs and inputs a stop cut short are marked as such, and the ones still out at the vendor are followed again. */
   readonly boot: () => Promise<void>;
-  /** Stops every job's work, the input sweep and the streams' timers. */
+  /** Stops every job's work, the input sweep, the streams' timers and the library's recording. */
   readonly close: () => Promise<void>;
 }
 
@@ -65,6 +73,7 @@ export interface MediaDeps {
   readonly clock: Time;
   readonly log: Logger;
   readonly attachment: Attachment;
+  readonly session: Session;
   readonly channel: Channel;
   readonly provider: Provider;
   readonly publicFetch: PublicFetch;
@@ -84,6 +93,8 @@ export async function makeMedia(deps: MediaDeps): Promise<Media> {
   const understanding = makeUnderstanding(deps, { inputs, remote: remoteFiles, machine });
   const speech = makeSpeech(deps, { inputs, machine });
   const audio = makeAudio(deps, { inputs, remote: remoteFiles, machine });
+  // Records what the farm hears from now on, until close.
+  const library = await makeLibrary(deps);
 
   const releasable = async (id: string) => {
     const job = await machine.get(id);
@@ -144,6 +155,10 @@ export async function makeMedia(deps: MediaDeps): Promise<Media> {
         }
         return machine.get(id);
       }),
+    libraryItems: library.list,
+    addLibraryItem: library.add,
+    removeLibraryItem: library.remove,
+    previewRemoveLibraryItem: library.previewRemove,
     boot: async () => {
       await remoteFiles.restore();
       await machine.interrupt();
@@ -164,6 +179,7 @@ export async function makeMedia(deps: MediaDeps): Promise<Media> {
       await machine.pickUp();
     },
     close: async () => {
+      await library.close();
       await cleanup.close();
       await machine.close();
       await speech.close();

@@ -1,6 +1,6 @@
 # 媒体任务与输入
 
-`Media` 服务管理生图、图片／视频理解、单人语音、多人对白、音色设计与克隆、长音频转写。用户在[AI 服务](docs/subsystems/provider.md)分别绑定连接与模型；任务先落库，页面通过同一状态流观察进度；表单收在[素材库](docs/subsystems/library.md)的「生成」对话框里，完成的结果进素材库。结果保留实际格式、元数据与厂商用量；实时 Live 与独立 Vision 的设备和会话归[语音](docs/subsystems/voice.md)。
+`Media` 服务管理生图、图片／视频理解、单人语音、多人对白、音色设计与克隆、长音频转写。用户在[AI 服务](docs/subsystems/provider.md)分别绑定连接与模型；任务先落库，页面通过同一状态流观察进度；表单收在[素材库](docs/subsystems/library.md)的「生成」对话框里，完成的结果进素材库；素材库（表 `media_library_item`，`library.ts`）也归这个模块：媒体产出的和收进来的文件是同一份目录，`library.*` 接口和 `library_item_*` 工具照旧，由 `Media` 的 `libraryItems`、`addLibraryItem` 等回答。结果保留实际格式、元数据与厂商用量；实时 Live 与独立 Vision 的设备和会话归[语音](docs/subsystems/voice.md)。
 
 ## 管什么，不管什么
 
@@ -18,7 +18,7 @@
 |---|---|
 | `packages/provider/src/moss/image.ts` | 固定端点、参数与布局校验、URL 响应、安全错误 |
 | `packages/protocol/src/media/` | 任务、请求、事实、Schema 与接口权限 |
-| `apps/server/src/modules/media/` | Media 服务、任务、下载与文件校验 |
+| `apps/server/src/modules/media/` | Media 服务、任务、下载与文件校验；`library.ts` 是素材库（[素材库](docs/subsystems/library.md)） |
 | `apps/server/src/infra/publicHttp.ts` | 只拨号已校验公网 IPv4 的独立 HTTP 客户端 |
 | `apps/server/src/modules/media/machine.ts`、`job.ts`、`apps/server/db/queries/media_job.sql` | 所有种类共用的一台任务机：表 `media_job`（按 `kind` 分）、收任务、锁、执行槽、跑断了记未知、下载结果存成附件、跟厂商任务、取消、重取、接续、重启；查询除音频的远端清理外都是共用的 |
 | `apps/server/src/modules/media/image.ts` | 生图：请求、出图后存成附件、发回请它画图的频道 |

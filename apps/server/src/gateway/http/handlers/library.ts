@@ -1,14 +1,14 @@
 import type { LibraryHandlers } from "@vibevalley/protocol/api";
 
-import type { Library } from "#/modules/library/library.ts";
+import type { Media } from "#/modules/media/media.ts";
 
 // Over HTTP it is the user (here or through the gate); helpers and assistants reach the library through their tools.
-export function libraryHandlers(deps: { readonly library: Library }): LibraryHandlers {
-  const { library } = deps;
+export function libraryHandlers(deps: { readonly media: Media }): LibraryHandlers {
+  const { media } = deps;
   return {
-    "library.item.list": (req) => library.list(req),
-    "library.item.add": (req) => library.add(req, { kind: "user" }),
-    "library.item.delete": ({ id }) => library.remove(id),
-    "library.item.previewDelete": ({ id }) => library.previewRemove(id),
+    "library.item.list": (req) => media.libraryItems(req),
+    "library.item.add": (req) => media.addLibraryItem(req, { kind: "user" }),
+    "library.item.delete": ({ id }) => media.removeLibraryItem(id),
+    "library.item.previewDelete": ({ id }) => media.previewRemoveLibraryItem(id),
   };
 }

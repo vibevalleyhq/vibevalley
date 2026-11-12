@@ -5,7 +5,7 @@ import { BizCode } from "@vibevalley/protocol/api";
 
 import { bizError, messageOf } from "#/base/errors.ts";
 import type { ServerConfig } from "#/infra/config.ts";
-import { type Farm, type ServiceOptions, services } from "#/services.ts";
+import { type Farm, makeFarm, type ServiceOptions } from "#/services.ts";
 
 import { api, artifactContent, attachments } from "./api.ts";
 import { handlers } from "./handlers.ts";
@@ -72,7 +72,7 @@ export async function app(
   const address = `127.0.0.1:${bound.port}`;
   let farm: Farm;
   try {
-    farm = await services(resolved, options);
+    farm = await makeFarm(resolved, options);
   } catch (e) {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     throw e;

@@ -238,7 +238,7 @@ describe("mcp", () => {
     const mcp = farm.mcp;
     const sessions = farm.session;
     const artifacts = farm.artifact;
-    const library = farm.library;
+    const media = farm.media;
     const got = await issues.hire(lab(), "画两种详情", "chat-j");
     const id = got.session.id;
     await until(() => tokens.length > 0, "the session's token");
@@ -289,7 +289,7 @@ describe("mcp", () => {
       const reply = await c.tool("library_item_add", { path });
       expect(reply).toContain("没成");
     }
-    const fetched = await library.list({ origin: "fetched" });
+    const fetched = await media.libraryItems({ origin: "fetched" });
     expect(fetched).toEqual([expect.objectContaining({ origin: { kind: "fetched", agent: "lab", session: id, from: { path: "out/two.html" } } })]);
   });
 

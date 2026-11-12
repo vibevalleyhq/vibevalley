@@ -42,11 +42,11 @@ const image = (id: string, attachment: T.Attachment, phase: T.MediaPhase): T.Med
 describe("the library", () => {
   test("keeps what the user says with a file, and what a ready job made, once each", async () => {
     await using farm = await world();
-    const { library, channel: chat, core } = farm;
+    const { media, channel: chat, core } = farm;
     const said = await farm.attachment.attach(file("note.txt", "打卡规则"));
     const { message } = await chat.post({ _tag: "User", text: "看这个", sendKey: "k1", attachments: [said.id] });
     const uploaded = await waitFor(
-      () => library.list({ origin: "uploaded" }),
+      () => media.libraryItems({ origin: "uploaded" }),
       (items) => items.length === 1,
       "the uploaded file",
     );
@@ -57,7 +57,7 @@ describe("the library", () => {
     core.apply({ type: "mediaChanged", jobs: [image("job-1", made, "ready")] });
     core.apply({ type: "mediaChanged", jobs: [image("job-1", made, "ready")] });
     const generated = await waitFor(
-      () => library.list({ origin: "generated" }),
+      () => media.libraryItems({ origin: "generated" }),
       (items) => items.length === 1,
       "the generated file",
     );
@@ -66,7 +66,7 @@ describe("the library", () => {
     // The same file said again is the same item, its first origin kept.
     await chat.post({ _tag: "User", text: "再看一次", sendKey: "k2", attachments: [made.id] });
     const all = await waitFor(
-      () => library.list({}),
+      () => media.libraryItems({}),
       (items) => items[0]?.attachment.id === made.id && items[0].lastAt > items[0].addedAt,
       "the item moved up",
     );
@@ -74,13 +74,13 @@ describe("the library", () => {
       [made.id, "generated"],
       [said.id, "uploaded"],
     ]);
-    const images = await library.list({ type: "image" });
-    const others = await library.list({ type: "other" });
+    const images = await media.libraryItems({ type: "image" });
+    const others = await media.libraryItems({ type: "other" });
     expect([images.length, others.length]).toEqual([1, 1]);
     // Words in the name, any case; by name and by size the other way round from the arrivals.
-    const named = await library.list({ text: "CAT" });
-    const byName = await library.list({ sort: "name" });
-    const bySize = await library.list({ sort: "size" });
+    const named = await media.libraryItems({ text: "CAT" });
+    const byName = await media.libraryItems({ sort: "name" });
+    const bySize = await media.libraryItems({ sort: "size" });
     expect(named.map((i) => i.attachment.id)).toEqual([made.id]);
     expect(byName.map((i) => i.attachment.name)).toEqual(["cat.png", "note.txt"]);
     expect(bySize.map((i) => i.attachment.id)).toEqual(made.size >= said.size ? [made.id, said.id] : [said.id, made.id]);
@@ -88,22 +88,22 @@ describe("the library", () => {
 
   test("takes an item out but keeps the file a message has", async () => {
     await using farm = await world();
-    const { library, attachment: files } = farm;
+    const { media, attachment: files } = farm;
     const kept = await files.attach(file("a.txt", "a"));
-    const item = await library.add({ attachment: kept.id }, { kind: "user" });
+    const item = await media.addLibraryItem({ attachment: kept.id }, { kind: "user" });
     expect(item.origin).toEqual({ kind: "uploaded" });
-    const preview = await library.previewRemove(kept.id);
+    const preview = await media.previewRemoveLibraryItem(kept.id);
     expect(preview.does).toHaveLength(1);
-    await library.remove(kept.id);
-    const left = await library.list({});
+    await media.removeLibraryItem(kept.id);
+    const left = await media.libraryItems({});
     const stillThere = await files.get(kept.id);
-    const again = await failure(library.remove(kept.id));
+    const again = await failure(media.removeLibraryItem(kept.id));
     expect([left, stillThere === undefined, again.kind]).toEqual([[], false, "Missing"]);
   });
 
   test("refuses what does not name one public source, or is not the caller's to give", async () => {
     await using farm = await world();
-    const { library } = farm;
+    const { media } = farm;
     const helper: AddedBy = { kind: "agent", agent: "lab", session: sessionId("w1") };
     const notPublic = ["http://example.com/a.png", "https://127.0.0.1/a.png", "https://10.0.0.8/a.png", "https://[::1]/a.png", "file:///etc/passwd"];
     const asks: readonly (readonly [T.LibraryAddRequest, AddedBy])[] = [
@@ -116,7 +116,7 @@ describe("the library", () => {
       [{ path: "a.png" }, helper],
     ];
     const tags: string[] = [];
-    for (const [req, by] of asks) tags.push((await failure(library.add(req, by))).kind);
+    for (const [req, by] of asks) tags.push((await failure(media.addLibraryItem(req, by))).kind);
     expect(tags).toEqual(asks.map(() => "Refused"));
   });
 });
