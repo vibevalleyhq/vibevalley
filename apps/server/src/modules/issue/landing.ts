@@ -84,8 +84,7 @@ export function issueLanding(r: Pick<IssueLifecycle, "setConflict" | "savePullRe
     } catch (e) {
       throw e instanceof ApiError ? MergeFailure.error(e.message) : e;
     }
-    await chat.post({
-      _tag: "Notice",
+    await chat.notice({
       channel: thread,
       text: t("server.issue.prDelivered", { url: pr.url }),
       code: "issue_pr_delivery",

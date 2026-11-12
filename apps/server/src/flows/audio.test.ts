@@ -44,7 +44,7 @@ test("user-directed audio tools create attributed dialogue and a preview without
   await configure(fw);
   const media = fw.media;
   const chat = fw.channel;
-  await chat.say("Create dialogue and a voice preview", {}, undefined, "");
+  await chat.say({ text: "Create dialogue and a voice preview", sendKey: "" });
   await waitFor(
     () => media.list(),
     (jobs) => [dialogue.id, design.id].every((id) => jobs.some((job) => job.id === id && job.phase === "ready")),
@@ -62,7 +62,7 @@ test("user-directed audio tools create attributed dialogue and a preview without
   expect(preview.result).toBeNull();
   expect(speech.attachment?.id).toMatch(/^[a-f0-9]{64}$/u);
   await until(() => requests.length >= 2, "audio creation acknowledged");
-  await chat.say("Read both audio results", {}, undefined, "");
+  await chat.say({ text: "Read both audio results", sendKey: "" });
   await until(() => requests.length >= 4, "audio results delivered");
   const results = requests.flatMap((request) => request.messages.filter((message) => message.role === "toolResult").map(messageText)).join("\n");
   expect(results).toContain(speech.attachment?.id);

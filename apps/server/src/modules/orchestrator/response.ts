@@ -57,10 +57,10 @@ export const makeResponses = (sessions: Session, channel: Channel, clock: Clock)
         const response = open(true);
         try {
           try {
-            await channel.user({
+            await channel.say({
               source: "voice",
               text,
-              envelope: newId(),
+              sendKey: newId(),
               responsePort: response.id,
               voiceMode: on === "phone" ? "conversation" : "api",
             });

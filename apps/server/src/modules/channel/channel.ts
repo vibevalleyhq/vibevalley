@@ -4,7 +4,7 @@ import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { userId } from "@vibevalley/protocol";
 
-import { ApiError, BizCode, lookIn, missing, refuseIn } from "#/base/errors.ts";
+import { BizCode, lookIn, missing, refuseIn } from "#/base/errors.ts";
 import type { Core } from "#/core/core.ts";
 import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
@@ -23,10 +23,11 @@ import {
   type Meta,
   metaOf,
   metaText,
+  type Noticing,
   type Picked,
-  type Post,
-  type PostOf,
-  type SayMore,
+  type Posting,
+  type Saying,
+  type Speaking,
   type Spoken,
   theRow,
   toMessage,
@@ -160,76 +161,55 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
     if (!(await qm.messageByNumber(db.sql, { channel_id: channel, number }))) throw refused(t("server.channel.noMessage", { n: number }));
   };
 
-  const userSays = async (
-    text: string,
-    channel: string | undefined,
-    sendKey: string,
-    more: SayMore,
-    source: Meta["ingressSource"],
-    responsePort?: string,
-    voiceMode?: Meta["voiceMode"],
-  ): Promise<{ message: T.ChatMessage; again: boolean }> => {
-    const files = await attachmentsOf(more.attachments ?? []);
-    if (!text.trim() && files.length === 0) throw refused(t("server.channel.empty"));
-    if (sendKey.length > sendKeyMax) throw refused(t("server.channel.sendKeyLong"));
-    if (more.to !== undefined && !isAssistant(more.to)) throw refused(t("server.channel.notOrchestrator", { id: more.to }));
-    // A channel as the user names it (general, #general, @fox) as well as by id; none is the default one.
-    const where = channel === undefined || store.channel(channel) ? (channel ?? store.defaultId()) : await resolveTarget(userId, channel);
-    if (!store.channel(where)) throw missing(t("server.channel.noChannel", { id: where }), [lookIn.channel]);
-    await answered(where, more.replyTo);
-    const written = await write({
-      channel: where,
-      from: userId,
-      kind: "chat",
-      text: text.trim(),
-      sendKey,
-      readBy: userId,
-      ...(more.replyTo !== undefined ? { replyTo: more.replyTo } : {}),
-      ...(files.length > 0 || more.picked || (more.blocks?.length ?? 0) > 0 || source || responsePort || voiceMode || more.to !== undefined
-        ? {
-            meta: {
-              ...(more.to !== undefined ? { ingressRecipient: more.to } : {}),
-              ...(files.length > 0 ? { attachments: files } : {}),
-              ...(more.picked ? { picked: more.picked } : {}),
-              ...((more.blocks?.length ?? 0) > 0 ? { blocks: more.blocks } : {}),
-              ...(source ? { ingressSource: source } : {}),
-              ...(source === "voice" ? { spoken: true } : {}),
-              ...(responsePort ? { responsePort } : {}),
-              ...(voiceMode ? { voiceMode } : {}),
-            },
-          }
-        : {}),
+  const say = ({ text, channel, sendKey, source, responsePort, voiceMode, ...more }: Saying) =>
+    store.locked(async (): Promise<{ message: T.ChatMessage; again: boolean }> => {
+      core.open();
+      const files = await attachmentsOf(more.attachments ?? []);
+      if (!text.trim() && files.length === 0) throw refused(t("server.channel.empty"));
+      if (sendKey.length > sendKeyMax) throw refused(t("server.channel.sendKeyLong"));
+      if (more.to !== undefined && !isAssistant(more.to)) throw refused(t("server.channel.notOrchestrator", { id: more.to }));
+      // A channel as the user names it (general, #general, @fox) as well as by id; none is the default one.
+      const where = channel === undefined || store.channel(channel) ? (channel ?? store.defaultId()) : await resolveTarget(userId, channel);
+      if (!store.channel(where)) throw missing(t("server.channel.noChannel", { id: where }), [lookIn.channel]);
+      await answered(where, more.replyTo);
+      const picked: Picked = {
+        ...(more.picked?.agent ? { agent: more.picked.agent } : {}),
+        ...(more.picked?.repo?.trim() ? { repo: more.picked.repo.trim() } : {}),
+      };
+      const meta: Meta = {
+        ...(more.to !== undefined ? { ingressRecipient: more.to } : {}),
+        ...(files.length > 0 ? { attachments: files } : {}),
+        ...(picked.agent || picked.repo ? { picked } : {}),
+        ...((more.blocks?.length ?? 0) > 0 ? { blocks: more.blocks } : {}),
+        ...(source ? { ingressSource: source } : {}),
+        ...(source === "voice" ? { spoken: true } : {}),
+        ...(responsePort ? { responsePort } : {}),
+        ...(voiceMode ? { voiceMode } : {}),
+      };
+      const written = await write({
+        channel: where,
+        from: userId,
+        kind: "chat",
+        text: text.trim(),
+        sendKey,
+        readBy: userId,
+        ...(more.replyTo !== undefined ? { replyTo: more.replyTo } : {}),
+        ...(Object.keys(meta).length > 0 ? { meta } : {}),
+      });
+      if (written.again) return { message: toMessage(written.row), again: true };
+      if (written.absent.length > 0)
+        core.notice(
+          "warn",
+          t("server.channel.absent", { who: list(written.absent.map((mention) => mentionOf(mention) ?? "@" + mention)), n: written.absent.length }),
+        );
+      return { message: toMessage(written.row), again: false };
     });
-    if (written.again) return { message: toMessage(written.row), again: true };
-    if (written.absent.length > 0)
-      core.notice(
-        "warn",
-        t("server.channel.absent", { who: list(written.absent.map((mention) => mentionOf(mention) ?? "@" + mention)), n: written.absent.length }),
-      );
-    return { message: toMessage(written.row), again: false };
-  };
 
   const recent = async (channel: string, n: number): Promise<AddressedMessage[]> => {
     if (!store.channel(channel)) return [];
     return [...(await qm.messagesBefore(db.sql, { channel_id: channel, number: 2147483647, n }))].toReversed().map(addressedOf);
   };
-  const postUser = (p: PostOf<"User">) => store.locked(() => userSays(p.text, p.channel, p.sendKey, p, p.source, p.responsePort, p.voiceMode));
-
-  const postHome = ({ from, home, text, sendKey, run }: PostOf<"Home">) =>
-    store.locked(async (): Promise<T.ChatMessage> => {
-      const written = await write({
-        channel: home,
-        from,
-        kind: "chat",
-        text: text.trim(),
-        meta: run ? { run } : {},
-        sendKey,
-        ...(from === userId ? { readBy: userId } : {}),
-      });
-      return toMessage(written.row);
-    });
-
-  const postAgent = ({ from, text, run, ...opt }: PostOf<"Agent">) =>
+  const speak = ({ from, text, run, ...opt }: Speaking) =>
     store.locked(async (): Promise<Spoken> => {
       const words = text.trim();
       if (!words) throw refused(t("server.channel.empty"));
@@ -260,7 +240,6 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         if (newest) await store.setRead(from, channel, newest.number, now);
         return { kind: "held", target, shown, more: unseen.length - shown.length };
       }
-      // calledBy finds only participants of kind agent, and those are sessions (their ids are session ids).
       await answered(channel, opt.reply);
       const written = await write({
         channel,
@@ -275,112 +254,33 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
       return { kind: "sent", message: toMessage(written.row), target, absent: written.absent };
     });
 
-  const postAnnounce = ({ from, channel, text, made, sendKey = "", run }: PostOf<"Announce">) =>
-    store.locked(async () => {
+  const post = ({ from, channel, text, run, sendKey = "", made, spoken }: Posting) =>
+    store.locked(async (): Promise<{ message: T.ChatMessage; again: boolean }> => {
+      if (sendKey.length > sendKeyMax) throw refused(t("server.channel.sendKeyLong"));
+      if (!text.trim() && made === undefined) throw refused(t("server.channel.empty"));
       const where = store.channel(channel) ? channel : await resolveTarget(from, channel);
       if (!store.channel(where)) throw refused(t("server.channel.channelGone"));
-      const shown = "card" in made ? { artifact: made.card } : { attachments: await attachmentsOf(made.attachments) };
+      const shown = made === undefined ? {} : "card" in made ? { artifact: made.card } : { attachments: await attachmentsOf(made.attachments) };
       const written = await write({
         channel: where,
         from,
         kind: "chat",
         text: text.trim(),
-        meta: { ...(run ? { run } : {}), ...shown },
+        meta: { ...(run ? { run } : {}), ...(spoken === true ? { spoken } : {}), ...shown },
         sendKey,
-        ...(from === userId ? { readBy: userId } : {}),
+        readBy: from,
       });
-      if (from !== userId) {
-        const now = clock.now();
-        await store.setRead(from, where, written.row.number, now);
-      }
-      return toMessage(written.row);
+      return { message: toMessage(written.row), again: written.again };
     });
 
-  const postCall = ({ from, text, sendKey }: PostOf<"Call">) =>
-    store.locked(async () => {
-      if (sendKey.length > sendKeyMax) throw refused(t("server.channel.sendKeyLong"));
-      if (!text.trim()) return false;
-      try {
-        const written = await write({
-          channel: store.defaultId(),
-          from,
-          kind: "chat",
-          text: text.trim(),
-          meta: { spoken: true },
-          sendKey,
-          ...(from === userId ? { readBy: userId } : {}),
-        });
-        return written.again;
-      } catch (d) {
-        if (d instanceof ApiError) throw d;
-        // Words said on a call are best kept, never a reason the call fails: the call goes on without them.
-        log.warn(`chat: words said on a call: ${String(d)}`);
-        return false;
-      }
-    });
-
-  const postRun = ({ channel, text, run, from }: PostOf<"Run">) =>
-    bestEffort(log, "chat: a run's words", async () => {
-      if (!text.trim()) return;
-      await store.locked(() => write({ channel, from, kind: "chat", text, meta: run ? { run } : {} }));
-    });
-
-  const postNotice = ({ channel, text, code, sendKey = "" }: PostOf<"Notice">) =>
+  const notice = ({ channel, text, code, sendKey = "" }: Noticing) =>
     bestEffort(log, "chat: notice", () => store.locked(() => write({ channel, from: "system", kind: "notice", text, meta: { code }, sendKey })));
 
-  // One door; each kind keeps its own checks and answer, and the overloads tie the answer to the kind.
-  function post(p: PostOf<"User">): Promise<{ message: T.ChatMessage; again: boolean }>;
-  function post(p: PostOf<"Home">): Promise<T.ChatMessage>;
-  function post(p: PostOf<"Agent">): Promise<Spoken>;
-  function post(p: PostOf<"Announce">): Promise<T.ChatMessage>;
-  function post(p: PostOf<"Call">): Promise<boolean>;
-  function post(p: PostOf<"Run"> | PostOf<"Notice">): Promise<void>;
-  function post(p: Post): Promise<{ message: T.ChatMessage; again: boolean } | T.ChatMessage | Spoken | boolean | void> {
-    switch (p._tag) {
-      case "User":
-        return postUser(p);
-      case "Home":
-        return postHome(p);
-      case "Agent":
-        return postAgent(p);
-      case "Announce":
-        return postAnnounce(p);
-      case "Call":
-        return postCall(p);
-      case "Run":
-        return postRun(p);
-      case "Notice":
-        return postNotice(p);
-    }
-  }
-
   const shape: Channel = {
-    user: (input) => {
-      core.open();
-      return post({
-        _tag: "User",
-        text: input.text,
-        channel: input.channel,
-        sendKey: input.envelope,
-        source: input.source,
-        ...(input.picked ? { picked: input.picked } : {}),
-        ...(input.responsePort ? { responsePort: input.responsePort } : {}),
-        ...(input.voiceMode ? { voiceMode: input.voiceMode } : {}),
-      });
-    },
-    say: async (text, pick, channel, sendKey, more) => {
-      const picked: Picked = { ...(pick.agent ? { agent: pick.agent } : {}), ...(pick.repo?.trim() ? { repo: pick.repo.trim() } : {}) };
-      core.open();
-      await post({
-        _tag: "User",
-        text,
-        channel,
-        sendKey,
-        ...more,
-        ...(picked.agent || picked.repo ? { picked } : {}),
-      });
-    },
+    say,
+    speak,
     post,
+    notice,
     userReads: () => userReadHub.subscribe(),
     now: () => core.state().chat,
     ...channelStreams(own, store, said),

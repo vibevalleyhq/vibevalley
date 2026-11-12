@@ -33,7 +33,7 @@ describe("resource_read", () => {
     const read = tools.orchestrator(caller).find((item) => item.name === "resource_read");
     if (read === undefined) throw new Error("resource_read is missing");
     const original = "甲".repeat(500);
-    const message = (await channels.post({ _tag: "User", text: original, sendKey: "" })).message;
+    const message = (await channels.say({ text: original, sendKey: "" })).message;
     const uri = `vv://envelope/${message.id}`;
     const firstText = await textResult(read, { uri, offset: 0, limit: 120 });
     let page = decodePage(firstText);
@@ -58,7 +58,7 @@ describe("resource_read", () => {
     const issues = testIssues(farm.issue);
     const tools = farm.tool;
     const secret = await channels.openChannel("secret", "", "");
-    const message = (await channels.post({ _tag: "User", text: "user only", channel: secret.id, sendKey: "" })).message;
+    const message = (await channels.say({ text: "user only", channel: secret.id, sendKey: "" })).message;
     const agent = sampleAgent({ id: "lab" });
     await farm.agent.save(agent);
     const issue = await issues.add({ title: "work", repo: "demo", agent: agent.id });

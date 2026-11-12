@@ -94,7 +94,6 @@ export function makeImage(deps: ImageDeps, machine: Machine) {
     const attachment = decodeAttachment(row.attachment);
     const request = decodeRequest(row.request);
     await channel.post({
-      _tag: "Announce",
       from: source.agent,
       channel: source.channel,
       text: t("server.media.imageMade", { prompt: head(request.prompt, 80) }),

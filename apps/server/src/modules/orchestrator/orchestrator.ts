@@ -11,7 +11,7 @@ import { head } from "#/base/clip.ts";
 import { BizCode, refuseIn } from "#/base/errors.ts";
 import { usersLanguage } from "#/base/prompts.ts";
 import { agentHome, reposDir, type ServerConfig } from "#/infra/config.ts";
-import type { Logger } from "#/infra/log.ts";
+import { bestEffort, type Logger } from "#/infra/log.ts";
 import { localeMinute, type Time } from "#/infra/time.ts";
 import { type Agent, noDeepSeekKey } from "#/modules/agent/agent.ts";
 import { traitsOf } from "#/modules/agent/prompts.ts";
@@ -162,7 +162,8 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
         first: { channel: chat.defaultChannel(), envelope: "", source: "user" },
         quiet: () => false,
         say: async (r, text, runId) => {
-          await chat.post({ _tag: "Run", from: id, channel: r.channel, text: text, run: runId });
+          // A run's words are best kept, never a reason the run fails; nothing said is nothing written.
+          if (text.trim()) await bestEffort(log, "a run's words", () => chat.post({ from: id, channel: r.channel, text: text, run: runId }));
         },
         channel: (r) => r.channel,
         fresh: () => {
@@ -304,7 +305,7 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
         const words = e.why === noDeepSeekKey() ? t("server.orchestrator.noKey") : t("server.orchestrator.cannotStart", { why: e.why });
         const again = me.cannot.get(n.channel) === words;
         me.cannot.set(n.channel, words);
-        if (!again) await chat.post({ _tag: "Run", from: me.id, channel: n.channel, text: words, run: e.run });
+        if (!again) await bestEffort(log, "a run's words", () => chat.post({ from: me.id, channel: n.channel, text: words, run: e.run }));
         taken = false;
       }
     } catch (e) {

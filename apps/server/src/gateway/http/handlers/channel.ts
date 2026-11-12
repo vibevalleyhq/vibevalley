@@ -54,7 +54,11 @@ export function channelHandlers(deps: ChannelHandlersDeps): ChannelHandlers {
       const blocks = await quoteBlocks(artifacts, body.blocks, log);
       // A profile picked that is not there is not passed on.
       const picked = body.agent !== undefined ? agents.agent(body.agent)?.id : undefined;
-      await channels.say(body.text, { ...(picked ? { agent: picked } : {}), ...(body.repo ? { repo: body.repo } : {}) }, body.id, body.sendKey ?? "", {
+      await channels.say({
+        text: body.text,
+        channel: body.id,
+        sendKey: body.sendKey ?? "",
+        picked: { ...(picked ? { agent: picked } : {}), ...(body.repo ? { repo: body.repo } : {}) },
         ...(body.replyTo !== undefined ? { replyTo: body.replyTo } : {}),
         ...(body.attachments ? { attachments: body.attachments } : {}),
         ...(blocks.length > 0 ? { blocks } : {}),

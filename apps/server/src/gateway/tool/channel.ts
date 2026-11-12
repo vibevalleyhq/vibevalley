@@ -36,8 +36,7 @@ export function channelTools(deps: Pick<ToolDeps, "channel" | "session">) {
   const messageSend = (who: Who) =>
     sessionSchemaTool("channel.message.send", async (p: SessionInput<"channel.message.send">) => {
       const c = callerOf(who);
-      const spoken = await chat.post({
-        _tag: "Agent",
+      const spoken = await chat.speak({
         from: participant(c),
         text: p.text,
         ...runOf(participant(c)),

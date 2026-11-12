@@ -336,7 +336,7 @@ export async function makeVoice(deps: VoiceDeps, options: VoiceOptions = {}): Pr
   const heard = async (agentId: string, text: string, picked: string, sendKey: string) => {
     const call = callOf(agentId);
     if (!call.quick) return;
-    await chat.user({ source: "voice", text, envelope: sendKey, ...(picked ? { picked: { agent: picked } } : {}) });
+    await chat.say({ source: "voice", text, sendKey, ...(picked ? { picked: { agent: picked } } : {}) });
   };
 
   /** The account MOSS Live calls on, or why there is none, as the voice page says it. */
@@ -584,7 +584,7 @@ export async function makeVoice(deps: VoiceDeps, options: VoiceOptions = {}): Pr
       const call = callOf(agentId);
       if (call.quick && text.trim() !== call.greeting)
         await bestEffort(log, "vibevalley: voice: the orchestrator's spoken words were not kept", () =>
-          chat.post({ _tag: "Call", from: defaultOrchestrator, text: text, sendKey: "" }),
+          chat.post({ from: defaultOrchestrator, channel: chat.defaultChannel(), text: text, spoken: true }),
         );
     },
     verifyMoss: async () => {

@@ -115,26 +115,30 @@ export interface Spoken {
   readonly lastRead?: string;
 }
 
-interface SpeakOptions {
+/** An agent's words in the chat, as it means them. */
+export interface Speaking {
+  readonly from: string;
+  readonly text: string;
+  readonly run?: string;
+  /** Where, as the speaker would say it; none is its home (or the default channel). */
   readonly target?: string;
+  /** Sent though there are newer words it has not seen. */
   readonly anyway?: boolean;
+  /** Sent on a channel right after it read a thread elsewhere. */
   readonly confirm?: boolean;
   readonly reply?: number;
 }
 
+/** What was made, shown on the message that says so: an artifact's card, or the files. */
 export type Made = { readonly card: T.ArtifactCard } | { readonly attachments: readonly string[] };
 
-export interface UserInput {
-  readonly source: "connector" | "voice";
-  readonly channel?: string;
-  readonly envelope: string;
+/** The user's words. */
+export interface Saying {
   readonly text: string;
-  readonly picked?: Picked;
-  readonly responsePort?: string;
-  readonly voiceMode?: "dictated" | "conversation" | "api";
-}
-
-export interface SayMore {
+  /** A place's id, or a channel as the user names it (general, #general, @fox); none is the default channel. */
+  readonly channel?: string | undefined;
+  /** The client's key for this send: a retry with it is the same message. */
+  readonly sendKey: string;
   readonly source?: "connector" | "voice";
   readonly responsePort?: string;
   readonly voiceMode?: "dictated" | "conversation" | "api";
@@ -144,6 +148,28 @@ export interface SayMore {
   readonly blocks?: readonly T.QuotedBlock[];
   /** Delivers only to this orchestrator instead of channel members. */
   readonly to?: string;
+}
+
+/** Words written as `from` into a place: no check of what it has seen, as an agent's speech has. */
+export interface Posting {
+  readonly from: string;
+  /** A place's id, or an address as `from` would say it ("" is its home, or the default channel). */
+  readonly channel: string;
+  readonly text: string;
+  readonly run?: string;
+  readonly sendKey?: string;
+  /** What was made, shown with the words (which may then be empty). */
+  readonly made?: Made;
+  /** Said aloud on a call: already heard there, so it wakes no one. */
+  readonly spoken?: boolean;
+}
+
+/** The farm's own line in a place; `code` names what it is about. */
+export interface Noticing {
+  readonly channel: string;
+  readonly text: string;
+  readonly code: string;
+  readonly sendKey?: string;
 }
 
 interface ReadOptions {
@@ -198,38 +224,6 @@ export interface Write {
   readonly replyTo?: number;
   /** Advances this participant's read cursor in the same transaction. */
   readonly readBy?: string;
-}
-
-export type Post =
-  | ({ readonly _tag: "User"; readonly text: string; readonly channel?: string | undefined; readonly sendKey: string } & SayMore)
-  /** Said in the speaker's home (the place an empty target means), as `from` (its run, if any). */
-  | { readonly _tag: "Home"; readonly from: string; readonly home: string; readonly text: string; readonly sendKey: string; readonly run?: string }
-  | ({ readonly _tag: "Agent"; readonly from: string; readonly text: string; readonly run?: string } & SpeakOptions)
-  | {
-      readonly _tag: "Announce";
-      readonly from: string;
-      readonly channel: string;
-      readonly text: string;
-      readonly made: Made;
-      readonly sendKey?: string;
-      readonly run?: string;
-    }
-  /** Recorded in the default channel without waking anyone. */
-  | { readonly _tag: "Call"; readonly from: string; readonly text: string; readonly sendKey: string }
-  | { readonly _tag: "Run"; readonly from: string; readonly channel: string; readonly text: string; readonly run: string }
-  /** `code` deduplicates repeated system notices. */
-  | { readonly _tag: "Notice"; readonly channel: string; readonly text: string; readonly code: string; readonly sendKey?: string };
-
-export type PostOf<Tag extends Post["_tag"]> = Extract<Post, { readonly _tag: Tag }>;
-
-/** Each kind of post with its answer; Run and Notice are best effort and never fail. */
-export interface PostDoor {
-  (p: PostOf<"User">): Promise<{ message: T.ChatMessage; again: boolean }>;
-  (p: PostOf<"Home">): Promise<T.ChatMessage>;
-  (p: PostOf<"Agent">): Promise<Spoken>;
-  (p: PostOf<"Announce">): Promise<T.ChatMessage>;
-  (p: PostOf<"Call">): Promise<boolean>;
-  (p: PostOf<"Run"> | PostOf<"Notice">): Promise<void>;
 }
 
 /** An agent seated to speak in the chat: an assistant (a profile speaking as itself, no `agent`), or a helper speaking
@@ -341,9 +335,15 @@ export interface ChannelService {
   readonly userReads: () => Subscription<UserRead>;
   readonly defaultChannel: () => string;
   readonly makeDefault: (id: string) => Promise<void>;
-  readonly user: (input: UserInput) => Promise<{ message: T.ChatMessage; again: boolean }>;
-  readonly say: (text: string, pick: Picked, channel: string | undefined, sendKey: string, more?: SayMore) => Promise<void>;
-  readonly post: PostDoor;
+  /** The user's words in a place: the farm goes live. */
+  readonly say: (s: Saying) => Promise<{ readonly message: T.ChatMessage; readonly again: boolean }>;
+  /** An agent's words: a retry of the same words is the same message; newer words it has not seen are shown instead of
+   * sending (held), and a channel right after reading a thread elsewhere is confirmed once. */
+  readonly speak: (s: Speaking) => Promise<Spoken>;
+  /** Words written as `from` into a place; the speaker has read the place up to them. */
+  readonly post: (p: Posting) => Promise<{ readonly message: T.ChatMessage; readonly again: boolean }>;
+  /** The farm's notice; best effort, it never fails. */
+  readonly notice: (n: Noticing) => Promise<void>;
   /** Edits do not wake participants. */
   readonly edit: (id: T.MessageId, text: string, keep?: readonly string[]) => Promise<T.ChatMessage>;
   /** Clears content and withdraws pending deliveries while preserving the message number. */

@@ -294,7 +294,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     }
     if (isClosed(issue.status)) throw refused(t("server.issue.closedReopen"));
     const thread = await chat.issueThread(issue.id, issue.title, session?.channel);
-    await chat.post({ _tag: "User", text: text, channel: thread, sendKey: sendKey });
+    await chat.say({ text: text, channel: thread, sendKey: sendKey });
     return { thread, ...(session ? { worker: session } : {}) };
   };
 
@@ -578,8 +578,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
         if (taker) await edit(id, { agent: taker.id }, by);
         await start(id, channel);
         const issueThread2 = await chat.issueThread(id, item.title, channel || undefined);
-        await chat.post({
-          _tag: "Notice",
+        await chat.notice({
           channel: issueThread2,
           text: t("server.issue.confirmedRequirements", { title: item.title, description: item.description, criteria: item.criteria.join("\n") }),
           code: "issue_confirmed",

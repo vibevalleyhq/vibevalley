@@ -180,8 +180,7 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
     const version = body === "html" ? 1 : 0;
     const card: T.ArtifactCard = { id, title, body, version, note: note ?? "", ...(display === null ? {} : { display }) };
     // Said first: the name it goes by is the one the channel knows its maker by.
-    const said = await chat.post({
-      _tag: "Announce",
+    const { message: said } = await chat.post({
       from: maker.from,
       channel: channel,
       text: words(t("server.artifact.made", { title }), note),
@@ -230,8 +229,7 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
     const shown = row.display !== null && isOneOf(ArtifactDisplayValues, row.display) ? { display: row.display } : {};
     const card: T.ArtifactCard = { id: S.artifactId(row.id), title: row.title, body: "html", version: next, note: note ?? "", ...shown };
     // Announced where the first one was: its comments stay in one place.
-    const said = await chat.post({
-      _tag: "Announce",
+    const { message: said } = await chat.post({
       from: maker.from,
       channel: row.channel_id ?? "",
       text: words(t("server.artifact.versioned", { title: row.title, version: next }), note),

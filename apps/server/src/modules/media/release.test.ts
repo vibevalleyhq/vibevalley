@@ -158,8 +158,7 @@ test("regression: releasing a design preview keeps its channel attachment and a 
   expect(design.phase, design.problem).toBe("ready");
   if (design.kind !== "voiceDesign" || !design.previewInput || !design.attachment) throw new Error("Missing saved voice preview");
   const channel = f.farm.channel;
-  const published = await channel.post({
-    _tag: "User",
+  const published = await channel.say({
     text: "Published preview",
     sendKey: "release-preview-published",
     attachments: [design.attachment.id],
@@ -174,7 +173,7 @@ test("regression: releasing a design preview keeps its channel attachment and a 
   const file = await f.farm.attachment.get(design.attachment.id);
   if (!file) throw new Error("Release deleted an independently owned channel attachment");
   expect(readFileSync(file.path)).toEqual(wav());
-  const said = await channel.post({ _tag: "User", text: "Published preview", sendKey: "release-preview-published", attachments: [design.attachment.id] });
+  const said = await channel.say({ text: "Published preview", sendKey: "release-preview-published", attachments: [design.attachment.id] });
   expect(said).toMatchObject({
     again: true,
     message: published.message,

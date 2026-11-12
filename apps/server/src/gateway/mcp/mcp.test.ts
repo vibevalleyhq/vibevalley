@@ -140,7 +140,7 @@ describe("mcp", () => {
       "resource_read",
       "session_list",
     ]);
-    const extra = (await chat.post({ _tag: "User", text: "顺手做另一件事", channel: thread, sendKey: "extra" })).message;
+    const extra = (await chat.say({ text: "顺手做另一件事", channel: thread, sendKey: "extra" })).message;
     const mailbox = farm.inside;
     await waitFor(
       () => mailbox.deliveriesOf(id).find((row) => row.envelope_id === extra.id)?.channel_id,
@@ -319,7 +319,7 @@ describe("mcp", () => {
       },
     );
     const direct = await farm.watch.direct("lab");
-    await chat.post({ _tag: "User", text: "在这里做一份", channel: direct, sendKey: "" });
+    await chat.say({ text: "在这里做一份", channel: direct, sendKey: "" });
     await until(() => tokens.length > 0, "the channel context's token");
     const c = client(mcp, tokens[0]!);
     await c.init();

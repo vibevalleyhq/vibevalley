@@ -96,7 +96,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
   const log = env.log.child(id);
   const say = async (text: string, channel: string | undefined, sendKey: string) => {
     try {
-      await chat.user({ source: "connector", text, ...(channel ? { channel } : {}), envelope: sendKey });
+      await chat.say({ source: "connector", text, ...(channel ? { channel } : {}), sendKey });
     } catch (e) {
       throw refusedStep(e);
     }

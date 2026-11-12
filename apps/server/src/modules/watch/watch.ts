@@ -160,7 +160,7 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
     }
   };
 
-  const notice = (channel: string, text: string, code: string) => chat.post({ _tag: "Notice", channel, text, code });
+  const notice = (channel: string, text: string, code: string) => chat.notice({ channel, text, code });
 
   const startTalk = async (channel: string, agentId: string) => {
     if (talkSession(channel)) return;
@@ -382,7 +382,7 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
     },
     tell: async (from, session, text, sendKey) => {
       const home = await chat.homeOf(session);
-      if (home) return chat.post({ _tag: "Home", from, home, text, sendKey, ...(sessions.live(from).run ? { run: sessions.live(from).run } : {}) });
+      if (home) return (await chat.post({ from, channel: home, text, sendKey, ...(sessions.live(from).run ? { run: sessions.live(from).run } : {}) })).message;
       // Sent with no place to say it in: the session hears it as a trigger addressed to it alone.
       if (!sessions.live(session).reachable) throw missing(t("server.channel.noHelper", { id: session }), [lookIn.session]);
       const channel = sessionOf(session)?.channel;

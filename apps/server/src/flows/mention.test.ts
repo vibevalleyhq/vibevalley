@@ -29,10 +29,9 @@ test("an unresolved user mention survives both history windows and restart until
       await using farm = await world({ config });
       const chat = farm.channel;
       const core = farm.core;
-      const parent = (await chat.post({ _tag: "User", text: "需要确认的话题", sendKey: "" })).message;
+      const parent = (await chat.say({ text: "需要确认的话题", sendKey: "" })).message;
       const written = (
-        await chat.post({
-          _tag: "Agent",
+        await chat.speak({
           from: "orchestrator",
           text: "@用户 请确认这份变更",
           target: `#general:${parent.number}`,
@@ -42,11 +41,10 @@ test("an unresolved user mention survives both history windows and restart until
       ({ channel: thread, id: message, at, number } = written);
       expect(mentionIds(core)).toEqual([message]);
       for (let i = 0; i < 101; i++) {
-        const other = (await chat.post({ _tag: "User", text: `其他话题 ${i}`, sendKey: "" })).message;
-        const fresh = (await chat.post({ _tag: "Agent", from: "orchestrator", text: "其他答复", target: `#general:${other.number}`, anyway: true })).message!
-          .channel;
-        await chat.post({ _tag: "Notice", channel: fresh, text: "动静一", code: "history" });
-        await chat.post({ _tag: "Notice", channel: fresh, text: "动静二", code: "history" });
+        const other = (await chat.say({ text: `其他话题 ${i}`, sendKey: "" })).message;
+        const fresh = (await chat.speak({ from: "orchestrator", text: "其他答复", target: `#general:${other.number}`, anyway: true })).message!.channel;
+        await chat.notice({ channel: fresh, text: "动静一", code: "history" });
+        await chat.notice({ channel: fresh, text: "动静二", code: "history" });
       }
       standing(core);
     }
@@ -69,16 +67,16 @@ test("only reading or replying in the mentioned channel completes a user mention
     const chat = farm.channel;
     const core = farm.core;
     const channel = await chat.openChannel("review", "", "");
-    const first = (await chat.post({ _tag: "Agent", from: "orchestrator", text: "@用户 第一份变更", target: "#review", anyway: true })).message!;
-    await chat.post({ _tag: "User", text: "默认频道的另一件事", sendKey: "" });
+    const first = (await chat.speak({ from: "orchestrator", text: "@用户 第一份变更", target: "#review", anyway: true })).message!;
+    await chat.say({ text: "默认频道的另一件事", sendKey: "" });
     expect(mentionIds(core)).toEqual([first.id]);
-    await chat.post({ _tag: "User", text: "确认了", channel: channel.id, sendKey: "" });
+    await chat.say({ text: "确认了", channel: channel.id, sendKey: "" });
     expect(mentionIds(core)).toEqual([]);
-    const second = (await chat.post({ _tag: "Agent", from: "orchestrator", text: "@用户 第二份变更", target: "#review", anyway: true })).message!;
+    const second = (await chat.speak({ from: "orchestrator", text: "@用户 第二份变更", target: "#review", anyway: true })).message!;
     expect(mentionIds(core)).toEqual([second.id]);
     await chat.markRead(channel.id, second.number);
     expect(mentionIds(core)).toEqual([]);
-    const third = (await chat.post({ _tag: "Agent", from: "orchestrator", text: "@用户 第三份变更", target: "#review", anyway: true })).message!;
+    const third = (await chat.speak({ from: "orchestrator", text: "@用户 第三份变更", target: "#review", anyway: true })).message!;
     expect(mentionIds(core)).toEqual([third.id]);
     await chat.read("user", { target: "#review" });
     expect(mentionIds(core)).toEqual([]);

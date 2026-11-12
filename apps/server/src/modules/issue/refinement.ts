@@ -93,7 +93,7 @@ export function refinement(d: RefinementDeps) {
       const thread = await chat.issueThread(item.id, item.title, channel || undefined);
       const history = await chat.history(thread, undefined, 40);
       const brief = refinementBrief(item, said, where, history.map((message) => message.text).join("\n\n"));
-      if (said) await chat.post({ _tag: "User", text: said, channel: thread, sendKey: "" });
+      if (said) await chat.say({ text: said, channel: thread, sendKey: "" });
       await beforeRefinement(item, said, chosen.id, where);
       // A draft cut short (a restart) may have left the worktree as its refiner had it: each draft starts from main.
       const kept = where ? await sessions.clearWorkplace(item.id, where, item.number) : { kept: false };
@@ -115,7 +115,7 @@ export function refinement(d: RefinementDeps) {
     const said = sessions.live(f.id).lastText;
     const thread = await chat.homeOf(f.id);
     const tell = async (text: string) => {
-      if (thread) await chat.post({ _tag: "Notice", channel: thread, text: text, code: "issue_refinement" });
+      if (thread) await chat.notice({ channel: thread, text: text, code: "issue_refinement" });
       else core.notice("warn", text);
     };
     if (f.outcome === "completed") {

@@ -377,36 +377,35 @@ describe("the chat", () => {
     run(async (f, x) => {
       await hireAndRun(f, x, "w-page", "work", "paging-repo");
       const channel = await f.chat.openChannel("paging", "", "");
-      for (const text of ["first", "second", "third", "fourth", "fifth"]) await f.chat.post({ _tag: "User", text: text, channel: channel.id, sendKey: "" });
+      for (const text of ["first", "second", "third", "fourth", "fifth"]) await f.chat.say({ text: text, channel: channel.id, sendKey: "" });
       const options = { target: "#paging", confirm: true };
-      const first = await f.chat.post({ _tag: "Agent", from: "w-page", text: "reply", ...options });
+      const first = await f.chat.speak({ from: "w-page", text: "reply", ...options });
       expect(first.shown?.map((message) => message.text)).toEqual(["first", "second", "third"]);
       expect(first.more).toBe(2);
       const rows = await f.sql(`select read_number from channel_read_cursor where participant_id = 'w-page' and channel_id = $1`, [channel.id]);
       expect(rows).toEqual([{ read_number: 3 }]);
-      const second = await f.chat.post({ _tag: "Agent", from: "w-page", text: "reply", ...options });
+      const second = await f.chat.speak({ from: "w-page", text: "reply", ...options });
       expect(second.shown?.map((message) => message.text)).toEqual(["fourth", "fifth"]);
       expect(second.more).toBe(0);
-      expect((await f.chat.post({ _tag: "Agent", from: "w-page", text: "reply", ...options })).kind).toBe("sent");
+      expect((await f.chat.speak({ from: "w-page", text: "reply", ...options })).kind).toBe("sent");
     }));
   test("a line said to an orchestrator reaches it alone, even where no one is in; said to a helper it is refused", () =>
     run(async (f) => {
       const quiet = (await f.chat.openChannel("quiet", "", "")).id;
       await f.chat.updateChannel(quiet, { members: [] });
       // Routing is done when say returns: the deliveries are written with the message.
-      const unheard = (await f.chat.post({ _tag: "User", text: "有人吗", channel: quiet, sendKey: "" })).message;
-      const asked = (await f.chat.post({ _tag: "User", text: "/imagegen 一只在麦田里打盹的橘猫", channel: quiet, sendKey: "", to: defaultOrchestrator }))
-        .message;
+      const unheard = (await f.chat.say({ text: "有人吗", channel: quiet, sendKey: "" })).message;
+      const asked = (await f.chat.say({ text: "/imagegen 一只在麦田里打盹的橘猫", channel: quiet, sendKey: "", to: defaultOrchestrator })).message;
       const toNoOne = await f.deliveryOf(defaultOrchestrator, unheard.id);
       const toIt = await f.deliveryOf(defaultOrchestrator, asked.id);
       expect([toNoOne, toIt?.reason]).toEqual([undefined, "addressed"]);
-      const refused = await failure(f.chat.post({ _tag: "User", text: "画一张", channel: quiet, sendKey: "", to: "lab" }));
+      const refused = await failure(f.chat.say({ text: "画一张", channel: quiet, sendKey: "", to: "lab" }));
       expect(refused).toMatchObject({ name: "ApiError", bizCode: BizCode.ChannelRefused });
     }));
   test("regression: publishing to the orchestrator does not acknowledge model consumption", () =>
     run(async (f, x) => {
       const heard = news(f);
-      const message = (await f.chat.post({ _tag: "User", text: "等实际入模", sendKey: "" })).message;
+      const message = (await f.chat.say({ text: "等实际入模", sendKey: "" })).message;
       await heard.of(message.id);
       expect((await f.deliveryOf(defaultOrchestrator, message.id))?.state).toBe("handed");
       expect((await f.chat.history(f.chat.defaultChannel())).find((item) => item.id === message.id)?.reactions).toEqual([]);
@@ -425,9 +424,9 @@ describe("the chat", () => {
   // A budget, at what it takes today: one line from the user in the general channel, written, delivered and told. A change that asks more fails here.
   test("one line from the user reads and writes the database a bounded number of times", () =>
     run(async (f) => {
-      await f.chat.post({ _tag: "User", text: "先暖一下", sendKey: "" });
+      await f.chat.say({ text: "先暖一下", sendKey: "" });
       const before = dbQueries.count();
-      await f.chat.post({ _tag: "User", text: "今天进度怎么样", sendKey: "" });
+      await f.chat.say({ text: "今天进度怎么样", sendKey: "" });
       const used = dbQueries.count() - before;
       expect(used).toBeGreaterThan(0);
       expect(used, `${used} queries`).toBeLessThanOrEqual(17);
@@ -460,14 +459,14 @@ describe("the chat", () => {
       expect([talk.subjectKind, talk.subjectId]).toEqual(["talk", "w1"]);
       const dispatched = await hire(f, x, "w2", "写 world", "chat-t", undefined, "i1");
       expect([dispatched.subjectKind, dispatched.subjectId, dispatched.id !== talk.id]).toEqual(["issue", "i1", true]);
-      await f.chat.post({ _tag: "User", text: "把输出改成中文", channel: talk.id, sendKey: "" });
+      await f.chat.say({ text: "把输出改成中文", channel: talk.id, sendKey: "" });
       await until(() => x.runsOf("w1").length >= 2, "a second turn");
     }));
 
   test("the user's words in an issue thread wake its session", () =>
     run(async (f, x) => {
       const thread = await hireAndRun(f, x, "w2", "写 hello", "chat-b");
-      const { message: said } = await f.chat.post({ _tag: "User", text: "把输出改成中文", channel: thread.id, sendKey: "" });
+      const { message: said } = await f.chat.say({ text: "把输出改成中文", channel: thread.id, sendKey: "" });
       await until(() => x.runsOf("w2").length >= 2, "a second turn");
       expect(x.runsOf("w2")[1]).toContain(`[target=#general:${thread.rootNumber} msg=${said.number} from=用户] 把输出改成中文`);
       await until(async () => (await f.deliveryOf("w2", said.id))?.state === "consumed", "consumed");
@@ -479,7 +478,7 @@ describe("the chat", () => {
       await hireAndRun(f, x, "w3", "写 hello", "chat-c");
       const heard = news(f);
       const before = x.runsOf("w3").length;
-      const { message: said } = await f.chat.post({ _tag: "User", text: "今天进度怎么样", sendKey: "" });
+      const { message: said } = await f.chat.say({ text: "今天进度怎么样", sendKey: "" });
       const n = await heard.of(said.id);
       expect([n.messages.length, n.messages[0]!.text, n.target, n.channel]).toEqual([1, "今天进度怎么样", "#general", f.chat.defaultChannel()]);
       // Who is handed what is settled before say returns: a session not woken by now is not woken by it.
@@ -499,7 +498,7 @@ describe("the chat", () => {
       expect([direct?.peer, direct?.title, more.length]).toEqual([defaultOrchestrator, builtIn.name, 0]);
       const heard = news(f);
       const before = x.runsOf("w3").length;
-      const { message: said } = await f.chat.post({ _tag: "User", text: "@w3 你先别动，我们单独说", channel: direct!.id, sendKey: "" });
+      const { message: said } = await f.chat.say({ text: "@w3 你先别动，我们单独说", channel: direct!.id, sendKey: "" });
       const n = await heard.of(said.id);
       expect([n.channel, n.type, n.target]).toEqual([direct!.id, "direct", "@user"]);
       const deliveryOf2 = await f.deliveryOf(defaultOrchestrator, said.id);
@@ -508,7 +507,7 @@ describe("the chat", () => {
       expect(deliveryOf3).toBeUndefined();
       expect(x.runsOf("w3")).toHaveLength(before);
       expect(f.messagesOf(direct!.id).at(-1)?.mentions).toEqual([]);
-      await f.chat.post({ _tag: "Run", from: defaultOrchestrator, channel: direct!.id, text: "好，说吧", run: "" });
+      await f.chat.post({ from: defaultOrchestrator, channel: direct!.id, text: "好，说吧", run: "" });
       await until(() => (f.channel(direct!.id)?.unread ?? 0) === 1, "the answer unread");
       expect((await f.chat.read(defaultOrchestrator, { target: "@用户" })).messages.map((m) => m.text)).toEqual(["@w3 你先别动，我们单独说", "好，说吧"]);
       const addressOf2 = await f.chat.addressOf(direct!.id);
@@ -536,7 +535,7 @@ describe("the chat", () => {
       await f.chat.updateChannel(b, { before: a });
       expect((await f.chat.channels()).map((c) => c.name)).toEqual(["general", "bb", "前端"]);
 
-      const said = (await f.chat.post({ _tag: "User", text: "一句话", channel: a, sendKey: "" })).message;
+      const said = (await f.chat.say({ text: "一句话", channel: a, sendKey: "" })).message;
       const thread = await f.chat.threadUnder(said.id);
       expect(f.channel(thread)?.title).toBe("一句话");
       await f.chat.updateChannel(thread, { name: "细说" });
@@ -557,10 +556,10 @@ describe("the chat", () => {
       const archiveFailure = await failure(f.chat.archive(f.chat.defaultChannel(), true));
       expect(archiveFailure).toMatchObject({ name: "ApiError", bizCode: BizCode.ChannelRefused });
 
-      await f.chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "随便说说", target: "#前端", anyway: true, confirm: true });
+      await f.chat.speak({ from: defaultOrchestrator, text: "随便说说", target: "#前端", anyway: true, confirm: true });
       await f.chat.setNotify(a, "mentions");
       expect(f.channel(a)?.unread).toBeUndefined();
-      await f.chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "@用户 看一下", target: "#前端", anyway: true, confirm: true });
+      await f.chat.speak({ from: defaultOrchestrator, text: "@用户 看一下", target: "#前端", anyway: true, confirm: true });
       expect(f.channel(a)?.unread).toBe(1);
       expect(f.chat.notifyOf(thread)).toBe("mentions");
       await f.chat.setNotify(a, "none");
@@ -586,20 +585,20 @@ describe("the chat", () => {
   test("regression: deleting a channel forgets the last read of its child threads", () =>
     run(async (f) => {
       const channel = await f.chat.openChannel("temporary", "", "");
-      const root = (await f.chat.post({ _tag: "User", text: "a thread", channel: channel.id, sendKey: "" })).message;
+      const root = (await f.chat.say({ text: "a thread", channel: channel.id, sendKey: "" })).message;
       await f.chat.threadUnder(root.id);
       await f.chat.read(defaultOrchestrator, { target: `#temporary:${root.number}` });
       await f.chat.removeChannel(channel.id);
-      expect((await f.chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "back here", target: "#general", anyway: true })).kind).toBe("sent");
+      expect((await f.chat.speak({ from: defaultOrchestrator, text: "back here", target: "#general", anyway: true })).kind).toBe("sent");
     }));
 
   test("a search reads its filters, and an edit can take a message's files off", () =>
     run(async (f) => {
       const general = f.chat.defaultChannel();
       const file = await f.attachment.attach({ name: "图.png", type: "image/png", data: Buffer.from("x").toString("base64") });
-      const pictured = (await f.chat.post({ _tag: "User", text: "看图", sendKey: "", attachments: [file.id] })).message;
-      await f.chat.post({ _tag: "User", text: "一个链接 https://example.com/page", sendKey: "" });
-      await f.chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "我看了图", anyway: true, confirm: true });
+      const pictured = (await f.chat.say({ text: "看图", sendKey: "", attachments: [file.id] })).message;
+      await f.chat.say({ text: "一个链接 https://example.com/page", sendKey: "" });
+      await f.chat.speak({ from: defaultOrchestrator, text: "我看了图", anyway: true, confirm: true });
       const text = async (q: string) => (await f.chat.search(q)).map((h) => h.message.text);
       const text2 = await text("has:image");
       expect(text2).toEqual(["看图"]);
@@ -632,7 +631,7 @@ describe("the chat", () => {
       expect(thread.root).toBe(dispatch?.id);
       await hireAndRun(f, x, "w5", "写 hello", "chat-sq");
       const heard = news(f);
-      const { message: said } = await f.chat.post({ _tag: "User", text: "打卡页今天能好吗", channel: channel.id, sendKey: "" });
+      const { message: said } = await f.chat.say({ text: "打卡页今天能好吗", channel: channel.id, sendKey: "" });
       const n = await heard.of(said.id);
       expect([n.channel, n.target]).toEqual([channel.id, "#clock-in"]);
       const deliveryOf2 = await f.deliveryOf("w4", said.id);
@@ -640,7 +639,7 @@ describe("the chat", () => {
       const deliveryOf3 = await f.deliveryOf("w5", said.id);
       expect(deliveryOf3).toBeUndefined();
       expect((await f.chat.read("w4", { target: "#clock-in" })).target).toBe("#clock-in");
-      expect((await f.chat.post({ _tag: "Agent", from: "w4", text: "今天能好", target: "#clock-in", anyway: true, confirm: true })).kind).toBe("sent");
+      expect((await f.chat.speak({ from: "w4", text: "今天能好", target: "#clock-in", anyway: true, confirm: true })).kind).toBe("sent");
       const chatFailure = await failure(f.chat.read("w4", { target: "#nowhere" }));
       expect(chatFailure).toMatchObject({
         name: "ApiError",
@@ -660,7 +659,7 @@ describe("the chat", () => {
         false,
       ]);
       expect((await f.chat.channels()).map((c) => c.name)).toEqual(["clock-in", "general"]);
-      expect((await f.chat.post({ _tag: "User", text: "没写频道", sendKey: "" })).message.channel).toBe(channel.id);
+      expect((await f.chat.say({ text: "没写频道", sendKey: "" })).message.channel).toBe(channel.id);
     }));
 
   test("regression: a busy session gets the full input burst in one steer", () =>
@@ -668,8 +667,8 @@ describe("the chat", () => {
       const thread = await hire(f, x, "w6", "慢慢做一个大活", "chat-d");
       x.deliver("w6", "慢慢做一个大活");
       expect(isBusy(f.core.session("w6")!)).toBe(true);
-      await f.chat.post({ _tag: "User", text: "补充：顺便写测试", channel: thread.id, sendKey: "" });
-      await f.chat.post({ _tag: "User", text: "还有：写 README", channel: thread.id, sendKey: "" });
+      await f.chat.say({ text: "补充：顺便写测试", channel: thread.id, sendKey: "" });
+      await f.chat.say({ text: "还有：写 README", channel: thread.id, sendKey: "" });
       await until(() => x.steersOf("w6").some((s) => s.includes("顺便写测试") && s.includes("写 README")), "the full input burst");
       expect(x.steersOf("w6")).toHaveLength(1);
       await until(async () => (await f.deliveries("w6")).every((row) => row.state === "consumed"), "the steered inputs consumed");
@@ -682,7 +681,7 @@ describe("the chat", () => {
       const thread = await hire(f, x, "w6", "work", "unconsumed");
       const acknowledge = x.consumed;
       x.consumed = () => {};
-      const message = (await f.chat.post({ _tag: "User", text: "followup without a model receipt", channel: thread.id, sendKey: "" })).message;
+      const message = (await f.chat.say({ text: "followup without a model receipt", channel: thread.id, sendKey: "" })).message;
       await until(
         async () => x.runsOf("w6").length > 0 && (await f.deliveryOf("w6", message.id))?.state === "pending",
         "the spoken but unconsumed input returned",
@@ -725,7 +724,7 @@ describe("the chat", () => {
     run(async (f, x) => {
       const thread = await hireAndRun(f, x, "w7", "写 hello", "chat-e");
       // The orchestrator is never cooled down, so only the hop limit holds.
-      for (let i = 1; i <= 5; i++) expect((await f.chat.post({ _tag: "Agent", from: "w7", text: `@助手 第 ${i} 次问`, anyway: true })).kind).toBe("sent");
+      for (let i = 1; i <= 5; i++) expect((await f.chat.speak({ from: "w7", text: `@助手 第 ${i} 次问`, anyway: true })).kind).toBe("sent");
       const held = (await f.deliveries(defaultOrchestrator)).filter((d) => d.reason === "mention").map((d) => d.held_by);
       expect(held).toEqual(["", "", "", "", "hop_limit"]);
       const notices = f.messagesOf(thread.id).filter((m) => m.kind === "notice");
@@ -737,38 +736,38 @@ describe("the chat", () => {
     run(async (f, x) => {
       const a = await hireAndRun(f, x, "w8", "写 hello", "chat-f");
       await hireAndRun(f, x, "w9", "写 world", "chat-g");
-      await f.chat.post({ _tag: "User", text: "@w8 这次必败", sendKey: "" });
+      await f.chat.say({ text: "@w8 这次必败", sendKey: "" });
       await until(() => f.messagesOf(a.id).some((m) => m.kind === "notice" && m.text.includes("一叫醒就失败")), "the breaker notice");
       expect(x.runsOf("w8")).toHaveLength(1 + wakeBreaker);
       for (const d of await f.deliveries("w8")) if (d.reason === "mention") expect(d.state).toBe("pending");
-      expect((await f.chat.post({ _tag: "Agent", from: "w9", text: "@w8 你那边怎么样", anyway: true })).kind).toBe("sent");
+      expect((await f.chat.speak({ from: "w9", text: "@w8 你那边怎么样", anyway: true })).kind).toBe("sent");
       expect((await f.deliveries("w8")).at(-1)?.held_by).toBe("wake_breaker");
-      await f.chat.post({ _tag: "User", text: "@w8 再试一次", sendKey: "" });
+      await f.chat.say({ text: "@w8 再试一次", sendKey: "" });
       await until(() => x.runsOf("w8").at(-1)!.includes("再试一次"), "woken by the user");
     }));
 
   test("speaking: retries, what it has not seen, confirming a channel, absent names and threads", () =>
     run(async (f, x) => {
       const thread = await hireAndRun(f, x, "w10", "写 hello", "chat-h");
-      const first = await f.chat.post({ _tag: "Agent", from: "w10", text: "我先看看代码" });
-      const again = await f.chat.post({ _tag: "Agent", from: "w10", text: "我先看看代码" });
+      const first = await f.chat.speak({ from: "w10", text: "我先看看代码" });
+      const again = await f.chat.speak({ from: "w10", text: "我先看看代码" });
       expect([first.kind, again.kind, again.message?.id]).toEqual(["sent", "sent", first.message?.id]);
-      const { message: words } = await f.chat.post({ _tag: "User", text: "先别动 main", channel: thread.id, sendKey: "" });
-      const held = await f.chat.post({ _tag: "Agent", from: "w10", text: "我改好了" });
+      const { message: words } = await f.chat.say({ text: "先别动 main", channel: thread.id, sendKey: "" });
+      const held = await f.chat.speak({ from: "w10", text: "我改好了" });
       expect([held.kind, held.shown?.map((m) => m.id)]).toEqual(["held", [words.id]]);
-      expect((await f.chat.post({ _tag: "Agent", from: "w10", text: "我改好了" })).kind).toBe("sent");
+      expect((await f.chat.speak({ from: "w10", text: "我改好了" })).kind).toBe("sent");
       await f.chat.read("w10");
-      const asked = await f.chat.post({ _tag: "Agent", from: "w10", text: "大家好", target: "#general" });
+      const asked = await f.chat.speak({ from: "w10", text: "大家好", target: "#general" });
       expect([asked.kind, asked.lastRead]).toEqual(["confirm", `#general:${thread.rootNumber}`]);
-      expect((await f.chat.post({ _tag: "Agent", from: "w10", text: "大家好", target: "#general", confirm: true, anyway: true })).kind).toBe("sent");
-      const absent = await f.chat.post({ _tag: "Agent", from: "w10", text: "@w99 你在吗", anyway: true });
+      expect((await f.chat.speak({ from: "w10", text: "大家好", target: "#general", confirm: true, anyway: true })).kind).toBe("sent");
+      const absent = await f.chat.speak({ from: "w10", text: "@w99 你在吗", anyway: true });
       expect([absent.kind, absent.absent]).toEqual(["sent", ["w99"]]);
-      const spokenFailure = await failure(f.chat.post({ _tag: "Agent", from: "w10", text: "hi", target: "#general:999999" }));
+      const spokenFailure = await failure(f.chat.speak({ from: "w10", text: "hi", target: "#general:999999" }));
       expect(spokenFailure).toMatchObject({
         message: expect.stringContaining("没有 999999 这条消息"),
       });
-      const { message: sq } = await f.chat.post({ _tag: "User", text: "大家早", channel: f.chat.defaultChannel(), sendKey: "" });
-      const talk = await f.chat.post({ _tag: "Agent", from: "w10", text: "早", target: `#general:${sq.number}`, anyway: true });
+      const { message: sq } = await f.chat.say({ text: "大家早", channel: f.chat.defaultChannel(), sendKey: "" });
+      const talk = await f.chat.speak({ from: "w10", text: "早", target: `#general:${sq.number}`, anyway: true });
       expect([talk.kind, talk.target]).toEqual(["sent", `#general:${sq.number}`]);
       const under = f.core.state().chat?.channels.find((c) => c.root === sq.id);
       expect(under?.subjectKind).toBe("talk");
@@ -777,11 +776,11 @@ describe("the chat", () => {
   test("what a session took in is neither unseen nor unread for it", () =>
     run(async (f, x) => {
       const thread = await hireAndRun(f, x, "w19", "写 hello", "chat-s");
-      const { message: words } = await f.chat.post({ _tag: "User", text: "顺便看看测试", channel: thread.id, sendKey: "" });
+      const { message: words } = await f.chat.say({ text: "顺便看看测试", channel: thread.id, sendKey: "" });
       await until(async () => (await f.deliveryOf("w19", words.id))?.state === "consumed", "the user's words taken in");
       await until(async () => (await f.sql("select 1 from channel_seen where participant_id = 'w19' and message_id = $1", [words.id])).length === 1, "seen");
       expect((await f.chat.unread("w19")).map((u) => u.channel)).not.toContain(`#general:${thread.rootNumber}`);
-      expect((await f.chat.post({ _tag: "Agent", from: "w19", text: "测试也看了" })).kind).toBe("sent");
+      expect((await f.chat.speak({ from: "w19", text: "测试也看了" })).kind).toBe("sent");
     }));
 
   test("a session's words after another session named it answer that one; the assistant's answer no one", () =>
@@ -789,9 +788,9 @@ describe("the chat", () => {
       const thread = await hireAndRun(f, x, "w17", "写 hello", "chat-q");
       await hireAndRun(f, x, "w18", "写 world", "chat-r");
       const facts = f.core.subscribe();
-      await f.chat.post({ _tag: "Agent", from: "w17", text: "@w18 帮我看一下", target: `#general:${thread.rootNumber}`, anyway: true });
-      const reply = await f.chat.post({ _tag: "Agent", from: "w18", text: "看过了", target: `#general:${thread.rootNumber}`, anyway: true });
-      const mine = await f.chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "@w18 好", target: `#general:${thread.rootNumber}`, anyway: true });
+      await f.chat.speak({ from: "w17", text: "@w18 帮我看一下", target: `#general:${thread.rootNumber}`, anyway: true });
+      const reply = await f.chat.speak({ from: "w18", text: "看过了", target: `#general:${thread.rootNumber}`, anyway: true });
+      const mine = await f.chat.speak({ from: defaultOrchestrator, text: "@w18 好", target: `#general:${thread.rootNumber}`, anyway: true });
       const told = facts.drain().flatMap((e) => (e.type === "messageChanged" ? [[e.message.id, e.answers ?? ""]] : []));
       facts.close();
       expect(told).toContainEqual([reply.message!.id, "w17"]);
@@ -802,13 +801,13 @@ describe("the chat", () => {
     run(async (f, x) => {
       await hireAndRun(f, x, "w11", "写 hello", "chat-k");
       const general = f.chat.defaultChannel();
-      await f.chat.post({ _tag: "Run", from: defaultOrchestrator, channel: general, text: "  ", run: "" });
+      expect((await failure(f.chat.post({ from: defaultOrchestrator, channel: general, text: "  ", run: "" }))).bizCode).toBe(BizCode.ChannelRefused);
       const ours = () => f.messagesOf(general).filter((m) => m.from === defaultOrchestrator && m.kind === "chat");
       expect(ours()).toEqual([]);
-      await f.chat.post({ _tag: "Run", from: defaultOrchestrator, channel: general, text: "好的，我叫 @w11 去看看", run: "" });
+      await f.chat.post({ from: defaultOrchestrator, channel: general, text: "好的，我叫 @w11 去看看", run: "" });
       expect(ours().map((m) => [m.text, m.mentions])).toEqual([["好的，我叫 @w11 去看看", ["w11"]]]);
       await until(() => x.runsOf("w11").length >= 2 && x.runsOf("w11")[1]!.includes("我叫 @w11 去看看"), "w11 woken");
-      await f.chat.post({ _tag: "Notice", channel: general, text: "定时任务到了", code: "cron" });
+      await f.chat.notice({ channel: general, text: "定时任务到了", code: "cron" });
       await until(() => f.messagesOf(general).some((m) => m.kind === "notice" && m.text === "定时任务到了"), "the notice");
       const last = f.messagesOf(general).at(-1)!;
       expect([last.kind, last.from]).toEqual(["notice", "system"]);
@@ -819,7 +818,7 @@ describe("the chat", () => {
     run(async (f) => {
       const general = f.chat.defaultChannel();
       const seqs: number[] = [];
-      for (let i = 0; i < 5; i++) seqs.push((await f.chat.post({ _tag: "User", text: `第 ${i} 句`, channel: general, sendKey: "" })).message.number);
+      for (let i = 0; i < 5; i++) seqs.push((await f.chat.say({ text: `第 ${i} 句`, channel: general, sendKey: "" })).message.number);
       const got = await f.chat.history(general, seqs[4], 2);
       expect(got.map((m) => m.number)).toEqual([seqs[2], seqs[3]]);
       const page = await f.chat.read("user", { target: "#general", before: seqs[4]!, limit: 2 });
@@ -829,7 +828,7 @@ describe("the chat", () => {
       await f.chat.markRead(general, seqs[1]!);
       expect((await failure(f.chat.markRead("nope", 1))).bizCode).toBe(BizCode.ChannelNotFound);
       expect(defaultOf(f.core.state().chat)?.read).toBe(seqs[4]);
-      expect((await failure(f.chat.post({ _tag: "User", text: "  ", sendKey: "" }))).bizCode).toBe(BizCode.ChannelRefused);
+      expect((await failure(f.chat.say({ text: "  ", sendKey: "" }))).bizCode).toBe(BizCode.ChannelRefused);
       const orchestratorDigest2 = await f.mailbox.orchestratorDigest(defaultOrchestrator);
       expect(orchestratorDigest2).toEqual([]);
     }));
@@ -848,7 +847,7 @@ describe("the chat", () => {
         (rows) => rows.length === 0,
         "the digest input consumed",
       );
-      await f.chat.post({ _tag: "User", text: "大家看一下", channel: f.chat.defaultChannel(), sendKey: "" });
+      await f.chat.say({ text: "大家看一下", channel: f.chat.defaultChannel(), sendKey: "" });
       const unread = await f.chat.unread("w12");
       expect(unread).toEqual([{ channel: "#general", unread: 2, mentionsYou: true, latest: "用户" }]);
       await f.chat.read("w12", { target: "#general" });
@@ -860,7 +859,7 @@ describe("the chat", () => {
     run(async (f, x) => {
       await hireAndRun(f, x, "w13", "写 hello", "chat-m");
       await until(() => !isBusy(f.core.session("w13")!), "resting");
-      await f.chat.post({ _tag: "User", text: "随便说说", channel: f.chat.defaultChannel(), sendKey: "" });
+      await f.chat.say({ text: "随便说说", channel: f.chat.defaultChannel(), sendKey: "" });
       f.core.apply({ type: "sessionLeft", id: sessionId("w13") });
       await until(async () => (await f.deliveries("w13")).at(-1)?.state === "dropped", "dropped");
       const left = await f.sql(`select left_at from channel_participant where id = 'w13'`);
@@ -873,7 +872,7 @@ describe("the chat", () => {
     let said: T.ChatMessage;
     await run(async (f, x) => {
       thread = await hireAndRun(f, x, "w14", "写 hello", "chat-i");
-      said = (await f.chat.post({ _tag: "User", text: "慢慢做：再加一个文件", channel: thread.id, sendKey: "" })).message;
+      said = (await f.chat.say({ text: "慢慢做：再加一个文件", channel: thread.id, sendKey: "" })).message;
       await until(async () => (await f.deliveryOf("w14", said.id))?.state === "handed", "handed");
     }, config);
     await run(async (g, y) => {
@@ -904,7 +903,7 @@ describe("the chat", () => {
     await run(async (f, x) => {
       x.holds = false;
       thread = await hireAndRun(f, x, "w15", "write route", "chat-route");
-      message = (await f.chat.post({ _tag: "User", text: "recover this input", channel: thread.id, sendKey: "route-gap" })).message;
+      message = (await f.chat.say({ text: "recover this input", channel: thread.id, sendKey: "route-gap" })).message;
       await until(async () => (await f.deliveryOf("w15", message.id))?.state === "consumed", "the first route");
       await f.sql(`delete from session_delivery where envelope_id = $1`, [message.id]);
       await f.sql(`update session_trigger set routed_at = null, routing_scope = null, routing_position = null where id = $1`, [message.id]);
@@ -923,7 +922,7 @@ describe("the chat", () => {
     await run(async (f, x) => {
       x.holds = false;
       thread = await hireAndRun(f, x, "w16", "write route", "chat-stuck");
-      const stuck = (await f.chat.post({ _tag: "User", text: "this one cannot be routed", channel: thread.id, sendKey: "stuck" })).message;
+      const stuck = (await f.chat.say({ text: "this one cannot be routed", channel: thread.id, sendKey: "stuck" })).message;
       await until(async () => (await f.deliveryOf("w16", stuck.id))?.state === "consumed", "the first route");
       // A receipt that no longer reads: routing it fails every time it is tried.
       await f.sql(`update session_trigger set routed_at = null, routing_scope = null, routing_position = null, trigger_json = 'not json' where id = $1`, [
@@ -937,7 +936,7 @@ describe("the chat", () => {
       () =>
         run(async (f, x) => {
           x.holds = false;
-          await f.chat.post({ _tag: "User", text: "after the stuck one", channel: thread.id, sendKey: "after" });
+          await f.chat.say({ text: "after the stuck one", channel: thread.id, sendKey: "after" });
           await until(() => x.runsOf("w16").some((input) => input.includes("after the stuck one")), "a message after the stuck one");
         }, config),
       20_000,
@@ -954,7 +953,7 @@ describe("the chat", () => {
 
   test("a valid JSON message meta with the wrong shape fails fast", () =>
     run(async (f) => {
-      const { message } = await f.chat.post({ _tag: "User", text: "带元数据", sendKey: "" });
+      const { message } = await f.chat.say({ text: "带元数据", sendKey: "" });
       await qm.updateMessageMeta(f.db.sql, { meta: `{"mentions":{},"spent":{"tokens":1e999}}`, id: message.id });
       const read = await f.chat.history(f.chat.defaultChannel()).then(
         () => "read",
@@ -966,8 +965,8 @@ describe("the chat", () => {
   test("a message keeps the run that made it", () =>
     run(async (f, x) => {
       const general = f.chat.defaultChannel();
-      await f.chat.post({ _tag: "Run", from: defaultOrchestrator, channel: general, text: "complete", run: "run-first" });
-      await f.chat.post({ _tag: "Run", from: defaultOrchestrator, channel: general, text: "unlinked", run: "" });
+      await f.chat.post({ from: defaultOrchestrator, channel: general, text: "complete", run: "run-first" });
+      await f.chat.post({ from: defaultOrchestrator, channel: general, text: "unlinked", run: "" });
       const saved = await f.chat.history(general);
       expect(saved.map((m) => [m.text, m.run])).toEqual([
         ["complete", "run-first"],
@@ -997,14 +996,14 @@ describe("the chat", () => {
   test("a room catches a follower up past its number, then tells it what is said there", () =>
     run(async (f) => {
       const general = f.chat.defaultChannel();
-      for (const text of ["一", "二", "三"]) await f.chat.post({ _tag: "User", text: text, sendKey: "" });
+      for (const text of ["一", "二", "三"]) await f.chat.say({ text: text, sendKey: "" });
       const one = (await f.chat.history(general)).find((m) => m.text === "一")!;
       const following = take(f.chat.follow(general, one.revision), 3);
       // What is said elsewhere is not this room's.
       const elsewhere = (await f.chat.openChannel("别处", "", "")).id;
-      await f.chat.post({ _tag: "Run", from: defaultOrchestrator, channel: elsewhere, text: "别处的话", run: "" });
+      await f.chat.post({ from: defaultOrchestrator, channel: elsewhere, text: "别处的话", run: "" });
       await until(() => f.messagesOf(elsewhere).length > 0, "said elsewhere");
-      await f.chat.post({ _tag: "User", text: "四", sendKey: "send-4" });
+      await f.chat.say({ text: "四", sendKey: "send-4" });
       const got = await following;
       expect(got.map((e) => (e._tag === "Message" ? [e.message.number, e.message.text] : e._tag))).toEqual([
         [2, "二"],
@@ -1019,17 +1018,17 @@ describe("the chat", () => {
     const config = testConfig();
     return run(async (f) => {
       const general = f.chat.defaultChannel();
-      const first = (await f.chat.post({ _tag: "User", text: "先这样", sendKey: "" })).message;
+      const first = (await f.chat.say({ text: "先这样", sendKey: "" })).message;
       expect((await f.chat.history(general))[0]!.reactions).toEqual([]);
-      const reply = (await f.chat.post({ _tag: "User", text: "补一句", sendKey: "", replyTo: first.number })).message;
+      const reply = (await f.chat.say({ text: "补一句", sendKey: "", replyTo: first.number })).message;
       expect(reply.replyTo).toBe(first.number);
-      const saidFailure = await failure(f.chat.post({ _tag: "User", text: "没有这条", sendKey: "", replyTo: 99 }));
+      const saidFailure = await failure(f.chat.say({ text: "没有这条", sendKey: "", replyTo: 99 }));
       expect(saidFailure).toMatchObject({ name: "ApiError", bizCode: BizCode.ChannelRefused });
       const since = (await f.chat.history(general)).at(-1)!.revision;
 
       const edited = await f.chat.edit(first.id, "改成这样");
       expect([edited.text, edited.edited !== undefined, edited.revision > since]).toEqual(["改成这样", true, true]);
-      const theirs = (await f.chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "我来看看", anyway: true, confirm: true })).message!;
+      const theirs = (await f.chat.speak({ from: defaultOrchestrator, text: "我来看看", anyway: true, confirm: true })).message!;
       const editedFailure = await failure(f.chat.edit(theirs.id, "不是你的"));
       expect(editedFailure).toMatchObject({ name: "ApiError", bizCode: BizCode.ChannelRefused });
       const liked = await f.chat.react(theirs.id, "user", "👍", true);
@@ -1065,14 +1064,14 @@ describe("the chat", () => {
       const file = await f.attachment.attach({ name: "截图.png", type: "image/png", data: Buffer.from("png bytes").toString("base64") });
       expect(file).toMatchObject({ name: "截图.png", type: "image/png", size: 9 });
       expect((await f.attachment.attach({ name: "again.png", type: "image/png", data: Buffer.from("png bytes").toString("base64") })).id).toBe(file.id);
-      const shown = (await f.chat.post({ _tag: "User", text: "", sendKey: "", attachments: [file.id] })).message;
+      const shown = (await f.chat.say({ text: "", sendKey: "", attachments: [file.id] })).message;
       expect(shown.attachments).toEqual([file]);
       const kept = await f.attachment.get(file.id);
       expect(readFileSync(kept!.path, "utf8")).toBe("png bytes");
       expect((await f.chat.read(defaultOrchestrator, { target: "#general", limit: 1 })).messages[0]!.attachments).toEqual([
         { name: "截图.png", path: kept!.path },
       ]);
-      const saidFailure2 = await failure(f.chat.post({ _tag: "User", text: "", sendKey: "", attachments: ["nope"] }));
+      const saidFailure2 = await failure(f.chat.say({ text: "", sendKey: "", attachments: ["nope"] }));
       expect(saidFailure2).toMatchObject({ name: "ApiError", bizCode: BizCode.NotFound });
     }, config);
   });
@@ -1102,7 +1101,7 @@ describe("the chat", () => {
   test("a follower too far behind is told to reload the room", () =>
     run(async (f) => {
       const general = f.chat.defaultChannel();
-      for (let i = 0; i <= catchUpMax; i++) await f.chat.post({ _tag: "Run", from: defaultOrchestrator, channel: general, text: `第 ${i} 句`, run: "" });
+      for (let i = 0; i <= catchUpMax; i++) await f.chat.post({ from: defaultOrchestrator, channel: general, text: `第 ${i} 句`, run: "" });
       const first = await take(f.chat.follow(general, 0), 1);
       expect(first).toEqual([{ _tag: "Reset" }]);
       const near = await take(f.chat.follow(general, 1), 1);
@@ -1113,14 +1112,14 @@ describe("the chat", () => {
 
   test("a send key writes once", () =>
     run(async (f) => {
-      const first = await f.chat.post({ _tag: "User", text: "早", sendKey: "k1" });
-      const second = await f.chat.post({ _tag: "User", text: "早", sendKey: "k1" });
+      const first = await f.chat.say({ text: "早", sendKey: "k1" });
+      const second = await f.chat.say({ text: "早", sendKey: "k1" });
       expect([first.again, second.again, second.message.id, second.message.number]).toEqual([false, true, first.message.id, first.message.number]);
-      expect((await f.chat.post({ _tag: "User", text: "早", sendKey: "k2" })).again).toBe(false);
-      for (let i = 0; i < 2; i++) expect((await f.chat.post({ _tag: "User", text: "晚", sendKey: "" })).again).toBe(false);
-      const saidFailure = await failure(f.chat.post({ _tag: "User", text: "早", sendKey: "k".repeat(65) }));
+      expect((await f.chat.say({ text: "早", sendKey: "k2" })).again).toBe(false);
+      for (let i = 0; i < 2; i++) expect((await f.chat.say({ text: "晚", sendKey: "" })).again).toBe(false);
+      const saidFailure = await failure(f.chat.say({ text: "早", sendKey: "k".repeat(65) }));
       expect(saidFailure).toMatchObject({ message: "sendKey 太长" });
-      for (let i = 0; i < 2; i++) await f.chat.post({ _tag: "Call", from: "user", text: "电话里说的", sendKey: "k3" });
+      for (let i = 0; i < 2; i++) await f.chat.post({ from: "user", channel: f.chat.defaultChannel(), text: "电话里说的", sendKey: "k3", spoken: true });
       const users = () => f.messagesOf(f.chat.defaultChannel()).filter((m) => m.from === "user");
       await until(() => users().length >= 5, "the user's lines heard");
       const said: Record<string, number> = {};
@@ -1135,7 +1134,7 @@ describe("the chat", () => {
       await hire(f, x, "w1", "first", "demo");
       await hire(f, x, "w2", "second", "demo");
       await trigger(f.db, "fail_second_recipient", "before insert on session_delivery", "new.session_id = 'w2'");
-      expect(await outcome(f.chat.post({ _tag: "User", text: "@w1 @w2 atomic fanout", sendKey: "fanout-key" }))).toBe("Failure");
+      expect(await outcome(f.chat.say({ text: "@w1 @w2 atomic fanout", sendKey: "fanout-key" }))).toBe("Failure");
       const [message] = await f.sql(`select id from channel_message where send_key = 'fanout-key'`);
       expect(message).toBeDefined();
       const id = String(message!["id"]);
@@ -1156,14 +1155,14 @@ describe("the chat", () => {
   test("a read receipt is written whole or not at all", () =>
     run(async (f) => {
       const general = f.chat.defaultChannel();
-      await f.chat.post({ _tag: "Run", from: defaultOrchestrator, channel: general, text: "hello", run: "" });
+      await f.chat.post({ from: defaultOrchestrator, channel: general, text: "hello", run: "" });
       const [message] = await f.chat.history(general);
       await trigger(f.db, "fail_receipt", "before insert on channel_read_cursor");
       expect(await outcome(f.chat.markRead(general, message!.number))).toBe("Failure");
       const rows = await f.sql(`select read_number from channel_read_cursor where participant_id = 'user' and channel_id = $1`, [general]);
       expect(rows).toEqual([]);
       // Nor is it read in what the chat shows next: what it kept in memory is read again from the database.
-      await f.chat.post({ _tag: "Notice", channel: general, text: "动静", code: "test" });
+      await f.chat.notice({ channel: general, text: "动静", code: "test" });
       expect(f.channel(general)?.read).toBeUndefined();
       await drop(f.db, "fail_receipt", "channel_read_cursor");
       await f.chat.markRead(general, message!.number);

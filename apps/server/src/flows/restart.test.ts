@@ -51,7 +51,7 @@ test("the assistant cut off mid-answer by a restart finishes it once the farm is
   const before = scriptedLLM([answer(words, { hangAfter: 3 })]);
   {
     await using farm = await open(before.llm);
-    await farm.channel.say("地里怎么样", {}, undefined, "");
+    await farm.channel.say({ text: "地里怎么样", sendKey: "" });
     // The answer has begun to show: the model is in the middle of it when the farm stops.
     await until(() => {
       const phase = farm.core.session(defaultOrchestrator)?.phase;
@@ -124,7 +124,7 @@ test("regression: the assistant and a helper both cut off mid-answer go on once 
     const told: Event[] = [];
     session.events((e) => told.push(e), { cursor: { sessionId: session.id, afterSeq: -1 } });
     await session.prompt(helperAsk);
-    await farm.channel.say("地里怎么样", {}, undefined, "");
+    await farm.channel.say({ text: "地里怎么样", sendKey: "" });
     await until(() => told.some((e) => e.kind === "text_delta"), "the helper's answer under way");
     await until(() => {
       const phase = farm.core.session(defaultOrchestrator)?.phase;

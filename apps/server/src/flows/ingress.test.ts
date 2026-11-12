@@ -53,9 +53,9 @@ test("regression: chat triggers keep their original payload through edits and re
   const mailbox = fw.inside;
   const tools = fw.tool;
   const sql = sqlOf(fw.db);
-  const before = await chat.post({ _tag: "User", text: "previous message", sendKey: "before" });
-  const current = await chat.user({ source: "voice", text: "original voice input", envelope: "voice-source" });
-  await chat.post({ _tag: "User", text: "next message", sendKey: "after" });
+  const before = await chat.say({ text: "previous message", sendKey: "before" });
+  const current = await chat.say({ source: "voice", text: "original voice input", sendKey: "voice-source" });
+  await chat.say({ text: "next message", sendKey: "after" });
   await chat.edit(current.message.id, "edited voice input");
   await sql`update session_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${current.message.id}`;
   // As a crash before the route left it: the watch's cursor still before the message.
