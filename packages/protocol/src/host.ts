@@ -16,7 +16,7 @@ export interface TraySummary {
   readonly title: string;
   readonly lines: readonly string[];
 }
-export const TraySummary = z.object({ title: z.string(), lines: z.array(z.string()) }) satisfies Codec<TraySummary>;
+export const TraySummary: Codec<TraySummary> = z.object({ title: z.string(), lines: z.array(z.string()) }) satisfies Codec<TraySummary>;
 
 export interface Shortcut {
   /** Electron accelerator notation (e.g. `Alt+Shift+Space`). */
@@ -63,7 +63,7 @@ export type UpdateState =
   | { readonly _tag: "manual"; readonly version: string; readonly next: string; readonly why: UpdateManual; readonly page: string }
   | { readonly _tag: "failed"; readonly version: string; readonly why: string };
 
-export const UpdateState = z.discriminatedUnion("_tag", [
+export const UpdateState: Codec<UpdateState> = z.discriminatedUnion("_tag", [
   z.object({ _tag: z.literal("idle"), version: z.string() }),
   z.object({ _tag: z.literal("checking"), version: z.string() }),
   z.object({ _tag: z.literal("downloading"), version: z.string(), next: z.string(), percent: z.number() }),

@@ -1,42 +1,44 @@
-import { Effect, Schema } from "effect";
-import { FetchHttpClient, HttpBody, HttpClient } from "effect/http";
+import { z } from "zod";
 
+import { bounded, type ProviderHttp, send } from "../base/http.ts";
+import { codePoints, fromJson, httpsUrl, int } from "../base/json.ts";
 import { mossImageModels } from "./image-models.ts";
-import { MossErrorOutcome, MossErrorReason, readMossResponse } from "./response.ts";
+import { badKey, type MossErrorFields, MossResponseTooLarge, readMossResponse, rejectedStatuses } from "./response.ts";
 
-const Text = Schema.String.check(Schema.isBetweenCodePoints(1, 4000), Schema.isPattern(/\S/u));
-const Dimension = Schema.Int.check(Schema.isBetween({ minimum: 256, maximum: 2048 }), Schema.isMultipleOf(16));
-const Size = Schema.Struct({ width: Dimension, height: Dimension }).check(Schema.makeFilter((size) => size.width * size.height <= 2097152));
-const Coordinate = Schema.Finite;
-const Layout = Schema.Struct({
-  summary: Schema.Struct({ caption: Text, meta: Schema.optionalKey(Schema.Array(Schema.NonEmptyString)), canvas: Schema.optionalKey(Schema.NonEmptyString) }),
-  items: Schema.Array(
-    Schema.Struct({
-      label: Schema.NonEmptyString,
-      caption: Text,
-      text: Schema.optionalKey(Schema.String),
-      bbox: Schema.Tuple([Coordinate, Coordinate, Coordinate, Coordinate]),
-    }),
-  ).check(Schema.isMinLength(1), Schema.isMaxLength(100)),
-  bbox_format: Schema.Literal("yxyx"),
-  bbox_coord_space: Schema.Literal("abs_centralized"),
+const Text = codePoints(1, 4000).regex(/\S/u);
+const Dimension = int(256, 2048).multipleOf(16);
+const Size = z.strictObject({ width: Dimension, height: Dimension }).refine((size) => size.width * size.height <= 2097152);
+const Coordinate = z.number();
+const Layout = z.strictObject({
+  summary: z.strictObject({ caption: Text, meta: z.exactOptional(z.array(z.string().min(1))), canvas: z.exactOptional(z.string().min(1)) }),
+  items: z
+    .array(
+      z.strictObject({
+        label: z.string().min(1),
+        caption: Text,
+        text: z.exactOptional(z.string()),
+        bbox: z.tuple([Coordinate, Coordinate, Coordinate, Coordinate]),
+      }),
+    )
+    .min(1)
+    .max(100),
+  bbox_format: z.literal("yxyx"),
+  bbox_coord_space: z.literal("abs_centralized"),
 });
 
-const encodeLayout = Schema.encodeEffect(Schema.fromJsonString(Layout));
-
-const MossImageInput = Schema.Struct({
-  model: Schema.Literals(mossImageModels),
-  prompt: Schema.Union([Text, Layout]),
-  size: Schema.optionalKey(Size),
-  seed: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }))),
-  steps: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 100 }))),
-  guidance: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 10 }))),
-  negativePrompt: Schema.optionalKey(Schema.String.check(Schema.isBetweenCodePoints(0, 4000))),
-  enhance: Schema.optionalKey(Schema.Boolean),
-  watermark: Schema.optionalKey(Schema.Boolean),
+const MossImageInput = z.strictObject({
+  model: z.enum(mossImageModels),
+  prompt: z.union([Text, Layout]),
+  size: z.exactOptional(Size),
+  seed: z.exactOptional(int()),
+  steps: z.exactOptional(int(1, 100)),
+  guidance: z.exactOptional(z.number().min(0).max(10)),
+  negativePrompt: z.exactOptional(codePoints(0, 4000)),
+  enhance: z.exactOptional(z.boolean()),
+  watermark: z.exactOptional(z.boolean()),
 });
 
-const ErrorCode = Schema.Literals([
+const ErrorCode = z.enum([
   "invalid_field_value",
   "forbidden",
   "prompt_enhancement_refused",
@@ -47,96 +49,123 @@ const ErrorCode = Schema.Literals([
   "prompt_enhancement_incomplete",
   "upstream_invalid_result",
 ]);
-const ErrorResponse = Schema.fromJsonString(Schema.Struct({ error: Schema.Struct({ code: ErrorCode }) }));
-const ImageResponse = Schema.fromJsonString(
-  Schema.Struct({
-    created: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-    data: Schema.Tuple([
-      Schema.Struct({
-        url: Schema.URLFromString.check(Schema.makeFilter((url) => url.protocol === "https:" && url.username === "" && url.password === "" && url.hash === "")),
-      }),
-    ]),
-    usage: Schema.Struct({ generated_images: Schema.Literal(1), output_width: Dimension, output_height: Dimension }).check(
-      Schema.makeFilter((usage) => usage.output_width * usage.output_height <= 2097152),
-    ),
-  }),
-);
+type ErrorCode = z.output<typeof ErrorCode>;
+const ErrorResponse = z.object({ error: z.object({ code: ErrorCode }) });
+const ImageResponse = z.object({
+  created: int(),
+  data: z.tuple([z.object({ url: httpsUrl() })]),
+  usage: z
+    .object({ generated_images: z.literal(1), output_width: Dimension, output_height: Dimension })
+    .refine((usage) => usage.output_width * usage.output_height <= 2097152),
+});
 
-class MossImageError extends Schema.TaggedError<MossImageError, { readonly brand: unique symbol }>()("MossImageError", {
-  reason: MossErrorReason,
-  outcome: MossErrorOutcome,
-  status: Schema.optionalKey(Schema.Int),
-  code: Schema.optionalKey(ErrorCode),
-}) {}
+class MossImageError extends Error {
+  override readonly name = "MossImageError";
+  readonly reason: MossErrorFields["reason"];
+  readonly outcome: MossErrorFields["outcome"];
+  declare readonly status?: number;
+  declare readonly code?: ErrorCode;
 
-export const prepareMossImage = Effect.fn("Provider.prepareMossImage")(function* (input: unknown) {
-  const request = yield* Schema.decodeUnknownEffect(MossImageInput)(input, { onExcessProperty: "error" }).pipe(
-    Effect.mapError(() => MossImageError.make({ reason: "InvalidInput", outcome: "NotSubmitted" })),
-  );
+  constructor(fields: MossErrorFields & { readonly code?: ErrorCode }) {
+    super(`MOSS image: ${fields.reason}`);
+    this.reason = fields.reason;
+    this.outcome = fields.outcome;
+    if (fields.status !== undefined) this.status = fields.status;
+    if (fields.code !== undefined) this.code = fields.code;
+  }
+}
+
+const invalidInput = () => new MossImageError({ reason: "InvalidInput", outcome: "NotSubmitted" });
+
+type ImageInput = z.output<typeof MossImageInput>;
+
+export const prepareMossImage = async (
+  input: unknown,
+): Promise<Omit<ImageInput, "prompt" | "size"> & { readonly prompt: string; readonly size: { readonly width: number; readonly height: number } }> => {
+  const parsed = MossImageInput.safeParse(input);
+  if (!parsed.success) throw invalidInput();
+  const request = parsed.data;
   const size = request.size ?? { width: 1024, height: 1024 };
   if (typeof request.prompt !== "string") {
     for (const item of request.prompt.items) {
       const [top, left, bottom, right] = item.bbox;
       if (top >= bottom || left >= right || top < -size.height / 2 || bottom > size.height / 2 || left < -size.width / 2 || right > size.width / 2)
-        return yield* MossImageError.make({ reason: "InvalidInput", outcome: "NotSubmitted" });
+        throw invalidInput();
     }
   }
-  const prompt =
-    typeof request.prompt === "string"
-      ? request.prompt
-      : yield* encodeLayout(request.prompt).pipe(Effect.mapError(() => MossImageError.make({ reason: "InvalidInput", outcome: "NotSubmitted" })));
-  if ([...prompt].length > 4000) return yield* MossImageError.make({ reason: "InvalidInput", outcome: "NotSubmitted" });
+  const prompt = typeof request.prompt === "string" ? request.prompt : JSON.stringify(request.prompt);
+  if ([...prompt].length > 4000) throw invalidInput();
   return { ...request, prompt, size };
-});
+};
 
-export const generateMossImage = Effect.fn("Provider.generateMossImage")(
-  function* (key: string, input: unknown) {
-    if (!key.trim() || /\s/u.test(key)) return yield* MossImageError.make({ reason: "Credentials", outcome: "NotSubmitted" });
-    const request = yield* prepareMossImage(input);
-    const { prompt, size } = request;
-    const body = yield* HttpBody.json({
-      model: request.model,
-      prompt,
-      size: `${size.width}x${size.height}`,
-      n: 1,
-      response_format: "url",
-      prompt_enhance: request.enhance ?? false,
-      output_watermark: { enabled: request.watermark ?? true },
-      ...(request.seed !== undefined ? { seed: request.seed } : {}),
-      ...(request.steps !== undefined ? { num_inference_steps: request.steps } : {}),
-      ...(request.guidance !== undefined ? { guidance_scale: request.guidance } : {}),
-      ...(request.negativePrompt !== undefined ? { negative_prompt: request.negativePrompt } : {}),
-    }).pipe(Effect.mapError(() => MossImageError.make({ reason: "InvalidInput", outcome: "NotSubmitted" })));
-    const http = yield* HttpClient.HttpClient;
-    const response = yield* http.post("https://api.mosi.cn/v1/images/generations", {
-      headers: { authorization: `Bearer ${key}`, accept: "application/json" },
-      body,
-    });
-    const raw = yield* readMossResponse(response).pipe(
-      Effect.catchTag("MossResponseTooLarge", () => Effect.fail(MossImageError.make({ reason: "TooLarge", outcome: "Unknown" }))),
-    );
-    if (response.status < 200 || response.status >= 300) {
-      const decoded = Schema.decodeOption(ErrorResponse)(raw);
-      return yield* MossImageError.make({
-        reason: "HttpStatus",
-        status: response.status,
-        outcome: [400, 401, 403, 413, 422, 429].includes(response.status) ? "Rejected" : "Unknown",
-        ...(decoded._tag === "Some" ? { code: decoded.value.error.code } : {}),
-      });
-    }
-    const result = yield* Schema.decodeEffect(ImageResponse)(raw).pipe(
-      Effect.mapError(() => MossImageError.make({ reason: "InvalidResponse", outcome: "Unknown" })),
-    );
-    if (result.usage.output_width !== size.width || result.usage.output_height !== size.height)
-      return yield* MossImageError.make({ reason: "InvalidResponse", outcome: "Unknown" });
-    // Persist this URL before downloading; a failed download must not trigger another generation.
-    return { url: result.data[0].url.href, created: result.created, usage: result.usage };
-  },
-  Effect.provideService(FetchHttpClient.RequestInit, { redirect: "manual" }),
-  Effect.timeout("900 seconds"),
-  // No request, prompt, signed URL or upstream error body may escape through failures.
-  Effect.catchTags({
-    HttpClientError: () => Effect.fail(MossImageError.make({ reason: "Network", outcome: "Unknown" })),
-    TimeoutError: () => Effect.fail(MossImageError.make({ reason: "Timeout", outcome: "Unknown" })),
-  }),
-);
+export interface MossImage {
+  readonly url: string;
+  readonly created: number;
+  readonly usage: { readonly generated_images: 1; readonly output_width: number; readonly output_height: number };
+}
+
+export const generateMossImage = (key: string, input: unknown, http: ProviderHttp): Promise<MossImage> =>
+  bounded(
+    900_000,
+    http,
+    async (signal) => {
+      if (badKey(key)) throw new MossImageError({ reason: "Credentials", outcome: "NotSubmitted" });
+      const request = await prepareMossImage(input);
+      const { prompt, size } = request;
+      let body: string;
+      try {
+        body = JSON.stringify({
+          model: request.model,
+          prompt,
+          size: `${size.width}x${size.height}`,
+          n: 1,
+          response_format: "url",
+          prompt_enhance: request.enhance ?? false,
+          output_watermark: { enabled: request.watermark ?? true },
+          ...(request.seed !== undefined ? { seed: request.seed } : {}),
+          ...(request.steps !== undefined ? { num_inference_steps: request.steps } : {}),
+          ...(request.guidance !== undefined ? { guidance_scale: request.guidance } : {}),
+          ...(request.negativePrompt !== undefined ? { negative_prompt: request.negativePrompt } : {}),
+        });
+      } catch {
+        throw invalidInput();
+      }
+      const response = await send(
+        http,
+        "https://api.mosi.cn/v1/images/generations",
+        {
+          method: "POST",
+          headers: { authorization: `Bearer ${key}`, accept: "application/json", "content-type": "application/json" },
+          body,
+          redirect: "manual",
+        },
+        signal,
+      );
+      let raw: string;
+      try {
+        raw = await readMossResponse(response, signal);
+      } catch (e) {
+        if (e instanceof MossResponseTooLarge) throw new MossImageError({ reason: "TooLarge", outcome: "Unknown" });
+        throw e;
+      }
+      if (response.status < 200 || response.status >= 300) {
+        const code = fromJson(ErrorResponse, raw)?.error.code;
+        throw new MossImageError({
+          reason: "HttpStatus",
+          status: response.status,
+          outcome: rejectedStatuses.includes(response.status) ? "Rejected" : "Unknown",
+          ...(code !== undefined ? { code } : {}),
+        });
+      }
+      const result = fromJson(ImageResponse, raw);
+      if (result === undefined || result.usage.output_width !== size.width || result.usage.output_height !== size.height)
+        throw new MossImageError({ reason: "InvalidResponse", outcome: "Unknown" });
+      // Persist this URL before downloading; a failed download must not trigger another generation.
+      return { url: result.data[0].url.href, created: result.created, usage: result.usage };
+    },
+    // No request, prompt, signed URL or upstream error body may escape through failures.
+    {
+      timeout: () => new MossImageError({ reason: "Timeout", outcome: "Unknown" }),
+      network: () => new MossImageError({ reason: "Network", outcome: "Unknown" }),
+    },
+  );

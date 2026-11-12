@@ -1,120 +1,24 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
 import { createModal } from "#/ui/Dialog.tsx";
-import { styleProps } from "#/ui/positioner.ts";
 
 import { DashedLine } from "./base";
 import { PxButton } from "./button";
 import { SpriteIcon } from "./icons";
-import { pxStyle } from "./style";
 
-const viewStyles = stylex.create({
-  close: {
-    display: "grid",
-    width: "2.25rem",
-    height: "2.25rem",
-    flexShrink: 0,
-    cursor: "pointer",
-    placeItems: "center",
-    backgroundColor: { default: null, "@media (hover:hover)": { default: null, ":hover": "var(--color-cream-200)" } },
-  },
-  closeIcon: {
-    translate: { default: null, [stylex.when.ancestor(":active")]: "1px 1px" },
-  },
-  modal: {
-    margin: "auto",
-    maxHeight: "none",
-    maxWidth: "none",
-    overflow: "visible",
-    backgroundColor: "var(--color-cream-50)",
-    padding: 0,
-    color: "var(--color-bark-900)",
-    transitionProperty: { default: "opacity,scale", "@media (prefers-reduced-motion: reduce)": "none" },
-    transitionTimingFunction: "var(--ease-out)",
-    transitionDuration: "150ms",
-    scale: { default: null, "@starting-style": "95% 95%" },
-    opacity: { default: null, "@starting-style": 0 },
-  },
-  farmBackdrop: {
-    backgroundColor: {
-      default: "var(--color-cream-50)",
-      "::backdrop": {
-        default: "var(--color-px-dialog-backdrop)",
-        "@supports (color: color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-bark-900) 30%, transparent)",
-      },
-    },
-  },
-  settingsBackdrop: { backgroundColor: { default: "var(--color-cream-50)", "::backdrop": "var(--color-px-scrim)" } },
-  settingsSize: { width: "min(512px,calc(100vw - 32px))", borderWidth: 2, borderStyle: "solid", borderColor: "var(--color-bark-500)" },
-  farmDialogRoot: {
-    display: "flex",
-    height: "100%",
-    flexDirection: "column",
-    overflow: "hidden",
-  },
-  farmDialogHeader: {
-    display: "flex",
-    flexShrink: "0",
-    alignItems: "center",
-    gap: "0.5rem",
-    backgroundColor: "var(--color-cream-100)",
-    paddingInline: "1rem",
-    paddingBlock: "0.625rem",
-  },
-  farmDialogTitle: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-  },
-  farmDialogRule: {
-    flexShrink: "0",
-    backgroundColor: "var(--color-cream-100)",
-  },
-  farmDialogBody: {
-    minHeight: "0",
-    flex: "1",
-    overflowY: "auto",
-    padding: "1rem",
-  },
-  farmSection: {
-    display: "flex",
-    flexDirection: "column",
-    paddingTop: "1rem",
-  },
-  farmSectionTitle: {
-    marginBottom: "0.375rem",
-    color: "var(--color-bark-600)",
-  },
-  pxDialogRoot: {
-    maxHeight: "85dvh",
-    overflowY: "auto",
-    padding: "1.5rem",
-  },
-  pxDialogHeader: {
-    marginBottom: "1.25rem",
-    display: "flex",
-    alignItems: "center",
-    gap: "0.75rem",
-  },
-  pxDialogTitle: {
-    minWidth: "0",
-    flex: "1",
-  },
-});
+const farmBackdrop = "bg-cream-50 backdrop:bg-bark-900/30";
+const settingsBackdrop = "bg-cream-50 backdrop:bg-px-scrim";
 
 function Modal(props: {
   open: boolean;
   onClose: () => void;
   label: string;
   testid?: string | undefined;
-  backdrop: stylex.StyleXStyles;
-  styles: stylex.StyleXStyles;
+  backdrop: string;
+  class: string;
   style?: JSX.CSSProperties;
   children: JSX.Element;
 }) {
@@ -130,21 +34,26 @@ function Modal(props: {
       onCancel={m.onCancel}
       onClose={m.onClose}
       onClick={m.onClick}
-      {...styleProps([viewStyles.modal, pxStyle.window, props.backdrop, props.styles], props.style)}
+      class={[
+        "m-auto max-h-none max-w-none overflow-visible p-0 text-bark-900 transition-[opacity,scale] duration-150 ease-out pixel-window starting:scale-95 starting:opacity-0 motion-reduce:transition-none",
+        props.backdrop,
+        props.class,
+      ]}
+      style={props.style}
     >
       <Show when={props.open}>{props.children}</Show>
     </dialog>
   );
 }
 
-const farmSizes = stylex.create({
-  sm: { width: "min(480px,calc(100vw - 24px))", height: "min(384px,88dvh)" },
-  md: { width: "min(480px,calc(100vw - 24px))", height: "min(608px,88dvh)" },
-  lg: { width: "min(736px,calc(100vw - 24px))", height: "min(576px,88dvh)" },
-  wide: { width: "min(720px,calc(100vw - 24px))", height: "min(608px,88dvh)" },
-});
+export type FarmDialogSize = "sm" | "md" | "lg" | "wide";
 
-export type FarmDialogSize = keyof typeof farmSizes;
+const farmSizes: Record<FarmDialogSize, string> = {
+  sm: "w-[min(480px,calc(100vw_-_24px))] h-[min(384px,88dvh)]",
+  md: "w-[min(480px,calc(100vw_-_24px))] h-[min(608px,88dvh)]",
+  lg: "w-[min(736px,calc(100vw_-_24px))] h-[min(576px,88dvh)]",
+  wide: "w-[min(720px,calc(100vw_-_24px))] h-[min(608px,88dvh)]",
+};
 
 /** A farm panel's frame: whatever it holds, it keeps its size and scrolls inside. Shown while `open` (default) is true. */
 export function FarmDialog(props: {
@@ -162,26 +71,26 @@ export function FarmDialog(props: {
       onClose={() => props.onClose()}
       label={props.title}
       testid={props.testid}
-      backdrop={viewStyles.farmBackdrop}
-      styles={farmSizes[props.size]}
+      backdrop={farmBackdrop}
+      class={farmSizes[props.size]}
     >
-      <div {...stylex.attrs(pxStyle.sm, viewStyles.farmDialogRoot)}>
-        <div {...stylex.attrs(viewStyles.farmDialogHeader)}>
+      <div class="flex h-full flex-col overflow-hidden pixel-sm">
+        <div class="flex shrink-0 items-center gap-2 bg-cream-100 px-4 py-2.5">
           <Show when={props.icon}>{(icon) => <SpriteIcon name={icon()} size={32} />}</Show>
-          <h2 {...stylex.attrs(pxStyle.lg, viewStyles.farmDialogTitle)}>{props.title}</h2>
+          <h2 class="min-w-0 flex-1 truncate pixel-lg">{props.title}</h2>
           <button
             type="button"
             aria-label={t("web.ui.pixel.close")}
             onClick={() => props.onClose()}
-            {...stylex.attrs(viewStyles.close, pxStyle.focus, stylex.defaultMarker())}
+            class="group grid size-9 shrink-0 cursor-pointer place-items-center pixel-focus hover:bg-cream-200"
           >
-            <SpriteIcon name="button-close" size={18} styles={viewStyles.closeIcon} />
+            <SpriteIcon name="button-close" size={18} class="group-active:translate-px" />
           </button>
         </div>
-        <div {...stylex.attrs(viewStyles.farmDialogRule)}>
+        <div class="shrink-0 bg-cream-100">
           <DashedLine />
         </div>
-        <div {...stylex.attrs(viewStyles.farmDialogBody)}>{props.children}</div>
+        <div class="min-h-0 flex-1 overflow-y-auto p-4">{props.children}</div>
       </div>
     </Modal>
   );
@@ -189,8 +98,8 @@ export function FarmDialog(props: {
 
 export function FarmSection(props: { title: string; children?: JSX.Element }) {
   return (
-    <section {...stylex.attrs(viewStyles.farmSection)}>
-      <h3 {...stylex.attrs(pxStyle.xs, viewStyles.farmSectionTitle)}>{props.title}</h3>
+    <section class="flex flex-col pt-4">
+      <h3 class="mb-1.5 text-bark-600 pixel-xs">{props.title}</h3>
       {props.children}
     </section>
   );
@@ -204,12 +113,12 @@ export function PxDialog(props: { title: string; open?: boolean; testid?: string
       onClose={() => props.onClose()}
       label={props.title}
       testid={props.testid}
-      backdrop={viewStyles.settingsBackdrop}
-      styles={viewStyles.settingsSize}
+      backdrop={settingsBackdrop}
+      class="w-[min(512px,calc(100vw_-_32px))] border-2 border-bark-500"
     >
-      <div {...stylex.attrs(pxStyle.sm, viewStyles.pxDialogRoot)}>
-        <div {...stylex.attrs(viewStyles.pxDialogHeader)}>
-          <h2 {...stylex.attrs(pxStyle.xl, viewStyles.pxDialogTitle)}>{props.title}</h2>
+      <div class="max-h-[85dvh] overflow-y-auto p-6 pixel-sm">
+        <div class="mb-5 flex items-center gap-3">
+          <h2 class="min-w-0 flex-1 pixel-xl">{props.title}</h2>
           <PxButton size="icon" label={t("web.ui.pixel.close")} onClick={() => props.onClose()}>
             <SpriteIcon name="button-close" size={16} />
           </PxButton>

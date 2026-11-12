@@ -2,7 +2,7 @@ import { execFile, spawn } from "node:child_process";
 import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
-import { Schema } from "effect";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 
@@ -77,7 +77,7 @@ export interface RunningServer {
 }
 
 /** The line the server prints once it listens (--ready-json). */
-const ServerReady = Schema.Struct({ url: Schema.String });
+const ServerReady = z.object({ url: z.string() });
 
 /** port 0 picks a free one; a restart in development (dev.ts) asks for the one it had, so the page keeps its origin and
  * what it stored there. */

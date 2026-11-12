@@ -1,15 +1,19 @@
-import { Effect, type FileSystem, Schema, type Scope, Stream } from "effect";
+import { readFile } from "node:fs/promises";
+
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import { attachmentMax } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 
-import { type ApiError, BizCode, refuseIn } from "#/base/errors.ts";
-import { bestEffort } from "#/infra/log.ts";
-import { type PublicHttp, publicHttps } from "#/infra/publicHttp.ts";
+import { ApiError, BizCode, refuseIn } from "#/base/errors.ts";
+import { bestEffort, type Logger } from "#/infra/log.ts";
+import { type PublicFetch, publicHttps } from "#/infra/publicHttp.ts";
+import type { Time } from "#/infra/time.ts";
 import type { Attachment } from "#/modules/attachment/attachment.ts";
 
 import { audioResultMax, type StagedAudioResult } from "./input.ts";
+import { bodyChunks, inTime } from "./job.ts";
 import { validateSpeechBytes } from "./validateSpeechBytes.ts";
 
 const refused = refuseIn(BizCode.MediaRefused);
@@ -21,23 +25,26 @@ export interface AudioSavedResult {
 }
 
 export interface MediaInputs {
+  /** Staged against the quota; disposing of it removes the file and gives the reservation back. */
   readonly stageResult: (
     name: string,
     format: T.MediaAudioFormat,
-    source: Stream.Stream<Uint8Array, ApiError>,
-  ) => Effect.Effect<StagedAudioResult, ApiError, Scope.Scope>;
-  readonly storeResult: (staged: StagedAudioResult, holder: string, retainSource?: boolean) => Effect.Effect<T.MediaInputReference, ApiError>;
-  readonly release: (holder: string) => Effect.Effect<void, ApiError>;
-  readonly delete: (id: string) => Effect.Effect<void, ApiError>;
+    source: AsyncIterable<Uint8Array>,
+    signal?: AbortSignal,
+  ) => Promise<StagedAudioResult & AsyncDisposable>;
+  readonly storeResult: (staged: StagedAudioResult, holder: string, retainSource?: boolean) => Promise<T.MediaInputReference>;
+  readonly release: (holder: string) => Promise<void>;
+  readonly delete: (id: string) => Promise<void>;
 }
 
 export interface AudioStreamDeps {
-  readonly files: Attachment["Service"];
-  readonly fs: FileSystem.FileSystem;
+  readonly files: Attachment;
+  readonly log: Logger;
+  readonly clock: Time;
 }
 
 export interface AudioDownloadDeps extends AudioStreamDeps {
-  readonly http: PublicHttp["Service"];
+  readonly publicFetch: PublicFetch;
 }
 
 const types: Record<T.MediaAudioFormat, readonly string[]> = {
@@ -48,73 +55,119 @@ const types: Record<T.MediaAudioFormat, readonly string[]> = {
   opus: ["audio/opus", "audio/ogg", "application/ogg"],
   pcm: ["audio/pcm", "audio/l16", "application/octet-stream"],
 };
-const Length = Schema.NumberFromString.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: audioResultMax }));
+const Length = z.coerce.number().int().min(1).max(audioResultMax);
 const failed = () => refused(t("server.media.speechDownloadFailed"));
+const downloadMs = 300_000;
 
-export const releaseAudioResult = Effect.fn("Media.releaseAudioResult")(function* (id: string, saved: AudioSavedResult, inputs: MediaInputs) {
-  if (!saved.resultInput) return;
-  yield* inputs.release(id);
-  yield* inputs.delete(saved.resultInput.id);
-}, bestEffort("Media audio result rollback is pending"));
+export const releaseAudioResult = (deps: { readonly log: Logger }, id: string, saved: AudioSavedResult, inputs: MediaInputs) =>
+  bestEffort(deps.log, "Media audio result rollback is pending", async () => {
+    if (!saved.resultInput) return;
+    await inputs.release(id);
+    await inputs.delete(saved.resultInput.id);
+  });
 
-export const saveAudioStream = Effect.fn("Media.saveAudioStream")(function* (
+/** source kept as the job's result: an attachment when it is small enough, else a pinned input. Only the staging is
+ * stopped by the signal: a result once staged is kept. */
+export async function saveAudioStream(
   deps: AudioStreamDeps,
   id: string,
   format: T.MediaAudioFormat,
-  source: Stream.Stream<Uint8Array, ApiError>,
+  source: AsyncIterable<Uint8Array>,
   inputs: MediaInputs,
   name: string = `moss-${id}.${format}`,
-): Effect.fn.Return<AudioSavedResult, ApiError> {
+  signal?: AbortSignal,
+): Promise<AudioSavedResult> {
   let retained: AudioSavedResult | undefined;
-  return yield* Effect.scoped(
-    Effect.uninterruptibleMask((resume) =>
-      Effect.gen(function* () {
-        const staged = yield* resume(inputs.stageResult(name, format, source));
-        const metadata = staged.metadata ? { metadata: staged.metadata } : {};
-        if (staged.size > attachmentMax) {
-          const resultInput = yield* inputs.storeResult(staged, id);
-          retained = { resultInput, ...metadata };
-          return retained;
-        }
-        const bytes = yield* deps.fs.readFile(staged.path).pipe(Effect.mapError(failed));
-        const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-        if (!validateSpeechBytes(buffer, format)) return yield* failed();
-        const attachment = yield* deps.files.attach({ name: staged.name, type: staged.mime, data: buffer.toString("base64") });
-        return { attachment, resultInput: null, ...metadata };
-      }),
-    ),
-  ).pipe(Effect.onError(() => (retained ? releaseAudioResult(id, retained, inputs) : Effect.void)));
-});
+  try {
+    await using staged = await inputs.stageResult(name, format, source, signal);
+    const metadata = staged.metadata ? { metadata: staged.metadata } : {};
+    if (staged.size > attachmentMax) {
+      const resultInput = await inputs.storeResult(staged, id);
+      retained = { resultInput, ...metadata };
+      return retained;
+    }
+    let buffer: Buffer;
+    try {
+      buffer = await readFile(staged.path);
+    } catch (e) {
+      deps.log.warn(`media: staged audio for ${id} could not be read`, e);
+      throw failed();
+    }
+    if (!validateSpeechBytes(buffer, format)) throw failed();
+    const attachment = await deps.files.attach({ name: staged.name, type: staged.mime, data: buffer.toString("base64") });
+    return { attachment, resultInput: null, ...metadata };
+  } catch (e) {
+    if (retained) await releaseAudioResult(deps, id, retained, inputs);
+    throw e;
+  }
+}
 
-export const saveAudioResult = Effect.fn("Media.saveAudioResult")(
-  function* (
-    deps: AudioDownloadDeps,
-    id: string,
-    address: string,
-    format: T.MediaAudioFormat,
-    inputs: MediaInputs,
-  ): Effect.fn.Return<AudioSavedResult, ApiError> {
-    const url = yield* Schema.decodeEffect(Schema.URLFromString)(address).pipe(Effect.mapError(failed));
-    if (!publicHttps(url)) return yield* failed();
-    const response = yield* deps.http.get(url, { headers: { accept: types[format].join(", ") } }).pipe(Effect.mapError(failed));
-    if (response.status !== 200 || !types[format].includes(response.headers["content-type"]?.split(";")[0]?.trim().toLowerCase() ?? "")) return yield* failed();
-    const declared = response.headers["content-length"];
-    const length = declared === undefined ? undefined : yield* Schema.decodeEffect(Length)(declared).pipe(Effect.mapError(failed));
-    let size = 0;
-    const source = response.stream.pipe(
-      Stream.mapError(failed),
-      Stream.mapEffect((chunk) => {
-        size += chunk.byteLength;
-        return size > audioResultMax || (length !== undefined && size > length) ? Effect.fail(failed()) : Effect.succeed(chunk);
-      }),
-      Stream.concat(
-        Stream.fromEffect(Effect.suspend(() => (length !== undefined && size !== length ? Effect.fail(failed()) : Effect.succeed(new Uint8Array(0))))),
-      ),
-    );
-    return yield* saveAudioStream(deps, id, format, source, inputs);
-  },
-  Effect.timeoutOrElse({
-    duration: "300 seconds",
-    orElse: () => Effect.fail(failed()),
-  }),
-);
+/** The bytes of a download, held to the size the vendor declared and to audioResultMax; anything off is failed(). */
+async function* checked(response: Response, length: number | undefined, signal: AbortSignal): AsyncGenerator<Uint8Array> {
+  let size = 0;
+  try {
+    for await (const chunk of bodyChunks(response, signal)) {
+      size += chunk.byteLength;
+      if (size > audioResultMax || (length !== undefined && size > length)) throw failed();
+      yield chunk;
+    }
+  } catch (e) {
+    if (signal.aborted || e instanceof ApiError) throw e;
+    throw failed();
+  }
+  if (length !== undefined && size !== length) throw failed();
+}
+
+/** Generated audio fetched from the vendor's public address and kept; past 300 seconds it is failed(). */
+export async function saveAudioResult(
+  deps: AudioDownloadDeps,
+  id: string,
+  address: string,
+  format: T.MediaAudioFormat,
+  inputs: MediaInputs,
+  signal?: AbortSignal,
+): Promise<AudioSavedResult> {
+  let url: URL;
+  try {
+    url = new URL(address);
+  } catch {
+    // An address that is not a URL is a download that cannot be made.
+    throw failed();
+  }
+  if (!publicHttps(url)) throw failed();
+  return inTime(
+    async (within) => {
+      let response: Response;
+      try {
+        response = await deps.publicFetch(url, { headers: { accept: types[format].join(", ") }, redirect: "manual", signal: within });
+      } catch (e) {
+        if (within.aborted) throw e;
+        deps.log.warn(`media: audio for ${id} could not be fetched`, e);
+        throw failed();
+      }
+      if (response.status !== 200 || !types[format].includes(response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? "")) {
+        await response.body?.cancel().catch(() => undefined);
+        throw failed();
+      }
+      const declared = response.headers.get("content-length");
+      let length: number | undefined;
+      if (declared !== null) {
+        const got = Length.safeParse(declared);
+        if (!got.success) {
+          await response.body?.cancel().catch(() => undefined);
+          throw failed();
+        }
+        length = got.data;
+      }
+      try {
+        return await saveAudioStream(deps, id, format, checked(response, length, within), inputs, undefined, within);
+      } catch (e) {
+        // Given up before the body was read (a deadline while staging began): it is let go here, not left open.
+        if (!response.bodyUsed) await response.body?.cancel().catch(() => undefined);
+        throw e;
+      }
+    },
+    downloadMs,
+    { clock: deps.clock, signal, timedOut: failed },
+  );
+}

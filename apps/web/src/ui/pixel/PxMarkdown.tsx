@@ -1,4 +1,5 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
+import type * as stylex from "@stylexjs/stylex";
 import { toDom } from "hast-util-to-dom";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
@@ -6,34 +7,12 @@ import remarkRehype from "remark-rehype";
 import { createMemo, onCleanup } from "solid-js";
 import { type Plugin, unified } from "unified";
 
-import { styleProps } from "#/ui/positioner.ts";
+import { withStyles } from "#/ui/positioner.ts";
 import { fragmentOf, remarkIssueRefs, richen } from "#/ui/richText.ts";
 
-import { pxStyle } from "./style";
-
-const styles = stylex.create({
-  root: { minWidth: 0, overflowWrap: "break-word" },
-  reading: { maxWidth: "560px" },
-  plain: { whiteSpace: "pre-wrap" },
-  clamped: (lines: number) => ({ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: lines, overflow: "hidden" }),
-  mention: {
-    display: "inline-block",
-    paddingInline: "0.3em",
-    whiteSpace: "nowrap",
-    backgroundColor: { default: "currentColor", "@supports (color: color-mix(in lab, red, red))": "color-mix(in oklab, currentColor 13%, transparent)" },
-  },
-  link: {
-    textDecorationLine: "underline",
-    textDecorationColor: { default: "currentColor", "@supports (color: color-mix(in lab, red, red))": "color-mix(in oklab, currentColor 45%, transparent)" },
-    WebkitTextDecorationColor: { default: null, "@supports (color: color-mix(in lab, red, red))": "color-mix(in oklab, currentColor 45%, transparent)" },
-  },
-  rule: {
-    marginBlock: "0.5rem",
-    height: "1.5px",
-    backgroundImage: "repeating-linear-gradient(90deg,currentColor 0 3px,transparent 3px 6px)",
-    opacity: 0.4,
-  },
-});
+const mentionClass = "inline-block px-[0.3em] whitespace-nowrap bg-current/13";
+const linkClass = "underline decoration-current/45";
+const ruleClass = "my-2 h-[1.5px] bg-[repeating-linear-gradient(90deg,currentColor_0_3px,transparent_3px_6px)] opacity-40";
 
 export { plainText } from "@vibevalley/protocol/rules";
 
@@ -72,12 +51,12 @@ function render(text: string, open: ((url: string) => void) | undefined): Node[]
   for (const a of [...root.querySelectorAll("a")]) {
     if (a.getAttribute("href") === mentionHref) {
       const tag = document.createElement("span");
-      tag.className = stylex.attrs(styles.mention).class ?? "";
+      tag.className = mentionClass;
       tag.append(...a.childNodes);
       a.replaceWith(tag);
       continue;
     }
-    a.className = stylex.attrs(styles.link).class ?? "";
+    a.className = linkClass;
     a.rel = "noreferrer";
     if (!open) a.target = "_blank";
     else
@@ -89,7 +68,7 @@ function render(text: string, open: ((url: string) => void) | undefined): Node[]
   for (const hr of [...root.querySelectorAll("hr")]) {
     const line = document.createElement("div");
     line.setAttribute("role", "separator");
-    line.className = stylex.attrs(styles.rule).class ?? "";
+    line.className = ruleClass;
     hr.replaceWith(line);
   }
   return [...root.childNodes];
@@ -99,13 +78,21 @@ function render(text: string, open: ((url: string) => void) | undefined): Node[]
  * GitHub-flavoured, no raw HTML. `mentions`: @w3, @助手, @用户 and @所有人 outside code become tags.
  * Links use `onOpenLink` when given, otherwise a new tab. `reading` limits lines to 40ch.
  */
-export function PxMarkdown(props: { text: string; mentions?: boolean; onOpenLink?: (url: string) => void; reading?: boolean; styles?: stylex.StyleXStyles }) {
+export function PxMarkdown(props: {
+  text: string;
+  mentions?: boolean;
+  onOpenLink?: (url: string) => void;
+  reading?: boolean;
+  class?: JSX.ClassValue | undefined;
+  // For callers still on StyleX; it goes when the last of them is on classes.
+  styles?: stylex.StyleXStyles;
+}) {
   const nodes = createMemo(() => render(props.mentions === true ? withMentions(props.text) : props.text, props.onOpenLink));
   return (
     <div
       data-pixel-markdown=""
       data-reading={props.reading === true ? "true" : undefined}
-      {...styleProps([styles.root, props.reading === true ? [pxStyle.read, styles.reading] : pxStyle.sm, props.styles])}
+      {...withStyles(props.styles, ["min-w-0 wrap-break-word", props.reading === true ? "max-w-[560px] pixel-read" : "pixel-sm", props.class])}
     >
       {nodes()}
     </div>
@@ -113,9 +100,22 @@ export function PxMarkdown(props: { text: string; mentions?: boolean; onOpenLink
 }
 
 /** Plain text to read, as PxMarkdown with `reading` draws it. */
-export function PxReadText(props: { text: string; maxLines?: number; styles?: stylex.StyleXStyles }) {
+export function PxReadText(props: {
+  text: string;
+  maxLines?: number;
+  class?: JSX.ClassValue | undefined;
+  // For callers still on StyleX; it goes when the last of them is on classes.
+  styles?: stylex.StyleXStyles;
+}) {
   return (
-    <p {...styleProps([pxStyle.read, styles.reading, styles.plain, props.styles, props.maxLines !== undefined && styles.clamped(props.maxLines)])}>
+    <p
+      {...withStyles(
+        props.styles,
+        // Important, so the clamp holds over a caller's styles as it did.
+        ["max-w-[560px] whitespace-pre-wrap pixel-read", props.class, props.maxLines !== undefined && "line-clamp-(--lines)!"],
+        props.maxLines === undefined ? undefined : { "--lines": String(props.maxLines) },
+      )}
+    >
       {props.text}
     </p>
   );

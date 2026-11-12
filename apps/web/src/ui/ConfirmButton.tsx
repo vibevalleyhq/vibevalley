@@ -1,32 +1,9 @@
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
 import { Button } from "./Button";
 import type { IconName } from "./icons";
-
-const fadeIn = stylex.keyframes({
-  from: { opacity: 0 },
-});
-
-const viewStyles = stylex.create({
-  group: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.5rem",
-    animationName: { default: fadeIn, "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: "180ms",
-    animationTimingFunction: "var(--ease-out)",
-    animationFillMode: "both",
-  },
-  confirmButtonSpan: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-});
 
 /** A button for what cannot be taken back (docs/style/design.md): the first press asks in place, the question, the action's own button and a way back. */
 export function ConfirmButton(props: {
@@ -53,13 +30,13 @@ export function ConfirmButton(props: {
     >
       <span
         role="group"
-        {...stylex.attrs(viewStyles.group)}
+        class="flex animate-fade-in flex-wrap items-center gap-2"
         onKeyDown={(e) => e.key === "Escape" && setArmed(false)}
         // Leaving the group takes the question back; moving between its buttons does not.
         onFocusOut={(e) => !e.currentTarget.contains(e.relatedTarget instanceof Node ? e.relatedTarget : null) && setArmed(false)}
       >
         <Show when={props.question}>
-          <span {...stylex.attrs(viewStyles.confirmButtonSpan)}>{props.question}</span>
+          <span class="text-sm text-muted">{props.question}</span>
         </Show>
         <Button
           tone={props.tone ?? "danger"}

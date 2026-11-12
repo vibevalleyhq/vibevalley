@@ -1,6 +1,6 @@
-import { Predicate, type Schema } from "effect";
+import { Predicate } from "effect";
 
-import { queryDecoder } from "./schema";
+import { queryDecoder, type QuerySchema } from "./schema";
 
 export type QueryKey = readonly (string | number | boolean | null)[];
 export type QueryRecord<T> = { readonly value: T; readonly updatedAt: number };
@@ -286,7 +286,7 @@ class Entry<T> implements EntryBase {
 }
 
 export function defineQuery<A = void, T = never, E = T>(
-  options: Policy & { schema: Schema.Codec<T, E>; key: (input: A) => QueryKey; fetch: (input: A, context: { signal: AbortSignal }) => Promise<unknown> },
+  options: Policy & { schema: QuerySchema<T, E>; key: (input: A) => QueryKey; fetch: (input: A, context: { signal: AbortSignal }) => Promise<unknown> },
 ): (input: A) => QueryDescriptor<T> {
   for (const n of [options.staleTime ?? 0, options.gcTime ?? 300_000]) if (n < 0 || Number.isNaN(n)) throw new Error("Query durations must be nonnegative");
   if (!Number.isInteger(options.retry ?? 0) || (options.retry ?? 0) < 0) throw new Error("Query retry must be a nonnegative integer");

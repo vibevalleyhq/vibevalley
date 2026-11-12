@@ -1,6 +1,6 @@
 # 界面怎么做：田间工作台
 
-VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的书桌，近乎中性的纸和墨，颜色只留给几样庄稼的意思；看和玩的地方是画出来的像素农场。本篇写工作台怎么做：审美、令牌、原子和模式、和那份八篇大纲的对照、给 agent 的清单。令牌的值以 `apps/web/src/style.css` 与 `apps/web/src/ui/tokens.stylex.ts` 为准，本篇只说用途和挑法；写错了由 lint 拦（`vibevalley/stylex-only`、`vibevalley/no-hex-color`、`vibevalley/design-tokens`，`scripts/audit/oxlint-plugin.ts`、`scripts/audit/design-tokens.ts`）。像素皮怎么画见 [农场的皮](docs/subsystems/farm.md)，页面的分层和宿主见 [客户端](docs/subsystems/app.md)。整套的样子在零件的故事里（`vp run --filter @vibevalley/web stories`，[`packages/stories`](packages/stories/README.md)）：每个令牌和零件的每种状态，浅色、深色并排，换宽度看窄窗口，动效的曲线从样式表里读。
+VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的书桌，近乎中性的纸和墨，颜色只留给几样庄稼的意思；看和玩的地方是画出来的像素农场。本篇写工作台怎么做：审美、令牌、原子和模式、和那份八篇大纲的对照、给 agent 的清单。令牌的值以 `apps/web/src/style.css`（`@theme`，Tailwind 的 class 名就是令牌名）为准，还没换下 StyleX 的文件经 `apps/web/src/ui/tokens.stylex.ts` 读同一组变量；本篇只说用途和挑法；写法照 [vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)，写错了由 lint 拦（`vibevalley/design-tokens`、`vibevalley/no-hex-color` 查 StyleX 的值和 class 里的任意值，`vibevalley/style-attrs`、没换的文件还有 `vibevalley/stylex-only`，`scripts/audit/oxlint-plugin.ts`、`scripts/audit/design-tokens.ts`）。像素皮怎么画见 [农场的皮](docs/subsystems/farm.md)，页面的分层和宿主见 [客户端](docs/subsystems/app.md)。整套的样子在零件的故事里（`vp run --filter @vibevalley/web stories`，[`packages/stories`](packages/stories/README.md)）：每个令牌和零件的每种状态，浅色、深色并排，换宽度看窄窗口，动效的曲线从样式表里读。
 
 ## 审美
 
@@ -22,10 +22,10 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 | 在哪 | `apps/web/src/ui`、`features/*`、`app` | `farm`、`tree`、`ui/pixel` |
 | 字 | 系统的中文字体（`--font-sans`），13px 正文 | FusionPixel（`--font-pixel`），只在 12、24px 清楚 |
 | 图标 | reicon 的线条图标（`ui/Icon.tsx` 的 `<Icon name>`），跟着字的颜色 | `public/pixel` 的贴图（`SpriteIcon`） |
-| 线和影 | 1px 的 `--color-line`，`--shadow-raise`、`--shadow-float` | 2px 的树皮色框，`--shadow-px` 和 `ui/pixel/style.ts` 的 `pxStyle.window`、`pxStyle.frame` |
+| 线和影 | 1px 的 `--color-line`，`--shadow-raise`、`--shadow-float` | 2px 的树皮色框，`--shadow-px` 和 `pixel-window`、`pixel-frame`（style.css 的 `@utility`） |
 | 动效 | 缓动和三档时长（下面「动效」） | `steps()` 走帧，一像素一像素地动 |
 | 主题 | 浅色、深色（设置 › 外观） | 只有画出来的那一套 |
-| 令牌的检查 | `stylex-only`、`no-hex-color`、`design-tokens` | `stylex-only`、`no-hex-color`：画出来的颜色也有名字；尺寸是画的一部分，不查 |
+| 令牌的检查 | `no-hex-color`、`design-tokens`、`style-attrs` | `no-hex-color`、`style-attrs`：画出来的颜色也有名字；尺寸是画的一部分，不查 |
 
 头像（`ui/domain/Face.tsx`）、农机的 logo、仓库的岛、额度瓶在工作台里也是画，照像素皮。
 
@@ -34,9 +34,9 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 像素皮不跟着主题换，但它的值和工作台一样有名字、只写在一处：
 
 - **颜色**按家族起名（`style.css` 的 CSS 自定义属性）：`cream`（纸和木板的底）、`bark`（框和字）、`leaf`（好、主操作）、`wheat`（在等）、`berry`（坏、危险）、`water`、`ink`（夜和调试台），手机屏的 `lcd`（和 `farm/phone/lcd.ts` 画布用的同一组绿）、首页的 `dusk` 和 `glow`；阴影和暗幕的 `px-drop`、`px-shade`、`px-dent`、`px-scrim`。写死的颜色由 `no-hex-color` 拦，头像的颜色是数据（`ui/domain/cast.ts`），照原样。
-- **字**只有 12px 和 24px（FusionPixel 只在这两档清楚），由 `ui/pixel/style.ts` 的 `pxStyle` 给；读的长文字（汇报、说明）用 `pxStyle.read`，是系统字体。
-- **框和影**：`pxStyle.window`（窗）、`frame`（厚框）、`ring`（框里一圈 2px）、`drop`（浮在板子上的投影）、`shade`（地图上的牌子和卡片，更深一些，不然看不出来）。
-- **焦点**只有一种：`pxStyle.focus`，叶色的 2px 外框，离边一个像素。
+- **字**只有 12px 和 24px（FusionPixel 只在这两档清楚），由 `pixel-xs`…`pixel-2xl` 给（style.css 的 `@utility`）；读的长文字（汇报、说明）用 `pixel-read`，是系统字体。
+- **框和影**：`pixel-window`（窗）、`pixel-frame`（厚框）、`pixel-ring`（框里一圈 2px）、`pixel-drop`（浮在板子上的投影）、`pixel-shade`（地图上的牌子和卡片，更深一些，不然看不出来）。
+- **焦点**只有一种：`pixel-focus`，叶色的 2px 外框，离边一个像素。
 - **叶和麦上的字是树皮色**（`var(--color-bark-900)`）：奶油色的字在 `leaf-500` 上只有 2.5:1，读不清；只有 `berry` 和更深的叶（`leaf-700`）上用奶油色的字。
 - **动效**走帧：关键帧用 `stylex.keyframes()` 配合 `steps()`，一个像素一个像素地动，每个动画写自己的减少动效的停法。
 
@@ -249,7 +249,7 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 
 **样式怎么拼**：
 
-- 普通 DOM 节点用 `stylex.attrs(styles.root, on && styles.active)`；共享常量从 `ui/tokens.stylex.ts` 或 `ui/pixel/style.ts` 导入，不在消费文件里复制私有的皮肤块，也不跨层引用 `--wb-*` 内部变量（一律用 `--color-*` 和 `--shadow-*`）。
+- 普通 DOM 节点用 `stylex.attrs(styles.root, on && styles.active)`；共享常量从 `ui/tokens.stylex.ts` 导入（像素皮的框、字、焦点已是 style.css 的 `pixel-*` class），不在消费文件里复制私有的皮肤块，也不跨层引用 `--wb-*` 内部变量（一律用 `--color-*` 和 `--shadow-*`）。
 - 接收外部 `styles?: stylex.StyleXStyles` 或需要合并原生 `style` 对象的原子零件，统一经 `ui/positioner.ts` 的 `styleProps(...)` 展开属性（内部单次调用 `stylex.props()`，把 `className` 映射成 `class` 并保留动态变量对象）。
 - 原子收的 `styles` 只管摆放（外边距、定位、宽、`flex`），它的样子（高、颜色、圆角、字号）由它自己的属性定（`tone`、`size`）；要一个新样子，给原子加一个属性，不在外面拿 `styles` 盖。
 

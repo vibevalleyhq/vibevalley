@@ -1,29 +1,27 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { NodeServices } from "@effect/platform-node";
-import { describe, expect, it } from "@effect/vitest";
-import { Effect, Formatter, Layer, Schema } from "effect";
+import { describe, expect, test } from "vite-plus/test";
 
 import type { Issue } from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 
-import { ServerConfig } from "#/infra/config.ts";
+import type { ServerConfig } from "#/infra/config.ts";
+import { keptLog } from "#/infra/log.ts";
+import { wallTime } from "#/infra/time.ts";
 import { gitSync, reposDir, repo, write } from "#/testing/git.ts";
 import { testConfig } from "#/testing/layers.ts";
 
 import { GitError, run } from "./git.ts";
 import { actionsJobOf } from "./pullSnapshot.ts";
-import { Repo, githubOrigin, type GitHubRun, probeGitHub, type RepoHooks } from "./repo.ts";
+import { githubOrigin, type GitHubRun, makeRepo, probeGitHub, type Repo, type RepoHooks } from "./repo.ts";
 import { repository } from "./repository.ts";
 
-const json = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
-
-const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });
+const noGitHub: GitHubRun = () => Promise.resolve({ out: "", ok: false, missing: true });
 const gh =
   (answer: (args: string[]) => { out: string; ok?: boolean; missing?: boolean }): GitHubRun =>
   (...args) =>
-    Effect.sync(() => ({
+    Promise.resolve().then(() => ({
       ok: true,
       missing: false,
       ...(args.includes("defaultBranchRef")
@@ -33,13 +31,23 @@ const gh =
           : answer(args)),
     }));
 
-const repos = <A, E>(root: string, body: Effect.Effect<A, E, Repo>, change: Partial<ServerConfig["Service"]> = {}, hooks: RepoHooks = {}) =>
-  body.pipe(
-    Effect.provide(
-      Repo.layer({ gh: noGitHub, command: (file, args, options) => run("sh", [file, ...args], options), ...hooks }).pipe(
-        Layer.provide(Layer.merge(Layer.succeed(ServerConfig, testConfig({ workRoot: dirname(root), ...change })), NodeServices.layer)),
-      ),
-    ),
+const repos = async <A>(root: string, body: (p: Repo) => Promise<A>, change: Partial<ServerConfig> = {}, hooks: RepoHooks = {}): Promise<A> => {
+  const p = await makeRepo(
+    { config: testConfig({ workRoot: dirname(root), ...change }), clock: wallTime, log: keptLog() },
+    { gh: noGitHub, command: (file, args, options) => run("sh", [file, ...args], options), ...hooks },
+  );
+  try {
+    return await body(p);
+  } finally {
+    await p.close();
+  }
+};
+
+/** What work threw; it failing to throw fails the test. */
+const thrown = (work: Promise<unknown>): Promise<Error> =>
+  work.then(
+    () => expect.unreachable("it went through"),
+    (e: unknown) => (e instanceof Error ? e : expect.unreachable(String(e))),
   );
 
 const loggedIn = (permission: () => string) =>
@@ -50,12 +58,12 @@ const loggedIn = (permission: () => string) =>
   });
 
 describe("GitHub", () => {
-  it("finds the Actions job in a check's URL, and none elsewhere", () => {
+  test("finds the Actions job in a check's URL, and none elsewhere", () => {
     expect(actionsJobOf("https://github.com/o/r/actions/runs/1/job/127709499860")).toBe("127709499860");
     expect(actionsJobOf("https://example.test/checks/1")).toBe("");
   });
 
-  it.effect("regression: GitHub snapshots read all collection pages and overflowing review threads", () => {
+  test("regression: GitHub snapshots read all collection pages and overflowing review threads", () => {
     const root = reposDir();
     const resolved: string[] = [];
     let failReviews = false;
@@ -78,9 +86,8 @@ describe("GitHub", () => {
     gitSync(join(root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
     return repos(
       root,
-      Effect.gen(function* () {
-        const repo = yield* Repo;
-        const snapshot = yield* repo.githubSnapshot("sample", 7);
+      async (repo) => {
+        const snapshot = await repo.githubSnapshot("sample", 7);
         expect(snapshot.viewer).toBe("gardener");
         expect(snapshot.checks).toEqual([
           { name: "test", status: "COMPLETED", conclusion: "FAILURE", url: "https://checks/1" },
@@ -97,19 +104,19 @@ describe("GitHub", () => {
         });
         expect(snapshot.comments.find((comment) => comment.id === "SECOND")).toMatchObject({ threadId: "PRRT_second", resolved: true });
         failReviews = true;
-        expect((yield* Effect.flip(repo.githubSnapshot("sample", 7)))._tag).toBe("RepoError");
-        yield* repo.resolveReviewThread("sample", "PRRT_9");
+        expect((await thrown(repo.githubSnapshot("sample", 7))).name).toBe("RepoError");
+        await repo.resolveReviewThread("sample", "PRRT_9");
         expect(resolved).toEqual(["PRRT_9"]);
-      }),
+      },
       {},
       {
         gh: gh((args) => {
-          if (args[0] === "pr") return { out: Formatter.formatJson({ headRefOid: "abc" }) };
-          if (args[1] === "user") return { out: Formatter.formatJson({ login: "gardener" }) };
+          if (args[0] === "pr") return { out: JSON.stringify({ headRefOid: "abc" }) };
+          if (args[1] === "user") return { out: JSON.stringify({ login: "gardener" }) };
           const thread = args.find((arg) => arg.startsWith("thread="))?.slice(7);
           if (thread) {
             resolved.push(thread);
-            return { out: Formatter.formatJson({ data: { resolveReviewThread: { thread: { id: thread, isResolved: true } } } }) };
+            return { out: JSON.stringify({ data: { resolveReviewThread: { thread: { id: thread, isResolved: true } } } }) };
           }
           expect(args).toContain("--paginate");
           expect(args).toContain("--slurp");
@@ -117,7 +124,7 @@ describe("GitHub", () => {
           expect(query).not.toContain("databaseId");
           if (query.startsWith("query PullChecks("))
             return {
-              out: Formatter.formatJson([
+              out: JSON.stringify([
                 {
                   data: {
                     repository: {
@@ -148,7 +155,7 @@ describe("GitHub", () => {
             return failReviews
               ? { out: "not available", ok: false }
               : {
-                  out: Formatter.formatJson(
+                  out: JSON.stringify(
                     [1, 2].map((i) =>
                       pull("reviews", [
                         {
@@ -164,7 +171,7 @@ describe("GitHub", () => {
                 };
           if (query.startsWith("query PullComments("))
             return {
-              out: Formatter.formatJson(
+              out: JSON.stringify(
                 [1, 2].map((i) =>
                   pull("comments", [
                     {
@@ -180,7 +187,7 @@ describe("GitHub", () => {
             };
           if (query.startsWith("query PullThreads("))
             return {
-              out: Formatter.formatJson([
+              out: JSON.stringify([
                 pull("reviewThreads", [
                   {
                     id: "PRRT_9",
@@ -196,108 +203,106 @@ describe("GitHub", () => {
           expect(query.startsWith("query PullThreadComments(")).toBe(true);
           expect(args).toContain("id=PRRT_9");
           expect(args).toContain("endCursor=edge99");
-          return { out: Formatter.formatJson([{ data: { node: { comments: { nodes: [inline[100]] } } } }]) };
+          return { out: JSON.stringify([{ data: { node: { comments: { nodes: [inline[100]] } } } }]) };
         }),
       },
     );
   });
 
-  it.effect("the probe says whether gh is there and logged in, and never what it printed", () =>
-    Effect.gen(function* () {
-      for (const [name, version, auth, want] of [
-        ["missing", { out: "", ok: false, missing: true }, { out: "" }, { installed: false, loggedIn: false, reason: "没装 gh" }],
-        [
-          "logged out",
-          { out: "gh version 2.80.0 (2025-09-01)\n" },
-          { out: "secret", ok: false },
-          { installed: true, loggedIn: false, reason: "没登录 GitHub" },
-        ],
-        [
-          "logged in",
-          { out: "gh version 2.80.0 (2025-09-01)\n" },
-          {
-            out: "github.com\n  ✓ Logged in to github.com account gardener (keyring)\n  - Active account: true\n  - Token: secret",
-          },
-          { installed: true, loggedIn: true, account: "gardener" },
-        ],
-      ] as const) {
-        const got = yield* probeGitHub(gh((args) => (args[0] === "--version" ? version : auth)));
-        expect(got, name).toMatchObject(want);
-        const shown = yield* json(got);
-        expect(shown).not.toContain("secret");
-      }
-    }),
-  );
+  test("the probe says whether gh is there and logged in, and never what it printed", async () => {
+    for (const [name, version, auth, want] of [
+      ["missing", { out: "", ok: false, missing: true }, { out: "" }, { installed: false, loggedIn: false, reason: "没装 gh" }],
+      ["logged out", { out: "gh version 2.80.0 (2025-09-01)\n" }, { out: "secret", ok: false }, { installed: true, loggedIn: false, reason: "没登录 GitHub" }],
+      [
+        "logged in",
+        { out: "gh version 2.80.0 (2025-09-01)\n" },
+        {
+          out: "github.com\n  ✓ Logged in to github.com account gardener (keyring)\n  - Active account: true\n  - Token: secret",
+        },
+        { installed: true, loggedIn: true, account: "gardener" },
+      ],
+    ] as const) {
+      const got = await probeGitHub(
+        gh((args) => (args[0] === "--version" ? version : auth)),
+        wallTime,
+      );
+      expect(got, name).toMatchObject(want);
+      const shown = JSON.stringify(got);
+      expect(shown).not.toContain("secret");
+    }
+  });
 
-  it("origins", () => {
+  test("origins", () => {
     for (const s of ["git@github.com:user/repo.git", "ssh://git@github.com/user/repo.git", "https://github.com/user/repo.git"])
       expect(githubOrigin(s)).toBe("user/repo");
     for (const s of ["https://github.com.evil/o/r", "https://token@github.com/o/r", "/tmp/repo", "https://github.com/o/r/issues"])
       expect(githubOrigin(s)).toBe("");
   });
 
-  it.effect("permissions are found on a refresh and kept: a summary questions gh nothing", () => {
+  test("permissions are found on a refresh and kept: a summary questions gh nothing", () => {
     let permission = "WRITE";
     let calls = 0;
-    const counted: GitHubRun = (...args) => Effect.tap(loggedIn(() => permission)(...args), () => Effect.sync(() => calls++));
+    const counted: GitHubRun = async (...args) => {
+      const r = await loggedIn(() => permission)(...args);
+      calls++;
+      return r;
+    };
     return repos(
       reposDir(),
-      Effect.gen(function* () {
-        const p = yield* Repo;
-        const made = yield* p.create({ name: "garden" });
+      async (p) => {
+        const made = await p.create({ name: "garden" });
         gitSync(made.path, "remote", "add", "origin", "git@github.com:user/repo.git");
         for (const perm of ["WRITE", "ADMIN", "MAINTAIN", "READ", "TRIAGE"]) {
           permission = perm;
-          yield* p.refreshGitHub();
+          await p.refreshGitHub();
           const before = calls;
           const want = ["WRITE", "ADMIN", "MAINTAIN"].includes(perm);
-          expect((yield* p.summary(made)).pullRequest).toEqual(want ? { available: true, reason: "" } : { available: false, reason: "没有写权限" });
+          expect((await p.summary(made)).pullRequest).toEqual(want ? { available: true, reason: "" } : { available: false, reason: "没有写权限" });
           expect(calls).toBe(before);
         }
         gitSync(made.path, "remote", "set-url", "origin", "https://gitlab.com/user/repo");
-        yield* p.refreshGitHub();
-        expect((yield* p.summary(made)).pullRequest).toEqual({
+        await p.refreshGitHub();
+        expect((await p.summary(made)).pullRequest).toEqual({
           available: false,
           reason: "不是 GitHub 仓库",
         });
-      }),
+      },
       {},
       { gh: counted },
     );
   });
 
-  it.effect("logged out or gone, the permissions are dropped", () => {
+  test("logged out or gone, the permissions are dropped", () => {
     let mode = "logged in";
     const changing: GitHubRun = (...args) =>
       mode === "missing"
-        ? Effect.succeed({ out: "", ok: false, missing: true })
+        ? Promise.resolve({ out: "", ok: false, missing: true })
         : mode === "logged out" && args[0] !== "--version"
-          ? Effect.succeed({ out: "token: secret", ok: false, missing: false })
+          ? Promise.resolve({ out: "token: secret", ok: false, missing: false })
           : loggedIn(() => "WRITE")(...args);
     return repos(
       reposDir(),
-      Effect.gen(function* () {
-        const p = yield* Repo;
-        const made = yield* p.create({ name: "garden" });
+      async (p) => {
+        const made = await p.create({ name: "garden" });
         gitSync(made.path, "remote", "add", "origin", "https://github.com/user/repo.git");
-        yield* p.refreshGitHub();
-        expect((yield* p.summary(made)).pullRequest.available).toBe(true);
+        await p.refreshGitHub();
+        expect((await p.summary(made)).pullRequest.available).toBe(true);
         for (const [m, reason] of [
           ["logged out", "没登录 GitHub"],
           ["missing", "没装 gh"],
         ] as const) {
           mode = m;
-          const status = yield* p.refreshGitHub();
+          const status = await p.refreshGitHub();
           expect(status.reason).toBe(reason);
-          expect((yield* p.summary(made)).pullRequest).toEqual({ available: false, reason });
+          expect((await p.summary(made)).pullRequest).toEqual({ available: false, reason });
         }
-      }),
+      },
       {},
       { gh: changing },
     );
   });
 
-  it.effect("a private repository is cloned by the logged-in gh", () => {
+  test("a private repository is cloned by the logged-in gh", () => {
     const root = reposDir();
     const cloning = gh((args) => {
       if (args[0] === "--version") return { out: "gh version 2.80.0" };
@@ -308,79 +313,77 @@ describe("GitHub", () => {
     });
     return repos(
       root,
-      Effect.gen(function* () {
+      async (p) => {
         expect(
-          (yield* (yield* Repo).create({
-            name: "private",
-            github: "https://github.com/user/private",
-          })).git,
+          (
+            await p.create({
+              name: "private",
+              github: "https://github.com/user/private",
+            })
+          ).git,
         ).toBe(true);
-      }),
+      },
       {},
       { gh: cloning },
     );
   });
 
-  it.effect("pull requests need the repo opted in and the permission", () =>
+  test("pull requests need the repo opted in and the permission", () =>
     repos(
       reposDir(),
-      Effect.gen(function* () {
-        const p = yield* Repo;
+      async (p) => {
         for (const name of ["enabled", "other"]) {
-          const made = yield* p.create({ name });
+          const made = await p.create({ name });
           gitSync(made.path, "remote", "add", "origin", `https://github.com/user/${name}.git`);
         }
         expect(p.usesPullRequests("enabled")).toBe(false);
-        yield* p.refreshGitHub();
+        await p.refreshGitHub();
         expect(p.usesPullRequests("enabled")).toBe(true);
         expect(p.usesPullRequests("other")).toBe(false);
-      }),
+      },
       { github: { prRepos: ["enabled"], prPollSeconds: 180 } },
       { gh: loggedIn(() => "WRITE") },
-    ),
-  );
+    ));
 
-  it.effect("a pull request: the check first, then the push, and one already open is found again", () => {
+  test("a pull request: the check first, then the push, and one already open is found again", () => {
     let pushes = 0;
     let calls = 0;
     let pushFails = true;
     const issue = { number: 1, title: "sample" } as Issue;
     return repos(
       reposDir(),
-      Effect.gen(function* () {
-        const p = yield* Repo;
-        const place = yield* p.workplace("sample", 1, true, "");
+      async (p) => {
+        const place = await p.workplace("sample", 1, true, "");
         gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
         mkdirSync(join(place.cwd, ".vibevalley"));
         const check = join(place.cwd, ".vibevalley/check");
         write(check, "#!/bin/sh\necho check-failed\nexit 1\n", 0o755);
         gitSync(place.cwd, "add", ".vibevalley/check");
         gitSync(place.cwd, "commit", "-qm", "check");
-        yield* Effect.flip(p.submitPullRequest(place, issue, "done"));
+        await thrown(p.submitPullRequest(place, issue, "done"));
         expect([pushes, calls]).toEqual([0, 0]);
         write(check, "#!/bin/sh\nprintf changed > generated.ts\nexit 0\n", 0o755);
         gitSync(place.cwd, "commit", "-qam", "check again");
-        yield* Effect.flip(p.submitPullRequest(place, issue, "done"));
+        await thrown(p.submitPullRequest(place, issue, "done"));
         expect([pushes, calls]).toEqual([0, 0]);
         write(check, "#!/bin/sh\nexit 0\n", 0o755);
         gitSync(place.cwd, "commit", "-qam", "passing check");
-        yield* Effect.flip(p.submitPullRequest(place, issue, "done"));
+        await thrown(p.submitPullRequest(place, issue, "done"));
         expect(calls).toBe(0);
         gitSync(place.cwd, "clean", "-fd");
         pushFails = false;
-        expect((yield* p.submitPullRequest(place, issue, "done")).number).toBe(4);
+        expect((await p.submitPullRequest(place, issue, "done")).number).toBe(4);
         expect(calls).toBe(1);
-      }),
+      },
       {},
       {
         publication: {
           tip: (cwd) => repository(cwd).tip("main"),
-          fetch: () => Effect.void,
-          push: () =>
-            Effect.suspend(() => {
-              pushes++;
-              return pushFails ? Effect.fail(GitError.of(1, "push refused")) : Effect.void;
-            }),
+          fetch: () => Promise.resolve(),
+          push: () => {
+            pushes++;
+            return pushFails ? Promise.reject(GitError.of(1, "push refused")) : Promise.resolve();
+          },
         },
         gh: gh((args) => {
           calls++;
@@ -391,76 +394,71 @@ describe("GitHub", () => {
     );
   });
 
-  it.effect("an answer from gh that is not the shape asked for is refused, not taken as a pull request", () => {
+  test("an answer from gh that is not the shape asked for is refused, not taken as a pull request", () => {
     const issue = { number: 1, title: "sample" } as Issue;
     return repos(
       reposDir(),
-      Effect.gen(function* () {
-        const p = yield* Repo;
-        const place = yield* p.workplace("sample", 1, true, "");
+      async (p) => {
+        const place = await p.workplace("sample", 1, true, "");
         gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
-        expect((yield* Effect.flip(p.submitPullRequest(place, issue, "done"))).message).toContain("已推送");
-        expect((yield* Effect.flip(p.pullRequestState("sample", 3))).message).toBe("无法读取 PR #3 状态");
-      }),
+        expect((await thrown(p.submitPullRequest(place, issue, "done"))).message).toContain("已推送");
+        expect((await thrown(p.pullRequestState("sample", 3))).message).toBe("无法读取 PR #3 状态");
+      },
       {},
       {
-        publication: { tip: (cwd) => repository(cwd).tip("main"), fetch: () => Effect.void, push: () => Effect.void },
+        publication: { tip: (cwd) => repository(cwd).tip("main"), fetch: () => Promise.resolve(), push: () => Promise.resolve() },
         gh: gh((args) => ({ out: args[1] === "list" ? `[{"html_url":"https://github.com/test/sample/pull/4"}]` : "null" })),
       },
     );
   });
 
-  it.effect("the pull request's body says whether the check ran", () =>
-    Effect.gen(function* () {
-      for (const hasCheck of [false, true]) {
-        let body = "";
-        yield* repos(
-          reposDir(),
-          Effect.gen(function* () {
-            const p = yield* Repo;
-            const place = yield* p.workplace("sample", 1, true, "");
-            gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
-            if (hasCheck) {
-              mkdirSync(join(place.cwd, ".vibevalley"));
-              write(join(place.cwd, ".vibevalley/check"), "#!/bin/sh\nexit 0\n", 0o755);
-              gitSync(place.cwd, "add", ".vibevalley/check");
-              gitSync(place.cwd, "commit", "-qm", "check");
-            }
-            yield* p.submitPullRequest(place, { number: 1, title: "sample" } as Issue, "done");
-            expect(body).toBe("工单 #1\n\ndone\n\n" + (hasCheck ? ".vibevalley/check 通过。" : "这个仓库没有 .vibevalley/check，没跑检查。"));
+  test("the pull request's body says whether the check ran", async () => {
+    for (const hasCheck of [false, true]) {
+      let body = "";
+      await repos(
+        reposDir(),
+        async (p) => {
+          const place = await p.workplace("sample", 1, true, "");
+          gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
+          if (hasCheck) {
+            mkdirSync(join(place.cwd, ".vibevalley"));
+            write(join(place.cwd, ".vibevalley/check"), "#!/bin/sh\nexit 0\n", 0o755);
+            gitSync(place.cwd, "add", ".vibevalley/check");
+            gitSync(place.cwd, "commit", "-qm", "check");
+          }
+          await p.submitPullRequest(place, { number: 1, title: "sample" } as Issue, "done");
+          expect(body).toBe("工单 #1\n\ndone\n\n" + (hasCheck ? ".vibevalley/check 通过。" : "这个仓库没有 .vibevalley/check，没跑检查。"));
+        },
+        {},
+        {
+          publication: { tip: (cwd) => repository(cwd).tip("main"), fetch: () => Promise.resolve(), push: () => Promise.resolve() },
+          gh: gh((args) => {
+            if (args[1] === "list") return { out: "[]" };
+            body = args.at(-1)!;
+            return { out: "https://github.com/test/sample/pull/1" };
           }),
-          {},
-          {
-            publication: { tip: (cwd) => repository(cwd).tip("main"), fetch: () => Effect.void, push: () => Effect.void },
-            gh: gh((args) => {
-              if (args[1] === "list") return { out: "[]" };
-              body = args.at(-1)!;
-              return { out: "https://github.com/test/sample/pull/1" };
-            }),
-          },
-        );
-      }
-    }),
-  );
+        },
+      );
+    }
+  });
 
-  it.effect("the helper's own title and body, left in the worktree's git directory, open the pull request", () => {
+  test("the helper's own title and body, left in the worktree's git directory, open the pull request", () => {
     let args: string[] = [];
     return repos(
       reposDir(),
-      Effect.gen(function* () {
-        const p = yield* Repo;
-        const place = yield* p.workplace("sample", 1, true, "");
+      async (p) => {
+        const place = await p.workplace("sample", 1, true, "");
         gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
         const file = gitSync(place.cwd, "rev-parse", "--path-format=absolute", "--git-path", "vibevalley-pr.md").trim();
         writeFileSync(file, "# The board keeps its order\n\n## What changed\n\nIt does.\n");
-        yield* p.submitPullRequest(place, { number: 1, title: "看板不乱了" } as Issue, "done");
+        await p.submitPullRequest(place, { number: 1, title: "看板不乱了" } as Issue, "done");
         expect(args.slice(args.indexOf("--title"))).toEqual(["--title", "The board keeps its order", "--body", "## What changed\n\nIt does."]);
         // Not committed: the tree is clean.
         expect(gitSync(place.cwd, "status", "--porcelain").trim()).toBe("");
-      }),
+      },
       {},
       {
-        publication: { tip: (cwd) => repository(cwd).tip("main"), fetch: () => Effect.void, push: () => Effect.void },
+        publication: { tip: (cwd) => repository(cwd).tip("main"), fetch: () => Promise.resolve(), push: () => Promise.resolve() },
         gh: gh((given) => {
           if (given[1] === "list") return { out: "[]" };
           args = given;
@@ -470,85 +468,79 @@ describe("GitHub", () => {
     );
   });
 
-  it.effect("a new issue starts from origin's main when it can be fast-forwarded to", () =>
-    Effect.gen(function* () {
-      for (const mode of ["checked-out", "other-branch", "dirty", "diverged", "fetch-failure", "not-enabled"]) {
-        const root = reposDir();
-        const hooks: RepoHooks = {
-          gh: loggedIn(() => (mode === "not-enabled" ? "READ" : "WRITE")),
-        };
-        let failFetch = false;
-        let originPath = "";
-        yield* repos(
-          root,
-          Effect.gen(function* () {
-            const p = yield* Repo;
-            yield* p.create({ name: "sample" });
-            const path = join(root, "sample");
-            const origin = join(tempDir("vibevalley-origin-"), "origin.git");
-            gitSync(path, "clone", "-q", "--bare", path, origin);
-            // gh sees a GitHub repository; git fetches the local one.
-            gitSync(path, "remote", "add", "origin", "https://github.com/test/sample.git");
-            gitSync(path, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
-            originPath = origin;
-            yield* p.refreshGitHub();
-            const old = gitSync(path, "rev-parse", "main");
-            const remote = join(tempDir("vibevalley-remote-"), "remote");
-            gitSync(path, "clone", "-q", origin, remote);
-            gitSync(remote, "commit", "--allow-empty", "-m", "remote change");
+  test("a new issue starts from origin's main when it can be fast-forwarded to", async () => {
+    for (const mode of ["checked-out", "other-branch", "dirty", "diverged", "fetch-failure", "not-enabled"]) {
+      const root = reposDir();
+      const hooks: RepoHooks = {
+        gh: loggedIn(() => (mode === "not-enabled" ? "READ" : "WRITE")),
+      };
+      let failFetch = false;
+      let originPath = "";
+      await repos(
+        root,
+        async (p) => {
+          await p.create({ name: "sample" });
+          const path = join(root, "sample");
+          const origin = join(tempDir("vibevalley-origin-"), "origin.git");
+          gitSync(path, "clone", "-q", "--bare", path, origin);
+          // gh sees a GitHub repository; git fetches the local one.
+          gitSync(path, "remote", "add", "origin", "https://github.com/test/sample.git");
+          gitSync(path, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
+          originPath = origin;
+          await p.refreshGitHub();
+          const old = gitSync(path, "rev-parse", "main");
+          const remote = join(tempDir("vibevalley-remote-"), "remote");
+          gitSync(path, "clone", "-q", origin, remote);
+          gitSync(remote, "commit", "--allow-empty", "-m", "remote change");
+          gitSync(remote, "push", "-q", "origin", "main");
+          let want = gitSync(remote, "rev-parse", "HEAD");
+          if (mode === "other-branch") gitSync(path, "checkout", "-q", "-b", "personal");
+          if (mode === "dirty") {
+            writeFileSync(join(path, "dirty"), "keep");
+            want = old;
+          }
+          if (mode === "diverged") {
+            gitSync(path, "commit", "--allow-empty", "-m", "local change");
+            want = gitSync(path, "rev-parse", "HEAD");
+          }
+          if (mode === "fetch-failure") {
+            failFetch = true;
+            want = old;
+          }
+          if (mode === "not-enabled") want = old;
+          const place = await p.workplace("sample", 1, true, "");
+          expect([mode, gitSync(place.cwd, "rev-parse", "HEAD")]).toEqual([mode, want]);
+          expect([mode, gitSync(path, "rev-parse", "main")]).toEqual([mode, want]);
+          if (mode === "checked-out") {
+            gitSync(remote, "commit", "--allow-empty", "-m", "merged PR");
             gitSync(remote, "push", "-q", "origin", "main");
-            let want = gitSync(remote, "rev-parse", "HEAD");
-            if (mode === "other-branch") gitSync(path, "checkout", "-q", "-b", "personal");
-            if (mode === "dirty") {
-              writeFileSync(join(path, "dirty"), "keep");
-              want = old;
-            }
-            if (mode === "diverged") {
-              gitSync(path, "commit", "--allow-empty", "-m", "local change");
-              want = gitSync(path, "rev-parse", "HEAD");
-            }
-            if (mode === "fetch-failure") {
-              failFetch = true;
-              want = old;
-            }
-            if (mode === "not-enabled") want = old;
-            const place = yield* p.workplace("sample", 1, true, "");
-            expect([mode, gitSync(place.cwd, "rev-parse", "HEAD")]).toEqual([mode, want]);
-            expect([mode, gitSync(path, "rev-parse", "main")]).toEqual([mode, want]);
-            if (mode === "checked-out") {
-              gitSync(remote, "commit", "--allow-empty", "-m", "merged PR");
-              gitSync(remote, "push", "-q", "origin", "main");
-              yield* p.finishPullRequest("sample", 1);
-              expect(gitSync(path, "rev-parse", "main")).toBe(gitSync(remote, "rev-parse", "HEAD"));
-            }
-          }),
-          { github: { prRepos: ["sample"], prPollSeconds: 180 } },
-          {
-            ...hooks,
-            fetch: (cwd, branch) =>
-              failFetch
-                ? Effect.succeed(false)
-                : Effect.sync(() => {
-                    gitSync(cwd, "fetch", "-q", originPath, branch);
-                    return true;
-                  }),
-          },
-        );
-      }
-    }),
-  );
+            await p.finishPullRequest("sample", 1);
+            expect(gitSync(path, "rev-parse", "main")).toBe(gitSync(remote, "rev-parse", "HEAD"));
+          }
+        },
+        { github: { prRepos: ["sample"], prPollSeconds: 180 } },
+        {
+          ...hooks,
+          fetch: (cwd, branch) =>
+            failFetch
+              ? Promise.resolve(false)
+              : Promise.resolve().then(() => {
+                  gitSync(cwd, "fetch", "-q", originPath, branch);
+                  return true;
+                }),
+        },
+      );
+    }
+  });
 
-  it.effect("contributions count once per repository, its worktrees too", () => {
+  test("contributions count once per repository, its worktrees too", () => {
     const root = reposDir();
     const nested = join(root, "nested", "repo");
     repo(nested, 2, 1);
     gitSync(nested, "worktree", "add", "-q", "-b", "side", join(dirname(root), "worktrees", "copy"));
-    return repos(
-      root,
-      Effect.gen(function* () {
-        const repos = yield* (yield* Repo).contributions([]);
-        expect(repos.map((r) => r.commits)).toEqual([2]);
-      }),
-    );
+    return repos(root, async (p) => {
+      const repos = await p.contributions([]);
+      expect(repos.map((r) => r.commits)).toEqual([2]);
+    });
   });
 });

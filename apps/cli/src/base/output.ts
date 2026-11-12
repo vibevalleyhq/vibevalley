@@ -1,4 +1,4 @@
-import { Effect, Option, Schema, Stdio, Stream } from "effect";
+import type { Clock } from "@vibevalley/async";
 
 /** Exit codes a script can branch on. */
 export const exit = {
@@ -17,72 +17,128 @@ export const exit = {
   interrupted: 130,
 } as const;
 
-const NextStep = Schema.Struct({ say: Schema.String, run: Schema.optionalKey(Schema.Array(Schema.String)) });
-
 /** One thing to do next: what to do, and, when it is a command, the words to run (without the program's name). */
-export type Next = typeof NextStep.Type;
+export interface Next {
+  readonly say: string;
+  readonly run?: readonly string[];
+}
+
+export interface FailureFields {
+  readonly code: number;
+  /** ApiError's kind (Refused, Missing…), the parser's (MissingArgument…), or Unreachable, InvalidJson, Server. */
+  readonly tag: string;
+  readonly text: string;
+  readonly bizCode?: number;
+  readonly status?: number;
+  readonly next?: readonly Next[];
+}
 
 /** A command that did not go through, as it is printed: `{"error": {...}}` on stderr. */
-export class Failure extends Schema.TaggedError<Failure, { readonly brand: unique symbol }>()("Failure", {
-  code: Schema.Int,
-  /** ApiError's kind (Refused, Missing…), the parser's (MissingArgument…), or Unreachable, InvalidJson, Server. */
-  tag: Schema.String,
-  text: Schema.String,
-  bizCode: Schema.optionalKey(Schema.Int),
-  status: Schema.optionalKey(Schema.Int),
-  next: Schema.optionalKey(Schema.Array(NextStep)),
-}) {}
+export class Failure extends Error implements FailureFields {
+  override readonly name = "Failure";
+  readonly code: number;
+  readonly tag: string;
+  readonly text: string;
+  readonly bizCode?: number;
+  readonly status?: number;
+  readonly next?: readonly Next[];
+
+  constructor(f: FailureFields) {
+    super(f.text);
+    this.code = f.code;
+    this.tag = f.tag;
+    this.text = f.text;
+    if (f.bizCode !== undefined) this.bizCode = f.bizCode;
+    if (f.status !== undefined) this.status = f.status;
+    if (f.next !== undefined) this.next = f.next;
+  }
+
+  /** Its fields, to make another failure from with some changed. */
+  fields(): FailureFields {
+    return {
+      code: this.code,
+      tag: this.tag,
+      text: this.text,
+      ...(this.bizCode !== undefined ? { bizCode: this.bizCode } : {}),
+      ...(this.status !== undefined ? { status: this.status } : {}),
+      ...(this.next !== undefined ? { next: this.next } : {}),
+    };
+  }
+}
 
 /** The conversation ended with this exit code; it has said what it had to on the terminal itself. */
-export class Ended extends Schema.TaggedError<Ended, { readonly brand: unique symbol }>()("Ended", {
-  code: Schema.Finite,
-}) {}
+export class Ended extends Error {
+  override readonly name = "Ended";
+  readonly code: number;
+  constructor(code: number) {
+    super(`ended with ${code}`);
+    this.code = code;
+  }
+}
 
-const line = (to: "stdout" | "stderr", text: string) =>
-  Effect.flatMap(Stdio.Stdio, (io) => Stream.run(Stream.make(text + "\n"), io[to]({ endOnDone: false }))).pipe(Effect.ignore({ log: "Debug" }));
+/** What a run of the command line reads and writes: the process's own in main.ts, a test's own in testing.ts. */
+export interface Io {
+  /** Writes text as it is (no newline added). */
+  readonly stdout: (text: string) => void;
+  readonly stderr: (text: string) => void;
+  /** What stdin holds, to its end. */
+  readonly stdin: () => Promise<string>;
+  readonly stdoutIsTerminal: boolean;
+  readonly env: Readonly<Record<string, string | undefined>>;
+  readonly fetch: typeof fetch;
+  /** What time it is, and waiting (the retries and polls between tries; a sleep rejects once its signal aborts). */
+  readonly clock: Clock;
+  /** Aborted by Ctrl+C: every request and wait of the run lets go. */
+  readonly signal: AbortSignal;
+}
 
-export const out = (text: string) => line("stdout", text);
-export const err = (text: string) => line("stderr", text);
+export const out = (io: Io, text: string) => io.stdout(text + "\n");
+export const err = (io: Io, text: string) => io.stderr(text + "\n");
 
-/** What stdin holds, to its end. */
-const stdinText = Effect.flatMap(Stdio.Stdio, (io) => io.stdin.pipe(Stream.decodeText, Stream.mkString));
-
-/** Optional stdin input for commands that fall back to empty text when stdin cannot be read, recording the cause at debug level. */
-export const stdinTextOrEmpty = stdinText.pipe(
-  Effect.tapError((e) => Effect.logDebug("stdin could not be read", e)),
-  Effect.orElseSucceed(() => ""),
-);
-
-const oneLine = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
-const laidOut = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown, { space: 2 }));
+/** Optional stdin input for commands that fall back to empty text when stdin cannot be read. */
+export const stdinTextOrEmpty = async (io: Io): Promise<string> => {
+  try {
+    return await io.stdin();
+  } catch {
+    // No stdin to read (closed, or not a stream): the command goes on as if it were empty, which it then says.
+    return "";
+  }
+};
 
 /** A value as JSON text, one line (as JSON.stringify writes it) or, laid out, indented by two. */
-export const jsonText = (value: unknown, layout: "line" | "laidOut" = "line") =>
-  (layout === "laidOut" ? laidOut : oneLine)(value).pipe(Effect.mapError((e) => Failure.make({ code: exit.other, tag: "InvalidJson", text: e.message })));
+export const jsonText = (value: unknown, layout: "line" | "laidOut" = "line"): string => {
+  try {
+    // JSON.stringify answers undefined for undefined itself: written as null, as a document always is something.
+    return JSON.stringify(value, undefined, layout === "laidOut" ? 2 : undefined) ?? "null";
+  } catch (e) {
+    throw new Failure({ code: exit.other, tag: "InvalidJson", text: e instanceof Error ? e.message : String(e) });
+  }
+};
 
-/** A document as stdout takes it: laid out for a person on a terminal, one line otherwise. */
-const printDocument = Effect.fnUntraced(function* (value: unknown) {
-  const io = yield* Stdio.Stdio;
-  const tty = yield* io.stdoutIsTerminal;
-  const text = yield* jsonText(value, tty ? "laidOut" : "line");
-  return yield* out(text);
-});
-
-const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
-
-/** An answer's body as a document; one that is not JSON goes as it came. */
-export const printBody = (text: string) => (text.trim() === "" ? Effect.void : Option.match(json(text), { onNone: () => out(text), onSome: printDocument }));
+/** An answer's body as a document: laid out for a person on a terminal, one line otherwise; one that is not JSON goes as it came. */
+export const printBody = (io: Io, text: string) => {
+  if (text.trim() === "") return;
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    // Not JSON (an answer in plain words): printed as it came.
+    return out(io, text);
+  }
+  out(io, jsonText(value, io.stdoutIsTerminal ? "laidOut" : "line"));
+};
 
 /** The failure on stderr, always one line, so a script can read the last line as JSON. */
-export const printFailure = Effect.fnUntraced(function* (f: Failure) {
-  const text = yield* jsonText({
-    error: {
-      ...(f.bizCode !== undefined ? { bizCode: f.bizCode } : {}),
-      tag: f.tag,
-      message: f.text,
-      ...(f.status !== undefined ? { status: f.status } : {}),
-      ...(f.next && f.next.length > 0 ? { next: f.next } : {}),
-    },
-  });
-  return yield* err(text);
-});
+export const printFailure = (io: Io, f: Failure) =>
+  err(
+    io,
+    jsonText({
+      error: {
+        ...(f.bizCode !== undefined ? { bizCode: f.bizCode } : {}),
+        tag: f.tag,
+        message: f.text,
+        ...(f.status !== undefined ? { status: f.status } : {}),
+        ...(f.next && f.next.length > 0 ? { next: f.next } : {}),
+      },
+    }),
+  );

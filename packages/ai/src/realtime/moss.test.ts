@@ -1,4 +1,3 @@
-import { Option } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 import { mossAudioTag, mossFrameSamples, mossTaggedFrameBytes, packTaggedAudio, unpackPcm16 } from "@vibevalley/provider/moss";
@@ -8,7 +7,7 @@ import { heard, levelOf, type MossTurn } from "./moss-session.ts";
 import { MossEngine } from "./moss.ts";
 import { Playback } from "./playback.ts";
 
-const parsed = (text: string) => Option.getOrUndefined(parsedJson(text));
+const parsed = (text: string) => parsedJson(text);
 
 describe("heard", () => {
   it("revises a turn's words in place and starts a line for the next turn", () => {

@@ -1,19 +1,17 @@
-import { Effect } from "effect";
-
 import { userId } from "@vibevalley/protocol";
 import type { PkmHandlers } from "@vibevalley/protocol/api";
 
-import { Pkm } from "#/modules/pkm/pkm.ts";
+import type { Pkm } from "#/modules/pkm/pkm.ts";
 
-export const pkmHandlers = Effect.gen(function* () {
-  const pkm = yield* Pkm;
-  const done: PkmHandlers = {
+export function pkmHandlers(deps: { readonly pkm: Pkm }): PkmHandlers {
+  const { pkm } = deps;
+  return {
     "pkm.page.list": () => pkm.list(),
     "pkm.page.get": ({ page }) => pkm.page(page),
     "pkm.page.save": (req) => pkm.save(req),
     "pkm.page.move": (req) => pkm.move(req),
     "pkm.page.rename": (req) => pkm.rename(req),
-    "pkm.page.export": ({ page }) => Effect.map(pkm.markdown(page), (markdown) => ({ markdown })),
+    "pkm.page.export": async ({ page }) => ({ markdown: await pkm.markdown(page) }),
     "pkm.block.apply": (req) => pkm.apply(req),
     "pkm.search": (req) => pkm.search(req),
     "pkm.capture": ({ text, page }) => pkm.capture(text, undefined, page),
@@ -29,5 +27,4 @@ export const pkmHandlers = Effect.gen(function* () {
     "pkm.undo": () => pkm.undo(),
     "pkm.scan": () => pkm.scan(),
   };
-  return done;
-});
+}

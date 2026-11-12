@@ -1,5 +1,10 @@
-import { DateTime, Effect, type FileSystem, type Path, Schema } from "effect";
+import type { Dirent } from "node:fs";
+import { lstat, readdir } from "node:fs/promises";
+import { join } from "node:path";
 
+import { z } from "zod";
+
+import { mapConcurrent } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
@@ -50,9 +55,7 @@ const localeCompare = (a: string, b: string) => {
 };
 
 /** tokei --output json: each language's lines and the files it read. */
-const tokeiOutput = jsonOrNone(
-  Schema.Record(Schema.String, Schema.Struct({ code: Schema.Finite, comments: Schema.Finite, blanks: Schema.Finite, reports: Schema.Array(Schema.Unknown) })),
-);
+const tokeiOutput = jsonOrNone(z.record(z.string(), z.object({ code: z.number(), comments: z.number(), blanks: z.number(), reports: z.array(z.unknown()) })));
 
 /** Its total, and languages with nothing but blank lines, left out; undefined when it is not tokei's output. */
 export function countsOf(output: string): T.LanguageCount[] | undefined {
@@ -73,7 +76,10 @@ export function countsOf(output: string): T.LanguageCount[] | undefined {
 }
 
 /** The calendar day an instant falls on where the farm runs, as yyyy-mm-dd. */
-const localDay = (ms: number) => DateTime.formatIsoDate(DateTime.makeZonedUnsafe(ms, { timeZone: DateTime.zoneMakeLocal() }));
+const localDay = (ms: number) => {
+  const d = new Date(ms);
+  return `${String(d.getFullYear()).padStart(4, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 
 export function activityOf(log: string, dayOf: (ms: number) => string = localDay): { days: T.RepoActivity["days"]; authors: T.RepoActivity["authors"] } {
   const byDay = new Map<string, number>();
@@ -98,45 +104,54 @@ export const secondsOf = (text: string) => {
   return text.trim() === "" || !Number.isFinite(n) || n <= 0 ? 0 : Math.trunc(n * 1000);
 };
 
-/** Whether there is anything at path, a link included (which FileSystem's exists follows). */
-export const lexists = (fs: FileSystem.FileSystem, path: string) =>
-  fs.lstat(path).pipe(
-    Effect.as(true),
-    Effect.orElseSucceed(() => false),
-  );
+/** Whether there is anything at path, a link included (which an exists that follows links would miss). */
+export const lexists = async (path: string): Promise<boolean> => {
+  try {
+    await lstat(path);
+    return true;
+  } catch {
+    // Not there, or not to be looked at: either way nothing this server can use.
+    return false;
+  }
+};
 
 const skipDirs = new Set(["node_modules", ".git", ".venv", "vendor", "dist", "build", "target", ".next"]);
 
 /** The repositories under dir, at most depth folders down; a repository's own folders are not looked into. */
-const repoDirs = (fs: FileSystem.FileSystem, path: Path.Path, dir: string, depth: number): Effect.Effect<string[]> =>
-  Effect.gen(function* () {
-    const entries = yield* fs.readDirectoryEntries(dir).pipe(Effect.orElseSucceed(() => []));
-    if (entries.some((e) => e.name === ".git")) return [dir];
-    if (depth === 0) return [];
-    const under = yield* Effect.forEach(
-      entries.filter((e) => e.type === "Directory" && !skipDirs.has(e.name)),
-      (e) => repoDirs(fs, path, path.join(dir, e.name), depth - 1),
-      { concurrency: 8 },
-    );
-    return under.flat();
-  });
+const repoDirs = async (dir: string, depth: number): Promise<string[]> => {
+  let entries: Dirent[];
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    // A folder that cannot be read holds no repository this server can count.
+    entries = [];
+  }
+  if (entries.some((e) => e.name === ".git")) return [dir];
+  if (depth === 0) return [];
+  const under = await mapConcurrent(
+    entries.filter((e) => e.isDirectory() && !skipDirs.has(e.name)),
+    8,
+    (e) => repoDirs(join(dir, e.name), depth - 1),
+  );
+  return under.flat();
+};
 
-export const contributionsOf = Effect.fn("Repo.contributions")(function* (fs: FileSystem.FileSystem, path: Path.Path, root: string, extra: readonly string[]) {
-  const global = (yield* gitQuiet("", "config", "--global", "user.email")).toLowerCase();
+export async function contributionsOf(root: string, extra: readonly string[]): Promise<T.Repo[]> {
+  const global = (await gitQuiet("", "config", "--global", "user.email")).toLowerCase();
   const seen = new Set<string>();
   const out: T.Repo[] = [];
-  for (const dir of yield* repoDirs(fs, path, root, 3)) {
+  for (const dir of await repoDirs(root, 3)) {
     // Worktrees share their repository's history: one count per repository.
-    const common = yield* gitQuiet("", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const common = await gitQuiet("", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir");
     if (common === "" || seen.has(common)) continue;
     seen.add(common);
-    const mine = new Set([global, (yield* gitQuiet("", "-C", dir, "config", "user.email")).toLowerCase(), ...extra].filter((e) => e !== ""));
-    const emails = (yield* gitQuiet("", "-C", dir, "log", "--all", "--format=%ae")).split("\n");
+    const mine = new Set([global, (await gitQuiet("", "-C", dir, "config", "user.email")).toLowerCase(), ...extra].filter((e) => e !== ""));
+    const emails = (await gitQuiet("", "-C", dir, "log", "--all", "--format=%ae")).split("\n");
     const commits = emails.filter((e) => e !== "" && mine.has(e.toLowerCase())).length;
     out.push({
-      path: (yield* gitQuiet("", "-C", dir, "rev-parse", "--show-toplevel")) || dir,
+      path: (await gitQuiet("", "-C", dir, "rev-parse", "--show-toplevel")) || dir,
       commits,
     });
   }
   return out;
-});
+}

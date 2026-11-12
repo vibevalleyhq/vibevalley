@@ -1,25 +1,33 @@
 import { chmodSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { NodeServices } from "@effect/platform-node";
-import { describe, expect, it } from "@effect/vitest";
-import { Array as Arr, Cause, Effect, Exit, Formatter, Layer, Option } from "effect";
+import { describe, expect, test } from "vite-plus/test";
 
 import { setLocale } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime } from "@vibevalley/protocol";
-import { BizCode } from "@vibevalley/protocol/api";
+import { ApiError, BizCode } from "@vibevalley/protocol/api";
 
 import { serverFile, serverFiles } from "#/base/assets.ts";
-import { ServerConfig } from "#/infra/config.ts";
+import { Inconsistent } from "#/base/errors.ts";
+import type { ServerConfig } from "#/infra/config.ts";
+import { keptLog } from "#/infra/log.ts";
+import { wallTime } from "#/infra/time.ts";
 import { defaultSettings } from "#/modules/runtime/presets.ts";
 import { instructions } from "#/modules/session/briefing.ts";
 import { testConfig, starter } from "#/testing/layers.ts";
 
-import { Agent, withCast } from "./agent.ts";
+import { makeAgent, withCast } from "./agent.ts";
 
-const run = <A, E>(config: ServerConfig["Service"], body: Effect.Effect<A, E, Agent>) =>
-  Effect.scoped(body.pipe(Effect.provide(Agent.layer.pipe(Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer)))));
+const open = (config: ServerConfig) => makeAgent({ config, clock: wallTime, log: keptLog() });
+const refusal = async (p: Promise<unknown>): Promise<ApiError> => {
+  const e = await p.then(
+    () => undefined,
+    (e: unknown) => e,
+  );
+  if (!(e instanceof ApiError)) throw new Error(`not refused: ${String(e)}`);
+  return e;
+};
 
 const draft = (change: Partial<T.Agent> = {}): T.Agent => ({
   id: "",
@@ -44,111 +52,88 @@ const draft = (change: Partial<T.Agent> = {}): T.Agent => ({
 });
 
 describe("profiles", () => {
-  it.effect("deleting a skill removes profile references and a recreated name does not reattach it", () => {
+  test("deleting a skill removes profile references and a recreated name does not reattach it", async () => {
     const config = testConfig();
     let profile = "";
-    return run(
-      config,
-      Effect.gen(function* () {
-        const s = yield* Agent;
-        const skill = yield* s.createSkill({
-          id: "",
-          name: "Transient Skill",
-          description: "",
-          body: "old",
-        });
-        profile = (yield* s.create(draft({ skills: [skill.id, "other"] }))).id;
-        yield* s.save({ ...s.agent(defaultOrchestrator)!, skills: [skill.id] });
-        yield* s.removeSkill(skill.id);
-        expect(s.agent(profile)?.skills).toEqual(["other"]);
-        expect(s.agent(defaultOrchestrator)?.skills).toEqual([]);
-        const recreated = yield* s.createSkill({
-          id: "",
-          name: skill.name,
-          description: "",
-          body: "new",
-        });
-        expect(recreated.id).toBe(skill.id);
-        expect(s.agent(profile)?.skills).not.toContain(recreated.id);
-      }),
-    ).pipe(
-      Effect.andThen(
-        run(
-          config,
-          Effect.gen(function* () {
-            const s = yield* Agent;
-            expect(s.agent(profile)?.skills).toEqual(["other"]);
-            expect(s.agent(defaultOrchestrator)?.skills).toEqual([]);
-          }),
-        ),
-      ),
-    );
+    {
+      const s = await open(config);
+      const skill = await s.createSkill({
+        id: "",
+        name: "Transient Skill",
+        description: "",
+        body: "old",
+      });
+      profile = (await s.create(draft({ skills: [skill.id, "other"] }))).id;
+      await s.save({ ...s.agent(defaultOrchestrator)!, skills: [skill.id] });
+      await s.removeSkill(skill.id);
+      expect(s.agent(profile)?.skills).toEqual(["other"]);
+      expect(s.agent(defaultOrchestrator)?.skills).toEqual([]);
+      const recreated = await s.createSkill({
+        id: "",
+        name: skill.name,
+        description: "",
+        body: "new",
+      });
+      expect(recreated.id).toBe(skill.id);
+      expect(s.agent(profile)?.skills).not.toContain(recreated.id);
+      await s.close();
+    }
+    const s = await open(config);
+    expect(s.agent(profile)?.skills).toEqual(["other"]);
+    expect(s.agent(defaultOrchestrator)?.skills).toEqual([]);
+    await s.close();
   });
 
-  it.effect("an unreadable config.json is kept aside, and the seeds start", () => {
+  test("an unreadable config.json is kept aside, and the seeds start", async () => {
     const config = testConfig();
     writeFileSync(join(config.home, "config.json"), "{not json");
-    return run(
-      config,
-      Effect.gen(function* () {
-        expect((yield* Agent).agents().length).toBeGreaterThan(0);
-        const kept = readdirSync(config.home).filter((f) => f.startsWith("config.json.unreadable-"));
-        expect(kept).toHaveLength(1);
-        expect(readFileSync(join(config.home, kept[0]!), "utf8")).toBe("{not json");
-      }),
-    );
+    expect((await open(config)).agents().length).toBeGreaterThan(0);
+    const kept = readdirSync(config.home).filter((f) => f.startsWith("config.json.unreadable-"));
+    expect(kept).toHaveLength(1);
+    expect(readFileSync(join(config.home, kept[0]!), "utf8")).toBe("{not json");
   });
 
-  it.effect("valid JSON with the wrong profile shape is kept aside", () => {
+  test("valid JSON with the wrong profile shape is kept aside", async () => {
     const config = testConfig();
     const raw = `{"agents":{},"skills":[],"settings":{}}`;
     writeFileSync(join(config.home, "config.json"), raw);
-    return run(
-      config,
-      Effect.gen(function* () {
-        expect((yield* Agent).agents().length).toBeGreaterThan(0);
-        const kept = readdirSync(config.home).filter((f) => f.startsWith("config.json.unreadable-"));
-        expect(kept).toHaveLength(1);
-        expect(readFileSync(join(config.home, kept[0]!), "utf8")).toBe(raw);
-      }),
-    );
+    expect((await open(config)).agents().length).toBeGreaterThan(0);
+    const kept = readdirSync(config.home).filter((f) => f.startsWith("config.json.unreadable-"));
+    expect(kept).toHaveLength(1);
+    expect(readFileSync(join(config.home, kept[0]!), "utf8")).toBe(raw);
   });
 
-  it.effect("a profile whose look lacks a build and a head is filled in, and nothing is set aside", () => {
+  test("a profile whose look lacks a build and a head is filled in, and nothing is set aside", async () => {
     const config = testConfig();
     const mine = { ...starter("lab"), id: "mine", name: "我的" };
     const { build: _, head: __, ...look } = mine.look;
-    const raw = Formatter.formatJson({
+    const raw = JSON.stringify({
       agents: [{ ...mine, look }],
       skills: [{ id: "s1", name: "tidy", description: "整理", body: "整理代码" }],
       settings: { pi: { ...defaultSettings(), defaultModel: "deepseek-chat" } },
     });
     writeFileSync(join(config.home, "config.json"), raw);
-    return run(
-      config,
-      Effect.gen(function* () {
-        const agents = yield* Agent;
-        expect(agents.agent("mine")?.look).toMatchObject({ build: "biped", head: "rounded" });
-        expect(agents.skills().flatMap((k) => (k.builtIn === true ? [] : [k.id]))).toEqual(["s1"]);
-        expect(agents.settings("pi").defaultModel).toBe("deepseek-chat");
-        expect(readdirSync(config.home).filter((f) => f.startsWith("config.json.unreadable-"))).toEqual([]);
-      }),
-    );
+    const agents = await open(config);
+    expect(agents.agent("mine")?.look).toMatchObject({ build: "biped", head: "rounded" });
+    expect(agents.skills().flatMap((k) => (k.builtIn === true ? [] : [k.id]))).toEqual(["s1"]);
+    expect(agents.settings("pi").defaultModel).toBe("deepseek-chat");
+    expect(readdirSync(config.home).filter((f) => f.startsWith("config.json.unreadable-"))).toEqual([]);
   });
 
-  it.effect("one that cannot be kept aside stops the start, and is not touched", () => {
+  test("one that cannot be kept aside stops the start, and is not touched", async () => {
     const config = testConfig();
     writeFileSync(join(config.home, "config.json"), "{not json");
     chmodSync(config.home, 0o555);
-    return Effect.gen(function* () {
-      const exit = yield* Effect.exit(run(config, Agent));
-      chmodSync(config.home, 0o755);
-      expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(true);
-      expect(readFileSync(join(config.home, "config.json"), "utf8")).toBe("{not json");
-    });
+    const failed = await open(config).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    chmodSync(config.home, 0o755);
+    expect(failed).toBeInstanceOf(Inconsistent);
+    expect(readFileSync(join(config.home, "config.json"), "utf8")).toBe("{not json");
   });
 
-  it("a profile without an animal gets the one the client showed", () => {
+  test("a profile without an animal gets the one the client showed", () => {
     for (const [id, want] of [
       ["backend", "cat"],
       ["agent-7", "fox"],
@@ -161,164 +146,119 @@ describe("profiles", () => {
     expect([kept.look.species, kept.look.outfit]).toEqual(["owl", "rain"]);
   });
 
-  it.effect("the orchestrator is built in: not sent work, never deleted, only on VibeValley's own agent", () => {
+  test("the orchestrator is built in: not sent work, never deleted, only on VibeValley's own agent", async () => {
     const config = testConfig();
-    return run(
-      config,
-      Effect.gen(function* () {
-        const s = yield* Agent;
-        const orchestrator = s.agent(defaultOrchestrator)!;
-        expect([orchestrator.runtime, orchestrator.enabled]).toEqual([orchestratorRuntime, true]);
-        expect(s.agents().some((a) => a.id === defaultOrchestrator)).toBe(false);
-        expect(s.all().some((a) => a.id === defaultOrchestrator)).toBe(true);
-        expect((yield* Effect.flip(s.remove(defaultOrchestrator))).bizCode).toBe(BizCode.AgentRefused);
-        expect((yield* Effect.flip(s.save({ ...orchestrator, runtime: "claude" }))).bizCode).toBe(BizCode.AgentRefused);
-        yield* s.save({ ...orchestrator, model: "deepseek-pro" });
-      }),
-    ).pipe(
-      Effect.andThen(
-        run(
-          config,
-          Effect.map(Agent, (again) => expect(again.agent(defaultOrchestrator)?.model).toBe("deepseek-pro")),
-        ),
-      ),
-    );
+    const s = await open(config);
+    const orchestrator = s.agent(defaultOrchestrator)!;
+    expect([orchestrator.runtime, orchestrator.enabled]).toEqual([orchestratorRuntime, true]);
+    expect(s.agents().some((a) => a.id === defaultOrchestrator)).toBe(false);
+    expect(s.all().some((a) => a.id === defaultOrchestrator)).toBe(true);
+    expect((await refusal(s.remove(defaultOrchestrator))).bizCode).toBe(BizCode.AgentRefused);
+    expect((await refusal(s.save({ ...orchestrator, runtime: "claude" }))).bizCode).toBe(BizCode.AgentRefused);
+    await s.save({ ...orchestrator, model: "deepseek-pro" });
+    const again = await open(config);
+    expect(again.agent(defaultOrchestrator)?.model).toBe("deepseek-pro");
   });
 
   // A profile is an orchestrator or a worker; there may be several orchestrators, each on VibeValley's own agent, and the
   // default one stays one.
-  it.effect("a profile's role: several orchestrators, each on VibeValley's own agent, and work goes only to workers", () =>
-    run(
-      testConfig(),
-      Effect.gen(function* () {
-        const s = yield* Agent;
-        expect((yield* Effect.flip(s.create(draft({ name: "外头的助手", role: "orchestrator", runtime: "claude" })))).bizCode).toBe(BizCode.AgentRefused);
-        const lead = yield* s.create(draft({ name: "前端组长", role: "orchestrator", runtime: orchestratorRuntime }));
-        expect(s.orchestrators().map((a) => a.id)).toEqual([defaultOrchestrator, lead.id]);
-        expect([s.isOrchestrator(lead.id), s.isOrchestrator("backend")]).toEqual([true, false]);
-        expect(s.agents().some((a) => a.role === "orchestrator")).toBe(false);
-        expect((yield* Effect.flip(s.save({ ...s.agent(defaultOrchestrator)!, role: "worker" }))).bizCode).toBe(BizCode.AgentRefused);
-        yield* s.save({ ...lead, role: "worker" });
-        expect(s.agents().some((a) => a.id === lead.id)).toBe(true);
-        yield* s.remove(lead.id);
-      }),
-    ),
-  );
+  test("a profile's role: several orchestrators, each on VibeValley's own agent, and work goes only to workers", async () => {
+    const s = await open(testConfig());
+    expect((await refusal(s.create(draft({ name: "外头的助手", role: "orchestrator", runtime: "claude" })))).bizCode).toBe(BizCode.AgentRefused);
+    const lead = await s.create(draft({ name: "前端组长", role: "orchestrator", runtime: orchestratorRuntime }));
+    expect(s.orchestrators().map((a) => a.id)).toEqual([defaultOrchestrator, lead.id]);
+    expect([s.isOrchestrator(lead.id), s.isOrchestrator("backend")]).toEqual([true, false]);
+    expect(s.agents().some((a) => a.role === "orchestrator")).toBe(false);
+    expect((await refusal(s.save({ ...s.agent(defaultOrchestrator)!, role: "worker" }))).bizCode).toBe(BizCode.AgentRefused);
+    await s.save({ ...lead, role: "worker" });
+    expect(s.agents().some((a) => a.id === lead.id)).toBe(true);
+    await s.remove(lead.id);
+  });
 
-  it.effect("a new farm has only the default orchestrator, and the starters the configuration names", () =>
-    run(
-      testConfig({ agent: { model: "", starters: [] } }),
-      Effect.gen(function* () {
-        const s = yield* Agent;
-        expect(s.all().map((a) => [a.id, a.from?.template])).toEqual([[defaultOrchestrator, defaultOrchestrator]]);
-      }),
-    ).pipe(
-      Effect.andThen(
-        run(
-          testConfig({ agent: { model: "", starters: ["docs", "nobody", "lab"] } }),
-          Effect.map(Agent, (s) => expect(s.all().map((a) => a.id)).toEqual([defaultOrchestrator, "docs", "lab"])),
-        ),
-      ),
-    ),
-  );
+  test("a new farm has only the default orchestrator, and the starters the configuration names", async () => {
+    const s = await open(testConfig({ agent: { model: "", starters: [] } }));
+    expect(s.all().map((a) => [a.id, a.from?.template])).toEqual([[defaultOrchestrator, defaultOrchestrator]]);
+    const named = await open(testConfig({ agent: { model: "", starters: ["docs", "nobody", "lab"] } }));
+    expect(named.all().map((a) => a.id)).toEqual([defaultOrchestrator, "docs", "lab"]);
+  });
 
-  it.effect("a template installs as many profiles as asked, and an update is taken only when asked", () =>
-    run(
-      testConfig(),
-      Effect.gen(function* () {
-        const s = yield* Agent;
-        const second = yield* s.installTemplate("backend");
-        expect([second.id, second.name, second.from]).toEqual(["backend-2", "后端老周 2", { template: "backend", version: 1 }]);
-        expect((yield* s.templates()).find((t) => t.id === "backend")?.installed).toEqual(["backend", "backend-2"]);
-        expect((yield* Effect.flip(s.installTemplate("nobody"))).bizCode).toBe(BizCode.AgentNotFound);
-        // The user's changes stay until the profile is made again from the template; the machine's stay after it too.
-        yield* s.save({ ...second, name: "后端二号", persona: "我自己写的", env: { CI: "1" }, from: { template: "backend", version: 0 } });
-        const again = yield* s.updateFromTemplate("backend-2");
-        expect([again.name, again.persona, again.env, again.from?.version]).toEqual(["后端二号", starter("backend").persona, { CI: "1" }, 1]);
-        const hand = yield* s.create(draft({ name: "手捏的" }));
-        expect((yield* Effect.flip(s.updateFromTemplate(hand.id))).bizCode).toBe(BizCode.AgentRefused);
-      }),
-    ),
-  );
+  test("a template installs as many profiles as asked, and an update is taken only when asked", async () => {
+    const s = await open(testConfig());
+    const second = await s.installTemplate("backend");
+    expect([second.id, second.name, second.from]).toEqual(["backend-2", "后端老周 2", { template: "backend", version: 1 }]);
+    expect((await s.templates()).find((t) => t.id === "backend")?.installed).toEqual(["backend", "backend-2"]);
+    expect((await refusal(s.installTemplate("nobody"))).bizCode).toBe(BizCode.AgentNotFound);
+    // The user's changes stay until the profile is made again from the template; the machine's stay after it too.
+    await s.save({ ...second, name: "后端二号", persona: "我自己写的", env: { CI: "1" }, from: { template: "backend", version: 0 } });
+    const again = await s.updateFromTemplate("backend-2");
+    expect([again.name, again.persona, again.env, again.from?.version]).toEqual(["后端二号", starter("backend").persona, { CI: "1" }, 1]);
+    const hand = await s.create(draft({ name: "手捏的" }));
+    expect((await refusal(s.updateFromTemplate(hand.id))).bizCode).toBe(BizCode.AgentRefused);
+  });
 
-  it.effect("a template folder on this machine is added beside the built-in ones, installed, and deleted", () => {
+  test("a template folder on this machine is added beside the built-in ones, installed, and deleted", async () => {
     const config = testConfig();
     const folder = join(config.home, "lead-template");
     mkdirSync(folder);
-    writeFileSync(join(folder, "agent.json"), Formatter.formatJson({ id: "lead", version: 2, role: "orchestrator", name: "组长", duty: "专管前端" }));
+    writeFileSync(join(folder, "agent.json"), JSON.stringify({ id: "lead", version: 2, role: "orchestrator", name: "组长", duty: "专管前端" }));
     writeFileSync(join(folder, "persona.md"), "你专管前端的工单。\n");
     writeFileSync(join(folder, "notes.txt"), "not a template's");
     const broken = join(config.home, "broken-template");
     mkdirSync(broken);
-    writeFileSync(join(broken, "agent.json"), Formatter.formatJson({ id: "Bad Id", version: 1, role: "worker", name: "坏的", runtime: "pi" }));
-    return run(
-      config,
-      Effect.gen(function* () {
-        const s = yield* Agent;
-        const templateAddedFailure = yield* Effect.flip(s.addTemplate(broken));
-        expect(templateAddedFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.AgentRefused, message: expect.stringMatching(/Bad Id/u) });
-        expect((yield* Effect.flip(s.addTemplate(join(config.home, "nowhere")))).bizCode).toBe(BizCode.AgentRefused);
-        const added = yield* s.addTemplate(folder);
-        expect([added.source, added.runtime, added.persona]).toEqual(["added", orchestratorRuntime, "你专管前端的工单。"]);
-        expect(readdirSync(join(config.home, "agent-templates", "lead")).toSorted()).toEqual(["agent.json", "persona.md"]);
-        expect((yield* Effect.flip(s.addTemplate(folder))).bizCode).toBe(BizCode.AgentRefused);
-        const lead = yield* s.installTemplate("lead");
-        expect([lead.role, s.isOrchestrator(lead.id)]).toEqual(["orchestrator", true]);
-        expect((yield* s.previewRemoveTemplate("lead")).does[0]).toContain("1 份档案留着");
-        expect((yield* Effect.flip(s.removeTemplate("backend"))).bizCode).toBe(BizCode.AgentRefused);
-        yield* s.removeTemplate("lead");
-        expect((yield* s.templates()).some((t) => t.id === "lead")).toBe(false);
-        expect(s.agent(lead.id)?.from).toEqual({ template: "lead", version: 2 });
-      }),
-    );
+    writeFileSync(join(broken, "agent.json"), JSON.stringify({ id: "Bad Id", version: 1, role: "worker", name: "坏的", runtime: "pi" }));
+    const s = await open(config);
+    const templateAddedFailure = await refusal(s.addTemplate(broken));
+    expect(templateAddedFailure).toMatchObject({ bizCode: BizCode.AgentRefused, message: expect.stringMatching(/Bad Id/u) });
+    expect((await refusal(s.addTemplate(join(config.home, "nowhere")))).bizCode).toBe(BizCode.AgentRefused);
+    const added = await s.addTemplate(folder);
+    expect([added.source, added.runtime, added.persona]).toEqual(["added", orchestratorRuntime, "你专管前端的工单。"]);
+    expect(readdirSync(join(config.home, "agent-templates", "lead")).toSorted()).toEqual(["agent.json", "persona.md"]);
+    expect((await refusal(s.addTemplate(folder))).bizCode).toBe(BizCode.AgentRefused);
+    const lead = await s.installTemplate("lead");
+    expect([lead.role, s.isOrchestrator(lead.id)]).toEqual(["orchestrator", true]);
+    expect((await s.previewRemoveTemplate("lead")).does[0]).toContain("1 份档案留着");
+    expect((await refusal(s.removeTemplate("backend"))).bizCode).toBe(BizCode.AgentRefused);
+    await s.removeTemplate("lead");
+    expect((await s.templates()).some((t) => t.id === "lead")).toBe(false);
+    expect(s.agent(lead.id)?.from).toEqual({ template: "lead", version: 2 });
   });
 
-  it.effect("creation gives distinct ids; a draft with an id is refused", () =>
-    run(
-      testConfig(),
-      Effect.gen(function* () {
-        const s = yield* Agent;
-        const ids = new Set<string>();
-        const skills = new Set<string>();
-        for (let i = 0; i < 12; i++) {
-          ids.add((yield* s.create(draft())).id);
-          skills.add((yield* s.createSkill({ id: "", name: "Same Skill", body: "" } as never)).id);
-        }
-        expect(ids.size).toBe(12);
-        expect([...skills].slice(0, 3)).toEqual(["same-skill", "same-skill-2", "same-skill-3"]);
-        expect((yield* Effect.flip(s.create(draft({ id: "mine" })))).bizCode).toBe(BizCode.AgentRefused);
-        const saved = yield* s.save({
-          ...draft({ id: "agent-7" }),
-          look: { species: null, outfit: null, orchestrator: null, body: "", trim: "", hat: "", eye: "" } as T.Agent["look"],
-        });
-        expect([saved.look.species, saved.look.outfit, saved.look.build, saved.look.head]).toEqual(["fox", "farmer", "biped", "rounded"]);
-      }),
-    ),
-  );
+  test("creation gives distinct ids; a draft with an id is refused", async () => {
+    const s = await open(testConfig());
+    const ids = new Set<string>();
+    const skills = new Set<string>();
+    for (let i = 0; i < 12; i++) {
+      ids.add((await s.create(draft())).id);
+      skills.add((await s.createSkill({ id: "", name: "Same Skill", body: "" } as never)).id);
+    }
+    expect(ids.size).toBe(12);
+    expect([...skills].slice(0, 3)).toEqual(["same-skill", "same-skill-2", "same-skill-3"]);
+    expect((await refusal(s.create(draft({ id: "mine" })))).bizCode).toBe(BizCode.AgentRefused);
+    const saved = await s.save({
+      ...draft({ id: "agent-7" }),
+      look: { species: null, outfit: null, orchestrator: null, body: "", trim: "", hat: "", eye: "" } as T.Agent["look"],
+    });
+    expect([saved.look.species, saved.look.outfit, saved.look.build, saved.look.head]).toEqual(["fox", "farmer", "biped", "rounded"]);
+  });
 
-  it.effect("what is handed out is a copy", () =>
-    run(
-      testConfig(),
-      Effect.gen(function* () {
-        const s = yield* Agent;
-        const one = s.agents()[0]!;
-        one.tags.push("changed");
-        one.env.X = "y";
-        expect(s.agent(one.id)!.tags).not.toContain("changed");
-        const settings = s.settings("pi");
-        settings.env.X = "y";
-        expect(s.settings("pi").env).toEqual({});
-      }),
-    ),
-  );
+  test("what is handed out is a copy", async () => {
+    const s = await open(testConfig());
+    const one = s.agents()[0]!;
+    one.tags.push("changed");
+    one.env.X = "y";
+    expect(s.agent(one.id)!.tags).not.toContain("changed");
+    const settings = s.settings("pi");
+    settings.env.X = "y";
+    expect(s.settings("pi").env).toEqual({});
+  });
 });
 
 describe("the built-in skills", () => {
   const dir = serverFile("src/modules/agent/skills");
   const han = /\p{Script=Han}/u;
-  const skillOf = (all: readonly T.Skill[], id: string) => Option.getOrUndefined(Arr.findFirst(all, (k) => k.id === id));
+  const skillOf = (all: readonly T.Skill[], id: string) => all.find((k) => k.id === id);
 
-  it("ship with the server, each folder a SKILL.md and its English twin, the twin in English", () => {
+  test("ship with the server, each folder a SKILL.md and its English twin, the twin in English", () => {
     expect(serverFiles).toContain("src/modules/agent/skills");
     const folders = readdirSync(dir);
     expect(folders.length).toBeGreaterThan(0);
@@ -328,70 +268,51 @@ describe("the built-in skills", () => {
     }
   });
 
-  it.effect("are listed first and read-only: no skill.* changes or deletes one, and a new skill doesn't take its id", () =>
-    run(
-      testConfig(),
-      Effect.gen(function* () {
-        const s = yield* Agent;
-        const reviewer = skillOf(s.skills(), "reviewer")!;
-        expect([reviewer.builtIn, s.skills()[0]?.builtIn, reviewer.name === reviewer.id, reviewer.body === ""]).toEqual([true, true, false, false]);
-        expect((yield* Effect.flip(s.saveSkill({ ...reviewer, body: "改掉" }))).bizCode).toBe(BizCode.AgentRefused);
-        expect((yield* Effect.flip(s.removeSkill("reviewer"))).bizCode).toBe(BizCode.AgentRefused);
-        expect((yield* Effect.flip(s.previewRemoveSkill("reviewer"))).bizCode).toBe(BizCode.AgentRefused);
-        const mine = yield* s.createSkill({ id: "", name: "reviewer", description: "", body: "我的", builtIn: true });
-        expect([mine.id, mine.builtIn]).toEqual(["reviewer-2", undefined]);
-        expect(skillOf(s.skills(), "reviewer")?.body).toBe(reviewer.body);
-      }),
-    ),
-  );
-
-  it.effect("say themselves in English when the farm does", () => {
-    setLocale("en");
-    return run(
-      testConfig(),
-      Effect.gen(function* () {
-        const s = yield* Agent;
-        for (const k of s.skills()) if (k.builtIn === true) expect(k.name + k.description).not.toMatch(han);
-      }),
-    ).pipe(Effect.ensuring(Effect.sync(() => setLocale("zh"))));
+  test("are listed first and read-only: no skill.* changes or deletes one, and a new skill doesn't take its id", async () => {
+    const s = await open(testConfig());
+    const reviewer = skillOf(s.skills(), "reviewer")!;
+    expect([reviewer.builtIn, s.skills()[0]?.builtIn, reviewer.name === reviewer.id, reviewer.body === ""]).toEqual([true, true, false, false]);
+    expect((await refusal(s.saveSkill({ ...reviewer, body: "改掉" }))).bizCode).toBe(BizCode.AgentRefused);
+    expect((await refusal(s.removeSkill("reviewer"))).bizCode).toBe(BizCode.AgentRefused);
+    expect((await refusal(s.previewRemoveSkill("reviewer"))).bizCode).toBe(BizCode.AgentRefused);
+    const mine = await s.createSkill({ id: "", name: "reviewer", description: "", body: "我的", builtIn: true });
+    expect([mine.id, mine.builtIn]).toEqual(["reviewer-2", undefined]);
+    expect(skillOf(s.skills(), "reviewer")?.body).toBe(reviewer.body);
   });
 
-  it.effect("a template ticks the ones it names, a helper's prompt carries a ticked one, and the user's own ticks stay", () => {
+  test("say themselves in English when the farm does", async () => {
+    setLocale("en");
+    try {
+      const s = await open(testConfig());
+      for (const k of s.skills()) if (k.builtIn === true) expect(k.name + k.description).not.toMatch(han);
+    } finally {
+      setLocale("zh");
+    }
+  });
+
+  test("a template ticks the ones it names, a helper's prompt carries a ticked one, and the user's own ticks stay", async () => {
     const config = testConfig();
     const folder = join(config.home, "picked");
     mkdirSync(folder, { recursive: true });
-    writeFileSync(
-      join(folder, "agent.json"),
-      Formatter.formatJson({ id: "checker", version: 1, role: "worker", name: "审查", runtime: "pi", skills: ["reviewer"] }),
-    );
-    return run(
-      config,
-      Effect.gen(function* () {
-        const s = yield* Agent;
-        expect((yield* s.addTemplate(folder)).skills).toEqual(["reviewer"]);
-        const made = yield* s.installTemplate("checker");
-        expect(made.skills).toEqual(["reviewer"]);
-        expect(instructions(made, s.skills())).toContain(skillOf(s.skills(), "reviewer")!.body);
-        const again = yield* s.updateFromTemplate((yield* s.save({ ...made, skills: ["slides"] })).id);
-        expect(again.skills).toEqual(["slides", "reviewer"]);
-        const hand = yield* s.create(draft({ skills: ["pages"] }));
-        expect(instructions(hand, s.skills())).toContain(skillOf(s.skills(), "pages")!.body);
-      }),
-    );
+    writeFileSync(join(folder, "agent.json"), JSON.stringify({ id: "checker", version: 1, role: "worker", name: "审查", runtime: "pi", skills: ["reviewer"] }));
+    const s = await open(config);
+    expect((await s.addTemplate(folder)).skills).toEqual(["reviewer"]);
+    const made = await s.installTemplate("checker");
+    expect(made.skills).toEqual(["reviewer"]);
+    expect(instructions(made, s.skills())).toContain(skillOf(s.skills(), "reviewer")!.body);
+    const again = await s.updateFromTemplate((await s.save({ ...made, skills: ["slides"] })).id);
+    expect(again.skills).toEqual(["slides", "reviewer"]);
+    const hand = await s.create(draft({ skills: ["pages"] }));
+    expect(instructions(hand, s.skills())).toContain(skillOf(s.skills(), "pages")!.body);
   });
 
-  it.effect("the slides, collector, pages and reviewer templates each come with their skill, ticked when installed", () =>
-    run(
-      testConfig(),
-      Effect.gen(function* () {
-        const s = yield* Agent;
-        const templates = yield* s.templates();
-        for (const id of ["slides", "collector", "pages", "reviewer"]) {
-          const template = Option.getOrUndefined(Arr.findFirst(templates, (t) => t.id === id));
-          expect([template?.role, template?.skills]).toEqual(["worker", [id]]);
-          expect((yield* s.installTemplate(id)).skills).toEqual([id]);
-        }
-      }),
-    ),
-  );
+  test("the slides, collector, pages and reviewer templates each come with their skill, ticked when installed", async () => {
+    const s = await open(testConfig());
+    const templates = await s.templates();
+    for (const id of ["slides", "collector", "pages", "reviewer"]) {
+      const template = templates.find((t) => t.id === id);
+      expect([template?.role, template?.skills]).toEqual(["worker", [id]]);
+      expect((await s.installTemplate(id)).skills).toEqual([id]);
+    }
+  });
 });

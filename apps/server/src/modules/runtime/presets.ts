@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -12,12 +12,12 @@ import presetsEn from "./presets.en.json";
 import presetsZh from "./presets.json";
 import { yuan } from "./quota.ts";
 
-const Presets = Schema.Struct({
+const Presets = z.object({
   defaultSettings: S.RuntimeSettings,
   fallbackPreset: S.RuntimePreset,
-  runtimePresets: Schema.Array(S.RuntimePreset),
-  runtimeSupport: Schema.Record(Schema.String, S.RuntimeSupport),
-  runtimeIds: Schema.Array(Schema.String),
+  runtimePresets: z.array(S.RuntimePreset),
+  runtimeSupport: z.record(z.string(), S.RuntimeSupport),
+  runtimeIds: z.array(z.string()),
 });
 const presets = localizedJson(Presets, presetsZh, presetsEn);
 

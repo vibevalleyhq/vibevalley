@@ -1,56 +1,9 @@
-import * as stylex from "@stylexjs/stylex";
 import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 
 import { Toggle, ToggleGroup } from "@vibevalley/base-ui";
 
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
-import { styleProps } from "./positioner";
-
-const styles = stylex.create({
-  track: {
-    position: "relative",
-    flexWrap: "wrap",
-    gap: "0.125rem",
-    borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--color-hover)",
-    padding: "0.125rem",
-  },
-  block: { display: "flex", width: "100%" },
-  fitted: { display: "inline-flex", width: "fit-content" },
-  thumb: {
-    pointerEvents: "none",
-    position: "absolute",
-    top: 0,
-    left: 0,
-    borderRadius: "var(--radius-sm)",
-    backgroundColor: "var(--color-page)",
-    boxShadow: "var(--shadow-raise)",
-  },
-  place: (x: number, y: number, width: number, height: number) => ({ translate: `${x}px ${y}px`, width, height }),
-  moved: { transitionProperty: "translate, width", transitionDuration: "280ms", transitionTimingFunction: "var(--ease-out)" },
-  option: {
-    position: "relative",
-    display: "inline-flex",
-    height: "1.5rem",
-    cursor: { default: "pointer", ":disabled": "default" },
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "0.375rem",
-    borderRadius: "var(--radius-sm)",
-    paddingInline: "0.625rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    whiteSpace: "nowrap",
-    transitionProperty: "color, background-color, border-color",
-    transitionDuration: "120ms",
-    transitionTimingFunction: "var(--ease-out)",
-    opacity: { default: null, ":disabled": 0.5 },
-  },
-  stretched: { flex: 1 },
-  selected: { fontWeight: "var(--font-weight-medium)", color: "var(--color-ink)" },
-  idle: { color: { default: "var(--color-muted)", "@media (hover: hover)": { default: null, ":hover": "var(--color-ink)" } } },
-});
 
 interface Place {
   readonly x: number;
@@ -105,10 +58,19 @@ export function Segmented<T extends string>(props: {
       }}
       aria-label={props.label}
       data-testid={props.testid}
-      {...stylex.attrs(styles.track, props.block === true ? styles.block : styles.fitted)}
+      class={["relative flex-wrap gap-0.5 rounded-md bg-hover p-0.5", props.block === true ? "flex w-full" : "inline-flex w-fit"]}
     >
       <Show when={thumb()}>
-        {(at) => <span aria-hidden="true" {...styleProps([styles.thumb, moved() && styles.moved, styles.place(at().x, at().y, at().w, at().h)])} />}
+        {(at) => (
+          <span
+            aria-hidden="true"
+            class={[
+              "pointer-events-none absolute top-0 left-0 rounded-sm bg-page shadow-raise",
+              moved() && "transition-[translate,width] duration-280 ease-out",
+            ]}
+            style={{ translate: `${at().x}px ${at().y}px`, width: `${at().w}px`, height: `${at().h}px` }}
+          />
+        )}
       </Show>
       <For each={props.options}>
         {(o) => (
@@ -117,7 +79,11 @@ export function Segmented<T extends string>(props: {
             data-key={o.value}
             disabled={o.disabled}
             title={o.title}
-            {...stylex.attrs(styles.option, props.block === true && styles.stretched, o.value === props.value ? styles.selected : styles.idle)}
+            class={[
+              "relative inline-flex h-6 cursor-pointer items-center justify-center gap-1.5 rounded-sm px-2.5 text-sm whitespace-nowrap transition-[color,background-color,border-color] duration-120 ease-out disabled:cursor-default disabled:opacity-50",
+              props.block === true && "flex-1",
+              o.value === props.value ? "font-medium text-ink" : "text-muted hover:text-ink",
+            ]}
           >
             <Show when={o.icon}>{(name) => <Icon name={name()} size={14} />}</Show>
             {o.label}

@@ -1,14 +1,17 @@
-import { Clock, Context, Effect, Layer, Predicate, Schedule, Schema, Semaphore, Stream, Option } from "effect";
+import { z } from "zod";
 
+import { Semaphore, TaskGroup } from "@vibevalley/async";
 import type { Achievement, CommitCount, LedgerEntry } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { newId } from "#/base/ids.ts";
 import { jsonOrNone, jsonText } from "#/base/json.ts";
-import { Core } from "#/core/core.ts";
-import { ServerConfig } from "#/infra/config.ts";
-import { Db } from "#/infra/db.ts";
-import { Repo } from "#/modules/repo/repo.ts";
+import type { Core } from "#/core/core.ts";
+import type { ServerConfig } from "#/infra/config.ts";
+import { type Db, SqlError } from "#/infra/db.ts";
+import type { Logger } from "#/infra/log.ts";
+import type { Time } from "#/infra/time.ts";
+import type { Repo } from "#/modules/repo/repo.ts";
 import { isHired } from "#/modules/session/roster.ts";
 import * as q from "#db/game_ledger.sql.ts";
 
@@ -20,136 +23,144 @@ const countEveryMs = 2 * 60_000;
 const countAfterRunMs = 15_000;
 
 /** A ledger row's payload, and the entry it makes with the row's kind and time; a row this code cannot read any more is none. */
-const payloadOf = jsonOrNone(Schema.Unknown);
-const entryOf = Schema.decodeUnknownOption(S.LedgerEntry);
+const payloadOf = jsonOrNone(z.unknown());
 
-export class Game extends Context.Service<
-  Game,
-  {
-    /** The achievements in words, in the page's order; how far the farm is with each goes in every frame's view. */
-    readonly achievements: () => Achievement[];
-    /** The title the user wears: an achievement and its tier; none of either is the plain title. */
-    readonly chooseTitle: (achievement: string | undefined, tier: number | undefined) => Effect.Effect<void>;
-    /** The next session hired within ten seconds goes to this station, if it is still free. */
-    readonly want: (station: number) => void;
-    readonly record: (entry: Entry) => Effect.Effect<void>;
-    /** Commits on every repo, a repository with several worktrees once: "yours" by author email. */
-    readonly count: () => Effect.Effect<CommitCount>;
-    /** The count and its write, serialized with run-end refreshes. */
-    readonly refresh: Effect.Effect<void>;
-    /** How many runs' ends asked for a count. */
-    readonly asked: () => number;
-  }
->()("@vibevalley/server/modules/game/game") {
-  static readonly layer = Layer.effect(
-    Game,
-    Effect.suspend(() => make),
-  );
+export interface Game {
+  /** The achievements in words, in the page's order; how far the farm is with each goes in every frame's view. */
+  readonly achievements: () => Achievement[];
+  /** The title the user wears: an achievement and its tier; none of either is the plain title. */
+  readonly chooseTitle: (achievement: string | undefined, tier: number | undefined) => Promise<void>;
+  /** The next session hired within ten seconds goes to this station, if it is still free. */
+  readonly want: (station: number) => void;
+  readonly record: (entry: Entry) => Promise<void>;
+  /** Commits on every repo, a repository with several worktrees once: "yours" by author email. */
+  readonly count: () => Promise<CommitCount>;
+  /** The count and its write, serialized with run-end refreshes. */
+  readonly refresh: () => Promise<void>;
+  /** How many runs' ends asked for a count. */
+  readonly asked: () => number;
+  /** The commits counted now and every two minutes, once the farm is up. */
+  readonly start: () => Promise<void>;
+  readonly close: () => Promise<void>;
 }
 
-const make = Effect.gen(function* () {
-  const clock = yield* Clock.Clock;
-  const config = yield* ServerConfig;
-  const core = yield* Core;
-  const repos = yield* Repo;
-  const db = yield* Db;
+export interface GameDeps {
+  readonly config: ServerConfig;
+  readonly clock: Time;
+  readonly log: Logger;
+  readonly db: Db;
+  readonly core: Core;
+  readonly repo: Repo;
+}
+
+export async function makeGame(deps: GameDeps): Promise<Game> {
+  const { clock, config, core, repo: repos, db } = deps;
+  const log = deps.log.child("game");
+  const tasks = new TaskGroup({ name: "game", onError: (task, e) => log.error(`${task} failed:`, e) });
 
   // A row this code cannot read any more is left out of the fold.
-  const rows = yield* db.run(q.ledgerEntries());
+  const rows = await q.ledgerEntries(db.sql);
   const entries: LedgerEntry[] = [];
   for (const row of rows) {
     const fields = payloadOf(row.payload);
-    if (!Predicate.isObject(fields)) continue;
-    const entry = entryOf({ ...fields, kind: row.kind, at: row.at });
-    if (Option.isSome(entry)) entries.push(entry.value);
+    if (typeof fields !== "object" || fields === null) continue;
+    const entry = S.LedgerEntry.safeParse({ ...fields, kind: row.kind, at: row.at });
+    if (entry.success) entries.push(entry.data);
   }
   let folded: Folded = progressFold(entries);
-  yield* core.apply({ type: "progressChanged", progress: folded.progress });
+  core.apply({ type: "progressChanged", progress: folded.progress });
 
   // One entry at a time, so the order in the table is the order of the fold.
-  const one = yield* Semaphore.make(1);
-  const record = Effect.fn("Game.record")(
-    function* (input: Entry) {
-      const at = yield* Clock.currentTimeMillis;
-      const entry = { ...input, at };
-      const { kind, at: _, ...payload } = entry;
-      yield* db.attempt(Effect.flatMap(jsonText(payload), (text) => q.addLedgerEntry({ id: newId(at), kind, at, payload: text })));
-      const [next, news] = progressStep(folded, entry);
-      folded = next;
-      yield* core.apply({ type: "progressChanged", progress: next.progress, ...((news.coins ?? 0) !== 0 || news.unlocked.length > 0 ? { news } : {}) });
-    },
-    (effect, input) => Effect.catchCause(effect, (cause) => Effect.logError(`vibevalley: a ledger entry (${input.kind}) was not kept`, cause)),
-    one.withPermits(1),
-  );
+  const one = new Semaphore(1);
+  const record = (input: Entry): Promise<void> =>
+    one.with(async () => {
+      try {
+        const at = clock.now();
+        const entry = { ...input, at };
+        const { kind, at: _, ...payload } = entry;
+        await q.addLedgerEntry(db.sql, { id: newId(at), kind, at, payload: jsonText(payload) });
+        const [next, news] = progressStep(folded, entry);
+        folded = next;
+        core.apply({ type: "progressChanged", progress: next.progress, ...((news.coins ?? 0) !== 0 || news.unlocked.length > 0 ? { news } : {}) });
+      } catch (e) {
+        // The farm goes on without the entry, whatever stopped it: the database's failure is the one expected.
+        log.error(`vibevalley: a ledger entry (${input.kind}) was not kept${e instanceof SqlError ? "" : " (not by the database)"}`, e);
+      }
+    });
 
   const extra = config.gitEmails.map((e) => e.trim().toLowerCase()).filter((e) => e !== "");
-  const count = Effect.fn("Game.count")(function* (): Effect.fn.Return<CommitCount> {
-    const counted = yield* repos.contributions(extra);
+  const count = async (): Promise<CommitCount> => {
+    const counted = await repos.contributions(extra);
     return { repos: counted, total: counted.reduce((n, r) => n + r.commits, 0) };
-  });
+  };
   // The ticker and a run's end both count: one at a time, so an older count never lands after a newer one.
-  const counting = yield* Semaphore.make(1);
-  const refresh = counting.withPermits(1)(Effect.flatMap(count(), core.setCommits));
+  const counting = new Semaphore(1);
+  const refresh = () => counting.with(async () => core.setCommits(await count()));
   let asked = 0;
   let pending = false;
-  const scope = yield* Effect.scope;
   // Several runs share one count.
-  const soon = Effect.gen(function* () {
+  const soon = () => {
     asked++;
     if (pending) return;
     pending = true;
-    yield* Effect.forkIn(
-      Effect.gen(function* () {
-        yield* Effect.sleep(countAfterRunMs);
-        pending = false;
-        yield* refresh;
-      }),
-      scope,
-    );
-  });
+    tasks.run("count after a run", async (signal) => {
+      await clock.sleep(countAfterRunMs, signal);
+      pending = false;
+      await refresh();
+    });
+  };
 
   let wanted: { station: number; until: number } | undefined;
 
-  const [state, transitions] = yield* core.transitions;
-  yield* Effect.forEach(catchUp(state), (e) => record(e), { discard: true });
-  yield* Effect.forkScoped(
-    Stream.runForEach(transitions, ({ before, fact, after }) =>
-      Effect.gen(function* () {
-        if (fact.type === "progressChanged" && fact.commits === undefined && fact.station === undefined) return;
-        if (fact.type === "sessionReported") yield* soon;
+  const { state, changes } = core.transitions();
+  for (const e of catchUp(state)) await record(e);
+  tasks.run("progress", async (signal) => {
+    try {
+      for (let r = await changes.next(signal); r.done !== true; r = await changes.next(signal)) {
+        const { before, fact, after } = r.value;
+        if (fact.type === "progressChanged" && fact.commits === undefined && fact.station === undefined) continue;
+        if (fact.type === "sessionReported") soon();
         if (fact.type === "sessionChanged" && isHired(fact.session)) {
           const wish = wanted;
           wanted = undefined;
-          if (wish && wish.until > fact.at) yield* core.apply({ type: "progressChanged", station: { id: fact.session.id, station: wish.station } });
+          if (wish && wish.until > fact.at) core.apply({ type: "progressChanged", station: { id: fact.session.id, station: wish.station } });
         }
-        yield* Effect.forEach(entriesFor(before, fact, after), (e) => record(e), { discard: true });
-      }),
-    ),
-  );
-  const user2 = yield* core.user;
-  yield* Effect.forkScoped(
-    Stream.runForEach(user2, (d) => (d.kind === "reviewed" ? record({ kind: "reviewed", session: d.session }) : record({ kind: "voice" }))),
-  );
+        for (const e of entriesFor(before, fact, after)) await record(e);
+      }
+    } finally {
+      changes.close();
+    }
+  });
+  const user = core.user();
+  tasks.run("user", async (signal) => {
+    try {
+      for (let r = await user.next(signal); r.done !== true; r = await user.next(signal)) {
+        const d = r.value;
+        await (d.kind === "reviewed" ? record({ kind: "reviewed", session: d.session }) : record({ kind: "voice" }));
+      }
+    } finally {
+      user.close();
+    }
+  });
 
-  return Game.of({
+  return {
     achievements: achievementsInWords,
-    chooseTitle: Effect.fn("Game.chooseTitle")(function* (achievement, tier) {
-      return yield* record({ kind: "titled", ...(achievement ? { achievement } : {}), ...(tier != null && tier !== 0 ? { tier } : {}) });
-    }),
+    chooseTitle: (achievement, tier) => record({ kind: "titled", ...(achievement ? { achievement } : {}), ...(tier != null && tier !== 0 ? { tier } : {}) }),
     want: (station) => {
-      wanted = { station, until: clock.currentTimeMillisUnsafe() + wantStationForMs };
+      wanted = { station, until: clock.now() + wantStationForMs };
     },
     record,
     count,
     refresh,
     asked: () => asked,
-  });
-});
-
-/** The commits counted now and every two minutes, once the farm is up. */
-export const start = Layer.effectDiscard(
-  Effect.gen(function* () {
-    const game = yield* Game;
-    yield* Effect.forkScoped(game.refresh.pipe(Effect.repeat(Schedule.spaced(countEveryMs))));
-  }),
-);
+    start: async () => {
+      tasks.run("count", async (signal) => {
+        while (true) {
+          await refresh();
+          await clock.sleep(countEveryMs, signal);
+        }
+      });
+    },
+    close: () => tasks.close(),
+  };
+}

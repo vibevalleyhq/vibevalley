@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -6,129 +5,6 @@ import { t } from "@vibevalley/i18n";
 import { createModal } from "./Dialog";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
-
-const popIn = stylex.keyframes({
-  from: { opacity: 0, scale: 0.98 },
-});
-
-const fadeIn = stylex.keyframes({
-  from: { opacity: 0 },
-});
-
-const styles = stylex.create({
-  dialog: {
-    margin: "auto",
-    width: "100%",
-    height: "100%",
-    maxHeight: "none",
-    maxWidth: "none",
-    animationName: {
-      default: fadeIn,
-      "@media (prefers-reduced-motion: reduce)": "none",
-      "::backdrop": fadeIn,
-    },
-    animationDuration: {
-      default: "180ms",
-      "::backdrop": "180ms",
-    },
-    animationTimingFunction: {
-      default: "var(--ease-out)",
-      "::backdrop": "var(--ease-out)",
-    },
-    animationFillMode: {
-      default: "both",
-      "::backdrop": "both",
-    },
-    backgroundColor: {
-      default: "transparent",
-      "::backdrop": "var(--wb-scrim)",
-    },
-    padding: "0",
-    WebkitBackdropFilter: {
-      default: null,
-      "::backdrop": "blur(var(--blur-sm))",
-    },
-    backdropFilter: {
-      default: null,
-      "::backdrop": "blur(var(--blur-sm))",
-    },
-  },
-  picture: {
-    pointerEvents: "auto",
-    maxHeight: "calc(100% - 4rem)",
-    maxWidth: "100%",
-    animationName: { default: popIn, "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: "280ms",
-    animationTimingFunction: "var(--ease-out)",
-    animationFillMode: "both",
-    borderRadius: "var(--radius-lg)",
-    objectFit: "contain",
-    boxShadow: "var(--shadow-float)",
-  },
-  openOriginal: {
-    display: "inline-flex",
-    width: "1.75rem",
-    height: "1.75rem",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-md)",
-    color: {
-      default: "var(--color-muted)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-ink)",
-      },
-    },
-    transitionProperty: "color, background-color, border-color",
-    transitionTimingFunction: "var(--ease-out)",
-    transitionDuration: "120ms",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-selected)",
-      },
-    },
-  },
-  stage: {
-    pointerEvents: "none",
-    display: "flex",
-    width: "100%",
-    height: "100%",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "0.75rem",
-    padding: "1.5rem",
-  },
-  toolbar: {
-    pointerEvents: "auto",
-    display: "flex",
-    alignItems: "center",
-    gap: "0.25rem",
-    borderRadius: "var(--radius-lg)",
-    backgroundColor: "var(--color-page)",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.25rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-ink)",
-    boxShadow: "var(--shadow-float)",
-  },
-  counter: {
-    paddingInline: "0.25rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  caption: {
-    maxWidth: "18rem",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    paddingInline: "0.25rem",
-  },
-});
 
 export interface Picture {
   readonly src: string;
@@ -160,21 +36,29 @@ export function Lightbox(props: { pictures: readonly Picture[]; at: number | und
         if (e.key === "ArrowLeft") go(-1);
         if (e.key === "ArrowRight") go(1);
       }}
-      {...stylex.attrs(styles.dialog)}
+      class="m-auto size-full max-h-none max-w-none animate-fade-in bg-transparent p-0 backdrop:animate-fade-in backdrop:bg-scrim backdrop:backdrop-blur-sm"
     >
       <Show when={shown()}>
         {(p) => (
-          <div {...stylex.attrs(styles.stage)} onClick={() => props.onAt(undefined)}>
-            <img src={p().src} alt={p().name} {...stylex.attrs(styles.picture)} onClick={(e) => e.stopPropagation()} />
-            <div {...stylex.attrs(styles.toolbar)} onClick={(e) => e.stopPropagation()}>
+          <div class="pointer-events-none flex size-full flex-col items-center justify-center gap-3 p-6" onClick={() => props.onAt(undefined)}>
+            <img
+              src={p().src}
+              alt={p().name}
+              class="pointer-events-auto max-h-[calc(100%-4rem)] max-w-full animate-pop-in rounded-lg object-contain shadow-float"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <div
+              class="pointer-events-auto flex items-center gap-1 rounded-lg bg-page px-2 py-1 text-sm text-ink shadow-float"
+              onClick={(e) => e.stopPropagation()}
+            >
               <Show when={count() > 1}>
                 <IconButton icon="previous" label={t("web.base.lightbox.prev")} onClick={() => go(-1)} />
-                <span {...stylex.attrs(styles.counter)}>
+                <span class="px-1 text-xs text-muted">
                   {(props.at ?? 0) + 1} / {count()}
                 </span>
                 <IconButton icon="next" label={t("web.base.lightbox.next")} onClick={() => go(1)} />
               </Show>
-              <span {...stylex.attrs(styles.caption)}>{p().name}</span>
+              <span class="max-w-72 truncate px-1">{p().name}</span>
               {/* The file itself, not a page of the workbench: a plain link to a new tab. */}
               <a
                 href={p().src}
@@ -183,7 +67,7 @@ export function Lightbox(props: { pictures: readonly Picture[]; at: number | und
                 data-testid="lightbox-original"
                 aria-label={t("web.base.lightbox.original")}
                 title={t("web.base.lightbox.original")}
-                {...stylex.attrs(styles.openOriginal)}
+                class="inline-flex size-7 items-center justify-center rounded-md text-muted transition-[color,background-color,border-color] duration-120 ease-out hover:bg-selected hover:text-ink"
               >
                 <Icon name="open" size={16} />
               </a>

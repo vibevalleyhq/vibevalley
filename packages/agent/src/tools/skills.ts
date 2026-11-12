@@ -1,10 +1,10 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { Effect, type FileSystem } from "effect";
+import { mapConcurrent } from "@vibevalley/async";
 
 import { skills as skillWords } from "../base/prompts.ts";
-import { ToolFailed } from "../core/errors.ts";
+import { AgentFailed, ToolFailed } from "../core/errors.ts";
 import { type AgentFs, agentFsOf } from "../infra/fs.ts";
 
 export interface SkillInfo {
@@ -46,53 +46,43 @@ export function frontMatter(text: string): Record<string, string> {
 
 export const skillBody = (text: string) => text.replace(frontMatterHead, "").trim();
 
-const isDir = (io: AgentFs, path: string): Effect.Effect<boolean> =>
-  io.stat(path).pipe(
-    Effect.map((s) => s.isDirectory),
-    Effect.catchTag("AgentFailed", () => Effect.succeed(false)),
-  );
-
-const readText = (io: AgentFs, path: string): Effect.Effect<string | undefined> =>
-  io.readText(path).pipe(
-    Effect.map((text): string | undefined => text),
-    Effect.catchTag("AgentFailed", () => Effect.undefined),
-  );
+/** A failure to read (no such folder, not a folder) is none: the skills are what can be read. */
+async function orNone<A>(read: () => Promise<A>, none: A): Promise<A> {
+  try {
+    return await read();
+  } catch (e) {
+    if (e instanceof AgentFailed) return none;
+    throw e;
+  }
+}
 
 /** One folder's skills, in its order; an unreadable folder or SKILL.md is none. */
-const skillsIn = (io: AgentFs, dir: string): Effect.Effect<SkillInfo[]> =>
-  Effect.gen(function* () {
-    const entries = yield* io.readDir(dir).pipe(Effect.catchTag("AgentFailed", () => Effect.succeed<readonly string[]>([])));
-    const read = yield* Effect.forEach(
-      entries,
-      (entry) =>
-        Effect.gen(function* () {
-          if (!(yield* isDir(io, join(dir, entry)))) return undefined;
-          const path = join(dir, entry, "SKILL.md");
-          const data = yield* readText(io, path);
-          if (data === undefined) return undefined;
-          const fm = frontMatter(data);
-          const info: SkillInfo = { name: fm.name || entry, description: fm.description ?? "", path };
-          return info;
-        }),
-      { concurrency: 16 },
-    );
-    return read.filter((s): s is SkillInfo => s !== undefined);
+async function skillsIn(io: AgentFs, dir: string): Promise<SkillInfo[]> {
+  const entries = await orNone<readonly string[]>(() => io.readDir(dir), []);
+  const read = await mapConcurrent(entries, 16, async (entry): Promise<SkillInfo | undefined> => {
+    if (!(await orNone(async () => (await io.stat(join(dir, entry))).isDirectory, false))) return undefined;
+    const path = join(dir, entry, "SKILL.md");
+    const data = await orNone<string | undefined>(() => io.readText(path), undefined);
+    if (data === undefined) return undefined;
+    const fm = frontMatter(data);
+    return { name: fm.name || entry, description: fm.description ?? "", path };
   });
+  return read.filter((s): s is SkillInfo => s !== undefined);
+}
 
 /** The first of a name wins. Unreadable folders are skipped. */
-export const scanSkills = (dirs: readonly string[], fs?: FileSystem.FileSystem): Effect.Effect<SkillInfo[]> =>
-  Effect.gen(function* () {
-    const io = agentFsOf(fs);
-    const groups = yield* Effect.forEach(dirs, (dir) => skillsIn(io, dir), { concurrency: "unbounded" });
-    const found = new Map<string, SkillInfo>();
-    for (const skills of groups) for (const s of skills) if (!found.has(s.name)) found.set(s.name, s);
-    // localeCompare: case folded first.
-    return [...found.values()].toSorted((a, b) => {
-      const la = a.name.toLowerCase();
-      const lb = b.name.toLowerCase();
-      return la !== lb ? (la < lb ? -1 : 1) : a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
-    });
+export async function scanSkills(dirs: readonly string[], fs?: AgentFs): Promise<SkillInfo[]> {
+  const io = agentFsOf(fs);
+  const groups = await Promise.all(dirs.map((dir) => skillsIn(io, dir)));
+  const found = new Map<string, SkillInfo>();
+  for (const skills of groups) for (const s of skills) if (!found.has(s.name)) found.set(s.name, s);
+  // localeCompare: case folded first.
+  return [...found.values()].toSorted((a, b) => {
+    const la = a.name.toLowerCase();
+    const lb = b.name.toLowerCase();
+    return la !== lb ? (la < lb ? -1 : 1) : a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
   });
+}
 
 export function skillIndex(skills: readonly SkillInfo[], max = 160): string {
   return skills
@@ -103,19 +93,21 @@ export function skillIndex(skills: readonly SkillInfo[], max = 160): string {
     .join("\n");
 }
 
-export const readSkill = (skills: readonly SkillInfo[], name: string, fs?: FileSystem.FileSystem): Effect.Effect<string, ToolFailed> =>
-  Effect.gen(function* () {
-    const s = skills.find((x) => x.name === name);
-    if (!s) {
-      return yield* ToolFailed.make({
-        message: skillWords.noSuchSkill(
-          name,
-          skills.map((x) => x.name),
-        ),
-      });
-    }
-    const data = yield* agentFsOf(fs)
-      .readText(s.path)
-      .pipe(Effect.mapError((cause) => ToolFailed.make({ message: skillWords.cannotRead(s.path), cause })));
-    return skillWords.body(s.name, s.path, skillBody(data));
-  });
+/** Throws a ToolFailed when there is no such skill or its file cannot be read. */
+export async function readSkill(skills: readonly SkillInfo[], name: string, fs?: AgentFs): Promise<string> {
+  const s = skills.find((x) => x.name === name);
+  if (!s)
+    throw new ToolFailed(
+      skillWords.noSuchSkill(
+        name,
+        skills.map((x) => x.name),
+      ),
+    );
+  let data: string;
+  try {
+    data = await agentFsOf(fs).readText(s.path);
+  } catch (cause) {
+    throw new ToolFailed(skillWords.cannotRead(s.path), cause);
+  }
+  return skillWords.body(s.name, s.path, skillBody(data));
+}

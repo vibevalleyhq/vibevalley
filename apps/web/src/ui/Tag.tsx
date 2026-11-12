@@ -1,3 +1,4 @@
+import type { JSX } from "@solidjs/web";
 import type * as stylex from "@stylexjs/stylex";
 
 import { Icon } from "./Icon";
@@ -37,7 +38,7 @@ export function Dot(props: {
   tone: DotTone;
   size?: number;
   ring?: boolean;
-  class?: string | undefined;
+  class?: JSX.ClassValue | undefined;
   // For callers still on StyleX; it goes when the last of them is on classes.
   styles?: stylex.StyleXStyles;
 }) {

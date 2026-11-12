@@ -1,15 +1,15 @@
-import { Effect, type FileSystem, Formatter } from "effect";
-
 import { complete, type ModelClient } from "@vibevalley/ai/client";
 import type { ToolDeclaration, Usage } from "@vibevalley/ai/messages";
 
 import { type BrainMessage, type CompactionSummaryMessage, messageText, requestContext, transcript } from "../base/messages.ts";
 import { compaction as compactionWords } from "../base/prompts.ts";
+import type { AgentFs } from "../infra/fs.ts";
+import type { AgentLog } from "../infra/log.ts";
 import { archive } from "../tools/memory.ts";
 import { applySummary } from "./session.ts";
 
 /** Characters over three: close enough for mixed Chinese and code. */
-export const estimateTokens = (messages: readonly BrainMessage[]) => Math.ceil(Formatter.formatJson(messages).length / 3);
+export const estimateTokens = (messages: readonly BrainMessage[]) => Math.ceil(JSON.stringify(messages).length / 3);
 
 export const summaryInstructions = compactionWords.summaryInstructions;
 
@@ -39,10 +39,11 @@ export interface CompactionOptions {
   /** The assistant's last words kept as they were, when that keeps the kept part under half the budget. */
   readonly keepSaid: number;
   /** Written after the summary, as it stands when the fold is made (its open tasks); "" for none. */
-  readonly append?: () => Effect.Effect<string>;
+  readonly append?: () => Promise<string>;
   /** The brain's Time: the summary's and the asked messages' times, the archive's name. */
   readonly now: () => number;
-  readonly fs?: FileSystem.FileSystem;
+  readonly fs?: AgentFs;
+  readonly log: AgentLog;
 }
 
 interface CompactionPlan {
@@ -75,28 +76,29 @@ export function applyPlan(plan: CompactionPlan, summary: CompactionSummaryMessag
   return { summary: s, messages: applySummary(plan.messages, s) };
 }
 
-const summaryOf = (plan: CompactionPlan, said: string, where: string, options: CompactionOptions) =>
-  Effect.gen(function* () {
-    let summary = said || compactionWords.noSummary;
-    const more = options.append ? yield* options.append() : "";
-    if (more) summary += "\n\n" + more;
-    const message: CompactionSummaryMessage = {
-      role: "compactionSummary",
-      summary,
-      tokensBefore: plan.tokens,
-      timestamp: options.now(),
-      ...(where ? { archive: where } : {}),
-      kept: plan.messages.length - plan.cut,
-    };
-    return message;
-  });
+async function summaryOf(plan: CompactionPlan, said: string, where: string, options: CompactionOptions): Promise<CompactionSummaryMessage> {
+  let summary = said || compactionWords.noSummary;
+  const more = options.append ? await options.append() : "";
+  if (more) summary += "\n\n" + more;
+  return {
+    role: "compactionSummary",
+    summary,
+    tokensBefore: plan.tokens,
+    timestamp: options.now(),
+    ...(where ? { archive: where } : {}),
+    kept: plan.messages.length - plan.cut,
+  };
+}
 
 /** Where the folded part is kept word for word; "" when it could not be: the fold goes on without it. */
-const archived = (options: CompactionOptions, text: string): Effect.Effect<string> =>
-  archive(options.home, options.session, text, options.now(), options.fs).pipe(
-    Effect.tapError((e) => Effect.logWarning(`agent ${options.session}: cannot archive folded transcript:`, e)),
-    Effect.orElseSucceed(() => ""),
-  );
+async function archived(options: CompactionOptions, text: string): Promise<string> {
+  try {
+    return await archive(options.home, options.session, text, options.now(), options.fs);
+  } catch (e) {
+    options.log.warn(`agent ${options.session}: cannot archive folded transcript:`, e);
+    return "";
+  }
+}
 
 export interface Summarized {
   readonly summary?: CompactionSummaryMessage;
@@ -105,32 +107,40 @@ export interface Summarized {
 
 /** The summary of the whole conversation, asked with the same start (prefix, tools) as its requests, so the cache covers
  * all but the last message. */
-export const compactInPlace = (plan: CompactionPlan, options: CompactionOptions, prefix: string, tools: readonly ToolDeclaration[]) =>
-  Effect.gen(function* () {
-    const asked = requestContext(prefix, tools, plan.messages);
-    const answer = yield* complete(
-      options.llm,
-      { ...asked, messages: [...asked.messages, { role: "user", content: summaryInPlace, timestamp: options.now() }] },
-      { toolChoice: "none" },
-    );
-    const said = messageText(answer).trim();
-    const called = answer.content.some((c) => c.type === "toolCall");
-    if (answer.stopReason === "error" || answer.stopReason === "aborted" || said === "" || called) return yield* compact(plan, options);
-    const where = yield* archived(options, transcript(plan.messages.slice(0, plan.cut)));
-    const summarized: Summarized = { summary: yield* summaryOf(plan, said, where, options), usage: answer.usage };
-    return summarized;
-  });
+export async function compactInPlace(
+  plan: CompactionPlan,
+  options: CompactionOptions,
+  prefix: string,
+  tools: readonly ToolDeclaration[],
+  signal?: AbortSignal,
+): Promise<Summarized> {
+  const asked = requestContext(prefix, tools, plan.messages);
+  const answer = await complete(
+    options.llm,
+    { ...asked, messages: [...asked.messages, { role: "user", content: summaryInPlace, timestamp: options.now() }] },
+    { toolChoice: "none" },
+    signal,
+  );
+  const said = messageText(answer).trim();
+  const called = answer.content.some((c) => c.type === "toolCall");
+  if (answer.stopReason === "error" || answer.stopReason === "aborted" || said === "" || called) return compact(plan, options, signal);
+  const where = await archived(options, transcript(plan.messages.slice(0, plan.cut)));
+  return { summary: await summaryOf(plan, said, where, options), usage: answer.usage };
+}
 
-const compact = (plan: CompactionPlan, options: CompactionOptions) =>
-  Effect.gen(function* () {
-    const text = transcript(plan.messages.slice(0, plan.cut));
-    const where = yield* archived(options, text);
-    const answer = yield* complete(options.llm, {
+async function compact(plan: CompactionPlan, options: CompactionOptions, signal?: AbortSignal): Promise<Summarized> {
+  const text = transcript(plan.messages.slice(0, plan.cut));
+  const where = await archived(options, text);
+  const answer = await complete(
+    options.llm,
+    {
       system: summaryInstructions,
       tools: [],
       messages: [{ role: "user", content: text, timestamp: options.now() }],
-    });
-    const said = answer.stopReason === "error" ? "" : messageText(answer).trim();
-    const summarized: Summarized = { summary: yield* summaryOf(plan, said, where, options), usage: answer.usage };
-    return summarized;
-  });
+    },
+    {},
+    signal,
+  );
+  const said = answer.stopReason === "error" ? "" : messageText(answer).trim();
+  return { summary: await summaryOf(plan, said, where, options), usage: answer.usage };
+}

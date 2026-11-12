@@ -1,29 +1,29 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import type { UpdateManual } from "@vibevalley/protocol/host";
 
-export const Build = Schema.Struct({
+export const Build = z.object({
   /** process.arch: arm64 or x64. */
-  arch: Schema.String,
+  arch: z.string(),
   /** The zip of the .app, beside release.json. */
-  file: Schema.String,
-  size: Schema.Finite,
+  file: z.string(),
+  size: z.number(),
   /** Hex. */
-  sha512: Schema.String,
+  sha512: z.string(),
 });
-export type Build = typeof Build.Type;
+export type Build = z.infer<typeof Build>;
 
-export const Release = Schema.Struct({
-  version: Schema.String,
+export const Release = z.object({
+  version: z.string(),
   /** One line a change, the merged pull requests' titles. */
-  notes: Schema.Array(Schema.String),
+  notes: z.array(z.string()),
   /** The baseline hash its server makes a database from (apps/server src/infra/baseline.ts). */
-  schema: Schema.String,
+  schema: z.string(),
   /** The release's page, to download it by hand. */
-  page: Schema.String,
-  builds: Schema.Array(Build),
+  page: z.string(),
+  builds: z.array(Build),
 });
-export type Release = typeof Release.Type;
+export type Release = z.infer<typeof Release>;
 
 /** x.y.z, or a prerelease of it: x.y.z-alpha.n, x.y.z-beta.n (the tag without its v; scripts/release.ts makes them). */
 const versionPattern = /^(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta)\.(\d+))?$/u;
@@ -57,12 +57,12 @@ export function stageOf(v: string): Stage | undefined {
 }
 
 /** One of GitHub's releases as its list gives it, the fields read here. */
-export const ListedRelease = Schema.Struct({
-  tag_name: Schema.String,
-  draft: Schema.Boolean,
-  assets: Schema.Array(Schema.Struct({ name: Schema.String, browser_download_url: Schema.String })),
+export const ListedRelease = z.object({
+  tag_name: z.string(),
+  draft: z.boolean(),
+  assets: z.array(z.object({ name: z.string(), browser_download_url: z.string() })),
 });
-export type ListedRelease = typeof ListedRelease.Type;
+export type ListedRelease = z.infer<typeof ListedRelease>;
 
 /** The release.json of the latest release of a stage, from GitHub's list of releases: each channel's app updates only within its own (channel.ts). */
 export function manifestFor(list: readonly ListedRelease[], stage: Stage): string | undefined {

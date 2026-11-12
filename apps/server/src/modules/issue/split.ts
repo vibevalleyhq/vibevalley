@@ -1,19 +1,18 @@
-import { Effect, Semaphore } from "effect";
-
 import { dagIDValid, dagProblems } from "@vibevalley/agent/dag";
+import { Semaphore } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { assignedAgentOf, isBusy, latestSessionIdOf } from "@vibevalley/protocol/rules";
 import { issueId } from "@vibevalley/protocol/schema";
 
 import { actsForUser, type Actor } from "#/base/actor.ts";
-import { BizCode, reasonOf, refuseIn } from "#/base/errors.ts";
+import { ApiError, BizCode, messageOf, refuseIn } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
-import { Agent } from "#/modules/agent/agent.ts";
-import { Channel } from "#/modules/channel/channel.ts";
-import { issueBranch, Repo } from "#/modules/repo/repo.ts";
+import type { Agent } from "#/modules/agent/agent.ts";
+import type { Channel } from "#/modules/channel/channel.ts";
+import { issueBranch, type Repo } from "#/modules/repo/repo.ts";
 import { MergeFailure, type Workplace } from "#/modules/repo/workplace.ts";
-import { Session } from "#/modules/session/session.ts";
+import { NotTakenIn, type Session } from "#/modules/session/session.ts";
 
 import { maxChildren } from "./creation.ts";
 import type { IssueLifecycle } from "./lifecycle.ts";
@@ -23,128 +22,124 @@ import { isClosed } from "./status.ts";
 
 const refused = refuseIn(BizCode.IssueRefused);
 
-export const issueSplitting = (r: IssueLifecycle) =>
-  Effect.gen(function* () {
-    const store = yield* Agent;
-    const repos = yield* Repo;
-    const sessions = yield* Session;
-    const chat = yield* Channel;
-    const { everyIssue, get, publish, issueWords, changesOf, setConflict, asked, saveSplit, completeChild } = r;
-    const splitting = yield* Semaphore.make(1);
-    const split = Effect.fn("Issue.split")(function* (id: string, title: string, drafts: readonly T.IssueChildDraft[], by: Actor) {
-      const parent = yield* get(id);
+export interface SplitDeps {
+  readonly agent: Agent;
+  readonly repo: Repo;
+  readonly session: Session;
+  readonly channel: Channel;
+}
+
+export type IssueSplitting = ReturnType<typeof issueSplitting>;
+
+export function issueSplitting(r: IssueLifecycle, deps: SplitDeps) {
+  const { agent: store, repo: repos, session: sessions, channel: chat } = deps;
+  const { everyIssue, get, publish, issueWords, changesOf, setConflict, asked, saveSplit, completeChild } = r;
+  const splitting = new Semaphore(1);
+  const split = (id: string, title: string, drafts: readonly T.IssueChildDraft[], by: Actor): Promise<string> =>
+    splitting.with(async () => {
+      const parent = await get(id);
       if (by.kind === "agent" && by.role === "worker") {
         const caller = sessions.sessionOf(by.id);
-        if (!caller || caller.refining || latestSessionIdOf(parent) !== by.id || caller.issue !== parent.id)
-          return yield* refused(t("server.issue.split.notCurrent"));
-      } else if (!actsForUser(by)) return yield* refused(needsUser);
-      if (isClosed(parent.status)) return yield* refused(t("server.issue.dependencies.closedParent"));
+        if (!caller || caller.refining || latestSessionIdOf(parent) !== by.id || caller.issue !== parent.id) throw refused(t("server.issue.split.notCurrent"));
+      } else if (!actsForUser(by)) throw refused(needsUser);
+      if (isClosed(parent.status)) throw refused(t("server.issue.dependencies.closedParent"));
       const parentRepo = parent.repo;
-      if (!parentRepo) return yield* refused(t("server.issue.noRepo"));
-      if ((yield* everyIssue).some((item) => item.parent === parent.id)) return yield* refused(t("server.issue.split.already"));
+      if (!parentRepo) throw refused(t("server.issue.noRepo"));
+      if ((await everyIssue()).some((item) => item.parent === parent.id)) throw refused(t("server.issue.split.already"));
       if (
         drafts.length === 0 ||
         drafts.length > maxChildren ||
         drafts.some((draft) => !dagIDValid(draft.id)) ||
         dagProblems(drafts.map((draft) => ({ id: draft.id, after: draft.needs ?? [] }))).length > 0
       )
-        return yield* refused(t("server.issue.split.invalid", { max: maxChildren }));
+        throw refused(t("server.issue.split.invalid", { max: maxChildren }));
       const withIds = drafts.map((draft) => ({ draft, childId: issueId(newId()) }));
       const ids = new Map(withIds.map(({ draft, childId }) => [draft.id, childId]));
-      const rows = yield* Effect.forEach(withIds, ({ draft, childId }) =>
-        Effect.gen(function* () {
-          const named = draft.agent?.trim() || assignedAgentOf(parent);
-          const agent = store.agents().find((candidate) => candidate.id === named || candidate.name === named);
-          if (!agent || agent.role !== "worker" || !agent.enabled) return yield* refused(t("server.issue.split.agent", { agent: named ?? "" }));
-          const [childTitle, description] = yield* issueWords({
-            title: draft.title?.trim() || draft.brief,
-            description: draft.title?.trim() ? draft.brief : "",
-          });
-          const check = draft.check?.trim();
-          if (draft.acceptance === true && !check) return yield* refused(t("server.issue.verification.acceptanceNeedsCheck"));
-          const req: T.IssueRequest = {
-            title: childTitle,
-            description,
-            parent: parent.id,
-            repo: parentRepo,
-            agent: agent.id,
-            priority: parent.priority,
-            blockedBy: (draft.needs ?? []).flatMap((need) => {
-              const dep = ids.get(need);
-              return dep ? [dep] : [];
-            }),
-            constraints: { acceptance: draft.acceptance === true, scope: draft.scope ?? [], frozen: [], ...(check ? { check } : {}) },
-          };
-          return { id: childId, req };
-        }),
-      );
+      const rows = withIds.map(({ draft, childId }) => {
+        const named = draft.agent?.trim() || assignedAgentOf(parent);
+        const agent = store.agents().find((candidate) => candidate.id === named || candidate.name === named);
+        if (!agent || agent.role !== "worker" || !agent.enabled) throw refused(t("server.issue.split.agent", { agent: named ?? "" }));
+        const [childTitle, description] = issueWords({
+          title: draft.title?.trim() || draft.brief,
+          description: draft.title?.trim() ? draft.brief : "",
+        });
+        const check = draft.check?.trim();
+        if (draft.acceptance === true && !check) throw refused(t("server.issue.verification.acceptanceNeedsCheck"));
+        const req: T.IssueRequest = {
+          title: childTitle,
+          description,
+          parent: parent.id,
+          repo: parentRepo,
+          agent: agent.id,
+          priority: parent.priority,
+          blockedBy: (draft.needs ?? []).flatMap((need) => {
+            const dep = ids.get(need);
+            return dep ? [dep] : [];
+          }),
+          constraints: { acceptance: draft.acceptance === true, scope: draft.scope ?? [], frozen: [], ...(check ? { check } : {}) },
+        };
+        return { id: childId, req };
+      });
       const session = latestSessionIdOf(parent);
       if (session && sessions.isReachable(session)) {
-        if (!sessions.sessionOf(session)?.branch) return yield* refused(t("server.issue.split.needsBranch"));
-        const changes = yield* changesOf(parent);
-        if (changes && changes.uncommitted.length > 0) return yield* refused(t("server.issue.split.commitFirst"));
+        if (!sessions.sessionOf(session)?.branch) throw refused(t("server.issue.split.needsBranch"));
+        const changes = await changesOf(parent);
+        if (changes && changes.uncommitted.length > 0) throw refused(t("server.issue.split.commitFirst"));
       }
-      const channel = (yield* chat.topOf(session ? (sessions.sessionOf(session)?.channel ?? "") : "")).id;
-      yield* saveSplit(id, title, channel, parent.mandate, rows);
+      const channel = (await chat.topOf(session ? (sessions.sessionOf(session)?.channel ?? "") : "")).id;
+      await saveSplit(id, title, channel, parent.mandate, rows);
       return (
         t("server.issue.split.created", { n: parent.number, count: rows.length }) +
         "\n" +
         rows.map((row) => `${row.req.title}: vv://issue/${row.id}`).join("\n")
       );
-    }, splitting.withPermits(1));
+    });
 
-    const joining = yield* Semaphore.make(1);
-    const joinChildren = Effect.fn("Issue.joinChildren")(function* () {
-      const all = yield* everyIssue;
-      yield* Effect.forEach(
-        all.filter((item): item is T.Issue & { readonly parent: T.IssueId } => item.parent !== undefined && item.stage.state === "reviewing"),
-        (child) =>
-          Effect.gen(function* () {
-            const parent = yield* get(child.parent);
-            const parentRepo = parent.repo;
-            if (!parentRepo || isClosed(parent.status)) return;
-            const session = latestSessionIdOf(child);
-            if (!session || !sessions.isReachable(session)) return;
-            const parentSession = latestSessionIdOf(parent);
-            const parentWorker = parentSession ? sessions.sessionOf(parentSession) : undefined;
-            if (parentWorker && isBusy(parentWorker)) return;
-            yield* sessions
-              .handOver(
-                session,
-                "completed",
-                (place) =>
-                  Effect.gen(function* () {
-                    const constraints = yield* verifyChild(repos, child, parent, all, place);
-                    const mergeIntoParent = (target: Workplace) => repos.mergeInto(place, issueBranch(parent.number), target.cwd);
-                    const merged =
-                      parentSession && sessions.isReachable(parentSession)
-                        ? yield* sessions
-                            .withIdleWorkplace(parentSession, mergeIntoParent)
-                            .pipe(Effect.mapError((error) => (error._tag === "MergeFailure" ? error : MergeFailure.error(reasonOf(error)))))
-                        : yield* Effect.flatMap(repos.workplace(parentRepo, parent.number, true, ""), mergeIntoParent);
-                    yield* completeChild(child.id, constraints);
-                    return merged;
-                  }),
-                "helper",
-              )
-              .pipe(
-                Effect.tap(() => setConflict(child.id, undefined)),
-                Effect.catch((failure) =>
-                  Effect.andThen(
-                    failure._tag === "NotTakenIn" && failure.failure.kind === "conflict"
-                      ? setConflict(child.id, { base: failure.failure.base, files: [...failure.failure.files] })
-                      : Effect.void,
-                    asked(child.id, [{ question: failure._tag === "NotTakenIn" ? failure.message : reasonOf(failure), options: [] }]),
-                  ),
-                ),
-              );
-            yield* publish(parent.id);
-          }),
-        { discard: true },
+  const joining = new Semaphore(1);
+  const joinOne = async (child: T.Issue & { readonly parent: T.IssueId }, all: readonly T.Issue[]) => {
+    const parent = await get(child.parent);
+    const parentRepo = parent.repo;
+    if (!parentRepo || isClosed(parent.status)) return;
+    const session = latestSessionIdOf(child);
+    if (!session || !sessions.isReachable(session)) return;
+    const parentSession = latestSessionIdOf(parent);
+    const parentWorker = parentSession ? sessions.sessionOf(parentSession) : undefined;
+    if (parentWorker && isBusy(parentWorker)) return;
+    try {
+      await sessions.handOver(
+        session,
+        "completed",
+        async (place) => {
+          const constraints = await verifyChild(repos, child, parent, all, place);
+          const mergeIntoParent = (target: Workplace) => repos.mergeInto(place, issueBranch(parent.number), target.cwd);
+          let merged;
+          if (parentSession && sessions.isReachable(parentSession)) {
+            try {
+              merged = await sessions.withIdleWorkplace(parentSession, mergeIntoParent);
+            } catch (error) {
+              throw error instanceof MergeFailure ? error : MergeFailure.error(messageOf(error));
+            }
+          } else merged = await mergeIntoParent(await repos.workplace(parentRepo, parent.number, true, ""));
+          await completeChild(child.id, constraints);
+          return merged;
+        },
+        "helper",
       );
-    }, joining.withPermits(1));
+      await setConflict(child.id, undefined);
+    } catch (failure) {
+      if (!(failure instanceof NotTakenIn) && !(failure instanceof ApiError)) throw failure;
+      if (failure instanceof NotTakenIn && failure.failure.kind === "conflict")
+        await setConflict(child.id, { base: failure.failure.base, files: [...failure.failure.files] });
+      await asked(child.id, [{ question: failure.message, options: [] }]);
+    }
+    await publish(parent.id);
+  };
+  const joinChildren = (): Promise<void> =>
+    joining.with(async () => {
+      const all = await everyIssue();
+      for (const child of all.filter((item): item is T.Issue & { readonly parent: T.IssueId } => item.parent !== undefined && item.stage.state === "reviewing"))
+        await joinOne(child, all);
+    });
 
-    return { split, joinChildren };
-  });
-
-export type IssueSplitting = Effect.Success<ReturnType<typeof issueSplitting>>;
+  return { split, joinChildren };
+}

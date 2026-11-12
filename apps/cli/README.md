@@ -2,13 +2,15 @@
 
 `vibevalley`, the command line: for the agents on this machine first (Claude Code, Codex, the helpers) and for people
 too. It follows the farm's model as a repo tracker's does (`gh issue`): one command is one operation of the server's,
-`<resource> [<sub-resource>] <verb>`, typed with effect/cli and asking the server through the generated `VibeValleyApi`;
+`<resource> [<sub-resource>] <verb>`, typed with commander (src/infra/command.ts) and asking the server through the generated `VibeValleyApi`;
 it loads none of the server and works out nothing the server decides. How it reads and why: [development](docs/development.md#只用命令行派一个活),
 [the core](docs/subsystems/core.md).
 
 ```
 src/main.ts        the root: the groups below, the global flags (--server, --dry-run, --format), how help and failures are said
-src/farm.ts        what every command stands on: global flags, SSE frames, ask (the typed client), show (text or --format json), change (--dry-run)
+src/infra/command.ts  the command tree on commander: arguments and flags read back typed, help (EXAMPLES…), parser mistakes as failures
+src/infra/farm.ts  what every command stands on: SSE frames, ask (the typed client), change (--dry-run), the desktop app's socket
+src/base/format.ts the global flags (--server, --dry-run, --format) and show (text or --format json)
 src/commands/issue.ts  issue list|show [--watch]|watch [--jsonl] [--follow]|create|edit|status|comment|review|diff|timeline|delete
 src/worker.ts      separate session-authenticated entry; commands/worker.ts implements report, pr-submit, context, read, doctor
 src/issue-watch.ts bounded observation, revisions and reconnects
@@ -19,8 +21,8 @@ src/notes.ts       memory list|search|create|delete, cron list|create|edit|delet
 src/app.ts         the desktop app's own abilities, over its socket in the farm's home (@vibevalley/home)
 src/doctor.ts      this machine's farm: found, reachable, the app, the runtimes, the keys, connecting to this machine
 src/chat.ts        `chat [runtime]`: the server's conversation program, handed this terminal (VIBEVALLEY_CHAT); bare `vibevalley` is the help
-src/output.ts      stdout for the result, the failure as one JSON line on stderr, exit codes by kind
-src/testing.ts     a run in the process against a whole farm (@vibevalley/server/testing)
+src/base/output.ts the run's io, stdout for the result, the failure as one JSON line on stderr, exit codes by kind
+src/testing/       a run in the process (cli.ts) against a whole farm (@vibevalley/server/testing)
 ```
 
 ## Rules

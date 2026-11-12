@@ -1,4 +1,6 @@
-import { Schema } from "effect";
+import { z } from "zod";
+
+import { fromJson } from "../base/json.ts";
 
 export const mossRealtimeUrl = "wss://api.mosi.cn/v1/realtime?model=moss-live-1.0";
 export const mossInRate = 16000;
@@ -7,46 +9,44 @@ export const mossFrameSamples = 320;
 export const mossTaggedFrameBytes = 1 + mossFrameSamples * 2;
 export const mossAudioTag = 0x00;
 
-const MossErrorObjectSchema = Schema.Struct({
-  message: Schema.optionalKey(Schema.String),
-  code: Schema.optionalKey(Schema.String),
-  client_event_id: Schema.optionalKey(Schema.String),
+const MossErrorObjectSchema = z.object({
+  message: z.exactOptional(z.string()),
+  code: z.exactOptional(z.string()),
+  client_event_id: z.exactOptional(z.string()),
 });
-const MossEventPayloadSchema = Schema.Struct({
-  session_id: Schema.optionalKey(Schema.String),
-  memory_scope: Schema.optionalKey(Schema.String),
-  delegation: Schema.optionalKey(Schema.String),
-  status: Schema.optionalKey(Schema.String),
-  reconnect: Schema.optionalKey(Schema.Boolean),
-  code: Schema.optionalKey(Schema.Union([Schema.String, Schema.Finite])),
-  text: Schema.optionalKey(Schema.String),
-  turn: Schema.optionalKey(Schema.String),
-  turn_id: Schema.optionalKey(Schema.String),
-  chunk_id: Schema.optionalKey(Schema.String),
-  run_id: Schema.optionalKey(Schema.String),
-  reason: Schema.optionalKey(Schema.String),
-  call_id: Schema.optionalKey(Schema.String),
-  name: Schema.optionalKey(Schema.String),
-  arguments: Schema.optionalKey(Schema.String),
-  error: Schema.optionalKey(Schema.Union([Schema.String, MossErrorObjectSchema])),
+const MossEventPayloadSchema = z.object({
+  session_id: z.exactOptional(z.string()),
+  memory_scope: z.exactOptional(z.string()),
+  delegation: z.exactOptional(z.string()),
+  status: z.exactOptional(z.string()),
+  reconnect: z.exactOptional(z.boolean()),
+  code: z.exactOptional(z.union([z.string(), z.number()])),
+  text: z.exactOptional(z.string()),
+  turn: z.exactOptional(z.string()),
+  turn_id: z.exactOptional(z.string()),
+  chunk_id: z.exactOptional(z.string()),
+  run_id: z.exactOptional(z.string()),
+  reason: z.exactOptional(z.string()),
+  call_id: z.exactOptional(z.string()),
+  name: z.exactOptional(z.string()),
+  arguments: z.exactOptional(z.string()),
+  error: z.exactOptional(z.union([z.string(), MossErrorObjectSchema])),
 });
-const MossFrameSchema = Schema.fromJsonString(
-  Schema.Struct({
-    action: Schema.optionalKey(Schema.String),
-    type: Schema.optionalKey(Schema.String),
-    call_id: Schema.optionalKey(Schema.String),
-    name: Schema.optionalKey(Schema.String),
-    arguments: Schema.optionalKey(Schema.String),
-    error: Schema.optionalKey(MossErrorObjectSchema),
-    data: Schema.optionalKey(MossEventPayloadSchema),
-  }),
-);
-const decodeFrame = Schema.decodeUnknownOption(MossFrameSchema);
-export const decodeMossFrame = (input: unknown) => decodeFrame(input);
+const MossFrameSchema = z.object({
+  action: z.exactOptional(z.string()),
+  type: z.exactOptional(z.string()),
+  call_id: z.exactOptional(z.string()),
+  name: z.exactOptional(z.string()),
+  arguments: z.exactOptional(z.string()),
+  error: z.exactOptional(MossErrorObjectSchema),
+  data: z.exactOptional(MossEventPayloadSchema),
+});
+export type MossFrame = z.output<typeof MossFrameSchema>;
+/** A MOSS Live text frame, or undefined when it is not JSON of that shape. */
+export const decodeMossFrame = (input: unknown): MossFrame | undefined => fromJson(MossFrameSchema, input);
 
 export const mossErrorMessage = (body: string): string => {
-  const decoded = decodeMossFrame(body);
-  const msg = decoded._tag === "Some" ? decoded.value.error?.message : undefined;
+  const msg = decodeMossFrame(body)?.error?.message;
   return msg ? msg : body.slice(0, 200);
 };
 

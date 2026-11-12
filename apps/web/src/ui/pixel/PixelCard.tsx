@@ -1,88 +1,8 @@
-import * as stylex from "@stylexjs/stylex";
 import { For, Match, Switch } from "solid-js";
 
 import type { BadgeTone } from "@vibevalley/protocol";
 
 import type { SpriteAtlas, SpriteInfo } from "./atlas";
-import { pxStyle } from "./style";
-
-const viewStyles = stylex.create({
-  animalFaceSpan: {
-    position: "relative",
-    display: "inline-block",
-    flexShrink: "0",
-    overflow: "hidden",
-    backgroundColor: {
-      default: "var(--color-px-leaf-wash)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 60%, transparent)",
-    },
-  },
-  animalFaceImg: {
-    position: "absolute",
-    maxWidth: "none",
-    imageRendering: "pixelated",
-  },
-  pieceWords: {
-    fontFamily: "var(--font-pixel)",
-    fontWeight: "var(--font-weight-normal)",
-  },
-  pieceWordsClamped: {
-    overflow: "hidden",
-  },
-  pieceWordsCenter: {
-    textAlign: "center",
-  },
-  pieceViewImg: {
-    flexShrink: "0",
-    imageRendering: "pixelated",
-  },
-  pieceViewSvg: {
-    flexShrink: "0",
-  },
-  pieceViewSpan: {
-    position: "relative",
-    flexShrink: "0",
-  },
-  pieceViewSpan2: {
-    position: "absolute",
-    top: "0",
-  },
-  pieceViewSpan3: {
-    position: "absolute",
-    insetBlock: "0",
-    left: "0",
-  },
-  pixelCardOuter: {
-    display: "inline-block",
-    paddingRight: "0.125rem",
-    paddingBottom: "0.125rem",
-  },
-  pixelCardBox: {
-    boxSizing: "border-box",
-    display: "flex",
-    borderStyle: "solid",
-    borderWidth: "2px",
-  },
-  pixelCardCentred: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pixelCardRows: {
-    display: "flex",
-    flexDirection: "column",
-  },
-  pixelCardRowsCenter: {
-    alignItems: "center",
-  },
-  pixelCardRowsStart: {
-    alignItems: "flex-start",
-  },
-  pixelCardRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: "3px",
-  },
-});
 
 export const CardColors = {
   ink: "var(--color-bark-850)",
@@ -130,12 +50,16 @@ export function AnimalFace(props: { atlas: SpriteAtlas; look: string; size: numb
     return { url: sp.url, left: props.size / 2 - (sp.w / 2) * k, top: props.size / 2 - (sp.h * 0.25 + sp.h * 0.03) * k, width: sp.w * k, height: sp.h * k };
   };
   return (
-    <span {...stylex.attrs(viewStyles.animalFaceSpan)} style={{ width: `${props.size}px`, height: `${props.size}px` }} aria-hidden="true">
+    <span
+      class="relative inline-block shrink-0 overflow-hidden bg-leaf-300/60"
+      style={{ width: `${props.size}px`, height: `${props.size}px` }}
+      aria-hidden="true"
+    >
       <img
         src={cut().url}
         alt=""
         draggable="false"
-        {...stylex.attrs(viewStyles.animalFaceImg)}
+        class="absolute max-w-none [image-rendering:pixelated]"
         style={{ left: `${cut().left}px`, top: `${cut().top}px`, width: `${cut().width}px`, height: `${cut().height}px` }}
       />
     </span>
@@ -148,7 +72,7 @@ function PieceView(props: { piece: Piece; ink: string; maxWidth?: number | undef
       <Match when={props.piece.kind === "words" ? props.piece : undefined}>
         {(p) => (
           <span
-            {...stylex.attrs(viewStyles.pieceWords, props.maxLines !== undefined && viewStyles.pieceWordsClamped, props.center && viewStyles.pieceWordsCenter)}
+            class={["font-pixel font-normal", props.maxLines !== undefined && "overflow-hidden", props.center && "text-center"]}
             style={{
               "font-size": `${p().size ?? 12}px`,
               "line-height": `${(p().size ?? 12) + 2}px`,
@@ -167,7 +91,7 @@ function PieceView(props: { piece: Piece; ink: string; maxWidth?: number | undef
             src={p().sprite.url}
             alt=""
             draggable="false"
-            {...stylex.attrs(viewStyles.pieceViewImg)}
+            class="shrink-0 [image-rendering:pixelated]"
             style={{ height: `${p().px}px`, width: `${(p().px * p().sprite.w) / p().sprite.h}px` }}
           />
         )}
@@ -181,7 +105,7 @@ function PieceView(props: { piece: Piece; ink: string; maxWidth?: number | undef
               height={p().px}
               viewBox={`0 0 ${grid().w} ${grid().h}`}
               shape-rendering="crispEdges"
-              {...stylex.attrs(viewStyles.pieceViewSvg)}
+              class="shrink-0"
               aria-hidden="true"
             >
               <For each={p().cells}>{([x, y, w, h, c]) => <rect x={x} y={y} width={w} height={h} fill={c} />}</For>
@@ -194,11 +118,11 @@ function PieceView(props: { piece: Piece; ink: string; maxWidth?: number | undef
           const px = () => p().px ?? 22;
           const n = () => p().looks.length;
           return (
-            <span {...stylex.attrs(viewStyles.pieceViewSpan)} style={{ width: `${n() === 0 ? 0 : px() + (n() - 1) * (px() - 10)}px`, height: `${px()}px` }}>
+            <span class="relative shrink-0" style={{ width: `${n() === 0 ? 0 : px() + (n() - 1) * (px() - 10)}px`, height: `${px()}px` }}>
               {/* The first is drawn last, on top. */}
               <For each={p().looks} keyed={false}>
                 {(look, i) => (
-                  <span {...stylex.attrs(viewStyles.pieceViewSpan2)} style={{ left: `${i * (px() - 10)}px`, "z-index": n() - i }}>
+                  <span class="absolute top-0" style={{ left: `${i * (px() - 10)}px`, "z-index": n() - i }}>
                     <AnimalFace atlas={p().atlas} look={look()} size={px()} />
                   </span>
                 )}
@@ -212,14 +136,8 @@ function PieceView(props: { piece: Piece; ink: string; maxWidth?: number | undef
           // Whole twentieths, so the fill moves in steps.
           const steps = () => Math.round(Math.min(1, Math.max(0, p().fill)) * 20) / 20;
           return (
-            <span
-              {...stylex.attrs(viewStyles.pieceViewSpan)}
-              style={{ width: `${p().w}px`, height: `${p().h}px`, background: p().track ?? CardColors.barTrack }}
-            >
-              <span
-                {...stylex.attrs(viewStyles.pieceViewSpan3)}
-                style={{ width: `${Math.round(p().w * steps())}px`, background: p().color ?? CardColors.barFill }}
-              />
+            <span class="relative shrink-0" style={{ width: `${p().w}px`, height: `${p().h}px`, background: p().track ?? CardColors.barTrack }}>
+              <span class="absolute inset-y-0 left-0" style={{ width: `${Math.round(p().w * steps())}px`, background: p().color ?? CardColors.barFill }} />
             </span>
           );
         }}
@@ -243,9 +161,9 @@ export function PixelCard(props: {
 }) {
   const centred = () => !(props.center !== true) || props.width !== undefined || props.height !== undefined;
   return (
-    <div {...stylex.attrs(viewStyles.pixelCardOuter)}>
+    <div class="inline-block pr-0.5 pb-0.5">
       <div
-        {...stylex.attrs(pxStyle.shade, viewStyles.pixelCardBox, centred() && viewStyles.pixelCardCentred)}
+        class={["box-border flex border-2 pixel-shade", centred() && "items-center justify-center"]}
         style={{
           background: props.paper ?? CardColors.paper,
           "border-color": CardColors.ink,
@@ -254,10 +172,10 @@ export function PixelCard(props: {
           "min-height": props.height !== undefined ? `${props.height}px` : undefined,
         }}
       >
-        <div {...stylex.attrs(viewStyles.pixelCardRows, props.center === true ? viewStyles.pixelCardRowsCenter : viewStyles.pixelCardRowsStart)}>
+        <div class={["flex flex-col", props.center === true ? "items-center" : "items-start"]}>
           <For each={props.rows} keyed={false}>
             {(row) => (
-              <div {...stylex.attrs(viewStyles.pixelCardRow)}>
+              <div class="flex items-center gap-0.75">
                 <For each={row()} keyed={false}>
                   {(p) => (
                     <PieceView

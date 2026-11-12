@@ -1,5 +1,3 @@
-import { Formatter } from "effect";
-
 import { maybe, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { executionsOf } from "@vibevalley/protocol/rules";
@@ -21,9 +19,9 @@ export const issueRow = (id: string, req: T.IssueRequest, mandate: T.IssueMandat
   auto_submit_pr: mandate.autoSubmitPr,
   repo: req.repo?.trim() || null,
   parent: req.parent ?? null,
-  blocked_by: (req.blockedBy?.length ?? 0) > 0 ? Formatter.formatJson(req.blockedBy) : null,
-  constraints: req.constraints ? Formatter.formatJson(req.constraints) : null,
-  criteria: (req.criteria?.length ?? 0) > 0 ? Formatter.formatJson(req.criteria) : null,
+  blocked_by: (req.blockedBy?.length ?? 0) > 0 ? JSON.stringify(req.blockedBy) : null,
+  constraints: req.constraints ? JSON.stringify(req.constraints) : null,
+  criteria: (req.criteria?.length ?? 0) > 0 ? JSON.stringify(req.criteria) : null,
   priority: req.priority ?? "medium",
   created_at: at,
   cron: cron ?? null,

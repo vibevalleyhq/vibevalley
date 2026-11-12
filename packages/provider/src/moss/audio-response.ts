@@ -1,11 +1,12 @@
-import { Effect, Schema } from "effect";
-import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
+import { z } from "zod";
 
-import { MossErrorOutcome, MossErrorReason, readMossResponse } from "./response.ts";
+import { bounded, type ProviderHttp, send } from "../base/http.ts";
+import { codePoints, fromJson, httpsUrl, int } from "../base/json.ts";
+import { badKey, type MossErrorFields, MossResponseTooLarge, readMossResponse, rejectedStatuses } from "./response.ts";
 import { mossSpeechFormats } from "./speech-models.ts";
 
-export const AudioId = Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9_-]{1,256}$/u));
-const ErrorCode = Schema.Literals([
+export const AudioId = z.string().regex(/^[a-zA-Z0-9_-]{1,256}$/u);
+const ErrorCode = z.enum([
   "voice_not_found",
   "task_not_found",
   "unsupported_stream",
@@ -16,21 +17,32 @@ const ErrorCode = Schema.Literals([
   "rate_limit_exceeded",
   "concurrency_limit_exceeded",
 ]);
-const ErrorBody = Schema.fromJsonString(Schema.Struct({ error: Schema.Struct({ code: ErrorCode }) }));
-export class MossAudioError extends Schema.TaggedError<MossAudioError, { readonly brand: unique symbol }>()("MossAudioError", {
-  reason: MossErrorReason,
-  outcome: MossErrorOutcome,
-  status: Schema.optionalKey(Schema.Int),
-  code: Schema.optionalKey(ErrorCode),
-}) {}
+type ErrorCode = z.output<typeof ErrorCode>;
+const ErrorBody = z.object({ error: z.object({ code: ErrorCode }) });
 
-const UsageCount = Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }));
-export const AudioUsage = Schema.Struct({
-  input_characters: Schema.optionalKey(UsageCount),
-  prompt_tokens: Schema.optionalKey(UsageCount),
-  completion_tokens: Schema.optionalKey(UsageCount),
-  total_tokens: Schema.optionalKey(UsageCount),
-  input_audio_seconds: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
+export class MossAudioError extends Error {
+  override readonly name = "MossAudioError";
+  readonly reason: MossErrorFields["reason"];
+  readonly outcome: MossErrorFields["outcome"];
+  declare readonly status?: number;
+  declare readonly code?: ErrorCode;
+
+  constructor(fields: MossErrorFields & { readonly code?: ErrorCode }) {
+    super(`MOSS audio: ${fields.reason}`);
+    this.reason = fields.reason;
+    this.outcome = fields.outcome;
+    if (fields.status !== undefined) this.status = fields.status;
+    if (fields.code !== undefined) this.code = fields.code;
+  }
+}
+
+const UsageCount = int();
+export const AudioUsage = z.object({
+  input_characters: z.exactOptional(UsageCount),
+  prompt_tokens: z.exactOptional(UsageCount),
+  completion_tokens: z.exactOptional(UsageCount),
+  total_tokens: z.exactOptional(UsageCount),
+  input_audio_seconds: z.exactOptional(z.number().min(0)),
 });
 
 export interface MossAudioUsage {
@@ -41,7 +53,7 @@ export interface MossAudioUsage {
   readonly inputAudioSeconds?: number;
 }
 
-export function audioUsage(usage: typeof AudioUsage.Type): MossAudioUsage {
+export function audioUsage(usage: z.output<typeof AudioUsage>): MossAudioUsage {
   return {
     ...(usage.input_characters !== undefined ? { inputCharacters: usage.input_characters } : {}),
     ...(usage.prompt_tokens !== undefined ? { promptTokens: usage.prompt_tokens } : {}),
@@ -59,37 +71,82 @@ const mimeTypes: Record<(typeof mossSpeechFormats)[number], readonly string[]> =
   aac: ["audio/aac", "audio/aacp"],
   opus: ["audio/opus", "audio/ogg", "application/ogg"],
 };
-export const AudioResult = Schema.Struct({
-  url: Schema.URLFromString.check(
-    Schema.makeFilter((url) => url.href.length <= 8192 && url.protocol === "https:" && url.username === "" && url.password === "" && url.hash === ""),
-  ),
-  response_format: Schema.Literals(mossSpeechFormats),
-  content_type: Schema.String.check(Schema.isBetweenCodePoints(1, 256)),
-}).check(Schema.makeFilter((result) => mimeTypes[result.response_format].includes(result.content_type.split(";")[0]?.trim().toLowerCase() ?? "")));
+/** The fields of an audio result; an object holding them must also pass `audioMimeMatches`. */
+export const audioResultShape = {
+  url: httpsUrl(8192),
+  response_format: z.enum(mossSpeechFormats),
+  content_type: codePoints(1, 256),
+};
+/** The content type is one of the format's MIME types. */
+export const audioMimeMatches = (result: { readonly response_format: (typeof mossSpeechFormats)[number]; readonly content_type: string }): boolean =>
+  mimeTypes[result.response_format].includes(result.content_type.split(";")[0]?.trim().toLowerCase() ?? "");
 
-export const audioRequest = Effect.fnUntraced(
-  function* (key: string, request: HttpClientRequest.HttpClientRequest) {
-    if (!key.trim() || /\s/u.test(key)) return yield* MossAudioError.make({ reason: "Credentials", outcome: "NotSubmitted" });
-    const http = yield* HttpClient.HttpClient;
-    const response = yield* http.execute(request.pipe(HttpClientRequest.setHeaders({ authorization: `Bearer ${key}`, accept: "application/json" })));
-    const raw = yield* readMossResponse(response).pipe(
-      Effect.catchTag("MossResponseTooLarge", () => Effect.fail(MossAudioError.make({ reason: "TooLarge", outcome: "Unknown" }))),
-    );
-    if (response.status < 200 || response.status >= 300) {
-      const parsed = Schema.decodeOption(ErrorBody)(raw);
-      const code = parsed._tag === "Some" ? parsed.value.error.code : undefined;
-      return yield* MossAudioError.make({
-        reason: "HttpStatus",
-        status: response.status,
-        outcome:
-          [400, 401, 403, 413, 422, 429].includes(response.status) || (response.status === 404 && (code === "voice_not_found" || code === "task_not_found"))
-            ? "Rejected"
-            : "Unknown",
-        ...(code !== undefined ? { code } : {}),
-      });
-    }
-    return raw;
-  },
-  Effect.provideService(FetchHttpClient.RequestInit, { redirect: "manual" }),
-  Effect.catchTag("HttpClientError", () => Effect.fail(MossAudioError.make({ reason: "Network", outcome: "Unknown" }))),
-);
+export const invalidAudioResponse = () => new MossAudioError({ reason: "InvalidResponse", outcome: "Unknown" });
+export const invalidAudioInput = () => new MossAudioError({ reason: "InvalidInput", outcome: "NotSubmitted" });
+
+/** body as JSON text, or InvalidInput when JSON cannot hold it. */
+export function audioJson(body: unknown): string {
+  try {
+    const text = JSON.stringify(body);
+    if (text === undefined) throw invalidAudioInput();
+    return text;
+  } catch (e) {
+    if (e instanceof MossAudioError) throw e;
+    throw invalidAudioInput();
+  }
+}
+
+export interface AudioRequest {
+  readonly method: "GET" | "POST";
+  readonly url: string | URL;
+  /** JSON text or a form. */
+  readonly body?: string | FormData;
+}
+
+/** One request to the MOSS audio API with key, never following a redirect (it would carry the key); the raw body of a 2xx
+ * answer, else a MossAudioError saying whether MOSS refused it. */
+export async function audioRequest(key: string, request: AudioRequest, http: ProviderHttp, signal: AbortSignal): Promise<string> {
+  if (badKey(key)) throw new MossAudioError({ reason: "Credentials", outcome: "NotSubmitted" });
+  const response = await send(
+    http,
+    request.url,
+    {
+      method: request.method,
+      headers: {
+        authorization: `Bearer ${key}`,
+        accept: "application/json",
+        ...(typeof request.body === "string" ? { "content-type": "application/json" } : {}),
+      },
+      ...(request.body !== undefined ? { body: request.body } : {}),
+      redirect: "manual",
+    },
+    signal,
+  );
+  let raw: string;
+  try {
+    raw = await readMossResponse(response, signal);
+  } catch (e) {
+    if (e instanceof MossResponseTooLarge) throw new MossAudioError({ reason: "TooLarge", outcome: "Unknown" });
+    throw e;
+  }
+  if (response.status < 200 || response.status >= 300) {
+    const code = fromJson(ErrorBody, raw)?.error.code;
+    throw new MossAudioError({
+      reason: "HttpStatus",
+      status: response.status,
+      outcome:
+        rejectedStatuses.includes(response.status) || (response.status === 404 && (code === "voice_not_found" || code === "task_not_found"))
+          ? "Rejected"
+          : "Unknown",
+      ...(code !== undefined ? { code } : {}),
+    });
+  }
+  return raw;
+}
+
+/** An audio call under a deadline of ms: running out is Timeout, a transport failure Network, both of unknown outcome. */
+export const boundedAudio = <A>(ms: number, http: ProviderHttp, work: (signal: AbortSignal) => Promise<A>): Promise<A> =>
+  bounded(ms, http, work, {
+    timeout: () => new MossAudioError({ reason: "Timeout", outcome: "Unknown" }),
+    network: () => new MossAudioError({ reason: "Network", outcome: "Unknown" }),
+  });

@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect";
+import { z } from "zod";
 
 import type * as T from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
@@ -12,14 +12,14 @@ import type * as qr from "#db/session_run.sql.ts";
 import { isOnDuty } from "./roster.ts";
 
 const triggerOf = storedJsonOrUndefined(S.RunTrigger, "session_run.triggered_by");
-export const heardOf = storedJsonOrUndefined(Schema.mutable(Schema.Array(Schema.String)), "session_run.heard");
+export const heardOf = storedJsonOrUndefined(z.array(z.string()), "session_run.heard");
 export const pendingReportOf = storedJsonOrUndefined(S.IssueReport, "session.pending_report");
 const spentOf = storedJsonOrUndefined(S.Spent, "session_run.spent");
 const phaseOf = jsonOf(S.Phase, "session.phase");
 const lastRunOf = jsonOf(S.LastRun, "session.last_run");
 const strictSpentOf = jsonOf(S.Spent, "session.spent");
 export const placeOf = storedJsonOrUndefined(
-  Schema.Struct({ repo: Schema.String, cwd: Schema.String, branch: Schema.optionalKey(Schema.String) }) satisfies Schema.Codec<Workplace>,
+  z.object({ repo: z.string(), cwd: z.string(), branch: z.exactOptional(z.string()) }) satisfies z.ZodType<Workplace>,
   "session.place",
 );
 
@@ -77,23 +77,15 @@ export function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSe
   return s;
 }
 
-export const sessionState = (s: T.Session) =>
-  Effect.map(
-    Effect.all({
-      phase: jsonText(s.phase),
-      lastRun: s.lastRun ? jsonText(s.lastRun) : Effect.succeed(null),
-      spent: s.spent ? jsonText(s.spent) : Effect.succeed(null),
-    }),
-    ({ phase, lastRun, spent }): qs.KeepSessionStateParams => ({
-      id: s.id,
-      phase,
-      refining: s.refining,
-      runs: s.runs,
-      last_run: lastRun,
-      spent,
-      channel: s.channel ?? null,
-    }),
-  );
+export const sessionState = (s: T.Session): qs.KeepSessionStateParams => ({
+  id: s.id,
+  phase: jsonText(s.phase),
+  refining: s.refining,
+  runs: s.runs,
+  last_run: s.lastRun ? jsonText(s.lastRun) : null,
+  spent: s.spent ? jsonText(s.spent) : null,
+  channel: s.channel ?? null,
+});
 
 export function restoredSession(row: qs.ActiveSessionsResult): T.Session {
   const phase = phaseOf(row.phase);

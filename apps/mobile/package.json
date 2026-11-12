@@ -10,6 +10,7 @@
     "@formatjs/intl-getcanonicallocales": "catalog:",
     "@formatjs/intl-locale": "catalog:",
     "@formatjs/intl-pluralrules": "catalog:",
+    "@vibevalley/async": "workspace:*",
     "@vibevalley/bridge": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
@@ -24,7 +25,8 @@
     "react-native": "catalog:expo",
     "react-native-agora": "catalog:",
     "react-native-safe-area-context": "catalog:expo",
-    "react-native-webview": "catalog:expo"
+    "react-native-webview": "catalog:expo",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

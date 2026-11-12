@@ -1,71 +1,8 @@
-import * as stylex from "@stylexjs/stylex";
-
 import { Link as A } from "#/infra/router.ts";
 
 import { Icon, type IconSize } from "./Icon";
 import type { IconName } from "./icons";
 import { Tip } from "./Tip";
-
-const viewStyles = stylex.create({
-  button: {
-    display: "inline-flex",
-    width: "1.75rem",
-    height: "1.75rem",
-    flexShrink: 0,
-    cursor: { default: "pointer", ":disabled": "default" },
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-md)",
-    transitionProperty: "background-color, color, translate",
-    transitionDuration: "120ms",
-    transitionTimingFunction: "var(--ease-out)",
-    backgroundColor: { default: null, "@media (hover: hover)": { default: null, ":hover": "var(--color-selected)" } },
-    translate: { default: null, ":active": { default: "0 1px", ":disabled": "0 0" } },
-    opacity: { default: null, ":disabled": 0.5 },
-  },
-  normal: { color: { default: "var(--color-muted)", "@media (hover: hover)": { default: null, ":hover": "var(--color-ink)" } } },
-  danger: { color: "var(--color-berry)" },
-  pressed: { backgroundColor: "var(--color-selected)" },
-  iconLink: {
-    display: "inline-flex",
-    width: "1.75rem",
-    height: "1.75rem",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-md)",
-    color: {
-      default: "var(--color-muted)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-ink)",
-      },
-    },
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-selected)",
-      },
-    },
-  },
-  outLinkA: {
-    display: "inline-flex",
-    flexShrink: "0",
-    alignItems: "center",
-    gap: "0.25rem",
-    borderRadius: "var(--radius-sm)",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    whiteSpace: "nowrap",
-    color: {
-      default: "var(--color-muted)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-ink)",
-      },
-    },
-  },
-});
 
 /** A button that is only its icon: its label is what hovering shows and what a screen reader says. */
 export function IconButton(props: {
@@ -87,7 +24,11 @@ export function IconButton(props: {
         aria-pressed={props.pressed === undefined ? undefined : props.pressed ? "true" : "false"}
         disabled={props.disabled}
         onClick={() => props.onClick()}
-        {...stylex.attrs(viewStyles.button, props.tone === "danger" ? viewStyles.danger : viewStyles.normal, props.pressed === true && viewStyles.pressed)}
+        class={[
+          "inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md transition-[background-color,color,translate] duration-120 ease-out hover:bg-selected active:translate-y-px disabled:cursor-default disabled:opacity-50 disabled:active:translate-y-0",
+          props.tone === "danger" ? "text-berry" : "text-muted hover:text-ink",
+          props.pressed === true && "bg-selected",
+        ]}
       >
         <Icon name={props.icon} size={props.size ?? 16} />
       </button>
@@ -98,7 +39,12 @@ export function IconButton(props: {
 /** A link out to another site, in a new tab, that says where it goes: beside a field, where an icon alone would not. */
 export function OutLink(props: { href: string; label: string }) {
   return (
-    <a href={props.href} target="_blank" rel="noreferrer" {...stylex.attrs(viewStyles.outLinkA)}>
+    <a
+      href={props.href}
+      target="_blank"
+      rel="noreferrer"
+      class="inline-flex shrink-0 items-center gap-1 rounded-sm text-xs whitespace-nowrap text-muted hover:text-ink"
+    >
       {props.label}
       <Icon name="open" size={12} />
     </a>
@@ -109,7 +55,11 @@ export function OutLink(props: { href: string; label: string }) {
 export function IconLink(props: { href: `/${string}`; label: string; icon?: IconName }) {
   return (
     <Tip text={props.label}>
-      <A href={props.href} aria-label={props.label} {...stylex.attrs(viewStyles.iconLink)}>
+      <A
+        href={props.href}
+        aria-label={props.label}
+        class="inline-flex size-7 items-center justify-center rounded-md text-muted hover:bg-selected hover:text-ink"
+      >
         <Icon name={props.icon ?? "open"} size={16} />
       </A>
     </Tip>

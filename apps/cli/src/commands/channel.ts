@@ -1,11 +1,9 @@
-import { Effect } from "effect";
-import { Command, Flag } from "effect/cli";
-
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
 import { show } from "#/base/format.ts";
-import { ask, change, given, nameArg, words } from "#/infra/farm.ts";
+import { arg, command, group, opt } from "#/infra/command.ts";
+import { ask, change } from "#/infra/farm.ts";
 
 const nameOf = (c: T.Channel) => c.name ?? c.title;
 
@@ -14,73 +12,56 @@ const channelLine = (c: T.Channel) =>
 
 const messageLine = (m: T.ChatMessage) => `#${m.number}  ${m.name}: ${m.text.replace(/\s+/gu, " ").trim()}`;
 
-const channelArg = nameArg("channel", "cli.arg.channel");
+const channelArg = arg.text("channel", "cli.arg.channel");
 
-const listCommand = Command.make("list", {}, () =>
-  Effect.flatMap(
-    ask((api) => api.channel.list()),
-    (all) => show(all, (cs) => cs.map(channelLine).join("\n")),
-  ),
-).pipe(
-  Command.withDescription(t("cli.command.channel.list")),
-  Command.withExamples([{ command: "vibevalley channel list", description: t("cli.example.channelList.about") }]),
-);
+const listCommand = command("list", {
+  about: t("cli.command.channel.list"),
+  examples: [{ command: "vibevalley channel list", description: t("cli.example.channelList.about") }],
+  run: async (_, ctx) => show(ctx, await ask(ctx, (api) => api.channel.list()), (cs) => cs.map(channelLine).join("\n")),
+});
 
-const messageList = Command.make(
-  "list",
-  {
+const messageList = command("list", {
+  about: t("cli.command.channel.messageList"),
+  examples: [{ command: "vibevalley channel message list general --limit 10", description: t("cli.example.channelMessageList.about") }],
+  params: {
     channel: channelArg,
-    limit: Flag.Int("limit").pipe(Flag.withDefault(20), Flag.withDescription(t("cli.flag.limit"))),
-    before: Flag.Int("before").pipe(Flag.optional, Flag.withDescription(t("cli.flag.before"))),
+    limit: opt.intOr("limit", 20, "cli.flag.limit"),
+    before: opt.int("before", "cli.flag.before"),
   },
-  (o) => {
-    const before = given(o.before);
-    return Effect.flatMap(
-      ask((api) => api.channel.message.list({ id: o.channel, limit: o.limit, ...(before === undefined ? {} : { before }) })),
-      (messages) =>
-        show(messages, (ms) => {
-          const first = ms[0];
-          return [...ms.map(messageLine), ...(first && first.number > 1 ? [t("cli.more", { flag: `--before ${first.number}` })] : [])].join("\n");
-        }),
-    );
+  run: async (o, ctx) => {
+    const before = o.before;
+    const messages = await ask(ctx, (api) => api.channel.message.list({ id: o.channel, limit: o.limit, ...(before === undefined ? {} : { before }) }));
+    show(ctx, messages, (ms) => {
+      const first = ms[0];
+      return [...ms.map(messageLine), ...(first && first.number > 1 ? [t("cli.more", { flag: `--before ${first.number}` })] : [])].join("\n");
+    });
   },
-).pipe(
-  Command.withDescription(t("cli.command.channel.messageList")),
-  Command.withExamples([{ command: "vibevalley channel message list general --limit 10", description: t("cli.example.channelMessageList.about") }]),
-);
+});
 
-const messageSend = Command.make(
-  "send",
-  { channel: channelArg, words: words("cli.arg.message"), reply: Flag.Int("reply").pipe(Flag.optional, Flag.withDescription(t("cli.flag.reply"))) },
-  (o) => {
-    const replyTo = given(o.reply);
-    return change({
+const messageSend = command("send", {
+  about: t("cli.command.channel.messageSend"),
+  examples: [{ command: t("cli.example.channelMessageSend.run"), description: t("cli.example.channelMessageSend.about") }],
+  params: { channel: channelArg, words: arg.words("cli.arg.message"), reply: opt.int("reply", "cli.flag.reply") },
+  run: (o, ctx) => {
+    const replyTo = o.reply;
+    return change(ctx, {
       name: "channel message send",
       does: (api) => api.channel.message.send({ id: o.channel, text: o.words.join(" "), ...(replyTo === undefined ? {} : { replyTo }) }),
       said: () => t("cli.channel.sent", { channel: o.channel }),
     });
   },
-).pipe(
-  Command.withDescription(t("cli.command.channel.messageSend")),
-  Command.withExamples([{ command: t("cli.example.channelMessageSend.run"), description: t("cli.example.channelMessageSend.about") }]),
-);
+});
 
-const messageSearch = Command.make("search", { words: words("cli.arg.search") }, (o) =>
-  Effect.flatMap(
-    ask((api) => api.channel.message.search({ text: o.words.join(" ") })),
-    (hits) => show(hits, (hs) => hs.map((h) => `${h.channel}  ${messageLine(h.message)}`).join("\n")),
-  ),
-).pipe(
-  Command.withDescription(t("cli.command.channel.messageSearch")),
-  Command.withExamples([{ command: t("cli.example.channelMessageSearch.run"), description: t("cli.example.channelMessageSearch.about") }]),
-);
+const messageSearch = command("search", {
+  about: t("cli.command.channel.messageSearch"),
+  examples: [{ command: t("cli.example.channelMessageSearch.run"), description: t("cli.example.channelMessageSearch.about") }],
+  params: { words: arg.words("cli.arg.search") },
+  run: async (o, ctx) =>
+    show(ctx, await ask(ctx, (api) => api.channel.message.search({ text: o.words.join(" ") })), (hs) =>
+      hs.map((h) => `${h.channel}  ${messageLine(h.message)}`).join("\n"),
+    ),
+});
 
-const messageGroup = Command.make("message").pipe(
-  Command.withSubcommands([messageList, messageSend, messageSearch]),
-  Command.withDescription(t("cli.group.channel.message.about")),
-);
+const messageGroup = group("message", t("cli.group.channel.message.about"), [messageList, messageSend, messageSearch]);
 
-export const channelCommand = Command.make("channel").pipe(
-  Command.withSubcommands([listCommand, messageGroup]),
-  Command.withDescription(t("cli.group.channel.about")),
-);
+export const channelCommand = group("channel", t("cli.group.channel.about"), [listCommand, messageGroup]);

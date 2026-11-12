@@ -1,55 +1,61 @@
-import { Effect } from "effect";
-
 import type * as T from "@vibevalley/protocol";
 import { userId } from "@vibevalley/protocol";
-import type { ChannelHandlers } from "@vibevalley/protocol/api";
+import { ApiError, type ChannelHandlers } from "@vibevalley/protocol/api";
 
-import { missing, lookIn, reasonOf } from "#/base/errors.ts";
+import { lookIn, missing, reasonOf } from "#/base/errors.ts";
 import { requestKeys } from "#/gateway/http/api.ts";
-import { Artifact } from "#/modules/artifact/artifact.ts";
-import { Channel } from "#/modules/channel/channel.ts";
-import { Game } from "#/modules/game/game.ts";
+import type { Logger } from "#/infra/log.ts";
+import type { Time } from "#/infra/time.ts";
+import type { Artifact } from "#/modules/artifact/artifact.ts";
+import type { Channel } from "#/modules/channel/channel.ts";
+import type { Game } from "#/modules/game/game.ts";
 
 /** Snapshots the blocks quoted by the user so later edits or deletions remain visible on the message. */
-const quoteBlocks = (artifacts: Artifact["Service"], refs: readonly T.BlockRef[] | undefined): Effect.Effect<T.QuotedBlock[]> =>
-  Effect.forEach(refs ?? [], (ref) =>
-    Effect.gen(function* () {
-      const snapshot = yield* artifacts.blocks(ref.artifactId);
+async function quoteBlocks(artifacts: Artifact, refs: readonly T.BlockRef[] | undefined, log: Logger): Promise<T.QuotedBlock[]> {
+  const out: T.QuotedBlock[] = [];
+  for (const ref of refs ?? []) {
+    try {
+      const snapshot = await artifacts.blocks(ref.artifactId);
       const block = snapshot.blocks.find((b) => b.id === ref.blockId);
-      return {
+      out.push({
         artifactId: ref.artifactId,
         blockId: ref.blockId,
         rev: ref.rev,
         title: snapshot.artifact.title,
         ...(block ? { type: block.type, text: block.text.map((s) => s.t).join(""), nowRev: block.rev } : { deleted: true }),
-      } satisfies T.QuotedBlock;
-    }).pipe(Effect.catch((e) => Effect.as(Effect.logWarning("quoting a block failed", e), undefined))),
-  ).pipe(Effect.map((all) => all.flatMap((b) => (b === undefined ? [] : [b]))));
+      } satisfies T.QuotedBlock);
+    } catch (e) {
+      // A block that cannot be read is left out of the quote: the message still goes.
+      log.warn("quoting a block failed", e);
+    }
+  }
+  return out;
+}
 
-export const channelHandlers = Effect.gen(function* () {
-  const artifacts = yield* Artifact;
-  const channels = yield* Channel;
-  const game = yield* Game;
-  const threadOnce = yield* requestKeys<string>();
-  const done: ChannelHandlers = {
-    "channel.message.send": (body) =>
-      Effect.gen(function* () {
-        if (body.station !== undefined) game.want(body.station);
-        const blocks = yield* quoteBlocks(artifacts, body.blocks);
-        yield* channels.say(
-          body.text,
-          { ...(body.agent ? { agent: body.agent } : {}), ...(body.repo ? { repo: body.repo } : {}) },
-          body.id,
-          body.sendKey ?? "",
-          {
-            ...(body.replyTo !== undefined ? { replyTo: body.replyTo } : {}),
-            ...(body.attachments ? { attachments: body.attachments } : {}),
-            ...(blocks.length > 0 ? { blocks } : {}),
-            ...(body.to !== undefined ? { to: body.to } : {}),
-          },
-        );
-      }),
-    "channel.create": (body) => Effect.map(channels.openChannel(body.name, body.description ?? "", body.repo ?? ""), (c) => c.id),
+export interface ChannelHandlersDeps {
+  readonly artifact: Artifact;
+  readonly channel: Channel;
+  readonly game: Game;
+  readonly clock: Time;
+  readonly log: Logger;
+}
+
+export function channelHandlers(deps: ChannelHandlersDeps): ChannelHandlers {
+  const { artifact: artifacts, channel: channels, game } = deps;
+  const log = deps.log.child("http/channel");
+  const threadOnce = requestKeys<string>(deps.clock);
+  return {
+    "channel.message.send": async (body) => {
+      if (body.station !== undefined) game.want(body.station);
+      const blocks = await quoteBlocks(artifacts, body.blocks, log);
+      await channels.say(body.text, { ...(body.agent ? { agent: body.agent } : {}), ...(body.repo ? { repo: body.repo } : {}) }, body.id, body.sendKey ?? "", {
+        ...(body.replyTo !== undefined ? { replyTo: body.replyTo } : {}),
+        ...(body.attachments ? { attachments: body.attachments } : {}),
+        ...(blocks.length > 0 ? { blocks } : {}),
+        ...(body.to !== undefined ? { to: body.to } : {}),
+      });
+    },
+    "channel.create": async (body) => (await channels.openChannel(body.name, body.description ?? "", body.repo ?? "")).id,
     "channel.update": ({ id, ...body }) => channels.updateChannel(id, body),
     "channel.archive.set": ({ id, on }) => channels.archive(id, on),
     "channel.delete": ({ id }) => channels.removeChannel(id),
@@ -61,7 +67,14 @@ export const channelHandlers = Effect.gen(function* () {
     "channel.unread.list": () => channels.unread(userId),
     "channel.default.set": ({ id }) => channels.makeDefault(id),
     "channel.message.list": ({ id, before, limit }) => channels.history(id, before, limit),
-    "channel.markRead": ({ id, ...body }) => channels.markRead(id, body.number).pipe(Effect.mapError((e) => missing(reasonOf(e), [lookIn.channel]))),
+    "channel.markRead": async ({ id, ...body }) => {
+      try {
+        await channels.markRead(id, body.number);
+      } catch (e) {
+        if (e instanceof ApiError) throw missing(reasonOf(e), [lookIn.channel]);
+        throw e;
+      }
+    },
     "channel.message.update": ({ id, text, attachments }) => channels.edit(id, text, attachments),
     "channel.message.delete": ({ id }) => channels.remove(id),
     "channel.message.previewDelete": ({ id }) => channels.previewRemove(id),
@@ -69,7 +82,6 @@ export const channelHandlers = Effect.gen(function* () {
     "channel.reaction.set": ({ id, emoji, on }) => channels.react(id, userId, emoji, on),
     "channel.pin.set": ({ id, on }) => channels.pin(id, on),
     "channel.pin.list": ({ id }) => channels.pins(id),
-    "channel.thread.create": ({ id, requestKey }) => threadOnce(requestKey, channels.threadUnder(id)),
+    "channel.thread.create": ({ id, requestKey }) => threadOnce(requestKey, () => channels.threadUnder(id)),
   };
-  return done;
-});
+}

@@ -1,5 +1,3 @@
-import { Effect } from "effect";
-
 import type { Handlers } from "@vibevalley/protocol/api";
 
 import { agentHandlers } from "#/gateway/http/handlers/agent.ts";
@@ -25,31 +23,54 @@ import { settingHandlers } from "#/gateway/http/handlers/setting.ts";
 import { userHandlers } from "#/gateway/http/handlers/user.ts";
 import { voiceHandlers } from "#/gateway/http/handlers/voice.ts";
 
+/** The services every concept's handlers forward to (a Farm has them all). */
+export type HandlersDeps = Parameters<typeof coreHandlers>[0] &
+  Parameters<typeof orchestratorHandlers>[0] &
+  Parameters<typeof gameHandlers>[0] &
+  Parameters<typeof voiceHandlers>[0] &
+  Parameters<typeof connectorHandlers>[0] &
+  Parameters<typeof lanHandlers>[0] &
+  Parameters<typeof userHandlers>[0] &
+  Parameters<typeof repoHandlers>[0] &
+  Parameters<typeof channelHandlers>[0] &
+  Parameters<typeof settingHandlers>[0] &
+  Parameters<typeof providerHandlers>[0] &
+  Parameters<typeof mediaHandlers>[0] &
+  Parameters<typeof agentHandlers>[0] &
+  Parameters<typeof memoryHandlers>[0] &
+  Parameters<typeof runtimeHandlers>[0] &
+  Parameters<typeof sessionHandlers>[0] &
+  Parameters<typeof artifactHandlers>[0] &
+  Parameters<typeof libraryHandlers>[0] &
+  Parameters<typeof attachmentHandlers>[0] &
+  Parameters<typeof pkmHandlers>[0] &
+  Parameters<typeof cronHandlers>[0] &
+  Parameters<typeof issueHandlers>[0];
+
 /** Every endpoint's answer, put together from each concept's (http/handlers/<concept>.ts). */
-export const handlers = Effect.gen(function* () {
-  const done: Handlers = {
-    ...(yield* coreHandlers),
-    ...(yield* orchestratorHandlers),
-    ...(yield* gameHandlers),
-    ...(yield* voiceHandlers),
-    ...(yield* connectorHandlers),
-    ...(yield* lanHandlers),
-    ...(yield* userHandlers),
-    ...(yield* repoHandlers),
-    ...(yield* channelHandlers),
-    ...(yield* settingHandlers),
-    ...(yield* providerHandlers),
-    ...(yield* mediaHandlers),
-    ...(yield* agentHandlers),
-    ...(yield* memoryHandlers),
-    ...(yield* runtimeHandlers),
-    ...(yield* sessionHandlers),
-    ...(yield* artifactHandlers),
-    ...(yield* libraryHandlers),
-    ...(yield* attachmentHandlers),
-    ...(yield* pkmHandlers),
-    ...(yield* cronHandlers),
-    ...(yield* issueHandlers),
+export function handlers(deps: HandlersDeps): Handlers {
+  return {
+    ...coreHandlers(deps),
+    ...orchestratorHandlers(deps),
+    ...gameHandlers(deps),
+    ...voiceHandlers(deps),
+    ...connectorHandlers(deps),
+    ...lanHandlers(deps),
+    ...userHandlers(deps),
+    ...repoHandlers(deps),
+    ...channelHandlers(deps),
+    ...settingHandlers(deps),
+    ...providerHandlers(deps),
+    ...mediaHandlers(deps),
+    ...agentHandlers(deps),
+    ...memoryHandlers(deps),
+    ...runtimeHandlers(deps),
+    ...sessionHandlers(deps),
+    ...artifactHandlers(deps),
+    ...libraryHandlers(deps),
+    ...attachmentHandlers(deps),
+    ...pkmHandlers(deps),
+    ...cronHandlers(deps),
+    ...issueHandlers(deps),
   };
-  return done;
-});
+}

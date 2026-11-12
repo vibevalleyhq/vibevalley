@@ -1,29 +1,24 @@
-import { Effect } from "effect";
-import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
+import { Hono } from "hono";
 
-import { Mcp } from "#/gateway/mcp/mcp.ts";
+import type { Mcp } from "#/gateway/mcp/mcp.ts";
+import type { Logger } from "#/infra/log.ts";
+import type { Time } from "#/infra/time.ts";
 import { chatCompletions } from "#/modules/orchestrator/openai.ts";
-import { Orchestrator } from "#/modules/orchestrator/orchestrator.ts";
+import type { Orchestrator } from "#/modules/orchestrator/orchestrator.ts";
 import { chatCompletionsPath } from "#/modules/orchestrator/situation.ts";
 
-export const mcpRoute = HttpRouter.use((router) =>
-  Effect.gen(function* () {
-    const mcp = yield* Mcp;
-    const response = yield* Orchestrator;
-    yield* router.add(
-      "*",
-      "/mcp",
-      Effect.suspend(() => {
-        // The caller going away aborts the Web request, as the SDK's handler listens for.
-        const gone = new AbortController();
-        return Effect.gen(function* () {
-          const httpServerRequest = yield* HttpServerRequest.HttpServerRequest;
-          const request = yield* HttpServerRequest.toWeb(httpServerRequest, { signal: gone.signal });
-          const handle2 = yield* mcp.handle(request);
-          return HttpServerResponse.fromWeb(handle2);
-        }).pipe(Effect.onInterrupt(() => Effect.sync(() => gone.abort())));
-      }),
-    );
-    yield* router.add("*", chatCompletionsPath, chatCompletions({ answerer: response.answerer("api") }));
-  }),
-);
+export interface McpRouteDeps {
+  readonly mcp: Mcp;
+  readonly orchestrator: Orchestrator;
+  readonly clock: Time;
+  readonly log: Logger;
+}
+
+export function mcpRoute(deps: McpRouteDeps): Hono {
+  const app = new Hono();
+  // The caller going away aborts the Web request's signal, as the SDK's handler listens for.
+  app.all("/mcp", (c) => deps.mcp.handle(c.req.raw));
+  const completions = chatCompletions({ answerer: deps.orchestrator.answerer("api") }, { clock: deps.clock, log: deps.log });
+  app.all(chatCompletionsPath, (c) => completions(c.req.raw));
+  return app;
+}

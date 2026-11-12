@@ -1,4 +1,5 @@
 import { Effect, Exit, Schema } from "effect";
+import type { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 
@@ -7,7 +8,24 @@ class QueryDecodeError extends Schema.TaggedError<QueryDecodeError, { readonly b
     return t("web.base.query.invalidResponse");
   }
 }
-export function queryDecoder<T, E>(schema: Schema.Codec<T, E>) {
+
+export type QuerySchema<T, E = T> = z.ZodType<T> | Schema.Codec<T, E>;
+
+const isZod = <T, E>(schema: QuerySchema<T, E>): schema is z.ZodType<T> => "_zod" in schema;
+
+export function queryDecoder<T, E>(schema: QuerySchema<T, E>) {
+  if (isZod(schema)) {
+    const parse = (input: unknown): T => {
+      const got = schema.safeParse(input);
+      if (got.success) return got.data;
+      throw QueryDecodeError.make({});
+    };
+    return {
+      same: (left: T, right: T) => JSON.stringify(left) === JSON.stringify(right),
+      decode: async (input: unknown, _signal: AbortSignal): Promise<T> => parse(input),
+      check: (input: T): T => parse(input),
+    };
+  }
   const decode = Schema.decodeUnknownEffect(schema);
   const check = Schema.decodeUnknownExit(Schema.toType(schema));
   return {

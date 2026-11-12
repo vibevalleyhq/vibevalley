@@ -105,8 +105,9 @@ export function dbOver(driver: Driver, log: Logger, clock: Clock): Db {
     const s = scope.getStore();
     return s?.open === true ? s : undefined;
   };
-  const run = async (text: string, params: readonly unknown[]) => {
-    dbQueries.add();
+  const run = async (text: string, params: readonly unknown[], control = false) => {
+    // What the code asked for is counted; the transaction's own begin, commit and savepoints are not.
+    if (!control) dbQueries.add();
     try {
       return await driver.query(text, params);
     } catch (e) {
@@ -123,14 +124,14 @@ export function dbOver(driver: Driver, log: Logger, clock: Clock): Db {
     if (outer !== undefined) {
       const name = `sp_${++savepoints}`;
       const own: TxScope = { open: true, hooks: [], depth: outer.depth + 1 };
-      await run(`savepoint ${name}`, []);
+      await run(`savepoint ${name}`, [], true);
       try {
         const a = await scope.run(own, work);
-        await run(`release savepoint ${name}`, []);
+        await run(`release savepoint ${name}`, [], true);
         outer.hooks.push(...own.hooks);
         return a;
       } catch (e) {
-        await run(`rollback to savepoint ${name}`, []);
+        await run(`rollback to savepoint ${name}`, [], true);
         throw e;
       } finally {
         own.open = false;
@@ -139,15 +140,15 @@ export function dbOver(driver: Driver, log: Logger, clock: Clock): Db {
     const own: TxScope = { open: true, hooks: [], depth: 0 };
     const a = await lock.with(async () => {
       const started = clock.now();
-      await run("begin", []);
+      await run("begin", [], true);
       let a: A;
       try {
         a = await scope.run(own, work);
         own.open = false;
-        await run("commit", []);
+        await run("commit", [], true);
       } catch (e) {
         own.open = false;
-        await run("rollback", []).catch(() => undefined);
+        await run("rollback", [], true).catch(() => undefined);
         throw e;
       } finally {
         const took = clock.now() - started;

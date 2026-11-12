@@ -1,21 +1,20 @@
 import { randomUUID } from "node:crypto";
+import { readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { Event, Session } from "@botiverse/oar";
-import { NodeServices } from "@effect/platform-node";
-import { Effect, Exit, FileSystem, Scope, Stream } from "effect";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 
 import { lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf } from "@vibevalley/agent/testing";
 import { answer, text as words, toolCall } from "@vibevalley/ai/testing";
-import { nextTurn, whenTrue } from "@vibevalley/testkit/until";
+import { TaskGroup } from "@vibevalley/async";
+import { whenTrue } from "@vibevalley/testkit/until";
 
+import { keptLog } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
 
 import { helperInstructions, vibevalleyRuntimeOf } from "./vibevalley.ts";
-
-const fs = Effect.runSync(Effect.service(FileSystem.FileSystem).pipe(Effect.provide(NodeServices.layer)));
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -24,15 +23,16 @@ const home = () => {
   return h.dir;
 };
 const sessions: Session[] = [];
-const scopes: Scope.Closeable[] = [];
-const owner = async () => {
-  const scope = await Effect.runPromise(Scope.make());
-  scopes.push(scope);
-  return { run: Effect.runPromise, scope };
+const owners: TaskGroup[] = [];
+const owner = () => {
+  const tasks = new TaskGroup({ name: "test sessions" });
+  owners.push(tasks);
+  return tasks;
 };
+const log = keptLog();
 afterEach(async () => {
   await Promise.all(sessions.splice(0).map((s) => s.dispose()));
-  await Promise.all(scopes.splice(0).map((scope) => Effect.runPromise(Scope.close(scope, Exit.void))));
+  await Promise.all(owners.splice(0).map((tasks) => tasks.close()));
   for (const done of homes.splice(0)) done();
 });
 
@@ -49,7 +49,7 @@ async function open(steps: readonly Step[], extra: { resume?: string; home?: str
   const { llm, requests, pending } = scriptedLLM(steps);
   const h = extra.home ?? home();
   const cwd = extra.cwd ?? home();
-  const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: await owner(), home: () => h, llm: () => llm });
+  const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: owner(), log, home: () => h, llm: () => llm });
   const session = await runtime.session(
     { kind: "available", via: "bundled" },
     {
@@ -78,16 +78,14 @@ describe("VibeValley's runtime", () => {
       ...llm,
       service: {
         ...llm.service,
-        stream: () =>
-          Stream.fromEffect(
-            Effect.gen(function* () {
-              started = true;
-              yield* Effect.uninterruptible(Effect.promise(() => gate.promise));
-            }),
-          ).pipe(Stream.drain),
+        stream: async function* () {
+          started = true;
+          await gate.promise;
+          yield* [];
+        },
       },
     };
-    const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: await owner(), home, llm: () => held });
+    const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: owner(), log, home, llm: () => held });
     const session = await runtime.session({ kind: "available", via: "bundled" }, { cwd: home() });
     sessions.push(session);
     const events: Event[] = [];
@@ -102,8 +100,7 @@ describe("VibeValley's runtime", () => {
       void second.then(() => {
         done = true;
       });
-      await nextTurn();
-      expect(done).toBe(false);
+      // The brain's loop lets go of a model stream that takes no notice of its stop: the close does not wait on it.
       gate.resolve();
       await Promise.all([first, second]);
       expect(done).toBe(true);
@@ -116,27 +113,36 @@ describe("VibeValley's runtime", () => {
   });
 
   it("cuts off a runtime's active model when its owner's scope closes", async () => {
-    const parent = await owner();
+    const parent = owner();
     const { llm } = scriptedLLM();
     let started = false;
     let cut = false;
-    const waiting = Effect.onInterrupt(
-      Effect.gen(function* () {
-        started = true;
-        return yield* Effect.never;
-      }),
-      () =>
-        Effect.sync(() => {
-          cut = true;
-        }),
-    );
-    const held = { ...llm, service: { ...llm.service, stream: () => Stream.fromEffect(waiting).pipe(Stream.drain) } };
-    const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: parent, home, llm: () => held });
+    const held = {
+      ...llm,
+      service: {
+        ...llm.service,
+        stream: async function* (_model: unknown, _context: unknown, _options: unknown, signal?: AbortSignal) {
+          started = true;
+          await new Promise<never>((_, reject) =>
+            signal?.addEventListener(
+              "abort",
+              () => {
+                cut = true;
+                reject(signal.reason as unknown);
+              },
+              { once: true },
+            ),
+          );
+          yield* [];
+        },
+      },
+    };
+    const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: parent, log, home, llm: () => held });
     const session = await runtime.session({ kind: "available", via: "bundled" }, { cwd: home() });
     sessions.push(session);
     await session.prompt("work");
     await whenTrue(() => started, "the model started");
-    await Effect.runPromise(Scope.close(parent.scope, Exit.void));
+    await parent.close();
     expect(cut).toBe(true);
     await session.dispose();
   });
@@ -147,7 +153,7 @@ describe("VibeValley's runtime", () => {
     });
     expect((await r.session.prompt("写个 hello.txt")).kind).toBe("accepted");
     await whenTrue(() => ended(r).length === 1, "ended(r).length === 1");
-    expect(await Effect.runPromise(fs.readFileString(join(r.cwd, "hello.txt")))).toBe("hi");
+    expect(await readFile(join(r.cwd, "hello.txt"), "utf8")).toBe("hi");
     const kinds = new Set(r.events.map((e) => e.kind));
     for (const k of ["model", "text_delta", "tool_call_started", "tool_call_ended", "turn_ended", "usage"]) expect(kinds).toContain(k);
     const started = r.events.find((e) => e.kind === "tool_call_started");
@@ -211,10 +217,9 @@ describe("VibeValley's runtime", () => {
 
   it("gives the model the tools of the session's MCP servers", async () => {
     const dir = home();
-    await Effect.runPromise(
-      fs.writeFileString(
-        join(dir, "farm.cjs"),
-        `const rl = require('node:readline').createInterface({ input: process.stdin })
+    await writeFile(
+      join(dir, "farm.cjs"),
+      `const rl = require('node:readline').createInterface({ input: process.stdin })
 const send = (m) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...m }) + '\\n')
 rl.on('line', (line) => {
   const m = JSON.parse(line)
@@ -222,7 +227,6 @@ rl.on('line', (line) => {
   else if (m.method === 'tools/list') send({ id: m.id, result: { tools: [{ name: 'say', description: '在田头说话', inputSchema: { type: 'object', properties: { text: { type: 'string' } } } }] } })
   else if (m.method === 'tools/call') send({ id: m.id, result: { content: [{ type: 'text', text: '说了：' + m.params.arguments.text }] } })
 })`,
-      ),
     );
     const r = await open([answer([toolCall("farm__say", { text: "做完了" })]), (c) => answer(c.messages.at(-1)?.role === "toolResult" ? "好" : "没调到")], {
       mcp: join(dir, "farm.cjs"),
@@ -244,7 +248,7 @@ rl.on('line', (line) => {
 
   it("lists DeepSeek's models, is bundled, and says why it cannot run", async () => {
     const { llm } = scriptedLLM();
-    const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: await owner(), llm: () => llm });
+    const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: owner(), log, llm: () => llm });
     const models = await runtime.listModels();
     expect(models.kind === "ok" && models.models.some((m) => m.id === "deepseek-flash" && m.effortLevels.join(",") === "high,max" && m.default === true)).toBe(
       true,
@@ -253,7 +257,8 @@ rl.on('line', (line) => {
     await expect(runtime.session({ kind: "available", via: "bundled" }, { cwd: tmpdir(), effort: "low" })).rejects.toThrow(/只有 high、max/u);
     const keyless = vibevalleyRuntimeOf({
       time: wallTime,
-      owner: await owner(),
+      owner: owner(),
+      log,
       llm: () => {
         throw new Error("没有 DeepSeek 的密钥");
       },

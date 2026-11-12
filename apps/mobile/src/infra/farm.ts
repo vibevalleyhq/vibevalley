@@ -1,5 +1,5 @@
-import { Option, Schema } from "effect";
 import * as SecureStore from "expo-secure-store";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import { pathOf } from "@vibevalley/protocol";
@@ -26,20 +26,26 @@ type FarmChoice = { readonly kind: "loading" } | { readonly kind: "farm"; readon
 
 const where = "vibevalley.farm";
 
-const StoredFarm = Schema.fromJsonString(
-  Schema.Struct({
-    url: Schema.NonEmptyString,
-    key: Schema.NonEmptyString,
-    hostName: Schema.String,
+const StoredFarm = S.jsonString(
+  z.object({
+    url: z.string().min(1),
+    key: z.string().min(1),
+    hostName: z.string(),
   }),
 );
-const PairedAnswer = Schema.fromJsonString(apiSuccessEnvelope(S.LanPaired));
-const RefusedAnswer = Schema.fromJsonString(ApiErrorEnvelope);
+const PairedAnswer = S.jsonString(apiSuccessEnvelope(S.LanPaired));
+const RefusedAnswer = S.jsonString(ApiErrorEnvelope);
+
+/** text decoded by schema; undefined when it is not that. */
+const decoded = <A>(schema: z.ZodType<A, string>, text: string): A | undefined => {
+  const got = schema.safeParse(text);
+  return got.success ? got.data : undefined;
+};
 
 async function readFarm(): Promise<Farm | undefined> {
   const text = await SecureStore.getItemAsync(where);
   if (!text) return undefined;
-  return Option.getOrUndefined(Schema.decodeUnknownOption(StoredFarm)(text));
+  return decoded(StoredFarm, text);
 }
 
 const writeFarm = (farm: Farm | undefined) => (farm ? SecureStore.setItemAsync(where, JSON.stringify(farm)) : SecureStore.deleteItemAsync(where));
@@ -152,11 +158,11 @@ export class FarmConnection {
       const text = await response.text();
       if (!this.owns(revision)) return;
       if (!response.ok) {
-        const refused = Option.getOrUndefined(Schema.decodeUnknownOption(RefusedAnswer)(text));
+        const refused = decoded(RefusedAnswer, text);
         const problem = refused?.message ?? text;
         throw new Error(problem || t("mobile.answered", { status: response.status }));
       }
-      const paired = Option.getOrUndefined(Schema.decodeUnknownOption(PairedAnswer)(text))?.data;
+      const paired = decoded(PairedAnswer, text)?.data;
       if (!paired) throw new Error(t("mobile.answered", { status: response.status }));
       const farm: Farm = { url: choice.link.url, key: paired.key, hostName: paired.hostName };
       await this.serialize(async () => {

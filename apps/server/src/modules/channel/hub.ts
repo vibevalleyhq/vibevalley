@@ -1,19 +1,18 @@
-import { Clock, Effect, PubSub } from "effect";
-
+import { Hub } from "@vibevalley/async";
 import type * as T from "@vibevalley/protocol";
 import { userId } from "@vibevalley/protocol";
 import { oneLine } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
 import { head } from "#/base/clip.ts";
-import { scopedPubSub } from "#/base/pubsub.ts";
-import { Core } from "#/core/core.ts";
-import { Db } from "#/infra/db.ts";
-import { Agent } from "#/modules/agent/agent.ts";
-import { Attachment } from "#/modules/attachment/attachment.ts";
+import type { Core } from "#/core/core.ts";
+import type { Db } from "#/infra/db.ts";
+import type { Time } from "#/infra/time.ts";
+import type { Agent } from "#/modules/agent/agent.ts";
+import type { Attachment } from "#/modules/attachment/attachment.ts";
 import { type Envelope, orchestratorIn } from "#/modules/mailbox/envelope.ts";
-import { Mailbox } from "#/modules/mailbox/mailbox.ts";
-import { Session } from "#/modules/session/session.ts";
+import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
+import type { Session } from "#/modules/session/session.ts";
 import * as qc from "#db/channel.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 
@@ -28,6 +27,8 @@ import {
   type ThreadSubject,
   subjectOf,
   type ChannelEnvelopeRow,
+  theRow,
+  type UserRead,
 } from "./contracts.ts";
 import { keepChannels, targetOf } from "./messages.ts";
 import { messageMutations } from "./mutations.ts";
@@ -43,16 +44,23 @@ export const lastMax = 80;
 /** The first n units of text, on one line. */
 export const lineOf = (text: string, n: number) => head(oneLine(text).trim(), n);
 
-export const channelHub = Effect.gen(function* () {
-  const core = yield* Core;
-  const agents = yield* Agent;
-  const db = yield* Db;
-  const mailbox = yield* Mailbox;
-  const sessions = yield* Session;
-  const store = yield* makeChannelStore;
+export interface ChannelHubDeps {
+  readonly clock: Time;
+  readonly db: Db;
+  readonly core: Core;
+  readonly agent: Agent;
+  readonly attachment: Attachment;
+  readonly session: Session;
+  readonly mailbox: Mailbox;
+}
+
+/** The chat's shared state and the ways it is told: the store, the hubs of what was said and read, and the frames. */
+export async function makeChannelHub(deps: ChannelHubDeps) {
+  const { core, agent: agents, db, mailbox, session: sessions, clock } = deps;
+  const store = await makeChannelStore(deps);
   // Every message once written, for the rooms: each follower reads it through a bounded relay of its own.
-  const said = yield* scopedPubSub<T.ChatMessage>();
-  const userReadHub = yield* scopedPubSub<{ readonly channel: string; readonly number: number; readonly at: number }>();
+  const said = new Hub<T.ChatMessage>();
+  const userReadHub = new Hub<UserRead>();
 
   const orchestratorIds = () => agents.orchestrators().map((a) => a.id);
 
@@ -139,42 +147,42 @@ export const channelHub = Effect.gen(function* () {
 
   /** What a page lists a channel with: the user's unread there, and a thread's title when its subject does not
    * name it (a page keeps no messages to name it by). */
-  const counted = Effect.fnUntraced(function* (row: ChannelRow) {
+  const counted = async (row: ChannelRow) => {
     // Set to none it counts nothing; to mentions, only what names the user and is not handled yet.
     const n =
       row.notify === "none"
         ? 0
         : row.notify === "mentions"
-          ? (yield* db.run(qm.userMentions())).filter((m) => m.channel_id === row.id).length
-          : (yield* db.run(qm.userUnread({ channel_id: row.id, read_number: store.userReadIn(row.id) ?? 0 }))).n;
+          ? (await qm.userMentions(db.sql)).filter((m) => m.channel_id === row.id).length
+          : theRow(await qm.userUnread(db.sql, { channel_id: row.id, read_number: store.userReadIn(row.id) ?? 0 }), "UserUnread").n;
     const sk = subjectKind(row.subject_kind);
     let title = "";
     if (row.type === "thread" && row.name) title = row.name;
     else if (row.type === "direct" && row.peer_id) title = store.participant(row.peer_id)?.name ?? "";
     else if (row.type === "thread" && sk === "talk" && row.subject_id) title = store.participant(row.subject_id)?.name ?? "";
     // Any other thread (one opened under a message, with no session of its own) by the message it hangs under.
-    if (!title && row.type === "thread" && row.root_id) title = lineOf((yield* db.one(qm.messageByID({ id: row.root_id })))?.body ?? "", threadTitleMax);
+    if (!title && row.type === "thread" && row.root_id) title = lineOf((await qm.messageByID(db.sql, { id: row.root_id }))?.body ?? "", threadTitleMax);
     const last =
-      row.last_number != null && row.last_number !== 0 ? yield* db.one(qm.messageByNumber({ channel_id: row.id, number: row.last_number })) : undefined;
+      row.last_number != null && row.last_number !== 0 ? await qm.messageByNumber(db.sql, { channel_id: row.id, number: row.last_number }) : undefined;
     return toChannel(row, n ?? 0, title, last);
-  });
+  };
 
-  const publishChannel = Effect.fnUntraced(function* (id: string) {
+  const publishChannel = async (id: string) => {
     const row = store.channel(id);
     if (row) {
-      const channel = yield* counted(row);
+      const channel = await counted(row);
       // A metadata change can read a message's number before the message's own fact is applied.
       const published = store.publishedNumber(id);
       const last = published !== undefined && (channel.lastNumber ?? 0) > published ? published : channel.lastNumber;
-      yield* core.apply({ type: "channelChanged", channel: { ...channel, ...(last === undefined ? {} : { lastNumber: last }) } });
+      core.apply({ type: "channelChanged", channel: { ...channel, ...(last === undefined ? {} : { lastNumber: last }) } });
     }
-  });
+  };
 
-  const publishUserMentions = Effect.gen(function* () {
+  const publishUserMentions = async () => {
     // A place set to none tells the user of nothing, its mentions included.
     const quiet = (id: string | null) => id !== null && store.channel(id)?.notify === "none";
-    const rows = (yield* db.run(qm.userMentions())).filter((r) => !quiet(r.channel_id) && !quiet(r.top_id));
-    yield* core.apply({
+    const rows = (await qm.userMentions(db.sql)).filter((r) => !quiet(r.channel_id) && !quiet(r.top_id));
+    core.apply({
       type: "userMentionsChanged",
       mentions: rows.map((r) => ({
         message: toMessage(r),
@@ -182,23 +190,23 @@ export const channelHub = Effect.gen(function* () {
         address: targetOfRow(r.channel_type, r.root_number, null, r.top_id, r.channel_name),
       })),
     });
-  });
+  };
 
-  const publishMessage = Effect.fn("Channel.publishMessage")(function* (row: MsgRow, answers: T.SessionId | undefined) {
+  const publishMessage = (row: MsgRow, answers: T.SessionId | undefined) => {
     const ch = store.channel(row.channel_id);
     const thread = ch?.type !== "channel" && ch?.subject_kind === "issue" && ch.subject_id ? ch.subject_id : undefined;
     const message = toMessage(row);
-    yield* core.apply({ type: "messageChanged", message, ...(thread ? { thread } : {}), ...(answers ? { answers } : {}) });
+    core.apply({ type: "messageChanged", message, ...(thread ? { thread } : {}), ...(answers ? { answers } : {}) });
     store.notePublished(row.channel_id, row.number);
-    yield* PubSub.publish(said, message);
-  });
+    said.publish(message);
+  };
 
-  const threadOf = (subject: ThreadSubject) => Effect.sync(() => store.threadOfSubject(subject.kind, subject.id));
+  const threadOf = (subject: ThreadSubject) => store.threadOfSubject(subject.kind, subject.id);
 
-  const threadOfSession = Effect.fnUntraced(function* (session: string) {
+  const threadOfSession = async (session: string): Promise<string | undefined> => {
     const h = sessionOf(session);
-    return h ? (directOfSession(h) ?? (yield* threadOf(subjectOf(h)))) : undefined;
-  });
+    return h ? (directOfSession(h) ?? threadOf(subjectOf(h))) : undefined;
+  };
 
   /** Who a thread's words are for, worked out now rather than kept: the session on the issue, or a talk thread's own session. */
   const ownerOf = (ch: ChannelRow): string => {
@@ -210,19 +218,16 @@ export const channelHub = Effect.gen(function* () {
   };
 
   /** Tool reads advance the cursor; passive input consumption belongs to Session receipts. */
-  const readUpTo = Effect.fnUntraced(function* (who: string, channel: string, upto: number) {
-    const now = yield* Clock.currentTimeMillis;
-    yield* store.setRead(who, channel, upto, now);
-  });
-  const readThrough = Effect.fnUntraced(function* (who: string, channel: string, upto: number) {
-    yield* store.tx(readUpTo(who, channel, upto));
+  const readUpTo = (who: string, channel: string, upto: number) => store.setRead(who, channel, upto, clock.now());
+  const readThrough = async (who: string, channel: string, upto: number) => {
+    await store.tx(() => readUpTo(who, channel, upto));
     if (who === userId) {
-      yield* PubSub.publish(userReadHub, { channel, number: upto, at: yield* Clock.currentTimeMillis });
-      yield* publishUserMentions;
+      userReadHub.publish({ channel, number: upto, at: clock.now() });
+      await publishUserMentions();
     }
-  });
+  };
 
-  const { messageOf, change, reacting } = messageMutations(db, store.tx, said, publishChannel);
+  const { messageOf, change, reacting } = messageMutations({ db, clock }, said, publishChannel);
 
   const channelEnvelope = (row: MsgRow): ChannelEnvelopeRow => {
     const channel = store.channel(row.channel_id);
@@ -271,7 +276,7 @@ export const channelHub = Effect.gen(function* () {
     reactions: null,
   });
 
-  const files = yield* Attachment;
+  const files = deps.attachment;
   const filesAt = files.pathOf;
   const attachmentsOf = files.of;
   const deliveryTarget = (r: ChannelEnvelopeRow) => targetOfRow(r.channel_type, r.root_number, null, null, r.channel_name || null);
@@ -286,21 +291,17 @@ export const channelHub = Effect.gen(function* () {
     ...envelopeMore(r, filesAt),
   });
 
-  const inboxRows = Effect.fn("Channel.deliveryUnread")(function* (who: string) {
+  const inboxRows = (who: string) => {
     const h = sessionOf(who);
     const channel = h ? channelOfSession(h) : store.defaultId();
-    return yield* mailbox.unreadSummary(who, channel);
-  });
+    return mailbox.unreadSummary(who, channel);
+  };
 
-  yield* store.locked(
-    Effect.gen(function* () {
-      const recent = yield* db.run(qc.recentChannels({ n: keepChannels }));
-      yield* Effect.forEach([...recent].toReversed(), (c) => Effect.flatMap(counted(c), (channel) => core.apply({ type: "channelChanged", channel })), {
-        discard: true,
-      });
-      yield* publishUserMentions;
-    }),
-  );
+  await store.locked(async () => {
+    const recent = await qc.recentChannels(db.sql, { n: keepChannels });
+    for (const c of [...recent].toReversed()) core.apply({ type: "channelChanged", channel: await counted(c) });
+    await publishUserMentions();
+  });
 
   const envelopeOf = (row: MsgRow, target: string): Envelope => ({
     id: S.messageId(row.id),
@@ -349,7 +350,12 @@ export const channelHub = Effect.gen(function* () {
     asEnvelope,
     inboxRows,
     envelopeOf,
+    /** Readers of the hubs see their end. */
+    close: () => {
+      said.end();
+      userReadHub.end();
+    },
   };
-});
+}
 
-export type ChannelHub = Effect.Success<typeof channelHub>;
+export type ChannelHub = Awaited<ReturnType<typeof makeChannelHub>>;

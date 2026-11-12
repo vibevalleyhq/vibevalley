@@ -470,7 +470,9 @@ const styleAttrs = defineRule({
         if (node.name.type !== "JSXIdentifier") return;
         const attr = node.name.name;
         if (attr === "className" || attr === "classList") context.report({ node, messageId: "classAttr", data: { attr } });
-        if (attr !== "style" || node.value === null) return;
+        // A component's `style` is a prop it hands on (a story showing that it does); the element's own looks are what count.
+        const element = node.parent.type === "JSXOpeningElement" && node.parent.name.type === "JSXIdentifier" && /^[a-z]/u.test(node.parent.name.name);
+        if (attr !== "style" || node.value === null || !element) return;
         const value = node.value.type === "JSXExpressionContainer" ? node.value.expression : node.value;
         if (fixedStyle(value)) context.report({ node, messageId: "fixedStyle" });
       },
@@ -1657,11 +1659,18 @@ const singularService = defineRule({
   },
 });
 
-/** The server's service classes, read once when the plugin loads. */
+/** The server's services, read once when the plugin loads. */
 const serviceNames = new Set(
-  globSync("apps/server/src/**/*.ts", { cwd: repo })
-    .filter((f) => !f.endsWith(".test.ts"))
-    .flatMap((f) => [...readFileSync(resolve(repo, f), "utf8").matchAll(/^export class (\w+) extends Context\.Service\b/gmu)].map((m) => m[1] ?? "")),
+  globSync("apps/server/src/{core,modules/*,gateway/*}/*.ts", { cwd: repo })
+    .filter((f) => {
+      const parts = f.split("/");
+      return parts.at(-1)?.slice(0, -3) === parts.at(-2);
+    })
+    .flatMap((f) =>
+      [...readFileSync(resolve(repo, f), "utf8").matchAll(/^export (?:class (\w+) extends Context\.Service|(?:async )?function make(\w+))\b/gmu)].map(
+        (m) => m[1] ?? m[2] ?? "",
+      ),
+    ),
 );
 
 const protocolNamespace = defineRule({

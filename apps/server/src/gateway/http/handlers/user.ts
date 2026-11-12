@@ -1,38 +1,35 @@
-import { Effect, Option } from "effect";
-import { HttpServerRequest } from "effect/http";
-
 import type { UserHandlers } from "@vibevalley/protocol/api";
 
+import { requestHeaders } from "#/gateway/http/api.ts";
 import { deviceHeader, fromHeader, outsideHeader } from "#/gateway/lan/lan.ts";
-import { type Caller, User } from "#/modules/user/user.ts";
+import type { Caller, User } from "#/modules/user/user.ts";
 
 // Only the gate says a request came from outside, and which device: it drops both headers from what it is handed.
-const caller = Effect.map(Effect.serviceOption(HttpServerRequest.HttpServerRequest), (request): Caller => {
-  const headers = Option.getOrUndefined(Option.map(request, (r) => r.headers));
-  const device = headers?.[deviceHeader];
-  const from = headers?.[fromHeader];
+const caller = (): Caller => {
+  const headers = requestHeaders();
+  const device = headers?.get(deviceHeader) ?? undefined;
+  const from = headers?.get(fromHeader) ?? undefined;
   return {
-    here: headers?.[outsideHeader] === undefined,
+    here: (headers?.get(outsideHeader) ?? null) === null,
     ...(device !== undefined && device !== "" ? { device } : {}),
     ...(from !== undefined && from !== "" ? { from } : {}),
   };
-});
+};
 
-export const userHandlers = Effect.gen(function* () {
-  const user = yield* User;
-  const done: UserHandlers = {
-    "user.get": () => Effect.map(caller, user.status),
+export function userHandlers(deps: { readonly user: User }): UserHandlers {
+  const { user } = deps;
+  return {
+    "user.get": async () => user.status(caller()),
     "user.update": (body) => user.rename(body.name),
-    "user.password.set": (body) => Effect.flatMap(caller, (c) => user.setPassword(c, body.password)),
+    "user.password.set": (body) => user.setPassword(caller(), body.password),
     "user.login": (body) => user.login(body.password, body.device),
-    "user.logout": () => Effect.flatMap(caller, user.logout),
-    "user.device.list": () => Effect.sync(user.devices),
+    "user.logout": () => user.logout(caller()),
+    "user.device.list": async () => user.devices(),
     "user.device.delete": ({ id }) => user.revoke(id),
     "user.device.previewDelete": ({ id }) => user.previewRevoke(id),
-    "user.approval.create": (body) => Effect.flatMap(caller, (c) => user.request(c, body.name)),
+    "user.approval.create": (body) => user.request(caller(), body.name),
     "user.approval.collect": (body) => user.collect(body.claim),
-    "user.approval.list": () => Effect.sync(user.requests),
+    "user.approval.list": async () => user.requests(),
     "user.approval.answer": (body) => user.answerRequest(body.id, body.allow),
   };
-  return done;
-});
+}

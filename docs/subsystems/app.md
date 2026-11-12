@@ -42,7 +42,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
   - `VibeValleyApi` 自动解包 `{ bizCode, message, data?, error? }` 信封；错误经 `infra/api.ts` 的 `faultOf` 转为结构化 `UiFault`（携带六位 `bizCode`、语义 `tag`、`reason`、`next`、`settings` 以及由 `bizCodeMeta` 决定的 `retryable`），只挂在失败或降级分支上；组件内禁止绕过 `act.run` 直接调写接口（`vibevalley/act-door` 检查）。
 - **一次性读取走 `infra/query.ts`**：自有 Query client 管缓存与失效，结果先经 Schema 解码，状态流重连时自动 `refetchOnRelink`。会话轨迹经 `features/session/runs.ts` 的 `SessionLogs` 先订直播流、再读快照并按 `seq` 与 `revision` 合并。
 - **颜色收进语义调色板**：浅色/深色主题通过 `<html data-theme>` 切换，只用 `style.css` 语义色变量（`vibevalley/no-hex-color` 检查）；像素皮固定 `data-theme="light"`。
-- **组件样式统一由 StyleX 编译并受门禁保护**：组件对外收有类型的 `styles?: stylex.StyleXStyles`，不收 `class` 字符串；`stylex.attrs` 与 `styleProps` 在 DOM 边界挂载样式，`vibevalley/stylex-only` 禁止 JSX 直接书写 `class` / `className` / `classList`。动态几何坐标、Canvas 数据、Motion 动画与 Shiki 语法高亮等外部计算值通过原生对象 `style` 保持单一所有者，且 `vibevalley/no-hex-color` 同时拦截 StyleX 定义与 JSX 内联 `style` 中的硬编码十六进制色值。
+- **样式正从 StyleX 换回 Tailwind v4**（[vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)）：换过的零件写元素上的 class、对外收 `class`，迁移期间还收没换的调用方传的 StyleX `styles`（`ui/positioner.ts` 的 `withStyles`）；没换的文件照旧用 `stylex.attrs` 与 `styleProps`；层的顺序 `theme, base, components, utilities, stylex` 让 StyleX 照旧压过 class。`vibevalley/style-attrs` 拦 `className` / `classList` 和只写死值的 `style`，`vibevalley/design-tokens` 拦 class 里绕过令牌的任意值。动态几何坐标、Canvas 数据、Motion 动画与 Shiki 语法高亮等外部计算值通过原生对象 `style` 保持单一所有者，且 `vibevalley/no-hex-color` 同时拦截 StyleX 定义与 JSX 内联 `style` 中的硬编码十六进制色值。
 - **全局 CSS 仅保留非 JSX 边界**：`style.css` 按 `@layer theme, base, components, stylex` 声明层序，仅承载重置（`reset.css`）、字体与令牌、桌面拖拽区（`[data-window-drag]`）以及消毒后富文本 DOM 后代（`Markdown.css`、`PxMarkdown.css` 与 `richText.ts` 代码块/图表）；故事宿主另导入 `@vibevalley/stories/style.css` 的填满画布规则。跨目录的 `.stylex.ts` 标记沿用 `#/`，应用与故事编译器显式配置同一别名。
 
 ### 宿主与多端
@@ -118,6 +118,6 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 
 ## 怎么验证
 
-- `vp run web:check`、`vp test run apps/web/src/layers.test.ts apps/web/src/stories.test.ts`：页面类型、StyleX 编译与令牌/门禁规则（`vibevalley/stylex-only`、`vibevalley/no-hex-color`、`vibevalley/design-tokens`）、分层方向与故事覆盖测试。
+- `vp run web:check`、`vp test run apps/web/src/layers.test.ts apps/web/src/stories.test.ts`：页面类型、StyleX 与 Tailwind 的编译、令牌/门禁规则（`vibevalley/stylex-only`、`vibevalley/style-attrs`、`vibevalley/no-hex-color`、`vibevalley/design-tokens`）、分层方向与故事覆盖测试。
 - `vp run --filter @vibevalley/web e2e`（`apps/web/test/*.spec.ts`）：各页面 Playwright 端到端与 axe 无障碍测试。
 - `vp run desktop:test`、`apps/desktop/src/base/releases.test.ts`、`vp run --filter @vibevalley/desktop update-check`：桌面端启动、灵动岛、渠道版本与自更新测试。

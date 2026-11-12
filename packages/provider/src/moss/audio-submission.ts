@@ -1,14 +1,13 @@
-import { Effect, Schema } from "effect";
-import { HttpBody, HttpClientRequest } from "effect/http";
+import { z } from "zod";
 
-import { AudioId, audioRequest, MossAudioError } from "./audio-response.ts";
+import type { ProviderHttp } from "../base/http.ts";
+import { fromJson, int } from "../base/json.ts";
+import { AudioId, audioJson, audioRequest, boundedAudio, invalidAudioResponse } from "./audio-response.ts";
 
-const Submission = Schema.fromJsonString(
-  Schema.Struct({
-    task_id: AudioId,
-    retry_after: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }))),
-  }),
-);
+const Submission = z.object({
+  task_id: AudioId,
+  retry_after: z.exactOptional(int()),
+});
 
 export interface MossAudioSubmission {
   readonly taskId: string;
@@ -17,20 +16,14 @@ export interface MossAudioSubmission {
 
 type Endpoint = "speech/speakers" | "voice/generations" | "transcriptions";
 
-export const submitMossAudioTask = Effect.fnUntraced(
-  function* (key: string, endpoint: Endpoint, input: unknown) {
-    const body = yield* HttpBody.json(input).pipe(Effect.mapError(() => MossAudioError.make({ reason: "InvalidInput", outcome: "NotSubmitted" })));
-    const raw = yield* audioRequest(key, HttpClientRequest.post(`https://api.mosi.cn/v1/audio/${endpoint}`, { body }));
-    const result = yield* Schema.decodeEffect(Submission)(raw).pipe(
-      Effect.mapError(() => MossAudioError.make({ reason: "InvalidResponse", outcome: "Unknown" })),
-    );
+export const submitMossAudioTask = (key: string, endpoint: Endpoint, input: unknown, http: ProviderHttp): Promise<MossAudioSubmission> =>
+  boundedAudio(300_000, http, async (signal) => {
+    const body = audioJson(input);
+    const raw = await audioRequest(key, { method: "POST", url: `https://api.mosi.cn/v1/audio/${endpoint}`, body }, http, signal);
+    const result = fromJson(Submission, raw);
+    if (result === undefined) throw invalidAudioResponse();
     return {
       taskId: result.task_id,
       ...(result.retry_after !== undefined ? { retryAfterSeconds: result.retry_after } : {}),
     } satisfies MossAudioSubmission;
-  },
-  Effect.timeoutOrElse({
-    duration: "300 seconds",
-    orElse: () => Effect.fail(MossAudioError.make({ reason: "Timeout", outcome: "Unknown" })),
-  }),
-);
+  });

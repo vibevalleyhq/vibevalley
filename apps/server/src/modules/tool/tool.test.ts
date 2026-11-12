@@ -27,7 +27,7 @@ describe("the tools", () => {
       for (const op of ops) {
         const e = endpoints.find((x) => x.op === op);
         expect({ op, can: e?.can.includes(caller) }).toEqual({ op, can: true });
-        const fields = Object.keys(table[op as keyof typeof table].fields);
+        const fields = Object.keys(table[op as keyof typeof table].shape);
         const allowed = new Set([...fieldsOf(e!), ...(agentOnly[op] ?? [])]);
         expect({ op, extra: fields.filter((f) => !allowed.has(f)) }).toEqual({ op, extra: [] });
       }
@@ -45,7 +45,7 @@ describe("the tools", () => {
   });
 
   it("let the orchestrator and a helper say how an html artifact is shown", () => {
-    for (const table of [parameters, sessionParameters]) expect(table["artifact.create"].fields).toHaveProperty("display");
+    for (const table of [parameters, sessionParameters]) expect(table["artifact.create"].shape).toHaveProperty("display");
     expect(params.artifact.display).toMatch(/slides/u);
   });
 

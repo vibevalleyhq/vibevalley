@@ -1,28 +1,27 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { NodeServices } from "@effect/platform-node";
-import { describe, expect, it } from "@effect/vitest";
-import { Clock, Effect, Fiber, Formatter, Layer, PubSub, Queue, Scheduler, Stream } from "effect";
-import { TestClock } from "effect/testing";
-import { vi } from "vite-plus/test";
+import { afterEach, describe, expect, test, vi } from "vite-plus/test";
 
+import { Hub } from "@vibevalley/async";
 import type { SpaceState, Session, StateFrame } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { layer as projection } from "#/gateway/projection/frame.ts";
-import { ServerConfig } from "#/infra/config.ts";
+import { makeProjection } from "#/gateway/projection/frame.ts";
+import type { ServerConfig } from "#/infra/config.ts";
+import { keptLog } from "#/infra/log.ts";
+import { wallTime } from "#/infra/time.ts";
 import { emptyProgress } from "#/modules/game/progress.ts";
 import { testConfig, whenState } from "#/testing/layers.ts";
 
-import { bounded, Core, emptySpaceState, stateEveryMs } from "./core.ts";
+import { bounded, type Core, emptySpaceState, makeCore, stateEveryMs } from "./core.ts";
 
-const coreLayer = (config: ServerConfig["Service"]) =>
-  Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, config)), Layer.provide(NodeServices.layer));
-const withCore =
-  (config: ServerConfig["Service"]) =>
-  <A, E, R>(self: Effect.Effect<A, E, R>) =>
-    Effect.provide(self, coreLayer(config));
+// The core reads no files: a config is given only to say where a legacy state.json would have been.
+const coreOf = (_config: ServerConfig = testConfig()) => makeCore({ projection: makeProjection(), clock: wallTime });
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 const helper: Session = {
   id: sessionId("w1"),
@@ -42,31 +41,46 @@ const phaseOf = (action: "thinking" | "speaking", since = 0): Session["phase"] =
   since,
   doing: { action: action === "speaking" ? "speaking_text" : "thinking", label: "" },
 });
-const activity = Effect.fnUntraced(function* (core: Core["Service"], agent: string, action: "thinking" | "speaking", channel?: string) {
+const activity = (core: Core, agent: string, action: "thinking" | "speaking", channel?: string) => {
   const id = sessionId(agent);
   const had = core.session(id);
-  const since = had?.phase._tag === "working" ? had.phase.since : yield* Clock.currentTimeMillis;
-  yield* core.apply(...(had ? [] : [{ type: "sessionChanged" as const, session: { ...helper, id, agent, role: "orchestrator" as const } }]), {
+  const since = had?.phase._tag === "working" ? had.phase.since : wallTime.now();
+  core.apply(...(had ? [] : [{ type: "sessionChanged" as const, session: { ...helper, id, agent, role: "orchestrator" as const } }]), {
     type: "sessionPhaseChanged",
     id,
     phase: phaseOf(action, since),
     ...(channel ? { channel } : {}),
   });
-});
+};
+
+/** Every value of it from now on, kept as they come, until stop. */
+function collect<A>(source: (signal: AbortSignal) => AsyncIterable<A>) {
+  const got: A[] = [];
+  const stopped = new AbortController();
+  const reading = (async () => {
+    for await (const a of source(stopped.signal)) got.push(a);
+  })();
+  return {
+    got,
+    stop: async () => {
+      stopped.abort();
+      // Its end is the abort just asked for.
+      await reading.catch(() => undefined);
+    },
+  };
+}
+
+const turn = () => new Promise<void>((resolve) => setImmediate(resolve));
 
 describe("core", () => {
-  it("regression: a successful state wait releases its real-time deadline", async () => {
+  test("regression: a successful state wait releases its real-time deadline", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     try {
-      const found = await Effect.runPromise(
-        Effect.gen(function* () {
-          const core = yield* Core;
-          const waiting = yield* Effect.forkChild(whenState((s) => s.call === "live", "live call", 60_000));
-          yield* Effect.yieldNow;
-          yield* core.open();
-          return yield* Fiber.join(waiting);
-        }).pipe(Effect.scoped, withCore(testConfig())),
-      );
+      const core = coreOf();
+      const waiting = whenState(core, (s) => s.call === "live", "live call", 60_000);
+      await Promise.resolve();
+      core.open();
+      const found = await waiting;
       expect(found).toBe(true);
       expect(vi.getTimerCount()).toBe(0);
     } finally {
@@ -74,7 +88,7 @@ describe("core", () => {
     }
   });
 
-  it.effect("regression: the core ignores legacy state.json and starts from its empty projection", () => {
+  test("regression: the core ignores legacy state.json and starts from its empty projection", () => {
     const config = testConfig();
     const was: SpaceState = {
       ...emptySpaceState(),
@@ -85,211 +99,203 @@ describe("core", () => {
       crons: [],
       issues: [],
     };
-    writeFileSync(join(config.home, "state.json"), Formatter.formatJson(was));
-    return Effect.gen(function* () {
-      const s = (yield* Core).state();
-      expect([s.call, s.callReason]).toEqual(["idle", ""]);
-      expect([s.progress, s.crons, s.issues]).toEqual([undefined, [], []]);
-      expect(s.sessions).toEqual([]);
-      expect(readFileSync(join(config.home, "state.json"), "utf8")).toBe(Formatter.formatJson(was));
-    }).pipe(withCore(config));
+    writeFileSync(join(config.home, "state.json"), JSON.stringify(was));
+    const s = coreOf(config).state();
+    expect([s.call, s.callReason]).toEqual(["idle", ""]);
+    expect([s.progress, s.crons, s.issues]).toEqual([undefined, [], []]);
+    expect(s.sessions).toEqual([]);
+    expect(readFileSync(join(config.home, "state.json"), "utf8")).toBe(JSON.stringify(was));
   });
 
-  it.effect("regression: a legacy state file is neither decoded nor rewritten", () => {
+  test("regression: a legacy state file is neither decoded nor rewritten", () => {
     const config = testConfig();
-    const raw = Formatter.formatJson({ call: "idle", sessions: {} });
+    const raw = JSON.stringify({ call: "idle", sessions: {} });
     writeFileSync(join(config.home, "state.json"), raw);
-    return Effect.gen(function* () {
-      yield* Effect.scoped(
-        Effect.gen(function* () {
-          expect((yield* Core).state()).toEqual(emptySpaceState());
-        }).pipe(withCore(config)),
-      );
-      const kept = readdirSync(config.home).filter((f) => f.startsWith("state.json.unreadable-"));
-      expect(kept).toHaveLength(0);
-      expect(readFileSync(join(config.home, "state.json"), "utf8")).toBe(raw);
-    });
+    const core = coreOf(config);
+    expect(core.state()).toEqual(emptySpaceState());
+    core.close();
+    const kept = readdirSync(config.home).filter((f) => f.startsWith("state.json.unreadable-"));
+    expect(kept).toHaveLength(0);
+    expect(readFileSync(join(config.home, "state.json"), "utf8")).toBe(raw);
   });
 
-  it.effect("open reads the call state when its effect runs", () => {
+  test("open reads the call state when its effect runs", () => {
+    const core = coreOf();
+    core.open();
+    core.apply({ type: "callChanged", state: "idle", reason: "" });
+    expect(core.state().call).toBe("idle");
+    core.open();
+    expect(core.state().call).toBe("live");
+  });
+
+  test("a fact is stamped and sent without creating a file snapshot", async () => {
+    vi.useFakeTimers({ now: 0 });
     const config = testConfig();
-    return Effect.gen(function* () {
-      const core = yield* Core;
-      yield* core.open();
-      const reopen = core.open();
-      yield* core.apply({ type: "callChanged", state: "idle", reason: "" });
-      expect(core.state().call).toBe("idle");
-      yield* reopen;
-      expect(core.state().call).toBe("live");
-    }).pipe(withCore(config));
+    const core = coreOf(config);
+    const seen = collect((signal) => core.events(signal));
+    await vi.advanceTimersByTimeAsync(5);
+    core.apply({ type: "sessionChanged", session: { ...helper, phase: { _tag: "working", since: 5, doing: { action: "none", label: "" } } } });
+    activity(core, "orchestrator", "thinking");
+    activity(core, "orchestrator", "thinking");
+    core.apply({ type: "progressChanged", progress: emptyProgress() });
+    core.setCommits({ total: 1, repos: [] });
+    vi.useRealTimers();
+    await vi.waitFor(() => expect(seen.got.length).toBeGreaterThanOrEqual(6));
+    await seen.stop();
+    const got = seen.got.slice(0, 6);
+    expect(got.map((e) => e.type)).toEqual(["snapshot", "sessionChanged", "sessionChanged", "sessionPhaseChanged", "progressChanged", "progressChanged"]);
+    expect(got[2]!.at).toBeGreaterThan(0);
+    core.close();
+    expect(existsSync(join(config.home, "state.json"))).toBe(false);
   });
 
-  it.effect("a fact is stamped and sent without creating a file snapshot", () => {
-    const config = testConfig();
-    return Effect.gen(function* () {
-      yield* Effect.scoped(
-        Effect.gen(function* () {
-          const core = yield* Core;
-          const seen = yield* core.events.pipe(Stream.take(6), Stream.runCollect, Effect.forkScoped);
-          yield* TestClock.adjust(5);
-          yield* core.apply({ type: "sessionChanged", session: { ...helper, phase: { _tag: "working", since: 5, doing: { action: "none", label: "" } } } });
-          yield* activity(core, "orchestrator", "thinking");
-          yield* activity(core, "orchestrator", "thinking");
-          yield* core.apply({ type: "progressChanged", progress: emptyProgress() });
-          yield* core.setCommits({ total: 1, today: 0, week: 0 });
-          const got = yield* Fiber.join(seen);
-          expect(got.map((e) => e.type)).toEqual(["snapshot", "sessionChanged", "sessionChanged", "sessionPhaseChanged", "progressChanged", "progressChanged"]);
-          expect(got[2]!.at).toBeGreaterThan(0);
-        }).pipe(withCore(config)),
-      );
-      expect(existsSync(join(config.home, "state.json"))).toBe(false);
-    });
+  test("a burst of facts is one frame", async () => {
+    vi.useFakeTimers();
+    const core = coreOf();
+    const frames = collect<StateFrame>((signal) => core.states(signal));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(frames.got.shift()?.state.sessions).toEqual([]);
+    activity(core, "orchestrator", "speaking");
+    core.setCommits({ total: 2, repos: [] });
+    await vi.advanceTimersByTimeAsync(stateEveryMs);
+    const next = frames.got.shift()!;
+    expect([next.state.sessions.find((s) => s.id === "orchestrator")?.phase, next.state.commits?.total]).toMatchObject([
+      phaseOf("speaking", expect.any(Number)),
+      2,
+    ]);
+    await vi.advanceTimersByTimeAsync(stateEveryMs * 2);
+    const size2 = frames.got.length;
+    expect(size2).toBe(0);
+    core.close();
+    await frames.stop();
   });
 
-  it.effect("a burst of facts is one frame", () =>
-    Effect.gen(function* () {
-      const core = yield* Core;
-      const frames = yield* Queue.unbounded<StateFrame>();
-      yield* core.states.pipe(
-        Stream.runForEach((f) => Queue.offer(frames, f)),
-        Effect.forkScoped,
-      );
-      expect((yield* Queue.take(frames)).state.sessions).toEqual([]);
-      yield* activity(core, "orchestrator", "speaking");
-      yield* core.setCommits({ total: 2 });
-      yield* TestClock.adjust(stateEveryMs);
-      const next = yield* Queue.take(frames);
-      expect([next.state.sessions.find((s) => s.id === "orchestrator")?.phase, next.state.commits?.total]).toMatchObject([
-        phaseOf("speaking", expect.any(Number)),
-        2,
-      ]);
-      yield* TestClock.adjust(stateEveryMs * 2);
-      const size2 = yield* Queue.size(frames);
-      expect(size2).toBe(0);
-    }).pipe(withCore(testConfig())),
-  );
+  test("seq goes up once per commit that changes the state, and a frame carries the seq of the state it shows", async () => {
+    vi.useFakeTimers();
+    const core = coreOf();
+    const frames = collect<StateFrame>((signal) => core.states(signal));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(frames.got.shift()?.seq).toBe(0);
+    activity(core, "orchestrator", "thinking");
+    expect(core.seq()).toBe(1);
+    // The same again changes nothing: no fold, no seq.
+    activity(core, "orchestrator", "thinking");
+    expect(core.seq()).toBe(1);
+    // A batch is one commit.
+    core.apply(
+      { type: "sessionPhaseChanged", id: sessionId("orchestrator"), phase: phaseOf("speaking") },
+      { type: "progressChanged", commits: { total: 3, repos: [] } },
+    );
+    const replied = core.seq();
+    expect(replied).toBe(2);
+    await vi.advanceTimersByTimeAsync(stateEveryMs);
+    const next = frames.got.shift()!;
+    // What a reply read after its change says (replied) is no later than the first frame that shows the change.
+    expect(next.seq).toBeGreaterThanOrEqual(replied);
+    expect(next.state.commits?.total).toBe(3);
+    core.close();
+    await frames.stop();
+  });
 
-  it.effect("seq goes up once per commit that changes the state, and a frame carries the seq of the state it shows", () =>
-    Effect.gen(function* () {
-      const core = yield* Core;
-      const frames = yield* Queue.unbounded<StateFrame>();
-      yield* core.states.pipe(
-        Stream.runForEach((f) => Queue.offer(frames, f)),
-        Effect.forkScoped,
-      );
-      expect((yield* Queue.take(frames)).seq).toBe(0);
-      yield* activity(core, "orchestrator", "thinking");
-      expect(core.seq()).toBe(1);
-      // The same again changes nothing: no fold, no seq.
-      yield* activity(core, "orchestrator", "thinking");
-      expect(core.seq()).toBe(1);
-      // A batch is one commit.
-      yield* core.apply(
-        { type: "sessionPhaseChanged", id: sessionId("orchestrator"), phase: phaseOf("speaking") },
-        { type: "progressChanged", commits: { total: 3, repos: [] } },
-      );
-      const replied = core.seq();
-      expect(replied).toBe(2);
-      yield* TestClock.adjust(stateEveryMs);
-      const next = yield* Queue.take(frames);
-      // What a reply read after its change says (replied) is no later than the first frame that shows the change.
-      expect(next.seq).toBeGreaterThanOrEqual(replied);
-      expect(next.state.commits?.total).toBe(3);
-    }).pipe(withCore(testConfig())),
-  );
+  test("an internal subscriber keeps a whole burst while it works", async () => {
+    vi.useFakeTimers();
+    const core = coreOf();
+    activity(core, "orchestrator", "speaking");
+    const incoming = core.subscribe();
+    let seen = 0;
+    const reading = (async () => {
+      for (let r = await incoming.next(); r.done !== true && seen < 128; r = await incoming.next()) {
+        seen++;
+        if (seen === 128) break;
+        // On the fake timers: a reader slower than the burst, not a wait.
+        await wallTime.sleep(1);
+      }
+    })();
+    await vi.advanceTimersByTimeAsync(5);
+    for (let i = 0; i < 128; i++) activity(core, "orchestrator", i % 2 === 0 ? "thinking" : "speaking");
+    await vi.advanceTimersByTimeAsync(200);
+    await reading;
+    const seen2 = seen;
+    expect(seen2).toBe(128);
+    incoming.close();
+    core.close();
+  });
 
-  it.effect("an internal subscriber keeps a whole burst while it works", () =>
-    Effect.gen(function* () {
-      const core = yield* Core;
-      yield* activity(core, "orchestrator", "speaking");
-      const incoming = yield* core.subscribe;
-      const seen = yield* Effect.forkScoped(
-        incoming.pipe(
-          Stream.take(128),
-          // On the TestClock: a reader slower than the burst, not a wait.
-          // oxlint-disable-next-line vibevalley/no-test-sleep
-          Stream.tap(() => Effect.sleep(1)),
-          Stream.runCount,
-        ),
-      );
-      yield* TestClock.adjust(5);
-      for (let i = 0; i < 128; i++) yield* activity(core, "orchestrator", i % 2 === 0 ? "thinking" : "speaking");
-      yield* TestClock.adjust(200);
-      const seen2 = yield* Fiber.join(seen);
-      expect(seen2).toBe(128);
-    }).pipe(withCore(testConfig())),
-  );
+  test("session phases update independently and keep their supplied run start", async () => {
+    vi.useFakeTimers();
+    const core = coreOf();
+    activity(core, "orchestrator", "thinking", "c1");
+    activity(core, "lead", "speaking", "c2");
+    const began = core.session("orchestrator")!.phase;
+    await vi.advanceTimersByTimeAsync(5_000);
+    activity(core, "orchestrator", "speaking", "c1");
+    expect(core.session("orchestrator")?.phase).toMatchObject({ _tag: "working", since: began._tag === "working" ? began.since : 0 });
+    expect(core.session("lead")?.channel).toBe("c2");
+    core.apply({ type: "sessionPhaseChanged", id: sessionId("orchestrator"), phase: { _tag: "resting" } });
+    expect(core.session("orchestrator")).toMatchObject({ phase: { _tag: "resting" } });
+    expect(core.session("orchestrator")?.channel).toBeUndefined();
+    expect(core.session("lead")?.phase).toEqual(phaseOf("speaking", expect.any(Number)));
+  });
 
-  it.effect("session phases update independently and keep their supplied run start", () =>
-    Effect.gen(function* () {
-      const core = yield* Core;
-      yield* activity(core, "orchestrator", "thinking", "c1");
-      yield* activity(core, "lead", "speaking", "c2");
-      const began = core.session("orchestrator")!.phase;
-      yield* TestClock.adjust(5_000);
-      yield* activity(core, "orchestrator", "speaking", "c1");
-      expect(core.session("orchestrator")?.phase).toMatchObject({ _tag: "working", since: began._tag === "working" ? began.since : 0 });
-      expect(core.session("lead")?.channel).toBe("c2");
-      yield* core.apply({ type: "sessionPhaseChanged", id: sessionId("orchestrator"), phase: { _tag: "resting" } });
-      expect(core.session("orchestrator")).toMatchObject({ phase: { _tag: "resting" } });
-      expect(core.session("orchestrator")?.channel).toBeUndefined();
-      expect(core.session("lead")?.phase).toEqual(phaseOf("speaking", expect.any(Number)));
-    }).pipe(withCore(testConfig())),
-  );
+  test("regression: a scheduler yield cannot leave the core locked against a synchronous callback", async () => {
+    const core = coreOf();
+    const rounds = Array.from({ length: 32 }, (_, i) => i);
+    const writer = (async () => {
+      for (const i of rounds) {
+        core.apply({ type: "callChanged", state: "live", reason: `writer-${i}` });
+        await Promise.resolve();
+      }
+    })();
+    const callbacks = (async () => {
+      for (const i of rounds) {
+        core.apply({ type: "callChanged", state: "idle", reason: `callback-${i}` });
+        await turn();
+      }
+    })();
+    await Promise.all([writer, callbacks]);
+    expect(core.seq()).toBe(rounds.length * 2);
+  });
 
-  it.effect("regression: a scheduler yield cannot leave the core locked against a synchronous callback", () =>
-    Effect.gen(function* () {
-      const context2 = yield* Effect.context();
-      const runSync = Effect.runSyncWith(context2);
-      const core = yield* Core;
-      const rounds = Array.from({ length: 32 }, (_, i) => i);
-      const writer = Effect.forEach(rounds, (i) => core.apply({ type: "callChanged", state: "live", reason: `writer-${i}` }), { discard: true }).pipe(
-        Effect.provideService(Scheduler.MaxOpsBeforeYield, 32),
-      );
-      const callbacks = Effect.forEach(
-        rounds,
-        (i) => Effect.sync(() => runSync(core.apply({ type: "callChanged", state: "idle", reason: `callback-${i}` }))).pipe(Effect.andThen(Effect.yieldNow)),
-        { discard: true },
-      );
-      yield* Effect.all([writer, callbacks], { concurrency: "unbounded", discard: true });
-      expect(core.seq()).toBe(rounds.length * 2);
-    }).pipe(withCore(testConfig())),
-  );
-
-  it.effect("apply stays synchronous for oar callbacks", () =>
-    Effect.gen(function* () {
-      const context2 = yield* Effect.context();
-      const runSync = Effect.runSyncWith(context2);
-      const core = yield* Core;
-      yield* core.apply({ type: "sessionChanged", session: helper });
-      yield* Effect.sync(() => runSync(core.apply({ type: "sessionPhaseChanged", id: helper.id, phase: phaseOf("thinking") })));
-      expect(core.session(helper.id)?.phase).toEqual(phaseOf("thinking"));
-    }).pipe(withCore(testConfig())),
-  );
+  test("apply stays synchronous for oar callbacks", () => {
+    const core = coreOf();
+    core.apply({ type: "sessionChanged", session: helper });
+    core.apply({ type: "sessionPhaseChanged", id: helper.id, phase: phaseOf("thinking") });
+    expect(core.session(helper.id)?.phase).toEqual(phaseOf("thinking"));
+  });
 });
 
 describe("bounded streams", () => {
-  it.effect("keeps the source order", () =>
-    Effect.gen(function* () {
-      const bounded2 = yield* bounded(Stream.make(1, 2, 3), "test").pipe(Stream.runCollect);
-      expect(bounded2).toEqual([1, 2, 3]);
-    }),
-  );
+  test("keeps the source order", async () => {
+    async function* source() {
+      yield* [1, 2, 3];
+    }
+    const bounded2: number[] = [];
+    for await (const n of bounded(source(), "test", keptLog())) bounded2.push(n);
+    expect(bounded2).toEqual([1, 2, 3]);
+  });
 
-  it.effect("ends the slow subscription and runs the source finalizer once", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const pubsub = yield* PubSub.unbounded<number>();
-        let finalized = 0;
-        const source = Stream.fromPubSub(pubsub).pipe(Stream.ensuring(Effect.sync(() => finalized++)));
-        const fiber = yield* Effect.forkChild(Stream.runDrain(bounded(source, "test", 2)));
-        yield* TestClock.adjust(5);
-        yield* PubSub.publish(pubsub, 1);
-        yield* PubSub.publish(pubsub, 2);
-        yield* PubSub.publish(pubsub, 3);
-        yield* Fiber.await(fiber);
-        expect(finalized).toBe(1);
-      }),
-    ),
-  );
+  test("ends the slow subscription and runs the source finalizer once", async () => {
+    const hub = new Hub<number>();
+    let finalized = 0;
+    const sub = hub.subscribe();
+    async function* source() {
+      try {
+        yield* sub;
+      } finally {
+        finalized++;
+      }
+    }
+    const slow = bounded(source(), "test", keptLog(), 2);
+    // The reader takes one and then nothing while the source runs on: the fourth value finds the queue of two full.
+    const first = slow.next();
+    await turn();
+    hub.publish(1);
+    hub.publish(2);
+    hub.publish(3);
+    hub.publish(4);
+    await turn();
+    await first;
+    for (let r = await slow.next(); r.done !== true; r = await slow.next());
+    expect(finalized).toBe(1);
+  });
 });

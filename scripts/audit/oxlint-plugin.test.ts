@@ -184,6 +184,7 @@ tester.run("style-attrs", rule("style-attrs"), {
     { code: "const v = <div style={{ width: `${percent()}%` }} />", filename: "a.tsx" },
     { code: "const v = <div style={{ '--x': `${x}px`, display: 'grid' }} />", filename: "a.tsx" },
     { code: "const v = <div style={props.style} />", filename: "a.tsx" },
+    { code: "const v = <Button style={{ 'margin-left': '12px' }} />", filename: "a.tsx" },
   ],
   invalid: [
     { code: "const v = <div className='card' />", filename: "a.tsx", errors: [{ messageId: "classAttr" }] },

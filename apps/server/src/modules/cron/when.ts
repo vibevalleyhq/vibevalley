@@ -1,4 +1,3 @@
-import { Cron as EffectCron, DateTime, Option } from "effect";
 // When a cron runs and how it is said. The next run is the first matching minute strictly after the last run.
 
 import { list, t } from "@vibevalley/i18n";
@@ -14,25 +13,120 @@ const cronTime = /^([01]?\d|2[0-3]):([0-5]\d)$/u;
 
 const givenOffset = /^(?:GMT)?([+-])([01]\d|2[0-3])(?::?([0-5]\d))?$/u;
 
-const fixed = (sign: string, hours: string, minutes: string | undefined) =>
-  DateTime.zoneMakeOffset((sign === "-" ? -1 : 1) * (Number(hours) * 60 + Number(minutes ?? 0)) * 60_000);
+/** A time zone as the crons read it: a fixed offset from UTC, or one the platform knows by name. */
+export type Zone = { readonly kind: "offset"; readonly ms: number } | { readonly kind: "named"; readonly id: string };
 
-const named = (tz: string) => (tz === "" || tz === "Local" ? undefined : Option.getOrUndefined(DateTime.zoneMakeNamed(tz)));
+const fixed = (sign: string, hours: string, minutes: string | undefined): Zone => ({
+  kind: "offset",
+  ms: (sign === "-" ? -1 : 1) * (Number(hours) * 60 + Number(minutes ?? 0)) * 60_000,
+});
+
+const formats = new Map<string, Intl.DateTimeFormat>();
+/** The formatter that says an instant's wall time in zone id; undefined for a zone the platform does not know. */
+function formatOf(id: string): Intl.DateTimeFormat | undefined {
+  let f = formats.get(id);
+  if (f !== undefined) return f;
+  try {
+    f = new Intl.DateTimeFormat("en-US", {
+      timeZone: id,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+      second: "numeric",
+    });
+  } catch (e) {
+    if (e instanceof RangeError) return undefined;
+    throw e;
+  }
+  formats.set(id, f);
+  return f;
+}
+
+const named = (tz: string): Zone | undefined => (tz === "" || tz === "Local" || formatOf(tz) === undefined ? undefined : { kind: "named", id: tz });
+
+/** The zone this machine is in. */
+const localZone = (): Zone => ({ kind: "named", id: Intl.DateTimeFormat().resolvedOptions().timeZone });
+
+const utc: Zone = { kind: "offset", ms: 0 };
 
 /** One parser for accepted, scheduled and displayed zones: IANA or a fixed offset, optionally prefixed with GMT. */
-export function givenZone(tz: string): DateTime.TimeZone | undefined {
+export function givenZone(tz: string): Zone | undefined {
   const m = givenOffset.exec(tz);
   if (m?.[1] && m[2]) return fixed(m[1], m[2], m[3]);
   return tz.startsWith("+") || tz.startsWith("-") ? undefined : named(tz);
 }
 
-/** The first run of the cron strictly after from. */
-function nextOf(cron: EffectCron.Cron, from: number): number | undefined {
-  try {
-    return EffectCron.next(cron, from).getTime();
-  } catch {
-    return undefined;
+const dayMs = 86_400_000;
+
+/** How far the zone's wall clock is ahead of UTC at the instant at. */
+function offsetAt(at: number, zone: Zone): number {
+  if (zone.kind === "offset") return zone.ms;
+  const f = formatOf(zone.id);
+  if (f === undefined) return 0;
+  const n: Partial<Record<Intl.DateTimeFormatPartTypes, number>> = {};
+  for (const part of f.formatToParts(at)) if (part.type !== "literal") n[part.type] = Number(part.value);
+  const wall = Date.UTC(n.year ?? 1970, (n.month ?? 1) - 1, n.day ?? 1, n.hour ?? 0, n.minute ?? 0, n.second ?? 0);
+  return wall - (at - (((at % 1000) + 1000) % 1000));
+}
+
+/** The wall clock at an instant, as the UTC fields of a Date. */
+const wallOf = (at: number, zone: Zone) => new Date(at + offsetAt(at, zone));
+
+/** The instant a wall time (as UTC millis) names: in a fold the earlier one; in a gap the time as if the clock had not
+ * moved yet, which lands after the gap. */
+function instantOf(wall: number, zone: Zone): number {
+  if (zone.kind === "offset") return wall - zone.ms;
+  const before = offsetAt(wall - dayMs, zone);
+  const after = offsetAt(wall + dayMs, zone);
+  const hits = [wall - before, wall - after].filter((at) => at + offsetAt(at, zone) === wall);
+  return hits.length > 0 ? Math.min(...hits) : wall - before;
+}
+
+/** The fields as sets, an empty one any; the day fields are both due (and), or either one is. */
+interface CronSpec {
+  readonly minutes: ReadonlySet<number>;
+  readonly hours: ReadonlySet<number>;
+  readonly days: ReadonlySet<number>;
+  readonly months: ReadonlySet<number>;
+  readonly weekdays: ReadonlySet<number>;
+  readonly and: boolean;
+}
+
+function dayDue(spec: CronSpec, day: Date): boolean {
+  if (spec.months.size > 0 && !spec.months.has(day.getUTCMonth() + 1)) return false;
+  const { days, weekdays } = spec;
+  if (days.size === 0 && weekdays.size === 0) return true;
+  if (spec.and) return (days.size === 0 || days.has(day.getUTCDate())) && (weekdays.size === 0 || weekdays.has(day.getUTCDay()));
+  if (weekdays.size === 0) return days.has(day.getUTCDate());
+  if (days.size === 0) return weekdays.has(day.getUTCDay());
+  return days.has(day.getUTCDate()) || weekdays.has(day.getUTCDay());
+}
+
+const ascending = (set: ReadonlySet<number>, lo: number, hi: number) =>
+  set.size > 0 ? [...set].toSorted((a, b) => a - b) : Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
+
+/** Long enough for a 29th of February, even across a century that skips one. */
+const searchDays = 366 * 9;
+
+/** The first run of the cron strictly after from, or undefined when none comes within the search. */
+function nextOf(spec: CronSpec, zone: Zone, from: number): number | undefined {
+  const start = wallOf(from, zone);
+  const hours = ascending(spec.hours, 0, 23);
+  const minutes = ascending(spec.minutes, 0, 59);
+  // From a day early: a fold can put a wall time of the day before after from.
+  for (let i = -1; i < searchDays; i++) {
+    const day = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate() + i));
+    if (!dayDue(spec, day)) continue;
+    for (const h of hours)
+      for (const mi of minutes) {
+        const at = instantOf(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate(), h, mi), zone);
+        if (at > from) return at;
+      }
   }
+  return undefined;
 }
 
 export function nextRun(s: T.Cron): number | undefined {
@@ -60,15 +154,22 @@ function daily(from: number, at: string, days: readonly number[], tz: string): n
   if (!m || !timeZone) return undefined;
   // Cron reads only 0 to 7 (7 is Sunday again); anything else is no cron.
   if (days.some((d) => d < 0 || d > 7)) return undefined;
-  const cron = EffectCron.make({ minutes: [Number(m[2])], hours: [Number(m[1])], days: [], months: [], weekdays: days.map((d) => d % 7), tz: timeZone });
-  return nextOf(cron, from);
+  const spec: CronSpec = {
+    minutes: new Set([Number(m[2])]),
+    hours: new Set([Number(m[1])]),
+    days: new Set(),
+    months: new Set(),
+    weekdays: new Set(days.map((d) => d % 7)),
+    and: false,
+  };
+  return nextOf(spec, timeZone, from);
 }
 
 /** A zone that is none is read as UTC. */
 function clock(at: number, tz: string): string {
-  const w = DateTime.toParts(DateTime.makeZonedUnsafe(at, { timeZone: givenZone(tz) ?? DateTime.zoneMakeOffset(0) }));
+  const w = wallOf(at, givenZone(tz) ?? utc);
   const two = (n: number) => String(n).padStart(2, "0");
-  return `${w.month}/${w.day} ${two(w.hour)}:${two(w.minute)}`;
+  return `${w.getUTCMonth() + 1}/${w.getUTCDate()} ${two(w.getUTCHours())}:${two(w.getUTCMinutes())}`;
 }
 
 export function whenText(when: T.CronWhen, tz: string): string {
@@ -95,16 +196,6 @@ export function nextText(s: T.Cron): string {
   if (s.pending) return t("server.cron.next.pending");
   if (s.when.kind === "once" && s.lastRun !== undefined) return t("server.cron.next.done");
   return t("server.cron.next.off");
-}
-
-/** The fields as sets; the day fields are both due (and) when either starts with *, else either one is. */
-interface CronSpec {
-  readonly minutes: ReadonlySet<number>;
-  readonly hours: ReadonlySet<number>;
-  readonly days: ReadonlySet<number>;
-  readonly months: ReadonlySet<number>;
-  readonly weekdays: ReadonlySet<number>;
-  readonly and: boolean;
 }
 
 /** The bounds of the five fields; server.cron.expr.fields names them, in this order. */
@@ -180,7 +271,7 @@ function cronNext(from: number, expr: string, tz: string): number | undefined {
   const spec = parseCron(expr);
   const timeZone = givenZone(tz);
   if (typeof spec === "string" || !timeZone) return undefined;
-  return nextOf(EffectCron.make({ ...spec, tz: timeZone }), from);
+  return nextOf(spec, timeZone, from);
 }
 
 /** The common shapes in words, the rest as the expression itself. */
@@ -272,6 +363,6 @@ export function dueText(s: T.Cron, missed: boolean): string {
 function exprProblem(expr: string, now: number, tz: string | undefined): string {
   const spec = parseCron(expr);
   if (typeof spec === "string") return spec;
-  const timeZone = tz === undefined ? DateTime.zoneMakeLocal() : (givenZone(tz) ?? DateTime.zoneMakeLocal());
-  return nextOf(EffectCron.make({ ...spec, tz: timeZone }), now) === undefined ? t("server.cron.expr.never", { expr }) : "";
+  const timeZone = tz === undefined ? localZone() : (givenZone(tz) ?? localZone());
+  return nextOf(spec, timeZone, now) === undefined ? t("server.cron.expr.never", { expr }) : "";
 }

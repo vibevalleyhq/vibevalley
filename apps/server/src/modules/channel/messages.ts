@@ -1,5 +1,3 @@
-import { DateTime, Function } from "effect";
-
 import type * as T from "@vibevalley/protocol";
 
 import { compareText, or } from "#/base/order.ts";
@@ -17,27 +15,18 @@ const isTop = (c: T.Channel) => c.type !== "thread";
 
 const emptyChat = (): T.Chat => ({ channels: [], userMentions: [] });
 
-export const withUserMentions: {
-  (userMentions: T.Chat["userMentions"]): (chat: T.Chat | undefined) => T.Chat;
-  (chat: T.Chat | undefined, userMentions: T.Chat["userMentions"]): T.Chat;
-} = Function.dual(2, (chat: T.Chat | undefined, userMentions: T.Chat["userMentions"]): T.Chat => ({ ...(chat ?? emptyChat()), userMentions }));
+export const withUserMentions = (chat: T.Chat | undefined, userMentions: T.Chat["userMentions"]): T.Chat => ({ ...(chat ?? emptyChat()), userMentions });
 
 /** A message said: news when its number is past what the state knows of its channel, or when the state does not keep that channel. */
-export const withMessage: {
-  (m: T.ChatMessage): (chat: T.Chat | undefined) => [T.Chat | undefined, boolean];
-  (chat: T.Chat | undefined, m: T.ChatMessage): [T.Chat | undefined, boolean];
-} = Function.dual(2, (chat: T.Chat | undefined, m: T.ChatMessage): [T.Chat | undefined, boolean] => {
+export const withMessage = (chat: T.Chat | undefined, m: T.ChatMessage): [T.Chat | undefined, boolean] => {
   const c = chat?.channels.find((x) => x.id === m.channel);
   if (!chat || !c) return [chat, true];
   if (m.number <= (c.lastNumber ?? 0)) return [chat, false];
   return [{ ...chat, channels: chat.channels.map((x) => (x === c ? { ...c, lastNumber: m.number } : x)) }, true];
-});
+};
 
 /** Beyond keepChannels the quietest threads go; the channels always stay. */
-export const withChannel: {
-  (c: T.Channel): (chat: T.Chat | undefined) => T.Chat;
-  (chat: T.Chat | undefined, c: T.Channel): T.Chat;
-} = Function.dual(2, (chat: T.Chat | undefined, c: T.Channel): T.Chat => {
+export const withChannel = (chat: T.Chat | undefined, c: T.Channel): T.Chat => {
   const base = chat ?? emptyChat();
   let all = base.channels.filter((x) => x.id !== c.id);
   all.push(c);
@@ -48,7 +37,7 @@ export const withChannel: {
   const keep = new Set(ranked.slice(0, keepChannels).map((x) => x.id));
   all = all.filter((x) => keep.has(x.id)).toSorted(byID);
   return { ...base, channels: all };
-});
+};
 
 type SearchHas = "file" | "image" | "link";
 
@@ -77,14 +66,8 @@ export function parseSearch(text: string): SearchQuery {
   const words = text
     .replace(filterPattern, (whole, key: string, value: string) => {
       const day = dayPattern.exec(value);
-      const at = day
-        ? DateTime.toEpochMillis(
-            DateTime.makeZonedUnsafe(
-              { year: Number(day[1]), month: Number(day[2]), day: Number(day[3]) },
-              { timeZone: DateTime.zoneMakeLocal(), adjustForTimeZone: true },
-            ),
-          )
-        : undefined;
+      // The day's midnight in this machine's zone.
+      const at = day ? new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3])).getTime() : undefined;
       switch (key.toLowerCase()) {
         case "from":
           from = chatNamed[value.replace(/^@/u, "")] ?? value.replace(/^@/u, "");

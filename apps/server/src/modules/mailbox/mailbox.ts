@@ -1,16 +1,18 @@
-import { Array as Arr, Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, type Scope, Semaphore, Schema, Stream, Schedule } from "effect";
+import { z } from "zod";
 
+import { Hub, Semaphore, type Subscription, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { type ApiError, BizCode, lookIn, missing, refuseIn } from "#/base/errors.ts";
-import { valueOf } from "#/base/json.ts";
-import { Core } from "#/core/core.ts";
-import { ServerConfig } from "#/infra/config.ts";
-import { Db } from "#/infra/db.ts";
-import { bestEffort } from "#/infra/log.ts";
-import { Agent } from "#/modules/agent/agent.ts";
-import { type HireRefused, type NotRecorded, Session } from "#/modules/session/session.ts";
+import { BizCode, Inconsistent, lookIn, missing, refuseIn } from "#/base/errors.ts";
+import { jsonOf, valueOf } from "#/base/json.ts";
+import type { Core } from "#/core/core.ts";
+import type { ServerConfig } from "#/infra/config.ts";
+import type { Db } from "#/infra/db.ts";
+import { bestEffort, type Logger } from "#/infra/log.ts";
+import type { Time } from "#/infra/time.ts";
+import type { Agent } from "#/modules/agent/agent.ts";
+import type { Session, SessionNews } from "#/modules/session/session.ts";
 import { defaultID, topPlace, unreadOf } from "#db/channel.sql.ts";
 import { membersOf } from "#db/channel_member.sql.ts";
 import * as qd from "#db/mailbox_delivery.sql.ts";
@@ -46,7 +48,7 @@ import { channelRecipients, waitsForHuman } from "./routing.ts";
 import * as S from "./schema.ts";
 import type { Trigger } from "./shapes.ts";
 import { triggerJournal } from "./triggers.ts";
-import { makeWorkMailbox } from "./work.ts";
+import { makeWorkMailbox, type OutboundDelivery } from "./work.ts";
 
 const refused = refuseIn(BizCode.ChannelRefused);
 
@@ -57,9 +59,10 @@ export interface InsertDelivery {
   readonly row: DeliveryDraft;
 }
 
-const RoutePosition = Schema.Struct({ scope: Schema.String, position: Schema.Int });
-const readRouteReceipt = valueOf(Schema.Struct({ ...RoutePosition.fields, from_user: Schema.Boolean }), "mailbox.routeReceipt");
-const readUserRoutes = valueOf(Schema.Array(RoutePosition), "mailbox.userRoutes");
+const RoutePosition = z.object({ scope: z.string(), position: z.number().int() });
+const readRouteReceipt = valueOf(RoutePosition.extend({ from_user: z.boolean() }), "mailbox.routeReceipt");
+const readUserRoutes = valueOf(z.array(RoutePosition), "mailbox.userRoutes");
+const readTrigger = jsonOf(S.Trigger);
 
 export interface QueuedInput {
   readonly issue: string;
@@ -82,10 +85,10 @@ export type Arrival =
       readonly options: Omit<SendOptions, "hiring" | "envelopeIds">;
       readonly envelopes: { readonly _tag: "Talk"; readonly rows: readonly TalkRow[] } | { readonly _tag: "Queued"; readonly triggers: readonly Trigger[] };
       /** Runs inside the session hire transaction before the session is visible. */
-      readonly hiring: (session: T.Session, launch: string, at: number) => Effect.Effect<void, NotRecorded>;
+      readonly hiring: (session: T.Session, launch: string, at: number) => Promise<void>;
     };
 
-type SendOptions = Parameters<Session["Service"]["hire"]>[3];
+type SendOptions = Parameters<Session["hire"]>[3];
 
 export type TriggerArrival = Extract<Arrival, { readonly _tag: "Trigger" }>;
 export type HireArrival = Extract<Arrival, { readonly _tag: "Hire" }>;
@@ -106,479 +109,472 @@ export type DeliveryNews =
   | { readonly _tag: "Braked"; readonly session: string; readonly failed: number }
   | Handed;
 
-export class Mailbox extends Context.Service<
-  Mailbox,
-  {
-    readonly record: (event: SourceEvent) => Effect.Effect<Trigger | undefined, ApiError>;
-    readonly accept: (event: SourceEvent) => Effect.Effect<Trigger | undefined, ApiError>;
-    readonly recordTrigger: (input: TriggerInput) => Effect.Effect<Trigger, ApiError>;
-    readonly readTrigger: (id: string) => Effect.Effect<TriggerResource | undefined, Schema.SchemaError>;
-    readonly knownGitHubEvents: (repo: string, pr: number) => Effect.Effect<readonly KnownGitHubEvent[]>;
-    readonly replayCronTriggers: (consume: (trigger: Trigger, data: unknown) => Effect.Effect<void, ApiError | Schema.SchemaError>) => Effect.Effect<void>;
-    readonly unreadSummary: (participant: string, channel: string) => Effect.Effect<UnreadRow[]>;
-    readonly triggersOf: (issue: string) => Effect.Effect<readonly Trigger[]>;
-    /** Dispatches first, then routed order. */
-    readonly queuedTriggers: Effect.Effect<readonly QueuedInput[]>;
-    readonly isRouted: (trigger: string) => Effect.Effect<boolean>;
-    readonly receive: {
-      (arrival: TriggerArrival): Effect.Effect<ChannelRouteResult, ApiError>;
-      (arrival: HireArrival): Effect.Effect<HiredReceipt, HireRefused>;
-    };
-    readonly subscribe: (issue: string, threads: readonly string[]) => Effect.Effect<void, ApiError>;
-    readonly ownerOf: (trigger: string) => Effect.Effect<string | undefined>;
-    readonly deliveriesOf: (session: string) => readonly DeliveryRow[];
-    readonly orchestratorDigest: (agent: string) => Effect.Effect<Envelope[]>;
-    readonly start: Effect.Effect<void>;
-    readonly restore: Effect.Effect<void>;
-    readonly replay: Effect.Effect<void>;
-    readonly news: Effect.Effect<Stream.Stream<DeliveryNews>, never, Scope.Scope>;
-    readonly handBack: (session: string, envelope: string) => Effect.Effect<void>;
-    readonly withdraw: (what: Withdrawal) => Effect.Effect<void>;
-    readonly waitingOn: (envelope: string) => Effect.Effect<number>;
-    readonly decline: (session: string, envelope: string, reason: string) => Effect.Effect<void, ApiError>;
-  }
->()("@vibevalley/server/modules/mailbox/mailbox") {
-  static readonly layer = Layer.effect(
-    Mailbox,
-    Effect.gen(function* () {
-      const db = yield* Db;
-      const journal = yield* triggerJournal;
-      const core = yield* Core;
-      const sessions = yield* Session;
-      const agents = yield* Agent;
-      const config = yield* ServerConfig;
-      const issueOf = (id: string) => core.state().issues.find((issue) => issue.id === id);
-      const defaultChannelOf = Effect.gen(function* () {
-        return (yield* db.one(defaultID()))?.id ?? "";
-      });
-      const orchestratorInChannel = Effect.fn("Mailbox.orchestratorIn")(function* (channel: string) {
-        const top = yield* db.one(topPlace({ id: channel }));
-        const rows = top === undefined || top.type === "direct" ? [] : yield* db.run(membersOf({ channel_id: top.id }));
-        return orchestratorIn({ top, members: Arr.map(rows, (m) => m.participant_id), isOrchestrator: agents.isOrchestrator });
-      });
-      const unreadSummary = Effect.fn("Mailbox.unreadSummary")((participant: string, channel: string): Effect.Effect<UnreadRow[]> =>
-        Effect.map(db.run(unreadOf({ participant, channel })), (rows) =>
-          rows.slice(0, summaryChannels).map((row) => ({
-            target: targetOf({ type: channelType(row.type), ...(row.root_number !== null ? { rootNumber: row.root_number } : {}) }, row.channel_name || ""),
-            unread: row.unread ?? 0,
-            mentionsYou: row.mentions_you === true,
-            ...(row.latest_sender_name ? { latest: row.latest_sender_name } : {}),
-          })),
-        ),
-      );
-      const deliveryUnread = Effect.fn("Mailbox.deliveryUnread")(function* (who: string) {
-        const h = sessions.sessionOf(who);
-        const channel = h?.channel ?? (yield* defaultChannelOf);
-        return yield* unreadSummary(who, channel);
-      });
-      const open = new Deliveries();
-      const reach = new Reach();
-      const received = (row: qr.MarkRoutedResult) => {
-        const receipt = readRouteReceipt(row);
-        if (receipt.from_user) reach.userSpoke(receipt.scope, receipt.position);
-      };
-      const stored = (session: string, row: DeliveryRow) => {
-        open.inserted(session, row);
-        if (row.payload.trigger.actor.kind === "user" && row.envelope_id !== row.payload.trigger.id) reach.userSpoke(row.scope, row.position);
-        reach.delivered({
-          scope: row.scope,
-          position: row.position,
-          session,
-          senderKind: row.payload.trigger.actor.kind,
-          wakes: row.wakes,
-          held: row.held_by !== null,
-          at: row.created_at,
-        });
-      };
-      const breaker = new WakeBreaker();
-      const newsHub = yield* PubSub.unbounded<DeliveryNews>();
-      const routeLock = yield* Semaphore.make(1);
-      const routeLocked = <A, E>(effect: Effect.Effect<A, E>) => routeLock.withPermits(1)(effect);
-      const pumpLock = yield* Semaphore.make(1);
-      const pumpLocked = <A, E>(effect: Effect.Effect<A, E>) => pumpLock.withPermits(1)(effect);
-      const writeLock = yield* Semaphore.make(1);
-      const writtenLocked = <A, E>(effect: Effect.Effect<A, E>) => writeLock.withPermits(1)(Effect.uninterruptible(effect));
-      const timers = yield* FiberMap.make<string>();
-      const runTimer = yield* FiberMap.runtime(timers)();
-      const forkHere = yield* FiberSet.makeRuntime();
-      let closed = false;
-      const later = (key: string, ms: number, effect: () => Effect.Effect<void>) =>
-        void runTimer(
-          key,
-          Effect.delay(
-            Effect.sync(() => {
-              if (!closed) void Effect.suspend(() => (closed ? Effect.void : effect())).pipe(pumpLocked, bestEffort(`mailbox: ${key}`), forkHere);
+export interface Mailbox {
+  readonly record: (event: SourceEvent) => Promise<Trigger | undefined>;
+  readonly accept: (event: SourceEvent) => Promise<Trigger | undefined>;
+  readonly recordTrigger: (input: TriggerInput) => Promise<Trigger>;
+  readonly readTrigger: (id: string) => Promise<TriggerResource | undefined>;
+  readonly knownGitHubEvents: (repo: string, pr: number) => Promise<readonly KnownGitHubEvent[]>;
+  readonly replayCronTriggers: (consume: (trigger: Trigger, data: unknown) => Promise<void>) => Promise<void>;
+  readonly unreadSummary: (participant: string, channel: string) => Promise<UnreadRow[]>;
+  readonly triggersOf: (issue: string) => Promise<readonly Trigger[]>;
+  /** Dispatches first, then routed order. */
+  readonly queuedTriggers: () => Promise<readonly QueuedInput[]>;
+  readonly isRouted: (trigger: string) => Promise<boolean>;
+  /** A trigger's refusals are ApiErrors; a hire's is HireRefused. */
+  readonly receive: {
+    (arrival: TriggerArrival): Promise<ChannelRouteResult>;
+    (arrival: HireArrival): Promise<HiredReceipt>;
+  };
+  readonly subscribe: (issue: string, threads: readonly string[]) => Promise<void>;
+  readonly ownerOf: (trigger: string) => Promise<string | undefined>;
+  readonly deliveriesOf: (session: string) => readonly DeliveryRow[];
+  readonly orchestratorDigest: (agent: string) => Promise<Envelope[]>;
+  /** At startup, after the modules below it started: restores the open deliveries, routes what was left, wakes who waits. */
+  readonly start: () => Promise<void>;
+  readonly restore: () => Promise<void>;
+  readonly replay: () => Promise<void>;
+  /** What the mailbox tells, subscribed before it returns. */
+  readonly news: () => Subscription<DeliveryNews>;
+  readonly handBack: (session: string, envelope: string) => Promise<void>;
+  readonly withdraw: (what: Withdrawal) => Promise<void>;
+  readonly waitingOn: (envelope: string) => Promise<number>;
+  readonly decline: (session: string, envelope: string, reason: string) => Promise<void>;
+  readonly close: () => Promise<void>;
+}
+
+export interface MailboxDeps {
+  readonly db: Db;
+  readonly clock: Time;
+  readonly log: Logger;
+  readonly config: ServerConfig;
+  readonly core: Core;
+  readonly agent: Agent;
+  readonly session: Session;
+}
+
+export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
+  const { db, core, config, clock, session: sessions, agent: agents } = deps;
+  const log = deps.log.child("mailbox");
+  const journal = triggerJournal({ db, log });
+  const tasks = new TaskGroup({ name: "mailbox", onError: (task, e) => log.error(`${task} failed:`, e) });
+  const issueOf = (id: string) => core.state().issues.find((issue) => issue.id === id);
+  const defaultChannelOf = async () => (await defaultID(db.sql))?.id ?? "";
+  const orchestratorInChannel = async (channel: string) => {
+    const top = await topPlace(db.sql, { id: channel });
+    const rows = top === undefined || top.type === "direct" ? [] : await membersOf(db.sql, { channel_id: top.id });
+    return orchestratorIn({ top, members: rows.map((m) => m.participant_id), isOrchestrator: agents.isOrchestrator });
+  };
+  const unreadSummary = async (participant: string, channel: string): Promise<UnreadRow[]> =>
+    (await unreadOf(db.sql, { participant, channel })).slice(0, summaryChannels).map((row) => ({
+      target: targetOf({ type: channelType(row.type), ...(row.root_number !== null ? { rootNumber: row.root_number } : {}) }, row.channel_name || ""),
+      unread: row.unread ?? 0,
+      mentionsYou: row.mentions_you === true,
+      ...(row.latest_sender_name ? { latest: row.latest_sender_name } : {}),
+    }));
+  const deliveryUnread = async (who: string) => {
+    const h = sessions.sessionOf(who);
+    const channel = h?.channel ?? (await defaultChannelOf());
+    return unreadSummary(who, channel);
+  };
+  const open = new Deliveries();
+  const reach = new Reach();
+  const received = (row: qr.MarkRoutedResult) => {
+    const receipt = readRouteReceipt(row);
+    if (receipt.from_user) reach.userSpoke(receipt.scope, receipt.position);
+  };
+  const stored = (session: string, row: DeliveryRow) => {
+    open.inserted(session, row);
+    if (row.payload.trigger.actor.kind === "user" && row.envelope_id !== row.payload.trigger.id) reach.userSpoke(row.scope, row.position);
+    reach.delivered({
+      scope: row.scope,
+      position: row.position,
+      session,
+      senderKind: row.payload.trigger.actor.kind,
+      wakes: row.wakes,
+      held: row.held_by !== null,
+      at: row.created_at,
+    });
+  };
+  const breaker = new WakeBreaker();
+  const newsHub = new Hub<DeliveryNews>();
+  const routeLock = new Semaphore(1);
+  const routeLocked = <A>(work: () => Promise<A>) => routeLock.with(work);
+  const pumpLock = new Semaphore(1);
+  const pumpLocked = <A>(work: () => Promise<A>) => pumpLock.with(work);
+  const writeLock = new Semaphore(1);
+  // A write, once begun, runs to its end: none is handed a signal.
+  const writtenLocked = <A>(work: () => Promise<A>) => writeLock.with(work);
+  /** One pending timer per key: a later() for a key already waiting is dropped. The key is free again once it fires. */
+  const timers = new Map<string, () => void>();
+  let closed = false;
+  const later = (key: string, ms: number, work: () => Promise<void>) => {
+    if (closed || timers.has(key)) return;
+    timers.set(
+      key,
+      clock.after(ms, () => {
+        timers.delete(key);
+        if (closed) return;
+        tasks.run(`mailbox: ${key}`, () =>
+          bestEffort(log, `mailbox: ${key}`, () =>
+            pumpLocked(async () => {
+              if (!closed) await work();
             }),
-            ms,
           ),
-          { onlyIfMissing: true },
         );
-      const work = yield* makeWorkMailbox({
-        writtenLocked,
-        received,
-        stored,
-        defaultChannel: defaultChannelOf,
-        open,
-        reach,
-        breaker,
-        dispatch: (session) => later(`trigger:${session}`, 0, () => pump.kick(session)),
-        issueOf,
-        orchestratorIn: orchestratorInChannel,
+      }),
+    );
+  };
+  const work = makeWorkMailbox(
+    { db, clock, session: sessions, agent: agents },
+    {
+      writtenLocked,
+      received,
+      stored,
+      defaultChannel: defaultChannelOf,
+      open,
+      reach,
+      breaker,
+      dispatch: (session) => later(`trigger:${session}`, 0, () => pump.kick(session)),
+      issueOf,
+      orchestratorIn: orchestratorInChannel,
+    },
+  );
+  const flushIssue = (issue: string, human?: boolean) => routeLocked(() => work.flush(issue, human));
+  const restore = () =>
+    writtenLocked(async () => {
+      const snapshot = await db.tx(async () => {
+        await qd.rollbackAll(db.sql);
+        return {
+          rows: await qd.allOpenDeliveries(db.sql),
+          scopes: await qd.agentWakesByScope(db.sql),
+          sessions: await qd.lastAgentWakes(db.sql),
+          users: await qd.lastUserRoutes(db.sql),
+        };
       });
-      const flushIssue = (issue: string, human?: boolean) => routeLocked(work.flush(issue, human));
-      const restore = writtenLocked(
-        Effect.gen(function* () {
-          const snapshot = yield* db.inTx(
-            Effect.gen(function* () {
-              yield* db.run(qd.rollbackAll());
-              return yield* Effect.all({
-                rows: db.run(qd.allOpenDeliveries()),
-                scopes: db.run(qd.agentWakesByScope()),
-                sessions: db.run(qd.lastAgentWakes()),
-                users: db.run(qd.lastUserRoutes()),
+      open.load(snapshot.rows);
+      reach.load(
+        snapshot.scopes,
+        snapshot.sessions.filter((row) => sessions.isReachable(row.session_id)),
+        readUserRoutes(snapshot.users),
+      );
+    });
+
+  // Routing is one at a time and, once begun, runs to its end.
+  const route = (trigger: Trigger, to?: ChannelHearers | { readonly session: string }): Promise<ChannelRouteResult> =>
+    routeLocked(async () => {
+      const audience: readonly OutboundDelivery[] | undefined =
+        to === undefined
+          ? undefined
+          : "row" in to
+            ? channelRecipients(trigger, to)
+            : [
+                {
+                  trigger,
+                  session: to.session,
+                  role: agents.isOrchestrator(to.session) ? ("orchestrator" as const) : ("worker" as const),
+                  commit: async () => {},
+                  event: trigger.actor.kind === "user" ? ("conversation" as const) : ("mention" as const),
+                },
+              ];
+      const result = await work.receive(trigger, audience);
+      if (!(await work.isRouted(trigger.id))) {
+        const at = clock.now();
+        const routed = await qr.markRouted(db.sql, {
+          envelope_id: trigger.id,
+          scope: deliveryScope(trigger.replyChannel ?? (await defaultChannelOf())),
+          routed_at: at,
+        });
+        if (routed === undefined) throw new Inconsistent(`trigger ${trigger.id} was routed before it was recorded`);
+        received(routed);
+      }
+      return result ?? { heldNotice: "" };
+    });
+
+  const hire = async (arrival: HireArrival): Promise<HiredReceipt> => {
+    const room = await sessions.makeRoom(arrival.agent.runtime, arrival.where);
+    const envelopes = arrival.envelopes;
+    const { session } = await sessions.hire(arrival.agent, arrival.brief, arrival.where, {
+      ...arrival.options,
+      ...(envelopes._tag === "Talk" ? { envelopeIds: envelopes.rows.map((envelope) => envelope.row.envelope_id) } : {}),
+      hiring: async (s, launch) => {
+        const at = clock.now();
+        await arrival.hiring(s, launch, at);
+        switch (envelopes._tag) {
+          case "Talk":
+            return work.registerTalk(s.id, launch, at, envelopes.rows);
+          case "Queued":
+            if (envelopes.triggers.length > 0) await work.registerInitialInputs(s, launch, envelopes.triggers);
+            return;
+        }
+      },
+    });
+    // Kick the pump in case messages arrived in the conversation while hiring was in flight.
+    if (envelopes._tag === "Talk") later(`kick:${session.id}`, 0, () => pump.kick(session.id));
+    return { hired: session, ...(room.evicted ? { evicted: room.evicted } : {}) };
+  };
+
+  const dropSession = (session: string, why: string) =>
+    db.tx(async () => {
+      await qd.dropOpen(db.sql, { session_id: session, dropped_why: why });
+      await db.afterCommit(() => {
+        open.dropped(session);
+        reach.left(session);
+        breaker.reset(session);
+      });
+    });
+  const record = async (event: SourceEvent) => {
+    if (event.selfEcho === true) return undefined;
+    return journal.recordTrigger(event);
+  };
+  const accept = async (event: SourceEvent) => {
+    const trigger = await record(event);
+    if (trigger) await api.receive({ _tag: "Trigger", trigger });
+    return trigger;
+  };
+  function receive(arrival: TriggerArrival): Promise<ChannelRouteResult>;
+  function receive(arrival: HireArrival): Promise<HiredReceipt>;
+  function receive(arrival: Arrival): Promise<ChannelRouteResult | HiredReceipt> {
+    switch (arrival._tag) {
+      case "Trigger":
+        return route(arrival.trigger, arrival.to);
+      case "Hire":
+        return hire(arrival);
+    }
+  }
+  const replay = async () => {
+    let after = 0;
+    while (true) {
+      const rows = await qr.unroutedTriggers(db.sql, { after });
+      const last = rows.at(-1);
+      if (!last) return;
+      for (const row of rows)
+        await bestEffort(log, `mailbox: replay ${row.id}`, () => api.receive({ _tag: "Trigger", trigger: readTrigger(row.trigger_json) }));
+      after = last.seq;
+    }
+  };
+  const handBack = (session: string, envelope: string) =>
+    writtenLocked(() =>
+      db.tx(async () => {
+        await qd.rollbackOne(db.sql, { session_id: session, envelope_id: envelope });
+        await db.afterCommit(() => open.handedBackOne(session, envelope));
+      }),
+    );
+
+  const handToHost = async (recipient: string, messages: readonly Envelope[], primary: DeliveryRow) => {
+    const meta = primary.payload.trigger.meta;
+    const source = orchestratorSource(primary.payload.trigger.source);
+    newsHub.publish({
+      _tag: "Handed",
+      agent: recipient,
+      channel: primary.channel_id ?? (await defaultChannelOf()),
+      type: primary.payload.channelType,
+      target: inputOf(primary).target,
+      messages: [...messages],
+      ...(source ? { source } : {}),
+      ...(meta.issue ? { issue: meta.issue } : {}),
+      ...(meta.trigger ? { by: meta.trigger } : {}),
+    });
+  };
+  const pump = makePump<Envelope>(
+    { session: sessions, clock, log },
+    {
+      pending: (session) => open.of(session),
+      dropSession: (session, why) => writtenLocked(() => dropSession(session, why)),
+      handBack,
+      hand: work.hand,
+      consume: (session, envelope, at) =>
+        writtenLocked(() =>
+          db.tx(async () => {
+            await qd.consumeDelivery(db.sql, { session_id: session, envelope_id: envelope, consumed_at: at });
+            await db.afterCommit(() => open.remove(session, envelope));
+          }),
+        ),
+      returnHanded: (session) =>
+        writtenLocked(() =>
+          db.tx(async () => {
+            const rows = await qd.rollbackHanded(db.sql, { session_id: session });
+            await db.afterCommit(() => open.handedBack(session));
+            return rows.map((row) => row.envelope_id);
+          }),
+        ),
+      breakerSpoke: (session) => breaker.spoke(session),
+      breakerFailed: (session) => breaker.failed(session),
+      breakerOpen: (session) => breaker.isOpen(session),
+
+      readyInputs: (recipient, rows) => {
+        const current = sessions.sessionOf(recipient)?.issue;
+        const itemOf = (row: DeliveryRow) => {
+          const id = row.payload.trigger.meta.issue;
+          return issueOf(id ?? current ?? "");
+        };
+        const answered = new Set(
+          rows
+            .filter((row) => row.payload.trigger.actor.kind === "user" && row.state === "pending")
+            .flatMap((row) => {
+              const issue = itemOf(row);
+              return issue && issue.status !== "done" && issue.status !== "canceled" ? [issue.id] : [];
+            }),
+        );
+        return rows.filter((row) => {
+          const issue = itemOf(row);
+          return (
+            !issue ||
+            (issue.status !== "done" &&
+              issue.status !== "canceled" &&
+              (!waitsForHuman(issue) || row.payload.trigger.actor.kind === "user" || answered.has(issue.id)))
+          );
+        });
+      },
+      closed: () => closed,
+      isHosted: agents.isHosted,
+      message: (row) => inputOf(row),
+      wakeInput: async (recipient, _rows, messages) => {
+        const all = await deliveryUnread(recipient);
+        return wakeInput(
+          [...messages],
+          all.filter((other) => !messages.some((message) => message.target === other.target)),
+        );
+      },
+      handToHost,
+      consumedMessages: async (recipient, messages) => {
+        for (const message of messages) newsHub.publish({ _tag: "Consumed", session: recipient, envelope: message });
+      },
+      breakerNotice: async (recipient, failed) => newsHub.publish({ _tag: "Braked", session: recipient, failed }),
+      later,
+      noticeBatchMs: config.chat.noticeBatchMs,
+      retryWakeMs: config.chat.retryWakeMs,
+    },
+  );
+
+  const onNews = (news: SessionNews): Promise<void> => {
+    switch (news._tag) {
+      case "Consumed":
+        return bestEffort(log, `mailbox: input consumed by ${news.session}`, () => pumpLocked(() => pump.consumed(news)));
+      case "Returned":
+        return bestEffort(log, `mailbox: input returned by ${news.session}`, () => pumpLocked(() => pump.returned(news)));
+      case "Spoke":
+      case "Ended":
+      case "HandedOff":
+      case "Settling":
+      case "Closed":
+      case "Compacting":
+        return bestEffort(log, `mailbox: ${news.id} ${news._tag}`, () => pumpLocked(() => pump.activity(news)));
+      default:
+        return Promise.resolve();
+    }
+  };
+  const sessionNews = sessions.news();
+  tasks.run("session news", async (signal) => {
+    try {
+      for (let r = await sessionNews.next(signal); r.done !== true; r = await sessionNews.next(signal)) await onNews(r.value);
+    } finally {
+      sessionNews.close();
+    }
+  });
+
+  const bindIssue = (issue: T.Issue) =>
+    work.subscribe(issue.id, [`issue:${issue.id}`, ...(issue.repo && issue.pullRequest ? [`github:${issue.repo}#${issue.pullRequest.number}`] : [])]);
+  const onFact = (fact: T.ServerEvent) =>
+    bestEffort(log, "mailbox: issue routing", async () => {
+      if (fact.type === "issueChanged") {
+        await bindIssue(fact.issue);
+        if (fact.issue.status === "done" || fact.issue.status === "canceled") {
+          await flushIssue(fact.issue.id);
+        } else later(`issue:${fact.issue.id}`, 0, () => bestEffort(log, `mailbox: inputs of ${fact.issue.id}`, () => flushIssue(fact.issue.id)));
+      } else if (fact.type === "issueRemoved") {
+        return;
+      } else if (fact.type === "sessionChanged" && fact.session.issue && issueOf(fact.session.issue) !== undefined) {
+        const issue = fact.session.issue;
+        later(`issue:${issue}`, 0, () => bestEffort(log, `mailbox: inputs of ${issue}`, () => flushIssue(issue)));
+      } else if (
+        fact.type === "channelChanged" &&
+        fact.channel.subjectKind === "issue" &&
+        fact.channel.subjectId &&
+        issueOf(fact.channel.subjectId) !== undefined
+      ) {
+        await work.subscribe(fact.channel.subjectId, [`channel:${fact.channel.id}`]);
+      }
+    });
+
+  const { changes } = core.transitions();
+  tasks.run("issue routing", async (signal) => {
+    try {
+      for (let r = await changes.next(signal); r.done !== true; r = await changes.next(signal)) await onFact(r.value.fact);
+    } finally {
+      changes.close();
+    }
+  });
+
+  const api: Mailbox = {
+    ...journal,
+    record,
+    accept,
+    unreadSummary,
+    isRouted: work.isRouted,
+    triggersOf: work.issueInputs,
+    queuedTriggers: work.queuedInputs,
+    receive,
+    subscribe: (issue, threads) => work.subscribe(issue, threads),
+    ownerOf: work.ownerOf,
+    deliveriesOf: (session) => open.of(session),
+    orchestratorDigest: async (agent) =>
+      open
+        .of(agent)
+        .filter((row) => !(row.wakes && row.held_by === null))
+        .map((row) => inputOf(row)),
+    start: async () => {
+      await restore();
+      await replay();
+      for (const issue of core.state().issues)
+        await bestEffort(log, `mailbox: restore issue ${issue.id}`, async () => {
+          await bindIssue(issue);
+          await flushIssue(issue.id);
+        });
+      for (const session of sessions.hired()) await pumpLocked(() => pump.kick(session.id));
+    },
+    restore,
+    replay,
+    news: () => newsHub.subscribe(),
+    handBack,
+    withdraw: async (what) => {
+      switch (what._tag) {
+        case "Session":
+          return writtenLocked(() => dropSession(what.session, what.why));
+        case "Envelope":
+          return writtenLocked(() =>
+            db.tx(async () => {
+              const rows = await qd.dropOpenOf(db.sql, { message_id: what.envelope });
+              await db.afterCommit(() => {
+                for (const row of rows) open.remove(row.session_id, what.envelope);
               });
             }),
           );
-          open.load(snapshot.rows);
-          reach.load(
-            snapshot.scopes,
-            snapshot.sessions.filter((row) => sessions.isReachable(row.session_id)),
-            readUserRoutes(snapshot.users),
-          );
-        }),
-      );
-
-      let start: Effect.Effect<void> = Effect.void;
-      const route = Effect.fn("Mailbox.receive")(
-        function* (trigger: Trigger, to?: ChannelHearers | { readonly session: string }) {
-          const audience =
-            to === undefined
-              ? undefined
-              : "row" in to
-                ? channelRecipients(trigger, to)
-                : [
-                    {
-                      trigger,
-                      session: to.session,
-                      role: agents.isOrchestrator(to.session) ? ("orchestrator" as const) : ("worker" as const),
-                      commit: Effect.void,
-                      event: trigger.actor.kind === "user" ? ("conversation" as const) : ("mention" as const),
-                    },
-                  ];
-          const result = yield* work.receive(trigger, audience);
-          if (!(yield* work.isRouted(trigger.id))) {
-            const at = yield* Clock.currentTimeMillis;
-            const markRouted2 = yield* db.run(
-              qr.markRouted({
-                envelope_id: trigger.id,
-                scope: deliveryScope(trigger.replyChannel ?? (yield* defaultChannelOf)),
-                routed_at: at,
-              }),
-            );
-            received(markRouted2);
-          }
-          return result ?? { heldNotice: "" };
-        },
-        // Routing is one at a time and, once begun, runs to its end.
-        (effect) => routeLocked(Effect.uninterruptible(effect)),
-      );
-
-      const hire = Effect.fn("Mailbox.receive")(function* (arrival: HireArrival): Effect.fn.Return<HiredReceipt, HireRefused> {
-        const room = yield* sessions.makeRoom(arrival.agent.runtime, arrival.where);
-        const envelopes = arrival.envelopes;
-        const { session } = yield* sessions.hire(arrival.agent, arrival.brief, arrival.where, {
-          ...arrival.options,
-          ...(envelopes._tag === "Talk" ? { envelopeIds: envelopes.rows.map((envelope) => envelope.row.envelope_id) } : {}),
-          hiring: (s, launch) =>
-            Effect.gen(function* () {
-              const at = yield* Clock.currentTimeMillis;
-              yield* arrival.hiring(s, launch, at);
-              switch (envelopes._tag) {
-                case "Talk":
-                  return yield* work.registerTalk(s.id, launch, at, envelopes.rows);
-                case "Queued":
-                  if (envelopes.triggers.length > 0) yield* work.registerInitialInputs(s, launch, envelopes.triggers);
-                  return;
-              }
-            }),
-        });
-        // Kick the pump in case messages arrived in the conversation while hiring was in flight.
-        if (envelopes._tag === "Talk") yield* Effect.sync(() => later(`kick:${session.id}`, 0, () => pump.kick(session.id)));
-        return { hired: session, ...(room.evicted ? { evicted: room.evicted } : {}) };
-      });
-
-      const dropSession = (session: string, why: string) =>
-        db.inTx(
-          Effect.gen(function* () {
-            yield* db.run(qd.dropOpen({ session_id: session, dropped_why: why }));
-            yield* db.afterCommit(
-              Effect.sync(() => {
-                open.dropped(session);
-                reach.left(session);
-                breaker.reset(session);
-              }),
-            );
-          }),
-        );
-      const record = Effect.fn("Mailbox.record")(function* (event: SourceEvent) {
-        if (event.selfEcho === true) return undefined;
-        return yield* journal.recordTrigger(event);
-      });
-      const accept = Effect.fn("Mailbox.accept")(function* (event: SourceEvent) {
-        const trigger = yield* record(event);
-        if (trigger) yield* api.receive({ _tag: "Trigger", trigger });
-        return trigger;
-      });
-      function receive(arrival: TriggerArrival): Effect.Effect<ChannelRouteResult, ApiError>;
-      function receive(arrival: HireArrival): Effect.Effect<HiredReceipt, HireRefused>;
-      function receive(arrival: Arrival): Effect.Effect<ChannelRouteResult | HiredReceipt, ApiError | HireRefused> {
-        switch (arrival._tag) {
-          case "Trigger":
-            return route(arrival.trigger, arrival.to);
-          case "Hire":
-            return hire(arrival);
-        }
+        case "Issue":
+          return work.retireDispatches(what.issue, what.at);
       }
-      const api = Mailbox.of({
-        ...journal,
-        record,
-        accept,
-        unreadSummary,
-        isRouted: work.isRouted,
-        triggersOf: work.issueInputs,
-        queuedTriggers: work.queuedInputs,
-        receive,
-        subscribe: Effect.fnUntraced(function* (issue: string, threads: readonly string[]) {
-          return yield* work.subscribe(issue, threads);
-        }),
-        ownerOf: work.ownerOf,
-        deliveriesOf: (session) => open.of(session),
-        orchestratorDigest: Effect.fn("Mailbox.orchestratorDigest")((agent) =>
-          Effect.sync(() =>
-            open
-              .of(agent)
-              .filter((row) => !(row.wakes && row.held_by === null))
-              .map((row) => inputOf(row)),
-          ),
-        ),
-        start: Effect.suspend(() => start),
-        restore,
-        replay: Effect.gen(function* () {
-          let after = 0;
-          while (true) {
-            const rows = yield* db.run(qr.unroutedTriggers({ after }));
-            const last = rows.at(-1);
-            if (!last) return;
-            yield* Effect.forEach(
-              rows,
-              (row) =>
-                Effect.flatMap(Schema.decodeEffect(Schema.fromJsonString(S.Trigger))(row.trigger_json), (trigger) =>
-                  api.receive({ _tag: "Trigger", trigger }),
-                ).pipe(bestEffort(`mailbox: replay ${row.id}`)),
-              { discard: true },
-            );
-            after = last.seq;
-          }
-        }),
-        news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
-        handBack: Effect.fn("Mailbox.handBack")(function* (session, envelope) {
-          yield* db.inTx(
-            Effect.gen(function* () {
-              yield* db.run(qd.rollbackOne({ session_id: session, envelope_id: envelope }));
-              yield* db.afterCommit(Effect.sync(() => open.handedBackOne(session, envelope)));
-            }),
-          );
-        }, writtenLocked),
-        withdraw: Effect.fn("Mailbox.withdraw")(function* (what) {
-          switch (what._tag) {
-            case "Session":
-              return yield* writtenLocked(dropSession(what.session, what.why));
-            case "Envelope":
-              return yield* writtenLocked(
-                db.inTx(
-                  Effect.gen(function* () {
-                    const rows = yield* db.run(qd.dropOpenOf({ message_id: what.envelope }));
-                    yield* db.afterCommit(
-                      Effect.sync(() => {
-                        for (const row of rows) open.remove(row.session_id, what.envelope);
-                      }),
-                    );
-                  }),
-                ),
-              );
-            case "Issue":
-              return yield* work.retireDispatches(what.issue, what.at);
-          }
-        }),
-        waitingOn: Effect.fn("Mailbox.waitingOn")(function* (envelope) {
-          return (yield* db.run(qd.waitingOn({ message_id: envelope }))).length;
-        }),
-        decline: Effect.fn("Mailbox.decline")(function* (session, envelope, reason) {
-          const why = reason.trim();
-          if (!why) return yield* refused(t("server.issue.noTitle"));
-          if (yield* routeLocked(work.decline(session, envelope, why))) return;
-          return yield* missing(t("server.issue.issueRef", { ref: envelope }), [lookIn.issue]);
-        }),
-      });
+    },
+    waitingOn: async (envelope) => (await qd.waitingOn(db.sql, { message_id: envelope })).length,
+    decline: async (session, envelope, reason) => {
+      const why = reason.trim();
+      if (!why) throw refused(t("server.issue.noTitle"));
+      if (await routeLocked(() => work.decline(session, envelope, why))) return;
+      throw missing(t("server.issue.issueRef", { ref: envelope }), [lookIn.issue]);
+    },
+    close: async () => {
+      closed = true;
+      for (const cancel of timers.values()) cancel();
+      timers.clear();
+      await tasks.close();
+      newsHub.end();
+    },
+  };
 
-      const handToHost = (recipient: string, messages: readonly Envelope[], primary: DeliveryRow) =>
-        Effect.gen(function* () {
-          const meta = primary.payload.trigger.meta;
-          const source = orchestratorSource(primary.payload.trigger.source);
-          PubSub.publishUnsafe(newsHub, {
-            _tag: "Handed",
-            agent: recipient,
-            channel: primary.channel_id ?? (yield* defaultChannelOf),
-            type: primary.payload.channelType,
-            target: inputOf(primary).target,
-            messages: [...messages],
-            ...(source ? { source } : {}),
-            ...(meta.issue ? { issue: meta.issue } : {}),
-            ...(meta.trigger ? { by: meta.trigger } : {}),
-          });
-        });
-      const pump = makePump<Envelope>(sessions, {
-        pending: api.deliveriesOf,
-        dropSession: (session, why) => writtenLocked(dropSession(session, why)),
-        handBack: api.handBack,
-        hand: work.hand,
-        consume: Effect.fn("Mailbox.consume")(function* (session, envelope, at) {
-          yield* db.inTx(
-            Effect.gen(function* () {
-              yield* db.run(qd.consumeDelivery({ session_id: session, envelope_id: envelope, consumed_at: at }));
-              yield* db.afterCommit(Effect.sync(() => open.remove(session, envelope)));
-            }),
-          );
-        }, writtenLocked),
-        returnHanded: Effect.fn("Mailbox.returnHanded")(function* (session) {
-          return yield* db.inTx(
-            Effect.gen(function* () {
-              const rows = yield* db.run(qd.rollbackHanded({ session_id: session }));
-              yield* db.afterCommit(Effect.sync(() => open.handedBack(session)));
-              return rows.map((row) => row.envelope_id);
-            }),
-          );
-        }, writtenLocked),
-        breakerSpoke: (session) => breaker.spoke(session),
-        breakerFailed: (session) => breaker.failed(session),
-        breakerOpen: (session) => breaker.isOpen(session),
-
-        readyInputs: (recipient, rows) => {
-          const current = sessions.sessionOf(recipient)?.issue;
-          const itemOf = (row: DeliveryRow) => {
-            const id = row.payload.trigger.meta.issue;
-            return issueOf(id ?? current ?? "");
-          };
-          const answered = new Set(
-            rows
-              .filter((row) => row.payload.trigger.actor.kind === "user" && row.state === "pending")
-              .flatMap((row) => {
-                const issue = itemOf(row);
-                return issue && issue.status !== "done" && issue.status !== "canceled" ? [issue.id] : [];
-              }),
-          );
-          return rows.filter((row) => {
-            const issue = itemOf(row);
-            return (
-              !issue ||
-              (issue.status !== "done" &&
-                issue.status !== "canceled" &&
-                (!waitsForHuman(issue) || row.payload.trigger.actor.kind === "user" || answered.has(issue.id)))
-            );
-          });
-        },
-        closed: () => closed,
-        isHosted: agents.isHosted,
-        message: (row) => inputOf(row),
-        wakeInput: (recipient, _rows, messages) =>
-          Effect.map(deliveryUnread(recipient), (all) =>
-            wakeInput(
-              [...messages],
-              all.filter((other) => !messages.some((message) => message.target === other.target)),
-            ),
-          ),
-        handToHost,
-        consumedMessages: (recipient, messages) =>
-          Effect.sync(() => {
-            for (const message of messages) PubSub.publishUnsafe(newsHub, { _tag: "Consumed", session: recipient, envelope: message });
-          }),
-        breakerNotice: (recipient, failed) => Effect.sync(() => PubSub.publishUnsafe(newsHub, { _tag: "Braked", session: recipient, failed })),
-        later,
-        noticeBatchMs: config.chat.noticeBatchMs,
-        retryWakeMs: config.chat.retryWakeMs,
-      });
-
-      const sessionNews = yield* sessions.news;
-      yield* Effect.forkScoped(
-        Stream.runForEach(sessionNews, (news) => {
-          switch (news._tag) {
-            case "Consumed":
-              return pumpLocked(pump.consumed(news)).pipe(bestEffort(`mailbox: input consumed by ${news.session}`));
-            case "Returned":
-              return pumpLocked(pump.returned(news)).pipe(bestEffort(`mailbox: input returned by ${news.session}`));
-            case "Spoke":
-            case "Ended":
-            case "HandedOff":
-            case "Settling":
-            case "Closed":
-            case "Compacting":
-              return pumpLocked(pump.activity(news)).pipe(bestEffort(`mailbox: ${news.id} ${news._tag}`));
-            default:
-              return Effect.void;
-          }
-        }),
-      );
-
-      const bindIssue = (issue: T.Issue) =>
-        work.subscribe(issue.id, [`issue:${issue.id}`, ...(issue.repo && issue.pullRequest ? [`github:${issue.repo}#${issue.pullRequest.number}`] : [])]);
-      const onFact = (fact: T.ServerEvent) =>
-        Effect.gen(function* () {
-          if (fact.type === "issueChanged") {
-            yield* bindIssue(fact.issue);
-            if (fact.issue.status === "done" || fact.issue.status === "canceled") {
-              yield* flushIssue(fact.issue.id);
-            } else later(`issue:${fact.issue.id}`, 0, () => flushIssue(fact.issue.id).pipe(bestEffort(`mailbox: inputs of ${fact.issue.id}`)));
-          } else if (fact.type === "issueRemoved") {
-            return;
-          } else if (fact.type === "sessionChanged" && fact.session.issue && issueOf(fact.session.issue) !== undefined) {
-            const issue = fact.session.issue;
-            later(`issue:${issue}`, 0, () => flushIssue(issue).pipe(bestEffort(`mailbox: inputs of ${issue}`)));
-          } else if (
-            fact.type === "channelChanged" &&
-            fact.channel.subjectKind === "issue" &&
-            fact.channel.subjectId &&
-            issueOf(fact.channel.subjectId) !== undefined
-          ) {
-            yield* work.subscribe(fact.channel.subjectId, [`channel:${fact.channel.id}`]);
-          }
-        }).pipe(bestEffort("mailbox: issue routing"));
-
-      const [, transitions] = yield* core.transitions;
-      yield* Effect.forkScoped(Stream.runForEach(transitions, ({ fact }) => onFact(fact)));
-
-      start = Effect.gen(function* () {
-        yield* api.restore;
-        yield* api.replay;
-        yield* Effect.forEach(
-          core.state().issues,
-          (issue) =>
-            Effect.gen(function* () {
-              yield* bindIssue(issue);
-              yield* flushIssue(issue.id);
-            }).pipe(bestEffort(`mailbox: restore issue ${issue.id}`)),
-          { discard: true },
-        );
-        yield* Effect.forEach(sessions.hired(), (session) => pumpLocked(pump.kick(session.id)), { discard: true });
-      });
-      yield* Effect.forkScoped(api.replay.pipe(Effect.repeat(Schedule.spaced(config.chat.retryWakeMs)), Effect.delay(config.chat.retryWakeMs)));
-      yield* Effect.addFinalizer(() =>
-        Effect.sync(() => {
-          closed = true;
-        }),
-      );
-      return api;
-    }),
-  );
+  tasks.run("replay", async (signal) => {
+    while (true) {
+      await clock.sleep(config.chat.retryWakeMs, signal);
+      await replay();
+    }
+  });
+  return api;
 }
-
-export const start = Layer.effectDiscard(Effect.flatMap(Mailbox, (mailbox) => mailbox.start));

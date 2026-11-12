@@ -3,16 +3,18 @@ import { join } from "node:path";
 import type { ControlOutcome, Event, Runtime as OarRuntime, Session as RuntimeSession, SessionOptions } from "@botiverse/oar";
 import { createSubagents, type Subagent, type SubagentReport, type Subagents } from "@botiverse/oar/agents";
 import { applyTaskEvent, initialStatus, initialTasks, observeSessionView, reduceStatus, stallOf, type TaskMap } from "@botiverse/oar/observe";
-import { Clock, Config, Deferred, Effect, Exit, FiberMap, FiberSet, Metric, Schema, type Scope } from "effect";
 
+import { abortable, type Clock, TaskGroup, withTimeout } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { maxRunning } from "@vibevalley/protocol";
 
-import { type ApiError, BizCode, messageOf, reasonOf, refuseIn } from "#/base/errors.ts";
-import { reposDir, ServerConfig } from "#/infra/config.ts";
+import { BizCode, messageOf, refuseIn } from "#/base/errors.ts";
+import { reposDir, type ServerConfig } from "#/infra/config.ts";
+import type { Logger } from "#/infra/log.ts";
+import { gauge } from "#/infra/metrics.ts";
 import { loopbackEnvironment, observeToolConnections } from "#/modules/runtime/access.ts";
-import { probeInstallation, Runtime } from "#/modules/runtime/runtime.ts";
+import { probeInstallation, type Runtime } from "#/modules/runtime/runtime.ts";
 
 const refused = refuseIn(BizCode.SessionRefused);
 
@@ -56,28 +58,29 @@ export type StartFailure = { readonly execution?: never; readonly refused: strin
 export type Started = { readonly execution: Execution; readonly refused?: never; readonly retained?: never } | StartFailure;
 
 export interface Executions {
-  readonly start: (input: StartExecution) => Effect.Effect<Started>;
-  readonly deliver: (id: string, text: string, inputId: string) => Effect.Effect<DeliveredInput>;
-  readonly interrupt: (id: string) => Effect.Effect<ControlOutcome | { readonly kind: "failed"; readonly reason: string }>;
-  readonly close: (id: string) => Effect.Effect<void, ApiError>;
-  readonly failed: (id: string, why: string) => Effect.Effect<StartFailure>;
+  readonly start: (input: StartExecution) => Promise<Started>;
+  readonly deliver: (id: string, text: string, inputId: string) => Promise<DeliveredInput>;
+  readonly interrupt: (id: string) => Promise<ControlOutcome | { readonly kind: "failed"; readonly reason: string }>;
+  /** Refused (an ApiError) when the runtime does not confirm disposal. Aborting signal stops the caller's wait, not the
+   * closing: that belongs to the executor, and a later close waits for the same end. */
+  readonly close: (id: string, signal?: AbortSignal) => Promise<void>;
+  readonly failed: (id: string, why: string) => Promise<StartFailure>;
   readonly observe: (id: string, observer: ExecutionObserver) => void;
   readonly detach: (id: string) => void;
   readonly find: (id: string) => Execution | undefined;
   readonly all: () => readonly Execution[];
 }
 
-class NotClosed extends Schema.TaggedError<NotClosed, { readonly brand: unique symbol }>()("NotClosed", {
-  message: Schema.String,
-  cause: Schema.Defect(),
-}) {}
+class NotClosed extends Error {
+  override readonly name = "NotClosed";
+}
 
 type AllocationPhase =
   | { readonly _tag: "spawning" }
   | { readonly _tag: "unobserved"; readonly agent: Subagent }
   | { readonly _tag: "observing"; readonly agent: Subagent; readonly stop: () => void }
   | { readonly _tag: "detached"; readonly agent: Subagent }
-  | { readonly _tag: "closing"; readonly attached: boolean; readonly wait: Deferred.Deferred<void, NotClosed>; readonly failure?: string };
+  | { readonly _tag: "closing"; readonly attached: boolean; readonly wait: Promise<void>; readonly failure?: string };
 
 interface Allocation {
   readonly owner: ExecutionOwner;
@@ -96,8 +99,9 @@ const isAttached = (phase: AllocationPhase): boolean => phase._tag === "observin
 
 const failureOf = (phase: AllocationPhase): string | undefined => (phase._tag === "closing" ? phase.failure : undefined);
 
-const notClosed = (cause: unknown) => NotClosed.make({ message: messageOf(cause), cause });
-const running = Metric.gauge("vibevalley.sessions.running", { description: "Runtime sessions open now (the helpers' and the orchestrators')" });
+const notClosed = (cause: unknown) => new NotClosed(messageOf(cause), { cause });
+/** Runtime sessions open now (the helpers' and the orchestrators'). */
+const running = gauge("vibevalley.sessions.running");
 const closeWaitMs = 15_000;
 
 /** Calls onStall once a turn has had no record for stallMs, folded from the session's first record as its events are. */
@@ -105,27 +109,22 @@ export function watchStalls(
   session: RuntimeSession,
   stallMs: number,
   onStall: (silentForMs: number, at: number) => void,
-  timer: (wait: Effect.Effect<void>) => void,
-  now: () => number,
+  timer: (wait: (signal: AbortSignal) => Promise<void>) => void,
+  clock: Pick<Clock, "now" | "sleep">,
 ) {
   let status = initialStatus;
-  // The timer is one keyed fiber of the service's: arming again replaces it, Effect.void disarms it.
-  const disarm = () => timer(Effect.void);
+  // The timer is one keyed task of the service's: arming again replaces it, a wait that does nothing disarms it.
+  const disarm = () => timer(() => Promise.resolve());
   const stop = session.rawEvents(
     (record) => {
       status = reduceStatus(status, record, session.id);
       if (status.kind !== "running") return disarm();
-      timer(
-        Effect.sleep(stallMs).pipe(
-          Effect.andThen(
-            Effect.sync(() => {
-              const at = now();
-              const stall = stallOf(status, at, stallMs);
-              if (stall !== null) onStall(stall.silentForMs, at);
-            }),
-          ),
-        ),
-      );
+      timer(async (signal) => {
+        await clock.sleep(stallMs, signal);
+        const at = clock.now();
+        const stall = stallOf(status, at, stallMs);
+        if (stall !== null) onStall(stall.silentForMs, at);
+      });
     },
     { sessionId: session.id, afterSeq: -1 },
   );
@@ -151,24 +150,23 @@ const view = (allocation: Allocation): Execution => {
   };
 };
 
-export const makeExecutor = Effect.gen(function* (): Effect.fn.Return<Executions, never, ServerConfig | Runtime | Scope.Scope> {
-  const config = yield* ServerConfig;
+export interface ExecutorDeps {
+  readonly config: ServerConfig;
+  readonly runtime: Runtime;
+  readonly clock: Clock;
+  readonly log: Logger;
+}
+
+/** The executions on this machine, and close(): it lets go of every one, waiting closeWaitMs at most for them to confirm. */
+export function makeExecutor(deps: ExecutorDeps): Executions & { readonly closeAll: () => Promise<void> } {
+  const { config, clock } = deps;
+  const log = deps.log.child("executor");
   const inherited = {
-    // A string with a default cannot fail to read.
-    NO_PROXY: yield* Config.String("NO_PROXY").pipe(
-      Config.withDefault(""),
-      Effect.orElseSucceed(() => ""),
-    ),
-    no_proxy: yield* Config.String("no_proxy").pipe(
-      Config.withDefault(""),
-      Effect.orElseSucceed(() => ""),
-    ),
+    NO_PROXY: process.env.NO_PROXY ?? "",
+    no_proxy: process.env.no_proxy ?? "",
   };
-  const runtimes = yield* Runtime;
-  const clock = yield* Clock.Clock;
-  const forkHere = yield* FiberSet.makeRuntime();
-  const timers = yield* FiberMap.make<string>();
-  const later = yield* FiberMap.runtime(timers)();
+  const runtimes = deps.runtime;
+  const tasks = new TaskGroup({ name: "executor", onError: (task, e) => log.warn(`${task} failed`, e) });
   const allocations = new Map<string, Allocation>();
 
   const stopObserving = (allocation: Allocation) => {
@@ -179,32 +177,28 @@ export const makeExecutor = Effect.gen(function* (): Effect.fn.Return<Executions
   };
 
   // Closing outlives an interrupted caller; all later callers receive the same disposal result.
-  const closeAllocation = (allocation: Allocation): Effect.Effect<void, NotClosed> =>
-    Effect.suspend(() => {
-      if (allocation.phase._tag === "closing") return Deferred.await(allocation.phase.wait);
-      const wait = Deferred.makeUnsafe<void, NotClosed>();
-      const attached = isAttached(allocation.phase);
-      if (allocation.phase._tag === "observing") allocation.phase.stop();
-      allocation.phase = { _tag: "closing", attached, wait };
-      const close = Effect.gen(function* () {
-        const crew = yield* Effect.exit(Effect.tryPromise({ try: () => allocation.subagents.close(), catch: notClosed }));
-        // oar may already have closed its Subagent after a failed prompt; that no-op does not confirm disposal.
-        const resources = yield* Effect.forEach(
-          [...allocation.resources],
-          (session) => Effect.exit(Effect.tryPromise({ try: () => session.dispose(), catch: notClosed })),
-          { concurrency: "unbounded" },
-        );
-        const failed = [crew, ...resources].find(Exit.isFailure);
-        if (failed) return yield* failed;
-      });
-      forkHere(
-        close.pipe(
-          Effect.onExit((exit) => Deferred.done(wait, exit)),
-          Effect.ignore({ log: "Debug" }),
-        ),
-      );
-      return Deferred.await(wait);
+  const closeAllocation = (allocation: Allocation): Promise<void> => {
+    if (allocation.phase._tag === "closing") return allocation.phase.wait;
+    const { promise: wait, resolve, reject } = Promise.withResolvers<void>();
+    // Each caller awaits it; one that has gone (aborted) must not leave it unhandled.
+    wait.catch(() => {});
+    const attached = isAttached(allocation.phase);
+    if (allocation.phase._tag === "observing") allocation.phase.stop();
+    allocation.phase = { _tag: "closing", attached, wait };
+    const close = async () => {
+      const crew = await Promise.allSettled([allocation.subagents.close()]);
+      // oar may already have closed its Subagent after a failed prompt; that no-op does not confirm disposal.
+      const resources = await Promise.allSettled([...allocation.resources].map((session) => session.dispose()));
+      const failed = [...crew, ...resources].find((r) => r.status === "rejected");
+      if (failed) throw notClosed(failed.reason);
+    };
+    // Not under the caller's signal, nor the group's: disposal runs to its end once begun.
+    close().then(resolve, (e: unknown) => {
+      log.debug("an execution did not close", e);
+      reject(e instanceof NotClosed ? e : notClosed(e));
     });
+    return wait;
+  };
 
   const setClosingFailure = (allocation: Allocation, failure: string) => {
     if (allocation.phase._tag === "closing") {
@@ -212,77 +206,82 @@ export const makeExecutor = Effect.gen(function* (): Effect.fn.Return<Executions
     }
   };
 
-  const closeOwned = Effect.fnUntraced(function* (allocation: Allocation) {
-    yield* closeAllocation(allocation).pipe(
-      Effect.mapError((e) => {
-        const failure = t("server.session.life.notStopped", { why: e.message });
-        setClosingFailure(allocation, failure);
-        return refused(failure);
-      }),
-    );
+  const closeOwned = async (allocation: Allocation, signal?: AbortSignal) => {
+    try {
+      await abortable(closeAllocation(allocation), signal);
+    } catch (e) {
+      if (!(e instanceof NotClosed)) throw e;
+      const failure = t("server.session.life.notStopped", { why: e.message });
+      setClosingFailure(allocation, failure);
+      throw refused(failure);
+    }
     stopObserving(allocation);
     if (allocations.get(allocation.owner.id) === allocation) allocations.delete(allocation.owner.id);
-    yield* Metric.update(running, allocations.size);
-  });
+    running.set(allocations.size);
+  };
 
-  const close = Effect.fn("Executions.close")(function* (id: string) {
+  const close = async (id: string, signal?: AbortSignal) => {
     const allocation = allocations.get(id);
-    if (allocation) yield* closeOwned(allocation);
-  });
+    if (allocation) await closeOwned(allocation, signal);
+  };
 
-  const failedAllocation = Effect.fnUntraced(function* (allocation: Allocation, why: string): Effect.fn.Return<StartFailure> {
-    return yield* closeOwned(allocation).pipe(
-      Effect.match({
-        onSuccess: () => ({ refused: why, retained: false }),
-        onFailure: (e) => {
-          const failure = t("shared.join.clauses", { a: why, b: reasonOf(e) });
-          setClosingFailure(allocation, failure);
-          return { refused: failure, retained: true };
-        },
-      }),
-    );
-  });
+  const failedAllocation = async (allocation: Allocation, why: string): Promise<StartFailure> => {
+    try {
+      await closeOwned(allocation);
+      return { refused: why, retained: false };
+    } catch (e) {
+      const failure = t("shared.join.clauses", { a: why, b: messageOf(e) });
+      setClosingFailure(allocation, failure);
+      return { refused: failure, retained: true };
+    }
+  };
 
-  const failed = Effect.fn("Executions.failed")(function* (id: string, why: string): Effect.fn.Return<StartFailure> {
+  const failed = async (id: string, why: string): Promise<StartFailure> => {
     const allocation = allocations.get(id);
-    return allocation ? yield* failedAllocation(allocation, why) : { refused: why, retained: false };
-  });
+    return allocation ? failedAllocation(allocation, why) : { refused: why, retained: false };
+  };
 
   const detach = (id: string) => {
     const allocation = allocations.get(id);
     if (allocation) stopObserving(allocation);
   };
 
-  yield* Effect.addFinalizer(() =>
-    Effect.sync(() => {
-      for (const id of allocations.keys()) detach(id);
-    }).pipe(
-      Effect.andThen(
-        Effect.forEach(
-          [...allocations],
-          ([id, allocation]) =>
-            closeAllocation(allocation).pipe(
-              Effect.catch((e) => Effect.logWarning("an execution did not close", e).pipe(Effect.annotateLogs({ session: id }))),
-            ),
-          { concurrency: "unbounded", discard: true },
-        ).pipe(Effect.timeoutOption(closeWaitMs)),
-      ),
-    ),
-  );
+  const closeAll = async () => {
+    for (const id of allocations.keys()) detach(id);
+    try {
+      await withTimeout(
+        () =>
+          Promise.all(
+            [...allocations].map(async ([id, allocation]) => {
+              try {
+                await closeAllocation(allocation);
+              } catch (e) {
+                log.warn(`an execution did not close (session ${id})`, e);
+              }
+            }),
+          ),
+        closeWaitMs,
+        { clock },
+      );
+    } catch (e) {
+      // Past the wait the server goes on closing: what has not confirmed by then is left to the runtime.
+      log.warn("executions still closing after the wait", e);
+    }
+    await tasks.close();
+  };
 
   return {
-    start: Effect.fn("Executions.start")(function* ({ agent, owner, cwd, input, resume, options }): Effect.fn.Return<Started> {
+    closeAll,
+    start: async ({ agent, owner, cwd, input, resume, options }): Promise<Started> => {
       const id = owner.id;
       const prior = allocations.get(id);
       if (prior) return { refused: failureOf(prior.phase) ?? t("server.session.life.notReturned"), retained: true };
-      const resolved = yield* runtimes.resolve(agent).pipe(
-        Effect.match({
-          onFailure: (e) => ({ _tag: "refused" as const, refused: reasonOf(e) }),
-          onSuccess: (value) => ({ _tag: "resolved" as const, value }),
-        }),
-      );
-      if (resolved._tag === "refused") return { refused: resolved.refused, retained: false };
-      const r = resolved.value;
+      let r: Awaited<ReturnType<Runtime["resolve"]>>;
+      try {
+        r = await runtimes.resolve(agent);
+      } catch (e) {
+        return { refused: messageOf(e), retained: false };
+      }
       const raced = allocations.get(id);
       if (raced) return { refused: failureOf(raced.phase) ?? t("server.session.life.notReturned"), retained: true };
       const base = r.runtime;
@@ -328,63 +327,66 @@ export const makeExecutor = Effect.gen(function* (): Effect.fn.Return<Executions
         phase: { _tag: "spawning" },
       };
       allocations.set(id, allocation);
-      yield* Metric.update(running, allocations.size);
-      const opening = Effect.gen(function* () {
-        const spawned = yield* Effect.promise(() =>
-          subagents
-            .spawn({
-              runtime: base.id,
-              name: id,
-              task: input,
-              cwd,
-              ...(r.model ? { model: r.model } : {}),
-              ...(r.effort ? { effort: r.effort } : {}),
-              ...(resume ? { resume } : {}),
-              env: r.env,
-            })
-            .catch((e: unknown) => ({ kind: "refused" as const, code: "open_failed" as const, reason: messageOf(e) })),
-        );
-        if (spawned.kind !== "spawned") return yield* failedAllocation(allocation, t("shared.join.aside", { text: spawned.reason, aside: spawned.code }));
+      running.set(allocations.size);
+      const opening = async (): Promise<Started> => {
+        const spawned = await subagents
+          .spawn({
+            runtime: base.id,
+            name: id,
+            task: input,
+            cwd,
+            ...(r.model ? { model: r.model } : {}),
+            ...(r.effort ? { effort: r.effort } : {}),
+            ...(resume ? { resume } : {}),
+            env: r.env,
+          })
+          .catch((e: unknown) => ({ kind: "refused" as const, code: "open_failed" as const, reason: messageOf(e) }));
+        if (spawned.kind !== "spawned") return failedAllocation(allocation, t("shared.join.aside", { text: spawned.reason, aside: spawned.code }));
         allocation.phase = { _tag: "unobserved", agent: spawned.agent };
         allocation.sessionId = spawned.agent.session.id;
         const verb = resume ? "woke" : "sent";
         const how = r.model ? ", model " + r.model : ", the runtime's default model";
-        yield* Effect.logInfo(`vibevalley: ${verb} ${id} (${agent.name}): ${agent.runtime}${how}, in ${cwd}`);
+        log.info(`vibevalley: ${verb} ${id} (${agent.name}): ${agent.runtime}${how}, in ${cwd}`);
         return { execution: view(allocation) };
-      });
-      return yield* opening.pipe(Effect.onExit((exit) => (exit._tag === "Failure" ? Effect.ignore(closeOwned(allocation), { log: "Warn" }) : Effect.void)));
-    }),
-    deliver: Effect.fn("Executions.deliver")(function* (id, text, inputId) {
+      };
+      try {
+        return await opening();
+      } catch (e) {
+        try {
+          await closeOwned(allocation);
+        } catch (closing) {
+          log.warn("an execution that failed to open did not close", closing);
+        }
+        throw e;
+      }
+    },
+    deliver: async (id, text, inputId): Promise<DeliveredInput> => {
       const allocation = allocations.get(id);
       const agent = allocation ? agentOf(allocation.phase) : undefined;
       if (!agent) return { kind: "rejected", code: "closed", reason: t("server.session.life.noHelper", { id }) };
       if (agent.session.status().value.kind === "idle") {
-        return yield* Effect.tryPromise({
-          try: () => agent.send(text, "followup"),
-          catch: (cause) => ({ kind: "rejected", code: "send_failed", reason: messageOf(cause) }) as const,
-        }).pipe(Effect.catch((rejected) => Effect.succeed(rejected)));
+        try {
+          return await agent.send(text, "followup");
+        } catch (cause) {
+          return { kind: "rejected", code: "send_failed", reason: messageOf(cause) };
+        }
       }
-      const attempted = yield* Effect.tryPromise({
-        try: () => agent.session.deliver(text, { inputId }),
-        catch: (cause) => ({ kind: "rejected", code: "send_failed", reason: messageOf(cause) }) as const,
-      }).pipe(
-        Effect.match({
-          onFailure: (rejected) => ({ _tag: "Failed", rejected }) as const,
-          onSuccess: (delivered) => ({ _tag: "Delivered", delivered }) as const,
-        }),
-      );
-      if (attempted._tag === "Failed") return attempted.rejected;
-      const delivered = attempted.delivered;
+      let delivered: Awaited<ReturnType<typeof agent.session.deliver>>;
+      try {
+        delivered = await agent.session.deliver(text, { inputId });
+      } catch (cause) {
+        return { kind: "rejected", code: "send_failed", reason: messageOf(cause) };
+      }
       return delivered.landed === "rejected"
-        ? ({ kind: "rejected", code: delivered.code, reason: delivered.reason } as const)
-        : ({ kind: "accepted", landed: delivered.landed, inputId: delivered.inputId } as const);
-    }),
-    interrupt: Effect.fn("Executions.interrupt")(function* (id) {
+        ? { kind: "rejected", code: delivered.code, reason: delivered.reason }
+        : { kind: "accepted", landed: delivered.landed, inputId: delivered.inputId };
+    },
+    interrupt: async (id) => {
       const allocation = allocations.get(id);
       const agent = allocation ? agentOf(allocation.phase) : undefined;
       if (!agent) return { kind: "failed", reason: t("server.session.life.noHelper", { id }) };
-      return yield* Effect.promise(() => agent.interrupt().catch((e: unknown) => ({ kind: "failed" as const, reason: String(e) })));
-    }),
+      return agent.interrupt().catch((e: unknown) => ({ kind: "failed" as const, reason: String(e) }));
+    },
     close,
     failed,
     observe: (id, observer) => {
@@ -453,8 +455,10 @@ export const makeExecutor = Effect.gen(function* (): Effect.fn.Return<Executions
         session,
         observer.stallMs,
         (silentForMs, at) => isObserving() && observer.stalled(silentForMs, at),
-        (wait) => void later(id, wait),
-        () => clock.currentTimeMillisUnsafe(),
+        (wait) => {
+          tasks.keyed(id, wait);
+        },
+        clock,
       );
       stops.push(stopEvents, stopConnections, stopInputs, stopReports, stopStalls);
       // A turn can finish between spawn and observation; its unread report still belongs to this execution.
@@ -469,4 +473,4 @@ export const makeExecutor = Effect.gen(function* (): Effect.fn.Return<Executions
     },
     all: () => [...allocations.values()].map(view),
   };
-});
+}

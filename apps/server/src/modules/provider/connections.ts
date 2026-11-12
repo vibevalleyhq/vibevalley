@@ -1,7 +1,6 @@
-import { Effect, Redacted } from "effect";
-
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
+import { Secret } from "@vibevalley/protocol/schema";
 import { mossImageModels } from "@vibevalley/provider/moss/image-models";
 import { mossLiveModels } from "@vibevalley/provider/moss/live-models";
 import { mossSpeakersModels } from "@vibevalley/provider/moss/speakers-models";
@@ -20,7 +19,7 @@ export const providerStatus = (settings: ProviderSettings): T.ProviderStatus => 
   revision: settings.revision,
   connections: settings.connections.map(({ key, ...connection }) => ({
     ...connection,
-    key: Redacted.value(key) ? { source: "settings", hint: keyHint(Redacted.value(key)) } : { source: null },
+    key: key.reveal() ? { source: "settings", hint: keyHint(key.reveal()) } : { source: null },
   })),
   dictation: settings.dictation ? { ...settings.dictation } : null,
   image: settings.image ? { ...settings.image } : null,
@@ -44,20 +43,21 @@ export const providerStatus = (settings: ProviderSettings): T.ProviderStatus => 
 
 const refuse = (message: string) => bizError(BizCode.ProviderRefused, message);
 
-export const connectionsOver = Effect.fn("Provider.connectionsOver")(function* (current: ProviderSettings, update: T.ProviderUpdate) {
-  if (update.revision !== current.revision) return yield* refuse(t("server.provider.changed"));
-  if (update.connections.length > 32) return yield* refuse(t("server.provider.limit"));
+/** The providers update lays over current; refused (thrown) when it cannot be right. */
+export function connectionsOver(current: ProviderSettings, update: T.ProviderUpdate): ProviderSettings {
+  if (update.revision !== current.revision) throw refuse(t("server.provider.changed"));
+  if (update.connections.length > 32) throw refuse(t("server.provider.limit"));
   const seen = new Set<string>();
   const connections: ProviderSettings["connections"][number][] = [];
   for (const input of update.connections) {
-    if (!/^[a-zA-Z0-9_-]{1,80}$/u.test(input.id) || seen.has(input.id)) return yield* refuse(t("server.provider.id"));
+    if (!/^[a-zA-Z0-9_-]{1,80}$/u.test(input.id) || seen.has(input.id)) throw refuse(t("server.provider.id"));
     seen.add(input.id);
     const name = input.name.trim();
-    if (!name || name.length > 80) return yield* refuse(t("server.provider.name"));
+    if (!name || name.length > 80) throw refuse(t("server.provider.name"));
     const kept = current.connections.find((c) => c.id === input.id)?.key;
-    const key = input.key === undefined ? (kept === undefined ? "" : Redacted.value(kept)) : input.key === null ? "" : input.key.trim();
-    if ((input.key !== undefined && input.key !== null && key === "") || /\s/u.test(key) || key.length > 4096) return yield* refuse(t("server.provider.key"));
-    connections.push({ id: input.id, name, adapter: input.adapter, enabled: input.enabled, key: Redacted.make(key) });
+    const key = input.key === undefined ? (kept === undefined ? "" : kept.reveal()) : input.key === null ? "" : input.key.trim();
+    if ((input.key !== undefined && input.key !== null && key === "") || /\s/u.test(key) || key.length > 4096) throw refuse(t("server.provider.key"));
+    connections.push({ id: input.id, name, adapter: input.adapter, enabled: input.enabled, key: new Secret(key) });
   }
   const next: ProviderSettings = {
     revision: current.revision + 1,
@@ -83,12 +83,12 @@ export const connectionsOver = Effect.fn("Provider.connectionsOver")(function* (
     (next.transcription && !boundConnection(next, next.transcription.connection)) ||
     (next.vision && !boundConnection(next, next.vision.connection))
   )
-    return yield* refuse(t("server.provider.bound"));
-  if (next.dictation && !mossTranscription.models.some((model) => model === next.dictation?.model)) return yield* refuse(t("server.provider.model"));
-  if (next.image && !mossImageModels.some((model) => model === next.image?.model)) return yield* refuse(t("server.provider.imageModel"));
+    throw refuse(t("server.provider.bound"));
+  if (next.dictation && !mossTranscription.models.some((model) => model === next.dictation?.model)) throw refuse(t("server.provider.model"));
+  if (next.image && !mossImageModels.some((model) => model === next.image?.model)) throw refuse(t("server.provider.imageModel"));
   if (next.understanding && !mossUnderstandingModels.some((model) => model === next.understanding?.model))
-    return yield* refuse(t("server.provider.understandingModel"));
-  if (next.speech && !mossSpeechModels.some((model) => model === next.speech?.model)) return yield* refuse(t("server.provider.speechModel"));
+    throw refuse(t("server.provider.understandingModel"));
+  if (next.speech && !mossSpeechModels.some((model) => model === next.speech?.model)) throw refuse(t("server.provider.speechModel"));
   for (const [use, models] of [
     ["live", mossLiveModels],
     ["speakers", mossSpeakersModels],
@@ -98,7 +98,7 @@ export const connectionsOver = Effect.fn("Provider.connectionsOver")(function* (
   ] as const) {
     const binding = next[use];
     if (binding && !models.some((model) => model === binding.model))
-      return yield* refuse(t("server.provider.capabilityModel", { capability: t(`server.provider.use.${use}`) }));
+      throw refuse(t("server.provider.capabilityModel", { capability: t(`server.provider.use.${use}`) }));
   }
   return next;
-});
+}

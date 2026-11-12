@@ -1,5 +1,3 @@
-import { Array as Arr, Schema } from "effect";
-
 import type * as T from "@vibevalley/protocol";
 import { deepseekModels } from "@vibevalley/provider/deepseek/models";
 import { mossImageModels } from "@vibevalley/provider/moss/image-models";
@@ -29,13 +27,24 @@ export interface GeneratedImage {
   readonly usage: { readonly images: number; readonly width: number; readonly height: number };
 }
 
-const VendorFailureOutcome = Schema.Literals(["Rejected", "Unknown"]);
+/** Whether the vendor may have taken (and billed) the call: Rejected says it did not. */
+export type VendorFailureOutcome = "Rejected" | "Unknown";
 
-export class ImageFailure extends Schema.TaggedError<ImageFailure, { readonly brand: unique symbol }>()("ImageFailure", {
-  outcome: VendorFailureOutcome,
-}) {}
+export class ImageFailure extends Error {
+  override readonly name = "ImageFailure";
+  readonly outcome: VendorFailureOutcome;
+  constructor(fields: { readonly outcome: VendorFailureOutcome }) {
+    super(`image: ${fields.outcome}`);
+    this.outcome = fields.outcome;
+  }
+}
 
-export class InvalidRequest extends Schema.TaggedError<InvalidRequest, { readonly brand: unique symbol }>()("InvalidRequest", {}) {}
+export class InvalidRequest extends Error {
+  override readonly name = "InvalidRequest";
+  constructor() {
+    super("The vendor would not take this request");
+  }
+}
 
 export interface SpeechRequest {
   readonly text: string;
@@ -73,9 +82,14 @@ export interface UnderstandingRequest {
   readonly maxOutputTokens: number;
 }
 
-export class UnderstandingFailure extends Schema.TaggedError<UnderstandingFailure, { readonly brand: unique symbol }>()("UnderstandingFailure", {
-  outcome: VendorFailureOutcome,
-}) {}
+export class UnderstandingFailure extends Error {
+  override readonly name = "UnderstandingFailure";
+  readonly outcome: VendorFailureOutcome;
+  constructor(fields: { readonly outcome: VendorFailureOutcome }) {
+    super(`understanding: ${fields.outcome}`);
+    this.outcome = fields.outcome;
+  }
+}
 
 export interface FileUpload {
   readonly file: Blob;
@@ -88,9 +102,14 @@ export interface UploadedFile {
   readonly state: "ready" | "rejected" | "unknown";
 }
 
-export class FileFailure extends Schema.TaggedError<FileFailure, { readonly brand: unique symbol }>()("FileFailure", {
-  outcome: VendorFailureOutcome,
-}) {}
+export class FileFailure extends Error {
+  override readonly name = "FileFailure";
+  readonly outcome: VendorFailureOutcome;
+  constructor(fields: { readonly outcome: VendorFailureOutcome }) {
+    super(`file: ${fields.outcome}`);
+    this.outcome = fields.outcome;
+  }
+}
 
 export interface GeneratedAudio {
   readonly url: string;
@@ -116,11 +135,17 @@ export type SpeechEvent =
   | { readonly type: "speech.audio.delta"; readonly audio: Uint8Array }
   | { readonly type: "speech.audio.done"; readonly usage?: T.MediaAudioUsage; readonly durationSeconds?: number };
 
-export class AudioFailure extends Schema.TaggedError<AudioFailure, { readonly brand: unique symbol }>()("AudioFailure", {
-  outcome: VendorFailureOutcome,
+export class AudioFailure extends Error {
+  override readonly name = "AudioFailure";
+  readonly outcome: VendorFailureOutcome;
   /** True for network, timeout, 429 and 5xx responses. */
-  retryable: Schema.Boolean,
-}) {}
+  readonly retryable: boolean;
+  constructor(fields: { readonly outcome: VendorFailureOutcome; readonly retryable: boolean }) {
+    super(`audio: ${fields.outcome}`);
+    this.outcome = fields.outcome;
+    this.retryable = fields.retryable;
+  }
+}
 
 export type RealtimeLink = MossLink;
 export type RealtimeEvents = MossEvents;
@@ -161,7 +186,7 @@ export const vendors: Record<"moss" | "deepseek" | "agora", Vendor> = {
     name: "DeepSeek",
     console: "https://platform.deepseek.com/api_keys",
     keys: "setting",
-    chat: { models: Arr.map(deepseekModels, (model) => model.id) },
+    chat: { models: deepseekModels.map((model) => model.id) },
   },
   agora: { name: "Agora", console: "https://console.agora.io/", keys: "setting", call: { line: "rtc" } },
 };

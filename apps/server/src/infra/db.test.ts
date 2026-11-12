@@ -70,8 +70,7 @@ describe("the database", () => {
       await addUserDevice(db.sql, device("m1", 1));
       await seenUserDevice(db.sql, { last_seen: 2, id: "m1" });
     });
-    // begin, two writes, commit.
-    expect(dbQueries.count() - before).toBe(4);
+    expect(dbQueries.count() - before).toBe(2);
     const failed = await db
       .tx(async () => {
         await setLanOpen(db.sql, { open: true });

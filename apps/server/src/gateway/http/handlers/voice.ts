@@ -1,12 +1,10 @@
-import { Effect } from "effect";
-
 import type { VoiceHandlers } from "@vibevalley/protocol/api";
 
-import { Voice } from "#/gateway/voice/voice.ts";
+import type { Voice } from "#/gateway/voice/voice.ts";
 
-export const voiceHandlers = Effect.gen(function* () {
-  const voice = yield* Voice;
-  const done: VoiceHandlers = {
+export function voiceHandlers(deps: { readonly voice: Voice }): VoiceHandlers {
+  const { voice } = deps;
+  return {
     "voice.grant.create": () => voice.session(),
     "voice.grant.renew": (body) => voice.renew(body.channel, body.uid),
     "voice.call.start": (body) => voice.start(body.channel, body.uid, body.about),
@@ -17,5 +15,4 @@ export const voiceHandlers = Effect.gen(function* () {
     "voice.moss.verify": () => voice.verifyMoss(),
     "voice.hear": (body) => voice.heardCurrent(body.text, body.agent ?? "", body.sendKey ?? ""),
   };
-  return done;
-});
+}

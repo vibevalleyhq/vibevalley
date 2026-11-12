@@ -1,39 +1,11 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
+import type * as stylex from "@stylexjs/stylex";
 import { omit } from "solid-js";
 
 import { Checkbox as Base } from "@vibevalley/base-ui";
 
 import { Icon } from "./Icon";
-import { styleProps } from "./positioner";
-
-const styles = stylex.create({
-  box: {
-    display: "flex",
-    width: "1rem",
-    height: "1rem",
-    flexShrink: 0,
-    cursor: { default: "pointer", ":disabled": "default" },
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-xs)",
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: {
-      default: "var(--color-line)",
-      ":is([data-checked], [data-indeterminate])": "var(--color-accent)",
-      "@media (hover: hover)": { default: null, ":hover": "var(--color-muted)" },
-    },
-    backgroundColor: { default: "var(--color-page)", ":is([data-checked], [data-indeterminate])": "var(--color-accent)" },
-    color: "var(--color-page)",
-    transitionProperty: "color, background-color, border-color",
-    transitionDuration: "120ms",
-    transitionTimingFunction: "var(--ease-out)",
-    opacity: { default: null, ":disabled": 0.5 },
-  },
-  indicator: {
-    display: "flex",
-  },
-});
+import { withStyles } from "./positioner";
 
 /** A box to tick (base-ui's Checkbox): the same box on every system and in both themes, ticked in the accent colour. */
 export function Checkbox(props: {
@@ -44,10 +16,12 @@ export function Checkbox(props: {
   disabled?: boolean;
   testid?: string;
   /** Placement only. */
+  class?: JSX.ClassValue | undefined;
+  // For callers still on StyleX; it goes when the last of them is on classes.
   styles?: stylex.StyleXStyles;
   "data-key"?: string | number;
 }) {
-  const rest = omit(props, "checked", "onChange", "label", "indeterminate", "disabled", "testid", "styles");
+  const rest = omit(props, "checked", "onChange", "label", "indeterminate", "disabled", "testid", "class", "styles");
   return (
     <Base.Root
       {...rest}
@@ -57,9 +31,13 @@ export function Checkbox(props: {
       disabled={props.disabled}
       aria-label={props.label}
       data-testid={props.testid}
-      {...styleProps([styles.box, props.styles])}
+      {...withStyles(props.styles, [
+        // Under the pointer the edge is muted, ticked or not.
+        "flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-xs border border-line bg-page text-page transition-[color,background-color,border-color] duration-120 ease-out hover:border-muted disabled:cursor-default disabled:opacity-50 data-checked:border-accent data-checked:bg-accent data-checked:hover:border-muted data-indeterminate:border-accent data-indeterminate:bg-accent data-indeterminate:hover:border-muted",
+        props.class,
+      ])}
     >
-      <Base.Indicator {...stylex.attrs(styles.indicator)}>
+      <Base.Indicator class="flex">
         <Icon name={props.indeterminate === true ? "partly" : "ticked"} size={12} />
       </Base.Indicator>
     </Base.Root>

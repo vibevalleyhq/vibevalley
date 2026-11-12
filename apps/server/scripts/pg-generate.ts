@@ -363,7 +363,16 @@ const schemaOf = (t: Type) => {
 /** A parameter's type as the code passes it. */
 const tsOf = (t: Type) => {
   const base =
-    t.words ?? (t.base === "int" || t.base === "real" ? "number" : t.base === "bool" ? "boolean" : t.base === "text[]" ? "readonly string[]" : t.base === "int[]" ? "readonly number[]" : "string");
+    t.words ??
+    (t.base === "int" || t.base === "real"
+      ? "number"
+      : t.base === "bool"
+        ? "boolean"
+        : t.base === "text[]"
+          ? "readonly string[]"
+          : t.base === "int[]"
+            ? "readonly number[]"
+            : "string");
   return t.nullable ? `${base} | null` : base;
 };
 

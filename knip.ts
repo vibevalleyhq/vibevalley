@@ -37,11 +37,15 @@ const config: KnipConfig = {
     "apps/web": {
       entry: ["index.html", "stories.html", "src/stories.tsx", "vite.stories.config.ts", "test/**/*.ts"],
       project: ["src/**/*.{ts,tsx}", "test/**/*.ts"],
+      // Imported by src/style.css (@import "tailwindcss/…"), which knip does not read.
+      ignoreDependencies: ["tailwindcss"],
     },
     "apps/site": {
       // scripts/images.ts reads the scene exports through Vite's ssrLoadModule.
       entry: ["src/{App,Document}.tsx", "src/base/scene.ts", "scripts/*.ts", "test/**/*.ts", "test/prerender/fixture/{App,Document}.tsx"],
       project: ["src/**/*.{ts,tsx}", "scripts/**/*.ts", "test/**/*.{ts,tsx}"],
+      // Imported by the site's stylesheet once it is on Tailwind (vv-tailwind); knip does not read CSS either way.
+      ignoreDependencies: ["tailwindcss"],
     },
     "apps/desktop": {
       entry: ["src/main.ts", "src/preload/preload.ts", "scripts/*.ts", "test/**/*.ts"],

@@ -1,12 +1,11 @@
-import { Effect, Layer, Option, Ref, Stream } from "effect";
-import { HttpClient, HttpClientResponse } from "effect/http";
+import { reasonOf, throwIfAborted } from "@vibevalley/async";
 
 import { jsonText, parsedJson } from "../base/json.ts";
 import type { AssistantMessage, Context, StopReason, TextContent, ThinkingContent, ToolCall, Usage } from "../base/messages.ts";
 import { zeroUsage } from "../base/messages.ts";
 import type { Model } from "../base/models.ts";
 import { models } from "../base/models.ts";
-import { Llm } from "../llm/llm.ts";
+import type { Llm } from "../llm/llm.ts";
 import type { RequestOptions } from "../llm/request.ts";
 import type { AssistantMessageEvent } from "../llm/response.ts";
 
@@ -114,53 +113,61 @@ function eventsOf(model: Model, a: Answer, timestamp: number): { events: Assista
   return { events, hangsAt };
 }
 
+/** A turn of the event loop: a scripted stream's events come a tick apart, as a stream's do. */
+const aTick = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+/** Never resolves; rejects with the signal's reason once it aborts. */
+const hang = (signal: AbortSignal | undefined) =>
+  new Promise<never>((_, reject) => {
+    if (signal === undefined) return;
+    if (signal.aborted) reject(reasonOf(signal));
+    signal.addEventListener("abort", () => reject(reasonOf(signal)), { once: true });
+  });
+
 /** Each request takes the next step, its events a tick apart as a stream's; one past the script is a failed answer
  * saying so. */
-export const scriptedLlm = Effect.fnUntraced(function* (steps: readonly Step[]) {
+export function scriptedLlm(steps: readonly Step[]) {
   const script = [...steps];
-  const next = yield* Ref.make(0);
+  let next = 0;
   const requests: Request[] = [];
-  const llm = Llm.of({
-    stream: (model, context, options) =>
-      Stream.unwrap(
-        Effect.gen(function* () {
-          const request: Request = { ...structuredClone(context), model, options };
-          requests.push(request);
-          const i = yield* Ref.getAndUpdate(next, (n) => n + 1);
-          const step = script[i];
-          const made =
-            step === undefined
-              ? answer("", { stopReason: "error", errorMessage: `the script has no answer ${i + 1}` })
-              : typeof step === "function"
-                ? step(request)
-                : step;
-          const a = made instanceof Promise ? yield* Effect.promise(() => made) : made;
-          const { events, hangsAt } = eventsOf(model, a, 0);
-          const told = Stream.mapEffect(Stream.fromIterable(hangsAt === undefined ? events : events.slice(0, hangsAt)), (e) => Effect.as(Effect.yieldNow, e));
-          return hangsAt === undefined ? told : Stream.concat(told, Stream.never);
-        }),
-      ),
+  async function* stream(model: Model, context: Context, options: RequestOptions, signal?: AbortSignal): AsyncGenerator<AssistantMessageEvent> {
+    const request: Request = { ...structuredClone(context), model, options };
+    requests.push(request);
+    const i = next++;
+    const step = script[i];
+    const a =
+      step === undefined
+        ? answer("", { stopReason: "error", errorMessage: `the script has no answer ${i + 1}` })
+        : typeof step === "function"
+          ? await step(request)
+          : step;
+    const { events, hangsAt } = eventsOf(model, a, 0);
+    for (const e of hangsAt === undefined ? events : events.slice(0, hangsAt)) {
+      await aTick();
+      throwIfAborted(signal);
+      yield e;
+    }
+    if (hangsAt !== undefined) await hang(signal);
+  }
+  const llm: Llm = {
+    stream,
     // The script never fails on the wire: its failures are error answers, as a model's are.
-    complete: (model, context, options) =>
-      Stream.runLast(llm.stream(model, context, options)).pipe(
-        Effect.catchTag("LlmError", (e) => Effect.die(e)),
-        Effect.map((last) => {
-          const e = last._tag === "Some" ? last.value : undefined;
-          if (e?.type === "done") return e.message;
-          if (e?.type === "error") return e.error;
-          throw new Error("a scripted stream ends with done or error");
-        }),
-      ),
-  });
+    complete: async (model, context, options, signal) => {
+      let last: AssistantMessageEvent | undefined;
+      for await (const e of stream(model, context, options, signal)) last = e;
+      if (last?.type === "done") return last.message;
+      if (last?.type === "error") return last.error;
+      throw new Error("a scripted stream ends with done or error");
+    },
+  };
   return {
     llm,
     requests,
-    layer: Layer.succeed(Llm, llm),
     append: (...more: readonly Step[]) => void script.push(...more),
     /** Steps no request has taken yet. */
-    pending: Effect.map(Ref.get(next), (n) => Math.max(script.length - n, 0)),
+    pending: () => Math.max(script.length - next, 0),
   };
-});
+}
 
 /** One chat/completions stream chunk, as DeepSeek writes it. */
 export const chunk = (delta: Record<string, unknown>, finish: string | null = null, more: Record<string, unknown> = {}) =>
@@ -172,16 +179,12 @@ export interface Sent {
   body: unknown;
 }
 
-export const http = (sent: Sent[], body: string | ReadableStream<Uint8Array>, status = 200) =>
-  Layer.succeed(
-    HttpClient.HttpClient,
-    HttpClient.make((request, url) => {
-      const b = request.body;
-      sent.push({
-        url: url.toString(),
-        authorization: request.headers.authorization,
-        body: b._tag === "Uint8Array" ? Option.getOrUndefined(parsedJson(new TextDecoder().decode(b.body))) : undefined,
-      });
-      return Effect.succeed(HttpClientResponse.fromWeb(request, new Response(body, { status })));
-    }),
-  );
+/** A fetch that keeps what it was asked and answers body with status. */
+export const http =
+  (sent: Sent[], body: string | ReadableStream<Uint8Array>, status = 200): typeof fetch =>
+  async (input, init) => {
+    const request = new globalThis.Request(input, init);
+    const text = await request.text();
+    sent.push({ url: request.url, authorization: request.headers.get("authorization") ?? undefined, body: text === "" ? undefined : parsedJson(text) });
+    return new Response(body, { status });
+  };

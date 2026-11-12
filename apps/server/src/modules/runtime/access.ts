@@ -1,5 +1,5 @@
 import type { Session as RuntimeSession, SessionOptions } from "@botiverse/oar";
-import { Option, Schema } from "effect";
+import { z } from "zod";
 
 import type * as T from "@vibevalley/protocol";
 
@@ -24,14 +24,12 @@ export function loopbackEnvironment<Env extends SessionOptions["env"]>(
   return { ...env, NO_PROXY: bypass, no_proxy: bypass };
 }
 
-const startupStatus = Schema.decodeUnknownOption(
-  Schema.Struct({
-    name: Schema.String,
-    threadId: Schema.optionalKey(Schema.NullOr(Schema.String)),
-    status: Schema.Literals(["starting", "ready", "failed", "cancelled"]),
-    error: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  }),
-);
+const StartupStatus = z.object({
+  name: z.string(),
+  threadId: z.exactOptional(z.string().nullable()),
+  status: z.enum(["starting", "ready", "failed", "cancelled"]),
+  error: z.exactOptional(z.string().nullable()),
+});
 
 export function observeToolConnections(
   session: Pick<RuntimeSession, "id" | "rawEvents">,
@@ -45,9 +43,9 @@ export function observeToolConnections(
     (record) => {
       if (record.kind !== "frame" || record.sessionId !== session.id || record.agentPath.length !== 0 || record.body.type !== "mcpServer/startupStatus/updated")
         return;
-      const decoded = startupStatus(record.body.native);
-      if (Option.isNone(decoded) || !servers.includes(decoded.value.name)) return;
-      const { name, status, error, threadId } = decoded.value;
+      const decoded = StartupStatus.safeParse(record.body.native);
+      if (!decoded.success || !servers.includes(decoded.data.name)) return;
+      const { name, status, error, threadId } = decoded.data;
       if (threadId !== undefined && threadId !== null && threadId !== session.id) return;
       observed({ server: name, status, ...(error ? { reason: redactedHead(redact(error), 2000) } : {}) });
     },

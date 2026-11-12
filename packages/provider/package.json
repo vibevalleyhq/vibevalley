@@ -133,11 +133,10 @@
     "@vibevalley/async": "workspace:*",
     "agora-agents": "catalog:",
     "agora-token": "catalog:",
-    "effect": "catalog:",
-    "undici": "catalog:"
+    "undici": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "@vibevalley/testkit": "workspace:*",
     "vite-plus": "catalog:"

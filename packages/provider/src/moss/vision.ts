@@ -1,33 +1,30 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
-import { jsonText } from "../base/json.ts";
+import { fromJson, jsonText } from "../base/json.ts";
 
 export const visionFrameBytes = 256 * 1024;
 export const visionFrameIntervalMs = 1000;
 export const visionBufferedBytes = 512 * 1024;
 
-const Usage = Schema.Struct({
-  vision_tokens: Schema.Finite,
-  text_input_tokens: Schema.Finite,
-  text_output_tokens: Schema.Finite,
-  text_tokens: Schema.Finite,
-  total_tokens: Schema.Finite,
+const Usage = z.object({
+  vision_tokens: z.number(),
+  text_input_tokens: z.number(),
+  text_output_tokens: z.number(),
+  text_tokens: z.number(),
+  total_tokens: z.number(),
 });
-const Event = Schema.fromJsonString(
-  Schema.Struct({
-    type: Schema.String,
-    seq_no: Schema.optionalKey(Schema.NullOr(Schema.Int)),
-    max_frame_bytes: Schema.optionalKey(Schema.Int),
-    turn_id: Schema.optionalKey(Schema.Int),
-    response_id: Schema.optionalKey(Schema.NullOr(Schema.String)),
-    response_seq: Schema.optionalKey(Schema.Int),
-    delta: Schema.optionalKey(Schema.String),
-    reason: Schema.optionalKey(Schema.String),
-    code: Schema.optionalKey(Schema.String),
-    usage: Schema.optionalKey(Usage),
-  }),
-);
-const decode = Schema.decodeUnknownOption(Event);
+const Event = z.object({
+  type: z.string(),
+  seq_no: z.exactOptional(z.number().int().nullable()),
+  max_frame_bytes: z.exactOptional(z.number().int()),
+  turn_id: z.exactOptional(z.number().int()),
+  response_id: z.exactOptional(z.string().nullable()),
+  response_seq: z.exactOptional(z.number().int()),
+  delta: z.exactOptional(z.string()),
+  reason: z.exactOptional(z.string()),
+  code: z.exactOptional(z.string()),
+  usage: z.exactOptional(Usage),
+});
 
 export interface VisionResponse {
   readonly id: string;
@@ -52,7 +49,7 @@ export class VisionSession {
   problem: string | undefined = undefined;
   responses: readonly VisionResponse[] = [];
   maxFrameBytes = visionFrameBytes;
-  usage: typeof Usage.Type | undefined = undefined;
+  usage: z.output<typeof Usage> | undefined = undefined;
   lastEvent = "";
   private seq = 0;
   private created = false;
@@ -125,9 +122,8 @@ export class VisionSession {
   receive(json: string): void {
     if (this.phase !== "connecting" && this.phase !== "ready") return;
     if (json.length > 256 * 1024) return this.fail("message_limit");
-    const result = decode(json);
-    if (result._tag === "None") return this.fail("invalid_event");
-    const event = result.value;
+    const event = fromJson(Event, json);
+    if (event === undefined) return this.fail("invalid_event");
     this.lastEvent = event.type;
     switch (event.type) {
       case "session.created":

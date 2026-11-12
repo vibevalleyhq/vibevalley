@@ -1,28 +1,33 @@
-import { Effect } from "effect";
-
 import type * as T from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
+import { Inconsistent } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { compare, compareText, or } from "#/base/order.ts";
-import type { Db } from "#/infra/db.ts";
+import { type Db, SqlError } from "#/infra/db.ts";
 import * as q from "#db/issue_assignment.sql.ts";
 import type * as qe from "#db/issue_assignment_execution.sql.ts";
 
 import { nullText } from "./rows.ts";
 
 /** Called in the transaction that changes responsibility. */
-export const assignTo = Effect.fnUntraced(function* (db: Db["Service"], issue: string, agent: string | undefined, at: number) {
+export async function assignTo(db: Db, issue: string, agent: string | undefined, at: number) {
   const assignedAgent = nullText(agent);
-  // A row that does not decode, or an insert that returns no row, is a bug; only the database's own failure stays.
-  const ended = yield* db.attempt(q.endAssignments({ issue, agent: assignedAgent, ended_at: at })).pipe(Effect.catchTag("SchemaError", Effect.die));
-  const assigned = assignedAgent
-    ? yield* db
-        .attempt(q.addAssignment({ id: newId(), issue, agent: assignedAgent, assigned_at: at }))
-        .pipe(Effect.catchTags({ NoSuchElementError: Effect.die, SchemaError: Effect.die }))
-    : undefined;
-  return { changed: assigned ? [...ended, assigned] : ended, assigned };
-});
+  try {
+    const ended = await q.endAssignments(db.sql, { issue, agent: assignedAgent, ended_at: at });
+    let assigned: q.AddAssignmentResult | undefined;
+    if (assignedAgent) {
+      assigned = await q.addAssignment(db.sql, { id: newId(), issue, agent: assignedAgent, assigned_at: at });
+      if (assigned === undefined) throw new Inconsistent(`issue ${issue}: an assignment insert returned no row`);
+    }
+    return { changed: assigned ? [...ended, assigned] : ended, assigned };
+  } catch (e) {
+    // A row that does not decode, or an insert that returns no row, is a bug; only the database's own failure goes up
+    // as itself, for the caller's refusal.
+    if (e instanceof SqlError || e instanceof Inconsistent) throw e;
+    throw new Inconsistent(`issue ${issue}: an assignment row did not read`, { cause: e });
+  }
+}
 
 const executionOf = (row: qe.AddExecutionResult): T.Assignment["executions"][number] =>
   row.role === "worker"

@@ -1,9 +1,10 @@
 // oxlint-disable-next-line vibevalley/sync-fs -- readNow, the fallback before loadSegmenter has read the data; once per process
 import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 
-import { Effect, FileSystem, Schema } from "effect";
+import { z } from "zod";
 
 import { serverFile } from "#/base/assets.ts";
 import { jsonOf } from "#/base/json.ts";
@@ -46,18 +47,17 @@ const files = { dictionary: "zh_s.txt.gz", emit: "hmm_emit.json.gz" } as const;
 const readNow = (file: string) => gunzipSync(readFileSync(join(dataDir, file))).toString("utf8");
 
 /** Reads the dictionary and the HMM's table on the file system, off the event loop. */
-export const loadSegmenter = Effect.fn("Gse.loadSegmenter")(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const read = (file: string) => Effect.map(fs.readFile(join(dataDir, file)), (bytes) => gunzipSync(bytes).toString("utf8"));
+export const loadSegmenter = async (): Promise<void> => {
+  const read = async (file: string) => gunzipSync(await readFile(join(dataDir, file))).toString("utf8");
   if (dictionary === undefined) {
-    const words = yield* read(files.dictionary);
+    const words = await read(files.dictionary);
     dictionary = dictionaryOf(words);
   }
   if (emitTable === undefined) {
-    const emitJson = yield* read(files.emit);
-    emitTable = yield* Schema.decodeEffect(Schema.fromJsonString(EmitTable))(emitJson);
+    const emitJson = await read(files.emit);
+    emitTable = emitOf(emitJson);
   }
-}, Effect.orDie);
+};
 
 const dict = (): Dictionary => (dictionary ??= dictionaryOf(readNow(files.dictionary)));
 
@@ -157,7 +157,7 @@ function routesOf(runes: readonly string[]): { freq: number; index: number }[] {
 const HmmStateValues = ["B", "E", "M", "S"] as const;
 type State = (typeof HmmStateValues)[number];
 
-const EmitTable = Schema.Record(Schema.Literals(HmmStateValues), Schema.Record(Schema.String, Schema.Finite));
+const EmitTable = z.record(z.enum(HmmStateValues), z.record(z.string(), z.number()));
 let emitTable: Record<State, Record<string, number>> | undefined;
 const emitOf = jsonOf(EmitTable);
 const emit = () => (emitTable ??= emitOf(readNow(files.emit)));

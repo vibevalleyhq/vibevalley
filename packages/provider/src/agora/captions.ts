@@ -1,15 +1,17 @@
-import { Option, Schema } from "effect";
+import { z } from "zod";
 
-const CaptionMessageSchema = Schema.Struct({
-  object: Schema.optionalKey(Schema.String),
-  turn_id: Schema.optionalKey(Schema.Finite),
-  turn_status: Schema.optionalKey(Schema.Finite),
-  text: Schema.optionalKey(Schema.String),
-  final: Schema.optionalKey(Schema.Boolean),
-  state: Schema.optionalKey(Schema.String),
+import { fromJson } from "../base/json.ts";
+
+const CaptionMessageSchema = z.object({
+  object: z.exactOptional(z.string()),
+  turn_id: z.exactOptional(z.number()),
+  turn_status: z.exactOptional(z.number()),
+  text: z.exactOptional(z.string()),
+  final: z.exactOptional(z.boolean()),
+  state: z.exactOptional(z.string()),
 });
-export type CaptionMessage = typeof CaptionMessageSchema.Type;
-const decodePacket = Schema.decodeUnknownOption(Schema.fromJsonString(CaptionMessageSchema));
+export type CaptionMessage = z.output<typeof CaptionMessageSchema>;
+const decodePacket = (text: string): CaptionMessage | undefined => fromJson(CaptionMessageSchema, text);
 
 export class CaptionPackets {
   private readonly chunks = new Map<string, Map<number, string>>();
@@ -18,7 +20,7 @@ export class CaptionPackets {
   }
   assemble(packet: string): CaptionMessage | undefined {
     const parts = packet.split("|");
-    if (parts.length !== 4) return Option.getOrUndefined(decodePacket(packet));
+    if (parts.length !== 4) return decodePacket(packet);
     const [id = "", index = "", total = "", data = ""] = parts;
     const i = /^\d+$/u.test(index) ? Number(index) : NaN;
     const n = total === "???" ? undefined : /^\d+$/u.test(total) ? Number(total) : NaN;
@@ -31,8 +33,9 @@ export class CaptionPackets {
     try {
       const joined = Array.from({ length: n }, (_, k) => got.get(k + 1) ?? "").join("");
       const bytes = Uint8Array.from(atob(joined), (c) => c.charCodeAt(0));
-      return Option.getOrUndefined(decodePacket(new TextDecoder().decode(bytes)));
+      return decodePacket(new TextDecoder().decode(bytes));
     } catch {
+      // A packet that is not Base64 is noise on the data stream, dropped like any other undecodable one.
       return undefined;
     }
   }

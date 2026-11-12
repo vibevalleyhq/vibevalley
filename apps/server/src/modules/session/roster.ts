@@ -1,5 +1,3 @@
-import { Function } from "effect";
-
 import type * as T from "@vibevalley/protocol";
 
 // Finding and changing a session in the core state. Nothing here changes what it is given.
@@ -19,16 +17,25 @@ export function sessionOnIssue(state: T.SpaceState, issue: string): T.Session | 
 }
 
 /** The very same state when there is no such session. */
-export const withSession: {
-  (id: string, change: (h: T.Session) => T.Session): (state: T.SpaceState) => [T.SpaceState, boolean];
-  (state: T.SpaceState, id: string, change: (h: T.Session) => T.Session): [T.SpaceState, boolean];
-} = Function.dual(3, (state: T.SpaceState, id: string, change: (h: T.Session) => T.Session): [T.SpaceState, boolean] => {
+export function withSession(id: string, change: (h: T.Session) => T.Session): (state: T.SpaceState) => [T.SpaceState, boolean];
+export function withSession(state: T.SpaceState, id: string, change: (h: T.Session) => T.Session): [T.SpaceState, boolean];
+export function withSession(
+  ...args: [string, (h: T.Session) => T.Session] | [T.SpaceState, string, (h: T.Session) => T.Session]
+): ((state: T.SpaceState) => [T.SpaceState, boolean]) | [T.SpaceState, boolean] {
+  if (args.length === 2) {
+    const [id, change] = args;
+    return (state: T.SpaceState) => changed(state, id, change);
+  }
+  return changed(...args);
+}
+
+function changed(state: T.SpaceState, id: string, change: (h: T.Session) => T.Session): [T.SpaceState, boolean] {
   const i = state.sessions.findIndex((h) => h.id === id);
   const current = state.sessions[i];
   if (i < 0 || !current) return [state, false];
   const sessions = [...state.sessions];
   sessions[i] = change(current);
   return [{ ...state, sessions }, true];
-});
+}
 
 export const doingOf = (h: T.Session): T.Doing => (h.phase._tag === "working" ? h.phase.doing : { action: "none", label: "" });

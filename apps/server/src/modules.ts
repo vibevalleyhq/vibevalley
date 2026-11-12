@@ -1,5 +1,3 @@
-import { String as Str } from "effect";
-
 export interface Module {
   readonly name: string;
   /** Paths under src/ ("base", "modules/issue", "gateway/http", "main.ts"…). */
@@ -45,13 +43,13 @@ export const outside = ["testing", "flows"];
 
 /** The concept unit a path under src/ belongs to ("modules/issue", "gateway/http", "base", "main.ts"). */
 export function unitOf(path: string): string {
-  const [first, second = ""] = Str.split("/")(path);
+  const [first = "", second = ""] = path.split("/");
   return (first === "modules" || first === "gateway") && second !== "" ? `${first}/${second}` : first;
 }
 
 /** The singular concept name ("issue", "http", "base") for SQL table ownership and service-path reporting. */
 export function conceptOf(path: string): string {
-  const [first, second = ""] = Str.split("/")(path);
+  const [first = "", second = ""] = path.split("/");
   return (first === "modules" || first === "gateway") && second !== "" ? second : first;
 }
 

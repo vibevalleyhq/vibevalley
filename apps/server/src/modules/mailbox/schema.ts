@@ -1,78 +1,82 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import { Actor, ChannelType, IssueId, QuotedBlock, RunTrigger, type Wire } from "@vibevalley/protocol/schema";
 
 import type * as T from "./shapes.ts";
 import { GithubTriggerEventValues, TriggerAddressingValues, TriggerSourceValues, VoiceModeValues } from "./shapes.ts";
 
-const CardAttachmentSchema: Schema.Codec<T.CardAttachment, Wire<T.CardAttachment>> = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  mimeType: Schema.String,
-  readUri: Schema.String,
-});
+type Codec<A> = z.ZodType<A, Wire<A>>;
 
-const ParentPreviewSchema: Schema.Codec<T.ParentPreview, Wire<T.ParentPreview>> = Schema.Struct({
-  id: Schema.String,
-  from: Schema.String,
-  preview: Schema.String,
-  readUri: Schema.String,
-});
+const CardAttachmentSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  mimeType: z.string(),
+  readUri: z.string(),
+}) satisfies Codec<T.CardAttachment>;
 
-const CompactCard: Schema.Codec<T.CompactCard, Wire<T.CompactCard>> = Schema.Struct({
-  summary: Schema.String,
-  totalChars: Schema.Finite,
-  truncated: Schema.Boolean,
-  readUri: Schema.String,
-  attachments: Schema.optionalKey(Schema.Array(CardAttachmentSchema)),
-  parentPreview: Schema.optionalKey(ParentPreviewSchema),
-});
+const ParentPreviewSchema = z.object({
+  id: z.string(),
+  from: z.string(),
+  preview: z.string(),
+  readUri: z.string(),
+}) satisfies Codec<T.ParentPreview>;
 
-export const TriggerContext: Schema.Codec<T.TriggerContext, Wire<T.TriggerContext>> = Schema.Struct({
-  number: Schema.Int,
-  target: Schema.String,
-  replyTo: Schema.optionalKey(Schema.Int),
-  edited: Schema.optionalKey(Schema.Boolean),
-  deleted: Schema.optionalKey(Schema.Boolean),
-  attachments: Schema.optionalKey(Schema.Array(Schema.Struct({ name: Schema.String, path: Schema.String }))),
-  artifact: Schema.optionalKey(Schema.Struct({ id: Schema.String, title: Schema.String, version: Schema.Int })),
-  blocks: Schema.optionalKey(Schema.Array(QuotedBlock)),
-  picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), repo: Schema.optionalKey(Schema.String) })),
-  responsePort: Schema.optionalKey(Schema.String),
-  voiceMode: Schema.optionalKey(Schema.Literals(VoiceModeValues)),
-});
+const CompactCard = z.object({
+  summary: z.string(),
+  totalChars: z.number(),
+  truncated: z.boolean(),
+  readUri: z.string(),
+  attachments: z.exactOptional(z.array(CardAttachmentSchema)),
+  parentPreview: z.exactOptional(ParentPreviewSchema),
+}) satisfies Codec<T.CompactCard>;
 
-const TriggerMeta: Schema.Codec<T.TriggerMeta, Wire<T.TriggerMeta>> = Schema.Struct({
-  issue: Schema.optionalKey(IssueId),
-  ingressRecipient: Schema.optionalKey(Schema.String),
-  trigger: Schema.optionalKey(RunTrigger),
-  dispatch: Schema.optionalKey(Schema.Boolean),
-  cron: Schema.optionalKey(Schema.String),
-  repo: Schema.optionalKey(Schema.String),
-  pr: Schema.optionalKey(Schema.Int),
-  kind: Schema.optionalKey(Schema.Literals(GithubTriggerEventValues)),
-  head: Schema.optionalKey(Schema.String),
-  fingerprint: Schema.optionalKey(Schema.String),
-  failed: Schema.optionalKey(Schema.Boolean),
-  botRound: Schema.optionalKey(Schema.Int),
-  botRoundKey: Schema.optionalKey(Schema.String),
-  channelMessageId: Schema.optionalKey(Schema.String),
-  inputContext: Schema.optionalKey(TriggerContext),
-  channelType: Schema.optionalKey(ChannelType),
-  responsePort: Schema.optionalKey(Schema.String),
-  voiceMode: Schema.optionalKey(Schema.Literals(VoiceModeValues)),
-});
+const Picked = z.object({ agent: z.exactOptional(z.string()), repo: z.exactOptional(z.string()) });
 
-export const Trigger: Schema.Codec<T.Trigger, Wire<T.Trigger>> = Schema.Struct({
-  id: Schema.String,
-  source: Schema.Literals(TriggerSourceValues),
+export const TriggerContext = z.object({
+  number: z.number().int(),
+  target: z.string(),
+  replyTo: z.exactOptional(z.number().int()),
+  edited: z.exactOptional(z.boolean()),
+  deleted: z.exactOptional(z.boolean()),
+  attachments: z.exactOptional(z.array(z.object({ name: z.string(), path: z.string() }))),
+  artifact: z.exactOptional(z.object({ id: z.string(), title: z.string(), version: z.number().int() })),
+  blocks: z.exactOptional(z.array(QuotedBlock)),
+  picked: z.exactOptional(Picked),
+  responsePort: z.exactOptional(z.string()),
+  voiceMode: z.exactOptional(z.enum(VoiceModeValues)),
+}) satisfies Codec<T.TriggerContext>;
+
+const TriggerMeta = z.object({
+  issue: z.exactOptional(IssueId),
+  ingressRecipient: z.exactOptional(z.string()),
+  trigger: z.exactOptional(RunTrigger),
+  dispatch: z.exactOptional(z.boolean()),
+  cron: z.exactOptional(z.string()),
+  repo: z.exactOptional(z.string()),
+  pr: z.exactOptional(z.number().int()),
+  kind: z.exactOptional(z.enum(GithubTriggerEventValues)),
+  head: z.exactOptional(z.string()),
+  fingerprint: z.exactOptional(z.string()),
+  failed: z.exactOptional(z.boolean()),
+  botRound: z.exactOptional(z.number().int()),
+  botRoundKey: z.exactOptional(z.string()),
+  channelMessageId: z.exactOptional(z.string()),
+  inputContext: z.exactOptional(TriggerContext),
+  channelType: z.exactOptional(ChannelType),
+  responsePort: z.exactOptional(z.string()),
+  voiceMode: z.exactOptional(z.enum(VoiceModeValues)),
+}) satisfies Codec<T.TriggerMeta>;
+
+export const Trigger = z.object({
+  id: z.string(),
+  source: z.enum(TriggerSourceValues),
   actor: Actor,
-  addressed: Schema.Literals(TriggerAddressingValues),
-  threads: Schema.Array(Schema.String),
-  replyTo: Schema.optionalKey(Schema.String),
-  replyChannel: Schema.optionalKey(Schema.String),
-  picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), repo: Schema.optionalKey(Schema.String) })),
+  addressed: z.enum(TriggerAddressingValues),
+  threads: z.array(z.string()),
+  replyTo: z.exactOptional(z.string()),
+  replyChannel: z.exactOptional(z.string()),
+  picked: z.exactOptional(Picked),
   card: CompactCard,
   meta: TriggerMeta,
-  at: Schema.Finite,
-});
+  at: z.number(),
+}) satisfies Codec<T.Trigger>;

@@ -1,6 +1,6 @@
-import { Effect, Stream } from "effect";
-import { HttpClient, HttpClientResponse } from "effect/http";
 import { describe, expect, it } from "vite-plus/test";
+
+import { collect } from "@vibevalley/async";
 
 import { encodeDeepSeekRequest } from "./request.ts";
 import { decodeDeepSeekChunk } from "./response.ts";
@@ -71,7 +71,7 @@ describe("DeepSeek protocol", () => {
     expect(chunk.finish).toEqual({ raw: "blocked", reason: "error", error: "Provider finish_reason: blocked" });
   });
 
-  it("decodes CRLF multiline SSE frames, skips comments, and stops at [DONE]", () => {
+  it("decodes CRLF multiline SSE frames, skips comments, and stops at [DONE]", async () => {
     const wire = [
       ": ping\r\n\r\n",
       'data: {"choices":[{"delta":\r\n',
@@ -79,16 +79,10 @@ describe("DeepSeek protocol", () => {
       "data: [DONE]\r\n\r\n",
       "data: not-json-after-done\r\n\r\n",
     ].join("");
-    const client = HttpClient.make((request) =>
-      Effect.succeed(HttpClientResponse.fromWeb(request, new Response(wire, { status: 200, headers: { "content-type": "text/event-stream" } }))),
-    );
-    return Effect.runPromise(
-      Effect.gen(function* () {
-        const model = yield* deepseekModel({ model: "deepseek-chat", baseUrl: "https://api.deepseek.com", key: "test-key" });
-        const stream = yield* model.stream({ messages: [], maxTokens: 1024, reasoning: false });
-        const chunks = yield* Stream.runCollect(stream);
-        expect(chunks).toEqual([{ text: "hi", calls: [] }]);
-      }).pipe(Effect.provideService(HttpClient.HttpClient, client)),
-    );
+    const fetcher: typeof fetch = async () => new Response(wire, { status: 200, headers: { "content-type": "text/event-stream" } });
+    const model = deepseekModel({ model: "deepseek-chat", baseUrl: "https://api.deepseek.com", key: "test-key" }, fetcher);
+    const stream = await model.stream({ messages: [], maxTokens: 1024, reasoning: false });
+    const chunks = await collect(stream);
+    expect(chunks).toEqual([{ text: "hi", calls: [] }]);
   });
 });

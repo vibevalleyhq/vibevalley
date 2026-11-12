@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createEffect, createSignal, createUniqueId, For, Show } from "solid-js";
 
 import { aria } from "#/base/dom.tsx";
@@ -7,235 +6,6 @@ import { PxWindow } from "./base";
 import { type PickOption, pickItems } from "./cells";
 import { PxTip } from "./field";
 import { SpriteIcon } from "./icons";
-import { pxStyle } from "./style";
-
-const styles = stylex.create({
-  pickChevron: { rotate: "90deg" },
-  pxSegmentedButton: {
-    height: "1.75rem",
-    cursor: {
-      default: "pointer",
-      ":disabled": "default",
-    },
-    paddingInline: "0.75rem",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.3333",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    whiteSpace: "nowrap",
-    boxShadow: "inset 0 0 0 2px var(--color-cream-300)",
-    outlineStyle: {
-      default: "none",
-      ":focus-visible": "solid",
-    },
-    fontSynthesis: "none",
-    outlineWidth: {
-      default: null,
-      ":focus-visible": "2px",
-    },
-    outlineOffset: {
-      default: null,
-      ":focus-visible": "1px",
-    },
-    outlineColor: {
-      default: null,
-      ":focus-visible": "var(--color-leaf-500)",
-    },
-    translate: {
-      default: null,
-      ":enabled:active": "1px 1px",
-    },
-    opacity: {
-      default: null,
-      ":disabled": ".35",
-    },
-  },
-  pxSegmentedButtonPrimary: {
-    color: "var(--color-bark-800)",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":enabled:hover": "var(--color-cream-300)",
-      },
-    },
-  },
-  pxSegmentedButtonSecondary: {
-    color: "var(--color-bark-900)",
-    backgroundColor: "var(--color-leaf-500)",
-  },
-  pxPickSpan: {
-    flex: "1",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.4286",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    fontSynthesis: "none",
-  },
-  pxPickSpanState: {
-    color: "var(--color-bark-800)",
-  },
-  pxPickSpanState2: {
-    color: "var(--color-leaf-700)",
-  },
-  pxPickSpanState3: {
-    color: "var(--color-bark-600)",
-  },
-  pxPickPxWindow: {
-    position: "absolute",
-    top: "100%",
-    left: "0",
-    zIndex: 30,
-    marginTop: "0.375rem",
-    minWidth: "100%",
-    transformOrigin: "top",
-    padding: "0.25rem",
-    transitionProperty: {
-      default: "opacity,scale",
-      "@media (prefers-reduced-motion:reduce)": "none",
-    },
-    transitionTimingFunction: "var(--ease-out)",
-    transitionDuration: ".1s",
-    scale: {
-      default: null,
-      "@starting-style": "95% 95%",
-    },
-    opacity: {
-      default: null,
-      "@starting-style": "0",
-    },
-  },
-  pxSegmented: {
-    flexWrap: "wrap",
-    gap: "0.25rem",
-    backgroundColor: "var(--color-cream-200)",
-    padding: "0.25rem",
-  },
-  pxSegmentedBlock: {
-    display: "flex",
-  },
-  pxSegmentedInline: {
-    display: "inline-flex",
-  },
-  pxPickDiv: {
-    position: "relative",
-    width: "100%",
-  },
-  pxPickButton: {
-    display: "flex",
-    height: "2.25rem",
-    width: "100%",
-    cursor: {
-      default: "pointer",
-      ":disabled": "default",
-    },
-    alignItems: "center",
-    gap: "0.5rem",
-    backgroundColor: "var(--color-cream-100)",
-    paddingInline: "0.75rem",
-    textAlign: "left",
-    opacity: {
-      default: null,
-      ":disabled": ".5",
-    },
-  },
-  pxPickValue: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-  },
-  pxPickPlaceholder: {
-    color: "var(--color-bark-600)",
-  },
-  pxPickSelected: {
-    color: "var(--color-bark-900)",
-  },
-  pxPickUl: {
-    maxHeight: "50vh",
-    overflowY: "auto",
-  },
-  pxPickLi: {
-    display: "flex",
-    cursor: "pointer",
-    alignItems: "baseline",
-    gap: "0.75rem",
-    paddingInline: "0.625rem",
-    paddingBlock: "0.375rem",
-    whiteSpace: "nowrap",
-  },
-  pxPickLiActive: {
-    backgroundColor: "var(--color-cream-200)",
-  },
-  pxPickDetail: {
-    color: "var(--color-bark-600)",
-  },
-  pxSwitchButton: {
-    display: "inline-flex",
-    maxWidth: "100%",
-    cursor: {
-      default: "pointer",
-      ":disabled": "default",
-    },
-    alignItems: "center",
-    gap: "0.75rem",
-    textAlign: "left",
-    color: "var(--color-bark-900)",
-    opacity: {
-      default: null,
-      ":disabled": ".5",
-    },
-  },
-  pxSwitchTrack: {
-    display: "flex",
-    height: "1.5rem",
-    width: "2.5rem",
-    flexShrink: "0",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-cream-300)",
-    transitionProperty: {
-      default: "color, background-color, border-color",
-      "@media (prefers-reduced-motion:reduce)": "none",
-    },
-    transitionTimingFunction: "var(--ease-out)",
-    transitionDuration: ".15s",
-  },
-  pxSwitchTrackOff: {
-    backgroundColor: {
-      default: "var(--color-px-choice-well)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-cream-300) 70%, transparent)",
-    },
-  },
-  pxSwitchTrackOn: {
-    backgroundColor: "var(--color-leaf-500)",
-  },
-  pxSwitchThumb: {
-    width: "1.25rem",
-    height: "1.25rem",
-    backgroundColor: "var(--color-cream-50)",
-    transitionProperty: {
-      default: "translate",
-      "@media (prefers-reduced-motion:reduce)": "none",
-    },
-    transitionTimingFunction: "var(--ease-out)",
-    transitionDuration: ".15s",
-  },
-  pxSwitchThumbOn: {
-    translate: "1rem 0",
-  },
-  pxSwitchText: {
-    display: "flex",
-    minWidth: "0",
-    flexDirection: "column",
-  },
-  pxSwitchHint: {
-    color: "var(--color-bark-500)",
-  },
-});
 
 interface SegmentOption<T> {
   value: T;
@@ -254,11 +24,7 @@ export function PxSegmented<T extends string | number | boolean>(props: {
   label?: string;
 }) {
   return (
-    <div
-      role="group"
-      aria-label={props.label}
-      {...stylex.attrs(styles.pxSegmented, (props.block ?? true) ? styles.pxSegmentedBlock : styles.pxSegmentedInline)}
-    >
+    <div role="group" aria-label={props.label} class={["flex-wrap gap-1 bg-cream-200 p-1", (props.block ?? true) ? "flex" : "inline-flex"]}>
       <For each={props.options}>
         {(o) => (
           <button
@@ -267,7 +33,10 @@ export function PxSegmented<T extends string | number | boolean>(props: {
             aria-pressed={aria(o.value === props.value)}
             disabled={o.disabled}
             onClick={() => props.onChange(o.value)}
-            {...stylex.attrs(styles.pxSegmentedButton, o.value === props.value ? styles.pxSegmentedButtonSecondary : styles.pxSegmentedButtonPrimary)}
+            class={[
+              "h-7 cursor-pointer px-3 whitespace-nowrap pixel-ring pixel-xs pixel-focus enabled:active:translate-px disabled:cursor-default disabled:opacity-35",
+              o.value === props.value ? "bg-leaf-500 text-bark-900" : "text-bark-800 enabled:hover:bg-cream-300",
+            ]}
           >
             {o.label}
           </button>
@@ -317,7 +86,7 @@ export function PxPick(props: {
   };
 
   return (
-    <div ref={(el) => (wrap = el)} {...stylex.attrs(styles.pxPickDiv)}>
+    <div ref={(el) => (wrap = el)} class="relative w-full">
       <button
         id={props.id}
         data-testid={props.testid}
@@ -349,14 +118,14 @@ export function PxPick(props: {
           else return;
           e.preventDefault();
         }}
-        {...stylex.attrs(pxStyle.sm, pxStyle.ring, pxStyle.focus, styles.pxPickButton)}
+        class="flex h-9 w-full cursor-pointer items-center gap-2 bg-cream-100 px-3 text-left pixel-sm pixel-ring pixel-focus disabled:cursor-default disabled:opacity-50"
       >
-        <span {...stylex.attrs(styles.pxPickValue, current().value === "" ? styles.pxPickPlaceholder : styles.pxPickSelected)}>{current().label}</span>
-        <SpriteIcon name="button-next" size={12} styles={styles.pickChevron} />
+        <span class={["min-w-0 flex-1 truncate", current().value === "" ? "text-bark-600" : "text-bark-900"]}>{current().label}</span>
+        <SpriteIcon name="button-next" size={12} class="rotate-90" />
       </button>
       <Show when={open()}>
-        <PxWindow styles={[styles.pxPickPxWindow]}>
-          <ul id={listId} role="listbox" aria-label={props.label} {...stylex.attrs(styles.pxPickUl)}>
+        <PxWindow class="absolute top-full left-0 z-30 mt-1.5 min-w-full origin-top p-1 transition-[opacity,scale] duration-100 ease-out starting:scale-95 starting:opacity-0 motion-reduce:transition-none">
+          <ul id={listId} role="listbox" aria-label={props.label} class="max-h-[50vh] overflow-y-auto">
             <For each={items()}>
               {(o, i) => (
                 <li
@@ -370,18 +139,13 @@ export function PxPick(props: {
                     e.preventDefault();
                     pick(o.value);
                   }}
-                  {...stylex.attrs(styles.pxPickLi, i() === highlight() && styles.pxPickLiActive)}
+                  class={["flex cursor-pointer items-baseline gap-3 px-2.5 py-1.5 whitespace-nowrap", i() === highlight() && "bg-cream-200"]}
                 >
-                  <span
-                    {...stylex.attrs(
-                      styles.pxPickSpan,
-                      o.value === "" ? styles.pxPickSpanState3 : o.value === props.value ? styles.pxPickSpanState2 : styles.pxPickSpanState,
-                    )}
-                  >
+                  <span class={["flex-1 pixel-sm", o.value === "" ? "text-bark-600" : o.value === props.value ? "text-leaf-700" : "text-bark-800"]}>
                     {o.label}
                   </span>
                   <Show when={o.detail}>
-                    <span {...stylex.attrs(pxStyle.xs, styles.pxPickDetail)}>{o.detail}</span>
+                    <span class="text-bark-600 pixel-xs">{o.detail}</span>
                   </Show>
                 </li>
               )}
@@ -408,18 +172,25 @@ export function PxSwitchField(props: {
       aria-checked={aria(props.checked)}
       disabled={props.disabled}
       onClick={() => props.onChange(!props.checked)}
-      {...stylex.attrs(pxStyle.focus, styles.pxSwitchButton)}
+      class="inline-flex max-w-full cursor-pointer items-center gap-3 text-left text-bark-900 pixel-focus disabled:cursor-default disabled:opacity-50"
     >
       {/* The inner line is the padding: the 20 px thumb travels 16 px. */}
-      <span {...stylex.attrs(styles.pxSwitchTrack, props.checked ? styles.pxSwitchTrackOn : styles.pxSwitchTrackOff)}>
-        <span {...stylex.attrs(pxStyle.drop, styles.pxSwitchThumb, props.checked && styles.pxSwitchThumbOn)} />
+      <span
+        class={[
+          "flex h-6 w-10 shrink-0 border-2 border-cream-300 transition-[color,background-color,border-color] duration-150 ease-out motion-reduce:transition-none",
+          props.checked ? "bg-leaf-500" : "bg-cream-300/70",
+        ]}
+      >
+        <span
+          class={["size-5 bg-cream-50 pixel-drop transition-[translate] duration-150 ease-out motion-reduce:transition-none", props.checked && "translate-x-4"]}
+        />
       </span>
-      <span {...stylex.attrs(styles.pxSwitchText)}>
-        <PxTip tip={props.tip} styles={pxStyle.sm}>
+      <span class="flex min-w-0 flex-col">
+        <PxTip tip={props.tip} class="pixel-sm">
           {props.label}
         </PxTip>
         <Show when={props.hint}>
-          <span {...stylex.attrs(pxStyle.fine, styles.pxSwitchHint)}>{props.hint}</span>
+          <span class="text-bark-500 pixel-fine">{props.hint}</span>
         </Show>
       </span>
     </button>

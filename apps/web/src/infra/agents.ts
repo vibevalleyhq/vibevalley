@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import { type Agent, type AgentProblem, defaultOrchestrator, type OrchestratorLook } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
@@ -38,7 +38,7 @@ export function useAgent(id: () => string | undefined) {
 
 /** What the server says is wrong with each of these drafts (agent.validate), by id; empty until it answers. */
 const problemsQuery = defineQuery({
-  schema: Schema.mutable(Schema.Array(S.AgentValidation)),
+  schema: z.array(S.AgentValidation),
   key: (input: { agents: readonly Agent[]; token: string }) => ["agent-check", input.token],
   fetch: (input, context) => api.agent.validate({ agents: [...input.agents] }, context),
   gcTime: 0,

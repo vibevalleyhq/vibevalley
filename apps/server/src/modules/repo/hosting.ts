@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -28,50 +28,53 @@ export function hostedOrigin(url: string): HostedRepo | undefined {
   return { platform: host === "github.com" ? "github" : "gitlab", host, name };
 }
 
-export const runGitLab: GitHubRun = (...args) =>
-  Effect.map(run("glab", args, { env: { ...process.env, GITLAB_HOST: "gitlab.com", GLAB_PROMPT_DISABLED: "1" }, timeoutMs: 15_000 }), (r) => ({
-    out: r.stdout,
-    ok: r.code === 0,
-    missing: r.missing,
-  }));
+export const runGitLab: GitHubRun = async (...args) => {
+  const r = await run("glab", args, { env: { ...process.env, GITLAB_HOST: "gitlab.com", GLAB_PROMPT_DISABLED: "1" }, timeoutMs: 15_000 });
+  return { out: r.stdout, ok: r.code === 0, missing: r.missing };
+};
 
-const githubRepo = jsonOrNone(Schema.Struct({ defaultBranchRef: Schema.Struct({ name: Schema.String }) }));
-const gitlabRepo = jsonOrNone(Schema.Struct({ default_branch: Schema.String }));
+const githubRepo = jsonOrNone(z.object({ defaultBranchRef: z.object({ name: z.string() }) }));
+const gitlabRepo = jsonOrNone(z.object({ default_branch: z.string() }));
 const githubPulls = jsonOrNone(
-  Schema.Array(
-    Schema.Struct({ number: Schema.Int, url: Schema.String, isCrossRepository: Schema.Boolean, state: Schema.Literals(["OPEN", "MERGED", "CLOSED"]) }),
-  ),
+  z.array(z.object({ number: z.number().int(), url: z.string(), isCrossRepository: z.boolean(), state: z.enum(["OPEN", "MERGED", "CLOSED"]) })),
 );
-const gitlabMerge = Schema.Struct({
-  iid: Schema.Int,
-  web_url: Schema.String,
-  source_project_id: Schema.Int,
-  target_project_id: Schema.Int,
-  state: Schema.Literals(["opened", "merged", "closed", "locked"]),
+const gitlabMerge = z.object({
+  iid: z.number().int(),
+  web_url: z.string(),
+  source_project_id: z.number().int(),
+  target_project_id: z.number().int(),
+  state: z.enum(["opened", "merged", "closed", "locked"]),
 });
-const gitlabPulls = jsonOrNone(Schema.Array(gitlabMerge));
+const gitlabPulls = jsonOrNone(z.array(gitlabMerge));
 const gitlabPull = jsonOrNone(gitlabMerge);
-const received = Schema.decodeUnknownEffect(Schema.Struct({ number: Schema.Int, url: Schema.String.check(Schema.isPattern(/^https:\/\//u)) }));
+const received = z.object({ number: z.number().int(), url: z.string().regex(/^https:\/\//u) });
 
-const failure = (stage: string) => RepoError.make({ message: t("server.repo.publish.platformFailed", { stage }) });
+/** A request open on the platform, as it answered. */
+export interface Receipt {
+  readonly number: number;
+  readonly url: string;
+  readonly state: "open";
+}
+
+const failure = (stage: string) => new RepoError(t("server.repo.publish.platformFailed", { stage }));
 
 export const hosting = (repo: HostedRepo, command: GitHubRun) => {
   const github = repo.platform === "github";
   const project = `projects/${encodeURIComponent(repo.name)}`;
-  const receipt = Effect.fnUntraced(function* (number: number, url: string) {
-    yield* received({ number, url }).pipe(Effect.mapError(() => failure("receipt decode")));
+  const receipt = (number: number, url: string): Receipt => {
+    if (!received.safeParse({ number, url }).success) throw failure("receipt decode");
     const prefix = `https://${repo.host}/${repo.name}/${github ? "pull" : "-/merge_requests"}/`;
-    if (number <= 0 || url !== prefix + number) return yield* failure("receipt");
+    if (number <= 0 || url !== prefix + number) throw failure("receipt");
     return { number, url, state: "open" as const };
-  });
-  const request = Effect.fnUntraced(function* (...args: string[]) {
-    const result = yield* command(...args);
-    if (!result.ok) return yield* failure(result.missing ? (github ? "gh missing" : "glab missing") : args.slice(0, 2).join(" "));
+  };
+  const request = async (...args: string[]) => {
+    const result = await command(...args);
+    if (!result.ok) throw failure(result.missing ? (github ? "gh missing" : "glab missing") : args.slice(0, 2).join(" "));
     return result.out;
-  });
-  const find = Effect.fnUntraced(function* (branch: string, base: string) {
+  };
+  const find = async (branch: string, base: string): Promise<Receipt | undefined> => {
     if (github) {
-      const response2 = yield* request(
+      const response2 = await request(
         "pr",
         "list",
         "--repo",
@@ -86,35 +89,35 @@ export const hosting = (repo: HostedRepo, command: GitHubRun) => {
         "url,number,isCrossRepository,state",
       );
       const parsed = githubPulls(response2);
-      if (!parsed || parsed.length > 1) return yield* failure("list decode");
+      if (!parsed || parsed.length > 1) throw failure("list decode");
       const first = parsed.find((pr) => !pr.isCrossRepository && pr.state === "OPEN");
-      return first ? yield* receipt(first.number, first.url) : undefined;
+      return first ? receipt(first.number, first.url) : undefined;
     }
-    const response = yield* request(
+    const response = await request(
       "api",
       `${project}/merge_requests?state=opened&source_branch=${encodeURIComponent(branch)}&target_branch=${encodeURIComponent(base)}&per_page=2`,
     );
     const parsed = gitlabPulls(response);
-    if (!parsed || parsed.length > 1) return yield* failure("list decode");
+    if (!parsed || parsed.length > 1) throw failure("list decode");
     const first = parsed.find((mr) => mr.source_project_id === mr.target_project_id && (mr.state === "opened" || mr.state === "locked"));
-    return first ? yield* receipt(first.iid, first.web_url) : undefined;
-  });
+    return first ? receipt(first.iid, first.web_url) : undefined;
+  };
   return {
-    inspect: Effect.fnUntraced(function* () {
-      yield* request("auth", "status", "--hostname", repo.host);
-      const out = yield* github ? request("repo", "view", repo.name, "--json", "defaultBranchRef") : request("api", project);
+    inspect: async () => {
+      await request("auth", "status", "--hostname", repo.host);
+      const out = await (github ? request("repo", "view", repo.name, "--json", "defaultBranchRef") : request("api", project));
       const base = github ? githubRepo(out)?.defaultBranchRef.name : gitlabRepo(out)?.default_branch;
-      if (!base) return yield* failure("repository decode");
+      if (!base) throw failure("repository decode");
       return base;
-    }),
+    },
     find,
-    create: Effect.fnUntraced(function* (req: T.SubmitBranch) {
+    create: async (req: T.SubmitBranch): Promise<Receipt> => {
       if (github) {
-        const out = yield* request("pr", "create", "--repo", repo.name, "--head", req.branch, "--base", req.base, "--title", req.title, "--body", req.body);
+        const out = await request("pr", "create", "--repo", repo.name, "--head", req.branch, "--base", req.base, "--title", req.title, "--body", req.body);
         const url = out.trim();
-        return yield* receipt(Number(url.slice(url.lastIndexOf("/") + 1)), url);
+        return receipt(Number(url.slice(url.lastIndexOf("/") + 1)), url);
       }
-      const out = yield* request(
+      const out = await request(
         "api",
         `${project}/merge_requests`,
         "--method",
@@ -130,8 +133,8 @@ export const hosting = (repo: HostedRepo, command: GitHubRun) => {
       );
       const parsed = gitlabPull(out);
       if (!parsed || parsed.source_project_id !== parsed.target_project_id || (parsed.state !== "opened" && parsed.state !== "locked"))
-        return yield* failure("create decode");
-      return yield* receipt(parsed.iid, parsed.web_url);
-    }),
+        throw failure("create decode");
+      return receipt(parsed.iid, parsed.web_url);
+    },
   };
 };

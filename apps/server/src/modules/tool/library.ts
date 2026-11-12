@@ -1,40 +1,44 @@
-import { Array as Arr, Effect } from "effect";
-
+import type * as T from "@vibevalley/protocol";
+import { isApiError } from "@vibevalley/protocol/api";
 import * as S from "@vibevalley/protocol/schema";
 
 import { reasonOf } from "#/base/errors.ts";
-import { Library } from "#/modules/library/library.ts";
 
 import { answers } from "./prompts.ts";
 import { callerOf, sessionSchemaTool, tool, type Who } from "./schemas.ts";
+import type { ToolDeps } from "./tool.ts";
 
-export const libraryTools = Effect.gen(function* () {
-  const library = yield* Library;
-  const listed = (req: Parameters<typeof library.list>[0]) =>
-    Effect.map(library.list(req), (items) => (items.length === 0 ? answers.library.none : Arr.join(Arr.map(items, answers.library.line), "\n")));
-  const said = (e: Effect.Effect<string, Parameters<typeof reasonOf>[0]>) => Effect.catch(e, (err) => Effect.succeed(answers.failed(reasonOf(err))));
+export function libraryTools(deps: Pick<ToolDeps, "library">) {
+  const { library } = deps;
+  const listed = async (req: T.LibraryListRequest) => {
+    const items = await library.list(req);
+    return items.length === 0 ? answers.library.none : items.map(answers.library.line).join("\n");
+  };
+  // A refused add is the answer; anything else fails the call.
+  const said = async (work: () => Promise<string>) => {
+    try {
+      return await work();
+    } catch (e) {
+      if (isApiError(e)) return answers.failed(reasonOf(e));
+      throw e;
+    }
+  };
   return {
     orchestrator: (who: Who) => [
       tool("library.item.list", (p) => listed(p)),
-      tool(
-        "library.item.add",
-        Effect.fn("Tool.libraryAdd")(function* (p) {
-          const c = yield* callerOf(who);
-          return yield* said(Effect.map(library.add(p, { kind: "agent", agent: c.agent }), answers.library.added));
-        }),
-      ),
+      tool("library.item.add", (p, signal) => {
+        const c = callerOf(who);
+        return said(async () => answers.library.added(await library.add(p, { kind: "agent", agent: c.agent }, signal)));
+      }),
     ],
     session: (who: Who) => [
       sessionSchemaTool("library.item.list", (p) => listed(p)),
-      sessionSchemaTool(
-        "library.item.add",
-        Effect.fn("Tool.libraryAdd")(function* (p) {
-          const c = yield* callerOf(who);
-          return yield* said(
-            Effect.map(library.add(p, { kind: "agent", agent: c.agent, ...(c.session ? { session: S.sessionId(c.session) } : {}) }), answers.library.added),
-          );
-        }),
-      ),
+      sessionSchemaTool("library.item.add", (p, signal) => {
+        const c = callerOf(who);
+        return said(async () =>
+          answers.library.added(await library.add(p, { kind: "agent", agent: c.agent, ...(c.session ? { session: S.sessionId(c.session) } : {}) }, signal)),
+        );
+      }),
     ],
   };
-});
+}

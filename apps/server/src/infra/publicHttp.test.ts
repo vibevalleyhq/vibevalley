@@ -1,4 +1,4 @@
-import { expect, it } from "@effect/vitest";
+import { expect, it } from "vite-plus/test";
 
 import { publicHttps, publicIpv4, publicLookup } from "./publicHttp.ts";
 

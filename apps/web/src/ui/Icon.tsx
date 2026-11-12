@@ -1,3 +1,4 @@
+import type { JSX } from "@solidjs/web";
 import type * as stylex from "@stylexjs/stylex";
 
 import { type IconName, icons } from "./icons";
@@ -13,7 +14,7 @@ export function Icon(props: {
   name: IconName;
   size?: IconSize;
   label?: string;
-  class?: string | undefined;
+  class?: JSX.ClassValue | undefined;
   // For callers still on StyleX; it goes when the last of them is on classes.
   styles?: stylex.StyleXStyles;
 }) {

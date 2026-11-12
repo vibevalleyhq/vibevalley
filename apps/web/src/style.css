@@ -141,40 +141,6 @@
   --shiki-token-link: var(--wb-water);
 }
 
-/* The palette as utilities (bg-page, text-muted, border-line, outline-focus…, with /N for a mix: bg-wheat/25). Inline, so
-   a class reads the --wb-* colour where it is used and a part in the other theme (the pixel skin, a story's dark frame)
-   gets its own; the --color-* names above stay for StyleX and the CSS. */
-@theme inline {
-  --color-page: var(--wb-page);
-  --color-side: var(--wb-side);
-  --color-ink: var(--wb-ink);
-  --color-muted: var(--wb-muted);
-  --color-faint: var(--wb-faint);
-  --color-line: var(--wb-line);
-  --color-hover: var(--wb-hover);
-  --color-selected: var(--wb-selected);
-  --color-focus: var(--wb-focus);
-  --color-accent: var(--wb-accent);
-  --color-accent-hover: var(--wb-accent-hover);
-  --color-leaf: var(--wb-leaf);
-  --color-wheat: var(--wb-wheat);
-  --color-berry: var(--wb-berry);
-  --color-water: var(--wb-water);
-  --color-bark: var(--wb-bark);
-  --color-ok-soft: var(--wb-ok-soft);
-  --color-ok-ink: var(--wb-ok-ink);
-  --color-bad-soft: var(--wb-bad-soft);
-  --color-warn-ink: var(--wb-warn-ink);
-  --color-scrim: var(--wb-scrim);
-  --color-rail: var(--wb-rail);
-  --color-on-rail: var(--wb-on-rail);
-  --color-idle: var(--wb-idle);
-  --color-code-bg: var(--wb-code-bg);
-  --color-code-ink: var(--wb-code-ink);
-  --shadow-float: 0 8px 24px var(--wb-float);
-  --shadow-raise: 0 1px 2px var(--wb-raise);
-}
-
 /* The tokens that do not change with the theme, as Tailwind's theme: each is a utility (font-mono, text-sm, leading-xs,
    rounded-md, ease-out, bg-cream-100, shadow-px…) and, being static, a variable on :root for StyleX and the CSS above.
    Tailwind's own palette, ladders and corners are cleared first, so a class can only name one of these. */
@@ -385,6 +351,40 @@
   --color-glow-soft: #f3e2b8;
 }
 
+/* The palette as utilities (bg-page, text-muted, border-line, outline-focus…, with /N for a mix: bg-wheat/25). Inline, so
+   a class reads the --wb-* colour where it is used and a part in the other theme (the pixel skin, a story's dark frame)
+   gets its own; the --color-* names above stay for StyleX and the CSS. */
+@theme inline {
+  --color-page: var(--wb-page);
+  --color-side: var(--wb-side);
+  --color-ink: var(--wb-ink);
+  --color-muted: var(--wb-muted);
+  --color-faint: var(--wb-faint);
+  --color-line: var(--wb-line);
+  --color-hover: var(--wb-hover);
+  --color-selected: var(--wb-selected);
+  --color-focus: var(--wb-focus);
+  --color-accent: var(--wb-accent);
+  --color-accent-hover: var(--wb-accent-hover);
+  --color-leaf: var(--wb-leaf);
+  --color-wheat: var(--wb-wheat);
+  --color-berry: var(--wb-berry);
+  --color-water: var(--wb-water);
+  --color-bark: var(--wb-bark);
+  --color-ok-soft: var(--wb-ok-soft);
+  --color-ok-ink: var(--wb-ok-ink);
+  --color-bad-soft: var(--wb-bad-soft);
+  --color-warn-ink: var(--wb-warn-ink);
+  --color-scrim: var(--wb-scrim);
+  --color-rail: var(--wb-rail);
+  --color-on-rail: var(--wb-on-rail);
+  --color-idle: var(--wb-idle);
+  --color-code-bg: var(--wb-code-bg);
+  --color-code-ink: var(--wb-code-ink);
+  --shadow-float: 0 8px 24px var(--wb-float);
+  --shadow-raise: 0 1px 2px var(--wb-raise);
+}
+
 /* Sharp at 12 and 24 px only. */
 @font-face {
   font-family: "FusionPixel";
@@ -528,14 +528,82 @@
   }
 }
 
+/* A helper's poses (ui/domain/PoseSprite.tsx): animate-pose-idle… each its own beat, eased in and out; cheer is timed
+   frame by frame. PoseSprite stops them when the system asks for less motion. */
+@theme {
+  --animate-pose-idle: pose-idle 2.6s ease-in-out infinite;
+  --animate-pose-walk: pose-walk 0.28s ease-in-out infinite;
+  --animate-pose-work: pose-work 0.9s ease-in-out infinite;
+  --animate-pose-think: pose-think 3.2s ease-in-out infinite;
+  --animate-pose-cheer: pose-cheer 2.2s linear infinite;
+  --animate-pose-worry: pose-worry 1.6s ease-in-out infinite;
+
+  @keyframes pose-idle {
+    50% {
+      transform: scale(1.012, 0.985);
+    }
+  }
+  @keyframes pose-walk {
+    50% {
+      transform: translateY(-3px);
+    }
+  }
+  @keyframes pose-work {
+    0%,
+    100% {
+      transform: rotate(-2.5deg);
+    }
+    50% {
+      transform: translateY(-3px) rotate(2.5deg);
+    }
+  }
+  @keyframes pose-think {
+    0%,
+    100% {
+      transform: rotate(-1.5deg);
+    }
+    50% {
+      transform: rotate(1.5deg);
+    }
+  }
+  @keyframes pose-cheer {
+    0% {
+      transform: none;
+      animation-timing-function: ease-out;
+    }
+    20% {
+      transform: translateY(-16px);
+      animation-timing-function: ease-in;
+    }
+    40% {
+      transform: scale(1.03, 0.97);
+    }
+    60%,
+    100% {
+      transform: none;
+    }
+  }
+  @keyframes pose-worry {
+    0%,
+    100% {
+      transform: none;
+    }
+    25% {
+      transform: rotate(-3deg);
+    }
+    75% {
+      transform: rotate(3deg);
+    }
+  }
+}
+
 @utility scroll-fade-x {
   mask-image: linear-gradient(to right, transparent, black var(--fade-left), black calc(100% - var(--fade-right)), transparent);
   animation: scroll-fade-x linear both;
   animation-timeline: scroll(self x);
 }
 
-/* The pixel skin's frames, type and focus as classes (docs/style/design.md, 像素皮的令牌): the same looks as pxStyle in
-   ui/pixel/style.ts, which stays for the farm and the tree until they are on classes. Type is 12 or 24px only, the sizes
+/* The pixel skin's frames, type and focus as classes (docs/style/design.md, 像素皮的令牌). Type is 12 or 24px only, the sizes
    FusionPixel is sharp at; pixel-read is the system face for long words to read. */
 @utility pixel-window {
   box-shadow:

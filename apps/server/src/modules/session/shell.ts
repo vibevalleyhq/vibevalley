@@ -1,6 +1,5 @@
+import { mkdir, mkdtemp, readdir, realpath, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
-
-import { Effect, type FileSystem } from "effect";
 
 import { t } from "@vibevalley/i18n";
 
@@ -62,34 +61,31 @@ function shellWord(s: string): string | undefined {
 }
 
 /** Context files survive suspension and never share a repo checkout. */
-export const contextPlace = Effect.fn("Session.contextPlace")(function* (
-  fs: FileSystem.FileSystem,
-  workRoot: string,
-  id: string,
-): Effect.fn.Return<Workplace, RepoError> {
+export async function contextPlace(workRoot: string, id: string): Promise<Workplace> {
   const root = join(workRoot, "contexts");
-  const make = Effect.gen(function* () {
-    yield* fs.makeDirectory(root, { recursive: true });
-    const work = yield* fs.realPath(workRoot);
-    const parent = yield* fs.realPath(root);
-    if (dirname(parent) !== work) return yield* RepoError.make({ message: t("server.repo.outside") });
-    const directory = yield* fs.makeTempDirectory({ directory: parent, prefix: id + "-" });
-    const cwd = yield* fs.realPath(directory);
-    if (dirname(cwd) !== parent) return yield* RepoError.make({ message: t("server.repo.outside") });
+  try {
+    await mkdir(root, { recursive: true });
+    const work = await realpath(workRoot);
+    const parent = await realpath(root);
+    if (dirname(parent) !== work) throw new RepoError(t("server.repo.outside"));
+    const directory = await mkdtemp(join(parent, id + "-"));
+    const cwd = await realpath(directory);
+    if (dirname(cwd) !== parent) throw new RepoError(t("server.repo.outside"));
     return { repo: "", cwd };
-  });
-  return yield* make.pipe(Effect.mapError((cause) => RepoError.make({ message: messageOf(cause), cause })));
-});
+  } catch (cause) {
+    throw new RepoError(messageOf(cause), { cause });
+  }
+}
 
 /** A failed opening can discard only an empty context directory. */
-export const releaseContextPlace = Effect.fn("Session.releaseContextPlace")(function* (
-  fs: FileSystem.FileSystem,
-  place: Workplace,
-): Effect.fn.Return<WorkplaceRelease> {
+export async function releaseContextPlace(place: Workplace): Promise<WorkplaceRelease> {
   const kept = (why: string): WorkplaceRelease => ({ kept: true, reason: t("server.session.life.contextKept", { cwd: place.cwd, why }) });
-  return yield* Effect.gen(function* () {
-    if ((yield* fs.readDirectory(place.cwd)).length > 0) return kept(t("server.session.life.contextHasFiles"));
-    yield* fs.remove(place.cwd, { recursive: true });
-    return { kept: false as const };
-  }).pipe(Effect.catch((cause) => Effect.succeed(cause.pipe(messageOf, kept))));
-});
+  try {
+    if ((await readdir(place.cwd)).length > 0) return kept(t("server.session.life.contextHasFiles"));
+    await rm(place.cwd, { recursive: true });
+    return { kept: false };
+  } catch (cause) {
+    // Kept, with why: the directory stays for the user to look at.
+    return kept(messageOf(cause));
+  }
+}

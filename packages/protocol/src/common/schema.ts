@@ -5,7 +5,7 @@ import * as T from "./shapes";
 
 /** A string read as one kind of id. The only place a plain string becomes a branded one without a check of its own:
  * the kind is what the field says. */
-export const branded = <B extends T.Branded<string>>(): z.ZodType<B, string> =>
+const branded = <B extends T.Branded<string>>(): z.ZodType<B, string> =>
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a brand is a promise about where the string came from, not a shape to check
   z.string().transform((s) => s as B);
 

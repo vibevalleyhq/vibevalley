@@ -1,5 +1,3 @@
-import { Effect, Layer } from "effect";
-
 import { registryOf } from "#/modules/runtime/runtime.ts";
 
 import { app } from "./http.ts";
@@ -9,19 +7,22 @@ import { quietApp } from "./world.ts";
 
 export { lookIn, memoriesOf } from "#/base/errors.ts";
 
-/** The whole farm on a free port: its address. */
-export const farm = Effect.gen(function* () {
-  let address = "";
-  yield* Layer.build(app(testConfig(), 0, (a) => Effect.sync(() => void (address = a)), quietApp));
-  return "http://" + address;
-});
+/** A farm served for a test: where it answers, and its end. */
+export interface RunningFarm extends AsyncDisposable {
+  readonly url: string;
+}
+
+/** The whole farm on a free port. */
+export async function farm(): Promise<RunningFarm> {
+  const served = await app(testConfig(), 0, undefined, quietApp);
+  return { url: "http://" + served.address, [Symbol.asyncDispose]: () => served.close() };
+}
 
 /** The same with the test helper as its only runtime (pi, testing/worker.ts), so an issue can be worked from outside as
  * an agent would. */
-export const workingFarm = Effect.gen(function* () {
-  let address = "";
+export async function workingFarm(): Promise<RunningFarm> {
   const given = [helper()];
   const runtime = { registry: registryOf(given), probe: installedOnly(given), background: false };
-  yield* Layer.build(app(testConfig(), 0, (a) => Effect.sync(() => void (address = a)), { ...quietApp, runtime }));
-  return "http://" + address;
-});
+  const served = await app(testConfig(), 0, undefined, { ...quietApp, runtime });
+  return { url: "http://" + served.address, [Symbol.asyncDispose]: () => served.close() };
+}

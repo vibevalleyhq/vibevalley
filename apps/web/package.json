@@ -21,6 +21,7 @@
     "@tailwindcss/vite": "catalog:",
     "@vibevalley/ai": "workspace:*",
     "@vibevalley/artifact": "workspace:*",
+    "@vibevalley/async": "workspace:*",
     "@vibevalley/base-ui": "workspace:*",
     "@vibevalley/bridge": "workspace:*",
     "@vibevalley/engine": "workspace:*",
@@ -43,7 +44,8 @@
     "solid-js": "catalog:",
     "tailwindcss": "catalog:",
     "unified": "catalog:",
-    "uqr": "catalog:"
+    "uqr": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@axe-core/playwright": "catalog:",

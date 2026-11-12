@@ -13,7 +13,9 @@
     "update-check": "vpx scripts/update-check.ts"
   },
   "dependencies": {
-    "@vibevalley/home": "workspace:*"
+    "@vibevalley/async": "workspace:*",
+    "@vibevalley/home": "workspace:*",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
@@ -23,7 +25,6 @@
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
     "@vibevalley/server": "workspace:*",
-    "effect": "catalog:",
     "electron": "catalog:",
     "electron-builder": "catalog:",
     "esbuild": "catalog:",

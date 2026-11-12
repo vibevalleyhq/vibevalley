@@ -10,7 +10,7 @@ import { IssueReportMemoryScopeValues } from "./shapes";
 const Landing = z.enum(T.LandingValues) satisfies Codec<T.Landing>;
 const IssueCanceled = z.enum(T.IssueCanceledValues) satisfies Codec<T.IssueCanceled>;
 
-export const Priority = z.enum(T.PriorityValues) satisfies Codec<T.Priority>;
+const Priority = z.enum(T.PriorityValues) satisfies Codec<T.Priority>;
 
 export const IssueStatus = z.enum(T.IssueStatusValues) satisfies Codec<T.IssueStatus>;
 

@@ -1,4 +1,4 @@
-import { Array as Arr, Formatter, Option, Schema } from "effect";
+import { z } from "zod";
 
 import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator, userId } from "@vibevalley/protocol";
@@ -33,26 +33,26 @@ export interface Meta {
   voiceMode?: "dictated" | "conversation" | "api";
 }
 
-const MetaSchema: Schema.Codec<Meta, Wire<Meta>> = Schema.Struct({
-  run: Schema.optionalKey(Schema.String),
-  mentions: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
-  session: Schema.optionalKey(S.SessionId),
-  outcome: Schema.optionalKey(S.Outcome),
-  spent: Schema.optionalKey(S.Spent),
-  code: Schema.optionalKey(Schema.String),
-  spoken: Schema.optionalKey(Schema.Boolean),
-  attachments: Schema.optionalKey(Schema.mutable(Schema.Array(S.Attachment))),
-  embeds: Schema.optionalKey(Schema.mutable(Schema.Array(S.Embed))),
-  artifact: Schema.optionalKey(S.ArtifactCard),
-  blocks: Schema.optionalKey(Schema.mutable(Schema.Array(S.QuotedBlock))),
-  picked: Schema.optionalKey(Schema.Struct({ agent: Schema.optionalKey(Schema.String), repo: Schema.optionalKey(Schema.String) })),
-  ingressSource: Schema.optionalKey(Schema.Literals(IngressSourceValues)),
-  ingressRecipient: Schema.optionalKey(Schema.String),
-  issue: Schema.optionalKey(S.IssueId),
-  trigger: Schema.optionalKey(S.RunTrigger),
-  responsePort: Schema.optionalKey(Schema.String),
-  voiceMode: Schema.optionalKey(Schema.Literals(VoiceModeValues)),
-});
+const MetaSchema = z.object({
+  run: z.exactOptional(z.string()),
+  mentions: z.exactOptional(z.array(z.string())),
+  session: z.exactOptional(S.SessionId),
+  outcome: z.exactOptional(S.Outcome),
+  spent: z.exactOptional(S.Spent),
+  code: z.exactOptional(z.string()),
+  spoken: z.exactOptional(z.boolean()),
+  attachments: z.exactOptional(z.array(S.Attachment)),
+  embeds: z.exactOptional(z.array(S.Embed)),
+  artifact: z.exactOptional(S.ArtifactCard),
+  blocks: z.exactOptional(z.array(S.QuotedBlock)),
+  picked: z.exactOptional(z.object({ agent: z.exactOptional(z.string()), repo: z.exactOptional(z.string()) })),
+  ingressSource: z.exactOptional(z.enum(IngressSourceValues)),
+  ingressRecipient: z.exactOptional(z.string()),
+  issue: z.exactOptional(S.IssueId),
+  trigger: z.exactOptional(S.RunTrigger),
+  responsePort: z.exactOptional(z.string()),
+  voiceMode: z.exactOptional(z.enum(VoiceModeValues)),
+}) satisfies z.ZodType<Meta, Wire<Meta>>;
 
 const decodeMetaText = storedJsonOrUndefined(MetaSchema, "channel_message.meta");
 const decodeMetaValue = valueOf(MetaSchema, "channel_message.meta");
@@ -62,7 +62,7 @@ export const metaOf = (raw: unknown): Meta => (raw == null ? {} : typeof raw ===
 export const metaText = (m: Meta | undefined) =>
   m === undefined
     ? null
-    : Formatter.formatJson(
+    : JSON.stringify(
         Object.fromEntries(Object.entries(m).filter(([, v]) => v !== undefined && v !== "" && v !== false && !(Array.isArray(v) && v.length === 0))),
       );
 
@@ -71,7 +71,7 @@ export const actorOfParticipant = (kind: T.ActorKind, role: T.AgentRole | null, 
     ? { kind: "agent", id, role: role ?? "worker", ...(name !== undefined ? { name } : {}) }
     : { kind, id, ...(name !== undefined ? { name } : {}) };
 
-export const channelType = (type: string): T.ChannelType => (Schema.is(S.ChannelType)(type) ? type : "channel");
+export const channelType = (type: string): T.ChannelType => S.ChannelType.safeParse(type).data ?? "channel";
 
 export const envelopeMore = (
   row: { readonly meta: string | null; readonly reply_number: number | null; readonly edited_at?: number | null; readonly deleted_at?: number | null },
@@ -159,8 +159,8 @@ export const orchestratorIn = (place: {
 }): string => {
   const { top, members, isOrchestrator } = place;
   if (top?.type === "direct") return top.peer_id !== null && isOrchestrator(top.peer_id) ? top.peer_id : defaultOrchestrator;
-  if (Arr.contains(members, defaultOrchestrator)) return defaultOrchestrator;
-  return Option.getOrElse(Arr.findFirst(members, isOrchestrator), () => defaultOrchestrator);
+  if (members.includes(defaultOrchestrator)) return defaultOrchestrator;
+  return members.find(isOrchestrator) ?? defaultOrchestrator;
 };
 
 export interface ChannelAudience {

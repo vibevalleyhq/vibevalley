@@ -1,25 +1,26 @@
-import { Effect } from "effect";
-
 import { userId } from "@vibevalley/protocol";
 import type { ArtifactHandlers } from "@vibevalley/protocol/api";
 
-import { Agent } from "#/modules/agent/agent.ts";
-import { Artifact } from "#/modules/artifact/artifact.ts";
-import { Issue } from "#/modules/issue/issue.ts";
+import type { Agent } from "#/modules/agent/agent.ts";
+import type { Artifact } from "#/modules/artifact/artifact.ts";
+import type { Issue } from "#/modules/issue/issue.ts";
 
-export const artifactHandlers = Effect.gen(function* () {
-  const agents = yield* Agent;
-  const artifacts = yield* Artifact;
-  const issues = yield* Issue;
-  const done: ArtifactHandlers = {
-    "artifact.list": ({ channel, issue }) =>
-      Effect.flatMap(issue ? issues.idOf(issue) : Effect.undefined, (id) => artifacts.list({ ...(channel ? { channel } : {}), ...(id ? { issue: id } : {}) })),
+export function artifactHandlers(deps: { readonly agent: Agent; readonly artifact: Artifact; readonly issue: Issue }): ArtifactHandlers {
+  const { agent: agents, artifact: artifacts, issue: issues } = deps;
+  return {
+    "artifact.list": async ({ channel, issue }) => {
+      const id = issue ? await issues.idOf(issue) : undefined;
+      return artifacts.list({ ...(channel ? { channel } : {}), ...(id ? { issue: id } : {}) });
+    },
     "artifact.get": ({ id }) => artifacts.get(id),
-    "artifact.content.get": ({ id, version }) => Effect.map(artifacts.content(id, version), (c) => ({ version: c.version, content: c.content })),
-    "artifact.create": (req) =>
-      Effect.flatMap(req.issue ? issues.idOf(req.issue) : Effect.undefined, (issue) =>
-        artifacts.create({ from: userId, by: userId }, { ...req, ...(issue ? { issue } : {}) }),
-      ),
+    "artifact.content.get": async ({ id, version }) => {
+      const c = await artifacts.content(id, version);
+      return { version: c.version, content: c.content };
+    },
+    "artifact.create": async (req) => {
+      const issue = req.issue ? await issues.idOf(req.issue) : undefined;
+      return artifacts.create({ from: userId, by: userId }, { ...req, ...(issue ? { issue } : {}) });
+    },
     "artifact.version.create": (req) => artifacts.version({ from: userId, by: userId }, req),
     "artifact.html.edit": (req) => artifacts.htmlEdit({ from: userId, by: userId }, req),
     "artifact.update": (req) => artifacts.update(req),
@@ -35,8 +36,7 @@ export const artifactHandlers = Effect.gen(function* () {
     "artifact.suggestion.create": ({ id, ...body }) => artifacts.suggest(id, userId, body),
     "artifact.suggestion.accept": ({ id, suggestion }) => artifacts.acceptSuggestion(id, suggestion, userId),
     "artifact.suggestion.reject": ({ id, suggestion }) => artifacts.rejectSuggestion(id, suggestion, userId),
-    "artifact.markdown.get": ({ id }) => Effect.map(artifacts.markdown(id), (markdown) => ({ markdown })),
+    "artifact.markdown.get": async ({ id }) => ({ markdown: await artifacts.markdown(id) }),
     "artifact.demo": ({ id }) => artifacts.demo(id, agents.agents()),
   };
-  return done;
-});
+}

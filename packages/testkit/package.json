@@ -10,8 +10,8 @@
   },
   "dependencies": {
     "@vibevalley/async": "workspace:*",
-    "effect": "catalog:",
-    "vite": "catalog:"
+    "vite": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

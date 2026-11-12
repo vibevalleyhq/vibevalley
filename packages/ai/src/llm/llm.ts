@@ -1,47 +1,51 @@
-import { Clock, Context, Effect, Layer, Predicate, Schema, Stream } from "effect";
-import { HttpClient } from "effect/http";
-
+import { type Clock, isAbort, systemClock } from "@vibevalley/async";
+import type { DeepSeekChunk } from "@vibevalley/provider/deepseek/response";
 import { makeDeepSeekModel } from "@vibevalley/provider/deepseek/server";
 
+import { isRecord } from "../base/json.ts";
 import type { AssistantMessage, Context as LlmContext } from "../base/messages.ts";
 import { zeroUsage } from "../base/messages.ts";
 import type { Model } from "../base/models.ts";
 import { type RequestOptions, requestInput } from "./request.ts";
 import { type AssistantMessageEvent, Fold } from "./response.ts";
 
-// messages.ts keeps pi-ai's shapes as interfaces, not schemas; the fold builds this value itself, so its role is enough to
-// tell it apart.
-const AnswerSoFar = Schema.declare((u): u is AssistantMessage => Predicate.hasProperty(u, "role") && u.role === "assistant");
-
 export interface StreamOptions extends RequestOptions {
   readonly apiKey: string;
 }
 
-/** The model could not be asked or its answer not read: no connection, a refusal by status, a broken stream. */
-export class LlmError extends Schema.TaggedError<LlmError, { readonly brand: unique symbol }>()("LlmError", {
-  reason: Schema.Literals(["network", "status", "stream"]),
-  /** The HTTP status, for status. */
-  status: Schema.optionalKey(Schema.Int),
-  message: Schema.String,
-  /** What had come when it failed. */
-  partial: Schema.optionalKey(AnswerSoFar),
-  /** The connection's own failure, for network. */
-  cause: Schema.optionalKey(Schema.Defect()),
-}) {}
+export type LlmErrorReason = "network" | "status" | "stream";
 
-export class Llm extends Context.Service<
-  Llm,
-  {
-    /** Starts with start, ends with done or error; interrupting it stops the request. */
-    readonly stream: (model: Model, context: LlmContext, options: StreamOptions) => Stream.Stream<AssistantMessageEvent, LlmError>;
-    /** The whole answer; a failure is its error message (stopReason error), as a stream's error event carries one. */
-    readonly complete: (model: Model, context: LlmContext, options: StreamOptions) => Effect.Effect<AssistantMessage>;
+/** The model could not be asked or its answer not read: no connection, a refusal by status, a broken stream. */
+export class LlmError extends Error {
+  override readonly name = "LlmError";
+  readonly reason: LlmErrorReason;
+  /** The HTTP status, for status. */
+  readonly status: number | undefined;
+  /** What had come when it failed. */
+  readonly partial: AssistantMessage | undefined;
+
+  /** cause: the connection's own failure, for network. */
+  constructor(reason: LlmErrorReason, message: string, more: { readonly status?: number; readonly partial?: AssistantMessage; readonly cause?: unknown } = {}) {
+    super(message, more.cause === undefined ? undefined : { cause: more.cause });
+    this.reason = reason;
+    this.status = more.status;
+    this.partial = more.partial;
   }
->()("@vibevalley/ai/llm/llm") {
-  static readonly layer = Layer.effect(
-    Llm,
-    Effect.suspend(() => make),
-  );
+}
+
+export interface Llm {
+  /** Starts with start, ends with done or error; a failure to ask or to read is an LlmError. The signal (or leaving the
+   * loop early) stops the request. */
+  readonly stream: (model: Model, context: LlmContext, options: StreamOptions, signal?: AbortSignal) => AsyncIterable<AssistantMessageEvent>;
+  /** The whole answer; a failure is its error message (stopReason error), as a stream's error event carries one. */
+  readonly complete: (model: Model, context: LlmContext, options: StreamOptions, signal?: AbortSignal) => Promise<AssistantMessage>;
+}
+
+export interface LlmDeps {
+  /** How requests go out; a test gives one that answers itself. Default: the global fetch. */
+  readonly fetch?: typeof fetch;
+  /** A request's start time. Default: the system clock. */
+  readonly clock?: Clock;
 }
 
 /** A failed request as the message a turn keeps: what had come, stopReason error. */
@@ -59,50 +63,63 @@ export const failedMessage = (model: Model, timestamp: number, e: LlmError): Ass
   errorMessage: e.message,
 });
 
-export const make = Effect.gen(function* () {
-  const http = yield* HttpClient.HttpClient;
+const reasons: readonly LlmErrorReason[] = ["network", "status", "stream"];
 
-  const stream = (model: Model, context: LlmContext, options: StreamOptions): Stream.Stream<AssistantMessageEvent, LlmError> =>
-    Stream.unwrap(
-      Effect.gen(function* () {
-        const now = yield* Clock.currentTimeMillis;
-        const fold = new Fold(model, now);
-        const language = makeDeepSeekModel(http, { model: model.id, baseUrl: model.baseUrl, key: options.apiKey });
-        const source = yield* language.stream(requestInput(model, context, options)).pipe(
-          Effect.mapError((e) =>
-            LlmError.make({
-              reason: e.reason,
-              message: e.message,
-              ...(e.status !== undefined ? { status: e.status } : {}),
-              ...(e.cause !== undefined ? { cause: e.cause } : {}),
-            }),
-          ),
-        );
-        const events = source.pipe(
-          Stream.mapError((e) => LlmError.make({ reason: e.reason, message: e.message, partial: fold.message() })),
-          Stream.map((chunk) => fold.chunk(chunk)),
-          Stream.flattenIterable,
-        );
-        return Stream.make(fold.start()).pipe(Stream.concat(events), Stream.concat(Stream.suspend(() => Stream.fromIterable(fold.end()))));
-      }),
-    );
+/** The provider's failure (its reason, status and cause) as an LlmError; anything else is not the provider's to say. */
+function llmErrorOf(e: unknown, partial: AssistantMessage | undefined): LlmError | undefined {
+  if (!(e instanceof Error) || !isRecord(e)) return undefined;
+  const reason = reasons.find((r) => r === e.reason);
+  if (reason === undefined) return undefined;
+  return new LlmError(reason, e.message, {
+    ...(typeof e.status === "number" ? { status: e.status } : {}),
+    ...(partial !== undefined ? { partial } : {}),
+    ...(partial === undefined && e.cause !== undefined ? { cause: e.cause } : {}),
+  });
+}
 
-  const complete = (model: Model, context: LlmContext, options: StreamOptions) =>
-    Effect.gen(function* () {
-      const asked = yield* Clock.currentTimeMillis;
-      const last = yield* stream(model, context, options).pipe(
-        Stream.runLast,
-        Effect.map((e) => (e._tag === "Some" ? e.value : undefined)),
-        Effect.catchTag("LlmError", (e) => Effect.succeed(failedMessage(model, asked, e))),
-      );
-      if (last === undefined) return failedMessage(model, asked, LlmError.make({ reason: "stream", message: "The stream said nothing" }));
-      if ("role" in last) return last;
-      return last.type === "done"
-        ? last.message
-        : last.type === "error"
-          ? last.error
-          : failedMessage(model, asked, LlmError.make({ reason: "stream", message: "The stream ended early" }));
-    });
+export function makeLlm(deps: LlmDeps = {}): Llm {
+  const fetchFn = deps.fetch ?? globalThis.fetch;
+  const clock = deps.clock ?? systemClock;
 
-  return Llm.of({ stream, complete });
-});
+  async function* stream(model: Model, context: LlmContext, options: StreamOptions, signal?: AbortSignal): AsyncGenerator<AssistantMessageEvent> {
+    const fold = new Fold(model, clock.now());
+    const language = makeDeepSeekModel(fetchFn, { model: model.id, baseUrl: model.baseUrl, key: options.apiKey });
+    let source: AsyncIterable<DeepSeekChunk>;
+    try {
+      source = await language.stream(requestInput(model, context, options), signal);
+    } catch (e) {
+      if (isAbort(e, signal)) throw e;
+      throw llmErrorOf(e, undefined) ?? e;
+    }
+    yield fold.start();
+    try {
+      for await (const chunk of source) yield* fold.chunk(chunk);
+    } catch (e) {
+      if (isAbort(e, signal)) throw e;
+      throw llmErrorOf(e, fold.message()) ?? e;
+    }
+    yield* fold.end();
+  }
+
+  const complete = async (model: Model, context: LlmContext, options: StreamOptions, signal?: AbortSignal): Promise<AssistantMessage> => {
+    const asked = clock.now();
+    let last: AssistantMessageEvent | undefined;
+    try {
+      for await (const e of stream(model, context, options, signal)) last = e;
+    } catch (e) {
+      if (e instanceof LlmError) return failedMessage(model, asked, e);
+      throw e;
+    }
+    if (last === undefined) return failedMessage(model, asked, new LlmError("stream", "The stream said nothing"));
+    return last.type === "done"
+      ? last.message
+      : last.type === "error"
+        ? last.error
+        : failedMessage(model, asked, new LlmError("stream", "The stream ended early"));
+  };
+
+  return { stream, complete };
+}
+
+/** makeLlm, under the name the hosts have called it by. */
+export const make = makeLlm;

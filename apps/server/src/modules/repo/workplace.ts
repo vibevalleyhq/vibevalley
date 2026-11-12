@@ -1,7 +1,9 @@
-import { Option, Schema } from "effect";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import type { RepoStack, PullRequest } from "@vibevalley/protocol";
+
+import { jsonOrNone } from "#/base/json.ts";
 
 export interface Workplace {
   readonly repo: string;
@@ -29,38 +31,36 @@ export interface Merged {
   readonly warning?: string;
 }
 
-const MergeFailureKindValues = ["conflict", "check", "error"] as const;
+export type MergeFailureKind = "conflict" | "check" | "error";
 
-/** Why a merge did not go in: a conflict (and with what), the check, or git. */
 /** Work that did not merge: a conflict (with the base and its files), a failed check, or anything else. */
-export class MergeFailure extends Schema.TaggedError<MergeFailure, { readonly brand: unique symbol }>()("MergeFailure", {
-  kind: Schema.Literals(MergeFailureKindValues),
-  reasonText: Schema.String,
-  base: Schema.String,
-  files: Schema.Array(Schema.String),
-  message: Schema.String,
-}) {
+export class MergeFailure extends Error {
+  override readonly name = "MergeFailure";
+  readonly kind: MergeFailureKind;
+  readonly reasonText: string;
+  readonly base: string;
+  readonly files: readonly string[];
+  constructor(kind: MergeFailureKind, reasonText: string, base: string, files: readonly string[], message: string) {
+    super(message);
+    this.kind = kind;
+    this.reasonText = reasonText;
+    this.base = base;
+    this.files = files;
+  }
   static conflict(base: string, files: readonly string[]) {
-    return MergeFailure.make({
-      kind: "conflict",
-      reasonText: "",
-      base,
-      files,
-      message: t("server.repo.conflict", { base }),
-    });
+    return new MergeFailure("conflict", "", base, files, t("server.repo.conflict", { base }));
   }
   static failedCheck(why: string) {
-    return MergeFailure.make({ kind: "check", reasonText: why, base: "", files: [], message: why });
+    return new MergeFailure("check", why, "", [], why);
   }
   static error(why: string) {
-    return MergeFailure.make({ kind: "error", reasonText: why, base: "", files: [], message: why });
+    return new MergeFailure("error", why, "", [], why);
   }
 }
 
-export class RepoError extends Schema.TaggedError<RepoError, { readonly brand: unique symbol }>()("RepoError", {
-  message: Schema.String,
-  cause: Schema.optionalKey(Schema.Defect()),
-}) {}
+export class RepoError extends Error {
+  override readonly name = "RepoError";
+}
 
 /** Where, in a worktree's git directory (git rev-parse --git-path), its helper leaves the pull request's title and body. */
 export const pullRequestFile = "vibevalley-pr.md";
@@ -138,14 +138,12 @@ export function stackOf(files: ReadonlyMap<string, string>): RepoStack {
 }
 
 // An unreadable package.json, or one whose scripts are not all text, has none.
-const scriptsOf = Schema.decodeUnknownOption(
-  Schema.fromJsonString(Schema.Struct({ scripts: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)) })),
-);
+const scriptsOf = jsonOrNone(z.object({ scripts: z.exactOptional(z.record(z.string(), z.string())) }));
 
 /** The package orchestrator is the lockfile's; a command is there only when package.json has that script, always as `<pm> run <script>`. */
 function nodeStack(pkg: string, has: (name: (typeof stackFiles)[number]) => boolean): RepoStack {
   const pm = has("bun.lock") || has("bun.lockb") ? "bun" : has("pnpm-lock.yaml") ? "pnpm" : has("yarn.lock") ? "yarn" : "npm";
-  const scripts: Readonly<Record<string, string>> = Option.match(scriptsOf(pkg), { onNone: () => ({}), onSome: (p) => p.scripts ?? {} });
+  const scripts: Readonly<Record<string, string>> = scriptsOf(pkg)?.scripts ?? {};
   const runScript = (s: string) => (scripts[s]?.trim() ? `${pm} run ${s}` : "");
   return withCommands({
     name: "node",

@@ -20,7 +20,7 @@ export function Button(
     tone?: Tone;
     icon?: IconName | undefined;
     children?: JSX.Element;
-    class?: string | undefined;
+    class?: JSX.ClassValue | undefined;
   } & Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "class" | "style"> &
     (
       | { styles?: undefined; style?: JSX.ButtonHTMLAttributes<HTMLButtonElement>["style"] }

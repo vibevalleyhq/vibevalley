@@ -1,11 +1,9 @@
-import { Effect } from "effect";
-
 import { t } from "@vibevalley/i18n";
 import type { Changes, ChangedFile } from "@vibevalley/protocol";
 
 import { numberIn } from "#/base/order.ts";
 
-import { git, GitError, gitOk, gitQuiet, gitRun, type Ran, reason } from "./git.ts";
+import { GitError, gitWith, type Ran, reason } from "./git.ts";
 
 const patchLines = 400;
 const patchesMax = 400_000;
@@ -14,21 +12,33 @@ const patchesMax = 400_000;
 export const asFarm = ["-c", "user.name=vibevalley", "-c", "user.email=vibevalley@localhost"];
 
 /** "" when it went through, else the first line git said. */
-const why = (ran: Effect.Effect<Ran>) => Effect.map(ran, (r) => (r.code === 0 ? "" : reason(r.stderr)));
+const why = async (ran: Promise<Ran>) => {
+  const r = await ran;
+  return r.code === 0 ? "" : reason(r.stderr);
+};
 
-/** The repository (or a worktree of it) at path. */
-export const repository = (path: string) => {
+/** The repository (or a worktree of it) at path; its git commands stop when signal aborts. */
+export const repository = (path: string, signal?: AbortSignal) => {
+  const { git, gitOk, gitQuiet, gitRun } = gitWith(signal);
+
   /** The branch checked out: in a repo's own folder, its main. */
-  const main = git(path, "symbolic-ref", "--short", "HEAD");
+  const main = () => git(path, "symbolic-ref", "--short", "HEAD");
 
   /** As the machine's git user, else as vibevalley. */
-  const commit = (message: string) => git(path, "commit", "-q", "-m", message).pipe(Effect.catch(() => git(path, ...asFarm, "commit", "-q", "-m", message)));
+  const commit = async (message: string) => {
+    try {
+      return await git(path, "commit", "-q", "-m", message);
+    } catch (e) {
+      if (!(e instanceof GitError)) throw e;
+      return git(path, ...asFarm, "commit", "-q", "-m", message);
+    }
+  };
 
   /** The files merging branch into base would conflict on; none when it merges cleanly. */
-  const conflicts = Effect.fnUntraced(function* (base: string, branch: string): Effect.fn.Return<string[], GitError> {
-    const r = yield* gitRun(path, "merge-tree", "--write-tree", "--name-only", "--no-messages", base, branch);
+  const conflicts = async (base: string, branch: string): Promise<string[]> => {
+    const r = await gitRun(path, "merge-tree", "--write-tree", "--name-only", "--no-messages", base, branch);
     if (r.code === 0) return [];
-    if (r.code !== 1) return yield* GitError.of(r.code, r.code < 0 ? r.stderr : t("server.repo.mergeTree", { code: r.code }));
+    if (r.code !== 1) throw GitError.of(r.code, r.code < 0 ? r.stderr : t("server.repo.mergeTree", { code: r.code }));
     // First line: the tree it would write; then each conflicted file.
     return [
       ...new Set(
@@ -39,57 +49,59 @@ export const repository = (path: string) => {
           .filter((l) => l !== ""),
       ),
     ];
-  });
+  };
 
   return {
     main,
-    head: git(path, "rev-parse", "--verify", "HEAD^{commit}"),
-    status: git(path, "status", "--porcelain=v1", "--untracked-files=all"),
-    commonDirectory: git(path, "rev-parse", "--path-format=absolute", "--git-common-dir"),
-    location: Effect.map(git(path, "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"), (out) => {
+    head: () => git(path, "rev-parse", "--verify", "HEAD^{commit}"),
+    status: () => git(path, "status", "--porcelain=v1", "--untracked-files=all"),
+    commonDirectory: () => git(path, "rev-parse", "--path-format=absolute", "--git-common-dir"),
+    location: async () => {
+      const out = await git(path, "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir");
       const [top = "", common = ""] = out.split("\n");
       return { top, common };
-    }),
-    checkout: Effect.map(git(path, "status", "--porcelain=v2", "--branch", "--untracked-files=all"), (out) => {
-      const lines = out.split("\n");
+    },
+    checkout: async () => {
+      const lines = (await git(path, "status", "--porcelain=v2", "--branch", "--untracked-files=all")).split("\n");
       return {
         branch: lines.find((line) => line.startsWith("# branch.head "))?.slice(14) ?? "",
         sha: lines.find((line) => line.startsWith("# branch.oid "))?.slice(13) ?? "",
         clean: lines.every((line) => line.startsWith("# ") || line === ""),
       };
-    }),
-    configuration: Effect.map(git(path, "config", "--null", "--list"), (out) =>
-      out
+    },
+    configuration: async () =>
+      (await git(path, "config", "--null", "--list"))
         .split("\0")
         .filter(Boolean)
         .map((entry) => {
           const at = entry.indexOf("\n");
           return { key: at < 0 ? entry : entry.slice(0, at), value: at < 0 ? "" : entry.slice(at + 1) };
         }),
-    ),
     validBranch: (branch: string) => gitOk(path, "check-ref-format", "refs/heads/" + branch),
     fetch: (url: string, branch: string) => git(path, "fetch", "--no-tags", "--no-write-fetch-head", "--", url, "refs/heads/" + branch),
     push: (url: string, branch: string, sha: string) =>
       git(path, "push", "--porcelain", "--no-follow-tags", "--recurse-submodules=no", "--", url, sha + ":refs/heads/" + branch),
     remoteTip: (url: string, branch: string) => git(path, "ls-remote", "--exit-code", "--refs", "--", url, "refs/heads/" + branch),
-    worktrees: git(path, "worktree", "list", "--porcelain", "-z"),
+    worktrees: () => git(path, "worktree", "list", "--porcelain", "-z"),
     addWorktree: (cwd: string, branch: string, from?: string) =>
       git(path, "worktree", "add", ...(from === undefined ? [] : ["-b", branch]), "--", cwd, from ?? branch),
     /** The same, or "" when git cannot say. */
-    mainOrNone: gitQuiet(path, "symbolic-ref", "--short", "HEAD"),
+    mainOrNone: () => gitQuiet(path, "symbolic-ref", "--short", "HEAD"),
     /** Whether refs/heads/<branch> is there; a git that cannot tell fails. */
-    hasBranch: (branch: string) =>
-      Effect.flatMap(gitRun(path, "show-ref", "--verify", "--quiet", "refs/heads/" + branch), (r) =>
-        r.code === 0 ? Effect.succeed(true) : r.code === 1 ? Effect.succeed(false) : Effect.fail(GitError.of(r.code, r.stderr)),
-      ),
+    hasBranch: async (branch: string) => {
+      const r = await gitRun(path, "show-ref", "--verify", "--quiet", "refs/heads/" + branch);
+      if (r.code === 0) return true;
+      if (r.code === 1) return false;
+      throw GitError.of(r.code, r.stderr);
+    },
     /** Where a branch points. */
     tip: (branch: string) => git(path, "rev-parse", "refs/heads/" + branch),
     /** Whether newer has older in it; false when git cannot say. */
     isAncestor: (older: string, newer: string) => gitOk(path, "merge-base", "--is-ancestor", older, newer),
     /** How many commits branch has that base has not. */
-    ahead: (base: string, branch: string) => Effect.map(git(path, "rev-list", "--count", `${base}..${branch}`), (n) => numberIn(n)),
+    ahead: async (base: string, branch: string) => numberIn(await git(path, "rev-list", "--count", `${base}..${branch}`)),
     /** origin's URL, or "" when it has none. */
-    origin: gitQuiet(path, "remote", "get-url", "origin"),
+    origin: () => gitQuiet(path, "remote", "get-url", "origin"),
     /** "" when the worktree at cwd is gone; without force, one with changes stays. */
     removeWorktree: (cwd: string, force: boolean) => why(gitRun(path, "worktree", "remove", ...(force ? ["--force"] : []), cwd)),
     /** "" when the branch is gone. */
@@ -97,17 +109,22 @@ export const repository = (path: string) => {
     commit,
     conflicts,
     /** A merge commit of theirs into ours, made without checking either out: merge-tree writes the tree. */
-    mergeCommit: Effect.fnUntraced(function* (ours: string, theirs: string, message: string) {
-      const tree = (yield* git(path, "merge-tree", "--write-tree", "--no-messages", ours, theirs)).split("\n")[0] ?? "";
+    mergeCommit: async (ours: string, theirs: string, message: string) => {
+      const tree = (await git(path, "merge-tree", "--write-tree", "--no-messages", ours, theirs)).split("\n")[0] ?? "";
       const args = ["commit-tree", tree, "-p", ours, "-p", theirs, "-m", message];
-      return yield* git(path, ...args).pipe(Effect.catch(() => git(path, ...asFarm, ...args)));
-    }),
+      try {
+        return await git(path, ...args);
+      } catch (e) {
+        if (!(e instanceof GitError)) throw e;
+        return git(path, ...asFarm, ...args);
+      }
+    },
     /** What branch changes against main, with what is uncommitted in cwd (none for ""). */
-    describe: Effect.fnUntraced(function* (repo: string, cwd: string, branch: string | undefined) {
-      const base = yield* main;
+    describe: async (repo: string, cwd: string, branch: string | undefined): Promise<Changes> => {
+      const base = await main();
       const uncommitted: Changes["uncommitted"] = [];
       if (cwd !== "") {
-        const status = yield* gitRun(cwd, "status", "--porcelain=v1", "-uall");
+        const status = await gitRun(cwd, "status", "--porcelain=v1", "-uall");
         for (const line of status.stdout.replace(/\n+$/u, "").split("\n")) {
           if (line.length < 4) continue;
           const code = line.slice(0, 2).trim();
@@ -129,18 +146,18 @@ export const repository = (path: string) => {
       if (!branch) return changes;
       changes.branch = branch;
       const range = `${base}...${branch}`;
-      const log = yield* git(path, "log", "--format=%h%x09%ct%x09%s", `${base}..${branch}`);
+      const log = await git(path, "log", "--format=%h%x09%ct%x09%s", `${base}..${branch}`);
       // One diff for all three: the raw lines (":<modes> <ids> <letter>\t<path>") and the numstat lines come first, then
       // the patch from its first "diff --git".
-      const diff = yield* git(path, "diff", "--no-renames", "--no-color", "--raw", "--numstat", "-p", range);
+      const diff = await git(path, "diff", "--no-renames", "--no-color", "--raw", "--numstat", "-p", range);
       const first = diff.startsWith("diff --git ") ? 0 : diff.indexOf("\ndiff --git ");
       const at = first < 0 ? diff.length : first === 0 ? 0 : first + 1;
       const head = diff.slice(0, at).split("\n");
       const names = head.flatMap((l) => (l.startsWith(":") ? [l.slice(l.lastIndexOf(" ", l.indexOf("\t")) + 1)] : [])).join("\n");
       const numbers = head.filter((l) => !l.startsWith(":")).join("\n");
       const patch = diff.slice(at).trim();
-      const clashes = yield* conflicts(base, branch);
-      const behind = yield* gitQuiet(path, "rev-list", "--count", `${branch}..${base}`);
+      const clashes = await conflicts(base, branch);
+      const behind = await gitQuiet(path, "rev-list", "--count", `${branch}..${base}`);
       const counts = new Map<string, { added: number; removed: number }>();
       for (const line of numbers.split("\n")) {
         const parts = line.split("\t");
@@ -193,6 +210,6 @@ export const repository = (path: string) => {
       changes.conflicts.push(...clashes);
       changes.behind = numberIn(behind);
       return changes;
-    }),
+    },
   };
 };

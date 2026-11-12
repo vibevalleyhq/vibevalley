@@ -1,4 +1,3 @@
-import { Formatter } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 import { normalSpans } from "@vibevalley/artifact";
@@ -319,7 +318,7 @@ const spansText = (spans: readonly TextSpan[]) =>
   spans
     .map(
       (s) =>
-        Formatter.formatJson(s.t) +
+        JSON.stringify(s.t) +
         (s.marks.bold === true ? "B" : "") +
         (s.marks.italic === true ? "I" : "") +
         (s.marks.code === true ? "C" : "") +

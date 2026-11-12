@@ -1,5 +1,5 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
+import type * as stylex from "@stylexjs/stylex";
 import { createSignal, omit, Show } from "solid-js";
 
 import { Switch } from "@vibevalley/base-ui";
@@ -12,255 +12,17 @@ import { Link as A } from "#/infra/router.ts";
 import { TextInput, type TextInputProps } from "./Field";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
-import { styleProps } from "./positioner";
+import { withStyles } from "./positioner";
 import { Hint } from "./Tip";
-
-const styles = stylex.create({
-  toggleLabel: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "0.5rem",
-  },
-  toggleDisabled: {
-    opacity: ".5",
-  },
-  toggleEnabled: {
-    cursor: "pointer",
-  },
-  switchRoot: {
-    marginTop: "0.125rem",
-    display: "flex",
-    height: "1rem",
-    width: "1.75rem",
-    flexShrink: 0,
-    alignItems: "center",
-    borderRadius: "9999px",
-    padding: "0.125rem",
-    backgroundColor: { default: "var(--color-selected)", ":is([data-checked])": "var(--color-accent)" },
-    transitionProperty: "color, background-color, border-color",
-    transitionDuration: "180ms",
-    transitionTimingFunction: "var(--ease-out)",
-  },
-  switchThumb: {
-    display: "block",
-    width: "0.75rem",
-    height: "0.75rem",
-    borderRadius: "9999px",
-    backgroundColor: "var(--color-page)",
-    boxShadow: "var(--shadow-toggle-thumb)",
-    transitionProperty: "translate",
-    transitionDuration: "180ms",
-    transitionTimingFunction: "var(--ease-out)",
-    translate: { default: null, ":is([data-checked])": "0.75rem 0" },
-  },
-  textLink: {
-    cursor: "pointer",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    textDecorationLine: "underline",
-    textDecorationColor: { default: "currentcolor", "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, currentcolor 50%, transparent)" },
-  },
-  quietLink: { color: { default: "var(--color-muted)", "@media (hover: hover)": { default: null, ":hover": "var(--color-ink)" } } },
-  dangerLink: { color: { default: "var(--color-berry)", "@media (hover: hover)": { default: null, ":hover": "var(--color-ink)" } } },
-  windowStrip: (height: number) => ({ pointerEvents: "none", position: "fixed", insetInline: 0, top: 0, height }),
-  secretInput: { paddingRight: "2.25rem", fontFamily: "var(--font-mono)" },
-  split: {
-    display: "flex",
-    height: "100%",
-    minHeight: 0,
-    flexDirection: { default: "column", "@media (width >= 48rem)": "row" },
-    overflowX: { default: null, "@media (width >= 48rem)": "hidden" },
-    overflowY: { default: "auto", "@media (width >= 48rem)": "hidden" },
-  },
-  splitGap: { gap: "0.75rem" },
-  splitList: {
-    flexShrink: 0,
-    width: { default: null, "@media (width >= 48rem)": "17.5rem" },
-    overflowY: { default: null, "@media (width >= 48rem)": "auto" },
-  },
-  splitEdge: {
-    borderBottomWidth: { default: 1, "@media (width >= 48rem)": 0 },
-    borderBottomStyle: "solid",
-    borderRightWidth: { default: null, "@media (width >= 48rem)": 1 },
-    borderRightStyle: "solid",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-side)",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.75rem",
-  },
-  splitBody: { minWidth: 0, flex: "1", overflowY: { default: null, "@media (width >= 48rem)": "auto" } },
-  splitBodyEdge: { padding: "0.75rem" },
-  column: { display: "flex", flexDirection: "column" },
-  listHeader: { display: "flex", flexShrink: 0, alignItems: "center", gap: "0.5rem" },
-  listHeaderBare: { height: "2rem", paddingInline: "0.5rem" },
-  listHeaderBox: {
-    height: "2.5rem",
-    borderBottomWidth: 1,
-    borderBottomStyle: "solid",
-    borderColor: "var(--color-line)",
-    paddingInline: "0.75rem",
-  },
-  listTitle: { flex: "1", textOverflow: "ellipsis", whiteSpace: "nowrap", overflow: "hidden" },
-  listTitleBare: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontWeight: "var(--font-weight-medium)",
-    color: "var(--color-faint)",
-  },
-  listTitleBox: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", fontWeight: "var(--font-weight-semibold)" },
-  listBare: { gap: "1px" },
-  listBox: { padding: "0.25rem" },
-  listRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.625rem",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.625rem",
-    paddingBlock: "0.5rem",
-    backgroundColor: {
-      default: null,
-      ':where([aria-current="page"])': "var(--color-selected)",
-      "@media (hover: hover)": { default: null, ":hover": "var(--color-hover)" },
-    },
-    outlineWidth: { default: null, ":focus-visible": 2 },
-    outlineStyle: { default: null, ":focus-visible": "solid" },
-    outlineColor: { default: null, ":focus-visible": "var(--color-focus)" },
-  },
-  rowText: { display: "flex", minWidth: 0, flex: "1", flexDirection: "column" },
-  card: {
-    display: "flex",
-    flexDirection: "column",
-    borderRadius: "var(--radius-lg)",
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-  },
-  rowTitle: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    fontWeight: "var(--font-weight-medium)",
-  },
-  rowLine: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  cardHeader: {
-    display: "flex",
-    minHeight: "3rem",
-    alignItems: "center",
-    gap: "0.5rem",
-    borderBottomStyle: "solid",
-    borderBottomWidth: "1px",
-    borderColor: "var(--color-line)",
-    paddingInline: "1rem",
-    paddingBlock: "0.5rem",
-  },
-  cardTitle: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-base)",
-    lineHeight: "var(--leading-base)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  cardBody: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "1rem",
-    padding: "1rem",
-  },
-  quiet: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  empty: {
-    display: "flex",
-    height: "100%",
-    minHeight: "12rem",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "1.5rem",
-  },
-  emptyBody: {
-    display: "flex",
-    maxWidth: "24rem",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "0.75rem",
-    textAlign: "center",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  emptyIcon: {
-    color: "var(--color-faint)",
-  },
-  toggleBody: {
-    display: "flex",
-    flexDirection: "column",
-  },
-  toggleTitle: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.25rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  toggleHint: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  secretBox: {
-    position: "relative",
-    display: "flex",
-  },
-  reveal: {
-    position: "absolute",
-    insetBlock: "0",
-    right: "0.25rem",
-    marginBlock: "auto",
-    display: "inline-flex",
-    width: "1.75rem",
-    height: "1.75rem",
-    cursor: "pointer",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-sm)",
-    color: {
-      default: "var(--color-faint)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-ink)",
-      },
-    },
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-});
 
 /** edge: a page's own list as a side column against the rail (its ListCard bare), not a card in a page that already has one. */
 export function Split(props: { list: JSX.Element; children: JSX.Element; edge?: boolean }) {
   return (
-    <div {...stylex.attrs(styles.split, props.edge !== true && styles.splitGap)}>
-      <div {...stylex.attrs(styles.splitList, props.edge === true && styles.splitEdge)}>{props.list}</div>
-      <div {...stylex.attrs(styles.splitBody, props.edge === true && styles.splitBodyEdge)}>{props.children}</div>
+    <div class={["flex h-full min-h-0 flex-col overflow-y-auto md:flex-row md:overflow-x-hidden md:overflow-y-hidden", props.edge !== true && "gap-3"]}>
+      <div class={["shrink-0 md:w-70 md:overflow-y-auto", props.edge === true && "border-b border-line bg-side px-2 py-3 md:border-r md:border-b-0"]}>
+        {props.list}
+      </div>
+      <div class={["min-w-0 flex-1 md:overflow-y-auto", props.edge === true && "p-3"]}>{props.children}</div>
     </div>
   );
 }
@@ -269,12 +31,16 @@ export function Split(props: { list: JSX.Element; children: JSX.Element; edge?: 
 export function ListCard(props: { title: string; label?: string; action?: JSX.Element; children: JSX.Element; testid?: string; bare?: boolean }) {
   const bare = () => props.bare === true;
   return (
-    <section aria-label={props.label ?? props.title} data-testid={props.testid} {...stylex.attrs(bare() ? styles.column : styles.card)}>
-      <header {...stylex.attrs(styles.listHeader, bare() ? styles.listHeaderBare : styles.listHeaderBox)}>
-        <h2 {...stylex.attrs(styles.listTitle, bare() ? styles.listTitleBare : styles.listTitleBox)}>{props.title}</h2>
+    <section
+      aria-label={props.label ?? props.title}
+      data-testid={props.testid}
+      class={bare() ? "flex flex-col" : "flex flex-col rounded-lg border border-line bg-page"}
+    >
+      <header class={["flex shrink-0 items-center gap-2", bare() ? "h-8 px-2" : "h-10 border-b border-line px-3"]}>
+        <h2 class={["flex-1 truncate", bare() ? "text-xs font-medium text-faint" : "text-sm font-semibold"]}>{props.title}</h2>
         {props.action}
       </header>
-      <ul {...stylex.attrs(styles.column, bare() ? styles.listBare : styles.listBox)}>{props.children}</ul>
+      <ul class={["flex flex-col", bare() ? "gap-px" : "p-1"]}>{props.children}</ul>
     </section>
   );
 }
@@ -288,13 +54,14 @@ export function ListRow(props: { to: string; item?: string; active?: boolean; ti
         data-testid="list-row"
         data-key={props.item}
         aria-current={props.active === true ? "page" : undefined}
-        {...stylex.attrs(styles.listRow)}
+        // The open row is selected under a hover's colour: :where keeps it below hover:.
+        class="flex items-center gap-2.5 rounded-md px-2.5 py-2 hover:bg-hover [&:where([aria-current=page])]:bg-selected"
       >
         {props.leading}
-        <span {...stylex.attrs(styles.rowText)}>
-          <span {...stylex.attrs(styles.rowTitle)}>{props.title}</span>
+        <span class="flex min-w-0 flex-1 flex-col">
+          <span class="truncate text-sm font-medium">{props.title}</span>
           <Show when={props.line}>
-            <span {...stylex.attrs(styles.rowLine)}>{props.line}</span>
+            <span class="truncate text-xs text-muted">{props.line}</span>
           </Show>
         </span>
         {props.trailing}
@@ -308,34 +75,40 @@ export function Card(props: {
   title?: JSX.Element;
   action?: JSX.Element;
   children: JSX.Element;
+  class?: JSX.ClassValue | undefined;
+  // For callers still on StyleX; it goes when the last of them is on classes.
   styles?: stylex.StyleXStyles;
   testid?: string;
   item?: string;
 }) {
   return (
-    <section data-testid={props.testid} data-key={props.item} {...styleProps([styles.card, props.styles])}>
+    <section
+      data-testid={props.testid}
+      data-key={props.item}
+      {...withStyles(props.styles, ["flex flex-col rounded-lg border border-line bg-page", props.class])}
+    >
       <Show when={props.title !== undefined}>
-        <header {...stylex.attrs(styles.cardHeader)}>
-          <h2 {...stylex.attrs(styles.cardTitle)}>{props.title}</h2>
+        <header class="flex min-h-12 items-center gap-2 border-b border-line px-4 py-2">
+          <h2 class="min-w-0 flex-1 truncate text-base font-semibold">{props.title}</h2>
           {props.action}
         </header>
       </Show>
-      <div {...stylex.attrs(styles.cardBody)}>{props.children}</div>
+      <div class="flex flex-col gap-4 p-4">{props.children}</div>
     </section>
   );
 }
 
 /** Nothing to show yet, in words. */
 export function Quiet(props: { children: JSX.Element }) {
-  return <p {...stylex.attrs(styles.quiet)}>{props.children}</p>;
+  return <p class="text-sm text-muted">{props.children}</p>;
 }
 
 /** A place with nothing in it yet (docs/style/design.md): its icon, why it is empty, and the next step if there is one. */
 export function Empty(props: { icon: IconName; children: JSX.Element; action?: JSX.Element; testid?: string }) {
   return (
-    <div data-testid={props.testid ?? "empty"} {...stylex.attrs(styles.empty)}>
-      <div {...stylex.attrs(styles.emptyBody)}>
-        <Icon name={props.icon} size={48} styles={styles.emptyIcon} />
+    <div data-testid={props.testid ?? "empty"} class="flex h-full min-h-48 items-center justify-center p-6">
+      <div class="flex max-w-sm flex-col items-center gap-3 text-center text-sm text-muted">
+        <Icon name={props.icon} size={48} class="text-faint" />
         <p>{props.children}</p>
         {props.action}
       </div>
@@ -356,24 +129,24 @@ export function Toggle(props: {
   testid?: string;
 }) {
   return (
-    <label {...stylex.attrs(styles.toggleLabel, props.disabled === true ? styles.toggleDisabled : styles.toggleEnabled)}>
+    <label class={["flex items-start gap-2", props.disabled === true ? "opacity-50" : "cursor-pointer"]}>
       <Switch.Root
         data-testid={props.testid}
         checked={props.checked}
         onCheckedChange={props.onChange}
         aria-label={props.ariaLabel ?? props.label}
         disabled={props.disabled}
-        {...stylex.attrs(styles.switchRoot)}
+        class="mt-0.5 flex h-4 w-7 shrink-0 items-center rounded-full bg-selected p-0.5 transition-[color,background-color,border-color] duration-180 ease-out data-checked:bg-accent"
       >
-        <Switch.Thumb {...stylex.attrs(styles.switchThumb)} />
+        <Switch.Thumb class="block size-3 rounded-full bg-page shadow-toggle-thumb transition-[translate] duration-180 ease-out data-checked:translate-x-3" />
       </Switch.Root>
-      <span {...stylex.attrs(styles.toggleBody)}>
-        <span {...stylex.attrs(styles.toggleTitle)}>
+      <span class="flex flex-col">
+        <span class="flex items-center gap-1 text-sm">
           {props.label}
           <Show when={props.tip}>{(t) => <Hint text={t()} />}</Show>
         </span>
         <Show when={props.hint}>
-          <span {...stylex.attrs(styles.toggleHint)}>{props.hint}</span>
+          <span class="text-xs text-muted">{props.hint}</span>
         </Show>
       </span>
     </label>
@@ -383,15 +156,16 @@ export function Toggle(props: {
 /** A key: hidden until the eye is pressed. */
 export function SecretInput(props: TextInputProps) {
   const [shown, setShown] = createSignal(false);
-  const rest = omit(props, "styles");
+  const rest = omit(props, "class");
   return (
-    <span {...stylex.attrs(styles.secretBox)}>
-      <TextInput {...rest} type={shown() ? "text" : "password"} autocomplete="off" spellcheck="false" styles={[styles.secretInput, props.styles]} />
+    <span class="relative flex">
+      {/* pr-9 over TextInput's px-2.5: Tailwind puts a side's padding after both sides'. */}
+      <TextInput {...rest} type={shown() ? "text" : "password"} autocomplete="off" spellcheck="false" class={["pr-9 font-mono", props.class]} />
       <button
         type="button"
         data-testid="reveal"
         aria-pressed={aria(shown())}
-        {...stylex.attrs(styles.reveal)}
+        class="absolute inset-y-0 right-1 my-auto inline-flex size-7 cursor-pointer items-center justify-center rounded-sm text-faint hover:bg-hover hover:text-ink"
         aria-label={shown() ? t("web.base.secret.hide") : t("web.base.secret.peek")}
         title={shown() ? t("web.base.secret.hide") : t("web.base.secret.peek")}
         onClick={() => setShown(!shown())}
@@ -404,7 +178,9 @@ export function SecretInput(props: TextInputProps) {
 
 /** A quiet underlined word: a page to open in the browser, or onClick. */
 export function TextLink(props: { children: JSX.Element; href?: string; onClick?: () => void; danger?: boolean }) {
-  const look = () => stylex.attrs(styles.textLink, props.danger === true ? styles.dangerLink : styles.quietLink);
+  const look = () => ({
+    class: ["cursor-pointer text-xs underline decoration-current/50 hover:text-ink", props.danger === true ? "text-berry" : "text-muted"],
+  });
   return (
     <Show
       when={props.href}
@@ -437,7 +213,7 @@ export const titleBar = {
 export function WindowStrip() {
   return (
     <Show when={titleBar.top > 0}>
-      <div aria-hidden="true" data-window-drag="" {...styleProps(styles.windowStrip(titleBar.top))} />
+      <div aria-hidden="true" data-window-drag="" class="pointer-events-none fixed inset-x-0 top-0" style={{ height: `${titleBar.top}px` }} />
     </Show>
   );
 }

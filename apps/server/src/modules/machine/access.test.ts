@@ -1,19 +1,27 @@
 import type { RawEvent, SessionOptions } from "@botiverse/oar";
 import { scriptedRuntime } from "@botiverse/oar/testing";
-import { it } from "@effect/vitest";
-import { ConfigProvider, Effect } from "effect";
-import { expect } from "vite-plus/test";
+import { expect, test } from "vite-plus/test";
 
 import { issueId } from "@vibevalley/protocol/schema";
 
-import { Core } from "#/core/core.ts";
-import { Session } from "#/modules/session/session.ts";
 import { starter, until } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 
-import { Machine } from "./machine.ts";
+/** Runs with no proxy bypass in the server's own environment, as a farm started without one. */
+async function withoutProxyEnvironment<A>(work: () => Promise<A>): Promise<A> {
+  const was = { NO_PROXY: process.env.NO_PROXY, no_proxy: process.env.no_proxy };
+  delete process.env.NO_PROXY;
+  delete process.env.no_proxy;
+  try {
+    return await work();
+  } finally {
+    for (const [key, value] of Object.entries(was))
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+  }
+}
 
-it.live("regression: worker environments merge proxy bypasses without changing their source", () => {
+test("regression: worker environments merge proxy bypasses without changing their source", () => {
   const env = { NO_PROXY: "example.com,localhost,example.com", no_proxy: "internal,::1", HTTPS_PROXY: "http://proxy.invalid:8080" };
   let received: SessionOptions["env"];
   const base = scriptedRuntime({ id: "pi", turn: () => {} });
@@ -24,9 +32,10 @@ it.live("regression: worker environments merge proxy bypasses without changing t
       return base.session(...args);
     },
   };
-  return Effect.gen(function* () {
-    const sessions = yield* Session;
-    const sent = yield* sessions.hire({ ...starter("lab"), effort: "", env }, "work", "demo", {
+  return withoutProxyEnvironment(async () => {
+    await using farm = await world({ runtimes: [runtime], repos: ["demo"] });
+    const sessions = farm.session;
+    const sent = await sessions.hire({ ...starter("lab"), effort: "", env }, "work", "demo", {
       context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } },
     });
     expect(sent.session.id).toBeTruthy();
@@ -36,14 +45,10 @@ it.live("regression: worker environments merge proxy bypasses without changing t
       HTTPS_PROXY: env.HTTPS_PROXY,
     });
     expect(env).toEqual({ NO_PROXY: "example.com,localhost,example.com", no_proxy: "internal,::1", HTTPS_PROXY: "http://proxy.invalid:8080" });
-  }).pipe(
-    Effect.scoped,
-    Effect.provide(world({ runtimes: [runtime], repos: ["demo"] })),
-    Effect.provideService(ConfigProvider.ConfigProvider, ConfigProvider.fromUnknown({})),
-  );
+  });
 });
 
-it.live("regression: early tool connection failures reach the journal and core without failing the run", () => {
+test("regression: early tool connection failures reach the journal and core without failing the run", () => {
   const base = scriptedRuntime({ id: "codex", turn: () => {} });
   let released = 0;
   let subscribed = 0;
@@ -73,32 +78,28 @@ it.live("regression: early tool connection failures reach the journal and core w
         },
       })),
   };
-  return Effect.gen(function* () {
-    const sessions = yield* Session;
-    const core = yield* Core;
-    const machines = yield* Machine;
-    const sent = yield* sessions.hire({ ...starter("lab"), runtime: "codex", effort: "" }, "work", "demo", {
-      hiring: () =>
-        Effect.sync(() => {
-          observing = true;
-        }),
+  return withoutProxyEnvironment(async () => {
+    await using farm = await world({ runtimes: [runtime], repos: ["demo"] });
+    const sessions = farm.session;
+    const core = farm.core;
+    const machines = farm.machine;
+    const sent = await sessions.hire({ ...starter("lab"), runtime: "codex", effort: "" }, "work", "demo", {
+      hiring: async () => {
+        observing = true;
+      },
       context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } },
     });
     const id = sent.session.id;
     expect(core.session(id)).toMatchObject({ toolConnections: [{ server: "vibevalley", status: "failed", reason: "connection refused" }] });
-    const events2 = yield* sessions.events(id);
+    const events2 = await sessions.events(id);
     expect(events2).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ type: "run/error", connection: { server: "vibevalley", status: "failed", reason: "connection refused" } }),
       ]),
     );
-    yield* until(() => core.session(id)?.phase._tag === "done", "the successful run despite optional MCP failure");
-    yield* machines.executions(machines.here()).close(id);
+    await until(() => core.session(id)?.phase._tag === "done", "the successful run despite optional MCP failure");
+    await machines.executions(machines.here()).close(id);
     expect(subscribed).toBeGreaterThan(0);
     expect(released).toBe(subscribed);
-  }).pipe(
-    Effect.scoped,
-    Effect.provide(world({ runtimes: [runtime], repos: ["demo"] })),
-    Effect.provideService(ConfigProvider.ConfigProvider, ConfigProvider.fromUnknown({})),
-  );
+  });
 });

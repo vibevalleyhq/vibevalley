@@ -1,6 +1,6 @@
-import { Effect } from "effect";
-import { type HttpClient, HttpClientRequest } from "effect/http";
 import { WebSocket } from "undici";
+
+import { type Clock, systemClock, withTimeout } from "@vibevalley/async";
 
 import { jsonText } from "../base/json.ts";
 import { decodeMossFrame, mossErrorMessage, mossRealtimeUrl } from "./index.ts";
@@ -35,11 +35,11 @@ export interface MossEvents {
 
 export interface MossTransport {
   readonly connect: (key: string, on: MossEvents, model?: string) => MossLink;
-  /** The HTTP status of a plain request with the key and its body, or why nothing answered. */
-  readonly status: (key: string, model?: string) => Effect.Effect<{ readonly code: number; readonly body: string }, string>;
+  /** The HTTP status of a plain request with the key and its body; rejects with why nothing answered. */
+  readonly status: (key: string, model?: string) => Promise<{ readonly code: number; readonly body: string }>;
 }
 
-export const makeMossTransport = (http: HttpClient.HttpClient): MossTransport => ({
+export const makeMossTransport = (fetcher: typeof fetch, clock: Clock = systemClock): MossTransport => ({
   connect: (key, on, model = "moss-live-1.0") => {
     if (!mossLiveModels.some((supported) => supported === model) && !mossVisionModels.some((supported) => supported === model))
       throw new Error("Unsupported MOSS realtime model");
@@ -56,65 +56,78 @@ export const makeMossTransport = (http: HttpClient.HttpClient): MossTransport =>
     ws.addEventListener("error", () => on.down(""));
     return { send: (text) => ws.send(text), close: () => ws.close(), bufferedAmount: () => ws.bufferedAmount };
   },
-  status: (key, model = "moss-live-1.0") =>
-    Effect.gen(function* () {
-      const url = new URL(mossRealtimeUrl.replace(/^wss:/u, "https:"));
-      url.searchParams.set("model", model);
-      const r = yield* http.execute(HttpClientRequest.get(url.href).pipe(HttpClientRequest.bearerToken(key)));
-      return { code: r.status, body: yield* r.text };
-    }).pipe(Effect.timeoutOrElse({ duration: mossDeadlineMs, orElse: () => Effect.fail("timed out") }), Effect.mapError(String)),
+  status: async (key, model = "moss-live-1.0") => {
+    const url = new URL(mossRealtimeUrl.replace(/^wss:/u, "https:"));
+    url.searchParams.set("model", model);
+    try {
+      return await withTimeout(
+        async (signal) => {
+          const r = await fetcher(url.href, { headers: { authorization: `Bearer ${key}` }, signal });
+          return { code: r.status, body: await r.text() };
+        },
+        mossDeadlineMs,
+        { clock },
+      );
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "TimeoutError") throw new Error("timed out", { cause: e });
+      throw e;
+    }
+  },
 });
 
-const handshake = (key: string, transport: MossTransport, model: string) =>
-  Effect.callback<"attached" | { readonly error: string } | { readonly down: string } | "silent">((resume) => {
-    let settled = false;
-    let link: MossLink | undefined;
-    const settle = (r: "attached" | { readonly error: string } | { readonly down: string } | "silent") => {
-      if (settled) return;
-      settled = true;
-      link?.close();
-      resume(Effect.succeed(r));
-    };
-    link = transport.connect(
-      key,
-      {
-        open: () => link?.send(jsonText({ action: "attach_session", memory_scope: "session" })),
-        text: (data) => {
-          const decoded = decodeMossFrame(data);
-          if (decoded._tag === "None") return;
-          const m = decoded.value;
-          if (m.action === "session_attached") settle("attached");
-          else if (m.action === "error") {
-            const err = m.data?.error;
-            settle({ error: typeof err === "string" ? err : (err?.message ?? "") });
-          }
-        },
-        down: (why) => settle({ down: why }),
-      },
-      model,
-    );
-    return Effect.sync(() => settle("silent"));
-  }).pipe(
-    // Timing out interrupts the callback, whose finalizer closes the link.
-    Effect.timeoutOrElse({ duration: mossDeadlineMs, orElse: () => Effect.succeed("silent" as const) }),
+type Handshake = "attached" | { readonly error: string } | { readonly down: string } | "silent";
+
+/** Attaches a session and closes it at once; "silent" when nothing decisive came within the deadline. */
+const handshake = (key: string, transport: MossTransport, model: string, clock: Clock): Promise<Handshake> => {
+  const { promise, resolve } = Promise.withResolvers<Handshake>();
+  const stop = new AbortController();
+  let settled = false;
+  let link: MossLink | undefined;
+  const settle = (r: Handshake) => {
+    if (settled) return;
+    settled = true;
+    stop.abort();
+    link?.close();
+    resolve(r);
+  };
+  void clock.sleep(mossDeadlineMs, stop.signal).then(
+    () => settle("silent"),
+    // Stopped: the handshake settled first.
+    () => undefined,
   );
+  link = transport.connect(
+    key,
+    {
+      open: () => link?.send(jsonText({ action: "attach_session", memory_scope: "session" })),
+      text: (data) => {
+        const m = decodeMossFrame(data);
+        if (m === undefined) return;
+        if (m.action === "session_attached") settle("attached");
+        else if (m.action === "error") {
+          const err = m.data?.error;
+          settle({ error: typeof err === "string" ? err : (err?.message ?? "") });
+        }
+      },
+      down: (why) => settle({ down: why }),
+    },
+    model,
+  );
+  return promise;
+};
 
 /** Whether MOSS Live takes key. */
-export const verifyMoss = Effect.fn("Moss.verify")(function* (
-  key: string,
-  transport: MossTransport,
-  model: string = "moss-live-1.0",
-): Effect.fn.Return<MossVerify> {
+export async function verifyMoss(key: string, transport: MossTransport, model: string = "moss-live-1.0", clock: Clock = systemClock): Promise<MossVerify> {
   const safe = (text: string) => (key ? text.replaceAll(key, "[redacted]") : text).slice(0, 200);
-  const got = yield* handshake(key, transport, model);
-  if (got === "attached") return { kind: "ok" } as const;
-  if (got === "silent") return { kind: "silent" } as const;
-  if ("error" in got) return { kind: "failed", why: safe(got.error) } as const;
-  return yield* transport.status(key, model).pipe(
-    Effect.match({
-      onFailure: (why): MossVerify => ({ kind: "unreachable", why: safe(got.down || why) }),
-      onSuccess: ({ code, body }): MossVerify =>
-        code === 401 || code === 403 ? { kind: "refused", why: safe(mossErrorMessage(body)) } : { kind: "failed", why: safe(got.down || `HTTP ${code}`) },
-    }),
-  );
-});
+  const got = await handshake(key, transport, model, clock);
+  if (got === "attached") return { kind: "ok" };
+  if (got === "silent") return { kind: "silent" };
+  if ("error" in got) return { kind: "failed", why: safe(got.error) };
+  let answer: { readonly code: number; readonly body: string };
+  try {
+    answer = await transport.status(key, model);
+  } catch (e) {
+    return { kind: "unreachable", why: safe(got.down || (e instanceof Error ? e.message : String(e))) };
+  }
+  const { code, body } = answer;
+  return code === 401 || code === 403 ? { kind: "refused", why: safe(mossErrorMessage(body)) } : { kind: "failed", why: safe(got.down || `HTTP ${code}`) };
+}

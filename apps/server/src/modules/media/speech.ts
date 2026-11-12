@@ -1,22 +1,25 @@
-import { type Cause, Clock, Effect, FiberMap, FileSystem, Option, Queue, Schema, Stream } from "effect";
+import { z } from "zod";
 
+import { abortable, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { MediaAudioFormatValues, MediaPhaseValues } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
-import { type ApiError, BizCode, refuseIn } from "#/base/errors.ts";
-import { Db } from "#/infra/db.ts";
-import { bestEffort } from "#/infra/log.ts";
-import { PublicHttp } from "#/infra/publicHttp.ts";
-import { Attachment } from "#/modules/attachment/attachment.ts";
-import { type Account, Provider } from "#/modules/provider/provider.ts";
-import type { SpeechRequest } from "#/modules/provider/vendors.ts";
+import { BizCode, refuseIn } from "#/base/errors.ts";
+import { jsonText } from "#/base/json.ts";
+import type { Db } from "#/infra/db.ts";
+import { bestEffort, type Logger } from "#/infra/log.ts";
+import type { PublicFetch } from "#/infra/publicHttp.ts";
+import type { Time } from "#/infra/time.ts";
+import type { Attachment } from "#/modules/attachment/attachment.ts";
+import type { Account, Provider } from "#/modules/provider/provider.ts";
+import { AudioFailure, type SpeechRequest } from "#/modules/provider/vendors.ts";
 import * as q from "#db/media_job.sql.ts";
 
 import { saveAudioResult, releaseAudioResult, type MediaInputs } from "./audioResult.ts";
-import { jobsOf, newJob, type Row } from "./job.ts";
+import { jobsOf, newJob, type Row, storedAs } from "./job.ts";
 import type { Machine, Patch } from "./machine.ts";
 import type { MediaCaller } from "./media.ts";
 import { receiveSpeechStream, type SpeechStreamSaved } from "./speechStream.ts";
@@ -27,30 +30,101 @@ interface Ports {
   readonly inputs: MediaInputs;
   readonly machine: Machine;
 }
-const encodeJson = <A, I>(schema: Schema.Codec<A, I>) => {
-  const encode = Schema.encodeEffect(Schema.fromJsonString(schema));
-  return (value: A) => encode(value).pipe(Effect.mapError(() => refused(t("server.media.corrupt"))));
-};
-const attachmentJson = encodeJson(S.Attachment);
-const referenceJson = encodeJson(S.MediaInputReference);
-const metadataJson = encodeJson(S.MediaAudioMetadata);
-const usageJson = encodeJson(S.MediaAudioUsage);
-const requestJson = Schema.encodeEffect(Schema.fromJsonString(S.MediaSpeechRequest));
-const sourceJson = Schema.encodeEffect(Schema.fromJsonString(S.MediaSource));
+
+export interface SpeechDeps {
+  readonly db: Db;
+  readonly clock: Time;
+  readonly log: Logger;
+  readonly attachment: Attachment;
+  readonly provider: Provider;
+  readonly publicFetch: PublicFetch;
+}
+
+/** A streamed job's events on their way to the page: at most `capacity` waiting, an offer past that waits for the page.
+ * end() lets the page read what is left; shutdown() drops it all and lets every waiting offer go. */
+class SpeechChannel {
+  readonly #items: T.MediaSpeechEvent[] = [];
+  readonly #takers: ((r: IteratorResult<T.MediaSpeechEvent>) => void)[] = [];
+  readonly #offers: (() => void)[] = [];
+  #ended = false;
+  #shut = false;
+  readonly capacity: number;
+  claimed = false;
+
+  constructor(capacity: number) {
+    this.capacity = capacity;
+  }
+
+  /** Kept, or dropped once the channel ended or was shut; waits while it is full. */
+  async offer(event: T.MediaSpeechEvent, signal?: AbortSignal): Promise<void> {
+    while (!this.#ended && !this.#shut && this.#takers.length === 0 && this.#items.length >= this.capacity) {
+      const { promise, resolve } = Promise.withResolvers<void>();
+      this.#offers.push(resolve);
+      await abortable(promise, signal);
+    }
+    this.tryOffer(event);
+  }
+
+  /** Kept unless full, ended or shut. */
+  tryOffer(event: T.MediaSpeechEvent): boolean {
+    if (this.#ended || this.#shut) return false;
+    const taker = this.#takers.shift();
+    if (taker) {
+      taker({ value: event, done: false });
+      return true;
+    }
+    if (this.#items.length >= this.capacity) return false;
+    this.#items.push(event);
+    return true;
+  }
+
+  async next(signal?: AbortSignal): Promise<IteratorResult<T.MediaSpeechEvent>> {
+    const item = this.#items.shift();
+    if (item !== undefined) {
+      this.#offers.shift()?.();
+      return { value: item, done: false };
+    }
+    if (this.#ended || this.#shut) return { value: undefined, done: true };
+    const { promise, resolve } = Promise.withResolvers<IteratorResult<T.MediaSpeechEvent>>();
+    this.#takers.push(resolve);
+    try {
+      return await abortable(promise, signal);
+    } finally {
+      const at = this.#takers.indexOf(resolve);
+      if (at >= 0) this.#takers.splice(at, 1);
+    }
+  }
+
+  end(): void {
+    this.#ended = true;
+    if (this.#items.length === 0) this.#wake();
+  }
+
+  shutdown(): void {
+    this.#shut = true;
+    this.#items.length = 0;
+    this.#wake();
+  }
+
+  #wake() {
+    for (const taker of this.#takers.splice(0)) taker({ value: undefined, done: true });
+    for (const offer of this.#offers.splice(0)) offer();
+  }
+}
 
 const jobs = jobsOf({ kinds: ["speech"], phases: MediaPhaseValues });
+const AudioFormat = z.enum(MediaAudioFormatValues);
 
 /** Single-voice speech: asked at once, as a vendor task followed until done, or streamed to the page as it is spoken. */
-export const makeSpeech = Effect.fnUntraced(function* ({ inputs, machine }: Ports) {
-  const db = yield* Db;
-  const kept = yield* Attachment;
-  const provider = yield* Provider;
-  const downloads = yield* PublicHttp;
-  const fs = yield* FileSystem.FileSystem;
-  const audioStorage = { http: downloads, files: kept, fs };
-  const streams = new Map<string, { queue: Queue.Queue<T.MediaSpeechEvent, Cause.Done>; claimed: boolean }>();
-  const streamCleanup = yield* FiberMap.make<string, void, never>();
+export function makeSpeech(deps: SpeechDeps, { inputs, machine }: Ports) {
+  const { db, clock, attachment: kept, provider, publicFetch } = deps;
+  const log = deps.log.child("media/speech");
+  const audioStorage = { publicFetch, files: kept, log, clock };
+  const streams = new Map<string, SpeechChannel>();
+  // A finished stream's events stay a minute for a page that comes late, one timer per job.
+  const streamCleanup = new TaskGroup({ name: "media.speech", onError: (task, e) => log.warn(`${task} failed`, e) });
   const corrupt = () => refused(t("server.media.corrupt"));
+  const invalid = () => refused(t("server.media.speechInvalid"));
   const words = {
     unknown: t("server.media.speechUnknown"),
     rejected: t("server.media.speechRejected"),
@@ -59,20 +133,21 @@ export const makeSpeech = Effect.fnUntraced(function* ({ inputs, machine }: Port
     accountChanged: t("server.media.remoteAccountChanged"),
     noResume: t("server.media.speechNoResume"),
   };
-  const decodeRequest = (text: string) => Schema.decodeEffect(Schema.fromJsonString(S.MediaSpeechRequest))(text).pipe(Effect.mapError(corrupt));
-  const view = Effect.fnUntraced(function* (given: Row): Effect.fn.Return<T.MediaSpeechJob, ApiError> {
+  const decodeRequest = storedAs(S.MediaSpeechRequest, corrupt);
+  const view = async (given: Row): Promise<T.MediaSpeechJob> => {
     const row = jobs.one(given);
-    if (row === undefined) return yield* corrupt();
-    const input = yield* decodeRequest(row.request);
-    const decoded = <A, I>(schema: Schema.Codec<A, I>, text: string) => Schema.decodeEffect(Schema.fromJsonString(schema))(text).pipe(Effect.mapError(corrupt));
-    const attachment = row.attachment === null ? undefined : yield* decoded(S.Attachment, row.attachment);
-    const format =
-      row.result_format === null
-        ? input.format
-        : yield* Schema.decodeEffect(Schema.Literals(MediaAudioFormatValues))(row.result_format).pipe(Effect.mapError(corrupt));
-    const metadata = row.metadata === null ? undefined : yield* decoded(S.MediaAudioMetadata, row.metadata);
-    const usage = row.usage === null ? undefined : yield* decoded(S.MediaAudioUsage, row.usage);
-    const resultInput = row.result_input === null ? null : yield* decoded(S.MediaInputReference, row.result_input);
+    if (row === undefined) throw corrupt();
+    const input = decodeRequest(row.request);
+    const attachment = row.attachment === null ? undefined : storedAs(S.Attachment, corrupt)(row.attachment);
+    let format = input.format;
+    if (row.result_format !== null) {
+      const got = AudioFormat.safeParse(row.result_format);
+      if (!got.success) throw corrupt();
+      format = got.data;
+    }
+    const metadata = row.metadata === null ? undefined : storedAs(S.MediaAudioMetadata, corrupt)(row.metadata);
+    const usage = row.usage === null ? undefined : storedAs(S.MediaAudioUsage, corrupt)(row.usage);
+    const resultInput = row.result_input === null ? null : storedAs(S.MediaInputReference, corrupt)(row.result_input);
     return {
       kind: "speech",
       id: row.id,
@@ -91,7 +166,7 @@ export const makeSpeech = Effect.fnUntraced(function* ({ inputs, machine }: Port
       model: row.model,
       connection: row.connection,
       revision: row.revision,
-      source: yield* decoded(S.MediaSource, row.source),
+      source: storedAs(S.MediaSource, corrupt)(row.source),
       phase: row.phase,
       phaseText: t(`server.media.phase.${row.phase}`),
       problem: row.problem,
@@ -103,200 +178,195 @@ export const makeSpeech = Effect.fnUntraced(function* ({ inputs, machine }: Port
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
-  });
-  const get = Effect.fn("Media.speechGet")(function* (id: string) {
-    const row = yield* machine.found(id, ["speech"]);
-    return yield* view(row);
-  });
+  };
+  const get = async (id: string) => view(await machine.found(id, ["speech"]));
   const audioFields = (made: { url: string; format: T.MediaAudioFormat; contentType: string; usage?: T.MediaAudioUsage }) =>
-    Effect.gen(function* () {
-      return {
-        result_url: made.url,
-        result_format: made.format,
-        content_type: made.contentType,
-        usage: made.usage === undefined ? null : yield* usageJson(made.usage),
-      } satisfies Patch;
-    });
+    ({
+      result_url: made.url,
+      result_format: made.format,
+      content_type: made.contentType,
+      usage: made.usage === undefined ? null : jsonText(made.usage),
+    }) satisfies Patch;
   /** What a saved result writes, kept or kept as an input for later use. */
-  const savedFields = Effect.fnUntraced(function* (saved: { attachment?: T.Attachment; resultInput: T.MediaInputReference | null }) {
-    return {
-      attachment: saved.attachment === undefined ? null : yield* attachmentJson(saved.attachment),
-      result_input: saved.resultInput === null ? null : yield* referenceJson(saved.resultInput),
-    } satisfies Patch;
-  });
+  const savedFields = (saved: { attachment?: T.Attachment; resultInput: T.MediaInputReference | null }) =>
+    ({
+      attachment: saved.attachment === undefined ? null : jsonText(saved.attachment),
+      result_input: saved.resultInput === null ? null : jsonText(saved.resultInput),
+    }) satisfies Patch;
 
   /** Streamed speech goes to the page as it is spoken and is kept whole once done. */
-  const receive = Effect.fnUntraced(function* (id: string, account: Account, synthesis: SpeechRequest) {
+  const receive = async (id: string, account: Account, synthesis: SpeechRequest, signal: AbortSignal) => {
     const session = streams.get(id);
-    if (!session) return yield* refused(t("server.media.speechInvalid"));
-    yield* receiveSpeechStream(audioStorage, id, account.speech.stream(synthesis), {
-      inputs,
-      task: (taskId) => machine.change(id, ["generating", "canceled"], { remote_task: taskId }).pipe(Effect.asVoid),
-      emit: (event) => Queue.offer(session.queue, event).pipe(Effect.asVoid),
-      save: Effect.fnUntraced(function* (saved: SpeechStreamSaved) {
-        const patch = {
-          ...(yield* savedFields(saved)),
-          result_format: "wav",
-          content_type: "audio/wav",
-          metadata: yield* metadataJson(saved.metadata),
-          usage: saved.usage === undefined ? null : yield* usageJson(saved.usage),
-        } satisfies Patch;
-        if (
-          !(yield* machine.change(id, ["generating"], {
-            ...patch,
-            phase: saved.complete ? "ready" : "unknown",
-            problem: saved.complete ? "" : t("server.media.speechPartial"),
-          })) &&
-          !(yield* machine.change(id, ["canceled"], patch))
-        )
-          yield* releaseAudioResult(id, saved, inputs);
-      }),
-    }).pipe(
-      Effect.catch(() =>
-        Effect.gen(function* () {
-          yield* machine.change(id, ["generating"], { phase: "unknown", problem: words.unknown });
-          Queue.offerUnsafe(session.queue, { type: "failed" });
-        }),
-      ),
-      Effect.ensuring(
-        Effect.gen(function* () {
-          yield* Queue.end(session.queue);
-          yield* FiberMap.run(
-            streamCleanup,
-            id,
-            Effect.gen(function* () {
-              yield* Effect.sleep("1 minute");
-              yield* Queue.shutdown(session.queue);
-              streams.delete(id);
-            }),
-          );
-        }),
-      ),
-    );
-  });
+    if (!session) throw invalid();
+    try {
+      await receiveSpeechStream(
+        audioStorage,
+        id,
+        (within) => account.speech.stream(synthesis, within),
+        {
+          inputs,
+          task: async (taskId) => {
+            await machine.change(id, ["generating", "canceled"], { remote_task: taskId });
+          },
+          emit: (event, within) => session.offer(event, within),
+          save: async (saved: SpeechStreamSaved) => {
+            const patch = {
+              ...savedFields(saved),
+              result_format: "wav",
+              content_type: "audio/wav",
+              metadata: jsonText(saved.metadata),
+              usage: saved.usage === undefined ? null : jsonText(saved.usage),
+            } satisfies Patch;
+            if (
+              !(await machine.change(id, ["generating"], {
+                ...patch,
+                phase: saved.complete ? "ready" : "unknown",
+                problem: saved.complete ? "" : t("server.media.speechPartial"),
+              })) &&
+              !(await machine.change(id, ["canceled"], patch))
+            )
+              await releaseAudioResult(deps, id, saved, inputs);
+          },
+        },
+        signal,
+      );
+    } catch (e) {
+      if (signal.aborted) throw e;
+      log.warn(`media: speech stream ${id} failed`, e);
+      await machine.change(id, ["generating"], { phase: "unknown", problem: words.unknown });
+      session.tryOffer({ type: "failed" });
+    } finally {
+      session.end();
+      streamCleanup.keyed(id, async (stop) => {
+        await clock.sleep(60_000, stop);
+        session.shutdown();
+        if (streams.get(id) === session) streams.delete(id);
+      });
+    }
+  };
 
   machine.register({
     kinds: ["speech"],
     words,
     view,
-    keep: Effect.fnUntraced(function* (given) {
-      const job = yield* view(given);
-      const saved = yield* saveAudioResult(audioStorage, given.id, given.result_url ?? "", job.format, inputs);
-      const undo = releaseAudioResult(given.id, saved, inputs).pipe(bestEffort(`media: letting go of speech ${given.id}`));
-      const patch = yield* Effect.gen(function* () {
-        return {
-          ...(yield* savedFields(saved)),
-          metadata: saved.metadata === undefined ? null : yield* metadataJson(saved.metadata),
-        } satisfies Patch;
-      }).pipe(Effect.onError(() => undo));
+    keep: async (given, signal) => {
+      const job = await view(given);
+      const saved = await saveAudioResult(audioStorage, given.id, given.result_url ?? "", job.format, inputs, signal);
+      const undo = () => bestEffort(log, `media: letting go of speech ${given.id}`, () => releaseAudioResult(deps, given.id, saved, inputs));
+      const patch = {
+        ...savedFields(saved),
+        metadata: saved.metadata === undefined ? null : jsonText(saved.metadata),
+      } satisfies Patch;
       return { patch, undo };
-    }),
+    },
     task: {
       kind: () => "speech",
-      done: Effect.fnUntraced(function* (_row, task) {
-        if (task.kind === "transcription") return yield* corrupt();
-        return { ...(yield* audioFields(task)), phase: "downloading" as const };
-      }),
+      done: async (_row, task) => {
+        if (task.kind === "transcription") throw corrupt();
+        return { ...audioFields(task), phase: "downloading" as const };
+      },
     },
-    canceled: (id) =>
-      Effect.gen(function* () {
-        const session = streams.get(id);
-        if (!session) return;
-        yield* Queue.shutdown(session.queue);
-        streams.delete(id);
-      }),
+    canceled: async (id) => {
+      const session = streams.get(id);
+      if (!session) return;
+      session.shutdown();
+      streams.delete(id);
+    },
   });
+
+  const generate = async (input: T.MediaSpeechRequest, account: Account, synthesis: SpeechRequest, signal: AbortSignal) => {
+    if (!(await machine.change(input.id, ["queued"], { phase: "generating" }))) return;
+    if (input.streaming === true) {
+      await receive(input.id, account, synthesis, signal);
+      return;
+    }
+    try {
+      if (input.asynchronous === true) {
+        await machine.follow(input.id, (within) => account.speech.createTask(synthesis, within), signal);
+        return;
+      }
+      const made = await account.speech.generate(synthesis, signal);
+      if (await machine.change(input.id, ["generating"], { ...audioFields(made), phase: "downloading" })) await machine.download(input.id, signal);
+    } catch (error) {
+      if (!(error instanceof AudioFailure) || signal.aborted) throw error;
+      await machine.failed(input.id, error.outcome, words);
+    }
+  };
 
   return {
     get,
-    events: Effect.fn("Media.speechEvents")(function* (id: string) {
-      const session = yield* machine.lock.withPermits(1)(
-        Effect.gen(function* () {
-          const session = streams.get(id);
-          if (!session || session.claimed) return yield* refused(t("server.media.speechStreamUnavailable"));
-          session.claimed = true;
-          return session;
-        }),
-      );
-      return Stream.fromQueue(session.queue).pipe(
-        Stream.takeUntil((event) => event.type === "done" || event.type === "failed"),
-        Stream.ensuring(
-          Effect.gen(function* () {
-            yield* Queue.shutdown(session.queue);
-            streams.delete(id);
-            yield* machine
-              .change(id, ["queued", "generating"], { phase: "canceled", problem: t("server.media.canceled") })
-              .pipe(bestEffort("Speech stream disconnect could not be recorded"));
-            yield* machine.stop(id);
+    /** The page's one reading of a streamed job; it claims the stream on the first next() (refused when another page has
+     * it), and a page that goes away cancels the job. */
+    events: async function* (id: string, signal?: AbortSignal): AsyncGenerator<T.MediaSpeechEvent> {
+      const session = await machine.lock.with(async () => {
+        const session = streams.get(id);
+        if (!session || session.claimed) throw refused(t("server.media.speechStreamUnavailable"));
+        session.claimed = true;
+        return session;
+      });
+      try {
+        for (;;) {
+          const next = await session.next(signal);
+          if (next.done === true) return;
+          yield next.value;
+          if (next.value.type === "done" || next.value.type === "failed") return;
+        }
+      } finally {
+        session.shutdown();
+        if (streams.get(id) === session) streams.delete(id);
+        await bestEffort(log, "Speech stream disconnect could not be recorded", () =>
+          machine.change(id, ["queued", "generating"], { phase: "canceled", problem: t("server.media.canceled") }),
+        );
+        await machine.stop(id);
+      }
+    },
+    // Not stopped by the caller: a job once admitted is written and started.
+    create: async (given: T.MediaSpeechRequest, caller: MediaCaller): Promise<T.MediaSpeechJob> => {
+      if (caller.kind === "orchestrator" && !caller.forUser) throw refused(t("server.media.userRequired"));
+      const source = S.MediaSource.safeParse(caller);
+      if (!source.success) throw invalid();
+      const parsed = S.MediaSpeechRequest.safeParse(given);
+      if (!parsed.success) throw invalid();
+      const input = parsed.data;
+      if (input.streaming === true && (caller.kind !== "user" || input.asynchronous === true || input.format !== "pcm")) throw invalid();
+      return machine.lock.with(async () => {
+        const existing = await machine.admit(input.id, ["speech"], async (row) => {
+          const stored = decodeRequest(row.request);
+          const shown = await view(row);
+          return same(stored, input) && same(shown.source, source.data);
+        });
+        if (existing !== undefined) return view(existing);
+        const account = await provider.speech();
+        if (input.connection !== account.connection || input.revision !== account.revision) throw refused(t("server.media.speechChanged"));
+        const synthesis: SpeechRequest = { text: input.text, voice: input.voice, format: input.format };
+        try {
+          await account.speech.check({ ...synthesis, streaming: input.streaming === true });
+        } catch {
+          // The vendor would not take it as asked: said as invalid speech.
+          throw invalid();
+        }
+        if (input.streaming === true && streams.size >= 8) throw invalid();
+        await q.insertMediaJob(
+          db.sql,
+          newJob({
+            id: input.id,
+            kind: "speech",
+            phase: "queued",
+            request: jsonText(input),
+            source: jsonText(source.data),
+            connection: account.connection,
+            revision: account.revision,
+            model: account.model,
+            fingerprint: account.fingerprint,
+            now: clock.now(),
           }),
-        ),
-      );
-    }),
-    create: Effect.fn("Media.createSpeech")(function* (given: T.MediaSpeechRequest, caller: MediaCaller) {
-      if (caller.kind === "orchestrator" && !caller.forUser) return yield* refused(t("server.media.userRequired"));
-      const source: T.MediaSource = yield* Schema.decodeEffect(S.MediaSource)(caller).pipe(Effect.mapError(() => refused(t("server.media.speechInvalid"))));
-      const input = yield* Schema.decodeEffect(S.MediaSpeechRequest)(given).pipe(Effect.mapError(() => refused(t("server.media.speechInvalid"))));
-      if (input.streaming === true && (caller.kind !== "user" || input.asynchronous === true || input.format !== "pcm"))
-        return yield* refused(t("server.media.speechInvalid"));
-      return yield* machine.lock.withPermits(1)(
-        Effect.gen(function* () {
-          const existing = yield* machine.admit(input.id, ["speech"], (row) =>
-            Effect.gen(function* () {
-              const stored = yield* decodeRequest(row.request);
-              const shown = yield* view(row);
-              return same(stored, input) && same(shown.source, source);
-            }),
-          );
-          if (Option.isSome(existing)) return yield* view(existing.value);
-          const account = yield* provider.speech();
-          if (input.connection !== account.connection || input.revision !== account.revision) return yield* refused(t("server.media.speechChanged"));
-          const synthesis: SpeechRequest = { text: input.text, voice: input.voice, format: input.format };
-          yield* account.speech
-            .check({ ...synthesis, streaming: input.streaming === true })
-            .pipe(Effect.mapError(() => refused(t("server.media.speechInvalid"))));
-          if (input.streaming === true && streams.size >= 8) return yield* refused(t("server.media.speechInvalid"));
-          yield* db.run(
-            q.insertMediaJob(
-              newJob({
-                id: input.id,
-                kind: "speech",
-                phase: "queued",
-                request: yield* requestJson(input).pipe(Effect.mapError(() => refused(t("server.media.speechInvalid")))),
-                source: yield* sourceJson(source).pipe(Effect.mapError(() => refused(t("server.media.speechInvalid")))),
-                connection: account.connection,
-                revision: account.revision,
-                model: account.model,
-                fingerprint: account.fingerprint,
-                now: yield* Clock.currentTimeMillis,
-              }),
-            ),
-          );
-          if (input.streaming === true) streams.set(input.id, { queue: yield* Queue.bounded<T.MediaSpeechEvent, Cause.Done>(16), claimed: false });
-          yield* machine.publish();
-          yield* machine.run(
-            input.id,
-            Effect.gen(function* () {
-              if (!(yield* machine.change(input.id, ["queued"], { phase: "generating" }))) return;
-              if (input.streaming === true) return yield* receive(input.id, account, synthesis);
-              if (input.asynchronous === true)
-                return yield* machine
-                  .follow(input.id, account.speech.createTask(synthesis))
-                  .pipe(Effect.catchTag("AudioFailure", (error) => Effect.asVoid(machine.failed(input.id, error.outcome, words))));
-              yield* account.speech.generate(synthesis).pipe(
-                Effect.flatMap((made) =>
-                  Effect.gen(function* () {
-                    if (yield* machine.change(input.id, ["generating"], { ...(yield* audioFields(made)), phase: "downloading" }))
-                      yield* machine.download(input.id);
-                  }),
-                ),
-                Effect.catchTag("AudioFailure", (error) => machine.failed(input.id, error.outcome, words)),
-                Effect.asVoid,
-              );
-            }),
-          );
-          return yield* get(input.id);
-        }).pipe(Effect.uninterruptible),
-      );
-    }),
+        );
+        if (input.streaming === true) streams.set(input.id, new SpeechChannel(16));
+        await machine.publish();
+        await machine.run(input.id, (signal) => generate(input, account, synthesis, signal));
+        return get(input.id);
+      });
+    },
+    close: () => streamCleanup.close(),
   };
-});
+}

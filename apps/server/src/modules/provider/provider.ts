@@ -1,14 +1,15 @@
 import { createHash } from "node:crypto";
 
-import { Cause, Context, Effect, Layer, Redacted, type Scope, Stream, String as Str } from "effect";
-import { HttpClient } from "effect/http";
+import { z } from "zod";
 
+import { isAbort } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
+import type { Secret } from "@vibevalley/protocol/schema";
 import { getMossAudioTask, type MossAudioTask } from "@vibevalley/provider/moss/audio-tasks";
 import { deleteMossFile, uploadMossFile } from "@vibevalley/provider/moss/files";
 import { generateMossImage, prepareMossImage } from "@vibevalley/provider/moss/image";
-import { type MossModelError, mossModels } from "@vibevalley/provider/moss/models";
+import { mossModels } from "@vibevalley/provider/moss/models";
 import { makeMossTransport, verifyMoss } from "@vibevalley/provider/moss/server";
 import { createMossSpeakersTask, prepareMossSpeakers } from "@vibevalley/provider/moss/speakers";
 import { createMossSpeechTask, generateMossSpeech, prepareMossSpeech } from "@vibevalley/provider/moss/speech";
@@ -21,8 +22,10 @@ import { createMossVoice, listMossVoices } from "@vibevalley/provider/moss/voice
 import { mossTranscription, type TranscriptionFormat, transcriptionModel } from "@vibevalley/provider/transcription";
 
 import { type ApiError, BizCode, bizError } from "#/base/errors.ts";
+import type { Logger } from "#/infra/log.ts";
+import type { Time } from "#/infra/time.ts";
 import { bindingOf, boundConnection, type ProviderSettings } from "#/modules/setting/provider.ts";
-import { Setting } from "#/modules/setting/setting.ts";
+import type { Setting } from "#/modules/setting/setting.ts";
 
 import { connectionsOver, providerStatus } from "./connections.ts";
 import {
@@ -56,84 +59,58 @@ export interface BoundImage {
   readonly connection: string;
   readonly revision: number;
   readonly model: string;
-  readonly run: Effect.Effect<GeneratedImage, ImageFailure>;
+  /** Throws ImageFailure when the vendor refused it or its answer is unknown. */
+  readonly run: (signal?: AbortSignal) => Promise<GeneratedImage>;
 }
-
-type ImageCall = (
-  model: string,
-  request: ImageRequest,
-) => Effect.Effect<(key: string) => Effect.Effect<GeneratedImage, ImageFailure, HttpClient.HttpClient>, "invalid">;
-
-const mossDraw = Effect.fnUntraced(
-  function* (key: string, prepared: unknown) {
-    const result = yield* generateMossImage(key, prepared);
-    return { url: result.url, usage: { images: result.usage.generated_images, width: result.usage.output_width, height: result.usage.output_height } };
-  },
-  // NotSent means nothing reached the vendor, so nothing can have been billed.
-  Effect.catchTag("MossImageError", (error) => Effect.fail(ImageFailure.make({ outcome: error.outcome === "Unknown" ? "Unknown" : "Rejected" }))),
-);
-
-const mossImage: ImageCall = Effect.fnUntraced(function* (model, request) {
-  const prepared = yield* prepareMossImage({
-    model,
-    prompt: request.prompt,
-    size: { width: request.width, height: request.height },
-    ...(request.seed !== undefined ? { seed: request.seed } : {}),
-    ...(request.steps !== undefined ? { steps: request.steps } : {}),
-    ...(request.guidance !== undefined ? { guidance: request.guidance } : {}),
-    ...(request.negativePrompt !== undefined ? { negativePrompt: request.negativePrompt } : {}),
-    enhance: request.enhance,
-    watermark: request.watermark,
-  }).pipe(Effect.mapError((): "invalid" => "invalid"));
-  return (key: string) => mossDraw(key, prepared);
-});
 
 type Adapter = ProviderSettings["connections"][number]["adapter"];
 
-const imageCalls: Record<Adapter, ImageCall | undefined> = { moss: mossImage };
-
 export interface Calls {
   readonly speech: {
-    readonly check: (request: SpeechRequest & { readonly streaming: boolean }) => Effect.Effect<void, InvalidRequest>;
-    readonly generate: (request: SpeechRequest) => Effect.Effect<GeneratedAudio, AudioFailure>;
-    readonly createTask: (request: SpeechRequest) => Effect.Effect<string, AudioFailure>;
-    readonly stream: (request: SpeechRequest) => Stream.Stream<SpeechEvent, AudioFailure>;
+    /** Throws InvalidRequest. */
+    readonly check: (request: SpeechRequest & { readonly streaming: boolean }) => Promise<void>;
+    /** The rest throw AudioFailure. */
+    readonly generate: (request: SpeechRequest, signal?: AbortSignal) => Promise<GeneratedAudio>;
+    readonly createTask: (request: SpeechRequest, signal?: AbortSignal) => Promise<string>;
+    readonly stream: (request: SpeechRequest, signal?: AbortSignal) => AsyncIterable<SpeechEvent>;
   };
   readonly speakers: {
-    readonly check: (request: SpeakersRequest) => Effect.Effect<void, InvalidRequest>;
-    readonly createTask: (request: SpeakersRequest) => Effect.Effect<string, AudioFailure>;
+    readonly check: (request: SpeakersRequest) => Promise<void>;
+    readonly createTask: (request: SpeakersRequest, signal?: AbortSignal) => Promise<string>;
   };
   readonly voiceDesign: {
-    readonly check: (request: VoiceDesignRequest) => Effect.Effect<void, InvalidRequest>;
-    readonly createTask: (request: VoiceDesignRequest) => Effect.Effect<string, AudioFailure>;
+    readonly check: (request: VoiceDesignRequest) => Promise<void>;
+    readonly createTask: (request: VoiceDesignRequest, signal?: AbortSignal) => Promise<string>;
   };
   readonly transcription: {
-    readonly check: (request: TranscriptionRequest & { readonly streaming: boolean }) => Effect.Effect<void, InvalidRequest>;
-    readonly createTask: (request: TranscriptionRequest) => Effect.Effect<string, AudioFailure>;
-    readonly stream: (request: TranscriptionRequest) => Stream.Stream<TranscriptionEvent, AudioFailure>;
+    readonly check: (request: TranscriptionRequest & { readonly streaming: boolean }) => Promise<void>;
+    readonly createTask: (request: TranscriptionRequest, signal?: AbortSignal) => Promise<string>;
+    readonly stream: (request: TranscriptionRequest, signal?: AbortSignal) => AsyncIterable<TranscriptionEvent>;
   };
   readonly understanding: {
-    readonly check: (request: UnderstandingRequest) => Effect.Effect<void, InvalidRequest>;
-    readonly ask: (request: UnderstandingRequest) => Effect.Effect<NonNullable<T.MediaUnderstandingJob["result"]>, UnderstandingFailure>;
+    readonly check: (request: UnderstandingRequest) => Promise<void>;
+    /** Throws UnderstandingFailure. */
+    readonly ask: (request: UnderstandingRequest, signal?: AbortSignal) => Promise<NonNullable<T.MediaUnderstandingJob["result"]>>;
   };
-  readonly voices: { readonly clone: (request: CloneRequest) => Effect.Effect<T.ProviderVoiceListing["voices"][number], AudioFailure> };
-  readonly tasks: { readonly get: (id: string) => Effect.Effect<AudioTask, AudioFailure> };
+  readonly voices: { readonly clone: (request: CloneRequest, signal?: AbortSignal) => Promise<T.ProviderVoiceListing["voices"][number]> };
+  readonly tasks: { readonly get: (id: string, signal?: AbortSignal) => Promise<AudioTask> };
   readonly files: {
-    readonly upload: (file: FileUpload) => Effect.Effect<UploadedFile, FileFailure>;
+    /** Throws FileFailure. */
+    readonly upload: (file: FileUpload, signal?: AbortSignal) => Promise<UploadedFile>;
     /** 404 counts as already deleted. */
-    readonly delete: (id: string) => Effect.Effect<void, FileFailure>;
+    readonly delete: (id: string, signal?: AbortSignal) => Promise<void>;
   };
   readonly realtime: {
     readonly connect: (on: RealtimeEvents, transport?: RealtimeTransport) => RealtimeLink;
     /** Strips the key from echoed vendor error text. */
     readonly redact: (text: string) => string;
-    readonly verify: (transport?: RealtimeTransport) => Effect.Effect<RealtimeCheck>;
+    readonly verify: (transport?: RealtimeTransport) => Promise<RealtimeCheck>;
   };
 }
 
 export interface Dictation {
   readonly model: string;
-  readonly transcriber: (format: TranscriptionFormat) => Effect.Effect<Effect.Success<ReturnType<typeof transcriptionModel>>, never, Scope.Scope>;
+  readonly transcriber: (format: TranscriptionFormat) => Promise<ReturnType<typeof transcriptionModel>>;
 }
 
 export interface Account extends Calls {
@@ -145,16 +122,45 @@ export interface Account extends Calls {
 
 const fingerprint = (key: string) => createHash("sha256").update(key).digest("hex");
 
-const audioFailure = (error: Effect.Error<ReturnType<typeof getMossAudioTask>>) =>
-  AudioFailure.make({
-    // NotSent means nothing reached the vendor, so nothing can have been billed.
-    outcome: error.outcome === "Unknown" ? "Unknown" : "Rejected",
+/** What a vendor's own failure says (its error classes are the package's own); undefined for anything else, which goes on up as it is. */
+const VendorError = z.object({
+  reason: z.enum(["Credentials", "InvalidInput", "Network", "Timeout", "HttpStatus", "InvalidResponse", "TooLarge"]),
+  outcome: z.enum(["NotSubmitted", "Rejected", "Unknown"]),
+  status: z.number().optional(),
+});
+const vendorError = (e: unknown) => {
+  if (!(e instanceof Error)) return undefined;
+  const got = VendorError.safeParse(e);
+  return got.success ? got.data : undefined;
+};
+
+// NotSent means nothing reached the vendor, so nothing can have been billed.
+const outcomeOf = (error: { readonly outcome: string }) => (error.outcome === "Unknown" ? "Unknown" : "Rejected");
+
+/** work, a vendor's failure thrown as the module's own failure. */
+const mapped = async <A>(work: Promise<A>, as: (error: NonNullable<ReturnType<typeof vendorError>>) => Error): Promise<A> => {
+  try {
+    return await work;
+  } catch (e) {
+    const error = vendorError(e);
+    throw error === undefined ? e : as(error);
+  }
+};
+
+const audioFailure = (error: NonNullable<ReturnType<typeof vendorError>>) =>
+  new AudioFailure({
+    outcome: outcomeOf(error),
     retryable:
       error.reason === "Network" || error.reason === "Timeout" || (error.reason === "HttpStatus" && (error.status === 429 || (error.status ?? 0) >= 500)),
   });
 
-const fileFailure = (error: Effect.Error<ReturnType<typeof uploadMossFile>>) =>
-  FileFailure.make({ outcome: error.outcome === "Unknown" ? "Unknown" : "Rejected" });
+const fileFailure = (error: NonNullable<ReturnType<typeof vendorError>>) => new FileFailure({ outcome: outcomeOf(error) });
+
+/** A check: whatever the vendor's preparation refuses is an InvalidRequest. */
+const checked = async (prepare: Promise<unknown>, also = true) => {
+  await mapped(prepare, () => new InvalidRequest());
+  if (!also) throw new InvalidRequest();
+};
 
 const mossTask = (task: MossAudioTask): AudioTask => {
   const kind = task.object === "audio.speech" ? "speech" : task.object === "audio.voice_generation" ? "voiceGeneration" : "transcription";
@@ -188,43 +194,65 @@ const mossTask = (task: MossAudioTask): AudioTask => {
   }
 };
 
-/** Which call to a vendor it is: what its logs and trace say of it, never the key. */
+/** Which call to a vendor it is: what its logs say of it, never the key. */
 interface CallSite {
   readonly vendor: Adapter;
   readonly connection: string;
   readonly model: string;
 }
 
-const vendorCall =
-  (http: HttpClient.HttpClient, site: CallSite) =>
-  (what: string) =>
-  <A, E, R>(call: Effect.Effect<A, E, R>) =>
-    call.pipe(
-      Effect.provideService(HttpClient.HttpClient, http),
-      Effect.tapCause((cause) => (Cause.hasInterrupts(cause) ? Effect.void : Effect.logWarning(`provider: ${site.vendor} ${what} failed`, cause))),
-      Effect.withLogSpan(`${site.vendor}.${what}`),
-      Effect.annotateLogs({ vendor: site.vendor, call: what, connection: site.connection, model: site.model }),
-      Effect.withSpan(`Provider.${site.vendor}.${what}`, { attributes: { vendor: site.vendor, connection: site.connection, model: site.model } }),
-    );
+interface VendorHttp {
+  readonly fetch: typeof fetch;
+  readonly clock: Time;
+  readonly log: Logger;
+}
 
-const vendorStream =
-  (http: HttpClient.HttpClient, site: CallSite) =>
+const siteWords = (site: CallSite) => `(vendor ${site.vendor}, connection ${site.connection}, model ${site.model})`;
+
+/** A call to a vendor: a failure other than the caller's abort is logged once, with the call and never the key. */
+const vendorCall =
+  (http: VendorHttp, site: CallSite) =>
   (what: string) =>
-  <A, E, R>(stream: Stream.Stream<A, E, R>) =>
-    stream.pipe(
-      Stream.provideService(HttpClient.HttpClient, http),
-      Stream.tapError((error) =>
-        Effect.logWarning(`provider: ${site.vendor} ${what} failed`, error).pipe(
-          Effect.annotateLogs({ vendor: site.vendor, call: what, connection: site.connection, model: site.model }),
-        ),
-      ),
-      Stream.withSpan(`Provider.${site.vendor}.${what}`, { attributes: { vendor: site.vendor, connection: site.connection, model: site.model } }),
-    );
+  async <A>(
+    call: (http: { readonly fetch: typeof fetch; readonly clock: Time; readonly signal?: AbortSignal }) => Promise<A>,
+    signal?: AbortSignal,
+  ): Promise<A> => {
+    try {
+      return await call({ fetch: http.fetch, clock: http.clock, ...(signal !== undefined ? { signal } : {}) });
+    } catch (e) {
+      if (!isAbort(e, signal)) http.log.warn(`provider: ${site.vendor} ${what} failed ${siteWords(site)}`, e);
+      throw e;
+    }
+  };
+
+/** A stream from a vendor, logged as vendorCall logs. */
+const vendorStream = (http: VendorHttp, site: CallSite) => (what: string) =>
+  async function* <A>(
+    stream: (http: { readonly fetch: typeof fetch; readonly clock: Time; readonly signal?: AbortSignal }) => AsyncIterable<A>,
+    signal?: AbortSignal,
+  ): AsyncGenerator<A> {
+    try {
+      yield* stream({ fetch: http.fetch, clock: http.clock, ...(signal !== undefined ? { signal } : {}) });
+    } catch (e) {
+      if (!isAbort(e, signal)) http.log.warn(`provider: ${site.vendor} ${what} failed ${siteWords(site)}`, e);
+      throw e;
+    }
+  };
+
+/** A stream's vendor failures thrown as the module's own. */
+async function* mappedStream<A>(stream: AsyncIterable<A>, as: (error: NonNullable<ReturnType<typeof vendorError>>) => Error): AsyncGenerator<A> {
+  try {
+    yield* stream;
+  } catch (e) {
+    const error = vendorError(e);
+    throw error === undefined ? e : as(error);
+  }
+}
 
 const mossStreamingSpeech: ReadonlySet<string> = new Set(["moss-tts-1.5-flash", "moss-tts-1.5-flash-2026-06-26"]);
 
-const mossCalls = (http: HttpClient.HttpClient) => {
-  const defaultTransport = makeMossTransport(http);
+const mossCalls = (http: VendorHttp) => {
+  const defaultTransport = makeMossTransport(http.fetch, http.clock);
   return (key: string, model: string, connection: string): Calls => {
     const sealed = vendorCall(http, { vendor: "moss", connection, model });
     const streamed = vendorStream(http, { vendor: "moss", connection, model });
@@ -238,118 +266,134 @@ const mossCalls = (http: HttpClient.HttpClient) => {
       ...(request.keyterms !== undefined ? { keyterms: request.keyterms } : {}),
     });
     const question = (request: UnderstandingRequest) => ({ model, text: request.text, media: request.media, maxOutputTokens: request.maxOutputTokens });
-    const taskId = (result: { readonly taskId: string }) => result.taskId;
     return {
       speech: {
-        check: (request) =>
-          prepareMossSpeech(synthesis(request)).pipe(
-            Effect.mapError(() => InvalidRequest.make()),
-            Effect.flatMap(() => (request.streaming && !mossStreamingSpeech.has(model) ? Effect.fail(InvalidRequest.make()) : Effect.void)),
+        check: (request) => checked(prepareMossSpeech(synthesis(request)), !request.streaming || mossStreamingSpeech.has(model)),
+        generate: async (request, signal) => {
+          const result = await mapped(
+            sealed("speech.generate")((h) => generateMossSpeech(key, synthesis(request), h), signal),
+            audioFailure,
+          );
+          return {
+            url: result.url,
+            format: result.format,
+            contentType: result.contentType,
+            ...(result.usage !== undefined ? { usage: result.usage } : {}),
+          };
+        },
+        createTask: async (request, signal) =>
+          (
+            await mapped(
+              sealed("speech.createTask")((h) => createMossSpeechTask(key, synthesis(request), h), signal),
+              audioFailure,
+            )
+          ).taskId,
+        stream: (request, signal) =>
+          mappedStream(
+            streamed("speech.stream")((h) => streamMossSpeech(key, synthesis(request), h), signal),
+            audioFailure,
           ),
-        generate: (request) =>
-          generateMossSpeech(key, synthesis(request)).pipe(
-            sealed("speech.generate"),
-            Effect.mapBoth({
-              onSuccess: (result) => ({
-                url: result.url,
-                format: result.format,
-                contentType: result.contentType,
-                ...(result.usage !== undefined ? { usage: result.usage } : {}),
-              }),
-              onFailure: audioFailure,
-            }),
-          ),
-        createTask: (request) =>
-          createMossSpeechTask(key, synthesis(request)).pipe(
-            sealed("speech.createTask"),
-            Effect.mapBoth({ onSuccess: (result) => result.taskId, onFailure: audioFailure }),
-          ),
-        stream: (request) => streamMossSpeech(key, synthesis(request)).pipe(streamed("speech.stream"), Stream.mapError(audioFailure)),
       },
       speakers: {
-        check: (request) =>
-          prepareMossSpeakers(dialogue(request)).pipe(
-            Effect.mapError(() => InvalidRequest.make()),
-            Effect.asVoid,
-          ),
-        createTask: (request) =>
-          createMossSpeakersTask(key, dialogue(request)).pipe(sealed("speakers.createTask"), Effect.mapBoth({ onSuccess: taskId, onFailure: audioFailure })),
+        check: (request) => checked(prepareMossSpeakers(dialogue(request))),
+        createTask: async (request, signal) =>
+          (
+            await mapped(
+              sealed("speakers.createTask")((h) => createMossSpeakersTask(key, dialogue(request), h), signal),
+              audioFailure,
+            )
+          ).taskId,
       },
       voiceDesign: {
-        check: (request) =>
-          prepareMossVoiceDesign(design(request)).pipe(
-            Effect.mapError(() => InvalidRequest.make()),
-            Effect.asVoid,
-          ),
-        createTask: (request) =>
-          createMossVoiceDesignTask(key, design(request)).pipe(
-            sealed("voiceDesign.createTask"),
-            Effect.mapBoth({ onSuccess: taskId, onFailure: audioFailure }),
-          ),
+        check: (request) => checked(prepareMossVoiceDesign(design(request))),
+        createTask: async (request, signal) =>
+          (
+            await mapped(
+              sealed("voiceDesign.createTask")((h) => createMossVoiceDesignTask(key, design(request), h), signal),
+              audioFailure,
+            )
+          ).taskId,
       },
       transcription: {
-        check: (request) =>
-          prepareMossTranscription(transcript(request)).pipe(
-            Effect.mapError(() => InvalidRequest.make()),
-            Effect.flatMap(() =>
-              request.streaming && !Str.startsWith("moss-transcribe-diarize-pro")(model) ? Effect.fail(InvalidRequest.make()) : Effect.void,
-            ),
+        check: (request) => checked(prepareMossTranscription(transcript(request)), !request.streaming || model.startsWith("moss-transcribe-diarize-pro")),
+        createTask: async (request, signal) =>
+          (
+            await mapped(
+              sealed("transcription.createTask")((h) => createMossTranscriptionTask(key, transcript(request), h), signal),
+              audioFailure,
+            )
+          ).taskId,
+        stream: (request, signal) =>
+          mappedStream(
+            streamed("transcription.stream")((h) => streamMossTranscription(key, transcript(request), h), signal),
+            audioFailure,
           ),
-        createTask: (request) =>
-          createMossTranscriptionTask(key, transcript(request)).pipe(
-            sealed("transcription.createTask"),
-            Effect.mapBoth({ onSuccess: taskId, onFailure: audioFailure }),
-          ),
-        stream: (request) => streamMossTranscription(key, transcript(request)).pipe(streamed("transcription.stream"), Stream.mapError(audioFailure)),
       },
       understanding: {
-        check: (request) =>
-          prepareMossUnderstanding(question(request)).pipe(
-            Effect.mapError(() => InvalidRequest.make()),
-            Effect.asVoid,
-          ),
-        ask: (request) =>
-          understandMossMedia(key, question(request)).pipe(
-            sealed("understanding.ask"),
-            Effect.mapBoth({
-              onSuccess: ({ id: _responseId, ...result }) => result,
-              onFailure: (error) => UnderstandingFailure.make({ outcome: error.outcome === "Unknown" ? "Unknown" : "Rejected" }),
-            }),
-          ),
+        check: (request) => checked(prepareMossUnderstanding(question(request))),
+        ask: async (request, signal) => {
+          const { id: _responseId, ...result } = await mapped(
+            sealed("understanding.ask")((h) => understandMossMedia(key, question(request), h), signal),
+            (error) => new UnderstandingFailure({ outcome: outcomeOf(error) }),
+          );
+          return result;
+        },
       },
       voices: {
-        clone: (request) =>
-          createMossVoice(key, {
-            audio: request.audio,
-            filename: request.filename,
-            durationSeconds: request.durationSeconds,
-            ...(request.name !== undefined ? { name: request.name } : {}),
-          }).pipe(sealed("voices.clone"), Effect.mapError(audioFailure)),
+        clone: (request, signal) =>
+          mapped(
+            sealed("voices.clone")(
+              (h) =>
+                createMossVoice(
+                  key,
+                  {
+                    audio: request.audio,
+                    filename: request.filename,
+                    durationSeconds: request.durationSeconds,
+                    ...(request.name !== undefined ? { name: request.name } : {}),
+                  },
+                  h,
+                ),
+              signal,
+            ),
+            audioFailure,
+          ),
       },
-      tasks: { get: (id) => getMossAudioTask(key, id).pipe(sealed("tasks.get"), Effect.mapBoth({ onSuccess: mossTask, onFailure: audioFailure })) },
+      tasks: {
+        get: async (id, signal) =>
+          mossTask(
+            await mapped(
+              sealed("tasks.get")((h) => getMossAudioTask(key, id, h), signal),
+              audioFailure,
+            ),
+          ),
+      },
       realtime: {
         connect: (on, transport = defaultTransport) => transport.connect(key, on, model),
-        redact: (text) => Str.replaceAll(key, "[redacted]")(text),
-        verify: (transport = defaultTransport) => verifyMoss(key, transport, model),
+        redact: (text) => text.replaceAll(key, "[redacted]"),
+        verify: (transport = defaultTransport) => verifyMoss(key, transport, model, http.clock),
       },
       files: {
-        upload: (file) =>
-          uploadMossFile(key, { file: file.file, filename: file.filename, purpose: file.purpose }).pipe(
-            sealed("files.upload"),
-            Effect.mapBoth({
-              onSuccess: (result) => ({
-                id: result.id,
-                state: result.status === "processed" || result.status === "active" ? "ready" : result.status === "failed" ? "rejected" : "unknown",
-              }),
-              onFailure: fileFailure,
-            }),
-          ),
-        delete: (id) =>
-          deleteMossFile(key, id).pipe(
-            sealed("files.delete"),
-            Effect.asVoid,
-            Effect.catchTag("MossFileError", (error) => (error.status === 404 ? Effect.void : Effect.fail(fileFailure(error)))),
-          ),
+        upload: async (file, signal) => {
+          const result = await mapped(
+            sealed("files.upload")((h) => uploadMossFile(key, { file: file.file, filename: file.filename, purpose: file.purpose }, h), signal),
+            fileFailure,
+          );
+          return {
+            id: result.id,
+            state: result.status === "processed" || result.status === "active" ? "ready" : result.status === "failed" ? "rejected" : "unknown",
+          };
+        },
+        delete: async (id, signal) => {
+          try {
+            await sealed("files.delete")((h) => deleteMossFile(key, id, h), signal);
+          } catch (e) {
+            const error = vendorError(e);
+            if (error === undefined) throw e;
+            if (error.status === 404) return;
+            throw fileFailure(error);
+          }
+        },
       },
     };
   };
@@ -357,7 +401,10 @@ const mossCalls = (http: HttpClient.HttpClient) => {
 
 const refuse = (reason: string): ApiError => bizError(BizCode.ProviderRefused, reason);
 
-const refusal = (error: MossModelError | Effect.Error<ReturnType<typeof listMossVoices>>): ApiError => {
+/** A model or voice listing's failure, in the user's words; anything else goes on up as it is. */
+const refusal = (e: unknown): unknown => {
+  const error = vendorError(e) ?? (e instanceof Error && e.name === "MossModelError" ? vendorModelError(e) : undefined);
+  if (error === undefined) return e;
   const reason = () => {
     switch (error.reason) {
       case "InvalidInput":
@@ -388,149 +435,165 @@ const refusal = (error: MossModelError | Effect.Error<ReturnType<typeof listMoss
   return refuse(reason());
 };
 
-export class Provider extends Context.Service<
-  Provider,
-  {
-    readonly status: () => T.ProviderStatus;
-    readonly update: (input: T.ProviderUpdate) => Effect.Effect<T.ProviderStatus, ApiError>;
-    readonly voices: (input: T.ProviderVoiceRequest) => Effect.Effect<T.ProviderVoiceListing, ApiError>;
-    /** Rebinds by stored connection ID; compare `fingerprint` against the task's snapshot to detect key rotation. */
-    readonly account: (stored: { readonly connection: string; readonly model: string }) => Effect.Effect<Account, ApiError>;
-    readonly speech: () => Effect.Effect<Account, ApiError>;
-    readonly models: (input: T.ProviderModelRequest) => Effect.Effect<T.ProviderModelListing, ApiError>;
-    readonly dictation: () => Effect.Effect<Dictation, ApiError>;
-    readonly image: (request: ImageRequest) => Effect.Effect<BoundImage, ApiError>;
-    readonly understanding: () => Effect.Effect<Account, ApiError>;
-    readonly speakers: () => Effect.Effect<Account, ApiError>;
-    readonly voiceDesign: () => Effect.Effect<Account, ApiError>;
-    readonly transcription: () => Effect.Effect<Account, ApiError>;
-    readonly vision: () => Effect.Effect<Account, ApiError>;
-    readonly live: () => Effect.Effect<Account, ApiError>;
-  }
->()("@vibevalley/server/modules/provider/provider") {
-  static readonly layer = Layer.effect(
-    Provider,
-    Effect.suspend(() => make),
-  );
+/** MossModelError has a reason and maybe a status, but no outcome. */
+const vendorModelError = (e: Error) => {
+  const got = VendorError.omit({ outcome: true }).safeParse(e);
+  return got.success ? got.data : undefined;
+};
+
+/** An image call checked now (it throws what the vendor's preparation refuses), to run later with the key. */
+type ImageCall = (
+  model: string,
+  request: ImageRequest,
+) => Promise<(key: string, http: { readonly fetch: typeof fetch; readonly clock: Time; readonly signal?: AbortSignal }) => Promise<GeneratedImage>>;
+
+const mossImage: ImageCall = async (model, request) => {
+  const input = {
+    model,
+    prompt: request.prompt,
+    size: { width: request.width, height: request.height },
+    ...(request.seed !== undefined ? { seed: request.seed } : {}),
+    ...(request.steps !== undefined ? { steps: request.steps } : {}),
+    ...(request.guidance !== undefined ? { guidance: request.guidance } : {}),
+    ...(request.negativePrompt !== undefined ? { negativePrompt: request.negativePrompt } : {}),
+    enhance: request.enhance,
+    watermark: request.watermark,
+  };
+  await prepareMossImage(input);
+  return async (key, http) => {
+    const result = await mapped(generateMossImage(key, input, http), (error) => new ImageFailure({ outcome: outcomeOf(error) }));
+    return { url: result.url, usage: { images: result.usage.generated_images, width: result.usage.output_width, height: result.usage.output_height } };
+  };
+};
+
+const imageCalls: Record<Adapter, ImageCall | undefined> = { moss: mossImage };
+
+export interface Provider {
+  readonly status: () => T.ProviderStatus;
+  readonly update: (input: T.ProviderUpdate) => Promise<T.ProviderStatus>;
+  readonly voices: (input: T.ProviderVoiceRequest, signal?: AbortSignal) => Promise<T.ProviderVoiceListing>;
+  /** Rebinds by stored connection ID; compare `fingerprint` against the task's snapshot to detect key rotation. */
+  readonly account: (stored: { readonly connection: string; readonly model: string }) => Promise<Account>;
+  readonly speech: () => Promise<Account>;
+  readonly models: (input: T.ProviderModelRequest, signal?: AbortSignal) => Promise<T.ProviderModelListing>;
+  readonly dictation: () => Promise<Dictation>;
+  readonly image: (request: ImageRequest) => Promise<BoundImage>;
+  readonly understanding: () => Promise<Account>;
+  readonly speakers: () => Promise<Account>;
+  readonly voiceDesign: () => Promise<Account>;
+  readonly transcription: () => Promise<Account>;
+  readonly vision: () => Promise<Account>;
+  readonly live: () => Promise<Account>;
 }
 
-const make = Effect.gen(function* () {
-  const settings = yield* Setting;
-  const http = yield* HttpClient.HttpClient;
+export interface ProviderDeps {
+  readonly setting: Setting;
+  readonly fetch: typeof fetch;
+  readonly clock: Time;
+  readonly log: Logger;
+}
+
+export async function makeProvider(deps: ProviderDeps): Promise<Provider> {
+  const settings = deps.setting;
+  const http: VendorHttp = { fetch: deps.fetch, clock: deps.clock, log: deps.log.child("provider") };
   const clients: Record<Adapter, (key: string, model: string, connection: string) => Calls> = { moss: mossCalls(http) };
-  const bind = (connection: { readonly id: string; readonly adapter: Adapter; readonly key: Redacted.Redacted }, revision: number, model: string): Account => ({
+  const bind = (connection: { readonly id: string; readonly adapter: Adapter; readonly key: Secret }, revision: number, model: string): Account => ({
     connection: connection.id,
     revision,
     model,
-    fingerprint: fingerprint(Redacted.value(connection.key)),
-    ...clients[connection.adapter](Redacted.value(connection.key), model, connection.id),
+    fingerprint: fingerprint(connection.key.reveal()),
+    ...clients[connection.adapter](connection.key.reveal(), model, connection.id),
   });
-  const capable = Effect.fnUntraced(function* (use: "speakers" | "voiceDesign" | "transcription" | "vision" | "live"): Effect.fn.Return<Account, ApiError> {
+  const capable = async (use: "speakers" | "voiceDesign" | "transcription" | "vision" | "live"): Promise<Account> => {
     const config = settings.providers();
     const bound = bindingOf(use)(config);
     const capability = t(`server.provider.use.${use}`);
-    if (!bound.ready) return yield* refuse(t("server.provider.capabilityUnbound", { capability }));
-    if (vendors[bound.connection.adapter][use]?.models.includes(bound.model) !== true)
-      return yield* refuse(t("server.provider.capabilityModel", { capability }));
+    if (!bound.ready) throw refuse(t("server.provider.capabilityUnbound", { capability }));
+    if (vendors[bound.connection.adapter][use]?.models.includes(bound.model) !== true) throw refuse(t("server.provider.capabilityModel", { capability }));
     return bind(bound.connection, config.revision, bound.model);
-  });
+  };
   const transcriber =
-    (connection: { readonly url: string; readonly model: string; readonly key: string }, account: string): Dictation["transcriber"] =>
-    (format) =>
-      transcriptionModel(connection, format).pipe(vendorCall(http, { vendor: "moss", connection: account, model: connection.model })("dictation.model"));
-  return Provider.of({
+    (connection: { readonly url: string; readonly model: string; readonly key: string }): Dictation["transcriber"] =>
+    async (format) =>
+      transcriptionModel(connection, format, { fetch: http.fetch, clock: http.clock });
+  return {
     status: () => providerStatus(settings.providers()),
-    speakers: Effect.fn("Provider.speakers")(function* () {
-      return yield* capable("speakers");
-    }),
-    voiceDesign: Effect.fn("Provider.voiceDesign")(function* () {
-      return yield* capable("voiceDesign");
-    }),
-    transcription: Effect.fn("Provider.transcription")(function* () {
-      return yield* capable("transcription");
-    }),
-    vision: Effect.fn("Provider.vision")(function* () {
-      return yield* capable("vision");
-    }),
-    live: Effect.fn("Provider.live")(function* () {
-      return yield* capable("live");
-    }),
-    update: Effect.fn("Provider.update")(function* (input) {
-      const next = yield* settings.updateProviders((current) => connectionsOver(current, input));
+    speakers: () => capable("speakers"),
+    voiceDesign: () => capable("voiceDesign"),
+    transcription: () => capable("transcription"),
+    vision: () => capable("vision"),
+    live: () => capable("live"),
+    update: async (input) => {
+      const next = await settings.updateProviders((current) => connectionsOver(current, input));
       return providerStatus(next);
-    }),
-    models: Effect.fn("Provider.models")(function* (input) {
+    },
+    models: async (input, signal) => {
       const config = settings.providers();
-      if (input.revision !== config.revision) return yield* refuse(t("server.provider.changed"));
+      if (input.revision !== config.revision) throw refuse(t("server.provider.changed"));
       const connection = boundConnection(config, input.connection);
-      if (!connection) return yield* refuse(t("server.provider.noKey"));
-      const models = yield* mossModels(Redacted.value(connection.key)).pipe(
-        vendorCall(http, { vendor: connection.adapter, connection: connection.id, model: "" })("models.list"),
-        Effect.mapError(refusal),
-      );
-      if (settings.providers().revision !== config.revision) return yield* refuse(t("server.provider.changed"));
-      return { connection: connection.id, revision: config.revision, models };
-    }),
-    voices: Effect.fn("Provider.voices")(function* ({ connection: id, revision, ...pagination }) {
+      if (!connection) throw refuse(t("server.provider.noKey"));
+      const call = vendorCall(http, { vendor: connection.adapter, connection: connection.id, model: "" })("models.list");
+      const models = await call((h) => mossModels(connection.key.reveal(), h), signal).catch((e: unknown) => {
+        throw refusal(e);
+      });
+      if (settings.providers().revision !== config.revision) throw refuse(t("server.provider.changed"));
+      return { connection: connection.id, revision: config.revision, models: [...models] };
+    },
+    voices: async ({ connection: id, revision, ...pagination }, signal) => {
       const config = settings.providers();
-      if (revision !== config.revision) return yield* refuse(t("server.provider.changed"));
+      if (revision !== config.revision) throw refuse(t("server.provider.changed"));
       const connection = boundConnection(config, id);
-      if (!connection) return yield* refuse(t("server.provider.noKey"));
-      const listing = yield* listMossVoices(Redacted.value(connection.key), pagination).pipe(
-        vendorCall(http, { vendor: connection.adapter, connection: connection.id, model: "" })("voices.list"),
-        Effect.mapError(refusal),
-      );
-      if (settings.providers().revision !== config.revision) return yield* refuse(t("server.provider.changed"));
-      return { connection: id, revision, ...listing };
-    }),
-    account: Effect.fn("Provider.account")(function* (stored) {
+      if (!connection) throw refuse(t("server.provider.noKey"));
+      const call = vendorCall(http, { vendor: connection.adapter, connection: connection.id, model: "" })("voices.list");
+      const listing = await call((h) => listMossVoices(connection.key.reveal(), pagination, h), signal).catch((e: unknown) => {
+        throw refusal(e);
+      });
+      if (settings.providers().revision !== config.revision) throw refuse(t("server.provider.changed"));
+      return { connection: id, revision, ...listing, voices: [...listing.voices] };
+    },
+    account: async (stored) => {
       const config = settings.providers();
       const connection = boundConnection(config, stored.connection);
-      if (!connection) return yield* refuse(t("server.provider.noKey"));
+      if (!connection) throw refuse(t("server.provider.noKey"));
       return bind(connection, config.revision, stored.model);
-    }),
-    speech: Effect.fn("Provider.speech")(function* () {
+    },
+    speech: async () => {
       const config = settings.providers();
       const bound = bindingOf("speech")(config);
-      if (!bound.ready) return yield* refuse(t("server.provider.speechUnbound"));
-      if (vendors[bound.connection.adapter].speech?.models.includes(bound.model) !== true) return yield* refuse(t("server.provider.speechModel"));
+      if (!bound.ready) throw refuse(t("server.provider.speechUnbound"));
+      if (vendors[bound.connection.adapter].speech?.models.includes(bound.model) !== true) throw refuse(t("server.provider.speechModel"));
       return bind(bound.connection, config.revision, bound.model);
-    }),
-    dictation: Effect.fn("Provider.dictation")(function* () {
+    },
+    dictation: async () => {
       const own = settings.dictation();
-      if (own?.via === "own") return { model: own.model, transcriber: transcriber({ url: own.url, model: own.model, key: Redacted.value(own.key) }, "own") };
-      if (!own) return yield* refuse(t("server.voice.dictation.unset"));
+      if (own?.via === "own") return { model: own.model, transcriber: transcriber({ url: own.url, model: own.model, key: own.key.reveal() }) };
+      if (!own) throw refuse(t("server.voice.dictation.unset"));
       const bound = bindingOf("dictation")(settings.providers());
-      if (!bound.ready) return yield* refuse(t("server.provider.unbound"));
+      if (!bound.ready) throw refuse(t("server.provider.unbound"));
       return {
         model: bound.model,
-        transcriber: transcriber({ url: mossTranscription.url, model: bound.model, key: Redacted.value(bound.connection.key) }, bound.connection.id),
+        transcriber: transcriber({ url: mossTranscription.url, model: bound.model, key: bound.connection.key.reveal() }),
       };
-    }),
-    image: Effect.fn("Provider.image")(function* (request: ImageRequest) {
+    },
+    image: async (request) => {
       const config = settings.providers();
       const bound = bindingOf("image")(config);
-      if (!bound.ready) return yield* refuse(t("server.provider.imageUnbound"));
+      if (!bound.ready) throw refuse(t("server.provider.imageUnbound"));
       const adapter = bound.connection.adapter;
       const call = imageCalls[adapter];
-      if (call === undefined || vendors[adapter].image?.models.includes(bound.model) !== true) return yield* refuse(t("server.provider.imageModel"));
-      const run = yield* call(bound.model, request).pipe(Effect.mapError(() => refuse(t("server.media.invalid"))));
+      if (call === undefined || vendors[adapter].image?.models.includes(bound.model) !== true) throw refuse(t("server.provider.imageModel"));
+      const run = await mapped(call(bound.model, request), () => refuse(t("server.media.invalid")));
       // Capture the key now so rotating the account later does not alter a queued task.
-      return {
-        connection: bound.connection.id,
-        revision: config.revision,
-        model: bound.model,
-        run: run(Redacted.value(bound.connection.key)).pipe(
-          vendorCall(http, { vendor: adapter, connection: bound.connection.id, model: bound.model })("image.generate"),
-        ),
-      };
-    }),
-    understanding: Effect.fn("Provider.understanding")(function* () {
+      const key = bound.connection.key.reveal();
+      const sealed = vendorCall(http, { vendor: adapter, connection: bound.connection.id, model: bound.model })("image.generate");
+      return { connection: bound.connection.id, revision: config.revision, model: bound.model, run: (signal) => sealed((h) => run(key, h), signal) };
+    },
+    understanding: async () => {
       const config = settings.providers();
       const bound = bindingOf("understanding")(config);
-      if (!bound.ready) return yield* refuse(t("server.provider.understandingUnbound"));
-      if (vendors[bound.connection.adapter].understanding?.models.includes(bound.model) !== true) return yield* refuse(t("server.provider.understandingModel"));
+      if (!bound.ready) throw refuse(t("server.provider.understandingUnbound"));
+      if (vendors[bound.connection.adapter].understanding?.models.includes(bound.model) !== true) throw refuse(t("server.provider.understandingModel"));
       return bind(bound.connection, config.revision, bound.model);
-    }),
-  });
-});
+    },
+  };
+}

@@ -1,16 +1,14 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { Schema } from "effect";
+import { z } from "zod";
 
-const Manifest = Schema.fromJsonString(
-  Schema.Struct({
-    name: Schema.String,
-    dependencies: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
-  }),
-);
+const Manifest = z.object({
+  name: z.string(),
+  dependencies: z.exactOptional(z.record(z.string(), z.string())),
+});
 
-const manifest = (dir: string) => Schema.decodeSync(Manifest)(readFileSync(join(dir, "package.json"), "utf8"));
+const manifest = (dir: string) => Manifest.parse(JSON.parse(readFileSync(join(dir, "package.json"), "utf8")));
 
 /** name → folder under packages/. */
 function workspacePackages(repo: string): Map<string, string> {

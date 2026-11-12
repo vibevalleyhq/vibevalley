@@ -1,572 +1,501 @@
-import { NodeServices } from "@effect/platform-node";
-import { expect, it } from "@effect/vitest";
-import { Array as Arr, Context, Deferred, Effect, Exit, Fiber, FileSystem, Layer, Option, Path, PlatformError, Schema, Stream } from "effect";
-import { SqlClient } from "effect/sql";
-import { TestClock } from "effect/testing";
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
+import { expect, test } from "vite-plus/test";
+
+import { mapConcurrent } from "@vibevalley/async";
 import { BizCode } from "@vibevalley/protocol/api";
 
 import { refused } from "#/base/errors.ts";
-import { ServerConfig } from "#/infra/config.ts";
-import { Database, Db } from "#/infra/db.ts";
-import { Attachment } from "#/modules/attachment/attachment.ts";
+import { keptLog } from "#/infra/log.ts";
+import { type Attachment, makeAttachment } from "#/modules/attachment/attachment.ts";
 import { wav } from "#/modules/media/testdata/audio.ts";
 import { png } from "#/modules/media/testdata/png.ts";
-import { testConfig } from "#/testing/layers.ts";
-import { allow, refuse } from "#/testing/refuse.ts";
+import { testConfig, testDb } from "#/testing/layers.ts";
 import * as q from "#db/media_input.sql.ts";
 
-import { makeInputs } from "./inputs.ts";
+import { diskStorage, type MediaInputStorage } from "./input.ts";
+import { type Inputs, makeInputs } from "./inputs.ts";
+import { allow, heldTime, hours, refuse } from "./testing.ts";
 
-const json = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
-const notIn = (value: unknown, secret: string) =>
-  Effect.map(json(value), (text) => {
-    expect(text).not.toContain(secret);
-  });
-
-const layer = () =>
-  Attachment.layer.pipe(
-    Layer.provideMerge(Db.layer),
-    Layer.provideMerge(Database),
-    Layer.provideMerge(NodeServices.layer),
-    Layer.provideMerge(Layer.succeed(ServerConfig, testConfig())),
+const notIn = (value: unknown, secret: string) => {
+  expect(JSON.stringify(value)).not.toContain(secret);
+};
+const failure = (p: Promise<unknown>) =>
+  p.then(
+    () => expect.unreachable("it was not refused"),
+    (e: unknown) => e,
   );
-/** Inputs and the Attachment they keep bytes through, both on the given file system. */
-const inputsOn = Effect.fnUntraced(function* (fs: FileSystem.FileSystem) {
-  const built = yield* Layer.build(Layer.fresh(Attachment.layer)).pipe(Effect.provideService(FileSystem.FileSystem, fs));
-  return yield* makeInputs.pipe(Effect.provideService(Attachment, Context.get(built, Attachment)), Effect.provideService(FileSystem.FileSystem, fs));
+
+async function* chunks(...parts: readonly Uint8Array[]) {
+  for (const part of parts) yield part;
+}
+/** A source that must never be read. */
+const unread = (why: string): AsyncIterable<Uint8Array> => ({
+  [Symbol.asyncIterator]: () => {
+    throw new Error(why);
+  },
 });
+/** Its first parts, then nothing ever again; reading past them says so. */
+const stalled = (...first: readonly Uint8Array[]) => {
+  const { promise: reading, resolve } = Promise.withResolvers<void>();
+  async function* source() {
+    for (const part of first) yield part;
+    resolve();
+    await new Promise<never>(() => undefined);
+  }
+  return { reading, source: source() };
+};
+/** A removal the file system refuses. */
+const denied = () => Object.assign(new Error("permission denied"), { code: "EACCES" });
+
+/** Inputs over a fresh database and attachments on a clock the test moves; another Inputs over the same store is as after a restart. */
+const aStore = async () => {
+  const config = testConfig();
+  const db = await testDb(config);
+  const held = heldTime();
+  const attachment = await makeAttachment({ config, clock: held.time, db });
+  const log = keptLog();
+  const make = (storage: MediaInputStorage = diskStorage, kept: Attachment = attachment) =>
+    makeInputs({ db, clock: held.time, log, attachment: kept }, storage);
+  return {
+    config,
+    db,
+    attachment,
+    adjust: held.adjust,
+    inputs: make(),
+    make,
+    [Symbol.asyncDispose]: () => db.close(),
+  };
+};
 const keptAt = (home: string, ...parts: string[]) => [home, "attachments", ...parts].join("/");
 const bytes = png();
 const metadata = { kind: "image", name: "input.png", mime: "image/png", size: bytes.length } as const;
-const saved = Effect.fnUntraced(function* (inputs: Effect.Success<typeof makeInputs>) {
-  const input = yield* inputs.create(metadata);
-  return yield* inputs.upload(input.id, Stream.make(bytes));
+const saved = async (inputs: Inputs) => {
+  const input = await inputs.create(metadata);
+  return inputs.upload(input.id, chunks(bytes));
+};
+const capacityOf = async (store: Awaited<ReturnType<typeof aStore>>) => q.inputCapacity(store.db.sql);
+
+test("input reservations are immutable, kept as one attachment, taken from a kept file, and never return private paths", async () => {
+  await using store = await aStore();
+  const { inputs, config } = store;
+  const first = await saved(inputs);
+  const second = await saved(inputs);
+  expect(first.id).not.toBe(second.id);
+  expect((await inputs.previewDelete(first.id)).does).toHaveLength(1);
+  expect((await inputs.get(first.id)).phase).toBe("ready");
+  expect(first).toMatchObject({ phase: "ready", canDelete: true, hash: second.hash });
+  notIn(first, config.home);
+  expect(existsSync(keptAt(config.home, first.hash ?? ""))).toBe(true);
+  const uploaded = await inputs.upload(first.id, unread("do not read a repeated upload"));
+  expect(uploaded).toEqual(first);
+  await inputs.delete(first.id);
+  expect((await inputs.get(second.id)).phase).toBe("ready");
+  expect((await inputs.previewDelete(second.id)).does).toHaveLength(1);
+  await inputs.delete(second.id);
+  expect(await inputs.previewDelete(second.id)).toEqual({ does: [] });
+  await inputs.delete(second.id);
+  // Media stops holding it; the attachment stays for whatever else keeps it.
+  expect(existsSync(keptAt(config.home, second.hash ?? ""))).toBe(true);
+  // A kept file is taken as an input on its own bytes; one that is no image, video or audio is refused.
+  const file = await store.attachment.attach({ name: "kept.png", type: "image/png", data: Buffer.from(bytes).toString("base64") });
+  const input = await inputs.adopt(file.id);
+  expect(input).toMatchObject({ phase: "ready", hash: file.id, kind: "image", mime: "image/png", size: bytes.length });
+  const text = await store.attachment.attach({ name: "notes.txt", type: "text/plain", data: Buffer.from("plain words").toString("base64") });
+  expect(await failure(inputs.adopt(text.id))).toMatchObject({ bizCode: BizCode.MediaRefused });
 });
 
-it.effect("input reservations are immutable, kept as one attachment, taken from a kept file, and never return private paths", () =>
-  Effect.gen(function* () {
-    const inputs = yield* makeInputs;
-    const fs = yield* FileSystem.FileSystem;
-    const config = yield* ServerConfig;
-    const first = yield* saved(inputs);
-    const second = yield* saved(inputs);
-    expect(first.id).not.toBe(second.id);
-    expect((yield* inputs.previewDelete(first.id)).does).toHaveLength(1);
-    expect((yield* inputs.get(first.id)).phase).toBe("ready");
-    expect(first).toMatchObject({ phase: "ready", canDelete: true, hash: second.hash });
-    yield* notIn(first, config.home);
-    const exists = yield* fs.exists(keptAt(config.home, first.hash ?? ""));
-    expect(exists).toBe(true);
-    const uploaded = yield* inputs.upload(first.id, Stream.fromEffect(Effect.die("do not read a repeated upload")));
-    expect(uploaded).toEqual(first);
-    yield* inputs.delete(first.id);
-    expect((yield* inputs.get(second.id)).phase).toBe("ready");
-    expect((yield* inputs.previewDelete(second.id)).does).toHaveLength(1);
-    yield* inputs.delete(second.id);
-    const previewDelete2 = yield* inputs.previewDelete(second.id);
-    expect(previewDelete2).toEqual({ does: [] });
-    yield* inputs.delete(second.id);
-    // Media stops holding it; the attachment stays for whatever else keeps it.
-    const stays = yield* fs.exists(keptAt(config.home, second.hash ?? ""));
-    expect(stays).toBe(true);
-    // A kept file is taken as an input on its own bytes; one that is no image, video or audio is refused.
-    const kept = yield* Attachment;
-    const file = yield* kept.attach({ name: "kept.png", type: "image/png", data: Buffer.from(bytes).toString("base64") });
-    const input = yield* inputs.adopt(file.id);
-    expect(input).toMatchObject({ phase: "ready", hash: file.id, kind: "image", mime: "image/png", size: bytes.length });
-    const text = yield* kept.attach({ name: "notes.txt", type: "text/plain", data: Buffer.from("plain words").toString("base64") });
-    expect((yield* Effect.flip(inputs.adopt(text.id))).bizCode).toBe(BizCode.MediaRefused);
-  }).pipe(Effect.provide(layer())),
-);
+test("concurrent reservations cannot overbook the byte quota", async () => {
+  await using store = await aStore();
+  const { inputs } = store;
+  const results = await Promise.allSettled(
+    Array.from({ length: 12 }, () => inputs.create({ kind: "video", name: "video.mp4", mime: "video/mp4", size: 200_000_000 })),
+  );
+  expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(10);
+  expect(await inputs.list()).toHaveLength(10);
+  for (const input of await inputs.list()) await inputs.delete(input.id);
+  expect((await inputs.create(metadata)).phase).toBe("reserved");
+});
 
-it.effect("concurrent reservations cannot overbook the byte quota", () =>
-  Effect.gen(function* () {
-    const inputs = yield* makeInputs;
-    const results = yield* Effect.forEach(
-      Array.from({ length: 12 }),
-      () => inputs.create({ kind: "video", name: "video.mp4", mime: "video/mp4", size: 200_000_000 }).pipe(Effect.option),
-      { concurrency: 12 },
-    );
-    expect(results.filter(Option.isSome)).toHaveLength(10);
-    const inputs2 = yield* inputs.list();
-    expect(inputs2).toHaveLength(10);
-    const inputs3 = yield* inputs.list();
-    yield* Effect.forEach(inputs3, (input) => inputs.delete(input.id), { discard: true });
-    expect((yield* inputs.create(metadata)).phase).toBe("reserved");
-  }).pipe(Effect.provide(layer())),
-);
+test("reservation count is bounded even for tiny files", async () => {
+  await using store = await aStore();
+  const { inputs } = store;
+  await mapConcurrent(Array.from({ length: 256 }), 16, () => inputs.create(metadata));
+  expect(await failure(inputs.create(metadata))).toMatchObject({ bizCode: BizCode.MediaRefused });
+  expect(await inputs.list()).toHaveLength(256);
+});
 
-it.effect("reservation count is bounded even for tiny files", () =>
-  Effect.gen(function* () {
-    const inputs = yield* makeInputs;
-    yield* Effect.forEach(Array.from({ length: 256 }), () => inputs.create(metadata), { discard: true, concurrency: 16 });
-    const createdFailure = yield* Effect.flip(inputs.create(metadata));
-    expect(createdFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-    const inputs2 = yield* inputs.list();
-    expect(inputs2).toHaveLength(256);
-  }).pipe(Effect.provide(layer())),
-);
+test("references survive expiry and restart, and release permits cleanup", async () => {
+  await using store = await aStore();
+  const { inputs } = store;
+  const first = await saved(inputs);
+  const unused = await saved(inputs);
+  await inputs.pin([first.id], "task-a", async () => undefined);
+  expect((await inputs.get(first.id)).canDelete).toBe(false);
+  expect(await failure(inputs.delete(first.id))).toMatchObject({ bizCode: BizCode.MediaRefused });
+  expect(await failure(inputs.previewDelete(first.id))).toMatchObject({ bizCode: BizCode.MediaRefused });
+  await store.adjust(hours(24));
+  const restarted = store.make();
+  await restarted.restore();
+  await restarted.sweep();
+  expect((await restarted.get(first.id)).phase).toBe("ready");
+  expect(await failure(restarted.get(unused.id))).toMatchObject({ bizCode: BizCode.MediaRefused });
+  await restarted.release("task-a");
+  await restarted.sweep();
+  expect(await restarted.list()).toEqual([]);
+});
 
-it.effect("references survive expiry and restart, and release permits cleanup", () =>
-  Effect.gen(function* () {
-    const inputs = yield* makeInputs;
-    const first = yield* saved(inputs);
-    const unused = yield* saved(inputs);
-    yield* inputs.pin([first.id], "task-a", Effect.void);
-    expect((yield* inputs.get(first.id)).canDelete).toBe(false);
-    const deletedFailure = yield* Effect.flip(inputs.delete(first.id));
-    expect(deletedFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-    const previewDeleteFailure = yield* Effect.flip(inputs.previewDelete(first.id));
-    expect(previewDeleteFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-    yield* TestClock.adjust("24 hours");
-    const restarted = yield* makeInputs;
-    yield* restarted.restore();
-    yield* restarted.sweep();
-    expect((yield* restarted.get(first.id)).phase).toBe("ready");
-    const restartedFailure = yield* Effect.flip(restarted.get(unused.id));
-    expect(restartedFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-    yield* restarted.release("task-a");
-    yield* restarted.sweep();
-    const restarteds = yield* restarted.list();
-    expect(restarteds).toEqual([]);
-  }).pipe(Effect.provide(layer())),
-);
+test("reference acquisition and admission roll back together", async () => {
+  await using store = await aStore();
+  const { inputs } = store;
+  const first = await saved(inputs);
+  await failure(inputs.pin([first.id, "missing"], "task-a", async () => undefined));
+  expect((await inputs.get(first.id)).canDelete).toBe(true);
+  await failure(
+    inputs.pin([first.id], "task-b", async () => {
+      throw refused("admission failed");
+    }),
+  );
+  expect((await inputs.get(first.id)).canDelete).toBe(true);
+  await inputs.pin([first.id, first.id], "task-c", async () => undefined);
+  await inputs.release("task-c");
+  await inputs.delete(first.id);
+});
 
-it.effect("reference acquisition and admission roll back together", () =>
-  Effect.gen(function* () {
-    const inputs = yield* makeInputs;
-    const first = yield* saved(inputs);
-    yield* Effect.flip(inputs.pin([first.id, "missing"], "task-a", Effect.void));
-    expect((yield* inputs.get(first.id)).canDelete).toBe(true);
-    yield* Effect.flip(inputs.pin([first.id], "task-b", Effect.fail(refused("admission failed"))));
-    expect((yield* inputs.get(first.id)).canDelete).toBe(true);
-    yield* inputs.pin([first.id, first.id], "task-c", Effect.void);
-    yield* inputs.release("task-c");
-    yield* inputs.delete(first.id);
-  }).pipe(Effect.provide(layer())),
-);
+test("regression: an interrupted upload releases admission and permits an explicit local retry", async () => {
+  await using store = await aStore();
+  const { inputs } = store;
+  const input = await inputs.create(metadata);
+  const { reading, source } = stalled(bytes.subarray(0, 32));
+  const stop = new AbortController();
+  const upload = failure(inputs.upload(input.id, source, stop.signal));
+  await reading;
+  expect((await inputs.get(input.id)).canDelete).toBe(false);
+  expect(await failure(inputs.delete(input.id))).toMatchObject({ bizCode: BizCode.MediaRefused });
+  expect(await failure(inputs.upload(input.id, chunks(bytes)))).toMatchObject({ bizCode: BizCode.MediaRefused });
+  stop.abort();
+  await upload;
+  expect((await inputs.get(input.id)).phase).toBe("failed");
+  expect((await inputs.upload(input.id, chunks(bytes))).canDelete).toBe(true);
+});
 
-it.effect("regression: an interrupted upload releases admission and permits an explicit local retry", () =>
-  Effect.gen(function* () {
-    const inputs = yield* makeInputs;
-    const input = yield* inputs.create(metadata);
-    const reading = yield* Deferred.make<void>();
-    const source = Stream.concat(
-      Stream.make(bytes.subarray(0, 32)),
-      Stream.fromEffect(Deferred.succeed(reading, undefined).pipe(Effect.andThen(Effect.never))),
-    );
-    const fiber = yield* inputs.upload(input.id, source).pipe(Effect.forkChild);
-    yield* Deferred.await(reading);
-    expect((yield* inputs.get(input.id)).canDelete).toBe(false);
-    const deletedFailure = yield* Effect.flip(inputs.delete(input.id));
-    expect(deletedFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-    const uploadedFailure = yield* Effect.flip(inputs.upload(input.id, Stream.make(bytes)));
-    expect(uploadedFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-    yield* Fiber.interrupt(fiber);
-    expect((yield* inputs.get(input.id)).phase).toBe("failed");
-    expect((yield* inputs.upload(input.id, Stream.make(bytes))).canDelete).toBe(true);
-  }).pipe(Effect.provide(layer())),
-);
+test("regression: failed partial-file cleanup retains its reservation and cannot accumulate retry files", async () => {
+  await using store = await aStore();
+  const root = keptAt(store.config.home, "staging", "media");
+  let blocked = false;
+  const failing: MediaInputStorage = {
+    ...diskStorage,
+    remove: async (path) => {
+      if (blocked && path.startsWith(root + "/")) throw denied();
+      await diskStorage.remove(path);
+    },
+  };
+  const inputs = store.make(failing);
+  const input = await inputs.create(metadata);
+  async function* source() {
+    yield bytes.subarray(0, 32);
+    blocked = true;
+  }
+  await failure(inputs.upload(input.id, source()));
+  expect((await inputs.get(input.id)).phase).toBe("failed");
+  expect(readdirSync(join(root, input.id))).toHaveLength(1);
+  expect(await failure(inputs.upload(input.id, unread("must not accept another file")))).toMatchObject({ bizCode: BizCode.MediaRefused });
+  expect(await failure(inputs.delete(input.id))).toMatchObject({ bizCode: BizCode.MediaRefused });
+  await inputs.sweep();
+  expect(await inputs.list()).toHaveLength(1);
+  blocked = false;
+  await inputs.sweep();
+  expect(await inputs.list()).toEqual([]);
+  expect(existsSync(join(root, input.id))).toBe(false);
+});
 
-it.effect("regression: failed partial-file cleanup retains its reservation and cannot accumulate retry files", () =>
-  Effect.gen(function* () {
-    const { join } = yield* Path.Path;
-    const fs = yield* FileSystem.FileSystem;
-    const root = keptAt((yield* ServerConfig).home, "staging", "media");
-    let blocked = false;
-    const remove: typeof fs.remove = (path, options) =>
-      blocked && path.startsWith(root + "/")
-        ? Effect.fail(PlatformError.systemError({ _tag: "PermissionDenied", module: "FileSystem", method: "remove" }))
-        : fs.remove(path, options);
-    const failing = FileSystem.FileSystem.of({
-      ...fs,
-      remove,
-      makeTempDirectoryScoped: (options) =>
-        Effect.acquireRelease(fs.makeTempDirectory(options), (directory) => remove(directory, { recursive: true, force: true }).pipe(Effect.orDie)),
-    });
-    const inputs = yield* makeInputs.pipe(Effect.provideService(FileSystem.FileSystem, failing));
-    const input = yield* inputs.create(metadata);
-    const source = Stream.make(bytes.subarray(0, 32)).pipe(
-      Stream.tap(() =>
-        Effect.sync(() => {
-          blocked = true;
-        }),
-      ),
-    );
-    const uploaded = yield* Effect.exit(inputs.upload(input.id, source));
-    expect(Exit.isFailure(uploaded)).toBe(true);
-    expect((yield* inputs.get(input.id)).phase).toBe("failed");
-    const directory2 = yield* fs.readDirectory(join(root, input.id));
-    expect(directory2).toHaveLength(1);
-    const uploadedFailure = yield* Effect.flip(inputs.upload(input.id, Stream.fromEffect(Effect.die("must not accept another file"))));
-    expect(uploadedFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-    const deletedFailure = yield* Effect.flip(inputs.delete(input.id));
-    expect(deletedFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-    yield* inputs.sweep();
-    const inputs2 = yield* inputs.list();
-    expect(inputs2).toHaveLength(1);
-    blocked = false;
-    yield* inputs.sweep();
-    const inputs3 = yield* inputs.list();
-    expect(inputs3).toEqual([]);
-    const exists2 = yield* fs.exists(join(root, input.id));
-    expect(exists2).toBe(false);
-  }).pipe(Effect.provide(layer())),
-);
+test("at most eight streams are accepted concurrently and timeout releases every slot", async () => {
+  await using store = await aStore();
+  const { inputs } = store;
+  const active: Promise<unknown>[] = [];
+  for (let n = 0; n < 8; n++) {
+    const input = await inputs.create(metadata);
+    const { reading, source } = stalled();
+    active.push(failure(inputs.upload(input.id, source)));
+    await reading;
+  }
+  const next = await inputs.create(metadata);
+  expect(await failure(inputs.upload(next.id, chunks(bytes)))).toMatchObject({ bizCode: BizCode.MediaRefused });
+  await store.adjust(300_000);
+  await Promise.all(active);
+  expect((await inputs.upload(next.id, chunks(bytes))).phase).toBe("ready");
+});
 
-it.effect("at most eight streams are accepted concurrently and timeout releases every slot", () =>
-  Effect.gen(function* () {
-    const inputs = yield* makeInputs;
-    const active = yield* Effect.forEach(Array.from({ length: 8 }), () =>
-      Effect.gen(function* () {
-        const input = yield* inputs.create(metadata);
-        const started = yield* Deferred.make<void>();
-        const source = Stream.fromEffect(Deferred.succeed(started, undefined).pipe(Effect.andThen(Effect.never)));
-        const fiber = yield* inputs.upload(input.id, source).pipe(Effect.flip, Effect.forkChild);
-        yield* Deferred.await(started);
-        return fiber;
-      }),
-    );
-    const next = yield* inputs.create(metadata);
-    const uploadedFailure = yield* Effect.flip(inputs.upload(next.id, Stream.make(bytes)));
-    expect(uploadedFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-    yield* TestClock.adjust("300 seconds");
-    yield* Effect.forEach(active, Fiber.join, { discard: true });
-    expect((yield* inputs.upload(next.id, Stream.make(bytes))).phase).toBe("ready");
-  }).pipe(Effect.provide(layer())),
-);
+test("startup removes partial files without repeating any upload", async () => {
+  await using store = await aStore();
+  const { inputs } = store;
+  const input = await inputs.create(metadata);
+  const staging = keptAt(store.config.home, "staging", "media");
+  mkdirSync(join(staging, ".input-interrupted"), { recursive: true });
+  writeFileSync(join(staging, ".input-interrupted/content"), "partial");
+  await q.changeInput(store.db.sql, { id: input.id, phase: "uploading", hash: null, expires: input.expiresAt });
+  const restarted = store.make();
+  await restarted.restore();
+  expect((await restarted.get(input.id)).phase).toBe("failed");
+  expect(existsSync(staging)).toBe(false);
+});
 
-it.effect("startup removes partial files without repeating any upload", () =>
-  Effect.gen(function* () {
-    const { join } = yield* Path.Path;
-    const inputs = yield* makeInputs;
-    const input = yield* inputs.create(metadata);
-    const db = yield* Db;
-    const fs = yield* FileSystem.FileSystem;
-    const config = yield* ServerConfig;
-    const staging = keptAt(config.home, "staging", "media");
-    yield* fs.makeDirectory(join(staging, ".input-interrupted"), { recursive: true });
-    yield* fs.writeFileString(join(staging, ".input-interrupted/content"), "partial");
-    yield* db.run(q.changeInput({ id: input.id, phase: "uploading", hash: null, expires: input.expiresAt }));
-    const restarted = yield* makeInputs;
-    yield* restarted.restore();
-    expect((yield* restarted.get(input.id)).phase).toBe("failed");
-    const exists2 = yield* fs.exists(staging);
-    expect(exists2).toBe(false);
-  }).pipe(Effect.provide(layer())),
-);
+test("regression: repairing a missing saved input cannot replace its original content", async () => {
+  await using store = await aStore();
+  const input = await saved(store.inputs);
+  rmSync(keptAt(store.config.home, input.hash ?? ""));
+  const restarted = store.make();
+  await restarted.restore();
+  expect((await restarted.get(input.id)).phase).toBe("failed");
+  const different = Buffer.from(bytes);
+  different[20] = 23;
+  expect(await failure(restarted.upload(input.id, chunks(different)))).toMatchObject({ bizCode: BizCode.MediaRefused });
+  expect((await restarted.upload(input.id, chunks(bytes))).hash).toBe(input.hash);
+});
 
-it.effect("regression: repairing a missing saved input cannot replace its original content", () =>
-  Effect.gen(function* () {
-    const inputs = yield* makeInputs;
-    const fs = yield* FileSystem.FileSystem;
-    const config = yield* ServerConfig;
-    const input = yield* saved(inputs);
-    yield* fs.remove(keptAt(config.home, input.hash ?? ""));
-    const restarted = yield* makeInputs;
-    yield* restarted.restore();
-    expect((yield* restarted.get(input.id)).phase).toBe("failed");
-    const different = Buffer.from(bytes);
-    different[20] = 23;
-    const uploadedFailure = yield* Effect.flip(restarted.upload(input.id, Stream.make(different)));
-    expect(uploadedFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-    expect((yield* restarted.upload(input.id, Stream.make(bytes))).hash).toBe(input.hash);
-  }).pipe(Effect.provide(layer())),
-);
+test.each([false, true])("regression: a rejected database commit remains accounted and retryable when rollback is blocked: %s", async (blockRollback) => {
+  await using store = await aStore();
+  const home = store.config.home;
+  const staging = keptAt(home, "staging", "media");
+  // Blocked once bytes flow: the cleanup after the failed commit, not the one before the upload starts.
+  let blocked = false;
+  const failing: MediaInputStorage = {
+    ...diskStorage,
+    remove: async (path) => {
+      if (blocked && path.startsWith(staging + "/")) throw denied();
+      await diskStorage.remove(path);
+    },
+  };
+  const inputs = store.make(failing);
+  const input = await inputs.create(metadata);
+  await refuse(store.db, "media_input_test_fail", "BEFORE UPDATE OF phase ON media_input", "NEW.phase = 'ready'", "injected database failure");
+  async function* flowing() {
+    blocked = blockRollback;
+    yield bytes;
+  }
+  const error = await failure(inputs.upload(input.id, flowing()));
+  expect(error).toMatchObject({ bizCode: BizCode.MediaRefused });
+  notIn(error, "injected database failure");
+  const failed = await inputs.get(input.id);
+  expect(failed).toMatchObject({ phase: "failed" });
+  expect(failed.hash).not.toBeNull();
+  // The bytes were kept as an attachment before the commit failed; the reservation stays accounted either way.
+  expect(existsSync(keptAt(home, failed.hash ?? ""))).toBe(true);
+  blocked = false;
+  await allow(store.db, "media_input_test_fail");
+  expect((await inputs.upload(input.id, chunks(bytes))).phase).toBe("ready");
+});
 
-it.effect.each([false, true])("regression: a rejected database commit remains accounted and retryable when rollback is blocked: %s", (blockRollback) =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient;
-    const fs = yield* FileSystem.FileSystem;
-    const home = (yield* ServerConfig).home;
-    const staging = keptAt(home, "staging", "media");
-    // Blocked once bytes flow: the cleanup after the failed commit, not the one before the upload starts.
-    let blocked = false;
-    const failing = FileSystem.FileSystem.of({
-      ...fs,
-      remove: (path, options) =>
-        blocked && path.startsWith(staging + "/")
-          ? Effect.fail(PlatformError.systemError({ _tag: "PermissionDenied", module: "FileSystem", method: "remove" }))
-          : fs.remove(path, options),
-    });
-    const inputs = yield* inputsOn(failing);
-    const input = yield* inputs.create(metadata);
-    yield* refuse(sql, "media_input_test_fail", "BEFORE UPDATE OF phase ON media_input", "NEW.phase = 'ready'", "injected database failure");
-    const flowing = Stream.make(bytes).pipe(
-      Stream.tap(() =>
-        Effect.sync(() => {
-          blocked = blockRollback;
-        }),
-      ),
-    );
-    const error = yield* Effect.flip(inputs.upload(input.id, flowing));
-    expect(error).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-    yield* notIn(error, "injected database failure");
-    const failed = yield* inputs.get(input.id);
-    expect(failed).toMatchObject({ phase: "failed" });
-    expect(failed.hash).not.toBeNull();
-    // The bytes were kept as an attachment before the commit failed; the reservation stays accounted either way.
-    const exists = yield* fs.exists(keptAt(home, failed.hash ?? ""));
-    expect(exists).toBe(true);
-    blocked = false;
-    yield* allow(sql, "media_input_test_fail");
-    expect((yield* inputs.upload(input.id, Stream.make(bytes))).phase).toBe("ready");
-  }).pipe(Effect.provide(layer())),
-);
+test("failed deletion remains a tombstone and is resumed after restart", async () => {
+  await using store = await aStore();
+  let blocked = "";
+  const failing: MediaInputStorage = {
+    ...diskStorage,
+    remove: async (path) => {
+      if (path === blocked) throw denied();
+      await diskStorage.remove(path);
+    },
+  };
+  const inputs = store.make(failing);
+  const input = await saved(inputs);
+  blocked = join(keptAt(store.config.home, "staging", "media"), input.id);
+  expect(await failure(inputs.delete(input.id))).toMatchObject({ bizCode: BizCode.MediaRefused });
+  expect((await inputs.get(input.id)).phase).toBe("deleting");
+  expect(await failure(inputs.upload(input.id, chunks(bytes)))).toMatchObject({ bizCode: BizCode.MediaRefused });
+  await inputs.create(metadata);
+  await store.adjust(hours(24));
+  await inputs.sweep();
+  expect((await inputs.list()).map((row) => row.id)).toEqual([input.id]);
+  const restarted = store.make();
+  await restarted.restore();
+  await restarted.sweep();
+  expect(await restarted.list()).toEqual([]);
+  expect(existsSync(blocked)).toBe(false);
+});
 
-it.effect("failed deletion remains a tombstone and is resumed after restart", () =>
-  Effect.gen(function* () {
-    const { join } = yield* Path.Path;
-    const fs = yield* FileSystem.FileSystem;
-    let blocked = "";
-    const failing = FileSystem.FileSystem.of({
-      ...fs,
-      remove: (path, options) =>
-        path === blocked
-          ? Effect.fail(PlatformError.systemError({ _tag: "PermissionDenied", module: "FileSystem", method: "remove" }))
-          : fs.remove(path, options),
-    });
-    const inputs = yield* inputsOn(failing);
-    const input = yield* saved(inputs);
-    blocked = join(keptAt((yield* ServerConfig).home, "staging", "media"), input.id);
-    const deletedFailure = yield* Effect.flip(inputs.delete(input.id));
-    expect(deletedFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-    expect((yield* inputs.get(input.id)).phase).toBe("deleting");
-    const uploadedFailure = yield* Effect.flip(inputs.upload(input.id, Stream.make(bytes)));
-    expect(uploadedFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-    yield* inputs.create(metadata);
-    yield* TestClock.adjust("24 hours");
-    yield* inputs.sweep();
-    expect((yield* inputs.list()).map((row) => row.id)).toEqual([input.id]);
-    const restarted = yield* makeInputs;
-    yield* restarted.restore();
-    yield* restarted.sweep();
-    const restarteds = yield* restarted.list();
-    expect(restarteds).toEqual([]);
-    const exists2 = yield* fs.exists(blocked);
-    expect(exists2).toBe(false);
-  }).pipe(Effect.provide(layer())),
-);
+test("only the retaining task can obtain a checked disk-backed Blob", async () => {
+  await using store = await aStore();
+  const { inputs } = store;
+  const input = await saved(inputs);
+  expect(await failure(inputs.blob(input.id, "task-a"))).toMatchObject({ bizCode: BizCode.MediaRefused });
+  await inputs.pin([input.id], "task-a", async () => undefined);
+  expect(await failure(inputs.blob(input.id, "task-b"))).toMatchObject({ bizCode: BizCode.MediaRefused });
+  const blob = await inputs.blob(input.id, "task-a");
+  expect([blob.size, blob.type]).toEqual([bytes.length, "image/png"]);
+  expect(Buffer.from(await blob.arrayBuffer())).toEqual(bytes);
+  await inputs.release("task-a");
+  expect(await failure(inputs.blob(input.id, "task-a"))).toMatchObject({ bizCode: BizCode.MediaRefused });
+});
 
-it.effect("only the retaining task can obtain a checked disk-backed Blob", () =>
-  Effect.gen(function* () {
-    const inputs = yield* makeInputs;
-    const input = yield* saved(inputs);
-    const blobFailure = yield* Effect.flip(inputs.blob(input.id, "task-a"));
-    expect(blobFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-    yield* inputs.pin([input.id], "task-a", Effect.void);
-    const blobFailure2 = yield* Effect.flip(inputs.blob(input.id, "task-b"));
-    expect(blobFailure2).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-    const blob = yield* inputs.blob(input.id, "task-a");
-    expect([blob.size, blob.type]).toEqual([bytes.length, "image/png"]);
-    const arrayBuffer2 = yield* Effect.promise(() => blob.arrayBuffer());
-    expect(Buffer.from(arrayBuffer2)).toEqual(bytes);
-    yield* inputs.release("task-a");
-    const blobFailure3 = yield* Effect.flip(inputs.blob(input.id, "task-a"));
-    expect(blobFailure3).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-  }).pipe(Effect.provide(layer())),
-);
+test.each(["changed", "truncated", "grown", "missing"])("regression: %s input bytes cannot be sent to a provider", async (broken) => {
+  await using store = await aStore();
+  const { inputs } = store;
+  const input = await saved(inputs);
+  const path = keptAt(store.config.home, input.hash ?? "");
+  await inputs.pin([input.id], "task-a", async () => undefined);
+  const changed = Buffer.from(bytes);
+  changed[20] = 23;
+  if (broken === "missing") rmSync(path);
+  else writeFileSync(path, broken === "changed" ? changed : broken === "truncated" ? bytes.subarray(0, 20) : Buffer.concat([bytes, bytes]));
+  const error = await failure(inputs.blob(input.id, "task-a"));
+  expect(error).toMatchObject({ bizCode: BizCode.MediaRefused });
+  notIn(error, path);
+  expect((await inputs.get(input.id)).phase).toBe("failed");
+  expect((await inputs.upload(input.id, chunks(bytes))).phase).toBe("ready");
+  const repaired = await inputs.blob(input.id, "task-a");
+  expect(Buffer.from(await repaired.arrayBuffer())).toEqual(bytes);
+});
 
-it.effect.each(["changed", "truncated", "grown", "missing"])("regression: %s input bytes cannot be sent to a provider", (failure) =>
-  Effect.gen(function* () {
-    const inputs = yield* makeInputs;
-    const input = yield* saved(inputs);
-    const fs = yield* FileSystem.FileSystem;
-    const path = keptAt((yield* ServerConfig).home, input.hash ?? "");
-    yield* inputs.pin([input.id], "task-a", Effect.void);
-    const changed = Buffer.from(bytes);
-    changed[20] = 23;
-    if (failure === "missing") yield* fs.remove(path);
-    else yield* fs.writeFile(path, failure === "changed" ? changed : failure === "truncated" ? bytes.subarray(0, 20) : Buffer.concat([bytes, bytes]));
-    const error = yield* Effect.flip(inputs.blob(input.id, "task-a"));
-    expect(error).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-    yield* notIn(error, path);
-    expect((yield* inputs.get(input.id)).phase).toBe("failed");
-    expect((yield* inputs.upload(input.id, Stream.make(bytes))).phase).toBe("ready");
-    const repaired = yield* inputs.blob(input.id, "task-a");
-    const arrayBuffer2 = yield* Effect.promise(() => repaired.arrayBuffer());
-    expect(Buffer.from(arrayBuffer2)).toEqual(bytes);
-  }).pipe(Effect.provide(layer())),
-);
+test("regression: retained audio content remains playable after expiry while unretained and corrupt inputs cannot be read", async () => {
+  await using store = await aStore();
+  const { inputs } = store;
+  const bytes = wav();
+  const metadata = { kind: "audio", name: "sample.wav", mime: "audio/wav", size: bytes.length } as const;
+  const first = await inputs.create(metadata);
+  const second = await inputs.create(metadata);
+  await inputs.upload(first.id, chunks(bytes.subarray(0, 5), bytes.subarray(5)));
+  await inputs.upload(second.id, chunks(bytes));
+  await inputs.pin([first.id], "transcript", async () => undefined);
+  await store.adjust(hours(25));
+  expect(await failure(inputs.content(second.id))).toMatchObject({ bizCode: BizCode.MediaRefused });
+  const content = await inputs.content(first.id);
+  expect(content).toMatchObject({ mime: "audio/wav", size: bytes.length, name: "sample.wav" });
+  writeFileSync(content.path, Buffer.alloc(bytes.length));
+  const error = await failure(inputs.content(first.id));
+  expect(error).toMatchObject({ bizCode: BizCode.MediaRefused });
+  notIn(error, content.path);
+});
 
-it.effect("regression: retained audio content remains playable after expiry while unretained and corrupt inputs cannot be read", () =>
-  Effect.gen(function* () {
-    const inputs = yield* makeInputs;
-    const bytes = wav();
-    const metadata = { kind: "audio", name: "sample.wav", mime: "audio/wav", size: bytes.length } as const;
-    const first = yield* inputs.create(metadata);
-    const second = yield* inputs.create(metadata);
-    yield* inputs.upload(first.id, Stream.make(bytes.subarray(0, 5), bytes.subarray(5)));
-    yield* inputs.upload(second.id, Stream.make(bytes));
-    yield* inputs.pin([first.id], "transcript", Effect.void);
-    yield* TestClock.adjust("25 hours");
-    const contentFailure = yield* inputs.content(second.id).pipe(Effect.flip);
-    expect(contentFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-    const content = yield* inputs.content(first.id);
-    expect(content).toMatchObject({ mime: "audio/wav", size: bytes.length, name: "sample.wav" });
-    yield* (yield* FileSystem.FileSystem).writeFile(content.path, Buffer.alloc(bytes.length));
-    const error = yield* inputs.content(first.id).pipe(Effect.flip);
-    expect(error).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-    yield* notIn(error, content.path);
-  }).pipe(Effect.provide(layer())),
-);
+test("regression: generated raw PCM uses the hash store without inventing metadata or weakening public uploads", async () => {
+  await using store = await aStore();
+  const { inputs } = store;
+  const source = Uint8Array.of(1, 2, 3, 4);
+  expect(await failure(inputs.create({ kind: "audio", name: "raw.pcm", mime: "audio/pcm", size: source.length }))).toMatchObject({
+    bizCode: BizCode.MediaRefused,
+  });
+  const first = await (async () => {
+    await using staged = await inputs.stageResult("raw.pcm", "pcm", chunks(source));
+    expect(staged.metadata).toBeUndefined();
+    return await inputs.storeResult(staged, "first");
+  })();
+  const second = await (async () => {
+    await using staged = await inputs.stageResult("raw.pcm", "pcm", chunks(source));
+    return await inputs.storeResult(staged, "second");
+  })();
+  expect(first.hash).toBe(second.hash);
+  const home = store.config.home;
+  expect(existsSync(keptAt(home, first.hash))).toBe(true);
+  expect(readdirSync(keptAt(home, "staging", "media"))).toEqual([]);
+  expect((await inputs.content(first.id)).mime).toBe("audio/pcm");
+  await inputs.release("unrelated");
+  expect((await inputs.get(first.id)).canDelete).toBe(false);
+  await inputs.release("first");
+  await inputs.delete(first.id);
+  expect((await inputs.content(second.id)).size).toBe(source.length);
+  expect((await capacityOf(store))?.bytes).toBe(source.length);
+});
 
-it.effect("regression: generated raw PCM uses the hash store without inventing metadata or weakening public uploads", () =>
-  Effect.gen(function* () {
-    const inputs = yield* makeInputs;
-    const source = Uint8Array.of(1, 2, 3, 4);
-    const createdFailure = yield* inputs.create({ kind: "audio", name: "raw.pcm", mime: "audio/pcm", size: source.length }).pipe(Effect.flip);
-    expect(createdFailure).toMatchObject({
-      _tag: "ApiError",
-      bizCode: BizCode.MediaRefused,
-    });
-    const first = yield* Effect.scoped(
-      Effect.gen(function* () {
-        const staged = yield* inputs.stageResult("raw.pcm", "pcm", Stream.make(source));
-        expect(staged.metadata).toBeUndefined();
-        return yield* inputs.storeResult(staged, "first");
-      }),
-    );
-    const second = yield* Effect.scoped(
-      Effect.gen(function* () {
-        const staged = yield* inputs.stageResult("raw.pcm", "pcm", Stream.make(source));
-        return yield* inputs.storeResult(staged, "second");
-      }),
-    );
-    expect(first.hash).toBe(second.hash);
-    const fs = yield* FileSystem.FileSystem;
-    const home = (yield* ServerConfig).home;
-    const exists = yield* fs.exists(keptAt(home, first.hash));
-    expect(exists).toBe(true);
-    const directory2 = yield* fs.readDirectory(keptAt(home, "staging", "media"));
-    expect(directory2).toEqual([]);
-    expect((yield* inputs.content(first.id)).mime).toBe("audio/pcm");
-    yield* inputs.release("unrelated");
-    expect((yield* inputs.get(first.id)).canDelete).toBe(false);
-    yield* inputs.release("first");
-    yield* inputs.delete(first.id);
-    expect((yield* inputs.content(second.id)).size).toBe(source.length);
-    expect((yield* (yield* Db).run(q.inputCapacity())).bytes).toBe(source.length);
-  }).pipe(Effect.provide(layer())),
-);
+test("regression: generated staging observes reserved quota and releases failed temporary bytes", async () => {
+  await using store = await aStore();
+  const { inputs } = store;
+  for (let index = 0; index < 4; index++) await inputs.create({ kind: "audio", name: `reserved-${index}.wav`, mime: "audio/wav", size: 512_000_000 });
+  await inputs.create({ kind: "audio", name: "remainder.wav", mime: "audio/wav", size: 2 * 1024 * 1024 * 1024 - 4 * 512_000_000 - 4 });
+  const resultStagedFailure = await failure(
+    (async () => {
+      await using _staged = await inputs.stageResult("too-large.pcm", "pcm", chunks(new Uint8Array(5)));
+    })(),
+  );
+  expect(resultStagedFailure).toMatchObject({ bizCode: BizCode.MediaRefused });
+  expect(readdirSync(keptAt(store.config.home, "staging", "media"))).toEqual([]);
+  const result = await (async () => {
+    await using staged = await inputs.stageResult("fits.pcm", "pcm", chunks(new Uint8Array(4)));
+    return await inputs.storeResult(staged, "fits");
+  })();
+  expect((await inputs.content(result.id)).size).toBe(4);
+  expect((await capacityOf(store))?.bytes).toBe(2 * 1024 * 1024 * 1024);
+});
 
-it.effect("regression: generated staging observes reserved quota and releases failed temporary bytes", () =>
-  Effect.gen(function* () {
-    const inputs = yield* makeInputs;
-    for (let index = 0; index < 4; index++) yield* inputs.create({ kind: "audio", name: `reserved-${index}.wav`, mime: "audio/wav", size: 512_000_000 });
-    yield* inputs.create({ kind: "audio", name: "remainder.wav", mime: "audio/wav", size: 2 * 1024 * 1024 * 1024 - 4 * 512_000_000 - 4 });
-    const resultStagedFailure = yield* inputs.stageResult("too-large.pcm", "pcm", Stream.make(new Uint8Array(5))).pipe(Effect.scoped, Effect.flip);
-    expect(resultStagedFailure).toMatchObject({
-      _tag: "ApiError",
-      bizCode: BizCode.MediaRefused,
-    });
-    const fs = yield* FileSystem.FileSystem;
-    const directory = yield* fs.readDirectory(keptAt((yield* ServerConfig).home, "staging", "media"));
-    expect(directory).toEqual([]);
-    const result = yield* Effect.scoped(
-      Effect.gen(function* () {
-        const staged = yield* inputs.stageResult("fits.pcm", "pcm", Stream.make(new Uint8Array(4)));
-        return yield* inputs.storeResult(staged, "fits");
-      }),
-    );
-    expect((yield* inputs.content(result.id)).size).toBe(4);
-    expect((yield* (yield* Db).run(q.inputCapacity())).bytes).toBe(2 * 1024 * 1024 * 1024);
-  }).pipe(Effect.provide(layer())),
-);
+test("regression: failed generated-result promotion rolls back rows, pins, and temporary files", async () => {
+  await using store = await aStore();
+  // Keeping the staged file fails as a rename refused by the disk would.
+  const failing: Attachment = {
+    ...store.attachment,
+    keepStaged: async () => {
+      throw refused("rename refused");
+    },
+  };
+  const inputs = store.make(diskStorage, failing);
+  {
+    await using staged = await inputs.stageResult("sample.wav", "wav", chunks(wav()));
+    expect(await failure(inputs.storeResult(staged, "failed"))).toMatchObject({ bizCode: BizCode.MediaRefused });
+  }
+  expect(await inputs.list()).toEqual([]);
+  const home = store.config.home;
+  expect(readdirSync(keptAt(home, "staging", "media"))).toEqual([]);
+  expect(readdirSync(keptAt(home)).filter((name) => /^[0-9a-f]{64}$/u.test(name))).toEqual([]);
+});
 
-it.effect("regression: failed generated-result promotion rolls back rows, pins, and temporary files", () =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const failing = FileSystem.FileSystem.of({
-      ...fs,
-      rename: () => Effect.fail(PlatformError.systemError({ _tag: "PermissionDenied", module: "FileSystem", method: "rename" })),
-    });
-    const inputs = yield* inputsOn(failing);
-    yield* Effect.scoped(
-      Effect.gen(function* () {
-        const staged = yield* inputs.stageResult("sample.wav", "wav", Stream.make(wav()));
-        const storeResultFailure = yield* inputs.storeResult(staged, "failed").pipe(Effect.flip);
-        expect(storeResultFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-      }),
-    );
-    const inputs2 = yield* inputs.list();
-    expect(inputs2).toEqual([]);
-    const home = (yield* ServerConfig).home;
-    const directory = yield* fs.readDirectory(keptAt(home, "staging", "media"));
-    expect(directory).toEqual([]);
-    const kept = yield* fs.readDirectory(keptAt(home));
-    expect(Arr.filter(kept, (name) => /^[0-9a-f]{64}$/u.test(name))).toEqual([]);
-  }).pipe(Effect.provide(layer())),
-);
+test("regression: explicit asset release preserves shared pins and content until the final holder releases quota", async () => {
+  await using store = await aStore();
+  const { inputs } = store;
+  const nothing = async () => undefined;
+  const first = await saved(inputs);
+  const sharedContent = await saved(inputs);
+  await inputs.pin([first.id], "job-a", nothing);
+  await inputs.pin([first.id], "job-b", nothing);
+  await inputs.pin([sharedContent.id], "job-c", nothing);
+  await store.adjust(hours(25));
+  await inputs.sweep();
+  expect((await capacityOf(store))?.bytes).toBe(bytes.length * 2);
+  await inputs.releaseAssets([first.id], ["job-a"], nothing);
+  expect((await inputs.get(first.id)).canDelete).toBe(false);
+  expect((await inputs.blob(first.id, "job-b")).size).toBe(bytes.length);
+  expect(await failure(inputs.blob(first.id, "job-a"))).toMatchObject({ bizCode: BizCode.MediaRefused });
+  await inputs.releaseAssets([first.id], ["job-b"], nothing);
+  expect(await failure(inputs.get(first.id))).toMatchObject({ bizCode: BizCode.MediaRefused });
+  expect((await inputs.content(sharedContent.id)).size).toBe(bytes.length);
+  expect((await capacityOf(store))?.bytes).toBe(bytes.length);
+  await inputs.releaseAssets([sharedContent.id], ["job-c"], nothing);
+  expect(await capacityOf(store)).toEqual({ bytes: 0, count: 0 });
+  expect((await inputs.create(metadata)).phase).toBe("reserved");
+});
 
-it.effect("regression: explicit asset release preserves shared pins and content until the final holder releases quota", () =>
-  Effect.gen(function* () {
-    const inputs = yield* makeInputs;
-    const first = yield* saved(inputs);
-    const sharedContent = yield* saved(inputs);
-    yield* inputs.pin([first.id], "job-a", Effect.void);
-    yield* inputs.pin([first.id], "job-b", Effect.void);
-    yield* inputs.pin([sharedContent.id], "job-c", Effect.void);
-    yield* TestClock.adjust("25 hours");
-    yield* inputs.sweep();
-    expect((yield* (yield* Db).run(q.inputCapacity())).bytes).toBe(bytes.length * 2);
-    yield* inputs.releaseAssets([first.id], ["job-a"], Effect.void);
-    expect((yield* inputs.get(first.id)).canDelete).toBe(false);
-    expect((yield* inputs.blob(first.id, "job-b")).size).toBe(bytes.length);
-    const blobFailure = yield* inputs.blob(first.id, "job-a").pipe(Effect.flip);
-    expect(blobFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-    yield* inputs.releaseAssets([first.id], ["job-b"], Effect.void);
-    const inputFailure = yield* inputs.get(first.id).pipe(Effect.flip);
-    expect(inputFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-    expect((yield* inputs.content(sharedContent.id)).size).toBe(bytes.length);
-    expect((yield* (yield* Db).run(q.inputCapacity())).bytes).toBe(bytes.length);
-    yield* inputs.releaseAssets([sharedContent.id], ["job-c"], Effect.void);
-    const outcome = yield* (yield* Db).run(q.inputCapacity());
-    expect(outcome).toEqual({ bytes: 0, count: 0 });
-    expect((yield* inputs.create(metadata)).phase).toBe("reserved");
-  }).pipe(Effect.provide(layer())),
-);
+test("regression: failed reference clearing rolls back asset pins and leaves bytes readable", async () => {
+  await using store = await aStore();
+  const { inputs } = store;
+  const input = await saved(inputs);
+  await inputs.pin([input.id], "job", async () => undefined);
+  const assetsReleasedFailure = await failure(
+    inputs.releaseAssets([input.id], ["job"], async () => {
+      throw refused("clear failed");
+    }),
+  );
+  expect(assetsReleasedFailure).toMatchObject({ bizCode: BizCode.Refused, message: "clear failed" });
+  expect((await inputs.get(input.id)).canDelete).toBe(false);
+  expect((await inputs.blob(input.id, "job")).size).toBe(bytes.length);
+});
 
-it.effect("regression: failed reference clearing rolls back asset pins and leaves bytes readable", () =>
-  Effect.gen(function* () {
-    const inputs = yield* makeInputs;
-    const input = yield* saved(inputs);
-    yield* inputs.pin([input.id], "job", Effect.void);
-    const assetsReleasedFailure = yield* inputs.releaseAssets([input.id], ["job"], Effect.fail(refused("clear failed"))).pipe(Effect.flip);
-    expect(assetsReleasedFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.Refused, message: "clear failed" });
-    expect((yield* inputs.get(input.id)).canDelete).toBe(false);
-    expect((yield* inputs.blob(input.id, "job")).size).toBe(bytes.length);
-  }).pipe(Effect.provide(layer())),
-);
-
-it.effect("regression: failed explicit unlink keeps a quota-accounted tombstone for restart cleanup", () =>
-  Effect.gen(function* () {
-    const { join } = yield* Path.Path;
-    const fs = yield* FileSystem.FileSystem;
-    let blocked = "";
-    const failing = FileSystem.FileSystem.of({
-      ...fs,
-      remove: (path, options) =>
-        path === blocked
-          ? Effect.fail(PlatformError.systemError({ _tag: "PermissionDenied", module: "FileSystem", method: "remove" }))
-          : fs.remove(path, options),
-    });
-    const inputs = yield* inputsOn(failing);
-    const input = yield* saved(inputs);
-    yield* inputs.pin([input.id], "job", Effect.void);
-    blocked = join(keptAt((yield* ServerConfig).home, "staging", "media"), input.id);
-    const assetsReleasedFailure = yield* inputs.releaseAssets([input.id], ["job"], Effect.void).pipe(Effect.flip);
-    expect(assetsReleasedFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.MediaRefused });
-    const input2 = yield* inputs.get(input.id);
-    expect(input2).toMatchObject({ phase: "deleting", canDelete: true });
-    const outcome = yield* (yield* Db).run(q.inputCapacity());
-    expect(outcome).toEqual({ bytes: bytes.length, count: 1 });
-    blocked = "";
-    const restarted = yield* makeInputs;
-    yield* restarted.restore();
-    yield* restarted.sweep();
-    const outcome2 = yield* (yield* Db).run(q.inputCapacity());
-    expect(outcome2).toEqual({ bytes: 0, count: 0 });
-  }).pipe(Effect.provide(layer())),
-);
+test("regression: failed explicit unlink keeps a quota-accounted tombstone for restart cleanup", async () => {
+  await using store = await aStore();
+  let blocked = "";
+  const failing: MediaInputStorage = {
+    ...diskStorage,
+    remove: async (path) => {
+      if (path === blocked) throw denied();
+      await diskStorage.remove(path);
+    },
+  };
+  const inputs = store.make(failing);
+  const input = await saved(inputs);
+  await inputs.pin([input.id], "job", async () => undefined);
+  blocked = join(keptAt(store.config.home, "staging", "media"), input.id);
+  expect(await failure(inputs.releaseAssets([input.id], ["job"], async () => undefined))).toMatchObject({ bizCode: BizCode.MediaRefused });
+  expect(await inputs.get(input.id)).toMatchObject({ phase: "deleting", canDelete: true });
+  expect(await capacityOf(store)).toEqual({ bytes: bytes.length, count: 1 });
+  blocked = "";
+  const restarted = store.make();
+  await restarted.restore();
+  await restarted.sweep();
+  expect(await capacityOf(store)).toEqual({ bytes: 0, count: 0 });
+});

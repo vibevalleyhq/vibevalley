@@ -9,18 +9,15 @@
     "start": "vpx src/main.ts"
   },
   "dependencies": {
-    "@effect/platform-node": "catalog:",
     "@vibevalley/async": "workspace:*",
     "@vibevalley/bridge": "workspace:*",
     "@vibevalley/home": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
     "commander": "catalog:",
-    "effect": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "@vibevalley/server": "workspace:*",
     "@vibevalley/testkit": "workspace:*",

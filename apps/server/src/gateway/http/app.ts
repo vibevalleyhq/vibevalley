@@ -1,78 +1,106 @@
-import { createServer } from "node:http";
+import { createAdaptorServer } from "@hono/node-server";
+import { Hono } from "hono";
 
-import { NodeHttpServer } from "@effect/platform-node";
-import { Effect, Layer } from "effect";
-import { HttpRouter, HttpServer } from "effect/http";
+import { BizCode } from "@vibevalley/protocol/api";
 
-import { Lan } from "#/gateway/lan/lan.ts";
+import { bizError, messageOf } from "#/base/errors.ts";
 import type { ServerConfig } from "#/infra/config.ts";
-import { Session } from "#/modules/session/session.ts";
-import { type ServiceOptions, services } from "#/services.ts";
+import { type Farm, type ServiceOptions, services } from "#/services.ts";
 
-import { api, artifactContent, attachments, mossLine } from "./api.ts";
+import { api, artifactContent, attachments } from "./api.ts";
 import { handlers } from "./handlers.ts";
+import { voiceLines } from "./line.ts";
 import { mcpRoute } from "./mcp.ts";
-import { mediaInputContent, mediaSpeechStream, mediaUploads } from "./media.ts";
+import { mediaRoutes } from "./media.ts";
 import { page } from "./page.ts";
+import { replyError } from "./respond.ts";
 import { subscriptions } from "./rpc.ts";
 import { issueWatchStream, streams } from "./streams.ts";
 
-const routes = (config: ServerConfig["Service"]) =>
-  Layer.mergeAll(
-    Layer.unwrap(Effect.map(handlers, (h) => api(h))),
-    streams,
-    issueWatchStream,
-    attachments,
-    artifactContent,
-    subscriptions,
-    mossLine,
-    mediaUploads,
-    mediaInputContent,
-    mediaSpeechStream,
-    mcpRoute,
-    config.web ? page(config.web) : Layer.empty,
-  );
+/** Every route on the farm's services. */
+export function routes(farm: Farm, config: ServerConfig): Hono {
+  const deps = { ...farm, config };
+  const app = new Hono();
+  app.route("/", api(handlers(deps), { log: farm.log.child("http") }));
+  app.route("/", streams(deps));
+  app.route("/", issueWatchStream(deps));
+  app.route("/", attachments(deps));
+  app.route("/", artifactContent(deps));
+  app.route("/", subscriptions(deps));
+  app.route("/", mediaRoutes(deps));
+  app.route("/", mcpRoute(deps));
+  if (config.web) app.route("/", page(config.web, farm.log.child("http/page")));
+  app.onError((e) => {
+    farm.log.error("vibevalley: a route failed", e);
+    return replyError(bizError(BizCode.InternalError, messageOf(e)));
+  });
+  return app;
+}
 
-/** The address it listens on, once it does; told to who needs it, then to listening. */
-const ready = (listening: (address: string) => Effect.Effect<void>) =>
-  Layer.effectDiscard(
-    Effect.gen(function* () {
-      const server = yield* HttpServer.HttpServer;
-      if (server.address._tag === "UnixPathAddress") return;
-      const address = `127.0.0.1:${server.address.port}`;
-      // A free port (0) is known only now: sessions opened from here on reach /mcp there.
-      (yield* Session).setAddress(address);
-      // What the lan listener lets through goes to here.
-      (yield* Lan).setUpstream(address);
-      yield* listening(address);
-    }),
-  );
+/** The farm served over HTTP, on 127.0.0.1 only. */
+export interface App extends AsyncDisposable {
+  /** 127.0.0.1:<port>, the port it was bound to. */
+  readonly address: string;
+  readonly farm: Farm;
+  /** Every connection is cut, the listener closes, then the farm. */
+  readonly close: () => Promise<void>;
+}
 
-const served = (config: ServerConfig["Service"], listening: (address: string) => Effect.Effect<void>, options: ServiceOptions) =>
-  Layer.unwrap(
-    Effect.gen(function* () {
-      const server = yield* HttpServer.HttpServer;
-      const boundPort = server.address._tag === "UnixPathAddress" ? config.port : server.address.port;
-      // Resolve ephemeral port 0 before building services so restored sessions and LAN forwarding never see :0.
-      const resolved = boundPort === config.port ? config : { ...config, port: boundPort };
-      return HttpRouter.serve(routes(resolved), { disableListenLog: true, disableLogger: true }).pipe(
-        Layer.merge(ready(listening)),
-        Layer.provideMerge(services(resolved, options)),
-      );
-    }),
-  );
-
-/** port 0 is a free one. */
-export const app = (
-  config: ServerConfig["Service"],
+/** port 0 is a free one. listening is told the address once the farm is up and served there. */
+export async function app(
+  config: ServerConfig,
   port: number,
-  listening: (address: string) => Effect.Effect<void> = () => Effect.void,
+  listening: (address: string) => void | Promise<void> = () => {},
   options: ServiceOptions = {},
-) => {
-  const server = createServer();
-  return served(config, listening, options).pipe(
-    // Stopping waits for every socket to close, and an event stream whose client has gone keeps its socket until its next write: every connection is closed first, before the server's own close.
-    Layer.merge(Layer.effectDiscard(Effect.addFinalizer(() => Effect.sync(() => server.closeAllConnections())))),
-    Layer.provide(NodeHttpServer.layer(() => server, { host: "127.0.0.1", port })),
-  );
-};
+): Promise<App> {
+  // Requests that come before the farm is up wait for nothing: they are told to come back.
+  let served: Hono | undefined;
+  const server = createAdaptorServer({
+    fetch: (request, env) => (served ? served.fetch(request, env) : replyError(bizError(BizCode.ServiceUnavailable, "starting"))),
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+  const bound = server.address();
+  if (bound === null || typeof bound === "string") throw new Error(`the server is not on a TCP port: ${bound ?? "none"}`);
+  // Resolve ephemeral port 0 before building services so restored sessions and LAN forwarding never see :0.
+  const resolved = bound.port === config.port ? config : { ...config, port: bound.port };
+  const address = `127.0.0.1:${bound.port}`;
+  let farm: Farm;
+  try {
+    farm = await services(resolved, options);
+  } catch (e) {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    throw e;
+  }
+  const lines = voiceLines({ voice: farm.voice, log: farm.log.child("http/voice") });
+  server.on("upgrade", lines.upgrade);
+  served = routes(farm, resolved);
+  // A free port (0) is known only now: sessions opened from here on reach /mcp there.
+  farm.session.setAddress(address);
+  // What the lan listener lets through goes to here.
+  farm.lan.setUpstream(address);
+
+  let closing: Promise<void> | undefined;
+  const close = () =>
+    (closing ??= (async () => {
+      // Stopping waits for every socket to close, and an event stream whose client has gone keeps its socket until its
+      // next write: every connection is closed first, before the server's own close.
+      const stopped = new Promise<void>((resolve) => server.close(() => resolve()));
+      if ("closeAllConnections" in server) server.closeAllConnections();
+      await lines.close();
+      await stopped;
+      await farm.close();
+    })());
+  try {
+    await listening(address);
+  } catch (e) {
+    await close();
+    throw e;
+  }
+  return { address, farm, close, [Symbol.asyncDispose]: close };
+}

@@ -1,15 +1,14 @@
 import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 
-import { Array as Arr, Cause, Clock, Context, Effect, FiberSet, Layer, Option, Order, PubSub, Schedule, Semaphore, Stream, String as Str } from "effect";
-
+import { Hub, Semaphore, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
 import { type ApiError, BizCode, bizError, lookIn, missing } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
-import { scopedPubSub } from "#/base/pubsub.ts";
-import { Db } from "#/infra/db.ts";
-import { callbackLog } from "#/infra/log.ts";
+import type { Db } from "#/infra/db.ts";
+import type { Logger } from "#/infra/log.ts";
+import type { Time } from "#/infra/time.ts";
 import * as accountQ from "#db/user_account.sql.ts";
 import * as q from "#db/user_device.sql.ts";
 
@@ -24,6 +23,7 @@ const collectEverySeconds = 2;
 const slowDownSeconds = 5;
 const collectSlack = 0.8;
 const idleForMs = 90 * 24 * 3600_000;
+const sweepEveryMs = 24 * 3600_000;
 /** Prefix recognized by secret scanners. */
 const keyPrefix = "vvk_";
 // Omit vowels and 0/O/1/I look-alikes to avoid accidental words and transcription slips.
@@ -49,7 +49,7 @@ interface Request extends T.Approval {
 
 const requestCode = () => {
   const letters = Array.from(randomBytes(8), (b) => codeLetters[b % codeLetters.length] ?? "B");
-  return Arr.join(Arr.take(letters, 4), "") + "-" + Arr.join(Arr.drop(letters, 4), "");
+  return letters.slice(0, 4).join("") + "-" + letters.slice(4).join("");
 };
 
 export interface Caller {
@@ -59,32 +59,33 @@ export interface Caller {
   readonly from?: string;
 }
 
-export class User extends Context.Service<
-  User,
-  {
-    readonly status: (caller: Caller) => T.UserStatus;
-    readonly rename: (name: string) => Effect.Effect<T.UserStatus, ApiError>;
-    /** Local callers only; refused through the LAN gate. */
-    readonly setPassword: (caller: Caller, password: string) => Effect.Effect<T.UserStatus, ApiError>;
-    readonly login: (password: string, device: string) => Effect.Effect<T.UserLogin, ApiError>;
-    readonly logout: (caller: Caller) => Effect.Effect<void, ApiError>;
-    readonly pair: (name: string) => Effect.Effect<T.UserLogin>;
-    readonly devices: () => T.UserDevice[];
-    /** Updates `lastSeen` and revokes keys idle past `idleForMs`. */
-    readonly byKey: (key: string) => T.UserDevice | undefined;
-    readonly revoke: (id: string) => Effect.Effect<T.UserDevice[], ApiError>;
-    readonly previewRevoke: (id: string) => Effect.Effect<T.Preview, ApiError>;
-    readonly request: (caller: Caller, name: string) => Effect.Effect<T.ApprovalCreated, ApiError>;
-    readonly collect: (claim: string) => Effect.Effect<T.ApprovalCollected, ApiError>;
-    readonly requests: () => T.Approval[];
-    readonly answerRequest: (id: string, allow: boolean) => Effect.Effect<T.Approval[], ApiError>;
-    readonly revoked: Stream.Stream<string>;
-  }
->()("@vibevalley/server/modules/user/user") {
-  static readonly layer = Layer.effect(
-    User,
-    Effect.suspend(() => make),
-  );
+export interface User {
+  readonly status: (caller: Caller) => T.UserStatus;
+  readonly rename: (name: string) => Promise<T.UserStatus>;
+  /** Local callers only; refused through the LAN gate. */
+  readonly setPassword: (caller: Caller, password: string) => Promise<T.UserStatus>;
+  readonly login: (password: string, device: string) => Promise<T.UserLogin>;
+  readonly logout: (caller: Caller) => Promise<void>;
+  readonly pair: (name: string) => Promise<T.UserLogin>;
+  readonly devices: () => T.UserDevice[];
+  /** Updates `lastSeen` and revokes keys idle past `idleForMs`. */
+  readonly byKey: (key: string) => T.UserDevice | undefined;
+  readonly revoke: (id: string) => Promise<T.UserDevice[]>;
+  readonly previewRevoke: (id: string) => Promise<T.Preview>;
+  readonly request: (caller: Caller, name: string) => Promise<T.ApprovalCreated>;
+  readonly collect: (claim: string) => Promise<T.ApprovalCollected>;
+  readonly requests: () => T.Approval[];
+  readonly answerRequest: (id: string, allow: boolean) => Promise<T.Approval[]>;
+  /** The id of each device revoked from now on. */
+  readonly revoked: (signal?: AbortSignal) => AsyncIterable<string>;
+  /** Stops the daily sweep and the writes byKey left running. */
+  readonly close: () => Promise<void>;
+}
+
+export interface UserDeps {
+  readonly db: Db;
+  readonly clock: Time;
+  readonly log: Logger;
 }
 
 const keyHash = (key: string) => createHash("sha256").update(key).digest("hex");
@@ -95,52 +96,55 @@ export const sameSecret =
   (given: string): boolean =>
     given.length === want.length && timingSafeEqual(Buffer.from(given), Buffer.from(want));
 
-export const tidyName = (given: string) => Arr.join(Arr.take(Array.from(Arr.join(Arr.filter(Str.split(given, /\s+/u), Str.isNonEmpty), " ")), 40), "");
+export const tidyName = (given: string) =>
+  Array.from(
+    given
+      .split(/\s+/u)
+      .filter((w) => w !== "")
+      .join(" "),
+  )
+    .slice(0, 40)
+    .join("");
 
 const derive = (password: string, salt: Buffer, length: number, costs: { readonly N: number; readonly r: number; readonly p: number }) =>
-  Effect.callback<Buffer>((resume) => {
-    scrypt(Str.normalize("NFKC")(password), salt, length, { ...costs, maxmem: cost.maxmem }, (e, out) =>
-      resume(e === null ? Effect.succeed(out) : Effect.die(e)),
-    );
+  new Promise<Buffer>((resolve, reject) => {
+    scrypt(password.normalize("NFKC"), salt, length, { ...costs, maxmem: cost.maxmem }, (e, out) => (e === null ? resolve(out) : reject(e)));
   });
 
-const hashPassword = (password: string) =>
-  Effect.gen(function* () {
-    const salt = randomBytes(16);
-    const out = yield* derive(password, salt, hashLength, cost);
-    return Arr.join(["scrypt", String(cost.N), String(cost.r), String(cost.p), salt.toString("base64url"), out.toString("base64url")], ":");
-  });
+const hashPassword = async (password: string) => {
+  const salt = randomBytes(16);
+  const out = await derive(password, salt, hashLength, cost);
+  return ["scrypt", String(cost.N), String(cost.r), String(cost.p), salt.toString("base64url"), out.toString("base64url")].join(":");
+};
 
 /** Reads N/r/p from the stored hash so cost upgrades do not invalidate existing passwords. */
-const checkPassword = (password: string, stored: string) =>
-  Effect.gen(function* () {
-    const [kind, n, r, p, salt = "", want = ""] = Str.split(stored, ":");
-    if (kind !== "scrypt") return false;
-    const expected = Buffer.from(want, "base64url");
-    const out = yield* derive(password, Buffer.from(salt, "base64url"), expected.length, { N: Number(n), r: Number(r), p: Number(p) });
-    return out.length === expected.length && timingSafeEqual(out, expected);
-  });
+const checkPassword = async (password: string, stored: string) => {
+  const [kind, n, r, p, salt = "", want = ""] = stored.split(":");
+  if (kind !== "scrypt") return false;
+  const expected = Buffer.from(want, "base64url");
+  const out = await derive(password, Buffer.from(salt, "base64url"), expected.length, { N: Number(n), r: Number(r), p: Number(p) });
+  return out.length === expected.length && timingSafeEqual(out, expected);
+};
 
-const byAdded = Order.mapInput(Order.Number, (d: T.UserDevice) => d.addedAt);
+const byAdded = (a: T.UserDevice, b: T.UserDevice) => a.addedAt - b.addedAt;
 
-const make = Effect.gen(function* () {
-  const db = yield* Db;
-  const logs = yield* callbackLog;
-  const forkHere = yield* FiberSet.makeRuntime();
-  const clock = yield* Clock.Clock;
-  const now = () => clock.currentTimeMillisUnsafe();
-  const revokes = yield* scopedPubSub<string>();
+export async function makeUser(deps: UserDeps): Promise<User> {
+  const { db, clock } = deps;
+  const log = deps.log.child("user");
+  const tasks = new TaskGroup({ name: "user", onError: (task, e) => log.error(`vibevalley: user: ${task}`, e) });
+  const now = () => clock.now();
+  const revokes = new Hub<string>();
   // Serialize sign-ins so concurrent attempts cannot race past `wrongTries`.
-  const signing = yield* Semaphore.make(1);
+  const signing = new Semaphore(1);
 
-  const account = yield* db.one(accountQ.userAccount());
+  const account = await accountQ.userAccount(db.sql);
   let name = account?.name ?? "";
   let passwordHash = account?.password_hash ?? undefined;
   let wrong = 0;
   let lockedUntil = 0;
 
   const devices = new Map<string, Device>();
-  for (const row of yield* db.run(q.userDevices())) {
+  for (const row of await q.userDevices(db.sql)) {
     devices.set(row.id, {
       id: row.id,
       name: row.name,
@@ -156,14 +160,15 @@ const make = Effect.gen(function* () {
   const waiting = new Map<string, Request>();
   const live = () => {
     for (const [id, r] of waiting) if (r.expiresAt <= now()) waiting.delete(id);
-    return Arr.map(Array.from(waiting.values()), ({ claimHash: _, approved: __, every: ___, lastCollect: ____, ...r }): T.Approval => r);
+    return Array.from(waiting.values(), ({ claimHash: _, approved: __, every: ___, lastCollect: ____, ...r }): T.Approval => r);
   };
 
   const shown = ({ keyHash: _, written: __, ...d }: Device): T.UserDevice => d;
-  const listed = () => Arr.sort(Arr.map(Array.from(devices.values()), shown), byAdded);
+  const listed = () => Array.from(devices.values(), shown).toSorted(byAdded);
   const known = (id: string) => {
     const d = devices.get(id);
-    return d !== undefined ? Effect.succeed(d) : Effect.fail(missing(t("server.user.noDevice", { id }), [lookIn.device]));
+    if (d === undefined) throw missing(t("server.user.noDevice", { id }), [lookIn.device]);
+    return d;
   };
 
   const status = (caller: Caller): T.UserStatus => {
@@ -173,108 +178,105 @@ const make = Effect.gen(function* () {
     return { name: seen ? name : "", password: passwordHash !== undefined, here: caller.here, ...(device !== undefined ? { device: shown(device) } : {}) };
   };
 
-  const addDevice = Effect.fn("User.addDevice")(function* (given: string, came: T.UserDevice["came"]) {
+  const addDevice = async (given: string, came: T.UserDevice["came"]) => {
     const key = keyPrefix + randomBytes(32).toString("base64url");
     const tidy = tidyName(given);
-    const d: Device = { id: newId(), name: Str.isEmpty(tidy) ? t("server.user.aDevice") : tidy, came, addedAt: now(), keyHash: keyHash(key), written: 0 };
-    yield* db.run(q.addUserDevice({ id: d.id, name: d.name, came, key_hash: d.keyHash, added_at: d.addedAt }));
+    const d: Device = { id: newId(), name: tidy === "" ? t("server.user.aDevice") : tidy, came, addedAt: now(), keyHash: keyHash(key), written: 0 };
+    await q.addUserDevice(db.sql, { id: d.id, name: d.name, came, key_hash: d.keyHash, added_at: d.addedAt });
     devices.set(d.id, d);
-    logs.info(`vibevalley: user: device "${d.name}" added (${came})`);
+    log.info(`vibevalley: user: device "${d.name}" added (${came})`);
     return { device: d.id, key };
-  });
+  };
 
-  const revoke = Effect.fn("User.revoke")(function* (id: string) {
-    yield* known(id);
-    yield* db.run(q.removeUserDevice({ id }));
+  const revoke = async (id: string) => {
+    known(id);
+    await q.removeUserDevice(db.sql, { id });
     devices.delete(id);
-    yield* PubSub.publish(revokes, id);
+    revokes.publish(id);
     return listed();
-  });
+  };
 
   const idle = (d: Device) => now() - (d.lastSeen ?? d.addedAt) >= idleForMs;
-  const takeBackIdle = Effect.fn("User.takeBackIdle")(function* () {
-    yield* Effect.forEach(
-      Arr.filter(Array.from(devices.values()), idle),
-      (d) => {
-        logs.info(`vibevalley: user: "${d.name}" unused for 90 days, its key taken back`);
-        return revoke(d.id);
-      },
-      { discard: true },
-    );
+  const takeBackIdle = async () => {
+    for (const d of Array.from(devices.values()).filter(idle)) {
+      log.info(`vibevalley: user: "${d.name}" unused for 90 days, its key taken back`);
+      await revoke(d.id);
+    }
+  };
+  tasks.run("sweep", async (signal) => {
+    for (;;) {
+      await takeBackIdle();
+      await clock.sleep(sweepEveryMs, signal);
+    }
   });
-  yield* Effect.forkScoped(Effect.repeat(takeBackIdle(), Schedule.spaced("1 day")));
 
-  return User.of({
+  return {
     status,
-    rename: Effect.fn("User.rename")(function* (given) {
+    rename: async (given) => {
       const next = tidyName(given);
-      yield* db.run(accountQ.setUserName({ name: next }));
+      await accountQ.setUserName(db.sql, { name: next });
       name = next;
       return status({ here: true });
-    }),
-    setPassword: Effect.fn("User.setPassword")(function* (caller, password) {
-      if (!caller.here) return yield* refuse(t("server.user.passwordHere"));
-      if ([...password].length < passwordMin) return yield* refuse(t("server.user.passwordShort", { n: passwordMin }));
-      const stored = yield* hashPassword(password);
-      yield* db.run(accountQ.setUserPassword({ password_hash: stored, password_set_at: now() }));
+    },
+    setPassword: async (caller, password) => {
+      if (!caller.here) throw refuse(t("server.user.passwordHere"));
+      if ([...password].length < passwordMin) throw refuse(t("server.user.passwordShort", { n: passwordMin }));
+      const stored = await hashPassword(password);
+      await accountQ.setUserPassword(db.sql, { password_hash: stored, password_set_at: now() });
       passwordHash = stored;
       wrong = 0;
       lockedUntil = 0;
-      logs.info("vibevalley: user: the password is set");
+      log.info("vibevalley: user: the password is set");
       return status(caller);
-    }),
-    login: Effect.fn("User.login")(function* (password, device) {
-      if (passwordHash === undefined) return yield* refuse(t("server.user.noPassword"));
-      if (now() < lockedUntil) return yield* refuse(t("server.user.locked", { s: Math.ceil((lockedUntil - now()) / 1000) }));
-      if (!(yield* checkPassword(password, passwordHash))) {
-        wrong++;
-        if (wrong >= wrongTries) {
-          wrong = 0;
-          lockedUntil = now() + lockedForMs;
-          logs.info("vibevalley: user: too many wrong passwords, sign-in is locked for a while");
+    },
+    login: (password, device) =>
+      signing.with(async () => {
+        if (passwordHash === undefined) throw refuse(t("server.user.noPassword"));
+        if (now() < lockedUntil) throw refuse(t("server.user.locked", { s: Math.ceil((lockedUntil - now()) / 1000) }));
+        if (!(await checkPassword(password, passwordHash))) {
+          wrong++;
+          if (wrong >= wrongTries) {
+            wrong = 0;
+            lockedUntil = now() + lockedForMs;
+            log.info("vibevalley: user: too many wrong passwords, sign-in is locked for a while");
+          }
+          throw refuse(t("server.user.wrongPassword"));
         }
-        return yield* refuse(t("server.user.wrongPassword"));
-      }
-      wrong = 0;
-      return yield* addDevice(device, "login");
-    }, signing.withPermits(1)),
-    logout: Effect.fn("User.logout")(function* (caller) {
-      if (caller.device === undefined) return yield* refuse(t("server.user.notADevice"));
-      yield* revoke(caller.device);
-    }),
-    pair: Effect.fn("User.pair")(function* (given) {
-      return yield* addDevice(given, "paired");
-    }),
+        wrong = 0;
+        return addDevice(device, "login");
+      }),
+    logout: async (caller) => {
+      if (caller.device === undefined) throw refuse(t("server.user.notADevice"));
+      await revoke(caller.device);
+    },
+    pair: (given) => addDevice(given, "paired"),
     devices: listed,
     byKey: (key) => {
       if (key === "") return undefined;
       const matches = sameSecret(keyHash(key));
-      const hit = Arr.findFirst(Array.from(devices.values()), (d) => matches(d.keyHash));
-      if (Option.isNone(hit)) return undefined;
-      const found = hit.value;
+      const found = Array.from(devices.values()).find((d) => matches(d.keyHash));
+      if (found === undefined) return undefined;
       if (idle(found)) {
-        forkHere(revoke(found.id).pipe(Effect.catchCause((c) => Effect.logError(`vibevalley: user: ${Cause.pretty(c)}`))));
+        tasks.run("revoke", () => revoke(found.id));
         return undefined;
       }
       const at = now();
       found.lastSeen = at;
       if (at - found.written >= seenEveryMs) {
         found.written = at;
-        forkHere(
-          db.run(q.seenUserDevice({ last_seen: at, id: found.id })).pipe(Effect.catchCause((c) => Effect.logError(`vibevalley: user: ${Cause.pretty(c)}`))),
-        );
+        tasks.run("seen", () => q.seenUserDevice(db.sql, { last_seen: at, id: found.id }));
       }
       return shown(found);
     },
     revoke,
-    request: Effect.fn("User.request")(function* (caller, given) {
-      if (live().length >= requestsAtOnce) return yield* refuse(t("server.user.requestsBusy"));
+    request: async (caller, given) => {
+      if (live().length >= requestsAtOnce) throw refuse(t("server.user.requestsBusy"));
       const tidy = tidyName(given);
       const claim = randomBytes(32).toString("base64url");
       const r: Request = {
         id: newId(),
         code: requestCode(),
-        name: Str.isEmpty(tidy) ? t("server.user.aDevice") : tidy,
+        name: tidy === "" ? t("server.user.aDevice") : tidy,
         from: caller.here ? "" : (caller.from ?? ""),
         askedAt: now(),
         expiresAt: now() + requestForMs,
@@ -284,15 +286,14 @@ const make = Effect.gen(function* () {
         lastCollect: Number.NEGATIVE_INFINITY,
       };
       waiting.set(r.id, r);
-      logs.info(`vibevalley: user: "${r.name}" asks to sign in (${r.code})`);
+      log.info(`vibevalley: user: "${r.name}" asks to sign in (${r.code})`);
       return { code: r.code, claim, expiresAt: r.expiresAt, every: collectEverySeconds };
-    }),
-    collect: Effect.fn("User.collect")(function* (claim) {
+    },
+    collect: async (claim) => {
       live();
       const matches = sameSecret(keyHash(claim));
-      const hit = Arr.findFirst(Array.from(waiting.values()), (r) => matches(r.claimHash));
-      if (Option.isNone(hit)) return yield* refuse(t("server.user.requestGone"));
-      const r = hit.value;
+      const r = Array.from(waiting.values()).find((w) => matches(w.claimHash));
+      if (r === undefined) throw refuse(t("server.user.requestGone"));
       if (!r.approved) {
         const tooSoon = now() - r.lastCollect < r.every * 1000 * collectSlack;
         r.lastCollect = now();
@@ -302,22 +303,33 @@ const make = Effect.gen(function* () {
       }
       // Persist the device only on collection so abandoned approvals leave no row behind.
       waiting.delete(r.id);
-      return { login: yield* addDevice(r.name, "login") };
-    }),
+      return { login: await addDevice(r.name, "login") };
+    },
     requests: live,
-    answerRequest: Effect.fn("User.answerRequest")(function* (id, allow) {
+    answerRequest: async (id, allow) => {
       live();
       const r = waiting.get(id);
-      if (r === undefined) return yield* refuse(t("server.user.requestGone"));
+      if (r === undefined) throw refuse(t("server.user.requestGone"));
       if (allow) r.approved = true;
       else waiting.delete(id);
-      logs.info(`vibevalley: user: "${r.name}" (${r.code}) ${allow ? "approved" : "refused"}`);
+      log.info(`vibevalley: user: "${r.name}" (${r.code}) ${allow ? "approved" : "refused"}`);
       return live();
-    }),
-    previewRevoke: Effect.fn("User.previewRevoke")(function* (id) {
-      const d = yield* known(id);
+    },
+    previewRevoke: async (id) => {
+      const d = known(id);
       return { does: [t("server.user.revoke", { name: d.name })] };
-    }),
-    revoked: Stream.fromPubSub(revokes),
-  });
-});
+    },
+    revoked: async function* (signal) {
+      using heard = revokes.subscribe();
+      for (;;) {
+        const next = await heard.next(signal);
+        if (next.done === true) return;
+        yield next.value;
+      }
+    },
+    close: async () => {
+      await tasks.close();
+      revokes.end();
+    },
+  };
+}

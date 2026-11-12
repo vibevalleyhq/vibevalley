@@ -1,4 +1,5 @@
-import { Predicate, Schema } from "effect";
+import { Predicate } from "effect";
+import { z } from "zod";
 
 import { VibeValleyApiError } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
@@ -40,19 +41,19 @@ export const cursorsQuery = defineQuery({
   ...retryRead,
 });
 export const agentsQuery = defineQuery({
-  schema: Schema.mutable(Schema.Array(S.Agent)),
+  schema: z.array(S.Agent),
   key: () => ["agents"],
   fetch: (_: void, context) => api.agent.list(context),
   ...retryRead,
 });
 export const templatesQuery = defineQuery({
-  schema: Schema.mutable(Schema.Array(S.AgentTemplate)),
+  schema: z.array(S.AgentTemplate),
   key: () => ["agent-templates"],
   fetch: (_: void, context) => api.agent.template.list(context),
   ...retryRead,
 });
 export const reposQuery = defineQuery({
-  schema: Schema.mutable(Schema.Array(S.RepoSummary)),
+  schema: z.array(S.RepoSummary),
   key: () => ["repos"],
   fetch: (_: void, context) => api.repo.list(context),
   ...retryRead,
@@ -70,13 +71,13 @@ export const settingsQuery = defineQuery({
   ...retryRead,
 });
 export const runtimesQuery = defineQuery({
-  schema: Schema.mutable(Schema.Array(S.RuntimeInfo)),
+  schema: z.array(S.RuntimeInfo),
   key: () => ["runtimes"],
   fetch: (_: void, context) => api.runtime.list(context),
   ...retryRead,
 });
 export const achievementsQuery = defineQuery({
-  schema: Schema.mutable(Schema.Array(S.Achievement)),
+  schema: z.array(S.Achievement),
   key: () => ["achievements"],
   fetch: (_: void, context) => api.game.achievement.list(context),
   staleTime: Infinity,

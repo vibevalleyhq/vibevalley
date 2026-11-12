@@ -1,11 +1,12 @@
-import { Clock, Effect, Stream } from "effect";
-
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { type ApiError, BizCode, refuseIn } from "#/base/errors.ts";
-import { bestEffort } from "#/infra/log.ts";
-import type { AudioFailure, TranscriptionEvent } from "#/modules/provider/vendors.ts";
+import { BizCode, refuseIn } from "#/base/errors.ts";
+import { bestEffort, type Logger } from "#/infra/log.ts";
+import type { Time } from "#/infra/time.ts";
+import type { TranscriptionEvent } from "#/modules/provider/vendors.ts";
+
+import { untilAborted } from "./job.ts";
 
 const refused = refuseIn(BizCode.MediaRefused);
 
@@ -15,14 +16,18 @@ export interface TranscriptionCheckpoint {
   complete: boolean;
 }
 interface Ports {
-  task: (id: string) => Effect.Effect<void, ApiError>;
-  save: (value: TranscriptionCheckpoint) => Effect.Effect<void, ApiError>;
+  task: (id: string) => Promise<void>;
+  save: (value: TranscriptionCheckpoint) => Promise<void>;
 }
 
-export const receiveTranscriptionStream = Effect.fn("Media.receiveTranscriptionStream")(function* (
-  events: Stream.Stream<TranscriptionEvent, AudioFailure>,
+/** The vendor's transcript as it comes, saved at most every 200 ms (and at once for each segment and the end); stopped
+ * or failed, what came so far is saved before the failure goes on. */
+export async function receiveTranscriptionStream(
+  deps: { readonly clock: Time; readonly log: Logger },
+  events: AsyncIterable<TranscriptionEvent>,
   ports: Ports,
-) {
+  signal: AbortSignal,
+): Promise<void> {
   let text = "";
   const segments: T.MediaAudioSegment[] = [];
   const indexes = new Set<number>();
@@ -30,46 +35,45 @@ export const receiveTranscriptionStream = Effect.fn("Media.receiveTranscriptionS
   let dirty = false;
   let complete = false;
   let last = -Infinity;
-  const flush = (force: boolean) =>
-    Effect.gen(function* () {
-      const now = yield* Clock.currentTimeMillis;
-      if (!dirty || (!force && now - last < 200)) return;
-      yield* ports.save({ result: { kind: "transcription", text, segments }, ...(usage === undefined ? {} : { usage }), complete });
-      last = now;
-      dirty = false;
-    });
-  yield* events.pipe(
-    Stream.runForEach((event) =>
-      Effect.gen(function* () {
-        switch (event.type) {
-          case "task.created":
-            yield* ports.task(event.taskId);
-            return;
-          case "transcript.text.delta":
-            if (text.length + event.text.length > 1_000_000) return yield* refused(t("server.media.audioInvalid"));
-            text += event.text;
-            dirty = true;
-            yield* flush(false);
-            return;
-          case "transcript.segment.done":
-            if (segments.length >= 10_000 || indexes.has(event.index)) return yield* refused(t("server.media.audioInvalid"));
-            indexes.add(event.index);
-            segments.push(event.segment);
-            if (event.usage !== undefined) usage = event.usage;
-            dirty = true;
-            yield* flush(true);
-            return;
-          case "transcript.text.done":
-            if (event.text.length > 1_000_000) return yield* refused(t("server.media.audioInvalid"));
-            text = event.text;
-            if (event.usage !== undefined) usage = event.usage;
-            complete = true;
-            dirty = true;
-            yield* flush(true);
-            return;
-        }
-      }),
-    ),
-    Effect.onError(() => flush(true).pipe(bestEffort("Partial transcription checkpoint could not be saved"))),
-  );
-});
+  const flush = async (force: boolean) => {
+    const now = deps.clock.now();
+    if (!dirty || (!force && now - last < 200)) return;
+    await ports.save({ result: { kind: "transcription", text, segments }, ...(usage === undefined ? {} : { usage }), complete });
+    last = now;
+    dirty = false;
+  };
+  try {
+    for await (const event of untilAborted(events, signal)) {
+      switch (event.type) {
+        case "task.created":
+          await ports.task(event.taskId);
+          break;
+        case "transcript.text.delta":
+          if (text.length + event.text.length > 1_000_000) throw refused(t("server.media.audioInvalid"));
+          text += event.text;
+          dirty = true;
+          await flush(false);
+          break;
+        case "transcript.segment.done":
+          if (segments.length >= 10_000 || indexes.has(event.index)) throw refused(t("server.media.audioInvalid"));
+          indexes.add(event.index);
+          segments.push(event.segment);
+          if (event.usage !== undefined) usage = event.usage;
+          dirty = true;
+          await flush(true);
+          break;
+        case "transcript.text.done":
+          if (event.text.length > 1_000_000) throw refused(t("server.media.audioInvalid"));
+          text = event.text;
+          if (event.usage !== undefined) usage = event.usage;
+          complete = true;
+          dirty = true;
+          await flush(true);
+          break;
+      }
+    }
+  } catch (e) {
+    await bestEffort(deps.log, "Partial transcription checkpoint could not be saved", () => flush(true));
+    throw e;
+  }
+}

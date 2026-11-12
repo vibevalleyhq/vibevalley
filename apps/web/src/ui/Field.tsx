@@ -1,141 +1,44 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
+import type * as stylex from "@stylexjs/stylex";
 import { For, omit } from "solid-js";
 
 import { Select as Base } from "@vibevalley/base-ui";
 
 import { Icon } from "./Icon";
-import { positionerAttrs, styleProps } from "./positioner";
+import { withStyles } from "./positioner";
 import { Hint } from "./Tip";
 
-const popIn = stylex.keyframes({
-  from: { opacity: 0, scale: 0.98 },
-});
+const box = "w-full rounded-md border border-line bg-page px-2.5 py-1.5 text-sm outline-none placeholder:text-faint focus:border-focus";
 
-const styles = stylex.create({
-  box: {
-    width: "100%",
-    borderRadius: "var(--radius-md)",
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: { default: "var(--color-line)", ":focus": "var(--color-focus)" },
-    backgroundColor: "var(--color-page)",
-    paddingLeft: "0.625rem",
-    paddingRight: "0.625rem",
-    paddingBlock: "0.375rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    outlineStyle: "none",
-    color: { default: null, "::placeholder": "var(--color-faint)" },
-  },
-  input: { height: "2rem" },
-  textarea: { resize: "vertical" },
-  label: { display: "flex", flexDirection: "column", gap: "0.25rem" },
-  caption: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.375rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontWeight: "var(--font-weight-medium)",
-    color: "var(--color-muted)",
-  },
-  trigger: {
-    display: "flex",
-    minWidth: 0,
-    cursor: { default: "pointer", ":disabled": "default" },
-    alignItems: "center",
-    gap: "0.375rem",
-    borderRadius: "var(--radius-md)",
-    borderWidth: 1,
-    borderStyle: "solid",
-    textAlign: "left",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    outlineStyle: "none",
-    opacity: { default: null, ":disabled": 0.5 },
-  },
-  control: { height: "1.75rem", paddingInline: "0.5rem" },
-  field: { height: "2rem", paddingInline: "0.625rem" },
-  quiet: {
-    borderColor: {
-      default: "transparent",
-      "@media (hover: hover)": { default: null, ":hover": "var(--color-line)" },
-      ":is([data-popup-open])": "var(--color-line)",
-    },
-    backgroundColor: {
-      default: "transparent",
-      "@media (hover: hover)": { default: null, ":hover": "var(--color-page)" },
-      ":is([data-popup-open])": "var(--color-page)",
-    },
-  },
-  filter: {
-    borderColor: "color-mix(in oklab, var(--color-accent) 40%, transparent)",
-    backgroundColor: {
-      default: "color-mix(in oklab, var(--color-accent) 8%, transparent)",
-      "@media (hover: hover)": { default: null, ":hover": "color-mix(in oklab, var(--color-accent) 12%, transparent)" },
-    },
-  },
-  normal: {
-    borderColor: { default: "var(--color-line)", ":is([data-popup-open])": "var(--color-focus)" },
-    backgroundColor: { default: "var(--color-page)", "@media (hover: hover)": { default: null, ":hover": "var(--color-hover)" } },
-  },
-  value: { minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
-  chevron: { flexShrink: 0, color: "var(--color-muted)" },
-  popup: {
-    maxHeight: "18rem",
-    minWidth: "var(--anchor-width)",
-    transformOrigin: "top",
-    animationName: { default: popIn, "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: "280ms",
-    animationTimingFunction: "var(--ease-out)",
-    animationFillMode: "both",
-    overflowY: "auto",
-    borderRadius: "var(--radius-lg)",
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-    padding: "0.25rem",
-    boxShadow: "var(--shadow-float)",
-    outlineStyle: "none",
-  },
-  item: {
-    display: "flex",
-    height: "1.75rem",
-    cursor: { default: "pointer", ":is([data-disabled])": "default" },
-    alignItems: "center",
-    gap: "0.5rem",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.5rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    outlineStyle: "none",
-    opacity: { default: null, ":is([data-disabled])": 0.5 },
-    backgroundColor: { default: null, ":is([data-highlighted])": "var(--color-hover)" },
-    fontWeight: { default: null, ":is([data-selected])": "var(--font-weight-medium)" },
-  },
-  indicator: { display: "flex", flexShrink: 0, color: "var(--color-accent)" },
-});
+const looks = {
+  quiet: "border-transparent bg-transparent hover:border-line hover:bg-page data-popup-open:border-line data-popup-open:bg-page",
+  filter: "border-accent/40 bg-accent/8 hover:bg-accent/12",
+  normal: "border-line bg-page hover:bg-hover data-popup-open:border-focus",
+};
 
-type ControlAppearance = { styles?: stylex.StyleXStyles; style?: JSX.CSSProperties | undefined };
+type ControlAppearance = {
+  class?: JSX.ClassValue | undefined;
+  // For callers still on StyleX; it goes when the last of them is on classes.
+  styles?: stylex.StyleXStyles;
+  style?: JSX.CSSProperties | undefined;
+};
 export type TextInputProps = Omit<JSX.InputHTMLAttributes<HTMLInputElement>, "class" | "style"> & ControlAppearance;
 
 export function TextInput(props: TextInputProps) {
-  const rest = omit(props, "styles", "style");
-  return <input {...rest} {...styleProps([styles.box, styles.input, props.styles], props.style)} />;
+  const rest = omit(props, "class", "styles", "style");
+  return <input {...rest} {...withStyles(props.styles, [box, "h-8", props.class], props.style)} />;
 }
 
 export function TextArea(props: Omit<JSX.TextareaHTMLAttributes<HTMLTextAreaElement>, "class" | "style"> & ControlAppearance) {
-  const rest = omit(props, "styles", "style");
-  return <textarea {...rest} {...styleProps([styles.box, styles.textarea, props.styles], props.style)} />;
+  const rest = omit(props, "class", "styles", "style");
+  return <textarea {...rest} {...withStyles(props.styles, [box, "resize-y", props.class], props.style)} />;
 }
 
 /** A label over its control; what it means is behind an info icon beside the label. */
 export function Field(props: { label: string; hint?: string | undefined; children: JSX.Element }) {
   return (
-    <label {...stylex.attrs(styles.label)}>
-      <span {...stylex.attrs(styles.caption)}>
+    <label class="flex flex-col gap-1">
+      <span class="flex items-center gap-1.5 text-xs font-medium text-muted">
         {props.label}
         {props.hint && <Hint text={props.hint} />}
       </span>
@@ -152,6 +55,8 @@ export function Select<V extends string>(props: {
   placeholder?: ("" extends V ? string : never) | undefined;
   label: string;
   /** Placement only: width, margins. */
+  class?: JSX.ClassValue | undefined;
+  // For callers still on StyleX; it goes when the last of them is on classes.
   styles?: stylex.StyleXStyles;
   testid?: string | undefined;
   quiet?: boolean;
@@ -173,24 +78,29 @@ export function Select<V extends string>(props: {
         data-state={props.state}
         aria-busy={props.state === "pending" ? "true" : undefined}
         aria-label={props.label}
-        {...styleProps([
-          styles.trigger,
-          props.size === "control" ? styles.control : styles.field,
-          props.quiet === true ? styles.quiet : props.filter === true && props.value !== "" ? styles.filter : styles.normal,
-          props.styles,
+        {...withStyles(props.styles, [
+          "flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md border text-left text-sm outline-none disabled:cursor-default disabled:opacity-50",
+          props.size === "control" ? "h-7 px-2" : "h-8 px-2.5",
+          props.quiet === true ? looks.quiet : props.filter === true && props.value !== "" ? looks.filter : looks.normal,
+          props.class,
         ])}
       >
-        <Base.Value {...stylex.attrs(styles.value)} placeholder={props.placeholder} />
-        <Icon name="choose" size={12} styles={styles.chevron} />
+        <Base.Value class="min-w-0 flex-1 truncate" placeholder={props.placeholder} />
+        <Icon name="choose" size={12} class="text-muted" />
       </Base.Trigger>
       <Base.Portal>
-        <Base.Positioner {...positionerAttrs()} sideOffset={4}>
-          <Base.Popup {...stylex.attrs(styles.popup)}>
+        <Base.Positioner class="z-30" sideOffset={4}>
+          <Base.Popup class="max-h-72 min-w-(--anchor-width) origin-top animate-pop-in overflow-y-auto rounded-lg border border-line bg-page p-1 shadow-float outline-none">
             <For each={all()}>
               {(o) => (
-                <Base.Item value={o.value} data-key={o.value} disabled={o.disabled} {...stylex.attrs(styles.item)}>
-                  <span {...stylex.attrs(styles.value)}>{o.label}</span>
-                  <Base.ItemIndicator {...stylex.attrs(styles.indicator)}>
+                <Base.Item
+                  value={o.value}
+                  data-key={o.value}
+                  disabled={o.disabled}
+                  class="flex h-7 cursor-pointer items-center gap-2 rounded-md px-2 text-sm outline-none data-disabled:cursor-default data-disabled:opacity-50 data-highlighted:bg-hover data-selected:font-medium"
+                >
+                  <span class="min-w-0 flex-1 truncate">{o.label}</span>
+                  <Base.ItemIndicator class="flex shrink-0 text-accent">
                     <Icon name="ticked" size={14} />
                   </Base.ItemIndicator>
                 </Base.Item>

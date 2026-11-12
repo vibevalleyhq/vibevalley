@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { Formatter, Schema } from "effect";
+import { z } from "zod";
 
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
@@ -20,12 +20,12 @@ export interface DeliveryPayload {
   readonly channelType: T.ChannelType;
 }
 
-const Payload: Schema.Codec<DeliveryPayload, S.Wire<DeliveryPayload>> = Schema.Struct({
-  note: Schema.optionalKey(Schema.String),
+const Payload = z.object({
+  note: z.exactOptional(z.string()),
   trigger: MS.Trigger,
   context: MS.TriggerContext,
   channelType: S.ChannelType,
-});
+}) satisfies z.ZodType<DeliveryPayload, S.Wire<DeliveryPayload>>;
 export const readPayload = jsonOf(Payload, "mailbox_delivery.payload_json");
 
 export interface TriggerInput {
@@ -54,7 +54,7 @@ export const triggerOf = (input: TriggerInput): Trigger => {
   const id =
     input.id ??
     createHash("sha256")
-      .update(Formatter.formatJson([input.source, input.key]))
+      .update(JSON.stringify([input.source, input.key]))
       .digest("hex");
   const { issue, ...restMeta } = input.meta ?? {};
   return {

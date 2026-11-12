@@ -1,29 +1,25 @@
-import { NodeServices } from "@effect/platform-node";
-import { Effect, Layer, Stream } from "effect";
-import { HttpRouter } from "effect/http";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import type { LiveEvent, ServerEvent, StateFrame } from "@vibevalley/protocol";
 
-import { Core } from "#/core/core.ts";
-import { layer as projection } from "#/gateway/projection/frame.ts";
-import { ServerConfig } from "#/infra/config.ts";
-import { testConfig } from "#/testing/layers.ts";
+import { type Core, makeCore } from "#/core/core.ts";
+import { makeProjection } from "#/gateway/projection/frame.ts";
+import { keptLog } from "#/infra/log.ts";
+import { wallTime } from "#/infra/time.ts";
 
 import { streams } from "./streams.ts";
 
-const appFor = (change: (core: Core["Service"]) => Core["Service"]) => {
-  const base = Core.layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer));
-  const custom = Layer.unwrap(Effect.map(Core, (core) => Layer.succeed(Core, Core.of(change(core))))).pipe(Layer.provide(base));
-  return streams.pipe(Layer.provide(custom));
-};
+async function* one<A>(a: A): AsyncGenerator<A> {
+  yield a;
+}
 
-async function withRoutes(change: (core: Core["Service"]) => Core["Service"], body: (handler: (request: Request) => Promise<Response>) => Promise<void>) {
-  const { handler, dispose } = HttpRouter.toWebHandler(appFor(change));
+async function withRoutes(change: (core: Core) => Core, body: (handler: (request: Request) => Promise<Response>) => Promise<void>) {
+  const core = makeCore({ projection: makeProjection(), clock: wallTime });
   try {
-    await body(handler);
+    const routes = streams({ core: change(core), log: keptLog(), clock: wallTime });
+    await body(async (request) => routes.fetch(request));
   } finally {
-    await dispose();
+    core.close();
   }
 }
 
@@ -37,7 +33,7 @@ const firstChunk = async (res: Response) => {
 };
 
 describe("the SSE contract", () => {
-  it("encodes a real StateFrame", async () => {
+  test("encodes a real StateFrame", async () => {
     await withRoutes(
       (core) => core,
       async (handler) => {
@@ -50,9 +46,9 @@ describe("the SSE contract", () => {
     );
   });
 
-  it("ends the stream on an invalid StateFrame", async () => {
+  test("ends the stream on an invalid StateFrame", async () => {
     await withRoutes(
-      (core) => ({ ...core, states: Stream.succeed({} as StateFrame) }),
+      (core) => ({ ...core, states: () => one({} as StateFrame) }),
       async (handler) => {
         const res = await handler(new Request("http://farm/api/v1/state"));
         expect(res.status).toBe(200);
@@ -61,10 +57,10 @@ describe("the SSE contract", () => {
     );
   });
 
-  it("ends the stream on an invalid ServerEvent", async () => {
+  test("ends the stream on an invalid ServerEvent", async () => {
     const bad = { type: "notice", at: 0, level: "info", text: 42 } as unknown as ServerEvent;
     await withRoutes(
-      (core) => ({ ...core, events: Stream.succeed(bad) }),
+      (core) => ({ ...core, events: () => one(bad) }),
       async (handler) => {
         const res = await handler(new Request("http://farm/api/v1/events"));
         await expect(res.text()).rejects.toThrow();
@@ -72,10 +68,10 @@ describe("the SSE contract", () => {
     );
   });
 
-  it("ends the stream on an invalid LiveEvent", async () => {
+  test("ends the stream on an invalid LiveEvent", async () => {
     const bad = { type: "notice", at: 0, level: "info", text: 42 } as unknown as LiveEvent;
     await withRoutes(
-      (core) => ({ ...core, live: Stream.succeed(bad) }),
+      (core) => ({ ...core, live: () => one(bad) }),
       async (handler) => {
         const res = await handler(new Request("http://farm/api/v1/live"));
         await expect(res.text()).rejects.toThrow();

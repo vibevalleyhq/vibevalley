@@ -1,41 +1,61 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 
-import { Clock, Cron, DateTime, Effect, FiberHandle, type FileSystem, Option, Predicate, Result, Schema, type Scope } from "effect";
+import { z } from "zod";
 
+import { type Clock, systemClock, TaskGroup } from "@vibevalley/async";
+
+import { type Cron, nextCron, parseCronExpression } from "../base/cron.ts";
 import { reminders as reminderWords } from "../base/prompts.ts";
-import { AgentFailed, agentFailed, ToolFailed, toolFailed } from "../core/errors.ts";
+import { AgentFailed, messageOf, ToolFailed, toolFailed } from "../core/errors.ts";
 import type { Tool } from "../core/loop.ts";
 import { schemaEffectTool } from "../core/tool.ts";
-import { agentFsOf } from "../infra/fs.ts";
+import { type AgentFs, agentFsOf } from "../infra/fs.ts";
+import { type AgentLog, consoleLog } from "../infra/log.ts";
 
-const ReminderSchema = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  message: Schema.String,
+export interface Reminder {
+  readonly id: string;
+  readonly name: string;
+  readonly message: string;
   /** One of: a cron expression, a moment (ISO), every so many minutes. */
-  cron: Schema.optionalKey(Schema.String),
-  at: Schema.optionalKey(Schema.String),
-  everyMinutes: Schema.optionalKey(Schema.Finite),
-  created: Schema.String,
-  lastRun: Schema.optionalKey(Schema.String),
-});
-export type Reminder = typeof ReminderSchema.Type;
+  readonly cron?: string;
+  readonly at?: string;
+  readonly everyMinutes?: number;
+  readonly created: string;
+  readonly lastRun?: string;
+}
+
+const ReminderSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  message: z.string(),
+  cron: z.exactOptional(z.string()),
+  at: z.exactOptional(z.string()),
+  everyMinutes: z.exactOptional(z.number()),
+  created: z.string(),
+  lastRun: z.exactOptional(z.string()),
+}) satisfies z.ZodType<Reminder>;
 
 const parseDate = (text: string) => {
   const d = new Date(text.trim());
   return Number.isNaN(d.getTime()) ? undefined : d;
 };
 
-/** The expression as Effect's Cron, or why it is not one, in the model's words. */
-export const parseCron = (expr: string): Result.Result<Cron.Cron, string> => Result.mapError(Cron.parse(expr), (e) => reminderWords.badCron(e.message));
+/** The expression as a Cron, or why it is not one, in the model's words. */
+export function parseCron(expr: string): { readonly ok: true; readonly cron: Cron } | { readonly ok: false; readonly problem: string } {
+  const parsed = parseCronExpression(expr);
+  return parsed.ok ? parsed : { ok: false, problem: reminderWords.badCron(parsed.problem) };
+}
 
 export function nextRun(reminder: Reminder): Date | undefined {
   const from = parseDate(reminder.lastRun || reminder.created) ?? new Date(0);
   if (reminder.at) return reminder.lastRun ? undefined : parseDate(reminder.at);
   if (reminder.everyMinutes != null && reminder.everyMinutes !== 0) return new Date(from.getTime() + reminder.everyMinutes * 60_000);
-  // Effect's Cron starts at the second after from; one that does not parse never comes due.
-  if (reminder.cron) return Option.getOrUndefined(Result.getSuccess(Result.map(parseCron(reminder.cron), (c) => Cron.next(c, from))));
+  // A cron starts at the second after from; one that does not parse never comes due.
+  if (reminder.cron) {
+    const parsed = parseCron(reminder.cron);
+    return parsed.ok ? nextCron(parsed.cron, from) : undefined;
+  }
   return undefined;
 }
 
@@ -61,8 +81,7 @@ export function describeReminder(j: Reminder): string {
 
 const dueMessage = (j: Reminder) => reminderWords.due(j.id, j.name, j.message);
 
-const ReminderList = Schema.fromJsonString(Schema.mutable(Schema.Array(ReminderSchema)));
-const encodeReminderList = Schema.encodeEffect(ReminderList);
+const ReminderList = z.array(ReminderSchema);
 
 function buildReminder(
   p: {
@@ -74,18 +93,18 @@ function buildReminder(
   },
   nowMs: number,
 ): Reminder | ToolFailed {
-  if ([p.at, p.every_minutes, p.cron].filter((x) => x !== undefined && x !== null).length !== 1) return ToolFailed.make({ message: reminderWords.oneOfThree });
+  if ([p.at, p.every_minutes, p.cron].filter((x) => x !== undefined && x !== null).length !== 1) return new ToolFailed(reminderWords.oneOfThree);
   let at: Date | undefined;
   if (p.at != null) {
     at = parseDate(p.at);
-    if (!at) return ToolFailed.make({ message: reminderWords.badAt(p.at) });
+    if (!at) return new ToolFailed(reminderWords.badAt(p.at));
   }
-  if (p.every_minutes != null && !(p.every_minutes >= 1)) return ToolFailed.make({ message: reminderWords.badEveryMinutes });
+  if (p.every_minutes != null && !(p.every_minutes >= 1)) return new ToolFailed(reminderWords.badEveryMinutes);
   if (p.cron != null) {
     const parsed = parseCron(p.cron);
-    if (Result.isFailure(parsed)) return ToolFailed.make({ message: parsed.failure });
+    if (!parsed.ok) return new ToolFailed(parsed.problem);
   }
-  const made = DateTime.toDateUtc(DateTime.makeUnsafe(nowMs));
+  const made = new Date(nowMs);
   return {
     id: "reminder-" + randomUUID(),
     name: p.name,
@@ -108,119 +127,150 @@ const retryClaimMs = 20_000;
 
 interface Reminders {
   readonly tools: Tool[];
-  /** What is due at now, each stored as run (or gone, once) before it is said, so it comes due at most once. */
-  readonly claimDue: (now: Date) => Effect.Effect<string[], AgentFailed>;
+  /** What is due at now, each stored as run (or gone, once) before it is said, so it comes due at most once. Throws an
+   * AgentFailed when the list cannot be read or the claim not stored. */
+  readonly claimDue: (now: Date) => Promise<string[]>;
+  /** No more wakes. */
+  readonly close: () => Promise<void>;
 }
 
-/** The reminders in home: read once, then held. a fiber of the scope sleeps until the next is due and hands what came due to wake. */
-export const makeReminders = (
-  home: string,
-  wake: (due: string[]) => Effect.Effect<void>,
-  fs?: FileSystem.FileSystem,
-): Effect.Effect<Reminders, never, Scope.Scope> =>
-  Effect.gen(function* () {
-    const io = agentFsOf(fs);
-    const clock = yield* Clock.Clock;
-    const file = join(home, "reminders.json");
-    const read = yield* io.readTextIfExists(file).pipe(
-      Effect.map((text) => (text === undefined ? Result.succeed<Reminder[]>([]) : Result.mapError(Schema.decodeResult(ReminderList)(text), (e) => e.message))),
-      Effect.catchTag("AgentFailed", (e) => Effect.succeed(Result.fail(e.message))),
-    );
-    let list: Reminder[] = Result.isSuccess(read) ? read.success : [];
-    const unreadable = Result.isFailure(read) ? read.failure : undefined;
-    const heldAgent = (): Effect.Effect<Reminder[], AgentFailed> =>
-      unreadable !== undefined ? Effect.fail(AgentFailed.make({ message: unreadable })) : Effect.succeed(list);
-    const heldTool = (): Effect.Effect<Reminder[], ToolFailed> =>
-      unreadable !== undefined ? Effect.fail(ToolFailed.make({ message: unreadable })) : Effect.succeed(list);
+export interface RemindersOptions {
+  readonly fs?: AgentFs;
+  /** When reminders come due, and when one was made. Default: the system clock. */
+  readonly clock?: Clock;
+  readonly log?: AgentLog;
+}
 
-    const store = (next: Reminder[]): Effect.Effect<void, AgentFailed> =>
-      Effect.gen(function* () {
-        const encoded = yield* Effect.mapError(encodeReminderList(next), agentFailed);
-        yield* io.makeDir(home);
-        yield* io.writeText(file + ".tmp", encoded);
-        yield* io.rename(file + ".tmp", file);
-        list = next;
-      });
+/** The reminders in home: read once, then held. One background task sleeps until the next is due and hands what came due
+ * to wake. */
+export async function makeReminders(home: string, wake: (due: string[]) => void | Promise<void>, options: RemindersOptions = {}): Promise<Reminders> {
+  const io = agentFsOf(options.fs);
+  const clock = options.clock ?? systemClock;
+  const log = options.log ?? consoleLog;
+  const tasks = new TaskGroup({ name: "reminders", onError: (task, e) => log.error(`agent: reminders ${task} failed:`, e) });
+  const file = join(home, "reminders.json");
+  let list: Reminder[] = [];
+  let unreadable: string | undefined;
+  try {
+    const text = await io.readTextIfExists(file);
+    if (text !== undefined) unreadable = readList(text, (read) => (list = read));
+  } catch (e) {
+    if (!(e instanceof AgentFailed)) throw e;
+    unreadable = e.message;
+  }
+  const heldAgent = (): Reminder[] => {
+    if (unreadable !== undefined) throw new AgentFailed(unreadable);
+    return list;
+  };
+  const heldTool = (): Reminder[] => {
+    if (unreadable !== undefined) throw new ToolFailed(unreadable);
+    return list;
+  };
 
-    const claimDue = (at: Date): Effect.Effect<string[], AgentFailed> =>
-      Effect.gen(function* () {
-        const reminders = yield* heldAgent();
-        const due = dueReminders(reminders, at);
-        if (due.length === 0) return [];
-        yield* store(afterClaim(reminders, due, at));
-        return due.map(dueMessage);
-      });
+  const store = async (next: Reminder[]): Promise<void> => {
+    const encoded = JSON.stringify(next);
+    await io.makeDir(home);
+    await io.writeText(file + ".tmp", encoded);
+    await io.rename(file + ".tmp", file);
+    list = next;
+  };
 
-    // One sleeping fiber: armed again whenever the list changes or one comes due.
-    const waiting = yield* FiberHandle.make();
-    const start = yield* FiberHandle.runtime(waiting)();
-    const arm = (): void => {
-      if (unreadable !== undefined) return;
-      const next = list
-        .map(nextRun)
-        .reduce<number | undefined>((soonest, d) => (d && (soonest === undefined || d.getTime() < soonest) ? d.getTime() : soonest), undefined);
-      if (next === undefined) return void start(Effect.void);
-      const waitMs = Math.max(0, next - clock.currentTimeMillisUnsafe());
-      start(
-        Effect.gen(function* () {
-          yield* Effect.sleep(waitMs);
-          const wokeAt = yield* Clock.currentTimeMillis;
-          const due = yield* claimDue(DateTime.toDateUtc(DateTime.makeUnsafe(wokeAt)));
-          yield* wake(due);
-          arm();
-        }).pipe(
-          Effect.catch((e) =>
-            Effect.gen(function* () {
-              yield* Effect.logError("agent: cannot claim due reminders:", e);
-              yield* Effect.sleep(retryClaimMs);
-              arm();
-            }),
-          ),
-        ),
-      );
-    };
-    arm();
+  const claimDue = async (at: Date): Promise<string[]> => {
+    const reminders = heldAgent();
+    const due = dueReminders(reminders, at);
+    if (due.length === 0) return [];
+    await store(afterClaim(reminders, due, at));
+    return due.map(dueMessage);
+  };
 
-    const add = schemaEffectTool({
-      name: "reminder",
-      description: reminderWords.reminderDescription,
-      parameters: Schema.Struct({
-        name: Schema.String,
-        message: Schema.String,
-        at: Schema.optionalKey(Schema.String),
-        every_minutes: Schema.optionalKey(Schema.Finite),
-        cron: Schema.optionalKey(Schema.String),
-      }),
-      run: (p) =>
-        Effect.gen(function* () {
-          const now = yield* Clock.currentTimeMillis;
-          const built = buildReminder(p, now);
-          if (Predicate.isTagged(built, "ToolFailed")) return yield* built;
-          const reminders = yield* heldTool();
-          yield* Effect.mapError(store([...reminders, built]), toolFailed);
-          arm();
-          return reminderWords.set + describeReminder(built);
-        }),
+  // One sleeping task: armed again whenever the list changes or one comes due.
+  const arm = (): void => {
+    if (unreadable !== undefined) return;
+    const next = list
+      .map(nextRun)
+      .reduce<number | undefined>((soonest, d) => (d && (soonest === undefined || d.getTime() < soonest) ? d.getTime() : soonest), undefined);
+    if (next === undefined) {
+      tasks.keyed("wait", async () => undefined);
+      return;
+    }
+    tasks.keyed("wait", async (signal) => {
+      try {
+        // Until the moment itself: the task starts once the one it replaces has ended.
+        await clock.sleep(Math.max(0, next - clock.now()), signal);
+        const due = await claimDue(new Date(clock.now()));
+        await wake(due);
+      } catch (e) {
+        if (signal.aborted) throw e;
+        log.error("agent: cannot claim due reminders:", e);
+        await clock.sleep(retryClaimMs, signal);
+      }
+      arm();
     });
-    const listTool = schemaEffectTool({
-      name: "list_reminders",
-      description: reminderWords.listDescription,
-      parameters: Schema.Struct({}),
-      run: () => Effect.map(heldTool(), (reminders) => (reminders.length === 0 ? reminderWords.none : reminders.map(describeReminder).join("\n"))),
-    });
-    const cancel = schemaEffectTool({
-      name: "cancel_reminder",
-      description: reminderWords.cancelDescription,
-      parameters: Schema.Struct({ id: Schema.String }),
-      run: (p) =>
-        Effect.gen(function* () {
-          const reminders = yield* heldTool();
-          const j = reminders.find((x) => x.id === p.id);
-          if (!j) return yield* ToolFailed.make({ message: reminderWords.notFound(p.id) });
-          yield* Effect.mapError(store(reminders.filter((x) => x !== j)), toolFailed);
-          arm();
-          return reminderWords.canceled(j.name);
-        }),
-    });
-    return { tools: [add, listTool, cancel], claimDue } satisfies Reminders;
+  };
+  arm();
+
+  const add = schemaEffectTool({
+    name: "reminder",
+    description: reminderWords.reminderDescription,
+    parameters: z.object({
+      name: z.string(),
+      message: z.string(),
+      at: z.exactOptional(z.string()),
+      every_minutes: z.exactOptional(z.number()),
+      cron: z.exactOptional(z.string()),
+    }),
+    run: async (p) => {
+      const built = buildReminder(p, clock.now());
+      if (built instanceof ToolFailed) throw built;
+      const reminders = heldTool();
+      try {
+        await store([...reminders, built]);
+      } catch (e) {
+        throw toolFailed(e);
+      }
+      arm();
+      return reminderWords.set + describeReminder(built);
+    },
   });
+  const listTool = schemaEffectTool({
+    name: "list_reminders",
+    description: reminderWords.listDescription,
+    parameters: z.object({}),
+    run: async () => {
+      const reminders = heldTool();
+      return reminders.length === 0 ? reminderWords.none : reminders.map(describeReminder).join("\n");
+    },
+  });
+  const cancel = schemaEffectTool({
+    name: "cancel_reminder",
+    description: reminderWords.cancelDescription,
+    parameters: z.object({ id: z.string() }),
+    run: async (p) => {
+      const reminders = heldTool();
+      const j = reminders.find((x) => x.id === p.id);
+      if (!j) throw new ToolFailed(reminderWords.notFound(p.id));
+      try {
+        await store(reminders.filter((x) => x !== j));
+      } catch (e) {
+        throw toolFailed(e);
+      }
+      arm();
+      return reminderWords.canceled(j.name);
+    },
+  });
+  return { tools: [add, listTool, cancel], claimDue, close: () => tasks.close() };
+}
+
+/** The file's list handed to keep; what is wrong with it when it is not JSON or not a list of reminders. */
+function readList(text: string, keep: (list: Reminder[]) => void): string | undefined {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    return messageOf(e);
+  }
+  const parsed = ReminderList.safeParse(data);
+  if (!parsed.success) return parsed.error.message;
+  keep(parsed.data);
+  return undefined;
+}

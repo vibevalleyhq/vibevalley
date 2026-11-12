@@ -656,6 +656,8 @@ export default defineConfig({
           "apps/server/src/gateway/voice/line.ts",
           "apps/server/src/testing/git.ts",
           "apps/server/src/testing/worker.ts",
+          "apps/server/src/modules/session/worker.ts",
+          "apps/cli/src/infra/spawn.ts",
           "apps/desktop/src/infra/island.ts",
           "apps/desktop/src/infra/server.ts",
           "apps/desktop/src/infra/update.ts",

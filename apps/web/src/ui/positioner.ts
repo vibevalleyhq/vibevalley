@@ -1,7 +1,7 @@
 import type { JSX } from "@solidjs/web";
 import * as stylex from "@stylexjs/stylex";
 
-import { type ClassValue, cx } from "./cx";
+import { cx } from "./cx";
 
 const styles = stylex.create({ floating: { zIndex: 30 } });
 
@@ -21,7 +21,7 @@ export function positionerAttrs(...values: readonly stylex.StyleXStyles[]) {
  * (vv-tailwind). StyleX's layer is above Tailwind's (style.css), so the caller's styles still win over the part's classes
  * as they did. Goes away with the last caller that passes `styles`.
  */
-export function withStyles(styles: stylex.StyleXStyles | undefined, classes: ClassValue, inline?: JSX.CSSProperties) {
+export function withStyles(styles: stylex.StyleXStyles | undefined, classes: JSX.ClassValue, inline?: JSX.CSSProperties) {
   if (styles === undefined) return { class: cx(classes), style: inline };
   const { className, style } = stylex.props(styles);
   return { class: cx(classes, className), style: inline === undefined ? style : { ...style, ...inline } };

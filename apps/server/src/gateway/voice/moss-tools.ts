@@ -1,11 +1,8 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
-const MossAskOrchestratorArgsSchema = Schema.fromJsonString(
-  Schema.Struct({
-    question: Schema.String,
-  }),
-);
-const decodeAskArgs = Schema.decodeUnknownOption(MossAskOrchestratorArgsSchema);
+import { jsonOrNone } from "#/base/json.ts";
+
+const decodeAskArgs = jsonOrNone(z.object({ question: z.string() }));
 
 export interface MossToolCall {
   readonly callId: string;
@@ -13,64 +10,57 @@ export interface MossToolCall {
   readonly question: string;
 }
 
-const CallSchema = Schema.Struct({
-  call_id: Schema.String,
-  name: Schema.String,
-  arguments: Schema.String,
+const CallSchema = z.object({
+  call_id: z.string(),
+  name: z.string(),
+  arguments: z.string(),
 });
-const decodeCallEvent = Schema.decodeUnknownOption(
-  Schema.fromJsonString(
-    Schema.Struct({
-      action: Schema.Literal("response.function_call_arguments.done"),
-      data: CallSchema,
-    }),
-  ),
+const decodeCallEvent = jsonOrNone(
+  z.object({
+    action: z.literal("response.function_call_arguments.done"),
+    data: CallSchema,
+  }),
 );
-const decodeResponse = Schema.decodeUnknownOption(
-  Schema.fromJsonString(
-    Schema.Struct({
-      action: Schema.Literal("response.done"),
-      data: Schema.Struct({
-        response: Schema.Struct({
-          status: Schema.Literal("completed"),
-          output: Schema.Array(
-            Schema.Struct({
-              ...CallSchema.fields,
-              type: Schema.Literal("function_call"),
-              status: Schema.Literal("completed"),
-            }),
-          ),
-        }),
+const decodeResponse = jsonOrNone(
+  z.object({
+    action: z.literal("response.done"),
+    data: z.object({
+      response: z.object({
+        status: z.literal("completed"),
+        output: z.array(
+          CallSchema.extend({
+            type: z.literal("function_call"),
+            status: z.literal("completed"),
+          }),
+        ),
       }),
     }),
-  ),
+  }),
 );
-const decodeAck = Schema.decodeUnknownOption(
-  Schema.fromJsonString(
-    Schema.Struct({
-      action: Schema.Literal("conversation.item.created"),
-      data: Schema.Struct({
-        item: Schema.Struct({
-          type: Schema.Literal("function_call_output"),
-          call_id: Schema.String,
-        }),
+const decodeAck = jsonOrNone(
+  z.object({
+    action: z.literal("conversation.item.created"),
+    data: z.object({
+      item: z.object({
+        type: z.literal("function_call_output"),
+        call_id: z.string(),
       }),
     }),
-  ),
+  }),
 );
 
 export function extractMossToolCalls(raw: string): readonly MossToolCall[] {
   if (raw.length > 64 * 1024) return [];
   const event = decodeCallEvent(raw);
-  const response = event._tag === "None" ? decodeResponse(raw) : undefined;
-  const calls = event._tag === "Some" ? [event.value.data] : response?._tag === "Some" ? response.value.data.response.output : [];
+  const response = event === undefined ? decodeResponse(raw) : undefined;
+  const calls = event !== undefined ? [event.data] : (response?.data.response.output ?? []);
   const seen = new Set<string>();
   const output: MossToolCall[] = [];
   for (const call of calls) {
     if (call.name !== "ask_orchestrator" || !call.call_id || call.call_id.length > 256 || seen.has(call.call_id)) continue;
     const args = decodeAskArgs(call.arguments);
-    if (args._tag === "None") continue;
-    const question = args.value.question.trim();
+    if (args === undefined) continue;
+    const question = args.question.trim();
     if (!question || question.length > 16_000) continue;
     seen.add(call.call_id);
     output.push({ callId: call.call_id, name: call.name, question });
@@ -80,8 +70,7 @@ export function extractMossToolCalls(raw: string): readonly MossToolCall[] {
 
 export function extractMossToolAck(raw: string): string | undefined {
   if (raw.length > 64 * 1024) return undefined;
-  const decoded = decodeAck(raw);
-  return decoded._tag === "Some" ? decoded.value.data.item.call_id || undefined : undefined;
+  return decodeAck(raw)?.data.item.call_id || undefined;
 }
 
 export const mossOrchestratorTool = {
@@ -100,23 +89,26 @@ export const mossOrchestratorTool = {
   },
 } as const;
 
-const MossFrame = Schema.Union([
-  Schema.Struct({
-    action: Schema.Literal("session.commentary.append"),
-    content: Schema.String,
-    status: Schema.Literal("completed"),
-    event_id: Schema.String,
+const MossFrame = z.union([
+  z.object({
+    action: z.literal("session.commentary.append"),
+    content: z.string(),
+    status: z.literal("completed"),
+    event_id: z.string(),
   }),
-  Schema.Struct({
-    action: Schema.Literal("session.update"),
-    session: Schema.Struct({ persona: Schema.Struct({ prompt: Schema.String }), instructions: Schema.String, tools: Schema.Array(Schema.Unknown) }),
+  z.object({
+    action: z.literal("session.update"),
+    session: z.object({ persona: z.object({ prompt: z.string() }), instructions: z.string(), tools: z.array(z.unknown()) }),
   }),
-  Schema.Struct({ action: Schema.Literal("response.create"), response: Schema.Struct({ call_ids: Schema.Array(Schema.String) }) }),
-  Schema.Struct({
-    action: Schema.Literal("conversation.item.create"),
-    item: Schema.Struct({ type: Schema.Literal("function_call_output"), call_id: Schema.String, output: Schema.String }),
+  z.object({ action: z.literal("response.create"), response: z.object({ call_ids: z.array(z.string()) }) }),
+  z.object({
+    action: z.literal("conversation.item.create"),
+    item: z.object({ type: z.literal("function_call_output"), call_id: z.string(), output: z.string() }),
   }),
 ]);
 
-/** A frame the farm says to MOSS Live, as its socket takes it; none for one that does not encode (each is built from strings). */
-export const mossFrame = Schema.encodeOption(Schema.fromJsonString(MossFrame));
+/** A frame the farm says to MOSS Live, as its socket takes it; none for one that does not fit (each is built from strings). */
+export const mossFrame = (frame: z.input<typeof MossFrame>): string | undefined => {
+  const checked = MossFrame.safeParse(frame);
+  return checked.success ? JSON.stringify(checked.data) : undefined;
+};

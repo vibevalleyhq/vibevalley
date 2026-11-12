@@ -1,28 +1,34 @@
-import { Array as Arr, Option, Redacted, Schema } from "effect";
+import { z } from "zod";
 
-const Connection = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  adapter: Schema.Literal("moss"),
-  enabled: Schema.Boolean,
-  // A plain string in settings.json; in memory it stays redacted until a call sends it.
-  key: Schema.RedactedFromValue(Schema.String),
+import { Secret } from "@vibevalley/protocol/schema";
+
+/** A key: a plain string in settings.json; in memory it stays a Secret until a call sends it. */
+export const StoredKey = z.codec(z.string(), z.instanceof(Secret), { decode: (s) => new Secret(s), encode: (s) => s.reveal() });
+
+const Connection = z.object({
+  id: z.string(),
+  name: z.string(),
+  adapter: z.literal("moss"),
+  enabled: z.boolean(),
+  key: StoredKey,
 });
 
-export const ProviderSettings = Schema.Struct({
-  revision: Schema.Int,
-  connections: Schema.Array(Connection),
-  dictation: Schema.NullOr(Schema.Struct({ connection: Schema.String, model: Schema.String })),
-  image: Schema.NullOr(Schema.Struct({ connection: Schema.String, model: Schema.String })),
-  speech: Schema.NullOr(Schema.Struct({ connection: Schema.String, model: Schema.String })),
-  understanding: Schema.NullOr(Schema.Struct({ connection: Schema.String, model: Schema.String })),
-  live: Schema.NullOr(Schema.Struct({ connection: Schema.String, model: Schema.String })),
-  speakers: Schema.NullOr(Schema.Struct({ connection: Schema.String, model: Schema.String })),
-  voiceDesign: Schema.NullOr(Schema.Struct({ connection: Schema.String, model: Schema.String })),
-  transcription: Schema.NullOr(Schema.Struct({ connection: Schema.String, model: Schema.String })),
-  vision: Schema.NullOr(Schema.Struct({ connection: Schema.String, model: Schema.String })),
+const Binding = z.object({ connection: z.string(), model: z.string() }).nullable();
+
+export const ProviderSettings = z.object({
+  revision: z.number().int(),
+  connections: z.array(Connection),
+  dictation: Binding,
+  image: Binding,
+  speech: Binding,
+  understanding: Binding,
+  live: Binding,
+  speakers: Binding,
+  voiceDesign: Binding,
+  transcription: Binding,
+  vision: Binding,
 });
-export type ProviderSettings = typeof ProviderSettings.Type;
+export type ProviderSettings = z.output<typeof ProviderSettings>;
 
 export const emptyProviders: ProviderSettings = {
   revision: 0,
@@ -54,13 +60,12 @@ export const bindingOf =
     | { readonly ready: false; readonly missing: "mossAccount" | "binding" | "mossOff" | "mossKey" } => {
     if (settings.connections.length === 0) return { ready: false, missing: "mossAccount" };
     const binding = settings[use];
-    const found = binding === null ? Option.none() : Arr.findFirst(settings.connections, (c) => c.id === binding.connection);
-    if (binding === null || Option.isNone(found)) return { ready: false, missing: "binding" };
-    const connection = found.value;
+    const connection = binding === null ? undefined : settings.connections.find((c) => c.id === binding.connection);
+    if (binding === null || connection === undefined) return { ready: false, missing: "binding" };
     if (!connection.enabled) return { ready: false, missing: "mossOff" };
-    if (Redacted.value(connection.key) === "") return { ready: false, missing: "mossKey" };
+    if (connection.key.reveal() === "") return { ready: false, missing: "mossKey" };
     return { ready: true, connection, model: binding.model };
   };
 
 export const boundConnection = (settings: ProviderSettings, id: string | null) =>
-  settings.connections.find((connection) => connection.id === id && connection.enabled && Redacted.value(connection.key) !== "");
+  settings.connections.find((connection) => connection.id === id && connection.enabled && connection.key.reveal() !== "");

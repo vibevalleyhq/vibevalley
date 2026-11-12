@@ -1,19 +1,18 @@
-import { Effect } from "effect";
-
 import { t } from "@vibevalley/i18n";
 import type { SessionHandlers } from "@vibevalley/protocol/api";
 
-import { missing, lookIn, orMissing } from "#/base/errors.ts";
-import { Session } from "#/modules/session/session.ts";
+import { lookIn, missing, orMissing } from "#/base/errors.ts";
+import type { Session } from "#/modules/session/session.ts";
 
-export const sessionHandlers = Effect.gen(function* () {
-  const sessions = yield* Session;
-  const done: SessionHandlers = {
-    "session.stop": ({ id }) =>
-      sessions.isReachable(id) ? Effect.asVoid(sessions.stop(id)) : Effect.fail(missing(t("server.helperRef", { id }), [lookIn.session])),
+export function sessionHandlers(deps: { readonly session: Session }): SessionHandlers {
+  const sessions = deps.session;
+  return {
+    "session.stop": async ({ id }) => {
+      if (!sessions.isReachable(id)) throw missing(t("server.helperRef", { id }), [lookIn.session]);
+      await sessions.stop(id);
+    },
     "session.list": ({ agent }) => sessions.list(agent ?? ""),
-    "session.get": ({ id }) => sessions.get(id).pipe(orMissing(t("server.helperRef", { id }), [lookIn.session])),
-    "session.event.list": ({ id, run }) => Effect.map(sessions.events(id, run ?? ""), (events) => events ?? []),
+    "session.get": async ({ id }) => orMissing(t("server.helperRef", { id }), [lookIn.session])(await sessions.get(id)),
+    "session.event.list": async ({ id, run }) => (await sessions.events(id, run ?? "")) ?? [],
   };
-  return done;
-});
+}

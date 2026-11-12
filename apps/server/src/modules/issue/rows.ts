@@ -1,11 +1,11 @@
-import { Formatter, Schema } from "effect";
+import { z } from "zod";
 
 import type * as T from "@vibevalley/protocol";
 import { sessionIdsOf } from "@vibevalley/protocol/rules";
 import { issueId } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
-import { storedJsonOrUndefined } from "#/base/json.ts";
+import { jsonText, storedJsonOrUndefined } from "#/base/json.ts";
 import { type Core } from "#/core/core.ts";
 import type * as q from "#db/issue.sql.ts";
 
@@ -17,23 +17,23 @@ export const nullText = (s: string | undefined) => {
   return text === "" ? null : text;
 };
 
-export const jsonOrNull = (v: unknown, there: boolean) => (there ? Formatter.formatJson(v) : null);
+export const jsonOrNull = (v: unknown, there: boolean) => (there ? jsonText(v) : null);
 
 type Row = q.GetIssueResult;
-const strings = Schema.mutable(Schema.Array(Schema.String));
+const strings = z.array(z.string());
 const column = {
   constraints: storedJsonOrUndefined(S.IssueConstraints, "issue.constraints"),
   conflict: storedJsonOrUndefined(S.Conflict, "issue.conflict"),
-  issueIds: storedJsonOrUndefined(Schema.mutable(Schema.Array(S.IssueId)), "issue.blocked_by"),
+  issueIds: storedJsonOrUndefined(z.array(S.IssueId), "issue.blocked_by"),
   strings: storedJsonOrUndefined(strings, "issue.criteria"),
-  checks: storedJsonOrUndefined(Schema.mutable(Schema.Array(S.CriterionCheck)), "issue.checks"),
+  checks: storedJsonOrUndefined(z.array(S.CriterionCheck), "issue.checks"),
   pullRequest: storedJsonOrUndefined(S.PullRequest, "issue.pull_request"),
   answer: storedJsonOrUndefined(S.IssueAnswer, "issue.answer"),
-  findings: storedJsonOrUndefined(Schema.mutable(Schema.Array(S.Finding)), "issue.findings"),
-  questions: storedJsonOrUndefined(Schema.mutable(Schema.Array(S.Question)), "issue.questions"),
+  findings: storedJsonOrUndefined(z.array(S.Finding), "issue.findings"),
+  questions: storedJsonOrUndefined(z.array(S.Question), "issue.questions"),
 };
 
-export function issueRows(core: Core["Service"]) {
+export function issueRows(core: Core) {
   return function issueOf(row: Row, assignments: readonly T.Assignment[]): T.Issue {
     const state = core.state();
     const blockedBy = column.issueIds(row.blocked_by);
