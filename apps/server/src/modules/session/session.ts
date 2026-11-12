@@ -9,10 +9,9 @@ import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import type { Memory } from "#/modules/memory/memory.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
-import { type Merged, RepoError, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "#/modules/repo/workplace.ts";
+import { RepoError, type WorkplaceCleanup, type WorkplaceRelease } from "#/modules/repo/workplace.ts";
 import type { Runtime } from "#/modules/runtime/runtime.ts";
 
-import type { Settle } from "./briefing.ts";
 import type { Accepted, ChannelHearers, ChannelRouteResult, Envelope } from "./envelope.ts";
 import { makeGitHubPoller } from "./github.ts";
 import type { AgentHost, HostOptions } from "./host.ts";
@@ -20,7 +19,7 @@ import { type ChildChecks, type IssueRecord, type Landing, makeLanding } from ".
 import { HireRefused, type Lifecycle, makeLifecycle, type SessionNews, type SessionOptions } from "./lifecycle.ts";
 import { type Machine, makeMachine } from "./machine.ts";
 import { type DeliveryNews, type Dispatch, type HireArrival, type HiredReceipt, type Mailbox, makeMailbox, type QueuedInput } from "./mailbox.ts";
-import type { KnownGitHubEvent, SourceEvent, TriggerInput, TriggerResource } from "./payload.ts";
+import type { SourceEvent, TriggerInput, TriggerResource } from "./payload.ts";
 import { summaryOf } from "./report.ts";
 import type { Trigger } from "./shapes.ts";
 
@@ -30,7 +29,7 @@ export { DeliveryRefused, HireRefused, newsOf, NotRecorded, NotTakenIn, NotWorkF
 
 /** A hire: the helper, its brief and where it works, and the inputs it starts with. parent: the issue in that repo
  * whose branch its branch forks from; that issue's checkout is made first. */
-export type HireOrder = Omit<HireArrival, "_tag"> & { readonly parent?: number };
+export type HireOrder = HireArrival & { readonly parent?: number };
 
 /** Who hears a routed trigger: a channel's hearers, or one session. */
 export type Audience = ChannelHearers | { readonly session: string };
@@ -77,20 +76,6 @@ export interface Session {
   readonly stop: (session: string) => Promise<boolean>;
   /** The helper let go; true when it was there. Work "discard" resets its branch once the runtime stops writing. */
   readonly dismiss: (session: string, work?: "keep" | "discard", closed?: "dismissed" | "completed") => Promise<boolean>;
-  /** A session's workplace used under its lock. */
-  readonly withWorkplace: <A>(session: string, use: (place: Workplace) => Promise<A>) => Promise<A>;
-  /** A session's workplace used under its lock while it rests: refused while it works, its execution rests first. */
-  readonly withIdleWorkplace: <A>(session: string, use: (place: Workplace) => Promise<A>) => Promise<A>;
-  /** An issue's own checkout in its repo, when no helper holds it; kept for the next helper. */
-  readonly withCheckout: <A>(repo: string, issue: number, use: (place: Workplace) => Promise<A>) => Promise<A>;
-  /** A session's workplace handed over, then the session lets go as closed: throws NotTakenIn when use fails and the
-   * session stays, ApiError when it cannot hand over now. */
-  readonly handOver: (
-    session: string,
-    closed: T.SessionClose,
-    use: (place: Workplace, lastText: string) => Promise<Merged>,
-    settle?: Settle,
-  ) => Promise<Merged>;
   /** The issue's work merged into main, or submitted as its pull request (one is open, or its repo goes by pull
    * requests): from its helper's workplace, which then lets go; from the issue's own checkout when no helper holds it
    * and fromCheckout. Throws NotTakenIn when the helper's work does not go in (the helper stays). */
@@ -130,8 +115,6 @@ export interface Session {
   readonly triggersOf: (issue: string) => Promise<readonly Trigger[]>;
   /** Every queued trigger: dispatches first, then routed order. */
   readonly queuedTriggers: () => Promise<readonly QueuedInput[]>;
-  /** A pull request's GitHub events recorded. */
-  readonly knownGitHubEvents: (repo: string, pr: number) => Promise<readonly KnownGitHubEvent[]>;
   /** The issue a trigger belongs to. */
   readonly ownerOf: (trigger: string) => Promise<string | undefined>;
   readonly isRouted: (trigger: string) => Promise<boolean>;
@@ -185,11 +168,11 @@ export function insideOf(session: Session): Inside {
 
 /** A source's event recorded as a trigger and routed; the farm's own echo is neither. */
 const receiving =
-  (mailbox: Pick<Mailbox, "record" | "receive">) =>
+  (mailbox: Pick<Mailbox, "record" | "route">) =>
   async (event: SourceEvent): Promise<Accepted> => {
     const trigger = await mailbox.record(event);
     if (trigger === undefined) return { heldNotice: "" };
-    return { ...(await mailbox.receive({ _tag: "Trigger", trigger })), trigger };
+    return { ...(await mailbox.route(trigger)), trigger };
   };
 
 /** The door over the parts: what makeSession returns, and what a test that plays the sessions builds over its own. */
@@ -203,31 +186,27 @@ export function sessionOver(parts: {
 }): Session {
   const { lifecycle, mailbox, repo, landing, close } = parts;
   return {
-    route: (trigger, to) => mailbox.receive({ _tag: "Trigger", trigger, ...(to ? { to } : {}) }),
+    route: mailbox.route,
     recordTrigger: mailbox.recordTrigger,
     receive: receiving(mailbox),
     queueDispatch: mailbox.queueDispatch,
     hireWith: async ({ parent, ...order }) => {
       if (parent !== undefined)
         try {
-          await repo.checkout({ _tag: "Open", repo: order.where, issue: parent, worktree: true, base: "" });
+          await repo.checkout({ repo: order.where, issue: parent, worktree: true, base: "" });
         } catch (e) {
           if (e instanceof RepoError) throw new HireRefused(e.message, undefined, { cause: e });
           throw e;
         }
-      return mailbox.receive({ _tag: "Hire", ...order });
+      return mailbox.hireWith(order);
     },
-    withdrawEnvelope: (envelope) => mailbox.withdraw({ _tag: "Envelope", envelope }),
-    withdrawDeliveries: (session, why) => mailbox.withdraw({ _tag: "Session", session, why }),
-    withdrawDispatches: (issue, at) => mailbox.withdraw({ _tag: "Issue", issue, at }),
+    withdrawEnvelope: mailbox.withdrawEnvelope,
+    withdrawDeliveries: mailbox.withdrawDeliveries,
+    withdrawDispatches: mailbox.withdrawDispatches,
     decline: mailbox.decline,
     handBack: mailbox.handBack,
     stop: lifecycle.stop,
     dismiss: lifecycle.dismiss,
-    withWorkplace: lifecycle.withWorkplace,
-    withIdleWorkplace: lifecycle.withIdleWorkplace,
-    withCheckout: async (repoId, issue, use) => use(await repo.checkout({ _tag: "Open", repo: repoId, issue, worktree: true, base: "" })),
-    handOver: lifecycle.handOver,
     merge: landing.merge,
     submitPullRequest: landing.submitPullRequest,
     refreshPullRequests: landing.refreshPullRequests,
@@ -260,7 +239,6 @@ export function sessionOver(parts: {
     trigger: mailbox.readTrigger,
     triggersOf: mailbox.triggersOf,
     queuedTriggers: mailbox.queuedTriggers,
-    knownGitHubEvents: mailbox.knownGitHubEvents,
     ownerOf: mailbox.ownerOf,
     isRouted: mailbox.isRouted,
     waitingOn: mailbox.waitingOn,

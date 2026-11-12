@@ -115,27 +115,14 @@ const exists = async (path: string): Promise<boolean> => {
   }
 };
 
-/** An issue's checkout: opened (a worktree on the issue's branch forked from base, "" for main, or the repo's own
- * folder), let go (kept when it holds work, and said why), reset to main while it stays, or cleared once no helper is
- * on its issue (work "discard" by default). */
-export type CheckoutAt =
-  | {
-      readonly _tag: "Open";
-      readonly repo: string;
-      readonly issue: number;
-      readonly worktree: boolean;
-      readonly base: string;
-      readonly signal?: AbortSignal;
-    }
-  | { readonly _tag: "Release"; readonly place: Workplace }
-  | { readonly _tag: "Reset"; readonly place: Workplace }
-  | { readonly _tag: "Clear"; readonly repo: string; readonly issue: number; readonly work?: WorkplaceCleanup };
-
-export interface Checkout {
-  (at: Extract<CheckoutAt, { readonly _tag: "Open" }>): Promise<Workplace>;
-  (at: Extract<CheckoutAt, { readonly _tag: "Release" }>): Promise<WorkplaceRelease>;
-  (at: Extract<CheckoutAt, { readonly _tag: "Reset" }>): Promise<void>;
-  (at: Extract<CheckoutAt, { readonly _tag: "Clear" }>): Promise<WorkplaceRelease>;
+/** Where an issue's checkout is: a worktree on the issue's branch forked from base ("" for main), or the repo's own
+ * folder. */
+export interface CheckoutAt {
+  readonly repo: string;
+  readonly issue: number;
+  readonly worktree: boolean;
+  readonly base: string;
+  readonly signal?: AbortSignal;
 }
 
 /** The repositories under the work root, their worktrees, checks, merges and pull requests. Long operations take a
@@ -153,8 +140,14 @@ export interface Repo {
   readonly languages: (name: string, signal?: AbortSignal) => Promise<T.RepoLanguages | undefined>;
   readonly activity: (name: string) => Promise<T.RepoActivity | undefined>;
   readonly contributions: (extra: readonly string[]) => Promise<T.Repo[]>;
-  /** An issue's checkout; only the session module opens and lets go of them. */
-  readonly checkout: Checkout;
+  /** An issue's checkout, made when it is not there yet; only the session module makes and lets go of them. */
+  readonly checkout: (at: CheckoutAt) => Promise<Workplace>;
+  /** A checkout let go: kept when it holds work, and said why. */
+  readonly releaseCheckout: (place: Workplace) => Promise<WorkplaceRelease>;
+  /** A checkout's branch reset to main while it stays. */
+  readonly resetCheckout: (place: Workplace) => Promise<void>;
+  /** An issue's checkout cleared once no helper is on its issue (work "discard" by default). */
+  readonly clearCheckout: (repo: string, issue: number, work?: WorkplaceCleanup) => Promise<WorkplaceRelease>;
   readonly changes: (place: Workplace) => Promise<T.Changes>;
   readonly branchChanges: (repo: string, branch: string) => Promise<T.Changes | undefined>;
   readonly changedFiles: (cwd: string, baseBranch: string) => Promise<string[]>;
@@ -663,22 +656,6 @@ export async function makeRepo(deps: RepoDeps, hooks: RepoHooks = {}): Promise<R
     );
   };
 
-  function checkout(at: Extract<CheckoutAt, { readonly _tag: "Open" }>): Promise<Workplace>;
-  function checkout(at: Extract<CheckoutAt, { readonly _tag: "Release" }>): Promise<WorkplaceRelease>;
-  function checkout(at: Extract<CheckoutAt, { readonly _tag: "Reset" }>): Promise<void>;
-  function checkout(at: Extract<CheckoutAt, { readonly _tag: "Clear" }>): Promise<WorkplaceRelease>;
-  function checkout(at: CheckoutAt): Promise<Workplace | WorkplaceRelease | void> {
-    switch (at._tag) {
-      case "Open":
-        return workplace(at.repo, at.issue, at.worktree, at.base, at.signal);
-      case "Release":
-        return release(at.place);
-      case "Reset":
-        return reset(at.place);
-      case "Clear":
-        return clear(at.repo, at.issue, at.work);
-    }
-  }
   return {
     githubSnapshot,
     root,
@@ -748,7 +725,10 @@ export async function makeRepo(deps: RepoDeps, hooks: RepoHooks = {}): Promise<R
       return out;
     },
     contributions: (extra) => contributionsOf(root, extra),
-    checkout,
+    checkout: (at) => workplace(at.repo, at.issue, at.worktree, at.base, at.signal),
+    releaseCheckout: release,
+    resetCheckout: reset,
+    clearCheckout: clear,
     changes: (place) => describe(place.repo, place.cwd, place.branch),
     branchChanges: async (repo, branch) => {
       // An issue worked in a profile's own folder has no repo, and so no issue branch: none to read.

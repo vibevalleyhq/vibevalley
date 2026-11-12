@@ -88,7 +88,7 @@ export function makeLanding(deps: LandingDeps): Landing {
 
   /** An issue's own checkout in its repo, when no helper holds it; kept for the next helper. */
   const withCheckout = async <A>(repo: string, issue: number, use: (place: Workplace) => Promise<A>) =>
-    use(await repos.checkout({ _tag: "Open", repo, issue, worktree: true, base: "" }));
+    use(await repos.checkout({ repo, issue, worktree: true, base: "" }));
 
   const pullRequestOf = async (place: Workplace, issue: T.Issue, said: string, record: IssueRecord): Promise<Merged> => {
     let pr: T.PullRequest;

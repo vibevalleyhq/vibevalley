@@ -117,7 +117,7 @@ test("regression: splitting creates real queued issues whose dependencies merge 
   expect(waiting).toHaveLength(1);
   expect(waiting[0]?.target).toEqual({ kind: "issue", id: parent.id });
   expect((await service.changes(parent.id, user)).commits.length).toBeGreaterThan(0);
-  const place = await fw.repo.checkout({ _tag: "Open", repo: "split", issue: parent.number, worktree: true, base: "" });
+  const place = await fw.repo.checkout({ repo: "split", issue: parent.number, worktree: true, base: "" });
   expect(readFileSync(join(place.cwd, "second.txt"), "utf8")).toBe("done");
   await service.setStatus(parent.id, "done", "", "", user);
   const core = fw.core;

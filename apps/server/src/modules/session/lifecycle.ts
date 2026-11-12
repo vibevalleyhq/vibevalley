@@ -463,19 +463,12 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
       try {
         place =
           issue && repo
-            ? await repos.checkout({
-                _tag: "Open",
-                repo,
-                issue: issue.number,
-                worktree: opt.worktree ?? agent.worktree,
-                base: opt.base ?? "",
-                ...(signal ? { signal } : {}),
-              })
+            ? await repos.checkout({ repo, issue: issue.number, worktree: opt.worktree ?? agent.worktree, base: opt.base ?? "", ...(signal ? { signal } : {}) })
             : await contextPlace(config.workRoot, id);
       } catch (e) {
         throw new HireRefused(t("server.session.life.noPlace", { name: agent.name, why: messageOf(e) }), undefined, { cause: e });
       }
-      const releasePlace = () => (place.repo ? repos.checkout({ _tag: "Release", place }) : releaseContextPlace(place));
+      const releasePlace = () => (place.repo ? repos.releaseCheckout(place) : releaseContextPlace(place));
       // The hand's own cleanups (its log, its credential) close when it leaves; the startup's undo an opening that did
       // not commit. Both run last-deferred first.
       const handScope = handStack();
@@ -678,11 +671,9 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
         if (work === "discard" && !current?.issue) throw refused(t("server.session.life.noIssue"));
         await closeExecution(h);
         if (work === "discard" && h.place.branch)
-          await repos
-            .checkout({ _tag: "Reset", place: h.place })
-            .catch((e: unknown) => core.notice("warn", t("server.session.life.notReset", { name, why: messageOf(e) })));
+          await repos.resetCheckout(h.place).catch((e: unknown) => core.notice("warn", t("server.session.life.notReset", { name, why: messageOf(e) })));
         await leave(h, closed, 0);
-        const kept = h.place.repo ? await repos.checkout({ _tag: "Release", place: h.place }) : await releaseContextPlace(h.place);
+        const kept = h.place.repo ? await repos.releaseCheckout(h.place) : await releaseContextPlace(h.place);
         if (kept.kept) core.notice("info", t("server.session.life.left", { name, why: kept.reason }));
         return true;
       },
@@ -697,9 +688,7 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
       async (h) => {
         const s = core.session(id);
         if (!s || isBusy(s) || !h.place.branch) return;
-        await repos
-          .checkout({ _tag: "Reset", place: h.place })
-          .catch((e: unknown) => core.notice("warn", t("server.session.life.notReset", { name: s.name, why: messageOf(e) })));
+        await repos.resetCheckout(h.place).catch((e: unknown) => core.notice("warn", t("server.session.life.notReset", { name: s.name, why: messageOf(e) })));
       },
     );
   };
@@ -709,7 +698,7 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
       const unclosed = executor.all().find((a) => a.owner.issue === issue);
       if (unclosed) throw refused(unclosed.failure ?? t("server.session.life.issueNotReturned"));
       if (core.state().sessions.some((s) => s.issue === issue)) throw refused(t("server.session.life.stillHasHelper"));
-      return repos.checkout({ _tag: "Clear", repo, issue: number, ...(work ? { work } : {}) });
+      return repos.clearCheckout(repo, number, work);
     });
 
   const report = async (id: string, given: T.IssueReport) => {

@@ -73,35 +73,24 @@ export interface TalkRow {
   readonly context: InputContext;
 }
 
-export type Arrival =
-  | { readonly _tag: "Trigger"; readonly trigger: Trigger; readonly to?: ChannelHearers | { readonly session: string } }
-  | {
-      readonly _tag: "Hire";
-      readonly agent: T.Agent;
-      readonly brief: string;
-      /** Empty for a direct conversation. */
-      readonly where: string;
-      readonly options: Omit<SendOptions, "hiring" | "envelopeIds">;
-      readonly envelopes: { readonly _tag: "Talk"; readonly rows: readonly TalkRow[] } | { readonly _tag: "Queued"; readonly triggers: readonly Trigger[] };
-      /** Runs inside the session hire transaction before the session is visible. */
-      readonly hiring: (session: T.Session, launch: string, at: number) => Promise<void>;
-    };
+/** A helper to hire: the profile, its brief and where it works, and the inputs it starts with. */
+export interface HireArrival {
+  readonly agent: T.Agent;
+  readonly brief: string;
+  /** Empty for a direct conversation. */
+  readonly where: string;
+  readonly options: Omit<SendOptions, "hiring" | "envelopeIds">;
+  readonly envelopes: { readonly _tag: "Talk"; readonly rows: readonly TalkRow[] } | { readonly _tag: "Queued"; readonly triggers: readonly Trigger[] };
+  /** Runs inside the session hire transaction before the session is visible. */
+  readonly hiring: (session: T.Session, launch: string, at: number) => Promise<void>;
+}
 
 type SendOptions = Parameters<Lifecycle["hire"]>[3];
-
-export type TriggerArrival = Extract<Arrival, { readonly _tag: "Trigger" }>;
-export type HireArrival = Extract<Arrival, { readonly _tag: "Hire" }>;
 
 export interface HiredReceipt {
   readonly hired: T.Session;
   readonly evicted?: string;
 }
-
-export type Withdrawal =
-  | { readonly _tag: "Session"; readonly session: string; readonly why: string }
-  | { readonly _tag: "Envelope"; readonly envelope: string }
-  /** Runs in its own transaction, outside writeLock. */
-  | { readonly _tag: "Issue"; readonly issue: string; readonly at: number };
 
 /** What an issue's next helper is to be told when it is sent: the issue's words, or the ones it was started with. */
 export interface Dispatch {
@@ -134,10 +123,10 @@ export interface Mailbox {
   readonly queuedTriggers: () => Promise<readonly QueuedInput[]>;
   readonly isRouted: (trigger: string) => Promise<boolean>;
   /** A trigger's refusals are ApiErrors; a hire's is HireRefused. */
-  readonly receive: {
-    (arrival: TriggerArrival): Promise<ChannelRouteResult>;
-    (arrival: HireArrival): Promise<HiredReceipt>;
-  };
+  /** A recorded trigger routed to who hears it (its audience when given); refusals are ApiErrors. */
+  readonly route: (trigger: Trigger, to?: ChannelHearers | { readonly session: string }) => Promise<ChannelRouteResult>;
+  /** A helper hired with its first inputs; throws HireRefused. */
+  readonly hireWith: (arrival: HireArrival) => Promise<HiredReceipt>;
   readonly subscribe: (issue: string, threads: readonly string[]) => Promise<void>;
   readonly ownerOf: (trigger: string) => Promise<string | undefined>;
   readonly deliveriesOf: (session: string) => readonly DeliveryRow[];
@@ -149,7 +138,12 @@ export interface Mailbox {
   /** What the mailbox tells, subscribed before it returns. */
   readonly news: () => Subscription<DeliveryNews>;
   readonly handBack: (session: string, envelope: string) => Promise<void>;
-  readonly withdraw: (what: Withdrawal) => Promise<void>;
+  /** A channel message's envelope taken back from every delivery that still waits on it. */
+  readonly withdrawEnvelope: (envelope: string) => Promise<void>;
+  /** A session's open deliveries dropped: it left. */
+  readonly withdrawDeliveries: (session: string, why: string) => Promise<void>;
+  /** An issue's dispatches recorded before `at` taken back; in its own transaction, outside writeLock. */
+  readonly withdrawDispatches: (issue: string, at: number) => Promise<void>;
   readonly waitingOn: (envelope: string) => Promise<number>;
   readonly decline: (session: string, envelope: string, reason: string) => Promise<void>;
   readonly close: () => Promise<void>;
@@ -335,27 +329,16 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
   };
   const accept = async (event: SourceEvent) => {
     const trigger = await record(event);
-    if (trigger) await api.receive({ _tag: "Trigger", trigger });
+    if (trigger) await route(trigger);
     return trigger;
   };
-  function receive(arrival: TriggerArrival): Promise<ChannelRouteResult>;
-  function receive(arrival: HireArrival): Promise<HiredReceipt>;
-  function receive(arrival: Arrival): Promise<ChannelRouteResult | HiredReceipt> {
-    switch (arrival._tag) {
-      case "Trigger":
-        return route(arrival.trigger, arrival.to);
-      case "Hire":
-        return hire(arrival);
-    }
-  }
   const replay = async () => {
     let after = 0;
     while (true) {
       const rows = await qr.unroutedTriggers(db.sql, { after });
       const last = rows.at(-1);
       if (!last) return;
-      for (const row of rows)
-        await bestEffort(log, `mailbox: replay ${row.id}`, () => api.receive({ _tag: "Trigger", trigger: readTrigger(row.trigger_json) }));
+      for (const row of rows) await bestEffort(log, `mailbox: replay ${row.id}`, () => route(readTrigger(row.trigger_json)));
       after = last.seq;
     }
   };
@@ -535,7 +518,8 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
     isRouted: work.isRouted,
     triggersOf: work.issueInputs,
     queuedTriggers: work.queuedInputs,
-    receive,
+    route,
+    hireWith: hire,
     subscribe: (issue, threads) => work.subscribe(issue, threads),
     ownerOf: work.ownerOf,
     deliveriesOf: (session) => open.of(session),
@@ -558,23 +542,17 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
     replay,
     news: () => newsHub.subscribe(),
     handBack,
-    withdraw: async (what) => {
-      switch (what._tag) {
-        case "Session":
-          return writtenLocked(() => dropSession(what.session, what.why));
-        case "Envelope":
-          return writtenLocked(() =>
-            db.tx(async () => {
-              const rows = await qd.dropOpenOf(db.sql, { message_id: what.envelope });
-              await db.afterCommit(() => {
-                for (const row of rows) open.remove(row.session_id, what.envelope);
-              });
-            }),
-          );
-        case "Issue":
-          return work.retireDispatches(what.issue, what.at);
-      }
-    },
+    withdrawDeliveries: (session, why) => writtenLocked(() => dropSession(session, why)),
+    withdrawEnvelope: (envelope) =>
+      writtenLocked(() =>
+        db.tx(async () => {
+          const rows = await qd.dropOpenOf(db.sql, { message_id: envelope });
+          await db.afterCommit(() => {
+            for (const row of rows) open.remove(row.session_id, envelope);
+          });
+        }),
+      ),
+    withdrawDispatches: (issue, at) => work.retireDispatches(issue, at),
     waitingOn: async (envelope) => (await qd.waitingOn(db.sql, { message_id: envelope })).length,
     decline: async (session, envelope, reason) => {
       const why = reason.trim();
