@@ -2,21 +2,19 @@ import { dagIDValid, dagProblems } from "@vibevalley/agent/dag";
 import { Semaphore } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { assignedAgentOf, isBusy, latestSessionIdOf } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 import { issueId } from "@vibevalley/protocol/schema";
 
 import { actsForUser, type Actor } from "#/base/actor.ts";
-import { ApiError, BizCode, messageOf, refuseIn } from "#/base/errors.ts";
+import { ApiError, BizCode, refuseIn } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
-import { issueBranch, type Repo } from "#/modules/repo/repo.ts";
-import { MergeFailure, type Workplace } from "#/modules/repo/workplace.ts";
 import { NotTakenIn, type Session } from "#/modules/session/session.ts";
 
 import { maxChildren } from "./creation.ts";
 import type { IssueLifecycle } from "./lifecycle.ts";
-import { verifyChild } from "./merge.ts";
+import { childChecks } from "./merge.ts";
 import { needsUser } from "./prompts.ts";
 import { isClosed } from "./status.ts";
 
@@ -24,7 +22,6 @@ const refused = refuseIn(BizCode.IssueRefused);
 
 export interface SplitDeps {
   readonly agent: Agent;
-  readonly repo: Repo;
   readonly session: Session;
   readonly channel: Channel;
 }
@@ -32,7 +29,7 @@ export interface SplitDeps {
 export type IssueSplitting = ReturnType<typeof issueSplitting>;
 
 export function issueSplitting(r: IssueLifecycle, deps: SplitDeps) {
-  const { agent: store, repo: repos, session: sessions, channel: chat } = deps;
+  const { agent: store, session: sessions, channel: chat } = deps;
   const { everyIssue, get, publish, issueWords, changesOf, setConflict, asked, saveSplit, completeChild } = r;
   const splitting = new Semaphore(1);
   const split = (id: string, title: string, drafts: readonly T.IssueChildDraft[], by: Actor): Promise<string> =>
@@ -98,33 +95,13 @@ export function issueSplitting(r: IssueLifecycle, deps: SplitDeps) {
   const joining = new Semaphore(1);
   const joinOne = async (child: T.Issue & { readonly parent: T.IssueId }, all: readonly T.Issue[]) => {
     const parent = await get(child.parent);
-    const parentRepo = parent.repo;
-    if (!parentRepo || isClosed(parent.status)) return;
-    const session = latestSessionIdOf(child);
-    if (!session || !sessions.live(session).reachable) return;
-    const parentSession = latestSessionIdOf(parent);
-    const parentWorker = parentSession ? sessions.live(parentSession).session : undefined;
-    if (parentWorker && isBusy(parentWorker)) return;
+    if (!parent.repo || isClosed(parent.status)) return;
+    const checks = childChecks(child, all);
     try {
-      await sessions.handOver(
-        session,
-        "completed",
-        async (place) => {
-          const constraints = await verifyChild(repos, child, parent, all, place);
-          const mergeIntoParent = (target: Workplace) => repos.mergeInto(place, issueBranch(parent.number), target.cwd);
-          let merged;
-          if (parentSession && sessions.live(parentSession).reachable) {
-            try {
-              merged = await sessions.withIdleWorkplace(parentSession, mergeIntoParent);
-            } catch (error) {
-              throw error instanceof MergeFailure ? error : MergeFailure.error(messageOf(error));
-            }
-          } else merged = await sessions.withCheckout(parentRepo, parent.number, mergeIntoParent);
-          await completeChild(child.id, constraints);
-          return merged;
-        },
-        "helper",
+      const merged = await sessions.mergeChild(child, parent, checks, (frozen) =>
+        completeChild(child.id, checks.acceptance && child.constraints ? { ...child.constraints, frozen: [...(frozen ?? [])] } : child.constraints),
       );
+      if (!merged) return;
       await setConflict(child.id, undefined);
     } catch (failure) {
       if (!(failure instanceof NotTakenIn) && !(failure instanceof ApiError)) throw failure;

@@ -221,7 +221,7 @@ CREATE TABLE session_trigger (
          (routed_at is not null and routing_scope is not null and routing_position is not null)),
   unique (source, source_key)
 );
-CREATE TABLE issue_github (
+CREATE TABLE session_github_cursor (
   repo text not null,
   pr_number integer not null,
   check_fingerprint text not null default '',

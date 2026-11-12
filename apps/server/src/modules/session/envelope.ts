@@ -7,7 +7,7 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { storedJsonOrUndefined, valueOf } from "#/base/json.ts";
 
-import { type TriggerContext, VoiceModeValues } from "./shapes.ts";
+import { type Trigger, type TriggerContext, VoiceModeValues } from "./shapes.ts";
 
 const IngressSourceValues = ["issue", "cron", "patrol", "connector", "voice", "github"] as const;
 
@@ -209,6 +209,11 @@ export interface ChannelHearers {
 
 export interface ChannelRouteResult {
   readonly heldNotice: string;
+}
+
+/** A source's event taken in: its trigger (none for the farm's own echo) and what its routing said. */
+export interface Accepted extends ChannelRouteResult {
+  readonly trigger?: Trigger;
 }
 
 export interface Handed {

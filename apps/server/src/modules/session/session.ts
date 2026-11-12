@@ -13,8 +13,10 @@ import type { Merged, Workplace, WorkplaceCleanup, WorkplaceRelease } from "#/mo
 import type { Runtime } from "#/modules/runtime/runtime.ts";
 
 import type { Settle } from "./briefing.ts";
-import type { ChannelHearers, ChannelRouteResult, Envelope } from "./envelope.ts";
+import type { Accepted, ChannelHearers, ChannelRouteResult, Envelope } from "./envelope.ts";
+import { makeGitHubPoller } from "./github.ts";
 import type { AgentHost, HostOptions } from "./host.ts";
+import { type ChildChecks, type IssueRecord, type Landing, makeLanding } from "./landing.ts";
 import { type Lifecycle, makeLifecycle, type SessionNews, type SessionOptions } from "./lifecycle.ts";
 import { type Machine, makeMachine } from "./machine.ts";
 import { type DeliveryNews, type HireArrival, type HiredReceipt, type Mailbox, makeMailbox, type QueuedInput } from "./mailbox.ts";
@@ -22,14 +24,9 @@ import type { KnownGitHubEvent, SourceEvent, TriggerInput, TriggerResource } fro
 import { summaryOf } from "./report.ts";
 import type { Trigger } from "./shapes.ts";
 
-export type { QueuedInput, SessionOptions };
+export type { Accepted, ChildChecks, IssueRecord, QueuedInput, SessionOptions };
 export type { Hired, HireOptions, RunFinished, RunStore, SessionNews } from "./lifecycle.ts";
 export { DeliveryRefused, HireRefused, newsOf, NotRecorded, NotTakenIn, NotWorkFile, runOf } from "./lifecycle.ts";
-
-/** A source's event taken in: its trigger (none for the farm's own echo) and what its routing said. */
-export interface Accepted extends ChannelRouteResult {
-  readonly trigger?: Trigger;
-}
 
 /** A hire: the helper, its brief and where it works, and the inputs it starts with. */
 export type HireOrder = Omit<HireArrival, "_tag">;
@@ -91,6 +88,25 @@ export interface Session {
     use: (place: Workplace, lastText: string) => Promise<Merged>,
     settle?: Settle,
   ) => Promise<Merged>;
+  /** The issue's work merged into main, or submitted as its pull request (one is open, or its repo goes by pull
+   * requests): from its helper's workplace, which then lets go; from the issue's own checkout when no helper holds it
+   * and fromCheckout. Throws NotTakenIn when the helper's work does not go in (the helper stays). */
+  readonly merge: Landing["merge"];
+  /** The helper's work submitted as the issue's pull request while it stays; read gives the issue under the helper's
+   * workplace lock (refused when it is closed). Throws MergeFailure. */
+  readonly submitPullRequest: Landing["submitPullRequest"];
+  /** Each followed pull request's state read; one merged or closed is kept, or finishes its issue. */
+  readonly refreshPullRequests: Landing["refreshPullRequests"];
+  /** The open pull requests of the issues on the board followed on GitHub: failed or finished CI, new reviews and
+   * comments taken in. */
+  readonly pollGitHub: (onBoard: readonly T.Issue[]) => Promise<void>;
+  /** A child's work checked and merged into its parent's branch, then its helper lets go; undefined when it waits.
+   * Throws NotTakenIn when the work does not go in. */
+  readonly mergeChild: Landing["mergeChild"];
+  /** The issue's work: in its helper's workplace while one holds it, else on its branch. Throws RepoError. */
+  readonly changesOf: Landing["changesOf"];
+  /** Whether the session's work still conflicts with base. */
+  readonly conflictOf: Landing["conflictOf"];
   /** A session's branch reset to main while it stays. */
   readonly discardWork: (session: string) => Promise<void>;
   /** An issue's checkout let go once no helper is on it. */
@@ -164,22 +180,29 @@ export function insideOf(session: Session): Inside {
   return inside;
 }
 
+/** A source's event recorded as a trigger and routed; the farm's own echo is neither. */
+const receiving =
+  (mailbox: Pick<Mailbox, "record" | "receive">) =>
+  async (event: SourceEvent): Promise<Accepted> => {
+    const trigger = await mailbox.record(event);
+    if (trigger === undefined) return { heldNotice: "" };
+    return { ...(await mailbox.receive({ _tag: "Trigger", trigger })), trigger };
+  };
+
 /** The door over the parts: what makeSession returns, and what a test that plays the sessions builds over its own. */
 export function sessionOver(parts: {
   readonly lifecycle: Lifecycle;
   readonly mailbox: Mailbox;
   readonly repo: Pick<Repo, "checkout">;
+  readonly landing: Landing;
+  readonly pollGitHub: (onBoard: readonly T.Issue[]) => Promise<void>;
   readonly close: () => Promise<void>;
 }): Session {
-  const { lifecycle, mailbox, repo, close } = parts;
+  const { lifecycle, mailbox, repo, landing, close } = parts;
   return {
     route: (trigger, to) => mailbox.receive({ _tag: "Trigger", trigger, ...(to ? { to } : {}) }),
     recordTrigger: mailbox.recordTrigger,
-    receive: async (event) => {
-      const trigger = await mailbox.record(event);
-      if (trigger === undefined) return { heldNotice: "" };
-      return { ...(await mailbox.receive({ _tag: "Trigger", trigger })), trigger };
-    },
+    receive: receiving(mailbox),
     hireWith: (order) => mailbox.receive({ _tag: "Hire", ...order }),
     withdrawEnvelope: (envelope) => mailbox.withdraw({ _tag: "Envelope", envelope }),
     withdrawDeliveries: (session, why) => mailbox.withdraw({ _tag: "Session", session, why }),
@@ -192,6 +215,13 @@ export function sessionOver(parts: {
     withIdleWorkplace: lifecycle.withIdleWorkplace,
     withCheckout: async (repoId, issue, use) => use(await repo.checkout({ _tag: "Open", repo: repoId, issue, worktree: true, base: "" })),
     handOver: lifecycle.handOver,
+    merge: landing.merge,
+    submitPullRequest: landing.submitPullRequest,
+    refreshPullRequests: landing.refreshPullRequests,
+    pollGitHub: parts.pollGitHub,
+    mergeChild: landing.mergeChild,
+    changesOf: landing.changesOf,
+    conflictOf: landing.conflictOf,
     discardWork: lifecycle.discardWork,
     clearWorkplace: lifecycle.clearWorkplace,
     hired: lifecycle.hired,
@@ -270,7 +300,16 @@ export async function makeSession(deps: SessionDeps, options: SessionOptions = {
     const mailbox = await makeMailbox({ ...deps, session: lifecycle });
     closes.push(mailbox.close);
 
-    const session = sessionOver({ lifecycle, mailbox, repo: deps.repo, close });
+    const landing = makeLanding({ core: deps.core, log: deps.log, repo: deps.repo, lifecycle });
+    const gitHub = makeGitHubPoller({
+      db: deps.db,
+      repo: deps.repo,
+      clock: deps.clock,
+      log: deps.log,
+      receive: receiving(mailbox),
+      knownGitHubEvents: mailbox.knownGitHubEvents,
+    });
+    const session = sessionOver({ lifecycle, mailbox, repo: deps.repo, landing, pollGitHub: gitHub.pollOpen, close });
     insides.set(session, {
       ...lifecycle,
       ...mailbox,

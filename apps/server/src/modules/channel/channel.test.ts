@@ -187,14 +187,22 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
   const lifecycle = played as unknown as Lifecycle;
   const agent = await makeAgent({ config: c, clock, log });
   const mailbox = await makeMailbox({ db, clock, log, config: c, core, agent, session: lifecycle });
+  const noRepos = async (): Promise<never> => {
+    throw new Error("the chat's tests have no repos");
+  };
   const session = sessionOver({
     lifecycle,
     mailbox,
-    repo: {
-      checkout: async () => {
-        throw new Error("the chat's tests have no repos");
-      },
+    repo: { checkout: noRepos },
+    landing: {
+      merge: noRepos,
+      submitPullRequest: noRepos,
+      refreshPullRequests: noRepos,
+      mergeChild: noRepos,
+      changesOf: noRepos,
+      conflictOf: noRepos,
     },
+    pollGitHub: noRepos,
     close: () => mailbox.close(),
   });
   const attachment = await makeAttachment({ config: c, clock, db });

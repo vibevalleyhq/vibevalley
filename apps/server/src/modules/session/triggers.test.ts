@@ -3,8 +3,8 @@ import { expect, test } from "vite-plus/test";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { moduleWorld } from "#/testing/world.ts";
-import * as cursor from "#db/issue_github.sql.ts";
 import { allOpenDeliveries } from "#db/session_delivery.sql.ts";
+import * as cursor from "#db/session_github_cursor.sql.ts";
 
 import { type TriggerInput, triggerOf } from "./payload.ts";
 

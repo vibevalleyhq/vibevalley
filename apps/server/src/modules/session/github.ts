@@ -12,22 +12,29 @@ import type { Time } from "#/infra/time.ts";
 import { actionsJobOf } from "#/modules/repo/pullSnapshot.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
 import { RepoError } from "#/modules/repo/workplace.ts";
-import type { Session } from "#/modules/session/session.ts";
-import * as q from "#db/issue_github.sql.ts";
+import * as q from "#db/session_github_cursor.sql.ts";
+
+import type { Accepted } from "./envelope.ts";
+import type { KnownGitHubEvent, SourceEvent } from "./payload.ts";
 
 const failedChecks = new Set(["FAILURE", "ERROR", "CANCELLED", "CANCELED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE", "STALE"]);
 const finishedChecks = new Set(["COMPLETED", "SUCCESS", "FAILURE", "ERROR"]);
 
 export interface GitHubPollDeps {
   readonly db: Db;
-  readonly session: Session;
   readonly repo: Repo;
   readonly clock: Time;
   readonly log: Logger;
+  /** A source's event recorded as a trigger and routed. */
+  readonly receive: (event: SourceEvent) => Promise<Accepted>;
+  /** A pull request's GitHub events recorded. */
+  readonly knownGitHubEvents: (repo: string, pr: number) => Promise<readonly KnownGitHubEvent[]>;
 }
 
-export function makeGitHubPoller(onBoard: () => readonly T.Issue[], deps: GitHubPollDeps) {
-  const { db, session: sessions, repo: repos, clock, log } = deps;
+/** The open pull requests on the board followed on GitHub: a CI run that failed or finished, and each review and
+ * comment not seen before, taken in as triggers for the issue's thread. */
+export function makeGitHubPoller(deps: GitHubPollDeps) {
+  const { db, repo: repos, clock, log, receive, knownGitHubEvents } = deps;
   const polling = new Semaphore(1);
 
   /** Fetch logs via gh so helpers need no browser. */
@@ -40,7 +47,7 @@ export function makeGitHubPoller(onBoard: () => readonly T.Issue[], deps: GitHub
     } catch (e) {
       // No GitHub remote: the check is told without its log.
       if (!(e instanceof RepoError)) throw e;
-      log.debug(`issue: no GitHub remote for ${repo}: ${e.message}`);
+      log.debug(`session: no GitHub remote for ${repo}: ${e.message}`);
       return "";
     }
     if (!remote) return "";
@@ -73,7 +80,7 @@ export function makeGitHubPoller(onBoard: () => readonly T.Issue[], deps: GitHub
       });
       const finished = checks.length > 0 && checks.every((check) => check.conclusion !== "" || finishedChecks.has(check.status.toUpperCase()));
       if (failed.length > 0 || finished)
-        await sessions.receive({
+        await receive({
           ...base,
           key: `${repo}#${pr.number}:ci:${revision}`,
           actor: { kind: "system", id: `github:${repo}#${pr.number}` },
@@ -83,7 +90,7 @@ export function makeGitHubPoller(onBoard: () => readonly T.Issue[], deps: GitHub
         });
       await q.observeGitHubChecks(db.sql, { repo, pr_number: pr.number, check_fingerprint: fingerprint, check_revision: revision });
     }
-    const known = await sessions.knownGitHubEvents(repo, pr.number);
+    const known = await knownGitHubEvents(repo, pr.number);
     const keys = new Set(known.filter((event) => event.routed).map((event) => event.key));
     const rounds = new Map(
       known.flatMap((event) => (event.botRoundKey !== undefined && event.botRound !== undefined ? [[event.botRoundKey, event.botRound] as const] : [])),
@@ -122,7 +129,7 @@ export function makeGitHubPoller(onBoard: () => readonly T.Issue[], deps: GitHub
     for (const event of events) {
       if (keys.has(event.key) || event.author.toLowerCase() === current.viewer.toLowerCase()) continue;
       const round = event.bot ? (rounds.get(event.round) ?? botRound + 1) : undefined;
-      const accepted = await sessions.receive({
+      const accepted = await receive({
         ...base,
         key: event.key,
         actor: { kind: "system", id: event.author || "deleted", name: event.author },
@@ -140,10 +147,10 @@ export function makeGitHubPoller(onBoard: () => readonly T.Issue[], deps: GitHub
     }
   };
 
-  const pollOpen = (): Promise<void> =>
+  const pollOpen = (onBoard: readonly T.Issue[]): Promise<void> =>
     polling.with(async () => {
-      for (const issue of onBoard().filter((issue) => issue.pullRequest?.state === "open"))
-        await bestEffort(log, `issue: GitHub issue #${issue.number}`, () => poll(issue));
+      for (const issue of onBoard.filter((issue) => issue.pullRequest?.state === "open"))
+        await bestEffort(log, `session: GitHub issue #${issue.number}`, () => poll(issue));
     });
   return { pollOpen };
 }

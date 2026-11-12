@@ -24,7 +24,6 @@ import type { Trigger } from "#/modules/session/shapes.ts";
 import { findingsOf, milestonesOf } from "./brief.ts";
 import { explicitMandate, filledKinds, inferredMandate, mandateNoteFits, sentTitles } from "./creation.ts";
 import { type Dispatched, issueDispatch } from "./dispatch.ts";
-import { makeGitHubPoller } from "./github.ts";
 import { issueLifecycle } from "./lifecycle.ts";
 import { merging } from "./merge.ts";
 import { nextSteps } from "./moves.ts";
@@ -182,7 +181,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
   const { config, clock, core, agent: store, repo: repos, runtime: runtimes, session: sessions, channel: chat, db } = deps;
   const log = deps.log.child("issue");
   const tasks = new TaskGroup({ name: "issue", onError: (task, e) => log.error(`${task} failed:`, e) });
-  const r = await issueLifecycle({ core, agent: store, repo: repos, session: sessions, db, clock, log });
+  const r = await issueLifecycle({ core, agent: store, session: sessions, db, clock, log });
   const {
     issueOfSession,
     loadKept,
@@ -211,7 +210,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     savePullRequest,
     finishPullRequest,
   } = r;
-  const { split, joinChildren } = issueSplitting(r, { agent: store, repo: repos, session: sessions, channel: chat });
+  const { split, joinChildren } = issueSplitting(r, { agent: store, session: sessions, channel: chat });
   const d = issueDispatch(r, joinChildren, { core, agent: store, repo: repos, runtime: runtimes, session: sessions, channel: chat, log });
   const { hire, start, refreshQueue, reopen, scheduled } = d;
   const { withEdit, settledMove, stuckWords, movesWords } = issueSettling(r, d, { agent: store, repo: repos, runtime: runtimes, session: sessions, clock });
@@ -222,18 +221,16 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     submit,
   } = merging({
     core,
-    log,
     sessions,
-    repos,
     chat,
     get,
     list: everyIssue,
-    liveSession,
     setConflict,
     savePullRequest,
     finishPullRequest,
   });
-  const { pollOpen: pollGitHub } = makeGitHubPoller(() => core.state().issues, { db, session: sessions, repo: repos, clock, log });
+
+  const pollGitHub = () => sessions.pollGitHub(core.state().issues);
 
   const chooseAgent = async (brief: string, name: string, picked: string): Promise<T.Agent> => {
     const key = name.trim();
@@ -398,7 +395,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
         if (issue) {
           const conflict = (await get(issue)).conflict;
           if (conflict) {
-            const rechecked = await sessions.withWorkplace(e.id, (place) => repos.conflict(place, conflict.base));
+            const rechecked = await sessions.conflictOf(e.id, conflict.base);
             await setConflict(issue, rechecked);
           }
         }

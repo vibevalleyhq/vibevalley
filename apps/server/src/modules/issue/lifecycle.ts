@@ -11,7 +11,6 @@ import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
-import { issueBranch, type Repo } from "#/modules/repo/repo.ts";
 import { RepoError } from "#/modules/repo/workplace.ts";
 import { NotRecorded, type Session } from "#/modules/session/session.ts";
 import type { Trigger } from "#/modules/session/shapes.ts";
@@ -35,7 +34,6 @@ const closingOf = (closed: T.SessionClose | undefined): { delivered: T.Landing }
 export interface IssueParts {
   readonly core: Core;
   readonly agent: Agent;
-  readonly repo: Repo;
   readonly session: Session;
   readonly db: Db;
   readonly clock: Time;
@@ -45,7 +43,7 @@ export interface IssueParts {
 export type IssueLifecycle = Awaited<ReturnType<typeof issueLifecycle>>;
 
 export async function issueLifecycle(deps: IssueParts) {
-  const { core, agent: agents, repo: repos, session: sessions, db, clock, log } = deps;
+  const { core, agent: agents, session: sessions, db, clock, log } = deps;
   const store = await makeIssueStore({ core, db });
 
   const loadKept = async () => {
@@ -295,10 +293,8 @@ export async function issueLifecycle(deps: IssueParts) {
   const repoRefusal = (e: unknown) => (e instanceof RepoError ? refused(e.message) : e);
 
   const changesOf = async (item: T.Issue): Promise<T.Changes | undefined> => {
-    const session = latestSessionIdOf(item);
     try {
-      if (session && sessions.live(session).reachable) return await sessions.withWorkplace(session, (place) => repos.changes(place));
-      return item.repo ? await repos.branchChanges(item.repo, issueBranch(item.number)) : undefined;
+      return await sessions.changesOf(item);
     } catch (e) {
       throw repoRefusal(e);
     }
