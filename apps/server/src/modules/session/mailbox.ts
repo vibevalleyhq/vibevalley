@@ -5,6 +5,7 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
 import { BizCode, Inconsistent, lookIn, missing, refuseIn } from "#/base/errors.ts";
+import { newId } from "#/base/ids.ts";
 import { jsonOf, valueOf } from "#/base/json.ts";
 import type { Core } from "#/core/core.ts";
 import type { ServerConfig } from "#/infra/config.ts";
@@ -102,6 +103,18 @@ export type Withdrawal =
   /** Runs in its own transaction, outside writeLock. */
   | { readonly _tag: "Issue"; readonly issue: string; readonly at: number };
 
+/** What an issue's next helper is to be told when it is sent: the issue's words, or the ones it was started with. */
+export interface Dispatch {
+  readonly issue: string;
+  /** The profile that is to take it. */
+  readonly agent: string;
+  readonly text: string;
+  /** Where its helper answers. */
+  readonly channel: string;
+  readonly by: T.RunTrigger;
+  readonly at: number;
+}
+
 export type DeliveryNews =
   | { readonly _tag: "Consumed"; readonly session: string; readonly envelope: string }
   | { readonly _tag: "Braked"; readonly session: string; readonly failed: number }
@@ -111,6 +124,8 @@ export interface Mailbox {
   readonly record: (event: SourceEvent) => Promise<Trigger | undefined>;
   readonly accept: (event: SourceEvent) => Promise<Trigger | undefined>;
   readonly recordTrigger: (input: TriggerInput) => Promise<Trigger>;
+  /** A dispatch held for the issue's next helper: recorded in the caller's transaction, routed once it commits. */
+  readonly queueDispatch: (dispatch: Dispatch) => Promise<void>;
   readonly readTrigger: (id: string) => Promise<TriggerResource | undefined>;
   readonly knownGitHubEvents: (repo: string, pr: number) => Promise<readonly KnownGitHubEvent[]>;
   readonly replayCronTriggers: (consume: (trigger: Trigger, data: unknown) => Promise<void>) => Promise<void>;
@@ -497,9 +512,25 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
     }
   });
 
+  const queueDispatch = async (d: Dispatch) => {
+    const trigger = await journal.recordTrigger({
+      source: "workbench",
+      key: newId(),
+      actor: { kind: "system", id: "system" },
+      text: d.text,
+      threads: [`issue:${d.issue}`],
+      addressed: "thread_owner",
+      replyChannel: d.channel,
+      meta: { ingressRecipient: d.agent, issue: d.issue, trigger: d.by, dispatch: true },
+      at: d.at,
+    });
+    await db.afterCommit(() => bestEffort(log, `issue: route ${trigger.id}`, () => route(trigger)));
+  };
+
   const api: Mailbox = {
     ...journal,
     record,
+    queueDispatch,
     accept,
     isRouted: work.isRouted,
     triggersOf: work.issueInputs,

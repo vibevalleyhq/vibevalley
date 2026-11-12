@@ -374,8 +374,6 @@ export async function issueLifecycle(deps: IssueParts) {
 
   const withdrawDispatches = (id: string, at: number) => sessions.withdrawDispatches(id, at);
 
-  const route = (dispatch: Trigger) => bestEffort(log, `issue: route ${dispatch.id}`, () => sessions.route(dispatch));
-
   /** The issue already owns its number and workplace before its session starts. Throws NotRecorded when the database does not keep it. */
   const recordHiredStart = async (id: string, session: T.Session) => {
     try {
@@ -392,31 +390,17 @@ export async function issueLifecycle(deps: IssueParts) {
 
   const recordOnDutyStart = async (issue: T.Issue, agent: string, channel: string, input?: { readonly text: string; readonly by: T.RunTrigger }) => {
     const assignedAt = clock.now();
-    let dispatch: Trigger | undefined;
     await db.tx(async () => {
       if (isClosed(issue.status)) await q.reopenIssue(db.sql, { id: issue.id });
       await q.queueIssue(db.sql, { id: issue.id, at: assignedAt });
       await store.executeInTx(issue.id, agent, agent, assignedAt, () => publish(issue.id));
-      if (input)
-        dispatch = await sessions.recordTrigger({
-          source: "workbench",
-          key: newId(),
-          actor: { kind: "system", id: "system" },
-          text: input.text,
-          threads: [`issue:${issue.id}`],
-          addressed: "thread_owner",
-          replyChannel: channel,
-          meta: { ingressRecipient: agent, issue: issue.id, trigger: input.by, dispatch: true },
-          at: assignedAt,
-        });
+      if (input) await sessions.queueDispatch({ issue: issue.id, agent, text: input.text, channel, by: input.by, at: assignedAt });
     });
-    if (dispatch) await route(dispatch);
   };
 
   const setQueued = async (id: string, queued: boolean, channel: string, by?: T.RunTrigger, source?: Trigger) => {
     const item = await unsent(id);
     const at = clock.now();
-    let dispatch: Trigger | undefined;
     await db.tx(async () => {
       if (!queued) {
         await withdrawDispatches(id, at);
@@ -426,20 +410,16 @@ export async function issueLifecycle(deps: IssueParts) {
       }
       const changed = await q.queueIssue(db.sql, { at, id });
       if (changed.length > 0 && !source)
-        dispatch = await sessions.recordTrigger({
-          source: "workbench",
-          key: newId(),
-          actor: { kind: "system", id: "system" },
+        await sessions.queueDispatch({
+          issue: id,
+          agent: assignedAgentOf(item) ?? "",
           text: issueBrief(item),
-          threads: [`issue:${id}`],
-          addressed: "thread_owner",
-          replyChannel: channel,
-          meta: { ingressRecipient: assignedAgentOf(item) ?? "", issue: id, trigger: by ?? { kind: "issue" }, dispatch: true },
+          channel,
+          by: by ?? { kind: "issue" },
           at,
         });
       await db.afterCommit(() => publish(id));
     });
-    if (dispatch) await route(dispatch);
     return get(id);
   };
 
@@ -476,7 +456,6 @@ export async function issueLifecycle(deps: IssueParts) {
     rows: readonly { readonly id: T.IssueId; readonly req: T.IssueRequest }[],
   ) => {
     const at = clock.now();
-    const dispatches: Trigger[] = [];
     try {
       await db.tx(async () => {
         const current = await q.getIssue(db.sql, { id });
@@ -495,18 +474,14 @@ export async function issueLifecycle(deps: IssueParts) {
           });
         for (const row of rows) {
           await q.addIssue(db.sql, issueRow(row.id, row.req, parentMandate, at));
-          const triggerRecorded = await sessions.recordTrigger({
-            source: "workbench",
-            key: newId(),
-            actor: { kind: "system", id: "system" },
+          await sessions.queueDispatch({
+            issue: row.id,
+            agent: row.req.agent ?? "",
             text: [row.req.title, row.req.description].filter(Boolean).join("\n\n"),
-            threads: [`issue:${row.id}`],
-            addressed: "thread_owner",
-            replyChannel: channel,
-            meta: { ingressRecipient: row.req.agent ?? "", issue: row.id, trigger: { kind: "issue" }, dispatch: true },
+            channel,
+            by: { kind: "issue" },
             at,
           });
-          dispatches.push(triggerRecorded);
           await q.queueIssue(db.sql, { id: row.id, at });
           await store.assignInTx(row.id, row.req.agent, at);
         }
@@ -516,8 +491,7 @@ export async function issueLifecycle(deps: IssueParts) {
       if (e instanceof SqlError) throw refused(causeMessage(e));
       throw e;
     }
-    for (const dispatch of dispatches) await route(dispatch);
-    // Children reach the board only once their dispatches are held: the queue reacts to their issueChanged, and an
+    // The dispatches were routed as the transaction committed (queueDispatch). Children reach the board only once their dispatches are held: the queue reacts to their issueChanged, and an
     // earlier one would find no queued input and, the issue then unchanged, never be told again.
     for (const row of rows) await publish(row.id);
   };

@@ -94,15 +94,6 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
     if (blocked.length > 0) throw new HireRefused(t("server.issue.dependencies.waiting", { issues: list(blocked) }));
     const parent = issue.parent ? await get(issue.parent).catch(noneIfRefused) : undefined;
     const base = opt.base ?? (parent ? issueBranch(parent.number) : undefined);
-    if (parent) {
-      try {
-        // The parent's checkout, for the child's branch to fork from.
-        await sessions.withCheckout(where, parent.number, async () => {});
-      } catch (e) {
-        if (e instanceof RepoError) throw new HireRefused(e.message, undefined, { cause: e });
-        throw e;
-      }
-    }
     // A draft's session is not one of the issue's sessions: the issue stays unsent.
     const constraints = workConstraints(
       issue.constraints,
@@ -115,6 +106,8 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
         agent,
         brief: [brief, constraints].filter(Boolean).join("\n\n"),
         where,
+        // The child's branch forks from the parent's.
+        ...(parent ? { parent: parent.number } : {}),
         options: { ...sending, ...(base ? { base, worktree: true } : {}), context: { kind: "issue", issue: hiredIssue } },
         envelopes: { _tag: "Queued", triggers: opt.inputs ?? [] },
         hiring: async (w) => {

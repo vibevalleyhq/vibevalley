@@ -9,7 +9,7 @@ import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import type { Memory } from "#/modules/memory/memory.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
-import type { Merged, Workplace, WorkplaceCleanup, WorkplaceRelease } from "#/modules/repo/workplace.ts";
+import { type Merged, RepoError, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "#/modules/repo/workplace.ts";
 import type { Runtime } from "#/modules/runtime/runtime.ts";
 
 import type { Settle } from "./briefing.ts";
@@ -17,9 +17,9 @@ import type { Accepted, ChannelHearers, ChannelRouteResult, Envelope } from "./e
 import { makeGitHubPoller } from "./github.ts";
 import type { AgentHost, HostOptions } from "./host.ts";
 import { type ChildChecks, type IssueRecord, type Landing, makeLanding } from "./landing.ts";
-import { type Lifecycle, makeLifecycle, type SessionNews, type SessionOptions } from "./lifecycle.ts";
+import { HireRefused, type Lifecycle, makeLifecycle, type SessionNews, type SessionOptions } from "./lifecycle.ts";
 import { type Machine, makeMachine } from "./machine.ts";
-import { type DeliveryNews, type HireArrival, type HiredReceipt, type Mailbox, makeMailbox, type QueuedInput } from "./mailbox.ts";
+import { type DeliveryNews, type Dispatch, type HireArrival, type HiredReceipt, type Mailbox, makeMailbox, type QueuedInput } from "./mailbox.ts";
 import type { KnownGitHubEvent, SourceEvent, TriggerInput, TriggerResource } from "./payload.ts";
 import { summaryOf } from "./report.ts";
 import type { Trigger } from "./shapes.ts";
@@ -28,8 +28,9 @@ export type { Accepted, ChildChecks, IssueRecord, QueuedInput, SessionOptions };
 export type { Hired, HireOptions, RunFinished, RunStore, SessionNews } from "./lifecycle.ts";
 export { DeliveryRefused, HireRefused, newsOf, NotRecorded, NotTakenIn, NotWorkFile, runOf } from "./lifecycle.ts";
 
-/** A hire: the helper, its brief and where it works, and the inputs it starts with. */
-export type HireOrder = Omit<HireArrival, "_tag">;
+/** A hire: the helper, its brief and where it works, and the inputs it starts with. parent: the issue in that repo
+ * whose branch its branch forks from; that issue's checkout is made first. */
+export type HireOrder = Omit<HireArrival, "_tag"> & { readonly parent?: number };
 
 /** Who hears a routed trigger: a channel's hearers, or one session. */
 export type Audience = ChannelHearers | { readonly session: string };
@@ -56,9 +57,11 @@ export interface Session {
   readonly route: (trigger: Trigger, to?: Audience) => Promise<ChannelRouteResult>;
   /** A trigger recorded in the caller's transaction; route it after. */
   readonly recordTrigger: (input: TriggerInput) => Promise<Trigger>;
+  /** A dispatch held for the issue's next helper: recorded in the caller's transaction, routed once it commits. */
+  readonly queueDispatch: (dispatch: Dispatch) => Promise<void>;
   /** A source's event recorded as a trigger and routed; the farm's own echo is neither. */
   readonly receive: (event: SourceEvent) => Promise<Accepted>;
-  /** A helper hired with its first inputs; throws HireRefused. */
+  /** A helper hired with its first inputs; throws HireRefused (also when the parent's checkout cannot be made). */
   readonly hireWith: (order: HireOrder) => Promise<HiredReceipt>;
   /** A channel message's envelope taken back from every delivery that still waits on it. */
   readonly withdrawEnvelope: (envelope: string) => Promise<void>;
@@ -203,7 +206,17 @@ export function sessionOver(parts: {
     route: (trigger, to) => mailbox.receive({ _tag: "Trigger", trigger, ...(to ? { to } : {}) }),
     recordTrigger: mailbox.recordTrigger,
     receive: receiving(mailbox),
-    hireWith: (order) => mailbox.receive({ _tag: "Hire", ...order }),
+    queueDispatch: mailbox.queueDispatch,
+    hireWith: async ({ parent, ...order }) => {
+      if (parent !== undefined)
+        try {
+          await repo.checkout({ _tag: "Open", repo: order.where, issue: parent, worktree: true, base: "" });
+        } catch (e) {
+          if (e instanceof RepoError) throw new HireRefused(e.message, undefined, { cause: e });
+          throw e;
+        }
+      return mailbox.receive({ _tag: "Hire", ...order });
+    },
     withdrawEnvelope: (envelope) => mailbox.withdraw({ _tag: "Envelope", envelope }),
     withdrawDeliveries: (session, why) => mailbox.withdraw({ _tag: "Session", session, why }),
     withdrawDispatches: (issue, at) => mailbox.withdraw({ _tag: "Issue", issue, at }),
