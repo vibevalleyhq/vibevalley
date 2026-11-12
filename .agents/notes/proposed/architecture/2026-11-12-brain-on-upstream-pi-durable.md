@@ -23,9 +23,8 @@ P0–P3 已做完，现在的样子沉淀在 [VibeValley 自己的 agent](docs/s
 
 还剩：
 
-1. **评测的对照表。** 真模型的助手评测（`vp run --filter @vibevalley/server evals`，花钱，先问用户）在换之前、之后各跑一遍，两张 `| case | model | passed | tokens |` 放进 PR。
-2. **Postgres 的存储后端。** 过 pi-durable 的一致性测试，换掉 `durable.db`；换后端只碰 `runtime/durable.ts`。
-3. **农机换回 oar 的 runtime。** oar 的 pi-durable runtime 跟上 1.5 以后，`runtime/vibevalley.ts` 换回它，删掉 `pnpm-workspace.yaml` 里放宽 peer 的那条。
+1. **Postgres 的存储后端。** 过 pi-durable 的一致性测试，换掉 `durable.db`；换后端只碰 `runtime/durable.ts`。
+2. **农机换回 oar 的 runtime。** oar 的 pi-durable runtime 跟上 1.5 以后，`runtime/vibevalley.ts` 换回它，删掉 `pnpm-workspace.yaml` 里放宽 peer 的那条。
 
 ## Alternatives considered
 
@@ -38,7 +37,7 @@ P0–P3 已做完，现在的样子沉淀在 [VibeValley 自己的 agent](docs/s
 
 - P0 的流程测试在：答到一半关掉、重起、答完、只记一次；`session/host` 原有的测试和全部流程测试照旧过。
 - 助手和农机都跑在 Harness 上，`durable.db` 在家目录；`packages/agent`、`packages/ai` 里不再有自己的循环、会话文件和模型桥。
-- 真模型的助手评测换之前、之后各一张表，放进 PR（花钱，先问用户）。（还没跑）
+- 真模型的助手评测换之前、之后各一张表，放进 PR（2026-11-12 跑过：换之前 10/11 个样例过，`hand-over-in-place` 3/5 是样例缺了工单的状态，补上以后换之后 11/11 过）。
 - `vp check`、`server:check`、`web:check`、`desktop:test`、`docs:verify`、`deadcode` 全过；[vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 的服务端分册走通。
 - `docs/subsystems/brain.md`、`session.md` 改成新的样子，删掉本 Note。
 
