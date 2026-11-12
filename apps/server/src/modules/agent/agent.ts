@@ -4,14 +4,11 @@ import { join } from "node:path";
 import { z } from "zod";
 
 import { frontMatter, skillBody } from "@vibevalley/agent/skills";
-import { deepseek, MissingKey, type ModelClient } from "@vibevalley/ai/client";
-import type { Llm } from "@vibevalley/ai/llm";
 import type { Clock } from "@vibevalley/async";
 import { currentLocale, list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime, SpeciesValues } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
-import type { Secret } from "@vibevalley/protocol/schema";
 
 import { serverFile } from "#/base/assets.ts";
 import { BizCode, errnoOf, Inconsistent, lookIn, messageOf, missing, refuseIn } from "#/base/errors.ts";
@@ -384,14 +381,3 @@ export async function makeAgent(deps: AgentDeps): Promise<Agent> {
 }
 
 export const noDeepSeekKey = () => t("server.agent.noDeepSeekKey");
-
-/** Reveals the Secret lazily per request so the plaintext key is not retained in closures. */
-export function modelClient(id: string, key: Secret | (() => Secret | undefined), service: Llm): ModelClient {
-  const plain = typeof key === "function" ? () => key()?.reveal() : () => key.reveal();
-  try {
-    return deepseek(id, plain, service);
-  } catch (e) {
-    if (e instanceof MissingKey) throw new Error(noDeepSeekKey(), { cause: e });
-    throw e;
-  }
-}

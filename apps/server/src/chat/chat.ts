@@ -10,7 +10,6 @@ import { type McpServer, readMcpConfig } from "@vibevalley/agent/mcp";
 import { fileMemory } from "@vibevalley/agent/memory";
 import { defaultSkillDirs, scanSkills } from "@vibevalley/agent/skills";
 import { memoryStore } from "@vibevalley/agent/todoStore";
-import { type Llm, makeLlm } from "@vibevalley/ai/llm";
 import { Queue, TaskGroup } from "@vibevalley/async";
 import { homeOf } from "@vibevalley/home";
 import { currentLocale, t } from "@vibevalley/i18n";
@@ -20,16 +19,12 @@ import { loadConfig } from "#/infra/config.ts";
 import { HomeTaken, leaseHome } from "#/infra/lease.ts";
 import { makeLogger } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
-import { modelClient } from "#/modules/agent/agent.ts";
 import { dshRuntime } from "#/modules/runtime/dsh.ts";
-import { openDurable } from "#/modules/runtime/durable.ts";
+import { deepseekAccess, openDurable } from "#/modules/runtime/durable.ts";
 import { registryOf } from "#/modules/runtime/runtime.ts";
 import { helperKey, vibevalleyRuntimeOf } from "#/modules/runtime/vibevalley.ts";
 
 import { instructions } from "./prompts.ts";
-
-// The command line and the live evals have no farm to give the Llm its fetch: it gets the global one.
-const standaloneLlm = (): Llm => makeLlm();
 
 /** What the user should be told went wrong: said on stderr, and the conversation ends. */
 class ChatRefused extends Error {
@@ -90,7 +85,10 @@ const toOarMcp = (s: McpServer): OarMcpServer[] =>
  * goes on with the same conversation each time, until /reset. */
 export async function ownChat(values: OwnChat): Promise<void> {
   const config = await loadConfig();
-  const llm = modelClient(values.model || config.agent.model, config.deepseek.apiKey, standaloneLlm());
+  // The key of the config and the environment (the app's settings are the server's), and the global fetch: no farm here.
+  const models = deepseekAccess({ key: () => config.deepseek.apiKey, fetch: globalThis.fetch, clock: wallTime });
+  const cannot = models.cannotAsk();
+  if (cannot !== undefined) throw new ChatRefused(cannot);
   const cwd = values.cwd ? resolve(values.cwd) : process.cwd();
   const home = join(homeOf(), "agent", values.name);
   const servers = await readMcpConfig(values.mcp || join(home, "mcp.json")).catch((e: unknown) => {
@@ -108,12 +106,11 @@ export async function ownChat(values: OwnChat): Promise<void> {
   }
   const log = makeLogger({ name: "chat", level: "warn", write: (_level, _name, line) => process.stderr.write(dim(line) + "\n") });
   try {
-    const durable = await openDurable({ file: release ? join(home, "durable.db") : undefined, clock: wallTime, log });
+    const durable = await openDurable({ file: release ? join(home, "durable.db") : undefined, clock: wallTime, log, models });
     const owner = new TaskGroup({ name: "chat" });
     try {
       const runtime = vibevalleyRuntimeOf({
         durable,
-        llm: () => llm,
         time: wallTime,
         owner,
         log,
@@ -123,7 +120,13 @@ export async function ownChat(values: OwnChat): Promise<void> {
       const id = `chat.${values.name}`;
       const session = await runtime.session(
         { kind: "available", via: "bundled" },
-        { cwd, resume: id, systemPrompt: instructions(currentLocale()), mcpServers: servers.flatMap(toOarMcp) },
+        {
+          cwd,
+          resume: id,
+          model: values.model || config.agent.model,
+          systemPrompt: instructions(currentLocale()),
+          mcpServers: servers.flatMap(toOarMcp),
+        },
       );
       const skills = (await scanSkills(defaultSkillDirs(cwd))).length;
       const reset = async () => {

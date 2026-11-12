@@ -101,7 +101,8 @@ const farm = async (f: Reply = respond, config: ServerConfig = testConfig()) => 
     runtimes: [pi],
     repos: ["demo", "notes"],
   });
-  return Object.assign(await orchestrated(below, { llm: () => llm }), { requests });
+  below.deepseek.use(llm);
+  return Object.assign(await orchestrated(below), { requests });
 };
 
 /** The orchestrator's conversation as kept in durable.db, an entry a line. */
@@ -401,7 +402,8 @@ describe("the orchestrator", () => {
         throw new Error("额度读不出来");
       },
     });
-    await using f = await orchestrated(below, { llm: () => llm });
+    below.deepseek.use(llm);
+    await using f = await orchestrated(below);
     const response = f.orchestrator;
     const words = (async () => {
       for await (const _ of response.answerer("api")(orchestratorModel)!("在吗")) void _;

@@ -8,7 +8,6 @@ import { defineRuntime, type InstallationSnapshot, RuntimeRegistry } from "@boti
 import { afterEach, describe, expect, test } from "vite-plus/test";
 
 import { testClock } from "@vibevalley/agent/testing";
-import { makeLlm } from "@vibevalley/ai/llm";
 import { setLocale, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { ApiError, BizCode } from "@vibevalley/protocol/api";
@@ -23,7 +22,7 @@ import { localParts, type Time, wallTime } from "#/infra/time.ts";
 import { type Agent, makeAgent } from "#/modules/agent/agent.ts";
 import { sampleAgent } from "#/modules/agent/seed.ts";
 import { makeSetting, type Setting } from "#/modules/setting/setting.ts";
-import { testConfig } from "#/testing/layers.ts";
+import { offlineNetwork, testConfig } from "#/testing/layers.ts";
 import { allow, refuse } from "#/testing/refuse.ts";
 
 import { piBalance } from "./pi.ts";
@@ -98,7 +97,10 @@ async function world(config: ServerConfig = testConfig(), clock: Time = wallTime
     setting,
     log,
     runtime: async (options) => {
-      const r = await makeRuntime({ config, clock, log, db, core, agent, setting, llm: makeLlm() }, { registry: new RuntimeRegistry([]), ...options });
+      const r = await makeRuntime(
+        { config, clock, log, db, core, agent, setting, fetch: offlineNetwork.fetch },
+        { registry: new RuntimeRegistry([]), ...options },
+      );
       opened.push(r);
       return r;
     },

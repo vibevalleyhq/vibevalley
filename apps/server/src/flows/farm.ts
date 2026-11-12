@@ -115,7 +115,8 @@ export async function failure(p: Promise<unknown>): Promise<Error & { readonly b
 export async function mediaFarm(llm: ModelClient) {
   const w = await world({ config: testConfig({ patrol: { heartbeatMinutes: 0 } }), network: network() });
   try {
-    const orchestrator = await makeOrchestrator(w, { llm: () => llm });
+    w.deepseek.use(llm);
+    const orchestrator = await makeOrchestrator(w);
     w.closes.push(() => orchestrator.close());
     return Object.assign(w, { orchestrator });
   } catch (e) {

@@ -7,12 +7,15 @@ import type { Event, Session } from "@botiverse/oar";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 
 import { lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf } from "@vibevalley/agent/testing";
+import type { ModelClient } from "@vibevalley/ai/client";
 import { answer, text as words, toolCall } from "@vibevalley/ai/testing";
 import { TaskGroup } from "@vibevalley/async";
 import { whenTrue } from "@vibevalley/testkit/until";
 
 import { keptLog } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
+import { noDeepSeekKey } from "#/modules/agent/agent.ts";
+import { type ScriptedDeepSeek, scriptedDeepSeek } from "#/testing/deepseek.ts";
 
 import { type Durable, openDurable } from "./durable.ts";
 import { helperInstructions, vibevalleyRuntimeOf } from "./vibevalley.ts";
@@ -32,16 +35,28 @@ const owner = () => {
 };
 const log = keptLog();
 const durables: Durable[] = [];
-/** A harness kept in memory, or in file. */
+/** The scripted DeepSeek each harness asks. */
+const seats = new Map<Durable, ScriptedDeepSeek>();
+/** A harness kept in memory, or in file, asking a scripted DeepSeek with nothing seated yet. */
 const durable = async (file?: string) => {
-  const d = await openDurable({ file, clock: wallTime, log });
+  const seat = scriptedDeepSeek(wallTime);
+  const d = await openDurable({ file, clock: wallTime, log, models: seat.models });
   durables.push(d);
+  seats.set(d, seat);
   return d;
+};
+/** From now on, d's conversations are answered by llm. */
+const seat = (d: Durable, llm: ModelClient) => {
+  const found = seats.get(d);
+  if (!found) throw new Error("a harness this file did not open");
+  found.use(llm);
 };
 afterEach(async () => {
   await Promise.all(sessions.splice(0).map((s) => s.dispose()));
   await Promise.all(owners.splice(0).map((tasks) => tasks.close()));
   await Promise.all(durables.splice(0).map((d) => d.close()));
+  await Promise.all([...seats.values()].map((s) => s.close()));
+  seats.clear();
   for (const done of homes.splice(0)) done();
 });
 
@@ -60,8 +75,9 @@ async function open(
 ): Promise<Opened> {
   const { llm, requests, pending } = scriptedLLM(steps);
   const d = extra.durable ?? (await durable());
+  seat(d, llm);
   const cwd = extra.cwd ?? home();
-  const runtime = vibevalleyRuntimeOf({ durable: d, time: wallTime, owner: owner(), log, llm: () => llm });
+  const runtime = vibevalleyRuntimeOf({ durable: d, time: wallTime, owner: owner(), log });
   const session = await runtime.session(
     { kind: "available", via: "bundled" },
     {
@@ -98,7 +114,9 @@ describe("VibeValley's runtime", () => {
         },
       },
     };
-    const runtime = vibevalleyRuntimeOf({ durable: await durable(), time: wallTime, owner: owner(), log, llm: () => held });
+    const d = await durable();
+    seat(d, held);
+    const runtime = vibevalleyRuntimeOf({ durable: d, time: wallTime, owner: owner(), log });
     const session = await runtime.session({ kind: "available", via: "bundled" }, { cwd: home() });
     sessions.push(session);
     const events: Event[] = [];
@@ -150,7 +168,9 @@ describe("VibeValley's runtime", () => {
         },
       },
     };
-    const runtime = vibevalleyRuntimeOf({ durable: await durable(), time: wallTime, owner: parent, log, llm: () => held });
+    const d = await durable();
+    seat(d, held);
+    const runtime = vibevalleyRuntimeOf({ durable: d, time: wallTime, owner: parent, log });
     const session = await runtime.session({ kind: "available", via: "bundled" }, { cwd: home() });
     sessions.push(session);
     await session.prompt("work");
@@ -234,7 +254,7 @@ describe("VibeValley's runtime", () => {
     const cwd = home();
     // The first process: the model is in the middle of its answer when the harness goes away, its session never let go.
     const before = await open([answer(words, { hangAfter: 3 })], {
-      durable: await openDurable({ file, clock: wallTime, log }),
+      durable: await durable(file),
       cwd,
     });
     await before.session.prompt("地里怎么样");
@@ -313,26 +333,18 @@ rl.on('line', (line) => {
   });
 
   it("lists DeepSeek's models, is bundled, and says why it cannot run", async () => {
-    const { llm } = scriptedLLM();
-    const runtime = vibevalleyRuntimeOf({ durable: await durable(), time: wallTime, owner: owner(), log, llm: () => llm });
+    const d = await durable();
+    seat(d, scriptedLLM().llm);
+    const runtime = vibevalleyRuntimeOf({ durable: d, time: wallTime, owner: owner(), log });
     const models = await runtime.listModels();
     expect(models.kind === "ok" && models.models.some((m) => m.id === "deepseek-flash" && m.effortLevels.join(",") === "high,max" && m.default === true)).toBe(
       true,
     );
     expect(await runtime.installation()).toEqual({ kind: "available", via: "bundled" });
     await expect(runtime.session({ kind: "available", via: "bundled" }, { cwd: tmpdir(), effort: "low" })).rejects.toThrow(/只有 high、max/u);
-    const keyless = vibevalleyRuntimeOf({
-      durable: await durable(),
-      time: wallTime,
-      owner: owner(),
-      log,
-      llm: () => {
-        throw new Error("没有 DeepSeek 的密钥");
-      },
-    });
-    expect(await keyless.installation()).toEqual({
-      kind: "unsupported",
-      reason: "没有 DeepSeek 的密钥",
-    });
+    // Nothing seated: a farm without a DeepSeek key.
+    const keyless = vibevalleyRuntimeOf({ durable: await durable(), time: wallTime, owner: owner(), log });
+    expect(await keyless.installation()).toEqual({ kind: "unsupported", reason: noDeepSeekKey() });
+    await expect(keyless.session({ kind: "available", via: "bundled" }, { cwd: tmpdir() })).rejects.toThrow(noDeepSeekKey());
   });
 });

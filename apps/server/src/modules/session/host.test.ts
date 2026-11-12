@@ -83,6 +83,7 @@ describe("AgentHost", () => {
       answer([text("我看一下"), toolCall("remember", { note: "remembered in database" }), toolCall("missing", {})]),
       answer("看完了，一切正常"),
     ]);
+    farm.deepseek.use(llm);
     const memory = farm.memory;
     await memory.remember({ agent: "orchestrator", text: "database preference", repo: "", by: user });
     const finished: Extract<SessionNews, { _tag: "RunFinished" }>[] = [];
@@ -113,7 +114,7 @@ describe("AgentHost", () => {
       home: config.home,
       cwd: config.workRoot,
       instructions: "",
-      llm: () => llm,
+      model: () => "",
       tools: () => [],
       first: "first",
       quiet: () => false,
@@ -162,14 +163,14 @@ describe("AgentHost", () => {
     const config = testConfig();
     await using farm = await world({ config });
     const sessions = farm.session;
-    const { llm } = scriptedLLM();
+    farm.deepseek.use(scriptedLLM().llm);
     const host = await sessions.host({
       session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "助手", runtime: "vibevalley", brief: "" },
       inputType: "testInput",
       home: config.home,
       cwd: config.workRoot,
       instructions: "",
-      llm: () => llm,
+      model: () => "",
       tools: () => [],
       first: "first",
       quiet: () => true,
@@ -209,14 +210,14 @@ describe("AgentHost", () => {
     const config = testConfig();
     await using farm = await world({ config });
     const sessions = farm.session;
-    const { llm } = scriptedLLM();
+    farm.deepseek.use(scriptedLLM().llm);
     const host = await sessions.host({
       session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "助手", runtime: "vibevalley", brief: "" },
       inputType: "testInput",
       home: config.home,
       cwd: config.workRoot,
       instructions: "",
-      llm: () => llm,
+      model: () => "",
       tools: () => [],
       first: "first",
       quiet: () => true,

@@ -23,7 +23,7 @@
 | `packages/agent/src/brain/brain.ts`、`session.ts`、`fs.ts`、`compaction.ts`、`prefix.ts` | `makeBrain` 入口（显式 `BrainState`）、`TranscriptStore` `.jsonl` 端口、`AgentFs` 文件端口、上下文压缩与前缀分段 SHA-256 校验 |
 | `packages/agent/src/tools/self.ts`、`skills.ts`、`memory.ts`、`mcp.ts`、`reminders.ts` | 收 `AbortSignal` 的内置工具、技能目录扫描、`MemoryPort`、MCP 客户端与定时提醒 |
 | `packages/agent/src/tools/todo.ts`、`todoTools.ts`、`coding.ts`、`dag.ts` | 自身任务图 `Todo`、本地文件/shell 编码工具与通用 DAG 算法 |
-| `apps/server/src/modules/session/host.ts`、`runtime/durable.ts`、`runtime/vibevalley.ts`、`chat/chat.ts` | 助手宿主 `AgentHost`、农场唯一的 `Harness`（`durableTool` 把 `Tool` 包成 pi-durable 的工具，模型桥接到 `ModelClient`）、`vibevalley` 农机（oar 的 `Runtime`，一个会话一个 pi-durable 对话，含 `runtime_todo` 表存储）与 CLI 终端对话（同一个农机，跑在自己的 `Harness` 上）；四者都跑在 pi-durable 上 |
+| `apps/server/src/modules/session/host.ts`、`runtime/durable.ts`、`runtime/vibevalley.ts`、`chat/chat.ts` | 助手宿主 `AgentHost`、农场唯一的 `Harness`（`durableTool` 把 `Tool` 包成 pi-durable 的工具；模型是 pi-ai 的 DeepSeek provider，`deepseekAccess`）、`vibevalley` 农机（oar 的 `Runtime`，一个会话一个 pi-durable 对话，含 `runtime_todo` 表存储）与 CLI 终端对话（同一个农机，跑在自己的 `Harness` 上）；四者都跑在 pi-durable 上 |
 
 ## 模型和不变量
 
@@ -32,6 +32,7 @@
 - Provider 的 `makeDeepSeekModel` 只收显式 `model`、`baseUrl`、`key` 与调用者的 `fetch`；不读环境、登录或农场配置，不重试、不换供应商。返回 DeepSeek 增量和带标签错误，不依赖 agent 消息。
 - AI 的 `Llm` 保留 `start`、thinking/text/tool 增量、`done/error`，失败保留已到达的内容；消费结束或打断时释放响应 reader。`ModelClient` 每次请求读取调用者提供的当前 key。
 - 历史重放、缺失工具结果补齐、图片降级、上下文预算、工具参数修补与成本计算留在 AI；模型目录、wire 字段、usage 和 finish reason 解码归 Provider。
+- 跑在 pi-durable 上的三种宿主（助手、农机、终端对话）不经 `ModelClient`：`Harness` 开的时候把 pi-ai 1.5.2 的 DeepSeek provider 以 `deepseek` 注册一次（`runtime/durable.ts` 的 `deepseekAccess`），每次请求从设置（终端对话从配置和环境）现取钥匙，`fetch` 是农场的；没有钥匙也照样注册，这一轮以「没有 DeepSeek 的密钥」（`server.agent.noDeepSeekKey`）失败，不会是 `no_model`。对话写 `{ provider: "deepseek", modelId }`，模型是 pi-ai 目录里的（`deepseek-flash`、`deepseek-v4-pro`），档案写的不在目录里就用 `deepseek-flash`；帮工的 effort `high`、`max` 就是 pi-ai 的 thinking level，原样发成 `reasoning_effort`，助手不思考（`thinking: disabled`）。模型的窗口按目录（100 万），压缩仍在 12 万 token 挡住（`compaction.modelOverrides` 的 `reserveTokens`），后台压缩提前 32k 开始。不重试。花了多少：token 读 pi-ai 的 usage（和原来一样，缓存不算进 input），人民币仍由 `runtime/price.ts` 按 `packages/ai` 的价目表算。纯工具回答发回时 `content: null`、带回 `reasoning_content`，choice 里的 usage、迟到的工具 ID 都照读（`runtime/durable.test.ts` 用录下的流离线核对）。
 - 官方 `@ai-sdk/deepseek@3.0.80` 不是现有桥的等价替代：离线 fixture 中它将纯工具 assistant 的 `content: null` 编为 `""`，忽略 `reasoning_text` 与 choice 内 usage。现有流还接受迟到的工具 ID。为保持这些契约，语言保留单一专有适配器，不加 SDK 旁路；SDK Core 用于转写，不接管 agent 循环。
 
 ### 四种宿主配置（`BrainOptions`）
@@ -65,7 +66,7 @@
 ### 接着做被打断的一轮
 
 - 助手、`vibevalley` 农机和终端对话不走下面两条：它们跑在上游 pi-durable 的 `Harness` 上（`runtime/durable.ts`，`$VIBEVALLEY_HOME/durable.db`，测试农场在内存里），输入、每次回答、每个工具调用先落盘再显示；服务端在助手答到一半时停掉，重开以后这一轮接着答完，`session_run` 里还是同一轮（[计划](.agents/notes/proposed/architecture/2026-11-12-brain-on-upstream-pi-durable.md)）。
-- 农机的会话被放下（`dispose`，或服务端关门时它的主人 `owner` 关掉）时停下这一轮，和 oar 的约定一样；进程没来得及放下就没了（崩溃）时，这一轮留在 `durable.db` 里，同一个 oar 会话再打开（`resume`）就接着跑完，作为这个会话的一轮报出来；在那以前别处先让 `Harness` 接着跑（助手开机时有没答完的一轮）的话，这个会话的模型还没接上，这一轮以 `no_model` 结束。农场开机时帮工那一侧仍按「打断了」处理，下一句话来时才用 `resume` 打开。
+- 农机的会话被放下（`dispose`，或服务端关门时它的主人 `owner` 关掉）时停下这一轮，和 oar 的约定一样；进程没来得及放下就没了（崩溃）时，这一轮留在 `durable.db` 里，同一个 oar 会话再打开（`resume`）就接着跑完，作为这个会话的一轮报出来；在那以前别处先让 `Harness` 接着跑（助手开机时有没答完的一轮）的话，它也接着答完，因为模型是整个 `Harness` 共用的；只是帮工自己的扩展（提示的几段和工具）要等会话再打开才装上，这之间它答的是没有这些的。农场开机时帮工那一侧仍按「打断了」处理，下一句话来时才用 `resume` 打开。
 - 终端对话不用服务端的 `durable.db`：pi-durable 没有跨进程的锁，它在 `agent/<名字>/` 下开自己的，开着时租着这个目录；同名的第二个对话只在内存里。
 - 关闭或崩溃打断时，取消产生的半截消息不写入 `.jsonl`。
 - 调用 `resume(maxAgeMs)` 时，若最后一条是 `maxAgeMs` 内未完结的用户消息、工具结果或无结果的 `tool_calls`，自动补入「服务端重启，结果未知，请先核实」回执并继续跑完该轮。
@@ -106,3 +107,4 @@
 - `packages/ai/src/llm/llm.test.ts`：UTF-8 分片、迟到工具 ID、密钥替换、单请求、错误部分内容与 reader 取消。
 - `packages/agent/src/brain/loop.test.ts`、`core/loop.test.ts`、`brain.test.ts`、`todo.test.ts`：工具并发、插话/排队、前缀哈希、空闲压缩、断点续跑与子帮手 DAG 测试。
 - `apps/server/src/modules/runtime/vibevalley.test.ts`、`orchestrator/openai.test.ts`：oar 农机适配、任务表持久化与 OpenAI 协议入口测试。
+- `apps/server/src/modules/runtime/durable.test.ts`：pi-ai 的 DeepSeek provider 在 `Harness` 下对录下的 DeepSeek 流的读法和发法、钥匙每次现取、没有钥匙的说法；`flows/restart.test.ts`：助手和帮工都答到一半时崩溃，重开后两个都答完。测试农场的 `Harness` 问的是 `testing/deepseek.ts` 的照脚本回答的 `deepseek`（`farm.deepseek.use(llm)`），不连网。

@@ -3,20 +3,16 @@ import { join } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import {
   type Api,
-  type ApiStreamOptions,
   type AssistantMessage as PiAssistantMessage,
-  type AssistantMessageEvent as PiEvent,
   type AssistantMessageEventStream,
   createAssistantMessageEventStream,
   createModels,
-  getCurrentSystemPrompt,
-  getCurrentTools,
   type Model as PiModel,
   type Provider,
   type SimpleStreamOptions,
   type TranscriptContext,
-  type Usage as PiUsage,
 } from "@earendil-works/pi-ai";
+import { deepseekProvider } from "@earendil-works/pi-ai/providers/deepseek";
 import {
   type AgentChange,
   configure,
@@ -36,29 +32,16 @@ import {
 } from "@earendil-works/pi-durable";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
-import { z } from "zod";
 
 import { ToolFailed } from "@vibevalley/agent/core/errors";
 import type { Tool } from "@vibevalley/agent/core/loop";
-import type { ModelClient } from "@vibevalley/ai/client";
-import { failedMessage, LlmError } from "@vibevalley/ai/llm";
-import {
-  type AssistantMessage,
-  AssistantMessageSchema,
-  type Context,
-  type Message,
-  ToolResultMessageSchema,
-  type Usage,
-  UserMessageSchema,
-  zeroUsage,
-} from "@vibevalley/ai/messages";
-import type { AssistantMessageEvent } from "@vibevalley/ai/response";
-import { abortable, isAbort, TaskGroup } from "@vibevalley/async";
+import { AssistantMessageSchema, type Message, ToolResultMessageSchema, UserMessageSchema } from "@vibevalley/ai/messages";
+import type { Secret } from "@vibevalley/protocol/schema";
 
-import { messageOf } from "#/base/errors.ts";
 import { dbDir, type ServerConfig } from "#/infra/config.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
+import { noDeepSeekKey } from "#/modules/agent/agent.ts";
 
 /** The farm's one durable harness: every conversation of an agent that runs in this server, kept in durable.db. */
 export interface Durable {
@@ -71,9 +54,24 @@ export interface Durable {
   readonly existing: (key: string) => Promise<Conversation | undefined>;
   /** Whether key's conversation has a run, or input waiting for one, that the harness goes on with once it runs. */
   readonly busy: (key: string) => Promise<boolean>;
-  /** The model a conversation of key asks: llm, asked again at each request, so a key or model saved meanwhile is used. */
-  readonly model: (key: string, llm: () => ModelClient) => ModelRef;
+  /** The DeepSeek model a conversation asks for id: id itself, or the default model for an id empty or not in the
+   * catalog. */
+  readonly model: (id: string) => DeepSeekModel;
+  /** Why nothing can be asked now (no DeepSeek key), in the user's words; undefined when a model can be asked. */
+  readonly cannotAsk: () => string | undefined;
   readonly close: () => Promise<void>;
+}
+
+export interface DeepSeekModel {
+  readonly ref: ModelRef;
+  readonly contextWindow: number;
+}
+
+/** The provider every conversation of a harness asks, registered once as "deepseek" when it opens, and what it lacks to
+ * be asked. */
+export interface ModelAccess {
+  readonly provider: Provider;
+  readonly cannotAsk: () => string | undefined;
 }
 
 export interface DurableDeps {
@@ -81,6 +79,7 @@ export interface DurableDeps {
   readonly file: string | undefined;
   readonly clock: Time;
   readonly log: Logger;
+  readonly models: ModelAccess;
 }
 
 /** Where a farm keeps its conversations: durable.db in its home, or in memory with a database in memory. */
@@ -97,17 +96,75 @@ const Kept = defineDoc<{ conversations: Record<string, ConversationId> }>({
   checkpointWhen: () => true,
 });
 
-/** The one model id each bridged provider has: the conversation's model, whichever DeepSeek model its llm names. */
-const modelId = "assistant";
-/** Where a request blocks to fold the conversation: its own loop folded at 120k tokens, and each request pays for its
- * whole context. 16k above it is pi-durable's default reserve. */
-const foldWindow = 136_000;
+export const deepseekId = "deepseek";
+/** The model a profile that names none asks. */
+export const defaultModel = "deepseek-flash";
+/** pi-ai's DeepSeek models, the ones a conversation may ask. */
+export const deepseekModels: readonly PiModel<Api>[] = deepseekProvider().getModels();
+/** Where a request blocks to fold the conversation, whatever the model's window: the assistant's own loop folded at
+ * 120k tokens, and each request pays for its whole context. Background folding starts pi-durable's 32k before it. */
+const foldAt = 120_000;
+
+/** DeepSeek as pi-ai asks it, with the key the farm has at each request: one saved meanwhile is used, and none is a
+ * failed answer that says where to put one. fetch is the farm's. */
+export function deepseekAccess(deps: { readonly key: () => Secret | undefined; readonly fetch: typeof fetch; readonly clock: Time }): ModelAccess {
+  const upstream: Provider = deepseekProvider();
+  const key = () => deps.key()?.reveal() || undefined;
+  // The key is the one auth gave this request (pi-ai's Models puts it in the options).
+  const ask = (model: PiModel<Api>, transcript: TranscriptContext, options: SimpleStreamOptions | undefined): AssistantMessageEventStream => {
+    if (options?.apiKey === undefined) return failedAnswer(model, noDeepSeekKey(), deps.clock.now());
+    return upstream.streamSimple(model, transcript, { ...options, fetch: deps.fetch });
+  };
+  const provider: Provider = {
+    id: deepseekId,
+    name: upstream.name,
+    ...(upstream.baseUrl === undefined ? {} : { baseUrl: upstream.baseUrl }),
+    // Read at each request. No key still resolves: the run is asked and fails saying where to put one, never ends
+    // no_model or "not configured".
+    auth: {
+      apiKey: {
+        name: "DeepSeek API key",
+        resolve: async () => {
+          const found = key();
+          return { auth: found === undefined ? {} : { apiKey: found }, source: "VibeValley" };
+        },
+      },
+    },
+    getModels: () => upstream.getModels(),
+    stream: (model, transcript, options) => {
+      if (options?.apiKey === undefined) return failedAnswer(model, noDeepSeekKey(), deps.clock.now());
+      return upstream.stream(model, transcript, Object.assign({}, options, { fetch: deps.fetch }));
+    },
+    streamSimple: ask,
+  };
+  return { provider, cannotAsk: () => (key() === undefined ? noDeepSeekKey() : undefined) };
+}
+
+/** An answer that failed before it was asked: why is what the run ends with. */
+function failedAnswer(model: PiModel<Api>, why: string, at: number): AssistantMessageEventStream {
+  const out = createAssistantMessageEventStream();
+  const error: PiAssistantMessage = {
+    role: "assistant",
+    content: [],
+    api: model.api,
+    provider: model.provider,
+    model: model.id,
+    usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+    stopReason: "error",
+    errorMessage: why,
+    timestamp: at,
+  };
+  out.push({ type: "error", reason: "error", error });
+  out.end();
+  return out;
+}
 
 export async function openDurable(deps: DurableDeps): Promise<Durable> {
   const log = deps.log.child("durable");
-  const tasks = new TaskGroup({ name: "durable", onError: (task, e) => log.error(`${task} failed`, e) });
   const storage = deps.file === undefined ? new MemoryStorage() : await openNodeSqliteStorage(deps.file);
   const models = createModels();
+  // Once, before any run: every conversation, whoever's, finds its model however the harness comes to run it.
+  models.setProvider(deps.models.provider);
   const registry = createRegistry();
   const harness = await Harness.open(
     storage,
@@ -116,9 +173,16 @@ export async function openDurable(deps: DurableDeps): Promise<Durable> {
       registry,
       now: () => deps.clock.now(),
       identity: { attribution: null },
-      // Nothing is selected unless a conversation asks for it: each host's extension is its own.
-      // A failed answer is not asked again: the assistant's own loop never was, and a retry can say a thing twice.
-      settings: { extensions: [], retry: { enabled: false } },
+      settings: {
+        // Nothing is selected unless a conversation asks for it: each host's extension is its own.
+        extensions: [],
+        // A failed answer is not asked again: the assistant's own loop never was, and a retry can say a thing twice.
+        retry: { enabled: false },
+        // The window is the model's (a request may answer as long as it allows); the fold comes at foldAt.
+        compaction: {
+          modelOverrides: Object.fromEntries(deepseekModels.map((m) => [`${deepseekId}/${m.id}`, { reserveTokens: Math.max(0, m.contextWindow - foldAt) }])),
+        },
+      },
       onReport: (report) => log.warn(`pi-durable: ${report.kind}`, report.error),
       // Files and commands of a conversation with a working directory (a helper's) are there; one without has none.
       env: ({ cwd }) => (cwd === undefined ? undefined : new NodeExecutionEnv({ cwd })),
@@ -157,21 +221,17 @@ export async function openDurable(deps: DurableDeps): Promise<Durable> {
     return live?.run !== undefined || (inbox?.items.some((item) => item.mode !== "write") ?? false);
   };
 
-  const model = (key: string, llm: () => ModelClient): ModelRef => {
-    const provider = `vibevalley.${key}`;
-    models.setProvider(bridge(provider, llm, deps.clock, tasks));
-    return { provider, modelId };
+  const model = (id: string): DeepSeekModel => {
+    const found = deepseekModels.find((m) => m.id === id) ?? deepseekModels.find((m) => m.id === defaultModel);
+    if (found === undefined) throw new Error(`pi-ai's DeepSeek catalog has no ${defaultModel}`);
+    return { ref: { provider: deepseekId, modelId: found.id }, contextWindow: found.contextWindow };
   };
 
   let closing: Promise<void> | undefined;
-  const close = () =>
-    (closing ??= (async () => {
-      // The runs under way stay as they are: the next open goes on with them.
-      await harness.close(context);
-      await tasks.close();
-    })());
+  // The runs under way stay as they are: the next open goes on with them.
+  const close = () => (closing ??= harness.close(context));
 
-  return { harness, registry, conversation, existing, busy, model, close };
+  return { harness, registry, conversation, existing, busy, model, cannotAsk: deps.models.cannotAsk, close };
 }
 
 /** An entry's one model message, read as packages/ai's; undefined for an entry the model does not see. */
@@ -211,195 +271,3 @@ export const durableTool = (tool: Tool): ToolRegistration =>
       }
     },
   });
-
-/** A pi-ai provider whose one model is llm: today's DeepSeek wire (packages/ai) under pi-durable. */
-function bridge(provider: string, llm: () => ModelClient, clock: Time, tasks: TaskGroup): Provider {
-  const answer = async (out: AssistantMessageEventStream, model: PiModel<Api>, transcript: TranscriptContext, options: SimpleStreamOptions) => {
-    const asked = clock.now();
-    const failed = (why: string, stopReason: "error" | "aborted"): PiAssistantMessage => ({
-      role: "assistant",
-      content: [],
-      api: model.api,
-      provider,
-      model: model.id,
-      usage: piUsage(zeroUsage()),
-      stopReason,
-      errorMessage: why,
-      timestamp: asked,
-    });
-    let client: ModelClient;
-    try {
-      client = llm();
-    } catch (e) {
-      out.push({ type: "error", reason: "error", error: failed(messageOf(e), "error") });
-      out.end();
-      return;
-    }
-    const reasoning = options.reasoning;
-    try {
-      const events = client.service.stream(
-        client.model,
-        requestOf(transcript),
-        { apiKey: client.apiKey?.() ?? "", ...(reasoning ? { reasoning } : {}), ...(options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens }) },
-        options.signal,
-      );
-      // A stream that takes no notice of the stop is let go of, not waited for: the run ends aborted at once.
-      const reading = events[Symbol.asyncIterator]();
-      for (let next = await abortable(reading.next(), options.signal); next.done !== true; next = await abortable(reading.next(), options.signal)) {
-        out.push(piEvent(next.value));
-        if (next.value.type === "done" || next.value.type === "error") {
-          out.end();
-          return;
-        }
-      }
-      // A stream that ends without its last event says nothing more: the answer it gave is over, stopped or failed.
-      if (options.signal?.aborted === true) out.push({ type: "error", reason: "aborted", error: failed(messageOf(options.signal.reason), "aborted") });
-      else out.push({ type: "error", reason: "error", error: failed("the model's answer ended without its end", "error") });
-    } catch (e) {
-      if (e instanceof LlmError) out.push({ type: "error", reason: "error", error: piMessage(failedMessage(client.model, asked, e)) });
-      else if (isAbort(e, options.signal)) out.push({ type: "error", reason: "aborted", error: failed(messageOf(e), "aborted") });
-      else out.push({ type: "error", reason: "error", error: failed(messageOf(e), "error") });
-    }
-    out.end();
-  };
-
-  const stream = (model: PiModel<Api>, transcript: TranscriptContext, options?: SimpleStreamOptions): AssistantMessageEventStream => {
-    const out = createAssistantMessageEventStream();
-    tasks.run(`asking ${provider}`, () => answer(out, model, transcript, options ?? {}));
-    return out;
-  };
-
-  const models = (): PiModel<Api>[] => {
-    let client: ModelClient;
-    try {
-      client = llm();
-    } catch {
-      // No key yet: no model, and a run that asks for one ends no_model.
-      return [];
-    }
-    const m = client.model;
-    return [
-      {
-        id: modelId,
-        name: m.name,
-        api: "vibevalley",
-        provider,
-        baseUrl: m.baseUrl,
-        reasoning: m.reasoning,
-        input: [...m.input],
-        cost: { ...m.cost },
-        contextWindow: Math.min(m.contextWindow, foldWindow),
-        maxTokens: m.maxTokens,
-      },
-    ];
-  };
-
-  return {
-    id: provider,
-    name: provider,
-    auth: { apiKey: { name: "VibeValley", resolve: async () => ({ auth: {} }) } },
-    getModels: models,
-    // A request without the simple options: only how it stops and how long it may answer carry over.
-    stream: <A extends Api>(model: PiModel<A>, transcript: TranscriptContext, options?: ApiStreamOptions<A>) =>
-      stream(model, transcript, {
-        ...(options?.signal === undefined ? {} : { signal: options.signal }),
-        ...(options?.maxTokens === undefined ? {} : { maxTokens: options.maxTokens }),
-      }),
-    streamSimple: stream,
-  };
-}
-
-/** What pi-durable asks, as packages/ai's request: the replayed prompt and tools lead, the rest in order. */
-function requestOf(transcript: TranscriptContext): Context {
-  const messages: Message[] = [];
-  for (const m of transcript.messages) {
-    switch (m.role) {
-      case "system":
-        break;
-      case "user":
-        messages.push(UserMessageSchema.parse(m));
-        break;
-      case "assistant":
-        messages.push(AssistantMessageSchema.parse(m));
-        break;
-      case "toolResult":
-        messages.push(ToolResultMessageSchema.parse(m));
-        break;
-    }
-  }
-  const tools = getCurrentTools(transcript.messages).map((t) => ({ name: t.name, description: t.description, parameters: JsonObject.parse(t.parameters) }));
-  return { system: getCurrentSystemPrompt(transcript.messages), tools, messages };
-}
-
-const JsonObject = z.record(z.string(), z.json());
-
-const piUsage = (u: Usage): PiUsage => ({
-  input: u.input,
-  output: u.output,
-  cacheRead: u.cacheRead,
-  cacheWrite: u.cacheWrite,
-  ...(u.reasoning === undefined ? {} : { reasoning: u.reasoning }),
-  totalTokens: u.totalTokens,
-  cost: { ...u.cost },
-});
-
-function piMessage(m: AssistantMessage): PiAssistantMessage {
-  return {
-    role: "assistant",
-    content: m.content.map((c) => {
-      switch (c.type) {
-        case "text":
-          return { type: "text", text: c.text };
-        case "thinking":
-          return { type: "thinking", thinking: c.thinking, ...(c.thinkingSignature === undefined ? {} : { thinkingSignature: c.thinkingSignature }) };
-        case "toolCall":
-          return {
-            type: "toolCall",
-            id: c.id,
-            name: c.name,
-            arguments: JsonObject.parse(c.arguments),
-            ...(c.argumentsError === undefined ? {} : { argumentsError: c.argumentsError }),
-          };
-      }
-    }),
-    api: m.api,
-    provider: m.provider,
-    model: m.model,
-    usage: piUsage(m.usage),
-    stopReason: m.stopReason,
-    timestamp: m.timestamp,
-    ...(m.responseId === undefined ? {} : { responseId: m.responseId }),
-    ...(m.responseModel === undefined ? {} : { responseModel: m.responseModel }),
-    ...(m.rawStopReason === undefined ? {} : { rawStopReason: m.rawStopReason }),
-    ...(m.errorMessage === undefined ? {} : { errorMessage: m.errorMessage }),
-    ...(m.durationMs === undefined ? {} : { durationMs: m.durationMs }),
-  };
-}
-
-function piEvent(e: AssistantMessageEvent): PiEvent {
-  switch (e.type) {
-    case "start":
-      return { type: "start", partial: piMessage(e.partial) };
-    case "text_start":
-    case "thinking_start":
-    case "toolcall_start":
-      return { type: e.type, contentIndex: e.contentIndex, partial: piMessage(e.partial) };
-    case "text_delta":
-    case "thinking_delta":
-    case "toolcall_delta":
-      return { type: e.type, contentIndex: e.contentIndex, delta: e.delta, partial: piMessage(e.partial) };
-    case "text_end":
-    case "thinking_end":
-      return { type: e.type, contentIndex: e.contentIndex, content: e.content, partial: piMessage(e.partial) };
-    case "toolcall_end": {
-      const partial = piMessage(e.partial);
-      const call = partial.content[e.contentIndex];
-      if (call?.type !== "toolCall") throw new Error(`toolcall_end at ${e.contentIndex} is not a tool call`);
-      return { type: "toolcall_end", contentIndex: e.contentIndex, toolCall: call, partial };
-    }
-    case "done":
-      return { type: "done", reason: e.reason, message: piMessage(e.message) };
-    case "error":
-      return { type: "error", reason: e.reason, error: piMessage(e.error) };
-  }
-}

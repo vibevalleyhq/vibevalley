@@ -207,7 +207,7 @@
   "Session.withWorkplace": ["issue"],
   "Session.workFile": ["library", "tool"],
   "Setting.agora": ["voice"],
-  "Setting.deepseekApiKey": ["orchestrator", "runtime"],
+  "Setting.deepseekApiKey": ["runtime"],
   "Setting.dictation": ["provider"],
   "Setting.memorySources": ["memory"],
   "Setting.providers": ["provider"],

@@ -1,5 +1,3 @@
-import { type Llm, makeLlm } from "@vibevalley/ai/llm";
-
 import { type Connector, type ConnectorOptions, makeConnector } from "#/gateway/connector/connector.ts";
 import { type Lan, type LanOptions, makeLan } from "#/gateway/lan/lan.ts";
 import { makeMcp, type Mcp, type McpOptions } from "#/gateway/mcp/mcp.ts";
@@ -72,7 +70,6 @@ export interface PlatformFarm {
   readonly user: User;
   readonly attachment: Attachment;
   readonly provider: Provider;
-  readonly llm: Llm;
 }
 
 /** Agents: the profiles, their memory, the runtimes they run on. */
@@ -196,8 +193,7 @@ export async function platform(config: ServerConfig, parts: PlatformParts = {}):
     const withSetting = add(base, { setting: await makeSetting(base) });
     const withUser = add(withSetting, { user: await makeUser(withSetting) });
     const withAttachment = add(withUser, { attachment: await makeAttachment(withUser) });
-    const withProvider = add(withAttachment, { provider: await makeProvider(withAttachment) });
-    return add(withProvider, { llm: makeLlm({ fetch: fetcher, clock }) });
+    return add(withAttachment, { provider: await makeProvider(withAttachment) });
   } catch (e) {
     await closeAll(built);
     throw e;

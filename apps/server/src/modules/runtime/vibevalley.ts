@@ -25,14 +25,11 @@ import { defaultSkillDirs, scanSkills, skillIndex } from "@vibevalley/agent/skil
 import { finished, type Todo } from "@vibevalley/agent/todo";
 import type { TodoStore } from "@vibevalley/agent/todoStore";
 import { todoTools, watchedStore } from "@vibevalley/agent/todoTools";
-import { defaultModel, type ModelClient } from "@vibevalley/ai/client";
 import type { AssistantMessage, ToolResultMessage } from "@vibevalley/ai/messages";
-import { models } from "@vibevalley/ai/models";
 import { abortable, type Clock, isAbort, type TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import { isOneOf } from "@vibevalley/protocol/rules";
 
-import { messageOf } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { storedJsonOrUndefined } from "#/base/json.ts";
 import type { Db } from "#/infra/db.ts";
@@ -40,7 +37,7 @@ import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import * as q from "#db/runtime_todo.sql.ts";
 
-import { type Durable, durableTool, entryMessage } from "./durable.ts";
+import { deepseekModels, defaultModel, type Durable, durableTool, entryMessage } from "./durable.ts";
 import { helperInstructions, helperWords } from "./prompts.ts";
 
 const vibevalleyRuntime = "vibevalley";
@@ -61,10 +58,8 @@ export { helperInstructions };
 export const helperKey = (session: string) => `helper:${session}`;
 
 export interface RuntimeOptions {
-  /** The harness the sessions' conversations are kept in. */
+  /** The harness the sessions' conversations are kept in, and the model they ask. */
   readonly durable: Durable;
-  /** Asked each session, so a key saved meanwhile is used. "" is the default model. */
-  readonly llm: (model: string) => ModelClient;
   /** Where a session keeps its own todos; absent, it keeps none. */
   readonly todos?: (session: string) => TodoStore;
   /** What the agent remembers, with the tools to add to it; absent, it remembers nothing. */
@@ -183,7 +178,6 @@ const spent = (view: ConversationView): Tokens => {
 const contextOf = (m: AssistantMessage) => m.usage.input + m.usage.cacheRead + m.usage.output;
 
 export function vibevalleyRuntimeOf(options: RuntimeOptions) {
-  const llmOf = options.llm;
   const { durable, owner, log } = options;
 
   const start = async (_installation: unknown, o: SessionOptions) => {
@@ -193,7 +187,9 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
     const effort = o.effort && isOneOf(efforts, o.effort) ? o.effort : undefined;
     if (o.effort && !effort)
       throw new Error(t("server.agent.efforts", { runtime: vibevalleyRuntime, efforts: efforts.join(t("server.agent.effortsAnd")), asked: o.effort }));
-    const llm = llmOf(o.model ?? "");
+    const cannot = durable.cannotAsk();
+    if (cannot !== undefined) throw new Error(cannot);
+    const model = durable.model(o.model ?? "");
     const kernel = createSessionKernel(o.resume);
     const key = helperKey(kernel.sessionId);
     const instructions = o.systemPrompt ?? [helperInstructions(), ...(o.appendSystemPrompt ? [o.appendSystemPrompt] : [])].join("\n\n");
@@ -250,8 +246,9 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
       });
       durable.registry.install(extension);
       const conversation = await durable.conversation(key, {
-        model: durable.model(key, () => llm),
+        model: model.ref,
         extensions: [extension],
+        // DeepSeek's own two: pi-ai sends high and max as themselves.
         thinkingLevel: effort ?? "off",
         cwd: o.cwd,
         maxTurns,
@@ -282,7 +279,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
         placed = false;
         last = undefined;
         shown = 0;
-        const window = llm.model.contextWindow;
+        const window = model.contextWindow;
         const tokens = newest ? contextOf(newest) : 0;
         frame("vibevalley/end", { outcome }, [
           { kind: "turn_ended", outcome },
@@ -460,7 +457,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
         }
       });
 
-      frame("vibevalley/model", { model: llm.model.id }, [{ kind: "model", model: llm.model.id }]);
+      frame("vibevalley/model", { model: model.ref.modelId }, [{ kind: "model", model: model.ref.modelId }]);
       if (o.effort) frame("vibevalley/effort", { effort: o.effort }, [{ kind: "effort", effort: o.effort }]);
       // A run a restart cut off goes on: the conversation is the one it was, and its turn is told as this session's.
       if (o.resume !== undefined && LiveView.parse(watch.value.docs["pi.live"] ?? {}).run !== undefined) durable.harness.resume();
@@ -521,16 +518,12 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
     id: vibevalleyRuntime,
     session: start,
     installation: async () => {
-      try {
-        llmOf("");
-        return { kind: "available", via: "bundled" };
-      } catch (e) {
-        return { kind: "unsupported", reason: messageOf(e) };
-      }
+      const cannot = durable.cannotAsk();
+      return cannot === undefined ? { kind: "available", via: "bundled" } : { kind: "unsupported", reason: cannot };
     },
     listModels: async () => ({
       kind: "ok",
-      models: models.map((m) => ({
+      models: deepseekModels.map((m) => ({
         id: m.id,
         displayName: m.name,
         effortLevels: [...efforts],

@@ -3,7 +3,7 @@ import { getModel, type Model, models } from "../base/models.ts";
 import type { Llm } from "./llm.ts";
 import type { RequestOptions } from "./request.ts";
 
-export const defaultModel = "deepseek-flash";
+const defaultModel = "deepseek-flash";
 
 /** No key to ask the model with; the host says where to put one. */
 export class MissingKey extends Error {

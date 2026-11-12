@@ -19,7 +19,6 @@ import { type MemoryPort } from "@vibevalley/agent/memory";
 import { type BrainMessage, customMessage, messageText } from "@vibevalley/agent/messages";
 import { selfTools } from "@vibevalley/agent/self";
 import { scanSkills, skillIndex } from "@vibevalley/agent/skills";
-import type { ModelClient } from "@vibevalley/ai/client";
 import { type AssistantMessage, AssistantMessageSchema, ToolResultMessageSchema, type Usage, UserMessageSchema, zeroUsage } from "@vibevalley/ai/messages";
 import { abortable, Semaphore, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
@@ -31,7 +30,7 @@ import { newId } from "#/base/ids.ts";
 import { type Core } from "#/core/core.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import { type Durable, durableTool, entryMessage } from "#/modules/runtime/durable.ts";
+import { type DeepSeekModel, type Durable, durableTool, entryMessage } from "#/modules/runtime/durable.ts";
 
 import { makeInProcessRun, NotRecorded, RunBusy, type RunInput } from "./inProcessRun.ts";
 import type { Journal } from "./journal.ts";
@@ -187,8 +186,9 @@ export interface HostOptions<R> {
   readonly home: string;
   readonly cwd: string;
   readonly instructions: string;
-  /** Invoked lazily on first input; throws when the model key is missing. */
-  readonly llm: () => ModelClient;
+  /** The DeepSeek model it asks, as its profile names it ("" is the default); read as it starts, and may throw why it
+   * cannot be asked. */
+  readonly model: () => string;
   readonly tools: (current: () => R) => Tool[];
   readonly skills?: readonly string[];
   readonly wakeSoon?: (withinMs: number) => boolean;
@@ -347,7 +347,6 @@ export async function makeHost<R>(
     ],
   });
   durable.registry.install(extension);
-  const model = durable.model(o.session.id, o.llm);
 
   const current = (): Hosted<R> => input;
 
@@ -528,13 +527,16 @@ export async function makeHost<R>(
   const start = async () => {
     if (attached._tag !== "none") return attached;
     if (closing) throw new CannotStart(stopped());
-    let llm: ModelClient;
+    let model: DeepSeekModel;
     try {
-      llm = o.llm();
+      // The model the profile names is refused before a missing key, as it always was.
+      model = durable.model(o.model());
+      const cannot = durable.cannotAsk();
+      if (cannot !== undefined) throw new Error(cannot);
     } catch (e) {
       throw new CannotStart(messageOf(e), { cause: e });
     }
-    const conversation = await durable.conversation(o.session.id, { model, extensions: [extension], thinkingLevel: "off" });
+    const conversation = await durable.conversation(o.session.id, { model: model.ref, extensions: [extension], thinkingLevel: "off" });
     const watch = await conversation.watch(context);
     const entries = watch.value.entries;
     seen = entries.at(-1)?.id;
@@ -553,7 +555,7 @@ export async function makeHost<R>(
       } else inProcess.resume(o.restored(input.route));
     }
     o.fresh();
-    logger.info(`vibevalley: on vibevalley's own agent (pi-durable), model ${llm.model.id}`);
+    logger.info(`vibevalley: on vibevalley's own agent (pi-durable), model ${model.ref.modelId}`);
     attached = { _tag: "watching", conversation, watch };
     return attached;
   };
@@ -623,7 +625,8 @@ export async function makeHost<R>(
 
   const resume = (maxAgeMs: number) =>
     inputs.with(async () => {
-      if (closing) return;
+      // Without a key the run waits, as it was, for the next input to say why it cannot start.
+      if (closing || durable.cannotAsk() !== undefined) return;
       let s: Watching | undefined;
       try {
         s = await start();
