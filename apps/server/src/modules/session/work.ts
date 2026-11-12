@@ -22,7 +22,7 @@ import { type Lifecycle, NotRecorded } from "./lifecycle.ts";
 import type { InsertDelivery, TalkRow } from "./mailbox.ts";
 import { readPayload, deliveryScope, triggerPayload } from "./payload.ts";
 import { handbackWords, releasedInputWords } from "./prompts.ts";
-import { waitsForHuman, type DeliveryEvent, type Urgency, triggerEvent, urgencyOf } from "./routing.ts";
+import { holdReasonOf, type DeliveryEvent, type Urgency, triggerEvent, urgencyOf } from "./routing.ts";
 import * as S from "./schema.ts";
 import type { Trigger } from "./shapes.ts";
 
@@ -350,14 +350,7 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
     let forwarded = false;
     for (const input of inputs) {
       const trigger = readTrigger(input.trigger_json);
-      const reason =
-        trigger.meta.botRound !== undefined && trigger.meta.botRound > issue.mandate.maxBotReviewRounds && !human
-          ? "budget"
-          : !recipient
-            ? "session"
-            : waitsForHuman(issue) && trigger.actor.kind !== "user" && !human
-              ? "human"
-              : undefined;
+      const reason = holdReasonOf(trigger, issue, recipient, human);
       if (reason) {
         await qi.holdIssueInput(db.sql, { trigger_id: trigger.id, reason });
         continue;

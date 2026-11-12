@@ -10,6 +10,22 @@ import type { OutboundDelivery } from "./work.ts";
 export const waitsForHuman = (issue: Pick<T.Issue, "stage">) =>
   issue.stage.state === "asking" || issue.stage.state === "stuck" || issue.stage.state === "reviewing";
 
+/** Why an input for an issue stays held in its pool: past the issue's bot review rounds, no one to take it, or the
+ * issue waits on the user; the user's own words (human) pass the first and the last. Undefined: it goes on now. */
+export const holdReasonOf = (
+  trigger: Pick<Trigger, "meta" | "actor">,
+  issue: Pick<T.Issue, "stage" | "mandate">,
+  recipient: string | undefined,
+  human: boolean,
+): "budget" | "session" | "human" | undefined =>
+  trigger.meta.botRound !== undefined && trigger.meta.botRound > issue.mandate.maxBotReviewRounds && !human
+    ? "budget"
+    : !recipient
+      ? "session"
+      : waitsForHuman(issue) && trigger.actor.kind !== "user" && !human
+        ? "human"
+        : undefined;
+
 /** Who hears a message before wake brakes are applied. */
 export function whoHears(input: ChannelAudience): Recipient[] {
   const deliveries: Recipient[] = [];

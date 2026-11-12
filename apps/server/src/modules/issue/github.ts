@@ -18,6 +18,16 @@ import * as qe from "#db/issue_github_event.sql.ts";
 const failedChecks = new Set(["FAILURE", "ERROR", "CANCELLED", "CANCELED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE", "STALE"]);
 const finishedChecks = new Set(["COMPLETED", "SUCCESS", "FAILURE", "ERROR"]);
 
+/** A pull request's checks as its helper is told of them: the failed ones, and whether every one has finished. */
+export function checksVerdict<C extends { readonly status: string; readonly conclusion: string }>(
+  checks: readonly C[],
+): { readonly failed: C[]; readonly finished: boolean } {
+  return {
+    failed: checks.filter((check) => failedChecks.has((check.conclusion || check.status).toUpperCase())),
+    finished: checks.length > 0 && checks.every((check) => check.conclusion !== "" || finishedChecks.has(check.status.toUpperCase())),
+  };
+}
+
 export interface GitHubPollDeps {
   readonly db: Db;
   readonly repo: Repo;
@@ -50,12 +60,11 @@ export function makeGitHubPoller(deps: GitHubPollDeps) {
       .digest("hex");
     if (fingerprint !== cursor.check_fingerprint) {
       const revision = cursor.check_revision + 1;
-      const failed = checks.filter((check) => failedChecks.has((check.conclusion || check.status).toUpperCase()));
+      const { failed, finished } = checksVerdict(checks);
       const failedText = await mapConcurrent(failed, 3, async (check) => {
         const job = await repos.failedJobLog(repo, check.url);
         return `${check.name}: ${check.conclusion || check.status}${job ? "\n" + job : ""}`;
       });
-      const finished = checks.length > 0 && checks.every((check) => check.conclusion !== "" || finishedChecks.has(check.status.toUpperCase()));
       if (failed.length > 0 || finished)
         await receive({
           ...base,

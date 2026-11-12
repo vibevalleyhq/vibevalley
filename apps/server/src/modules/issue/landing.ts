@@ -23,6 +23,30 @@ export interface FollowedPullRequest {
   readonly finishes: boolean;
 }
 
+/** The issue's work goes in as a pull request: one is open, or its repo goes by pull requests. */
+export const goesByPullRequest = (issue: Pick<T.Issue, "pullRequest">, usesPullRequests: boolean) => issue.pullRequest?.state === "open" || usesPullRequests;
+
+/** How an issue's work goes in: from its own checkout (no helper holds it and its children merged into it), refused
+ * (never started, or its helper is gone), or from its helper's workplace as a pull request or a merge into main. */
+export type LandingRoute =
+  | { readonly kind: "checkout"; readonly repo: string }
+  | { readonly kind: "notStarted" }
+  | { readonly kind: "helperGone" | "pullRequest" | "merge"; readonly session: string };
+
+export function landingRouteOf(
+  issue: Pick<T.Issue, "repo" | "pullRequest">,
+  helper: { readonly last: string | undefined; readonly reachable: boolean },
+  fromCheckout: boolean,
+  usesPullRequests: boolean,
+): LandingRoute {
+  const { last, reachable } = helper;
+  if (issue.repo && (!last || !reachable) && fromCheckout) return { kind: "checkout", repo: issue.repo };
+  if (last === undefined) return { kind: "notStarted" };
+  if (!reachable) return { kind: "helperGone", session: last };
+  if (issue.repo && goesByPullRequest(issue, usesPullRequests)) return { kind: "pullRequest", session: last };
+  return { kind: "merge", session: last };
+}
+
 export interface LandingDeps {
   readonly core: Core;
   readonly log: Logger;
@@ -92,7 +116,7 @@ export function issueLanding(r: Pick<IssueLifecycle, "setConflict" | "savePullRe
   const mergeCheckout = async (issue: T.Issue, repo: string) => {
     try {
       return await withCheckout(repo, issue.number, async (place) => {
-        if (issue.pullRequest?.state === "open" || repos.usesPullRequests(repo)) return (await pullRequestOf(place, issue, issue.description)).text;
+        if (goesByPullRequest(issue, repos.usesPullRequests(repo))) return (await pullRequestOf(place, issue, issue.description)).text;
         let merged: Merged;
         try {
           merged = await repos.merge(place);
@@ -113,16 +137,25 @@ export function issueLanding(r: Pick<IssueLifecycle, "setConflict" | "savePullRe
    * and fromCheckout. Throws NotTakenIn when the helper's work does not go in (the helper stays). */
   const merge = async (issue: T.Issue, fromCheckout: boolean): Promise<string> => {
     const last = latestSessionIdOf(issue);
-    if (issue.repo && (!last || !reachable(last)) && fromCheckout) return mergeCheckout(issue, issue.repo);
-    if (last === undefined) throw refused(t("server.issue.notStarted"));
-    if (!reachable(last)) throw missing(t("server.issue.helperRef", { id: last }), [lookIn.session]);
-    if (issue.repo && (issue.pullRequest?.state === "open" || repos.usesPullRequests(issue.repo)))
-      return (await handedOver(last, (place, said) => pullRequestOf(place, issue, said))).text;
-    const session = sessions.live(last).session;
-    if (!session) throw missing(t("server.issue.helperRef", { id: last }), [lookIn.session]);
-    const merged = await handedOver(last, (place) => repos.merge(place));
-    core.notice("info", t("server.issue.merge.merged", { name: session.name, text: merged.text }));
-    return merged.text;
+    const usesPullRequests = issue.repo ? repos.usesPullRequests(issue.repo) : false;
+    const route = landingRouteOf(issue, { last, reachable: last !== undefined && reachable(last) }, fromCheckout, usesPullRequests);
+    switch (route.kind) {
+      case "checkout":
+        return mergeCheckout(issue, route.repo);
+      case "notStarted":
+        throw refused(t("server.issue.notStarted"));
+      case "helperGone":
+        throw missing(t("server.issue.helperRef", { id: route.session }), [lookIn.session]);
+      case "pullRequest":
+        return (await handedOver(route.session, (place, said) => pullRequestOf(place, issue, said))).text;
+      case "merge": {
+        const session = sessions.live(route.session).session;
+        if (!session) throw missing(t("server.issue.helperRef", { id: route.session }), [lookIn.session]);
+        const merged = await handedOver(route.session, (place) => repos.merge(place));
+        core.notice("info", t("server.issue.merge.merged", { name: session.name, text: merged.text }));
+        return merged.text;
+      }
+    }
   };
 
   /** The helper's work submitted as the issue's pull request while it stays; read gives the issue under the helper's

@@ -70,7 +70,7 @@ export function merging(d: MergeDeps) {
 
   const refreshPullRequests = (): Promise<void> =>
     prLock.with(async () => {
-      const followed = (await list()).map((issue) => ({ issue, finishes: issue.deliver !== "pull_request" && issue.closedAt === undefined }));
+      const followed = (await list()).map((issue) => ({ issue, finishes: finishesWithPullRequest(issue) }));
       await landing.refreshPullRequests(followed);
     });
 
@@ -94,6 +94,10 @@ export function merging(d: MergeDeps) {
 
   return { merge, refreshPullRequests, submit };
 }
+
+/** A followed pull request's end finishes its issue: one still open that delivers by merging (one that delivers the
+ * pull request itself is done already, and a closed one only keeps the state). */
+export const finishesWithPullRequest = (issue: Pick<T.Issue, "deliver" | "closedAt">) => issue.deliver !== "pull_request" && issue.closedAt === undefined;
 
 /** What a child's work must pass before it merges into its parent: its own check, the acceptance ancestors' frozen
  * files, and (the last of its siblings) their checks. */
