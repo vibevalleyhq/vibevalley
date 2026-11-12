@@ -9,9 +9,7 @@ import { compareText, or } from "#/base/order.ts";
 import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import { actionsJobOf } from "#/modules/repo/pullSnapshot.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
-import { RepoError } from "#/modules/repo/workplace.ts";
 import * as q from "#db/session_github_cursor.sql.ts";
 
 import type { Accepted } from "./envelope.ts";
@@ -37,25 +35,6 @@ export function makeGitHubPoller(deps: GitHubPollDeps) {
   const { db, repo: repos, clock, log, receive, knownGitHubEvents } = deps;
   const polling = new Semaphore(1);
 
-  /** Fetch logs via gh so helpers need no browser. */
-  const jobLog = async (repo: string, url: string) => {
-    const job = actionsJobOf(url);
-    if (!job) return "";
-    let remote: string;
-    try {
-      remote = await repos.githubRemote(repo);
-    } catch (e) {
-      // No GitHub remote: the check is told without its log.
-      if (!(e instanceof RepoError)) throw e;
-      log.debug(`session: no GitHub remote for ${repo}: ${e.message}`);
-      return "";
-    }
-    if (!remote) return "";
-    const said = await repos.githubRequest("run", "view", "--job", job, "--log-failed", "--repo", remote);
-    if (!said.ok) return "";
-    return said.out.trim().split("\n").slice(-40).join("\n").slice(-4000);
-  };
-
   const poll = async (issue: T.Issue) => {
     const pr = issue.pullRequest;
     const repo = issue.repo;
@@ -75,7 +54,7 @@ export function makeGitHubPoller(deps: GitHubPollDeps) {
       const revision = cursor.check_revision + 1;
       const failed = checks.filter((check) => failedChecks.has((check.conclusion || check.status).toUpperCase()));
       const failedText = await mapConcurrent(failed, 3, async (check) => {
-        const job = await jobLog(repo, check.url);
+        const job = await repos.failedJobLog(repo, check.url);
         return `${check.name}: ${check.conclusion || check.status}${job ? "\n" + job : ""}`;
       });
       const finished = checks.length > 0 && checks.every((check) => check.conclusion !== "" || finishedChecks.has(check.status.toUpperCase()));

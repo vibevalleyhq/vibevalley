@@ -176,7 +176,6 @@ export const makeRepoGitHub = (env: RepoGitHubEnv) => {
       if (result.state === "CLOSED") return "closed";
       throw fail(t("server.repo.github.stateUnknown", { n }));
     },
-    githubRequest: ((...args) => gh(...args)) satisfies GitHubRun,
     githubRemote,
     resolveReviewThread: async (name: string, thread: string): Promise<void> => {
       await githubRemote(name);

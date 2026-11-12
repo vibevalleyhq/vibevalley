@@ -15,7 +15,7 @@ import type { Runtime } from "#/modules/runtime/runtime.ts";
 import type { Accepted, ChannelHearers, ChannelRouteResult, Envelope } from "./envelope.ts";
 import { makeGitHubPoller } from "./github.ts";
 import type { AgentHost, HostOptions } from "./host.ts";
-import { type ChildChecks, type IssueRecord, type Landing, makeLanding } from "./landing.ts";
+import { type IssueRecord, type Landing, makeLanding } from "./landing.ts";
 import { HireRefused, type Lifecycle, makeLifecycle, type SessionNews, type SessionOptions } from "./lifecycle.ts";
 import { type Machine, makeMachine } from "./machine.ts";
 import { type DeliveryNews, type Dispatch, type HireArrival, type HiredReceipt, type Mailbox, makeMailbox, type QueuedInput } from "./mailbox.ts";
@@ -23,7 +23,7 @@ import type { SourceEvent, TriggerInput, TriggerResource } from "./payload.ts";
 import { summaryOf } from "./report.ts";
 import type { Trigger } from "./shapes.ts";
 
-export type { Accepted, ChildChecks, IssueRecord, QueuedInput, SessionOptions };
+export type { Accepted, IssueRecord, QueuedInput, SessionOptions };
 export type { Hired, HireOptions, RunFinished, RunStore, SessionNews } from "./lifecycle.ts";
 export { DeliveryRefused, HireRefused, newsOf, NotRecorded, NotTakenIn, NotWorkFile, runOf } from "./lifecycle.ts";
 

@@ -7,8 +7,8 @@ import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 import { ApiError, BizCode, refuseIn } from "#/base/errors.ts";
 import type { Core } from "#/core/core.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
-import { MergeFailure } from "#/modules/repo/workplace.ts";
-import { type ChildChecks, type IssueRecord, NotTakenIn, type Session } from "#/modules/session/session.ts";
+import { type CheckoutChecks, MergeFailure } from "#/modules/repo/workplace.ts";
+import { type IssueRecord, NotTakenIn, type Session } from "#/modules/session/session.ts";
 
 import { acceptanceAncestors } from "./dependencies.ts";
 import { statusMove } from "./moves.ts";
@@ -120,7 +120,7 @@ export function merging(d: MergeDeps) {
 
 /** What a child's work must pass before it merges into its parent: its own check, the acceptance ancestors' frozen
  * files, and (the last of its siblings) their checks. */
-export function childChecks(child: T.Issue, all: readonly T.Issue[]): ChildChecks {
+export function childChecks(child: T.Issue, all: readonly T.Issue[]): CheckoutChecks {
   const constraints = child.constraints;
   const inherited = acceptanceAncestors(child, all);
   if (constraints?.acceptance === true) return { acceptance: true, check: constraints.check ?? "" };

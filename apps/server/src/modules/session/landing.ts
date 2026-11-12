@@ -1,4 +1,4 @@
-import { list, t } from "@vibevalley/i18n";
+import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { isBusy, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
@@ -6,7 +6,7 @@ import { ApiError, BizCode, lookIn, messageOf, missing, refuseIn } from "#/base/
 import type { Core } from "#/core/core.ts";
 import type { Logger } from "#/infra/log.ts";
 import { issueBranch, type Repo } from "#/modules/repo/repo.ts";
-import { type Merged, MergeFailure, RepoError, type Workplace } from "#/modules/repo/workplace.ts";
+import { type CheckoutChecks, type Merged, MergeFailure, RepoError, type Workplace } from "#/modules/repo/workplace.ts";
 
 import { type Lifecycle, NotTakenIn } from "./lifecycle.ts";
 
@@ -34,13 +34,6 @@ export interface FollowedPullRequest {
   readonly finishes: boolean;
 }
 
-/** What a child issue's work must pass before it merges into its parent's branch. An acceptance check must fail on the
- * work (it is the test the siblings make pass), and the files the work touched are frozen for them; otherwise the
- * checks must pass, and the frozen files stay untouched. */
-export type ChildChecks =
-  | { readonly acceptance: true; readonly check: string }
-  | { readonly acceptance: false; readonly frozen: readonly string[]; readonly checks: readonly string[] };
-
 export interface Landing {
   /** The issue's work merged into main, or submitted as its pull request (one is open, or its repo goes by pull
    * requests): from its helper's workplace, which then lets go; from the issue's own checkout when no helper holds it
@@ -58,7 +51,7 @@ export interface Landing {
   readonly mergeChild: (
     child: T.Issue,
     parent: T.Issue,
-    checks: ChildChecks,
+    checks: CheckoutChecks,
     merged: (frozen: readonly string[] | undefined) => Promise<void>,
   ) => Promise<Merged | undefined>;
   /** The issue's work: in its helper's workplace while one holds it, else on its branch; none without a repo or a branch.
@@ -186,37 +179,7 @@ export function makeLanding(deps: LandingDeps): Landing {
     }
   };
 
-  /** The frozen files of an acceptance check (what the work touched); none otherwise. Throws MergeFailure. */
-  const verify = async (place: Workplace, parent: number, checks: ChildChecks): Promise<readonly string[] | undefined> => {
-    const changed = async () => {
-      try {
-        return await repos.changedFiles(place.cwd, issueBranch(parent));
-      } catch (error) {
-        if (error instanceof RepoError) throw MergeFailure.error(error.message);
-        throw error;
-      }
-    };
-    if (checks.acceptance) {
-      if (!checks.check) throw MergeFailure.failedCheck(t("server.issue.verification.acceptanceNeedsCheck"));
-      if ((await repos.run(place.cwd, checks.check)).ok)
-        throw MergeFailure.failedCheck(t("server.issue.verification.acceptancePassed", { check: checks.check }));
-      return changed();
-    }
-    const frozen = new Set(checks.frozen);
-    const checkFrozen = async () => {
-      const touched = (await changed()).filter((file) => frozen.has(file));
-      if (touched.length > 0) throw MergeFailure.failedCheck(t("server.issue.verification.frozen", { files: list(touched) }));
-    };
-    if (frozen.size > 0) await checkFrozen();
-    for (const check of checks.checks) {
-      const result = await repos.run(place.cwd, check);
-      if (!result.ok) throw MergeFailure.failedCheck(t("server.issue.verification.failed", { check, output: result.output }));
-    }
-    if (frozen.size > 0) await checkFrozen();
-    return undefined;
-  };
-
-  const mergeChild = async (child: T.Issue, parent: T.Issue, checks: ChildChecks, merged: (frozen: readonly string[] | undefined) => Promise<void>) => {
+  const mergeChild = async (child: T.Issue, parent: T.Issue, checks: CheckoutChecks, merged: (frozen: readonly string[] | undefined) => Promise<void>) => {
     const parentRepo = parent.repo;
     const session = latestSessionIdOf(child);
     if (!parentRepo || !session || !lifecycle.isReachable(session)) return undefined;
@@ -227,7 +190,7 @@ export function makeLanding(deps: LandingDeps): Landing {
       session,
       "completed",
       async (place) => {
-        const frozen = await verify(place, parent.number, checks);
+        const frozen = await repos.verifyCheckout(place, issueBranch(parent.number), checks);
         const mergeIntoParent = (target: Workplace) => repos.mergeInto(place, issueBranch(parent.number), target.cwd);
         let into: Merged;
         if (parentSession && lifecycle.isReachable(parentSession)) {
