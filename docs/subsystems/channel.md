@@ -18,12 +18,13 @@
 |---|---|
 | `apps/server/src/modules/channel/channel.ts`、`contracts.ts` | 对外 `Channel` 服务接口 |
 | `apps/server/src/modules/channel/store.ts`、`hub.ts`、`mutations.ts`、`rooms.ts` | `ChannelStore`（单写锁、`ChatModel` 内存镜像与 `db.afterCommit` 提交后同步、受管 `userReadHub` 发布）、频道增删改查与已读游标 |
-| `apps/server/src/modules/channel/writing.ts`、`directory.ts` | 消息与发言人（`kind` + `role`）落库、生成 `Trigger`、计算候选受众并交 `Session` |
-| `apps/server/src/modules/channel/threads.ts`、`talk.ts` | 工单串创建/恢复、汇报贴出、私聊会话按需拉起 |
+| `apps/server/src/modules/channel/writing.ts`、`directory.ts` | 消息与发言人（`kind` + `role`）落库、记下带序号的事件（`channel_event`）、在锁里按序告诉观察者 |
+| `apps/server/src/modules/watch/` | 观察者：把提交的消息生成 `Trigger`、算候选受众交 `Session`；工单串创建/恢复、帮工的「家」、汇报贴出、私聊会话按需拉起、👀 与熔断通知；开机按游标（`watch_cursor`）重放 |
 | `apps/server/src/modules/channel/messages.ts`、`embeds.ts` | 地址解析、`@` 识别、搜索过滤与公网链接预览抓取 |
 | `packages/protocol/src/rpc.ts`、`apps/server/src/gateway/http/rpc.ts` | 频道与 Artifact 订阅流（SSE，`/api/v1/subscribe/<名字>`，[SSE 流](docs/subsystems/core.md#sse-流和其余路由)）的契约与服务端挂载 |
 | `apps/server/src/gateway/connector/` | `connector.ts` 桥接协调器、`digest.ts`、`weixin.ts`、`feishu.ts`、`qq.ts` |
-| 表 `channel`、`channel_participant`、`channel_message`、`channel_mention`、`channel_member`、`channel_read_cursor` | 频道与消息存储表 |
+| 表 `channel`、`channel_participant`、`channel_message`、`channel_mention`、`channel_member`、`channel_read_cursor`、`channel_event` | 频道与消息存储表；`channel_event` 是按提交次序编号的事件（`posted`、`removed`） |
+| 表 `watch_cursor` | 观察者读到 `channel_event` 的哪一号 |
 | 表 `connector_account`、`connector_inbound`、`connector_outbox` | 外部聊天软件账号、入站去重与出站队列 |
 | `apps/web/src/features/channel/`、`apps/web/src/farm/chat/` | 工作台聊天页、输入框 `composing.ts`、订阅 `follow.ts` 与农场田头窗 |
 
@@ -43,7 +44,8 @@
   - 调读取接口推进 `channel_read_cursor.read_number`。
   - 模型实际消费投递推进 `session_delivery.consumed_at` 并加 👀 反应，未读查询同时排除两者已覆盖的消息。
 - **发言人统一存 `kind` + `role`，线上读 `ChatMessage.actor`**：`channel_participant` 将身份拆为 `kind`（`user`、`agent`、`system`）与 `role`（仅 `kind = 'agent'` 时非空，取 `orchestrator` 或 `worker`）；消息、触发与信箱统一携带 `Actor`（角色经 `actorRoleOf` 读取），不再拆出 `fromKind`、`fromRole` 或单独的发送者枚举。
-- **写话只有一个门 `Channel.post(Post)`**：`Post` 是按写话场景分的联合，`User`（用户）、`Tell`（对一个帮工说）、`Agent`（帮工、助手经说话工具）、`Announce`（带上做出来的 Artifact 或文件）、`Call`（通话里说的，不叫醒人）、`Run`（服务端里跑的 agent 一轮说完的话）、`Notice`（农场的通知）。每种保留自己的检查和答复，重载把答复的类型钉在种类上（`PostDoor`），调用方不用拆走不到的分支；七种最后都落进 `writing.ts` 的 `write`。
+- **写话只有一个门 `Channel.post(Post)`**：`Post` 是按写话场景分的联合，`User`（用户）、`Home`（在说话人的「家」里说）、`Agent`（帮工、助手经说话工具）、`Announce`（带上做出来的 Artifact 或文件）、`Call`（通话里说的，不叫醒人）、`Run`（服务端里跑的 agent 一轮说完的话）、`Notice`（农场的通知）。每种保留自己的检查和答复，重载把答复的类型钉在种类上（`PostDoor`），调用方不用拆走不到的分支；七种最后都落进 `writing.ts` 的 `write`。消息的 `run` 由调用方给（工具、Artifact 的 `Maker`），频道不问会话。对一个帮工说（`Watch.tell`）在观察层：它有家就是 `Home`，没有就记成只给它的触发。
+- **频道不认识会话，事件交给观察者**：每条消息和每次删除在同一个事务里记一条 `channel_event`（单调的 `seq`）；提交以后、写话返回以前，在频道的锁里按序告诉唯一的观察者（`Channel.observe`，`Watch` 在建好时登记），观察者不能回调频道上锁的成员。观察者抛的（不是 `ApiError`）让这次写话失败，事件留着；`Watch` 每处理完一个事件把 `watch_cursor` 往前推（只往前），开机 `Channel.replay` 把游标后的事件再告诉它一遍（已路由的跳过，失败的记日志放过）。参与者的「家」（`channel_participant.home_id`，`Channel.homeOf`）是空目标的去处，由观察层在开串、拉起私聊时给。删频道时查谁还指着它：频道只数自己的话题串，工单（定时任务、排队的工单）、连接器（账号）、观察层（在那里的帮工）各自登记 `Channel.guardRemoval`。
 - **发送幂等键 `sendKey`**：用户发言带 `sendKey`（唯一索引 `(sender, send_key)`），重发返回原消息；帮工 60 秒内向同处发相同正文也自动去重。
 
 ### 受众计算与说话防撞

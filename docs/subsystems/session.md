@@ -69,7 +69,7 @@
 | `room` | 这个农机在这个仓库上还能不能再开一个帮工 | 工单 |
 | `news`、`deliveries` | 会话的一切动静（`Hired`、`Reported`、`Left`、`IssueStarted`、`RunFinished`、回执和启动动静），投递的动静（`Handed`、`Consumed`、`Braked`） | 工单、频道、助手 |
 | `decline`、`handBack`、`report`、`workFile`、`subscribe`、`replayCronTriggers`、`who`、`setAddress`、`host` | 帮工拒收、助手退回、帮工交汇报、读帮工目录里的文件、绑定工单的串、重放 cron 触发、令牌认人、`/mcp` 地址、助手的进程内宿主 | 工具、助手、工单（定时任务）、媒体、`/mcp`、接口 |
-| `boot`、`wake`、`close` | 开机接回会话；频道恢复串以后恢复投递并叫醒；关门 | `services.ts` |
+| `boot`、`wake`、`close` | 开机接回会话；观察层恢复串、重放事件以后恢复投递并叫醒；关门 | `services.ts` |
 
 - **测试经 `insideOf` 驱动里面的部分**（`hire`、`deliver`、`handOver`、`restore`…），模块不许用它（`modules.test.ts` 查）。
 
@@ -113,7 +113,7 @@
 
 **一件活到了（`route`、`recordTrigger`、`receive`）**
 
-1. `Channel`、`Issue`（含定时任务和跟 PR）、`Inbox` 或助手把来源事件交来（`receive`），或在自己的事务里记下（`recordTrigger`）、提交后再 `route`。
+1. `Watch`（读频道提交的事件）、`Issue`（含定时任务和跟 PR）、`Inbox` 或助手把来源事件交来（`receive`），或在自己的事务里记下（`recordTrigger`）、提交后再 `route`。
 2. 信箱在写锁内算受众、查工单蓄水门禁与三道刹车，原子写入 `session_delivery` 与路由回执。
 3. `pump.ts` 唤醒空闲帮工、对正忙帮工攒批（`chat.notice_batch_ms` = 3s）插话，或发布 `Handed` 交给当值助手。
 4. 会话换人或关单时，未消费的用户追问以确定性返回编号转交新负责人或助手。
@@ -141,13 +141,13 @@
 **开机（`boot`、`wake`）**
 
 1. `boot`：清理过期轨迹文件；读回在场会话，目录丢失的记 `sessionLeft(lost)`；`vibevalley` 农机上留着一轮的帮工重新打开接着答（见[重启](#重启)），其余未完结的 `session_run` 记 `interrupted`，在忙的会话报「打断了」停在 `resting`。
-2. 频道恢复各会话的串。
+2. 观察层（`watch.boot`）恢复各会话的串，把游标后的频道事件重放一遍。
 3. `wake`：把未终结的投递读回缓存、`handed` 退回 `pending`，重放没有路由回执的触发，按工单放行蓄水池，叫醒在等的会话。
 
 ## 和谁打交道
 
 - **工单（`issue`，含定时任务）**：用 26 个成员（`service-paths.json` 逐个记着）：派活（`hireWith`、`queueDispatch`、`withdrawDispatches`、`triggersOf`、`queuedTriggers`、`room`）、叫停放走（`stop`、`dismiss`）、借工作目录交付（`handOver`、`withWorkplace`、`withIdleWorkplace`）、工作目录（`discardWork`、`clearWorkplace`）、记下并路由触发（定时任务的 `recordTrigger`、`route`、`isRouted`、`ownerOf`、`subscribe`、`replayCronTriggers`，跟 PR 的 `receive`）、在场与查询（`hired`、`live`、`get`、`list`、`runsOf`）和 `news`；订阅 `news` 的 `Reported`、`Left`、`IssueStarted`、`RunFinished` 更新工单状态、问题与冲突。
-- **频道（`channel`）**：记下并路由消息（`recordTrigger`、`route`）、开私聊帮工（`hireWith`）、撤回（`withdrawEnvelope`、`withdrawDeliveries`）、读在场会话（`hired`、`live`）和还在等的投递（`waitingOn`），订阅 `news` 的 `Hired`、`Left`、`Reported` 管工单串与汇报、`deliveries` 的 `Consumed` 加 👀；未读摘要自己用 `unreadSummaryOf` 算。
+- **观察层（`watch`）**：频道不调 `Session`。`Watch` 读频道提交的事件，记下并路由消息（`recordTrigger`、`route`，重放时先问 `isRouted`）、开私聊帮工（`hireWith`）、撤回（`withdrawEnvelope`、`withdrawDeliveries`）、读在场会话（`hired`、`live`）和还在等的投递（`waitingOn`），订阅 `news` 的 `Hired`、`Left`、`Reported` 管工单串与汇报、`deliveries` 的 `Consumed` 加 👀、`Braked` 贴熔断通知；频道的未读摘要自己用 `unreadSummaryOf` 算。开机是 `session.boot()` → `watch.boot()`（开串、按游标重放）→ `session.wake()`。
 - **仓库、农机与记性（`repo`、`runtime`、`memory`）**：`Repo.checkout`、`releaseCheckout`、`resetCheckout`、`clearCheckout` 给帮工开、放、重置、清工单的检出，`houseRules`、`limit`、`usesPullRequests` 拼任务说明和算容量；合并、提 PR、检查与 GitHub 都是工单经仓库带类型的操作做的；农机探测与计费、pi-durable 的 `Harness`；每轮前后召回与写入记忆。
 - **助手（`orchestrator`）**：经 `host` 创建进程内 `AgentHost`，共用 `session` 与 `session_run`；收 `deliveries` 的 `Handed`、`digest` 的摘要，退回用 `handBack`。
 

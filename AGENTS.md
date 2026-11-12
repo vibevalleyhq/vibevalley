@@ -7,7 +7,8 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 ```
 apps/server/               服务端（普通 TypeScript，Hono，Node 24；仓库里用 vpx 跑源码，桌面版带 vp pack 打的包）：src/modules 按单数概念分深模块
                            （setting、user、attachment、provider、agent、memory、runtime、repo、session（触发和投递、会话和每一轮、工作目录、交付与跟 PR、执行器）、
-                           channel、media（含素材库）、artifact、pkm、issue（含定时任务）、inbox、orchestrator、game）；src/gateway 是对外的门（http、mcp 和它的 tool、lan、
+                           channel（不调 session：提交的消息记成带序号的 channel_event）、media（含素材库）、artifact、pkm、watch（按游标读频道事件，路由给帮工、
+                           开串、私聊帮工、汇报、👀）、issue（含定时任务）、inbox、orchestrator、game）；src/gateway 是对外的门（http、mcp 和它的 tool、lan、
                            voice、connector、projection），base 与 infra 是纯地基与外部适配；自研 agent 跑在 pi-durable 上（runtime/durable.ts、session/host.ts、
                            runtime/vibevalley.ts），services.ts 按序组装（buildModules + makeFarm），chat/main.ts 是终端对话（apps/server/README.md）
 apps/server/db/            库（Postgres：database.url，或家目录里的 PGlite）：migrations/0001_schema.up.sql 是唯一的表结构，queries/<表>.sql 一张表一个文件，

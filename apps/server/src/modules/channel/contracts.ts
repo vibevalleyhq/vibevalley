@@ -345,7 +345,7 @@ export interface ChannelService {
   /** A participant gone: in nothing, never back. */
   readonly leave: (participant: string) => Promise<void>;
   readonly participants: () => readonly Participant[];
-  /** Follows a place from its newest message on. */
+  /** Makes a participant a member of a place from its newest message on. */
   readonly addFollower: (channel: string, participant: string) => Promise<void>;
   readonly membersOf: (channel: string) => readonly string[];
   /** The thread kept about a topic, if one was opened. */
