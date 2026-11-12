@@ -1,31 +1,25 @@
 <h1 align="center">VibeValley · 码农场物语</h1>
 
-> A team of coding agents you direct by voice or chat, drawn as a pixel farm. Runs on your own machine.
+> Direct a team of coding agents by voice or chat, on your own machine. Linear for agents, drawn as a pixel farm.
 
-**VibeValley**（码农场物语）是一个用语音或打字指挥的编码 agent 团队，画成一座像素农场。
-
-你只和**助手**说话。助手把活派给**帮工**，帮工是你机器上真实的编码 agent（pi、Claude Code、Codex……），在你的项目里开分支、改代码、跑测试、提交。地里的庄稼跟着它们的真实进度长：读代码时发芽，改文件时长叶，做完了结出麦子。你看过**收成清单**，才把它的分支合进主分支。
-
-你、助手和帮工在同一个群聊**田头**里说话：每件活下面挂着一个工单串，帮工在里面确认、提问、汇报，你随时插话。说到底，VibeValley 是跑在本机的 AI 版 Linear：工单派给编码 agent，它在项目里一轮一轮干活，你看过改动再合并；农场是穿在外面的皮（[概念](docs/concepts.md)）。
+**VibeValley**（码农场物语）让一个人用一句话指挥一队编码 agent：你对**助手**说要做什么，它拆成工单、挑帮工、派出去、把结果告诉你；**帮工**是你机器上真实的编码 agent（pi、Claude Code、Codex……），在你的项目里开分支、改代码、跑测试、提交；你看过改动，才合进主分支。它是跑在本机的 AI 版 Linear，外面画成一座像素农场：庄稼跟着真实的进度长（[概念](docs/concepts.md)）。
 
 ![农场：田地、助手和右下角的田头](docs/images/farm.png)
 
+## 为什么用它
+
+- **说一句话，派出一队人。** 你只和助手说话，打字或按住说话都行。它把一句话拆成工单，按档案挑帮工、开分支，派出去；帮工确认、提问、汇报都在同一个群聊（田头）里，每件活一个串，你随时插话。
+- **用的是你本机真的编码 agent。** pi、Claude Code、Codex 等由 [oar](https://github.com/botiverse/oar) 统一驱动，用你已经登录好的账号；没有也行，自带一个只要 DeepSeek 钥匙的农机。
+- **同时干好几件，互不踩脚。** 最多 6 个帮工同时干活（每个仓库默认 3 个），各在自己工单的 worktree 和分支上；派不出去的排队，空出来自动接上。
+- **合不合由你说了算。** 做完的活先给你看提交、diff 和会不会冲突，你说「完成」才合进主分支；冲突了让它自己解决。长任务拆成有先后的子工单，修 bug 先写一个**会失败的验收测试**，后面的子工单改不了它，最后一步要让它通过。
+- **服务端停了也不丢活。** 助手和自带的农机跑在 [pi-durable](https://www.npmjs.com/package/@earendil-works/pi-durable) 上：每一轮、每个工具调用先落盘再显示。助手答到一半服务端停了，重启后接着答完；进程崩在半路时，帮工也从断点接着做，这一轮只记一次。
+- **一眼看清谁在干什么。** 工作台照 Linear：看板、工单详情、每一步的轨迹（收到的话、每条命令和输出），哪一步不对就在那一步写评论。农场把同样的状态画出来：每个仓库是一座岛，在做的工单是一块地，读代码发芽、改文件长叶、做完结出麦子。
+- **在哪都能派活。** 语音（Agora）、微信、飞书、QQ 只认你自己的账号；手机或另一台电脑经「连接到本机」连进来，前提是你在本机点过头。
+- **少操心。** 「每天九点跑一遍测试」这样的定时任务；不调模型的巡查，提醒没人回的提问、没动静的帮工、做完没收的活；每个农机的额度和每日预算，用完了就不再派。
+- **全在你的机器上。** 服务端默认只听 `127.0.0.1`，数据在你的家目录（`~/.vibevalley`）；帮工的记性、档案、笔记和 Artifact 都在本机。
+
 > [!WARNING]
 > 帮工**没有权限确认、不开沙箱**，能在这台机器上执行任意命令。服务端只监听 `127.0.0.1`，不要把它暴露到网络上。只把你愿意交给编码 agent 的项目放进工作目录。
-
-## 能做什么
-
-- **派活和收获**：对助手说「在 clock-in 里加一个查询打卡记录的接口，写测试」。助手挑一个合适的帮工，按档案设置给它开独立的分支和 worktree，或让它在项目目录里干活。做完后你看提交、diff 和会不会冲突，确认了再合进主分支；冲突了让它自己解决。
-- **同时干好几件活**：最多 6 个帮工同时在地里干活；用 worktree 的帮工各有独立分支。
-- **地图**：每个项目是一座小岛，岛上的地对着它在做的工单和还能派活的空位，排队的活是院门外的种子袋；点空位就给这个项目写一张工单。
-- **看得见过程**：每个帮工的每一步都记成轨迹，包括收到的话、每条命令和输出、说的话。哪一步不对，可以就那一步写评论，它会接着改。
-- **拆成子工单**：长任务可以拆成有先后的子工单。互不依赖的子工单同时做，每一张过了检查才合进父工单分支，最后一次合进主分支。修 bug 时第一步先写一个**会失败的验收测试**，后面的子工单不能改它，最后一步要让它通过。
-- **频道、定时和巡查**：按项目开频道；「每天九点跑一遍测试」这样的定时任务；不调模型的巡查，提醒没人回的提问、没动静的帮工、做完没收的活。
-- **帮工档案和记性**：给帮工捏人设、选农机和模型、装技能。帮工在汇报里写的「记住：……」，下次开工时会想起来。
-- **语音**：按住说话，语音助手（Agora Conversational AI）听你说完，交给同一个助手去派活。
-- **从外面派活**：把田头接到微信、飞书或 QQ，只认你自己的账号。手机或另一台电脑可以经「连接到本机」连进来，前提是你在本机点过头。
-- **管住花费**：每个农机的额度、今天花了多少、每日预算；额度快用完时提醒，用完了就不再派。
-- **农场本身**：像素村有昼夜和光照，有狗、会在路上走的帮工、成就和称号，还有一部能玩小游戏的手机。
 
 ![地图：每个项目一座岛，地是在做的工单和空位](docs/images/map.png)
 
@@ -33,37 +27,36 @@
 
 ```mermaid
 flowchart LR
-  you([你]) -- 打字 / 语音 --> app[页面<br/>农场画面、田头、配置]
+  you([你]) -- 打字 / 语音 / 微信 --> app[工作台和农场<br/>桌面版、浏览器、手机]
   app -- HTTP 命令 --> server
   server -- SSE：折好的核心状态 --> app
-  subgraph server[TypeScript 服务端 127.0.0.1:8787]
-    manager[助手<br/>vibevalley 自己的 agent]
-    chat[田头<br/>Postgres]
+  subgraph server[TypeScript 服务端 127.0.0.1]
+    manager[助手<br/>pi-durable]
+    chat[田头和工单<br/>Postgres / PGlite]
     site[核心状态<br/>只由事实改变]
-    sessions[帮工<br/>oar]
+    sessions[帮工<br/>oar · pi-durable]
   end
   manager --> sessions
   sessions -- 会话事件 --> site
-  sessions --> rt[本机的农机<br/>pi · Claude Code · Codex]
+  sessions --> rt[本机的农机<br/>pi · Claude Code · Codex …]
   rt --> repo[(你的项目<br/>项目目录或工单的 worktree)]
 ```
 
-- **服务端**（`apps/server`，TypeScript，跑在 Node 上）：助手、帮工、田头、项目和收获、Artifact 和笔记、语音、连接器都在这一个进程里，数据在 Postgres（没配就是家目录里的 PGlite）。帮工由 [oar](https://github.com/botiverse/oar) 驱动，它统一驱动不同的编码 agent 程序。
+- **一个服务端进程**（`apps/server`，TypeScript，Node 24）：助手、帮工、田头、工单和交付、Artifact 和笔记、语音、连接器都在里面；数据在 Postgres（没配就是家目录里的 PGlite），助手和帮工的对话在 pi-durable 的 `durable.db`。
 - **核心状态只有一份**：农场上的一切是一个值，只因「事实」而变（雇了一个帮工、开始一轮、跑了一条命令……）。服务端用纯函数把事实折进状态，页面只读折好的结果。
-- **页面**（`apps/web`，Solid 2）：农场和像素村、田头、工单、Artifact、笔记、配置页、语音，由服务端在 `/` 提供；浏览器直接打开就能用。
-- **桌面版**（`apps/desktop`，Electron）：带着服务端起来、打开它的页面，加上通知、菜单栏、灵动岛和语音的快捷键。
-- **形状只写一次**：接口和数据形状按概念写在 `packages/protocol/src/<概念>/`（`shapes.ts`、`schema.ts`、`api.ts`），服务端、页面和命令行 import 同一份，两边不会对不上。
+- **一份页面，三个宿主**（`apps/web`，Solid 2 + Tailwind）：`/` 是工作台，`/farm` 是像素农场；桌面版（Electron）加上通知、菜单栏、灵动岛和语音快捷键，手机壳（Expo）扫码配对后打开同一个页面。
+- **契约只写一次**：接口和形状按概念写在 `packages/protocol`（Zod），服务端、页面和命令行用同一份，两边对不上就编不过。
 
 更多见 [docs/architecture.md](docs/architecture.md)。
 
 ## 快速开始
 
 > [!NOTE]
-> 仓库正在密集调整：概念、接口和存盘格式都还会变，可能会有 bug，升级后旧数据也可能要迁移。升级前先备份农场的数据（`~/.vibevalley`）。遇到问题欢迎提 issue。
+> 还在快速迭代：概念、接口和存盘格式都会变，升级后旧数据可能作废重建。升级前先备份 `~/.vibevalley`。遇到问题欢迎提 issue。
 
 ### 需要
 
-- macOS（Apple 芯片）。macOS 应用是主要的形态，单独跑的服务端也能用浏览器打开；手机版正在换成新的壳，暂时用不了。
+- macOS（Apple 芯片）。macOS 应用是主要的形态；单独跑的服务端用浏览器打开；手机壳（iOS、Android）要自己构建（[apps/mobile](apps/mobile/README.md)）。
 - 至少一个装好并登录的编码 agent：[pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent)、[Claude Code](https://docs.anthropic.com/en/docs/claude-code)、[Codex](https://github.com/openai/codex)。VibeValley 也自带一个农机，只要 DeepSeek 的钥匙。
 - 一把 [DeepSeek](https://platform.deepseek.com/) 的 API 钥匙，助手要用。
 - 构建要 [Vite+](https://viteplus.dev)（`vp`）：它照 `.node-version` 装 Node 24，带着 pnpm。
@@ -94,9 +87,9 @@ vp run --filter @vibevalley/server start --web ../web/dist   # 服务端，127.0
 ### 第一次打开
 
 1. 在首页「设置」里填 DeepSeek 的钥匙。
-2. 在「农具」页里启用本机装好的农机。
+2. 在「农机」页里启用本机装好的农机。
 3. 把项目放进工作目录（默认 `~/vibevalley-dev`，`VIBEVALLEY_WORK_ROOT`），一个文件夹一个项目。没有也行，助手会帮你建。
-4. 在田头对助手说要做什么。
+4. 在聊天里对助手说要做什么。
 
 从派第一张工单到收获、处理冲突和失败、管住花费，见 [使用指南](docs/guide.md)。
 
@@ -124,6 +117,7 @@ docs/              文档：现在怎么用、怎么开发、各部分怎么工�
 ## 致谢
 
 - [oar](https://github.com/botiverse/oar)（botiverse，Apache-2.0）：驱动编码 agent 的运行时。田头的频道、工单串和外部渠道参照了 botiverse 的 Raft。
+- [pi-durable 和 pi-ai](https://github.com/earendil-works/pi)（Earendil）：助手和帮工跑在上面，断在半路的一轮重启后接着做。
 - [Hono](https://hono.dev/)、[Zod](https://zod.dev/)、[PGlite](https://pglite.dev/)、[Solid](https://www.solidjs.com/)、[Tailwind CSS](https://tailwindcss.com/) 和 [Electron](https://www.electronjs.org/)：服务端的接口、契约、数据库、页面、样式和桌面版。
 - [Agora Conversational AI](https://www.agora.io/)：语音助手；服务端照它的官方示例 [agent-quickstart-nextjs](https://github.com/AgoraIO-Conversational-AI/agent-quickstart-nextjs)（MIT）改写。
 - [DeepSeek](https://www.deepseek.com/)：助手用的模型。
