@@ -225,23 +225,20 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         const channel = sessionOf(session)?.channel;
         const at = clock.now();
         const speaker = sessionOf(from);
-        const trigger = await sessions.receive({
-          _tag: "Record",
-          input: {
-            source: "channel",
-            key: sendKey || newId(at),
-            actor:
-              from === userId
-                ? { kind: "user", id: userId }
-                : { kind: "agent", role: agents.isOrchestrator(from) ? "orchestrator" : "worker", id: from, ...(speaker ? { name: speaker.name } : {}) },
-            text: text.trim(),
-            threads: [],
-            addressed: "direct",
-            ...(channel ? { replyChannel: channel } : {}),
-            at,
-          },
+        const trigger = await sessions.recordTrigger({
+          source: "channel",
+          key: sendKey || newId(at),
+          actor:
+            from === userId
+              ? { kind: "user", id: userId }
+              : { kind: "agent", role: agents.isOrchestrator(from) ? "orchestrator" : "worker", id: from, ...(speaker ? { name: speaker.name } : {}) },
+          text: text.trim(),
+          threads: [],
+          addressed: "direct",
+          ...(channel ? { replyChannel: channel } : {}),
+          at,
         });
-        await sessions.receive({ _tag: "Trigger", trigger, to: { session } });
+        await sessions.route(trigger, { session });
         return undefined;
       }
       const run = sessions.live(from).run;
@@ -465,13 +462,13 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         const row = await messageOf(id);
         if (row.deleted_at !== null) throw refused(t("server.channel.messageGone"));
         await change(row, (revision, now) => qm.deleteMessage(db.sql, { at: now, revision, id }));
-        await sessions.withdraw({ _tag: "Envelope", envelope: id });
+        await sessions.withdrawEnvelope(id);
       }),
     previewRemove: async (id) => {
       const row = await messageOf(id);
       if (row.deleted_at !== null) throw refused(t("server.channel.messageGone"));
       const ch = store.channel(row.channel_id);
-      const waiting = await sessions.read({ _tag: "Waiting", envelope: id });
+      const waiting = await sessions.waitingOn(id);
       return {
         does: [
           t("server.channel.deletes", { target: ch ? targetOfChannel(ch) : "", number: row.number, name: row.sender_name, text: lineOf(row.body, lastMax) }),

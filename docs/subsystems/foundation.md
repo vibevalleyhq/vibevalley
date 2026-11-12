@@ -55,7 +55,7 @@
 - **单数概念名，拒绝单调用方顶层服务**：目录、表名和服务名均用单数概念词，协议同名类型统一写为 `T.Issue`（由 `singular-service` 与 `protocol-namespace` 规则检查）；仅有一个模块调用的内部设施留在调用方模块内（由 `scripts/audit/service-paths.ts` 扇入检查守住）。
 - **组装与启动分两阶段**：`services.ts` 的 `buildModules` 照模块次序一行一个 `await makeX({ … })` 建到工单和定时任务，`makeFarm` 接着建后面的，每个服务的依赖在调用处按名字写明（没有分层的阶段类型，也不把「下面的全部」交给上面），拼成 `Farm` 并完成订阅，再按次序调各模块的 `boot()`；`Farm` 是 `AsyncDisposable`，关的时候倒着调各服务的 `close()`，一个失败不挡别的，建到一半失败也照此关掉已建的。测试的 `testing/world.ts` 用同一个 `buildModules` 建到工单（`moduleWorld`），再加 Inbox、工具和 `/mcp`（`world`）。HTTP 监听就绪后才将地址注入 `Session` 和 `Lan`。
 - **操作与发言主体统一用协议 `Actor`**：HTTP 与连接器入口构造 `user`（`base/actor.ts`），助手运行构造 `agent`（带 `role: "orchestrator"` 与 `forUser`），`/mcp` 构造 `agent`（带 `role: "worker"` 与会话 id），定时、巡查与 GitHub 轮询构造 `system`。协议消息、服务端 `Trigger` 与信箱共用同一个 `T.Actor`；落库列统一存 `ActorKind`（`user`、`agent`、`system`）与可选 `AgentRole`。
-- **模块之间的路径与服务扇入记成表**：`scripts/audit/service-paths.ts` 按语法树、照名字声明的类型（`deps.agent.list()`、从 `deps` 解构出来的 `agent`）读出哪个模块用了别的模块服务的哪个成员（存在 `scripts/audit/service-paths.json`）并校验顶层服务扇入；`vp run paths:check` 与 `docs:verify` 一并检查，多一条路或新增单调用方顶层服务即失败。一件事一条路：往频道写话只有 `Channel.post`（[频道](docs/subsystems/channel.md#模型和不变量)），到帮工只有 `Session.receive`（[帮工](docs/subsystems/session.md#对外的门)）。
+- **模块之间的路径与服务扇入记成表**：`scripts/audit/service-paths.ts` 按语法树、照名字声明的类型（`deps.agent.list()`、从 `deps` 解构出来的 `agent`）读出哪个模块用了别的模块服务的哪个成员（存在 `scripts/audit/service-paths.json`）并校验顶层服务扇入；`vp run paths:check` 与 `docs:verify` 一并检查，多一条路或新增单调用方顶层服务即失败。一件事一条路：往频道写话只有 `Channel.post`（[频道](docs/subsystems/channel.md#模型和不变量)），触发到帮工只有 `Session.route`（[帮工](docs/subsystems/session.md#对外的门)）。
 - **单实例家目录租约**：`infra/lease.ts` 在 `$VIBEVALLEY_HOME/.vibevalley.lock` 写入进程 pid；若旧进程仍在运行则拒绝启动，已退出则接管。
 
 ### 异步、资源与错误

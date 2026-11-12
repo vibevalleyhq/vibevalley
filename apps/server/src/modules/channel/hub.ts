@@ -89,7 +89,7 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
     return !h.issue && ch?.type === "direct" && ch.peer_id === profileId(h.agent) ? ch.id : undefined;
   };
   const sessionOf = (id: string) => sessions.live(id).session;
-  const hired = () => sessions.live();
+  const hired = () => sessions.hired();
   /** The helper working the issue now: the latest hired of those on it. */
   const onIssue = (issue: string) =>
     hired().reduce<T.Session | undefined>((on, h) => (h.issue === issue && (!on || h.hiredAt >= on.hiredAt) ? h : on), undefined);

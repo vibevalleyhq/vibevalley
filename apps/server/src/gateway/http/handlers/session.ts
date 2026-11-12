@@ -9,10 +9,10 @@ export function sessionHandlers(deps: { readonly session: Session }): SessionHan
   return {
     "session.stop": async ({ id }) => {
       if (!sessions.live(id).reachable) throw missing(t("server.helperRef", { id }), [lookIn.session]);
-      await sessions.withdraw({ _tag: "Turn", session: id });
+      await sessions.stop(id);
     },
-    "session.list": ({ agent }) => sessions.read({ _tag: "Sessions", agent: agent ?? "" }),
-    "session.get": async ({ id }) => orMissing(t("server.helperRef", { id }), [lookIn.session])(await sessions.read({ _tag: "Session", id })),
-    "session.event.list": async ({ id, run }) => (await sessions.read({ _tag: "Events", session: id, run: run ?? "" })) ?? [],
+    "session.list": ({ agent }) => sessions.list(agent),
+    "session.get": async ({ id }) => orMissing(t("server.helperRef", { id }), [lookIn.session])(await sessions.get(id)),
+    "session.event.list": async ({ id, run }) => (await sessions.eventsOf(id, run ?? "")) ?? [],
   };
 }

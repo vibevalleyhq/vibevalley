@@ -4,7 +4,7 @@ import type { InsertDelivery } from "#/modules/session/mailbox.ts";
 import * as qd from "#db/session_delivery.sql.ts";
 import * as qr from "#db/session_trigger.sql.ts";
 
-/** A delivery written and routed as Mailbox commits one, and nothing after: what a stop between commit and hand-off
+/** A delivery written and routed as the session module commits one, and nothing after: what a stop between commit and hand-off
  * leaves for Mailbox.restore. An existing row stays as it is. */
 export async function committedDelivery(db: Db, input: InsertDelivery): Promise<void> {
   const payloadJson = jsonText(input.row.payload);

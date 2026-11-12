@@ -72,8 +72,7 @@ export function directTalk(
     const target = targetOfChannel(place);
     let opened: string;
     try {
-      const received = await sessions.receive({
-        _tag: "Hire",
+      const received = await sessions.hireWith({
         agent,
         brief: talkBrief(agent.name, envelopeLines(ordered.map((m) => envelopeOf(m, target)))),
         where: "",

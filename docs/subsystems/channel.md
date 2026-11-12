@@ -77,7 +77,7 @@
 **用户发送消息**
 
 1. `Channel.say` 在单写锁内将消息、提及、关注和 `Trigger` 写入库，推进用户已读游标。
-2. 调用 `Session.receive` 在事务内写投递行与路由回执（中途崩溃由启动重放恢复）。
+2. 调用 `Session.route` 在事务内写投递行与路由回执（中途崩溃由启动重放恢复）。
 3. 施加 `messageChanged`、`channelChanged`、`userMentionsChanged` 事实，并向订阅流推送。
 
 **派活开启工单串与贴出汇报**

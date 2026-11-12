@@ -178,7 +178,7 @@ export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "s
       case "trigger": {
         let resource;
         try {
-          resource = await sessions.read({ _tag: "Trigger", id: ref.id });
+          resource = await sessions.trigger(ref.id);
         } catch (error) {
           throw new ResourceError(messageOf(error), { cause: error });
         }
@@ -186,7 +186,7 @@ export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "s
         let permitted = orchestrator;
         if (session?.issue && !permitted) permitted = (await issues.get(session.issue)).mandate.originTriggerId === ref.id;
         if (session && !permitted) {
-          const owner = await sessions.read({ _tag: "Owner", trigger: ref.id });
+          const owner = await sessions.ownerOf(ref.id);
           if (owner) {
             const ownerIssue = await issues.get(owner);
             permitted = await mayReadIssue(session, ownerIssue);
@@ -222,7 +222,7 @@ export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "s
       case "issue": {
         const issue = await issues.get(ref.id);
         if (!orchestrator && (session === undefined || !(await mayReadIssue(session, issue)))) throw refuse(resourceWords.forbidden(uri));
-        return textOf({ issue, runs: await sessions.read({ _tag: "Runs", issue: issue.id }), messages: await channels.issueMessages(issue.id) });
+        return textOf({ issue, runs: await sessions.runsOf(issue.id), messages: await channels.issueMessages(issue.id) });
       }
       case "channel": {
         if (!orchestrator && (session === undefined || !(await mayReadChannel(session, ref.id)))) throw refuse(resourceWords.forbidden(uri));
@@ -231,7 +231,7 @@ export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "s
       }
       case "session": {
         if (!orchestrator && session?.id !== ref.id) throw refuse(resourceWords.forbidden(uri));
-        const events = await sessions.read({ _tag: "Events", session: ref.id });
+        const events = await sessions.eventsOf(ref.id);
         if (events === undefined) throw refuse(resourceWords.missing(uri));
         return textOf({ events });
       }

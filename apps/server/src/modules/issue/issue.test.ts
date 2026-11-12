@@ -528,7 +528,7 @@ describe("issues", () => {
     const issues2 = await issues.list();
     expect(issues2).toEqual([]);
     expect(core.state().issues).toEqual([]);
-    expect(sessions.live()).toEqual([]);
+    expect(sessions.hired()).toEqual([]);
     noWorktree(f.config.workRoot);
 
     const existing = await issues.add({ title: "already queued", repo: "demo", agent: agent.id });
@@ -552,7 +552,7 @@ describe("issues", () => {
     await refuse(w.db, "reject_issue", "before insert on issue", "", "test write failure");
     const got = await flip(issues.hire({ ...lab(), worktree: true }, "test", "demo"), HireRefused);
     expect(got.reason).toContain("test write failure");
-    expect([core.state().sessions.filter((s) => s.role === "worker").length, sessions.live().length]).toEqual([0, 0]);
+    expect([core.state().sessions.filter((s) => s.role === "worker").length, sessions.hired().length]).toEqual([0, 0]);
     noWorktree(f.config.workRoot);
   });
 
@@ -619,7 +619,7 @@ describe("issues", () => {
     const sessions = w.inside;
     const first = await issues.hire(lab(), "first", "demo");
     const id = first.session.issue!;
-    await sessions.withdraw({ _tag: "Helper", session: first.session.id });
+    await sessions.dismiss(first.session.id);
     const second = await issues.hire(lab(), "second", "demo", { issue: id });
     expect(second.session).toBeDefined();
     await issues.changes(id, user);
@@ -661,13 +661,13 @@ describe("issues", () => {
     expect(sessionIdsOf(got)).toHaveLength(1);
     const queuedSession = sessionIdsOf(got)[0];
     if (queuedSession === undefined) throw new Error("the issue has no execution session");
-    expect((await sessions.read({ _tag: "Session", id: queuedSession }))?.channel).toBe(first.id);
+    expect((await sessions.get(queuedSession))?.channel).toBe(first.id);
     await waitFor(
-      () => sessions.read({ _tag: "Runs", issue: issue.id }),
+      () => sessions.runsOf(issue.id),
       (r) => r.length > 0,
       "the queued run",
     );
-    expect((await sessions.read({ _tag: "Runs", issue: issue.id }))[0]!.triggeredBy.kind).toBe("issue");
+    expect((await sessions.runsOf(issue.id))[0]!.triggeredBy.kind).toBe("issue");
     const rows = await w.db.sql.query(`select 1 from session_issue_input where issue_id = $1 and state = 'held'`, [issue.id]);
     expect(rows).toEqual([]);
   });
@@ -707,7 +707,7 @@ describe("issues", () => {
     expect(inputs[0]).not.toContain("old-dispatch-context");
     const issue2 = await issues.get(item.id);
     const session = sessionIdsOf(issue2)[0]!;
-    expect((await sessions.read({ _tag: "Session", id: session }))?.channel).toBe(second.id);
+    expect((await sessions.get(session))?.channel).toBe(second.id);
   });
 
   it("a queued cron keeps its trigger and that it was missed", async () => {
@@ -733,13 +733,13 @@ describe("issues", () => {
     core.apply({ type: "sessionLeft", id: sessionId("occupied") });
     await w.issue.refreshQueue();
     await waitFor(
-      () => sessions.read({ _tag: "Runs", issue: issue!.id }),
+      () => sessions.runsOf(issue!.id),
       (r) => r.length > 0,
       "the scheduled run",
     );
-    const [run] = await sessions.read({ _tag: "Runs", issue: issue!.id });
+    const [run] = await sessions.runsOf(issue!.id);
     expect(run!.triggeredBy).toEqual({ kind: "cron", cron: sc.id, missed: true, message: issue!.mandate.originTriggerId });
-    expect((await sessions.read({ _tag: "Session", id: run!.session }))?.channel).toBe(channel.id);
+    expect((await sessions.get(run!.session))?.channel).toBe(channel.id);
   });
 
   it("a queued todo starts once there is room, and keeps its place until then", async () => {
@@ -796,7 +796,7 @@ describe("issues", () => {
     expect(sessions.live(first).session).toBeUndefined();
     const next = sessionIdsOf(handed)[1];
     if (next === undefined) throw new Error("the issue has no second execution session");
-    const second = (await sessions.read({ _tag: "Session", id: next }))!;
+    const second = (await sessions.get(next))!;
     expect(second.agent).toBe("lab2");
     expect(second.brief).toMatch(/^接着写\n\n（这张工单换你接手了，之前是 /u);
     await inReview(2);
@@ -837,13 +837,13 @@ describe("issues", () => {
     const issue = await issues.add({ title: "history", repo: "demo", agent: "lab" });
     const first = (await issues.hire(lab(), "first", "demo", { issue: issue.id })).session;
     await until(() => sessions.live(first.id).session?.phase._tag === "done", "the first report");
-    await sessions.withdraw({ _tag: "Helper", session: first.id });
+    await sessions.dismiss(first.id);
     const live = (await issues.hire(lab(), "second", "demo", { issue: issue.id })).session;
     await until(() => sessions.live(live.id).session?.phase._tag === "done", "the live report");
     await sessions.suspend(live.id);
     const missing = (await issues.hire(lab(), "third", "demo", { issue: issue.id })).session;
     await until(() => sessions.live(missing.id).session?.phase._tag === "done", "the third report");
-    await sessions.withdraw({ _tag: "Helper", session: missing.id });
+    await sessions.dismiss(missing.id);
     const [got] = await issues.history();
     expect(got!.sessions.map((s) => [s.id, s.phase._tag])).toEqual([
       [first.id, "closed"],

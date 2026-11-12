@@ -198,7 +198,7 @@ test("a helper on the farm's own runtime cut off mid-answer by a restart finishe
   expect(after.requests).toHaveLength(1);
   expect(ran).toEqual([{ outcome: "completed" }]);
   expect(farm.session.live(helper).lastText).toBe(helperWords);
-  const events = (await farm.session.read({ _tag: "Events", session: helper })) ?? [];
+  const events = (await farm.session.eventsOf(helper)) ?? [];
   expect(events.filter((e) => e.type === "run/end")).toHaveLength(1);
   expect(events.filter((e) => e.type === "user/message")).toHaveLength(1);
 });

@@ -106,26 +106,25 @@ export function issueSplitting(r: IssueLifecycle, deps: SplitDeps) {
     const parentWorker = parentSession ? sessions.live(parentSession).session : undefined;
     if (parentWorker && isBusy(parentWorker)) return;
     try {
-      await sessions.workplace({
-        _tag: "HandOver",
+      await sessions.handOver(
         session,
-        closed: "completed",
-        use: async (place) => {
+        "completed",
+        async (place) => {
           const constraints = await verifyChild(repos, child, parent, all, place);
           const mergeIntoParent = (target: Workplace) => repos.mergeInto(place, issueBranch(parent.number), target.cwd);
           let merged;
           if (parentSession && sessions.live(parentSession).reachable) {
             try {
-              merged = await sessions.workplace({ _tag: "Session", session: parentSession, idle: true, use: mergeIntoParent });
+              merged = await sessions.withIdleWorkplace(parentSession, mergeIntoParent);
             } catch (error) {
               throw error instanceof MergeFailure ? error : MergeFailure.error(messageOf(error));
             }
-          } else merged = await sessions.workplace({ _tag: "Issue", repo: parentRepo, number: parent.number, use: mergeIntoParent });
+          } else merged = await sessions.withCheckout(parentRepo, parent.number, mergeIntoParent);
           await completeChild(child.id, constraints);
           return merged;
         },
-        settle: "helper",
-      });
+        "helper",
+      );
       await setConflict(child.id, undefined);
     } catch (failure) {
       if (!(failure instanceof NotTakenIn) && !(failure instanceof ApiError)) throw failure;

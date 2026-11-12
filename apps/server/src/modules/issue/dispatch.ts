@@ -97,7 +97,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
     if (parent) {
       try {
         // The parent's checkout, for the child's branch to fork from.
-        await sessions.workplace({ _tag: "Issue", repo: where, number: parent.number, use: async () => {} });
+        await sessions.withCheckout(where, parent.number, async () => {});
       } catch (e) {
         if (e instanceof RepoError) throw new HireRefused(e.message, undefined, { cause: e });
         throw e;
@@ -111,8 +111,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
     const { issue: _issue, hiring: _hiring, ...sending } = opt;
     const hiredIssue = issue;
     try {
-      const received = await sessions.receive({
-        _tag: "Hire",
+      const received = await sessions.hireWith({
         agent,
         brief: [brief, constraints].filter(Boolean).join("\n\n"),
         where,
@@ -169,7 +168,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
 
   const start = async (id: string, channel: string, by?: T.RunTrigger, said?: string, inputs: readonly Trigger[] = []): Promise<Dispatched> => {
     const mine = await get(id).catch(noneIfRefused);
-    const queued = inputs.length > 0 || mine === undefined ? undefined : await sessions.read({ _tag: "IssueTriggers", issue: id });
+    const queued = inputs.length > 0 || mine === undefined ? undefined : await sessions.triggersOf(id);
     const initial = queued ?? inputs;
     if (mine) {
       const children = (await everyIssue()).filter((child) => child.parent === mine.id);
@@ -235,7 +234,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
   /** In the board's order: one that cannot go any more leaves the queue. */
   const refreshQueue = (): Promise<void> =>
     trying.with(async () => {
-      const inputs = await sessions.read({ _tag: "Queued" });
+      const inputs = await sessions.queuedTriggers();
       await bestEffort(log, "vibevalley: child issues could not be merged", () => joinChildren());
       const all = await everyIssue();
       for (const issue of all) {
@@ -274,7 +273,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
       await start(id, channel, by, text);
       return "";
     }
-    const last = await sessions.read({ _tag: "Session", id: newest });
+    const last = await sessions.get(newest);
     if (!last) throw missing(t("server.issue.issueRef", { ref: id }), [lookIn.issue]);
     if (!isClosed(issue.status)) throw refused(t("server.issue.stillWorking", { name: last.name }));
     const agent = to ?? store.agent(last.agent);

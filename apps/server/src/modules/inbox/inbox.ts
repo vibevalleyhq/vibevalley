@@ -123,20 +123,17 @@ export async function makeInbox(deps: InboxDeps): Promise<Inbox> {
     await bestEffort(log, "vibevalley: patrol inputs were not kept", async () => {
       for (const [channel, notes] of byChannel) {
         const top = await chat.topOf(channel);
-        const trigger = await sessions.receive({
-          _tag: "Record",
-          input: {
-            key: `${channel}:${now}:${notes.map((note) => note.key).join(",")}`,
-            source: "patrol",
-            actor: { kind: "system", id: "patrol" },
-            addressed: "direct",
-            threads: [],
-            replyChannel: channel,
-            at: now,
-            text: patrolText(top.name, notes),
-          },
+        const trigger = await sessions.recordTrigger({
+          key: `${channel}:${now}:${notes.map((note) => note.key).join(",")}`,
+          source: "patrol",
+          actor: { kind: "system", id: "patrol" },
+          addressed: "direct",
+          threads: [],
+          replyChannel: channel,
+          at: now,
+          text: patrolText(top.name, notes),
         });
-        await sessions.receive({ _tag: "Trigger", trigger });
+        await sessions.route(trigger);
       }
     });
   };

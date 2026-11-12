@@ -120,8 +120,8 @@ export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: T
     const input = channelTrigger(fact, inputContext(asEnvelope(fact.row)));
     let routed: { readonly heldNotice: string };
     try {
-      const original = await sessions.receive({ _tag: "Record", input });
-      routed = await sessions.receive({ _tag: "Trigger", trigger: original, to: fact });
+      const original = await sessions.recordTrigger(input);
+      routed = await sessions.route(original, fact);
     } catch (error) {
       // A refusal is the route's answer: the message is kept, and one not routed now is routed again at startup
       // (unroutedChannelMessages). Anything else (the database failing) fails the write.

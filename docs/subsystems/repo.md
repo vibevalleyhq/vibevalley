@@ -31,7 +31,7 @@
 - **仓库即 `repos/<名字>` 下的直接子目录**：名字仅含字母、数字、`-`、`_`、`.`（最长 64 字符），禁止符号链接跳出 `repos/`。派活目标仓库不存在时自动 `git init -b main` 并生成初始提交。
 - **一张工单固定一个 worktree 与一条分支**：路径为 `worktrees/<仓库>.<工单号>`，分支为 `vibevalley/issue-<工单号>`；重开或换帮工直接复用，首次创建时从基分支切出，目标仓库有 `.vibevalley/setup` 就在锁外跑一次（脚本由目标仓库自己提供）。
 - **同仓库写操作串行，本地合并的耗时检查在锁外执行**：每个仓库一把信号量锁 `serially` 保护新建、开 worktree、合并与清理；`.vibevalley/check`（默认限时 1200 秒）在锁外运行，通过后重新进锁核对分支与基分支未变才执行合并。
-- **工单的检出只有一扇门（`checkout`），只给帮工模块用**：`Open` 开（复用）一张工单的 worktree 或仓库本身的目录，`Release` 放下，`Reset` 把分支重置回主分支，`Clear` 在工单上没有帮工时清掉；工单要用检出经 `Session.workplace`（[帮工](docs/subsystems/session.md#对外的门)）。
+- **工单的检出只有一扇门（`checkout`），只给帮工模块用**：`Open` 开（复用）一张工单的 worktree 或仓库本身的目录，`Release` 放下，`Reset` 把分支重置回主分支，`Clear` 在工单上没有帮工时清掉；工单要用检出经 `Session` 的 `withWorkplace`、`withCheckout`、`handOver`（[帮工](docs/subsystems/session.md#对外的门)）。
 - **清理回执区分现场是否保留（`WorkplaceRelease`）**：`Release` 与 `Clear` 返回 `{ kept, why? }`；有未提交改动或未合入提交时保留现场，仅 `kept: false` 时允许删除工单身份。
 - **冲突预检与合入父分支均不污染工作区**：
   - 冲突检测用 `git merge-tree --write-tree`；子工单合入父分支（`mergeInto`）用 `merge-tree` + `commit-tree` + 带旧值校验的 `update-ref`。

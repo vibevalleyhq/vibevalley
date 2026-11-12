@@ -99,7 +99,7 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 ## 和谁打交道
 
-- **帮工（`session`）**：只经七样门（[帮工](docs/subsystems/session.md#对外的门)）：`receive`（记下并路由排队输入和轮询到的 GitHub PR CI/Review 事件，`Hire` 派工）、`withdraw`（撤回派活、叫停、放走帮工）、`workplace`（帮工的或工单自己的检出：看改动、合并、交接、重置、清理）、`live` 与 `read`（在场的帮工、各轮、事件、排队的触发）、`room`（还能不能再开一个）、`news`（更新工单状态、问题与冲突）。
+- **帮工（`session`）**：经 `Session` 的门（[帮工](docs/subsystems/session.md#对外的门)）：`recordTrigger`、`route`（记下并路由排队输入）、`receive`（轮询到的 GitHub PR CI/Review 事件）、`hireWith`（派工）、`withdrawDispatches`、`stop`、`dismiss`（撤回派活、叫停、放走帮工）、`withWorkplace`、`withIdleWorkplace`、`withCheckout`、`handOver`、`discardWork`、`clearWorkplace`（帮工的或工单自己的检出：看改动、合并、交接、重置、清理）、`hired`、`live`、`get`、`list`、`runsOf`、`triggersOf`、`queuedTriggers`、`knownGitHubEvents`（在场的帮工、会话、各轮、排队的触发、PR 的事件）、`room`（还能不能再开一个）、`news`（更新工单状态、问题与冲突）。
 - **仓库（`repo`）**：管理冲突预检、`.vibevalley/check`、分支合并、`gh` PR 操作与 `githubSnapshot` 快照拉取。
 - **频道（`channel`）**：用户发言经 `Channel.userInThread` 清空问题并作废旧验收标记。
 

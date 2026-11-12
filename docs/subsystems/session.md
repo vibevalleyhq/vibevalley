@@ -55,11 +55,14 @@
 
 | 成员 | 做什么 | 谁用 |
 |---|---|---|
-| `receive` | 一件活到了：`Trigger`（路由已记下的触发，可指定听众或帮工）、`Record`（在调用方的事务里记下，提交后再以 `Trigger` 路由）、`Event`（来源事件：记下，农场自己的回声不记，再路由）、`Hire`（腾位置、开帮工、在同一事务里跑调用方的 `hiring`） | 工单、频道、定时任务、Inbox、助手 |
-| `withdraw` | 拿回来：一封信、一张工单的派活、一个会话的未投递，叫停一个会话正在跑的一轮（`Turn`），放走一个帮工（`Helper`，`discard` 时先重置分支） | 工单、频道、接口 |
-| `workplace` | 工作目录：在帮工的锁里用它的（`idle` 时要它闲着）、没有帮工时用工单的检出、交接后放走（`HandOver`）、帮工留着时把分支重置回主分支（`Discard`）、工单上没有帮工时清掉检出（`Clear`） | 工单 |
-| `live` | 不带参数：在场的帮工；带会话 ID：它此刻的样子（核心状态里的会话、这个进程是否握着它、最后说的话和汇报摘要、正在哪一轮、工作目录） | 工单、频道、Inbox、助手、工具、`/mcp` |
-| `read` | 查过去和在等的：会话（含已离场的）、一张工单的各轮、一个会话的事件；触发器、一张工单的和全部排队的触发、一个 PR 的 GitHub 事件、触发的归属工单与是否已路由；一封信还在几处投递里、助手的摘要 | 工单、频道、定时任务、助手、工具、接口 |
+| `route`、`recordTrigger`、`receive`、`hireWith` | 一件活到了：路由已记下的触发（可指定听众或帮工）；在调用方的事务里记下触发，提交后再 `route`；来源事件记下再路由（农场自己的回声不记）；腾位置、开帮工、在同一事务里跑调用方的 `hiring`，带着它的头几件输入 | 工单、频道、定时任务、Inbox、助手 |
+| `withdrawEnvelope`、`withdrawDeliveries`、`withdrawDispatches` | 拿回来：一封信、一个会话的未投递、一张工单的派活 | 频道、工单 |
+| `stop`、`dismiss` | 叫停一个会话正在跑的一轮；放走一个帮工（`discard` 时等农机不再写了再重置分支） | 工单、接口 |
+| `withWorkplace`、`withIdleWorkplace`、`withCheckout`、`handOver`、`discardWork`、`clearWorkplace` | 工作目录：在帮工的锁里用它的、要它闲着时用它的、没有帮工时用工单的检出、用完交接后放走、帮工留着时把分支重置回主分支、工单上没有帮工时清掉检出 | 工单 |
+| `hired`、`live` | 在场的帮工；一个会话此刻的样子（核心状态里的会话、这个进程是否握着它、最后说的话和汇报摘要、正在哪一轮、工作目录） | 工单、频道、Inbox、助手、工具、`/mcp` |
+| `get`、`list`、`runsOf`、`eventsOf` | 会话（含已离场的）、全部或一个档案的会话、一张工单的各轮、一个会话的事件 | 工单、工具、接口 |
+| `trigger`、`triggersOf`、`queuedTriggers`、`knownGitHubEvents`、`ownerOf`、`isRouted` | 一条触发、一张工单的触发、全部排队的触发、一个 PR 的 GitHub 事件、触发的归属工单、是否已路由 | 工单、定时任务、工具 |
+| `waitingOn`、`digest` | 一封信还在几处投递里；助手没读的摘要 | 频道、助手 |
 | `room` | 这个农机在这个仓库上还能不能再开一个帮工 | 工单 |
 | `news`、`deliveries` | 会话的一切动静（`Hired`、`Reported`、`Left`、`IssueStarted`、`RunFinished`、回执和启动动静），投递的动静（`Handed`、`Consumed`、`Braked`） | 工单、频道、助手 |
 | `decline`、`handBack`、`report`、`workFile`、`subscribe`、`replayCronTriggers`、`who`、`setAddress`、`host` | 帮工拒收、助手退回、帮工交汇报、读帮工目录里的文件、绑定工单的串、重放 cron 触发、令牌认人、`/mcp` 地址、助手的进程内宿主 | 工具、助手、定时任务、媒体、`/mcp`、接口 |
@@ -70,7 +73,7 @@
 ### 触发与投递
 
 - **一个 `(source, key)` 只产生一条不可变 `Trigger`**：重复到达的来源事件直接返回首次写入的 `Trigger` 与原文（`selfEcho: true` 直接忽略）；控制头（`TriggerMeta`、`TriggerContext`）经 Schema 解码，原始文本或结构化数据存入同行 payload 列，只读（供 `vv://trigger/<id>` 分页读取）。
-- **记下参与调用方的事务，不另起后台任务**：上游在同一事务里提交来源游标与 `Trigger`（`receive` 的 `Record`），提交后再路由。
+- **记下参与调用方的事务，不另起后台任务**：上游在同一事务里提交来源游标与 `Trigger`（`recordTrigger`），提交后再 `route`。
 - **来源先落库，投递行与路由回执同事务提交**：投递写入 `session_delivery`、路由回执写在 `session_trigger` 上，同一事务；中途崩溃时重启后重放。
 - **至少投递一次，按 `launch` 对账，真实入模才算消费**：交给会话时标为 `handed` 并记下这次农机连接号 `launch`（`${id}#n`，一次连接可跨多轮 `Run`）；模型真正收下（会话的 `Consumed` 回执）才标 `consumed`；回合结束、重连、会话关闭或服务重启时仍未收到回执的 `handed` 按 `launch` 退回 `pending` 重投。
 - **两级缓冲（工单蓄水池 → 会话信箱）**：发往工单的输入先匹配 `session_subscription` 进入 `session_issue_input`；工单排队或在等用户时自动输入保持 `held`（同一工单只留最新一条 cron 输入）；工单就绪或用户新发言放行时转入当前负责会话的 `session_delivery`。
@@ -105,14 +108,14 @@
 
 ## 怎么走
 
-**一件活到了（`receive`）**
+**一件活到了（`route`、`recordTrigger`、`receive`）**
 
-1. `Channel`、`Issue`、`Cron`、`Inbox` 或助手把来源事件交来（`Event`），或在自己的事务里记下（`Record`）、提交后再交 `Trigger`。
+1. `Channel`、`Issue`、`Cron`、`Inbox` 或助手把来源事件交来（`receive`），或在自己的事务里记下（`recordTrigger`）、提交后再 `route`。
 2. 信箱在写锁内算受众、查工单蓄水门禁与三道刹车，原子写入 `session_delivery` 与路由回执。
 3. `pump.ts` 唤醒空闲帮工、对正忙帮工攒批（`chat.notice_batch_ms` = 3s）插话，或发布 `Handed` 交给当值助手。
 4. 会话换人或关单时，未消费的用户追问以确定性返回编号转交新负责人或助手。
 
-**派出帮工（`Hire`）**
+**派出帮工（`hireWith`）**
 
 1. 在准入锁内检查容量上限（不满足时抛 `HireRefused`），分配 `w<n>` 编号，经 `Repo.checkout` 打开工单的检出，并创建 `handScope` 与 `startupScope`（都是 `AsyncDisposableStack`，`hands.ts`）挂上轨迹、令牌与目录的释放。
 2. 召回档案记忆，拼装规矩、人设、技能与任务说明，经执行器启动 oar 会话。
@@ -126,10 +129,10 @@
 3. 会话正在 `working` 时，支持插话的农机直接 `steer` 进当前 `Run`；不支持的排入下一轮。
 4. 容量不足或投递被拒时抛 `DeliveryRefused`（`AgentHost.submit` 抛 `SubmitRefused`），失败或中断时回收预留的输入。
 
-**交接与离场（`workplace` 的 `HandOver`、`withdraw` 的 `Helper`）**
+**交接与离场（`handOver`、`dismiss`）**
 
 1. 先关闭底层 oar 会话；关闭失败则拒绝合并或重置，保持现场占位。
-2. `HandOver` 在会话锁内运行调用方传入的检查与合并；失败则保留 `Session` 与分支并抛 `NotTakenIn`。
+2. `handOver` 在会话锁内运行调用方传入的检查与合并；失败则保留 `Session` 与分支并抛 `NotTakenIn`。
 3. 合并成功或放走帮工后，更新 `session` 表为 `closed`、关闭 `handScope` 作废令牌与轨迹、经 `Repo.checkout` 放下检出、通知 `Memory.endSession` 并施加 `sessionLeft`。
 
 **开机（`boot`、`wake`）**
@@ -140,15 +143,15 @@
 
 ## 和谁打交道
 
-- **工单（`issue`）**：只用 `receive`、`withdraw`、`workplace`、`live`、`read`、`room`、`news` 七样；订阅 `news` 的 `Reported`、`Left`、`IssueStarted`、`RunFinished` 更新工单状态、问题与冲突。
-- **频道（`channel`）**：路由消息（`receive`）、撤回（`withdraw`）、读在场会话（`live`）和还在等的投递（`read`），订阅 `news` 的 `Hired`、`Left`、`Reported` 管工单串与汇报、`deliveries` 的 `Consumed` 加 👀；未读摘要自己用 `unreadSummaryOf` 算。
+- **工单（`issue`）**：用派活、拿回、叫停放走、工作目录、在场与查询、`room`、`news` 这几组里的 23 个成员（`service-paths.json` 逐个记着）；订阅 `news` 的 `Reported`、`Left`、`IssueStarted`、`RunFinished` 更新工单状态、问题与冲突。
+- **频道（`channel`）**：记下并路由消息（`recordTrigger`、`route`）、开私聊帮工（`hireWith`）、撤回（`withdrawEnvelope`、`withdrawDeliveries`）、读在场会话（`hired`、`live`）和还在等的投递（`waitingOn`），订阅 `news` 的 `Hired`、`Left`、`Reported` 管工单串与汇报、`deliveries` 的 `Consumed` 加 👀；未读摘要自己用 `unreadSummaryOf` 算。
 - **仓库、农机与记性（`repo`、`runtime`、`memory`）**：`Repo.checkout` 只给本模块开、放、重置、清工单的检出；农机探测与计费、pi-durable 的 `Harness`；每轮前后召回与写入记忆。
-- **助手（`orchestrator`）**：经 `host` 创建进程内 `AgentHost`，共用 `session` 与 `session_run`；收 `deliveries` 的 `Handed`、`read` 的摘要，退回用 `handBack`。
+- **助手（`orchestrator`）**：经 `host` 创建进程内 `AgentHost`，共用 `session` 与 `session_run`；收 `deliveries` 的 `Handed`、`digest` 的摘要，退回用 `handBack`。
 
 ## 为什么这样
 
-- **一件活的触发、投递、执行和工作目录放在一个模块**：信箱和会话各记着同一件活的一半状态（投递和执行），分开时任何一边收窄都得把另一半往外递；合起来以后别的模块只认一扇门，工单用的成员从 24 个降到 7 个。
-- **门按调用方要做的事分，同一件事的几种做法放在一个成员的标签里**：`receive`、`withdraw`、`workplace`、`read` 各是一个成员，标签说做哪一种；路径表（`service-paths.json`）因此只记模块用了哪扇门，看不到具体哪种。没有把七样再并成更少的：`news` 是流、`room` 和 `live` 是同步读，硬并只会造出一个什么都管的成员。
+- **一件活的触发、投递、执行和工作目录放在一个模块**：信箱和会话各记着同一件活的一半状态（投递和执行），分开时任何一边收窄都得把另一半往外递；合起来以后别的模块只认一扇门，投递和执行之间的往来留在模块里。
+- **一个成员答一个问题，不用标签把几件事并成一个**：曾把 `receive`、`withdraw`、`workplace`、`read` 做成带标签的大成员，成员数是少了，面却一样宽，路径表（`service-paths.json`）也看不出模块用的是哪一样（[一个名字只答一个问题](docs/style/naming.md)）。现在每件事一个名字，门窄靠的是只留别的模块真在用的成员：路径表里没人用的就删。
 - **用执行器隔离进程资源，用纯函数表达领域规则**：防止启动中断或关闭失败时泄漏子进程或重用脏目录；事件映射与汇报解析保持纯函数以便快速单测。
 - **区分 `Session`、`Run`、进程连接 `launch` 与 oar 会话**：`Session` 代表跨轮次工作现场，`Run` 记单轮触发与花费，内存 `launch`（`${id}#n`）标识一次底层连接以便重连时退回未确认投递，底层 oar 会话可随时替换而不丢工单归属。
 - **受众计算与投递控制解耦**：频道只回答「谁在场、关注了哪个串」，蓄水、优先级、刹车和重试在本模块。

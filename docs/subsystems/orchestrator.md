@@ -46,7 +46,7 @@
 
 **处理一条输入**
 
-1. `Session.deliveries` 的 `Handed` 交来待处理的信，并附上期间已完成汇报与巡查摘要（`Session.read` 的 `Digest`）。
+1. `Session.deliveries` 的 `Handed` 交来待处理的信，并附上期间已完成汇报与巡查摘要（`Session.digest`）。
 2. 按 `intake` 表投递：纯用户发言、电话和 `chat/completions` 调 `send` 插话；含帮工发言的群聊、工单、定时和巡查调 `later` 排队。
 3. 模型调工具并生成回复，整条写入目标频道，在轨迹中记录 `llm/usage`（含缓存命中率）。
 
@@ -57,7 +57,7 @@
 
 ## 和谁打交道
 
-- **信箱与频道（`session`、`channel`）**：从 `Session` 收投递（`deliveries`）与摘要（`read`），退回用 `handBack`，经 `Channel.post` 的 `Run` 写回回复。
+- **信箱与频道（`session`、`channel`）**：从 `Session` 收投递（`deliveries`）与摘要（`digest`），退回用 `handBack`，经 `Channel.post` 的 `Run` 写回回复。
 - **工单与定时任务（`issue`、`cron`）**：通过 `tool` 调用服务方法；指派给助手的工单跑完后进 `in_review` 等用户点头。
 - **帮工与大脑（`session`、`packages/agent`）**：经 `Session.host` 在农场的 `Harness` 上运行助手的对话，经 `MemoryPort` 读写 `memory` 表。
 - **语音（`voice`）**：经 `response.ts` 的 `Caller` 端口向电话流式推送回答文本。

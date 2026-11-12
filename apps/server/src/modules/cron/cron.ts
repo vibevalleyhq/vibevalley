@@ -110,20 +110,17 @@ export async function makeCron(deps: CronDeps): Promise<Cron> {
   const recordDue = (due: Due) => {
     const s = due.cron;
     const thread = `cron:${s.id}`;
-    return sessions.receive({
-      _tag: "Record",
-      input: {
-        source: "cron",
-        key: due.id,
-        actor: { kind: "system", id: s.id },
-        text: dueText(s, due.missed),
-        threads: [thread],
-        addressed: "thread_owner",
-        replyChannel: s.channel,
-        meta: { cron: s.id, trigger: { kind: "cron", cron: s.id, ...(due.missed ? { missed: true } : {}) } },
-        at: s.lastRun ?? s.created,
-        data: s,
-      },
+    return sessions.recordTrigger({
+      source: "cron",
+      key: due.id,
+      actor: { kind: "system", id: s.id },
+      text: dueText(s, due.missed),
+      threads: [thread],
+      addressed: "thread_owner",
+      replyChannel: s.channel,
+      meta: { cron: s.id, trigger: { kind: "cron", cron: s.id, ...(due.missed ? { missed: true } : {}) } },
+      at: s.lastRun ?? s.created,
+      data: s,
     });
   };
 
@@ -131,12 +128,12 @@ export async function makeCron(deps: CronDeps): Promise<Cron> {
     bestEffort(log, `cron occurrence ${due.id}`, async () => {
       const s = due.cron;
       const thread = `cron:${s.id}`;
-      if (!(await sessions.read({ _tag: "Routed", trigger: trigger.id }))) {
+      if (!(await sessions.isRouted(trigger.id))) {
         const issue = await issues.scheduled(due, trigger);
         await sessions.subscribe(issue.id, [thread]);
-        await sessions.receive({ _tag: "Trigger", trigger });
+        await sessions.route(trigger);
       } else {
-        const issue = await sessions.read({ _tag: "Owner", trigger: trigger.id });
+        const issue = await sessions.ownerOf(trigger.id);
         if (issue) await sessions.subscribe(issue, [thread]);
       }
     });

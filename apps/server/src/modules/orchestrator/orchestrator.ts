@@ -184,7 +184,7 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
   // Place target channel on the final line so switching channels invalidates only one line in `situationDelta`.
   const situation = async (channel: string) => {
     const sessions = await agentLines();
-    const roster = run.live();
+    const roster = run.hired();
     const here = await chat.addressOf(channel);
     const byChannel = (await chat.channels()).map((c) => {
       const theirs = roster.filter((session) => (session.channel ?? chat.defaultChannel()) === c.id).map((session) => tool.sessionLine(session));
@@ -213,7 +213,7 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
   };
 
   const news = async (me: Instance): Promise<[string, string[]]> => {
-    const digest = await run.read({ _tag: "Digest", agent: me.id });
+    const digest = await run.digest(me.id);
     return digest.length === 0 ? ["", []] : [situationWords.news(orchestratorEnvelopeLines(digest)), digest.map((m) => m.id)];
   };
 

@@ -64,16 +64,11 @@ export function merging(d: MergeDeps) {
   };
   const handedOver = async (id: string, use: (place: Workplace, said: string) => Promise<Merged>) => {
     try {
-      return await sessions.workplace({
-        _tag: "HandOver",
-        session: id,
-        closed: "merged",
-        use: async (place, said) => {
-          const merged = await use(place, said);
-          const issue = sessions.live(id).session?.issue;
-          if (issue) await d.setConflict(issue, undefined);
-          return merged;
-        },
+      return await sessions.handOver(id, "merged", async (place, said) => {
+        const merged = await use(place, said);
+        const issue = sessions.live(id).session?.issue;
+        if (issue) await d.setConflict(issue, undefined);
+        return merged;
       });
     } catch (e) {
       if (e instanceof NotTakenIn) throw await notTaken(id, e);
@@ -122,22 +117,17 @@ export function merging(d: MergeDeps) {
       if (issue.repo && (!last || !sessions.live(last).reachable) && (await list()).some((child) => child.parent === issue.id)) {
         const repo = issue.repo;
         try {
-          return await sessions.workplace({
-            _tag: "Issue",
-            repo,
-            number: issue.number,
-            use: async (place) => {
-              if (issue.pullRequest?.state === "open" || repos.usesPullRequests(repo)) return (await pullRequestOf(place, issue, issue.description)).text;
-              let merged: Merged;
-              try {
-                merged = await repos.merge(place);
-              } catch (error) {
-                if (error instanceof MergeFailure && error.kind === "conflict") await d.setConflict(issue.id, { base: error.base, files: [...error.files] });
-                throw error;
-              }
-              await d.setConflict(issue.id, undefined);
-              return merged.text;
-            },
+          return await sessions.withCheckout(repo, issue.number, async (place) => {
+            if (issue.pullRequest?.state === "open" || repos.usesPullRequests(repo)) return (await pullRequestOf(place, issue, issue.description)).text;
+            let merged: Merged;
+            try {
+              merged = await repos.merge(place);
+            } catch (error) {
+              if (error instanceof MergeFailure && error.kind === "conflict") await d.setConflict(issue.id, { base: error.base, files: [...error.files] });
+              throw error;
+            }
+            await d.setConflict(issue.id, undefined);
+            return merged.text;
           });
         } catch (e) {
           throw asRefusal(e);
@@ -155,7 +145,7 @@ export function merging(d: MergeDeps) {
     const id = latestSessionIdOf(issue);
     if (id && sessions.live(id).reachable) {
       try {
-        await sessions.workplace({ _tag: "HandOver", session: id, closed, use: (place) => repos.finishPullRequest(place.repo, issue.number) });
+        await sessions.handOver(id, closed, (place) => repos.finishPullRequest(place.repo, issue.number));
       } catch (e) {
         if (e instanceof NotTakenIn) throw refused(e.failure.reasonText);
         throw e;
@@ -190,14 +180,10 @@ export function merging(d: MergeDeps) {
   const submit = (id: string, session: string, summary?: string): Promise<string> =>
     prLock.with(async () => {
       try {
-        const submitted = await sessions.workplace({
-          _tag: "Session",
-          session,
-          use: async (place) => {
-            const issue = await get(id);
-            if (issue.status === "done" || issue.status === "canceled") throw refused(t("server.issue.closedReopen"));
-            return pullRequestOf(place, issue, summary ?? [issue.title, issue.description].filter(Boolean).join("\n\n"));
-          },
+        const submitted = await sessions.withWorkplace(session, async (place) => {
+          const issue = await get(id);
+          if (issue.status === "done" || issue.status === "canceled") throw refused(t("server.issue.closedReopen"));
+          return pullRequestOf(place, issue, summary ?? [issue.title, issue.description].filter(Boolean).join("\n\n"));
         });
         return submitted.text;
       } catch (error) {

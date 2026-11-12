@@ -86,7 +86,7 @@ export function sessionThreads(deps: SessionThreadsDeps, r: ChannelHub, w: Chann
     for (const p of store.participants()) {
       if (p.role !== "worker" || p.runtime === null || p.left_at !== null || on.has(p.id)) continue;
       await store.markParticipantLeft(p.id, now);
-      await sessions.withdraw({ _tag: "Session", session: p.id, why: "left" });
+      await sessions.withdrawDeliveries(p.id, "left");
     }
   };
 

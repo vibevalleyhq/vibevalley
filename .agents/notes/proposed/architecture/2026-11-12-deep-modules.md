@@ -28,9 +28,9 @@ Status: proposed
 ## Step 2 as done
 
 - `modules/session` 吞下 mailbox 和 machine：表改名 `session_trigger`、`session_delivery`、`session_order`、`session_subscription`、`session_issue_input`、`session_machine`；`services.ts` 的 `buildModules` 建到工单，`makeFarm` 和测试的 `moduleWorld` 共用它。
-- `Session` 对外 20 个成员（[对外的门](docs/subsystems/session.md#对外的门)），里面的 `Lifecycle`、`Mailbox`、`Machine` 只经 `insideOf` 给测试。同一件事的几种做法并成一个成员、用标签分（`receive`、`withdraw`、`workplace`、`read`、`live`），所以路径表只看得到门。
-- issue 用 Session 的成员从 24 个降到 7 个（`receive`、`withdraw`、`workplace`、`live`、`read`、`room`、`news`），没到 5 个：`news` 是流、`room` 和 `live` 是同步读，再并只会造出一个什么都管的成员；issue 用 Repo 仍是 15 个，交付归 repo（第 3 步）以后再降。
-- Repo 的 `workplace`、`release`、`reset`、`clear` 并成 `checkout`，只有 session 用；issue 要工单自己的检出走 `Session.workplace` 的 `Issue`。
+- `Session` 对外 44 个成员（[对外的门](docs/subsystems/session.md#对外的门)），每个答一个问题、每个都有别的模块、接口或 `services.ts` 在用；里面的 `Lifecycle`、`Mailbox`、`Machine` 只经 `insideOf` 给测试。先做过一版把几件事并进带标签的成员（`receive`、`withdraw`、`workplace`、`read`、`live`），成员数少了、面没变窄，路径表也看不出用的是哪件事，违反[一个名字只答一个问题](docs/style/naming.md)，已拆回具名成员。
+- issue 用 Session 的 23 个成员（原来 Session 17 个加 Mailbox 7 个，共 24 个）：合并消掉的是 mailbox 和 session 之间的互相伸手，不是 issue 的成员数；issue 用 Repo 仍是 15 个，交付归 repo（第 3 步）以后再降。
+- Repo 的 `workplace`、`release`、`reset`、`clear` 并成 `checkout`，只有 session 用；issue 要工单自己的检出走 `Session.withCheckout`。
 - `registry`、`launch`、`watch` 这些里面的部分没有收拢：它们现在只在模块里，收拢不改任何调用方，留给第 5 步和纯判断一起做。
 - 重启：`vibevalley` 农机上答到一半的帮工在正常关门以后接着答，记在原来那一轮上（`Durable.leave`、`goOn`、`Hand.goesOn`）；`session_run` 的开着的一轮仍是接上时认的那一轮，pi-durable 不记我们的轮次 ID，所以「接管」没有删。外部农机照旧记 `interrupted`。
 

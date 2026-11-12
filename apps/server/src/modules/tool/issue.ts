@@ -109,14 +109,14 @@ export function issueTools(deps: Pick<ToolDeps, "clock" | "log" | "agent" | "ses
   const numberOf = (session: T.Session) => (session.issue ? issue.onBoard().find((item) => item.id === session.issue)?.number : undefined);
 
   const roster = tool("session.list", () => {
-    const all = run.live();
+    const all = run.hired();
     return all.length === 0 ? answers.roster.empty : all.map((session) => sessionLine(session, clock.now(), numberOf(session))).join("\n");
   });
 
   const sessionList = sessionSchemaTool("session.list", () => {
     // Listed without @: an @ wakes someone, and models copy what they read.
     const lines = [answers.sessionList.intro];
-    for (const h of run.live())
+    for (const h of run.hired())
       lines.push(answers.sessionList.row(h.id, h.name, h.runtime, h.repo ?? "?", phaseText(h, clock.now()), head(h.brief.replace(spaces, " "), 60)));
     lines.push(answers.sessionList.wake);
     return lines.join("\n");

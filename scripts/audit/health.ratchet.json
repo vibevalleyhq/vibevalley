@@ -195,13 +195,6 @@
     "lintOff": 0,
     "swallowed": 0
   },
-  "server: Mailbox": {
-    "nonNull": 0,
-    "doubleCast": 0,
-    "cast": 0,
-    "lintOff": 0,
-    "swallowed": 0
-  },
   "server: Orchestrator": {
     "nonNull": 0,
     "doubleCast": 0,

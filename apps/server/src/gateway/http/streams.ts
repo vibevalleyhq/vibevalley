@@ -130,12 +130,7 @@ export function issueWatchStream(deps: SseDeps & { readonly core: Core; readonly
       if (e instanceof ApiError) return empty(404);
       throw e;
     }
-    return sse(
-      "issue.watch",
-      (signal) => watchIssue(initial, deps.core, (id) => deps.session.read({ _tag: "Events", session: id }), deps.log, signal),
-      S.IssueWatch,
-      deps,
-    );
+    return sse("issue.watch", (signal) => watchIssue(initial, deps.core, (id) => deps.session.eventsOf(id), deps.log, signal), S.IssueWatch, deps);
   });
   return app;
 }
