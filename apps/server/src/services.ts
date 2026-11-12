@@ -128,44 +128,112 @@ export async function closeAll(closes: Close[]): Promise<void> {
   if (failures.length > 1) throw new AggregateError(failures, "the farm did not close cleanly");
 }
 
-/** The whole farm: every module built in module order (modules.ts), each from the services before it, then every
- * startup in module order. A failure closes what was built. */
-export async function makeFarm(config: ServerConfig, options: ServiceOptions = {}): Promise<Farm> {
+/** The modules up to the issues and what runs on a schedule (modules.ts's order, to Issues), built and not started:
+ * what the farm builds first and what a module test runs on (testing/world.ts). */
+export type Modules = Pick<
+  Farm,
+  | "config"
+  | "clock"
+  | "log"
+  | "fetch"
+  | "publicFetch"
+  | "db"
+  | "projection"
+  | "core"
+  | "setting"
+  | "user"
+  | "attachment"
+  | "provider"
+  | "agent"
+  | "memory"
+  | "runtime"
+  | "repo"
+  | "machine"
+  | "session"
+  | "mailbox"
+  | "channel"
+  | "media"
+  | "artifact"
+  | "pkm"
+  | "issue"
+  | "cron"
+>;
+
+/** Builds the modules to the issues, each from the services before it, keeping each one's close in closes. heard is
+ * handed the core before any module is built on it (a test's listener). */
+export async function buildModules(config: ServerConfig, options: ServiceOptions, closes: Close[], heard?: (core: Core) => void): Promise<Modules> {
   const parts = options.platform ?? {};
   const clock = parts.clock ?? wallTime;
   const log = parts.log ?? makeLogger({ name: "vibevalley" });
   const fetch = parts.fetch ?? globalThis.fetch;
   const publicFetch = parts.publicFetch ?? publicFetchOf();
+  const own = owning(closes);
+  // Platform: the database first (closed last), then the core state and the services every module uses.
+  const db = own(await openDb(config, log.child("db"), clock));
+  const projection = makeProjection();
+  const core = own(makeCore({ projection, clock }));
+  heard?.(core);
+  const setting = own(await makeSetting({ config, clock, log }));
+  const user = own(await makeUser({ db, clock, log }));
+  const attachment = own(await makeAttachment({ config, clock, db }));
+  const provider = own(await makeProvider({ setting, fetch, clock, log }));
+  // Agents: the profiles, their memory, the runtimes they run on.
+  const agent = own(await makeAgent({ config, clock, log }));
+  const memory = own(await makeMemory({ clock, log, fetch, db, setting, agent }, options.memory));
+  const runtime = own(await makeRuntime({ config, clock, log, db, core, agent, setting, fetch }, options.runtime));
+  // Source Control: repositories, worktrees, checks, merges and pull requests.
+  const repo = own(await makeRepo({ config, clock, log }, options.repo));
+  // Agent Sessions: an agent at work on an issue in a workplace.
+  const machine = own(await makeMachine({ config, clock, log, db, core, runtime }));
+  const session = own(await makeSession({ config, clock, log, db, core, agent, memory, repo, machine, runtime }, options.session));
+  // Mailbox: source triggers, delivery priority, per-Session input and the execution pump.
+  const mailbox = own(await makeMailbox({ db, clock, log, config, core, agent, session }));
+  // Collaboration: channels, threads, messages, media and its library, documents, the user's notes.
+  const channel = own(await makeChannel({ clock, log, fetch, db, core, agent, attachment, session, mailbox }));
+  const media = own(await makeMedia({ db, core, clock, log, attachment, session, channel, provider, publicFetch }));
+  const artifact = own(await makeArtifact({ db, clock, log, attachment, channel }));
+  const pkm = own(await makePkm({ config, clock, log, db }));
+  // Issues: the issues and what runs on a schedule.
+  const issue = own(await makeIssue({ config, clock, log, db, core, agent, repo, runtime, session, channel, mailbox }));
+  const cron = own(await makeCron({ config, clock, log, db, core, agent, channel, issue, mailbox }));
+  return {
+    config,
+    clock,
+    log,
+    fetch,
+    publicFetch,
+    db,
+    projection,
+    core,
+    setting,
+    user,
+    attachment,
+    provider,
+    agent,
+    memory,
+    runtime,
+    repo,
+    machine,
+    session,
+    mailbox,
+    channel,
+    media,
+    artifact,
+    pkm,
+    issue,
+    cron,
+  };
+}
+
+/** The whole farm: buildModules, then the modules after the issues in module order (modules.ts), then every startup in
+ * module order. A failure closes what was built. */
+export async function makeFarm(config: ServerConfig, options: ServiceOptions = {}): Promise<Farm> {
   const closes: Close[] = [];
   const own = owning(closes);
   try {
-    // Platform: the database first (closed last), then the core state and the services every module uses.
-    const db = own(await openDb(config, log.child("db"), clock));
-    const projection = makeProjection();
-    const core = own(makeCore({ projection, clock }));
-    const setting = own(await makeSetting({ config, clock, log }));
-    const user = own(await makeUser({ db, clock, log }));
-    const attachment = own(await makeAttachment({ config, clock, db }));
-    const provider = own(await makeProvider({ setting, fetch, clock, log }));
-    // Agents: the profiles, their memory, the runtimes they run on.
-    const agent = own(await makeAgent({ config, clock, log }));
-    const memory = own(await makeMemory({ clock, log, fetch, db, setting, agent }, options.memory));
-    const runtime = own(await makeRuntime({ config, clock, log, db, core, agent, setting, fetch }, options.runtime));
-    // Source Control: repositories, worktrees, checks, merges and pull requests.
-    const repo = own(await makeRepo({ config, clock, log }, options.repo));
-    // Agent Sessions: an agent at work on an issue in a workplace.
-    const machine = own(await makeMachine({ config, clock, log, db, core, runtime }));
-    const session = own(await makeSession({ config, clock, log, db, core, agent, memory, repo, machine, runtime }, options.session));
-    // Mailbox: source triggers, delivery priority, per-Session input and the execution pump.
-    const mailbox = own(await makeMailbox({ db, clock, log, config, core, agent, session }));
-    // Collaboration: channels, threads, messages, media and its library, documents, the user's notes.
-    const channel = own(await makeChannel({ clock, log, fetch, db, core, agent, attachment, session, mailbox }));
-    const media = own(await makeMedia({ db, core, clock, log, attachment, session, channel, provider, publicFetch }));
-    const artifact = own(await makeArtifact({ db, clock, log, attachment, channel }));
-    const pkm = own(await makePkm({ config, clock, log, db }));
-    // Issues: the issues and what runs on a schedule.
-    const issue = own(await makeIssue({ config, clock, log, db, core, agent, repo, runtime, session, channel, mailbox }));
-    const cron = own(await makeCron({ config, clock, log, db, core, agent, channel, issue, mailbox }));
+    const modules = await buildModules(config, options, closes);
+    const { clock, log, fetch, db, core, setting, user, agent, memory, runtime, repo, session, mailbox, channel, media, artifact, pkm, issue, cron } = modules;
+    const { provider } = modules;
     // Inbox: what is news to the user, and the patrol.
     const inbox = own(await makeInbox({ config, clock, log, db, core, channel, issue, session, mailbox }));
     // Orchestrator: the agent that hands the user's work to helpers, and its tools.
@@ -201,31 +269,7 @@ export async function makeFarm(config: ServerConfig, options: ServiceOptions = {
     let closing: Promise<void> | undefined;
     const close = () => (closing ??= closeAll(closes));
     return {
-      config,
-      clock,
-      log,
-      fetch,
-      publicFetch,
-      db,
-      projection,
-      core,
-      setting,
-      user,
-      attachment,
-      provider,
-      agent,
-      memory,
-      runtime,
-      repo,
-      machine,
-      session,
-      mailbox,
-      channel,
-      media,
-      artifact,
-      pkm,
-      issue,
-      cron,
+      ...modules,
       inbox,
       tool,
       orchestrator,

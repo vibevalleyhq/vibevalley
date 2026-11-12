@@ -6,37 +6,19 @@ import { type Runtime } from "@botiverse/oar";
 import type { AccountUsage, ChatMessage, IssueRequest } from "@vibevalley/protocol";
 
 import type { Core } from "#/core/core.ts";
-import { makeCore } from "#/core/core.ts";
 import { makeMcp, type Mcp } from "#/gateway/mcp/mcp.ts";
-import { makeProjection } from "#/gateway/projection/frame.ts";
 import { type ServerConfig } from "#/infra/config.ts";
-import { openDb } from "#/infra/db.ts";
-import { makeLogger } from "#/infra/log.ts";
 import type { PublicFetch } from "#/infra/publicHttp.ts";
 import { type Time, wallTime } from "#/infra/time.ts";
-import { makeAgent } from "#/modules/agent/agent.ts";
-import { makeArtifact } from "#/modules/artifact/artifact.ts";
-import { makeAttachment } from "#/modules/attachment/attachment.ts";
-import { makeChannel } from "#/modules/channel/channel.ts";
-import { makeCron } from "#/modules/cron/cron.ts";
 import { type Inbox, makeInbox } from "#/modules/inbox/inbox.ts";
 import { explicitMandate } from "#/modules/issue/creation.ts";
-import { type Issue, makeIssue } from "#/modules/issue/issue.ts";
-import { makeMachine } from "#/modules/machine/machine.ts";
-import { makeMailbox } from "#/modules/mailbox/mailbox.ts";
-import { makeMedia } from "#/modules/media/media.ts";
-import { makeMemory } from "#/modules/memory/memory.ts";
-import { makePkm } from "#/modules/pkm/pkm.ts";
-import { makeProvider } from "#/modules/provider/provider.ts";
-import { type GitHubRun, makeRepo, type RepoHooks } from "#/modules/repo/repo.ts";
+import { type Issue } from "#/modules/issue/issue.ts";
+import { type GitHubRun, type RepoHooks } from "#/modules/repo/repo.ts";
 import type { ModelAccess } from "#/modules/runtime/durable.ts";
-import { makeRuntime, registryOf } from "#/modules/runtime/runtime.ts";
-import { makeSession } from "#/modules/session/session.ts";
+import { registryOf } from "#/modules/runtime/runtime.ts";
 import { type WorkerAccess, type workerAccess } from "#/modules/session/worker.ts";
-import { makeSetting } from "#/modules/setting/setting.ts";
 import { makeTool, type Tool } from "#/modules/tool/tool.ts";
-import { makeUser } from "#/modules/user/user.ts";
-import { type Close, closeAll, type Farm, owning, type ServiceOptions } from "#/services.ts";
+import { buildModules, type Close, closeAll, type Modules, owning, type ServiceOptions } from "#/services.ts";
 
 import { scriptedDeepSeek, type ScriptedDeepSeek } from "./deepseek.ts";
 import { repo } from "./git.ts";
@@ -112,16 +94,18 @@ const fakeWorkerAccess = async (): Promise<WorkerAccess> => {
   };
 };
 
-/** The farm up to its issues (services.ts's makeFarm, cut there), built and not started, with what the test hears. */
-export type ModuleWorld = Omit<Farm, "inbox" | "tool" | "orchestrator" | "game" | "mcp" | "lan" | "voice" | "connector"> & {
-  /** What the test's own services close with, after the farm's closes; each is called the last added first. */
-  readonly closes: Close[];
-  readonly said: Said;
-  /** What the farm's harness asks for DeepSeek: a test seats its scripted model here. */
-  readonly deepseek: Pick<ScriptedDeepSeek, "use">;
-};
+/** The farm up to its issues (services.ts's buildModules), built and not started, with what the test hears. */
+export type ModuleWorld = Modules &
+  AsyncDisposable & {
+    readonly close: () => Promise<void>;
+    /** What the test's own services close with, after the farm's closes; each is called the last added first. */
+    readonly closes: Close[];
+    readonly said: Said;
+    /** What the farm's harness asks for DeepSeek: a test seats its scripted model here. */
+    readonly deepseek: Pick<ScriptedDeepSeek, "use">;
+  };
 
-/** Core domain services below Inbox/Tool/Mcp for module tests: services.ts's order and deps, to the issues. */
+/** Core domain services below Inbox/Tool/Mcp for module tests: services.ts's buildModules, with the test's runtimes, repos and network. */
 export async function moduleWorld(options: WorldOptions = {}): Promise<ModuleWorld> {
   const base = options.config ?? testConfig();
   const config = options.stallMs !== undefined ? { ...base, session: { ...base.session, stallSeconds: options.stallMs / 1000 } } : base;
@@ -144,62 +128,21 @@ export async function moduleWorld(options: WorldOptions = {}): Promise<ModuleWor
     repo: { gh: noGitHub, ...options.repoHooks },
     session: { workerAccess: options.workerAccess ?? fakeWorkerAccess },
   };
-  const { fetch, publicFetch } = options.network ?? offlineNetwork;
-  const log = makeLogger({ name: "vibevalley" });
+  const network = options.network ?? offlineNetwork;
   // Closed last: after the harness, whose runs it may still be answering.
   const closes: Close[] = [() => deepseek.close()];
-  const own = owning(closes);
+  const ear: { heard?: ReturnType<typeof said> } = {};
   try {
-    const db = own(await openDb(config, log.child("db"), clock));
-    const projection = makeProjection();
-    const core = own(makeCore({ projection, clock }));
-    const heard = said(core);
-    closes.push(heard.close);
-    const setting = own(await makeSetting({ config, clock, log }));
-    const user = own(await makeUser({ db, clock, log }));
-    const attachment = own(await makeAttachment({ config, clock, db }));
-    const provider = own(await makeProvider({ setting, fetch, clock, log }));
-    const agent = own(await makeAgent({ config, clock, log }));
-    const memory = own(await makeMemory({ clock, log, fetch, db, setting, agent }, o.memory));
-    const runtime = own(await makeRuntime({ config, clock, log, db, core, agent, setting, fetch }, o.runtime));
-    const repo = own(await makeRepo({ config, clock, log }, o.repo));
-    const machine = own(await makeMachine({ config, clock, log, db, core, runtime }));
-    const session = own(await makeSession({ config, clock, log, db, core, agent, memory, repo, machine, runtime }, o.session));
-    const mailbox = own(await makeMailbox({ db, clock, log, config, core, agent, session }));
-    const channel = own(await makeChannel({ clock, log, fetch, db, core, agent, attachment, session, mailbox }));
-    const media = own(await makeMedia({ db, core, clock, log, attachment, session, channel, provider, publicFetch }));
-    const artifact = own(await makeArtifact({ db, clock, log, attachment, channel }));
-    const pkm = own(await makePkm({ config, clock, log, db }));
-    const issue = own(await makeIssue({ config, clock, log, db, core, agent, repo, runtime, session, channel, mailbox }));
-    const cron = own(await makeCron({ config, clock, log, db, core, agent, channel, issue, mailbox }));
+    const modules = await buildModules(config, { ...o, platform: { ...network, clock } }, closes, (core) => {
+      ear.heard = said(core);
+      closes.push(ear.heard.close);
+    });
+    const heard = ear.heard;
+    if (heard === undefined) throw new Error("the farm was built without its core");
     let closing: Promise<void> | undefined;
     const close = () => (closing ??= closeAll(closes));
     return {
-      config,
-      clock,
-      log,
-      fetch,
-      publicFetch,
-      db,
-      projection,
-      core,
-      setting,
-      user,
-      attachment,
-      provider,
-      agent,
-      memory,
-      runtime,
-      repo,
-      machine,
-      session,
-      mailbox,
-      channel,
-      media,
-      artifact,
-      pkm,
-      issue,
-      cron,
+      ...modules,
       closes,
       said: { in: heard.in, all: heard.all },
       deepseek: { use: deepseek.use },
