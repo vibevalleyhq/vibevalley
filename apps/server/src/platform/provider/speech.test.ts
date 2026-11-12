@@ -7,7 +7,7 @@ import { mossSpeechModels } from "@vibevalley/provider/moss/speech-models";
 import { providerHandlers } from "#/gateway/http/handlers/provider.ts";
 import { keptLog } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
-import { makeSetting } from "#/modules/setting/setting.ts";
+import { makeSetting } from "#/platform/setting/setting.ts";
 import { testConfig } from "#/testing/layers.ts";
 
 import { type Account, type Dictation, makeProvider } from "./provider.ts";

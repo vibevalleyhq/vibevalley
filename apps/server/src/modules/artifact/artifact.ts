@@ -11,8 +11,8 @@ import { newId } from "#/base/ids.ts";
 import type { Db } from "#/infra/db.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Attachment } from "#/modules/attachment/attachment.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
+import type { Attachment } from "#/platform/attachment/attachment.ts";
 import * as qa from "#db/artifact.sql.ts";
 import * as qv from "#db/artifact_version.sql.ts";
 

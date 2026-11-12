@@ -25,7 +25,7 @@ import { hostName, serverAddress, type ServerConfig } from "#/infra/config.ts";
 import type { Db } from "#/infra/db.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import { sameSecret, tidyName, type User } from "#/modules/user/user.ts";
+import { sameSecret, tidyName, type User } from "#/platform/user/user.ts";
 import * as lanQ from "#db/lan.sql.ts";
 
 const pairingForMs = 2 * 60_000;

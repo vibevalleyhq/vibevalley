@@ -23,7 +23,7 @@ import { keptLog, type Logger } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
 import { makeAgent } from "#/modules/agent/agent.ts";
 import builtIn from "#/modules/agent/templates/orchestrator/agent.json" with { type: "json" };
-import { type Attachment, makeAttachment } from "#/modules/attachment/attachment.ts";
+import { type Attachment, makeAttachment } from "#/platform/attachment/attachment.ts";
 import { type Channel, catchUpMax, makeChannel } from "#/modules/channel/channel.ts";
 import { effectsOf } from "#/modules/game/view.ts";
 import { channelUses, type Issue } from "#/modules/issue/issue.ts";

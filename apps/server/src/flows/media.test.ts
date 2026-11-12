@@ -4,8 +4,8 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { orchestrator, worker } from "#/base/actor.ts";
 import { png } from "#/modules/media/testdata/png.ts";
-import type { Provider } from "#/modules/provider/provider.ts";
 import { messageText } from "#/modules/runtime/durable.ts";
+import type { Provider } from "#/platform/provider/provider.ts";
 import { until, waitFor } from "#/testing/layers.ts";
 import { answer, scriptedLLM, toolCall } from "#/testing/model.ts";
 

@@ -12,8 +12,8 @@ import { mossVoiceDesignModels } from "@vibevalley/provider/moss/voice-design-mo
 import { mossTranscription } from "@vibevalley/provider/transcription";
 
 import { BizCode, bizError } from "#/base/errors.ts";
-import { keyHint } from "#/modules/setting/memorySources.ts";
-import { boundConnection, type ProviderSettings } from "#/modules/setting/provider.ts";
+import { keyHint } from "#/platform/setting/memorySources.ts";
+import { boundConnection, type ProviderSettings } from "#/platform/setting/provider.ts";
 
 export const providerStatus = (settings: ProviderSettings): T.ProviderStatus => ({
   revision: settings.revision,

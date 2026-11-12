@@ -8,9 +8,9 @@ import { BizCode } from "@vibevalley/protocol/api";
 
 import { refused } from "#/base/errors.ts";
 import { keptLog } from "#/infra/log.ts";
-import { type Attachment, makeAttachment } from "#/modules/attachment/attachment.ts";
 import { wav } from "#/modules/media/testdata/audio.ts";
 import { png } from "#/modules/media/testdata/png.ts";
+import { type Attachment, makeAttachment } from "#/platform/attachment/attachment.ts";
 import { testConfig, testDb } from "#/testing/layers.ts";
 import * as q from "#db/media_input.sql.ts";
 

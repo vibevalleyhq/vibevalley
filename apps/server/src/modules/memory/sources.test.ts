@@ -1,7 +1,7 @@
 import { expect, test } from "vite-plus/test";
 
 import { keptLog } from "#/infra/log.ts";
-import type { MemorySourceConfig } from "#/modules/setting/memorySources.ts";
+import type { MemorySourceConfig } from "#/platform/setting/memorySources.ts";
 
 import { makeSources, type Source } from "./sources.ts";
 

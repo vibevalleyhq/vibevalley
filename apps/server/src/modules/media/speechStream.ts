@@ -4,7 +4,7 @@ import type * as T from "@vibevalley/protocol";
 
 import { BizCode, refuseIn } from "#/base/errors.ts";
 import { bestEffort } from "#/infra/log.ts";
-import type { SpeechEvent } from "#/modules/provider/vendors.ts";
+import type { SpeechEvent } from "#/platform/provider/vendors.ts";
 
 import { type AudioStreamDeps, releaseAudioResult, saveAudioStream, type MediaInputs } from "./audioResult.ts";
 import { inTime, untilAborted } from "./job.ts";

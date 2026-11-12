@@ -23,7 +23,7 @@
 | `apps/server/src/gateway/voice/voice.ts` | 农场侧薄消费层：绑定 `Setting`、`Orchestrator`、`Channel`、`Watch`（收件箱）、`Core`，管理 RTC/MOSS 授予与通话内 `speak` |
 | `apps/server/src/gateway/voice/moss-relay.ts`、`moss-tools.ts` | MOSS Live WebSocket 双向透传、会话指令改写与 `ask_orchestrator` 工具提取 |
 | `apps/server/src/gateway/voice/line.ts` | 语音线路（`8788` 回环监听）与 `cloudflared` 隧道管理 |
-| `apps/server/src/modules/setting/voice.ts` | 语音默认配置 `defaultVoice`、校验 `voiceProblem` 与差异提取 `voiceOverrides` |
+| `apps/server/src/platform/setting/voice.ts` | 语音默认配置 `defaultVoice`、校验 `voiceProblem` 与差异提取 `voiceOverrides` |
 | `apps/web/src/features/voice/model/`、`views/` | `model/` 里 `call.ts`、`dictation.ts`、`moss-line.ts` 管设备与宿主，`moss-worker.ts`/`moss-worklets.ts` 保持 PCM 绕开 UI 主线程，`captions.ts` 管展示轮次，`contract.ts` 定义应用会话接口；`views/` 是表单与 playground |
 | `apps/mobile/src/infra/rtc.ts` | 手机壳原生声网 RTC 适配（锁屏不断线） |
 

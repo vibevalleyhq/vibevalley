@@ -52,7 +52,7 @@ const keeping = new Set(["Pick", "Omit", "Readonly", "Partial", "Required", "Non
 export const moduleOf = (path: string): string | undefined => {
   const rest = path.startsWith(root) ? path.slice(root.length) : undefined;
   const [first, second, ...more] = rest?.split("/") ?? [];
-  if ((first === "modules" || first === "gateway") && second !== undefined) return second;
+  if ((first === "platform" || first === "modules" || first === "gateway") && second !== undefined) return second;
   return second !== undefined || more.length > 0 ? first : undefined;
 };
 

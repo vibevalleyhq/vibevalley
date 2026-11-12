@@ -13,7 +13,7 @@ import { newId } from "#/base/ids.ts";
 import { type Db, SqlError } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
-import type { Setting } from "#/modules/setting/setting.ts";
+import type { Setting } from "#/platform/setting/setting.ts";
 import * as q from "#db/memory.sql.ts";
 
 import { everos } from "./everos.ts";

@@ -41,7 +41,7 @@ const depsOf = (text: string) =>
   [...text.matchAll(/interface \w*Deps\b[^{]*\{([^}]*)\}/gu)].flatMap((m) => [...(m[1] ?? "").matchAll(/readonly (\w+)\??:/gu)].map((k) => k[1] ?? ""));
 
 /** The unit a deps key names: the module or gateway of that name. */
-const unitOfKey = (key: string) => [`modules/${key}`, `gateway/${key}`].find((unit) => moduleOf(unit) !== undefined);
+const unitOfKey = (key: string) => containers.map((c) => `${c}/${key}`).find((unit) => moduleOf(unit) !== undefined);
 
 function inspect(file: string, unread: string) {
   // A service reads the core state off its deps as well as off a const it took from them: both are core.state().
@@ -120,7 +120,7 @@ const sessionLeaks = (source: ReturnType<typeof inspect>) => [
 ];
 
 describe("the modules", () => {
-  it("hold every folder and file under src, with domain slices under modules/ and protocol doors under gateway/", () => {
+  it("hold every folder and file under src, with primitives under platform/, domain slices under modules/ and protocol doors under gateway/", () => {
     const tops = readdirSync(src).filter((f) => statSync(join(src, f)).isDirectory() || (f.endsWith(".ts") && !f.endsWith(".test.ts")));
     const unownedTops = tops.filter((t) => !outside.includes(t) && !(containers as readonly string[]).includes(t) && moduleOf(t) === undefined);
     const unownedUnits = containers.flatMap((c) =>
@@ -130,7 +130,7 @@ describe("the modules", () => {
     );
     expect(
       [...unownedTops, ...unownedUnits],
-      "a folder or file under src/ belongs to no module, so nothing says what it may import. Fix: place domain concepts under src/modules/<concept> and ingress adapters under src/gateway/<adapter>, and register the unit in modules.ts. See apps/server/src/modules.ts",
+      "a folder or file under src/ belongs to no module, so nothing says what it may import. Fix: place platform primitives under src/platform/<concept>, domain concepts under src/modules/<concept> and ingress adapters under src/gateway/<adapter>, and register the unit in modules.ts. See apps/server/src/modules.ts",
     ).toEqual([]);
   });
 
@@ -217,7 +217,7 @@ describe("the modules", () => {
     expect(leaks('import * as qd from "#db/session_delivery.sql.ts";')).toEqual(["#db/session_delivery.sql.ts"]);
     expect(
       leaks(
-        'import type { Db } from "#/infra/db.ts";\nimport type { Attachment } from "#/modules/attachment/attachment.ts";\nimport { metaOf } from "./meta.ts";\nimport * as qm from "#db/channel_message.sql.ts";',
+        'import type { Db } from "#/infra/db.ts";\nimport type { Attachment } from "#/platform/attachment/attachment.ts";\nimport { metaOf } from "./meta.ts";\nimport * as qm from "#db/channel_message.sql.ts";',
       ),
     ).toEqual([]);
   });

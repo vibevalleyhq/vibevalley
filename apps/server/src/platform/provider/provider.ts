@@ -24,8 +24,8 @@ import { mossTranscription, type TranscriptionFormat, transcriptionModel } from 
 import { type ApiError, BizCode, bizError } from "#/base/errors.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import { bindingOf, boundConnection, type ProviderSettings } from "#/modules/setting/provider.ts";
-import type { Setting } from "#/modules/setting/setting.ts";
+import { bindingOf, boundConnection, type ProviderSettings } from "#/platform/setting/provider.ts";
+import type { Setting } from "#/platform/setting/setting.ts";
 
 import { connectionsOver, providerStatus } from "./connections.ts";
 import {

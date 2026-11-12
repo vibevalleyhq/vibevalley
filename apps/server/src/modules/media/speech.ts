@@ -13,9 +13,9 @@ import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { PublicFetch } from "#/infra/publicHttp.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Attachment } from "#/modules/attachment/attachment.ts";
-import type { Account, Provider } from "#/modules/provider/provider.ts";
-import { AudioFailure, type SpeechRequest } from "#/modules/provider/vendors.ts";
+import type { Attachment } from "#/platform/attachment/attachment.ts";
+import type { Account, Provider } from "#/platform/provider/provider.ts";
+import { AudioFailure, type SpeechRequest } from "#/platform/provider/vendors.ts";
 import * as q from "#db/media_job.sql.ts";
 
 import { saveAudioResult, releaseAudioResult, type MediaInputs } from "./audioResult.ts";

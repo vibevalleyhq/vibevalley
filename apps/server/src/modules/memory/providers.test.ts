@@ -5,7 +5,7 @@ import { ApiError, BizCode } from "@vibevalley/protocol/api";
 import { whenTrue } from "@vibevalley/testkit/until";
 
 import { user as userActor } from "#/base/actor.ts";
-import type { MemorySourceConfig } from "#/modules/setting/memorySources.ts";
+import type { MemorySourceConfig } from "#/platform/setting/memorySources.ts";
 import { testConfig } from "#/testing/layers.ts";
 
 import { type BuildSource, type FinishedRun, foundText, type Found, type Memory, type Note, type RecallCue, type SearchQuery } from "./memory.ts";

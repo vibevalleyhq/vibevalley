@@ -8,7 +8,7 @@ import { head } from "#/base/clip.ts";
 import type { Core } from "#/core/core.ts";
 import type { Db } from "#/infra/db.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Attachment } from "#/modules/attachment/attachment.ts";
+import type { Attachment } from "#/platform/attachment/attachment.ts";
 import * as qc from "#db/channel.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 

@@ -15,7 +15,7 @@ import { type Db, SqlError } from "#/infra/db.ts";
 import { fileBlob } from "#/infra/files.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Attachment } from "#/modules/attachment/attachment.ts";
+import type { Attachment } from "#/platform/attachment/attachment.ts";
 import * as q from "#db/media_input.sql.ts";
 import * as pins from "#db/media_input_pin.sql.ts";
 

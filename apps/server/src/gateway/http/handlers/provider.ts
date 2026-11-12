@@ -1,6 +1,6 @@
 import type { ProviderHandlers } from "@vibevalley/protocol/api";
 
-import type { Provider } from "#/modules/provider/provider.ts";
+import type { Provider } from "#/platform/provider/provider.ts";
 
 export function providerHandlers(deps: { readonly provider: Provider }): ProviderHandlers {
   const { provider } = deps;

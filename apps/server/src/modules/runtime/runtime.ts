@@ -18,7 +18,7 @@ import type { Db } from "#/infra/db.ts";
 import type { Logger } from "#/infra/log.ts";
 import { type Time, withinRealTime } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
-import type { Setting } from "#/modules/setting/setting.ts";
+import type { Setting } from "#/platform/setting/setting.ts";
 
 import { dshRuntime } from "./dsh.ts";
 import { deepseekAccess, type Durable, durableFile, type ModelAccess, openDurable } from "./durable.ts";

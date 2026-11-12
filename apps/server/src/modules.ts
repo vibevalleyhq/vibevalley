@@ -1,13 +1,13 @@
 export interface Module {
   readonly name: string;
-  /** Paths under src/ ("base", "modules/issue", "gateway/http", "main.ts"…). */
+  /** Paths under src/ ("base", "platform/setting", "modules/issue", "gateway/http", "main.ts"…). */
   readonly parts: readonly string[];
 }
 
 export const modules: readonly Module[] = [
   {
     name: "Platform",
-    parts: ["base", "infra", "core", "modules/setting", "modules/user", "modules/attachment", "modules/provider"],
+    parts: ["base", "infra", "core", "platform/setting", "platform/user", "platform/attachment", "platform/provider"],
   },
   { name: "Agents", parts: ["modules/agent", "modules/runtime", "modules/memory"] },
   { name: "Source Control", parts: ["modules/repo"] },
@@ -36,7 +36,9 @@ export const modules: readonly Module[] = [
 ];
 
 /** Allowed second-level containers and test harnesses under apps/server/src/. */
-export const containers = ["modules", "gateway"] as const;
+export const containers = ["platform", "modules", "gateway"] as const;
+
+const isContainer = (folder: string) => containers.some((c) => c === folder);
 
 /** What the tests and the test farm are made of; they may use every module. */
 export const outside = ["testing", "flows"];
@@ -44,13 +46,13 @@ export const outside = ["testing", "flows"];
 /** The concept unit a path under src/ belongs to ("modules/issue", "gateway/http", "base", "main.ts"). */
 export function unitOf(path: string): string {
   const [first = "", second = ""] = path.split("/");
-  return (first === "modules" || first === "gateway") && second !== "" ? `${first}/${second}` : first;
+  return isContainer(first) && second !== "" ? `${first}/${second}` : first;
 }
 
 /** The singular concept name ("issue", "http", "base") for SQL table ownership and service-path reporting. */
 export function conceptOf(path: string): string {
   const [first = "", second = ""] = path.split("/");
-  return (first === "modules" || first === "gateway") && second !== "" ? second : first;
+  return isContainer(first) && second !== "" ? second : first;
 }
 
 /** The module a path under src/ (forward slashes) is part of; undefined outside every module. */

@@ -3,7 +3,7 @@ import { expect, test } from "vite-plus/test";
 import type { ProviderConnectionUpdate, ProviderUpdate } from "@vibevalley/protocol";
 import { ApiError, BizCode } from "@vibevalley/protocol/api";
 
-import { emptyProviders } from "#/modules/setting/provider.ts";
+import { emptyProviders } from "#/platform/setting/provider.ts";
 
 import { connectionsOver } from "./connections.ts";
 

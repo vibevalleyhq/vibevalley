@@ -4,7 +4,7 @@ import type * as T from "@vibevalley/protocol";
 import { BizCode, refuseIn } from "#/base/errors.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import type { TranscriptionEvent } from "#/modules/provider/vendors.ts";
+import type { TranscriptionEvent } from "#/platform/provider/vendors.ts";
 
 import { untilAborted } from "./job.ts";
 

@@ -5,7 +5,7 @@ import { type Db, openDb } from "#/infra/db.ts";
 import { keptLog } from "#/infra/log.ts";
 import { type Time, wallTime } from "#/infra/time.ts";
 import { type Agent, makeAgent } from "#/modules/agent/agent.ts";
-import { makeSetting, type Setting } from "#/modules/setting/setting.ts";
+import { makeSetting, type Setting } from "#/platform/setting/setting.ts";
 
 import { makeMemory, type Memory, type MemoryOptions } from "./memory.ts";
 

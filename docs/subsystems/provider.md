@@ -10,7 +10,7 @@
 | MOSS 账号模型目录查询、用途模型校验和解析 | 录音设备、通话、中继与字幕（[语音](docs/subsystems/voice.md)） |
 | 脱敏的公共状态、配置版本冲突与迟到查询结果 | 外部编码农机的登录、模型和凭据（[档案和农机](docs/subsystems/agent.md)） |
 
-当前适配器为 MOSS；供应商目录（`apps/server/src/modules/provider/vendors.ts`）还列出 DeepSeek（助手的对话模型）与声网（通话线路），它们的钥匙仍在各自的设置里。用的地方只拿到不认供应商的账号：连接、revision、模型、Key 的指纹，和封着 Key 与 Provider 自己 `fetch` 的调用。自建兼容转写地址仍由听写设置配置，Provider 统一解析调用配置，不把任意地址当成 MOSS 官方连接。媒体任务由 Media 管；Provider 只选择账号和模型、查询目录与音色，不因保存设置自动发起生成或上传。
+当前适配器为 MOSS；供应商目录（`apps/server/src/platform/provider/vendors.ts`）还列出 DeepSeek（助手的对话模型）与声网（通话线路），它们的钥匙仍在各自的设置里。用的地方只拿到不认供应商的账号：连接、revision、模型、Key 的指纹，和封着 Key 与 Provider 自己 `fetch` 的调用。自建兼容转写地址仍由听写设置配置，Provider 统一解析调用配置，不把任意地址当成 MOSS 官方连接。媒体任务由 Media 管；Provider 只选择账号和模型、查询目录与音色，不因保存设置自动发起生成或上传。
 
 ## 在哪
 
@@ -19,8 +19,8 @@
 | `packages/provider/src/moss/models.ts` | 官方模型目录的认证请求、响应解码和安全错误分类 |
 | `packages/provider/src/moss/image-models.ts` | 已适配的生图模型与快照；配置校验与生图协议共用唯一列表 |
 | `packages/provider/src/base/transcription.ts` | 支持的 MOSS 转写模型、官方地址、唯一的兼容转写客户端 |
-| `apps/server/src/modules/provider/` | `Provider` 服务、供应商目录 `vendors.ts`、连接变更规则与不认供应商的能力出口 |
-| `apps/server/src/modules/setting/provider.ts` | `settings.json.providers` 的私有 Schema 与单一绑定规则 `bindingOf` |
+| `apps/server/src/platform/provider/` | `Provider` 服务、供应商目录 `vendors.ts`、连接变更规则与不认供应商的能力出口 |
+| `apps/server/src/platform/setting/provider.ts` | `settings.json.providers` 的私有 Schema 与单一绑定规则 `bindingOf` |
 | `packages/protocol/src/provider/` | 公共形状、Schema 和接口权限 |
 | `apps/web/src/features/provider/` | `/settings/providers` 的连接与默认用途表单 |
 
@@ -65,9 +65,9 @@
 
 - `packages/provider/src/moss/models.test.ts`：认证头、未知模型、重定向、响应上限、错误分类、超时、取消与凭据保护。
 - `packages/provider/src/moss/speech.test.ts`、`audio-tasks.test.ts`、`voices.test.ts`：同步／异步提交、状态读取、分页、响应上限、取消、超时和脱敏；只证明协议，不证明生成产品或真实厂商可用。
-- `apps/server/src/modules/provider/speech.test.ts`：四个单人语音模型的独立绑定、凭据轮换、不可变快照、引用保护与账号音色分页；配置变化后拒绝迟到结果。
-- `apps/server/src/modules/provider/provider.test.ts`：凭据更新、用途引用、账号隔离、版本冲突、并发保存、迟到目录结果。
-- `apps/server/src/modules/setting/setting.test.ts`：权限 `0600`、私有配置重启后保留、公共设置只暴露就绪状态。
+- `apps/server/src/platform/provider/speech.test.ts`：四个单人语音模型的独立绑定、凭据轮换、不可变快照、引用保护与账号音色分页；配置变化后拒绝迟到结果。
+- `apps/server/src/platform/provider/provider.test.ts`：凭据更新、用途引用、账号隔离、版本冲突、并发保存、迟到目录结果。
+- `apps/server/src/platform/setting/setting.test.ts`：权限 `0600`、私有配置重启后保留、公共设置只暴露就绪状态。
 - `apps/server/src/gateway/voice/voice.test.ts`、`http/moss.test.ts`：听写使用选择的模型与连接、MOSS Live 使用绑定密钥、自建转写与实时中继回归。
 - `apps/web/test/providers.spec.ts`：真实隔离服务端上的表单保存、刷新、密钥脱敏、冲突草稿、用途解绑清除与空选项显示。
 - `apps/web/test/a11y.spec.ts`：已绑定生图与理解模型的浅深主题无障碍检查、390px 窄屏与截图；模型与语音网络适配由不联网协议测试覆盖，不当作真实厂商效果验收。

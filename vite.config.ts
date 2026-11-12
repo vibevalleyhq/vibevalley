@@ -526,7 +526,7 @@ export default defineConfig({
           "apps/server/src/infra/lease.ts",
           "apps/server/src/infra/db.ts",
           "apps/server/src/infra/baseline.ts",
-          "apps/server/src/modules/setting/setting.ts",
+          "apps/server/src/platform/setting/setting.ts",
         ],
         rules: { "vibevalley/sync-fs": "error" },
       },

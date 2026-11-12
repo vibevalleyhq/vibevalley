@@ -15,7 +15,7 @@ import { counter } from "#/infra/metrics.ts";
 import type { Artifact } from "#/modules/artifact/artifact.ts";
 import { artifactHeaders, artifactPrintHeaders } from "#/modules/artifact/policy.ts";
 import { shellThemeOf, withShell } from "#/modules/artifact/shell.ts";
-import type { Attachment } from "#/modules/attachment/attachment.ts";
+import type { Attachment } from "#/platform/attachment/attachment.ts";
 
 import { empty, fileResponse, notFound, replyError, textUpTo } from "./respond.ts";
 import { fromTheFarm } from "./rpc.ts";

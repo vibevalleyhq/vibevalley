@@ -1,6 +1,6 @@
 import type { SettingHandlers } from "@vibevalley/protocol/api";
 
-import type { Setting } from "#/modules/setting/setting.ts";
+import type { Setting } from "#/platform/setting/setting.ts";
 
 export function settingHandlers(deps: { readonly setting: Setting }): SettingHandlers {
   const { setting } = deps;

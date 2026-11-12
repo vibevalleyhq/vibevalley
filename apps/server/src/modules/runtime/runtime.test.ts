@@ -21,7 +21,7 @@ import { keptLog } from "#/infra/log.ts";
 import { localParts, type Time, wallTime } from "#/infra/time.ts";
 import { type Agent, makeAgent } from "#/modules/agent/agent.ts";
 import { sampleAgent } from "#/modules/agent/seed.ts";
-import { makeSetting, type Setting } from "#/modules/setting/setting.ts";
+import { makeSetting, type Setting } from "#/platform/setting/setting.ts";
 import { offlineNetwork, testConfig } from "#/testing/layers.ts";
 import { allow, refuse } from "#/testing/refuse.ts";
 

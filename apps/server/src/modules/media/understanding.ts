@@ -12,8 +12,8 @@ import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
-import type { Account, Provider } from "#/modules/provider/provider.ts";
-import { UnderstandingFailure } from "#/modules/provider/vendors.ts";
+import type { Account, Provider } from "#/platform/provider/provider.ts";
+import { UnderstandingFailure } from "#/platform/provider/vendors.ts";
 import * as q from "#db/media_job.sql.ts";
 
 import type { Inputs } from "./inputs.ts";

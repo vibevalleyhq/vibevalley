@@ -1,6 +1,6 @@
 import type { AttachmentHandlers } from "@vibevalley/protocol/api";
 
-import type { Attachment } from "#/modules/attachment/attachment.ts";
+import type { Attachment } from "#/platform/attachment/attachment.ts";
 
 export function attachmentHandlers(deps: { readonly attachment: Attachment }): AttachmentHandlers {
   const files = deps.attachment;

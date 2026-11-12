@@ -10,7 +10,7 @@ import type { Core } from "#/core/core.ts";
 import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Attachment } from "#/modules/attachment/attachment.ts";
+import type { Attachment } from "#/platform/attachment/attachment.ts";
 import * as qe from "#db/channel_event.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qr from "#db/channel_read_cursor.sql.ts";
