@@ -155,7 +155,7 @@ test("regression: a failed split commits no child, assignment, queue entry or pa
   expect(fw.inside.hired()).toEqual([]);
   const unsafe2 = await sql.unsafe("select * from session_trigger where trigger_json::jsonb -> 'meta' -> 'dispatch' = 'true'::jsonb");
   expect(unsafe2).toHaveLength(0);
-  const unsafe3 = await sql.unsafe("select * from session_issue_input");
+  const unsafe3 = await sql.unsafe("select * from issue_input");
   expect(unsafe3).toHaveLength(0);
   const unsafe4 = await sql.unsafe("select * from issue_assignment");
   expect(unsafe4).toHaveLength(1);

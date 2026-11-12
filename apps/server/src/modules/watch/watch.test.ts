@@ -24,6 +24,7 @@ import { wallTime } from "#/infra/time.ts";
 import builtIn from "#/modules/agent/templates/orchestrator/agent.json" with { type: "json" };
 import { type Channel, catchUpMax, makeChannel } from "#/modules/channel/channel.ts";
 import { effectsOf } from "#/modules/game/view.ts";
+import { issueIntake } from "#/modules/issue/intake.ts";
 import { channelUses, type Issue } from "#/modules/issue/issue.ts";
 import type { Handed } from "#/modules/session/envelope.ts";
 import { restoredSession, sessionState } from "#/modules/session/history.ts";
@@ -187,7 +188,7 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
   // A test double of the few members the chat and the mailbox use.
   const lifecycle = played as unknown as Lifecycle;
   const agent = await testAgent({ config: c, clock, log, db, core });
-  const mailbox = await makeMailbox({ db, clock, log, config: c, core, agent, session: lifecycle });
+  const mailbox = await makeMailbox({ db, clock, log, config: c, agent, session: lifecycle });
   const noRepos = async (): Promise<never> => {
     throw new Error("the chat's tests have no repos");
   };
@@ -199,8 +200,10 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
   });
   const attachment = await makeAttachment({ config: c, clock, db });
   const chat = await makeChannel({ clock, log, fetch: offline, db, core, attachment });
-  // The watch's inbox reads the board through the issues; these tests have none.
-  const issue = { onBoard: () => [] } as unknown as Issue;
+  // The watch routes through the issues' intake (an issue's threads go into its pool); its inbox reads the board through
+  // the issues, and these tests have none.
+  const intake = issueIntake({ config: c, clock, log, db, core, agent, session, channel: chat });
+  const issue = { onBoard: () => [], route: intake.route } as unknown as Issue;
   const watch = await makeWatch({ config: c, clock, log, db, core, agent, session, channel: chat, issue });
   const { changes: moves } = core.transitions();
   const relay = (async () => {
@@ -210,8 +213,9 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
       if (n) x.news.publish(n);
     }
   })();
-  // services.ts's startup order: the deliveries, then the watch.
+  // services.ts's startup order: the deliveries, the issues' intake, then the watch.
   await mailbox.boot();
+  await intake.boot();
   await watch.boot();
   const deliveries = async (recipient: string) =>
     (
@@ -242,6 +246,7 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
       moves.close();
       await relay;
       await watch.close();
+      await intake.close();
       await chat.close();
       await mailbox.close();
       await agent.close();

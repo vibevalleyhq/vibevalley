@@ -359,7 +359,7 @@ describe("the orchestrator", () => {
 
   it("a new interactive response ends the previous port that is still open", async () => {
     await using f = await farm();
-    const responses = makeResponses(f.farm.inside, f.farm.channel, f.farm.clock);
+    const responses = makeResponses(f.farm.inside, f.farm.issue, f.farm.channel, f.farm.clock);
     const collect = async (words: AsyncIterable<string>) => {
       const out: string[] = [];
       for await (const w of words) out.push(w);

@@ -60,11 +60,11 @@ for (const mode of ["settle", "handoff", "stop", "failed", "late"] as const) {
       expect(sessions.noRoom("pi", "background") === "").toBe(handoff);
       if (handoff)
         await await_(
-          () => sessions.issueRuns(issue.id),
+          () => fw.intake.runsOf(issue.id),
           (runs) => runs[0]?.endedAt !== undefined,
           "the persisted handoff",
         );
-      else expect((await sessions.issueRuns(issue.id))[0]?.endedAt).toBeUndefined();
+      else expect((await fw.intake.runsOf(issue.id))[0]?.endedAt).toBeUndefined();
       if (mode === "late") {
         await sessions.report(id, { summary: "preview ready", questions: [], checks: [], remember: [], prSubmit: false });
         await until(() => sessions.sessionOf(id)?.phase._tag === "done", "the late handoff");

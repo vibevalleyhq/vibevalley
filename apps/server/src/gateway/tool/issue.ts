@@ -141,7 +141,7 @@ export function issueTools(deps: Pick<ToolDeps, "clock" | "log" | "agent" | "ses
   const issueHandback = (who: Who) =>
     customTool("issue_handback", issueHandbackDescription, IssueHandbackInput, async ({ envelope, reason }) => {
       const caller = callerOf(who);
-      await run.decline(caller.session, envelope, reason);
+      await issue.decline(caller.session, envelope, reason);
       return issueHandbackRecorded;
     });
 

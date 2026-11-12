@@ -18,6 +18,7 @@ import * as q from "#db/issue.sql.ts";
 import { issueBrief, splitBrief } from "./brief.ts";
 import { issueRow } from "./creation.ts";
 import { dependencyProblems } from "./dependencies.ts";
+import type { Intake } from "./intake.ts";
 import { kept, openQuestions } from "./refinement.ts";
 import { jsonOrNull, nullText } from "./rows.ts";
 import { isClosed } from "./status.ts";
@@ -34,6 +35,8 @@ export interface IssueParts {
   readonly core: Core;
   readonly agent: Agent;
   readonly session: Session;
+  /** The issues' pool: what a dispatch is kept in until the issue's helper is sent. */
+  readonly intake: Pick<Intake, "queueDispatch" | "withdrawDispatches">;
   readonly db: Db;
   readonly clock: Time;
   readonly log: Logger;
@@ -42,7 +45,7 @@ export interface IssueParts {
 export type IssueLifecycle = Awaited<ReturnType<typeof issueLifecycle>>;
 
 export async function issueLifecycle(deps: IssueParts) {
-  const { core, agent: agents, session: sessions, db, clock, log } = deps;
+  const { core, agent: agents, session: sessions, intake, db, clock, log } = deps;
   const store = await makeIssueStore({ core, db });
 
   const loadKept = async () => {
@@ -360,15 +363,13 @@ export async function issueLifecycle(deps: IssueParts) {
     });
   };
 
-  const withdrawDispatches = (id: string, at: number) => sessions.withdrawDispatches(id, at);
-
   /** The issue already owns its number and workplace before its session starts. Throws NotRecorded when the database does not keep it. */
   const recordHiredStart = async (id: string, session: T.Session) => {
     try {
       await db.tx(async () => {
         await q.reopenIssue(db.sql, { id });
         await store.executeInTx(id, session.agent, session.id, session.hiredAt, () => publish(id));
-        await withdrawDispatches(id, session.hiredAt);
+        await intake.withdrawDispatches(id);
       });
     } catch (e) {
       if (e instanceof SqlError) throw new NotRecorded(causeMessage(e), { cause: e });
@@ -382,7 +383,7 @@ export async function issueLifecycle(deps: IssueParts) {
       if (isClosed(issue.status)) await q.reopenIssue(db.sql, { id: issue.id });
       await q.queueIssue(db.sql, { id: issue.id, at: assignedAt });
       await store.executeInTx(issue.id, agent, agent, assignedAt, () => publish(issue.id));
-      if (input) await sessions.queueDispatch({ issue: issue.id, agent, text: input.text, channel, by: input.by, at: assignedAt });
+      if (input) await intake.queueDispatch({ issue: issue.id, agent, text: input.text, channel, by: input.by, at: assignedAt });
     });
   };
 
@@ -391,14 +392,14 @@ export async function issueLifecycle(deps: IssueParts) {
     const at = clock.now();
     await db.tx(async () => {
       if (!queued) {
-        await withdrawDispatches(id, at);
+        await intake.withdrawDispatches(id);
         await q.unqueueIssue(db.sql, { id });
         await db.afterCommit(() => publish(id));
         return;
       }
       const changed = await q.queueIssue(db.sql, { at, id });
       if (changed.length > 0 && !source)
-        await sessions.queueDispatch({
+        await intake.queueDispatch({
           issue: id,
           agent: assignedAgentOf(item) ?? "",
           text: issueBrief(item),
@@ -413,9 +414,8 @@ export async function issueLifecycle(deps: IssueParts) {
 
   const drop = async (id: string) => {
     await unsent(id);
-    const now = clock.now();
     await db.tx(async () => {
-      await withdrawDispatches(id, now);
+      await intake.withdrawDispatches(id);
       await q.unqueueIssue(db.sql, { id });
       await q.cancelIssue(db.sql, { closed_at: clock.now(), canceled: "dismissed", id });
       await db.afterCommit(() => publish(id));
@@ -462,7 +462,7 @@ export async function issueLifecycle(deps: IssueParts) {
           });
         for (const row of rows) {
           await q.addIssue(db.sql, issueRow(row.id, row.req, parentMandate, at));
-          await sessions.queueDispatch({
+          await intake.queueDispatch({
             issue: row.id,
             agent: row.req.agent ?? "",
             text: [row.req.title, row.req.description].filter(Boolean).join("\n\n"),

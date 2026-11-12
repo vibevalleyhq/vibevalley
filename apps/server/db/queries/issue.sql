@@ -6,7 +6,7 @@ select issue.*, latest_run.started_at::session_run.started_at? as run_started_at
        latest_run.outcome as run_outcome
 from issue left join session_run latest_run on latest_run.id = (
   select r.id from session_run r
-  where (r.issue = issue.id or exists (select 1 from session_run_issue l where l.run = r.id and l.issue = issue.id))
+  where (r.issue = issue.id or exists (select 1 from issue_run l where l.run = r.id and l.issue = issue.id))
     and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment
       where a.issue = issue.id and e.executor = r.session)
   order by r.started_at desc, r.id desc limit 1
@@ -17,14 +17,14 @@ select issue.*, latest_run.started_at::session_run.started_at? as run_started_at
        latest_run.outcome as run_outcome
 from issue left join session_run latest_run on latest_run.id = (
   select r.id from session_run r
-  where (r.issue = issue.id or exists (select 1 from session_run_issue l where l.run = r.id and l.issue = issue.id))
+  where (r.issue = issue.id or exists (select 1 from issue_run l where l.run = r.id and l.issue = issue.id))
     and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment
       where a.issue = issue.id and e.executor = r.session)
   order by r.started_at desc, r.id desc limit 1
 ) where issue.id = sqlc.arg(id);
 
 -- name: IssueExists :one
--- Whether an issue is there at all, for the deliveries' routing before the core fact reaches it (Session.useIssues).
+-- Whether an issue is there at all, for the intake's routing before the core fact reaches it (issue/intake.ts).
 select id from issue where id = sqlc.arg(id);
 
 -- name: IssueByNumber :one
@@ -32,7 +32,7 @@ select issue.*, latest_run.started_at::session_run.started_at? as run_started_at
        latest_run.outcome as run_outcome
 from issue left join session_run latest_run on latest_run.id = (
   select r.id from session_run r
-  where (r.issue = issue.id or exists (select 1 from session_run_issue l where l.run = r.id and l.issue = issue.id))
+  where (r.issue = issue.id or exists (select 1 from issue_run l where l.run = r.id and l.issue = issue.id))
     and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment
       where a.issue = issue.id and e.executor = r.session)
   order by r.started_at desc, r.id desc limit 1
@@ -101,7 +101,7 @@ select issue.*, latest_run.started_at::session_run.started_at? as run_started_at
        latest_run.outcome as run_outcome
 from issue left join session_run latest_run on latest_run.id = (
   select r.id from session_run r
-  where (r.issue = issue.id or exists (select 1 from session_run_issue l where l.run = r.id and l.issue = issue.id))
+  where (r.issue = issue.id or exists (select 1 from issue_run l where l.run = r.id and l.issue = issue.id))
     and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment
       where a.issue = issue.id and e.executor = r.session)
   order by r.started_at desc, r.id desc limit 1
@@ -116,7 +116,7 @@ select issue.*, latest_run.started_at::session_run.started_at? as run_started_at
        latest_run.outcome as run_outcome
 from issue left join session_run latest_run on latest_run.id = (
   select r.id from session_run r
-  where (r.issue = issue.id or exists (select 1 from session_run_issue l where l.run = r.id and l.issue = issue.id))
+  where (r.issue = issue.id or exists (select 1 from issue_run l where l.run = r.id and l.issue = issue.id))
     and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment
       where a.issue = issue.id and e.executor = r.session)
   order by r.started_at desc, r.id desc limit 1
@@ -128,7 +128,7 @@ select issue.*, latest_run.started_at::session_run.started_at? as run_started_at
        latest_run.outcome as run_outcome
 from issue left join session_run latest_run on latest_run.id = (
   select r.id from session_run r
-  where (r.issue = issue.id or exists (select 1 from session_run_issue l where l.run = r.id and l.issue = issue.id))
+  where (r.issue = issue.id or exists (select 1 from issue_run l where l.run = r.id and l.issue = issue.id))
     and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment
       where a.issue = issue.id and e.executor = r.session)
   order by r.started_at desc, r.id desc limit 1

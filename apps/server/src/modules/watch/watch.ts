@@ -147,7 +147,7 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
       role: agents.isOrchestrator(d.recipient) ? "orchestrator" : "worker",
       event: event(d.reason),
     }));
-    await sessions.route(trigger, hearers);
+    await deps.issue.route(trigger, hearers);
     if (trigger.actor.kind === "user") {
       reach.userSpoke(scope);
       // Spoken to by the user: the breaker lets it wake again.
@@ -338,7 +338,6 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
   );
   sessions.useChat({
     defaultChannel: () => chat.defaultChannel(),
-    orchestratorIn: (channel) => chat.orchestratorIn(channel),
     unreadOf: async (participant, channel) =>
       (await chat.unread(participant, channel)).map((u) => ({
         target: u.channel,

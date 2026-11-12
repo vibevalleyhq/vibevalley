@@ -53,7 +53,7 @@ test("regression: cron replay supplies decoded source payloads without routing t
   const first = await mailbox.recordTrigger({ ...event, source: "cron", key: "first", data: { occurrence: 1 } });
   const second = await mailbox.recordTrigger({ ...event, source: "cron", key: "second", data: { occurrence: 2 } });
   const seen: unknown[] = [];
-  await mailbox.replayCronTriggers(async (trigger, data) => void seen.push({ id: trigger.id, data }));
+  await mailbox.unrouted(async (trigger, data) => void (trigger.source === "cron" && seen.push({ id: trigger.id, data })));
   expect(seen).toEqual([
     { id: first.id, data: { occurrence: 1 } },
     { id: second.id, data: { occurrence: 2 } },

@@ -187,7 +187,7 @@ export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "s
         let permitted = orchestrator;
         if (session?.issue && !permitted) permitted = (await issues.get(session.issue)).mandate.originTriggerId === ref.id;
         if (session && !permitted) {
-          const owner = await sessions.ownerOf(ref.id);
+          const owner = await issues.ownerOf(ref.id);
           if (owner) {
             const ownerIssue = await issues.get(owner);
             permitted = await mayReadIssue(session, ownerIssue);
@@ -223,7 +223,7 @@ export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "s
       case "issue": {
         const issue = await issues.get(ref.id);
         if (!orchestrator && (session === undefined || !(await mayReadIssue(session, issue)))) throw refuse(resourceWords.forbidden(uri));
-        return textOf({ issue, runs: await sessions.runsOf(issue.id), messages: await channels.issueMessages(issue.id) });
+        return textOf({ issue, runs: await issues.runs(issue.id), messages: await channels.issueMessages(issue.id) });
       }
       case "channel": {
         if (!orchestrator && (session === undefined || !(await mayReadChannel(session, ref.id)))) throw refuse(resourceWords.forbidden(uri));

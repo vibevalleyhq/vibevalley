@@ -109,8 +109,8 @@ describe("an issue's thread", () => {
       (channel) => channel === thread,
       "the followup owned by the session",
     );
-    await fw.inside.decline(session.id, followup.id, "超出当前范围");
-    await fw.inside.decline(session.id, followup.id, "超出当前范围");
+    await fw.intake.decline(session.id, followup.id, "超出当前范围");
+    await fw.intake.decline(session.id, followup.id, "超出当前范围");
     const returned = mailbox.deliveriesOf(channels.orchestratorIn(thread)).filter((row) => row.envelope_id === `returned:${issue.id}:${followup.id}`);
     expect(returned).toHaveLength(1);
     expect(returned[0]!.payload.trigger.id).toBe(followup.id);
@@ -160,7 +160,7 @@ describe("an issue's thread", () => {
       n: number;
     }>`select count(*) as n from session_delivery where message_id = ${kept.message.id} and session_id = ${first}`;
     expect(woken[0]!.n).toBe(0);
-    const rows = await sql`select trigger_id from session_issue_input where trigger_id = ${kept.message.id} and state = 'returned'`;
+    const rows = await sql`select trigger_id from issue_input where trigger_id = ${kept.message.id} and state = 'returned'`;
     expect(rows).toHaveLength(1);
 
     const setStatus2 = await issues.setStatus(issue.id, "todo", "接着做", "", user);

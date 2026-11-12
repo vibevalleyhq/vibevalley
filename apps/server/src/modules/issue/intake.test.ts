@@ -1,7 +1,7 @@
 import { expect, test } from "vite-plus/test";
 
 import { testDb } from "#/testing/layers.ts";
-import { issueInputs, pendingIssueInputs } from "#db/session_issue_input.sql.ts";
+import { issueInputs, pendingIssueInputs } from "#db/issue_input.sql.ts";
 
 test("regression: reassignment selects unread inputs without loading consumed history", async () => {
   await using db = await testDb();
@@ -13,7 +13,7 @@ test("regression: reassignment selects unread inputs without loading consumed hi
   await sql`insert into session_trigger (id, source, source_key, trigger_json, payload_json, occurred_at, routed_at, routing_scope, routing_position)
       select n, 'github', n, '{"actor":{"kind":"user"}}', '{}', 0, 0, 'issue:work', n
       from (with recursive s(n) as (select 1 union all select n + 1 from s where n < 2007) select n from s)`;
-  await sql`insert into session_issue_input (trigger_id, issue_id, state, session_id, created_at)
+  await sql`insert into issue_input (trigger_id, issue_id, state, session_id, created_at)
       select n, 'work', 'forwarded', 'old', 0 from (with recursive s(n) as (select 1 union all select n + 1 from s where n < 2007) select n from s)`;
   await sql`insert into session_delivery (session_id, envelope_id, scope, source, urgency, reason, wakes, state, payload_json, created_at)
       select 'old', n, 'issue:work', 'github', 'queue', 'addressed', true, 'consumed', '{}', 0
@@ -23,7 +23,7 @@ test("regression: reassignment selects unread inputs without loading consumed hi
   await sql`update session_delivery set state = 'dropped', dropped_why = 'left' where envelope_id = '2003'`;
   await sql`update session_delivery set state = 'dropped', dropped_why = 'reassigned' where envelope_id = '2004'`;
   await sql`update session_delivery set state = 'dropped', dropped_why = 'deleted' where envelope_id = '2005'`;
-  await sql`update session_issue_input set state = 'held', session_id = null where trigger_id = '2006'`;
+  await sql`update issue_input set state = 'held', session_id = null where trigger_id = '2006'`;
   const selected = async (recipient: string | null, closing = false) =>
     (await pendingIssueInputs(db.sql, { issue_id: "work", recipient, closing })).map((row) => row.trigger_id);
   const selected2 = await selected("new");

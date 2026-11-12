@@ -16,8 +16,9 @@ import type { Agent } from "#/modules/agent/agent.ts";
 import { templateCatalog } from "#/modules/agent/seed.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
+import type { Hearer } from "#/modules/session/envelope.ts";
 import type { Hired, HireOptions, SessionNews, Session } from "#/modules/session/session.ts";
-import * as issueQ from "#db/issue.sql.ts";
+import type { Trigger } from "#/modules/session/shapes.ts";
 import * as cronQ from "#db/issue_cron.sql.ts";
 
 import { findingsOf, milestonesOf } from "./brief.ts";
@@ -25,6 +26,8 @@ import { explicitMandate, filledKinds, inferredMandate, mandateNoteFits, sentTit
 import { type Due, issueCron } from "./cron.ts";
 import { type Dispatched, issueDispatch } from "./dispatch.ts";
 import { makeGitHubPoller } from "./github.ts";
+import { readyInputs } from "./inputs.ts";
+import { type Intake, issueIntake } from "./intake.ts";
 import { issueLanding } from "./landing.ts";
 import { issueLifecycle } from "./lifecycle.ts";
 import { merging } from "./merge.ts";
@@ -139,6 +142,15 @@ export interface Issue {
   readonly history: () => Promise<T.IssueHistory[]>;
   readonly timeline: (id: string) => Promise<T.IssueTimeline>;
   readonly templates: (repo: string) => Promise<T.RepoTemplates>;
+  /** The runs that took the issue's inputs. */
+  readonly runs: (id: string) => Promise<T.Run[]>;
+  /** A recorded trigger routed: into the pool of the issue whose threads it is in, else to the hearers given (as the
+   * watch braked them), else to the orchestrator it names or the one of its place (intake.ts). */
+  readonly route: (trigger: Trigger, hearers?: readonly Hearer[]) => Promise<void>;
+  /** The issue a trigger is an input of. */
+  readonly ownerOf: (trigger: string) => Promise<string | undefined>;
+  /** A helper says an input is not its to take; the orchestrator is told why. */
+  readonly decline: (session: string, envelope: string, reason: string) => Promise<void>;
   /** Throws HireRefused. */
   readonly hire: (agent: T.Agent, brief: string, repo: string, opt?: HireOptions) => Promise<Hired>;
   readonly pollGitHub: () => Promise<void>;
@@ -199,11 +211,21 @@ export const channelUses =
     return [...(crons !== 0 ? [t("server.channel.cronsThere", { n: crons })] : []), ...(queued !== 0 ? [t("server.channel.queuedThere", { n: queued })] : [])];
   };
 
+const intakes = new WeakMap<Issue, Intake>();
+
+/** An issues module's intake (its pools, subscriptions and routing), for tests only (modules.test.ts keeps it so). */
+export function intakeOf(issue: Issue): Intake {
+  const intake = intakes.get(issue);
+  if (intake === undefined) throw new Error("not an issues module makeIssue made");
+  return intake;
+}
+
 export async function makeIssue(deps: IssueDeps): Promise<Issue> {
   const { config, clock, core, agent: store, repo: repos, session: sessions, channel: chat, db } = deps;
   const log = deps.log.child("issue");
   const tasks = new TaskGroup({ name: "issue", onError: (task, e) => log.error(`${task} failed:`, e) });
-  const r = await issueLifecycle({ core, agent: store, session: sessions, db, clock, log });
+  const intake = issueIntake({ config, clock, log, db, core, agent: store, session: sessions, channel: chat });
+  const r = await issueLifecycle({ core, agent: store, session: sessions, intake, db, clock, log });
   const {
     issueOfSession,
     loadKept,
@@ -232,11 +254,11 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
   const landing = issueLanding(r, { core, log, repo: repos, session: sessions, channel: chat });
   const { changesOf } = landing;
   const { split, joinChildren } = issueSplitting(r, { agent: store, session: sessions, channel: chat, landing });
-  const d = issueDispatch(r, joinChildren, { core, agent: store, repo: repos, session: sessions, channel: chat, log });
+  const d = issueDispatch(r, joinChildren, { core, agent: store, repo: repos, session: sessions, intake, channel: chat, log });
   const { hire, start, refreshQueue, reopen, scheduled } = d;
-  chat.guardRemoval(channelUses({ db, queued: () => sessions.queuedTriggers() }));
-  sessions.useIssues({ issues: () => core.state().issues, exists: async (id) => (await issueQ.issueExists(db.sql, { id })) !== undefined });
-  const cron = await issueCron({ config, clock, log, db, core, agent: store, channel: chat, session: sessions, scheduled });
+  chat.guardRemoval(channelUses({ db, queued: () => intake.queued() }));
+  sessions.useReadiness((inputs) => readyInputs(inputs, (id) => core.state().issues.find((issue) => issue.id === id)));
+  const cron = await issueCron({ config, clock, log, db, core, agent: store, channel: chat, session: sessions, intake, scheduled });
   const { withEdit, settledMove, stuckWords, movesWords } = issueSettling(r, d, {
     agent: store,
     repo: repos,
@@ -272,7 +294,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     setConflict,
   });
 
-  const gitHub = makeGitHubPoller({ db, repo: repos, clock, log, receive: sessions.receive });
+  const gitHub = makeGitHubPoller({ db, repo: repos, clock, log, receive: intake.receive });
   const pollGitHub = () => gitHub.pollOpen(core.state().issues);
 
   const chooseAgent = async (brief: string, name: string, picked: string): Promise<T.Agent> => {
@@ -445,11 +467,12 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
         return;
       }
       case "IssueStarted":
+        await bestEffort(log, `vibevalley: run ${n.run} on issue ${n.issue}`, () => intake.ranOn(n.run, n.issue));
         await unqueue(n.issue);
         return;
       case "RunFinished":
         // In-process orchestrator runs emit no `Reported`; move their issues to await user review when the turn ends.
-        for (const id of n.issues) await bestEffort(log, `vibevalley: run ${n.id} finished on issue ${id}`, () => endRun(id));
+        for (const id of await intake.issuesOfRun(n.id, n.issue)) await bestEffort(log, `vibevalley: run ${n.id} finished on issue ${id}`, () => endRun(id));
         return;
       default:
         return;
@@ -491,7 +514,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
 
   const timeline = async (id: string) => {
     const issue = await get(id);
-    const runs = await sessions.runsOf(issue.id);
+    const runs = await intake.runsOf(issue.id);
     const names = new Map<string, string>();
     for (const s of new Set(runs.map((r) => r.session))) {
       const found = await sessions.get(s);
@@ -656,6 +679,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
 
   /** Startup's timers run here: the queue's wake-up and the pull requests' poll. */
   const startup = async () => {
+    await intake.boot();
     await refreshQueue();
     tasks.run("issue: queue wake-up", async (signal) => {
       for (;;) {
@@ -674,7 +698,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     await cron.boot();
   };
 
-  return {
+  const issue: Issue = {
     submitPullRequest,
     split,
     onBoard: () => core.state().issues,
@@ -744,6 +768,10 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
       const all = await everyIssue();
       return { repo: name, stack, recent: sentTitles(all, name, store.isOrchestrator), kinds: filledKinds(templateCatalog(), stack) };
     },
+    runs: async (id) => intake.runsOf((await get(id)).id),
+    route: intake.route,
+    ownerOf: intake.ownerOf,
+    decline: intake.decline,
     hire,
     pollGitHub,
     refreshPullRequests,
@@ -759,6 +787,9 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     close: async () => {
       await cron.close();
       await tasks.close();
+      await intake.close();
     },
   };
+  intakes.set(issue, intake);
+  return issue;
 }

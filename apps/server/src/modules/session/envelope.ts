@@ -33,20 +33,24 @@ export interface UnreadRow {
 
 export const summaryChannels = 20;
 
-/** What the mailbox reads of the chat, told by the layer above it (the watch): the default channel, the orchestrator a
- * place's words that name no one go to, and a participant's unread (`channel`: the one it is in), newest first. */
+/** What the mailbox reads of the chat, told by the layer above it (the watch): the default channel, and a participant's
+ * unread (`channel`: the one it is in), newest first. */
 export interface ChatView {
   readonly defaultChannel: () => string;
-  readonly orchestratorIn: (channel: string) => string;
   readonly unreadOf: (participant: string, channel: string) => Promise<readonly UnreadRow[]>;
 }
 
-/** What the mailbox reads of the issues, told by the layer above it (the issues): those on the board, and whether one
- * is kept at all (an issue off the board still owns its threads). */
-export interface IssueView {
-  readonly issues: () => readonly T.Issue[];
-  readonly exists: (id: string) => Promise<boolean>;
+/** A session's input waiting to be handed to it, as the layer above judges it: the issue it is for (its own, or the
+ * session's), whether the user said it, and whether it is still pending (not handed yet). */
+export interface WaitingInput {
+  readonly issue?: string;
+  readonly fromUser: boolean;
+  readonly pending: boolean;
 }
+
+/** Which of a session's waiting inputs may be handed to it now, one answer per input, as the layer above decides (the
+ * issues); until told, all of them. */
+export type Readiness = (inputs: readonly WaitingInput[]) => readonly boolean[];
 
 type StoredMessageKind = "chat" | "dispatch" | "report" | "notice";
 
@@ -78,6 +82,9 @@ export type HeldBy = "hop_limit" | "cooldown" | "wake_breaker";
 /** What a delivery is to its session: how urgent it is follows from this (routing.ts urgencyOf). */
 export type DeliveryEvent = "stop" | "conversation" | "mention" | "assignment" | "review" | "ci_failed" | "report_attention" | "report_progress" | "ambient";
 
+/** How a delivery reaches a busy session: stop it, steer its turn, wait for the next, or wait to be read with the rest. */
+export type Urgency = "interrupt" | "steer" | "queue" | "digest";
+
 /** A session that hears a routed trigger, as the layer above worked it out: why, whether it wakes, what held it back. */
 export interface Hearer {
   readonly session: string;
@@ -86,6 +93,29 @@ export interface Hearer {
   readonly heldBy?: HeldBy;
   readonly role: T.AgentRole;
   readonly event: DeliveryEvent;
+}
+
+/** A session a routed trigger is delivered to, as the layer above picked it (Session.route). */
+export interface Delivery {
+  readonly session: string;
+  /** Why, whether it wakes and what held it back, as the watch heard it; else addressed, waking unless a digest. */
+  readonly heard?: Pick<Hearer, "reason" | "wakes" | "heldBy">;
+  /** What the session is (its profile's role when not given) and what the delivery is to it: its urgency follows. */
+  readonly role?: T.AgentRole;
+  readonly event?: DeliveryEvent;
+  readonly urgency?: Urgency;
+  /** The issue it is for: where it counts (payload.ts deliveryScope), and what the run that takes it took. */
+  readonly issue?: string;
+  /** The session it went to before: that delivery is dropped as reassigned. */
+  readonly previous?: string;
+  /** Its own id when not the trigger's: an input handed back goes to another session as a second delivery. */
+  readonly id?: string;
+  /** Said to the session with it. */
+  readonly note?: string;
+  /** Read in the routing transaction: false leaves this one out. */
+  readonly prepare?: () => Promise<boolean>;
+  /** Written in the routing transaction, with the delivery. */
+  readonly commit?: () => Promise<void>;
 }
 
 /** A source's event taken in: its trigger (none for the farm's own echo). */

@@ -400,7 +400,7 @@ describe("a session's work", () => {
         expect((await sessions.deliver(session.id, "再看看", delivery(said, ["m42"]))).kind).toBe("run");
         await w.nextReport();
         const got = await await_(
-          () => sessions.issueRuns(session.issue!),
+          () => fw.intake.runsOf(session.issue!),
           (r) => r.length === 2 && r[1]!.endedAt !== undefined,
           "two runs ended",
         );
@@ -408,14 +408,14 @@ describe("a session's work", () => {
         expect(got[1]!.triggeredBy).toEqual(said);
         await sessions.deliver(session.id, "发呆一会儿", delivery({ kind: "comment" }));
         await await_(
-          () => sessions.issueRuns(session.issue!),
+          () => fw.intake.runsOf(session.issue!),
           (r) => r.length === 3,
           "a third run going",
         );
         expect((await sessions.deliver(session.id, "顺便看看", delivery({ kind: "comment", message: "m43" }, ["m43"]))).kind).toBe("steered");
         // A run's heard is recorded behind the steer (recordRun), so it is waited for.
         await await_(
-          () => sessions.issueRuns(session.issue!),
+          () => fw.intake.runsOf(session.issue!),
           (r) => r[2]?.heard.includes("m43") === true,
           "the steered message heard",
         );
@@ -425,8 +425,7 @@ describe("a session's work", () => {
     const after = farm({ config });
     {
       await using fw = await after.open();
-      const sessions = fw.inside;
-      expect((await sessions.issueRuns(session.issue!))[2]!.outcome).toBe("interrupted");
+      expect((await fw.intake.runsOf(session.issue!))[2]!.outcome).toBe("interrupted");
     }
   });
 

@@ -35,9 +35,11 @@ export type LaunchActivity =
   | { readonly _tag: "Closed"; readonly id: string; readonly launch: string }
   | { readonly _tag: "Compacting"; readonly id: string; readonly on: boolean };
 
+/** A run ended; issue: the helper's own, when it works one (the issues an in-process agent's run took were told as
+ * IssueStarted). */
 export interface RunFinished {
   readonly id: string;
-  readonly issues: T.IssueId[];
+  readonly issue?: string;
   readonly outcome: T.Outcome;
 }
 
@@ -66,7 +68,7 @@ export type SessionNews =
   | { readonly _tag: "Hired"; readonly session: T.Session }
   | { readonly _tag: "Reported"; readonly report: Extract<T.Fact, { type: "sessionReported" }>; readonly session: T.Session | undefined }
   | { readonly _tag: "Left"; readonly left: Extract<T.Fact, { type: "sessionLeft" }> }
-  | { readonly _tag: "IssueStarted"; readonly issue: string }
+  | { readonly _tag: "IssueStarted"; readonly issue: string; readonly run: string }
   | ({ readonly _tag: "RunFinished" } & RunFinished)
   | ({ readonly _tag: "Consumed" } & Consumed)
   | ({ readonly _tag: "Returned" } & Returned)

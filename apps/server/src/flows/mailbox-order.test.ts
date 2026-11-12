@@ -27,7 +27,7 @@ test("regression: concurrent mailbox writes and restoration leave every committe
   const mailbox = fw.inside;
   const channel = fw.channel.defaultChannel();
   const recorded = [];
-  for (let n = 0; n < 12; n++) recorded.push(await mailbox.record(signal(`concurrent-${n}`)));
+  for (let n = 0; n < 12; n++) recorded.push(await mailbox.recordTrigger(signal(`concurrent-${n}`)));
   const inputs = recorded.filter((input) => input !== undefined);
   const writes = inputs.map((trigger) =>
     committedDelivery(fw.db, {
@@ -108,7 +108,7 @@ test("regression: queued triggers enter the first model request in receipt order
   const issue = await issues.add({ title: "work", agent: "lab", repo: "fifo" });
   const markers = ["FIFO_FIRST_CARD", "FIFO_SECOND_CARD", "FIFO_THIRD_CARD"];
   for (const [index, text] of markers.entries())
-    await mailbox.record({
+    await mailbox.recordTrigger({
       source: "github",
       key: text,
       actor: { kind: "system", id: "checks" },
@@ -118,7 +118,7 @@ test("regression: queued triggers enter the first model request in receipt order
       at: [500, 1, 500][index]!,
       meta: { kind: "ci", failed: true },
     });
-  await mailbox.replay();
+  await fw.intake.replay();
   await issues.start(issue.id, "");
   await until(() => inputs.length === 1, "the queued batch in the initial request");
   const positions = markers.map((marker) => inputs[0]!.indexOf(marker));
@@ -165,16 +165,18 @@ test("regression: an independent agent wake restores cooldown using receipt time
     await fw.watch.boot();
     const second = await call("future-source-clock");
     expect(mailbox.deliveriesOf(started.session!).find((row) => row.envelope_id === second.id)?.held_by).toBe("cooldown");
-    const queued = (await mailbox.accept({
-      source: "github",
-      key: "queued-ci",
-      actor: { kind: "system", id: "checks" },
-      addressed: "thread_owner",
-      threads,
-      text: "queued-ci",
-      at: 0,
-      meta: { kind: "ci", failed: true },
-    }))!;
+    const queued = (
+      await fw.intake.receive({
+        source: "github",
+        key: "queued-ci",
+        actor: { kind: "system", id: "checks" },
+        addressed: "thread_owner",
+        threads,
+        text: "queued-ci",
+        at: 0,
+        meta: { kind: "ci", failed: true },
+      })
+    ).trigger!;
     await fw.channel.say({ text: "user-authorized-wave", channel: thread, sendKey: "" });
     await until(() => !mailbox.deliveriesOf(started.session!).some((row) => row.envelope_id === second.id), "the held card consumed with a user steer");
     expect(steers().some((text) => text.includes("future-source-clock") && text.includes("user-authorized-wave"))).toBe(true);

@@ -33,10 +33,10 @@ test("regression: an orchestrator assignment survives startup and an acknowledge
   expect(queued.lastRun).toBeUndefined();
   // A crash between the trigger's write and its hand-off: the row is there, routed to no one.
   await sql`delete from session_delivery where envelope_id = ${triggerId}`;
-  await sql`delete from session_issue_input where trigger_id = ${triggerId}`;
+  await sql`delete from issue_input where trigger_id = ${triggerId}`;
   await sql`update session_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${triggerId}`;
   await mailbox.bootDeliveries();
-  await fw.inside.replay();
+  await fw.intake.replay();
   const deliveries = await sql`select session_id, envelope_id from session_delivery where envelope_id = ${triggerId}`;
   expect(deliveries).toHaveLength(1);
   // A second replay of the same unrouted row acknowledges no second delivery.

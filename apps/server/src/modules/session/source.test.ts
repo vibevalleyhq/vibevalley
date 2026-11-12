@@ -24,8 +24,8 @@ test("regression: machine triggers are immutable source records and do not becom
     replyChannel: channel,
     at: 10,
   };
-  const first = (await mailbox.record(event))!;
-  const duplicate = await mailbox.record({ ...event, text: "changed on retry", at: 20 });
+  const first = await mailbox.recordTrigger(event);
+  const duplicate = await mailbox.recordTrigger({ ...event, text: "changed on retry", at: 20 });
   expect(duplicate).toEqual(first);
   expect(first.card.summary.length).toBe(600);
   expect(first.card.totalChars).toBe(event.text.length);
@@ -33,8 +33,9 @@ test("regression: machine triggers are immutable source records and do not becom
   const page = await tools.readResource(defaultOrchestrator, { uri: first.card.readUri, limit: 16000 });
   expect(page.text).toContain("src/run.ts");
   expect(page.text).toContain(event.text);
-  const recorded = await mailbox.record({ ...event, key: "self", selfEcho: true });
-  expect(recorded).toBeUndefined();
+  // The farm's own echo is taken in by no one: the intake records none (issue/intake.ts receive).
+  const recorded = await farm.intake.receive({ ...event, key: "self", selfEcho: true });
+  expect(recorded.trigger).toBeUndefined();
   const history2 = await chat.history(channel);
   expect(history2).toEqual(before);
 });

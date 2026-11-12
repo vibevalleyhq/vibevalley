@@ -138,7 +138,7 @@ describe("AgentHost", () => {
     await reading;
     expect(said).toEqual(["我看一下", "看完了，一切正常"]);
     await until(() => finished.length === 1 && consumed.length === 1, "the public run events");
-    expect(finished).toEqual([{ _tag: "RunFinished", id: expect.any(String), issues: [], outcome: "completed" }]);
+    expect(finished).toEqual([{ _tag: "RunFinished", id: expect.any(String), outcome: "completed" }]);
     expect(consumed).toEqual([{ _tag: "Consumed", session: "orchestrator", envelopeIds: ["m1"] }]);
     expect(answeringRuns).toEqual([finished[0]!.id, finished[0]!.id]);
     expect(requests[0]!.system).toContain("database preference");

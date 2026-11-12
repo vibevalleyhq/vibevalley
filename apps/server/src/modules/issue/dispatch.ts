@@ -12,13 +12,14 @@ import { issueBranch, type Repo } from "#/modules/repo/repo.ts";
 import { RepoError } from "#/modules/repo/workplace.ts";
 import { conflictBrief } from "#/modules/session/briefing.ts";
 import { askedMax } from "#/modules/session/journal.ts";
-import { type Hired, type HireOptions, HireRefused, type QueuedInput, type Session } from "#/modules/session/session.ts";
+import { type Hired, type HireOptions, HireRefused, type Session } from "#/modules/session/session.ts";
 import type { Trigger } from "#/modules/session/shapes.ts";
 
 import { issueBrief } from "./brief.ts";
 import { explicitMandate, inferredMandate } from "./creation.ts";
 import type { Due } from "./cron.ts";
 import { acceptanceAncestors, blockedIssues } from "./dependencies.ts";
+import type { Intake, QueuedInput } from "./intake.ts";
 import type { IssueLifecycle } from "./lifecycle.ts";
 import { workConstraints } from "./prompts.ts";
 import type { IssueSplitting } from "./split.ts";
@@ -51,6 +52,7 @@ export interface DispatchDeps {
   readonly agent: Agent;
   readonly repo: Repo;
   readonly session: Session;
+  readonly intake: Pick<Intake, "inputsOf" | "queued" | "forwarded">;
   readonly channel: Channel;
   readonly log: Logger;
 }
@@ -67,7 +69,7 @@ const noneIfRefused = (e: unknown): undefined => {
 export type IssueDispatch = ReturnType<typeof issueDispatch>;
 
 export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["joinChildren"], deps: DispatchDeps) {
-  const { core, agent: store, repo: repos, session: sessions, channel: chat, log } = deps;
+  const { core, agent: store, repo: repos, session: sessions, intake, channel: chat, log } = deps;
   const { everyIssue, get, ofCron, unsent, attemptAdd, add, remove, recordHiredStart, recordOnDutyStart, setQueued } = r;
   /** One round of the queue at a time. */
   const trying = new Semaphore(1);
@@ -112,6 +114,8 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
           if (opt.refining !== true) await recordHiredStart(hiredIssue.id, w);
         },
       });
+      const inputs = opt.inputs ?? [];
+      if (inputs.length > 0) await intake.forwarded(hiredIssue.id, received.hired.id, inputs);
       return { session: received.hired, ...(received.evicted ? { evicted: received.evicted } : {}) };
     } catch (refusedHire) {
       if (!(refusedHire instanceof HireRefused)) throw refusedHire;
@@ -159,7 +163,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
 
   const start = async (id: string, channel: string, by?: T.RunTrigger, said?: string, inputs: readonly Trigger[] = []): Promise<Dispatched> => {
     const mine = await get(id).catch(noneIfRefused);
-    const queued = inputs.length > 0 || mine === undefined ? undefined : await sessions.triggersOf(id);
+    const queued = inputs.length > 0 || mine === undefined ? undefined : await intake.inputsOf(id);
     const initial = queued ?? inputs;
     if (mine) {
       const children = (await everyIssue()).filter((child) => child.parent === mine.id);
@@ -225,7 +229,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
   /** In the board's order: one that cannot go any more leaves the queue. */
   const refreshQueue = (): Promise<void> =>
     trying.with(async () => {
-      const inputs = await sessions.queuedTriggers();
+      const inputs = await intake.queued();
       await bestEffort(log, "vibevalley: child issues could not be merged", () => joinChildren());
       const all = await everyIssue();
       for (const issue of all) {

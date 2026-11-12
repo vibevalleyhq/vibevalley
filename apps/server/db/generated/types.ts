@@ -65,6 +65,9 @@ export type Words_issue_deliver = z.infer<typeof Words_issue_deliver>
 export const Words_issue_delivered = z.enum(["merged","merged_into_parent","pull_request","submitted","kept","none"])
 export type Words_issue_delivered = z.infer<typeof Words_issue_delivered>
 
+export const Words_issue_input_state = z.enum(["held","forwarded","returned"])
+export type Words_issue_input_state = z.infer<typeof Words_issue_input_state>
+
 export const Words_issue_mandate_strength = z.enum(["explicit","inferred"])
 export type Words_issue_mandate_strength = z.infer<typeof Words_issue_mandate_strength>
 
@@ -118,9 +121,6 @@ export type Words_session_delivery_state = z.infer<typeof Words_session_delivery
 
 export const Words_session_delivery_urgency = z.enum(["interrupt","steer","queue","digest"])
 export type Words_session_delivery_urgency = z.infer<typeof Words_session_delivery_urgency>
-
-export const Words_session_issue_input_state = z.enum(["held","forwarded","returned"])
-export type Words_session_issue_input_state = z.infer<typeof Words_session_issue_input_state>
 
 export const Words_session_role = z.enum(["orchestrator","worker"])
 export type Words_session_role = z.infer<typeof Words_session_role>

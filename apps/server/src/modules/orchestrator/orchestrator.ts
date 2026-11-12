@@ -118,7 +118,7 @@ export interface OrchestratorDeps {
 export async function makeOrchestrator(deps: OrchestratorDeps, options: OrchestratorOptions = {}): Promise<Orchestrator> {
   const { clock, config, agent: store, repo: repos, pkm: notes, session: run, channel: chat, issue: issues, tools: tool } = deps;
   const log = deps.log.child("orchestrator");
-  const responses = makeResponses(run, chat, clock);
+  const responses = makeResponses(run, issues, chat, clock);
   const tasks = new TaskGroup({ name: "orchestrator", onError: (task, e) => log.error(`vibevalley: the orchestrator's ${task} failed`, e) });
 
   const toolsFor = (id: string) => (current: () => HostContext) =>

@@ -19,6 +19,7 @@ import type { Session } from "#/modules/session/session.ts";
 import type { Trigger } from "#/modules/session/shapes.ts";
 import * as q from "#db/issue_cron.sql.ts";
 
+import type { Intake } from "./intake.ts";
 import { afterRun, cronProblem, dueCrons, dueText, givenZone, isMissed, needsOK, whenText } from "./when.ts";
 
 const refused = refuseIn(BizCode.CronRefused);
@@ -56,6 +57,8 @@ export interface CronDeps {
   readonly agent: Agent;
   readonly channel: Channel;
   readonly session: Session;
+  /** Where a due cron's trigger goes: the pool of the issue it made, whose thread it subscribes. */
+  readonly intake: Pick<Intake, "route" | "subscribe" | "ownerOf">;
   /** The issue a due cron's trigger goes to: the one it made last, reopened, or a new one. */
   readonly scheduled: (due: Due, input: Trigger) => Promise<T.Issue>;
 }
@@ -69,7 +72,7 @@ const localZone = (): string => {
 const whenOf = jsonOrNone(S.CronWhen);
 
 export async function issueCron(deps: CronDeps): Promise<IssueCron> {
-  const { core, agent: store, channel: chat, scheduled, session: sessions, db, clock, config } = deps;
+  const { core, agent: store, channel: chat, scheduled, session: sessions, intake, db, clock, config } = deps;
   const log = deps.log.child("cron");
   const tasks = new TaskGroup({ name: "cron", onError: (task, e) => log.error(`${task} failed:`, e) });
   const now = () => clock.now();
@@ -131,16 +134,17 @@ export async function issueCron(deps: CronDeps): Promise<IssueCron> {
       const thread = `cron:${s.id}`;
       if (!(await sessions.isRouted(trigger.id))) {
         const issue = await scheduled(due, trigger);
-        await sessions.subscribe(issue.id, [thread]);
-        await sessions.route(trigger);
+        await intake.subscribe(issue.id, [thread]);
+        await intake.route(trigger);
       } else {
-        const issue = await sessions.ownerOf(trigger.id);
-        if (issue) await sessions.subscribe(issue, [thread]);
+        const issue = await intake.ownerOf(trigger.id);
+        if (issue) await intake.subscribe(issue, [thread]);
       }
     });
 
   const replay = () =>
-    sessions.replayCronTriggers(async (trigger, data) => {
+    sessions.unrouted(async (trigger, data) => {
+      if (trigger.source !== "cron") return;
       const cron = S.Cron.parse(data);
       const by = trigger.meta.trigger;
       await handle({ id: trigger.id, cron, missed: by?.kind === "cron" && by.missed === true }, trigger);

@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 按自己的游标（`watch_cursor`）读频道的 `channel_event`，每个事件路由一次，开机接着读 | 消息、席位、未读与看过的存储（[频道](docs/subsystems/channel.md)） |
-| 谁听见一句话（`whoHears`）、三道刹车（`brakes.ts`）、把听众交给 `Session.route` | 投递行、四档紧急度、蓄水池、叫醒与重投（[帮工](docs/subsystems/session.md#触发与投递)） |
+| 谁听见一句话（`whoHears`）、三道刹车（`brakes.ts`）、把听众交给 `Issue.route` | 一句话是不是工单的、蓄水池（[工单](docs/subsystems/issue.md#蓄水池和路由)）；投递行、四档紧急度、叫醒与重投（[帮工](docs/subsystems/session.md#触发与投递)） |
 | 给助手和档案排席位、开私聊（`direct`）、帮工的串和「家」、贴汇报、看过的标记与 👀、熔断与跳数通知 | 工单的状态机、派活与交付（[工单](docs/subsystems/issue.md)） |
 | 用户的收件箱：从 `SpaceState` 现算要用户处理的事、刚来的（`inboxNews`）、外推门禁（`toUser`、`handoffState`）、巡查（`patrol`） | 手机来电、系统通知、托盘和电话播报的画法（[农场的皮](docs/subsystems/farm.md)、[客户端](docs/subsystems/app.md)、[语音](docs/subsystems/voice.md)）；连接器的发送与退避（[频道](docs/subsystems/channel.md#外部连接器微信飞书qq)） |
 
@@ -36,7 +36,7 @@
 
 ### 三道刹车（`brakes.ts`）
 
-每一次自动叫醒都过这三道：观察层路由的每一句话（`@` 提及、私聊、串、汇报、连接器和通话带进来的、巡查的提醒）先过 `brakes`，再把带着 `held_by` 的听众交给 `Session.route`；不是话的触发（定时任务、GitHub、派活）来自 `system`，只受熔断约束，由 `Session` 按观察层的决定拦着。
+每一次自动叫醒都过这三道：观察层路由的每一句话（`@` 提及、私聊、串、汇报、连接器和通话带进来的、巡查的提醒）先过 `brakes`，再把带着 `held_by` 的听众交给 `Issue.route`（用户在工单串里的话进工单的蓄水池，其余的由它交 `Session.route` 投递）；不是话的触发（定时任务、GitHub、派活）来自 `system`，只受熔断约束，由 `Session` 按观察层的决定拦着。
 
 | 刹车 | 拦什么 | 放开 |
 |---|---|---|
@@ -73,7 +73,7 @@
 **一句话路由**
 
 1. 频道提交消息，发出事件；观察层取到它（在线），或开机从游标后读到它（`Channel.events`、`committedOf`）。
-2. 算听众：`to` 指定的助手，或 `whoHears`（私聊的对面、被 `@` 的、串的主人和成员、频道的成员、在场帮工的知晓）；过 `brakes`；记 `Trigger`，交 `Session.route`。
+2. 算听众：`to` 指定的助手，或 `whoHears`（私聊的对面、被 `@` 的、串的主人和成员、频道的成员、在场帮工的知晓）；过 `brakes`；记 `Trigger`，交 `Issue.route`。
 3. 用户的话把那一处的跳数清零、放开它叫醒的熔断帮工；agent 的话记下叫醒了谁。被跳数拦下时在那里说一次通知。
 4. 私聊里用户对档案说话、还没有帮工时，拉起私聊帮工（`hireWith`，它的头几件输入是私聊里用户说过的）。
 5. 游标往前走；等这个事件的写话返回。
@@ -86,8 +86,8 @@
 ## 和谁打交道
 
 - **频道（`channel`）**：读事件（`committed`、`events`、`committedOf`）、等写话（`awaitReader`）、排席位（`seat`）、开串和私聊、贴汇报（`note`）、通知（`notice`）、看过与回应、回执（`userReceipt`、`userReadReports`）；登记删频道的理由（在那里的帮工）。
-- **帮工（`session`）**：`recordTrigger`、`route`（带着刹车定下的听众）、`isRouted`、`hireWith`、`withdrawEnvelope`、`withdrawDeliveries`、`holdWakes`、`agentWakes`、`waitingOn`、`hired`、`live`；订阅 `news`、`deliveries`；建好时经 `Session.useChat` 给信箱一个只读的 `ChatView`（默认频道、一处的助手、未读）。
-- **工单（`issue`）**：收件箱读看板（`onBoard`）。工单不调观察层：工单的话说进帮工的家或工单串，由观察层路由。
+- **帮工（`session`）**：`recordTrigger`、`isRouted`、`hireWith`、`withdrawEnvelope`、`withdrawDeliveries`、`holdWakes`、`agentWakes`、`waitingOn`、`hired`、`live`；订阅 `news`、`deliveries`；建好时经 `Session.useChat` 给信箱一个只读的 `ChatView`（默认频道、未读）。
+- **工单（`issue`）**：`route`（带着刹车定下的听众；工单的入口：是工单的进蓄水池，不是的投给听众），收件箱读看板（`onBoard`）。工单不调观察层：工单的话说进帮工的家或工单串，由观察层路由。
 - **语音、连接器（`voice`、`connector`）**：`Voice` 订阅 `inboxNews`；`Connector` 订阅 `toUser`、`externalChanges`，外推前问 `handoffState`。
 - **接口（`http`）**：`channel.direct.create` 是 `direct`，`channel.message.previewDelete` 是 `previewRemove`（加上还在等的投递数）。
 
@@ -101,7 +101,6 @@
 
 ## 还没做的
 
-- 工单蓄水池、订阅和派活的队列搬出 `Session`、由工单按游标观察：[正交领域与事件观察](.agents/notes/proposed/architecture/2026-11-12-orthogonal-domains-and-event-watch.md)。
 
 ## 怎么验证
 

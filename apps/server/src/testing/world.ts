@@ -14,7 +14,8 @@ import { type Time, wallTime } from "#/infra/time.ts";
 import type { ModelAccess } from "#/modules/agent/durable.ts";
 import { registryOf } from "#/modules/agent/runtime.ts";
 import { explicitMandate } from "#/modules/issue/creation.ts";
-import { type Issue } from "#/modules/issue/issue.ts";
+import type { Intake } from "#/modules/issue/intake.ts";
+import { type Issue, intakeOf } from "#/modules/issue/issue.ts";
 import { type GitHubRun, type RepoHooks } from "#/modules/repo/repo.ts";
 import { type Inside, insideOf } from "#/modules/session/session.ts";
 import { type WorkerAccess, type workerAccess } from "#/modules/session/worker.ts";
@@ -101,6 +102,8 @@ export type ModuleWorld = Modules &
   AsyncDisposable & {
     /** The parts behind the session module, for the tests that drive them. */
     readonly inside: Inside;
+    /** The issues' intake (pools, subscriptions, routing), for the tests that drive it. */
+    readonly intake: Intake;
     readonly close: () => Promise<void>;
     /** What the test's own services close with, after the farm's closes; each is called the last added first. */
     readonly closes: Close[];
@@ -148,6 +151,7 @@ export async function moduleWorld(options: WorldOptions = {}): Promise<ModuleWor
     return {
       ...modules,
       inside: insideOf(modules.session),
+      intake: intakeOf(modules.issue),
       closes,
       said: { in: heard.in, all: heard.all },
       deepseek: { use: deepseek.use },

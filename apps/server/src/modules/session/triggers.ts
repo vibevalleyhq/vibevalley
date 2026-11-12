@@ -3,7 +3,6 @@ import { z } from "zod";
 import { BizCode, Inconsistent, refuseIn } from "#/base/errors.ts";
 import { jsonOf, jsonText } from "#/base/json.ts";
 import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
-import { bestEffort, type Logger } from "#/infra/log.ts";
 import * as q from "#db/session_trigger.sql.ts";
 
 import { type TriggerInput, type TriggerResource, triggerOf } from "./payload.ts";
@@ -19,11 +18,10 @@ const decodePayload = jsonOf(Payload);
 export interface TriggerJournal {
   readonly readTrigger: (id: string) => Promise<TriggerResource | undefined>;
   readonly recordTrigger: (input: TriggerInput) => Promise<Trigger>;
-  readonly replayCronTriggers: (consume: (trigger: Trigger, data: unknown) => Promise<void>) => Promise<void>;
 }
 
-export function triggerJournal(deps: { readonly db: Db; readonly log: Logger }): TriggerJournal {
-  const { db, log } = deps;
+export function triggerJournal(deps: { readonly db: Db }): TriggerJournal {
+  const { db } = deps;
   const readTrigger = async (id: string) => {
     const row = await q.triggerById(db.sql, { id });
     return row ? { trigger: decodeTrigger(row.trigger_json), payload: decodePayload(row.payload_json) } : undefined;
@@ -53,20 +51,5 @@ export function triggerJournal(deps: { readonly db: Db; readonly log: Logger }):
   return {
     readTrigger,
     recordTrigger: (input) => keep(triggerOf(input), input.key, { text: input.text, data: input.data ?? null }),
-    replayCronTriggers: async (consume) => {
-      let after = 0;
-      while (true) {
-        const rows = await q.unroutedCronTriggers(db.sql, { after });
-        const last = rows.at(-1);
-        if (!last) return;
-        for (const row of rows)
-          await bestEffort(log, `mailbox: replay cron ${row.id}`, async () => {
-            const trigger = decodeTrigger(row.trigger_json);
-            const payload = decodePayload(row.payload_json);
-            await consume(trigger, payload.data);
-          });
-        after = last.seq;
-      }
-    },
   };
 }

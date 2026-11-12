@@ -8,18 +8,16 @@ import { requestKeys } from "#/gateway/http/api.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import { type Issue, IssueCreateRefused } from "#/modules/issue/issue.ts";
-import type { Session } from "#/modules/session/session.ts";
 
 export interface IssueHandlersDeps {
   readonly core: Core;
-  readonly session: Session;
   readonly channel: Channel;
   readonly issue: Issue;
   readonly clock: Time;
 }
 
 export function issueHandlers(deps: IssueHandlersDeps): IssueHandlers {
-  const { core, session: sessions, channel: channels, issue: issues } = deps;
+  const { core, channel: channels, issue: issues } = deps;
   /** An issue's id, with the fields the user changed beside an act saved first. */
   const edited = async (ref: string, edit: T.IssueUpdate | undefined) => {
     const id = await issues.idOf(ref);
@@ -37,7 +35,7 @@ export function issueHandlers(deps: IssueHandlersDeps): IssueHandlers {
     "issue.split": async ({ id: ref, ...body }) => issues.split(await issues.idOf(ref), body.title ?? "", body.tasks, user),
     "issue.history.list": () => issues.history(),
     "issue.get": ({ id }) => issues.get(id),
-    "issue.run.list": async ({ id }) => sessions.runsOf((await issues.get(id)).id),
+    "issue.run.list": async ({ id }) => issues.runs(id),
     "issue.timeline.get": ({ id }) => issues.timeline(id),
     "issue.create": ({ requestKey, autoSubmitPr, ...body }) =>
       createOnce(requestKey, () =>

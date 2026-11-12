@@ -648,7 +648,7 @@ describe("issues", () => {
       (
         await w.db.sql.query(
           `select t.trigger_json::jsonb->>'replyChannel' as channel
-        from session_issue_input m join session_trigger t on t.id = m.trigger_id where m.issue_id = $1 and m.state = 'held'`,
+        from issue_input m join session_trigger t on t.id = m.trigger_id where m.issue_id = $1 and m.state = 'held'`,
           [issue.id],
         )
       ).map((r) => r["channel"]),
@@ -663,12 +663,12 @@ describe("issues", () => {
     if (queuedSession === undefined) throw new Error("the issue has no execution session");
     expect((await sessions.get(queuedSession))?.channel).toBe(first.id);
     await waitFor(
-      () => sessions.runsOf(issue.id),
+      () => w.intake.runsOf(issue.id),
       (r) => r.length > 0,
       "the queued run",
     );
-    expect((await sessions.runsOf(issue.id))[0]!.triggeredBy.kind).toBe("issue");
-    const rows = await w.db.sql.query(`select 1 from session_issue_input where issue_id = $1 and state = 'held'`, [issue.id]);
+    expect((await w.intake.runsOf(issue.id))[0]!.triggeredBy.kind).toBe("issue");
+    const rows = await w.db.sql.query(`select 1 from issue_input where issue_id = $1 and state = 'held'`, [issue.id]);
     expect(rows).toEqual([]);
   });
 
@@ -733,11 +733,11 @@ describe("issues", () => {
     core.apply({ type: "sessionLeft", id: sessionId("occupied") });
     await w.issue.refreshQueue();
     await waitFor(
-      () => sessions.runsOf(issue!.id),
+      () => w.intake.runsOf(issue!.id),
       (r) => r.length > 0,
       "the scheduled run",
     );
-    const [run] = await sessions.runsOf(issue!.id);
+    const [run] = await w.intake.runsOf(issue!.id);
     expect(run!.triggeredBy).toEqual({ kind: "cron", cron: sc.id, missed: true, message: issue!.mandate.originTriggerId });
     expect((await sessions.get(run!.session))?.channel).toBe(channel.id);
   });

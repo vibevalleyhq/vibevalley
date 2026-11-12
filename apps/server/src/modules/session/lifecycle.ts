@@ -25,7 +25,7 @@ import * as qr from "#db/session_run.sql.ts";
 
 import { sessionName, type Settle, whoMakesRoom, withRecall } from "./briefing.ts";
 import { handStack } from "./hands.ts";
-import { endedSession, heardOf, pendingReportOf, placeOf, restoredSession, runOf, sessionState } from "./history.ts";
+import { endedSession, heardOf, pendingReportOf, placeOf, restoredSession, sessionState } from "./history.ts";
 import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
 import { NotRecorded } from "./inProcessRun.ts";
 import { makeLaunch, NotTakenIn, reasonText } from "./launch.ts";
@@ -132,7 +132,6 @@ export interface Lifecycle {
   /** Pass `""` for all agents. */
   readonly list: (agent: string) => Promise<T.Session[]>;
   readonly get: (id: string) => Promise<T.Session | undefined>;
-  readonly issueRuns: (issue: string) => Promise<T.Run[]>;
   readonly events: (id: string, run?: string) => Promise<T.SessionEvent[] | undefined>;
   /** Everything Session tells, subscribed before it returns: nothing told after is missed. */
   readonly news: () => Subscription<SessionNews>;
@@ -268,8 +267,7 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
   const finishInterrupted = (run: string) =>
     bestEffort(log, `vibevalley: run ${run}`, async () => {
       await runs.finish(run, "interrupted", t("server.session.log.restarted"));
-      const linked = await runs.issues(run);
-      tell({ _tag: "RunFinished", id: run, issues: linked, outcome: "interrupted" });
+      tell({ _tag: "RunFinished", id: run, outcome: "interrupted" });
     });
 
   /** A helper on VibeValley's own runtime that was answering when the farm stopped is opened again on its conversation,
@@ -793,7 +791,6 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
       if (row === undefined || row.ended_at === null) return undefined;
       return endedSession(row, await qr.runsOfSession(db.sql, { session: id }));
     },
-    issueRuns: async (issue) => (await qr.runsOfIssue(db.sql, { issue_id: issue })).map(runOf),
     events: (id, run) => trajectories.events(id, run),
     sessionOf: (id) => core.session(id),
     hired: () => core.state().sessions.filter(isHired),

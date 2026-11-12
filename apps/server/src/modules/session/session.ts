@@ -11,16 +11,16 @@ import type { Memory } from "#/modules/memory/memory.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
 import { RepoError, type WorkplaceCleanup, type WorkplaceRelease } from "#/modules/repo/workplace.ts";
 
-import type { Accepted, AgentWakes, ChatView, Envelope, Hearer, IssueView } from "./envelope.ts";
+import type { AgentWakes, ChatView, Delivery, Envelope, Readiness } from "./envelope.ts";
 import type { AgentHost, HostOptions } from "./host.ts";
 import { HireRefused, type Lifecycle, makeLifecycle, type SessionNews, type SessionOptions } from "./lifecycle.ts";
 import { type Machine, makeMachine } from "./machine.ts";
-import { type DeliveryNews, type Dispatch, type HireArrival, type HiredReceipt, type Mailbox, makeMailbox, type QueuedInput } from "./mailbox.ts";
-import type { SourceEvent, TriggerInput, TriggerResource } from "./payload.ts";
+import { type DeliveryNews, type HireArrival, type HiredReceipt, type Mailbox, makeMailbox } from "./mailbox.ts";
+import type { TriggerInput, TriggerResource } from "./payload.ts";
 import { summaryOf } from "./report.ts";
 import type { Trigger } from "./shapes.ts";
 
-export type { Accepted, QueuedInput, SessionOptions };
+export type { SessionOptions };
 export type { Hired, HireOptions, RunFinished, RunStore, SessionNews } from "./lifecycle.ts";
 export { DeliveryRefused, HireRefused, newsOf, NotRecorded, NotTakenIn, NotWorkFile, runOf } from "./lifecycle.ts";
 
@@ -46,35 +46,26 @@ export interface Live {
 /** An agent profile doing a piece of work: what triggers it and its deliveries, the sessions and their runs, their
  * workplaces, and the executions on the machine they run on. Refusals are ApiErrors unless a member says otherwise. */
 export interface Session {
-  /** A trigger already recorded, routed to who hears it: the hearers when given, as the layer above braked them; else
-   * the issue whose threads it is in, or the orchestrator of its place. */
-  readonly route: (trigger: Trigger, hearers?: readonly Hearer[]) => Promise<void>;
+  /** A trigger already recorded, delivered to the sessions the layer above picked (each woken), then kept as routed:
+   * where scope says when it went to no one (payload.ts deliveryScope), else where it is delivered. */
+  readonly route: (trigger: Trigger, to: readonly Delivery[], scope?: string) => Promise<void>;
   /** A trigger recorded in the caller's transaction; route it after. */
   readonly recordTrigger: (input: TriggerInput) => Promise<Trigger>;
-  /** A dispatch held for the issue's next helper: recorded in the caller's transaction, routed once it commits. */
-  readonly queueDispatch: (dispatch: Dispatch) => Promise<void>;
-  /** A source's event recorded as a trigger and routed; the farm's own echo is neither. */
-  readonly receive: (event: SourceEvent) => Promise<Accepted>;
   /** A helper hired with its first inputs; throws HireRefused (also when the parent's checkout cannot be made). */
   readonly hireWith: (order: HireOrder) => Promise<HiredReceipt>;
   /** A channel message's envelope taken back from every delivery that still waits on it. */
   readonly withdrawEnvelope: (envelope: string) => Promise<void>;
   /** A session's open deliveries dropped: it left. */
   readonly withdrawDeliveries: (session: string, why: string) => Promise<void>;
-  /** An issue's dispatches recorded before `at` taken back; in its own transaction. */
-  readonly withdrawDispatches: (issue: string, at: number) => Promise<void>;
   /** The chat the deliveries read their places from (the default channel, a place's orchestrator, a participant's unread),
    * told by the layer above the sessions; until then, an empty one. */
   readonly useChat: (view: ChatView) => void;
-  /** The issues the deliveries read (those on the board, whether one is kept), told by the issues above the sessions;
-   * until then, none. */
-  readonly useIssues: (view: IssueView) => void;
+  /** Which of a session's waiting inputs may be handed to it now, told by the issues above the sessions; until then, all. */
+  readonly useReadiness: (ready: Readiness) => void;
   /** A session's pending inputs kept from waking it, or let wake it again (and it is woken): the wake breaker's call. */
   readonly holdWakes: (session: string, held: boolean) => Promise<void>;
   /** What agents' words woke since the user last spoke, as the deliveries kept it. */
   readonly agentWakes: () => Promise<AgentWakes>;
-  /** A helper says an input is not its to take; the orchestrator is told why. */
-  readonly decline: (session: string, envelope: string, reason: string) => Promise<void>;
   /** An orchestrator's host gives back an input it did not take. */
   readonly handBack: (session: string, envelope: string) => Promise<void>;
   /** A session's running turn stopped; true when the stop was taken. */
@@ -101,16 +92,13 @@ export interface Session {
   readonly get: (session: string) => Promise<T.Session | undefined>;
   /** The sessions, the ended too; every agent's when none is given. */
   readonly list: (agent?: string) => Promise<T.Session[]>;
-  readonly runsOf: (issue: string) => Promise<T.Run[]>;
   /** Undefined when the session is unknown; one run's when given. */
   readonly eventsOf: (session: string, run?: string) => Promise<T.SessionEvent[] | undefined>;
   readonly trigger: (id: string) => Promise<TriggerResource | undefined>;
-  readonly triggersOf: (issue: string) => Promise<readonly Trigger[]>;
-  /** Every queued trigger: dispatches first, then routed order. */
-  readonly queuedTriggers: () => Promise<readonly QueuedInput[]>;
-  /** The issue a trigger belongs to. */
-  readonly ownerOf: (trigger: string) => Promise<string | undefined>;
   readonly isRouted: (trigger: string) => Promise<boolean>;
+  /** Each trigger recorded and not routed but the chat's (the watch reads those again), in order, with its source's data:
+   * what a restart or a failed route left for the layer above to route again. */
+  readonly unrouted: (consume: (trigger: Trigger, data: unknown) => Promise<void>) => Promise<void>;
   /** How many deliveries a message still waits in. */
   readonly waitingOn: (envelope: string) => Promise<number>;
   /** What an orchestrator has not read yet. */
@@ -119,10 +107,6 @@ export interface Session {
   readonly report: (id: string, report: T.IssueReport) => Promise<void>;
   /** Rejects `..` segments and symlinks escaping the session's working directory; throws NotWorkFile. */
   readonly workFile: (id: string, path: string, max: number) => Promise<{ readonly name: string; readonly bytes: Uint8Array }>;
-  /** The threads whose words reach the issue's helper. */
-  readonly subscribe: (issue: string, threads: readonly string[]) => Promise<void>;
-  /** Each cron trigger recorded and not routed, in order. */
-  readonly replayCronTriggers: (consume: (trigger: Trigger, data: unknown) => Promise<void>) => Promise<void>;
   /** Everything the sessions tell, subscribed before it returns: nothing told after is missed. */
   readonly news: () => Subscription<SessionNews>;
   /** What the deliveries tell, subscribed before it returns. */
@@ -132,8 +116,8 @@ export interface Session {
   readonly setAddress: (address: string) => void;
   /** An in-process agent's host; the caller owns it and closes it (`await using`). Throws NotRecorded. */
   readonly host: <R>(options: HostOptions<R>) => Promise<AgentHost<R>>;
-  /** At startup, after the modules below it started: the sessions back, then their open deliveries restored, what was
-   * left routed (not the chat's: the watch reads those again) and who waits woken. */
+  /** At startup, after the modules below it started: the sessions back, then their open deliveries restored and who
+   * waits woken. */
   readonly boot: () => Promise<void>;
   /** The deliveries stop, then the sessions save what a restart needs, then every execution is let go. */
   readonly close: () => Promise<void>;
@@ -159,16 +143,6 @@ export function insideOf(session: Session): Inside {
   return inside;
 }
 
-/** A source's event recorded as a trigger and routed; the farm's own echo is neither. */
-const receiving =
-  (mailbox: Pick<Mailbox, "record" | "route">) =>
-  async (event: SourceEvent): Promise<Accepted> => {
-    const trigger = await mailbox.record(event);
-    if (trigger === undefined) return {};
-    await mailbox.route(trigger);
-    return { trigger };
-  };
-
 /** The door over the parts: what makeSession returns, and what a test that plays the sessions builds over its own. */
 export function sessionOver(parts: {
   readonly lifecycle: Lifecycle;
@@ -180,8 +154,6 @@ export function sessionOver(parts: {
   return {
     route: mailbox.route,
     recordTrigger: mailbox.recordTrigger,
-    receive: receiving(mailbox),
-    queueDispatch: mailbox.queueDispatch,
     hireWith: async ({ parent, ...order }) => {
       if (parent !== undefined)
         try {
@@ -194,12 +166,10 @@ export function sessionOver(parts: {
     },
     withdrawEnvelope: mailbox.withdrawEnvelope,
     withdrawDeliveries: mailbox.withdrawDeliveries,
-    withdrawDispatches: mailbox.withdrawDispatches,
     useChat: mailbox.useChat,
-    useIssues: mailbox.useIssues,
+    useReadiness: mailbox.useReadiness,
     holdWakes: mailbox.holdWakes,
     agentWakes: mailbox.agentWakes,
-    decline: mailbox.decline,
     handBack: mailbox.handBack,
     stop: lifecycle.stop,
     dismiss: lifecycle.dismiss,
@@ -226,19 +196,14 @@ export function sessionOver(parts: {
     room: lifecycle.noRoom,
     get: lifecycle.get,
     list: (agent) => lifecycle.list(agent ?? ""),
-    runsOf: lifecycle.issueRuns,
     eventsOf: lifecycle.events,
     trigger: mailbox.readTrigger,
-    triggersOf: mailbox.triggersOf,
-    queuedTriggers: mailbox.queuedTriggers,
-    ownerOf: mailbox.ownerOf,
     isRouted: mailbox.isRouted,
+    unrouted: mailbox.unrouted,
     waitingOn: mailbox.waitingOn,
     digest: mailbox.orchestratorDigest,
     report: lifecycle.report,
     workFile: lifecycle.workFile,
-    subscribe: mailbox.subscribe,
-    replayCronTriggers: mailbox.replayCronTriggers,
     news: lifecycle.news,
     deliveries: mailbox.news,
     who: lifecycle.who,

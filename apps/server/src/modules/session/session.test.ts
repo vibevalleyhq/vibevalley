@@ -296,7 +296,7 @@ describe("sessions", () => {
     );
     // The run's end is written just after the report's fact.
     const runs = await waitFor(
-      () => sessions.issueRuns("i1"),
+      () => farm.intake.runsOf("i1"),
       (rs) => rs[0]?.outcome !== undefined,
       "the run's end written",
     );
@@ -307,7 +307,7 @@ describe("sessions", () => {
     expect(told).toMatchObject({ kind: "run" });
     await until(() => core.session(id)?.runs === 2 && phase(core, id) === "done", "the second run");
     const both = await waitFor(
-      () => sessions.issueRuns("i1"),
+      () => farm.intake.runsOf("i1"),
       (rs) => rs.length === 2,
       "both runs of the issue",
     );

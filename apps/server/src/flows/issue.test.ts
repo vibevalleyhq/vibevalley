@@ -278,7 +278,6 @@ describe("an issue", () => {
     const w = watch(fw);
     const issue = fw.issue;
     const issues = testIssues(issue);
-    const sessions = fw.inside;
     const crons = fw.issue;
     await fw.agent.save({ ...lab(), enabled: true });
     const made = await crons.addCron(
@@ -291,14 +290,13 @@ describe("an issue", () => {
       },
       user,
     );
-    const mailbox = fw.inside;
     const due = async () => {
       clock.adjust(5 * 60_000 + 1);
       await crons.tickCrons();
-      await mailbox.replay();
+      await fw.intake.replay();
     };
     const ofCron = async () => withCron(await issues.list(), made.id);
-    const runs = async () => sessions.issueRuns((await ofCron()).id);
+    const runs = async () => fw.intake.runsOf((await ofCron()).id);
     await due();
     await w.nextReport();
     const first = await ofCron();
@@ -312,7 +310,7 @@ describe("an issue", () => {
     const runs2 = await runs();
     expect(runs2).toHaveLength(1);
     const sql = sqlOf(fw.db);
-    const held = await sql.unsafe<{ state: string }>("select state from session_issue_input where issue_id = $1 and state = 'held'", [first.id]);
+    const held = await sql.unsafe<{ state: string }>("select state from issue_input where issue_id = $1 and state = 'held'", [first.id]);
     expect(held).toHaveLength(1);
 
     await issues.setStatus(first.id, "done", "", "", user);
