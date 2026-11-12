@@ -21,7 +21,7 @@
 
 ### architecture
 
-- 2026-11-12 [模块要深：合并把一件事拆散的模块，接口收窄到调用方要的](.agents/notes/proposed/architecture/2026-11-12-deep-modules.md)
+- 2026-11-12 [正交领域与事件观察：Channel 纯聊天、Session 纯执行、上层按事件观察驱动](.agents/notes/proposed/architecture/2026-11-12-orthogonal-domains-and-event-watch.md)
 - 2026-11-11 [扩展剩余跨模块品牌主键与 SQL 主外键自动品牌生成](.agents/notes/proposed/architecture/2026-11-11-type-driven-boundaries-and-branded-ids.md)
 - 2026-11-10 [拆出 apps/machine：一个服务端经出站长连接管多台机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)
 - 2026-11-10 [邮箱收成一把锁、删掉回填地址的方法、页面不再深拷贝每一帧](.agents/notes/proposed/architecture/2026-11-10-atomic-commits-and-hot-paths.md)

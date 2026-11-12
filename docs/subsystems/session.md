@@ -173,7 +173,7 @@
 ## 还没做的
 
 - 接入 opencode、grok、kimi、antigravity、cursor 等更多农机：[其他农机提案](.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)。
-- 纯判断搬出服务：[模块要深](.agents/notes/proposed/architecture/2026-11-12-deep-modules.md)。
+- 正交领域切分、事件观察驱动与纯判断搬出服务：[正交领域与事件观察](.agents/notes/proposed/architecture/2026-11-12-orthogonal-domains-and-event-watch.md)。
 
 ## 怎么验证
 

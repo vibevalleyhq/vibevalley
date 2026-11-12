@@ -15,9 +15,9 @@
 | [architecture.md](docs/architecture.md) | 按顺序的地图：分层、核心状态、事件流、接口和存储；改 `apps/`、`packages/` 之前读 | 各子系统的细节、决策理由 |
 | `subsystems/` 下的各篇（[写法](docs/subsystems/README.md)） | 一个子系统沉淀下来的样子，从架构的角度：边界、在哪、模型和不变量、流程、和谁打交道、为什么这样、放弃了哪些路 | 教学步骤（→ 教程）、过程和日期、计划（→ 提案）、另一份子系统索引 |
 | [concepts.md](docs/concepts.md) 和 `reference/` 下的各篇 | 概念，和查的东西：还没拆成子系统的行为、生成的表（[capabilities.md](docs/reference/capabilities.md)）、界面清单（[farm-ui.md](docs/reference/farm-ui.md)） | 子系统已经写了的（→ 链接过去）、教学步骤、理由、计划 |
-| `style/` 下的各篇（[code.md](docs/style/code.md)、[naming.md](docs/style/naming.md)、[writing.md](docs/style/writing.md)、[design.md](docs/style/design.md)） | 代码、文字和界面怎么写 | 某个子系统的行为 |
+| `style/` 下的各篇（[module-design.md](docs/style/module-design.md)、[code.md](docs/style/code.md)、[naming.md](docs/style/naming.md)、[writing.md](docs/style/writing.md)、[design.md](docs/style/design.md)） | 模块边界、代码、文字和界面怎么写 | 某个子系统的行为 |
 | [Agent Notes](.agents/notes/README.md) | 具体的计划：要做什么、怎么做、怎么算做完；做的过程里的决定 | 做完以后仍然成立的（→ 沉淀进子系统，Note 删掉） |
-| 包的 README（`apps/server/README.md`、`apps/web/README.md`、`apps/desktop/README.md`、`packages/*/README.md`、`apps/site/README.md`） | 这个包的对外约定：管什么、导出什么、依赖谁、不变量、测试 | 别的包的事、代码注释的复述 |
+| 包的 README（`apps/*/README.md`、`packages/*/README.md`） | 这个包的对外约定：管什么、导出什么、依赖谁、不变量、测试 | 别的包的事、代码注释的复述 |
 | 代码注释（[写法](docs/style/code.md#注释)） | 这段代码的约定和不显然的约束 | 推理过程、测试流程、远处的行为、概述和历史 |
 
 `docs/` 里只放文档：教程、子系统、参考和写法。子系统的「为什么这样」就是沉淀下来的理由；还没做的大事和正在做的计划 → `proposed/` Note。包的约定 → 包 README；常驻规矩 → 根目录 `AGENTS.md`，附上理由的链接。
@@ -42,7 +42,7 @@
 - 手抄的清单（接口、字段、环境变量、测试列表）和代码对不上：以代码为准，能链接就链接。
 - 一段塞了好几条规则：拆开。
 - 到处加粗：只给改变行为的那一句。
-- `implemented/` Note 里还有「应该」「计划」「验收」：改成上线的样子。
+- 已上线的 Note 还留在 `.agents/notes/` 里（含未及时沉淀删除的 `implemented/` Note），或半落地的 `proposed/` Note 仍把已上线现状写成待办计划：做完的沉淀进对应 `docs/subsystems/*.md` 并删掉 Note（跑 `vp run notes:catalog`），只做完一半的删去已上线部分。
 
 ## 检查命令
 
