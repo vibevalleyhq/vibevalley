@@ -20,8 +20,8 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [repo.md](docs/subsystems/repo.md) | 仓库：工作目录、worktree、检查、GitHub 检测与 PR 快照、地契 |
 | [artifact.md](docs/subsystems/artifact.md) | Artifact：用户和帮工一起写的块、交上来的网页；按块存按 op 改，网页按版本存、隔离着看，带卡片说出来 |
 | [pkm.md](docs/subsystems/pkm.md) | 笔记：用户的 Logseq 式大纲页面，按 PARA 分文件夹；文件是真相，读进内存再写回，块引用、反链、搜索、闪念、剪藏、改写和撤销 |
-| [channel.md](docs/subsystems/channel.md) | 频道：默认频道、私聊、谁听见、工单串、连接器、Inbox |
-| [inbox.md](docs/subsystems/inbox.md) | Inbox：要你处理的事、刚来的、巡查，经通话、手机、系统通知送到用户 |
+| [channel.md](docs/subsystems/channel.md) | 频道：默认频道、私聊、消息和事件、工单串、连接器 |
+| [watch.md](docs/subsystems/watch.md) | 观察层：按游标读频道的事件、谁听见、三道刹车、帮工的串和回执；收件箱：要你处理的事、刚来的、巡查，经通话、手机、系统通知送到用户 |
 | [brain.md](docs/subsystems/brain.md) | VibeValley 自己的 agent：模型请求、循环、对话文件、提示开头、压缩、技能、记性、帮手、自己的任务，四种用法 |
 | [orchestrator.md](docs/subsystems/orchestrator.md) | 助手：收什么话、现状、工具与 `vv://` 资源读取、谁能让它合并、巡查、评测 |
 | [memory.md](docs/subsystems/memory.md) | 记性：想起、记下、主动查、外面的来源 |

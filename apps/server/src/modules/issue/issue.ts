@@ -249,7 +249,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
   });
 
   /** Words for a session: said in its home, or in its issue's thread when it has none (the watch routes them). */
-  const tellSession = async (from: string, session: string, text: string, sendKey = "") => {
+  const sayTo = async (from: string, session: string, text: string, sendKey = "") => {
     const live = sessions.live(session);
     let where = await chat.homeOf(session);
     if (!where && live.reachable && live.session?.issue) {
@@ -268,7 +268,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
   } = merging({
     core,
     sessions,
-    tell: tellSession,
+    tell: sayTo,
     landing,
     get,
     list: everyIssue,
@@ -302,7 +302,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     const session = latest === undefined ? undefined : sessions.live(latest).session;
     if (by.kind === "agent") {
       if (!session) return {};
-      await tellSession(by.id, session.id, text, sendKey);
+      await sayTo(by.id, session.id, text, sendKey);
       return { worker: session };
     }
     if (isClosed(issue.status)) throw refused(t("server.issue.closedReopen"));

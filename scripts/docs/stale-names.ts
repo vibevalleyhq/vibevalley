@@ -29,8 +29,8 @@ const RULES: readonly Rule[] = [
     name: "a delivery name the one-door plan retired",
     pattern:
       /\b(openDeliveries|returnOne|returnInput|registerTalk|registerInitialInputs|deliverDirect|breakerNotices|dropEnvelope|retireDispatches|queuedInputs|issueInputs|DeliveryChange|recordChannelTrigger|forOrchestrator|OrchestratorNews|ChannelMail|ChannelRouteInput|InboxMessage|asInbox|inboxLines|orchestratorInboxLines|inboxMore|InputConsumed|InputReturned|startedIssues|finishedRuns|inputsConsumed|inputsReturned|launchesHub)\b|\bsessions\.(register|launches|present|presentSessions|workers)\b|\b(presentSessions|registerOrchestrator|orchestratorOfRow|orchestratorForChannel|OrchestratorForChannel|setOrchestrator|SetOrchestrator|channel_follow|Follows|isForOrchestrator|beginOrchestrator|recordOrchestratorStart|recordWorkerStart|publishOrchestrator|orchestratorSays|tellSession|runSays)\b/u,
-    says: "the session module's door: receive (a Trigger with ChannelHearers or a session, a Record, an Event, or a Hire), withdraw, read (IssueTriggers, Queued, Digest…), handBack, decline, deliveries (Handed, Consumed, Braked); an envelope as its helper reads it is Envelope; an orchestrator's session is registered by Session itself whenever its profile is kept (Agent.whenKept); everything a session does is one Session.news (Hired, Reported, Left, IssueStarted, RunFinished, Consumed, Returned and its launch's Spoke, Ended, HandedOff, Settling, Closed, Compacting) (docs/subsystems/session.md); the deliveries' own steps inside apps/server/src/modules/session are their business",
-    except: /^apps\/server\/src\/modules\/session\/(mailbox|work|pump|deliveries|brakes|routing|triggers|envelope|payload)(\.test)?\.ts$/u,
+    says: "the session module's door: receive (a Trigger with the watch's braked Hearers, a Record, an Event, or a Hire), withdraw, read (IssueTriggers, Queued, Digest…), handBack, decline, deliveries (Handed, Consumed, EmptyWake); an envelope as its helper reads it is Envelope; an orchestrator's session is registered by Session itself whenever its profile is kept (Agent.whenKept); everything a session does is one Session.news (Hired, Reported, Left, IssueStarted, RunFinished, Consumed, Returned and its launch's Spoke, Ended, HandedOff, Settling, Closed, Compacting) (docs/subsystems/session.md); the deliveries' own steps inside apps/server/src/modules/session are their business",
+    except: /^apps\/server\/src\/modules\/session\/(mailbox|work|pump|deliveries|routing|triggers|envelope|payload)(\.test)?\.ts$/u,
   },
   {
     name: "send for hiring a helper",
@@ -364,7 +364,7 @@ const RULES: readonly Rule[] = [
   {
     name: "the inbox module under the notice name",
     pattern: /@\/notice\/|apps\/server\/src\/notice\b|\bNotices\b|"vibevalley\/Notice"|server\.notice\.|features\/notice\b|web\.notice\./u,
-    says: "the module is inbox (apps/server/src/inbox, the Inbox service, server.inbox.*; the page's features/inbox, web.inbox.*); a notice is Core.notice, a one-line word to the user",
+    says: "the user's inbox is the watch's (apps/server/src/modules/watch/inbox.ts, Watch.inboxNews, server.inbox.*; the page's features/inbox, web.inbox.*); a notice is Core.notice, a one-line word to the user",
   },
   {
     name: "the page's log split into rounds or turns of its own",

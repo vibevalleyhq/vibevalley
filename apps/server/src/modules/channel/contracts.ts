@@ -372,8 +372,8 @@ export interface ChannelService {
   /** A posted message as it is now, told as when it was committed; none once it is deleted or its place is gone. */
   readonly committedOf: (message: string) => Promise<Committed | undefined>;
   /** A reader the chat's writes wait on: a message said, posted, spoken or noted, or a removal, returns once
-   * `handled(seq)` has for its event (a throw fails the write; the event stays committed). Notices do not wait: they
-   * wake no one, and a reader may write one while it handles an event. */
+   * `handled(seq)` has for its event (a throw fails the write; the event stays committed). A notice does not wait: it
+   * wakes no one, and a reader may write one while it handles an event. */
   readonly awaitReader: (handled: (seq: number) => Promise<void>) => void;
   /** Seats an agent who speaks for the layers above under the name it goes by now; seated again if it left. */
   readonly seat: (seat: Seat) => Promise<void>;

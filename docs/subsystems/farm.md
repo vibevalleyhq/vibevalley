@@ -9,7 +9,7 @@
 | 384×256 像素村画布、整数倍缩放裁边、LDtk 地图、A* 寻路、昼夜光照与粒子动效 | 地块庄稼与木牌状态计算（`game/view.ts` 的 `plotOf`，[游戏](docs/subsystems/game.md)） |
 | 帮工在院子里的去处（`Whereabouts`）、朝向、姿势与 800ms 最短保持时间 | 帮工真实阶段与工单状态流转（[帮工](docs/subsystems/session.md)、[工单](docs/subsystems/issue.md)） |
 | 快捷栏 6 把农具的指向提示（`aimTool`）与点击派发（`commands.ts`） | 农具调用的底层接口规则与播种模板填充（[工单](docs/subsystems/issue.md)、[仓库](docs/subsystems/repo.md)） |
-| 仓库群岛地图（`RepoMap`）、折叠屏手机（来电、田头窗、小游戏）、合成音效与图鉴（`/catalog`） | 哪些事项进 Inbox（[Inbox](docs/subsystems/inbox.md)）与各面板详细元素（[farm-ui.md](docs/reference/farm-ui.md)） |
+| 仓库群岛地图（`RepoMap`）、折叠屏手机（来电、田头窗、小游戏）、合成音效与图鉴（`/catalog`） | 哪些事项进 Inbox（[收件箱](docs/subsystems/watch.md#收件箱)）与各面板详细元素（[farm-ui.md](docs/reference/farm-ui.md)） |
 
 目录结构与画布-DOM 同步见 [apps/web/src/farm/README.md](apps/web/src/farm/README.md)。
 

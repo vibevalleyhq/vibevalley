@@ -20,7 +20,7 @@
 |---|---|
 | [`packages/provider/`](packages/provider/README.md) | 显式转写模型、MOSS 帧与鉴权连接、Agora SDK/RTC token、字幕分片；无应用设置、业务工具或 UI |
 | [`packages/ai/`](packages/ai/README.md) | Core 转写调用、WAV/RMS、MOSS 会话与 `Playback` 样本级打断对账；浏览器入口不加载服务端模型工厂 |
-| `apps/server/src/gateway/voice/voice.ts` | 农场侧薄消费层：绑定 `Setting`、`Orchestrator`、`Channel`、`Inbox`、`Core`，管理 RTC/MOSS 授予与通话内 `speak` |
+| `apps/server/src/gateway/voice/voice.ts` | 农场侧薄消费层：绑定 `Setting`、`Orchestrator`、`Channel`、`Watch`（收件箱）、`Core`，管理 RTC/MOSS 授予与通话内 `speak` |
 | `apps/server/src/gateway/voice/moss-relay.ts`、`moss-tools.ts` | MOSS Live WebSocket 双向透传、会话指令改写与 `ask_orchestrator` 工具提取 |
 | `apps/server/src/gateway/voice/line.ts` | 语音线路（`8788` 回环监听）与 `cloudflared` 隧道管理 |
 | `apps/server/src/modules/setting/voice.ts` | 语音默认配置 `defaultVoice`、校验 `voiceProblem` 与差异提取 `voiceOverrides` |
@@ -41,8 +41,8 @@
   - **MOSS Live 本机模式（`vendor: "moss"`）**：无需声网凭据与 `8788` 隧道；通话复用 `/api/v1/voice/moss/line` 本机 WebSocket 中继（`MossLine`），服务端拦截页面 `session.update` 注入农场人设与 `ask_orchestrator` 工具（最多 4 并发、单通上限 64 次调用），通话内主动播报按 2000 字切段发 `session.commentary.append`（`session.updated` 就绪前暂存 `pending` 队列），字幕同走 `quick` 落库。
 - **挂断立即终止字幕资格**：调用 `voice.call.stop` 先撤销授予并将通话标为 `ending`，后续迟到的 `hear` / `say` 一律拒绝。
 - **助手来电与通话内播报串行排队**：
-  - 通话中若 `Inbox.news` 出现新事项，先等 3 秒合并同批事项，经 `Orchestrator.brief` 生成口语摘要，再调声网 `session.say`（`APPEND` 排在当前话音后，按句切分为 480 字节以内）播报。
-  - 未通话时手机按 Inbox 响铃；用户接听时带该事项启动通话，跳过开场白直接由助手播报该事项。
+  - 通话中若 `Watch.inboxNews` 出现新事项，先等 3 秒合并同批事项，经 `Orchestrator.brief` 生成口语摘要，再调声网 `session.say`（`APPEND` 排在当前话音后，按句切分为 480 字节以内）播报。
+  - 未通话时手机按收件箱响铃；用户接听时带该事项启动通话，跳过开场白直接由助手播报该事项。
 - **一段听写绑定唯一输入框目标**：录音开始时锁定发起的输入框；切换焦点或在别处点停止不会写错目标，组件卸载时自动取消在途转写。
 - **MOSS Live 经服务端隐藏密钥中继**：页面连 `/api/v1/voice/moss/line`（校验同源 `Origin` 与回环 `Host`），服务端向 Provider 要 MOSS Live 绑定的账号，用它封着 Key 的线路握手（Key 由 Provider 注入，回传的帧里也由它抹掉），双向透传帧。
 
@@ -81,7 +81,7 @@ Vision 的帧要先等 `input.frame.ready` 再发送二进制，等 `input.frame
 ## 和谁打交道
 
 - **助手与频道（`orchestrator`、`channel`）**：助手经 `response.ts` 处理流式回答与 `brief` 播报；定稿文字经 `Channel.post` 的 `Call` 写默认频道。
-- **通知与设置（`inbox`、`setting`）**：订阅 `Inbox.news` 驱动通话内主动播报；从 `Setting` 实时读取声网凭据与语音配置。
+- **通知与设置（`watch`、`setting`）**：订阅 `Watch.inboxNews` 驱动通话内主动播报；从 `Setting` 实时读取声网凭据与语音配置。
 - **[AI 服务](docs/subsystems/provider.md)**：Provider 解析听写连接与默认模型、交出 MOSS Live 与 Vision 绑定的账号（Key 封在线路里）；语音页不再保存独立的 MOSS Key。
 
 ## 为什么这样

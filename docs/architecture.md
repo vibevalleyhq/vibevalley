@@ -59,19 +59,18 @@ flowchart LR
 仓库目录结构见根目录 [AGENTS.md](AGENTS.md#目录)。
 
 - **契约（`packages/protocol`）**：服务端与客户端唯一的共享契约。每个概念一个目录 `src/<概念>/`，包含 `shapes.ts`（类型）、`schema.ts`（`Codec<T.X>` 解码器）和 `api.ts`（接口行与 `Handlers`）。`src/rules/` 只放服务端与页面共用的纯函数；仅服务端使用的规则留在各自模块（[地基](docs/subsystems/foundation.md)）。
-- **服务（`apps/server/src/`）**：一块业务一个单数目录，归入 11 个有序模块（见 `apps/server/src/modules.ts`）：
+- **服务（`apps/server/src/`）**：一块业务一个单数目录，归入 10 个有序模块（见 `apps/server/src/modules.ts`）：
   1. `Platform`（`base`、`infra`、`core`、`setting`、`user`、`attachment`、`provider`）
   2. `Agents`（`agent`、`runtime`、`memory`；循环和持久是 pi-durable 的，`runtime/durable.ts` 开它的 `Harness`，我们自己的工具在 `packages/agent`）
   3. `Source Control`（`repo`）
-  4. `Agent Sessions`（`session`：触发和投递、会话和每一轮、工作目录、执行器）
+  4. `Agent Sessions`（`session`：触发和投递、会话和每一轮、工作目录、执行器；不 import 频道、工单和观察层，`modules.test.ts` 查）
   5. `Collaboration`（`channel`、`media`（含素材库）、`artifact`、`pkm`；`channel` 只靠 `Platform`，不 import 别的业务模块，`modules.test.ts` 查）
-  6. `Watch`（`watch`：给助手和档案排聊天里的席位，按自己的游标读频道已提交的事件，路由给帮工，开帮工的串、拉起私聊帮工、贴汇报、记看过和 👀，把聊天的默认频道、助手和未读交给 `Session`）
-  7. `Issues`（`issue`，含定时任务）
-  8. `Inbox`（`inbox`）
-  9. `Orchestrator`（`orchestrator`）
-  10. `Gamification`（`game`）
-  11. `Gateway`（`http`、`mcp`、`tool`、`lan`、`connector`、`voice`、`chat`、`projection`，及顶层入口 `main.ts`、`services.ts`、`modules.ts`）
-  模块只可 import 排在它前面的模块，不直接读其他模块在 `SpaceState` 里的字段（`apps/server/src/modules.test.ts` 检查）。反向通知走订阅（`AsyncIterable`）或窄端口。`apps/server/src/services.ts` 的 `buildModules` 照模块次序一行一个 `makeX({ … })`、依赖在调用处写明，建到工单和定时任务（模块测试的 `moduleWorld` 也用它）；`makeFarm` 接着建后面的，再按模块顺序调各模块的 `boot()`；建到一半失败就倒着关掉已建的。
+  6. `Issues`（`issue`，含定时任务；看板经 `Session.useIssues` 只读交给信箱）
+  7. `Watch`（`watch`：按自己的游标读频道已提交的事件，算谁听见、过三道刹车交给帮工；排席位、开帮工的串、拉起私聊帮工、贴汇报、记看过和 👀，把聊天的默认频道、助手和未读交给 `Session`；用户的收件箱和巡查）
+  8. `Orchestrator`（`orchestrator`）
+  9. `Gamification`（`game`）
+  10. `Gateway`（`http`、`mcp`、`tool`、`lan`、`connector`、`voice`、`chat`、`projection`，及顶层入口 `main.ts`、`services.ts`、`modules.ts`）
+  模块只可 import 排在它前面的模块，不直接读其他模块在 `SpaceState` 里的字段（`apps/server/src/modules.test.ts` 检查）。反向通知走订阅（`AsyncIterable`）或窄端口。`apps/server/src/services.ts` 的 `buildModules` 照模块次序一行一个 `makeX({ … })`、依赖在调用处写明，建到观察层（模块测试的 `moduleWorld` 也用它）；`makeFarm` 接着建后面的，再按模块顺序调各模块的 `boot()`，每个一次；建到一半失败就倒着关掉已建的。
 - **网关（`apps/server/src/gateway/http`、`mcp`、`tool`）**：`http/api.ts` 按 `endpoints` 挂载路由，`http/handlers/<概念>.ts` 实现接口，`http/streams.ts`、`http/rpc.ts` 提供 SSE 流；`gateway/tool/` 是助手和帮工的工具，`gateway/mcp/` 把它们经 `/mcp` 给帮工；助手经自己声明的 `OrchestratorTools` 在组装时拿到它们（[核心状态](docs/subsystems/core.md)、[助手](docs/subsystems/orchestrator.md)）。
 - **存储（Postgres + 文件）**：配了 `database.url` 连那个 Postgres，否则是进程内的 PGlite，同一种方言；表结构基线为 `apps/server/db/migrations/0001_schema.up.sql`，查询在 `apps/server/db/queries/<表>.sql`，由 `apps/server/scripts/pg-generate.ts` 生成 `apps/server/db/generated/`（[地基](docs/subsystems/foundation.md)）。
 - **客户端（`apps/web`、`apps/desktop`、`apps/mobile`、`apps/cli`）**：`apps/web` 按概念分 feature，层间单向依赖（`base` → `infra` → `state` → `ui` → `ui/domain` → `ui/pixel` → `features` → `farm`/`tree` → `app`）。桌面壳（Electron）、浏览器和手机壳（Expo WebView）共用同一份页面（[客户端](docs/subsystems/app.md)）。

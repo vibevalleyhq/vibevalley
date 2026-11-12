@@ -18,7 +18,7 @@ const refused = refuseIn(BizCode.IssueRefused);
 interface MergeDeps {
   readonly core: Core;
   readonly sessions: Session;
-  /** Words for a session, said where it works (issue.ts tellSession). */
+  /** Words for a session, said where it works (issue.ts sayTo). */
   readonly tell: (from: string, session: string, text: string) => Promise<void>;
   readonly landing: IssueLanding;
   readonly get: (ref: string) => Promise<T.Issue>;
