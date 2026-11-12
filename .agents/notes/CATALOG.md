@@ -2,7 +2,7 @@
 
 由 [scripts/docs/agent-notes.ts](scripts/docs/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（30 篇）
+## proposed（31 篇）
 
 ### feature
 
@@ -22,6 +22,7 @@
 
 ### architecture
 
+- 2026-11-12 [模块要深：合并把一件事拆散的模块，接口收窄到调用方要的](.agents/notes/proposed/architecture/2026-11-12-deep-modules.md)
 - 2026-11-12 [大脑换成上游的 pi-durable](.agents/notes/proposed/architecture/2026-11-12-brain-on-upstream-pi-durable.md)
 - 2026-11-11 [扩展剩余跨模块品牌主键与 SQL 主外键自动品牌生成](.agents/notes/proposed/architecture/2026-11-11-type-driven-boundaries-and-branded-ids.md)
 - 2026-11-10 [一个服务端管多台机器，库换成 Postgres](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)
