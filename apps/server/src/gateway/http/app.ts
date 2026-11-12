@@ -18,7 +18,7 @@ import { subscriptions } from "./rpc.ts";
 import { issueWatchStream, streams } from "./streams.ts";
 
 /** Every route on the farm's services. */
-export function routes(farm: Farm, config: ServerConfig): Hono {
+function routes(farm: Farm, config: ServerConfig): Hono {
   const deps = { ...farm, config };
   const app = new Hono();
   app.route("/", api(handlers(deps), { log: farm.log.child("http") }));

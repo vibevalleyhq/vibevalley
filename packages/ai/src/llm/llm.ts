@@ -120,6 +120,3 @@ export function makeLlm(deps: LlmDeps = {}): Llm {
 
   return { stream, complete };
 }
-
-/** makeLlm, under the name the hosts have called it by. */
-export const make = makeLlm;

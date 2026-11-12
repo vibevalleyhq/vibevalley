@@ -14,7 +14,7 @@ import { withCast } from "#/modules/agent/agent.ts";
 import { builtInDir, profileOf, templateFrom } from "#/modules/agent/template.ts";
 import builtInIndex from "#/modules/agent/templates/index.json" with { type: "json" };
 
-export { aTurn, gate, nextTurn, until, untilGot, waitFor, whenTrue, within } from "@vibevalley/testkit/until";
+export { gate, nextTurn, until, untilGot, waitFor, whenTrue, within } from "@vibevalley/testkit/until";
 
 /** A built-in template as a farm whose agent.starters names it has it: under the template's own id. */
 export const starter = (id: string): Agent => {
@@ -89,12 +89,12 @@ export function shiftedTime(): Time & { readonly adjust: (ms: number) => void } 
 export const testDb = (change: Partial<ServerConfig> = {}): Promise<Db> => openDb(testConfig(change), makeLogger({ name: "test", level: "warn" }), wallTime);
 
 /** A fetch for a test that must not reach the network: every request fails, so one made by mistake is a failure. */
-export const offline: PublicFetch = (url) => Promise.reject(new Error(`no network in tests: ${String(url)}`));
+const offline: PublicFetch = (url) => Promise.reject(new Error(`no network in tests: ${String(url)}`));
 
 const loopbackUrl = /^https?:\/\/(?:127\.0\.0\.1|\[::1\])(?::\d+)?(?:\/|$)/u;
 
 /** The farm's own fetch in a test: only to this machine (the farm's own listeners), never following a redirect. */
-export const loopback: typeof fetch = (input, init) => {
+const loopback: typeof fetch = (input, init) => {
   const url = input instanceof Request ? input.url : String(input);
   if (!loopbackUrl.test(url)) return Promise.reject(new Error("External HTTP is disabled in server tests"));
   return globalThis.fetch(input, { redirect: "manual", ...init });

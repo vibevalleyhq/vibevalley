@@ -11,8 +11,6 @@ import { assignTo, Assignments } from "./assignment.ts";
 import { issueRows } from "./rows.ts";
 import { issueOrder, keepClosedIssues } from "./status.ts";
 
-export type IssueStore = Awaited<ReturnType<typeof makeIssueStore>>;
-
 /** Owns the in-memory `Assignments` index alongside the database's writes so callers never touch uncommitted responsibility state. */
 export async function makeIssueStore(deps: { readonly core: Core; readonly db: Db }) {
   const { core, db } = deps;

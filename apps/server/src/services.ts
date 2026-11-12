@@ -233,9 +233,9 @@ export const issues = async <B extends CollaborationFarm & Building>(below: B) =
   return add(withIssue, { cron: await makeCron(withIssue) });
 };
 
-export const inbox = async <B extends IssuesFarm & Building>(below: B) => add(below, { inbox: await makeInbox(below) });
+const inbox = async <B extends IssuesFarm & Building>(below: B) => add(below, { inbox: await makeInbox(below) });
 
-export const orchestrator = async <B extends InboxFarm & Building>(below: B, o: ServiceOptions = {}) => {
+const orchestrator = async <B extends InboxFarm & Building>(below: B, o: ServiceOptions = {}) => {
   const withTool = add(below, { tool: await makeTool(below) });
   return add(withTool, { orchestrator: await makeOrchestrator(withTool, o.orchestrator) });
 };
@@ -250,7 +250,7 @@ const gateway = async <B extends GamificationFarm & Building>(below: B, o: Servi
 };
 
 /** Source Control's startup: the first look at GitHub. */
-export const sourceControlBoot = (farm: SourceControlFarm) => farm.repo.boot();
+const sourceControlBoot = (farm: SourceControlFarm) => farm.repo.boot();
 /** Agent Sessions' startup: the sessions on the farm when it stopped are taken up again, or let go. */
 export const agentSessionsBoot = (farm: AgentSessionsFarm) => farm.session.boot();
 /** Collaboration's startup, after the sessions came back: their threads, before the mailbox wakes anyone. */
@@ -259,22 +259,17 @@ export const channelBoot = (farm: CollaborationFarm) => farm.channel.boot();
 export const mailboxBoot = (farm: MailboxFarm) => farm.mailbox.boot();
 /** The rest of Collaboration's startup, after the mailbox: what media waited for. */
 export const mediaBoot = (farm: CollaborationFarm) => farm.media.boot();
-/** Collaboration's whole startup, for a farm that starts its mailbox elsewhere. */
-export const collaborationBoot = async (farm: CollaborationFarm) => {
-  await channelBoot(farm);
-  await mediaBoot(farm);
-};
-export const issuesBoot = async (farm: IssuesFarm) => {
+const issuesBoot = async (farm: IssuesFarm) => {
   await farm.issue.boot();
   await farm.cron.boot();
 };
 /** Inbox's startup, after the sessions and issues came back: what stands is known, the patrol starts its rounds. */
 export const inboxBoot = (farm: InboxFarm) => farm.inbox.boot();
 /** Gamification's startup: commits start being counted. */
-export const gamificationBoot = (farm: { readonly game: Game }) => farm.game.boot();
+const gamificationBoot = (farm: { readonly game: Game }) => farm.game.boot();
 
 /** The whole farm: every module built, then every startup in module order. A failure closes what was built. */
-export async function makeFarm(config: ServerConfig, options: ServiceOptions = {}, base: PlatformParts = options.platform ?? {}): Promise<Farm> {
+async function makeFarm(config: ServerConfig, options: ServiceOptions = {}, base: PlatformParts = options.platform ?? {}): Promise<Farm> {
   const below = await platform(config, base);
   try {
     const built = await gateway(

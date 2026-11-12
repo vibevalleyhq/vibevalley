@@ -48,4 +48,3 @@ export const gate = () => {
 
 /** One turn of the event loop: whatever was set going before it (a publish taken by a forked reader, a promise already resolved) has run. */
 export const nextTurn = () => new Promise<void>((resolve) => setImmediate(resolve));
-export const aTurn = nextTurn;

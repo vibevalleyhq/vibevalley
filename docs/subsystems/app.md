@@ -107,6 +107,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 
 - **一份 Solid 2 页面服务三个宿主**：UI 与纯函数规则只写一遍，按 id `reconcile` 细粒度更新，避免高频帧触发整树重渲染。
 - **状态中间层收拢到 `state/atom.ts` 的 Atom，意图按帧 `seq` 结算**：消除「请求返回先弹回旧状态、下一帧再跳过去」的闪烁。
+- **样式回到 Tailwind v4，不用编译期求值的样式库**：2026-11-08 换上的样式库要在构建期求值，限制构建才报、构建慢、样式名按位置起，还要一整套自己的 lint 和 skill；Tailwind 是 agent 最熟的写法，令牌在 `@theme` 一处。没选 CSS Modules（回到给样式起名的老问题）或 vanilla-extract（同样构建期求值）。
 - **按概念分 feature，单向分层且出口显式**：跨 feature 只走 `index.ts` 并禁止成环；像素农场作为皮肤层放在 `features` 之上。
 - **四渠道完全隔离并自带 CLI**：正式版与开发版/测试版可同机并排运行，互不争抢库，用户无需另装 Node 即可使用 CLI。
 

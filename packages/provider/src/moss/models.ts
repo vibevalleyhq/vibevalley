@@ -4,7 +4,7 @@ import { bodyChunks, bounded, type ProviderHttp, send } from "../base/http.ts";
 import { fromJson } from "../base/json.ts";
 import { badKey } from "./response.ts";
 
-export class MossModelError extends Error {
+class MossModelError extends Error {
   override readonly name = "MossModelError";
   readonly reason: "Credentials" | "Network" | "Timeout" | "HttpStatus" | "InvalidResponse" | "TooLarge";
   declare readonly status?: number;

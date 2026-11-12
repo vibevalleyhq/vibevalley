@@ -62,9 +62,6 @@ export class Secret {
   }
 }
 
-/** x's value read as a Secret. */
-export const secretOf = <I>(x: z.ZodType<string, I>): z.ZodType<Secret, I> => x.transform((s) => new Secret(s));
-
 export const Validation = z.object({
   problem: z.string(),
 }) satisfies Codec<T.Validation>;

@@ -138,7 +138,7 @@ export const gitWith = (signal?: AbortSignal) => {
   };
 };
 
-export const { gitRun, git, gitOk, gitQuiet } = gitWith();
+export const { gitQuiet } = gitWith();
 
 /** The first line that says something. */
 export const reason = (e: unknown) => {

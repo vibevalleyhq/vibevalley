@@ -109,14 +109,14 @@
 
 让不变量住进类型，在系统入口一次性完成解析（Parse, don't validate），不在业务内部散落防御性判断或裸字符串约定：
 
-- **进门一次解析，门内靠铸造函数构造**：HTTP、CLI、工具参数、配置、落盘 JSON 与外部响应在边界经 Zod（`z.object`、`.check`、`.transform`、`jsonString`）一步窄化为带约束的领域值（如 [tool/schemas.ts](apps/server/src/modules/tool/schemas.ts) 将状态别名直接解码为 `S.IssueStatus`）；配置由 [config.ts](apps/server/src/infra/config.ts) 的键表一次解出，数字不放行 `NaN` / `Infinity`，格式错误当场失败、不兜底成默认值。门内造品牌主键用协议的铸造函数（`issueId(s)`），不写 `as` 断言；含密钥的值是 `Secret`（`toJSON` 抛错、打印成 `[secret]`），用 `secretOf(...)` 解进来（[schema-audit.ts](scripts/audit/schema-audit.ts) 检查）。
+- **进门一次解析，门内靠铸造函数构造**：HTTP、CLI、工具参数、配置、落盘 JSON 与外部响应在边界经 Zod（`z.object`、`.check`、`.transform`、`jsonString`）一步窄化为带约束的领域值（如 [tool/schemas.ts](apps/server/src/modules/tool/schemas.ts) 将状态别名直接解码为 `S.IssueStatus`）；配置由 [config.ts](apps/server/src/infra/config.ts) 的键表一次解出，数字不放行 `NaN` / `Infinity`，格式错误当场失败、不兜底成默认值。门内造品牌主键用协议的铸造函数（`issueId(s)`），不写 `as` 断言；含密钥的值是 `Secret`（`toJSON` 抛错、打印成 `[secret]`），落盘的经 `z.codec` 解进来（[schema-audit.ts](scripts/audit/schema-audit.ts) 检查）。
 - **全栈共用 Zod 契约，边界一律 Fail-Fast**：前后端均直接运行在同一份 Zod 契约之上（SSE 流经 [stream.ts](packages/protocol/src/stream.ts) 解码，HTTP 客户端 [client.ts](packages/protocol/src/client.ts) 按 `Endpoint.result` 与 `ApiError` 信封解码，SQL 查询的每一行经生成的结果 Schema 解码，工具与配置进门窄化）。边界外进来的值直接 `X.parse`、不符即错（要自己处理错的用 `safeParse`，JSON 文本用 `jsonOf`）；不在内部散落防御性守卫。`packages/protocol` 通过 `satisfies Codec<T.X>`（[codec.ts](packages/protocol/src/codec.ts)）锁死形状与解码器，其余模块直接用 `z.infer<typeof X>` 派生编译期类型；闭合词集统一导出 `XValues`，Schema 写 `z.enum(T.XValues)`，不重复内联字面量。
 - **未解析引用与品牌主键分离**：持久实体主键使用品牌标称类型（如 `IssueId`、`SessionId`、`ChannelId`、`AgentId`），不应跨概念混传同为 `string` 的 ID。用户、CLI 或模型传入的名称、编号与地址（如 `#41`、频道名、`vv://`）按引用建模，在所属服务的入口（如 `Issue.idOf`、`Channel.placeOf`、`Agent.named`）一次性解析为品牌主键；服务内部与存储层只传递已解析的品牌主键。
 - **存储解码区分「缺省」与「损坏」**：库表 `CHECK` 枚举由 [pg-generate.ts](apps/server/scripts/pg-generate.ts) 生成字面量联合并经 [schema-audit.ts](scripts/audit/schema-audit.ts) 与协议枚举对账。服务端自有表的可空 JSON 列统一用 `storedJsonOrUndefined(Schema, "表.列")`（`null` 归 `undefined`，非空损坏立即抛 `Inconsistent` fail-fast），非空 JSON 列用 `jsonOf(Schema, "表.列")`，不用 `jsonOrNone` 把数据损坏静默吞成缺省；仅外部不可信 CLI / Webhook 载荷才用 `jsonOrNone` 容错。
 
 ### 显式状态
 
-一件事沿一条线走（签了、正在接、通话中；等着、就绪、关了），就用一个联合表示它：每个状态一个标签，只有这个状态才有的东西挂在这个状态上（失败的意图才有 `fault`，通话中的授权才有 agent id），存在一个 `let`、信号或 `Cell` 里。例子：[意图](apps/web/src/state/intent.ts)的 `IntentAt`、[语音](apps/server/src/gateway/voice/voice.ts)的 `GrantPhase` 与 `MossPhase`、[记性源](apps/server/src/modules/memory/sources.ts)的 `Held`、帮工招人时的 `startup.phase`（[帮工](apps/server/src/modules/session/session.ts)）。
+一件事沿一条线走（签了、正在接、通话中；等着、就绪、关了），就用一个联合表示它：每个状态一个标签，只有这个状态才有的东西挂在这个状态上（失败的意图才有 `fault`，通话中的授权才有 agent id），存在一个 `let` 或信号里。例子：[意图](apps/web/src/state/intent.ts)的 `IntentAt`、[语音](apps/server/src/gateway/voice/voice.ts)的 `GrantPhase` 与 `MossPhase`、[记性源](apps/server/src/modules/memory/sources.ts)的 `Held`、帮工招人时的 `startup.phase`（[帮工](apps/server/src/modules/session/session.ts)）。
 
 - **各管各的维度分开放。** 在任一状态下都可能为真的，不并进联合：表单的校验、提交、输入法组字（[表单](apps/web/src/infra/form/form.ts)）；MOSS 回答的音频发完、回答结束和被切断（[MOSS](packages/ai/src/realtime/moss.ts)）。硬并只会得到它们的乘积。
 - **永远同值的删掉副本。** 读源头：通话的「在结束」就是它 `life` 的 abort。
@@ -125,7 +125,7 @@
 - **闭包里改的状态放进有类型的属性。** TypeScript 按初值收窄闭包外对 `let` 的读，看不到闭包里的赋值；放进标好类型的对象属性或有名字的类型（[闪播](apps/web/src/features/media/flash-stream.ts)）。
 - **页面的帧不拆。** 帧是 Solid 的 store，按 id 逐个 reconcile（[帧](apps/web/src/infra/frame.ts)）；为了联合改成按状态整个替换，会让每次换态重建整份画面。
 
-`practice:check` 的 `loose-flags` 拦一个函数里三个以上的 `let` 布尔：多半是一条没写出来的线；真是几个独立的维度，就照上面分开放、各自起名。不用 XState 等外部状态机运行时：TypeScript 判别联合配合服务端的字段或 `Cell`（读改写之间夹着 `await` 时包进同一把 `Semaphore`）、客户端 `state/` 的 store 与组件内 `createSignal` 加 `variant()`，零额外依赖即可获得编译期穷尽检查。
+`practice:check` 的 `loose-flags` 拦一个函数里三个以上的 `let` 布尔：多半是一条没写出来的线；真是几个独立的维度，就照上面分开放、各自起名。不用 XState 等外部状态机运行时：TypeScript 判别联合配合服务端的字段（读改写之间夹着 `await` 时包进同一把 `Semaphore`）、客户端 `state/` 的 store 与组件内 `createSignal` 加 `variant()`，零额外依赖即可获得编译期穷尽检查。
 
 ### 错误与回滚契约
 

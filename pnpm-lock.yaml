@@ -347,9 +347,6 @@ catalogs:
     vite-plus:
       specifier: 1.5.0
       version: 1.5.0
-    vitest:
-      specifier: 5.1.0
-      version: 5.1.0
     ws:
       specifier: ^8.22.2
       version: 8.22.2
@@ -499,9 +496,6 @@ importers:
       vite-plus:
         specifier: 'catalog:'
         version: 1.5.0(@astrojs/compiler-rs@0.5.2)(@types/node@26.6.6)(@vitest/browser-playwright@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.28.2)(happy-dom@21.0.4)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.51.2)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1)
-      vitest:
-        specifier: 'catalog:'
-        version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.1.0)(@vitest/browser-preview@5.1.0)(@vitest/ui@5.1.0)(@voidzero-dev/vite-plus-core@1.5.0(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1))(happy-dom@21.0.4)(jsdom@30.1.3(@noble/hashes@1.8.0))
 
   apps/desktop:
     dependencies:
@@ -562,9 +556,6 @@ importers:
       '@formatjs/intl-pluralrules':
         specifier: 'catalog:'
         version: 7.0.2
-      '@vibevalley/async':
-        specifier: workspace:*
-        version: link:../../packages/async
       '@vibevalley/bridge':
         specifier: workspace:*
         version: link:../../packages/bridge
@@ -714,9 +705,6 @@ importers:
       vite-plus:
         specifier: 'catalog:'
         version: 1.5.0(@astrojs/compiler-rs@0.5.2)(@types/node@26.6.6)(@vitest/browser-playwright@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.28.2)(happy-dom@21.0.4)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.51.2)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1)
-      vitest:
-        specifier: 'catalog:'
-        version: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.1.0)(@vitest/browser-preview@5.1.0)(@vitest/ui@5.1.0)(@voidzero-dev/vite-plus-core@1.5.0(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1))(happy-dom@21.0.4)(jsdom@30.1.3(@noble/hashes@1.8.0))
 
   apps/site:
     dependencies:
@@ -778,9 +766,6 @@ importers:
       '@vibevalley/artifact':
         specifier: workspace:*
         version: link:../../packages/artifact
-      '@vibevalley/async':
-        specifier: workspace:*
-        version: link:../../packages/async
       '@vibevalley/base-ui':
         specifier: workspace:*
         version: link:../../packages/base-ui
@@ -1026,9 +1011,6 @@ importers:
 
   packages/home:
     dependencies:
-      '@vibevalley/async':
-        specifier: workspace:*
-        version: link:../async
       '@vibevalley/i18n':
         specifier: workspace:*
         version: link:../i18n
@@ -1145,9 +1127,6 @@ importers:
 
   packages/testkit:
     dependencies:
-      '@vibevalley/async':
-        specifier: workspace:*
-        version: link:../async
       vite:
         specifier: 'catalog:'
         version: '@voidzero-dev/vite-plus-core@1.5.0(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1)'

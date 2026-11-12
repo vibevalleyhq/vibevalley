@@ -26,7 +26,7 @@ export interface ResourcePage {
 }
 
 /** A resource read refused: a bad URI or offset, one this session may not read, or a snapshot gone. */
-export class ResourceError extends Error {
+class ResourceError extends Error {
   override readonly name = "ResourceError";
 }
 const refuse = (message: string) => new ResourceError(message);
@@ -86,7 +86,7 @@ export class TextCache {
   }
 }
 
-export const ResourceRequest = z.object({
+const ResourceRequest = z.object({
   uri: z.string().describe(resourceWords.uri),
   offset: z.exactOptional(z.number().int().describe(resourceWords.offset)),
   limit: z.exactOptional(z.number().int().describe(resourceWords.limit)),

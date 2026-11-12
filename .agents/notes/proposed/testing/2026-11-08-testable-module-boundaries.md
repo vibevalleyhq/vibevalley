@@ -12,7 +12,7 @@ Status: proposed
 | `packages/testkit/src/until.ts` | 冻结业务的测试时钟时，若 `waitFor` 的 `getter` 自身挂起，等待器内部期限不触发 | 仅靠外层 500ms 兜底退出，缺少独立于 `getter` 的真实时间 watchdog |
 | `packages/agent/src/testing/testing.ts` | `withAgent` 默认用 `Date.now()` 构造消息，`ask` 靠固定两次 `yieldNow` 等待订阅者消费 | 输入与 `Brain` 的 `Clock` 不在同一时间线；同刻提醒碰撞与 `Session.host` 关闭作用域已修，消费等待仍待收口 |
 | `apps/server/src/testing/world.ts`、`worker.ts` | 默认装配装入真实的 `fetch` 与 `Llm`；`installedOnly` 用墙钟生成 `checkedAt`；工单与频道模块测试仍依赖整座 `world()` | 意外外呼未被默认端口拒绝；测试探测时间不随测试时钟推进；尚未用窄 `Mailbox` 替身隔离单模块测试 |
-| `apps/server/src/modules/cron/cron.test.ts` | 以 `drained = aTurn` 代替目标事件或提交确认等待 | 一轮事件循环不能证明异步消费者与周期驱动已完成 |
+| `apps/server/src/modules/cron/cron.test.ts` | 以 `drained = nextTurn` 代替目标事件或提交确认等待 | 一轮事件循环不能证明异步消费者与周期驱动已完成 |
 | `apps/web/src/features/pkm/Calendar.tsx` | 创建时一次性读取「今天」 | 实机验证将浏览器时间从 `2026-12-31 23:59:59` 拨至 `2027-01-01 00:00:01` 并触发可见性恢复后，仍高亮旧日期 |
 | `vite.config.ts` | 对全部测试与 `testing/` 目录整体关闭 `vibevalley/no-wall-clock` | 测试夹具默认时间输入不受共享时钟门禁约束 |
 
@@ -22,7 +22,7 @@ Status: proposed
 
 1. **agent 夹具与提醒边界（`packages/agent`）**：`withAgent` 默认消息时间改读测试 `Clock`（历史消息允许显式传参）；订阅先于 `ask` 建立，按公开 `progress().current` 匹配并等待目标运行的 `agent_settled`，删除固定两次 `yieldNow` 假设；补期限边界、错过期限恢复与关闭后不再唤醒测试。
 2. **Session 与 Executor 并发收尾（`apps/server/src/modules/session`、`executor`）**：修复 `Executor.observe` 先立观察身份再订阅回放，拒绝旧观察器迟到回调；在脚本 runtime 边界用 `gate` 构造「开启未返回时取消」「取消后迟到成功」「`dispose` 失败后再次派活」三种交错；补 `infra/time.ts` 的 `sleep` 中断与 `Scope` 关闭契约测试。
-3. **Cron 与 Mailbox 恢复及驱动接线（`apps/server/src/modules/cron`、`mailbox`）**：去掉 `drained = aTurn`，改为等待目标状态或持久化记录；补提交前失败、提交后路由失败、停机重建恢复，以及至少一条由真实 `Cron.start` 周期驱动触发（非手调 `tick`）的测试。
+3. **Cron 与 Mailbox 恢复及驱动接线（`apps/server/src/modules/cron`、`mailbox`）**：去掉 `drained = nextTurn`，改为等待目标状态或持久化记录；补提交前失败、提交后路由失败、停机重建恢复，以及至少一条由真实 `Cron.start` 周期驱动触发（非手调 `tick`）的测试。
 4. **测试装配隔离与窄替身（`apps/server/src/services.ts`、`testing/`、`packages/testkit`）**：分离领域服务组合与外部端口接入，测试默认注入拒绝意外远程请求与模型调用的端口，`installedOnly` 改读环境 `Clock`；为 `Channel` 与 `Issue` 各提供至少一组基于窄 `Mailbox` 替身、无需 `world()` 的模块测试；为 `waitFor` 增加覆盖挂起 `getter` 的真实时间 watchdog 与有界诊断。
 5. **PKM 本地日期订阅（`apps/web/src/infra`、`features/pkm/Calendar.tsx`）**：纯日期函数显式收 `now`；在 `infra` 提供浏览器本地自然日订阅（跨午夜与页面恢复可见时刷新，无订阅者时清理定时器与监听），不覆盖用户主动选定的查看月份。
 6. **收紧门禁与实测对账（`vite.config.ts`、`scripts/audit/oxlint-plugin.ts`）**：缩小 `no-wall-clock` 在测试与夹具上的豁免（放行 `new Date(timestamp)` 与窄边界保护）；按迁移前同一基线（串行与默认并发各连跑 20 轮，`--retry=0`）复测 `agent`、`Session`、`delivery` 三组耗时与稳定性，沉淀至 [地基](docs/subsystems/foundation.md) 与 [客户端](docs/subsystems/app.md) 后删除本 Note。

@@ -38,7 +38,7 @@ export const unavailable = (reason: string, settings?: VoiceFix): ApiError => ne
 const errorMessage = (u: unknown): string => (u instanceof Error ? u.message : String(u));
 
 /** A step of a call outside the farm (Agora, the orchestrator's answer) that did not go; cause is what it threw. */
-export class CallStepFailed extends Error {
+class CallStepFailed extends Error {
   override readonly name = "CallStepFailed";
 }
 

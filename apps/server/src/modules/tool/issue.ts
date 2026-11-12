@@ -41,7 +41,7 @@ const IssueHandbackInput = z.object({ envelope: z.string(), reason: z.string() }
 const IssuePrSubmitInput = z.object({ summary: z.exactOptional(z.string()) });
 
 /** An issue the model named that is not on the farm: its message is the answer the model reads. */
-export class IssueNotFound extends Error {
+class IssueNotFound extends Error {
   override readonly name = "IssueNotFound";
 }
 

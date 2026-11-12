@@ -30,8 +30,6 @@ export class AudioTooLong extends Error {
   }
 }
 
-export type AudioFailure = UnsupportedFormat | EmptyAudio | AudioTooLong;
-
 /** The model call failed; cause is its own failure, as it threw it. */
 export class TranscriptionFailed extends Error {
   override readonly name = "TranscriptionFailed";
@@ -41,7 +39,7 @@ export class TranscriptionFailed extends Error {
   }
 }
 
-/** The recording, checked before any model is called; a bad one throws its AudioFailure. */
+/** The recording, checked before any model is called; a bad one throws UnsupportedFormat, EmptyAudio or AudioTooLong. */
 export async function transcriptionAudio(audio64: string, given: string): Promise<{ readonly audio: Buffer; readonly format: TranscriptionFormat }> {
   const format = given.trim().replace(/^\./u, "").toLowerCase();
   const decoded = TranscriptionFormat.safeParse(format);

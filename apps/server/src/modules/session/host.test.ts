@@ -9,7 +9,7 @@ import { collect } from "@vibevalley/async";
 
 import { user } from "#/base/actor.ts";
 import builtIn from "#/modules/agent/templates/orchestrator/agent.json" with { type: "json" };
-import { testConfig, aTurn, until } from "#/testing/layers.ts";
+import { testConfig, nextTurn, until } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 import * as qs from "#db/session.sql.ts";
 
@@ -24,7 +24,7 @@ const settledBy = async (p: Promise<unknown>) => {
     () => (settled = true),
     () => (settled = true),
   );
-  await aTurn();
+  await nextTurn();
   return settled;
 };
 

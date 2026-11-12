@@ -6,12 +6,12 @@ import { type Io, jsonText, out, printBody } from "./output.ts";
 // Before any help text is written: the words are in the farm's language.
 setLocale(savedLocale(homeOf()));
 
-export const fallbackServer = "http://127.0.0.1:8787";
+const fallbackServer = "http://127.0.0.1:8787";
 /** The server signed in to (auth login), else the one using this machine's home (its server.json), else the default port. */
 const defaultServer = signedIn(homeOf())?.server ?? announced(homeOf()) ?? fallbackServer;
 
 export type OutputFormat = "text" | "json";
-export const outputFormats = ["text", "json"] as const satisfies readonly OutputFormat[];
+const outputFormats = ["text", "json"] as const satisfies readonly OutputFormat[];
 
 /** The global flags, read anywhere on the line, with their fallbacks applied. */
 export interface Globals {

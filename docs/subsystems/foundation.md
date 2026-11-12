@@ -63,7 +63,7 @@
 写法的细节和从 Effect 改过来的对照在 [vv-typescript](.agents/skills/vv-typescript/SKILL.md)；本节记录现行结构与门禁。
 
 - **服务是工厂加接口，依赖从参数进来**：每个模块导出接口 `X` 和 `makeX(deps: XDeps)`，`deps` 只放它用到的、排在它前面的服务，键是服务名的小驼峰（`deps.issue`）。没有全局单例：时钟、库、配置、`fetch` 都从 `deps` 进来，测试只换参数。
-- **异步原语只有一套**：`@vibevalley/async` 给出 `TaskGroup`（后台任务归服务，`close()` 中止并等它们结束；同键只许一个在跑的 `keyed`）、`Queue`、`Hub`（先订后返的广播）、`Cell`（一个值和它的变化）、`Semaphore`、`retry`、`withTimeout` 和 `AsyncIterable` 的组合子。长操作收最后一个参数 `signal?: AbortSignal`，往下传给 `fetch`、子进程和 `clock.sleep`；资源返回 `AsyncDisposable`，调用方 `await using`。不 `void` 一个 Promise 放着不管（`typescript/no-floating-promises` 检查）。
+- **异步原语只有一套**：`@vibevalley/async` 给出 `TaskGroup`（后台任务归服务，`close()` 中止并等它们结束；同键只许一个在跑的 `keyed`）、`Queue`、`Hub`（先订后返的广播）、`Semaphore`、`retry`、`withTimeout` 和 `AsyncIterable` 的组合子。长操作收最后一个参数 `signal?: AbortSignal`，往下传给 `fetch`、子进程和 `clock.sleep`；资源返回 `AsyncDisposable`，调用方 `await using`。不 `void` 一个 Promise 放着不管（`typescript/no-floating-promises` 检查）。
 - **服务缓存按实例隔离**：`makeProjection()` 每个农场一份投影缓存，并发测试农场互不串用；`Core` 是同步的，`core.apply` 折完即返回，订阅返回 `Subscription`，慢读者经 `bounded` 限量。
 - **读接口错误边界**：附件与 Artifact 路由只将缺文件或 `ApiError`（`status === 404`）转为 `404`，其余故障记日志回 `500`。
 - **时间经 `Clock`**：禁止在 `apps/server/src`、`apps/cli/src`、`packages/ai/src` 与 `packages/agent/src` 直接调 `Date.now()` 或 `setTimeout`（`vibevalley/no-wall-clock` 检查），读时间用 `deps.clock.now()`、等用 `deps.clock.sleep(ms, signal)`；墙上的钟只在 `infra/time.ts` 与 `packages/agent/src/infra/realTime.ts`。延迟和周期任务是 `TaskGroup` 里的循环。
@@ -148,7 +148,9 @@
 - **Postgres，不再是 `node:sqlite`**：一个服务端要管多台机器（[一个服务端管多台机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)），库要能放在服务器上、被多台机器的活同时写；只在一台电脑上用时仍开箱即用，靠同一种方言的 PGlite。生成器 `scripts/pg-generate.ts` 让 Postgres 自己说每个参数和结果列的类型（Parse、Describe），不再从文本里猜。代价：PGlite 是数十 MB 的 WASM，新起一个要近一秒（测试从模板拷贝，约 0.1 秒），也比 `node:sqlite` 吃 CPU，服务端测试只开一半的核。
 - **单一表结构基线，内部不留兼容**：启动时按 `db.schema` 哈希自动归档旧库并重建，省去演进期的多步迁移负担。
 - **规则用手写的例子测，不录黄金数据**：录下的 `*.jsonl.gz` 有几十 MB，改了只看得到二进制，规则一改就整份重写，说不出哪里变对了、哪里变错了；拿不出它抓到过真问题的证据，就去掉了。
-- **不用 Effect，写普通 TypeScript**：Effect 的服务、错误通道和 fiber 让每个模块多一层要学的写法，agent 照抄时最常错在它身上（错误变成缺陷、fiber 不归作用域、`yield*` 漏写），而仓库要的打断、收尾和并发用 `AbortSignal`、`await using` 和一个小的 `@vibevalley/async` 就够；运行时校验换成 Zod，SQL 的结果行也由生成器写成 Zod（[计划](.agents/notes/proposed/architecture/2026-11-11-plain-typescript-without-effect.md)）。代价：错误不再写在类型里，靠 `ApiError` 的 `bizCode`、`instanceof` 和 `catching` 表守住。
+- **不用 Effect，写普通 TypeScript**：Effect 的服务、错误通道和 fiber 让每个模块多一层要学的写法，agent 照抄时最常错在它身上（错误变成缺陷、fiber 不归作用域、`yield*` 漏写），而仓库要的打断、收尾和并发用 `AbortSignal`、`await using` 和一个小的 `@vibevalley/async` 就够；运行时校验换成 Zod，SQL 的结果行也由生成器写成 Zod。代价：错误不再写在类型里，靠 `ApiError` 的 `bizCode`、`instanceof` 和 `catching` 表守住。没选只把 Effect 收缩到服务端内核：两种写法的交界要长期养着；也没选换另一个效果库（fp-ts、neverthrow）：问题是写法离普通 TypeScript 太远，换一个库只是换一套写不对的 API。
+- **运行时校验只用 Zod**：agent 最熟、生态最全（Hono、MCP SDK、JSON Schema 输出都直接支持）；契约、查询的行、配置、工具入参用同一种，只有一套要学。没选 Valibot、ArkType（更小更快，但少有人熟）。
+- **查询仍由 SQL 生成，只换输出**：`scripts/pg-generate.ts` 让 Postgres 自己说参数和结果列的类型（Parse、Describe），写出 Zod 的行 Schema 和普通的 `async` 函数。没选 ORM 或查询构造器（Drizzle、Kysely）：类型会从库的推断来而不是从数据库来，44 个查询文件要改写成 TypeScript；也没选 sqlc 本身：它的 TypeScript 插件不写 Zod，驱动里没有 PGlite。
 - **话进 JSON 词典并生成类型，提示词保持中文**：由 `scripts/gen/i18n.ts` 统一查漏翻与死键；提示词不翻，避免双份提示调优与评测漂移。
 
 ## 怎么验证

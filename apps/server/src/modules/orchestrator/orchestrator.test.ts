@@ -15,7 +15,7 @@ import { executionsOf } from "@vibevalley/protocol/rules";
 
 import { user } from "#/base/actor.ts";
 import type { ServerConfig } from "#/infra/config.ts";
-import { starter, testConfig, aTurn, gate, nextTurn, untilGot as until, waitFor, whenTrue, within } from "#/testing/layers.ts";
+import { starter, testConfig, nextTurn, gate, untilGot as until, waitFor, whenTrue, within } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 
 import { makeOrchestrator, type Orchestrator, type OrchestratorOptions } from "./orchestrator.ts";
@@ -345,7 +345,7 @@ describe("the orchestrator", () => {
     const response = f.orchestrator;
     // A caller that left before reading: its answer was never read, so it never started.
     void response.answerer("api")(orchestratorModel)!("在吗");
-    await aTurn();
+    await nextTurn();
     expect(f.requests).toHaveLength(0);
   });
 

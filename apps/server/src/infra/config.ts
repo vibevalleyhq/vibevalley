@@ -82,7 +82,7 @@ export function defaults(home = homedir()): ServerConfig {
 }
 
 /** Why the configuration cannot be read: the file, or a key's value. */
-export class ConfigError extends Error {
+class ConfigError extends Error {
   override readonly name = "ConfigError";
 }
 

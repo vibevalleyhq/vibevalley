@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 
 import { abortable, isAbort } from "./abort.ts";
-import { Cell } from "./cell.ts";
 import { sleep } from "./clock.ts";
 import { Hub } from "./hub.ts";
 import { Queue } from "./queue.ts";
@@ -135,19 +134,6 @@ describe("a hub", () => {
     expect(await collect(a)).toEqual(["one", "two"]);
     expect(await collect(b)).toEqual(["one"]);
     expect(hub.subscribers).toBe(0);
-  });
-});
-
-describe("a cell", () => {
-  test("follow gives the current value, then the latest change", async () => {
-    const cell = new Cell(1);
-    const sub = cell.follow();
-    expect((await sub.next()).value).toBe(1);
-    cell.set(2);
-    cell.set(3);
-    cell.set(3);
-    expect((await sub.next()).value).toBe(3);
-    sub.close();
   });
 });
 

@@ -42,7 +42,7 @@ packages/home/             农场的家目录在磁盘上的约定：在哪、�
 packages/testkit/          测试共用的：在真实时间上等条件、测试金字塔（只在 devDependencies）
 packages/tsrs/             TypeScript 跑在 tsrs（TypeScript 7 的 Rust 移植）上：顶替 oxlint-tsgolint 给 vp check 做带类型的 lint 和类型检查，
                            tsdk/ 是编辑器用的 TypeScript
-packages/async/            异步原语：打断（AbortSignal）、TaskGroup、Queue、Hub、Cell、Semaphore、重试与超时、AsyncIterable 的组合子；时钟（Clock）
+packages/async/            异步原语：打断（AbortSignal）、TaskGroup、Queue、Hub、Semaphore、重试与超时、AsyncIterable 的组合子；时钟（Clock）
 packages/health/           仓库的体检：热点（改动次数乘行数）和逃生口（类型的、吞掉错误的）的棘轮；这个仓库的配置在 scripts/health.config.ts
 packages/stories/          零件的故事（像 Storybook）：故事的格式和查看器；页面的故事分四层：设计体系、组件（ui/ 每个零件旁边一个 X.stories.tsx）、交互、界面
 design/                    生图提示词、脚本和切图规则（写进 apps/web/public）；原图和效果图在单独的仓库 vibevalley-art，design/art.sh 链接进来

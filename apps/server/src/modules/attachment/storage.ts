@@ -8,7 +8,7 @@ import { errnoOf, messageOf } from "#/base/errors.ts";
 import type { ServerConfig } from "#/infra/config.ts";
 import { fileBlob, writeOnce } from "#/infra/files.ts";
 
-export class StorageError extends Error {
+class StorageError extends Error {
   override readonly name = "StorageError";
 }
 

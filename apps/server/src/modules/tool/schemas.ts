@@ -393,7 +393,7 @@ const written = (node: unknown): unknown => {
   return out;
 };
 
-export const toolParameters = (parameters: z.ZodObject): JsonSchema => {
+const toolParameters = (parameters: z.ZodObject): JsonSchema => {
   if (Object.keys(parameters.shape).length === 0) return { additionalProperties: true, properties: {}, type: "object" };
   const shaped = written(z.toJSONSchema(parameters, { io: "input" }));
   return isObject(shaped) ? shaped : {};

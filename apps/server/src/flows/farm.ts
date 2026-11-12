@@ -22,7 +22,7 @@ export const lab = (): T.Agent => ({ ...starter("lab"), effort: "" });
 export type FlowWorld = World & { readonly game: Game };
 
 /** World with the game, then the startup of what is in it, in module order. */
-export async function flowWorld(options: WorldOptions): Promise<FlowWorld> {
+async function flowWorld(options: WorldOptions): Promise<FlowWorld> {
   const below = await world(options);
   try {
     const built = await gamification(below);

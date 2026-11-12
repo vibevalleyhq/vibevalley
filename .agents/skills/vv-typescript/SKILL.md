@@ -77,10 +77,9 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
 | 一起来，最多 n 个 | `await mapConcurrent(xs, n, f)` |
 | 一把锁、n 个名额 | `const lock = new Semaphore(1); await lock.with(() => …)` |
 | 跨异步的状态 | 普通的变量或字段；有 `await` 夹在读和写之间时，读改写包进同一把锁 |
-| 一个值和它的变化 | `Cell` |
 | 一条队列 | `Queue`（`unbounded`、`sliding`、`dropping`） |
 | 给很多读者的新闻 | `Hub`；读者 `using sub = hub.subscribe()`，`for await (const x of sub)` |
-| 一串值 | `AsyncIterable`，写成 `async function*`；`merge`、`map`、`filter`、`lines`、`collect` |
+| 一串值 | `AsyncIterable`，写成 `async function*`；`merge`、`map`、`lines`、`collect`、`mapConcurrent` |
 | 等一个将来的值 | `Promise.withResolvers()` |
 | 现在几点、等一会儿 | `deps.clock.now()`、`await deps.clock.sleep(ms, signal)`；不直接 `Date.now()`、`setTimeout`（lint 查） |
 | 超时 | `await withTimeout((signal) => f(signal), ms, { clock })` |
@@ -96,7 +95,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
 - **解的时候**：门口用 `X.parse(v)`（错了抛 `ZodError`，网关答 `InvalidInput`）；要自己处理错的用 `X.safeParse(v)`。不要 `as` 一个没解过的值。
 - **JSON 列和落盘文件**：Schema 里写 `jsonString(X)`（`@vibevalley/protocol/schema`：`z.string()` 转 `JSON.parse` 再 `pipe(X)`）；服务端读一列用 `base/json.ts` 的 `storedJsonOrUndefined(X, "表.列")`，坏了当场失败，带表名和列名，不吞。
 - **工具给模型的参数**：`z.toJSONSchema(X)`。
-- **密钥**：`Secret`（`toJSON` 抛错，`toString` 是 `[secret]`），`secretOf(z.string())` 解进来。
+- **密钥**：`Secret`（`toJSON` 抛错，`toString` 是 `[secret]`），落盘的读进来时用 Zod 的 `z.codec` 封成 `Secret`（`setting/provider.ts` 的 `StoredKey`）。
 
 ## 6. 库
 

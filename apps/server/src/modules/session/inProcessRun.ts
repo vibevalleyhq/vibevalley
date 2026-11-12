@@ -190,9 +190,9 @@ export function recording(deps: { readonly db: Db; readonly clock: Clock }) {
     }
   };
   return {
-    // The times are read as each is asked for, before the row is written.
-    start: async (id: string, session: string, issue: string, trigger: RunTrigger) => {
-      const at = clock.now();
+    // The times are read as each is asked for, before the row is written; a caller that queues the write passes the
+    // time the run started, so an input consumed meanwhile is never dated before its run.
+    start: async (id: string, session: string, issue: string, trigger: RunTrigger, at = clock.now()) => {
       await tried(() => qr.startRun(db.sql, { id, session, issue: issue || null, triggered_by: jsonText(trigger), started_at: at }));
     },
     link: async (run: string, issue: string) => {

@@ -7,6 +7,3 @@ export function isObject(input: unknown): input is { [x: PropertyKey]: unknown }
 export function isObjectOrArray(input: unknown): input is { [x: PropertyKey]: unknown } | unknown[] {
   return typeof input === "object" && input !== null;
 }
-
-/** An object with this `_tag`. */
-export const isTagged = <K extends string>(input: unknown, tag: K): input is { readonly _tag: K } => isObject(input) && input["_tag"] === tag;

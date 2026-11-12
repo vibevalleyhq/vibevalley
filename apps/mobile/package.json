@@ -10,7 +10,6 @@
     "@formatjs/intl-getcanonicallocales": "catalog:",
     "@formatjs/intl-locale": "catalog:",
     "@formatjs/intl-pluralrules": "catalog:",
-    "@vibevalley/async": "workspace:*",
     "@vibevalley/bridge": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",

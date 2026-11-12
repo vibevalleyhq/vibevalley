@@ -57,7 +57,7 @@
 | `clip` | `clip.ts` | s on one line and trimmed, at most max units with the ellipsis. |
 | `head` | `clip.ts` | The first n UTF-16 units of s, never half a surrogate pair. |
 | `compactCard` | `clip.ts` |  |
-| `bizError` | `errors.ts` | Builds a yieldable ApiError with a six-digit business error code, message, and optional remediation detail. |
+| `bizError` | `errors.ts` | An ApiError with a six-digit business error code, message, and optional remediation detail: thrown, never returned. |
 | `refused` | `errors.ts` |  |
 | `refuseIn` | `errors.ts` | Module-scoped refusal builder bound to a specific six-digit BizCode. |
 | `missing` | `errors.ts` | Something asked for by id or name is not there. next is required: where to look for the ones that are (lookIn). |
@@ -67,25 +67,25 @@
 | `messageOf` | `errors.ts` | What a thrown or rejected value says: an Error's message, anything else as text. |
 | `errnoOf` | `errors.ts` | A failed system call's code (ENOENT, EPERM…), or undefined for anything else. |
 | `Inconsistent` | `errors.ts` | A defect, never an expected failure: the farm's own records disagree with each other, or a caller broke a rule it is held to. |
-| `orMissing` | `errors.ts` | A lookup's answer, or Missing (what was not found, and where to look) when it found none. |
+| `orMissing` | `errors.ts` | A lookup's answer, or Missing (what was not found, and where to look) thrown when it found none. |
 | `newId` | `ids.ts` |  |
 | `code` | `ids.ts` | A short human code, for pairing a device: not an id, and never a key. |
+| `problemOf` | `json.ts` | A Zod failure in one line: the path of the first issue and what it says. |
 | `jsonOf` | `json.ts` | Read where unreadable JSON is already a defect: a value that does not fit the Schema is one too. |
 | `storedJsonOrUndefined` | `json.ts` | Read a nullable JSON column written by this server: null stays undefined, while corrupt JSON fails fast as Inconsistent. |
 | `valueOf` | `json.ts` | Validate an in-memory row or value that must fit schema; a mismatch fails fast as Inconsistent. |
-| `jsonText` | `json.ts` | As JSON.stringify writes it; a cycle or a bigint fails instead of throws. |
+| `jsonText` | `json.ts` | As JSON.stringify writes it; a cycle or a bigint throws. |
 | `jsonOrNone` | `json.ts` | Read untrusted external JSON where unreadable or misfit input is taken as none. |
 | `localizedJson` | `json.ts` | A data file kept in each language (seeds.json and seeds.en.json), read once per language; one that does not fit its |
 | `lastJsonBlock` | `json.ts` | The last fenced block of a model's text that decodes with schema and is not refused, or the words for why the last one tried was not. |
 | `misfitField` | `json.ts` | The field a decoding first failed on, undefined when the value itself was not an object. |
 | `wireOf` | `json.ts` | value with every own key set to undefined dropped, in plain objects and arrays all the way down. |
-| `wireJson` | `json.ts` | The JSON text of value as the wire carries it: wireOf, then encoded by schema (which still fails on a missing required |
+| `wireJson` | `json.ts` | The JSON text of value as the wire carries it: wireOf, then checked by schema (which still fails on a missing required |
 | `compareText` | `order.ts` | By UTF-8 bytes, which is by code point, not by UTF-16 unit: the order the recorded cases were sorted in. |
 | `compare` | `order.ts` |  |
 | `or` | `order.ts` |  |
 | `numberIn` | `order.ts` |  |
 | `usersLanguage` | `prompts.ts` |  |
-| `scopedPubSub` | `pubsub.ts` | An unbounded PubSub shut down when the scope that made it (its service's layer) closes, so a subscriber's stream ends |
 | `checksFromText` | `questions.ts` | The helper's text checks, one per criterion line; explicit issue_report.checks still win. |
 | `questionsFromText` | `questions.ts` |  |
 | `redact` | `redact.ts` |  |
@@ -101,10 +101,8 @@
 | `baselineSql` | `baseline.ts` |  |
 | `baselineHash` | `baseline.ts` |  |
 | `baselineStatements` | `baseline.ts` | The baseline as single statements, in order: a driver prepares one at a time. A function's body ($$ … $$) and a |
-| `ServerConfig` | `config.ts` |  |
 | `defaults` | `config.ts` |  |
-| `ConfigError` | `config.ts` | Why the configuration cannot be read: the file, or a key's value. |
-| `loadConfig` | `config.ts` | file: the YAML to read, which must be there. empty is home/vibevalley.yaml, read if it is there. |
+| `loadConfig` | `config.ts` | file: the YAML to read, which must be there. empty is home/vibevalley.yaml, read if it is there. The environment wins |
 | `pkmDir` | `config.ts` |  |
 | `hostName` | `config.ts` | This computer's name as people say it: its host name without .local. |
 | `dbDir` | `config.ts` | The database's folder, or "memory". |
@@ -113,25 +111,26 @@
 | `worktreesDir` | `config.ts` | Where the issues' worktrees are: <repo>.<issue number> under it. |
 | `agentHome` | `config.ts` | A profile's folder for conversation logs, archives and evals; memory rows live in the database. |
 | `dbQueries` | `db.ts` | Every query run: what a test holds a hot path's budget to, and a reading of the farm's load. |
+| `SqlError` | `db.ts` | The database failed a statement: what it said, with the statement's first words. |
+| `causeMessage` | `db.ts` | What the database said, from under the errors around it. |
 | `setAsideStale` | `db.ts` | A folder's database made from another baseline is moved aside, whole, to <folder>.<hash>-<time>. The baseline it was made from is in <folder>.schema. |
-| `Database` | `db.ts` | The database as an SqlClient, with the schema in place: Postgres at database.url, or else PGlite in the home (in |
-| `causeMessage` | `db.ts` | What the database said, from under the SqlError around it. |
-| `Db` | `db.ts` | The farm's database as the services use it: a generated query (db/generated) run against it. |
+| `openDb` | `db.ts` | The database with the schema in place: Postgres at database.url, or else PGlite in the home (in memory for "memory"). |
 | `fileBlob` | `files.ts` |  |
-| `NotWritten` | `files.ts` |  |
 | `writeOnce` | `files.ts` |  |
 | `readOrSetAside` | `files.ts` | A user's file (config.json, settings.json); one whose read fails is set aside and read as undefined. |
 | `keptFile` | `files.ts` | soonMs: how long a soon write waits after the first change, so a burst is one write and a crash loses no more. |
 | `HomeTaken` | `lease.ts` |  |
 | `HomeUnavailable` | `lease.ts` | The lock file could not be read or written for another reason (permissions, a missing home). |
 | `leaseHome` | `lease.ts` | Takes the home, or throws HomeTaken; the function it returns gives it back. |
-| `callbackLog` | `log.ts` | Made in a service's make: the lines it writes end with the service and keep its logger. |
-| `bestEffort` | `log.ts` | Work the caller goes on without: a failure or a defect is logged at Warn after what (the words say what was being done), and the caller carries on. |
+| `makeLogger` | `log.ts` |  |
+| `keptLog` | `log.ts` | A logger that keeps what it is told, for a test to read. |
+| `bestEffort` | `log.ts` | Work the caller goes on without: a failure is logged at warn after what (the words say what was being done), and the |
+| `counter` | `metrics.ts` |  |
+| `gauge` | `metrics.ts` |  |
 | `publicIpv4` | `publicHttp.ts` |  |
 | `publicLookup` | `publicHttp.ts` |  |
 | `publicHttps` | `publicHttp.ts` |  |
-| `PublicHttp` | `publicHttp.ts` |  |
-| `timeHere` | `time.ts` | The Clock of the service that asks, as a Time. |
+| `publicFetch` | `publicHttp.ts` |  |
 | `wallTime` | `time.ts` | The wall clock, for code with no service to ask: a class tested on its own, the command line. |
 | `withinRealTime` | `time.ts` | A deadline on a real process or network call (a runtime's probe of its CLI): real time, whatever the Clock says, and it keeps nothing alive. |
 | `afterRealTime` | `time.ts` | A deadline on a real process (a command's timeout, the grace before SIGKILL): runs f after ms of real time, whatever the Clock says. |
@@ -158,8 +157,8 @@
 | `committed` | `evals.ts` |  |
 | `stubbed` | `evals.ts` | Every farm tool answers a call with what the case recorded for the same call (the same tool and arguments), each once, and nothing for another. |
 | `replayWorld` | `evals.ts` |  |
-| `replaySetup` | `evals.ts` |  |
-| `farm` | `farm.ts` | The whole farm on a free port: its address. |
+| `replaySetup` | `evals.ts` | The orchestrator's tools on the farm, and its input: stubbed with what the case recorded, or, for a scenario, live |
+| `farm` | `farm.ts` | The whole farm on a free port. |
 | `workingFarm` | `farm.ts` | The same with the test helper as its only runtime (pi, testing/worker.ts), so an issue can be worked from outside as |
 | `gitSync` | `git.ts` | Runs git in dir as a test user. its output, trimmed. |
 | `gitIn` | `git.ts` | Runs git in dir as dir's own config says (no test user). its output, trimmed. |
@@ -167,27 +166,25 @@
 | `reposDir` | `git.ts` |  |
 | `repo` | `git.ts` | A repository with `mine` commits by the test user, `others` by someone else. |
 | `write` | `git.ts` |  |
-| `app` | `http.ts` |  |
+| `app` | `http.ts` | The whole app on the test's network: loopback only. |
 | `starter` | `layers.ts` | A built-in template as a farm whose agent.starters names it has it: under the template's own id. |
 | `testConfig` | `layers.ts` |  |
-| `testDatabase` | `layers.ts` |  |
-| `offline` | `layers.ts` | An HTTP client for a test that must not reach the network: every request dies, so one made by mistake is a failure. |
-| `offlineNetwork` | `layers.ts` |  |
+| `shiftedTime` | `layers.ts` | The wall clock moved on by hand: now() is ahead by what adjust added, and a timer is due once that time comes, by |
+| `testDb` | `layers.ts` | A database of its own in memory, with the schema: closed with await using. |
+| `offlineNetwork` | `layers.ts` | The network a test farm has: loopback for its own fetch, nothing for the public one. |
 | `whenState` | `layers.ts` | What pick finds in the core state: in it now, or in the first state the core moves to where it finds something. |
-| `network` | `network.ts` |  |
+| `network` | `network.ts` | Every vendor the media tests reach (MOSS's audio, images, files, understanding), answered offline; the public fetch |
 | `realtimeFixture` | `realtime.ts` |  |
 | `refuse` | `refuse.ts` | A trigger named name refusing the write on says (before insert on t, before update of c on t), when when holds |
 | `allow` | `refuse.ts` | The write refuse stopped goes through again. |
-| `heard` | `refuse.ts` | The lines the farm logs from here on, each with its cause; layer is given to what builds the farm. |
+| `sqlOf` | `sql.ts` | A test's own statements on the farm's database, written as a template: each value is a parameter ($1, $2…). |
 | `releaseHeld` | `worker.ts` | Once n turns are held, lets every held turn go on: a turn not yet at its hold would miss a release made before. |
 | `helper` | `worker.ts` | The helper every flow hires: what it does is in the words of its brief (the part after the reminders). draft-only drafts. |
 | `installedOnly` | `worker.ts` | A probe that finds every runtime given, bundled, and no other. |
-| `quietApp` | `world.ts` | For a test that builds the whole app (http/app.ts): nothing of this machine's is asked in the background. |
+| `quietApp` | `world.ts` | For a test that builds the whole app (http/app.ts): nothing of this machine's is asked in the background, and the |
 | `moduleWorld` | `world.ts` | Core domain services below Inbox/Tool/Mcp for module tests. |
-| `world` | `world.ts` | The farm up to its inbox, with the tools and /mcp: no orchestrator, gateway or game, and no startup (farm.ts adds |
+| `world` | `world.ts` |  |
 | `testIssues` | `world.ts` | Issues a test adds are ones the user sent, so their mandate is explicit. |
-| `Said` | `world.ts` |  |
-| `said` | `world.ts` |  |
 
 ## `apps/web/src/base`
 
@@ -214,6 +211,8 @@
 | `spentText` | `format.ts` |  |
 | `messageOf` | `format.ts` | What a thrown or rejected value says: an Error's message, anything else as text. |
 | `spanText` | `format.ts` | How long, in round words: rounded relative duration. |
+| `isObject` | `guards.ts` | Not null, not an array: a record to read keys of. |
+| `isObjectOrArray` | `guards.ts` | An object or an array. |
 | `SpriteManifest` | `manifests.ts` |  |
 | `CursorManifest` | `manifests.ts` |  |
 | `pinyinLoaded` | `search.ts` | Settles once pinyin matches too (tests wait on it). |
@@ -241,6 +240,7 @@
 | `orchestratorLookOf` | `agents.ts` | An orchestrator's look (its sprites are manager-<look>); the plain farmer until the profiles are read. |
 | `useAgent` | `agents.ts` | A profile by its id, once the profiles are read; undefined for none or one gone. |
 | `useAgentProblems` | `agents.ts` |  |
+| `ApiConnectionError` | `api.ts` | The server could not be reached at all. |
 | `api` | `api.ts` | The page is served by the server it talks to: the same origin. |
 | `reasonOf` | `api.ts` | What a refusal says, for a toast or an inline line. |
 | `faultOf` | `api.ts` | The fault a refusal or connection failure carries. |
@@ -249,7 +249,7 @@
 | `attachmentData` | `attachment.ts` | A file's bytes as attachment.create takes them: base64. |
 | `useForm` | `form.ts` |  |
 | `createForm` | `form/form.ts` |  |
-| `formIssues` | `form/issues.ts` |  |
+| `formIssues` | `form/issues.ts` | Zod's issues as the form tells them; read with `reportInput`, so a missing key is told apart from a wrong type. The |
 | `at` | `form/paths.ts` |  |
 | `at` | `form/paths.ts` |  |
 | `replace` | `form/paths.ts` |  |
@@ -264,6 +264,8 @@
 | `orchestratorMood` | `frame.ts` |  |
 | `rawFrame` | `frame.ts` | The frame as the stream sent it: a new object each time, for code that compares the one before with the one after (sounds, the canvas, the host's notices). |
 | `subscribeLive` | `frame.ts` | Listens to the live stream (/api/v1/live). returns how to stop. |
+| `reconnectDelayMs` | `gateway.ts` | The wait before connecting again after a connection could not be opened: 500 ms, growing by half each time, at most 5 s. |
+| `subscribe` | `gateway.ts` | Each event of one subscription (its `subscriptionUrl`, each event decoded with its `event` Schema) until stop() is |
 | `followChannel` | `gateway.ts` | What is said in a channel after the message numbered after, then from now on. |
 | `followReports` | `gateway.ts` | The farm's reports after the one with this id (the newest when absent), then each from now on. |
 | `followArtifact` | `gateway.ts` | A blocks artifact's changes after this seq, then each batch from now on. |
@@ -292,6 +294,7 @@
 | `waitForReads` | `query/activity.ts` |  |
 | `defineQuery` | `query/cache.ts` |  |
 | `createQueryClient` | `query/cache.ts` |  |
+| `QueryDecodeError` | `query/schema.ts` | A response that is not in the query's shape. Carries none of the issues: they can contain credentials. |
 | `queryDecoder` | `query/schema.ts` |  |
 | `useQueryClient` | `query/solid.tsx` |  |
 | `QueryProvider` | `query/solid.tsx` |  |
@@ -322,7 +325,8 @@
 | `useMatches` | `router/routes.tsx` |  |
 | `Routes` | `router/routes.tsx` |  |
 | `Outlet` | `router/routes.tsx` |  |
-| `searchParam` | `router/search.ts` |  |
+| `attemptCodec` | `router/search.ts` | A decode or an encode, or undefined when it fails; a Schema that decodes asynchronously never admits a value. |
+| `searchParam` | `router/search.ts` | One value of a search key, read with `schema`: a key given twice does not decode. |
 | `search` | `router/search.ts` |  |
 | `useSaveSettings` | `settings.ts` | Saves, and the settings the server answers with are the cached ones from then on. |
 | `useUpdates` | `settings.ts` | The desktop's own update as it is now and as it changes (Host.update); undefined where the host is not updated from |
@@ -340,6 +344,8 @@
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
+| `atom` | `atom.ts` |  |
+| `Registry` | `atom.ts` | Where atoms' values live: the page's one, or a test's or a story's own. |
 | `createRegistry` | `atom.ts` |  |
 | `pageRegistry` | `atom.ts` | The page's one registry. |
 | `RegistryContext` | `atom.ts` | Every atom's value lives in one registry for the page; the page's own unless a test or a story gives another. |
@@ -349,8 +355,9 @@
 | `usePageAtom` | `atom.ts` | Binds a page atom's reads and writes to the active `RegistryContext`, for component callbacks in tests and stories. |
 | `defineAtom` | `atom.ts` | A value of the page's that lasts until it closes (a dialog the shell and a page both open, the farm's overlays). |
 | `framesSource` | `atom.ts` |  |
-| `linkIn` | `atom.ts` | Whether the state stream is up now, read from its source: reading framesAtom here would open and close the stream. |
-| `framesAtom` | `atom.ts` | The state stream as an atom: subscribed to its source while anything reads it, so the stream stays open meanwhile. |
+| `linkIn` | `atom.ts` | Whether the state stream is up now, read from its source: subscribing would open and close the stream. |
+| `framesIn` | `atom.ts` | The registry's frames now. |
+| `subscribeFrames` | `atom.ts` | Hears each frame of the registry's source, and follows the source when a test swaps it; the stream stays open meanwhile. |
 | `latestReader` | `atom.ts` | The answer to the newest ask only, a failure told as a failure rather than "nothing found". |
 | `useLatest` | `atom.ts` | The answer to the newest `key()` while the component lives; undefined while there is nothing to ask. |
 | `bySeq` | `intent.ts` | A reply that carries the seq of the fold with its change (an issue moved): shown once a frame has caught up. |
@@ -400,8 +407,7 @@
 | `waitFor` | `until.ts` | What get answers once ok holds for it. what is said if it never does (a function: read when it is given up on). |
 | `untilGot` | `until.ts` | The value get gives once it is something. |
 | `until` | `until.ts` | Once ok holds. |
-| `whenTrue` | `until.ts` | until for a test written with promises (a fake runtime, a fake model). |
+| `whenTrue` | `until.ts` | until under the name the promise-written tests (a fake runtime, a fake model) already use. |
 | `within` | `until.ts` | What p settles to, or a rejection naming what took longer than ms (real time): a deadline on something the test |
 | `gate` | `until.ts` | A gate a fake waits at until the test opens it: a fake that should be busy is busy until the test says, not for a |
 | `nextTurn` | `until.ts` | One turn of the event loop: whatever was set going before it (a publish taken by a forked reader, a promise already resolved) has run. |
-| `aTurn` | `until.ts` |  |

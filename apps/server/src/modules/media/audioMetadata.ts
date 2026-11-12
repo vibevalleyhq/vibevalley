@@ -1,6 +1,6 @@
 import { parseBlob } from "music-metadata";
 
-export class MediaAudioInvalid extends Error {
+class MediaAudioInvalid extends Error {
   override readonly name = "MediaAudioInvalid";
   constructor(fields: { readonly cause?: unknown } = {}) {
     super("The audio could not be read", "cause" in fields ? { cause: fields.cause } : undefined);

@@ -12,7 +12,7 @@ import type { Logger } from "./log.ts";
 // The native Blob keeps multipart uploads disk-backed rather than buffering the file.
 export const fileBlob = (path: string, type: string): Promise<Blob> => openAsBlob(path, { type });
 
-export class NotWritten extends Error {
+class NotWritten extends Error {
   override readonly name = "NotWritten";
 }
 

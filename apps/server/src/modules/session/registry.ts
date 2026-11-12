@@ -200,13 +200,14 @@ export async function makeRegistry(deps: RegistryDeps) {
     const by = expected?.trigger ?? { kind: "runtime" };
     const issue = core.session(h.id)?.issue ?? h.issue;
     const id = newId();
+    const at = clock.now();
     // Assign `h.run` synchronously before async DB persistence so an immediate `report` finds it.
     h.run = id;
     h.heard = [];
     h.report = undefined;
     recordRun(`vibevalley: ${h.id}'s previous report was not cleared`, () => qs.clearPendingReport(db.sql, { id: h.id }));
     h.journal.runStarted(id);
-    recordRun(`vibevalley: a run not kept (session ${h.id})`, () => runs.start(id, h.id, issue, by));
+    recordRun(`vibevalley: a run not kept (session ${h.id})`, () => runs.start(id, h.id, issue, by, at));
     if (expected?.inputId === undefined && expected !== undefined && expected.envelopeIds.length > 0) consume(h, expected.envelopeIds);
   };
 

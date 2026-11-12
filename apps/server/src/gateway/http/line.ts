@@ -13,7 +13,7 @@ import type { Logger } from "#/infra/log.ts";
 import { fromTheFarm } from "./rpc.ts";
 
 /** A node request's headers as a Web Headers. */
-export const headersOf = (req: IncomingMessage): Headers => {
+const headersOf = (req: IncomingMessage): Headers => {
   const headers = new Headers();
   for (const [k, v] of Object.entries(req.headers)) if (v !== undefined) for (const one of [v].flat()) headers.append(k, one);
   return headers;

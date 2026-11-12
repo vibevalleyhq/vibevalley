@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-截至 2026-11-12，仓库在向发布态过渡时存在 3 处存量工程张力（原来的样式迁移收尾和 Effect 不稳定 API 两项，随[离开 Effect](.agents/notes/proposed/architecture/2026-11-11-plain-typescript-without-effect.md) 换回 Tailwind v4、整个拿掉 Effect 而消失）：
+截至 2026-11-12，仓库在向发布态过渡时存在 3 处存量工程张力（原来的样式迁移收尾和 Effect 不稳定 API 两项，随离开 Effect（[地基](docs/subsystems/foundation.md#为什么这样)） 换回 Tailwind v4、整个拿掉 Effect 而消失）：
 
 - **跨异步隐式状态机与手工回滚布尔群漏检**：[practice-audit.ts](scripts/audit/practice-audit.ts) 的 `loose-flags` 仅检查单个函数体顶层的 `let x = false` 与 `createSignal(false)`，未覆盖类字段包（如 `VoiceCall`）及跨异步边界的手工回滚标志（如 [session.ts](apps/server/src/modules/session/session.ts) 中的 `committed`、`released`、`registeredRow`）。
 - **局部逃生口与静默吞错堆积**：[health.ratchet.json](scripts/audit/health.ratchet.json) 记录 `web: farm` 的 `nonNull`（`!`）断言与 `web: features/voice` 的 `swallowed`；[practice.ratchet.json](scripts/audit/practice.ratchet.json) 记录 `apps/server` 的 `swallow-without-record` 与 `failure-without-reason`。

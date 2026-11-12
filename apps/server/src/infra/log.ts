@@ -15,7 +15,7 @@ export interface Logger {
 const order: Record<Level, number> = { debug: 0, info: 1, warn: 2, error: 3 };
 
 /** A line's words: an Error by its stack (or message), anything else as text. */
-export const wordsOf = (m: unknown): string =>
+const wordsOf = (m: unknown): string =>
   m instanceof Error ? (m.stack ?? `${m.name}: ${m.message}`) : typeof m === "string" ? m : (JSON.stringify(m) ?? String(m));
 
 export interface LoggerOptions {

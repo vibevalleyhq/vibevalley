@@ -97,7 +97,7 @@ interface TxScope {
 }
 
 /** The Db over one driver: the lock that makes it one connection, transactions, after-commit hooks. */
-export function dbOver(driver: Driver, log: Logger, clock: Clock): Db {
+function dbOver(driver: Driver, log: Logger, clock: Clock): Db {
   const lock = new Semaphore(1);
   const scope = new AsyncLocalStorage<TxScope>();
   let savepoints = 0;
@@ -189,7 +189,7 @@ export function setAsideStale(where: string, hash: string, now: number): string 
 }
 
 /** The database could not be opened or given its schema: the farm does not start. */
-export class Unopened extends Error {
+class Unopened extends Error {
   override readonly name = "Unopened";
 }
 

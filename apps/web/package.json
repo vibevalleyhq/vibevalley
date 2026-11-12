@@ -20,7 +20,6 @@
     "@tailwindcss/vite": "catalog:",
     "@vibevalley/ai": "workspace:*",
     "@vibevalley/artifact": "workspace:*",
-    "@vibevalley/async": "workspace:*",
     "@vibevalley/base-ui": "workspace:*",
     "@vibevalley/bridge": "workspace:*",
     "@vibevalley/engine": "workspace:*",

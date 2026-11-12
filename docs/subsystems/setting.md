@@ -61,7 +61,7 @@
 - **设置优先于配置，按需实时读取**：`deepseekApiKey()` 与 `agora()` 优先取 `settings.json`，为空时回退 `ServerConfig`，保存后立即生效。
 - **暴露当前空间的实际路径**：`SettingsStatus.paths` 给出 `repos`、`worktrees` 与 `pkm` 的绝对路径，关于页逐行显示。
 - **密钥在内存里为 `Secret`，不出服务端，损坏文件保留备份**：
-  - `settings.json` 在磁盘上是普通字符串，读进内存经 `secretOf(z.string())` 封成 `Secret`（启动配置的钥匙由 `infra/config.ts` 同样封好），`JSON.stringify` 会抛错、日志里打印成 `[secret]`，只在发请求处 `reveal()` 取明文；`setting.get` 仅返回来源 `settings`/`config` 与末四位提示（`…xxxx`）。
+  - `settings.json` 在磁盘上是普通字符串，读进内存经 `StoredKey`（Zod 的 `z.codec`）封成 `Secret`（启动配置的钥匙由 `infra/config.ts` 同样封好），`JSON.stringify` 会抛错、日志里打印成 `[secret]`，只在发请求处 `reveal()` 取明文；`setting.get` 仅返回来源 `settings`/`config` 与末四位提示（`…xxxx`）。
   - `settings.json` 以 `0600` 权限经临时文件原子改名写入；启动时若文件损坏，改名为 `settings.json.unreadable-<毫秒>` 备份并从空设置启动。
 - **每个功能的准备状态由服务端统一计算（`SettingsStatus.readiness`）**：
   - `setting/readiness.ts`（复用 `setting/provider.ts` 的 `bindingOf`）为 11 项功能（`orchestrator`、`image`、`understanding`、`speech`、`speakers`、`voiceDesign`、`transcription`、`dictation`、`live`、`vision`、`call`）给出 `{ ready: true }` 或 `{ ready: false, missing }`。
@@ -85,7 +85,7 @@ Setting 在 `settings.json.providers` 保存供应商私有配置，普通设置
 
 ## 为什么这样
 
-- **静态配置与动态设置分离，两类钥匙内存统一 `Secret`**：`vibevalley.yaml` 只在启动时读一次（`loadConfig`），`settings.json` 在运行期由界面原子更新（`secretOf`），互不覆盖且明文不进日志。
+- **静态配置与动态设置分离，两类钥匙内存统一 `Secret`**：`vibevalley.yaml` 只在启动时读一次（`loadConfig`），`settings.json` 在运行期由界面原子更新（`StoredKey`），互不覆盖且明文不进日志。
 - **准备状态由服务端算一份，钥匙放一页**：连接启用、凭据与用途绑定规则只在 `bindingOf` 和 `readiness.ts` 写一次，避免页面再推一份或等发出去才报错；三家钥匙收在「账号与钥匙」一页，避免四处翻找。
 - **单一 `ServerConfig` 入口与统一 `redact` 出口**：禁止业务模块直接读 `process.env`；日志与外部记忆共用同一套脱敏规则，防止密钥外泄。
 

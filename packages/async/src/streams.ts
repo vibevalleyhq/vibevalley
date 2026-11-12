@@ -31,10 +31,6 @@ export async function* map<A, B>(source: AsyncIterable<A>, f: (a: A) => B | Prom
   for await (const a of source) yield await f(a);
 }
 
-export async function* filter<A>(source: AsyncIterable<A>, keep: (a: A) => boolean): AsyncGenerator<A> {
-  for await (const a of source) if (keep(a)) yield a;
-}
-
 /** Text split into lines (\n or \r\n), the last kept only if the text ended with it or it is not empty. */
 export async function* lines(source: AsyncIterable<string | Uint8Array>): AsyncGenerator<string> {
   const decoder = new TextDecoder();

@@ -24,10 +24,10 @@ import { registryOf } from "#/modules/runtime/runtime.ts";
 import { instructions } from "./prompts.ts";
 
 // The command line and the live evals have no farm to give the Llm its fetch: it gets the global one.
-export const standaloneLlm = (): Llm => makeLlm();
+const standaloneLlm = (): Llm => makeLlm();
 
 /** What the user should be told went wrong: said on stderr, and the conversation ends. */
-export class ChatRefused extends Error {
+class ChatRefused extends Error {
   override readonly name = "ChatRefused";
 }
 

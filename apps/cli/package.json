@@ -21,7 +21,6 @@
     "@types/node": "catalog:",
     "@vibevalley/server": "workspace:*",
     "@vibevalley/testkit": "workspace:*",
-    "vite-plus": "catalog:",
-    "vitest": "catalog:"
+    "vite-plus": "catalog:"
   }
 }
