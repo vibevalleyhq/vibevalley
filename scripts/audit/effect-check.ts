@@ -1,12 +1,10 @@
-import { spawn } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
 
 import { Predicate } from "effect";
-
-import { type Counts, type RatchetWords, grownRules, ratchetProblems, touchedFiles } from "./ratchet.ts";
 
 /** Every project Effect's language service checks; each has its own tsconfig.json. */
 export const projects = [
@@ -27,12 +25,6 @@ export const projects = [
 ] as const;
 
 export const ratchetPath = "scripts/audit/effect.ratchet.json";
-
-const words: RatchetWords = {
-  write: "vp run effect:write",
-  see: "See .agents/skills/vv-effect/references/tools.md",
-  cleared: () => 'Fix: set it to "error" in tsconfig.base.json\'s plugin and `vp run effect:write`. See .agents/skills/vv-effect/references/tools.md',
-};
 
 type Diagnostic = {
   readonly file: string;
@@ -83,48 +75,46 @@ function diagnose(project: string, config: string): Promise<Diagnostic[]> {
   });
 }
 
+/** Files that import Effect: the repository is leaving it (.agents/notes/proposed/architecture/2026-11-11-plain-typescript-without-effect.md), so this only goes down. */
+export function effectFiles(): string[] {
+  const listed = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "apps", "packages", "scripts"], { encoding: "utf8" }).stdout;
+  return listed
+    .split("\n")
+    .filter((f) => /\.(?:ts|tsx|mts)$/u.test(f) && !f.endsWith(".d.ts") && !f.includes("/node_modules/") && existsSync(f))
+    .filter((f) => /from\s+["'](?:effect|@effect\/[\w-]+)(?:\/[\w./-]+)?["']|import\(["'](?:effect|@effect\/)/u.test(readFileSync(f, "utf8")));
+}
+
 if (import.meta.main) {
   const { values } = parseArgs({ options: { write: { type: "boolean" } } });
   const plugin = pluginOf(JSON.parse(readFileSync("tsconfig.base.json", "utf8")));
-  const ratcheted = allRules().filter((rule) => !(rule in plugin.diagnosticSeverity));
-  // The config's own levels, and each rule it does not name yet as a warning: errors fail, warnings are counted.
+  // A rule the config does not name is off: only the rules it names hold (errors fail).
+  const unnamed = allRules().filter((rule) => !(rule in plugin.diagnosticSeverity));
   const config = JSON.stringify({
     ...plugin,
-    diagnosticSeverity: { ...plugin.diagnosticSeverity, ...Object.fromEntries(ratcheted.map((r) => [r, "warning"])) },
+    diagnosticSeverity: { ...plugin.diagnosticSeverity, ...Object.fromEntries(unnamed.map((r) => [r, "off"])) },
   });
   const found = await Promise.all(projects.map(async (project) => ({ project, diagnostics: await diagnose(project, config) })));
 
   const here = `${process.cwd()}/`;
   const where = (d: Diagnostic) => `${d.file.replace(here, "")}:${d.line}:${d.column} ${d.name}: ${d.message}`;
-  const seen = new Set<string>();
-  const failed: string[] = [];
-  const now: Record<string, Record<string, number>> = Object.fromEntries(ratcheted.map((r) => [r, {}]));
-  for (const { project, diagnostics } of found)
-    for (const d of diagnostics) {
-      // A file in two projects (a shared test helper) is reported by both: count it once.
-      const key = `${d.file}:${d.line}:${d.column}:${d.name}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      if (ratcheted.includes(d.name)) {
-        const counts = (now[d.name] ??= {});
-        counts[project] = (counts[project] ?? 0) + 1;
-      } else if (d.severity === "error" || d.severity === "warning") failed.push(where(d));
-    }
+  const failed = new Set<string>();
+  for (const { diagnostics } of found) for (const d of diagnostics) if (d.severity === "error" || d.severity === "warning") failed.add(where(d));
 
+  const files = effectFiles().length;
   if (values.write === true) {
-    writeFileSync(ratchetPath, JSON.stringify(now, null, 2) + "\n");
-    console.log(`effect: ratchet written for ${ratcheted.length} rules the config does not name yet`);
+    writeFileSync(ratchetPath, JSON.stringify({ files }, null, 2) + "\n");
+    console.log(`effect: ${files} files import Effect, written to the ratchet`);
   }
-  const kept: Counts = values.write === true ? now : JSON.parse(readFileSync(ratchetPath, "utf8"));
-  const problems = ratchetProblems(kept, now, words);
-  // The hits that broke the ratchet, in the files this change touches, so the message points at code.
-  const grown = grownRules(kept, now);
-  if (grown.size > 0) {
-    const touched = touchedFiles();
-    for (const { diagnostics } of found) for (const d of diagnostics) if (grown.has(d.name) && touched.has(d.file.replace(here, ""))) failed.push(where(d));
-  }
-  for (const line of [...new Set(failed)]) console.error(line);
+  const kept: unknown = JSON.parse(readFileSync(ratchetPath, "utf8"));
+  const keptFiles = Predicate.hasProperty(kept, "files") && typeof kept.files === "number" ? kept.files : 0;
+  const problems: string[] = [];
+  if (files > keptFiles)
+    problems.push(
+      `${files} files import Effect (kept ${keptFiles}): new code does not use it. Fix: write it in plain TypeScript. See .agents/notes/proposed/architecture/2026-11-11-plain-typescript-without-effect.md`,
+    );
+  else if (files < keptFiles) problems.push(`${files} files import Effect, down from ${keptFiles}. Fix: \`vp run effect:write\` lowers the ratchet.`);
+  for (const line of failed) console.error(line);
   for (const p of problems) console.error(`effect: ${p}`);
-  if (failed.length > 0 || problems.length > 0) process.exit(1);
-  console.log(`effect: ${projects.length} projects clean; ${ratcheted.length} rules on the ratchet`);
+  if (failed.size > 0 || problems.length > 0) process.exit(1);
+  console.log(`effect: ${projects.length} projects clean; ${files} files import Effect`);
 }

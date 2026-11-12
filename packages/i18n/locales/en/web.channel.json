@@ -284,5 +284,7 @@
       "stop": "Stopped",
       "imagegen": "Handed to the assistant; the image will be posted here"
     }
-  }
+  },
+  "lacks": "cannot answer: {why}",
+  "lacksFix": "Settings"
 }

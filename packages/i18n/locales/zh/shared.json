@@ -86,7 +86,7 @@
     "done": "这一轮做完了，等你看{conflict}",
     "failed": "这一轮没做成",
     "resting": "歇着（上一轮{last}）{conflict}",
-    "unfinished": "没做完",
+    "rested": "歇着{conflict}",
     "conflict": "，合进 {base} 会冲突（{files}）",
     "working": "在{action}",
     "workingOn": "在{action}：{label}",

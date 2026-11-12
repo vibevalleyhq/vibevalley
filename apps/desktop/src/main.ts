@@ -8,6 +8,7 @@ import { t } from "@vibevalley/i18n";
 import { desktopVoiceShortcut } from "@vibevalley/protocol/host";
 
 import { channels, serverEnvOf } from "./base/channel";
+import { devPageOf } from "./base/devPage";
 import { reasonOf } from "./base/lines";
 import { commandLine } from "./infra/commandLine";
 import { serveControl } from "./infra/control";
@@ -38,6 +39,8 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   const paths = appPaths();
+  // Only `vp run desktop:dev` says one; a packaged app never reads it.
+  const dev = !app.isPackaged && process.env.VIBEVALLEY_DEV === "1" ? devPageOf(process.env) : undefined;
   let server: ServerKeeper | undefined;
   let updates: Updater | undefined;
   // The server gets its time to save before the app goes; then is the moment an update is put in place.
@@ -58,13 +61,19 @@ if (!app.requestSingleInstanceLock()) {
   const starting = shellPath(paths.shellPath, process.env).then(async ({ path }) => {
     const keeper = serverKeeper(paths, serverEnvOf(currentChannel(), path ? { ...process.env, PATH: path } : process.env));
     server = keeper;
-    return keeper.start().then(
+    return keeper.start(dev?.serverPort).then(
       () => ({ keeper }) as const,
       (e: unknown) => ({ failed: e }) as const,
     );
   });
 
-  const window = mainWindow({ web: paths.web, server: () => server?.url() });
+  const window = mainWindow({
+    web: paths.web,
+    page: () => {
+      const url = server?.url();
+      return url === undefined ? undefined : (dev?.page ?? url);
+    },
+  });
   const hostUpdates = {
     state: () => updates?.state() ?? { _tag: "idle" as const, version: app.getVersion() },
     check: async () => updates?.check(),
@@ -163,7 +172,7 @@ if (!app.requestSingleInstanceLock()) {
     if (probe) probe.island = island.probe;
     app.on("will-quit", island.stop);
     if (!app.isPackaged && process.env.VIBEVALLEY_DEV === "1")
-      app.on("will-quit", devMode({ web: paths.web, repo: join(app.getAppPath(), "..", ".."), server: keeper, window }));
+      app.on("will-quit", devMode({ repo: join(app.getAppPath(), "..", ".."), server: keeper, window }));
     // Only a packaged app of a released stage updates itself.
     const stage = currentChannel();
     if (app.isPackaged && stage !== "dev") {

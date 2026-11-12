@@ -112,6 +112,23 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
   const fullTitle = issueTitle(issue, issues);
   const title = shortTitle(fullTitle);
 
+  /** The status summary, one part each: the stage, how long, who, the rounds, the time used, the money. cny is all the issue's runs when known. */
+  const statusParts = (now: number, cny?: number): string[] => {
+    const s = session ?? head;
+    const runs = Math.round(s.runs);
+    const waited = stage.since !== undefined ? now - stage.since : undefined;
+    const used = (endedAt(head) ?? now) - first.hiredAt;
+    const spentCny = cny ?? s.spent?.cny;
+    return [
+      t(`shared.stage.${stage.state}`),
+      ...(waited === undefined ? [] : [waited < 60_000 ? t("web.issue.issue.justNow") : t("web.issue.issue.since", { span: spanText(waited) })]),
+      head.name,
+      ...(runs > 0 ? [t("web.issue.issue.ran", { n: runs })] : []),
+      ...(used >= 60_000 ? [t("web.issue.issue.used", { span: spanText(used) })] : []),
+      ...(spentCny !== undefined ? [`¥${spentCny.toFixed(2)}`] : []),
+    ];
+  };
+
   return {
     issue,
     head,
@@ -148,22 +165,9 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
       n: sessions.length,
       line: sessions.map((r) => t("web.issue.issue.historyItem", { name: r.name, id: r.id })).join(" → "),
     }),
-    /** status summary line. cny is all the issue's runs when known. */
-    statusLine(now: number, cny?: number) {
-      const s = session ?? head;
-      const runs = Math.round(s.runs);
-      const waited = stage.since !== undefined ? now - stage.since : undefined;
-      const used = (endedAt(head) ?? now) - first.hiredAt;
-      const spentCny = cny ?? s.spent?.cny;
-      return [
-        t(`shared.stage.${stage.state}`),
-        ...(waited === undefined ? [] : [waited < 60_000 ? t("web.issue.issue.justNow") : t("web.issue.issue.since", { span: spanText(waited) })]),
-        head.name,
-        ...(runs > 0 ? [t("web.issue.issue.ran", { n: runs })] : []),
-        ...(used >= 60_000 ? [t("web.issue.issue.used", { span: spanText(used) })] : []),
-        ...(spentCny !== undefined ? [`¥${spentCny.toFixed(2)}`] : []),
-      ].join(" · ");
-    },
+    statusParts,
+    /** The status summary on one line. */
+    statusLine: (now: number, cny?: number) => statusParts(now, cny).join(" · "),
     usedLine(steps: SessionEvent[], now: number) {
       const s = session ?? head;
       const runs = s.runs > 0 ? Math.round(s.runs) : steps.filter((e) => e.type === "run/start").length;

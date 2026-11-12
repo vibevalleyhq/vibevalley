@@ -12,7 +12,7 @@ src/host.ts        main's end of the page's host (desktopBridge): notices, the t
 src/tray.ts        the menu bar's summary
 src/menu.ts        the application menu, in the farm's language
 src/server.ts      the server as a child: the login shell's PATH (the last one kept, asked again behind), the ready line, SIGTERM then SIGKILL, and its keeper
-src/dev.ts         development: the page reloads, the server starts again when no helper is working
+src/dev.ts         development: the server starts again when no helper is working (the page updates itself, from Vite)
 src/preload.ts     the host interface, through contextBridge
 src/bridge.ts      the bridge's one IPC channel and its two ends
 src/chrome.ts      the title strip, the window's buttons and its ground, shared by main and the preload
@@ -28,11 +28,13 @@ test/              Playwright starting the whole app with temporary home and Ele
 The desktop test passes Electron's `--user-data-dir` before the app starts. Its single-instance lock, browser storage
 and farm files belong to the temporary directories, so the owner's desktop app can stay open during the test.
 
-Development starts one Vite watch build and waits for its first complete bundle before launching Electron. Later
-builds still reload the page; there is no second initial build that reloads the app during startup.
+Development builds the page once (the window's opening cover is `dist/opening.html`), then starts Vite's dev server on
+127.0.0.1 and Electron. The window loads Vite's page, whose changes arrive by hot module replacement; Vite sends `/api`
+to the server on a port `scripts/dev.ts` chose first, which stays the same across the server's restarts
+(`src/base/devPage.ts`). The page runs Solid's development build there, not the production one.
 
 ```bash
-vp run dev        # from the repository root: vp run desktop:dev; builds the page, rebuilds it on change (the window reloads) and restarts the server when its code changes
+vp run dev        # from the repository root: vp run desktop:dev; the page from Vite with hot updates, and the server restarted when its code changes
 vp run test       # the main process's rules (src/*.test.ts), also in vp run web:check
 vp run e2e        # from the root: vp run desktop:test; builds the page first (dependsOn), then Playwright on the whole app
 vp run package    # from the root: vp run package:mac

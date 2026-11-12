@@ -7,7 +7,7 @@ import type { ServerKeeper } from "../infra/server";
 import { workspaceClosure } from "../infra/workspace.ts";
 import type { MainWindow } from "./window";
 
-/** A build writes many files; one reload once they are all there. */
+/** A change often writes several files; one restart once they are all there. */
 const settleMs = 400;
 
 /** How often a restart held back by working helpers asks again. */
@@ -22,10 +22,8 @@ function debounce(f: () => void) {
 }
 
 interface DevHooks {
-  /** apps/web/dist and the repository root. */
-  web: string;
+  /** The repository root. */
   repo: string;
-  reloadPage: () => void;
   restartServer: () => Promise<void>;
   /** How many helpers are working now; 0 when that cannot be asked (the server is down). */
   working: () => Promise<number>;
@@ -46,8 +44,6 @@ export async function restartWhenIdle(h: Pick<DevHooks, "working" | "restartServ
 
 function watchForDev(h: DevHooks): () => void {
   const watchers: FSWatcher[] = [];
-  const page = debounce(h.reloadPage);
-  watchers.push(watch(h.web, { recursive: true }, page));
   let restarting = Promise.resolve();
   const server = debounce(() => {
     // One restart at a time; a change during one restarts again after it.
@@ -67,14 +63,10 @@ function watchForDev(h: DevHooks): () => void {
   return () => watchers.forEach((w) => w.close());
 }
 
-export function devMode(o: { readonly web: string; readonly repo: string; readonly server: ServerKeeper; readonly window: MainWindow }) {
+/** The page's changes come hot from Vite (scripts/dev.ts); the server's restart the server. */
+export function devMode(o: { readonly repo: string; readonly server: ServerKeeper; readonly window: MainWindow }) {
   return watchForDev({
-    web: o.web,
     repo: o.repo,
-    reloadPage: () => {
-      console.log("vibevalley dev: the page was built again, reloading");
-      o.window.current()?.webContents.reloadIgnoringCache();
-    },
     working: async () => {
       const url = o.server.url();
       if (url === undefined) return 0;

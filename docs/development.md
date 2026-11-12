@@ -10,7 +10,7 @@
 vp install                                   # 根目录：安装全部 workspace 依赖
 vp run --filter @vibevalley/web build         # 构建页面（apps/web/dist）
 vp run --filter @vibevalley/server start --web ../web/dist   # 监听 127.0.0.1:8787，读 $VIBEVALLEY_HOME/vibevalley.yaml，在 / 提供页面
-vp run desktop:dev                           # 桌面版：Electron 拉起服务端并打开页面；改页面自动刷新，改服务端空闲时自动重启
+vp run desktop:dev                           # 桌面版：Electron 拉起服务端，窗口打开 Vite 的 dev server；改页面就地热替换，改服务端空闲时自动重启
 ```
 
 - **目录**：帮工在 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）下运行，仓库在 `repos/`，worktree 在 `worktrees/`；设置与数据在 `~/.vibevalley`（`VIBEVALLEY_HOME`），详情见[设置和配置](docs/subsystems/setting.md#模型和不变量)。

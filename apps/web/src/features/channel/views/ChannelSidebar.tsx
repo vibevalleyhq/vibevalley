@@ -12,11 +12,13 @@ import { archivedOf, channelName, chatPath, directsOf, groupsOf, sessionThreadOf
 import { useAgent } from "#/infra/agents.ts";
 import { api } from "#/infra/api.ts";
 import { orchestratorMood, orchestratorSession, type OrchestratorMood, useCore } from "#/infra/frame.ts";
-import { ready, useAgents } from "#/infra/query.ts";
+import { ready, settingsQuery, useAgents, useQuery } from "#/infra/query.ts";
+import { fixOf } from "#/infra/readiness.ts";
 import { useRouter } from "#/infra/router.ts";
 import { createAct } from "#/ui/act.ts";
 import { OrchestratorFace } from "#/ui/domain/Face.tsx";
 import { Icon } from "#/ui/Icon.tsx";
+import { TextLink } from "#/ui/layout.tsx";
 
 import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots, phaseDot, phaseText } from "./presence";
 import { switcher } from "./QuickSwitcher";
@@ -353,6 +355,13 @@ const styles = stylex.create({
     fontSize: "var(--text-xs)",
     lineHeight: "var(--leading-xs)",
     color: "var(--color-muted)",
+  },
+  orchestratorLineName: {
+    flexShrink: 0,
+    whiteSpace: "nowrap",
+  },
+  orchestratorLineWhy: {
+    minWidth: 0,
   },
 });
 
@@ -692,6 +701,12 @@ function OrchestratorLine(props: { agent: string }) {
   const core = useCore();
   const profile = useAgent(() => props.agent);
   const now = (): OrchestratorMood => orchestratorMood(core(), props.agent);
+  const settings = useQuery(settingsQuery);
+  // Listening is not a promise the orchestrator can keep without its model: then the line says what it lacks, and where that is set.
+  const lacks = () => {
+    const readiness = ready(settings, undefined)?.readiness.orchestrator;
+    return readiness?.ready === false ? fixOf(readiness.missing) : undefined;
+  };
   const clock = useNow();
   const since = () => {
     const phase = orchestratorSession(core(), props.agent)?.phase;
@@ -701,14 +716,31 @@ function OrchestratorLine(props: { agent: string }) {
     <div
       data-testid="channel-orchestrator-line"
       data-key={props.agent}
-      data-state={now()}
+      data-state={lacks() ? "lacking" : now()}
       {...stylex.attrs(styles.channelOrchestratorLine)}
       aria-label={t("web.channel.orchestrator")}
     >
       <OrchestratorFace size={32} agent={props.agent} />
-      {profile()?.name || t("web.channel.orchestrator")}
-      <Dot tone={now() === "idle" ? "idle" : now() === "thinking" ? "wheat" : "leaf"} size={8} styles={styles.typingDot} />
-      <span {...stylex.attrs(styles.orchestratorLineSpan)}>{orchestratorMoodLabels[now()]}</span>
+      <span {...stylex.attrs(styles.orchestratorLineName)}>{profile()?.name || t("web.channel.orchestrator")}</span>
+      <Show
+        when={lacks()}
+        fallback={
+          <>
+            <Dot tone={now() === "idle" ? "idle" : now() === "thinking" ? "wheat" : "leaf"} size={8} styles={styles.typingDot} />
+            <span {...stylex.attrs(styles.orchestratorLineSpan)}>{orchestratorMoodLabels[now()]}</span>
+          </>
+        }
+      >
+        {(fix) => (
+          <>
+            <Dot tone="berry" size={8} styles={styles.typingDot} />
+            <span {...stylex.attrs(styles.orchestratorLineSpan, styles.orchestratorLineWhy)}>{t("web.channel.lacks", { why: fix().words })}</span>
+            <span {...stylex.attrs(styles.orchestratorLineName)}>
+              <TextLink href={fix().href}>{t("web.channel.lacksFix")}</TextLink>
+            </span>
+          </>
+        )}
+      </Show>
       <Show when={since()}>{(at) => <span {...stylex.attrs(styles.sidebarSpan3)}>{tookText(Math.max(0, clock() - at()))}</span>}</Show>
       <Show when={now() === "thinking"}>
         <ThinkingDots />

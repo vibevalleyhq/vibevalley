@@ -89,7 +89,6 @@ const styles = stylex.create({
     lineHeight: "var(--leading-lg)",
     fontWeight: "var(--font-weight-semibold)",
   },
-  issueDetailSpan3: {},
   issueDetailSpanTone: {
     color: "var(--color-berry)",
   },
@@ -148,10 +147,22 @@ const styles = stylex.create({
   issueNow: {
     marginTop: "0.375rem",
     display: "flex",
-    alignItems: "center",
+    // Top-aligned, so a line that wraps on a narrow screen keeps the dot on its first line.
+    alignItems: "flex-start",
     gap: "0.5rem",
     fontSize: "var(--text-sm)",
     lineHeight: "var(--leading-sm)",
+  },
+  issueNowDot: {
+    flexShrink: 0,
+    // Centres the 8px dot on the first line: (line height - dot) / 2.
+    marginTop: "calc((var(--leading-sm) - 8px) / 2)",
+  },
+  issueNowLine: {
+    minWidth: 0,
+  },
+  issueNowPart: {
+    whiteSpace: "nowrap",
   },
   issueAsk: {
     marginBottom: "1.25rem",
@@ -360,10 +371,17 @@ export function IssueDetail(props: {
         <IssueTitle shown={s().title} full={live().title} editable={s().open} state={labeled().state("title")} onSave={(title) => setLabel({ title })} />
       </div>
       <div {...stylex.attrs(styles.issueNow)} aria-label={t("web.issue.detail.now")} data-testid="issue-now" data-state={s().stage.state}>
-        <Dot tone={tone()} size={8} ring={false} />
-        <span>{t(`shared.status.${live().status}`)} ·</span>
-        <span {...stylex.attrs(styles.issueDetailSpan3, tone() === "berry" ? styles.issueDetailSpanTone : styles.issueDetailSpanAlt)}>
-          {s().statusLine(now(), timeline()?.spent?.cny)}
+        <Dot tone={tone()} size={8} ring={false} styles={styles.issueNowDot} />
+        <span {...stylex.attrs(styles.issueNowLine, tone() === "berry" ? styles.issueDetailSpanTone : styles.issueDetailSpanAlt)}>
+          {/* Each part whole: a narrow screen wraps between them, not inside "第 1 轮". */}
+          <For each={s().statusParts(now(), timeline()?.spent?.cny)}>
+            {(part, i) => (
+              <>
+                {i() > 0 ? " · " : ""}
+                <span {...stylex.attrs(styles.issueNowPart)}>{part}</span>
+              </>
+            )}
+          </For>
         </span>
       </div>
     </div>

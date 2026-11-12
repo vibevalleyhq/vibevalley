@@ -39,8 +39,9 @@ export interface UpdateCover {
 export function mainWindow(o: {
   /** apps/web/dist, where opening.html is. */
   readonly web: string;
-  /** The server's address once it is up: a window made again opens on it, and the page stays on its origin. */
-  readonly server: () => string | undefined;
+  /** The page's address once the server is up (the server's own, or in development Vite's, base/devPage.ts): a window made
+   * again opens on it, and the page stays on its origin. */
+  readonly page: () => string | undefined;
 }) {
   let window: BrowserWindow | undefined;
   let cover: OpeningView | undefined;
@@ -118,7 +119,7 @@ export function mainWindow(o: {
       if (
         contents !== made.webContents ||
         made.isDestroyed() ||
-        !pagePermission(permission, origin, o.server(), details.isMainFrame, [details.mediaType ?? "unknown"])
+        !pagePermission(permission, origin, o.page(), details.isMainFrame, [details.mediaType ?? "unknown"])
       )
         return false;
       if (permission !== "media" || process.platform !== "darwin") return true;
@@ -131,8 +132,8 @@ export function mainWindow(o: {
         contents === made.webContents &&
         !made.isDestroyed() &&
         !contents.isDestroyed() &&
-        navigationOf(contents.getURL(), o.server()) === "stay" &&
-        pagePermission(permission, origin, o.server(), details.isMainFrame, mediaTypes);
+        navigationOf(contents.getURL(), o.page()) === "stay" &&
+        pagePermission(permission, origin, o.page(), details.isMainFrame, mediaTypes);
       if (!allowed()) return callback(false);
       if (permission !== "media" || process.platform !== "darwin") return callback(true);
       // Check is not consent: only the explicit device request may open an OS prompt.
@@ -152,13 +153,13 @@ export function mainWindow(o: {
       const to = filledNear({ w, h }, farmFraming.picture, farmFraming.cut, minSize, { w: area.width, h: area.height });
       if (to.w !== w || to.h !== h) made.setContentSize(to.w, to.h, true);
     });
-    // The page stays on the server's origin; any other link opens in the browser.
+    // The page stays on its origin; any other link opens in the browser.
     made.webContents.setWindowOpenHandler(({ url: to }) => {
       if (navigationOf(to, undefined) === "browser") void shell.openExternal(to);
       return { action: "deny" };
     });
     made.webContents.on("will-navigate", (event, to) => {
-      const where = navigationOf(to, o.server());
+      const where = navigationOf(to, o.page());
       if (where === "stay") return;
       event.preventDefault();
       if (where === "browser") void shell.openExternal(to);
@@ -232,17 +233,17 @@ export function mainWindow(o: {
         });
       return current.ending;
     },
-    /** A place on the server's page: "" is its start. */
+    /** A place on the page: "" is its start. */
     open: (path = "") => {
-      const server = o.server();
-      if (server !== undefined) void loaded(now().loadURL(server + path));
+      const page = o.page();
+      if (page !== undefined) void loaded(now().loadURL(page + path));
     },
     /** In front, made again if it was closed. steal: from whatever program is in front (a click on the island). */
     show: (steal = false) => {
       const fresh = window === undefined;
       const w = now();
-      const server = o.server();
-      if (fresh && server !== undefined) void loaded(w.loadURL(server));
+      const page = o.page();
+      if (fresh && page !== undefined) void loaded(w.loadURL(page));
       const reveal = () => {
         if (w.isDestroyed()) return;
         if (w.isMinimized()) w.restore();

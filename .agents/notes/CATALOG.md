@@ -2,7 +2,7 @@
 
 由 [scripts/docs/agent-notes.ts](scripts/docs/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（30 篇）
+## proposed（31 篇）
 
 ### feature
 
@@ -23,6 +23,7 @@
 ### architecture
 
 - 2026-11-11 [扩展剩余跨模块品牌主键与 SQL 主外键自动品牌生成](.agents/notes/proposed/architecture/2026-11-11-type-driven-boundaries-and-branded-ids.md)
+- 2026-11-11 [普通 TypeScript：不用 Effect、Schema 用 Zod、查询由 SQL 生成 Zod、样式回到 Tailwind v4](.agents/notes/proposed/architecture/2026-11-11-plain-typescript-without-effect.md)
 - 2026-11-10 [一个服务端管多台机器，库换成 Postgres](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)
 - 2026-11-10 [事务提交尾段原子同步、监听地址就绪门与热路径增量投影](.agents/notes/proposed/architecture/2026-11-10-atomic-commits-and-hot-paths.md)
 - 2026-11-07 [让获授权的工作持续推进并可信交付](.agents/notes/proposed/architecture/2026-11-07-authorized-work-and-prompt-design.md)
