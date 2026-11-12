@@ -11,7 +11,7 @@
 |---|---|
 | RTC 令牌签发、认领、续期与撤销（`AgoraGrant`），请语音 agent 进出频道 | 助手的思考、工具调用与回复生成（[助手](docs/subsystems/orchestrator.md)） |
 | 语音线路（默认端口 `8788`）：单接口回环监听、每通电话独立 Bearer 钥匙与隧道管理 | OpenAI `chat/completions` 协议转换与进程内 `Caller` 端口（[助手](docs/subsystems/orchestrator.md)） |
-| 通话内主动播报队列（`Voice.speak`）与双模式字幕分流（助手直答 vs 快嘴模型） | 通话记录写入默认频道且不重复唤醒（[频道](docs/subsystems/channel.md) 的 `spoken`） |
+| 通话内主动播报队列（`Voice.speak`）与双模式字幕分流（助手直答 vs 快嘴模型） | 通话记录写入默认频道且不重复唤醒（[频道](docs/subsystems/channel.md) `Channel.post` 的 `Call`） |
 | 听写音频转发（MOSS / 自建地址）与 MOSS Live 实时线路转发 | 语音设置在 `settings.json` 中的持久化与脱敏（[设置和配置](docs/subsystems/setting.md)） |
 
 ## 在哪
@@ -27,7 +27,7 @@
 | `apps/web/src/features/voice/model/`、`views/` | `model/` 里 `call.ts`、`dictation.ts`、`moss-line.ts` 管设备与宿主，`moss-worker.ts`/`moss-worklets.ts` 保持 PCM 绕开 UI 主线程，`captions.ts` 管展示轮次，`contract.ts` 定义应用会话接口；`views/` 是表单与 playground |
 | `apps/mobile/src/infra/rtc.ts` | 手机壳原生声网 RTC 适配（锁屏不断线） |
 
-接口见 [capabilities.md](docs/reference/capabilities.md)（`voice.*` 及 `GET /api/v1/voice/moss/line`）。
+接口见 [capabilities.md](docs/reference/capabilities.md)（`voice.*` 及 `GET /api/v1/voice/moss/line`、`/api/v1/voice/vision/line`）。
 
 ## 模型和不变量
 
@@ -80,7 +80,7 @@ Vision 的帧要先等 `input.frame.ready` 再发送二进制，等 `input.frame
 
 ## 和谁打交道
 
-- **助手与频道（`orchestrator`、`channel`）**：助手经 `response.ts` 处理流式回答与 `brief` 播报；定稿文字经 `Channel.spoken` 写默认频道。
+- **助手与频道（`orchestrator`、`channel`）**：助手经 `response.ts` 处理流式回答与 `brief` 播报；定稿文字经 `Channel.post` 的 `Call` 写默认频道。
 - **通知与设置（`inbox`、`setting`）**：订阅 `Inbox.news` 驱动通话内主动播报；从 `Setting` 实时读取声网凭据与语音配置。
 - **[AI 服务](docs/subsystems/provider.md)**：Provider 解析听写连接与默认模型、交出 MOSS Live 与 Vision 绑定的账号（Key 封在线路里）；语音页不再保存独立的 MOSS Key。
 
@@ -101,5 +101,5 @@ Vision 的帧要先等 `input.frame.ready` 再发送二进制，等 `input.frame
 ## 怎么验证
 
 - `packages/provider/src/moss/moss.test.ts`、`packages/ai/src/realtime/moss.test.ts`、`sdk.test.ts`：握手、tagged-v1、完成回执、样本级打断与 SDK 替代边界。
-- `apps/server/src/gateway/voice/voice.test.ts`、`moss.test.ts`、`http/moss.test.ts`：授予认领、多事项合并播报、512 字节切段、挂断拒收字幕与 MOSS 中继测试。
+- `apps/server/src/gateway/voice/voice.test.ts`、`moss-tools.test.ts`、`apps/server/src/gateway/http/moss.test.ts`：授予认领、多事项合并播报、512 字节切段、挂断拒收字幕与 MOSS 中继测试。
 - `apps/web/src/features/voice/model/captions.test.ts`、`apps/web/test/voice.spec.ts`、`farm-phone.spec.ts`：分块字幕拼接、缺钥匙提示、听写与来电接听测试。

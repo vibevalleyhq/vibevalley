@@ -60,7 +60,7 @@
 ## 和谁打交道
 
 - **核心状态与频道（`core`、`channel`）**：读取工单、会话、`Chat.userMentions` 与 `channel_read_cursor`。
-- **信箱、语音与连接器（`session`、`voice`、`connector`）**：巡查摘要投递给 `Session`；`Voice` 订阅 `news`、`Connector` 订阅 `toUser`。
+- **帮工、语音与连接器（`session`、`voice`、`connector`）**：巡查摘要投递给 `Session`；`Voice` 订阅 `news`、`Connector` 订阅 `toUser`。
 
 ## 为什么这样
 

@@ -81,7 +81,7 @@
 ## 还没做的
 
 - 同一工单 worktree 内多帮工接力写锁交接：[一块地上几个人一起种](.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md)。
-- 将 `.vibevalley/check` 抽成测试端口、分支合并与释放决策抽成规则层纯函数：[把模块层往下压](.agents/notes/proposed/testing/2026-10-26-press-the-module-layer-down.md)。
+- 将 `.vibevalley/check` 抽成可注入测试端口，免去合并单测重复拉起 shell 子进程：[等待器真实时间上限、模块窄替身与测试时钟门禁收窄](.agents/notes/proposed/testing/2026-11-08-testable-module-boundaries.md)。
 
 ## 怎么验证
 

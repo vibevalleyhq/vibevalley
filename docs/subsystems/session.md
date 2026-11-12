@@ -48,7 +48,7 @@
 
 - **助手与帮工统一在 `sessions` 中**：以 `Session.role`（`orchestrator` 或 `worker`）区分，共用 `phase` 与 `session_run`；仅 `worker` 参与并发槽位、地块分配与目录恢复。
 - **助手的会话由本模块自己登记**：开机时登记每个助手档案，之后经 `Agent.whenKept` 在档案存下的那次写返回之前登记或改名；登记失败那次写就失败。工单、频道用到助手的会话时它已经在了。
-- **执行器隔着链路**：会话经 `Machine.executions(machine)` 拿到一台机器的 `Executions`（`link.ts` 包装 `executor.ts`），过界的每个值都复制一份，为执行器搬到别的进程、别的机器做准备。
+- **执行器隔着链路**：会话经 `session/machine.ts` 的 `executions(machine)` 拿到一台机器的 `Executions`（`link.ts` 包装 `executor.ts`），过界的每个值都复制一份，为执行器搬到别的进程、别的机器做准备。
 - **执行器拥有底层资源，会话拥有领域状态**：`executor.ts` 持有 oar 实例直至确认底层进程关闭才释放占位；关闭失败时继续占槽并拒绝清理该目录。
 
 ### 对外的门
@@ -173,7 +173,7 @@
 ## 还没做的
 
 - 接入 opencode、grok、kimi、antigravity、cursor 等更多农机：[其他农机提案](.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)。
-- 交付归仓库、纯判断搬出服务：[模块要深](.agents/notes/proposed/architecture/2026-11-12-deep-modules.md)。
+- 纯判断搬出服务：[模块要深](.agents/notes/proposed/architecture/2026-11-12-deep-modules.md)。
 
 ## 怎么验证
 

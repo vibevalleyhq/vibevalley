@@ -115,7 +115,6 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 ## 还没做的
 
 - 多帮工协作同一块地、逐条勾选持久化验收标准：[一块地上几个人一起种](.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md)。
-- 故障自动回流成验收样本、退回超限换新会话：[先采样，再验收](.agents/notes/proposed/architecture/2026-10-14-sample-then-verify.md)。
 
 ## 怎么验证
 

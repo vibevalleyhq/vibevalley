@@ -32,8 +32,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [user.md](docs/subsystems/user.md) | 用户和设备：一个用户、名字和密码、每台设备一把钥匙、密码和确认码登录、收回和久不用作废 |
 | [setting.md](docs/subsystems/setting.md) | 设置：settings.json、配置和环境变量、钥匙和打码 |
 | [provider.md](docs/subsystems/provider.md) | AI 服务：供应商连接、模型目录、默认用途、凭据与配置版本 |
-| [library.md](docs/subsystems/library.md) | 素材库：生成的、你上传的、帮工拿回来的文件，一份文件一张卡，记着来路 |
-| [media.md](docs/subsystems/media.md) | 生图：持久化任务、独立下载、安全校验、本机附件与状态投影 |
+| [media.md](docs/subsystems/media.md) | 媒体和素材库：生图、语音、理解、转写任务与本机输入，独立下载与安全校验；生成的、你上传的、帮工拿回来的文件，一份文件一张卡，记着来路 |
 | [game.md](docs/subsystems/game.md) | 游戏：账本、金币和成就、等级、空地和特效 |
 | [core.md](docs/subsystems/core.md) | 核心状态：一份状态只因事实而变、SSE 流和全部路由、接口和能力表、重启 |
 | [foundation.md](docs/subsystems/foundation.md) | 地基：一个仓库、一块业务一个服务（工厂加接口）、异步原语、Zod 的形状和规则、Postgres 查询生成器、表结构、测试 |
@@ -80,7 +79,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 仓库 | repo | repo（`RepoSummary`） | 一块地 |
 | 空间 | space | `SpaceState`；目录是 `ServerConfig` 的 `workRoot` | 世界、全图 |
 | 宿主 | host | `ServerConfig.home`（`$VIBEVALLEY_HOME`） |  |
-| 空位 | spot | `ServerConfig.repo.maxSessions`（配置 `repo.max_sessions`）、`Session.makeRoom`；每台农机另有 `maxWorking` | 并发位、空地 |
+| 空位 | spot | `ServerConfig.repo.maxSessions`（配置 `repo.max_sessions`）、`Session.room`；每台农机另有 `maxWorking` | 并发位、空地 |
 | 档案模板 | profile template | `AgentTemplate`（`agent.template.*`） | 种子、预设 |
 | 工单模板 | ticket template | issue template（`IssueTemplate`、`repo.template.list`） | seed |
 | 阶段 | what it is doing | phase（`Session.phase`） | 状态（指阶段时） |
@@ -106,10 +105,10 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 子工单 | child issue | `Issue`（带 `parent`、`blockedBy`；拆单输入为 `IssueChildDraft`） | Task、步骤状态机 |
 | 派活 | dispatch | hire（`Issue.hire`、事实 `FactSessionChanged`） |  |
 | 派工关联 | assignment | `Assignment`（`issue_assignment`） |  |
-| 执行器 | executor | `Executions`（`Machine.executions`） |  |
+| 执行器 | executor | `Executions`（`executor.ts`） |  |
 | 起草 | refine | refine（`IssueRefinement`、`issue.refine`） |  |
 | 用户 | user | user（`User`、`userId`） | 主人、owner |
-| 田头 | the farm chat | 默认频道（`Channel.default`） | 群（指默认频道时） |
+| 田头 | the farm chat | 默认频道（`Channel.defaultChannel`） | 群（指默认频道时） |
 | 私聊 | direct message | direct | 私信 |
 | 和帮工私聊 | talk | `Channel.direct`、`Session.channel` |  |
 | 频道 | channel | channel（`Channel`） | 群（指频道时）、群聊 |

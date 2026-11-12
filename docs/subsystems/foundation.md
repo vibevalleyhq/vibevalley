@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 工作区、依赖 catalog、构建与类型检查 | 各包的对外约定（各包 `README.md`） |
-| 服务端 11 个模块的划分、依赖方向与两阶段启动 | 各模块的业务行为（对应子系统文档） |
+| 服务端 10 个模块的划分、依赖方向与两阶段启动 | 各模块的业务行为（对应子系统文档） |
 | `packages/protocol` 的概念目录、Schema 与客户端生成 | 核心状态折叠与接口路由（[核心状态](docs/subsystems/core.md)） |
 | Postgres 基线表结构、SQL 代码生成、主键与命名规范 | 业务表含义（各子系统）与家目录文件（[架构](docs/architecture.md#存了什么)） |
 | 测试金字塔、虚拟时钟与脚本化帮工 | 页面分层与宿主打包（[客户端](docs/subsystems/app.md)） |
@@ -28,7 +28,7 @@
 | `packages/protocol/src/rules/` | 服务端与页面共用的纯函数规则 |
 | `packages/protocol/src/client.ts` | 由 `scripts/gen/api-client.ts` 生成的 HTTP 客户端 `VibeValleyApi` |
 | `apps/server/db/migrations/0001_schema.up.sql` | 唯一的 Postgres 表结构基线 |
-| `apps/server/db/queries/<表>.sql`、`db/generated/` | 按表拆分的 SQL 查询与 `scripts/pg-generate.ts` 生成代码 |
+| `apps/server/db/queries/<表>.sql`、`db/generated/` | 按表拆分的 SQL 查询与 `apps/server/scripts/pg-generate.ts` 生成代码 |
 | `apps/server/src/testing/`、`packages/testkit/` | 测试农场组装、虚拟时钟等待与测试金字塔分级 |
 | `packages/i18n/`、`scripts/gen/i18n.ts` | 中英双语词典 JSON、生成的 `src/catalogs.ts` 与词条检查工具 |
 
@@ -94,7 +94,7 @@
 | 层 | 入口 | 真实部分 | 替身端口 | 预算 | 位置 |
 |---|---|---|---|---|---|
 | 规则 | 纯函数 | 被测代码 | 无 | 20ms | 不碰库、进程、网络的 `*.test.ts` |
-| 模块 | 模块服务接口 | 当前及下层模块、内存库、真 git | `scriptedRuntime`、照脚本回答的 DeepSeek、假聊天/声网 | 300ms | `apps/server/src/<模块>/*.test.ts` |
+| 模块 | 模块服务接口 | 当前及下层模块、内存库、真 git | `scriptedRuntime`、照脚本回答的 DeepSeek、假聊天/声网 | 300ms | `apps/server/src/modules/<模块>/*.test.ts`、`gateway/<门>/*.test.ts` |
 | 流程 | `flows/farm.ts` | 全部服务端模块与真 git | 同上 | 2s | `apps/server/src/flows/*.test.ts` |
 | 浏览器组件 | 组件 DOM 与 owner | Chromium、Solid、真实组件 | 故事数据，无服务端 | 3s | `apps/web/test/stories.spec.ts` |
 | 页面 | HTTP 与 SSE | 真服务端进程 + Chromium | 脚本化帮工、无外部密钥 | 3s | `apps/web/test/projects.ts` 的 integration 项目 |
@@ -143,14 +143,14 @@
 
 ## 为什么这样
 
-- **按限界上下文切成 11 个单向模块**：消除平铺服务的隐式启动耦合与跨模块状态直读，用 `modules.test.ts` 守住边界；放弃平铺加 lint 或粗粒度并成 5 个大模块。
+- **按限界上下文切成 10 个单向模块**：消除平铺服务的隐式启动耦合与跨模块状态直读，用 `modules.test.ts` 守住边界；放弃平铺加 lint 或粗粒度并成 5 个大模块。
 - **契约按概念分目录，不拆多包**：消除单大文件合并冲突，同时避免拆成十几个子包的构建开销。
-- **Postgres，不再是 `node:sqlite`**：一个服务端要管多台机器（[一个服务端管多台机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)），库要能放在服务器上、被多台机器的活同时写；只在一台电脑上用时仍开箱即用，靠同一种方言的 PGlite。生成器 `scripts/pg-generate.ts` 让 Postgres 自己说每个参数和结果列的类型（Parse、Describe），不再从文本里猜。代价：PGlite 是数十 MB 的 WASM，新起一个要近一秒（测试从模板拷贝，约 0.1 秒），也比 `node:sqlite` 吃 CPU，服务端测试只开一半的核。
+- **Postgres，不再是 `node:sqlite`**：一个服务端要管多台机器（[一个服务端管多台机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)），库要能放在服务器上、被多台机器的活同时写；只在一台电脑上用时仍开箱即用，靠同一种方言的 PGlite。生成器 `apps/server/scripts/pg-generate.ts` 让 Postgres 自己说每个参数和结果列的类型（Parse、Describe），不再从文本里猜。代价：PGlite 是数十 MB 的 WASM，新起一个要近一秒（测试从模板拷贝，约 0.1 秒），也比 `node:sqlite` 吃 CPU，服务端测试只开一半的核。
 - **单一表结构基线，内部不留兼容**：启动时按 `db.schema` 哈希自动归档旧库并重建，省去演进期的多步迁移负担。
 - **规则用手写的例子测，不录黄金数据**：录下的 `*.jsonl.gz` 有几十 MB，改了只看得到二进制，规则一改就整份重写，说不出哪里变对了、哪里变错了；拿不出它抓到过真问题的证据，就去掉了。
 - **不用 Effect，写普通 TypeScript**：Effect 的服务、错误通道和 fiber 让每个模块多一层要学的写法，agent 照抄时最常错在它身上（错误变成缺陷、fiber 不归作用域、`yield*` 漏写），而仓库要的打断、收尾和并发用 `AbortSignal`、`await using` 和一个小的 `@vibevalley/async` 就够；运行时校验换成 Zod，SQL 的结果行也由生成器写成 Zod。代价：错误不再写在类型里，靠 `ApiError` 的 `bizCode`、`instanceof` 和 `catching` 表守住。没选只把 Effect 收缩到服务端内核：两种写法的交界要长期养着；也没选换另一个效果库（fp-ts、neverthrow）：问题是写法离普通 TypeScript 太远，换一个库只是换一套写不对的 API。
 - **运行时校验只用 Zod**：agent 最熟、生态最全（Hono、MCP SDK、JSON Schema 输出都直接支持）；契约、查询的行、配置、工具入参用同一种，只有一套要学。没选 Valibot、ArkType（更小更快，但少有人熟）。
-- **查询仍由 SQL 生成，只换输出**：`scripts/pg-generate.ts` 让 Postgres 自己说参数和结果列的类型（Parse、Describe），写出 Zod 的行 Schema 和普通的 `async` 函数。没选 ORM 或查询构造器（Drizzle、Kysely）：类型会从库的推断来而不是从数据库来，44 个查询文件要改写成 TypeScript；也没选 sqlc 本身：它的 TypeScript 插件不写 Zod，驱动里没有 PGlite。
+- **查询仍由 SQL 生成，只换输出**：`apps/server/scripts/pg-generate.ts` 让 Postgres 自己说参数和结果列的类型（Parse、Describe），写出 Zod 的行 Schema 和普通的 `async` 函数。没选 ORM 或查询构造器（Drizzle、Kysely）：类型会从库的推断来而不是从数据库来，44 个查询文件要改写成 TypeScript；也没选 sqlc 本身：它的 TypeScript 插件不写 Zod，驱动里没有 PGlite。
 - **话进 JSON 词典并生成类型，提示词保持中文**：由 `scripts/gen/i18n.ts` 统一查漏翻与死键；提示词不翻，避免双份提示调优与评测漂移。
 
 ## 怎么验证

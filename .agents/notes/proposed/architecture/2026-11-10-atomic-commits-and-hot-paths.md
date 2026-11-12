@@ -6,15 +6,15 @@ Status: proposed
 
 提交尾段（`db.afterCommit`）、先定端口再组装服务、`Issue.idOf`、看板单行排序、`doing` 短路与出帧缓存已经在代码里（见 [核心状态和接口](docs/subsystems/core.md)、[工单](docs/subsystems/issue.md)）。还剩三处：
 
-- **邮箱靠三把锁手工同步**：[mailbox.ts](apps/server/src/modules/session/mailbox.ts) 用 `routeLock`、`pumpLock`、`writeLock` 三个独立的 `Semaphore` 守着表外的 `Deliveries`（[deliveries.ts](apps/server/src/modules/session/deliveries.ts)）、`Reach` 和 `WakeBreaker`（[brakes.ts](apps/server/src/modules/session/brakes.ts)）。镜像的更新已经挂在 `db.afterCommit` 上，但路由、投递泵和写入各拿各的锁，`Withdrawal` 的 `Issue` 一支还在 `writeLock` 外另开事务；三把锁之间的先后只靠调用点自己遵守。
+- **邮箱靠三把锁手工同步**：[mailbox.ts](apps/server/src/modules/session/mailbox.ts) 用 `routeLock`、`pumpLock`、`writeLock` 三个独立的 `Semaphore` 守着表外的 `Deliveries`（[deliveries.ts](apps/server/src/modules/session/deliveries.ts)）、`Reach` 和 `WakeBreaker`（[brakes.ts](apps/server/src/modules/session/brakes.ts)）。镜像的更新已经挂在 `db.afterCommit` 上，但路由、投递泵和写入各拿各的锁，`withdrawDispatches` 还在 `writeLock` 外另开事务；三把锁之间的先后只靠调用点自己遵守。
 - **回填地址的方法成了空转**：[app.ts](apps/server/src/gateway/http/app.ts) 已经先绑端口、用真实端口组装服务，[registry.ts](apps/server/src/modules/session/registry.ts) 的 `mcpEndpoint` 和 [lan.ts](apps/server/src/gateway/lan/lan.ts) 的 `upstream` 一开始就是对的地址；随后的 `Session.setAddress`、`Lan.setUpstream` 只是写回同一个值。它们留着可变的入口，测试（`flows/reach.test.ts`、`flows/worker-cli.test.ts`）还在用它改地址。
 - **页面每帧深拷贝整棵 `StateFrame`**：[apps/web/src/infra/frame.ts](apps/web/src/infra/frame.ts) 的 `createFrames` 在建 store 和每次 `reconcile` 前对整帧 `structuredClone`，帮工每步动作都会让 200ms 一帧的拷贝走一遍全部工单、会话和频道。
 
 ## Proposal
 
-1. **邮箱收成一个有序的门**：把 `Deliveries` 与 `Reach` 的变更都收进 `writtenLocked` 的事务出口，路由和投递泵排在同一把锁后面；`Withdrawal` 的 `Issue` 一支也走这把锁。做完删掉 `routeLock`、`pumpLock`。
+1. **邮箱收成一个有序的门**：把 `Deliveries` 与 `Reach` 的变更都收进 `writtenLocked` 的事务出口，路由和投递泵排在同一把锁后面；`withdrawDispatches` 也走这把锁。做完删掉 `routeLock`、`pumpLock`。
 2. **删掉 `setAddress`、`setUpstream`**：地址只由组装时的配置给出；两个流程测试改成用固定端口的配置组装。
-3. **页面按需复制**：`frames.get().frame` 保持网络解码出的不可变树，只在第一次建 store 时复制；`reconcile` 改为直接读新帧（它只读来源、写进 store），去掉每帧的 `structuredClone`。和 [页面的连接接着带上在线状态和工单的增量](.agents/notes/proposed/architecture/2026-10-27-presence-and-entity-deltas.md) 一起做时，增量直接打进 store。
+3. **页面按需复制**：`frames.get().frame` 保持网络解码出的不可变树，只在第一次建 store 时复制；`reconcile` 改为直接读新帧（它只读来源、写进 store），去掉每帧的 `structuredClone`。
 
 ## Alternatives considered
 

@@ -44,7 +44,7 @@
 
 ## 和谁打交道
 
-- **工单与信箱（`issue`、`session`）**：调用 `Issue.scheduled` 获取或创建绑定工单，通过 `Session` 投递到期 `Trigger`。
+- **工单与帮工（`issue`、`session`）**：调用 `Issue.scheduled` 获取或创建绑定工单，通过 `Session` 投递到期 `Trigger`。
 - **通知（`inbox`）**：`pending` 状态的定时任务由 `inbox/items.ts` 派生为 `cron-ask` 提醒用户审批。
 
 ## 为什么这样

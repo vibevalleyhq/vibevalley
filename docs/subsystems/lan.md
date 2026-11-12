@@ -14,7 +14,7 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/gateway/lan/lan.ts` | 门的监听、配对状态机、请求守卫 `guard`、放行表 `remoteMay`、登录和退出时的 Cookie、HTTP/WS 代理转发 |
+| `apps/server/src/gateway/lan/lan.ts` | 门的监听、配对状态机、请求守卫 `guard`、放行表 `remoteMay`、登录和退出时的 Cookie、HTTP/SSE 代理转发 |
 | `apps/web/src/features/lan/LanPage.tsx`、`PairPage.tsx` | 设置「设备」页里「连接到本机」的卡片与远端设备的 `/pair` 配对页 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`lan.*`）。

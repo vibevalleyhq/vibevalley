@@ -22,7 +22,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 | `apps/web/src/base/` | 纯工具层：格式化、排序、拼音搜索（`search.ts`）、中文标点转换（`typedMarks.ts`）、快捷键 |
 | `apps/web/src/infra/` | 外部通信层：`frame.ts`（状态流和窄流）、`gateway.ts`（订阅流）、`query.ts`、`host.ts`、`router.ts` |
 | `apps/web/src/state/` | 状态中间层：`atom.ts`（`AtomRegistry`）、`intent.ts`（乐观意图）、`stored.ts`（`localStorage` 门面）、`prefs.ts` |
-| `apps/web/src/ui/`、`ui/pixel/` | 基于 `@vibevalley/base-ui` 的无样式组件封装、线条图标（`icons.ts`）与像素通用组件 |
+| `apps/web/src/ui/`、`ui/domain/`、`ui/pixel/` | 基于 `@vibevalley/base-ui` 的无样式组件封装、线条图标（`icons.ts`）、跨模块业务展示件与像素通用组件 |
 | `apps/web/src/features/<概念>/` | 按概念划分的业务模块，跨 feature 仅经 `index.ts` 导入且无环（`src/layers.test.ts` 检查） |
 | `apps/web/src/farm/`、`tree/` | 像素农场与记忆树皮肤层 |
 | `apps/web/src/app/` | 顶层路由表（`App.tsx`）、侧栏导航（`places.ts`）与外框（`Shell.tsx`） |
@@ -113,7 +113,6 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 ## 还没做的
 
 - 手机竖屏专属版面：[手机竖屏版面](.agents/notes/proposed/feature/2026-10-09-mobile-layout.md)。
-- 状态流按实体增量推送：[页面的连接接着带上在线状态和工单的增量](.agents/notes/proposed/architecture/2026-10-27-presence-and-entity-deltas.md)。
 - 页面关闭时的移动推送、Windows 桌面版、macOS Developer ID 签名与公证。
 
 ## 怎么验证

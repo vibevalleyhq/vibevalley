@@ -57,9 +57,9 @@
 
 ## 和谁打交道
 
-- **信箱与频道（`session`、`channel`）**：从 `Session` 收投递（`deliveries`）与摘要（`digest`），退回用 `handBack`，经 `Channel.post` 的 `Run` 写回回复。
+- **帮工与频道（`session`、`channel`）**：经 `Session.host` 在农场的 `Harness` 上运行助手的对话，从 `Session` 收投递（`deliveries`）与摘要（`digest`）、退回用 `handBack`；经 `Channel.post` 的 `Run` 写回回复。
 - **工单与定时任务（`issue`、`cron`）**：通过 `tool` 调用服务方法；指派给助手的工单跑完后进 `in_review` 等用户点头。
-- **帮工与大脑（`session`、`packages/agent`）**：经 `Session.host` 在农场的 `Harness` 上运行助手的对话，经 `MemoryPort` 读写 `memory` 表。
+- **自有 agent 工具与记性（`packages/agent`、`memory`）**：挂载助手扩展并经 `MemoryPort` 读写 `memory` 表。
 - **语音（`voice`）**：经 `response.ts` 的 `Caller` 端口向电话流式推送回答文本。
 
 ## 为什么这样
@@ -71,9 +71,8 @@
 
 ## 还没做的
 
-- 授权、责任、恢复与交付共同约束提示词：[让获授权的工作持续推进并可信交付](.agents/notes/proposed/architecture/2026-11-07-authorized-work-and-prompt-design.md)。
+- 授权分档、跨轮同意与持续推进交付：[让获授权的工作持续推进并可信交付](.agents/notes/proposed/architecture/2026-11-07-authorized-work-and-prompt-design.md)。
 - 按档案配 `toolsets`、助手加载技能与 `/` 调用：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
-- 按动作分档授权与跨轮同意：[助手的授权](.agents/notes/proposed/feature/2026-10-21-orchestrator-authorization.md)。
 - 仓库健康度、早报、工单关系与分拣建议：[助手给用户报告](.agents/notes/proposed/feature/2026-10-21-the-orchestrator-reports.md)。
 
 ## 怎么验证

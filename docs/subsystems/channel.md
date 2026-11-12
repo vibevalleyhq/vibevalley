@@ -76,7 +76,7 @@
 
 **用户发送消息**
 
-1. `Channel.say` 在单写锁内将消息、提及、关注和 `Trigger` 写入库，推进用户已读游标。
+1. `Channel.user`（或 `Channel.post` 的 `User`）在单写锁内将消息、提及、关注和 `Trigger` 写入库，推进用户已读游标。
 2. 调用 `Session.route` 在事务内写投递行与路由回执（中途崩溃由启动重放恢复）。
 3. 施加 `messageChanged`、`channelChanged`、`userMentionsChanged` 事实，并向订阅流推送。
 
@@ -87,8 +87,7 @@
 
 ## 和谁打交道
 
-- **信箱**：Channel 算出候选受众并落库后，交 [帮工的信箱](docs/subsystems/session.md#触发与投递) 执行刹车、蓄水与唤醒。
-- **帮工与助手（`session`、`orchestrator`）**：订阅 `Session` 事件维护串；助手经 `Channel.post` 的 `Run` 写回复（在服务端里跑的 agent 一轮说的话，一整条）。
+- **帮工与助手（`session`、`orchestrator`）**：算出候选受众并落库后交 `Session`（[触发与投递](docs/subsystems/session.md#触发与投递)）执行刹车、蓄水与唤醒，并订阅 `Session` 事件维护工单串；助手经 `Channel.post` 的 `Run` 写回复（在服务端里跑的 agent 一轮说的话，一整条）。
 - **工单与通知（`issue`、`inbox`）**：向工单广播 `userInThread`；向 Inbox 提供 `userMentions` 并消费 `Inbox.toUser`。
 
 ## 为什么这样
@@ -101,11 +100,10 @@
 ## 还没做的
 
 - 不支持 MCP 的农机使用 CLI 说话工具：[其他农机提案](.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)。
-- 一条连接合并状态增量与在线状态：[页面的连接接着带上在线状态和工单的增量](.agents/notes/proposed/architecture/2026-10-27-presence-and-entity-deltas.md)。
 
 ## 怎么验证
 
 - `apps/server/src/modules/channel/channel.test.ts`、`mentions.test.ts`、`messages.test.ts`：路由、修订号补齐、新鲜度拦截与 `userMentions` 测试。
 - `apps/server/src/flows/thread.test.ts`、`talk.test.ts`：工单串跨重开复用与私聊休眠恢复测试。
-- `apps/server/src/gateway/connector/connector.test.ts`、`digest.test.ts`：微信/飞书/QQ 收发去重、退避与配对测试。
+- `apps/server/src/gateway/connector/connector.test.ts`、`weixin.test.ts`、`qq.test.ts`：微信/飞书/QQ 收发去重、退避与配对测试。
 - `apps/web/test/chat.spec.ts`、`chat-messages.spec.ts`、`chat-rest.spec.ts`、`channel-follow.spec.ts`：聊天界面与实时订阅端到端测试。
