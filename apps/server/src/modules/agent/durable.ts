@@ -48,8 +48,8 @@ import type { Secret } from "@vibevalley/protocol/schema";
 import { dbDir, type ServerConfig } from "#/infra/config.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import { noDeepSeekKey } from "#/modules/agent/agent.ts";
 
+import { noDeepSeekKey } from "./profile.ts";
 import { durableWords } from "./prompts.ts";
 
 /** The farm's one durable harness: every conversation of an agent that runs in this server, kept in durable.db. */

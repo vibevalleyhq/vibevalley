@@ -13,13 +13,13 @@ import { Inconsistent } from "#/base/errors.ts";
 import type { ServerConfig } from "#/infra/config.ts";
 import { keptLog } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
-import { defaultSettings } from "#/modules/runtime/presets.ts";
+import { defaultSettings } from "#/modules/agent/presets.ts";
 import { instructions } from "#/modules/session/briefing.ts";
 import { testConfig, starter } from "#/testing/layers.ts";
 
-import { makeAgent, withCast } from "./agent.ts";
+import { makeProfileStore, withCast } from "./profile.ts";
 
-const open = (config: ServerConfig) => makeAgent({ config, clock: wallTime, log: keptLog() });
+const open = (config: ServerConfig) => makeProfileStore({ config, clock: wallTime, log: keptLog() });
 const refusal = async (p: Promise<unknown>): Promise<ApiError> => {
   const e = await p.then(
     () => undefined,

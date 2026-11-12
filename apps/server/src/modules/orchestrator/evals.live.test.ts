@@ -6,7 +6,7 @@ import { withTimeout } from "@vibevalley/async";
 import { Secret } from "@vibevalley/protocol/schema";
 
 import { wallTime } from "#/infra/time.ts";
-import { deepseekAccess } from "#/modules/runtime/durable.ts";
+import { deepseekAccess } from "#/modules/agent/durable.ts";
 import { orchestratorTurn, casesIn, check, committed, type EvalCase, replaySetup, replayWorld, transcript } from "#/testing/evals.ts";
 
 // Read as the file is collected: whether the suite runs at all is decided then.

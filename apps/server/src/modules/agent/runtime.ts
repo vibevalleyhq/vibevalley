@@ -17,7 +17,6 @@ import { reposDir, type ServerConfig } from "#/infra/config.ts";
 import type { Db } from "#/infra/db.ts";
 import type { Logger } from "#/infra/log.ts";
 import { type Time, withinRealTime } from "#/infra/time.ts";
-import type { Agent } from "#/modules/agent/agent.ts";
 import type { Setting } from "#/platform/setting/setting.ts";
 
 import { dshRuntime } from "./dsh.ts";
@@ -26,6 +25,7 @@ import { type Helpers, makeHelpers } from "./helperExtension.ts";
 import { piBalance, type PiDefault, piSettings } from "./pi.ts";
 import { agentProblems, type Candidate, chooseAgent, supportOf, moneyStop, presetOf, runtimeIds, runtimeLabel, sessionOptions } from "./presets.ts";
 import { inCny, makeSpending, price, type Rate } from "./price.ts";
+import type { ProfileStore } from "./profile.ts";
 import { quotaOf } from "./quota.ts";
 import { dbTodoStores, vibevalleyRuntimeOf } from "./vibevalley.ts";
 
@@ -54,12 +54,13 @@ export interface Resolved {
   readonly env: Record<string, string>;
 }
 
-export interface Runtime {
+/** The runtimes the profiles run on: what is installed, its quota and spending, and the farm's own harness. */
+export interface RuntimeFleet {
   /** Returns immediately with `checking` placeholders while background probes run. */
-  readonly list: () => Promise<T.RuntimeInfo[]>;
-  readonly refresh: (id: string) => Promise<T.RuntimeInfo | undefined>;
-  readonly info: (id: string) => Promise<T.RuntimeInfo | undefined>;
-  readonly update: (id: string, s: T.RuntimeSettings) => Promise<T.RuntimeInfo | undefined>;
+  readonly runtimes: () => Promise<T.RuntimeInfo[]>;
+  readonly refreshRuntime: (id: string) => Promise<T.RuntimeInfo | undefined>;
+  readonly runtimeInfo: (id: string) => Promise<T.RuntimeInfo | undefined>;
+  readonly updateRuntime: (id: string, s: T.RuntimeSettings) => Promise<T.RuntimeInfo | undefined>;
   readonly problemsOf: (agent: T.Agent) => Promise<T.AgentProblem[]>;
   readonly assess: (agent: T.Agent) => Promise<Assessment>;
   readonly candidates: () => Promise<Candidate[]>;
@@ -78,13 +79,13 @@ export interface Runtime {
   readonly close: () => Promise<void>;
 }
 
-export interface RuntimeDeps {
+export interface RuntimeFleetDeps {
   readonly config: ServerConfig;
   readonly clock: Time;
   readonly log: Logger;
   readonly db: Db;
   readonly core: Core;
-  readonly agent: Agent;
+  readonly profiles: ProfileStore;
   /** Only for VibeValley's own runtime, which is not built when options.registry is given. */
   readonly setting: Setting;
   /** How DeepSeek is reached. */
@@ -160,8 +161,8 @@ const defaultUsageOf: UsageOf = async (_id, runtime, found) => {
   return usage ? fromOar(usage) : null;
 };
 
-export async function makeRuntime(deps: RuntimeDeps, options: RuntimeOptions = {}): Promise<Runtime> {
-  const { config, core, agent: store, clock } = deps;
+export async function makeRuntimeFleet(deps: RuntimeFleetDeps, options: RuntimeOptions = {}): Promise<RuntimeFleet> {
+  const { config, core, profiles: store, clock } = deps;
   const log = deps.log.child("runtime");
   // The sessions of VibeValley's own runtime: closed last, after the probes and the spending.
   const owner = new TaskGroup({ name: "runtime sessions", onError: (task, e) => log.error(`${task} failed`, e) });
@@ -432,7 +433,7 @@ export async function makeRuntime(deps: RuntimeDeps, options: RuntimeOptions = {
   };
 
   return {
-    list: async () => {
+    runtimes: async () => {
       const infos: T.RuntimeInfo[] = [];
       for (const id of runtimeIds()) {
         const hit = held(id);
@@ -468,9 +469,9 @@ export async function makeRuntime(deps: RuntimeDeps, options: RuntimeOptions = {
       }
       return infos;
     },
-    refresh,
-    info,
-    update: async (id, s) => {
+    refreshRuntime: refresh,
+    runtimeInfo: info,
+    updateRuntime: async (id, s) => {
       if (!known(id)) return undefined;
       try {
         await store.saveSettings(id, s);

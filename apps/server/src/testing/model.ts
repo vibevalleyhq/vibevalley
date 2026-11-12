@@ -15,7 +15,7 @@ import type {
 
 import { reasonOf, throwIfAborted } from "@vibevalley/async";
 
-import { messageText, type ModelMessage } from "#/modules/runtime/durable.ts";
+import { messageText, type ModelMessage } from "#/modules/agent/durable.ts";
 
 export const text = (t: string): TextContent => ({ type: "text", text: t });
 export const thinking = (t: string): ThinkingContent => ({ type: "thinking", thinking: t, thinkingSignature: "reasoning_content" });

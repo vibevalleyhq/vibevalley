@@ -8,6 +8,12 @@ export function rowOf<A>(query: string, schema: z.ZodType<A>, row: unknown): A {
   return got.data
 }
 
+export const Words_agent_todo_executor = z.enum(["self","subagent"])
+export type Words_agent_todo_executor = z.infer<typeof Words_agent_todo_executor>
+
+export const Words_agent_todo_state = z.enum(["waiting","working","done","failed","skipped"])
+export type Words_agent_todo_state = z.infer<typeof Words_agent_todo_state>
+
 export const Words_artifact_block_revision_kind = z.enum(["normal","conflict"])
 export type Words_artifact_block_revision_kind = z.infer<typeof Words_artifact_block_revision_kind>
 
@@ -97,12 +103,6 @@ export type Words_memory_kind = z.infer<typeof Words_memory_kind>
 
 export const Words_pkm_comment_status = z.enum(["open","suggested","accepted","rejected"])
 export type Words_pkm_comment_status = z.infer<typeof Words_pkm_comment_status>
-
-export const Words_runtime_todo_executor = z.enum(["self","subagent"])
-export type Words_runtime_todo_executor = z.infer<typeof Words_runtime_todo_executor>
-
-export const Words_runtime_todo_state = z.enum(["waiting","working","done","failed","skipped"])
-export type Words_runtime_todo_state = z.infer<typeof Words_runtime_todo_state>
 
 export const Words_session_closed = z.enum(["merged","completed","dismissed","lost"])
 export type Words_session_closed = z.infer<typeof Words_session_closed>

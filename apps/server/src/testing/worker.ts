@@ -8,8 +8,8 @@ import { scriptedRuntime, type ScriptedTurn } from "@botiverse/oar/testing";
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
 
 import { wallTime } from "#/infra/time.ts";
+import { supportOf, presetOf } from "#/modules/agent/presets.ts";
 import { answerOpening, criteriaHead } from "#/modules/issue/prompts.ts";
-import { supportOf, presetOf } from "#/modules/runtime/presets.ts";
 import { briefBreak } from "#/modules/session/briefing.ts";
 
 import { until } from "./layers.ts";

@@ -8,7 +8,6 @@ import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import { issueBranch, type Repo } from "#/modules/repo/repo.ts";
 import { RepoError } from "#/modules/repo/workplace.ts";
-import type { Runtime } from "#/modules/runtime/runtime.ts";
 import { conflictBrief } from "#/modules/session/briefing.ts";
 import type { Session } from "#/modules/session/session.ts";
 
@@ -30,7 +29,6 @@ export interface StatusOptions {
 export interface SettleDeps {
   readonly agent: Agent;
   readonly repo: Repo;
-  readonly runtime: Runtime;
   readonly session: Session;
   readonly clock: Time;
   readonly landing: Pick<IssueLanding, "changesOf">;
@@ -48,7 +46,7 @@ export interface SettledMove {
 }
 
 export function issueSettling(r: IssueLifecycle, d: Pick<IssueDispatch, "readyOf">, deps: SettleDeps) {
-  const { agent: store, repo: repos, runtime: runtimes, session: sessions, clock } = deps;
+  const { agent: store, repo: repos, session: sessions, clock } = deps;
   const { changesOf } = deps.landing;
   const { unsent } = r;
   const { readyOf } = d;
@@ -71,7 +69,7 @@ export function issueSettling(r: IssueLifecycle, d: Pick<IssueDispatch, "readyOf
     if (to !== "todo") throw refused(t("server.issue.handOverOnTodo"));
     if (issue.status === "in_progress" && issue.stage.state === "working") throw refused(t("server.issue.stopFirst", { n: issue.number }));
     if (!a.enabled) throw refused(t("server.issue.disabled", { name: a.name }));
-    for (const i of await runtimes.problemsOf(a)) if (i.level === "error") throw refused(t("server.issue.cannotSend", { name: a.name, why: i.text }));
+    for (const i of await store.problemsOf(a)) if (i.level === "error") throw refused(t("server.issue.cannotSend", { name: a.name, why: i.text }));
     return a;
   };
 

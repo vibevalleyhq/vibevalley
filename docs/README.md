@@ -98,8 +98,8 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 记性 | memory | memory（`Memory`） | 记忆库 |
 | 技能 | skill | skill（`Skill`） | 插件（指技能时） |
 | 人设 | persona | `persona.md`、`PersonaMode` |  |
-| 帮手 | subagent | subagent（`runtime_todo.executor` 的 `subagent`） |  |
-| 自己的任务 | todo | `Todo`（`runtime_todo` 表，工具 `todo_add`、`todo_update`、`todo_list`） |  |
+| 帮手 | subagent | subagent（`agent_todo.executor` 的 `subagent`） |  |
+| 自己的任务 | todo | `Todo`（`agent_todo` 表，工具 `todo_add`、`todo_update`、`todo_list`） |  |
 | 父工单 | parent issue | `Issue`（有子工单） | 计划图、TaskGraph |
 | 子工单 | child issue | `Issue`（带 `parent`、`blockedBy`；拆单输入为 `IssueChildDraft`） | Task、步骤状态机 |
 | 派活 | dispatch | hire（`Issue.hire`、事实 `FactSessionChanged`） |  |

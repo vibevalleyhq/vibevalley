@@ -10,7 +10,7 @@ import { type Db, openDb } from "#/infra/db.ts";
 import { makeLogger } from "#/infra/log.ts";
 import type { PublicFetch } from "#/infra/publicHttp.ts";
 import { afterRealTime, type Time, wallTime } from "#/infra/time.ts";
-import { withCast } from "#/modules/agent/agent.ts";
+import { withCast } from "#/modules/agent/profile.ts";
 import { builtInDir, profileOf, templateFrom } from "#/modules/agent/template.ts";
 import builtInIndex from "#/modules/agent/templates/index.json" with { type: "json" };
 

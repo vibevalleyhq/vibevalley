@@ -21,7 +21,6 @@ import type { ServerConfig } from "#/infra/config.ts";
 import { type Db, dbQueries, openDb } from "#/infra/db.ts";
 import { keptLog, type Logger } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
-import { makeAgent } from "#/modules/agent/agent.ts";
 import builtIn from "#/modules/agent/templates/orchestrator/agent.json" with { type: "json" };
 import { type Attachment, makeAttachment } from "#/platform/attachment/attachment.ts";
 import { type Channel, catchUpMax, makeChannel } from "#/modules/channel/channel.ts";
@@ -34,6 +33,7 @@ import { type Mailbox, makeMailbox } from "#/modules/session/mailbox.ts";
 import { summaryOf } from "#/modules/session/report.ts";
 import { DeliveryRefused, newsOf, sessionOver, type SessionNews } from "#/modules/session/session.ts";
 import type { Consumed, Delivered, LaunchActivity } from "#/modules/session/signals.ts";
+import { testAgent } from "#/testing/agent.ts";
 import { testConfig, until, waitFor } from "#/testing/layers.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qsession from "#db/session.sql.ts";
@@ -186,7 +186,7 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
   };
   // A test double of the few members the chat and the mailbox use.
   const lifecycle = played as unknown as Lifecycle;
-  const agent = await makeAgent({ config: c, clock, log });
+  const agent = await testAgent({ config: c, clock, log, db, core });
   const mailbox = await makeMailbox({ db, clock, log, config: c, core, agent, session: lifecycle });
   const noRepos = async (): Promise<never> => {
     throw new Error("the chat's tests have no repos");

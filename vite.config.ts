@@ -542,7 +542,7 @@ export default defineConfig({
         excludeFiles: [
           "**/scripts/**",
           "apps/server/src/modules/repo/git.ts",
-          "apps/server/src/modules/runtime/dsh.ts",
+          "apps/server/src/modules/agent/dsh.ts",
           "apps/server/src/gateway/voice/line.ts",
           "apps/server/src/testing/git.ts",
           "apps/server/src/testing/worker.ts",

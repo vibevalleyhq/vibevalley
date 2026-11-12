@@ -37,12 +37,12 @@ const log = makeLogger({ name: "vibevalley" });
 // The page's tests (apps/web/test/fixtures.ts) never ask this machine's coding agents, nor the network. Never set otherwise.
 async function testOptions(): Promise<ServiceOptions> {
   const { helper, installedOnly } = await import("./testing/worker.ts");
-  const { registryOf } = await import("#/modules/runtime/runtime.ts");
+  const { registryOf } = await import("#/modules/agent/runtime.ts");
   const { realtimeFixture } = await import("./testing/realtime.ts");
   const { network } = await import("./testing/network.ts");
   const given = [helper()];
   return {
-    runtime: { registry: registryOf(given), probe: installedOnly(given), background: false },
+    agent: { registry: registryOf(given), probe: installedOnly(given), background: false },
     voice: { moss: realtimeFixture },
     platform: { ...network(), log },
   };

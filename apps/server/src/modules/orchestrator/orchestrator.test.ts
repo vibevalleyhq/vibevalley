@@ -12,7 +12,7 @@ import { executionsOf } from "@vibevalley/protocol/rules";
 
 import { user } from "#/base/actor.ts";
 import type { ServerConfig } from "#/infra/config.ts";
-import { messageText } from "#/modules/runtime/durable.ts";
+import { messageText } from "#/modules/agent/durable.ts";
 import { starter, testConfig, nextTurn, gate, untilGot as until, waitFor, whenTrue, within } from "#/testing/layers.ts";
 import { type Answer, answer, type Reply, type Request, scriptedLLM, toolCall } from "#/testing/model.ts";
 import { world } from "#/testing/world.ts";
@@ -106,7 +106,7 @@ const farm = async (f: Reply = respond, config: ServerConfig = testConfig()) => 
 
 /** The orchestrator's conversation as kept in durable.db, an entry a line. */
 const transcript = async (farm: Farm, orchestrator: string) => {
-  const kept = await farm.runtime.durable.existing(orchestrator);
+  const kept = await farm.agent.durable.existing(orchestrator);
   if (!kept) return "";
   const { items } = await kept.entries({ order: "ascending" }, 1000, undefined, BACKGROUND_CONTEXT);
   return items.map((e) => JSON.stringify(e)).join("\n");

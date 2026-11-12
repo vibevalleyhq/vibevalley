@@ -28,8 +28,8 @@
 | `reaction.ts`、`report.ts`、`briefing.ts`、`roster.ts` | 事件映射、汇报解析、容量检查与任务说明拼装、在场会话查找的纯函数 |
 | `journal.ts`、`host.ts`、`inProcessRun.ts` | 轨迹日志文件读写、进程内 `AgentHost`（投递被拒抛 `SubmitRefused`）与 `InProcessRun`（`Run` 的落库） |
 | `worker.ts`、`shell.ts` | 帮工 CLI 的凭证文件与认证探测（[帮工 CLI 接入](docs/subsystems/session.md#帮工-cli-接入)）、私聊的上下文目录 |
-| `apps/server/src/modules/runtime/` | 农机注册探测、价格表、额度与每日花费记账、VibeValley 自己的农机（`vibevalley.ts`） |
-| 表 `session`、`session_run`、`session_run_issue`、`session_trigger`、`session_order`、`session_delivery`、`session_subscription`、`session_issue_input`、`session_machine`、`runtime_spend` | 会话（含 `pending_report`）、轮次与关联工单、触发器、投递的统一次序、投递、工单订阅与蓄水池、机器、按日花费 |
+| `apps/server/src/modules/agent/` | 农机注册探测、价格表、额度与每日花费记账、VibeValley 自己的农机（`vibevalley.ts`） |
+| 表 `session`、`session_run`、`session_run_issue`、`session_trigger`、`session_order`、`session_delivery`、`session_subscription`、`session_issue_input`、`session_machine`、`agent_spend` | 会话（含 `pending_report`）、轮次与关联工单、触发器、投递的统一次序、投递、工单订阅与蓄水池、机器、按日花费 |
 | `apps/web/src/features/session/` | `WorkLog.tsx`、`Trajectory.tsx`、`runs.ts` 瀑布图与 `events.ts` 订阅 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`session.*`、`runtime.*`）。
@@ -103,7 +103,7 @@
 - **三级并发上限（`room`）**：全农场最多 6 个在忙帮工 `maxRunning`，单台农机按 `maxWorking` 限制，单仓库默认最多 3 个 `repo.max_sessions`；槽位满 6 个又来新活时，最久闲置的工单会话收工、私聊会话休眠。
 - **无沙箱与无逐条权限确认**：帮工在 `$VIBEVALLEY_WORK_ROOT` 下直接执行命令，不弹权限确认；安全边界是服务端只听 `127.0.0.1`。
 - **只追加的轨迹日志**：`events/<id>.json` 按序记录每一步事件，流式草稿按 `revision` 递增推送，落盘后不改。帮工留最近 240 条、助手留 1000 条，离场默认 30 天后清理文件。
-- **额度与每日花费**：额度何时读、何时标「快用完了」见[档案和农机](docs/subsystems/agent.md#怎么走)；按日花费记入 `runtime_spend`，额度或预算耗尽时（`moneyStop`）阻止派新活，在跑回合继续跑完。
+- **额度与每日花费**：额度何时读、何时标「快用完了」见[档案和农机](docs/subsystems/agent.md#怎么走)；按日花费记入 `agent_spend`，额度或预算耗尽时（`moneyStop`）阻止派新活，在跑回合继续跑完。
 
 ### 重启
 
@@ -180,7 +180,7 @@
 - `routing.test.ts`：蓄水池的放行（`holdReasonOf`）。
 - `apps/server/src/flows/restart.test.ts`：助手、帮工答到一半时崩溃或正常关门，重开后接着答完、记一轮。
 - `apps/server/src/modules.test.ts`：别的模块不碰投递的内部文件、共享契约不碰存储、只有测试用 `insideOf`、本模块不碰频道与工单。
-- `apps/server/src/modules/runtime/runtime.test.ts`、`presets.test.ts`：农机探测缓存、额度计算与每日花费。
+- `apps/server/src/modules/agent/runtime.test.ts`、`presets.test.ts`：农机探测缓存、额度计算与每日花费。
 
 ## 代理和 MCP 连接
 

@@ -13,7 +13,7 @@ import { whenTrue } from "@vibevalley/testkit/until";
 
 import { keptLog } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
-import { noDeepSeekKey } from "#/modules/agent/agent.ts";
+import { noDeepSeekKey } from "#/modules/agent/profile.ts";
 import { type ScriptedDeepSeek, scriptedDeepSeek } from "#/testing/deepseek.ts";
 import { answer, lastUser, type Request, scriptedLLM, type ScriptedModel, type Step, systemPrompt, text as words, toolCall, toolsOf } from "#/testing/model.ts";
 

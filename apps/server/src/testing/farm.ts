@@ -1,4 +1,4 @@
-import { registryOf } from "#/modules/runtime/runtime.ts";
+import { registryOf } from "#/modules/agent/runtime.ts";
 
 import { app } from "./http.ts";
 import { testConfig } from "./layers.ts";
@@ -22,7 +22,7 @@ export async function farm(): Promise<RunningFarm> {
  * an agent would. */
 export async function workingFarm(): Promise<RunningFarm> {
   const given = [helper()];
-  const runtime = { registry: registryOf(given), probe: installedOnly(given), background: false };
-  const served = await app(testConfig(), 0, undefined, { ...quietApp, runtime });
+  const agent = { registry: registryOf(given), probe: installedOnly(given), background: false };
+  const served = await app(testConfig(), 0, undefined, { ...quietApp, agent });
   return { url: "http://" + served.address, [Symbol.asyncDispose]: () => served.close() };
 }

@@ -11,9 +11,9 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 
 import { keptLog } from "#/infra/log.ts";
+import { entryMessage, messageText } from "#/modules/agent/durable.ts";
+import { helperInstructions, helperKey, vibevalleyRuntimeOf } from "#/modules/agent/vibevalley.ts";
 import { makeOrchestrator } from "#/modules/orchestrator/orchestrator.ts";
-import { entryMessage, messageText } from "#/modules/runtime/durable.ts";
-import { helperInstructions, helperKey, vibevalleyRuntimeOf } from "#/modules/runtime/vibevalley.ts";
 import { starter, testConfig } from "#/testing/layers.ts";
 import { answer, lastUser, type Request, scriptedLLM, type Step } from "#/testing/model.ts";
 import { sqlOf } from "#/testing/sql.ts";
@@ -113,7 +113,7 @@ test("regression: the assistant and a helper both cut off mid-answer go on once 
   let helper = "";
   try {
     await using farm = await open([both(true), both(true)]);
-    const runtime = vibevalleyRuntimeOf({ durable: farm.runtime.durable, helpers: farm.runtime.helpers, owner, log: keptLog() });
+    const runtime = vibevalleyRuntimeOf({ durable: farm.agent.durable, helpers: farm.agent.helpers, owner, log: keptLog() });
     const session = await runtime.session(
       { kind: "available", via: "bundled" },
       { cwd: helperCwd, appendSystemPrompt: "你是后端老周。", env: { FARM_TOKEN: "t0k" } },
@@ -135,7 +135,7 @@ test("regression: the assistant and a helper both cut off mid-answer go on once 
   // Back: the assistant's restart runs every conversation left mid-answer, the helper's too, before its session is
   // opened again.
   await using farm = await open([both(false), both(false)]);
-  const durable = farm.runtime.durable;
+  const durable = farm.agent.durable;
   await until(() => said(farm)().length > 0, "the assistant's answer after the restart");
   expect(said(farm)()).toEqual([words]);
   const conversation = await durable.existing(helperKey(helper));

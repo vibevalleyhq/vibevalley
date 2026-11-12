@@ -91,7 +91,7 @@ const RULES: readonly Rule[] = [
     pattern: /[Pp]laybook|\b[a-z_]*[Pp]lan(s|ner|ners|ning|ned)?\b|\b[A-Z][A-Za-z]*Plan(?![te])[A-Za-z]*\b/u,
     says: "a task (Task, task.*, task_split …), split for breaking one into steps, step for one of its steps",
     // A compaction's plan of what to fold, and oar's own usage.Plan: other meanings of the word.
-    except: /^apps\/server\/src\/modules\/(agent\/brain\/(compaction|agent|.*\.test)\.ts|runtime\/runtime\.ts)$/u,
+    except: /^apps\/server\/src\/modules\/(agent\/brain\/(compaction|agent|.*\.test)\.ts|agent\/runtime\.ts)$/u,
   },
   {
     name: "a task graph under its old name",
@@ -325,7 +325,7 @@ const RULES: readonly Rule[] = [
     pattern: /\b(Conversation\w*|conversation_id|channel_conversation|Rooms|RoomEvent|roomsPath|useRoom|followRoom)\b/u,
     says: "Channel (channel_id, the Channel service): a channel, a direct channel and a thread are all channels, by type (as Discord's); a model's conversation is the brain's word",
     // pi-durable's Conversation is a model's: the server uses its API in these four files only.
-    except: /^apps\/server\/src\/modules\/(runtime\/durable|runtime\/vibevalley|runtime\/helperExtension|session\/host)\.ts$/u,
+    except: /^apps\/server\/src\/modules\/(agent\/durable|agent\/vibevalley|agent\/helperExtension|session\/host)\.ts$/u,
   },
   {
     name: "a business name in farm words",
@@ -377,7 +377,12 @@ const RULES: readonly Rule[] = [
     name: "an agent's own todo under the task name",
     pattern:
       /\b(AgentTask|AgentTaskStore|AgentTaskRunner|AgentTaskError|makeTaskRunner|taskTools|tasks_changed)\b|agentTask(Store|Tools)?(\.ts)?["']|agent\/taskStore\b|"vibevalley\/tasks"|\bagent_task\w*|\b\w*AgentTasks?\b/u,
-    says: "an agent's own todo list is Todo (packages/agent todo.ts, todoStore.ts, todoTools.ts: TodoStore, TodoRunner, makeTodoRunner, todoTools, todos_changed); the server keeps it in runtime/todoStore.ts, table runtime_todo (queries OpenTodos, AddTodo, FinishTodos); a task is only a plan's (Task)",
+    says: "an agent's own todo list is Todo (packages/agent todo.ts, todoStore.ts, todoTools.ts: TodoStore, TodoRunner, makeTodoRunner, todoTools, todos_changed); the server keeps it in agent/vibevalley.ts (dbTodoStores), table agent_todo (queries OpenTodos, AddTodo, FinishTodos); a task is only a plan's (Task)",
+  },
+  {
+    name: "the runtimes as a module of their own",
+    pattern: /\bruntime_(spend|todo)\b|modules\/runtime\b|\bmakeRuntime\b|\b(farm|deps|w)\.runtime\./u,
+    says: "the runtimes are part of the agent module: one Agent service (apps/server/src/modules/agent: runtimes, refreshRuntime, runtimeInfo, updateRuntime, resolve, durable…), tables agent_spend and agent_todo",
   },
   {
     name: "the text given to a helper as a task",

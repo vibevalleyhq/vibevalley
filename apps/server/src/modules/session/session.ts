@@ -10,7 +10,6 @@ import type { Agent } from "#/modules/agent/agent.ts";
 import type { Memory } from "#/modules/memory/memory.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
 import { RepoError, type WorkplaceCleanup, type WorkplaceRelease } from "#/modules/repo/workplace.ts";
-import type { Runtime } from "#/modules/runtime/runtime.ts";
 
 import type { Accepted, AgentWakes, ChatView, Envelope, Hearer, IssueView } from "./envelope.ts";
 import type { AgentHost, HostOptions } from "./host.ts";
@@ -262,7 +261,6 @@ export interface SessionDeps {
   readonly agent: Agent;
   readonly memory: Memory;
   readonly repo: Repo;
-  readonly runtime: Runtime;
 }
 
 export async function makeSession(deps: SessionDeps, options: SessionOptions = {}): Promise<Session> {

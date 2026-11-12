@@ -16,11 +16,10 @@ import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
+import { goOn, helperKey, vibevalleyRuntime } from "#/modules/agent/vibevalley.ts";
 import type { Memory } from "#/modules/memory/memory.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
 import { type Merged, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "#/modules/repo/workplace.ts";
-import type { Runtime } from "#/modules/runtime/runtime.ts";
-import { goOn, helperKey, vibevalleyRuntime } from "#/modules/runtime/vibevalley.ts";
 import * as qs from "#db/session.sql.ts";
 import * as qr from "#db/session_run.sql.ts";
 
@@ -160,7 +159,6 @@ export interface LifecycleDeps {
   readonly memory: Memory;
   readonly repo: Repo;
   readonly machine: Machine;
-  readonly runtime: Runtime;
 }
 
 export interface SessionOptions {
@@ -300,13 +298,13 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
     // pi-durable keeps a conversation's run under way across a restart; the other runtimes cannot take a turn up again.
     const goingOn = new Set<string>();
     for (const row of kept)
-      if (!isOnDuty(row) && row.runtime === vibevalleyRuntime && row.oar_session && (await deps.runtime.durable.busy(helperKey(row.oar_session))))
+      if (!isOnDuty(row) && row.runtime === vibevalleyRuntime && row.oar_session && (await deps.agent.durable.busy(helperKey(row.oar_session))))
         goingOn.add(row.id);
     const openRun = new Map<string, string>();
     for (const row of await qr.openRuns(db.sql)) {
       if (goingOn.has(row.session)) openRun.set(row.session, row.id);
       // Its durable conversation goes on with it: its host ends it once the answer comes.
-      else if (!(await deps.runtime.durable.busy(row.session))) await finishInterrupted(row.id);
+      else if (!(await deps.agent.durable.busy(row.session))) await finishInterrupted(row.id);
     }
     // Continue numbering past the highest historical session id so trajectory files are never reused.
     hired = Math.max(
@@ -754,13 +752,13 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
       core,
       clock,
       log,
-      durable: deps.runtime.durable,
+      durable: deps.agent.durable,
     });
   };
 
   const close = async () => {
     // A helper answering on VibeValley's own runtime is let go with its run under way: restore goes on with it.
-    deps.runtime.durable.leave();
+    deps.agent.durable.leave();
     moves.close();
     await tasks.close();
     await cli?.close();

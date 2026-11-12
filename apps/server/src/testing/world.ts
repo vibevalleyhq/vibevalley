@@ -11,11 +11,11 @@ import { makeTool, type Tool } from "#/gateway/tool/tool.ts";
 import { type ServerConfig } from "#/infra/config.ts";
 import type { PublicFetch } from "#/infra/publicHttp.ts";
 import { type Time, wallTime } from "#/infra/time.ts";
+import type { ModelAccess } from "#/modules/agent/durable.ts";
+import { registryOf } from "#/modules/agent/runtime.ts";
 import { explicitMandate } from "#/modules/issue/creation.ts";
 import { type Issue } from "#/modules/issue/issue.ts";
 import { type GitHubRun, type RepoHooks } from "#/modules/repo/repo.ts";
-import type { ModelAccess } from "#/modules/runtime/durable.ts";
-import { registryOf } from "#/modules/runtime/runtime.ts";
 import { type Inside, insideOf } from "#/modules/session/session.ts";
 import { type WorkerAccess, type workerAccess } from "#/modules/session/worker.ts";
 import { buildModules, type Close, closeAll, type Modules, owning, type ServiceOptions } from "#/services.ts";
@@ -30,7 +30,7 @@ const noGitHub: GitHubRun = () => Promise.resolve({ out: "", ok: false, missing:
 /** For a test that builds the whole app (http/app.ts): nothing of this machine's is asked in the background, and the
  * network is the test's (loopback only). */
 export const quietApp = {
-  runtime: { background: false },
+  agent: { background: false },
   repo: { gh: noGitHub },
   orchestrator: { listen: false },
   platform: offlineNetwork,
@@ -122,7 +122,7 @@ export async function moduleWorld(options: WorldOptions = {}): Promise<ModuleWor
   const clock = options.clock ?? wallTime;
   const deepseek = scriptedDeepSeek(clock);
   const o: ServiceOptions = {
-    runtime: {
+    agent: {
       registry: options.ownRuntime === true ? (own) => registryOf([...given, own]) : registryOf(given),
       background: false,
       probe: installedOnly(options.ownRuntime === true ? [...given, { id: "vibevalley" }] : given, options.usage),

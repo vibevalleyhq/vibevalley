@@ -16,7 +16,6 @@ import type { Agent } from "#/modules/agent/agent.ts";
 import { templateCatalog } from "#/modules/agent/seed.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
-import type { Runtime } from "#/modules/runtime/runtime.ts";
 import type { Hired, HireOptions, SessionNews, Session } from "#/modules/session/session.ts";
 import * as issueQ from "#db/issue.sql.ts";
 import * as cronQ from "#db/issue_cron.sql.ts";
@@ -173,7 +172,6 @@ export interface IssueDeps {
   readonly core: Core;
   readonly agent: Agent;
   readonly repo: Repo;
-  readonly runtime: Runtime;
   readonly session: Session;
   readonly channel: Channel;
 }
@@ -202,7 +200,7 @@ export const channelUses =
   };
 
 export async function makeIssue(deps: IssueDeps): Promise<Issue> {
-  const { config, clock, core, agent: store, repo: repos, runtime: runtimes, session: sessions, channel: chat, db } = deps;
+  const { config, clock, core, agent: store, repo: repos, session: sessions, channel: chat, db } = deps;
   const log = deps.log.child("issue");
   const tasks = new TaskGroup({ name: "issue", onError: (task, e) => log.error(`${task} failed:`, e) });
   const r = await issueLifecycle({ core, agent: store, session: sessions, db, clock, log });
@@ -234,7 +232,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
   const landing = issueLanding(r, { core, log, repo: repos, session: sessions, channel: chat });
   const { changesOf } = landing;
   const { split, joinChildren } = issueSplitting(r, { agent: store, session: sessions, channel: chat, landing });
-  const d = issueDispatch(r, joinChildren, { core, agent: store, repo: repos, runtime: runtimes, session: sessions, channel: chat, log });
+  const d = issueDispatch(r, joinChildren, { core, agent: store, repo: repos, session: sessions, channel: chat, log });
   const { hire, start, refreshQueue, reopen, scheduled } = d;
   chat.guardRemoval(channelUses({ db, queued: () => sessions.queuedTriggers() }));
   sessions.useIssues({ issues: () => core.state().issues, exists: async (id) => (await issueQ.issueExists(db.sql, { id })) !== undefined });
@@ -242,7 +240,6 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
   const { withEdit, settledMove, stuckWords, movesWords } = issueSettling(r, d, {
     agent: store,
     repo: repos,
-    runtime: runtimes,
     session: sessions,
     clock,
     landing,
@@ -280,7 +277,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
 
   const chooseAgent = async (brief: string, name: string, picked: string): Promise<T.Agent> => {
     const key = name.trim();
-    const chosen = await runtimes.choose(brief, key, picked);
+    const chosen = await store.choose(brief, key, picked);
     if (!chosen) throw new AgentChoiceRefused("noneAvailable", key);
     if (key && chosen.id !== key && chosen.name !== key && chosen.runtime !== key) throw new AgentChoiceRefused("notFound", key);
     return chosen;
@@ -326,7 +323,6 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     core,
     log,
     store,
-    runtimes,
     sessions,
     chat,
     get,

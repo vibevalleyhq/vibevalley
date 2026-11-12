@@ -10,7 +10,7 @@ import { Inconsistent } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { jsonText } from "#/base/json.ts";
 import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
-import { messageText } from "#/modules/runtime/durable.ts";
+import { messageText } from "#/modules/agent/durable.ts";
 import * as qr from "#db/session_run.sql.ts";
 import * as qi from "#db/session_run_issue.sql.ts";
 

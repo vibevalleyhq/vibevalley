@@ -749,7 +749,6 @@ describe("an issue", () => {
     const f = farm({ usage: () => usage });
     await using fw = await f.open();
     const issues = fw.issue;
-    const runtimes = fw.runtime;
     const agents = fw.agent;
     const hire = () =>
       issues.hire(lab(), "随便做点什么", "money").then(
@@ -767,13 +766,13 @@ describe("an issue", () => {
       available: true,
       balances: [{ currency: "CNY", amount: 0 }],
     };
-    await runtimes.refresh("pi");
+    await agents.refreshRuntime("pi");
     const hired = await hire();
     expect(hired).toMatch(/余额用完了/u);
 
     usage = null;
-    runtimes.spend("pi", 1.2);
-    await runtimes.update("pi", { ...settings, dailyBudget: 1 });
+    agents.spend("pi", 1.2);
+    await agents.updateRuntime("pi", { ...settings, dailyBudget: 1 });
     const hired2 = await hire();
     expect(hired2).toMatch(/每日预算 ¥1\.00/u);
 
@@ -787,7 +786,7 @@ describe("an issue", () => {
         { label: "Codex · 1 week", usedPercent: 100, resetsAt: resets },
       ],
     };
-    await runtimes.update("pi", settings);
+    await agents.updateRuntime("pi", settings);
     const hired3 = await hire();
     expect(hired3).toMatch(/额度用完了（Codex · 1 week），10 月 14 日 08:00重置/u);
 
@@ -796,7 +795,7 @@ describe("an issue", () => {
       subscription: "pro",
       windows: [{ label: "Codex · 1 week", usedPercent: 99, resetsAt: resets }],
     };
-    await runtimes.refresh("pi");
+    await agents.refreshRuntime("pi");
     const hired4 = await hire();
     expect(hired4).toBe("");
   });

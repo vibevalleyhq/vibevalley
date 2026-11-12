@@ -17,7 +17,7 @@ import { newId } from "#/base/ids.ts";
 import { storedJsonOrUndefined } from "#/base/json.ts";
 import type { Db } from "#/infra/db.ts";
 import type { Logger } from "#/infra/log.ts";
-import * as q from "#db/runtime_todo.sql.ts";
+import * as q from "#db/agent_todo.sql.ts";
 
 import { deepseekModels, defaultModel, type Durable, durableTool, entryMessage, messageText } from "./durable.ts";
 import type { Helpers } from "./helperExtension.ts";
@@ -441,7 +441,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
   return runtime;
 }
 
-const afterOf = storedJsonOrUndefined(z.array(z.string()), "runtime_todo.after");
+const afterOf = storedJsonOrUndefined(z.array(z.string()), "agent_todo.after");
 const fromRow = (r: q.OpenTodosResult): Todo => ({
   id: r.id,
   title: r.title,

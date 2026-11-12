@@ -10,7 +10,6 @@ import type { Agent } from "#/modules/agent/agent.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import { issueBranch, type Repo } from "#/modules/repo/repo.ts";
 import { RepoError } from "#/modules/repo/workplace.ts";
-import type { Runtime } from "#/modules/runtime/runtime.ts";
 import { conflictBrief } from "#/modules/session/briefing.ts";
 import { askedMax } from "#/modules/session/journal.ts";
 import { type Hired, type HireOptions, HireRefused, type QueuedInput, type Session } from "#/modules/session/session.ts";
@@ -51,7 +50,6 @@ export interface DispatchDeps {
   readonly core: Core;
   readonly agent: Agent;
   readonly repo: Repo;
-  readonly runtime: Runtime;
   readonly session: Session;
   readonly channel: Channel;
   readonly log: Logger;
@@ -69,7 +67,7 @@ const noneIfRefused = (e: unknown): undefined => {
 export type IssueDispatch = ReturnType<typeof issueDispatch>;
 
 export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["joinChildren"], deps: DispatchDeps) {
-  const { core, agent: store, repo: repos, runtime: runtimes, session: sessions, channel: chat, log } = deps;
+  const { core, agent: store, repo: repos, session: sessions, channel: chat, log } = deps;
   const { everyIssue, get, ofCron, unsent, attemptAdd, add, remove, recordHiredStart, recordOnDutyStart, setQueued } = r;
   /** One round of the queue at a time. */
   const trying = new Semaphore(1);
@@ -78,7 +76,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
   const hire = async (agent: T.Agent, brief: string, repo: string, opt: HireOptions = {}): Promise<Hired> => {
     if (store.isOrchestrator(agent.id)) throw new HireRefused(t("server.issue.orchestratorNotHelper"));
     if (!agent.enabled) throw new HireRefused(t("server.issue.disabled", { name: agent.name }));
-    for (const i of await runtimes.problemsOf(agent))
+    for (const i of await store.problemsOf(agent))
       if (i.level === "error") throw new HireRefused(t("server.issue.cannotSend", { name: agent.name, why: i.text }));
     const where = repo.trim() || agent.workdir.trim();
     if (!where && opt.refining !== true) throw new HireRefused(t("server.issue.noRepo"));

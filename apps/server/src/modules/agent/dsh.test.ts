@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { tempDir } from "@vibevalley/testkit/temp";
 
-import recorded from "#/modules/runtime/testdata/dsh-acp-0.2.1-rc.2.json" with { type: "json" };
+import recorded from "#/modules/agent/testdata/dsh-acp-0.2.1-rc.2.json" with { type: "json" };
 
 import { dshRuntime, modelId, optionValue, repoModels } from "./dsh.ts";
 

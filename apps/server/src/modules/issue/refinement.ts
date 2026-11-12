@@ -12,10 +12,9 @@ import { questionsFromText } from "#/base/questions.ts";
 import type { Core } from "#/core/core.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
+import { chooseAgent } from "#/modules/agent/presets.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { WorkplaceRelease } from "#/modules/repo/workplace.ts";
-import { chooseAgent } from "#/modules/runtime/presets.ts";
-import type { Runtime } from "#/modules/runtime/runtime.ts";
 import { type Hired, type HireOptions, HireRefused, type Session } from "#/modules/session/session.ts";
 
 import { splitBrief } from "./brief.ts";
@@ -29,7 +28,6 @@ interface RefinementDeps {
   readonly core: Core;
   readonly log: Logger;
   readonly store: Agent;
-  readonly runtimes: Runtime;
   readonly sessions: Session;
   readonly chat: Channel;
   readonly get: (ref: string) => Promise<T.Issue>;
@@ -43,12 +41,12 @@ interface RefinementDeps {
 }
 
 export function refinement(d: RefinementDeps) {
-  const { core, log, store, runtimes, sessions, chat, get, unsent, hire, lastAssigneeIn, saveEdit, saveRefinement } = d;
+  const { core, log, store, sessions, chat, get, unsent, hire, lastAssigneeIn, saveEdit, saveRefinement } = d;
   /** One draft starts at a time: two clicks do not send two sessions. */
   const drafting = new Semaphore(1);
 
   const refiner = async (issue: T.Issue) => {
-    const candidates = await runtimes.candidates();
+    const candidates = await store.candidates();
     let named = "";
     const agent = assignedAgentOf(issue);
     if (agent) {

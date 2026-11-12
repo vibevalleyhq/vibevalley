@@ -16,8 +16,8 @@ import { abortable, isAbort, TaskGroup } from "@vibevalley/async";
 
 import { messageOf } from "#/base/errors.ts";
 import type { Time } from "#/infra/time.ts";
-import { noDeepSeekKey } from "#/modules/agent/agent.ts";
-import { deepseekId, deepseekModels, type ModelAccess, type ModelMessage } from "#/modules/runtime/durable.ts";
+import { deepseekId, deepseekModels, type ModelAccess, type ModelMessage } from "#/modules/agent/durable.ts";
+import { noDeepSeekKey } from "#/modules/agent/profile.ts";
 
 import type { Request, ScriptedModel } from "./model.ts";
 

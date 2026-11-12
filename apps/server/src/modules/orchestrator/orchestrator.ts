@@ -13,16 +13,16 @@ import { usersLanguage } from "#/base/prompts.ts";
 import { agentHome, reposDir, type ServerConfig } from "#/infra/config.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import { localeMinute, type Time } from "#/infra/time.ts";
-import { type Agent, noDeepSeekKey } from "#/modules/agent/agent.ts";
+import type { Agent } from "#/modules/agent/agent.ts";
+import { defaultModel } from "#/modules/agent/durable.ts";
+import { runtimeLabel } from "#/modules/agent/presets.ts";
+import { noDeepSeekKey } from "#/modules/agent/profile.ts";
 import { traitsOf } from "#/modules/agent/prompts.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { Issue } from "#/modules/issue/issue.ts";
 import { nextRun } from "#/modules/issue/when.ts";
 import type { Pkm } from "#/modules/pkm/pkm.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
-import { defaultModel } from "#/modules/runtime/durable.ts";
-import { runtimeLabel } from "#/modules/runtime/presets.ts";
-import type { Runtime } from "#/modules/runtime/runtime.ts";
 import type { Handed, Picked } from "#/modules/session/envelope.ts";
 import { type AgentHost, SubmitRefused } from "#/modules/session/host.ts";
 import type { ToolStart } from "#/modules/session/reaction.ts";
@@ -107,7 +107,6 @@ export interface OrchestratorDeps {
   readonly log: Logger;
   readonly config: ServerConfig;
   readonly agent: Agent;
-  readonly runtime: Runtime;
   readonly repo: Repo;
   readonly pkm: Pkm;
   readonly session: Session;
@@ -117,7 +116,7 @@ export interface OrchestratorDeps {
 }
 
 export async function makeOrchestrator(deps: OrchestratorDeps, options: OrchestratorOptions = {}): Promise<Orchestrator> {
-  const { clock, config, agent: store, runtime: runtimes, repo: repos, pkm: notes, session: run, channel: chat, issue: issues, tools: tool } = deps;
+  const { clock, config, agent: store, repo: repos, pkm: notes, session: run, channel: chat, issue: issues, tools: tool } = deps;
   const log = deps.log.child("orchestrator");
   const responses = makeResponses(run, chat, clock);
   const tasks = new TaskGroup({ name: "orchestrator", onError: (task, e) => log.error(`vibevalley: the orchestrator's ${task} failed`, e) });
@@ -181,7 +180,7 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
   const agentLines = async () => {
     const lines: string[] = [];
     for (const a of store.agents()) {
-      const assessed = await runtimes.assess(a);
+      const assessed = await store.assess(a);
       const p = assessed.agent;
       let line = situationWords.agent(p.name, p.id, runtimeLabel(p.runtime), traitsOf(p));
       if (p.enabled && assessed.blocking.length === 0) line += situationWords.quota(quotaText(assessed.info));

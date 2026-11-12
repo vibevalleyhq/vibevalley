@@ -9,8 +9,8 @@ import type { Core } from "#/core/core.ts";
 import type { ServerConfig } from "#/infra/config.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
+import type { Agent } from "#/modules/agent/agent.ts";
 import type { Memory } from "#/modules/memory/memory.ts";
-import type { Runtime } from "#/modules/runtime/runtime.ts";
 
 import { type Execution, type StartFailure } from "./executor.ts";
 import { type Journal } from "./journal.ts";
@@ -26,7 +26,7 @@ export interface WatchDeps {
   readonly log: Logger;
   readonly core: Core;
   readonly memory: Memory;
-  readonly runtime: Runtime;
+  readonly agent: Agent;
   readonly machine: Machine;
 }
 
@@ -34,7 +34,7 @@ export interface WatchDeps {
 export function makeWatch(r: SessionRegistry, deps: WatchDeps) {
   const { config, core, clock, log } = deps;
   const memories = deps.memory;
-  const runtimes = deps.runtime;
+  const runtimes = deps.agent;
   const machines = deps.machine;
   const executor = machines.executions(machines.here());
   const { fire, signal, launchOf, save, startRun, inputChanged, endRun } = r;

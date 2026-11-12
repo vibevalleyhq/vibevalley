@@ -7,7 +7,7 @@ import { openDb } from "#/infra/db.ts";
 import { keptLog } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
 import { testConfig } from "#/testing/layers.ts";
-import * as q from "#db/runtime_todo.sql.ts";
+import * as q from "#db/agent_todo.sql.ts";
 
 import { dbTodoStores } from "./vibevalley.ts";
 
@@ -79,7 +79,7 @@ describe("an agent's own todos, kept", () => {
         () => "loaded",
         (e: unknown) => String(e),
       );
-    expect(loaded).toContain("runtime_todo.after");
+    expect(loaded).toContain("agent_todo.after");
   });
 
   test("one keeper's tasks are not another's", async () => {

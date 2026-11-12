@@ -19,7 +19,6 @@ import type { ServerConfig } from "#/infra/config.ts";
 import { type Db, openDb } from "#/infra/db.ts";
 import { keptLog } from "#/infra/log.ts";
 import { localParts, type Time, wallTime } from "#/infra/time.ts";
-import { type Agent, makeAgent } from "#/modules/agent/agent.ts";
 import { sampleAgent } from "#/modules/agent/seed.ts";
 import { makeSetting, type Setting } from "#/platform/setting/setting.ts";
 import { offlineNetwork, testConfig } from "#/testing/layers.ts";
@@ -28,7 +27,8 @@ import { allow, refuse } from "#/testing/refuse.ts";
 import { piBalance } from "./pi.ts";
 import { supportOf, presetOf, runtimeIds } from "./presets.ts";
 import { inCny, price } from "./price.ts";
-import { makeRuntime, type Runtime, type RuntimeOptions, usable } from "./runtime.ts";
+import { makeProfileStore, type ProfileStore } from "./profile.ts";
+import { makeRuntimeFleet, type RuntimeOptions, type RuntimeFleet, usable } from "./runtime.ts";
 
 const fake = (id: string, more: Partial<Parameters<typeof defineRuntime>[0]> = {}) =>
   defineRuntime({
@@ -99,11 +99,11 @@ interface World extends AsyncDisposable {
   readonly clock: Time;
   readonly db: Db;
   readonly core: Core;
-  readonly agent: Agent;
+  readonly agent: ProfileStore;
   readonly setting: Setting;
   readonly log: ReturnType<typeof keptLog>;
   /** A runtime service on this farm, closed with it (or by the test, before). */
-  readonly runtime: (options: RuntimeOptions) => Promise<Runtime>;
+  readonly runtime: (options: RuntimeOptions) => Promise<RuntimeFleet>;
 }
 
 /** What the runtime service stands on: the farm's own, no network (no runtime here asks a model). */
@@ -121,8 +121,8 @@ async function world(config: ServerConfig = testConfig(), clock: Time = wallTime
     clock,
   });
   const setting = await makeSetting({ config, clock, log });
-  const agent = await makeAgent({ config, clock, log });
-  const opened: Runtime[] = [];
+  const agent = await makeProfileStore({ config, clock, log });
+  const opened: RuntimeFleet[] = [];
   return {
     config,
     clock,
@@ -132,8 +132,8 @@ async function world(config: ServerConfig = testConfig(), clock: Time = wallTime
     setting,
     log,
     runtime: async (options) => {
-      const r = await makeRuntime(
-        { config, clock, log, db, core, agent, setting, fetch: offlineNetwork.fetch },
+      const r = await makeRuntimeFleet(
+        { config, clock, log, db, core, profiles: agent, setting, fetch: offlineNetwork.fetch },
         { registry: new RuntimeRegistry([]), ...options },
       );
       opened.push(r);
@@ -190,17 +190,17 @@ describe("runtime", () => {
       await using w = await world();
       const r = await w.runtime({ registry, background: false, usageOf: async () => null });
       const reason = async () => {
-        const got = (await r.list()).find((x) => x.id === "pi")!.installation;
+        const got = (await r.runtimes()).find((x) => x.id === "pi")!.installation;
         return got.status === "unsupported" ? got.reason : "";
       };
-      await r.refresh("pi");
+      await r.refreshRuntime("pi");
       const chinese = await reason();
       setLocale("en");
       const reason2 = await reason();
       // The list shows what it held until the probe in English lands.
       expect(reason2).toBe(chinese);
       await waitFor(reason, (r) => r === "oar does not know this runtime", "the reason in English");
-      expect((await r.info("pi"))!.installation).toMatchObject({ reason: "oar does not know this runtime" });
+      expect((await r.runtimeInfo("pi"))!.installation).toMatchObject({ reason: "oar does not know this runtime" });
     } finally {
       setLocale("zh");
     }
@@ -232,12 +232,12 @@ describe("runtime", () => {
         return null;
       },
     });
-    const slow = r.refresh("pi");
+    const slow = r.refreshRuntime("pi");
     await until(() => n === 1);
-    await r.refresh("pi");
+    await r.refreshRuntime("pi");
     release();
     await slow;
-    const got = await r.info("pi");
+    const got = await r.runtimeInfo("pi");
     expect(got!.installation).toMatchObject({ command: "new" });
     observeUsage = true;
     r.usageSoon("pi");
@@ -276,8 +276,8 @@ describe("runtime", () => {
             return null;
           },
         });
-        await r.refresh("pi");
-        const fullRefresh = r.refresh("pi");
+        await r.refreshRuntime("pi");
+        const fullRefresh = r.refreshRuntime("pi");
         await until(() => full === 2);
         r.usageSoon("pi");
         await clock.adjust(20_000);
@@ -293,7 +293,7 @@ describe("runtime", () => {
           releaseFull();
           await fullRefresh;
         }
-        const got = await r.info("pi");
+        const got = await r.runtimeInfo("pi");
         expect(got!.installation).toMatchObject({ command: "new" });
         expect(got!.usage).toBeNull();
       } finally {
@@ -339,11 +339,11 @@ describe("runtime", () => {
     await whenTrue(() => pushed.some((info) => info.id === "pi" && info.spentToday === 1), "spend push");
     answer(0, used(40));
     await waitFor(
-      () => r.info("pi"),
+      () => r.runtimeInfo("pi"),
       (info) => info?.usage?.status === "ok" && info.usage.windows[0]?.usedPercent === 40,
       "the usage kept after spend",
     );
-    expect((await r.info("pi"))!.spentToday).toBe(1);
+    expect((await r.runtimeInfo("pi"))!.spentToday).toBe(1);
     await clock.adjust(300_000);
     await whenTrue(() => out.length === 2, "periodic usage");
     r.usageSoon("pi");
@@ -351,13 +351,13 @@ describe("runtime", () => {
     await whenTrue(() => out.length === 3, "overlapping delayed usage");
     answer(2, used(100));
     await waitFor(
-      () => r.info("pi"),
+      () => r.runtimeInfo("pi"),
       (info) => info?.usage?.status === "ok" && info.usage.windows[0]?.usedPercent === 100,
       "the newer usage",
     );
     answer(1, used(70));
     await nextTurn();
-    expect((await r.info("pi"))!.usage).toEqual(used(100));
+    expect((await r.runtimeInfo("pi"))!.usage).toEqual(used(100));
   });
 
   test("a failed list probe is retried without changing the synchronous checking answer", async () => {
@@ -372,7 +372,7 @@ describe("runtime", () => {
         return probes === 1 ? first.promise : second.promise;
       },
     });
-    const pi = async () => (await r.list()).find((info) => info.id === "pi")!;
+    const pi = async () => (await r.runtimes()).find((info) => info.id === "pi")!;
     expect((await pi()).installation.status).toBe("checking");
     await until(() => probes === 1);
     first.reject(new Error("first probe failed"));
@@ -396,16 +396,16 @@ describe("runtime", () => {
         return probes === 1 ? old.promise : latest.promise;
       },
     });
-    const oldResult = r.refresh("pi").then(
+    const oldResult = r.refreshRuntime("pi").then(
       () => ({ status: "resolved" as const }),
       (error: unknown) => ({ status: "rejected" as const, error }),
     );
     await until(() => probes === 1);
-    const latestResult = r.refresh("pi");
+    const latestResult = r.refreshRuntime("pi");
     await until(() => probes === 2);
     old.reject(new Error("old probe failed"));
     expect(await oldResult).toMatchObject({ status: "rejected" });
-    expect((await r.list()).find((info) => info.id === "pi")!.installation.status).toBe("checking");
+    expect((await r.runtimes()).find((info) => info.id === "pi")!.installation.status).toBe("checking");
     latest.resolve(await notFound("pi"));
     expect((await latestResult)!.installation.status).toBe("not_found");
     // The old read's failure started no read of its own.
@@ -431,7 +431,7 @@ describe("runtime", () => {
     expect(usable(assessed)).toBe(false);
     expect(usable(await r.assess(agent({})))).toBe(true);
     expect(usable(await r.assess(agent({ enabled: false })))).toBe(false);
-    const opencode = (await r.info("opencode"))!.support.refused;
+    const opencode = (await r.runtimeInfo("opencode"))!.support.refused;
     expect(opencode).toEqual({
       env: "test env",
       disallowedTools: supportOf("opencode").refused.disallowedTools,
@@ -540,9 +540,9 @@ describe("runtime", () => {
           };
         },
       });
-      await r.info("pi");
+      await r.runtimeInfo("pi");
       const store = w.agent;
-      const updating = r.update("pi", { ...store.settings("pi"), defaultEffort: "high" });
+      const updating = r.updateRuntime("pi", { ...store.settings("pi"), defaultEffort: "high" });
       await until(() => waiting);
       const a = agent({});
       expect((await r.problemsOf(a)).map((i) => i.field)).toEqual(["effort"]);
@@ -568,7 +568,7 @@ describe("runtime", () => {
       const a = agent({});
       expect(await r.problemsOf(a)).toEqual([]);
       const store = w.agent;
-      await r.update("pi", {
+      await r.updateRuntime("pi", {
         ...store.settings("pi"),
         ...(option === "effort" ? { defaultEffort: "high" } : { env: { NEW: "set" } }),
       });
@@ -589,7 +589,7 @@ describe("runtime", () => {
       }),
     });
     const store = w.agent;
-    await r.update("pi", { ...store.settings("pi"), enabled: false, dailyBudget: 1 });
+    await r.updateRuntime("pi", { ...store.settings("pi"), enabled: false, dailyBudget: 1 });
     r.spend("pi", 1);
     const a = agent({ enabled: false });
     expect(usable(await r.assess(a))).toBe(false);
@@ -606,12 +606,12 @@ describe("runtime", () => {
     await using w = await world();
     const r = await w.runtime({ background: false, usageOf: async () => null, registry });
     // The first answer does not wait for a probe: every runtime is checking, already with its name, look and facts.
-    for (const info of await r.list()) {
+    for (const info of await r.runtimes()) {
       expect(info.installation.status).toBe("checking");
       expect(info.preset).toEqual(presetOf(info.id));
     }
     const list = await waitFor(
-      () => r.list(),
+      () => r.runtimes(),
       (all) => all.every((i) => i.installation.status !== "checking"),
       "every runtime probed",
     );
@@ -653,7 +653,7 @@ describe("runtime", () => {
         env: {},
       });
       const r = await w.runtime({ background: false, usageOf: async () => null, registry });
-      await r.refresh("pi");
+      await r.refreshRuntime("pi");
       return await r.resolve(agent({}));
     };
     try {
@@ -671,16 +671,16 @@ describe("runtime", () => {
     const r = await runtimes(w, { probe: notFound });
     const agents = w.agent;
     await agents.saveSettings("pi", { ...agents.settings("pi"), dailyBudget: 10 });
-    await r.refresh("pi");
+    await r.refreshRuntime("pi");
     r.spend("pi", 12);
-    expect((await r.info("pi"))!.stop).toMatch(/每日预算 ¥10\.00/u);
+    expect((await r.runtimeInfo("pi"))!.stop).toMatch(/每日预算 ¥10\.00/u);
     await clock.adjust(day);
-    const got = await r.info("pi");
+    const got = await r.runtimeInfo("pi");
     expect([got!.spentToday, got!.stop]).toEqual([undefined, ""]);
     r.spend("pi", 3);
-    expect((await r.info("pi"))!.spentToday).toBe(3);
+    expect((await r.runtimeInfo("pi"))!.spentToday).toBe(3);
     r.spend("pi", 9);
-    expect((await r.info("pi"))!.stop).toMatch(/每日预算 ¥10\.00/u);
+    expect((await r.runtimeInfo("pi"))!.stop).toMatch(/每日预算 ¥10\.00/u);
   });
 
   test("regression: legacy spend files are ignored and invalid amounts cannot enter the database counter", async () => {
@@ -690,25 +690,25 @@ describe("runtime", () => {
     writeFileSync(join(config.home, "spend.json"), `{"day":"${today}","byRuntime":{"pi":1e999}}`);
     await using w = await world(config);
     const r = await runtimes(w, { probe: notFound });
-    await r.refresh("pi");
-    expect((await r.info("pi"))!.spentToday).toBeUndefined();
+    await r.refreshRuntime("pi");
+    expect((await r.runtimeInfo("pi"))!.spentToday).toBeUndefined();
     r.spend("pi", Number.POSITIVE_INFINITY);
     r.spend("pi", Number.NaN);
-    expect((await r.info("pi"))!.spentToday).toBeUndefined();
-    const inserted = await w.db.sql.exec(`insert into runtime_spend (day, runtime, cny) values ('1970-01-01', 'pi', 9e999)`).then(
+    expect((await r.runtimeInfo("pi"))!.spentToday).toBeUndefined();
+    const inserted = await w.db.sql.exec(`insert into agent_spend (day, runtime, cny) values ('1970-01-01', 'pi', 9e999)`).then(
       () => "Success",
       () => "Failure",
     );
     expect(inserted).toBe("Failure");
     r.spend("pi", 2);
-    expect((await r.info("pi"))!.spentToday).toBe(2);
+    expect((await r.runtimeInfo("pi"))!.spentToday).toBe(2);
   });
 
   test("regression: flushed spending survives restart without being added twice and each day remains separate", async () => {
     const config = testConfig();
     const clock = testTime();
     await using w = await world(config, clock);
-    const cnyOf = async () => (await w.db.sql.query(`select cny from runtime_spend where runtime = 'pi' order by day`)).map((row) => ({ cny: row.cny }));
+    const cnyOf = async () => (await w.db.sql.query(`select cny from agent_spend where runtime = 'pi' order by day`)).map((row) => ({ cny: row.cny }));
     {
       const runtime = await runtimes(w);
       runtime.spend("pi", 4);
@@ -719,14 +719,14 @@ describe("runtime", () => {
     expect(existsSync(join(config.home, "spend.json"))).toBe(false);
     {
       const runtime = await runtimes(w);
-      expect((await runtime.info("pi"))?.spentToday).toBe(4);
+      expect((await runtime.runtimeInfo("pi"))?.spentToday).toBe(4);
       runtime.spend("pi", 2);
       await runtime.close();
     }
     await clock.adjust(day);
     {
       const runtime = await runtimes(w);
-      expect((await runtime.info("pi"))?.spentToday).toBeUndefined();
+      expect((await runtime.runtimeInfo("pi"))?.spentToday).toBeUndefined();
       runtime.spend("pi", 5);
       await runtime.close();
     }
@@ -738,8 +738,8 @@ describe("runtime", () => {
     const clock = testTime();
     await using w = await world(config, clock);
     const sql = w.db.sql;
-    const cnyOf = async () => (await sql.query(`select cny from runtime_spend where runtime = 'pi'`)).map((row) => ({ cny: row.cny }));
-    await refuse(sql, "refuse_spend", "before insert on runtime_spend");
+    const cnyOf = async () => (await sql.query(`select cny from agent_spend where runtime = 'pi'`)).map((row) => ({ cny: row.cny }));
+    await refuse(sql, "refuse_spend", "before insert on agent_spend");
     {
       const runtime = await runtimes(w);
       runtime.spend("pi", 4);
@@ -749,8 +749,8 @@ describe("runtime", () => {
         (n) => n > 0,
         "the rejected write",
       );
-      expect(await sql.query(`select * from runtime_spend`)).toEqual([]);
-      expect((await runtime.info("pi"))?.spentToday).toBe(4);
+      expect(await sql.query(`select * from agent_spend`)).toEqual([]);
+      expect((await runtime.runtimeInfo("pi"))?.spentToday).toBe(4);
       await allow(sql, "refuse_spend");
       await clock.adjust(2000);
       await waitFor(cnyOf, (rows) => rows[0]?.cny === 4, "the retry committed");
@@ -773,7 +773,7 @@ describe("runtime", () => {
     rmSync(file, { force: true });
     mkdirSync(file);
     const unsaved = await refusal(
-      r.update("pi", {
+      r.updateRuntime("pi", {
         enabled: true,
         binPath: "",
         defaultModel: "unsaved",

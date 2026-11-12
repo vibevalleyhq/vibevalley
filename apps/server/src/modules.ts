@@ -9,7 +9,7 @@ export const modules: readonly Module[] = [
     name: "Platform",
     parts: ["base", "infra", "core", "platform/setting", "platform/user", "platform/attachment", "platform/provider"],
   },
-  { name: "Agents", parts: ["modules/agent", "modules/runtime", "modules/memory"] },
+  { name: "Agents", parts: ["modules/agent", "modules/memory"] },
   { name: "Source Control", parts: ["modules/repo"] },
   { name: "Agent Sessions", parts: ["modules/session"] },
   { name: "Collaboration", parts: ["modules/channel", "modules/media", "modules/artifact", "modules/pkm"] },

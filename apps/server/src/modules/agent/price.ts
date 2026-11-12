@@ -5,7 +5,7 @@ import { type Clock, Queue, Semaphore, TaskGroup } from "@vibevalley/async";
 import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import { localParts } from "#/infra/time.ts";
-import * as q from "#db/runtime_spend.sql.ts";
+import * as q from "#db/agent_spend.sql.ts";
 
 import type { PiDefault } from "./pi.ts";
 

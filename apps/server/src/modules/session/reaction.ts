@@ -9,8 +9,8 @@ import { isBusy } from "@vibevalley/protocol/rules";
 
 import { clip } from "#/base/clip.ts";
 import type { FactIn } from "#/core/core.ts";
-import type { Rate } from "#/modules/runtime/price.ts";
-import { goOn } from "#/modules/runtime/vibevalley.ts";
+import type { Rate } from "#/modules/agent/price.ts";
+import { goOn } from "#/modules/agent/vibevalley.ts";
 
 import { briefBreak, recalledIn } from "./briefing.ts";
 import { failureText } from "./report.ts";

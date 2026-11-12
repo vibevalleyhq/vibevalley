@@ -7,7 +7,7 @@ import { Secret } from "@vibevalley/protocol/schema";
 
 import { keptLog } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
-import { noDeepSeekKey } from "#/modules/agent/agent.ts";
+import { noDeepSeekKey } from "#/modules/agent/profile.ts";
 
 import { deepseekAccess, type Durable, entryMessage, openDurable } from "./durable.ts";
 

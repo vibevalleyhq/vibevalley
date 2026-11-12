@@ -19,11 +19,11 @@ import { loadConfig } from "#/infra/config.ts";
 import { HomeTaken, leaseHome } from "#/infra/lease.ts";
 import { makeLogger } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
-import { dshRuntime } from "#/modules/runtime/dsh.ts";
-import { deepseekAccess, openDurable } from "#/modules/runtime/durable.ts";
-import { makeHelpers } from "#/modules/runtime/helperExtension.ts";
-import { registryOf } from "#/modules/runtime/runtime.ts";
-import { helperKey, vibevalleyRuntimeOf } from "#/modules/runtime/vibevalley.ts";
+import { dshRuntime } from "#/modules/agent/dsh.ts";
+import { deepseekAccess, openDurable } from "#/modules/agent/durable.ts";
+import { makeHelpers } from "#/modules/agent/helperExtension.ts";
+import { registryOf } from "#/modules/agent/runtime.ts";
+import { helperKey, vibevalleyRuntimeOf } from "#/modules/agent/vibevalley.ts";
 
 import { instructions } from "./prompts.ts";
 

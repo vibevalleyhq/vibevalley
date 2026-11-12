@@ -15,9 +15,9 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/modules/runtime/durable.ts` | `openDurable`：开 `Harness`（`$VIBEVALLEY_HOME/durable.db`，测试农场在内存里），注册 `deepseek`（`deepseekAccess`），装上开机就要的扩展，替没装上的扩展站岗；`conversation(key, agent, init)` 按会话找回或新建对话；`durableTool`、`entryMessage`、`messageText` |
-| `apps/server/src/modules/runtime/helperExtension.ts` | 帮工的扩展 `vibevalley.helper`（`makeHelpers`）：pi-durable 的 `read`、`write`、`edit`、`bash`，自己的任务、技能、记性和 `spawn_agent`；会话自己的部分记在对话的 `vibevalley.helper` 文档里 |
-| `apps/server/src/modules/runtime/vibevalley.ts` | `vibevalley` 农机：照 oar 的 `Runtime` 契约，一个 oar 会话一个对话，出 oar 的事件；会话的 MCP 服务是它自己的扩展 `vibevalley.mcp.<会话>` |
+| `apps/server/src/modules/agent/durable.ts` | `openDurable`：开 `Harness`（`$VIBEVALLEY_HOME/durable.db`，测试农场在内存里），注册 `deepseek`（`deepseekAccess`），装上开机就要的扩展，替没装上的扩展站岗；`conversation(key, agent, init)` 按会话找回或新建对话；`durableTool`、`entryMessage`、`messageText` |
+| `apps/server/src/modules/agent/helperExtension.ts` | 帮工的扩展 `vibevalley.helper`（`makeHelpers`）：pi-durable 的 `read`、`write`、`edit`、`bash`，自己的任务、技能、记性和 `spawn_agent`；会话自己的部分记在对话的 `vibevalley.helper` 文档里 |
+| `apps/server/src/modules/agent/vibevalley.ts` | `vibevalley` 农机：照 oar 的 `Runtime` 契约，一个 oar 会话一个对话，出 oar 的事件；会话的 MCP 服务是它自己的扩展 `vibevalley.mcp.<会话>` |
 | `apps/server/src/modules/session/host.ts` | 助手的宿主 `AgentHost`：扩展 `vibevalley.<会话>`（助手的工具、提示的几段），读对话的提交喂给 `journal` 和 `InProcessRun` |
 | `apps/server/src/chat/chat.ts` | 终端里的对话：同一个农机，跑在 `agent/<名字>/durable.db` 的自己的 `Harness` 上 |
 | `packages/agent/src/core/` | `Tool`、`ToolResult`、`runTool`、`schemaTool`（`tool.ts`），参数的 JSON Schema（`schema.ts` 的 `parametersOf`、`coerceArguments`），`ToolFailed` |
@@ -43,7 +43,7 @@
 | 编码工具 | 无 | pi-durable 的 `read`、`write`、`edit`、`bash`（工作目录是帮工的，`bash` 带会话的环境变量、默认 120 秒） | 同帮工 | 同父对话 |
 | 技能（`SKILL.md`） | 助手自己的技能目录 | 帮工工作目录和家目录的技能目录 | 同帮工 | 同父对话 |
 | 记性（`MemoryPort`） | 数据库 `memory` 表 | 无（由 `Session` 管） | `agent/<名字>/MEMORY.md` | 同父对话 |
-| 自己的任务图 | 无 | 有（存 `runtime_todo` 表；只记 `self`） | 有（存内存） | 同父对话 |
+| 自己的任务图 | 无 | 有（存 `agent_todo` 表；只记 `self`） | 有（存内存） | 同父对话 |
 | `spawn_agent` | 无 | 有（调用拥有的子对话） | 有 | 无（不嵌套） |
 | 对话 | `durable.db` | `durable.db`（一个 oar 会话一个，`resume` 找回） | `agent/<名字>/durable.db` | 父对话的调用拥有的子对话 |
 
@@ -59,7 +59,7 @@ pi-durable 自己压缩。模型的窗口按目录（100 万 token），一次�
 
 - 输入、每次回答、每个工具调用先落进 `durable.db` 再显示；服务端在一轮中间停掉，重开以后 `Harness` 接着跑完它，`session_run` 里还是同一轮。会改东西的工具不声明 `replay: "safe"`，断在中间的调用模型读到 `interrupted`；`spawn_agent` 能重放（子对话照 `requestId` 找回）。
 - 一个对话按名字选它的扩展，没装上的扩展 pi-durable 不报错、直接没有。所以扩展在任何一轮跑起来以前就在：
-  - 帮工的 `vibevalley.helper` 在 `Harness` 开的时候装上；会话自己的部分不在内存里，从对话本身读：工作目录是对话的 `cwd`，指令、环境变量和 oar 会话的 ID 在对话的 `vibevalley.helper` 文档里（建对话的同一个提交写进去，帮手的子对话照抄一份），自己的任务按会话 ID 去 `runtime_todo` 表找。会话没重新打开时，这一轮照样有它全部的提示和工具。
+  - 帮工的 `vibevalley.helper` 在 `Harness` 开的时候装上；会话自己的部分不在内存里，从对话本身读：工作目录是对话的 `cwd`，指令、环境变量和 oar 会话的 ID 在对话的 `vibevalley.helper` 文档里（建对话的同一个提交写进去，帮手的子对话照抄一份），自己的任务按会话 ID 去 `agent_todo` 表找。会话没重新打开时，这一轮照样有它全部的提示和工具。
   - 助手的扩展由 `makeHost` 装：助手开机时先给每个助手造好宿主（宿主造的时候就从对话里读回最新输入的去处），再让任何一个接着跑。
   - `openDurable` 开完以后，凡是有没跑完的一轮、却选了没装上的扩展的对话，就照它转写里最后给模型看的样子给那个扩展装一个替身：工具照旧在，调用时回一个失败的结果，说明它所在的会话还没重新打开；提示的那几段照它上次显示的样子不变。宿主装上真的扩展（同名）就替换它。帮工的 MCP 服务是会话自己的进程，会话没打开前它的工具就是这样回答的。
 - 农机的会话被放下（`dispose`）时停下这一轮，和 oar 的约定一样；农场关门时例外：会话模块先调 `Durable.leave`，之后放下的会话让这一轮留在 `durable.db` 里，崩溃时也一样留着。开机时帮工那一侧看到对话还有没跑完的一轮，就用同一个 oar 会话再打开（`resume`，输入是 `goOn`：不进对话，那一轮就是这次的回合），答完记在原来那一轮上（[帮工的重启](docs/subsystems/session.md#重启)）。
@@ -99,8 +99,8 @@ pi-durable 自己压缩。模型的窗口按目录（100 万 token），一次�
 
 ## 怎么验证
 
-- `apps/server/src/modules/runtime/durable.test.ts`：pi-ai 的 DeepSeek provider 在 `Harness` 下对录下的 DeepSeek 流的读法和发法、钥匙每次现取、没有钥匙的说法。
-- `apps/server/src/modules/runtime/vibevalley.test.ts`：农机的 oar 适配、编码工具、环境变量、帮手、MCP；一轮在会话重开前接着跑时 MCP 的工具回答用不了、提示不变。
+- `apps/server/src/modules/agent/durable.test.ts`：pi-ai 的 DeepSeek provider 在 `Harness` 下对录下的 DeepSeek 流的读法和发法、钥匙每次现取、没有钥匙的说法。
+- `apps/server/src/modules/agent/vibevalley.test.ts`：农机的 oar 适配、编码工具、环境变量、帮手、MCP；一轮在会话重开前接着跑时 MCP 的工具回答用不了、提示不变。
 - `apps/server/src/flows/restart.test.ts`：助手和帮工都答到一半时崩溃，重开后两个都答完，帮工那一轮有它的提示和工具；帮工答到一半时正常关门，重开后接着答完、记一轮。
 - `apps/server/src/modules/orchestrator/evals.test.ts`：评测的判法、录下的用例，以及评测走的那条路（`orchestratorTurn`）离线跑一遍。
 - `packages/agent/src/tools/tools.test.ts`、`todo.test.ts`、`declared.test.ts`：技能、记性、MCP、任务图，以及工具给模型看的样子不变。

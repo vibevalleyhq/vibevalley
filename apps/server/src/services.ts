@@ -4,7 +4,7 @@ import { makeMcp, type Mcp, type McpOptions } from "#/gateway/mcp/mcp.ts";
 import { makeProjection } from "#/gateway/projection/frame.ts";
 import { makeTool, type Tool } from "#/gateway/tool/tool.ts";
 import { makeVoice, type Voice, type VoiceOptions } from "#/gateway/voice/voice.ts";
-import { type Agent, makeAgent } from "#/modules/agent/agent.ts";
+import { type Agent, type AgentOptions, makeAgent } from "#/modules/agent/agent.ts";
 import { type Artifact, makeArtifact } from "#/modules/artifact/artifact.ts";
 import { type Channel, makeChannel } from "#/modules/channel/channel.ts";
 import { type Game, makeGame } from "#/modules/game/game.ts";
@@ -14,7 +14,6 @@ import { makeMemory, type Memory, type MemoryOptions } from "#/modules/memory/me
 import { makeOrchestrator, type Orchestrator, type OrchestratorOptions } from "#/modules/orchestrator/orchestrator.ts";
 import { makePkm, type Pkm } from "#/modules/pkm/pkm.ts";
 import { makeRepo, type Repo, type RepoHooks } from "#/modules/repo/repo.ts";
-import { makeRuntime, type Runtime, type RuntimeOptions } from "#/modules/runtime/runtime.ts";
 import { makeSession, type Session, type SessionOptions } from "#/modules/session/session.ts";
 import { makeWatch, type Watch } from "#/modules/watch/watch.ts";
 import { type Attachment, makeAttachment } from "#/platform/attachment/attachment.ts";
@@ -31,7 +30,7 @@ import { type Time, wallTime } from "./infra/time.ts";
 
 /** What a test changes in a module: the farm's own otherwise. */
 export interface ServiceOptions {
-  readonly runtime?: RuntimeOptions;
+  readonly agent?: AgentOptions;
   readonly repo?: RepoHooks;
   readonly memory?: MemoryOptions;
   readonly session?: SessionOptions;
@@ -69,7 +68,6 @@ export interface Farm extends AsyncDisposable {
   readonly provider: Provider;
   readonly agent: Agent;
   readonly memory: Memory;
-  readonly runtime: Runtime;
   readonly repo: Repo;
   readonly session: Session;
   readonly channel: Channel;
@@ -140,7 +138,6 @@ export type Modules = Pick<
   | "provider"
   | "agent"
   | "memory"
-  | "runtime"
   | "repo"
   | "session"
   | "channel"
@@ -169,22 +166,21 @@ export async function buildModules(config: ServerConfig, options: ServiceOptions
   const user = own(await makeUser({ db, clock, log }));
   const attachment = own(await makeAttachment({ config, clock, db }));
   const provider = own(await makeProvider({ setting, fetch, clock, log }));
-  // Agents: the profiles, their memory, the runtimes they run on.
-  const agent = own(await makeAgent({ config, clock, log }));
+  // Agents: the profiles and the runtimes they run on, then their memory.
+  const agent = own(await makeAgent({ config, clock, log, db, core, setting, fetch }, options.agent));
   const memory = own(await makeMemory({ clock, log, fetch, db, setting, agent }, options.memory));
-  const runtime = own(await makeRuntime({ config, clock, log, db, core, agent, setting, fetch }, options.runtime));
   // Source Control: repositories, worktrees, checks, merges and pull requests.
   const repo = own(await makeRepo({ config, clock, log }, options.repo));
   // Agent Sessions: an agent profile at work: its triggers and deliveries, its sessions and runs, their workplaces and
   // the machine they run on.
-  const session = own(await makeSession({ config, clock, log, db, core, agent, memory, repo, runtime }, options.session));
+  const session = own(await makeSession({ config, clock, log, db, core, agent, memory, repo }, options.session));
   // Collaboration: channels, threads, messages, media and its library, documents, the user's notes.
   const channel = own(await makeChannel({ clock, log, fetch, db, core, attachment }));
   const media = own(await makeMedia({ db, core, clock, log, attachment, session, channel, provider, publicFetch }));
   const artifact = own(await makeArtifact({ db, clock, log, attachment, channel }));
   const pkm = own(await makePkm({ config, clock, log, db }));
   // Issues: the issues and what runs on a schedule.
-  const issue = own(await makeIssue({ config, clock, log, db, core, agent, repo, runtime, session, channel }));
+  const issue = own(await makeIssue({ config, clock, log, db, core, agent, repo, session, channel }));
   // Watch: the chat's committed events routed to the sessions through the brakes, their threads, talks and receipts in
   // the chat; the user's inbox and the patrol.
   const watch = own(await makeWatch({ config, clock, log, db, core, agent, session, channel, issue }));
@@ -203,7 +199,6 @@ export async function buildModules(config: ServerConfig, options: ServiceOptions
     provider,
     agent,
     memory,
-    runtime,
     repo,
     session,
     channel,
@@ -222,14 +217,12 @@ export async function makeFarm(config: ServerConfig, options: ServiceOptions = {
   const own = owning(closes);
   try {
     const modules = await buildModules(config, options, closes);
-    const { clock, log, fetch, db, core, setting, user, agent, memory, runtime, repo, session, channel, media, artifact, pkm, watch, issue } = modules;
+    const { clock, log, fetch, db, core, setting, user, agent, memory, repo, session, channel, media, artifact, pkm, watch, issue } = modules;
     const { provider } = modules;
     // Gateway's tools first: the orchestrator holds them (OrchestratorTools), and /mcp serves them to sessions.
     const tool = own(await makeTool({ clock, log, agent, session, issue, channel, memory, media, pkm, artifact, repo }));
     // Orchestrator: the agent that hands the user's work to helpers.
-    const orchestrator = own(
-      await makeOrchestrator({ clock, log, config, agent, runtime, repo, pkm, session, channel, issue, tools: tool }, options.orchestrator),
-    );
+    const orchestrator = own(await makeOrchestrator({ clock, log, config, agent, repo, pkm, session, channel, issue, tools: tool }, options.orchestrator));
     // Gamification: the ledger, progress and achievements, from events only.
     const game = own(await makeGame({ config, clock, log, db, core, repo }));
     // Gateway: every way in from outside; http/app.ts mounts the HTTP API on these services.

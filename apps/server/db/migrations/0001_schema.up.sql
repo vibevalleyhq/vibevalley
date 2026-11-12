@@ -537,7 +537,7 @@ CREATE TABLE session_run_issue (
   primary key (run, issue)
 );
 CREATE INDEX session_run_issue_by_issue on session_run_issue(issue, run);
-CREATE TABLE runtime_todo (
+CREATE TABLE agent_todo (
   graph text not null,
   keeper text not null,
   id text not null,
@@ -553,7 +553,7 @@ CREATE TABLE runtime_todo (
   finished_at double precision,
   primary key (graph, id)
 );
-CREATE INDEX runtime_todo_by_keeper on runtime_todo (keeper, finished_at);
+CREATE INDEX agent_todo_by_keeper on agent_todo (keeper, finished_at);
 -- Artifacts (artifact/artifact.ts). A blocks one's blocks are a flat list, nested by parent_id and ordered by
 -- (order_key, id); every change is an op, and a batch of ops is one artifact_change with the artifact's next seq.
 CREATE TABLE artifact (
@@ -673,7 +673,7 @@ select scope, position from session_delivery
 where payload_json::jsonb -> 'trigger' -> 'actor' ->> 'kind' = 'user'
   and envelope_id <> payload_json::jsonb -> 'trigger' ->> 'id';
 
-CREATE TABLE runtime_spend (
+CREATE TABLE agent_spend (
   day text NOT NULL,
   runtime text NOT NULL,
   cny double precision NOT NULL CHECK (cny >= 0 AND cny < 'Infinity'::double precision),

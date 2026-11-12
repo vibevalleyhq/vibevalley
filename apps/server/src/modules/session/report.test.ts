@@ -5,8 +5,8 @@ import type { Doing, Session } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { clip } from "#/base/clip.ts";
+import { inCny } from "#/modules/agent/price.ts";
 import { MergeFailure } from "#/modules/repo/workplace.ts";
-import { inCny } from "#/modules/runtime/price.ts";
 
 import { briefBreak, conflictBrief, noRoom, notTakenIn, sessionName, whoMakesRoom, withRecall } from "./briefing.ts";
 import { recallHead } from "./prompts.ts";
