@@ -3,7 +3,8 @@ export const zh = {
   home: "/",
   other: { label: "EN", href: "/en/", name: "English" },
   title: "码农场物语 · VibeValley",
-  description: "一群写代码的小动物，等你来派活：用语音或打字指挥的编码 agent 团队，画成一座像素农场。跑在你自己的电脑上，开源。",
+  description:
+    "一句话指挥一队编码 agent：助手拆成工单、派给你电脑上真的 pi、Claude Code、Codex，你看过改动才合进主分支。AI 版的 Linear，画成一座像素农场。跑在你自己的电脑上，开源。",
   nav: { how: "怎么玩", features: "能做什么", screens: "看看农场", start: "开始种地", github: "GitHub" },
   hero: {
     name: "码农场物语",
@@ -39,22 +40,22 @@ export const zh = {
     git: { branch: "vibevalley/w3-mgr2k", worktree: "自己的 worktree", commits: "个提交", tests: "测试", merged: "收进 main" },
     steps: [
       { icon: "act-speaking_text", title: "说一句", text: "对助手说：「在 clock-in 里加一个查询打卡记录的接口，写测试。」打字也行，按住说话也行。" },
-      { icon: "icon-seeds", title: "派活", text: "助手挑一个合适的帮工，在项目里给它开独立的分支和 worktree，像在空地上播下种子。" },
+      { icon: "icon-seeds", title: "派活", text: "助手把这句话拆成工单，按档案挑一个帮工，在项目里给它开独立的分支和 worktree，像在空地上播下种子。" },
       {
         icon: "act-run_command",
         title: "干活",
         text: "帮工读代码、改文件、跑测试、提交。地里的庄稼跟着它的真实进度长：读代码时发芽，改文件时长叶，做完了结出麦子。",
       },
-      { icon: "icon-harvest", title: "收获", text: "你看过收成清单：几个提交、改了什么、会不会冲突，确认了才合进主分支；冲突了让它自己解决。" },
+      { icon: "icon-harvest", title: "收获", text: "你看过收成清单：几个提交、改了什么、会不会冲突，说「完成」才合进主分支；冲突了让它自己解决。" },
     ],
   },
   features: {
     title: "能做什么",
-    // The farm's numbers (lib/facts.ts), what each counts.
+    // The farm's numbers (src/base/facts.ts), what each counts.
     tally: {
       machines: "台农机：自带的、pi、Claude Code、Codex",
       looks: "种帮工：7 种小动物 × 4 套衣服",
-      plots: "块地一起开工",
+      plots: "块地一起开工，每个仓库默认 3 块",
       achievements: "个成就",
       games: "个手机小游戏",
       connectors: "个聊天软件能派活：微信、飞书、QQ",
@@ -62,36 +63,56 @@ export const zh = {
     items: [
       {
         icon: "icon-board",
-        title: "田头群聊",
-        text: "你、助手和帮工在同一个群里说话。每件活下面挂一个工单串，帮工在里面确认、提问、汇报，你随时插话；还能按项目开频道。",
+        title: "一句话，派出一队人",
+        text: "你只和助手说话，打字或按住说话都行。它把一句话拆成工单，按档案挑帮工、开分支，派出去；帮工在田头每件活的工单串里确认、提问、汇报，你随时插话。",
+      },
+      {
+        icon: "icon-branch",
+        title: "几块地一起种",
+        text: "最多 6 个帮工同时干活（每个仓库默认 3 个），各在自己工单的 worktree 和分支上，互不踩脚。派不出去的排队，空出地来自动接上。",
       },
       {
         icon: "icon-task-board",
-        title: "种植计划",
-        text: "长任务先拆成一张有先后的步骤图，你看过草稿再开工。修 bug 时第一步先写一个会失败的验收测试，后面的步骤谁也改不动它。",
+        title: "收不收由你",
+        text: "做完的活先给你看提交、diff 和会不会冲突，你说「完成」才合进主分支。长任务拆成有先后的子工单；修 bug 先写一个会失败的验收测试，后面的子工单改不了它，最后一步要让它通过。",
       },
-      { icon: "button-mic", title: "张嘴就派活", text: "按住说话，语音助手听你说完，交给同一个助手去派活。" },
+      {
+        icon: "icon-log",
+        title: "停了也不丢活",
+        text: "助手和自带的农机跑在 pi-durable 上：每一轮、每个工具调用先落盘再显示。助手答到一半服务端停了，重启后接着答完；进程崩在半路时，帮工也从断点接着做，这一轮只记一次。",
+      },
       {
         icon: "icon-tasks",
-        title: "工单看板和地图",
-        text: "每次种植是一张工单：待办、处理中、等你看、已关。地满了就排队，空出地来自动开工。地图上每个项目是一座小岛，看得见哪块地在干活、还能派几件。",
+        title: "工作台和农场",
+        text: "工作台照 Linear：看板、工单详情、每一步的轨迹，哪一步不对就在那一步写评论。农场把同样的状态画出来：每个仓库是一座岛，在做的工单是一块地。",
       },
-      { icon: "icon-clock", title: "定时和巡查", text: "「每天九点跑一遍测试」这样的定时任务；不调模型的巡查，提醒没人回的提问、没动静的帮工、做完没收的活。" },
-      { icon: "icon-pigeon", title: "从外面派活", text: "把田头接到微信、飞书或 QQ，只认你自己的账号。手机或另一台电脑经「连接到本机」连进来。" },
-      { icon: "icon-coin", title: "管住花费", text: "每台农机的额度、今天花了多少、每日预算；额度快用完时提醒，用完了就不再派。" },
-      { icon: "icon-trophy", title: "农场本身", text: "昼夜和光照，狗和会走路的帮工，成就和称号，还有一部能玩小游戏的手机。" },
+      {
+        icon: "icon-pigeon",
+        title: "在哪都能派活",
+        text: "语音、微信、飞书、QQ，只认你自己的账号。手机或另一台电脑经「连接到本机」连进来：你在本机点过头，或凭你设的密码登录。",
+      },
+      {
+        icon: "icon-clock",
+        title: "少操心",
+        text: "「每天九点跑一遍测试」这样的定时任务；不调模型的巡查，提醒没人回的提问、没动静的帮工、做完没收的活；每台农机的额度和每日预算，用完了就不再派。",
+      },
+      {
+        icon: "icon-shed",
+        title: "全在你的电脑上",
+        text: "服务端只听 127.0.0.1，数据在你的家目录（~/.vibevalley）；帮工的记性、档案、笔记和 Artifact 都在本机。",
+      },
     ],
   },
   runtimes: {
     title: "你的农机",
-    text: "帮工开的是你电脑上装好、登录好的编码 agent，每台的额度和花费都看得见。VibeValley 也自带一台，只要 DeepSeek 的钥匙。",
+    text: "帮工开的是你电脑上装好、登录好的编码 agent，由 oar 统一驱动，每台的额度和花费都看得见。VibeValley 也自带一台，只要 DeepSeek 的钥匙。",
     own: "VibeValley 自带",
   },
   devices: {
     title: "在哪都能看农场",
-    text: "界面是一份 React 页面，Mac 应用和浏览器打开的是同一份。农场跑在你的 Mac 上；在田头派活、看工单、收帮工的汇报。不在家时，把田头接到微信、飞书或 QQ。",
+    text: "界面是一份 Solid 页面，Mac 应用、浏览器和手机壳打开的是同一份。农场跑在你的 Mac 上；在田头派活、看工单、收帮工的汇报。不在家时，把田头接到微信、飞书或 QQ。",
     platforms: ["macOS", "iPhone", "安卓"],
-    note: "手机版正在换成新的壳，暂时用不了；连接到本机只在信得过的网络里打开。",
+    note: "手机壳（iPhone、安卓）要自己构建，扫码配对后打开同一份页面。「连接到本机」默认关着，只放你在本机点过头的设备，和凭密码或确认码登录的设备；只在信得过的网络里打开。",
     shots: { mac: "Mac 上的农场", chat: "手机上的田头", tickets: "手机上的工单" },
   },
   screens: {
@@ -116,7 +137,7 @@ export const zh = {
       "macOS（Apple 芯片）",
       "至少一个装好并登录的编码 agent：pi、Claude Code 或 Codex",
       "一把 DeepSeek 的 API 钥匙，助手要用",
-      "自己构建要 Bun 1.4 和 Node 24",
+      "构建要 Vite+（vp）：它照 .node-version 装 Node 24，带着 pnpm",
     ],
     build: "打一个 macOS 应用",
     more: "更多见仓库里的 README 和 docs/。",

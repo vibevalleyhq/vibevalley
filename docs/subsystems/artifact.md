@@ -43,7 +43,7 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档产�
 - **单写锁批处理与幂等 `batchId`**：`artifact.submit` 在单锁单事务内按序施加 `BlockOp[]`、递增文档 `seq` 与块 `rev` 并返回 `BlockAck`；相同 `batchId` 重发直接返回首次结果。
 - **按 `baseRev` 与文本比对判冲突**：`update_text` 与 `split_block` 携带 `baseRev`；若 `baseRev` 落后但该块文本未变（仅改过勾选或属性）仍正常施加，文本已变则返回 `conflict` 并将提交文本存为 `conflict` 修订。
 - **用户写过的块受保护（`Suggestion`）**：agent 对 `updatedBy = "user"` 的块调修改或删除时，服务端不改原块，而是记一条带 `baseRev` 的 `Suggestion`；用户接受时若块当前 `rev` 仍等于 `baseRev` 才应用，否则作废。
-- **实时推送与拼字保护**：块与建议经 `/api/v1/rpc` 的 `artifact.follow` 实时推送；前端 `BlockEditor` 对正聚焦、正处于输入法拼字或有待发改动的块保留本地文本，失焦且在途批次落定后再应用远端更新。
+- **实时推送与拼字保护**：块与建议经订阅流 `artifact.follow`、`artifact.suggestion.follow`（[SSE 流](docs/subsystems/core.md#sse-流和其余路由)）实时推送；前端 `BlockEditor` 对正聚焦、正处于输入法拼字或有待发改动的块保留本地文本，失焦且在途批次落定后再应用远端更新。
 
 ## 怎么走
 
@@ -60,7 +60,7 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档产�
 
 ## 和谁打交道
 
-- **频道（`channel`）**：调用 `Channel.announce` 发 Artifact 卡片；在消息中记录被引用的块快照。
+- **频道（`channel`）**：调用 `channel.post({ _tag: "Announce" })` 发 Artifact 卡片；在消息中记录被引用的块快照。
 - **工具（`tool`、`mcp`）**：向助手和帮工暴露 `artifact_*` 工具，自动绑定会话工单与档案身份。
 - **「连接到本机」（`lan`）**：放行配对设备访问 `GET /api/v1/artifact/<id>/<version>`。
 

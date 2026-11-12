@@ -21,9 +21,9 @@
 |---|---|
 | `apps/server/src/modules/game/game.ts` | 账本持久化（`game_ledger`）、订阅 `Core`、commit 统计调度、称号设置与空地预约 |
 | `apps/server/src/modules/game/progress.ts` | 账本条目提取（`entriesFor`）、进度折叠纯函数（`progressFold`）与成就文案组装 |
-| `apps/server/src/modules/game/view.ts`、`play.ts` | 等级公式（`xpToNext`）、地块映射（`plotOf`）、帧视图（`viewOf`）、特效与地块分配 |
+| `apps/server/src/modules/game/view.ts` | 等级公式（`xpToNext`）、地块映射（`plotOf`）、帧视图（`viewOf`）、特效（`effectsOf`）与地块分配（`freeStation`、`stationed`） |
 | `apps/server/src/modules/agent/seeds.json` | 内置成就定义（`achievements`） |
-| `apps/web/src/farm/panels/Achievements.tsx`、`hud/FxLayer.tsx` | 任务与成就面板、称号佩戴与画面特效层 |
+| `apps/web/src/farm/panels/Achievements.tsx`、`apps/web/src/farm/hud/FxLayer.tsx` | 任务与成就面板、称号佩戴与画面特效层 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`game.achievement.list`、`game.title.set`）。
 
@@ -50,7 +50,7 @@
 
 ## 怎么走
 
-1. **监听事实记账**：订阅 `Core.transitions` 与 `Core.owner` 提取账本条目，写入 `game_ledger` 后施加 `progressChanged` 事实。
+1. **监听事实记账**：订阅 `Core.transitions` 与 `Core.user` 提取账本条目，写入 `game_ledger` 后施加 `progressChanged` 事实。
 2. **统计 commit**：启动就绪、每 2 分钟及 `sessionReported` 后 15 秒调用 `Repo.contributions`，变化时更新 `progressChanged.commits`。
 3. **指定空地播种**：用户点击空地发消息附带 `station`（0–5），`Game.want` 保留预约 10 秒，期间新派出的帮工自动移至该地块。
 

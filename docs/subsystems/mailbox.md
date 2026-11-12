@@ -34,7 +34,7 @@
   - `withdraw`：撤回一个帮工、一封信或一张工单的待投递；退回重投（`handBack`）与帮工拒收退回工单池（`decline`）语义相反，独立保留。
   - `triggersOf` 与 `queuedTriggers`：分别读取单张工单与全部排队工单池内等待的触发；`deliveriesOf`、`waitingOn`、`isRouted` 与 `unreadSummary` 提供投递与未读只读查询。
   - `news`：向外发布 `Handed`（交给当值助手）、`Consumed`（模型已收下）与 `Braked`（空唤醒熔断）。
-- **触发器存储只经 Mailbox 服务**：上游调用 `record`、`accept`、`recordTrigger`、`readTrigger`、`knownGitHubEvents` 与 `replayCronTriggers`，不传 `Db` 或 SQL 参数。记录方法参与调用方的事务，不另起纤程；提交后再调用 `receive`。
+- **触发器存储只经 Mailbox 服务**：上游调用 `record`、`accept`、`recordTrigger`、`readTrigger`、`knownGitHubEvents` 与 `replayCronTriggers`，不传 `Db` 或 SQL 参数。记录方法参与调用方的事务，不另起后台任务；提交后再调用 `receive`。
 - **跨模块入口由检查限定**：外部只导入 `mailbox.ts` 服务或 `payload.ts`、`envelope.ts`、`prompts.ts` 共享契约。共享契约不能导入数据库、基础设施或模块内部实现；`modules.test.ts` 同时检查直接导入、重导出与字面量动态导入。
 - **来源先落库，投递行与路由回执同事务提交**：
   - 上游在同一事务内提交来源游标与 `Trigger`，提交后再推进路由。

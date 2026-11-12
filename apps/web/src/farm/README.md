@@ -21,7 +21,7 @@ prop-less. The HUD mounts `Phone` (with the chat in it) over its button, giving 
 | The debug console | `debug/` | ` opens it: the farm's calls, the clock, local effects, the frames seen |
 | The repo map | `map/` | not on `/`: the islands on the workbench's repos page, which `app/` hands to `features/repo` (`repoMap`, a `ReposSkin`) |
 
-Shared: `world/`, `store.ts`, `commands.ts`, `tools.ts`, `cues.ts`, `effects.ts` (effects made on the page), the pixel pieces
+Shared: `world/`, `store.ts`, `commands.ts`, `tools.ts`, `cues.ts`, `frames.ts` (the farm's frame for one repo, and `localEffects`: effects made on the page), the pixel pieces
 (`src/ui/pixel`),
 `packages/engine`.
 

@@ -8,7 +8,7 @@
 - 改了助手的提示怎么拼、对话怎么压缩（`session/host.ts` 的扩展、`runtime/durable.ts` 的压缩门槛），或升级了 pi-durable、pi-ai。
 - 往 `apps/server/src/modules/orchestrator/testdata/evals/` 加了样例。
 
-不用它：只改了助手的 harness（输入怎么排队、话发到哪个频道、工具怎么调农场），`vp run --filter @vibevalley/server test src/orchestrator` 就够。
+不用它：只改了助手的 harness（输入怎么排队、话发到哪个频道、工具怎么调农场），`vp run --filter @vibevalley/server test src/modules/orchestrator` 就够。
 
 重放连网、花钱（一个样例约等于助手一轮的 token 乘 5），**跑之前先问用户**。没有钥匙或用户没同意时，只做「准备」的第 1 步，并在汇报里写明在线的那半没跑。
 
@@ -17,13 +17,13 @@
 1. 先过离线的检查：每个样例能解开、`expect` 不空、每条 `expect` 写全了它那一种要的字段、录下的那一轮过不了它的 `expect`。
 
    ```bash
-   vp check && vp run --filter @vibevalley/server test src/orchestrator/evals.test.ts
+   vp check && vp run --filter @vibevalley/server test src/modules/orchestrator/evals.test.ts
    ```
 
 2. 要加新样例时，从家目录拿用户标出的那一轮：
 
    ```bash
-   ls ~/.vibevalley/orchestrator/evals/
+   ls ~/.vibevalley/agent/orchestrator/evals/
    ```
 
    读 `want`，在 `expect` 里写几条判断（`kind` 只有 `called`、`notCalled`、`silent`、`says`、`saysNot`，字段见 `apps/server/src/testing/evals.ts` 的 `Expect`）。去掉私人的内容（名字、路径、仓库、钥匙），文件名起成一句话的英文（`think-before-dispatch.json`），放进 `apps/server/src/modules/orchestrator/testdata/evals/`，再跑第 1 步：它报这个样例的 `missed` 是 `false`，说明 `expect` 抓不住录下的错，重写它。
@@ -45,7 +45,7 @@
 4. 只想少采几次省钱、换模型、把家目录里的样例也跑上，或改了提示以后只重放没过的那几个（`VIBEVALLEY_EVAL_ONLY` 写样例名的开头，逗号分开；合之前全套还要过一次）：
 
    ```bash
-   VIBEVALLEY_EVAL_N=2 VIBEVALLEY_EVAL_MODEL=deepseek-flash VIBEVALLEY_EVALS=~/.vibevalley/orchestrator/evals vp run --filter @vibevalley/server evals
+   VIBEVALLEY_EVAL_N=2 VIBEVALLEY_EVAL_MODEL=deepseek-flash VIBEVALLEY_EVALS=~/.vibevalley/agent/orchestrator/evals vp run --filter @vibevalley/server evals
    VIBEVALLEY_EVAL_ONLY=hand-over-in-place vp run --filter @vibevalley/server evals
    ```
 

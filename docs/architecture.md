@@ -11,7 +11,7 @@ flowchart LR
   end
 
   subgraph Server[apps/server · Hono · 127.0.0.1:8787]
-    API[handlers<br/>VibeValleyApi、三条 SSE]
+    API[handlers<br/>VibeValleyApi、SSE 流]
     SITE[Core<br/>核心状态 SpaceState]
     FM[助手<br/>VibeValley agent + 派活工具]
     CHAT[频道<br/>群聊 · Postgres]
@@ -72,8 +72,8 @@ flowchart LR
   9. `Orchestrator`（`orchestrator`、`tool`）
   10. `Gamification`（`game`）
   11. `Gateway`（`http`、`mcp`、`lan`、`connector`、`voice`、`chat`、`projection`）
-  模块只可 import 排在它前面的模块，不直接读其他模块在 `SpaceState` 里的字段（`apps/server/src/modules.test.ts` 检查）。反向通知走 `Stream` 或窄端口。`apps/server/src/services.ts` 分两阶段组装：先构建所有服务并注册订阅，再按模块顺序执行启动任务。
-- **网关（`apps/server/src/gateway/http`、`mcp`）**：`http/api.ts` 按 `endpoints` 挂载路由，`http/handlers/<概念>.ts` 实现接口，`http/streams.ts` 提供三条 SSE 流；`src/mcp/` 为帮工提供 `/mcp`（[核心状态](docs/subsystems/core.md)）。
+  模块只可 import 排在它前面的模块，不直接读其他模块在 `SpaceState` 里的字段（`apps/server/src/modules.test.ts` 检查）。反向通知走订阅（`AsyncIterable`）或窄端口。`apps/server/src/services.ts` 分两阶段组装：先构建所有服务并注册订阅，再按模块顺序调各模块的 `boot()`。
+- **网关（`apps/server/src/gateway/http`、`mcp`）**：`http/api.ts` 按 `endpoints` 挂载路由，`http/handlers/<概念>.ts` 实现接口，`http/streams.ts`、`http/rpc.ts` 提供 SSE 流；`gateway/mcp/` 为帮工提供 `/mcp`（[核心状态](docs/subsystems/core.md)）。
 - **存储（Postgres + 文件）**：配了 `database.url` 连那个 Postgres，否则是进程内的 PGlite，同一种方言；表结构基线为 `apps/server/db/migrations/0001_schema.up.sql`，查询在 `apps/server/db/queries/<表>.sql`，由 `scripts/pg-generate.ts` 生成 `apps/server/db/generated/`（[地基](docs/subsystems/foundation.md)）。
 - **客户端（`apps/web`、`apps/desktop`、`apps/mobile`、`apps/cli`）**：`apps/web` 按概念分 feature，层间单向依赖（`base` → `infra` → `state` → `ui` → `ui/pixel` → `features` → `farm`/`tree` → `app`）。桌面壳（Electron）、浏览器和手机壳（Expo WebView）共用同一份页面（[客户端](docs/subsystems/app.md)）。
 
@@ -84,28 +84,13 @@ flowchart LR
 - **唯一修改入口**：只有 `Core.apply` 可修改 `SpaceState`。纯函数 `reduce(state, fact)`（`apps/server/src/gateway/projection/reduce.ts`）计算新状态；不改变状态的事实不发送。
 - **派生帧 `StateFrame`**：`GET /api/v1/state` 至多每 200 毫秒推送一帧。纯函数 `frameOf`（`apps/server/src/gateway/projection/frame.ts`）在状态副本上填入界面文案（`phaseText`、`whenText`、工单 `stage` 与可执行动作 `acts`），并计算 `inbox`、`view` 和 `effects`。持久层和 `reduce` 不保存界面文案。
 
-## 事件流
+## 事件流和接口
 
-服务端提供三条全局 SSE 流和一条工单观察流（每 20 秒发送一次心跳，容量 64，积压超限断开重连）：
-
-| 路径 | 连接初值 | 后续推送 | 消费者 |
-|---|---|---|---|
-| `GET /api/v1/state` | 当前 `StateFrame` | 200ms 窗口合并后的 `StateFrame` | 页面、`issue show --watch` |
-| `GET /api/v1/live` | 无 | `LiveEvent`（`SessionEvent`、`Notice`、`Runtime`） | 页面 |
-| `GET /api/v1/issue/watch/:id` | 工单状态与有界保留轨迹 | `IssueWatch` 状态、轨迹和缺口 | `issue watch` |
-| `GET /api/v1/events` | `snapshot`（`SpaceState`） | `ServerEvent`（每条 `Fact` 及 `LiveEvent`） | 调试 |
-
-## HTTP 接口
-
-`packages/protocol/src/api.ts` 汇总各概念的 `endpoints`。每个接口定义 `op`（如 `issue.status.update`，对应 `POST /api/v1/issue/status/update`）、`about`、输入与输出的 Schema，以及权限集合 `can`（`user`、`remote`、`orchestrator`、`session`）。
-
-- 所有命令接口均使用 `POST /api/v1/<路径>`，参数统一放在 JSON 请求体中。
-- 除上述 SSE 流外，另有 `GET /api/v1/attachment/<id>`（附件）、`GET /api/v1/artifact/<id>/<version>`（网页 Artifact）、`GET /api/v1/rpc`（频道与 Artifact 订阅 WebSocket）、`/mcp`（帮工工具）和 `POST /v1/chat/completions`（语音助手入口）。
-- 从外面来的只经「连接到本机」那道门：配对来的设备只放 `can` 含 `remote` 的接口与流，登录来的设备是用户本人（[能力表](docs/reference/capabilities.md)、[连接到本机](docs/subsystems/lan.md)、[用户和设备](docs/subsystems/user.md)）。
+命令走 `POST /api/v1/<路径>`，状态、事件和订阅走 SSE；全部路由、流、权限 `can` 和错误信封见[核心状态和接口](docs/subsystems/core.md#sse-流和其余路由)，每个接口的权限见生成的[能力表](docs/reference/capabilities.md)。从外面来的只经「连接到本机」那道门（[连接到本机](docs/subsystems/lan.md)）。
 
 ## 存了什么
 
-数据分两层：**Host**（`$VIBEVALLEY_HOME`，默认 `~/.vibevalley`）存跨空间共用的运行状态，**Space**（`$VIBEVALLEY_WORK_ROOT`，默认 `~/vibevalley-dev`）存这一套工作的仓库、工作树和笔记。不兼容旧格式。
+数据分两层：Host（`$VIBEVALLEY_HOME`，默认 `~/.vibevalley`）和 Space（`$VIBEVALLEY_WORK_ROOT`，默认 `~/vibevalley-dev`），各放什么见[概念](docs/concepts.md#host-和-space)。
 
 Host：
 
@@ -128,8 +113,6 @@ Space `$VIBEVALLEY_WORK_ROOT`（默认 `~/vibevalley-dev`）下：
 - `worktrees/`：工单分支的 git worktree（`worktrees/<仓库>.<工单号>`）。
 - `pkm/`：笔记库（PARA 目录与日记 Markdown，可通过 `pkm.root` 改到别处，[笔记](docs/subsystems/pkm.md)）。
 - `contexts/<Session id>-<后缀>/`：非工单聊天会话的独立工作目录。
-
-工单、频道等业务状态现在仍在 Host 的 `db/` 里，所以切换 Space 目前只切目录，看板还没跟着切（[Space 领域模型](.agents/notes/proposed/architecture/2026-11-06-space-domain-model.md)）。
 
 页面偏好（主题、音量、看板视图、草稿）保存在浏览器 `localStorage`（统一经 `apps/web/src/state/stored.ts` 读写）。
 

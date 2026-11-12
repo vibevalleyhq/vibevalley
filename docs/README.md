@@ -36,13 +36,13 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [library.md](docs/subsystems/library.md) | 素材库：生成的、你上传的、帮工拿回来的文件，一份文件一张卡，记着来路 |
 | [media.md](docs/subsystems/media.md) | 生图：持久化任务、独立下载、安全校验、本机附件与状态投影 |
 | [game.md](docs/subsystems/game.md) | 游戏：账本、金币和成就、等级、空地和特效 |
-| [core.md](docs/subsystems/core.md) | 核心状态：一份状态只因事实而变、三条流、接口和能力表、重启 |
+| [core.md](docs/subsystems/core.md) | 核心状态：一份状态只因事实而变、SSE 流和全部路由、接口和能力表、重启 |
 | [foundation.md](docs/subsystems/foundation.md) | 地基：一个仓库、一块业务一个服务（工厂加接口）、异步原语、Zod 的形状和规则、Postgres 查询生成器、表结构、测试 |
 | [app.md](docs/subsystems/app.md) | 客户端：一份 Solid 页面、问服务端、宿主接口、Electron 的桌面版和打包 |
 | [farm.md](docs/subsystems/farm.md) | 农场的皮：像素村、地里长什么、走路、手机、音效、图鉴 |
 | [agent.md](docs/subsystems/agent.md) | 档案和农机：档案和它的角色、种子、农机的探测和清单、技能书 |
 | [process.md](docs/subsystems/process.md) | 工程流程：文档分层、Note 和子系统、检查、skill、写作规范、素材流水线 |
-| [site.md](docs/subsystems/site.md) | 官网：Astro、island、图从游戏来 |
+| [site.md](docs/subsystems/site.md) | 官网：Vite + Solid 2 静态生成、图从游戏来 |
 
 查的东西（`reference/`）：
 
@@ -57,7 +57,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 
 | 文档 | 讲什么 |
 |---|---|
-| [module-design.md](docs/style/module-design.md) | 架构、模块边界与测试设计：道（责任与不变量）、术（类型驱动与进门解码、显式状态、错误契约与测试证据）、器（实现与检查工具） |
+| [module-design.md](docs/style/module-design.md) | 架构、模块边界与测试设计：责任和边界、类型驱动与进门解码、显式状态、错误契约与测试证据、检查工具 |
 | [code.md](docs/style/code.md) | 代码：格式、叫法、注释写什么不写什么 |
 | [naming.md](docs/style/naming.md) | 命名：名字站在领域的视角，不用的名字，文件、代码、接口、表、词典的键和测试标记的形状，改名 |
 | [design.md](docs/style/design.md) | 界面：田间工作台的审美、令牌（表面、颜色、圆角、控件、线和影、字、图标、动效、层）、原子和模式、给 agent 的清单 |
@@ -141,7 +141,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 开花 | flowering | 等你看 | `in_review`，帮工 `done` |
 | 缺肥（地干裂）、施肥 | dry, water | 等你回答、回答 | `questions` |
 | 草、除草中 | weeds, weeding | 验收意见、带着意见再修一轮 | `findings` |
-| 收获、收成清单 | harvest, harvest list | 完成、改动 | 动作 `complete`、`Changes` |
+| 收获 | harvest | 完成（收之前看改动） | 动作 `complete`、`Changes` |
 | 麦茬 | stubble | 已完成 | `done` |
 | 仓库 | warehouse | 合进主分支或 PR 合了的工单 | `delivered`：`merged`、`pull_request` |
 | 图纸桌 | issue board | 工单 | `Issue` |

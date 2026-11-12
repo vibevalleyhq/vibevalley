@@ -5,24 +5,30 @@ reaches the machine only through the host interface (`@vibevalley/protocol/host`
 [the client](docs/subsystems/app.md).
 
 ```
-src/main.ts        one instance, then each part below started in turn; quitting waits for the server to save
-src/paths.ts       where the server, the page, the island, the logs and the updates are, in the repository or packaged
-src/window.ts      the one window: the bar, the page, the server's origin only, 3 : 2, brought to the front
-src/host.ts        main's end of the page's host (desktopBridge): notices, the tray, theme, language, Finder
-src/tray.ts        the menu bar's summary
-src/menu.ts        the application menu, in the farm's language
-src/server.ts      the server as a child: the login shell's PATH (the last one kept, asked again behind), the ready line, SIGTERM then SIGKILL, and its keeper
-src/dev.ts         development: the server starts again when no helper is working (the page updates itself, from Vite)
-src/preload.ts     the host interface, through contextBridge
-src/bridge.ts      the bridge's one IPC channel and its two ends
-src/chrome.ts      the title strip, the window's buttons and its ground, shared by main and the preload
-src/lines.ts       a child's JSON lines, read by a Schema
-src/island.ts      the island at the notch (apps/island): the state stream read here, the glance it is sent, a click back
-src/probe.ts       what the desktop test reads, only when it starts the app
-scripts/build.ts   build/main.cjs and build/preload.cjs; on macOS the island's release build too
-scripts/package.ts the macOS .app and .dmg in dist/: the shell, the page, the island, and the server with its production dependencies
-resources/         the app icon
-test/              Playwright starting the whole app with temporary home and Electron user-data directories
+src/main.ts                one instance, then each part below started in turn; quitting waits for the server to save
+src/base/                  pure rules: boundary.ts (the window's sandbox and title bar, the page's ground in either theme),
+                           channel.ts (stable, beta, alpha or dev, and the home that goes with it), devPage.ts (the dev
+                           server's port), lines.ts (a child's JSON lines, read by a schema), releases.ts (version order)
+src/infra/server.ts        the server as a child: the login shell's PATH (the last one kept, asked again behind), the ready line, SIGTERM then SIGKILL, and its keeper
+src/infra/paths.ts         where the server, the page, the island, the logs and the updates are, in the repository or packaged
+src/infra/update.ts        the app updating itself from GitHub Releases, by channel
+src/infra/island.ts        the island at the notch (apps/island): the state stream read here, the glance it is sent, a click back
+src/infra/control.ts       the socket in the farm's home that `vibevalley app` talks to
+src/infra/commandLine.ts   installing the `vibevalley` command into ~/.local/bin
+src/infra/machine.ts       which running channel holds the Mac's shared things (the island, the shortcuts)
+src/infra/workspace.ts     the workspace packages the server needs, for packaging
+src/infra/probe.ts         what the desktop test reads, only when it starts the app
+src/ui/window.ts           the one window: the bar, the page, the server's origin only, 3 : 2, brought to the front
+src/ui/host.ts             main's end of the page's host (desktopBridge): notices, the tray, theme, language, Finder
+src/ui/menu.ts             the application menu and the menu bar's summary, in the farm's language
+src/ui/dev.ts              development: the server starts again when no helper is working (the page updates itself, from Vite)
+src/preload/preload.ts     the host interface, through contextBridge
+scripts/build.ts           build/main.cjs and build/preload.cjs; on macOS the island's release build too
+scripts/dev.ts             vp run dev: builds the shell and the page, starts Vite, the server and Electron
+scripts/package.ts         the macOS .app and .dmg in dist/: the shell, the page, the island, and the server with its production dependencies
+scripts/update-check.ts    an update walked through on two real packages
+resources/                 the app icon
+test/                      Playwright starting the whole app with temporary home and Electron user-data directories
 ```
 
 The desktop test passes Electron's `--user-data-dir` before the app starts. Its single-instance lock, browser storage

@@ -1,9 +1,9 @@
 {
   "opening": {
-    "name": "码农谷物语",
+    "name": "码农场物语",
     "waking": "加载中……",
-    "label": "正在加载码农谷物语",
-    "cannotStart": "码农谷物语起不来：{why}",
+    "label": "正在加载码农场物语",
+    "cannotStart": "码农场物语起不来：{why}",
     "starting": "正在唤醒农场……",
     "connecting": "正在连接……",
     "reading": "正在准备工作台……",

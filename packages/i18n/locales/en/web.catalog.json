@@ -44,8 +44,7 @@
   "soundsIntro": "Every sound on the farm: click one to hear it.",
   "soundsFind": "Find: a sound's name or group (water, yard, coin…)",
   "soundsRecipes": "The sounds are synthesized on the fly, with no audio files: the recipes are in",
-  "soundsMusic": ". With sound off they are silent. There is no background music yet; the prompts for Suno are in",
-  "period": ".",
+  "soundsMuted": ". With sound off they are silent.",
   "playSound": "Play {name}",
   "shelf": {
     "helpers": {

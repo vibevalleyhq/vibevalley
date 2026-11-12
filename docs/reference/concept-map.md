@@ -33,7 +33,7 @@
 |---|---|---|---|
 | Host、空间 | `infra/config.ts` 的 `ServerConfig`（`home`、`workRoot`）；`services.ts` 组装全部服务 | `$VIBEVALLEY_HOME`、`$VIBEVALLEY_WORK_ROOT` | — |
 | 仓库 | `Repo`（`repo/repo.ts`、`git.ts`、`workplace.ts`、`github.ts`） | Space 的 `repos/` 与工单检出 `worktrees/` | 会话的 `cwd` |
-| 助手 | `Orchestrator`（每个助手档案一个 `AgentHost`） | `session` 表、`agent/<档案 id>/` | 跑在进程内 agent（`packages/agent`） |
+| 助手 | `Orchestrator`（每个助手档案一个 `AgentHost`，`Session.host` 开在 `session/host.ts`） | `session` 表、`durable.db`、`agent/<档案 id>/` | 不经 oar：跑在 pi-durable 上，`AgentHost` 的一个会话是 `runtime/durable.ts` 开的 `Harness` 上的一个对话，工具来自 `packages/agent`（[VibeValley 自己的 agent](docs/subsystems/brain.md)） |
 | 档案、技能 | `Agent`（`agent/agent.ts`、`template.ts`） | `config.json`、`agent-templates/`、内置 `templates/` 与 `skills/` | — |
 | 农机 | `Runtime`（`runtime/runtime.ts`、`presets.ts`） | `config.json` 农机设置、`runtime_spend` 表 | `Runtime`、`RuntimeRegistry` |
 | 工单、父子工单 | `Issue`（`issue/issue.ts`、`lifecycle.ts`、`dependencies.ts`、`github.ts`） | `issue`、`issue_assignment`、`issue_assignment_execution`、`issue_github` 表 | 通用 DAG 在 `packages/agent/src/base/dag.ts` |

@@ -24,7 +24,7 @@
 
 ## 模型和不变量
 
-- **按内容存一次，写完才发布**：id 是字节的 SHA-256；同样的字节再来是同一个附件，名字和类型记第一次的。`put` 经 `infra/files.ts` 的 `writeOnce` 落盘；流式写入先写进 `scratch` 下的临时目录，全部写完才改名到键下，取消或失败时临时文件随作用域清理，不留残缺文件。
+- **按内容存一次，写完才发布**：id 是字节的 SHA-256；同样的字节再来是同一个附件，名字和类型记第一次的。`put` 经 `infra/files.ts` 的 `writeOnce` 落盘；流式写入先写进 `scratch` 下的临时目录，全部写完才改名到键下，取消或失败时删掉临时文件，不留残缺文件。
 - **上限**：经 `attachment.create` 上传的单个 25MB（`attachmentMax`），以 Base64 走请求体。用它的模块自己守自己的上限：网页 Artifact 一稿 5MB；媒体的输入流式写进暂存目录 `staging`（即 `storage.scratch`）下的 `media/`、记在媒体的配额里，最大 512MB，写完经 `keepStaged`（`storage.adopt`）放进来。
 - **放进来时核对**：`keepStaged` 遇到同名的文件先算它的哈希，对不上（磁盘上被改过）就用新写的替换，不信任坏掉的那份。
 - **`pathOf` 隔离本机路径假设**：HTTP 的文件响应、给帮工的信封、上传给厂商需要本机路径时统一调 `Attachment.pathOf`；未来多机拆出对象存储实现时（[一个服务端管多台机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)），只需在 `attachment/storage.ts` 内切换后端并按需拉取到本机，上层模块不动。

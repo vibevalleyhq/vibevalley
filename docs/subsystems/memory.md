@@ -8,7 +8,7 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 档案记忆的增删查、去重、300 条容量淘汰与中英文分词（`gse` + FTS5） | 召回文本如何拼入会话提示与轨迹事件（[帮工](docs/subsystems/session.md)） |
+| 档案记忆的增删查、去重、300 条容量淘汰与中英文分词（`gse`）与 Postgres 全文索引（`term_vector` 上的 GIN 索引） | 召回文本如何拼入会话提示与轨迹事件（[帮工](docs/subsystems/session.md)） |
 | 开工前相关性召回（`pick`）及页面「下回想起什么」预览（`memory.recall`） | 单个 `Session` 已召回记忆 ID 的记录（`session.recalled` 列，[帮工](docs/subsystems/session.md)） |
 | 本地的库与 Nowledge Mem、EverOS 并发读取、按名次合并与后台异步写入 | 外部来源地址与密钥在 `settings.json` 中的保存与校验（[设置和配置](docs/subsystems/setting.md)） |
 | 助手与帮工共用的 `MemoryPort` | 程序性操作手册与技能书（[档案和农机](docs/subsystems/agent.md)） |
@@ -22,7 +22,7 @@
 | `apps/server/src/modules/memory/gse.ts` | 简体中文分词与英文整词提取（`termsList`） |
 | `apps/server/src/modules/memory/sources.ts` | 多记忆来源聚合、2 秒读超时与后台异步写队列 |
 | `apps/server/src/modules/memory/nowledge.ts`、`everos.ts` | Nowledge Mem（MCP）与 EverOS（HTTP）外部来源适配器 |
-| `apps/web/src/features/memory/Memory.tsx`、`tree/` | 工作台「记忆」页与记忆树视图 |
+| `apps/web/src/features/memory/Memory.tsx`、`apps/web/src/tree/` | 工作台「记忆」页与记忆树视图 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`memory.*`）。
 
@@ -38,7 +38,7 @@
 - **高重合度自动去重**：同一仓库范围内若已存在完全相同、或分词重合度（`memoryLikeness`）≥ `0.8` 的条目，则跳过不重复记。
 - **纯函数评分召回（`pick`）**：
   - 排除当前 `Session` 已召回过的 ID 及自己写下的条目；跨仓库条目须共享至少 3 个词才进入候选。
-  - 评分公式：`种类分 + 范围分 + min(共有词数, 8)×0.5 + min(bm25, 5)×0.3 + exp(-距上次召回天数 / 30)`。
+  - 评分公式：`种类分 + 范围分 + min(共有词数, 8)×0.5 + min(ts_rank, 5)×0.3 + exp(-距上次召回天数 / 30)`。
   - 每次召回最多 8 条、总长不超过 1600 字（其中 `issue` 类最多 3 条）。
 - **外部来源读限时、写异步，出站强制脱敏**：
   - 读取时本地库与外部来源并发查询，外部来源限时 2 秒；超时或失败只记日志，多来源结果按名次交错抽取并去重。

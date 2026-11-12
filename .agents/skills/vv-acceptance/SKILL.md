@@ -1,6 +1,6 @@
 ---
 name: vv-acceptance
-description: 改完 VibeValley 的代码之后，在真的程序上验收、拿到证据再汇报：起一个和用户的数据隔开的服务端，看接口和 /api/v1/state（apps/server/**、apps/server/db、packages/protocol）、截页面的图（apps/web/**）、在模拟器上走手机壳的配对（apps/mobile/**、packages/protocol/src/host.ts、apps/server/src/lan）、在真的打包上走桌面版的自己更新（apps/desktop/src/infra/update.ts、apps/desktop/scripts/package.ts）、用真模型重放助手的评测（助手的提示、工具描述、packages/agent，花钱，先问用户）。用在：用户说「验证一下」「验收」「跑起来看看」「截个图」「手机上看看」「跑一下助手的评测」；改了接口、服务、表结构、开机流程、页面、手机壳、桌面的更新之后，说「做完了」之前，即使用户没开口；写 PR 的 Checks 要附证据时。只改了纯函数、测试已经覆盖的，或只改了注释和文档，跑测试就够。
+description: 改完 VibeValley 的代码之后，在真的程序上验收、拿到证据再汇报：起一个和用户的数据隔开的服务端，看接口和 /api/v1/state（apps/server/**、apps/server/db、packages/protocol）、截页面的图（apps/web/**）、在模拟器上走手机壳的配对（apps/mobile/**、packages/protocol/src/host.ts、apps/server/src/gateway/lan）、在真的打包上走桌面版的自己更新（apps/desktop/src/infra/update.ts、apps/desktop/scripts/package.ts）、用真模型重放助手的评测（助手的提示、工具描述、packages/agent，花钱，先问用户）。用在：用户说「验证一下」「验收」「跑起来看看」「截个图」「手机上看看」「跑一下助手的评测」；改了接口、服务、表结构、开机流程、页面、手机壳、桌面的更新之后，说「做完了」之前，即使用户没开口；写 PR 的 Checks 要附证据时。只改了纯函数、测试已经覆盖的，或只改了注释和文档，跑测试就够。
 ---
 
 # 验收

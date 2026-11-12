@@ -17,11 +17,12 @@
 | 位置 | 职责 |
 |---|---|
 | `scripts/docs/agent-notes.ts`、`skills.ts`、`doc-links.ts` | 校验 Note 目录格式并生成 `CATALOG.md`、校验 skill 结构、校验文档链接与反引号路径 |
-| `scripts/docs/stale-names.ts`、`glossary.ts`、`i18n.ts` | 拦截已废弃旧名字、校验用语表代码名、校验双语词典与 `catalogs.ts` |
-| `scripts/gen/capabilities.ts`、`api-client.ts`、`primitives.ts` | 生成并校验 `capabilities.md`、`client.ts` 与 `primitives.md` |
-| `scripts/audit/oxlint-plugin.ts`、`deadcode.ts`、`regression.ts` | 仓库自定义 lint 规则、`knip` 死代码检查、PR 回归测试修改门禁 |
+| `scripts/docs/stale-names.ts`、`glossary.ts` | 拦截已废弃旧名字、校验用语表代码名 |
+| `scripts/gen/capabilities.ts`、`api-client.ts`、`primitives.ts`、`i18n.ts` | 生成并校验 `capabilities.md`、`client.ts`、`primitives.md` 与双语词典的 `catalogs.ts` |
+| `scripts/audit/oxlint-plugin.ts`、`deadcode.ts` | 仓库自定义 lint 规则、`knip` 死代码检查 |
+| `scripts/release/regression.ts`、`verify-server.ts` | PR 回归测试修改门禁、启动隔离沙箱服务端 |
 | `scripts/audit/practice-audit.ts`、`service-paths.ts`、`protocol-surface.ts`、`schema-audit.ts` | 全仓语法树实践棘轮、服务调用矩阵与扇入检查、根协议导出面棘轮、SQL 枚举与 `Secret` 契约审计 |
-| `scripts/audit/comment-review.ts`、`verify-server.ts` | 调用模型审查新增注释、启动隔离沙箱服务端 |
+| `scripts/audit/comment-review.ts` | 调用模型审查新增注释 |
 | `packages/health/`、`scripts/audit/health.config.ts`、`health.ratchet.json` | 热点分析与类型/错误逃生口棘轮检查 |
 | `.agents/notes/`、`.agents/skills/` | Agent Notes 目录与仓库 skills（`.claude/skills` 软链至此） |
 | `design/pixel/gen.sh`、`process.py`、`design/art.sh` | 像素素材生成、去品红切格缩放脚本与原图仓库软链 |
@@ -35,7 +36,7 @@
 - **静态门禁分四层互补**：严格的 TypeScript（tsrs）守住签名与契约（`satisfies Codec<T.X>`，`vp check`）；oxlint 插件守住单文件语法与导入门面（`vp check`）；全仓语法树工具守住跨文件不变量与拓扑（`practice-audit.ts`、`service-paths.ts`、`protocol-surface.ts`）；契约审计守住跨语言表结构与序列化安全（`schema-audit.ts`）。零命中规则直接报错，存量债务按区域进棘轮只减不增。
 - **逃生口按区棘轮，只减不增**：`packages/health` 统计类型逃生口（`x!`、`as T`、lint disable）与错误逃生口并比对 `scripts/audit/health.ratchet.json`；增加报错，减少也要求下调棘轮。
 - **死代码零容忍，回归测试受保护**：`vp run deadcode` 拦截未使用导出与依赖。修改或删除 `regression: ` 测试，或 `fix/` 分支未补回归测试，须在 PR 正文 `## Regression` 说明（`scripts/release/regression.ts` 检查）。
-- **命名一致**：展示名用 `VibeValley` / `码农场物语`；代码、目录、环境变量 `VIBEVALLEY_*` 和分支前缀 `vibevalley/` 统一用小写 `vibevalley`。
+- **命名一致**：展示名用 `VibeValley`；中文名取词典的 `web.opening.name`（`packages/i18n/locales/zh/web.json`，开屏用它），不在代码里另写；代码、目录、环境变量 `VIBEVALLEY_*` 和分支前缀 `vibevalley/` 统一用小写 `vibevalley`。
 
 ## 怎么走
 
@@ -62,7 +63,7 @@
 ## 和谁打交道
 
 - **根目录 `AGENTS.md` 与 `docs/`**：由 `docs:verify` 校验链接、路径、用语表和生成文档同步。
-- **CI 与 Git Hooks**：提交前跑 `vp check --fix --deny-warnings`；CI 跑类型检查、测试金字塔、`health:verify`、`deadcode`、`docs:verify` 和 `regression.ts`。
+- **CI 与 Git Hooks**：提交前跑 `vp check --fix --deny-warnings`；CI 跑类型检查、测试金字塔、`health:verify`、`deadcode`、`docs:verify` 和 `scripts/release/regression.ts`。
 - **验收 Skill**：`.agents/skills/vv-acceptance/` 提供隔离服务端沙箱（`scripts/release/verify-server.ts`）与实机验证分册。
 
 ## 为什么这样

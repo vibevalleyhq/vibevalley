@@ -22,7 +22,7 @@
 | `apps/server/src/modules/inbox/items.ts` | 纯函数 `inbox`、`inboxEntries` 与连接器外推资格 `forUser` |
 | `apps/server/src/modules/inbox/patrol.ts` | 纯函数 `patrolStep`（宽限期与已读延期判定） |
 | `packages/protocol/src/rules/inbox.ts` | 前后端共用的新事项识别规则 `freshOf` |
-| `apps/web/src/farm/phone/calls.ts`、`features/inbox/` | 农场手机来电、系统通知（`Follow.tsx`）与菜单栏托盘摘要（`tray.ts`） |
+| `apps/web/src/farm/phone/calls.ts`、`apps/web/src/features/inbox/` | 农场手机来电、系统通知（`Follow.tsx`）与菜单栏托盘摘要（`tray.ts`） |
 
 ## 模型和不变量
 
@@ -45,7 +45,8 @@
   - 原生子工单成功完成后自动合入父分支，不单独产生 `review` 条目。
 - **启动已有事项不响铃（`freshOf`）**：服务端启动 `prime` 与页面首次打开均先记下存量 ID；仅后续新出现的 ID 触发响铃与通知，且同一 ID 只响一次。
 - **人类交接门禁（Human Handoff，`toUser`）**：
-  - 仅待人介入的工单汇报（起草确认、`asking`、`blocked`、`ready`）或助手直接回话/@用户，且用户未读未回时，才经 `toUser` 外推连接器。
+  - 仅待人介入的工单汇报（工单的 `stage.state` 是 `draft`、`asking`、`stuck` 或 `reviewing`，`inbox/inbox.ts`）、派活消息或助手直接回话/@用户，且用户未读未回时，才经 `toUser` 外推连接器。
+  - 每个频道有自己的通知设置 `notify`（`all`、`mentions`、`none`，`channel.notify.set`）：`none` 的频道什么都不外推，`mentions` 的只外推 @用户 和 @所有人的（`items.ts` 的 `forUser`）。
   - 一旦用户在工作台已读、回复，或工单离开待人介入阶段，立即通知连接器撤回未发出的 `connector_outbox` 行。
 - **已读自动延长巡查宽限期**：
   - 若用户已读过报告所在的频道位置，巡查宽限期从已读时刻起至少延长 2 小时。
@@ -68,4 +69,4 @@
 ## 怎么验证
 
 - `apps/server/src/modules/inbox/*.test.ts`：8 种事项派生、宽限期计算与已读撤回测试。
-- `apps/web/src/farm/phone/calls.test.ts`、`features/inbox/tray.test.ts`、`apps/web/test/farm-phone.spec.ts`：来电去重、托盘摘要与接听测试。
+- `apps/web/src/farm/phone/calls.test.ts`、`apps/web/src/features/inbox/tray.test.ts`、`apps/web/test/farm-phone.spec.ts`：来电去重、托盘摘要与接听测试。

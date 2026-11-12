@@ -20,10 +20,12 @@
 | 位置 | 职责 |
 |---|---|
 | `apps/server/src/modules/machine/machine.ts`、`executor.ts`、`link.ts` | 机器登记、经链路暴露的 `Executions`（管理 oar `Subagents` 启停、投递、中断与静默检测） |
-| `apps/server/src/modules/session/session.ts`、`hands.ts`、`registry.ts`、`recording.ts` | 对外 `Session` 服务、`HandRoster`（独占在场 `Hand` 映射、`/mcp` 令牌与 `hand.access -> admission` 锁序）、运行登记与数据库持久化 |
+| `apps/server/src/modules/session/session.ts`、`hands.ts`、`registry.ts`、`history.ts` | 对外 `Session` 服务、`HandRoster`（独占在场 `Hand` 映射、`/mcp` 令牌与 `hand.access -> admission` 锁序）、运行登记、行与 `Session`/`Run` 的互转 |
 | `apps/server/src/modules/session/launch.ts`、`signals.ts`、`watch.ts` | 并发准入、唤醒/休眠、招人与投递拒绝错误（`HireRefused`、`DeliveryRefused`）、事件跟踪与 `settling` 后台收尾 |
-| `apps/server/src/modules/session/reaction.ts`、`report.ts`、`hiring.ts`、`briefing.ts` | 事件映射、汇报解析、容量检查与任务说明拼装纯函数 |
-| `apps/server/src/modules/session/journal.ts`、`host.ts`、`inProcessRun.ts` | 轨迹日志文件读写、进程内 `AgentHost`（含 `SubmitRefused` 错误通道）与 `InProcessRun` |
+| `apps/server/src/modules/session/reaction.ts`、`report.ts`、`briefing.ts`、`roster.ts` | 事件映射、汇报解析、容量检查（`noRoom`）与任务说明拼装、在场会话查找的纯函数 |
+| `apps/server/src/modules/session/journal.ts`、`host.ts`、`inProcessRun.ts` | 轨迹日志文件读写、进程内 `AgentHost`（投递被拒抛 `SubmitRefused`）与 `InProcessRun`（含 `Run` 的落库 `recording`） |
+| `apps/server/src/modules/session/worker.ts`、`shell.ts` | 帮工 CLI 的凭证文件与认证探测（[帮工 CLI 接入](docs/subsystems/session.md#帮工-cli-接入)）、私聊的上下文目录 |
+| `apps/server/src/modules/runtime/access.ts` | 农机报来的 MCP 连接状态 |
 | `apps/server/src/modules/runtime/` | 农机注册探测、价格表 `price.ts`、额度 `quota.ts` 与每日花费记账 |
 | 表 `session`、`session_run`、`session_run_issue`、`runtime_spend` | 会话主表（含 `pending_report`）、运行轮次、关联工单与按日花费 |
 | `apps/web/src/features/session/` | `WorkLog.tsx`、`Trajectory.tsx`、`runs.ts` 瀑布图与 `events.ts` 订阅 |
@@ -71,14 +73,14 @@
 - **无沙箱与无逐条权限确认**：帮工在 `$VIBEVALLEY_WORK_ROOT` 下直接执行命令，不弹权限确认；安全边界是服务端只听 `127.0.0.1`。
 - **只追加的轨迹日志**：`events/<id>.json` 按序记录每一步事件，流式草稿按 `revision` 递增推送，落盘后不改。帮工留最近 240 条、助手留 1000 条，离场默认 30 天后清理文件。
 - **额度与每日花费**：
-  - 开机、每 5 分钟及每轮后 20 秒读额度，低于 15%（`quotaLow`）标「快用完了」。
+  - 额度何时读、何时标「快用完了」见[档案和农机](docs/subsystems/agent.md#怎么走)。
   - 按日花费记入 `runtime_spend` 表；额度或预算耗尽时（`moneyStop`）阻止派新活，在跑回合继续跑完。
 
 ## 怎么走
 
 **派出帮工（`Session.hire`）**
 
-1. 在准入锁内检查容量上限（不满足时经错误通道返回 `HireRefused`），分配 `w<n>` 编号，调用 `Repo.workplace` 准备目录，并创建 `handScope` 与 `startupScope` 挂载轨迹、令牌与目录释放终结器。
+1. 在准入锁内检查容量上限（不满足时抛 `HireRefused`），分配 `w<n>` 编号，调用 `Repo.workplace` 准备目录，并创建 `handScope` 与 `startupScope`（都是 `AsyncDisposableStack`，`hands.ts`）挂上轨迹、令牌与目录的释放。
 2. 召回档案记忆，拼装规矩、人设、技能与任务说明，通过 `Machine.executions` 启动 oar 会话。
 3. 释放准入锁，写入 `session` 表并调用 `hiring` 回调登记工单关联或私聊投递；如果任一步失败或中断，关闭 `startupScope` 逆序回滚并返回 `HireRefused`。
 4. 登记 `HandRoster`（移交 `handScope`）并施加 `sessionChanged` 事实，启动事件监听与静默计时器（默认 240 秒无事件报 `quiet`）。
@@ -88,7 +90,7 @@
 1. 会话 `resting` 且执行器仍在时，检查上限、召回新记忆并发送 followup，开启新 `Run`。
 2. 执行器已关闭（重启或休眠后）时，按 `oarSessionId` 续接；续接失败则在原目录新建 oar 会话并提示查看 `git log`。
 3. 会话正在 `working` 时，支持插话的农机直接 `steer` 进当前 `Run`；不支持的排入下一轮。
-4. 容量不足或投递被拒时走 `DeliveryRefused` 错误通道（`AgentHost.submit` 走 `SubmitRefused`），失败或中断时回收 `expect` 输入预留。
+4. 容量不足或投递被拒时抛 `DeliveryRefused`（`AgentHost.submit` 抛 `SubmitRefused`），失败或中断时回收 `expect` 输入预留。
 
 **交接与离场（`handOver` / `dismiss`）**
 
@@ -127,21 +129,18 @@
 - `apps/server/src/modules/machine/executor.test.ts`、`access.test.ts`、`apps/server/src/modules/session/session.test.ts`、`apps/server/src/flows/work.test.ts`：执行器生命周期、派工、带话、静默告警、容量上限、合并交接与重启恢复测试。
 - `apps/server/src/modules/runtime/runtime.test.ts`、`presets.test.ts`：农机探测缓存、额度计算与每日花费测试。
 
-### Worker access observations
+## 代理和 MCP 连接
 
-`machine/executor.ts` merges the effective `NO_PROXY` and `no_proxy` entries with `127.0.0.1,localhost,::1` for each child session. Both variables receive the same trimmed, deduplicated list. Inherited and profile values are combined. Null and empty profile values add no entries; they cannot remove inherited bypasses or loopback hosts. Runtimes that declare `refusedSessionOptions.env` receive no added environment values. oar Subagents already refuses these runtimes because it needs a depth variable; this change does not alter that refusal. Other proxy variables and the host environment stay unchanged.
-
-`Session.toolConnections` contains observations for the configured MCP servers. A missing entry or `unknown` means no connection evidence. `starting`, `ready`, `failed`, and `cancelled` are runtime reports, not HTTP health results. These optional MCP observations do not gate a run or establish readiness of the separate required worker CLI. The required CLI gate is described in [worker access](docs/subsystems/session.md#帮工-cli-接入).
-
-The runtime boundary decodes Codex 0.167.0 `mcpServer/startupStatus/updated` parameters with Schema. oar 0.86.0 has no neutral MCP startup event: its inventories are independent workspace queries, and tool-call events describe calls rather than connection readiness. Other runtimes stay `unknown`. Only root-session records for configured servers are accepted. An explicit native `threadId` must match the session. The Codex protocol permits missing or null `threadId` for startup notifications; these are observed on the dedicated session process. Errors are redacted and capped at 2000 characters. The raw notification stays inside the runtime adapter.
-
-The observer replays retained records from `afterSeq: -1`, then reads live records. Detach and close unsubscribe it. A new execution resets the prior connection observations. Session writes failed or cancelled connections to the bounded journal as `run/error` with a structured `connection`. Every observation emits `sessionToolChanged`; projection/reduce replaces only that server’s entry. `sessionToolsReset` clears observations on a new execution or reattachment; resuming a turn on the same execution keeps them. Restarted sessions have no observations until attached. Watch consumers use these shared fields; they do not parse vendor notifications. oar replay covers retained records only, and journal retention remains 240 events.
+- **回环地址总是绕过代理**：`machine/executor.ts` 给每个子会话的 `NO_PROXY` 和 `no_proxy` 写同一份去重清单：继承的值、档案的值，再加 `127.0.0.1,localhost,::1`。档案里的空值不删继承的条目和回环地址；其余代理变量不动。声明了 `refusedSessionOptions.env` 的农机不加任何环境变量。
+- **MCP 连接只记观察，不挡开工**：`Session.toolConnections` 是档案配置的每个 MCP 服务的连接观察；没有条目或 `unknown` 表示没有证据。`starting`、`ready`、`failed`、`cancelled` 是农机报来的，不是健康检查，不挡 run，也不代表帮工 CLI 可用（那一道门见[帮工 CLI 接入](docs/subsystems/session.md#帮工-cli-接入)）。
+- **只认农机自己报的启动状态**：目前只有 Codex 报 MCP 启动状态，在农机适配层（`runtime/access.ts`）解码，其余农机一律 `unknown`。只收根会话、配置里有的服务；带了 `threadId` 就须是这个会话的。错误脱敏后截到 2000 字。
+- **观察跟着执行走**：观察者先重放保留的记录再读实时的；每条观察施加 `sessionToolChanged`，`reduce` 只换那个服务的条目。新执行或重新接上时 `sessionToolsReset` 清空，同一执行上接着跑的回合保留。连接失败或取消写进轨迹的 `run/error`（带 `connection`）。看的人读这些共用字段，不解析各家农机的通知。
 
 ## 帮工 CLI 接入
 
 帮工 CLI 与 MCP 共用 Session 签发的令牌和同一工具执行路径，交活及 PR 授权仍由领域服务处理。令牌在启动前登记，重新启动时轮换，离场或启动认证失败时撤销；未知身份不回退用户。令牌索引只管凭证，不保存第二份会话状态。
 
-服务端为每个会话写入临时凭证文件：父目录权限 `0700`，文件 `0600`，内容只有回环 MCP 地址和令牌。启动说明只含绝对可执行路径、加载器和凭证文件路径，不含秘密；CLI 自己读文件。离场删除文件，服务作用域结束删除整个目录。文件方案不依赖农机传递秘密环境变量，`ELECTRON_RUN_AS_NODE` 只作用于 CLI 子进程。
+服务端为每个会话写入临时凭证文件：父目录权限 `0700`，文件 `0600`，内容只有回环 MCP 地址和令牌。启动说明只含绝对可执行路径、加载器和凭证文件路径，不含秘密；CLI 自己读文件。离场删除文件，服务关闭时删除整个目录。文件方案不依赖农机传递秘密环境变量，`ELECTRON_RUN_AS_NODE` 只作用于 CLI 子进程。
 
 派工前先确认 CLI 可执行，再以该会话凭证运行只读 `doctor` 认证请求；任何一步失败都拒绝启动。该探测证明服务端至 CLI 的认证链路，帮工仍须在自己的 shell 中先运行 `doctor`，失败报告阻塞。可选 MCP 的连接状态独立观察，没有证据仍是 unknown。
 

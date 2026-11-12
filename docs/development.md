@@ -43,6 +43,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 - `vp run web:check`：`vp check`、前端规则 vitest 与页面构建；浏览器改动先跑对应的 `e2e:component`、`e2e:integration` 或 `e2e:audit`，交付节点用 `vp run --filter @vibevalley/web e2e` 做全量自动检查。各入口只构建需要的产物，真实集成用隔离服务端与临时家目录；纯截图另跑 `e2e:visual` 并看图，见 [页面命令](apps/web/README.md#commands)。
 - `vp run desktop:test`：Playwright 启动完整 Electron 应用。
 - `vp run docs:verify`：校验 Note、skill、文档链接与旧名字。
+- **这个仓库的 `.vibevalley/check` 和 `.vibevalley/setup`**：帮工交活前服务端跑工单 worktree 里的 `.vibevalley/check`（[仓库](docs/subsystems/repo.md#怎么走)）。本仓库的 check 先去掉 `VIBEVALLEY_*` 和模型钥匙等环境变量，再跑 `vp install --frozen-lockfile`、`vp check --deny-warnings`，按改动的路径跑 `server:check`、`web:check`，最后跑 `docs:verify`；新 worktree 先跑 setup：`vp install --frozen-lockfile` 和 `vp run packages:build`。
 
 测试不连接真实模型：服务端使用脚本化模型（`apps/server/src/testing/model.ts`），帮工使用 oar 测试 runtime。助手真模型评测（`vp run --filter @vibevalley/server evals`）消耗 DeepSeek 额度，运行前须经用户同意。
 
@@ -72,22 +73,12 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 
 命令行位于 `apps/cli`（入口 `src/main.ts`），仓库内通过 `vp run --filter @vibevalley/cli start` 运行，桌面端「关于 → 安装命令行」后直接运行 `vibevalley`（或 `vibevalley-beta`、`vibevalley-alpha`）。默认连接 `$VIBEVALLEY_HOME/server.json` 记录的服务端或 `http://127.0.0.1:8787`，可用 `--server` 或 `VIBEVALLEY_SERVER` 覆盖。
 
-- **设计原则**：基于 `effect/cli` 与 `VibeValleyApi`，不加载服务端。路径为 `<资源> [<子资源>] <动词>`（`list`、`show`、`create`、`edit`、`delete` 及资源专用动词）。所有子命令均带描述与 `EXAMPLES`（`apps/cli/src/main.test.ts` 校验）。
+- **设计原则**：基于 commander（`apps/cli/src/infra/command.ts`）与 `VibeValleyApi`，不加载服务端。路径为 `<资源> [<子资源>] <动词>`（`list`、`show`、`create`、`edit`、`delete` 及资源专用动词）。所有子命令均带描述与 `EXAMPLES`（`apps/cli/src/main.test.ts` 校验）。
 - **工单**：`issue list|show|create|edit|status|comment|review|diff|timeline|delete`。`issue show --watch` 持续订阅状态流直到 `in_review`、`done` 或 `canceled`。
 - **笔记**：`pkm capture`、`pkm search`、`pkm radar`、`pkm journal show`、`pkm page list|show|save|export|edit`（`edit` 调用 `$VISUAL` / `$EDITOR` 编辑原文并写回）。
 - **桌面与诊断**：`vibevalley doctor` 检查农场、服务端、桌面端、农机、模型密钥与局域网状态；`vibevalley app status|open|quit|restart|update` 控制桌面端进程；`vibevalley chat [runtime]` 启动终端对话。
 - **输出与试跑**：默认输出单行短文本（首词为后续命令要用的 ID 或编号），`--format json` 输出协议原始结构。带 `dryRun` 的破坏性命令支持 `--dry-run` 预演；无试跑的写命令传 `--dry-run` 返回 `NoDryRun`（退出码 `2`）。
-- **错误与退出码**：失败时 stdout 为空，stderr 末行输出单行 JSON `{"error":{"tag":…,"message":…,"next":[{"say":…,"run":[…]}]}}`。
-
-  | 退出码 | 含义 |
-  |---|---|
-  | 0 | 成功或显示帮助 |
-  | 1 | 服务端内部错误 |
-  | 2 | 命令用法或参数错误 |
-  | 3 | 服务端拒绝（`Refused`） |
-  | 4 | 目标不存在（`Missing`） |
-  | 5 | 服务端或桌面端不可达 |
-  | 130 | Ctrl+C 中断（`issue show --watch` 等） |
+- **错误与退出码**：失败时 stdout 为空，stderr 末行是一行 JSON；它的格式和各退出码见 [apps/cli/README.md](apps/cli/README.md)（代码在 `apps/cli/src/base/output.ts`）。
 
 **标准工单闭环**：
 

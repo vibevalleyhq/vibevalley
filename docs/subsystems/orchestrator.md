@@ -9,7 +9,7 @@
 | 助手输入拼装：来源标记、时间、现状增量（`situationDelta`）、记忆增量与汇报摘要 | 谁该被唤醒、刹车与投递队列（[Mailbox](docs/subsystems/mailbox.md)） |
 | 助手与帮工的工具表声明（`apps/server/src/modules/tool/`）及用户授权门禁（`actsForUser`） | 工具背后的业务执行（[工单](docs/subsystems/issue.md)、[频道](docs/subsystems/channel.md)、[定时任务](docs/subsystems/cron.md)） |
 | 按档案管理多个助手实例、将回复写回频道或语音响应端口 | 对话循环、前缀缓存、上下文压缩与断点续跑（[VibeValley 自己的 agent](docs/subsystems/brain.md)、[帮工](docs/subsystems/session.md)） |
-| 挑档案算法（`Runtime.choose`）与错轮评测录制（`orchestrator.eval.create`） | 农机可用性检查（[档案和农机](docs/subsystems/agent.md)）与语音通话传输（[语音](docs/subsystems/voice.md)） |
+| 错轮评测录制（`orchestrator.eval.create`） | 挑档案算法 `Runtime.choose` 与农机可用性检查（[档案和农机](docs/subsystems/agent.md#模型和不变量)）、语音通话传输（[语音](docs/subsystems/voice.md)） |
 
 ## 在哪
 
@@ -39,7 +39,7 @@
 - **工具枚举在入口归一，非法值拒绝**：状态和优先级接受标准值与别名；未传才是缺省，非法值不转成缺省。解码失败时不执行工具的业务函数，`tool/schemas.test.ts` 验证这条。
 - **`resource_read` 按会话权限只读裁剪并固定分页快照**：投递卡片只带摘要与 `vv://` 指针（Trigger、工单、频道、GitHub 评审线程、Artifact、记忆、仓库）。`Tool.readResource` 不改业务表、不推进消费回执；助手可读全局资源，帮工仅可读自身工单、父工单、显式 `blockedBy` 工单及所在频道，首次读取（`offset = 0`）写入会话级 LRU `TextCache` 以保证后续分页一致。
 - **改工单与定周期任务须有当轮用户授权（`actsForUser`）**：仅当本轮最新输入含用户原话时 `Actor.forUser` 为真；否则调 `issue_update`、`issue_status_update` 直接拒绝，调周期/派工 `cron_create` 存为 `pending` 待批。
-- **挑档案顺序（`chooseAgent`）**：依次匹配：点名的档案名/ID → 指定农机首个可用档案 → 用户界面选定档案 → 工单文字命中 `Agent.tags` 最多的可用档案。
+- **派活时挑档案**：调 `Runtime.choose`，顺序见[档案和农机](docs/subsystems/agent.md#模型和不变量)。
 - **整条消息落库，流式字只走响应端口**：思考与书写阶段更新助手 `Session.phase`（`thinking` / `speaking_text`）与 `channel`；完整回复生成后一次性写入频道，若带 `responsePort` 则同步流式推送。
 
 ## 怎么走

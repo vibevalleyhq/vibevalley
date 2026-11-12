@@ -17,7 +17,7 @@ description: 去掉 VibeValley 代码里没价值的注释：用 scripts/audit/c
 
 ```bash
 vpx scripts/audit/comment-review.ts --dry-run                          # 这个分支新加的
-vpx scripts/audit/comment-review.ts --all apps/server/src/issue --dry-run   # 一块已有的
+vpx scripts/audit/comment-review.ts --all apps/server/src/modules/issue --dry-run   # 一块已有的
 ```
 
 花钱的量级：一个模块一两百条注释、十次以内的请求，一分钱上下。新加的直接跑；`--all` 超过 500 条，先把条数告诉用户再跑。
@@ -26,7 +26,7 @@ vpx scripts/audit/comment-review.ts --all apps/server/src/issue --dry-run   # �
 
 ```bash
 vpx scripts/audit/comment-review.ts                                    # 要 DEEPSEEK_API_KEY
-vpx scripts/audit/comment-review.ts --all apps/server/src/issue
+vpx scripts/audit/comment-review.ts --all apps/server/src/modules/issue
 ```
 
 每条不该留的打三行：`文件:行  delete|rewrite  <对上的规矩那一行>: <理由>`、注释原文、`rewrite` 的话 `→ 改好的写法`。判 `keep` 的不打。有不该留的退出码 1；模型漏答或答得不成格式，脚本报错退出，重跑一次，还错就看报错。
@@ -48,7 +48,7 @@ vpx scripts/audit/comment-review.ts --all apps/server/src/issue
 
 - `vp check --fix`，再 `vp check`。只删、改了注释，不用跑测试；改了名字或类型，跑和那块有关的最窄的检查（`vp run server:check`、`vp run web:check`）。
 - 再跑一次第 2 节的命令：改写的注释是新加的，会再审一遍；模型每次判的不一样，`--all` 的第二轮还会在第一轮留下的里报出新的，照第 3 节核实。第二轮还报的、你已经判过要留的，不再改，不来回拉锯。
-- 清一块已有的注释是机械改动，单独一个 PR（[vv-pr](.agents/skills/vv-pr/SKILL.md) 第 1 节），一块一个；标题说改完以后的样子（`Issue module comments say only what the code cannot`）。
+- 清一块已有的注释是机械改动：和同一批工作放在一个 PR 里，自成一个提交，一块一个；用户要求分开才单开 PR（[vv-pr](.agents/skills/vv-pr/SKILL.md) 第 1 节）。提交的标题说改完以后的样子（`Issue module comments say only what the code cannot`）。
 
 ## 5. 汇报
 

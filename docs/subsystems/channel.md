@@ -9,7 +9,7 @@
 | 频道、私聊、串的增删改查，消息号与地址 `#<频道>:<消息号>` | 工单生命周期与派活决策（[工单](docs/subsystems/issue.md)） |
 | 消息写入、编辑、删除、回应、置顶、带附件、搜索与链接预览 | 收件优先级、三道刹车、投递状态与唤醒调度（[Mailbox](docs/subsystems/mailbox.md)） |
 | 阅读游标（`channel_read_cursor`）与未处理 `@用户`（`userMentions`） | 会话如何跑一轮、私聊执行器休眠实现（[帮工](docs/subsystems/session.md)） |
-| 页面按频道的 RPC WebSocket 实时订阅与按修订号（`revision`）补齐 | 哪些未读事项提醒用户或外推连接器（[Inbox](docs/subsystems/inbox.md)） |
+| 页面按频道的订阅流（`channel.follow`、`channel.reports`）与按修订号（`revision`）补齐 | 哪些未读事项提醒用户或外推连接器（[Inbox](docs/subsystems/inbox.md)） |
 | 外部连接器（微信、飞书、QQ）：配对、收件去重、发件退避与摘要 | 助手如何生成回复（[助手](docs/subsystems/orchestrator.md)） |
 
 ## 在哪
@@ -21,7 +21,7 @@
 | `apps/server/src/modules/channel/writing.ts`、`directory.ts` | 消息与发言人（`kind` + `role`）落库、生成 `Trigger`、计算候选受众并交 `Mailbox` |
 | `apps/server/src/modules/channel/threads.ts`、`talk.ts` | 工单串创建/恢复、汇报贴出、私聊会话按需拉起 |
 | `apps/server/src/modules/channel/messages.ts`、`embeds.ts` | 地址解析、`@` 识别、搜索过滤与公网链接预览抓取 |
-| `packages/protocol/src/rpc.ts`、`apps/server/src/gateway/http/rpc.ts` | `/api/v1/rpc` 频道与 Artifact 实时订阅契约与服务端挂载 |
+| `packages/protocol/src/rpc.ts`、`apps/server/src/gateway/http/rpc.ts` | 频道与 Artifact 订阅流（SSE，`/api/v1/subscribe/<名字>`，[SSE 流](docs/subsystems/core.md#sse-流和其余路由)）的契约与服务端挂载 |
 | `apps/server/src/gateway/connector/` | `connector.ts` 桥接协调器、`digest.ts`、`weixin.ts`、`feishu.ts`、`qq.ts` |
 | 表 `channel`、`channel_participant`、`channel_message`、`channel_mention`、`channel_member`、`channel_read_cursor` | 频道与消息存储表 |
 | 表 `connector_account`、`connector_inbound`、`connector_outbox` | 外部聊天软件账号、入站去重与出站队列 |
@@ -38,12 +38,12 @@
   - `direct`：用户与单个助手或帮工档案的私聊；与帮工私聊直接拉起绑定该频道的 `Session`（用独立 `contexts/` 目录，闲置 10 分钟休眠），不建隐藏工单。
   - `thread`：挂在父频道某条消息下的串；每张工单固定一个工单串（`subject_kind: "issue"`），重开或换帮工复用同一串。
 - **单连接串行写库，内存镜像经 `db.afterCommit` 同步**：所有写操作经 `ChannelStore` 信号量串行提交，消息号从 `1` 递增（对外地址 `#<频道>:<消息号>`）；`ChatModel` 变更统一挂在 `db.afterCommit` 钩子上，事务回滚时自动丢弃，不向外暴露裸 `ChatModel` 或依赖全表重载兜底。
-- **核心状态只留近期摘要，正文按频道订阅**：`SpaceState.chat` 仅保留最近 100 个频道/串摘要与全量未处理的 `userMentions`。正文经 `/api/v1/rpc` 的 `channel.follow({ id, after })` 订阅：消息增改删或置顶均递增 `revision`，重连落后 200 条以内按修订号补齐，超出则回 `Reset` 重拉最新页。
+- **核心状态只留近期摘要，正文按频道订阅**：`SpaceState.chat` 仅保留最近 100 个频道/串摘要与全量未处理的 `userMentions`。正文经订阅流 `channel.follow({ id, after })` 读：消息增改删或置顶均递增 `revision`，重连落后 200 条以内按修订号补齐，超出则回 `Reset` 重拉最新页。
 - **主动阅读与被动消费分开记账**：
   - 调读取接口推进 `channel_read_cursor.read_number`。
   - 模型实际消费投递推进 `mailbox_delivery.consumed_at` 并加 👀 反应，未读查询同时排除两者已覆盖的消息。
 - **发言人统一存 `kind` + `role`，线上读 `ChatMessage.actor`**：`channel_participant` 将身份拆为 `kind`（`user`、`agent`、`system`）与 `role`（仅 `kind = 'agent'` 时非空，取 `orchestrator` 或 `worker`）；消息、触发与信箱统一携带 `Actor`（角色经 `actorRoleOf` 读取），不再拆出 `fromKind`、`fromRole` 或单独的发送者枚举。
-- **写话只有一个门 `Channel.post(Post)`**：`Post` 是按写话场景分的联合，`User`（用户）、`Tell`（对一个帮工说）、`Agent`（帮工、助手经说话工具）、`Announce`（带上做出来的 Artifact 或文件）、`Call`（通话里说的，不叫醒人）、`Run`（服务端里跑的 agent 一轮说完的话）、`Notice`（农场的通知）。每种保留自己的检查和答复，重载把答复的类型钉在种类上（`PostDoor`），调用方不用拆走不到的分支；七种都开同一个 `Channel.post` span，种类记在 span 的 `post` 属性上，最后都落进 `writing.ts` 的 `write`。
+- **写话只有一个门 `Channel.post(Post)`**：`Post` 是按写话场景分的联合，`User`（用户）、`Tell`（对一个帮工说）、`Agent`（帮工、助手经说话工具）、`Announce`（带上做出来的 Artifact 或文件）、`Call`（通话里说的，不叫醒人）、`Run`（服务端里跑的 agent 一轮说完的话）、`Notice`（农场的通知）。每种保留自己的检查和答复，重载把答复的类型钉在种类上（`PostDoor`），调用方不用拆走不到的分支；七种最后都落进 `writing.ts` 的 `write`。
 - **发送幂等键 `sendKey`**：用户发言带 `sendKey`（唯一索引 `(sender, send_key)`），重发返回原消息；帮工 60 秒内向同处发相同正文也自动去重。
 
 ### 受众计算与说话防撞
@@ -78,7 +78,7 @@
 
 1. `Channel.say` 在单写锁内将消息、提及、关注和 `Trigger` 写入库，推进用户已读游标。
 2. 调用 `Mailbox.receive` 在事务内写投递行与路由回执（中途崩溃由启动重放恢复）。
-3. 施加 `messageChanged`、`channelChanged`、`userMentionsChanged` 事实，并向 WebSocket 订阅者推送。
+3. 施加 `messageChanged`、`channelChanged`、`userMentionsChanged` 事实，并向订阅流推送。
 
 **派活开启工单串与贴出汇报**
 
@@ -94,18 +94,18 @@
 ## 为什么这样
 
 - **人与 agent 共处群聊，一张工单固定一个工单串**：帮工直接在串内汇报和提问，避免助手转述失真；重开或换人复用原串，上下文不散落。
-- **消息不进 `StateFrame`，走按修订号的 RPC 订阅**：避免数百条消息放大全局帧体积，同时支持断线后按 `revision` 增量补齐。
+- **消息不进 `StateFrame`，走按修订号的订阅流**：避免数百条消息放大全局帧体积，同时支持断线后按 `revision` 增量补齐。
 - **帮工说话前拦截未读，末尾汇报自动贴出**：防止多帮工并发抢答或误发顶层频道，也省去每轮末尾额外调一次说话工具。
 - **外部连接器只做频道门面，只走出站连接**：三家平台共用一套收发去重与退避桥接层，不建第二套 agent 循环，且只认配对用户以守住本机命令执行安全。
 
 ## 还没做的
 
 - 不支持 MCP 的农机使用 CLI 说话工具：[其他农机提案](.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)。
-- 单条 WebSocket 连接合并状态增量与在线状态：[页面的连接接着带上在线状态和工单的增量](.agents/notes/proposed/architecture/2026-10-27-presence-and-entity-deltas.md)。
+- 一条连接合并状态增量与在线状态：[页面的连接接着带上在线状态和工单的增量](.agents/notes/proposed/architecture/2026-10-27-presence-and-entity-deltas.md)。
 
 ## 怎么验证
 
 - `apps/server/src/modules/channel/channel.test.ts`、`mentions.test.ts`、`messages.test.ts`：路由、修订号补齐、新鲜度拦截与 `userMentions` 测试。
-- `apps/server/src/flows/thread.test.ts`、`talk.test.ts`：工单串跨重开复用與私聊休眠恢复测试。
+- `apps/server/src/flows/thread.test.ts`、`talk.test.ts`：工单串跨重开复用与私聊休眠恢复测试。
 - `apps/server/src/gateway/connector/connector.test.ts`、`digest.test.ts`：微信/飞书/QQ 收发去重、退避与配对测试。
 - `apps/web/test/chat.spec.ts`、`chat-messages.spec.ts`、`chat-rest.spec.ts`、`channel-follow.spec.ts`：聊天界面与实时订阅端到端测试。

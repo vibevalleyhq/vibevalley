@@ -72,7 +72,7 @@
 ## 怎么走
 
 1. **启动加载**：`loadConfig` 解析环境变量与 `vibevalley.yaml` 生成 `ServerConfig`；`Setting` 读取并校验 `settings.json`。
-2. **校验与保存**：前端实时调用 `setting.validate` 检查格式；保存时调用 `setting.update`（仅本机 `owner` 可调）原子写盘。
+2. **校验与保存**：前端实时调用 `setting.validate` 检查格式；保存时调用 `setting.update`（`can` 只有 `user`）原子写盘。
 
 ## 和谁打交道
 

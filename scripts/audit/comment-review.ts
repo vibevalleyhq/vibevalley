@@ -150,7 +150,7 @@ export async function review(rule: string, comments: readonly Comment[], ask: As
   return found.flat();
 }
 
-/** As the farm's orchestrator (packages/ai/src/models.ts). */
+/** As the farm's orchestrator, when its profile names no model (apps/server/src/modules/runtime/durable.ts defaultModel). */
 const model = "deepseek-flash";
 
 const deepseek =
