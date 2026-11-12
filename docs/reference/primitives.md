@@ -143,6 +143,7 @@
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
+| `testAgent` | `agent.ts` | The agent module on its own: no runtime unless options give one, nothing probed in the background, no network. Its |
 | `span` | `artifact.ts` |  |
 | `bold` | `artifact.ts` |  |
 | `para` | `artifact.ts` |  |

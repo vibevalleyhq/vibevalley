@@ -15,10 +15,10 @@ import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { Orchestrator } from "#/modules/orchestrator/orchestrator.ts";
+import type { Watch } from "#/modules/watch/watch.ts";
 import type { Account, Provider } from "#/platform/provider/provider.ts";
 import type { RealtimeEvents, RealtimeLink, RealtimeTransport } from "#/platform/provider/vendors.ts";
 import type { AgoraCredentials, Setting } from "#/platform/setting/setting.ts";
-import type { Watch } from "#/modules/watch/watch.ts";
 
 import {
   agentFor,
