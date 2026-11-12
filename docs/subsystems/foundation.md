@@ -23,7 +23,7 @@
 | `packages/async/` | 打断、后台任务、队列、广播、锁、重试与超时：服务端和各个包共用的异步原语 |
 | `scripts/audit/practice-audit.ts`、`service-paths.ts`、`protocol-surface.ts`、`schema-audit.ts` | 全仓语法树实践棘轮、服务调用矩阵与扇入检查、根协议导出面棘轮、SQL 枚举 / 品牌主键 / `Secret` / `BizCode` 注册表边界审计 |
 | `apps/server/src/{base,infra,core}/` | 服务端纯地基、外部系统适配与核心状态投影底座 |
-| `apps/server/src/modules/<概念>/`、`gateway/`、`modules.ts`、`services.ts` | 纵向领域模块、对外协议与出帧网关、10 层归属表与服务组装 |
+| `apps/server/src/platform/<概念>/`、`modules/<概念>/`、`gateway/`、`modules.ts`、`services.ts` | 底座原语（设置、用户、附件、厂商）、纵向领域模块、对外协议与出帧网关、11 层归属表与服务组装 |
 | `packages/protocol/src/<概念>/` | 按概念划分的 `shapes.ts`、`schema.ts`（Zod）、`api.ts` |
 | `packages/protocol/src/rules/` | 服务端与页面共用的纯函数规则 |
 | `packages/protocol/src/client.ts` | 由 `scripts/gen/api-client.ts` 生成的 HTTP 客户端 `VibeValleyApi` |
@@ -41,7 +41,7 @@
 - **单一语言与运行器**：全仓使用 TypeScript，开发与测试用 `vpx` 直接运行源码，桌面版服务端用 `vp pack` 打包为 `dist/main.mjs`。
 - **依赖版本集中**：所有应用（含 `apps/site`）与共享包使用根 workspace 和同一份锁文件。版本集中在 `pnpm-workspace.yaml` 的 catalog 中，各包写 `catalog:` 或具名 catalog，由 `scripts/audit/catalog.test.ts` 检查。Expo 的版本放在 `expo`；不保留应用自己的 workspace 或锁文件。
 - **开启全局虚拟存储**：`enableGlobalVirtualStore` 让新 worktree 直接硬链全局包，几秒内完成安装。
-- **跨包统一的二级目录语法**：超过 8 个生产文件的子包，`src/` 根目录仅放包入口与装配清单（`index.ts`、`main.ts`、`worker.ts`、`App.tsx`、`services.ts`、`modules.ts`），实现统一归入标准二级目录：`base/`（零 I/O 纯函数与数据结构，由 `vibevalley/subpackage-layers` 静态守住纯度）、`infra/`（外部系统与 SDK 适配）、`state/`（客户端状态中间层）、`ui/`（通用组件与样式令牌；跨模块业务展示件放 `ui/domain/`）、纵向能力域目录（`server` 的 `modules/<概念>/` 与 `gateway/`、`web` 的 `features/<概念>/`、`cli` 的 `commands/`、库包的能力子目录）以及 `testing/`。Electron 沙箱桥独立放入 `apps/desktop/src/preload/`，禁止导入主进程或 Node I/O 模块；`≤ 8` 个文件的微型单职责包保持 `src/` 扁平。
+- **跨包统一的二级目录语法**：超过 8 个生产文件的子包，`src/` 根目录仅放包入口与装配清单（`index.ts`、`main.ts`、`worker.ts`、`App.tsx`、`services.ts`、`modules.ts`），实现统一归入标准二级目录：`base/`（零 I/O 纯函数与数据结构，由 `vibevalley/subpackage-layers` 静态守住纯度）、`infra/`（外部系统与 SDK 适配）、`state/`（客户端状态中间层）、`ui/`（通用组件与样式令牌；跨模块业务展示件放 `ui/domain/`）、纵向能力域目录（`server` 的 `platform/<概念>/`、`modules/<概念>/` 与 `gateway/`、`web` 的 `features/<概念>/`、`cli` 的 `commands/`、库包的能力子目录）以及 `testing/`。Electron 沙箱桥独立放入 `apps/desktop/src/preload/`，禁止导入主进程或 Node I/O 模块；`≤ 8` 个文件的微型单职责包保持 `src/` 扁平。
 - **跨包走包名，包内跨目录走 `#/`**：跨包导入应写 `@vibevalley/*`，`apps/server`、`apps/web` 与 `apps/cli` 跨目录导入写 `#/` 和 `#db/`（由 `no-cross-package-path` 与 `parent-import` 规则检查）。
 - **包导出分离类型与源码**：`packages/*` 的代码导出将 `types` 指向 `dist/*.d.ts`（`vp run packages:build` 生成，`scripts/audit/built-types.ts` 检查），`default` 指向源码；`.css` 导出直接指向 `src/` 下存在的样式表，不伪造类型声明。
 - **严格可选属性**：开启 `exactOptionalPropertyTypes`，对外对象用 `omitUndefined` 清理未定义键（[代码风格](docs/style/code.md#没有值)）。
@@ -94,7 +94,7 @@
 | 层 | 入口 | 真实部分 | 替身端口 | 预算 | 位置 |
 |---|---|---|---|---|---|
 | 规则 | 纯函数 | 被测代码 | 无 | 20ms | 不碰库、进程、网络的 `*.test.ts` |
-| 模块 | 模块服务接口 | 当前及下层模块、内存库、真 git | `scriptedRuntime`、照脚本回答的 DeepSeek、假聊天/声网 | 300ms | `apps/server/src/modules/<模块>/*.test.ts`、`gateway/<门>/*.test.ts` |
+| 模块 | 模块服务接口 | 当前及下层模块、内存库、真 git | `scriptedRuntime`、照脚本回答的 DeepSeek、假聊天/声网 | 300ms | `apps/server/src/{platform,modules}/<模块>/*.test.ts`、`gateway/<门>/*.test.ts` |
 | 流程 | `flows/farm.ts` | 全部服务端模块与真 git | 同上 | 2s | `apps/server/src/flows/*.test.ts` |
 | 浏览器组件 | 组件 DOM 与 owner | Chromium、Solid、真实组件 | 故事数据，无服务端 | 3s | `apps/web/test/stories.spec.ts` |
 | 页面 | HTTP 与 SSE | 真服务端进程 + Chromium | 脚本化帮工、无外部密钥 | 3s | `apps/web/test/projects.ts` 的 integration 项目 |

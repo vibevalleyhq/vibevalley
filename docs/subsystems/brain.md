@@ -6,7 +6,7 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 农场唯一的 `Harness`（`runtime/durable.ts`）：存储、注册一次的 DeepSeek、每个会话的对话、压缩的门槛 | 模型名称的选择和 DeepSeek 密钥的存放（[档案和农机](docs/subsystems/agent.md)、[设置和配置](docs/subsystems/setting.md)） |
+| 农场唯一的 `Harness`（`agent/durable.ts`）：存储、注册一次的 DeepSeek、每个会话的对话、压缩的门槛 | 模型名称的选择和 DeepSeek 密钥的存放（[档案和农机](docs/subsystems/agent.md)、[设置和配置](docs/subsystems/setting.md)） |
 | 我们的工具（`Tool`：JSON Schema 加 `execute`）怎样成为 pi-durable 的工具（`durableTool`） | 输入什么时候送、有没有用户的授权、一轮怎样记进 `session_run`（[助手](docs/subsystems/orchestrator.md)、[帮工](docs/subsystems/session.md)） |
 | 每种宿主的扩展（提示的几段和工具），以及服务端重启后接着跑的一轮仍有它们 | 农场的业务工具（`apps/server/src/gateway/tool`）、跨档案的数据库记忆（[记性](docs/subsystems/memory.md)） |
 | 技能按需加载、`MemoryPort`、MCP 客户端、自己的任务图、帮手（`spawn_agent`） | 循环、工具并发、插话和排队、落盘、压缩、断点续跑（pi-durable 自己的） |
@@ -31,8 +31,8 @@
 
 - `Harness` 开的时候把 pi-ai 的 DeepSeek provider 以 `deepseek` 注册一次（`deepseekAccess`）：每次请求从设置（终端对话从配置和环境）现取钥匙，`fetch` 是农场的；没有钥匙也照样注册，这一轮以「没有 DeepSeek 的密钥」（`server.agent.noDeepSeekKey`）失败，不会是 `no_model`。哪个宿主先让 `Harness` 接着跑，别的会话的一轮都找得到模型。
 - 对话写 `{ provider: "deepseek", modelId }`，模型是 pi-ai 目录里的（`deepseek-flash`、`deepseek-v4-pro`），档案写的不在目录里就用 `deepseek-flash`。帮工的 effort `high`、`max` 就是 pi-ai 的 thinking level，原样发成 `reasoning_effort`；助手不思考（`thinkingLevel: "off"`）。失败的回答不重试（`retry.enabled: false`）。
-- 纯工具的回答发回时 `content: null`、带回 `reasoning_content`；choice 里的 usage、迟到的工具 ID 都照读（`runtime/durable.test.ts` 用录下的 DeepSeek 流离线核对）。
-- 花了多少：token 读 pi-ai 的 usage（缓存不算进 input），人民币由 `runtime/price.ts` 按它自己的 DeepSeek 价目表算，不用 pi-ai 目录里的价。
+- 纯工具的回答发回时 `content: null`、带回 `reasoning_content`；choice 里的 usage、迟到的工具 ID 都照读（`agent/durable.test.ts` 用录下的 DeepSeek 流离线核对）。
+- 花了多少：token 读 pi-ai 的 usage（缓存不算进 input），人民币由 `agent/price.ts` 按它自己的 DeepSeek 价目表算，不用 pi-ai 目录里的价。
 
 ### 四种宿主
 
@@ -68,7 +68,7 @@ pi-durable 自己压缩。模型的窗口按目录（100 万 token），一次�
 
 ### 自己带的东西
 
-- **技能按需加载**：扫技能目录下 `SKILL.md` 的 frontmatter，提示里只列名字和 160 字以内的简介，`load_skill` 时才读正文。帮工和终端对话扫的目录是 `~/.agents/skills`、`~/.claude/skills`、`<工作目录>/.agents/skills`（`packages/agent/src/tools/skills.ts` 的 `defaultSkillDirs`，`runtime/helperExtension.ts` 用它）。
+- **技能按需加载**：扫技能目录下 `SKILL.md` 的 frontmatter，提示里只列名字和 160 字以内的简介，`load_skill` 时才读正文。帮工和终端对话扫的目录是 `~/.agents/skills`、`~/.claude/skills`、`<工作目录>/.agents/skills`（`packages/agent/src/tools/skills.ts` 的 `defaultSkillDirs`，`agent/helperExtension.ts` 用它）。
 - **记性**：`remember`、`rewrite_memory` 经 `MemoryPort`（服务端接 `memory` 表，终端对话接 `MEMORY.md`）。
 - **帮手**：`spawn_agent` 开一个这次调用拥有的子对话，抄父对话的 agent、去掉 `spawn_agent`，它的回答就是结果。
 - **自己的任务**：`todo_add|update|list` 维护最多 30 件的 DAG（`dag.ts` 查圈和缺的前置），全由自己做；帮工的图变了经 oar 的原始记录（`vibevalley/todos`）进轨迹。
@@ -81,7 +81,7 @@ pi-durable 自己压缩。模型的窗口按目录（100 万 token），一次�
 
 ## 和谁打交道
 
-- **四个宿主**：助手 `session/host.ts`、农机 `runtime/vibevalley.ts`、终端对话 `chat/chat.ts`、`spawn_agent` 的子对话。
+- **四个宿主**：助手 `session/host.ts`、农机 `agent/vibevalley.ts`、终端对话 `chat/chat.ts`、`spawn_agent` 的子对话。
 - **资源读取（`Tool.readResource`）**：助手和帮工的 `resource_read` 经 `apps/server/src/gateway/tool/resource.ts` 按会话的权限分页读 `vv://` 资源。
 - **评测**：`vp run --filter @vibevalley/server evals` 在测试农场上照农场的样子跑助手的一轮（`testing/evals.ts` 的 `orchestratorTurn`：助手的宿主、它的提示和工具，经 pi-ai 问真的 DeepSeek），工具答的是用例录下的结果；要 `DEEPSEEK_API_KEY`、花钱，先问用户。
 
@@ -95,7 +95,7 @@ pi-durable 自己压缩。模型的窗口按目录（100 万 token），一次�
 ## 还没做的
 
 - 按档案 `toolsets` 分配工具、统一技能发现并让助手也能加载技能：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
-- Postgres 的 pi-durable 存储后端（换掉 `durable.db`），以及 oar 跟上 pi-durable 1.5 后将 `runtime/vibevalley.ts` 换回它的 runtime 并移除 `peerDependencyRules` 放宽项。
+- Postgres 的 pi-durable 存储后端（换掉 `durable.db`），以及 oar 跟上 pi-durable 1.5 后将 `agent/vibevalley.ts` 换回它的 runtime 并移除 `peerDependencyRules` 放宽项。
 
 ## 怎么验证
 

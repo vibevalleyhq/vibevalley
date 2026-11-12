@@ -29,7 +29,7 @@
 | `journal.ts`、`host.ts`、`inProcessRun.ts` | 轨迹日志文件读写、进程内 `AgentHost`（投递被拒抛 `SubmitRefused`）与 `InProcessRun`（`Run` 的落库） |
 | `worker.ts`、`shell.ts` | 帮工 CLI 的凭证文件与认证探测（[帮工 CLI 接入](docs/subsystems/session.md#帮工-cli-接入)）、私聊的上下文目录 |
 | `apps/server/src/modules/agent/` | 农机注册探测、价格表、额度与每日花费记账、VibeValley 自己的农机（`vibevalley.ts`） |
-| 表 `session`、`session_run`、`session_run_issue`、`session_trigger`、`session_order`、`session_delivery`、`session_subscription`、`session_issue_input`、`session_machine`、`agent_spend` | 会话（含 `pending_report`）、轮次与关联工单、触发器、投递的统一次序、投递、工单订阅与蓄水池、机器、按日花费 |
+| 表 `session`、`session_run`、`session_run_issue`、`session_trigger`、`session_order`、`session_delivery`、`session_subscription`、`session_issue_input`、`session_machine` | 会话（含 `pending_report`）、轮次与关联工单、触发器、投递的统一次序、投递、工单订阅与蓄水池、机器 |
 | `apps/web/src/features/session/` | `WorkLog.tsx`、`Trajectory.tsx`、`runs.ts` 瀑布图与 `events.ts` 订阅 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`session.*`、`runtime.*`）。
@@ -103,7 +103,7 @@
 - **三级并发上限（`room`）**：全农场最多 6 个在忙帮工 `maxRunning`，单台农机按 `maxWorking` 限制，单仓库默认最多 3 个 `repo.max_sessions`；槽位满 6 个又来新活时，最久闲置的工单会话收工、私聊会话休眠。
 - **无沙箱与无逐条权限确认**：帮工在 `$VIBEVALLEY_WORK_ROOT` 下直接执行命令，不弹权限确认；安全边界是服务端只听 `127.0.0.1`。
 - **只追加的轨迹日志**：`events/<id>.json` 按序记录每一步事件，流式草稿按 `revision` 递增推送，落盘后不改。帮工留最近 240 条、助手留 1000 条，离场默认 30 天后清理文件。
-- **额度与每日花费**：额度何时读、何时标「快用完了」见[档案和农机](docs/subsystems/agent.md#怎么走)；按日花费记入 `agent_spend`，额度或预算耗尽时（`moneyStop`）阻止派新活，在跑回合继续跑完。
+- **额度与每日花费**：额度何时读、何时标「快用完了」见[档案和农机](docs/subsystems/agent.md#怎么走)；按日花费由 `Agent.spend` 记入它的 `agent_spend`，额度或预算耗尽时（`moneyStop`）阻止派新活，在跑回合继续跑完。
 
 ### 重启
 
@@ -150,7 +150,7 @@
 
 - **工单（`issue`，含定时任务）**：用 27 个成员（`service-paths.json` 逐个记着）：派活（`hireWith`、`queueDispatch`、`withdrawDispatches`、`triggersOf`、`queuedTriggers`、`room`）、叫停放走（`stop`、`dismiss`）、借工作目录交付（`handOver`、`withWorkplace`、`withIdleWorkplace`）、工作目录（`discardWork`、`clearWorkplace`）、记下并路由触发（定时任务的 `recordTrigger`、`route`、`isRouted`、`ownerOf`、`subscribe`、`replayCronTriggers`，跟 PR 的 `receive`）、在场与查询（`hired`、`live`、`get`、`list`、`runsOf`）、`news`，和建好时交给信箱的看板（`useIssues`：`IssueView` 背后是核心状态里的工单和 `issue` 表，信箱不读 `core.state().issues`，也不读工单的表）；订阅 `news` 的 `Reported`、`Left`、`IssueStarted`、`RunFinished` 更新工单状态、问题与冲突。
 - **观察层（`watch`）**：频道不调 `Session`。`Watch` 按自己的游标读频道提交的事件，算听众、过刹车，记下并路由消息（`recordTrigger`、`route`，再读时先问 `isRouted`）、开私聊帮工（`hireWith`）、撤回（`withdrawEnvelope`、`withdrawDeliveries`）、熔断（`holdWakes`）、开机读刹车的起点（`agentWakes`）、读在场会话（`hired`、`live`）和还在等的投递（`waitingOn`），订阅 `news` 的 `Hired`、`Left`、`Reported`、`Spoke` 管工单串、汇报和熔断计数，`deliveries` 的 `Consumed` 先在聊天里记看过（`Channel.markSeen`）再加 👀、`EmptyWake` 数熔断。会话不读聊天的表：信箱要的默认频道、一处的助手和一个参与者别处的未读，由 `Watch` 建好时经 `Session.useChat` 交给它一个 `ChatView`（背后是 `Channel.defaultChannel`、`orchestratorIn`、`unread`），之前是空的。`modules/session` 下的文件（测试也算）不 import 频道、工单、观察层，也不读它们的表（`modules.test.ts`）。
-- **仓库、农机与记性（`repo`、`runtime`、`memory`）**：`Repo.checkout`、`releaseCheckout`、`resetCheckout`、`clearCheckout` 给帮工开、放、重置、清工单的检出，`houseRules`、`limit`、`usesPullRequests` 拼任务说明和算容量；合并、提 PR、检查与 GitHub 都是工单经仓库带类型的操作做的；农机探测与计费、pi-durable 的 `Harness`；每轮前后召回与写入记忆。
+- **仓库、档案（含农机）与记性（`repo`、`agent`、`memory`）**：`Repo.checkout`、`releaseCheckout`、`resetCheckout`、`clearCheckout` 给帮工开、放、重置、清工单的检出，`houseRules`、`limit`、`usesPullRequests` 拼任务说明和算容量；合并、提 PR、检查与 GitHub 都是工单经仓库带类型的操作做的；`Agent` 的农机探测与计费（`resolve`、`quote`、`spend`、`usageSoon`）、pi-durable 的 `Harness`（`Agent.durable`）；每轮前后召回与写入记忆。
 - **助手（`orchestrator`）**：经 `host` 创建进程内 `AgentHost`，共用 `session` 与 `session_run`；收 `deliveries` 的 `Handed`、`digest` 的摘要，退回用 `handBack`。
 
 ## 为什么这样
@@ -186,7 +186,7 @@
 
 - **回环地址总是绕过代理**：`session/executor.ts` 给每个子会话的 `NO_PROXY` 和 `no_proxy` 写同一份去重清单：继承的值、档案的值，再加 `127.0.0.1,localhost,::1`。档案里的空值不删继承的条目和回环地址；其余代理变量不动。声明了 `refusedSessionOptions.env` 的农机不加任何环境变量。
 - **MCP 连接只记观察，不挡开工**：`Session.toolConnections` 是档案配置的每个 MCP 服务的连接观察；没有条目或 `unknown` 表示没有证据。`starting`、`ready`、`failed`、`cancelled` 是农机报来的，不是健康检查，不挡 run，也不代表帮工 CLI 可用（那一道门见[帮工 CLI 接入](docs/subsystems/session.md#帮工-cli-接入)）。
-- **只认农机自己报的启动状态**：目前只有 Codex 报 MCP 启动状态，在农机适配层（`runtime/access.ts`）解码，其余农机一律 `unknown`。只收根会话、配置里有的服务；带了 `threadId` 就须是这个会话的。错误脱敏后截到 2000 字。
+- **只认农机自己报的启动状态**：目前只有 Codex 报 MCP 启动状态，在农机适配层（`agent/access.ts`）解码，其余农机一律 `unknown`。只收根会话、配置里有的服务；带了 `threadId` 就须是这个会话的。错误脱敏后截到 2000 字。
 - **观察跟着执行走**：观察者先重放保留的记录再读实时的；每条观察施加 `sessionToolChanged`，`reduce` 只换那个服务的条目。新执行或重新接上时 `sessionToolsReset` 清空，同一执行上接着跑的回合保留。连接失败或取消写进轨迹的 `run/error`（带 `connection`）。看的人读这些共用字段，不解析各家农机的通知。
 
 ## 帮工 CLI 接入

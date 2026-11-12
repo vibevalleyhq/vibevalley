@@ -5,12 +5,13 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 ## 目录
 
 ```
-apps/server/               服务端（普通 TypeScript，Hono，Node 24；仓库里用 vpx 跑源码，桌面版带 vp pack 打的包）：src/modules 按单数概念分深模块
-                           （setting、user、attachment、provider、agent、memory、runtime、repo、session（触发和投递、会话和每一轮、工作目录、执行器；不 import 频道和工单）、
+apps/server/               服务端（普通 TypeScript，Hono，Node 24；仓库里用 vpx 跑源码，桌面版带 vp pack 打的包）：src/platform 是底座原语
+                           （setting、user、attachment、provider），src/modules 按单数概念分深模块
+                           （agent（档案、技能和农机）、memory、repo、session（触发和投递、会话和每一轮、工作目录、执行器；不 import 频道和工单）、
                            channel（只靠底座，不 import 业务模块：提交的消息记成带序号的 channel_event）、media（含素材库）、artifact、pkm、issue（含定时任务）、
                            watch（按游标读频道事件、谁听见、三道刹车 brakes.ts，排席位、开串、私聊帮工、汇报、看过和 👀，收件箱和巡查）、orchestrator、game）；src/gateway 是对外的门（http、mcp 和它的 tool、lan、
-                           voice、connector、projection），base 与 infra 是纯地基与外部适配；自研 agent 跑在 pi-durable 上（runtime/durable.ts、session/host.ts、
-                           runtime/vibevalley.ts），services.ts 按序组装（buildModules + makeFarm），chat/main.ts 是终端对话（apps/server/README.md）
+                           voice、connector、projection），base 与 infra 是纯地基与外部适配；自研 agent 跑在 pi-durable 上（agent/durable.ts、session/host.ts、
+                           agent/vibevalley.ts），services.ts 按序组装（buildModules + makeFarm），chat/main.ts 是终端对话（apps/server/README.md）
 apps/server/db/            库（Postgres：database.url，或家目录里的 PGlite）：migrations/0001_schema.up.sql 是唯一的表结构，queries/<表>.sql 一张表一个文件，
                            generated/ 是 apps/server/scripts/pg-generate.ts 从它们写出的
 apps/cli/                  命令行（vibevalley，commander）：照领域模型一条命令一个操作，经 VibeValleyApi 调服务端，不载入服务端（apps/cli/README.md）

@@ -59,9 +59,9 @@ flowchart LR
 仓库目录结构见根目录 [AGENTS.md](AGENTS.md#目录)。
 
 - **契约（`packages/protocol`）**：服务端与客户端唯一的共享契约。每个概念一个目录 `src/<概念>/`，包含 `shapes.ts`（类型）、`schema.ts`（`Codec<T.X>` 解码器）和 `api.ts`（接口行与 `Handlers`）。`src/rules/` 只放服务端与页面共用的纯函数；仅服务端使用的规则留在各自模块（[地基](docs/subsystems/foundation.md)）。
-- **服务（`apps/server/src/`）**：一块业务一个单数目录，归入 10 个有序模块（见 `apps/server/src/modules.ts`）：
-  1. `Platform`（`base`、`infra`、`core`、`setting`、`user`、`attachment`、`provider`）
-  2. `Agents`（`agent`、`runtime`、`memory`；循环和持久是 pi-durable 的，`runtime/durable.ts` 开它的 `Harness`，我们自己的工具在 `packages/agent`）
+- **服务（`apps/server/src/`）**：一块业务一个单数目录（底座原语在 `platform/`，业务在 `modules/`，对外的门在 `gateway/`），归入 10 个有序模块（见 `apps/server/src/modules.ts`）：
+  1. `Platform`（`base`、`infra`、`core`，及 `platform/` 下的 `setting`、`user`、`attachment`、`provider`：不含业务规则的底座）
+  2. `Agents`（`agent`：档案、技能、模板和农机是一个 `Agent` 服务，表 `agent_spend`、`agent_todo`；`memory`；循环和持久是 pi-durable 的，`agent/durable.ts` 开它的 `Harness`，我们自己的工具在 `packages/agent`）
   3. `Source Control`（`repo`）
   4. `Agent Sessions`（`session`：触发和投递、会话和每一轮、工作目录、执行器；不 import 频道、工单和观察层，`modules.test.ts` 查）
   5. `Collaboration`（`channel`、`media`（含素材库）、`artifact`、`pkm`；`channel` 只靠 `Platform`，不 import 别的业务模块，`modules.test.ts` 查）

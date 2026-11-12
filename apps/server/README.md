@@ -14,7 +14,8 @@ src/modules.ts       which folders make up which part of the server (Platform, A
 src/base/            what touches nothing outside: ids, JSON, order, redaction, errors
 src/infra/           what deals with the process and the machine: configuration, database, files, the home's lease, logs, time
 src/core/            the one core state: Core applies facts through gateway/projection
-src/modules/<name>/  one deep service each: setting user attachment provider agent memory runtime repo session (triggers,
+src/platform/<name>/ the primitives below every module, one service each: setting user attachment provider
+src/modules/<name>/  one deep service each: agent (profiles, skills, templates and the runtimes) memory repo session (triggers,
                      deliveries, sessions and runs, workplaces, executions) channel media artifact pkm issue cron inbox tool
                      orchestrator game
 src/gateway/         what faces outside, built last: http/ (the router over the endpoint table, handlers/<concept>.ts, the SSE
