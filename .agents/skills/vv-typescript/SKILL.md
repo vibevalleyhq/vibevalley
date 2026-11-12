@@ -46,7 +46,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
 
 ## 2. 错误
 
-- **对调用方的拒绝**（参数不对、不让做、找不到）：抛 `ApiError`（`@vibevalley/protocol/api`），带 `bizCode`。`base/errors.ts` 的帮手：`throw refused(t("…"))`、`throw missing(…)`。网关把它写成 `{ bizCode, message, error? }`。
+- **对调用方的拒绝**（参数不对、不让做、找不到）：抛 `ApiError`（`@vibevalley/protocol/api`），带 `bizCode`。`base/errors.ts` 的帮手：`throw refused(t("…"))`；找不到时 `throw missing(t("…"), [lookIn.issue])`（`missing(what, next, bizCode?)`：`next` 必填，是去哪列出有的那些，`lookIn.<概念>` 或 `memoriesOf(agent)`；不给 `bizCode` 时按 `next[0]` 取对应的 `…NotFound`），查表的结果用 `orMissing(what, next)(found)`。网关把它写成 `{ bizCode, message, error? }`。
 - **模块自己的、调用方要分辨的失败**：一个 `Error` 子类，`name` 和类名一样、全仓唯一，用 `instanceof` 接：
 
   ```ts

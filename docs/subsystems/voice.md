@@ -24,7 +24,7 @@
 | `apps/server/src/gateway/voice/moss-relay.ts`、`moss-tools.ts` | MOSS Live WebSocket 双向透传、会话指令改写与 `ask_orchestrator` 工具提取 |
 | `apps/server/src/gateway/voice/line.ts` | 语音线路（`8788` 回环监听）与 `cloudflared` 隧道管理 |
 | `apps/server/src/modules/setting/voice.ts` | 语音默认配置 `defaultVoice`、校验 `voiceProblem` 与差异提取 `voiceOverrides` |
-| `apps/web/src/features/voice/` | `call.ts`、`dictation.ts`、`moss-line.ts` 管设备与宿主，`moss-worker.ts`/`moss-worklets.ts` 保持 PCM 绕开 UI 主线程；`captions.ts` 管展示轮次，`contract.ts` 定义应用会话接口；表单与 playground 留在此处 |
+| `apps/web/src/features/voice/model/`、`views/` | `model/` 里 `call.ts`、`dictation.ts`、`moss-line.ts` 管设备与宿主，`moss-worker.ts`/`moss-worklets.ts` 保持 PCM 绕开 UI 主线程，`captions.ts` 管展示轮次，`contract.ts` 定义应用会话接口；`views/` 是表单与 playground |
 | `apps/mobile/src/infra/rtc.ts` | 手机壳原生声网 RTC 适配（锁屏不断线） |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`voice.*` 及 `GET /api/v1/voice/moss/line`）。
@@ -51,9 +51,9 @@
 **拨通与挂断电话**
 
 1. 页面获取麦克风权限，调 `voice.grant.create` 拿到 `AgoraGrant`，经 `host.rtc` 或 Web SDK 加入频道。
-2. 调 `voice.call.start`：服务端认领授予，创建 `callScope` 依次挂入线路钥匙、声网 ConvoAI 会话与挂断 `Deferred`，并施加 `callChanged(live)` 事实；启动失败或中断时关闭 `callScope` 逆序回滚。
+2. 调 `voice.call.start`：服务端认领授予，创建 `callScope`（`gateway/voice/voice.ts`）依次挂入线路钥匙和声网 ConvoAI 会话的释放，挂断信号是它的 `hungUp`（`AbortSignal`），并施加 `callChanged(live)` 事实；启动失败或中断时关闭 `callScope`，按挂入的逆序释放。
 3. 通话中页面从 data stream 拼接实时字幕（`captions.ts`），句子定稿并落入频道后自动替换。
-4. 挂断时调 `voice.call.stop`，完成挂断信号并关闭 `callScope`，撤销授予、销毁线路钥匙并请声网 agent 离开频道。
+4. 挂断时调 `voice.call.stop`，中止 `hungUp` 并关闭 `callScope`，撤销授予、销毁线路钥匙并请声网 agent 离开频道。
 
 **语音听写**
 

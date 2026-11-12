@@ -12,7 +12,7 @@ interface Props {
     name: string;
     logo: string;
   }[];
-  /** Each of the farm's numbers' picture (lib/facts.ts), in its order. */
+  /** Each of the farm's numbers' picture (src/base/facts.ts), in its order. */
   tallies: string[];
 }
 export default function Features(props: Props) {

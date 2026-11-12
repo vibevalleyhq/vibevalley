@@ -44,8 +44,7 @@
   "soundsIntro": "农场里的每个声音，点一下就能听。",
   "soundsFind": "找：声音的名字或分组（浇水、院子、coin……）",
   "soundsRecipes": "音效都是现合成的，没有音频文件：配方在",
-  "soundsMusic": "。关了音效就听不到。背景音乐还没有，给 Suno 的提示词在",
-  "period": "。",
+  "soundsMuted": "。关了音效就听不到。",
   "playSound": "播放 {name}",
   "shelf": {
     "helpers": {

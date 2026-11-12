@@ -16,7 +16,7 @@
 |---|---|
 | `apps/server/src/modules/cron/cron.ts` | `Cron` 服务：增删改、到期与补跑判定（`dueCrons`、`isMissed`、`needsOK`）、到期事务与重放 |
 | `apps/server/src/modules/cron/when.ts` | 五种时间规格解析、`nextRun`、`whenText` 与 `nextText` |
-| `apps/web/src/features/chat/` | 频道菜单与聊天页「定时任务」标签页 |
+| `apps/web/src/features/channel/views/Tabs.tsx` | 聊天页的「定时任务」标签页 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`cron.*`，其中 `cron.update` 仅对用户与 `remote` 开放）。
 

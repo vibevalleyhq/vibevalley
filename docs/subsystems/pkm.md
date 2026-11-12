@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 笔记库目录管理、Markdown 与大纲树互转（`parse` / `print`） | 帮工和助手交付的文档与网页（[Artifact](docs/subsystems/artifact.md)） |
-| 块操作（`PkmBlockOp`）、双链、标签、块引用、反链与 FTS5 检索 | 档案的经验记忆存储（[记性](docs/subsystems/memory.md)） |
+| 块操作（`PkmBlockOp`）、双链、标签、块引用、反链与全文检索 | 档案的经验记忆存储（[记性](docs/subsystems/memory.md)） |
 | 闪念捕获、网页剪藏、话题聚类、改名合并、导出与按文件撤销 | 助手与帮工的 `pkm_*` 工具封装（`apps/server/src/modules/tool/pkm.ts`） |
 | 行内批注与改写建议（`pkm_comment`）的创建、接受与拒绝 | |
 
@@ -48,7 +48,7 @@
 ## 怎么走
 
 1. **闪念捕获（`pkm.capture`）**：未指定页面时追加到今日日记 `journals/YYYY_MM_DD.md` 并标 `LATER #inbox`；指定页面时追加到该页末尾。
-2. **全文检索（`pkm.search`）**：加载或写回时用 `gse` 分词更新 `pkm_term` FTS5 索引；查询结合 `bm25`、整句命中与 PARA 层级权重排序。
+2. **全文检索（`pkm.search`）**：加载或写回时用 `gse` 分词写进 `pkm_term` 表的 `terms` 列，查询走 Postgres 全文索引（`term_vector(terms)` 上的 GIN 索引，`term_query` 前缀匹配）；按 `ts_rank`、整句命中与 PARA 层级权重排序（`packages/pkm/src/graph.ts` 的 `search`）。
 3. **改名与合并（`pkm.page.rename`）**：目标页不存在时重命名并记 `alias::`；目标页已存在时合并块并删除旧文件，同时更新全库 `[[旧名]]`。
 
 ## 和谁打交道
@@ -67,5 +67,5 @@
 
 ## 怎么验证
 
-- `packages/pkm/src/outline.test.ts`、`apps/server/src/modules/pkm/*.test.ts`：大纲无损往返、按需 `id::`、反链展开、FTS5 权重与批注保留链接测试。
+- `packages/pkm/src/outline.test.ts`、`apps/server/src/modules/pkm/*.test.ts`：大纲无损往返、按需 `id::`、反链展开、检索权重与批注保留链接测试。
 - `apps/web/src/features/pkm/*.test.ts`、`apps/web/test/pkm.spec.ts`：键盘大纲编辑、多块选择与拖拽、搜索跳转与日记视图测试。

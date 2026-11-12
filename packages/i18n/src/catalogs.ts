@@ -1738,10 +1738,10 @@ export const catalogs = {
     },
     web: {
       opening: {
-        name: "码农谷物语",
+        name: "码农场物语",
         waking: "加载中……",
-        label: "正在加载码农谷物语",
-        cannotStart: "码农谷物语起不来：{why}",
+        label: "正在加载码农场物语",
+        cannotStart: "码农场物语起不来：{why}",
         starting: "正在唤醒农场……",
         connecting: "正在连接……",
         reading: "正在准备工作台……",
@@ -2334,8 +2334,7 @@ export const catalogs = {
       soundsIntro: "农场里的每个声音，点一下就能听。",
       soundsFind: "找：声音的名字或分组（浇水、院子、coin……）",
       soundsRecipes: "音效都是现合成的，没有音频文件：配方在",
-      soundsMusic: "。关了音效就听不到。背景音乐还没有，给 Suno 的提示词在",
-      period: "。",
+      soundsMuted: "。关了音效就听不到。",
       playSound: "播放 {name}",
       shelf: {
         helpers: { label: "帮工", hint: "七种动物、四套衣服：站、走、干活、欢呼、发愁；在建筑前坐、读、敲、修" },
@@ -7146,8 +7145,7 @@ export const catalogs = {
       soundsIntro: "Every sound on the farm: click one to hear it.",
       soundsFind: "Find: a sound's name or group (water, yard, coin…)",
       soundsRecipes: "The sounds are synthesized on the fly, with no audio files: the recipes are in",
-      soundsMusic: ". With sound off they are silent. There is no background music yet; the prompts for Suno are in",
-      period: ".",
+      soundsMuted: ". With sound off they are silent.",
       playSound: "Play {name}",
       shelf: {
         helpers: { label: "Helpers", hint: "Seven animals, four outfits: stand, walk, work, cheer, worry; sit, read, type and fix by the buildings" },
@@ -11850,7 +11848,6 @@ export interface Messages {
   "web.catalog.noCursors": undefined;
   "web.catalog.noMatch": undefined;
   "web.catalog.perSecond": { readonly n: string | number };
-  "web.catalog.period": undefined;
   "web.catalog.pick": undefined;
   "web.catalog.pixels": { readonly h: string | number; readonly w: string | number };
   "web.catalog.play": undefined;
@@ -11887,7 +11884,7 @@ export interface Messages {
   "web.catalog.size": undefined;
   "web.catalog.soundsFind": undefined;
   "web.catalog.soundsIntro": undefined;
-  "web.catalog.soundsMusic": undefined;
+  "web.catalog.soundsMuted": undefined;
   "web.catalog.soundsRecipes": undefined;
   "web.catalog.stop": undefined;
   "web.catalog.tab.cursors": undefined;

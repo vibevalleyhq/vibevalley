@@ -25,13 +25,13 @@
 | `apps/server/src/modules/media/understanding.ts` | 理解的授权核对、输入保留、持久化、恢复与清理 |
 | `apps/server/src/modules/media/speech.ts`、`speechStream.ts`、`audioResult.ts` | 单人语音、Flash 流式、构建期注入依赖端口的音频下载与落盘 |
 | `apps/server/src/modules/media/audio.ts`、`transcriptionStream.ts` | 多人对白、音色设计／克隆、长转写与异步恢复 |
-| `apps/server/src/modules/media/input.ts`、`inputs.ts` | 流式输入校验、`Scope` 托管的并发上传槽与生成配额预留、任务保留与本机回收 |
+| `apps/server/src/modules/media/input.ts`、`inputs.ts` | 流式输入校验、上传中的槽位与生成配额预留（暂存文件是 `AsyncDisposable`，`await using` 释放）、任务保留与本机回收 |
 | `apps/server/db/queries/media_input.sql`、`media_input_pin.sql` | 输入、删除标记与任务保留记录 |
 | `apps/server/src/gateway/http/media.ts` | 本机专用的二进制上传入口 |
 | `apps/server/src/modules/tool/media.ts` | 助手调用同一 Media 服务 |
 | `apps/web/src/features/media/` | 素材库「生成」对话框里的表单（生图、单人语音、音频工作台）与理解面板：任务、预览、保存与频道发布 |
 
-Media 在 Collaboration 中、Channel 之后组装；启动时在频道恢复后恢复任务。HTTP handler 只转发，接口权限见[接口清单](docs/reference/capabilities.md)。生图、语音及任务读取对 owner 与 orchestrator 开放，remote 和帮工没有生成权限；助手只有承接用户输入的一轮才能生成，自主巡查不能生成。理解的直接发起、授权登记及清理仅对 owner 开放；助手只能按已授权任务 ID 执行，模型不能自报上传许可或文件路径。
+Media 在 Collaboration 中、Channel 之后组装；启动时在频道恢复后恢复任务。HTTP handler 只转发，接口权限见[接口清单](docs/reference/capabilities.md)。生图、语音及任务读取对 `user` 与 `orchestrator` 开放，remote 和帮工没有生成权限；助手只有承接用户输入的一轮才能生成，自主巡查不能生成。理解的直接发起、授权登记及清理仅对 `user` 开放；助手只能按已授权任务 ID 执行，模型不能自报上传许可或文件路径。
 
 ## 不变量
 
@@ -48,7 +48,7 @@ Media 在 Collaboration 中、Channel 之后组装；启动时在频道恢复后
 - **可用意味着落盘**：小音频与图片经 `Attachment.attach` 存成附件；超过附件上限的音频由 Media 输入存储持有，不强塞 Base64 附件。内容以 SHA256 寻址，完整写临时文件后原子发布，取消或写失败不暴露半文件。
 - **页面不折事实**：每次状态变化由 `Core.apply(mediaChanged)` 投影；`phaseText`、可取消和可重试下载均由服务端给出。页面不在本地猜任务是否完成。
 
-**助手在频道里生的图自动发回。** 用户在频道里打 `/imagegen <描述>`，页面把这一行带 `to`（这里的助手）发出去，只交给这个助手；助手读自带的 `imagegen` skill（`apps/server/src/modules/orchestrator/skills/imagegen/SKILL.md`，随服务端打包），调 `media.image.create`。来源是助手、带来源频道的生图任务下载完成后，Media 以那个助手的名义用 `Channel.announce` 在来源频道发一条带图的消息，`sendKey` 为 `media:<任务 id>`，重试与重启只发一次；用户在本页发起的任务不自动发。
+**助手在频道里生的图自动发回。** 用户在频道里打 `/imagegen <描述>`，页面把这一行带 `to`（这里的助手）发出去，只交给这个助手；助手读自带的 `imagegen` skill（`apps/server/src/modules/orchestrator/skills/imagegen/SKILL.md`，随服务端打包），调 `media.image.create`。来源是助手、带来源频道的生图任务下载完成后，Media 以那个助手的名义用 `channel.post({ _tag: "Announce" })` 在来源频道发一条带图的消息，`sendKey` 为 `media:<任务 id>`，重试与重启只发一次；用户在本页发起的任务不自动发。
 
 发布沿用 Channel 接口与附件 ID。页面用命名空间、任务 ID、目标频道的 JSON 元组计算 SHA256，作为 64 字符的 `sendKey`；刷新后再次发布到同一频道不会多发一条，不同频道各有自己的发布。Artifact 引用同一个本机附件地址，不复制资产。
 
@@ -125,7 +125,7 @@ Flash 流式由服务端请求厂商 SSE，从元数据与 PCM 分片生成有�
 ## 为什么这样
 
 - **一台共用任务机承载全部媒体种类**：排队去重、单执行槽、阶段单向迁移、未知状态保护和独立下载重试在 `media/machine.ts` 写一次，各媒体种类只提供厂商请求与结果解析，避免生图、语音、理解和转写各自维护状态机。
-- **频道 `/imagegen` 经 `SayRequest.to` 交助手，出图后由 Media 直接发回**：页面不直接调 `media.image.create`（保留助手 `imagegen` skill 的提示词扩写与比例选择），服务端也不解析正文里的斜杠技能名；下载完成那一刻在 Media 内经 `Channel.announce`（`sendKey: media:<id>`）发回来源频道，免去助手轮询等待。
+- **频道 `/imagegen` 经 `SayRequest.to` 交助手，出图后由 Media 直接发回**：页面不直接调 `media.image.create`（保留助手 `imagegen` skill 的提示词扩写与比例选择），服务端也不解析正文里的斜杠技能名；下载完成那一刻在 Media 内经 `channel.post({ _tag: "Announce" })`（`sendKey: media:<id>`）发回来源频道，免去助手轮询等待。
 
 ## 怎么验证
 

@@ -32,7 +32,8 @@
 - **损坏配置自动备份，绝不覆盖**：启动时若 `config.json` 损坏或不符合 Schema，改名为 `config.json.unreadable-<毫秒>` 保留并按新农场初始化；改名失败则拒绝开机。
 - **角色固定为 `orchestrator` 与 `worker`**：默认助手 `orchestrator` 不可删除或改为帮工；所有助手档案必须用 `vibevalley` 农机，派工候选只含 `worker` 档案。
 - **角色只管职责，别的各问一处**：档案是农场里的一个人，`role` 只决定他能做什么（工具、权限、能不能派去改代码）。他怎么上班、在哪干活、话算谁说的，各由一处回答：当值（会话 id 就是档案 id、开机就在）问 `isOnDuty`，按活雇来的问 `isHired`（`session/roster.ts`）；在服务端进程里干活、由 `Session.host` 收消息的问 `Agent.isHosted`；交给当值的人的工单问 `assignedOnDuty`。今天这几处都由角色推出来，以后有不当值的助手或在进程里干活的帮工，只改这几处。跨层统一用 `Actor` 表示说话和操作的人：`kind` 固定为 `user`、`agent`、`system`，仅 `kind: "agent"` 携带 `role`（`orchestrator` 或 `worker`）与 `forUser`（取角色调 `actorRoleOf`）；`channel_participant` 分列存 `kind` 与 `role`，定时任务和记忆的作者也只记这三种 `ActorKind`。
-- **`duty` 供阅读，`tags` 供匹配**：`duty` 是一句话职责说明；`tags` 是关键词数组，`chooseAgent` 按工单文字命中的关键词数挑选帮工档案。
+- **`duty` 供阅读，`tags` 供匹配**：`duty` 是一句话职责说明；`tags` 是关键词数组。
+- **挑档案顺序（`chooseAgent`，`Runtime.choose`）**：依次匹配：点名的档案名或 ID → 点名的农机上首个可用档案 → 用户界面选定的档案 → 工单文字命中 `Agent.tags` 最多的可用档案。建单和起草经 `Issue.chooseAgent` 调它。
 - **自带的技能只读，按 id 引用**：`Agent.skills()` 先列自带的（`builtIn: true`），再列用户自己写的；`skill.update`、`skill.delete` 碰到自带的一律拒绝，新建技能不占它们的 id。档案只存技能的 id，所以 VibeValley 一更新，勾了它的档案都拿到新版本。模板在 `agent.json` 的 `skills` 里写自带技能的 id，安装时勾上；按模板更新时再勾上，用户另勾的留着。任何档案都能勾自带的技能。
 - **从模板按需安装与更新**：新农场默认只装 `orchestrator` 及 `agent.starters` 指定的模板；`agent.template.update` 仅覆盖 `duty`、`tags`、人设和 `worktree`，保留用户改过的名称、外观、农机与模型。
 - **外观确定性补齐（`withCast`）**：缺省外观按档案 `id` 哈希取模补齐，前后端 `castOf` 算法一致。
@@ -66,7 +67,7 @@
 
 1. 启动后在后台并发探测全部农机（最多 4 台并发）；`runtime.list` 立即返回缓存，未探完的返回 `checking`，探完经 `LiveEvent` 推送替换。
 2. 传入设置的 `binPath` 调用 oar `Installation`；若可用，并发读取模型列表、额度/余额、已装技能、MCP 与工具清单（每项限时 10 秒）。
-3. 每 5 分钟及每轮运行结束 20 秒后（`usageSoon`）刷新已启用农机的额度；花费变动后 3 秒内合并推送最新 `RuntimeInfo`。
+3. 开机、每 5 分钟及每轮运行结束 20 秒后（`usageSoon`）刷新已启用农机的额度，低于 15%（`quotaLow`）标「快用完了」；花费变动后 3 秒内合并推送最新 `RuntimeInfo`。
 
 **派活前解析配置（`Runtime.resolve`）**
 

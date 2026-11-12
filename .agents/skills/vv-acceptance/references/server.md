@@ -5,7 +5,7 @@
 ## 什么时候用
 
 - 改了 `apps/server/src/gateway/http/handlers.ts`、`apps/server/src/gateway/http`、`packages/protocol/src/api.ts`：新的或改过的接口。
-- 改了某个服务的行为（`issue`、`channel`、`setting`、`cron`、`task`……），想看它经接口和 `/api/v1/state` 出来的样子。
+- 改了某个服务的行为（`issue`、`channel`、`setting`、`cron`……），想看它经接口和 `/api/v1/state` 出来的样子。
 - 改了 `apps/server/db/migrations` 或 `apps/server/db/queries`：新库能建、能读写。
 - 改了开机的流程（`apps/server/src/main.ts`、`services.ts`、`http/app.ts`）。
 
@@ -48,13 +48,13 @@
    '
    ```
 
-   带 `--format json` 的命令，stdout 是一个 JSON 文档（不带是给人和 agent 读的短文字）：`issue status 1 todo` 派出去，`issue show --watch` 等帮工交回来（经过的状态在 stderr），`issue diff` 是改动，`--dry-run` 答复会做什么（`{"does":[…]}`）、什么都不动，真做以后 `status` 是 `done`、`delivered` 是 `merged`，`git log` 里有帮工的提交。帮工照标题里的字眼干活（「写打卡」写 `clock.ts` 并提交，别的字眼见 `helper.ts`）；档案要用不带思考力度的（`docs`、`night`），带了的（`lab`）会被它拒。被拒的命令退出码是 3，stderr 最后一行是带 `next` 的 JSON，`next` 里的 `run` 能原样接在 `vv` 后面跑；要断言失败，用 `|| true` 接住，再读那一行。`scripts/release/verify-server.test.ts` 跑着同样的一遍。
+   带 `--format json` 的命令，stdout 是一个 JSON 文档（不带是给人和 agent 读的短文字）：`issue status 1 todo` 派出去，`issue show --watch` 等帮工交回来（经过的状态在 stderr），`issue diff` 是改动，`--dry-run` 答复会做什么（`{"does":[…]}`）、什么都不动，真做以后 `status` 是 `done`、`delivered` 是 `merged`，`git log` 里有帮工的提交。帮工照标题里的字眼干活（「写打卡」写 `clock.ts` 并提交，别的字眼见 `apps/server/src/testing/worker.ts`）；档案要用不带思考力度的（`docs`、`night`），带了的（`lab`）会被它拒。被拒的命令退出码是 3，stderr 最后一行是带 `next` 的 JSON，`next` 里的 `run` 能原样接在 `vv` 后面跑；要断言失败，用 `|| true` 接住，再读那一行。`scripts/release/verify-server.test.ts` 跑着同样的一遍。
 
 4. 页面也改了的，在同一个子命令末尾接上 [page.md](.agents/skills/vv-acceptance/references/page.md) 的截图命令。
 
 ### 真实帮工的 CLI 与连接观测
 
-仅在用户已授权真实农机验收时执行；需要本机 Codex 登录，会消耗模型额度。普通规则先跑服务端的 `src/modules/runtime/access.test.ts`、`src/modules/session/worker.test.ts`、`src/flows/worker-cli.test.ts`、`src/modules/issue/watch.test.ts`，以及 CLI 的 `src/issue-watch*.test.ts`、`src/worker.test.ts`。在各包目录运行 `env -u OAR_SUBAGENT_DEPTH vp test run <文件>`，根目录的测试配置只收集 scripts。
+仅在用户已授权真实农机验收时执行；需要本机 Codex 登录，会消耗模型额度。普通规则先跑服务端的 `src/modules/runtime/access.test.ts`、`src/modules/session/worker.test.ts`、`src/flows/worker-cli.test.ts`、`src/modules/issue/watch.test.ts`，以及 CLI 的 `src/commands/issue-watch*.test.ts`、`src/worker.test.ts`。在各包目录运行 `env -u OAR_SUBAGENT_DEPTH vp test run <文件>`，根目录的测试配置只收集 scripts。
 
 1. 把下列脚本存到独立临时证据目录的 `worker.sh`。它只创建沙箱项目，凭证文件只写入假令牌，不读取真实令牌。
 
@@ -93,7 +93,7 @@ vv session list --format json
 
 ## 出错时
 
-- **`issue status 1 todo` 被拒**：档案带了思考力度（换 `docs`、`night`），或标题里没有帮工认得的字眼（见 `helper.ts`）。
+- **`issue status 1 todo` 被拒**：档案带了思考力度（换 `docs`、`night`），或标题里没有帮工认得的字眼（见 `apps/server/src/testing/worker.ts`）。
 - **表结构对不上**：`db/generated` 不是最新的，`vp run --filter @vibevalley/server db:generate`。
 
 ## 收拾

@@ -1,6 +1,6 @@
 ---
 name: vv-governance
-description: 在 VibeValley 里管住 agent 写的代码不变坏：照《AI 智能体时代的软件维护与工程治理白皮书：五层抗熵金字塔体系》的六种病、五层、十条铁律，加规矩和检查、评审代码、问清边界、做纯重构、做跨很多文件的机械改动；每个要点都写了它在这个仓库已有、已做、改写、以后做还是不做。用在：要加一条规矩、一条 lint、一个检查、一个棘轮，或者想知道一个问题该写成代码、检查还是文字；评审一个 PR 或一块代码有没有在变坏（抄了第二份、旧的没删、as/空 catch/改断言绕过检查、循环里逐个查库、乱引依赖、用户看不过来）；写计划前问清失败、并发、规模和存量数据；派或做一张纯重构的单；一次改名或改签名要跨很多文件；用户问白皮书的某一条（契约墙、骨架、处方式报错、死代码、3+1、300 行重生成、北极星指标、合并队列……）在这里做不做、怎么做。用户没提白皮书、只说「怎么防止 agent 把代码写烂」「这个检查该怎么加」「帮我看看这块是不是越改越乱」时，也用它。
+description: 在 VibeValley 里管住 agent 写的代码不变坏：加规矩、lint、检查或棘轮时选最便宜的手段；评审一块代码有没有在变坏（抄第二份、旧的没删、as/空 catch/改断言、N+1、乱引依赖）；写计划前问清边界；做纯重构或跨很多文件的机械改动；用户问白皮书（五层金字塔、十条铁律）的某一条在这里做不做（契约墙、骨架、处方式报错、3+1、合并队列……）；用户说「怎么防止 agent 把代码写烂」「这个检查该怎么加」「这块是不是越改越乱」时也用。
 ---
 
 # 管住 agent 写的代码不变坏
@@ -11,7 +11,7 @@ description: 在 VibeValley 里管住 agent 写的代码不变坏：照《AI 智
 
 ## 先读哪里
 
-- 要回答「白皮书的某一条在这里怎么样」，或者下面任何一步碰到具体的一条：读 [references/whitepaper.md](.agents/skills/vv-governance/references/whitepaper.md) 里对应的一节（开头有目录）。每条写了处境：**已有**（在哪）、**已做**（吸收白皮书时加的，在哪）、**改写**（思路留下、换成这里的做法）、**以后做**（什么条件下做，挂在[提案](.agents/notes/proposed/process/2026-10-30-whitepaper-checks-that-say-how.md)）、**不做**（为什么）。
+- 要回答「白皮书的某一条在这里怎么样」，或者下面任何一步碰到具体的一条：读 [references/whitepaper.md](.agents/skills/vv-governance/references/whitepaper.md) 里对应的一行。每条写了处境：**已有**（在哪）、**已做**（吸收白皮书时加的，在哪）、**改写**（思路留下、换成这里的做法）、**以后做**（什么条件下做，挂在[提案](.agents/notes/proposed/process/2026-10-30-whitepaper-checks-that-say-how.md)）、**不做**（为什么）。
 - 回答这类问题时，先给处境的结论，再给在哪、为什么；以后做的说出触发条件；不做的说出它和哪条规矩冲突。不要把白皮书的原文当成这里的做法讲。
 
 ## 1. 加一条规矩或一个检查
@@ -36,7 +36,7 @@ agent 照着已有的代码抄、走最短的路，写在文字里的规矩会�
 | 绕开约束 | 有没有 `as`、`as unknown as`、`!`、关 lint 的注释、空的 `catch`、`.catch(() => undefined)`？测试的断言是不是改松了？ | `vp run health:verify`（逃生口的棘轮）；diff 里的测试改动；`regression: ` 开头的测试被动了要在 `## Regression` 里点名 |
 | 温室假设 | 循环里有没有逐个查库、逐个起 git？流是不是假设一次到一整行？写盘是不是每来一点就写一次？ | 读循环体；`docs/subsystems/foundation.md`「贵的东西归拥有它的模块管」；测试里有没有大一点的数据 |
 | 架构漂移 | 有没有新加依赖？有没有跨层、跨模块、穿过别人 `index.ts` 的 import？ | `pnpm-workspace.yaml` 的 catalog 的 diff；`vp check`（`page-layers`、`import/no-cycle`、`no-restricted-imports`）；`apps/server/src/modules.test.ts` |
-| 看不过来 | 用户要读哪几行才能放心合？契约（`packages/protocol`、`db/`、服务接口）改了什么？ | 把契约的 diff 单独列在 PR 正文最前；一个 PR 讲一件事（[vv-pr](.agents/skills/vv-pr/SKILL.md)） |
+| 看不过来 | 用户要读哪几行才能放心合？契约（`packages/protocol`、`db/`、服务接口）改了什么？ | 把契约的 diff 单独列在 PR 正文最前；一批工作一个 PR，不同的事分成不同的提交（[vv-pr](.agents/skills/vv-pr/SKILL.md) 第 1 节） |
 
 查到的照 [vv-simplify](.agents/skills/vv-simplify/SKILL.md) 的格式列给用户：每处带证据（文件和行号、命令的输出）、怎么改、靠哪个测试证明没变坏。只列不改，用户点了再改。
 
@@ -57,8 +57,8 @@ agent 加功能时只在局部补，不会顺手提炼；提炼要单独一道�
 
 1. 靶子来自读数，不来自印象：`vp run health` 的热点、`vp run deadcode`、[vv-simplify](.agents/skills/vv-simplify/SKILL.md) 找到的重复。凭印象挑的常常不是最该清的。
 2. 分开不变的和变的：几处一样的控制流（截断、退避、重试、失败时发什么）收进一个地方（拥有它的模块的服务，或一个骨架函数），各处只留自己不同的那一点（报文怎么拼、怎么签名），作为参数或窄接口传进去。
-3. 分支用 `refactor/`，不和功能放在一个 PR。行为不变：测试只因改名、挪地方而变，断言不减；`regression: ` 开头的测试不动。
-4. 结果要可量：删了多少行、调用方少知道了什么、哪个测试证明行为没变，写进 PR 的 `## What changed`。行数不设门槛（会被刷），但一张重构单没有让代码变少或变简单，就不该合。
+3. 重构自成一个或几个提交，不和功能的改动混在同一个提交里；单独做的重构分支用 `refactor/`，和同一批的功能一起交时放在同一个 PR，用户要求才拆（[vv-pr](.agents/skills/vv-pr/SKILL.md) 第 1 节）。行为不变：测试只因改名、挪地方而变，断言不减；`regression: ` 开头的测试不动。
+4. 结果要可量：删了多少行、调用方少知道了什么、哪个测试证明行为没变，写进那个提交的说明和 PR 的 `## What changed`。行数不设门槛（会被刷），但一张重构单没有让代码变少或变简单，就不该合。
 
 ## 5. 一次改很多文件
 
@@ -67,4 +67,4 @@ agent 加功能时只在局部补，不会顺手提炼；提炼要单独一道�
 - 改名用 TypeScript 的语言服务（编辑器的重命名）；去掉没人用的 `export` 用 `vpx knip --fix --fix-type exports,types`；结构性的改写用 ast-grep 或 ts-morph 写一次性的脚本，脚本放在临时目录，不进仓库（进了仓库会被当成代码检查、格式化）。
 - 先在一个文件上跑，看 diff 对了再全量跑；全量跑完立刻 `vp check`。脚本出过错的，把它碰过的文件从 `origin/main` 恢复，重新来，不在坏的结果上修补：坏在哪不一定看得出。
 - 每处不一样、要逐处判断的（删死代码、改调用方的逻辑），即使文件多也逐处看过再改。
-- 漏改由 `tsc` 和 `scripts/docs/stale-names.ts` 兜底：改名是一个决定时，把旧名写进 `stale-names.ts`，旧名就回不来。
+- 漏改由 `vp check`（类型）和 `scripts/docs/stale-names.ts` 兜底：改名是一个决定时，把旧名写进 `stale-names.ts`，旧名就回不来。

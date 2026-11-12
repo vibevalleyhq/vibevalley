@@ -19,7 +19,7 @@ vp run site:deploy                                    # 构建，再发到 Cloud
 
 `src/Document.tsx` 管文档、分享元信息、首屏资源与字体；`src/App.tsx` 选择首页或 404，`src/sections/Home.tsx` 拼出两种语言的首页。所有区块都在构建时写进 HTML，无脚本也能阅读。屏幕内外的节点随整个文档一起接管，不按可见性另建根。
 
-`src/ui/global.css` 持有颜色、字体、硬阴影、动画和 `<html data-scene>` 的时辰规则；颜色、字号、阴影写在它的 `@theme` 里，class 名就是令牌名（`bg-cream-100`、`text-sm`、`shadow-hard`），不另存一份值。共用组件在 `src/ui/ui.tsx`，动画的订阅与清理在 `src/animation/`。
+`src/ui/global.css` 持有颜色、字体、硬阴影、动画和 `<html data-scene>` 的时辰规则；颜色、字号、阴影写在它的 `@theme` 里，class 名就是令牌名（`bg-cream-100`、`text-sm`、`shadow-hard`），不另存一份值。共用组件在 `src/ui/ui.tsx`，动画的订阅与清理在 `src/ui/`（`entrance.ts`、`scroll.ts`、`Presence.tsx`、`image.ts`）。
 
 ## 素材
 
@@ -34,7 +34,7 @@ vp run site:deploy                                    # 构建，再发到 Cloud
 
 - 云、炊烟和走路等循环动画使用 CSS；离屏区块标记 `data-off` 后暂停。
 - 视差和滚动叙事由 Motion 的 `scroll()` 驱动。`Hero.tsx` 走完一天，`How.tsx` 按 `src/base/story.ts` 展示工作步骤。
-- `src/animation/` 管进入、退出、图片展开、滚动、可见性和资源清理；组件管具体内容。截图对话框约束焦点，关闭后恢复焦点和滚动。
+- `src/ui/entrance.ts` 管进场，`Presence.tsx` 管进入和退出，`image.ts` 管图片展开，`scroll.ts` 管滚动、可见性和资源清理；组件管具体内容。截图对话框约束焦点，关闭后恢复焦点和滚动。
 - 减少动画时跳过视差和进场，暂停 CSS 循环，内容仍完整。
 - 首页时辰的句子要押韵：中文押 -ai 韵，英文两两押韵。改一句时一起检查其他句。
 - 展示数字在 `src/base/facts.ts`，注明游戏代码中的出处；游戏变了跟着改。
@@ -48,10 +48,6 @@ vp run site:deploy                                    # 构建，再发到 Cloud
 ## 文字
 
 `src/i18n/zh.ts` 与 `en.ts` 形状相同，类型检查两者。新文案先加在 `zh.ts`，再补英文。
-
-## 演讲稿
-
-一场演讲一个 `talks/<场>/`：幻灯片是带样式和翻页的 `index.html` 与图片，旁边放提纲和会议模板。这里不发布；讲完后把页面和图挪进 `public/talks/<场>/`，构建原样拷贝，发布在 `/talks/<场>/`。署名用「海拉鲁编程客」，不写真名。
 
 ## 发布
 

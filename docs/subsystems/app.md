@@ -20,7 +20,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 | 位置 | 职责 |
 |---|---|
 | `apps/web/src/base/` | 纯工具层：格式化、排序、拼音搜索（`search.ts`）、中文标点转换（`typedMarks.ts`）、快捷键 |
-| `apps/web/src/infra/` | 外部通信层：`frame.ts`（状态流）、`live.ts`（窄流）、`gateway.ts`（RPC WebSocket）、`query.ts`、`host.ts`、`router.ts` |
+| `apps/web/src/infra/` | 外部通信层：`frame.ts`（状态流和窄流）、`gateway.ts`（订阅流）、`query.ts`、`host.ts`、`router.ts` |
 | `apps/web/src/state/` | 状态中间层：`atom.ts`（`AtomRegistry`）、`intent.ts`（乐观意图）、`stored.ts`（`localStorage` 门面）、`prefs.ts` |
 | `apps/web/src/ui/`、`ui/pixel/` | 基于 `@vibevalley/base-ui` 的无样式组件封装、线条图标（`icons.ts`）与像素通用组件 |
 | `apps/web/src/features/<概念>/` | 按概念划分的业务模块，跨 feature 仅经 `index.ts` 导入且无环（`src/layers.test.ts` 检查） |
@@ -28,8 +28,8 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 | `apps/web/src/app/` | 顶层路由表（`App.tsx`）、侧栏导航（`places.ts`）与外框（`Shell.tsx`） |
 | `packages/stories/`、`apps/web/src/stories.tsx` | 按「设计体系 / 组件 / 交互 / 界面」四层组织的组件故事查看器 |
 | `packages/protocol/src/host.ts` | `Host` 接口、`desktopBridge`、`mobileBridge` 与 `desktopControl` 契约 |
-| `apps/desktop/src/`、`apps/island/` | Electron 主进程（`main.ts`、`server.ts`、`channel.ts`、`update.ts`）与 macOS 原生灵动岛 |
-| `apps/mobile/src/` | Expo 手机壳（`farm.ts`、`PairScreen.tsx`、`FarmScreen.tsx`、`rtc.ts`） |
+| `apps/desktop/src/`、`apps/island/` | Electron 主进程（`main.ts`、`infra/server.ts`、`base/channel.ts`、`infra/update.ts`）与 macOS 原生灵动岛 |
+| `apps/mobile/src/` | Expo 手机壳（`infra/farm.ts`、`screens/PairScreen.tsx`、`screens/FarmScreen.tsx`、`infra/rtc.ts`） |
 
 ## 模型和不变量
 
@@ -48,7 +48,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 ### 宿主与多端
 
 - **宿主接口封闭，缺省能力为 `null`**：页面通过 `currentHost()` 检测能力是否存在，不分支判断宿主类型。跨进程调用经 `@vibevalley/bridge` 按 Schema 校验。
-- **远端浏览器先拿钥匙**：非回环地址打开页面时先问 `user.get`（钥匙可能在 HttpOnly 的 Cookie 里，页面读不到）；没有钥匙的，设过密码就去 `/login`，没设去 `/pair`（`features/user/entry.ts`）。配对把钥匙写进 `SameSite=Strict` 的 cookie，登录由门写进 HttpOnly 的 cookie（[连接到本机](docs/subsystems/lan.md)）。
+- **远端浏览器先拿钥匙**：非回环地址打开页面时由 `features/user/entry.ts` 决定进农场、去 `/login` 还是去 `/pair`；流程见[用户和设备](docs/subsystems/user.md#怎么走)，Cookie 见[连接到本机](docs/subsystems/lan.md#模型和不变量)。
 - **手机壳单连接串行切换**：`FarmConnection` 串行管理农场选择与系统钥匙串写入，切农场时取消在途入线；手机通话走原生声网 SDK（`apps/mobile/src/infra/rtc.ts`）保持锁屏不断线。
 
 ### 发布渠道
@@ -60,7 +60,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 | 正式版（`stable`） | `v0.4.0` | VibeValley / `dev.vibevalley.app` | `~/.vibevalley` | `~/vibevalley` | `vibevalley` |
 | Beta（`beta`） | `v0.4.0-beta.1` | VibeValley Beta / `dev.vibevalley.app.beta` | `~/.vibevalley-beta` | `~/vibevalley-beta` | `vibevalley-beta` |
 | Alpha（`alpha`） | `v0.4.0-alpha.1` | VibeValley Alpha / `dev.vibevalley.app.alpha` | `~/.vibevalley-alpha` | `~/vibevalley-alpha` | `vibevalley-alpha` |
-| 开发（`dev`） | `0.0.0` / 源码 | VibeValley Dev / `dev.vibevalley.app.dev` | `~/.vibevalley-dev` | `~/vibevalley-dev` | `vp run cli` |
+| 开发（`dev`） | `0.0.0` / 源码 | VibeValley Dev / `dev.vibevalley.app.dev` | `~/.vibevalley-dev` | `~/vibevalley-dev` | `vp run --filter @vibevalley/cli start` |
 
 - **渠道独立隔离，机器级资源抢占**：各渠道有独立的单实例锁、家目录、工作目录和相隔 10 的默认端口；全局快捷键与灵动岛归先启动的渠道持有（`apps/desktop/src/infra/machine.ts`）。
 - **发版阶段与表结构锁死**：
@@ -72,7 +72,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 
 **桌面端启动与退出**
 
-1. Electron 获取本渠道单实例锁，在同一个窗口上方用沙箱化的 `WebContentsView` 展示静态加载页 `opening.html`，文档和字体加载后显示窗口。它与浏览器首屏共用三张无字开机场景（`public/brand/opening-*.webp`），按本机时间选择：5–10 点晨光山谷、10–18 点门口迎宾、其余时间夜间灯火。品牌名、加载状态和失败原因由页面单独绘制；中文开屏名为「码农谷物语」，英文为「VibeValley」。
+1. Electron 获取本渠道单实例锁，在同一个窗口上方用沙箱化的 `WebContentsView` 展示静态加载页 `opening.html`，文档和字体加载后显示窗口。它与浏览器首屏共用三张无字开机场景（`public/brand/opening-*.webp`），按本机时间选择：5–10 点晨光山谷、10–18 点门口迎宾、其余时间夜间灯火。品牌名、加载状态和失败原因由页面单独绘制，品牌名取词典的 `web.opening.name`。
 2. 读取缓存的登录 shell `PATH`，并发启动服务端子进程（传入 `VIBEVALLEY_PORT=0 --ready-json --web <页面目录>`）。
 3. 等待服务端 stdout 输出 JSON 就绪收据（限时 40 秒），在开屏下面加载它的网页，不替换开屏文档。网页通过 `Host.opening` 上报真实阶段，隐藏自己的内联开屏；场景、字体和进度保留到同一次退场。服务启动失败时在原开屏展示原因与日志路径，不重新加载。整页刷新重新开屏，应用内导航不重播。
 4. 启动 `VibeValleyIsland` 子进程，主进程订阅 `/api/v1/state` 将工单摘要推给灵动岛 stdin，点击条目经 stdout 打开对应工单。
@@ -84,8 +84,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 
 **工作台路由**
 
-- `/` 打开默认页（`/chat` 或设备偏好的农场页），`/farm` 与 `/farm/<仓库>` 打开像素农场，`/pair` 为局域网配对页。
-- `Shell` 外框包含农场和 `/chat`、`/issues`、`/artifacts`、`/pkm`、`/agents`、`/runtimes`、`/repos`、`/catalog`、`/settings`。农场保留侧栏，不显示工作台页头；`/tree` 和 `/pair` 在外框之外。
+- 路由表在 `apps/web/src/app/App.tsx`，导航栏的条目在 `apps/web/src/app/places.ts`，设置的分区在 `apps/web/src/features/setting/SettingsPage.tsx`；以代码为准，这里不抄。农场保留侧栏，不显示工作台页头；`/tree` 和 `/pair` 在外框 `Shell` 之外。
 - `infra/router.ts` 提供 Router、对象路由表与 Outlet。共同布局跨页面保留，参数变化保留页面实例，需要重建的农场按仓库显式设 key。应用布局读 route meta，不自行拆 URL。匹配、History、参数与查询字符串的约定见 [Router](apps/web/src/infra/router/README.md)。
 - URL 查询字段只经 Router 更新；工单筛选由 Schema 读写，不再由 Atom 另存。未知页面、非法站内编码和不满足 Codec 的参数显示错误页，不默默跳到可写页面。
 - 无样式的 Query、Router、Form、Table 归 `infra`，数据契约使用 Zod；视觉绑定归 `ui`。Form 管编辑版本、校验与明确的提交收据；Table 消费已解码的领域行，不拥有请求。字段、生命周期和受控状态的契约见 [页面基础设施](apps/web/src/infra/README.md)。
@@ -107,7 +106,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 
 - **一份 Solid 2 页面服务三个宿主**：UI 与纯函数规则只写一遍，按 id `reconcile` 细粒度更新，避免高频帧触发整树重渲染。
 - **状态中间层收拢到 `state/atom.ts` 的 Atom，意图按帧 `seq` 结算**：消除「请求返回先弹回旧状态、下一帧再跳过去」的闪烁。
-- **样式回到 Tailwind v4，不用编译期求值的样式库**：2026-11-08 换上的样式库要在构建期求值，限制构建才报、构建慢、样式名按位置起，还要一整套自己的 lint 和 skill；Tailwind 是 agent 最熟的写法，令牌在 `@theme` 一处。没选 CSS Modules（回到给样式起名的老问题）或 vanilla-extract（同样构建期求值）。
+- **样式用 Tailwind v4，不用编译期求值的样式库**：编译期求值的样式库限制要到构建才报、构建慢、样式名按位置起，还要一整套自己的 lint 和 skill；Tailwind 是 agent 最熟的写法，令牌在 `@theme` 一处。没选 CSS Modules（回到给样式起名的老问题）或 vanilla-extract（同样构建期求值）。
 - **按概念分 feature，单向分层且出口显式**：跨 feature 只走 `index.ts` 并禁止成环；像素农场作为皮肤层放在 `features` 之上。
 - **四渠道完全隔离并自带 CLI**：正式版与开发版/测试版可同机并排运行，互不争抢库，用户无需另装 Node 即可使用 CLI。
 

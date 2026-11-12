@@ -1,6 +1,6 @@
 # 界面怎么做：田间工作台
 
-VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的书桌，近乎中性的纸和墨，颜色只留给几样庄稼的意思；看和玩的地方是画出来的像素农场。本篇写工作台怎么做：审美、令牌、原子和模式、和那份八篇大纲的对照、给 agent 的清单。令牌的值以 `apps/web/src/style.css`（`@theme`，Tailwind 的 class 名就是令牌名）为准；本篇只说用途和挑法；写法照 [vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)，写错了由 lint 拦（`vibevalley/design-tokens`、`vibevalley/no-hex-color` 查 class 里的任意值和 `style` 里的散值，`vibevalley/style-attrs` 拦写死的 `style`，`scripts/audit/oxlint-plugin.ts`、`scripts/audit/design-tokens.ts`）。像素皮怎么画见 [农场的皮](docs/subsystems/farm.md)，页面的分层和宿主见 [客户端](docs/subsystems/app.md)。整套的样子在零件的故事里（`vp run --filter @vibevalley/web stories`，[`packages/stories`](packages/stories/README.md)）：每个令牌和零件的每种状态，浅色、深色并排，换宽度看窄窗口，动效的曲线从样式表里读。
+VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的书桌，近乎中性的纸和墨，颜色只留给几样庄稼的意思；看和玩的地方是画出来的像素农场。本篇写工作台怎么做：审美、令牌、原子和模式、给 agent 的清单。令牌的值以 `apps/web/src/style.css`（`@theme`，Tailwind 的 class 名就是令牌名）为准；本篇只说用途和挑法；写法照 [vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)，写错了由 lint 拦（`vibevalley/design-tokens`、`vibevalley/no-hex-color` 查 class 里的任意值和 `style` 里的散值，`vibevalley/style-attrs` 拦写死的 `style`，`scripts/audit/oxlint-plugin.ts`、`scripts/audit/design-tokens.ts`）。像素皮怎么画见 [农场的皮](docs/subsystems/farm.md)，页面的分层和宿主见 [客户端](docs/subsystems/app.md)。整套的样子在零件的故事里（`vp run --filter @vibevalley/web stories`，[`packages/stories`](packages/stories/README.md)）：每个令牌和零件的每种状态，浅色、深色并排，换宽度看窄窗口，动效的曲线从样式表里读。
 
 ## 审美
 
@@ -113,8 +113,8 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 
 - 粗细三种：400 正文，500（`--font-weight-medium`）选中、标签，600（`--font-weight-semibold`）标题和名字。
 - 数字默认等宽（`body` 的 `font-variant-numeric: tabular-nums`）：计数、时间、额度、钱对得齐，变的时候不跳。
-- 代码、id、分支、命令用 `var(--font-mono)`。
-- 中文的标点不挤压，一行的字不手动断；放不下用单行省略（`overflow: "hidden"`、`textOverflow: "ellipsis"`、`whiteSpace: "nowrap"`）或多行截断（`WebkitLineClamp`），弹性子容器要有 `minWidth: 0`。
+- 代码、id、分支、命令用 `font-mono`。
+- 中文的标点不挤压，一行的字不手动断；放不下用单行省略（`truncate`）或多行截断（`line-clamp-2`、`line-clamp-3`），弹性子容器要有 `min-w-0`。
 
 ### 图标
 
@@ -142,19 +142,19 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 
 ### 层
 
-| `zIndex` | 放什么 |
+| class | 放什么 |
 |---|---|
-| `10` | 贴在内容上的：黏在顶上的栏头、悬停才出的工具条 |
-| `20` | 盖在页面上的面板：串的侧面板、工单的详情、拖进来的落点 |
-| `30` | 菜单、浮层、提示、手机上的抽屉 |
-| `40` | toast |
+| `z-10` | 贴在内容上的：黏在顶上的栏头、悬停才出的工具条 |
+| `z-20` | 盖在页面上的面板：串的侧面板、工单的详情、拖进来的落点 |
+| `z-30` | 菜单、浮层、提示、手机上的抽屉 |
+| `z-40` | toast |
 
 对话框用原生的 `<dialog>`，在浏览器的顶层，不排进来。
 
 ### 禁用、空、滚动
 
 - 滚动条和选中的字也取调色板（`style.css` 的 base 层）：细的、淡墨色、没有槽，深色主题里不是系统的浅灰条；选中的字是叶色。
-- 禁用一律在 `:disabled` 条件里写 `opacity: 0.5`、`cursor: "default"`；按下时不下沉。
+- 禁用一律写 `disabled:opacity-50 disabled:cursor-default`；按下时不下沉。
 - 能滚的区域（不带边框和阴影的那一层）用滚动遮罩：还能往哪边滚，那边淡出 16px，滚到头就不淡；样式由组件声明，沿用 `style.css` 的 `@property` 滚动关键帧。遮罩会连边框和阴影一起遮，所以加在里面那层，不加在带边框的浮层上。折起来的长字最后三成淡出，看得出还有。
 - 消息列表离开最新的一屏，底上出一个胶囊：这期间别人说了几条，或「回到最新」；点了滚回底（减少动效时直接跳）。
 
@@ -184,9 +184,9 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 - **对话框和确认**（`ui/Dialog.tsx`、`ui/ConfirmButton.tsx`）：对话框标题一行，下面是内容，Esc 和点暗幕关掉。两张皮的模态（`Dialog`、`Lightbox`、像素皮的 `PxDialog`、`FarmDialog`）都经 `ui/Dialog.tsx` 的 `createModal` 开关原生的 `<dialog>`：Esc 和点暗幕只是请调用的一方关，开没开由它的 `open` 说了算。删、合、关这种收不回的用 `ConfirmButton`：第一次点在原地问（「删掉 X？」、危险按钮、「算了」），Esc 或焦点离开就收回；或者先问服务端的预演（`--dry-run` 那一路）把会发生什么列出来。不用 `window.confirm`。消息上悬停的工具条地方小，删除是同一个按钮点两次。
 - **标签和计数**：`Tag`（`ui/Tag.tsx`）只取 `tone`（`ok`、`bad`、`wait`），自带字色；未读用 `Count`（`"9999px"`、`--text-xs`）。
 - **附件**（`ui/domain/AttachmentTile.tsx`、`ui/Lightbox.tsx`）：图片在消息里最多 `16rem` 高，一圈 `--color-line`、`--radius-md`，点开是看图的浮层（← → 翻同一条消息的图，Esc 关，原图另开一个标签页）；文件和输入框里待发的附件是磁贴：图的缩略图或类型的图标、名字、大小，待发的能逐个去掉。
-- **消息**：一行一条，不画气泡（群聊里人多，靠头像和名字分人）；连着说的不重复头像；时间是 `--text-xs` 加 `--color-faint`；悬停的工具条在右上，`zIndex: 10`。
+- **消息**：一行一条，不画气泡（群聊里人多，靠头像和名字分人）；连着说的不重复头像；时间是 `--text-xs` 加 `--color-faint`；悬停的工具条在右上，`z-10`。
 - **在想和在写**：只在服务端说它在想、在写的那个频道里画三个点（`ThinkingDots`），带着是谁和这一轮过了多久（「在想… · 12 秒」，从服务端记的 `since` 起算，不猜）；侧栏底下这里的助手也写着过了多久。答完，回答下面折成一行「想了 40 秒 · 用了 3 个工具」，点开是干活的经过；没用工具的回答不加这一行。
-- **输入框**（`features/channel/views/Composer.tsx`）：回车发，Shift+回车换行，`@` 出名单，开头打 `/` 出命令（`features/channel/model/commands.ts`：`/issue` 记工单、`/remember` 让助手记住、`/stop` 叫停、`/dm` 私聊）；一条命令就是一个接口，成了在 toast 里说一句，没成那行字留在框里。拖文件进来整块变成落点。
+- **输入框**（`features/channel/views/Composer.tsx`）：回车发，Shift+回车换行，`@` 出名单，开头打 `/` 出命令（`features/channel/model/commands.ts`：`/issue` 记工单、`/remember` 让助手记住、`/stop` 叫停、`/dm` 私聊、`/imagegen` 把生图交给这里的助手（[媒体](docs/subsystems/media.md)））；一条命令就是一个接口，成了在 toast 里说一句，没成那行字留在框里。拖文件进来整块变成落点。
 - **代码**（`ui/code/highlight.ts`）：补丁和代码块按文件的后缀或代码块的标记着色，在 Web Worker 里做，一种语言一个按需加载的包；颜色回来以前、认不得的语言、太长的块（3000 行以上）都是不着色的原样。
 - **干活的经过**（`features/session/WorkLog.tsx`）：每一步一个块，底色说它是什么（交给它的话麦色 14%、想起的叶色 15%、它说的 `--color-hover`、出错莓色 10%，用 `color-mix()` 调配），长的先折起来。
 - **分栏**（`ui/Splitter.tsx`）：侧面板和导航的边能拖宽窄，指针放上去出一条 `--color-focus` 色的线，← → 每次 16px，双击回默认；宽窄按面板记在本机的偏好里（`state/prefs.ts` 的 `widths`），有上下限。窄屏上面板盖住页面时不给拖。
@@ -194,56 +194,7 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 - **空状态**（`ui/layout.tsx` 的 `Empty`）：一整块没有东西时（文档、技能的右边、频道的任务页签），一个 48px 的 `faint` 图标、一句为什么空、下一步的按钮（有就放）；一节里的空只写一行 `--color-muted` 的字，不放大图标。
 - **出错和限流**：一次性的用 toast（坏的是莓色）；持续的写在它所在的地方（额度瓶、连接的小灯、工单的「卡住了」）；拒绝的话里带下一步。
 
-## 和那份八篇大纲对照
-
-用户给的大纲是一个通用 AI 聊天应用的设计体系。我们取它的骨架，值和取舍按田间工作台定。「有」是现在的样子已经写在本篇或子系统里；「不做」写明为什么。
-
-| 大纲 | 我们的做法 | 状态 |
-|---|---|---|
-| 1.1 设计哲学与视觉调性 | 本篇「审美」：田间工作台 | 有 |
-| 1.2 表面体系与色彩阶梯 | 「表面」「状态色」，浅色、深色两套值 | 有 |
-| 1.3 控件尺寸与圆角矩阵 | 「圆角」「控件」，lint 拦散值 | 有 |
-| 1.4 发丝细边、微光阴影、边框防臃肿 | 一圈 12% 的线、两档阴影、一个块一圈线 | 有 |
-| 1.5 字体排版与图标对齐 | 字的阶梯、默认等宽数字、图标配字 | 有 |
-| 1.6 动效令牌与贝塞尔曲线 | 三档时长、四条缓动、两个进场 | 有 |
-| 2.1 按钮阶梯 | 四种 `tone` 加 `IconButton`，按下下沉 | 有 |
-| 2.2 分段滑动胶囊 | `Segmented`，滑块垫在选中的项下面、换选项时滑过去 | 有 |
-| 2.3 状态灯与微动效 | `ui/Tag.tsx` 的 `Dot` 一个点、`PhaseGlyph`、在想的点 | 有 |
-| 2.4 模态确认对话框 | 原生 `<dialog>`、`ConfirmButton` 原地确认、服务端预演 | 有 |
-| 2.5 附件磁贴与上下文胶囊 | `AttachmentTile`：缩略图或类型的图标、名字、大小；@ 名 | 有 |
-| 3.1 会话气泡 | 一行一条、不画气泡（群聊人多） | 不做气泡 |
-| 3.2 思考过程折叠与时间状态机 | 在想的点带着过了多久；答完折成「想了 40 秒 · 用了 3 个工具」，点开是干活的经过 | 有 |
-| 3.3 富文本输入框与指令引擎 | 回车、@、附件、拖进来；`/` 的命令，一条命令就是一个接口 | 有 |
-| 3.4 模型切换器与 Token 计量 | 模型属于档案（档案页里换），每次汇报带花费，额度瓶；不在输入框里换模型 | 有，不做输入框里的切换 |
-| 3.5 工具调用与 MCP 决策卡片 | 工具的每一步在干活的经过里；帮工没有权限确认（根目录 `AGENTS.md`），所以没有批准卡片 | 有，不做批准卡片 |
-| 4.1 动效引擎与关键帧 | `style.css` 的关键帧（入场、循环、滚动时间轴），元素上用 `animate-*` 或 `[animation-name:…]` | 有 |
-| 4.2 光效着色器与推理氛围 | 农场有 PixiJS 的像素光照和昼夜；工作台是安静的工具，不放光效 | 有（农场），工作台不做 |
-| 4.3 滚动边缘渐变遮罩 | `scroll-fade-y`、`scroll-fade-x`，工作台和田头都用它们 | 有 |
-| 5.1 语音模式与 Web Audio | 通话、听写、MOSS，农场的音效用 Web Audio 合成；工作台不出声 | 有 |
-| 5.2 媒体查看器与画廊转场 | `Lightbox`：从图上长出来，← → 翻，Esc 关 | 有 |
-| 5.3 双栏弹性分割 | 串的侧面板、设置的导航用 `Splitter` 拖宽窄，记在本机 | 有 |
-| 5.4 工件预览沙箱 | 产物是分支和文档，没有要沙箱跑的工件 | 不做 |
-| 5.5 代码差异与语法高亮 | 完成前逐个文件看补丁，按文件的语言着色（`ui/code`，Worker 里的 Shiki，颜色接调色板） | 有 |
-| 6.1 macOS 宿主融合与窗口材质 | 沉浸式标题栏、红绿灯、托盘、全局快捷键、灵动岛；纸是不透明的，不用毛玻璃 | 有，不做毛玻璃 |
-| 6.2 侧边栏拖放重排 | 频道拖到另一个上排在它前面、进它的组 | 有 |
-| 6.3 多代理协作看板 | 工单看板、好几个助手、农场 | 有 |
-| 6.4 流式文本与滚动视口 | 助手说完整条才写进频道；消息倒着排，停在最新；离开时底上的胶囊数着新消息、点了回到最新 | 有 |
-| 6.5 容器查询与防挤压 | 工单页用容器查询，子项允许缩到 `minWidth: 0`，长字省略；每处在 400px 和 720px 宽都不出界（`test/narrow.spec.ts`） | 有 |
-| 6.6 全键盘与无障碍 | Ctrl+K、Esc、全页的焦点框、每个图标按钮有名字；`?` 打开快捷键一览，和认键的是同一张表 | 有 |
-| 6.7 异常、限流与状态机 | 状态由服务端折好：额度、卡住的原因、重试、连接的小灯 | 有 |
-| 7.1 样式编译与基础 CSS | Tailwind v4 由元素上的 class 生成组件样式；`style.css` 提供令牌（`@theme`）、字体和明确归属的全局规则，`reset.css` 提供重置 | 有 |
-| 7.2 工程源码清单 | `apps/web/README.md`、[客户端](docs/subsystems/app.md) | 有 |
-| 7.3 资产、字体和音频 | `design/` 的出图和切图、FusionPixel、合成的音效、reicon | 有 |
-| 8.1–8.7 给 agent 的指南 | 本篇「给 agent 的速查」和 lint | 有 |
-
 ## 给 agent 的速查
-
-**挑动效**：
-
-1. 在指针底下（悬停、按下、小箭头转）→ `transitionDuration: "120ms"`。
-2. 一个状态变了（颜色、显示、选中）→ `transitionDuration: "180ms"`、`transitionTimingFunction: "var(--ease-out)"`。
-3. 一块东西进来或离开（面板、抽屉、对话框）→ 进来 `"280ms"` 加 `"var(--ease-out)"` 或 `popIn` 关键帧，离开更快、`"var(--ease-in)"`。
-4. 一个小东西冒出来要人注意（新的角标）→ `"var(--ease-spring)"`，只用这一处。
 
 **写一个新界面之前**：先在故事里看一眼，再找有没有现成的原子（`ui/` 下：`Button`、`IconButton`、`ConfirmButton`、`Segmented`、`Tabs`、`Dialog`、`Field`、`Select`、`Checkbox`、`Empty`、`MoreMenu`、`Tip`、`Icon`、`Dot`、`Tag`、`AttachmentTile`、`Lightbox`、`Splitter`），有就用，不另写一个长得差不多的。加了原子或一种 `tone`，在它旁边的 `X.stories.tsx` 写上（`src/stories.test.ts` 查 `ui/` 的每个零件都有）；加了令牌，加进 `ui/tokens.stories.tsx`。离开页面的数据就画不出来的零件，把画的部分拆成只吃参数的一块再写故事（`ShortcutSheet` 的 `Shortcuts`）。故事分四层（[客户端](docs/subsystems/app.md)）：设计体系、组件、交互、界面；几个零件一起完成的一件事（确认、保存、空状态）写成「交互」的故事，一个概念的一块界面用编出来的数据写成「界面」的故事。
 
@@ -262,7 +213,7 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 - [ ] 一个区域最多一个 `primary`；危险的操作不填满，收不回的先确认或预演。
 - [ ] 一个块一圈线，块里没有再套边；只有浮层有 `--shadow-float`。
 - [ ] 每个只有图标的按钮有名字；键盘能走到、Esc 能关。
-- [ ] 长的字会截断或折叠（`minWidth: 0`、`textOverflow: "ellipsis"`、`WebkitLineClamp`），窄窗口不撑破（新的一处加进 `test/narrow.spec.ts` 的 `places`）。
+- [ ] 长的字会截断或折叠（`min-w-0`、`truncate`、`line-clamp-*`），窄窗口不撑破（新的一处加进 `test/narrow.spec.ts` 的 `places`）。
 - [ ] 空的、加载中、出错三种样子都有。
 - [ ] 动效有因果，减少动效时停得下。
 - [ ] 照 [验收](.agents/skills/vv-acceptance/SKILL.md) 的页面分册截图，浅色、深色各一张。

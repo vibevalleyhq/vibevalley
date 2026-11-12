@@ -18,13 +18,13 @@
 | 位置 | 职责 |
 |---|---|
 | `apps/web/src/farm/canvas/` | `VillageCanvas.tsx`、`scene.ts`（按脚底 y 轴排序）、`dog.ts`、`life.ts`、`fx.ts` |
-| `apps/web/src/farm/world/` | `world.ts`（地点映射 `placeOfAction`、节流 `Whereabouts`、命中 `villageHitAt`、缩放 `frameVillage`）、`level.ts`、`plots.ts`、`sprites.ts` |
-| `apps/web/src/farm/hud/`、`panels/`、`issue/` | 顶栏 HUD、播种袋 `SeedForms.tsx`、收成清单、仓库、成就与农场工单详情 `IssueView.tsx` |
+| `apps/web/src/farm/world/` | `world.ts`（地点映射 `placeOfAction`、节流 `Whereabouts`、命中 `villageHitAt`、缩放 `frameVillage`）、`level.ts`、`plots.ts`、`textures.ts` |
+| `apps/web/src/farm/hud/`、`panels/`、`issue/` | 顶栏 HUD、播种袋 `SeedForms.tsx`、收获面板 `Harvest.tsx`、仓库、成就与农场工单详情 `IssueView.tsx` |
 | `apps/web/src/farm/phone/`、`chat/` | 折叠屏手机 `Phone.tsx`、来电状态 `calls.ts`、5 个纯函数小游戏 `games/*.ts`、田头聊天窗 `ChatWindow.tsx` |
 | `apps/web/src/farm/map/` | 仓库群岛地图 `RepoMap.tsx` 与纯函数 `islands.ts` |
 | `apps/web/src/farm/tools.ts`、`commands.ts`、`cues.ts` | 农具定义、点击命令映射与状态驱动音效 |
 | `packages/engine/` | `nav`（网格 A* 寻路）、`pixi`（法线光照、天色、粒子）、`audio`（K 计权合成器）、`clock.ts`、`framing.ts` |
-| `apps/web/src/features/catalog/` | 素材图鉴（读取 `public/pixel/sprites.json`、`cursors.json` 与 `ui/pixel/sound.ts`） |
+| `apps/web/src/features/catalog/` | 素材图鉴（读取 `apps/web/public/pixel/sprites.json`、`apps/web/public/cursors/cursors.json` 与 `apps/web/src/ui/pixel/sound.ts`） |
 
 ## 模型和不变量
 

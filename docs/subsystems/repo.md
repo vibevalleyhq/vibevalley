@@ -29,7 +29,7 @@
 ## 模型和不变量
 
 - **仓库即 `repos/<名字>` 下的直接子目录**：名字仅含字母、数字、`-`、`_`、`.`（最长 64 字符），禁止符号链接跳出 `repos/`。派活目标仓库不存在时自动 `git init -b main` 并生成初始提交。
-- **一张工单固定一个 worktree 与一条分支**：路径为 `worktrees/<仓库>.<工单号>`，分支为 `vibevalley/issue-<工单号>`；重开或换帮工直接复用，首次创建时从基分支切出并在锁外跑一次 `.vibevalley/setup`（安装依赖并构建各包的 `dist/` 声明）。
+- **一张工单固定一个 worktree 与一条分支**：路径为 `worktrees/<仓库>.<工单号>`，分支为 `vibevalley/issue-<工单号>`；重开或换帮工直接复用，首次创建时从基分支切出，目标仓库有 `.vibevalley/setup` 就在锁外跑一次（脚本由目标仓库自己提供）。
 - **同仓库写操作串行，本地合并的耗时检查在锁外执行**：每个仓库一把信号量锁 `serially` 保护新建、开 worktree、合并与清理；`.vibevalley/check`（默认限时 1200 秒）在锁外运行，通过后重新进锁核对分支与基分支未变才执行合并。
 - **清理回执区分现场是否保留（`WorkplaceRelease`）**：`release` 与 `clear` 返回 `{ kept, why? }`；有未提交改动或未合入提交时保留现场，仅 `kept: false` 时允许删除工单身份。
 - **冲突预检与合入父分支均不污染工作区**：
@@ -46,7 +46,7 @@
 
 **本地合并**
 
-1. **锁外准备**：要求工作树干净，用 `merge-tree` 预检冲突，执行 `.vibevalley/check`（`vp check --deny-warnings`、`server:check`/`web:check` 按改动范围、`docs:verify`）并记录当前分支 commit。
+1. **锁外准备**：要求工作树干净，用 `merge-tree` 预检冲突，执行目标仓库自己提供的 `.vibevalley/check`（`repo/check.ts`：没有这个文件记 `not-run`，退出码非 0 就把末尾 40 行交回帮工）并记录当前分支 commit。
 2. **进锁复核与执行**：确认分支 commit 未变、主分支无新增未检提交且无冲突：
    - **本地合并（`merge`）**：在仓库主检出执行 `git merge --no-edit`，成功后强制删除工单 worktree 与分支。
    - **合入父分支（`mergeInto`）**：通过 `commit-tree` 与 `update-ref` 原子推进父分支引用，清理子工单 worktree 与分支。
@@ -54,7 +54,7 @@
 
 **发布已有分支（`repo.pr.submit`）**
 
-本机用户显式给出检出根目录、分支、完整 SHA、base、标题和正文。检出可在空间外，不注册仓库。接口仅标注 owner，HTTP 拒绝 Bearer 身份；远程设备、助手和帮工工具不暴露此操作。本机回环监听仍是用户的信任边界。
+本机用户显式给出检出根目录、分支、完整 SHA、base、标题和正文。检出可在空间外，不注册仓库。接口的 `can` 只有 `user`，HTTP 拒绝 Bearer 身份；远程设备、助手和帮工工具不暴露此操作。本机回环监听仍是用户的信任边界。
 
 发布按仓库共用 Git 目录串行，拒绝脏目录、detached HEAD、分支或 SHA 不符、默认/base 分支、多远端、多个 URL、读写仓库不一致及 URL 重写配置。GitHub.com 用 gh，GitLab.com 用 glab；工具缺失、未登录、返回无法解码均拒绝。未知主机与自建 GitLab 不支持。
 

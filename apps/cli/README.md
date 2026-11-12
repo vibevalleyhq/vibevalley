@@ -7,22 +7,26 @@ it loads none of the server and works out nothing the server decides. How it rea
 [the core](docs/subsystems/core.md).
 
 ```
-src/main.ts        the root: the groups below, the global flags (--server, --dry-run, --format), how help and failures are said
-src/infra/command.ts  the command tree on commander: arguments and flags read back typed, help (EXAMPLES…), parser mistakes as failures
-src/infra/farm.ts  what every command stands on: SSE frames, ask (the typed client), change (--dry-run), the desktop app's socket
-src/base/format.ts the global flags (--server, --dry-run, --format) and show (text or --format json)
-src/commands/issue.ts  issue list|show [--watch]|watch [--jsonl] [--follow]|create|edit|status|comment|review|diff|timeline|delete
-src/worker.ts      separate session-authenticated entry; commands/worker.ts implements report, pr-submit, context, read, doctor
-src/issue-watch.ts bounded observation, revisions and reconnects
-src/channel.ts     channel list, channel message list|send|search
-src/pkm.ts         the notes: pkm capture|search|radar, pkm journal show, pkm page list|show|save|export|edit
-src/repo.ts     repo list|create, agent list|create|delete, session list|show|stop, runtime list|refresh
-src/notes.ts       memory list|search|create|delete, cron list|create|edit|delete, artifact list|show|read
-src/app.ts         the desktop app's own abilities, over its socket in the farm's home (@vibevalley/home)
-src/doctor.ts      this machine's farm: found, reachable, the app, the runtimes, the keys, connecting to this machine
-src/chat.ts        `chat [runtime]`: the server's conversation program, handed this terminal (VIBEVALLEY_CHAT); bare `vibevalley` is the help
-src/base/output.ts the run's io, stdout for the result, the failure as one JSON line on stderr, exit codes by kind
-src/testing/       a run in the process (cli.ts) against a whole farm (@vibevalley/server/testing)
+src/main.ts                    the root: the groups below, the global flags (--server, --dry-run, --format), how help and failures are said
+src/worker.ts                  the helpers' own entry, authenticated by the session (--worker-access-file); runs commands/worker.ts
+src/base/format.ts             the global flags and show (text or --format json)
+src/base/output.ts             the run's io: stdout for the result, the failure as one JSON line on stderr, exit codes by kind
+src/infra/command.ts           the command tree on commander: arguments and flags read back typed, help (EXAMPLES…), parser mistakes as failures
+src/infra/farm.ts              what every command stands on: state frames, ask (the typed client), change (--dry-run), the desktop app's socket
+src/infra/sse.ts               reading an SSE stream; process.ts the process's io; spawn.ts running another program
+src/commands/issue.ts          issue list|show [--watch]|watch [--jsonl] [--follow]|create|edit|status|comment|review|diff|timeline|delete
+src/commands/issue-watch.ts    issue watch: bounded observation, revisions and reconnects
+src/commands/channel.ts        channel list, channel message list|send|search
+src/commands/pkm.ts            pkm capture|search|radar, pkm journal show, pkm page list|show|save|export|edit
+src/commands/repo.ts           repo list|create, repo pr submit
+src/commands/agent.ts          agent list|create|delete; session.ts session list|show|stop; runtime.ts runtime list|refresh
+src/commands/memory.ts         memory list|search|create|delete; cron.ts cron list|create|edit|delete; artifact.ts artifact list|show|read
+src/commands/worker.ts         the helpers' report, pr-submit, context, read, doctor
+src/commands/auth.ts           auth login|status|logout (below)
+src/commands/app.ts            app status|open|quit|restart|update: the desktop app, over its socket in the farm's home (@vibevalley/home)
+src/commands/doctor.ts         this machine's farm: found, reachable, the app, the runtimes, the keys, connecting to this machine
+src/commands/chat.ts           `chat [runtime]`: the server's conversation program, handed this terminal; bare `vibevalley` is the help
+src/testing/                   a run in the process (cli.ts) against a whole farm (@vibevalley/server/testing), a fake server (http.ts)
 ```
 
 ## Rules
@@ -36,6 +40,15 @@ src/testing/       a run in the process (cli.ts) against a whole farm (@vibevall
   the home's files are `@vibevalley/home`'s.
 - Run it from the repository with `vp run --filter @vibevalley/cli start <command…>`; the desktop app bundles it
   (`vp pack`, dist/) and installs it as `vibevalley` (`-beta`, `-alpha`).
+
+## Exit codes and failures
+
+A script branches on the exit code (`src/base/output.ts`'s `exit`): `0` done, `1` the server failed or something else
+went wrong, `2` the command was written wrong (an unknown flag, a missing argument, a body its endpoint does not take),
+`3` the server refused, `4` no such thing, `5` no server to talk to, `130` stopped by Ctrl+C. A failure is one JSON line
+on stderr, `{"error":{"code","tag","text","bizCode"?,"status"?,"next"?}}`: `tag` is the ApiError's kind (`Refused`,
+`Missing`…), the parser's, or `Unreachable`/`InvalidJson`/`Server`; each `next` has `say` and, when it is a command,
+`run`, the words to run after `vibevalley`.
 
 ## Sign in to a server elsewhere
 

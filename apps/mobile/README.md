@@ -6,16 +6,17 @@ whose page end is `mobileHost` there). How it fits with the desktop and the brow
 pairing and keys: [连接到本机](docs/subsystems/lan.md).
 
 ```
-src/intl.ts          loads the Intl dependencies and English plural data before the shared formatter
-App.tsx              follows the current farm choice; a vibevalley://pair link asks the choice owner to pair again
-src/PairScreen.tsx   camera and form: selects a link, names the phone, asks to pair or cancels
-src/FarmScreen.tsx   the WebView: the key as the page's cookie; loading another page or leaving closes its host
-src/host.ts         one loaded page's native host: answers bridge calls, keeps each call's identity, closes its line
-src/farm.ts          FarmConnection owns the current choice, pending pairing and serialized keychain commits
-src/rtc.ts           the call on Agora's native SDK: owns pending microphone permission, the engine and release
-src/notify.ts        the page's notices as the phone's own (expo-notifications)
-src/pairing.ts       pure: pairing links, the phone's name, the key's cookie, levels; with its vitest
-scripts/e2e.ts       pairs a built app on an emulator or simulator with a sandboxed farm, and screenshots it
+index.ts                    the entry: loads src/base/intl.ts, then App
+App.tsx                     follows the current farm choice; a vibevalley://pair link asks the choice owner to pair again
+src/base/intl.ts            loads the Intl dependencies and English plural data before the shared formatter
+src/screens/PairScreen.tsx  camera and form: selects a link, names the phone, asks to pair or cancels
+src/screens/FarmScreen.tsx  the WebView: the key as the page's cookie; loading another page or leaving closes its host
+src/infra/host.ts           one loaded page's native host: answers bridge calls, keeps each call's identity, closes its line
+src/infra/farm.ts           FarmConnection owns the current choice, pending pairing and serialized keychain commits
+src/infra/rtc.ts            the call on Agora's native SDK: owns pending microphone permission, the engine and release
+src/infra/notify.ts         the page's notices as the phone's own (expo-notifications)
+src/infra/pairing.ts        pairing links, the phone's name, the key's cookie, levels; with its vitest
+scripts/e2e.ts              pairs a built app on an emulator or simulator with a sandboxed farm, and screenshots it
 ```
 
 `ios/` and `android/` are made from `app.json` by `expo prebuild` and not kept. An app built with

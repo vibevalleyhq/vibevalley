@@ -6,20 +6,18 @@
 
 ## 状态和用语
 
-状态词条定义在 `packages/i18n/locales/{zh,en}/shared.json`，前后端共用（详见 [话放在哪](docs/subsystems/foundation.md#话放在哪)）。种地隐喻词仅用于像素农场与游戏模块，由 `scripts/docs/stale-names.ts` 检查。
+每个取值在界面上叫什么，以词典 [shared.json](packages/i18n/locales/zh/shared.json)（英文在 `packages/i18n/locales/en/shared.json`）为准，前后端共用，这里不抄（[话放在哪](docs/subsystems/foundation.md#话放在哪)）。种地隐喻词仅用于像素农场与游戏模块，由 `scripts/docs/stale-names.ts` 检查；固定术语（问题、验收意见、改动、子工单、空位）见[用语表](docs/README.md#用语)。
 
-| 层级 | 字段 | 取值与名称 | 来源 |
+| 层级 | 字段 | 取值 | 来源 |
 |---|---|---|---|
-| 流程状态 | `status` | `backlog` 备选、`todo` 待办、`in_progress` 处理中、`in_review` 待验收、`done` 已完成、`canceled` 已取消 | 用户设置存库；`in_progress` 与 `in_review` 从在场 `Session` 或 `lastRun` 派生 |
-| 展示阶段 | `stage.state` | `draft` 草稿、`queued` 排队、`working` 在做、`asking` 等你回答、`reviewing` 等你验收、`stuck` 卡住了、`done` 已完成、`canceled` 已取消 | `issueStageOf` 实时计算 |
-| 受阻原因 | `stage.stuck` | `conflict` 有冲突、`failed` 没做成、`interrupted` 停在半路、`quiet` 没动静 | `issueStageOf` 实时计算 |
-| 可执行动作 | `stage.acts`、`lead` | `start` 开工、`answer` 回答、`reject` 打回、`complete` 完成、`acknowledge` 知道了、`resolve` 让它解决冲突、`resume` 接着做、`cure` 接着修、`tell` 带话、`stop` 叫停、`close` 取消、`reopen` 重开 | `issueStageOf` 计算，自带点击后发送的请求参数 |
-| 完成交付 | `delivered` | `merged` 合进主分支、`merged_into_parent` 合进父分支、`pull_request` PR 合入、`submitted` 已提交 PR/MR、`kept` 保留分支、`none` 无代码改动 | 完成关单时由服务端判定 |
-| 取消原因 | `canceled` | `dismissed` 取消、`lost` 工作目录丢失 | 取消关单时写入 |
-| 单轮结局 | `Run.outcome` | `completed` 做完了、`failed` 没做成、`interrupted` 停在半路 | 单次 `Run` 结束时写入 |
-| 会话阶段 | `Session.phase` | `working` 在干活、`done` 交回来、`failed` 没做成、`resting` 歇着、`closed` 走了 | 会话生命周期更新 |
-
-固定术语：帮工提问叫**问题** `questions`，打回意见叫**验收意见** `findings`，待合入内容叫**改动** `changes`，拆出的工单叫**子工单**，仓库并发上限叫**空位**。
+| 流程状态 | `status` | `backlog`、`todo`、`in_progress`、`in_review`、`done`、`canceled` | 用户设置存库；`in_progress` 与 `in_review` 从在场 `Session` 或 `lastRun` 派生 |
+| 展示阶段 | `stage.state` | `draft`、`queued`、`working`、`asking`、`reviewing`、`stuck`、`done`、`canceled` | `issueStageOf` 实时计算 |
+| 受阻原因 | `stage.stuck` | `conflict`、`failed`、`interrupted`、`quiet` | `issueStageOf` 实时计算 |
+| 可执行动作 | `stage.acts`、`lead` | `start`、`answer`、`reject`、`complete`、`acknowledge`、`resolve`、`resume`、`cure`、`tell`、`stop`、`close`、`reopen` | `issueStageOf` 计算，自带点击后发送的请求参数 |
+| 完成交付 | `delivered` | `merged`、`merged_into_parent`、`pull_request`（PR 合入）、`submitted`（提交了 PR/MR）、`kept`、`none` | 完成关单时由服务端判定（[完成和交付](docs/subsystems/issue.md#完成和交付)） |
+| 取消原因 | `canceled` | `dismissed`、`lost`（工作目录丢失） | 取消关单时写入 |
+| 单轮结局 | `Run.outcome` | `completed`、`failed`、`interrupted` | 单次 `Run` 结束时写入 |
+| 会话阶段 | `Session.phase` | `working`、`done`、`failed`、`resting`、`closed` | 会话生命周期更新 |
 
 ## 管什么，不管什么
 
@@ -27,7 +25,7 @@
 |---|---|
 | 工单模型、状态派生、原生父子依赖（`parent` / `blockedBy`）与合法状态流转 | 会话如何跑一轮、轨迹日志记录（[帮工](docs/subsystems/session.md)） |
 | 起草（`refine`）：派帮工只读看代码生成草稿、写回工单、重置 worktree | worktree 创建、重置与清理实现（[仓库](docs/subsystems/repo.md)） |
-| 派活、排队重试、拆分子工单（`split`）、换人、重开与取消 | 档案选择算法（[助手](docs/subsystems/orchestrator.md#模型和不变量)） |
+| 派活、排队重试、拆分子工单（`split`）、换人、重开与取消 | 档案选择算法（[档案和农机](docs/subsystems/agent.md#模型和不变量)） |
 | 验收、打回意见、问题清理与验收标准自评（`checks`） | 信箱投递、三道刹车与唤醒调度（[Mailbox](docs/subsystems/mailbox.md)） |
 | 完成与交付：冲突预检、跑 `.vibevalley/check`、合入父分支或主分支、提 PR 与轮询 | 农场地块渲染（[农场的皮](docs/subsystems/farm.md)） |
 
@@ -38,8 +36,9 @@
 | `apps/server/src/modules/issue/issue.ts`、`store.ts`、`lifecycle.ts` | 对外 `Issue` 服务、`IssueStore`（收拢工单表读写、家族子树级联删除与 `db.afterCommit` 下的 `Assignments` 内存同步）、生命周期写操作与事实发布 |
 | `apps/server/src/modules/issue/dispatch.ts`、`settle.ts` | 派活、排队刷新、重开、定时触发、状态流转前置判定与试跑预览 |
 | `apps/server/src/modules/issue/refinement.ts`、`split.ts`、`merge.ts`、`github.ts` | 工单起草、原生父子拆单与合入父分支、本地合并、PR 结局轮询与 CI/Review 增量观察（`Issue.pollGitHub`） |
-| `apps/server/src/modules/issue/status.ts`、`stage.ts`、`moves.ts` | 状态派生（`issueStatusOf`）、展示阶段（`issueStageOf`）与合法挪动（`statusMove`） |
-| `apps/server/src/modules/issue/dependencies.ts`、`brief.ts`、`timeline.ts`、`rows.ts` | 依赖环检测与解锁、任务说明拼装、时间线与行转换 |
+| `apps/server/src/modules/issue/status.ts`、`moves.ts` | 状态派生（`issueStatusOf`）、展示阶段（`issueStageOf`）与合法挪动（`statusMove`） |
+| `apps/server/src/modules/issue/creation.ts`、`assignment.ts` | 建单（仓库推导、父单继承、选人）与档案指派 |
+| `apps/server/src/modules/issue/dependencies.ts`、`brief.ts`、`rows.ts` | 依赖环检测与解锁、任务说明和时间线拼装、行转换 |
 | `packages/protocol/src/rules/issues.ts`、`stage.ts` | 前后端共用的 `shortTitle`、`closedText` 与 `stageWantsUser` |
 | 表 `issue`、`issue_assignment`、`issue_assignment_execution`、`issue_github` | 工单主表、档案责任关系、实际执行的 `Session` 关联与 GitHub PR CI 指纹游标 |
 | `apps/web/src/features/issue/`、`apps/web/src/farm/issue/IssueView.tsx` | 工作台看板与工单详情、动作分发 `acts.ts`、农场工单详情 |
@@ -54,7 +53,7 @@
 - **写操作收敛为「挪状态」与「说话」，建单与留言规则内聚在 `Issue`**：流转调 `issue.status.update`，评论调 `issue.comment.create`。`Issue.create`、`Issue.chooseAgent` 与带 `Actor` 的 `Issue.comment` 收拢仓库推导、父单继承、选人、派发与留言分流；工具与 HTTP 入口只做解码与格式化。
 - **看板挪一张工单只写一行**：`place`（`issue/lifecycle.ts`）在相邻两张未派发工单的 `rank` 之间取中值（排在两端时加减 1024），一次 `UPDATE`、一次发布；间距用完或超出 ±2,000,000,000 时才在一个事务里按 1024 的步长重排全部未派发工单。
 - **引用解析统一在服务内完成**：接口支持传入 `#41`、`41`、工单 UUID 或曾执行该工单的 `Session` ID（`Issue.idOf`）。
-- **先建工单身份，再派帮工**：即时派活先写 `issue` 表拿编号再开 `Session`，派工拒绝统一走 `HireRefused` 错误通道；启动失败且工作区干净时撤回新单，已有改动则保留现场。
+- **先建工单身份，再派帮工**：即时派活先写 `issue` 表拿编号再开 `Session`，派工拒绝统一抛 `HireRefused`；启动失败且工作区干净时撤回新单，已有改动则保留现场。
 - **授权边界 `Mandate`**：工单绑定不可变的 `originTriggerId`，助手建单附言硬限 30 词；仅当 `autoSubmitPr` 为真时允许自动提 PR，`maxBotReviewRounds` 限制自动响应评审轮数。
 - **单轮结局只认结构化 `issue_report`**：帮工通过 `issue_report` 提交状态、问题、`checks`、`answer`、记性与 `prSubmit`，不解析自由正文。
 - **执行情况与生命周期分开**：提问、失败、中断及未明确交回的休息会话保持 `in_progress`，`stage` 提供回答、重试、继续动作；有效交回且没有待答问题才进入 `in_review`。看板、详情与 CLI 都读取同一投影；CLI 的 `issue show --watch` 在提问或受阻阶段也返回，stderr 同时给出生命周期和阶段。
@@ -126,4 +125,4 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 `GET /api/v1/issue/watch/:id` 是本机的 SSE 观察流，CLI `issue watch` 使用它。路由只解析工单引用；`issue/watch.ts` 先订阅 Core 实时事件，再读取 `Core.states` 折好的工单和会话，补最近 8 个会话的保留轨迹。历史以批次发送（每批最多 241 条），实时发送 `SessionEvent`；新会话和进入交回阶段时补读历史，使尚未推送的末尾草稿也在退出前交出。`gap.before` 标明保留历史的起点；归档会话没有保留日志时发送不带 `before` 的 `gap`。`omittedSessions` 标明省略的较早会话数。
 
-观察流复用 Core 的 64 项有界缓冲，积压超限关闭连接，客户端重连补读。客户端只按会话、事件 `seq`、`revision` 去重，不比较不同连接的 Core 帧序号；宿主重启不改变轨迹的持久序号。状态来自服务端；`stageWantsUser`、完成和取消决定 `settled`，CLI 不重新判断业务进度。观察订阅的作用域关闭只释放队列与连接，不调用会话停止。JSONL 字段和退出方式见 [CLI](apps/cli/README.md#观察工单执行)。
+缓冲、心跳和积压断开和其余 SSE 流一样（[SSE 流](docs/subsystems/core.md#sse-流和其余路由)），客户端重连补读。客户端只按会话、事件 `seq`、`revision` 去重，不比较不同连接的 Core 帧序号；宿主重启不改变轨迹的持久序号。状态来自服务端；`stageWantsUser`、完成和取消决定 `settled`，CLI 不重新判断业务进度。观察流结束只释放队列与连接，不停会话。JSONL 字段和退出方式见 [CLI](apps/cli/README.md#观察工单执行)。

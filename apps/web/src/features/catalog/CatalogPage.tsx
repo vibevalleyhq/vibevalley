@@ -267,8 +267,7 @@ function Sounds(props: { tabs: JSX.Element }) {
       <Card>
         <p class="text-sm text-muted">
           {t("web.catalog.soundsRecipes")} <code class="font-mono text-xs">apps/web/src/ui/pixel/sound.ts</code>
-          {t("web.catalog.soundsMusic")} <code class="font-mono text-xs">design/music/suno-prompts.md</code>
-          {t("web.catalog.period")}
+          {t("web.catalog.soundsMuted")}
         </p>
       </Card>
       <For each={SOUND_GROUPS}>
