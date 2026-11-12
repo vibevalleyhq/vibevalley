@@ -4,12 +4,12 @@ Status: proposed
 
 ## Problem
 
-工单详情（`apps/web/src/features/issue/IssueDetail.tsx`）把一件事的经过拆在四块里，各有标题，各自取数：
+工单详情（`apps/web/src/features/issue/views/IssueDetail.tsx`）把一件事的经过拆在四块里，各有标题，各自取数：
 
 | 块 | 取数 | 内容 |
 |---|---|---|
 | 讨论与交付记录（`IssueThread`） | 工单串的频道消息，`useFollowed`，往上翻页 | 用户的话、帮工的汇报、系统消息 |
-| 怎么走到这一步（`Story`） | `issue.timeline.get`，服务端 `milestonesOf`（`apps/server/src/issue/brief.ts`）由 runs 折出 | 开单、开工、交回、提问、打回、验收、关单 |
+| 怎么走到这一步（`Story`） | `issue.timeline.get`，服务端 `milestonesOf`（`apps/server/src/modules/issue/brief.ts`）由 runs 折出 | 开单、开工、交回、提问、打回、验收、关单 |
 | 帮工的每一步（`WorkLog`） | `session.event.list`，只取当前帮工，展开才读 | 想、说、用工具、出错 |
 | 每一轮（`Runs`） | `issue.run.list` | 每轮的起止、结果、摘要 |
 

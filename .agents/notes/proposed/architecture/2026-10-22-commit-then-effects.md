@@ -5,7 +5,7 @@ Status: proposed
 ## Problem
 
 服务端已在 [Mailbox](docs/subsystems/mailbox.md)（`mailbox_trigger`、`mailbox_delivery`、`mailbox_issue`）与连接器（`connector_outbox`）实现「同事务落盘、后台投递」，但工单派活、检查合并与外部通知仍存在两处缺口：
-- **状态提交与外部动作未同事务持久化**：派活（改 `issue` 表 → 启动 oar `Session`）、完成交付（跑 `.vibevalley/check` → `git merge` / `gh pr create`）和声网通话在请求内串行执行外部 I/O；若写库与外部调用之间进程退出，重启后依赖各模块 `start` layer 按固定顺序修补。
+- **状态提交与外部动作未同事务持久化**：派活（改 `issue` 表 → 启动 oar `Session`）、完成交付（跑 `.vibevalley/check` → `git merge` / `gh pr create`）和声网通话在请求内串行执行外部 I/O；若写库与外部调用之间进程退出，重启后靠各模块在 `services.ts` 里排定的开机步骤按固定顺序修补。
 - **多套后台循环各自轮询**：`Mailbox`、`Connector`、`Issue.refreshQueue` 和 `Cron.tick` 各自维护一套轮询与退避重试。
 
 ## Proposal
@@ -19,7 +19,6 @@ Status: proposed
 ## Alternatives considered
 
 - **全量事件溯源**：需重写全部现有业务表与查询；现有业务表已是唯一真相，仅缺外部副作用同事务落盘。
-- **引入 `@effect/workflow` / cluster**：对当前单连接 Postgres / PGlite 架构过重，一张 `core_job` 表加服务 `TaskGroup` 里的任务即可满足。
 - **各模块继续各自维护 outbox 表**：每新增一种外部动作就多一套轮询与启动顺序依赖。
 
 ## Acceptance criteria

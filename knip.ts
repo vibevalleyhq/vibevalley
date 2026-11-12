@@ -17,13 +17,11 @@ const config: KnipConfig = {
     ".": {
       entry: ["scripts/*/*.ts"],
       project: ["scripts/**/*.ts"],
-      // lightningcss/parse5 stay in the root catalog until the next lockfile prune.
-      ignoreDependencies: ["lightningcss", "parse5"],
     },
     "apps/server": {
-      // main.ts and chat.ts run through vpx (`vp run start`, `vp run chat`, the desktop app and the e2e), which knip does
-      // not read in a script; both are the pack block's entries, and chat.ts is what the command line runs.
-      entry: ["scripts/*.ts", "src/main.ts", "src/chat/main.ts"],
+      // main.ts runs through vpx (`vp run start`, the desktop app and the e2e), which knip does not read in a script; it
+      // is the pack block's entry (knip finds the chat's src/chat/main.ts there itself).
+      entry: ["scripts/*.ts", "src/main.ts"],
       project: ["src/**/*.ts", "scripts/**/*.ts"],
     },
     "apps/cli": {
@@ -42,7 +40,7 @@ const config: KnipConfig = {
       // scripts/images.ts reads the scene exports through Vite's ssrLoadModule.
       entry: ["src/{App,Document}.tsx", "src/base/scene.ts", "scripts/*.ts", "test/**/*.ts", "test/prerender/fixture/{App,Document}.tsx"],
       project: ["src/**/*.{ts,tsx}", "scripts/**/*.ts", "test/**/*.{ts,tsx}"],
-      // Imported by the site's stylesheet once it is on Tailwind (vv-tailwind); knip does not read CSS either way.
+      // Imported by src/ui/global.css (@import "tailwindcss"), which knip does not read.
       ignoreDependencies: ["tailwindcss"],
     },
     "apps/desktop": {

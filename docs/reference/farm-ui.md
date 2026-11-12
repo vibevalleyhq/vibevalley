@@ -1,6 +1,6 @@
 # 农场界面和玩法
 
-农场是像素画小院（`/`）：帮工按手头任务前往书屋、工坊、电台，地块庄稼随进度生长；院内小摊、告示板、邮筒对应各功能面板。概念映射见 [concepts.md](docs/concepts.md)「农场是皮」，像素渲染、寻路与音效见 [农场的皮](docs/subsystems/farm.md)，素材管线见 [开发](docs/development.md#素材音效和官网)。
+农场是像素画小院（`/farm`）：帮工按手头任务前往书屋、工坊、电台，地块庄稼随进度生长；院内小摊、告示板、邮筒对应各功能面板。概念映射见 [concepts.md](docs/concepts.md)「农场是皮」，像素渲染、寻路与音效见 [农场的皮](docs/subsystems/farm.md)，素材管线见 [开发](docs/development.md#素材音效和官网)。
 
 画风采用型号 B「温室花园」（原图在 `vibevalley-art` 仓库，经 `design/art.sh` 链入；[为什么是农场](docs/subsystems/farm.md)）。字体为 Fusion Pixel 12px，字号仅用 12 与 24。
 

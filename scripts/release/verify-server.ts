@@ -243,7 +243,7 @@ if (import.meta.main) {
   const scriptedHelper = args[0] === "--scripted-helper";
   if (scriptedHelper) args = args.slice(1);
   if (args[0] === "--help") {
-    console.log("usage: vpx scripts/verify-server.ts [--scripted-helper] [-- command args...]");
+    console.log("usage: vpx scripts/release/verify-server.ts [--scripted-helper] [-- command args...]");
   } else {
     try {
       process.exitCode = (await runVerification(args[0] === "--" ? args.slice(1) : args, { scriptedHelper })).code;

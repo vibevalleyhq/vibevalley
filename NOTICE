@@ -5,14 +5,10 @@ Licensed under the Apache License, Version 2.0 (LICENSE).
 
 This product includes software from other projects:
 
-- oar (https://github.com/botiverse/oar), Apache License 2.0.
-  server/pkg/smith is a Go port of oar, modified for vibevalley; oar's license is in
-  server/pkg/smith/LICENSE.
-
 - agent-quickstart-nextjs
   (https://github.com/AgoraIO-Conversational-AI/agent-quickstart-nextjs),
-  MIT License. server/pkg/agora and server/internal/voice/agora.go adapt its
-  token, invite and stop routes. Its notice:
+  MIT License. packages/provider/src/agora/server.ts and apps/server/src/gateway/voice/agora.ts
+  adapt its token, invite and stop routes. Its notice:
 
     MIT License
 
@@ -40,17 +36,17 @@ This product includes software from other projects:
   SIL Open Font License 1.1; apps/web/public/fonts/fusion-pixel-OFL.txt.
 
 - gse (https://github.com/go-ego/gse, v1.1.0), Apache License 2.0.
-  server/internal/memory cuts Chinese with it; server/internal/memory/dict/zh_s.txt.gz is its
-  data/dict/zh/s_1.txt, compressed. That dictionary comes from jieba
+  apps/server/src/modules/memory/gse.ts cuts Chinese as it does; apps/server/src/modules/memory/data/zh_s.txt.gz
+  is its data/dict/zh/s_1.txt, compressed. That dictionary comes from jieba
   (https://github.com/fxsjy/jieba), MIT License, Copyright (c) 2013 Sun Junyi; the MIT
   terms are below.
 
 - openclaw-weixin (@tencent-weixin/openclaw-weixin 2.4.10), MIT License.
-  server/pkg/weixin is written from it (iLink bot login, getupdates, sendmessage).
+  apps/server/src/gateway/connector/weixin.ts is written from it (iLink bot login, getupdates, sendmessage).
   Copyright (C) 2026 Tencent. All rights reserved.
 
 - botpy (https://github.com/tencent-connect/botpy), MIT License.
-  server/pkg/qq is written from it (the QQ bot's token, gateway and C2C replies).
+  apps/server/src/gateway/connector/qq.ts is written from it (the QQ bot's token, gateway and C2C replies).
   Copyright (c) 2021 Tencent
 
 - Hugeicons (https://hugeicons.com, @hugeicons/core-free-icons 4.3.5), MIT License.

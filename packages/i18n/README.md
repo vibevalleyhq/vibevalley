@@ -13,8 +13,8 @@ What is said to a model is not here: it stays in each module's `prompts.ts`.
 
 ```bash
 vp run i18n:gen               # after editing locales/: rewrite catalogs.ts
-vpx scripts/i18n.ts check     # in docs:verify: missing, unused, untranslated, mismatched placeholders
-vpx scripts/i18n.ts find 存好  # which key says it
+vpx scripts/gen/i18n.ts check     # in docs:verify: missing, unused, untranslated, mismatched placeholders
+vpx scripts/gen/i18n.ts find 存好  # which key says it
 vp run test                   # vitest: t, the formats, the types
 ```
 

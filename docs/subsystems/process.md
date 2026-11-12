@@ -77,7 +77,6 @@
 
 - 高阶骨架、重复代码 lint 与流分片测试：[白皮书检查提案](.agents/notes/proposed/process/2026-10-30-whitepaper-checks-that-say-how.md)。
 - 跨区共改耦合度、函数级热点与代码存活率统计：[仓库健康度读数](.agents/notes/proposed/process/2026-10-29-repo-health-readings.md)。
-- PR 同题比较评分细则：[PR Review 评分](.agents/notes/proposed/process/2026-10-25-pr-review-scoring.md)。
 
 ## 怎么验证
 

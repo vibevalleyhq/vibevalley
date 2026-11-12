@@ -43,7 +43,7 @@ packages/testkit/          测试共用的：在真实时间上等条件、测�
 packages/tsrs/             TypeScript 跑在 tsrs（TypeScript 7 的 Rust 移植）上：顶替 oxlint-tsgolint 给 vp check 做带类型的 lint 和类型检查，
                            tsdk/ 是编辑器用的 TypeScript
 packages/async/            异步原语：打断（AbortSignal）、TaskGroup、Queue、Hub、Semaphore、重试与超时、AsyncIterable 的组合子；时钟（Clock）
-packages/health/           仓库的体检：热点（改动次数乘行数）和逃生口（类型的、吞掉错误的）的棘轮；这个仓库的配置在 scripts/health.config.ts
+packages/health/           仓库的体检：热点（改动次数乘行数）和逃生口（类型的、吞掉错误的）的棘轮；这个仓库的配置在 scripts/audit/health.config.ts
 packages/stories/          零件的故事（像 Storybook）：故事的格式和查看器；页面的故事分四层：设计体系、组件（ui/ 每个零件旁边一个 X.stories.tsx）、交互、界面
 design/                    生图提示词、脚本和切图规则（写进 apps/web/public）；原图和效果图在单独的仓库 vibevalley-art，design/art.sh 链接进来
 docs/                      当前的行为和约定；subsystems/ 是各子系统从架构角度沉淀下来的样子（docs/AGENTS.md）
@@ -59,7 +59,7 @@ scripts/                   按职责分为 gen/（生成物写出）、audit/（
 ```bash
 vp install                                                      # 根目录：装 apps/*、packages/* 的依赖（Vite+ 带的 pnpm 12，pnpm workspace）
 vp check                                                        # 改完任何代码：格式（oxfmt）、lint（oxlint，带类型，跑在 tsrs 上）和全部包的类型；--fix 改格式
-vpx scripts/comment-review.ts                                   # 提 PR 前：模型照 docs/style/code.md 审这个分支新加的注释，你逐条核实再删或改（vv-comments；--all <目录> 清一块已有的）
+vpx scripts/audit/comment-review.ts                                   # 提 PR 前：模型照 docs/style/code.md 审这个分支新加的注释，你逐条核实再删或改（vv-comments；--all <目录> 清一块已有的）
 vp run --filter @vibevalley/server start                         # 服务端，127.0.0.1:8787；后面加 --web ../web/dist 同时提供页面
 vp run --filter @vibevalley/cli start issue list                 # 命令行：照领域模型一条命令一个操作（issue status、channel message send…），auth login 像 gh 那样登录到别处的服务端，doctor 看农场好不好，pkm 记、搜、看、改笔记，app 管桌面版，chat [农机] 在终端里对话；装了桌面版的在「关于」里装 vibevalley 命令
 vp run server:check                                             # 改完服务端、packages/protocol、ai、agent、testkit：类型（vp check）、规则的测试、查询是否最新、vitest
@@ -79,10 +79,10 @@ vp run release alpha|beta|final                                 # 发版：算�
 vp run --filter @vibevalley/desktop update-check                 # 改了桌面版的更新或打包：两个真的包上走一遍更新（十分钟上下）；推 v* 的 tag 发布草稿 Release
 vp run capabilities                                             # 改了 <概念>/api.ts 的接口或 can：重写 docs/reference/capabilities.md（docs:verify 查它）
 vp run api:client                                               # 改了 <概念>/api.ts 的接口：重写 packages/protocol/src/client.ts 的 VibeValleyApi（docs:verify 查它）
-vp run i18n:gen                                                 # 改了 packages/i18n/locales：重写 catalogs.ts（键和参数的类型）；vpx scripts/i18n.ts check|find <文字> 查问题、找键
+vp run i18n:gen                                                 # 改了 packages/i18n/locales：重写 catalogs.ts（键和参数的类型）；vpx scripts/gen/i18n.ts check|find <文字> 查问题、找键
 vp run health                                                   # 看先改哪里：热点和逃生口；vp run health:verify 对棘轮（逃生口变少了跑 vp run health:write 降下来）
-vp run practice:check                                           # 评审列出、还没有 lint 管的测试和异步写法（吞掉的错误、跨 await 的读改写、无界重试…）（scripts/practice-audit.ts，按语法树读）：存量记在 scripts/practice.ratchet.json，只许减（变少了跑 vp run practice:write）；只在本机提交前的钩子里跑，vpx scripts/practice-audit.ts 列出全部
-vp run paths:check                                              # 服务端模块之间的路径（scripts/service-paths.ts，按语法树读）：哪个模块用了别的模块服务的哪个成员，记在 scripts/service-paths.json；多一条路就失败，要么走已有的门，要么 vp run paths:write 写下来并在 PR 里说明；只在本机提交前的钩子里跑，vpx scripts/service-paths.ts 列出整张表
+vp run practice:check                                           # 评审列出、还没有 lint 管的测试和异步写法（吞掉的错误、跨 await 的读改写、无界重试…）（scripts/audit/practice-audit.ts，按语法树读）：存量记在 scripts/audit/practice.ratchet.json，只许减（变少了跑 vp run practice:write）；只在本机提交前的钩子里跑，vpx scripts/audit/practice-audit.ts 列出全部
+vp run paths:check                                              # 服务端模块之间的路径（scripts/audit/service-paths.ts，按语法树读）：哪个模块用了别的模块服务的哪个成员，记在 scripts/audit/service-paths.json；多一条路就失败，要么走已有的门，要么 vp run paths:write 写下来并在 PR 里说明；只在本机提交前的钩子里跑，vpx scripts/audit/service-paths.ts 列出整张表
 vp run deadcode                                                 # 改完代码：knip 查没人用的文件、导出和依赖（knip.ts 写什么在跑），报出的照它说的删
 vp run notes:catalog                                            # 加、挪、删 Note 或改了标题：重写 .agents/notes/CATALOG.md
 vp run docs:verify                                              # 改完文档、Note 或 skill：Note 和 skill 的格式、目录是否最新、链接、旧名字

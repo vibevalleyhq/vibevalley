@@ -52,6 +52,7 @@
 - **核心状态保留活跃与近期工单**：全量工单存 `issue` 表；`SpaceState.issues` 保留未关工单及最近关闭的 50 张工单（含子工单，`keepClosedIssues`）。
 - **责任关系与执行分离，内存索引由 `IssueStore` 经提交钩子同步**：指派档案写 `issue_assignment`（换人或清空才写 `ended_at`），实际运行的 `Session` 记在 `issue_assignment_execution`；`issue/store.ts` 将 `Assignments` 内存变更绑定在 `db.afterCommit`，删除工单时先在事务内查出家族子树 ID 并在提交后按集摘除，不向外暴露裸 `Assignments` 或触发全表重载。
 - **写操作收敛为「挪状态」与「说话」，建单与留言规则内聚在 `Issue`**：流转调 `issue.status.update`，评论调 `issue.comment.create`。`Issue.create`、`Issue.chooseAgent` 与带 `Actor` 的 `Issue.comment` 收拢仓库推导、父单继承、选人、派发与留言分流；工具与 HTTP 入口只做解码与格式化。
+- **看板挪一张工单只写一行**：`place`（`issue/lifecycle.ts`）在相邻两张未派发工单的 `rank` 之间取中值（排在两端时加减 1024），一次 `UPDATE`、一次发布；间距用完或超出 ±2,000,000,000 时才在一个事务里按 1024 的步长重排全部未派发工单。
 - **引用解析统一在服务内完成**：接口支持传入 `#41`、`41`、工单 UUID 或曾执行该工单的 `Session` ID（`Issue.idOf`）。
 - **先建工单身份，再派帮工**：即时派活先写 `issue` 表拿编号再开 `Session`，派工拒绝统一走 `HireRefused` 错误通道；启动失败且工作区干净时撤回新单，已有改动则保留现场。
 - **授权边界 `Mandate`**：工单绑定不可变的 `originTriggerId`，助手建单附言硬限 30 词；仅当 `autoSubmitPr` 为真时允许自动提 PR，`maxBotReviewRounds` 限制自动响应评审轮数。

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { chromium } from "@playwright/test";
 
 const server = process.env.VIBEVALLEY_SERVER;
-if (!server) throw new Error("VIBEVALLEY_SERVER is not set: run this under scripts/verify-server.ts");
+if (!server) throw new Error("VIBEVALLEY_SERVER is not set: run this under scripts/release/verify-server.ts");
 const pages = (process.env.VIBEVALLEY_PAGES ?? "/farm,/issues,/chat,/library,/artifacts,/agents,/orchestrator,/runtimes,/repos,/catalog,/settings")
   .split(",")
   .filter(Boolean);

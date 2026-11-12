@@ -120,7 +120,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
 ## 9. 测试
 
 - `vite-plus/test` 的 `test`、`describe`、`expect`；异步测试直接写 `async`。
-- 整农场：`await using farm = await world({ … })`（`src/testing/world.ts`），帮工是 oar 的 `scriptedRuntime`，模型是照脚本回答的 `Llm`。
+- 整农场：`await using farm = await world({ … })`（`src/testing/world.ts`），帮工是 oar 的 `scriptedRuntime`，模型是照脚本回答的 DeepSeek（`farm.deepseek.use(scriptedLLM(…).llm)`，`src/testing/model.ts`），不连网。
 - 时间：`vi.useFakeTimers()` 加 `vi.advanceTimersByTimeAsync(ms)`；或者给 `deps.clock` 一个测试时钟（`world({ clock: shiftedTime() })`）。不在测试里真等。
 - 等一个条件：`@vibevalley/testkit/until` 的 `until`、`waitFor`；整农场的状态用 `testing/layers.ts` 的 `whenState`。
 - 修缺陷补的测试以 `regression: ` 开头，删改它要在 PR 里点名说明。
