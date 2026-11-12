@@ -2,7 +2,7 @@ import { dagIDValid, dagProblems } from "../base/dag.ts";
 import { todoWords as words } from "../base/prompts.ts";
 
 /** The first n UTF-16 units of s, never half a surrogate pair. */
-export function head(s: string, n: number): string {
+function head(s: string, n: number): string {
   let out = "";
   for (const ch of s) {
     if (out.length + ch.length > n) break;
@@ -48,9 +48,6 @@ const ready = (g: readonly Todo[], t: Todo) =>
   });
 
 export const readyTodos = (g: readonly Todo[]) => g.filter((t) => ready(g, t));
-
-/** Each task's state, in order: to tell whether a change changed anything. */
-export const states = (g: readonly Todo[]) => g.map((t) => t.state);
 
 /** Every task settled: the graph is finished and can be put away. */
 export const finished = (g: readonly Todo[]) => g.length > 0 && g.every(settled);

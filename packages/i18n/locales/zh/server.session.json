@@ -45,7 +45,6 @@
     "exitedNotice": "{name} 的 {why}",
     "staleRun": "上一轮停在了半路，太久了，没有接着做",
     "stoppedByUser": "你叫停了",
-    "folded": "整理对话，{usage}",
     "clipped": "… 省略 {n} 个字 …",
     "quiet": "已经 {span}没动静了{last}。可能在跑很久的命令，也可能卡住了",
     "quietLast": "（最后在：{label}）",

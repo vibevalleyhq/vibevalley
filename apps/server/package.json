@@ -16,14 +16,16 @@
   },
   "scripts": {
     "start": "vpx src/main.ts",
-    "evals": "VIBEVALLEY_EVALS_LIVE=1 vp test run src/modules/orchestrator/evals.live.test.ts",
+    "evals": "VIBEVALLEY_EVALS_LIVE=1 vp test run src/modules/orchestrator/evals.live.test.ts --silent=false",
     "db:generate": "vpx scripts/pg-generate.ts",
     "db:check": "vpx scripts/pg-generate.ts --check",
     "chat": "vpx src/chat/main.ts"
   },
   "dependencies": {
     "@botiverse/oar": "catalog:",
+    "@earendil-works/chord": "catalog:",
     "@earendil-works/pi-ai": "catalog:",
+    "@earendil-works/pi-durable": "catalog:",
     "@electric-sql/pglite": "catalog:",
     "@hono/node-server": "catalog:",
     "@larksuiteoapi/node-sdk": "catalog:",

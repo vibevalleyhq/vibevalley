@@ -1,21 +1,20 @@
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 
 import { scriptedRuntime } from "@botiverse/oar/testing";
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
+import { type Message } from "@earendil-works/pi-ai";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { z } from "zod";
 
-import { messageText } from "@vibevalley/agent/messages";
-import { type Reply, type Request, scriptedLLM } from "@vibevalley/agent/testing";
-import type { Message } from "@vibevalley/ai/messages";
-import { type Answer, answer, toolCall } from "@vibevalley/ai/testing";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import { ApiError, BizCode } from "@vibevalley/protocol/api";
 import { executionsOf } from "@vibevalley/protocol/rules";
 
 import { user } from "#/base/actor.ts";
 import type { ServerConfig } from "#/infra/config.ts";
+import { messageText } from "#/modules/runtime/durable.ts";
 import { starter, testConfig, nextTurn, gate, untilGot as until, waitFor, whenTrue, within } from "#/testing/layers.ts";
+import { type Answer, answer, type Reply, type Request, scriptedLLM, toolCall } from "#/testing/model.ts";
 import { world } from "#/testing/world.ts";
 
 import { makeOrchestrator, type Orchestrator, type OrchestratorOptions } from "./orchestrator.ts";
@@ -101,7 +100,16 @@ const farm = async (f: Reply = respond, config: ServerConfig = testConfig()) => 
     runtimes: [pi],
     repos: ["demo", "notes"],
   });
-  return Object.assign(await orchestrated(below, { llm: () => llm }), { requests });
+  below.deepseek.use(llm);
+  return Object.assign(await orchestrated(below), { requests });
+};
+
+/** The orchestrator's conversation as kept in durable.db, an entry a line. */
+const transcript = async (farm: Farm, orchestrator: string) => {
+  const kept = await farm.runtime.durable.existing(orchestrator);
+  if (!kept) return "";
+  const { items } = await kept.entries({ order: "ascending" }, 1000, undefined, BACKGROUND_CONTEXT);
+  return items.map((e) => JSON.stringify(e)).join("\n");
 };
 
 /** Everything handed to the orchestrator before this is taken once this is: it takes one input at a time. */
@@ -235,7 +243,7 @@ describe("the orchestrator", () => {
     await chat.say("私下问你", {}, direct, "");
     expect((await until(() => from(direct, lead.id)[0], "its answer in its direct channel")).name).toBe("阿青");
     expect(asked("私下问你")[0]!.system).toContain("你是助手「阿青」");
-    const log = await readFile(join(config.home, "agent", lead.id, `${lead.id}.jsonl`), "utf8");
+    const log = await transcript(f.farm, lead.id);
     expect(log).toContain("私下问你");
 
     const notes = (await chat.openChannel("notes-room", "", "")).id;
@@ -270,9 +278,9 @@ describe("the orchestrator", () => {
     // The user speaking, from any door, opens the farm.
     expect(f.farm.core.state().call).toBe("live");
     await until(() => words().length >= 1, "its words");
-    const kept = await readFile(join(config.home, "agent", "orchestrator", "orchestrator.jsonl"), "utf8");
-    expect(kept).toMatch(/"customType":"orchestratorInput"[^\n]*【现状】/u);
-    expect(kept).toMatch(/"customType":"orchestratorInput"[^\n]*"source":"user","user":true/u);
+    const kept = await transcript(f.farm, "orchestrator");
+    expect(kept).toMatch(/"kind":"orchestratorInput"[^\n]*【现状】/u);
+    expect(kept).toMatch(/"kind":"orchestratorInput"[^\n]*"source":"user","user":true/u);
   });
 
   it("streams its words to a call", async () => {
@@ -393,7 +401,8 @@ describe("the orchestrator", () => {
         throw new Error("额度读不出来");
       },
     });
-    await using f = await orchestrated(below, { llm: () => llm });
+    below.deepseek.use(llm);
+    await using f = await orchestrated(below);
     const response = f.orchestrator;
     const words = (async () => {
       for await (const _ of response.answerer("api")(orchestratorModel)!("在吗")) void _;

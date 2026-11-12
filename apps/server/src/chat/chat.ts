@@ -1,30 +1,31 @@
+import { mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 
-import type { Event, Session } from "@botiverse/oar";
+import type { Event, McpServer as OarMcpServer, Session } from "@botiverse/oar";
 import { promptAndWait } from "@botiverse/oar/observe";
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 
-import { type BrainEvent, makeBrain } from "@vibevalley/agent/brain";
-import { codingTools } from "@vibevalley/agent/coding";
-import { readMcpConfig } from "@vibevalley/agent/mcp";
-import { userMessage } from "@vibevalley/agent/messages";
+import { type McpServer, readMcpConfig } from "@vibevalley/agent/mcp";
+import { fileMemory } from "@vibevalley/agent/memory";
+import { defaultSkillDirs, scanSkills } from "@vibevalley/agent/skills";
 import { memoryStore } from "@vibevalley/agent/todoStore";
-import { type Llm, makeLlm } from "@vibevalley/ai/llm";
 import { Queue, TaskGroup } from "@vibevalley/async";
 import { homeOf } from "@vibevalley/home";
-import { t, currentLocale } from "@vibevalley/i18n";
+import { currentLocale, t } from "@vibevalley/i18n";
 
 import { messageOf } from "#/base/errors.ts";
 import { loadConfig } from "#/infra/config.ts";
+import { HomeTaken, leaseHome } from "#/infra/lease.ts";
+import { makeLogger } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
-import { modelClient } from "#/modules/agent/agent.ts";
 import { dshRuntime } from "#/modules/runtime/dsh.ts";
+import { deepseekAccess, openDurable } from "#/modules/runtime/durable.ts";
+import { makeHelpers } from "#/modules/runtime/helperExtension.ts";
 import { registryOf } from "#/modules/runtime/runtime.ts";
+import { helperKey, vibevalleyRuntimeOf } from "#/modules/runtime/vibevalley.ts";
 
 import { instructions } from "./prompts.ts";
-
-// The command line and the live evals have no farm to give the Llm its fetch: it gets the global one.
-const standaloneLlm = (): Llm => makeLlm();
 
 /** What the user should be told went wrong: said on stderr, and the conversation ends. */
 class ChatRefused extends Error {
@@ -37,40 +38,6 @@ const short = (s: string) => {
   return (r.length > 120 ? r.slice(0, 120).join("") + "…" : s).split(/\s+/u).filter(Boolean).join(" ");
 };
 const write = (s: string) => process.stdout.write(s);
-
-function show(e: BrainEvent, prompt: () => void) {
-  switch (e.type) {
-    case "message_update": {
-      const d = e.assistantMessageEvent;
-      if (d.type === "thinking_delta") write(dim(d.delta));
-      else if (d.type === "thinking_end") write("\n");
-      else if (d.type === "text_delta") write(d.delta);
-      return;
-    }
-    case "message_end":
-      if (e.message.role !== "assistant") return;
-      if (e.message.stopReason === "error") write(t("server.chat.error", { why: e.message.errorMessage ?? "" }));
-      write("\n");
-      return;
-    case "tool_execution_start":
-      write(dim("→ " + e.toolName + " " + short(JSON.stringify(e.args ?? {}))) + "\n");
-      return;
-    case "tool_execution_end":
-      write(dim((e.isError ? "✗ " : "✓ ") + short(e.result.content.map((c) => (c.type === "text" ? c.text : "")).join(""))) + "\n");
-      return;
-    case "compaction_end":
-      if (e.compaction) write(dim(t("server.chat.compacted", { archive: e.compaction.archive ?? "" })) + "\n");
-      return;
-    case "agent_settled":
-      write(
-        dim(t("server.chat.usage", { aborted: e.run.aborted, input: e.run.usage.input, cached: e.run.usage.cacheRead, output: e.run.usage.output }) + "\n"),
-      );
-      prompt();
-      return;
-    default:
-      break;
-  }
-}
 
 type Typed = { readonly kind: "line"; readonly text: string } | { readonly kind: "interrupt" };
 
@@ -104,73 +71,71 @@ interface OwnChat {
   readonly model: string;
   /** The MCP config; <home>/mcp.json when empty. */
   readonly mcp: string;
-  /** One question and its answer, no conversation. */
+  /** One question and its answer. */
   readonly p?: string;
 }
 
-/** The conversation with VibeValley's own agent. */
+const toOarMcp = (s: McpServer): OarMcpServer[] =>
+  s.url !== undefined
+    ? [{ name: s.name, type: "http", url: s.url, ...(s.headers ? { headers: s.headers } : {}) }]
+    : s.command !== undefined
+      ? [{ name: s.name, command: s.command, ...(s.args ? { args: s.args } : {}), ...(s.env ? { env: s.env } : {}) }]
+      : [];
+
+/** The conversation with VibeValley's own agent: the runtime a helper runs on, on a harness of its own in its home. It
+ * goes on with the same conversation each time, until /reset. */
 export async function ownChat(values: OwnChat): Promise<void> {
   const config = await loadConfig();
-  const llm = modelClient(values.model || config.agent.model, config.deepseek.apiKey, standaloneLlm());
+  // The key of the config and the environment (the app's settings are the server's), and the global fetch: no farm here.
+  const models = deepseekAccess({ key: () => config.deepseek.apiKey, fetch: globalThis.fetch, clock: wallTime });
+  const cannot = models.cannotAsk();
+  if (cannot !== undefined) throw new ChatRefused(cannot);
   const cwd = values.cwd ? resolve(values.cwd) : process.cwd();
   const home = join(homeOf(), "agent", values.name);
   const servers = await readMcpConfig(values.mcp || join(home, "mcp.json")).catch((e: unknown) => {
     throw new ChatRefused(messageOf(e), { cause: e });
   });
-  const asked = values.p !== undefined;
-  // A one-off question keeps no reminders running.
-  await using agent = await makeBrain({
-    name: values.name,
-    instructions: instructions(currentLocale()),
-    llm,
-    home,
-    cwd,
-    tools: codingTools({ cwd }),
-    mcpServers: servers,
-    reminders: !asked,
-    todos: memoryStore(),
-  });
-  for (const why of agent.mcpStatus().failed) console.error(dim(why));
-  let prompt = () => {};
-  using events = agent.events();
-  const said = (text: string) => userMessage(text, wallTime.now());
-  if (values.p !== undefined) {
-    // The answer is shown to its end before the question's command does.
-    const answer = agent.ask(said(values.p));
-    for await (const e of events) {
-      show(e, () => prompt());
-      if (e.type === "agent_settled") break;
-    }
-    await answer;
-    return;
+  await mkdir(home, { recursive: true });
+  // pi-durable has no lock between processes, and the server's durable.db is the server's: this conversation keeps its
+  // own file, leased while it runs. A second one under the same name keeps its conversation in memory.
+  let release: (() => void) | undefined;
+  try {
+    release = leaseHome(home);
+  } catch (e) {
+    if (!(e instanceof HomeTaken)) throw e;
+    process.stderr.write(dim(t("server.chat.notKept", { home })) + "\n");
   }
-  await using tasks = new TaskGroup({ name: "chat" });
-  tasks.run("show", async (signal) => {
-    for (let r = await events.next(signal); r.done !== true; r = await events.next(signal)) show(r.value, () => prompt());
-  });
-  console.log(
-    dim(`vibevalley agent · ${cwd} · ${home}\n` + t("server.chat.hello", { skills: (await agent.skills()).length, tools: agent.mcpStatus().toolCount })),
-  );
-  prompt = () => write("› ");
-  prompt();
-  await typed(async (typedIn) => {
-    if (typedIn.kind === "interrupt") {
-      if (!agent.busy()) {
-        write("\n");
-        return "quit";
-      }
-      return agent.stop();
+  const log = makeLogger({ name: "chat", level: "warn", write: (_level, _name, line) => process.stderr.write(dim(line) + "\n") });
+  try {
+    const helpers = makeHelpers({ memory: fileMemory(home, () => wallTime.now()), todos: () => memoryStore(), time: wallTime, log });
+    const durable = await openDurable({ file: release ? join(home, "durable.db") : undefined, clock: wallTime, log, models, extensions: [helpers.extension] });
+    const owner = new TaskGroup({ name: "chat" });
+    try {
+      const runtime = vibevalleyRuntimeOf({ durable, helpers, owner, log });
+      const id = `chat.${values.name}`;
+      const session = await runtime.session(
+        { kind: "available", via: "bundled" },
+        {
+          cwd,
+          resume: id,
+          model: values.model || config.agent.model,
+          systemPrompt: instructions(currentLocale()),
+          mcpServers: servers.flatMap(toOarMcp),
+        },
+      );
+      const skills = (await scanSkills(defaultSkillDirs(cwd))).length;
+      const reset = async () => {
+        await (await durable.existing(helperKey(id)))?.reset(undefined, BACKGROUND_CONTEXT);
+        write(dim(t("server.chat.forgot")) + "\n");
+      };
+      await talk(session, values.p === undefined ? `vibevalley agent · ${cwd} · ${home}\n` + t("server.chat.hello", { skills }) : undefined, values.p, reset);
+    } finally {
+      await owner.close();
+      await durable.close();
     }
-    const text = typedIn.text;
-    if (text === "/exit") return "quit";
-    if (text === "/reset") {
-      await agent.reset();
-      write(dim(t("server.chat.forgot")) + "\n");
-      return prompt();
-    }
-    if (text) await agent.send(said(text));
-    else prompt();
-  });
+  } finally {
+    release?.();
+  }
 }
 
 /** What a runtime said, as lines. */
@@ -186,7 +151,7 @@ function render(e: Event): string | undefined {
     case "tool_call_ended":
       return dim((e.result === "failed" ? "✗ " : "✓ ") + short((e.content ?? []).map((c) => ("text" in c ? c.text : "")).join("")));
     case "turn_ended":
-      return "";
+      return e.outcome.kind === "failed" ? t("server.chat.error", { why: e.outcome.reason }) : "";
     default:
       break;
   }
@@ -220,8 +185,14 @@ export async function runtimeChat(id: string, values: RuntimeChat): Promise<void
     ...(values.effort ? { effort: values.effort } : {}),
     ...(values.resume ? { resume: values.resume } : {}),
   });
+  await talk(session, `${id} · ${session.id}${values.resume ? t("server.chat.resumed") : ""}\n` + t("server.chat.direct"), values.p);
+}
+
+/** The lines typed, one turn at a time, until /exit or Ctrl+C when nothing is under way; header is said first. The
+ * session is let go of at the end. */
+async function talk(session: Session, header: string | undefined, p: string | undefined, reset?: () => Promise<void>): Promise<void> {
   try {
-    write(dim(`${id} · ${session.id}${values.resume ? t("server.chat.resumed") : ""}\n` + t("server.chat.direct")) + "\n");
+    if (header !== undefined) write(dim(header) + "\n");
     session.events(
       (e) => {
         const line = render(e);
@@ -239,10 +210,10 @@ export async function runtimeChat(id: string, values: RuntimeChat): Promise<void
       try {
         said(await promptAndWait(session, text, signal ? { signal } : {}), "rejected");
       } finally {
-        write("› ");
+        if (p === undefined) write("› ");
       }
     };
-    if (values.p !== undefined) return await turnOf(values.p);
+    if (p !== undefined) return await turnOf(p);
     await using turns = new TaskGroup({ name: "chat", onError: (_, e) => write(dim(messageOf(e)) + "\n") });
     write("› ");
     await typed(async (typedIn) => {
@@ -256,6 +227,12 @@ export async function runtimeChat(id: string, values: RuntimeChat): Promise<void
       }
       const text = typedIn.text;
       if (text === "/exit") return "quit";
+      // A reset asked during a turn is kept for its end.
+      if (text === "/reset" && reset) {
+        await reset();
+        if (!busy) write("› ");
+        return;
+      }
       if (!text) {
         if (!busy) write("› ");
         return;

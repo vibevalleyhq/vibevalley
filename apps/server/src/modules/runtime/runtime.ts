@@ -7,7 +7,6 @@ import {
   RuntimeRegistry,
 } from "@botiverse/oar";
 
-import type { Llm } from "@vibevalley/ai/llm";
 import { mapConcurrent, TaskGroup } from "@vibevalley/async";
 import { currentLocale, type Locale, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -18,10 +17,12 @@ import { reposDir, type ServerConfig } from "#/infra/config.ts";
 import type { Db } from "#/infra/db.ts";
 import type { Logger } from "#/infra/log.ts";
 import { type Time, withinRealTime } from "#/infra/time.ts";
-import { type Agent, modelClient } from "#/modules/agent/agent.ts";
+import type { Agent } from "#/modules/agent/agent.ts";
 import type { Setting } from "#/modules/setting/setting.ts";
 
 import { dshRuntime } from "./dsh.ts";
+import { deepseekAccess, type Durable, durableFile, type ModelAccess, openDurable } from "./durable.ts";
+import { type Helpers, makeHelpers } from "./helperExtension.ts";
 import { piBalance, type PiDefault, piSettings } from "./pi.ts";
 import { agentProblems, type Candidate, chooseAgent, supportOf, moneyStop, presetOf, runtimeIds, runtimeLabel, sessionOptions } from "./presets.ts";
 import { inCny, makeSpending, price, type Rate } from "./price.ts";
@@ -68,7 +69,12 @@ export interface Runtime {
   readonly quote: (id: string, model: string) => Rate | undefined;
   readonly spend: (id: string, cny: number) => void;
   readonly usageSoon: (id: string) => void;
-  /** Stops the probes and timers, writes the day's spending, then closes the sessions of VibeValley's own runtime. */
+  /** The conversations of the agents that run in this server (the assistant's), kept across restarts. */
+  readonly durable: Durable;
+  /** The helpers' side of that harness, which VibeValley's own runtime runs its sessions with. */
+  readonly helpers: Helpers;
+  /** Stops the probes and timers, writes the day's spending, closes the sessions of VibeValley's own runtime, then the
+   * durable conversations. */
   readonly close: () => Promise<void>;
 }
 
@@ -81,7 +87,8 @@ export interface RuntimeDeps {
   readonly agent: Agent;
   /** Only for VibeValley's own runtime, which is not built when options.registry is given. */
   readonly setting: Setting;
-  readonly llm: Llm;
+  /** How DeepSeek is reached. */
+  readonly fetch: typeof fetch;
 }
 
 type UsageOf = (id: string, runtime: OarRuntime, found: AvailableInstallation, settings: T.RuntimeSettings) => Promise<T.AccountUsage | null>;
@@ -91,6 +98,8 @@ export interface RuntimeOptions {
   probe?: (id: string) => Promise<T.RuntimeInfo>;
   usageOf?: UsageOf;
   background?: boolean;
+  /** The model every conversation of the farm's harness asks; DeepSeek with the key in settings when absent. */
+  models?: ModelAccess;
 }
 
 export function registryOf(extra: readonly OarRuntime[] = []) {
@@ -155,19 +164,12 @@ export async function makeRuntime(deps: RuntimeDeps, options: RuntimeOptions = {
   const log = deps.log.child("runtime");
   // The sessions of VibeValley's own runtime: closed last, after the probes and the spending.
   const owner = new TaskGroup({ name: "runtime sessions", onError: (task, e) => log.error(`${task} failed`, e) });
-  const registry =
-    options.registry ??
-    registryOf([
-      vibevalleyRuntimeOf({
-        home: () => config.home,
-        llm: (model) => modelClient(model, deps.setting.deepseekApiKey, deps.llm),
-        time: clock,
-        owner,
-        log,
-        todos: dbTodoStores({ db: deps.db, clock }),
-      }),
-      dshRuntime,
-    ]);
+  const models = options.models ?? deepseekAccess({ key: deps.setting.deepseekApiKey, fetch: deps.fetch, clock });
+  // The helpers' extension is there before anything runs: a helper's run the harness goes on with before its session
+  // opens again has its tools and prompt.
+  const helpers = makeHelpers({ todos: dbTodoStores({ db: deps.db, clock }), time: clock, log });
+  const durable = await openDurable({ file: durableFile(config), clock, log, models, extensions: [helpers.extension] });
+  const registry = options.registry ?? registryOf([vibevalleyRuntimeOf({ durable, helpers, owner, log }), dshRuntime]);
   const tasks = new TaskGroup({ name: "runtime", onError: (task, e) => log.warn(`${task} failed`, e) });
   const usageOf = async (id: string, runtime: OarRuntime, found: AvailableInstallation, settings: T.RuntimeSettings): Promise<T.AccountUsage | null> => {
     if (!options.usageOf && id === "pi") return piBalance(settings, process.env);
@@ -515,11 +517,14 @@ export async function makeRuntime(deps: RuntimeDeps, options: RuntimeOptions = {
       if (closed) return;
       later(`usage:${id}`, usageAfterRunMs, () => warned(`reading the usage of ${id}`, () => refreshUsage(id)));
     },
+    durable,
+    helpers,
     close: async () => {
       closed = true;
       await tasks.close();
       await daily.close();
       await owner.close();
+      await durable.close();
     },
   };
 }

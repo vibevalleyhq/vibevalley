@@ -2,21 +2,28 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { scriptedRuntime } from "@botiverse/oar/testing";
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
+import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
 
 import { ToolFailed } from "@vibevalley/agent/core/errors";
-import type { Tool } from "@vibevalley/agent/core/loop";
-import { type BrainMessage, messageText } from "@vibevalley/agent/messages";
+import type { Tool } from "@vibevalley/agent/core/tool";
 import { selfTools } from "@vibevalley/agent/self";
-import type { AssistantMessage, ToolCall } from "@vibevalley/ai/messages";
+import { abortable } from "@vibevalley/async";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { orchestrator } from "#/base/actor.ts";
+import { orchestratorHost, orchestratorInput } from "#/modules/orchestrator/orchestrator.ts";
 import { noResult, situationWords } from "#/modules/orchestrator/prompts.ts";
+import { type ModelAccess, messageText, type ModelMessage } from "#/modules/runtime/durable.ts";
+import { type CaseInput, turnOf } from "#/modules/session/host.ts";
 import { channelLine } from "#/modules/tool/prompts.ts";
 import { type Op, schemas, toolName } from "#/modules/tool/schemas.ts";
 
 import { starter, testConfig } from "./layers.ts";
 import { type World, world } from "./world.ts";
+
+/** A message of a case: one the model saw, or the hosted input that began the turn. */
+export type CaseMessage = ModelMessage | CaseInput;
 
 /** One check on a turn, a closed set by kind. */
 export interface Expect {
@@ -37,11 +44,11 @@ export interface EvalCase {
   /** The memory snapshot when the turn was marked, not necessarily as it was in the turn. */
   readonly memory: string;
   readonly tools: readonly string[];
-  readonly before: readonly BrainMessage[];
-  readonly input: BrainMessage;
+  readonly before: readonly CaseMessage[];
+  readonly input: CaseMessage;
   /** An isolated synthetic farm, not a reconstruction of the historical farm in did. */
   readonly scenario?: { readonly repos: readonly string[] };
-  readonly did: readonly BrainMessage[];
+  readonly did: readonly CaseMessage[];
   /** Empty when saved. */
   readonly expect: readonly Expect[];
 }
@@ -86,17 +93,39 @@ export function problemOf(e: Expect): string {
   return typeof c === "string" ? c : "";
 }
 
-const assistants = (turn: readonly BrainMessage[]) => turn.filter((m): m is AssistantMessage => m.role === "assistant");
-const callsOf = (turn: readonly BrainMessage[]) => assistants(turn).flatMap((a) => a.content.filter((c): c is ToolCall => c.type === "toolCall"));
+const assistants = (turn: readonly CaseMessage[]) => turn.filter((m): m is AssistantMessage => m.role === "assistant");
+const callsOf = (turn: readonly CaseMessage[]) => assistants(turn).flatMap((a) => a.content.filter((c): c is ToolCall => c.type === "toolCall"));
 /** What it said in the turn, each message's words on a line. */
-const wordsOf = (turn: readonly BrainMessage[]) =>
+const wordsOf = (turn: readonly CaseMessage[]) =>
   assistants(turn)
     .map((a) => messageText(a).trim())
     .filter(Boolean)
     .join("\n");
 
+/** A turn as a failed sample shows it: what it said, each call and each result. */
+export function transcript(turn: readonly CaseMessage[]): string {
+  const out: string[] = [];
+  for (const m of turn)
+    switch (m.role) {
+      case "custom":
+      case "user":
+        out.push("## input\n" + (m.role === "custom" ? m.content : messageText(m)));
+        break;
+      case "assistant":
+        for (const c of m.content) {
+          if (c.type === "text" && c.text.trim() !== "") out.push("## said\n" + c.text);
+          if (c.type === "toolCall") out.push("## called " + c.name + "\n" + JSON.stringify(c.arguments));
+        }
+        break;
+      case "toolResult":
+        out.push("## " + m.toolName + (m.isError ? " failed" : " answered") + "\n" + messageText(m));
+        break;
+    }
+  return out.join("\n\n");
+}
+
 /** The expectations the turn does not meet, each as it is written; none when it passes. */
-export function check(expect: readonly Expect[], turn: readonly BrainMessage[]): string[] {
+export function check(expect: readonly Expect[], turn: readonly CaseMessage[]): string[] {
   const calls = callsOf(turn);
   const words = wordsOf(turn);
   const called = (tool: string, args = "", lacks?: string) =>
@@ -148,7 +177,7 @@ export function casesIn(dir: string): { file: string; case: EvalCase }[] {
   return names.toSorted().map((n) => ({ file: join(dir, n), case: JSON.parse(readFileSync(join(dir, n), "utf8")) as EvalCase }));
 }
 
-export const isInput = (m: BrainMessage) => m.role === "custom" && (m as { customType?: string }).customType === "orchestratorInput";
+export const isInput = (m: CaseMessage): m is CaseInput => m.role === "custom" && m.customType === orchestratorInput;
 
 export const committed = join(import.meta.dirname, "..", "modules", "orchestrator", "testdata", "evals");
 
@@ -165,10 +194,10 @@ const argsKey = (args: unknown): string => {
 };
 
 /** Every farm tool answers a call with what the case recorded for the same call (the same tool and arguments), each once, and nothing for another. */
-export function stubbed(tools: readonly Tool[], did: readonly BrainMessage[]): Tool[] {
+export function stubbed(tools: readonly Tool[], did: readonly CaseMessage[]): Tool[] {
   const calls = new Map<string, string>();
   for (const m of did) if (m.role === "assistant") for (const c of m.content) if (c.type === "toolCall") calls.set(c.id, c.name + " " + argsKey(c.arguments));
-  const recorded = new Map<string, Extract<BrainMessage, { role: "toolResult" }>[]>();
+  const recorded = new Map<string, Extract<CaseMessage, { role: "toolResult" }>[]>();
   for (const m of did) {
     if (m.role !== "toolResult") continue;
     const key = calls.get(m.toolCallId);
@@ -187,20 +216,22 @@ export function stubbed(tools: readonly Tool[], did: readonly BrainMessage[]): T
 
 const evalRuntime = scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("Synthetic eval worker received the task.") });
 
-export function replayWorld(c: EvalCase) {
+/** The farm a case replays on; models is the DeepSeek its harness asks, the scripted one a test seats when absent. */
+export function replayWorld(c: EvalCase, models?: ModelAccess) {
   const config = testConfig();
-  return world(
-    c.scenario
+  return world({
+    ...(c.scenario
       ? {
           config: { ...config, agent: { ...config.agent, starters: ["lab"] } },
           repos: c.scenario.repos,
           runtimes: [evalRuntime],
         }
-      : { config },
-  );
+      : { config }),
+    ...(models ? { models } : {}),
+  });
 }
 
-/** The orchestrator's tools on the farm, and its input: stubbed with what the case recorded, or, for a scenario, live
+/** The orchestrator's tools on the farm, and its input's words: stubbed with what the case recorded, or, for a scenario, live
  * on the farm with the situation it would have been told. */
 export async function replaySetup(farm: World, c: EvalCase) {
   const chat = farm.channel;
@@ -214,8 +245,8 @@ export async function replaySetup(farm: World, c: EvalCase) {
     envelope: "",
     actor: orchestrator(true),
   }));
-  if (!c.scenario) return { tools: stubbed(tools, c.did), input: c.input };
-  if (c.input.role !== "custom") throw new Error("A scenario needs an orchestrator input");
+  if (!isInput(c.input)) throw new Error("A case begins with an orchestrator input");
+  if (!c.scenario) return { tools: stubbed(tools, c.did), input: c.input.content };
   const profile = await farm.agent.save({ ...starter("lab"), enabled: true, effort: "" });
   const repos = farm.repo;
   const folders = await repos.list();
@@ -230,5 +261,59 @@ export async function replaySetup(farm: World, c: EvalCase) {
     address.target,
     "zh",
   );
-  return { tools, input: { ...c.input, content: situation + "\n\n" + messageText(c.input) } };
+  return { tools, input: situation + "\n\n" + c.input.content };
+}
+
+const context = BACKGROUND_CONTEXT;
+
+/** The assistant's turn on the farm's harness, as the farm runs it: the host the orchestrator makes (its prompt, its
+ * own tools, the model asked through the farm's DeepSeek), with tools for the farm's and memory and before as the
+ * conversation's past; what the model did after input, and the tokens it took. Throws why the turn failed. */
+export async function orchestratorTurn(
+  farm: World,
+  o: { readonly model: string; readonly tools: readonly Tool[]; readonly memory: string; readonly before: readonly CaseMessage[]; readonly input: string },
+  signal?: AbortSignal,
+): Promise<{ readonly turn: ModelMessage[]; readonly tokens: number }> {
+  const id = defaultOrchestrator;
+  const durable = farm.runtime.durable;
+  if (o.memory) await farm.memory.forAgent(id, id).rewrite(o.memory);
+  const past = o.before.filter((m): m is ModelMessage => m.role !== "custom");
+  if (past.length > 0) {
+    const kept = await durable.conversation(id, {});
+    await kept.commit(async (tx) => {
+      for (const m of past) await tx.appendEntry(kept.id, { kind: "vibevalley.replayed", model: [m] });
+    }, context);
+  }
+  const here = farm.channel.defaultChannel();
+  await using host = await farm.session.host({
+    ...orchestratorHost(farm.config, id, farm.agent.agent(id)),
+    model: () => o.model,
+    tools: () => [...o.tools],
+    first: { channel: here },
+    quiet: () => true,
+    say: async () => {},
+    channel: (r) => r.channel,
+    fresh: () => {},
+    restored: (r) => ({ by: { kind: "comment", channel: r.channel } }),
+    toolStart: farm.tool.start,
+  });
+  await host.submit(async () => ({ text: o.input }), { route: { channel: here }, run: { by: { kind: "comment", channel: here } } }, true);
+  const conversation = await durable.existing(id);
+  if (!conversation) throw new Error("the assistant has no conversation");
+  // The run started is the one the input placed: wait for it to end.
+  for (;;) {
+    await conversation.waitForIdle(context);
+    if (!(await durable.busy(id))) break;
+    await abortable(new Promise((resolve) => setImmediate(resolve)), signal);
+  }
+  const entries = (await conversation.entries({ order: "ascending" }, 100_000, undefined, context)).items;
+  const at = entries.findLastIndex((e) => e.kind === orchestratorInput);
+  const turn = turnOf(entries.slice(at + 1), orchestratorInput);
+  let tokens = 0;
+  for (const m of turn) {
+    if (m.role !== "assistant") continue;
+    tokens += m.usage.totalTokens;
+    if (m.stopReason === "error") throw new Error("the model: " + (m.errorMessage ?? ""));
+  }
+  return { turn, tokens };
 }

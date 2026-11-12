@@ -1,5 +1,6 @@
+import { deepseekProvider } from "@earendil-works/pi-ai/providers/deepseek";
+
 import type * as T from "@vibevalley/protocol";
-import { deepseekModels } from "@vibevalley/provider/deepseek/models";
 import { mossImageModels } from "@vibevalley/provider/moss/image-models";
 import { mossLiveModels } from "@vibevalley/provider/moss/live-models";
 import type { MossEvents, MossLink, MossTransport, MossVerify } from "@vibevalley/provider/moss/server";
@@ -186,7 +187,11 @@ export const vendors: Record<"moss" | "deepseek" | "agora", Vendor> = {
     name: "DeepSeek",
     console: "https://platform.deepseek.com/api_keys",
     keys: "setting",
-    chat: { models: deepseekModels.map((model) => model.id) },
+    chat: {
+      models: deepseekProvider()
+        .getModels()
+        .map((model) => model.id),
+    },
   },
   agora: { name: "Agora", console: "https://console.agora.io/", keys: "setting", call: { line: "rtc" } },
 };

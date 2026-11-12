@@ -44,7 +44,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 - `vp run desktop:test`：Playwright 启动完整 Electron 应用。
 - `vp run docs:verify`：校验 Note、skill、文档链接与旧名字。
 
-测试不连接真实模型：服务端使用脚本化模型（`@vibevalley/ai/testing`），帮工使用 oar 测试 runtime。助手真模型评测（`vp run --filter @vibevalley/server evals`）消耗 DeepSeek 额度，运行前须经用户同意。
+测试不连接真实模型：服务端使用脚本化模型（`apps/server/src/testing/model.ts`），帮工使用 oar 测试 runtime。助手真模型评测（`vp run --filter @vibevalley/server evals`）消耗 DeepSeek 额度，运行前须经用户同意。
 
 ## 分支、提交和 PR
 

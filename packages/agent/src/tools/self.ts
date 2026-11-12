@@ -2,11 +2,10 @@ import { z } from "zod";
 
 import { self as selfWords } from "../base/prompts.ts";
 import { ToolFailed, toolFailed } from "../core/errors.ts";
-import type { Tool } from "../core/loop.ts";
-import { schemaTool } from "../core/tool.ts";
+import { schemaTool, type Tool } from "../core/tool.ts";
 import type { AgentFs } from "../infra/fs.ts";
 import { type AgentLog, consoleLog } from "../infra/log.ts";
-import { archiveFiles, fileMemory, type MemoryPort, searchArchive } from "./memory.ts";
+import { fileMemory, type MemoryPort } from "./memory.ts";
 import { readSkill, type SkillInfo } from "./skills.ts";
 
 export interface SelfOptions {
@@ -27,15 +26,6 @@ async function asTool<A>(f: () => Promise<A>): Promise<A> {
   } catch (e) {
     throw toolFailed(e);
   }
-}
-
-async function searchIn(home: string, query: string, fs?: AgentFs): Promise<string> {
-  if (query.trim() === "") throw new ToolFailed(selfWords.emptyQuery);
-  const files = await asTool(() => archiveFiles(home, fs));
-  if (files.length === 0) return selfWords.noArchive;
-  const hits = await asTool(() => searchArchive(home, query, 0, fs));
-  if (hits.length === 0) return selfWords.noHits(query);
-  return hits.map((h) => `${h.file}:${h.line}\n${h.text}`).join("\n\n---\n\n");
 }
 
 export function selfTools(o: SelfOptions): Tool[] {
@@ -66,17 +56,11 @@ export function selfTools(o: SelfOptions): Tool[] {
       return selfWords.rewritten(await asTool(() => memory.rewrite(p.content)));
     },
   });
-  const search = schemaTool({
-    name: "search_archive",
-    description: selfWords.searchArchiveDescription,
-    parameters: z.object({ query: z.string() }),
-    run: (p) => searchIn(o.home, p.query, o.fs),
-  });
-  return [loadSkill, ...(memory ? [rememberTool, rewrite] : []), search];
+  return [loadSkill, ...(memory ? [rememberTool, rewrite] : [])];
 }
 
 /** Throws a ToolFailed for a subagent that did not answer; the signal calls the subagent back. */
-export type Subagent = (brief: string, label: string, signal?: AbortSignal) => Promise<string>;
+type Subagent = (brief: string, label: string, signal?: AbortSignal) => Promise<string>;
 
 export const subagentTool = (spawn: Subagent) =>
   schemaTool({

@@ -155,6 +155,11 @@ function makeJournal(disk: KeptFile, initial: readonly SessionEvent[], push: (e:
     add({ type: "run/start", text: "" });
   }
 
+  /** Goes on with run id, opened before a restart: its start is already in the log. */
+  function runResumed(id: string) {
+    run = id;
+  }
+
   function runEnded(id: string, outcome: Outcome) {
     if (run !== id) return;
     add({ type: "run/end", text: outcome });
@@ -246,7 +251,7 @@ function makeJournal(disk: KeptFile, initial: readonly SessionEvent[], push: (e:
     disk.soon(body);
     closed = true;
   }
-  return { events, runStarted, runEnded, asked, said, thought, toolStarted, toolInput, toolEnded, note, connection, usage, close };
+  return { events, runStarted, runResumed, runEnded, asked, said, thought, toolStarted, toolInput, toolEnded, note, connection, usage, close };
 }
 
 /** Nothing that leads out of the folder. */

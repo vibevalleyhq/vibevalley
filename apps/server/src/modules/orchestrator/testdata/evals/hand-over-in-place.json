@@ -47,6 +47,73 @@
       "content": [
         {
           "type": "toolCall",
+          "id": "call_0a",
+          "name": "issue_get",
+          "arguments": {
+            "id": "41"
+          }
+        },
+        {
+          "type": "toolCall",
+          "id": "call_0b",
+          "name": "session_list",
+          "arguments": {}
+        }
+      ],
+      "api": "openai-completions",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "usage": {
+        "input": 0,
+        "output": 10,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 10,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792271160800,
+      "durationMs": 0
+    },
+    {
+      "role": "toolResult",
+      "toolCallId": "call_0a",
+      "toolName": "issue_get",
+      "content": [
+        {
+          "type": "text",
+          "text": "#41「首页白屏」在做 · demo · 小白\n  · 20 分钟前 小白 开工\n  · 25 分钟前 开单\n- 小白（w3，Pi，在 demo 的 vibevalley/issue-41）工单 #41 「首页白屏」，在思考\n目录：~/.vibevalley/work/worktrees/demo.41\n上一轮完整汇报（结尾部分）：\n还没有"
+        }
+      ],
+      "isError": false,
+      "timestamp": 1792271160900,
+      "durationMs": 100
+    },
+    {
+      "role": "toolResult",
+      "toolCallId": "call_0b",
+      "toolName": "session_list",
+      "content": [
+        {
+          "type": "text",
+          "text": "- 小白（w3，Pi，在 demo 的 vibevalley/issue-41）工单 #41 「首页白屏」，在思考"
+        }
+      ],
+      "isError": false,
+      "timestamp": 1792271161000,
+      "durationMs": 100
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "toolCall",
           "id": "call_1",
           "name": "issue_create",
           "arguments": {

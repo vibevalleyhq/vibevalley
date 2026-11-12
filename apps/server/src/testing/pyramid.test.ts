@@ -37,11 +37,17 @@ describe("the test pyramid", () => {
     ).toEqual([]);
   });
 
-  it("follows imports into the workspace's packages", () => {
+  // Into the workspace's packages too: packages/testkit's own tests hold that, with packages made for it.
+  it("follows imports to the seam a file reaches", () => {
+    expect(reach("src/modules/orchestrator/orchestrator.test.ts")).toEqual([
+      "src/modules/orchestrator/orchestrator.test.ts",
+      "src/modules/runtime/durable.ts",
+      "@earendil-works/pi-durable/env/node",
+    ]);
     expect(reach("src/modules/runtime/vibevalley.ts")).toEqual([
       "src/modules/runtime/vibevalley.ts",
-      "../../packages/agent/src/tools/coding.ts",
-      "node:child_process",
+      "src/modules/runtime/durable.ts",
+      "@earendil-works/pi-durable/env/node",
     ]);
   });
 });

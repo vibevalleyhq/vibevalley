@@ -45,8 +45,8 @@
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 1,
-    "lintOff": 4,
-    "swallowed": 1
+    "lintOff": 3,
+    "swallowed": 0
   },
   "packages/ai": {
     "nonNull": 0,
@@ -149,8 +149,8 @@
   "server: Agent Sessions": {
     "nonNull": 0,
     "doubleCast": 0,
-    "cast": 2,
-    "lintOff": 2,
+    "cast": 1,
+    "lintOff": 1,
     "swallowed": 1
   },
   "server: Agents": {

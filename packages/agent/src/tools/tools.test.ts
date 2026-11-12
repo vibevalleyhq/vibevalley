@@ -1,21 +1,15 @@
-import { existsSync, mkdirSync, readFileSync, rmdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, test } from "vite-plus/test";
-import { z } from "zod";
 
-import { objectSchema, toolArguments } from "@vibevalley/ai/tools";
-import { waitFor } from "@vibevalley/testkit/until";
+import { tempDir } from "@vibevalley/testkit/temp";
 
-import { makeBrain } from "../brain/brain.ts";
 import { ToolFailed } from "../core/errors.ts";
-import type { Tool } from "../core/loop.ts";
-import { runTool } from "../core/tool.ts";
+import { coerceArguments, objectSchema } from "../core/schema.ts";
+import { runTool, type Tool } from "../core/tool.ts";
 import { readMcpConfig, connectAll, mcpContentText, mcpToolName } from "../infra/mcp.ts";
-import { scriptedLLM, tempHome, type TestClock, testClock } from "../testing/testing.ts";
-import { codingTools, htmlText } from "./coding.ts";
-import { archive, forgetLine, readMemory } from "./memory.ts";
-import { describeReminder, dueReminders, makeReminders, nextRun, parseCron, type Reminder } from "./reminders.ts";
+import { forgetLine, readMemory } from "./memory.ts";
 import { selfTools } from "./self.ts";
 import { frontMatter, readSkill, scanSkills, skillBody } from "./skills.ts";
 import { memoryStore } from "./todoStore.ts";
@@ -23,21 +17,19 @@ import { todoTools } from "./todoTools.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {
-  const h = tempHome();
-  homes.push(h.done);
-  return h.dir;
+  const dir = tempDir("vibevalley-agent-");
+  homes.push(() => rmSync(dir, { recursive: true, force: true }));
+  return dir;
 };
 afterEach(() => {
   for (const done of homes.splice(0)) done();
 });
 
-/** As the agent calls it: arguments checked first, a bad one said as a failure. */
+/** As a conversation calls it: the arguments as models get them wrong mended first. */
 const call = async (tools: readonly Tool[], name: string, params: unknown): Promise<string> => {
   const tool = tools.find((t) => t.name === name);
   if (!tool) throw new Error(`no ${name}`);
-  const args = toolArguments(name, params, tool.parameters);
-  if ("refused" in args) throw new ToolFailed(args.refused);
-  const result = await tool.execute(args.ok, { id: "t" });
+  const result = await tool.execute(coerceArguments(params, tool.parameters), { id: "t" });
   return result.content.map((c) => (c.type === "text" ? c.text : "")).join("");
 };
 /** The failure's message; a call that goes, or fails with anything but a ToolFailed, fails the test. */
@@ -49,11 +41,6 @@ const fails = async (called: Promise<string>): Promise<string> => {
   if (!(e instanceof ToolFailed)) throw e;
   return e.message;
 };
-/** Reminders on the test's clock, closed with the test. */
-const reminders = async (dir: string, wake: (due: string[]) => void, clock: TestClock) => {
-  const made = await makeReminders(dir, wake, { clock });
-  return Object.assign(made, { [Symbol.asyncDispose]: () => made.close() });
-};
 /** What a call rejects with. */
 const failure = (p: Promise<unknown>): Promise<unknown> =>
   p.then(
@@ -63,7 +50,7 @@ const failure = (p: Promise<unknown>): Promise<unknown> =>
 
 describe("the task tools", () => {
   test("task and mark the agent's own todos", async () => {
-    const tools = todoTools(memoryStore(), false, async () => undefined);
+    const tools = todoTools(memoryStore(), async () => undefined);
     const response = await call(tools, "todo_add", { tasks: [{ id: "fix", brief: "改", after: ["nope"] }] });
     expect(response).toMatch(/没收：「fix」要等的「nope」不存在/u);
     const fails2 = await fails(call(tools, "todo_add", { tasks: [{ id: "x", brief: "查", by: "subagent" }] }));
@@ -89,7 +76,7 @@ describe("the task tools", () => {
   });
 });
 
-describe("a tool whose work is an Effect", () => {
+describe("a tool whose work takes a signal", () => {
   test("is interrupted when the run stops", async () => {
     let interrupted = false;
     const waits = runTool({
@@ -124,48 +111,6 @@ describe("a tool whose work is an Effect", () => {
   });
 });
 
-describe("the coding tools", () => {
-  test("read, write and edit a file", async () => {
-    const dir = home();
-    const tools = codingTools({ cwd: dir });
-    const response = await call(tools, "write_file", { path: "src/a.ts", content: "one\ntwo\nthree\ntwo" });
-    expect(response).toBe("写好了 src/a.ts（4 行）");
-    const response2 = await call(tools, "read_file", { path: "src/a.ts", offset: 2, limit: 1 });
-    expect(response2).toBe("     2\ttwo\n（共 4 行，这里到第 2 行；接着读用 offset=3）");
-    const fails2 = await fails(call(tools, "edit_file", { path: "src/a.ts", old_text: "two", new_text: "2" }));
-    expect(fails2).toMatch(/出现了 2 次/u);
-    const fails3 = await fails(call(tools, "edit_file", { path: "src/a.ts", old_text: "four", new_text: "4" }));
-    expect(fails3).toMatch(/找不到 old_text/u);
-    await call(tools, "edit_file", {
-      path: "src/a.ts",
-      old_text: "two",
-      new_text: "$&2",
-      replace_all: true,
-    });
-    expect(readFileSync(join(dir, "src/a.ts"), "utf8")).toBe("one\n$&2\nthree\n$&2");
-  });
-
-  test("list, search and run", async () => {
-    const dir = home();
-    mkdirSync(join(dir, "node_modules", "x"), { recursive: true });
-    mkdirSync(join(dir, "lib"), { recursive: true });
-    writeFileSync(join(dir, "lib", "b.txt"), "needle here\n");
-    const tools = codingTools({ cwd: dir, commandTimeoutMs: 1_000 });
-    const response = await call(tools, "list_dir", { depth: 2 });
-    expect(response).toBe("lib/\n  b.txt");
-    const found = await call(tools, "grep", { pattern: "needle" }).catch((e: unknown) => (e instanceof ToolFailed ? e.message : Promise.reject(e)));
-    if (found !== "这台机器没有 ripgrep（rg）：用 bash 跑 grep -rn 代替。") expect(found).toContain("b.txt:1:needle here");
-    const response2 = await call(tools, "bash", { command: "echo hi; exit 3" });
-    expect(response2).toBe("hi\n（退出码 3）");
-    const response3 = await call(tools, "bash", { command: "sleep 5", timeout_seconds: 0.2 });
-    expect(response3).toMatch(/超时，停掉了/u);
-  });
-
-  test("turn a web page into its words", () => {
-    expect(htmlText("<html><style>x{}</style><h1>标题</h1><p>一 &amp; 二</p><script>no()</script></html>")).toBe("标题\n一 & 二");
-  });
-});
-
 describe("skills and memory", () => {
   test("read front matter, and the first skill of a name wins", async () => {
     const dir = home();
@@ -187,7 +132,7 @@ describe("skills and memory", () => {
     expect(nope).toMatch(/有：tidy/u);
   });
 
-  test("remember, rewrite and search the archive", async () => {
+  test("remember and rewrite", async () => {
     const dir = home();
     const tools = selfTools({ now: Date.now, home: dir, skills: async () => [], memory: true });
     const memory = () => readMemory(dir);
@@ -195,229 +140,11 @@ describe("skills and memory", () => {
     expect((await memory()).prompt).toMatch(/^- \d{4}-\d\d-\d\d 用户喜欢 简短的回答$/u);
     await call(tools, "rewrite_memory", { content: "- 只说中文" });
     expect((await memory()).prompt).toBe("- 只说中文");
-    const response = await call(tools, "search_archive", { query: "端口" });
-    expect(response).toBe("还没有归档的旧对话。");
-    const archivedAt = Date.now();
-    await archive(dir, "s", "## 用户\n服务端口是 8787\n## 助手\n好", archivedAt);
-    const response2 = await call(tools, "search_archive", { query: "端口" });
-    expect(response2).toMatch(/s-.*\.md:2\n## 用户\n服务端口是 8787/u);
-    expect(selfTools({ now: Date.now, home: dir, skills: async () => [], memory: false }).map((t) => t.name)).toEqual(["load_skill", "search_archive"]);
+    expect(selfTools({ now: Date.now, home: dir, skills: async () => [], memory: false }).map((t) => t.name)).toEqual(["load_skill"]);
     const lines = (await memory()).lines;
     expect(lines.map((l) => l.text)).toEqual(["只说中文"]);
     await forgetLine(dir, lines[0]!.id);
     expect((await memory()).lines).toEqual([]);
-  });
-});
-
-describe("reminders", () => {
-  const epoch = 1798758000000;
-
-  test("are due by their kind", () => {
-    const created = "2026-10-12T00:00:00.000Z";
-    const at: Reminder = { id: "a", name: "a", message: "", at: "2026-10-12T01:00:00.000Z", created };
-    const every: Reminder = { id: "e", name: "e", message: "", everyMinutes: 30, created };
-    const cron: Reminder = { id: "c", name: "c", message: "", cron: "0 * * * *", created };
-    expect(nextRun(at)!.toISOString()).toBe("2026-10-12T01:00:00.000Z");
-    expect(nextRun({ ...at, lastRun: "2026-10-12T01:00:00.000Z" })).toBeUndefined();
-    expect(nextRun(every)!.toISOString()).toBe("2026-10-12T00:30:00.000Z");
-    expect(nextRun(cron)!.getUTCMinutes()).toBe(0);
-    expect(nextRun({ ...cron, cron: "every day" })).toBeUndefined();
-    expect(dueReminders([at, every, cron], new Date("2026-10-12T00:45:00.000Z")).map((j) => j.id)).toEqual(["e"]);
-    const bad = parseCron("every day");
-    expect(!bad.ok && bad.problem).toMatch(/cron 写得不对/u);
-    expect(describeReminder(every)).toMatch(/^- e「e」每 30 分钟；下次 /u);
-  });
-
-  test("run a missed reminder once", async () => {
-    const dir = home();
-    const clock = testClock(epoch);
-    await using s = await reminders(dir, () => undefined, clock);
-    const fails2 = await fails(call(s.tools, "reminder", { name: "x", message: "m" }));
-    expect(fails2).toMatch(/正好给一个/u);
-    const fails3 = await fails(call(s.tools, "reminder", { name: "x", message: "m", cron: "nope" }));
-    expect(fails3).toMatch(/cron 写得不对/u);
-    await call(s.tools, "reminder", { name: "巡检", message: "看看测试", every_minutes: 10 });
-    await call(s.tools, "reminder", {
-      name: "提醒",
-      message: "开会",
-      at: new Date(epoch + 60_000).toISOString(),
-    });
-    const response = await call(s.tools, "list_reminders", {});
-    expect(response).toMatch(/「巡检」每 10 分钟[\s\S]*「提醒」/u);
-    const later = new Date(epoch + 3_600_000);
-    const woke = await s.claimDue(later);
-    expect(woke.length).toBe(2);
-    expect(woke[0]).toMatch(/^【提醒「巡检」到点了/u);
-    const dueClaimed = await s.claimDue(later);
-    expect(dueClaimed).toEqual([]);
-    const left = JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8")) as Reminder[];
-    expect(left.map((j) => j.name)).toEqual(["巡检"]);
-    await call(s.tools, "cancel_reminder", { id: left[0]!.id });
-    const response2 = await call(s.tools, "list_reminders", {});
-    expect(response2).toBe("没有定好的事。");
-  });
-
-  test("regression: same-time reminder IDs preserve future reminders and cancel only the addressed reminder", async () => {
-    const clock = testClock(epoch);
-    const dir = home();
-    await using s = await reminders(dir, () => undefined, clock);
-    for (const [name, offset] of [
-      ["first", 60_000],
-      ["future", 120_000],
-      ["cancel", 180_000],
-    ] as const) {
-      await call(s.tools, "reminder", { name, message: name, at: new Date(epoch + offset).toISOString() });
-    }
-    const saved = z
-      .array(z.object({ id: z.string(), name: z.string(), created: z.string() }))
-      .parse(JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8")));
-    expect(new Set(saved.map((r) => r.id)).size).toBe(3);
-    expect(saved.map((r) => r.created)).toEqual(Array(3).fill(new Date(epoch).toISOString()));
-    const response = await call(s.tools, "list_reminders", {});
-    expect(response).toMatch(/「first」[\s\S]*「future」[\s\S]*「cancel」/u);
-    await call(s.tools, "cancel_reminder", { id: saved[2]!.id });
-    expect(JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8"))).toMatchObject([{ id: saved[0]!.id }, { id: saved[1]!.id }]);
-    const dueClaimed = await s.claimDue(new Date(epoch + 60000 - 1));
-    expect(dueClaimed).toEqual([]);
-    const dueClaimed2 = await s.claimDue(new Date(epoch + 60000));
-    expect(dueClaimed2).toEqual([expect.stringContaining("「first」")]);
-    const dueClaimed3 = await s.claimDue(new Date(epoch + 60000));
-    expect(dueClaimed3).toEqual([]);
-    expect(JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8"))).toMatchObject([{ id: saved[1]!.id, name: "future" }]);
-    const dueClaimed4 = await s.claimDue(new Date(epoch + 120000));
-    expect(dueClaimed4).toEqual([expect.stringContaining("「future」")]);
-  });
-
-  test("canceling a waiting reminder and closing its scope prevent later wakes", async () => {
-    const clock = testClock(epoch);
-    const dir = home();
-    const woke: string[] = [];
-    await using s = await reminders(dir, (due) => void woke.push(...due), clock);
-    await call(s.tools, "reminder", { name: "cancel", message: "", at: new Date(epoch + 60_000).toISOString() });
-    await call(s.tools, "reminder", { name: "keep", message: "", at: new Date(epoch + 120_000).toISOString() });
-    const saved = z.array(z.object({ id: z.string() })).parse(JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8")));
-    await call(s.tools, "cancel_reminder", { id: saved[0]!.id });
-    await clock.adjust(60_000);
-    expect(woke).toEqual([]);
-    await clock.adjust(60_000);
-    await waitFor(
-      () => woke.length,
-      (n) => n === 1,
-      "uncanceled reminder wakes",
-    );
-    expect(woke).toEqual([expect.stringContaining("「keep」")]);
-    await call(s.tools, "reminder", { name: "closed", message: "", at: new Date(epoch + 180_000).toISOString() });
-    await s.close();
-    await clock.adjust(60_000);
-    expect(woke).toEqual([expect.stringContaining("「keep」")]);
-    expect(JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8"))).toMatchObject([{ name: "closed" }]);
-  });
-
-  test("wake the agent when one comes due, on the Clock, and what came due while away at once", async () => {
-    const dir = home();
-    const start = new Date("2026-10-12T00:00:00.000Z").getTime();
-    const clock = testClock(start);
-    writeFileSync(
-      join(dir, "reminders.json"),
-      JSON.stringify([
-        { id: "missed", name: "错过的", message: "", at: new Date(start - 60_000).toISOString(), created: new Date(start - 3_600_000).toISOString() },
-        { id: "soon", name: "一会儿", message: "", at: new Date(start + 10 * 60_000).toISOString(), created: new Date(start).toISOString() },
-      ]),
-    );
-    const woke: string[] = [];
-    const storedAtWake: unknown[] = [];
-    await using _s = await reminders(
-      dir,
-      (due) => {
-        storedAtWake.push(JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8")));
-        woke.push(...due);
-      },
-      clock,
-    );
-    await waitFor(
-      () => woke.length,
-      (n) => n === 1,
-      "the missed one",
-    );
-    expect(woke[0]).toMatch(/错过的/u);
-    expect(storedAtWake).toEqual([[expect.objectContaining({ id: "soon" })]]);
-    await clock.adjust(10 * 60_000 - 1);
-    expect(woke.length).toBe(1);
-    await clock.adjust(1);
-    await waitFor(
-      () => woke.length,
-      (n) => n === 2,
-      "the one due now",
-    );
-    expect(woke[1]).toMatch(/一会儿/u);
-    expect(storedAtWake[1]).toEqual([]);
-  });
-
-  test("come due only once the claim is stored", async () => {
-    const dir = home();
-    const clock = testClock(epoch);
-    const now = new Date(epoch + 60_000);
-    writeFileSync(
-      join(dir, "reminders.json"),
-      JSON.stringify([
-        {
-          id: "once",
-          name: "",
-          message: "",
-          at: now.toISOString(),
-          created: new Date(epoch).toISOString(),
-        },
-      ]),
-    );
-    // A directory at the temporary file's path makes the atomic write fail.
-    mkdirSync(join(dir, "reminders.json.tmp"));
-    const woke: string[] = [];
-    await using s = await reminders(dir, (due) => void woke.push(...due), clock);
-    const firstClaim = await failure(s.claimDue(now));
-    expect(firstClaim).toMatchObject({ _tag: "AgentFailed" });
-    const secondClaim = await failure(s.claimDue(now));
-    expect(secondClaim).toMatchObject({ _tag: "AgentFailed" });
-    expect(woke).toEqual([]);
-    expect(JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8"))).toMatchObject([{ id: "once" }]);
-    rmdirSync(join(dir, "reminders.json.tmp"));
-    expect((await s.claimDue(now)).length).toBe(1);
-    const dueClaimed = await s.claimDue(now);
-    expect(dueClaimed).toEqual([]);
-    expect(JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8"))).toEqual([]);
-  });
-
-  test("do not run a persisted reminder whose shape is wrong", async () => {
-    const dir = home();
-    const clock = testClock(epoch);
-    const damaged = JSON.stringify([
-      {
-        id: "important",
-        name: "",
-        message: "",
-        everyMinutes: "5",
-        created: new Date(0).toISOString(),
-      },
-    ]);
-    writeFileSync(join(dir, "reminders.json"), damaged);
-    await using s = await reminders(dir, () => undefined, clock);
-    const now = clock.now();
-    const claim = await failure(s.claimDue(new Date(now)));
-    expect(claim).toMatchObject({ _tag: "AgentFailed" });
-    expect(readFileSync(join(dir, "reminders.json"), "utf8")).toBe(damaged);
-  });
-
-  test("do not read a damaged file as an empty list", async () => {
-    const dir = home();
-    const clock = testClock(epoch);
-    const damaged = `[{"id":"important"`;
-    writeFileSync(join(dir, "reminders.json"), damaged);
-    await using s = await reminders(dir, () => undefined, clock);
-    await fails(call(s.tools, "reminder", { name: "new", message: "work", every_minutes: 5 }));
-    await fails(call(s.tools, "list_reminders", {}));
-    const now = clock.now();
-    const claim = await failure(s.claimDue(new Date(now)));
-    expect(claim).toMatchObject({ _tag: "AgentFailed" });
-    expect(readFileSync(join(dir, "reminders.json"), "utf8")).toBe(damaged);
   });
 });
 
@@ -487,35 +214,5 @@ describe("MCP", () => {
     expect(response).toBe("5");
     const fails2 = await fails(call(all.tools, "calc__boom", {}));
     expect(fails2).toBe("炸了");
-  });
-
-  test("belongs to the agent that connected it", async () => {
-    const dir = home();
-    writeFileSync(join(dir, "mcp.cjs"), fakeMCP);
-    // The brain's scope is this one: its end closes the brain, and its MCP servers with it.
-    const tools = await (async () => {
-      await using agent = await makeBrain({
-        name: "test",
-        instructions: "",
-        llm: scriptedLLM().llm,
-        home: dir,
-        cwd: dir,
-        noSession: true,
-        noSkills: true,
-        noSubagents: true,
-        mcpServers: [
-          { name: "calc", command: process.execPath, args: [join(dir, "mcp.cjs")] },
-          { name: "gone", command: join(dir, "missing") },
-        ],
-      });
-      const status = agent.mcpStatus();
-      expect(status.toolCount).toBe(2);
-      expect(status.failed.length).toBe(1);
-      const response = await call(agent.tools(), "calc__add", { a: 2, b: 3 });
-      expect(response).toBe("5");
-      return agent.tools();
-    })();
-    await fails(call(tools, "calc__add", { a: 2, b: 3 }));
-    expect(existsSync(join(dir, "test.jsonl"))).toBe(false);
   });
 });

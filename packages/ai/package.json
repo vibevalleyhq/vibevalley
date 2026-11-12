@@ -26,45 +26,16 @@
     "./transcription": {
       "types": "./dist/audio/transcription.d.ts",
       "default": "./src/audio/transcription.ts"
-    },
-    "./client": {
-      "types": "./dist/llm/client.d.ts",
-      "default": "./src/llm/client.ts"
-    },
-    "./llm": {
-      "types": "./dist/llm/llm.d.ts",
-      "default": "./src/llm/llm.ts"
-    },
-    "./messages": {
-      "types": "./dist/base/messages.d.ts",
-      "default": "./src/base/messages.ts"
-    },
-    "./models": {
-      "types": "./dist/base/models.d.ts",
-      "default": "./src/base/models.ts"
-    },
-    "./response": {
-      "types": "./dist/llm/response.d.ts",
-      "default": "./src/llm/response.ts"
-    },
-    "./testing": {
-      "types": "./dist/testing/testing.d.ts",
-      "default": "./src/testing/testing.ts"
-    },
-    "./tools": {
-      "types": "./dist/base/tools.d.ts",
-      "default": "./src/base/tools.ts"
     }
   },
   "dependencies": {
-    "@vibevalley/async": "workspace:*",
     "@vibevalley/provider": "workspace:*",
-    "ai": "catalog:",
-    "zod": "catalog:"
+    "ai": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "@vibevalley/testkit": "workspace:*",
-    "vite-plus": "catalog:"
+    "vite-plus": "catalog:",
+    "zod": "catalog:"
   }
 }

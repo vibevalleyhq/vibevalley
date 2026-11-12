@@ -147,17 +147,20 @@
 | `bold` | `artifact.ts` |  |
 | `para` | `artifact.ts` |  |
 | `sample` | `artifact.ts` | Every kind of block, and inline marks, as the export writes them. |
+| `scriptedDeepSeek` | `deepseek.ts` |  |
 | `committedDelivery` | `deliveries.ts` | A delivery written and routed as Mailbox commits one, and nothing after: what a stop between commit and hand-off |
 | `kinds` | `evals.ts` |  |
 | `orchestratorToolNames` | `evals.ts` | The orchestrator's tools by name, as its brain has them: the farm's and its own (no skills, subagents or crons). |
 | `problemOf` | `evals.ts` | "" when it is whole: the fields its kind reads are there. |
+| `transcript` | `evals.ts` | A turn as a failed sample shows it: what it said, each call and each result. |
 | `check` | `evals.ts` | The expectations the turn does not meet, each as it is written; none when it passes. |
 | `casesIn` | `evals.ts` | The cases in dir (*.json), by file name. |
 | `isInput` | `evals.ts` |  |
 | `committed` | `evals.ts` |  |
 | `stubbed` | `evals.ts` | Every farm tool answers a call with what the case recorded for the same call (the same tool and arguments), each once, and nothing for another. |
-| `replayWorld` | `evals.ts` |  |
-| `replaySetup` | `evals.ts` | The orchestrator's tools on the farm, and its input: stubbed with what the case recorded, or, for a scenario, live |
+| `replayWorld` | `evals.ts` | The farm a case replays on; models is the DeepSeek its harness asks, the scripted one a test seats when absent. |
+| `replaySetup` | `evals.ts` | The orchestrator's tools on the farm, and its input's words: stubbed with what the case recorded, or, for a scenario, live |
+| `orchestratorTurn` | `evals.ts` | The assistant's turn on the farm's harness, as the farm runs it: the host the orchestrator makes (its prompt, its |
 | `farm` | `farm.ts` | The whole farm on a free port. |
 | `workingFarm` | `farm.ts` | The same with the test helper as its only runtime (pi, testing/worker.ts), so an issue can be worked from outside as |
 | `gitSync` | `git.ts` | Runs git in dir as a test user. its output, trimmed. |
@@ -173,6 +176,15 @@
 | `testDb` | `layers.ts` | A database of its own in memory, with the schema: closed with await using. |
 | `offlineNetwork` | `layers.ts` | The network a test farm has: loopback for its own fetch, nothing for the public one. |
 | `whenState` | `layers.ts` | What pick finds in the core state: in it now, or in the first state the core moves to where it finds something. |
+| `text` | `model.ts` |  |
+| `thinking` | `model.ts` |  |
+| `toolCall` | `model.ts` |  |
+| `assistantMessage` | `model.ts` | An answer as DeepSeek's would be kept, for a test that builds a turn by hand. |
+| `answer` | `model.ts` |  |
+| `systemPrompt` | `model.ts` |  |
+| `toolsOf` | `model.ts` |  |
+| `lastUser` | `model.ts` |  |
+| `scriptedLLM` | `model.ts` | Each request takes the next step, its events a tick apart as a stream's; one past the script is a failed answer |
 | `network` | `network.ts` | Every vendor the media tests reach (MOSS's audio, images, files, understanding), answered offline; the public fetch |
 | `realtimeFixture` | `realtime.ts` |  |
 | `refuse` | `refuse.ts` | A trigger named name refusing the write on says (before insert on t, before update of c on t), when when holds |

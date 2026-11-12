@@ -21,24 +21,6 @@ export class ToolFailed extends Error {
 /** What a tool's body threw or rejected with, or the agent it started failed with, as the failed result. */
 export const toolFailed = (e: unknown): ToolFailed => new ToolFailed(messageOf(e), e);
 
-/** A run asked of an agent that is already running one. */
-export class AgentBusy extends Error {
-  override readonly name = "AgentBusy";
-  readonly _tag = "AgentBusy";
-}
-
-/** continue with nothing to go on from: no messages yet, or an answer and nothing steered or queued after it. */
-export class CannotContinue extends Error {
-  override readonly name = "CannotContinue";
-  readonly _tag = "CannotContinue";
-}
-
-/** Asked of an agent that is closed. */
-export class AgentClosed extends Error {
-  override readonly name = "AgentClosed";
-  readonly _tag = "AgentClosed";
-}
-
 /** Something of the agent's own that did not go: its tools servers, its reminders, its saved conversation. */
 export class AgentFailed extends Error {
   override readonly name = "AgentFailed";

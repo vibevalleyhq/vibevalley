@@ -1,6 +1,5 @@
 import { getBuiltinModel, getBuiltinProviders } from "@earendil-works/pi-ai/providers/all";
 
-import { getModel } from "@vibevalley/ai/models";
 import { type Clock, Queue, Semaphore, TaskGroup } from "@vibevalley/async";
 
 import type { Db } from "#/infra/db.ts";
@@ -38,6 +37,12 @@ export const inCny = (p: Price, cnyPerUsd: number): Rate => ({
   },
 });
 
+/** DeepSeek's own models, in dollars per million tokens: what the farm charges a run of them at, whatever a catalog says. */
+const deepseekPrices: ReadonlyMap<string, Price> = new Map([
+  ["deepseek-flash", { input: 0.14, output: 0.28, cacheRead: 0.028, cacheWrite: 0 }],
+  ["deepseek-v4-pro", { input: 1.74, output: 3.48, cacheRead: 0.145, cacheWrite: 0 }],
+]);
+
 const vibevalleyRuntime = "vibevalley";
 /** VibeValley's agent's model when the profile names none. */
 const defaultModel = "deepseek-flash";
@@ -69,7 +74,7 @@ function piPrice(model: string): Price | undefined {
 export function price(runtime: string, model: string, pi: PiDefault): Price | undefined {
   switch (runtime) {
     case vibevalleyRuntime:
-      return priceOf(getModel("deepseek", model || defaultModel)?.cost);
+      return deepseekPrices.get(model || defaultModel);
     case "pi": {
       if (!model) {
         if (!pi.provider || !pi.model) return undefined;
@@ -80,7 +85,7 @@ export function price(runtime: string, model: string, pi: PiDefault): Price | un
     case "dsh": {
       // dsh names a model provider/model. only DeepSeek's own is priced here.
       const slash = model.indexOf("/");
-      if (slash >= 0 && model.slice(0, slash) === "deepseek-official") return priceOf(getModel("deepseek", model.slice(slash + 1))?.cost);
+      if (slash >= 0 && model.slice(0, slash) === "deepseek-official") return deepseekPrices.get(model.slice(slash + 1));
       return undefined;
     }
   }

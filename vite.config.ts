@@ -26,9 +26,9 @@ export const refused = {
     "move what both need into the package, or have the app pass it in",
     "docs/architecture.md",
   ),
-  aiToAgent: says("packages/ai knows nothing of the agent, which is built on it", "move what ai needs down into packages/ai", "packages/ai/README.md"),
+  aiToAgent: says("packages/ai (voice and transcription) knows nothing of the agent", "move what ai needs down into packages/ai", "packages/ai/README.md"),
   coreToBrain: says(
-    "the agent's core does not import its brain: the brain is built on core",
+    "the agent's core (a tool and its schema) does not import the rest of the agent, which is built on it",
     "move what core needs into packages/agent/src/core, or pass it in",
     "packages/agent/README.md",
   ),
@@ -330,7 +330,7 @@ export default defineConfig({
         rules: { "no-console": "off" },
       },
       {
-        // The model's package knows nothing of the agent, and neither knows the farm: no app, no owner's words, no
+        // The voice package knows nothing of the agent, and neither knows the farm: no app, no owner's words, no
         // contract with the page (the later override for packages/agent replaces this one there).
         files: ["packages/ai/src/**"],
         rules: {
@@ -397,7 +397,7 @@ export default defineConfig({
         },
       },
       {
-        // The loop and its tools stand alone: the brain is built on core, never the other way.
+        // A tool and its schema stand alone: the agent's own tools are built on core, never the other way.
         files: ["packages/agent/src/core/**"],
         rules: {
           "no-restricted-imports": [
@@ -516,14 +516,13 @@ export default defineConfig({
         rules: { "vibevalley/db-door": "error" },
       },
       {
-        // The server and the brain read and write files off the event loop (scripts/audit/oxlint-plugin.ts, sync-fs). Before the
+        // The server and the agent read and write files off the event loop (scripts/audit/oxlint-plugin.ts, sync-fs). Before the
         // services are up a sync call is fine: the home's lock, the database's folder and baseline, the locale the CLI
         // starts in; and the evals' cases are read by a tool, not the server.
         files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**"],
         excludeFiles: [
           "**/*.test.ts",
           "apps/server/src/testing/**",
-          "packages/agent/src/testing/**",
           "apps/server/src/infra/lease.ts",
           "apps/server/src/infra/db.ts",
           "apps/server/src/infra/baseline.ts",
@@ -554,7 +553,6 @@ export default defineConfig({
           "apps/desktop/src/infra/update.ts",
           "apps/web/test/fixtures.ts",
           "apps/web/test/global-setup.ts",
-          "packages/agent/src/tools/coding.ts",
           "packages/health/src/collect.ts",
         ],
         rules: { "vibevalley/child-process-door": "error" },

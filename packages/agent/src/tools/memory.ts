@@ -12,7 +12,7 @@ import { type AgentLog, consoleLog } from "../infra/log.ts";
 const memoryPromptChars = 8_000;
 
 /** The standalone agent's file adapter; hosted agents can inject another MemoryPort. */
-export const memoryFile = (home: string) => join(home, "MEMORY.md");
+const memoryFile = (home: string) => join(home, "MEMORY.md");
 
 /** `- YYYY-MM-DD note`, or whatever the agent wrote when it tidied. id is stable while the line is unchanged. */
 export interface MemoryLine {
@@ -133,7 +133,7 @@ function localDate(now: number): string {
 }
 
 /** now: epoch milliseconds. */
-export async function remember(home: string, note: string, now: number, fs?: AgentFs): Promise<MemoryLine> {
+async function remember(home: string, note: string, now: number, fs?: AgentFs): Promise<MemoryLine> {
   const io = agentFsOf(fs);
   await io.makeDir(home);
   const date = localDate(now);
@@ -154,18 +154,6 @@ async function rewriteMemory(home: string, text: string, fs?: AgentFs): Promise<
 }
 
 const archiveDir = (home: string) => join(home, "archive");
-
-/** The UTC ISO time with its colons and dot made dashes. */
-const isoStamp = (now: number) => new Date(now).toISOString().replace(/[:.]/gu, "-");
-
-/** now: epoch milliseconds. */
-export async function archive(home: string, session: string, text: string, now: number, fs?: AgentFs): Promise<string> {
-  const io = agentFsOf(fs);
-  await io.makeDir(archiveDir(home));
-  const path = join(archiveDir(home), `${session}-${isoStamp(now)}.md`);
-  await io.writeText(path, text);
-  return path;
-}
 
 /** No archive folder (or one that cannot be read) is no archive. */
 async function archiveNames(io: AgentFs, home: string): Promise<string[]> {

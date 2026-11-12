@@ -1,9 +1,8 @@
 {
   "error": "\nSomething went wrong: {why}",
-  "compacted": "(the conversation so far was compacted into a summary; the original is in {archive})",
-  "usage": "{aborted, select, true {(stopped, input {input}, cached {cached}, output {output})} other {(input {input}, cached {cached}, output {output})}}",
-  "hello": "{skills} skills, {tools} MCP tools. /reset forgets the conversation, /exit quits, Ctrl+C stops.",
+  "hello": "{skills} skills. /reset forgets the conversation, /exit quits, Ctrl+C stops.",
   "forgot": "Forgotten.",
+  "notKept": "{home} is taken by another conversation: this one lives only in this process and is not kept.",
   "noRuntime": "There is no machine {id}",
   "unknownInstall": "Cannot tell whether {id} is installed",
   "unusable": "{id} cannot be used: {kind}",

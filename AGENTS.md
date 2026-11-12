@@ -8,8 +8,8 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 apps/server/               服务端（普通 TypeScript，Hono，Node 24；仓库里用 vpx 跑源码，桌面版带 vp pack 打的包）：src/modules 里一块业务一个文件夹，名字用单数，每个导出一个服务
                            （接口加 make<服务>(deps)）：setting、user、attachment、provider、agent、memory、runtime、repo、machine、session、mailbox、channel、media、library、artifact、
                            pkm、issue、cron、inbox、tool、orchestrator、game；src/gateway 是对外的门：http、mcp、lan、voice、connector，projection 是核心状态的折法和拼帧（读各模块的
-                           规则，组装时交给 core）；VibeValley 自己的 agent 在 packages/agent，这里只组装它（runtime/vibevalley.ts 是
-                           oar 的 vibevalley runtime）；base 是不碰外面的地基（id、JSON、排序、脱敏），infra 是和进程、机器打交道的
+                           规则，组装时交给 core）；VibeValley 自己的 agent 跑在 pi-durable 上（runtime/durable.ts 开唯一的 Harness，
+                           session/host.ts 是助手，runtime/vibevalley.ts 是 oar 的 vibevalley runtime）；base 是不碰外面的地基（id、JSON、排序、脱敏），infra 是和进程、机器打交道的
                            （配置、库、文件、家目录的租约、日志、时间）；services.ts 按次序把它们组装起来，
                            handlers.ts 把 http/handlers/<概念>.ts 合成全部接口的处理，http/ 是路由、流和 /mcp；chat/main.ts 是终端里的对话（和农机直接聊、
                            自己的 agent），由命令行交出终端来跑
@@ -30,11 +30,11 @@ packages/protocol/         契约：一个概念一个文件夹 src/<概念>/（
 packages/base-ui/          无样式的组件（照 Base UI 的 Solid 2 版）：键盘、焦点、ARIA、开合和选中的状态、浮层的定位；样子在 apps/web/src/ui
 packages/engine/           像素农场的引擎：Pixi 的舞台、寻路、音效合成、日钟、按整数倍放大
 packages/i18n/             对用户说的话：locales/<语言>/<宿主.模块>.json 的词典，代码里 t("key")；src/catalogs.ts 由 i18n:gen 写出
-packages/ai/               模型能力与无框架运行：Provider 到现有 Llm/ModelClient 的消息桥、历史重放和预算、工具 Schema、脚本模型；Core 转写、WAV 和 MOSS 播放对账
-packages/agent/            VibeValley 自己的 agent：core/ 是循环和工具，其余是 Brain（对话、压缩、技能、记性、帮手、自己的任务）；
-                           不认识农场，lint 查方向（ai ← agent ← apps/server）
-packages/provider/         厂商接入：DeepSeek 目录/协议/显式连接、转写模型、MOSS wire/鉴权、声网 SDK/RTC token/字幕分片；不依赖 ai、agent、protocol 或应用
-                           AI 能力调用、WAV 和 MOSS 无框架运行在 packages/ai；通话编排、页面中继、采集/播放设备归 apps 的 voice
+packages/ai/               语音和转写的无框架运行：Core 转写、WAV/RMS、MOSS 会话和播放对账、轮次；对话模型不在这里（pi-ai）
+packages/agent/            VibeValley 自己的 agent 带的工具：core/ 是工具和它的参数 Schema，其余是技能、记性、MCP 客户端、自己的任务、
+                           帮手的说法和 DAG；循环、持久和压缩是 pi-durable 的；不认识农场，lint 查方向（agent ← apps/server）
+packages/provider/         厂商接入：转写模型、MOSS wire/鉴权、声网 SDK/RTC token/字幕分片；不依赖 ai、agent、protocol 或应用；
+                           DeepSeek 经 pi-ai 的 provider；WAV 和 MOSS 无框架运行在 packages/ai；通话编排、页面中继、采集/播放设备归 apps 的 voice
 packages/pkm/              知识库与双链大纲引擎：Logseq 风格 Markdown 解析与打印、PARA 目录规则、双链图谱与嵌入展开、前端大纲键盘编辑与框选状态机
 packages/artifact/         Artifact（块文档与 HTML 页）引擎：块操作并发状态机 Page、Markdown 双向互转、HTML CSP 沙箱与 AST 检查、前端协同编辑器 BlockEditor
 packages/bridge/           宿主之间的调用：一份契约（每个调用的入参、出参，每个推送的载荷，都是 Schema），两头由它生成，传输是各宿主的适配器
@@ -129,7 +129,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **工具链**：Vite+（`vp`）管装依赖、格式、lint、类型、测试和任务，配置在根目录 `vite.config.ts`（[Vite+ 的 monorepo 指南](https://viteplus.dev/guide/monorepo)）：格式和 lint 只在根目录配，包之间的差别写成 `overrides`，各包的 `vite.config.ts` 只放 Vite、Vitest 和任务；依赖的版本只写在 `pnpm-workspace.yaml` 的 catalog，`package.json` 写 `catalog:`（[地基](docs/subsystems/foundation.md)）；`vp check` 查格式（oxfmt，160 列；Markdown、生成的和数据不排）、oxlint（带类型的规则）和全部包的类型，`vp check --fix` 改格式，各包不另跑 `tsc`；别的包的类型读它打好的 `dist/`（`vp run packages:build`，各项检查先跑它），代码读源码（[地基](docs/subsystems/foundation.md)）。任务一律 `vp run`：检查（测试、构建、`server:check`、`docs:verify`）写成 `vite.config.ts` 的任务，带缓存，什么都没改时重放结果，先后用 `dependsOn`；会写文件或一直跑的（`api:client`、`desktop:dev`、`e2e`）留在 `package.json`，不缓存。测试用 `vp test`（vitest，跑在 Node 上，测试从 `vite-plus/test` import），每个包的 `vite.config.ts` 写它的 `test`（哪些文件、时区）；界面和整个应用用 Playwright（`e2e`）；脚本用 `vpx` 直接跑 `.ts`，都不带构建。
 - **话放在哪**：对用户说的话（界面、帧里的说法、通知、拒绝、田头的系统消息、命令行）写进词典 `packages/i18n/locales/{zh,en}/<宿主.模块>.json`，代码里写 `t("key")`，改完 `vp run i18n:gen`，键和参数有类型，`vpx scripts/gen/i18n.ts check` 查漏翻、没人用的和占位；对模型说的写进模块的 `prompts.ts`，用中文，加一句用用户的语言回答；别处的中文由 lint `vibevalley/no-cjk-literal` 拦下（[话放在哪](docs/subsystems/foundation.md#话放在哪)）。
 - **代码风格**：代码和接口用实际的概念，界面上的叫法照[用语表](docs/README.md#用语)；工单的状态和动作在哪里都用工单自己的词（完成、改动、问题、计划，词典的 `shared` 命名空间），种地的词（收获、缺肥、种植计划……）只在农场的皮里，`stale-names.ts` 查（[状态和用语](docs/subsystems/issue.md#状态和用语)）；名字站在领域的视角、说这里管什么事，不用 `rules`、`state`、`utils` 这类说性质的名字（[命名](docs/style/naming.md)）；注释用英文，只写不看就会写错或改错的：为什么、顺序和锁、安全边界、格式和取值、要和别处保持一致的，不复述代码、不写概述和历史（[建议和不建议的写法](docs/style/code.md)）。
-- **测试**：服务端的测试用 oar 的 `scriptedRuntime`（`@botiverse/oar/testing`）扮演帮工、用真的 git 仓库（`src/testing/git.ts`）、模型用照脚本回答的 `Llm`（`@vibevalley/ai/testing`，大脑经 `packages/agent/src/testing/testing.ts`），不连网，`src/testing/world.ts` 搭一个整农场，跨好几个模块的流程写在 `src/flows`（帮工照工单的字眼干活，`src/testing/worker.ts`）；纯函数的规则直接测，页面里的判断抽成 `features/<概念>/*.ts` 的纯函数用 vitest 测；页面的 Playwright 只测接线和主线、不断言文案，按 `data-testid` 和状态属性找元素，不按界面上的字（lint `vibevalley/no-copy-selector` 查），可访问性每页一次 axe；它对着真的服务端，测试的服务端拿到的环境去掉了一切钥匙，`HOME` 也是临时的，不问这台机器上的编码 agent：pi 换成同一个照字眼干活的帮工、别的 runtime 都当没装（`VIBEVALLEY_TEST_RUNTIMES`），派活、提问、交活都能真走一遍，不用手搓帧。改了帮工、仓库、工单的状态和完成、核心状态或游戏规则的行为，补对应的测试；修缺陷补的测试名字以 `regression: ` 开头，之后删改它要在 PR 里点名说明（[规矩](docs/development.md#分支提交和-pr)）。测试按接缝分层（规则、模块、流程、浏览器组件、页面、宿主、真模型），每层有自己的入口和预算；高一层只测新增的接线风险，主题扫描与纯截图单独运行，行为在能看见它的最低一层测（[测试金字塔](docs/subsystems/foundation.md)）。
+- **测试**：服务端的测试用 oar 的 `scriptedRuntime`（`@botiverse/oar/testing`）扮演帮工、用真的 git 仓库（`src/testing/git.ts`）、模型是照脚本回答的 DeepSeek（`src/testing/model.ts` 的 `scriptedLLM`，经 `src/testing/deepseek.ts` 坐上农场的 Harness，`farm.deepseek.use`），不连网，`src/testing/world.ts` 搭一个整农场，跨好几个模块的流程写在 `src/flows`（帮工照工单的字眼干活，`src/testing/worker.ts`）；纯函数的规则直接测，页面里的判断抽成 `features/<概念>/*.ts` 的纯函数用 vitest 测；页面的 Playwright 只测接线和主线、不断言文案，按 `data-testid` 和状态属性找元素，不按界面上的字（lint `vibevalley/no-copy-selector` 查），可访问性每页一次 axe；它对着真的服务端，测试的服务端拿到的环境去掉了一切钥匙，`HOME` 也是临时的，不问这台机器上的编码 agent：pi 换成同一个照字眼干活的帮工、别的 runtime 都当没装（`VIBEVALLEY_TEST_RUNTIMES`），派活、提问、交活都能真走一遍，不用手搓帧。改了帮工、仓库、工单的状态和完成、核心状态或游戏规则的行为，补对应的测试；修缺陷补的测试名字以 `regression: ` 开头，之后删改它要在 PR 里点名说明（[规矩](docs/development.md#分支提交和-pr)）。测试按接缝分层（规则、模块、流程、浏览器组件、页面、宿主、真模型），每层有自己的入口和预算；高一层只测新增的接线风险，主题扫描与纯截图单独运行，行为在能看见它的最低一层测（[测试金字塔](docs/subsystems/foundation.md)）。
 - **边界和棘轮**：长操作收 `AbortSignal` 并往下传；后台任务进服务的 `TaskGroup`，不 `void` 一个 Promise 放着不管；读改写之间夹着 `await` 的状态包进同一把 `Semaphore`；资源取得和释放成对（`await using`、`AsyncDisposableStack`）；对调用方的拒绝抛 `ApiError`（带 `bizCode`），模块自己的失败是 `Error` 子类（`name` 与类名同名且全仓唯一，`instanceof` 接），预期的结果返回判别联合；`SqlError` 只在 `infra/db.test.ts` 的 `catching` 表列出的地方接；存量语法债与逃生口由 `practice:check`、`paths:check` 和 `health:verify` 单向棘轮锁死（[地基](docs/subsystems/foundation.md)）。
 - **改完要验证**：先跑最窄的检查；改了接口、服务、页面或手机壳，照 [vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 找到对应的分册，在真的程序上看一遍，汇报时附上它要的证据；一类改动没有分册，又花了工夫才验证完，就照 `create-verification-skill` 补一份（[.agents/skills](.agents/skills/README.md)）。
 - **分支、提交和 PR**：同一批工作的多个改动默认合成一个 PR，尽量少开 PR；`main` 只经 PR、squash 合并，CI 全过才能合；分支 `<类>/<主题>`，提交和 PR 的标题、正文用英文，标题一句话说改完以后的行为、最多 100 字，不带 agent 署名；commit-msg hook 和 CI 查，开、改、合照 [vv-pr](.agents/skills/vv-pr/SKILL.md)（[规矩](docs/development.md#分支提交和-pr)）。

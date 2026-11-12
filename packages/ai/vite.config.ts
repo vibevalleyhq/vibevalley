@@ -6,13 +6,6 @@ export default defineConfig({
   // The types other packages check against (package.json's exports.
   pack: {
     entry: [
-      "src/llm/client.ts",
-      "src/llm/llm.ts",
-      "src/base/messages.ts",
-      "src/base/models.ts",
-      "src/llm/response.ts",
-      "src/testing/testing.ts",
-      "src/base/tools.ts",
       "src/audio/audio.ts",
       "src/audio/transcription.ts",
       "src/realtime/moss.ts",

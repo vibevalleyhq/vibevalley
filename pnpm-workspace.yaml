@@ -24,8 +24,10 @@ catalog:
   "@formatjs/intl-pluralrules": "7.0.2"
   base64-js: "1.5.1"
   "@axe-core/playwright": "^4.14.0"
-  "@botiverse/oar": "0.86.0"
-  "@earendil-works/pi-ai": "1.5.0"
+  "@botiverse/oar": "0.101.0"
+  "@earendil-works/chord": "1.5.2"
+  "@earendil-works/pi-ai": "1.5.2"
+  "@earendil-works/pi-durable": "1.5.2"
   "@electric-sql/pglite": "0.5.16"
   "@floating-ui/dom": "^1.8.0"
   "@larksuiteoapi/node-sdk": "^1.76.0"
@@ -119,6 +121,10 @@ peerDependencyRules:
   allowedVersions:
     vite: "*"
     vitest: "*"
+    # oar's own pi-durable runtime is written against 1.4 and is not used: the server's runtime/durable.ts runs
+    # pi-durable 1.5 itself (apps/server/src/modules/runtime/durable.ts). Drop these once oar's peer reaches 1.5.
+    "@botiverse/oar>@earendil-works/pi-durable": "1.5.2"
+    "@botiverse/oar>@earendil-works/chord": "1.5.2"
 
 # Install scripts: esbuild fetches its binary in its; the others have never been run and are not needed. (Electron has
 # none: it downloads its binary the first time it runs.)
@@ -217,3 +223,4 @@ minimumReleaseAgeExclude:
   - "@ai-sdk/gateway@4.0.137"
   - ai@7.0.164
   - "@electric-sql/pglite@0.5.16"
+  - "@botiverse/oar@0.101.0"

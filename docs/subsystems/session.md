@@ -106,7 +106,7 @@
 - **工单（`issue`）**：开帮工经 `Mailbox.receive`（`Hire`），调用 `withWorkplace`、`withIdleWorkplace`、`clearWorkplace`、`discardWork`、`handOver`、`dismiss`；订阅 `Session.news`（`Reported`、`Left`、`IssueStarted`、`RunFinished`）。
 - **信箱与频道（`mailbox`、`channel`）**：Mailbox 调 `deliver` 并订阅 `news` 的回执和启动动静；Channel 订阅 `news` 的 `Hired`、`Left`、`Reported` 管理工单串与汇报。帮工做的每件事都只在这一条 `news` 上说，各订阅方按 `_tag` 取自己要的。
 - **仓库、农机与记性（`repo`、`runtime`、`memory`）**：提供工作目录、农机探测/计费和每轮前后的记忆召回与写入。
-- **助手（`orchestrator`）**：通过 `Session.host` 创建进程内 `AgentHost`，共用 `session` 与 `session_run` 表。
+- **助手（`orchestrator`）**：通过 `Session.host` 创建进程内 `AgentHost`，共用 `session` 与 `session_run` 表；`AgentHost` 的一个会话是农场 `Harness` 上的一个 pi-durable 对话，重启后没答完的一轮接着答、仍记作同一轮（[VibeValley 自己的 agent](docs/subsystems/brain.md#接着做被打断的一轮)）。
 
 ## 为什么这样
 

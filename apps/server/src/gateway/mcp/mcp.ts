@@ -2,8 +2,8 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
-import type { Tool as LoopTool } from "@vibevalley/agent/core/loop";
-import { coerceArguments } from "@vibevalley/ai/tools";
+import { coerceArguments } from "@vibevalley/agent/core/schema";
+import type { Tool as LoopTool } from "@vibevalley/agent/core/tool";
 
 import { worker } from "#/base/actor.ts";
 import { messageOf } from "#/base/errors.ts";

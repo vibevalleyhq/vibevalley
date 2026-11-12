@@ -1,9 +1,7 @@
 import { selfTools } from "@vibevalley/agent/self";
-import { defaultModel, type ModelClient } from "@vibevalley/ai/client";
-import type { Llm } from "@vibevalley/ai/llm";
 import { Semaphore, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
-import type { OrchestratorEval } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime, userId } from "@vibevalley/protocol";
 
 import { orchestrator } from "#/base/actor.ts";
@@ -14,7 +12,7 @@ import { usersLanguage } from "#/base/prompts.ts";
 import { agentHome, reposDir, type ServerConfig } from "#/infra/config.ts";
 import type { Logger } from "#/infra/log.ts";
 import { localeMinute, type Time } from "#/infra/time.ts";
-import { type Agent, modelClient, noDeepSeekKey } from "#/modules/agent/agent.ts";
+import { type Agent, noDeepSeekKey } from "#/modules/agent/agent.ts";
 import { traitsOf } from "#/modules/agent/prompts.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { Cron } from "#/modules/cron/cron.ts";
@@ -23,11 +21,11 @@ import type { Handed, Picked } from "#/modules/mailbox/envelope.ts";
 import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
 import type { Pkm } from "#/modules/pkm/pkm.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
+import { defaultModel } from "#/modules/runtime/durable.ts";
 import { runtimeLabel } from "#/modules/runtime/presets.ts";
 import type { Runtime } from "#/modules/runtime/runtime.ts";
 import { type AgentHost, SubmitRefused } from "#/modules/session/host.ts";
 import type { Session } from "#/modules/session/session.ts";
-import type { Setting } from "#/modules/setting/setting.ts";
 import { answers as toolAnswers, channelLine } from "#/modules/tool/prompts.ts";
 import type { Tool } from "#/modules/tool/tool.ts";
 
@@ -56,10 +54,33 @@ interface HostContext {
   readonly user?: boolean;
 }
 
+/** What an assistant's host is made with, but for its model, its tools and where it speaks: the same for the farm and
+ * its evals (testing/evals.ts). */
+export const orchestratorHost = (config: ServerConfig, id: string, profile: T.Agent | undefined) => ({
+  session: {
+    id,
+    role: "orchestrator" as const,
+    agent: id,
+    name: profile?.name || t("server.orchestrator.label"),
+    runtime: orchestratorRuntime,
+    brief: profile?.duty ?? "",
+  },
+  inputType: orchestratorInput,
+  home: agentHome(config, id),
+  cwd: reposDir(config),
+  // Append custom profile identity after the shared prefix so default orchestrator eval caches stay stable.
+  instructions: systemPrompt + agentPrompt + (id === defaultOrchestrator || !profile ? "" : identityNote(profile.name, profile.persona)),
+  skills: [orchestratorSkills],
+  keepEvents,
+});
+
+/** The kind of entry an input to the assistant is kept as. */
+export const orchestratorInput = "orchestratorInput";
+
 export interface Orchestrator {
   /** Aborts the orchestrator's own turn and queued inputs without stopping helper sessions. */
   readonly stop: (agent?: string) => Promise<void>;
-  readonly markWrong: (on: number, want: string, agent?: string) => Promise<OrchestratorEval>;
+  readonly markWrong: (on: number, want: string, agent?: string) => Promise<T.OrchestratorEval>;
   readonly answerer: (on: "api" | "phone") => (model: string) => Answer | undefined;
   /** Throws NotAnswered. */
   readonly brief: (line: string, signal?: AbortSignal) => Promise<string>;
@@ -68,7 +89,6 @@ export interface Orchestrator {
 }
 
 export interface OrchestratorOptions {
-  readonly llm?: () => ModelClient;
   /** Whether it hears the farm; a test without a model does not, so nothing reaches a model. */
   readonly listen?: boolean;
 }
@@ -78,7 +98,6 @@ export interface OrchestratorDeps {
   readonly log: Logger;
   readonly config: ServerConfig;
   readonly agent: Agent;
-  readonly setting: Setting;
   readonly runtime: Runtime;
   readonly repo: Repo;
   readonly pkm: Pkm;
@@ -87,25 +106,10 @@ export interface OrchestratorDeps {
   readonly mailbox: Mailbox;
   readonly cron: Cron;
   readonly tool: Tool;
-  readonly llm: Llm;
 }
 
 export async function makeOrchestrator(deps: OrchestratorDeps, options: OrchestratorOptions = {}): Promise<Orchestrator> {
-  const {
-    clock,
-    config,
-    agent: store,
-    setting: settings,
-    runtime: runtimes,
-    repo: repos,
-    pkm: notes,
-    session: run,
-    channel: chat,
-    mailbox,
-    cron,
-    tool,
-    llm: service,
-  } = deps;
+  const { clock, config, agent: store, runtime: runtimes, repo: repos, pkm: notes, session: run, channel: chat, mailbox, cron, tool } = deps;
   const log = deps.log.child("orchestrator");
   const responses = makeResponses(mailbox, chat, clock);
   const tasks = new TaskGroup({ name: "orchestrator", onError: (task, e) => log.error(`vibevalley: the orchestrator's ${task} failed`, e) });
@@ -133,11 +137,8 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
       const had = instances.get(id);
       if (had) return had;
       const home = agentHome(config, id);
-      const llmOf = (): ModelClient => {
-        if (options.llm) return options.llm();
-        // The key saved in settings, asked before each request: one saved while the orchestrator runs is used at once.
-        return modelClient(deepseekModel(store.agent(id)?.model.trim() ?? "", defaultModel), settings.deepseekApiKey, service);
-      };
+      // Read as the conversation starts, so a model the profile names meanwhile is taken up; the key is read at each request.
+      const modelOf = () => deepseekModel(store.agent(id)?.model.trim() ?? "", defaultModel);
       const wakeSoon = (withinMs: number) => {
         const by = clock.now() + withinMs;
         return cron.list().some((s) => {
@@ -145,24 +146,10 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
           return next !== undefined && (s.agent || chat.orchestratorIn(s.channel)) === id && next <= by;
         });
       };
-      const profile = store.agent(id);
       const host = await run.host<HostContext>({
-        session: {
-          id,
-          role: "orchestrator",
-          agent: id,
-          name: profile?.name || t("server.orchestrator.label"),
-          runtime: orchestratorRuntime,
-          brief: profile?.duty ?? "",
-        },
-        inputType: "orchestratorInput",
-        home,
-        cwd: reposDir(config),
-        // Append custom profile identity after the shared prefix so default orchestrator eval caches stay stable.
-        instructions: systemPrompt + agentPrompt + (id === defaultOrchestrator || !profile ? "" : identityNote(profile.name, profile.persona)),
-        llm: llmOf,
+        ...orchestratorHost(config, id, store.agent(id)),
+        model: modelOf,
         tools: toolsFor(id),
-        skills: [orchestratorSkills],
         wakeSoon,
         first: { channel: chat.defaultChannel(), envelope: "", source: "user" },
         quiet: () => false,
@@ -174,7 +161,6 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
           me.shown = "";
         },
         restored: (r) => ({ ...(r.issue ? { issue: r.issue } : {}), by: { kind: intake[r.source].trigger, channel: r.channel } }),
-        keepEvents,
         toolStart: tool.start,
       });
       const me: Instance = { id, home, cannot: new Map(), shown: "", host };
@@ -341,16 +327,19 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
         heard.close();
       }
     });
+    // Every host first, then the resumes: the first resume lets the harness go on with every conversation left mid-run,
+    // and each needs its host's extension installed by then.
+    const unfinished: Instance[] = [];
     for (const a of store.orchestrators()) {
       const me = await instanceOf(a.id);
-      if ((options.llm !== undefined || settings.deepseekApiKey() !== undefined) && (await me.host.unfinished()))
-        tasks.run(`resume ${a.id}`, () => me.host.resume(resumeWithinMs));
+      if (await me.host.unfinished()) unfinished.push(me);
     }
+    for (const me of unfinished) tasks.run(`resume ${me.id}`, () => me.host.resume(resumeWithinMs));
   }
 
   const modelId = (id: string) => {
     try {
-      return options.llm ? options.llm().model.id : deepseekModel(store.agent(id)?.model.trim() ?? "", defaultModel);
+      return deepseekModel(store.agent(id)?.model.trim() ?? "", defaultModel);
     } catch {
       // No model to ask (no key): the eval is named by the profile's model as written.
       return store.agent(id)?.model ?? "";

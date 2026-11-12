@@ -1,4 +1,4 @@
-import type { Tool as LoopTool } from "@vibevalley/agent/core/loop";
+import type { Tool as LoopTool } from "@vibevalley/agent/core/tool";
 import { maybe, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 

@@ -1,11 +1,10 @@
 import { expect, test } from "vite-plus/test";
 
-import { scriptedLLM } from "@vibevalley/agent/testing";
-import { answer } from "@vibevalley/ai/testing";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { waitFor } from "#/testing/layers.ts";
+import { answer, scriptedLLM } from "#/testing/model.ts";
 import { sqlOf } from "#/testing/sql.ts";
 import { moduleWorld, testIssues } from "#/testing/world.ts";
 
@@ -48,7 +47,7 @@ test("regression: an orchestrator assignment survives startup and an acknowledge
   const rows2 = await sql`select id from channel_message where body = ${source.payload.text}`;
   expect(rows2).toHaveLength(0);
   const release = Promise.withResolvers<void>();
-  const { llm } = scriptedLLM([() => release.promise.then(() => answer("finished"))]);
+  fw.deepseek.use(scriptedLLM([() => release.promise.then(() => answer("finished"))]).llm);
   const config = fw.config;
   const channel = source.trigger.replyChannel ?? fw.channel.defaultChannel();
   const by = S.RunTrigger.parse(JSON.parse(JSON.stringify(source.trigger.meta.trigger)));
@@ -58,7 +57,7 @@ test("regression: an orchestrator assignment survives startup and an acknowledge
     home: config.home,
     cwd: config.workRoot,
     instructions: "",
-    llm: () => llm,
+    model: () => "",
     tools: () => [],
     first: channel,
     quiet: () => false,

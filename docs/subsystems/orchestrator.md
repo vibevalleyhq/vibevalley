@@ -21,7 +21,7 @@
 | `apps/server/src/modules/orchestrator/prompts.ts` | 助手系统提示词 |
 | `apps/server/src/modules/tool/tool.ts`、`schemas.ts`、`prompts.ts` | 助手和帮工 `/mcp` 的工具；参数与接口权限对应，媒体流程由脚本模型验证 |
 | `apps/server/src/modules/tool/resource.ts` | `resource_read`（`Tool.readResource`）：解析 `vv://` URI，执行会话级只读权限裁剪与 UTF-16 快照分页（`TextCache`） |
-| `$VIBEVALLEY_HOME/agent/<档案 id>/` | 对话文件 `<档案 id>.jsonl`、压缩归档 `archive/` 与错轮评测 `evals/` |
+| `$VIBEVALLEY_HOME/agent/<档案 id>/` | 错轮评测 `evals/`；压缩归档 `archive/`（`orchestrator.archive.*` 读它，pi-durable 的压缩不写它）；对话在 `$VIBEVALLEY_HOME/durable.db` |
 | `apps/web/src/features/orchestrator/OrchestratorPage.tsx` | 工作台助手页（记性、轨迹、旧账、声音） |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`orchestrator.*`）。
@@ -52,14 +52,14 @@
 
 **重启续跑与错轮评测**
 
-1. 启动时检查各助手 `.jsonl` 末尾：若停在 30 分钟内未完结的工具调用或输入，自动补入重启说明并跑完该轮（[VibeValley 自己的 agent](docs/subsystems/brain.md#接着做被打断的一轮)）。
+1. 启动时先给每个助手造好宿主，再让对话里没跑完的一轮接着跑（30 分钟以前开始的那轮停下、记一条）（[VibeValley 自己的 agent](docs/subsystems/brain.md#接着做被打断的一轮)）。
 2. 用户在轨迹页点「这一轮做错了」（`orchestrator.eval.create`），服务端提取该轮上下文、输入、记忆快照与输出存为 `evals/<id>.json`，供加入 `testdata/evals/` 回归测试。
 
 ## 和谁打交道
 
 - **信箱与频道（`mailbox`、`channel`）**：从 `Mailbox` 收投递与摘要，经 `Channel.post` 的 `Run` 写回回复。
 - **工单与定时任务（`issue`、`cron`）**：通过 `tool` 调用服务方法；指派给助手的工单跑完后进 `in_review` 等用户点头。
-- **帮工与大脑（`session`、`packages/agent`）**：经 `Session.host` 运行 `Brain`，经 `MemoryPort` 读写 `memory` 表。
+- **帮工与大脑（`session`、`packages/agent`）**：经 `Session.host` 在农场的 `Harness` 上运行助手的对话，经 `MemoryPort` 读写 `memory` 表。
 - **语音（`voice`）**：经 `response.ts` 的 `Caller` 端口向电话流式推送回答文本。
 
 ## 为什么这样

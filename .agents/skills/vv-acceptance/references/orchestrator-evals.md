@@ -1,11 +1,11 @@
 # 验收助手的评测
 
-[验收](.agents/skills/vv-acceptance/SKILL.md)的一份分册，不用沙箱。助手的测试用照脚本回答的模型（`@vibevalley/ai/testing`），只验证 harness。模型拿到这样的输入会不会做对，要用真模型重放用户标出的那些轮：每个样例采 5 次，至少过 4 次算过。设计和理由见 [助手的错变成评测](docs/subsystems/orchestrator.md)。
+[验收](.agents/skills/vv-acceptance/SKILL.md)的一份分册，不用沙箱。助手的测试用照脚本回答的模型（`apps/server/src/testing/model.ts`），只验证 harness。模型拿到这样的输入会不会做对，要用真模型重放用户标出的那些轮：每个样例采 5 次，至少过 4 次算过。设计和理由见 [助手的错变成评测](docs/subsystems/orchestrator.md)。
 
 ## 什么时候用
 
 - 改了 `systemPrompt`、`agentPrompt`、`apps/server/src/modules/tool` 里助手工具的名字、描述、参数或顺序。
-- 改了 `packages/agent` 里系统提示怎么拼、对话怎么压缩（`agent.ts`、`prefix.ts`、`compaction.ts`）。
+- 改了助手的提示怎么拼、对话怎么压缩（`session/host.ts` 的扩展、`runtime/durable.ts` 的压缩门槛），或升级了 pi-durable、pi-ai。
 - 往 `apps/server/src/modules/orchestrator/testdata/evals/` 加了样例。
 
 不用它：只改了助手的 harness（输入怎么排队、话发到哪个频道、工具怎么调农场），`vp run --filter @vibevalley/server test src/orchestrator` 就够。

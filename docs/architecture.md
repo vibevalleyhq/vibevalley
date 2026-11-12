@@ -62,7 +62,7 @@ flowchart LR
 - **契约（`packages/protocol`）**：服务端与客户端唯一的共享契约。每个概念一个目录 `src/<概念>/`，包含 `shapes.ts`（类型）、`schema.ts`（`Codec<T.X>` 解码器）和 `api.ts`（接口行与 `Handlers`）。`src/rules/` 只放服务端与页面共用的纯函数；仅服务端使用的规则留在各自模块（[地基](docs/subsystems/foundation.md)）。
 - **服务（`apps/server/src/`）**：一块业务一个单数目录，归入 11 个有序模块（见 `apps/server/src/modules.ts`）：
   1. `Platform`（`base`、`infra`、`core`、`setting`、`user`、`attachment`、`provider`）
-  2. `Agents`（`agent`、`runtime`、`memory`；模型和循环在 `packages/ai`、`packages/agent`）
+  2. `Agents`（`agent`、`runtime`、`memory`；循环和持久是 pi-durable 的，`runtime/durable.ts` 开它的 `Harness`，我们自己的工具在 `packages/agent`）
   3. `Source Control`（`repo`）
   4. `Agent Sessions`（`machine`、`session`）
   5. `Mailbox`（`mailbox`）
@@ -119,8 +119,8 @@ Host：
 | `vibevalley.yaml` | 可选的静态配置文件 |
 | `db/` | PGlite 的数据目录（配了 `database.url` 时不用它）：会话与运行（`session`、`session_run`）、信箱（`mailbox_trigger`、`mailbox_delivery`、`mailbox_subscription`、`mailbox_issue`）、工单 GitHub 观察游标（`issue_github`）、频道、工单、Artifact、游戏账本、记忆、定时任务、连接器、用户的账号和设备、笔记批注与撤销 |
 | `events/<id>.json` | 会话轨迹日志（帮工离开后保留 30 天） |
-| `helpers/<oar-id>.jsonl` | `vibevalley` 农机帮工的对话记录 |
-| `agent/<档案 id>/` | 助手对话 `<档案 id>.jsonl`、压缩归档 `archive/`、评测样例 `evals/` |
+| `durable.db` | pi-durable 的对话：助手的，和 `vibevalley` 农机上帮工的（一个 oar 会话一个）（测试农场在内存里） |
+| `agent/<档案 id>/` | 助手的评测样例 `evals/`；终端对话 `chat` 的 `durable.db`（它自己的，对话开着时租着这个目录）、`MEMORY.md` 和 `mcp.json` |
 | `logs/` | 帮工原始运行日志与桌面端服务端日志 |
 
 Space `$VIBEVALLEY_WORK_ROOT`（默认 `~/vibevalley-dev`）下：

@@ -1,6 +1,6 @@
-import type { CoreEvent } from "@vibevalley/agent/brain";
-import type { ToolResult } from "@vibevalley/agent/core/loop";
-import { messageText } from "@vibevalley/agent/messages";
+import type { AssistantMessage, UserMessage } from "@earendil-works/pi-ai";
+
+import type { ToolResult } from "@vibevalley/agent/core/tool";
 import type { Clock } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type { Outcome, RunTrigger, Spent } from "@vibevalley/protocol";
@@ -10,6 +10,7 @@ import { Inconsistent } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { jsonText } from "#/base/json.ts";
 import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
+import { messageText } from "#/modules/runtime/durable.ts";
 import * as qr from "#db/session_run.sql.ts";
 import * as qi from "#db/session_run_issue.sql.ts";
 
@@ -36,19 +37,32 @@ export interface RunInput {
   readonly asked?: string;
 }
 
+/** What an in-process agent's host tells its run, in order: an input taken, an answer, a tool's start and end, and the
+ * run's end with its last answer. */
+export type RunEvent =
+  | { readonly type: "message_start"; readonly message: UserMessage }
+  | { readonly type: "message_end"; readonly message: AssistantMessage }
+  | { readonly type: "tool_execution_start"; readonly toolCallId: string; readonly toolName: string; readonly args: unknown }
+  | { readonly type: "tool_execution_end"; readonly toolCallId: string; readonly toolName: string; readonly result: ToolResult; readonly isError: boolean }
+  | { readonly type: "agent_end"; readonly messages: readonly AssistantMessage[] };
+
 /** A tool result's text. */
 const resultText = (result: ToolResult) => result.content.flatMap((p) => (p.type === "text" && p.text ? [p.text] : [])).join("\n");
 
 /** The run of an in-process agent, fed the loop's events. */
 interface InProcessRun {
   /** The loop's events, in order; input only for a consumed input's message_start. */
-  readonly observe: (e: CoreEvent, input?: RunInput) => Promise<void>;
+  readonly observe: (e: RunEvent, input?: RunInput) => Promise<void>;
   /** A rejected input as its own failed run, without consuming another input's work; NotRecorded or RunBusy when it cannot be. */
   readonly failedStart: (input: RunInput, text: string, reason: string) => Promise<string>;
   /** The input of the next run, which goes on with one consumed before a restart; undefined forgets it. */
   readonly resume: (input: RunInput | undefined) => void;
+  /** Goes on with run, recorded and not ended before a restart, as the run under way. */
+  readonly adopt: (run: string) => void;
   /** Ends the run going on as interrupted; takes no more events from when it is called. */
   readonly close: () => Promise<void>;
+  /** Takes no more events and leaves the run going on open, for the next start to adopt. */
+  readonly leave: () => void;
   readonly currentRun: () => string;
 }
 
@@ -98,7 +112,7 @@ export function makeInProcessRun(session: string, journal: Journal, toolStart: (
   /** A run for what the loop does without an input: the one going on, or one started for it. */
   const going = () => begin({ by: { kind: "" } });
 
-  const observe = async (e: CoreEvent, input?: RunInput) => {
+  const observe = async (e: RunEvent, input?: RunInput) => {
     if (closed) return;
     if (input) {
       // The loop hands a consumed input with the message_start it opened: anything else is a bug in the host.
@@ -114,12 +128,11 @@ export function makeInProcessRun(session: string, journal: Journal, toolStart: (
     switch (e.type) {
       case "agent_end": {
         const last = e.messages.at(-1);
-        if (last?.role === "assistant" && last.stopReason === "aborted" && !ending) outcome = "interrupted";
+        if (last?.stopReason === "aborted" && !ending) outcome = "interrupted";
         return finish();
       }
       case "message_end": {
         const m = e.message;
-        if (m.role !== "assistant") return;
         await going();
         for (const part of m.content) if (part.type === "thinking" && part.thinking) journal.thought(part.thinking);
         const text = messageText(m).trim();
@@ -173,7 +186,17 @@ export function makeInProcessRun(session: string, journal: Journal, toolStart: (
     resume: (input) => {
       resuming = input;
     },
+    adopt: (id) => {
+      run = id;
+      journal.runResumed(id);
+      outcome = "completed";
+      summary = "";
+      heard = [];
+    },
     close,
+    leave: () => {
+      closed = true;
+    },
     currentRun,
   };
 }
@@ -202,6 +225,11 @@ export function recording(deps: { readonly db: Db; readonly clock: Clock }) {
       await tried(() => qr.heardInRun(db.sql, { heard: jsonText(heard), id }));
     },
     issues: async (run: string) => (await tried(() => qi.runIssues(db.sql, { run }))).map((row) => issueId(row.issue)),
+    /** The session's run not ended yet: at most one, left open by a restart. */
+    unended: async (session: string) => {
+      const row = (await tried(() => qr.openRuns(db.sql))).findLast((r) => r.session === session);
+      return row === undefined ? undefined : { id: row.id, startedAt: row.started_at };
+    },
     finish: async (id: string, outcome: Outcome, summary: string, spent?: Spent) => {
       const at = clock.now();
       await tried(() => qr.endRun(db.sql, { ended_at: at, outcome, summary: summary || null, spent: spent ? jsonText(spent) : null, id }));

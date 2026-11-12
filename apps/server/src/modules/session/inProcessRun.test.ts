@@ -1,11 +1,10 @@
+import { type StopReason } from "@earendil-works/pi-ai";
 import { describe, expect, test } from "vite-plus/test";
-
-import type { CoreEvent } from "@vibevalley/agent/brain";
-import type { StopReason } from "@vibevalley/ai/messages";
-import { assistantMessage, text, thinking } from "@vibevalley/ai/testing";
 
 import { keptLog } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
+import { type RunEvent as CoreEvent } from "#/modules/session/inProcessRun.ts";
+import { assistantMessage, text, thinking } from "#/testing/model.ts";
 import { world } from "#/testing/world.ts";
 import * as qs from "#db/session.sql.ts";
 

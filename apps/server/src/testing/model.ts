@@ -1,34 +1,52 @@
+import type {
+  Api,
+  AssistantMessage,
+  AssistantMessageEvent,
+  Message,
+  Model,
+  StopReason,
+  TextContent,
+  ThinkingContent,
+  ThinkingLevel,
+  Tool,
+  ToolCall,
+  Usage,
+} from "@earendil-works/pi-ai";
+
 import { reasonOf, throwIfAborted } from "@vibevalley/async";
 
-import { jsonText, parsedJson } from "../base/json.ts";
-import type { AssistantMessage, Context, StopReason, TextContent, ThinkingContent, ToolCall, Usage } from "../base/messages.ts";
-import { zeroUsage } from "../base/messages.ts";
-import type { Model } from "../base/models.ts";
-import { models } from "../base/models.ts";
-import type { Llm } from "../llm/llm.ts";
-import type { RequestOptions } from "../llm/request.ts";
-import type { AssistantMessageEvent } from "../llm/response.ts";
+import { messageText, type ModelMessage } from "#/modules/runtime/durable.ts";
 
 export const text = (t: string): TextContent => ({ type: "text", text: t });
 export const thinking = (t: string): ThinkingContent => ({ type: "thinking", thinking: t, thinkingSignature: "reasoning_content" });
-export const toolCall = (name: string, args: Record<string, unknown>, id?: string): ToolCall => ({
+export const toolCall = (name: string, args: ToolCall["arguments"], id?: string): ToolCall => ({
   type: "toolCall",
   id: id ?? `call_${name}`,
   name,
   arguments: args,
 });
 
+const zeroUsage = (): Usage => ({
+  input: 0,
+  output: 0,
+  cacheRead: 0,
+  cacheWrite: 0,
+  totalTokens: 0,
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+});
+
+/** An answer as DeepSeek's would be kept, for a test that builds a turn by hand. */
 export const assistantMessage = (
   content: string | readonly (TextContent | ThinkingContent | ToolCall)[],
   more: Partial<Omit<AssistantMessage, "role" | "content">> = {},
 ): AssistantMessage => {
-  const blocks = typeof content === "string" ? [text(content)] : content;
+  const blocks = typeof content === "string" ? [text(content)] : [...content];
   return {
     role: "assistant",
     content: blocks,
-    api: testModel.api,
-    provider: testModel.provider,
-    model: testModel.id,
+    api: "openai-completions",
+    provider: "deepseek",
+    model: "deepseek-flash",
     usage: zeroUsage(),
     stopReason: blocks.some((c) => c.type === "toolCall") ? "toolUse" : "stop",
     timestamp: 0,
@@ -52,19 +70,33 @@ export const answer = (content: string | readonly (TextContent | ThinkingContent
   ...more,
 });
 
+/** One request as the model is asked it: the prompt and tools the transcript leads with, and the messages. */
+export interface Request {
+  readonly system: string;
+  readonly tools: readonly Tool[];
+  readonly messages: readonly ModelMessage[];
+  readonly model: Model<Api>;
+  readonly options: { readonly reasoning?: ThinkingLevel; readonly maxTokens?: number };
+}
+
 export type Reply = (request: Request) => Answer | Promise<Answer>;
 
 export type Step = Answer | Reply;
 
-export interface Request extends Context {
-  readonly model: Model;
-  readonly options: RequestOptions;
+/** A model a test seats on the farm's DeepSeek: each request streams its answer's events. */
+export interface ScriptedModel {
+  readonly stream: (request: Request, signal?: AbortSignal) => AsyncIterable<AssistantMessageEvent>;
 }
 
-export const testModel: Model = models[0];
+export const systemPrompt = (r: Request) => r.system;
+export const toolsOf = (r: Request) => r.tools;
+export const lastUser = (r: { readonly messages: readonly Message[] }) => {
+  const m = r.messages.findLast((x) => x.role === "user");
+  return m?.role === "user" ? messageText(m) : "";
+};
 
 /** The events an answer streams as, a text a character at a time (enough to see a stream move). */
-function eventsOf(model: Model, a: Answer, timestamp: number): { events: AssistantMessageEvent[]; hangsAt: number | undefined } {
+function eventsOf(model: Model<Api>, a: Answer): { events: AssistantMessageEvent[]; hangsAt: number | undefined } {
   const content: (TextContent | ThinkingContent | ToolCall)[] = [];
   const calls = a.content.some((c) => c.type === "toolCall");
   const stopReason: StopReason = a.stopReason ?? (calls ? "toolUse" : "stop");
@@ -81,7 +113,7 @@ function eventsOf(model: Model, a: Answer, timestamp: number): { events: Assista
     model: model.id,
     usage: usage(),
     stopReason,
-    timestamp,
+    timestamp: 0,
     ...(a.errorMessage !== undefined ? { errorMessage: a.errorMessage } : {}),
   });
   const events: AssistantMessageEvent[] = [{ type: "start", partial: message() }];
@@ -92,7 +124,7 @@ function eventsOf(model: Model, a: Answer, timestamp: number): { events: Assista
     if (block.type === "toolCall") {
       content.push(block);
       events.push({ type: "toolcall_start", contentIndex: i, partial: message() });
-      events.push({ type: "toolcall_delta", contentIndex: i, delta: jsonText(block.arguments), partial: message() });
+      events.push({ type: "toolcall_delta", contentIndex: i, delta: JSON.stringify(block.arguments), partial: message() });
       events.push({ type: "toolcall_end", contentIndex: i, toolCall: block, partial: message() });
       continue;
     }
@@ -126,12 +158,11 @@ const hang = (signal: AbortSignal | undefined) =>
 
 /** Each request takes the next step, its events a tick apart as a stream's; one past the script is a failed answer
  * saying so. */
-export function scriptedLlm(steps: readonly Step[]) {
+export function scriptedLLM(steps: readonly Step[] = []) {
   const script = [...steps];
   let next = 0;
   const requests: Request[] = [];
-  async function* stream(model: Model, context: Context, options: RequestOptions, signal?: AbortSignal): AsyncGenerator<AssistantMessageEvent> {
-    const request: Request = { ...structuredClone(context), model, options };
+  async function* stream(request: Request, signal?: AbortSignal): AsyncGenerator<AssistantMessageEvent> {
     requests.push(request);
     const i = next++;
     const step = script[i];
@@ -141,7 +172,7 @@ export function scriptedLlm(steps: readonly Step[]) {
         : typeof step === "function"
           ? await step(request)
           : step;
-    const { events, hangsAt } = eventsOf(model, a, 0);
+    const { events, hangsAt } = eventsOf(request.model, a);
     for (const e of hangsAt === undefined ? events : events.slice(0, hangsAt)) {
       await aTick();
       throwIfAborted(signal);
@@ -149,17 +180,7 @@ export function scriptedLlm(steps: readonly Step[]) {
     }
     if (hangsAt !== undefined) await hang(signal);
   }
-  const llm: Llm = {
-    stream,
-    // The script never fails on the wire: its failures are error answers, as a model's are.
-    complete: async (model, context, options, signal) => {
-      let last: AssistantMessageEvent | undefined;
-      for await (const e of stream(model, context, options, signal)) last = e;
-      if (last?.type === "done") return last.message;
-      if (last?.type === "error") return last.error;
-      throw new Error("a scripted stream ends with done or error");
-    },
-  };
+  const llm: ScriptedModel = { stream };
   return {
     llm,
     requests,
@@ -168,23 +189,3 @@ export function scriptedLlm(steps: readonly Step[]) {
     pending: () => Math.max(script.length - next, 0),
   };
 }
-
-/** One chat/completions stream chunk, as DeepSeek writes it. */
-export const chunk = (delta: Record<string, unknown>, finish: string | null = null, more: Record<string, unknown> = {}) =>
-  `data: ${jsonText({ id: "r", model: "deepseek-flash", choices: [{ index: 0, delta, finish_reason: finish }], ...more })}\n\n`;
-
-export interface Sent {
-  url: string;
-  authorization: string | undefined;
-  body: unknown;
-}
-
-/** A fetch that keeps what it was asked and answers body with status. */
-export const http =
-  (sent: Sent[], body: string | ReadableStream<Uint8Array>, status = 200): typeof fetch =>
-  async (input, init) => {
-    const request = new globalThis.Request(input, init);
-    const text = await request.text();
-    sent.push({ url: request.url, authorization: request.headers.get("authorization") ?? undefined, body: text === "" ? undefined : parsedJson(text) });
-    return new Response(body, { status });
-  };
