@@ -141,7 +141,7 @@ describe("mcp", () => {
       "session_list",
     ]);
     const extra = (await chat.post({ _tag: "User", text: "顺手做另一件事", channel: thread, sendKey: "extra" })).message;
-    const mailbox = farm.mailbox;
+    const mailbox = farm.session;
     await waitFor(
       () => mailbox.deliveriesOf(id).find((row) => row.envelope_id === extra.id)?.channel_id,
       (channel) => channel === thread,

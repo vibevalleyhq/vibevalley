@@ -9,16 +9,16 @@ import { BizCode, Inconsistent, lookIn, missing, refuseIn } from "#/base/errors.
 import { jsonOf, jsonText } from "#/base/json.ts";
 import { type Db, SqlError, causeMessage } from "#/infra/db.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
-import { NotRecorded, type Session } from "#/modules/session/session.ts";
 import { issueExists } from "#db/issue.sql.ts";
-import * as qd from "#db/mailbox_delivery.sql.ts";
-import * as qi from "#db/mailbox_issue.sql.ts";
-import * as qs from "#db/mailbox_subscription.sql.ts";
-import * as qr from "#db/mailbox_trigger.sql.ts";
+import * as qd from "#db/session_delivery.sql.ts";
+import * as qi from "#db/session_issue_input.sql.ts";
+import * as qs from "#db/session_subscription.sql.ts";
+import * as qr from "#db/session_trigger.sql.ts";
 
 import { agentWakeCooldownMs, brakes, hopLimit, hopLimitText, type Recipient, type Reach, type WakeBreaker } from "./brakes.ts";
 import type { Deliveries, DeliveryDraft, DeliveryRow } from "./deliveries.ts";
 import { channelType, type ChannelRouteResult } from "./envelope.ts";
+import { type Lifecycle, NotRecorded } from "./lifecycle.ts";
 import type { InsertDelivery, TalkRow } from "./mailbox.ts";
 import { readPayload, deliveryScope, triggerPayload } from "./payload.ts";
 import { handbackWords, releasedInputWords } from "./prompts.ts";
@@ -64,7 +64,7 @@ const readTrigger = jsonOf(S.Trigger, "mailbox.trigger_json");
 export interface WorkDeps {
   readonly db: Db;
   readonly clock: Clock;
-  readonly session: Session;
+  readonly session: Lifecycle;
   readonly agent: Agent;
 }
 

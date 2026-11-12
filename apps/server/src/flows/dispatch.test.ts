@@ -17,14 +17,14 @@ test("regression: an orchestrator assignment survives startup and an acknowledge
     const item = await testIssues(issues).add({ title: "durable assignment", agent: defaultOrchestrator });
     await testIssues(issues).start(item.id, fw.channel.defaultChannel());
     const sql = sqlOf(fw.db);
-    const rows = await sql<{ id: string }>`select id from mailbox_trigger
+    const rows = await sql<{ id: string }>`select id from session_trigger
         where trigger_json::jsonb->'meta'->>'issue' = ${item.id} and trigger_json::jsonb->'meta'->'dispatch' = 'true'
         order by seq desc limit 1`;
     triggerId = rows[0]?.id ?? "";
     issueId = item.id;
   }
   const issues = fw.issue;
-  const mailbox = fw.mailbox;
+  const mailbox = fw.session;
   const sql = sqlOf(fw.db);
   const source = (await mailbox.readTrigger(triggerId))!;
   expect(source.payload.text).toBe("durable assignment");
@@ -32,17 +32,17 @@ test("regression: an orchestrator assignment survives startup and an acknowledge
   expect(queued.status).toBe("todo");
   expect(queued.lastRun).toBeUndefined();
   // A crash between the trigger's write and its hand-off: the row is there, routed to no one.
-  await sql`delete from mailbox_delivery where envelope_id = ${triggerId}`;
-  await sql`delete from mailbox_issue where trigger_id = ${triggerId}`;
-  await sql`update mailbox_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${triggerId}`;
-  await mailbox.boot();
-  await fw.mailbox.replay();
-  const deliveries = await sql`select session_id, envelope_id from mailbox_delivery where envelope_id = ${triggerId}`;
+  await sql`delete from session_delivery where envelope_id = ${triggerId}`;
+  await sql`delete from session_issue_input where trigger_id = ${triggerId}`;
+  await sql`update session_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${triggerId}`;
+  await mailbox.wake();
+  await fw.session.replay();
+  const deliveries = await sql`select session_id, envelope_id from session_delivery where envelope_id = ${triggerId}`;
   expect(deliveries).toHaveLength(1);
   // A second replay of the same unrouted row acknowledges no second delivery.
-  await sql`update mailbox_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${triggerId}`;
+  await sql`update session_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${triggerId}`;
   await fw.issue.refreshQueue();
-  const rows = await sql`select session_id, envelope_id from mailbox_delivery where envelope_id = ${triggerId}`;
+  const rows = await sql`select session_id, envelope_id from session_delivery where envelope_id = ${triggerId}`;
   expect(rows).toEqual(deliveries);
   const rows2 = await sql`select id from channel_message where body = ${source.payload.text}`;
   expect(rows2).toHaveLength(0);

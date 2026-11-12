@@ -29,7 +29,7 @@ async function flowWorld(options: WorldOptions): Promise<FlowWorld> {
     // services.ts's startup order, for what is in it.
     await below.session.boot();
     await below.channel.boot();
-    await below.mailbox.boot();
+    await below.session.wake();
     await below.media.boot();
     await below.inbox.boot();
     return { ...below, game };

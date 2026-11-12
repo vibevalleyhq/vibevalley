@@ -11,11 +11,10 @@ import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
-import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
-import type { Trigger } from "#/modules/mailbox/shapes.ts";
 import { issueBranch, type Repo } from "#/modules/repo/repo.ts";
 import { RepoError } from "#/modules/repo/workplace.ts";
 import { NotRecorded, type Session } from "#/modules/session/session.ts";
+import type { Trigger } from "#/modules/session/shapes.ts";
 import * as q from "#db/issue.sql.ts";
 
 import { issueBrief, splitBrief } from "./brief.ts";
@@ -38,7 +37,6 @@ export interface IssueParts {
   readonly agent: Agent;
   readonly repo: Repo;
   readonly session: Session;
-  readonly mailbox: Mailbox;
   readonly db: Db;
   readonly clock: Time;
   readonly log: Logger;
@@ -47,7 +45,7 @@ export interface IssueParts {
 export type IssueLifecycle = Awaited<ReturnType<typeof issueLifecycle>>;
 
 export async function issueLifecycle(deps: IssueParts) {
-  const { core, agent: agents, repo: repos, session: sessions, mailbox, db, clock, log } = deps;
+  const { core, agent: agents, repo: repos, session: sessions, db, clock, log } = deps;
   const store = await makeIssueStore({ core, db });
 
   const loadKept = async () => {
@@ -378,9 +376,9 @@ export async function issueLifecycle(deps: IssueParts) {
     });
   };
 
-  const withdrawDispatches = (id: string, at: number) => mailbox.withdraw({ _tag: "Issue", issue: id, at });
+  const withdrawDispatches = (id: string, at: number) => sessions.withdraw({ _tag: "Issue", issue: id, at });
 
-  const route = (dispatch: Trigger) => bestEffort(log, `issue: route ${dispatch.id}`, () => mailbox.receive({ _tag: "Trigger", trigger: dispatch }));
+  const route = (dispatch: Trigger) => bestEffort(log, `issue: route ${dispatch.id}`, () => sessions.receive({ _tag: "Trigger", trigger: dispatch }));
 
   /** The issue already owns its number and workplace before its session starts. Throws NotRecorded when the database does not keep it. */
   const recordHiredStart = async (id: string, session: T.Session) => {
@@ -404,7 +402,7 @@ export async function issueLifecycle(deps: IssueParts) {
       await q.queueIssue(db.sql, { id: issue.id, at: assignedAt });
       await store.executeInTx(issue.id, agent, agent, assignedAt, () => publish(issue.id));
       if (input)
-        dispatch = await mailbox.recordTrigger({
+        dispatch = await sessions.recordTrigger({
           source: "workbench",
           key: newId(),
           actor: { kind: "system", id: "system" },
@@ -432,7 +430,7 @@ export async function issueLifecycle(deps: IssueParts) {
       }
       const changed = await q.queueIssue(db.sql, { at, id });
       if (changed.length > 0 && !source)
-        dispatch = await mailbox.recordTrigger({
+        dispatch = await sessions.recordTrigger({
           source: "workbench",
           key: newId(),
           actor: { kind: "system", id: "system" },
@@ -501,7 +499,7 @@ export async function issueLifecycle(deps: IssueParts) {
           });
         for (const row of rows) {
           await q.addIssue(db.sql, issueRow(row.id, row.req, parentMandate, at));
-          const triggerRecorded = await mailbox.recordTrigger({
+          const triggerRecorded = await sessions.recordTrigger({
             source: "workbench",
             key: newId(),
             actor: { kind: "system", id: "system" },

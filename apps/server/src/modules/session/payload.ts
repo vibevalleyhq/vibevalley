@@ -26,7 +26,7 @@ const Payload = z.object({
   context: MS.TriggerContext,
   channelType: S.ChannelType,
 }) satisfies z.ZodType<DeliveryPayload, S.Wire<DeliveryPayload>>;
-export const readPayload = jsonOf(Payload, "mailbox_delivery.payload_json");
+export const readPayload = jsonOf(Payload, "session_delivery.payload_json");
 
 export interface TriggerInput {
   /** A channel message's own id, so its trigger and its deliveries share it; otherwise made from source and key. */

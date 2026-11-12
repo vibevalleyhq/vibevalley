@@ -13,8 +13,7 @@ import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import type { Attachment } from "#/modules/attachment/attachment.ts";
-import { heldShown, type Envelope, type Picked, retryWindowMs } from "#/modules/mailbox/envelope.ts";
-import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
+import { heldShown, type Envelope, type Picked, retryWindowMs } from "#/modules/session/envelope.ts";
 import type { Session } from "#/modules/session/session.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qr from "#db/channel_read_cursor.sql.ts";
@@ -55,7 +54,6 @@ export interface ChannelDeps {
   readonly agent: Agent;
   readonly attachment: Attachment;
   readonly session: Session;
-  readonly mailbox: Mailbox;
 }
 
 /** A subscription's values that keep, as f makes them (undefined: dropped). */
@@ -89,7 +87,7 @@ function mapped<A, B>(sub: Subscription<A>, f: (a: A) => B | undefined): Subscri
 }
 
 export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
-  const { core, agent: agents, db, clock, session: sessions, mailbox } = deps;
+  const { core, agent: agents, db, clock, session: sessions } = deps;
   const log = deps.log.child("channel");
   const tasks = new TaskGroup({ name: "channel", onError: (task, e) => log.warn(`${task} failed`, e) });
   const own = { ...deps, log };
@@ -227,7 +225,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         const channel = sessionOf(session)?.channel;
         const at = clock.now();
         const speaker = sessionOf(from);
-        const trigger = await mailbox.recordTrigger({
+        const trigger = await sessions.recordTrigger({
           source: "channel",
           key: sendKey || newId(at),
           actor:
@@ -240,7 +238,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
           ...(channel ? { replyChannel: channel } : {}),
           at,
         });
-        await mailbox.receive({ _tag: "Trigger", trigger, to: { session } });
+        await sessions.receive({ _tag: "Trigger", trigger, to: { session } });
         return undefined;
       }
       const run = sessions.runOf(from);
@@ -464,13 +462,13 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         const row = await messageOf(id);
         if (row.deleted_at !== null) throw refused(t("server.channel.messageGone"));
         await change(row, (revision, now) => qm.deleteMessage(db.sql, { at: now, revision, id }));
-        await mailbox.withdraw({ _tag: "Envelope", envelope: id });
+        await sessions.withdraw({ _tag: "Envelope", envelope: id });
       }),
     previewRemove: async (id) => {
       const row = await messageOf(id);
       if (row.deleted_at !== null) throw refused(t("server.channel.messageGone"));
       const ch = store.channel(row.channel_id);
-      const waiting = await mailbox.waitingOn(id);
+      const waiting = await sessions.waitingOn(id);
       return {
         does: [
           t("server.channel.deletes", { target: ch ? targetOfChannel(ch) : "", number: row.number, name: row.sender_name, text: lineOf(row.body, lastMax) }),
@@ -632,7 +630,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
       directs.close();
     }
   });
-  const deliveries = mailbox.news();
+  const deliveries = sessions.deliveries();
   tasks.run("chat: delivery news", async (signal) => {
     try {
       for (let n = await deliveries.next(signal); n.done !== true; n = await deliveries.next(signal)) {

@@ -648,7 +648,7 @@ describe("issues", () => {
       (
         await w.db.sql.query(
           `select t.trigger_json::jsonb->>'replyChannel' as channel
-        from mailbox_issue m join mailbox_trigger t on t.id = m.trigger_id where m.issue_id = $1 and m.state = 'held'`,
+        from session_issue_input m join session_trigger t on t.id = m.trigger_id where m.issue_id = $1 and m.state = 'held'`,
           [issue.id],
         )
       ).map((r) => r["channel"]),
@@ -668,7 +668,7 @@ describe("issues", () => {
       "the queued run",
     );
     expect((await sessions.issueRuns(issue.id))[0]!.triggeredBy.kind).toBe("issue");
-    const rows = await w.db.sql.query(`select 1 from mailbox_issue where issue_id = $1 and state = 'held'`, [issue.id]);
+    const rows = await w.db.sql.query(`select 1 from session_issue_input where issue_id = $1 and state = 'held'`, [issue.id]);
     expect(rows).toEqual([]);
   });
 

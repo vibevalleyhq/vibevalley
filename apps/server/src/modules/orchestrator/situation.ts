@@ -2,9 +2,9 @@ import { t } from "@vibevalley/i18n";
 import { userId, quotaLow, type RunTrigger, type RuntimeInfo } from "@vibevalley/protocol";
 
 import { head } from "#/base/clip.ts";
-import { type Envelope } from "#/modules/mailbox/envelope.ts";
-import { messageLine } from "#/modules/mailbox/prompts.ts";
 import { yuan } from "#/modules/runtime/quota.ts";
+import { type Envelope } from "#/modules/session/envelope.ts";
+import { messageLine } from "#/modules/session/prompts.ts";
 
 import { lineWords, quotaWords, situationWords, sourceHead } from "./prompts.ts";
 

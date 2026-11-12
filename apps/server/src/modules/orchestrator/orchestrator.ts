@@ -17,13 +17,12 @@ import { traitsOf } from "#/modules/agent/prompts.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { Cron } from "#/modules/cron/cron.ts";
 import { nextRun } from "#/modules/cron/when.ts";
-import type { Handed, Picked } from "#/modules/mailbox/envelope.ts";
-import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
 import type { Pkm } from "#/modules/pkm/pkm.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
 import { defaultModel } from "#/modules/runtime/durable.ts";
 import { runtimeLabel } from "#/modules/runtime/presets.ts";
 import type { Runtime } from "#/modules/runtime/runtime.ts";
+import type { Handed, Picked } from "#/modules/session/envelope.ts";
 import { type AgentHost, SubmitRefused } from "#/modules/session/host.ts";
 import type { Session } from "#/modules/session/session.ts";
 import { answers as toolAnswers, channelLine } from "#/modules/tool/prompts.ts";
@@ -103,15 +102,14 @@ export interface OrchestratorDeps {
   readonly pkm: Pkm;
   readonly session: Session;
   readonly channel: Channel;
-  readonly mailbox: Mailbox;
   readonly cron: Cron;
   readonly tool: Tool;
 }
 
 export async function makeOrchestrator(deps: OrchestratorDeps, options: OrchestratorOptions = {}): Promise<Orchestrator> {
-  const { clock, config, agent: store, runtime: runtimes, repo: repos, pkm: notes, session: run, channel: chat, mailbox, cron, tool } = deps;
+  const { clock, config, agent: store, runtime: runtimes, repo: repos, pkm: notes, session: run, channel: chat, cron, tool } = deps;
   const log = deps.log.child("orchestrator");
-  const responses = makeResponses(mailbox, chat, clock);
+  const responses = makeResponses(run, chat, clock);
   const tasks = new TaskGroup({ name: "orchestrator", onError: (task, e) => log.error(`vibevalley: the orchestrator's ${task} failed`, e) });
 
   const toolsFor = (id: string) => (current: () => HostContext) =>
@@ -215,7 +213,7 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
   };
 
   const news = async (me: Instance): Promise<[string, string[]]> => {
-    const digest = await mailbox.orchestratorDigest(me.id);
+    const digest = await run.orchestratorDigest(me.id);
     return digest.length === 0 ? ["", []] : [situationWords.news(orchestratorEnvelopeLines(digest)), digest.map((m) => m.id)];
   };
 
@@ -233,7 +231,7 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
     return note;
   };
 
-  /** Whether the orchestrator took the line in; one it did not is handed back to the mailbox. */
+  /** Whether the orchestrator took the line in; one it did not is handed back to the run. */
   const heardInChat = async (n: Handed): Promise<void> => {
     const fromPerson = n.messages.every((m) => m.from === userId);
     const user = n.messages.some((m) => m.from === userId);
@@ -304,12 +302,12 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
       log.error(`vibevalley: the orchestrator could not take ${source}:`, e);
       taken = false;
     }
-    if (!taken) for (const message of n.messages) await mailbox.handBack(n.agent, message.id);
+    if (!taken) for (const message of n.messages) await run.handBack(n.agent, message.id);
   };
 
   if (options.listen ?? true) {
     // Subscribed now, before anything the modules after it start can hand a line over.
-    const heard = mailbox.news();
+    const heard = run.deliveries();
     tasks.run("hearing", async (signal) => {
       try {
         for (;;) {

@@ -136,8 +136,8 @@ function resourceRef(uri: string): ResourceRef | undefined {
 
 const textOf = (value: unknown): string => JSON.stringify(value, null, 2);
 
-export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "session" | "mailbox" | "repo">) {
-  const { channel: channels, issue: issues, session: sessions, mailbox, repo: repos } = deps;
+export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "session" | "repo">) {
+  const { channel: channels, issue: issues, session: sessions, repo: repos } = deps;
   const cache = new TextCache(cacheBytes);
 
   const ownSession = (id: string) => sessions.sessionOf(id);
@@ -178,7 +178,7 @@ export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "s
       case "trigger": {
         let resource;
         try {
-          resource = await mailbox.readTrigger(ref.id);
+          resource = await sessions.readTrigger(ref.id);
         } catch (error) {
           throw new ResourceError(messageOf(error), { cause: error });
         }
@@ -186,7 +186,7 @@ export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "s
         let permitted = orchestrator;
         if (session?.issue && !permitted) permitted = (await issues.get(session.issue)).mandate.originTriggerId === ref.id;
         if (session && !permitted) {
-          const owner = await mailbox.ownerOf(ref.id);
+          const owner = await sessions.ownerOf(ref.id);
           if (owner) {
             const ownerIssue = await issues.get(owner);
             permitted = await mayReadIssue(session, ownerIssue);

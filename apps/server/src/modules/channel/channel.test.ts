@@ -25,10 +25,11 @@ import { makeAgent } from "#/modules/agent/agent.ts";
 import builtIn from "#/modules/agent/templates/orchestrator/agent.json" with { type: "json" };
 import { type Attachment, makeAttachment } from "#/modules/attachment/attachment.ts";
 import { effectsOf } from "#/modules/game/view.ts";
-import { wakeBreaker } from "#/modules/mailbox/brakes.ts";
-import { type Handed, orchestratorIn } from "#/modules/mailbox/envelope.ts";
-import { type Mailbox, makeMailbox } from "#/modules/mailbox/mailbox.ts";
+import { wakeBreaker } from "#/modules/session/brakes.ts";
+import { type Handed, orchestratorIn } from "#/modules/session/envelope.ts";
 import { restoredSession, sessionState } from "#/modules/session/history.ts";
+import type { Lifecycle } from "#/modules/session/lifecycle.ts";
+import { type Mailbox, makeMailbox } from "#/modules/session/mailbox.ts";
 import { summaryOf } from "#/modules/session/report.ts";
 import { sessionOnIssue } from "#/modules/session/roster.ts";
 import { DeliveryRefused, newsOf, type Session, type SessionNews } from "#/modules/session/session.ts";
@@ -184,11 +185,12 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
     news: () => x.news.subscribe(),
   };
   // A test double of the few members the chat and the mailbox use.
-  const session = played as unknown as Session;
+  const lifecycle = played as unknown as Lifecycle;
   const agent = await makeAgent({ config: c, clock, log });
-  const mailbox = await makeMailbox({ db, clock, log, config: c, core, agent, session });
+  const mailbox = await makeMailbox({ db, clock, log, config: c, core, agent, session: lifecycle });
+  const session = { ...played, ...mailbox, news: played.news, deliveries: mailbox.news } as unknown as Session;
   const attachment = await makeAttachment({ config: c, clock, db });
-  const chat = await makeChannel({ clock, log, fetch: offline, db, core, agent, attachment, session, mailbox });
+  const chat = await makeChannel({ clock, log, fetch: offline, db, core, agent, attachment, session });
   const { changes: moves } = core.transitions();
   const relay = (async () => {
     for await (const { fact, after } of moves) {
@@ -202,7 +204,7 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
   const deliveries = async (recipient: string) =>
     (
       await db.sql.query(
-        "select envelope_id, reason, wakes, coalesce(held_by, '') as held_by, state from mailbox_delivery where session_id = $1 order by envelope_id",
+        "select envelope_id, reason, wakes, coalesce(held_by, '') as held_by, state from session_delivery where session_id = $1 order by envelope_id",
         [recipient],
       )
     ).map((row) => DeliveryRow.parse(row));
@@ -698,7 +700,7 @@ describe("the chat", () => {
       const thread = await f.chat.threadOfSession("o2");
       expect(thread).toBeUndefined();
       await f.chat.post({ _tag: "Tell", from: userId, session: "o2", text: "直接说给它", sendKey: "" });
-      const recorded = (await f.sql(`select id from mailbox_trigger where trigger_json like $1`, ["%直接说给它%"])).map((r) => ({ id: String(r["id"]) }));
+      const recorded = (await f.sql(`select id from session_trigger where trigger_json like $1`, ["%直接说给它%"])).map((r) => ({ id: String(r["id"]) }));
       expect(recorded).toHaveLength(1);
       await until(async () => (await f.deliveryOf("o2", recorded[0]!.id)) !== undefined, "its delivery");
       const delivered = await f.deliveryOf("o2", recorded[0]!.id);
@@ -866,8 +868,8 @@ describe("the chat", () => {
       thread = await hireAndRun(f, x, "w15", "write route", "chat-route");
       message = (await f.chat.post({ _tag: "User", text: "recover this input", channel: thread.id, sendKey: "route-gap" })).message;
       await until(async () => (await f.deliveryOf("w15", message.id))?.state === "consumed", "the first route");
-      await f.sql(`delete from mailbox_delivery where envelope_id = $1`, [message.id]);
-      await f.sql(`update mailbox_trigger set routed_at = null, routing_scope = null, routing_position = null where id = $1`, [message.id]);
+      await f.sql(`delete from session_delivery where envelope_id = $1`, [message.id]);
+      await f.sql(`update session_trigger set routed_at = null, routing_scope = null, routing_position = null where id = $1`, [message.id]);
     }, config);
     await run(async (_f, x) => {
       x.holds = false;
@@ -884,7 +886,7 @@ describe("the chat", () => {
       const stuck = (await f.chat.post({ _tag: "User", text: "this one cannot be routed", channel: thread.id, sendKey: "stuck" })).message;
       await until(async () => (await f.deliveryOf("w16", stuck.id))?.state === "consumed", "the first route");
       // A receipt that no longer reads: routing it fails every time it is tried.
-      await f.sql(`update mailbox_trigger set routed_at = null, routing_scope = null, routing_position = null, trigger_json = 'not json' where id = $1`, [
+      await f.sql(`update session_trigger set routed_at = null, routing_scope = null, routing_position = null, trigger_json = 'not json' where id = $1`, [
         stuck.id,
       ]);
     }, config);
@@ -1090,20 +1092,20 @@ describe("the chat", () => {
     run(async (f, x) => {
       await hire(f, x, "w1", "first", "demo");
       await hire(f, x, "w2", "second", "demo");
-      await trigger(f.db, "fail_second_recipient", "before insert on mailbox_delivery", "new.session_id = 'w2'");
+      await trigger(f.db, "fail_second_recipient", "before insert on session_delivery", "new.session_id = 'w2'");
       expect(await outcome(f.chat.post({ _tag: "User", text: "@w1 @w2 atomic fanout", sendKey: "fanout-key" }))).toBe("Failure");
       const [message] = await f.sql(`select id from channel_message where send_key = 'fanout-key'`);
       expect(message).toBeDefined();
       const id = String(message!["id"]);
-      const rows = await f.sql(`select session_id from mailbox_delivery where envelope_id = $1`, [id]);
+      const rows = await f.sql(`select session_id from session_delivery where envelope_id = $1`, [id]);
       expect(rows).toEqual([]);
       const registered2 = await f.mailbox.isRouted(id);
       expect(registered2).toBe(false);
       expect(f.mailbox.deliveriesOf("w1").some((row) => row.envelope_id === id)).toBe(false);
-      await drop(f.db, "fail_second_recipient", "mailbox_delivery");
+      await drop(f.db, "fail_second_recipient", "session_delivery");
       await f.chat.boot();
       await f.chat.boot();
-      const rows2 = await f.sql(`select session_id from mailbox_delivery where envelope_id = $1 order by session_id`, [id]);
+      const rows2 = await f.sql(`select session_id from session_delivery where envelope_id = $1 order by session_id`, [id]);
       expect(rows2).toEqual([{ session_id: "w1" }, { session_id: "w2" }]);
       const registered3 = await f.mailbox.isRouted(id);
       expect(registered3).toBe(true);

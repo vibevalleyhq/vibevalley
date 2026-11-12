@@ -65,8 +65,8 @@ const createRefusalWords = (refusal: IssueCreateRefused): string => {
   }
 };
 
-export function issueTools(deps: Pick<ToolDeps, "clock" | "log" | "agent" | "session" | "issue" | "mailbox">) {
-  const { clock, agent: agents, session: run, issue, mailbox } = deps;
+export function issueTools(deps: Pick<ToolDeps, "clock" | "log" | "agent" | "session" | "issue">) {
+  const { clock, agent: agents, session: run, issue } = deps;
   const log = deps.log.child("tool");
 
   // Resolves `#41`, `41`, an issue id, or the name or id of a helper working it via Issue.get / Issue.idOf.
@@ -140,7 +140,7 @@ export function issueTools(deps: Pick<ToolDeps, "clock" | "log" | "agent" | "ses
   const issueHandback = (who: Who) =>
     customTool("issue_handback", issueHandbackDescription, IssueHandbackInput, async ({ envelope, reason }) => {
       const caller = callerOf(who);
-      await mailbox.decline(caller.session, envelope, reason);
+      await run.decline(caller.session, envelope, reason);
       return issueHandbackRecorded;
     });
 

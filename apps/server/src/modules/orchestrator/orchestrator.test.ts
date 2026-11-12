@@ -291,7 +291,7 @@ describe("the orchestrator", () => {
     let got = "";
     for await (const piece of onPhone(response, "现在地里怎么样")) got += piece;
     expect(got).toBe("收到\n");
-    const rows = await f.farm.db.sql.query(`select d.source, m.meta from mailbox_delivery d
+    const rows = await f.farm.db.sql.query(`select d.source, m.meta from session_delivery d
           join channel_message m on m.id = d.message_id where m.body = '现在地里怎么样'`);
     expect(rows).toEqual([
       {
@@ -333,7 +333,7 @@ describe("the orchestrator", () => {
     expect(briefSaid).toContain("#41 交回来了");
     const rows = await f.farm.db.sql.query(`select id from channel_message where body like '%【要告诉用户】%'`);
     expect(rows).toHaveLength(0);
-    const rows2 = await f.farm.db.sql.query(`select id from mailbox_trigger where payload_json::jsonb ->> 'text' = '【要告诉用户】
+    const rows2 = await f.farm.db.sql.query(`select id from session_trigger where payload_json::jsonb ->> 'text' = '【要告诉用户】
 - #41 交回来了'`);
     expect(rows2).toHaveLength(1);
   });
@@ -359,7 +359,7 @@ describe("the orchestrator", () => {
 
   it("a new interactive response ends the previous port that is still open", async () => {
     await using f = await farm();
-    const responses = makeResponses(f.farm.mailbox, f.farm.channel, f.farm.clock);
+    const responses = makeResponses(f.farm.session, f.farm.channel, f.farm.clock);
     const collect = async (words: AsyncIterable<string>) => {
       const out: string[] = [];
       for await (const w of words) out.push(w);
@@ -629,7 +629,7 @@ describe("the orchestrator", () => {
     expect(f.requests.some((c) => lastLine(c).includes("【巡查】"))).toBe(false);
     clock.adjust(3 * 3_600_000);
     await inbox.patrol();
-    expect(f.farm.mailbox.deliveriesOf(defaultOrchestrator).some((row) => row.source === "patrol" && row.urgency === "digest")).toBe(true);
+    expect(f.farm.session.deliveriesOf(defaultOrchestrator).some((row) => row.source === "patrol" && row.urgency === "digest")).toBe(true);
     await marked(f);
     const line = await until(() => f.requests.map(lastInput).find((input) => input.includes("【巡查】")), "the patrol digest");
     expect(line).toContain("「加个 CHANGELOG」");

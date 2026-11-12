@@ -3,7 +3,7 @@ import { expect, test } from "vite-plus/test";
 
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
-import { type SourceEvent } from "#/modules/mailbox/mailbox.ts";
+import { type SourceEvent } from "#/modules/session/mailbox.ts";
 import { committedDelivery } from "#/testing/deliveries.ts";
 import { testIssues } from "#/testing/world.ts";
 
@@ -22,7 +22,7 @@ const signal = (key: string, kind: "user" | "agent" = "agent", threads: readonly
 test("regression: concurrent mailbox writes and restoration leave every committed input in the cache", async () => {
   const f = farm();
   await using fw = await f.open();
-  const mailbox = fw.mailbox;
+  const mailbox = fw.session;
   const channel = fw.channel.defaultChannel();
   const recorded = [];
   for (let n = 0; n < 12; n++) recorded.push(await mailbox.record(signal(`concurrent-${n}`)));
@@ -47,7 +47,7 @@ test("regression: concurrent mailbox writes and restoration leave every committe
       },
     }),
   );
-  await Promise.all([...writes, mailbox.restore(), mailbox.restore()]);
+  await Promise.all([...writes, mailbox.restoreDeliveries(), mailbox.restoreDeliveries()]);
   expect(
     mailbox
       .deliveriesOf(defaultOrchestrator)
@@ -59,19 +59,19 @@ test("regression: concurrent mailbox writes and restoration leave every committe
 test("regression: independent input hops survive restore and only a new user receipt resets them", async () => {
   const f = farm();
   await using fw = await f.open();
-  const mailbox = fw.mailbox;
+  const mailbox = fw.session;
   const accept = (key: string, kind: "user" | "agent" = "agent") => mailbox.accept(signal(key, kind));
   for (const n of [1, 2, 3, 4, 5]) await accept(`before-user-${n}`);
   const rows = () => mailbox.deliveriesOf(defaultOrchestrator);
   expect(rows().map((row) => row.held_by)).toEqual([null, null, null, null, "hop_limit"]);
-  await mailbox.restore();
+  await mailbox.restoreDeliveries();
   const blocked = (await accept("after-restore"))!;
   expect(rows().find((row) => row.envelope_id === blocked.id)?.held_by).toBe("hop_limit");
   await accept("user-receipt", "user");
   const next = (await accept("after-user-1"))!;
   expect(rows().find((row) => row.envelope_id === next.id)?.held_by).toBeNull();
   await accept("user-receipt", "user");
-  await mailbox.restore();
+  await mailbox.restoreDeliveries();
   for (const n of [2, 3, 4]) await accept(`after-user-${n}`);
   const capped = (await accept("after-user-5"))!;
   expect(rows().find((row) => row.envelope_id === capped.id)?.held_by).toBe("hop_limit");
@@ -91,7 +91,7 @@ test("regression: queued triggers enter the first model request in receipt order
   await using fw = await f.open();
   const issue2 = fw.issue;
   const issues = testIssues(issue2);
-  const mailbox = fw.mailbox;
+  const mailbox = fw.session;
   await fw.agent.save(lab());
   const issue = await issues.add({ title: "work", agent: "lab", repo: "fifo" });
   const markers = ["FIFO_FIRST_CARD", "FIFO_SECOND_CARD", "FIFO_THIRD_CARD"];
@@ -133,7 +133,7 @@ test("regression: an independent agent wake restores cooldown using receipt time
   try {
     const issue2 = fw.issue;
     const issues = testIssues(issue2);
-    const mailbox = fw.mailbox;
+    const mailbox = fw.session;
     await fw.agent.save(lab());
     const issue = await issues.add({ title: "work", agent: "lab", repo: "cooldown" });
     const started = await issues.start(issue.id, "");
@@ -144,7 +144,7 @@ test("regression: an independent agent wake restores cooldown using receipt time
       () => steers().some((text) => text.includes("first-wake")) && !mailbox.deliveriesOf(started.session!).some((row) => row.envelope_id === first.id),
       "the first agent input consumed",
     );
-    await mailbox.restore();
+    await mailbox.restoreDeliveries();
     const second = (await mailbox.accept(signal("future-source-clock", "agent", threads, 9_000_000_000_000)))!;
     expect(mailbox.deliveriesOf(started.session!).find((row) => row.envelope_id === second.id)?.held_by).toBe("cooldown");
     const queued = (await mailbox.accept({

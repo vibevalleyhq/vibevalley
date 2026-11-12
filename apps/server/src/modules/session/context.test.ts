@@ -37,7 +37,7 @@ describe("an agent's channel context", () => {
     });
     await using farm = await world({ config, runtimes: [runtime] });
     const sessions = farm.session;
-    const machines = farm.machine;
+    const machines = farm.session;
     const executor = machines.executions(machines.here());
     const core = farm.core;
     const repos = farm.repo;
@@ -92,7 +92,7 @@ describe("an agent's channel context", () => {
     const runtime = scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("结论：回答了") });
     await using farm = await world({ runtimes: [runtime] });
     const sessions = farm.session;
-    const machines = farm.machine;
+    const machines = farm.session;
     const executor = machines.executions(machines.here());
     const core = farm.core;
     const chat = farm.channel;
@@ -195,7 +195,7 @@ describe("an agent's channel context", () => {
     {
       await using farm = await world({ config, runtimes: [runtime] });
       const sessions = farm.session;
-      const machines = farm.machine;
+      const machines = farm.session;
       const executor = machines.executions(machines.here());
       const core = farm.core;
       const agent = profile();

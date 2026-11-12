@@ -7,7 +7,7 @@ import type { Db } from "#/infra/db.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Runtime } from "#/modules/runtime/runtime.ts";
-import { addHereMachine, hereMachine } from "#db/machine.sql.ts";
+import { addHereMachine, hereMachine } from "#db/session_machine.sql.ts";
 
 import { type Executions, makeExecutor } from "./executor.ts";
 import { linked } from "./link.ts";

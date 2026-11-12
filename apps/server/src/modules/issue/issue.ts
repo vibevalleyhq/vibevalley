@@ -16,11 +16,10 @@ import type { Agent } from "#/modules/agent/agent.ts";
 import { templateCatalog } from "#/modules/agent/seed.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { Due } from "#/modules/cron/cron.ts";
-import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
-import type { Trigger } from "#/modules/mailbox/shapes.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
 import type { Runtime } from "#/modules/runtime/runtime.ts";
 import type { Hired, HireOptions, SessionNews, Session } from "#/modules/session/session.ts";
+import type { Trigger } from "#/modules/session/shapes.ts";
 
 import { findingsOf, milestonesOf } from "./brief.ts";
 import { explicitMandate, filledKinds, inferredMandate, mandateNoteFits, sentTitles } from "./creation.ts";
@@ -163,7 +162,6 @@ export interface IssueDeps {
   readonly runtime: Runtime;
   readonly session: Session;
   readonly channel: Channel;
-  readonly mailbox: Mailbox;
 }
 
 export interface IssueReviewRequest {
@@ -181,10 +179,10 @@ function failedText(findings: readonly T.Finding[], text: string): string {
 }
 
 export async function makeIssue(deps: IssueDeps): Promise<Issue> {
-  const { config, clock, core, agent: store, repo: repos, runtime: runtimes, session: sessions, channel: chat, mailbox, db } = deps;
+  const { config, clock, core, agent: store, repo: repos, runtime: runtimes, session: sessions, channel: chat, db } = deps;
   const log = deps.log.child("issue");
   const tasks = new TaskGroup({ name: "issue", onError: (task, e) => log.error(`${task} failed:`, e) });
-  const r = await issueLifecycle({ core, agent: store, repo: repos, session: sessions, mailbox, db, clock, log });
+  const r = await issueLifecycle({ core, agent: store, repo: repos, session: sessions, db, clock, log });
   const {
     issueOfSession,
     loadKept,
@@ -214,7 +212,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     finishPullRequest,
   } = r;
   const { split, joinChildren } = issueSplitting(r, { agent: store, repo: repos, session: sessions, channel: chat });
-  const d = issueDispatch(r, joinChildren, { core, agent: store, repo: repos, runtime: runtimes, session: sessions, channel: chat, mailbox, log });
+  const d = issueDispatch(r, joinChildren, { core, agent: store, repo: repos, runtime: runtimes, session: sessions, channel: chat, log });
   const { hire, start, refreshQueue, reopen, scheduled } = d;
   const { withEdit, settledMove, stuckWords, movesWords } = issueSettling(r, d, { agent: store, repo: repos, runtime: runtimes, session: sessions, clock });
 
@@ -235,7 +233,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     savePullRequest,
     finishPullRequest,
   });
-  const { pollOpen: pollGitHub } = makeGitHubPoller(() => core.state().issues, { db, mailbox, repo: repos, clock, log });
+  const { pollOpen: pollGitHub } = makeGitHubPoller(() => core.state().issues, { db, session: sessions, repo: repos, clock, log });
 
   const chooseAgent = async (brief: string, name: string, picked: string): Promise<T.Agent> => {
     const key = name.trim();

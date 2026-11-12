@@ -64,7 +64,7 @@ for (const submittedReport of [false, true]) {
     try {
       const issues = fw.issue;
       const sessions = fw.session;
-      const mailbox = fw.mailbox;
+      const mailbox = fw.session;
       const sql = sqlOf(fw.db);
       await fw.agent.save(lab());
       git(config.workRoot, "init", "--bare", bare);
@@ -104,7 +104,7 @@ for (const submittedReport of [false, true]) {
       await until(() => inputs.length === 2, "CI automatically woke the helper");
       expect(inputs[1]).toContain("fix-first-ci");
       await await_(
-        () => sql<{ state: string }>`select state from mailbox_delivery where envelope_id = ${ci.id}`,
+        () => sql<{ state: string }>`select state from session_delivery where envelope_id = ${ci.id}`,
         (rows) => rows[0]?.state === "consumed",
         "CI entered the model",
       );
@@ -113,7 +113,7 @@ for (const submittedReport of [false, true]) {
       await until(() => sessions.sessionOf(id)?.phase._tag === "done", "explicit handoff");
       expect((await issues.get(issue.id)).stage.state).toBe("reviewing");
       const held = (await mailbox.accept(event("after-handoff-ci")))!;
-      expect((await sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${held.id}`)[0]?.state).toBe("held");
+      expect((await sql<{ state: string }>`select state from session_issue_input where trigger_id = ${held.id}`)[0]?.state).toBe("held");
       expect(inputs).toHaveLength(2);
     } finally {
       first.resolve();

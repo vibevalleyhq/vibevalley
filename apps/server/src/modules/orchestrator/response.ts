@@ -3,14 +3,14 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { newId } from "#/base/ids.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
-import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
 import { Caller } from "#/modules/session/host.ts";
+import type { Session } from "#/modules/session/session.ts";
 
 import type { Answer } from "./openai.ts";
 import { orchestratorModel } from "./situation.ts";
 
 /** The live API/phone responses, from opening a port to dropping it once its words are read. */
-export const makeResponses = (mailbox: Mailbox, channel: Channel, clock: Clock) => {
+export const makeResponses = (sessions: Session, channel: Channel, clock: Clock) => {
   const responses = new Map<string, Caller>();
   let latestResponse = "";
 
@@ -82,7 +82,7 @@ export const makeResponses = (mailbox: Mailbox, channel: Channel, clock: Clock) 
     const response = open(false);
     try {
       try {
-        await mailbox.accept({
+        await sessions.accept({
           source: "workbench",
           key: newId(),
           actor: { kind: "system", id: "system" },

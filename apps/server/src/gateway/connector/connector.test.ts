@@ -195,7 +195,7 @@ const feishuMsg = (from: string, text: string, chatType = "p2p"): FeishuMessage 
 
 /** The orchestrator consumer as the chat apps meet it here: each durable Mailbox input is answered at once. */
 const echoing = (w: World) => {
-  const news = w.mailbox.news();
+  const news = w.session.deliveries();
   const reading = (async () => {
     for await (const n of news)
       if (n._tag === "Handed")
@@ -284,7 +284,7 @@ describe("the chat apps", () => {
       reply: "ctx-a",
     });
     expect(await saidIn(f, chat.defaultChannel())).toEqual(["帮我看看打卡页"]);
-    const rows = await f.world.db.sql.query(`select d.source, m.meta from mailbox_delivery d
+    const rows = await f.world.db.sql.query(`select d.source, m.meta from session_delivery d
           join channel_message m on m.id = d.message_id where m.body = '帮我看看打卡页'`);
     expect(rows).toEqual([{ source: "connector", meta: `{"ingressSource":"connector"}` }]);
     expect(await statusOf(f, "weixin")()).toMatchObject({

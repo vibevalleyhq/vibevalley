@@ -10,8 +10,7 @@ import type { Db } from "#/infra/db.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import type { Attachment } from "#/modules/attachment/attachment.ts";
-import { type Envelope, orchestratorIn } from "#/modules/mailbox/envelope.ts";
-import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
+import { type Envelope, orchestratorIn } from "#/modules/session/envelope.ts";
 import type { Session } from "#/modules/session/session.ts";
 import * as qc from "#db/channel.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
@@ -51,12 +50,11 @@ export interface ChannelHubDeps {
   readonly agent: Agent;
   readonly attachment: Attachment;
   readonly session: Session;
-  readonly mailbox: Mailbox;
 }
 
 /** The chat's shared state and the ways it is told: the store, the hubs of what was said and read, and the frames. */
 export async function makeChannelHub(deps: ChannelHubDeps) {
-  const { core, agent: agents, db, mailbox, session: sessions, clock } = deps;
+  const { core, agent: agents, db, session: sessions, clock } = deps;
   const store = await makeChannelStore(deps);
   // Every message once written, for the rooms: each follower reads it through a bounded relay of its own.
   const said = new Hub<T.ChatMessage>();
@@ -294,7 +292,7 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
   const inboxRows = (who: string) => {
     const h = sessionOf(who);
     const channel = h ? channelOfSession(h) : store.defaultId();
-    return mailbox.unreadSummary(who, channel);
+    return sessions.unreadSummary(who, channel);
   };
 
   await store.locked(async () => {

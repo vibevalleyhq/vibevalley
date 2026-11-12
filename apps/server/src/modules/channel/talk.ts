@@ -6,10 +6,9 @@ import { userId } from "@vibevalley/protocol";
 import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
-import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
-import { inputContext } from "#/modules/mailbox/payload.ts";
-import { envelopeLines, talkBrief } from "#/modules/mailbox/prompts.ts";
-import { HireRefused } from "#/modules/session/session.ts";
+import { inputContext } from "#/modules/session/payload.ts";
+import { envelopeLines, talkBrief } from "#/modules/session/prompts.ts";
+import { HireRefused, type Session } from "#/modules/session/session.ts";
 import * as qm from "#db/channel_message.sql.ts";
 
 import type { MsgRow } from "./contracts.ts";
@@ -23,7 +22,7 @@ export interface DirectTalkDeps {
   readonly log: Logger;
   readonly db: Db;
   readonly agent: Agent;
-  readonly mailbox: Mailbox;
+  readonly session: Session;
 }
 
 /** tasks: the channel's own; a direct context being opened is keyed by its channel, one at a time. */
@@ -35,7 +34,7 @@ export function directTalk(
   notice: (channel: string, text: string, code: string) => Promise<void>,
   tasks: TaskGroup,
 ) {
-  const { agent: agents, db, mailbox, log } = deps;
+  const { agent: agents, db, session: sessions, log } = deps;
   const { store, talkSession, targetOfChannel, channelEnvelope, asEnvelope, envelopeOf } = r;
   const { sessionsLeft } = th;
   const { settle } = w;
@@ -73,7 +72,7 @@ export function directTalk(
     const target = targetOfChannel(place);
     let opened: string;
     try {
-      const received = await mailbox.receive({
+      const received = await sessions.receive({
         _tag: "Hire",
         agent,
         brief: talkBrief(agent.name, envelopeLines(ordered.map((m) => envelopeOf(m, target)))),

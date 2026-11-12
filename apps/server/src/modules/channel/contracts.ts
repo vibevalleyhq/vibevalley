@@ -7,14 +7,14 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { Inconsistent } from "#/base/errors.ts";
 import { jsonText, storedJsonOrUndefined } from "#/base/json.ts";
-import { actorOfParticipant, type Envelope, type Meta, metaOf, type Picked } from "#/modules/mailbox/envelope.ts";
+import { actorOfParticipant, type Envelope, type Meta, metaOf, type Picked } from "#/modules/session/envelope.ts";
 import type * as qm from "#db/channel_message.sql.ts";
 
 import { type ChannelRow } from "./rooms.ts";
 
-export type { ChannelAudience, ChannelEnvelopeRow, ChannelHearers, Meta } from "#/modules/mailbox/envelope.ts";
-export type { Envelope, Picked } from "#/modules/mailbox/envelope.ts";
-export { actorOfParticipant, channelType, envelopeMore, metaOf, metaText } from "#/modules/mailbox/envelope.ts";
+export type { ChannelAudience, ChannelEnvelopeRow, ChannelHearers, Meta } from "#/modules/session/envelope.ts";
+export type { Envelope, Picked } from "#/modules/session/envelope.ts";
+export { actorOfParticipant, channelType, envelopeMore, metaOf, metaText } from "#/modules/session/envelope.ts";
 export type { Delivered, SessionNews } from "#/modules/session/signals.ts";
 
 export type MsgRow = qm.MessageByIDResult;

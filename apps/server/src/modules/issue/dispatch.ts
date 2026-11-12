@@ -9,14 +9,13 @@ import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { Due } from "#/modules/cron/cron.ts";
-import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
-import type { Trigger } from "#/modules/mailbox/shapes.ts";
 import { issueBranch, type Repo } from "#/modules/repo/repo.ts";
 import { RepoError } from "#/modules/repo/workplace.ts";
 import type { Runtime } from "#/modules/runtime/runtime.ts";
 import { conflictBrief } from "#/modules/session/briefing.ts";
 import { askedMax } from "#/modules/session/journal.ts";
 import { type Hired, type HireOptions, HireRefused, type Session } from "#/modules/session/session.ts";
+import type { Trigger } from "#/modules/session/shapes.ts";
 
 import { issueBrief } from "./brief.ts";
 import { explicitMandate, inferredMandate } from "./creation.ts";
@@ -55,7 +54,6 @@ export interface DispatchDeps {
   readonly runtime: Runtime;
   readonly session: Session;
   readonly channel: Channel;
-  readonly mailbox: Mailbox;
   readonly log: Logger;
 }
 
@@ -71,7 +69,7 @@ const noneIfRefused = (e: unknown): undefined => {
 export type IssueDispatch = ReturnType<typeof issueDispatch>;
 
 export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["joinChildren"], deps: DispatchDeps) {
-  const { core, agent: store, repo: repos, runtime: runtimes, session: sessions, channel: chat, mailbox, log } = deps;
+  const { core, agent: store, repo: repos, runtime: runtimes, session: sessions, channel: chat, log } = deps;
   const { everyIssue, get, ofCron, unsent, attemptAdd, add, remove, recordHiredStart, recordOnDutyStart, setQueued } = r;
   /** One round of the queue at a time. */
   const trying = new Semaphore(1);
@@ -112,7 +110,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
     const { issue: _issue, hiring: _hiring, ...sending } = opt;
     const hiredIssue = issue;
     try {
-      const received = await mailbox.receive({
+      const received = await sessions.receive({
         _tag: "Hire",
         agent,
         brief: [brief, constraints].filter(Boolean).join("\n\n"),
@@ -170,7 +168,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
 
   const start = async (id: string, channel: string, by?: T.RunTrigger, said?: string, inputs: readonly Trigger[] = []): Promise<Dispatched> => {
     const mine = await get(id).catch(noneIfRefused);
-    const queued = inputs.length > 0 || mine === undefined ? undefined : await mailbox.triggersOf(id);
+    const queued = inputs.length > 0 || mine === undefined ? undefined : await sessions.triggersOf(id);
     const initial = queued ?? inputs;
     if (mine) {
       const children = (await everyIssue()).filter((child) => child.parent === mine.id);
@@ -214,7 +212,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
   };
 
   /** One queued issue's turn: "" when it stays queued, else the session sent. Throws ApiError when it cannot go any more. */
-  const tryQueued = async (issue: T.Issue, inputs: Awaited<ReturnType<Mailbox["queuedTriggers"]>>, title: string): Promise<string> => {
+  const tryQueued = async (issue: T.Issue, inputs: Awaited<ReturnType<Session["queuedTriggers"]>>, title: string): Promise<string> => {
     const [, agent, repo] = await ready(issue.id);
     if (sessions.noRoom(agent.runtime, repo)) return "";
     const triggers = inputs.filter((item) => item.issue === issue.id).map((item) => item.trigger);
@@ -236,7 +234,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
   /** In the board's order: one that cannot go any more leaves the queue. */
   const refreshQueue = (): Promise<void> =>
     trying.with(async () => {
-      const inputs = await mailbox.queuedTriggers();
+      const inputs = await sessions.queuedTriggers();
       await bestEffort(log, "vibevalley: child issues could not be merged", () => joinChildren());
       const all = await everyIssue();
       for (const issue of all) {

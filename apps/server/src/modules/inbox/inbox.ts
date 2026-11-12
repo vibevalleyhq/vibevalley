@@ -10,7 +10,6 @@ import type { Time } from "#/infra/time.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import { toMessage } from "#/modules/channel/contracts.ts";
 import type { Issue } from "#/modules/issue/issue.ts";
-import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
 import type { Session } from "#/modules/session/session.ts";
 import { messageByID, notificationReceipt, userReadReports } from "#db/channel_message.sql.ts";
 
@@ -43,11 +42,10 @@ export interface InboxDeps {
   readonly channel: Channel;
   readonly issue: Issue;
   readonly session: Session;
-  readonly mailbox: Mailbox;
 }
 
 export async function makeInbox(deps: InboxDeps): Promise<Inbox> {
-  const { core, channel: chat, issue: issues, session: sessions, mailbox, db, clock, config } = deps;
+  const { core, channel: chat, issue: issues, session: sessions, db, clock, config } = deps;
   const log = deps.log.child("inbox");
   const tasks = new TaskGroup({ name: "inbox", onError: (task, e) => log.error(`${task} failed:`, e) });
   const turn = new Semaphore(1);
@@ -125,7 +123,7 @@ export async function makeInbox(deps: InboxDeps): Promise<Inbox> {
     await bestEffort(log, "vibevalley: patrol inputs were not kept", async () => {
       for (const [channel, notes] of byChannel) {
         const top = await chat.topOf(channel);
-        const trigger = await mailbox.recordTrigger({
+        const trigger = await sessions.recordTrigger({
           key: `${channel}:${now}:${notes.map((note) => note.key).join(",")}`,
           source: "patrol",
           actor: { kind: "system", id: "patrol" },
@@ -135,7 +133,7 @@ export async function makeInbox(deps: InboxDeps): Promise<Inbox> {
           at: now,
           text: patrolText(top.name, notes),
         });
-        await mailbox.receive({ _tag: "Trigger", trigger });
+        await sessions.receive({ _tag: "Trigger", trigger });
       }
     });
   };

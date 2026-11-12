@@ -82,7 +82,7 @@ test("regression: early tool connection failures reach the journal and core with
     await using farm = await world({ runtimes: [runtime], repos: ["demo"] });
     const sessions = farm.session;
     const core = farm.core;
-    const machines = farm.machine;
+    const machines = farm.session;
     const sent = await sessions.hire({ ...starter("lab"), runtime: "codex", effort: "" }, "work", "demo", {
       hiring: async () => {
         observing = true;

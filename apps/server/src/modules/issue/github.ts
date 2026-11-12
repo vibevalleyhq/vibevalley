@@ -9,10 +9,10 @@ import { compareText, or } from "#/base/order.ts";
 import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
 import { actionsJobOf } from "#/modules/repo/pullSnapshot.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
 import { RepoError } from "#/modules/repo/workplace.ts";
+import type { Session } from "#/modules/session/session.ts";
 import * as q from "#db/issue_github.sql.ts";
 
 const failedChecks = new Set(["FAILURE", "ERROR", "CANCELLED", "CANCELED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE", "STALE"]);
@@ -20,14 +20,14 @@ const finishedChecks = new Set(["COMPLETED", "SUCCESS", "FAILURE", "ERROR"]);
 
 export interface GitHubPollDeps {
   readonly db: Db;
-  readonly mailbox: Mailbox;
+  readonly session: Session;
   readonly repo: Repo;
   readonly clock: Time;
   readonly log: Logger;
 }
 
 export function makeGitHubPoller(onBoard: () => readonly T.Issue[], deps: GitHubPollDeps) {
-  const { db, mailbox, repo: repos, clock, log } = deps;
+  const { db, session: sessions, repo: repos, clock, log } = deps;
   const polling = new Semaphore(1);
 
   /** Fetch logs via gh so helpers need no browser. */
@@ -73,7 +73,7 @@ export function makeGitHubPoller(onBoard: () => readonly T.Issue[], deps: GitHub
       });
       const finished = checks.length > 0 && checks.every((check) => check.conclusion !== "" || finishedChecks.has(check.status.toUpperCase()));
       if (failed.length > 0 || finished)
-        await mailbox.accept({
+        await sessions.accept({
           ...base,
           key: `${repo}#${pr.number}:ci:${revision}`,
           actor: { kind: "system", id: `github:${repo}#${pr.number}` },
@@ -83,7 +83,7 @@ export function makeGitHubPoller(onBoard: () => readonly T.Issue[], deps: GitHub
         });
       await q.observeGitHubChecks(db.sql, { repo, pr_number: pr.number, check_fingerprint: fingerprint, check_revision: revision });
     }
-    const known = await mailbox.knownGitHubEvents(repo, pr.number);
+    const known = await sessions.knownGitHubEvents(repo, pr.number);
     const keys = new Set(known.filter((event) => event.routed).map((event) => event.key));
     const rounds = new Map(
       known.flatMap((event) => (event.botRoundKey !== undefined && event.botRound !== undefined ? [[event.botRoundKey, event.botRound] as const] : [])),
@@ -122,7 +122,7 @@ export function makeGitHubPoller(onBoard: () => readonly T.Issue[], deps: GitHub
     for (const event of events) {
       if (keys.has(event.key) || event.author.toLowerCase() === current.viewer.toLowerCase()) continue;
       const round = event.bot ? (rounds.get(event.round) ?? botRound + 1) : undefined;
-      const accepted = await mailbox.accept({
+      const accepted = await sessions.accept({
         ...base,
         key: event.key,
         actor: { kind: "system", id: event.author || "deleted", name: event.author },

@@ -65,21 +65,6 @@ export type Words_issue_mandate_strength = z.infer<typeof Words_issue_mandate_st
 export const Words_issue_priority = z.enum(["urgent","high","medium","low"])
 export type Words_issue_priority = z.infer<typeof Words_issue_priority>
 
-export const Words_mailbox_delivery_held_by = z.enum(["hop_limit","cooldown","wake_breaker"])
-export type Words_mailbox_delivery_held_by = z.infer<typeof Words_mailbox_delivery_held_by>
-
-export const Words_mailbox_delivery_source = z.enum(["workbench","channel","connector","voice","github","cron","patrol"])
-export type Words_mailbox_delivery_source = z.infer<typeof Words_mailbox_delivery_source>
-
-export const Words_mailbox_delivery_state = z.enum(["pending","handed","consumed","dropped"])
-export type Words_mailbox_delivery_state = z.infer<typeof Words_mailbox_delivery_state>
-
-export const Words_mailbox_delivery_urgency = z.enum(["interrupt","steer","queue","digest"])
-export type Words_mailbox_delivery_urgency = z.infer<typeof Words_mailbox_delivery_urgency>
-
-export const Words_mailbox_issue_state = z.enum(["held","forwarded","returned"])
-export type Words_mailbox_issue_state = z.infer<typeof Words_mailbox_issue_state>
-
 export const Words_media_input_phase = z.enum(["reserved","uploading","ready","failed","deleting"])
 export type Words_media_input_phase = z.infer<typeof Words_media_input_phase>
 
@@ -121,6 +106,21 @@ export type Words_runtime_todo_state = z.infer<typeof Words_runtime_todo_state>
 
 export const Words_session_closed = z.enum(["merged","completed","dismissed","lost"])
 export type Words_session_closed = z.infer<typeof Words_session_closed>
+
+export const Words_session_delivery_held_by = z.enum(["hop_limit","cooldown","wake_breaker"])
+export type Words_session_delivery_held_by = z.infer<typeof Words_session_delivery_held_by>
+
+export const Words_session_delivery_source = z.enum(["workbench","channel","connector","voice","github","cron","patrol"])
+export type Words_session_delivery_source = z.infer<typeof Words_session_delivery_source>
+
+export const Words_session_delivery_state = z.enum(["pending","handed","consumed","dropped"])
+export type Words_session_delivery_state = z.infer<typeof Words_session_delivery_state>
+
+export const Words_session_delivery_urgency = z.enum(["interrupt","steer","queue","digest"])
+export type Words_session_delivery_urgency = z.infer<typeof Words_session_delivery_urgency>
+
+export const Words_session_issue_input_state = z.enum(["held","forwarded","returned"])
+export type Words_session_issue_input_state = z.infer<typeof Words_session_issue_input_state>
 
 export const Words_session_role = z.enum(["orchestrator","worker"])
 export type Words_session_role = z.infer<typeof Words_session_role>

@@ -5,7 +5,6 @@ import { head } from "#/base/clip.ts";
 import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
 import type { Session } from "#/modules/session/session.ts";
 import * as qm from "#db/channel_message.sql.ts";
 
@@ -20,11 +19,10 @@ export interface SessionThreadsDeps {
   readonly log: Logger;
   readonly db: Db;
   readonly session: Session;
-  readonly mailbox: Mailbox;
 }
 
 export function sessionThreads(deps: SessionThreadsDeps, r: ChannelHub, w: ChannelWriting) {
-  const { db, session: sessions, mailbox, clock, log } = deps;
+  const { db, session: sessions, clock, log } = deps;
   const { store, orchestratorInRow, directOfSession, channelOfSession, sessionOf, hired, threadOf, threadOfSession, messageRow } = r;
   const { settle, write } = w;
   let closed = false;
@@ -88,7 +86,7 @@ export function sessionThreads(deps: SessionThreadsDeps, r: ChannelHub, w: Chann
     for (const p of store.participants()) {
       if (p.role !== "worker" || p.runtime === null || p.left_at !== null || on.has(p.id)) continue;
       await store.markParticipantLeft(p.id, now);
-      await mailbox.withdraw({ _tag: "Session", session: p.id, why: "left" });
+      await sessions.withdraw({ _tag: "Session", session: p.id, why: "left" });
     }
   };
 

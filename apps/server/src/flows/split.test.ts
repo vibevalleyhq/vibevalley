@@ -153,9 +153,9 @@ test("regression: a failed split commits no child, assignment, queue entry or pa
   expect((await issues.list()).map((item) => [item.id, item.title])).toEqual([[parent.id, "parent"]]);
   expect(fw.core.state().issues.map((item) => item.id)).toEqual([parent.id]);
   expect(fw.session.hired()).toEqual([]);
-  const unsafe2 = await sql.unsafe("select * from mailbox_trigger where trigger_json::jsonb -> 'meta' -> 'dispatch' = 'true'::jsonb");
+  const unsafe2 = await sql.unsafe("select * from session_trigger where trigger_json::jsonb -> 'meta' -> 'dispatch' = 'true'::jsonb");
   expect(unsafe2).toHaveLength(0);
-  const unsafe3 = await sql.unsafe("select * from mailbox_issue");
+  const unsafe3 = await sql.unsafe("select * from session_issue_input");
   expect(unsafe3).toHaveLength(0);
   const unsafe4 = await sql.unsafe("select * from issue_assignment");
   expect(unsafe4).toHaveLength(1);

@@ -3,10 +3,10 @@ import { describe, expect, it, test } from "vite-plus/test";
 import { defaultOrchestrator, userId } from "@vibevalley/protocol";
 import { artifactId, blockId } from "@vibevalley/protocol/schema";
 
-import { brakes, type BrakeInput } from "#/modules/mailbox/brakes.ts";
-import type { Envelope } from "#/modules/mailbox/envelope.ts";
-import { messageLine, wakeInput } from "#/modules/mailbox/prompts.ts";
-import { whoHears } from "#/modules/mailbox/routing.ts";
+import { brakes, type BrakeInput } from "#/modules/session/brakes.ts";
+import type { Envelope } from "#/modules/session/envelope.ts";
+import { messageLine, wakeInput } from "#/modules/session/prompts.ts";
+import { whoHears } from "#/modules/session/routing.ts";
 
 import type { ChannelAudience } from "./contracts.ts";
 import { mentionsIn } from "./mentions.ts";

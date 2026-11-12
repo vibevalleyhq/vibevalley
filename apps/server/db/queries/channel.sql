@@ -55,7 +55,7 @@ with unread as (
   where m.sender_id <> sqlc.arg(participant) and m.kind <> 'notice'
     and (c.id = sqlc.arg(channel) or f.participant_id is not null)
     and m.number > greatest(coalesce(rc.read_number, 0), coalesce(f.from_number, 0))
-    and not exists (select 1 from mailbox_delivery d where d.session_id = sqlc.arg(participant) and d.message_id = m.id and d.consumed_at is not null)
+    and not exists (select 1 from session_delivery d where d.session_id = sqlc.arg(participant) and d.message_id = m.id and d.consumed_at is not null)
   group by c.id, ch.name
 )
 select u.*,
@@ -100,8 +100,8 @@ select id::channel.id as id, type::channel.type as type, peer_id::channel.peer_i
 select (select count(*) from cron r where r.channel_id = sqlc.arg(id))::int as crons,
        (select count(*) from connector_account a where a.channel_id = sqlc.arg(id))::int as connectors,
        (select count(distinct i.id) from issue i
-        left join mailbox_issue m on m.issue_id = i.id and m.state = 'held'
-        left join mailbox_trigger t on t.id = m.trigger_id
+        left join session_issue_input m on m.issue_id = i.id and m.state = 'held'
+        left join session_trigger t on t.id = m.trigger_id
         where i.queued_at is not null and (t.trigger_json::jsonb ->> 'replyChannel' = sqlc.arg(id)))::int as queued,
        (select count(*) from channel t where t.parent_id = sqlc.arg(id) and t.subject_kind = 'issue')::int as issue_threads;
 

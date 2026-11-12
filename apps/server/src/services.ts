@@ -11,8 +11,6 @@ import { type Cron, makeCron } from "#/modules/cron/cron.ts";
 import { type Game, makeGame } from "#/modules/game/game.ts";
 import { type Inbox, makeInbox } from "#/modules/inbox/inbox.ts";
 import { type Issue, makeIssue } from "#/modules/issue/issue.ts";
-import { type Machine, makeMachine } from "#/modules/machine/machine.ts";
-import { type Mailbox, makeMailbox } from "#/modules/mailbox/mailbox.ts";
 import { makeMedia, type Media } from "#/modules/media/media.ts";
 import { makeMemory, type Memory, type MemoryOptions } from "#/modules/memory/memory.ts";
 import { makeOrchestrator, type Orchestrator, type OrchestratorOptions } from "#/modules/orchestrator/orchestrator.ts";
@@ -74,9 +72,7 @@ export interface Farm extends AsyncDisposable {
   readonly memory: Memory;
   readonly runtime: Runtime;
   readonly repo: Repo;
-  readonly machine: Machine;
   readonly session: Session;
-  readonly mailbox: Mailbox;
   readonly channel: Channel;
   readonly media: Media;
   readonly artifact: Artifact;
@@ -128,7 +124,7 @@ export async function closeAll(closes: Close[]): Promise<void> {
   if (failures.length > 1) throw new AggregateError(failures, "the farm did not close cleanly");
 }
 
-/** The modules up to the issues and what runs on a schedule (modules.ts's order, to Issues), built and not started:
+/** The modules up to the issues and what runs on a schedule (modules.ts's order, through the issue module), built and not started:
  * what the farm builds first and what a module test runs on (testing/world.ts). */
 export type Modules = Pick<
   Farm,
@@ -148,9 +144,7 @@ export type Modules = Pick<
   | "memory"
   | "runtime"
   | "repo"
-  | "machine"
   | "session"
-  | "mailbox"
   | "channel"
   | "media"
   | "artifact"
@@ -183,19 +177,17 @@ export async function buildModules(config: ServerConfig, options: ServiceOptions
   const runtime = own(await makeRuntime({ config, clock, log, db, core, agent, setting, fetch }, options.runtime));
   // Source Control: repositories, worktrees, checks, merges and pull requests.
   const repo = own(await makeRepo({ config, clock, log }, options.repo));
-  // Agent Sessions: an agent at work on an issue in a workplace.
-  const machine = own(await makeMachine({ config, clock, log, db, core, runtime }));
-  const session = own(await makeSession({ config, clock, log, db, core, agent, memory, repo, machine, runtime }, options.session));
-  // Mailbox: source triggers, delivery priority, per-Session input and the execution pump.
-  const mailbox = own(await makeMailbox({ db, clock, log, config, core, agent, session }));
+  // Agent Sessions: an agent profile at work: its triggers and deliveries, its sessions and runs, their workplaces and
+  // the machine they run on.
+  const session = own(await makeSession({ config, clock, log, db, core, agent, memory, repo, runtime }, options.session));
   // Collaboration: channels, threads, messages, media and its library, documents, the user's notes.
-  const channel = own(await makeChannel({ clock, log, fetch, db, core, agent, attachment, session, mailbox }));
+  const channel = own(await makeChannel({ clock, log, fetch, db, core, agent, attachment, session }));
   const media = own(await makeMedia({ db, core, clock, log, attachment, session, channel, provider, publicFetch }));
   const artifact = own(await makeArtifact({ db, clock, log, attachment, channel }));
   const pkm = own(await makePkm({ config, clock, log, db }));
   // Issues: the issues and what runs on a schedule.
-  const issue = own(await makeIssue({ config, clock, log, db, core, agent, repo, runtime, session, channel, mailbox }));
-  const cron = own(await makeCron({ config, clock, log, db, core, agent, channel, issue, mailbox }));
+  const issue = own(await makeIssue({ config, clock, log, db, core, agent, repo, runtime, session, channel }));
+  const cron = own(await makeCron({ config, clock, log, db, core, agent, channel, issue, session }));
   return {
     config,
     clock,
@@ -213,9 +205,7 @@ export async function buildModules(config: ServerConfig, options: ServiceOptions
     memory,
     runtime,
     repo,
-    machine,
     session,
-    mailbox,
     channel,
     media,
     artifact,
@@ -232,15 +222,13 @@ export async function makeFarm(config: ServerConfig, options: ServiceOptions = {
   const own = owning(closes);
   try {
     const modules = await buildModules(config, options, closes);
-    const { clock, log, fetch, db, core, setting, user, agent, memory, runtime, repo, session, mailbox, channel, media, artifact, pkm, issue, cron } = modules;
+    const { clock, log, fetch, db, core, setting, user, agent, memory, runtime, repo, session, channel, media, artifact, pkm, issue, cron } = modules;
     const { provider } = modules;
     // Inbox: what is news to the user, and the patrol.
-    const inbox = own(await makeInbox({ config, clock, log, db, core, channel, issue, session, mailbox }));
+    const inbox = own(await makeInbox({ config, clock, log, db, core, channel, issue, session }));
     // Orchestrator: the agent that hands the user's work to helpers, and its tools.
-    const tool = own(await makeTool({ clock, log, agent, session, issue, mailbox, channel, cron, memory, media, pkm, artifact, repo }));
-    const orchestrator = own(
-      await makeOrchestrator({ clock, log, config, agent, runtime, repo, pkm, session, channel, mailbox, cron, tool }, options.orchestrator),
-    );
+    const tool = own(await makeTool({ clock, log, agent, session, issue, channel, cron, memory, media, pkm, artifact, repo }));
+    const orchestrator = own(await makeOrchestrator({ clock, log, config, agent, runtime, repo, pkm, session, channel, cron, tool }, options.orchestrator));
     // Gamification: the ledger, progress and achievements, from events only.
     const game = own(await makeGame({ config, clock, log, db, core, repo }));
     // Gateway: every way in from outside; http/app.ts mounts the HTTP API on these services.
@@ -253,10 +241,10 @@ export async function makeFarm(config: ServerConfig, options: ServiceOptions = {
     await repo.boot();
     // The sessions on the farm when it stopped are taken up again, or let go.
     await session.boot();
-    // Their threads, before the mailbox wakes anyone.
+    // Their threads, before the deliveries wake anyone.
     await channel.boot();
     // Open deliveries restored, committed messages without a route receipt replayed, then the sessions woken.
-    await mailbox.boot();
+    await session.wake();
     // What media waited for.
     await media.boot();
     await issue.boot();

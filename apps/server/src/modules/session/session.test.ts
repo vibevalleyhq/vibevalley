@@ -16,12 +16,12 @@ import { messageOf } from "#/base/errors.ts";
 import type { Core } from "#/core/core.ts";
 import { causeMessage, SqlError } from "#/infra/db.ts";
 import { wallTime } from "#/infra/time.ts";
-import { watchStalls } from "#/modules/machine/executor.ts";
 import { MergeFailure } from "#/modules/repo/workplace.ts";
 import { gitIn } from "#/testing/git.ts";
 import { starter, testConfig, until, waitFor } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 
+import { watchStalls } from "./executor.ts";
 import { DeliveryRefused, HireRefused, NotRecorded } from "./session.ts";
 import type { SessionNews, DeliveryInput } from "./signals.ts";
 import type { WorkerAccess } from "./worker.ts";

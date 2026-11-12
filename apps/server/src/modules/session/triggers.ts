@@ -4,7 +4,7 @@ import { BizCode, Inconsistent, refuseIn } from "#/base/errors.ts";
 import { jsonOf, jsonText } from "#/base/json.ts";
 import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
-import * as q from "#db/mailbox_trigger.sql.ts";
+import * as q from "#db/session_trigger.sql.ts";
 
 import { type KnownGitHubEvent, type TriggerInput, type TriggerResource, triggerOf } from "./payload.ts";
 import * as S from "./schema.ts";

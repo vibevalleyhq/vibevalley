@@ -10,7 +10,6 @@ import type { Artifact } from "#/modules/artifact/artifact.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { Cron } from "#/modules/cron/cron.ts";
 import type { Issue } from "#/modules/issue/issue.ts";
-import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
 import type { Media } from "#/modules/media/media.ts";
 import type { Memory } from "#/modules/memory/memory.ts";
 import type { Pkm } from "#/modules/pkm/pkm.ts";
@@ -49,7 +48,6 @@ export interface ToolDeps {
   readonly agent: Agent;
   readonly session: Session;
   readonly issue: Issue;
-  readonly mailbox: Mailbox;
   readonly channel: Channel;
   readonly cron: Cron;
   readonly memory: Memory;

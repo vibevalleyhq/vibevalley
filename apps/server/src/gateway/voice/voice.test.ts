@@ -459,7 +459,7 @@ describe("voice", () => {
     const grant = await voice.session();
     const agent = await voice.start(grant.channel, grant.uid);
     await voice.heard(agent.agentId, "语音消息", "", "voice-1");
-    const rows = await f.world.db.sql.query(`select d.source, m.meta from mailbox_delivery d
+    const rows = await f.world.db.sql.query(`select d.source, m.meta from session_delivery d
           join channel_message m on m.id = d.message_id where m.body = '语音消息'`);
     expect(rows).toEqual([{ source: "voice", meta: `{"ingressSource":"voice","spoken":true}` }]);
   });

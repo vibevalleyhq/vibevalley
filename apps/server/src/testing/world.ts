@@ -162,10 +162,10 @@ export type World = ModuleWorld & { readonly inbox: Inbox; readonly tool: Tool; 
 export async function world(options: WorldOptions = {}): Promise<World> {
   const below = await moduleWorld(options);
   try {
-    const { config, clock, log, db, core, agent, memory, repo, session, mailbox, channel, media, artifact, pkm, issue, cron } = below;
+    const { config, clock, log, db, core, agent, memory, repo, session, channel, media, artifact, pkm, issue, cron } = below;
     const own = owning(below.closes);
-    const inbox = own(await makeInbox({ config, clock, log, db, core, channel, issue, session, mailbox }));
-    const tool = own(await makeTool({ clock, log, agent, session, issue, mailbox, channel, cron, memory, media, pkm, artifact, repo }));
+    const inbox = own(await makeInbox({ config, clock, log, db, core, channel, issue, session }));
+    const tool = own(await makeTool({ clock, log, agent, session, issue, channel, cron, memory, media, pkm, artifact, repo }));
     const mcp = own(await makeMcp({ config, session, tool, log }, options.who ? { who: options.who } : {}));
     return { ...below, inbox, tool, mcp };
   } catch (e) {

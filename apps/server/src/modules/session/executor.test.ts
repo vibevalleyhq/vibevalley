@@ -36,7 +36,7 @@ test("regression: cancelling a close caller leaves disposal owned by the executo
   };
   await using farm = await world({ runtimes: [runtime], repos: ["demo"] });
   try {
-    const machines = farm.machine;
+    const machines = farm.session;
     const executor = machines.executions(machines.here());
     const sessions = farm.session;
     const agent = { ...starter("lab"), effort: "" };

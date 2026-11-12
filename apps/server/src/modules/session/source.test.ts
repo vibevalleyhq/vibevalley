@@ -10,7 +10,7 @@ import * as S from "./schema.ts";
 
 test("regression: machine triggers are immutable source records and do not become chat messages", async () => {
   await using farm = await world();
-  const { mailbox, channel: chat, tool: tools } = farm;
+  const { session: mailbox, channel: chat, tool: tools } = farm;
   const channel = chat.defaultChannel();
   const before = await chat.history(channel);
   const event: SourceEvent = {

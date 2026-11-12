@@ -36,7 +36,7 @@ for (const mode of ["settle", "handoff", "stop", "failed", "late"] as const) {
       });
       await using fw = await f.open();
       const sessions = fw.session;
-      const machines = fw.machine;
+      const machines = fw.session;
       const executor = machines.executions(machines.here());
       const issue2 = fw.issue;
       const issues = testIssues(issue2);

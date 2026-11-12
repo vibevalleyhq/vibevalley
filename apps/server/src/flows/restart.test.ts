@@ -40,7 +40,7 @@ test("the assistant cut off mid-answer by a restart finishes it once the farm is
       const orchestrator = await makeOrchestrator(below);
       below.closes.push(() => orchestrator.close());
       await below.session.boot();
-      await below.mailbox.boot();
+      await below.session.wake();
       return below;
     } catch (e) {
       await below.close();
@@ -101,7 +101,7 @@ test("regression: the assistant and a helper both cut off mid-answer go on once 
       const orchestrator = await makeOrchestrator(below);
       below.closes.push(() => orchestrator.close());
       await below.session.boot();
-      await below.mailbox.boot();
+      await below.session.wake();
       return below;
     } catch (e) {
       await below.close();

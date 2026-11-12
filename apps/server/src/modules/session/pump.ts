@@ -2,10 +2,10 @@ import type { Clock } from "@vibevalley/async";
 import { isBusy } from "@vibevalley/protocol/rules";
 
 import type { Logger } from "#/infra/log.ts";
-import type { Session } from "#/modules/session/session.ts";
-import { type Consumed, type Delivered, DeliveryRefused, type LaunchActivity, type Returned } from "#/modules/session/signals.ts";
 
 import type { DeliveryRow } from "./deliveries.ts";
+import type { Lifecycle } from "./lifecycle.ts";
+import { type Consumed, type Delivered, DeliveryRefused, type LaunchActivity, type Returned } from "./signals.ts";
 
 interface PumpPorts<Message> {
   readonly pending: (session: string) => readonly DeliveryRow[];
@@ -37,7 +37,7 @@ interface Pump {
   readonly returned: (input: Returned) => Promise<void>;
 }
 
-export const makePump = <Message>(deps: { readonly session: Session; readonly clock: Clock; readonly log: Logger }, ports: PumpPorts<Message>): Pump => {
+export const makePump = <Message>(deps: { readonly session: Lifecycle; readonly clock: Clock; readonly log: Logger }, ports: PumpPorts<Message>): Pump => {
   const { session: sessions, clock, log } = deps;
   const holds = new Map<string, Set<"compacting">>();
   const held = (session: string) => (holds.get(session)?.size ?? 0) > 0;

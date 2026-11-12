@@ -12,11 +12,10 @@ import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
-import type { Session, SessionNews } from "#/modules/session/session.ts";
 import { defaultID, topPlace, unreadOf } from "#db/channel.sql.ts";
 import { membersOf } from "#db/channel_member.sql.ts";
-import * as qd from "#db/mailbox_delivery.sql.ts";
-import * as qr from "#db/mailbox_trigger.sql.ts";
+import * as qd from "#db/session_delivery.sql.ts";
+import * as qr from "#db/session_trigger.sql.ts";
 
 import { Reach, WakeBreaker } from "./brakes.ts";
 import { Deliveries, type DeliveryRow, type DeliveryDraft } from "./deliveries.ts";
@@ -32,6 +31,7 @@ import {
   type UnreadRow,
   orchestratorIn,
 } from "./envelope.ts";
+import type { Lifecycle, SessionNews } from "./lifecycle.ts";
 import {
   inputOf,
   orchestratorSource,
@@ -88,7 +88,7 @@ export type Arrival =
       readonly hiring: (session: T.Session, launch: string, at: number) => Promise<void>;
     };
 
-type SendOptions = Parameters<Session["hire"]>[3];
+type SendOptions = Parameters<Lifecycle["hire"]>[3];
 
 export type TriggerArrival = Extract<Arrival, { readonly _tag: "Trigger" }>;
 export type HireArrival = Extract<Arrival, { readonly _tag: "Hire" }>;
@@ -150,7 +150,7 @@ export interface MailboxDeps {
   readonly config: ServerConfig;
   readonly core: Core;
   readonly agent: Agent;
-  readonly session: Session;
+  readonly session: Lifecycle;
 }
 
 export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {

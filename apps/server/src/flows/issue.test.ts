@@ -291,7 +291,7 @@ describe("an issue", () => {
       },
       user,
     );
-    const mailbox = fw.mailbox;
+    const mailbox = fw.session;
     const due = async () => {
       clock.adjust(5 * 60_000 + 1);
       await crons.tick();
@@ -312,7 +312,7 @@ describe("an issue", () => {
     const runs2 = await runs();
     expect(runs2).toHaveLength(1);
     const sql = sqlOf(fw.db);
-    const held = await sql.unsafe<{ state: string }>("select state from mailbox_issue where issue_id = $1 and state = 'held'", [first.id]);
+    const held = await sql.unsafe<{ state: string }>("select state from session_issue_input where issue_id = $1 and state = 'held'", [first.id]);
     expect(held).toHaveLength(1);
 
     await issues.setStatus(first.id, "done", "", "", user);
