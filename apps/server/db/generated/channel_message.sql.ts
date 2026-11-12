@@ -388,20 +388,21 @@ export async function unseenIn(sql: Sql, params: UnseenInParams): Promise<Unseen
   return rows.map((row) => rowOf("UnseenIn", UnseenInResult, row))
 }
 
-export interface HoldNoticeSinceUserParams {
+export interface NoticeSinceUserParams {
   readonly ["channel"]: string
+  readonly ["code"]: string
 }
 
-export const HoldNoticeSinceUserResult = z.object({
+export const NoticeSinceUserResult = z.object({
   ["n"]: z.number().int(),
 })
-export type HoldNoticeSinceUserResult = z.infer<typeof HoldNoticeSinceUserResult>
+export type NoticeSinceUserResult = z.infer<typeof NoticeSinceUserResult>
 
-export const HoldNoticeSinceUserSql = "-- name: HoldNoticeSinceUser :one\nselect count(*)::int as n from channel_message m\nwhere m.channel_id = $1 and m.sender_id = 'system' and (m.meta::jsonb ->> 'code') = 'hop_limit'\n  and m.id > coalesce((select max(u.id) from channel_message u where u.channel_id = $1 and u.sender_id = 'user'), '');"
+export const NoticeSinceUserSql = "-- name: NoticeSinceUser :one\n-- The farm's notices with a code in a place since the user last spoke there.\nselect count(*)::int as n from channel_message m\nwhere m.channel_id = $1 and m.sender_id = 'system' and (m.meta::jsonb ->> 'code') = $2::text\n  and m.id > coalesce((select max(u.id) from channel_message u where u.channel_id = $1 and u.sender_id = 'user'), '');"
 
-export async function holdNoticeSinceUser(sql: Sql, params: HoldNoticeSinceUserParams): Promise<HoldNoticeSinceUserResult | undefined> {
-  const [row] = await sql.query(HoldNoticeSinceUserSql, [params["channel"]])
-  return row === undefined ? undefined : rowOf("HoldNoticeSinceUser", HoldNoticeSinceUserResult, row)
+export async function noticeSinceUser(sql: Sql, params: NoticeSinceUserParams): Promise<NoticeSinceUserResult | undefined> {
+  const [row] = await sql.query(NoticeSinceUserSql, [params["channel"], params["code"]])
+  return row === undefined ? undefined : rowOf("NoticeSinceUser", NoticeSinceUserResult, row)
 }
 
 export interface MessageByNumberParams {

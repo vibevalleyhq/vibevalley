@@ -170,6 +170,8 @@ export interface Noticing {
   readonly text: string;
   readonly code: string;
   readonly sendKey?: string;
+  /** Said once in the place until the user next speaks there: another with the same code since is not written. */
+  readonly untilUserSpeaks?: boolean;
 }
 
 interface ReadOptions {
@@ -270,11 +272,12 @@ export interface Note {
 
 export interface Written {
   absent: string[];
-  heldNotice: string;
   answers?: T.SessionId;
   thread: string;
   again: boolean;
   row: MsgRow;
+  /** The event it was committed as; none for a retry of a message already written. */
+  event?: ChannelEvent;
 }
 
 /** One thing that happened in the chat, numbered in the order it was committed (channel_event). */
@@ -289,8 +292,6 @@ export interface ChannelEvent {
 /** A message just committed, with what the chat knows of where it was said: what the layers above route on. */
 export interface Committed {
   readonly event: ChannelEvent;
-  /** Told again at startup, after the reader's cursor: it may have been handled before the farm stopped. */
-  readonly replayed: boolean;
   readonly row: MsgRow;
   /** Where it was said. */
   readonly place: Place;
@@ -307,20 +308,8 @@ export interface Committed {
   readonly topic?: { readonly kind: NonNullable<T.Channel["subjectKind"]>; readonly id: string };
 }
 
-/** What an observer asks the chat to say after the message it was told of. */
-export interface Followup {
-  /** The hop limit's notice: said once by the farm (code hop_limit), until the user next speaks there. */
-  readonly hopLimit?: string;
-  /** The session whose call the message answers (it named the speaker since the speaker last spoke), told with it. */
-  readonly answers?: T.SessionId;
-}
-
-/** Told each committed event in order, under the chat's lock, before the write that made it returns: it must not
- * call back into the chat's locked members. A throw (not an ApiError) fails that write; the event stays to replay. */
-export interface ChannelObserver {
-  readonly posted: (c: Committed) => Promise<Followup | undefined>;
-  readonly removed: (event: ChannelEvent) => Promise<void>;
-}
+/** One committed event as a reader of the chat is told it: a message posted, with where it was said, or one removed. */
+export type Told = { readonly kind: "posted"; readonly posted: Committed } | { readonly kind: "removed"; readonly event: ChannelEvent };
 
 /** A read of the user's: where, up to which number, when. */
 export interface UserRead {
@@ -368,16 +357,19 @@ export interface ChannelService {
   readonly messageLocation: (id: T.MessageId) => Promise<{ readonly channel: T.Channel; readonly top: string } | undefined>;
   readonly envelopeResource: (id: T.MessageId) => Promise<EnvelopeResource | undefined>;
   readonly markRead: (channel: string, seq: number) => Promise<void>;
-  /** Who named `speaker` in a place since it last spoke there, before message `before`: newest first. */
-  readonly callersOf: (speaker: string, channel: string, before: string) => Promise<readonly string[]>;
   /** The place an empty target means for a participant: the home the layers above gave it. */
   readonly homeOf: (participant: string) => Promise<string | undefined>;
-  /** Each committed event from now on, told to `observer` (see ChannelObserver); one observer per chat. */
-  readonly observe: (observer: ChannelObserver) => void;
+  /** Each event committed from now on, in the order committed: subscribed before it returns. A reader keeps its own
+   * cursor and reads what it missed with `events`. */
+  readonly committed: () => Subscription<Told>;
   /** The events after `after`, oldest first, at most n. */
   readonly events: (after: number, n?: number) => Promise<ChannelEvent[]>;
-  /** Tells the observer each event after `after` again, in order (Committed.replayed); one that fails is logged and passed. */
-  readonly replay: (after: number, handled: (event: ChannelEvent) => Promise<void>) => Promise<void>;
+  /** A posted message as it is now, told as when it was committed; none once it is deleted or its place is gone. */
+  readonly committedOf: (message: string) => Promise<Committed | undefined>;
+  /** A reader the chat's writes wait on: a message said, posted, spoken or noted, or a removal, returns once
+   * `handled(seq)` has for its event (a throw fails the write; the event stays committed). Notices do not wait: they
+   * wake no one, and a reader may write one while it handles an event. */
+  readonly awaitReader: (handled: (seq: number) => Promise<void>) => void;
   /** Seats an agent who speaks for the layers above under the name it goes by now; seated again if it left. */
   readonly seat: (seat: Seat) => Promise<void>;
   /** A participant gone: in nothing, never back. */
@@ -403,8 +395,6 @@ export interface ChannelService {
   readonly recentRows: (channel: string, n: number) => Promise<readonly MsgRow[]>;
   /** A place's messages after number `after`, oldest first. */
   readonly rowsAfter: (channel: string, after: number) => Promise<readonly MsgRow[]>;
-  /** Tells the observers a committed message again, as when it was written (not as a replay). */
-  readonly retell: (message: string) => Promise<void>;
   /** A message as an agent reads it, at its place's address. */
   readonly addressedOf: (row: MsgRow) => AddressedMessage;
   /** A note the farm writes for the layers above: a dispatch under the orchestrator's name, or a report; `topic` opens

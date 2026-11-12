@@ -87,9 +87,10 @@ where m.channel_id = sqlc.arg(channel) and m.sender_id <> sqlc.arg(participant)
   and not exists (select 1 from channel_seen s where s.participant_id = sqlc.arg(participant) and s.message_id = m.id)
 order by m.number;
 
--- name: HoldNoticeSinceUser :one
+-- name: NoticeSinceUser :one
+-- The farm's notices with a code in a place since the user last spoke there.
 select count(*)::int as n from channel_message m
-where m.channel_id = sqlc.arg(channel) and m.sender_id = 'system' and (m.meta::jsonb ->> 'code') = 'hop_limit'
+where m.channel_id = sqlc.arg(channel) and m.sender_id = 'system' and (m.meta::jsonb ->> 'code') = sqlc.arg(code)::text
   and m.id > coalesce((select max(u.id) from channel_message u where u.channel_id = sqlc.arg(channel) and u.sender_id = 'user'), '');
 
 -- name: MessageByNumber :one

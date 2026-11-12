@@ -1,4 +1,5 @@
-// Every message is written to the database first, then told to the observers (the watch) as a numbered event before the write returns.
+// Every message is written to the database with a numbered event; the event goes to the readers (the watch) once it is
+// committed, and the write returns once they have handled it.
 import { type Subscription, TaskGroup } from "@vibevalley/async";
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -30,6 +31,7 @@ import {
   type Speaking,
   type Spoken,
   theRow,
+  type Written,
   toMessage,
 } from "./contracts.ts";
 import { channelDirectory } from "./directory.ts";
@@ -46,8 +48,6 @@ const searchMax = 50;
 const retryWindowMs = 60_000;
 /** How many of the messages a speaker has not seen are shown instead of sending its words. */
 const heldShown = 3;
-/** How many of those who named a speaker since it last spoke a caller is looked for among. */
-const callersMax = 20;
 const readLimit = 30;
 /** A follower further behind than this reads the room's newest page instead of every message since. */
 export { catchUpMax } from "./mutations.ts";
@@ -129,7 +129,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
     addressedOf,
     placeOf,
   } = r;
-  const { write, embedLater, settle, removed } = w;
+  const { write, handled, embedLater, removed, committedFrom } = w;
 
   /** A target as who would mean it: empty is a session's own thread (or the default channel), a channel by name, or a thread by its parent's number. */
   const resolveTarget = async (who: string, target: string): Promise<string> => {
@@ -161,8 +161,8 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
     if (!(await qm.messageByNumber(db.sql, { channel_id: channel, number }))) throw refused(t("server.channel.noMessage", { n: number }));
   };
 
-  const say = ({ text, channel, sendKey, source, responsePort, voiceMode, ...more }: Saying) =>
-    store.locked(async (): Promise<{ message: T.ChatMessage; again: boolean }> => {
+  const say = async ({ text, channel, sendKey, source, responsePort, voiceMode, ...more }: Saying) => {
+    const written = await store.locked(async (): Promise<Written> => {
       core.open();
       const files = await attachmentsOf(more.attachments ?? []);
       if (!text.trim() && files.length === 0) throw refused(t("server.channel.empty"));
@@ -196,21 +196,24 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         ...(more.replyTo !== undefined ? { replyTo: more.replyTo } : {}),
         ...(Object.keys(meta).length > 0 ? { meta } : {}),
       });
-      if (written.again) return { message: toMessage(written.row), again: true };
-      if (written.absent.length > 0)
+      if (!written.again && written.absent.length > 0)
         core.notice(
           "warn",
           t("server.channel.absent", { who: list(written.absent.map((mention) => mentionOf(mention) ?? "@" + mention)), n: written.absent.length }),
         );
-      return { message: toMessage(written.row), again: false };
+      return written;
     });
+    await handled(written);
+    return { message: toMessage(written.row), again: written.again };
+  };
 
   const recent = async (channel: string, n: number): Promise<AddressedMessage[]> => {
     if (!store.channel(channel)) return [];
     return [...(await qm.messagesBefore(db.sql, { channel_id: channel, number: 2147483647, n }))].toReversed().map(addressedOf);
   };
-  const speak = ({ from, text, run, ...opt }: Speaking) =>
-    store.locked(async (): Promise<Spoken> => {
+  const speak = async ({ from, text, run, ...opt }: Speaking): Promise<Spoken> => {
+    let written: Written | undefined;
+    const spoken = await store.locked(async (): Promise<Spoken> => {
       const words = text.trim();
       if (!words) throw refused(t("server.channel.empty"));
       const channel = await resolveTarget(from, opt.target ?? "");
@@ -241,7 +244,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         return { kind: "held", target, shown, more: unseen.length - shown.length };
       }
       await answered(channel, opt.reply);
-      const written = await write({
+      written = await write({
         channel,
         from,
         kind: "chat",
@@ -249,19 +252,21 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         ...(opt.reply !== undefined ? { replyTo: opt.reply } : {}),
         meta: run ? { run } : {},
       });
-      const now2 = clock.now();
-      await store.setRead(from, channel, written.row.number, now2);
+      await store.setRead(from, channel, written.row.number, clock.now());
       return { kind: "sent", message: toMessage(written.row), target, absent: written.absent };
     });
+    if (written) await handled(written);
+    return spoken;
+  };
 
-  const post = ({ from, channel, text, run, sendKey = "", made, spoken }: Posting) =>
-    store.locked(async (): Promise<{ message: T.ChatMessage; again: boolean }> => {
+  const post = async ({ from, channel, text, run, sendKey = "", made, spoken }: Posting) => {
+    const written = await store.locked(async (): Promise<Written> => {
       if (sendKey.length > sendKeyMax) throw refused(t("server.channel.sendKeyLong"));
       if (!text.trim() && made === undefined) throw refused(t("server.channel.empty"));
       const where = store.channel(channel) ? channel : await resolveTarget(from, channel);
       if (!store.channel(where)) throw refused(t("server.channel.channelGone"));
       const shown = made === undefined ? {} : "card" in made ? { artifact: made.card } : { attachments: await attachmentsOf(made.attachments) };
-      const written = await write({
+      return write({
         channel: where,
         from,
         kind: "chat",
@@ -270,11 +275,18 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         sendKey,
         readBy: from,
       });
-      return { message: toMessage(written.row), again: written.again };
     });
+    await handled(written);
+    return { message: toMessage(written.row), again: written.again };
+  };
 
-  const notice = ({ channel, text, code, sendKey = "" }: Noticing) =>
-    bestEffort(log, "chat: notice", () => store.locked(() => write({ channel, from: "system", kind: "notice", text, meta: { code }, sendKey })));
+  const notice = ({ channel, text, code, sendKey = "", untilUserSpeaks }: Noticing) =>
+    bestEffort(log, "chat: notice", () =>
+      store.locked(async () => {
+        if (untilUserSpeaks === true && theRow(await qm.noticeSinceUser(db.sql, { channel, code }), "NoticeSinceUser").n > 0) return;
+        await write({ channel, from: "system", kind: "notice", text, meta: { code }, sendKey });
+      }),
+    );
 
   const shape: Channel = {
     say,
@@ -321,8 +333,8 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         if (words !== row.body) embedLater({ ...row, body: words });
         return changed;
       }),
-    remove: (id) =>
-      store.locked(async () => {
+    remove: async (id) => {
+      const event = await store.locked(async () => {
         const row = await messageOf(id);
         if (row.deleted_at !== null) throw refused(t("server.channel.messageGone"));
         let event: ChannelEvent | undefined;
@@ -332,7 +344,10 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
           event = { seq, kind: "removed", channel: row.channel_id, message: id, at: now };
         });
         if (event) await removed(event);
-      }),
+        return event;
+      });
+      if (event) await handled({ event });
+    },
     previewRemove: async (id) => {
       const row = await messageOf(id);
       if (row.deleted_at !== null) throw refused(t("server.channel.messageGone"));
@@ -461,8 +476,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         await publishChannel(channel);
       }),
     homeOf: async (participant) => homeOf(participant),
-    callersOf: async (speaker, channel, before) => (await qm.callersOf(db.sql, { speaker, channel, before, n: callersMax })).map((r) => r.sender_id),
-    observe: w.observe,
+    committed: w.committed,
     events: async (after, n = 1000) =>
       (await qe.eventsAfter(db.sql, { after, n })).map((e) => ({
         seq: e.seq,
@@ -471,31 +485,14 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         message: e.message_id,
         at: e.at,
       })),
-    replay: async (after, handled) => {
-      for (let from = after; ;) {
-        const page = await shape.events(from);
-        const last = page.at(-1);
-        if (!last) return;
-        for (const event of page) {
-          await bestEffort(log, `chat: replay ${event.message}`, () =>
-            store.locked(async () => {
-              if (event.kind === "removed") await removed(event);
-              else {
-                const row = await qm.messageByID(db.sql, { id: event.message });
-                // A message whose place was deleted since has nothing left to route.
-                if (row && row.deleted_at === null && store.channel(row.channel_id)) {
-                  const written = await settle(row, event, true);
-                  if (written.heldNotice)
-                    await write({ channel: row.channel_id, from: "system", kind: "notice", text: written.heldNotice, meta: { code: "hop_limit" } });
-                }
-              }
-            }),
-          );
-          await handled(event);
-        }
-        from = last.seq;
-      }
-    },
+    committedOf: (message) =>
+      store.locked(async () => {
+        const row = await qm.messageByID(db.sql, { id: message });
+        const e = await qe.eventOf(db.sql, { message_id: message });
+        if (!row || !e || row.deleted_at !== null) return undefined;
+        return committedFrom(row, { seq: e.seq, kind: "posted", channel: e.channel_id, message: e.message_id, at: e.at });
+      }),
+    awaitReader: w.awaitReader,
     seat: (p) => store.locked(() => store.tx(() => store.seat(p))),
     leave: (participant) => store.locked(() => store.markParticipantLeft(participant, clock.now())),
     participants: () =>
@@ -519,17 +516,10 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
     dispatches: async (thread) => theRow(await qm.dispatchesIn(db.sql, { channel_id: thread }), "DispatchesIn").n ?? 0,
     recentRows: async (channel, n) => [...(await qm.messagesBefore(db.sql, { channel_id: channel, number: 2147483647, n }))].toReversed(),
     rowsAfter: (channel, after) => qm.messagesAfter(db.sql, { channel_id: channel, number: after, n: 1000 }),
-    retell: (message) =>
-      store.locked(async () => {
-        const row = await qm.messageByID(db.sql, { id: message });
-        const e = await qe.eventOf(db.sql, { message_id: message });
-        if (!row || !e || row.deleted_at !== null || !store.channel(row.channel_id)) return;
-        await settle(row, { seq: e.seq, kind: "posted", channel: e.channel_id, message: e.message_id, at: e.at }, false);
-      }),
     addressedOf,
-    note: (n) =>
-      store.locked(async () => {
-        const written = await write({
+    note: async (n) => {
+      const written = await store.locked(() =>
+        write({
           channel: n.channel,
           from: n.from,
           kind: n.kind,
@@ -537,9 +527,11 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
           meta: n.meta,
           ...(n.topic ? { thread: n.topic } : {}),
           ...(n.member ? { member: n.member } : {}),
-        });
-        return { thread: written.thread };
-      }),
+        }),
+      );
+      await handled(written);
+      return { thread: written.thread };
+    },
     userInThread: () =>
       mapped(core.subscribe(), (e) =>
         e.type === "messageChanged" && e.thread && e.message.actor.kind === "user" && e.message.kind === "chat"
@@ -549,6 +541,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
     ...dir,
     close: async () => {
       await tasks.close();
+      w.close();
       r.close();
     },
   };

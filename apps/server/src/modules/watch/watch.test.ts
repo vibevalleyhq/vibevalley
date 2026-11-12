@@ -1150,6 +1150,28 @@ describe("the chat", () => {
       expect(registered3).toBe(true);
     }));
 
+  test("the watch's cursor passes an event once it is routed, and stays before one that failed until startup reads it again", () =>
+    run(async (f, x) => {
+      await hire(f, x, "w1", "first", "demo");
+      const cursor = async () => Number((await f.sql(`select seq from watch_cursor where name = 'channel'`))[0]?.["seq"] ?? 0);
+      const seqOf = async (id: string) => Number((await f.sql(`select seq from channel_event where message_id = $1 and kind = 'posted'`, [id]))[0]?.["seq"]);
+      const { message: first } = await f.chat.say({ text: "@w1 第一句", sendKey: "" });
+      // The write returned once its event was handled: routed, and the cursor past it.
+      expect(await f.deliveryOf("w1", first.id)).toBeDefined();
+      expect(await cursor()).toBeGreaterThanOrEqual(await seqOf(first.id));
+      await trigger(f.db, "fail_w1", "before insert on session_delivery", "new.session_id = 'w1'");
+      expect(await outcome(f.chat.say({ text: "@w1 第二句", sendKey: "second" }))).toBe("Failure");
+      await drop(f.db, "fail_w1", "session_delivery");
+      const [second] = await f.sql(`select id from channel_message where send_key = 'second'`);
+      const secondId = String(second!["id"]);
+      const { message: third } = await f.chat.say({ text: "@w1 第三句", sendKey: "" });
+      expect(await f.deliveryOf("w1", third.id)).toBeDefined();
+      expect(await cursor()).toBeLessThan(await seqOf(secondId));
+      await f.watch.boot();
+      expect(await f.deliveryOf("w1", secondId)).toBeDefined();
+      expect(await cursor()).toBeGreaterThanOrEqual(await seqOf(third.id));
+    }));
+
   test("a read receipt is written whole or not at all", () =>
     run(async (f) => {
       const general = f.chat.defaultChannel();

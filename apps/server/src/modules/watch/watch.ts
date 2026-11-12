@@ -1,11 +1,16 @@
 // The layer over the chat and the sessions: it reads the chat's committed events (in order, after a cursor of its own)
 // and routes each to the sessions, opens their threads, hires a profile's direct helper, posts their reports, and
 // answers their receipts in the chat (👀, the wake breaker's notice).
-import { TaskGroup } from "@vibevalley/async";
+//
+// The events come live from Channel.committed, one at a time; the chat's writes wait on each (awaitReader), so a
+// message's routing is done when the write that said it returns. watch_cursor moves only once an event's effects are
+// kept (its route, a direct talk it opened), and startup reads the events after it again: a route is kept with the
+// trigger's id (the message's), so one already routed is passed.
+import { Semaphore, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { userId } from "@vibevalley/protocol";
-import { messageId, sessionId } from "@vibevalley/protocol/schema";
+import { messageId } from "@vibevalley/protocol/schema";
 
 import { head } from "#/base/clip.ts";
 import { ApiError, lookIn, missing } from "#/base/errors.ts";
@@ -15,16 +20,7 @@ import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
-import {
-  type ChannelEvent,
-  type Committed,
-  type Followup,
-  type Meta,
-  messageKind,
-  metaOf,
-  type MsgRow,
-  type ThreadSubject,
-} from "#/modules/channel/contracts.ts";
+import { type Committed, type Meta, messageKind, metaOf, type MsgRow, type ThreadSubject, type Told } from "#/modules/channel/contracts.ts";
 import { actorOfParticipant, type ChannelHearers } from "#/modules/session/envelope.ts";
 import { inputContext } from "#/modules/session/payload.ts";
 import { envelopeLines, talkBrief } from "#/modules/session/prompts.ts";
@@ -50,7 +46,7 @@ export interface Watch {
   readonly tell: (from: string, session: string, text: string, sendKey: string) => Promise<T.ChatMessage | undefined>;
   /** What deleting a message does, its waiting deliveries included. */
   readonly previewRemove: (id: T.MessageId) => Promise<T.Preview>;
-  /** At startup, after the sessions are back and before they are woken: their threads, then the events not yet routed. */
+  /** At startup: the sessions' threads, then the chat's events after the cursor, each once. */
   readonly boot: () => Promise<void>;
   readonly close: () => Promise<void>;
 }
@@ -72,11 +68,27 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
   const log = deps.log.child("watch");
   const tasks = new TaskGroup({ name: "watch", onError: (task, e) => log.warn(`${task} failed`, e) });
   let closed = false;
-  /** An event failed live: the cursor stays before it until startup tells it again. */
-  let stuck = false;
+  /** One event at a time, live or read again. */
+  const turn = new Semaphore(1);
+  /** Whether the cursor follows what is handled: held until startup has read the events after it, stuck once an event
+   * failed live (it stays before that one until the next startup reads it again). */
+  let cursor: "held" | "moving" | "stuck" = "held";
+  /** The newest event handled live, and the ones that failed (a waiting write is failed with it). */
+  let handledLive = 0;
+  const failures = new Map<number, Error>();
+  const waiting: { readonly seq: number; readonly done: (failure?: Error) => void }[] = [];
+  /** The newest event handled, and the cursor kept. */
+  let through = 0;
+  let kept = (await qw.cursorOf(db.sql, { name: routed }))?.seq ?? 0;
+  /** A direct talk being opened, by channel: the cursor stays before the event that opens it until it is open. */
+  const opening = new Map<string, number>();
 
-  const moveCursor = async (seq: number) => {
-    await qw.moveCursor(db.sql, { name: routed, seq });
+  const advance = async () => {
+    if (cursor !== "moving") return;
+    const to = Math.min(through, ...[...opening.values()].map((seq) => seq - 1));
+    if (to <= kept) return;
+    await qw.moveCursor(db.sql, { name: routed, seq: to });
+    kept = to;
   };
 
   const sessionOf = (id: string) => sessions.live(id).session;
@@ -102,9 +114,9 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
     return sessionOf(c.topic.id) ? c.topic.id : "";
   };
 
-  const route = async (c: Committed): Promise<Followup | undefined> => {
-    // Told again at startup: routed before the farm stopped, past where the cursor was kept.
-    if (c.replayed && (await sessions.isRouted(c.row.id))) return undefined;
+  /** again: read again from the events (at startup), so it may have been routed before; the hop limit's notice, if any. */
+  const route = async (c: Committed, again: boolean): Promise<string | undefined> => {
+    if (again && (await sessions.isRouted(c.row.id))) return undefined;
     const row = envelopeRowOf(c.row, c.place, c.channelName);
     const meta = metaOf(c.row.meta);
     const sessionsNow = hired();
@@ -138,7 +150,7 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
     try {
       const original = await sessions.recordTrigger(channelTrigger(fact, inputContext(chat.addressedOf(c.row))));
       const answer = await sessions.route(original, fact);
-      return answer.heldNotice ? { hopLimit: answer.heldNotice } : undefined;
+      return answer.heldNotice || undefined;
     } catch (error) {
       // A refusal is the route's answer: the message is kept and passed. Anything else (the database failing) fails the
       // write, and the event is told again at startup.
@@ -197,8 +209,12 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
       await notice(channel, t("server.channel.talkFailed", { why: e.reason }), "talk_refused");
       return;
     }
-    // What the user said while it was hired: told again, so it reaches the new session too (a delivery is one per session).
-    for (const row of await chat.rowsAfter(channel, last?.number ?? 0)) if (userChat(row) && row.sender_id !== opened) await chat.retell(row.id);
+    // What the user said while it was hired: routed again, so it reaches the new session too (a delivery is one per session).
+    for (const row of await chat.rowsAfter(channel, last?.number ?? 0)) {
+      if (!userChat(row) || row.sender_id === opened) continue;
+      const c = await chat.committedOf(row.id);
+      if (c) await turn.with(() => route(c, false));
+    }
   };
 
   const talkKey = (channel: string) => `talk:${channel}`;
@@ -211,35 +227,78 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
     const agentId = peer.agent;
     // One opening per channel: another message while it opens joins the one under way.
     if (tasks.has(talkKey(channel))) return;
-    tasks.keyed(talkKey(channel), () => bestEffort(log, "opening a direct context", () => startTalk(channel, agentId)));
+    opening.set(channel, c.event.seq);
+    tasks.keyed(talkKey(channel), async () => {
+      try {
+        await bestEffort(log, "opening a direct context", () => startTalk(channel, agentId));
+      } finally {
+        opening.delete(channel);
+        await bestEffort(log, "the watch's cursor", () => turn.with(advance));
+      }
+    });
   };
 
-  /** A session's words answer the session that last named it there since it last spoke. */
-  const answered = async (c: Committed): Promise<T.SessionId | undefined> => {
-    if (c.replayed || c.row.kind !== "chat" || c.row.sender_kind !== "agent" || agents.isOrchestrator(c.row.sender_id)) return undefined;
-    const callers = await chat.callersOf(c.row.sender_id, c.row.channel_id, c.row.id);
-    const caller = callers.find((id) => chat.participants().some((p) => p.id === id && p.agent !== null && p.id !== profileId(p.agent)));
-    return caller === undefined ? undefined : sessionId(caller);
+  /** One event, under the turn: routed (posted) or taken back (removed), then the cursor moved past it. */
+  const handle = async (told: Told, again: boolean) => {
+    switch (told.kind) {
+      case "posted": {
+        const c = told.posted;
+        const hopLimit = await route(c, again);
+        // Said once there by the farm, until the user next speaks there; it does not wait on this turn.
+        if (hopLimit) await chat.notice({ channel: c.row.channel_id, text: hopLimit, code: "hop_limit", untilUserSpeaks: true });
+        onDirect(c);
+        through = Math.max(through, c.event.seq);
+        break;
+      }
+      case "removed":
+        await sessions.withdrawEnvelope(told.event.message);
+        through = Math.max(through, told.event.seq);
+        break;
+    }
+    await advance();
   };
 
-  const posted = async (c: Committed) => {
-    try {
-      const routedTo = await route(c);
-      const answers = await answered(c);
-      const follow = answers ? { ...routedTo, answers } : routedTo;
-      if (!c.replayed && !stuck) await moveCursor(c.event.seq);
-      onDirect(c);
-      return follow;
-    } catch (e) {
-      stuck = true;
-      throw e;
+  const seqOf = (told: Told) => (told.kind === "posted" ? told.posted.event.seq : told.event.seq);
+  const live = async (told: Told) => {
+    const seq = seqOf(told);
+    await turn.with(async () => {
+      try {
+        await handle(told, false);
+      } catch (e) {
+        // The write that made it fails with this; startup reads it again.
+        cursor = "stuck";
+        failures.set(seq, e instanceof Error ? e : new Error(String(e)));
+        log.warn(`event ${seq}`, e);
+      }
+      handledLive = Math.max(handledLive, seq);
+    });
+    for (const w of waiting.filter((w) => w.seq <= handledLive)) {
+      waiting.splice(waiting.indexOf(w), 1);
+      const failure = failures.get(w.seq);
+      failures.delete(w.seq);
+      w.done(failure);
     }
   };
-  const removed = async (event: ChannelEvent) => {
-    await sessions.withdrawEnvelope(event.message);
-    if (!stuck) await moveCursor(event.seq);
-  };
-  chat.observe({ posted, removed });
+  const committed = chat.committed();
+  tasks.run("chat events", async (signal) => {
+    try {
+      for (let n = await committed.next(signal); n.done !== true; n = await committed.next(signal)) await live(n.value);
+    } finally {
+      committed.close();
+      for (const w of waiting.splice(0)) w.done();
+    }
+  });
+  chat.awaitReader(
+    (seq) =>
+      new Promise<void>((resolve, reject) => {
+        const done = (failure?: Error) => (failure === undefined ? resolve() : reject(failure));
+        if (closed) return resolve();
+        if (seq > handledLive) return void waiting.push({ seq, done });
+        const failure = failures.get(seq);
+        failures.delete(seq);
+        done(failure);
+      }),
+  );
   sessions.useChat({
     defaultChannel: () => chat.defaultChannel(),
     orchestratorIn: (channel) => chat.orchestratorIn(channel),
@@ -422,14 +481,32 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
     },
     boot: async () => {
       await openThreads();
-      const from = (await qw.cursorOf(db.sql, { name: routed }))?.seq ?? 0;
-      // Each event once, in order: one that cannot be routed is logged and passed, not tried again and again.
-      await chat.replay(from, (event) => moveCursor(event.seq));
-      stuck = false;
+      await turn.with(async () => {
+        // Each event once, in order: one that cannot be routed is logged and passed, not tried again and again.
+        for (let from = (await qw.cursorOf(db.sql, { name: routed }))?.seq ?? 0; ;) {
+          const page = await chat.events(from);
+          const last = page.at(-1);
+          if (!last) break;
+          for (const event of page) {
+            await bestEffort(log, `event ${event.seq}`, async () => {
+              if (event.kind === "removed") return handle({ kind: "removed", event }, true);
+              // A message deleted since, or whose place is gone, has nothing left to route.
+              const posted = await chat.committedOf(event.message);
+              if (posted) await handle({ kind: "posted", posted }, true);
+            });
+            through = Math.max(through, event.seq);
+          }
+          from = last.seq;
+        }
+        cursor = "moving";
+        failures.clear();
+        await advance();
+      });
     },
     close: async () => {
       closed = true;
       await tasks.close();
+      for (const w of waiting.splice(0)) w.done();
     },
   };
 }
