@@ -774,6 +774,16 @@ describe("the chat", () => {
       expect(under?.subjectKind).toBe("talk");
     }));
 
+  test("what a session took in is neither unseen nor unread for it", () =>
+    run(async (f, x) => {
+      const thread = await hireAndRun(f, x, "w19", "写 hello", "chat-s");
+      const { message: words } = await f.chat.post({ _tag: "User", text: "顺便看看测试", channel: thread.id, sendKey: "" });
+      await until(async () => (await f.deliveryOf("w19", words.id))?.state === "consumed", "the user's words taken in");
+      await until(async () => (await f.sql("select 1 from channel_seen where participant_id = 'w19' and message_id = $1", [words.id])).length === 1, "seen");
+      expect((await f.chat.unread("w19")).map((u) => u.channel)).not.toContain(`#general:${thread.rootNumber}`);
+      expect((await f.chat.post({ _tag: "Agent", from: "w19", text: "测试也看了" })).kind).toBe("sent");
+    }));
+
   test("a session's words after another session named it answer that one; the assistant's answer no one", () =>
     run(async (f, x) => {
       const thread = await hireAndRun(f, x, "w17", "写 hello", "chat-q");

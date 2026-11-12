@@ -206,6 +206,14 @@ CREATE TABLE channel_read_cursor (
   updated_at       double precision not null,
   primary key (participant_id, channel_id)
 );
+-- What a participant took in without reading it in the chat: a message handed to it, marked when it was taken (the
+-- layers above say when). A participant's unread and unseen leave these out.
+CREATE TABLE channel_seen (
+  participant_id  text not null references channel_participant (id),
+  message_id      text not null references channel_message (id) on delete cascade,
+  seen_at         double precision not null,
+  primary key (participant_id, message_id)
+);
 -- What happened in the chat, numbered in the order it was committed: the layers above read it after a cursor of their own.
 CREATE TABLE channel_event (
   seq         integer generated always as identity primary key,
@@ -646,6 +654,7 @@ CREATE INDEX channel_by_parent on channel (parent_id) where parent_id is not nul
 CREATE INDEX channel_event_by_message on channel_event (message_id);
 CREATE INDEX channel_member_by_participant on channel_member (participant_id);
 CREATE INDEX channel_read_cursor_by_channel on channel_read_cursor (channel_id);
+CREATE INDEX channel_seen_by_message on channel_seen (message_id);
 CREATE INDEX session_delivery_by_message on session_delivery (message_id);
 CREATE INDEX session_issue_input_by_session on session_issue_input (session_id) where session_id is not null;
 CREATE INDEX session_delivery_by_channel on session_delivery (channel_id) where channel_id is not null;

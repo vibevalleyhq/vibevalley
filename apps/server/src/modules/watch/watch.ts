@@ -346,6 +346,9 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
         const change = n.value;
         switch (change._tag) {
           case "Consumed":
+            // Marked before anything else the news sets off, in the order taken: a session that speaks right after
+            // taking its input is not held back by it.
+            await bestEffort(log, `${change.session} saw ${change.envelope}`, () => chat.markSeen(change.session, change.envelope));
             await bestEffort(log, `👀 on ${change.envelope}`, () =>
               chat.react(messageId(change.envelope), change.session, handedEmoji, true).then(() => undefined),
             );

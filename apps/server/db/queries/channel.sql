@@ -55,7 +55,7 @@ with unread as (
   where m.sender_id <> sqlc.arg(participant) and m.kind <> 'notice'
     and (c.id = sqlc.arg(channel) or f.participant_id is not null)
     and m.number > greatest(coalesce(rc.read_number, 0), coalesce(f.from_number, 0))
-    and not exists (select 1 from session_delivery d where d.session_id = sqlc.arg(participant) and d.message_id = m.id and d.consumed_at is not null)
+    and not exists (select 1 from channel_seen s where s.participant_id = sqlc.arg(participant) and s.message_id = m.id)
   group by c.id, ch.name
 )
 select u.*,

@@ -35,6 +35,7 @@
   "Channel.issueThread": ["issue"],
   "Channel.latest": ["watch"],
   "Channel.leave": ["watch"],
+  "Channel.markSeen": ["watch"],
   "Channel.membersOf": ["watch"],
   "Channel.messageLocation": ["connector"],
   "Channel.note": ["watch"],

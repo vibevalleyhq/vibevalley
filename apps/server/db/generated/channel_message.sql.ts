@@ -381,7 +381,7 @@ export const UnseenInResult = z.object({
 })
 export type UnseenInResult = z.infer<typeof UnseenInResult>
 
-export const UnseenInSql = "-- name: UnseenIn :many\n-- bound: one participant's unread in one channel; the read cursor moves past them.\n-- Oldest first, so a partial read can advance the cursor without skipping messages.\nselect m.id from channel_message m\nwhere m.channel_id = $1 and m.sender_id <> $2\n  and m.number > coalesce((select read_number from channel_read_cursor where participant_id = $2 and channel_id = $1), 0)\n  and not exists (select 1 from session_delivery d where d.session_id = $2 and d.message_id = m.id and d.consumed_at is not null)\norder by m.number;"
+export const UnseenInSql = "-- name: UnseenIn :many\n-- bound: one participant's unread in one channel; the read cursor moves past them.\n-- Oldest first, so a partial read can advance the cursor without skipping messages.\nselect m.id from channel_message m\nwhere m.channel_id = $1 and m.sender_id <> $2\n  and m.number > coalesce((select read_number from channel_read_cursor where participant_id = $2 and channel_id = $1), 0)\n  and not exists (select 1 from channel_seen s where s.participant_id = $2 and s.message_id = m.id)\norder by m.number;"
 
 export async function unseenIn(sql: Sql, params: UnseenInParams): Promise<UnseenInResult[]> {
   const rows = await sql.query(UnseenInSql, [params["channel"], params["participant"]])

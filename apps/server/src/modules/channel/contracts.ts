@@ -365,6 +365,9 @@ export interface ChannelService {
   readonly threadAbout: (kind: NonNullable<T.Channel["subjectKind"]>, id: string) => string | undefined;
   /** A place as the chat keeps it. */
   readonly place: (id: string) => Place | undefined;
+  /** A message a participant took in outside the chat (handed to it): no longer unread or unseen for it. A message that
+   * is not there marks nothing. */
+  readonly markSeen: (participant: string, message: string) => Promise<void>;
   /** Sets where a participant has read up to in a place. */
   readonly readUpTo: (participant: string, channel: string, number: number) => Promise<void>;
   /** The newest message number in a place, 0 for none. */

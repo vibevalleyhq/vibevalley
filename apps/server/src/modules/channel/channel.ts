@@ -14,6 +14,7 @@ import { heldShown, type Envelope, type Picked, retryWindowMs } from "#/modules/
 import * as qe from "#db/channel_event.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qr from "#db/channel_read_cursor.sql.ts";
+import * as qs from "#db/channel_seen.sql.ts";
 
 import {
   type ChannelEvent,
@@ -616,6 +617,9 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         lastNumber: row.last_number ?? 0,
         ...(kind !== undefined && row.subject_id !== null ? { topic: { kind, id: row.subject_id } } : {}),
       };
+    },
+    markSeen: async (participant, message) => {
+      await qs.markSeen(db.sql, { participant_id: participant, message_id: message, seen_at: clock.now() });
     },
     readUpTo: (participant, channel, number) => store.locked(() => store.tx(() => store.setRead(participant, channel, number, clock.now()))),
     latest: async (channel) => theRow(await qm.latestNumber(db.sql, { channel_id: channel }), "LatestNumber").n ?? 0,

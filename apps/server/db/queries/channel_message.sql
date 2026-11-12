@@ -84,7 +84,7 @@ limit sqlc.arg(n)::int;
 select m.id from channel_message m
 where m.channel_id = sqlc.arg(channel) and m.sender_id <> sqlc.arg(participant)
   and m.number > coalesce((select read_number from channel_read_cursor where participant_id = sqlc.arg(participant) and channel_id = sqlc.arg(channel)), 0)
-  and not exists (select 1 from session_delivery d where d.session_id = sqlc.arg(participant) and d.message_id = m.id and d.consumed_at is not null)
+  and not exists (select 1 from channel_seen s where s.participant_id = sqlc.arg(participant) and s.message_id = m.id)
 order by m.number;
 
 -- name: HoldNoticeSinceUser :one
