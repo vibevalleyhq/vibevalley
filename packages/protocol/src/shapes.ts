@@ -82,7 +82,6 @@ export {
   type UsageWindow,
 } from "./runtime/shapes";
 export {
-  type ArchiveListing,
   type Memory,
   memoryKeep,
   type MemoryKind,

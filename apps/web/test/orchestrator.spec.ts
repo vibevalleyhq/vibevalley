@@ -34,9 +34,8 @@ test("the orchestrator's trajectory shows what it was told, and a round it never
   await expect(page.getByTestId("steps-empty")).toBeVisible();
 });
 
-test("the archive and the orchestrator's voice", async ({ page }) => {
-  await page.goto("/orchestrator/archive");
-  await expect(page.getByTestId("archive")).toHaveAttribute("data-count", "0");
+test("the orchestrator's voice", async ({ page }) => {
+  await page.goto("/orchestrator");
   await tab(page, "voice").click();
   await expect(page).toHaveURL(/\/orchestrator\/voice$/u);
   const greeting = page.getByTestId("greeting");

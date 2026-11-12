@@ -25,7 +25,7 @@ export {
 export { Fact, Health, LiveEvent, ServerEvent, StateFrame } from "./core/schema";
 export { Agent, AgentTemplate, AgentValidateRequest, AgentValidation, Build, Head, Outfit, PersonaMode, Skill, Species } from "./agent/schema";
 export { ModelEntry, RuntimeInfo, RuntimePreset, RuntimeSettings, RuntimeSupport } from "./runtime/schema";
-export { ArchiveListing, Memory, MemoryList, MemoryRequest, MemorySearch, RecallPreview } from "./memory/schema";
+export { Memory, MemoryList, MemoryRequest, MemorySearch, RecallPreview } from "./memory/schema";
 export {
   BranchPublication,
   Changes,

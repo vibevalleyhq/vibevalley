@@ -35,7 +35,7 @@ export async function memoryWorld(
     (() => {
       throw new Error("a memory test reached for the network");
     });
-  const memory = await makeMemory({ config, clock, log, fetch, db, setting, agent }, options);
+  const memory = await makeMemory({ clock, log, fetch, db, setting, agent }, options);
   return {
     config,
     db,

@@ -21,14 +21,12 @@
 
 ## orchestrator
 
-助手：上线、停下、旧账、评测
+助手：上线、停下、评测
 
 | 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
 |---|---|---|---|---|---|---|
 | `orchestrator.open` | 让助手上线，可以说话了 | `/api/v1/orchestrator/open` | ✓ | ✓ |   |   |
 | `orchestrator.stop` | 停下助手这一轮，派出去的帮工接着干 | `/api/v1/orchestrator/stop` | ✓ | ✓ |   |   |
-| `orchestrator.archive.list` | 列出或搜助手压掉的对话原文 | `/api/v1/orchestrator/archive/list` | ✓ | ✓ |   |   |
-| `orchestrator.archive.get` | 读助手压掉的一份对话原文 | `/api/v1/orchestrator/archive/get` | ✓ | ✓ |   |   |
 | `orchestrator.eval.create` | 把助手做错的一轮存成评测样例，写上该怎么做 | `/api/v1/orchestrator/eval/create` | ✓ | ✓ |   |   |
 
 ## setting

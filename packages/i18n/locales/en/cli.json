@@ -353,10 +353,6 @@
       "search": "Search memories by words, every profile's if none is named"
     },
     "orchestrator": {
-      "archive": {
-        "get": "Read one of the assistant's archived conversations",
-        "list": "List or search the assistant's archived conversations"
-      },
       "eval": {
         "create": "Save an assistant turn that went wrong as an eval case, with what it should have done"
       },
@@ -550,7 +546,7 @@
       "about": "A profile's memories"
     },
     "orchestrator": {
-      "about": "The assistant: online, stop, archive, evals"
+      "about": "The assistant: online, stop, evals"
     },
     "pkm": {
       "about": "Notes: note a line, search, the radar, journals and pages",

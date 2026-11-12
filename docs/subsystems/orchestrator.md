@@ -21,8 +21,8 @@
 | `apps/server/src/modules/orchestrator/prompts.ts` | 助手系统提示词 |
 | `apps/server/src/modules/tool/tool.ts`、`schemas.ts`、`prompts.ts` | 助手和帮工 `/mcp` 的工具；参数与接口权限对应，媒体流程由脚本模型验证 |
 | `apps/server/src/modules/tool/resource.ts` | `resource_read`（`Tool.readResource`）：解析 `vv://` URI，执行会话级只读权限裁剪与 UTF-16 快照分页（`TextCache`） |
-| `$VIBEVALLEY_HOME/agent/<档案 id>/` | 错轮评测 `evals/`；压缩归档 `archive/`（`orchestrator.archive.*` 读它，pi-durable 的压缩不写它）；对话在 `$VIBEVALLEY_HOME/durable.db` |
-| `apps/web/src/features/orchestrator/OrchestratorPage.tsx` | 工作台助手页（记性、轨迹、旧账、声音） |
+| `$VIBEVALLEY_HOME/agent/<档案 id>/` | 错轮评测 `evals/`；对话在 `$VIBEVALLEY_HOME/durable.db` |
+| `apps/web/src/features/orchestrator/OrchestratorPage.tsx` | 工作台助手页（记性、轨迹、声音） |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`orchestrator.*`）。
 

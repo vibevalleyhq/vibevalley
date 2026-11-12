@@ -260,7 +260,6 @@ export const catalogs = {
           search: "按字搜记性，不指定档案就搜全部",
         },
         orchestrator: {
-          archive: { get: "读助手压掉的一份对话原文", list: "列出或搜助手压掉的对话原文" },
           eval: { create: "把助手做错的一轮存成评测样例，写上该怎么做" },
           open: "让助手上线，可以说话了",
           stop: "停下助手这一轮，派出去的帮工接着干",
@@ -367,7 +366,7 @@ export const catalogs = {
         issue: { about: "工单：写、改、挪状态、评论、验收" },
         lan: { about: "连接到本机：开关、配对、设备" },
         memory: { about: "档案的记性" },
-        orchestrator: { about: "助手：上线、停下、旧账、评测" },
+        orchestrator: { about: "助手：上线、停下、评测" },
         pkm: { about: "笔记：记一句、搜、雷达、日记和页", page: { about: "笔记的页：列出、看大纲、导出、改原文" }, journal: { about: "日记：一天一页" } },
         repo: { about: "仓库：工作目录下的 git 仓库" },
         runtime: { about: "农机：机器上的编码 agent" },
@@ -618,7 +617,6 @@ export const catalogs = {
         template: "列出模板，找它的 id",
         cron: "列出定时任务，找它的 id",
         device: "看连着的设备，找它的 id",
-        archive: "列出助手的旧账",
         channel: "列出频道，找它的 id",
         graph: "列出计划，找它的 id",
         memories: "列出它的记性，找那一条的 id",
@@ -628,7 +626,6 @@ export const catalogs = {
       },
       repoRef: "仓库 {id}",
       helperRef: "帮工 {id}",
-      archiveRef: "旧账 {name}",
     },
     "server.agent": {
       template: {
@@ -1605,7 +1602,6 @@ export const catalogs = {
         issue_split: "拆工单",
         remember: "记一条",
         rewrite_memory: "整理记性",
-        search_archive: "翻旧账",
         memory_search: "翻记性",
         memory_create: "替帮工记",
         artifact_block_create: "往 Artifact 里加一块",
@@ -3730,14 +3726,6 @@ export const catalogs = {
         orchestratorNothing: "还没记下什么。跟助手说「记住……」，或者你在上面替它记。",
         orchestratorOwn: "助手自己记的",
         told: "你交代的",
-        archiveIntro: "对话太长时，助手把前面的部分压成一段摘要，原文一字不改地存在这里。摘要里缺了细节，它自己会用 search_archive 来翻；你也可以在这里翻。",
-        search: "在旧账里搜",
-        searchHint: "搜一个词",
-        find: "搜",
-        found: "搜到的",
-        compacted: "压掉的对话",
-        noArchive: "还没有：助手的对话还没长到要压缩。",
-        chars: "{n} 字",
         note: "替它记一条",
         noteRepo: "比如：clock-in 的测试用 pnpm test，别用 npm",
         noteOrchestrator: "比如：提交信息写中文；周末别派夜班",
@@ -3761,7 +3749,7 @@ export const catalogs = {
       },
       pet: { dog: "小狗", ragdoll: "重点色布偶猫", bluecat: "蓝猫" },
       orchestrator: {
-        tab: { memory: "记性", trajectory: "轨迹", archive: "旧账", voice: "声音" },
+        tab: { memory: "记性", trajectory: "轨迹", voice: "声音" },
         all: "← 全部档案",
         title: "助手",
         intro: "助手不当帮工：听你说要做什么，派帮工去做，盯着进度，转告结果。",
@@ -4957,7 +4945,6 @@ export const catalogs = {
           search: "Search memories by words, every profile's if none is named",
         },
         orchestrator: {
-          archive: { get: "Read one of the assistant's archived conversations", list: "List or search the assistant's archived conversations" },
           eval: { create: "Save an assistant turn that went wrong as an eval case, with what it should have done" },
           open: "Bring the assistant online",
           stop: "Stop the assistant's current round; the helpers it sent keep working",
@@ -5088,7 +5075,7 @@ export const catalogs = {
         issue: { about: "Issues: write, edit, move, comment, review" },
         lan: { about: "Connect to this machine: on or off, pairing, devices" },
         memory: { about: "A profile's memories" },
-        orchestrator: { about: "The assistant: online, stop, archive, evals" },
+        orchestrator: { about: "The assistant: online, stop, evals" },
         pkm: {
           about: "Notes: note a line, search, the radar, journals and pages",
           page: { about: "Notes pages: list, outline, export, edit the file" },
@@ -5369,7 +5356,6 @@ export const catalogs = {
         template: "List the templates and find its id",
         cron: "List the scheduled tasks and find its id",
         device: "See the connected devices and find its id",
-        archive: "List the assistant's archive",
         channel: "List the channels and find its id",
         graph: "List the plans and find its id",
         memories: "List its memories and find that one's id",
@@ -5379,7 +5365,6 @@ export const catalogs = {
       },
       repoRef: "repo {id}",
       helperRef: "helper {id}",
-      archiveRef: "archive {name}",
     },
     "server.agent": {
       template: {
@@ -6394,7 +6379,6 @@ export const catalogs = {
         issue_split: "Split a ticket",
         remember: "Remember",
         rewrite_memory: "Tidy the memory",
-        search_archive: "Search old talks",
         memory_search: "Search the memory",
         memory_create: "Remember for a helper",
         artifact_block_create: "Add to an artifact",
@@ -8639,15 +8623,6 @@ export const catalogs = {
         orchestratorNothing: 'Nothing remembered yet. Tell the assistant "Remember…", or write one for it above.',
         orchestratorOwn: "the assistant remembered",
         told: "you told it",
-        archiveIntro:
-          "When the conversation grows too long, the assistant compacts the earlier part into a summary and keeps the original here word for word. When the summary misses a detail, it looks it up with search_archive; you can look here too.",
-        search: "Search the archive",
-        searchHint: "A word",
-        find: "Search",
-        found: "Found",
-        compacted: "Compacted conversations",
-        noArchive: "None yet: the assistant's conversation has not grown long enough to compact.",
-        chars: "{n} characters",
         note: "Write one for it",
         noteRepo: "Such as: clock-in's tests run with pnpm test, not npm",
         noteOrchestrator: "Such as: write commit messages in English; no night shifts on weekends",
@@ -8671,7 +8646,7 @@ export const catalogs = {
       },
       pet: { dog: "Puppy", ragdoll: "Colorpoint ragdoll", bluecat: "Blue cat" },
       orchestrator: {
-        tab: { memory: "Memory", trajectory: "Trajectory", archive: "Archive", voice: "Voice" },
+        tab: { memory: "Memory", trajectory: "Trajectory", voice: "Voice" },
         all: "← All profiles",
         title: "Assistant",
         intro: "The assistant is not a helper: it hears what you want done, sends helpers to do it, watches progress and passes on results.",
@@ -10053,8 +10028,6 @@ export interface Messages {
   "cli.op.memory.previewDelete": undefined;
   "cli.op.memory.recall": undefined;
   "cli.op.memory.search": undefined;
-  "cli.op.orchestrator.archive.get": undefined;
-  "cli.op.orchestrator.archive.list": undefined;
   "cli.op.orchestrator.eval.create": undefined;
   "cli.op.orchestrator.open": undefined;
   "cli.op.orchestrator.stop": undefined;
@@ -10246,7 +10219,6 @@ export interface Messages {
   "server.agent.template.taken": { readonly id: string | number };
   "server.agent.template.unreadable": { readonly file: string | number; readonly why: string | number };
   "server.agent.unequip": { readonly holders: string | number };
-  "server.archiveRef": { readonly name: string | number };
   "server.artifact.afterNotSibling": { readonly id: string | number };
   "server.artifact.attrNotForType": { readonly attr: string | number; readonly type: string | number };
   "server.artifact.badBlockType": { readonly types: string | number };
@@ -10730,7 +10702,6 @@ export interface Messages {
   "server.library.unreadable": { readonly path: string | number; readonly why: string | number };
   "server.library.userFetch": undefined;
   "server.lookIn.agent": undefined;
-  "server.lookIn.archive": undefined;
   "server.lookIn.artifact": undefined;
   "server.lookIn.channel": undefined;
   "server.lookIn.cron": undefined;
@@ -11165,7 +11136,6 @@ export interface Messages {
   "server.tool.labels.remember": undefined;
   "server.tool.labels.repo_list": undefined;
   "server.tool.labels.rewrite_memory": undefined;
-  "server.tool.labels.search_archive": undefined;
   "server.tool.labels.session_list": undefined;
   "server.tool.labels.session_stop": undefined;
   "server.user.aDevice": undefined;
@@ -13297,18 +13267,13 @@ export interface Messages {
   "web.media.width": undefined;
   "web.memory.memory.all": undefined;
   "web.memory.memory.allRepos": undefined;
-  "web.memory.memory.archiveIntro": undefined;
   "web.memory.memory.blank": undefined;
-  "web.memory.memory.chars": { readonly n: string | number };
-  "web.memory.memory.compacted": undefined;
   "web.memory.memory.emptyHere": undefined;
   "web.memory.memory.fading": { readonly keep: string | number };
-  "web.memory.memory.find": undefined;
   "web.memory.memory.forget": undefined;
   "web.memory.memory.forgetElsewhere": undefined;
   "web.memory.memory.forgetThere": { readonly source: string | number };
   "web.memory.memory.forgettable": undefined;
-  "web.memory.memory.found": undefined;
   "web.memory.memory.helper": undefined;
   "web.memory.memory.inSource": { readonly source: string | number };
   "web.memory.memory.intro": undefined;
@@ -13316,7 +13281,6 @@ export interface Messages {
   "web.memory.memory.listed": undefined;
   "web.memory.memory.neverRecalled": undefined;
   "web.memory.memory.next": undefined;
-  "web.memory.memory.noArchive": undefined;
   "web.memory.memory.noIssues": undefined;
   "web.memory.memory.noRepos": undefined;
   "web.memory.memory.note": undefined;
@@ -13340,8 +13304,6 @@ export interface Messages {
   "web.memory.memory.recalledLast": { readonly last: string | number; readonly n: string | number };
   "web.memory.memory.repo": undefined;
   "web.memory.memory.repoHint": undefined;
-  "web.memory.memory.search": undefined;
-  "web.memory.memory.searchHint": undefined;
   "web.memory.memory.sessions": { readonly name: string | number };
   "web.memory.memory.sources": undefined;
   "web.memory.memory.sourcesNote": undefined;
@@ -13389,7 +13351,6 @@ export interface Messages {
   "web.orchestrator.orchestrator.look": { readonly name: string | number };
   "web.orchestrator.orchestrator.profile": undefined;
   "web.orchestrator.orchestrator.quiet": undefined;
-  "web.orchestrator.orchestrator.tab.archive": undefined;
   "web.orchestrator.orchestrator.tab.memory": undefined;
   "web.orchestrator.orchestrator.tab.trajectory": undefined;
   "web.orchestrator.orchestrator.tab.voice": undefined;

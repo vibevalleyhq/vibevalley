@@ -3,7 +3,7 @@ import { Match, Show, Switch } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
-import { ArchivePanel, OrchestratorMemoryPanel } from "#/features/memory/index.ts";
+import { OrchestratorMemoryPanel } from "#/features/memory/index.ts";
 import { TrajectoryLog } from "#/features/session/index.ts";
 import { VoiceForm } from "#/features/voice/index.ts";
 import { useAgent } from "#/infra/agents.ts";
@@ -16,7 +16,6 @@ import { markWrongOf, orchestratorLooks } from "./looks";
 const tabs = [
   { id: "memory", label: t("web.orchestrator.orchestrator.tab.memory") },
   { id: "trajectory", label: t("web.orchestrator.orchestrator.tab.trajectory") },
-  { id: "archive", label: t("web.orchestrator.orchestrator.tab.archive") },
   { id: "voice", label: t("web.orchestrator.orchestrator.tab.voice") },
 ] as const;
 type Tab = (typeof tabs)[number]["id"];
@@ -106,9 +105,6 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
             <Switch>
               <Match when={at() === "memory"}>
                 <OrchestratorMemoryPanel agent={props.agent} />
-              </Match>
-              <Match when={at() === "archive"}>
-                <ArchivePanel agent={props.agent} />
               </Match>
               <Match when={at() === "voice"}>
                 <VoiceForm part="agent" />

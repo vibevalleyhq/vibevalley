@@ -9,7 +9,6 @@
     "template": "列出模板，找它的 id",
     "cron": "列出定时任务，找它的 id",
     "device": "看连着的设备，找它的 id",
-    "archive": "列出助手的旧账",
     "channel": "列出频道，找它的 id",
     "graph": "列出计划，找它的 id",
     "memories": "列出它的记性，找那一条的 id",
@@ -18,6 +17,5 @@
     "pkm": "列出笔记页，找它的名字"
   },
   "repoRef": "仓库 {id}",
-  "helperRef": "帮工 {id}",
-  "archiveRef": "旧账 {name}"
+  "helperRef": "帮工 {id}"
 }

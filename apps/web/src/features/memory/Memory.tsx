@@ -8,7 +8,7 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { aria, useNow } from "#/base/dom.tsx";
 import { ago } from "#/base/format.ts";
-import { api, createRequestKey, reasonOf } from "#/infra/api.ts";
+import { api, createRequestKey } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
 import { defineQuery, retryRead, useQueryClient, ready, useRepos, useQuery } from "#/infra/query.ts";
 import { createAct } from "#/ui/act.ts";
@@ -29,12 +29,6 @@ const recallQuery = defineQuery({
   schema: S.RecallPreview,
   key: (a: { agent: string; repo: string; text: string; version: number }) => ["recall", a.agent, a.repo, a.text, a.version],
   fetch: (a, context) => api.memory.recall({ agent: a.agent, repo: a.repo, text: a.text }, context),
-  ...retryRead,
-});
-const archiveQuery = defineQuery({
-  schema: S.ArchiveListing,
-  key: (a: { agent: string; q: string }) => ["archive", a.agent, a.q],
-  fetch: (a, context) => api.orchestrator.archive.list(omitUndefined({ agent: a.agent, q: a.q || undefined }), context),
   ...retryRead,
 });
 const useMemory = (agent: () => string) => useQuery(() => memoryQuery(agent()));
@@ -292,91 +286,6 @@ export function OrchestratorMemoryPanel(props: { agent: string }) {
         </div>
       )}
     </Show>
-  );
-}
-
-/** An orchestrator's folded conversation, by its profile id. */
-export function ArchivePanel(props: { agent: string }) {
-  const [query, setQuery] = createSignal("");
-  const [asked, setAsked] = createSignal<string>();
-  const [open, setOpen] = createSignal<{ name: string; text: string }>();
-  const listing = useQuery(() => archiveQuery({ agent: props.agent, q: asked() ?? "" }));
-  const now = useNow();
-  const show = async (name: string) => {
-    if (open()?.name === name) return setOpen(undefined);
-    let text: string;
-    try {
-      text = await api.orchestrator.archive.get({ agent: props.agent, name });
-    } catch (e) {
-      text = reasonOf(e);
-    }
-    setOpen({ name, text });
-  };
-  const data = () => ready(listing, undefined);
-  const hits = () => data()?.hits ?? [];
-  return (
-    <div class="flex flex-col gap-4">
-      <p class="text-sm text-muted">{t("web.memory.memory.archiveIntro")}</p>
-      <form
-        class="flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (query().trim()) setAsked(query().trim());
-        }}
-      >
-        <TextInput
-          aria-label={t("web.memory.memory.search")}
-          placeholder={t("web.memory.memory.searchHint")}
-          value={query()}
-          onInput={(e) => setQuery(e.currentTarget.value)}
-        />
-        <Button type="submit" icon="search" disabled={!query().trim()}>
-          {t("web.memory.memory.find")}
-        </Button>
-      </form>
-      <Show when={hits().length > 0}>
-        <Section title={t("web.memory.memory.found")} count={hits().length}>
-          <For each={hits()}>
-            {(h) => (
-              <div class="flex flex-col gap-0.5 rounded-md border border-line bg-page px-3 py-2">
-                <span class="font-mono text-xs text-muted">
-                  {h.file}:{Math.round(h.line)}
-                </span>
-                <span class="text-sm">{h.text}</span>
-              </div>
-            )}
-          </For>
-        </Section>
-      </Show>
-      <Section title={t("web.memory.memory.compacted")} count={data()?.files.length ?? 0} testid="archive">
-        <Show when={data()?.files} fallback={<Quiet>{listing.error() ? reasonOf(listing.error()) : t("web.base.reading")}</Quiet>}>
-          {(files) => (
-            <Show when={files().length > 0} fallback={<Quiet>{t("web.memory.memory.noArchive")}</Quiet>}>
-              <For each={files()} keyed={(f) => f.name}>
-                {(f) => (
-                  <div class="overflow-hidden rounded-md border border-line bg-page">
-                    <button
-                      type="button"
-                      aria-expanded={aria(open()?.name === f().name)}
-                      onClick={() => void show(f().name)}
-                      class="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left hover:bg-hover"
-                    >
-                      <span class="min-w-0 flex-1 truncate font-mono text-sm">{f().name}</span>
-                      <span class="text-xs text-muted">
-                        {ago(f().at, now())} · {t("web.memory.memory.chars", { n: Math.round(f().chars) })}
-                      </span>
-                    </button>
-                    <Show when={open()?.name === f().name}>
-                      <pre class="max-h-96 overflow-y-auto border-t border-line px-3 py-2 text-sm whitespace-pre-wrap select-text">{open()?.text}</pre>
-                    </Show>
-                  </div>
-                )}
-              </For>
-            </Show>
-          )}
-        </Show>
-      </Section>
-    </div>
   );
 }
 

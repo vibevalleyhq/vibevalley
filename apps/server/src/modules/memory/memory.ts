@@ -1,5 +1,5 @@
 import { agentFailed } from "@vibevalley/agent/core/errors";
-import { archiveFiles, type MemoryPort, parseMemoryLines, readArchive, searchArchive } from "@vibevalley/agent/memory";
+import { type MemoryPort, parseMemoryLines } from "@vibevalley/agent/memory";
 import { type Clock, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -10,7 +10,6 @@ import { type Actor, orchestrator, worker } from "#/base/actor.ts";
 import { clip } from "#/base/clip.ts";
 import { BizCode, bizError, memoriesOf, missing } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
-import { agentHome, type ServerConfig } from "#/infra/config.ts";
 import { type Db, SqlError } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
@@ -68,15 +67,11 @@ export interface Memory {
   readonly write: (n: Note) => Promise<T.Memory>;
   readonly list: (agent: string) => Promise<T.Memory[]>;
   readonly sources: () => Promise<T.MemorySourceInfo[]>;
-  /** An orchestrator's archive: what its compactions folded away. */
-  readonly archive: (agent: string, query: string) => Promise<T.ArchiveListing>;
-  readonly archiveFile: (agent: string, name: string) => Promise<string | undefined>;
   /** Stops cutting terms again, then drains and stops the memory sources. */
   readonly close: () => Promise<void>;
 }
 
 export interface MemoryDeps {
-  readonly config: ServerConfig;
   readonly clock: Clock;
   readonly log: Logger;
   readonly fetch: typeof fetch;
@@ -97,7 +92,7 @@ export interface MemoryOptions {
 }
 
 export async function makeMemory(deps: MemoryDeps, options: MemoryOptions = {}): Promise<Memory> {
-  const { config, setting, agent: agents } = deps;
+  const { setting, agent: agents } = deps;
   const build = options.build ?? defaultBuild;
   const log = deps.log.child("memory");
   const local = makeMemoryStore({ clock: deps.clock, db: deps.db, log });
@@ -116,7 +111,6 @@ export async function makeMemory(deps: MemoryDeps, options: MemoryOptions = {}):
     await loadSegmenter();
     await local.recutTerms(signal);
   });
-  const homeOf = (agent: string) => agentHome(config, agent);
 
   const list = async (agent: string) => (await sources.list(agent)).memories;
 
@@ -148,16 +142,6 @@ export async function makeMemory(deps: MemoryDeps, options: MemoryOptions = {}):
     const m = listed.memories.find((x) => x.id === id);
     if (!m) throw missing(t("server.memory.noMemory", { agent, id }), [memoriesOf(agent)]);
     return m;
-  };
-
-  /** An archive read that fails is logged and read as fallback. */
-  const orElse = async <A>(what: string, read: () => Promise<A>, fallback: A): Promise<A> => {
-    try {
-      return await read();
-    } catch (e) {
-      log.warn(`${what}: ${String(e)}`);
-      return fallback;
-    }
   };
 
   return {
@@ -236,13 +220,6 @@ export async function makeMemory(deps: MemoryDeps, options: MemoryOptions = {}):
     write,
     list,
     sources: () => sources.info(),
-    archive: async (agent, query) => {
-      const home = homeOf(agent);
-      const files = await orElse(`archive of ${agent} could not be listed`, () => archiveFiles(home), []);
-      const hits = query.trim() ? await orElse(`archive of ${agent} could not be searched`, () => searchArchive(home, query, 0), []) : [];
-      return { files, hits };
-    },
-    archiveFile: (agent, name) => orElse(`archive file ${name} of ${agent} could not be read`, () => readArchive(homeOf(agent), name), undefined),
     close: async () => {
       await tasks.close();
       await sources.close();

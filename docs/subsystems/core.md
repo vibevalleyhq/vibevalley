@@ -33,7 +33,8 @@
 - **事实命名表达发生了什么**：实体新增或更新叫 `<实体>Changed`，移除叫 `<实体>Removed`，生命周期结清用动词过去式（`sessionPhaseChanged`、`sessionReported`、`sessionLeft`）。
 - **批次原子可见，单条保留因果**：`apply(...facts)` 先在局部状态上逐条折叠并收集每条 `Transition`（`{ before, fact, after }`）与特效，再一次性替换可见状态并递增一次 `seq`。`reduce` 不得修改传入的旧状态。持有快照锁到事实发布完毕之间不主动让出调度，保证 oar 的同步回调不会遇到一个悬挂的写锁；这段只做同步折叠与发布，不放异步工作。
 - **先落库，后发事实**：各模块先提交数据库事务或文件，再调 `Core.apply`。Core 不存 `state.json` 文件，重启时从空状态由各模块从数据库恢复。
-- **按依赖重算工单派生状态**：`reduce` 仅在工单或会话集合引用变化时重算工单状态与动作（`withIssueStatuses`）；聊天或花费事实不触发工单重算。
+- **按依赖重算工单派生状态**：`reduce` 仅在工单或会话集合引用变化时重算工单状态与动作（`withIssueStatuses`）；聊天或花费事实不触发工单重算。一轮进行中的 `sessionPhaseChanged` 只改了 `doing` 或 `spent`（`since`、`quietSince` 不变，`phaseAffectsIssue`）时也跳过重算。
+- **出帧按引用复用子视图**：`gateway/projection/frame.ts` 给每个 `Core` 一份单槽缓存，`inbox`、农场 `viewOf` 和定时任务的文案在依赖的集合引用与界面语言都没变时直接复用上一帧的结果。
 - **界面文案只在出帧时填充**：`frameOf(state, effects)` 在状态副本上填入 `phaseText`、`actionText`、`whenText`、工单 `stage` 与可执行动作；`reduce` 与持久层不含界面文案。
 
 ### 三条 SSE 流
@@ -72,9 +73,10 @@
 
 **服务端重启恢复**
 
-1. `Core` 从空状态启动；各模块在构造阶段从数据库加载工单、频道、定时任务和在场会话并施加初始事实。
-2. 启动层（`start`/`ready`）按序恢复：Session 检查目录并标记中断 Run、Channel 恢复会话串、Mailbox 重放投递、Cron 补跑任务、Orchestrator 续接回合、Game 重折账本与统计 commit。
-3. HTTP 监听启动，写出 `server.json` 与就绪收据。
+1. `gateway/http/app.ts` 先绑定 HTTP 端口；配置为 `port: 0` 时在这里得到真实端口，再用它组装服务，恢复的会话和 `lan` 转发不会拿到 `:0`。
+2. `Core` 从空状态启动；各模块在构造阶段从数据库加载工单、频道、定时任务和在场会话并施加初始事实。
+3. 启动层（`start`/`ready`）按序恢复：Session 检查目录并标记中断 Run、Channel 恢复会话串、Mailbox 重放投递、Cron 补跑任务、Orchestrator 续接回合、Game 重折账本与统计 commit。
+4. 写出 `server.json` 与就绪收据。
 
 ## 和谁打交道
 
@@ -92,7 +94,7 @@
 
 ## 还没做的
 
-- `can` 只留 `owner` 与 `remote`，agent 工具按档案配置：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
+- `can` 只留 `user` 与 `remote`，agent 工具按档案配置：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
 - 状态提交与外部副作用统一为事务后任务：[状态先提交，副作用由 worker 在提交之后做](.agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md)。
 
 ## 怎么验证

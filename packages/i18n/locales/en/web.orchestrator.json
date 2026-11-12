@@ -34,7 +34,6 @@
     "tab": {
       "memory": "Memory",
       "trajectory": "Trajectory",
-      "archive": "Archive",
       "voice": "Voice"
     },
     "all": "← All profiles",
