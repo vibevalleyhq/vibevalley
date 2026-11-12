@@ -107,7 +107,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
   const w = channelWriting(own, r, tasks);
   const {
     store,
-    isAssistant,
+    isOrchestratorSeat,
     said,
     userReadHub,
     channelTags,
@@ -167,7 +167,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
       const files = await attachmentsOf(more.attachments ?? []);
       if (!text.trim() && files.length === 0) throw refused(t("server.channel.empty"));
       if (sendKey.length > sendKeyMax) throw refused(t("server.channel.sendKeyLong"));
-      if (more.to !== undefined && !isAssistant(more.to)) throw refused(t("server.channel.notOrchestrator", { id: more.to }));
+      if (more.to !== undefined && !isOrchestratorSeat(more.to)) throw refused(t("server.channel.notOrchestrator", { id: more.to }));
       // A channel as the user names it (general, #general, @fox) as well as by id; none is the default one.
       const where = channel === undefined || store.channel(channel) ? (channel ?? store.defaultId()) : await resolveTarget(userId, channel);
       if (!store.channel(where)) throw missing(t("server.channel.noChannel", { id: where }), [lookIn.channel]);

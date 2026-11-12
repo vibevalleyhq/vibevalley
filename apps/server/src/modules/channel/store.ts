@@ -74,7 +74,7 @@ export async function makeChannelStore(deps: ChannelStoreDeps) {
     ["system", "system", "VibeValley"],
   ] as const)
     await qp.upsertParticipant(db.sql, { id, kind, name, agent_id: null, home_id: null, joined_at: clock.now() });
-  // The default channel's member from its first day: seated under the assistant's word until the layers above seat it
+  // The default channel's member from its first day: seated under the orchestrator's word until the layers above seat it
   // under its profile's name.
   await qp.addParticipant(db.sql, { id: defaultOrchestrator, kind: "agent", name: t("server.channel.name.orchestrator"), joined_at: clock.now() });
   if ((await qc.defaultID(db.sql)) === undefined) {

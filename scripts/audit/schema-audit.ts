@@ -196,7 +196,6 @@ const storedEnums: readonly StoredEnum[] = [
   { column: "channel.subject_kind", protocol: "SubjectKindValues", values: T.SubjectKindValues },
   { column: "channel.notify", protocol: "NotifyValues", values: T.NotifyValues },
   { column: "channel_participant.kind", protocol: "ActorKindValues", values: T.ActorKindValues },
-  { column: "channel_participant.role", protocol: "AgentRoleValues", values: T.AgentRoleValues },
   { column: "channel_message.kind", protocol: "MessageKindValues", values: T.MessageKindValues },
   { column: "issue.mandate_strength", protocol: "MandateStrengthValues", values: T.MandateStrengthValues },
   { column: "issue.priority", protocol: "PriorityValues", values: T.PriorityValues },

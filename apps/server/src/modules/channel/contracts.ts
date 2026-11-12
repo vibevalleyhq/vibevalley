@@ -18,7 +18,7 @@ export { channelType, envelopeMore, metaOf, metaText } from "./meta.ts";
 export type MsgRow = qm.MessageByIDResult;
 
 /** Who said a message, as the page shows it: an agent's seat that speaks for a profile is a helper's, one that does not
- * is an assistant's (a profile speaking as itself). */
+ * is an orchestrator's (a profile speaking as itself). */
 export const actorOf = (kind: T.ActorKind, agent: string | null, id: string, name?: string): T.Actor =>
   kind === "agent"
     ? { kind: "agent", id, role: agent !== null ? "worker" : "orchestrator", ...(name !== undefined ? { name } : {}) }
@@ -226,7 +226,7 @@ export interface Write {
   readonly readBy?: string;
 }
 
-/** An agent seated to speak in the chat: an assistant (a profile speaking as itself, no `agent`), or a helper speaking
+/** An agent seated to speak in the chat: an orchestrator (a profile speaking as itself, no `agent`), or a helper speaking
  * for the profile `agent` (a session, a profile's seat in its direct channel). */
 export interface Seat {
   readonly id: string;
@@ -240,7 +240,7 @@ export interface Participant {
   readonly id: string;
   readonly kind: T.ActorKind;
   readonly name: string;
-  /** The profile it speaks for; none for the user, the farm and the assistants. */
+  /** The profile it speaks for; none for the user, the farm and the orchestrators. */
   readonly agent: string | null;
   readonly home: string | null;
   readonly left: boolean;
@@ -431,7 +431,7 @@ export interface ChannelService {
   readonly setNotify: (id: string, notify: T.Notify) => Promise<void>;
   /** `"none"` on either the thread or its parent channel silences both. */
   readonly notifyOf: (id: string) => T.Notify;
-  /** The direct channel with a seated agent (an assistant, a profile's seat), made when there is none. */
+  /** The direct channel with a seated agent (an orchestrator, a profile's seat), made when there is none. */
   readonly createDirect: (peer: string) => Promise<string>;
   readonly orchestratorIn: (channel: string) => string;
   readonly markUnread: (channel: string, number: number) => Promise<void>;

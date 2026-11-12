@@ -39,7 +39,7 @@ export interface ChannelWritingDeps {
 /** tasks: the channel's own, so the work a message sets off ends with the service. */
 export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: TaskGroup) {
   const { db, clock, log } = deps;
-  const { store, assistantIds, orchestratorInRow, membersOfRow, publishChannel, publishUserMentions, publishMessage, readUpTo, change, placeOf } = r;
+  const { store, orchestratorSeats, orchestratorInRow, membersOfRow, publishChannel, publishUserMentions, publishMessage, readUpTo, change, placeOf } = r;
   const observers: ChannelObserver[] = [];
   /** A helper's seat in the chat: an agent's participant speaking for a profile, there until it leaves. */
   const isHelper = (p: { readonly kind: string; readonly agent_id: string | null; readonly left_at: number | null }) =>
@@ -50,11 +50,11 @@ export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: T
     const ch = store.channel(row.channel_id);
     if (!ch) throw new Inconsistent(`no channel ${row.channel_id}`);
     const meta = metaOf(row.meta);
-    const orchestrators = assistantIds();
+    const orchestrators = orchestratorSeats();
     const here = orchestratorInRow(ch);
     // No one else is in a direct channel to be named.
     const mentions = ch.type === "direct" ? [] : mentionsIn(row.body, { here, orchestrators });
-    // Who is here to be named: the assistants, the user, everyone, and the helpers seated and not gone.
+    // Who is here to be named: the orchestrators, the user, everyone, and the helpers seated and not gone.
     const present = new Set(
       store
         .participants()

@@ -781,7 +781,7 @@ describe("the chat", () => {
       expect((await f.chat.speak({ from: "w19", text: "测试也看了" })).kind).toBe("sent");
     }));
 
-  test("a session's words after another session named it answer that one; the assistant's answer no one", () =>
+  test("a session's words after another session named it answer that one; the orchestrator's answer no one", () =>
     run(async (f, x) => {
       const thread = await hireAndRun(f, x, "w17", "写 hello", "chat-q");
       await hireAndRun(f, x, "w18", "写 world", "chat-r");
@@ -1228,7 +1228,7 @@ describe("the chat", () => {
 });
 
 test("regression: mailbox routing reads the current channel manager through threads and direct conversations", () =>
-  // The mailbox reads a place's assistant through the chat (Watch hands Session the chat's orchestratorIn).
+  // The mailbox reads a place's orchestrator through the chat (Watch hands Session the chat's orchestratorIn).
   run(async (f) => {
     for (const id of ["manager", "first", "second"]) await f.chat.seat({ id, name: id });
     const room = await f.chat.openChannel("room", "", "");

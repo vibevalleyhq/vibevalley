@@ -66,7 +66,7 @@ export interface Session {
   readonly withdrawDeliveries: (session: string, why: string) => Promise<void>;
   /** An issue's dispatches recorded before `at` taken back; in its own transaction. */
   readonly withdrawDispatches: (issue: string, at: number) => Promise<void>;
-  /** The chat the deliveries read their places from (the default channel, a place's assistant, a participant's unread),
+  /** The chat the deliveries read their places from (the default channel, a place's orchestrator, a participant's unread),
    * told by the layer above the sessions; until then, an empty one. */
   readonly useChat: (view: ChatView) => void;
   /** A helper says an input is not its to take; the orchestrator is told why. */

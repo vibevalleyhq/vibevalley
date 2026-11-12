@@ -42,7 +42,7 @@ export interface ChannelDirectoryDeps {
 
 export function channelDirectory(deps: ChannelDirectoryDeps, r: ChannelHub): DirectoryMethods {
   const { core, db, clock } = deps;
-  const { store, isAssistant, orchestratorInRow, targetOfChannel, publishChannel, publishUserMentions } = r;
+  const { store, isOrchestratorSeat, orchestratorInRow, targetOfChannel, publishChannel, publishUserMentions } = r;
   const guards: ((channel: string) => Promise<readonly string[]>)[] = [];
 
   /** A channel nothing points at any more; refused with what still does. */
@@ -103,13 +103,13 @@ export function channelDirectory(deps: ChannelDirectoryDeps, r: ChannelHub): Dir
         const desc = (upd.description !== undefined ? optional(upd.description) : null) ?? row.description;
         const proj = upd.repo !== undefined ? optional(upd.repo) : row.repo;
         const category = upd.category !== undefined ? optional(upd.category) : row.category;
-        // Only an assistant is put in a channel: a helper is hired into a place, not seated in one.
+        // Only an orchestrator is put in a channel: a helper is hired into a place, not seated in one.
         const wanted = upd.members === undefined ? undefined : [...new Set(upd.members.map((m) => m.trim()).filter((m) => m !== ""))];
-        const notOne = wanted?.find((m) => !isAssistant(m));
+        const notOne = wanted?.find((m) => !isOrchestratorSeat(m));
         if (notOne !== undefined) throw refused(t("server.channel.notOrchestrator", { id: notOne }));
         const had = store.membersOf(id);
         const joining = wanted === undefined ? [] : wanted.filter((m) => !had.includes(m));
-        const leaving = wanted === undefined ? [] : had.filter((m) => isAssistant(m) && !wanted.includes(m));
+        const leaving = wanted === undefined ? [] : had.filter((m) => isOrchestratorSeat(m) && !wanted.includes(m));
         // Placed before another channel: every channel but the default gets its place again, in order.
         const order =
           upd.before === undefined

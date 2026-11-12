@@ -55,15 +55,15 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
   const said = new Hub<T.ChatMessage>();
   const userReadHub = new Hub<UserRead>();
 
-  /** An assistant: an agent seated to speak as itself, for no other profile (the layers above seat them), not gone. */
-  const isAssistant = (id: string) => {
+  /** An orchestrator: an agent seated to speak as itself, for no other profile (the layers above seat them), not gone. */
+  const isOrchestratorSeat = (id: string) => {
     const p = store.participant(id);
     return p?.kind === "agent" && p.agent_id === null && p.left_at === null;
   };
-  const assistantIds = () =>
+  const orchestratorSeats = () =>
     store
       .participants()
-      .filter((p) => isAssistant(p.id))
+      .filter((p) => isOrchestratorSeat(p.id))
       .map((p) => p.id);
 
   /** A place's channel or direct channel: itself, or the one a thread hangs in. */
@@ -74,14 +74,14 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
     const top = topOfRow(row);
     return top === undefined || top.type === "direct" ? [] : store.membersOf(top.id);
   };
-  /** The assistant a place's words go to when they name no one: a direct channel's peer when it is one; otherwise the
-   * default assistant when it is a member, the first assistant member, or the default assistant. */
+  /** The orchestrator a place's words go to when they name no one: a direct channel's peer when it is one; otherwise the
+   * default orchestrator when it is a member, the first orchestrator member, or the default orchestrator. */
   const orchestratorInRow = (row: ChannelRow | undefined): string => {
     const top = topOfRow(row);
-    if (top?.type === "direct") return top.peer_id !== null && isAssistant(top.peer_id) ? top.peer_id : defaultOrchestrator;
+    if (top?.type === "direct") return top.peer_id !== null && isOrchestratorSeat(top.peer_id) ? top.peer_id : defaultOrchestrator;
     const members = membersOfRow(row);
     if (members.includes(defaultOrchestrator)) return defaultOrchestrator;
-    return members.find(isAssistant) ?? defaultOrchestrator;
+    return members.find(isOrchestratorSeat) ?? defaultOrchestrator;
   };
 
   /** A channel's name; none for a thread or what is not there. */
@@ -275,8 +275,8 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
     store,
     said,
     userReadHub,
-    isAssistant,
-    assistantIds,
+    isOrchestratorSeat,
+    orchestratorSeats,
     orchestratorInRow,
     membersOfRow,
     channelTags,

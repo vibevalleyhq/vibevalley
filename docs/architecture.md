@@ -64,8 +64,8 @@ flowchart LR
   2. `Agents`（`agent`、`runtime`、`memory`；循环和持久是 pi-durable 的，`runtime/durable.ts` 开它的 `Harness`，我们自己的工具在 `packages/agent`）
   3. `Source Control`（`repo`）
   4. `Agent Sessions`（`session`：触发和投递、会话和每一轮、工作目录、执行器）
-  5. `Collaboration`（`channel`、`media`（含素材库）、`artifact`、`pkm`；`channel` 不依赖 `session`）
-  6. `Watch`（`watch`：按自己的游标读频道已提交的事件，路由给帮工，开帮工的串、拉起私聊帮工、贴汇报和 👀）
+  5. `Collaboration`（`channel`、`media`（含素材库）、`artifact`、`pkm`；`channel` 只靠 `Platform`，不 import 别的业务模块，`modules.test.ts` 查）
+  6. `Watch`（`watch`：给助手和档案排聊天里的席位，按自己的游标读频道已提交的事件，路由给帮工，开帮工的串、拉起私聊帮工、贴汇报、记看过和 👀，把聊天的默认频道、助手和未读交给 `Session`）
   7. `Issues`（`issue`，含定时任务）
   8. `Inbox`（`inbox`）
   9. `Orchestrator`（`orchestrator`）

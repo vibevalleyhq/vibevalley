@@ -33,7 +33,7 @@ export interface UnreadRow {
 
 export const summaryChannels = 20;
 
-/** What the mailbox reads of the chat, told by the layer above it (the watch): the default channel, the assistant a
+/** What the mailbox reads of the chat, told by the layer above it (the watch): the default channel, the orchestrator a
  * place's words that name no one go to, and a participant's unread (`channel`: the one it is in), newest first. */
 export interface ChatView {
   readonly defaultChannel: () => string;

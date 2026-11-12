@@ -48,4 +48,4 @@
 
 - `apps/server/src/modules/attachment/storage.test.ts`：同一个键写两次只有一份，读回的字节和类型，删除，流式写入整份发布，取消的写入在键下和暂存里都不留东西。
 - `apps/server/src/gateway/http/attachment.test.ts`：读回的类型、`inline` 与下载、沙箱头、不存在和越界的 id、超限拒绝。
-- `apps/server/src/modules/channel/channel.test.ts`、`apps/server/src/modules/media/inputs.test.ts`、`apps/server/src/modules/artifact/artifact.test.ts`：带附件的消息、同一字节去重、经附件写进存储的媒体输入和网页稿。
+- `apps/server/src/modules/watch/watch.test.ts`、`apps/server/src/modules/media/inputs.test.ts`、`apps/server/src/modules/artifact/artifact.test.ts`：带附件的消息、同一字节去重、经附件写进存储的媒体输入和网页稿。
