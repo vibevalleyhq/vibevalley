@@ -6,6 +6,8 @@ import type * as T from "../shapes";
 import * as A from "./audio-schema";
 import * as S from "./schema";
 
+const libraryItemInput = input({ id: z.string() });
+
 export interface MediaHandlers {
   readonly "media.dialogue.create": (a: T.MediaSpeakersRequest) => Promise<T.MediaAudioJob>;
   readonly "media.voiceDesign.create": (a: T.MediaVoiceDesignRequest) => Promise<T.MediaAudioJob>;
@@ -35,6 +37,12 @@ export interface MediaHandlers {
   readonly "media.job.release": (a: T.MediaJobRequest) => Promise<T.MediaJob>;
   readonly "media.job.download": (a: T.MediaJobRequest) => Promise<T.MediaJob>;
   readonly "media.job.list": () => Promise<T.MediaJob[]>;
+  /** Newest first. */
+  readonly "library.item.list": (a: T.LibraryListRequest) => Promise<T.LibraryItem[]>;
+  readonly "library.item.add": (a: T.LibraryAddRequest) => Promise<T.LibraryItem>;
+  /** Only the item goes: a message that has the file still opens it. */
+  readonly "library.item.delete": (a: { readonly id: string }) => Promise<void>;
+  readonly "library.item.previewDelete": (a: { readonly id: string }) => Promise<T.Preview>;
 }
 
 export const mediaEndpoints: readonly Endpoint[] = [
@@ -72,4 +80,8 @@ export const mediaEndpoints: readonly Endpoint[] = [
   { op: "media.job.release", about: ["id"], input: S.MediaJobRequest, result: S.MediaJob, can: ["user"], dryRun: "media.job.previewRelease" },
   { op: "media.job.download", about: ["id"], input: S.MediaJobRequest, result: S.MediaJob, can: ["user", "orchestrator"] },
   { op: "media.job.list", about: [], input: undefined, result: z.array(S.MediaJob), can: ["user", "orchestrator"] },
+  { op: "library.item.list", about: [], input: S.LibraryListRequest, result: S.LibraryItems, can: ["user", "remote", "orchestrator", "session"] },
+  { op: "library.item.add", about: [], input: S.LibraryAddRequest, result: S.LibraryItem, can: ["user", "remote", "orchestrator", "session"] },
+  { op: "library.item.delete", about: ["id"], input: libraryItemInput, result: undefined, can: ["user", "remote"], dryRun: "library.item.previewDelete" },
+  { op: "library.item.previewDelete", about: ["id"], input: libraryItemInput, result: Preview, can: ["user", "remote"] },
 ];

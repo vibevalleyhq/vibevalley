@@ -5,15 +5,16 @@ import type { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/s
 import type { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress, SessionPlay } from "../game/shapes";
 import type { InboxItem } from "../inbox/shapes";
 import type { FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue } from "../issue/shapes";
-import type { FactMachineChanged, Machine } from "../machine/shapes";
 import type { MediaJob, FactMediaChanged } from "../media/shapes";
 import type { RuntimeInfo } from "../runtime/shapes";
 import type {
+  FactMachineChanged,
   FactSessionToolChanged,
   FactSessionToolsReset,
   FactSessionChanged,
   FactSessionLeft,
   FactSessionPhaseChanged,
+  Machine,
   Session,
   SessionEvent,
   SessionView,

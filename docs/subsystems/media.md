@@ -18,10 +18,10 @@
 | 位置 | 职责 |
 |---|---|
 | `packages/provider/src/moss/image.ts` | 固定端点、参数与布局校验、URL 响应、安全错误 |
-| `packages/protocol/src/media/`、`packages/protocol/src/library/` | 媒体任务、输入与素材库（`LibraryItem`、`LibraryOrigin`、`LibraryListRequest`、`LibraryAddRequest`）形状、Schema 与接口权限 |
+| `packages/protocol/src/media/` | 媒体任务、输入与素材库（`LibraryItem`、`LibraryOrigin`、`LibraryListRequest`、`LibraryAddRequest`）形状、Schema 与接口权限 |
 | `apps/server/src/modules/media/` | `Media` 服务：任务、下载、文件校验与素材库 |
 | `apps/server/src/modules/media/library.ts`、`apps/server/db/queries/media_library_item.sql` | `Media` 的 `libraryItems`、`addLibraryItem`、`removeLibraryItem`、`previewRemoveLibraryItem`；听核心状态变化记下生成结果与聊天附件；表 `media_library_item` 查询 |
-| `apps/server/src/gateway/http/handlers/library.ts`、`apps/server/src/modules/tool/library.ts` | `library.item.*` 接口；助手和帮工的 `library_item_add`、`library_item_list` 工具 |
+| `apps/server/src/gateway/http/handlers/media.ts`、`apps/server/src/gateway/tool/library.ts` | `library.item.*` 接口；助手和帮工的 `library_item_add`、`library_item_list` 工具 |
 | `apps/server/src/infra/publicHttp.ts` | 只拨号已校验公网 IPv4 的独立 HTTP 客户端 |
 | `apps/server/src/modules/media/machine.ts`、`job.ts`、`apps/server/db/queries/media_job.sql` | 所有种类共用的一台任务机：表 `media_job`（按 `kind` 分）、收任务、锁、执行槽、跑断了记未知、下载结果存成附件、跟厂商任务、取消、重取、接续、重启；查询除音频的远端清理外都是共用的 |
 | `apps/server/src/modules/media/image.ts` | 生图：请求、出图后存成附件、发回请它画图的频道 |
@@ -31,9 +31,8 @@
 | `apps/server/src/modules/media/input.ts`、`inputs.ts` | 流式输入校验、上传中的槽位与生成配额预留（暂存文件是 `AsyncDisposable`，`await using` 释放）、任务保留与本机回收 |
 | `apps/server/db/queries/media_input.sql`、`media_input_pin.sql` | 输入、删除标记与任务保留记录 |
 | `apps/server/src/gateway/http/media.ts` | 本机专用的二进制上传入口 |
-| `apps/server/src/modules/tool/media.ts` | 助手调用同一 `Media` 服务 |
-| `apps/web/src/features/library/` | `/library`：`Rail.tsx` 筛选栏、`Tiles.tsx` 缩略图、`Inspector.tsx` 详情栏、`LibraryPage.tsx` 工具条、上传、键盘和对话框（`?make=` 生成，`?understand=<附件 id>` 理解）；排法、计数、筛选和键盘落点在 `items.ts` 纯函数 |
-| `apps/web/src/features/media/` | 素材库「生成」对话框里的表单（生图、单人语音、音频工作台）与理解面板：任务、预览、保存与频道发布 |
+| `apps/server/src/gateway/tool/media.ts` | 助手调用同一 `Media` 服务 |
+| `apps/web/src/features/media/` | `/library`：`Rail.tsx` 筛选栏、`Tiles.tsx` 缩略图、`Inspector.tsx` 详情栏、`LibraryPage.tsx` 工具条、上传、键盘和对话框（`?make=` 生成，`?understand=<附件 id>` 理解）；排法、计数、筛选和键盘落点在 `items.ts` 纯函数；「生成」对话框里的表单（生图、单人语音、音频工作台）与理解面板：任务、预览、保存与频道发布 |
 
 Media 在 Collaboration 中、Channel 之后组装；启动时在频道恢复后恢复任务。HTTP handler 只转发，接口权限见[接口清单](docs/reference/capabilities.md)（`media.*`、`library.*`）。生图、语音及任务读取对 `user` 与 `orchestrator` 开放，remote 和帮工没有生成权限；助手只有承接用户输入的一轮才能生成，自主巡查不能生成。理解的直接发起、授权登记及清理仅对 `user` 开放；助手只能按已授权任务 ID 执行，模型不能自报上传许可或文件路径。
 
@@ -174,7 +173,7 @@ Flash 流式由服务端请求厂商 SSE，从元数据与 PCM 分片生成有�
 - `apps/server/src/modules/media/download.test.ts`、`infra/publicHttp.test.ts`、`infra/files.test.ts`：PNG 校验、不跟随跳转、无凭据下载、超时、地址与实际拨号检查；中断写入不暴露半文件，并发发布和已有文件不覆盖。
 - `apps/server/src/modules/media/input.test.ts`、`inputs.test.ts`：分块签名、字节上限、磁盘失败、取消、配额竞争、引用事务、过期回收、删除恢复、真实数据库拒绝提交后的文件回滚、缺失或损坏输入的核对和修复，以及把素材库附件当作理解输入时拦截非图/视频/音频类型。
 - `apps/server/src/gateway/http/media.test.ts`：真实本机 HTTP 上的输入预留、跨来源拒绝、二进制上传、26 MiB 流式容器传输与断线重试；大文件样例只验证传输和容器头，不代表视频解码或理解验收。
-- `apps/web/src/features/library/items.test.ts`、`apps/web/test/library.spec.ts`、`narrow.spec.ts`：种类、筛选和两组计数、按比例排满一行、方向键落点、Shift 选一段、扩展名和时长、在做的任务与理解结果；选文件和拖拽上传、按来路和种类筛、发到频道、Delete 原地确认拿掉（带一次 axe）及 400px 窄屏不出界。
+- `apps/web/src/features/media/items.test.ts`、`apps/web/test/library.spec.ts`、`narrow.spec.ts`：种类、筛选和两组计数、按比例排满一行、方向键落点、Shift 选一段、扩展名和时长、在做的任务与理解结果；选文件和拖拽上传、按来路和种类筛、发到频道、Delete 原地确认拿掉（带一次 axe）及 400px 窄屏不出界。
 - `apps/web/test/media.spec.ts`：真实隔离服务端上的文本与布局生成、状态流、PNG 预览和下载、频道去重发布、Artifact 引用、未知结果、取消、独立下载重试与表单拒绝。只由 `apps/server/src/testing/network.ts` 替换厂商请求与结果下载，任务、数据库、附件和 Core 都是真的；测试程序不读取用户的 Key、不访问厂商。
 - `apps/server/src/modules/media/understanding.test.ts`、`apps/web/test/understanding.spec.ts`：授权版本、跨类型 ID 冲突、上传状态、结果与用量、共享容量、取消、清理预览与重试、换 Key、清理断线、重启恢复及委托理解边界；合成 PNG 与可解码 MP4 的真实本机上传、从素材库详情栏发起理解并写回结果、Artifact 保存、刷新、截断、未知与取消。厂商传输仍是替身，不验证实际识别质量。
 - `apps/server/src/modules/media/speech.test.ts`、`audio.test.ts`、`audioResult.test.ts`、`release.test.ts`：同步／异步、实际格式与用量、流式部分结果、账号隔离、恢复、下载与显式资源释放。

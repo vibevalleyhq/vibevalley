@@ -15,7 +15,7 @@ import { ChatPage, chatSay } from "#/features/channel/index.ts";
 import { Follow } from "#/features/inbox/index.ts";
 import { IssuesPage, issueSearch } from "#/features/issue/index.ts";
 import { PairPage } from "#/features/lan/index.ts";
-import { LibraryPage } from "#/features/library/index.ts";
+import { LibraryPage } from "#/features/media/index.ts";
 import { OrchestratorPage } from "#/features/orchestrator/index.ts";
 import { PkmPage } from "#/features/pkm/index.ts";
 import { ReposPage, sortRepos } from "#/features/repo/index.ts";

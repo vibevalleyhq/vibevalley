@@ -5,7 +5,6 @@ import { t } from "@vibevalley/i18n";
 import { attachmentPath, type LibraryItem, type LibrarySort, LibrarySortValues, type MediaJob } from "@vibevalley/protocol";
 
 import { createSettled } from "#/base/dom.tsx";
-import { AudioPanel, ImagePanel, publicationKey, SpeechPanel, UnderstandingPanel } from "#/features/media/index.ts";
 import { api } from "#/infra/api.ts";
 import { attachmentData } from "#/infra/attachment.ts";
 import { useCore } from "#/infra/frame.ts";
@@ -22,11 +21,16 @@ import { Lightbox } from "#/ui/Lightbox.tsx";
 import { Segmented } from "#/ui/Segmented.tsx";
 import { toast } from "#/ui/toasts.ts";
 
+import { AudioPanel } from "./AudioPanel.tsx";
+import { ImagePanel } from "./ImagePanel.tsx";
 import { Inspector } from "./Inspector.tsx";
 import { between, countsOf, justify, type KindFilter, kindOf, making, type Names, neighbor, shown, understoodText, type Where } from "./items.ts";
 import { libraryQuery } from "./listing.ts";
+import { publicationKey } from "./publication.ts";
 import { Rail } from "./Rail.tsx";
+import { SpeechPanel } from "./SpeechPanel.tsx";
 import { knows, MakingTiles, ratioOf, type Seen, tileGap, Tiles, useWidth } from "./Tiles.tsx";
+import { UnderstandingPanel } from "./UnderstandingPanel.tsx";
 
 type Make = "image" | "speech" | "audio";
 const makes: readonly Make[] = ["image", "speech", "audio"];

@@ -8,15 +8,16 @@ import { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/schema
 import { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress, SessionPlay } from "../game/schema";
 import { InboxItem } from "../inbox/schema";
 import { FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue } from "../issue/schema";
-import { FactMachineChanged, Machine } from "../machine/schema";
 import { MediaJob, FactMediaChanged } from "../media/schema";
 import { RuntimeInfo } from "../runtime/schema";
 import {
+  FactMachineChanged,
   FactSessionToolChanged,
   FactSessionToolsReset,
   FactSessionChanged,
   FactSessionLeft,
   FactSessionPhaseChanged,
+  Machine,
   Session,
   SessionEvent,
   SessionView,

@@ -32,5 +32,10 @@ export function mediaHandlers(deps: { readonly media: Media }): MediaHandlers {
     "media.job.list": () => media.list(),
     "media.job.cancel": ({ id }) => media.cancel(id),
     "media.job.download": ({ id }) => media.retryDownload(id),
+    // Over HTTP it is the user (here or through the gate); helpers and assistants reach the library through their tools.
+    "library.item.list": (req) => media.libraryItems(req),
+    "library.item.add": (req) => media.addLibraryItem(req, { kind: "user" }),
+    "library.item.delete": ({ id }) => media.removeLibraryItem(id),
+    "library.item.previewDelete": ({ id }) => media.previewRemoveLibraryItem(id),
   };
 }

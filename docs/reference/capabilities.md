@@ -6,7 +6,7 @@
 |---|---|---|
 | 用户 | 用户在农场那台电脑上 | 页面、命令行 |
 | 连进来的设备 | 用户配对过的手机、另一台电脑 | 经「连接到本机」只放这一列打了 ✓ 的 |
-| 助手 | 助手 | 它的工具：打了 ✓ 的每个接口是它的一个工具（`channel.message.list` 是 `channel_message_list`），`apps/server/src/modules/tool` 照这一列给 |
+| 助手 | 助手 | 它的工具：打了 ✓ 的每个接口是它的一个工具（`channel.message.list` 是 `channel_message_list`），`apps/server/src/gateway/tool` 照这一列给 |
 | 帮工 | 在干活的帮工 | 经 `/mcp` 拿的工具，同上 |
 
 `GET /api/v1/state`、`GET /api/v1/events` 和 `GET /api/v1/live` 是 SSE，不在 `endpoints` 里：用户和连进来的设备都能读；`/state` 给折好的帧，`/live` 只给页面要的三种 side event，`/events` 留给调试。接口都在 `/api/v1` 下；不兼容改动和 v1 的保留见 [接口版本](docs/subsystems/core.md#为什么这样)。
@@ -83,6 +83,17 @@
 | `media.job.release` | 释放这个任务的本机音频资产，不删除共享资产，也不停止厂商计费 | `/api/v1/media/job/release` | ✓ |   |   |   |
 | `media.job.download` | 只重试结果下载，不重新生成 | `/api/v1/media/job/download` | ✓ |   | ✓ |   |
 | `media.job.list` | 列出最近生成任务 | `/api/v1/media/job/list` | ✓ |   | ✓ |   |
+
+## library
+
+
+
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
+|---|---|---|---|---|---|---|
+| `library.item.list` | 列出素材库：生成的、你上传的、帮工拿回来的文件，可按来路和种类筛 | `/api/v1/library/item/list` | ✓ | ✓ | ✓ | ✓ |
+| `library.item.add` | 把文件放进素材库：你上传好的附件，或助手、帮工给的网址或工作目录里的文件 | `/api/v1/library/item/add` | ✓ | ✓ | ✓ | ✓ |
+| `library.item.delete` | 从素材库拿掉一个文件（发过它的消息仍能打开） | `/api/v1/library/item/delete` | ✓ | ✓ |   |   |
+| `library.item.previewDelete` | 试拿掉：说会怎样，不真拿掉 | `/api/v1/library/item/previewDelete` | ✓ | ✓ |   |   |
 
 ## channel
 
@@ -361,17 +372,6 @@ GitHub 的检测：gh 装没装、登没登录
 | `user.approval.collect` | 取回同意后的钥匙；还在等时什么都不给 | `/api/v1/user/approval/collect` | ✓ | ✓ |   |   |
 | `user.approval.list` | 列出等着你同意的登录请求 | `/api/v1/user/approval/list` | ✓ |   |   |   |
 | `user.approval.answer` | 同意或拒绝一个登录请求 | `/api/v1/user/approval/answer` | ✓ |   |   |   |
-
-## library
-
-
-
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
-|---|---|---|---|---|---|---|
-| `library.item.list` | 列出素材库：生成的、你上传的、帮工拿回来的文件，可按来路和种类筛 | `/api/v1/library/item/list` | ✓ | ✓ | ✓ | ✓ |
-| `library.item.add` | 把文件放进素材库：你上传好的附件，或助手、帮工给的网址或工作目录里的文件 | `/api/v1/library/item/add` | ✓ | ✓ | ✓ | ✓ |
-| `library.item.delete` | 从素材库拿掉一个文件（发过它的消息仍能打开） | `/api/v1/library/item/delete` | ✓ | ✓ |   |   |
-| `library.item.previewDelete` | 试拿掉：说会怎样，不真拿掉 | `/api/v1/library/item/previewDelete` | ✓ | ✓ |   |   |
 
 ## attachment
 

@@ -26,7 +26,7 @@ const PrefsSchema = z.object({
   start: orFallback(z.literal(StartValues), "workbench"),
   /** A pane's width the user dragged it to (ui/Splitter.tsx), by the pane's name; one not dragged has its default. */
   widths: orFallback(z.record(z.string(), z.number()), {}),
-  /** The library's thumbnail row height, in px (features/library). */
+  /** The library's thumbnail row height, in px (features/media). */
   libraryTile: orFallback(z.number(), 160),
 });
 
