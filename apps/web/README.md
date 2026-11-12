@@ -13,10 +13,10 @@ src/base/           the pure ground, touching nothing outside: times and money i
                     (search.ts), typed marks (typedMarks.ts), the shortcut table, small Solid helpers (dom.tsx; external.ts: a framework-free store as
                     a signal)
 src/infra/          what talks to the outside: the state stream and live stream (frame.ts: the stream itself, framework-free, opened again
-                    when even the server's heartbeat stops coming, and its Solid store), the API client (api.ts, with request keys), rooms (gateway.ts), REST queries (query.ts,
+                    when even the server's heartbeat stops coming, and its Solid store), the API client (api.ts, with request keys), rooms (gateway.ts: the server's SSE subscriptions, each event decoded with its Schema), REST queries (query.ts,
                     agents.ts), saving settings, the host, the app's updates, the router (router/: history, matching and nested layouts), the
                     opening cover (opening.ts), the stories' fake server (storyApi.ts)
-src/state/          the middle layer on Effect's Atom: atom.ts (the page's registry, useAtom, the page's values as
+src/state/          the middle layer, atoms on plain Solid signals: atom.ts (the page's registry, useAtom, the page's values as
                     defineAtom, the frames as an atom, the newest answer of a read asked again as useLatest), stored.ts (a choice
                     kept on this machine: defineStored, the only door to the browser's storage), prefs.ts and
                     appearance.ts (this machine's choices and the look they give), intent.ts (what the owner asked for
@@ -64,13 +64,13 @@ test/               Playwright：组件（stories-fixtures.ts）、真实集成�
   `vibevalley/act-door`), and a refusal toast without the error tone is reported (`vibevalley/failure-tone`). A read
   asked again as the owner types or the place changes (a search, a channel's pins) shows only the answer to the newest
   ask, a failure as a failure (`useLatest`, `state/atom.ts`); the REST reads are read again when the state stream comes
-  back (`refetchOnRelink`). Only `src/state` imports `effect/reactivity` (lint `vibevalley/atom-door`): its API is
-  unstable, so a change in it is fixed there. Why: docs/subsystems/app.md, 为什么这样.
+  back (`refetchOnRelink`). Atoms live in a `Registry` (`state/atom.ts`): plain values with listeners, followed inside
+  Solid through a signal per registry. Why: docs/subsystems/app.md, 为什么这样.
 - **What the page keeps, it keeps one way.** A value that outlives a component (a dialog two places open, the farm's
   overlays, a draft, the toasts) is an atom of the page's: `const x = defineAtom(initial)` (`state/atom.ts`), read with
   `x.get()` anywhere (inside Solid it follows), written with `x.set`/`x.update`, heard from plain code with
-  `x.subscribe`. A choice kept on this machine is `defineStored(name, schema, fallback)` (`state/stored.ts`, on Atom's
-  `kvs`): the key is `vibevalley.<name>`, what does not decode reads as the fallback (`orFallback` per field of a
+  `x.subscribe`. A choice kept on this machine is `defineStored(name, schema, fallback)` (`state/stored.ts`, decoded with
+  its Zod schema): the key is `vibevalley.<name>`, what does not decode reads as the fallback (`orFallback` per field of a
   struct), a storage that throws keeps it for the page's life, and every reader, in this tab and the others, hears a
   change. A choice worth a link or a reload goes in the address (`useSearchParam` in `infra/router.ts`: the board's
   repo and helper); a passing one (the words in a search box) stays a signal in its component. A `createSignal` or
@@ -81,7 +81,7 @@ test/               Playwright：组件（stories-fixtures.ts）、真实集成�
 - **Layers, one way.** `base` → `infra` → `state` → `ui` → `ui/domain` → `ui/pixel` → `features` → the skins (`farm`, `tree`) → `app`:
   a file imports from its own folder or a layer before it, never after (lint, `vibevalley/page-layers` in
   `scripts/audit/oxlint-plugin.ts`). A file goes by what it is: pure (no server, host, browser history or storage) in `base`;
-  talking to the outside in `infra`; standing on Atom in `state`. A `base` file that needs an `infra` one moves up, or
+  talking to the outside in `infra`; holding the page's atoms in `state`. A `base` file that needs an `infra` one moves up, or
   what it needs moves down. A
   feature uses another only through its `index.ts`, named exports only, and the features' graph has no cycle
   (`src/layers.test.ts`). A piece two features both need (a word, a format, a query) goes down to the layer under both,
@@ -127,11 +127,10 @@ test/               Playwright：组件（stories-fixtures.ts）、真实集成�
     compares one frame with the one before (sounds, the canvas, the phone's calls) reads `rawFrame()`; the UI reads the
     store, reconciled by id, which updates only what changed.
   - A component runs once: what changes on its own (the window's size, the time) needs a signal (`useViewport`, `useNow`).
-- **Styles** are moving from StyleX back to Tailwind v4: the tokens are the `@theme` in `src/style.css`, a converted part
-  writes classes and takes `class` ([vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)), a file not yet converted stays on
-  StyleX ([vv-stylex](.agents/skills/vv-stylex/SKILL.md)). Reset, fonts, `[data-window-drag]` and owned rich-text descendants remain in CSS imported through
-  the host stylesheet (`@layer theme, base, components, utilities, stylex`: StyleX above the utilities, so a caller's StyleX
-  `styles` still win over a converted part's classes) (lint: `vibevalley/style-attrs`, `vibevalley/stylex-only`, `vibevalley/no-hex-color`,
+- **Styles** are Tailwind v4 classes on the elements: the tokens are the `@theme` in `src/style.css` and a class names one
+  of them; a part writes its classes and takes `class` ([vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)). Reset, fonts,
+  keyframes, `[data-window-drag]` and owned rich-text descendants remain in CSS imported through the host stylesheet
+  (`@layer theme, base, components, utilities`) (lint: `vibevalley/style-attrs`, `vibevalley/no-hex-color`,
   `vibevalley/design-tokens`).
   Comments are in English, only for what the code cannot say.
 

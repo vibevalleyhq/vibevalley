@@ -8,7 +8,6 @@
   },
   "dependencies": {
     "@solidjs/web": "catalog:",
-    "@stylexjs/stylex": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "motion": "catalog:",
     "solid-js": "catalog:",
@@ -17,7 +16,6 @@
   "devDependencies": {
     "@playwright/test": "catalog:",
     "@solidjs/vite-plugin": "catalog:",
-    "@stylexjs/unplugin": "catalog:",
     "@types/node": "catalog:",
     "@types/opentype.js": "catalog:",
     "opentype.js": "catalog:",

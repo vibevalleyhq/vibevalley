@@ -24,9 +24,6 @@
   "dependencies": {
     "@botiverse/oar": "catalog:",
     "@earendil-works/pi-ai": "catalog:",
-    "@effect/platform-node": "catalog:",
-    "@effect/sql-pg": "catalog:",
-    "@effect/sql-pglite": "catalog:",
     "@electric-sql/pglite": "catalog:",
     "@hono/node-server": "catalog:",
     "@larksuiteoapi/node-sdk": "catalog:",
@@ -41,7 +38,6 @@
     "@vibevalley/protocol": "workspace:*",
     "@vibevalley/provider": "workspace:*",
     "agora-agents": "catalog:",
-    "effect": "catalog:",
     "hono": "catalog:",
     "music-metadata": "catalog:",
     "pg": "catalog:",
@@ -51,7 +47,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
     "@types/ws": "catalog:",

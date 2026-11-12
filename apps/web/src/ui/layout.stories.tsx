@@ -1,4 +1,4 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
 import { createSignal, For } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
@@ -8,31 +8,9 @@ import { IconButton } from "./IconButton";
 import { Card, Empty, ListCard, ListRow, Quiet, SecretInput, Split, TextLink, Toggle } from "./layout";
 import { Dot } from "./Tag";
 
-const viewStyles = stylex.create({
-  splitExample: { height: "25rem", width: "100%" },
-  dynamicCard: (width: number) => ({ width, maxWidth: width }),
-  layoutStoriesDiv: {
-    width: "18rem",
-  },
-  layoutStoriesDiv2: {
-    width: "24rem",
-  },
-  layoutStoriesUl: {
-    width: "14rem",
-  },
-  layoutStoriesDiv3: {
-    display: "flex",
-    width: "24rem",
-    flexDirection: "column",
-    gap: "0.75rem",
-  },
-  layoutStoriesDiv4: {
-    display: "flex",
-    gap: "0.75rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-});
+const viewStyles = {
+  dynamicCard: (width: number): JSX.CSSProperties => ({ "--width": `${width}px` }),
+};
 
 const repos = [
   { id: "vibevalley", line: "3 个在做 · 1 个等你", tone: "leaf" as const },
@@ -46,7 +24,7 @@ export default stories({
     "Split boundaries": story({
       args: { edge: true },
       render: (a) => (
-        <div data-testid="split-boundaries" {...stylex.attrs(viewStyles.splitExample)}>
+        <div data-testid="split-boundaries" class="h-100 w-full">
           <Split
             edge={a.edge}
             list={
@@ -68,7 +46,7 @@ export default stories({
       args: { active: "vibevalley" },
       controls: { active: { kind: "choice", options: repos.map((p) => p.id) } },
       render: (a) => (
-        <div {...stylex.attrs(viewStyles.layoutStoriesDiv)}>
+        <div class="w-72">
           <ListCard title="仓库" action={<IconButton icon="add" label="新建仓库" onClick={() => undefined} />}>
             <For each={repos}>
               {(p) => <ListRow to={`/repos/${p.id}`} item={p.id} active={a.active === p.id} title={p.id} line={p.line} leading={<Dot tone={p.tone} />} />}
@@ -79,7 +57,7 @@ export default stories({
     }),
     Card: story({
       render: () => (
-        <div {...stylex.attrs(viewStyles.layoutStoriesDiv2)}>
+        <div class="w-96">
           <Card title="vibevalley" action={<Button>打开目录</Button>}>
             <Quiet>还没有说明。</Quiet>
           </Card>
@@ -90,18 +68,20 @@ export default stories({
       render: () => {
         const [wide, setWide] = createSignal(false);
         return (
-          <Card
-            testid="styled-card"
-            title="Card"
-            styles={viewStyles.dynamicCard(wide() ? 320 : 240)}
-            action={
-              <Button data-testid="card-resize" onClick={() => setWide(!wide())}>
-                Resize
-              </Button>
-            }
-          >
-            <Quiet>Content</Quiet>
-          </Card>
+          <div class="contents" style={viewStyles.dynamicCard(wide() ? 320 : 240)}>
+            <Card
+              testid="styled-card"
+              title="Card"
+              class="w-(--width) max-w-(--width)"
+              action={
+                <Button data-testid="card-resize" onClick={() => setWide(!wide())}>
+                  Resize
+                </Button>
+              }
+            >
+              <Quiet>Content</Quiet>
+            </Card>
+          </div>
         );
       },
     }),
@@ -115,7 +95,7 @@ export default stories({
       args: { active: false },
       grid: { rows: ["active", [false, true]], cols: "pseudo" },
       render: (a) => (
-        <ul {...stylex.attrs(viewStyles.layoutStoriesUl)}>
+        <ul class="w-56">
           <ListRow to="/repos/vibevalley" title="vibevalley" line="3 个在做" active={a.active} leading={<Dot tone="leaf" />} />
         </ul>
       ),
@@ -123,16 +103,16 @@ export default stories({
     Toggle: story({
       args: { checked: true, disabled: false, label: "开机时启动", hint: "登录后自己起来，农场一直在" },
       render: (a, set) => (
-        <div {...stylex.attrs(viewStyles.layoutStoriesDiv2)}>
+        <div class="w-96">
           <Toggle label={a.label} hint={a.hint || undefined} checked={a.checked} disabled={a.disabled} onChange={(checked) => set({ checked })} />
         </div>
       ),
     }),
     Controls: story({
       render: () => (
-        <div {...stylex.attrs(viewStyles.layoutStoriesDiv3)}>
+        <div class="flex w-96 flex-col gap-3">
           <SecretInput placeholder="sk-…" aria-label="钥匙" />
-          <div {...stylex.attrs(viewStyles.layoutStoriesDiv4)}>
+          <div class="flex gap-3 text-sm">
             <TextLink onClick={() => undefined}>换一个</TextLink>
             <TextLink danger onClick={() => undefined}>
               删掉

@@ -1,9 +1,10 @@
-import { Schema } from "effect";
+import { z } from "zod";
 // A session's log by run, the work log's words and colours, the trajectory's waterfall and totals, how steps arriving live merge in (mergeSteps), and the log kept per observed session (SessionLogs).
 
 import { t } from "@vibevalley/i18n";
 import type { LiveEvent, SessionEvent } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
+import { jsonString } from "@vibevalley/protocol/schema";
 
 import { big, tookText } from "#/base/format.ts";
 
@@ -170,18 +171,18 @@ export function spanColor(step: SessionEvent) {
   }
 }
 
-const CommandInput = Schema.fromJsonString(Schema.Struct({ command: Schema.optionalKey(Schema.String) }));
-const JsonObjectInput = Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown));
+const CommandInput = jsonString(z.object({ command: z.exactOptional(z.string()) }));
+const JsonObjectInput = jsonString(z.record(z.string(), z.unknown()));
 
 /** A call's input as it reads best: a command as `$ …`, JSON indented, anything else as it came. */
 export function readableInput(step: SessionEvent) {
   const raw = step.input?.trim() ?? "";
   if (!raw) return "";
-  const obj = Schema.decodeOption(JsonObjectInput)(raw);
-  if (obj._tag === "Some") {
-    const cmd = Schema.decodeOption(CommandInput)(raw);
-    if (cmd._tag === "Some" && cmd.value.command !== undefined) return `$ ${cmd.value.command}`;
-    return JSON.stringify(obj.value, null, 2);
+  const obj = JsonObjectInput.safeParse(raw);
+  if (obj.success) {
+    const cmd = CommandInput.safeParse(raw);
+    if (cmd.success && cmd.data.command !== undefined) return `$ ${cmd.data.command}`;
+    return JSON.stringify(obj.data, null, 2);
   }
   return raw;
 }

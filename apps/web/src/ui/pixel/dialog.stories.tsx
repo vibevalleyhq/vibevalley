@@ -1,23 +1,12 @@
-import * as stylex from "@stylexjs/stylex";
-
 import { stories, story } from "@vibevalley/stories";
 
 import { PxButton } from "./button";
 import { FarmDialog, type FarmDialogSize, FarmSection, PxDialog } from "./dialog";
-import { storyFrame } from "./story.stylex";
-
-const viewStyles = stylex.create({
-  dialogStoriesDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
-  },
-});
 
 export default stories({
   title: "组件/像素/dialog",
   themes: ["light"],
-  frame: storyFrame.pixel,
+  frame: "bg-cream-50 font-pixel text-(length:--text-xs) text-bark-900",
   stories: {
     "Farm dialog": story({
       note: "模态，盖在整页上。",
@@ -43,7 +32,7 @@ export default stories({
         <>
           <PxButton onClick={() => set({ open: true })}>打开</PxButton>
           <PxDialog title="拔掉这块地？" open={a.open} onClose={() => set({ open: false })}>
-            <div {...stylex.attrs(viewStyles.dialogStoriesDiv)}>
+            <div class="flex flex-col gap-3">
               <p>工单会关上，改动留在分支里。</p>
               <PxButton tone="danger" onClick={() => set({ open: false })}>
                 拔掉

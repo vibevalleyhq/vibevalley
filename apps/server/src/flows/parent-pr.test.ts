@@ -1,23 +1,19 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { expect, it } from "@effect/vitest";
-import { Effect, Formatter } from "effect";
+import { expect, test } from "vite-plus/test";
 
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { user } from "#/base/actor.ts";
-import { Agent } from "#/modules/agent/agent.ts";
 import { explicitMandate } from "#/modules/issue/creation.ts";
-import { Issue } from "#/modules/issue/issue.ts";
-import { Repo } from "#/modules/repo/repo.ts";
 import { repository } from "#/modules/repo/repository.ts";
 import { testConfig } from "#/testing/layers.ts";
 
 import { await_, farm, git, lab } from "./farm.ts";
 
 for (const ending of ["MERGED", "CLOSED"] as const) {
-  it.live(`regression: a parent without a session closes after its PR is ${ending.toLowerCase()}`, () => {
+  test(`regression: a parent without a session closes after its PR is ${ending.toLowerCase()}`, async () => {
     const base = testConfig();
     const config = { ...base, github: { ...base.github, prRepos: ["family-pr"] } };
     const path = join(config.workRoot, "repos", "family-pr");
@@ -28,49 +24,48 @@ for (const ending of ["MERGED", "CLOSED"] as const) {
       repos: ["family-pr"],
       repoHooks: {
         gh: (...args) =>
-          Effect.sync(() => {
+          (async () => {
             const ok = (out: string) => ({ out, ok: true, missing: false });
             if (args[0] === "--version") return ok("gh version 2.80.0");
             if (args[0] === "auth") return ok("Logged in to github.com account gardener (keyring)");
             if (args[0] === "repo") return ok('{"viewerPermission":"WRITE","defaultBranchRef":{"name":"main"}}');
             if (args[0] === "pr" && args[1] === "list") return ok("[]");
             if (args[0] === "pr" && args[1] === "create") return ok("https://github.com/test/family-pr/pull/1");
-            if (args[0] === "pr" && args[1] === "view") return ok(Formatter.formatJson({ state, mergedAt: null }));
+            if (args[0] === "pr" && args[1] === "view") return ok(JSON.stringify({ state, mergedAt: null }));
             return { out: "", ok: false, missing: false };
-          }),
+          })(),
         publication: {
-          tip: () => repository(path).head,
-          fetch: () => Effect.void,
+          tip: () => repository(path).head(),
+          fetch: () => Promise.resolve(),
           push: (cwd, _url, branch, sha) => repository(cwd).push(bare, branch, sha),
         },
-        fetch: () => Effect.succeed(false),
+        fetch: () => Promise.resolve(false),
       },
     });
-    return Effect.gen(function* () {
-      const issues = yield* Issue;
-      const repos = yield* Repo;
-      yield* (yield* Agent).save(lab());
-      git(config.workRoot, "init", "--bare", bare);
-      git(path, "remote", "add", "origin", "https://github.com/test/family-pr.git");
-      yield* repos.refreshGitHub();
-      const parent = yield* issues.add({ title: "parent", repo: "family-pr", agent: "lab" }, explicitMandate());
-      yield* issues.split(parent.id, "", [{ id: "clock", brief: "写打卡并提交" }], user);
-      yield* await_(
-        () => issues.get(parent.id),
-        (issue) => issue.status === "in_review",
-        "the parent ready for review",
-      );
-      const submitted = yield* issues.setStatus(parent.id, "done", "", "", user);
-      expect(latestSessionIdOf(submitted)).toBeUndefined();
-      expect(submitted.pullRequest?.state).toBe("open");
-      const place = yield* repos.workplace("family-pr", parent.number, true, "");
-      expect(existsSync(place.cwd)).toBe(true);
-      state = ending;
-      yield* issues.refreshPullRequests;
-      const finished = yield* issues.get(parent.id);
-      expect(finished.status).toBe(ending === "MERGED" ? "done" : "canceled");
-      expect(finished.pullRequest?.state).toBe(ending === "MERGED" ? "merged" : "closed");
-      expect(existsSync(place.cwd)).toBe(false);
-    }).pipe(Effect.scoped, Effect.provide(f.layer));
+    await using fw = await f.open();
+    const issues = fw.issue;
+    const repos = fw.repo;
+    await fw.agent.save(lab());
+    git(config.workRoot, "init", "--bare", bare);
+    git(path, "remote", "add", "origin", "https://github.com/test/family-pr.git");
+    await repos.refreshGitHub();
+    const parent = await issues.add({ title: "parent", repo: "family-pr", agent: "lab" }, explicitMandate());
+    await issues.split(parent.id, "", [{ id: "clock", brief: "写打卡并提交" }], user);
+    await await_(
+      () => issues.get(parent.id),
+      (issue) => issue.status === "in_review",
+      "the parent ready for review",
+    );
+    const submitted = await issues.setStatus(parent.id, "done", "", "", user);
+    expect(latestSessionIdOf(submitted)).toBeUndefined();
+    expect(submitted.pullRequest?.state).toBe("open");
+    const place = await repos.workplace("family-pr", parent.number, true, "");
+    expect(existsSync(place.cwd)).toBe(true);
+    state = ending;
+    await issues.refreshPullRequests();
+    const finished = await issues.get(parent.id);
+    expect(finished.status).toBe(ending === "MERGED" ? "done" : "canceled");
+    expect(finished.pullRequest?.state).toBe(ending === "MERGED" ? "merged" : "closed");
+    expect(existsSync(place.cwd)).toBe(false);
   });
 }

@@ -1,120 +1,11 @@
 import type { JSX } from "@solidjs/web";
-/** @jsxImportSource @solidjs/web */
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, onCleanup, onSettled } from "solid-js";
 
 import type { Copy } from "../i18n/zh";
 import { createImageTransition } from "../ui/image";
 import { Presence } from "../ui/Presence";
 import { createElementRef, createReveal, createScrollAnimation } from "../ui/scroll";
-import { Section, domAttrs } from "../ui/ui";
-
-const sceneStyles = stylex.create({
-  dialogBackdrop: {
-    position: "fixed",
-    inset: "0",
-    zIndex: 50,
-    display: "grid",
-    placeItems: "center",
-    backgroundColor: {
-      default: "var(--color-shade-80)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-shade) 80%, transparent)",
-    },
-    padding: {
-      default: "1rem",
-      "@media (width>=40rem)": "2rem",
-    },
-  },
-});
-
-const viewStyles = stylex.create({
-  tall: { gridRow: { default: null, "@media (width >= 64rem)": "span 2 / span 2" } },
-  offset: { marginTop: { default: null, "@media (width >= 64rem)": "60px" } },
-  screensDiv: {
-    display: "grid",
-    gridTemplateColumns: {
-      default: "minmax(0, 1fr)",
-      "@media (width>=64rem)": "minmax(0,1.4fr) minmax(0,1fr)",
-    },
-    alignItems: "flex-start",
-    gap: "1.75rem",
-  },
-  screensFigure: {
-    margin: "0",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-cream-50)",
-    boxShadow: "inset 0 0 0 2px var(--color-rim), 4px 4px 0 var(--color-drop)",
-    padding: "0.625rem",
-  },
-  screensButton: {
-    display: "block",
-    width: "100%",
-    cursor: "zoom-in",
-  },
-  screensImg: {
-    display: "block",
-    height: "auto",
-    width: "100%",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-  },
-  screensFigcaption: {
-    paddingInline: "0.25rem",
-    paddingTop: "0.625rem",
-    paddingBottom: "0.125rem",
-    fontSize: "15px",
-    color: "var(--color-bark-800)",
-  },
-  largeFigure: {
-    position: "relative",
-    margin: "0",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-cream-50)",
-    boxShadow: "inset 0 0 0 2px var(--color-rim), 4px 4px 0 var(--color-drop)",
-    padding: "0.625rem",
-  },
-  largeImg: {
-    display: "block",
-    height: "auto",
-    maxHeight: "80svh",
-    width: "auto",
-    maxWidth: "100%",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-  },
-  screenshotClose: {
-    position: "absolute",
-    top: "-1rem",
-    right: "-1rem",
-    display: "grid",
-    width: "2.75rem",
-    height: "2.75rem",
-    cursor: "pointer",
-    placeItems: "center",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: {
-      default: "var(--color-cream-50)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-cream-hover)",
-      },
-    },
-    boxShadow: "inset 2px 2px 0 var(--color-rim), 3px 3px 0 var(--color-drop)",
-  },
-  largeImg2: {
-    width: "1.5rem",
-    height: "1.5rem",
-    imageRendering: "pixelated",
-  },
-});
+import { Section } from "../ui/ui";
 
 interface Shot {
   src: string;
@@ -141,15 +32,18 @@ export default function Screens(props: Props) {
   return (
     <>
       <Section ref={root.set} id="screens" title={props.copy.title}>
-        <div {...stylex.attrs(viewStyles.screensDiv)}>
+        <div class="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] items-start gap-7">
           {props.shots.map((shot, i) => (
-            <Drift rate={DRIFT[i] ?? 0} styles={[i === 0 && viewStyles.tall, i === 1 && viewStyles.offset]}>
-              <figure data-reveal {...stylex.attrs(viewStyles.screensFigure)}>
+            <Drift rate={DRIFT[i] ?? 0} class={[i === 0 && "lg:row-span-2", i === 1 && "lg:mt-15"]}>
+              <figure
+                data-reveal
+                class="m-0 border-2 border-bark-900 bg-cream-50 [box-shadow:inset_0_0_0_2px_var(--color-rim),_4px_4px_0_var(--color-drop)] p-2.5"
+              >
                 <button
                   type="button"
                   data-testid={`screenshot-${i}`}
                   title={props.copy.open}
-                  {...stylex.attrs(viewStyles.screensButton)}
+                  class="block w-full cursor-zoom-in"
                   onClick={(event) => {
                     const source = event.currentTarget.querySelector("img");
                     if (source) setOpen({ shot, source });
@@ -164,10 +58,10 @@ export default function Screens(props: Props) {
                     decoding="async"
                     width={shot.width}
                     height={shot.height}
-                    {...stylex.attrs(viewStyles.screensImg)}
+                    class="block h-auto w-full border-2 border-bark-900"
                   />
                 </button>
-                <figcaption {...stylex.attrs(viewStyles.screensFigcaption)}>{shot.caption}</figcaption>
+                <figcaption class="px-1 pt-2.5 pb-0.5 text-[length:15px] text-bark-800">{shot.caption}</figcaption>
               </figure>
             </Drift>
           ))}
@@ -182,12 +76,12 @@ export default function Screens(props: Props) {
   );
 }
 
-function Drift(props: { rate: number; styles?: stylex.StyleXStyles; children: JSX.Element }) {
+function Drift(props: { rate: number; class?: JSX.ClassValue | undefined; children: JSX.Element }) {
   const ref = createScrollAnimation<HTMLDivElement>("self", ["start end", "end start"], () => [
     { keyframes: { transform: [`translateY(${600 * props.rate}px)`, `translateY(${-600 * props.rate}px)`] } },
   ]);
   return (
-    <div ref={ref.set} {...domAttrs(props.styles)}>
+    <div ref={ref.set} class={[props.class]}>
       {props.children}
     </div>
   );
@@ -233,20 +127,23 @@ function Large(props: { shot: Shot; source: HTMLImageElement; label: string; ico
       aria-label={props.shot.caption}
       data-testid="screenshot-dialog"
       onClick={close}
-      {...stylex.attrs(sceneStyles.dialogBackdrop)}
+      class="fixed inset-0 z-50 grid place-items-center bg-[color-mix(in_oklab,_var(--color-shade)_80%,_transparent)] p-4 sm:p-8"
     >
-      <figure onClick={(event) => event.stopPropagation()} {...stylex.attrs(viewStyles.largeFigure)}>
-        <img ref={image.set} src={props.shot.src} alt={props.shot.caption} {...stylex.attrs(viewStyles.largeImg)} />
-        <figcaption {...stylex.attrs(viewStyles.screensFigcaption)}>{props.shot.caption}</figcaption>
+      <figure
+        onClick={(event) => event.stopPropagation()}
+        class="relative m-0 border-2 border-bark-900 bg-cream-50 [box-shadow:inset_0_0_0_2px_var(--color-rim),_4px_4px_0_var(--color-drop)] p-2.5"
+      >
+        <img ref={image.set} src={props.shot.src} alt={props.shot.caption} class="block h-auto max-h-[80svh] w-auto max-w-full border-2 border-bark-900" />
+        <figcaption class="px-1 pt-2.5 pb-0.5 text-[length:15px] text-bark-800">{props.shot.caption}</figcaption>
         <button
           ref={button.set}
           type="button"
           data-testid="screenshot-close"
           onClick={close}
           aria-label={props.label}
-          {...stylex.attrs(viewStyles.screenshotClose)}
+          class="absolute -top-4 -right-4 grid w-11 h-11 cursor-pointer place-items-center border-2 border-bark-900 bg-cream-50 hover:bg-cream-hover [box-shadow:inset_2px_2px_0_var(--color-rim),_3px_3px_0_var(--color-drop)]"
         >
-          <img src={props.icon} alt="" {...stylex.attrs(viewStyles.largeImg2)} />
+          <img src={props.icon} alt="" class="w-6 h-6 [image-rendering:pixelated]" />
         </button>
       </figure>
     </div>

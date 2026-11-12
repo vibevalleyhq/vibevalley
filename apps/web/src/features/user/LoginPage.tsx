@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -12,57 +11,6 @@ import { deviceGuess } from "./device";
 import { afterSignIn } from "./entry";
 import { signIn as signInWith } from "./login";
 import { userQuery } from "./signIns";
-
-const viewStyles = stylex.create({
-  main: {
-    display: "flex",
-    minHeight: "100dvh",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "var(--color-side)",
-    paddingInline: "1rem",
-    color: "var(--color-ink)",
-  },
-  form: {
-    display: "flex",
-    width: "100%",
-    maxWidth: "var(--container-sm)",
-    flexDirection: "column",
-    gap: "1rem",
-    borderRadius: "var(--radius-lg)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-    padding: "1.25rem",
-  },
-  title: {
-    fontSize: "var(--text-lg)",
-    lineHeight: "var(--leading-lg)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  note: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  problem: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-berry)",
-  },
-  actions: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.75rem",
-  },
-  link: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-accent)",
-  },
-});
 
 /** Signing in from another device with the password set on the computer running VibeValley. */
 export function LoginPage() {
@@ -87,17 +35,17 @@ export function LoginPage() {
   };
 
   return (
-    <main {...stylex.attrs(viewStyles.main)}>
+    <main class="flex min-h-dvh items-center justify-center bg-side px-4 text-ink">
       <form
         data-testid="login"
-        {...stylex.attrs(viewStyles.form)}
+        class="flex w-full max-w-sm flex-col gap-4 rounded-lg border border-line bg-page p-5"
         onSubmit={(e) => {
           e.preventDefault();
           if (!signing()) signIn();
         }}
       >
-        <h1 {...stylex.attrs(viewStyles.title)}>{t("web.user.login.title")}</h1>
-        <p {...stylex.attrs(viewStyles.note)}>{noPassword() ? t("web.user.login.noPassword") : t("web.user.login.intro")}</p>
+        <h1 class="text-lg font-semibold">{t("web.user.login.title")}</h1>
+        <p class="text-sm text-muted">{noPassword() ? t("web.user.login.noPassword") : t("web.user.login.intro")}</p>
         <Show when={!noPassword()}>
           <Field label={t("web.user.login.password")}>
             <TextInput
@@ -112,18 +60,18 @@ export function LoginPage() {
             <TextInput data-testid="login-device" value={name()} onInput={(e) => setName(e.currentTarget.value)} maxlength={40} />
           </Field>
         </Show>
-        <div {...stylex.attrs(viewStyles.actions)}>
+        <div class="flex flex-wrap items-center gap-3">
           <Show when={!noPassword()}>
             <Button tone="primary" type="submit" data-testid="login-submit" disabled={signing() || password() === ""}>
               {signing() ? t("web.user.login.signing") : t("web.user.login.submit")}
             </Button>
           </Show>
-          <a href="/pair" data-testid="login-pair" {...stylex.attrs(viewStyles.link)}>
+          <a href="/pair" data-testid="login-pair" class="text-sm text-accent">
             {t("web.user.login.pairInstead")}
           </a>
         </div>
         <Show when={problem()}>
-          <p role="alert" {...stylex.attrs(viewStyles.problem)}>
+          <p role="alert" class="text-sm text-berry">
             {problem()}
           </p>
         </Show>

@@ -1,12 +1,12 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 
 import { parseSync } from "vite";
 
 import { type Counts, type RatchetWords, grownRules, ratchetProblems, touchedFiles } from "./ratchet.ts";
 
-/** Syntax, not text: each rule stands for a practice written in docs/style/module-design.md, the testable-boundaries Note or the vv-effect cases. */
+/** Syntax, not text: each rule stands for a practice written in docs/style/module-design.md, the testable-boundaries Note or the vv-typescript skill. */
 
 type Node = { readonly type?: unknown; readonly start?: number; readonly end?: number; readonly [key: string]: unknown };
 const isNode = (v: unknown): v is Node => typeof v === "object" && v !== null && !Array.isArray(v) && "type" in v && typeof v.type === "string";
@@ -33,130 +33,65 @@ const testRules = [
   "turn-as-absence",
   "unreleased-gate",
   "duplicated-setup",
-  "expect-in-unjoined-fiber",
+  "expect-in-floating-promise",
   "failure-without-reason",
-  "run-in-effect-test",
-  "shared-runtime-in-test",
-  "live-with-test-clock",
+  "shared-farm-in-test",
 ] as const;
-const sourceRules = [
-  "fork-then-join",
-  "span-after-result",
-  "unbounded-retry",
-  "ref-read-modify-write",
-  "pipe-on-effect-fn",
-  "logic-in-pipe",
-  "option-get-or-throw",
-  "die-with-plain-error",
-  "swallow-without-record",
-  "cause-as-string",
-  "uninterruptible-wait",
-  "layer-built-twice",
-  "loose-flags",
-  "duplicate-error-tag",
-  "provide-in-loop",
-  "cached-per-call",
-] as const;
+const sourceRules = ["unbounded-retry", "read-modify-write", "swallow-without-record", "cause-as-string", "loose-flags", "duplicate-error-class"] as const;
 export type Rule = (typeof testRules)[number] | (typeof sourceRules)[number];
 export const rules: readonly Rule[] = [...testRules, ...sourceRules];
 export type Finding = { readonly rule: Rule; readonly file: string; readonly line: number; readonly message: string };
 
+const skill = ".agents/skills/vv-typescript/SKILL.md";
 const why: Record<Rule, string> = {
   "turn-as-absence":
     "one turn of the event loop is not a boundary: a later run can still do what this says did not happen. " +
-    "Fix: wait for a finished operation, a confirmed step of the fake or a TestClock window, then assert; or say in a comment why nothing can come later. " +
+    "Fix: wait for a finished operation, a confirmed step of the fake or a window of the test clock (vi.advanceTimersByTimeAsync), then assert; or say in a comment why nothing can come later. " +
     "See .agents/notes/proposed/testing/2026-11-08-testable-module-boundaries.md (4.)",
   "unreleased-gate":
-    "something waits at this gate but nothing in the test opens it or hands it on, so the waiter only ends when the scope interrupts it. " +
-    "Fix: open it on the path the test means (Deferred.succeed / gate.open), and in a finalizer when an expect can fail first. " +
+    "something waits at this gate but nothing in the test opens it or hands it on, so the waiter only ends when the test is torn down. " +
+    "Fix: open it on the path the test means (resolve() / gate.open()), and in a finally when an expect can fail first. " +
     "See docs/style/module-design.md",
   "duplicated-setup":
     "the same setup is written out again: a change to it has to find every copy. " +
     "Fix: make it one helper next to the tests (or in src/testing) taking only what differs. " +
     "See .agents/notes/proposed/testing/2026-11-08-testable-module-boundaries.md (5.)",
-  "expect-in-unjoined-fiber":
-    "an expect inside a forked fiber that is never joined: when it fails, the fiber dies on its own and the test still passes. " +
-    "Fix: Fiber.join the fiber before the test ends, or collect what it sees and assert in the test's own fiber. " +
-    "See .agents/skills/vv-effect/references/cases.md (26.)",
+  "expect-in-floating-promise":
+    "an expect in a promise nothing awaits (void …, a bare .then, an async callback handed to a timer): when it fails, the rejection lands nowhere, or after the test, and the test still passes. " +
+    "Fix: await it before the test ends, or collect what it sees and assert in the test's own flow. " +
+    `See ${skill} (9.)`,
   "failure-without-reason":
-    "this says it failed but not how: a defect, an interruption or the wrong error passes it too. " +
-    'Fix: const error = yield* Effect.flip(x); expect(error).toMatchObject({ _tag: "…" }) (or match the Exit\'s cause). ' +
-    "See .agents/skills/vv-effect/references/cases.md (8.)",
-  "run-in-effect-test":
-    "a test file on @effect/vitest runs an Effect by hand: it leaves the test runtime (TestClock, the test's scope and its finalizers). " +
-    "Fix: write the test as it.effect / it.live and yield* the Effect. " +
-    "See .agents/skills/vv-effect/references/cases.md (26.)",
-  "shared-runtime-in-test":
-    "a runtime or layer built once at the top of a test file: state from one test leaks into the next, and nothing closes it. " +
-    "Fix: provide a fresh layer in each test; share only what is costly, with it.layer(…), and say what is shared. " +
-    "See .agents/skills/vv-effect/references/cases.md (36.)",
-  "live-with-test-clock":
-    "it.live runs on the real clock, so TestClock here moves a clock nothing reads. " +
-    "Fix: it.effect for a window of virtual time; it.live only for real I/O. " +
-    "See .agents/skills/vv-effect/references/cases.md (26.)",
-  "fork-then-join":
-    "a fiber joined right after it is forked: nothing ran beside it. Fix: yield* the effect itself; two at once with Effect.all(…, { concurrency }). " +
-    "See .agents/skills/vv-effect/references/cases.md (32.)",
-  "span-after-result":
-    "the span wraps an effect whose failure is already a value: the trace shows a success. " +
-    "Fix: put Effect.withSpan before Effect.result / option / exit / ignore (or name the function with Effect.fn). " +
-    "See .agents/skills/vv-effect/references/cases.md (28.)",
+    "this says it failed but not how: a TypeError from a bug, an abort or the wrong error passes it too. " +
+    "Fix: const e = await x.catch((e: unknown) => e); expect(e).toBeInstanceOf(TheError) / toMatchObject({ bizCode: … }), or toThrow(TheError) / toThrow(/what/). " +
+    `See ${skill} (11.)`,
+  "shared-farm-in-test":
+    "a farm, a database or a service built once at the top of a test file: state from one test leaks into the next, and nothing closes it. " +
+    "Fix: build it in each test with await using; share only what is costly, in beforeAll with its afterAll, and say what is shared. " +
+    `See ${skill} (9.)`,
   "unbounded-retry":
     "a retry with no upper bound turns one outage into forever. " +
-    "Fix: bound it (Schedule.upTo / recurs / { times }) and add Schedule.jittered; retry only what is safe to do twice. " +
-    "See .agents/skills/vv-effect/references/cases.md (31.)",
-  "ref-read-modify-write":
-    "a Ref read, then other effects, then a write of the same Ref: another fiber can write between them. " +
-    "Fix: Ref.modify / Ref.update for a pure step, SynchronizedRef.modifyEffect when the step runs effects. " +
-    "See .agents/skills/vv-effect/references/cases.md (20.)",
-  "pipe-on-effect-fn":
-    "Effect.fn(…)(…).pipe(…) pipes the function, not the Effect each call returns. " +
-    'Fix: pass the combinators as Effect.fn\'s further arguments: Effect.fn("X.m")(function* () {…}, locked). ' +
-    "See .agents/skills/vv-effect/references/cases.md (4.)",
-  "logic-in-pipe":
-    "two or more steps of logic chained in .pipe (Effect.map, flatMap, andThen, tap…): the flow reads inside out and each step's value is nameless. " +
-    "Fix: write the steps in Effect.gen (or Effect.fn), one yield* to a named const each; keep .pipe for behaviour attached to the whole (retry, timeout, catch, annotate). " +
-    "See apps/server/node_modules/effect/AGENTS.md (Writing Effect code)",
-  "option-get-or-throw":
-    "Option.getOrThrow throws a plain exception outside the error channel: a nameless defect. " +
-    "Fix: Option.match into a tagged error (or Inconsistent for a bug), Option.getOrElse for a default. " +
-    "See .agents/skills/vv-effect/references/cases.md (11.)",
-  "die-with-plain-error":
-    "a defect as a plain Error: logs and traces cannot tell this bug from a library's failure. " +
-    "Fix: Effect.die(new Inconsistent({ message })) from errors.ts. " +
-    "See .agents/skills/vv-effect/references/cases.md (9.)",
+    "Fix: retry(f, { retries: n, delay: exponential(…), when, signal }) from @vibevalley/async; retry only what is safe to do twice. " +
+    `See ${skill} (4.)`,
+  "read-modify-write":
+    "a read, then an await, then a write of the same thing: another task can write between them, and its write is lost. " +
+    "Fix: do the read and the write with no await between, or hold one lock around the three (Semaphore.with). " +
+    `See ${skill} (4.)`,
   "swallow-without-record":
     "every failure becomes an ordinary value and nothing is noted: a broken source looks like an empty one. " +
-    "Fix: Effect.tapError / tapCause with a log before it, catchTag only what is expected, or bestEffort(what) from infra/log.ts. " +
-    "See .agents/skills/vv-effect/references/cases.md (37.)",
+    "Fix: catch only what is expected (instanceof) and rethrow the rest, or log it before going on; when dropping it really is right, say why in a comment there. " +
+    `See ${skill} (2.)`,
   "cause-as-string":
     "the outside failure is kept only as text: its stack, status and the library's own error are gone. " +
-    "Fix: pass it whole as cause (cause: Schema.Defect()); say it to the user where it is handled, with t(). " +
-    "See .agents/skills/vv-effect/references/cases.md (10.)",
-  "uninterruptible-wait":
-    "Effect.uninterruptible around a wait: no timeout, race or shutdown can stop it. " +
-    "Fix: Effect.uninterruptibleMask((restore) => …) protecting only what must finish, and restore(wait). " +
-    "See .agents/skills/vv-effect/references/cases.md (30.)",
-  "layer-built-twice":
-    "the same layer constructor is called twice with the same arguments: two layers, built twice (two databases on one file). " +
-    "Fix: keep it in a constant and use that one value. " +
-    "See .agents/skills/vv-effect/references/cases.md (35.)",
+    "Fix: pass it whole as cause (new X(message, { cause: e })); say it to the user where it is handled, with t(). " +
+    `See ${skill} (2.)`,
   "loose-flags":
     "several flags kept loose in one function (let x = false…, createSignal(false)…): when they move together they are one state machine whose impossible combinations nothing stops. " +
-    "Fix: one union, a tag per state with what that state holds, in one let, signal or Ref; keep a flag apart only when it is a dimension of its own (it can be true in any of the states). " +
+    "Fix: one union, a tag per state with what that state holds, in one let, signal or Cell; keep a flag apart only when it is a dimension of its own (it can be true in any of the states). " +
     "See docs/style/module-design.md (显式状态)",
-  "duplicate-error-tag":
-    "two TaggedError classes share one _tag string, so catchTag and Match.tag cannot tell them apart across module boundaries. " +
-    "Fix: give each TaggedError a distinct domain _tag matching its class name. " +
-    "See .agents/skills/vv-effect/references/cases.md (42.)",
-  "provide-in-loop":
-    "Effect.provide inside a loop builds and tears down its Layer on every iteration instead of sharing one instance. " +
-    "Fix: hoist Effect.provide outside the loop, or build the Layer once in the enclosing scope before looping. " +
-    "See .agents/skills/vv-effect/references/cases.md (44.)",
-  "cached-per-call":
-    "Effect.cached / cachedWithTTL called per invocation or inside a loop creates a fresh cache each time, so nothing is shared across calls. " +
-    "Fix: yield* Effect.cached(...) once during Layer or service setup and reuse the returned Effect in methods. " +
-    "See .agents/skills/vv-effect/references/cases.md (45.)",
+  "duplicate-error-class":
+    "two Error subclasses share one name, so logs, the gateway's answer and a reader of instanceof cannot tell them apart across module boundaries. " +
+    "Fix: give each Error subclass a distinct domain name, and its name field the same string. " +
+    `See ${skill} (2.)`,
 };
 
 const lineAt = (text: string) => {
@@ -183,12 +118,13 @@ const memberOf = (n: Node | undefined): { object: Node; name: string } | undefin
   return object && isIdent(property) ? { object, name: String(property.name) } : undefined;
 };
 const unwrap = (n: Node | undefined): Node | undefined => {
-  // `yield* x`, `await x`, `(x)`, `x!`, `x as T` all wait for or are x.
-  while (n && ["YieldExpression", "AwaitExpression", "ParenthesizedExpression", "TSNonNullExpression", "TSAsExpression"].includes(String(n.type)))
+  // `await x`, `(x)`, `x!`, `x as T` all wait for or are x.
+  while (n && ["AwaitExpression", "ParenthesizedExpression", "TSNonNullExpression", "TSAsExpression", "ChainExpression"].includes(String(n.type)))
     n = field(n, "argument") ?? field(n, "expression");
   return n;
 };
 const isFunction = (n: Node) => n.type === "ArrowFunctionExpression" || n.type === "FunctionExpression" || n.type === "FunctionDeclaration";
+const textOf = (text: string, n: Node) => text.slice(n.start, n.end);
 
 const isBooleanLiteral = (n: Node | undefined) => n?.type === "Literal" && typeof n.value === "boolean";
 /** Three or more `let x = true/false` or boolean signals (`createSignal(false)`) in one function body. Fields of a type are left alone: most are a shape's data or a
@@ -214,20 +150,63 @@ function looseFlags(n: Node, report: (at: Node, what: string) => void) {
   }
 }
 
+const memberName = (n: Node | undefined, object: string): string | undefined => {
+  const m = memberOf(n);
+  return m !== undefined && isIdent(m.object, object) ? m.name : undefined;
+};
+
+/** Whether any node under n (n too) satisfies ok; inside nested functions only when asked. */
+function contains(n: Node, ok: (n: Node) => boolean, intoFunctions = true): boolean {
+  const visit = (m: Node, top: boolean): boolean => {
+    if (!top && !intoFunctions && isFunction(m)) return false;
+    if (ok(m)) return true;
+    return childrenOf(m).some((c) => visit(c, false));
+  };
+  return visit(n, true);
+}
+const isExpectCall = (n: Node) => n.type === "CallExpression" && isIdent(field(n, "callee"), "expect");
+const isAwait = (n: Node) => n.type === "AwaitExpression" || (n.type === "ForOfStatement" && n.await === true);
+
+/** The one thing a function returns: its expression body, or a body that is only `return x`. undefined: it does more. */
+const onlyReturn = (fn: Node): { value: Node | undefined } | undefined => {
+  const body = field(fn, "body");
+  if (!body) return undefined;
+  if (body.type !== "BlockStatement") return { value: body };
+  const statements = list(body, "body");
+  if (statements.length === 0) return { value: undefined };
+  return statements.length === 1 && statements[0]!.type === "ReturnStatement" ? { value: field(statements[0]!, "argument") } : undefined;
+};
+
+/** A timer that runs its callback on a later turn, with no wait of its own. */
+const turnTimers = new Set(["setImmediate", "queueMicrotask", "setTimeout"]);
+const isTurnTimer = (callee: Node | undefined, args: readonly Node[]) =>
+  (isIdent(callee) && turnTimers.has(String(callee.name)) && (args[1] === undefined || (args[1].type === "Literal" && args[1].value === 0))) ||
+  memberName(callee, "process") === "nextTick";
 const turnWaits = new Set(["aTurn", "nextTurn"]);
+/** `await aTurn()`, `await Promise.resolve()`, `await new Promise((r) => setImmediate(r))` and the like. */
 function isOneTurn(statement: Node): boolean {
   if (statement.type !== "ExpressionStatement") return false;
   const raw = field(statement, "expression");
-  if (raw?.type !== "YieldExpression" && raw?.type !== "AwaitExpression") return false;
-  let n = unwrap(raw);
-  if (n?.type === "CallExpression" && list(n, "arguments").length === 0) n = field(n, "callee");
+  if (raw?.type !== "AwaitExpression") return false;
+  const n = unwrap(raw);
   if (isIdent(n) && turnWaits.has(String(n.name))) return true;
-  const m = memberOf(n);
-  return m !== undefined && isIdent(m.object, "Effect") && m.name === "yieldNow";
+  if (n?.type === "CallExpression" && list(n, "arguments").length === 0) {
+    const callee = field(n, "callee");
+    if (isIdent(callee) && turnWaits.has(String(callee.name))) return true;
+    if (memberName(callee, "Promise") === "resolve") return true;
+  }
+  if (n?.type === "NewExpression" && isIdent(field(n, "callee"), "Promise")) {
+    const [executor] = list(n, "arguments");
+    if (isIdent(executor) && turnTimers.has(String(executor.name))) return true;
+    const value = executor && isFunction(executor) ? onlyReturn(executor)?.value : undefined;
+    const call = unwrap(value);
+    if (call?.type === "CallExpression" && isTurnTimer(field(call, "callee"), list(call, "arguments"))) return true;
+  }
+  return false;
 }
 
-/** Reads `expect(…)[.not|.resolves…].matcher(…)`. */
-function expectation(statement: Node): { matcher: string; call: Node; negated: boolean } | undefined {
+/** Reads `expect(…)[.not|.resolves|.rejects…].matcher(…)`. */
+function expectation(statement: Node): { matcher: string; call: Node; negated: boolean; rejects: boolean; subject: Node | undefined } | undefined {
   if (statement.type !== "ExpressionStatement") return undefined;
   const call = unwrap(field(statement, "expression"));
   if (call?.type !== "CallExpression") return undefined;
@@ -235,13 +214,17 @@ function expectation(statement: Node): { matcher: string; call: Node; negated: b
   if (!matcher) return undefined;
   let chain: Node | undefined = matcher.object;
   let negated = false;
+  let rejects = false;
   while (chain !== undefined && chain.type !== "CallExpression") {
     const m = memberOf(chain);
     if (!m) return undefined;
     if (m.name === "not") negated = true;
+    if (m.name === "rejects") rejects = true;
     chain = m.object;
   }
-  return chain !== undefined && isIdent(field(chain, "callee"), "expect") ? { matcher: matcher.name, call, negated } : undefined;
+  return chain !== undefined && isIdent(field(chain, "callee"), "expect")
+    ? { matcher: matcher.name, call, negated, rejects, subject: list(chain, "arguments")[0] }
+    : undefined;
 }
 
 const absent = new Set(["toBeUndefined", "toBeNull", "toBeFalsy", "toHaveLength", "toEqual", "toStrictEqual", "toBe", "toHaveBeenCalledTimes"]);
@@ -271,20 +254,17 @@ function turnAsAbsence(body: Node[], report: (n: Node) => void) {
   }
 }
 
-const opensDeferred = new Set(["succeed", "done", "complete", "completeWith", "fail", "failCause", "die", "interrupt", "interruptWith", "sync", "into"]);
-const opensDeferredUnsafe = new Set(["succeedUnsafe", "doneUnsafe", "failUnsafe", "failCauseUnsafe", "dieUnsafe", "interruptUnsafe"]);
-const waitsDeferred = new Set(["await", "poll", "isDone", "isDoneUnsafe"]);
-
+/** A gate: `Promise.withResolvers()` or testkit's `gate()`, whole (its members open and wait) or taken apart (its names do). */
 type Gate = {
   readonly name: string;
-  readonly kind: "deferred" | "gate";
   readonly at: Node;
   readonly scope: Node;
-  readonly open?: string | undefined;
-  readonly opened?: string | undefined;
+  readonly opens: ReadonlySet<string>;
+  readonly waits: ReadonlySet<string>;
+  readonly apart: boolean;
 };
+const gateKinds = { resolvers: { opens: ["resolve", "reject"], waits: ["promise"] }, gate: { opens: ["open"], waits: ["opened"] } } as const;
 
-/** `yield* Deferred.make<…>()`, `Deferred.makeUnsafe()`, testkit's `gate()` (whole, or `{ opened, open }`). */
 function gatesDeclaredIn(fn: Node): Gate[] {
   const gates: Gate[] = [];
   const visit = (n: Node) => {
@@ -292,21 +272,20 @@ function gatesDeclaredIn(fn: Node): Gate[] {
     if (n.type === "VariableDeclarator") {
       const init = unwrap(field(n, "init"));
       const id = field(n, "id");
-      if (init?.type === "CallExpression" && id) {
-        const callee = field(init, "callee");
-        const m = memberOf(callee);
-        if (m && isIdent(m.object, "Deferred") && (m.name === "make" || m.name === "makeUnsafe") && isIdent(id))
-          gates.push({ name: String(id.name), kind: "deferred", at: n, scope: fn });
-        if (isIdent(callee, "gate") && isIdent(id)) gates.push({ name: String(id.name), kind: "gate", at: n, scope: fn });
-        if (isIdent(callee, "gate") && id.type === "ObjectPattern") {
-          const names: Record<string, string> = {};
-          for (const p of list(id, "properties")) {
-            const key = field(p, "key");
-            const value = field(p, "value");
-            if (isIdent(key) && isIdent(value)) names[String(key.name)] = String(value.name);
-          }
-          gates.push({ name: names.opened ?? names.open ?? "gate", kind: "gate", at: n, scope: fn, open: names.open, opened: names.opened });
+      const callee = init?.type === "CallExpression" ? field(init, "callee") : undefined;
+      const kind = memberName(callee, "Promise") === "withResolvers" ? gateKinds.resolvers : isIdent(callee, "gate") ? gateKinds.gate : undefined;
+      if (kind && id && isIdent(id))
+        gates.push({ name: String(id.name), at: n, scope: fn, opens: new Set(kind.opens), waits: new Set(kind.waits), apart: false });
+      if (kind && id?.type === "ObjectPattern") {
+        const names: Record<string, string> = {};
+        for (const p of list(id, "properties")) {
+          const key = field(p, "key");
+          const value = field(p, "value");
+          if (isIdent(key) && isIdent(value)) names[String(key.name)] = String(value.name);
         }
+        const opens = kind.opens.flatMap((k) => (names[k] === undefined ? [] : [names[k]]));
+        const waits = kind.waits.flatMap((k) => (names[k] === undefined ? [] : [names[k]]));
+        gates.push({ name: waits[0] ?? opens[0] ?? "gate", at: n, scope: fn, opens: new Set(opens), waits: new Set(waits), apart: true });
       }
     }
     for (const c of childrenOf(n)) visit(c);
@@ -329,7 +308,7 @@ const bindsName = (fn: Node, name: string): boolean => {
 };
 
 type Use = { readonly node: Node; readonly parent: Node | undefined; readonly grand: Node | undefined };
-function usesOf(scope: Node, name: string, skip: Node): Use[] {
+function usesOf(scope: Node, name: string, skip: Node | undefined): Use[] {
   const uses: Use[] = [];
   const visit = (n: Node, parent: Node | undefined, grand: Node | undefined) => {
     if (n === skip) return;
@@ -348,35 +327,20 @@ function usesOf(scope: Node, name: string, skip: Node): Use[] {
 type Role = "opens" | "waits" | "escapes";
 function roleOf(gate: Gate, use: Use, name: string): Role {
   const { node, parent, grand } = use;
-  if (gate.kind === "deferred") {
-    if (parent?.type === "CallExpression" && list(parent, "arguments")[0] === node) {
-      const m = memberOf(field(parent, "callee"));
-      if (m && isIdent(m.object, "Deferred")) {
-        if (opensDeferred.has(m.name) || opensDeferredUnsafe.has(m.name)) return "opens";
-        if (waitsDeferred.has(m.name)) return "waits";
-      }
-    }
-    // `Effect.intoDeferred(x)` / `x.pipe(Effect.intoDeferred(d))` complete it too.
-    if (parent?.type === "CallExpression") {
-      const m = memberOf(field(parent, "callee"));
-      if (m?.name === "intoDeferred") return "opens";
-    }
-    return "escapes";
-  }
-  if (gate.open !== undefined || gate.opened !== undefined) {
-    if (name === gate.open) return parent?.type === "CallExpression" && parent.callee === node ? "opens" : "escapes";
+  if (gate.apart) {
+    if (gate.opens.has(name)) return parent?.type === "CallExpression" && parent.callee === node ? "opens" : "escapes";
     return parent?.type === "AwaitExpression" || (parent?.type === "MemberExpression" && memberOf(parent)?.name === "then") ? "waits" : "escapes";
   }
   const m = parent && memberOf(parent);
-  if (m?.name === "open") return grand?.type === "CallExpression" && grand.callee === parent ? "opens" : "escapes";
-  if (m?.name === "opened") return "waits";
+  if (m && gate.opens.has(m.name)) return grand?.type === "CallExpression" && grand.callee === parent ? "opens" : "escapes";
+  if (m && gate.waits.has(m.name)) return "waits";
   return "escapes";
 }
 
 function unreleasedGates(fn: Node, report: (n: Node, name: string) => void) {
   for (const gate of gatesDeclaredIn(fn)) {
-    const names = gate.open !== undefined || gate.opened !== undefined ? [gate.open, gate.opened].filter((n): n is string => n !== undefined) : [gate.name];
-    const roles = new Set(names.flatMap((name) => usesOf(gate.scope, name, field(gate.at, "id")!).map((u) => roleOf(gate, u, name))));
+    const names = gate.apart ? [...gate.opens, ...gate.waits] : [gate.name];
+    const roles = new Set(names.flatMap((name) => usesOf(gate.scope, name, field(gate.at, "id")).map((u) => roleOf(gate, u, name))));
     if (roles.has("waits") && !roles.has("opens") && !roles.has("escapes")) report(gate.at, gate.name);
   }
 }
@@ -403,7 +367,6 @@ function shapeOf(n: Node): string {
 }
 const calleeName = (n: Node | undefined): string => {
   n = unwrap(n);
-  if (n?.type === "ChainExpression") n = field(n, "expression");
   if (isIdent(n)) return String(n.name);
   const m = memberOf(n);
   return m ? `${calleeName(m.object)}.${m.name}` : "?";
@@ -424,269 +387,236 @@ function setupsIn(program: Node, file: string, line: (o: number) => number, into
   visit(program);
 }
 
-const memberName = (n: Node | undefined, object: string): string | undefined => {
-  const m = memberOf(n);
-  return m !== undefined && isIdent(m.object, object) ? m.name : undefined;
-};
-const callName = (n: Node | undefined, object: string): string | undefined =>
-  n?.type === "CallExpression" ? memberName(field(n, "callee"), object) : undefined;
-const refersTo = (n: Node | undefined, object: string, names: ReadonlySet<string>): boolean =>
-  names.has(memberName(n, object) ?? "") || names.has(callName(n, object) ?? "");
-
-/** Whether any node under n (n too) satisfies ok; inside nested functions only when asked. */
-function contains(n: Node, ok: (n: Node) => boolean, intoFunctions = true): boolean {
-  const visit = (m: Node, top: boolean): boolean => {
-    if (!top && !intoFunctions && isFunction(m)) return false;
-    if (ok(m)) return true;
-    return childrenOf(m).some((c) => visit(c, false));
-  };
-  return visit(n, true);
-}
-const isDelegatingYield = (n: Node) => n.type === "YieldExpression" && n.delegate === true;
-const isExpectCall = (n: Node) => n.type === "CallExpression" && isIdent(field(n, "callee"), "expect");
-
-/** The arguments a pipe applies in order: `x.pipe(a, b)`, `pipe(x, a, b)`, and `Effect.fn(…)(body, a, b)`. */
-function pipeSteps(n: Node): Node[] | undefined {
-  if (n.type !== "CallExpression") return undefined;
-  const callee = field(n, "callee");
-  if (memberOf(callee)?.name === "pipe") return list(n, "arguments");
-  if (isIdent(callee, "pipe")) return list(n, "arguments").slice(1);
-  if (callee?.type === "CallExpression" && ["fn", "fnUntraced"].includes(callName(callee, "Effect") ?? "")) return list(n, "arguments").slice(1);
-  if (["fn", "fnUntraced"].includes(callName(n, "Effect") ?? "") && list(n, "arguments")[0]?.type !== "Literal") return list(n, "arguments").slice(1);
-  return undefined;
-}
-
-const textOf = (text: string, n: Node) => text.slice(n.start, n.end);
-const topOf = (s: Node): Node | undefined => {
-  if (s.type === "ExpressionStatement") return field(s, "expression");
-  if (s.type === "ReturnStatement") return field(s, "argument");
-  if (s.type === "VariableDeclaration") {
-    const ds = list(s, "declarations");
-    return ds.length === 1 ? field(ds[0]!, "init") : undefined;
-  }
-  return undefined;
-};
-const declared = (s: Node): { id: string; init: Node } | undefined => {
-  if (s.type !== "VariableDeclaration") return undefined;
-  const ds = list(s, "declarations");
-  const id = ds.length === 1 ? field(ds[0]!, "id") : undefined;
-  const init = ds.length === 1 ? field(ds[0]!, "init") : undefined;
-  return isIdent(id) && init ? { id: String(id.name), init } : undefined;
-};
-
-const forks = new Set(["forkChild", "forkScoped", "forkDetach", "forkIn"]);
-
-function forkThenJoin(body: Node[], report: (n: Node, what: string) => void) {
-  for (let i = 0; i + 1 < body.length; i++) {
-    const d = declared(body[i]!);
-    if (!d || !forks.has(callName(unwrap(d.init), "Effect") ?? "")) continue;
-    const next = body[i + 1]!;
-    const joined = (n: Node) => ["join", "await"].includes(callName(n, "Fiber") ?? "") && isIdent(list(n, "arguments")[0], d.id);
-    if (contains(next, joined, false)) report(next, d.id);
-  }
-}
-
-const valueOut = new Set(["result", "option", "exit", "ignore", "ignoreCause", "orElseSucceed"]);
-function spanAfterResult(n: Node, report: (n: Node) => void) {
-  const steps = pipeSteps(n);
-  if (!steps) return;
-  const at = steps.findIndex((s) => refersTo(s, "Effect", valueOut));
-  if (at < 0) return;
-  for (const s of steps.slice(at + 1)) if (callName(s, "Effect") === "withSpan") report(s);
-}
-
-const bounding = new Set(["upTo", "recurs", "take", "during", "while", "until", "recurUpTo", "recurUntil", "recurWhile"]);
-const scheduleNames = new Set(["Schedule", "Duration"]);
-/** true: bounded or not known here; false: a schedule written here that never stops. */
-function bounded(policy: Node, consts: ReadonlyMap<string, Node>, depth = 0): boolean {
-  if (depth > 3) return true;
-  if (isIdent(policy)) {
-    const init = consts.get(String(policy.name));
-    return init === undefined ? true : bounded(init, consts, depth + 1);
-  }
-  if (policy.type === "ObjectExpression") {
-    const props = list(policy, "properties");
-    const key = (p: Node) => (isIdent(field(p, "key")) ? String(field(p, "key")!.name) : "");
-    if (props.some((p) => p.type !== "Property" || key(p) === "times")) return true;
-    const schedule = props.find((p) => key(p) === "schedule");
-    const value = schedule && field(schedule, "value");
-    return value ? bounded(value, consts, depth + 1) : false;
-  }
-  if (!contains(policy, (n) => memberName(n, "Schedule") !== undefined)) return true;
-  if (contains(policy, (n) => bounding.has(memberOf(n)?.name ?? ""))) return true;
-  // Another name in it (a helper, a variable) may bound it.
-  let unknown = false;
-  const visit = (n: Node, parent: Node | undefined) => {
-    if (isIdent(n) && !scheduleNames.has(String(n.name)) && !(parent?.type === "MemberExpression" && field(parent, "property") === n)) {
-      const init = consts.get(String(n.name));
-      if (init === undefined || bounded(init, consts, depth + 1)) unknown = true;
-    }
-    for (const c of childrenOf(n)) visit(c, n);
-  };
-  visit(policy, undefined);
-  return unknown;
-}
-function unboundedRetry(n: Node, consts: ReadonlyMap<string, Node>, report: (n: Node) => void) {
-  if (callName(n, "Effect") !== "retry") return;
+/** A promise that runs an expect and that nothing waits for: `void (async () => …)()`, a bare `.then(…)`, a timer's callback. */
+const settles = new Set(["then", "catch", "finally"]);
+function floatsAnExpect(n: Node | undefined): boolean {
+  n = n?.type === "ParenthesizedExpression" ? field(n, "expression") : n;
+  if (n?.type !== "CallExpression") return false;
+  const callee = unwrap(field(n, "callee"));
   const args = list(n, "arguments");
-  const policy = args.length === 2 ? args[1] : args[0];
-  if (policy && !bounded(policy, consts)) report(n);
+  const hasExpect = (xs: readonly Node[]) => xs.some((x) => contains(x, isExpectCall));
+  if (settles.has(memberOf(callee)?.name ?? "")) return hasExpect([n]);
+  if (callee && isFunction(callee) && callee.async === true) return contains(callee, isExpectCall);
+  if (isTurnTimer(callee, args) || isIdent(callee, "setInterval") || (isIdent(callee, "setTimeout") && args.length > 0)) return hasExpect(args);
+  return false;
 }
-
-const refs = ["Ref", "SynchronizedRef", "SubscriptionRef"];
-const refCall = (n: Node, names: readonly string[]) => refs.some((r) => names.includes(callName(n, r) ?? ""));
-function refReadModifyWrite(body: Node[], text: string, report: (n: Node, what: string) => void) {
-  for (let i = 0; i < body.length; i++) {
-    const read = unwrap(topOf(body[i]!));
-    if (body[i]!.type !== "VariableDeclaration" || !read || !refCall(read, ["get"])) continue;
-    const target = list(read, "arguments")[0];
-    if (!target) continue;
-    const key = textOf(text, target);
-    for (let j = i + 1; j < body.length; j++) {
-      const writes = (n: Node) => refCall(n, ["set"]) && list(n, "arguments")[0] !== undefined && textOf(text, list(n, "arguments")[0]!) === key;
-      if (!contains(body[j]!, writes, false)) continue;
-      if (body.slice(i + 1, j).some((s) => contains(s, isDelegatingYield, false))) report(body[j]!, key);
-      break;
+function expectInFloatingPromise(block: Node, body: Node[], report: (n: Node) => void) {
+  for (const s of body) {
+    if (s.type === "ExpressionStatement") {
+      const e = field(s, "expression");
+      if (e?.type === "UnaryExpression" && e.operator === "void" && field(e, "argument") && contains(field(e, "argument")!, isExpectCall)) report(s);
+      else if (floatsAnExpect(e)) report(s);
+    }
+    // `const p = (async () => { expect(…) })();` and p never used again.
+    if (s.type === "VariableDeclaration" && list(s, "declarations").length === 1) {
+      const d = list(s, "declarations")[0]!;
+      const id = field(d, "id");
+      if (isIdent(id) && floatsAnExpect(field(d, "init")) && usesOf(block, String(id.name), id).length === 0) report(s);
     }
   }
 }
 
-function pipeOnEffectFn(n: Node, report: (n: Node) => void) {
-  const m = memberOf(n);
-  if (m?.name !== "pipe") return;
-  const made = unwrap(m.object);
-  if (made?.type !== "CallExpression") return;
-  const callee = field(made, "callee");
-  const isFn = (c: Node | undefined) => ["fn", "fnUntraced"].includes(callName(c, "Effect") ?? "");
-  if (isFn(callee) || (callName(made, "Effect") === "fnUntraced" && !isFn(callee))) report(n);
+const anyError = (n: Node | undefined) => isIdent(n, "Error");
+function failureWithoutReason(statement: Node, report: (n: Node) => void) {
+  const e = expectation(statement);
+  if (!e || e.negated) return;
+  const args = list(e.call, "arguments");
+  if ((e.matcher === "toThrow" || e.matcher === "toThrowError") && (args.length === 0 || anyError(args[0]))) return report(statement);
+  if (e.matcher === "toBeInstanceOf" && anyError(args[0])) return report(statement);
+  if (e.rejects && ["toBeDefined", "toBeTruthy"].includes(e.matcher)) return report(statement);
 }
 
-/** The combinators that carry a step of the flow's own logic; the rest of .pipe's arguments attach behaviour. */
-const logicSteps = new Set(["map", "flatMap", "andThen", "tap", "zipWith", "filterOrFail", "flatten"]);
-function logicInPipe(n: Node, report: (n: Node) => void) {
-  if (n.type !== "CallExpression" || memberOf(field(n, "callee"))?.name !== "pipe") return;
-  if (list(n, "arguments").filter((arg) => logicSteps.has(callName(arg, "Effect") ?? "")).length >= 2) report(n);
+/** A test file's top-level declaration that builds something once for every test: a top-level await, or a farm. */
+const builders = new Set(["world", "moduleWorld", "testDb", "makeFarm"]);
+function sharedFarmInTest(program: Node, report: (n: Node) => void) {
+  const builds = (n: Node) => n.type === "AwaitExpression" || (n.type === "CallExpression" && builders.has(calleeName(field(n, "callee"))));
+  for (const s of list(program, "body")) {
+    const statement = s.type === "ExportNamedDeclaration" ? field(s, "declaration") : s;
+    if (statement?.type === "VariableDeclaration" && contains(statement, builds, false)) report(statement);
+  }
 }
 
-const plainErrors = new Set(["Error", "TypeError", "RangeError"]);
-function dieWithPlainError(n: Node, report: (n: Node) => void) {
-  const name = callName(n, "Effect");
-  if (name === "dieMessage") return report(n);
-  if (name !== "die") return;
-  const arg = list(n, "arguments")[0];
-  if (arg?.type === "NewExpression" && isIdent(field(arg, "callee")) && plainErrors.has(String(field(arg, "callee")!.name))) report(n);
+const isInfinite = (n: Node | undefined) =>
+  isIdent(n, "Infinity") || memberName(n, "Number") === "POSITIVE_INFINITY" || memberName(n, "Number") === "MAX_SAFE_INTEGER";
+const propertyNamed = (o: Node | undefined, key: string) =>
+  o?.type === "ObjectExpression" ? list(o, "properties").find((p) => p.type === "Property" && isIdent(field(p, "key"), key)) : undefined;
+const forever = (n: Node) =>
+  ((n.type === "WhileStatement" || n.type === "DoWhileStatement") && field(n, "test")?.type === "Literal" && field(n, "test")!.value === true) ||
+  (n.type === "ForStatement" && field(n, "test") === undefined);
+const leaves = (n: Node) => n.type === "ThrowStatement" || n.type === "ReturnStatement" || n.type === "BreakStatement";
+/** `retry(f, { retries: Infinity })`, or a loop that never ends by itself, leaves on success and only goes round again on failure. */
+function unboundedRetry(n: Node, report: (n: Node) => void) {
+  if (n.type === "CallExpression" && (isIdent(field(n, "callee"), "retry") || memberOf(field(n, "callee"))?.name === "retry")) {
+    const retries = propertyNamed(list(n, "arguments")[1], "retries");
+    if (retries && isInfinite(field(retries, "value"))) report(n);
+    return;
+  }
+  if (!forever(n)) return;
+  const body = field(n, "body");
+  const statements = body?.type === "BlockStatement" ? list(body, "body") : body ? [body] : [];
+  for (const s of statements) {
+    if (s.type !== "TryStatement") continue;
+    const tried = field(s, "block");
+    const handler = field(s, "handler");
+    const caught = handler && field(handler, "body");
+    if (tried && caught && contains(tried, (m) => m.type === "ReturnStatement" || m.type === "BreakStatement", false) && !contains(caught, leaves, false))
+      return report(n);
+  }
 }
 
-const recorded = new Set(["tapError", "tapCause", "tapErrorCause", "tapDefect", "tapErrorTag", "tapCauseIf"]);
-const quietValues = new Set(["succeed", "void", "succeedNone", "succeedSome", "never"]);
-const paramsUnused = (fn: Node) => list(fn, "params").every((p) => !isIdent(p) || usesOf(field(fn, "body")!, String(p.name), p).length === 0);
-const returnsQuietly = (fn: Node): boolean => {
-  const body = field(fn, "body");
-  if (!body) return false;
-  const value =
-    body.type === "BlockStatement"
-      ? list(body, "body").length === 1 && list(body, "body")[0]!.type === "ReturnStatement"
-        ? field(list(body, "body")[0]!, "argument")
-        : undefined
-      : body;
-  return value !== undefined && refersTo(value, "Effect", quietValues);
+/** Calls that hold a lock around what they run. */
+const locked = new Set(["with", "withLock", "runExclusive", "exclusive", "locked"]);
+const underLock = (parents: readonly Node[]) =>
+  parents.some(
+    (p) =>
+      p.type === "CallExpression" && locked.has(memberOf(field(p, "callee"))?.name ?? (isIdent(field(p, "callee")) ? String(field(p, "callee")!.name) : "")),
+  );
+/** `const v = x.get(k)`, then an await, then `x.set(k, …v…)` in the same block: a write made from what was read before
+ * the await. A write that does not use the read (a cache filled after its miss) loses nothing; a read again after the
+ * await is the re-check this asks for. */
+function readModifyWrite(body: Node[], text: string, parents: readonly Node[], report: (n: Node, what: string) => void) {
+  if (underLock(parents)) return;
+  for (let i = 0; i < body.length; i++) {
+    const s = body[i]!;
+    const ds = s.type === "VariableDeclaration" ? list(s, "declarations") : [];
+    const read = ds.length === 1 ? unwrap(field(ds[0]!, "init")) : undefined;
+    const readId = ds.length === 1 ? field(ds[0]!, "id") : undefined;
+    const got = read?.type === "CallExpression" ? memberOf(field(read, "callee")) : undefined;
+    if (!read || !isIdent(readId) || got?.name !== "get" || got.object.type === "ThisExpression") continue;
+    const readName = String(readId.name);
+    const target = textOf(text, got.object);
+    const key = list(read, "arguments")[0];
+    const keyText = key === undefined ? undefined : textOf(text, key);
+    let awaited = false;
+    for (let j = i + 1; j < body.length; j++) {
+      const at = body[j]!;
+      let write: Node | undefined;
+      const visit = (m: Node, top: boolean) => {
+        if (write || (!top && isFunction(m))) return;
+        const set = m.type === "CallExpression" ? memberOf(field(m, "callee")) : undefined;
+        const first = list(m, "arguments")[0];
+        if (set?.name === "set" && textOf(text, set.object) === target && (keyText === undefined || (first !== undefined && textOf(text, first) === keyText))) {
+          write = m;
+          return;
+        }
+        for (const c of childrenOf(m)) visit(c, false);
+      };
+      visit(at, true);
+      const awaitBefore = (w: Node) => contains(at, (m) => isAwait(m) && (m.start ?? 0) < (w.start ?? 0), false);
+      const found: Node | undefined = write;
+      if (found) {
+        const fromRead = list(found, "arguments").some((a) => usesOf(a, readName, undefined).length > 0);
+        if (fromRead && (awaited || awaitBefore(found))) report(found, `${target}.get(${keyText ?? ""}) … await … ${target}.set`);
+        break;
+      }
+      const readsAgain = (m: Node) =>
+        m.type === "CallExpression" && memberOf(field(m, "callee"))?.name === "get" && textOf(text, memberOf(field(m, "callee"))!.object) === target;
+      if (contains(at, readsAgain, false)) awaited = false;
+      else if (contains(at, isAwait, false)) awaited = true;
+    }
+  }
+}
+
+/** A comment in n, on the line above it or after it on its last line: a swallow that says why. */
+const commented = (text: string, n: Node) => {
+  const inner = textOf(text, n);
+  if (inner.includes("//") || inner.includes("/*")) return true;
+  const before = text.slice(0, n.start).split("\n");
+  const above = (before.at(-2) ?? "").trim();
+  const sameLine = (before.at(-1) ?? "").trim();
+  const after = text.slice(n.end).split("\n")[0] ?? "";
+  return above.startsWith("//") || above.endsWith("*/") || sameLine.startsWith("//") || after.includes("//");
 };
-function swallowWithoutRecord(n: Node, report: (n: Node) => void) {
-  const steps = pipeSteps(n);
-  const check = (call: Node, before: readonly Node[]) => {
-    const name = callName(call, "Effect");
-    if (name !== "catch" && name !== "catchCause" && name !== "orElseSucceed") return;
-    const args = list(call, "arguments");
-    const handler = args[args.length - 1];
-    if (name !== "orElseSucceed" && (!handler || !isFunction(handler) || !paramsUnused(handler) || !returnsQuietly(handler))) return;
-    if (before.some((s) => refersTo(s, "Effect", recorded))) return;
-    report(call);
-  };
-  if (steps) steps.forEach((s, i) => check(s, steps.slice(0, i)));
-  else if (list(n, "arguments").length === 2) check(n, []);
+const quiet = (v: Node | undefined): boolean =>
+  v === undefined ||
+  isIdent(v, "undefined") ||
+  v.type === "Literal" ||
+  (v.type === "ArrayExpression" && list(v, "elements").length === 0) ||
+  (v.type === "ObjectExpression" && list(v, "properties").length === 0) ||
+  (v.type === "UnaryExpression" && v.operator === "void");
+const unusedParams = (fn: Node, params: readonly Node[]) => {
+  const body = field(fn, "body");
+  return params.every((p) => !isIdent(p) || !body || usesOf(body, String(p.name), p).length === 0);
+};
+/** `catch {}`, `catch { return undefined }`, `.catch(() => undefined)`, `.catch(() => {})` with nothing said about it. */
+function swallowWithoutRecord(n: Node, text: string, report: (n: Node) => void) {
+  if (n.type === "CatchClause") {
+    const body = field(n, "body");
+    const statements = body ? list(body, "body") : [];
+    const param = field(n, "param");
+    const unused = !param || !isIdent(param) || !body || usesOf(body, String(param.name), param).length === 0;
+    const silent =
+      statements.length === 0 || (statements.length === 1 && statements[0]!.type === "ReturnStatement" && quiet(field(statements[0]!, "argument")));
+    if (unused && silent && !commented(text, n)) report(n);
+    return;
+  }
+  if (n.type !== "CallExpression" || memberOf(field(n, "callee"))?.name !== "catch") return;
+  const [handler] = list(n, "arguments");
+  if (!handler || !isFunction(handler)) return;
+  // A release on the way out (reader.cancel(), rollback): its own failure has nothing left to tell.
+  const caught = unwrap(memberOf(field(n, "callee"))?.object);
+  if (releases.has(caught?.type === "CallExpression" ? (memberOf(unwrap(field(caught, "callee")))?.name ?? "") : "")) return;
+  const returned = onlyReturn(handler);
+  if (returned && quiet(returned.value) && unusedParams(handler, list(handler, "params")) && !commented(text, handler)) report(n);
 }
 
-function onlyAsText(fn: Node, name: string): boolean {
-  const body = field(fn, "body");
-  if (!body) return false;
-  const uses = usesOf(body, name, fn);
+const releases = new Set(["cancel", "close", "destroy", "abort", "dispose", "kill", "rollback", "unlink", "rm", "return"]);
+const asText = new Set(["String", "messageOf", "causeMessage", "errorMessage"]);
+/** Whether every use of name in n is as text. */
+function onlyAsText(n: Node, name: string): boolean {
+  const uses = usesOf(n, name, undefined);
   if (uses.length === 0) return false;
   return uses.every(({ parent }) => {
     if (parent?.type === "TemplateLiteral") return true;
     if (parent?.type === "MemberExpression" && memberOf(parent)?.name === "message") return true;
     const callee = parent?.type === "CallExpression" ? field(parent, "callee") : undefined;
-    return isIdent(callee, "String") || isIdent(callee, "messageOf");
+    return isIdent(callee) && asText.has(String(callee.name));
   });
 }
+/** In a catch (a clause, or `.catch((e) => …)`): a new error made from e's text alone, with no cause. */
 function causeAsString(n: Node, report: (n: Node) => void) {
-  let fn: Node | undefined;
-  if (n.type === "Property" && isIdent(field(n, "key"), "catch")) fn = field(n, "value");
-  else if (callName(n, "Effect") === "mapError") fn = list(n, "arguments").at(-1);
-  if (!fn || !isFunction(fn)) return;
-  const [param] = list(fn, "params");
-  if (!isIdent(param) || !onlyAsText(fn, String(param.name))) return;
-  const made = unwrap(field(fn, "body"));
-  const arg = made?.type === "NewExpression" ? list(made, "arguments")[0] : undefined;
-  if (arg?.type !== "ObjectExpression") return;
-  const keys = new Set(list(arg, "properties").map((p) => (p.type === "Property" && isIdent(field(p, "key")) ? String(field(p, "key")!.name) : "…")));
-  if (!keys.has("cause") && !keys.has("…")) report(n);
-}
-
-const waits: Record<string, readonly string[]> = {
-  Deferred: ["await"],
-  Queue: ["take", "takeAll", "takeN", "takeBetween"],
-  Fiber: ["join", "await"],
-  Effect: ["sleep", "never"],
-  Latch: ["await"],
-};
-const isWait = (n: Node) =>
-  Object.entries(waits).some(([o, names]) => names.includes(callName(n, o) ?? "") || (o === "Effect" && memberName(n, o) === "never"));
-function uninterruptibleWait(n: Node, consts: ReadonlyMap<string, Node>, report: (n: Node) => void) {
-  let subject: Node | undefined;
-  if (callName(n, "Effect") === "uninterruptible") subject = list(n, "arguments")[0];
-  const steps = pipeSteps(n);
-  if (steps?.some((s) => memberName(s, "Effect") === "uninterruptible") === true) {
-    const callee = field(n, "callee");
-    subject = memberOf(callee)?.name === "pipe" ? memberOf(callee)!.object : list(n, "arguments")[0];
+  let param: Node | undefined;
+  let body: Node | undefined;
+  if (n.type === "CatchClause") [param, body] = [field(n, "param"), field(n, "body")];
+  else if (n.type === "CallExpression" && memberOf(field(n, "callee"))?.name === "catch") {
+    const [handler] = list(n, "arguments");
+    if (handler && isFunction(handler)) [param, body] = [list(handler, "params")[0], field(handler, "body")];
   }
-  if (isIdent(subject)) subject = consts.get(String(subject.name));
-  if (subject && contains(subject, isWait)) report(n);
-}
-
-function layersBuiltTwice(fn: Node, text: string, report: (n: Node, what: string) => void) {
-  const seen = new Map<string, number>();
-  const visit = (n: Node) => {
-    if (n !== fn && isFunction(n)) return;
-    if (n.type === "CallExpression" && list(n, "arguments").length > 0) {
-      const callee = field(n, "callee");
-      const name = memberOf(callee)?.name ?? (isIdent(callee) ? String(callee.name) : "");
-      if (name.startsWith("layer")) {
-        const key = `${textOf(text, callee!)}(${list(n, "arguments").map(shapeOf).join(",")})`;
-        const count = (seen.get(key) ?? 0) + 1;
-        seen.set(key, count);
-        if (count === 2) report(n, textOf(text, n).replace(/\s+/gu, " ").slice(0, 80));
-      }
+  if (!isIdent(param) || !body) return;
+  const name = String(param.name);
+  const made: Node[] = [];
+  const visit = (m: Node, top: boolean) => {
+    if (!top && isFunction(m)) return;
+    if (m.type === "ThrowStatement" || m === body) {
+      const made1 = unwrap(field(m, "argument") ?? (body.type === "BlockStatement" ? undefined : body));
+      if (made1?.type === "NewExpression") made.push(made1);
     }
-    for (const c of childrenOf(n)) visit(c);
+    for (const c of childrenOf(m)) visit(c, false);
   };
-  for (const c of childrenOf(fn)) visit(c);
+  visit(body, true);
+  for (const m of made) {
+    const args = list(m, "arguments");
+    const keepsCause = args.some(
+      (a) => a.type === "ObjectExpression" && list(a, "properties").some((p) => p.type !== "Property" || isIdent(field(p, "key"), "cause")),
+    );
+    if (!keepsCause && onlyAsText(m, name) && !args.some((a) => isIdent(a, name))) report(m);
+  }
 }
 
-type TaggedErrorSite = { readonly file: string; readonly line: number; readonly className: string };
-const isTaggedErrorRef = (n: Node | undefined): boolean => isIdent(n, "TaggedError") || memberOf(n)?.name === "TaggedError";
-function taggedErrorsIn(program: Node, file: string, line: (offset: number) => number, out: Map<string, TaggedErrorSite[]>) {
+type ErrorClassSite = { readonly file: string; readonly line: number; readonly className: string };
+/** Classes that extend Error or another …Error, by the name they go by: their `name = "…"` field, else the class's. */
+function errorClassesIn(program: Node, file: string, line: (offset: number) => number, out: Map<string, ErrorClassSite[]>) {
   const visit = (n: Node) => {
     if (n.type === "ClassDeclaration" || n.type === "ClassExpression") {
       const sup = field(n, "superClass");
-      const callee = sup?.type === "CallExpression" ? field(sup, "callee") : undefined;
-      const matches = callee !== undefined && (isTaggedErrorRef(callee) || (callee.type === "CallExpression" && isTaggedErrorRef(field(callee, "callee"))));
-      const tagArg = matches && sup ? list(sup, "arguments")[0] : undefined;
-      if (tagArg?.type === "Literal" && typeof tagArg.value === "string") {
-        const id = field(n, "id");
-        const className = isIdent(id) ? String(id.name) : "(anonymous)";
-        const sites = out.get(tagArg.value) ?? [];
-        sites.push({ file, line: line(n.start ?? 0), className });
-        out.set(tagArg.value, sites);
+      const superName = isIdent(sup) ? String(sup.name) : memberOf(sup)?.name;
+      const id = field(n, "id");
+      const className = isIdent(id) ? String(id.name) : undefined;
+      if (className !== undefined && superName !== undefined && /Error$|^DOMException$/u.test(superName)) {
+        const named = list(field(n, "body") ?? n, "body").find((m) => m.type === "PropertyDefinition" && isIdent(field(m, "key"), "name"));
+        const value = named && field(named, "value");
+        const name = value?.type === "Literal" && typeof value.value === "string" ? value.value : className;
+        out.set(name, [...(out.get(name) ?? []), { file, line: line(n.start ?? 0), className }]);
       }
     }
     for (const c of childrenOf(n)) visit(c);
@@ -694,181 +624,34 @@ function taggedErrorsIn(program: Node, file: string, line: (offset: number) => n
   visit(program);
 }
 
-const loopStatements = new Set(["ForStatement", "ForOfStatement", "ForInStatement", "WhileStatement", "DoWhileStatement"]);
-function insideLoopExecution(parents: readonly Node[]): boolean {
-  for (let i = parents.length - 1; i >= 0; i--) {
-    const p = parents[i]!;
-    if (loopStatements.has(String(p.type))) return true;
-    if (isFunction(p)) {
-      if (p.generator === true && callName(parents[i - 1], "Effect") === "gen") continue;
-      return false;
-    }
-  }
-  return false;
-}
-
-function provideInLoop(n: Node, parents: readonly Node[], report: (n: Node) => void) {
-  if (callName(n, "Effect") !== "provide") return;
-  const args = list(n, "arguments");
-  const provided = args.length === 2 ? args[1] : args[0];
-  if (
-    provided &&
-    (callName(provided, "Context") !== undefined || isIdent(memberOf(provided)?.object, "Context") || isIdent(provided, "ctx") || isIdent(provided, "context"))
-  )
-    return;
-  if (insideLoopExecution(parents)) report(n);
-}
-
-const cachedMethods = new Set(["cached", "cachedWithTTL", "cachedInvalidateWithTTL"]);
-const standaloneFnHolders = new Set(["VariableDeclarator", "Property", "MethodDefinition", "AssignmentExpression", "ExportDefaultDeclaration"]);
-function cachedPerCall(n: Node, parents: readonly Node[], report: (n: Node) => void) {
-  if (!cachedMethods.has(callName(n, "Effect") ?? "")) return;
-  if (insideLoopExecution(parents)) return report(n);
-  const fnIdx = parents.findLastIndex(isFunction);
-  if (fnIdx < 0) return;
-  const fn = parents[fnIdx]!;
-  if (fn.generator === true) return;
-  const holder = parents[fnIdx - 1];
-  if (fn.type !== "FunctionDeclaration" && !standaloneFnHolders.has(String(holder?.type))) return;
-  const body = field(fn, "body");
-  const directBody = body === n;
-  const directReturn =
-    body?.type === "BlockStatement" &&
-    parents[fnIdx + 1] === body &&
-    parents[fnIdx + 2]?.type === "ReturnStatement" &&
-    field(parents[fnIdx + 2]!, "argument") === n;
-  if (directBody || directReturn) report(n);
-}
-
-function expectInUnjoinedFiber(n: Node, parents: readonly Node[], report: (n: Node) => void) {
-  if (!forks.has(callName(n, "Effect") ?? "")) return;
-  const subject = list(n, "arguments")[0];
-  if (!subject || !contains(subject, isExpectCall)) return;
-  // `const f = yield* Effect.forkChild(…)`: joined somewhere in the function that holds f.
-  const [p1, p2] = [parents.at(-1), parents.at(-2)];
-  const declarator = p1?.type === "YieldExpression" ? p2 : p1;
-  const id = declarator?.type === "VariableDeclarator" ? field(declarator, "id") : undefined;
-  if (isIdent(id)) {
-    const scope = parents.toReversed().find(isFunction) ?? parents[0];
-    const joins = (m: Node) => callName(m, "Fiber") === "join" && isIdent(list(m, "arguments")[0], String(id.name));
-    if (scope && contains(scope, joins)) return;
-  }
-  report(n);
-}
-
-const failureChecks = new Set(["isFailure", "isSuccess"]);
-function failureWithoutReason(statement: Node, report: (n: Node) => void) {
-  const e = expectation(statement);
-  if (!e) return;
-  const callee = field(e.call, "callee");
-  const root = memberOf(callee)?.object;
-  const subject = root === undefined ? undefined : list(unwrapExpect(root), "arguments")[0];
-  const [arg] = list(e.call, "arguments");
-  const literal = arg?.type === "Literal" ? arg.value : undefined;
-  const truth = e.matcher === "toBeTruthy" ? true : e.matcher === "toBeFalsy" ? false : e.matcher === "toBe" ? literal : undefined;
-  const check = subject && (callName(subject, "Exit") ?? callName(subject, "Result"));
-  if (check !== undefined && failureChecks.has(check) && typeof truth === "boolean" && (check === "isFailure") === (truth !== e.negated))
-    return report(statement);
-  if (memberOf(subject)?.name === "_tag" && (e.matcher === "toBe" || e.matcher === "toEqual") && literal === "Failure" && !e.negated) return report(statement);
-  if (e.matcher === "toMatchObject" && arg?.type === "ObjectExpression") {
-    const props = list(arg, "properties");
-    const only = props.length === 1 ? props[0]! : undefined;
-    const value = only && field(only, "value");
-    if (only && isIdent(field(only, "key"), "_tag") && value?.type === "Literal" && value.value === "Failure") report(statement);
-  }
-}
-/** The `expect(…)` call at the root of a matcher chain. */
-function unwrapExpect(n: Node): Node {
-  let chain: Node | undefined = n;
-  while (chain !== undefined && chain.type !== "CallExpression") chain = memberOf(chain)?.object;
-  return chain ?? n;
-}
-
-const runs = new Set(["runPromise", "runSync", "runPromiseExit", "runSyncExit", "runFork", "runCallback"]);
-const importsFrom = (program: Node, from: (source: string) => boolean) =>
-  list(program, "body").some((s) => s.type === "ImportDeclaration" && from(String(field(s, "source")?.value)));
-
-function sharedRuntimeInTest(program: Node, report: (n: Node) => void) {
-  const builds = (n: Node) => runs.has(callName(n, "Effect") ?? "") || callName(n, "ManagedRuntime") === "make" || callName(n, "Layer") === "build";
-  for (const s of list(program, "body")) {
-    const statement = s.type === "ExportNamedDeclaration" ? field(s, "declaration") : s;
-    if (statement?.type === "VariableDeclaration" && contains(statement, builds, false)) report(statement);
-  }
-}
-
-function liveWithTestClock(n: Node, report: (n: Node) => void) {
-  if (n.type !== "CallExpression") return;
-  let callee = field(n, "callee");
-  if (callee?.type === "CallExpression") callee = field(callee, "callee"); // it.live.each(…)(…)
-  const m = memberOf(callee);
-  const live = m?.name === "live" ? m : memberOf(m?.object)?.name === "live" ? memberOf(m?.object) : undefined;
-  if (!live || !isIdent(live.object, "it")) return;
-  if (list(n, "arguments").some((a) => contains(a, (x) => memberName(x, "TestClock") !== undefined))) report(n);
-}
-
-const testFile = /\.(test|spec)\.tsx?$|(^|\/)testing(\/|\.tsx?$)/u;
-const usesEffect = (program: Node) => importsFrom(program, (s) => s === "effect" || s.startsWith("effect/") || s.startsWith("@effect/"));
+const testFile = /\.(test|spec)\.tsx?$|(^|\/)testing(\/|\.tsx?$)|(^|\/)test\//u;
 
 export function audit(files: ReadonlyArray<{ readonly path: string; readonly text: string }>): Finding[] {
   const findings: Finding[] = [];
   const setups = new Map<string, Setup[]>();
-  const errorTags = new Map<string, TaggedErrorSite[]>();
+  const errorClasses = new Map<string, ErrorClassSite[]>();
   for (const { path, text } of files) {
     const program: unknown = parseSync(path, text, { lang: path.endsWith(".tsx") ? "tsx" : "ts" }).program;
     if (!isNode(program)) continue;
     const isTest = testFile.test(path);
-    const effect = usesEffect(program);
     const line = lineAt(text);
     const add = (rule: Rule) => (n: Node, what?: string) =>
       findings.push({ rule, file: path, line: line(n.start ?? 0), message: `${what ?? textOf(text, n).replace(/\s+/gu, " ").slice(0, 80)}: ${why[rule]}` });
-    if (!isTest) {
-      // Components hold state without Effect too, so this one reads every source file.
-      const flagsIn = (n: Node) => {
-        looseFlags(n, add("loose-flags"));
-        for (const c of childrenOf(n)) flagsIn(c);
-      };
-      flagsIn(program);
-      taggedErrorsIn(program, path, line, errorTags);
-    }
-    if (!isTest && !effect) continue;
-    const consts = new Map<string, Node>();
+    if (!isTest) errorClassesIn(program, path, line, errorClasses);
     const parents: Node[] = [];
-    const visit = (n: Node) => {
-      if (n.type === "VariableDeclarator" && isIdent(field(n, "id")) && field(n, "init")) consts.set(String(field(n, "id")!.name), field(n, "init")!);
-      for (const c of childrenOf(n)) {
-        parents.push(n);
-        visit(c);
-        parents.pop();
-      }
-    };
-    visit(program);
     const check = (n: Node) => {
       const block = n.type === "BlockStatement" || n.type === "Program" ? list(n, "body") : undefined;
       if (isTest) {
         if (block) turnAsAbsence(block, (s) => add("turn-as-absence")(s));
+        if (block) expectInFloatingPromise(n, block, add("expect-in-floating-promise"));
         if (isFunction(n)) unreleasedGates(n, (at, name) => add("unreleased-gate")(at, `"${name}"`));
-        expectInUnjoinedFiber(n, parents, add("expect-in-unjoined-fiber"));
         failureWithoutReason(n, add("failure-without-reason"));
-        liveWithTestClock(n, add("live-with-test-clock"));
-        if (effect && importsFrom(program, (s) => s === "@effect/vitest") && runs.has(callName(n, "Effect") ?? "")) add("run-in-effect-test")(n);
-      }
-      if (effect) {
-        if (block) forkThenJoin(block, add("fork-then-join"));
-        if (block) refReadModifyWrite(block, text, add("ref-read-modify-write"));
-        pipeOnEffectFn(n, add("pipe-on-effect-fn"));
-        logicInPipe(n, add("logic-in-pipe"));
-      }
-      if (effect && !isTest) {
-        spanAfterResult(n, add("span-after-result"));
-        unboundedRetry(n, consts, add("unbounded-retry"));
-        if (memberName(n, "Option") === "getOrThrow" || memberName(n, "Option") === "getOrThrowWith") add("option-get-or-throw")(n);
-        dieWithPlainError(n, add("die-with-plain-error"));
-        swallowWithoutRecord(n, add("swallow-without-record"));
+      } else {
+        looseFlags(n, add("loose-flags"));
+        unboundedRetry(n, add("unbounded-retry"));
+        if (block) readModifyWrite(block, text, parents, add("read-modify-write"));
+        swallowWithoutRecord(n, text, add("swallow-without-record"));
         causeAsString(n, add("cause-as-string"));
-        uninterruptibleWait(n, consts, add("uninterruptible-wait"));
-        if (isFunction(n) || n.type === "Program") layersBuiltTwice(n, text, add("layer-built-twice"));
-        provideInLoop(n, parents, add("provide-in-loop"));
-        cachedPerCall(n, parents, add("cached-per-call"));
       }
       for (const c of childrenOf(n)) {
         parents.push(n);
@@ -878,7 +661,7 @@ export function audit(files: ReadonlyArray<{ readonly path: string; readonly tex
     };
     check(program);
     if (isTest) {
-      sharedRuntimeInTest(program, add("shared-runtime-in-test"));
+      sharedFarmInTest(program, add("shared-farm-in-test"));
       setupsIn(program, path, line, setups);
     }
   }
@@ -892,14 +675,14 @@ export function audit(files: ReadonlyArray<{ readonly path: string; readonly tex
       message: `${first!.callee}({…}) written ${copies.length} times, also at ${rest.map((s) => `${s.file}:${s.line}`).join(", ")}: ${why["duplicated-setup"]}`,
     });
   }
-  for (const [tag, sites] of errorTags) {
+  for (const [name, sites] of errorClasses) {
     if (sites.length < 2) continue;
     const [first, ...rest] = sites;
     findings.push({
-      rule: "duplicate-error-tag",
+      rule: "duplicate-error-class",
       file: first!.file,
       line: first!.line,
-      message: `_tag "${tag}" (${first!.className}) declared ${sites.length} times, also at ${rest.map((s) => `${s.file}:${s.line}`).join(", ")}: ${why["duplicate-error-tag"]}`,
+      message: `error "${name}" (${first!.className}) declared ${sites.length} times, also at ${rest.map((s) => `${s.file}:${s.line}`).join(", ")}: ${why["duplicate-error-class"]}`,
     });
   }
   return findings.toSorted((a, b) => (a.rule !== b.rule ? a.rule.localeCompare(b.rule) : a.file !== b.file ? a.file.localeCompare(b.file) : a.line - b.line));
@@ -931,7 +714,7 @@ if (import.meta.main) {
   });
   const paths = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", ...positionals], { encoding: "utf8" })
     .split("\n")
-    .filter((p) => scanned.test(p) && !skipped.test(p));
+    .filter((p) => scanned.test(p) && !skipped.test(p) && existsSync(p));
   const all = audit(paths.map((path) => ({ path, text: readFileSync(path, "utf8") })));
   if (values.check === true || values.write === true) {
     // The whole repository against the ratchet: a practice the review lists may not come back in new code.

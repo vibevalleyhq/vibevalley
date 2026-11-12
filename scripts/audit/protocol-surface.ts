@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { Schema } from "effect";
+import { z } from "zod";
 
 const root = resolve(import.meta.dirname, "../..");
 const ratchetPath = resolve(root, "scripts/audit/protocol-surface.ratchet.json");
@@ -18,11 +18,11 @@ interface Ratchet {
   readonly serverOnlyShapes: number;
 }
 
-const RatchetSchema = Schema.Struct({
-  publicShapes: Schema.Number,
-  publicSchemas: Schema.Number,
-  totalProtocolExports: Schema.Number,
-  serverOnlyShapes: Schema.Number,
+const RatchetSchema = z.object({
+  publicShapes: z.number(),
+  publicSchemas: z.number(),
+  totalProtocolExports: z.number(),
+  serverOnlyShapes: z.number(),
 });
 const ratchetKeys = ["publicShapes", "publicSchemas", "totalProtocolExports", "serverOnlyShapes"] as const satisfies readonly (keyof Ratchet)[];
 
@@ -181,7 +181,7 @@ if (import.meta.main) {
   if (!existsSync(ratchetPath)) {
     problems.push(`missing ${ratchetPath}; run \`vpx scripts/audit/protocol-surface.ts --write\``);
   } else {
-    const kept = Schema.decodeUnknownSync(Schema.fromJsonString(RatchetSchema))(readFileSync(ratchetPath, "utf8"));
+    const kept = RatchetSchema.parse(JSON.parse(readFileSync(ratchetPath, "utf8")));
     for (const key of ratchetKeys) {
       if (metrics[key] > kept[key]) {
         problems.push(

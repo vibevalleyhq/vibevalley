@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-总纲 [module-design.md](docs/style/module-design.md#静态化类型化与可分析化) 与 [地基](docs/subsystems/foundation.md#边界审计) 已落地全栈共用 `Schema` 的直接 Fail-Fast 边界（`VibeValleyApi` 按 `ApiError` 与 `Endpoint.result` 解码、SSE `stream.ts`、服务端自有表 `storedJsonOrUndefined(schema, "table.column")`、配置 `PortNumber` / `PositiveFinite` 进门窄化）、清零了协议与厂商层重复内联 `Schema.Literals` 及子包非递归 `Schema.Codec` 双写，并通过 `vibevalley/tagged-error-tag`、`vibevalley/effect-idioms`、`vibevalley/unstable-effect-door`、`practice:check`（`duplicate-error-tag` / `provide-in-loop` / `cached-per-call`）和 [schema-audit.ts](scripts/audit/schema-audit.ts)（`db-enum-mismatch`、`redacted-json-exposure`、`unbranded-id`）建立了零存量静态门禁。
+总纲 [module-design.md](docs/style/module-design.md#静态化类型化与可分析化) 与 [地基](docs/subsystems/foundation.md#边界审计) 已落地全栈共用 Zod 契约的直接 Fail-Fast 边界（`VibeValleyApi` 按 `ApiError` 与 `Endpoint.result` 解码、SSE `stream.ts`、服务端自有表 `storedJsonOrUndefined(schema, "table.column")`、配置 `PortNumber` / `PositiveFinite` 进门窄化），并通过 `practice:check`（`duplicate-error-class`）和 [schema-audit.ts](scripts/audit/schema-audit.ts)（`db-enum-mismatch`、`secret-exposure`、`unbranded-id`）建立了零存量静态门禁。
 
 在已锁死的 6 个核心品牌主键（`IssueId`、`SessionId`、`ArtifactId`、`BlockId`、`SuggestionId`、`MessageId`）之外，全仓还剩两项跨表结构与生成器的增量演进：
 
@@ -12,7 +12,7 @@ Status: proposed
    - [0001_schema.up.sql](apps/server/db/migrations/0001_schema.up.sql) 共 27 张表使用 `text primary key`，`packages/protocol/src/**/shapes.ts` 中频道、档案、触发器、定时任务、运行记录、附件、媒体作业、连接与机器（`ChannelId`、`AgentId`、`TriggerId`、`CronId`、`RunId`、`AttachmentId`、`MediaInputId`、`MediaJobId`、`ConnectionId`、`DeviceId`、`MachineId`）仍声明为裸 `string`。
    - 对这些尚未品牌化的实体，用户与模型输入的未解析引用（如频道名、档案名、`vv://` 地址）与已解析主键在函数签名上仍共用 `string`。
 2. **SQL 生成器尚未从主键与外键约束自动派生品牌类型**：
-   - [pg-generate.ts](apps/server/scripts/pg-generate.ts) 已自动将 `CHECK (col IN (...))` 转为字面量联合，但所有 `text` 主键与外键列仍生成裸 `Schema.String`，查库返回后需在业务层手工调用 `S.issueId(row.id)` 或 `S.sessionId(row.session)` 补标。
+   - [pg-generate.ts](apps/server/scripts/pg-generate.ts) 已自动将 `CHECK (col IN (...))` 转为字面量联合，但所有 `text` 主键与外键列仍生成裸 `z.string()`，查库返回后需在业务层手工调用 `S.issueId(row.id)` 或 `S.sessionId(row.session)` 补标。
 
 ## Proposal
 
@@ -33,7 +33,7 @@ Status: proposed
 
 - **取代并收口旧的边界与 HTTP 客户端评估计划（原 `2026-11-06-schema-at-boundaries.md`）**：前后端已共享 `@vibevalley/protocol/schema`，生成的 `VibeValleyApi` 已直接用 `ApiError` 与 `Endpoint.result` Schema 做边界 Fail-Fast 解码并通过回归测试，服务端自有表可空 JSON 列已统一改走 `storedJsonOrUndefined`，相关准则已沉淀进 [地基](docs/subsystems/foundation.md#边界审计) 与 [模块设计](docs/style/module-design.md#静态化类型化与可分析化)，故删除旧 Note。
 - **一次性把剩余 11 个实体主键在单个提交中全部品牌化**：`ChannelId` 与 `AgentId` 贯穿服务端 20 余个模块、前端 `features/` 及测试夹具，单次全量替换审阅面过大；按实体逐个合入并配合 `unbranded-id` 棘轮锁死更稳妥。
-- **把文件路径、普通展示文本、Git 分支名等所有字符串全部做成 `Brand`**：仅在跨函数易混传的**持久实体身份**与**受不变量约束的值对象**（端口、正有限数、密钥）上加 `Brand`；给普通文本打品牌只会制造无意义的包装噪音。
+- **把文件路径、普通展示文本、Git 分支名等所有字符串全部做成品牌类型**：仅在跨函数易混传的**持久实体身份**与**受不变量约束的值对象**（端口、正有限数、密钥）上加品牌；给普通文本打品牌只会制造无意义的包装噪音。
 
 ## Acceptance criteria
 

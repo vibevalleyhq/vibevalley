@@ -1,5 +1,4 @@
 import type { JSX } from "@solidjs/web";
-import type { StyleXStyles } from "@stylexjs/stylex";
 
 /** A control's kind matches its argument's type: a new kind also goes into ControlOf below. */
 export type Control =
@@ -41,7 +40,7 @@ export interface Stories {
   /** The themes the parts follow. a skin with colours of its own (the pixel farm) is drawn in its one. */
   readonly themes?: readonly ("light" | "dark")[];
   /** The host's ground and type, composed into each themed frame. */
-  readonly frame?: StyleXStyles;
+  readonly frame?: JSX.ClassValue;
 }
 
 export const story = <A extends Loose>(s: Story<A>): Story<A> => s;

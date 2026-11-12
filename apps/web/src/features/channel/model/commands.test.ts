@@ -1,4 +1,3 @@
-import { Array as Arr, Option } from "effect";
 import { expect, test } from "vite-plus/test";
 
 import type { Feature, Readiness } from "@vibevalley/protocol";
@@ -40,7 +39,7 @@ test("the menu follows a command only while it is typed first in the box", () =>
 
 test("/imagegen with images not set up opens the setting that fixes it instead of saying the line, and its menu row says why", () => {
   const readiness = everywhere({ ready: false, missing: "binding" });
-  const noteOf = (r: Record<Feature, Readiness>) => Arr.findFirst(commandNameables(r), (n) => n.token === "/imagegen").pipe(Option.map((n) => n.note));
+  const noteOf = (r: Record<Feature, Readiness>) => commandNameables(r).find((n) => n.token === "/imagegen")?.note;
   expect(noteOf(readiness)).not.toEqual(noteOf(everywhere({ ready: true })));
   return runCommand({ name: "imagegen", text: "一只猫" }, { channel: undefined, orchestrator: "orchestrator", readiness }).then((done) => {
     expect(done).toEqual({ open: "/settings/providers" });

@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show, untrack } from "solid-js";
 
 import { list, t } from "@vibevalley/i18n";
@@ -18,57 +17,6 @@ import { OutLink } from "#/ui/IconButton.tsx";
 import { KeyField, SaveBar } from "#/ui/KeyField.tsx";
 import { Card, Quiet, SecretInput } from "#/ui/layout.tsx";
 import { Hint } from "#/ui/Tip.tsx";
-
-const viewStyles = stylex.create({
-  content: { display: "flex", maxWidth: "var(--container-3xl)", minWidth: 0, flexDirection: "column", gap: "1.5rem" },
-  section: { display: "flex", minWidth: 0, flexDirection: "column", gap: "0.75rem" },
-  sectionHead: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem" },
-  sectionTitle: { flex: "1", fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", fontWeight: 600 },
-  toolbar: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem" },
-  minimumWidth: { minWidth: 0 },
-  form: { display: "flex", minWidth: 0, flexDirection: "column", gap: "0.75rem" },
-  nameRow: { display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: "0.75rem" },
-  nameField: { minWidth: "12rem", flex: "1" },
-  row: { display: "flex", height: "1.75rem", alignItems: "center", gap: "0.5rem" },
-  text: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)" },
-  detail: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", color: "var(--color-muted)" },
-  modelList: { maxHeight: "12rem", overflowY: "auto", fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)" },
-  list: { display: "flex", flexDirection: "column", gap: "0.25rem" },
-  model: { fontFamily: "var(--font-mono)", wordBreak: "break-all" },
-  link: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", color: "var(--color-water)", textDecorationLine: "underline" },
-  errorColor: { color: "var(--color-berry)" },
-  // One use a line: its name, then its connection and model side by side, wrapping under the name when narrow.
-  uses: { display: "flex", minWidth: 0, flexDirection: "column" },
-  group: {
-    paddingTop: "0.75rem",
-    paddingBottom: "0.25rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontWeight: 600,
-    color: "var(--color-muted)",
-  },
-  use: {
-    display: "flex",
-    minWidth: 0,
-    flexWrap: "wrap",
-    alignItems: "center",
-    columnGap: "0.75rem",
-    rowGap: "0.25rem",
-    borderTopStyle: "solid",
-    borderTopWidth: "1px",
-    borderColor: "var(--color-line)",
-    paddingBlock: "0.5rem",
-  },
-  useName: {
-    display: "flex",
-    width: "8rem",
-    alignItems: "center",
-    gap: "0.375rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  usePicks: { display: "grid", minWidth: "15rem", flex: "1", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" },
-});
 
 /** The uses a connection serves, in the groups the page shows them in; each one's words where it needs some. */
 const useGroups = [
@@ -191,14 +139,14 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
     <fieldset
       disabled={act.busy()}
       aria-label={t("web.provider.title")}
-      {...stylex.attrs(viewStyles.content)}
+      class="flex max-w-3xl min-w-0 flex-col gap-6"
       data-testid="provider-form"
       data-revision={base().revision}
     >
       <Show when={props.part === "accounts"}>
-        <section {...stylex.attrs(viewStyles.section)}>
-          <div {...stylex.attrs(viewStyles.sectionHead)}>
-            <h2 {...stylex.attrs(viewStyles.sectionTitle)}>MOSS</h2>
+        <section class="flex min-w-0 flex-col gap-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <h2 class="flex-1 text-sm font-semibold">MOSS</h2>
             <OutLink href="https://platform.moss.cn/" label={t("web.provider.console")} />
             <ConfirmButton
               testid="provider-reload"
@@ -229,9 +177,9 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
                 title={connection().name || "MOSS"}
                 testid="provider-connection"
                 item={connection().id}
-                styles={viewStyles.minimumWidth}
+                class="min-w-0"
                 action={
-                  <div {...stylex.attrs(viewStyles.toolbar)}>
+                  <div class="flex flex-wrap items-center gap-2">
                     <Button data-testid="provider-models" disabled={act.busy() || dirty()} onClick={() => void discover(connection().id)}>
                       {t("web.provider.discover")}
                     </Button>
@@ -248,9 +196,9 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
                   </div>
                 }
               >
-                <div {...stylex.attrs(viewStyles.form)}>
-                  <div {...stylex.attrs(viewStyles.nameRow)}>
-                    <div {...stylex.attrs(viewStyles.nameField)}>
+                <div class="flex min-w-0 flex-col gap-3">
+                  <div class="flex flex-wrap items-end gap-3">
+                    <div class="min-w-48 flex-1">
                       <Field label={t("web.provider.name")}>
                         <TextInput
                           data-testid="provider-name"
@@ -261,7 +209,7 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
                         />
                       </Field>
                     </div>
-                    <div {...stylex.attrs(viewStyles.row)}>
+                    <div class="flex h-7 items-center gap-2">
                       <Checkbox
                         testid="provider-enabled"
                         label={t("web.provider.enabled")}
@@ -269,7 +217,7 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
                         disabled={act.busy()}
                         onChange={(enabled) => change(connection().id, { enabled })}
                       />
-                      <span {...stylex.attrs(viewStyles.text)}>{t("web.provider.enabled")}</span>
+                      <span class="text-sm">{t("web.provider.enabled")}</span>
                     </div>
                   </div>
                   <div data-testid="provider-key">
@@ -292,25 +240,25 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
                     </KeyField>
                   </div>
                   <details data-testid="provider-adapted">
-                    <summary {...stylex.attrs(viewStyles.detail)}>{t("web.provider.adapted")}</summary>
-                    <ul {...stylex.attrs(viewStyles.list)}>
+                    <summary class="text-xs text-muted">{t("web.provider.adapted")}</summary>
+                    <ul class="flex flex-col gap-1">
                       <For each={adaptedUses}>
                         {(use) => (
-                          <li {...stylex.attrs(viewStyles.text)}>
+                          <li class="text-sm">
                             {t(`web.provider.use.${use}`)}
-                            <span {...stylex.attrs(viewStyles.detail)}> {list(base()[`${use}Models`])}</span>
+                            <span class="text-xs text-muted"> {list(base()[`${use}Models`])}</span>
                           </li>
                         )}
                       </For>
                     </ul>
                   </details>
-                  <p {...stylex.attrs(viewStyles.detail)}>{dirty() ? t("web.provider.saveFirst") : t("web.provider.discoveryHint")}</p>
+                  <p class="text-xs text-muted">{dirty() ? t("web.provider.saveFirst") : t("web.provider.discoveryHint")}</p>
                   <Show when={!dirty() && listing()?.revision === base().revision && listing()?.connection === connection().id ? listing() : undefined}>
                     {(result) => (
-                      <div data-testid="provider-model-list" {...stylex.attrs(viewStyles.modelList)}>
+                      <div data-testid="provider-model-list" class="max-h-48 overflow-y-auto text-sm">
                         <Show when={result().models.length > 0} fallback={<Quiet>{t("web.provider.noModels")}</Quiet>}>
-                          <ul {...stylex.attrs(viewStyles.list)}>
-                            <For each={result().models}>{(model) => <li {...stylex.attrs(viewStyles.model)}>{model.id}</li>}</For>
+                          <ul class="flex flex-col gap-1">
+                            <For each={result().models}>{(model) => <li class="font-mono break-all">{model.id}</li>}</For>
                           </ul>
                         </Show>
                       </div>
@@ -324,28 +272,28 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
       </Show>
       <Show when={props.part === "uses"}>
         <Card title={t("web.provider.uses")}>
-          <p {...stylex.attrs(viewStyles.detail)}>{t("web.provider.usesIntro")}</p>
-          <div {...stylex.attrs(viewStyles.uses)}>
+          <p class="text-xs text-muted">{t("web.provider.usesIntro")}</p>
+          <div class="flex min-w-0 flex-col">
             <For each={useGroups}>
               {(group) => (
                 <>
-                  <div {...stylex.attrs(viewStyles.group)}>{t(`web.provider.${group.title}`)}</div>
+                  <div class="pt-3 pb-1 text-xs font-semibold text-muted">{t(`web.provider.${group.title}`)}</div>
                   <For each={group.uses}>
                     {(item) => {
                       const use = item.use;
                       const name = t(`web.provider.use.${use}`);
                       return (
-                        <div data-testid="provider-use" data-key={use} {...stylex.attrs(viewStyles.use)}>
-                          <span {...stylex.attrs(viewStyles.useName)}>
+                        <div data-testid="provider-use" data-key={use} class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 border-t border-line py-2">
+                          <span class="flex w-32 items-center gap-1.5 text-sm">
                             {name}
                             <Show when={"hint" in item ? item.hint : undefined}>{(hint) => <Hint text={t(`web.provider.${hint()}`)} />}</Show>
                             <Show when={use === "speech"}>
-                              <Link href="/library?make=speech" data-testid="provider-speech-open" {...stylex.attrs(viewStyles.link)}>
+                              <Link href="/library?make=speech" data-testid="provider-speech-open" class="text-xs text-water underline">
                                 {t("web.provider.openSpeechShort")}
                               </Link>
                             </Show>
                           </span>
-                          <div {...stylex.attrs(viewStyles.usePicks)}>
+                          <div class="grid min-w-60 flex-1 grid-cols-[1fr_1fr] gap-2">
                             <Select
                               label={t("web.provider.connectionFor", { use: name })}
                               testid={`provider-${use}`}
@@ -384,7 +332,7 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
               )}
             </For>
           </div>
-          <p {...stylex.attrs(viewStyles.detail)}>{t("web.provider.bindingHint")}</p>
+          <p class="text-xs text-muted">{t("web.provider.bindingHint")}</p>
         </Card>
       </Show>
       <SaveBar
@@ -395,7 +343,7 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
         left={
           <Show when={error()}>
             {(why) => (
-              <p data-testid="provider-error" role="alert" {...stylex.attrs(viewStyles.errorColor)}>
+              <p data-testid="provider-error" role="alert" class="text-berry">
                 {why()}
               </p>
             )}

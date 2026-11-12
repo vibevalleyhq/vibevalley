@@ -1,5 +1,4 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -10,7 +9,6 @@ import { ago, tookText } from "#/base/format.ts";
 import { Icon } from "#/ui/Icon.tsx";
 import { actionIcon, type IconName } from "#/ui/icons.ts";
 import { Markdown } from "#/ui/Markdown.tsx";
-import { styleProps } from "#/ui/positioner.ts";
 
 import { createSessionEvents } from "./events";
 import {
@@ -30,387 +28,6 @@ import {
   spansOf,
 } from "./runs";
 
-const logStyles = stylex.create({
-  box: {
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.75rem",
-    paddingBlock: "0.5rem",
-  },
-  edge: {
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-  },
-  faint: {
-    fontStyle: "italic",
-  },
-  line: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "0.5rem",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.75rem",
-    paddingBlock: "0.375rem",
-  },
-  text: {
-    minWidth: "0",
-    flex: "1",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  user: {
-    backgroundColor: {
-      default: "var(--wb-wheat)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 14%, transparent)",
-    },
-  },
-  memory: {
-    backgroundColor: {
-      default: "var(--wb-leaf)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-leaf) 15%, transparent)",
-    },
-  },
-  assistant: {
-    backgroundColor: "var(--wb-hover)",
-  },
-  retry: {
-    backgroundColor: {
-      default: "var(--wb-wheat)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 12%, transparent)",
-    },
-  },
-  usage: {
-    backgroundColor: {
-      default: "var(--wb-wheat)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 6%, transparent)",
-    },
-  },
-  error: {
-    backgroundColor: {
-      default: "var(--wb-berry)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-berry) 10%, transparent)",
-    },
-  },
-  ink: {
-    color: "var(--wb-ink)",
-  },
-  muted: {
-    color: "var(--wb-muted)",
-  },
-  berry: {
-    color: "var(--wb-berry)",
-  },
-  duration: {
-    backgroundColor: {
-      default: "var(--timeline-color)",
-      "@media (hover: hover)": {
-        default: null,
-        ":hover": "var(--color-ink)",
-      },
-    },
-  },
-});
-
-const styles = stylex.create({
-  foldedDiv: {
-    width: "100%",
-    overflow: "hidden",
-  },
-  foldedDivPrimary: {
-    fontSize: null,
-    lineHeight: null,
-    whiteSpace: null,
-  },
-  foldedDivSecondary: {
-    fontSize: "var(--text-base)",
-    lineHeight: "var(--leading-base)",
-    whiteSpace: "pre-wrap",
-  },
-  foldedDivStateA: {
-    WebkitMaskImage: null,
-    maskImage: null,
-  },
-  foldedDivStateB: {
-    WebkitMaskImage: "linear-gradient(black 70%,transparent)",
-    maskImage: "linear-gradient(black 70%,transparent)",
-  },
-  runStepsWorkLog: {
-    marginTop: "0.375rem",
-  },
-  runStepsIcon: {
-    opacity: ".6",
-  },
-  runFoldIcon: {
-    transitionProperty: "rotate",
-    transitionTimingFunction: "var(--ease-out)",
-    transitionDuration: "120ms",
-  },
-  runFoldIconTone: {
-    rotate: "90deg",
-  },
-  runFoldIconAlt: {},
-  lineIcon: {
-    marginTop: "0.25rem",
-  },
-  runFoldDiv: {},
-  runFoldDivTone: {
-    marginLeft: "1.25rem",
-    borderLeftStyle: "solid",
-    borderLeftWidth: "2px",
-    borderColor: {
-      default: "var(--color-leaf)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf) 50%, transparent)",
-    },
-    paddingLeft: "0.625rem",
-  },
-  toolStepButton: {
-    display: "flex",
-    width: "100%",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.5rem",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.25rem",
-    textAlign: "left",
-  },
-  toolStepButtonTone: {
-    backgroundColor: {
-      default: "var(--color-hover)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  toolStepButtonAlt: {
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  workLog: {
-    maxHeight: "352px",
-    overflowY: "auto",
-    borderRadius: "var(--radius-md)",
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-  },
-  runDivider: {
-    borderTopWidth: { default: null, ":not(:last-child)": 0 },
-    borderBottomWidth: { default: null, ":not(:last-child)": 1 },
-    borderTopStyle: { default: null, ":not(:last-child)": "solid" },
-    borderBottomStyle: { default: null, ":not(:last-child)": "solid" },
-    borderColor: { default: null, ":not(:last-child)": "var(--color-line)" },
-  },
-  runStepsDiv: {
-    marginTop: "0.375rem",
-  },
-  runStepsButton: {
-    display: "inline-flex",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.375rem",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.375rem",
-    paddingBlock: "0.125rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontWeight: "var(--font-weight-medium)",
-    color: "var(--color-muted)",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  runFoldDiv2: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.375rem",
-    paddingInline: "0.5rem",
-    paddingTop: "0.5rem",
-    paddingBottom: "0.625rem",
-  },
-  runFoldButton: {
-    display: "flex",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.5rem",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.375rem",
-    paddingBlock: "0.25rem",
-    textAlign: "left",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  runFoldSpan: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  runFoldSpan2: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  runFoldDiv22: {
-    borderRadius: "var(--radius-md)",
-    backgroundColor: {
-      default: "var(--color-wheat)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-wheat) 15%, transparent)",
-    },
-    paddingInline: "0.75rem",
-    paddingBlock: "0.5rem",
-  },
-  runFoldButton2: {
-    cursor: "pointer",
-    alignSelf: "flex-start",
-    paddingLeft: "0.375rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-water)",
-    textDecorationLine: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "underline",
-      },
-    },
-  },
-  timeBarDiv: {
-    display: "flex",
-    height: "0.5rem",
-    gap: "1px",
-    overflow: "hidden",
-    borderRadius: "var(--radius-xs)",
-  },
-  whenSpan: {
-    flexShrink: "0",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  foldedDiv2: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-start",
-  },
-  foldedButton: {
-    marginTop: "0.25rem",
-    cursor: "pointer",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-water)",
-    textDecorationLine: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "underline",
-      },
-    },
-  },
-  boxDiv: {
-    marginBottom: "0.25rem",
-    display: "flex",
-    alignItems: "center",
-  },
-  boxSpan: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontWeight: "var(--font-weight-semibold)",
-    color: "var(--color-muted)",
-  },
-  boxSpan2: {
-    flex: "1",
-  },
-  toolStepSpan: {
-    width: "4rem",
-    flexShrink: "0",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    fontWeight: "var(--font-weight-medium)",
-  },
-  toolStepSpan2: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  toolStepSpan3: {
-    flexShrink: "0",
-  },
-  toolStepSpan4: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-faint)",
-  },
-  toolStepDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.375rem",
-    paddingTop: "0.25rem",
-    paddingRight: "0.5rem",
-    paddingBottom: "0.5rem",
-    paddingLeft: "2rem",
-  },
-  toolStepSpan5: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  toolStepPre: {
-    maxHeight: "10rem",
-    overflow: "auto",
-    borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--color-code-bg)",
-    paddingInline: "0.625rem",
-    paddingBlock: "0.5rem",
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    whiteSpace: "pre-wrap",
-    color: "var(--color-code-ink)",
-  },
-  toolStepPre2: {
-    maxHeight: "14rem",
-    overflow: "auto",
-    borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--color-hover)",
-    paddingInline: "0.625rem",
-    paddingBlock: "0.5rem",
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    whiteSpace: "pre-wrap",
-  },
-});
-
 /** Under a report or the orchestrator's answer: the run behind it, folded to one line until opened. */
 export function RunSteps(props: { session: string; run: string | undefined; orchestrator?: boolean }) {
   const [open, setOpen] = createSignal(false);
@@ -424,14 +41,19 @@ export function RunSteps(props: { session: string; run: string | undefined; orch
   return (
     <Show when={label()}>
       {(text) => (
-        <div {...stylex.attrs(styles.runStepsDiv)}>
-          <button type="button" onClick={() => setOpen(!open())} aria-expanded={aria(open())} {...stylex.attrs(styles.runStepsButton)}>
+        <div class="mt-1.5">
+          <button
+            type="button"
+            onClick={() => setOpen(!open())}
+            aria-expanded={aria(open())}
+            class="inline-flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted hover:bg-hover"
+          >
             <Icon name="log" size={14} />
             {text()}
-            <Icon name={open() ? "collapse" : "enlarge"} size={10} styles={[styles.runStepsIcon]} />
+            <Icon name={open() ? "collapse" : "enlarge"} size={10} class="opacity-60" />
           </button>
           <Show when={open()}>
-            <WorkLog steps={steps()} now={now()} asked={t("web.session.log.heard")} styles={[styles.runStepsWorkLog]} />
+            <WorkLog steps={steps()} now={now()} asked={t("web.session.log.heard")} class="mt-1.5" />
           </Show>
         </div>
       )}
@@ -439,13 +61,16 @@ export function RunSteps(props: { session: string; run: string | undefined; orch
   );
 }
 
-/** A session's steps by run, each run folded to its answer but the last. */
-export function WorkLog(props: { steps: SessionEvent[]; now: number; asked?: string; working?: boolean; styles?: stylex.StyleXStyles }) {
+/** A session's steps by run, each run folded to its answer but the last. Its height stops at 22rem, or at an ancestor's `--log-height`. */
+export function WorkLog(props: { steps: SessionEvent[]; now: number; asked?: string; working?: boolean; class?: JSX.ClassValue | undefined }) {
   const shown = () => shownEvents(props.steps);
   const runs = () => runsOf(shown());
   const firstAsked = () => shown().find((s) => s.type === "user/message" && s.under === undefined)?.seq;
   return (
-    <div {...styleProps([styles.workLog, props.styles])} aria-label={t("web.session.log.process")}>
+    <div
+      class={["max-h-[var(--log-height,22rem)] overflow-y-auto rounded-md border border-line bg-page", props.class]}
+      aria-label={t("web.session.log.process")}
+    >
       <For each={runs()} keyed={(r) => r.run ?? (r.asked ?? r.steps[0])?.seq ?? -1}>
         {(r, i) => (
           <RunFold
@@ -470,16 +95,21 @@ function RunFold(props: { run: RunView; last: boolean; live: boolean; now: numbe
     return open() ? props.run.steps : answer ? [answer] : [];
   };
   return (
-    <div {...stylex.attrs(styles.runFoldDiv2, styles.runDivider)}>
+    <div
+      class={[
+        "flex flex-col gap-1.5 px-2 pt-2 pb-2.5",
+        "not-last:border-t-0 not-last:border-b not-last:[border-top-style:solid] not-last:[border-bottom-style:solid] not-last:border-line",
+      ]}
+    >
       <button
         type="button"
         onClick={() => setToggled(!open())}
         aria-label={open() ? t("web.session.log.fold") : t("web.session.log.unfold")}
-        {...stylex.attrs(styles.runFoldButton)}
+        class="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-hover"
       >
-        <Icon name="expand" size={12} styles={[styles.runFoldIcon, open() ? styles.runFoldIconTone : styles.runFoldIconAlt]} />
-        <span {...stylex.attrs(styles.runFoldSpan)}>{props.label}</span>
-        <span {...stylex.attrs(styles.runFoldSpan2)}>
+        <Icon name="expand" size={12} class={["transition-[rotate] ease-out duration-120", open() ? "[rotate:90deg]" : ""]} />
+        <span class="text-sm font-semibold">{props.label}</span>
+        <span class="min-w-0 flex-1 truncate text-xs text-muted">
           {t("web.session.log.steps", { n: props.run.steps.length, took: tookText(runMs(props.run, end())) })}
           {props.live ? t("web.session.log.live") : ""}
         </span>
@@ -487,7 +117,7 @@ function RunFold(props: { run: RunView; last: boolean; live: boolean; now: numbe
       </button>
       <Show when={props.run.asked}>
         {(asked) => (
-          <div {...stylex.attrs(styles.runFoldDiv22)}>
+          <div class="rounded-md bg-wheat/15 px-3 py-2">
             <Folded text={asked().text} lines={4} />
           </div>
         )}
@@ -497,13 +127,13 @@ function RunFold(props: { run: RunView; last: boolean; live: boolean; now: numbe
       </Show>
       <For each={shown()} keyed={(s) => s.seq}>
         {(s) => (
-          <div {...stylex.attrs(styles.runFoldDiv, s().under !== undefined ? styles.runFoldDivTone : styles.runFoldDiv)}>
+          <div class={["", s().under !== undefined ? "ml-5 border-l-2 border-leaf/50 pl-2.5" : ""]}>
             <Step step={s()} now={props.now} />
           </div>
         )}
       </For>
       <Show when={!open() && props.run.steps.length > shown().length}>
-        <button type="button" onClick={() => setToggled(true)} {...stylex.attrs(styles.runFoldButton2)}>
+        <button type="button" onClick={() => setToggled(true)} class="cursor-pointer self-start pl-1.5 text-sm text-water hover:underline">
           {t("web.session.log.see", { n: props.run.steps.length })}
         </button>
       </Show>
@@ -519,12 +149,12 @@ function TimeBar(props: { run: RunView; end: number }) {
     return total <= 0 ? 1 : total / 80;
   };
   return (
-    <div {...stylex.attrs(styles.timeBarDiv)}>
+    <div class="flex h-2 gap-px overflow-hidden rounded-xs">
       <For each={spans()} keyed={(s) => s.step.seq}>
         {(s) => (
           <span
             title={`${spanLabel(s().step)} · ${tookText(s().ms)}\n${s().step.text.split("\n")[0]}`}
-            {...styleProps(logStyles.duration)}
+            class="bg-[var(--timeline-color)] hover:bg-ink"
             style={{ "flex-grow": Math.max(1, Math.round((Math.max(s().ms, least()) / least()) * 10)), "--timeline-color": spanColor(s().step) }}
           />
         )}
@@ -534,7 +164,7 @@ function TimeBar(props: { run: RunView; end: number }) {
 }
 
 function When(props: { at: number; now: number }) {
-  return <span {...stylex.attrs(styles.whenSpan)}>{ago(props.at, props.now)}</span>;
+  return <span class="shrink-0 text-xs text-muted">{ago(props.at, props.now)}</span>;
 }
 
 function Folded(props: { text: string; lines: number; markdown?: boolean }) {
@@ -542,19 +172,19 @@ function Folded(props: { text: string; lines: number; markdown?: boolean }) {
   const long = () => isLongText(props.text, props.lines);
   const clamp = () => long() && !open();
   return (
-    <div {...stylex.attrs(styles.foldedDiv2)}>
+    <div class="flex flex-col items-start">
       <div
-        {...stylex.attrs(
-          styles.foldedDiv,
-          props.markdown !== true ? styles.foldedDivSecondary : styles.foldedDivPrimary,
-          clamp() ? styles.foldedDivStateB : styles.foldedDivStateA,
-        )}
+        class={[
+          "w-full overflow-hidden",
+          props.markdown !== true ? "text-base whitespace-pre-wrap" : "",
+          clamp() ? "[mask-image:linear-gradient(black_70%,transparent)]" : "",
+        ]}
         style={clamp() ? { "max-height": `${props.lines * 22}px` } : undefined}
       >
         {props.markdown === true ? <Markdown text={props.text} /> : props.text}
       </div>
       <Show when={long()}>
-        <button type="button" onClick={() => setOpen(!open())} {...stylex.attrs(styles.foldedButton)}>
+        <button type="button" onClick={() => setOpen(!open())} class="mt-1 cursor-pointer text-sm text-water hover:underline">
           {open() ? t("web.session.log.less") : t("web.session.log.all")}
         </button>
       </Show>
@@ -562,12 +192,12 @@ function Folded(props: { text: string; lines: number; markdown?: boolean }) {
   );
 }
 
-function Box(props: { tint?: stylex.StyleXStyles; edge?: boolean; faint?: boolean; label: string; step: SessionEvent; now: number; children: JSX.Element }) {
+function Box(props: { tint?: JSX.ClassValue; edge?: boolean; faint?: boolean; label: string; step: SessionEvent; now: number; children: JSX.Element }) {
   return (
-    <div {...styleProps([logStyles.box, props.tint, props.edge === true && logStyles.edge, props.faint === true && logStyles.faint])}>
-      <div {...stylex.attrs(styles.boxDiv)}>
-        <span {...stylex.attrs(styles.boxSpan)}>{props.label}</span>
-        <span {...stylex.attrs(styles.boxSpan2)} />
+    <div class={["rounded-md px-3 py-2", props.tint, props.edge === true && "border border-line", props.faint === true && "italic"]}>
+      <div class="mb-1 flex items-center">
+        <span class="text-xs font-semibold text-muted">{props.label}</span>
+        <span class="flex-1" />
         <When at={props.step.time} now={props.now} />
       </div>
       {props.children}
@@ -575,11 +205,11 @@ function Box(props: { tint?: stylex.StyleXStyles; edge?: boolean; faint?: boolea
   );
 }
 
-function Line(props: { mark: IconName; step: SessionEvent; now: number; tint: stylex.StyleXStyles; ink: stylex.StyleXStyles }) {
+function Line(props: { mark: IconName; step: SessionEvent; now: number; tint: JSX.ClassValue; ink: JSX.ClassValue }) {
   return (
-    <div {...styleProps([logStyles.line, props.tint])}>
-      <Icon name={props.mark} size={12} styles={[styles.lineIcon]} />
-      <span {...styleProps([logStyles.text, props.ink])}>{props.step.text}</span>
+    <div class={["flex items-start gap-2 rounded-md px-3 py-1.5", props.tint]}>
+      <Icon name={props.mark} size={12} class="mt-1" />
+      <span class={["min-w-0 flex-1 text-sm", props.ink]}>{props.step.text}</span>
       <When at={props.step.time} now={props.now} />
     </div>
   );
@@ -591,12 +221,12 @@ function Step(props: { step: SessionEvent; now: number }) {
   return (
     <Switch>
       <Match when={props.step.type === "user/message"}>
-        <Box tint={logStyles.user} label={sub() ? t("web.session.log.subagentGot") : t("web.session.log.told")} step={props.step} now={props.now}>
+        <Box tint={"bg-wheat/14"} label={sub() ? t("web.session.log.subagentGot") : t("web.session.log.told")} step={props.step} now={props.now}>
           <Folded text={props.step.text} lines={4} />
         </Box>
       </Match>
       <Match when={props.step.type === "memory/recalled"}>
-        <Box tint={logStyles.memory} label={t("web.session.log.recalled")} step={props.step} now={props.now}>
+        <Box tint={"bg-leaf/15"} label={t("web.session.log.recalled")} step={props.step} now={props.now}>
           <Folded text={props.step.text} lines={3} />
         </Box>
       </Match>
@@ -606,7 +236,7 @@ function Step(props: { step: SessionEvent; now: number }) {
         </Box>
       </Match>
       <Match when={props.step.type === "assistant/message"}>
-        <Box tint={logStyles.assistant} label={sub() ? t("web.session.log.subagentSaid") : t("web.session.log.said")} step={props.step} now={props.now}>
+        <Box tint={"bg-hover"} label={sub() ? t("web.session.log.subagentSaid") : t("web.session.log.said")} step={props.step} now={props.now}>
           <Folded text={props.step.text} lines={8} markdown />
         </Box>
       </Match>
@@ -614,13 +244,13 @@ function Step(props: { step: SessionEvent; now: number }) {
         <ToolStep step={props.step} now={props.now} />
       </Match>
       <Match when={props.step.type === "llm/retry"}>
-        <Line mark="retry" step={props.step} now={props.now} tint={logStyles.retry} ink={logStyles.ink} />
+        <Line mark="retry" step={props.step} now={props.now} tint={"bg-wheat/12"} ink={"text-ink"} />
       </Match>
       <Match when={props.step.type === "llm/usage"}>
-        <Line mark="spend" step={props.step} now={props.now} tint={logStyles.usage} ink={logStyles.muted} />
+        <Line mark="spend" step={props.step} now={props.now} tint={"bg-wheat/6"} ink={"text-muted"} />
       </Match>
       <Match when={props.step.type === "run/error"}>
-        <Line mark="warn" step={props.step} now={props.now} tint={logStyles.error} ink={logStyles.berry} />
+        <Line mark="warn" step={props.step} now={props.now} tint={"bg-berry/10"} ink={"text-berry"} />
       </Match>
     </Switch>
   );
@@ -638,29 +268,29 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
         type="button"
         onClick={() => setOpen(!open())}
         aria-expanded={aria(open())}
-        {...stylex.attrs(styles.toolStepButton, open() ? styles.toolStepButtonTone : styles.toolStepButtonAlt)}
+        class={["flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-left", open() ? "bg-hover hover:bg-hover" : "hover:bg-hover"]}
       >
         <Icon name={actionIcon[props.step.action ?? "other"]} size={16} />
-        <span {...stylex.attrs(styles.toolStepSpan)}>{kind()}</span>
-        <span {...stylex.attrs(styles.toolStepSpan2)}>{farm() ?? props.step.text}</span>
-        <span title={state()} {...stylex.attrs(styles.toolStepSpan3)}>
-          <Show when={props.step.ok !== undefined} fallback={<span {...stylex.attrs(styles.toolStepSpan4)}>…</span>}>
+        <span class="w-16 shrink-0 truncate text-sm font-medium">{kind()}</span>
+        <span class="min-w-0 flex-1 truncate font-mono text-xs text-muted">{farm() ?? props.step.text}</span>
+        <span title={state()} class="shrink-0">
+          <Show when={props.step.ok !== undefined} fallback={<span class="text-xs text-faint">…</span>}>
             <Icon name={props.step.ok === true ? "check" : "cross"} size={12} label={state()} />
           </Show>
         </span>
         <When at={props.step.time} now={props.now} />
       </button>
       <Show when={open()}>
-        <div {...stylex.attrs(styles.toolStepDiv)}>
-          {props.step.tool && <span {...stylex.attrs(styles.toolStepSpan5)}>{t("web.session.log.tool", { name: props.step.tool })}</span>}
-          <Show when={input()}>{(text) => <pre {...stylex.attrs(styles.toolStepPre)}>{text()}</pre>}</Show>
+        <div class="flex flex-col gap-1.5 pt-1 pr-2 pb-2 pl-8">
+          {props.step.tool && <span class="text-xs text-muted">{t("web.session.log.tool", { name: props.step.tool })}</span>}
+          <Show when={input()}>
+            {(text) => <pre class="max-h-40 overflow-auto rounded-md bg-code-bg px-2.5 py-2 font-mono text-xs whitespace-pre-wrap text-code-ink">{text()}</pre>}
+          </Show>
           <Show
             when={props.step.output}
-            fallback={
-              <span {...stylex.attrs(styles.toolStepSpan5)}>{props.step.ok === undefined ? t("web.session.log.pending") : t("web.session.log.noOutput")}</span>
-            }
+            fallback={<span class="text-xs text-muted">{props.step.ok === undefined ? t("web.session.log.pending") : t("web.session.log.noOutput")}</span>}
           >
-            {(out) => <pre {...stylex.attrs(styles.toolStepPre2)}>{out()}</pre>}
+            {(out) => <pre class="max-h-56 overflow-auto rounded-md bg-hover px-2.5 py-2 font-mono text-xs whitespace-pre-wrap">{out()}</pre>}
           </Show>
         </div>
       </Show>

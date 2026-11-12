@@ -1,4 +1,4 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
 
 import type { OrchestratorEval } from "@vibevalley/protocol";
 import { stories, story } from "@vibevalley/stories";
@@ -7,13 +7,9 @@ import { failedRun, finishedRun, liveRun, nowAfter, toldTwiceRun } from "./sessi
 import { Trajectory } from "./Trajectory";
 import { WorkLog } from "./WorkLog";
 
-const viewStyles = stylex.create({
-  constrained: (maxHeight: number) => ({ maxHeight }),
-  workLogStoriesDiv: {
-    width: "100%",
-    maxWidth: "var(--container-2xl)",
-  },
-});
+const viewStyles = {
+  constrained: (maxHeight: number): JSX.CSSProperties => ({ "--log-height": `${maxHeight}px` }),
+};
 
 const twoRuns = [...finishedRun, ...liveRun];
 
@@ -23,15 +19,15 @@ export default stories({
     Composition: story({
       args: { maxHeight: 240 },
       render: (a) => (
-        <div data-testid="work-log-composition">
-          <WorkLog steps={twoRuns} now={nowAfter(twoRuns)} styles={viewStyles.constrained(a.maxHeight)} />
+        <div data-testid="work-log-composition" style={viewStyles.constrained(a.maxHeight)}>
+          <WorkLog steps={twoRuns} now={nowAfter(twoRuns)} />
         </div>
       ),
     }),
     Finished: story({
       note: "一轮做完：交给它的话、想起的、想的、读改跑（失败的那次红着）、重试、用了多少、它说的。",
       render: () => (
-        <div {...stylex.attrs(viewStyles.workLogStoriesDiv)}>
+        <div class="w-full max-w-2xl">
           <WorkLog steps={finishedRun} now={nowAfter(finishedRun)} />
         </div>
       ),
@@ -39,7 +35,7 @@ export default stories({
     Live: story({
       note: "第二轮还在跑：上一轮折起来，这一轮开着，命令还没回来。",
       render: () => (
-        <div {...stylex.attrs(viewStyles.workLogStoriesDiv)}>
+        <div class="w-full max-w-2xl">
           <WorkLog steps={twoRuns} now={nowAfter(twoRuns)} working />
         </div>
       ),
@@ -47,7 +43,7 @@ export default stories({
     Failed: story({
       note: "这一轮出错停了：原因在最后一行。",
       render: () => (
-        <div {...stylex.attrs(viewStyles.workLogStoriesDiv)}>
+        <div class="w-full max-w-2xl">
           <WorkLog steps={failedRun} now={nowAfter(failedRun)} />
         </div>
       ),
@@ -55,7 +51,7 @@ export default stories({
     ToldTwice: story({
       note: "干到一半又带了一句话：还是这一轮，后来的话在步骤里。",
       render: () => (
-        <div {...stylex.attrs(viewStyles.workLogStoriesDiv)}>
+        <div class="w-full max-w-2xl">
           <WorkLog steps={toldTwiceRun} now={nowAfter(toldTwiceRun)} />
         </div>
       ),

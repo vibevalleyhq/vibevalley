@@ -1,20 +1,8 @@
 /** @jsxImportSource @solidjs/web */
 import { HydrationScript, type JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 
 import { backgrounds } from "./base/images";
 import { page } from "./i18n/page";
-
-const sceneStyles = stylex.create({
-  lost: {
-    display: "grid",
-    minHeight: "100svh",
-    placeItems: "center",
-    paddingInline: "1rem",
-    paddingBlock: "2rem",
-    backgroundColor: "var(--color-cream-100)",
-  },
-});
 
 export default function Document(props: { children?: JSX.Element }) {
   const route = page();
@@ -53,7 +41,7 @@ export default function Document(props: { children?: JSX.Element }) {
         )}
         <HydrationScript />
       </head>
-      <body {...stylex.attrs(route.lost && sceneStyles.lost)}>{props.children}</body>
+      <body class={route.lost && "grid min-h-svh place-items-center px-4 py-8 bg-cream-100"}>{props.children}</body>
     </html>
   );
 }

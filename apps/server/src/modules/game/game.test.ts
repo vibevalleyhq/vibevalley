@@ -183,7 +183,7 @@ describe("the game", () => {
       const config = testConfig();
       {
         await using f = await farm(config, (current) => ({ ...current, contributions }));
-        await f.game.start();
+        await f.game.boot();
         const { core } = f;
         core.apply({ type: "sessionChanged", session: helper("w1") });
         core.apply({

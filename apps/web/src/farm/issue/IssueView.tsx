@@ -1,5 +1,4 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { createMemo, createSignal, Errored, For, Loading, Show, untrack } from "solid-js";
 
 import { list, t } from "@vibevalley/i18n";
@@ -19,7 +18,6 @@ import { isOneOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 import { aria, useNow } from "#/base/dom.tsx";
 import { tookText, wallClockText } from "#/base/format.ts";
 import { playBedFx } from "#/farm/commands.ts";
-import { farmGroup } from "#/farm/interaction.stylex.ts";
 import { farm, farmActWords, overlayOf, useFarm } from "#/farm/store.ts";
 import { useVillage } from "#/farm/world/load.ts";
 import { cropLabel, issueOf, plotOf, stationOfSession } from "#/farm/world/plots.ts";
@@ -51,364 +49,14 @@ import { useRouter } from "#/infra/router.ts";
 import { useIntents } from "#/state/intent.ts";
 import { castPrefix, outfitLabel, speciesLabel } from "#/ui/domain/cast.ts";
 import { createPixelAct, FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "#/ui/pixel/index.ts";
-import { styleProps } from "#/ui/positioner.ts";
 
-const styles = stylex.create({
-  emptyCriterion: { height: "0.625rem", width: "0.625rem", borderStyle: "solid", borderWidth: "2px" },
-  criterion: {
-    display: "flex",
-    cursor: "pointer",
-    alignItems: "flex-start",
-    gap: "0.5rem",
-    paddingBlock: "0.125rem",
-    textAlign: "left",
-  },
-  criterionBox: {
-    marginTop: "0.125rem",
-    display: "flex",
-    height: "1rem",
-    width: "1rem",
-    flexShrink: 0,
-    alignItems: "center",
-    justifyContent: "center",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    backgroundColor: "var(--color-cream-50)",
-    borderColor: {
-      default: "var(--color-bark-400)",
-      "@media (hover:hover)": { default: null, [stylex.when.ancestor(":hover", farmGroup)]: "var(--color-bark-600)" },
-    },
-  },
-  fold: {
-    display: "flex",
-    width: "100%",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.375rem",
-    paddingBlock: "0.5rem",
-    textAlign: "left",
-  },
-  foldOpen: { rotate: "90deg" },
-  foldLabel: {
-    fontSize: "13px",
-    color: {
-      default: "var(--color-bark-800)",
-      "@media (hover:hover)": { default: null, [stylex.when.ancestor(":hover", farmGroup)]: "var(--color-bark-900)" },
-    },
-  },
-  issueBodySpan: {
-    minWidth: "0",
-    flex: "1",
-    fontFamily: "var(--font-mono)",
-    fontSize: "12.5px",
-    wordBreak: "break-all",
-    WebkitUserSelect: "text",
-    userSelect: "text",
-  },
-  plotDetailP: {
-    fontSize: "13px",
-    lineHeight: "1.5",
-    color: "var(--color-bark-800)",
-  },
-  issueBodySpan2: {
-    fontSize: "12px",
-    color: "var(--color-bark-600)",
-  },
-  issueBodyP: {
-    marginTop: "0.25rem",
-    WebkitLineClamp: "4",
-    WebkitBoxOrient: "vertical",
-    display: "-webkit-box",
-    overflow: "hidden",
-    fontSize: "13px",
-    lineHeight: "1.5",
-    whiteSpace: "pre-wrap",
-    color: "var(--color-bark-800)",
-  },
-  issueBodySpan22: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "13px",
-    lineHeight: "1.5",
-    color: "var(--color-bark-800)",
-  },
-  issueBodyP2: {
-    fontSize: "13px",
-    lineHeight: "1.5",
-    color: "var(--color-water-500)",
-  },
-  issueBodyP3: {
-    fontSize: "13px",
-    lineHeight: "1.5",
-    color: "var(--color-berry)",
-  },
-  issueBodyP4: {
-    fontSize: "13px",
-    lineHeight: "1.5",
-  },
-  issueBodyPPrimary: {
-    color: "var(--color-bark-800)",
-  },
-  issueBodyPSecondary: {
-    color: "var(--color-berry)",
-  },
-  issueBodyP5: {
-    fontSize: "13px",
-    lineHeight: "1.5",
-    color: "var(--color-bark-800)",
-    textDecorationLine: "line-through",
-  },
-  asideP: {
-    textAlign: "center",
-    fontSize: "12px",
-    color: "var(--color-bark-600)",
-  },
-  criteriaSpan: {
-    display: "block",
-    fontSize: "12px",
-    color: "var(--color-bark-600)",
-  },
-  issueBodyDiv: {
-    display: "flex",
-    minWidth: "0",
-    flex: "1",
-    flexDirection: "column",
-  },
-  issueBodySpan3: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-  },
-  issueBodySpanTone: {
-    color: "var(--color-berry)",
-  },
-  issueBodySpanAlt: {
-    color: "var(--color-bark-600)",
-  },
-  issueBodySpan23: {},
-  issueBodyDiv2: {
-    display: "flex",
-    flexDirection: {
-      default: "column",
-      "@media (width>=40rem)": "row",
-    },
-    gap: "1rem",
-    alignItems: {
-      default: null,
-      "@media (width>=40rem)": "flex-start",
-    },
-  },
-  issueBodyDiv22: {
-    display: "flex",
-    alignItems: "baseline",
-    gap: "0.5rem",
-  },
-  issueBodyH3: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "16px",
-  },
-  issueNow: {
-    marginTop: "0.25rem",
-    fontSize: "13px",
-  },
-  issueStuck: {
-    color: "var(--color-berry-500)",
-  },
-  issueActive: {
-    color: "var(--color-bark-700)",
-  },
-  issueBodyDiv3: {
-    marginTop: "0.75rem",
-    padding: "0.75rem",
-  },
-  askBerry: {
-    backgroundColor: "color-mix(in srgb, var(--color-berry-500) 30%, var(--color-cream-50))",
-  },
-  askWheat: {
-    backgroundColor: "color-mix(in srgb, var(--color-wheat) 30%, var(--color-cream-50))",
-  },
-  askWater: {
-    backgroundColor: "color-mix(in srgb, var(--color-water-500) 30%, var(--color-cream-50))",
-  },
-  askLeaf: {
-    backgroundColor: "color-mix(in srgb, var(--color-leaf-500) 30%, var(--color-cream-50))",
-  },
-  askFaint: {
-    backgroundColor: "color-mix(in srgb, var(--color-cream-300) 30%, var(--color-cream-50))",
-  },
-  askMuted: {
-    backgroundColor: "color-mix(in srgb, var(--color-bark-400) 30%, var(--color-cream-50))",
-  },
-  issueBodyP6: {
-    fontSize: "14px",
-  },
-  issueBodyDiv4: {
-    marginTop: "0.5rem",
-  },
-  issueBodyDiv5: {
-    marginTop: "0.375rem",
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.375rem",
-  },
-  issueMove: {
-    marginTop: "0.5rem",
-    display: "flex",
-    alignItems: "center",
-    gap: "0.375rem",
-    fontSize: "12px",
-  },
-  issueBodyDiv6: {
-    marginTop: "0.75rem",
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.5rem",
-  },
-  issueBodyDiv7: {
-    marginTop: "0.375rem",
-  },
-  issueBodyDiv8: {
-    marginTop: "1rem",
-  },
-  issueBodyDiv9: {
-    display: "flex",
-    flexDirection: "column",
-  },
-  issueBodyP22: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontFamily: "var(--font-mono)",
-    fontSize: "11px",
-    color: "var(--color-bark-800)",
-  },
-  issueBodyP32: {
-    fontSize: "13px",
-    whiteSpace: "pre-wrap",
-    color: "var(--color-bark-800)",
-  },
-  plotDeliver: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.375rem",
-  },
-  issueBodySpan4: {
-    fontSize: "12px",
-    color: "var(--color-leaf-700)",
-  },
-  issueBodyP42: {
-    fontFamily: "var(--font-mono)",
-    fontSize: "12.5px",
-    color: "var(--color-bark-800)",
-  },
-  issueBodyDiv10: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  issueBodyDiv11: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.5rem",
-  },
-  asideDiv: {
-    display: "flex",
-    width: {
-      default: "100%",
-      "@media (width>=40rem)": "13rem",
-    },
-    flexShrink: "0",
-    flexDirection: "column",
-    alignItems: "center",
-    backgroundColor: "var(--color-cream-100)",
-    padding: "0.75rem",
-  },
-  asideDiv2: {
-    position: "relative",
-    display: "flex",
-    height: "11rem",
-    width: "11rem",
-    alignItems: "flex-end",
-    justifyContent: "center",
-  },
-  asideImg: {
-    position: "absolute",
-    bottom: "0",
-    width: "11rem",
-    opacity: ".9",
-    imageRendering: "pixelated",
-  },
-  asideImg2: {
-    position: "relative",
-    height: "9rem",
-    imageRendering: "pixelated",
-  },
-  asideP2: {
-    marginTop: "0.5rem",
-    fontSize: "13px",
-  },
-  criteriaDiv: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "0.5rem",
-    paddingBlock: "0.125rem",
-  },
-  criteriaSpan2: {
-    marginTop: "0.125rem",
-    display: "flex",
-    height: "1rem",
-    width: "1rem",
-    flexShrink: "0",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  criteriaSpan22: {
-    minWidth: "0",
-    flex: "1",
-  },
-  foldDiv: {
-    borderTopStyle: "solid",
-    borderTopWidth: "1px",
-    borderColor: "var(--color-cream-300)",
-  },
-  foldDiv2: {
-    paddingBottom: "0.75rem",
-  },
-  foldP: {
-    fontSize: "12px",
-    color: "var(--color-bark-500)",
-  },
-  rowDiv: {
-    marginBottom: "0.5rem",
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "0.75rem",
-  },
-  rowSpan: {
-    width: "72px",
-    flexShrink: "0",
-    fontSize: "13px",
-    color: "var(--color-bark-500)",
-  },
-});
-
-const askTones: Record<string, stylex.StyleXStyles> = {
-  berry: styles.askBerry,
-  wheat: styles.askWheat,
-  water: styles.askWater,
-  leaf: styles.askLeaf,
-  faint: styles.askFaint,
-  muted: styles.askMuted,
+const askTones: Record<string, JSX.ClassValue> = {
+  berry: "bg-[color-mix(in_srgb,_var(--color-berry-500)_30%,_var(--color-cream-50))]",
+  wheat: "bg-[color-mix(in_srgb,_var(--color-wheat)_30%,_var(--color-cream-50))]",
+  water: "bg-[color-mix(in_srgb,_var(--color-water-500)_30%,_var(--color-cream-50))]",
+  leaf: "bg-[color-mix(in_srgb,_var(--color-leaf-500)_30%,_var(--color-cream-50))]",
+  faint: "bg-[color-mix(in_srgb,_var(--color-cream-300)_30%,_var(--color-cream-50))]",
+  muted: "bg-[color-mix(in_srgb,_var(--color-bark-400)_30%,_var(--color-cream-50))]",
 };
 
 /** The plot's issue while the store says so (the inspect layer). */
@@ -445,7 +93,7 @@ function PlotDetail(props: { session: SessionView; onDone: () => void }) {
   };
   const hasThread = () => issueThreadOf(core()?.chat, id()) !== undefined;
   return (
-    <Show when={issue()} fallback={<p {...stylex.attrs(styles.plotDetailP)}>{t("web.farm.plot.unread")}</p>}>
+    <Show when={issue()} fallback={<p class="text-sm leading-[1.5] text-bark-800">{t("web.farm.plot.unread")}</p>}>
       {(i) => (
         <IssueBody
           issue={i()}
@@ -560,20 +208,20 @@ function IssueBody(props: {
   const boxShown = () => state() === "asking" || state() === "canceled" || box() !== undefined;
 
   return (
-    <div {...stylex.attrs(styles.issueBodyDiv2)}>
+    <div class="flex flex-col sm:flex-row gap-4 sm:items-start">
       <Aside session={s().head} agent={agent()} />
-      <div {...stylex.attrs(styles.issueBodyDiv)}>
-        <div {...stylex.attrs(styles.issueBodyDiv22)}>
-          <span {...stylex.attrs(styles.issueBodySpan2)}>#{props.issue.number}</span>
-          <h3 {...stylex.attrs(styles.issueBodyH3)} title={s().title}>
+      <div class="flex min-w-0 flex-1 flex-col">
+        <div class="flex items-baseline gap-2">
+          <span class="text-(length:--text-xs) text-bark-600">#{props.issue.number}</span>
+          <h3 class="min-w-0 flex-1 truncate text-(length:--text-lg)" title={s().title}>
             {s().title}
           </h3>
           <Show when={s().repo}>
-            <span {...stylex.attrs(styles.issueBodySpan2)}>{s().repo}</span>
+            <span class="text-(length:--text-xs) text-bark-600">{s().repo}</span>
           </Show>
         </div>
         <p
-          {...stylex.attrs(styles.issueNow, s().stage.state === "stuck" ? styles.issueStuck : styles.issueActive)}
+          class={["mt-1 text-(length:--text-sm)", s().stage.state === "stuck" ? "text-berry-500" : "text-bark-700"]}
           aria-label={t("web.farm.plot.now")}
           data-testid="issue-now"
           data-state={s().stage.state}
@@ -583,18 +231,22 @@ function IssueBody(props: {
 
         <Show when={s().ask}>
           {(ask) => (
-            <div {...styleProps([styles.issueBodyDiv3, askTones[ask().tone] ?? styles.askFaint])} aria-label={t("web.farm.plot.yours")} role="region">
-              <p {...stylex.attrs(styles.issueBodyP6)}>{ask().head}</p>
+            <div
+              class={["mt-3 p-3", askTones[ask().tone] ?? "bg-[color-mix(in_srgb,_var(--color-cream-300)_30%,_var(--color-cream-50))]"]}
+              aria-label={t("web.farm.plot.yours")}
+              role="region"
+            >
+              <p class="text-(length:--text-base)">{ask().head}</p>
               <Show when={ask().line}>
-                <p {...stylex.attrs(styles.issueBodyP)}>{ask().line}</p>
+                <p class="mt-1 line-clamp-4 text-sm leading-[1.5] whitespace-pre-wrap text-bark-800">{ask().line}</p>
               </Show>
               <Show when={state() === "asking"}>
                 <For each={props.issue.questions}>
                   {(q) => (
-                    <div {...stylex.attrs(styles.issueBodyDiv4)}>
-                      <p {...stylex.attrs(styles.plotDetailP)}>{q.question}</p>
+                    <div class="mt-2">
+                      <p class="text-sm leading-[1.5] text-bark-800">{q.question}</p>
                       <Show when={q.options.length}>
-                        <div {...stylex.attrs(styles.issueBodyDiv5)} role="group" aria-label={t("web.farm.plot.answerTo", { question: q.question })}>
+                        <div class="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-label={t("web.farm.plot.answerTo", { question: q.question })}>
                           <For each={q.options}>
                             {(o) => (
                               <PxButton size="sm" disabled={busy()} onClick={() => void acts.send("answer", o).then((ok) => ok && acts.setText(""))}>
@@ -612,7 +264,7 @@ function IssueBody(props: {
           )}
         </Show>
         <Show when={boxShown()}>
-          <div {...stylex.attrs(styles.issueBodyDiv4)}>
+          <div class="mt-2">
             <PxTextArea
               value={text()}
               onChange={setText}
@@ -643,8 +295,8 @@ function IssueBody(props: {
         </Show>
         <Show when={move()}>
           {(m) => (
-            <div data-testid="issue-move" data-state={m().state} {...stylex.attrs(styles.issueMove)}>
-              <span {...stylex.attrs(styles.issueBodySpan3, m().state === "failed" ? styles.issueBodySpanTone : styles.issueBodySpanAlt)} title={m().reason}>
+            <div data-testid="issue-move" data-state={m().state} class="mt-2 flex items-center gap-1.5 text-(length:--text-xs)">
+              <span class={["min-w-0 flex-1 truncate", m().state === "failed" ? "text-berry" : "text-bark-600"]} title={m().reason}>
                 {m().state === "moving" ? t("web.farm.plot.moving") : (m().reason ?? t("web.farm.plot.notMoved"))}
               </span>
               <Show when={m().state === "failed"}>
@@ -660,9 +312,9 @@ function IssueBody(props: {
         </Show>
         <For each={acts.words()} keyed={(w) => w.key}>
           {(w) => (
-            <div data-testid="issue-said" data-key={w().key} data-state={w().state} {...stylex.attrs(styles.issueMove)}>
-              <span {...stylex.attrs(styles.issueBodySpan22)}>{w().text}</span>
-              <span {...stylex.attrs(styles.issueBodySpan23, w().state === "failed" ? styles.issueBodySpanTone : styles.issueBodySpanAlt)} title={w().reason}>
+            <div data-testid="issue-said" data-key={w().key} data-state={w().state} class="mt-2 flex items-center gap-1.5 text-(length:--text-xs)">
+              <span class="min-w-0 flex-1 truncate text-sm leading-[1.5] text-bark-800">{w().text}</span>
+              <span class={["", w().state === "failed" ? "text-berry" : "text-bark-600"]} title={w().reason}>
                 {w().state === "sending" ? t("web.farm.plot.sending") : (w().reason ?? t("web.farm.plot.notSaid"))}
               </span>
               <Show when={w().state === "failed"}>
@@ -676,7 +328,7 @@ function IssueBody(props: {
             </div>
           )}
         </For>
-        <div {...stylex.attrs(styles.issueBodyDiv6)}>
+        <div class="mt-3 flex flex-wrap gap-2">
           <Show when={s().ask && s().lead} keyed>
             {(lead) => button(lead, () => true)}
           </Show>
@@ -689,31 +341,31 @@ function IssueBody(props: {
 
         <FarmSection title={s().criteria.length > 0 ? t("web.farm.plot.progressMet", { met: s().met, of: s().criteria.length }) : t("web.farm.plot.progress")}>
           <Show when={s().doing}>
-            <p {...stylex.attrs(styles.issueBodyP2)}>{s().doing}</p>
+            <p class="text-sm leading-[1.5] text-water-500">{s().doing}</p>
           </Show>
           <Show when={s().inFamily}>
-            <p {...stylex.attrs(styles.issueBodySpan2)}>{s().parentText}</p>
+            <p class="text-(length:--text-xs) text-bark-600">{s().parentText}</p>
           </Show>
           <Show
             when={s().criteria.length > 0}
-            fallback={<p {...stylex.attrs(styles.issueBodySpan2)}>{t("web.farm.plot.noCriteria", { answer: props.issue.deliver === "answer" })}</p>}
+            fallback={<p class="text-(length:--text-xs) text-bark-600">{t("web.farm.plot.noCriteria", { answer: props.issue.deliver === "answer" })}</p>}
           >
             <Criteria rows={s().criteria} checking={state() === "reviewing" && props.issue.reviewedAt === undefined} />
           </Show>
           <Show when={s().openFindings.length > 0}>
-            <div {...stylex.attrs(styles.issueBodyDiv7)}>
-              <For each={s().openFindings}>{(f) => <p {...stylex.attrs(styles.issueBodyP3)}>{t("web.farm.plot.rejected", { text: f.text })}</p>}</For>
+            <div class="mt-1.5">
+              <For each={s().openFindings}>{(f) => <p class="text-sm leading-[1.5] text-berry">{t("web.farm.plot.rejected", { text: f.text })}</p>}</For>
             </div>
           </Show>
         </FarmSection>
 
-        <div {...stylex.attrs(styles.issueBodyDiv8)}>
+        <div class="mt-4">
           <Show when={props.issue.deliver === "answer" ? props.issue.answer : undefined}>
             {(a) => (
               <FarmSection title={t("web.farm.plot.conclusion")}>
-                <p {...stylex.attrs(styles.plotDetailP)}>{a().conclusion}</p>
-                <For each={a().evidence}>{(l) => <p {...stylex.attrs(styles.issueBodySpan2)}>{t("web.farm.plot.evidence", { line: l })}</p>}</For>
-                <For each={a().next}>{(l) => <p {...stylex.attrs(styles.issueBodySpan2)}>{t("web.farm.plot.next", { line: l })}</p>}</For>
+                <p class="text-sm leading-[1.5] text-bark-800">{a().conclusion}</p>
+                <For each={a().evidence}>{(l) => <p class="text-(length:--text-xs) text-bark-600">{t("web.farm.plot.evidence", { line: l })}</p>}</For>
+                <For each={a().next}>{(l) => <p class="text-(length:--text-xs) text-bark-600">{t("web.farm.plot.next", { line: l })}</p>}</For>
               </FarmSection>
             )}
           </Show>
@@ -722,25 +374,25 @@ function IssueBody(props: {
               <Show
                 when={changed()}
                 fallback={
-                  <p {...stylex.attrs(styles.plotDetailP)}>{changes.status() === "pending" ? t("web.farm.reading") : t("web.farm.plot.changesUnread")}</p>
+                  <p class="text-sm leading-[1.5] text-bark-800">{changes.status() === "pending" ? t("web.farm.reading") : t("web.farm.plot.changesUnread")}</p>
                 }
               >
                 {(c) => (
-                  <div {...stylex.attrs(styles.issueBodyDiv9)}>
-                    <p {...stylex.attrs(styles.plotDetailP)}>{changesLine(c())}</p>
+                  <div class="flex flex-col">
+                    <p class="text-sm leading-[1.5] text-bark-800">{changesLine(c())}</p>
                     <Show when={c().conflicts.length > 0}>
-                      <p {...stylex.attrs(styles.issueBodyP3)}>{t("web.farm.plot.conflict", { base: c().base, files: list(c().conflicts) })}</p>
+                      <p class="text-sm leading-[1.5] text-berry">{t("web.farm.plot.conflict", { base: c().base, files: list(c().conflicts) })}</p>
                     </Show>
-                    <div {...stylex.attrs(styles.issueBodyDiv7)}>
+                    <div class="mt-1.5">
                       <For each={c().files.slice(0, 12)}>
                         {(f) => (
-                          <p {...stylex.attrs(styles.issueBodyP22)}>
+                          <p class="truncate font-mono text-(length:--text-2xs) text-bark-800">
                             {f.path} +{Math.round(f.added)} -{Math.round(f.removed)}
                           </p>
                         )}
                       </For>
                       <Show when={c().files.length > 12}>
-                        <p {...stylex.attrs(styles.issueBodySpan2)}>{t("web.farm.plot.moreFiles", { n: c().files.length - 12 })}</p>
+                        <p class="text-(length:--text-xs) text-bark-600">{t("web.farm.plot.moreFiles", { n: c().files.length - 12 })}</p>
                       </Show>
                     </div>
                   </div>
@@ -751,18 +403,15 @@ function IssueBody(props: {
           <Fold label={t("web.farm.plot.story")}>
             <Show
               when={timeline()}
-              fallback={<p {...stylex.attrs(styles.issueBodySpan2)}>{timelineQuery.status() === "pending" ? t("web.farm.reading") : t("web.farm.unread")}</p>}
+              fallback={
+                <p class="text-(length:--text-xs) text-bark-600">{timelineQuery.status() === "pending" ? t("web.farm.reading") : t("web.farm.unread")}</p>
+              }
             >
               {(line) => (
                 <For each={line().milestones}>
                   {(m) => (
                     <Row label={wallClockText(m.at)}>
-                      <p
-                        {...stylex.attrs(
-                          styles.issueBodyP4,
-                          m.kind === "failed" || m.kind === "rejected" ? styles.issueBodyPSecondary : styles.issueBodyPPrimary,
-                        )}
-                      >
+                      <p class={["text-sm leading-[1.5]", m.kind === "failed" || m.kind === "rejected" ? "text-berry" : "text-bark-800"]}>
                         {m.who ? `${m.who} · ` : ""}
                         {m.text}
                       </p>
@@ -773,7 +422,7 @@ function IssueBody(props: {
             </Show>
           </Fold>
           <Fold label={t("web.farm.plot.steps")}>
-            <Show when={steps().length > 0} fallback={<p {...stylex.attrs(styles.issueBodySpan2)}>{noStepsText(s().head)}</p>}>
+            <Show when={steps().length > 0} fallback={<p class="text-(length:--text-xs) text-bark-600">{noStepsText(s().head)}</p>}>
               <WorkLog steps={steps()} now={now()} working={state() === "working"} />
             </Show>
           </Fold>
@@ -781,23 +430,23 @@ function IssueBody(props: {
             <Runs issue={props.issue.id} version={`${sessionIdsOf(props.issue).length}:${s().head.runs}:${s().head.phase._tag}`} />
           </Fold>
           <Fold label={t("web.farm.plot.details")}>
-            <div {...stylex.attrs(styles.issueBodyDiv9)}>
+            <div class="flex flex-col">
               <Show when={s().description}>
                 <Row label={t("web.farm.plot.job")}>
-                  <p {...stylex.attrs(styles.issueBodyP32)}>{s().description}</p>
+                  <p class="text-(length:--text-sm) whitespace-pre-wrap text-bark-800">{s().description}</p>
                 </Row>
               </Show>
               <Row label={t("web.farm.plot.who")}>
-                <p {...stylex.attrs(styles.plotDetailP)}>{s().whoLine}</p>
+                <p class="text-sm leading-[1.5] text-bark-800">{s().whoLine}</p>
               </Row>
               <Show when={s().crewLine}>
                 <Row label={t("web.farm.plot.crew")}>
-                  <p {...stylex.attrs(styles.plotDetailP)}>{s().crewLine}</p>
+                  <p class="text-sm leading-[1.5] text-bark-800">{s().crewLine}</p>
                 </Row>
               </Show>
               <Show when={!s().inFamily}>
                 <Row label={t("web.farm.plot.deliver")}>
-                  <div {...stylex.attrs(styles.plotDeliver)} data-testid="plot-deliver" data-value={deliver().value} data-state={deliver().state}>
+                  <div class="flex flex-wrap items-center gap-1.5" data-testid="plot-deliver" data-value={deliver().value} data-state={deliver().state}>
                     <For each={DeliverableValues}>
                       {(d) => (
                         <PxButton
@@ -811,33 +460,35 @@ function IssueBody(props: {
                       )}
                     </For>
                     <Show when={props.issue.reviewedAt}>
-                      {(at) => <span {...stylex.attrs(styles.issueBodySpan4)}>{t("web.farm.plot.reviewed", { clock: wallClockText(at()) })}</span>}
+                      {(at) => <span class="text-(length:--text-xs) text-leaf-700">{t("web.farm.plot.reviewed", { clock: wallClockText(at()) })}</span>}
                     </Show>
                   </div>
                 </Row>
               </Show>
               <Show when={s().resolvedFindings.length > 0}>
                 <Row label={t("web.farm.plot.weeded")}>
-                  <For each={s().resolvedFindings}>{(f) => <p {...stylex.attrs(styles.issueBodyP5)}>{t("web.farm.plot.weed", { text: f.text })}</p>}</For>
+                  <For each={s().resolvedFindings}>
+                    {(f) => <p class="text-sm leading-[1.5] text-bark-800 line-through">{t("web.farm.plot.weed", { text: f.text })}</p>}
+                  </For>
                 </Row>
               </Show>
               <Show when={agent()?.model}>
                 {(model) => (
                   <Row label={t("web.farm.plot.model")}>
-                    <p {...stylex.attrs(styles.plotDetailP)}>{model()}</p>
+                    <p class="text-sm leading-[1.5] text-bark-800">{model()}</p>
                   </Row>
                 )}
               </Show>
               <Show when={s().head.branch}>
                 <Row label={t("web.farm.plot.branch")}>
-                  <p {...stylex.attrs(styles.issueBodyP42)}>{s().head.branch}</p>
+                  <p class="font-mono text-[length:12.5px] text-bark-800">{s().head.branch}</p>
                 </Row>
               </Show>
               <Show when={s().head.worktree}>
                 {(tree) => (
                   <Row label="worktree">
-                    <div {...stylex.attrs(styles.issueBodyDiv10)}>
-                      <span {...stylex.attrs(styles.issueBodySpan)}>{tree()}</span>
+                    <div class="flex items-center gap-2">
+                      <span class="min-w-0 flex-1 font-mono text-[length:12.5px] break-all select-text">{tree()}</span>
                       <PxButton size="sm" onClick={() => void navigator.clipboard.writeText(tree())}>
                         {t("web.farm.plot.copyPath")}
                       </PxButton>
@@ -846,22 +497,22 @@ function IssueBody(props: {
                 )}
               </Show>
               <Row label={t("web.farm.plot.opened")}>
-                <p {...stylex.attrs(styles.plotDetailP)}>{wallClockText(props.issue.createdAt)}</p>
+                <p class="text-sm leading-[1.5] text-bark-800">{wallClockText(props.issue.createdAt)}</p>
               </Row>
               <Show when={props.issue.closedAt}>
                 {(at) => (
                   <Row label={t("web.farm.plot.closed")}>
-                    <p {...stylex.attrs(styles.plotDetailP)}>{wallClockText(at())}</p>
+                    <p class="text-sm leading-[1.5] text-bark-800">{wallClockText(at())}</p>
                   </Row>
                 )}
               </Show>
               <Row label={t("web.farm.plot.history")}>
-                <p {...stylex.attrs(styles.plotDetailP)}>{s().historyLine}</p>
+                <p class="text-sm leading-[1.5] text-bark-800">{s().historyLine}</p>
               </Row>
               <Row label={t("web.farm.plot.took")}>
-                <p {...stylex.attrs(styles.plotDetailP)}>{s().usedLine(steps(), now())}</p>
+                <p class="text-sm leading-[1.5] text-bark-800">{s().usedLine(steps(), now())}</p>
               </Row>
-              <div {...stylex.attrs(styles.issueBodyDiv11)}>
+              <div class="flex flex-wrap gap-2">
                 <Show when={props.onThread}>
                   <PxButton size="sm" onClick={() => props.onThread?.()}>
                     {t("web.farm.plot.thread")}
@@ -902,16 +553,16 @@ function Aside(props: { session: Session; agent?: Agent | undefined }) {
     return p && a ? a.get(`${p}-down`) : undefined;
   };
   return (
-    <div {...stylex.attrs(styles.asideDiv)}>
-      <div {...stylex.attrs(styles.asideDiv2)}>
-        <Show when={crop()}>{(c) => <img src={c().url} alt="" {...stylex.attrs(styles.asideImg)} />}</Show>
-        <Show when={figure()}>{(f) => <img src={f().url} alt="" {...stylex.attrs(styles.asideImg2)} />}</Show>
+    <div class="flex w-full sm:w-52 shrink-0 flex-col items-center bg-cream-100 p-3">
+      <div class="relative flex h-44 w-44 items-end justify-center">
+        <Show when={crop()}>{(c) => <img src={c().url} alt="" class="absolute bottom-0 w-44 opacity-90 [image-rendering:pixelated]" />}</Show>
+        <Show when={figure()}>{(f) => <img src={f().url} alt="" class="relative h-36 [image-rendering:pixelated]" />}</Show>
       </div>
-      <p {...stylex.attrs(styles.asideP2)}>{cropLabel[plot().crop]}</p>
-      <p {...stylex.attrs(styles.asideP)}>
+      <p class="mt-2 text-(length:--text-sm)">{cropLabel[plot().crop]}</p>
+      <p class="text-center text-(length:--text-xs) text-bark-600">
         {labelOf(speciesLabel, SpeciesValues, kind()[0] ?? "")} · {labelOf(outfitLabel, OutfitValues, kind()[1] ?? "")}
       </p>
-      <p {...stylex.attrs(styles.issueBodySpan2)}>
+      <p class="text-(length:--text-xs) text-bark-600">
         {t("web.farm.plot.where", { plot: stationOfSession(props.session, frames.frame?.view.plays) + 1, round: Math.round(props.session.runs) })}
       </p>
     </div>
@@ -930,18 +581,18 @@ function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
   const [ticked, setTicked] = createSignal<ReadonlySet<number>>(new Set());
   const mark = (r: CriterionRow) => (r.result ? <SpriteIcon name={resultMark[r.result].icon} size={14} label={resultMark[r.result].label} /> : undefined);
   return (
-    <div {...stylex.attrs(styles.issueBodyDiv9)}>
+    <div class="flex flex-col">
       <For each={props.rows} keyed={(r) => r.text}>
         {(r, i) => (
           <Show
             when={props.checking}
             fallback={
-              <div {...stylex.attrs(styles.criteriaDiv)}>
-                <span {...stylex.attrs(styles.criteriaSpan2)}>{mark(r()) ?? <span {...styleProps(styles.emptyCriterion)} />}</span>
-                <span {...stylex.attrs(styles.criteriaSpan22)}>
-                  <span {...stylex.attrs(styles.plotDetailP)}>{r().text}</span>
+              <div class="flex items-start gap-2 py-0.5">
+                <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">{mark(r()) ?? <span class="h-2.5 w-2.5 border-2" />}</span>
+                <span class="min-w-0 flex-1">
+                  <span class="text-sm leading-[1.5] text-bark-800">{r().text}</span>
                   <Show when={r().proof}>
-                    <span {...stylex.attrs(styles.criteriaSpan)}>{r().proof}</span>
+                    <span class="block text-(length:--text-xs) text-bark-600">{r().proof}</span>
                   </Show>
                 </span>
               </div>
@@ -954,18 +605,18 @@ function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
               aria-pressed={aria(ticked().has(i()))}
               aria-label={r().text}
               onClick={() => setTicked((was) => (was.has(i()) ? new Set([...was].filter((x) => x !== i())) : new Set([...was, i()])))}
-              {...styleProps([farmGroup, styles.criterion])}
+              class={["group/farm-group", "flex cursor-pointer items-start gap-2 py-0.5 text-left"]}
             >
-              <span {...styleProps(styles.criterionBox)}>
+              <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border-2 bg-cream-50 border-bark-400 group-hover/farm-group:border-bark-600">
                 <Show when={ticked().has(i())}>
                   <SpriteIcon name="mark-check" size={12} label={t("web.farm.plot.ticked")} />
                 </Show>
               </span>
-              <span {...stylex.attrs(styles.criteriaSpan2)}>{mark(r())}</span>
-              <span {...stylex.attrs(styles.criteriaSpan22)}>
-                <span {...stylex.attrs(styles.plotDetailP)}>{r().text}</span>
+              <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">{mark(r())}</span>
+              <span class="min-w-0 flex-1">
+                <span class="text-sm leading-[1.5] text-bark-800">{r().text}</span>
                 <Show when={r().proof}>
-                  <span {...stylex.attrs(styles.criteriaSpan)}>{r().proof}</span>
+                  <span class="block text-(length:--text-xs) text-bark-600">{r().proof}</span>
                 </Show>
               </span>
             </button>
@@ -979,15 +630,21 @@ function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
 function Fold(props: { label: string; children: JSX.Element }) {
   const [open, setOpen] = createSignal(false);
   return (
-    <div {...stylex.attrs(styles.foldDiv)}>
-      <button type="button" data-testid="fold" aria-expanded={aria(open())} onClick={() => setOpen(!open())} {...styleProps([farmGroup, styles.fold])}>
-        <SpriteIcon name="button-next" size={12} styles={open() && styles.foldOpen} />
-        <span {...styleProps(styles.foldLabel)}>{props.label}</span>
+    <div class="border-t border-cream-300">
+      <button
+        type="button"
+        data-testid="fold"
+        aria-expanded={aria(open())}
+        onClick={() => setOpen(!open())}
+        class={["group/farm-group", "flex w-full cursor-pointer items-center gap-1.5 py-2 text-left"]}
+      >
+        <SpriteIcon name="button-next" size={12} class={open() && "[rotate:90deg]"} />
+        <span class="text-(length:--text-sm) text-bark-800 group-hover/farm-group:text-bark-900">{props.label}</span>
       </button>
       {/* Mounted with the dialog and only hidden while folded. */}
-      <div {...stylex.attrs(styles.foldDiv2)} hidden={!open()}>
-        <Errored fallback={<p {...stylex.attrs(styles.foldP)}>{t("web.farm.unread")}</p>}>
-          <Loading fallback={<p {...stylex.attrs(styles.foldP)}>{t("web.farm.reading")}</p>}>{props.children}</Loading>
+      <div class="pb-3" hidden={!open()}>
+        <Errored fallback={<p class="text-(length:--text-xs) text-bark-500">{t("web.farm.unread")}</p>}>
+          <Loading fallback={<p class="text-(length:--text-xs) text-bark-500">{t("web.farm.reading")}</p>}>{props.children}</Loading>
         </Errored>
       </div>
     </div>
@@ -996,9 +653,9 @@ function Fold(props: { label: string; children: JSX.Element }) {
 
 function Row(props: { label: string; children: JSX.Element }) {
   return (
-    <div {...stylex.attrs(styles.rowDiv)}>
-      <span {...stylex.attrs(styles.rowSpan)}>{props.label}</span>
-      <div {...stylex.attrs(styles.criteriaSpan22)}>{props.children}</div>
+    <div class="mb-2 flex items-start gap-3">
+      <span class="w-18 shrink-0 text-(length:--text-sm) text-bark-500">{props.label}</span>
+      <div class="min-w-0 flex-1">{props.children}</div>
     </div>
   );
 }
@@ -1012,13 +669,13 @@ function Runs(props: { issue: string; version: string }) {
   const runs = () => ready(runsQuery, []);
   const now = useNow();
   return (
-    <Show when={runs().length > 0} fallback={<p {...stylex.attrs(styles.issueBodySpan2)}>{t("web.farm.plot.noRuns")}</p>}>
+    <Show when={runs().length > 0} fallback={<p class="text-(length:--text-xs) text-bark-600">{t("web.farm.plot.noRuns")}</p>}>
       <FarmSection title={t("web.farm.plot.runs")}>
-        <p {...stylex.attrs(styles.issueBodySpan2)}>{t("web.farm.plot.runCount", { n: runs().length })}</p>
+        <p class="text-(length:--text-xs) text-bark-600">{t("web.farm.plot.runCount", { n: runs().length })}</p>
         <For each={[...runs()].toReversed()} keyed={(r) => r.id}>
           {(r) => (
             <Row label={wallClockText(r().startedAt)}>
-              <p {...stylex.attrs(styles.plotDetailP)}>{runText(r(), now(), tookText)}</p>
+              <p class="text-sm leading-[1.5] text-bark-800">{runText(r(), now(), tookText)}</p>
             </Row>
           )}
         </For>

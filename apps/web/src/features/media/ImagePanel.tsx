@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -15,36 +14,6 @@ import { Field, Select, TextArea, TextInput } from "#/ui/Field.tsx";
 import { Card, Quiet } from "#/ui/layout.tsx";
 
 import { publicationKey } from "./publication.ts";
-
-const viewStyles = stylex.create({
-  page: {
-    display: "flex",
-    height: "100%",
-    minWidth: 0,
-    flexDirection: "column",
-    gap: "1.25rem",
-    overflowY: "auto",
-    padding: "1.25rem",
-  },
-  header: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.75rem" },
-  title: { fontSize: "var(--text-xl)", lineHeight: "var(--leading-xl)", fontWeight: "var(--font-weight-semibold)" },
-  link: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", color: "var(--color-water)", textDecorationLine: "underline" },
-  actions: { display: "flex", flexWrap: "wrap", gap: "0.5rem" },
-  content: { display: "flex", maxWidth: "var(--container-3xl)", minWidth: 0, flexDirection: "column", gap: "1rem" },
-  notice: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", color: "var(--color-muted)" },
-  form: { display: "flex", minWidth: 0, flexDirection: "column", gap: "0.75rem" },
-  dimensions: { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0.75rem" },
-  summary: { cursor: "pointer", fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)" },
-  advanced: { marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.75rem" },
-  label: { display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)" },
-  detail: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", color: "var(--color-muted)" },
-  error: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", color: "var(--color-berry)" },
-  heading: { fontSize: "var(--text-base)", lineHeight: "var(--leading-base)", fontWeight: "var(--font-weight-semibold)" },
-  identifierDetail: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", wordBreak: "break-all", color: "var(--color-muted)" },
-  source: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", overflowWrap: "break-word", color: "var(--color-muted)" },
-  prose: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", overflowWrap: "break-word", whiteSpace: "pre-wrap" },
-  image: { maxHeight: "24rem", maxWidth: "100%", borderRadius: "var(--radius-md)", objectFit: "contain" },
-});
 
 /** The image form and its recent jobs: one of the forms the library's 生成 dialog holds. */
 export function ImagePanel() {
@@ -81,11 +50,11 @@ export function ImagePanel() {
     return act.run(() => api.media.image.create(input));
   };
   return (
-    <section {...stylex.attrs(viewStyles.content)} data-testid="image-panel" aria-label={t("web.media.image")}>
+    <section class="flex max-w-3xl min-w-0 flex-col gap-4" data-testid="image-panel" aria-label={t("web.media.image")}>
       <Readiness features={["image"]} />
       <Card title={t("web.media.generate")}>
-        <p {...stylex.attrs(viewStyles.notice)}>{t("web.media.notice")}</p>
-        <fieldset disabled={act.busy() || submitted() !== undefined} {...stylex.attrs(viewStyles.form)} aria-label={t("web.media.prompt")}>
+        <p class="text-sm text-muted">{t("web.media.notice")}</p>
+        <fieldset disabled={act.busy() || submitted() !== undefined} class="flex min-w-0 flex-col gap-3" aria-label={t("web.media.prompt")}>
           <Field label={t("web.media.format")}>
             <Select
               label={t("web.media.format")}
@@ -107,7 +76,7 @@ export function ImagePanel() {
               onInput={(event) => setPrompt(event.currentTarget.value)}
             />
           </Field>
-          <div {...stylex.attrs(viewStyles.dimensions)}>
+          <div class="grid grid-cols-2 gap-3">
             <Field label={t("web.media.width")}>
               <TextInput
                 data-testid="media-width"
@@ -128,8 +97,8 @@ export function ImagePanel() {
             </Field>
           </div>
           <details>
-            <summary {...stylex.attrs(viewStyles.summary)}>{t("web.media.advanced")}</summary>
-            <div {...stylex.attrs(viewStyles.advanced)}>
+            <summary class="cursor-pointer text-sm">{t("web.media.advanced")}</summary>
+            <div class="mt-3 flex flex-col gap-3">
               <Field label={t("web.media.seed")}>
                 <TextInput aria-label={t("web.media.seed")} type="number" value={seed()} onInput={(e) => setSeed(e.currentTarget.value)} />
               </Field>
@@ -148,11 +117,11 @@ export function ImagePanel() {
               <Field label={t("web.media.negative")}>
                 <TextArea aria-label={t("web.media.negative")} value={negative()} onInput={(e) => setNegative(e.currentTarget.value)} />
               </Field>
-              <label {...stylex.attrs(viewStyles.label)}>
+              <label class="flex items-center gap-2 text-sm">
                 <Checkbox label={t("web.media.enhance")} checked={enhance()} onChange={setEnhance} />
                 {t("web.media.enhance")}
               </label>
-              <label {...stylex.attrs(viewStyles.label)}>
+              <label class="flex items-center gap-2 text-sm">
                 <Checkbox label={t("web.media.watermark")} checked={watermark()} onChange={setWatermark} />
                 {t("web.media.watermark")}
               </label>
@@ -160,9 +129,9 @@ export function ImagePanel() {
           </details>
         </fieldset>
         <Show when={submitted()}>
-          <p {...stylex.attrs(viewStyles.detail)}>{t("web.media.pending")}</p>
+          <p class="text-xs text-muted">{t("web.media.pending")}</p>
         </Show>
-        <div {...stylex.attrs(viewStyles.actions)}>
+        <div class="flex flex-wrap gap-2">
           <Button data-testid="media-generate" tone="primary" disabled={act.busy() || !prompt().trim()} onClick={() => void submit()}>
             {submitted() ? t("web.media.resubmit") : t("web.media.generate")}
           </Button>
@@ -182,13 +151,13 @@ export function ImagePanel() {
         </div>
         <Show when={error()}>
           {(why) => (
-            <p role="alert" data-testid="media-error" {...stylex.attrs(viewStyles.error)}>
+            <p role="alert" data-testid="media-error" class="text-sm text-berry">
               {why()}
             </p>
           )}
         </Show>
       </Card>
-      <h2 {...stylex.attrs(viewStyles.heading)}>{t("web.media.history")}</h2>
+      <h2 class="text-base font-semibold">{t("web.media.history")}</h2>
       <Show when={images().length > 0} fallback={<Quiet>{t("web.media.empty")}</Quiet>}>
         <For each={images()} keyed={(job) => job.id}>
           {(job) => <JobCard job={job()} />}
@@ -224,27 +193,27 @@ function JobCard(props: { job: MediaImageJob }) {
   };
   return (
     <Card title={props.job.phaseText}>
-      <div data-testid="media-job" data-id={props.job.id} data-phase={props.job.phase} {...stylex.attrs(viewStyles.form)}>
-        <p {...stylex.attrs(viewStyles.identifierDetail)}>
+      <div data-testid="media-job" data-id={props.job.id} data-phase={props.job.phase} class="flex min-w-0 flex-col gap-3">
+        <p class="text-xs break-all text-muted">
           {props.job.model} · {props.job.id}
         </p>
-        <p data-testid="media-source" {...stylex.attrs(viewStyles.source)}>
+        <p data-testid="media-source" class="text-xs wrap-break-word text-muted">
           {props.job.source.kind === "user"
             ? t("web.media.sourceUser")
             : t("web.media.sourceAgent", { agent: props.job.source.agent, channel: props.job.source.channel })}
         </p>
-        <p data-testid="media-usage" {...stylex.attrs(viewStyles.detail)}>
+        <p data-testid="media-usage" class="text-xs text-muted">
           {props.job.usage ? t("web.media.usage", props.job.usage) : t("web.media.usageUnknown")}
         </p>
-        <p {...stylex.attrs(viewStyles.prose)}>{props.job.prompt}</p>
+        <p class="text-sm wrap-break-word whitespace-pre-wrap">{props.job.prompt}</p>
         <Show when={props.job.problem}>
-          <p {...stylex.attrs(viewStyles.notice)}>{props.job.problem}</p>
+          <p class="text-sm text-muted">{props.job.problem}</p>
         </Show>
         <Show when={props.job.attachment}>
           {(file) => (
             <>
-              <img data-testid="media-image" src={attachmentPath(file().id)} alt={props.job.prompt} {...stylex.attrs(viewStyles.image)} />
-              <a data-testid="media-save" href={attachmentPath(file().id)} download={file().name} {...stylex.attrs(viewStyles.link)}>
+              <img data-testid="media-image" src={attachmentPath(file().id)} alt={props.job.prompt} class="max-h-96 max-w-full rounded-md object-contain" />
+              <a data-testid="media-save" href={attachmentPath(file().id)} download={file().name} class="text-sm text-water underline">
                 {t("web.media.save")}
               </a>
               <Field label={t("web.media.channel")}>
@@ -272,7 +241,7 @@ function JobCard(props: { job: MediaImageJob }) {
             </>
           )}
         </Show>
-        <div {...stylex.attrs(viewStyles.actions)}>
+        <div class="flex flex-wrap gap-2">
           <Show when={props.job.canCancel}>
             <ConfirmButton
               testid="media-cancel"
@@ -290,7 +259,7 @@ function JobCard(props: { job: MediaImageJob }) {
         </div>
         <Show when={error()}>
           {(why) => (
-            <p role="alert" {...stylex.attrs(viewStyles.error)}>
+            <p role="alert" class="text-sm text-berry">
               {why()}
             </p>
           )}

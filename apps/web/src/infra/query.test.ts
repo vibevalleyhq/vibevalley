@@ -1,5 +1,5 @@
-import { Schema } from "effect";
 import { expect, test, vi } from "vite-plus/test";
+import { z } from "zod";
 
 import * as S from "@vibevalley/protocol/schema";
 
@@ -32,7 +32,7 @@ test("regression: a wrapped API connection failure still gets its single classif
     .mockRejectedValueOnce(new TypeError("offline"))
     .mockResolvedValueOnce(Response.json({ bizCode: 0, message: "ok", data: [] }));
   const query = defineQuery({
-    schema: Schema.Array(S.Agent),
+    schema: z.array(S.Agent),
     key: () => ["retry-transport"],
     fetch: (_: void, context) => api.agent.list(context),
     ...retryRead,

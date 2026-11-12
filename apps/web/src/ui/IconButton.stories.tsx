@@ -1,17 +1,7 @@
-import * as stylex from "@stylexjs/stylex";
-
 import { stories, story } from "@vibevalley/stories";
 
 import { IconButton, IconLink, OutLink } from "./IconButton";
 import { icons, type IconName } from "./icons";
-
-const viewStyles = stylex.create({
-  iconButtonStoriesDiv: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-});
 
 export default stories({
   title: "组件/工作台/IconButton",
@@ -48,7 +38,7 @@ export default stories({
     Kinds: story({
       note: "只有图标的链接只去工作台里；去外面的要说去哪（OutLink）。",
       render: () => (
-        <div {...stylex.attrs(viewStyles.iconButtonStoriesDiv)}>
+        <div class="flex items-center gap-2">
           <IconButton icon="search" label="搜索" onClick={() => undefined} />
           <IconButton icon="pin" label="置顶" pressed onClick={() => undefined} />
           <IconButton icon="delete" label="删除" tone="danger" onClick={() => undefined} />

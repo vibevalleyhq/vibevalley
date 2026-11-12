@@ -94,3 +94,10 @@ test("every struct Schema has the keys of its shape, nested object types too", (
   expect(compared).toBeGreaterThan(150);
   expect(differ).toEqual([]);
 });
+
+test("a length counted in code points is told to a model's JSON Schema, and an emoji is one character", () => {
+  const prompt = S.MediaImageRequest.shape.prompt;
+  expect(z.toJSONSchema(prompt, { io: "input" })).toMatchObject({ type: "string", minLength: 1, maxLength: 4000 });
+  expect(prompt.safeParse("😀".repeat(4000)).success).toBe(true);
+  expect(prompt.safeParse("a".repeat(4001)).success).toBe(false);
+});

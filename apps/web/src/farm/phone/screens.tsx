@@ -1,273 +1,21 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import type { InboxItem } from "@vibevalley/protocol";
 
 import { aria } from "#/base/dom.tsx";
-import { farmGroup, phoneAnimations } from "#/farm/interaction.stylex.ts";
 import { type CallPhase, createCall, voiceCall } from "#/features/voice/index.ts";
 import { useAgent } from "#/infra/agents.ts";
 import { useCore } from "#/infra/frame.ts";
 import { AgentFace, OrchestratorFace } from "#/ui/domain/Face.tsx";
 import { SpriteIcon } from "#/ui/pixel/index.ts";
 import type { GlyphCell } from "#/ui/pixel/PixelCard.tsx";
-import { styleProps } from "#/ui/positioner.ts";
 
 import { missedOf, phoneState } from "./calls";
 import { BugSnakeIcon } from "./games/BugSnakeGame";
 import { MergeIcon } from "./games/MergeGame";
 import { lcd, phoneCells } from "./lcd";
-
-const styles = stylex.create({
-  bigFace: {
-    display: "grid",
-    width: "72px",
-    height: "72px",
-    placeItems: "center",
-    backgroundColor: "var(--color-lcd-pale)",
-    boxShadow: "inset 0 0 0 2px var(--color-lcd-dark)",
-  },
-  callRow: {
-    display: "flex",
-    width: "100%",
-    alignItems: "center",
-    gap: "0.5rem",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.375rem",
-    textAlign: "left",
-  },
-  callRule: {
-    borderBottomStyle: "solid",
-    borderBottomWidth: "1px",
-    borderColor: "var(--color-lcd-rule)",
-  },
-  missedCall: { cursor: "pointer", backgroundColor: { default: null, "@media (hover:hover)": { default: null, ":hover": "var(--color-lcd-light)" } } },
-  app: { display: "flex", cursor: "pointer", flexDirection: "column", alignItems: "center", gap: "0.25rem" },
-  appIcon: {
-    position: "relative",
-    display: "grid",
-    width: "2.75rem",
-    height: "2.75rem",
-    placeItems: "center",
-    backgroundColor: {
-      default: "var(--color-lcd-pale)",
-      "@media (hover:hover)": { default: null, [stylex.when.ancestor(":hover", farmGroup)]: "var(--color-lcd-pale-hover)" },
-    },
-    boxShadow: "inset 0 0 0 2px var(--color-lcd-dark)",
-    translate: { default: null, [stylex.when.ancestor(":active", farmGroup)]: "0 1px" },
-  },
-  screenBody: {
-    display: "flex",
-    minHeight: "0",
-    flex: "1",
-    flexDirection: "column",
-    alignItems: "center",
-    paddingInline: "0.75rem",
-    paddingTop: "1.25rem",
-    textAlign: "center",
-  },
-  ringingText: {
-    marginTop: "0.5rem",
-    WebkitLineClamp: "3",
-    WebkitBoxOrient: "vertical",
-    display: "-webkit-box",
-    overflow: "hidden",
-    lineHeight: "1.625",
-  },
-  tabBar: {
-    display: "flex",
-    borderBottomStyle: "solid",
-    borderBottomWidth: "2px",
-    borderColor: "var(--color-lcd-dark)",
-  },
-  tabButton: {
-    flex: "1",
-    cursor: "pointer",
-    paddingBlock: "0.25rem",
-  },
-  tabActive: {
-    backgroundColor: "var(--color-lcd-dark)",
-    color: "var(--color-lcd-pale)",
-  },
-  tabIdle: {
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-lcd-light)",
-      },
-    },
-  },
-  lineStatus: {
-    marginTop: "0.75rem",
-    WebkitLineClamp: "4",
-    WebkitBoxOrient: "vertical",
-    display: "-webkit-box",
-    overflow: "hidden",
-    lineHeight: "1.625",
-  },
-  lineFailed: {
-    color: "var(--color-phone-failed)",
-  },
-  cellsSvg: {
-    flexShrink: "0",
-  },
-  smallFace: {
-    display: "grid",
-    width: "2rem",
-    height: "2rem",
-    flexShrink: "0",
-    placeItems: "center",
-    overflow: "hidden",
-    backgroundColor: "var(--color-lcd-pale)",
-  },
-  ringingFaceWrap: {
-    marginTop: "0.75rem",
-  },
-  callerName: {
-    marginTop: "0.75rem",
-    fontSize: "24px",
-    lineHeight: "1",
-  },
-  callerLabel: {
-    marginTop: "0.5rem",
-    backgroundColor: "var(--color-lcd-dark)",
-    paddingInline: "0.5rem",
-    color: "var(--color-lcd-pale)",
-  },
-  ringingActions: {
-    marginTop: "auto",
-    marginBottom: "1.25rem",
-    display: "flex",
-    gap: "2rem",
-  },
-  roundKey: {
-    display: "flex",
-    cursor: "pointer",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "0.25rem",
-  },
-  roundKeyCircle: {
-    display: "grid",
-    width: "2.75rem",
-    height: "2.75rem",
-    placeItems: "center",
-    boxShadow: "inset 0 0 0 2px var(--color-bark-900), inset -3px -3px 0 0 var(--color-px-key-dent)",
-  },
-  roundKeyAnswer: {
-    backgroundColor: "var(--color-leaf-600)",
-  },
-  roundKeyDecline: {
-    backgroundColor: "var(--color-berry-500)",
-  },
-  flexRow: {
-    display: "flex",
-  },
-  declineGlyph: {
-    transform: "rotate(135deg)",
-  },
-  callOrchestrator: {
-    margin: "0.5rem",
-    display: "flex",
-    cursor: "pointer",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "0.5rem",
-    backgroundColor: "var(--color-leaf-600)",
-    paddingBlock: "0.375rem",
-    color: "var(--color-cream-50)",
-    boxShadow: "inset 0 0 0 2px var(--color-bark-900)",
-    filter: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "brightness(110%)",
-      },
-    },
-  },
-  callsEmpty: {
-    paddingInline: "0.75rem",
-    paddingBlock: "1.5rem",
-    textAlign: "center",
-    color: "var(--color-lcd-dark)",
-  },
-  callList: {
-    minHeight: "0",
-    flex: "1",
-    overflowY: "auto",
-  },
-  callSummary: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-  },
-  inkLcdDark: {
-    color: "var(--color-lcd-dark)",
-  },
-  inkDecline: {
-    color: "var(--color-berry-500)",
-  },
-  missedBody: {
-    minWidth: "0",
-    flex: "1",
-  },
-  missedKind: {
-    marginLeft: "auto",
-    color: "var(--color-berry-500)",
-  },
-  missedText: {
-    display: "block",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    color: "var(--color-lcd-dark)",
-  },
-  orchestratorName: {
-    marginTop: "0.5rem",
-    fontSize: "24px",
-    lineHeight: "1",
-  },
-  orchestratorActions: {
-    marginTop: "auto",
-    marginBottom: "1.25rem",
-  },
-  sokobanIcon: {
-    display: "grid",
-    width: "1.75rem",
-    height: "1.75rem",
-    placeItems: "center",
-    fontSize: "18px",
-    lineHeight: "1",
-    boxShadow: "inset 0 0 0 2px var(--color-lcd-ink)",
-  },
-  gamesIcon: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2,minmax(0,1fr))",
-    gap: "1px",
-  },
-  appGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3,minmax(0,1fr))",
-    alignContent: "flex-start",
-    rowGap: "0.75rem",
-    paddingInline: "0.5rem",
-    paddingTop: "1rem",
-  },
-  appBadge: {
-    position: "absolute",
-    top: "-0.375rem",
-    right: "-0.375rem",
-    backgroundColor: "var(--color-berry-500)",
-    paddingInline: "0.25rem",
-    lineHeight: "14px",
-    color: "var(--color-cream-50)",
-  },
-});
 
 export type PhoneApp = "home" | "missed" | "log" | "orchestrator" | "games" | "blocks" | "dino" | "sokoban" | "bugs" | "merge";
 
@@ -283,7 +31,7 @@ function Cells(props: { cells: readonly GlyphCell[]; grid: [number, number]; siz
       viewBox={`${origin()[0]} ${origin()[1]} ${props.grid[0]} ${props.grid[1]}`}
       shape-rendering="crispEdges"
       aria-hidden="true"
-      {...stylex.attrs(styles.cellsSvg)}
+      class="shrink-0"
     >
       <For each={props.cells}>{([x, y, w, h, fill]) => <rect x={x} y={y} width={w} height={h} fill={fill} />}</For>
     </svg>
@@ -309,24 +57,35 @@ function CallerFace(props: { call: InboxItem; size: number }) {
 }
 
 const BigFace = (props: { children: JSX.Element; shake?: boolean }) => (
-  <span {...styleProps([styles.bigFace, !(props.shake !== true) && phoneAnimations.shake])}>{props.children}</span>
+  <span
+    class={[
+      "grid w-18 h-18 place-items-center bg-lcd-pale [box-shadow:inset_0_0_0_2px_var(--color-lcd-dark)]",
+      !(props.shake !== true) && "[animation-name:shake] motion-reduce:[animation-name:none] [animation-duration:500ms] [animation-iteration-count:infinite]",
+    ]}
+  >
+    {props.children}
+  </span>
 );
 
-const SmallFace = (props: { children: JSX.Element }) => <span {...stylex.attrs(styles.smallFace)}>{props.children}</span>;
+const SmallFace = (props: { children: JSX.Element }) => (
+  <span class="grid w-8 h-8 shrink-0 place-items-center overflow-hidden bg-lcd-pale">{props.children}</span>
+);
 
 export function RingingScreen(props: { call: InboxItem; onAnswer: () => void; onDecline: () => void }) {
   return (
-    <div data-testid="ringing" data-key={props.call.id} data-kind={props.call.kind} {...stylex.attrs(styles.screenBody)}>
-      <span {...styleProps(phoneAnimations.blink)}>{t("web.farm.phone.ringing")}</span>
-      <span {...stylex.attrs(styles.ringingFaceWrap)}>
+    <div data-testid="ringing" data-key={props.call.id} data-kind={props.call.kind} class="flex min-h-0 flex-1 flex-col items-center px-3 pt-5 text-center">
+      <span class="[animation-name:blink] motion-reduce:[animation-name:none] [animation-duration:1000ms] [animation-iteration-count:infinite]">
+        {t("web.farm.phone.ringing")}
+      </span>
+      <span class="mt-3">
         <BigFace shake>
           <CallerFace call={props.call} size={60} />
         </BigFace>
       </span>
-      <p {...stylex.attrs(styles.callerName)}>{props.call.who}</p>
-      <p {...stylex.attrs(styles.callerLabel)}>{props.call.words.label}</p>
-      <p {...stylex.attrs(styles.ringingText)}>{props.call.text}</p>
-      <div {...stylex.attrs(styles.ringingActions)}>
+      <p class="mt-3 text-2xl leading-none">{props.call.who}</p>
+      <p class="mt-2 bg-lcd-dark px-2 text-lcd-pale">{props.call.words.label}</p>
+      <p class="mt-2 line-clamp-3 leading-relaxed">{props.call.text}</p>
+      <div class="mt-auto mb-5 flex gap-8">
         <RoundKey answer={false} testid="decline" label={t("web.farm.phone.decline")} onClick={() => props.onDecline()} />
         <RoundKey answer testid="answer" label={t("web.farm.phone.answer")} onClick={() => props.onAnswer()} />
       </div>
@@ -336,9 +95,14 @@ export function RingingScreen(props: { call: InboxItem; onAnswer: () => void; on
 
 function RoundKey(props: { answer: boolean; testid: string; label: string; onClick: () => void }) {
   return (
-    <button type="button" data-testid={props.testid} onClick={() => props.onClick()} {...stylex.attrs(styles.roundKey)}>
-      <span {...stylex.attrs(styles.roundKeyCircle, props.answer ? styles.roundKeyAnswer : styles.roundKeyDecline)}>
-        <span {...stylex.attrs(styles.flexRow, !props.answer && styles.declineGlyph)}>
+    <button type="button" data-testid={props.testid} onClick={() => props.onClick()} class="flex cursor-pointer flex-col items-center gap-1">
+      <span
+        class={[
+          "grid w-11 h-11 place-items-center [box-shadow:inset_0_0_0_2px_var(--color-bark-900),_inset_-3px_-3px_0_0_var(--color-px-key-dent)]",
+          props.answer ? "bg-leaf-600" : "bg-berry-500",
+        ]}
+      >
+        <span class={["flex", !props.answer && "[transform:rotate(135deg)]"]}>
           <Cells
             cells={[
               [0, 2, 3, 4, creamFill],
@@ -357,7 +121,12 @@ function RoundKey(props: { answer: boolean; testid: string; label: string; onCli
 
 function CallOrchestrator(props: { onCall: () => void }) {
   return (
-    <button type="button" data-testid="call-orchestrator" onClick={() => props.onCall()} {...stylex.attrs(styles.callOrchestrator)}>
+    <button
+      type="button"
+      data-testid="call-orchestrator"
+      onClick={() => props.onCall()}
+      class="m-2 flex cursor-pointer items-center justify-center gap-2 bg-leaf-600 py-1.5 text-cream-50 [box-shadow:inset_0_0_0_2px_var(--color-bark-900)] hover:[filter:brightness(110%)]"
+    >
       <PhoneGlyph size={14} lit />
       {t("web.farm.phone.callOrchestrator")}
     </button>
@@ -368,13 +137,13 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
   const phone = phoneState();
   const missed = () => missedOf(phone());
   const empty = (text: string) => (
-    <li data-testid="calls-empty" {...stylex.attrs(styles.callsEmpty)}>
+    <li data-testid="calls-empty" class="px-3 py-6 text-center text-lcd-dark">
       {text}
     </li>
   );
   return (
     <>
-      <div {...stylex.attrs(styles.tabBar)}>
+      <div class="flex border-b-2 border-lcd-dark">
         <For each={["missed", "log"] as const}>
           {(s) => (
             <button
@@ -382,14 +151,14 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
               data-key={s}
               onClick={() => props.onScreen(s)}
               aria-pressed={aria(props.screen === s)}
-              {...stylex.attrs(styles.tabButton, props.screen === s ? styles.tabActive : styles.tabIdle)}
+              class={["flex-1 cursor-pointer py-1", props.screen === s ? "bg-lcd-dark text-lcd-pale" : "hover:bg-lcd-light"]}
             >
               {s === "missed" ? t("web.farm.phone.missed", { n: missed().length }) : t("web.farm.phone.log")}
             </button>
           )}
         </For>
       </div>
-      <ul {...stylex.attrs(styles.callList)}>
+      <ul class="min-h-0 flex-1 overflow-y-auto">
         <Show
           when={props.screen === "missed"}
           fallback={
@@ -400,15 +169,15 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
                     data-testid="call-log"
                     data-key={e().call.id}
                     data-answered={e().answered ? "" : undefined}
-                    {...stylex.attrs(styles.callRow, styles.callRule)}
+                    class={["flex w-full items-center gap-2 px-2 py-1.5 text-left", "border-b border-lcd-rule"]}
                   >
                     <SmallFace>
                       <CallerFace call={e().call} size={28} />
                     </SmallFace>
-                    <span {...stylex.attrs(styles.callSummary)}>
+                    <span class="min-w-0 flex-1 truncate">
                       {e().call.who} · {e().call.words.label}
                     </span>
-                    <span {...stylex.attrs(e().answered ? styles.inkLcdDark : styles.inkDecline)}>
+                    <span class={e().answered ? "text-lcd-dark" : "text-berry-500"}>
                       {e().answered ? t("web.farm.phone.answered") : t("web.farm.phone.declined")}
                     </span>
                   </li>
@@ -420,24 +189,24 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
           <Show when={missed().length > 0} fallback={empty(t("web.farm.phone.noMissed"))}>
             <For each={missed()} keyed={(c) => c.id}>
               {(c) => (
-                <li {...stylex.attrs(styles.callRule)}>
+                <li class="border-b border-lcd-rule">
                   <button
                     type="button"
                     data-testid="missed-call"
                     data-key={c().id}
                     onClick={() => props.onAnswer(c())}
                     aria-label={t("shared.join.labeled", { label: c().who, text: c().words.label })}
-                    {...stylex.attrs(styles.callRow, styles.missedCall)}
+                    class={["flex w-full items-center gap-2 px-2 py-1.5 text-left", "cursor-pointer hover:bg-lcd-light"]}
                   >
                     <SmallFace>
                       <CallerFace call={c()} size={28} />
                     </SmallFace>
-                    <span {...stylex.attrs(styles.missedBody)}>
-                      <span {...stylex.attrs(styles.flexRow)}>
+                    <span class="min-w-0 flex-1">
+                      <span class="flex">
                         {c().who}
-                        <span {...stylex.attrs(styles.missedKind)}>{c().words.label}</span>
+                        <span class="ml-auto text-berry-500">{c().words.label}</span>
                       </span>
-                      <span {...stylex.attrs(styles.missedText)}>{c().text}</span>
+                      <span class="block truncate text-lcd-dark">{c().text}</span>
                     </span>
                   </button>
                 </li>
@@ -480,13 +249,20 @@ export function OrchestratorLine(props: { phase: CallPhase; agentHere: boolean; 
   };
   const on = () => props.phase === "live" || props.phase === "connecting";
   return (
-    <div data-testid="orchestrator-line" data-state={props.phase} data-problem={props.problem ? "" : undefined} {...stylex.attrs(styles.screenBody)}>
+    <div
+      data-testid="orchestrator-line"
+      data-state={props.phase}
+      data-problem={props.problem ? "" : undefined}
+      class="flex min-h-0 flex-1 flex-col items-center px-3 pt-5 text-center"
+    >
       <BigFace shake={props.phase === "connecting"}>
         <OrchestratorFace size={60} />
       </BigFace>
-      <p {...stylex.attrs(styles.orchestratorName)}>{t("web.farm.phone.manager")}</p>
-      <p {...stylex.attrs(styles.lineStatus, props.phase === "idle" && props.problem !== undefined && props.problem !== "" && styles.lineFailed)}>{line()}</p>
-      <div {...stylex.attrs(styles.orchestratorActions)}>
+      <p class="mt-2 text-2xl leading-none">{t("web.farm.phone.manager")}</p>
+      <p class={["mt-3 line-clamp-4 leading-relaxed", props.phase === "idle" && props.problem !== undefined && props.problem !== "" && "text-phone-failed"]}>
+        {line()}
+      </p>
+      <div class="mt-auto mb-5">
         <RoundKey
           answer={!on()}
           testid="line-key"
@@ -506,7 +282,9 @@ interface App {
   readonly go: () => void;
 }
 
-const SokobanIcon = () => <span {...stylex.attrs(styles.sokobanIcon)}>×</span>;
+const SokobanIcon = () => (
+  <span class="grid w-7 h-7 place-items-center text-[length:18px] leading-none [box-shadow:inset_0_0_0_2px_var(--color-lcd-ink)]">×</span>
+);
 
 /** The games, in one folder on the home screen. */
 const games = (open: (app: PhoneApp) => void): App[] => [
@@ -519,7 +297,7 @@ const games = (open: (app: PhoneApp) => void): App[] => [
 
 /** The games folder's icon: four of them small, as a folder shows what is in it. */
 const GamesIcon = () => (
-  <span {...stylex.attrs(styles.gamesIcon)} aria-hidden="true">
+  <span class="grid grid-cols-2 gap-px" aria-hidden="true">
     <BlocksIcon size={12} />
     <DinoIcon size={12} />
     <BugSnakeIcon size={12} />
@@ -558,14 +336,20 @@ export function GamesScreen(props: { onOpen: (app: PhoneApp) => void }) {
 
 function AppGrid(props: { apps: readonly App[] }) {
   return (
-    <div {...stylex.attrs(styles.appGrid)}>
+    <div class="grid grid-cols-3 content-start gap-y-3 px-2 pt-4">
       <For each={props.apps}>
         {(a) => (
-          <button type="button" data-key={a.id} onClick={() => a.go()} aria-label={a.label} {...styleProps([farmGroup, styles.app])}>
-            <span {...styleProps(styles.appIcon)}>
+          <button
+            type="button"
+            data-key={a.id}
+            onClick={() => a.go()}
+            aria-label={a.label}
+            class={["group/farm-group", "flex cursor-pointer flex-col items-center gap-1"]}
+          >
+            <span class="relative grid w-11 h-11 place-items-center bg-lcd-pale group-hover/farm-group:bg-lcd-pale-hover [box-shadow:inset_0_0_0_2px_var(--color-lcd-dark)] group-active/farm-group:[translate:0_1px]">
               {a.icon()}
               <Show when={a.badge?.()}>
-                <span {...stylex.attrs(styles.appBadge)}>{a.badge?.()}</span>
+                <span class="absolute -top-1.5 -right-1.5 bg-berry-500 px-1 leading-2xs text-cream-50">{a.badge?.()}</span>
               </Show>
             </span>
             {a.label}

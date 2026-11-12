@@ -13,8 +13,8 @@ export interface SessionIdentity {
 export class DeliveryRefused extends Error {
   override readonly name = "DeliveryRefused";
   readonly reason: string;
-  constructor(reason: string) {
-    super(reason);
+  constructor(reason: string, options?: ErrorOptions) {
+    super(reason, options);
     this.reason = reason;
   }
 }

@@ -45,12 +45,12 @@ interface Account {
 const paused = (a: Account, now: number) => a.pausedUntil !== 0 && a.pausedUntil > now;
 
 /** Why a step of the bridge did not go through: the database, the farm, or an app. Said as the status's error. */
-export class BridgeError extends Error {
-  override readonly name = "BridgeError";
+export class ConnectorBridgeError extends Error {
+  override readonly name = "ConnectorBridgeError";
 }
 
 /** The farm refused a bridge's step: in the words its status says. */
-const refusedStep = (e: unknown): unknown => (e instanceof ApiError ? new BridgeError(e.message, { cause: e }) : e);
+const refusedStep = (e: unknown): unknown => (e instanceof ApiError ? new ConnectorBridgeError(e.message, { cause: e }) : e);
 
 /** Runs every one of works with one signal; the first that fails stops the others, and all have ended before it throws. */
 async function together(signal: AbortSignal, works: readonly ((signal: AbortSignal) => Promise<void>)[]): Promise<void> {
@@ -82,9 +82,9 @@ interface BridgeEnv {
   readonly retryMost: number;
   /** The service's tasks: each account's generation, the status said to the core. */
   readonly tasks: TaskGroup;
-  /** A query whose own failure (the database's) is a BridgeError here: the status says it. */
+  /** A query whose own failure (the database's) is a ConnectorBridgeError here: the status says it. */
   readonly tried: <A>(work: () => Promise<A>) => Promise<A>;
-  /** work in one transaction; the database's failure is a BridgeError, as tried's. */
+  /** work in one transaction; the database's failure is a ConnectorBridgeError, as tried's. */
   readonly inTx: <A>(work: () => Promise<A>) => Promise<A>;
   readonly isClosing: () => boolean;
 }
@@ -161,7 +161,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
     try {
       await work();
     } catch (e) {
-      if (!(e instanceof BridgeError)) throw e;
+      if (!(e instanceof ConnectorBridgeError)) throw e;
       log.error("vibevalley: connector", e.message);
     }
   };
@@ -183,7 +183,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
       if (at === outChanges) pendingOut = n;
       return n;
     } catch (e) {
-      if (!(e instanceof BridgeError)) throw e;
+      if (!(e instanceof ConnectorBridgeError)) throw e;
       return 0;
     }
   };
@@ -225,7 +225,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
       setErr(t("server.connector.expired"));
       return true;
     } catch (e) {
-      if (!(e instanceof BridgeError)) throw e;
+      if (!(e instanceof ConnectorBridgeError)) throw e;
       setErr(e.message);
       return false;
     }
@@ -258,7 +258,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
       try {
         listed = await tried(() => outboxQ.pendingOutbox(sql, { connector: id }));
       } catch (e) {
-        if (!(e instanceof BridgeError)) throw e;
+        if (!(e instanceof ConnectorBridgeError)) throw e;
         log.error("vibevalley: the outbox could not be read", e.message);
         return false;
       }
@@ -293,7 +293,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
             for (const oid of out.ids) await tried(() => outboxQ.outboxSent(sql, { sent_at: now(), ext_id: extId || null, id: oid }));
           });
         } catch (e) {
-          if (!(e instanceof BridgeError)) throw e;
+          if (!(e instanceof ConnectorBridgeError)) throw e;
           outboxChanged();
           setErr(e.message);
           return false;
@@ -321,7 +321,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
         added = pieces.length;
       }
     } catch (e) {
-      if (!(e instanceof BridgeError)) throw e;
+      if (!(e instanceof ConnectorBridgeError)) throw e;
       outboxChanged();
       setErr(e.message);
       return;
@@ -398,7 +398,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
   const accept = async (messages: readonly Inbound[], cursor: string) => {
     try {
       await inTx(async () => {
-        if ((await tried(() => accountQ.connectorAccount(sql, { connector: id }))) === undefined) throw new BridgeError(t("server.connector.stopped"));
+        if ((await tried(() => accountQ.connectorAccount(sql, { connector: id }))) === undefined) throw new ConnectorBridgeError(t("server.connector.stopped"));
         for (const m of messages) {
           const withId = Inbound.parse(m.id ? m : { ...m, id: newId() });
           await tried(() => inboundQ.acceptInbound(sql, { connector: id, ext_id: withId.id, payload: JSON.stringify(withId), created_at: now() }));
@@ -406,7 +406,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
         if (cursor) await tried(() => accountQ.accountCursor(sql, { connector: id, cursor }));
       });
     } catch (e) {
-      if (e instanceof BridgeError && !isClosing()) setErr(e.message);
+      if (e instanceof ConnectorBridgeError && !isClosing()) setErr(e.message);
       throw e;
     }
     mail.inbox.offer(undefined);
@@ -431,7 +431,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
       try {
         await drainInbox();
       } catch (e) {
-        if (!(e instanceof BridgeError)) throw e;
+        if (!(e instanceof ConnectorBridgeError)) throw e;
         setErr(e.message);
       }
       await wokeWithin(mail.inbox, 1_000, signal);
@@ -449,7 +449,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
         try {
           await accept(messages, c);
         } catch (e) {
-          if (e instanceof BridgeError) throw failedWith(e.message);
+          if (e instanceof ConnectorBridgeError) throw failedWith(e.message);
           throw e;
         }
       },
@@ -472,7 +472,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
           await tried(() => accountQ.pauseAccount(sql, { paused_until: null, connector: id }));
           await reload();
         } catch (e) {
-          if (!(e instanceof BridgeError)) throw e;
+          if (!(e instanceof ConnectorBridgeError)) throw e;
           setErr(e.message);
           await clock.sleep(Math.min(30_000, retryMost), signal);
         }
@@ -485,7 +485,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
       } catch (e) {
         if (isAbort(e, signal)) throw e;
         if (e instanceof AppFailed) stopped = e;
-        else if (e instanceof BridgeError) stopped = failedWith(e.message);
+        else if (e instanceof ConnectorBridgeError) stopped = failedWith(e.message);
         else throw e;
       }
       if (stopped.kind === "stale") {
@@ -549,7 +549,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
           outboxChanged(() => 0);
           await reload();
         } catch (e) {
-          if (!(e instanceof BridgeError)) throw e;
+          if (!(e instanceof ConnectorBridgeError)) throw e;
           outboxChanged();
           failure = e.message;
         }
@@ -647,7 +647,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
           account = undefined;
           setErr("");
         } catch (e) {
-          if (!(e instanceof BridgeError)) throw e;
+          if (!(e instanceof ConnectorBridgeError)) throw e;
           outboxChanged();
           resetProgress();
           loginTry++;
@@ -658,7 +658,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
       });
       return status();
     },
-    /** Throws BridgeError when the database did not take it. */
+    /** Throws ConnectorBridgeError when the database did not take it. */
     setChannel: async (to: string | undefined) => {
       await tried(() => accountQ.accountChannel(sql, { channel_id: to ?? null, connector: id }));
       await reload();

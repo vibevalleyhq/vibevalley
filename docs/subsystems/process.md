@@ -19,8 +19,8 @@
 | `scripts/docs/agent-notes.ts`、`skills.ts`、`doc-links.ts` | 校验 Note 目录格式并生成 `CATALOG.md`、校验 skill 结构、校验文档链接与反引号路径 |
 | `scripts/docs/stale-names.ts`、`glossary.ts`、`i18n.ts` | 拦截已废弃旧名字、校验用语表代码名、校验双语词典与 `catalogs.ts` |
 | `scripts/gen/capabilities.ts`、`api-client.ts`、`primitives.ts` | 生成并校验 `capabilities.md`、`client.ts` 与 `primitives.md` |
-| `scripts/audit/effect-check.ts`、`oxlint-plugin.ts`、`deadcode.ts`、`regression.ts` | `@effect/tsgo` 诊断与棘轮、仓库自定义 lint 规则、`knip` 死代码检查、PR 回归测试修改门禁 |
-| `scripts/audit/practice-audit.ts`、`service-paths.ts`、`protocol-surface.ts`、`schema-audit.ts` | 全仓语法树实践棘轮、服务调用矩阵与扇入检查、根协议导出面棘轮、SQL 枚举与 `Redacted` 契约审计 |
+| `scripts/audit/oxlint-plugin.ts`、`deadcode.ts`、`regression.ts` | 仓库自定义 lint 规则、`knip` 死代码检查、PR 回归测试修改门禁 |
+| `scripts/audit/practice-audit.ts`、`service-paths.ts`、`protocol-surface.ts`、`schema-audit.ts` | 全仓语法树实践棘轮、服务调用矩阵与扇入检查、根协议导出面棘轮、SQL 枚举与 `Secret` 契约审计 |
 | `scripts/audit/comment-review.ts`、`verify-server.ts` | 调用模型审查新增注释、启动隔离沙箱服务端 |
 | `packages/health/`、`scripts/audit/health.config.ts`、`health.ratchet.json` | 热点分析与类型/错误逃生口棘轮检查 |
 | `.agents/notes/`、`.agents/skills/` | Agent Notes 目录与仓库 skills（`.claude/skills` 软链至此） |
@@ -32,7 +32,7 @@
 - **Note 做完即沉淀并删除**：计划上线后，将长期成立的模型、不变量与放弃的路写进对应子系统文档，删除原 Note，并运行 `vp run notes:catalog`。
 - **链接与反引号路径全校验**：文档链接从仓库根写起；反引号内含目录且扩展名为源码/配置的路径必须在仓库中存在（`scripts/docs/doc-links.ts` 检查）。
 - **报错信息给出改法**：自定义 lint 规则与门禁报错应包含原因、`Fix:` 改法与 `See` 参考文件路径（`scripts/audit/oxlint-plugin.test.ts` 检查）。
-- **静态门禁分四层互补**：类型与 `@effect/tsgo` 守住签名与 Effect 语义（`effect:check`）；oxlint 插件守住单文件语法与导入门面（`vp check`）；全仓语法树工具守住跨文件不变量与拓扑（`practice-audit.ts`、`service-paths.ts`、`protocol-surface.ts`）；契约审计守住跨语言表结构与序列化安全（`schema-audit.ts`）。零命中规则直接报错，存量债务按区域进棘轮只减不增。
+- **静态门禁分四层互补**：严格的 TypeScript（tsrs）守住签名与契约（`satisfies Codec<T.X>`，`vp check`）；oxlint 插件守住单文件语法与导入门面（`vp check`）；全仓语法树工具守住跨文件不变量与拓扑（`practice-audit.ts`、`service-paths.ts`、`protocol-surface.ts`）；契约审计守住跨语言表结构与序列化安全（`schema-audit.ts`）。零命中规则直接报错，存量债务按区域进棘轮只减不增。
 - **逃生口按区棘轮，只减不增**：`packages/health` 统计类型逃生口（`x!`、`as T`、lint disable）与错误逃生口并比对 `scripts/audit/health.ratchet.json`；增加报错，减少也要求下调棘轮。
 - **死代码零容忍，回归测试受保护**：`vp run deadcode` 拦截未使用导出与依赖。修改或删除 `regression: ` 测试，或 `fix/` 分支未补回归测试，须在 PR 正文 `## Regression` 说明（`scripts/release/regression.ts` 检查）。
 - **命名一致**：展示名用 `VibeValley` / `码农场物语`；代码、目录、环境变量 `VIBEVALLEY_*` 和分支前缀 `vibevalley/` 统一用小写 `vibevalley`。
@@ -42,7 +42,7 @@
 **执行非平凡改动**
 
 1. 在 `.agents/notes/proposed/<类别>/` 编写计划 Note。
-2. 实现代码与测试，通过 `vp check`、`vp run effect:check` 和相关测试。
+2. 实现代码与测试，通过 `vp check` 和相关测试。
 3. 将 Note 中成立的设计决策沉淀进 `docs/subsystems/*.md`，删除该 Note。
 4. 运行 `vp run notes:catalog` 与 `vp run docs:verify`。
 

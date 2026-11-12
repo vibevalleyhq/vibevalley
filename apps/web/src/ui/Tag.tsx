@@ -1,9 +1,7 @@
 import type { JSX } from "@solidjs/web";
-import type * as stylex from "@stylexjs/stylex";
 
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
-import { withStyles } from "./positioner";
 
 /** What a tag says by its colour: done or new (ok), failed (bad), sent or stopped (wait). Its ink comes with it, so it
  * reads in both themes. */
@@ -34,21 +32,15 @@ const dotColor: Record<DotTone, string> = {
 };
 
 /** A round status dot. ring: drawn on a face or a picture, it is ringed in the page colour to stand off it. */
-export function Dot(props: {
-  tone: DotTone;
-  size?: number;
-  ring?: boolean;
-  class?: JSX.ClassValue | undefined;
-  // For callers still on StyleX; it goes when the last of them is on classes.
-  styles?: stylex.StyleXStyles;
-}) {
+export function Dot(props: { tone: DotTone; size?: number; ring?: boolean; class?: JSX.ClassValue | undefined }) {
   const size = () => `${props.size ?? 9}px`;
   return (
     <span
-      {...withStyles(props.styles, ["inline-block shrink-0 rounded-full", dotColor[props.tone], props.ring !== false && "ring-2 ring-page", props.class], {
+      class={["inline-block shrink-0 rounded-full", dotColor[props.tone], props.ring !== false && "ring-2 ring-page", props.class]}
+      style={{
         width: size(),
         height: size(),
-      })}
+      }}
       aria-hidden="true"
     />
   );

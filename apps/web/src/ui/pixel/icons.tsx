@@ -1,22 +1,12 @@
 import type { JSX } from "@solidjs/web";
-import type * as stylex from "@stylexjs/stylex";
 import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
 
 import type { Phase, SessionAction } from "@vibevalley/protocol";
 
 import { useInterval } from "#/base/timer.ts";
-import { withStyles } from "#/ui/positioner.ts";
 
 /** A drawing from apps/web/public/pixel; decorative unless it has a label. */
-export function SpriteIcon(props: {
-  name: string;
-  size: number;
-  label?: string;
-  class?: JSX.ClassValue | undefined;
-  // For callers still on StyleX; it goes when the last of them is on classes.
-  styles?: stylex.StyleXStyles;
-  style?: JSX.CSSProperties;
-}) {
+export function SpriteIcon(props: { name: string; size: number; label?: string; class?: JSX.ClassValue | undefined; style?: JSX.CSSProperties }) {
   return (
     <img
       src={`/pixel/${props.name}.png`}
@@ -25,11 +15,12 @@ export function SpriteIcon(props: {
       alt={props.label ?? ""}
       aria-hidden={props.label ? undefined : "true"}
       draggable="false"
-      {...withStyles(props.styles, ["inline-block shrink-0 object-contain [image-rendering:pixelated]", props.class], {
+      class={["inline-block shrink-0 object-contain [image-rendering:pixelated]", props.class]}
+      style={{
         ...props.style,
         width: `${props.size}px`,
         height: `${props.size}px`,
-      })}
+      }}
     />
   );
 }

@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -19,173 +18,6 @@ import { createPixelAct, FarmSection, PxButton, SpriteIcon } from "#/ui/pixel/in
 
 import { FarmEmpty, FarmTag, FileRow, PlusMinus, Tinted } from "./rows";
 
-const styles = stylex.create({
-  noticeBox: {
-    marginTop: "0.75rem",
-  },
-  conflictBox: {
-    marginTop: "0.75rem",
-    backgroundColor: "color-mix(in srgb, var(--color-berry-500) 12%, var(--color-cream-50))",
-    paddingBlock: "0.625rem",
-  },
-  errorTint: {
-    backgroundColor: "color-mix(in srgb, var(--color-berry-500) 12%, var(--color-cream-50))",
-  },
-  uncommittedBox: {
-    marginTop: "0.75rem",
-    backgroundColor: "color-mix(in srgb, var(--color-wheat) 20%, var(--color-cream-50))",
-  },
-  repoTag: {
-    backgroundColor: "var(--color-bark-450)",
-    color: "var(--color-cream-50)",
-  },
-  conflictFileTag: {
-    backgroundColor: "var(--color-cream-50)",
-    color: "var(--color-berry-500)",
-  },
-  counts: {
-    fontSize: "12px",
-    color: "var(--color-bark-600)",
-  },
-  resolveHint: {
-    marginTop: "0.375rem",
-    fontSize: "12px",
-    color: "var(--color-bark-600)",
-  },
-  statusHint: {
-    marginTop: "0.5rem",
-    fontSize: "12px",
-    color: "var(--color-bark-600)",
-  },
-  warehouseMeta: {
-    marginTop: "0.25rem",
-    display: "block",
-    fontSize: "12px",
-    color: "var(--color-bark-600)",
-  },
-  warehouseTitle: {
-    WebkitLineClamp: "2",
-    WebkitBoxOrient: "vertical",
-    display: "-webkit-box",
-    overflow: "hidden",
-    fontSize: "13px",
-  },
-  errorWrap: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-start",
-    gap: "0.75rem",
-  },
-  errorText: {
-    fontSize: "13px",
-    color: "var(--color-berry)",
-  },
-  reading: {
-    paddingBlock: "2.5rem",
-    textAlign: "center",
-    fontSize: "13px",
-    color: "var(--color-bark-600)",
-  },
-  readyView: {
-    display: "flex",
-    flexDirection: "column",
-  },
-  metaRow: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.375rem",
-  },
-  emptyNote: {
-    fontSize: "13px",
-    color: "var(--color-bark-600)",
-  },
-  conflictList: {
-    marginTop: "0.375rem",
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.25rem",
-  },
-  uncommittedTitle: {
-    fontSize: "12px",
-    color: "var(--color-bark-800)",
-  },
-  uncommittedList: {
-    marginTop: "0.25rem",
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.25rem",
-  },
-  uncommittedChip: {
-    backgroundColor: "var(--color-cream-50)",
-    paddingInline: "0.375rem",
-    paddingBlock: "0.125rem",
-    fontFamily: "var(--font-mono)",
-    fontSize: "12.5px",
-  },
-  actions: {
-    marginTop: "0.75rem",
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.5rem",
-  },
-  commitRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    paddingBlock: "1px",
-  },
-  commitHash: {
-    fontFamily: "var(--font-mono)",
-    fontSize: "12.5px",
-    color: "var(--color-bark-500)",
-  },
-  commitSubject: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "13px",
-  },
-  commitAgo: {
-    fontSize: "12px",
-    color: "var(--color-bark-400)",
-  },
-  fileList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.25rem",
-  },
-  warehouseGrid: {
-    display: "grid",
-    gap: "0.5rem",
-    gridTemplateColumns: {
-      default: null,
-      "@media (width>=40rem)": "repeat(2,minmax(0,1fr))",
-    },
-  },
-  warehouseCard: {
-    display: "flex",
-    cursor: "pointer",
-    alignItems: "flex-start",
-    gap: "0.75rem",
-    backgroundColor: {
-      default: "var(--color-cream-100)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-cream-200)",
-      },
-    },
-    padding: "0.75rem",
-    textAlign: "left",
-  },
-  warehouseBody: {
-    minWidth: "0",
-    flex: "1",
-  },
-});
-
 export function HarvestReview(props: { session: Session; onDone: () => void }) {
   const changes = useIssueChanges(() => issueOf(props.session));
   return (
@@ -195,9 +27,9 @@ export function HarvestReview(props: { session: Session; onDone: () => void }) {
       </Match>
       <Match when={changes.error()}>
         {(error) => (
-          <div {...stylex.attrs(styles.errorWrap)}>
-            <Tinted styles={styles.errorTint}>
-              <p {...stylex.attrs(styles.errorText)}>
+          <div class="flex flex-col items-start gap-3">
+            <Tinted class="bg-[color-mix(in_srgb,_var(--color-berry-500)_12%,_var(--color-cream-50))]">
+              <p class="text-(length:--text-sm) text-berry">
                 {t("web.farm.graph.unreadable")}
                 {reasonOf(error())}
               </p>
@@ -207,7 +39,7 @@ export function HarvestReview(props: { session: Session; onDone: () => void }) {
         )}
       </Match>
       <Match when={true}>
-        <p {...stylex.attrs(styles.reading)}>{t("web.farm.harvest.reading")}</p>
+        <p class="py-10 text-center text-(length:--text-sm) text-bark-600">{t("web.farm.harvest.reading")}</p>
       </Match>
     </Switch>
   );
@@ -233,13 +65,13 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
     if ((await act.run(async () => (await commands.resolve(session), true))) === true) props.onDone();
   };
   return (
-    <div {...stylex.attrs(styles.readyView)}>
-      <div {...stylex.attrs(styles.metaRow)}>
-        <FarmTag text={t("web.farm.harvest.repo", { repo: props.changes.repo })} styles={styles.repoTag} />
+    <div class="flex flex-col">
+      <div class="flex flex-wrap items-center gap-1.5">
+        <FarmTag text={t("web.farm.harvest.repo", { repo: props.changes.repo })} class="bg-bark-450 text-cream-50" />
         <Show when={props.changes.branch}>
           <FarmTag text={`${props.changes.branch} → ${props.changes.base}`} />
         </Show>
-        <span {...stylex.attrs(styles.counts)}>
+        <span class="text-(length:--text-xs) text-bark-600">
           {t("web.farm.harvest.counts", { commits: props.changes.commits.length, files: props.changes.files.length })}
         </span>
         <Show when={props.changes.files.length > 0}>
@@ -250,30 +82,32 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
         when={conflicts().length > 0}
         fallback={
           <Show when={empty()}>
-            <Tinted styles={styles.noticeBox}>
-              <p {...stylex.attrs(styles.emptyNote)}>{t("web.farm.harvest.none")}</p>
+            <Tinted class="mt-3">
+              <p class="text-(length:--text-sm) text-bark-600">{t("web.farm.harvest.none")}</p>
             </Tinted>
           </Show>
         }
       >
-        <Tinted styles={styles.conflictBox}>
-          <p {...stylex.attrs(styles.errorText)}>{t("web.farm.harvest.conflict", { base: props.changes.base })}</p>
-          <div {...stylex.attrs(styles.conflictList)}>
-            <For each={conflicts()}>{(f) => <FarmTag text={f} styles={styles.conflictFileTag} />}</For>
+        <Tinted class="mt-3 bg-[color-mix(in_srgb,_var(--color-berry-500)_12%,_var(--color-cream-50))] py-2.5">
+          <p class="text-(length:--text-sm) text-berry">{t("web.farm.harvest.conflict", { base: props.changes.base })}</p>
+          <div class="mt-1.5 flex flex-wrap gap-1">
+            <For each={conflicts()}>{(f) => <FarmTag text={f} class="bg-cream-50 text-berry-500" />}</For>
           </div>
-          <p {...stylex.attrs(styles.resolveHint)}>{t("web.farm.harvest.resolveHow", { base: props.changes.base })}</p>
+          <p class="mt-1.5 text-(length:--text-xs) text-bark-600">{t("web.farm.harvest.resolveHow", { base: props.changes.base })}</p>
         </Tinted>
       </Show>
       <Show when={props.changes.behind > 0 && conflicts().length === 0}>
-        <p {...stylex.attrs(styles.statusHint)}>{t("web.farm.harvest.behind", { base: props.changes.base, n: Math.round(props.changes.behind) })}</p>
+        <p class="mt-2 text-(length:--text-xs) text-bark-600">
+          {t("web.farm.harvest.behind", { base: props.changes.base, n: Math.round(props.changes.behind) })}
+        </p>
       </Show>
       <Show when={props.changes.uncommitted.length > 0}>
-        <Tinted styles={styles.uncommittedBox}>
-          <p {...stylex.attrs(styles.uncommittedTitle)}>{t("web.farm.harvest.uncommitted", { n: props.changes.uncommitted.length })}</p>
-          <div {...stylex.attrs(styles.uncommittedList)}>
+        <Tinted class="mt-3 bg-[color-mix(in_srgb,_var(--color-wheat)_20%,_var(--color-cream-50))]">
+          <p class="text-(length:--text-xs) text-bark-800">{t("web.farm.harvest.uncommitted", { n: props.changes.uncommitted.length })}</p>
+          <div class="mt-1 flex flex-wrap gap-1">
             <For each={props.changes.uncommitted}>
               {(f) => (
-                <span {...stylex.attrs(styles.uncommittedChip)}>
+                <span class="bg-cream-50 px-1.5 py-0.5 font-mono text-[length:12.5px]">
                   {changeKind(f.status).mark} {f.path}
                 </span>
               )}
@@ -281,7 +115,7 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
           </div>
         </Tinted>
       </Show>
-      <div {...stylex.attrs(styles.actions)}>
+      <div class="mt-3 flex flex-wrap gap-2">
         <Show when={acts().includes("complete")}>
           <PxButton tone="primary" data-act="complete" disabled={act.busy()} onClick={() => void take()}>
             {empty() ? t("web.farm.harvest.letGo") : t("web.farm.harvest.take", { base: props.changes.base })}
@@ -295,16 +129,16 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
         <PxButton onClick={() => props.onDone()}>{t("web.farm.notNow")}</PxButton>
       </div>
       <Show when={!acts().includes("complete") && !acts().includes("resolve")}>
-        <p {...stylex.attrs(styles.statusHint)}>{t("web.farm.water.moved")}</p>
+        <p class="mt-2 text-(length:--text-xs) text-bark-600">{t("web.farm.water.moved")}</p>
       </Show>
       <Show when={props.changes.commits.length > 0}>
         <FarmSection title={t("web.farm.graph.commits")}>
           <For each={props.changes.commits}>
             {(c) => (
-              <div {...stylex.attrs(styles.commitRow)}>
-                <span {...stylex.attrs(styles.commitHash)}>{c.hash}</span>
-                <span {...stylex.attrs(styles.commitSubject)}>{c.subject}</span>
-                <span {...stylex.attrs(styles.commitAgo)}>{ago(c.at, now())}</span>
+              <div class="flex items-center gap-2 py-px">
+                <span class="font-mono text-[length:12.5px] text-bark-500">{c.hash}</span>
+                <span class="min-w-0 flex-1 truncate text-(length:--text-sm)">{c.subject}</span>
+                <span class="text-(length:--text-xs) text-bark-400">{ago(c.at, now())}</span>
               </div>
             )}
           </For>
@@ -312,7 +146,7 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
       </Show>
       <Show when={props.changes.files.length > 0}>
         <FarmSection title={t("web.farm.harvest.files")}>
-          <div {...stylex.attrs(styles.fileList)}>
+          <div class="flex flex-col gap-1">
             <For each={props.changes.files}>{(f) => <FileRow file={f} conflict={conflicts().includes(f.path)} />}</For>
           </div>
         </FarmSection>
@@ -335,7 +169,7 @@ export function Warehouse() {
   const issues = () => core()?.issues ?? [];
   return (
     <Show when={stored().length > 0} fallback={<FarmEmpty text={t("web.farm.harvest.empty")} />}>
-      <div {...stylex.attrs(styles.warehouseGrid)}>
+      <div class="grid gap-2 sm:grid-cols-2">
         <For each={stored()}>
           {(i) => (
             <button
@@ -344,12 +178,12 @@ export function Warehouse() {
               onClick={() => {
                 router.navigate(`/issues/${encodeURIComponent(i.id)}`);
               }}
-              {...stylex.attrs(styles.warehouseCard)}
+              class="flex cursor-pointer items-start gap-3 bg-cream-100 hover:bg-cream-200 p-3 text-left"
             >
               <SpriteIcon name="icon-harvest" size={40} />
-              <span {...stylex.attrs(styles.warehouseBody)}>
-                <span {...stylex.attrs(styles.warehouseTitle)}>{issueTitle(i, issues())}</span>
-                <span {...stylex.attrs(styles.warehouseMeta)}>
+              <span class="min-w-0 flex-1">
+                <span class="line-clamp-2 text-(length:--text-sm)">{issueTitle(i, issues())}</span>
+                <span class="mt-1 block text-(length:--text-xs) text-bark-600">
                   {[agentName(i), i.repo, i.closedAt !== undefined ? t("web.farm.harvest.taken", { ago: ago(i.closedAt, now()) }) : undefined]
                     .filter(Boolean)
                     .join(" · ")}

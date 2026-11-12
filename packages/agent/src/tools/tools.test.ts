@@ -10,7 +10,7 @@ import { waitFor } from "@vibevalley/testkit/until";
 import { makeBrain } from "../brain/brain.ts";
 import { ToolFailed } from "../core/errors.ts";
 import type { Tool } from "../core/loop.ts";
-import { effectTool } from "../core/tool.ts";
+import { runTool } from "../core/tool.ts";
 import { readMcpConfig, connectAll, mcpContentText, mcpToolName } from "../infra/mcp.ts";
 import { scriptedLLM, tempHome, type TestClock, testClock } from "../testing/testing.ts";
 import { codingTools, htmlText } from "./coding.ts";
@@ -92,7 +92,7 @@ describe("the task tools", () => {
 describe("a tool whose work is an Effect", () => {
   test("is interrupted when the run stops", async () => {
     let interrupted = false;
-    const waits = effectTool({
+    const waits = runTool({
       name: "waits",
       description: "",
       parameters: objectSchema(),
@@ -113,7 +113,7 @@ describe("a tool whose work is an Effect", () => {
   });
 
   test("says a failure's message as its failed result", async () => {
-    const refuses = effectTool({
+    const refuses = runTool({
       name: "refuses",
       description: "",
       parameters: objectSchema(),

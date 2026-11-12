@@ -1,18 +1,8 @@
-import * as stylex from "@stylexjs/stylex";
-
 import { stories, story } from "@vibevalley/stories";
 
 import { Button } from "./Button";
 import { ToastHost } from "./ToastHost";
 import { toast } from "./toasts";
-
-const viewStyles = stylex.create({
-  toastHostStoriesDiv: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "0.5rem",
-  },
-});
 
 export default stories({
   title: "组件/工作台/ToastHost",
@@ -21,7 +11,7 @@ export default stories({
       fill: true,
       note: "底部一行，四秒后走；按钮在两个主题里都会加一条。",
       render: () => (
-        <div {...stylex.attrs(viewStyles.toastHostStoriesDiv)}>
+        <div class="flex items-start gap-2">
           <Button onClick={() => toast("已复制链接")}>说一句</Button>
           <Button tone="danger" onClick={() => toast("没连上服务端，稍后再试", "bad")}>
             说一句坏的

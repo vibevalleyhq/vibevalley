@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -25,30 +24,6 @@ import { Card, Quiet } from "#/ui/layout.tsx";
 import { FlashPlayer } from "./FlashPlayer.tsx";
 import { publicationKey } from "./publication.ts";
 import { ReleaseAssets } from "./ReleaseAssets.tsx";
-
-const viewStyles = stylex.create({
-  section: { display: "flex", minWidth: 0, flexDirection: "column", gap: "1rem" },
-  notice: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", color: "var(--color-muted)" },
-  identifierDetail: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", wordBreak: "break-all", color: "var(--color-muted)" },
-  form: { display: "flex", minWidth: 0, flexDirection: "column", gap: "0.75rem" },
-  actions: { display: "flex", flexWrap: "wrap", gap: "0.5rem" },
-  error: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", color: "var(--color-berry)" },
-  stack: { display: "flex", minWidth: 0, flexDirection: "column", gap: "0.5rem" },
-  detail: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", color: "var(--color-muted)" },
-  heading: { fontSize: "var(--text-base)", lineHeight: "var(--leading-base)", fontWeight: "var(--font-weight-semibold)" },
-  player: { width: "100%", maxWidth: "100%", minWidth: 0 },
-  source: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", overflowWrap: "break-word", color: "var(--color-muted)" },
-  metadata: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.5rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  prose: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", overflowWrap: "break-word", whiteSpace: "pre-wrap" },
-  link: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", color: "var(--color-water)", textDecorationLine: "underline" },
-});
 
 const voicesQuery = defineQuery({
   schema: S.ProviderVoiceListing,
@@ -121,12 +96,12 @@ export function SpeechPanel() {
     return act.run(() => api.media.speech.create(request));
   };
   return (
-    <section {...stylex.attrs(viewStyles.section)} data-testid="speech-panel" aria-label={t("web.media.speech.title")}>
+    <section class="flex min-w-0 flex-col gap-4" data-testid="speech-panel" aria-label={t("web.media.speech.title")}>
       <Card title={t("web.media.speech.title")}>
-        <p {...stylex.attrs(viewStyles.notice)}>{t("web.media.speech.notice")}</p>
+        <p class="text-sm text-muted">{t("web.media.speech.notice")}</p>
         <Show when={status()?.speech} fallback={<Quiet>{query.error() ? reasonOf(query.error()) : t("web.media.speech.configure")}</Quiet>}>
           <p
-            {...stylex.attrs(viewStyles.identifierDetail)}
+            class="text-xs break-all text-muted"
             data-testid="speech-connection"
             data-connection={status()?.speech?.connection}
             data-revision={status()?.revision}
@@ -145,7 +120,7 @@ export function SpeechPanel() {
         </Button>
         <fieldset
           disabled={act.busy() || streamActive() || submitted() !== undefined}
-          {...stylex.attrs(viewStyles.form)}
+          class="flex min-w-0 flex-col gap-3"
           aria-label={t("web.media.speech.title")}
         >
           <Field label={t("web.media.speech.voice")} hint={t("web.media.speech.voiceHint")}>
@@ -160,7 +135,7 @@ export function SpeechPanel() {
             />
           </Field>
           <Show when={status()?.speech}>
-            <div {...stylex.attrs(viewStyles.actions)}>
+            <div class="flex flex-wrap gap-2">
               <Button
                 data-testid="speech-voices-first"
                 disabled={voices.fetching()}
@@ -190,7 +165,7 @@ export function SpeechPanel() {
             </Show>
             <Show when={voices.error()}>
               {(why) => (
-                <p role="alert" {...stylex.attrs(viewStyles.error)}>
+                <p role="alert" class="text-sm text-berry">
                   {reasonOf(why())}
                 </p>
               )}
@@ -246,10 +221,10 @@ export function SpeechPanel() {
               data-id={sent().request.id}
               data-connection={sent().request.connection}
               data-revision={sent().request.revision}
-              {...stylex.attrs(viewStyles.stack)}
+              class="flex min-w-0 flex-col gap-2"
             >
-              <p {...stylex.attrs(viewStyles.detail)}>{t("web.media.speech.pending")}</p>
-              <p {...stylex.attrs(viewStyles.identifierDetail)}>
+              <p class="text-xs text-muted">{t("web.media.speech.pending")}</p>
+              <p class="text-xs break-all text-muted">
                 {t("web.media.speech.binding", {
                   account: sent().name,
                   connection: sent().request.connection,
@@ -266,7 +241,7 @@ export function SpeechPanel() {
             </div>
           )}
         </Show>
-        <div {...stylex.attrs(viewStyles.actions)}>
+        <div class="flex flex-wrap gap-2">
           <Show when={execution() !== "streaming"}>
             <Button
               data-testid="speech-generate"
@@ -292,13 +267,13 @@ export function SpeechPanel() {
         </div>
         <Show when={error()}>
           {(why) => (
-            <p role="alert" data-testid="speech-error" {...stylex.attrs(viewStyles.error)}>
+            <p role="alert" data-testid="speech-error" class="text-sm text-berry">
               {why()}
             </p>
           )}
         </Show>
       </Card>
-      <h2 {...stylex.attrs(viewStyles.heading)}>{t("web.media.speech.history")}</h2>
+      <h2 class="text-base font-semibold">{t("web.media.speech.history")}</h2>
       <Show when={jobs().length > 0} fallback={<Quiet>{t("web.media.speech.empty")}</Quiet>}>
         <For each={jobs()} keyed={(job) => job.id}>
           {(job) => <SpeechJob job={job()} />}
@@ -332,7 +307,7 @@ function SpeechAudio(props: { src: string; name: string; mime: string; format: M
         autoplay={false}
         preload="metadata"
         aria-label={props.name}
-        {...stylex.attrs(viewStyles.player)}
+        class="w-full max-w-full min-w-0"
       />
     </Show>
   );
@@ -362,18 +337,18 @@ function SpeechJob(props: { job: MediaSpeechJob }) {
   };
   return (
     <Card title={props.job.phaseText}>
-      <div data-testid="speech-job" data-id={props.job.id} data-phase={props.job.phase} {...stylex.attrs(viewStyles.form)}>
-        <p data-testid="speech-format-result" data-format={props.job.format} {...stylex.attrs(viewStyles.identifierDetail)}>
+      <div data-testid="speech-job" data-id={props.job.id} data-phase={props.job.phase} class="flex min-w-0 flex-col gap-3">
+        <p data-testid="speech-format-result" data-format={props.job.format} class="text-xs break-all text-muted">
           {props.job.model} · {props.job.connection} · {props.job.revision} · {props.job.voice} · {props.job.format} · {props.job.id}
         </p>
-        <p data-testid="speech-source" {...stylex.attrs(viewStyles.source)}>
+        <p data-testid="speech-source" class="text-xs wrap-break-word text-muted">
           {props.job.source.kind === "user"
             ? t("web.media.sourceUser")
             : t("web.media.sourceAgent", { agent: props.job.source.agent, channel: props.job.source.channel })}
         </p>
         <Show when={props.job.metadata}>
           {(metadata) => (
-            <div data-testid="speech-metadata" data-source={metadata().source} {...stylex.attrs(viewStyles.metadata)}>
+            <div data-testid="speech-metadata" data-source={metadata().source} class="flex flex-wrap gap-2 text-xs text-muted">
               <span>{metadata().source === "file" ? t("web.audio.metadataFile") : t("web.audio.metadataProvider")}</span>
               <Show when={metadata().sampleRate !== undefined}>
                 <span>{t("web.audio.metadataRate", { value: metadata().sampleRate ?? "" })}</span>
@@ -392,7 +367,7 @@ function SpeechJob(props: { job: MediaSpeechJob }) {
         </Show>
         <Show when={props.job.usage}>
           {(usage) => (
-            <div data-testid="speech-usage" {...stylex.attrs(viewStyles.metadata)}>
+            <div data-testid="speech-usage" class="flex flex-wrap gap-2 text-xs text-muted">
               <Show when={usage().inputCharacters !== undefined}>
                 <span>{t("web.audio.usageCharacters", { value: usage().inputCharacters ?? "" })}</span>
               </Show>
@@ -423,9 +398,9 @@ function SpeechJob(props: { job: MediaSpeechJob }) {
             {t("web.media.speech.resume")}
           </Button>
         </Show>
-        <p {...stylex.attrs(viewStyles.prose)}>{props.job.prompt}</p>
+        <p class="text-sm wrap-break-word whitespace-pre-wrap">{props.job.prompt}</p>
         <Show when={props.job.problem}>
-          <p data-testid="speech-problem" {...stylex.attrs(viewStyles.notice)}>
+          <p data-testid="speech-problem" class="text-sm text-muted">
             {props.job.problem}
           </p>
         </Show>
@@ -433,7 +408,7 @@ function SpeechJob(props: { job: MediaSpeechJob }) {
           {(file) => (
             <>
               <SpeechAudio src={file().src} name={file().name} mime={props.job.contentType ?? file().mime} format={props.job.format} />
-              <a data-testid="speech-save" href={file().src} download={file().name} {...stylex.attrs(viewStyles.link)}>
+              <a data-testid="speech-save" href={file().src} download={file().name} class="text-sm text-water underline">
                 {t("web.media.speech.save")}
               </a>
             </>
@@ -467,7 +442,7 @@ function SpeechJob(props: { job: MediaSpeechJob }) {
             </>
           )}
         </Show>
-        <div {...stylex.attrs(viewStyles.actions)}>
+        <div class="flex flex-wrap gap-2">
           <Show when={props.job.canCancel}>
             <ConfirmButton
               testid="speech-cancel"
@@ -495,7 +470,7 @@ function SpeechJob(props: { job: MediaSpeechJob }) {
         </div>
         <Show when={error()}>
           {(why) => (
-            <p role="alert" {...stylex.attrs(viewStyles.error)}>
+            <p role="alert" class="text-sm text-berry">
               {why()}
             </p>
           )}

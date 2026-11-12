@@ -1,38 +1,14 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
 import { For } from "solid-js";
 
 import { SessionActionValues, type Phase, type SessionAction } from "@vibevalley/protocol";
 import { stories, story } from "@vibevalley/stories";
 
 import { ActionGlyph, Marked, PhaseGlyph, SpriteIcon } from "./icons";
-import { storyFrame } from "./story.stylex";
 
-const viewStyles = stylex.create({
-  composed: (offset: number) => ({ marginLeft: offset, rotate: "90deg" }),
-  iconsStoriesDiv: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.75rem",
-  },
-  iconsStoriesDiv2: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "1rem",
-  },
-  iconsStoriesSpan: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.375rem",
-  },
-  iconsStoriesSpan2: {
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-2xs)",
-    lineHeight: "var(--leading-2xs)",
-  },
-  iconsStoriesDiv3: {
-    width: "16rem",
-  },
-});
+const viewStyles = {
+  composed: (offset: number): JSX.CSSProperties => ({ "margin-left": `${offset}px` }),
+};
 
 const sprites = ["icon-seeds", "icon-shovel", "icon-water", "icon-bell", "icon-coin", "icon-shed", "icon-tree", "icon-bug", "icon-trophy", "icon-wrench"];
 const working = (action: SessionAction) => ({ _tag: "working", since: 0, doing: { action } }) as Phase;
@@ -47,7 +23,7 @@ const phases: [string, Phase][] = [
 export default stories({
   title: "组件/像素/icons",
   themes: ["light"],
-  frame: storyFrame.pixel,
+  frame: "bg-cream-50 font-pixel text-(length:--text-xs) text-bark-900",
   stories: {
     Composition: story({
       args: { size: 24, offset: 12 },
@@ -56,14 +32,20 @@ export default stories({
         offset: { kind: "number", min: 0, max: 32, step: 4 },
       },
       render: (a) => (
-        <SpriteIcon name="button-next" size={a.size} label="Composed sprite" styles={viewStyles.composed(a.offset)} style={{ "margin-top": "8px" }} />
+        <SpriteIcon
+          name="button-next"
+          size={a.size}
+          label="Composed sprite"
+          class="[rotate:90deg]"
+          style={{ ...viewStyles.composed(a.offset), "margin-top": "8px" }}
+        />
       ),
     }),
     Sprites: story({
       args: { size: 24 },
       controls: { size: { kind: "number", min: 12, max: 48, step: 4 } },
       render: (a) => (
-        <div {...stylex.attrs(viewStyles.iconsStoriesDiv)}>
+        <div class="flex flex-wrap gap-3">
           <For each={sprites}>{(name) => <SpriteIcon name={name} size={a.size} label={name} />}</For>
         </div>
       ),
@@ -71,12 +53,12 @@ export default stories({
     Actions: story({
       note: "帮工这会儿在做的事。",
       render: () => (
-        <div {...stylex.attrs(viewStyles.iconsStoriesDiv2)}>
+        <div class="flex flex-wrap gap-4">
           <For each={SessionActionValues}>
             {(action) => (
-              <span {...stylex.attrs(viewStyles.iconsStoriesSpan)}>
+              <span class="flex items-center gap-1.5">
                 <ActionGlyph action={action} />
-                <span {...stylex.attrs(viewStyles.iconsStoriesSpan2)}>{action}</span>
+                <span class="font-mono text-2xs">{action}</span>
               </span>
             )}
           </For>
@@ -85,12 +67,12 @@ export default stories({
     }),
     Phases: story({
       render: () => (
-        <div {...stylex.attrs(viewStyles.iconsStoriesDiv2)}>
+        <div class="flex flex-wrap gap-4">
           <For each={phases}>
             {([name, phase]) => (
-              <span {...stylex.attrs(viewStyles.iconsStoriesSpan)}>
+              <span class="flex items-center gap-1.5">
                 <PhaseGlyph phase={phase} />
-                <span {...stylex.attrs(viewStyles.iconsStoriesSpan2)}>{name}</span>
+                <span class="font-mono text-2xs">{name}</span>
               </span>
             )}
           </For>
@@ -99,7 +81,7 @@ export default stories({
     }),
     Marked: story({
       render: () => (
-        <div {...stylex.attrs(viewStyles.iconsStoriesDiv3)}>
+        <div class="w-64">
           <Marked mark="icon-bell">助手说：两块地熟了，可以去看改动了。</Marked>
         </div>
       ),

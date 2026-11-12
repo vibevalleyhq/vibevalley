@@ -1,8 +1,5 @@
 import type { JSX } from "@solidjs/web";
-import type * as stylex from "@stylexjs/stylex";
 import { omit, Show } from "solid-js";
-
-import { withStyles } from "#/ui/positioner.ts";
 
 import { SpriteIcon } from "./icons";
 
@@ -30,12 +27,10 @@ export function PxButton(
     label?: string;
     onClick?: ((e: MouseEvent) => void) | undefined;
     class?: JSX.ClassValue | undefined;
-    // For callers still on StyleX; it goes when the last of them is on classes.
-    styles?: stylex.StyleXStyles;
     style?: JSX.CSSProperties;
   } & Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "aria-label" | "onClick" | "class" | "style">,
 ) {
-  const rest = omit(props, "children", "tone", "size", "icon", "label", "onClick", "disabled", "class", "styles", "style", "type");
+  const rest = omit(props, "children", "tone", "size", "icon", "label", "onClick", "disabled", "class", "style", "type");
   // An icon alone is not framed: it sits inside a frame already (a window, a field, a card), and a ring per icon is a box in a box.
   const bare = () => (props.size ?? "md") === "icon" && (props.tone ?? "plain") === "plain";
   return (
@@ -45,16 +40,13 @@ export function PxButton(
       onClick={(e) => props.onClick?.(e)}
       disabled={props.disabled === true || props.onClick === undefined}
       aria-label={props.label}
-      {...withStyles(
-        props.styles,
-        [
-          "pixel-sm inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap select-none pixel-focus disabled:cursor-default disabled:opacity-45",
-          sizes[props.size ?? "md"],
-          bare() ? bareLook : [tones[props.tone ?? "plain"], framed],
-          props.class,
-        ],
-        props.style,
-      )}
+      class={[
+        "pixel-sm inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap select-none pixel-focus disabled:cursor-default disabled:opacity-45",
+        sizes[props.size ?? "md"],
+        bare() ? bareLook : [tones[props.tone ?? "plain"], framed],
+        props.class,
+      ]}
+      style={props.style}
     >
       <Show when={props.icon}>{(icon) => <SpriteIcon name={icon()} size={14} />}</Show>
       {props.children}

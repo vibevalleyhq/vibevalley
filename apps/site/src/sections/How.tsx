@@ -1,6 +1,4 @@
 import type { JSX } from "@solidjs/web";
-/** @jsxImportSource @solidjs/web */
-import * as stylex from "@stylexjs/stylex";
 import { steps, type MotionValue } from "motion";
 import { createEffect, createMemo, createSignal, onCleanup, onSettled } from "solid-js";
 
@@ -25,418 +23,23 @@ import type { Copy } from "../i18n/zh";
 import { createEntrance } from "../ui/entrance";
 import { Presence } from "../ui/Presence";
 import { createElementRef, createMotionValue, createScrollPosition, readMotion, reducedMotion, createReveal } from "../ui/scroll";
-import { Section, domAttrs } from "../ui/ui";
+import { Section } from "../ui/ui";
 
-const sceneStyles = stylex.create({
-  finishedField: {
-    position: "relative",
-    marginBottom: "3rem",
-    overflow: "hidden",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundImage: "var(--scene-field-background)",
-    boxShadow: "4px 4px 0 var(--color-drop)",
-  },
-  storyScene: {
-    position: "relative",
-    height: {
-      default: "264px",
-      "@media (width>=64rem)": "396px",
-    },
-    flexShrink: "0",
-    overflow: "hidden",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-story-sky)",
-    boxShadow: "4px 4px 0 var(--color-drop)",
-  },
-  sky: {
-    position: "absolute",
-    inset: "0",
-    backgroundImage: "var(--scene-story-background)",
-  },
-  cloud: {
-    position: "absolute",
-    left: "0",
-    height: "0.625rem",
-    animationName: "title-cloud",
-    animationDuration: "160s",
-    animationDelay: "0s",
-    animationTimingFunction: "linear",
-    animationIterationCount: "infinite",
-    animationDirection: "normal",
-    animationFillMode: "none",
-    animationPlayState: "running",
-    borderRadius: "3px",
-    backgroundColor: {
-      default: "var(--color-cream-translucent)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-cream-50) 90%, transparent)",
-    },
-    boxShadow: "var(--shadow-story-cloud)",
-  },
-  ground: {
-    position: "absolute",
-    insetInline: "0",
-    bottom: "0",
-    backgroundImage: "var(--scene-field-background)",
-  },
-});
+const dotTones = {
+  base: "bg-bark-900",
+  branch: "bg-leaf-500",
+  merge: "bg-wheat",
+};
 
-const dotTones = stylex.create({
-  base: { backgroundColor: "var(--color-bark-900)" },
-  branch: { backgroundColor: "var(--color-leaf-500)" },
-  merge: { backgroundColor: "var(--color-wheat)" },
-});
-
-const viewStyles = stylex.create({
-  sprite: { imageRendering: "pixelated", position: "absolute", maxWidth: "none", transformOrigin: "bottom" },
-  spriteGeometry: (left: number, top: number, width: number, height: number) => ({ left, top, width, height }),
-  distantBuilding: { scale: "75% 75%", filter: "brightness(95%) saturate(75%)" },
-  distantDetail: { scale: "55% 55%", filter: "brightness(75%)" },
-  halfSize: { scale: "50% 50%" },
-  badge: {
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: "var(--color-bark-900)",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.25rem",
-  },
-  captionStep: {
-    fontFamily: "var(--font-pixel)",
-    fontSize: "var(--text-base)",
-    lineHeight: "1",
-    transitionProperty: "color, background-color, border-color",
-    transitionDuration: "0.3s",
-    transitionTimingFunction: "steps(3)",
-  },
-  completed: { backgroundColor: "var(--color-leaf-500)", color: "var(--color-cream-50)" },
-  current: { backgroundColor: "var(--color-wheat)" },
-  waiting: { backgroundColor: "var(--color-cream-100)", color: "var(--color-bark-500)" },
-  forked: { backgroundColor: "var(--color-leaf-300)" },
-  pendingTests: { backgroundColor: "var(--color-cream-100)" },
-  count: { fontVariantNumeric: "tabular-nums" },
-  dot: { position: "absolute", translate: "-50% -50%", borderWidth: 2, borderStyle: "solid", borderColor: "var(--color-bark-900)" },
-  smallDot: { width: "0.75rem", height: "0.75rem" },
-  largeDot: { width: "1rem", height: "1rem" },
-  dotPosition: (left: string, top: number) => ({ left, top }),
-  finishedDiv: {
-    display: "grid",
-    gridTemplateColumns: "repeat(4,minmax(0,1fr))",
-    alignItems: "flex-end",
-    gap: "22px",
-    paddingInline: {
-      default: "0.75rem",
-      "@media (width>=40rem)": "1.5rem",
-      "@media (width>=64rem)": "0",
-    },
-    paddingTop: {
-      default: "1.5rem",
-      "@media (width>=40rem)": "2rem",
-    },
-  },
-  finishedDiv2: {
-    display: "flex",
-    justifyContent: "center",
-  },
-  finishedImg: {
-    width: {
-      default: "68px",
-      "@media (width>=40rem)": "102px",
-      "@media (width>=64rem)": "136px",
-    },
-    maxWidth: "none",
-    imageRendering: "pixelated",
-  },
-  finishedDiv3: {
-    position: "relative",
-    marginTop: "0.5rem",
-    marginBottom: {
-      default: "0.75rem",
-      "@media (width>=40rem)": "1rem",
-    },
-    height: {
-      default: "2.5rem",
-      "@media (width>=40rem)": "3rem",
-    },
-    borderBlockStyle: "solid",
-    borderBlockWidth: "2px",
-    borderColor: "var(--color-path-edge)",
-    backgroundImage: "repeating-linear-gradient(90deg,var(--color-path) 0 22px,var(--color-path-groove) 22px 26px)",
-  },
-  finishedImg2: {
-    position: "absolute",
-    right: "4%",
-    bottom: "0.375rem",
-    height: {
-      default: "3.5rem",
-      "@media (width>=40rem)": "84px",
-      "@media (width>=64rem)": "7rem",
-    },
-    width: "auto",
-    maxWidth: "none",
-    imageRendering: "pixelated",
-  },
-  finishedDiv4: {
-    marginBottom: "3rem",
-  },
-  finishedOl: {
-    display: "grid",
-    gridTemplateColumns: {
-      default: "minmax(0, 1fr)",
-      "@media (width>=40rem)": "repeat(2,minmax(0,1fr))",
-      "@media (width>=64rem)": "repeat(4,minmax(0,1fr))",
-    },
-    gap: "22px",
-  },
-  finishedLi: {
-    position: "relative",
-    marginTop: {
-      default: "0.625rem",
-      "@media (width>=40rem)": "0",
-    },
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-cream-50)",
-    boxShadow: "inset 0 0 0 2px var(--color-rim), 4px 4px 0 var(--color-drop)",
-    paddingInline: "22px",
-    paddingTop: "26px",
-    paddingBottom: "22px",
-  },
-  finishedSpan: {
-    position: "absolute",
-    top: "-1rem",
-    left: "18px",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-leaf-500)",
-    paddingInline: "0.625rem",
-    paddingBlock: "0.375rem",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "var(--text-lg)",
-    lineHeight: "1",
-    color: "var(--color-cream-50)",
-  },
-  finishedImg3: {
-    marginBottom: "0.75rem",
-    width: "3.5rem",
-    height: "3.5rem",
-    objectFit: "contain",
-    imageRendering: "pixelated",
-  },
-  finishedH3: {
-    marginBottom: "0.375rem",
-    fontSize: "var(--text-2xl)",
-    lineHeight: "var(--leading-2xl)",
-  },
-  finishedP: {
-    fontSize: "var(--text-base)",
-    lineHeight: "var(--leading-base)",
-    color: "var(--color-bark-800)",
-  },
-  howTrack: {
-    position: "relative",
-  },
-  storyDiv: {
-    position: "sticky",
-    top: "4rem",
-    display: "flex",
-    height: "calc(100svh - 4rem)",
-    flexDirection: "column",
-    justifyContent: "center",
-    gap: "1.25rem",
-    paddingBlock: "1rem",
-  },
-  storyDiv2: {
-    position: "absolute",
-    top: "0",
-    left: "0",
-    transformOrigin: "0 0",
-  },
-  storyDiv3: {
-    position: "absolute",
-    top: "0",
-    left: "0",
-  },
-  storyImg: {
-    position: "absolute",
-    maxWidth: "none",
-    imageRendering: "pixelated",
-  },
-  captionDiv: {
-    position: "relative",
-    minHeight: "11rem",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-cream-50)",
-    boxShadow: "inset 0 0 0 2px var(--color-rim), 4px 4px 0 var(--color-drop)",
-    paddingInline: "1.25rem",
-    paddingTop: "1rem",
-    paddingBottom: "1.25rem",
-  },
-  captionOl: {
-    marginBottom: "0.75rem",
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.5rem",
-  },
-  captionDiv2: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "1rem",
-  },
-  captionImg: {
-    width: "3rem",
-    height: "3rem",
-    flex: "none",
-    objectFit: "contain",
-    imageRendering: "pixelated",
-  },
-  captionH3: {
-    marginBottom: "0.25rem",
-    fontSize: "var(--text-2xl)",
-    lineHeight: "var(--leading-2xl)",
-  },
-  passDiv: {
-    position: "absolute",
-    inset: "0",
-  },
-  groundDiv: {
-    position: "absolute",
-    insetInline: "0",
-    borderBlockStyle: "solid",
-    borderBlockWidth: "1px",
-    borderColor: "var(--color-path-edge)",
-    backgroundImage: "repeating-linear-gradient(90deg,var(--color-path) 0 11px,var(--color-path-groove) 11px 13px)",
-  },
-  spotDiv: {
-    position: "absolute",
-  },
-  spotDiv2: {
-    position: "absolute",
-    top: "0",
-  },
-  popDiv: {
-    position: "absolute",
-    bottom: "0",
-    left: "0",
-    translate: "-50% 0",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-cream-50)",
-    padding: "0.125rem",
-    boxShadow: "1px 1px 0 var(--color-drop)",
-  },
-  popImg: {
-    display: "block",
-    maxWidth: "none",
-    imageRendering: "pixelated",
-  },
-  branchDiv: {
-    position: "relative",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-cream-50)",
-    boxShadow: "inset 0 0 0 2px var(--color-rim), 4px 4px 0 var(--color-drop)",
-    paddingInline: "1rem",
-    paddingTop: "0.75rem",
-    paddingBottom: "0.5rem",
-  },
-  branchDiv2: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.5rem",
-    fontFamily: "var(--font-pixel)",
-    fontSize: {
-      default: "var(--text-sm)",
-      "@media (width>=40rem)": "var(--text-base)",
-    },
-    lineHeight: {
-      default: "1",
-      "@media (width>=40rem)": "1",
-    },
-  },
-  branchSpan: {
-    display: {
-      default: "none",
-      "@media (width>=40rem)": "inline",
-    },
-  },
-  branchSpan2: {
-    marginLeft: "auto",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-cream-100)",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.25rem",
-    fontVariantNumeric: "tabular-nums",
-  },
-  branchSpan3: {
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-cream-100)",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.25rem",
-    fontVariantNumeric: "tabular-nums",
-  },
-  branchSpan4: {
-    color: "var(--color-leaf-700)",
-  },
-  branchSpan5: {
-    color: "var(--color-berry)",
-  },
-  branchDiv3: {
-    position: "relative",
-    marginTop: "0.25rem",
-    height: "92px",
-  },
-  branchSvg: {
-    position: "absolute",
-    inset: "0",
-    width: "100%",
-    height: "100%",
-  },
-  branchSpan6: {
-    position: "absolute",
-    left: "0",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "var(--text-sm)",
-    lineHeight: "1",
-    color: "var(--color-bark-800)",
-  },
-  branchSpan7: {
-    position: "absolute",
-    display: "flex",
-    translate: "-50% 0",
-    alignItems: "center",
-    gap: "0.25rem",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-wheat)",
-    paddingInline: "0.375rem",
-    paddingBlock: "0.125rem",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "var(--text-sm)",
-    lineHeight: "1",
-    whiteSpace: "nowrap",
-  },
-  branchImg: {
-    width: "0.875rem",
-    height: "0.875rem",
-    objectFit: "contain",
-    imageRendering: "pixelated",
-  },
-});
+const viewStyles = {
+  spriteGeometry: (left: number, top: number, width: number, height: number): JSX.CSSProperties => ({
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${width}px`,
+    height: `${height}px`,
+  }),
+  dotPosition: (left: string, top: number): JSX.CSSProperties => ({ left: left, top: `${top}px` }),
+};
 interface Props {
   copy: Copy["how"];
   icons: string[];
@@ -460,28 +63,41 @@ function Finished(props: Props) {
   const grown = PLACES.map((_, i) => stageOf(i, { place: PLACES.length - 1, working: true, work: 1, x: 0 }));
   return (
     <div>
-      <div aria-hidden="true" {...stylex.attrs(sceneStyles.finishedField)}>
-        <div {...stylex.attrs(viewStyles.finishedDiv)}>
+      <div
+        aria-hidden="true"
+        class="relative mb-12 overflow-hidden border-2 border-bark-900 bg-[image:var(--scene-field-background)] [box-shadow:4px_4px_0_var(--color-drop)]"
+      >
+        <div class="grid grid-cols-4 items-end gap-5.5 px-3 sm:px-6 lg:px-0 pt-6 sm:pt-8">
           {grown.map((stage) => (
-            <div {...stylex.attrs(viewStyles.finishedDiv2)}>
-              <img loading="lazy" src={props.art[stage].src} alt="" {...stylex.attrs(viewStyles.finishedImg)} />
+            <div class="flex justify-center">
+              <img loading="lazy" src={props.art[stage].src} alt="" class="w-17 sm:w-25.5 lg:w-34 max-w-none [image-rendering:pixelated]" />
             </div>
           ))}
         </div>
-        <div {...stylex.attrs(viewStyles.finishedDiv3)}>
-          <img loading="lazy" src={props.art.cheer.src} alt="" {...stylex.attrs(viewStyles.finishedImg2)} />
+        <div class="relative mt-2 mb-3 sm:mb-4 h-10 sm:h-12 border-y-2 border-(--color-path-edge) bg-[image:repeating-linear-gradient(90deg,var(--color-path)_0_22px,var(--color-path-groove)_22px_26px)]">
+          <img
+            loading="lazy"
+            src={props.art.cheer.src}
+            alt=""
+            class="absolute right-[4%] bottom-1.5 h-14 sm:h-21 lg:h-28 w-auto max-w-none [image-rendering:pixelated]"
+          />
         </div>
       </div>
-      <div {...stylex.attrs(viewStyles.finishedDiv4)}>
+      <div class="mb-12">
         <Branch copy={props.copy.git} now={{ place: PLACES.length - 1, working: true, work: 1, x: 0 }} check={props.art["mark-check"].src} />
       </div>
-      <ol role="list" {...stylex.attrs(viewStyles.finishedOl)}>
+      <ol role="list" class="grid grid-cols-[minmax(0,1fr)] sm:grid-cols-2 lg:grid-cols-4 gap-5.5">
         {props.copy.steps.map((s, i) => (
-          <li data-reveal={i * 80} {...stylex.attrs(viewStyles.finishedLi)}>
-            <span {...stylex.attrs(viewStyles.finishedSpan)}>{i + 1}</span>
-            <img loading="lazy" src={props.icons[i]} alt="" {...stylex.attrs(viewStyles.finishedImg3)} />
-            <h3 {...stylex.attrs(viewStyles.finishedH3)}>{s.title}</h3>
-            <p {...stylex.attrs(viewStyles.finishedP)}>{s.text}</p>
+          <li
+            data-reveal={i * 80}
+            class="relative mt-2.5 sm:mt-0 border-2 border-bark-900 bg-cream-50 [box-shadow:inset_0_0_0_2px_var(--color-rim),_4px_4px_0_var(--color-drop)] px-5.5 pt-6.5 pb-5.5"
+          >
+            <span class="absolute -top-4 left-4.5 border-2 border-bark-900 bg-leaf-500 px-2.5 py-1.5 font-pixel text-lg leading-none text-cream-50">
+              {i + 1}
+            </span>
+            <img loading="lazy" src={props.icons[i]} alt="" class="mb-3 w-14 h-14 object-contain [image-rendering:pixelated]" />
+            <h3 class="mb-1.5 text-2xl">{s.title}</h3>
+            <p class="text-base text-bark-800">{s.text}</p>
           </li>
         ))}
       </ol>
@@ -583,15 +199,20 @@ function Story(props: Props) {
       ref={track.set}
       data-testid="how-track"
       data-step={now().place}
-      {...stylex.attrs(viewStyles.howTrack)}
+      class="relative"
       style={{
         height: `${100 + PLACES.length * 80}svh`,
       }}
     >
-      <div {...stylex.attrs(viewStyles.storyDiv)}>
-        <div ref={stage.set} data-testid="how-stage" aria-hidden="true" {...stylex.attrs(sceneStyles.storyScene)}>
+      <div class="sticky top-16 flex h-[calc(100svh_-_4rem)] flex-col justify-center gap-5 py-4">
+        <div
+          ref={stage.set}
+          data-testid="how-stage"
+          aria-hidden="true"
+          class="relative h-66 lg:h-99 shrink-0 overflow-hidden border-2 border-bark-900 bg-(--color-story-sky) [box-shadow:4px_4px_0_var(--color-drop)]"
+        >
           <div
-            {...stylex.attrs(viewStyles.storyDiv2)}
+            class="absolute top-0 left-0 [transform-origin:0_0]"
             style={{
               width: `${FIELD.w}px`,
               height: `${FIELD.h}px`,
@@ -602,7 +223,7 @@ function Story(props: Props) {
             <Hills camera={camera} />
             <Pass camera={camera} pace={PACE.back}>
               {BACK.map((b) => (
-                <Sprite art={props.art[b.name]} x={b.x} y={74} styles={viewStyles.distantBuilding} />
+                <Sprite art={props.art[b.name]} x={b.x} y={74} class="[scale:75%_75%] [filter:brightness(95%)_saturate(75%)]" />
               ))}
             </Pass>
             <Pass camera={camera} pace={PACE.field}>
@@ -611,7 +232,7 @@ function Story(props: Props) {
                 <Spot place={place} index={i} now={now()} art={props.art} />
               ))}
               <div
-                {...stylex.attrs(viewStyles.storyDiv3)}
+                class="absolute top-0 left-0"
                 style={{
                   transform: `translate(${position()}px, ${FIELD.path}px)`,
                 }}
@@ -620,7 +241,7 @@ function Story(props: Props) {
                   ref={helper.set}
                   src={props.art.side.src}
                   alt=""
-                  {...stylex.attrs(viewStyles.storyImg)}
+                  class="absolute max-w-none [image-rendering:pixelated]"
                   style={{
                     left: `${-props.art.side.ax}px`,
                     top: `${-props.art.side.ay}px`,
@@ -639,7 +260,7 @@ function Story(props: Props) {
             <Pass camera={camera} pace={PACE.near}>
               {/* Low and small: they brush past the helper's feet, never over what it is doing. */}
               {NEAR.map((n) => (
-                <Sprite art={props.art[n.name]} x={n.x} y={FIELD.h + 30} styles={viewStyles.distantDetail} />
+                <Sprite art={props.art[n.name]} x={n.x} y={FIELD.h + 30} class="[scale:55%_55%] [filter:brightness(75%)]" />
               ))}
             </Pass>
           </div>
@@ -652,16 +273,16 @@ function Story(props: Props) {
 }
 function Caption(props: { copy: Copy["how"]; icons: string[]; now: Moment }) {
   return (
-    <div {...stylex.attrs(viewStyles.captionDiv)}>
-      <ol role="list" {...stylex.attrs(viewStyles.captionOl)}>
+    <div class="relative min-h-44 border-2 border-bark-900 bg-cream-50 [box-shadow:inset_0_0_0_2px_var(--color-rim),_4px_4px_0_var(--color-drop)] px-5 pt-4 pb-5">
+      <ol role="list" class="mb-3 flex flex-wrap gap-2">
         {props.copy.steps.map((s, i) => (
           <li
             aria-current={i === props.now.place ? "step" : undefined}
-            {...stylex.attrs(
-              viewStyles.badge,
-              viewStyles.captionStep,
-              i < props.now.place ? viewStyles.completed : i === props.now.place ? viewStyles.current : viewStyles.waiting,
-            )}
+            class={[
+              "border-2 border-bark-900 px-2 py-1",
+              "font-pixel text-base leading-none transition-[color,background-color,border-color] duration-300 ease-[steps(3)]",
+              i < props.now.place ? "bg-leaf-500 text-cream-50" : i === props.now.place ? "bg-wheat" : "bg-cream-100 text-bark-500",
+            ]}
           >
             {i + 1} {s.title}
           </li>
@@ -681,11 +302,11 @@ function Caption(props: { copy: Copy["how"]; icons: string[]; now: Moment }) {
             return value;
           });
           return (
-            <div ref={ref} {...stylex.attrs(viewStyles.captionDiv2)}>
-              <img src={props.icons[index]} alt="" {...stylex.attrs(viewStyles.captionImg)} />
+            <div ref={ref} class="flex items-start gap-4">
+              <img src={props.icons[index]} alt="" class="w-12 h-12 flex-none object-contain [image-rendering:pixelated]" />
               <div>
-                <h3 {...stylex.attrs(viewStyles.captionH3)}>{step().title}</h3>
-                <p {...stylex.attrs(viewStyles.finishedP)}>{step().text}</p>
+                <h3 class="mb-1 text-2xl">{step().title}</h3>
+                <p class="text-base text-bark-800">{step().text}</p>
               </div>
             </div>
           );
@@ -699,7 +320,7 @@ function Pass(props: { camera: MotionValue<number>; pace: number; children: JSX.
   const value = readMotion(props.camera);
   return (
     <div
-      {...stylex.attrs(viewStyles.passDiv)}
+      class="absolute inset-0"
       style={{
         transform: `translateX(${-value() * props.pace}px)`,
       }}
@@ -711,14 +332,14 @@ function Pass(props: { camera: MotionValue<number>; pace: number; children: JSX.
 function Sky(props: { camera: MotionValue<number> }) {
   return (
     <>
-      <div {...stylex.attrs(sceneStyles.sky)} />
+      <div class="absolute inset-0 bg-[image:var(--scene-story-background)]" />
       <Pass camera={props.camera} pace={PACE.sky}>
         {[
           { y: 8, w: 46, d: 70, delay: -10 },
           { y: 20, w: 30, d: 95, delay: -60 },
         ].map((c) => (
           <span
-            {...stylex.attrs(sceneStyles.cloud)}
+            class="absolute left-0 h-2.5 [animation-name:title-cloud] [animation-duration:160000ms] [animation-timing-function:linear] [animation-iteration-count:infinite] rounded-[3px] bg-cream-50/90 shadow-story-cloud"
             style={{
               top: `${c.y}px`,
               width: `${c.w}px`,
@@ -745,12 +366,12 @@ function Hills(props: { camera: MotionValue<number> }) {
   return (
     <>
       <Pass camera={props.camera} pace={PACE.hills * 0.6}>
-        <svg {...stylex.attrs(viewStyles.passDiv)} width={FIELD.w} height={FIELD.h} shape-rendering="crispEdges">
+        <svg class="absolute inset-0" width={FIELD.w} height={FIELD.h} shape-rendering="crispEdges">
           <polygon points={band(60, 16, 70, 1)} fill="#8db5a0" />
         </svg>
       </Pass>
       <Pass camera={props.camera} pace={PACE.hills}>
-        <svg {...stylex.attrs(viewStyles.passDiv)} width={FIELD.w} height={FIELD.h} shape-rendering="crispEdges">
+        <svg class="absolute inset-0" width={FIELD.w} height={FIELD.h} shape-rendering="crispEdges">
           <polygon points={band(76, 10, 46, 3)} fill="#7aa95a" />
         </svg>
       </Pass>
@@ -761,13 +382,13 @@ function Ground() {
   return (
     <>
       <div
-        {...stylex.attrs(sceneStyles.ground)}
+        class="absolute inset-x-0 bottom-0 bg-[image:var(--scene-field-background)]"
         style={{
           top: `${74}px`,
         }}
       />
       <div
-        {...stylex.attrs(viewStyles.groundDiv)}
+        class="absolute inset-x-0 border-y border-(--color-path-edge) bg-[image:repeating-linear-gradient(90deg,var(--color-path)_0_11px,var(--color-path-groove)_11px_13px)]"
         style={{
           top: `${FIELD.path - 9}px`,
           height: `${14}px`,
@@ -777,12 +398,13 @@ function Ground() {
   );
 }
 /** A picture standing on the field at x, its feet at y. */
-function Sprite(props: { art: Art; x: number; y: number; styles?: stylex.StyleXStyles }) {
+function Sprite(props: { art: Art; x: number; y: number; class?: JSX.ClassValue | undefined }) {
   return (
     <img
       src={props.art.src}
       alt=""
-      {...domAttrs(viewStyles.sprite, props.styles, viewStyles.spriteGeometry(props.x - props.art.ax, props.y - props.art.ay, props.art.w, props.art.h))}
+      class={["[image-rendering:pixelated] absolute max-w-none origin-bottom", props.class]}
+      style={viewStyles.spriteGeometry(props.x - props.art.ax, props.y - props.art.ay, props.art.w, props.art.h)}
     />
   );
 }
@@ -797,7 +419,7 @@ function Spot(props: { place: (typeof PLACES)[number]; index: number; now: Momen
       <Sprite art={props.art[props.place.thing.name]} x={props.place.thing.x} y={FIELD.stand} />
       <div
         ref={plot.set}
-        {...stylex.attrs(viewStyles.spotDiv)}
+        class="absolute"
         style={{
           left: `${props.place.plot}px`,
           top: `${FIELD.stand}px`,
@@ -823,12 +445,12 @@ function Spot(props: { place: (typeof PLACES)[number]; index: number; now: Momen
         {(_, ref) => (
           <div
             ref={ref}
-            {...stylex.attrs(viewStyles.spotDiv2)}
+            class="absolute top-0"
             style={{
               left: `${props.place.plot}px`,
             }}
           >
-            <Sprite art={props.art["coins-stack"]} x={0} y={0} styles={viewStyles.halfSize} />
+            <Sprite art={props.art["coins-stack"]} x={0} y={0} class="[scale:50%_50%]" />
           </div>
         )}
       </Presence>
@@ -841,13 +463,13 @@ function Spot(props: { place: (typeof PLACES)[number]; index: number; now: Momen
         {(_, ref) => (
           <div
             ref={ref}
-            {...stylex.attrs(viewStyles.spotDiv)}
+            class="absolute"
             style={{
               left: `${props.place.plot + 24}px`,
               top: `${FIELD.stand - 34}px`,
             }}
           >
-            <Sprite art={props.art["stamp-done"]} x={0} y={0} styles={viewStyles.halfSize} />
+            <Sprite art={props.art["stamp-done"]} x={0} y={0} class="[scale:50%_50%]" />
           </div>
         )}
       </Presence>
@@ -858,18 +480,18 @@ function Pop(props: { art: Art; x: number; y: number; ref: (element: HTMLElement
   return (
     <div
       ref={props.ref}
-      {...stylex.attrs(viewStyles.spotDiv)}
+      class="absolute"
       style={{
         left: `${props.x}px`,
         top: `${props.y}px`,
         "transform-origin": "50% 100%",
       }}
     >
-      <div {...stylex.attrs(viewStyles.popDiv)}>
+      <div class="absolute bottom-0 left-0 -translate-x-1/2 border border-bark-900 bg-cream-50 p-0.5 [box-shadow:1px_1px_0_var(--color-drop)]">
         <img
           src={props.art.src}
           alt=""
-          {...stylex.attrs(viewStyles.popImg)}
+          class="block max-w-none [image-rendering:pixelated]"
           style={{
             width: `${Math.round(props.art.w * 0.55)}px`,
             height: `${Math.round(props.art.h * 0.55)}px`,
@@ -901,29 +523,32 @@ function Branch(props: { copy: Copy["how"]["git"]; now: Moment; check: string })
       : "",
   );
   return (
-    <div {...stylex.attrs(viewStyles.branchDiv)} aria-hidden="true">
-      <div {...stylex.attrs(viewStyles.branchDiv2)}>
-        <span {...stylex.attrs(viewStyles.badge, b().forked ? viewStyles.forked : viewStyles.waiting)}>
+    <div
+      class="relative border-2 border-bark-900 bg-cream-50 [box-shadow:inset_0_0_0_2px_var(--color-rim),_4px_4px_0_var(--color-drop)] px-4 pt-3 pb-2"
+      aria-hidden="true"
+    >
+      <div class="flex flex-wrap items-center gap-2 font-pixel text-sm sm:text-base leading-none sm:leading-none">
+        <span class={["border-2 border-bark-900 px-2 py-1", b().forked ? "bg-leaf-300" : "bg-cream-100 text-bark-500"]}>
           {props.copy.branch}
-          <span {...stylex.attrs(viewStyles.branchSpan)}> · {props.copy.worktree}</span>
+          <span class="hidden sm:inline"> · {props.copy.worktree}</span>
         </span>
-        <span {...stylex.attrs(viewStyles.branchSpan2)}>
+        <span class="ml-auto border-2 border-bark-900 bg-cream-100 px-2 py-1 tabular-nums">
           {b().commits} {props.copy.commits}
         </span>
-        <span {...stylex.attrs(viewStyles.branchSpan3)}>
-          <span {...stylex.attrs(viewStyles.branchSpan4)}>+{b().plus}</span> <span {...stylex.attrs(viewStyles.branchSpan5)}>−{b().minus}</span>
+        <span class="border-2 border-bark-900 bg-cream-100 px-2 py-1 tabular-nums">
+          <span class="text-leaf-700">+{b().plus}</span> <span class="text-berry">−{b().minus}</span>
         </span>
-        <span {...stylex.attrs(viewStyles.badge, viewStyles.count, b().tests === JOB.tests ? viewStyles.completed : viewStyles.pendingTests)}>
+        <span class={["border-2 border-bark-900 px-2 py-1", "tabular-nums", b().tests === JOB.tests ? "bg-leaf-500 text-cream-50" : "bg-cream-100"]}>
           {props.copy.tests} {b().tests}/{JOB.tests}
         </span>
       </div>
-      <div {...stylex.attrs(viewStyles.branchDiv3)}>
-        <svg {...stylex.attrs(viewStyles.branchSvg)} viewBox="0 0 100 92" preserveAspectRatio="none" shape-rendering="crispEdges">
+      <div class="relative mt-1 h-23">
+        <svg class="absolute inset-0 w-full h-full" viewBox="0 0 100 92" preserveAspectRatio="none" shape-rendering="crispEdges">
           <line x1="0" y1={main} x2="100" y2={main} stroke="var(--color-bark-900)" stroke-width="3" vector-effect="non-scaling-stroke" />
           {path() && <path d={path()} fill="none" stroke="var(--color-leaf-600)" stroke-width="3" vector-effect="non-scaling-stroke" />}
         </svg>
         <span
-          {...stylex.attrs(viewStyles.branchSpan6)}
+          class="absolute left-0 font-pixel text-sm leading-none text-bark-800"
           style={{
             top: `${main - 22}px`,
           }}
@@ -944,14 +569,14 @@ function Branch(props: { copy: Copy["how"]["git"]; now: Moment; check: string })
           {(_, ref) => (
             <span
               ref={ref}
-              {...stylex.attrs(viewStyles.branchSpan7)}
+              class="absolute flex -translate-x-1/2 items-center gap-1 border-2 border-bark-900 bg-wheat px-1.5 py-0.5 font-pixel text-sm leading-none whitespace-nowrap"
               style={{
                 left: `${GIT.join * 100}%`,
                 top: `${main - 42}px`,
               }}
             >
               {props.copy.merged}
-              <img src={props.check} alt="" {...stylex.attrs(viewStyles.branchImg)} />
+              <img src={props.check} alt="" class="w-3.5 h-3.5 object-contain [image-rendering:pixelated]" />
             </span>
           )}
         </Presence>
@@ -965,12 +590,8 @@ function Dot(props: { x: number; y: number; shown: boolean; tone: keyof typeof d
       {(_, ref) => (
         <span
           ref={ref}
-          {...domAttrs(
-            viewStyles.dot,
-            props.large === true ? viewStyles.largeDot : viewStyles.smallDot,
-            dotTones[props.tone],
-            viewStyles.dotPosition(`${props.x * 100}%`, props.y),
-          )}
+          class={["absolute -translate-1/2 border-2 border-bark-900", props.large === true ? "w-4 h-4" : "w-3 h-3", dotTones[props.tone]]}
+          style={viewStyles.dotPosition(`${props.x * 100}%`, props.y)}
         />
       )}
     </Presence>

@@ -120,12 +120,21 @@ export const KeyStatus = z.object({
 
 export const Locale = z.enum(T.LocaleValues) satisfies Codec<T.Locale>;
 
-/** A string's length counted in code points, not UTF-16 units: an emoji is one character, as a person counts it. */
-export const codePoints = (min: number, max: number) =>
-  z.refine<string>(
+/** A string's length counted in code points, not UTF-16 units: an emoji is one character, as a person counts it.
+ * Written into the JSON Schema a tool's model reads as minLength/maxLength, which count code points too (the bag's
+ * minimum/maximum are what z.toJSONSchema reads for a string; a refine alone says nothing there). */
+export const codePoints = (min: number, max: number) => {
+  const check = z.refine<string>(
     (s) => {
       const n = [...s].length;
       return n >= min && n <= max;
     },
     { message: `between ${min} and ${max} characters` },
   );
+  check._zod.onattach.push((schema) => {
+    const bag: Record<string, unknown> = schema._zod.bag;
+    bag["minimum"] = min;
+    bag["maximum"] = max;
+  });
+  return check;
+};

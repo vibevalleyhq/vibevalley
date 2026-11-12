@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -16,154 +15,6 @@ import { Icon } from "#/ui/Icon.tsx";
 import { titleFor } from "./days";
 import { tierOrder } from "./outline";
 import { pkmHref, usePkmVault } from "./vault";
-
-const styles = stylex.create({
-  filterButton: {
-    height: "1.5rem",
-    cursor: "pointer",
-    borderRadius: "9999px",
-    paddingInline: "0.625rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    transitionProperty: "color, background-color, border-color",
-    transitionTimingFunction: "var(--ease-out)",
-    transitionDuration: "120ms",
-  },
-  filterButtonPrimary: {
-    color: {
-      default: "var(--color-muted)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-ink)",
-      },
-    },
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  filterButtonSecondary: {
-    color: "var(--color-ink)",
-    backgroundColor: "var(--color-selected)",
-  },
-  searchBodyIcon: {
-    color: "var(--color-muted)",
-  },
-  searchBodyDiv: {
-    display: "flex",
-    cursor: "pointer",
-    flexDirection: "column",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.375rem",
-    backgroundColor: {
-      default: null,
-      ":is([aria-selected=true])": "var(--color-selected)",
-    },
-  },
-  foundRowSpan: {
-    WebkitLineClamp: "2",
-    WebkitBoxOrient: "vertical",
-    display: "-webkit-box",
-    overflow: "hidden",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  searchBodyDiv2: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
-  },
-  searchBodyLabel: {
-    display: "flex",
-    height: "2.5rem",
-    alignItems: "center",
-    gap: "0.5rem",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: {
-      default: "var(--color-line)",
-      ":focus-within": "var(--color-focus)",
-    },
-    backgroundColor: "var(--color-page)",
-    paddingInline: "0.75rem",
-  },
-  pkmSearchInput: {
-    minWidth: "0",
-    flex: "1",
-    backgroundColor: "transparent",
-    fontSize: "var(--text-base)",
-    lineHeight: "var(--leading-base)",
-    outlineStyle: "none",
-    color: {
-      default: null,
-      "::placeholder": "var(--color-faint)",
-    },
-  },
-  searchBodyDiv22: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.25rem",
-  },
-  searchBodySpan: {
-    marginInline: "0.25rem",
-    height: "1rem",
-    borderLeftStyle: "solid",
-    borderLeftWidth: "1px",
-    borderColor: "var(--color-line)",
-  },
-  searchBodyDiv3: {
-    display: "flex",
-    maxHeight: "60vh",
-    flexDirection: "column",
-    gap: "0.75rem",
-    overflowY: "auto",
-  },
-  searchBodyP: {
-    paddingInline: "0.5rem",
-    paddingBlock: "1rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  searchBodySection: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.125rem",
-  },
-  searchBodyH3: {
-    paddingInline: "0.5rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontWeight: "var(--font-weight-semibold)",
-    color: "var(--color-muted)",
-  },
-  litMark: {
-    borderRadius: "var(--radius-xs)",
-    backgroundColor: {
-      default: "var(--color-wheat)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-wheat) 30%, transparent)",
-    },
-    color: "var(--color-ink)",
-  },
-  foundRowSpan2: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  foundRowSpan22: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-faint)",
-  },
-});
 
 const opened = defineAtom<{ readonly query: string } | undefined>(undefined);
 
@@ -255,9 +106,9 @@ function SearchBody(props: { initial: string; onClose: () => void }) {
     queueMicrotask(() => document.querySelector('[data-testid="pkm-search"] [aria-selected="true"]')?.scrollIntoView({ block: "nearest" }));
   };
   return (
-    <div {...stylex.attrs(styles.searchBodyDiv2)}>
-      <label {...stylex.attrs(styles.searchBodyLabel)}>
-        <Icon name="search" size={16} styles={[styles.searchBodyIcon]} />
+    <div class="flex flex-col gap-3">
+      <label class="flex h-10 items-center gap-2 rounded-md border border-line focus-within:border-focus bg-page px-3">
+        <Icon name="search" size={16} class="text-muted" />
         <input
           ref={autofocus()}
           data-testid="pkm-search-input"
@@ -280,10 +131,10 @@ function SearchBody(props: { initial: string; onClose: () => void }) {
               open(row);
             }
           }}
-          {...stylex.attrs(styles.pkmSearchInput)}
+          class="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-faint"
         />
       </label>
-      <div {...stylex.attrs(styles.searchBodyDiv22)} role="group" aria-label={t("web.pkm.search.filters")}>
+      <div class="flex flex-wrap items-center gap-1" role="group" aria-label={t("web.pkm.search.filters")}>
         <Filter on={tier() === undefined} label={t("web.pkm.search.all")} testid="pkm-search-all" onToggle={() => pick(() => setTier(undefined))} />
         <For each={tierOrder}>
           {(tr) => (
@@ -295,20 +146,20 @@ function SearchBody(props: { initial: string; onClose: () => void }) {
             />
           )}
         </For>
-        <span {...stylex.attrs(styles.searchBodySpan)} />
+        <span class="mx-1 h-4 border-l border-line" />
         <Filter on={todo()} label={t("web.pkm.search.todo")} testid="pkm-search-todo" onToggle={() => pick(() => setTodo((on) => !on))} />
         <Show when={here}>
           <Filter on={linked()} label={t("web.pkm.search.linked")} testid="pkm-search-linked" onToggle={() => pick(() => setLinked((on) => !on))} />
         </Show>
       </div>
-      <div role="listbox" aria-label={t("web.pkm.search.title")} {...stylex.attrs(styles.searchBodyDiv3)}>
+      <div role="listbox" aria-label={t("web.pkm.search.title")} class="flex max-h-[60vh] flex-col gap-3 overflow-y-auto">
         <Show when={request() && found()?.state === "done" && rows().length === 0}>
-          <p {...stylex.attrs(styles.searchBodyP)}>{t("web.pkm.search.none")}</p>
+          <p class="px-2 py-4 text-sm text-muted">{t("web.pkm.search.none")}</p>
         </Show>
         <For each={groups()} keyed={(g) => g.key}>
           {(g) => (
-            <section {...stylex.attrs(styles.searchBodySection)}>
-              <h3 {...stylex.attrs(styles.searchBodyH3)}>{g().title}</h3>
+            <section class="flex flex-col gap-0.5">
+              <h3 class="px-2 text-xs font-semibold text-muted">{g().title}</h3>
               <For each={g().rows} keyed={(r) => keyOf(r.row)}>
                 {(r) => (
                   <div
@@ -318,7 +169,7 @@ function SearchBody(props: { initial: string; onClose: () => void }) {
                     aria-selected={active() === r().index ? "true" : "false"}
                     onPointerMove={() => setActive(r().index)}
                     onClick={() => open(r().row)}
-                    {...stylex.attrs(styles.searchBodyDiv)}
+                    class="flex cursor-pointer flex-col rounded-md px-2 py-1.5 aria-selected:bg-selected"
                   >
                     <FoundRow row={r().row} words={words()} />
                   </div>
@@ -345,7 +196,7 @@ function Lit(props: { text: string; words: readonly string[] }) {
     <For each={parts()}>
       {(p) => (
         <Show when={p.lit} fallback={<>{p.text}</>}>
-          <mark {...stylex.attrs(styles.litMark)}>{p.text}</mark>
+          <mark class="rounded-xs bg-wheat/30 text-ink">{p.text}</mark>
         </Show>
       )}
     </For>
@@ -355,14 +206,11 @@ function Lit(props: { text: string; words: readonly string[] }) {
 function FoundRow(props: { row: Found; words: readonly string[] }) {
   const hit = () => (props.row.kind === "block" ? props.row.hit : undefined);
   return (
-    <Show
-      when={hit()}
-      fallback={<span {...stylex.attrs(styles.foundRowSpan2)}>{props.row.kind === "page" ? titleFor(props.row.page.title, props.row.page.day) : ""}</span>}
-    >
+    <Show when={hit()} fallback={<span class="text-sm">{props.row.kind === "page" ? titleFor(props.row.page.title, props.row.page.day) : ""}</span>}>
       {(h) => (
         <>
-          <Show when={h().path}>{(path) => <span {...stylex.attrs(styles.foundRowSpan22)}>{path()}</span>}</Show>
-          <span {...stylex.attrs(styles.foundRowSpan)}>
+          <Show when={h().path}>{(path) => <span class="truncate text-xs text-faint">{path()}</span>}</Show>
+          <span class="line-clamp-2 text-sm">
             <Lit text={h().plain} words={props.words} />
           </span>
         </>
@@ -378,7 +226,10 @@ function Filter(props: { on: boolean; label: string; testid: string; onToggle: (
       data-testid={props.testid}
       aria-pressed={props.on ? "true" : "false"}
       onClick={() => props.onToggle()}
-      {...stylex.attrs(styles.filterButton, props.on ? styles.filterButtonSecondary : styles.filterButtonPrimary)}
+      class={[
+        "h-6 cursor-pointer rounded-full px-2.5 text-xs transition-[color,background-color,border-color] ease-out duration-120",
+        props.on ? "text-ink bg-selected" : "text-muted hover:text-ink hover:bg-hover",
+      ]}
     >
       {props.label}
     </button>

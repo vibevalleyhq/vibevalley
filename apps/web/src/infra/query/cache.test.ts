@@ -1,5 +1,5 @@
-import { Schema } from "effect";
 import { afterEach, expect, test, vi } from "vite-plus/test";
+import { z } from "zod";
 
 import { waitForReads } from "./activity";
 import { createQueryClient, defineQuery } from "./cache";
@@ -33,7 +33,7 @@ afterEach(() => {
 test("regression: startup errors include only enabled consumers and clear after confirmed data", async () => {
   const c = client();
   const query = defineQuery({
-    schema: Schema.Finite,
+    schema: z.number(),
     key: () => ["startup"],
     fetch: (): Promise<number> => Promise.reject(new Error("unavailable")),
   });
@@ -55,7 +55,7 @@ test("regression: startup errors include only enabled consumers and clear after 
 test("deduplicates leases and isolates clients and typed key segments", async () => {
   const work = deferred<string>();
   const fetch = vi.fn(() => work.promise);
-  const query = defineQuery({ schema: Schema.String, key: (id: string | number) => ["one", id], fetch, staleTime: Infinity });
+  const query = defineQuery({ schema: z.string(), key: (id: string | number) => ["one", id], fetch, staleTime: Infinity });
   const a = client();
   const b = client();
   const first = a.fetch(query("1"));
@@ -77,7 +77,7 @@ test("regression: invalidation during a read waits for a new answer without over
     .fn()
     .mockImplementationOnce(() => first.promise)
     .mockImplementationOnce(() => second.promise);
-  const query = defineQuery({ schema: Schema.Finite, key: () => ["one"], fetch: (): Promise<number> => fetch() });
+  const query = defineQuery({ schema: z.number(), key: () => ["one"], fetch: (): Promise<number> => fetch() });
   const c = client();
   const got = c.fetch(query());
   await flush();
@@ -95,7 +95,7 @@ test("regression: invalidation during a read waits for a new answer without over
 test("regression: confirmed data and clear cannot be overwritten by ignored cancellation", async () => {
   vi.useFakeTimers();
   const work = deferred<number>();
-  const query = defineQuery({ schema: Schema.Finite, key: () => ["one"], fetch: () => work.promise });
+  const query = defineQuery({ schema: z.number(), key: () => ["one"], fetch: () => work.promise });
   const c = client();
   const promise = c.fetch(query()).catch((e: unknown) => e);
   await flush();
@@ -105,7 +105,7 @@ test("regression: confirmed data and clear cannot be overwritten by ignored canc
   expect(c.read(query()).record?.value).toBe(2);
   expect(c.fetching()).toBe(0);
   const next = deferred<number>();
-  const another = defineQuery({ schema: Schema.Finite, key: () => ["two"], fetch: () => next.promise });
+  const another = defineQuery({ schema: z.number(), key: () => ["two"], fetch: () => next.promise });
   const pending = c.fetch(another()).catch((e: unknown) => e);
   await flush();
   c.clear();
@@ -117,7 +117,7 @@ test("regression: confirmed data and clear cannot be overwritten by ignored canc
 test("refresh errors keep the successful record, including undefined", async () => {
   let fail = false;
   const query = defineQuery({
-    schema: Schema.Undefined,
+    schema: z.undefined(),
     key: () => ["one"],
     fetch: (): Promise<undefined> => (fail ? Promise.reject(new Error("offline")) : Promise.resolve(undefined)),
     staleTime: Infinity,
@@ -141,7 +141,7 @@ test("shared subscribers and explicit leases cancel only after the last demand e
   let signal: AbortSignal | undefined;
   const work = deferred<number>();
   const query = defineQuery({
-    schema: Schema.Finite,
+    schema: z.number(),
     key: () => ["one"],
     fetch: (_: void, context) => {
       signal = context.signal;
@@ -167,7 +167,7 @@ test("last disabled subscriber aborts and prevents late writes", async () => {
   const work = deferred<number>();
   let signal: AbortSignal | undefined;
   const query = defineQuery({
-    schema: Schema.Finite,
+    schema: z.number(),
     key: () => ["one"],
     fetch: (_: void, ctx) => {
       signal = ctx.signal;
@@ -188,7 +188,7 @@ test("last disabled subscriber aborts and prevents late writes", async () => {
 test("polls at the shortest demand, marks stale on time, and stops timers on GC", async () => {
   vi.useFakeTimers();
   const fetch = vi.fn(() => Promise.resolve(1));
-  const query = defineQuery({ schema: Schema.Finite, key: () => ["one"], fetch, staleTime: 10, gcTime: 5 });
+  const query = defineQuery({ schema: z.number(), key: () => ["one"], fetch, staleTime: 10, gcTime: 5 });
   const c = client();
   const changed = vi.fn();
   const sub = c.subscribe(query(), changed, { enabled: true, interval: 50 });
@@ -212,7 +212,7 @@ test("polls at the shortest demand, marks stale on time, and stops timers on GC"
 test("bounded classified retries are canceled with their user", async () => {
   vi.useFakeTimers();
   const fetch = vi.fn(() => Promise.reject(new Error("retry")));
-  const query = defineQuery({ schema: Schema.Finite, key: () => ["one"], fetch, retry: 1, retryWhen: () => true });
+  const query = defineQuery({ schema: z.number(), key: () => ["one"], fetch, retry: 1, retryWhen: () => true });
   const c = client();
   const outcome = c.fetch(query()).catch((e: unknown) => e);
   await vi.advanceTimersByTimeAsync(251);
@@ -230,7 +230,7 @@ test("regression: repeated callback identities retain separate demands and dispo
   let signal: AbortSignal | undefined;
   const work = deferred<number>();
   const query = defineQuery({
-    schema: Schema.Finite,
+    schema: z.number(),
     key: () => ["dispose"],
     fetch: (_: void, context) => {
       signal = context.signal;
@@ -256,8 +256,8 @@ test("regression: repeated callback identities retain separate demands and dispo
 });
 
 test("key prefixes use segments and conflicting definitions fail", async () => {
-  const a = defineQuery({ schema: Schema.Finite, key: (id: string) => [id], fetch: () => Promise.resolve(1), staleTime: Infinity });
-  const b = defineQuery({ schema: Schema.Finite, key: () => ["a"], fetch: () => Promise.resolve(2) });
+  const a = defineQuery({ schema: z.number(), key: (id: string) => [id], fetch: () => Promise.resolve(1), staleTime: Infinity });
+  const b = defineQuery({ schema: z.number(), key: () => ["a"], fetch: () => Promise.resolve(2) });
   const c = client();
   await c.fetch(a("a"));
   await c.fetch(a("ab"));
@@ -266,7 +266,7 @@ test("key prefixes use segments and conflicting definitions fail", async () => {
   expect(c.read(a("ab")).stale).toBe(false);
   expect(() => c.read(b())).toThrow("Conflicting");
   expect(() => a(Number.NaN.toString())).not.toThrow();
-  const invalid = defineQuery({ schema: Schema.Finite, key: () => [Number.NaN], fetch: () => Promise.resolve(1) });
+  const invalid = defineQuery({ schema: z.number(), key: () => [Number.NaN], fetch: () => Promise.resolve(1) });
   expect(invalid).toThrow("finite");
 });
 

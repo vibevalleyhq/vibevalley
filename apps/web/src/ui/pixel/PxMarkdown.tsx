@@ -1,5 +1,4 @@
 import type { JSX } from "@solidjs/web";
-import type * as stylex from "@stylexjs/stylex";
 import { toDom } from "hast-util-to-dom";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
@@ -7,7 +6,6 @@ import remarkRehype from "remark-rehype";
 import { createMemo, onCleanup } from "solid-js";
 import { type Plugin, unified } from "unified";
 
-import { withStyles } from "#/ui/positioner.ts";
 import { fragmentOf, remarkIssueRefs, richen } from "#/ui/richText.ts";
 
 const mentionClass = "inline-block px-[0.3em] whitespace-nowrap bg-current/13";
@@ -84,15 +82,13 @@ export function PxMarkdown(props: {
   onOpenLink?: (url: string) => void;
   reading?: boolean;
   class?: JSX.ClassValue | undefined;
-  // For callers still on StyleX; it goes when the last of them is on classes.
-  styles?: stylex.StyleXStyles;
 }) {
   const nodes = createMemo(() => render(props.mentions === true ? withMentions(props.text) : props.text, props.onOpenLink));
   return (
     <div
       data-pixel-markdown=""
       data-reading={props.reading === true ? "true" : undefined}
-      {...withStyles(props.styles, ["min-w-0 wrap-break-word", props.reading === true ? "max-w-[560px] pixel-read" : "pixel-sm", props.class])}
+      class={["min-w-0 wrap-break-word", props.reading === true ? "max-w-[560px] pixel-read" : "pixel-sm", props.class]}
     >
       {nodes()}
     </div>
@@ -100,21 +96,12 @@ export function PxMarkdown(props: {
 }
 
 /** Plain text to read, as PxMarkdown with `reading` draws it. */
-export function PxReadText(props: {
-  text: string;
-  maxLines?: number;
-  class?: JSX.ClassValue | undefined;
-  // For callers still on StyleX; it goes when the last of them is on classes.
-  styles?: stylex.StyleXStyles;
-}) {
+export function PxReadText(props: { text: string; maxLines?: number; class?: JSX.ClassValue | undefined }) {
   return (
     <p
-      {...withStyles(
-        props.styles,
-        // Important, so the clamp holds over a caller's styles as it did.
-        ["max-w-[560px] whitespace-pre-wrap pixel-read", props.class, props.maxLines !== undefined && "line-clamp-(--lines)!"],
-        props.maxLines === undefined ? undefined : { "--lines": String(props.maxLines) },
-      )}
+      // Important, so the clamp holds over a caller's classes.
+      class={["max-w-[560px] whitespace-pre-wrap pixel-read", props.class, props.maxLines !== undefined && "line-clamp-(--lines)!"]}
+      style={props.maxLines === undefined ? undefined : { "--lines": String(props.maxLines) }}
     >
       {props.text}
     </p>

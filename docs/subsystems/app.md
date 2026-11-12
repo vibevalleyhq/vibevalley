@@ -42,8 +42,8 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
   - `VibeValleyApi` 自动解包 `{ bizCode, message, data?, error? }` 信封；错误经 `infra/api.ts` 的 `faultOf` 转为结构化 `UiFault`（携带六位 `bizCode`、语义 `tag`、`reason`、`next`、`settings` 以及由 `bizCodeMeta` 决定的 `retryable`），只挂在失败或降级分支上；组件内禁止绕过 `act.run` 直接调写接口（`vibevalley/act-door` 检查）。
 - **一次性读取走 `infra/query.ts`**：自有 Query client 管缓存与失效，结果先经 Schema 解码，状态流重连时自动 `refetchOnRelink`。会话轨迹经 `features/session/runs.ts` 的 `SessionLogs` 先订直播流、再读快照并按 `seq` 与 `revision` 合并。
 - **颜色收进语义调色板**：浅色/深色主题通过 `<html data-theme>` 切换，只用 `style.css` 语义色变量（`vibevalley/no-hex-color` 检查）；像素皮固定 `data-theme="light"`。
-- **样式正从 StyleX 换回 Tailwind v4**（[vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)）：换过的零件写元素上的 class、对外收 `class`，迁移期间还收没换的调用方传的 StyleX `styles`（`ui/positioner.ts` 的 `withStyles`）；没换的文件照旧用 `stylex.attrs` 与 `styleProps`；层的顺序 `theme, base, components, utilities, stylex` 让 StyleX 照旧压过 class。`vibevalley/style-attrs` 拦 `className` / `classList` 和只写死值的 `style`，`vibevalley/design-tokens` 拦 class 里绕过令牌的任意值。动态几何坐标、Canvas 数据、Motion 动画与 Shiki 语法高亮等外部计算值通过原生对象 `style` 保持单一所有者，且 `vibevalley/no-hex-color` 同时拦截 StyleX 定义与 JSX 内联 `style` 中的硬编码十六进制色值。
-- **全局 CSS 仅保留非 JSX 边界**：`style.css` 按 `@layer theme, base, components, stylex` 声明层序，仅承载重置（`reset.css`）、字体与令牌、桌面拖拽区（`[data-window-drag]`）以及消毒后富文本 DOM 后代（`Markdown.css`、`PxMarkdown.css` 与 `richText.ts` 代码块/图表）；故事宿主另导入 `@vibevalley/stories/style.css` 的填满画布规则。跨目录的 `.stylex.ts` 标记沿用 `#/`，应用与故事编译器显式配置同一别名。
+- **样式是元素上的 Tailwind v4 class**（[vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)）：令牌在 `style.css` 的 `@theme`，class 名就是令牌名；零件对外收 `class`，被调用方改的样子做成变体属性。`vibevalley/style-attrs` 拦 `className` / `classList` 和只写死值的 `style`，`vibevalley/design-tokens` 拦 class 里绕过令牌的任意值。动态几何坐标、Canvas 数据、Motion 动画与 Shiki 语法高亮等外部计算值通过原生对象 `style` 保持单一所有者，且 `vibevalley/no-hex-color` 同时拦截 class 与 JSX 内联 `style` 中的硬编码十六进制色值。
+- **全局 CSS 仅保留非 JSX 边界**：`style.css` 按 `@layer theme, base, components, utilities` 声明层序，仅承载重置（`reset.css`）、字体与令牌、桌面拖拽区（`[data-window-drag]`）以及消毒后富文本 DOM 后代（`Markdown.css`、`PxMarkdown.css` 与 `richText.ts` 代码块/图表）；故事宿主（`src/stories.css`）另导入 `@vibevalley/stories/style.css` 的填满画布规则，并用 `@source` 让 Tailwind 也扫查看器自己的 class。
 
 ### 宿主与多端
 
@@ -88,7 +88,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 - `Shell` 外框包含农场和 `/chat`、`/issues`、`/artifacts`、`/pkm`、`/agents`、`/runtimes`、`/repos`、`/catalog`、`/settings`。农场保留侧栏，不显示工作台页头；`/tree` 和 `/pair` 在外框之外。
 - `infra/router.ts` 提供 Router、对象路由表与 Outlet。共同布局跨页面保留，参数变化保留页面实例，需要重建的农场按仓库显式设 key。应用布局读 route meta，不自行拆 URL。匹配、History、参数与查询字符串的约定见 [Router](apps/web/src/infra/router/README.md)。
 - URL 查询字段只经 Router 更新；工单筛选由 Schema 读写，不再由 Atom 另存。未知页面、非法站内编码和不满足 Codec 的参数显示错误页，不默默跳到可写页面。
-- 无样式的 Query、Router、Form、Table 归 `infra`，数据契约使用 Effect Schema；视觉绑定归 `ui`。Form 管编辑版本、校验与明确的提交收据；Table 消费已解码的领域行，不拥有请求。字段、生命周期和受控状态的契约见 [页面基础设施](apps/web/src/infra/README.md)。
+- 无样式的 Query、Router、Form、Table 归 `infra`，数据契约使用 Zod；视觉绑定归 `ui`。Form 管编辑版本、校验与明确的提交收据；Table 消费已解码的领域行，不拥有请求。字段、生命周期和受控状态的契约见 [页面基础设施](apps/web/src/infra/README.md)。
 
 **打包与自更新**
 
@@ -106,7 +106,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 ## 为什么这样
 
 - **一份 Solid 2 页面服务三个宿主**：UI 与纯函数规则只写一遍，按 id `reconcile` 细粒度更新，避免高频帧触发整树重渲染。
-- **状态中间层收拢到 Effect Atom，意图按帧 `seq` 结算**：消除「请求返回先弹回旧状态、下一帧再跳过去」的闪烁。
+- **状态中间层收拢到 `state/atom.ts` 的 Atom，意图按帧 `seq` 结算**：消除「请求返回先弹回旧状态、下一帧再跳过去」的闪烁。
 - **按概念分 feature，单向分层且出口显式**：跨 feature 只走 `index.ts` 并禁止成环；像素农场作为皮肤层放在 `features` 之上。
 - **四渠道完全隔离并自带 CLI**：正式版与开发版/测试版可同机并排运行，互不争抢库，用户无需另装 Node 即可使用 CLI。
 
@@ -118,6 +118,6 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 
 ## 怎么验证
 
-- `vp run web:check`、`vp test run apps/web/src/layers.test.ts apps/web/src/stories.test.ts`：页面类型、StyleX 与 Tailwind 的编译、令牌/门禁规则（`vibevalley/stylex-only`、`vibevalley/style-attrs`、`vibevalley/no-hex-color`、`vibevalley/design-tokens`）、分层方向与故事覆盖测试。
+- `vp run web:check`、`vp test run apps/web/src/layers.test.ts apps/web/src/stories.test.ts`：页面类型、Tailwind 的编译、令牌/门禁规则（`vibevalley/style-attrs`、`vibevalley/no-hex-color`、`vibevalley/design-tokens`）、分层方向与故事覆盖测试。
 - `vp run --filter @vibevalley/web e2e`（`apps/web/test/*.spec.ts`）：各页面 Playwright 端到端与 axe 无障碍测试。
 - `vp run desktop:test`、`apps/desktop/src/base/releases.test.ts`、`vp run --filter @vibevalley/desktop update-check`：桌面端启动、灵动岛、渠道版本与自更新测试。

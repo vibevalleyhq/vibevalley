@@ -1,6 +1,5 @@
-import * as stylex from "@stylexjs/stylex";
-import { Schema } from "effect";
 import { createSignal } from "solid-js";
+import { z } from "zod";
 
 import { stories, story } from "@vibevalley/stories";
 
@@ -20,24 +19,6 @@ import {
   search,
   searchParam,
 } from "#/infra/router.ts";
-
-const styles = stylex.create({
-  controlsDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
-  },
-  controlsNav: {
-    display: "flex",
-    gap: "0.75rem",
-  },
-  routerStoriesDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "1rem",
-    padding: "1rem",
-  },
-});
 
 const detail = route("/demo/:id");
 
@@ -64,8 +45,8 @@ function Controls() {
   const [, update] = useSearchParams();
   const [prevented, setPrevented] = createSignal(0);
   return (
-    <div {...stylex.attrs(styles.controlsDiv)}>
-      <nav aria-label="示例导航" {...stylex.attrs(styles.controlsNav)}>
+    <div class="flex flex-col gap-3">
+      <nav aria-label="示例导航" class="flex gap-3">
         <NavLink href="/demo/one" end data-testid="router-one">
           One
         </NavLink>
@@ -92,7 +73,7 @@ function Controls() {
           New tab
         </Link>
       </nav>
-      <div {...stylex.attrs(styles.controlsNav)}>
+      <div class="flex gap-3">
         <button type="button" data-testid="router-back" onClick={() => router.history.back()}>
           Back
         </button>
@@ -122,9 +103,9 @@ function Controls() {
   );
 }
 
-const positive = Schema.FiniteFromString.check(Schema.isGreaterThan(0));
-const typedSearch = search({ page: Schema.optional(searchParam(positive)), tags: Schema.optional(Schema.Array(Schema.String)) });
-const typedRoute = route("/typed/:id", { params: Schema.Struct({ id: positive }), search: typedSearch });
+const positive = z.codec(z.string(), z.number().positive(), { decode: Number, encode: String });
+const typedSearch = search({ page: searchParam(positive).optional(), tags: z.array(z.string()).optional() });
+const typedRoute = route("/typed/:id", { params: z.object({ id: positive }), search: typedSearch });
 function TypedDetail() {
   const params = useParams(typedRoute);
   const [filters, update] = useSearchValues(typedSearch);
@@ -183,7 +164,7 @@ export default stories({
     Navigation: story({
       render: () => (
         <Router history={memoryHistory("/demo/one")}>
-          <div {...stylex.attrs(styles.routerStoriesDiv)}>
+          <div class="flex flex-col gap-4 p-4">
             <Controls />
             <Routes
               routes={[

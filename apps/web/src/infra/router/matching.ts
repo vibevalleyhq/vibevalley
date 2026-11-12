@@ -1,6 +1,6 @@
-import { Exit, Schema } from "effect";
+import { z } from "zod";
 
-import type { SearchCheck } from "./search";
+import { attemptCodec, type SearchCheck } from "./search";
 
 type Parameter<S extends string> = S extends `:${infer Name}` ? Name : S extends "*" ? "rest" : never;
 type Names<P extends string> = P extends `${infer Head}/${infer Tail}` ? Parameter<Head> | Names<Tail> : Parameter<P>;
@@ -109,35 +109,31 @@ export interface RoutePath<P extends string = string, T extends object = Params<
   readonly resolve: (pathname: string, search: string) => "missing" | "invalid" | "matched";
 }
 export function route<const P extends string>(path: P, options?: { search?: SearchCheck }): RoutePath<P>;
-export function route<const P extends string, T extends object>(
-  path: P,
-  options: { params: Schema.Codec<T, Params<P>>; search?: SearchCheck },
-): RoutePath<P, T>;
-export function route(path: string, options?: { params?: Schema.Codec<object, Readonly<Record<string, string>>>; search?: SearchCheck }): unknown {
+export function route<const P extends string, T extends object>(path: P, options: { params: z.ZodType<T, Params<P>>; search?: SearchCheck }): RoutePath<P, T>;
+export function route(path: string, options?: { params?: z.ZodType<object, Readonly<Record<string, string>>>; search?: SearchCheck }): unknown {
   const pattern = patternOf(path);
-  const schema = options?.params ?? Schema.Record(Schema.String, Schema.String);
-  const decode = Schema.decodeUnknownExit(schema);
-  const encode = Schema.encodeUnknownExit(schema);
+  const schema = options?.params ?? z.record(z.string(), z.string());
+  // undefined: the path is not this route's; { value: undefined }: it is, with parameters that do not decode.
   const parse = (pathname: string) => {
     const input = pattern.match(pathname);
-    return input === undefined ? undefined : decode(input);
+    return input === undefined ? undefined : { value: attemptCodec(() => z.safeDecode(schema, input)) };
   };
   return {
     path,
     segments: pattern.segments,
     build: (params: object) => {
-      const result = encode(params);
-      if (Exit.isFailure(result)) throw new Error("Invalid route parameters");
-      return pattern.build(result.value);
+      const result = attemptCodec(() => z.safeEncode(schema, params));
+      if (result === undefined) throw new Error("Invalid route parameters");
+      return pattern.build(result);
     },
     match: (pathname: string) => {
       const result = parse(pathname);
-      return result && Exit.isSuccess(result) ? result.value : undefined;
+      return result?.value;
     },
     resolve: (pathname: string, text: string) => {
       const result = parse(pathname);
       if (result === undefined) return "missing";
-      return Exit.isSuccess(result) && (options?.search?.valid(text) ?? true) ? "matched" : "invalid";
+      return result.value !== undefined && (options?.search?.valid(text) ?? true) ? "matched" : "invalid";
     },
   };
 }

@@ -1,5 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
-import { Array as Arr } from "effect";
 import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -17,53 +15,6 @@ import { Card, Quiet } from "#/ui/layout.tsx";
 
 import { approvalsQuery } from "./signIns";
 
-const viewStyles = stylex.create({
-  row: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  text: {
-    display: "flex",
-    minWidth: "0",
-    flex: "1",
-    flexDirection: "column",
-  },
-  name: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    fontWeight: "var(--font-weight-medium)",
-  },
-  code: {
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-lg)",
-    lineHeight: "var(--leading-lg)",
-    letterSpacing: "0.08em",
-  },
-  when: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  warn: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-berry)",
-  },
-  page: {
-    height: "100%",
-    overflowY: "auto",
-    padding: "1.25rem",
-  },
-  body: {
-    display: "flex",
-    maxWidth: "var(--container-3xl)",
-    flexDirection: "column",
-    gap: "0.75rem",
-  },
-});
-
 /** The sign-in requests waiting on this page's say, the one matching `code` first; approving signs that device in. */
 export function Approvals(props: { code?: string | undefined; always?: boolean }) {
   const client = useQueryClient();
@@ -75,7 +26,7 @@ export function Approvals(props: { code?: string | undefined; always?: boolean }
     const all = ready(approvals, undefined) ?? [];
     // The one the link names first; the rest, if any, after it.
     const named = props.code;
-    return [...Arr.filter(all, (a) => a.code === named), ...Arr.filter(all, (a) => a.code !== named)];
+    return [...all.filter((a) => a.code === named), ...all.filter((a) => a.code !== named)];
   };
   const answer = (a: Approval, allow: boolean) =>
     void act.run(() => api.user.approval.answer({ id: a.id, allow }).then((left) => client.setData(approvalsQuery(), () => ({ value: left }))));
@@ -83,19 +34,19 @@ export function Approvals(props: { code?: string | undefined; always?: boolean }
     <Show when={list().length > 0 || props.always === true}>
       <Card title={t("web.user.approvals.title")} testid="approvals">
         <Show when={list().length > 0} fallback={<Quiet>{t("web.user.approvals.none")}</Quiet>}>
-          <p {...stylex.attrs(viewStyles.warn)}>{t("web.user.approvals.onlyYours")}</p>
+          <p class="text-sm text-berry">{t("web.user.approvals.onlyYours")}</p>
           <For each={list()}>
             {(a) => (
-              <div data-key={a.id} data-code={a.code} {...stylex.attrs(viewStyles.row)}>
-                <span {...stylex.attrs(viewStyles.text)}>
-                  <span {...stylex.attrs(viewStyles.name)}>{t("web.user.approvals.wants", { name: a.name })}</span>
-                  <span {...stylex.attrs(viewStyles.code)}>{a.code}</span>
-                  <span data-testid="approval-from" {...stylex.attrs(viewStyles.when)}>
+              <div data-key={a.id} data-code={a.code} class="flex flex-wrap items-center gap-2">
+                <span class="flex min-w-0 flex-1 flex-col">
+                  <span class="text-sm font-medium">{t("web.user.approvals.wants", { name: a.name })}</span>
+                  <span class="font-mono text-lg tracking-[0.08em]">{a.code}</span>
+                  <span data-testid="approval-from" class="text-xs text-muted">
                     {a.from === ""
                       ? t("web.user.approvals.fromHere", { at: momentText(a.askedAt) })
                       : t("web.user.approvals.from", { from: a.from, at: momentText(a.askedAt) })}
                   </span>
-                  <span {...stylex.attrs(viewStyles.when)}>{t("web.user.approvals.left", { m: Math.max(0, Math.ceil((a.expiresAt - now()) / 60_000)) })}</span>
+                  <span class="text-xs text-muted">{t("web.user.approvals.left", { m: Math.max(0, Math.ceil((a.expiresAt - now()) / 60_000)) })}</span>
                 </span>
                 <Button tone="primary" data-testid="approval-allow" disabled={act.busy()} onClick={() => answer(a, true)}>
                   {t("web.user.approvals.allow")}
@@ -116,9 +67,9 @@ export function Approvals(props: { code?: string | undefined; always?: boolean }
 export function ApprovePage() {
   const params = useSearch();
   return (
-    <div {...stylex.attrs(viewStyles.page)}>
+    <div class="h-full overflow-y-auto p-5">
       <Page title={t("web.user.approvals.page")} hint={t("web.user.approvals.hint")}>
-        <div {...stylex.attrs(viewStyles.body)}>
+        <div class="flex max-w-3xl flex-col gap-3">
           <Approvals code={params().get("code") ?? undefined} always />
         </div>
       </Page>

@@ -2,581 +2,414 @@
   "apps/cli": {
     "nonNull": 0,
     "doubleCast": 0,
-    "cast": 0,
-    "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "cast": 1,
+    "lintOff": 1,
+    "swallowed": 2
   },
   "apps/desktop": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 1,
-    "lintOff": 2,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "lintOff": 1,
+    "swallowed": 2
   },
   "apps/mobile": {
     "nonNull": 0,
     "doubleCast": 1,
     "cast": 1,
-    "lintOff": 3,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "lintOff": 2,
+    "swallowed": 1
   },
   "apps/server": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "apps/site": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "apps/web": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 1,
-    "lintOff": 2,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "lintOff": 1,
+    "swallowed": 0
   },
   "packages/agent": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 1,
-    "lintOff": 2,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "lintOff": 4,
+    "swallowed": 1
   },
   "packages/ai": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "packages/artifact": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
-    "lintOff": 1,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "lintOff": 0,
+    "swallowed": 0
+  },
+  "packages/async": {
+    "nonNull": 5,
+    "doubleCast": 0,
+    "cast": 0,
+    "lintOff": 0,
+    "swallowed": 1
   },
   "packages/base-ui": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 3,
     "lintOff": 4,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "packages/bridge": {
     "nonNull": 0,
     "doubleCast": 1,
     "cast": 2,
     "lintOff": 3,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "packages/engine": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 1,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "packages/health": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 2,
     "lintOff": 2,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "packages/home": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "packages/i18n": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "packages/pkm": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "packages/protocol": {
     "nonNull": 0,
-    "doubleCast": 2,
-    "cast": 1,
+    "doubleCast": 0,
+    "cast": 3,
     "lintOff": 3,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "packages/provider": {
-    "nonNull": 0,
+    "nonNull": 1,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 6
   },
   "packages/stories": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "packages/testkit": {
     "nonNull": 0,
     "doubleCast": 0,
-    "cast": 1,
-    "lintOff": 1,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "cast": 0,
+    "lintOff": 0,
+    "swallowed": 0
   },
   "server: Agent Sessions": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 2,
     "lintOff": 2,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 1
   },
   "server: Agents": {
-    "nonNull": 0,
+    "nonNull": 1,
     "doubleCast": 1,
     "cast": 2,
     "lintOff": 4,
-    "orDie": 6,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 1
   },
   "server: Collaboration": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 10
   },
   "server: Gamification": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "server: Gateway": {
     "nonNull": 0,
     "doubleCast": 0,
-    "cast": 2,
-    "lintOff": 3,
-    "orDie": 1,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "cast": 3,
+    "lintOff": 2,
+    "swallowed": 4
   },
   "server: Inbox": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "server: Issues": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "server: Mailbox": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "server: Orchestrator": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "server: Platform": {
     "nonNull": 0,
-    "doubleCast": 0,
-    "cast": 4,
-    "lintOff": 5,
-    "orDie": 2,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "doubleCast": 1,
+    "cast": 5,
+    "lintOff": 10,
+    "swallowed": 4
   },
   "server: Source Control": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 2,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 1
   },
   "web: app": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "web: base": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 2,
     "lintOff": 2,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "web: farm": {
     "nonNull": 3,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 3,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "web: features/agent": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "web: features/artifact": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "web: features/catalog": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "web: features/channel": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
-    "lintOff": 2,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "lintOff": 1,
+    "swallowed": 0
   },
   "web: features/connector": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "web: features/inbox": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "web: features/issue": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "web: features/lan": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "web: features/library": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "web: features/media": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
-    "lintOff": 3,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "lintOff": 0,
+    "swallowed": 0
   },
   "web: features/memory": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "web: features/orchestrator": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "web: features/pkm": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "web: features/provider": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "web: features/repo": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "web: features/runtime": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "web: features/session": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "web: features/setting": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 2
   },
   "web: features/user": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "web: features/voice": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "web: infra": {
     "nonNull": 0,
     "doubleCast": 0,
-    "cast": 0,
-    "lintOff": 1,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "cast": 1,
+    "lintOff": 0,
+    "swallowed": 0
   },
   "web: state": {
     "nonNull": 0,
-    "doubleCast": 0,
-    "cast": 0,
-    "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "doubleCast": 1,
+    "cast": 2,
+    "lintOff": 3,
+    "swallowed": 0
   },
   "web: tree": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 0,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 0
   },
   "web: ui": {
     "nonNull": 0,
     "doubleCast": 4,
     "cast": 0,
     "lintOff": 6,
-    "orDie": 0,
-    "ignored": 0,
-    "swallowed": 0,
-    "resultBranch": 0
+    "swallowed": 1
   }
 }

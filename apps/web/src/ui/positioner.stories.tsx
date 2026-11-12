@@ -1,36 +1,12 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
 import { createSignal } from "solid-js";
 
 import { Popover } from "@vibevalley/base-ui";
 import { stories, story } from "@vibevalley/stories";
 
-import { positionerAttrs } from "./positioner";
-
-const styles = stylex.create({
-  frame: (backgroundColor: string) => ({ backgroundColor, color: "var(--color-ink)" }),
-  trigger: {
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: "var(--color-line)",
-    borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--color-page)",
-    color: "var(--color-ink)",
-    paddingInline: "0.625rem",
-    paddingBlock: "0.375rem",
-  },
-  active: { backgroundColor: "var(--color-selected)" },
-  width: (width: number) => ({ width }),
-  popup: {
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: "var(--color-line)",
-    borderRadius: "var(--radius-lg)",
-    backgroundColor: "var(--color-page)",
-    color: "var(--color-ink)",
-    padding: "0.75rem",
-    boxShadow: "var(--shadow-float)",
-  },
-});
+const styles = {
+  width: (width: number): JSX.CSSProperties => ({ width: `${width}px` }),
+};
 
 function Positioned() {
   const [wide, setWide] = createSignal(false);
@@ -39,20 +15,20 @@ function Positioned() {
     <Popover.Root>
       <Popover.Trigger
         ref={setTrigger}
-        data-testid="stylex-trigger"
+        data-testid="positioned-trigger"
         data-ref-forwarded={trigger() === undefined ? "false" : "true"}
-        {...stylex.attrs(styles.trigger, wide() && styles.active)}
+        class={["border border-line rounded-md text-ink px-2.5 py-1.5", wide() ? "bg-selected" : "bg-page"]}
       >
         Open
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Positioner data-testid="stylex-positioner" sideOffset={6} {...positionerAttrs(styles.width(wide() ? 280 : 200))}>
-          <Popover.Popup data-testid="stylex-popup" {...stylex.attrs(styles.popup)}>
+        <Popover.Positioner data-testid="positioned-positioner" sideOffset={6} class="z-30" style={styles.width(wide() ? 280 : 200)}>
+          <Popover.Popup data-testid="positioned-popup" class="border border-line rounded-lg bg-page text-ink p-3 shadow-float">
             <button
               type="button"
-              data-testid="stylex-resize"
+              data-testid="positioned-resize"
               data-wide={wide() ? "true" : "false"}
-              {...stylex.attrs(styles.trigger)}
+              class="border border-line rounded-md bg-page text-ink px-2.5 py-1.5"
               onClick={() => setWide((value) => !value)}
             >
               Resize
@@ -66,6 +42,6 @@ function Positioned() {
 
 export default stories({
   title: "组件/工作台/Positioner",
-  frame: styles.frame("var(--color-page)"),
+  frame: "bg-page",
   stories: { Dynamic: story({ render: () => <Positioned /> }) },
 });

@@ -2,20 +2,16 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { scriptedRuntime } from "@botiverse/oar/testing";
-import { it, expect } from "@effect/vitest";
-import { Effect } from "effect";
+import { expect, test } from "vite-plus/test";
 
 import { BizCode } from "@vibevalley/protocol/api";
 import { assignedAgentOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 
 import { user, worker as sessionActor } from "#/base/actor.ts";
-import { Agent } from "#/modules/agent/agent.ts";
-import { Issue } from "#/modules/issue/issue.ts";
-import { Session } from "#/modules/session/session.ts";
 import { gitIn } from "#/testing/git.ts";
 import { testIssues } from "#/testing/world.ts";
 
-import { farm, lab, mustHire, await_ } from "./farm.ts";
+import { farm, lab, mustHire, await_, failure } from "./farm.ts";
 
 const steps = [
   { id: "a", brief: "test-step-a", agent: "lab", check: "test -f a.txt" },
@@ -23,22 +19,21 @@ const steps = [
   { id: "c", brief: "test-step-c", agent: "lab", needs: ["a", "b"] },
 ];
 
-it.live("regression: splitting an in-place session cannot create children with an unrelated parent branch", () => {
+test("regression: splitting an in-place session cannot create children with an unrelated parent branch", async () => {
   const f = farm({ repos: ["in-place"], runtime: scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("finished") }) });
-  return Effect.gen(function* () {
-    const service = yield* Issue;
-    const issues = testIssues(service);
-    yield* (yield* Agent).save(lab());
-    const parent = yield* issues.add({ title: "parent", repo: "in-place", agent: "lab" });
-    const hired = yield* issues.hire(lab(), "work in place", "in-place", { issue: parent.id, worktree: false });
-    const helper = mustHire(hired);
-    expect(helper.branch).toBeUndefined();
-    expect((yield* Effect.flip(service.split(parent.id, "", steps, sessionActor(helper.id)))).bizCode).toBe(BizCode.IssueRefused);
-    expect((yield* issues.list()).filter((issue) => issue.parent === parent.id)).toEqual([]);
-  }).pipe(Effect.scoped, Effect.provide(f.layer));
+  await using fw = await f.open();
+  const service = fw.issue;
+  const issues = testIssues(service);
+  await fw.agent.save(lab());
+  const parent = await issues.add({ title: "parent", repo: "in-place", agent: "lab" });
+  const hired = await issues.hire(lab(), "work in place", "in-place", { issue: parent.id, worktree: false });
+  const helper = mustHire(hired);
+  expect(helper.branch).toBeUndefined();
+  expect((await failure(service.split(parent.id, "", steps, sessionActor(helper.id)))).bizCode).toBe(BizCode.IssueRefused);
+  expect((await issues.list()).filter((issue) => issue.parent === parent.id)).toEqual([]);
 });
 
-it.live("regression: splitting preserves the parent's assignment and branch ancestry", () => {
+test("regression: splitting preserves the parent's assignment and branch ancestry", async () => {
   const { promise: gate, resolve: release } = Promise.withResolvers<void>();
   const f = farm({
     repos: ["board"],
@@ -58,32 +53,38 @@ it.live("regression: splitting preserves the parent's assignment and branch ance
       },
     }),
   });
-  return Effect.gen(function* () {
-    const issue2 = yield* Issue;
+  await using fw = await f.open();
+  try {
+    const issue2 = fw.issue;
     const issues = testIssues(issue2);
-    const sessions = yield* Session;
-    yield* (yield* Agent).save(lab());
-    const issue = yield* issues.add({ title: "整个看板重做", description: "像 Linear 那样", repo: "board", agent: "lab" });
-    yield* issues.edit(issue.id, { criteria: ["卡片紧凑"] }, user);
-    const hired = yield* issues.hire(lab(), "hold-parent", "board", { issue: issue.id, worktree: true });
+    const sessions = fw.session;
+    await fw.agent.save(lab());
+    const issue = await issues.add({ title: "整个看板重做", description: "像 Linear 那样", repo: "board", agent: "lab" });
+    await issues.edit(issue.id, { criteria: ["卡片紧凑"] }, user);
+    const hired = await issues.hire(lab(), "hold-parent", "board", { issue: issue.id, worktree: true });
     const helper = mustHire(hired);
-    const service = yield* Issue;
-    const split2 = yield* service.split(issue.id, "", steps, sessionActor(helper.id));
+    const service = fw.issue;
+    const split2 = await service.split(issue.id, "", steps, sessionActor(helper.id));
     expect(split2).toMatch(/3 张子工单/u);
-    const children = (yield* issues.list()).filter((item) => item.parent === issue.id);
+    const children = (await issues.list()).filter((item) => item.parent === issue.id);
     expect(children).toHaveLength(3);
-    const parent = yield* issues.get(issue.id);
+    const parent = await issues.get(issue.id);
     expect([parent.number, assignedAgentOf(parent), parent.criteria, sessionIdsOf(parent)[0]]).toEqual([issue.number, "lab", ["卡片紧凑"], helper.id]);
-    expect((yield* Effect.exit(service.split(issue.id, "", steps, sessionActor(helper.id))))._tag).toBe("Failure");
+    expect(await failure(service.split(issue.id, "", steps, sessionActor(helper.id)))).toBeInstanceOf(Error);
     release();
 
-    yield* await_(
-      () => Effect.andThen(issues.refreshQueue, issues.get(issue.id)),
+    await await_(
+      async () => {
+        await issues.refreshQueue();
+        return issues.get(issue.id);
+      },
       (item) => item.status === "in_review",
       "all native children merged",
     );
     expect(sessions.isReachable(helper.id)).toBe(true);
-    expect((yield* issues.get(issue.id)).closedAt).toBeUndefined();
+    expect((await issues.get(issue.id)).closedAt).toBeUndefined();
     expect(gitIn(helper.worktree!, "status", "--porcelain")).toBe("");
-  }).pipe(Effect.ensuring(Effect.sync(release)), Effect.scoped, Effect.provide(f.layer));
+  } finally {
+    release();
+  }
 });

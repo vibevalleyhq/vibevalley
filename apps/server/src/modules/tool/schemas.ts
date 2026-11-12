@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { ToolFailed } from "@vibevalley/agent/core/errors";
-import { effectTool } from "@vibevalley/agent/core/tool";
+import { runTool } from "@vibevalley/agent/core/tool";
 import type { JsonSchema } from "@vibevalley/ai/tools";
 import { isAbort } from "@vibevalley/async";
 import {
@@ -481,7 +481,7 @@ const toolOf =
   <K extends keyof All & Op>(op: K, body: Body<z.output<All[K]>>) => {
     const schema: All[K] = all[op];
     const read = (args: unknown): z.output<All[K]> => schema.parse(args);
-    return effectTool({
+    return runTool({
       name: toolName(op),
       description: words[op],
       parameters: shown[op] ?? {},
@@ -496,7 +496,7 @@ export const sessionSchemaTool = toolOf(sessionParameters, sessionSchemas, {
 });
 
 export const customTool = <S extends z.ZodObject>(name: string, description: string, parameters: S, body: Body<z.output<S>>) =>
-  effectTool({
+  runTool({
     name,
     description,
     parameters: toolParameters(parameters),

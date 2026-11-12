@@ -2,25 +2,19 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { scriptedRuntime, type ScriptedTurn } from "@botiverse/oar/testing";
-import { expect, it } from "@effect/vitest";
-import { Effect } from "effect";
-import { SqlClient } from "effect/sql";
+import { expect, test } from "vite-plus/test";
 
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
-import { Agent } from "#/modules/agent/agent.ts";
 import { explicitMandate } from "#/modules/issue/creation.ts";
-import { Issue } from "#/modules/issue/issue.ts";
-import { Mailbox } from "#/modules/mailbox/mailbox.ts";
-import { Repo } from "#/modules/repo/repo.ts";
 import { repository } from "#/modules/repo/repository.ts";
-import { Session } from "#/modules/session/session.ts";
 import { testConfig } from "#/testing/layers.ts";
+import { sqlOf } from "#/testing/sql.ts";
 
 import { await_, farm, git, lab, until } from "./farm.ts";
 
 for (const submittedReport of [false, true]) {
-  it.live(`regression: an in-flight PR follows CI after ${submittedReport ? "a submission report" : "an ordinary turn"} until explicit handoff`, () => {
+  test(`regression: an in-flight PR follows CI after ${submittedReport ? "a submission report" : "an ordinary turn"} until explicit handoff`, async () => {
     const first = Promise.withResolvers<void>();
     const reviewed = Promise.withResolvers<void>();
     const inputs: string[] = [];
@@ -34,7 +28,7 @@ for (const submittedReport of [false, true]) {
       repos: ["follow"],
       repoHooks: {
         gh: (...args) =>
-          Effect.sync(() => {
+          (async () => {
             const ok = (out: string) => ({ out, ok: true, missing: false });
             if (args[0] === "--version") return ok("gh version 2.80.0");
             if (args[0] === "auth") return ok("Logged in to github.com account gardener (keyring)");
@@ -43,13 +37,13 @@ for (const submittedReport of [false, true]) {
             if (args[0] === "pr" && args[1] === "create") return ok("https://github.com/test/follow/pull/1");
             if (args[0] === "pr" && args[1] === "view") return ok('{"state":"OPEN","mergedAt":null}');
             return { out: "", ok: false, missing: false };
-          }),
+          })(),
         publication: {
-          tip: () => repository(path).head,
-          fetch: () => Effect.void,
+          tip: () => repository(path).head(),
+          fetch: () => Promise.resolve(),
           push: (cwd, _url, branch, sha) => repository(cwd).push(bare, branch, sha),
         },
-        fetch: () => Effect.succeed(false),
+        fetch: () => Promise.resolve(false),
       },
       runtime: scriptedRuntime({
         id: "pi",
@@ -66,34 +60,35 @@ for (const submittedReport of [false, true]) {
         },
       }),
     });
-    return Effect.gen(function* () {
-      const issues = yield* Issue;
-      const sessions = yield* Session;
-      const mailbox = yield* Mailbox;
-      const sql = yield* SqlClient.SqlClient;
-      yield* (yield* Agent).save(lab());
+    await using fw = await f.open();
+    try {
+      const issues = fw.issue;
+      const sessions = fw.session;
+      const mailbox = fw.mailbox;
+      const sql = sqlOf(fw.db);
+      await fw.agent.save(lab());
       git(config.workRoot, "init", "--bare", bare);
       git(path, "remote", "add", "origin", "https://github.com/test/follow.git");
-      yield* (yield* Repo).refreshGitHub();
-      const issue = yield* issues.add({ title: "work", repo: "follow", agent: "lab" }, explicitMandate("", true));
-      yield* issues.start(issue.id, "");
-      const issue2 = yield* issues.get(issue.id);
+      await fw.repo.refreshGitHub();
+      const issue = await issues.add({ title: "work", repo: "follow", agent: "lab" }, explicitMandate("", true));
+      await issues.start(issue.id, "");
+      const issue2 = await issues.get(issue.id);
       const id = latestSessionIdOf(issue2)!;
-      yield* until(() => inputs.length === 1, "the implementation committed");
-      yield* issues.submitPullRequest(id);
-      if (submittedReport) yield* sessions.report(id, { summary: "PR submitted", questions: [], checks: [], remember: [], prSubmit: true });
+      await until(() => inputs.length === 1, "the implementation committed");
+      await issues.submitPullRequest(id);
+      if (submittedReport) await sessions.report(id, { summary: "PR submitted", questions: [], checks: [], remember: [], prSubmit: true });
       first.resolve();
       if (background) {
-        yield* until(() => {
+        await until(() => {
           const phase = sessions.sessionOf(id)?.phase;
           return phase?._tag === "working" && phase.doing.action === "wait";
         }, "submission waits for background work");
         expect(sessions.noRoom("pi", "follow")).not.toBe("");
         background.end();
       }
-      yield* until(() => sessions.sessionOf(id)?.phase._tag === "resting", "waiting for external review");
-      expect((yield* issues.get(issue.id)).stage.state).toBe("working");
-      expect((yield* issues.get(issue.id)).status).toBe("in_progress");
+      await until(() => sessions.sessionOf(id)?.phase._tag === "resting", "waiting for external review");
+      expect((await issues.get(issue.id)).stage.state).toBe("working");
+      expect((await issues.get(issue.id)).status).toBe("in_progress");
       expect(sessions.noRoom("pi", "follow")).toBe("");
       const event = (key: string) => ({
         source: "github" as const,
@@ -105,30 +100,24 @@ for (const submittedReport of [false, true]) {
         at: 1,
         meta: { kind: "ci" as const, failed: true },
       });
-      const ci = (yield* mailbox.accept(event("fix-first-ci")))!;
-      yield* until(() => inputs.length === 2, "CI automatically woke the helper");
+      const ci = (await mailbox.accept(event("fix-first-ci")))!;
+      await until(() => inputs.length === 2, "CI automatically woke the helper");
       expect(inputs[1]).toContain("fix-first-ci");
-      yield* await_(
+      await await_(
         () => sql<{ state: string }>`select state from mailbox_delivery where envelope_id = ${ci.id}`,
         (rows) => rows[0]?.state === "consumed",
         "CI entered the model",
       );
-      yield* sessions.report(id, { summary: "ready for the user", questions: [], checks: [], remember: [], prSubmit: false });
+      await sessions.report(id, { summary: "ready for the user", questions: [], checks: [], remember: [], prSubmit: false });
       reviewed.resolve();
-      yield* until(() => sessions.sessionOf(id)?.phase._tag === "done", "explicit handoff");
-      expect((yield* issues.get(issue.id)).stage.state).toBe("reviewing");
-      const held = (yield* mailbox.accept(event("after-handoff-ci")))!;
-      expect((yield* sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${held.id}`)[0]?.state).toBe("held");
+      await until(() => sessions.sessionOf(id)?.phase._tag === "done", "explicit handoff");
+      expect((await issues.get(issue.id)).stage.state).toBe("reviewing");
+      const held = (await mailbox.accept(event("after-handoff-ci")))!;
+      expect((await sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${held.id}`)[0]?.state).toBe("held");
       expect(inputs).toHaveLength(2);
-    }).pipe(
-      Effect.ensuring(
-        Effect.sync(() => {
-          first.resolve();
-          reviewed.resolve();
-        }),
-      ),
-      Effect.scoped,
-      Effect.provide(f.layer),
-    );
+    } finally {
+      first.resolve();
+      reviewed.resolve();
+    }
   });
 }

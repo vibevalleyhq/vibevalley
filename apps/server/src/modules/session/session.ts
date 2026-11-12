@@ -53,8 +53,8 @@ export class HireRefused extends Error {
   override readonly name = "HireRefused";
   readonly reason: string;
   readonly retainedWork?: boolean;
-  constructor(reason: string, retainedWork?: boolean) {
-    super(reason);
+  constructor(reason: string, retainedWork?: boolean, options?: ErrorOptions) {
+    super(reason, options);
     this.reason = reason;
     if (retainedWork !== undefined) this.retainedWork = retainedWork;
   }
@@ -146,7 +146,7 @@ export interface Session {
   /** Brings back the sessions a restart left: their hands, their interrupted runs. */
   readonly restore: () => Promise<void>;
   /** At startup, after the modules below it started: restore. */
-  readonly start: () => Promise<void>;
+  readonly boot: () => Promise<void>;
   /** Saves what a restart needs, lets every hand go and removes the helpers' credentials. */
   readonly close: () => Promise<void>;
 }
@@ -399,7 +399,7 @@ export async function makeSession(deps: SessionDeps, options: SessionOptions = {
     try {
       await (oldest.issue ? dismiss(oldest.id) : suspend(oldest.id));
     } catch (e) {
-      throw new HireRefused(messageOf(e));
+      throw new HireRefused(messageOf(e), undefined, { cause: e });
     }
     return { evicted: oldest.name };
   };
@@ -431,7 +431,7 @@ export async function makeSession(deps: SessionDeps, options: SessionOptions = {
             ? await repos.workplace(repo, issue.number, opt.worktree ?? agent.worktree, opt.base ?? "", signal)
             : await contextPlace(config.workRoot, id);
       } catch (e) {
-        throw new HireRefused(t("server.session.life.noPlace", { name: agent.name, why: messageOf(e) }));
+        throw new HireRefused(t("server.session.life.noPlace", { name: agent.name, why: messageOf(e) }), undefined, { cause: e });
       }
       const releasePlace = () => (place.repo ? repos.release(place) : releaseContextPlace(place));
       // The hand's own cleanups (its log, its credential) close when it leaves; the startup's undo an opening that did
@@ -773,7 +773,7 @@ export async function makeSession(deps: SessionDeps, options: SessionOptions = {
     setAddress: (address) => void (mcpEndpoint.url = `http://${address}/mcp`),
     host,
     restore,
-    start: restore,
+    boot: restore,
     close,
   };
 }

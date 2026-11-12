@@ -1,16 +1,16 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
-export const SpriteManifest = Schema.Record(
-  Schema.String,
-  Schema.Struct({
-    w: Schema.Finite,
-    h: Schema.Finite,
-    ax: Schema.Finite,
-    ay: Schema.Finite,
-    hx: Schema.optionalKey(Schema.Finite),
-    hy: Schema.optionalKey(Schema.Finite),
-    yard: Schema.optionalKey(Schema.Array(Schema.Finite)),
-    sheet: Schema.optionalKey(Schema.String),
+export const SpriteManifest = z.record(
+  z.string(),
+  z.object({
+    w: z.number(),
+    h: z.number(),
+    ax: z.number(),
+    ay: z.number(),
+    hx: z.exactOptional(z.number()),
+    hy: z.exactOptional(z.number()),
+    yard: z.exactOptional(z.array(z.number())),
+    sheet: z.exactOptional(z.string()),
   }),
 );
-export const CursorManifest = Schema.Record(Schema.String, Schema.Struct({ hx: Schema.Finite, hy: Schema.Finite }));
+export const CursorManifest = z.record(z.string(), z.object({ hx: z.number(), hy: z.number() }));

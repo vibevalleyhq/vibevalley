@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { type Component, createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -19,210 +18,6 @@ import { toast } from "#/ui/toasts.ts";
 import { dateText, type Recency, recencyOf, recencyText, since } from "./calendar";
 import { type Asked, CommitCalendar, Hands, Languages, NewRepoForm, Stat } from "./RepoPanels";
 import { languageShares, number, sortRepos } from "./repos";
-
-const styles = stylex.create({
-  reposPageDiv: {
-    display: "flex",
-    height: "100%",
-    minHeight: "0",
-    flexDirection: {
-      default: "column",
-      "@media (width>=48rem)": "row",
-    },
-    overflowY: {
-      default: "auto",
-      "@media (width>=48rem)": "hidden",
-    },
-    overflowX: {
-      default: null,
-      "@media (width>=48rem)": "hidden",
-    },
-  },
-  overviewSpan: {
-    borderRadius: "var(--radius-sm)",
-    backgroundColor: {
-      default: "var(--color-px-leaf-soft)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 50%, transparent)",
-    },
-    paddingInline: "0.375rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-  },
-  reposPageDiv2: {
-    display: "flex",
-    minHeight: {
-      default: "480px",
-      "@media (width>=48rem)": "0",
-    },
-    minWidth: "0",
-    flex: "1",
-    flexDirection: "column",
-    padding: "0.75rem",
-  },
-  overviewDiv: {
-    display: "flex",
-    minWidth: "0",
-    flex: "1",
-    flexDirection: "column",
-    gap: "0.75rem",
-  },
-  reposPageDiv3: {
-    maxHeight: {
-      default: "15rem",
-      "@media (width>=48rem)": "none",
-    },
-    flexShrink: "0",
-    overflowY: "auto",
-    borderBottomStyle: {
-      default: "solid",
-      "@media (width>=48rem)": "solid",
-    },
-    borderBottomWidth: {
-      default: "1px",
-      "@media (width>=48rem)": "0",
-    },
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-side)",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.75rem",
-    width: {
-      default: null,
-      "@media (width>=48rem)": "18rem",
-    },
-    borderRightStyle: {
-      default: null,
-      "@media (width>=48rem)": "solid",
-    },
-    borderRightWidth: {
-      default: null,
-      "@media (width>=48rem)": "1px",
-    },
-  },
-  reposPageLi: {
-    paddingInline: "0.625rem",
-    paddingTop: "0.25rem",
-    paddingBottom: "0.375rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  reposPageLi2: {
-    paddingInline: "0.625rem",
-    paddingBottom: "0.5rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  repo: {
-    display: "flex",
-    maxWidth: "var(--container-4xl)",
-    flexDirection: "column",
-    gap: "0.75rem",
-    overflowY: {
-      default: null,
-      "@media (width>=48rem)": "auto",
-    },
-  },
-  overviewSection: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "1rem",
-    borderRadius: "var(--radius-lg)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-    padding: "1rem",
-  },
-  overviewSpan2: {
-    display: "flex",
-    width: "6rem",
-    height: "6rem",
-    flexShrink: "0",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-lg)",
-    backgroundColor: "var(--color-hover)",
-  },
-  overviewDiv2: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.75rem",
-  },
-  overviewH2: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-xl)",
-    lineHeight: "var(--leading-xl)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  overviewDiv22: {
-    display: "flex",
-    flexWrap: "wrap",
-    columnGap: "1.5rem",
-    rowGap: "0.5rem",
-  },
-  overviewDiv3: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.375rem",
-  },
-  overviewSpan22: {
-    minWidth: "0",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  overviewButton: {
-    cursor: "pointer",
-    borderRadius: "var(--radius-sm)",
-    padding: "0.25rem",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  overviewDiv4: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-end",
-    gap: "0.25rem",
-  },
-  overviewButton2: {
-    cursor: "pointer",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    padding: "0.375rem",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-    opacity: {
-      default: null,
-      ":disabled": ".5",
-    },
-  },
-  overviewSpan3: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-});
 
 const languagesQuery = defineQuery({
   schema: S.RepoLanguages,
@@ -269,8 +64,8 @@ export function ReposPage(props: { rest: string; skin: ReposSkin }) {
   const [creating, setCreating] = createSignal(false);
   return (
     // The list is the page's side column, against the rail as the chat's and the notes' are (ui/layout.tsx Split edge).
-    <div {...stylex.attrs(styles.reposPageDiv)}>
-      <div {...stylex.attrs(styles.reposPageDiv3)}>
+    <div class="flex h-full min-h-0 flex-col md:flex-row overflow-y-auto md:overflow-y-hidden md:overflow-x-hidden">
+      <div class="max-h-60 md:max-h-none shrink-0 overflow-y-auto md:[border-bottom-style:solid] border-b md:border-b-0 border-line bg-side px-2 py-3 md:w-72 md:[border-right-style:solid] md:border-r">
         <ListCard
           bare
           title={t("web.repo.title")}
@@ -282,7 +77,7 @@ export function ReposPage(props: { rest: string; skin: ReposSkin }) {
             </Button>
           }
         >
-          <li {...stylex.attrs(styles.reposPageLi)}>{t("web.repo.repos")}</li>
+          <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">{t("web.repo.repos")}</li>
           <Switch
             fallback={
               <>
@@ -307,15 +102,15 @@ export function ReposPage(props: { rest: string; skin: ReposSkin }) {
             }
           >
             <Match when={!ready(list, undefined)}>
-              <li {...stylex.attrs(styles.reposPageLi2)}>{t("web.repo.finding")}</li>
+              <li class="px-2.5 pb-2 text-sm text-muted">{t("web.repo.finding")}</li>
             </Match>
             <Match when={sorted().length === 0}>
-              <li {...stylex.attrs(styles.reposPageLi2)}>{t("web.repo.none")}</li>
+              <li class="px-2.5 pb-2 text-sm text-muted">{t("web.repo.none")}</li>
             </Match>
           </Switch>
         </ListCard>
       </div>
-      <div {...stylex.attrs(styles.reposPageDiv2)}>
+      <div class="flex min-h-120 md:min-h-0 min-w-0 flex-1 flex-col p-3">
         {/* Keyed by the name, a plain value: the panel's queries are still settling when the page moves back to the map, and a read through a narrowed accessor then would halt the page. */}
         <Show when={selected()?.name} keyed fallback={<props.skin.Map />}>
           {(name) => <RepoPanel name={name} repos={sorted} now={now()} Head={props.skin.Head} />}
@@ -336,7 +131,7 @@ export function ReposPage(props: { rest: string; skin: ReposSkin }) {
 function RepoPanel(props: { name: string; repos: () => RepoSummary[]; now: number; Head: ReposSkin["Head"] }) {
   const repo = createMemo<RepoSummary | undefined>((last) => props.repos().find((p) => p.name === props.name) ?? last);
   return (
-    <div data-testid="repo" data-key={props.name} {...stylex.attrs(styles.repo)}>
+    <div data-testid="repo" data-key={props.name} class="flex max-w-4xl flex-col gap-3 md:overflow-y-auto">
       <props.Head name={props.name} />
       <Show when={repo()}>{(p) => <Details repo={p()} now={props.now} />}</Show>
     </div>
@@ -394,38 +189,38 @@ function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; a
   const busy = () => props.languages.fetching() || props.activity.fetching();
   const notCounted = () => !!props.languages.error();
   return (
-    <section {...stylex.attrs(styles.overviewSection)}>
-      <span {...stylex.attrs(styles.overviewSpan2)}>
+    <section class="flex flex-wrap items-center gap-4 rounded-lg border border-line bg-page p-4">
+      <span class="flex w-24 h-24 shrink-0 items-center justify-center rounded-lg bg-hover">
         <SpriteIcon name={recencyPicture[recency()]} size={80} label={t("web.repo.recency.label", { label: recencyText(recency()) })} />
       </span>
-      <div {...stylex.attrs(styles.overviewDiv)}>
-        <div {...stylex.attrs(styles.overviewDiv2)}>
-          <h2 {...stylex.attrs(styles.overviewH2)}>{props.repo.name}</h2>
-          <span {...stylex.attrs(styles.overviewSpan)}>{recencyText(recency())}</span>
+      <div class="flex min-w-0 flex-1 flex-col gap-3">
+        <div class="flex flex-wrap items-center gap-3">
+          <h2 class="truncate text-xl font-semibold">{props.repo.name}</h2>
+          <span class="rounded-sm bg-leaf-300/50 px-1.5 text-xs">{recencyText(recency())}</span>
         </div>
-        <div {...stylex.attrs(styles.overviewDiv22)}>
+        <div class="flex flex-wrap gap-x-6 gap-y-2">
           <Stat label={t("web.repo.firstCommit")} value={firstCommit()} />
           <Stat label={t("web.repo.commitCount")} value={commitTotal()} />
           <Stat label={t("web.repo.code")} value={codeLines()} />
           <Stat label={t("web.repo.languages")} value={languageTotal()} />
         </div>
-        <div {...stylex.attrs(styles.overviewDiv3)}>
+        <div class="flex items-center gap-1.5">
           <Icon name="folder" size={14} />
-          <span {...stylex.attrs(styles.overviewSpan22)} title={props.repo.path}>
+          <span class="min-w-0 truncate font-mono text-xs text-muted" title={props.repo.path}>
             {props.repo.path}
           </span>
           <button
             type="button"
             title={t("web.repo.copyPath")}
             aria-label={t("web.repo.copyPath")}
-            {...stylex.attrs(styles.overviewButton)}
+            class="cursor-pointer rounded-sm p-1 hover:bg-hover"
             onClick={() => void copyPath(props.repo.path)}
           >
             <Icon name="copy" size={14} />
           </button>
         </div>
       </div>
-      <div {...stylex.attrs(styles.overviewDiv4)}>
+      <div class="flex flex-col items-end gap-1">
         <button
           type="button"
           title={busy() ? t("web.repo.counting") : t("web.repo.recount")}
@@ -434,13 +229,11 @@ function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; a
           onClick={() => {
             void Promise.allSettled([props.languages.refetch(), props.activity.refetch()]);
           }}
-          {...stylex.attrs(styles.overviewButton2)}
+          class="cursor-pointer rounded-md border border-line p-1.5 hover:bg-hover disabled:opacity-50"
         >
           <Icon name="refresh" size={16} />
         </button>
-        <Show when={counted()}>
-          {(c) => <span {...stylex.attrs(styles.overviewSpan3)}>{t("web.repo.countedAgo", { ago: since(c().at, props.now) })}</span>}
-        </Show>
+        <Show when={counted()}>{(c) => <span class="text-xs text-muted">{t("web.repo.countedAgo", { ago: since(c().at, props.now) })}</span>}</Show>
       </div>
     </section>
   );

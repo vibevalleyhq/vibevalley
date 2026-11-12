@@ -42,16 +42,16 @@ export function relay(page: WebSocket, line: MossLine, hooks?: MossRelayHooks, c
   let waitingBytes = 0;
   let windowBytes = 0;
   let windowAt = clock.now();
-  let open = false;
-  let closed = false;
-  let finished = false;
+  // connecting → open (MOSS took the link) → closing (a limit was passed: the page is being told) → finished.
+  let phase: "connecting" | "open" | "closing" | "finished" = "connecting";
+  /** Nothing more is taken from either side. */
+  const stopped = () => phase === "closing" || phase === "finished";
   let closeHook: (() => void) | void;
   const waiting: (string | Uint8Array)[] = [];
 
   const finish = () => {
-    if (finished) return;
-    finished = true;
-    closed = true;
+    if (phase === "finished") return;
+    phase = "finished";
     waiting.length = 0;
     page.off("message", fromPage);
     page.off("close", finish);
@@ -62,8 +62,8 @@ export function relay(page: WebSocket, line: MossLine, hooks?: MossRelayHooks, c
     end();
   };
   const fail = () => {
-    if (closed) return;
-    closed = true;
+    if (stopped()) return;
+    phase = "closing";
     if (page.readyState === page.OPEN) page.close(1009, "Realtime buffer limit");
     finish();
   };
@@ -72,7 +72,7 @@ export function relay(page: WebSocket, line: MossLine, hooks?: MossRelayHooks, c
     if (pumping) return;
     pumping = true;
     try {
-      for (let frame = down.shift(); frame !== undefined && !finished; frame = down.shift()) {
+      for (let frame = down.shift(); frame !== undefined && phase !== "finished"; frame = down.shift()) {
         downBytes -= size(frame);
         if (isClose(frame)) {
           if (page.readyState === page.OPEN) page.close(frame.code, frame.reason);
@@ -90,7 +90,7 @@ export function relay(page: WebSocket, line: MossLine, hooks?: MossRelayHooks, c
     }
   };
   const enqueue = (frame: Down) => {
-    if (closed) return;
+    if (stopped()) return;
     const bytes = size(frame);
     if (bytes > 512 * 1024 || downBytes + bytes > 2 * 1024 * 1024 || down.length >= downFrames) return fail();
     downBytes += bytes;
@@ -101,14 +101,14 @@ export function relay(page: WebSocket, line: MossLine, hooks?: MossRelayHooks, c
 
   const link: RealtimeLink = line.connect({
     open: () => {
-      if (closed) return;
-      open = true;
+      if (stopped()) return;
+      phase = "open";
       closeHook = hooks?.onOpen?.(link, sendToPage);
       for (const frame of waiting.splice(0)) link.send(frame);
       waitingBytes = 0;
     },
     text: (data) => {
-      if (closed) return;
+      if (stopped()) return;
       if (Buffer.byteLength(data) > 256 * 1024) return fail();
       const safe = line.redact(data);
       hooks?.onMossText?.(safe, link, sendToPage);
@@ -120,7 +120,7 @@ export function relay(page: WebSocket, line: MossLine, hooks?: MossRelayHooks, c
   });
 
   function fromPage(data: RawData, isBinary: boolean) {
-    if (closed) return;
+    if (stopped()) return;
     const frame: string | Uint8Array = isBinary ? bytesOf(data) : Buffer.from(bytesOf(data)).toString("utf8");
     const bytes = size(frame);
     const now = clock.now();
@@ -131,8 +131,8 @@ export function relay(page: WebSocket, line: MossLine, hooks?: MossRelayHooks, c
     windowBytes += bytes;
     if (bytes > 256 * 1024 + 1 || windowBytes > 1024 * 1024 || (link.bufferedAmount?.() ?? 0) > 512 * 1024) return fail();
     const transformed = typeof frame === "string" && hooks?.onPageText ? hooks.onPageText(frame, link, sendToPage) : frame;
-    if (transformed === undefined || closed) return;
-    if (open) link.send(transformed);
+    if (transformed === undefined || stopped()) return;
+    if (phase === "open") link.send(transformed);
     else {
       waitingBytes += size(transformed);
       if (waiting.length >= 16 || waitingBytes > 512 * 1024) return fail();

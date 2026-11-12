@@ -23,30 +23,22 @@ catalog:
   "@formatjs/intl-locale": "5.4.2"
   "@formatjs/intl-pluralrules": "7.0.2"
   base64-js: "1.5.1"
-  "@effect/tsgo": "0.67.0"
   "@axe-core/playwright": "^4.14.0"
   "@botiverse/oar": "0.86.0"
   "@earendil-works/pi-ai": "1.5.0"
-  "@effect/platform-node": "4.1.2"
-  "@effect/sql-pg": "4.1.2"
-  "@effect/sql-pglite": "4.1.2"
   "@electric-sql/pglite": "0.5.16"
-  "@effect/vitest": "4.1.2"
   "@floating-ui/dom": "^1.8.0"
   "@larksuiteoapi/node-sdk": "^1.76.0"
   "@modelcontextprotocol/sdk": "^1.32.2"
   "@playwright/test": "^1.64.1"
   "@solidjs/vite-plugin": "3.0.0-next.56"
   "@solidjs/web": "2.0.0-rc.21"
-  "@stylexjs/stylex": "0.19.1"
-  "@stylexjs/unplugin": "0.19.1"
   "@types/node": "^26.6.6"
   "@vitest/browser-playwright": "5.1.0"
   agora-agents: "2.13.0"
   agora-rtc-sdk-ng: "4.24.9"
   agora-token: "2.0.7"
   axe-core: "^4.14.0"
-  effect: "4.1.2"
   electron: "^45.2.1"
   electron-builder: "^26.18.0"
   esbuild: "^0.28.2"
@@ -156,14 +148,6 @@ packageExtensions:
       "@types/react": "~19.3.0"
 
 minimumReleaseAgeExclude:
-  - "@effect/tsgo-darwin-arm64@0.63.0 || 0.67.0"
-  - "@effect/tsgo-darwin-x64@0.63.0 || 0.67.0"
-  - "@effect/tsgo-linux-arm64@0.63.0 || 0.67.0"
-  - "@effect/tsgo-linux-arm@0.63.0 || 0.67.0"
-  - "@effect/tsgo-linux-x64@0.63.0 || 0.67.0"
-  - "@effect/tsgo-win32-arm64@0.63.0 || 0.67.0"
-  - "@effect/tsgo-win32-x64@0.63.0 || 0.67.0"
-  - "@effect/tsgo@0.63.0 || 0.67.0"
   - knip@6.44.0
   - "@formatjs/intl-locale@5.4.1"
   - "@formatjs/intl-supportedvaluesof@2.5.0"
@@ -233,8 +217,3 @@ minimumReleaseAgeExclude:
   - "@ai-sdk/gateway@4.0.137"
   - ai@7.0.164
   - "@electric-sql/pglite@0.5.16"
-
-# effect-tsgo looks up every integration before any command and stops at one it cannot resolve: here oxlint-tsgolint
-# through vite-plus is packages/tsrs, which has no tsgolint binary. Drop this once @effect/tsgo skips it on its own.
-patchedDependencies:
-  "@effect/tsgo@0.67.0": patches/@effect__tsgo@0.67.0.patch

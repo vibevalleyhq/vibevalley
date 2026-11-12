@@ -14,7 +14,7 @@ import type { Inbox } from "#/modules/inbox/inbox.ts";
 import * as inboundQ from "#db/connector_inbound.sql.ts";
 import * as outboxQ from "#db/connector_outbox.sql.ts";
 
-import { BridgeError, makeBridge } from "./bridge.ts";
+import { ConnectorBridgeError, makeBridge } from "./bridge.ts";
 import { type FeishuApi, FeishuClient, feishuAdapter } from "./feishu.ts";
 import { type QQApi, QQClient, qqAdapter } from "./qq.ts";
 import { baseUrl, type WeixinApi, WeixinClient, weixinAdapter } from "./weixin.ts";
@@ -53,7 +53,7 @@ export interface ConnectorDeps {
 
 /** The database's own failures (a statement refused, a row that does not read) are a bridge's failure: its status says them. */
 const asBridgeError = (e: unknown): unknown =>
-  e instanceof BridgeError ? e : e instanceof SqlError || e instanceof z.ZodError ? new BridgeError(causeMessage(e), { cause: e }) : e;
+  e instanceof ConnectorBridgeError ? e : e instanceof SqlError || e instanceof z.ZodError ? new ConnectorBridgeError(causeMessage(e), { cause: e }) : e;
 
 export async function makeConnector(deps: ConnectorDeps, options: ConnectorOptions = {}): Promise<Connector> {
   // The farm's own waits and times (a pause, a retry, when a message went out) on the service's clock.
@@ -120,7 +120,7 @@ export async function makeConnector(deps: ConnectorDeps, options: ConnectorOptio
         await tried(() => inboundQ.pruneInbound(db.sql, { before }));
         await tried(() => outboxQ.pruneOutbox(db.sql, { before }));
       } catch (e) {
-        if (!(e instanceof BridgeError)) throw e;
+        if (!(e instanceof ConnectorBridgeError)) throw e;
         log.warn("vibevalley: connector history was not pruned", e.message);
       }
       await clock.sleep(dayMs, signal);
@@ -150,7 +150,7 @@ export async function makeConnector(deps: ConnectorDeps, options: ConnectorOptio
       try {
         return await b.setChannel(channel.id !== chat.defaultChannel() ? channel.id : undefined);
       } catch (e) {
-        if (e instanceof BridgeError) throw bizError(BizCode.ConnectorRefused, e.message);
+        if (e instanceof ConnectorBridgeError) throw bizError(BizCode.ConnectorRefused, e.message);
         throw e;
       }
     },

@@ -1,4 +1,3 @@
-import { Array as Arr } from "effect";
 import { expect, test } from "vite-plus/test";
 
 import type { LibraryItem, MediaJob } from "@vibevalley/protocol";
@@ -19,7 +18,7 @@ const said = item("d", "image/jpeg", { kind: "uploaded", channel: "c1", message:
 const names = { agent: (id: string) => (id === "lab" ? "实验员" : id), channel: (id: string) => (id === "c1" ? "#general" : id) };
 
 test("a file's kind is read off its media type", () => {
-  expect(Arr.map(["image/webp", "audio/wav", "video/mp4", "application/pdf"], kindOf)).toEqual(["image", "audio", "video", "other"]);
+  expect(["image/webp", "audio/wav", "video/mp4", "application/pdf"].map(kindOf)).toEqual(["image", "audio", "video", "other"]);
 });
 
 test("the rail lets through what both its groups name", () => {
@@ -58,7 +57,7 @@ test("each group of the rail is counted with the other group's choice applied", 
 test("rows are justified to the width, the last one left at its height", () => {
   const rows = justify({ ratios: [1, 2, 1, 1, 0.1], width: 400, height: 100, gap: 0 });
   // 1+2+1 = 4 at 100 high is exactly 400 wide; the rest is the last row, a sliver kept to half as wide as high.
-  expect(Arr.map(rows, (r) => Arr.map(r, (p) => [p.index, p.width, p.height]))).toEqual([
+  expect(rows.map((r) => r.map((p) => [p.index, p.width, p.height]))).toEqual([
     [
       [0, 100, 100],
       [1, 200, 100],
@@ -71,7 +70,7 @@ test("rows are justified to the width, the last one left at its height", () => {
   ]);
   const scaled = justify({ ratios: [1, 1, 1], width: 250, height: 100, gap: 10 });
   // Three would be 320 wide: the row shrinks to (250 - 20) / 3 high and fills the width with its gaps.
-  expect(Arr.map(scaled[0] ?? [], (p) => Math.round(p.height))).toEqual([77, 77, 77]);
+  expect((scaled[0] ?? []).map((p) => Math.round(p.height))).toEqual([77, 77, 77]);
   expect(Math.round((scaled[0]?.at(-1)?.x ?? 0) + (scaled[0]?.at(-1)?.width ?? 0))).toBe(250);
   expect(justify({ ratios: [1], width: 0, height: 100, gap: 0 })).toEqual([]);
 });

@@ -1,5 +1,4 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -13,171 +12,6 @@ import { AgentFace } from "#/ui/domain/Face.tsx";
 import { PoseSprite } from "#/ui/domain/PoseSprite.tsx";
 import { Hint } from "#/ui/Tip.tsx";
 
-const styles = stylex.create({
-  stageSpan: {
-    borderRadius: "var(--radius-md)",
-    backgroundColor: {
-      default: "var(--color-avatar-paper)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-paper) 92%, transparent)",
-    },
-    paddingInline: "0.75rem",
-    paddingBlock: "0.125rem",
-    fontSize: "var(--text-lg)",
-    lineHeight: "var(--leading-lg)",
-  },
-  stageSpan2: {
-    maxWidth: "24rem",
-    borderRadius: "var(--radius-sm)",
-    backgroundColor: {
-      default: "var(--color-avatar-soft-paper)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-paper) 75%, transparent)",
-    },
-    paddingInline: "0.5rem",
-    paddingBlock: "1px",
-    textAlign: "center",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-  },
-  stageSpan3: {
-    pointerEvents: "none",
-    position: "absolute",
-    top: "0.75rem",
-    right: "1rem",
-    borderRadius: "var(--radius-sm)",
-    backgroundColor: {
-      default: "var(--color-avatar-soft-paper)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-paper) 75%, transparent)",
-    },
-    paddingInline: "0.5rem",
-    paddingBlock: "1px",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-  },
-  tileButton: {
-    display: "flex",
-    cursor: "pointer",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "0.125rem",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    paddingInline: "0.25rem",
-    paddingTop: "0.25rem",
-    paddingBottom: "0.375rem",
-  },
-  tileButtonTone: {
-    borderColor: {
-      default: "var(--color-ink)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink) 40%, transparent)",
-    },
-    backgroundColor: "var(--color-selected)",
-  },
-  tileButtonAlt: {
-    borderColor: "var(--color-line)",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  tileSpan: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-  },
-  tileSpanTone: {
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  tileSpanAlt: {
-    color: "var(--color-muted)",
-  },
-  labeledDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.25rem",
-  },
-  labeledDiv2: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.375rem",
-  },
-  labeledSpan: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontWeight: "var(--font-weight-medium)",
-    color: "var(--color-muted)",
-  },
-  labeledSpan2: {
-    flex: "1",
-  },
-  labeledSpan3: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-berry)",
-  },
-  lookPanelDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "1.25rem",
-  },
-  lookPanelDiv2: {
-    display: "grid",
-    gridTemplateColumns: "repeat(4,minmax(0,1fr))",
-    gap: "0.375rem",
-  },
-  lookPanelSpan: {
-    display: "flex",
-    height: "4rem",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  lookPanelImg: {
-    height: "4rem",
-    objectFit: "contain",
-    imageRendering: "pixelated",
-  },
-  stageDiv: {
-    backgroundImage: "radial-gradient(60% 60% at 50% 45%, var(--color-agent-stage-center), var(--color-agent-stage-middle) 60%, var(--color-agent-stage-edge))",
-    position: "relative",
-    display: "flex",
-    flex: "1",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  stageDiv2: {
-    position: "relative",
-    height: "18rem",
-    width: "24rem",
-    maxWidth: "100%",
-  },
-  stageImg: {
-    left: 192 - 288 * 0.62,
-    position: "absolute",
-    bottom: "1.5rem",
-    width: "18rem",
-    imageRendering: "pixelated",
-  },
-  stageDiv3: {
-    position: "absolute",
-    right: "6rem",
-    bottom: "0.5rem",
-    translate: "50% 0",
-  },
-  stageDiv4: {
-    pointerEvents: "none",
-    position: "absolute",
-    insetInline: "0",
-    bottom: "1rem",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "0.25rem",
-  },
-});
-
 /** A label with what it means behind an info icon, what sits at its right, the control, and what is wrong under it. */
 export function Labeled(props: {
   label: string;
@@ -188,16 +22,16 @@ export function Labeled(props: {
   children: JSX.Element;
 }) {
   return (
-    <div {...stylex.attrs(styles.labeledDiv)}>
-      <div {...stylex.attrs(styles.labeledDiv2)}>
-        <span {...stylex.attrs(styles.labeledSpan)}>{props.label}</span>
+    <div class="flex flex-col gap-1">
+      <div class="flex items-center gap-1.5">
+        <span class="text-xs font-medium text-muted">{props.label}</span>
         <Show when={props.hint ?? props.tip}>{(h) => <Hint text={h()} />}</Show>
-        <span {...stylex.attrs(styles.labeledSpan2)} />
+        <span class="flex-1" />
         {props.aside}
       </div>
       {props.children}
       <Show when={props.error}>
-        <span {...stylex.attrs(styles.labeledSpan3)}>{props.error}</span>
+        <span class="text-xs text-berry">{props.error}</span>
       </Show>
     </div>
   );
@@ -207,14 +41,14 @@ export function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"])
   const cast = () => castOf(props.draft.look, props.draft.id);
   const sprites = useSprites();
   return (
-    <div {...stylex.attrs(styles.lookPanelDiv)}>
+    <div class="flex flex-col gap-5">
       <div>
         <Button icon="shuffle" onClick={() => props.onChange(randomLook())}>
           {t("web.agent.random")}
         </Button>
       </div>
       <Labeled label={t("web.agent.looksAs")} hint={t("web.agent.looksHint")}>
-        <div {...stylex.attrs(styles.lookPanelDiv2)}>
+        <div class="grid grid-cols-4 gap-1.5">
           <For each={SpeciesValues}>
             {(species) => (
               <Tile active={cast().species === species} label={speciesLabel[species]} onClick={() => props.onChange({ ...props.draft.look, species })}>
@@ -225,7 +59,7 @@ export function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"])
         </div>
       </Labeled>
       <Labeled label={t("web.agent.wears")}>
-        <div {...stylex.attrs(styles.lookPanelDiv2)}>
+        <div class="grid grid-cols-4 gap-1.5">
           <For each={OutfitValues}>
             {(outfit) => {
               const name = () => {
@@ -234,8 +68,8 @@ export function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"])
               };
               return (
                 <Tile active={cast().outfit === outfit} label={outfitLabel[outfit]} onClick={() => props.onChange({ ...props.draft.look, outfit })}>
-                  <span {...stylex.attrs(styles.lookPanelSpan)}>
-                    <Show when={name()}>{(n) => <img src={`/pixel/${n()}.png`} alt="" {...stylex.attrs(styles.lookPanelImg)} />}</Show>
+                  <span class="flex h-16 items-center justify-center">
+                    <Show when={name()}>{(n) => <img src={`/pixel/${n()}.png`} alt="" class="h-16 object-contain [image-rendering:pixelated]" />}</Show>
                   </span>
                 </Tile>
               );
@@ -255,10 +89,13 @@ function Tile(props: { active: boolean; label: string; onClick: () => void; chil
       aria-label={props.label}
       aria-pressed={aria(props.active)}
       onClick={() => props.onClick()}
-      {...stylex.attrs(styles.tileButton, props.active ? styles.tileButtonTone : styles.tileButtonAlt)}
+      class={[
+        "flex cursor-pointer flex-col items-center gap-0.5 rounded-md border px-1 pt-1 pb-1.5",
+        props.active ? "border-ink/40 bg-selected" : "border-line hover:bg-hover",
+      ]}
     >
       {props.children}
-      <span {...stylex.attrs(styles.tileSpan, props.active ? styles.tileSpanTone : styles.tileSpanAlt)}>{props.label}</span>
+      <span class={["text-xs", props.active ? "font-semibold" : "text-muted"]}>{props.label}</span>
     </button>
   );
 }
@@ -268,20 +105,25 @@ export function Stage(props: { draft: Agent; pose: Pose }) {
   const cast = () => castOf(props.draft.look, props.draft.id);
   const crop = () => stagePoses.find((p) => p.pose === props.pose)?.crop ?? "empty";
   return (
-    <div {...stylex.attrs(styles.stageDiv)}>
-      <div {...stylex.attrs(styles.stageDiv2)}>
-        <img src={`/pixel/${cropSprite(crop())}.png`} alt="" {...stylex.attrs(styles.stageImg)} onError={(e) => (e.currentTarget.style.display = "none")} />
-        <div {...stylex.attrs(styles.stageDiv3)}>
+    <div class="bg-[image:radial-gradient(60%_60%_at_50%_45%,_var(--color-agent-stage-center),_var(--color-agent-stage-middle)_60%,_var(--color-agent-stage-edge))] relative flex flex-1 items-center justify-center overflow-hidden">
+      <div class="relative h-72 w-96 max-w-full">
+        <img
+          src={`/pixel/${cropSprite(crop())}.png`}
+          alt=""
+          class="left-[13.439999999999998px] absolute bottom-6 w-72 [image-rendering:pixelated]"
+          onError={(e) => (e.currentTarget.style.display = "none")}
+        />
+        <div class="absolute right-24 bottom-2 translate-x-1/2">
           <PoseSprite cast={cast()} pose={props.pose} height={224} />
         </div>
       </div>
-      <div {...stylex.attrs(styles.stageDiv4)}>
-        <span {...stylex.attrs(styles.stageSpan)}>{props.draft.name || t("web.agent.unnamedAgent")}</span>
+      <div class="pointer-events-none absolute inset-x-0 bottom-4 flex flex-col items-center gap-1">
+        <span class="rounded-md bg-paper/92 px-3 py-0.5 text-lg">{props.draft.name || t("web.agent.unnamedAgent")}</span>
         <Show when={props.draft.duty}>
-          <span {...stylex.attrs(styles.stageSpan2)}>{props.draft.duty}</span>
+          <span class="max-w-96 rounded-sm bg-paper/75 px-2 py-px text-center text-xs">{props.draft.duty}</span>
         </Show>
       </div>
-      <span {...stylex.attrs(styles.stageSpan3)}>
+      <span class="pointer-events-none absolute top-3 right-4 rounded-sm bg-paper/75 px-2 py-px text-xs">
         {speciesLabel[cast().species]} · {outfitLabel[cast().outfit]}
       </span>
     </div>

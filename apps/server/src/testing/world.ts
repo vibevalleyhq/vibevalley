@@ -8,6 +8,8 @@ import type { AccountUsage, ChatMessage, IssueRequest } from "@vibevalley/protoc
 import type { Core } from "#/core/core.ts";
 import { makeMcp, type Mcp } from "#/gateway/mcp/mcp.ts";
 import { type ServerConfig } from "#/infra/config.ts";
+import type { PublicFetch } from "#/infra/publicHttp.ts";
+import type { Time } from "#/infra/time.ts";
 import { type Inbox, makeInbox } from "#/modules/inbox/inbox.ts";
 import { explicitMandate } from "#/modules/issue/creation.ts";
 import type { Issue } from "#/modules/issue/issue.ts";
@@ -57,6 +59,10 @@ export interface WorldOptions {
   readonly usage?: () => AccountUsage | null;
   /** Who an MCP token names; the sessions' tokens when absent. */
   readonly who?: (token: string) => string;
+  /** The network the farm reaches (testing/network.ts's vendors); loopback only when absent. */
+  readonly network?: { readonly fetch: typeof fetch; readonly publicFetch: PublicFetch };
+  /** The farm's clock (testing/layers.ts's shiftedTime); the wall clock when absent. */
+  readonly clock?: Time;
 }
 
 /** What is said in a test farm, from the farm's start. */
@@ -114,7 +120,7 @@ export async function moduleWorld(options: WorldOptions = {}): Promise<ModuleWor
     repo: { gh: noGitHub, ...options.repoHooks },
     session: { workerAccess: options.workerAccess ?? fakeWorkerAccess },
   };
-  const below = await platform(config, offlineNetwork);
+  const below = await platform(config, { ...(options.network ?? offlineNetwork), ...(options.clock ? { clock: options.clock } : {}) });
   try {
     const heard = said(below.core);
     below.closes.push(heard.close);

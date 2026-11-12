@@ -1,4 +1,4 @@
-import { Option, Schema, String as Str } from "effect";
+import { z } from "zod";
 
 export const presenterHref = (deck: { readonly id: string; readonly version: number }) => `/present?artifact=${encodeURIComponent(deck.id)}&v=${deck.version}`;
 
@@ -14,15 +14,14 @@ export const stepped = (move: { readonly at: number; readonly step: number; read
 
 export function elapsedText(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
-  const two = (n: number) => Str.padStart(2, "0")(String(n));
+  const two = (n: number) => String(n).padStart(2, "0");
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   return h > 0 ? `${h}:${two(m)}:${two(s % 60)}` : `${m}:${two(s % 60)}`;
 }
 
-const SlidePost = Schema.Struct({ page: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 10_000 })) });
-const decodeSlidePost = Schema.decodeUnknownOption(SlidePost);
+const SlidePost = z.object({ page: z.int().min(0).max(10_000) });
 
-export const slidePostOf = (data: unknown): number | undefined => Option.getOrUndefined(decodeSlidePost(data))?.page;
+export const slidePostOf = (data: unknown): number | undefined => SlidePost.safeParse(data).data?.page;
 
 export const slidesChannelName = (deck: { readonly id: string; readonly version: number }) => `vibevalley-slides:${deck.id}:${deck.version}`;

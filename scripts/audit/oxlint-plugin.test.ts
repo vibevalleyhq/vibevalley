@@ -15,7 +15,7 @@ const rule = (name: string) => plugin.rules[name]!;
 const page = (path: string) => `/repo/apps/web/src/${path}`;
 
 tester.run("no-wall-clock", rule("no-wall-clock"), {
-  valid: ["new Date(0)", "Clock.currentTimeMillis", "time.now()", "function f(Date) { Date.now() }", "const timers = {setTimeout() {}}; timers.setTimeout()"],
+  valid: ["new Date(0)", "clock.now()", "time.now()", "function f(Date) { Date.now() }", "const timers = {setTimeout() {}}; timers.setTimeout()"],
   invalid: [
     { code: "globalThis.Date.now()", errors: [{ messageId: "wallClock" }] },
     { code: "import * as timers from 'node:timers'; timers.setTimeout(f, 1)", errors: [{ messageId: "wallClock" }] },
@@ -28,14 +28,10 @@ tester.run("no-wall-clock", rule("no-wall-clock"), {
 });
 
 tester.run("no-test-sleep", rule("no-test-sleep"), {
-  valid: ["until(() => done)", "TestClock.adjust('1 second')", "other.sleep(10)"],
+  valid: ["until(() => done)", "vi.advanceTimersByTimeAsync(1000)", "clock.sleep(10)", "other.sleep(10)"],
   invalid: [
-    { code: "import * as effect from 'effect'; effect.Effect.sleep(1)", errors: [{ messageId: "sleep" }] },
-    { code: "import {Effect as E} from 'effect'; E.sleep(1)", errors: [{ messageId: "sleep" }] },
-    { code: "import {sleep as pause} from 'effect/Effect'; pause(1)", errors: [{ messageId: "sleep" }] },
     { code: "import {setTimeout as pause} from 'node:timers/promises'; pause(1)", errors: [{ messageId: "sleep" }] },
     { code: "globalThis.setTimeout(f, 1)", errors: [{ messageId: "sleep" }] },
-    { code: "Effect.sleep('1 second')", errors: [{ messageId: "sleep" }] },
     { code: "page.waitForTimeout(500)", errors: [{ messageId: "sleep" }] },
     { code: "setTimeout(f, 10)", errors: [{ messageId: "sleep" }] },
   ],
@@ -60,70 +56,17 @@ tester.run("no-cjk-literal", rule("no-cjk-literal"), {
   ],
 });
 
-const stylexImport = "import * as sx from '@stylexjs/stylex';";
-
 tester.run("no-hex-color", rule("no-hex-color"), {
   valid: [
-    `${stylexImport} sx.create({card: {color: 'var(--color-ink)', boxShadow: 'inset 0 2px 0 var(--color-accent)'}})`,
-    `${stylexImport} sx.create({card: {content: '"#abc"', backgroundImage: 'url(/art.svg#abc)'}})`,
-    `${stylexImport} const data = {color: '#abc'}; const note = 'see #abc';`,
+    { code: "const v = <div style={{ color: 'var(--color-ink)', 'box-shadow': 'inset 0 2px 0 var(--color-accent)' }} />", filename: "a.tsx" },
+    { code: "const v = <div style={{ content: '\"#abc\"', 'background-image': 'url(/art.svg#abc)' }} />", filename: "a.tsx" },
+    "const data = {color: '#abc'}; const note = 'see #abc';",
     { code: "const v = <div class='bg-page text-muted border-line bg-wheat/25 bg-[url(/a.svg#abc)]' />", filename: "a.tsx" },
-    `${stylexImport} function other(sx) { return sx.create({card: {color: '#abc'}}) }`,
-    `${stylexImport} const f = (sx) => sx.create({card: {color: '#abc'}});`,
-    "import {create} from 'another-library'; create({card: {color: '#abc'}})",
-    `${stylexImport} sx.create({card: (kind) => ({color: kind === '#abc' ? 'var(--color-ink)' : 'var(--color-muted)'})})`,
-    `${stylexImport} sx.createTheme(tokens, {ink: 'var(--color-ink)'})`,
+    { code: "const v = <div title='#abc' data-tone='#abc' />", filename: "a.tsx" },
   ],
   invalid: [
-    { code: `${stylexImport} sx.create({card: {color: '#e3efd2'}})`, errors: [{ messageId: "hex" }] },
-    {
-      code: "import {create as css} from '@stylexjs/stylex'; css({card: {backgroundColor: {default: null, '@media (hover: hover)': {default: null, ':hover': '#abc'}}}})",
-      errors: [{ messageId: "hex" }],
-    },
-    {
-      code: "import sx from '@stylexjs/stylex'; const css = sx.create; const paint = '#abcd'; css({card: {color: paint}})",
-      errors: [{ messageId: "hex" }],
-    },
-    {
-      code: `${stylexImport} const {create: css} = sx; css({card: {borderColor: '#abc'}})`,
-      errors: [{ messageId: "hex" }],
-    },
-    {
-      code: `${stylexImport} const base = {color: '#abc'}; sx.create({card: {...base}})`,
-      errors: [{ messageId: "hex" }],
-    },
-    {
-      code: `${stylexImport} sx.create({card: (active) => { if (active) return {color: '#abc'}; return {color: 'var(--color-ink)'}; }})`,
-      errors: [{ messageId: "hex" }],
-    },
-    {
-      code: `${stylexImport} sx.create({card: {boxShadow: \`0 \${offset}px 2px #2f1f1326\`}})`,
-      errors: [{ messageId: "hex" }],
-    },
-    {
-      code: `${stylexImport} sx.create({card: {color: sx.firstThatWorks('var(--color-ink)', '#abc')}})`,
-      errors: [{ messageId: "hex" }],
-    },
-    {
-      code: `${stylexImport} sx.keyframes({from: {color: '#abc'}, to: {color: 'var(--color-ink)'}})`,
-      errors: [{ messageId: "hex" }],
-    },
-    {
-      code: `${stylexImport} sx.createTheme(tokens, {ink: {default: 'var(--color-ink)', '@media (prefers-color-scheme: dark)': '#abc'}})`,
-      errors: [{ messageId: "hex" }],
-    },
-    { code: `${stylexImport} sx.defineVars({ink: '#abc'})`, errors: [{ messageId: "hex" }] },
-    { code: `${stylexImport} sx.defineConsts({ink: '#abc'})`, errors: [{ messageId: "hex" }] },
-    { code: `${stylexImport} sx.defineVars({ink: sx.types.color('#abc')})`, errors: [{ messageId: "hex" }] },
-    { code: `${stylexImport} sx.create({card: {'--accent': '#abc'}})`, errors: [{ messageId: "hex" }] },
-    {
-      code: "import {default as sx} from '@stylexjs/stylex'; sx['create']({card: {color: '#abc'}})",
-      errors: [{ messageId: "hex" }],
-    },
-    {
-      code: `${stylexImport} sx.create({card: {'::before': {color: '#abc', content: '"#abc"'}}})`,
-      errors: [{ messageId: "hex" }],
-    },
+    { code: "const v = <div style={{ color: '#e3efd2' }} />", filename: "a.tsx", errors: [{ messageId: "hex" }] },
+    { code: "const v = <div style={{ '--accent': '#abc' }} />", filename: "a.tsx", errors: [{ messageId: "hex" }] },
     {
       code: "const v = <span style={{ background: active ? '#74a046' : 'var(--color-page)' }} />",
       filename: "a.tsx",
@@ -138,42 +81,6 @@ tester.run("no-hex-color", rule("no-hex-color"), {
     { code: "const tones = { plain: 'hover:text-[#abcdef]' };", errors: [{ messageId: "hexClass" }] },
     { code: "const v = <div class={cx('p-2', `shadow-[0_1px_#000a]`)} />", filename: "a.tsx", errors: [{ messageId: "hexClass" }] },
     { code: "const v = <div class='[border-color:#abc]' />", filename: "a.tsx", errors: [{ messageId: "hexClass" }] },
-  ],
-});
-
-tester.run("stylex-only", rule("stylex-only"), {
-  valid: [
-    {
-      code: `${stylexImport} const s = sx.create({ box: { display: 'flex', gridTemplateColumns: 'minmax(0, 1fr)', transitionProperty: 'rotate', content: '"!important --tw-ring-shadow"' } }); const v = <div {...sx.attrs(s.box)} />`,
-      filename: "a.tsx",
-    },
-    { code: "const v = <div {...styleProps(styles.box)} />", filename: "a.tsx" },
-    { code: "const appearance = { class: ['markdown', composed.class] }; const v = <div {...appearance} />", filename: "a.tsx" },
-    { code: "const v = <div class='flex gap-2' />", filename: "a.tsx" },
-  ],
-  invalid: [
-    {
-      code: `${stylexImport} sx.create({ warn: { backgroundColor: 'var(--color-warn) !important' } })`,
-      filename: "a.tsx",
-      errors: [{ messageId: "important" }],
-    },
-    { code: `${stylexImport} sx.create({ card: { boxShadow: 'var(--tw-ring-shadow)' } })`, filename: "a.tsx", errors: [{ messageId: "tailwindVar" }] },
-    { code: `${stylexImport} sx.create({ card: { '--tw-scale-x': '1' } })`, filename: "a.tsx", errors: [{ messageId: "tailwindVar" }] },
-    {
-      code: `${stylexImport} sx.create({ card: { boxShadow: '0 0 transparent, 0 0 transparent, var(--shadow-float)' } })`,
-      filename: "a.tsx",
-      errors: [{ messageId: "tailwindShadow" }],
-    },
-    {
-      code: `${stylexImport} sx.create({ grid: { gridTemplateColumns: 'repeat(1,minmax(0,1fr))' } })`,
-      filename: "a.tsx",
-      errors: [{ messageId: "tailwindGrid" }],
-    },
-    {
-      code: `${stylexImport} sx.create({ icon: { transitionProperty: 'transform, translate, scale, rotate' } })`,
-      filename: "a.tsx",
-      errors: [{ messageId: "tailwindTransform" }],
-    },
   ],
 });
 
@@ -207,65 +114,25 @@ tester.run("no-copy-selector", rule("no-copy-selector"), {
 
 tester.run("design-tokens", rule("design-tokens"), {
   valid: [
-    `${stylexImport} sx.create({card: {borderRadius: 'var(--radius-lg)', fontSize: 'var(--text-sm)', transitionDuration: '180ms', zIndex: 30}})`,
-    `${stylexImport} sx.create({card: {opacity: {default: 0.4, ':disabled': 0.5}}})`,
-    `${stylexImport} sx.create({card: (width) => ({width, height: 37, top: -13, translate: \`\${width}px 0\`})})`,
-    `${stylexImport} sx.keyframes({from: {translate: '0 37px', opacity: 0}, to: {translate: '0 0', opacity: 1}})`,
-    `${stylexImport} const data = {fontSize: 37}; const note = 'rounded 7px';`,
+    {
+      code: "const v = <div style={{ 'border-radius': 'var(--radius-lg)', 'font-size': 'var(--text-sm)', 'transition-duration': '180ms', 'z-index': 30 }} />",
+      filename: "a.tsx",
+    },
+    { code: "const v = <div style={{ width: `${width()}px`, height: '37px', top: '-13px', translate: `${x}px 0` }} />", filename: "a.tsx" },
+    "const data = {fontSize: 37}; const note = 'rounded 7px';",
     {
       code: "const v = <div class='rounded-md text-sm leading-xs p-1.25 gap-2.5 z-30 duration-120 ease-out shadow-float disabled:opacity-50 w-[37px] h-[calc(100%-2px)] text-[var(--text-sm)] p-[var(--gutter)] data-[state=open]:bg-hover rounded-full text-ink' />",
       filename: "a.tsx",
     },
-    `${stylexImport} function other(sx) { return sx.create({card: {fontSize: 37}}) }`,
-    `${stylexImport} sx.positionTry({top: 37, left: 19, width: 143})`,
-    `${stylexImport} sx.create({card: {opacity: {default: 1, ':not(:disabled)': 0.4}}})`,
-    "import {create as css} from 'another-library'; css({card: {fontSize: 37}})",
-    `${stylexImport} sx.create({card: {'::before': {content: '"rounded-[7px]"', fontSize: 'inherit'}}})`,
+    { code: "const v = <div style={{ 'border-radius': `${r}px` }} />", filename: "a.tsx" },
   ],
   invalid: [
-    { code: `${stylexImport} sx.create({card: {borderRadius: '7px'}})`, errors: [{ messageId: "radius" }] },
-    { code: `${stylexImport} sx.create({card: {zIndex: -999}})`, errors: [{ messageId: "layer" }] },
-    {
-      code: "import {create as css} from '@stylexjs/stylex'; css({card: {fontSize: {default: 'var(--text-sm)', '@media (min-width: 40rem)': '17px'}}})",
-      errors: [{ messageId: "type" }],
-    },
-    {
-      code: `${stylexImport} const css = sx.create; const corners = {borderRadius: 7}; css({card: {...corners}})`,
-      errors: [{ messageId: "radius" }],
-    },
-    {
-      code: `${stylexImport} sx.create({card: (active) => ({transitionDuration: active ? '150ms' : '120ms'})})`,
-      errors: [{ messageId: "motion" }],
-    },
-    {
-      code: `${stylexImport} sx.create({card: {opacity: {default: 1, ':disabled': {'default': 0.5, '@media (hover: hover)': 0.4}}}})`,
-      errors: [{ messageId: "disabled" }],
-    },
-    {
-      code: `${stylexImport} sx.create({card: {'::placeholder': {fontSize: 17}}})`,
-      errors: [{ messageId: "type" }],
-    },
-    {
-      code: `${stylexImport} sx.create({card: {boxShadow: '0 1px 2px black'}})`,
-      errors: [{ messageId: "shadow" }],
-    },
-    {
-      code: `${stylexImport} sx.create({card: {transitionTimingFunction: sx.firstThatWorks('var(--ease-out)', 'linear')}})`,
-      errors: [{ messageId: "motion" }],
-    },
-    {
-      code: `${stylexImport} sx.keyframes({from: {zIndex: 999}, to: {zIndex: 30}})`,
-      errors: [{ messageId: "layer" }],
-    },
-    {
-      code: `${stylexImport} sx.viewTransitionClass({old: {borderRadius: '7px'}})`,
-      errors: [{ messageId: "radius" }],
-    },
-    {
-      code: `${stylexImport} sx.create({card: {fontSize: ('17px' as const)}})`,
-      filename: "tokens.ts",
-      errors: [{ messageId: "type" }],
-    },
+    { code: "const v = <div style={{ 'border-radius': '7px' }} />", filename: "a.tsx", errors: [{ messageId: "radius" }] },
+    { code: "const v = <div style={{ zIndex: '-999' }} />", filename: "a.tsx", errors: [{ messageId: "layer" }] },
+    { code: "const v = <div style={{ 'font-size': active ? 'var(--text-sm)' : '17px' }} />", filename: "a.tsx", errors: [{ messageId: "type" }] },
+    { code: "const v = <div style={{ 'transition-duration': '150ms' }} />", filename: "a.tsx", errors: [{ messageId: "motion" }] },
+    { code: "const v = <div style={{ 'box-shadow': '0 1px 2px black' }} />", filename: "a.tsx", errors: [{ messageId: "shadow" }] },
+    { code: "const v = <div style={{ 'transition-timing-function': 'linear' }} />", filename: "a.tsx", errors: [{ messageId: "motion" }] },
     { code: "const v = <div class='flex text-[13px]' />", filename: "a.tsx", errors: [{ messageId: "typeClass" }] },
     { code: "const v = <div class='sm:leading-[17px]' />", filename: "a.tsx", errors: [{ messageId: "typeClass" }] },
     { code: "const v = <div class='p-[7px]' />", filename: "a.tsx", errors: [{ messageId: "spacingClass" }] },
@@ -370,81 +237,25 @@ tester.run("no-cross-package-path", rule("no-cross-package-path"), {
   ],
 });
 
-tester.run("promise-boundary", rule("promise-boundary"), {
-  valid: [
-    { code: "const a = Effect.tryPromise(async () => { await x(); });", filename: "/repo/apps/server/src/a.ts" },
-    { code: "const a = Effect.tryPromise({ try: async (signal) => f(signal), catch: e });", filename: "/repo/apps/server/src/a.ts" },
-    { code: "const a = Effect.promise(async () => g());", filename: "/repo/apps/server/src/a.ts" },
-    { code: "const a = () => fetch(u).then((r) => r.text());", filename: "/repo/apps/server/src/a.ts" },
-    { code: "const a = Effect.tryPromise({ try: async () => (await f()).text, catch: e });", filename: "/repo/apps/server/src/a.ts" },
-  ],
-  invalid: [
-    { code: "async function a() {}", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "async" }] },
-    { code: "const a = async () => { await b(); };", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "async" }] },
-    { code: "const a = Effect.tryPromise(() => run(async () => 1));", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "async" }] },
-    { code: "const a = new Promise((r) => r(1));", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "promise" }] },
-    {
-      code: "const a = Effect.tryPromise({ try: async () => { const r = await realpath(d); if (bad(r)) throw e; return await stat(r); }, catch: e });",
-      filename: "/repo/apps/server/src/a.ts",
-      errors: [{ messageId: "steps" }],
-    },
-    { code: "const a = Effect.promise(async () => { await a(); await b(); });", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "steps" }] },
-  ],
-});
-
-tester.run("try-promise-catch", rule("try-promise-catch"), {
-  valid: [
-    {
-      code: "const a = Effect.tryPromise({ try: (signal) => fetch(u, { signal }), catch: (e) => new E({ cause: e }) });",
-      filename: "/repo/apps/server/src/a.ts",
-    },
-    { code: "const a = Effect.promise(() => db.close());", filename: "/repo/apps/server/src/a.ts" },
-  ],
-  invalid: [
-    { code: "const a = Effect.tryPromise(() => lookup(host));", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "thunk" }] },
-    { code: "const a = Effect.tryPromise(function (signal) { return f(signal); });", filename: "/repo/packages/ai/src/a.ts", errors: [{ messageId: "thunk" }] },
-  ],
-});
-
 tester.run("db-door", rule("db-door"), {
   valid: [
-    { code: "function* f() { const db = yield* Db; yield* Effect.result(db.attempt(q.x())); }", filename: "/repo/apps/server/src/issue/issue.ts" },
-    { code: 'import type { SqlClient } from "effect/sql";', filename: "/repo/apps/server/src/issue/merge.ts" },
-    { code: 'import { type SqlClient, SqlError } from "effect/sql";', filename: "/repo/apps/server/src/session/session.ts" },
-    {
-      code: 'import { SqlClient } from "effect/sql";\nconst t = sql.withTransaction(work);',
-      filename: "/repo/apps/server/src/infra/db.ts",
-    },
+    { code: 'import { getIssue } from "#/db/generated/issue.sql.ts";', filename: "/repo/apps/server/src/modules/issue/issue.ts" },
+    { code: 'import { type Db, SqlError } from "#/infra/db.ts";', filename: "/repo/apps/server/src/modules/session/session.ts" },
+    { code: 'import { PGlite } from "@electric-sql/pglite";\nimport pg from "pg";', filename: "/repo/apps/server/src/infra/db.ts" },
+    { code: 'import { pgliteSomething } from "pglite-adjacent";', filename: "/repo/apps/server/src/modules/issue/issue.ts" },
   ],
   invalid: [
-    { code: 'import { SqlClient } from "effect/sql";', filename: "/repo/apps/server/src/issue/issue.ts", errors: [{ messageId: "client" }] },
-    { code: "const t = sql.withTransaction(work);", filename: "/repo/apps/server/src/memory/store.ts", errors: [{ messageId: "transaction" }] },
-    { code: 'import * as Sql from "effect/sql";', filename: "/repo/apps/server/src/issue/issue.ts", errors: [{ messageId: "client" }] },
-    { code: "function* f() { const { attempt: db, run } = yield* Db; }", filename: "/repo/apps/server/src/game/game.ts", errors: [{ messageId: "whole" }] },
+    { code: 'import pg from "pg";', filename: "/repo/apps/server/src/modules/issue/issue.ts", errors: [{ messageId: "driver", data: { source: "pg" } }] },
+    { code: 'import type { PoolClient } from "pg";', filename: "/repo/apps/server/src/modules/memory/store.ts", errors: [{ messageId: "driver" }] },
+    { code: 'import { PGlite } from "@electric-sql/pglite";', filename: "/repo/apps/server/src/infra/baseline.ts", errors: [{ messageId: "driver" }] },
     {
-      code: "function* f() { const db = yield* Db; yield* Effect.result(db.run(q.x())); }",
-      filename: "/repo/apps/server/src/game/game.ts",
-      errors: [{ messageId: "runCaught" }],
+      code: 'import { vector } from "@electric-sql/pglite/vector";',
+      filename: "/repo/apps/server/src/modules/memory/memory.ts",
+      errors: [{ messageId: "driver" }],
     },
-    { code: 'import * as Sql from "effect/sql/SqlClient";', filename: "/repo/apps/server/src/issue/issue.ts", errors: [{ messageId: "client" }] },
+    { code: 'export * from "pg";', filename: "/repo/apps/server/src/base/sql.ts", errors: [{ messageId: "driver" }] },
+    { code: 'const pg = await import("pg");', filename: "/repo/apps/server/src/main.ts", errors: [{ messageId: "driver" }] },
   ],
-});
-
-tester.run("scoped-fibers", rule("scoped-fibers"), {
-  valid: ["Effect.forkScoped(work)", "FiberSet.run(set, work)", "Effect.forkChild(work)"],
-  invalid: [
-    { code: "Effect.forkDetach(work)", errors: [{ messageId: "detached" }] },
-    { code: "Effect.runFork(work)", errors: [{ messageId: "detached" }] },
-  ],
-});
-
-tester.run("clock-in-effect", rule("clock-in-effect"), {
-  valid: [
-    "Effect.gen(function* () { const at = yield* Clock.currentTimeMillis; })",
-    "Effect.gen(function* () { emit(() => clock.currentTimeMillisUnsafe()); })",
-    "const now = () => clock.currentTimeMillisUnsafe();",
-  ],
-  invalid: [{ code: "Effect.gen(function* () { const at = clock.currentTimeMillisUnsafe(); })", errors: [{ messageId: "unsafe" }] }],
 });
 
 tester.run("sync-fs", rule("sync-fs"), {
@@ -473,43 +284,6 @@ tester.run("child-process-door", rule("child-process-door"), {
   invalid: [
     { code: 'import { execFileSync } from "node:child_process";', errors: [{ messageId: "spawn" }] },
     { code: 'import * as cp from "child_process";', errors: [{ messageId: "spawn" }] },
-  ],
-});
-
-tester.run("atom-door", rule("atom-door"), {
-  valid: [
-    { code: 'import { Atom } from "effect/reactivity";', filename: page("state/atom.ts") },
-    { code: 'import { Atom, type AtomRegistry } from "effect/reactivity";', filename: page("state/intent.ts") },
-    { code: 'import { Effect } from "effect";', filename: page("features/issue/moves.ts") },
-    { code: 'import { Atom } from "effect/reactivity";', filename: "/repo/apps/server/src/core/core.ts" },
-  ],
-  invalid: [
-    { code: 'import { Atom } from "effect/reactivity";', filename: page("features/issue/moves.ts"), errors: [{ messageId: "atom" }] },
-    { code: 'import type { AtomRegistry } from "effect/reactivity";', filename: page("farm/store.ts"), errors: [{ messageId: "atom" }] },
-    { code: 'import * as Atom from "effect/reactivity/Atom";', filename: page("ui/act.ts"), errors: [{ messageId: "atom" }] },
-  ],
-});
-
-tester.run("unstable-effect-door", rule("unstable-effect-door"), {
-  valid: [
-    { code: 'import { Effect } from "effect";', filename: "/repo/apps/server/src/issue/issue.ts" },
-    { code: 'import * as X from "effect/unstable/ai";', filename: "/repo/apps/server/src/infra/ai.ts" },
-    { code: 'import * as X from "effect/experimental";', filename: page("state/atom.ts") },
-    { code: 'import { Rpc, RpcGroup } from "effect/rpc";', filename: "/repo/packages/protocol/src/rpc.ts" },
-    { code: 'import { RpcServer } from "effect/rpc";', filename: "/repo/apps/server/src/gateway/http/rpc.ts" },
-    { code: 'import { RpcClient } from "effect/rpc";', filename: page("infra/gateway.ts") },
-    { code: 'import { Otlp } from "effect/observability";', filename: "/repo/apps/server/src/main.ts" },
-    { code: 'import { Otlp } from "effect/observability";', filename: "/repo/apps/server/src/infra/telemetry.ts" },
-    { code: 'import { Command } from "effect/cli";', filename: "/repo/apps/cli/src/main.ts" },
-    { code: 'import { Command } from "effect/cli";', filename: "/repo/apps/server/src/chat/main.ts" },
-  ],
-  invalid: [
-    { code: 'import * as X from "effect/unstable/ai";', filename: "/repo/apps/server/src/issue/issue.ts", errors: [{ messageId: "unstable" }] },
-    { code: 'import * as X from "effect/experimental";', filename: page("features/issue/moves.ts"), errors: [{ messageId: "unstable" }] },
-    { code: 'import { RpcClient } from "effect/rpc";', filename: page("features/issue/moves.ts"), errors: [{ messageId: "rpc" }] },
-    { code: 'export * from "effect/rpc";', filename: "/repo/packages/protocol/src/api.ts", errors: [{ messageId: "rpc" }] },
-    { code: 'import { Otlp } from "effect/observability";', filename: "/repo/apps/server/src/issue/issue.ts", errors: [{ messageId: "observability" }] },
-    { code: 'import { Command } from "effect/cli";', filename: "/repo/apps/server/src/issue/issue.ts", errors: [{ messageId: "cli" }] },
   ],
 });
 
@@ -603,108 +377,33 @@ tester.run("global-doors", rule("global-doors"), {
   ],
 });
 
-tester.run("no-instanceof-tagged", rule("no-instanceof-tagged"), {
-  valid: [
-    "if (e instanceof Error) f(e.message)",
-    "if (e instanceof TypeError) f()",
-    "if (e instanceof TemplateProblem) f()",
-    'const isMerge = Predicate.isTagged(e, "MergeFailure")',
-    "class Plain extends Error {}\nif (e instanceof Plain) f()",
-  ],
-  invalid: [
-    { code: "const a = e instanceof MergeFailure ? e : wrap(e)", errors: [{ messageId: "tagged" }] },
-    { code: "if (e instanceof SqlError.SqlError) f()", errors: [{ messageId: "tagged" }] },
-    { code: "if (e instanceof Refused) f()", errors: [{ messageId: "tagged" }] },
-    {
-      code: 'if (e instanceof Busy) f()\nexport class Busy extends Data.TaggedError("Busy")<{ readonly message: string }> {}',
-      filename: "a.ts",
-      errors: [{ messageId: "tagged" }],
-    },
-  ],
-});
-
-tester.run("no-object-guard", rule("no-object-guard"), {
-  valid: [
-    "const ok = Predicate.isObject(x)",
-    'const ok = typeof x === "string" && x !== ""',
-    'const ok = typeof x === "object" && y !== null',
-    "const ok = x !== null && x !== undefined",
-  ],
-  invalid: [
-    { code: 'const ok = typeof x === "object" && x !== null', errors: [{ messageId: "guard" }] },
-    { code: 'const ok = x !== null && typeof x === "object"', errors: [{ messageId: "guard" }] },
-    { code: 'const ok = typeof v.a === "object" && v.a !== null && !Array.isArray(v.a)', errors: [{ messageId: "guard" }] },
-    { code: 'const ok = ready && typeof x === "object" && x != null', errors: [{ messageId: "guard" }] },
-    { code: 'const ok = typeof (x) === "object" && (x) !== null', errors: [{ messageId: "guard" }] },
-    { code: 'const ok = typeof x === "object" && ( x ) !== null', errors: [{ messageId: "guard" }] },
-  ],
-});
-
-tester.run("service-method-names", rule("service-method-names"), {
-  valid: [
-    'Issue.of({ create: Effect.fn("Issue.create")(function* (req) { return yield* add(req); }) })',
-    "Core.of({ apply: Effect.fnUntraced(function* (fact) { yield* fold(fact); }) })",
-    'const list = Effect.fn("Cron.list")(function* () { return []; });\nCron.of({ list })',
-    "Core.of({ state: () => state, follow: (id) => Stream.fromPubSub(events), events: Stream.empty, owner: Effect.map(sub, f) })",
-    "Lan.of({ answer: (id) => lookup(id), me: () => Effect.runSync(read) })",
-    "GitError.of(code, stderr)",
-    "const call = (x) => x;\nGame.of({ want: (s) => call(s) })",
-    'const blocks = { submit: Effect.fn("Artifact.submit")(function* (b) { return b; }) };\nArtifact.of({ submit: blocks.submit })',
-    'const a = Effect.fn("Channel.post")(function* (p) { return p; });\nconst b = Effect.fn("Channel.post", { attributes: { post: "B" } })(function* (p) { return p; });\nfunction post(p) { switch (p._tag) { case "A": return a(p); case "B": return b(p); } }\nChannel.of({ post })',
-  ],
-  invalid: [
-    { code: "Core.of({ open: () => Effect.suspend(() => go) })", errors: [{ messageId: "unnamed", data: { service: "Core", method: "open" } }] },
-    { code: "Game.of({ count: () => repos.contributions(e).pipe(Effect.map(total)) })", errors: [{ messageId: "unnamed" }] },
-    { code: "Notice.of({ say(text) { if (!text) return Effect.void; return Effect.log(text); } })", errors: [{ messageId: "unnamed" }] },
-    {
-      code: "const apply = (f) => Effect.sync(() => f);\nCore.of({ apply, setCommits: (c) => apply(c) })",
-      errors: [{ messageId: "unnamed" }, { messageId: "unnamed" }],
-    },
-    {
-      code: 'const changesOf = Effect.fn("Session.changesOf")(function* (id) { return id; });\nSession.of({ changes: changesOf })',
-      errors: [{ messageId: "name" }],
-    },
-    { code: "Connector.of({ login: (id) => bridge(id)?.login() ?? Effect.succeed(off(id)) })", errors: [{ messageId: "unnamed" }] },
-    { code: "const locked = (e) => lock.withPermits(1)(e);\nChannel.of({ pin: (id) => locked(pinning(id)) })", errors: [{ messageId: "unnamed" }] },
-    {
-      code: "Task.of({ act: Effect.fn(function* (id) { return id; }) })",
-      errors: [{ messageId: "name", data: { service: "Task", method: "act", given: "nothing" } }],
-    },
-    {
-      code: 'const blocks = { submit: Effect.fn("BlockStore.submit")(function* (b) { return b; }) };\nArtifact.of({ submit: blocks.submit })',
-      errors: [{ messageId: "name", data: { service: "Artifact", method: "submit", given: '"BlockStore.submit"' } }],
-    },
-    {
-      code: "const blocks = { submit: (b) => Effect.succeed(b) };\nArtifact.of({ submit: blocks.submit })",
-      errors: [{ messageId: "unnamed" }],
-    },
-    {
-      code: 'const a = Effect.fn("Channel.say")(function* (p) { return p; });\nconst b = Effect.fn("Channel.post")(function* (p) { return p; });\nfunction post(p) { if (p.a) return a(p); return b(p); }\nChannel.of({ post })',
-      errors: [{ messageId: "unnamed", data: { service: "Channel", method: "post" } }],
-    },
-  ],
-});
-
 const server = "/repo/apps/server/src/a.ts";
 
 tester.run("singular-service", rule("singular-service"), {
   valid: [
-    { code: 'class Issue extends Context.Service<Issue, { list: () => number }>()("vibevalley/Issue") {}', filename: server },
-    { code: 'class Progress extends Context.Service<Progress, {}>()("vibevalley/Progress") {}', filename: server },
-    { code: 'class Ingress extends Context.Service<Ingress, {}>()("vibevalley/Ingress") {}', filename: server },
-    { code: 'class SyncStatus extends Context.Service<SyncStatus, {}>()("vibevalley/SyncStatus") {}', filename: server },
-    { code: "class Issues extends Data.Class {}", filename: server },
+    { code: "export interface Issue {}\nexport async function makeIssue() {}", filename: "/repo/apps/server/src/modules/issue/issue.ts" },
+    { code: "export type Channel = {};\nexport async function makeChannel() {}", filename: "/repo/apps/server/src/modules/channel/channel.ts" },
+    { code: "export interface Core {}\nexport function makeCore() {}", filename: "/repo/apps/server/src/core/core.ts" },
+    { code: "export interface Lan {}\nexport async function makeLan() {}", filename: "/repo/apps/server/src/gateway/lan/lan.ts" },
+    { code: "export interface Progress {}\nexport async function makeProgress() {}", filename: "/repo/apps/server/src/modules/progress/progress.ts" },
+    { code: "export function makeSources() {}", filename: "/repo/apps/server/src/modules/memory/sources.ts" },
+    { code: "export function makeThings() {}", filename: "/repo/apps/server/src/infra/infra.ts" },
   ],
   invalid: [
     {
-      code: 'class Issues extends Context.Service<Issues, {}>()("vibevalley/Issue") {}',
-      filename: server,
-      errors: [{ messageId: "plural", data: { name: "Issues", singular: "Issue" } }],
+      code: "export interface Issues {}\nexport async function makeIssues() {}",
+      filename: "/repo/apps/server/src/modules/issues/issues.ts",
+      errors: [{ messageId: "plural", data: { folder: "issues", singular: "issue", Singular: "Issue" } }],
     },
     {
-      code: 'export class Memories extends Context.Service<Memories, {}>()("vibevalley/Memory") {}',
-      filename: server,
-      errors: [{ messageId: "plural", data: { name: "Memories", singular: "Memory" } }],
+      code: "export interface Memory {}\nexport async function makeMemories() {}",
+      filename: "/repo/apps/server/src/modules/memory/memory.ts",
+      errors: [{ messageId: "factory", data: { name: "makeMemories", folder: "memory", Service: "Memory" } }],
+    },
+    {
+      code: "export async function makeGame() {}",
+      filename: "/repo/apps/server/src/modules/game/game.ts",
+      errors: [{ messageId: "missing", data: { folder: "game", Service: "Game" } }],
     },
   ],
 });
@@ -725,84 +424,6 @@ tester.run("protocol-namespace", rule("protocol-namespace"), {
         { messageId: "named", data: { name: "Session" } },
         { messageId: "named", data: { name: "Channel" } },
       ],
-    },
-  ],
-});
-
-tester.run("tagged-error-tag", rule("tagged-error-tag"), {
-  valid: [
-    { code: 'export class HireRefused extends Schema.TaggedError<HireRefused>()("HireRefused", { reason: Schema.String }) {}', filename: "a.ts" },
-    { code: 'class LocalFailed extends S.TaggedError<LocalFailed>()("LocalFailed", {}) {}', filename: "a.ts" },
-    "class PlainError extends Error {}",
-  ],
-  invalid: [
-    {
-      code: 'export class HireRefused extends Schema.TaggedError<HireRefused>()("WrongTag", { reason: Schema.String }) {}',
-      filename: "a.ts",
-      errors: [{ messageId: "mismatch", data: { name: "HireRefused", tag: "WrongTag" } }],
-    },
-    {
-      code: "const tag = 'HireRefused'; class HireRefused extends Schema.TaggedError<HireRefused>()(tag, {}) {}",
-      filename: "a.ts",
-      errors: [{ messageId: "dynamic" }],
-    },
-    {
-      code: 'const Anonymous = class extends Schema.TaggedError<never>()("Anonymous", {}) {};',
-      filename: "a.ts",
-      errors: [{ messageId: "dynamic" }],
-    },
-  ],
-});
-
-tester.run("effect-idioms", rule("effect-idioms"), {
-  valid: [
-    'import { pipe, Effect, Config, Match, Schema } from "effect";',
-    { code: 'import type { flow } from "effect/Function";', filename: "a.ts" },
-    "work.pipe(Effect.map((x) => parse(x)))",
-    "Effect.map(work, parse)",
-    "function f(Effect) { return Effect.map(parse); }",
-    { code: 'Match.value(event).pipe(Match.withReturnType<string>(), Match.tag("Started", () => "ok"), Match.exhaustive)', filename: "a.ts" },
-    'const port = Config.Port("PORT").pipe(Config.withDefault(8787));',
-    'const count = Config.Int("COUNT").pipe(Config.orElse(() => Config.Int("FALLBACK_COUNT")));',
-    "Schema.Array(Tag).pipe(Schema.decodeTo(Schema.toType(Schema.ReadonlySet(Tag)), tx))",
-  ],
-  invalid: [
-    {
-      code: 'import { flow } from "effect";',
-      errors: [{ messageId: "noFlow" }],
-    },
-    {
-      code: 'import { flow as compose } from "effect/Function";',
-      errors: [{ messageId: "noFlow" }],
-    },
-    {
-      code: "work.pipe(Effect.map(parse));",
-      errors: [{ messageId: "tacitMap" }],
-    },
-    {
-      code: "work.pipe(Effect.map(Option.getOrUndefined));",
-      errors: [{ messageId: "tacitMap" }],
-    },
-    {
-      code: 'Match.value(event).pipe(Match.tag("Started", () => "ok"), Match.withReturnType<string>(), Match.exhaustive);',
-      filename: "a.ts",
-      errors: [{ messageId: "matchReturnTypeLate" }],
-    },
-    {
-      code: 'const port = Config.Number("PORT");',
-      errors: [{ messageId: "configNumber" }],
-    },
-    {
-      code: 'import { Config as Keys } from "effect"; const port = Keys.Number("PORT");',
-      errors: [{ messageId: "configNumber" }],
-    },
-    {
-      code: 'const port = Config.Int("PORT").pipe(Config.orElse(() => Config.succeed(8787)));',
-      errors: [{ messageId: "configOrElseDefault" }],
-    },
-    {
-      code: "Schema.Array(Tag).pipe(Schema.decodeTo(Schema.ReadonlySet(Tag), tx));",
-      errors: [{ messageId: "decodeToDouble" }],
     },
   ],
 });

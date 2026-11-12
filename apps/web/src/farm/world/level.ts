@@ -1,4 +1,6 @@
-import { Schema } from "effect";
+import { z } from "zod";
+
+import { jsonString } from "@vibevalley/protocol/schema";
 
 export interface Point {
   readonly x: number;
@@ -22,41 +24,41 @@ interface Thing {
   readonly field: (name: string) => unknown;
 }
 
-const LdtkEntitySchema = Schema.Struct({
-  __identifier: Schema.String,
-  px: Schema.Tuple([Schema.Finite, Schema.Finite]),
-  width: Schema.Finite,
-  height: Schema.Finite,
-  __pivot: Schema.Tuple([Schema.Finite, Schema.Finite]),
-  fieldInstances: Schema.Array(
-    Schema.Struct({
-      __identifier: Schema.String,
-      __value: Schema.Unknown,
+const LdtkEntitySchema = z.object({
+  __identifier: z.string(),
+  px: z.tuple([z.number(), z.number()]),
+  width: z.number(),
+  height: z.number(),
+  __pivot: z.tuple([z.number(), z.number()]),
+  fieldInstances: z.array(
+    z.object({
+      __identifier: z.string(),
+      __value: z.unknown(),
     }),
   ),
 });
 
-const LdtkLayerSchema = Schema.Struct({
-  __identifier: Schema.String,
-  __cWid: Schema.Finite,
-  __cHei: Schema.Finite,
-  __gridSize: Schema.Finite,
-  intGridCsv: Schema.Array(Schema.Finite),
-  entityInstances: Schema.Array(LdtkEntitySchema),
+const LdtkLayerSchema = z.object({
+  __identifier: z.string(),
+  __cWid: z.number(),
+  __cHei: z.number(),
+  __gridSize: z.number(),
+  intGridCsv: z.array(z.number()),
+  entityInstances: z.array(LdtkEntitySchema),
 });
-type LdtkLayer = typeof LdtkLayerSchema.Type;
+type LdtkLayer = z.output<typeof LdtkLayerSchema>;
 
-const LdtkRepoSchema = Schema.Struct({
-  levels: Schema.Array(
-    Schema.Struct({
-      pxWid: Schema.Finite,
-      pxHei: Schema.Finite,
-      layerInstances: Schema.Array(LdtkLayerSchema),
+const LdtkRepoSchema = z.object({
+  levels: z.array(
+    z.object({
+      pxWid: z.number(),
+      pxHei: z.number(),
+      layerInstances: z.array(LdtkLayerSchema),
     }),
   ),
 });
 
-const decodeLdtkRepo = Schema.decodeUnknownSync(Schema.fromJsonString(LdtkRepoSchema));
+const decodeLdtkRepo = (text: string) => jsonString(LdtkRepoSchema).parse(text);
 
 export class Level {
   readonly width: number;

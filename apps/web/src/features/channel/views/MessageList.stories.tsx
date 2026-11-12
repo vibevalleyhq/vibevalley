@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { For } from "solid-js";
 
 import type { Actor, ChatMessage } from "@vibevalley/protocol";
@@ -6,15 +5,6 @@ import { messageId } from "@vibevalley/protocol/schema";
 import { stories, story, type Story } from "@vibevalley/stories";
 
 import { MessageRow } from "./MessageList";
-
-const viewStyles = stylex.create({
-  listDiv: {
-    display: "flex",
-    width: "100%",
-    maxWidth: "var(--container-2xl)",
-    flexDirection: "column",
-  },
-});
 
 const now = Date.now();
 const min = 60_000;
@@ -51,7 +41,7 @@ const list = (note: string, rows: { m: ChatMessage; continues?: boolean }[]): St
   story({
     note,
     render: () => (
-      <div {...stylex.attrs(viewStyles.listDiv)}>
+      <div class="flex w-full max-w-2xl flex-col">
         <For each={rows}>{(r) => <MessageRow m={r.m} continues={r.continues ?? false} inChannel />}</For>
       </div>
     ),

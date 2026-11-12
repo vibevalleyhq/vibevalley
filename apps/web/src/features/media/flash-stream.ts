@@ -1,10 +1,8 @@
-import { Schema } from "effect";
-
 import { t } from "@vibevalley/i18n";
 import { mediaSpeechStreamPath, type MediaSpeechEvent } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-const decodeEvent = Schema.decodeUnknownSync(Schema.fromJsonString(S.MediaSpeechEvent));
+const decodeEvent = (line: string) => S.jsonString(S.MediaSpeechEvent).parse(line);
 const maximumChunk = 32 * 1024;
 const maximumLine = 4 * Math.ceil(maximumChunk / 3) + 1024;
 const maximumAudio = 512_000_000;

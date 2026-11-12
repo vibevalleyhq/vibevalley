@@ -278,7 +278,7 @@ test("regression: migrated popups disable their animations for reduced motion", 
   }
 });
 
-test("regression: segmented StyleX geometry follows selection and block resizing", async ({ page }) => {
+test("regression: segmented geometry follows selection and block resizing", async ({ page }) => {
   const check = diagnosticsOf(page);
   for (const theme of ["light", "dark"]) {
     await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Segmented:Playground", theme, w: "400" })}`);
@@ -388,27 +388,27 @@ test("regression: styled tabs retain keyboard selection, navigation and dynamic 
   }
 });
 
-test("regression: StyleX variables survive Base UI positioning and reactive variants", async ({ page }) => {
+test("regression: dynamic styles survive Base UI positioning and reactive variants", async ({ page }) => {
   const check = diagnosticsOf(page);
   for (const theme of ["light", "dark"]) {
     await page.goto(`/?${new URLSearchParams({ s: "组件/工作台/Positioner:Dynamic", theme, w: "400" })}`);
-    const trigger = page.getByTestId("stylex-trigger");
+    const trigger = page.getByTestId("positioned-trigger");
     await expect(trigger).toHaveAttribute("data-ref-forwarded", "true");
     const before = await trigger.evaluate((element) => getComputedStyle(element).backgroundColor);
     await expect(page.getByTestId("story-frame")).toHaveCSS("background-color", before);
     await expect(page.getByTestId("story-frame")).toHaveCSS("width", "400px");
     await trigger.focus();
     await page.keyboard.press("Enter");
-    const positioner = page.getByTestId("stylex-positioner");
+    const positioner = page.getByTestId("positioned-positioner");
     await expect(positioner).toHaveCSS("position", "fixed");
     await expect(positioner).toHaveCSS("z-index", "30");
     await expect(positioner).toHaveCSS("width", "200px");
-    await expect(page.getByTestId("stylex-resize")).toBeFocused();
+    await expect(page.getByTestId("positioned-resize")).toBeFocused();
     const anchor = await trigger.boundingBox();
     const popup = await positioner.boundingBox();
     if (!anchor || !popup) throw new Error("Missing positioned geometry");
     expect(Math.abs(popup.y - anchor.y - anchor.height - 6)).toBeLessThan(1);
-    await page.getByTestId("stylex-resize").click();
+    await page.getByTestId("positioned-resize").click();
     await expect(positioner).toHaveCSS("width", "280px");
     await expect(trigger).not.toHaveCSS("background-color", before);
     await page.keyboard.press("Escape");

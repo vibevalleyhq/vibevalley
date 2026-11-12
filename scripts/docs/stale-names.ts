@@ -197,7 +197,7 @@ const RULES: readonly Rule[] = [
     name: "an issue's cron under the schedule name",
     pattern:
       /\b(Schedules|ScheduleShape|ScheduleRequest|ScheduleWhen\w*|ScheduleBy|scheduleProblem|listSchedules|FactSchedule|FactUnschedule)\b|\bschedules?\.\w|"(un)?schedule"/u,
-    says: "Cron (the shape T.Cron and the service), CronRequest, CronWhen, cron.*; Effect's Schedule is another thing",
+    says: "Cron (the shape T.Cron and the service), CronRequest, CronWhen, cron.*",
   },
   {
     name: "a helper's question under the ask name",
@@ -345,8 +345,8 @@ const RULES: readonly Rule[] = [
   {
     name: "a service method repeating its service, or the startup config as Settings",
     pattern:
-      /\b(saveAgent|createAgent|deleteAgent|previewDeleteAgent|deleteSkill|previewDeleteSkill|deleteTemplate|previewDeleteTemplate|forgetOf|previewForgetOf)\b|yield\* (?:Settings\b|Config\b(?!\s*\.))/u,
-    says: "agents.save, create, remove, previewRemove, removeSkill, removeTemplate; memories.forget, previewForget; the startup config is the ServerConfig service (yield* ServerConfig)",
+      /\b(saveAgent|createAgent|deleteAgent|previewDeleteAgent|deleteSkill|previewDeleteSkill|deleteTemplate|previewDeleteTemplate|forgetOf|previewForgetOf)\b|\bsettings\??\s*:\s*ServerConfig\b|\bdeps\.settings\b/u,
+    says: "agents.save, create, remove, previewRemove, removeSkill, removeTemplate; memories.forget, previewForget; the startup config is deps.config (a ServerConfig); deps.setting is the settings the page changes",
   },
   {
     name: "an issue's text as a job",
@@ -397,7 +397,7 @@ const RULES: readonly Rule[] = [
     name: "a service under a plural name",
     pattern:
       /\b(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Repos|Runtimes|Sessions|Tasks|Tools)(?=\.[A-Za-z]|\[|\s*[,;})]|$)|"(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Repos|Runtimes|Sessions|Tasks|Tools)\.\w+"|\b(makeMemories|makeBlocks|BlocksOptions)\b|memory\/memories\b/u,
-    says: 'a service takes its concept\'s singular word (Agent, Artifact, Channel, Connector, Cron, Issue, Machine, Mailbox, Memory, Repo, Runtime, Session, Task, Tool; Effect.fn("Issue.edit")); the protocol shape of the same name is T.Issue; the stores are MemoryStore (memory/memory.ts, makeMemoryStore) and BlockStore (makeBlockStore) (docs/style/naming.md)',
+    says: "a service takes its concept's singular word (Agent, Artifact, Channel, Connector, Cron, Issue, Machine, Mailbox, Memory, Repo, Runtime, Session, Task, Tool; its deps key is the same word in lower case, deps.issue); the protocol shape of the same name is T.Issue; the stores are MemoryStore (memory/memory.ts, makeMemoryStore) and BlockStore (makeBlockStore) (docs/style/naming.md)",
     dirs: ["apps/server/src"],
   },
   {

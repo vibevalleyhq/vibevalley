@@ -607,7 +607,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
           : undefined,
       ),
     ...dir,
-    start,
+    boot: start,
     close: async () => {
       th.close();
       await tasks.close();

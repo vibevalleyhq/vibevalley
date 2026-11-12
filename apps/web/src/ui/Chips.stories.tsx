@@ -1,18 +1,8 @@
-import * as stylex from "@stylexjs/stylex";
 import { createSignal } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
 
 import { ChipsInput, KeyValueEditor } from "./Chips";
-
-const viewStyles = stylex.create({
-  chipsStoriesDiv: {
-    width: "20rem",
-  },
-  chipsStoriesDiv2: {
-    width: "24rem",
-  },
-});
 
 export default stories({
   title: "组件/工作台/Chips",
@@ -21,7 +11,7 @@ export default stories({
       note: "回车或逗号加一个，空着按退格删最后一个。",
       args: { words: "frontend,urgent", disabled: false },
       render: (a, set) => (
-        <div {...stylex.attrs(viewStyles.chipsStoriesDiv)}>
+        <div class="w-80">
           <ChipsInput
             label="标签"
             placeholder="加一个标签"
@@ -36,7 +26,7 @@ export default stories({
       render: () => {
         const [env, setEnv] = createSignal<Record<string, string>>({ NODE_ENV: "development", PORT: "8787" });
         return (
-          <div {...stylex.attrs(viewStyles.chipsStoriesDiv2)}>
+          <div class="w-96">
             <KeyValueEditor value={env()} onChange={setEnv} />
           </div>
         );
@@ -47,7 +37,7 @@ export default stories({
       render: (a) => {
         const [env, setEnv] = createSignal<Record<string, string>>({ NODE_ENV: "development", PORT: "8787" });
         return (
-          <div {...stylex.attrs(viewStyles.chipsStoriesDiv2)}>
+          <div class="w-96">
             <KeyValueEditor value={env()} onChange={setEnv} disabled={a.disabled} />
           </div>
         );

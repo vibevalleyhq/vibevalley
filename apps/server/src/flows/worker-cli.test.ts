@@ -1,100 +1,90 @@
+// oxlint-disable-next-line vibevalley/child-process-door -- the test runs the worker CLI as a helper would, through a shell, and reads all it printed
+import { spawn } from "node:child_process";
 import { existsSync, statSync, writeFileSync } from "node:fs";
-import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 
 import { scriptedRuntime } from "@botiverse/oar/testing";
-import { NodeHttpServer } from "@effect/platform-node";
-import { expect, it } from "@effect/vitest";
-import { Context, Effect, Layer, Stream } from "effect";
-import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http";
-import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import { createAdaptorServer } from "@hono/node-server";
+import { expect, test } from "vite-plus/test";
 
-import { Mcp } from "#/gateway/mcp/mcp.ts";
-import { Agent } from "#/modules/agent/agent.ts";
+import { makeMcp, type Mcp } from "#/gateway/mcp/mcp.ts";
 import { explicitMandate } from "#/modules/issue/creation.ts";
-import { Issue } from "#/modules/issue/issue.ts";
-import { Repo } from "#/modules/repo/repo.ts";
 import { repository } from "#/modules/repo/repository.ts";
-import { Session } from "#/modules/session/session.ts";
 import { workerAccess } from "#/modules/session/worker.ts";
-import { Tool } from "#/modules/tool/tool.ts";
+import type { Tool } from "#/modules/tool/tool.ts";
 import { gitIn } from "#/testing/git.ts";
 import { starter, testConfig, until, waitFor } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 
-const listen = Effect.fnUntraced(function* (mcp: Mcp["Service"]) {
-  const node = createServer();
-  const routes = HttpRouter.use((router) =>
-    router.add(
-      "POST",
-      "/mcp",
-      Effect.gen(function* () {
-        const httpServerRequest = yield* HttpServerRequest.HttpServerRequest;
-        const request = yield* HttpServerRequest.toWeb(httpServerRequest);
-        const handle2 = yield* mcp.handle(request);
-        return HttpServerResponse.fromWeb(handle2);
+/** /mcp served on a free loopback port: its address, closed with await using. */
+async function listen(mcp: Mcp) {
+  const node = createAdaptorServer({ fetch: (request: Request) => mcp.handle(request) });
+  await new Promise<void>((resolve) => node.listen(0, "127.0.0.1", () => resolve()));
+  const { port } = node.address() as AddressInfo;
+  return {
+    endpoint: `127.0.0.1:${port}/mcp`,
+    [Symbol.asyncDispose]: () =>
+      new Promise<void>((resolve) => {
+        if ("closeAllConnections" in node) node.closeAllConnections();
+        node.close(() => resolve());
       }),
-    ),
-  );
-  const listener = NodeHttpServer.layer(() => node, { host: "127.0.0.1", port: 0 });
-  const http = yield* Layer.build(HttpRouter.serve(routes, { disableLogger: true, disableListenLog: true }).pipe(Layer.provideMerge(listener)));
-  const server = Context.get(http, HttpServer.HttpServer);
-  if (server.address._tag === "UnixPathAddress") throw new Error("TCP required");
-  yield* Effect.addFinalizer(() => Effect.sync(() => node.closeAllConnections()));
-  return HttpServer.formatAddress(server.address) + "/mcp";
-});
+  };
+}
 
-it.live("regression: worker CLI preserves returned tool errors and ignores unavailable user discovery", () =>
-  Effect.gen(function* () {
-    let isError = false;
-    let calls = 0;
-    const original = yield* Tool;
-    const replacement = Tool.of({
-      ...original,
-      session: () => [
-        {
-          name: "session_list",
-          description: "",
-          parameters: {},
-          execute: () =>
-            Effect.sync(() => {
-              calls++;
-              return { content: [{ type: "text" as const, text: isError ? "Repository checks failed: valid " + "x".repeat(9000) : "result" }], isError };
-            }),
+/** The shell command's exit code and everything it wrote, stdout and stderr together. */
+function sh(command: string, env: Record<string, string>) {
+  return new Promise<{ code: number; output: string }>((resolve, reject) => {
+    const child = spawn("/bin/sh", ["-c", command], { env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "pipe"] });
+    let output = "";
+    child.stdout.setEncoding("utf8").on("data", (d: string) => (output += d));
+    child.stderr.setEncoding("utf8").on("data", (d: string) => (output += d));
+    child.once("error", reject);
+    child.once("close", (code) => resolve({ code: code ?? -1, output }));
+  });
+}
+
+const cliEnv = { VIBEVALLEY_HOME: "/nonexistent-worker-home", VIBEVALLEY_SERVER: "http://127.0.0.1:1" };
+
+test("regression: worker CLI preserves returned tool errors and ignores unavailable user discovery", async () => {
+  await using fw = await world();
+  let isError = false;
+  let calls = 0;
+  const original = fw.tool;
+  const replacement: Tool = {
+    ...original,
+    session: () => [
+      {
+        name: "session_list",
+        description: "",
+        parameters: {},
+        execute: async () => {
+          calls++;
+          return { content: [{ type: "text" as const, text: isError ? "Repository checks failed: valid " + "x".repeat(9000) : "result" }], isError };
         },
-      ],
-    });
-    const ctx = yield* Layer.build(Mcp.layer({ who: (token) => (token === "valid" ? "worker" : "") }).pipe(Layer.provide(Layer.succeed(Tool, replacement))));
-    const mcp = Context.get(ctx, Mcp);
-    const endpoint = yield* listen(mcp);
-    const cli = yield* workerAccess;
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const access = yield* cli.prepare("fixture", endpoint, "valid");
-    const run = () =>
-      Effect.gen(function* () {
-        const process = yield* spawner.spawn(
-          ChildProcess.make("/bin/sh", ["-c", access.command + " doctor"], {
-            env: {
-              VIBEVALLEY_HOME: "/nonexistent-worker-home",
-              VIBEVALLEY_SERVER: "http://127.0.0.1:1",
-            },
-          }),
-        );
-        const [code, output] = yield* Effect.all([process.exitCode, Stream.mkString(Stream.decodeText(process.all))], { concurrency: 2 });
-        return { code, output };
-      });
-    expect((yield* run()).code).toBe(0);
+      },
+    ],
+  };
+  const mcp = await makeMcp({ ...fw, tool: replacement }, { who: (token) => (token === "valid" ? "worker" : "") });
+  try {
+    await using served = await listen(mcp);
+    await using cli = await workerAccess();
+    const access = await cli.prepare("fixture", "http://" + served.endpoint, "valid");
+    const run = () => sh(access.command + " doctor", cliEnv);
+    expect((await run()).code).toBe(0);
     isError = true;
-    const failed = yield* run();
+    const failed = await run();
     expect(failed.code).not.toBe(0);
     expect(failed.output).toContain("Repository checks failed:");
     expect(failed.output).not.toContain("valid");
     expect(failed.output.length).toBeLessThan(17000);
     expect(calls).toBe(3);
-  }).pipe(Effect.scoped, Effect.provide(world())),
-);
+  } finally {
+    await mcp.close();
+  }
+});
 
-it.live("regression: a real worker CLI submits its authorized PR and report as its session", () => {
+test("regression: a real worker CLI submits its authorized PR and report as its session", async () => {
   const base = testConfig();
   const config = { ...base, github: { ...base.github, prRepos: ["demo"] } };
   const gate = Promise.withResolvers<void>();
@@ -120,74 +110,64 @@ it.live("regression: a real worker CLI submits its authorized PR and report as i
   });
   const bare = join(config.workRoot, "origin.git");
   const repo = join(config.workRoot, "repos", "demo");
-  return Effect.gen(function* () {
-    yield* Effect.addFinalizer(() => Effect.sync(() => gate.resolve()));
-    const mcp = yield* Mcp;
-    const endpoint = yield* listen(mcp);
-    const sessions = yield* Session;
-    sessions.setAddress(new URL(endpoint).host);
-    const issues = yield* Issue;
+  await using fw = await world({
+    config,
+    workerAccess,
+    runtimes: [runtime],
+    repos: ["demo"],
+    repoHooks: {
+      gh: async (...args) => {
+        const ok = (out: string) => ({ out, ok: true, missing: false });
+        if (args[0] === "--version") return ok("gh version 2.80.0");
+        if (args[0] === "auth") return ok("Logged in to github.com account gardener (keyring)");
+        if (args[0] === "repo") return ok('{"viewerPermission":"WRITE","defaultBranchRef":{"name":"main"}}');
+        if (args[0] === "pr" && args[1] === "list") return ok("[]");
+        if (args[0] === "pr" && args[1] === "create") return ok("https://github.com/test/demo/pull/1");
+        return { out: "", ok: false, missing: false };
+      },
+      publication: {
+        tip: () => repository(repo).head(),
+        fetch: () => Promise.resolve(),
+        push: (cwd, _url, branch, sha) => repository(cwd).push(bare, branch, sha),
+      },
+      fetch: () => Promise.resolve(false),
+    },
+  });
+  try {
+    await using served = await listen(fw.mcp);
+    const sessions = fw.session;
+    sessions.setAddress(new URL("http://" + served.endpoint).host);
+    const issues = fw.issue;
     const agent = { ...starter("lab"), effort: "" };
-    yield* (yield* Agent).save(agent);
+    await fw.agent.save(agent);
     gitIn(config.workRoot, "init", "--bare", bare);
     gitIn(repo, "remote", "add", "origin", "https://github.com/test/demo.git");
-    yield* (yield* Repo).refreshGitHub();
-    const issue = yield* issues.add({ title: "work", repo: "demo", agent: "lab" }, explicitMandate("", true));
-    yield* issues.start(issue.id, "");
-    yield* until(() => token !== "", "worker environment");
+    await fw.repo.refreshGitHub();
+    const issue = await issues.add({ title: "work", repo: "demo", agent: "lab" }, explicitMandate("", true));
+    await issues.start(issue.id, "");
+    await until(() => token !== "", "worker environment");
     expect(injectedElectron).toBeUndefined();
     const id = sessions.who(token);
     expect(command).not.toBe("");
     expect(statSync(credentialFile).mode & 0o777).toBe(0o600);
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const run = (operation: string) =>
-      spawner.exitCode(
-        ChildProcess.make("/bin/sh", ["-c", command + " " + operation], {
-          env: {
-            VIBEVALLEY_HOME: "/nonexistent-worker-home",
-            VIBEVALLEY_SERVER: "http://127.0.0.1:1",
-          },
-        }),
-      );
-    const outcome = yield* run("pr-submit");
+    const run = async (operation: string) => (await sh(command + " " + operation, cliEnv)).code;
+    const outcome = await run("pr-submit");
     expect(outcome).toBe(0);
-    expect((yield* issues.get(issue.id)).pullRequest?.number).toBe(1);
-    const outcome2 = yield* run(`report '{"summary":"CLI report","session":"someone-else","questions":[{"question":"Next?","options":["A","B"]}]}'`);
+    expect((await issues.get(issue.id)).pullRequest?.number).toBe(1);
+    const outcome2 = await run(`report '{"summary":"CLI report","session":"someone-else","questions":[{"question":"Next?","options":["A","B"]}]}'`);
     expect(outcome2).toBe(0);
     gate.resolve();
-    yield* waitFor(issues.get(issue.id), (item) => item.questions.length === 1, "CLI report");
-    expect((yield* issues.get(issue.id)).questions[0]?.question).toBe("Next?");
-    yield* sessions.dismiss(id);
+    await waitFor(
+      () => issues.get(issue.id),
+      (item) => item.questions.length === 1,
+      "CLI report",
+    );
+    expect((await issues.get(issue.id)).questions[0]?.question).toBe("Next?");
+    await sessions.dismiss(id);
     expect(sessions.who(token)).toBe("");
     expect(existsSync(credentialFile)).toBe(false);
-    expect((yield* issues.get(issue.id)).questions[0]?.question).toBe("Next?");
-  }).pipe(
-    Effect.scoped,
-    Effect.provide(
-      world({
-        config,
-        workerAccess,
-        runtimes: [runtime],
-        repos: ["demo"],
-        repoHooks: {
-          gh: (...args) =>
-            Effect.sync(() => {
-              const ok = (out: string) => ({ out, ok: true, missing: false });
-              if (args[0] === "--version") return ok("gh version 2.80.0");
-              if (args[0] === "auth") return ok("Logged in to github.com account gardener (keyring)");
-              if (args[0] === "repo") return ok('{"viewerPermission":"WRITE","defaultBranchRef":{"name":"main"}}');
-              if (args[0] === "pr" && args[1] === "list") return ok("[]");
-              if (args[0] === "pr" && args[1] === "create") return ok("https://github.com/test/demo/pull/1");
-              return { out: "", ok: false, missing: false };
-            }),
-          publication: {
-            tip: () => repository(repo).head,
-            fetch: () => Effect.void,
-            push: (cwd, _url, branch, sha) => repository(cwd).push(bare, branch, sha),
-          },
-          fetch: () => Effect.succeed(false),
-        },
-      }),
-    ),
-  );
+    expect((await issues.get(issue.id)).questions[0]?.question).toBe("Next?");
+  } finally {
+    gate.resolve();
+  }
 });

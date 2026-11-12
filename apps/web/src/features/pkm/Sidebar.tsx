@@ -1,4 +1,4 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -9,225 +9,11 @@ import { ready } from "#/infra/query.ts";
 import { Link as A } from "#/infra/router.ts";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
-import { styleProps } from "#/ui/positioner.ts";
 
 import { tierOrder } from "./outline";
 import { tierLabel } from "./PageView";
 import { notesSearch } from "./Search";
-import { tierHeading } from "./sidebar.stylex";
 import { pkmHref, usePkmRadar } from "./vault";
-
-const sidebarStyles = stylex.create({
-  row: {
-    display: "flex",
-    height: "1.75rem",
-    alignItems: "center",
-    gap: "0.5rem",
-    borderRadius: "var(--radius-md)",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    transitionProperty: "color, background-color, border-color",
-    transitionTimingFunction: "var(--ease-out)",
-    transitionDuration: "120ms",
-    paddingLeft: "0.5rem",
-    paddingRight: "0.5rem",
-  },
-  selected: {
-    backgroundColor: "var(--wb-selected)",
-    color: "var(--wb-ink)",
-  },
-  idle: {
-    color: "var(--wb-ink)",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--wb-hover)",
-      },
-    },
-  },
-  nested: {
-    paddingLeft: "1.875rem",
-  },
-  toggle: {
-    cursor: "pointer",
-    textAlign: "left",
-  },
-  count: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontVariantNumeric: "tabular-nums",
-  },
-  faint: {
-    color: "var(--wb-faint)",
-  },
-  overdue: {
-    color: "var(--wb-berry)",
-  },
-});
-
-const styles = stylex.create({
-  sidebarDiv: {
-    marginInline: "-0.5rem",
-    display: "flex",
-    minHeight: "0",
-    WebkitMaskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
-    maskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
-    animationName: "scroll-fade-y",
-    animationDuration: "0s",
-    animationDelay: "0s",
-    animationTimingFunction: "linear",
-    animationIterationCount: "1",
-    animationDirection: "normal",
-    animationFillMode: "both",
-    animationPlayState: "running",
-    animationTimeline: "scroll(self y)",
-    flexDirection: "column",
-    gap: "1rem",
-    overflowY: "auto",
-    paddingInline: "0.5rem",
-    paddingBottom: "0.5rem",
-  },
-  sidebarRoot: {
-    display: "flex",
-    minHeight: "0",
-    flex: "1",
-    flexDirection: "column",
-    gap: "1rem",
-  },
-  sidebarButton: {
-    display: "flex",
-    height: "2rem",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.5rem",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: {
-      default: "var(--color-line)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-faint)",
-        "@supports (color:color-mix(in lab, red, red))": {
-          default: null,
-          ":hover": "color-mix(in oklab, var(--color-faint) 40%, transparent)",
-        },
-      },
-    },
-    backgroundColor: "var(--color-page)",
-    paddingInline: "0.5rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: {
-      default: "var(--color-faint)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-muted)",
-      },
-    },
-    transitionProperty: "color, background-color, border-color",
-    transitionTimingFunction: "var(--ease-out)",
-    transitionDuration: "120ms",
-  },
-  sidebarIconActive: {
-    color: "var(--color-ink)",
-  },
-  sidebarIconFaint: {
-    color: "var(--color-faint)",
-  },
-  tierHeading: {
-    display: "flex",
-    height: "1.5rem",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.25rem",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.5rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontWeight: "var(--font-weight-medium)",
-    color: { default: "var(--color-faint)", "@media (hover: hover)": { default: null, ":hover": "var(--color-muted)" } },
-  },
-  expandedTierIcon: {
-    opacity: {
-      default: 0,
-      [stylex.when.ancestor(":focus-visible", tierHeading)]: 1,
-      "@media (hover: hover)": { default: null, [stylex.when.ancestor(":hover", tierHeading)]: 1 },
-    },
-    transitionProperty: "opacity",
-    transitionDuration: "120ms",
-    transitionTimingFunction: "var(--ease-out)",
-  },
-  sidebarSpan: {
-    flex: "1",
-    textAlign: "left",
-  },
-  sidebarDiv2: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "1px",
-  },
-  sidebarSpan2: {
-    flex: "1",
-  },
-  sidebarP: {
-    paddingInline: "0.5rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-berry)",
-  },
-  sidebarSpan3: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-  },
-  sidebarSpan4: {
-    flexShrink: "0",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-faint)",
-    fontVariantNumeric: "tabular-nums",
-  },
-  pkmRadar: {
-    display: "contents",
-  },
-  radarA: {
-    display: "flex",
-    flexDirection: "column",
-    borderRadius: "var(--radius-md)",
-    paddingBlock: "0.25rem",
-    paddingRight: "0.5rem",
-    paddingLeft: "1.875rem",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  radarSpan: {
-    flexShrink: "0",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-faint)",
-  },
-  radarSpan2: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  radarSpan3: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-berry)",
-  },
-});
 
 /** slug: the page open, if any. */
 export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPageSummary[]; error?: unknown }) {
@@ -241,35 +27,50 @@ export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPa
       return next;
     });
   return (
-    <div {...stylex.attrs(styles.sidebarRoot)}>
-      <button type="button" data-testid="pkm-find" onClick={() => notesSearch.open()} {...stylex.attrs(styles.sidebarButton)}>
+    <div class="flex min-h-0 flex-1 flex-col gap-4">
+      <button
+        type="button"
+        data-testid="pkm-find"
+        onClick={() => notesSearch.open()}
+        class="flex h-8 cursor-pointer items-center gap-2 rounded-md border border-line hover:border-faint/40 bg-page px-2 text-sm text-faint hover:text-muted transition-[color,background-color,border-color] ease-out duration-120"
+      >
         <Icon name="search" size={14} />
-        <span {...stylex.attrs(styles.sidebarSpan)}>{t("web.pkm.list.find")}</span>
+        <span class="flex-1 text-left">{t("web.pkm.list.find")}</span>
       </button>
-      <div {...stylex.attrs(styles.sidebarDiv2)}>
-        <A href="/pkm" data-testid="pkm-today" aria-current={props.slug === undefined ? "page" : undefined} {...styleProps(row(props.slug === undefined))}>
-          <Icon name="calendar" size={14} styles={props.slug === undefined ? styles.sidebarIconActive : styles.sidebarIconFaint} />
-          <span {...stylex.attrs(styles.sidebarSpan2)}>{t("web.pkm.list.today")}</span>
+      <div class="flex flex-col gap-px">
+        <A href="/pkm" data-testid="pkm-today" aria-current={props.slug === undefined ? "page" : undefined} class={row(props.slug === undefined)}>
+          <Icon name="calendar" size={14} class={props.slug === undefined ? "text-ink" : "text-faint"} />
+          <span class="flex-1">{t("web.pkm.list.today")}</span>
         </A>
         <Radar />
       </div>
-      <Show when={props.error}>{(e) => <p {...stylex.attrs(styles.sidebarP)}>{reasonOf(e())}</p>}</Show>
-      <div {...stylex.attrs(styles.sidebarDiv)} data-testid="pkm-list">
+      <Show when={props.error}>{(e) => <p class="px-2 text-xs text-berry">{reasonOf(e())}</p>}</Show>
+      <div
+        class="-mx-2 flex min-h-0 [mask-image:linear-gradient(to_bottom,_transparent,_black_var(--fade-top),_black_calc(100%_-_var(--fade-bottom)),_transparent)] [animation-name:scroll-fade-y] [animation-duration:0ms] [animation-timing-function:linear] [animation-fill-mode:both] [animation-timeline:scroll(self_y)] flex-col gap-4 overflow-y-auto px-2 pb-2"
+        data-testid="pkm-list"
+      >
         <For each={tierOrder.filter((tier) => tier !== "journal" && listed(tier).length > 0)}>
           {(tier) => (
-            <section data-testid="pkm-tier" data-key={tier} {...stylex.attrs(styles.sidebarDiv2)}>
+            <section data-testid="pkm-tier" data-key={tier} class="flex flex-col gap-px">
               <button
                 type="button"
                 aria-expanded={shut().has(tier) ? "false" : "true"}
                 onClick={() => toggle(tier)}
-                {...stylex.attrs(styles.tierHeading, tierHeading)}
+                class={["flex h-6 cursor-pointer items-center gap-1 rounded-md px-2 text-xs font-medium text-faint hover:text-muted", "group/tier-heading"]}
               >
                 {tierLabel(tier)}
                 {/* Folded, the arrow stays to say so; open, it comes only when pointed at. */}
-                <Icon name={shut().has(tier) ? "next" : "choose"} size={10} styles={!shut().has(tier) && styles.expandedTierIcon} />
+                <Icon
+                  name={shut().has(tier) ? "next" : "choose"}
+                  size={10}
+                  class={
+                    !shut().has(tier) &&
+                    "opacity-0 group-focus-visible/tier-heading:opacity-100 group-hover/tier-heading:opacity-100 transition-[opacity] duration-120 ease-out"
+                  }
+                />
               </button>
               <Show when={!shut().has(tier)}>
-                <ul {...stylex.attrs(styles.sidebarDiv2)}>
+                <ul class="flex flex-col gap-px">
                   <For each={listed(tier)} keyed={(p) => p.slug}>
                     {(p) => (
                       <li>
@@ -278,11 +79,11 @@ export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPa
                           data-testid="pkm-row"
                           data-key={p().slug}
                           aria-current={p().slug === props.slug ? "page" : undefined}
-                          {...styleProps([row(p().slug === props.slug), sidebarStyles.nested])}
+                          class={[row(p().slug === props.slug), "pl-7.5"]}
                         >
-                          <span {...stylex.attrs(styles.sidebarSpan3)}>{p().title}</span>
+                          <span class="min-w-0 flex-1 truncate">{p().title}</span>
                           <Show when={p().open > 0}>
-                            <span {...stylex.attrs(styles.sidebarSpan4)} title={t("web.pkm.list.open", { n: p().open })}>
+                            <span class="shrink-0 text-xs text-faint tabular-nums" title={t("web.pkm.list.open", { n: p().open })}>
                               {p().open}
                             </span>
                           </Show>
@@ -300,37 +101,32 @@ export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPa
   );
 }
 
-const row = (here: boolean): stylex.StyleXStyles => [sidebarStyles.row, here ? sidebarStyles.selected : sidebarStyles.idle];
+const row = (here: boolean): JSX.ClassValue => [
+  "flex h-7 items-center gap-2 rounded-md text-sm transition-[color,background-color,border-color] ease-out duration-120 pl-2 pr-2",
+  here ? "bg-selected text-ink" : "text-ink hover:bg-hover",
+];
 
 function Radar() {
   const radar = usePkmRadar();
   const [which, setWhich] = createSignal<"stale" | "overdue">();
   const flip = (to: "stale" | "overdue") => setWhich((was) => (was === to ? undefined : to));
-  const look = (props: {
-    icon: IconName;
-    label: string;
-    n: number;
-    open?: boolean | undefined;
-    tone?: stylex.StyleXStyles;
-    testid: string;
-    click: () => void;
-  }) => (
+  const look = (props: { icon: IconName; label: string; n: number; open?: boolean | undefined; tone?: JSX.ClassValue; testid: string; click: () => void }) => (
     <button
       type="button"
       data-testid={props.testid}
       aria-expanded={props.open === undefined ? undefined : props.open ? "true" : "false"}
       onClick={() => props.click()}
-      {...styleProps([row(props.open === true), sidebarStyles.toggle])}
+      class={[row(props.open === true), "cursor-pointer text-left"]}
     >
-      <Icon name={props.icon} size={14} styles={styles.sidebarIconFaint} />
-      <span {...stylex.attrs(styles.sidebarSpan2)}>{props.label}</span>
-      <span {...styleProps([sidebarStyles.count, props.tone ?? sidebarStyles.faint])}>{props.n}</span>
+      <Icon name={props.icon} size={14} class="text-faint" />
+      <span class="flex-1">{props.label}</span>
+      <span class={["text-xs tabular-nums", props.tone ?? "text-faint"]}>{props.n}</span>
     </button>
   );
   return (
     <Show when={ready(radar, undefined)}>
       {(r) => (
-        <div data-testid="pkm-radar" {...stylex.attrs(styles.pkmRadar)}>
+        <div data-testid="pkm-radar" class="contents">
           <Show when={r().inbox > 0}>
             {look({
               icon: "inbox",
@@ -351,13 +147,13 @@ function Radar() {
             })}
           </Show>
           <Show when={which() === "stale"}>
-            <ul {...stylex.attrs(styles.sidebarDiv2)}>
+            <ul class="flex flex-col gap-px">
               <For each={r().stale} keyed={(s) => s.slug}>
                 {(s) => (
                   <li>
-                    <A href={pkmHref(s().slug)} {...styleProps([row(false), sidebarStyles.nested])}>
-                      <span {...stylex.attrs(styles.sidebarSpan3)}>{s().title}</span>
-                      <span {...stylex.attrs(styles.radarSpan)}>{t("web.pkm.radar.days", { n: s().days })}</span>
+                    <A href={pkmHref(s().slug)} class={[row(false), "pl-7.5"]}>
+                      <span class="min-w-0 flex-1 truncate">{s().title}</span>
+                      <span class="shrink-0 text-xs text-faint">{t("web.pkm.radar.days", { n: s().days })}</span>
                     </A>
                   </li>
                 )}
@@ -371,19 +167,19 @@ function Radar() {
               n: r().overdue.length,
               open: which() === "overdue",
               // The one count that is a fault, in its colour.
-              tone: sidebarStyles.overdue,
+              tone: "text-berry",
               testid: "pkm-radar-overdue",
               click: () => flip("overdue"),
             })}
           </Show>
           <Show when={which() === "overdue"}>
-            <ul {...stylex.attrs(styles.sidebarDiv2)}>
+            <ul class="flex flex-col gap-px">
               <For each={r().overdue} keyed={(o) => o.block}>
                 {(o) => (
                   <li>
-                    <A href={pkmHref(o().page, o().block)} {...stylex.attrs(styles.radarA)}>
-                      <span {...stylex.attrs(styles.radarSpan2)}>{o().plain}</span>
-                      <span {...stylex.attrs(styles.radarSpan3)}>{o().deadline}</span>
+                    <A href={pkmHref(o().page, o().block)} class="flex flex-col rounded-md py-1 pr-2 pl-7.5 hover:bg-hover">
+                      <span class="truncate text-sm">{o().plain}</span>
+                      <span class="text-xs text-berry">{o().deadline}</span>
                     </A>
                   </li>
                 )}

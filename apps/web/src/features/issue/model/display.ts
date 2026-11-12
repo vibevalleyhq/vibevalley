@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import type { Issue, Priority } from "@vibevalley/protocol";
@@ -45,10 +45,10 @@ export const defaultLook: BoardLook = { view: "board", grouping: "status", order
 // How the board looks on this machine: kept across reloads (state/stored.ts), each part falling back on its own.
 export const boardLook = defineStored(
   "board.look",
-  Schema.Struct({
-    view: orFallback(Schema.Literals(boardViews), defaultLook.view),
-    grouping: orFallback(Schema.Literals(groupings), defaultLook.grouping),
-    ordering: orFallback(Schema.Literals(orderings), defaultLook.ordering),
+  z.object({
+    view: orFallback(z.literal(boardViews), defaultLook.view),
+    grouping: orFallback(z.literal(groupings), defaultLook.grouping),
+    ordering: orFallback(z.literal(orderings), defaultLook.ordering),
   }),
   defaultLook,
 );

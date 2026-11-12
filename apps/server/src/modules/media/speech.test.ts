@@ -383,7 +383,7 @@ test("regression: stopping the service during speech submission retains uncertai
   }
   await using f = await aMedia({ config, configured: false, fetch: unreachable("Uncertain speech cannot resubmit") });
   const { media } = f;
-  await media.start();
+  await media.boot();
   expect((await media.get(input.id)).phase).toBe("unknown");
   expect((await media.createSpeech(input, { kind: "user" })).phase).toBe("unknown");
   expect(await failure(media.retryDownload(input.id))).toMatchObject({ bizCode: BizCode.MediaRefused });
@@ -420,7 +420,7 @@ test("speech source and completed attachment survive restart without accepting a
   })();
   await using f = await aMedia({ config, configured: false, fetch: unreachable("Restart cannot synthesize") });
   const { media } = f;
-  await media.start();
+  await media.boot();
   expect(await media.get(input.id)).toEqual(saved);
   expect(await media.createSpeech(input, caller)).toEqual(saved);
   expect(await failure(media.createSpeech(input, { kind: "user" }))).toMatchObject({ bizCode: BizCode.MediaRefused });
@@ -452,7 +452,7 @@ test("restart cancels unsent speech, marks uncertainty and resumes only persiste
     });
   }
   const { media } = f;
-  await media.start();
+  await media.boot();
   expect((await media.get("queued")).phase).toBe("canceled");
   expect((await media.get("generating")).phase).toBe("unknown");
   await waitFor(
@@ -528,7 +528,7 @@ test("regression: restart never queries a known asynchronous task with replaced 
   if (!row) throw new Error("Missing seeded speech");
   await q.changeMediaJob(db.sql, { ...row, phase: "generating", remote_task: "known-before-restart", now: 2 });
   const { media } = f;
-  await media.start();
+  await media.boot();
   const paused = await waitFor(
     () => media.get(input.id),
     (job) => job.phase === "unknown",
@@ -666,7 +666,7 @@ test("regression: large speech is a pinned user-readable asset and survives rest
     }),
   });
   const { media } = f;
-  await media.start();
+  await media.boot();
   expect(await media.get(input.id)).toEqual(saved);
   if (!saved.resultInput) throw new Error("Expected persisted large speech asset");
   expect((await media.inputs.content(saved.resultInput.id)).size).toBe(bytes.length);

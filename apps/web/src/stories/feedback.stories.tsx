@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Match, Switch } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
@@ -7,36 +6,6 @@ import { Button } from "#/ui/Button.tsx";
 import { Empty } from "#/ui/layout.tsx";
 import { ToastHost } from "#/ui/ToastHost.tsx";
 import { toast } from "#/ui/toasts.ts";
-
-const styles = stylex.create({
-  list: {
-    borderRadius: "var(--radius-lg)",
-    borderStyle: "solid",
-    borderWidth: 1,
-    borderColor: "var(--color-line)",
-  },
-  feedbackStoriesDiv: {
-    display: "flex",
-    flexDirection: "column",
-  },
-  feedbackStoriesP: {
-    padding: "1rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-faint)",
-  },
-  feedbackStoriesLi: {
-    borderTopStyle: { default: null, ":not(:last-child)": "solid" },
-    borderBottomStyle: { default: null, ":not(:last-child)": "solid" },
-    borderTopWidth: { default: null, ":not(:last-child)": 0 },
-    borderBottomWidth: { default: null, ":not(:last-child)": 1 },
-    borderColor: { default: null, ":not(:last-child)": "var(--color-line)" },
-    paddingInline: "1rem",
-    paddingBlock: "0.625rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-});
 
 export default stories({
   title: "交互/空的、加载和出错",
@@ -49,7 +18,7 @@ export default stories({
       render: (a, set) => {
         const [rows, setRows] = createSignal<string[]>([]);
         return (
-          <div {...stylex.attrs(styles.feedbackStoriesDiv)}>
+          <div class="flex flex-col">
             <Switch>
               <Match when={a.state === "empty"}>
                 <Empty
@@ -71,7 +40,7 @@ export default stories({
                 </Empty>
               </Match>
               <Match when={a.state === "loading"}>
-                <p {...stylex.attrs(styles.feedbackStoriesP)} aria-busy="true">
+                <p class="p-4 text-xs text-faint" aria-busy="true">
                   在读……
                 </p>
               </Match>
@@ -81,9 +50,13 @@ export default stories({
                 </Empty>
               </Match>
               <Match when={a.state === "full"}>
-                <ul {...stylex.attrs(styles.list)}>
+                <ul class="rounded-lg border border-line">
                   <For each={rows().length > 0 ? rows() : ["修好登录", "补齐看板的测试"]}>
-                    {(r) => <li {...stylex.attrs(styles.feedbackStoriesLi)}>{r}</li>}
+                    {(r) => (
+                      <li class="not-last:[border-top-style:solid] not-last:[border-bottom-style:solid] not-last:border-t-0 not-last:border-b not-last:border-line px-4 py-2.5 text-sm">
+                        {r}
+                      </li>
+                    )}
                   </For>
                 </ul>
               </Match>

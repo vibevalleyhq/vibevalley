@@ -1,24 +1,6 @@
-import * as stylex from "@stylexjs/stylex";
-
 import { stories, story } from "@vibevalley/stories";
 
 import { MoreMenu } from "./MoreMenu";
-
-const styles = stylex.create({
-  moreMenuStoriesDiv: {
-    display: "flex",
-    justifyContent: "flex-end",
-    paddingTop: "10rem",
-    paddingRight: "1rem",
-    paddingBottom: "1rem",
-    paddingLeft: "1rem",
-  },
-  moreMenuStoriesDiv2: {
-    display: "flex",
-    justifyContent: "flex-end",
-    padding: "1rem",
-  },
-});
 
 const noop = () => undefined;
 
@@ -27,7 +9,7 @@ export default stories({
   stories: {
     "A place's other actions": story({
       render: () => (
-        <div {...stylex.attrs(styles.moreMenuStoriesDiv2)}>
+        <div class="flex justify-end p-4">
           <MoreMenu
             label="更多"
             items={[
@@ -41,7 +23,7 @@ export default stories({
     }),
     "Opening upwards, from a toolbar": story({
       render: () => (
-        <div {...stylex.attrs(styles.moreMenuStoriesDiv)}>
+        <div class="flex justify-end pt-40 pr-4 pb-4 pl-4">
           <MoreMenu label="更多" side="top" items={[{ key: "copy-link", label: "复制链接", icon: "copy", onSelect: noop }]} />
         </div>
       ),
@@ -49,7 +31,7 @@ export default stories({
     "One choice of a kind, under its own icon": story({
       note: "发到哪个频道：触发的图标说是哪一类选择，不是 ⋯。",
       render: () => (
-        <div {...stylex.attrs(styles.moreMenuStoriesDiv2)}>
+        <div class="flex justify-end p-4">
           <MoreMenu
             label="发到频道"
             icon="send"

@@ -1,256 +1,15 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
 import { ago } from "#/base/format.ts";
 import { PxButton, PxPick, PxWindow, SpriteIcon } from "#/ui/pixel/index.ts";
-import { styleProps } from "#/ui/positioner.ts";
 
 import { stageName, type TreeFilter } from "./memories";
 import { type MemoryItem, type MemoryKind, type MemoryTree, TreeStageValues } from "./mock";
 import type { SceneHover } from "./Scene";
 import { type Ties, tiesOf } from "./sky";
-
-const styles = stylex.create({
-  lookUp: { marginTop: "auto", width: "100%" },
-  panelPxWindow: {
-    position: "absolute",
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
-    overflowY: "auto",
-    padding: "1rem",
-  },
-  panelPxWindowPrimary: {
-    top: "0.75rem",
-    right: "0.75rem",
-    bottom: "0.75rem",
-    insetInline: null,
-    height: null,
-  },
-  panelPxWindowSecondary: {
-    top: null,
-    right: null,
-    bottom: "0.5rem",
-    insetInline: "0.5rem",
-    height: "48%",
-  },
-  tipPxWindow: {
-    pointerEvents: "none",
-    position: "fixed",
-    zIndex: 40,
-    width: "256px",
-    paddingInline: "0.625rem",
-    paddingBlock: "0.5rem",
-  },
-  panelH1: {
-    fontFamily: "var(--font-pixel)",
-    fontSize: "24px",
-    lineHeight: "1.5556",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    fontSynthesis: "none",
-  },
-  panelP: {
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.3333",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    color: "var(--color-bark-500)",
-    fontSynthesis: "none",
-  },
-  panelSpan: {
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.4286",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    fontSynthesis: "none",
-  },
-  panelSpan2: {
-    marginLeft: "auto",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.3333",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    color: "var(--color-bark-500)",
-    fontSynthesis: "none",
-  },
-  panelSpan3: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.4286",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    fontSynthesis: "none",
-  },
-  panelSpan4: {
-    flexShrink: "0",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.3333",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    color: "var(--color-bark-500)",
-    fontSynthesis: "none",
-  },
-  panelLi: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.4286",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    fontSynthesis: "none",
-  },
-  panelSpan5: {
-    minWidth: "0",
-    flex: "1",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.4286",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    fontSynthesis: "none",
-  },
-  tipSpan: {
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.3333",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    fontSynthesis: "none",
-  },
-  tipP: {
-    marginTop: "0.25rem",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.4286",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    fontSynthesis: "none",
-  },
-  tipP2: {
-    marginTop: "0.25rem",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.3333",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    color: "var(--color-bark-500)",
-    fontSynthesis: "none",
-  },
-  tipP3: {
-    marginTop: "0.125rem",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.3333",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    color: "var(--color-leaf-700)",
-    fontSynthesis: "none",
-  },
-  filters: { display: "flex", gap: "0.5rem" },
-  panelHeader: {
-    textAlign: "center",
-  },
-  panelDiv: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-cream-300)",
-    backgroundColor: "var(--color-cream-100)",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.375rem",
-  },
-  memoryCounts: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3,minmax(0,1fr))",
-    gap: "0.5rem",
-  },
-  panelDl: {
-    display: "grid",
-    gridTemplateColumns: "auto 1fr",
-    columnGap: "0.75rem",
-    rowGap: "0.25rem",
-  },
-  panelUl: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.25rem",
-  },
-  panelLi2: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  panelUl2: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.5rem",
-  },
-  tieListDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.125rem",
-  },
-  tieListButton: {
-    display: "flex",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.375rem",
-    textAlign: "left",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-cream-200)",
-      },
-    },
-  },
-  countDiv: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "0.375rem",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-cream-300)",
-    backgroundColor: "var(--color-cream-100)",
-    paddingBlock: "0.375rem",
-  },
-  sectionSection: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.375rem",
-    borderTopStyle: "dashed",
-    borderTopWidth: "2px",
-    borderStyle: "dashed",
-    borderColor: "var(--color-cream-300)",
-    paddingTop: "0.5rem",
-  },
-  sectionDiv: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.375rem",
-  },
-  sectionSpan: {
-    marginLeft: "auto",
-  },
-});
 
 export const panelWidth = 340;
 export const narrowBelow = 760;
@@ -267,9 +26,9 @@ function tieWords(kind: MemoryKind, ties: Ties): string[] {
   return words;
 }
 
-export function Filters(props: { tree: MemoryTree; filter: TreeFilter; setFilter: (f: TreeFilter) => void; styles?: stylex.StyleXStyles }) {
+export function Filters(props: { tree: MemoryTree; filter: TreeFilter; setFilter: (f: TreeFilter) => void; class?: JSX.ClassValue | undefined }) {
   return (
-    <div {...styleProps([styles.filters, props.styles])}>
+    <div class={["flex gap-2", props.class]}>
       <PxPick
         label={t("web.tree.byHelper")}
         testid="tree-by-helper"
@@ -321,19 +80,19 @@ export function Panel(props: {
   return (
     <PxWindow
       testid="tree-panel"
-      styles={[styles.panelPxWindow, props.narrow ? styles.panelPxWindowSecondary : styles.panelPxWindowPrimary]}
+      class={["absolute flex flex-col gap-3 overflow-y-auto p-4", props.narrow ? "bottom-2 inset-x-2 h-[48%]" : "top-3 right-3 bottom-3"]}
       style={props.narrow ? undefined : { width: `${panelWidth}px` }}
     >
-      <header {...stylex.attrs(styles.panelHeader)}>
-        <h1 {...stylex.attrs(styles.panelH1)}>{t("web.tree.title")}</h1>
-        <p {...stylex.attrs(styles.panelP)}>{t("web.tree.stats", { days: days(), rounds: props.tree.rounds, recalls: props.tree.recalls })}</p>
+      <header class="text-center">
+        <h1 class="pixel-lg">{t("web.tree.title")}</h1>
+        <p class="pixel-xs text-bark-500">{t("web.tree.stats", { days: days(), rounds: props.tree.rounds, recalls: props.tree.recalls })}</p>
       </header>
-      <div {...stylex.attrs(styles.panelDiv)}>
+      <div class="flex items-center gap-2 border-2 border-cream-300 bg-cream-100 px-2 py-1.5">
         <SpriteIcon name="icon-rings" size={20} />
-        <span {...stylex.attrs(styles.panelSpan)}>{stageName(props.tree.stage)}</span>
-        <span {...stylex.attrs(styles.panelSpan2)}>{growth()}</span>
+        <span class="pixel-sm">{stageName(props.tree.stage)}</span>
+        <span class="pixel-xs ml-auto text-bark-500">{growth()}</span>
       </div>
-      <div {...stylex.attrs(styles.memoryCounts)} data-testid="memory-counts">
+      <div class="grid grid-cols-3 gap-2" data-testid="memory-counts">
         <Count icon="icon-leaf" label={t("web.tree.kind.leaf")} n={props.tally.leaf} />
         <Count icon="icon-fruit" label={t("web.tree.kind.fruit")} n={props.tally.fruit} />
         <Count icon="icon-seed" label={t("web.tree.kind.seed")} n={props.tally.seed} />
@@ -346,36 +105,36 @@ export function Panel(props: {
             icon={kindIcon[m().kind]}
             aside={<PxButton size="sm" label={t("web.tree.fold")} icon="button-close" onClick={props.unpick} />}
           >
-            <p {...stylex.attrs(styles.panelP)}>
+            <p class="pixel-xs text-bark-500">
               {props.agentName(m().agent)} · {m().repo ?? t("web.tree.everyRepo")} · {ago(m().at, props.now)}
             </p>
-            <Show when={m().case} fallback={<p {...stylex.attrs(styles.panelSpan)}>{m().body}</p>}>
+            <Show when={m().case} fallback={<p class="pixel-sm">{m().body}</p>}>
               {(c) => (
-                <dl {...stylex.attrs(styles.panelDl)}>
-                  <dt {...stylex.attrs(styles.panelP)}>{t("web.tree.intent")}</dt>
-                  <dd {...stylex.attrs(styles.panelSpan)}>{c().intent}</dd>
-                  <dt {...stylex.attrs(styles.panelP)}>{t("web.tree.approach")}</dt>
-                  <dd {...stylex.attrs(styles.panelSpan)}>{c().approach}</dd>
-                  <dt {...stylex.attrs(styles.panelP)}>{t("web.tree.insight")}</dt>
-                  <dd {...stylex.attrs(styles.panelSpan)}>{c().insight}</dd>
+                <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                  <dt class="pixel-xs text-bark-500">{t("web.tree.intent")}</dt>
+                  <dd class="pixel-sm">{c().intent}</dd>
+                  <dt class="pixel-xs text-bark-500">{t("web.tree.approach")}</dt>
+                  <dd class="pixel-sm">{c().approach}</dd>
+                  <dt class="pixel-xs text-bark-500">{t("web.tree.insight")}</dt>
+                  <dd class="pixel-sm">{c().insight}</dd>
                 </dl>
               )}
             </Show>
-            <p {...stylex.attrs(styles.panelP)}>{t("web.tree.recalled", { n: m().recalled })}</p>
+            <p class="pixel-xs text-bark-500">{t("web.tree.recalled", { n: m().recalled })}</p>
             <TieList tree={props.tree} item={m()} pick={props.pick} />
           </Section>
         )}
       </Show>
       <Section title={t("web.tree.recent")}>
-        <ul {...stylex.attrs(styles.panelUl)}>
+        <ul class="flex flex-col gap-1">
           <For each={props.recent}>
             {(m) => (
-              <li {...stylex.attrs(styles.panelLi2)}>
+              <li class="flex items-center gap-2">
                 <SpriteIcon name={kindIcon[m.kind]} size={16} label={kindName(m.kind)} />
-                <span {...stylex.attrs(styles.panelSpan3)} title={m.body}>
+                <span class="pixel-sm min-w-0 flex-1 truncate" title={m.body}>
                   {m.body}
                 </span>
-                <span {...stylex.attrs(styles.panelSpan4)}>{props.agentName(m.agent)}</span>
+                <span class="pixel-xs shrink-0 text-bark-500">{props.agentName(m.agent)}</span>
               </li>
             )}
           </For>
@@ -392,11 +151,11 @@ export function Panel(props: {
           </Show>
         }
       >
-        <Show when={showFading()} fallback={<p {...stylex.attrs(styles.panelP)}>{t("web.tree.fadingNote")}</p>}>
-          <ul {...stylex.attrs(styles.panelUl)}>
+        <Show when={showFading()} fallback={<p class="pixel-xs text-bark-500">{t("web.tree.fadingNote")}</p>}>
+          <ul class="flex flex-col gap-1">
             <For each={props.fading}>
               {(m) => (
-                <li {...stylex.attrs(styles.panelLi)} title={m.body}>
+                <li class="pixel-sm truncate" title={m.body}>
                   {m.body}
                 </li>
               )}
@@ -405,13 +164,13 @@ export function Panel(props: {
         </Show>
       </Section>
       <Section title={t("web.tree.waiting")} icon="icon-seed-gold">
-        <Show when={props.waiting.length > 0} fallback={<p {...stylex.attrs(styles.panelP)}>{t("web.tree.noSeeds")}</p>}>
-          <ul {...stylex.attrs(styles.panelUl2)}>
+        <Show when={props.waiting.length > 0} fallback={<p class="pixel-xs text-bark-500">{t("web.tree.noSeeds")}</p>}>
+          <ul class="flex flex-col gap-2">
             <For each={props.waiting}>
               {(seed) => (
-                <li {...stylex.attrs(styles.panelLi2)}>
+                <li class="flex items-center gap-2">
                   <SpriteIcon name="icon-seed" size={20} />
-                  <span {...stylex.attrs(styles.panelSpan5)}>{seed.body}</span>
+                  <span class="pixel-sm min-w-0 flex-1">{seed.body}</span>
                   <PxButton size="sm" tone="primary" data-testid="tree-sow" onClick={() => props.onSow(seed)}>
                     {t("web.tree.sow")}
                   </PxButton>
@@ -421,7 +180,7 @@ export function Panel(props: {
           </ul>
         </Show>
       </Section>
-      <PxButton tone="accent" icon="icon-stars" data-testid="tree-sky" styles={styles.lookUp} onClick={props.onLookUp}>
+      <PxButton tone="accent" icon="icon-stars" data-testid="tree-sky" class="mt-auto w-full" onClick={props.onLookUp}>
         {t("web.tree.lookUp")}
       </PxButton>
     </PxWindow>
@@ -446,15 +205,15 @@ function TieList(props: { tree: MemoryTree; item: MemoryItem; pick: (m: MemoryIt
   return (
     <For each={groups()}>
       {(g) => (
-        <div {...stylex.attrs(styles.tieListDiv)}>
-          <span {...stylex.attrs(styles.panelP)}>{g.title}</span>
+        <div class="flex flex-col gap-0.5">
+          <span class="pixel-xs text-bark-500">{g.title}</span>
           <For each={g.ids}>
             {(id) => (
               <Show when={find(id)}>
                 {(m) => (
-                  <button type="button" onClick={() => props.pick(m())} {...stylex.attrs(styles.tieListButton)}>
+                  <button type="button" onClick={() => props.pick(m())} class="flex cursor-pointer items-center gap-1.5 text-left hover:bg-cream-200">
                     <SpriteIcon name={kindIcon[m().kind]} size={14} />
-                    <span {...stylex.attrs(styles.panelSpan3)}>{m().body}</span>
+                    <span class="pixel-sm min-w-0 flex-1 truncate">{m().body}</span>
                   </button>
                 )}
               </Show>
@@ -468,20 +227,20 @@ function TieList(props: { tree: MemoryTree; item: MemoryItem; pick: (m: MemoryIt
 
 function Count(props: { icon: string; label: string; n: number }) {
   return (
-    <div {...stylex.attrs(styles.countDiv)} title={props.label}>
+    <div class="flex items-center justify-center gap-1.5 border-2 border-cream-300 bg-cream-100 py-1.5" title={props.label}>
       <SpriteIcon name={props.icon} size={20} label={props.label} />
-      <span {...stylex.attrs(styles.panelSpan)}>{props.n}</span>
+      <span class="pixel-sm">{props.n}</span>
     </div>
   );
 }
 
 function Section(props: { title: string; icon?: string; aside?: JSX.Element; children: JSX.Element }) {
   return (
-    <section {...stylex.attrs(styles.sectionSection)}>
-      <div {...stylex.attrs(styles.sectionDiv)}>
+    <section class="flex flex-col gap-1.5 [border-top-style:dashed] border-t-2 border-dashed border-cream-300 pt-2">
+      <div class="flex items-center gap-1.5">
         <Show when={props.icon}>{(icon) => <SpriteIcon name={icon()} size={16} />}</Show>
-        <h2 {...stylex.attrs(styles.panelSpan)}>{props.title}</h2>
-        <span {...stylex.attrs(styles.sectionSpan)}>{props.aside}</span>
+        <h2 class="pixel-sm">{props.title}</h2>
+        <span class="ml-auto">{props.aside}</span>
       </div>
       {props.children}
     </section>
@@ -494,20 +253,20 @@ export function Tip(props: { hover: SceneHover; tree: MemoryTree; agentName: (id
   const left = () => Math.min(props.hover.x + 14, window.innerWidth - 270);
   const top = () => Math.min(props.hover.y + 14, window.innerHeight - 110);
   return (
-    <PxWindow styles={[styles.tipPxWindow]} style={{ left: `${left()}px`, top: `${top()}px` }}>
-      <div {...stylex.attrs(styles.sectionDiv)}>
+    <PxWindow class="pointer-events-none fixed z-40 w-64 px-2.5 py-2" style={{ left: `${left()}px`, top: `${top()}px` }}>
+      <div class="flex items-center gap-1.5">
         <SpriteIcon name={kindIcon[m().kind]} size={14} />
-        <span {...stylex.attrs(styles.tipSpan)}>
+        <span class="pixel-xs">
           {props.agentName(m().agent)} · {m().repo ?? t("web.tree.everyRepo")}
         </span>
       </div>
-      <p {...stylex.attrs(styles.tipP)}>{m().body}</p>
-      <p {...stylex.attrs(styles.tipP2)}>
+      <p class="pixel-sm mt-1">{m().body}</p>
+      <p class="pixel-xs mt-1 text-bark-500">
         {ago(m().at, props.now)} · {t("web.tree.recalled", { n: m().recalled })}
         {m().fading ? t("web.tree.aboutToFall") : ""}
       </p>
       <Show when={ties().length > 0}>
-        <p {...stylex.attrs(styles.tipP3)}>{ties().join(" · ")}</p>
+        <p class="pixel-xs mt-0.5 text-leaf-700">{ties().join(" · ")}</p>
       </Show>
     </PxWindow>
   );

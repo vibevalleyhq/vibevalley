@@ -1,99 +1,13 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { For } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import type { PkmTransclusion } from "@vibevalley/protocol";
 
 import { Link as A } from "#/infra/router.ts";
-import { styleProps } from "#/ui/positioner.ts";
 
 import { type Piece, piecesOf } from "./outline";
 import { pkmHref } from "./vault";
-
-const bodyStyles = stylex.create({
-  body: {
-    whiteSpace: "pre-wrap",
-  },
-  heading: {
-    fontSize: "var(--text-lg)",
-    lineHeight: "var(--leading-lg)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  subheading: {
-    fontSize: "var(--text-base)",
-    lineHeight: "var(--leading-base)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  minorHeading: {
-    fontWeight: "var(--font-weight-semibold)",
-  },
-});
-
-const styles = stylex.create({
-  bodyA: {
-    color: "var(--wb-water)",
-    textDecorationLine: "underline",
-    WebkitTextDecorationColor: {
-      default: "var(--wb-water)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-water) 25%, transparent)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--wb-water)",
-      },
-    },
-    textDecorationColor: {
-      default: "var(--wb-water)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-water) 25%, transparent)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--wb-water)",
-      },
-    },
-    textUnderlineOffset: "3px",
-  },
-  bodyMark: {
-    backgroundColor: "transparent",
-    color: "var(--wb-ink)",
-    textDecorationLine: "underline",
-    WebkitTextDecorationColor: {
-      default: "var(--wb-wheat)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 70%, transparent)",
-    },
-    textDecorationColor: {
-      default: "var(--wb-wheat)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 70%, transparent)",
-    },
-    textUnderlineOffset: "3px",
-  },
-  bodySpan: {
-    textDecorationLine: "underline",
-    WebkitTextDecorationColor: {
-      default: "var(--wb-faint)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-faint) 50%, transparent)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--wb-faint)",
-      },
-    },
-    textDecorationColor: {
-      default: "var(--wb-faint)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-faint) 50%, transparent)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--wb-faint)",
-      },
-    },
-    textDecorationStyle: "dotted",
-    textUnderlineOffset: "3px",
-  },
-  bodySpanPrimary: {
-    color: null,
-  },
-  bodySpanSecondary: {
-    color: "var(--wb-berry)",
-  },
-});
 
 /** refs: the read-out ((refs)) of the page and of the blocks shown with it. */
 export function Body(props: { text: string; refs: readonly PkmTransclusion[] }) {
@@ -111,7 +25,7 @@ export function Body(props: { text: string; refs: readonly PkmTransclusion[] }) 
             data-testid="pkm-link"
             // A hairline under it, not colour alone, tells it from the words around it (in the dark theme the colours are
             // too close); full under the pointer.
-            {...stylex.attrs(styles.bodyA)}
+            class="text-water underline decoration-water/25 hover:decoration-water underline-offset-3"
             onClick={(e: MouseEvent) => e.stopPropagation()}
           >
             {p.text}
@@ -119,7 +33,7 @@ export function Body(props: { text: string; refs: readonly PkmTransclusion[] }) 
         );
       case "remark":
         return (
-          <mark data-testid="pkm-remark" title={p.remark} {...stylex.attrs(styles.bodyMark)}>
+          <mark data-testid="pkm-remark" title={p.remark} class="bg-transparent text-ink underline decoration-wheat/70 underline-offset-3">
             {p.text}
           </mark>
         );
@@ -129,7 +43,7 @@ export function Body(props: { text: string; refs: readonly PkmTransclusion[] }) 
           <span
             data-testid="pkm-ref"
             title={ref?.pageTitle ? t("web.pkm.page.refFrom", { page: ref.pageTitle }) : undefined}
-            {...stylex.attrs(styles.bodySpan, ref?.found === false ? styles.bodySpanSecondary : styles.bodySpanPrimary)}
+            class={["underline decoration-faint/50 hover:decoration-faint decoration-dotted underline-offset-3", ref?.found === false ? "text-berry" : ""]}
           >
             {ref?.body ?? t("web.pkm.page.missingRef")}
           </span>
@@ -139,10 +53,10 @@ export function Body(props: { text: string; refs: readonly PkmTransclusion[] }) 
   };
   const size = () => {
     const level = heading()?.[1]?.length;
-    return level === 1 ? bodyStyles.heading : level === 2 ? bodyStyles.subheading : level === 3 ? bodyStyles.minorHeading : undefined;
+    return level === 1 ? "text-lg font-semibold" : level === 2 ? "text-base font-semibold" : level === 3 ? "font-semibold" : undefined;
   };
   return (
-    <span {...styleProps([bodyStyles.body, size()])}>
+    <span class={["whitespace-pre-wrap", size()]}>
       <For each={piecesOf(shown())}>{(p) => drawn(p)}</For>
     </span>
   );

@@ -1,5 +1,5 @@
-import { Schema } from "effect";
 import { createEffect, createMemo, deep } from "solid-js";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import { type Issue, type IssueHistory, defaultOrchestrator, type Session } from "@vibevalley/protocol";
@@ -13,7 +13,7 @@ import { boardRows, historyKey } from "./cards";
 
 /** Every issue with its real sessions: the frame's issues as the frame has them, the history (issue.history.list) for the sessions that left and, with `older`, the issues the frame no longer keeps (rows.ts). */
 const historyQuery = defineQuery({
-  schema: Schema.mutable(Schema.Array(S.IssueHistory)),
+  schema: z.array(S.IssueHistory),
   key: () => ["issues", "history"],
   fetch: (_: void, context) => api.issue.history.list(context),
   ...retryRead,
@@ -31,7 +31,7 @@ const timelineQuery = defineQuery({
   ...retryRead,
 });
 const runsQuery = defineQuery({
-  schema: Schema.mutable(Schema.Array(S.Run)),
+  schema: z.array(S.Run),
   key: (a: { id: string; version: string }) => ["issues", "runs", a.id, a.version],
   fetch: (a, context) => api.issue.run.list({ id: a.id }, context),
   ...retryRead,

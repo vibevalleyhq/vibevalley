@@ -40,7 +40,7 @@ export interface Game {
   /** How many runs' ends asked for a count. */
   readonly asked: () => number;
   /** The commits counted now and every two minutes, once the farm is up. */
-  readonly start: () => Promise<void>;
+  readonly boot: () => Promise<void>;
   readonly close: () => Promise<void>;
 }
 
@@ -153,7 +153,7 @@ export async function makeGame(deps: GameDeps): Promise<Game> {
     count,
     refresh,
     asked: () => asked,
-    start: async () => {
+    boot: async () => {
       tasks.run("count", async (signal) => {
         while (true) {
           await refresh();

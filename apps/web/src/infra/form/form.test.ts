@@ -1,5 +1,5 @@
-import { Effect, Schema, SchemaGetter } from "effect";
 import { afterEach, expect, expectTypeOf, test, vi } from "vite-plus/test";
+import { z } from "zod";
 
 import { createForm, type Submission } from "./form";
 import type { Path, PathValue } from "./paths";
@@ -14,17 +14,17 @@ afterEach(() => {
   for (const dispose of cleanup.splice(0)) dispose();
   vi.useRealTimers();
 });
-const Input = Schema.Struct({
-  name: Schema.Trim.check(Schema.isMinLength(1)),
-  age: Schema.Trim.check(Schema.isMinLength(1)).pipe(Schema.decodeTo(Schema.FiniteFromString)),
+const Input = z.object({
+  name: z.string().trim().min(1),
+  age: z.string().trim().min(1).pipe(z.coerce.number<string>()),
 });
 
 test("encoded fields retain input while decoded values reach submission", async () => {
-  const submitted = vi.fn((value: typeof Input.Type): Promise<Submission<number>> => Promise.resolve({ kind: "accepted", receipt: value.age }));
+  const submitted = vi.fn((value: z.output<typeof Input>): Promise<Submission<number>> => Promise.resolve({ kind: "accepted", receipt: value.age }));
   const form = keep(createForm({ schema: Input, defaultValues: { name: " Ada ", age: "42" }, messages, onSubmit: submitted }));
   expectTypeOf(form.field(["age"]).value()).toEqualTypeOf<string>();
   expectTypeOf<number>().not.toExtend<Parameters<ReturnType<typeof form.field<readonly ["age"]>>["setValue"]>[0]>();
-  expectTypeOf<readonly ["missing"]>().not.toExtend<Path<typeof Input.Encoded>>();
+  expectTypeOf<readonly ["missing"]>().not.toExtend<Path<z.input<typeof Input>>>();
   expectTypeOf<PathValue<{ rows: readonly { name: string }[] }, readonly ["rows", number, "name"]>>().toEqualTypeOf<string>();
   const result = await form.submit();
   expect(result.kind).toBe("accepted");
@@ -48,7 +48,7 @@ test("structured field and root failures contain no raw secret and show after to
   expect(JSON.stringify(form.issues())).not.toContain("secret-value");
   expect(await form.submit()).toEqual({ kind: "invalid" });
   expect(form.field(["age"]).messages()).toEqual(["invalid"]);
-  const cross = Schema.Struct({ left: Schema.String, right: Schema.String }).check(Schema.makeFilter((value) => value.left === value.right));
+  const cross = z.object({ left: z.string(), right: z.string() }).refine((value) => value.left === value.right);
   const root = keep(
     createForm({ schema: cross, defaultValues: { left: "a", right: "b" }, messages, onSubmit: () => Promise.resolve({ kind: "accepted", receipt: 1 }) }),
   );
@@ -98,23 +98,9 @@ test("regression: unknown and rejected delivery keep values and never retry", as
 
 test("regression: async validation cannot submit an obsolete revision and dispose interrupts it", async () => {
   vi.useFakeTimers();
-  let aborted = 0;
-  const delayed = Schema.String.pipe(
-    Schema.decodeTo(Schema.String, {
-      decode: SchemaGetter.transformEffect((_value: string): Effect.Effect<string> =>
-        Effect.never.pipe(
-          Effect.onInterrupt(() =>
-            Effect.sync(() => {
-              aborted++;
-            }),
-          ),
-        ),
-      ),
-      encode: SchemaGetter.passthrough(),
-    }),
-  );
+  const delayed = z.string().transform((_value: string) => new Promise<string>(() => {}));
   const submit = vi.fn((): Promise<Submission<void>> => Promise.resolve({ kind: "accepted", receipt: undefined }));
-  const form = keep(createForm({ schema: Schema.Struct({ name: delayed }), defaultValues: { name: "old" }, messages, onSubmit: submit }));
+  const form = keep(createForm({ schema: z.object({ name: delayed }), defaultValues: { name: "old" }, messages, onSubmit: submit }));
   const pending = form.submit();
   await vi.advanceTimersByTimeAsync(0);
   form.field(["name"]).setValue("new");
@@ -129,20 +115,15 @@ test("regression: async validation cannot submit an obsolete revision and dispos
   await vi.advanceTimersByTimeAsync(25);
   expect(await last).toEqual({ kind: "disposed" });
   expect(changed).not.toHaveBeenCalled();
-  expect(aborted).toBeGreaterThanOrEqual(2);
 });
 
 test("asynchronous decoding succeeds only for its revision and empty numeric input is not zero", async () => {
   const gates: (() => void)[] = [];
-  const schema = Schema.String.pipe(
-    Schema.decodeTo(Schema.String, {
-      decode: SchemaGetter.transformEffect((value: string) =>
-        Effect.callback<string>((resume) => {
-          gates.push(() => resume(Effect.succeed(value.toUpperCase())));
-        }),
-      ),
-      encode: SchemaGetter.passthrough(),
-    }),
+  const schema = z.string().transform(
+    (value: string) =>
+      new Promise<string>((resolve) => {
+        gates.push(() => resolve(value.toUpperCase()));
+      }),
   );
   const form = keep(createForm({ schema, defaultValues: "first", messages, onSubmit: (value) => Promise.resolve({ kind: "accepted", receipt: value }) }));
   const one = form.validate();
@@ -160,8 +141,8 @@ test("asynchronous decoding succeeds only for its revision and empty numeric inp
 });
 
 test("union branches, nested array failures and validation defects remain distinct and redacted", async () => {
-  const schema = Schema.Struct({
-    rows: Schema.Array(Schema.Struct({ value: Schema.Union([Schema.String.check(Schema.isMinLength(3)), Schema.String.check(Schema.isPattern(/^\d+$/u))]) })),
+  const schema = z.object({
+    rows: z.array(z.object({ value: z.union([z.string().min(3), z.string().regex(/^\d+$/u)]) })),
   });
   const form = keep(
     createForm({ schema, defaultValues: { rows: [{ value: "x" }] }, messages, onSubmit: () => Promise.resolve({ kind: "accepted", receipt: 1 }) }),
@@ -169,9 +150,9 @@ test("union branches, nested array failures and validation defects remain distin
   await form.validate();
   expect(form.issues()[0]).toMatchObject({ path: ["rows", 0, "value"], code: "union" });
   expect(form.issues()[0]?.branches).toHaveLength(2);
-  const broken = Schema.String.pipe(
-    Schema.decodeTo(Schema.String, { decode: SchemaGetter.transformEffect(() => Effect.die("private secret")), encode: SchemaGetter.passthrough() }),
-  );
+  const broken = z.string().transform((): string => {
+    throw new Error("private secret");
+  });
   const failure = keep(createForm({ schema: broken, defaultValues: "input", messages, onSubmit: () => Promise.resolve({ kind: "accepted", receipt: 1 }) }));
   expect(await failure.submit()).toEqual({ kind: "unavailable" });
   expect(failure.issues()).toEqual([]);
@@ -179,7 +160,7 @@ test("union branches, nested array failures and validation defects remain distin
 });
 
 test("null values and absent optional keys remain distinct in the editing baseline", () => {
-  const schema = Schema.Struct({ value: Schema.NullOr(Schema.String), optional: Schema.optional(Schema.String) });
+  const schema = z.object({ value: z.string().nullable(), optional: z.string().optional() });
   const form = keep(createForm({ schema, defaultValues: { value: null }, messages, onSubmit: () => Promise.resolve({ kind: "accepted", receipt: 1 }) }));
   form.field(["value"]).setValue("changed");
   expect(form.dirty()).toBe(true);
@@ -190,7 +171,7 @@ test("null values and absent optional keys remain distinct in the editing baseli
 });
 
 test("composition blocks submission and nested updates preserve arrays and conditional values", async () => {
-  const schema = Schema.Struct({ rows: Schema.Array(Schema.Struct({ name: Schema.String })), extra: Schema.optionalKey(Schema.String) });
+  const schema = z.object({ rows: z.array(z.object({ name: z.string() })), extra: z.exactOptional(z.string()) });
   const form = keep(
     createForm({
       schema,
@@ -207,7 +188,7 @@ test("composition blocks submission and nested updates preserve arrays and condi
   expect((await form.submit()).kind).toBe("accepted");
   const record = keep(
     createForm({
-      schema: Schema.Record(Schema.String, Schema.String),
+      schema: z.record(z.string(), z.string()),
       defaultValues: {},
       messages,
       onSubmit: () => Promise.resolve({ kind: "accepted", receipt: 1 }),

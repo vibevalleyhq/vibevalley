@@ -1,18 +1,7 @@
-import * as stylex from "@stylexjs/stylex";
-
 import type { ConnectorID, ConnectorState, ConnectorStatus } from "@vibevalley/protocol";
 import { stories, story } from "@vibevalley/stories";
 
 import { ConnectorCard } from "./ConnectorsPage";
-
-const viewStyles = stylex.create({
-  connectorsPageStoriesDiv: {
-    width: "30rem",
-  },
-  connectorsPageStoriesDiv2: {
-    width: "20rem",
-  },
-});
 
 const now = Date.now();
 const min = 60_000;
@@ -45,7 +34,7 @@ export default stories({
       args: { id: "weixin", state: "off" },
       grid: { rows: ["state", ["off", "waiting", "scanned", "verify", "pairing", "connected", "paused"]] },
       render: (a) => (
-        <div {...stylex.attrs(viewStyles.connectorsPageStoriesDiv)}>
+        <div class="w-120">
           <ConnectorCard id={a.id as ConnectorID} status={statusOf(a.id as ConnectorID, a.state as ConnectorState)} />
         </div>
       ),
@@ -55,7 +44,7 @@ export default stories({
       args: { id: "weixin" },
       grid: { cols: ["id", ["weixin", "feishu", "qq"]] },
       render: (a) => (
-        <div {...stylex.attrs(viewStyles.connectorsPageStoriesDiv2)}>
+        <div class="w-80">
           <ConnectorCard id={a.id as ConnectorID} status={statusOf(a.id as ConnectorID, "off")} />
         </div>
       ),
@@ -64,7 +53,7 @@ export default stories({
       note: "出错时原因写在卡片底下，状态照旧。",
       args: { error: "二维码过期了，点刷新再扫一次" },
       render: (a) => (
-        <div {...stylex.attrs(viewStyles.connectorsPageStoriesDiv)}>
+        <div class="w-120">
           <ConnectorCard id="weixin" status={statusOf("weixin", "waiting", { error: a.error })} />
         </div>
       ),

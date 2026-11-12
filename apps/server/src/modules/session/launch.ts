@@ -211,7 +211,7 @@ export function makeLaunch(r: SessionRegistry, wt: SessionWatch, cli: WorkerAcce
     try {
       await rest(h);
     } catch (e) {
-      throw new DeliveryRefused(messageOf(e));
+      throw new DeliveryRefused(messageOf(e), { cause: e });
     }
     const resume = h.oarSessionId;
     let opened = await open(agent, session, h, h.place, withRecall(recall, input), resume);

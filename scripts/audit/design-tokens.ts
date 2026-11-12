@@ -35,13 +35,13 @@ export function offTokens(property: string, value: string | number, disabled = f
 }
 
 export const tokenAdvice: Record<TokenKind, string> = {
-  radius: "a named corner such as borderRadius: 'var(--radius-md)' (xs/sm/md/lg/xl); 0 for square corners or '9999px' for pills",
-  type: "fontSize: 'var(--text-sm)' from the host's named type tokens (2xs through 3xl); reserve 2xl/3xl for document titles and pairing codes",
+  radius: "a named corner: rounded-md (xs/sm/md/lg/xl) in `class`, or var(--radius-md) in a style; 0 for square corners or rounded-full for pills",
+  type: "the type ladder: text-sm in `class` (2xs through 3xl), or var(--text-sm) in a style; reserve 2xl/3xl for document titles and pairing codes",
   motion:
-    "transition longhands with 120ms (hover/press), 180ms (state), 280ms (panel), or 0; transitionTimingFunction: 'var(--ease-out)' (in/in-out/spring for other motion)",
-  layer: "zIndex: 10 (on content), 20 (panel), 30 (menu/popover/tip), or 40 (toast)",
-  disabled: "opacity: { default: null, ':disabled': 0.5 }, the one disabled look",
-  shadow: "boxShadow: 'var(--shadow-raise)' or 'var(--shadow-float)'; an inset line uses var(--color-accent)",
+    "120ms (hover/press), 180ms (state), 280ms (panel) or 0: duration-120 in `class`; ease-out (in/in-out/spring for other motion), or var(--ease-out) in a style",
+  layer: "z-10 (on content), z-20 (panel), z-30 (menu/popover/tip) or z-40 (toast)",
+  disabled: "disabled:opacity-50, the one disabled look",
+  shadow: "shadow-raise or shadow-float (var(--shadow-raise), var(--shadow-float) in a style); an inset line uses var(--color-accent)",
 };
 
 /** URL fragments identify assets, not colours; content and arbitrary business strings are not paint. */

@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -22,124 +21,6 @@ import { AppearancePage } from "./AppearancePage";
 import { GeneralPage } from "./GeneralPage";
 import { Readiness } from "./Readiness.tsx";
 import { GitHub, SettingsFile, SettingsForm } from "./SettingsForm";
-
-const styles = stylex.create({
-  settingsPageDiv: {
-    minHeight: "0",
-    minWidth: "0",
-    flex: "1",
-    WebkitMaskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
-    maskImage: "linear-gradient(to bottom, transparent, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent)",
-    animationName: "scroll-fade-y",
-    animationDuration: "0s",
-    animationDelay: "0s",
-    animationTimingFunction: "linear",
-    animationIterationCount: "1",
-    animationDirection: "normal",
-    animationFillMode: "both",
-    animationPlayState: "running",
-    animationTimeline: "scroll(self y)",
-    overflowY: "auto",
-    padding: "1.25rem",
-  },
-  sectionLinkA: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.625rem",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.375rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  sectionLinkATone: {
-    backgroundColor: "var(--color-selected)",
-    fontWeight: "var(--font-weight-medium)",
-    color: "var(--color-ink)",
-  },
-  sectionLinkAAlt: {
-    color: {
-      default: "var(--color-muted)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-ink)",
-      },
-    },
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  settingsPageDiv2: {
-    display: "flex",
-    height: "100%",
-    minHeight: "0",
-    flexDirection: {
-      default: "column",
-      "@media (width>=48rem)": "row",
-    },
-  },
-  settingsNav: {
-    position: "relative",
-    display: "flex",
-    flexShrink: "0",
-    flexDirection: "column",
-    gap: "1rem",
-    borderColor: "var(--color-line)",
-    padding: "0.75rem",
-    width: {
-      default: null,
-      "@media (width>=48rem)": "var(--pane-w)",
-    },
-    maxHeight: {
-      default: "14rem",
-      "@media (width>=48rem)": "none",
-    },
-    overflowY: "auto",
-    borderRightStyle: {
-      default: null,
-      "@media (width>=48rem)": "solid",
-    },
-    borderRightWidth: {
-      default: null,
-      "@media (width>=48rem)": "1px",
-    },
-  },
-  settingsPageDiv22: {
-    display: {
-      default: "none",
-      "@media (width>=48rem)": "block",
-    },
-  },
-  settingsPageDiv3: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.125rem",
-  },
-  settingsPageSpan: {
-    paddingInline: "0.5rem",
-    paddingBottom: "0.25rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontWeight: "var(--font-weight-medium)",
-    color: "var(--color-faint)",
-  },
-  settingsPageDiv4: {
-    display: "flex",
-    flexDirection: "column",
-    borderTopStyle: "solid",
-    borderTopWidth: "1px",
-    borderColor: "var(--color-line)",
-    paddingTop: "0.75rem",
-    marginTop: {
-      default: null,
-      "@media (width>=48rem)": "auto",
-    },
-  },
-});
 
 /** The groups listed under their names. */
 type Listed = "options" | "helpers" | "voice" | "connect";
@@ -186,14 +67,14 @@ export function SettingsPage(props: { rest: string }) {
     <Show when={section()} fallback={<Navigate href="/settings/general" />}>
       {(section) => (
         <SettingsSearch value={q}>
-          <div {...stylex.attrs(styles.settingsPageDiv2)}>
+          <div class="flex h-full min-h-0 flex-col md:flex-row">
             <nav
               aria-label={t("web.setting.nav.label")}
               data-testid="settings-nav"
-              {...stylex.attrs(styles.settingsNav)}
+              class="relative flex shrink-0 flex-col gap-4 border-line p-3 md:w-(--pane-w) max-h-56 md:max-h-none overflow-y-auto md:[border-right-style:solid] md:border-r"
               style={{ "--pane-w": `${navWidth()}px` }}
             >
-              <div {...stylex.attrs(styles.settingsPageDiv22)}>
+              <div class="hidden md:block">
                 <Splitter pane="settingsNav" side="right" width={navWidth()} min={176} max={360} label={t("web.setting.nav.width")} />
               </div>
               <TextInput
@@ -207,8 +88,8 @@ export function SettingsPage(props: { rest: string }) {
               <For each={groups}>
                 {(g) => (
                   <Show when={shown(g).length > 0}>
-                    <div {...stylex.attrs(styles.settingsPageDiv3)}>
-                      <span {...stylex.attrs(styles.settingsPageSpan)}>{t(`web.setting.groups.${g}`)}</span>
+                    <div class="flex flex-col gap-0.5">
+                      <span class="px-2 pb-1 text-xs font-medium text-faint">{t(`web.setting.groups.${g}`)}</span>
                       <For each={shown(g)}>{(s) => <SectionLink section={s} current={s === section()} />}</For>
                     </div>
                   </Show>
@@ -216,13 +97,13 @@ export function SettingsPage(props: { rest: string }) {
               </For>
               <For each={shown("about")}>
                 {(s) => (
-                  <div {...stylex.attrs(styles.settingsPageDiv4)}>
+                  <div class="flex flex-col border-t border-line pt-3 md:mt-auto">
                     <SectionLink section={s} current={s === section()} />
                   </div>
                 )}
               </For>
             </nav>
-            <div {...stylex.attrs(styles.settingsPageDiv)}>
+            <div class="min-h-0 min-w-0 flex-1 [mask-image:linear-gradient(to_bottom,_transparent,_black_var(--fade-top),_black_calc(100%_-_var(--fade-bottom)),_transparent)] [animation-name:scroll-fade-y] [animation-duration:0ms] [animation-timing-function:linear] [animation-fill-mode:both] [animation-timeline:scroll(self_y)] overflow-y-auto p-5">
               <Switch>
                 <Match when={section().id === "general"}>
                   <GeneralPage />
@@ -302,7 +183,10 @@ function SectionLink(props: { section: Section; current: boolean }) {
       href={`/settings/${props.section.id}`}
       data-key={props.section.id}
       aria-current={props.current ? "page" : undefined}
-      {...stylex.attrs(styles.sectionLinkA, props.current ? styles.sectionLinkATone : styles.sectionLinkAAlt)}
+      class={[
+        "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm",
+        props.current ? "bg-selected font-medium text-ink" : "text-muted hover:text-ink hover:bg-hover",
+      ]}
     >
       <Icon name={props.section.icon} size={16} />
       {props.section.label}

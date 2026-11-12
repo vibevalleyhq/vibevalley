@@ -1,7 +1,6 @@
-/* Tailwind's tokens and utilities, below StyleX while the page moves from StyleX to Tailwind (vv-tailwind): a component
-   still on StyleX, or a caller's StyleX styles passed to a part already on classes, keeps winning as it did. reset.css is
-   Tailwind's preflight as it was compiled, so tailwindcss/preflight.css is not imported a second time. */
-@layer theme, base, components, utilities, stylex;
+/* Tailwind's tokens and utilities (vv-tailwind). reset.css is Tailwind's preflight as it was compiled, so
+   tailwindcss/preflight.css is not imported a second time. */
+@layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
 @import "./reset.css";
@@ -142,7 +141,7 @@
 }
 
 /* The tokens that do not change with the theme, as Tailwind's theme: each is a utility (font-mono, text-sm, leading-xs,
-   rounded-md, ease-out, bg-cream-100, shadow-px…) and, being static, a variable on :root for StyleX and the CSS above.
+   rounded-md, ease-out, bg-cream-100, shadow-px…) and, being static, a variable on :root for the CSS here and inline styles.
    Tailwind's own palette, ladders and corners are cleared first, so a class can only name one of these. */
 @theme static {
   --color-*: initial;
@@ -353,7 +352,7 @@
 
 /* The palette as utilities (bg-page, text-muted, border-line, outline-focus…, with /N for a mix: bg-wheat/25). Inline, so
    a class reads the --wb-* colour where it is used and a part in the other theme (the pixel skin, a story's dark frame)
-   gets its own; the --color-* names above stay for StyleX and the CSS. */
+   gets its own; the --color-* names above stay for the CSS and inline styles. */
 @theme inline {
   --color-page: var(--wb-page);
   --color-side: var(--wb-side);
@@ -438,7 +437,7 @@
   }
 }
 
-/* animate-pop-in and animate-fade-in (@theme above); the StyleX components still define their own keyframes. */
+/* animate-pop-in and animate-fade-in (@theme above), and the keyframes that classes name with [animation-name:…]. */
 @keyframes pop-in {
   from {
     opacity: 0;
@@ -448,6 +447,83 @@
 @keyframes fade-in {
   from {
     opacity: 0;
+  }
+}
+/* Something at work: typing, writing, recording. */
+@keyframes pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+/* Three dots of someone thinking, one after another. */
+@keyframes thinking-bounce {
+  0%,
+  100% {
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+    transform: translateY(-25%);
+  }
+  50% {
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+    transform: none;
+  }
+}
+/* The farm's: a level reached, a sign that hops, a phone that rings, a cursor that blinks. */
+@keyframes level-up {
+  0% {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.9);
+  }
+  9% {
+    opacity: 1;
+    transform: translateY(0) scale(1.04);
+  }
+  15% {
+    transform: translateY(0) scale(1);
+  }
+  86% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(1);
+  }
+}
+@keyframes hop {
+  0%,
+  88% {
+    transform: translateY(0);
+  }
+  89%,
+  100% {
+    transform: translateY(-3px);
+  }
+}
+@keyframes shake {
+  0%,
+  24.99% {
+    transform: translate(-1px, 0);
+  }
+  25%,
+  49.99% {
+    transform: translate(1px, 0);
+  }
+  50%,
+  74.99% {
+    transform: translate(-1px, -1px);
+  }
+  75%,
+  100% {
+    transform: translate(1px, 0);
+  }
+}
+@keyframes blink {
+  0%,
+  49.99% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0.3;
   }
 }
 

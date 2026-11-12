@@ -1,4 +1,4 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
 import { For } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
@@ -6,57 +6,9 @@ import { stories, story } from "@vibevalley/stories";
 import { Icon, type IconSize } from "./Icon";
 import { icons, type IconName } from "./icons";
 
-const viewStyles = stylex.create({
-  placement: (offset: number) => ({ marginLeft: offset, color: "var(--color-ink)" }),
-  iconStoriesDiv: {
-    display: "grid",
-    width: "100%",
-    gridTemplateColumns: "repeat(auto-fill,minmax(6rem,1fr))",
-    gap: "0.5rem",
-  },
-  iconStoriesDiv2: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "0.25rem",
-    borderRadius: "var(--radius-md)",
-    padding: "0.5rem",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  iconStoriesSpan: {
-    maxWidth: "100%",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-2xs)",
-    lineHeight: "var(--leading-2xs)",
-    color: "var(--color-muted)",
-  },
-  iconStoriesDiv3: {
-    display: "flex",
-    alignItems: "flex-end",
-    gap: "1rem",
-  },
-  iconStoriesDiv4: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "0.25rem",
-  },
-  iconStoriesSpan2: {
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-2xs)",
-    lineHeight: "var(--leading-2xs)",
-    color: "var(--color-muted)",
-  },
-});
+const viewStyles = {
+  placement: (offset: number): JSX.CSSProperties => ({ "--offset": `${offset}px` }),
+};
 
 const ladder: IconSize[] = [10, 12, 14, 16, 20, 24, 48];
 const names = Object.keys(icons) as IconName[];
@@ -67,10 +19,10 @@ export default stories({
     Composition: story({
       args: { offset: 12 },
       render: (a, set) => (
-        <div>
+        <div style={viewStyles.placement(a.offset)}>
           <Icon name="check" label="Reference" />
-          <Icon name="check" label="Composed" styles={viewStyles.placement(a.offset)} />
-          <Icon name="file" label="Document" styles={viewStyles.placement(a.offset)} />
+          <Icon name="check" label="Composed" class="ml-(--offset) text-ink" />
+          <Icon name="file" label="Document" class="ml-(--offset) text-ink" />
           <button type="button" data-testid="move-icons" onClick={() => set({ offset: 28 })}>
             Move
             <Icon name="next" />
@@ -83,12 +35,12 @@ export default stories({
       args: { size: 20 },
       controls: { size: { kind: "number", min: 10, max: 48 } },
       render: (a) => (
-        <div {...stylex.attrs(viewStyles.iconStoriesDiv)}>
+        <div class="grid w-full grid-cols-[repeat(auto-fill,minmax(6rem,1fr))] gap-2">
           <For each={names}>
             {(name) => (
-              <div {...stylex.attrs(viewStyles.iconStoriesDiv2)}>
+              <div class="flex flex-col items-center gap-1 rounded-md p-2 hover:bg-hover">
                 <Icon name={name} size={a.size as IconSize} />
-                <span {...stylex.attrs(viewStyles.iconStoriesSpan)}>{name}</span>
+                <span class="max-w-full truncate font-mono text-2xs text-muted">{name}</span>
               </div>
             )}
           </For>
@@ -98,12 +50,12 @@ export default stories({
     Sizes: story({
       note: "只用这一档：10 12 14 16 20 24 48。",
       render: () => (
-        <div {...stylex.attrs(viewStyles.iconStoriesDiv3)}>
+        <div class="flex items-end gap-4">
           <For each={ladder}>
             {(size) => (
-              <div {...stylex.attrs(viewStyles.iconStoriesDiv4)}>
+              <div class="flex flex-col items-center gap-1">
                 <Icon name="issues" size={size} />
-                <span {...stylex.attrs(viewStyles.iconStoriesSpan2)}>{size}</span>
+                <span class="font-mono text-2xs text-muted">{size}</span>
               </div>
             )}
           </For>

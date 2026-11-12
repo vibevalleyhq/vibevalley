@@ -9,7 +9,7 @@ import { defaults, type ServerConfig } from "#/infra/config.ts";
 import { type Db, openDb } from "#/infra/db.ts";
 import { makeLogger } from "#/infra/log.ts";
 import type { PublicFetch } from "#/infra/publicHttp.ts";
-import { afterRealTime, wallTime } from "#/infra/time.ts";
+import { afterRealTime, type Time, wallTime } from "#/infra/time.ts";
 import { withCast } from "#/modules/agent/agent.ts";
 import { builtInDir, profileOf, templateFrom } from "#/modules/agent/template.ts";
 import builtInIndex from "#/modules/agent/templates/index.json" with { type: "json" };
@@ -40,6 +40,48 @@ export function testConfig(change: Partial<ServerConfig> = {}): ServerConfig {
     lan: { ...config.lan, port: 0 },
     agent: { ...config.agent, starters: starters() },
     ...change,
+  };
+}
+
+/** The wall clock moved on by hand: now() is ahead by what adjust added, and a timer is due once that time comes, by
+ * waiting or by adjust. A test moves the farm's day (a cron coming due, an idle session suspended) without waiting for
+ * it. */
+export function shiftedTime(): Time & { readonly adjust: (ms: number) => void } {
+  let ahead = 0;
+  const now = () => wallTime.now() + ahead;
+  const due = new Set<{ readonly at: number; readonly fire: () => void }>();
+  const after = (ms: number, f: () => void) => {
+    const timer = { at: now() + ms, fire: () => cancel() || f() };
+    const cancelReal = wallTime.after(ms, () => timer.fire());
+    const cancel = () => {
+      cancelReal();
+      due.delete(timer);
+      return false;
+    };
+    due.add(timer);
+    return () => void cancel();
+  };
+  const sleep = (ms: number, signal?: AbortSignal) =>
+    new Promise<void>((resolve, reject) => {
+      if (signal?.aborted === true) return reject(signal.reason);
+      const cancel = after(ms, () => {
+        signal?.removeEventListener("abort", onAbort);
+        resolve();
+      });
+      const onAbort = () => {
+        cancel();
+        reject(signal?.reason);
+      };
+      signal?.addEventListener("abort", onAbort, { once: true });
+    });
+  return {
+    now,
+    sleep,
+    after,
+    adjust: (ms) => {
+      ahead += ms;
+      for (const timer of [...due]) if (timer.at <= now()) timer.fire();
+    },
   };
 }
 

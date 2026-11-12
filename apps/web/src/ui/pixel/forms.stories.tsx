@@ -1,25 +1,16 @@
-import * as stylex from "@stylexjs/stylex";
-
 import { stories, story } from "@vibevalley/stories";
 
 import { PxChipsInput } from "./forms";
-import { storyFrame } from "./story.stylex";
-
-const viewStyles = stylex.create({
-  formsStoriesDiv: {
-    width: "20rem",
-  },
-});
 
 export default stories({
   title: "组件/像素/forms",
   themes: ["light"],
-  frame: storyFrame.pixel,
+  frame: "bg-cream-50 font-pixel text-(length:--text-xs) text-bark-900",
   stories: {
     Chips: story({
       args: { words: "frontend,urgent", disabled: false },
       render: (a, set) => (
-        <div {...stylex.attrs(viewStyles.formsStoriesDiv)}>
+        <div class="w-80">
           <PxChipsInput
             label="标签"
             placeholder="加一个"

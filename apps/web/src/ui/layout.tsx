@@ -1,5 +1,4 @@
 import type { JSX } from "@solidjs/web";
-import type * as stylex from "@stylexjs/stylex";
 import { createSignal, omit, Show } from "solid-js";
 
 import { Switch } from "@vibevalley/base-ui";
@@ -12,7 +11,6 @@ import { Link as A } from "#/infra/router.ts";
 import { TextInput, type TextInputProps } from "./Field";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
-import { withStyles } from "./positioner";
 import { Hint } from "./Tip";
 
 /** edge: a page's own list as a side column against the rail (its ListCard bare), not a card in a page that already has one. */
@@ -76,17 +74,11 @@ export function Card(props: {
   action?: JSX.Element;
   children: JSX.Element;
   class?: JSX.ClassValue | undefined;
-  // For callers still on StyleX; it goes when the last of them is on classes.
-  styles?: stylex.StyleXStyles;
   testid?: string;
   item?: string;
 }) {
   return (
-    <section
-      data-testid={props.testid}
-      data-key={props.item}
-      {...withStyles(props.styles, ["flex flex-col rounded-lg border border-line bg-page", props.class])}
-    >
+    <section data-testid={props.testid} data-key={props.item} class={["flex flex-col rounded-lg border border-line bg-page", props.class]}>
       <Show when={props.title !== undefined}>
         <header class="flex min-h-12 items-center gap-2 border-b border-line px-4 py-2">
           <h2 class="min-w-0 flex-1 truncate text-base font-semibold">{props.title}</h2>

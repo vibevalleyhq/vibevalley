@@ -1,6 +1,5 @@
-import * as stylex from "@stylexjs/stylex";
-import { Schema } from "effect";
 import { Show } from "solid-js";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import type { ArtifactBody, ArtifactCard as Card, ArtifactDisplay, ArtifactListRequest } from "@vibevalley/protocol";
@@ -13,65 +12,6 @@ import { useRouter, Link as A } from "#/infra/router.ts";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
 
-const styles = stylex.create({
-  artifactCardA: {
-    marginTop: "0.25rem",
-    display: "flex",
-    width: "100%",
-    maxWidth: "var(--container-md)",
-    alignItems: "center",
-    gap: "0.75rem",
-    borderRadius: "var(--radius-lg)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    backgroundColor: {
-      default: "var(--color-page)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-    paddingInline: "0.75rem",
-    paddingBlock: "0.5rem",
-    transitionProperty: "color, background-color, border-color",
-    transitionTimingFunction: "var(--ease-out)",
-    transitionDuration: "120ms",
-  },
-  artifactCardSpan: {
-    display: "flex",
-    width: "2.25rem",
-    height: "2.25rem",
-    flexShrink: "0",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--color-hover)",
-    color: "var(--color-muted)",
-  },
-  artifactCardSpan2: {
-    display: "flex",
-    minWidth: "0",
-    flexDirection: "column",
-  },
-  artifactCardSpan3: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  artifactCardSpan4: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-});
-
 // Artifacts (docs/subsystems/artifact.md) are not in the frame.
 const fresh = 5_000;
 
@@ -81,7 +21,7 @@ const artifactQuery = defineQuery({
   fetch: (id, context) => api.artifact.get({ id: artifactId(id) }, context),
 });
 const artifactsQuery = defineQuery({
-  schema: Schema.mutable(Schema.Array(S.Artifact)),
+  schema: z.array(S.Artifact),
   key: (q: ArtifactListRequest) => ["artifacts", "list", q.channel ?? null, q.issue ?? null],
   fetch: (q, context) => api.artifact.list(q, context),
   ...retryRead,
@@ -120,14 +60,14 @@ export function ArtifactCard(props: { card: Card }) {
       data-key={props.card.id}
       data-version={props.card.version}
       aria-label={t("web.artifact.card.open", { title: props.card.title })}
-      {...stylex.attrs(styles.artifactCardA)}
+      class="mt-1 flex w-full max-w-md items-center gap-3 rounded-lg border border-line bg-page hover:bg-hover px-3 py-2 transition-[color,background-color,border-color] ease-out duration-120"
     >
-      <span {...stylex.attrs(styles.artifactCardSpan)}>
+      <span class="flex w-9 h-9 shrink-0 items-center justify-center rounded-md bg-hover text-muted">
         <Icon name={bodyIcon[props.card.body]} size={20} />
       </span>
-      <span {...stylex.attrs(styles.artifactCardSpan2)}>
-        <span {...stylex.attrs(styles.artifactCardSpan3)}>{props.card.title}</span>
-        <span {...stylex.attrs(styles.artifactCardSpan4)}>
+      <span class="flex min-w-0 flex-col">
+        <span class="truncate text-sm font-semibold">{props.card.title}</span>
+        <span class="truncate text-xs text-muted">
           {kindLabel(props.card)}
           <Show when={props.card.body === "html"}> · {t("web.artifact.card.version", { version: props.card.version })}</Show>
           <Show when={props.card.note}>{(note) => <> · {note()}</>}</Show>

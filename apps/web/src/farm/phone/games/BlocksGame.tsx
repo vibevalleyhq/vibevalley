@@ -1,78 +1,12 @@
-import * as stylex from "@stylexjs/stylex";
 import { createEffect, createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { phoneAnimations } from "#/farm/interaction.stylex.ts";
 import { lcd } from "#/farm/phone/lcd.ts";
 import { kept, usePad, useTicks } from "#/farm/phone/pad.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
-import { styleProps } from "#/ui/positioner.ts";
 
 import { type Blocks, blocksHeight, blocksWidth, cellsOf, fall, fallMs, landingOf, newBlocks, type PieceKind, pieceKinds, shift, slam, turn } from "./blocks";
-
-const styles = stylex.create({
-  overlay: {
-    position: "absolute",
-    inset: "0",
-    display: "grid",
-    placeItems: "center",
-    backgroundColor: {
-      default: "var(--color-lcd-panel)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-lcd-paper) 80%, transparent)",
-    },
-    textAlign: "center",
-  },
-  root: {
-    display: "flex",
-    minHeight: "0",
-    flex: "1",
-    paddingInline: "0.5rem",
-    paddingTop: "0.5rem",
-  },
-  rootBig: {
-    gap: "1rem",
-  },
-  rootCompact: {
-    gap: "0.5rem",
-  },
-  sidebar: {
-    display: "flex",
-    minWidth: "0",
-    flex: "1",
-    flexDirection: "column",
-    gap: "0.5rem",
-  },
-  wellFrame: {
-    position: "relative",
-    flexShrink: "0",
-    alignSelf: "flex-start",
-    boxShadow: "0 0 0 2px var(--color-lcd-ink)",
-  },
-  canvas: {
-    display: "block",
-    imageRendering: "pixelated",
-  },
-  help: {
-    marginTop: "auto",
-    marginBottom: "0.25rem",
-    lineHeight: "1.625",
-    color: "var(--color-lcd-dark)",
-  },
-  nextSvg: {
-    marginTop: "0.25rem",
-    display: "block",
-    backgroundColor: "var(--color-lcd-light)",
-    padding: "0.25rem",
-  },
-  statRow: {
-    display: "flex",
-  },
-  statValue: {
-    marginLeft: "auto",
-    fontVariantNumeric: "tabular-nums",
-  },
-});
 
 const game = kept<Blocks | undefined>(undefined);
 const best = kept(0);
@@ -181,36 +115,36 @@ export function BlocksGame(props: { big?: boolean }) {
     <div
       data-testid="blocks"
       data-state={!g() ? "ready" : g()?.over === true ? "over" : playing() ? "playing" : "paused"}
-      {...stylex.attrs(styles.root, props.big === true ? styles.rootBig : styles.rootCompact)}
+      class={["flex min-h-0 flex-1 px-2 pt-2", props.big === true ? "gap-4" : "gap-2"]}
     >
-      <div {...stylex.attrs(styles.wellFrame)}>
+      <div class="relative shrink-0 self-start [box-shadow:0_0_0_2px_var(--color-lcd-ink)]">
         <canvas
           ref={(el) => (canvas = el)}
           width={blocksWidth * cell()}
           height={blocksHeight * cell()}
-          {...stylex.attrs(styles.canvas)}
+          class="block [image-rendering:pixelated]"
           aria-label={t("web.farm.phone.blocks.well")}
           role="img"
         />
         <Show when={!g() || g()?.over === true || !playing()}>
-          <div {...stylex.attrs(styles.overlay)}>
+          <div class="absolute inset-0 grid place-items-center bg-lcd-paper/80 text-center">
             <span>
               {g()?.over === true ? t("web.farm.phone.blocks.noRoom") : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.blocks")}
               <br />
-              <span {...styleProps(phoneAnimations.blink)}>
+              <span class="[animation-name:blink] motion-reduce:[animation-name:none] [animation-duration:1000ms] [animation-iteration-count:infinite]">
                 {t("web.farm.phone.pressA", { what: g() && g()?.over !== true ? t("web.farm.phone.resume") : t("web.farm.phone.start") })}
               </span>
             </span>
           </div>
         </Show>
       </div>
-      <div {...stylex.attrs(styles.sidebar)}>
+      <div class="flex min-w-0 flex-1 flex-col gap-2">
         <Next kind={g()?.next} />
         <Stat label={t("web.farm.phone.blocks.score")} value={g()?.score ?? 0} />
         <Stat label={t("web.farm.phone.blocks.lines")} value={g()?.lines ?? 0} />
         <Stat label={t("web.farm.phone.blocks.level")} value={g()?.level ?? 1} />
         <Stat label={t("web.farm.phone.blocks.best")} value={Math.max(top(), g()?.score ?? 0)} />
-        <p {...stylex.attrs(styles.help)}>
+        <p class="mt-auto mb-1 leading-relaxed text-lcd-dark">
           {t("web.farm.phone.blocks.help")}
           <br />
           {t("web.farm.phone.blocks.help2")}
@@ -227,7 +161,7 @@ function Next(props: { kind: PieceKind | undefined }) {
   return (
     <div>
       <span>{t("web.farm.phone.blocks.next")}</span>
-      <svg width={36} height={20} viewBox="0 0 4 2" shape-rendering="crispEdges" {...stylex.attrs(styles.nextSvg)} aria-hidden="true">
+      <svg width={36} height={20} viewBox="0 0 4 2" shape-rendering="crispEdges" class="mt-1 block bg-lcd-light p-1" aria-hidden="true">
         <For each={cells()}>{([x, y]) => <rect x={x} y={y === 0 ? 0 : 1} width={0.9} height={0.9} fill={lcd.ink} />}</For>
       </svg>
     </div>
@@ -236,9 +170,9 @@ function Next(props: { kind: PieceKind | undefined }) {
 
 function Stat(props: { label: string; value: number }) {
   return (
-    <div {...stylex.attrs(styles.statRow)}>
+    <div class="flex">
       <span>{props.label}</span>
-      <span {...stylex.attrs(styles.statValue)}>{props.value}</span>
+      <span class="ml-auto tabular-nums">{props.value}</span>
     </div>
   );
 }

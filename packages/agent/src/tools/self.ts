@@ -3,7 +3,7 @@ import { z } from "zod";
 import { self as selfWords } from "../base/prompts.ts";
 import { ToolFailed, toolFailed } from "../core/errors.ts";
 import type { Tool } from "../core/loop.ts";
-import { schemaEffectTool } from "../core/tool.ts";
+import { schemaTool } from "../core/tool.ts";
 import type { AgentFs } from "../infra/fs.ts";
 import { type AgentLog, consoleLog } from "../infra/log.ts";
 import { archiveFiles, fileMemory, type MemoryPort, searchArchive } from "./memory.ts";
@@ -40,13 +40,13 @@ async function searchIn(home: string, query: string, fs?: AgentFs): Promise<stri
 
 export function selfTools(o: SelfOptions): Tool[] {
   const memory = o.memory === true ? fileMemory(o.home, o.now, o.fs, o.log ?? consoleLog) : o.memory === false ? undefined : o.memory;
-  const loadSkill = schemaEffectTool({
+  const loadSkill = schemaTool({
     name: "load_skill",
     description: selfWords.loadSkillDescription,
     parameters: z.object({ name: z.string() }),
     run: async (p) => readSkill(await o.skills(), p.name, o.fs),
   });
-  const rememberTool = schemaEffectTool({
+  const rememberTool = schemaTool({
     name: "remember",
     description: selfWords.rememberDescription,
     parameters: z.object({ note: z.string() }),
@@ -57,7 +57,7 @@ export function selfTools(o: SelfOptions): Tool[] {
       return selfWords.remembered;
     },
   });
-  const rewrite = schemaEffectTool({
+  const rewrite = schemaTool({
     name: "rewrite_memory",
     description: selfWords.rewriteMemoryDescription,
     parameters: z.object({ content: z.string() }),
@@ -66,7 +66,7 @@ export function selfTools(o: SelfOptions): Tool[] {
       return selfWords.rewritten(await asTool(() => memory.rewrite(p.content)));
     },
   });
-  const search = schemaEffectTool({
+  const search = schemaTool({
     name: "search_archive",
     description: selfWords.searchArchiveDescription,
     parameters: z.object({ query: z.string() }),
@@ -79,7 +79,7 @@ export function selfTools(o: SelfOptions): Tool[] {
 export type Subagent = (brief: string, label: string, signal?: AbortSignal) => Promise<string>;
 
 export const subagentTool = (spawn: Subagent) =>
-  schemaEffectTool({
+  schemaTool({
     name: "spawn_agent",
     description: selfWords.spawnAgentDescription,
     parameters: z.object({ brief: z.string(), label: z.exactOptional(z.string()) }),

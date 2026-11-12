@@ -1,5 +1,3 @@
-import { String as Str } from "effect";
-
 import type { UserStatus } from "@vibevalley/protocol";
 
 /** Where a page opened from outside goes before the farm: nowhere once it holds a key; else signing in (and back to
@@ -11,7 +9,7 @@ export function entryFor({ status, at = "/" }: { readonly status: UserStatus | u
 }
 
 // "//host" and "/\host" are other sites to a browser.
-const onThisFarm = (path: string) => Str.startsWith("/")(path) && !Str.startsWith("//")(path) && !Str.startsWith("/\\")(path);
+const onThisFarm = (path: string) => path.startsWith("/") && !path.startsWith("//") && !path.startsWith("/\\");
 
 /** Where to go once signed in: the page it was sent away from, only ever a path on this farm. */
 export function afterSignIn(search: string): string {

@@ -52,27 +52,27 @@ export const textTool = (spec: TextToolSpec): Tool => ({
   },
 });
 
-interface EffectToolSpec extends Omit<TextToolSpec, "run"> {
+interface RunToolSpec extends Omit<TextToolSpec, "run"> {
   /** Throws a ToolFailed: its message is the failed result the model reads. The signal aborts when the run stops. */
   readonly run: (params: unknown, signal?: AbortSignal) => Promise<string>;
 }
 
-/** A tool whose work throws its ToolFailed itself (the name is the one the hosts know it by). */
-export const effectTool = (spec: EffectToolSpec): Tool => ({
+/** A tool whose work throws its ToolFailed itself. */
+export const runTool = (spec: RunToolSpec): Tool => ({
   name: spec.name,
   description: spec.description,
   parameters: spec.parameters,
   execute: async (params, _call, signal) => answered(await spec.run(params, signal)),
 });
 
-interface SchemaEffectToolSpec<S extends z.ZodObject> extends Omit<EffectToolSpec, "parameters" | "run"> {
+interface SchemaToolSpec<S extends z.ZodObject> extends Omit<RunToolSpec, "parameters" | "run"> {
   readonly parameters: S;
   readonly run: (params: z.output<S>, signal?: AbortSignal) => Promise<string>;
 }
 
 /** The arguments are read by the Schema first; ones it refuses are a failed result. */
-export function schemaEffectTool<S extends z.ZodObject>(spec: SchemaEffectToolSpec<S>): Tool {
-  return effectTool({
+export function schemaTool<S extends z.ZodObject>(spec: SchemaToolSpec<S>): Tool {
+  return runTool({
     ...spec,
     parameters: parametersOf(spec.parameters),
     run: (p, signal) => {

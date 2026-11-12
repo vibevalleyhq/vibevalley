@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -12,41 +11,6 @@ import { Button } from "#/ui/Button.tsx";
 import { Card } from "#/ui/layout.tsx";
 
 import { devicesQuery, userQuery } from "./signIns";
-
-const viewStyles = stylex.create({
-  row: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  text: {
-    display: "flex",
-    minWidth: "0",
-    flex: "1",
-    flexDirection: "column",
-  },
-  name: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    fontWeight: "var(--font-weight-medium)",
-  },
-  when: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  count: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-});
 
 /** When it came and when it was last seen, said by how it came: paired, or signed in. */
 const cameText = (d: UserDevice) => {
@@ -70,14 +34,14 @@ export function Devices() {
       <Card
         title={t("web.user.devices.title")}
         testid="devices"
-        action={<span {...stylex.attrs(viewStyles.count)}>{t("web.user.devices.count", { n: list().length })}</span>}
+        action={<span class="text-sm text-muted">{t("web.user.devices.count", { n: list().length })}</span>}
       >
         <For each={list()}>
           {(d) => (
-            <div data-key={d.id} data-came={d.came} {...stylex.attrs(viewStyles.row)}>
-              <span {...stylex.attrs(viewStyles.text)}>
-                <span {...stylex.attrs(viewStyles.name)}>{d.id === mine() ? t("web.user.devices.thisOne", { name: d.name }) : d.name}</span>
-                <span {...stylex.attrs(viewStyles.when)}>{cameText(d)}</span>
+            <div data-key={d.id} data-came={d.came} class="flex items-center gap-2">
+              <span class="flex min-w-0 flex-1 flex-col">
+                <span class="truncate text-sm font-medium">{d.id === mine() ? t("web.user.devices.thisOne", { name: d.name }) : d.name}</span>
+                <span class="truncate text-xs text-muted">{cameText(d)}</span>
               </span>
               <Button
                 tone="danger"

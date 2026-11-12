@@ -30,7 +30,7 @@ export interface Inbox {
   /** Pending external deliveries changed: a later connector rereads them. */
   readonly externalChanges: () => Subscription<void>;
   /** After the sessions and issues came back: the inbox as it stands is known, and the patrol starts its rounds. */
-  readonly start: () => Promise<void>;
+  readonly boot: () => Promise<void>;
   readonly close: () => Promise<void>;
 }
 
@@ -154,7 +154,7 @@ export async function makeInbox(deps: InboxDeps): Promise<Inbox> {
     handoffState,
     prime,
     externalChanges: () => externalHub.subscribe(),
-    start: async () => {
+    boot: async () => {
       await prime();
       const every = config.patrol.heartbeatMinutes * 60_000;
       if (every > 0)

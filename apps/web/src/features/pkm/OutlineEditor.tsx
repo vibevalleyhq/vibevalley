@@ -1,5 +1,4 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { createEffect, createSignal, For, onSettled, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -12,7 +11,6 @@ import { useLatest } from "#/state/atom.ts";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
 import { typeMarks } from "#/ui/markInput.ts";
-import { styleProps } from "#/ui/positioner.ts";
 
 import { Body } from "./Body";
 import { dayKey } from "./days";
@@ -35,301 +33,6 @@ import {
 } from "./editing";
 import type { DropAt } from "./selection";
 
-const outlineStyles = stylex.create({
-  row: {
-    position: "relative",
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "0.25rem",
-    borderRadius: "var(--radius-sm)",
-    paddingBlock: "1px",
-    transitionProperty: "color, background-color, border-color",
-    transitionTimingFunction: "var(--ease-out)",
-    transitionDuration: "280ms",
-  },
-  picked: {
-    backgroundColor: "var(--wb-selected)",
-  },
-  lit: {
-    backgroundColor: {
-      default: "var(--wb-wheat)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 20%, transparent)",
-    },
-  },
-  bullet: {
-    width: "0.375rem",
-    height: "0.375rem",
-    borderRadius: "9999px",
-    backgroundColor: "var(--wb-muted)",
-  },
-  foldedBullet: {
-    boxShadow: "0 0 0 3px var(--color-line)",
-  },
-  expandedBullet: {
-    display: {
-      default: null,
-      "@media (hover: hover)": {
-        default: null,
-        [stylex.when.ancestor(":hover")]: "none",
-      },
-    },
-  },
-  marker: {
-    marginTop: "0.25rem",
-    display: "flex",
-    width: "1rem",
-    height: "1rem",
-    flexShrink: "0",
-    cursor: "pointer",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-xs)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-  },
-  todo: {
-    borderColor: {
-      default: "var(--wb-muted)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--wb-ink)",
-      },
-    },
-    backgroundColor: "var(--wb-page)",
-  },
-  waiting: {
-    borderColor: "var(--wb-wheat)",
-    color: "var(--wb-warn-ink)",
-  },
-  doing: {
-    borderColor: "var(--wb-wheat)",
-    backgroundColor: {
-      default: "var(--wb-wheat)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--wb-wheat) 20%, transparent)",
-    },
-    color: "var(--wb-warn-ink)",
-  },
-  done: {
-    borderColor: "var(--wb-accent)",
-    backgroundColor: "var(--wb-accent)",
-    color: "var(--wb-page)",
-  },
-  canceled: {
-    borderColor: "var(--wb-line)",
-    color: "var(--wb-faint)",
-  },
-});
-
-const styles = stylex.create({
-  rowDiv: {
-    minHeight: "1.5rem",
-    cursor: "text",
-    borderRadius: "var(--radius-sm)",
-    paddingInline: "0.25rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "1.5rem",
-  },
-  rowDivPrimary: {
-    textDecorationLine: null,
-    WebkitTextDecorationColor: null,
-    textDecorationColor: null,
-  },
-  rowDivSecondary: {
-    textDecorationLine: "line-through",
-    WebkitTextDecorationColor: "var(--wb-faint)",
-    textDecorationColor: "var(--wb-faint)",
-  },
-  expandedChevron: {
-    position: "absolute",
-  },
-  dropLine: {
-    pointerEvents: "none",
-    position: "absolute",
-    right: "0",
-    height: "0.125rem",
-    borderRadius: "9999px",
-    backgroundColor: "var(--color-water)",
-  },
-  dropBefore: {
-    top: "-1px",
-  },
-  dropAfter: {
-    bottom: "-1px",
-  },
-  rowSpan: {
-    position: "absolute",
-    insetBlock: "0",
-    borderLeftStyle: "solid",
-    borderLeftWidth: "1px",
-    borderColor: "var(--color-line)",
-  },
-  pkmBullet: {
-    position: "relative",
-    marginTop: "0.25rem",
-    display: "flex",
-    width: "1rem",
-    height: "1rem",
-    flexShrink: "0",
-    cursor: {
-      default: "pointer",
-      ":disabled": "default",
-    },
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-xs)",
-    color: "var(--color-muted)",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  rowBody: {
-    minWidth: "0",
-    flex: "1",
-  },
-  rowDone: {
-    color: "var(--color-muted)",
-  },
-  rowSpan2: {
-    color: "var(--color-faint)",
-  },
-  pkmBubble: {
-    marginTop: "0.125rem",
-    display: "inline-flex",
-    height: "1.25rem",
-    flexShrink: "0",
-    alignItems: "center",
-    gap: "0.125rem",
-    borderRadius: "9999px",
-    backgroundColor: {
-      default: "var(--color-wheat)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-wheat) 20%, transparent)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-wheat)",
-        "@supports (color:color-mix(in lab, red, red))": {
-          default: null,
-          ":hover": "color-mix(in oklab, var(--color-wheat) 30%, transparent)",
-        },
-      },
-    },
-    paddingInline: "0.375rem",
-    fontSize: "var(--text-2xs)",
-    lineHeight: "var(--leading-2xs)",
-    color: "var(--color-warn-ink)",
-  },
-  editorDiv: {
-    position: "relative",
-  },
-  pkmEditor: {
-    display: "block",
-    minHeight: "1.5rem",
-    width: "100%",
-    resize: "none",
-    overflow: "hidden",
-    borderRadius: "var(--radius-sm)",
-    backgroundColor: "var(--color-hover)",
-    paddingInline: "0.25rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "1.5rem",
-    color: "var(--color-ink)",
-    outlineStyle: "none",
-  },
-  pkmComplete: {
-    position: "absolute",
-    top: "100%",
-    left: "0",
-    zIndex: "20",
-    marginTop: "0.25rem",
-    display: "flex",
-    maxHeight: "16rem",
-    width: "20rem",
-    maxWidth: "100%",
-    flexDirection: "column",
-    overflowY: "auto",
-    borderRadius: "var(--radius-lg)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-    padding: "0.25rem",
-    boxShadow: "var(--shadow-float)",
-  },
-  editorLi: {
-    display: "flex",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.5rem",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.25rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    backgroundColor: {
-      default: null,
-      ":is([aria-selected=true])": "var(--color-selected)",
-    },
-  },
-  editorSpan: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-  },
-  editorSpan2: {
-    flexShrink: "0",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  pkmToolbar: {
-    position: "sticky",
-    bottom: "0",
-    zIndex: "10",
-    marginTop: "0.5rem",
-    display: {
-      default: "flex",
-      "@media (width>=48rem)": "none",
-    },
-    justifyContent: "space-around",
-    borderTopStyle: "solid",
-    borderTopWidth: "1px",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-    paddingBlock: "0.25rem",
-  },
-  toolbarButton: {
-    display: "flex",
-    width: "2.25rem",
-    height: "2.25rem",
-    cursor: "pointer",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-md)",
-    color: {
-      default: "var(--color-muted)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-ink)",
-      },
-    },
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-});
-
 export interface Writing {
   readonly block: string;
   readonly caret: () => Caret;
@@ -341,14 +44,14 @@ export const newId = () => crypto.randomUUID();
 /** One level of the outline's indent, px. */
 export const indentPx = 20;
 
-const markerLook: Partial<Record<PkmMarker, { readonly checked: boolean | "mixed"; readonly icon?: IconName; readonly tone: stylex.StyleXStyles }>> = {
-  TODO: { checked: false, tone: outlineStyles.todo },
-  LATER: { checked: false, tone: outlineStyles.todo },
-  WAITING: { checked: false, icon: "wait", tone: outlineStyles.waiting },
-  DOING: { checked: "mixed", icon: "partly", tone: outlineStyles.doing },
-  NOW: { checked: "mixed", icon: "partly", tone: outlineStyles.doing },
-  DONE: { checked: true, icon: "ticked", tone: outlineStyles.done },
-  CANCELED: { checked: true, icon: "close", tone: outlineStyles.canceled },
+const markerLook: Partial<Record<PkmMarker, { readonly checked: boolean | "mixed"; readonly icon?: IconName; readonly tone: JSX.ClassValue }>> = {
+  TODO: { checked: false, tone: "border-muted hover:border-ink bg-page" },
+  LATER: { checked: false, tone: "border-muted hover:border-ink bg-page" },
+  WAITING: { checked: false, icon: "wait", tone: "border-wheat text-warn-ink" },
+  DOING: { checked: "mixed", icon: "partly", tone: "border-wheat bg-wheat/20 text-warn-ink" },
+  NOW: { checked: "mixed", icon: "partly", tone: "border-wheat bg-wheat/20 text-warn-ink" },
+  DONE: { checked: true, icon: "ticked", tone: "border-accent bg-accent text-page" },
+  CANCELED: { checked: true, icon: "close", tone: "border-line text-faint" },
 };
 
 export function Row(props: {
@@ -380,7 +83,11 @@ export function Row(props: {
       data-marker={props.block.marker}
       data-lit={props.lit ? "" : undefined}
       data-picked={props.picked ? "" : undefined}
-      {...styleProps([stylex.defaultMarker(), outlineStyles.row, props.picked ? outlineStyles.picked : props.lit ? outlineStyles.lit : undefined])}
+      class={[
+        "group",
+        "relative flex items-start gap-1 rounded-sm py-px transition-[color,background-color,border-color] ease-out duration-280",
+        props.picked ? "bg-selected" : props.lit ? "bg-wheat/20" : "",
+      ]}
       style={{ "padding-left": `${props.block.depth * indentPx}px` }}
       onDragOver={(e) => props.onDragOver(e, e.currentTarget.getBoundingClientRect())}
       onDrop={(e) => props.onDrop(e)}
@@ -391,13 +98,13 @@ export function Row(props: {
             aria-hidden="true"
             data-testid="pkm-drop"
             data-at={at()}
-            {...stylex.attrs(styles.dropLine, at() === "before" ? styles.dropBefore : styles.dropAfter)}
+            class={["pointer-events-none absolute right-0 h-0.5 rounded-full bg-water", at() === "before" ? "-top-px" : "-bottom-px"]}
             style={{ left: `${(props.block.depth + (at() === "inside" ? 2 : 1)) * indentPx}px` }}
           />
         )}
       </Show>
       <For each={Array.from({ length: props.block.depth }, (_, i) => i)}>
-        {(i) => <span aria-hidden="true" {...stylex.attrs(styles.rowSpan)} style={{ left: `${i * indentPx + 9}px` }} />}
+        {(i) => <span aria-hidden="true" class="absolute inset-y-0 border-l border-line" style={{ left: `${i * indentPx + 9}px` }} />}
       </For>
       <button
         type="button"
@@ -409,11 +116,11 @@ export function Row(props: {
         onDragStart={(e) => props.onDrag(e)}
         onDragEnd={() => props.onDragEnd()}
         onClick={() => props.onToggle()}
-        {...stylex.attrs(styles.pkmBullet)}
+        class="relative mt-1 flex w-4 h-4 shrink-0 cursor-pointer disabled:cursor-default items-center justify-center rounded-xs text-muted hover:bg-hover"
       >
-        <span {...styleProps([outlineStyles.bullet, props.parent && (props.folded ? outlineStyles.foldedBullet : outlineStyles.expandedBullet)])} />
+        <span class={["w-1.5 h-1.5 rounded-full bg-muted", props.parent && props.folded ? "[box-shadow:0_0_0_3px_var(--color-line)]" : "group-hover:hidden"]} />
         <Show when={props.parent && !props.folded}>
-          <Icon name="choose" size={12} styles={styles.expandedChevron} />
+          <Icon name="choose" size={12} class="absolute" />
         </Show>
       </button>
       <Show when={props.block.marker && markerLook[props.block.marker]}>
@@ -426,13 +133,13 @@ export function Row(props: {
             aria-label={t(`web.pkm.marker.${props.block.marker ?? "TODO"}`)}
             title={t(`web.pkm.marker.${props.block.marker ?? "TODO"}`)}
             onClick={() => props.onMarker(props.block.marker === "DONE" ? "TODO" : "DONE")}
-            {...styleProps([outlineStyles.marker, look().tone])}
+            class={["mt-1 flex w-4 h-4 shrink-0 cursor-pointer items-center justify-center rounded-xs border", look().tone]}
           >
             <Show when={look().icon}>{(icon) => <Icon name={icon()} size={10} />}</Show>
           </button>
         )}
       </Show>
-      <div {...stylex.attrs(styles.rowBody, done() && styles.rowDone)}>
+      <div class={["min-w-0 flex-1", done() && "text-muted"]}>
         <Show
           when={props.focus}
           fallback={
@@ -446,9 +153,9 @@ export function Row(props: {
               // A Shift+click picks blocks; it does not select the words between.
               onMouseDown={(e) => e.shiftKey && e.preventDefault()}
               onKeyDown={(e) => e.key === "Enter" && props.onOpen("end", false)}
-              {...stylex.attrs(styles.rowDiv, done() ? styles.rowDivSecondary : styles.rowDivPrimary)}
+              class={["min-h-6 cursor-text rounded-sm px-1 text-sm leading-lg", done() ? "line-through decoration-faint" : ""]}
             >
-              <Show when={props.block.body} fallback={<span {...stylex.attrs(styles.rowSpan2)}>{"\u00a0"}</span>}>
+              <Show when={props.block.body} fallback={<span class="text-faint">{"\u00a0"}</span>}>
                 <Body text={props.block.body} refs={props.refs} />
               </Show>
             </div>
@@ -462,7 +169,7 @@ export function Row(props: {
           href={`#comment-${props.block.id}`}
           data-testid="pkm-bubble"
           aria-label={t("web.pkm.comments.count", { n: props.comments })}
-          {...stylex.attrs(styles.pkmBubble)}
+          class="mt-0.5 inline-flex h-5 shrink-0 items-center gap-0.5 rounded-full bg-wheat/20 hover:bg-wheat/30 px-1.5 text-2xs text-warn-ink"
         >
           <Icon name="thread" size={10} />
           {props.comments}
@@ -664,7 +371,7 @@ export function Editor(props: {
     return () => props.onWriting(undefined);
   });
   return (
-    <div {...stylex.attrs(styles.editorDiv)}>
+    <div class="relative">
       <textarea
         ref={(t) => (el = t)}
         data-testid="pkm-editor"
@@ -709,10 +416,14 @@ export function Editor(props: {
           e.preventDefault();
           hand(a);
         }}
-        {...stylex.attrs(styles.pkmEditor)}
+        class="block min-h-6 w-full resize-none overflow-hidden rounded-sm bg-hover px-1 text-sm leading-lg text-ink outline-none"
       />
       <Show when={choices().length > 0}>
-        <ul role="listbox" data-testid="pkm-complete" {...stylex.attrs(styles.pkmComplete)}>
+        <ul
+          role="listbox"
+          data-testid="pkm-complete"
+          class="absolute top-full left-0 z-20 mt-1 flex max-h-64 w-80 max-w-full flex-col overflow-y-auto rounded-lg border border-line bg-page p-1 shadow-float"
+        >
           <For each={choices()} keyed={(c) => c.key}>
             {(c, i) => (
               <li
@@ -724,10 +435,10 @@ export function Editor(props: {
                   e.preventDefault();
                   c().pick();
                 }}
-                {...stylex.attrs(styles.editorLi)}
+                class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm aria-selected:bg-selected"
               >
-                <span {...stylex.attrs(styles.editorSpan)}>{c().label}</span>
-                <Show when={c().hint}>{(h) => <span {...stylex.attrs(styles.editorSpan2)}>{h()}</span>}</Show>
+                <span class="min-w-0 flex-1 truncate">{c().label}</span>
+                <Show when={c().hint}>{(h) => <span class="shrink-0 truncate text-xs text-muted">{h()}</span>}</Show>
               </li>
             )}
           </For>
@@ -749,7 +460,12 @@ export function Toolbar(props: { writing: Writing }) {
     { id: "link", icon: "link", label: t("web.pkm.toolbar.link"), run: () => props.writing.insert("[[]]", 2) },
   ];
   return (
-    <div role="toolbar" aria-label={t("web.pkm.toolbar.label")} data-testid="pkm-toolbar" {...stylex.attrs(styles.pkmToolbar)}>
+    <div
+      role="toolbar"
+      aria-label={t("web.pkm.toolbar.label")}
+      data-testid="pkm-toolbar"
+      class="sticky bottom-0 z-10 mt-2 flex md:hidden justify-around border-t border-line bg-page py-1"
+    >
       <For each={tools}>
         {(tool) => (
           <button
@@ -759,7 +475,7 @@ export function Toolbar(props: { writing: Writing }) {
             // The box keeps the focus, so the keyboard stays up.
             onPointerDown={(e) => e.preventDefault()}
             onClick={() => tool.run()}
-            {...stylex.attrs(styles.toolbarButton)}
+            class="flex w-9 h-9 cursor-pointer items-center justify-center rounded-md text-muted hover:text-ink hover:bg-hover"
           >
             <Icon name={tool.icon} size={16} />
           </button>

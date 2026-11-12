@@ -1,14 +1,17 @@
 import { type Runtime } from "@botiverse/oar";
 import type { ScriptedTurn } from "@botiverse/oar/testing";
 
+import type { ModelClient } from "@vibevalley/ai/client";
 import type * as T from "@vibevalley/protocol";
 
 import type { ServerConfig } from "#/infra/config.ts";
 import type { Game } from "#/modules/game/game.ts";
+import { makeOrchestrator } from "#/modules/orchestrator/orchestrator.ts";
 import { type Hired } from "#/modules/session/session.ts";
-import { agentSessionsStart, channelStart, gamification, inboxStart, mailboxReady, mediaStart } from "#/services.ts";
+import { agentSessionsBoot, channelBoot, gamification, inboxBoot, mailboxBoot, mediaBoot } from "#/services.ts";
 import { gitIn } from "#/testing/git.ts";
 import { starter, testConfig, until as untilHeld, waitFor } from "#/testing/layers.ts";
+import { network } from "#/testing/network.ts";
 import { helper } from "#/testing/worker.ts";
 import { type World, world, type WorldOptions } from "#/testing/world.ts";
 
@@ -23,11 +26,11 @@ export async function flowWorld(options: WorldOptions): Promise<FlowWorld> {
   const below = await world(options);
   try {
     const built = await gamification(below);
-    await agentSessionsStart(built);
-    await channelStart(built);
-    await mailboxReady(built);
-    await mediaStart(built);
-    await inboxStart(built);
+    await agentSessionsBoot(built);
+    await channelBoot(built);
+    await mailboxBoot(built);
+    await mediaBoot(built);
+    await inboxBoot(built);
     return built;
   } catch (e) {
     await below.close();
@@ -95,3 +98,28 @@ export const await_ = <A>(get: () => A | Promise<A>, ok: (a: A) => boolean, what
 export const mustHire = (h: Hired): T.Session => h.session;
 
 export const git = gitIn;
+
+/** What p was refused with: the test fails if it went through. */
+export async function failure(p: Promise<unknown>): Promise<Error & { readonly bizCode?: unknown; readonly reason?: unknown }> {
+  const settled = await p.then(
+    () => undefined,
+    (e: unknown) => ({ e }),
+  );
+  if (settled === undefined) throw new Error("expected a refusal, and it went through");
+  if (!(settled.e instanceof Error)) throw new Error(`refused with something not an Error: ${String(settled.e)}`, { cause: settled.e });
+  return settled.e;
+}
+
+/** The farm up to its tools on the offline vendors (testing/network.ts), and the orchestrator answering with llm; no
+ * startup. */
+export async function mediaFarm(llm: ModelClient) {
+  const w = await world({ config: testConfig({ patrol: { heartbeatMinutes: 0 } }), network: network() });
+  try {
+    const orchestrator = await makeOrchestrator(w, { llm: () => llm });
+    w.closes.push(() => orchestrator.close());
+    return Object.assign(w, { orchestrator });
+  } catch (e) {
+    await w.close();
+    throw e;
+  }
+}

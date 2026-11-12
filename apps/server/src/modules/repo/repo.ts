@@ -156,7 +156,7 @@ export interface Repo {
   readonly resolveReviewThread: (name: string, thread: string) => Promise<void>;
   readonly finishPullRequest: (name: string, n: number) => Promise<Merged>;
   /** As the server starts: a first look at GitHub, in the background; the page asks again with github.refresh. */
-  readonly start: () => Promise<void>;
+  readonly boot: () => Promise<void>;
   readonly close: () => Promise<void>;
 }
 
@@ -767,7 +767,7 @@ export async function makeRepo(deps: RepoDeps, hooks: RepoHooks = {}): Promise<R
       }
     },
     ...githubMethods,
-    start: () => {
+    boot: () => {
       tasks.run("refreshGitHub", () => github.refreshGitHub());
       return Promise.resolve();
     },

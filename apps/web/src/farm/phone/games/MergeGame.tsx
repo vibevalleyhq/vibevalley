@@ -1,13 +1,11 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { phoneAnimations } from "#/farm/interaction.stylex.ts";
 import { lcd } from "#/farm/phone/lcd.ts";
 import { kept, usePad } from "#/farm/phone/pad.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
-import { styleProps } from "#/ui/positioner.ts";
 
 import { type Merge, type MergeDirection, mergeGoal, mergeSize, mergeStageName, mergeStages, mergeTop, newMerge, slideMerge, undoMerge } from "./merge";
 
@@ -16,91 +14,9 @@ const gap = 4;
 const swipeAt = 16;
 const side = mergeSize * tile + (mergeSize + 1) * gap;
 
-const styles = stylex.create({
-  overlay: {
-    position: "absolute",
-    inset: "0",
-    display: "grid",
-    placeItems: "center",
-    backgroundColor: {
-      default: "var(--color-lcd-panel)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-lcd-paper) 80%, transparent)",
-    },
-    textAlign: "center",
-  },
-  root: {
-    display: "flex",
-    minHeight: "0",
-    flex: "1",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "0.375rem",
-    paddingInline: "0.5rem",
-    paddingTop: "0.5rem",
-  },
-  headerRow: {
-    display: "flex",
-    width: "100%",
-    paddingInline: "0.25rem",
-  },
-  bestScore: {
-    marginLeft: "auto",
-    fontVariantNumeric: "tabular-nums",
-  },
-  scoreValue: {
-    fontVariantNumeric: "tabular-nums",
-  },
-  reachedLabel: {
-    marginLeft: "auto",
-  },
-  board: (side: number, columns: string) => ({
-    position: "relative",
-    display: "grid",
-    width: side,
-    height: side,
-    flexShrink: "0",
-    touchAction: "none",
-    gridTemplateColumns: columns,
-    gap,
-    backgroundColor: "var(--color-lcd-dark)",
-    padding: gap,
-  }),
-  cell: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cellFilled: {
-    backgroundColor: "var(--color-lcd-paper)",
-  },
-  cellEmpty: {
-    backgroundColor: "var(--color-lcd-light)",
-  },
-  cellGrown: {
-    boxShadow: "inset 0 0 0 2px var(--color-lcd-ink)",
-  },
-  cellLabel: {
-    lineHeight: "14px",
-  },
-  stagesRow: {
-    display: "flex",
-    gap: "0.125rem",
-  },
-  cropFaint: {
-    opacity: 0.25,
-  },
-  cropReady: {
-    opacity: 1,
-  },
-  help: {
-    marginTop: "auto",
-    marginBottom: "0.25rem",
-    textAlign: "center",
-    lineHeight: "1.625",
-    color: "var(--color-lcd-dark)",
-  },
-});
+const styles = {
+  board: (side: number, columns: string): JSX.CSSProperties => ({ width: `${side}px`, height: `${side}px`, "grid-template-columns": columns }),
+};
 
 const game = kept<Merge | undefined>(undefined);
 const best = kept(0);
@@ -277,7 +193,7 @@ function Crop(props: { stage: number; size: number; faint?: boolean }) {
       viewBox="0 0 12 12"
       shape-rendering="crispEdges"
       aria-hidden="true"
-      {...stylex.attrs(props.faint === true ? styles.cropFaint : styles.cropReady)}
+      class={props.faint === true ? "opacity-25" : "opacity-100"}
     >
       <For each={cells()}>{(c) => <rect x={c.x} y={c.y} width={1} height={1} fill={c.fill} />}</For>
     </svg>
@@ -372,18 +288,18 @@ export function MergeGame() {
             : undefined;
   };
   return (
-    <div {...stylex.attrs(styles.root)}>
-      <div {...stylex.attrs(styles.headerRow)}>
+    <div class="flex min-h-0 flex-1 flex-col items-center gap-1.5 px-2 pt-2">
+      <div class="flex w-full px-1">
         <span>{t("web.farm.phone.game.merge")}</span>
-        <span {...stylex.attrs(styles.bestScore)}>
+        <span class="ml-auto tabular-nums">
           {t("web.farm.phone.blocks.best")} {Math.max(top(), score())}
         </span>
       </div>
-      <div {...stylex.attrs(styles.headerRow)}>
-        <span {...stylex.attrs(styles.scoreValue)}>
+      <div class="flex w-full px-1">
+        <span class="tabular-nums">
           {t("web.farm.phone.blocks.score")} {score()}
         </span>
-        <span {...stylex.attrs(styles.reachedLabel)}>{reached() !== 0 ? t("web.farm.phone.merge.reached", { stage: mergeStageName(reached()) }) : ""}</span>
+        <span class="ml-auto">{reached() !== 0 ? t("web.farm.phone.merge.reached", { stage: mergeStageName(reached()) }) : ""}</span>
       </div>
       <div
         role="img"
@@ -394,34 +310,43 @@ export function MergeGame() {
             ? t("web.farm.phone.merge.field", { n: board().filter((c) => c !== 0).length, top: mergeStageName(Math.max(reached(), 1)) })
             : t("web.farm.phone.game.merge")
         }
-        {...stylex.attrs(styles.board(side, `repeat(${mergeSize}, ${tile}px)`))}
+        class="relative grid shrink-0 touch-none gap-1 bg-lcd-dark p-1"
+        style={styles.board(side, `repeat(${mergeSize}, ${tile}px)`)}
         onPointerDown={(e) => (touch = { x: e.clientX, y: e.clientY })}
         onPointerUp={(e) => swiped(e.clientX, e.clientY)}
         onPointerCancel={() => (touch = undefined)}
       >
         <For each={board()} keyed={false}>
           {(stage, i) => (
-            <div {...stylex.attrs(styles.cell, stage() !== 0 ? styles.cellFilled : styles.cellEmpty, g()?.grown.includes(i) === true && styles.cellGrown)}>
+            <div
+              class={[
+                "flex flex-col items-center justify-center",
+                stage() !== 0 ? "bg-lcd-paper" : "bg-lcd-light",
+                g()?.grown.includes(i) === true && "[box-shadow:inset_0_0_0_2px_var(--color-lcd-ink)]",
+              ]}
+            >
               <Show when={stage() > 0}>
                 <Crop stage={stage()} size={36} />
-                <span {...stylex.attrs(styles.cellLabel)}>{mergeStageName(stage())}</span>
+                <span class="leading-2xs">{mergeStageName(stage())}</span>
               </Show>
             </div>
           )}
         </For>
         <Show when={overlay()}>
           {(o) => (
-            <div {...stylex.attrs(styles.overlay)}>
+            <div class="absolute inset-0 grid place-items-center bg-lcd-paper/80 text-center">
               <span>
                 {o()[0]}
                 <br />
-                <span {...styleProps(phoneAnimations.blink)}>{o()[1]}</span>
+                <span class="[animation-name:blink] motion-reduce:[animation-name:none] [animation-duration:1000ms] [animation-iteration-count:infinite]">
+                  {o()[1]}
+                </span>
               </span>
             </div>
           )}
         </Show>
       </div>
-      <div {...stylex.attrs(styles.stagesRow)} aria-label={t("web.farm.phone.merge.stages")}>
+      <div class="flex gap-0.5" aria-label={t("web.farm.phone.merge.stages")}>
         <For each={mergeStages}>
           {(name, i) => (
             <span title={name}>
@@ -430,7 +355,7 @@ export function MergeGame() {
           )}
         </For>
       </div>
-      <p {...stylex.attrs(styles.help)}>
+      <p class="mt-auto mb-1 text-center leading-relaxed text-lcd-dark">
         {t("web.farm.phone.merge.help")}
         <br />
         {t("web.farm.phone.merge.help2")}

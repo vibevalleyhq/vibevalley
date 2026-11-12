@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Match, Show, snapshot, Switch as Pick, untrack } from "solid-js";
 
 import { t, currentLocale } from "@vibevalley/i18n";
@@ -30,110 +29,6 @@ import { Hint, Tip } from "#/ui/Tip.tsx";
 import { toast } from "#/ui/toasts.ts";
 
 import { DeepseekForm } from "./DeepseekForm";
-
-const styles = stylex.create({
-  sourceMarkSpan: {
-    display: "block",
-    width: "0.5rem",
-    height: "0.5rem",
-    borderRadius: "9999px",
-  },
-  sourceMarkSpanState: {
-    backgroundColor: "var(--wb-faint)",
-    borderStyle: null,
-    borderWidth: null,
-    borderColor: null,
-  },
-  sourceMarkSpanState2: {
-    backgroundColor: "var(--wb-leaf)",
-    borderStyle: null,
-    borderWidth: null,
-    borderColor: null,
-  },
-  sourceMarkSpanState3: {
-    backgroundColor: null,
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--wb-faint)",
-  },
-  sourceFieldTextInput: {
-    fontFamily: "var(--font-mono)",
-  },
-  memoryFormForm: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "1rem",
-  },
-  memoryFormP: {
-    color: "var(--color-berry)",
-  },
-  sourceMark: {
-    display: "inline-flex",
-    padding: "0.25rem",
-    outlineStyle: {
-      default: "none",
-      ":focus-visible": "none",
-    },
-    outlineWidth: {
-      default: null,
-      ":focus-visible": "2px",
-    },
-    outlineColor: {
-      default: null,
-      ":focus-visible": "var(--color-focus)",
-    },
-  },
-  sourceFieldDiv: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    paddingInline: "1rem",
-    paddingBlock: "0.75rem",
-  },
-  sourceFieldSpan: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    fontWeight: "var(--font-weight-medium)",
-  },
-  sourceFieldSpan2: {
-    flex: "1",
-  },
-  sourceFieldDiv2: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
-    borderTopStyle: "solid",
-    borderTopWidth: "1px",
-    borderColor: "var(--color-line)",
-    paddingInline: "1rem",
-    paddingBlock: "0.75rem",
-  },
-  sourceFieldDiv3: {
-    display: "flex",
-    flexWrap: "wrap",
-    columnGap: "1.5rem",
-    rowGap: "0.625rem",
-  },
-  gitHubDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.5rem",
-  },
-  gitHubSpan: {
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  gitHubSpan2: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  gitHubP: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-berry)",
-  },
-});
 
 type SettingsPart = "deepseek" | "memory";
 
@@ -249,7 +144,7 @@ function MemoryForm(props: { status: SettingsStatus }) {
 
   return (
     <form
-      {...stylex.attrs(styles.memoryFormForm)}
+      class="flex flex-col gap-4"
       onSubmit={(e) => {
         e.preventDefault();
         if (!busy() && dirty()) void submit();
@@ -266,7 +161,7 @@ function MemoryForm(props: { status: SettingsStatus }) {
           busy={busy()}
           onSave={() => void submit()}
           onUndo={undo}
-          left={<Show when={error()}>{(e) => <p {...stylex.attrs(styles.memoryFormP)}>{e()}</p>}</Show>}
+          left={<Show when={error()}>{(e) => <p class="text-berry">{e()}</p>}</Show>}
         />
       </Show>
     </form>
@@ -289,14 +184,9 @@ function SourceMark(props: { draft: SourceDraft }) {
         data-state={!props.draft.saved ? "unset" : props.draft.saved.enabled ? "on" : "off"}
         aria-label={text()}
         tabindex={0}
-        {...stylex.attrs(styles.sourceMark)}
+        class="inline-flex p-1 outline-none focus-visible:outline-none focus-visible:outline-2 focus-visible:outline-focus"
       >
-        <span
-          {...stylex.attrs(
-            styles.sourceMarkSpan,
-            !props.draft.saved ? styles.sourceMarkSpanState3 : props.draft.saved.enabled ? styles.sourceMarkSpanState2 : styles.sourceMarkSpanState,
-          )}
-        />
+        <span class={["block w-2 h-2 rounded-full", !props.draft.saved ? "border border-faint" : props.draft.saved.enabled ? "bg-leaf" : "bg-faint"]} />
       </span>
     </Tip>
   );
@@ -306,10 +196,10 @@ function SourceField(props: { draft: SourceDraft; set: (change: Partial<SourceDr
   const label = () => sourceLabels[props.draft.kind];
   return (
     <div data-testid="source" data-key={props.draft.kind}>
-      <div {...stylex.attrs(styles.sourceFieldDiv)}>
-        <span {...stylex.attrs(styles.sourceFieldSpan)}>{label()}</span>
+      <div class="flex items-center gap-2 px-4 py-3">
+        <span class="text-sm font-medium">{label()}</span>
         <SourceMark draft={props.draft} />
-        <span {...stylex.attrs(styles.sourceFieldSpan2)} />
+        <span class="flex-1" />
         <Toggle
           label={t("web.setting.source.enabled")}
           ariaLabel={t("web.setting.source.enable", { label: label() })}
@@ -326,11 +216,11 @@ function SourceField(props: { draft: SourceDraft; set: (change: Partial<SourceDr
         />
       </div>
       <Show when={props.draft.open}>
-        <div {...stylex.attrs(styles.sourceFieldDiv2)}>
+        <div class="flex flex-col gap-3 border-t border-line px-4 py-3">
           <TextInput
             data-testid="source-address"
             aria-label={t("web.setting.source.address", { label: label() })}
-            styles={styles.sourceFieldTextInput}
+            class="font-mono"
             placeholder={sourceAddress[props.draft.kind]}
             value={props.draft.url}
             onInput={(e) => props.set({ url: e.currentTarget.value })}
@@ -357,7 +247,7 @@ function SourceField(props: { draft: SourceDraft; set: (change: Partial<SourceDr
               onInput={(e) => props.set({ user: e.currentTarget.value })}
             />
           </Show>
-          <div {...stylex.attrs(styles.sourceFieldDiv3)}>
+          <div class="flex flex-wrap gap-x-6 gap-y-2.5">
             <Toggle
               label={t("web.setting.source.read")}
               tip={t("web.setting.source.readHint")}
@@ -400,26 +290,26 @@ export function GitHub() {
     return act.run(async () => setRefreshed(await api.github.refresh()));
   };
   return (
-    <div {...stylex.attrs(styles.gitHubDiv)}>
+    <div class="flex flex-col gap-2">
       <Pick fallback={<Quiet>{status.error() ? t("web.base.form.unreachable", { why: reasonOf(status.error()) }) : t("web.base.form.asking")}</Quiet>}>
         <Match when={now()}>
           {(s) => (
             <SettingsGroup>
               <SettingRow label={t("web.setting.github.cli")} hint={t("web.setting.github.cliHint")} tip={s().reason}>
                 <Icon name={s().installed ? "check" : "cross"} size={16} />
-                <span {...stylex.attrs(styles.gitHubSpan)}>{s().installed ? s().version : t("web.setting.github.noGh")}</span>
+                <span class="font-mono text-sm">{s().installed ? s().version : t("web.setting.github.noGh")}</span>
                 <IconButton icon="refresh" testid="github-recheck" label={t("web.setting.github.recheck")} disabled={busy()} onClick={() => void recheck()} />
               </SettingRow>
               <SettingRow label={t("web.setting.github.login")} hint={t("web.setting.github.loginHint")}>
                 <Icon name={s().loggedIn ? "check" : "warn"} size={16} />
-                <span {...stylex.attrs(styles.gitHubSpan2)}>{s().loggedIn ? s().account : t("web.setting.github.notLoggedIn")}</span>
+                <span class="text-sm">{s().loggedIn ? s().account : t("web.setting.github.notLoggedIn")}</span>
               </SettingRow>
             </SettingsGroup>
           )}
         </Match>
       </Pick>
       <Show when={error()}>
-        <p {...stylex.attrs(styles.gitHubP)}>{error()}</p>
+        <p class="text-sm text-berry">{error()}</p>
       </Show>
     </div>
   );

@@ -397,7 +397,7 @@ test("regression: restart cancels unsent work, preserves uncertain work and resu
       });
     });
   }
-  await media.start();
+  await media.boot();
   expect(await media.get("restart-queued")).toMatchObject({ phase: "canceled", cleanup: "done" });
   expect(await failure(pinned.blob(input.id, "restart-queued"))).toMatchObject({ bizCode: BizCode.MediaRefused });
   expect(await media.get("restart-uploading")).toMatchObject({ phase: "unknown", cleanup: "pending" });
@@ -453,7 +453,7 @@ test.each(["cancel", "restart", "expire", "account"] as const)("unused approval 
       await media.cancel(request.id);
       break;
     case "restart":
-      await media.start();
+      await media.boot();
       break;
     case "expire":
       await f.adjust(minutes(15));

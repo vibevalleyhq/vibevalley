@@ -1,4 +1,4 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
 
 import { stories, story } from "@vibevalley/stories";
 
@@ -8,10 +8,9 @@ import { Tabs, type TabsLook } from "./Tabs";
 
 type Tab = "chat" | "issues" | "crons" | "files";
 
-const styles = stylex.create({
-  line: { borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-line)", paddingInline: "0.75rem" },
-  width: (width: number) => ({ width }),
-});
+const styles = {
+  width: (width: number): JSX.CSSProperties => ({ "--width": `${width}px` }),
+};
 
 function LinkedTabs() {
   const router = useRouter();
@@ -39,7 +38,9 @@ export default stories({
       args: { wide: false },
       render: (a, set) => (
         <>
-          <Tabs label="群聊里" value="chat" styles={styles.width(a.wide ? 280 : 200)} items={[{ value: "chat", label: "聊天" }]} />
+          <div class="contents" style={styles.width(a.wide ? 280 : 200)}>
+            <Tabs label="群聊里" value="chat" class="w-(--width)" items={[{ value: "chat", label: "聊天" }]} />
+          </div>
           <button type="button" data-testid="tabs-resize" onClick={() => set({ wide: !a.wide })}>
             宽度
           </button>
@@ -71,7 +72,7 @@ export default stories({
           look={a.look as TabsLook}
           value={a.value as Tab}
           onChange={(value) => set({ value })}
-          styles={a.look === "line" && styles.line}
+          class={a.look === "line" && "border-b border-line px-3"}
           items={[
             { value: "chat", label: "聊天", icon: a.icons ? "chat" : undefined },
             { value: "issues", label: "活", icon: a.icons ? "issues" : undefined },

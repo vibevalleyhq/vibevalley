@@ -1,5 +1,4 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -16,328 +15,6 @@ import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Select, TextArea, TextInput } from "#/ui/Field.tsx";
 import { Quiet } from "#/ui/layout.tsx";
-import { styleProps } from "#/ui/positioner.ts";
-
-const memoryStyles = stylex.create({
-  card: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "0.5rem",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
-    paddingInline: "0.75rem",
-    paddingBlock: "0.5rem",
-  },
-  forget: {
-    flexShrink: "0",
-    cursor: "pointer",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.125rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: {
-      default: "var(--wb-muted)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--wb-berry)",
-      },
-    },
-    opacity: {
-      default: "0",
-      ":focus-visible": "1",
-      "@media (hover: hover)": {
-        default: null,
-        [stylex.when.ancestor(":hover")]: 1,
-      },
-    },
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--wb-hover)",
-      },
-    },
-  },
-});
-
-const styles = stylex.create({
-  archivePanelPre: {
-    maxHeight: "24rem",
-    overflowY: "auto",
-    borderTopStyle: "solid",
-    borderTopWidth: "1px",
-    borderColor: "var(--wb-line)",
-    paddingInline: "0.75rem",
-    paddingBlock: "0.5rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    whiteSpace: "pre-wrap",
-    WebkitUserSelect: "text",
-    userSelect: "text",
-  },
-  memoryPanelDiv: {
-    display: "flex",
-    overflow: "hidden",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-  },
-  sourcesDiv: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    columnGap: "0.5rem",
-    rowGap: "0.125rem",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-    paddingInline: "0.75rem",
-    paddingBlock: "0.5rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  recallPreviewP: {
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-    paddingInline: "0.75rem",
-    paddingBlock: "0.5rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    whiteSpace: "pre-wrap",
-  },
-  archivePanelDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.125rem",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-    paddingInline: "0.75rem",
-    paddingBlock: "0.5rem",
-  },
-  archivePanelDiv2: {
-    overflow: "hidden",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-  },
-  writeNoteTextInput: {
-    fontFamily: "var(--font-mono)",
-  },
-  pillButton: {
-    height: "1.5rem",
-    cursor: "pointer",
-    borderRadius: "9999px",
-    paddingInline: "0.625rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-  },
-  pillButtonTone: {
-    backgroundColor: "var(--color-ink)",
-    color: "var(--color-page)",
-  },
-  pillButtonAlt: {
-    backgroundColor: {
-      default: "var(--color-hover)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-selected)",
-      },
-    },
-  },
-  sourcesSpan: {},
-  sourcesSpanTone: {
-    color: "var(--color-accent)",
-  },
-  sourcesSpanAlt: {
-    color: "var(--color-berry)",
-  },
-  memoryItemSpan: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  memoryItemSpanTone: {
-    color: "var(--color-muted)",
-  },
-  sectionSection: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.5rem",
-  },
-  sectionHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  sectionH3: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  sectionSpan: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  sectionSpan2: {
-    flex: "1",
-  },
-  memoryPanelDiv2: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "1rem",
-  },
-  memoryPanelP: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  memoryPanelSpan: {
-    width: "3px",
-    flexShrink: "0",
-    backgroundColor: "var(--color-leaf)",
-  },
-  memoryPanelDiv22: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.125rem",
-    paddingInline: "0.75rem",
-    paddingBlock: "0.5rem",
-  },
-  memoryPanelSpan2: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.5rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  memoryPanelSpan3: {
-    fontWeight: "var(--font-weight-medium)",
-    color: "var(--color-ink)",
-  },
-  memoryPanelSpan4: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  memoryPanelDiv3: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.25rem",
-  },
-  sourcesSpan2: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    fontWeight: "var(--font-weight-medium)",
-    color: "var(--color-ink)",
-  },
-  recallPreviewDiv: {
-    display: "flex",
-    flexDirection: {
-      default: "column",
-      "@media (width>=40rem)": "row",
-    },
-    gap: "0.375rem",
-  },
-  archivePanelForm: {
-    display: "flex",
-    gap: "0.5rem",
-  },
-  archivePanelSpan: {
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  archivePanelButton: {
-    display: "flex",
-    width: "100%",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.5rem",
-    paddingInline: "0.75rem",
-    paddingBlock: "0.5rem",
-    textAlign: "left",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  archivePanelSpan2: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  writeNoteDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.25rem",
-  },
-  writeNoteSpan: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontWeight: "var(--font-weight-medium)",
-    color: "var(--color-muted)",
-  },
-  writeNoteDiv2: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    paddingTop: "0.25rem",
-  },
-  writeNoteSpan2: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-faint)",
-  },
-  writeNoteSpan3: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-berry)",
-  },
-  memoryItemDiv: {
-    display: "flex",
-    minWidth: "0",
-    flex: "1",
-    flexDirection: "column",
-    gap: "0.125rem",
-  },
-  memoryItemSpan2: {
-    display: "flex",
-    flexWrap: "wrap",
-    columnGap: "0.5rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  memoryItemSpan22: {
-    color: "var(--color-warn-ink)",
-  },
-});
 
 /** Notes not tied to a repo. */
 const everywhere = "*";
@@ -377,15 +54,15 @@ function createForget(agent: () => string) {
 /** A titled part of a panel, its count beside the title. */
 function Section(props: { title: string; count?: number; aside?: JSX.Element; testid?: string; children: JSX.Element }) {
   return (
-    <section aria-label={props.title} data-testid={props.testid} data-count={props.count} {...stylex.attrs(styles.sectionSection)}>
-      <header {...stylex.attrs(styles.sectionHeader)}>
-        <h3 {...stylex.attrs(styles.sectionH3)}>{props.title}</h3>
+    <section aria-label={props.title} data-testid={props.testid} data-count={props.count} class="flex flex-col gap-2">
+      <header class="flex items-center gap-2">
+        <h3 class="text-sm font-semibold">{props.title}</h3>
         <Show when={props.count !== undefined}>
-          <span {...stylex.attrs(styles.sectionSpan)}>{props.count}</span>
+          <span class="text-xs text-muted">{props.count}</span>
         </Show>
-        <span {...stylex.attrs(styles.sectionSpan2)} />
+        <span class="flex-1" />
         <Show when={props.aside}>
-          <span {...stylex.attrs(styles.sectionSpan)}>{props.aside}</span>
+          <span class="text-xs text-muted">{props.aside}</span>
         </Show>
       </header>
       {props.children}
@@ -406,7 +83,7 @@ function Pill(props: { label: string; on: boolean; onClick: () => void }) {
       type="button"
       aria-pressed={aria(props.on)}
       onClick={() => props.onClick()}
-      {...stylex.attrs(styles.pillButton, props.on ? styles.pillButtonTone : styles.pillButtonAlt)}
+      class={["h-6 cursor-pointer rounded-full px-2.5 text-xs", props.on ? "bg-ink text-page" : "bg-hover hover:bg-selected"]}
     >
       {props.label}
     </button>
@@ -437,8 +114,8 @@ export function MemoryPanel(props: { agent: string }) {
           ? t("web.memory.memory.orchestrators")
           : t("web.memory.memory.own");
   return (
-    <div {...stylex.attrs(styles.memoryPanelDiv2)}>
-      <p {...stylex.attrs(styles.memoryPanelP)}>{t("web.memory.memory.intro")}</p>
+    <div class="flex flex-col gap-4">
+      <p class="text-sm text-muted">{t("web.memory.memory.intro")}</p>
       <Show when={sources().size > 1}>
         <Sources sources={[...sources().values()]} />
       </Show>
@@ -446,15 +123,15 @@ export function MemoryPanel(props: { agent: string }) {
         <Show when={done().length > 0} fallback={<Quiet>{t("web.memory.memory.noIssues")}</Quiet>}>
           <For each={done()} keyed={(m) => m.id}>
             {(m) => (
-              <div {...stylex.attrs(styles.memoryPanelDiv)}>
-                <span {...stylex.attrs(styles.memoryPanelSpan)} />
-                <div {...stylex.attrs(styles.memoryPanelDiv22)}>
-                  <span {...stylex.attrs(styles.memoryPanelSpan2)}>
-                    <span {...stylex.attrs(styles.memoryPanelSpan3)}>{sessionNameOf(m().session)}</span>
+              <div class="flex overflow-hidden rounded-md border border-line bg-page">
+                <span class="w-0.75 shrink-0 bg-leaf" />
+                <div class="flex flex-col gap-0.5 px-3 py-2">
+                  <span class="flex flex-wrap gap-2 text-xs text-muted">
+                    <span class="font-medium text-ink">{sessionNameOf(m().session)}</span>
                     <span>{m().repo ?? t("web.memory.memory.allRepos")}</span>
                     <span>{ago(m().at, now())}</span>
                   </span>
-                  <span {...stylex.attrs(styles.memoryPanelSpan4)}>{m().text}</span>
+                  <span class="text-sm">{m().text}</span>
                 </div>
               </div>
             )}
@@ -465,7 +142,7 @@ export function MemoryPanel(props: { agent: string }) {
       <WriteNote agent={props.agent} withRepo />
       <Section title={t("web.memory.memory.notes")} count={notes().length}>
         <Show when={repos().length > 0}>
-          <div {...stylex.attrs(styles.memoryPanelDiv3)}>
+          <div class="flex flex-wrap gap-1">
             <For
               each={[["", t("web.memory.memory.all")] as const, [everywhere, t("web.memory.memory.allRepos")] as const, ...repos().map((p) => [p, p] as const)]}
             >
@@ -524,11 +201,9 @@ function Sources(props: { sources: MemorySourceInfo[] }) {
     <Section title={t("web.memory.memory.sources")} count={props.sources.filter((s) => s.on).length}>
       <For each={props.sources}>
         {(s) => (
-          <div {...stylex.attrs(styles.sourcesDiv)}>
-            <span {...stylex.attrs(styles.sourcesSpan2)}>{s.label}</span>
-            <span {...stylex.attrs(styles.sourcesSpan, s.on ? styles.sourcesSpanTone : styles.sourcesSpanAlt)}>
-              {s.on ? t("web.memory.memory.on") : t("web.memory.memory.off", { why: s.off })}
-            </span>
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md border border-line bg-page px-3 py-2 text-xs text-muted">
+            <span class="text-sm font-medium text-ink">{s.label}</span>
+            <span class={["", s.on ? "text-accent" : "text-berry"]}>{s.on ? t("web.memory.memory.on") : t("web.memory.memory.off", { why: s.off })}</span>
             <Show when={s.on}>
               <span>{s.canList ? t("web.memory.memory.listed") : t("web.memory.memory.unlisted")}</span>
               <span>{s.canForget ? t("web.memory.memory.forgettable") : t("web.memory.memory.forgetElsewhere")}</span>
@@ -539,12 +214,10 @@ function Sources(props: { sources: MemorySourceInfo[] }) {
           </div>
         )}
       </For>
-      <p {...stylex.attrs(styles.sectionSpan)}>{t("web.memory.memory.sourcesNote")}</p>
+      <p class="text-xs text-muted">{t("web.memory.memory.sourcesNote")}</p>
     </Section>
   );
 }
-
-const selectStyles = stylex.create({ scope: { width: { default: null, "@media (width >= 40rem)": "10rem" } } });
 
 /** The pick the server would make, without counting it (memory.recall). */
 function RecallPreview(props: { agent: string }) {
@@ -568,9 +241,9 @@ function RecallPreview(props: { agent: string }) {
           : undefined
       }
     >
-      <div {...stylex.attrs(styles.recallPreviewDiv)}>
+      <div class="flex flex-col sm:flex-row gap-1.5">
         <Select
-          styles={selectStyles.scope}
+          class="sm:w-40"
           label={t("web.memory.memory.where")}
           placeholder={t("web.memory.memory.pick")}
           value={where()}
@@ -585,7 +258,7 @@ function RecallPreview(props: { agent: string }) {
         />
       </div>
       <Show when={lines().length > 0} fallback={<Quiet>{where() ? t("web.memory.memory.blank") : t("web.memory.memory.noRepos")}</Quiet>}>
-        <p {...stylex.attrs(styles.recallPreviewP)}>{lines().join("\n")}</p>
+        <p class="rounded-md border border-line bg-page px-3 py-2 text-sm whitespace-pre-wrap">{lines().join("\n")}</p>
       </Show>
     </Section>
   );
@@ -600,8 +273,8 @@ export function OrchestratorMemoryPanel(props: { agent: string }) {
   return (
     <Show when={view()} fallback={<Quiet>{t("web.memory.memory.orchestratorReading")}</Quiet>}>
       {(v) => (
-        <div {...stylex.attrs(styles.memoryPanelDiv2)}>
-          <p {...stylex.attrs(styles.memoryPanelP)}>{t("web.memory.memory.orchestratorIntro")}</p>
+        <div class="flex flex-col gap-4">
+          <p class="text-sm text-muted">{t("web.memory.memory.orchestratorIntro")}</p>
           <WriteNote agent={props.agent} />
           <Section title={t("web.memory.memory.notes")} count={v().memories.length} testid="notes">
             <Show when={v().memories.length > 0} fallback={<Quiet>{t("web.memory.memory.orchestratorNothing")}</Quiet>}>
@@ -642,10 +315,10 @@ export function ArchivePanel(props: { agent: string }) {
   const data = () => ready(listing, undefined);
   const hits = () => data()?.hits ?? [];
   return (
-    <div {...stylex.attrs(styles.memoryPanelDiv2)}>
-      <p {...stylex.attrs(styles.memoryPanelP)}>{t("web.memory.memory.archiveIntro")}</p>
+    <div class="flex flex-col gap-4">
+      <p class="text-sm text-muted">{t("web.memory.memory.archiveIntro")}</p>
       <form
-        {...stylex.attrs(styles.archivePanelForm)}
+        class="flex gap-2"
         onSubmit={(e) => {
           e.preventDefault();
           if (query().trim()) setAsked(query().trim());
@@ -665,11 +338,11 @@ export function ArchivePanel(props: { agent: string }) {
         <Section title={t("web.memory.memory.found")} count={hits().length}>
           <For each={hits()}>
             {(h) => (
-              <div {...stylex.attrs(styles.archivePanelDiv)}>
-                <span {...stylex.attrs(styles.archivePanelSpan)}>
+              <div class="flex flex-col gap-0.5 rounded-md border border-line bg-page px-3 py-2">
+                <span class="font-mono text-xs text-muted">
                   {h.file}:{Math.round(h.line)}
                 </span>
-                <span {...stylex.attrs(styles.memoryPanelSpan4)}>{h.text}</span>
+                <span class="text-sm">{h.text}</span>
               </div>
             )}
           </For>
@@ -681,20 +354,20 @@ export function ArchivePanel(props: { agent: string }) {
             <Show when={files().length > 0} fallback={<Quiet>{t("web.memory.memory.noArchive")}</Quiet>}>
               <For each={files()} keyed={(f) => f.name}>
                 {(f) => (
-                  <div {...stylex.attrs(styles.archivePanelDiv2)}>
+                  <div class="overflow-hidden rounded-md border border-line bg-page">
                     <button
                       type="button"
                       aria-expanded={aria(open()?.name === f().name)}
                       onClick={() => void show(f().name)}
-                      {...stylex.attrs(styles.archivePanelButton)}
+                      class="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left hover:bg-hover"
                     >
-                      <span {...stylex.attrs(styles.archivePanelSpan2)}>{f().name}</span>
-                      <span {...stylex.attrs(styles.sectionSpan)}>
+                      <span class="min-w-0 flex-1 truncate font-mono text-sm">{f().name}</span>
+                      <span class="text-xs text-muted">
                         {ago(f().at, now())} · {t("web.memory.memory.chars", { n: Math.round(f().chars) })}
                       </span>
                     </button>
                     <Show when={open()?.name === f().name}>
-                      <pre {...stylex.attrs(styles.archivePanelPre)}>{open()?.text}</pre>
+                      <pre class="max-h-96 overflow-y-auto border-t border-line px-3 py-2 text-sm whitespace-pre-wrap select-text">{open()?.text}</pre>
                     </Show>
                   </div>
                 )}
@@ -730,8 +403,8 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
     if (done === true) setText("");
   };
   return (
-    <div {...stylex.attrs(styles.writeNoteDiv)}>
-      <span {...stylex.attrs(styles.writeNoteSpan)}>{t("web.memory.memory.note")}</span>
+    <div class="flex flex-col gap-1">
+      <span class="text-xs font-medium text-muted">{t("web.memory.memory.note")}</span>
       <TextArea
         data-testid="note-input"
         aria-label={t("web.memory.memory.note")}
@@ -740,11 +413,11 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
         value={text()}
         onInput={(e) => setText(e.currentTarget.value)}
       />
-      <div {...stylex.attrs(styles.writeNoteDiv2)}>
-        <Show when={props.withRepo} fallback={<span {...stylex.attrs(styles.sectionSpan2)} />}>
+      <div class="flex items-center gap-2 pt-1">
+        <Show when={props.withRepo} fallback={<span class="flex-1" />}>
           <TextInput
             aria-label={t("web.memory.memory.repo")}
-            styles={styles.writeNoteTextInput}
+            class="font-mono"
             placeholder={t("web.memory.memory.repoHint")}
             list="memory-repos"
             value={repo()}
@@ -760,13 +433,9 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
       </div>
       <Show
         when={error()}
-        fallback={
-          <span {...stylex.attrs(styles.writeNoteSpan2)}>
-            {props.withRepo === true ? t("web.memory.memory.noteHintRepo") : t("web.memory.memory.noteHint")}
-          </span>
-        }
+        fallback={<span class="text-xs text-faint">{props.withRepo === true ? t("web.memory.memory.noteHintRepo") : t("web.memory.memory.noteHint")}</span>}
       >
-        <span {...stylex.attrs(styles.writeNoteSpan3)}>{error()}</span>
+        <span class="text-xs text-berry">{error()}</span>
       </Show>
     </div>
   );
@@ -777,20 +446,25 @@ export function MemoryItem(props: { memory: Memory; onForget?: (() => void) | un
     <div
       data-testid="memory"
       data-key={props.memory.id}
-      {...styleProps([stylex.defaultMarker(), memoryStyles.card])}
+      class={["group", "flex items-start gap-2 rounded-md border border-line bg-page px-3 py-2"]}
       data-faded={props.faded === true ? "" : undefined}
     >
-      <div {...stylex.attrs(styles.memoryItemDiv)}>
-        <span {...stylex.attrs(styles.memoryItemSpan, !(props.faded !== true) ? styles.memoryItemSpanTone : styles.sourcesSpan)}>{props.memory.text}</span>
-        <span {...stylex.attrs(styles.memoryItemSpan2)}>
+      <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span class={["text-sm", !(props.faded !== true) ? "text-muted" : ""]}>{props.memory.text}</span>
+        <span class="flex flex-wrap gap-x-2 text-xs text-muted">
           <For each={props.meta}>{(m) => <span>{m}</span>}</For>
           <Show when={props.warning}>
-            <span {...stylex.attrs(styles.memoryItemSpan22)}>{props.warning}</span>
+            <span class="text-warn-ink">{props.warning}</span>
           </Show>
         </span>
       </div>
       <Show when={props.onForget}>
-        <button type="button" data-testid="forget" onClick={() => props.onForget?.()} {...styleProps(memoryStyles.forget)}>
+        <button
+          type="button"
+          data-testid="forget"
+          onClick={() => props.onForget?.()}
+          class="shrink-0 cursor-pointer rounded-md px-2 py-0.5 text-xs text-muted hover:text-berry opacity-0 focus-visible:opacity-100 group-hover:opacity-100 hover:bg-hover"
+        >
           {t("web.memory.memory.forget")}
         </button>
       </Show>

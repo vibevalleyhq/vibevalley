@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -13,82 +12,6 @@ import { OrchestratorFace } from "#/ui/domain/Face.tsx";
 import { Tabs } from "#/ui/Tabs.tsx";
 
 import { markWrongOf, orchestratorLooks } from "./looks";
-
-const styles = stylex.create({
-  orchestratorOfA: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-    textDecorationLine: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "underline",
-      },
-    },
-  },
-  orchestratorOfA2: {
-    textDecorationLine: "underline",
-  },
-  headDiv: {
-    display: "flex",
-    alignItems: "center",
-    gap: "1rem",
-    paddingTop: "1rem",
-  },
-  headSpan: {
-    display: "flex",
-    width: "4.5rem",
-    height: "4.5rem",
-    flexShrink: "0",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-lg)",
-    backgroundColor: "var(--color-hover)",
-  },
-  headDiv2: {
-    display: "flex",
-    minWidth: "0",
-    flexDirection: "column",
-    gap: "0.125rem",
-  },
-  headH1: {
-    fontSize: "var(--text-2xl)",
-    lineHeight: "var(--leading-2xl)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  headP: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  orchestratorOfDiv: {
-    display: "flex",
-    height: "100%",
-    minHeight: "0",
-    flexDirection: "column",
-    gap: "1rem",
-    paddingInline: "1rem",
-    paddingBottom: "1rem",
-  },
-  orchestratorOfDiv2: {
-    minHeight: "0",
-    flex: "1",
-  },
-  orchestratorOfDiv3: {
-    height: "100%",
-    overflowY: "auto",
-    paddingInline: "1rem",
-    paddingBottom: "1rem",
-  },
-  orchestratorOfDiv4: {
-    display: "flex",
-    maxWidth: "var(--container-4xl)",
-    flexDirection: "column",
-    gap: "1rem",
-  },
-  tabs: { borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-line)", paddingBottom: "0.5rem" },
-});
 
 const tabs = [
   { id: "memory", label: t("web.orchestrator.orchestrator.tab.memory") },
@@ -128,19 +51,19 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
   const at = () => (shown().some((t) => t.id === props.tab) ? props.tab : "memory");
   const look = () => orchestratorLooks.find((l) => l.id === (profile()?.look.orchestrator ?? "farmer"));
   const head = () => (
-    <div {...stylex.attrs(styles.headDiv)}>
-      <span {...stylex.attrs(styles.headSpan)}>
+    <div class="flex items-center gap-4 pt-4">
+      <span class="flex w-18 h-18 shrink-0 items-center justify-center rounded-lg bg-hover">
         <OrchestratorFace size={64} agent={props.agent} />
       </span>
-      <div {...stylex.attrs(styles.headDiv2)}>
-        <A href="/agents" {...stylex.attrs(styles.orchestratorOfA)}>
+      <div class="flex min-w-0 flex-col gap-0.5">
+        <A href="/agents" class="text-xs text-muted hover:underline">
           {t("web.orchestrator.orchestrator.all")}
         </A>
-        <h1 {...stylex.attrs(styles.headH1)}>{profile()?.name || t("web.orchestrator.orchestrator.title")}</h1>
-        <p {...stylex.attrs(styles.headP)}>
+        <h1 class="text-2xl font-semibold">{profile()?.name || t("web.orchestrator.orchestrator.title")}</h1>
+        <p class="text-sm text-muted">
           {t("web.orchestrator.orchestrator.intro")}
           {look() ? t("web.orchestrator.orchestrator.look", { name: look()?.name ?? "" }) : ""}{" "}
-          <A href={`/agents/${encodeURIComponent(props.agent)}`} {...stylex.attrs(styles.orchestratorOfA2)}>
+          <A href={`/agents/${encodeURIComponent(props.agent)}`} class="underline">
             {t("web.orchestrator.orchestrator.profile")}
           </A>
         </p>
@@ -153,17 +76,17 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
       value={at()}
       onChange={(v) => router.navigate(orchestratorHref(props.agent, v))}
       items={shown().map((x) => ({ value: x.id, label: x.label }))}
-      styles={styles.tabs}
+      class="border-b border-line pb-2"
     />
   );
   // The trajectory takes the whole content area, its rows scrolling under a fixed head; the other tabs are a column.
   return (
     <Switch>
       <Match when={at() === "trajectory"}>
-        <div {...stylex.attrs(styles.orchestratorOfDiv)}>
+        <div class="flex h-full min-h-0 flex-col gap-4 px-4 pb-4">
           {head()}
           {bar()}
-          <div {...stylex.attrs(styles.orchestratorOfDiv2)}>
+          <div class="min-h-0 flex-1">
             <TrajectoryLog
               id={props.agent}
               asked={t("web.orchestrator.orchestrator.heard")}
@@ -176,8 +99,8 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
         </div>
       </Match>
       <Match when={at() !== "trajectory"}>
-        <div {...stylex.attrs(styles.orchestratorOfDiv3)}>
-          <div {...stylex.attrs(styles.orchestratorOfDiv4)}>
+        <div class="h-full overflow-y-auto px-4 pb-4">
+          <div class="flex max-w-4xl flex-col gap-4">
             {head()}
             {bar()}
             <Switch>

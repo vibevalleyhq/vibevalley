@@ -1,5 +1,5 @@
-import { Schema } from "effect";
 import type { Accessor } from "solid-js";
+import { z } from "zod";
 
 import { ThemeChoice } from "@vibevalley/protocol/host";
 
@@ -15,22 +15,22 @@ export type Scale = (typeof ScaleValues)[number];
 export const StartValues = ["workbench", "farm"] as const;
 export type Start = (typeof StartValues)[number];
 
-const PrefsSchema = Schema.Struct({
+const PrefsSchema = z.object({
   /** Who the next job goes to: a profile's id, or "auto" for the orchestrator to choose. */
-  pick: orFallback(Schema.NonEmptyString, "auto"),
+  pick: orFallback(z.string().min(1), "auto"),
   /** The repo the last issue was given to on this machine ("" none), for the next quick add. */
-  repo: orFallback(Schema.String, ""),
-  pet: orFallback(Schema.NonEmptyString, "dog"),
+  repo: orFallback(z.string(), ""),
+  pet: orFallback(z.string().min(1), "dog"),
   theme: orFallback(ThemeChoice, "system"),
-  scale: orFallback(Schema.Literals(ScaleValues), 100),
-  start: orFallback(Schema.Literals(StartValues), "workbench"),
+  scale: orFallback(z.literal(ScaleValues), 100),
+  start: orFallback(z.literal(StartValues), "workbench"),
   /** A pane's width the user dragged it to (ui/Splitter.tsx), by the pane's name; one not dragged has its default. */
-  widths: orFallback(Schema.Record(Schema.String, Schema.Finite), {}),
+  widths: orFallback(z.record(z.string(), z.number()), {}),
   /** The library's thumbnail row height, in px (features/library). */
-  libraryTile: orFallback(Schema.Finite, 160),
+  libraryTile: orFallback(z.number(), 160),
 });
 
-type Prefs = typeof PrefsSchema.Type;
+type Prefs = z.output<typeof PrefsSchema>;
 
 const prefs = defineStored("prefs", PrefsSchema, {
   pick: "auto",

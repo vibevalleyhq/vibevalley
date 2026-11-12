@@ -1,4 +1,6 @@
-import { Cause, Effect, Exit, Option, Predicate, Schema } from "effect";
+import { type z } from "zod";
+
+import { isObject } from "#/base/guards.ts";
 
 import { formIssues, type FormIssue } from "./issues";
 import { at, immutable, replace, type FormValue, type Path, type PathValue } from "./paths";
@@ -10,7 +12,7 @@ export type Submission<R> =
 export type Attempt = { readonly revision: number; readonly attemptId: string };
 export type SubmitResult<R> = (Submission<R> & Attempt) | { readonly kind: "busy" | "composing" | "outdated" | "invalid" | "unavailable" | "disposed" };
 export type FormOptions<T, E extends FormValue, R> = {
-  readonly schema: Schema.Codec<T, E>;
+  readonly schema: z.ZodType<T, E>;
   readonly defaultValues: E;
   readonly messages: { issue: (issue: FormIssue) => string; unavailable: string; unknown: string };
   readonly onSubmit: (value: T, attempt: Attempt) => Promise<Submission<R>>;
@@ -40,7 +42,7 @@ export type FormField<V> = {
 const equal = (a: unknown, b: unknown): boolean => {
   if (Object.is(a, b)) return true;
   if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((value: unknown, index) => equal(value, b[index]));
-  if (Predicate.isObject(a) && Predicate.isObject(b))
+  if (isObject(a) && isObject(b))
     return Object.keys(a).length === Object.keys(b).length && Object.keys(a).every((key) => Object.hasOwn(b, key) && equal(a[key], b[key]));
   return false;
 };
@@ -84,17 +86,25 @@ export function createForm<T, E extends FormValue, R>(options: FormOptions<T, E,
     controller = task;
     const input = current.values;
     update({ validating: true });
-    const result = await Effect.runPromiseExit(Schema.decodeUnknownEffect(options.schema, { errors: "all" })(input), { signal: task.signal });
+    // Zod cannot stop a decode on its way: an aborted or outdated one is let go, and what it comes back with is not read.
+    const abandoned = new Promise<"abandoned">((resolve) => task.signal.addEventListener("abort", () => resolve("abandoned"), { once: true }));
+    const result = await Promise.race([
+      options.schema.safeParseAsync(input, { reportInput: true }).then(
+        (r) => ({ kind: "decoded", r }) as const,
+        () => ({ kind: "broke" }) as const,
+      ),
+      abandoned,
+    ]);
     if (closed) return { kind: "disposed" };
-    if (id !== validation || revision !== current.revision) return { kind: "outdated" };
+    if (result === "abandoned" || id !== validation || revision !== current.revision) return { kind: "outdated" };
     controller = undefined;
-    if (Exit.isSuccess(result)) {
-      update({ validating: false, issues: [] });
-      return { kind: "valid", value: result.value };
-    }
-    const error = Cause.findErrorOption(result.cause);
-    if (Option.isSome(error)) {
-      update({ validating: false, issues: formIssues(error.value.issue) });
+    if (result.kind === "decoded") {
+      const { r } = result;
+      if (r.success) {
+        update({ validating: false, issues: [] });
+        return { kind: "valid", value: r.data };
+      }
+      update({ validating: false, issues: formIssues(r.error.issues) });
       return { kind: "invalid" };
     }
     update({ validating: false, submitError: options.messages.unavailable });

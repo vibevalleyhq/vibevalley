@@ -1,4 +1,4 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
 import { For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -15,178 +15,13 @@ import { Button } from "#/ui/Button.tsx";
 import { AgentFace } from "#/ui/domain/Face.tsx";
 import { Card, ListCard, ListRow, Quiet, Split } from "#/ui/layout.tsx";
 import { RuntimeIcon } from "#/ui/pixel/RuntimeIcon.tsx";
-import { styleProps } from "#/ui/positioner.ts";
 
 import { quotaOf } from "./quota";
 import { InventoryCard, ModelsCard, SettingsCard, Stamina, SupportCard, Usage } from "./RuntimeCards";
 
-const styles = stylex.create({
-  runtimesPageSpan: {
-    width: "0.5rem",
-    height: "0.5rem",
-    borderRadius: "9999px",
-  },
-  runtimesPageSpanState: {
-    backgroundColor: "var(--wb-berry)",
-  },
-  runtimesPageSpanState2: {
-    backgroundColor: "var(--wb-faint)",
-  },
-  runtimesPageSpanState3: {
-    backgroundColor: "var(--wb-leaf)",
-  },
-  detailA: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: {
-      default: "var(--color-muted)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-ink)",
-      },
-    },
-    textDecorationLine: "underline",
-  },
-  detailA2: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.375rem",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    paddingBlock: "0.25rem",
-    paddingRight: "0.75rem",
-    paddingLeft: "0.25rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  runtimesPageSpan2: {},
-  runtimesPageSpanTone: {
-    opacity: ".5",
-    filter: "grayscale(100%)",
-  },
-  detailDiv: {
-    display: "flex",
-    minWidth: "0",
-    flex: "1",
-    flexDirection: "column",
-    gap: "0.125rem",
-  },
-  portrait: (hat: string) => ({ backgroundImage: `radial-gradient(70% 70% at 50% 70%, ${hat}33, var(--color-page))` }),
-  runtimesPageP: {
-    padding: "2rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-berry)",
-  },
-  runtimesPageDiv: {
-    height: "100%",
-  },
-  runtimesPageLi: {
-    paddingInline: "0.625rem",
-    paddingTop: "0.25rem",
-    paddingBottom: "0.375rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  runtimesPageSpan3: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-end",
-    gap: "0.25rem",
-  },
-  detailDiv2: {
-    display: "flex",
-    maxWidth: "var(--container-4xl)",
-    flexDirection: "column",
-    gap: "0.75rem",
-  },
-  detailDiv22: {
-    display: "flex",
-    alignItems: "center",
-    gap: "1rem",
-    paddingInline: "0.25rem",
-    paddingTop: "0.25rem",
-    paddingBottom: "0.5rem",
-  },
-  detailSpan: {
-    display: "flex",
-    width: "4.5rem",
-    height: "4.5rem",
-    flexShrink: "0",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-lg)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-  },
-  detailH2: {
-    fontSize: "var(--text-xl)",
-    lineHeight: "var(--leading-xl)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  detailP: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  detailDiv3: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.5rem",
-    paddingTop: "0.25rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  detailSpan2: {
-    borderRadius: "var(--radius-sm)",
-    backgroundColor: "var(--color-ok-soft)",
-    paddingInline: "0.375rem",
-    color: "var(--color-ok-ink)",
-  },
-  detailSpan3: {
-    fontFamily: "var(--font-mono)",
-  },
-  detailSpan4: {
-    borderRadius: "var(--radius-sm)",
-    backgroundColor: "var(--color-bad-soft)",
-    paddingInline: "0.375rem",
-    color: "var(--color-berry)",
-  },
-  detailDiv4: {
-    display: "grid",
-    gap: "0.75rem",
-    gridTemplateColumns: {
-      default: null,
-      "@media (width>=48rem)": "repeat(2,minmax(0,1fr))",
-    },
-  },
-  detailDiv5: {
-    display: "grid",
-    gap: "0.75rem",
-    gridTemplateColumns: {
-      default: null,
-      "@media (width>=48rem)": "repeat(3,minmax(0,1fr))",
-    },
-  },
-  detailDiv6: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.5rem",
-  },
-});
+const styles = {
+  portrait: (hat: string): JSX.CSSProperties => ({ "background-image": `radial-gradient(70% 70% at 50% 70%, ${hat}33, var(--color-page))` }),
+};
 
 const statusOf = (r: RuntimeInfo) => {
   const i = r.installation;
@@ -213,18 +48,18 @@ export function RuntimesPage(props: { rest: string }) {
     <Show
       when={!runtimes.error()}
       fallback={
-        <p {...stylex.attrs(styles.runtimesPageP)}>
+        <p class="p-8 text-sm text-berry">
           {t("web.runtime.noRuntimes")}
           {reasonOf(runtimes.error())}
         </p>
       }
     >
-      <div {...stylex.attrs(styles.runtimesPageDiv)}>
+      <div class="h-full">
         <Split
           edge
           list={
             <ListCard bare title={t("web.runtime.title")} label={t("web.runtime.list")} testid="runtimes">
-              <li {...stylex.attrs(styles.runtimesPageLi)}>{t("web.runtime.intro")}</li>
+              <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">{t("web.runtime.intro")}</li>
               <For each={list()}>
                 {(r) => {
                   const ok = () => r.installation.status === "available";
@@ -238,19 +73,13 @@ export function RuntimesPage(props: { rest: string }) {
                       title={r.preset.label}
                       line={`${statusOf(r)}${using() > 0 ? t("web.runtime.usedBy", { n: using() }) : ""}`}
                       leading={
-                        <span {...stylex.attrs(styles.runtimesPageSpan2, !ok() ? styles.runtimesPageSpanTone : styles.runtimesPageSpan2)}>
+                        <span class={["", !ok() ? "opacity-50 [filter:grayscale(100%)]" : ""]}>
                           <RuntimeIcon runtime={r.id} size={36} />
                         </span>
                       }
                       trailing={
-                        <span {...stylex.attrs(styles.runtimesPageSpan3)}>
-                          <span
-                            {...stylex.attrs(
-                              styles.runtimesPageSpan,
-                              ok() ? (r.settings.enabled ? styles.runtimesPageSpanState3 : styles.runtimesPageSpanState2) : styles.runtimesPageSpanState,
-                            )}
-                            aria-hidden="true"
-                          />
+                        <span class="flex flex-col items-end gap-1">
+                          <span class={["w-2 h-2 rounded-full", ok() ? (r.settings.enabled ? "bg-leaf" : "bg-faint") : "bg-berry"]} aria-hidden="true" />
                           <Show when={ok() && quota().level !== "unknown"}>
                             <Stamina quota={quota()} width={60} height={7} />
                           </Show>
@@ -282,34 +111,34 @@ export function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
     return refreshing.run(async () => keep(await api.runtime.refresh({ id })));
   };
   return (
-    <div {...stylex.attrs(styles.detailDiv2)}>
-      <div {...stylex.attrs(styles.detailDiv22)}>
-        <span {...styleProps([styles.detailSpan, styles.portrait(props.info.preset.look.hat)])}>
-          <span {...stylex.attrs(styles.runtimesPageSpan2, inst().status !== "available" ? styles.runtimesPageSpanTone : styles.runtimesPageSpan2)}>
+    <div class="flex max-w-4xl flex-col gap-3">
+      <div class="flex items-center gap-4 px-1 pt-1 pb-2">
+        <span class="flex w-18 h-18 shrink-0 items-center justify-center rounded-lg border border-line" style={styles.portrait(props.info.preset.look.hat)}>
+          <span class={["", inst().status !== "available" ? "opacity-50 [filter:grayscale(100%)]" : ""]}>
             <RuntimeIcon runtime={props.info.id} size={60} />
           </span>
         </span>
-        <div {...stylex.attrs(styles.detailDiv)}>
-          <h2 {...stylex.attrs(styles.detailH2)}>{props.info.preset.label}</h2>
-          <p {...stylex.attrs(styles.detailP)}>{props.info.preset.blurb}</p>
-          <div {...stylex.attrs(styles.detailDiv3)}>
+        <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+          <h2 class="text-xl font-semibold">{props.info.preset.label}</h2>
+          <p class="text-sm text-muted">{props.info.preset.blurb}</p>
+          <div class="flex flex-wrap items-center gap-2 pt-1 text-xs text-muted">
             <Switch>
               <Match when={variant(inst(), "status", "available")}>
                 {(i) => (
                   <>
-                    <span {...stylex.attrs(styles.detailSpan2)}>
+                    <span class="rounded-sm bg-ok-soft px-1.5 text-ok-ink">
                       {t("web.runtime.available")} {i().version ?? ""}
                     </span>
-                    <span {...stylex.attrs(styles.detailSpan3)}>{i().command}</span>
+                    <span class="font-mono">{i().command}</span>
                     <span>{i().via === "bundled" ? t("web.runtime.bundled") : t("web.runtime.commandLine")}</span>
                   </>
                 )}
               </Match>
               <Match when={variant(inst(), "status", "unsupported")}>
-                {(i) => <span {...stylex.attrs(styles.detailSpan4)}>{t("web.runtime.unsupportedWhy", { why: i().reason })}</span>}
+                {(i) => <span class="rounded-sm bg-bad-soft px-1.5 text-berry">{t("web.runtime.unsupportedWhy", { why: i().reason })}</span>}
               </Match>
               <Match when={inst().status === "not_found"}>
-                <span {...stylex.attrs(styles.detailSpan4)}>{t("web.runtime.notHere")}</span>
+                <span class="rounded-sm bg-bad-soft px-1.5 text-berry">{t("web.runtime.notHere")}</span>
               </Match>
             </Switch>
             <Show when={inst().status !== "checking"} fallback={<span>{t("web.runtime.checking")}</span>}>
@@ -321,7 +150,7 @@ export function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
           {refreshing.busy() ? t("web.runtime.checking") : t("web.runtime.recheck")}
         </Button>
       </div>
-      <div {...stylex.attrs(styles.detailDiv4)}>
+      <div class="grid gap-3 md:grid-cols-2">
         <Card title={t("web.runtime.account")}>
           <Usage info={props.info} />
         </Card>
@@ -329,7 +158,7 @@ export function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
       </div>
       <SettingsCard info={props.info} onSaved={keep} />
       <ModelsCard info={props.info} />
-      <div {...stylex.attrs(styles.detailDiv5)}>
+      <div class="grid gap-3 md:grid-cols-3">
         <InventoryCard title={t("web.runtime.skills")} entries={props.info.skills} />
         <InventoryCard title={t("web.runtime.mcp")} entries={props.info.mcpServers} />
         <InventoryCard title={t("web.runtime.tools")} entries={props.info.tools} />
@@ -337,16 +166,19 @@ export function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
       <Card
         title={t("web.runtime.agents")}
         action={
-          <A href={`/agents/new?runtime=${encodeURIComponent(props.info.id)}`} data-testid="new-agent" {...stylex.attrs(styles.detailA)}>
+          <A href={`/agents/new?runtime=${encodeURIComponent(props.info.id)}`} data-testid="new-agent" class="text-xs text-muted hover:text-ink underline">
             {t("web.runtime.makeAgent")}
           </A>
         }
       >
         <Show when={props.agents.length > 0} fallback={<Quiet>{t("web.runtime.noneYet")}</Quiet>}>
-          <div {...stylex.attrs(styles.detailDiv6)}>
+          <div class="flex flex-wrap gap-2">
             <For each={props.agents}>
               {(a) => (
-                <A href={`/agents/${encodeURIComponent(a.id)}`} {...stylex.attrs(styles.detailA2)}>
+                <A
+                  href={`/agents/${encodeURIComponent(a.id)}`}
+                  class="flex items-center gap-1.5 rounded-md border border-line py-1 pr-3 pl-1 text-sm hover:bg-hover"
+                >
                   <AgentFace agentId={a.id} runtime={a.runtime} look={a.look} size={26} />
                   {a.name}
                 </A>

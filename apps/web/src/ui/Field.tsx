@@ -1,14 +1,12 @@
 import type { JSX } from "@solidjs/web";
-import type * as stylex from "@stylexjs/stylex";
 import { For, omit } from "solid-js";
 
 import { Select as Base } from "@vibevalley/base-ui";
 
 import { Icon } from "./Icon";
-import { withStyles } from "./positioner";
 import { Hint } from "./Tip";
 
-const box = "w-full rounded-md border border-line bg-page px-2.5 py-1.5 text-sm outline-none placeholder:text-faint focus:border-focus";
+const box = "rounded-md border border-line bg-page px-2.5 py-1.5 outline-none placeholder:text-faint focus:border-focus";
 
 const looks = {
   quiet: "border-transparent bg-transparent hover:border-line hover:bg-page data-popup-open:border-line data-popup-open:bg-page",
@@ -17,21 +15,36 @@ const looks = {
 };
 
 type ControlAppearance = {
+  /** Placement only: margins, grow, a width when `wide` is false. */
   class?: JSX.ClassValue | undefined;
-  // For callers still on StyleX; it goes when the last of them is on classes.
-  styles?: stylex.StyleXStyles;
   style?: JSX.CSSProperties | undefined;
+  /** true (default): as wide as its container; false: the caller's class gives the width. */
+  wide?: boolean;
+  /** The words' size: sm (default), or lg for a title being renamed. */
+  text?: "sm" | "lg";
 };
 export type TextInputProps = Omit<JSX.InputHTMLAttributes<HTMLInputElement>, "class" | "style"> & ControlAppearance;
 
 export function TextInput(props: TextInputProps) {
-  const rest = omit(props, "class", "styles", "style");
-  return <input {...rest} {...withStyles(props.styles, [box, "h-8", props.class], props.style)} />;
+  const rest = omit(props, "class", "style", "wide", "text");
+  return (
+    <input
+      {...rest}
+      class={[box, props.wide !== false && "w-full", props.text === "lg" ? "text-lg font-semibold" : "text-sm", "h-8", props.class]}
+      style={props.style}
+    />
+  );
 }
 
 export function TextArea(props: Omit<JSX.TextareaHTMLAttributes<HTMLTextAreaElement>, "class" | "style"> & ControlAppearance) {
-  const rest = omit(props, "class", "styles", "style");
-  return <textarea {...rest} {...withStyles(props.styles, [box, "resize-y", props.class], props.style)} />;
+  const rest = omit(props, "class", "style", "wide", "text");
+  return (
+    <textarea
+      {...rest}
+      class={[box, props.wide !== false && "w-full", props.text === "lg" ? "text-lg font-semibold" : "text-sm", "resize-y", props.class]}
+      style={props.style}
+    />
+  );
 }
 
 /** A label over its control; what it means is behind an info icon beside the label. */
@@ -56,14 +69,14 @@ export function Select<V extends string>(props: {
   label: string;
   /** Placement only: width, margins. */
   class?: JSX.ClassValue | undefined;
-  // For callers still on StyleX; it goes when the last of them is on classes.
-  styles?: stylex.StyleXStyles;
   testid?: string | undefined;
   quiet?: boolean;
   /** A filter that narrows: tinted while a value other than "" is chosen. */
   filter?: boolean;
   /** control: 28px, for a toolbar row; field (default): 32px, beside inputs. */
   size?: "control" | "field";
+  /** The words' size: sm (default), or xs in a dense row. */
+  text?: "sm" | "xs";
   disabled?: boolean | undefined;
   /** A choice on its way to the server (shown already) or refused (the value is the server's again). */
   state?: "pending" | "failed" | undefined;
@@ -78,12 +91,13 @@ export function Select<V extends string>(props: {
         data-state={props.state}
         aria-busy={props.state === "pending" ? "true" : undefined}
         aria-label={props.label}
-        {...withStyles(props.styles, [
-          "flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md border text-left text-sm outline-none disabled:cursor-default disabled:opacity-50",
+        class={[
+          "flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md border text-left outline-none disabled:cursor-default disabled:opacity-50",
+          props.text === "xs" ? "text-xs" : "text-sm",
           props.size === "control" ? "h-7 px-2" : "h-8 px-2.5",
           props.quiet === true ? looks.quiet : props.filter === true && props.value !== "" ? looks.filter : looks.normal,
           props.class,
-        ])}
+        ]}
       >
         <Base.Value class="min-w-0 flex-1 truncate" placeholder={props.placeholder} />
         <Icon name="choose" size={12} class="text-muted" />

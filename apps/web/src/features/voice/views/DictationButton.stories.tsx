@@ -1,12 +1,12 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
 
 import { stories, story } from "@vibevalley/stories";
 
 import { DictationMark, type DictationState } from "./DictationButton";
 
-const styles = stylex.create({
-  placement: (marginLeft: number) => ({ marginLeft, width: "1.75rem", height: "1.75rem", borderRadius: "var(--radius-md)" }),
-});
+const styles = {
+  placement: (marginLeft: number): JSX.CSSProperties => ({ "--indent": `${marginLeft}px` }),
+};
 
 export default stories({
   title: "组件/语音/听写",
@@ -14,7 +14,15 @@ export default stories({
     Composition: story({
       args: { recording: true, surface: true, indent: 4 },
       render: (a) => (
-        <DictationMark state={a.recording ? "recording" : "idle"} bar surface={a.surface} styles={styles.placement(a.indent)} onClick={() => undefined} />
+        <div class="contents" style={styles.placement(a.indent)}>
+          <DictationMark
+            state={a.recording ? "recording" : "idle"}
+            bar
+            surface={a.surface}
+            class="ml-(--indent) w-7 h-7 rounded-md"
+            onClick={() => undefined}
+          />
+        </div>
       ),
     }),
     States: story({

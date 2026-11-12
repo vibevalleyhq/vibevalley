@@ -8,7 +8,7 @@ import { type Clock, isAbort, reasonOf, systemClock, withTimeout } from "@vibeva
 import { coding as words } from "../base/prompts.ts";
 import { errnoOf, messageOf, ToolFailed, toolFailed } from "../core/errors.ts";
 import type { Tool } from "../core/loop.ts";
-import { schemaEffectTool } from "../core/tool.ts";
+import { schemaTool } from "../core/tool.ts";
 import { type AgentFs, agentFsOf } from "../infra/fs.ts";
 import { afterRealTime } from "../infra/realTime.ts";
 
@@ -155,7 +155,7 @@ export function codingTools(o: CodingOptions): Tool[] {
     return r !== "" && r !== "." && !r.startsWith("..") ? r : path;
   };
 
-  const read = schemaEffectTool({
+  const read = schemaTool({
     name: "read_file",
     description: words.readDescription,
     parameters: z.object({ path: z.string(), offset: z.exactOptional(z.int()), limit: z.exactOptional(z.int()) }),
@@ -171,7 +171,7 @@ export function codingTools(o: CodingOptions): Tool[] {
     },
   });
 
-  const write = schemaEffectTool({
+  const write = schemaTool({
     name: "write_file",
     description: words.writeDescription,
     parameters: z.object({ path: z.string(), content: z.string() }),
@@ -185,7 +185,7 @@ export function codingTools(o: CodingOptions): Tool[] {
     },
   });
 
-  const edit = schemaEffectTool({
+  const edit = schemaTool({
     name: "edit_file",
     description: words.editDescription,
     parameters: z.object({ path: z.string(), old_text: z.string(), new_text: z.string(), replace_all: z.exactOptional(z.boolean()) }),
@@ -202,7 +202,7 @@ export function codingTools(o: CodingOptions): Tool[] {
     },
   });
 
-  const list = schemaEffectTool({
+  const list = schemaTool({
     name: "list_dir",
     description: words.listDirDescription,
     parameters: z.object({ path: z.exactOptional(z.string()), depth: z.exactOptional(z.int()) }),
@@ -227,7 +227,7 @@ export function codingTools(o: CodingOptions): Tool[] {
     },
   });
 
-  const grep = schemaEffectTool({
+  const grep = schemaTool({
     name: "grep",
     description: words.grepDescription,
     parameters: z.object({
@@ -260,7 +260,7 @@ export function codingTools(o: CodingOptions): Tool[] {
     },
   });
 
-  const bash = schemaEffectTool({
+  const bash = schemaTool({
     name: "bash",
     description: words.bashDescription(formatSeconds(timeout)),
     parameters: z.object({ command: z.string(), timeout_seconds: z.exactOptional(z.number()) }),
@@ -279,7 +279,7 @@ export function codingTools(o: CodingOptions): Tool[] {
     },
   });
 
-  const fetchTool = schemaEffectTool({
+  const fetchTool = schemaTool({
     name: "web_fetch",
     description: words.webFetchDescription,
     parameters: z.object({ url: z.string() }),

@@ -1,6 +1,5 @@
-import * as stylex from "@stylexjs/stylex";
-import { Array as Arr, Option, Schema } from "effect";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
+import { z } from "zod";
 
 import { list as listed, t } from "@vibevalley/i18n";
 import type { Agent, RuntimeInfo, Skill } from "@vibevalley/protocol";
@@ -26,250 +25,11 @@ import { RuntimeIcon } from "#/ui/pixel/RuntimeIcon.tsx";
 import { type InstalledSkill, installedSkills } from "./quota";
 import { SkillInput } from "./skill-form";
 
-const styles = stylex.create({
-  skillsPageDiv: {
-    display: "flex",
-    height: "100%",
-    minHeight: "0",
-    flexDirection: {
-      default: "column",
-      "@media (width>=64rem)": "row",
-    },
-    gap: "0.75rem",
-    overflowY: {
-      default: "auto",
-      "@media (width>=64rem)": "hidden",
-    },
-    overflowX: {
-      default: null,
-      "@media (width>=64rem)": "hidden",
-    },
-  },
-  skillsPageA: {
-    display: "inline-flex",
-    height: "1.5rem",
-    alignItems: "center",
-    borderRadius: "var(--radius-md)",
-    backgroundColor: {
-      default: "var(--color-accent)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-accent-hover)",
-      },
-    },
-    paddingInline: "0.5rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-page)",
-  },
-  entryA: {
-    display: "flex",
-    flexDirection: "column",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.375rem",
-  },
-  entryATone: {
-    backgroundColor: {
-      default: "var(--color-selected)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  entryAAlt: {
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  skillEditorA: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.375rem",
-    borderRadius: "var(--radius-md)",
-    backgroundColor: {
-      default: "var(--color-hover)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-selected)",
-      },
-    },
-    paddingBlock: "0.25rem",
-    paddingRight: "0.75rem",
-    paddingLeft: "0.25rem",
-  },
-  skillCard: { maxWidth: "var(--container-3xl)" },
-  skillsBook: {
-    display: "flex",
-    flexShrink: "0",
-    flexDirection: "column",
-    gap: "0.5rem",
-    borderRadius: "var(--radius-lg)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-    padding: "0.5rem",
-    width: {
-      default: null,
-      "@media (width>=64rem)": "18rem",
-    },
-    overflowY: {
-      default: null,
-      "@media (width>=64rem)": "auto",
-    },
-  },
-  skillsPageH2: {
-    paddingInline: "0.5rem",
-    paddingTop: "0.375rem",
-    fontSize: "var(--text-base)",
-    lineHeight: "var(--leading-base)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  skillsPageP: {
-    paddingInline: "0.5rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-berry)",
-  },
-  skillsPageH3: {
-    paddingInline: "0.5rem",
-    paddingTop: "0.5rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontWeight: "var(--font-weight-semibold)",
-    color: "var(--color-muted)",
-  },
-  skillsPageP2: {
-    paddingInline: "0.5rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  skillsPageUl: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.125rem",
-  },
-  skillsPageDiv2: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    paddingInline: "0.5rem",
-    paddingTop: "0.75rem",
-  },
-  skillsPageH32: {
-    flex: "1",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontWeight: "var(--font-weight-semibold)",
-    color: "var(--color-muted)",
-  },
-  skillsPageDiv22: {
-    minWidth: "0",
-    flex: "1",
-    overflowY: {
-      default: null,
-      "@media (width>=64rem)": "auto",
-    },
-  },
-  entrySpan: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    fontWeight: "var(--font-weight-medium)",
-  },
-  entrySpan2: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  installedCardP: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  installedCardP2: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    whiteSpace: "pre-wrap",
-  },
-  installedCardDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.375rem",
-  },
-  installedCardH3: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontWeight: "var(--font-weight-semibold)",
-    color: "var(--color-muted)",
-  },
-  installedCardDiv2: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.625rem",
-    borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--color-hover)",
-    paddingInline: "0.75rem",
-    paddingBlock: "0.5rem",
-  },
-  installedCardSpan: {
-    width: "6rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    fontWeight: "var(--font-weight-medium)",
-  },
-  installedCardSpan2: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  skillEditorDiv: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  skillEditorSpan: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontWeight: "var(--font-weight-medium)",
-    color: "var(--color-muted)",
-  },
-  skillEditorDiv2: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.5rem",
-  },
-  skillEditorSpan2: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    fontWeight: "var(--font-weight-medium)",
-  },
-});
-
 const installedPrefix = "installed:";
 const skillPath = (id?: string) => (id === undefined ? "/settings/skills" : `/settings/skills/${encodeURIComponent(id)}`);
 
 const skillsQuery = defineQuery({
-  schema: Schema.mutable(Schema.Array(S.Skill)),
+  schema: z.array(S.Skill),
   key: () => ["skills"],
   fetch: (_: void, context) => api.skill.list(context),
   ...retryRead,
@@ -284,8 +44,8 @@ export function SkillsPage(props: { id?: string | undefined }) {
   const catalog = () => ready(runtimes, []);
   const installed = () => installedSkills(catalog());
   const all = (): readonly Skill[] => ready(skills, []);
-  const own = () => Arr.filter(all(), (s) => s.builtIn !== true);
-  const builtIns = () => Arr.filter(all(), (s) => s.builtIn === true);
+  const own = () => all().filter((s) => s.builtIn !== true);
+  const builtIns = () => all().filter((s) => s.builtIn === true);
   const creating = () => props.id === "new";
   const shownInstalled = () => {
     const id = props.id;
@@ -293,7 +53,7 @@ export function SkillsPage(props: { id?: string | undefined }) {
   };
   const shownBuiltIn = () => {
     const id = props.id;
-    return creating() || shownInstalled() !== undefined ? undefined : Option.getOrUndefined(Arr.findFirst(builtIns(), (s) => s.id === id));
+    return creating() || shownInstalled() !== undefined ? undefined : builtIns().find((s) => s.id === id);
   };
   const selected = () =>
     creating() || shownInstalled() || shownBuiltIn() !== undefined
@@ -306,15 +66,19 @@ export function SkillsPage(props: { id?: string | undefined }) {
   const ownShown = () => (q() ? own().filter((s) => matches(q(), [s.name, s.description, s.body])) : own());
   const builtInShown = () => {
     const text = q();
-    return text === "" ? builtIns() : Arr.filter(builtIns(), (s) => matches(text, [s.name, s.description, s.body]));
+    return text === "" ? builtIns() : builtIns().filter((s) => matches(text, [s.name, s.description, s.body]));
   };
   const count = (shown: number, all: number) => (q() ? `${shown} / ${all}` : `${all}`);
   const open = () => shownInstalled() ?? first();
 
   return (
-    <div {...stylex.attrs(styles.skillsPageDiv)}>
-      <nav aria-label={t("web.runtime.library.book")} data-testid="skills-book" {...stylex.attrs(styles.skillsBook)}>
-        <h2 {...stylex.attrs(styles.skillsPageH2)}>{t("web.runtime.library.book")}</h2>
+    <div class="flex h-full min-h-0 flex-col lg:flex-row gap-3 overflow-y-auto lg:overflow-y-hidden lg:overflow-x-hidden">
+      <nav
+        aria-label={t("web.runtime.library.book")}
+        data-testid="skills-book"
+        class="flex shrink-0 flex-col gap-2 rounded-lg border border-line bg-page p-2 lg:w-72 lg:overflow-y-auto"
+      >
+        <h2 class="px-2 pt-1.5 text-base font-semibold">{t("web.runtime.library.book")}</h2>
         <TextInput
           data-testid="skills-search"
           aria-label={t("web.runtime.library.search")}
@@ -323,19 +87,19 @@ export function SkillsPage(props: { id?: string | undefined }) {
           onInput={(e) => setQuery(e.currentTarget.value)}
         />
         <Show when={runtimes.error()}>
-          <p {...stylex.attrs(styles.skillsPageP)}>
+          <p class="px-2 text-xs text-berry">
             {t("web.runtime.library.noRuntimes")}
             {reasonOf(runtimes.error())}
           </p>
         </Show>
-        <h3 {...stylex.attrs(styles.skillsPageH3)}>{t("web.runtime.library.installed", { count: count(list().length, installed().length) })}</h3>
+        <h3 class="px-2 pt-2 text-xs font-semibold text-muted">{t("web.runtime.library.installed", { count: count(list().length, installed().length) })}</h3>
         <Show when={installed().length === 0}>
-          <p {...stylex.attrs(styles.skillsPageP2)}>{t("web.runtime.library.noneReported")}</p>
+          <p class="px-2 text-xs text-muted">{t("web.runtime.library.noneReported")}</p>
         </Show>
         <Show when={installed().length > 0 && list().length === 0}>
-          <p {...stylex.attrs(styles.skillsPageP2)}>{t("web.runtime.library.noMatch")}</p>
+          <p class="px-2 text-xs text-muted">{t("web.runtime.library.noMatch")}</p>
         </Show>
-        <ul {...stylex.attrs(styles.skillsPageUl)}>
+        <ul class="flex flex-col gap-0.5">
           <For each={list()}>
             {(s) => (
               <Entry
@@ -347,21 +111,27 @@ export function SkillsPage(props: { id?: string | undefined }) {
             )}
           </For>
         </ul>
-        <h3 {...stylex.attrs(styles.skillsPageH3)}>{t("web.runtime.library.builtIn", { count: count(builtInShown().length, builtIns().length) })}</h3>
-        <ul {...stylex.attrs(styles.skillsPageUl)} data-testid="built-in-skills">
+        <h3 class="px-2 pt-2 text-xs font-semibold text-muted">
+          {t("web.runtime.library.builtIn", { count: count(builtInShown().length, builtIns().length) })}
+        </h3>
+        <ul class="flex flex-col gap-0.5" data-testid="built-in-skills">
           <For each={builtInShown()}>{(s) => <Entry to={skillPath(s.id)} on={shownBuiltIn()?.id === s.id} title={s.name} detail={s.description} />}</For>
         </ul>
-        <div {...stylex.attrs(styles.skillsPageDiv2)}>
-          <h3 {...stylex.attrs(styles.skillsPageH32)}>{t("web.runtime.library.own", { count: count(ownShown().length, own().length) })}</h3>
-          <A href={skillPath("new")} data-testid="new-skill" {...stylex.attrs(styles.skillsPageA)}>
+        <div class="flex items-center gap-2 px-2 pt-3">
+          <h3 class="flex-1 text-xs font-semibold text-muted">{t("web.runtime.library.own", { count: count(ownShown().length, own().length) })}</h3>
+          <A
+            href={skillPath("new")}
+            data-testid="new-skill"
+            class="inline-flex h-6 items-center rounded-md bg-accent hover:bg-accent-hover px-2 text-xs text-page"
+          >
             {t("web.runtime.library.newSkill")}
           </A>
         </div>
-        <ul {...stylex.attrs(styles.skillsPageUl)}>
+        <ul class="flex flex-col gap-0.5">
           <For each={ownShown()}>{(s) => <Entry to={skillPath(s.id)} on={!creating() && selected()?.id === s.id} title={s.name} detail={s.description} />}</For>
         </ul>
       </nav>
-      <div {...stylex.attrs(styles.skillsPageDiv22)}>
+      <div class="min-w-0 flex-1 lg:overflow-y-auto">
         <Switch
           fallback={
             <Empty
@@ -395,11 +165,11 @@ function Entry(props: { to: string; on: boolean; title: string; detail: string }
         href={props.to}
         data-testid="skill-entry"
         aria-current={props.on ? "page" : undefined}
-        {...stylex.attrs(styles.entryA, props.on ? styles.entryATone : styles.entryAAlt)}
+        class={["flex flex-col rounded-md px-2 py-1.5", props.on ? "bg-selected hover:bg-hover" : "hover:bg-hover"]}
       >
-        <span {...stylex.attrs(styles.entrySpan)}>{props.title}</span>
+        <span class="truncate text-sm font-medium">{props.title}</span>
         <Show when={props.detail}>
-          <span {...stylex.attrs(styles.entrySpan2)}>{props.detail}</span>
+          <span class="truncate text-xs text-muted">{props.detail}</span>
         </Show>
       </A>
     </li>
@@ -411,14 +181,14 @@ function BuiltInCard(props: { skill: Skill }) {
   const allAgents = useAgents();
   const agents = () => {
     const id = props.skill.id;
-    return Arr.filter(ready(allAgents, []), (a) => a.skills.includes(id));
+    return ready(allAgents, []).filter((a) => a.skills.includes(id));
   };
   return (
-    <Card title={props.skill.name} styles={styles.skillCard}>
-      <div data-testid="built-in-skill" {...stylex.attrs(styles.installedCardDiv)}>
-        <p {...stylex.attrs(styles.installedCardP)}>{t("web.runtime.library.builtInNote")}</p>
+    <Card title={props.skill.name} class="max-w-3xl">
+      <div data-testid="built-in-skill" class="flex flex-col gap-1.5">
+        <p class="text-xs text-muted">{t("web.runtime.library.builtInNote")}</p>
         <Show when={props.skill.description !== ""}>
-          <p {...stylex.attrs(styles.installedCardP2)}>{props.skill.description}</p>
+          <p class="text-sm whitespace-pre-wrap">{props.skill.description}</p>
         </Show>
         <Markdown text={props.skill.body} />
         <SkillUsers agents={agents()} />
@@ -429,15 +199,15 @@ function BuiltInCard(props: { skill: Skill }) {
 
 function SkillUsers(props: { agents: readonly Agent[] }) {
   return (
-    <div data-testid="skill-users" data-count={props.agents.length} {...stylex.attrs(styles.installedCardDiv)}>
-      <span {...stylex.attrs(styles.skillEditorSpan)}>{t("web.runtime.library.who")}</span>
-      <Show when={props.agents.length > 0} fallback={<p {...stylex.attrs(styles.installedCardP)}>{t("web.runtime.library.nobody")}</p>}>
-        <div {...stylex.attrs(styles.skillEditorDiv2)}>
+    <div data-testid="skill-users" data-count={props.agents.length} class="flex flex-col gap-1.5">
+      <span class="text-xs font-medium text-muted">{t("web.runtime.library.who")}</span>
+      <Show when={props.agents.length > 0} fallback={<p class="text-xs text-muted">{t("web.runtime.library.nobody")}</p>}>
+        <div class="flex flex-wrap gap-2">
           <For each={props.agents}>
             {(a) => (
-              <A href={`/agents/${encodeURIComponent(a.id)}`} {...stylex.attrs(styles.skillEditorA)}>
+              <A href={`/agents/${encodeURIComponent(a.id)}`} class="flex items-center gap-1.5 rounded-md bg-hover hover:bg-selected py-1 pr-3 pl-1">
                 <AgentFace agentId={a.id} runtime={a.runtime} look={a.look} size={26} />
-                <span {...stylex.attrs(styles.skillEditorSpan2)}>{a.name}</span>
+                <span class="text-sm font-medium">{a.name}</span>
               </A>
             )}
           </For>
@@ -450,19 +220,19 @@ function SkillUsers(props: { agents: readonly Agent[] }) {
 /** Read-only: it lives with the runtime. */
 function InstalledCard(props: { skill: InstalledSkill; catalog: readonly RuntimeInfo[] }) {
   return (
-    <Card title={props.skill.name} styles={styles.skillCard}>
-      <p {...stylex.attrs(styles.installedCardP)}>{t("web.runtime.library.installedNote")}</p>
+    <Card title={props.skill.name} class="max-w-3xl">
+      <p class="text-xs text-muted">{t("web.runtime.library.installedNote")}</p>
       <Show when={props.skill.description}>
-        <p {...stylex.attrs(styles.installedCardP2)}>{props.skill.description}</p>
+        <p class="text-sm whitespace-pre-wrap">{props.skill.description}</p>
       </Show>
-      <div {...stylex.attrs(styles.installedCardDiv)}>
-        <h3 {...stylex.attrs(styles.installedCardH3)}>{t("web.runtime.library.where")}</h3>
+      <div class="flex flex-col gap-1.5">
+        <h3 class="text-xs font-semibold text-muted">{t("web.runtime.library.where")}</h3>
         <For each={props.skill.runtimes}>
           {(x) => (
-            <div {...stylex.attrs(styles.installedCardDiv2)}>
+            <div class="flex items-center gap-2.5 rounded-md bg-hover px-3 py-2">
               <RuntimeIcon runtime={x.runtime} size={28} />
-              <span {...stylex.attrs(styles.installedCardSpan)}>{runtimeName(props.catalog, x.runtime)}</span>
-              <span {...stylex.attrs(styles.installedCardSpan2)} title={x.source}>
+              <span class="w-24 text-sm font-medium">{runtimeName(props.catalog, x.runtime)}</span>
+              <span class="min-w-0 flex-1 truncate font-mono text-xs text-muted" title={x.source}>
                 {x.source}
               </span>
             </div>
@@ -519,9 +289,9 @@ function SkillEditor(props: { skill?: Skill }) {
     <Form form={form} testid="skill-form">
       <Card
         title={name.value() || t("web.runtime.library.newSkill")}
-        styles={styles.skillCard}
+        class="max-w-3xl"
         action={
-          <div {...stylex.attrs(styles.skillEditorDiv)}>
+          <div class="flex flex-wrap items-center gap-2">
             <Show when={skill}>
               {(s) => (
                 <ConfirmButton

@@ -148,7 +148,7 @@ export interface Issue {
   readonly submitPullRequest: (session: string, summary?: string) => Promise<string>;
   /** At startup, after the modules below it started: a first round of the queue, then the queue and the pull requests
    * on their timers. (start is taken: it starts an issue.) */
-  readonly startup: () => Promise<void>;
+  readonly boot: () => Promise<void>;
   readonly close: () => Promise<void>;
 }
 
@@ -712,7 +712,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     pollGitHub,
     refreshPullRequests,
     refreshQueue,
-    startup,
+    boot: startup,
     close: () => tasks.close(),
   };
 }

@@ -5,7 +5,7 @@ import { type Task, TaskGroup } from "@vibevalley/async";
 import { todoToolWords as words } from "../base/prompts.ts";
 import { messageOf } from "../core/errors.ts";
 import type { Tool } from "../core/loop.ts";
-import { schemaEffectTool } from "../core/tool.ts";
+import { schemaTool } from "../core/tool.ts";
 import { type AgentLog, consoleLog } from "../infra/log.ts";
 import type { Subagent } from "./self.ts";
 import * as engine from "./todo.ts";
@@ -27,7 +27,7 @@ export function watchedStore(store: TodoStore, changed: (g: engine.Todo[]) => vo
 
 /** changed runs after every change the model makes, so that what became ready goes out. */
 export function todoTools(store: TodoStore, canHelp: boolean, changed: () => Promise<void>): Tool[] {
-  const add = schemaEffectTool({
+  const add = schemaTool({
     name: "todo_add",
     description: words.addDescription,
     parameters: z.object({
@@ -53,7 +53,7 @@ export function todoTools(store: TodoStore, canHelp: boolean, changed: () => Pro
       return engine.text(g);
     },
   });
-  const update = schemaEffectTool({
+  const update = schemaTool({
     name: "todo_update",
     description: words.updateDescription,
     parameters: z.object({
@@ -76,7 +76,7 @@ export function todoTools(store: TodoStore, canHelp: boolean, changed: () => Pro
       return engine.text(g);
     },
   });
-  const list = schemaEffectTool({
+  const list = schemaTool({
     name: "todo_list",
     description: words.graphDescription,
     parameters: z.object({}),

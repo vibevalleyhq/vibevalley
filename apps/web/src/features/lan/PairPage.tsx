@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -9,51 +8,6 @@ import { Button } from "#/ui/Button.tsx";
 import { Field, TextInput } from "#/ui/Field.tsx";
 
 import { pair } from "./device";
-
-const viewStyles = stylex.create({
-  askAction: { alignSelf: "flex-start" },
-  pairPageMain: {
-    display: "flex",
-    minHeight: "100dvh",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "var(--color-side)",
-    paddingInline: "1rem",
-    color: "var(--color-ink)",
-  },
-  pairPageForm: {
-    display: "flex",
-    width: "100%",
-    maxWidth: "var(--container-sm)",
-    flexDirection: "column",
-    gap: "1rem",
-    borderRadius: "var(--radius-lg)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-    padding: "1.25rem",
-  },
-  pairPageH1: {
-    fontSize: "var(--text-lg)",
-    lineHeight: "var(--leading-lg)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  pairPageP: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  pairPageP2: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  pairPageP3: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-berry)",
-  },
-});
 
 export function PairPage() {
   const given = new URLSearchParams(location.search).get("c") ?? "";
@@ -75,16 +29,16 @@ export function PairPage() {
   };
 
   return (
-    <main {...stylex.attrs(viewStyles.pairPageMain)}>
+    <main class="flex min-h-dvh items-center justify-center bg-side px-4 text-ink">
       <form
-        {...stylex.attrs(viewStyles.pairPageForm)}
+        class="flex w-full max-w-sm flex-col gap-4 rounded-lg border border-line bg-page p-5"
         onSubmit={(e) => {
           e.preventDefault();
           if (!asking()) void ask();
         }}
       >
-        <h1 {...stylex.attrs(viewStyles.pairPageH1)}>{t("web.lan.pair.title")}</h1>
-        <p {...stylex.attrs(viewStyles.pairPageP)}>{t("web.lan.pair.intro")}</p>
+        <h1 class="text-lg font-semibold">{t("web.lan.pair.title")}</h1>
+        <p class="text-sm text-muted">{t("web.lan.pair.intro")}</p>
         <Show when={!given}>
           <Field label={t("web.lan.pair.code")} hint={t("web.lan.pair.codeHint")}>
             <TextInput data-testid="pair-code" value={code()} onInput={(e) => setCode(e.currentTarget.value)} autocapitalize="characters" autocomplete="off" />
@@ -96,17 +50,17 @@ export function PairPage() {
         <Show
           when={asking()}
           fallback={
-            <Button tone="primary" type="submit" data-testid="pair-ask" disabled={!code().trim()} styles={viewStyles.askAction}>
+            <Button tone="primary" type="submit" data-testid="pair-ask" disabled={!code().trim()} class="self-start">
               {t("web.lan.pair.ask")}
             </Button>
           }
         >
-          <p role="status" {...stylex.attrs(viewStyles.pairPageP2)}>
+          <p role="status" class="text-sm">
             {t("web.lan.pair.waiting")}
           </p>
         </Show>
         <Show when={problem()}>
-          <p role="alert" {...stylex.attrs(viewStyles.pairPageP3)}>
+          <p role="alert" class="text-sm text-berry">
             {problem()}
           </p>
         </Show>

@@ -1,4 +1,3 @@
-import { Predicate } from "effect";
 import { z } from "zod";
 
 import { VibeValleyApiError } from "@vibevalley/protocol";
@@ -6,7 +5,7 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { CursorManifest, SpriteManifest } from "#/base/manifests.ts";
 
-import { api } from "./api";
+import { api, ApiConnectionError } from "./api";
 import type { FramesSource } from "./frame";
 import { defineQuery, type QueryClient } from "./query/cache";
 import { useQuery } from "./query/solid";
@@ -16,7 +15,7 @@ export { QueryProvider, ready, useQuery, useQueryClient, type QueryResult } from
 export const retryRead = {
   retry: 1,
   retryWhen: (error: unknown) =>
-    Predicate.isTagged(error, "ApiConnectionError") || error instanceof TypeError || (error instanceof VibeValleyApiError && error.status >= 500),
+    error instanceof ApiConnectionError || error instanceof TypeError || (error instanceof VibeValleyApiError && error.status >= 500),
 };
 export function refetchOnRelink(source: FramesSource, client: QueryClient) {
   let was = source.get().link;

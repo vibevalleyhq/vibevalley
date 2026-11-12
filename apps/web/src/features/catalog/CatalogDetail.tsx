@@ -1,5 +1,4 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { Slider } from "@vibevalley/base-ui";
@@ -12,257 +11,15 @@ import { useRouter } from "#/infra/router.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import { Card, Toggle } from "#/ui/layout.tsx";
-import { styleProps } from "#/ui/positioner.ts";
 import { Segmented } from "#/ui/Segmented.tsx";
 
 import { framesOf, type Picture, remakeOf } from "./shelves";
 
-const groundStyles = stylex.create({
-  grass: {
-    backgroundColor: "var(--color-catalog-grass)",
-    backgroundImage: "none",
-    backgroundSize: "auto",
-  },
-  night: {
-    backgroundColor: "var(--color-catalog-night)",
-    backgroundImage: "none",
-    backgroundSize: "auto",
-  },
-  check: {
-    backgroundColor: "var(--color-catalog-paper)",
-    backgroundImage: "repeating-conic-gradient(var(--color-catalog-check) 0% 25%, transparent 0% 50%)",
-    backgroundSize: "12px 12px",
-  },
-});
-
-const styles = stylex.create({
-  detailSliderRoot: {
-    width: "6rem",
-  },
-  detailSliderControl: {
-    position: "relative",
-    display: "flex",
-    height: "1rem",
-    cursor: "pointer",
-    alignItems: "center",
-  },
-  detailSliderTrack: {
-    position: "relative",
-    height: "0.25rem",
-    width: "100%",
-    borderRadius: "9999px",
-    backgroundColor: "var(--color-selected)",
-  },
-  detailSliderIndicator: {
-    height: "100%",
-    borderRadius: "9999px",
-    backgroundColor: "var(--color-leaf)",
-  },
-  detailSliderThumb: {
-    top: "50%",
-    width: "0.75rem",
-    height: "0.75rem",
-    translate: "0 -50%",
-    borderRadius: "9999px",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-leaf)",
-    backgroundColor: "var(--color-page)",
-    boxShadow: "var(--shadow-raise)",
-    outlineStyle: {
-      default: "none",
-      ":focus-visible": "none",
-    },
-    outlineWidth: {
-      default: null,
-      ":focus-visible": "2px",
-    },
-    outlineColor: {
-      default: null,
-      ":focus-visible": "var(--color-focus)",
-    },
-  },
-  detailButton: {
-    display: "flex",
-    width: "2.75rem",
-    height: "2.75rem",
-    cursor: "pointer",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    borderRadius: "var(--radius-sm)",
-  },
-  detailButtonTone: {
-    boxShadow: "0 0 0 2px var(--color-focus)",
-  },
-  detailButtonAlt: {},
-  imgImg: {
-    maxWidth: "none",
-    imageRendering: "pixelated",
-  },
-  copyButton: {
-    display: "flex",
-    flexShrink: "0",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.25rem",
-    borderRadius: "var(--radius-sm)",
-    paddingInline: "0.375rem",
-    paddingBlock: "0.125rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  rowDiv: {
-    display: "flex",
-    gap: "0.5rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  rowSpan: {
-    width: "4rem",
-    flexShrink: "0",
-    color: "var(--color-muted)",
-  },
-  rowSpan2: {
-    display: "flex",
-    minWidth: "0",
-    flex: "1",
-    alignItems: "center",
-    gap: "0.25rem",
-  },
-  codeCode: {
-    minWidth: "0",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    borderRadius: "var(--radius-sm)",
-    backgroundColor: "var(--color-hover)",
-    paddingInline: "0.375rem",
-    paddingBlock: "1px",
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-2xs)",
-    lineHeight: "var(--leading-2xs)",
-  },
-  detailDiv: {
-    display: "flex",
-    maxHeight: "22rem",
-    minHeight: "10rem",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "auto",
-    borderRadius: "var(--radius-md)",
-    padding: "0.75rem",
-  },
-  detailSpan: {
-    position: "relative",
-  },
-  detailSpan2: {
-    width: 12,
-    height: 12,
-    backgroundImage: "linear-gradient(var(--color-berry-500),var(--color-berry-500)), linear-gradient(var(--color-berry-500),var(--color-berry-500))",
-    backgroundPosition: "center, center",
-    backgroundSize: "100% 2px, 2px 100%",
-    backgroundRepeat: "no-repeat",
-    position: "absolute",
-  },
-  detailSpan3: {
-    width: 10,
-    height: 10,
-    position: "absolute",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-water)",
-  },
-  detailDiv2: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  detailDiv3: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.375rem",
-    borderRadius: "var(--radius-lg)",
-    backgroundColor: "var(--color-hover)",
-    padding: "0.5rem",
-  },
-  detailDiv4: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  detailSpan4: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  detailSpan5: {
-    flex: "1",
-  },
-  detailSpan6: {
-    width: "3.5rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  detailDiv5: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.25rem",
-  },
-  detailDiv6: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.375rem",
-  },
-  cursor: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "0.25rem",
-    padding: "0.25rem",
-  },
-  cursorTileSpan: {
-    display: "flex",
-    height: "4rem",
-    width: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-md)",
-  },
-  cursorTileImg: {
-    height: "2.5rem",
-    imageRendering: "pixelated",
-  },
-  cursorTileImg2: {
-    display: "none",
-  },
-  cursorTileSpan2: {
-    position: "absolute",
-    width: "0.5rem",
-    height: "0.5rem",
-    borderRadius: "9999px",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-berry)",
-  },
-  cursorTileSpan3: {
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-});
+const groundStyles = {
+  grass: "bg-catalog-grass bg-none bg-auto",
+  night: "bg-catalog-night bg-none bg-auto",
+  check: "bg-catalog-paper bg-[image:repeating-conic-gradient(var(--color-catalog-check)_0%_25%,_transparent_0%_50%)] [background-size:12px_12px]",
+};
 
 export type Ground = "check" | "grass" | "night";
 export const grounds: { value: Ground; label: string }[] = [
@@ -271,7 +28,7 @@ export const grounds: { value: Ground; label: string }[] = [
   { value: "night", label: t("web.catalog.ground.night") },
 ];
 
-export const groundStyle = (g: Ground): stylex.StyleXStyles => groundStyles[g];
+export const groundStyle = (g: Ground): JSX.ClassValue => groundStyles[g];
 
 /** Whole steps, so its pixels stay square. */
 export const fitScale = (p: Picture, box: number) => {
@@ -285,7 +42,7 @@ export function Img(props: { p: Picture; scale: number }) {
       src={`/pixel/${props.p.name}.png`}
       alt=""
       draggable="false"
-      {...stylex.attrs(styles.imgImg)}
+      class="max-w-none [image-rendering:pixelated]"
       style={{ width: `${Math.round(props.p.w * props.scale)}px`, height: `${Math.round(props.p.h * props.scale)}px` }}
     />
   );
@@ -308,7 +65,11 @@ function Copy(props: { text: string }) {
     }
   };
   return (
-    <button type="button" onClick={() => void copy(props.text)} {...stylex.attrs(styles.copyButton)}>
+    <button
+      type="button"
+      onClick={() => void copy(props.text)}
+      class="flex shrink-0 cursor-pointer items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs text-muted hover:bg-hover"
+    >
       <Icon name={done() ? "check" : "copy"} size={12} />
       {done() ? t("web.catalog.copied") : t("web.catalog.copy")}
     </button>
@@ -317,9 +78,9 @@ function Copy(props: { text: string }) {
 
 function Row(props: { label: string; children: JSX.Element }) {
   return (
-    <div {...stylex.attrs(styles.rowDiv)}>
-      <span {...stylex.attrs(styles.rowSpan)}>{props.label}</span>
-      <span {...stylex.attrs(styles.rowSpan2)}>{props.children}</span>
+    <div class="flex gap-2 text-sm">
+      <span class="w-16 shrink-0 text-muted">{props.label}</span>
+      <span class="flex min-w-0 flex-1 items-center gap-1">{props.children}</span>
     </div>
   );
 }
@@ -327,7 +88,7 @@ function Row(props: { label: string; children: JSX.Element }) {
 function Code(props: { text: string }) {
   return (
     <>
-      <code title={props.text} {...stylex.attrs(styles.codeCode)}>
+      <code title={props.text} class="min-w-0 truncate rounded-sm bg-hover px-1.5 py-px font-mono text-2xs">
         {props.text}
       </code>
       <Copy text={props.text} />
@@ -360,13 +121,13 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
   const scales = () => [...new Set([1, 2, 4, 8, scale()])].toSorted((a, b) => a - b);
   return (
     <Card title={props.picture.name} action={<Copy text={props.picture.name} />} testid="picture-detail" item={props.picture.name}>
-      <div {...styleProps([styles.detailDiv, groundStyle(props.ground)])}>
-        <span {...stylex.attrs(styles.detailSpan)} style={{ width: `${shown().w * scale()}px`, height: `${shown().h * scale()}px` }}>
+      <div class={["flex max-h-88 min-h-40 items-center justify-center overflow-auto rounded-md p-3", groundStyle(props.ground)]}>
+        <span class="relative" style={{ width: `${shown().w * scale()}px`, height: `${shown().h * scale()}px` }}>
           <Img p={shown()} scale={scale()} />
           <Show when={marks()}>
             <span
               title={t("web.catalog.anchor")}
-              {...stylex.attrs(styles.detailSpan2)}
+              class="w-3 h-3 bg-[image:linear-gradient(var(--color-berry-500),var(--color-berry-500)),_linear-gradient(var(--color-berry-500),var(--color-berry-500))] [background-position:center,_center] [background-size:100%_2px,_2px_100%] bg-no-repeat absolute"
               style={{
                 left: `${shown().ax * scale() - 6}px`,
                 top: `${shown().ay * scale() - 6}px`,
@@ -376,7 +137,7 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
               {(head) => (
                 <span
                   title={t("web.catalog.head")}
-                  {...stylex.attrs(styles.detailSpan3)}
+                  class="w-2.5 h-2.5 absolute border-2 border-water"
                   style={{ left: `${head().x * scale() - 5}px`, top: `${head().y * scale() - 5}px` }}
                 />
               )}
@@ -384,7 +145,7 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
           </Show>
         </span>
       </div>
-      <div {...stylex.attrs(styles.detailDiv2)}>
+      <div class="flex flex-wrap items-center gap-2">
         <Segmented
           label={t("web.catalog.zoom")}
           value={String(scale())}
@@ -395,24 +156,27 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
       </div>
       <Show when={frames()}>
         {(f) => (
-          <div {...stylex.attrs(styles.detailDiv3)}>
-            <div {...stylex.attrs(styles.detailDiv4)}>
+          <div class="flex flex-col gap-1.5 rounded-lg bg-hover p-2">
+            <div class="flex items-center gap-2">
               <Button data-testid="play" aria-pressed={aria(playing())} onClick={() => setPlaying(!playing())}>
                 {playing() ? t("web.catalog.stop") : t("web.catalog.play")}
               </Button>
-              <span {...stylex.attrs(styles.detailSpan4)}>{t("web.catalog.frames", { n: f().length })}</span>
-              <span {...stylex.attrs(styles.detailSpan5)} />
-              <Slider.Root min={1} max={12} value={fps()} onValueChange={setFps} {...stylex.attrs(styles.detailSliderRoot)}>
-                <Slider.Control {...stylex.attrs(styles.detailSliderControl)}>
-                  <Slider.Track {...stylex.attrs(styles.detailSliderTrack)}>
-                    <Slider.Indicator {...stylex.attrs(styles.detailSliderIndicator)} />
-                    <Slider.Thumb aria-label={t("web.catalog.fps")} {...stylex.attrs(styles.detailSliderThumb)} />
+              <span class="text-xs text-muted">{t("web.catalog.frames", { n: f().length })}</span>
+              <span class="flex-1" />
+              <Slider.Root min={1} max={12} value={fps()} onValueChange={setFps} class="w-24">
+                <Slider.Control class="relative flex h-4 cursor-pointer items-center">
+                  <Slider.Track class="relative h-1 w-full rounded-full bg-selected">
+                    <Slider.Indicator class="h-full rounded-full bg-leaf" />
+                    <Slider.Thumb
+                      aria-label={t("web.catalog.fps")}
+                      class="top-1/2 w-3 h-3 -translate-y-1/2 rounded-full border border-leaf bg-page shadow-raise outline-none focus-visible:outline-none focus-visible:outline-2 focus-visible:outline-focus"
+                    />
                   </Slider.Track>
                 </Slider.Control>
               </Slider.Root>
-              <span {...stylex.attrs(styles.detailSpan6)}>{t("web.catalog.perSecond", { n: fps() })}</span>
+              <span class="w-14 text-xs text-muted">{t("web.catalog.perSecond", { n: fps() })}</span>
             </div>
-            <div {...stylex.attrs(styles.detailDiv5)}>
+            <div class="flex flex-wrap gap-1">
               <For each={f()}>
                 {(name, i) => (
                   <Show when={props.byName.get(name)}>
@@ -422,11 +186,11 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
                         title={name}
                         aria-label={name}
                         onClick={() => router.navigate(`/catalog/${encodeURIComponent(name)}`)}
-                        {...styleProps([
-                          styles.detailButton,
-                          playing() && i() === frame() % f().length ? styles.detailButtonTone : styles.detailButtonAlt,
+                        class={[
+                          "flex w-11 h-11 cursor-pointer items-center justify-center overflow-hidden rounded-sm",
+                          playing() && i() === frame() % f().length ? "[box-shadow:0_0_0_2px_var(--color-focus)]" : "",
                           groundStyle(props.ground),
-                        ])}
+                        ]}
                       >
                         <Img p={p()} scale={fitScale(p(), 38)} />
                       </button>
@@ -438,12 +202,12 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
           </div>
         )}
       </Show>
-      <div {...stylex.attrs(styles.detailDiv6)}>
+      <div class="flex flex-col gap-1.5">
         <Row label={t("web.catalog.size")}>{t("web.catalog.pixels", { w: numberText(props.picture.w), h: numberText(props.picture.h) })}</Row>
         <Row label={t("web.catalog.anchor")}>{`(${numberText(props.picture.ax)}, ${numberText(props.picture.ay)})`}</Row>
         <Show when={headOf(props.picture)}>{(head) => <Row label={t("web.catalog.head")}>{`(${numberText(head().x)}, ${numberText(head().y)})`}</Row>}</Show>
         <Row label={t("web.catalog.from")}>
-          <Show when={props.picture.sheet} fallback={<span {...stylex.attrs(styles.detailSpan4)}>{t("web.catalog.unrecorded")}</span>}>
+          <Show when={props.picture.sheet} fallback={<span class="text-xs text-muted">{t("web.catalog.unrecorded")}</span>}>
             {(sheet) => <Code text={sheet()} />}
           </Show>
         </Row>
@@ -477,27 +241,32 @@ export function CursorTile(props: { name: string; hx: number; hy: number; ground
     return n && ratio != null && ratio !== 0 ? n.w * ratio : height;
   };
   return (
-    <div data-testid="cursor" data-key={props.name} {...stylex.attrs(styles.cursor)}>
-      <span {...styleProps([styles.cursorTileSpan, groundStyle(props.ground)])}>
-        <span {...stylex.attrs(styles.detailSpan)} style={{ height: `${height}px`, width: `${widthPx()}px` }}>
+    <div data-testid="cursor" data-key={props.name} class="flex flex-col items-center gap-1 p-1">
+      <span class={["flex h-16 w-full items-center justify-center rounded-md", groundStyle(props.ground)]}>
+        <span class="relative" style={{ height: `${height}px`, width: `${widthPx()}px` }}>
           <img
             src={`/cursors/${props.name}@2x.png`}
             alt=""
-            {...stylex.attrs(styles.cursorTileImg)}
+            class="h-10 [image-rendering:pixelated]"
             onError={(e) => (e.currentTarget.src = `/cursors/${props.name}.png`)}
           />
           <img
             src={`/cursors/${props.name}.png`}
             alt=""
-            {...stylex.attrs(styles.cursorTileImg2)}
+            class="hidden"
             onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
           />
           <Show when={k()}>
-            {(ratio) => <span {...stylex.attrs(styles.cursorTileSpan2)} style={{ left: `${props.hx * ratio() - 4}px`, top: `${props.hy * ratio() - 4}px` }} />}
+            {(ratio) => (
+              <span
+                class="absolute w-2 h-2 rounded-full border border-bark-900 bg-berry"
+                style={{ left: `${props.hx * ratio() - 4}px`, top: `${props.hy * ratio() - 4}px` }}
+              />
+            )}
           </Show>
         </span>
       </span>
-      <span {...stylex.attrs(styles.cursorTileSpan3)}>{props.name}</span>
+      <span class="font-mono text-xs text-muted">{props.name}</span>
     </div>
   );
 }

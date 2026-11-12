@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -14,101 +13,6 @@ import { allOf, counts, kept, newest, type TreeFilter } from "./memories";
 import { type MemoryItem, mockTree, TreeStageValues } from "./mock";
 import { Scene, type SceneArea, type SceneHover } from "./Scene";
 import { Filters, narrowBelow, Panel, panelWidth, Tip } from "./TreePanel";
-
-const styles = stylex.create({
-  homeCorner: {
-    position: "absolute",
-    top: "0.75rem",
-    left: "0.75rem",
-  },
-  hidden: {
-    display: "none",
-  },
-  treePageFilters: {
-    minWidth: "220px",
-    flex: "1",
-  },
-  treePageDiv: {
-    position: "fixed",
-    inset: "0",
-    overflow: "hidden",
-    backgroundColor: "var(--color-ground)",
-    fontFamily: "var(--font-pixel)",
-    color: "var(--color-bark-900)",
-    WebkitUserSelect: "none",
-    userSelect: "none",
-  },
-  treePagePxWindow: {
-    position: "absolute",
-    top: "0.75rem",
-    left: "0.75rem",
-    paddingInline: "0.75rem",
-    paddingBlock: "0.5rem",
-  },
-  treePageDiv2: {
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.4286",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    fontSynthesis: "none",
-  },
-  treePageDiv22: {
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.3333",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    color: "var(--color-bark-500)",
-    fontSynthesis: "none",
-  },
-  treePageSpan: {
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.3333",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    fontSynthesis: "none",
-  },
-  treePageSpan2: {
-    width: "64px",
-    textAlign: "right",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.3333",
-    fontWeight: "var(--font-weight-normal)",
-    letterSpacing: "var(--tracking-normal)",
-    fontSynthesis: "none",
-  },
-  controls: {
-    position: "absolute",
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.75rem",
-    paddingInline: "0.75rem",
-    paddingBlock: "0.5rem",
-  },
-  skyControls: { insetInline: "0.75rem", bottom: "0.75rem", marginInline: "auto", maxWidth: "760px" },
-  narrowControls: { insetInline: "0.5rem", top: "calc(52% - 56px)" },
-  groundControls: { bottom: "0.75rem", left: "0.75rem" },
-  treePageDiv3: {
-    position: "absolute",
-    top: "0.75rem",
-    right: "0.75rem",
-  },
-  treePageLabel: {
-    display: "flex",
-    minWidth: "220px",
-    flex: "1",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  treePageInput: {
-    flex: "1",
-    accentColor: "var(--color-leaf-500)",
-  },
-});
 
 export function TreePage() {
   const router = useRouter();
@@ -154,7 +58,7 @@ export function TreePage() {
 
   // Drawn: the workbench's dark theme does not reach in (style.css).
   return (
-    <div data-theme="light" {...stylex.attrs(styles.treePageDiv)} data-testid="memory-tree">
+    <div data-theme="light" class="fixed inset-0 overflow-hidden bg-ground font-pixel text-bark-900 select-none" data-testid="memory-tree">
       <Scene
         tree={tree}
         filter={filter()}
@@ -189,30 +93,33 @@ export function TreePage() {
           />
         }
       >
-        <PxWindow styles={[styles.treePagePxWindow]}>
-          <div {...stylex.attrs(styles.treePageDiv2)}>{t("web.tree.sky")}</div>
-          <div {...stylex.attrs(styles.treePageDiv22)}>{t("web.tree.skyHint")}</div>
+        <PxWindow class="absolute top-3 left-3 px-3 py-2">
+          <div class="pixel-sm">{t("web.tree.sky")}</div>
+          <div class="pixel-xs text-bark-500">{t("web.tree.skyHint")}</div>
         </PxWindow>
-        <div {...stylex.attrs(styles.treePageDiv3)}>
+        <div class="absolute top-3 right-3">
           <PxButton icon="icon-tree" data-testid="tree-back" onClick={() => lookUp(false)}>
             {t("web.tree.back")}
           </PxButton>
         </div>
       </Show>
-      <div {...stylex.attrs(styles.homeCorner, sky() && styles.hidden)}>
+      <div class={["absolute top-3 left-3", sky() && "hidden"]}>
         <PxButton icon="icon-map" data-testid="tree-home" onClick={home}>
           {t("web.tree.farm")}
         </PxButton>
       </div>
       <PxWindow
-        styles={[styles.controls, sky() ? styles.skyControls : narrow() ? styles.narrowControls : styles.groundControls]}
+        class={[
+          "absolute flex flex-wrap items-center gap-3 px-3 py-2",
+          sky() ? "inset-x-3 bottom-3 mx-auto max-w-190" : narrow() ? "inset-x-2 top-[calc(52%_-_56px)]" : "bottom-3 left-3",
+        ]}
         style={sky() || narrow() ? undefined : { width: `${Math.min(520, area().w - 24)}px` }}
       >
         <Show when={sky()}>
-          <Filters tree={tree} filter={filter()} setFilter={setFilter} styles={[styles.treePageFilters]} />
+          <Filters tree={tree} filter={filter()} setFilter={setFilter} class="min-w-55 flex-1" />
         </Show>
-        <label {...stylex.attrs(styles.treePageLabel)}>
-          <span {...stylex.attrs(styles.treePageSpan)}>{t("web.tree.earliest")}</span>
+        <label class="flex min-w-55 flex-1 items-center gap-2">
+          <span class="pixel-xs">{t("web.tree.earliest")}</span>
           <input
             type="range"
             min="0"
@@ -221,9 +128,9 @@ export function TreePage() {
             value={until()}
             aria-label={t("web.tree.past")}
             onInput={(e) => setUntil(Number(e.currentTarget.value))}
-            {...stylex.attrs(styles.treePageInput)}
+            class="flex-1 accent-leaf-500"
           />
-          <span data-testid="tree-until" data-now={until() >= 1 ? "" : undefined} {...stylex.attrs(styles.treePageSpan2)}>
+          <span data-testid="tree-until" data-now={until() >= 1 ? "" : undefined} class="pixel-xs w-16 text-right">
             {until() >= 1 ? t("web.tree.now") : t("web.tree.day", { n: day() })}
           </span>
         </label>

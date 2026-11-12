@@ -9,7 +9,7 @@ import { type Cron, nextCron, parseCronExpression } from "../base/cron.ts";
 import { reminders as reminderWords } from "../base/prompts.ts";
 import { AgentFailed, messageOf, ToolFailed, toolFailed } from "../core/errors.ts";
 import type { Tool } from "../core/loop.ts";
-import { schemaEffectTool } from "../core/tool.ts";
+import { schemaTool } from "../core/tool.ts";
 import { type AgentFs, agentFsOf } from "../infra/fs.ts";
 import { type AgentLog, consoleLog } from "../infra/log.ts";
 
@@ -209,7 +209,7 @@ export async function makeReminders(home: string, wake: (due: string[]) => void 
   };
   arm();
 
-  const add = schemaEffectTool({
+  const add = schemaTool({
     name: "reminder",
     description: reminderWords.reminderDescription,
     parameters: z.object({
@@ -232,7 +232,7 @@ export async function makeReminders(home: string, wake: (due: string[]) => void 
       return reminderWords.set + describeReminder(built);
     },
   });
-  const listTool = schemaEffectTool({
+  const listTool = schemaTool({
     name: "list_reminders",
     description: reminderWords.listDescription,
     parameters: z.object({}),
@@ -241,7 +241,7 @@ export async function makeReminders(home: string, wake: (due: string[]) => void 
       return reminders.length === 0 ? reminderWords.none : reminders.map(describeReminder).join("\n");
     },
   });
-  const cancel = schemaEffectTool({
+  const cancel = schemaTool({
     name: "cancel_reminder",
     description: reminderWords.cancelDescription,
     parameters: z.object({ id: z.string() }),

@@ -131,7 +131,7 @@ export interface Mailbox {
   readonly deliveriesOf: (session: string) => readonly DeliveryRow[];
   readonly orchestratorDigest: (agent: string) => Promise<Envelope[]>;
   /** At startup, after the modules below it started: restores the open deliveries, routes what was left, wakes who waits. */
-  readonly start: () => Promise<void>;
+  readonly boot: () => Promise<void>;
   readonly restore: () => Promise<void>;
   readonly replay: () => Promise<void>;
   /** What the mailbox tells, subscribed before it returns. */
@@ -523,7 +523,7 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
         .of(agent)
         .filter((row) => !(row.wakes && row.held_by === null))
         .map((row) => inputOf(row)),
-    start: async () => {
+    boot: async () => {
       await restore();
       await replay();
       for (const issue of core.state().issues)

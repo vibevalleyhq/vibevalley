@@ -1,11 +1,9 @@
 import type { JSX } from "@solidjs/web";
-import type * as stylex from "@stylexjs/stylex";
 import { omit } from "solid-js";
 
 import { Checkbox as Base } from "@vibevalley/base-ui";
 
 import { Icon } from "./Icon";
-import { withStyles } from "./positioner";
 
 /** A box to tick (base-ui's Checkbox): the same box on every system and in both themes, ticked in the accent colour. */
 export function Checkbox(props: {
@@ -17,11 +15,9 @@ export function Checkbox(props: {
   testid?: string;
   /** Placement only. */
   class?: JSX.ClassValue | undefined;
-  // For callers still on StyleX; it goes when the last of them is on classes.
-  styles?: stylex.StyleXStyles;
   "data-key"?: string | number;
 }) {
-  const rest = omit(props, "checked", "onChange", "label", "indeterminate", "disabled", "testid", "class", "styles");
+  const rest = omit(props, "checked", "onChange", "label", "indeterminate", "disabled", "testid", "class");
   return (
     <Base.Root
       {...rest}
@@ -31,11 +27,11 @@ export function Checkbox(props: {
       disabled={props.disabled}
       aria-label={props.label}
       data-testid={props.testid}
-      {...withStyles(props.styles, [
+      class={[
         // Under the pointer the edge is muted, ticked or not.
         "flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-xs border border-line bg-page text-page transition-[color,background-color,border-color] duration-120 ease-out hover:border-muted disabled:cursor-default disabled:opacity-50 data-checked:border-accent data-checked:bg-accent data-checked:hover:border-muted data-indeterminate:border-accent data-indeterminate:bg-accent data-indeterminate:hover:border-muted",
         props.class,
-      ])}
+      ]}
     >
       <Base.Indicator class="flex">
         <Icon name={props.indeterminate === true ? "partly" : "ticked"} size={12} />

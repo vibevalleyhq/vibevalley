@@ -100,7 +100,7 @@ test("regression: releasing one transcript preserves another job's pins, then fr
     );
   }
   await f.adjust(hours(25));
-  await media.start();
+  await media.boot();
   expect((await media.inputs.content(local.id)).size).toBe(bytes.length);
   const before = await media.get(first.id);
   const row = await q.mediaJob(db.sql, { id: first.id });
@@ -121,7 +121,7 @@ test("regression: releasing one transcript preserves another job's pins, then fr
   await media.release(second.id);
   expect(await input.inputCapacity(db.sql)).toEqual({ bytes: 0, count: 0 });
   expect(await failure(media.inputs.get(local.id))).toMatchObject({ bizCode: BizCode.MediaRefused });
-  await media.start();
+  await media.boot();
   expect(await media.createTranscription(first)).toMatchObject({ id: first.id, input: null, result: { text: "Retain this transcript." } });
   expect(await media.createTranscription(second)).toMatchObject({ id: second.id, input: null });
   expect([uploads, submissions, deletes]).toEqual([2, 2, 2]);
@@ -310,7 +310,7 @@ test.each(["unknown", "canceled", "download_failed"] as const)(
     expect(await q.mediaJob(db.sql, { id: design.id })).toMatchObject({ remote_task: "paid-task", assets_released: 1 });
     expect(await q.mediaJob(db.sql, { id: spoken.id })).toMatchObject({ remote_task: "paid-task", assets_released: 1 });
     for (const id of assets) expect(await failure(inputs.get(id))).toMatchObject({ bizCode: BizCode.MediaRefused });
-    await media.start();
+    await media.boot();
     expect(await media.createVoiceDesign(design, { kind: "user" })).toMatchObject({ phase, resultInput: null, canRelease: false });
     expect(await media.createSpeech(spoken, { kind: "user" })).toMatchObject({ phase, resultInput: null, canRelease: false });
     expect(await input.inputCapacity(db.sql)).toEqual({ bytes: 0, count: 0 });
@@ -358,7 +358,7 @@ test("regression: local release leaves failed remote deletion receipts retryable
   expect(released).toMatchObject({ input: null, canCleanup: true, result: { text: "Keep the transcript." } });
   expect(await failure(media.inputs.get(local.id))).toMatchObject({ bizCode: BizCode.MediaRefused });
   expect(deletes).toBe(1);
-  await media.start();
+  await media.boot();
   expect(await media.get(request.id)).toMatchObject({ input: null, canCleanup: false, problem: "", result: { text: "Keep the transcript." } });
   expect(await media.createTranscription(request)).toMatchObject({ input: null, canRelease: false });
   expect([submissions, deletes]).toEqual([1, 2]);

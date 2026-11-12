@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -14,179 +13,12 @@ import { Hint, Tip } from "#/ui/Tip.tsx";
 
 import { VisionPlayground } from "./VisionPlayground.tsx";
 
-const styles = stylex.create({
-  mossLineViewP: {
-    maxWidth: "80%",
-    borderRadius: "var(--radius-lg)",
-    paddingInline: "0.75rem",
-    paddingBlock: "0.375rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  mossLineViewPPrimary: {
-    backgroundColor: "var(--wb-hover)",
-  },
-  mossLineViewPSecondary: {
-    backgroundColor: "var(--wb-ok-soft)",
-  },
-  mossLineViewPStateA: {
-    fontStyle: null,
-  },
-  mossLineViewPStateB: {
-    fontStyle: "italic",
-  },
-  statSpan: {
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    fontVariantNumeric: "tabular-nums",
-  },
-  statSpanTone: {
-    color: "var(--color-berry)",
-  },
-  statSpanAlt: {
-    color: "var(--color-ink)",
-  },
-  mossLineViewDiv: {
-    display: "flex",
-  },
-  mossLineViewDivTone: {
-    justifyContent: "flex-end",
-  },
-  mossLineViewDivAlt: {
-    justifyContent: "flex-start",
-  },
-  mossLineViewSpan: {
-    marginRight: "0.375rem",
-  },
-  mossLineViewSpanTone: {
-    color: "var(--color-water)",
-  },
-  mossLineViewSpanAlt: {
-    color: "var(--color-leaf)",
-  },
-  debugSummary: {
-    cursor: "pointer",
-    paddingBlock: "0.5rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  levelSpan: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.375rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  levelSpan2: {
-    width: "2.5rem",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-  },
-  levelSpan3: {
-    height: "0.375rem",
-    width: "6rem",
-    overflow: "hidden",
-    borderRadius: "9999px",
-    backgroundColor: "var(--color-hover)",
-  },
-  levelSpan4: {
-    display: "block",
-    height: "100%",
-    borderRadius: "9999px",
-    backgroundColor: "var(--color-leaf)",
-    transitionProperty: "width",
-    transitionTimingFunction: "var(--ease-out)",
-    transitionDuration: "120ms",
-  },
-  statSpan2: {
-    display: "flex",
-    flexDirection: "column",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    paddingInline: "0.625rem",
-    paddingBlock: "0.375rem",
-  },
-  statSpan22: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  mossLine: {
-    display: "flex",
-    maxWidth: "var(--container-4xl)",
-    flexDirection: "column",
-    gap: "0.75rem",
-  },
-  mossLineViewDiv2: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
-    padding: "1rem",
-  },
-  mossLineViewLabel: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.25rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontWeight: "var(--font-weight-medium)",
-    color: "var(--color-muted)",
-  },
-  mossLineViewDiv22: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.75rem",
-  },
-  mossLineViewP2: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-berry)",
-  },
-  mossQos: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.5rem",
-    padding: "1rem",
-  },
-  mossSaid: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.5rem",
-    padding: "1rem",
-  },
-  mossLineViewP22: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  mossEvents: {
-    maxHeight: "18rem",
-    overflowY: "auto",
-    padding: "0.75rem",
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-  },
-  mossLineViewLi: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-  },
-});
-
 function Level(props: { value: number; label: string }) {
   return (
-    <span {...stylex.attrs(styles.levelSpan)} title={props.label}>
-      <span {...stylex.attrs(styles.levelSpan2)}>{props.label}</span>
-      <span {...stylex.attrs(styles.levelSpan3)}>
-        <span {...stylex.attrs(styles.levelSpan4)} style={{ width: `${props.value}%` }} />
+    <span class="flex items-center gap-1.5 text-xs text-muted" title={props.label}>
+      <span class="w-10 truncate">{props.label}</span>
+      <span class="h-1.5 w-24 overflow-hidden rounded-full bg-hover">
+        <span class="block h-full rounded-full bg-leaf transition-[width] ease-out duration-120" style={{ width: `${props.value}%` }} />
       </span>
     </span>
   );
@@ -196,9 +28,9 @@ function Level(props: { value: number; label: string }) {
 function Stat(props: { label: string; value: string; tip: string; bad?: boolean }) {
   return (
     <Tip text={props.tip}>
-      <span {...stylex.attrs(styles.statSpan2)} tabindex={0}>
-        <span {...stylex.attrs(styles.statSpan22)}>{props.label}</span>
-        <span {...stylex.attrs(styles.statSpan, props.bad === true ? styles.statSpanTone : styles.statSpanAlt)}>{props.value}</span>
+      <span class="flex flex-col rounded-md border border-line px-2.5 py-1.5" tabindex={0}>
+        <span class="text-xs text-muted">{props.label}</span>
+        <span class={["font-mono text-sm tabular-nums", props.bad === true ? "text-berry" : "text-ink"]}>{props.value}</span>
       </span>
     </Tip>
   );
@@ -210,9 +42,9 @@ export function MossPlayground() {
   const line = () => (version(), mossLine);
   onSettled(() => () => mossLine.end());
   return (
-    <div {...stylex.attrs(styles.mossLine)}>
+    <div class="flex max-w-4xl flex-col gap-3">
       <Show when={!localRelayHost(location.hostname)}>
-        <p role="status" {...stylex.attrs(styles.mossLineViewP22)}>
+        <p role="status" class="text-sm text-muted">
           {t("web.voice.moss.localOnly")}
         </p>
       </Show>
@@ -221,8 +53,8 @@ export function MossPlayground() {
         onSource={setSource}
         sharing={line().visualSource !== undefined}
         liveShare={
-          <div {...stylex.attrs(styles.mossLineViewDiv2)} data-testid="live-visual" data-state={line().visualSource ?? "idle"}>
-            <p {...stylex.attrs(styles.mossLineViewP22)}>{t("web.voice.vision.liveTitle")}</p>
+          <div class="flex flex-col gap-3 p-4" data-testid="live-visual" data-state={line().visualSource ?? "idle"}>
+            <p class="text-sm text-muted">{t("web.voice.vision.liveTitle")}</p>
             <Show
               when={line().visualSource !== undefined}
               fallback={
@@ -241,7 +73,7 @@ export function MossPlayground() {
             </Show>
             <Show when={line().visualProblem}>
               {(problem) => (
-                <p role="alert" {...stylex.attrs(styles.mossLineViewP2)}>
+                <p role="alert" class="text-sm text-berry">
                   {problem()}
                 </p>
               )}
@@ -276,10 +108,10 @@ export function MossLineView(props: {
   const [instructions, setInstructions] = createSignal(t("web.voice.moss.defaultInstructions"));
   const idle = () => line().phase === "idle";
   return (
-    <div {...stylex.attrs(styles.mossLine)} data-testid="moss-line" data-state={line().phase}>
-      <Card title={t("web.voice.moss.tryIt")} action={<span {...stylex.attrs(styles.statSpan22)}>{t("web.voice.moss.notInChat")}</span>}>
-        <div {...stylex.attrs(styles.mossLineViewDiv2)}>
-          <label {...stylex.attrs(styles.mossLineViewLabel)}>
+    <div class="flex max-w-4xl flex-col gap-3" data-testid="moss-line" data-state={line().phase}>
+      <Card title={t("web.voice.moss.tryIt")} action={<span class="text-xs text-muted">{t("web.voice.moss.notInChat")}</span>}>
+        <div class="flex flex-col gap-3 p-4">
+          <label class="flex flex-col gap-1 text-xs font-medium text-muted">
             {t("web.voice.moss.persona")}
             <TextArea
               rows={2}
@@ -289,11 +121,11 @@ export function MossLineView(props: {
               onInput={(e) => setPersona(e.currentTarget.value)}
             />
           </label>
-          <label {...stylex.attrs(styles.mossLineViewLabel)}>
+          <label class="flex flex-col gap-1 text-xs font-medium text-muted">
             {t("web.voice.moss.instructions")}
             <TextArea rows={2} disabled={!idle()} value={instructions()} onInput={(e) => setInstructions(e.currentTarget.value)} />
           </label>
-          <div {...stylex.attrs(styles.mossLineViewDiv22)}>
+          <div class="flex flex-wrap items-center gap-3">
             <Show
               when={idle()}
               fallback={
@@ -325,7 +157,7 @@ export function MossLineView(props: {
           </div>
           <Show when={line().problem}>
             {(p) => (
-              <p role="alert" {...stylex.attrs(styles.mossLineViewP2)}>
+              <p role="alert" class="text-sm text-berry">
                 {p()}
               </p>
             )}
@@ -333,17 +165,13 @@ export function MossLineView(props: {
         </div>
       </Card>
       <Card title={t("web.voice.moss.said")}>
-        <div {...stylex.attrs(styles.mossSaid)} role="log" aria-label={t("web.voice.moss.said")} data-testid="moss-said">
-          <Show when={line().turns.length > 0} fallback={<p {...stylex.attrs(styles.mossLineViewP22)}>{t("web.voice.moss.nothingSaid")}</p>}>
+        <div class="flex flex-col gap-2 p-4" role="log" aria-label={t("web.voice.moss.said")} data-testid="moss-said">
+          <Show when={line().turns.length > 0} fallback={<p class="text-sm text-muted">{t("web.voice.moss.nothingSaid")}</p>}>
             <For each={line().turns}>
               {(turn) => (
-                <div {...stylex.attrs(styles.mossLineViewDiv, turn.who === "user" ? styles.mossLineViewDivTone : styles.mossLineViewDivAlt)}>
+                <div class={["flex", turn.who === "user" ? "justify-end" : "justify-start"]}>
                   <p
-                    {...stylex.attrs(
-                      styles.mossLineViewP,
-                      turn.who === "user" ? styles.mossLineViewPSecondary : styles.mossLineViewPPrimary,
-                      !turn.done ? styles.mossLineViewPStateB : styles.mossLineViewPStateA,
-                    )}
+                    class={["max-w-[80%] rounded-lg px-3 py-1.5 text-sm", turn.who === "user" ? "bg-ok-soft" : "bg-hover", !turn.done ? "italic" : ""]}
                     data-done={turn.done ? "" : undefined}
                   >
                     {turn.text}
@@ -356,10 +184,10 @@ export function MossLineView(props: {
       </Card>
       {/* What the line does underneath, for when a call goes wrong: folded until asked for. */}
       <details data-testid="moss-debug">
-        <summary {...stylex.attrs(styles.debugSummary)}>{t("web.voice.moss.debug")}</summary>
-        <div {...stylex.attrs(styles.mossLine)}>
+        <summary class="cursor-pointer py-2 text-sm text-muted">{t("web.voice.moss.debug")}</summary>
+        <div class="flex max-w-4xl flex-col gap-3">
           <Card title={t("web.voice.moss.qos.title")} action={<Hint text={t("web.voice.moss.qos.hint")} />}>
-            <div {...stylex.attrs(styles.mossQos)} role="group" aria-label={t("web.voice.moss.qos.title")} data-testid="moss-qos">
+            <div class="flex flex-wrap gap-2 p-4" role="group" aria-label={t("web.voice.moss.qos.title")} data-testid="moss-qos">
               <Stat
                 label={t("web.voice.moss.qos.reply")}
                 value={
@@ -399,13 +227,11 @@ export function MossLineView(props: {
             </div>
           </Card>
           <Card title={t("web.voice.moss.events")} action={<Hint text={t("web.voice.moss.eventsHint")} />}>
-            <ol {...stylex.attrs(styles.mossEvents)} aria-label={t("web.voice.moss.events")} data-testid="moss-events">
+            <ol class="max-h-72 overflow-y-auto p-3 font-mono text-xs" aria-label={t("web.voice.moss.events")} data-testid="moss-events">
               <For each={line().events}>
                 {(e) => (
-                  <li {...stylex.attrs(styles.mossLineViewLi)} title={e.text}>
-                    <span {...stylex.attrs(styles.mossLineViewSpan, e.up ? styles.mossLineViewSpanTone : styles.mossLineViewSpanAlt)}>
-                      {e.up ? t("web.voice.moss.up") : t("web.voice.moss.down")}
-                    </span>
+                  <li class="truncate" title={e.text}>
+                    <span class={["mr-1.5", e.up ? "text-water" : "text-leaf"]}>{e.up ? t("web.voice.moss.up") : t("web.voice.moss.down")}</span>
                     {e.text}
                   </li>
                 )}

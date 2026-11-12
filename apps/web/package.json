@@ -17,7 +17,6 @@
   },
   "dependencies": {
     "@solidjs/web": "catalog:",
-    "@stylexjs/stylex": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@vibevalley/ai": "workspace:*",
     "@vibevalley/artifact": "workspace:*",
@@ -31,7 +30,6 @@
     "@vibevalley/provider": "workspace:*",
     "@vibevalley/stories": "workspace:*",
     "agora-rtc-sdk-ng": "catalog:",
-    "effect": "catalog:",
     "hast-util-to-dom": "catalog:",
     "pele": "catalog:",
     "pinyin-pro": "catalog:",
@@ -51,7 +49,6 @@
     "@axe-core/playwright": "catalog:",
     "@playwright/test": "catalog:",
     "@solidjs/vite-plugin": "catalog:",
-    "@stylexjs/unplugin": "catalog:",
     "@types/node": "catalog:",
     "@vibevalley/testkit": "workspace:*",
     "typescript": "catalog:",

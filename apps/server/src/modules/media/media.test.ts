@@ -53,7 +53,7 @@ const aMedia = async (options: MediaFarmOptions = {}) => {
 
 test("regression: startup projects an empty generation history before the first task", async () => {
   await using f = await mediaFarm();
-  await f.media.start();
+  await f.media.boot();
   expect(f.farm.core.state().media).toEqual([]);
 });
 
@@ -316,7 +316,7 @@ test("generation source and reported usage survive restart without accepting a d
   })();
   await using f = await mediaFarm({ fetch: generated, publicFetch: downloaded, config });
   const { media } = f;
-  await media.start();
+  await media.boot();
   expect(await media.get(input.id)).toEqual(saved);
   expect(await media.createImage(input, caller)).toEqual(saved);
   expect(await failure(media.createImage(input, { kind: "user" }))).toMatchObject({ bizCode: BizCode.MediaRefused });
@@ -374,7 +374,7 @@ test("restart marks unsent and ambiguous tasks separately and resumes only store
     });
   }
   const { media } = f;
-  await media.start();
+  await media.boot();
   expect((await media.get("queued")).phase).toBe("canceled");
   expect((await media.get("generating")).phase).toBe("unknown");
   await waitFor(
@@ -405,7 +405,7 @@ describe("images asked for in a channel", () => {
     expect(String(posted[0]?.["meta"])).toContain(ready.attachment?.id ?? "missing");
     expect(await postsOf("users-own")).toEqual([]);
     // A restart posts what is ready again; the send key keeps it once.
-    await media.start();
+    await media.boot();
     expect(await postsOf("asked-in-channel")).toHaveLength(1);
   });
 });

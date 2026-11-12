@@ -278,6 +278,6 @@ export interface ChannelService {
   readonly addressOf: (channel: string) => Promise<{ readonly direct: boolean; readonly target: string }>;
   readonly channelByName: (name: string) => Promise<Info | undefined>;
   /** Must run after sessions are restored on startup. */
-  readonly start: () => Promise<void>;
+  readonly boot: () => Promise<void>;
   readonly close: () => Promise<void>;
 }

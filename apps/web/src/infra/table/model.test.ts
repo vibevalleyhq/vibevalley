@@ -1,10 +1,10 @@
-import { Schema } from "effect";
 import { expect, expectTypeOf, test, vi } from "vite-plus/test";
+import { z } from "zod";
 
 import { createTable, defineColumns, type Owned, type Page, type Sort } from "./model";
 
-const Row = Schema.Struct({ id: Schema.String, name: Schema.String, rank: Schema.Finite });
-type Row = typeof Row.Type;
+const Row = z.object({ id: z.string(), name: z.string(), rank: z.number() });
+type Row = z.output<typeof Row>;
 const column = defineColumns(Row);
 const name = column("name", { value: (row) => row.name, compare: (a, b) => a.localeCompare(b), hideable: false });
 const rank = column("rank", { value: (row) => row.rank, compare: (a, b) => a - b });
@@ -33,14 +33,12 @@ test("columns preserve their value types and local stable sort precedes paginati
 
 test("schema-derived columns never decode already checked rows during table work", () => {
   let decoded = 0;
-  const Checked = Row.check(
-    Schema.makeFilter(() => {
-      decoded++;
-      return true;
-    }),
-  );
+  const Checked = Row.refine(() => {
+    decoded++;
+    return true;
+  });
   const checkedColumn = defineColumns(Checked)("rank", { value: (row) => row.rank, compare: (a, b) => a - b });
-  const row = Schema.decodeUnknownSync(Checked)(source[0]);
+  const row = Checked.parse(source[0]);
   expect(decoded).toBe(1);
   const table = createTable({ mode: "local", rows: () => [row], columns: [checkedColumn], rowId: (value) => value.id });
   table.setSort({ column: "rank", direction: "desc" });

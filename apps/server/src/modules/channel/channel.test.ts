@@ -197,8 +197,8 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
       if (n) x.news.publish(n);
     }
   })();
-  await chat.start();
-  await mailbox.start();
+  await chat.boot();
+  await mailbox.boot();
   const deliveries = async (recipient: string) =>
     (
       await db.sql.query(
@@ -1101,8 +1101,8 @@ describe("the chat", () => {
       expect(registered2).toBe(false);
       expect(f.mailbox.deliveriesOf("w1").some((row) => row.envelope_id === id)).toBe(false);
       await drop(f.db, "fail_second_recipient", "mailbox_delivery");
-      await f.chat.start();
-      await f.chat.start();
+      await f.chat.boot();
+      await f.chat.boot();
       const rows2 = await f.sql(`select session_id from mailbox_delivery where envelope_id = $1 order by session_id`, [id]);
       expect(rows2).toEqual([{ session_id: "w1" }, { session_id: "w2" }]);
       const registered3 = await f.mailbox.isRouted(id);

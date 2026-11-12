@@ -250,28 +250,28 @@ const gateway = async <B extends GamificationFarm & Building>(below: B, o: Servi
 };
 
 /** Source Control's startup: the first look at GitHub. */
-export const sourceControlStart = (farm: SourceControlFarm) => farm.repo.start();
+export const sourceControlBoot = (farm: SourceControlFarm) => farm.repo.boot();
 /** Agent Sessions' startup: the sessions on the farm when it stopped are taken up again, or let go. */
-export const agentSessionsStart = (farm: AgentSessionsFarm) => farm.session.start();
+export const agentSessionsBoot = (farm: AgentSessionsFarm) => farm.session.boot();
 /** Collaboration's startup, after the sessions came back: their threads, before the mailbox wakes anyone. */
-export const channelStart = (farm: CollaborationFarm) => farm.channel.start();
+export const channelBoot = (farm: CollaborationFarm) => farm.channel.boot();
 /** Mailbox's startup: restore open deliveries, replay committed messages without a route receipt, then wake sessions. */
-export const mailboxReady = (farm: MailboxFarm) => farm.mailbox.start();
+export const mailboxBoot = (farm: MailboxFarm) => farm.mailbox.boot();
 /** The rest of Collaboration's startup, after the mailbox: what media waited for. */
-export const mediaStart = (farm: CollaborationFarm) => farm.media.start();
+export const mediaBoot = (farm: CollaborationFarm) => farm.media.boot();
 /** Collaboration's whole startup, for a farm that starts its mailbox elsewhere. */
-export const collaborationStart = async (farm: CollaborationFarm) => {
-  await channelStart(farm);
-  await mediaStart(farm);
+export const collaborationBoot = async (farm: CollaborationFarm) => {
+  await channelBoot(farm);
+  await mediaBoot(farm);
 };
-export const issuesStart = async (farm: IssuesFarm) => {
-  await farm.issue.startup();
-  await farm.cron.start();
+export const issuesBoot = async (farm: IssuesFarm) => {
+  await farm.issue.boot();
+  await farm.cron.boot();
 };
 /** Inbox's startup, after the sessions and issues came back: what stands is known, the patrol starts its rounds. */
-export const inboxStart = (farm: InboxFarm) => farm.inbox.start();
+export const inboxBoot = (farm: InboxFarm) => farm.inbox.boot();
 /** Gamification's startup: commits start being counted. */
-export const gamificationStart = (farm: { readonly game: Game }) => farm.game.start();
+export const gamificationBoot = (farm: { readonly game: Game }) => farm.game.boot();
 
 /** The whole farm: every module built, then every startup in module order. A failure closes what was built. */
 export async function makeFarm(config: ServerConfig, options: ServiceOptions = {}, base: PlatformParts = options.platform ?? {}): Promise<Farm> {
@@ -288,14 +288,14 @@ export async function makeFarm(config: ServerConfig, options: ServiceOptions = {
       ),
       options,
     );
-    await sourceControlStart(built);
-    await agentSessionsStart(built);
-    await channelStart(built);
-    await mailboxReady(built);
-    await mediaStart(built);
-    await issuesStart(built);
-    await inboxStart(built);
-    await gamificationStart(built);
+    await sourceControlBoot(built);
+    await agentSessionsBoot(built);
+    await channelBoot(built);
+    await mailboxBoot(built);
+    await mediaBoot(built);
+    await issuesBoot(built);
+    await inboxBoot(built);
+    await gamificationBoot(built);
     let closing: Promise<void> | undefined;
     const close = () => (closing ??= closeAll(built));
     return Object.assign(built, { close, [Symbol.asyncDispose]: close });

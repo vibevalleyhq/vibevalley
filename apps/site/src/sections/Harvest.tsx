@@ -1,271 +1,8 @@
-import * as stylex from "@stylexjs/stylex";
-
 import { JOB } from "../base/story";
 /** @jsxImportSource @solidjs/web */
 import type { Copy } from "../i18n/zh";
 import { observeVisibility, createReveal, createScrollAnimation } from "../ui/scroll";
 import { CountUp } from "../ui/ui";
-
-const sceneStyles = stylex.create({
-  field: {
-    position: "relative",
-    overflow: "hidden",
-    borderBlockStyle: "solid",
-    borderBlockWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundImage: "var(--scene-harvest-background)",
-    paddingInline: "1rem",
-    paddingBlock: "clamp(96px,13vw,170px)",
-  },
-  shade: {
-    position: "absolute",
-    inset: "0",
-    backgroundImage: "var(--scene-harvest-shade)",
-  },
-  title: {
-    fontSize: "clamp(40px,8vw,104px)",
-    lineHeight: "1.2",
-    textShadow: "var(--text-shadow-title)",
-  },
-  description: {
-    marginInline: "auto",
-    marginTop: "1.25rem",
-    maxWidth: "34em",
-    fontSize: {
-      default: "var(--text-lg)",
-      "@media (width>=40rem)": "var(--text-xl)",
-    },
-    lineHeight: {
-      default: "var(--leading-lg)",
-      "@media (width>=40rem)": "var(--leading-xl)",
-    },
-    textWrap: "balance",
-    textShadow: "var(--text-shadow-thin)",
-  },
-  take: {
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-leaf-500)",
-    paddingInline: "0.75rem",
-    paddingBlock: "0.375rem",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "var(--text-base)",
-    lineHeight: "1",
-    color: "var(--color-cream-50)",
-    boxShadow: "inset 2px 2px 0 var(--color-leaf-hover), var(--shadow-hard-sm)",
-  },
-});
-
-const styles = stylex.create({
-  harvestImg: {
-    width: {
-      default: "2.25rem",
-      "@media (width>=40rem)": "2.75rem",
-    },
-    imageRendering: "pixelated",
-    animationName: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "title-float",
-    },
-    animationDuration: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "5s",
-    },
-    animationDelay: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "0s",
-    },
-    animationTimingFunction: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "ease-in-out",
-    },
-    animationIterationCount: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "infinite",
-    },
-    animationDirection: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "normal",
-    },
-    animationFillMode: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "none",
-    },
-    animationPlayState: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "running",
-    },
-  },
-  harvestDiv: {
-    position: "absolute",
-    top: "6%",
-    left: "-10%",
-    display: "flex",
-    width: "120%",
-    alignItems: "flex-end",
-    gap: "1.25rem",
-    opacity: ".6",
-  },
-  harvestImg2: {
-    width: {
-      default: "68px",
-      "@media (width>=40rem)": "102px",
-    },
-    maxWidth: "none",
-    imageRendering: "pixelated",
-  },
-  harvestDiv2: {
-    position: "absolute",
-    bottom: "-4%",
-    left: "-10%",
-    display: "flex",
-    width: "120%",
-    alignItems: "flex-end",
-    gap: "1.5rem",
-  },
-  harvestImg22: {
-    width: {
-      default: "102px",
-      "@media (width>=40rem)": "136px",
-    },
-    maxWidth: "none",
-    imageRendering: "pixelated",
-  },
-  harvestDiv3: {
-    position: "relative",
-    marginInline: "auto",
-    maxWidth: "920px",
-    textAlign: "center",
-    color: "var(--color-cream-50)",
-  },
-  harvestDiv4: {
-    marginBottom: "1rem",
-    display: "flex",
-    justifyContent: "center",
-    gap: "0.75rem",
-  },
-  harvestSpan: {
-    display: "block",
-  },
-  harvestListDiv: {
-    marginInline: "auto",
-    marginTop: "2.25rem",
-    width: "min(480px,100%)",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-cream-50)",
-    boxShadow: "inset 0 0 0 2px var(--color-rim), 4px 4px 0 var(--color-drop)",
-    padding: "1rem",
-    textAlign: "left",
-    color: "var(--color-bark-900)",
-  },
-  harvestListDiv2: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.625rem",
-  },
-  harvestListImg: {
-    width: "2rem",
-    height: "2rem",
-    objectFit: "contain",
-    imageRendering: "pixelated",
-  },
-  harvestListDiv3: {
-    minWidth: "0",
-  },
-  harvestListP: {
-    fontFamily: "var(--font-pixel)",
-    fontSize: "var(--text-lg)",
-    lineHeight: "1",
-  },
-  harvestListP2: {
-    marginTop: "0.25rem",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-bark-800)",
-  },
-  harvestListDl: {
-    marginTop: "0.75rem",
-    display: "grid",
-    gridTemplateColumns: "repeat(3,minmax(0,1fr))",
-    gap: "0.5rem",
-    textAlign: "center",
-  },
-  harvestListDiv4: {
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-cream-100)",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.5rem",
-  },
-  harvestListDt: {
-    clipPath: "inset(50%)",
-    whiteSpace: "nowrap",
-    borderWidth: "0",
-    width: "1px",
-    height: "1px",
-    margin: "-1px",
-    padding: "0",
-    position: "absolute",
-    overflow: "hidden",
-  },
-  harvestListDd: {
-    fontFamily: "var(--font-pixel)",
-    fontSize: "var(--text-3xl)",
-    lineHeight: "1",
-  },
-  harvestListDd2: {
-    marginTop: "0.25rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-bark-800)",
-  },
-  harvestListDd3: {
-    fontFamily: "var(--font-pixel)",
-    fontSize: {
-      default: "var(--text-xl)",
-      "@media (width>=40rem)": "var(--text-2xl)",
-    },
-    lineHeight: {
-      default: "1",
-      "@media (width>=40rem)": "1",
-    },
-    whiteSpace: "nowrap",
-  },
-  harvestListSpan: {
-    color: "var(--color-leaf-700)",
-  },
-  harvestListSpan2: {
-    color: "var(--color-berry)",
-  },
-  harvestListDiv5: {
-    marginTop: "0.75rem",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "0.75rem",
-  },
-  harvestListSpan3: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.375rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-leaf-700)",
-  },
-  harvestListImg2: {
-    width: "1rem",
-    height: "1rem",
-    objectFit: "contain",
-    imageRendering: "pixelated",
-  },
-});
 
 /** While the band crosses the screen, from its top at the screen's bottom to its bottom at the screen's top. */
 const CROSSING: ["start end", "end start"] = ["start end", "end start"];
@@ -285,39 +22,44 @@ export default function Harvest(props: Props) {
   const front = createScrollAnimation<HTMLDivElement>(ref, CROSSING, () => [{ keyframes: { transform: ["translateX(110px)", "translateX(-110px)"] } }]);
   observeVisibility(ref);
   return (
-    <section ref={ref.set} id="harvest" aria-labelledby="harvest-title" {...stylex.attrs(sceneStyles.field)}>
-      <div ref={back.set} aria-hidden="true" {...stylex.attrs(styles.harvestDiv)}>
+    <section
+      ref={ref.set}
+      id="harvest"
+      aria-labelledby="harvest-title"
+      class="relative overflow-hidden border-y-2 border-bark-900 bg-[image:var(--scene-harvest-background)] px-4 py-[clamp(96px,13vw,170px)]"
+    >
+      <div ref={back.set} aria-hidden="true" class="absolute top-[6%] -left-[10%] flex w-[120%] items-end gap-5 opacity-60">
         {props.rows[0].map((src) => (
-          <img loading="lazy" src={src} alt="" {...stylex.attrs(styles.harvestImg2)} />
+          <img loading="lazy" src={src} alt="" class="w-17 sm:w-25.5 max-w-none [image-rendering:pixelated]" />
         ))}
       </div>
-      <div ref={front.set} aria-hidden="true" {...stylex.attrs(styles.harvestDiv2)}>
+      <div ref={front.set} aria-hidden="true" class="absolute -bottom-[4%] -left-[10%] flex w-[120%] items-end gap-6">
         {props.rows[1].map((src) => (
-          <img loading="lazy" src={src} alt="" {...stylex.attrs(styles.harvestImg22)} />
+          <img loading="lazy" src={src} alt="" class="w-25.5 sm:w-34 max-w-none [image-rendering:pixelated]" />
         ))}
       </div>
       {/* Keep the words readable over the field. */}
-      <div aria-hidden="true" {...stylex.attrs(sceneStyles.shade)} />
-      <div {...stylex.attrs(styles.harvestDiv3)}>
-        <div aria-hidden="true" {...stylex.attrs(styles.harvestDiv4)}>
+      <div aria-hidden="true" class="absolute inset-0 bg-[image:var(--scene-harvest-shade)]" />
+      <div class="relative mx-auto max-w-230 text-center text-cream-50">
+        <div aria-hidden="true" class="mb-4 flex justify-center gap-3">
           {[0, 1, 2].map((i) => (
             <img
               loading="lazy"
               src={props.coins}
               alt=""
-              {...stylex.attrs(styles.harvestImg)}
+              class="w-9 sm:w-11 [image-rendering:pixelated] motion-safe:[animation-name:title-float] motion-safe:[animation-duration:5000ms] motion-safe:[animation-delay:0ms] motion-safe:[animation-timing-function:ease-in-out] motion-safe:[animation-iteration-count:infinite] motion-safe:[animation-direction:normal] motion-safe:[animation-fill-mode:none] motion-safe:[animation-play-state:running]"
               style={{
                 "animation-delay": `${i * -1.6}s`,
               }}
             />
           ))}
         </div>
-        <h2 id="harvest-title" data-reveal {...stylex.attrs(sceneStyles.title)}>
+        <h2 id="harvest-title" data-reveal class="text-[length:clamp(40px,8vw,104px)] leading-[1.2] [text-shadow:var(--text-shadow-title)]">
           {props.copy.title.map((line) => (
-            <span {...stylex.attrs(styles.harvestSpan)}>{line}</span>
+            <span class="block">{line}</span>
           ))}
         </h2>
-        <p data-reveal={120} {...stylex.attrs(sceneStyles.description)}>
+        <p data-reveal={120} class="mx-auto mt-5 max-w-[34em] text-lg sm:text-xl text-balance [text-shadow:var(--text-shadow-thin)]">
           {props.copy.text}
         </p>
         <HarvestList copy={props.copy.card} icons={props.icons} />
@@ -333,48 +75,53 @@ function HarvestList(props: {
   };
 }) {
   return (
-    <div data-reveal={240} {...stylex.attrs(styles.harvestListDiv)}>
-      <div {...stylex.attrs(styles.harvestListDiv2)}>
-        <img src={props.icons.harvest} alt="" {...stylex.attrs(styles.harvestListImg)} />
-        <div {...stylex.attrs(styles.harvestListDiv3)}>
-          <p {...stylex.attrs(styles.harvestListP)}>{props.copy.title}</p>
-          <p {...stylex.attrs(styles.harvestListP2)}>{props.copy.job}</p>
+    <div
+      data-reveal={240}
+      class="mx-auto mt-9 w-[min(480px,100%)] border-2 border-bark-900 bg-cream-50 [box-shadow:inset_0_0_0_2px_var(--color-rim),_4px_4px_0_var(--color-drop)] p-4 text-left text-bark-900"
+    >
+      <div class="flex items-center gap-2.5">
+        <img src={props.icons.harvest} alt="" class="w-8 h-8 object-contain [image-rendering:pixelated]" />
+        <div class="min-w-0">
+          <p class="font-pixel text-lg leading-none">{props.copy.title}</p>
+          <p class="mt-1 truncate text-sm text-bark-800">{props.copy.job}</p>
         </div>
       </div>
-      <dl {...stylex.attrs(styles.harvestListDl)}>
-        <div {...stylex.attrs(styles.harvestListDiv4)}>
-          <dt {...stylex.attrs(styles.harvestListDt)}>{props.copy.commits}</dt>
-          <dd {...stylex.attrs(styles.harvestListDd)}>
+      <dl class="mt-3 grid grid-cols-3 gap-2 text-center">
+        <div class="border-2 border-bark-900 bg-cream-100 px-2 py-2">
+          <dt class="[clip-path:inset(50%)] whitespace-nowrap border-0 w-px h-px -m-px p-0 absolute overflow-hidden">{props.copy.commits}</dt>
+          <dd class="font-pixel text-3xl leading-none">
             <CountUp to={JOB.commits} />
           </dd>
-          <dd {...stylex.attrs(styles.harvestListDd2)}>{props.copy.commits}</dd>
+          <dd class="mt-1 text-xs text-bark-800">{props.copy.commits}</dd>
         </div>
-        <div {...stylex.attrs(styles.harvestListDiv4)}>
-          <dt {...stylex.attrs(styles.harvestListDt)}>{props.copy.files}</dt>
-          <dd {...stylex.attrs(styles.harvestListDd)}>
+        <div class="border-2 border-bark-900 bg-cream-100 px-2 py-2">
+          <dt class="[clip-path:inset(50%)] whitespace-nowrap border-0 w-px h-px -m-px p-0 absolute overflow-hidden">{props.copy.files}</dt>
+          <dd class="font-pixel text-3xl leading-none">
             <CountUp to={JOB.files} />
           </dd>
-          <dd {...stylex.attrs(styles.harvestListDd2)}>{props.copy.files}</dd>
+          <dd class="mt-1 text-xs text-bark-800">{props.copy.files}</dd>
         </div>
-        <div {...stylex.attrs(styles.harvestListDiv4)}>
-          <dt {...stylex.attrs(styles.harvestListDt)}>{props.copy.lines}</dt>
-          <dd {...stylex.attrs(styles.harvestListDd3)}>
-            <span {...stylex.attrs(styles.harvestListSpan)}>
+        <div class="border-2 border-bark-900 bg-cream-100 px-2 py-2">
+          <dt class="[clip-path:inset(50%)] whitespace-nowrap border-0 w-px h-px -m-px p-0 absolute overflow-hidden">{props.copy.lines}</dt>
+          <dd class="font-pixel text-xl sm:text-2xl leading-none sm:leading-none whitespace-nowrap">
+            <span class="text-leaf-700">
               +<CountUp to={JOB.plus} />
             </span>{" "}
-            <span {...stylex.attrs(styles.harvestListSpan2)}>
+            <span class="text-berry">
               −<CountUp to={JOB.minus} />
             </span>
           </dd>
-          <dd {...stylex.attrs(styles.harvestListDd2)}>{props.copy.lines}</dd>
+          <dd class="mt-1 text-xs text-bark-800">{props.copy.lines}</dd>
         </div>
       </dl>
-      <div {...stylex.attrs(styles.harvestListDiv5)}>
-        <span {...stylex.attrs(styles.harvestListSpan3)}>
-          <img src={props.icons.check} alt="" {...stylex.attrs(styles.harvestListImg2)} />
+      <div class="mt-3 flex items-center justify-between gap-3">
+        <span class="flex items-center gap-1.5 text-sm text-leaf-700">
+          <img src={props.icons.check} alt="" class="w-4 h-4 object-contain [image-rendering:pixelated]" />
           {props.copy.clean}
         </span>
-        <span {...stylex.attrs(sceneStyles.take)}>{props.copy.take}</span>
+        <span class="border-2 border-bark-900 bg-leaf-500 px-3 py-1.5 font-pixel text-base leading-none text-cream-50 [box-shadow:inset_2px_2px_0_var(--color-leaf-hover),_var(--shadow-hard-sm)]">
+          {props.copy.take}
+        </span>
       </div>
     </div>
   );

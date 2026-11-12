@@ -138,11 +138,9 @@
     "startServer": "先起服务端（vp run --filter @vibevalley/server start），或用 --server 指到在跑的那个",
     "openApp": "先打开桌面版（vibevalley app open 也会打开它）"
   },
-  "and": "；",
   "failure": {
     "unreachable": "连不上 {base}：{why}",
     "retry": "服务端要流重连，命令行不接着连",
-    "stream": "流读不下去：{why}",
     "gone": "工单 #{n} 不在了：被删掉了",
     "appNotOpen": "连不上 {home} 的桌面版：{why}",
     "noDryRun": "{command} 没有试跑：去掉 --dry-run 才会做",

@@ -1,56 +1,38 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
 
 import { stories, story } from "@vibevalley/stories";
 
 import { DashedLine, PxCard, PxFrame, PxWindow } from "./base";
 import { PxButton } from "./button";
 import { PxTextArea, PxTextInput } from "./field";
-import { storyFrame } from "./story.stylex";
 
-const styles = stylex.create({
-  baseStoriesPxCard: {
-    width: "18rem",
-  },
-  baseStoriesDashedLine: {
-    marginBlock: "0.75rem",
-  },
-  baseStoriesPxWindow: {
-    width: "16rem",
-    padding: "1rem",
-  },
-  baseStoriesPxFrame: {
-    width: "14rem",
-  },
-  composedWindow: (width: number) => ({ width, marginLeft: "12px", padding: "0.75rem" }),
-  composedControl: (marginLeft: number) => ({ marginLeft, maxWidth: "240px" }),
-  baseStoriesDiv: {
-    padding: "0.75rem",
-  },
-});
+const styles = {
+  composed: (width: number, indent: number): JSX.CSSProperties => ({ width: `${width}px`, "--indent": `${indent}px` }),
+};
 
-const papers = stylex.create({
-  "bg-cream-50": { backgroundColor: "var(--color-cream-50)" },
-  "bg-cream-100": { backgroundColor: "var(--color-cream-100)" },
-  "bg-lcd-paper": { backgroundColor: "var(--color-lcd-paper)" },
-});
+const papers = {
+  "bg-cream-50": "bg-cream-50",
+  "bg-cream-100": "bg-cream-100",
+  "bg-lcd-paper": "bg-lcd-paper",
+};
 
-const paperChoices: Record<string, stylex.StyleXStyles<{ backgroundColor?: string }>> = papers;
+const paperChoices: Record<string, string> = papers;
 
 export default stories({
   title: "组件/像素/base",
   themes: ["light"],
-  frame: storyFrame.pixel,
+  frame: "bg-cream-50 font-pixel text-(length:--text-xs) text-bark-900",
   stories: {
     Composition: story({
       args: { width: 300, indent: 4, border: true, value: "", well: false, mono: false, disabled: false, reading: false },
       render: (a, set) => (
-        <PxWindow testid="pixel-window-composition" border={a.border} styles={styles.composedWindow(a.width)} style={{ "margin-top": "8px" }}>
+        <PxWindow testid="pixel-window-composition" border={a.border} class="ml-3 p-3" style={{ ...styles.composed(a.width, a.indent), "margin-top": "8px" }}>
           <PxTextInput
             testid="pixel-input-composition"
             label="名字"
             value={a.value}
             onChange={(value) => set({ value })}
-            styles={styles.composedControl(a.indent)}
+            class="ml-(--indent) max-w-60"
             well={a.well}
             mono={a.mono}
             disabled={a.disabled}
@@ -60,7 +42,7 @@ export default stories({
             label="说明"
             value={a.value}
             onChange={(value) => set({ value })}
-            styles={styles.composedControl(a.indent)}
+            class="ml-(--indent) max-w-60"
             reading={a.reading}
             mono={a.mono}
             disabled={a.disabled}
@@ -74,9 +56,9 @@ export default stories({
     Card: story({
       args: { title: "今天的收成", aside: "3 块地" },
       render: (a) => (
-        <PxCard title={a.title} aside={a.aside} styles={[styles.baseStoriesPxCard]}>
+        <PxCard title={a.title} aside={a.aside} class="w-72">
           <p>两块熟了，一块缺肥。</p>
-          <DashedLine styles={[styles.baseStoriesDashedLine]} />
+          <DashedLine class="my-3" />
           <PxButton tone="primary" onClick={() => undefined}>
             去看看
           </PxButton>
@@ -86,7 +68,7 @@ export default stories({
     Window: story({
       args: { border: true },
       render: (a) => (
-        <PxWindow border={a.border} styles={[styles.baseStoriesPxWindow]}>
+        <PxWindow border={a.border} class="w-64 p-4">
           窗子里的纸
         </PxWindow>
       ),
@@ -95,8 +77,8 @@ export default stories({
       args: { paper: "bg-cream-50" },
       controls: { paper: { kind: "choice", options: ["bg-cream-50", "bg-cream-100", "bg-lcd-paper"] } },
       render: (a) => (
-        <PxFrame paper={paperChoices[a.paper]} styles={[styles.baseStoriesPxFrame]}>
-          <div {...stylex.attrs(styles.baseStoriesDiv)}>框里的东西离边 2 像素</div>
+        <PxFrame paperClass={paperChoices[a.paper]} class="w-56">
+          <div class="p-3">框里的东西离边 2 像素</div>
         </PxFrame>
       ),
     }),

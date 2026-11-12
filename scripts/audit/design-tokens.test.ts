@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { hexColor, offTokens } from "./design-tokens.ts";
 
-describe("the workbench's StyleX design ladders", () => {
+describe("the workbench's design ladders, in a style or a class", () => {
   it.each([
     ["borderRadius", "var(--radius-md)"],
     ["borderTopLeftRadius", 0],

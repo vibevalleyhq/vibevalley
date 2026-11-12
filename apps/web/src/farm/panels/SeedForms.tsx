@@ -1,5 +1,4 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -21,226 +20,6 @@ import { usePrefs } from "#/state/prefs.ts";
 import { AgentFace } from "#/ui/domain/Face.tsx";
 import { createPixelAct, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "#/ui/pixel/index.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
-
-const styles = stylex.create({
-  whoTileButton: {
-    display: "flex",
-    width: "4rem",
-    cursor: "pointer",
-    flexDirection: "column",
-    alignItems: "center",
-    paddingBlock: "0.25rem",
-  },
-  whoTileButtonPrimary: {
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-cream-200)",
-      },
-    },
-  },
-  whoTileButtonSecondary: {
-    backgroundColor: {
-      default: "var(--color-px-leaf-strong)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 70%, transparent)",
-    },
-  },
-  sowFormButton: {
-    display: "flex",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.25rem",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    paddingBlock: "0.125rem",
-    paddingRight: "0.5rem",
-    paddingLeft: "0.25rem",
-    fontSize: "12px",
-  },
-  sowFormButtonPrimary: {
-    borderColor: "transparent",
-    color: "var(--color-bark-800)",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-cream-200)",
-      },
-    },
-  },
-  sowFormButtonSecondary: {
-    borderColor: "var(--color-leaf-500)",
-    color: "var(--color-bark-900)",
-    backgroundColor: {
-      default: "var(--color-px-leaf-wash)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 60%, transparent)",
-    },
-  },
-  sowFormP: {
-    fontSize: "12px",
-    color: "var(--color-bark-600)",
-  },
-  sowFormSpan: {
-    marginLeft: "0.5rem",
-    fontSize: "12px",
-    color: "var(--color-bark-600)",
-  },
-  sowFormP2: {
-    marginTop: "0.625rem",
-    fontSize: "12px",
-    color: "var(--color-bark-600)",
-  },
-  sowFormP3: {
-    marginTop: "0.75rem",
-    fontSize: "12px",
-    color: "var(--color-bark-600)",
-  },
-  sowFormP4: {
-    minWidth: "0",
-    flex: "1",
-    fontSize: "12px",
-    color: "var(--color-bark-600)",
-  },
-  waterFormP: {
-    marginTop: "0.25rem",
-    fontSize: "12px",
-    color: "var(--color-bark-600)",
-  },
-  chipButton: {
-    cursor: "pointer",
-    paddingInline: "0.75rem",
-    paddingBlock: "0.25rem",
-    fontSize: "12px",
-  },
-  chipButtonTone: {
-    backgroundColor: "var(--color-leaf-500)",
-    color: "var(--color-bark-900)",
-  },
-  chipButtonAlt: {
-    backgroundColor: {
-      default: "var(--color-cream-200)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-cream-300)",
-      },
-    },
-    color: "var(--color-bark-800)",
-  },
-  whoTileSpan: {
-    marginTop: "0.125rem",
-    maxWidth: "60px",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "12px",
-    color: "var(--color-bark-800)",
-  },
-  sowHomeless: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-start",
-    gap: "0.625rem",
-  },
-  sowFormP5: {
-    fontSize: "14px",
-    color: "var(--color-bark-900)",
-  },
-  sowForm: {
-    display: "flex",
-    flexDirection: "column",
-  },
-  sowFormDiv: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  sowFormP22: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "14px",
-    color: "var(--color-bark-900)",
-  },
-  sowFormDiv2: {
-    marginTop: "0.75rem",
-    display: "flex",
-    flexDirection: "column",
-  },
-  sowFormDiv3: {
-    marginTop: "0.625rem",
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  sowFormP32: {
-    fontSize: "12px",
-    color: "var(--color-berry)",
-  },
-  sowFormDiv4: {
-    marginTop: "0.375rem",
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.375rem",
-  },
-  seedKinds: {
-    marginTop: "0.375rem",
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.25rem",
-  },
-  sowFormDiv5: {
-    marginTop: "0.375rem",
-  },
-  sowFormSpan2: {
-    display: "flex",
-    height: "2.75rem",
-    width: "2.75rem",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "var(--color-cream-200)",
-    fontSize: "16px",
-    color: "var(--color-bark-600)",
-  },
-  sowFormDiv6: {
-    marginTop: "0.75rem",
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  sowFormP42: {
-    marginTop: "0.375rem",
-    fontSize: "12px",
-    color: "var(--color-berry)",
-  },
-  waterFormP2: {
-    fontSize: "13px",
-    color: "var(--color-bark-800)",
-  },
-  waterFormDiv: {
-    marginTop: "0.75rem",
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.375rem",
-  },
-  waterFormDiv2: {
-    marginTop: "0.75rem",
-    display: "flex",
-    alignItems: "flex-end",
-    gap: "0.5rem",
-  },
-  waterFormDiv3: {
-    flex: "1",
-  },
-  waterFormP22: {
-    marginTop: "0.375rem",
-    fontSize: "12px",
-    color: "var(--color-bark-600)",
-  },
-});
 
 const repoTemplatesQuery = defineQuery({
   schema: S.RepoTemplates,
@@ -268,7 +47,7 @@ function Chip(props: { text: string; on: boolean; onClick: () => void; testid: s
       data-key={props.item}
       aria-pressed={aria(props.on)}
       onClick={() => props.onClick()}
-      {...stylex.attrs(styles.chipButton, props.on ? styles.chipButtonTone : styles.chipButtonAlt)}
+      class={["cursor-pointer px-3 py-1 text-(length:--text-xs)", props.on ? "bg-leaf-500 text-bark-900" : "bg-cream-200 hover:bg-cream-300 text-bark-800"]}
     >
       {props.text}
     </button>
@@ -282,10 +61,10 @@ function WhoTile(props: { active: boolean; label: string; onClick: () => void; c
       aria-pressed={aria(props.active)}
       aria-label={props.label}
       onClick={() => props.onClick()}
-      {...stylex.attrs(styles.whoTileButton, props.active ? styles.whoTileButtonSecondary : styles.whoTileButtonPrimary)}
+      class={["flex w-16 cursor-pointer flex-col items-center py-1", props.active ? "bg-leaf-300/70" : "hover:bg-cream-200"]}
     >
       {props.children}
-      <span {...stylex.attrs(styles.whoTileSpan)}>{props.label}</span>
+      <span class="mt-0.5 max-w-15 truncate text-(length:--text-xs) text-bark-800">{props.label}</span>
     </button>
   );
 }
@@ -352,9 +131,9 @@ export function SowForm(props: { station: number; onDone: () => void }) {
     <Show
       when={repo()}
       fallback={
-        <div data-testid="sow-homeless" {...stylex.attrs(styles.sowHomeless)}>
-          <p {...stylex.attrs(styles.sowFormP5)}>{t("web.farm.sow.homeless")}</p>
-          <p {...stylex.attrs(styles.sowFormP)}>{repos().length > 0 ? t("web.farm.sow.toMap") : t("web.farm.sow.noRepos")}</p>
+        <div data-testid="sow-homeless" class="flex flex-col items-start gap-2.5">
+          <p class="text-(length:--text-base) text-bark-900">{t("web.farm.sow.homeless")}</p>
+          <p class="text-(length:--text-xs) text-bark-600">{repos().length > 0 ? t("web.farm.sow.toMap") : t("web.farm.sow.noRepos")}</p>
           <PxButton tone="primary" data-testid="sow-to-map" onClick={() => (props.onDone(), router.navigate("/repos"))}>
             {repos().length > 0 ? t("web.farm.sow.map") : t("web.farm.sow.makeRepo")}
           </PxButton>
@@ -362,22 +141,22 @@ export function SowForm(props: { station: number; onDone: () => void }) {
       }
     >
       {(p) => (
-        <div data-testid="sow-form" data-repo={p()} {...stylex.attrs(styles.sowForm)}>
-          <div {...stylex.attrs(styles.sowFormDiv)}>
-            <p {...stylex.attrs(styles.sowFormP22)}>
+        <div data-testid="sow-form" data-repo={p()} class="flex flex-col">
+          <div class="flex items-center gap-2">
+            <p class="min-w-0 flex-1 truncate text-(length:--text-base) text-bark-900">
               {t("web.farm.sow.plantIn", { repo: p() })}
-              <Show when={bag()?.stack.label}>{(label) => <span {...stylex.attrs(styles.sowFormSpan)}>{label()}</span>}</Show>
+              <Show when={bag()?.stack.label}>{(label) => <span class="ml-2 text-(length:--text-xs) text-bark-600">{label()}</span>}</Show>
             </p>
           </div>
-          <div {...stylex.attrs(styles.sowFormDiv2)}>
+          <div class="mt-3 flex flex-col">
             <Switch>
               <Match when={templates.status() === "pending" && !!repo()}>
-                <p {...stylex.attrs(styles.sowFormP2)}>{t("web.farm.sow.rummaging")}</p>
+                <p class="mt-2.5 text-(length:--text-xs) text-bark-600">{t("web.farm.sow.rummaging")}</p>
               </Match>
               <Match when={templates.error()}>
                 {(e) => (
-                  <div {...stylex.attrs(styles.sowFormDiv3)}>
-                    <p role="alert" {...stylex.attrs(styles.sowFormP32)}>
+                  <div class="mt-2.5 flex flex-wrap items-center gap-2">
+                    <p role="alert" class="text-(length:--text-xs) text-berry">
                       {t("web.farm.sow.noSeeds")}
                       {reasonOf(e())}
                     </p>
@@ -389,15 +168,15 @@ export function SowForm(props: { station: number; onDone: () => void }) {
               </Match>
             </Switch>
             <Show when={seeds().recent.length > 0}>
-              <p {...stylex.attrs(styles.sowFormP2)}>{t("web.farm.sow.recent")}</p>
-              <div {...stylex.attrs(styles.sowFormDiv4)}>
+              <p class="mt-2.5 text-(length:--text-xs) text-bark-600">{t("web.farm.sow.recent")}</p>
+              <div class="mt-1.5 flex flex-wrap gap-1.5">
                 <For each={seeds().recent}>{(r) => <Chip testid="seed-recent" text={r} on={text() === r} onClick={() => take(r)} />}</For>
               </div>
             </Show>
             <Show when={seeds().kinds.length > 0}>
-              <p {...stylex.attrs(styles.sowFormP2)}>{t("web.farm.sow.kinds")}</p>
+              <p class="mt-2.5 text-(length:--text-xs) text-bark-600">{t("web.farm.sow.kinds")}</p>
               {/* One kind at a time: its tab, then its seeds. */}
-              <div role="tablist" aria-label={t("web.farm.sow.kinds")} data-testid="seed-kinds" {...stylex.attrs(styles.seedKinds)}>
+              <div role="tablist" aria-label={t("web.farm.sow.kinds")} data-testid="seed-kinds" class="mt-1.5 flex flex-wrap gap-1">
                 <For each={seeds().kinds} keyed={(k) => k.kind.id}>
                   {(k) => (
                     <button
@@ -406,7 +185,12 @@ export function SowForm(props: { station: number; onDone: () => void }) {
                       data-key={k().kind.id}
                       aria-selected={aria(k().kind.id === kind()?.kind.id)}
                       onClick={() => setKindId(k().kind.id)}
-                      {...stylex.attrs(styles.sowFormButton, k().kind.id === kind()?.kind.id ? styles.sowFormButtonSecondary : styles.sowFormButtonPrimary)}
+                      class={[
+                        "flex cursor-pointer items-center gap-1 border-2 py-0.5 pr-2 pl-1 text-(length:--text-xs)",
+                        k().kind.id === kind()?.kind.id
+                          ? "border-leaf-500 text-bark-900 bg-leaf-300/60"
+                          : "border-transparent text-bark-800 hover:bg-cream-200",
+                      ]}
                     >
                       <SpriteIcon name={k().kind.icon} size={20} />
                       {k().kind.name}
@@ -416,7 +200,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
               </div>
               <Show when={kind()}>
                 {(k) => (
-                  <div role="tabpanel" aria-label={k().kind.name} {...stylex.attrs(styles.sowFormDiv4)}>
+                  <div role="tabpanel" aria-label={k().kind.name} class="mt-1.5 flex flex-wrap gap-1.5">
                     <For each={k().templates} keyed={(s) => s.id}>
                       {(s) => <Chip testid="seed" item={s().id} text={s().title} on={text() === s().text} onClick={() => take(s().text, s().blank)} />}
                     </For>
@@ -424,8 +208,8 @@ export function SowForm(props: { station: number; onDone: () => void }) {
                 )}
               </Show>
             </Show>
-            <p {...stylex.attrs(styles.sowFormP2)}>{t("web.farm.sow.own")}</p>
-            <div {...stylex.attrs(styles.sowFormDiv5)}>
+            <p class="mt-2.5 text-(length:--text-xs) text-bark-600">{t("web.farm.sow.own")}</p>
+            <div class="mt-1.5">
               <PxTextArea
                 ref={(el) => (words = el)}
                 value={text()}
@@ -436,10 +220,10 @@ export function SowForm(props: { station: number; onDone: () => void }) {
                 label={t("web.farm.sow.job")}
               />
             </div>
-            <p {...stylex.attrs(styles.sowFormP3)}>{t("web.farm.sow.who")}</p>
-            <div {...stylex.attrs(styles.seedKinds)} role="group" aria-label={t("web.farm.sow.who")}>
+            <p class="mt-3 text-(length:--text-xs) text-bark-600">{t("web.farm.sow.who")}</p>
+            <div class="mt-1.5 flex flex-wrap gap-1" role="group" aria-label={t("web.farm.sow.who")}>
               <WhoTile active={sower() === byOrchestrator} label={t("web.farm.sow.orchestratorPicks")} onClick={() => setWho(byOrchestrator)}>
-                <span {...stylex.attrs(styles.sowFormSpan2)}>?</span>
+                <span class="flex h-11 w-11 items-center justify-center bg-cream-200 text-(length:--text-lg) text-bark-600">?</span>
               </WhoTile>
               <For each={agents()} keyed={(a) => a.id}>
                 {(a) => (
@@ -449,8 +233,8 @@ export function SowForm(props: { station: number; onDone: () => void }) {
                 )}
               </For>
             </div>
-            <div {...stylex.attrs(styles.sowFormDiv6)}>
-              <p {...stylex.attrs(styles.sowFormP4)}>{t("web.farm.sow.how", { repo: p() })}</p>
+            <div class="mt-3 flex items-center gap-2">
+              <p class="min-w-0 flex-1 text-(length:--text-xs) text-bark-600">{t("web.farm.sow.how", { repo: p() })}</p>
               <PxButton data-testid="sow-draft" disabled={!canSow()} onClick={() => void write()}>
                 {t("web.farm.sow.draft")}
               </PxButton>
@@ -459,7 +243,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
               </PxButton>
             </div>
             <Show when={refused()}>
-              <p {...stylex.attrs(styles.sowFormP42)}>{refused()}</p>
+              <p class="mt-1.5 text-(length:--text-xs) text-berry">{refused()}</p>
             </Show>
           </div>
         </div>
@@ -489,15 +273,15 @@ export function WaterForm(props: { session: Session; onDone: () => void }) {
     }
   };
   return (
-    <div {...stylex.attrs(styles.sowForm)}>
-      <p {...stylex.attrs(styles.waterFormP2)}>{props.session.phase._tag === "working" ? t("web.farm.water.working") : t("web.farm.water.idle")}</p>
-      <p {...stylex.attrs(styles.waterFormP)}>{t("web.farm.water.thread")}</p>
-      <p {...stylex.attrs(styles.waterFormP)}>{t("web.farm.water.job", { brief: props.session.brief })}</p>
-      <div {...stylex.attrs(styles.waterFormDiv)}>
+    <div class="flex flex-col">
+      <p class="text-(length:--text-sm) text-bark-800">{props.session.phase._tag === "working" ? t("web.farm.water.working") : t("web.farm.water.idle")}</p>
+      <p class="mt-1 text-(length:--text-xs) text-bark-600">{t("web.farm.water.thread")}</p>
+      <p class="mt-1 text-(length:--text-xs) text-bark-600">{t("web.farm.water.job", { brief: props.session.brief })}</p>
+      <div class="mt-3 flex flex-wrap gap-1.5">
         <For each={dropsOfAdvice}>{(s) => <Chip testid="water-advice" text={s} on={text() === s} onClick={() => setText(s)} />}</For>
       </div>
-      <div {...stylex.attrs(styles.waterFormDiv2)}>
-        <div {...stylex.attrs(styles.waterFormDiv3)}>
+      <div class="mt-3 flex items-end gap-2">
+        <div class="flex-1">
           <PxTextArea
             value={text()}
             onChange={setText}
@@ -512,10 +296,10 @@ export function WaterForm(props: { session: Session; onDone: () => void }) {
         </PxButton>
       </div>
       <Show when={!canTell()}>
-        <p {...stylex.attrs(styles.waterFormP22)}>{t("web.farm.water.moved")}</p>
+        <p class="mt-1.5 text-(length:--text-xs) text-bark-600">{t("web.farm.water.moved")}</p>
       </Show>
       <Show when={refused()}>
-        <p {...stylex.attrs(styles.sowFormP42)}>{refused()}</p>
+        <p class="mt-1.5 text-(length:--text-xs) text-berry">{refused()}</p>
       </Show>
     </div>
   );

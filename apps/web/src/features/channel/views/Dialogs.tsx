@@ -1,6 +1,4 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
-import { Array as Arr, Order } from "effect";
 import { createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -19,56 +17,6 @@ import { Checkbox } from "#/ui/Checkbox.tsx";
 import { Dialog } from "#/ui/Dialog.tsx";
 import { Field, TextArea, TextInput } from "#/ui/Field.tsx";
 import { Segmented } from "#/ui/Segmented.tsx";
-
-const viewStyles = stylex.create({
-  formForm: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "1rem",
-  },
-  formP: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-berry)",
-  },
-  formDiv: {
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: "0.75rem",
-    paddingTop: "0.5rem",
-  },
-  channelSettingsFormDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "1.25rem",
-  },
-  channelDangerDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.5rem",
-    borderTopStyle: "solid",
-    borderTopWidth: "1px",
-    borderColor: "var(--color-line)",
-    paddingTop: "1rem",
-  },
-  channelDangerDiv2: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  channelDangerDiv3: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  channelDangerP: {
-    color: "var(--color-muted)",
-  },
-  channelDangerUl: {
-    listStyleType: "disc",
-    paddingLeft: "1.25rem",
-  },
-});
 
 function RepoInput(props: { value: string; onChange: (v: string) => void }) {
   const repos = useRepos();
@@ -100,7 +48,7 @@ function Form(props: {
   const ok = () => props.ready ?? true;
   return (
     <form
-      {...stylex.attrs(viewStyles.formForm)}
+      class="flex flex-col gap-4"
       onSubmit={(e) => {
         e.preventDefault();
         if (ok() && !props.busy) void props.onSubmit();
@@ -109,12 +57,12 @@ function Form(props: {
       {props.children}
       <Show when={props.error}>
         {(error) => (
-          <p role="alert" {...stylex.attrs(viewStyles.formP)}>
+          <p role="alert" class="text-sm text-berry">
             {error()}
           </p>
         )}
       </Show>
-      <div {...stylex.attrs(viewStyles.formDiv)}>
+      <div class="flex justify-end gap-3 pt-2">
         <Button data-testid="cancel" onClick={() => props.onCancel()}>
           {t("web.channel.dialog.cancel")}
         </Button>
@@ -135,7 +83,7 @@ export function createChannelForm(channel?: Channel) {
     repo: channel?.repo ?? "",
     category: channel?.category ?? "",
     notify: channel?.notify ?? "all",
-    members: Arr.sort(channel?.members ?? [], Order.String),
+    members: (channel?.members ?? []).toSorted(),
   }));
   const [name, setName] = createSignal(was.name);
   const [description, setDescription] = createSignal(was.description);
@@ -158,7 +106,7 @@ export function createChannelForm(channel?: Channel) {
       repo: repo(),
       category: category().trim(),
       notify: notify(),
-      members: Arr.sort(members(), Order.String),
+      members: members().toSorted(),
     };
     return act.run(async () => {
       if (!channel)
@@ -171,7 +119,7 @@ export function createChannelForm(channel?: Channel) {
           repo: now.repo,
           category: now.category,
           ...(now.name !== was.name ? { name: now.name } : {}),
-          ...(Arr.join(now.members, "\n") !== Arr.join(was.members, "\n") ? { members: now.members } : {}),
+          ...(now.members.join("\n") !== was.members.join("\n") ? { members: now.members } : {}),
         });
       if (now.notify !== was.notify) await api.channel.notify.set({ id: channel.id, notify: now.notify });
       return channel.id;
@@ -195,7 +143,7 @@ export function createChannelForm(channel?: Channel) {
     /** The orchestrators in the channel, by profile id. */
     members,
     /** Puts one in the channel, or takes it out. */
-    setMember: (id: string, on: boolean) => setMembers((m) => (on ? Arr.dedupe([...m, id]) : Arr.filter(m, (x) => x !== id))),
+    setMember: (id: string, on: boolean) => setMembers((m) => (on ? [...new Set([...m, id])] : m.filter((x) => x !== id))),
     busy,
     error,
     /** Pressing save now would be sent: not busy, and a new channel has a name. */
@@ -280,7 +228,7 @@ function ChannelSettingsForm(props: { channel: Channel; onClose: () => void; onG
     if ((await form.save()) !== undefined) props.onClose();
   };
   return (
-    <div {...stylex.attrs(viewStyles.channelSettingsFormDiv)}>
+    <div class="flex flex-col gap-5">
       <Form submit={t("web.channel.dialog.save")} onSubmit={submit} onCancel={() => props.onClose()} busy={form.busy()} error={form.error()}>
         <Show when={top()}>
           <Field label={t("web.channel.manage.name")} hint={t("web.channel.dialog.nameHint")}>
@@ -351,8 +299,8 @@ function ChannelDanger(props: { channel: Channel; onDone: () => void; onGone: ()
     });
   };
   return (
-    <div {...stylex.attrs(viewStyles.channelDangerDiv)}>
-      <div {...stylex.attrs(viewStyles.channelDangerDiv2)}>
+    <div class="flex flex-col gap-2 border-t border-line pt-4">
+      <div class="flex flex-wrap items-center gap-2">
         <Button data-testid="channel-archive" disabled={busy()} onClick={() => void act("archive")} title={t("web.channel.manage.archiveHint")}>
           {props.channel.archived !== undefined ? t("web.channel.manage.unarchive") : t("web.channel.manage.archive")}
         </Button>
@@ -371,15 +319,15 @@ function ChannelDanger(props: { channel: Channel; onDone: () => void; onGone: ()
       </div>
       <Show when={does()}>
         {(lines) => (
-          <div {...stylex.attrs(viewStyles.channelDangerDiv3)}>
-            <p {...stylex.attrs(viewStyles.channelDangerP)}>{t("web.channel.manage.removeWill")}</p>
-            <ul {...stylex.attrs(viewStyles.channelDangerUl)}>
+          <div class="text-sm">
+            <p class="text-muted">{t("web.channel.manage.removeWill")}</p>
+            <ul class="list-disc pl-5">
               <For each={lines()}>{(line) => <li>{line}</li>}</For>
             </ul>
           </div>
         )}
       </Show>
-      <Show when={error()}>{(e) => <p {...stylex.attrs(viewStyles.formP)}>{e()}</p>}</Show>
+      <Show when={error()}>{(e) => <p class="text-sm text-berry">{e()}</p>}</Show>
     </div>
   );
 }

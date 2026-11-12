@@ -1,5 +1,4 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { createMemo, createSignal, Match, onSettled, Show, Switch } from "solid-js";
 
 import { list, t } from "@vibevalley/i18n";
@@ -46,170 +45,6 @@ import { IssueDetail, OrchestratorIssueDetail } from "./IssueDetail";
 import { IssueList, type ListAdd } from "./IssueList";
 import { NewIssue, type NewIssueAt } from "./NewIssue";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
-
-const styles = stylex.create({
-  issueViewButton: {
-    marginBottom: "0.75rem",
-    display: "inline-flex",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.25rem",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.375rem",
-    paddingBlock: "0.125rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: {
-      default: "var(--color-muted)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-ink)",
-      },
-    },
-    transitionProperty: "color, background-color, border-color",
-    transitionTimingFunction: "var(--ease-out)",
-    transitionDuration: "120ms",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  toolbarDiv: {
-    display: "flex",
-    flexDirection: {
-      default: "column-reverse",
-      "@container (width>=760px)": "row",
-    },
-    gap: "0.5rem",
-    alignItems: {
-      default: null,
-      "@container (width>=760px)": "center",
-    },
-  },
-  issuesPage: {
-    position: "relative",
-    display: "flex",
-    height: "100%",
-    flexDirection: "column",
-  },
-  issuesPageP: {
-    paddingInline: "0.75rem",
-    paddingTop: "0.5rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-berry)",
-  },
-  detailP: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  detailH1: {
-    fontSize: "var(--text-lg)",
-    lineHeight: "var(--leading-lg)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  detailP2: {
-    marginTop: "0.75rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  detailH12: {
-    fontSize: "var(--text-xl)",
-    lineHeight: "var(--leading-xl)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  detailP3: {
-    marginTop: "0.75rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  issueViewDiv: {
-    minHeight: "0",
-    flex: "1",
-    overflowY: "auto",
-  },
-  issue: {
-    marginInline: "auto",
-    width: "100%",
-    maxWidth: "1200px",
-    paddingInline: "1.5rem",
-    paddingTop: "0.75rem",
-    paddingBottom: "2.5rem",
-  },
-  toolbarDiv2: {
-    containerType: "inline-size",
-    paddingInline: "0.75rem",
-    paddingTop: "0.75rem",
-    paddingBottom: "0.625rem",
-  },
-  toolbarDiv22: {
-    display: "flex",
-    minWidth: "0",
-    flex: "1",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  toolbarLabel: {
-    display: "flex",
-    height: "1.75rem",
-    width: "15rem",
-    alignItems: "center",
-    gap: "0.375rem",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: {
-      default: "var(--color-line)",
-      ":focus-within": "var(--color-focus)",
-    },
-    backgroundColor: "var(--color-page)",
-    paddingInline: "0.5rem",
-  },
-  issueSearch: {
-    minWidth: "0",
-    flex: "1",
-    backgroundColor: "transparent",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    outlineStyle: "none",
-    color: {
-      default: null,
-      "::placeholder": "var(--color-faint)",
-    },
-  },
-  toolbarSpan: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  filterClear: {
-    cursor: "pointer",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-water)",
-    textDecorationLine: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "underline",
-      },
-    },
-  },
-  toolbarDiv3: {
-    marginLeft: "auto",
-    display: "flex",
-    alignItems: "center",
-    gap: "0.375rem",
-  },
-});
-
-const selectStyles = stylex.create({ filter: { maxWidth: "12rem" } });
 
 type Closing = { issue: Issue; session: Session | undefined; review: boolean; lane?: Lane };
 
@@ -311,14 +146,14 @@ export function IssuesPage(props: { rest: string }) {
 
   // An issue is a page of its own (docs/style/design.md): the board and the list give way to it, and Escape or Issues comes back.
   return (
-    <div data-testid="issues-page" {...stylex.attrs(styles.issuesPage)}>
+    <div data-testid="issues-page" class="relative flex h-full flex-col">
       <Show
         when={id()}
         keyed
         fallback={
           <>
             <Show when={history.error()}>
-              <p {...stylex.attrs(styles.issuesPageP)}>
+              <p class="px-3 pt-2 text-sm text-berry">
                 {t("web.issue.page.historyUnread")}
                 {reasonOf(history.error())}
               </p>
@@ -410,13 +245,13 @@ function Detail(props: {
   return (
     <Switch>
       <Match when={!card() && !props.known}>
-        <p {...stylex.attrs(styles.detailP)}>{t("web.issue.reading")}</p>
+        <p class="text-sm text-muted">{t("web.issue.reading")}</p>
       </Match>
       <Match when={!card()}>
         {/* A link to an issue the farm does not have says so, instead of quietly showing the board. */}
         <div>
-          <h1 {...stylex.attrs(styles.detailH1)}>{t("web.issue.page.notFound")}</h1>
-          <p {...stylex.attrs(styles.detailP2)}>{t("web.issue.page.notFoundLine", { id: props.id })}</p>
+          <h1 class="text-lg font-semibold">{t("web.issue.page.notFound")}</h1>
+          <p class="mt-3 text-sm text-muted">{t("web.issue.page.notFoundLine", { id: props.id })}</p>
         </div>
       </Match>
       <Match when={shows("todo")} keyed>
@@ -439,8 +274,8 @@ function Detail(props: {
       <Match when={shows("missing")} keyed>
         {() => (
           <div>
-            <h1 {...stylex.attrs(styles.detailH12)}>{cardOf("missing").issue.title}</h1>
-            <p {...stylex.attrs(styles.detailP3)}>{t("web.issue.page.missing", { what: list(cardOf("missing").missing) })}</p>
+            <h1 class="text-xl font-semibold">{cardOf("missing").issue.title}</h1>
+            <p class="mt-3 text-sm">{t("web.issue.page.missing", { what: list(cardOf("missing").missing) })}</p>
           </div>
         )}
       </Match>
@@ -472,9 +307,14 @@ function IssueView(props: { onBack: () => void; children: JSX.Element }) {
     return () => document.removeEventListener("keydown", esc);
   });
   return (
-    <div {...stylex.attrs(styles.issueViewDiv)}>
-      <div data-testid="issue" {...stylex.attrs(styles.issue)}>
-        <button type="button" data-testid="issue-close" onClick={() => props.onBack()} {...stylex.attrs(styles.issueViewButton)}>
+    <div class="min-h-0 flex-1 overflow-y-auto">
+      <div data-testid="issue" class="mx-auto w-full max-w-300 px-6 pt-3 pb-10">
+        <button
+          type="button"
+          data-testid="issue-close"
+          onClick={() => props.onBack()}
+          class="mb-3 inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-sm text-muted hover:text-ink transition-[color,background-color,border-color] ease-out duration-120 hover:bg-hover"
+        >
           <Icon name="back" size={14} />
           {t("web.issue.page.backToBoard")}
         </button>
@@ -497,10 +337,10 @@ function Toolbar(props: {
   const agents = () => [...new Set(props.cards.map(cardAgent).filter((a): a is string => !!a))].toSorted((a, b) => nameOf()(a).localeCompare(nameOf()(b)));
   return (
     // Narrow, the views go on their own line above the filters, at the right where the Display panel opens leftwards.
-    <div {...stylex.attrs(styles.toolbarDiv2)}>
-      <div {...stylex.attrs(styles.toolbarDiv)}>
-        <div {...stylex.attrs(styles.toolbarDiv22)}>
-          <label {...stylex.attrs(styles.toolbarLabel)}>
+    <div class="@container px-3 pt-3 pb-2.5">
+      <div class="flex flex-col-reverse @min-[760px]:flex-row gap-2 @min-[760px]:items-center">
+        <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <label class="flex h-7 w-60 items-center gap-1.5 rounded-md border border-line focus-within:border-focus bg-page px-2">
             <Icon name="search" size={14} />
             <input
               data-testid="issue-search"
@@ -508,13 +348,13 @@ function Toolbar(props: {
               onInput={(e) => props.onFilter({ ...props.filter, query: e.currentTarget.value })}
               placeholder={t("web.issue.page.find")}
               aria-label={t("web.issue.page.findLabel")}
-              {...stylex.attrs(styles.issueSearch)}
+              class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
             />
           </label>
           <Icon name="filter" size={16} label={t("web.issue.page.filter")} />
           <Select
             size="control"
-            styles={selectStyles.filter}
+            class="max-w-48"
             label={t("web.issue.page.byRepo")}
             testid="filter-repo"
             filter
@@ -525,7 +365,7 @@ function Toolbar(props: {
           />
           <Select
             size="control"
-            styles={selectStyles.filter}
+            class="max-w-48"
             label={t("web.issue.page.byHelper")}
             testid="filter-agent"
             filter
@@ -535,13 +375,13 @@ function Toolbar(props: {
             onChange={(agent) => props.onFilter({ ...props.filter, agent })}
           />
           <Show when={filterAny(props.filter)}>
-            <span {...stylex.attrs(styles.toolbarSpan)}>{t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}</span>
-            <button type="button" data-testid="filter-clear" onClick={() => props.onFilter(noFilter)} {...stylex.attrs(styles.filterClear)}>
+            <span class="text-xs text-muted">{t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}</span>
+            <button type="button" data-testid="filter-clear" onClick={() => props.onFilter(noFilter)} class="cursor-pointer text-sm text-water hover:underline">
               {t("web.issue.page.clear")}
             </button>
           </Show>
         </div>
-        <div {...stylex.attrs(styles.toolbarDiv3)}>
+        <div class="ml-auto flex items-center gap-1.5">
           <Segmented
             label={t("web.issue.page.view")}
             testid="issue-view"

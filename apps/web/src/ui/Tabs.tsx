@@ -1,5 +1,4 @@
 import type { JSX } from "@solidjs/web";
-import type * as stylex from "@stylexjs/stylex";
 import { For, Show } from "solid-js";
 
 import { Tabs as Base } from "@vibevalley/base-ui";
@@ -8,7 +7,6 @@ import { Link as A } from "#/infra/router.ts";
 
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
-import { withStyles } from "./positioner";
 
 interface TabItem<T extends string> {
   readonly value: T;
@@ -39,8 +37,6 @@ export function Tabs<T extends string>(props: {
   items: readonly TabItem<T>[];
   look?: TabsLook;
   class?: JSX.ClassValue | undefined;
-  // For callers still on StyleX; it goes when the last of them is on classes.
-  styles?: stylex.StyleXStyles;
 }) {
   return (
     <Base.Root
@@ -50,7 +46,7 @@ export function Tabs<T extends string>(props: {
         if (item) props.onChange?.(item.value);
       }}
     >
-      <Base.List aria-label={props.label} {...withStyles(props.styles, [looks[props.look ?? "pills"].list, props.class])}>
+      <Base.List aria-label={props.label} class={[looks[props.look ?? "pills"].list, props.class]}>
         <For each={props.items}>
           {(item) => (
             <Base.Tab

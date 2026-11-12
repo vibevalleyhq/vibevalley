@@ -54,7 +54,7 @@ export interface Media {
   readonly previewRelease: (id: string) => Promise<T.Preview>;
   readonly release: (id: string) => Promise<T.MediaJob>;
   /** At startup: jobs and inputs a stop cut short are marked as such, and the ones still out at the vendor are followed again. */
-  readonly start: () => Promise<void>;
+  readonly boot: () => Promise<void>;
   /** Stops every job's work, the input sweep and the streams' timers. */
   readonly close: () => Promise<void>;
 }
@@ -144,7 +144,7 @@ export async function makeMedia(deps: MediaDeps): Promise<Media> {
         }
         return machine.get(id);
       }),
-    start: async () => {
+    boot: async () => {
       await remoteFiles.restore();
       await machine.interrupt();
       await inputs.restore();

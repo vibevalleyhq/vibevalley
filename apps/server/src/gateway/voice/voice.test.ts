@@ -14,7 +14,7 @@ import { makeProvider, type Provider } from "#/modules/provider/provider.ts";
 import { NotAnswered } from "#/modules/session/host.ts";
 import type { Setting } from "#/modules/setting/setting.ts";
 import { defaultVoice } from "#/modules/setting/voice.ts";
-import { inboxStart } from "#/services.ts";
+import { inboxBoot } from "#/services.ts";
 import { nextTurn, testConfig, until } from "#/testing/layers.ts";
 import { type World, world } from "#/testing/world.ts";
 
@@ -243,7 +243,7 @@ const farm = async (
   };
   const w = await world({ config });
   try {
-    await inboxStart(w);
+    await inboxBoot(w);
     const orchestrator = await makeOrchestrator(w);
     w.closes.push(() => orchestrator.close());
     const provider =

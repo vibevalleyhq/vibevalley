@@ -1,12 +1,10 @@
 import type { JSX } from "@solidjs/web";
-import type * as stylex from "@stylexjs/stylex";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onSettled, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
 import { aria } from "#/base/dom.tsx";
 import { spelled } from "#/base/search.ts";
-import { withStyles } from "#/ui/positioner.ts";
 
 import { PxWindow } from "./base";
 import { SpriteIcon } from "./icons";
@@ -15,16 +13,10 @@ const inputBox = "border-2 border-bark-500 bg-cream-input focus-within:border-le
 const control = "min-w-0 flex-1 bg-transparent text-bark-900 caret-bark-900 outline-none placeholder:text-bark-500";
 
 /** `label` with a dotted underline that shows `tip` on hover; the bare label without one. */
-export function PxTip(props: {
-  tip?: string | undefined;
-  children: JSX.Element;
-  class?: JSX.ClassValue | undefined;
-  // For callers still on StyleX; it goes when the last of them is on classes.
-  styles?: stylex.StyleXStyles;
-}) {
+export function PxTip(props: { tip?: string | undefined; children: JSX.Element; class?: JSX.ClassValue | undefined }) {
   return (
-    <Show when={props.tip} fallback={<span {...withStyles(props.styles, props.class)}>{props.children}</span>}>
-      <span title={props.tip} {...withStyles(props.styles, ["cursor-help underline decoration-bark-600 decoration-dotted decoration-2", props.class])}>
+    <Show when={props.tip} fallback={<span class={props.class}>{props.children}</span>}>
+      <span title={props.tip} class={["cursor-help underline decoration-bark-600 decoration-dotted decoration-2", props.class]}>
         {props.children}
       </span>
     </Show>
@@ -97,8 +89,6 @@ export function PxTextInput(props: {
   id?: string;
   ref?: (el: HTMLInputElement) => void;
   class?: JSX.ClassValue | undefined;
-  // For callers still on StyleX; it goes when the last of them is on classes.
-  styles?: stylex.StyleXStyles;
   testid?: string;
 }) {
   const listId = createUniqueId();
@@ -121,12 +111,12 @@ export function PxTextInput(props: {
   });
   return (
     <div
-      {...withStyles(props.styles, [
+      class={[
         "relative flex h-9 items-center gap-2 px-3 text-bark-900",
         props.well === true ? "bg-cream-100 pixel-ring" : inputBox,
         props.disabled === true && "opacity-50",
         props.class,
-      ])}
+      ]}
     >
       <Show when={props.icon}>{(icon) => <SpriteIcon name={icon()} size={14} />}</Show>
       <input
@@ -214,8 +204,6 @@ export function PxTextArea(props: {
   id?: string;
   ref?: (el: HTMLTextAreaElement) => void;
   class?: JSX.ClassValue | undefined;
-  // For callers still on StyleX; it goes when the last of them is on classes.
-  styles?: stylex.StyleXStyles;
 }) {
   let area: HTMLTextAreaElement | undefined;
   let typed = untrack(() => props.value);
@@ -232,7 +220,7 @@ export function PxTextArea(props: {
     if (props.autoFocus === true) area?.focus();
   });
   return (
-    <div {...withStyles(props.styles, ["flex px-3 py-2", inputBox, props.disabled === true && "opacity-50", props.class])}>
+    <div class={["flex px-3 py-2", inputBox, props.disabled === true && "opacity-50", props.class]}>
       <textarea
         ref={(t) => {
           area = t;

@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createEffect, createSignal, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -15,105 +14,12 @@ import { sendTo, useShown } from "./frame";
 import { shellPath } from "./shell";
 import { elapsedText, presenterOf, slidePostOf, slidesChannelName, stepped } from "./slides";
 
-const viewStyles = stylex.create({
-  page: {
-    display: "grid",
-    height: "100vh",
-    gridTemplateColumns: {
-      default: "1fr",
-      "@media (width>=48rem)": "minmax(0, 2fr) minmax(0, 1fr)",
-    },
-    gap: "1rem",
-    padding: "1rem",
-    backgroundColor: "var(--color-side)",
-    color: "var(--color-ink)",
-  },
-  main: {
-    display: "flex",
-    minHeight: "0",
-    flexDirection: "column",
-    gap: "0.75rem",
-  },
-  current: {
-    width: "100%",
-    aspectRatio: "16 / 9",
-    borderRadius: "var(--radius-lg)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-  },
-  bar: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  at: {
-    fontVariantNumeric: "tabular-nums",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  clock: {
-    marginLeft: "auto",
-    fontVariantNumeric: "tabular-nums",
-    fontSize: "var(--text-xl)",
-    lineHeight: "var(--leading-xl)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  side: {
-    display: "flex",
-    minHeight: "0",
-    flexDirection: "column",
-    gap: "0.75rem",
-  },
-  label: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-faint)",
-  },
-  next: {
-    width: "100%",
-    aspectRatio: "16 / 9",
-    pointerEvents: "none",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-  },
-  end: {
-    display: "flex",
-    width: "100%",
-    aspectRatio: "16 / 9",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "dashed",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    color: "var(--color-faint)",
-  },
-  notes: {
-    minHeight: "0",
-    flex: "1",
-    overflowY: "auto",
-    whiteSpace: "pre-wrap",
-    fontSize: "var(--text-lg)",
-    lineHeight: "1.6",
-  },
-  missing: {
-    padding: "1.5rem",
-    color: "var(--color-muted)",
-  },
-});
-
 /** The speaker's window of a deck: this slide, the next, its notes and the time. It and the workbench's tab follow each other. */
 export function PresenterPage() {
   const router = useRouter();
   const asked = () => presenterOf(new URL(router.path(), window.location.origin).search);
   return (
-    <Show when={asked()} fallback={<p {...stylex.attrs(viewStyles.missing)}>{t("web.artifact.presenter.missing")}</p>}>
+    <Show when={asked()} fallback={<p class="p-6 text-muted">{t("web.artifact.presenter.missing")}</p>}>
       {(a) => <Presenter id={a().id} version={a().version} />}
     </Show>
   );
@@ -154,8 +60,13 @@ function Presenter(props: { id: string; version: number }) {
   });
   const notes = () => shown().ready?.notes?.[at()] ?? "";
   return (
-    <main data-testid="presenter" data-at={at()} data-pages={pages()} {...stylex.attrs(viewStyles.page)}>
-      <section aria-label={t("web.artifact.presenter.current")} {...stylex.attrs(viewStyles.main)}>
+    <main
+      data-testid="presenter"
+      data-at={at()}
+      data-pages={pages()}
+      class="grid h-screen grid-cols-[1fr] md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-4 p-4 bg-side text-ink"
+    >
+      <section aria-label={t("web.artifact.presenter.current")} class="flex min-h-0 flex-col gap-3">
         <iframe
           ref={setFrame}
           data-testid="presenter-current"
@@ -163,9 +74,9 @@ function Presenter(props: { id: string; version: number }) {
           src={shellPath(props.id, props.version, "slides", shownTheme())}
           sandbox={htmlSandbox}
           referrerpolicy="no-referrer"
-          {...stylex.attrs(viewStyles.current)}
+          class="w-full aspect-video rounded-lg border border-line bg-page"
         />
-        <div {...stylex.attrs(viewStyles.bar)}>
+        <div class="flex items-center gap-2">
           <IconButton
             icon="previous"
             label={t("web.artifact.slides.previous")}
@@ -173,7 +84,7 @@ function Presenter(props: { id: string; version: number }) {
             disabled={at() === 0}
             onClick={() => goto(stepped({ at: at(), step: -1, pages: pages() }))}
           />
-          <span data-testid="presenter-at" {...stylex.attrs(viewStyles.at)}>
+          <span data-testid="presenter-at" class="tabular-nums text-sm text-muted">
             {t("web.artifact.slides.at", { at: at() + 1, pages: pages() })}
           </span>
           <IconButton
@@ -183,15 +94,22 @@ function Presenter(props: { id: string; version: number }) {
             disabled={at() >= pages() - 1}
             onClick={() => goto(stepped({ at: at(), step: 1, pages: pages() }))}
           />
-          <span data-testid="presenter-clock" aria-label={t("web.artifact.presenter.clock")} {...stylex.attrs(viewStyles.clock)}>
+          <span data-testid="presenter-clock" aria-label={t("web.artifact.presenter.clock")} class="ml-auto tabular-nums text-xl font-semibold">
             {elapsedText(now() - started())}
           </span>
           <Button onClick={() => setStarted(now())}>{t("web.artifact.presenter.restart")}</Button>
         </div>
       </section>
-      <aside aria-label={t("web.artifact.presenter.aside")} {...stylex.attrs(viewStyles.side)}>
-        <span {...stylex.attrs(viewStyles.label)}>{t("web.artifact.presenter.next")}</span>
-        <Show when={pages() > 0 && at() < pages() - 1} fallback={<div {...stylex.attrs(viewStyles.end)}>{t("web.artifact.presenter.end")}</div>}>
+      <aside aria-label={t("web.artifact.presenter.aside")} class="flex min-h-0 flex-col gap-3">
+        <span class="text-xs text-faint">{t("web.artifact.presenter.next")}</span>
+        <Show
+          when={pages() > 0 && at() < pages() - 1}
+          fallback={
+            <div class="flex w-full aspect-video items-center justify-center rounded-md border-dashed border border-line text-faint">
+              {t("web.artifact.presenter.end")}
+            </div>
+          }
+        >
           <iframe
             data-testid="presenter-next-slide"
             title={t("web.artifact.presenter.next")}
@@ -199,14 +117,14 @@ function Presenter(props: { id: string; version: number }) {
             src={shellPath(props.id, props.version, "slides", shownTheme(), { at: at() + 1, still: true })}
             sandbox={htmlSandbox}
             referrerpolicy="no-referrer"
-            {...stylex.attrs(viewStyles.next)}
+            class="w-full aspect-video pointer-events-none rounded-md border border-line bg-page"
           />
         </Show>
-        <span {...stylex.attrs(viewStyles.label)}>{t("web.artifact.presenter.notes")}</span>
-        <div data-testid="presenter-notes" {...stylex.attrs(viewStyles.notes)}>
+        <span class="text-xs text-faint">{t("web.artifact.presenter.notes")}</span>
+        <div data-testid="presenter-notes" class="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap text-lg leading-[1.6]">
           {notes() || t("web.artifact.presenter.noNotes")}
         </div>
-        <span {...stylex.attrs(viewStyles.label)}>{title()}</span>
+        <span class="text-xs text-faint">{title()}</span>
       </aside>
     </main>
   );

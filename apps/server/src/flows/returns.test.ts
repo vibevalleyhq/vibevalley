@@ -1,15 +1,11 @@
 import { scriptedRuntime } from "@botiverse/oar/testing";
-import { expect, it } from "@effect/vitest";
-import { Effect } from "effect";
-import { SqlClient } from "effect/sql";
+import { expect, test } from "vite-plus/test";
 
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { user } from "#/base/actor.ts";
-import { Agent } from "#/modules/agent/agent.ts";
-import { Channel } from "#/modules/channel/channel.ts";
-import { Issue } from "#/modules/issue/issue.ts";
-import { Mailbox, type SourceEvent } from "#/modules/mailbox/mailbox.ts";
+import { type SourceEvent } from "#/modules/mailbox/mailbox.ts";
+import { sqlOf } from "#/testing/sql.ts";
 import { testIssues } from "#/testing/world.ts";
 
 import { await_, farm, lab } from "./farm.ts";
@@ -24,64 +20,62 @@ const event = (issue: string, key: string): SourceEvent => ({
   at: 1,
 });
 
-it.live("regression: a consumed trigger can be handed back once without losing its source or consumption receipt", () => {
+test("regression: a consumed trigger can be handed back once without losing its source or consumption receipt", async () => {
   const f = farm({ runtime: scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("done") }) });
-  return Effect.gen(function* () {
-    const issue2 = yield* Issue;
-    const issues = testIssues(issue2);
-    const mailbox = yield* Mailbox;
-    const sql = yield* SqlClient.SqlClient;
-    yield* (yield* Agent).save(lab());
-    const issue = yield* issues.add({ title: "work", repo: "handback-trigger", agent: "lab" });
-    const started = yield* issues.start(issue.id, "");
-    const trigger = (yield* mailbox.accept(event(issue.id, "beyond-original-scope")))!;
-    const receipt = yield* sql`select routed_at, routing_scope, routing_position from mailbox_trigger where id = ${trigger.id}`;
-    yield* await_(
-      () => sql<{ state: string }>`select state from mailbox_delivery where session_id = ${started.session!} and envelope_id = ${trigger.id}`,
-      (rows) => rows[0]?.state === "consumed",
-      "the original input consumed",
-    );
-    yield* mailbox.decline(started.session!, trigger.id, "another work item");
-    yield* mailbox.decline(started.session!, trigger.id, "duplicate retry");
-    const returned = mailbox.deliveriesOf(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id);
-    expect(returned).toHaveLength(1);
-    expect(returned[0]!.envelope_id).not.toBe(trigger.id);
-    expect(returned[0]!.payload.note).toContain("another work item");
-    expect(returned[0]!.payload.trigger.meta.issue).toBeUndefined();
-    expect((yield* mailbox.readTrigger(trigger.id))?.trigger).toEqual(trigger);
-    expect(
-      (yield* sql<{ state: string }>`select state from mailbox_delivery where session_id = ${started.session!} and envelope_id = ${trigger.id}`)[0]?.state,
-    ).toBe("consumed");
-    expect((yield* sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${trigger.id}`)[0]?.state).toBe("returned");
-    const rows2 = yield* sql`select routed_at, routing_scope, routing_position from mailbox_trigger where id = ${trigger.id}`;
-    expect(rows2).toEqual(receipt);
-    yield* mailbox.restore;
-    expect(mailbox.deliveriesOf(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)).toHaveLength(1);
-    const userEpoch = yield* sql<{ position: number }>`select max(position) as position from mailbox_user_route where scope = ${returned[0]!.scope}`;
-    expect(userEpoch[0]!.position).toBe(returned[0]!.position);
-  }).pipe(Effect.scoped, Effect.provide(f.layer));
+  await using fw = await f.open();
+  const issue2 = fw.issue;
+  const issues = testIssues(issue2);
+  const mailbox = fw.mailbox;
+  const sql = sqlOf(fw.db);
+  await fw.agent.save(lab());
+  const issue = await issues.add({ title: "work", repo: "handback-trigger", agent: "lab" });
+  const started = await issues.start(issue.id, "");
+  const trigger = (await mailbox.accept(event(issue.id, "beyond-original-scope")))!;
+  const receipt = await sql`select routed_at, routing_scope, routing_position from mailbox_trigger where id = ${trigger.id}`;
+  await await_(
+    () => sql<{ state: string }>`select state from mailbox_delivery where session_id = ${started.session!} and envelope_id = ${trigger.id}`,
+    (rows) => rows[0]?.state === "consumed",
+    "the original input consumed",
+  );
+  await mailbox.decline(started.session!, trigger.id, "another work item");
+  await mailbox.decline(started.session!, trigger.id, "duplicate retry");
+  const returned = mailbox.deliveriesOf(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id);
+  expect(returned).toHaveLength(1);
+  expect(returned[0]!.envelope_id).not.toBe(trigger.id);
+  expect(returned[0]!.payload.note).toContain("another work item");
+  expect(returned[0]!.payload.trigger.meta.issue).toBeUndefined();
+  expect((await mailbox.readTrigger(trigger.id))?.trigger).toEqual(trigger);
+  expect(
+    (await sql<{ state: string }>`select state from mailbox_delivery where session_id = ${started.session!} and envelope_id = ${trigger.id}`)[0]?.state,
+  ).toBe("consumed");
+  expect((await sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${trigger.id}`)[0]?.state).toBe("returned");
+  const rows2 = await sql`select routed_at, routing_scope, routing_position from mailbox_trigger where id = ${trigger.id}`;
+  expect(rows2).toEqual(receipt);
+  await mailbox.restore();
+  expect(mailbox.deliveriesOf(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)).toHaveLength(1);
+  const userEpoch = await sql<{ position: number }>`select max(position) as position from mailbox_user_route where scope = ${returned[0]!.scope}`;
+  expect(userEpoch[0]!.position).toBe(returned[0]!.position);
 });
 
-it.live("regression: closing an unassigned issue returns its held user input without a machine chat message", () => {
+test("regression: closing an unassigned issue returns its held user input without a machine chat message", async () => {
   const f = farm();
-  return Effect.gen(function* () {
-    const service = yield* Issue;
-    const issues = testIssues(service);
-    const mailbox = yield* Mailbox;
-    const chat = yield* Channel;
-    const sql = yield* SqlClient.SqlClient;
-    const issue = yield* issues.add({ title: "waiting", repo: "unassigned-return" });
-    const source = event(issue.id, "unread-user-followup");
-    const trigger = (yield* mailbox.accept(source))!;
-    yield* service.setStatus(issue.id, "canceled", "", "", user);
-    yield* await_(
-      () => Effect.succeed(mailbox.deliveriesOf(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)),
-      (rows) => rows.length === 1,
-      "held input returned on cancel",
-    );
-    yield* mailbox.accept(source);
-    expect(mailbox.deliveriesOf(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)).toHaveLength(1);
-    expect((yield* sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${trigger.id}`)[0]?.state).toBe("returned");
-    expect((yield* chat.history(chat.defaultChannel())).some((message) => message.text.includes(source.text))).toBe(false);
-  }).pipe(Effect.scoped, Effect.provide(f.layer));
+  await using fw = await f.open();
+  const service = fw.issue;
+  const issues = testIssues(service);
+  const mailbox = fw.mailbox;
+  const chat = fw.channel;
+  const sql = sqlOf(fw.db);
+  const issue = await issues.add({ title: "waiting", repo: "unassigned-return" });
+  const source = event(issue.id, "unread-user-followup");
+  const trigger = (await mailbox.accept(source))!;
+  await service.setStatus(issue.id, "canceled", "", "", user);
+  await await_(
+    () => Promise.resolve(mailbox.deliveriesOf(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)),
+    (rows) => rows.length === 1,
+    "held input returned on cancel",
+  );
+  await mailbox.accept(source);
+  expect(mailbox.deliveriesOf(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)).toHaveLength(1);
+  expect((await sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${trigger.id}`)[0]?.state).toBe("returned");
+  expect((await chat.history(chat.defaultChannel())).some((message) => message.text.includes(source.text))).toBe(false);
 });

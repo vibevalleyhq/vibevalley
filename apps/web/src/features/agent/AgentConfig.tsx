@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -33,335 +32,6 @@ import { Tabs } from "#/ui/Tabs.tsx";
 
 import { Labeled } from "./AgentLook";
 
-const styles = stylex.create({
-  supportIcon: {
-    marginTop: "0.25rem",
-  },
-  configTabsTextInput: {
-    fontFamily: "var(--font-mono)",
-  },
-  toolsTextInput: {
-    width: "7rem",
-  },
-  toolsTextInput2: {
-    minWidth: "10rem",
-    flex: "1",
-    fontFamily: "var(--font-mono)",
-  },
-  skillPickerA: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-    textDecorationLine: "underline",
-  },
-  configTabsDiv: {
-    display: "flex",
-    minHeight: "0",
-    flex: "1",
-    flexDirection: "column",
-  },
-  configTabsDiv2: {
-    display: "flex",
-    minHeight: "0",
-    flex: "1",
-    flexDirection: "column",
-    gap: "1rem",
-    overflowY: "auto",
-    padding: "1rem",
-  },
-  runtimeChoiceButton: {
-    display: "flex",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.5rem",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    padding: "0.5rem",
-    textAlign: "left",
-  },
-  runtimeChoiceButtonTone: {
-    borderColor: {
-      default: "var(--color-ink)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink) 40%, transparent)",
-    },
-    backgroundColor: "var(--color-selected)",
-  },
-  runtimeChoiceButtonAlt: {
-    borderColor: "var(--color-line)",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  runtimeChoiceSpan: {},
-  runtimeChoiceSpanTone: {
-    opacity: ".5",
-    filter: "grayscale(100%)",
-  },
-  runtimeChoiceSpan2: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  runtimeChoiceSpanAlt: {
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  runtimeChoiceSpanAccent: {
-    fontWeight: "var(--font-weight-medium)",
-  },
-  runtimeChoiceSpan3: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-  },
-  runtimeChoiceSpanMuted: {
-    color: "var(--color-muted)",
-  },
-  runtimeChoiceSpanKind5: {
-    color: "var(--color-berry)",
-  },
-  skillPickerButton: {
-    display: "flex",
-    cursor: "pointer",
-    alignItems: "flex-start",
-    gap: "0.625rem",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    padding: "0.625rem",
-    textAlign: "left",
-  },
-  skillPickerSpan: {
-    marginTop: "0.125rem",
-    display: "flex",
-    width: "1rem",
-    height: "1rem",
-    flexShrink: "0",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-sm)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    backgroundColor: "var(--color-page)",
-  },
-  skillPickerSpanTone: {
-    borderColor: "var(--color-accent)",
-  },
-  skillPickerSpanAlt: {
-    borderColor: {
-      default: "var(--color-ink)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink) 25%, transparent)",
-    },
-  },
-  toolsDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.375rem",
-  },
-  toolsDivTone: {
-    opacity: ".5",
-  },
-  inventorySpan: {
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  inventorySpanTone: {
-    color: "var(--color-muted)",
-    textDecorationLine: "line-through",
-  },
-  runtimeChoiceSpan4: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  runtimeChoiceDiv: {
-    display: "grid",
-    gap: "0.375rem",
-    gridTemplateColumns: {
-      default: null,
-      "@media (width>=40rem)": "repeat(2,minmax(0,1fr))",
-    },
-  },
-  runtimeChoiceSpan22: {
-    display: "flex",
-    minWidth: "0",
-    flexDirection: "column",
-  },
-  supportSection: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.375rem",
-    borderRadius: "var(--radius-lg)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    padding: "0.75rem",
-  },
-  supportH3: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  supportSpan: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  supportSpan2: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "0.375rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  supportSpan3: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  supportSpan4: {
-    fontFamily: "var(--font-mono)",
-    color: "var(--color-ink)",
-  },
-  skillPickerDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.375rem",
-  },
-  skillPickerSpan2: {
-    display: "flex",
-    flexDirection: "column",
-  },
-  skillPickerSpan22: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    fontWeight: "var(--font-weight-medium)",
-  },
-  toolsDiv2: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    paddingInline: "0.75rem",
-    paddingBlock: "0.5rem",
-  },
-  toolsSpan: {
-    borderRadius: "var(--radius-sm)",
-    backgroundColor: "var(--color-selected)",
-    paddingInline: "0.375rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-  },
-  toolsSpan2: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  toolsButton: {
-    cursor: "pointer",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: {
-      default: "var(--color-muted)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-berry)",
-      },
-    },
-  },
-  toolsDiv22: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.375rem",
-  },
-  toolsDiv3: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.25rem",
-    paddingTop: "0.375rem",
-  },
-  toolsButton2: {
-    cursor: "pointer",
-    borderRadius: "var(--radius-sm)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    backgroundColor: {
-      default: "var(--color-page)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-    paddingInline: "0.375rem",
-    paddingBlock: "1px",
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: {
-      default: "var(--color-muted)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-ink)",
-      },
-    },
-  },
-  inventoryUl: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.25rem",
-  },
-  inventoryLi: {
-    display: "flex",
-    alignItems: "baseline",
-    gap: "0.5rem",
-  },
-  inventorySpan2: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  inventorySpan22: {
-    maxWidth: "10rem",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  tabs: {
-    borderBottomWidth: 1,
-    borderBottomStyle: "solid",
-    borderColor: "var(--color-line)",
-    paddingInline: "0.75rem",
-    paddingBlock: "0.5rem",
-  },
-});
-
 const noSupport: RuntimeSupport = { steer: false, refused: {}, capabilities: [], inProcess: false };
 export const supportOf = (info: RuntimeInfo | undefined) => info?.support ?? noSupport;
 
@@ -394,15 +64,15 @@ export function ConfigTabs(props: {
   const envRefused = () => support().refused[sessionEnv];
   const draft = () => props.draft;
   return (
-    <div {...stylex.attrs(styles.configTabsDiv)}>
+    <div class="flex min-h-0 flex-1 flex-col">
       <Tabs
         label={t("web.agent.tabs")}
         value={tab()}
         onChange={(v) => (v === "trajectories" ? props.onTrajectories() : setTab(v))}
         items={tabs().map(([value, label]) => ({ value, label }))}
-        styles={styles.tabs}
+        class="border-b border-line px-3 py-2"
       />
-      <div {...stylex.attrs(styles.configTabsDiv2)}>
+      <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
         <Switch>
           <Match when={tab() === "who"}>
             <Labeled label={t("web.agent.name")} tip={t("web.agent.nameTip")} error={props.nameTaken ? t("web.agent.nameTaken") : undefined}>
@@ -455,7 +125,7 @@ export function ConfigTabs(props: {
             <Labeled label={t("web.agent.workdir")} tip={t("web.agent.workdirTip")}>
               <TextInput
                 aria-label={t("web.agent.workdir")}
-                styles={styles.configTabsTextInput}
+                class="font-mono"
                 placeholder={t("web.agent.workdirHint")}
                 value={draft().workdir}
                 onInput={(e) => props.patch({ ...draft(), workdir: e.currentTarget.value })}
@@ -502,8 +172,8 @@ function RuntimeChoice(props: { draft: Agent; patch: Patch }) {
   };
   return (
     <Labeled label={t("web.agent.machine")} tip={t("web.agent.machineTip")}>
-      <Show when={runtimes().length > 0} fallback={<span {...stylex.attrs(styles.runtimeChoiceSpan4)}>{t("web.agent.readingMachines")}</span>}>
-        <div {...stylex.attrs(styles.runtimeChoiceDiv)}>
+      <Show when={runtimes().length > 0} fallback={<span class="text-xs text-muted">{t("web.agent.readingMachines")}</span>}>
+        <div class="grid gap-1.5 sm:grid-cols-2">
           <For each={runtimes()}>
             {(info) => {
               const available = () => info.installation.status === "available";
@@ -525,16 +195,17 @@ function RuntimeChoice(props: { draft: Agent; patch: Patch }) {
                   aria-pressed={aria(active())}
                   aria-label={info.preset.label}
                   onClick={() => choose(info)}
-                  {...stylex.attrs(styles.runtimeChoiceButton, active() ? styles.runtimeChoiceButtonTone : styles.runtimeChoiceButtonAlt)}
+                  class={[
+                    "flex cursor-pointer items-center gap-2 rounded-md border p-2 text-left",
+                    active() ? "border-ink/40 bg-selected" : "border-line hover:bg-hover",
+                  ]}
                 >
-                  <span {...stylex.attrs(styles.runtimeChoiceSpan, !ok() ? styles.runtimeChoiceSpanTone : styles.runtimeChoiceSpan)}>
+                  <span class={["", !ok() ? "opacity-50 [filter:grayscale(100%)]" : ""]}>
                     <RuntimeIcon runtime={info.id} size={32} />
                   </span>
-                  <span {...stylex.attrs(styles.runtimeChoiceSpan22)}>
-                    <span {...stylex.attrs(styles.runtimeChoiceSpan2, active() ? styles.runtimeChoiceSpanAlt : styles.runtimeChoiceSpanAccent)}>
-                      {info.preset.label}
-                    </span>
-                    <span {...stylex.attrs(styles.runtimeChoiceSpan3, ok() ? styles.runtimeChoiceSpanMuted : styles.runtimeChoiceSpanKind5)}>{status()}</span>
+                  <span class="flex min-w-0 flex-col">
+                    <span class={["truncate text-sm", active() ? "font-semibold" : "font-medium"]}>{info.preset.label}</span>
+                    <span class={["truncate text-xs", ok() ? "text-muted" : "text-berry"]}>{status()}</span>
                   </span>
                 </button>
               );
@@ -594,19 +265,19 @@ function ModelAndEffort(props: { draft: Agent; runtime?: RuntimeInfo | undefined
 function Support(props: { runtime: string; info?: RuntimeInfo | undefined }) {
   const support = () => supportOf(props.info);
   return (
-    <section {...stylex.attrs(styles.supportSection)}>
-      <h3 {...stylex.attrs(styles.supportH3)}>{t("web.agent.can", { runtime: props.info ? props.info.preset.label : props.runtime })}</h3>
-      <Show when={props.info} fallback={<span {...stylex.attrs(styles.supportSpan)}>{t("web.agent.readingMachines")}</span>}>
-        <span {...stylex.attrs(styles.supportSpan2)}>
-          <Icon name={support().steer ? "check" : "cross"} size={12} styles={[styles.supportIcon]} />
+    <section class="flex flex-col gap-1.5 rounded-lg border border-line p-3">
+      <h3 class="text-sm font-semibold">{t("web.agent.can", { runtime: props.info ? props.info.preset.label : props.runtime })}</h3>
+      <Show when={props.info} fallback={<span class="text-sm">{t("web.agent.readingMachines")}</span>}>
+        <span class="flex items-start gap-1.5 text-sm">
+          <Icon name={support().steer ? "check" : "cross"} size={12} class="mt-1" />
           {support().steer ? t("web.agent.steer") : t("web.agent.noSteer")}
         </span>
-        <span {...stylex.attrs(styles.supportSpan)}>{support().inProcess ? t("web.agent.inProcess") : t("web.agent.ownProcess")}</span>
+        <span class="text-sm">{support().inProcess ? t("web.agent.inProcess") : t("web.agent.ownProcess")}</span>
         <For each={Object.entries(support().refused)}>
           {([option, reason]) => (
-            <span {...stylex.attrs(styles.supportSpan3)}>
+            <span class="text-sm text-muted">
               {t("web.agent.refuses")}
-              <span {...stylex.attrs(styles.supportSpan4)}>{option}</span>
+              <span class="font-mono text-ink">{option}</span>
               {t("web.agent.colon")}
               {reason}
             </span>
@@ -668,12 +339,12 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; p
         label={t("web.agent.library")}
         tip={t("web.agent.libraryTip")}
         aside={
-          <A href="/settings/skills" {...stylex.attrs(styles.skillPickerA)}>
+          <A href="/settings/skills" class="text-xs text-muted underline">
             {t("web.agent.manageLibrary")}
           </A>
         }
       >
-        <div {...stylex.attrs(styles.skillPickerDiv)}>
+        <div class="flex flex-col gap-1.5">
           <For each={ready(all, [])}>
             {(s) => {
               const on = () => props.draft.skills.includes(s.id);
@@ -684,24 +355,29 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; p
                   aria-checked={aria(on())}
                   aria-label={s.name}
                   onClick={() => toggle(s.id)}
-                  {...stylex.attrs(styles.skillPickerButton, on() ? styles.runtimeChoiceButtonTone : styles.runtimeChoiceButtonAlt)}
+                  class={[
+                    "flex cursor-pointer items-start gap-2.5 rounded-md border p-2.5 text-left",
+                    on() ? "border-ink/40 bg-selected" : "border-line hover:bg-hover",
+                  ]}
                 >
-                  <span {...stylex.attrs(styles.skillPickerSpan, on() ? styles.skillPickerSpanTone : styles.skillPickerSpanAlt)}>
+                  <span
+                    class={["mt-0.5 flex w-4 h-4 shrink-0 items-center justify-center rounded-sm border bg-page", on() ? "border-accent" : "border-ink/25"]}
+                  >
                     <Show when={on()}>
                       <Icon name="check" size={12} />
                     </Show>
                   </span>
-                  <span {...stylex.attrs(styles.skillPickerSpan2)}>
-                    <span {...stylex.attrs(styles.skillPickerSpan22)}>
+                  <span class="flex flex-col">
+                    <span class="text-sm font-medium">
                       {s.name}
                       <Show when={s.builtIn === true}>
-                        <span data-testid="built-in-mark" {...stylex.attrs(styles.runtimeChoiceSpan4)}>
+                        <span data-testid="built-in-mark" class="text-xs text-muted">
                           {" · "}
                           {t("web.runtime.library.builtInTag")}
                         </span>
                       </Show>
                     </span>
-                    <span {...stylex.attrs(styles.runtimeChoiceSpan4)}>{s.description}</span>
+                    <span class="text-xs text-muted">{s.description}</span>
                   </span>
                 </button>
               );
@@ -742,26 +418,26 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
         hint={mcpRefused() ?? t("web.agent.mcpHint")}
         error={mcpRefused() && props.draft.mcpServers.length > 0 ? mcpRefused() : undefined}
       >
-        <div {...stylex.attrs(styles.toolsDiv, mcpRefused() ? styles.toolsDivTone : styles.runtimeChoiceSpan)}>
+        <div class={["flex flex-col gap-1.5", mcpRefused() ? "opacity-50" : ""]}>
           <For each={props.draft.mcpServers}>
             {(s) => (
-              <div {...stylex.attrs(styles.toolsDiv2)}>
-                <span {...stylex.attrs(styles.toolsSpan)}>{s.type}</span>
-                <span {...stylex.attrs(styles.skillPickerSpan22)}>{s.name}</span>
-                <span {...stylex.attrs(styles.toolsSpan2)}>{mcpTarget(s)}</span>
+              <div class="flex items-center gap-2 rounded-md border border-line px-3 py-2">
+                <span class="rounded-sm bg-selected px-1.5 text-xs">{s.type}</span>
+                <span class="text-sm font-medium">{s.name}</span>
+                <span class="min-w-0 flex-1 truncate font-mono text-xs text-muted">{mcpTarget(s)}</span>
                 <button
                   type="button"
                   disabled={!!mcpRefused()}
                   aria-label={t("web.agent.removeNamed", { name: s.name })}
                   onClick={() => props.patch({ ...props.draft, mcpServers: props.draft.mcpServers.filter((x) => x.name !== s.name) })}
-                  {...stylex.attrs(styles.toolsButton)}
+                  class="cursor-pointer text-xs text-muted hover:text-berry"
                 >
                   {t("web.agent.remove")}
                 </button>
               </div>
             )}
           </For>
-          <div {...stylex.attrs(styles.toolsDiv22)}>
+          <div class="flex flex-wrap items-center gap-1.5">
             <Segmented
               label={t("web.agent.mcpKind")}
               value={type()}
@@ -775,7 +451,8 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
               aria-label={t("web.agent.mcpName")}
               disabled={!!mcpRefused()}
               placeholder={t("web.agent.name")}
-              styles={styles.toolsTextInput}
+              wide={false}
+              class="w-28"
               value={name()}
               onInput={(e) => setName(e.currentTarget.value)}
             />
@@ -783,7 +460,7 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
               aria-label={t("web.agent.mcpTarget")}
               disabled={!!mcpRefused()}
               placeholder={type() === "stdio" ? "npx -y @scope/server" : "https://…/mcp"}
-              styles={styles.toolsTextInput2}
+              class="min-w-40 flex-1 font-mono"
               value={target()}
               onInput={(e) => setTarget(e.currentTarget.value)}
             />
@@ -807,13 +484,13 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
         />
         <Show when={!toolsRefused() ? props.runtime?.tools : undefined}>
           {(tools) => (
-            <div {...stylex.attrs(styles.toolsDiv3)}>
+            <div class="flex flex-wrap gap-1 pt-1.5">
               <For each={tools().filter((tool) => !props.draft.disallowedTools.includes(tool.name))}>
                 {(tool) => (
                   <button
                     type="button"
                     onClick={() => props.patch({ ...props.draft, disallowedTools: [...props.draft.disallowedTools, tool.name] })}
-                    {...stylex.attrs(styles.toolsButton2)}
+                    class="cursor-pointer rounded-sm border border-line bg-page hover:bg-hover px-1.5 py-px font-mono text-xs text-muted hover:text-ink"
                   >
                     + {tool.name}
                   </button>
@@ -834,14 +511,14 @@ function Inventory(props: { entries: InventoryEntry[] | null }) {
   return (
     <Switch
       fallback={
-        <ul {...stylex.attrs(styles.inventoryUl)}>
+        <ul class="flex flex-col gap-1">
           <For each={props.entries}>
             {(e) => (
-              <li {...stylex.attrs(styles.inventoryLi)}>
-                <span {...stylex.attrs(styles.inventorySpan, e.enabled === false ? styles.inventorySpanTone : styles.runtimeChoiceSpan)}>{e.name}</span>
-                <span {...stylex.attrs(styles.inventorySpan2)}>{e.description}</span>
+              <li class="flex items-baseline gap-2">
+                <span class={["font-mono text-sm", e.enabled === false ? "text-muted line-through" : ""]}>{e.name}</span>
+                <span class="min-w-0 flex-1 truncate text-xs text-muted">{e.description}</span>
                 <Show when={e.source}>
-                  <span {...stylex.attrs(styles.inventorySpan22)}>{e.source}</span>
+                  <span class="max-w-40 truncate text-xs text-muted">{e.source}</span>
                 </Show>
               </li>
             )}
@@ -850,10 +527,10 @@ function Inventory(props: { entries: InventoryEntry[] | null }) {
       }
     >
       <Match when={!props.entries}>
-        <span {...stylex.attrs(styles.runtimeChoiceSpan4)}>{t("web.agent.unreported")}</span>
+        <span class="text-xs text-muted">{t("web.agent.unreported")}</span>
       </Match>
       <Match when={props.entries?.length === 0}>
-        <span {...stylex.attrs(styles.runtimeChoiceSpan4)}>{t("web.agent.none")}</span>
+        <span class="text-xs text-muted">{t("web.agent.none")}</span>
       </Match>
     </Switch>
   );

@@ -100,7 +100,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
       try {
         await repos.workplace(where, parent.number, true, "");
       } catch (e) {
-        if (e instanceof RepoError) throw new HireRefused(e.message);
+        if (e instanceof RepoError) throw new HireRefused(e.message, undefined, { cause: e });
         throw e;
       }
     }

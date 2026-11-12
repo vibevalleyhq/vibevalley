@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -9,36 +8,6 @@ import { prefsNow } from "#/state/prefs.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Dialog } from "#/ui/Dialog.tsx";
 import { Select, TextArea } from "#/ui/Field.tsx";
-
-const viewStyles = stylex.create({
-  newIssueForm: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
-  },
-  newIssueDiv: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  newIssueDiv2: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    gap: "0.5rem",
-    borderTopStyle: "solid",
-    borderTopWidth: "1px",
-    borderColor: "var(--color-line)",
-    paddingTop: "0.75rem",
-  },
-  newIssueSpan: {
-    marginRight: "auto",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-faint)",
-  },
-});
 
 /** The repo and helper the board is filtered to, or the list group it was opened in. */
 export interface NewIssueAt {
@@ -64,7 +33,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
   return (
     <Dialog open onClose={() => props.onClose()} title={t("web.issue.new.title")} testid="issue-new-dialog">
       <form
-        {...stylex.attrs(viewStyles.newIssueForm)}
+        class="flex flex-col gap-3"
         onSubmit={(e) => {
           e.preventDefault();
           keep();
@@ -85,7 +54,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
             }
           }}
         />
-        <div {...stylex.attrs(viewStyles.newIssueDiv)}>
+        <div class="flex flex-wrap items-center gap-2">
           <Select
             quiet
             size="control"
@@ -107,8 +76,8 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
             options={agents().map((a) => ({ value: a.id, label: a.name }))}
           />
         </div>
-        <div {...stylex.attrs(viewStyles.newIssueDiv2)}>
-          <span {...stylex.attrs(viewStyles.newIssueSpan)}>{t("web.issue.new.keys")}</span>
+        <div class="flex items-center justify-end gap-2 border-t border-line pt-3">
+          <span class="mr-auto text-xs text-faint">{t("web.issue.new.keys")}</span>
           <Button type="button" onClick={() => props.onClose()}>
             {t("web.base.form.never")}
           </Button>

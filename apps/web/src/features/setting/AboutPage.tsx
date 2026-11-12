@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -13,29 +12,11 @@ import { toast } from "#/ui/toasts.ts";
 
 import { CommandLineRow, UpdateRow } from "./UpdateRow";
 
-const viewStyles = stylex.create({
-  pathRowSpan: {
-    maxWidth: "20rem",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  aboutPageSpan: {
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-});
-
 function PathRow(props: { label: string; hint: string; path: string }) {
   const reveal = currentHost().reveal;
   return (
     <SettingRow label={props.label} hint={props.hint}>
-      <span {...stylex.attrs(viewStyles.pathRowSpan)} title={props.path}>
+      <span class="max-w-80 truncate font-mono text-xs text-muted" title={props.path}>
         {props.path}
       </span>
       <IconButton
@@ -65,7 +46,7 @@ export function AboutPage() {
           <>
             <SettingsGroup>
               <SettingRow label={t("web.setting.about.version")} hint={t("web.setting.about.versionHint")}>
-                <span {...stylex.attrs(viewStyles.aboutPageSpan)}>{s().version}</span>
+                <span class="font-mono text-sm">{s().version}</span>
               </SettingRow>
               <UpdateRow />
               <CommandLineRow />

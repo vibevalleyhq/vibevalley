@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -9,20 +8,6 @@ import { fixOf } from "#/infra/readiness.ts";
 import { Icon } from "#/ui/Icon.tsx";
 import { TextLink } from "#/ui/layout.tsx";
 
-const styles = stylex.create({
-  lines: { display: "flex", flexDirection: "column", gap: "0.25rem" },
-  line: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.5rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  ready: { color: "var(--color-leaf)" },
-  lacking: { color: "var(--color-berry)" },
-});
-
 /** Whether the features a page sets up can be used now, as the server says (SettingsStatus.readiness), and where to
  * fix the ones that cannot. Says nothing while the settings are on their way. */
 export function Readiness(props: { features: readonly Feature[] }) {
@@ -31,7 +16,7 @@ export function Readiness(props: { features: readonly Feature[] }) {
   return (
     <Show when={readiness()}>
       {(all) => (
-        <div {...stylex.attrs(styles.lines)} data-testid="readiness">
+        <div class="flex flex-col gap-1" data-testid="readiness">
           <For each={props.features}>
             {(feature) => {
               const state = () => all()[feature];
@@ -41,12 +26,12 @@ export function Readiness(props: { features: readonly Feature[] }) {
                 return now.ready ? undefined : now.missing;
               };
               return (
-                <div {...stylex.attrs(styles.line)} data-key={feature} data-state={state().ready ? "ready" : "lacking"}>
+                <div class="flex flex-wrap items-center gap-2 text-sm" data-key={feature} data-state={state().ready ? "ready" : "lacking"}>
                   <Show
                     when={lacking()}
                     fallback={
                       <>
-                        <span {...stylex.attrs(styles.ready)}>
+                        <span class="text-leaf">
                           <Icon name="ticked" size={14} />
                         </span>
                         {t("web.setting.readiness.ready", { feature: name })}
@@ -55,7 +40,7 @@ export function Readiness(props: { features: readonly Feature[] }) {
                   >
                     {(missing) => (
                       <>
-                        <span {...stylex.attrs(styles.lacking)}>
+                        <span class="text-berry">
                           <Icon name="warn" size={14} />
                         </span>
                         {t("web.setting.readiness.lacks", { feature: name, why: fixOf(missing()).words })}

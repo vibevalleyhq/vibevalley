@@ -10,7 +10,7 @@ import { isRecord } from "../base/json.ts";
 import { mcpConfig, mcp as mcpWords } from "../base/prompts.ts";
 import { AgentFailed, messageOf, ToolFailed } from "../core/errors.ts";
 import type { Tool } from "../core/loop.ts";
-import { effectTool } from "../core/tool.ts";
+import { runTool } from "../core/tool.ts";
 import { type AgentFs, agentFsOf } from "./fs.ts";
 import { type AgentLog, consoleLog } from "./log.ts";
 import { asTransport } from "./mcpTransport.ts";
@@ -147,7 +147,7 @@ async function connectMcp(server: McpServer, log: AgentLog): Promise<McpConnecti
 
 function mcpTool(client: Client, server: string, t: { name: string; description?: string | undefined; inputSchema?: object | undefined }): Tool {
   const parameters: JsonSchema = t.inputSchema ? Object.fromEntries(Object.entries(t.inputSchema)) : { type: "object", properties: {} };
-  return effectTool({
+  return runTool({
     name: mcpToolName(server, t.name),
     description: mcpWords.toolDescription(server, t.description || t.name),
     parameters,

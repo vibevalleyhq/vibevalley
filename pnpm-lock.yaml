@@ -176,21 +176,6 @@ catalogs:
     '@earendil-works/pi-ai':
       specifier: 1.5.0
       version: 1.5.0
-    '@effect/platform-node':
-      specifier: 4.1.2
-      version: 4.1.2
-    '@effect/sql-pg':
-      specifier: 4.1.2
-      version: 4.1.2
-    '@effect/sql-pglite':
-      specifier: 4.1.2
-      version: 4.1.2
-    '@effect/tsgo':
-      specifier: 0.67.0
-      version: 0.67.0
-    '@effect/vitest':
-      specifier: 4.1.2
-      version: 4.1.2
     '@electric-sql/pglite':
       specifier: 0.5.16
       version: 0.5.16
@@ -224,12 +209,6 @@ catalogs:
     '@solidjs/web':
       specifier: 2.0.0-rc.21
       version: 2.0.0-rc.21
-    '@stylexjs/stylex':
-      specifier: 0.19.1
-      version: 0.19.1
-    '@stylexjs/unplugin':
-      specifier: 0.19.1
-      version: 0.19.1
     '@tailwindcss/vite':
       specifier: ^4.3.5
       version: 4.3.5
@@ -266,9 +245,6 @@ catalogs:
     commander:
       specifier: ^15.1.0
       version: 15.1.0
-    effect:
-      specifier: 4.1.2
-      version: 4.1.2
     electron:
       specifier: ^45.2.1
       version: 45.2.1
@@ -434,16 +410,10 @@ overrides:
 
 packageExtensionsChecksum: sha256-zp+bFSU1D+o23bFmDNGVi7EdVovwlJoujn5FnVtwOG4=
 
-patchedDependencies:
-  '@effect/tsgo@0.67.0': f71eb773f27341bb9410645004fe28b178255855517278a59fd4a10f1fe40217
-
 importers:
 
   .:
     devDependencies:
-      '@effect/tsgo':
-        specifier: 'catalog:'
-        version: 0.67.0(patch_hash=f71eb773f27341bb9410645004fe28b178255855517278a59fd4a10f1fe40217)
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.6
@@ -465,9 +435,6 @@ importers:
       '@vibevalley/testkit':
         specifier: workspace:*
         version: link:packages/testkit
-      effect:
-        specifier: 'catalog:'
-        version: 4.1.2
       eslint-plugin-solid:
         specifier: 'catalog:'
         version: 0.18.1(eslint@10.13.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@7.0.2)
@@ -492,6 +459,9 @@ importers:
       yaml:
         specifier: 'catalog:'
         version: 2.9.1
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.7
 
   apps/cli:
     dependencies:
@@ -662,15 +632,6 @@ importers:
       '@earendil-works/pi-ai':
         specifier: 'catalog:'
         version: 1.5.0(@aws-sdk/credential-provider-node@3.972.87)(@modelcontextprotocol/sdk@1.32.2(supports-color@8.1.1)(zod@4.6.7))(@smithy/signature-v4@5.7.4)(supports-color@8.1.1)(undici@8.12.3)(ws@8.22.2)(zod@4.6.7)
-      '@effect/platform-node':
-        specifier: 'catalog:'
-        version: 4.1.2(effect@4.1.2)(redis@6.3.0)
-      '@effect/sql-pg':
-        specifier: 'catalog:'
-        version: 4.1.2(effect@4.1.2)
-      '@effect/sql-pglite':
-        specifier: 'catalog:'
-        version: 4.1.2(effect@4.1.2)
       '@electric-sql/pglite':
         specifier: 'catalog:'
         version: 0.5.16
@@ -713,9 +674,6 @@ importers:
       agora-agents:
         specifier: 'catalog:'
         version: 2.13.0
-      effect:
-        specifier: 'catalog:'
-        version: 4.1.2
       hono:
         specifier: 'catalog:'
         version: 4.13.17
@@ -738,9 +696,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
-      '@effect/vitest':
-        specifier: 'catalog:'
-        version: 4.1.2(effect@4.1.2)(vitest@5.1.0)
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.6
@@ -768,9 +723,6 @@ importers:
       '@solidjs/web':
         specifier: 'catalog:'
         version: 2.0.0-rc.21(solid-js@2.0.0-rc.21)
-      '@stylexjs/stylex':
-        specifier: 'catalog:'
-        version: 0.19.1
       '@tailwindcss/vite':
         specifier: 'catalog:'
         version: 4.3.5(@voidzero-dev/vite-plus-core@1.5.0(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1))
@@ -790,9 +742,6 @@ importers:
       '@solidjs/vite-plugin':
         specifier: 'catalog:'
         version: 3.0.0-next.56(@solidjs/web@2.0.0-rc.21(solid-js@2.0.0-rc.21))(@voidzero-dev/vite-plus-core@1.5.0(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1))(solid-js@2.0.0-rc.21)(supports-color@8.1.1)
-      '@stylexjs/unplugin':
-        specifier: 'catalog:'
-        version: 0.19.1(supports-color@8.1.1)(unplugin@2.3.11)
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.6
@@ -820,9 +769,6 @@ importers:
       '@solidjs/web':
         specifier: 'catalog:'
         version: 2.0.0-rc.21(solid-js@2.0.0-rc.21)
-      '@stylexjs/stylex':
-        specifier: 'catalog:'
-        version: 0.19.1
       '@tailwindcss/vite':
         specifier: 'catalog:'
         version: 4.3.5(@voidzero-dev/vite-plus-core@1.5.0(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1))
@@ -862,9 +808,6 @@ importers:
       agora-rtc-sdk-ng:
         specifier: 'catalog:'
         version: 4.24.9(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)
-      effect:
-        specifier: 'catalog:'
-        version: 4.1.2
       hast-util-to-dom:
         specifier: 'catalog:'
         version: 4.0.1
@@ -917,9 +860,6 @@ importers:
       '@solidjs/vite-plugin':
         specifier: 'catalog:'
         version: 3.0.0-next.56(@solidjs/web@2.0.0-rc.21(solid-js@2.0.0-rc.21))(@voidzero-dev/vite-plus-core@1.5.0(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1))(solid-js@2.0.0-rc.21)(supports-color@8.1.1)
-      '@stylexjs/unplugin':
-        specifier: 'catalog:'
-        version: 0.19.1(supports-color@8.1.1)(unplugin@2.3.11)
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.6
@@ -994,9 +934,6 @@ importers:
       '@vibevalley/protocol':
         specifier: workspace:*
         version: link:../protocol
-      effect:
-        specifier: 'catalog:'
-        version: 4.1.2
       parse5:
         specifier: 'catalog:'
         version: 8.1.0
@@ -1189,9 +1126,6 @@ importers:
       '@solidjs/web':
         specifier: 'catalog:'
         version: 2.0.0-rc.21(solid-js@2.0.0-rc.21)
-      '@stylexjs/stylex':
-        specifier: 'catalog:'
-        version: 0.19.1
       axe-core:
         specifier: 'catalog:'
         version: 4.14.0
@@ -1230,9 +1164,6 @@ importers:
 
   packages/tsrs:
     dependencies:
-      '@effect/tsgo':
-        specifier: 'catalog:'
-        version: 0.67.0(patch_hash=f71eb773f27341bb9410645004fe28b178255855517278a59fd4a10f1fe40217)
       tsrs:
         specifier: 'catalog:'
         version: 0.21.0-ts7.1.0-beta
@@ -1882,9 +1813,6 @@ packages:
     resolution: {integrity: sha512-OoKoR0f76dCY666JlcbhmVTs2drYj1GUXZTYTcbUgJjh9Nv41aFfZ21bPQTERm5+L5cBDo466NltB2lplS5GBw==}
     engines: {node: '>=20.19.0'}
 
-  '@dual-bundle/import-meta-resolve@4.2.1':
-    resolution: {integrity: sha512-id+7YRUgoUX6CgV0DtuhirQWodeeA7Lf4i2x71JS/vtA5pRb/hIGWlw+G6MeXvsM+MXrz0VAydTGElX1rAfgPg==}
-
   '@earendil-works/pi-agent-core@1.5.0':
     resolution: {integrity: sha512-FOj+jXj48DbzMycR/ghNa2KcsqWmvOln24e0FnQOVgnd8vn5H79g335WdHaZUVdRo+zCeogb40/qPPlCWFuvmA==}
     engines: {node: '>=22.19.0'}
@@ -1918,77 +1846,6 @@ packages:
   '@earendil-works/pi-tui@1.5.0':
     resolution: {integrity: sha512-56KqrDVeLF18k+syppVbT35Ai1opbM44ot+sL7O3K40CaWwXCiwOpqEFugDBAILtAhseZh6uYIuYxPPOJHLFAA==}
     engines: {node: '>=22.19.0'}
-
-  '@effect/platform-node-shared@4.1.2':
-    resolution: {integrity: sha512-wSwl9A/G1hcVvF8nLI+YfB3EyOIDvWS6+lsTZBkmgDnPBL7m8YWZF+1HD+mdEsb52SUGfukip46Q3gRwSdk3QA==}
-    engines: {node: '>=22.19.0'}
-    peerDependencies:
-      effect: ^4.1.2
-
-  '@effect/platform-node@4.1.2':
-    resolution: {integrity: sha512-ye0UjxORdd5Qu3paZ1LljgGOALWHt7muP9VTpjUSCNfcesiB/Hm7wPJIvZeu4gnwpTe5BtEnO1VHngWqjJp8mA==}
-    engines: {node: '>=22.19.0'}
-    peerDependencies:
-      effect: ^4.1.2
-      redis: '>=5.1.0 <7.0.0'
-
-  '@effect/sql-pg@4.1.2':
-    resolution: {integrity: sha512-0UehR7B5W8dC+dX6fDeWStLbVbBb2M4pk4HBATEeH0cmV4Odl2lckTg0jFmLuadekTLa4OyB+bZQo1yTG1y2Mw==}
-    peerDependencies:
-      effect: ^4.1.2
-
-  '@effect/sql-pglite@4.1.2':
-    resolution: {integrity: sha512-VlSvLP7+nO/dCPdwQ2fsq2WWitPnTdFEWWEQ2Vy9VI4YKMF1639MgRtiSO3CgST2TkHevaFYfiTWximxR55/0g==}
-    peerDependencies:
-      effect: ^4.1.2
-
-  '@effect/tsgo-darwin-arm64@0.67.0':
-    resolution: {integrity: sha512-9ohlEurSN7oKTFC33m+CllUsvPZJa6TxN0xaEebj/XvSxAsrEl96quMEFUwGnKfbIUuqq19Kax0aVqdzeJz4ng==}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@effect/tsgo-darwin-x64@0.67.0':
-    resolution: {integrity: sha512-6LWvJwRjJDVIM+D06iqNDc5tHftryS+BPf12AAEPaws2PmieoA/AEziHZGJGOPttKcvkJJpJMMCS6CX2TRbMzw==}
-    cpu: [x64]
-    os: [darwin]
-
-  '@effect/tsgo-linux-arm64@0.67.0':
-    resolution: {integrity: sha512-oisvlR/VLSUSEfNuXhaSvSCB0EJINR/Ab+DxtAPjUk2qA5rf/2DfA9ZQsZmb/JfufQDK5TWObmA6n8Ovu3qnPA==}
-    cpu: [arm64]
-    os: [linux]
-
-  '@effect/tsgo-linux-arm@0.67.0':
-    resolution: {integrity: sha512-koxONObOQd6nlErV742Urqkr4Fixt1WdVdluFolusae2IQx/OGcnd1gL0gyJ8kHbV4J+lIvEjX/5nGGS+fJ7Vg==}
-    cpu: [arm]
-    os: [linux]
-
-  '@effect/tsgo-linux-x64@0.67.0':
-    resolution: {integrity: sha512-MsvRjR6v+Oqh+huppL0khl/S4tVquOHEM/W7LhTTPdtnVJF3R/3Zr2VMJs+AeMoQ2ohA77W9z7F5v9fnI9uY3Q==}
-    cpu: [x64]
-    os: [linux]
-
-  '@effect/tsgo-win32-arm64@0.67.0':
-    resolution: {integrity: sha512-xMb/29dt+OH4HTZe+5Xb8GrKUwUfqGG23Co6v1A1Zu9FEt0xu2/8p4FVaHKlsOaogncQvDm4OPauFKvCliKLIA==}
-    cpu: [arm64]
-    os: [win32]
-
-  '@effect/tsgo-win32-x64@0.67.0':
-    resolution: {integrity: sha512-OJO1hO3h9c99PGJiih/B9FakRTtm37WcVv5S1iKuZep7O9O2ldxZpjZ/SCxDRB9ylhJqBlCz2A32hpBva/tUaQ==}
-    cpu: [x64]
-    os: [win32]
-
-  '@effect/tsgo@0.67.0':
-    resolution: {integrity: sha512-TzfqMT+pytcSvuXrABXAZQsuq9DfFFMUi+cRWWCObNXMq8/1ESi3QtGDsXBK+NddmLn5cyqnLBndNfQoORNzjg==}
-    hasBin: true
-
-  '@effect/vitest@4.1.2':
-    resolution: {integrity: sha512-JJPwAHkJHxvM/woW9mMW/khjasAHcmwWdOMAgMy16rfqsxcVhFDnrRsvN9VI2+kMv8zDCCyBE2q1n5hzZlfE0w==}
-    peerDependencies:
-      effect: ^4.1.2
-      vitest: 5.1.0
-
-  '@electric-sql/pglite@0.5.15':
-    resolution: {integrity: sha512-ERZWgaRTxueGV4cvL1tfpAOzFCWTXoUtbCBqnf2FhHDVs/so9eAKaanvrwWF9Dntx7BYsmFQujVQ0/B4S8Mmiw==}
 
   '@electric-sql/pglite@0.5.16':
     resolution: {integrity: sha512-Nj8KcIsJL748W408U2N8q4+9IlONdpRIU8MJypIAAINMJ5nqKyqpX7Mgg/5XKkXiAib3AoZGR6hnJFlrlLBrcg==}
@@ -3398,42 +3255,6 @@ packages:
       '@types/react':
         optional: true
 
-  '@redis/bloom@6.3.0':
-    resolution: {integrity: sha512-NQ5poYpZr0jv6zazN1cy6JY5kIipKFZ3R9GTL4kOUTX3a9YAfY29U8bsE4lWhVQEM+G4V0BXVC57mubIdDijeA==}
-    engines: {node: '>= 20.0.0'}
-    peerDependencies:
-      '@redis/client': ^6.3.0
-
-  '@redis/client@6.3.0':
-    resolution: {integrity: sha512-fHrjwGCBvAANGi+TuRuwKi83sIOzgHr8eh+Uf48w3fSX7Hhrz174NrWqfJhAC2vnN0d/tfaZpdr6+o6JC3QHwg==}
-    engines: {node: '>= 20.0.0'}
-    peerDependencies:
-      '@node-rs/xxhash': ^1.1.0
-      '@opentelemetry/api': '>=1 <2'
-    peerDependenciesMeta:
-      '@node-rs/xxhash':
-        optional: true
-      '@opentelemetry/api':
-        optional: true
-
-  '@redis/json@6.3.0':
-    resolution: {integrity: sha512-yt6vRfPBXtW/3qm53cF81TSQpLMjWdW4/2E9WQ2GgbvsKkuCKCFQIcMiKlil1ZMnezK+IQuS795xKU5psbaegw==}
-    engines: {node: '>= 20.0.0'}
-    peerDependencies:
-      '@redis/client': ^6.3.0
-
-  '@redis/search@6.3.0':
-    resolution: {integrity: sha512-RPXAZmKjZZG7Tm7m1w9keFdXzbL91PiSHQBfQRe9xwW40jNsTRbG0FwhIz4QlHPU4gKDAsCy8IQHj4yZl4H9rw==}
-    engines: {node: '>= 20.0.0'}
-    peerDependencies:
-      '@redis/client': ^6.3.0
-
-  '@redis/time-series@6.3.0':
-    resolution: {integrity: sha512-+fJOB8mN1z5WRakCJNh5lVdz1KqvHGSOistsKeitD24QsCtPwyRQXWC0iq6T/i/ubLE/YcguZqPm8F598MKk4A==}
-    engines: {node: '>= 20.0.0'}
-    peerDependencies:
-      '@redis/client': ^6.3.0
-
   '@shikijs/core@4.6.0':
     resolution: {integrity: sha512-bfd4OKgvoyXYiYmMRuleA656P4V7M/Du9lcTl38Ngm6KszMj7bq4J1IGZwSYR4c95Tv5UQALtYNWUwaI9UT3xw==}
     engines: {node: '>=20'}
@@ -3573,20 +3394,6 @@ packages:
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
-
-  '@stylexjs/babel-plugin@0.19.1':
-    resolution: {integrity: sha512-Ig3crX6MuGWDEAx+f89aLxTQUWVeEc2Aco2moIdcObyvo7hZJgU26rxJN3k7geFjhi+5dfna6TNR8iTRK0PQGA==}
-
-  '@stylexjs/shared@0.19.1':
-    resolution: {integrity: sha512-oFBtW0NPNLJOT1gLweWRNKrIJHjJMwOmSV7fgd6ewok4fwb/Nh95PEaYGKu+ZONk0nNghjLFfOwiIsxJdvh3TQ==}
-
-  '@stylexjs/stylex@0.19.1':
-    resolution: {integrity: sha512-JwNFm0MOYPqi+M4Ax5Un4ZxfZp4HEAX2sAWetZ88KALFcv1eEiHNJs75oO3V3U7RVWnzfkiM8i9eBowC3hqgUw==}
-
-  '@stylexjs/unplugin@0.19.1':
-    resolution: {integrity: sha512-MJz/IPrFe3hSHbZtjbxaYd3kLgS718/NFBEY/Mf+njteJKLdY7bHHfVka3051LCYy9fKfyZapGCmUpibraHqmQ==}
-    peerDependencies:
-      unplugin: ^2.3.11
 
   '@szmarczak/http-timer@4.0.6':
     resolution: {integrity: sha512-4BAffykYOgO+5nzBWYwE3W90sBgLJoUPRWWcL8wlyiM8IB8ipJz3UMJ9KXQd1RKQXpKp8Tutn80HZtWsu2u76w==}
@@ -4791,9 +4598,6 @@ packages:
   crypt@0.0.2:
     resolution: {integrity: sha512-mCxBlsHFYh9C+HVpiEacem8FEBnMXgU9gy4zmNC+SXAZNB/1idgp/aulFJ4FgCi7GPEVbfyng092GqL2k2rmow==}
 
-  css-mediaquery@0.1.2:
-    resolution: {integrity: sha512-COtn4EROW5dBGlE/4PiKnh6rZpAPxDeFLaEEwt4i10jpDMFt2EhQGS79QmmrO+iKCHv0PU/HrOWEhijFd1x99Q==}
-
   css-tree@3.2.1:
     resolution: {integrity: sha512-X7sjQzceUhu1u7Y/ylrRZFU2FS6LRiFVp6rKLPg23y3x3c3DOKAwuXGDp+PAGjh6CSnCjYeAul8pcT8bAl+lSA==}
     engines: {node: ^10 || ^12.20.0 || ^14.13.0 || >=15.0.0}
@@ -4938,9 +4742,6 @@ packages:
 
   ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
-
-  effect@4.1.2:
-    resolution: {integrity: sha512-d3Oah1WyKxFLFh19yWheS5IXIVaITzxZ71JkE1rkUozq/6EcJSU5nPk5bF2QrSygZ3SQoiNQB8TsxFriyMeMaQ==}
 
   ejs@3.1.10:
     resolution: {integrity: sha512-UeJmFfOrAQS8OJWPZ4qtgHyWExa088/MtK5UEyoJGFH67cDEXkZSviOiKRCZ4Xij0zxI3JECgYs3oKx+AizQBA==}
@@ -6757,9 +6558,6 @@ packages:
     resolution: {integrity: sha512-LKWqWJRhstyYo9pGvgor/ivk2w94eSjE3RGVuzLGlr3NmD8bf7RcYGze1mNdEHRP6TRP6rMuDHk5t44hnTRyow==}
     engines: {node: '>=14.19.0'}
 
-  postcss-value-parser@4.2.0:
-    resolution: {integrity: sha512-1NNCs6uurfkVbeXG4S8JFT9t19m45ICnif8zWLd5oPSZ50QnwMfK+H3jv408d4jw/7Bttv5axS5IiHoLaVNHeQ==}
-
   postcss@8.5.31:
     resolution: {integrity: sha512-YUbWYCgErwnMAVkjUnYa+KlMBzGpHwiIt/DE7f0G33AuX2LH9UcTk6KgWxd3zRU+pN3u/C+Xl3EnMLM4Hea7Sg==}
     engines: {node: ^10 || ^12 || >=14}
@@ -6944,10 +6742,6 @@ packages:
 
   readable-stream@2.3.8:
     resolution: {integrity: sha512-8p0AUk4XODgIewSi0l8Epjs+EVnWiK7NoDIEGU0HhE7+ZyY8D1IMY7odu5lRrFXGg71L15KG8QrPmum45RTtdA==}
-
-  redis@6.3.0:
-    resolution: {integrity: sha512-XFQbPie1lGpKeUZ8ySYY43yLnQy/iIQtHNvIr/1XdaABpb96rUSdm3Mfl+98FEVbv9ZJIzINMno5s0Nh8E5LEw==}
-    engines: {node: '>= 20.0.0'}
 
   regenerate-unicode-properties@10.3.0:
     resolution: {integrity: sha512-9ns8odR8e9q3otKeHj3DE80jZYKg6zVeZKE+zQmRKXFoVUcuiTGeO6iusDhPRoIQQPVPRvH+SfBhrTud4eczuw==}
@@ -7297,9 +7091,6 @@ packages:
   style-to-object@1.0.14:
     resolution: {integrity: sha512-LIN7rULI0jBscWQYaSswptyderlarFkjQ+t79nzty8tcIAceVomEVlLzH5VP4Cmsv6MtKhs7qaAiwlcp+Mgaxw==}
 
-  styleq@0.2.1:
-    resolution: {integrity: sha512-L0TR0NQb+X4/ktDEKmjWyp27gla+LUYi/by5k5SjKXf6/pvZP7wbwEB5J+tqxdFVPgzbsuz+d4RTScO/QZquBw==}
-
   subset-font@2.9.0:
     resolution: {integrity: sha512-WJulQeFwbewrXIGcLJbSZFWI44fHW8gNRuPzLywfDL8w38IPRbN1JFxwG76aoohw9kcFdvjVIn2QmID1iy119A==}
 
@@ -7574,10 +7365,6 @@ packages:
     resolution: {integrity: sha512-pjy2bYhSsufwWlKwPc+l3cN7+wuJlK6uz0YdJEOlQDbl6jo/YlPi4mb8agUkVC8BF7V8NuzeyPNqRksA3hztKQ==}
     engines: {node: '>= 0.8'}
 
-  unplugin@2.3.11:
-    resolution: {integrity: sha512-5uKD0nqiYVzlmCRs01Fhs2BdkEgBS3SAVP6ndrBsuK42iC2+JHyxM05Rm9G8+5mkmRtzMZGY8Ct5+mliZxU/Ww==}
-    engines: {node: '>=18.12.0'}
-
   unzipper@0.12.5:
     resolution: {integrity: sha512-tXYOi9R57Uj/2Z25SOs5RRSzq886MBQj2gY8dPL+xl/kv6s6SvByoKfAtvfVeEuhntWDgjd2o9p2lb4TVPAz0A==}
 
@@ -7716,9 +7503,6 @@ packages:
   webidl-conversions@8.0.1:
     resolution: {integrity: sha512-BMhLD/Sw+GbJC21C/UgyaZX41nPt8bUTg+jWyDeg7e7YN4xOM05YPSIXceACnXVtqyEw/LMClUQMtMZ+PGGpqQ==}
     engines: {node: '>=20'}
-
-  webpack-virtual-modules@0.6.2:
-    resolution: {integrity: sha512-66/V2i5hQanC51vBQKPH4aI8NMAcBW59FVBs+rC7eGHupMyfn34q7rZIE+ETlJ+XTevqfUhVVBgSUNSW2flEUQ==}
 
   webrtc-adapter@8.2.0:
     resolution: {integrity: sha512-umxCMgedPAVq4Pe/jl3xmelLXLn4XZWFEMR5Iipb5wJ+k1xMX0yC4ZY9CueZUU1MjapFxai1tFGE7R/kotH6Ww==}
@@ -8762,8 +8546,6 @@ snapshots:
   '@csstools/css-tokenizer@4.0.2':
     optional: true
 
-  '@dual-bundle/import-meta-resolve@4.2.1': {}
-
   '@earendil-works/pi-agent-core@1.5.0(@aws-sdk/credential-provider-node@3.972.87)(@modelcontextprotocol/sdk@1.32.2(supports-color@8.1.1)(zod@4.6.7))(@smithy/signature-v4@5.7.4)(supports-color@8.1.1)(undici@8.12.3)(ws@8.22.2)(zod@4.6.7)':
     dependencies:
       '@earendil-works/pi-ai': 1.5.0(@aws-sdk/credential-provider-node@3.972.87)(@modelcontextprotocol/sdk@1.32.2(supports-color@8.1.1)(zod@4.6.7))(@smithy/signature-v4@5.7.4)(supports-color@8.1.1)(undici@8.12.3)(ws@8.22.2)(zod@4.6.7)
@@ -8859,72 +8641,6 @@ snapshots:
       get-east-asian-width: 1.6.0
       marked: 18.0.11
       marked-cjk-friendly: 0.1.2(marked@18.0.11)
-
-  '@effect/platform-node-shared@4.1.2(effect@4.1.2)':
-    dependencies:
-      '@types/ws': 8.18.2
-      effect: 4.1.2
-      ws: 8.22.2
-    transitivePeerDependencies:
-      - bufferutil
-      - utf-8-validate
-
-  '@effect/platform-node@4.1.2(effect@4.1.2)(redis@6.3.0)':
-    dependencies:
-      '@effect/platform-node-shared': 4.1.2(effect@4.1.2)
-      effect: 4.1.2
-      redis: 6.3.0
-      undici: 8.12.3
-    transitivePeerDependencies:
-      - bufferutil
-      - utf-8-validate
-
-  '@effect/sql-pg@4.1.2(effect@4.1.2)':
-    dependencies:
-      effect: 4.1.2
-
-  '@effect/sql-pglite@4.1.2(effect@4.1.2)':
-    dependencies:
-      '@electric-sql/pglite': 0.5.15
-      effect: 4.1.2
-
-  '@effect/tsgo-darwin-arm64@0.67.0':
-    optional: true
-
-  '@effect/tsgo-darwin-x64@0.67.0':
-    optional: true
-
-  '@effect/tsgo-linux-arm64@0.67.0':
-    optional: true
-
-  '@effect/tsgo-linux-arm@0.67.0':
-    optional: true
-
-  '@effect/tsgo-linux-x64@0.67.0':
-    optional: true
-
-  '@effect/tsgo-win32-arm64@0.67.0':
-    optional: true
-
-  '@effect/tsgo-win32-x64@0.67.0':
-    optional: true
-
-  '@effect/tsgo@0.67.0(patch_hash=f71eb773f27341bb9410645004fe28b178255855517278a59fd4a10f1fe40217)':
-    optionalDependencies:
-      '@effect/tsgo-darwin-arm64': 0.67.0
-      '@effect/tsgo-darwin-x64': 0.67.0
-      '@effect/tsgo-linux-arm': 0.67.0
-      '@effect/tsgo-linux-arm64': 0.67.0
-      '@effect/tsgo-linux-x64': 0.67.0
-      '@effect/tsgo-win32-arm64': 0.67.0
-      '@effect/tsgo-win32-x64': 0.67.0
-
-  '@effect/vitest@4.1.2(effect@4.1.2)(vitest@5.1.0)':
-    dependencies:
-      effect: 4.1.2
-      vitest: 5.1.0(@types/node@26.6.6)(@vitest/browser-playwright@5.1.0)(@vitest/browser-preview@5.1.0)(@vitest/ui@5.1.0)(@voidzero-dev/vite-plus-core@1.5.0(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1))(happy-dom@21.0.4)(jsdom@30.1.3(@noble/hashes@1.8.0))
-
-  '@electric-sql/pglite@0.5.15': {}
 
   '@electric-sql/pglite@0.5.16': {}
 
@@ -10224,24 +9940,6 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.3.0
 
-  '@redis/bloom@6.3.0(@redis/client@6.3.0)':
-    dependencies:
-      '@redis/client': 6.3.0
-
-  '@redis/client@6.3.0': {}
-
-  '@redis/json@6.3.0(@redis/client@6.3.0)':
-    dependencies:
-      '@redis/client': 6.3.0
-
-  '@redis/search@6.3.0(@redis/client@6.3.0)':
-    dependencies:
-      '@redis/client': 6.3.0
-
-  '@redis/time-series@6.3.0(@redis/client@6.3.0)':
-    dependencies:
-      '@redis/client': 6.3.0
-
   '@shikijs/core@4.6.0':
     dependencies:
       '@shikijs/primitive': 4.6.0
@@ -10390,40 +10088,6 @@ snapshots:
   '@stablelib/base64@1.0.1': {}
 
   '@standard-schema/spec@1.1.0': {}
-
-  '@stylexjs/babel-plugin@0.19.1(supports-color@8.1.1)':
-    dependencies:
-      '@babel/core': 7.29.7(supports-color@8.1.1)
-      '@babel/helper-module-imports': 7.29.7(supports-color@8.1.1)
-      '@babel/traverse': 7.29.10(supports-color@8.1.1)
-      '@babel/types': 7.29.8
-      '@dual-bundle/import-meta-resolve': 4.2.1
-      '@stylexjs/shared': 0.19.1
-      '@stylexjs/stylex': 0.19.1
-      postcss-value-parser: 4.2.0
-    transitivePeerDependencies:
-      - supports-color
-
-  '@stylexjs/shared@0.19.1': {}
-
-  '@stylexjs/stylex@0.19.1':
-    dependencies:
-      css-mediaquery: 0.1.2
-      invariant: 2.2.4
-      styleq: 0.2.1
-
-  '@stylexjs/unplugin@0.19.1(supports-color@8.1.1)(unplugin@2.3.11)':
-    dependencies:
-      '@babel/core': 7.29.7(supports-color@8.1.1)
-      '@babel/plugin-syntax-flow': 7.29.7(@babel/core@7.29.7(supports-color@8.1.1))
-      '@babel/plugin-syntax-jsx': 7.29.7(@babel/core@7.29.7(supports-color@8.1.1))
-      '@babel/plugin-syntax-typescript': 7.29.7(@babel/core@7.29.7(supports-color@8.1.1))
-      '@stylexjs/babel-plugin': 0.19.1(supports-color@8.1.1)
-      browserslist: 4.29.4
-      lightningcss: 1.33.0
-      unplugin: 2.3.11
-    transitivePeerDependencies:
-      - supports-color
 
   '@szmarczak/http-timer@4.0.6':
     dependencies:
@@ -11574,8 +11238,6 @@ snapshots:
 
   crypt@0.0.2: {}
 
-  css-mediaquery@0.1.2: {}
-
   css-tree@3.2.1:
     dependencies:
       mdn-data: 2.27.1
@@ -11712,8 +11374,6 @@ snapshots:
       safe-buffer: 5.2.1
 
   ee-first@1.1.1: {}
-
-  effect@4.1.2: {}
 
   ejs@3.1.10:
     dependencies:
@@ -14007,8 +13667,6 @@ snapshots:
 
   pngjs@7.0.0: {}
 
-  postcss-value-parser@4.2.0: {}
-
   postcss@8.5.31:
     dependencies:
       nanoid: 3.3.20
@@ -14229,17 +13887,6 @@ snapshots:
       safe-buffer: 5.1.2
       string_decoder: 1.1.1
       util-deprecate: 1.0.2
-
-  redis@6.3.0:
-    dependencies:
-      '@redis/bloom': 6.3.0(@redis/client@6.3.0)
-      '@redis/client': 6.3.0
-      '@redis/json': 6.3.0(@redis/client@6.3.0)
-      '@redis/search': 6.3.0(@redis/client@6.3.0)
-      '@redis/time-series': 6.3.0(@redis/client@6.3.0)
-    transitivePeerDependencies:
-      - '@node-rs/xxhash'
-      - '@opentelemetry/api'
 
   regenerate-unicode-properties@10.3.0:
     dependencies:
@@ -14656,8 +14303,6 @@ snapshots:
     dependencies:
       inline-style-parser: 0.2.7
 
-  styleq@0.2.1: {}
-
   subset-font@2.9.0:
     dependencies:
       fontverter: 2.0.0
@@ -14935,13 +14580,6 @@ snapshots:
 
   unpipe@1.0.0: {}
 
-  unplugin@2.3.11:
-    dependencies:
-      '@jridgewell/remapping': 2.3.5
-      acorn: 8.19.0
-      picomatch: 4.0.7
-      webpack-virtual-modules: 0.6.2
-
   unzipper@0.12.5:
     dependencies:
       bluebird: 3.7.2
@@ -15110,8 +14748,6 @@ snapshots:
 
   webidl-conversions@8.0.1:
     optional: true
-
-  webpack-virtual-modules@0.6.2: {}
 
   webrtc-adapter@8.2.0:
     dependencies:

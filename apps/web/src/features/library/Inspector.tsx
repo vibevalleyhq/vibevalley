@@ -1,5 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
-import { Array as Arr } from "effect";
 import { For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -16,116 +14,6 @@ import { MoreMenu } from "#/ui/MoreMenu.tsx";
 
 import { durationText, extOf, kindOf, type Names, originLine } from "./items.ts";
 import type { Seen } from "./Tiles.tsx";
-
-const popIn = stylex.keyframes({
-  from: { opacity: 0, scale: 0.98 },
-});
-
-const styles = stylex.create({
-  panel: {
-    gridArea: "side",
-    display: "flex",
-    flexShrink: 0,
-    flexDirection: "column",
-    gap: "1rem",
-    overflowY: "auto",
-    backgroundColor: "var(--color-page)",
-    padding: "1rem",
-    width: { default: "19rem", "@media (width < 40rem)": "auto" },
-    borderLeftWidth: { default: 1, "@media (width < 40rem)": 0 },
-    borderLeftStyle: "solid",
-    borderLeftColor: "var(--color-line)",
-    // On a phone it is a sheet from the bottom, over the files.
-    position: { default: "static", "@media (width < 40rem)": "fixed" },
-    insetInline: { default: null, "@media (width < 40rem)": 0 },
-    bottom: { default: null, "@media (width < 40rem)": 0 },
-    zIndex: { default: null, "@media (width < 40rem)": 30 },
-    maxHeight: { default: null, "@media (width < 40rem)": "70vh" },
-    borderTopWidth: { default: 0, "@media (width < 40rem)": 1 },
-    borderTopStyle: "solid",
-    borderTopColor: "var(--color-line)",
-    borderTopLeftRadius: { default: 0, "@media (width < 40rem)": "var(--radius-xl)" },
-    borderTopRightRadius: { default: 0, "@media (width < 40rem)": "var(--radius-xl)" },
-    boxShadow: { default: "none", "@media (width < 40rem)": "var(--shadow-float)" },
-    animationName: { default: null, "@media (width < 40rem)": { default: popIn, "@media (prefers-reduced-motion: reduce)": "none" } },
-    animationDuration: "280ms",
-    animationTimingFunction: "var(--ease-out)",
-  },
-  preview: {
-    display: "flex",
-    minHeight: "8rem",
-    maxHeight: "18rem",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    borderRadius: "var(--radius-lg)",
-    backgroundColor: "var(--color-hover)",
-    color: "var(--color-muted)",
-  },
-  previewPlain: { flexDirection: "column", gap: "0.25rem", paddingBlock: "1.5rem" },
-  image: { maxWidth: "100%", maxHeight: "18rem", objectFit: "contain", display: "block", cursor: "zoom-in" },
-  player: { width: "100%" },
-  ext: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", fontWeight: "var(--font-weight-medium)", color: "var(--color-ink)" },
-  head: { display: "flex", alignItems: "flex-start", gap: "0.5rem" },
-  name: {
-    minWidth: 0,
-    flex: 1,
-    overflowWrap: "anywhere",
-    fontSize: "var(--text-base)",
-    lineHeight: "var(--leading-base)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  actions: { display: "flex", alignItems: "center", gap: "0.25rem" },
-  grow: { flex: 1 },
-  facts: {
-    display: "grid",
-    gridTemplateColumns: "auto minmax(0, 1fr)",
-    columnGap: "1rem",
-    rowGap: "0.5rem",
-    margin: 0,
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  term: { color: "var(--color-muted)", whiteSpace: "nowrap" },
-  value: { margin: 0, minWidth: 0, overflowWrap: "anywhere", color: "var(--color-ink)" },
-  faint: { color: "var(--color-faint)" },
-  link: { color: "var(--color-water)", textDecorationLine: { default: "none", ":hover": "underline" } },
-  section: { display: "flex", flexDirection: "column", gap: "0.5rem" },
-  sectionTitle: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontWeight: "var(--font-weight-medium)",
-    color: "var(--color-faint)",
-  },
-  understood: { whiteSpace: "pre-wrap", fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)" },
-  // Asking before something goes: a berry tinted line, the danger button and a way out (docs/style/design.md).
-  ask: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.5rem",
-    borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--color-bad-soft)",
-    padding: "0.5rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-berry)",
-  },
-  askWords: { flexBasis: "100%" },
-  strip: { display: "flex", flexWrap: "wrap", gap: "0.25rem" },
-  stripItem: {
-    width: "3rem",
-    height: "3rem",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    borderRadius: "var(--radius-sm)",
-    backgroundColor: "var(--color-hover)",
-    color: "var(--color-muted)",
-  },
-  stripImage: { width: "100%", height: "100%", objectFit: "cover" },
-});
 
 export interface InspectorActions {
   readonly channels: readonly Channel[];
@@ -151,15 +39,15 @@ function SendMenu(props: { channels: readonly Channel[]; send: (channel: string)
       label={t("web.library.sendTo")}
       icon="send"
       testid="library-send"
-      items={Arr.map(props.channels, (c) => ({ key: c.id, label: `#${c.name ?? c.id}`, icon: "chat" as const, onSelect: () => props.send(c.id) }))}
+      items={props.channels.map((c) => ({ key: c.id, label: `#${c.name ?? c.id}`, icon: "chat" as const, onSelect: () => props.send(c.id) }))}
     />
   );
 }
 
 function Asking(props: { question: string; act: InspectorActions }) {
   return (
-    <div role="alert" data-testid="library-remove-ask" {...stylex.attrs(styles.ask)}>
-      <span {...stylex.attrs(styles.askWords)}>{props.question}</span>
+    <div role="alert" data-testid="library-remove-ask" class="flex flex-wrap items-center gap-2 rounded-md bg-bad-soft p-2 text-sm text-berry">
+      <span class="basis-full">{props.question}</span>
       <Button tone="danger" data-testid="library-remove-sure" onClick={() => props.act.remove()}>
         {t("web.library.removeSure")}
       </Button>
@@ -182,29 +70,34 @@ export function Inspector(props: {
   const now = useNow();
   const one = () => (props.items.length === 1 ? props.items[0] : undefined);
   return (
-    <aside aria-label={t("web.library.inspector.label")} data-testid="library-inspector" data-count={props.items.length} {...stylex.attrs(styles.panel)}>
+    <aside
+      aria-label={t("web.library.inspector.label")}
+      data-testid="library-inspector"
+      data-count={props.items.length}
+      class="[grid-area:side] flex shrink-0 flex-col gap-4 overflow-y-auto bg-page p-4 w-76 max-sm:w-auto border-l max-sm:border-l-0 border-l-line static max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-30 max-sm:max-h-[70vh] border-t-0 max-sm:border-t border-t-line rounded-tl-none max-sm:rounded-tl-xl rounded-tr-none max-sm:rounded-tr-xl shadow-none max-sm:shadow-float max-sm:[animation-name:pop-in] max-sm:motion-reduce:[animation-name:none] [animation-duration:280ms] [animation-timing-function:var(--ease-out)]"
+    >
       <Show
         when={one()}
         fallback={
           <>
-            <div {...stylex.attrs(styles.head)}>
-              <p {...stylex.attrs(styles.name)}>{t("web.library.inspector.selected", { n: props.items.length })}</p>
+            <div class="flex items-start gap-2">
+              <p class="min-w-0 flex-1 wrap-anywhere text-base font-semibold">{t("web.library.inspector.selected", { n: props.items.length })}</p>
               <IconButton icon="close" label={t("web.library.inspector.clear")} testid="library-clear" onClick={() => props.act.clear()} />
             </div>
-            <div {...stylex.attrs(styles.strip)}>
+            <div class="flex flex-wrap gap-1">
               <For each={props.items}>
                 {(item) => (
-                  <span {...stylex.attrs(styles.stripItem)} title={item.attachment.name}>
+                  <span class="w-12 h-12 flex items-center justify-center overflow-hidden rounded-sm bg-hover text-muted" title={item.attachment.name}>
                     <Show when={kindOf(item.attachment.type) === "image"} fallback={<Icon name="file" size={16} />}>
-                      <img src={attachmentPath(item.attachment.id)} alt="" {...stylex.attrs(styles.stripImage)} />
+                      <img src={attachmentPath(item.attachment.id)} alt="" class="w-full h-full object-cover" />
                     </Show>
                   </span>
                 )}
               </For>
             </div>
-            <div {...stylex.attrs(styles.actions)}>
+            <div class="flex items-center gap-1">
               <SendMenu channels={props.act.channels} send={props.act.send} />
-              <span {...stylex.attrs(styles.grow)} />
+              <span class="flex-1" />
               <MoreMenu
                 label={t("web.library.inspector.more")}
                 testid="library-more"
@@ -227,40 +120,40 @@ export function Inspector(props: {
           };
           return (
             <>
-              <div {...stylex.attrs(styles.head)}>
-                <p data-testid="library-inspector-name" {...stylex.attrs(styles.name)}>
+              <div class="flex items-start gap-2">
+                <p data-testid="library-inspector-name" class="min-w-0 flex-1 wrap-anywhere text-base font-semibold">
                   {file().name}
                 </p>
                 <IconButton icon="close" label={t("web.library.inspector.clear")} testid="library-clear" onClick={() => props.act.clear()} />
               </div>
               <Switch>
                 <Match when={kind() === "image"}>
-                  <div {...stylex.attrs(styles.preview)}>
-                    <img src={src()} alt={file().name} onClick={() => props.act.look()} {...stylex.attrs(styles.image)} />
+                  <div class="flex min-h-32 max-h-72 items-center justify-center overflow-hidden rounded-lg bg-hover text-muted">
+                    <img src={src()} alt={file().name} onClick={() => props.act.look()} class="max-w-full max-h-72 object-contain block cursor-zoom-in" />
                   </div>
                 </Match>
                 <Match when={kind() === "video"}>
-                  <div {...stylex.attrs(styles.preview)}>
-                    <video controls preload="metadata" src={src()} aria-label={file().name} {...stylex.attrs(styles.player)} />
+                  <div class="flex min-h-32 max-h-72 items-center justify-center overflow-hidden rounded-lg bg-hover text-muted">
+                    <video controls preload="metadata" src={src()} aria-label={file().name} class="w-full" />
                   </div>
                 </Match>
                 <Match when={kind() === "audio" || kind() === "other"}>
-                  <div {...stylex.attrs(styles.preview, styles.previewPlain)}>
+                  <div class={["flex min-h-32 max-h-72 items-center justify-center overflow-hidden rounded-lg bg-hover text-muted", "flex-col gap-1 py-6"]}>
                     <Icon name={kind() === "audio" ? "audio" : "file"} size={48} />
-                    <Show when={extOf(file().name)}>{(ext) => <span {...stylex.attrs(styles.ext)}>{ext()}</span>}</Show>
+                    <Show when={extOf(file().name)}>{(ext) => <span class="text-xs font-medium text-ink">{ext()}</span>}</Show>
                   </div>
                 </Match>
               </Switch>
               <Show when={kind() === "audio"}>
-                <audio controls preload="metadata" src={src()} aria-label={file().name} {...stylex.attrs(styles.player)} />
+                <audio controls preload="metadata" src={src()} aria-label={file().name} class="w-full" />
               </Show>
-              <div {...stylex.attrs(styles.actions)}>
+              <div class="flex items-center gap-1">
                 <IconButton icon="download" label={t("web.library.download")} testid="library-download" onClick={() => download(file().id, file().name)} />
                 <SendMenu channels={props.act.channels} send={props.act.send} />
                 <Show when={kind() === "image" || kind() === "video"}>
                   <IconButton icon="understand" label={t("web.library.understand")} testid="library-understand" onClick={() => props.act.understand()} />
                 </Show>
-                <span {...stylex.attrs(styles.grow)} />
+                <span class="flex-1" />
                 <MoreMenu
                   label={t("web.library.inspector.more")}
                   testid="library-more"
@@ -270,16 +163,16 @@ export function Inspector(props: {
               <Show when={props.asking}>
                 <Asking question={t("web.library.removeAsk", { name: file().name })} act={props.act} />
               </Show>
-              <dl {...stylex.attrs(styles.facts)}>
-                <dt {...stylex.attrs(styles.term)}>{t("web.library.inspector.kind")}</dt>
-                <dd {...stylex.attrs(styles.value)}>
-                  {t(`web.library.kind.${kind()}`)} <span {...stylex.attrs(styles.faint)}>{file().type}</span>
+              <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 m-0 text-sm">
+                <dt class="text-muted whitespace-nowrap">{t("web.library.inspector.kind")}</dt>
+                <dd class="m-0 min-w-0 wrap-anywhere text-ink">
+                  {t(`web.library.kind.${kind()}`)} <span class="text-faint">{file().type}</span>
                 </dd>
                 <Show when={props.seen?.width !== undefined && props.seen.height !== undefined ? props.seen : undefined}>
                   {(seen) => (
                     <>
-                      <dt {...stylex.attrs(styles.term)}>{t("web.library.inspector.pixels")}</dt>
-                      <dd data-testid="library-pixels" {...stylex.attrs(styles.value)}>
+                      <dt class="text-muted whitespace-nowrap">{t("web.library.inspector.pixels")}</dt>
+                      <dd data-testid="library-pixels" class="m-0 min-w-0 wrap-anywhere text-ink">
                         {seen().width} × {seen().height}
                       </dd>
                     </>
@@ -288,37 +181,37 @@ export function Inspector(props: {
                 <Show when={props.seen?.seconds}>
                   {(s) => (
                     <>
-                      <dt {...stylex.attrs(styles.term)}>{t("web.library.inspector.length")}</dt>
-                      <dd {...stylex.attrs(styles.value)}>{durationText(s())}</dd>
+                      <dt class="text-muted whitespace-nowrap">{t("web.library.inspector.length")}</dt>
+                      <dd class="m-0 min-w-0 wrap-anywhere text-ink">{durationText(s())}</dd>
                     </>
                   )}
                 </Show>
-                <dt {...stylex.attrs(styles.term)}>{t("web.library.inspector.bytes")}</dt>
-                <dd {...stylex.attrs(styles.value)}>{sizeText(file().size)}</dd>
-                <dt {...stylex.attrs(styles.term)}>{t("web.library.inspector.from")}</dt>
-                <dd data-testid="library-origin-line" {...stylex.attrs(styles.value)}>
+                <dt class="text-muted whitespace-nowrap">{t("web.library.inspector.bytes")}</dt>
+                <dd class="m-0 min-w-0 wrap-anywhere text-ink">{sizeText(file().size)}</dd>
+                <dt class="text-muted whitespace-nowrap">{t("web.library.inspector.from")}</dt>
+                <dd data-testid="library-origin-line" class="m-0 min-w-0 wrap-anywhere text-ink">
                   {originLine(props.names)(item().origin)}
                   <Show when={channel()}>
                     {(c) => (
                       <>
                         {" · "}
-                        <Link href={`/chat/${encodeURIComponent(c())}`} {...stylex.attrs(styles.link)}>
+                        <Link href={`/chat/${encodeURIComponent(c())}`} class="text-water no-underline hover:underline">
                           {t("web.library.inspector.openChannel", { channel: props.names.channel(c()) })}
                         </Link>
                       </>
                     )}
                   </Show>
                 </dd>
-                <dt {...stylex.attrs(styles.term)}>{t("web.library.inspector.added")}</dt>
-                <dd {...stylex.attrs(styles.value)} title={momentText(item().addedAt)}>
+                <dt class="text-muted whitespace-nowrap">{t("web.library.inspector.added")}</dt>
+                <dd class="m-0 min-w-0 wrap-anywhere text-ink" title={momentText(item().addedAt)}>
                   {ago(item().addedAt, now())}
                 </dd>
               </dl>
               <Show when={props.understood}>
                 {(text) => (
-                  <section {...stylex.attrs(styles.section)}>
-                    <h3 {...stylex.attrs(styles.sectionTitle)}>{t("web.library.understood")}</h3>
-                    <p data-testid="library-understood" {...stylex.attrs(styles.understood)}>
+                  <section class="flex flex-col gap-2">
+                    <h3 class="text-xs font-medium text-faint">{t("web.library.understood")}</h3>
+                    <p data-testid="library-understood" class="whitespace-pre-wrap text-sm">
                       {text()}
                     </p>
                   </section>

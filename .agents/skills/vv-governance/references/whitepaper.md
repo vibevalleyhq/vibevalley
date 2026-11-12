@@ -39,8 +39,8 @@
 **二、只加不删。** 机理：agent 不确定一个导出是不是还被反射或外部脚本用，为了编过，只加新的、不删旧的。例子：轮询改成 WebSocket 推送，新写了 streamStatus()，旧的 pollStatus() 连 5 个帮手、12 个测试都留着；半年后 40% 是没人调的僵尸代码，后来的 agent 把它当现行的照抄。
 在这里：已有「内部不留兼容」（改名、改形状直接改，不留兼容层）。已做：`vp run deadcode`（knip，零容忍，在 CI 里），接上时清出 130 个没人用的导出、12 个类型、24 处声明、两个整文件、一个依赖。
 
-**三、绕开约束。** 机理：类型检查（复杂的泛型、Effect 的错误通道）或测试挡住任务时，模型找阻力最小的路绕过去，不修根本的错。例子：修并发扣费，编译器说 InsufficientQuotaError 没处理，agent 塞了 Effect.orDie、用 as any 绕过类型；边界测试挂了，就把 expect(balance).toBe(0) 改成 toBe(-10)。
-在这里：已有：`typescript/no-explicit-any`、`no-unsafe-*`、`typescript/no-unsafe-type-assertion`，类型逃生口（`x!`、`as`、`as unknown as`、关 lint 的注释）的棘轮。已做：`Effect.orDie`、`Effect.ignore`、吞掉的 `catch` 进棘轮；修复补的测试以 `regression: ` 开头，删改要在 PR 里点名（`scripts/release/regression.ts`）。帮工那边已做：验收子工单先红、合入时冻结改动文件（[工单](docs/subsystems/issue.md#模型和不变量)）。
+**三、绕开约束。** 机理：类型检查（复杂的泛型、没处理的错误）或测试挡住任务时，模型找阻力最小的路绕过去，不修根本的错。例子：修并发扣费，编译器说 InsufficientQuotaError 没处理，agent 套了个空的 catch、用 as any 绕过类型；边界测试挂了，就把 expect(balance).toBe(0) 改成 toBe(-10)。
+在这里：已有：`typescript/no-explicit-any`、`no-unsafe-*`、`typescript/no-unsafe-type-assertion`，类型逃生口（`x!`、`as`、`as unknown as`、关 lint 的注释）的棘轮。已做：`as unknown as`、吞掉的 `catch` 和 `.catch(() => undefined)` 进棘轮；修复补的测试以 `regression: ` 开头，删改要在 PR 里点名（`scripts/release/regression.ts`）。帮工那边已做：验收子工单先红、合入时冻结改动文件（[工单](docs/subsystems/issue.md#模型和不变量)）。
 
 **四、温室假设。** 机理：训练语料多是教学代码，默认内存无限、网络秒回、磁盘不锁、外部进程输出规整。例子：看板接口在 50 个工单的 .map() 里逐个跑 git diff --numstat（N+1）；收模型的流时每来一个字就把整个历史 JSON.stringify 写一次盘；两个工单时很顺，第三天八十个工单，CPU 和磁盘满了。
 在这里：已有：贵的东西归拥有它的模块管，刚写下的不再读回，一条消息的几次写在一个事务里，时间归 `Clock`、测试拨 `TestClock`（[地基](docs/subsystems/foundation.md)）。已做：`Db` 与 `git` 入口记录确定性 I/O 次数断言。以后做：流按任意切片测（出现第一个这类回归时）。
@@ -55,7 +55,7 @@
 
 | 铁律 | 在这里 |
 |---|---|
-| 1. 机器能拦住的错，不花一个 token：架构规范写成毫秒级的类型检查和 AST 静态门禁，用退出码 1 代替说教 | 已有：四层手段的第 1、2 层；`vp check` 带类型的 lint、仓库自己的 oxlint 插件、`effect:check`、`practice:check` 全仓语法树审计、`paths:check`、`schema-audit.ts`、结构测试、CI |
+| 1. 机器能拦住的错，不花一个 token：架构规范写成毫秒级的类型检查和 AST 静态门禁，用退出码 1 代替说教 | 已有：四层手段的第 1、2 层；`vp check` 带类型的 lint、仓库自己的 oxlint 插件、`practice:check` 全仓语法树审计、`paths:check`、`schema-audit.ts`、结构测试、CI |
 | 2. 报错就是提示词：报错不只说不许做什么，印出标准写法的模板和参考文件的行号 | 已做：每个检查的话写错在哪、`Fix:`、`See`（`scripts/audit/oxlint-plugin.ts` 的 `says`，测试查 `See` 的文件在不在）；改写：写文件不写行号（行号一改就错，文件挪了测试会报） |
 | 3. 收回公共控制流，只让 AI 填空：超时、重试、配额、事务回滚、子进程回收焊死在高阶函数里，AI 只写 50 行以内的业务插件 | 已有：帮工经 oar 驱动，核心状态只由 `Core.apply` 改，git 子进程在 `repo/git.ts` 杀整个进程组。以后做：扩展点只填空 |
 | 4. 物理锁死契约和验收测试：协议 Schema、核心接口签名、验收测试目录只读；修 bug 先锁定必败的红灯测试 | 改写：不锁目录（用户和 agent 是同一个用户，锁不住），让改动被看见：`regression: ` 测试删改要点名，生成的文件不手改（`docs:verify`、`server:check` 查）。帮工那边已有：验收先红、写好冻结 |
@@ -195,11 +195,11 @@
 
 **1. 铁笼红线：**
 
-- 禁止类型和错误逃逸：业务代码不许 `as any`、`@ts-ignore`、`Effect.orDie`、空的 `catch {}`，可预期的错误显式声明在错误联合里。在这里：`as any` 由 lint 拦；关 lint、`as`、`!`、`orDie`、`ignore`、空 `catch` 进棘轮（有理由的旧用法留着，新增要说明）。
+- 禁止类型和错误逃逸：业务代码不许 `as any`、`@ts-ignore`、空的 `catch {}`，可预期的结果显式写成判别联合。在这里：`as any` 由 lint 拦；关 lint、`as`、`as unknown as`、`!`、吞掉的 `catch` 进棘轮（有理由的旧用法留着，新增要说明）。
 - 禁止越权改只读契约：功能和修复时，契约和验收测试目录只读，不许改断言迎合错误的实现。在这里：改写为改动要被看见（`regression: ` 测试、生成的文件）。
 - 禁止裸调系统副作用：不许直接用 `Bun.spawn`、`child_process`、`node:fs`、无界 `new Map()`，统一调原语词典里的受管服务。在这里：以后做：子进程的 import 限制、常驻集合的清点；`node:fs` 不限（服务端的存盘归拥有它的模块）。
 - 禁止手改多文件重构：5 个以上文件的机械改动写 codemod。在这里：做法，见 SKILL.md 第 5 节。
-- 禁止私自引入第三方包：`package.json` 锁写权限，校验用内置 Schema，日期用内置 DateTime。在这里：版本只在 catalog，`catalog.test.ts` 查；新依赖在 PR 的 diff 里看得见；校验用 Effect 的 `Schema`。
+- 禁止私自引入第三方包：`package.json` 锁写权限，校验用一个库（这里是 Zod），日期用一个库。在这里：版本只在 catalog，`catalog.test.ts` 查；新依赖在 PR 的 diff 里看得见；校验用 Zod。
 
 **2. 架构和目录：**
 

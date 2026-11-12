@@ -29,7 +29,7 @@ Status: proposed
 ## Alternatives considered
 
 - **对文件行数、函数行数或深度设 CI 硬门槛**：会诱导 agent 机械切碎文件或缩减接口凑数，读数变好看但代码未变简单。
-- **引入 Martin 抽象度 `A` 与主序列距离 `D`**：TypeScript + Effect 代码以 `Context.Service` 与协议 Schema 表达契约，按 Java 抽象类比例统计失真，仅保留不稳定度 `I`。
+- **引入 Martin 抽象度 `A` 与主序列距离 `D`**：TypeScript 代码以服务接口与协议 Schema 表达契约，按 Java 抽象类比例统计失真，仅保留不稳定度 `I`。
 - **引入 `dependency-cruiser` 或 `madge` 建图**：多一套外部依赖与别名配置；复用包内已有的 oxc `staticImports` 与 `package.json` `exports` 解析只需数十行。
 
 ## Acceptance criteria

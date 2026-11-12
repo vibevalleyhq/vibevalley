@@ -37,7 +37,7 @@
 
 ### process
 
-- 2026-11-10 [用 AST 切片、模型判别与单向棘轮收敛五大存量工程债](.agents/notes/proposed/process/2026-11-10-ast-and-model-debt-convergence.md)
+- 2026-11-10 [用 AST 切片、模型判别与单向棘轮收敛三类存量工程债](.agents/notes/proposed/process/2026-11-10-ast-and-model-debt-convergence.md)
 - 2026-10-30 [白皮书里还没做的：骨架、重复 lint、流切片、常驻集合和体检，各在什么时候做](.agents/notes/proposed/process/2026-10-30-whitepaper-checks-that-say-how.md)
 - 2026-10-29 [给仓库做体检：跨区共改、模块深度与代码存活率读数](.agents/notes/proposed/process/2026-10-29-repo-health-readings.md)
 - 2026-10-25 [PR Review：日常评审看证据，同题比较再评分](.agents/notes/proposed/process/2026-10-25-pr-review-scoring.md)

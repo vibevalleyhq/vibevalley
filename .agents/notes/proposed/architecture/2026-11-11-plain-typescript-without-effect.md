@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-主人的判断：Effect 和 StyleX 在这个仓库的收益不高，都拿掉。2026-11-11 的盘点支持这个判断。
+主人的判断：Effect 和页面的编译期样式库在这个仓库的收益不高，都拿掉。2026-11-11 的盘点支持这个判断。
 
 ### Effect
 
@@ -19,16 +19,9 @@ Status: proposed
 
 **Effect 确实给了的东西**不能丢，改写时要用别的办法守住：拒绝有类型（`ApiError` 加 `bizCode`）、长操作能被打断、资源开了一定关、后台任务有主、测试能控制时间、边界当场解码。
 
-### StyleX
+### 样式（已做完）
 
-2026-11-08 页面从 Tailwind v4 迁到 StyleX（#235），之后官网 `apps/site` 也照它写。现在 249 个文件、287 个 `stylex.create`。成本：
-
-- **构建期静态求值的限制让人和 agent 都踩坑。** 2026-11-11 页面构建失败过一次，六个文件（`Shell`、`Hud`、`Achievements`、`RepoPanels`、`MergeGame`、`BugSnakeGame`）因为样式里用了局部箭头函数、从非 `.stylex.ts` 文件引的常量、声明在使用之后的变量而求值失败；类型检查和 lint 都不报，只有构建报。修法（「这个函数要写成函数声明」「这个常量不能引」）没法从代码里看出来。
-- **构建慢。** 一次页面构建里 StyleX 的转换占了大约 77% 的插件时间。
-- **写法离 agent 最熟的远。** 同样一个布局，Tailwind 是元素上的一串 class，StyleX 是文件顶上一个对象加 `{...stylex.attrs(...)}`；迁移后样式名多是 `issueDetailSpan2`、`issueDetailDiv22` 这种按位置起的名字，读不出意思。
-- **它要一整套自己的守卫。** `vv-stylex` skill、lint 的 `stylex-only`（禁止 JSX 里写 class）、`design-tokens` 对 StyleX 值的检查，都是为它加的。
-
-迁移前的 Tailwind v4 用 `style.css` 的 `@theme` 放令牌，这个做法没有问题，令牌本身（颜色、圆角、字号、阴影、动效、层）保留。
+2026-11-08（#235）页面和官网换成了一个编译期求值的样式库：构建才报的求值限制、构建慢、按位置起的样式名、一整套自己的 lint 和 skill。S1–S4（见下文）已把它们换回 Tailwind v4，令牌（颜色、圆角、字号、阴影、动效、层）留在 `style.css` 的 `@theme`；写法见 [vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)。
 
 ## Proposal
 
@@ -54,7 +47,6 @@ Status: proposed
 | `effect/reactivity`、`Atom`（页面 9 处） | Solid 的 signal 和 store | |
 | `@effect/vitest`（134 个文件） | `vite-plus/test` | `world.ts` 用同样的工厂搭整农场 |
 | `packages/agent`、`packages/ai`（重写的 pi） | 上游的 pi-ai 加 pi-durable，经 oar 的 `createPiDurableRuntime` | 见第 1 步；验证不过就把循环移植成普通 TypeScript，不留在 Effect 里 |
-| StyleX（`stylex.create`、`stylex.attrs`、`*.stylex.ts`） | Tailwind v4（`@tailwindcss/vite`，`@theme` 令牌） | 见下文「样式」 |
 
 ### 查询：SQL 在前，生成 Zod
 
@@ -74,13 +66,12 @@ Status: proposed
 - **一个 `Sql` 接口，两个驱动**：`pg`（配了 `database.url`）和 PGlite（家目录里），同一种方言；事务是 `sql.tx(async (tx) => …)`，函数收 `Sql` 或 `Tx` 都行。
 - `server:check` 照旧查 `db/generated` 是不是最新；代码里只调生成的函数，SQL 只写在 `db/queries`（`schema.test.ts` 的几条照旧）。
 
-### 样式：回到 Tailwind v4
+### 样式：回到 Tailwind v4（已做完）
 
-- **令牌**：`apps/web/src/style.css` 回到 `@import "tailwindcss"` 加 `@theme`。现在 `tokens.stylex.ts`、`tabs.stylex.ts` 里的颜色、圆角、字号、阴影、动效、层、断点、容器宽度全部回到 `@theme`；两种主题照旧用 CSS 变量切换。官网 `apps/site` 用同一份令牌。
-- **组件**：每个 `stylex.create` 的条目换回元素上的 class；动态的值（宽度百分比、按数据算出的尺寸）用 `style` 属性或 CSS 变量，不拼 class 名。按位置起的样式名（`issueDetailSpan2` 这种）随之消失。
-- **零件的样子照旧在 `apps/web/src/ui`**，`packages/base-ui` 仍然无样式；零件旁边的 `X.stories.tsx` 照旧，改完在故事里两种主题、几种宽度看一遍。
-- **检查换成 Tailwind 的**：删掉 lint 的 `stylex-only`；`no-hex-color` 和 `design-tokens` 改成查 class 里的任意值（`bg-[#…]`、`p-[13px]` 这种绕过令牌的写法）和 `style` 里的散值；`vv-stylex` skill 换成 `vv-tailwind`（令牌在哪、任意值什么时候可以、动态值怎么写）；[界面怎么做](docs/style/design.md)和[客户端](docs/subsystems/app.md)里讲 StyleX 的部分改写。
-- **以截图为准**：迁移前后同一组页面、两种主题、三种宽度（1440×900、1152×768、390×844）各截一张，逐张对比；Playwright 的 `e2e:visual` 跑全套。
+- **令牌**只在 `apps/web/src/style.css` 的 `@theme`（官网的在 `apps/site/src/ui/global.css`），class 名就是令牌名；两种主题照旧用 CSS 变量切换。
+- **组件**写元素上的 class，对外收 `class`；动态的值（宽度百分比、按数据算出的尺寸）用 `style` 属性或 CSS 变量，不拼 class 名。零件的样子在 `apps/web/src/ui`，`packages/base-ui` 仍然无样式。
+- **检查**：`no-hex-color`、`design-tokens` 查 class 里的任意值和 `style` 里的散值，`style-attrs` 拦写死的 `style`。
+- **以截图为准**：迁移前后同一组页面（1440×900、1152×768、390×844）和故事的两种主题逐张对比。
 
 ### 用什么守住 Effect 给过的东西
 
@@ -106,10 +97,10 @@ Status: proposed
 
 **样式这条线**和 Effect 那条互不依赖，可以和第 1 到 4 步同时做；它只碰 `apps/web`、`apps/site`、`packages/stories` 和检查脚本。
 
-- **S1 令牌和检查。** `style.css` 回到 `@theme`，接上 `@tailwindcss/vite`；`design-tokens`、`no-hex-color` 改成认 Tailwind；`stylex-only` 先改成只拦新文件；`vv-tailwind` skill 写好。截好迁移前的基准截图。
-- **S2 零件。** `apps/web/src/ui`、`ui/domain`、`ui/pixel` 换回 class，每个零件对着它的故事看。
-- **S3 页面。** `features`、`farm`、`tree`、`app` 一组一个提交换完；每组对比截图。
-- **S4 官网和收尾。** `apps/site` 换完；删掉 `@stylexjs/*` 依赖、`*.stylex.ts`、`stylex-only`、`vv-stylex`；文档改写。
+- **S1 令牌和检查**（已做）。`style.css` 回到 `@theme`，接上 `@tailwindcss/vite`；`design-tokens`、`no-hex-color` 改成认 Tailwind；`vv-tailwind` skill 写好。截好迁移前的基准截图。
+- **S2 零件**（已做）。`apps/web/src/ui`、`ui/domain`、`ui/pixel` 换回 class，每个零件对着它的故事看。
+- **S3 页面**（已做）。`features`、`farm`、`tree`、`app` 和故事换完，对比截图。
+- **S4 官网和收尾**（已做）。`apps/site` 换完；旧样式库的依赖、文件、lint 规则和 skill 删掉；文档改写。
 
 工作量的估计（agent 写、人审）：Effect 这条线第 0 步已做（已合进 `main`），第 1 步 3 到 5 天，第 2 步 4 到 6 天，第 3 步 3 到 4 天，第 4 步 10 到 15 天，第 5 步 2 到 3 天；样式这条线 5 到 8 天，可以并行。合计五到七周。这期间 `main` 上只做小的修补。
 
@@ -129,15 +120,15 @@ Status: proposed
 
 **用 sqlc 本身（Go 写的工具）代替自己的生成器。** 没选：sqlc 的 TypeScript 输出插件不写 Zod，PGlite 也不在它的驱动里；我们的生成器已经做了 Parse、Describe、`CHECK` 转联合、可空标注，改输出比接一个外部工具小。
 
-**样式留在 StyleX，只补检查。** 没选：构建期求值的限制是它的工作方式，不是缺一条 lint；补检查只是把「构建才报」挪到「lint 才报」，写法还是离 agent 最熟的远。
+**样式留在原来的编译期样式库，只补检查。** 没选：构建期求值的限制是它的工作方式，不是缺一条 lint；补检查只是把「构建才报」挪到「lint 才报」，写法还是离 agent 最熟的远。
 
-**样式换成 CSS Modules 或 vanilla-extract。** 没选：前者回到「样式名起什么」的老问题，后者和 StyleX 一样有构建期求值；迁移前的 Tailwind v4 已经证明在这个仓库能用，令牌的结构也是现成的。
+**样式换成 CSS Modules 或 vanilla-extract。** 没选：前者回到「样式名起什么」的老问题，后者和原来的库一样有构建期求值；迁移前的 Tailwind v4 已经证明在这个仓库能用，令牌的结构也是现成的。
 
 **大脑不换上游，把重写的循环原样移植成普通 TypeScript。** 没选作首选：那样仍然自己养一套 agent 核心和持久化，放着上游现成的不用。它是第 1 步验证不过时的退路。
 
 ## Acceptance criteria
 
-- 全仓没有任何文件引用 `effect`、`@effect/*` 或 `@stylexjs/*`；`pnpm-workspace.yaml` 的 catalog 里没有它们；`effect:check`、`scripts/audit/effect.ratchet.json`、`vv-effect`、`effect-ts`、`vv-stylex` skill、lint 的 `stylex-only` 已删除。
+- 全仓没有任何文件引用 `effect`、`@effect/*` 或原来的样式库；`pnpm-workspace.yaml` 的 catalog 里没有它们；`effect:check`、`scripts/audit/effect.ratchet.json`、`vv-effect`、`effect-ts` skill 和只为旧样式库加的 skill、lint 规则已删除。
 - 运行时校验只有 Zod：契约、HTTP 入参、SSE、查询的结果行、落盘的 JSON、配置、工具入参。
 - `db/generated` 由 `scripts/pg-generate.ts` 从 `db/queries/*.sql` 写出，每条查询有 Zod 的参数和结果 Schema 和一个普通的 `async` 函数；`server:check` 查它是最新的。
 - 页面和官网的样式是 Tailwind v4，令牌只在 `@theme`；lint 拦下绕过令牌的任意值和散值。
@@ -158,4 +149,4 @@ Status: proposed
 - **改到一半停下来。** 两种写法并存比哪一种都差。缓解：分支上接缝的计数只许减；中间态从不合进 `main`，停下来的代价是丢掉分支，不是留下半截。
 - **功能停滞五到七周。** 缓解：样式那条线和服务端那条互不依赖，可以并行做；`main` 上的小修补每周合进分支。
 - **Zod 和 Effect Schema 的行为差异。** 可选字段、多余字段、日期和数字的宽严不一样，落盘的 JSON 可能读不回来。缓解：第 2 步给每个契约 Schema 用现有的黄金数据和测试夹具跑两边的解码，结果要一样；内部不留兼容的规矩不变，读不回来的本机旧库照旧作废重建。
-- **样式迁移走样。** 2,000 多处样式换回 class，细节（悬停、焦点环、`@supports` 的回退、容器查询）容易丢。缓解：迁移前截好基准图，每组对比；StyleX 里写了 `@supports`、`@container` 的条目单独列出来逐个核对。
+- **样式迁移走样。** 2,000 多处样式换回 class，细节（悬停、焦点环、`@supports` 的回退、容器查询）容易丢。缓解：迁移前截好基准图，每组对比；原来写了 `@supports`、`@container` 的条目单独列出来逐个核对。

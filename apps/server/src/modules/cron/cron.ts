@@ -43,7 +43,7 @@ export interface Cron {
   /** What comes due from now on, subscribed before it returns. */
   readonly due: () => Subscription<Due>;
   /** Ticks once every service is built, so what the first tick finds due reaches the orchestrator (once ready). */
-  readonly start: () => Promise<void>;
+  readonly boot: () => Promise<void>;
   readonly close: () => Promise<void>;
 }
 
@@ -248,7 +248,7 @@ export async function makeCron(deps: CronDeps): Promise<Cron> {
     },
     tick,
     due: () => dueHub.subscribe(),
-    start: async () => {
+    boot: async () => {
       const every = Math.max(config.cron.tickMs, 1);
       tasks.run("tick", async (signal) => {
         while (true) {
