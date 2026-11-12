@@ -25,9 +25,7 @@ import {
   type Envelope,
   type ChannelHearers,
   type Handed,
-  channelType,
-  targetOf,
-  summaryChannels,
+  unreadSummaryOf,
   type UnreadRow,
   orchestratorIn,
 } from "./envelope.ts";
@@ -116,7 +114,6 @@ export interface Mailbox {
   readonly readTrigger: (id: string) => Promise<TriggerResource | undefined>;
   readonly knownGitHubEvents: (repo: string, pr: number) => Promise<readonly KnownGitHubEvent[]>;
   readonly replayCronTriggers: (consume: (trigger: Trigger, data: unknown) => Promise<void>) => Promise<void>;
-  readonly unreadSummary: (participant: string, channel: string) => Promise<UnreadRow[]>;
   readonly triggersOf: (issue: string) => Promise<readonly Trigger[]>;
   /** Dispatches first, then routed order. */
   readonly queuedTriggers: () => Promise<readonly QueuedInput[]>;
@@ -165,13 +162,7 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
     const rows = top === undefined || top.type === "direct" ? [] : await membersOf(db.sql, { channel_id: top.id });
     return orchestratorIn({ top, members: rows.map((m) => m.participant_id), isOrchestrator: agents.isOrchestrator });
   };
-  const unreadSummary = async (participant: string, channel: string): Promise<UnreadRow[]> =>
-    (await unreadOf(db.sql, { participant, channel })).slice(0, summaryChannels).map((row) => ({
-      target: targetOf({ type: channelType(row.type), ...(row.root_number !== null ? { rootNumber: row.root_number } : {}) }, row.channel_name || ""),
-      unread: row.unread ?? 0,
-      mentionsYou: row.mentions_you === true,
-      ...(row.latest_sender_name ? { latest: row.latest_sender_name } : {}),
-    }));
+  const unreadSummary = async (participant: string, channel: string): Promise<UnreadRow[]> => unreadSummaryOf(await unreadOf(db.sql, { participant, channel }));
   const deliveryUnread = async (who: string) => {
     const h = sessions.sessionOf(who);
     const channel = h?.channel ?? (await defaultChannelOf());
@@ -510,7 +501,6 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
     ...journal,
     record,
     accept,
-    unreadSummary,
     isRouted: work.isRouted,
     triggersOf: work.issueInputs,
     queuedTriggers: work.queuedInputs,

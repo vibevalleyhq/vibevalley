@@ -23,7 +23,7 @@ test("regression: the mandate grants its worker access to the original trigger w
     }),
   });
   await using fw = await f.open();
-  const mailbox = fw.session;
+  const mailbox = fw.inside;
   const issues = fw.issue;
   const tools = fw.tool;
   await fw.agent.save(lab());
@@ -50,7 +50,7 @@ test("regression: chat triggers keep their original payload through edits and re
   const f = farm();
   await using fw = await f.open();
   const chat = fw.channel;
-  const mailbox = fw.session;
+  const mailbox = fw.inside;
   const tools = fw.tool;
   const sql = sqlOf(fw.db);
   const before = await chat.post({ _tag: "User", text: "previous message", sendKey: "before" });
@@ -58,7 +58,7 @@ test("regression: chat triggers keep their original payload through edits and re
   await chat.post({ _tag: "User", text: "next message", sendKey: "after" });
   await chat.edit(current.message.id, "edited voice input");
   await sql`update session_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${current.message.id}`;
-  await fw.session.replay();
+  await fw.inside.replay();
   const registered2 = await mailbox.isRouted(current.message.id);
   expect(registered2).toBe(false);
   await chat.boot();
@@ -89,8 +89,8 @@ test("regression: a persisted machine trigger reaches a worker without a chat me
   await using fw = await f.open();
   const issue2 = fw.issue;
   const issues = testIssues(issue2);
-  const sessions = fw.session;
-  const mailbox = fw.session;
+  const sessions = fw.inside;
+  const mailbox = fw.inside;
   const chat = fw.channel;
   await fw.agent.save(lab());
   const issue = await issues.add({ title: "work", repo: "machine-trigger", agent: "lab" });
@@ -171,8 +171,8 @@ test("regression: issue input waits without a session and a user followup releas
   await using fw = await f.open();
   const issue2 = fw.issue;
   const issues = testIssues(issue2);
-  const sessions = fw.session;
-  const mailbox = fw.session;
+  const sessions = fw.inside;
+  const mailbox = fw.inside;
   const tools = fw.tool;
   const sql = sqlOf(fw.db);
   await fw.agent.save(lab());

@@ -63,8 +63,8 @@ for (const submittedReport of [false, true]) {
     await using fw = await f.open();
     try {
       const issues = fw.issue;
-      const sessions = fw.session;
-      const mailbox = fw.session;
+      const sessions = fw.inside;
+      const mailbox = fw.inside;
       const sql = sqlOf(fw.db);
       await fw.agent.save(lab());
       git(config.workRoot, "init", "--bare", bare);

@@ -61,7 +61,7 @@ describe("memory", () => {
     await using fw = await f.open();
     const w = watch(fw);
     const issues = fw.issue;
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const memories = fw.memory;
     const core = fw.core;
     const lastText = (id: string, summary: string) => sessions.lastTextOf(id) || summary;
@@ -163,7 +163,7 @@ describe("memory", () => {
       await using fw = await before.open();
       const w = watch(fw);
       const issues = fw.issue;
-      const sessions = fw.session;
+      const sessions = fw.inside;
       // Waking after the restart reads the agent from the store, as in real use.
       await fw.agent.save(scribe());
       const hired = await issues.hire(scribe(), "写上班打卡，记一笔", "memo");
@@ -196,7 +196,7 @@ describe("memory", () => {
     {
       await using fw = await after.open();
       const w = watch(fw);
-      const sessions = fw.session;
+      const sessions = fw.inside;
       await kept(fw, "scribe", 3);
       expect((await sessions.deliver(session, "顺手把下班打卡的测试也补上", delivery({ kind: "comment" }))).kind).toBe("run");
       const nextPrompt2 = await nextPrompt(after, again, 0);

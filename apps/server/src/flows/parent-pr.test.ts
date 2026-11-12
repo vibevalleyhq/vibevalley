@@ -59,7 +59,7 @@ for (const ending of ["MERGED", "CLOSED"] as const) {
     const submitted = await issues.setStatus(parent.id, "done", "", "", user);
     expect(latestSessionIdOf(submitted)).toBeUndefined();
     expect(submitted.pullRequest?.state).toBe("open");
-    const place = await repos.workplace("family-pr", parent.number, true, "");
+    const place = await repos.checkout({ _tag: "Open", repo: "family-pr", issue: parent.number, worktree: true, base: "" });
     expect(existsSync(place.cwd)).toBe(true);
     state = ending;
     await issues.refreshPullRequests();

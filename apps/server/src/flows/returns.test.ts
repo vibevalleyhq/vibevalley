@@ -25,7 +25,7 @@ test("regression: a consumed trigger can be handed back once without losing its 
   await using fw = await f.open();
   const issue2 = fw.issue;
   const issues = testIssues(issue2);
-  const mailbox = fw.session;
+  const mailbox = fw.inside;
   const sql = sqlOf(fw.db);
   await fw.agent.save(lab());
   const issue = await issues.add({ title: "work", repo: "handback-trigger", agent: "lab" });
@@ -62,7 +62,7 @@ test("regression: closing an unassigned issue returns its held user input withou
   await using fw = await f.open();
   const service = fw.issue;
   const issues = testIssues(service);
-  const mailbox = fw.session;
+  const mailbox = fw.inside;
   const chat = fw.channel;
   const sql = sqlOf(fw.db);
   const issue = await issues.add({ title: "waiting", repo: "unassigned-return" });

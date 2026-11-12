@@ -36,8 +36,8 @@ describe("an agent's channel context", () => {
       },
     });
     await using farm = await world({ config, runtimes: [runtime] });
-    const sessions = farm.session;
-    const machines = farm.session;
+    const sessions = farm.inside;
+    const machines = farm.inside;
     const executor = machines.executions(machines.here());
     const core = farm.core;
     const repos = farm.repo;
@@ -91,8 +91,8 @@ describe("an agent's channel context", () => {
   test("regression: freeing an idle channel execution keeps its session identity", async () => {
     const runtime = scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("结论：回答了") });
     await using farm = await world({ runtimes: [runtime] });
-    const sessions = farm.session;
-    const machines = farm.session;
+    const sessions = farm.inside;
+    const machines = farm.inside;
     const executor = machines.executions(machines.here());
     const core = farm.core;
     const chat = farm.channel;
@@ -120,7 +120,7 @@ describe("an agent's channel context", () => {
   test("regression: a failed channel opening removes only its empty context directory", async () => {
     const config = testConfig();
     await using farm = await world({ config });
-    const sessions = farm.session;
+    const sessions = farm.inside;
     const channel = farm.channel.defaultChannel();
     const agent = { ...profile(), runtime: "not-installed" };
     const hired = await failure(sessions.hire(agent, "discuss", "", { context: { kind: "channel", channel } }));
@@ -153,7 +153,7 @@ describe("an agent's channel context", () => {
         }),
     };
     await using farm = await world({ config, runtimes: [runtime] });
-    const sessions = farm.session;
+    const sessions = farm.inside;
     const channel = farm.channel.defaultChannel();
     const agent = profile();
     await farm.agent.save(agent);
@@ -194,8 +194,8 @@ describe("an agent's channel context", () => {
     let cwd = "";
     {
       await using farm = await world({ config, runtimes: [runtime] });
-      const sessions = farm.session;
-      const machines = farm.session;
+      const sessions = farm.inside;
+      const machines = farm.inside;
       const executor = machines.executions(machines.here());
       const core = farm.core;
       const agent = profile();
@@ -211,7 +211,7 @@ describe("an agent's channel context", () => {
     }
     {
       await using farm = await world({ config, runtimes: [runtime] });
-      const sessions = farm.session;
+      const sessions = farm.inside;
       const core = farm.core;
       await sessions.restore();
       expect(sessions.sessionOf(id)?.channel).toBe(channel);
@@ -246,7 +246,7 @@ describe("an agent's channel context", () => {
     });
     {
       await using farm = await world({ config, runtimes: [runtime] });
-      const sessions = farm.session;
+      const sessions = farm.inside;
       const channel = farm.channel.defaultChannel();
       const refused = await failure(
         sessions.hire(profile(), "first", "", {
@@ -262,7 +262,7 @@ describe("an agent's channel context", () => {
     }
     {
       await using farm = await world({ config, runtimes: [runtime] });
-      const sessions = farm.session;
+      const sessions = farm.inside;
       const core = farm.core;
       await sessions.restore();
       const channel = farm.channel.defaultChannel();

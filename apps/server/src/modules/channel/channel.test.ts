@@ -31,8 +31,7 @@ import { restoredSession, sessionState } from "#/modules/session/history.ts";
 import type { Lifecycle } from "#/modules/session/lifecycle.ts";
 import { type Mailbox, makeMailbox } from "#/modules/session/mailbox.ts";
 import { summaryOf } from "#/modules/session/report.ts";
-import { sessionOnIssue } from "#/modules/session/roster.ts";
-import { DeliveryRefused, newsOf, type Session, type SessionNews } from "#/modules/session/session.ts";
+import { DeliveryRefused, newsOf, sessionOver, type SessionNews } from "#/modules/session/session.ts";
 import type { Consumed, LaunchActivity } from "#/modules/session/signals.ts";
 import { testConfig, until, waitFor } from "#/testing/layers.ts";
 import { topPlace } from "#db/channel.sql.ts";
@@ -174,21 +173,30 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
     isReachable: (id: string) => x.core.session(id) !== undefined,
     sessionOf: (id: string) => x.core.session(id),
     hired: () => x.core.state().sessions.filter((s) => s.role === "worker"),
-    deliver: async (id: string, text: string, input: Parameters<Session["deliver"]>[2]) => {
+    deliver: async (id: string, text: string, input: Parameters<Lifecycle["deliver"]>[2]) => {
       const out = x.deliver(id, text, () => x.consumed({ session: id, envelopeIds: [...input.envelopeIds] }));
       if (out instanceof DeliveryRefused) throw out;
       return out;
     },
     runOf: () => undefined,
-    reportOf: (id: string) => summaryOf(x.last.get(id) ?? ""),
-    onIssue: (issue: string) => sessionOnIssue(x.core.state(), issue)?.id,
+    lastTextOf: (id: string) => x.last.get(id) ?? "",
+    cwdOf: () => undefined,
     news: () => x.news.subscribe(),
   };
   // A test double of the few members the chat and the mailbox use.
   const lifecycle = played as unknown as Lifecycle;
   const agent = await makeAgent({ config: c, clock, log });
   const mailbox = await makeMailbox({ db, clock, log, config: c, core, agent, session: lifecycle });
-  const session = { ...played, ...mailbox, news: played.news, deliveries: mailbox.news } as unknown as Session;
+  const session = sessionOver({
+    lifecycle,
+    mailbox,
+    repo: {
+      checkout: async () => {
+        throw new Error("the chat's tests have no repos");
+      },
+    },
+    close: () => mailbox.close(),
+  });
   const attachment = await makeAttachment({ config: c, clock, db });
   const chat = await makeChannel({ clock, log, fetch: offline, db, core, agent, attachment, session });
   const { changes: moves } = core.transitions();

@@ -195,7 +195,7 @@ const feishuMsg = (from: string, text: string, chatType = "p2p"): FeishuMessage 
 
 /** The orchestrator consumer as the chat apps meet it here: each durable Mailbox input is answered at once. */
 const echoing = (w: World) => {
-  const news = w.session.deliveries();
+  const news = w.inside.deliveries();
   const reading = (async () => {
     for await (const n of news)
       if (n._tag === "Handed")

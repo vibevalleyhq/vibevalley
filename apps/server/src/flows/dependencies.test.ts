@@ -25,10 +25,10 @@ test("regression: native child issues wait for prerequisites and start from thei
   try {
     const service = fw.issue;
     const issues = testIssues(service);
-    const sessions = fw.session;
+    const sessions = fw.inside;
     await fw.agent.save(lab());
     const parent = await issues.add({ title: "父工单", agent: "lab", repo: "native" });
-    const parentPlace = await fw.repo.workplace("native", parent.number, true, "");
+    const parentPlace = await fw.repo.checkout({ _tag: "Open", repo: "native", issue: parent.number, worktree: true, base: "" });
     gitSync(parentPlace.cwd, "commit", "--allow-empty", "-m", "Prepare parent work");
     const parentHead = gitSync(parentPlace.cwd, "rev-parse", "HEAD");
     const prerequisite = await issues.add({ title: "前置工单", agent: "lab", repo: "native" });
@@ -83,7 +83,7 @@ test("regression: child changes merge into the parent worktree and reach main on
   );
   expect(completed.delivered).toBe("merged_into_parent");
   expect((await issues.get(parent.id)).status).toBe("in_review");
-  const place = await repos.workplace("merge-family", parent.number, true, "");
+  const place = await repos.checkout({ _tag: "Open", repo: "merge-family", issue: parent.number, worktree: true, base: "" });
   expect(readFileSync(join(place.cwd, "child.txt"), "utf8")).toBe("child result");
   expect(gitSync(place.cwd, "status", "--porcelain")).toBe("");
   const main = join(f.config.workRoot, "repos", "merge-family");
@@ -110,7 +110,7 @@ test("regression: automatic child merge preserves uncommitted parent work", asyn
   const issues = testIssues(issue);
   await fw.agent.save(lab());
   const parent = await issues.add({ title: "父工单", agent: "lab", repo: "dirty-parent" });
-  const place = await fw.repo.workplace("dirty-parent", parent.number, true, "");
+  const place = await fw.repo.checkout({ _tag: "Open", repo: "dirty-parent", issue: parent.number, worktree: true, base: "" });
   writeFileSync(join(place.cwd, "user.txt"), "unfinished user work");
   const before = gitSync(place.cwd, "rev-parse", "HEAD");
   const child = await issues.add({ title: "子工单", parent: parent.id });

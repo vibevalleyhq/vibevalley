@@ -123,6 +123,25 @@ export interface UnreadRow {
 
 export const summaryChannels = 20;
 
+/** The channels a participant has unread words in, as a wake-up and an inbox list them: the first summaryChannels of
+ * the unread rows (channel.sql's unreadOf), in their order. */
+export const unreadSummaryOf = (
+  rows: readonly {
+    readonly type: string;
+    readonly root_number: number | null;
+    readonly channel_name: string;
+    readonly unread: number;
+    readonly mentions_you: boolean;
+    readonly latest_sender_name: string | null;
+  }[],
+): UnreadRow[] =>
+  rows.slice(0, summaryChannels).map((row) => ({
+    target: targetOf({ type: channelType(row.type), ...(row.root_number !== null ? { rootNumber: row.root_number } : {}) }, row.channel_name || ""),
+    unread: row.unread,
+    mentionsYou: row.mentions_you,
+    ...(row.latest_sender_name ? { latest: row.latest_sender_name } : {}),
+  }));
+
 /** Identical text from the same sender and channel within this window is treated as a retry. */
 export const retryWindowMs = 60_000;
 

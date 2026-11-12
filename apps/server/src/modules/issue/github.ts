@@ -73,17 +73,20 @@ export function makeGitHubPoller(onBoard: () => readonly T.Issue[], deps: GitHub
       });
       const finished = checks.length > 0 && checks.every((check) => check.conclusion !== "" || finishedChecks.has(check.status.toUpperCase()));
       if (failed.length > 0 || finished)
-        await sessions.accept({
-          ...base,
-          key: `${repo}#${pr.number}:ci:${revision}`,
-          actor: { kind: "system", id: `github:${repo}#${pr.number}` },
-          text: (failed.length > 0 ? failedText : checks.map((check) => `${check.name}: ${check.conclusion || check.status}`)).join("\n"),
-          data: { head: current.head, checks },
-          meta: { ...scope, kind: "ci", head: current.head, fingerprint, failed: failed.length > 0 },
+        await sessions.receive({
+          _tag: "Event",
+          event: {
+            ...base,
+            key: `${repo}#${pr.number}:ci:${revision}`,
+            actor: { kind: "system", id: `github:${repo}#${pr.number}` },
+            text: (failed.length > 0 ? failedText : checks.map((check) => `${check.name}: ${check.conclusion || check.status}`)).join("\n"),
+            data: { head: current.head, checks },
+            meta: { ...scope, kind: "ci", head: current.head, fingerprint, failed: failed.length > 0 },
+          },
         });
       await q.observeGitHubChecks(db.sql, { repo, pr_number: pr.number, check_fingerprint: fingerprint, check_revision: revision });
     }
-    const known = await sessions.knownGitHubEvents(repo, pr.number);
+    const known = await sessions.read({ _tag: "GitHub", repo, pr: pr.number });
     const keys = new Set(known.filter((event) => event.routed).map((event) => event.key));
     const rounds = new Map(
       known.flatMap((event) => (event.botRoundKey !== undefined && event.botRound !== undefined ? [[event.botRoundKey, event.botRound] as const] : [])),
@@ -122,15 +125,18 @@ export function makeGitHubPoller(onBoard: () => readonly T.Issue[], deps: GitHub
     for (const event of events) {
       if (keys.has(event.key) || event.author.toLowerCase() === current.viewer.toLowerCase()) continue;
       const round = event.bot ? (rounds.get(event.round) ?? botRound + 1) : undefined;
-      const accepted = await sessions.accept({
-        ...base,
-        key: event.key,
-        actor: { kind: "system", id: event.author || "deleted", name: event.author },
-        text: event.text,
-        data: event.data,
-        meta: { ...scope, kind: event.kind, ...(round === undefined ? {} : { botRound: round, botRoundKey: event.round }) },
+      const accepted = await sessions.receive({
+        _tag: "Event",
+        event: {
+          ...base,
+          key: event.key,
+          actor: { kind: "system", id: event.author || "deleted", name: event.author },
+          text: event.text,
+          data: event.data,
+          meta: { ...scope, kind: event.kind, ...(round === undefined ? {} : { botRound: round, botRoundKey: event.round }) },
+        },
       });
-      if (accepted) {
+      if (accepted.trigger) {
         keys.add(event.key);
         if (round !== undefined) {
           rounds.set(event.round, round);

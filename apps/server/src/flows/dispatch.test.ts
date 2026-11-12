@@ -24,7 +24,7 @@ test("regression: an orchestrator assignment survives startup and an acknowledge
     issueId = item.id;
   }
   const issues = fw.issue;
-  const mailbox = fw.session;
+  const mailbox = fw.inside;
   const sql = sqlOf(fw.db);
   const source = (await mailbox.readTrigger(triggerId))!;
   expect(source.payload.text).toBe("durable assignment");
@@ -36,7 +36,7 @@ test("regression: an orchestrator assignment survives startup and an acknowledge
   await sql`delete from session_issue_input where trigger_id = ${triggerId}`;
   await sql`update session_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${triggerId}`;
   await mailbox.wake();
-  await fw.session.replay();
+  await fw.inside.replay();
   const deliveries = await sql`select session_id, envelope_id from session_delivery where envelope_id = ${triggerId}`;
   expect(deliveries).toHaveLength(1);
   // A second replay of the same unrouted row acknowledges no second delivery.
@@ -51,7 +51,7 @@ test("regression: an orchestrator assignment survives startup and an acknowledge
   const config = fw.config;
   const channel = source.trigger.replyChannel ?? fw.channel.defaultChannel();
   const by = S.RunTrigger.parse(JSON.parse(JSON.stringify(source.trigger.meta.trigger)));
-  await using host = await fw.session.host({
+  await using host = await fw.inside.host({
     session: { id: defaultOrchestrator, role: "orchestrator", agent: defaultOrchestrator, name: "orchestrator", runtime: "vibevalley", brief: "" },
     inputType: "dispatchTest",
     home: config.home,

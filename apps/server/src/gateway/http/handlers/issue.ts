@@ -37,7 +37,7 @@ export function issueHandlers(deps: IssueHandlersDeps): IssueHandlers {
     "issue.split": async ({ id: ref, ...body }) => issues.split(await issues.idOf(ref), body.title ?? "", body.tasks, user),
     "issue.history.list": () => issues.history(),
     "issue.get": ({ id }) => issues.get(id),
-    "issue.run.list": async ({ id }) => sessions.issueRuns((await issues.get(id)).id),
+    "issue.run.list": async ({ id }) => sessions.read({ _tag: "Runs", issue: (await issues.get(id)).id }),
     "issue.timeline.get": ({ id }) => issues.timeline(id),
     "issue.create": ({ requestKey, autoSubmitPr, ...body }) =>
       createOnce(requestKey, () =>

@@ -229,6 +229,16 @@ describe("the modules", () => {
     ).toEqual([]);
   });
 
+  it("reach a session module's inside only from tests", () => {
+    const found = sources()
+      .filter(({ from, file }) => from !== "modules/session/session.ts" && /\binsideOf\b/u.test(readFileSync(file, "utf8")))
+      .map(({ from }) => from);
+    expect(
+      found,
+      "a module reaches past Session into its parts (insideOf), so the narrow interface does not hold. Fix: use a member of Session, or add the one the module needs. See docs/subsystems/session.md",
+    ).toEqual([]);
+  });
+
   it("regression: a mailbox helper or re-export cannot bypass its service", () => {
     const channel = join(src, "modules/channel/writing.ts");
     expect(mailboxLeaks(inspect(channel, 'import { Mailbox } from "#/modules/session/mailbox.ts";'))).toEqual([]);

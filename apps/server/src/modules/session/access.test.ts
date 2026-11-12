@@ -34,7 +34,7 @@ test("regression: worker environments merge proxy bypasses without changing thei
   };
   return withoutProxyEnvironment(async () => {
     await using farm = await world({ runtimes: [runtime], repos: ["demo"] });
-    const sessions = farm.session;
+    const sessions = farm.inside;
     const sent = await sessions.hire({ ...starter("lab"), effort: "", env }, "work", "demo", {
       context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } },
     });
@@ -80,9 +80,9 @@ test("regression: early tool connection failures reach the journal and core with
   };
   return withoutProxyEnvironment(async () => {
     await using farm = await world({ runtimes: [runtime], repos: ["demo"] });
-    const sessions = farm.session;
+    const sessions = farm.inside;
     const core = farm.core;
-    const machines = farm.session;
+    const machines = farm.inside;
     const sent = await sessions.hire({ ...starter("lab"), runtime: "codex", effort: "" }, "work", "demo", {
       hiring: async () => {
         observing = true;

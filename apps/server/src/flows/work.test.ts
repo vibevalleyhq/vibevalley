@@ -7,7 +7,7 @@ import type * as T from "@vibevalley/protocol";
 import { needOf } from "@vibevalley/protocol/rules";
 
 import { orchestrator, user } from "#/base/actor.ts";
-import { type Session } from "#/modules/session/session.ts";
+import { type Inside } from "#/modules/session/session.ts";
 import type { DeliveryInput } from "#/modules/session/signals.ts";
 import { testConfig } from "#/testing/layers.ts";
 import { sqlOf } from "#/testing/sql.ts";
@@ -15,7 +15,7 @@ import { releaseHeld } from "#/testing/worker.ts";
 
 import { await_, farm, type FlowWorld, git, lab, mustHire, until, watch, failure } from "./farm.ts";
 
-const lastText = (sessions: Session, id: string, summary: string) => sessions.lastTextOf(id) || summary;
+const lastText = (sessions: Inside, id: string, summary: string) => sessions.lastTextOf(id) || summary;
 const delivery = (trigger: T.RunTrigger, envelopeIds: readonly string[] = []): DeliveryInput => ({ trigger, envelopeIds, byUserComment: false });
 
 describe("a session's work", () => {
@@ -24,7 +24,7 @@ describe("a session's work", () => {
     await using fw = await f.open();
     const w = watch(fw);
     const issues = fw.issue;
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const hired = await issues.hire(lab(), "写 hello.py", "demo");
     const session = mustHire(hired);
     const report = await w.nextReport();
@@ -112,7 +112,7 @@ describe("a session's work", () => {
     {
       await using fw = await after.open();
       const w = watch(fw);
-      const sessions = fw.session;
+      const sessions = fw.inside;
       const back = sessions.sessionOf(session.id)!;
       expect(back).toBeDefined();
       expect(back.phase._tag).toBe("done");
@@ -142,7 +142,7 @@ describe("a session's work", () => {
     const after = farm({ config: { ...base, db: join(base.home, "db-again") } });
     {
       await using fw = await after.open();
-      const sessions = fw.session;
+      const sessions = fw.inside;
       const core = fw.core;
       expect(sessions.sessionOf(session.id)).toBeUndefined();
       expect(core.state().sessions.some((s) => s.id === session.id)).toBe(false);
@@ -177,7 +177,7 @@ describe("a session's work", () => {
     await using fw = await f.open();
     const w = watch(fw);
     const issues = fw.issue;
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const hired = await issues.hire(lab(), "看看目录", "steps");
     const session = mustHire(hired);
     await w.nextReport();
@@ -203,7 +203,7 @@ describe("a session's work", () => {
     await using fw = await f.open();
     const w = watch(fw);
     const issues = fw.issue;
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const hired = await issues.hire(lab(), "这一单必败", "fails");
     const session = mustHire(hired);
     const report = await w.nextReport();
@@ -219,7 +219,7 @@ describe("a session's work", () => {
     await using fw = await f.open();
     const w = watch(fw);
     const issues = fw.issue;
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const hired = await issues.hire(lab(), "先发呆一会儿", "quiet");
     const session = mustHire(hired);
     await until(() => {
@@ -239,7 +239,7 @@ describe("a session's work", () => {
     await using fw = await f.open();
     const w = watch(fw);
     const issues = fw.issue;
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const hired = await issues.hire(lab(), "写打卡并提交", "preview");
     const session = mustHire(hired);
     await w.nextReport();
@@ -300,9 +300,9 @@ describe("a session's work", () => {
       await w.nextReport();
       await issues.setStatus(first.issue!, "done", "", "", user);
       await issues.changes(second.issue!, user);
-      await fw.session.dismiss(second.id);
+      await fw.inside.dismiss(second.id);
       expect((await issues.get(second.issue!)).conflict).toEqual({ base: "main", files: ["same.ts"] });
-      expect(Object.hasOwn((await fw.session.get(second.id))!, "conflict")).toBe(false);
+      expect(Object.hasOwn((await fw.inside.get(second.id))!, "conflict")).toBe(false);
       return second.issue!;
     })();
     {
@@ -317,7 +317,7 @@ describe("a session's work", () => {
     await using fw = await f.open();
     const w = watch(fw);
     const issues = fw.issue;
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const agents = fw.agent;
     const busy: T.Session[] = [];
     for (const i of ["1", "2", "3"]) {
@@ -342,7 +342,7 @@ describe("a session's work", () => {
     await using fw = await f.open();
     const w = watch(fw);
     const issues = fw.issue;
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const core = fw.core;
     const both = await Promise.all([issues.hire(lab(), "随便做点什么", "twins"), issues.hire(lab(), "随便做点什么", "twins")]);
     for (const h of both) mustHire(h);
@@ -358,7 +358,7 @@ describe("a session's work", () => {
     await using fw = await f.open();
     const w = watch(fw);
     const issues = fw.issue;
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const kinds: string[] = [];
     let id = "";
     using news = sessions.news();
@@ -392,7 +392,7 @@ describe("a session's work", () => {
       await using fw = await before.open();
       {
         const w = watch(fw);
-        const sessions = fw.session;
+        const sessions = fw.inside;
         await fw.agent.save(lab());
         const hired = await fw.issue.hire(lab(), "写打卡并提交", "runs");
         session = mustHire(hired);
@@ -425,7 +425,7 @@ describe("a session's work", () => {
     const after = farm({ config });
     {
       await using fw = await after.open();
-      const sessions = fw.session;
+      const sessions = fw.inside;
       expect((await sessions.issueRuns(session.issue!))[2]!.outcome).toBe("interrupted");
     }
   });
@@ -464,7 +464,7 @@ describe("a session's work", () => {
     await using fw = await f.open();
     const w = watch(fw);
     const issues = fw.issue;
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const hired = await issues.hire(lab(), "看看目录", "rows");
     const s = mustHire(hired);
     await w.nextReport();

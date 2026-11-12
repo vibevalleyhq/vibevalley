@@ -95,7 +95,7 @@ export function sessionThreads(deps: SessionThreadsDeps, r: ChannelHub, w: Chann
     if (!w || w.refining || outcome === "interrupted") return;
     const thread = await threadOfSession(id);
     if (!thread) return;
-    const said = outcome === "completed" ? sessions.reportOf(id) : "";
+    const said = outcome === "completed" ? sessions.live(id).summary : "";
     const meta: Meta = { outcome, ...(spent ? { spent } : {}), ...(run ? { run } : {}) };
     await write({ channel: thread, from: id, kind: "report", text: head(said || summary, reportMax), meta });
   };

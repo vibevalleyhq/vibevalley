@@ -117,7 +117,7 @@ test("regression: splitting creates real queued issues whose dependencies merge 
   expect(waiting).toHaveLength(1);
   expect(waiting[0]?.target).toEqual({ kind: "issue", id: parent.id });
   expect((await service.changes(parent.id, user)).commits.length).toBeGreaterThan(0);
-  const place = await fw.repo.workplace("split", parent.number, true, "");
+  const place = await fw.repo.checkout({ _tag: "Open", repo: "split", issue: parent.number, worktree: true, base: "" });
   expect(readFileSync(join(place.cwd, "second.txt"), "utf8")).toBe("done");
   await service.setStatus(parent.id, "done", "", "", user);
   const core = fw.core;
@@ -152,7 +152,7 @@ test("regression: a failed split commits no child, assignment, queue entry or pa
   expect(result.bizCode).toBe(BizCode.IssueRefused);
   expect((await issues.list()).map((item) => [item.id, item.title])).toEqual([[parent.id, "parent"]]);
   expect(fw.core.state().issues.map((item) => item.id)).toEqual([parent.id]);
-  expect(fw.session.hired()).toEqual([]);
+  expect(fw.inside.hired()).toEqual([]);
   const unsafe2 = await sql.unsafe("select * from session_trigger where trigger_json::jsonb -> 'meta' -> 'dispatch' = 'true'::jsonb");
   expect(unsafe2).toHaveLength(0);
   const unsafe3 = await sql.unsafe("select * from session_issue_input");

@@ -248,12 +248,12 @@ describe("issues", () => {
       },
     };
     const issues = testIssues(w.issue);
-    const sessions = w.session;
+    const sessions = w.inside;
     const agent = { ...lab(), worktree: true };
     const first = await flip(issues.hire(agent, "first work", "demo"), HireRefused);
     expect(first.reason).toContain("prompt transport dropped");
     expect(first.reason).toContain("did not stop");
-    expect(sessions.noRoom("pi", "demo")).not.toBe("");
+    expect(sessions.room("pi", "demo")).not.toBe("");
     const issue = (await issues.list())[0]!;
     const second = await flip(issues.hire(agent, "do not overlap", "demo", { issue: issue.id }), HireRefused);
     expect(second).toBeInstanceOf(HireRefused);
@@ -302,7 +302,7 @@ describe("issues", () => {
       },
     };
     const issues = testIssues(w.issue);
-    const sessions = w.session;
+    const sessions = w.inside;
     await refuse(w.db, "reject_link", "before insert on issue_assignment_execution", "", "link refused");
     const agent = { ...lab(), worktree: true };
     expect((await flip(issues.hire(agent, "first work", "demo"), HireRefused)).reason).toContain("did not stop");
@@ -313,7 +313,7 @@ describe("issues", () => {
     await allow(w.db, "reject_link");
     const again = await flip(issues.hire(agent, "do not overlap", "demo", { issue: issue.id }), HireRefused);
     expect(again.reason).toBeTruthy();
-    expect(sessions.noRoom("pi", "demo")).not.toBe("");
+    expect(sessions.room("pi", "demo")).not.toBe("");
     expect(turns).toBe(1);
   });
 
@@ -406,21 +406,21 @@ describe("issues", () => {
     await using w = f.world;
     await using _cleanup = { [Symbol.asyncDispose]: () => cleanup() };
     const issues = testIssues(w.issue);
-    const sessions = w.session;
+    const sessions = w.inside;
     await w.agent.save(lab());
     const issue = await issues.add({ title: "draft", repo: "demo", agent: "lab" });
     await issues.refine(issue.id, "keep reading", "");
     await until(() => started, "the writer");
     expect((await issues.get(issue.id)).assignments.map((a) => [a.agent, a.executions])).toEqual([["lab", []]]);
     const id = (await issues.get(issue.id)).refining!.session;
-    const cwd = sessions.cwdOf(id)!;
+    const cwd = sessions.live(id).cwd!;
     for (let n = 0; n < 2; n++) {
       const result = await issues.setStatus(issue.id, "canceled", "", "", user).then(
         () => expect.unreachable("the cancel went through"),
         (e: unknown) => e,
       );
       expect(messageOf(result)).toContain("did not stop");
-      expect(sessions.sessionOf(id)).toBeDefined();
+      expect(sessions.live(id).session).toBeDefined();
       expect(existsSync(join(cwd, "still-owned.txt"))).toBe(true);
       expect(stopped).toBe(false);
     }
@@ -472,11 +472,11 @@ describe("issues", () => {
     const f = await farm([worker]);
     await using w = f.world;
     const issues = testIssues(w.issue);
-    const sessions = w.session;
+    const sessions = w.inside;
     await w.agent.save(lab());
     const hired = await issues.hire({ ...lab(), worktree: true }, "keep my work", "demo");
     const first = hired.session;
-    await until(() => sessions.sessionOf(first.id)?.phase._tag === "done", "the dispatch's report");
+    await until(() => sessions.live(first.id).session?.phase._tag === "done", "the dispatch's report");
     const issue = await issues.get(first.issue!);
     expect([first.branch, firstBranch]).toEqual([`vibevalley/issue-${issue.number}`, `vibevalley/issue-${issue.number}`]);
     const commit = git(first.worktree!, "rev-parse", "HEAD").trim();
@@ -489,7 +489,7 @@ describe("issues", () => {
     const setStatus2 = await issues.setStatus(issue.id, "todo", "keep going", "", user);
     const again = latestSessionIdOf(setStatus2);
     if (again === undefined) throw new Error("the issue has no reopened session");
-    const reopened = sessions.sessionOf(again)!;
+    const reopened = sessions.live(again).session!;
     expect([reopened.branch, reopened.worktree]).toEqual([first.branch, first.worktree]);
     expect(git(reopened.worktree!, "rev-parse", "HEAD").trim()).toBe(commit);
     expect(reopened.brief).toContain("这条分支上已经有上次的提交");
@@ -498,7 +498,7 @@ describe("issues", () => {
   it("a session that cannot be opened gives its worktree back", async () => {
     const f = await farm();
     await using w = f.world;
-    const sessions = w.session;
+    const sessions = w.inside;
     const got = await flip(
       sessions.hire({ ...lab(), runtime: "missing-runtime", worktree: true }, "test", "demo", {
         context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } },
@@ -520,7 +520,7 @@ describe("issues", () => {
     ]);
     await using w = f.world;
     const issues = testIssues(w.issue);
-    const sessions = w.session;
+    const sessions = w.inside;
     const core = w.core;
     const agent = { ...lab(), worktree: true };
     const refused = await flip(issues.hire(agent, "new work", "demo"), HireRefused);
@@ -528,7 +528,7 @@ describe("issues", () => {
     const issues2 = await issues.list();
     expect(issues2).toEqual([]);
     expect(core.state().issues).toEqual([]);
-    expect(sessions.hired()).toEqual([]);
+    expect(sessions.live()).toEqual([]);
     noWorktree(f.config.workRoot);
 
     const existing = await issues.add({ title: "already queued", repo: "demo", agent: agent.id });
@@ -547,19 +547,19 @@ describe("issues", () => {
     await using w = f.world;
     const issues = testIssues(w.issue);
     const core = w.core;
-    const sessions = w.session;
+    const sessions = w.inside;
     await w.db.sql.query(`select 1`);
     await refuse(w.db, "reject_issue", "before insert on issue", "", "test write failure");
     const got = await flip(issues.hire({ ...lab(), worktree: true }, "test", "demo"), HireRefused);
     expect(got.reason).toContain("test write failure");
-    expect([core.state().sessions.filter((s) => s.role === "worker").length, sessions.hired().length]).toEqual([0, 0]);
+    expect([core.state().sessions.filter((s) => s.role === "worker").length, sessions.live().length]).toEqual([0, 0]);
     noWorktree(f.config.workRoot);
   });
 
   it("two sends at once honour the repo's room", async () => {
     const f = await farm();
     await using w = f.world;
-    const sessions = w.session;
+    const sessions = w.inside;
     const core = w.core;
     const got = await Promise.allSettled([
       sessions.hire(lab(), "test", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } } }),
@@ -599,11 +599,11 @@ describe("issues", () => {
     const f = await farm([worker]);
     await using w = f.world;
     const issues = testIssues(w.issue);
-    const sessions = w.session;
+    const sessions = w.inside;
     const chat = w.channel;
     await w.agent.save(lab());
     const hired = await issues.hire({ ...lab(), worktree: true }, "keep my work", "demo");
-    await until(() => sessions.sessionOf(hired.session.id)?.phase._tag === "done", "the report");
+    await until(() => sessions.live(hired.session.id).session?.phase._tag === "done", "the report");
     const repo = join(f.config.workRoot, "repos", "demo");
     renameSync(join(repo, ".git"), join(repo, ".git-hidden"));
     expect((await flip(issues.previewStatus(hired.session.issue!, "done", ""), ApiError)).bizCode).toBe(BizCode.IssueRefused);
@@ -616,17 +616,17 @@ describe("issues", () => {
     const f = await farm();
     await using w = f.world;
     const issues = testIssues(w.issue);
-    const sessions = w.session;
+    const sessions = w.inside;
     const first = await issues.hire(lab(), "first", "demo");
     const id = first.session.issue!;
-    await sessions.dismiss(first.session.id);
+    await sessions.withdraw({ _tag: "Helper", session: first.session.id });
     const second = await issues.hire(lab(), "second", "demo", { issue: id });
     expect(second.session).toBeDefined();
     await issues.changes(id, user);
     await expect(issues.setStatus(id, "done", "", "", user)).rejects.toBeDefined();
-    expect(sessions.sessionOf(second.session.id)).toBeDefined();
+    expect(sessions.live(second.session.id).session).toBeDefined();
     await issues.setStatus(id, "canceled", "", "", user);
-    expect(sessions.sessionOf(second.session.id)).toBeUndefined();
+    expect(sessions.live(second.session.id).session).toBeUndefined();
     await expect(issues.changes(id, user)).rejects.toBeDefined();
   });
 
@@ -636,7 +636,7 @@ describe("issues", () => {
     const issues = testIssues(w.issue);
     const core = w.core;
     const chat = w.channel;
-    const sessions = w.session;
+    const sessions = w.inside;
     await w.agent.save(lab());
     const first = await chat.openChannel("first", "", "demo");
     const second = await chat.openChannel("second", "", "demo");
@@ -661,13 +661,13 @@ describe("issues", () => {
     expect(sessionIdsOf(got)).toHaveLength(1);
     const queuedSession = sessionIdsOf(got)[0];
     if (queuedSession === undefined) throw new Error("the issue has no execution session");
-    expect((await sessions.get(queuedSession))?.channel).toBe(first.id);
+    expect((await sessions.read({ _tag: "Session", id: queuedSession }))?.channel).toBe(first.id);
     await waitFor(
-      () => sessions.issueRuns(issue.id),
+      () => sessions.read({ _tag: "Runs", issue: issue.id }),
       (r) => r.length > 0,
       "the queued run",
     );
-    expect((await sessions.issueRuns(issue.id))[0]!.triggeredBy.kind).toBe("issue");
+    expect((await sessions.read({ _tag: "Runs", issue: issue.id }))[0]!.triggeredBy.kind).toBe("issue");
     const rows = await w.db.sql.query(`select 1 from session_issue_input where issue_id = $1 and state = 'held'`, [issue.id]);
     expect(rows).toEqual([]);
   });
@@ -688,7 +688,7 @@ describe("issues", () => {
 
     const core = w.core;
     const chat = w.channel;
-    const sessions = w.session;
+    const sessions = w.inside;
     await w.agent.save(lab());
     const first = await chat.openChannel("queue-old", "", "demo");
     const second = await chat.openChannel("queue-new", "", "demo");
@@ -707,7 +707,7 @@ describe("issues", () => {
     expect(inputs[0]).not.toContain("old-dispatch-context");
     const issue2 = await issues.get(item.id);
     const session = sessionIdsOf(issue2)[0]!;
-    expect((await sessions.get(session))?.channel).toBe(second.id);
+    expect((await sessions.read({ _tag: "Session", id: session }))?.channel).toBe(second.id);
   });
 
   it("a queued cron keeps its trigger and that it was missed", async () => {
@@ -717,7 +717,7 @@ describe("issues", () => {
     const issues = testIssues(w.issue);
     const core = w.core;
     const chat = w.channel;
-    const sessions = w.session;
+    const sessions = w.inside;
     const crons = w.cron;
     await w.agent.save(lab());
     const channel = await chat.openChannel("scheduled", "", "demo");
@@ -733,13 +733,13 @@ describe("issues", () => {
     core.apply({ type: "sessionLeft", id: sessionId("occupied") });
     await w.issue.refreshQueue();
     await waitFor(
-      () => sessions.issueRuns(issue!.id),
+      () => sessions.read({ _tag: "Runs", issue: issue!.id }),
       (r) => r.length > 0,
       "the scheduled run",
     );
-    const [run] = await sessions.issueRuns(issue!.id);
+    const [run] = await sessions.read({ _tag: "Runs", issue: issue!.id });
     expect(run!.triggeredBy).toEqual({ kind: "cron", cron: sc.id, missed: true, message: issue!.mandate.originTriggerId });
-    expect((await sessions.get(run!.session))?.channel).toBe(channel.id);
+    expect((await sessions.read({ _tag: "Session", id: run!.session }))?.channel).toBe(channel.id);
   });
 
   it("a queued todo starts once there is room, and keeps its place until then", async () => {
@@ -766,7 +766,7 @@ describe("issues", () => {
     const f = await farm([scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做完了") })]);
     await using w = f.world;
     const issues = testIssues(w.issue);
-    const sessions = w.session;
+    const sessions = w.inside;
     const chat = w.channel;
     const agents = w.agent;
     await agents.save(lab());
@@ -793,10 +793,10 @@ describe("issues", () => {
     const handed = await issues.setStatus(issue.id, "todo", "接着写", chat.defaultChannel(), user, { agent: "Lab Two" });
     expect([assignedAgentOf(handed), sessionIdsOf(handed).length, handed.closedAt]).toEqual(["lab2", 2, undefined]);
     if (first === undefined) throw new Error("the issue has no first execution session");
-    expect(sessions.sessionOf(first)).toBeUndefined();
+    expect(sessions.live(first).session).toBeUndefined();
     const next = sessionIdsOf(handed)[1];
     if (next === undefined) throw new Error("the issue has no second execution session");
-    const second = (await sessions.get(next))!;
+    const second = (await sessions.read({ _tag: "Session", id: next }))!;
     expect(second.agent).toBe("lab2");
     expect(second.brief).toMatch(/^接着写\n\n（这张工单换你接手了，之前是 /u);
     await inReview(2);
@@ -833,17 +833,17 @@ describe("issues", () => {
     const f = await farm([scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("done") })]);
     await using w = f.world;
     const issues = testIssues(w.issue);
-    const sessions = w.session;
+    const sessions = w.inside;
     const issue = await issues.add({ title: "history", repo: "demo", agent: "lab" });
     const first = (await issues.hire(lab(), "first", "demo", { issue: issue.id })).session;
-    await until(() => sessions.sessionOf(first.id)?.phase._tag === "done", "the first report");
-    await sessions.dismiss(first.id);
+    await until(() => sessions.live(first.id).session?.phase._tag === "done", "the first report");
+    await sessions.withdraw({ _tag: "Helper", session: first.id });
     const live = (await issues.hire(lab(), "second", "demo", { issue: issue.id })).session;
-    await until(() => sessions.sessionOf(live.id)?.phase._tag === "done", "the live report");
+    await until(() => sessions.live(live.id).session?.phase._tag === "done", "the live report");
     await sessions.suspend(live.id);
     const missing = (await issues.hire(lab(), "third", "demo", { issue: issue.id })).session;
-    await until(() => sessions.sessionOf(missing.id)?.phase._tag === "done", "the third report");
-    await sessions.dismiss(missing.id);
+    await until(() => sessions.live(missing.id).session?.phase._tag === "done", "the third report");
+    await sessions.withdraw({ _tag: "Helper", session: missing.id });
     const [got] = await issues.history();
     expect(got!.sessions.map((s) => [s.id, s.phase._tag])).toEqual([
       [first.id, "closed"],

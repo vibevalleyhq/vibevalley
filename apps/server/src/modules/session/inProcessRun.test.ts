@@ -68,7 +68,7 @@ const records = async (farm: Farm) => {
 describe("the orchestrator's runs", () => {
   test("one loop is one run; its inputs' issues are all linked; failures and stops are said", async () => {
     await using farm = await world();
-    const sessions = farm.session;
+    const sessions = farm.inside;
     await issue(farm, "i1");
     await issue(farm, "i2");
     const { store, finished, journal, currentRun } = await records(farm);

@@ -221,27 +221,30 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
       const thread = await threadOfSession(session);
       if (!thread) {
         // Sent with no channel, so no thread to say it in: the session hears it as a trigger addressed to it alone.
-        if (!sessions.isReachable(session)) throw missing(t("server.channel.noHelper", { id: session }), [lookIn.session]);
+        if (!sessions.live(session).reachable) throw missing(t("server.channel.noHelper", { id: session }), [lookIn.session]);
         const channel = sessionOf(session)?.channel;
         const at = clock.now();
         const speaker = sessionOf(from);
-        const trigger = await sessions.recordTrigger({
-          source: "channel",
-          key: sendKey || newId(at),
-          actor:
-            from === userId
-              ? { kind: "user", id: userId }
-              : { kind: "agent", role: agents.isOrchestrator(from) ? "orchestrator" : "worker", id: from, ...(speaker ? { name: speaker.name } : {}) },
-          text: text.trim(),
-          threads: [],
-          addressed: "direct",
-          ...(channel ? { replyChannel: channel } : {}),
-          at,
+        const trigger = await sessions.receive({
+          _tag: "Record",
+          input: {
+            source: "channel",
+            key: sendKey || newId(at),
+            actor:
+              from === userId
+                ? { kind: "user", id: userId }
+                : { kind: "agent", role: agents.isOrchestrator(from) ? "orchestrator" : "worker", id: from, ...(speaker ? { name: speaker.name } : {}) },
+            text: text.trim(),
+            threads: [],
+            addressed: "direct",
+            ...(channel ? { replyChannel: channel } : {}),
+            at,
+          },
         });
         await sessions.receive({ _tag: "Trigger", trigger, to: { session } });
         return undefined;
       }
-      const run = sessions.runOf(from);
+      const run = sessions.live(from).run;
       const written = await write({
         channel: thread,
         from,
@@ -288,7 +291,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
       // calledBy finds only participants of kind agent, and those are sessions (their ids are session ids).
       const caller = !agents.isOrchestrator(from) ? (await qm.calledBy(db.sql, { speaker: from, channel, before: afterAll }))?.sender_id : undefined;
       const answers = caller === undefined ? undefined : sessionId(caller);
-      const run = sessions.runOf(from);
+      const run = sessions.live(from).run;
       if (agents.isOrchestrator(from)) await store.seat(from);
       await answered(channel, opt.reply);
       const written = await write({
@@ -309,7 +312,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
     store.locked(async () => {
       const where = store.channel(channel) ? channel : await resolveTarget(from, channel);
       if (!store.channel(where)) throw refused(t("server.channel.channelGone"));
-      const run = sessions.runOf(from);
+      const run = sessions.live(from).run;
       if (agents.isOrchestrator(from)) await store.seat(from);
       const shown = "card" in made ? { artifact: made.card } : { attachments: await attachmentsOf(made.attachments) };
       const written = await write({
@@ -468,7 +471,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
       const row = await messageOf(id);
       if (row.deleted_at !== null) throw refused(t("server.channel.messageGone"));
       const ch = store.channel(row.channel_id);
-      const waiting = await sessions.waitingOn(id);
+      const waiting = await sessions.read({ _tag: "Waiting", envelope: id });
       return {
         does: [
           t("server.channel.deletes", { target: ch ? targetOfChannel(ch) : "", number: row.number, name: row.sender_name, text: lineOf(row.body, lastMax) }),
@@ -564,7 +567,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         store.rememberReadTarget(
           who,
           target,
-          (participant) => participant === userId || agents.isOrchestrator(participant) || sessions.isReachable(participant),
+          (participant) => participant === userId || agents.isOrchestrator(participant) || sessions.live(participant).reachable,
         );
         const oldest = rows[0];
         const older = oldest !== undefined && (await qm.messagesBefore(db.sql, { channel_id: channel, number: oldest.number, n: 1 })).length > 0;
@@ -644,7 +647,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
           case "Braked":
             await bestEffort(log, `chat: wake breaker for ${change.session}`, async () => {
               const where = (await shape.threadOfSession(change.session)) ?? store.defaultId();
-              const name = sessions.sessionOf(change.session)?.name ?? change.session;
+              const name = sessions.live(change.session).session?.name ?? change.session;
               await post({ _tag: "Notice", channel: where, text: t("server.channel.breaker", { name, failed: change.failed }), code: "wake_breaker" });
             });
             break;

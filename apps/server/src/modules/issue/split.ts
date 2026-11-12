@@ -39,7 +39,7 @@ export function issueSplitting(r: IssueLifecycle, deps: SplitDeps) {
     splitting.with(async () => {
       const parent = await get(id);
       if (by.kind === "agent" && by.role === "worker") {
-        const caller = sessions.sessionOf(by.id);
+        const caller = sessions.live(by.id).session;
         if (!caller || caller.refining || latestSessionIdOf(parent) !== by.id || caller.issue !== parent.id) throw refused(t("server.issue.split.notCurrent"));
       } else if (!actsForUser(by)) throw refused(needsUser);
       if (isClosed(parent.status)) throw refused(t("server.issue.dependencies.closedParent"));
@@ -81,12 +81,12 @@ export function issueSplitting(r: IssueLifecycle, deps: SplitDeps) {
         return { id: childId, req };
       });
       const session = latestSessionIdOf(parent);
-      if (session && sessions.isReachable(session)) {
-        if (!sessions.sessionOf(session)?.branch) throw refused(t("server.issue.split.needsBranch"));
+      if (session && sessions.live(session).reachable) {
+        if (!sessions.live(session).session?.branch) throw refused(t("server.issue.split.needsBranch"));
         const changes = await changesOf(parent);
         if (changes && changes.uncommitted.length > 0) throw refused(t("server.issue.split.commitFirst"));
       }
-      const channel = (await chat.topOf(session ? (sessions.sessionOf(session)?.channel ?? "") : "")).id;
+      const channel = (await chat.topOf(session ? (sessions.live(session).session?.channel ?? "") : "")).id;
       await saveSplit(id, title, channel, parent.mandate, rows);
       return (
         t("server.issue.split.created", { n: parent.number, count: rows.length }) +
@@ -101,30 +101,31 @@ export function issueSplitting(r: IssueLifecycle, deps: SplitDeps) {
     const parentRepo = parent.repo;
     if (!parentRepo || isClosed(parent.status)) return;
     const session = latestSessionIdOf(child);
-    if (!session || !sessions.isReachable(session)) return;
+    if (!session || !sessions.live(session).reachable) return;
     const parentSession = latestSessionIdOf(parent);
-    const parentWorker = parentSession ? sessions.sessionOf(parentSession) : undefined;
+    const parentWorker = parentSession ? sessions.live(parentSession).session : undefined;
     if (parentWorker && isBusy(parentWorker)) return;
     try {
-      await sessions.handOver(
+      await sessions.workplace({
+        _tag: "HandOver",
         session,
-        "completed",
-        async (place) => {
+        closed: "completed",
+        use: async (place) => {
           const constraints = await verifyChild(repos, child, parent, all, place);
           const mergeIntoParent = (target: Workplace) => repos.mergeInto(place, issueBranch(parent.number), target.cwd);
           let merged;
-          if (parentSession && sessions.isReachable(parentSession)) {
+          if (parentSession && sessions.live(parentSession).reachable) {
             try {
-              merged = await sessions.withIdleWorkplace(parentSession, mergeIntoParent);
+              merged = await sessions.workplace({ _tag: "Session", session: parentSession, idle: true, use: mergeIntoParent });
             } catch (error) {
               throw error instanceof MergeFailure ? error : MergeFailure.error(messageOf(error));
             }
-          } else merged = await mergeIntoParent(await repos.workplace(parentRepo, parent.number, true, ""));
+          } else merged = await sessions.workplace({ _tag: "Issue", repo: parentRepo, number: parent.number, use: mergeIntoParent });
           await completeChild(child.id, constraints);
           return merged;
         },
-        "helper",
-      );
+        settle: "helper",
+      });
       await setConflict(child.id, undefined);
     } catch (failure) {
       if (!(failure instanceof NotTakenIn) && !(failure instanceof ApiError)) throw failure;

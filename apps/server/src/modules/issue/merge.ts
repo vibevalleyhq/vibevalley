@@ -46,7 +46,7 @@ export function merging(d: MergeDeps) {
   const prLock = new Semaphore(1);
 
   const notTaken = async (id: string, n: NotTakenIn) => {
-    const issue = sessions.sessionOf(id)?.issue;
+    const issue = sessions.live(id).session?.issue;
     if (issue && n.failure.kind === "conflict") await d.setConflict(issue, { base: n.failure.base, files: [...n.failure.files] });
     let [user, line] = [n.user, n.notice];
     if (n.fix) {
@@ -64,11 +64,16 @@ export function merging(d: MergeDeps) {
   };
   const handedOver = async (id: string, use: (place: Workplace, said: string) => Promise<Merged>) => {
     try {
-      return await sessions.handOver(id, "merged", async (place, said) => {
-        const merged = await use(place, said);
-        const issue = sessions.sessionOf(id)?.issue;
-        if (issue) await d.setConflict(issue, undefined);
-        return merged;
+      return await sessions.workplace({
+        _tag: "HandOver",
+        session: id,
+        closed: "merged",
+        use: async (place, said) => {
+          const merged = await use(place, said);
+          const issue = sessions.live(id).session?.issue;
+          if (issue) await d.setConflict(issue, undefined);
+          return merged;
+        },
       });
     } catch (e) {
       if (e instanceof NotTakenIn) throw await notTaken(id, e);
@@ -77,7 +82,7 @@ export function merging(d: MergeDeps) {
   };
 
   const mergeSession = async (id: string) => {
-    const session = sessions.sessionOf(id);
+    const session = sessions.live(id).session;
     if (!session) throw missing(t("server.issue.helperRef", { id }), [lookIn.session]);
     const merged = await handedOver(id, (place) => repos.merge(place));
     core.notice("info", t("server.issue.merge.merged", { name: session.name, text: merged.text }));
@@ -114,23 +119,29 @@ export function merging(d: MergeDeps) {
         if (m === "none") throw refused(why);
       }
       const last = latestSessionIdOf(issue);
-      if (issue.repo && (!last || !sessions.isReachable(last)) && (await list()).some((child) => child.parent === issue.id)) {
-        let place: Workplace;
+      if (issue.repo && (!last || !sessions.live(last).reachable) && (await list()).some((child) => child.parent === issue.id)) {
+        const repo = issue.repo;
         try {
-          place = await repos.workplace(issue.repo, issue.number, true, "");
-          if (issue.pullRequest?.state === "open" || repos.usesPullRequests(issue.repo)) return (await pullRequestOf(place, issue, issue.description)).text;
+          return await sessions.workplace({
+            _tag: "Issue",
+            repo,
+            number: issue.number,
+            use: async (place) => {
+              if (issue.pullRequest?.state === "open" || repos.usesPullRequests(repo)) return (await pullRequestOf(place, issue, issue.description)).text;
+              let merged: Merged;
+              try {
+                merged = await repos.merge(place);
+              } catch (error) {
+                if (error instanceof MergeFailure && error.kind === "conflict") await d.setConflict(issue.id, { base: error.base, files: [...error.files] });
+                throw error;
+              }
+              await d.setConflict(issue.id, undefined);
+              return merged.text;
+            },
+          });
         } catch (e) {
           throw asRefusal(e);
         }
-        let merged: Merged;
-        try {
-          merged = await repos.merge(place);
-        } catch (error) {
-          if (error instanceof MergeFailure && error.kind === "conflict") await d.setConflict(issue.id, { base: error.base, files: [...error.files] });
-          throw asRefusal(error);
-        }
-        await d.setConflict(issue.id, undefined);
-        return merged.text;
       }
       const session = await liveSession(id);
       if (issue.repo && (issue.pullRequest?.state === "open" || repos.usesPullRequests(issue.repo))) {
@@ -142,9 +153,9 @@ export function merging(d: MergeDeps) {
   const finishPullRequest = async (issue: T.Issue, state: T.PullRequestState) => {
     const closed = state === "closed" ? "dismissed" : "merged";
     const id = latestSessionIdOf(issue);
-    if (id && sessions.isReachable(id)) {
+    if (id && sessions.live(id).reachable) {
       try {
-        await sessions.handOver(id, closed, (place) => repos.finishPullRequest(place.repo, issue.number));
+        await sessions.workplace({ _tag: "HandOver", session: id, closed, use: (place) => repos.finishPullRequest(place.repo, issue.number) });
       } catch (e) {
         if (e instanceof NotTakenIn) throw refused(e.failure.reasonText);
         throw e;
@@ -179,10 +190,14 @@ export function merging(d: MergeDeps) {
   const submit = (id: string, session: string, summary?: string): Promise<string> =>
     prLock.with(async () => {
       try {
-        const submitted = await sessions.withWorkplace(session, async (place) => {
-          const issue = await get(id);
-          if (issue.status === "done" || issue.status === "canceled") throw refused(t("server.issue.closedReopen"));
-          return pullRequestOf(place, issue, summary ?? [issue.title, issue.description].filter(Boolean).join("\n\n"));
+        const submitted = await sessions.workplace({
+          _tag: "Session",
+          session,
+          use: async (place) => {
+            const issue = await get(id);
+            if (issue.status === "done" || issue.status === "canceled") throw refused(t("server.issue.closedReopen"));
+            return pullRequestOf(place, issue, summary ?? [issue.title, issue.description].filter(Boolean).join("\n\n"));
+          },
         });
         return submitted.text;
       } catch (error) {

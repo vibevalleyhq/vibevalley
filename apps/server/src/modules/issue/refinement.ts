@@ -96,7 +96,7 @@ export function refinement(d: RefinementDeps) {
       if (said) await chat.post({ _tag: "User", text: said, channel: thread, sendKey: "" });
       await beforeRefinement(item, said, chosen.id, where);
       // A draft cut short (a restart) may have left the worktree as its refiner had it: each draft starts from main.
-      const kept = where ? await sessions.clearWorkplace(item.id, where, item.number) : { kept: false };
+      const kept = where ? await sessions.workplace({ _tag: "Clear", issue: item.id, repo: where, number: item.number }) : { kept: false };
       if (kept.kept) log.info(`vibevalley: issue ${item.id}: retained draft workplace`);
       // Always a worktree, even for a profile that works in the repo folder: the reset after it must not touch the user's checkout.
       try {
@@ -109,10 +109,10 @@ export function refinement(d: RefinementDeps) {
     });
 
   const handedBack = async (f: { id: string; outcome: string; summary: string; questions?: readonly T.Question[] }) => {
-    const h = sessions.sessionOf(f.id);
+    const h = sessions.live(f.id).session;
     if (h?.refining !== true || !h.issue) return;
     const id = h.issue;
-    const said = sessions.lastTextOf(f.id);
+    const said = sessions.live(f.id).lastText;
     const thread = await chat.threadOfSession(f.id);
     const tell = async (text: string) => {
       if (thread) await chat.post({ _tag: "Notice", channel: thread, text: text, code: "issue_refinement" });
@@ -129,13 +129,13 @@ export function refinement(d: RefinementDeps) {
         );
       }
     } else await tell(t("server.issue.refinement.unfinished", { name: h.name, summary: f.summary }));
-    await sessions.dismiss(f.id, "discard");
+    await sessions.withdraw({ _tag: "Helper", session: f.id, work: "discard" });
   };
 
   const clearRefinement = async (issue: T.Issue): Promise<WorkplaceRelease> => {
-    if (issue.refining) await sessions.dismiss(issue.refining.session, "discard");
+    if (issue.refining) await sessions.withdraw({ _tag: "Helper", session: issue.refining.session, work: "discard" });
     if (issue.repo) {
-      const kept = await sessions.clearWorkplace(issue.id, issue.repo, issue.number);
+      const kept = await sessions.workplace({ _tag: "Clear", issue: issue.id, repo: issue.repo, number: issue.number });
       if (kept.kept) core.notice("warn", t("server.issue.refinement.canceled", { title: cut(issue.title, 40), why: kept.reason }));
       return kept;
     }

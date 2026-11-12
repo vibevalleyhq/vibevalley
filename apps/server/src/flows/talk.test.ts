@@ -49,7 +49,7 @@ describe("a talk with a helper profile", () => {
     await using fw = await f.open();
     const issues = fw.issue;
     const channels = fw.channel;
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const core = fw.core;
     const sql = sqlOf(fw.db);
     const { in: saidIn } = fw.said;
@@ -116,7 +116,7 @@ describe("a talk with a helper profile", () => {
     const f = farm({ runtime });
     await using fw = await f.open();
     const channels = fw.channel;
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const sql = sqlOf(fw.db);
     const said = fw.said.in;
     await fw.agent.save(lab());
@@ -166,7 +166,7 @@ describe("a talk with a helper profile", () => {
     const first = await (async () => {
       await using fw = await farm({ config, runtime }).open();
       const channels = fw.channel;
-      const sessions = fw.session;
+      const sessions = fw.inside;
       const said = fw.said.in;
       await fw.agent.save(lab());
       const dm = await channels.direct("lab");
@@ -188,7 +188,7 @@ describe("a talk with a helper profile", () => {
     {
       await using fw = await farm({ config, runtime }).open();
       const channels = fw.channel;
-      const sessions = fw.session;
+      const sessions = fw.inside;
       const said = fw.said.in;
       await channels.boot();
       const direct2 = await channels.direct("lab");

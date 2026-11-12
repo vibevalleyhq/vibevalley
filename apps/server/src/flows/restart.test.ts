@@ -39,8 +39,8 @@ test("the assistant cut off mid-answer by a restart finishes it once the farm is
       below.deepseek.use(llm);
       const orchestrator = await makeOrchestrator(below);
       below.closes.push(() => orchestrator.close());
-      await below.session.boot();
-      await below.session.wake();
+      await below.inside.boot();
+      await below.inside.wake();
       return below;
     } catch (e) {
       await below.close();
@@ -75,7 +75,7 @@ test("the assistant cut off mid-answer by a restart finishes it once the farm is
   expect(after.requests[0]!.messages.at(-1)).toMatchObject({ role: "user" });
   expect(said(farm)()).toEqual([words]);
   expect(ran).toEqual([{ outcome: "completed" }]);
-  const events = (await farm.session.events(defaultOrchestrator)) ?? [];
+  const events = (await farm.inside.events(defaultOrchestrator)) ?? [];
   expect(events.filter((e) => e.type === "run/end")).toHaveLength(1);
   expect(events.filter((e) => e.type === "user/message")).toHaveLength(1);
 });
@@ -100,8 +100,8 @@ test("regression: the assistant and a helper both cut off mid-answer go on once 
       below.deepseek.use(script.llm);
       const orchestrator = await makeOrchestrator(below);
       below.closes.push(() => orchestrator.close());
-      await below.session.boot();
-      await below.session.wake();
+      await below.inside.boot();
+      await below.inside.wake();
       return below;
     } catch (e) {
       await below.close();

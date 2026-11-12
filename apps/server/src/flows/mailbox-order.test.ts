@@ -22,7 +22,7 @@ const signal = (key: string, kind: "user" | "agent" = "agent", threads: readonly
 test("regression: concurrent mailbox writes and restoration leave every committed input in the cache", async () => {
   const f = farm();
   await using fw = await f.open();
-  const mailbox = fw.session;
+  const mailbox = fw.inside;
   const channel = fw.channel.defaultChannel();
   const recorded = [];
   for (let n = 0; n < 12; n++) recorded.push(await mailbox.record(signal(`concurrent-${n}`)));
@@ -59,7 +59,7 @@ test("regression: concurrent mailbox writes and restoration leave every committe
 test("regression: independent input hops survive restore and only a new user receipt resets them", async () => {
   const f = farm();
   await using fw = await f.open();
-  const mailbox = fw.session;
+  const mailbox = fw.inside;
   const accept = (key: string, kind: "user" | "agent" = "agent") => mailbox.accept(signal(key, kind));
   for (const n of [1, 2, 3, 4, 5]) await accept(`before-user-${n}`);
   const rows = () => mailbox.deliveriesOf(defaultOrchestrator);
@@ -91,7 +91,7 @@ test("regression: queued triggers enter the first model request in receipt order
   await using fw = await f.open();
   const issue2 = fw.issue;
   const issues = testIssues(issue2);
-  const mailbox = fw.session;
+  const mailbox = fw.inside;
   await fw.agent.save(lab());
   const issue = await issues.add({ title: "work", agent: "lab", repo: "fifo" });
   const markers = ["FIFO_FIRST_CARD", "FIFO_SECOND_CARD", "FIFO_THIRD_CARD"];
@@ -133,7 +133,7 @@ test("regression: an independent agent wake restores cooldown using receipt time
   try {
     const issue2 = fw.issue;
     const issues = testIssues(issue2);
-    const mailbox = fw.session;
+    const mailbox = fw.inside;
     await fw.agent.save(lab());
     const issue = await issues.add({ title: "work", agent: "lab", repo: "cooldown" });
     const started = await issues.start(issue.id, "");
@@ -162,7 +162,7 @@ test("regression: an independent agent wake restores cooldown using receipt time
     expect(steers().some((text) => text.includes("future-source-clock") && text.includes("user-authorized-wave"))).toBe(true);
     expect(steers().some((text) => text.includes("queued-ci"))).toBe(false);
     expect(mailbox.deliveriesOf(started.session!).find((row) => row.envelope_id === queued.id)?.state).toBe("pending");
-    const sessions = fw.session;
+    const sessions = fw.inside;
     gate.resolve();
     await until(() => sessions.sessionOf(started.session!)?.phase._tag === "done", "the original turn ended");
     await mailbox.accept(signal("user-next-run", "user", threads));

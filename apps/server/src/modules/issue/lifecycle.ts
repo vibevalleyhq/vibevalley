@@ -64,7 +64,7 @@ export async function issueLifecycle(deps: IssueParts) {
     }
     const bySession = store.issueOfSession(r);
     if (bySession) return bySession;
-    const hired = sessions.hired();
+    const hired = sessions.live();
     const byName = hired.find((s) => s.name === r) ?? hired.find((s) => s.name !== "" && r.includes(s.name));
     return byName?.issue ?? r;
   };
@@ -98,7 +98,7 @@ export async function issueLifecycle(deps: IssueParts) {
 
   const liveSession = async (id: string) => {
     const session = await latest(id);
-    if (!sessions.isReachable(session)) throw missing(t("server.issue.helperRef", { id: session }), [lookIn.session]);
+    if (!sessions.live(session).reachable) throw missing(t("server.issue.helperRef", { id: session }), [lookIn.session]);
     return session;
   };
 
@@ -297,7 +297,7 @@ export async function issueLifecycle(deps: IssueParts) {
   const changesOf = async (item: T.Issue): Promise<T.Changes | undefined> => {
     const session = latestSessionIdOf(item);
     try {
-      if (session && sessions.isReachable(session)) return await sessions.withWorkplace(session, (place) => repos.changes(place));
+      if (session && sessions.live(session).reachable) return await sessions.workplace({ _tag: "Session", session, use: (place) => repos.changes(place) });
       return item.repo ? await repos.branchChanges(item.repo, issueBranch(item.number)) : undefined;
     } catch (e) {
       throw repoRefusal(e);
@@ -354,7 +354,7 @@ export async function issueLifecycle(deps: IssueParts) {
       }
       await db.afterCommit(() => publish(issue));
     });
-    if (isLatestAnswer) await sessions.discardWork(sessionId);
+    if (isLatestAnswer) await sessions.workplace({ _tag: "Discard", session: sessionId });
     return issue;
   };
 
@@ -402,16 +402,19 @@ export async function issueLifecycle(deps: IssueParts) {
       await q.queueIssue(db.sql, { id: issue.id, at: assignedAt });
       await store.executeInTx(issue.id, agent, agent, assignedAt, () => publish(issue.id));
       if (input)
-        dispatch = await sessions.recordTrigger({
-          source: "workbench",
-          key: newId(),
-          actor: { kind: "system", id: "system" },
-          text: input.text,
-          threads: [`issue:${issue.id}`],
-          addressed: "thread_owner",
-          replyChannel: channel,
-          meta: { ingressRecipient: agent, issue: issue.id, trigger: input.by, dispatch: true },
-          at: assignedAt,
+        dispatch = await sessions.receive({
+          _tag: "Record",
+          input: {
+            source: "workbench",
+            key: newId(),
+            actor: { kind: "system", id: "system" },
+            text: input.text,
+            threads: [`issue:${issue.id}`],
+            addressed: "thread_owner",
+            replyChannel: channel,
+            meta: { ingressRecipient: agent, issue: issue.id, trigger: input.by, dispatch: true },
+            at: assignedAt,
+          },
         });
     });
     if (dispatch) await route(dispatch);
@@ -430,16 +433,19 @@ export async function issueLifecycle(deps: IssueParts) {
       }
       const changed = await q.queueIssue(db.sql, { at, id });
       if (changed.length > 0 && !source)
-        dispatch = await sessions.recordTrigger({
-          source: "workbench",
-          key: newId(),
-          actor: { kind: "system", id: "system" },
-          text: issueBrief(item),
-          threads: [`issue:${id}`],
-          addressed: "thread_owner",
-          replyChannel: channel,
-          meta: { ingressRecipient: assignedAgentOf(item) ?? "", issue: id, trigger: by ?? { kind: "issue" }, dispatch: true },
-          at,
+        dispatch = await sessions.receive({
+          _tag: "Record",
+          input: {
+            source: "workbench",
+            key: newId(),
+            actor: { kind: "system", id: "system" },
+            text: issueBrief(item),
+            threads: [`issue:${id}`],
+            addressed: "thread_owner",
+            replyChannel: channel,
+            meta: { ingressRecipient: assignedAgentOf(item) ?? "", issue: id, trigger: by ?? { kind: "issue" }, dispatch: true },
+            at,
+          },
         });
       await db.afterCommit(() => publish(id));
     });
@@ -499,16 +505,19 @@ export async function issueLifecycle(deps: IssueParts) {
           });
         for (const row of rows) {
           await q.addIssue(db.sql, issueRow(row.id, row.req, parentMandate, at));
-          const triggerRecorded = await sessions.recordTrigger({
-            source: "workbench",
-            key: newId(),
-            actor: { kind: "system", id: "system" },
-            text: [row.req.title, row.req.description].filter(Boolean).join("\n\n"),
-            threads: [`issue:${row.id}`],
-            addressed: "thread_owner",
-            replyChannel: channel,
-            meta: { ingressRecipient: row.req.agent ?? "", issue: row.id, trigger: { kind: "issue" }, dispatch: true },
-            at,
+          const triggerRecorded = await sessions.receive({
+            _tag: "Record",
+            input: {
+              source: "workbench",
+              key: newId(),
+              actor: { kind: "system", id: "system" },
+              text: [row.req.title, row.req.description].filter(Boolean).join("\n\n"),
+              threads: [`issue:${row.id}`],
+              addressed: "thread_owner",
+              replyChannel: channel,
+              meta: { ingressRecipient: row.req.agent ?? "", issue: row.id, trigger: { kind: "issue" }, dispatch: true },
+              at,
+            },
           });
           dispatches.push(triggerRecorded);
           await q.queueIssue(db.sql, { id: row.id, at });

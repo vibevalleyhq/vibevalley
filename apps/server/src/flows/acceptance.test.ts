@@ -51,7 +51,7 @@ for (const mode of ["pass", "frozen", "failed"] as const) {
       (item) => (mode === "pass" ? item.status === "done" : item.questions.length > 0),
       "the implementation verified",
     );
-    const place = await fw.repo.workplace("acceptance", parent.number, true, "");
+    const place = await fw.repo.checkout({ _tag: "Open", repo: "acceptance", issue: parent.number, worktree: true, base: "" });
     expect(readFileSync(join(place.cwd, "check.sh"), "utf8")).toBe("test -f result.txt\n");
     if (mode === "pass") {
       expect(result.delivered).toBe("merged_into_parent");

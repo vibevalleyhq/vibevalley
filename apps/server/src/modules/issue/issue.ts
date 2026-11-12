@@ -256,7 +256,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
   const comment = async (id: string, text: string, sendKey: string = "", by: Actor = userActor): Promise<CommentReceipt> => {
     const issue = await get(id);
     const latest = latestSessionIdOf(issue);
-    const session = latest === undefined ? undefined : sessions.sessionOf(latest);
+    const session = latest === undefined ? undefined : sessions.live(latest).session;
     if (by.kind === "agent") {
       if (!session) return {};
       await chat.post({ _tag: "Tell", from: by.id, session: session.id, text, sendKey });
@@ -275,8 +275,8 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
       await cancelAs(child.id, "dismissed");
     }
     const last = latestSessionIdOf(item);
-    if (last === undefined || !sessions.isReachable(last)) return;
-    if (!(await sessions.dismiss(last))) throw missing(t("server.issue.helperRef", { id: last }), [lookIn.session]);
+    if (last === undefined || !sessions.live(last).reachable) return;
+    if (!(await sessions.withdraw({ _tag: "Helper", session: last }))) throw missing(t("server.issue.helperRef", { id: last }), [lookIn.session]);
   };
 
   const { draft, handedBack, clearRefinement } = refinement({
@@ -362,7 +362,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
         if (error instanceof ApiError) return { issue: item, step: { _tag: "StartFailed", error } };
         throw error;
       }
-      const h = sent.session ? sessions.sessionOf(sent.session) : undefined;
+      const h = sent.session ? sessions.live(sent.session).session : undefined;
       return {
         issue: item,
         step: {
@@ -398,7 +398,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
         if (issue) {
           const conflict = (await get(issue)).conflict;
           if (conflict) {
-            const rechecked = await sessions.withWorkplace(e.id, (place) => repos.conflict(place, conflict.base));
+            const rechecked = await sessions.workplace({ _tag: "Session", session: e.id, use: (place) => repos.conflict(place, conflict.base) });
             await setConflict(issue, rechecked);
           }
         }
@@ -452,10 +452,10 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
 
   const timeline = async (id: string) => {
     const issue = await get(id);
-    const runs = await sessions.issueRuns(issue.id);
+    const runs = await sessions.read({ _tag: "Runs", issue: issue.id });
     const names = new Map<string, string>();
     for (const s of new Set(runs.map((r) => r.session))) {
-      const found = await sessions.get(s);
+      const found = await sessions.read({ _tag: "Session", id: s });
       if (found) names.set(s, found.name);
     }
     return milestonesOf(issue, runs, names);
@@ -494,7 +494,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     } else was = await unsent(id);
     const [title, description] = issueWords({ title: upd.title ?? was.title, description: upd.description ?? was.description });
     if (upd.repo !== undefined && upd.repo !== was.repo && was.repo) {
-      const released = await sessions.clearWorkplace(was.id, was.repo, was.number, "preserve");
+      const released = await sessions.workplace({ _tag: "Clear", issue: was.id, repo: was.repo, number: was.number, work: "preserve" });
       if (released.kept) throw refused(t("server.issue.cannotMoveRepo", { n: was.number, why: released.reason }));
     }
     const criteria = upd.criteria !== undefined ? kept(upd.criteria) : was.criteria;
@@ -592,7 +592,8 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
           // Record completion before dismissing the helper so `Left` does not mark the issue canceled.
           await complete(id, acceptedDelivery);
           const last = latestSessionIdOf(item);
-          if (last !== undefined && sessions.isReachable(last)) await sessions.dismiss(last, "keep", "completed");
+          if (last !== undefined && sessions.live(last).reachable)
+            await sessions.withdraw({ _tag: "Helper", session: last, work: "keep", closed: "completed" });
           break;
         }
         await mergeIssue(id, true);
@@ -657,7 +658,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     start: (id, channel) => start(id, channel),
     idOf,
     stop: async (id) => {
-      await sessions.stop(await liveSession(id));
+      await sessions.withdraw({ _tag: "Turn", session: await liveSession(id) });
     },
     setStatus,
     previewStatus: async (id, to, text, opt = {}, edit) => {
@@ -683,14 +684,14 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
       if (!changes) throw refused(t("server.issue.notStarted"));
       await setConflict(id, conflictOf(changes));
       const session = latestSessionIdOf(item);
-      if (by.kind === "user" && session && sessions.isReachable(session)) core.did({ kind: "reviewed", session });
+      if (by.kind === "user" && session && sessions.live(session).reachable) core.did({ kind: "reviewed", session });
       return changes;
     },
     review,
     refine: draft,
     history: async () => {
       const all = await everyIssue();
-      const byId = new Map((await sessions.list("")).map((s) => [s.id, s]));
+      const byId = new Map((await sessions.read({ _tag: "Sessions" })).map((s) => [s.id, s]));
       return all.map((issue) => ({
         issue,
         sessions: sessionIdsOf(issue).flatMap((id) => {

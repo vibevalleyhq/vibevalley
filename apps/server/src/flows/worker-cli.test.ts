@@ -135,7 +135,7 @@ test("regression: a real worker CLI submits its authorized PR and report as its 
   });
   try {
     await using served = await listen(fw.mcp);
-    const sessions = fw.session;
+    const sessions = fw.inside;
     sessions.setAddress(new URL("http://" + served.endpoint).host);
     const issues = fw.issue;
     const agent = { ...starter("lab"), effort: "" };

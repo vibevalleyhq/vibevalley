@@ -59,7 +59,7 @@ export async function makeInbox(deps: InboxDeps): Promise<Inbox> {
     const receipt = await notificationReceipt(db.sql, { id });
     if (!receipt || receipt.superseded) return undefined;
     if (message.kind === "report") {
-      const session = sessions.sessionOf(message.from);
+      const session = sessions.live(message.from).session;
       const issue = issues.onBoard().find((item) => item.id === session?.issue);
       if (issue && !["draft", "asking", "stuck", "reviewing"].includes(issue.stage.state)) return undefined;
       if (!issue && session?.phase._tag === "working") return undefined;
@@ -123,15 +123,18 @@ export async function makeInbox(deps: InboxDeps): Promise<Inbox> {
     await bestEffort(log, "vibevalley: patrol inputs were not kept", async () => {
       for (const [channel, notes] of byChannel) {
         const top = await chat.topOf(channel);
-        const trigger = await sessions.recordTrigger({
-          key: `${channel}:${now}:${notes.map((note) => note.key).join(",")}`,
-          source: "patrol",
-          actor: { kind: "system", id: "patrol" },
-          addressed: "direct",
-          threads: [],
-          replyChannel: channel,
-          at: now,
-          text: patrolText(top.name, notes),
+        const trigger = await sessions.receive({
+          _tag: "Record",
+          input: {
+            key: `${channel}:${now}:${notes.map((note) => note.key).join(",")}`,
+            source: "patrol",
+            actor: { kind: "system", id: "patrol" },
+            addressed: "direct",
+            threads: [],
+            replyChannel: channel,
+            at: now,
+            text: patrolText(top.name, notes),
+          },
         });
         await sessions.receive({ _tag: "Trigger", trigger });
       }

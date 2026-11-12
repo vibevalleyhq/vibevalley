@@ -16,6 +16,7 @@ import { type Issue } from "#/modules/issue/issue.ts";
 import { type GitHubRun, type RepoHooks } from "#/modules/repo/repo.ts";
 import type { ModelAccess } from "#/modules/runtime/durable.ts";
 import { registryOf } from "#/modules/runtime/runtime.ts";
+import { type Inside, insideOf } from "#/modules/session/session.ts";
 import { type WorkerAccess, type workerAccess } from "#/modules/session/worker.ts";
 import { makeTool, type Tool } from "#/modules/tool/tool.ts";
 import { buildModules, type Close, closeAll, type Modules, owning, type ServiceOptions } from "#/services.ts";
@@ -97,6 +98,8 @@ const fakeWorkerAccess = async (): Promise<WorkerAccess> => {
 /** The farm up to its issues (services.ts's buildModules), built and not started, with what the test hears. */
 export type ModuleWorld = Modules &
   AsyncDisposable & {
+    /** The parts behind the session module, for the tests that drive them. */
+    readonly inside: Inside;
     readonly close: () => Promise<void>;
     /** What the test's own services close with, after the farm's closes; each is called the last added first. */
     readonly closes: Close[];
@@ -143,6 +146,7 @@ export async function moduleWorld(options: WorldOptions = {}): Promise<ModuleWor
     const close = () => (closing ??= closeAll(closes));
     return {
       ...modules,
+      inside: insideOf(modules.session),
       closes,
       said: { in: heard.in, all: heard.all },
       deepseek: { use: deepseek.use },

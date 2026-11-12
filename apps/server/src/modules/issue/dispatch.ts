@@ -14,7 +14,7 @@ import { RepoError } from "#/modules/repo/workplace.ts";
 import type { Runtime } from "#/modules/runtime/runtime.ts";
 import { conflictBrief } from "#/modules/session/briefing.ts";
 import { askedMax } from "#/modules/session/journal.ts";
-import { type Hired, type HireOptions, HireRefused, type Session } from "#/modules/session/session.ts";
+import { type Hired, type HireOptions, HireRefused, type QueuedInput, type Session } from "#/modules/session/session.ts";
 import type { Trigger } from "#/modules/session/shapes.ts";
 
 import { issueBrief } from "./brief.ts";
@@ -96,7 +96,8 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
     const base = opt.base ?? (parent ? issueBranch(parent.number) : undefined);
     if (parent) {
       try {
-        await repos.workplace(where, parent.number, true, "");
+        // The parent's checkout, for the child's branch to fork from.
+        await sessions.workplace({ _tag: "Issue", repo: where, number: parent.number, use: async () => {} });
       } catch (e) {
         if (e instanceof RepoError) throw new HireRefused(e.message, undefined, { cause: e });
         throw e;
@@ -160,7 +161,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
   /** Its run starts as it is handed over: the issue is in progress until the run ends on it (endRun). */
   const beginOnDuty = async (issue: T.Issue, channel: string, input?: { readonly text: string; readonly by: T.RunTrigger }) => {
     const agent = assignedAgentOf(issue) || chat.orchestratorIn((await chat.topOf(channel)).id);
-    if (!sessions.sessionOf(agent)) throw refused(t("server.issue.profileGone", { id: agent }));
+    if (!sessions.live(agent).session) throw refused(t("server.issue.profileGone", { id: agent }));
     await recordOnDutyStart(issue, agent, channel, input);
   };
   const handOnDuty = (issue: T.Issue, channel: string, by: T.RunTrigger, said?: string) =>
@@ -168,7 +169,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
 
   const start = async (id: string, channel: string, by?: T.RunTrigger, said?: string, inputs: readonly Trigger[] = []): Promise<Dispatched> => {
     const mine = await get(id).catch(noneIfRefused);
-    const queued = inputs.length > 0 || mine === undefined ? undefined : await sessions.triggersOf(id);
+    const queued = inputs.length > 0 || mine === undefined ? undefined : await sessions.read({ _tag: "IssueTriggers", issue: id });
     const initial = queued ?? inputs;
     if (mine) {
       const children = (await everyIssue()).filter((child) => child.parent === mine.id);
@@ -197,7 +198,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
     if (issue.queuedAt !== undefined) return { queued: t("server.issue.waitingDispatch") };
     const where = channel;
     const trigger = by;
-    const full = sessions.noRoom(agent.runtime, repo);
+    const full = sessions.room(agent.runtime, repo);
     const blocked = issue.blockedBy.length > 0 ? blockedIssues(issue, await everyIssue()) : [];
     if (blocked.length > 0) {
       await setQueued(issue.id, true, (await chat.topOf(where)).id, trigger, initial[0]);
@@ -212,9 +213,9 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
   };
 
   /** One queued issue's turn: "" when it stays queued, else the session sent. Throws ApiError when it cannot go any more. */
-  const tryQueued = async (issue: T.Issue, inputs: Awaited<ReturnType<Session["queuedTriggers"]>>, title: string): Promise<string> => {
+  const tryQueued = async (issue: T.Issue, inputs: readonly QueuedInput[], title: string): Promise<string> => {
     const [, agent, repo] = await ready(issue.id);
-    if (sessions.noRoom(agent.runtime, repo)) return "";
+    if (sessions.room(agent.runtime, repo)) return "";
     const triggers = inputs.filter((item) => item.issue === issue.id).map((item) => item.trigger);
     const input = triggers[0];
     if (!input) return "";
@@ -234,7 +235,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
   /** In the board's order: one that cannot go any more leaves the queue. */
   const refreshQueue = (): Promise<void> =>
     trying.with(async () => {
-      const inputs = await sessions.queuedTriggers();
+      const inputs = await sessions.read({ _tag: "Queued" });
       await bestEffort(log, "vibevalley: child issues could not be merged", () => joinChildren());
       const all = await everyIssue();
       for (const issue of all) {
@@ -273,7 +274,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
       await start(id, channel, by, text);
       return "";
     }
-    const last = await sessions.get(newest);
+    const last = await sessions.read({ _tag: "Session", id: newest });
     if (!last) throw missing(t("server.issue.issueRef", { ref: id }), [lookIn.issue]);
     if (!isClosed(issue.status)) throw refused(t("server.issue.stillWorking", { name: last.name }));
     const agent = to ?? store.agent(last.agent);

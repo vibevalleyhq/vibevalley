@@ -40,7 +40,7 @@ describe("a refined issue", () => {
     const issue2 = fw.issue;
     const issues = testIssues(issue2);
     const chat = fw.channel;
-    const sessions = fw.session;
+    const sessions = fw.inside;
     await fw.agent.save({ ...lab(), workdir: "" });
     const issue = await issues.add({ title: "讨论看板", agent: "lab" });
     await issues.comment(issue.id, "只讨论桌面端，不做移动端");
@@ -78,7 +78,7 @@ describe("a refined issue", () => {
     const w = watch(fw);
     const issue2 = fw.issue;
     const issues = testIssues(issue2);
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const core = fw.core;
     await fw.agent.save(lab());
     const hired = await issues.hire(lab(), "看看仓库", "board");

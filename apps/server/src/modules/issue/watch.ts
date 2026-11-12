@@ -6,7 +6,6 @@ import { sessionIdsOf, stageWantsUser } from "@vibevalley/protocol/rules";
 
 import { bounded, type Core } from "#/core/core.ts";
 import type { Logger } from "#/infra/log.ts";
-import type { Session } from "#/modules/session/session.ts";
 
 const ended = Symbol("ended");
 
@@ -19,7 +18,8 @@ async function* untilEnd<A>(source: AsyncIterable<A>): AsyncGenerator<A | typeof
 export async function* watchIssue(
   initial: T.Issue,
   core: Pick<Core, "subscribe" | "states">,
-  sessions: Pick<Session, "events">,
+  /** A session's events, as Session.read gives them. */
+  eventsOf: (session: string) => Promise<readonly T.SessionEvent[] | undefined>,
   log: Logger,
   signal?: AbortSignal,
 ): AsyncGenerator<T.IssueWatch> {
@@ -56,7 +56,7 @@ export async function* watchIssue(
       const rows: T.IssueWatch[] = [];
       for (const id of selected) {
         if (loaded && ids.has(id) && !(settled && !wasSettled)) continue;
-        const history = ((await sessions.events(id)) ?? []).slice(-241);
+        const history = ((await eventsOf(id)) ?? []).slice(-241);
         const first = history[0]?.seq;
         if (first !== undefined && first > 0) rows.push({ kind: "gap", session: id, before: first });
         if (first === undefined && !frame.state.sessions.some((s) => s.id === id)) rows.push({ kind: "gap", session: id });

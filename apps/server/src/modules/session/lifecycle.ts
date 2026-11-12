@@ -32,8 +32,8 @@ import { makeLaunch, NotTakenIn, reasonText } from "./launch.ts";
 import type { Machine } from "./machine.ts";
 import { sourceBrief } from "./prompts.ts";
 import { type Hand, makeRegistry, type RunStore } from "./registry.ts";
-import { handsToUser, summaryOf } from "./report.ts";
-import { isHired, isOnDuty, sessionOnIssue } from "./roster.ts";
+import { handsToUser } from "./report.ts";
+import { isHired, isOnDuty } from "./roster.ts";
 import type { Trigger } from "./shapes.ts";
 import { contextPlace, releaseContextPlace } from "./shell.ts";
 import { type Delivered, type DeliveryInput, DeliveryRefused, type RunFinished, type SessionNews } from "./signals.ts";
@@ -126,9 +126,7 @@ export interface Lifecycle {
   /** Rejects `..` segments and symlinks escaping the session's working directory; throws NotWorkFile. */
   readonly workFile: (id: string, path: string, max: number) => Promise<{ readonly name: string; readonly bytes: Uint8Array }>;
   readonly runOf: (id: string) => string | undefined;
-  readonly reportOf: (id: string) => string;
   readonly report: (id: string, report: T.IssueReport) => Promise<void>;
-  readonly onIssue: (issue: string) => string | undefined;
   /** Throws NotTakenIn when use fails (the session stays), ApiError when the session cannot hand over now. */
   readonly handOver: (id: string, closed: T.SessionClose, use: (place: Workplace, lastText: string) => Promise<Merged>, settle?: Settle) => Promise<Merged>;
   /** Pass `""` for all agents. */
@@ -430,12 +428,19 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
       try {
         place =
           issue && repo
-            ? await repos.workplace(repo, issue.number, opt.worktree ?? agent.worktree, opt.base ?? "", signal)
+            ? await repos.checkout({
+                _tag: "Open",
+                repo,
+                issue: issue.number,
+                worktree: opt.worktree ?? agent.worktree,
+                base: opt.base ?? "",
+                ...(signal ? { signal } : {}),
+              })
             : await contextPlace(config.workRoot, id);
       } catch (e) {
         throw new HireRefused(t("server.session.life.noPlace", { name: agent.name, why: messageOf(e) }), undefined, { cause: e });
       }
-      const releasePlace = () => (place.repo ? repos.release(place) : releaseContextPlace(place));
+      const releasePlace = () => (place.repo ? repos.checkout({ _tag: "Release", place }) : releaseContextPlace(place));
       // The hand's own cleanups (its log, its credential) close when it leaves; the startup's undo an opening that did
       // not commit. Both run last-deferred first.
       const handScope = handStack();
@@ -638,9 +643,11 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
         if (work === "discard" && !current?.issue) throw refused(t("server.session.life.noIssue"));
         await closeExecution(h);
         if (work === "discard" && h.place.branch)
-          await repos.reset(h.place).catch((e: unknown) => core.notice("warn", t("server.session.life.notReset", { name, why: messageOf(e) })));
+          await repos
+            .checkout({ _tag: "Reset", place: h.place })
+            .catch((e: unknown) => core.notice("warn", t("server.session.life.notReset", { name, why: messageOf(e) })));
         await leave(h, closed, 0);
-        const kept = h.place.repo ? await repos.release(h.place) : await releaseContextPlace(h.place);
+        const kept = h.place.repo ? await repos.checkout({ _tag: "Release", place: h.place }) : await releaseContextPlace(h.place);
         if (kept.kept) core.notice("info", t("server.session.life.left", { name, why: kept.reason }));
         return true;
       },
@@ -655,7 +662,9 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
       async (h) => {
         const s = core.session(id);
         if (!s || isBusy(s) || !h.place.branch) return;
-        await repos.reset(h.place).catch((e: unknown) => core.notice("warn", t("server.session.life.notReset", { name: s.name, why: messageOf(e) })));
+        await repos
+          .checkout({ _tag: "Reset", place: h.place })
+          .catch((e: unknown) => core.notice("warn", t("server.session.life.notReset", { name: s.name, why: messageOf(e) })));
       },
     );
   };
@@ -665,7 +674,7 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
       const unclosed = executor.all().find((a) => a.owner.issue === issue);
       if (unclosed) throw refused(unclosed.failure ?? t("server.session.life.issueNotReturned"));
       if (core.state().sessions.some((s) => s.issue === issue)) throw refused(t("server.session.life.stillHasHelper"));
-      return repos.clear(repo, number, work);
+      return repos.checkout({ _tag: "Clear", repo, issue: number, ...(work ? { work } : {}) });
     });
 
   const report = async (id: string, given: T.IssueReport) => {
@@ -772,9 +781,7 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
       const run = roster.get(id)?.run ?? executions.get(id)?.() ?? "";
       return run === "" ? undefined : run;
     },
-    reportOf: (id) => summaryOf(roster.get(id)?.lastText ?? ""),
     report,
-    onIssue: (issue) => sessionOnIssue(core.state(), issue)?.id,
     news: () => newsHub.subscribe(),
     who: roster.who,
     setAddress: (address) => void (mcpEndpoint.url = `http://${address}/mcp`),

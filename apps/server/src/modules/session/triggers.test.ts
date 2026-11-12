@@ -22,7 +22,7 @@ const event: TriggerInput = {
 
 test("regression: the source cursor and Mailbox trigger share commit and rollback without routing", async () => {
   await using farm = await moduleWorld();
-  const { session: mailbox, db, core } = farm;
+  const { inside: mailbox, db, core } = farm;
   const state = core.state();
   const scope = { repo: "repo", pr_number: 7 };
   const id = triggerOf(event).id;
@@ -57,7 +57,7 @@ test("regression: the source cursor and Mailbox trigger share commit and rollbac
 
 test("regression: duplicate source and channel records keep the first trigger and payload", async () => {
   await using farm = await moduleWorld();
-  const { session: mailbox } = farm;
+  const { inside: mailbox } = farm;
   const first = await mailbox.recordTrigger(event);
   const triggerRecorded = await mailbox.recordTrigger({ ...event, text: "changed", data: null, at: 20 });
   expect(triggerRecorded).toEqual(first);
@@ -90,7 +90,7 @@ test("regression: duplicate source and channel records keep the first trigger an
 
 test("regression: cron replay supplies decoded source payloads without routing them", async () => {
   await using farm = await moduleWorld();
-  const { session: mailbox } = farm;
+  const { inside: mailbox } = farm;
   const first = await mailbox.recordTrigger({ ...event, source: "cron", key: "first", data: { occurrence: 1 } });
   const second = await mailbox.recordTrigger({ ...event, source: "cron", key: "second", data: { occurrence: 2 } });
   const seen: unknown[] = [];

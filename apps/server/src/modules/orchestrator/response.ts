@@ -82,16 +82,19 @@ export const makeResponses = (sessions: Session, channel: Channel, clock: Clock)
     const response = open(false);
     try {
       try {
-        await sessions.accept({
-          source: "workbench",
-          key: newId(),
-          actor: { kind: "system", id: "system" },
-          addressed: "direct",
-          threads: [],
-          replyChannel: channel.defaultChannel(),
-          text: line,
-          meta: { ingressRecipient: defaultOrchestrator, responsePort: response.id },
-          at: clock.now(),
+        await sessions.receive({
+          _tag: "Event",
+          event: {
+            source: "workbench",
+            key: newId(),
+            actor: { kind: "system", id: "system" },
+            addressed: "direct",
+            threads: [],
+            replyChannel: channel.defaultChannel(),
+            text: line,
+            meta: { ingressRecipient: defaultOrchestrator, responsePort: response.id },
+            at: clock.now(),
+          },
         });
       } catch (e) {
         // Not taken in: the reader below gets the failure as NotAnswered.

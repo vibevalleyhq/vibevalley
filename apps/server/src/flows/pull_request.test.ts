@@ -188,7 +188,7 @@ describe("a pull request", () => {
         {
           const w = watch(fw);
           const issues = fw.issue;
-          const sessions = fw.session;
+          const sessions = fw.inside;
           const repos = fw.repo;
           handoff = () => sessions.report(id, { summary: "ready for review", questions: [], checks: [], remember: [], prSubmit: false });
           await fw.agent.save(lab());
@@ -250,11 +250,11 @@ describe("a pull request", () => {
       {
         await using fw = await after.open();
         const issues = fw.issue;
-        const sessions = fw.session;
+        const sessions = fw.inside;
         await fw.repo.refreshGitHub();
         const restored = await issues.get(issue.id);
         expect(restored.pullRequest?.number).toBe(7);
-        const mailbox = fw.session;
+        const mailbox = fw.inside;
         await mailbox.record({
           source: "github",
           key: "clock#7:review:R1",
