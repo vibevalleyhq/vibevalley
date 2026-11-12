@@ -1480,7 +1480,6 @@ export const catalogs = {
         exitedNotice: "{name} 的 {why}",
         staleRun: "上一轮停在了半路，太久了，没有接着做",
         stoppedByUser: "你叫停了",
-        folded: "整理对话，{usage}",
         clipped: "… 省略 {n} 个字 …",
         quiet: "已经 {span}没动静了{last}。可能在跑很久的命令，也可能卡住了",
         quietLast: "（最后在：{label}）",
@@ -6267,7 +6266,6 @@ export const catalogs = {
         exitedNotice: "{name}: {why}",
         staleRun: "The last round stopped halfway too long ago, and was not carried on",
         stoppedByUser: "You stopped it",
-        folded: "Folded the conversation, {usage}",
         clipped: "… {n} characters left out …",
         quiet: "Quiet for {span}{last}. It may be running a long command, or it may be stuck",
         quietLast: " (last: {label})",
@@ -11071,7 +11069,6 @@ export interface Messages {
   "server.session.log.exited": { readonly runtime: string | number };
   "server.session.log.exitedCode": { readonly code: string | number; readonly runtime: string | number };
   "server.session.log.exitedNotice": { readonly name: string | number; readonly why: string | number };
-  "server.session.log.folded": { readonly usage: string | number };
   "server.session.log.image": undefined;
   "server.session.log.quiet": { readonly last: string | number; readonly span: string | number };
   "server.session.log.quietLast": { readonly label: string | number };

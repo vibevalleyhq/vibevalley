@@ -23,7 +23,7 @@
 | `packages/agent/src/brain/brain.ts`、`session.ts`、`fs.ts`、`compaction.ts`、`prefix.ts` | `makeBrain` 入口（显式 `BrainState`）、`TranscriptStore` `.jsonl` 端口、`AgentFs` 文件端口、上下文压缩与前缀分段 SHA-256 校验 |
 | `packages/agent/src/tools/self.ts`、`skills.ts`、`memory.ts`、`mcp.ts`、`reminders.ts` | 收 `AbortSignal` 的内置工具、技能目录扫描、`MemoryPort`、MCP 客户端与定时提醒 |
 | `packages/agent/src/tools/todo.ts`、`todoTools.ts`、`coding.ts`、`dag.ts` | 自身任务图 `Todo`、本地文件/shell 编码工具与通用 DAG 算法 |
-| `apps/server/src/modules/session/host.ts`、`runtime/vibevalley.ts`、`chat/main.ts` | 助手宿主 `AgentHost`、oar 农机适配（含 `runtime_todo` 表存储）与 CLI 终端对话 |
+| `apps/server/src/modules/session/host.ts`、`runtime/durable.ts`、`runtime/vibevalley.ts`、`chat/main.ts` | 助手宿主 `AgentHost`（跑在 pi-durable 上）、农场唯一的 `Harness` 与到 `ModelClient` 的模型桥、oar 农机适配（含 `runtime_todo` 表存储）与 CLI 终端对话 |
 
 ## 模型和不变量
 
@@ -44,7 +44,7 @@
 | 记忆（`MemoryPort`） | 数据库 `memory` 表 | 无（由 `Session` 管） | 本地 `MEMORY.md` | 无 |
 | 子帮手（`spawn_agent`） | 无 | 有 | 有 | 无（禁止嵌套） |
 | 自身任务图（`Todo`） | 无 | 有（存 `runtime_todo` 表） | 有（存内存） | 无 |
-| 对话文件（`.jsonl`） | 有 | 有（按会话） | 有 | 无 |
+| 对话文件（`.jsonl`） | 无（pi-durable 的对话，在 `durable.db`） | 有（按会话） | 有 | 无 |
 
 ### 提示分三段
 
@@ -64,6 +64,7 @@
 
 ### 接着做被打断的一轮
 
+- 助手不走下面两条：它跑在上游 pi-durable 的 `Harness` 上（`runtime/durable.ts`，`$VIBEVALLEY_HOME/durable.db`，测试农场在内存里），输入、每次回答、每个工具调用先落盘再显示；服务端在它答到一半时停掉，重开以后这一轮接着答完，`session_run` 里还是同一轮（[计划](.agents/notes/proposed/architecture/2026-11-12-brain-on-upstream-pi-durable.md)）。
 - 关闭或崩溃打断时，取消产生的半截消息不写入 `.jsonl`。
 - 调用 `resume(maxAgeMs)` 时，若最后一条是 `maxAgeMs` 内未完结的用户消息、工具结果或无结果的 `tool_calls`，自动补入「服务端重启，结果未知，请先核实」回执并继续跑完该轮。
 

@@ -24,7 +24,7 @@ oar 0.101（最新）带的 pi-durable runtime 写在 1.4 上（peer `~1.4.0`）
    - 我们的工具（`Tool`：JSON Schema 加 `execute`）由一个函数包成 `defineTool`，`ToolFailed` 照旧是模型读到的失败结果；会改东西的工具不声明 `replay: "safe"`，断在中间时模型读到 `interrupted`。
    - 事件：`conversation.watch()` 的提交读成现在 `BrainEvent` 喂给 `journal` 和 `reaction` 的那几样（开始、文字、工具开始和结束、一轮结束、用量），核心状态的事实不变。
    - 流程测试：pi-ai 的 faux provider 照脚本答；说一句话，在模型答到一半时 `farm.close()`，用同一个家目录再起，它答完，这一轮只记一次。原来 `host` 的测试照旧过。
-2. **P1 助手换模型的那一侧。** 用 pi-ai 的 DeepSeek provider 取代 `packages/ai` 的桥；先用离线的录制核对 `brain.md` 记的几处（纯工具的 `content: null`、`reasoning_text`、choice 里的 usage、迟到的工具 id），不对的在 provider 外面补。真模型的助手评测在换之前、之后各跑一遍（花钱，先问用户）。
+2. **P1 助手换模型的那一侧。** 用 pi-ai 的 DeepSeek provider 取代 `packages/ai` 的桥；先用离线的录制核对 `brain.md` 记的几处（纯工具的 `content: null`、`reasoning_text`、choice 里的 usage、迟到的工具 id），不对的在 provider 外面补。读 1.5.2 的代码（`api/openai-completions.js`）四处都已处理：助手消息默认 `content: null`，`reasoning_content`/`reasoning`/`reasoning_text` 都读、DeepSeek 的模型带 `requiresReasoningContentOnAssistantMessages`，`choice.usage` 在 `chunk.usage` 缺时读，迟到的工具 id 补到已开的调用上；模型 id（`deepseek-flash`、`deepseek-v4-pro`）和我们的一样。录制核对仍要做。真模型的助手评测在换之前、之后各跑一遍（花钱，先问用户）。
 3. **P2 农机。** `runtime/vibevalley.ts` 改成在同一个 Harness 上开 conversation、装 `CodingTools`（环境是帮工的工作目录），照 oar 的 `Runtime` 契约出事件；它也就持久了。命令行的 `chat` 用同一个。
 4. **P3 删。** `packages/agent` 里自己的循环、压缩、前缀、会话文件、子帮手和任务图，`packages/ai` 里模型的桥和重放，`session`、`mailbox` 里只为它做的恢复；还要的（技能的读法、`dag` 的校验、记性的端口、转写和 MOSS）留在原处或挪到用它的模块。`brain.md` 改成新的样子。
 

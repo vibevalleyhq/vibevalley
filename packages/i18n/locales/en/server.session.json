@@ -45,7 +45,6 @@
     "exitedNotice": "{name}: {why}",
     "staleRun": "The last round stopped halfway too long ago, and was not carried on",
     "stoppedByUser": "You stopped it",
-    "folded": "Folded the conversation, {usage}",
     "clipped": "… {n} characters left out …",
     "quiet": "Quiet for {span}{last}. It may be running a long command, or it may be stuck",
     "quietLast": " (last: {label})",

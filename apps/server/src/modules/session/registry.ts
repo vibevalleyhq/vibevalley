@@ -34,6 +34,7 @@ export interface RunStore {
   readonly link: (run: string, issue: string) => Promise<void>;
   readonly heard: (run: string, heard: readonly string[]) => Promise<void>;
   readonly issues: (run: string) => Promise<T.IssueId[]>;
+  readonly unended: (session: string) => Promise<{ readonly id: string; readonly startedAt: number } | undefined>;
   readonly finish: (id: string, outcome: T.Outcome, summary: string, spent?: T.Spent) => Promise<void>;
   readonly finished: (r: RunFinished) => void;
   readonly consumed: (c: Consumed) => void;

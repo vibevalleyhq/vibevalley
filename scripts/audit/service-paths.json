@@ -172,6 +172,7 @@
   "Runtime.assess": ["orchestrator"],
   "Runtime.candidates": ["issue"],
   "Runtime.choose": ["issue"],
+  "Runtime.durable": ["session"],
   "Runtime.problemsOf": ["issue"],
   "Runtime.quote": ["session"],
   "Runtime.resolve": ["machine"],

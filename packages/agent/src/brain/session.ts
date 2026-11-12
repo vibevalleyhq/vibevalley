@@ -17,7 +17,7 @@ export function applySummary(messages: readonly BrainMessage[], summary: Compact
   return [summary, ...(summary.kept > 0 ? messages.slice(Math.max(0, messages.length - summary.kept)) : [])];
 }
 
-export function replay(lines: readonly BrainMessage[]): BrainMessage[] {
+function replay(lines: readonly BrainMessage[]): BrainMessage[] {
   let out: BrainMessage[] = [];
   for (const m of lines) {
     if (m.role === "compactionSummary") out = applySummary(out, m);
@@ -47,7 +47,7 @@ function jsonOrUndefined(line: string): unknown {
 }
 
 /** Every line of a session file as written, the compactions among them and what they fold; empty when there is no file. */
-export async function readLines(file: string, fs?: AgentFs, log: AgentLog = consoleLog): Promise<BrainMessage[]> {
+async function readLines(file: string, fs?: AgentFs, log: AgentLog = consoleLog): Promise<BrainMessage[]> {
   try {
     const text = await agentFsOf(fs).readTextIfExists(file);
     return text === undefined ? [] : parseLines(text);

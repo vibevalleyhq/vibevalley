@@ -22,6 +22,7 @@ import { type Agent, modelClient } from "#/modules/agent/agent.ts";
 import type { Setting } from "#/modules/setting/setting.ts";
 
 import { dshRuntime } from "./dsh.ts";
+import { type Durable, openDurable } from "./durable.ts";
 import { piBalance, type PiDefault, piSettings } from "./pi.ts";
 import { agentProblems, type Candidate, chooseAgent, supportOf, moneyStop, presetOf, runtimeIds, runtimeLabel, sessionOptions } from "./presets.ts";
 import { inCny, makeSpending, price, type Rate } from "./price.ts";
@@ -68,7 +69,10 @@ export interface Runtime {
   readonly quote: (id: string, model: string) => Rate | undefined;
   readonly spend: (id: string, cny: number) => void;
   readonly usageSoon: (id: string) => void;
-  /** Stops the probes and timers, writes the day's spending, then closes the sessions of VibeValley's own runtime. */
+  /** The conversations of the agents that run in this server (the assistant's), kept across restarts. */
+  readonly durable: Durable;
+  /** Stops the probes and timers, writes the day's spending, closes the sessions of VibeValley's own runtime, then the
+   * durable conversations. */
   readonly close: () => Promise<void>;
 }
 
@@ -198,6 +202,7 @@ export async function makeRuntime(deps: RuntimeDeps, options: RuntimeOptions = {
   const usageAsked = new Map<string, number>();
   const usageTaken = new Map<string, number>();
   let closed = false;
+  const durable = await openDurable({ config, clock, log });
 
   const daily = await makeSpending({ db: deps.db, clock, log });
   const tally = daily.tally;
@@ -515,11 +520,13 @@ export async function makeRuntime(deps: RuntimeDeps, options: RuntimeOptions = {
       if (closed) return;
       later(`usage:${id}`, usageAfterRunMs, () => warned(`reading the usage of ${id}`, () => refreshUsage(id)));
     },
+    durable,
     close: async () => {
       closed = true;
       await tasks.close();
       await daily.close();
       await owner.close();
+      await durable.close();
     },
   };
 }

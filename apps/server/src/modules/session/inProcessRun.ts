@@ -47,8 +47,12 @@ interface InProcessRun {
   readonly failedStart: (input: RunInput, text: string, reason: string) => Promise<string>;
   /** The input of the next run, which goes on with one consumed before a restart; undefined forgets it. */
   readonly resume: (input: RunInput | undefined) => void;
+  /** Goes on with run, recorded and not ended before a restart, as the run under way. */
+  readonly adopt: (run: string) => void;
   /** Ends the run going on as interrupted; takes no more events from when it is called. */
   readonly close: () => Promise<void>;
+  /** Takes no more events and leaves the run going on open, for the next start to adopt. */
+  readonly leave: () => void;
   readonly currentRun: () => string;
 }
 
@@ -173,7 +177,17 @@ export function makeInProcessRun(session: string, journal: Journal, toolStart: (
     resume: (input) => {
       resuming = input;
     },
+    adopt: (id) => {
+      run = id;
+      journal.runResumed(id);
+      outcome = "completed";
+      summary = "";
+      heard = [];
+    },
     close,
+    leave: () => {
+      closed = true;
+    },
     currentRun,
   };
 }
@@ -202,6 +216,11 @@ export function recording(deps: { readonly db: Db; readonly clock: Clock }) {
       await tried(() => qr.heardInRun(db.sql, { heard: jsonText(heard), id }));
     },
     issues: async (run: string) => (await tried(() => qi.runIssues(db.sql, { run }))).map((row) => issueId(row.issue)),
+    /** The session's run not ended yet: at most one, left open by a restart. */
+    unended: async (session: string) => {
+      const row = (await tried(() => qr.openRuns(db.sql))).findLast((r) => r.session === session);
+      return row === undefined ? undefined : { id: row.id, startedAt: row.started_at };
+    },
     finish: async (id: string, outcome: Outcome, summary: string, spent?: Spent) => {
       const at = clock.now();
       await tried(() => qr.endRun(db.sql, { ended_at: at, outcome, summary: summary || null, spent: spent ? jsonText(spent) : null, id }));

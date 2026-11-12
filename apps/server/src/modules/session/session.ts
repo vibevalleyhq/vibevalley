@@ -271,6 +271,8 @@ export async function makeSession(deps: SessionDeps, options: SessionOptions = {
   const restore = async () => {
     await expireLogs(config.session.trajectoryDays);
     for (const row of await qr.openRuns(db.sql)) {
+      // Its durable conversation goes on with it: its host ends it once the answer comes.
+      if (await deps.runtime.durable.busy(row.session)) continue;
       await bestEffort(log, `vibevalley: run ${row.id}`, async () => {
         await runs.finish(row.id, "interrupted", t("server.session.log.restarted"));
         const linked = await runs.issues(row.id);
@@ -715,7 +717,12 @@ export async function makeSession(deps: SessionDeps, options: SessionOptions = {
       },
     };
     const journal = await trajectories.openLog(o.session.id, o.keepEvents);
-    return makeHost({ ...o, memory: memories.forAgent(o.session.agent, o.session.id) }, journal, hostedRuns, { core, clock, log });
+    return makeHost({ ...o, memory: memories.forAgent(o.session.agent, o.session.id) }, journal, hostedRuns, {
+      core,
+      clock,
+      log,
+      durable: deps.runtime.durable,
+    });
   };
 
   const close = async () => {

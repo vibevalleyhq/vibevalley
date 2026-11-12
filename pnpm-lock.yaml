@@ -182,9 +182,6 @@ catalogs:
     '@earendil-works/pi-durable':
       specifier: 1.5.2
       version: 1.5.2
-    '@earendil-works/pi-schema':
-      specifier: 1.5.2
-      version: 1.5.2
     '@electric-sql/pglite':
       specifier: 0.5.16
       version: 0.5.16
@@ -638,9 +635,6 @@ importers:
       '@earendil-works/pi-durable':
         specifier: 'catalog:'
         version: 1.5.2(@aws-sdk/credential-provider-node@3.972.87)(@modelcontextprotocol/sdk@1.32.2(supports-color@8.1.1)(zod@4.6.7))(@smithy/signature-v4@5.7.4)(esbuild@0.28.2)(react@19.3.0)(supports-color@8.1.1)(undici@8.12.3)(ws@8.22.2)(zod@4.6.7)
-      '@earendil-works/pi-schema':
-        specifier: 'catalog:'
-        version: 1.5.2
       '@electric-sql/pglite':
         specifier: 'catalog:'
         version: 0.5.16

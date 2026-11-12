@@ -26,7 +26,6 @@
     "@earendil-works/chord": "catalog:",
     "@earendil-works/pi-ai": "catalog:",
     "@earendil-works/pi-durable": "catalog:",
-    "@earendil-works/pi-schema": "catalog:",
     "@electric-sql/pglite": "catalog:",
     "@hono/node-server": "catalog:",
     "@larksuiteoapi/node-sdk": "catalog:",

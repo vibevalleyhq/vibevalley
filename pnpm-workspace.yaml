@@ -28,7 +28,6 @@ catalog:
   "@earendil-works/chord": "1.5.2"
   "@earendil-works/pi-ai": "1.5.2"
   "@earendil-works/pi-durable": "1.5.2"
-  "@earendil-works/pi-schema": "1.5.2"
   "@electric-sql/pglite": "0.5.16"
   "@floating-ui/dom": "^1.8.0"
   "@larksuiteoapi/node-sdk": "^1.76.0"

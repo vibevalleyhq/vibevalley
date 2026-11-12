@@ -324,6 +324,8 @@ const RULES: readonly Rule[] = [
     name: "a place to talk under another name",
     pattern: /\b(Conversation\w*|conversation_id|channel_conversation|Rooms|RoomEvent|roomsPath|useRoom|followRoom)\b/u,
     says: "Channel (channel_id, the Channel service): a channel, a direct channel and a thread are all channels, by type (as Discord's); a model's conversation is the brain's word",
+    // pi-durable's Conversation is a model's: the server uses its API in these two files only.
+    except: /^apps\/server\/src\/modules\/(runtime\/durable|session\/host)\.ts$/u,
   },
   {
     name: "a business name in farm words",
