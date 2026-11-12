@@ -23,7 +23,8 @@ import { deepseekModels, defaultModel, type Durable, durableTool, entryMessage, 
 import type { Helpers } from "./helperExtension.ts";
 import { helperInstructions } from "./prompts.ts";
 
-const vibevalleyRuntime = "vibevalley";
+/** Its id: the runtime a profile names to run on VibeValley's own agent. */
+export const vibevalleyRuntime = "vibevalley";
 
 /** DeepSeek's two. */
 const efforts = ["high", "max"] as const;
@@ -37,6 +38,10 @@ export { helperInstructions };
 
 /** The conversation an oar session of this runtime is kept as, in the harness. */
 export const helperKey = (session: string) => `helper:${session}`;
+
+/** The input a session is opened again with to go on with the run a restart left under way: never sent to the model,
+ * nothing is added to the conversation, and that run is the turn it starts. */
+export const goOn = "vibevalley:go-on";
 
 export interface RuntimeOptions {
   /** The harness the sessions' conversations are kept in, and the model they ask. */
@@ -147,6 +152,10 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
       let shown = 0;
       let compacting = false;
       let disposed = false;
+      /** The newest pi.live the session followed: whether a run is under way now. */
+      let lastLive = LiveView.parse(watch.value.docs["pi.live"] ?? {});
+      /** A run a restart left under way, for the first input (goOn) to take as its turn. */
+      let cutOff = o.resume !== undefined && lastLive.run !== undefined;
       let seen: EntryId | undefined = watch.value.entries.at(-1)?.id;
       const baseline = spent(watch.value);
       let total = baseline;
@@ -231,6 +240,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
       const follow = async (view: ConversationView) => {
         if (disposed) return;
         const live = LiveView.parse(view.docs["pi.live"] ?? {});
+        lastLive = live;
         total = spent(view);
         const entries = await fresh(view);
         for (const [i, e] of entries.entries()) {
@@ -316,7 +326,8 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
           queued.length = 0;
           released.resolve();
           try {
-            if (active) await conversation.abort(context);
+            // The farm stopping leaves the run under way: the harness goes on with it once the farm opens again.
+            if (active && !durable.leaving()) await conversation.abort(context);
           } catch (e) {
             log.warn(`vibevalley runtime: ${kernel.sessionId}'s turn was not stopped`, e);
           }
@@ -341,7 +352,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
       frame("vibevalley/model", { model: model.ref.modelId }, [{ kind: "model", model: model.ref.modelId }]);
       if (o.effort) frame("vibevalley/effort", { effort: o.effort }, [{ kind: "effort", effort: o.effort }]);
       // A run a restart cut off goes on: the conversation is the one it was, and its turn is told as this session's.
-      if (o.resume !== undefined && LiveView.parse(watch.value.docs["pi.live"] ?? {}).run !== undefined) durable.harness.resume();
+      if (cutOff) durable.harness.resume();
 
       const capabilities = { queue: { durable: false }, attribution: "none", images: false } as const;
       return sealSession({
@@ -349,6 +360,14 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
         capabilities,
         prompt: (input, inputOptions) =>
           kernel.control({ kind: "prompt", input, ...inputOptions }, async () => {
+            if (input === goOn && cutOff) {
+              // The run a restart left is this turn: it ends with that run, or now when it has ended meanwhile.
+              cutOff = false;
+              active = true;
+              placed = true;
+              if (lastLive.run === undefined) queueMicrotask(() => end(outcomeOf(lastLive)));
+              return { kind: "accepted" };
+            }
             if (active) return { kind: "rejected", code: "busy", reason: "busy" };
             const refused = inputImagesRefusal(capabilities, inputOptions?.images);
             if (refused !== null) return refused;

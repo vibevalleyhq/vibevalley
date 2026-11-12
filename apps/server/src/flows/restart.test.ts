@@ -14,7 +14,7 @@ import { keptLog } from "#/infra/log.ts";
 import { makeOrchestrator } from "#/modules/orchestrator/orchestrator.ts";
 import { entryMessage, messageText } from "#/modules/runtime/durable.ts";
 import { helperInstructions, helperKey, vibevalleyRuntimeOf } from "#/modules/runtime/vibevalley.ts";
-import { testConfig } from "#/testing/layers.ts";
+import { starter, testConfig } from "#/testing/layers.ts";
 import { answer, lastUser, type Request, scriptedLLM, type Step } from "#/testing/model.ts";
 import { sqlOf } from "#/testing/sql.ts";
 import { type World, world } from "#/testing/world.ts";
@@ -155,4 +155,50 @@ test("regression: the assistant and a helper both cut off mid-answer go on once 
   expect(again.system).toContain("你是后端老周。");
   expect(again.system).toContain(helperCwd);
   expect(again.tools.map((t) => t.name)).toEqual(expect.arrayContaining(["read", "write", "edit", "bash", "todo_add", "load_skill", "spawn_agent"]));
+});
+
+test("a helper on the farm's own runtime cut off mid-answer by a restart finishes it once the farm is back, as one run", async () => {
+  const config = testConfig({ db: "", patrol: { heartbeatMinutes: 0 } });
+  const helperWords = "数过了，三块地";
+  const profile = { ...starter("lab"), runtime: "vibevalley", effort: "" };
+  /** The farm on the same home each time: its sessions back, then their deliveries. */
+  const open = async (llm: ReturnType<typeof scriptedLLM>["llm"], repos: readonly string[] = []) => {
+    const below = await world({ config, ownRuntime: true, repos });
+    try {
+      below.deepseek.use(llm);
+      await below.session.boot();
+      await below.channel.boot();
+      await below.session.wake();
+      return below;
+    } catch (e) {
+      await below.close();
+      throw e;
+    }
+  };
+
+  const before = scriptedLLM([answer(helperWords, { hangAfter: 3 })]);
+  let helper = "";
+  {
+    await using farm = await open(before.llm, ["count"]);
+    await farm.agent.save(profile);
+    helper = (await farm.issue.hire(profile, "数一下地", "count")).session.id;
+    // The answer has begun to show: the model is in the middle of it when the farm stops, cleanly.
+    await until(() => {
+      const phase = farm.core.session(helper)?.phase;
+      return phase?._tag === "working" && phase.doing.action === "speaking_text";
+    }, "the helper's answer under way");
+  }
+
+  const after = scriptedLLM([answer(helperWords)]);
+  await using farm = await open(after.llm);
+  await until(() => farm.core.session(helper)?.phase._tag === "done", "the helper's answer after the restart");
+  const sql = sqlOf(farm.db);
+  const ran = await sql<{ outcome: string | null }>`select outcome from session_run where session = ${helper}`;
+  // Asked again once, said once, recorded once: the run the hire started is the one that ended.
+  expect(after.requests).toHaveLength(1);
+  expect(ran).toEqual([{ outcome: "completed" }]);
+  expect(farm.session.live(helper).lastText).toBe(helperWords);
+  const events = (await farm.session.read({ _tag: "Events", session: helper })) ?? [];
+  expect(events.filter((e) => e.type === "run/end")).toHaveLength(1);
+  expect(events.filter((e) => e.type === "user/message")).toHaveLength(1);
 });

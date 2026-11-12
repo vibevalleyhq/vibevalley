@@ -20,6 +20,7 @@ import type { Memory } from "#/modules/memory/memory.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
 import { type Merged, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "#/modules/repo/workplace.ts";
 import type { Runtime } from "#/modules/runtime/runtime.ts";
+import { goOn, helperKey, vibevalleyRuntime } from "#/modules/runtime/vibevalley.ts";
 import * as qs from "#db/session.sql.ts";
 import * as qr from "#db/session_run.sql.ts";
 
@@ -266,18 +267,47 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
     for (const row of ids) await trajectories.forget(row.id);
   };
 
+  const finishInterrupted = (run: string) =>
+    bestEffort(log, `vibevalley: run ${run}`, async () => {
+      await runs.finish(run, "interrupted", t("server.session.log.restarted"));
+      const linked = await runs.issues(run);
+      tell({ _tag: "RunFinished", id: run, issues: linked, outcome: "interrupted" });
+    });
+
+  /** A helper on VibeValley's own runtime that was answering when the farm stopped is opened again on its conversation,
+   * and the turn that goes on is the run it was in; false when it cannot be, and its run is then cut off. */
+  const goOnWith = async (h: Hand, session: T.Session, run: string): Promise<boolean> => {
+    const agent = deps.agent.agent(session.agent);
+    if (!agent) return false;
+    h.goesOn = run;
+    try {
+      const opened = await open(agent, session, h, h.place, goOn, h.oarSessionId);
+      if (opened.execution) {
+        attach(h, opened.execution, session.runtime);
+        return true;
+      }
+      log.warn(`vibevalley: ${session.id} did not go on with its run: ${opened.refused}`);
+    } catch (e) {
+      log.warn(`vibevalley: ${session.id} did not go on with its run`, e);
+    }
+    delete h.goesOn;
+    return false;
+  };
+
   const restore = async () => {
     await expireLogs(config.session.trajectoryDays);
-    for (const row of await qr.openRuns(db.sql)) {
-      // Its durable conversation goes on with it: its host ends it once the answer comes.
-      if (await deps.runtime.durable.busy(row.session)) continue;
-      await bestEffort(log, `vibevalley: run ${row.id}`, async () => {
-        await runs.finish(row.id, "interrupted", t("server.session.log.restarted"));
-        const linked = await runs.issues(row.id);
-        tell({ _tag: "RunFinished", id: row.id, issues: linked, outcome: "interrupted" });
-      });
-    }
     const kept = await qs.activeSessions(db.sql);
+    // pi-durable keeps a conversation's run under way across a restart; the other runtimes cannot take a turn up again.
+    const goingOn = new Set<string>();
+    for (const row of kept)
+      if (!isOnDuty(row) && row.runtime === vibevalleyRuntime && row.oar_session && (await deps.runtime.durable.busy(helperKey(row.oar_session))))
+        goingOn.add(row.id);
+    const openRun = new Map<string, string>();
+    for (const row of await qr.openRuns(db.sql)) {
+      if (goingOn.has(row.session)) openRun.set(row.session, row.id);
+      // Its durable conversation goes on with it: its host ends it once the answer comes.
+      else if (!(await deps.runtime.durable.busy(row.session))) await finishInterrupted(row.id);
+    }
     // Continue numbering past the highest historical session id so trajectory files are never reused.
     hired = Math.max(
       0,
@@ -337,6 +367,11 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
       };
       stack.defer(() => l.revokeAccess(hand));
       roster.set(hand);
+      const run = openRun.get(session.id);
+      if (run !== undefined) {
+        if (await goOnWith(hand, session, run)) continue;
+        await finishInterrupted(run);
+      }
       if (isBusy(session)) {
         core.apply({
           type: "sessionReported",
@@ -735,6 +770,8 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
   };
 
   const close = async () => {
+    // A helper answering on VibeValley's own runtime is let go with its run under way: restore goes on with it.
+    deps.runtime.durable.leave();
     moves.close();
     await tasks.close();
     await cli?.close();

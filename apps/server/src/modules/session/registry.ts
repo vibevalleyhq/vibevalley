@@ -197,6 +197,13 @@ export async function makeRegistry(deps: RegistryDeps) {
   const unexpect = (h: Hand) => void h.triggers.pop();
 
   const startRun = (h: Hand) => {
+    if (h.goesOn !== undefined) {
+      // Started before the restart, and recorded then: the turn takes it up as it was.
+      h.run = h.goesOn;
+      h.journal.runResumed(h.goesOn);
+      delete h.goesOn;
+      return;
+    }
     const expected = h.triggers.shift();
     const by = expected?.trigger ?? { kind: "runtime" };
     const issue = core.session(h.id)?.issue ?? h.issue;

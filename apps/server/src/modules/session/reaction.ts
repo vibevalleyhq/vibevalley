@@ -10,6 +10,7 @@ import { isBusy } from "@vibevalley/protocol/rules";
 import { clip } from "#/base/clip.ts";
 import type { FactIn } from "#/core/core.ts";
 import type { Rate } from "#/modules/runtime/price.ts";
+import { goOn } from "#/modules/runtime/vibevalley.ts";
 
 import { briefBreak, recalledIn } from "./briefing.ts";
 import { failureText } from "./report.ts";
@@ -154,7 +155,8 @@ export function reactionTo(event: Event, session: T.Session | undefined, trackin
       // A prompt-mode persona and what the turn is reminded of ride on top of the input: the panel shows the brief itself,
       // then what was recalled.
       const at = event.input.lastIndexOf(briefBreak);
-      journal.push({ type: "prompt", text: at >= 0 ? event.input.slice(at + briefBreak.length) : event.input });
+      // A turn that goes on with a run a restart left asks nothing new.
+      if (event.input !== goOn) journal.push({ type: "prompt", text: at >= 0 ? event.input.slice(at + briefBreak.length) : event.input });
       const recalled = recalledIn(event.input);
       if (recalled) journal.push({ type: "note", kind: "memory/recalled", text: recalled });
       facts.push({

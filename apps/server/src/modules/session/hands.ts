@@ -53,6 +53,8 @@ export interface Hand {
   triggers: { readonly trigger: T.RunTrigger; readonly envelopeIds: readonly string[]; readonly inputId?: string }[];
   readonly inputs: Map<string, readonly string[]>;
   run: string;
+  /** The run a restart left under way, for the turn that goes on with it to take up rather than start another. */
+  goesOn?: string;
   heard: string[];
   report: T.IssueReport | undefined;
   settling?: { readonly report: SubagentReport; readonly completedBefore: number };

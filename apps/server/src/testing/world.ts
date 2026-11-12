@@ -42,6 +42,8 @@ export interface WorldOptions {
   readonly config?: ServerConfig;
   /** The runtimes sessions run on; each is probed as installed. */
   readonly runtimes?: readonly Runtime[];
+  /** VibeValley's own runtime too, on the farm's harness, probed as installed. */
+  readonly ownRuntime?: boolean;
   readonly repoHooks?: RepoHooks;
   /** Repos made before the farm starts, each a git repository with one commit. */
   readonly repos?: readonly string[];
@@ -122,9 +124,9 @@ export async function moduleWorld(options: WorldOptions = {}): Promise<ModuleWor
   const deepseek = scriptedDeepSeek(clock);
   const o: ServiceOptions = {
     runtime: {
-      registry: registryOf(given),
+      registry: options.ownRuntime === true ? (own) => registryOf([...given, own]) : registryOf(given),
       background: false,
-      probe: installedOnly(given, options.usage),
+      probe: installedOnly(options.ownRuntime === true ? [...given, { id: "vibevalley" }] : given, options.usage),
       usageOf: async () => options.usage?.() ?? null,
       models: options.models ?? deepseek.models,
     },

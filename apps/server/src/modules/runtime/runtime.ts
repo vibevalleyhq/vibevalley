@@ -94,7 +94,8 @@ export interface RuntimeDeps {
 type UsageOf = (id: string, runtime: OarRuntime, found: AvailableInstallation, settings: T.RuntimeSettings) => Promise<T.AccountUsage | null>;
 
 export interface RuntimeOptions {
-  registry?: RuntimeRegistry;
+  /** The runtimes there are; a function is handed VibeValley's own, on this farm's harness. */
+  registry?: RuntimeRegistry | ((own: OarRuntime) => RuntimeRegistry);
   probe?: (id: string) => Promise<T.RuntimeInfo>;
   usageOf?: UsageOf;
   background?: boolean;
@@ -169,7 +170,8 @@ export async function makeRuntime(deps: RuntimeDeps, options: RuntimeOptions = {
   // opens again has its tools and prompt.
   const helpers = makeHelpers({ todos: dbTodoStores({ db: deps.db, clock }), time: clock, log });
   const durable = await openDurable({ file: durableFile(config), clock, log, models, extensions: [helpers.extension] });
-  const registry = options.registry ?? registryOf([vibevalleyRuntimeOf({ durable, helpers, owner, log }), dshRuntime]);
+  const own = vibevalleyRuntimeOf({ durable, helpers, owner, log });
+  const registry = typeof options.registry === "function" ? options.registry(own) : (options.registry ?? registryOf([own, dshRuntime]));
   const tasks = new TaskGroup({ name: "runtime", onError: (task, e) => log.warn(`${task} failed`, e) });
   const usageOf = async (id: string, runtime: OarRuntime, found: AvailableInstallation, settings: T.RuntimeSettings): Promise<T.AccountUsage | null> => {
     if (!options.usageOf && id === "pi") return piBalance(settings, process.env);

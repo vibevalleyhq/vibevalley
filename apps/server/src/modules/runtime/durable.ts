@@ -69,6 +69,10 @@ export interface Durable {
   readonly model: (id: string) => DeepSeekModel;
   /** Why nothing can be asked now (no DeepSeek key), in the user's words; undefined when a model can be asked. */
   readonly cannotAsk: () => string | undefined;
+  /** The farm is stopping: a session of VibeValley's own runtime let go from now on leaves its run under way, for the
+   * next open to go on with. */
+  readonly leave: () => void;
+  readonly leaving: () => boolean;
   readonly close: () => Promise<void>;
 }
 
@@ -245,10 +249,25 @@ export async function openDurable(deps: DurableDeps): Promise<Durable> {
   };
 
   let closing: Promise<void> | undefined;
+  let left = false;
   // The runs under way stay as they are: the next open goes on with them.
-  const close = () => (closing ??= harness.close(context));
+  const close = () => {
+    left = true;
+    return (closing ??= harness.close(context));
+  };
 
-  return { harness, registry, conversation, existing, busy, model, cannotAsk: deps.models.cannotAsk, close };
+  return {
+    harness,
+    registry,
+    conversation,
+    existing,
+    busy,
+    model,
+    cannotAsk: deps.models.cannotAsk,
+    leave: () => void (left = true),
+    leaving: () => left,
+    close,
+  };
 }
 
 /** The extensions conv selects that are not installed, each as it last showed itself to the model: the tools and

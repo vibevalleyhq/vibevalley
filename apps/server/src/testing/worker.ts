@@ -156,7 +156,7 @@ export const helper = (turns: ScriptedTurn[] = [], before?: (turn: ScriptedTurn,
 
 /** A probe that finds every runtime given, bundled, and no other. */
 export const installedOnly =
-  (given: readonly Runtime[], usage: () => AccountUsage | null = () => null) =>
+  (given: readonly Pick<Runtime, "id">[], usage: () => AccountUsage | null = () => null) =>
   async (id: string): Promise<RuntimeInfo> => ({
     id,
     preset: presetOf(id),
