@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 import { Hub, Semaphore, type Subscription, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -7,7 +5,7 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { BizCode, Inconsistent, lookIn, missing, refuseIn } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
-import { jsonOf, valueOf } from "#/base/json.ts";
+import { jsonOf } from "#/base/json.ts";
 import type { Core } from "#/core/core.ts";
 import type { ServerConfig } from "#/infra/config.ts";
 import type { Db } from "#/infra/db.ts";
@@ -17,14 +15,13 @@ import type { Agent } from "#/modules/agent/agent.ts";
 import * as qd from "#db/session_delivery.sql.ts";
 import * as qr from "#db/session_trigger.sql.ts";
 
-import { Reach, WakeBreaker } from "./brakes.ts";
 import { Deliveries, type DeliveryRow, type DeliveryDraft } from "./deliveries.ts";
-import { type ChannelEnvelopeRow, type ChannelRouteResult, type ChatView, type Envelope, type ChannelHearers, type Handed } from "./envelope.ts";
+import { type AgentWakes, type ChannelEnvelopeRow, type ChatView, type Envelope, type Handed, type Hearer } from "./envelope.ts";
 import type { Lifecycle, SessionNews } from "./lifecycle.ts";
 import { inputOf, orchestratorSource, deliveryScope, type InputContext, type SourceEvent, type TriggerInput, type TriggerResource } from "./payload.ts";
 import { wakeInput } from "./prompts.ts";
 import { makePump } from "./pump.ts";
-import { channelRecipients, waitsForHuman } from "./routing.ts";
+import { waitsForHuman } from "./routing.ts";
 import * as S from "./schema.ts";
 import type { Trigger } from "./shapes.ts";
 import { triggerJournal } from "./triggers.ts";
@@ -39,9 +36,6 @@ export interface InsertDelivery {
   readonly row: DeliveryDraft;
 }
 
-const RoutePosition = z.object({ scope: z.string(), position: z.number().int() });
-const readRouteReceipt = valueOf(RoutePosition.extend({ from_user: z.boolean() }), "mailbox.routeReceipt");
-const readUserRoutes = valueOf(z.array(RoutePosition), "mailbox.userRoutes");
 const readTrigger = jsonOf(S.Trigger);
 
 export interface QueuedInput {
@@ -87,7 +81,8 @@ export interface Dispatch {
 
 export type DeliveryNews =
   | { readonly _tag: "Consumed"; readonly session: string; readonly envelope: string }
-  | { readonly _tag: "Braked"; readonly session: string; readonly failed: number }
+  /** A wake that ended before the session said a word, its inputs handed back: what the wake breaker counts. */
+  | { readonly _tag: "EmptyWake"; readonly session: string }
   | Handed;
 
 export interface Mailbox {
@@ -102,9 +97,8 @@ export interface Mailbox {
   /** Dispatches first, then routed order. */
   readonly queuedTriggers: () => Promise<readonly QueuedInput[]>;
   readonly isRouted: (trigger: string) => Promise<boolean>;
-  /** A trigger's refusals are ApiErrors; a hire's is HireRefused. */
-  /** A recorded trigger routed to who hears it (its audience when given); refusals are ApiErrors. */
-  readonly route: (trigger: Trigger, to?: ChannelHearers | { readonly session: string }) => Promise<ChannelRouteResult>;
+  /** A recorded trigger routed to who hears it (hearers when given, as the layer above braked them); refusals are ApiErrors. */
+  readonly route: (trigger: Trigger, hearers?: readonly Hearer[]) => Promise<void>;
   /** A helper hired with its first inputs; throws HireRefused. */
   readonly hireWith: (arrival: HireArrival) => Promise<HiredReceipt>;
   readonly subscribe: (issue: string, threads: readonly string[]) => Promise<void>;
@@ -126,6 +120,10 @@ export interface Mailbox {
   readonly withdrawDispatches: (issue: string, at: number) => Promise<void>;
   /** The chat the mailbox reads its places from, told by the layer above it; until then, an empty one. */
   readonly useChat: (view: ChatView) => void;
+  /** A session's pending inputs kept from waking it (held) or let wake it again: the wake breaker's, decided above. */
+  readonly holdWakes: (session: string, held: boolean) => Promise<void>;
+  /** What agents' words woke since the user last spoke, as kept: where the brakes start from at startup. */
+  readonly agentWakes: () => Promise<AgentWakes>;
   readonly waitingOn: (envelope: string) => Promise<number>;
   readonly decline: (session: string, envelope: string, reason: string) => Promise<void>;
   readonly close: () => Promise<void>;
@@ -155,25 +153,9 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
     return chat.unreadOf(who, h?.channel ?? chat.defaultChannel());
   };
   const open = new Deliveries();
-  const reach = new Reach();
-  const received = (row: qr.MarkRoutedResult) => {
-    const receipt = readRouteReceipt(row);
-    if (receipt.from_user) reach.userSpoke(receipt.scope, receipt.position);
-  };
-  const stored = (session: string, row: DeliveryRow) => {
-    open.inserted(session, row);
-    if (row.payload.trigger.actor.kind === "user" && row.envelope_id !== row.payload.trigger.id) reach.userSpoke(row.scope, row.position);
-    reach.delivered({
-      scope: row.scope,
-      position: row.position,
-      session,
-      senderKind: row.payload.trigger.actor.kind,
-      wakes: row.wakes,
-      held: row.held_by !== null,
-      at: row.created_at,
-    });
-  };
-  const breaker = new WakeBreaker();
+  const stored = (session: string, row: DeliveryRow) => open.inserted(session, row);
+  /** The sessions the wake breaker holds: their inputs wait until it lets them go. */
+  const braked = new Set<string>();
   const newsHub = new Hub<DeliveryNews>();
   const routeLock = new Semaphore(1);
   const routeLocked = <A>(work: () => Promise<A>) => routeLock.with(work);
@@ -206,12 +188,9 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
     { db, clock, session: sessions, agent: agents },
     {
       writtenLocked,
-      received,
       stored,
       defaultChannel: defaultChannelOf,
       open,
-      reach,
-      breaker,
       dispatch: (session) => later(`trigger:${session}`, 0, () => pump.kick(session)),
       issueOf,
       orchestratorIn: orchestratorInChannel,
@@ -220,52 +199,33 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
   const flushIssue = (issue: string, human?: boolean) => routeLocked(() => work.flush(issue, human));
   const restore = () =>
     writtenLocked(async () => {
-      const snapshot = await db.tx(async () => {
+      const rows = await db.tx(async () => {
         await qd.rollbackAll(db.sql);
-        return {
-          rows: await qd.allOpenDeliveries(db.sql),
-          scopes: await qd.agentWakesByScope(db.sql),
-          sessions: await qd.lastAgentWakes(db.sql),
-          users: await qd.lastUserRoutes(db.sql),
-        };
+        return qd.allOpenDeliveries(db.sql);
       });
-      open.load(snapshot.rows);
-      reach.load(
-        snapshot.scopes,
-        snapshot.sessions.filter((row) => sessions.isReachable(row.session_id)),
-        readUserRoutes(snapshot.users),
-      );
+      open.load(rows);
     });
 
   // Routing is one at a time and, once begun, runs to its end.
-  const route = (trigger: Trigger, to?: ChannelHearers | { readonly session: string }): Promise<ChannelRouteResult> =>
+  const route = (trigger: Trigger, hearers?: readonly Hearer[]): Promise<void> =>
     routeLocked(async () => {
-      const audience: readonly OutboundDelivery[] | undefined =
-        to === undefined
-          ? undefined
-          : "row" in to
-            ? channelRecipients(trigger, to)
-            : [
-                {
-                  trigger,
-                  session: to.session,
-                  role: agents.isOrchestrator(to.session) ? ("orchestrator" as const) : ("worker" as const),
-                  commit: async () => {},
-                  event: trigger.actor.kind === "user" ? ("conversation" as const) : ("mention" as const),
-                },
-              ];
-      const result = await work.receive(trigger, audience);
+      const audience: readonly OutboundDelivery[] | undefined = hearers?.map((h) => ({
+        trigger,
+        session: h.session,
+        delivery: { reason: h.reason, wakes: h.wakes, ...(h.heldBy ? { heldBy: h.heldBy } : {}) },
+        role: h.role,
+        event: h.event,
+        commit: async () => {},
+      }));
+      await work.receive(trigger, audience);
       if (!(await work.isRouted(trigger.id))) {
-        const at = clock.now();
         const routed = await qr.markRouted(db.sql, {
           envelope_id: trigger.id,
           scope: deliveryScope(trigger.replyChannel ?? (await defaultChannelOf())),
-          routed_at: at,
+          routed_at: clock.now(),
         });
         if (routed === undefined) throw new Inconsistent(`trigger ${trigger.id} was routed before it was recorded`);
-        received(routed);
       }
-      return result ?? { heldNotice: "" };
     });
 
   const hire = async (arrival: HireArrival): Promise<HiredReceipt> => {
@@ -296,8 +256,7 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
       await qd.dropOpen(db.sql, { session_id: session, dropped_why: why });
       await db.afterCommit(() => {
         open.dropped(session);
-        reach.left(session);
-        breaker.reset(session);
+        braked.delete(session);
       });
     });
   const record = async (event: SourceEvent) => {
@@ -364,9 +323,8 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
             return rows.map((row) => row.envelope_id);
           }),
         ),
-      breakerSpoke: (session) => breaker.spoke(session),
-      breakerFailed: (session) => breaker.failed(session),
-      breakerOpen: (session) => breaker.isOpen(session),
+      emptyWake: (session) => newsHub.publish({ _tag: "EmptyWake", session }),
+      braked: (session) => braked.has(session),
 
       readyInputs: (recipient, rows) => {
         const current = sessions.sessionOf(recipient)?.issue;
@@ -406,7 +364,6 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
       consumedMessages: async (recipient, messages) => {
         for (const message of messages) newsHub.publish({ _tag: "Consumed", session: recipient, envelope: message });
       },
-      breakerNotice: async (recipient, failed) => newsHub.publish({ _tag: "Braked", session: recipient, failed }),
       later,
       noticeBatchMs: config.chat.noticeBatchMs,
       retryWakeMs: config.chat.retryWakeMs,
@@ -532,6 +489,17 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
     withdrawDispatches: (issue, at) => work.retireDispatches(issue, at),
     useChat: (view) => {
       chat = view;
+    },
+    holdWakes: async (session, held) => {
+      if (held) braked.add(session);
+      else if (braked.delete(session)) await pumpLocked(() => pump.kick(session));
+    },
+    agentWakes: async () => {
+      const [scopes, last] = await Promise.all([qd.agentWakesByScope(db.sql), qd.lastAgentWakes(db.sql)]);
+      return {
+        scopes: scopes.map((row) => ({ scope: row.scope, n: row.n ?? 0 })),
+        sessions: last.filter((row) => sessions.isReachable(row.session_id)).map((row) => ({ session: row.session_id, at: row.at ?? 0 })),
+      };
     },
     waitingOn: async (envelope) => (await qd.waitingOn(db.sql, { message_id: envelope })).length,
     decline: async (session, envelope, reason) => {

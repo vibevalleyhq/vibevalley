@@ -27,7 +27,6 @@ import { type Attachment, makeAttachment } from "#/modules/attachment/attachment
 import { type Channel, catchUpMax, makeChannel } from "#/modules/channel/channel.ts";
 import { effectsOf } from "#/modules/game/view.ts";
 import { channelUses } from "#/modules/issue/issue.ts";
-import { wakeBreaker } from "#/modules/session/brakes.ts";
 import type { Handed } from "#/modules/session/envelope.ts";
 import { restoredSession, sessionState } from "#/modules/session/history.ts";
 import type { Lifecycle } from "#/modules/session/lifecycle.ts";
@@ -39,6 +38,7 @@ import { testConfig, until, waitFor } from "#/testing/layers.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qsession from "#db/session.sql.ts";
 
+import { wakeBreaker } from "./brakes.ts";
 import { makeWatch, type Watch } from "./watch.ts";
 
 /** Sessions played: a turn takes its input, says it got it and reports. the slow mode is held until release (unless holds is off), the fail mode fails. */

@@ -1,5 +1,5 @@
 import { channelType, type Meta, metaOf, type MsgRow, type Place } from "#/modules/channel/contracts.ts";
-import { actorOfParticipant, type ChannelEnvelopeRow, type ChannelHearers } from "#/modules/session/envelope.ts";
+import { actorOfParticipant, type ChannelEnvelopeRow } from "#/modules/session/envelope.ts";
 import type { InputContext, TriggerInput } from "#/modules/session/payload.ts";
 import type { TriggerSource } from "#/modules/session/shapes.ts";
 
@@ -35,8 +35,17 @@ export const envelopeRowOf = (row: MsgRow, place: Place, channelName: string): C
   channel_name: channelName,
 });
 
+/** A chat message as its trigger is made from it: the row, the one it was said to alone (`to` in say), who it names and
+ * the session whose thread it is in. */
+export interface ChannelFact {
+  readonly row: ChannelEnvelopeRow;
+  readonly addressed?: string;
+  readonly mentions: readonly string[];
+  readonly threadOwner?: string;
+}
+
 /** The trigger a channel message is recorded as: its own id, its words, where it was said and who it is for. */
-export const channelTrigger = (fact: ChannelHearers, context: InputContext): TriggerInput => {
+export const channelTrigger = (fact: ChannelFact, context: InputContext): TriggerInput => {
   const meta = metaOf(fact.row.meta);
   const source = meta.ingressSource ? sourceByPurpose[meta.ingressSource] : "channel";
   const input: TriggerInput = {
@@ -46,9 +55,9 @@ export const channelTrigger = (fact: ChannelHearers, context: InputContext): Tri
     actor: actorOfParticipant(fact.row.sender_kind, fact.row.sender_role, fact.row.sender_id, fact.row.name),
     addressed: fact.addressed
       ? "direct"
-      : fact.audience.mentions.length > 0
+      : fact.mentions.length > 0
         ? "mention"
-        : fact.row.channel_type === "thread" && fact.audience.threadOwner
+        : fact.row.channel_type === "thread" && fact.threadOwner
           ? "thread_owner"
           : "unaddressed",
     threads: [`channel:${fact.row.channel_id}`, ...(fact.row.subject_kind === "issue" && fact.row.subject_id ? [`issue:${fact.row.subject_id}`] : [])],

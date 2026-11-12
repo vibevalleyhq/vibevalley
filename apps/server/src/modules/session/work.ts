@@ -15,14 +15,13 @@ import * as qi from "#db/session_issue_input.sql.ts";
 import * as qs from "#db/session_subscription.sql.ts";
 import * as qr from "#db/session_trigger.sql.ts";
 
-import { agentWakeCooldownMs, brakes, hopLimit, hopLimitText, type Recipient, type Reach, type WakeBreaker } from "./brakes.ts";
 import type { Deliveries, DeliveryDraft, DeliveryRow } from "./deliveries.ts";
-import { channelType, type ChannelRouteResult } from "./envelope.ts";
+import { channelType, type DeliveryEvent, type Hearer } from "./envelope.ts";
 import { type Lifecycle, NotRecorded } from "./lifecycle.ts";
 import type { InsertDelivery, TalkRow } from "./mailbox.ts";
 import { readPayload, deliveryScope, triggerPayload } from "./payload.ts";
 import { handbackWords, releasedInputWords } from "./prompts.ts";
-import { holdReasonOf, type DeliveryEvent, type Urgency, triggerEvent, urgencyOf } from "./routing.ts";
+import { holdReasonOf, type Urgency, triggerEvent, urgencyOf } from "./routing.ts";
 import * as S from "./schema.ts";
 import type { Trigger } from "./shapes.ts";
 
@@ -30,7 +29,8 @@ const refused = refuseIn(BizCode.ChannelRefused);
 
 export interface OutboundDelivery {
   readonly urgency?: Urgency;
-  readonly delivery?: Recipient;
+  /** Why it is delivered, whether it wakes and what held it back, as the layer above worked it out (watch/brakes.ts). */
+  readonly delivery?: Pick<Hearer, "reason" | "wakes" | "heldBy">;
   readonly event?: DeliveryEvent;
   readonly role?: T.AgentRole;
   readonly deliveryId?: string;
@@ -47,12 +47,9 @@ export interface OutboundDelivery {
 
 interface WorkOptions {
   readonly writtenLocked: <A>(work: () => Promise<A>) => Promise<A>;
-  readonly received: (receipt: qr.MarkRoutedResult) => void;
   readonly stored: (session: string, row: DeliveryRow) => void;
   readonly defaultChannel: () => Promise<string>;
   readonly open: Deliveries;
-  readonly reach: Reach;
-  readonly breaker: WakeBreaker;
   readonly dispatch: (session: string) => void;
   readonly issueOf: (id: string) => T.Issue | undefined;
   /** The orchestrator in a channel (envelope.ts orchestratorIn): who what names no one there goes to. */
@@ -73,7 +70,7 @@ const notRecorded = (e: unknown): unknown => (e instanceof SqlError || e instanc
 
 export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
   const { db, clock, session: sessions, agent: agents } = deps;
-  const { writtenLocked, received, stored, defaultChannel, open, reach, breaker, dispatch, issueOf, orchestratorIn } = options;
+  const { writtenLocked, stored, defaultChannel, open, dispatch, issueOf, orchestratorIn } = options;
 
   const writeDelivery = (input: InsertDelivery) =>
     qd.insertDelivery(db.sql, {
@@ -100,14 +97,13 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
     return receipt;
   };
 
-  const forward = (inputs: readonly OutboundDelivery[]): Promise<ChannelRouteResult> =>
+  const forward = (inputs: readonly OutboundDelivery[]): Promise<void> =>
     writtenLocked(async () => {
       const at = clock.now();
-      const drafts = [];
+      const entries: { input: OutboundDelivery; row: DeliveryDraft }[] = [];
       for (const input of inputs) {
         const { trigger } = input;
         const destination = trigger.replyChannel ?? sessions.sessionOf(input.session)?.channel ?? (await defaultChannel());
-        const scope = deliveryScope(destination, input.issue);
         const urgency =
           input.urgency ??
           urgencyOf({
@@ -117,34 +113,12 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
             event: input.event ?? triggerEvent(trigger),
             canSteer: true,
           });
-        drafts.push({
+        const delivery = input.delivery ?? { reason: "addressed" as const, wakes: urgency !== "digest" };
+        entries.push({
           input,
-          destination,
-          scope,
-          urgency,
-          candidate: input.delivery ?? { recipient: input.session, reason: "addressed" as const, wakes: urgency !== "digest" },
-        });
-      }
-      const entries = [...Map.groupBy(drafts, (draft) => draft.scope).values()].flatMap((group) => {
-        const first = group[0];
-        if (!first) return [];
-        const deliveries = brakes(
-          group.map((draft) => draft.candidate),
-          {
-            actor: first.input.trigger.actor,
-            orchestrators: agents.orchestrators().map((agent) => agent.id),
-            hops: reach.hops(first.scope),
-            cooling: group.filter((draft) => at - reach.lastWake(draft.input.session) < agentWakeCooldownMs).map((draft) => draft.input.session),
-            broken: breaker.tripped(),
-          },
-        );
-        return group.flatMap(({ input, scope, destination, urgency }, index) => {
-          const { trigger } = input;
-          const delivery = deliveries[index];
-          if (!delivery) return [];
-          const row: DeliveryDraft = {
+          row: {
             envelope_id: input.deliveryId ?? trigger.id,
-            scope,
+            scope: deliveryScope(destination, input.issue),
             message_id: trigger.meta.channelMessageId ?? null,
             channel_id: destination,
             source: trigger.source,
@@ -156,12 +130,11 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
             launch: null,
             created_at: at,
             payload: triggerPayload(trigger, input.issue, input.note),
-          };
-          return [{ input, row }];
+          },
         });
-      });
+      }
       await db.tx(async () => {
-        const committed: ({ input: OutboundDelivery; row: DeliveryDraft; added: qd.InsertDeliveryResult[]; receipt: qr.MarkRoutedResult } | undefined)[] = [];
+        const committed: ({ input: OutboundDelivery; row: DeliveryDraft; added: qd.InsertDeliveryResult[] } | undefined)[] = [];
         for (const { input, row } of entries) {
           if (input.prepare && !(await input.prepare())) {
             committed.push(undefined);
@@ -170,20 +143,17 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
           if (input.previous) await qd.dropReassigned(db.sql, { session_id: input.previous, envelope_id: input.trigger.id });
           const added = await writeDelivery({ session: input.session, row });
           await input.commit();
-          const receipt = await markRoute({ session: input.session, row });
-          committed.push({ input, row, added, receipt });
+          await markRoute({ session: input.session, row });
+          committed.push({ input, row, added });
         }
         await db.afterCommit(() => {
           for (const entry of committed) {
             if (!entry) continue;
-            received(entry.receipt);
             if (entry.input.previous) open.remove(entry.input.previous, entry.input.trigger.id);
             for (const added of entry.added) stored(entry.input.session, { ...entry.row, position: added.position });
-            if (entry.input.trigger.actor.kind === "user" && entry.row.wakes) breaker.reset(entry.input.session);
           }
         });
       });
-      return { heldNotice: entries.some(({ row }) => row.held_by === "hop_limit") ? hopLimitText(hopLimit) : "" };
     });
 
   const registerInitialInputs = (session: T.Session, launch: string, inputs: readonly Trigger[]): Promise<void> =>
@@ -208,17 +178,16 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
       }));
       try {
         await db.tx(async () => {
-          const committed: { added: qd.InsertDeliveryResult[]; receipt: qr.MarkRoutedResult; row: DeliveryDraft }[] = [];
+          const committed: { added: qd.InsertDeliveryResult[]; row: DeliveryDraft }[] = [];
           for (const row of rows) {
             if (session.issue) await qi.holdIssueTrigger(db.sql, { trigger_id: row.envelope_id, issue_id: session.issue, created_at: at });
             const added = await writeDelivery({ session: session.id, row });
             await qd.markHanded(db.sql, { session_id: session.id, envelope_id: row.envelope_id, launch, handed_at: at });
             if (session.issue) await qi.forwardIssueInput(db.sql, { trigger_id: row.envelope_id, session_id: session.id });
-            const receipt = await markRoute({ session: session.id, row });
-            committed.push({ added, receipt, row });
+            await markRoute({ session: session.id, row });
+            committed.push({ added, row });
           }
           await db.afterCommit(() => {
-            for (const entry of committed) received(entry.receipt);
             for (const entry of committed) for (const added of entry.added) stored(session.id, { ...entry.row, position: added.position });
           });
         });
@@ -270,18 +239,15 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
       }
       try {
         await db.tx(async () => {
-          const committed: { added: qd.InsertDeliveryResult[]; receipt: qr.MarkRoutedResult; row: DeliveryDraft }[] = [];
+          const committed: { added: qd.InsertDeliveryResult[]; row: DeliveryDraft }[] = [];
           for (const row of prepared) {
             const added = await writeDelivery({ session, row });
             await qd.markHanded(db.sql, { session_id: session, envelope_id: row.envelope_id, launch, handed_at: at });
-            const receipt = await markRoute({ session, row });
-            committed.push({ row, added, receipt });
+            await markRoute({ session, row });
+            committed.push({ row, added });
           }
           await db.afterCommit(() => {
-            for (const entry of committed) {
-              received(entry.receipt);
-              for (const added of entry.added) stored(session, { ...entry.row, position: added.position });
-            }
+            for (const entry of committed) for (const added of entry.added) stored(session, { ...entry.row, position: added.position });
           });
         });
       } catch (e) {
@@ -384,7 +350,7 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
 
   const isRouted = async (trigger: string): Promise<boolean> => (await qr.isRouted(db.sql, { envelope_id: trigger }))?.routed === true;
 
-  const receive = async (trigger: Trigger, audience?: readonly OutboundDelivery[]): Promise<ChannelRouteResult | undefined> => {
+  const receive = async (trigger: Trigger, audience?: readonly OutboundDelivery[]): Promise<void> => {
     const existing = await qi.existingIssueInput(db.sql, { trigger_id: trigger.id });
     if (existing) {
       if (existing.state === "held") await flush(existing.issue_id);
@@ -404,7 +370,7 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
     const issue = ids.values().next().value;
     if (issue) {
       const at = clock.now();
-      const receipt = await db.tx(async () => {
+      await db.tx(async () => {
         await qi.holdIssueTrigger(db.sql, { issue_id: issue, trigger_id: trigger.id, created_at: at });
         if (trigger.meta.dispatch === true) await qi.supersedeDispatch(db.sql, { issue_id: issue, trigger_id: trigger.id });
         const routed = await qr.markRouted(db.sql, {
@@ -413,23 +379,20 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
           scope: deliveryScope(trigger.replyChannel ?? (await defaultChannel()), issue),
         });
         if (routed === undefined) throw new Inconsistent(`trigger ${trigger.id} was routed before it was recorded`);
-        return routed;
       });
-      await writtenLocked(async () => received(receipt));
       await flush(issue, trigger.actor.kind === "user");
       return;
     }
     if (audience) {
-      const result = await forward(audience);
+      await forward(audience);
       for (const input of audience) dispatch(input.session);
-      return result;
+      return;
     }
     const addressed = trigger.meta.ingressRecipient;
     const recipient =
       addressed !== undefined && agents.isOrchestrator(addressed) ? addressed : await orchestratorIn(trigger.replyChannel ?? (await defaultChannel()));
     await forward([{ trigger, session: recipient, commit: async () => {} }]);
     dispatch(recipient);
-    return undefined;
   };
 
   const decline = async (session: string, delivery: string, reason: string): Promise<boolean> => {

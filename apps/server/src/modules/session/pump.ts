@@ -14,9 +14,10 @@ interface PumpPorts<Message> {
   readonly returnHanded: (session: string) => Promise<readonly string[]>;
   readonly handBack: (session: string, envelope: string) => Promise<void>;
   readonly dropSession: (session: string, why: string) => Promise<void>;
-  readonly breakerSpoke: (session: string) => void;
-  readonly breakerFailed: (session: string) => { readonly count: number; readonly tripped: boolean };
-  readonly breakerOpen: (session: string) => boolean;
+  /** A wake ended before the session said a word and handed its inputs back (the wake breaker above counts these). */
+  readonly emptyWake: (session: string) => void;
+  /** Held by the wake breaker: its inputs do not wake it. */
+  readonly braked: (session: string) => boolean;
   readonly readyInputs: (recipient: string, rows: readonly DeliveryRow[]) => readonly DeliveryRow[];
   readonly closed: () => boolean;
   readonly isHosted: (id: string) => boolean;
@@ -24,7 +25,6 @@ interface PumpPorts<Message> {
   readonly wakeInput: (recipient: string, rows: readonly DeliveryRow[], messages: readonly Message[]) => Promise<string>;
   readonly handToHost: (recipient: string, messages: readonly Message[], primary: DeliveryRow) => Promise<void>;
   readonly consumedMessages: (recipient: string, envelopes: readonly string[]) => Promise<void>;
-  readonly breakerNotice: (recipient: string, failed: number) => Promise<void>;
   readonly later: (key: string, ms: number, effect: () => Promise<void>) => void;
   readonly noticeBatchMs: number;
   readonly retryWakeMs: number;
@@ -93,7 +93,7 @@ export const makePump = <Message>(deps: { readonly session: Lifecycle; readonly 
       if (rows.some((row) => row.state === "pending" && row.held_by === null)) ports.later(`notice:${recipient}`, ports.noticeBatchMs, () => notify(recipient));
       return;
     }
-    if (waking.length === 0 || ports.breakerOpen(recipient)) return;
+    if (waking.length === 0 || ports.braked(recipient)) return;
     const batch = rows.filter((row) => row.state === "pending");
     const messages = batch.map(ports.message);
     const input = await ports.wakeInput(recipient, batch, messages);
@@ -124,18 +124,13 @@ export const makePump = <Message>(deps: { readonly session: Lifecycle; readonly 
     if (ports.closed()) return;
     switch (activity._tag) {
       case "Spoke":
-        ports.breakerSpoke(activity.id);
-        return;
       case "Settling":
         return;
       case "HandedOff":
       case "Ended": {
         const rolled = await ports.returnHanded(activity.id);
         if (rolled.length > 0) {
-          if (!activity.spoke) {
-            const { count, tripped } = ports.breakerFailed(activity.id);
-            if (tripped) await ports.breakerNotice(activity.id, count);
-          }
+          if (!activity.spoke) ports.emptyWake(activity.id);
           ports.later(`wake:${activity.id}`, ports.retryWakeMs, () => kick(activity.id));
           return;
         }

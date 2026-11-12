@@ -21,13 +21,16 @@ import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import { type Committed, type Meta, messageKind, metaOf, type MsgRow, type ThreadSubject, type Told } from "#/modules/channel/contracts.ts";
-import { actorOfParticipant, type ChannelHearers } from "#/modules/session/envelope.ts";
-import { inputContext } from "#/modules/session/payload.ts";
+import { actorOfParticipant, type DeliveryEvent, type DeliveryReason, type Hearer } from "#/modules/session/envelope.ts";
+import { deliveryScope, inputContext } from "#/modules/session/payload.ts";
 import { envelopeLines, talkBrief } from "#/modules/session/prompts.ts";
 import { HireRefused, NotRecorded, type Session } from "#/modules/session/session.ts";
+import type { Trigger } from "#/modules/session/shapes.ts";
 import type { SessionNews } from "#/modules/session/signals.ts";
 import * as qw from "#db/watch_cursor.sql.ts";
 
+import { brakes, hopLimit, hopLimitText, Reach, type Recipient, WakeBreaker } from "./brakes.ts";
+import { type ChannelAudience, eventOf, whoHears } from "./hearers.ts";
 import { channelTrigger, envelopeRowOf } from "./trigger.ts";
 
 /** A helper profile's seat in the chat, the peer of its direct channel: apart from the orchestrators and the sessions. */
@@ -80,6 +83,8 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
   /** The newest event handled, and the cursor kept. */
   let through = 0;
   let kept = (await qw.cursorOf(db.sql, { name: routed }))?.seq ?? 0;
+  const reach = new Reach();
+  const breaker = new WakeBreaker();
   /** A direct talk being opened, by channel: the cursor stays before the event that opens it until it is open. */
   const opening = new Map<string, number>();
 
@@ -114,6 +119,37 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
     return sessionOf(c.topic.id) ? c.topic.id : "";
   };
 
+  /** A trigger routed to the candidates, each through the brakes first (scope: where the hops are counted); the hop
+   * limit's notice when it held one back. What woke whom is kept for the next. */
+  const hear = async (trigger: Trigger, scope: string, candidates: readonly Recipient[], event: (reason: DeliveryReason) => DeliveryEvent) => {
+    const at = clock.now();
+    const braked = brakes(candidates, {
+      actor: trigger.actor,
+      orchestrators: agents.orchestrators().map((a) => a.id),
+      hops: reach.hops(scope),
+      cooling: reach.cooling(
+        candidates.map((d) => d.recipient),
+        at,
+      ),
+      broken: breaker.tripped(),
+    });
+    const hearers: Hearer[] = braked.map((d) => ({
+      session: d.recipient,
+      reason: d.reason,
+      wakes: d.wakes,
+      ...(d.heldBy ? { heldBy: d.heldBy } : {}),
+      role: agents.isOrchestrator(d.recipient) ? "orchestrator" : "worker",
+      event: event(d.reason),
+    }));
+    await sessions.route(trigger, hearers);
+    if (trigger.actor.kind === "user") {
+      reach.userSpoke(scope);
+      // Spoken to by the user: the breaker lets it wake again.
+      for (const h of hearers) if (h.wakes && breaker.reset(h.session)) await sessions.holdWakes(h.session, false);
+    } else if (trigger.actor.kind === "agent") for (const h of hearers) if (h.wakes && !h.heldBy) reach.woke(scope, h.session, at);
+    return hearers.some((h) => h.heldBy === "hop_limit") ? hopLimitText(hopLimit) : undefined;
+  };
+
   /** again: read again from the events (at startup), so it may have been routed before; the hop limit's notice, if any. */
   const route = async (c: Committed, again: boolean): Promise<string | undefined> => {
     if (again && (await sessions.isRouted(c.row.id))) return undefined;
@@ -122,35 +158,30 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
     const sessionsNow = hired();
     const orchestrators = agents.orchestrators().map((a) => a.id);
     const present = sessionsNow.map((h) => h.id);
-    const audience = sessionsNow.filter((h) => c.channel.type === "thread" || channelOfSession(h) === c.row.channel_id).map((h) => h.id);
+    const listening = sessionsNow.filter((h) => c.channel.type === "thread" || channelOfSession(h) === c.row.channel_id).map((h) => h.id);
     const addressed = meta.ingressRecipient;
-    const recipients = [...new Set([...present, ...orchestrators, ...(addressed ? [addressed] : [])])];
-    const fact: ChannelHearers = {
-      row,
-      audience: {
-        from: row.sender_id,
-        actor: actorOfParticipant(row.sender_kind, row.sender_role, row.sender_id, row.name),
-        kind: messageKind(c.row.kind),
-        mentions: c.mentions,
-        channel: c.channel,
-        orchestrator: c.orchestrator,
-        channelMembers: c.channelMembers,
-        orchestrators,
-        threadOwner: ownerOf(c),
-        sessions: audience,
-        present,
-        members: c.members,
-        ...(meta.outcome ? { outcome: meta.outcome } : {}),
-        spoken: meta.spoken === true && meta.ingressSource !== "voice",
-      },
-      ...(addressed ? { addressed } : {}),
-      roles: Object.fromEntries(recipients.map((recipient) => [recipient, agents.isOrchestrator(recipient) ? "orchestrator" : "worker"])),
+    const threadOwner = ownerOf(c);
+    const audience: ChannelAudience = {
+      from: row.sender_id,
+      actor: actorOfParticipant(row.sender_kind, row.sender_role, row.sender_id, row.name),
+      kind: messageKind(c.row.kind),
+      mentions: c.mentions,
+      channel: c.channel,
+      orchestrator: c.orchestrator,
+      channelMembers: c.channelMembers,
+      orchestrators,
+      threadOwner,
+      sessions: listening,
+      present,
+      members: c.members,
       ...(meta.outcome ? { outcome: meta.outcome } : {}),
+      spoken: meta.spoken === true && meta.ingressSource !== "voice",
     };
+    const candidates: Recipient[] = addressed ? [{ recipient: addressed, reason: "addressed", wakes: true }] : whoHears(audience);
     try {
+      const fact = { row, mentions: c.mentions, threadOwner, ...(addressed ? { addressed } : {}) };
       const original = await sessions.recordTrigger(channelTrigger(fact, inputContext(chat.addressedOf(c.row))));
-      const answer = await sessions.route(original, fact);
-      return answer.heldNotice || undefined;
+      return await hear(original, deliveryScope(c.row.channel_id), candidates, (reason) => eventOf(audience, reason));
     } catch (error) {
       // A refusal is the route's answer: the message is kept and passed. Anything else (the database failing) fails the
       // write, and the event is told again at startup.
@@ -385,8 +416,15 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
 
   // The sessions' news, one at a time: hired and left open and close threads, a report is posted in the thread.
   const onSessionNews = async (n: SessionNews) => {
-    // Runs, inputs and launches are the issues' and Mailbox's.
-    if (closed || (n._tag !== "Hired" && n._tag !== "Left" && n._tag !== "Reported")) return;
+    if (closed) return;
+    // A word said: the wakes before that ended without one do not count.
+    if (n._tag === "Spoke") return breaker.spoke(n.id);
+    if (n._tag === "Left") {
+      reach.left(n.left.id);
+      breaker.reset(n.left.id);
+    }
+    // Runs, inputs and launches are the issues' and the deliveries'.
+    if (n._tag !== "Hired" && n._tag !== "Left" && n._tag !== "Reported") return;
     await bestEffort(log, `after ${n._tag}`, async () => {
       switch (n._tag) {
         case "Hired":
@@ -424,13 +462,17 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
             break;
           case "Handed":
             break;
-          case "Braked":
+          case "EmptyWake": {
+            const { count, tripped } = breaker.failed(change.session);
+            if (!tripped) break;
             await bestEffort(log, `wake breaker for ${change.session}`, async () => {
+              await sessions.holdWakes(change.session, true);
               const where = (await chat.homeOf(change.session)) ?? chat.defaultChannel();
               const name = sessions.live(change.session).session?.name ?? change.session;
-              await notice(where, t("server.channel.breaker", { name, failed: change.failed }), "wake_breaker");
+              await notice(where, t("server.channel.breaker", { name, failed: count }), "wake_breaker");
             });
             break;
+          }
         }
       }
     } finally {
@@ -471,7 +513,11 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
         ...(channel ? { replyChannel: channel } : {}),
         at,
       });
-      await sessions.route(trigger, { session });
+      await turn.with(() =>
+        hear(trigger, deliveryScope(channel ?? chat.defaultChannel()), [{ recipient: session, reason: "addressed", wakes: true }], () =>
+          trigger.actor.kind === "user" ? "conversation" : "mention",
+        ),
+      );
       return undefined;
     },
     previewRemove: async (id) => {
@@ -480,6 +526,8 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
       return { ...base, does: [...base.does, ...(waiting > 0 ? [t("server.channel.deletesDeliveries", { n: waiting })] : [])] };
     },
     boot: async () => {
+      const wakes = await sessions.agentWakes();
+      reach.load(wakes.scopes, wakes.sessions);
       await openThreads();
       await turn.with(async () => {
         // Each event once, in order: one that cannot be routed is logged and passed, not tried again and again.

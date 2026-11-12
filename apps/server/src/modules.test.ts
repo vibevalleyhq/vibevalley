@@ -86,7 +86,6 @@ const foreignQueries = (file: string, edges: readonly Edge[]) => {
 
 /** The deliveries' machinery inside session: other modules reach it through mailbox.ts's types and session.ts. */
 const deliveryFiles = new Set([
-  "modules/session/brakes.ts",
   "modules/session/deliveries.ts",
   "modules/session/pump.ts",
   "modules/session/routing.ts",

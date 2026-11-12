@@ -12,7 +12,7 @@ import type { Repo } from "#/modules/repo/repo.ts";
 import { RepoError, type WorkplaceCleanup, type WorkplaceRelease } from "#/modules/repo/workplace.ts";
 import type { Runtime } from "#/modules/runtime/runtime.ts";
 
-import type { Accepted, ChannelHearers, ChannelRouteResult, ChatView, Envelope } from "./envelope.ts";
+import type { Accepted, AgentWakes, ChatView, Envelope, Hearer } from "./envelope.ts";
 import type { AgentHost, HostOptions } from "./host.ts";
 import { HireRefused, type Lifecycle, makeLifecycle, type SessionNews, type SessionOptions } from "./lifecycle.ts";
 import { type Machine, makeMachine } from "./machine.ts";
@@ -28,9 +28,6 @@ export { DeliveryRefused, HireRefused, newsOf, NotRecorded, NotTakenIn, NotWorkF
 /** A hire: the helper, its brief and where it works, and the inputs it starts with. parent: the issue in that repo
  * whose branch its branch forks from; that issue's checkout is made first. */
 export type HireOrder = HireArrival & { readonly parent?: number };
-
-/** Who hears a routed trigger: a channel's hearers, or one session. */
-export type Audience = ChannelHearers | { readonly session: string };
 
 /** A session as this process has it now. */
 export interface Live {
@@ -50,8 +47,9 @@ export interface Live {
 /** An agent profile doing a piece of work: what triggers it and its deliveries, the sessions and their runs, their
  * workplaces, and the executions on the machine they run on. Refusals are ApiErrors unless a member says otherwise. */
 export interface Session {
-  /** A trigger already recorded, routed to who hears it (its audience when given). */
-  readonly route: (trigger: Trigger, to?: Audience) => Promise<ChannelRouteResult>;
+  /** A trigger already recorded, routed to who hears it: the hearers when given, as the layer above braked them; else
+   * the issue whose threads it is in, or the orchestrator of its place. */
+  readonly route: (trigger: Trigger, hearers?: readonly Hearer[]) => Promise<void>;
   /** A trigger recorded in the caller's transaction; route it after. */
   readonly recordTrigger: (input: TriggerInput) => Promise<Trigger>;
   /** A dispatch held for the issue's next helper: recorded in the caller's transaction, routed once it commits. */
@@ -69,6 +67,10 @@ export interface Session {
   /** The chat the deliveries read their places from (the default channel, a place's orchestrator, a participant's unread),
    * told by the layer above the sessions; until then, an empty one. */
   readonly useChat: (view: ChatView) => void;
+  /** A session's pending inputs kept from waking it, or let wake it again (and it is woken): the wake breaker's call. */
+  readonly holdWakes: (session: string, held: boolean) => Promise<void>;
+  /** What agents' words woke since the user last spoke, as the deliveries kept it. */
+  readonly agentWakes: () => Promise<AgentWakes>;
   /** A helper says an input is not its to take; the orchestrator is told why. */
   readonly decline: (session: string, envelope: string, reason: string) => Promise<void>;
   /** An orchestrator's host gives back an input it did not take. */
@@ -160,8 +162,9 @@ const receiving =
   (mailbox: Pick<Mailbox, "record" | "route">) =>
   async (event: SourceEvent): Promise<Accepted> => {
     const trigger = await mailbox.record(event);
-    if (trigger === undefined) return { heldNotice: "" };
-    return { ...(await mailbox.route(trigger)), trigger };
+    if (trigger === undefined) return {};
+    await mailbox.route(trigger);
+    return { trigger };
   };
 
 /** The door over the parts: what makeSession returns, and what a test that plays the sessions builds over its own. */
@@ -191,6 +194,8 @@ export function sessionOver(parts: {
     withdrawDeliveries: mailbox.withdrawDeliveries,
     withdrawDispatches: mailbox.withdrawDispatches,
     useChat: mailbox.useChat,
+    holdWakes: mailbox.holdWakes,
+    agentWakes: mailbox.agentWakes,
     decline: mailbox.decline,
     handBack: mailbox.handBack,
     stop: lifecycle.stop,

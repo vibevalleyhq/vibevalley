@@ -64,38 +64,34 @@ export interface ChannelEnvelopeRow {
   readonly channel_name: string | null;
 }
 
-export interface ChannelAudience {
-  readonly from: string;
-  readonly actor: T.Actor;
-  readonly kind: T.MessageKind;
-  readonly mentions: readonly string[];
-  readonly channel: Pick<T.Channel, "type" | "peer">;
-  readonly orchestrator: string;
-  readonly channelMembers: readonly string[];
-  readonly orchestrators: readonly string[];
-  readonly threadOwner?: string;
-  readonly sessions: readonly string[];
-  readonly present?: readonly string[] | null;
-  readonly members: readonly string[];
-  readonly outcome?: T.Outcome;
-  readonly spoken?: boolean;
+/** Why a delivery reaches its session. */
+export type DeliveryReason = "mention" | "everyone" | "own_thread" | "member" | "channel" | "direct" | "addressed";
+/** Which brake held a delivery back from waking its session (watch/brakes.ts). */
+export type HeldBy = "hop_limit" | "cooldown" | "wake_breaker";
+/** What a delivery is to its session: how urgent it is follows from this (routing.ts urgencyOf). */
+export type DeliveryEvent = "stop" | "conversation" | "mention" | "assignment" | "review" | "ci_failed" | "report_attention" | "report_progress" | "ambient";
+
+/** A session that hears a routed trigger, as the layer above worked it out: why, whether it wakes, what held it back. */
+export interface Hearer {
+  readonly session: string;
+  readonly reason: DeliveryReason;
+  readonly wakes: boolean;
+  readonly heldBy?: HeldBy;
+  readonly role: T.AgentRole;
+  readonly event: DeliveryEvent;
 }
 
-export interface ChannelHearers {
-  readonly row: ChannelEnvelopeRow;
-  readonly audience: ChannelAudience;
-  readonly addressed?: string;
-  readonly roles: Readonly<Record<string, T.AgentRole>>;
-  readonly outcome?: T.Outcome;
-}
-
-export interface ChannelRouteResult {
-  readonly heldNotice: string;
-}
-
-/** A source's event taken in: its trigger (none for the farm's own echo) and what its routing said. */
-export interface Accepted extends ChannelRouteResult {
+/** A source's event taken in: its trigger (none for the farm's own echo). */
+export interface Accepted {
   readonly trigger?: Trigger;
+}
+
+/** The wakes of agents' words since the user last spoke, as the deliveries kept them: what the brakes start from. */
+export interface AgentWakes {
+  /** Per routing scope (payload.ts deliveryScope), the deliveries that woke a session since the user's newest there. */
+  readonly scopes: readonly { readonly scope: string; readonly n: number }[];
+  /** Per session, when an agent's words last woke it. */
+  readonly sessions: readonly { readonly session: string; readonly at: number }[];
 }
 
 export interface Handed {
