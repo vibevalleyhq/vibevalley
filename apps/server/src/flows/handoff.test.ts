@@ -6,7 +6,7 @@ test("regression: user read cursors and later replies suppress external notifica
   const f = farm();
   await using fw = await f.open();
   const chat = fw.channel;
-  const inbox = fw.inbox;
+  const inbox = fw.watch;
   const channel = chat.defaultChannel();
   const agent = chat.orchestratorIn(channel);
   await chat.post({ from: agent, channel: channel, text: "需要你确认", run: "read-receipt" });

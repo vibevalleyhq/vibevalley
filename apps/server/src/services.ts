@@ -9,7 +9,6 @@ import { type Artifact, makeArtifact } from "#/modules/artifact/artifact.ts";
 import { type Attachment, makeAttachment } from "#/modules/attachment/attachment.ts";
 import { type Channel, makeChannel } from "#/modules/channel/channel.ts";
 import { type Game, makeGame } from "#/modules/game/game.ts";
-import { type Inbox, makeInbox } from "#/modules/inbox/inbox.ts";
 import { type Issue, makeIssue } from "#/modules/issue/issue.ts";
 import { makeMedia, type Media } from "#/modules/media/media.ts";
 import { makeMemory, type Memory, type MemoryOptions } from "#/modules/memory/memory.ts";
@@ -77,9 +76,8 @@ export interface Farm extends AsyncDisposable {
   readonly media: Media;
   readonly artifact: Artifact;
   readonly pkm: Pkm;
-  readonly watch: Watch;
   readonly issue: Issue;
-  readonly inbox: Inbox;
+  readonly watch: Watch;
   readonly tool: Tool;
   readonly orchestrator: Orchestrator;
   readonly game: Game;
@@ -124,8 +122,8 @@ export async function closeAll(closes: Close[]): Promise<void> {
   if (failures.length > 1) throw new AggregateError(failures, "the farm did not close cleanly");
 }
 
-/** The modules up to the issues and what runs on a schedule (modules.ts's order, through the issue module), built and not started:
- * what the farm builds first and what a module test runs on (testing/world.ts). */
+/** The modules up to the watch (modules.ts's order, through the watch), built and not started: what the farm builds
+ * first and what a module test runs on (testing/world.ts). */
 export type Modules = Pick<
   Farm,
   | "config"
@@ -149,11 +147,11 @@ export type Modules = Pick<
   | "media"
   | "artifact"
   | "pkm"
-  | "watch"
   | "issue"
+  | "watch"
 >;
 
-/** Builds the modules to the issues, each from the services before it, keeping each one's close in closes. heard is
+/** Builds the modules to the watch, each from the services before it, keeping each one's close in closes. heard is
  * handed the core before any module is built on it (a test's listener). */
 export async function buildModules(config: ServerConfig, options: ServiceOptions, closes: Close[], heard?: (core: Core) => void): Promise<Modules> {
   const parts = options.platform ?? {};
@@ -185,10 +183,11 @@ export async function buildModules(config: ServerConfig, options: ServiceOptions
   const media = own(await makeMedia({ db, core, clock, log, attachment, session, channel, provider, publicFetch }));
   const artifact = own(await makeArtifact({ db, clock, log, attachment, channel }));
   const pkm = own(await makePkm({ config, clock, log, db }));
-  // Watch: the chat's committed events routed to the sessions, and their threads, talks and receipts in the chat.
-  const watch = own(await makeWatch({ clock, log, db, agent, session, channel }));
   // Issues: the issues and what runs on a schedule.
-  const issue = own(await makeIssue({ config, clock, log, db, core, agent, repo, runtime, session, channel, watch }));
+  const issue = own(await makeIssue({ config, clock, log, db, core, agent, repo, runtime, session, channel }));
+  // Watch: the chat's committed events routed to the sessions through the brakes, their threads, talks and receipts in
+  // the chat; the user's inbox and the patrol.
+  const watch = own(await makeWatch({ config, clock, log, db, core, agent, session, channel, issue }));
   return {
     config,
     clock,
@@ -211,12 +210,12 @@ export async function buildModules(config: ServerConfig, options: ServiceOptions
     media,
     artifact,
     pkm,
-    watch,
     issue,
+    watch,
   };
 }
 
-/** The whole farm: buildModules, then the modules after the issues in module order (modules.ts), then every startup in
+/** The whole farm: buildModules, then the modules after the watch in module order (modules.ts), then every startup in
  * module order. A failure closes what was built. */
 export async function makeFarm(config: ServerConfig, options: ServiceOptions = {}): Promise<Farm> {
   const closes: Close[] = [];
@@ -225,8 +224,6 @@ export async function makeFarm(config: ServerConfig, options: ServiceOptions = {
     const modules = await buildModules(config, options, closes);
     const { clock, log, fetch, db, core, setting, user, agent, memory, runtime, repo, session, channel, media, artifact, pkm, watch, issue } = modules;
     const { provider } = modules;
-    // Inbox: what is news to the user, and the patrol.
-    const inbox = own(await makeInbox({ config, clock, log, db, core, channel, issue, session }));
     // Gateway's tools first: the orchestrator holds them (OrchestratorTools), and /mcp serves them to sessions.
     const tool = own(await makeTool({ clock, log, agent, session, issue, channel, memory, media, pkm, artifact, repo }));
     // Orchestrator: the agent that hands the user's work to helpers.
@@ -238,8 +235,8 @@ export async function makeFarm(config: ServerConfig, options: ServiceOptions = {
     // Gateway: every way in from outside; http/app.ts mounts the HTTP API on these services.
     const mcp = own(await makeMcp({ config, session, tool, log }, options.mcp));
     const lan = own(await makeLan({ config, db, user, clock, log, fetch }, options.lan));
-    const voice = own(await makeVoice({ config, clock, log, fetch, core, inbox, setting, provider, channel, orchestrator }, options.voice));
-    const connector = own(await makeConnector({ clock, db, log, fetch, core, channel, inbox }, options.connector));
+    const voice = own(await makeVoice({ config, clock, log, fetch, core, watch, setting, provider, channel, orchestrator }, options.voice));
+    const connector = own(await makeConnector({ clock, db, log, fetch, core, channel, watch }, options.connector));
 
     // The first look at GitHub.
     await repo.boot();
@@ -252,8 +249,6 @@ export async function makeFarm(config: ServerConfig, options: ServiceOptions = {
     // What media waited for.
     await media.boot();
     await issue.boot();
-    // What stands is known: the patrol starts its rounds.
-    await inbox.boot();
     // Commits start being counted.
     await game.boot();
 
@@ -261,7 +256,6 @@ export async function makeFarm(config: ServerConfig, options: ServiceOptions = {
     const close = () => (closing ??= closeAll(closes));
     return {
       ...modules,
-      inbox,
       tool,
       orchestrator,
       game,

@@ -1,6 +1,7 @@
 // The layer over the chat and the sessions: it reads the chat's committed events (in order, after a cursor of its own)
 // and routes each to the sessions, opens their threads, hires a profile's direct helper, posts their reports, and
-// answers their receipts in the chat (👀, the wake breaker's notice).
+// answers their receipts in the chat (👀, the wake breaker's notice). It is also the user's inbox and the patrol
+// (inbox.ts).
 //
 // The events come live from Channel.committed, one at a time; the chat's writes wait on each (awaitReader), so a
 // message's routing is done when the write that said it returns. watch_cursor moves only once an event's effects are
@@ -14,13 +15,15 @@ import { messageId } from "@vibevalley/protocol/schema";
 
 import { head } from "#/base/clip.ts";
 import { ApiError, lookIn, missing } from "#/base/errors.ts";
-import { newId } from "#/base/ids.ts";
+import type { Core } from "#/core/core.ts";
+import type { ServerConfig } from "#/infra/config.ts";
 import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import { type Committed, type Meta, messageKind, metaOf, type MsgRow, type ThreadSubject, type Told } from "#/modules/channel/contracts.ts";
+import type { Issue } from "#/modules/issue/issue.ts";
 import { actorOfParticipant, type DeliveryEvent, type DeliveryReason, type Hearer } from "#/modules/session/envelope.ts";
 import { deliveryScope, inputContext } from "#/modules/session/payload.ts";
 import { envelopeLines, talkBrief } from "#/modules/session/prompts.ts";
@@ -31,6 +34,7 @@ import * as qw from "#db/watch_cursor.sql.ts";
 
 import { brakes, hopLimit, hopLimitText, Reach, type Recipient, WakeBreaker } from "./brakes.ts";
 import { type ChannelAudience, eventOf, whoHears } from "./hearers.ts";
+import { userInbox, type UserInbox } from "./inbox.ts";
 import { channelTrigger, envelopeRowOf } from "./trigger.ts";
 
 /** A helper profile's seat in the chat, the peer of its direct channel: apart from the orchestrators and the sessions. */
@@ -42,25 +46,27 @@ const talkContext = 12;
 /** The cursor's name in watch_cursor: how far the chat's events were routed. */
 const routed = "channel";
 
-export interface Watch {
+export interface Watch extends UserInbox {
   /** The direct channel with a profile (by name or id): an orchestrator's own, or a helper profile's seat; made when there is none. */
   readonly direct: (ref: string) => Promise<string>;
-  /** Words for a session: said in its home, or heard by it alone when it has none. */
-  readonly tell: (from: string, session: string, text: string, sendKey: string) => Promise<T.ChatMessage | undefined>;
   /** What deleting a message does, its waiting deliveries included. */
   readonly previewRemove: (id: T.MessageId) => Promise<T.Preview>;
-  /** At startup: the sessions' threads, then the chat's events after the cursor, each once. */
+  /** At startup: the sessions' threads, the chat's events after the cursor (each once), then the inbox as it stands and
+   * the patrol's rounds. */
   readonly boot: () => Promise<void>;
   readonly close: () => Promise<void>;
 }
 
 export interface WatchDeps {
+  readonly config: ServerConfig;
   readonly clock: Time;
   readonly log: Logger;
   readonly db: Db;
+  readonly core: Core;
   readonly agent: Agent;
   readonly session: Session;
   readonly channel: Channel;
+  readonly issue: Issue;
 }
 
 /** Keyed by `issue` when working one so reassigned sessions reuse the same issue thread. */
@@ -480,7 +486,20 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
     }
   });
 
+  const inbox = userInbox(deps, (trigger) =>
+    turn.with(async () => {
+      // The patrol's note is for the orchestrator of its place, as a digest: it wakes no one.
+      const place = trigger.replyChannel ?? chat.defaultChannel();
+      await hear(trigger, deliveryScope(place), [{ recipient: chat.orchestratorIn(place), reason: "addressed", wakes: false }], () => "ambient");
+    }),
+  );
+
   return {
+    inboxNews: inbox.inboxNews,
+    toUser: inbox.toUser,
+    patrol: inbox.patrol,
+    handoffState: inbox.handoffState,
+    externalChanges: inbox.externalChanges,
     direct: async (ref) => {
       const name = ref.trim();
       const agent = agents.named(name) ?? agents.agent(name) ?? agents.orchestrators().find((o) => o.name === name);
@@ -491,34 +510,6 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
       }
       await chat.seat({ id: profileId(agent.id), name: agent.name, agent: agent.id });
       return chat.createDirect(profileId(agent.id));
-    },
-    tell: async (from, session, text, sendKey) => {
-      const home = await chat.homeOf(session);
-      if (home) return (await chat.post({ from, channel: home, text, sendKey, ...(sessions.live(from).run ? { run: sessions.live(from).run } : {}) })).message;
-      // Sent with no place to say it in: the session hears it as a trigger addressed to it alone.
-      if (!sessions.live(session).reachable) throw missing(t("server.channel.noHelper", { id: session }), [lookIn.session]);
-      const channel = sessionOf(session)?.channel;
-      const at = clock.now();
-      const speaker = sessionOf(from);
-      const trigger = await sessions.recordTrigger({
-        source: "channel",
-        key: sendKey || newId(at),
-        actor:
-          from === userId
-            ? { kind: "user", id: userId }
-            : { kind: "agent", role: agents.isOrchestrator(from) ? "orchestrator" : "worker", id: from, ...(speaker ? { name: speaker.name } : {}) },
-        text: text.trim(),
-        threads: [],
-        addressed: "direct",
-        ...(channel ? { replyChannel: channel } : {}),
-        at,
-      });
-      await turn.with(() =>
-        hear(trigger, deliveryScope(channel ?? chat.defaultChannel()), [{ recipient: session, reason: "addressed", wakes: true }], () =>
-          trigger.actor.kind === "user" ? "conversation" : "mention",
-        ),
-      );
-      return undefined;
     },
     previewRemove: async (id) => {
       const base = await chat.previewRemove(id);
@@ -550,9 +541,11 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
         failures.clear();
         await advance();
       });
+      await inbox.boot();
     },
     close: async () => {
       closed = true;
+      await inbox.close();
       await tasks.close();
       for (const w of waiting.splice(0)) w.done();
     },

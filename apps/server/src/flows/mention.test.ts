@@ -4,7 +4,7 @@ import { expect, test } from "vite-plus/test";
 
 import type { Core } from "#/core/core.ts";
 import { frameOf } from "#/gateway/projection/frame.ts";
-import { emptyPatrol, patrolStep } from "#/modules/inbox/patrol.ts";
+import { emptyPatrol, patrolStep } from "#/modules/watch/patrol.ts";
 import { testConfig } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 

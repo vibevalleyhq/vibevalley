@@ -9,7 +9,6 @@ import { BizCode, Inconsistent, lookIn, missing, refuseIn } from "#/base/errors.
 import { jsonOf, jsonText } from "#/base/json.ts";
 import { type Db, SqlError, causeMessage } from "#/infra/db.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
-import { issueExists } from "#db/issue.sql.ts";
 import * as qd from "#db/session_delivery.sql.ts";
 import * as qi from "#db/session_issue_input.sql.ts";
 import * as qs from "#db/session_subscription.sql.ts";
@@ -52,6 +51,8 @@ interface WorkOptions {
   readonly open: Deliveries;
   readonly dispatch: (session: string) => void;
   readonly issueOf: (id: string) => T.Issue | undefined;
+  /** An issue kept, on the board or not (IssueView.exists). */
+  readonly issueKept: (id: string) => Promise<boolean>;
   /** The orchestrator in a channel (envelope.ts orchestratorIn): who what names no one there goes to. */
   readonly orchestratorIn: (channel: string) => Promise<string>;
 }
@@ -70,7 +71,7 @@ const notRecorded = (e: unknown): unknown => (e instanceof SqlError || e instanc
 
 export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
   const { db, clock, session: sessions, agent: agents } = deps;
-  const { writtenLocked, stored, defaultChannel, open, dispatch, issueOf, orchestratorIn } = options;
+  const { writtenLocked, stored, defaultChannel, open, dispatch, issueOf, issueKept, orchestratorIn } = options;
 
   const writeDelivery = (input: InsertDelivery) =>
     qd.insertDelivery(db.sql, {
@@ -364,7 +365,7 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
       const id = thread.slice(6);
       const issue = issueOf(id);
       if (issue) ids.add(issue.id);
-      else if (await issueExists(db.sql, { id })) ids.add(id);
+      else if (await issueKept(id)) ids.add(id);
     }
     if (ids.size > 1) throw refused(t("server.mailbox.ambiguous"));
     const issue = ids.values().next().value;

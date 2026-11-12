@@ -16,7 +16,7 @@ import type { Sql } from "#/infra/db.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
-import type { Inbox } from "#/modules/inbox/inbox.ts";
+import type { Watch } from "#/modules/watch/watch.ts";
 import * as accountQ from "#db/connector_account.sql.ts";
 import * as inboundQ from "#db/connector_inbound.sql.ts";
 import * as outboxQ from "#db/connector_outbox.sql.ts";
@@ -77,7 +77,7 @@ interface BridgeEnv {
   readonly log: Logger;
   readonly chat: Channel;
   readonly core: Core;
-  readonly inbox: Inbox;
+  readonly watch: Watch;
   readonly retryFirst: number;
   readonly retryMost: number;
   /** The service's tasks: each account's generation, the status said to the core. */
@@ -90,7 +90,7 @@ interface BridgeEnv {
 }
 
 export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly outbox: Queue<void>; readonly inbox: Queue<void> }) => {
-  const { clock, sql, chat, core, inbox, retryFirst, retryMost, tasks, tried, inTx, isClosing } = env;
+  const { clock, sql, chat, core, watch, retryFirst, retryMost, tasks, tried, inTx, isClosing } = env;
   const now = () => clock.now();
   const id = adapter.id;
   const log = env.log.child(id);
@@ -264,7 +264,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
       }
       const allowed = new Set<string>();
       for (const message of new Set(listed.map((row) => row.message_id))) {
-        if ((await inbox.handoffState(message)) === "unseen") allowed.add(message);
+        if ((await watch.handoffState(message)) === "unseen") allowed.add(message);
         else await tried(() => outboxQ.dropPendingOutboxForMessage(sql, { message_id: message }));
       }
       const pending = listed.filter((row) => allowed.has(row.message_id));
@@ -308,7 +308,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
   const offer = async (m: ChatMessage) => {
     const a = snapshot();
     if (!a || !a.user) return;
-    if ((await inbox.handoffState(m.id)) !== "unseen") return;
+    if ((await watch.handoffState(m.id)) !== "unseen") return;
     let added = 0;
     try {
       const place = await located(m.id);

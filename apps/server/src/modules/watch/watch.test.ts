@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { Hub, systemClock, withTimeout } from "@vibevalley/async";
 import type * as T from "@vibevalley/protocol";
-import { defaultOrchestrator, userId } from "@vibevalley/protocol";
+import { defaultOrchestrator } from "@vibevalley/protocol";
 import { BizCode } from "@vibevalley/protocol/api";
 import { channelOf, defaultOf, isBusy } from "@vibevalley/protocol/rules";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
@@ -26,7 +26,7 @@ import builtIn from "#/modules/agent/templates/orchestrator/agent.json" with { t
 import { type Attachment, makeAttachment } from "#/modules/attachment/attachment.ts";
 import { type Channel, catchUpMax, makeChannel } from "#/modules/channel/channel.ts";
 import { effectsOf } from "#/modules/game/view.ts";
-import { channelUses } from "#/modules/issue/issue.ts";
+import { channelUses, type Issue } from "#/modules/issue/issue.ts";
 import type { Handed } from "#/modules/session/envelope.ts";
 import { restoredSession, sessionState } from "#/modules/session/history.ts";
 import type { Lifecycle } from "#/modules/session/lifecycle.ts";
@@ -199,7 +199,9 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
   });
   const attachment = await makeAttachment({ config: c, clock, db });
   const chat = await makeChannel({ clock, log, fetch: offline, db, core, attachment });
-  const watch = await makeWatch({ clock, log, db, agent, session, channel: chat });
+  // The watch's inbox reads the board through the issues; these tests have none.
+  const issue = { onBoard: () => [] } as unknown as Issue;
+  const watch = await makeWatch({ config: c, clock, log, db, core, agent, session, channel: chat, issue });
   const { changes: moves } = core.transitions();
   const relay = (async () => {
     for await (const { fact, after } of moves) {
@@ -688,34 +690,6 @@ describe("the chat", () => {
       await until(async () => (await f.deliveryOf("w6", message.id))?.state === "consumed", "the retried input consumed");
       expect(x.runsOf("w6").length).toBeGreaterThan(1);
       expect(x.runsOf("w6").at(-1)).toContain("followup without a model receipt");
-    }));
-
-  test("a line told to a session with no thread is a recorded trigger delivered to it alone", () =>
-    run(async (f) => {
-      // Only workers get a thread: a second orchestrator session is present and has none.
-      const session: T.Session = {
-        id: sessionId("o2"),
-        role: "orchestrator",
-        name: "另一个助手",
-        agent: "lab",
-        runtime: "pi",
-        brief: "",
-        repo: "",
-        hiredAt: Date.now(),
-        runs: 0,
-        phase: { _tag: "resting" },
-        refining: false,
-      };
-      await keepSession(f, session);
-      f.core.apply({ type: "sessionChanged", session });
-      const thread = await f.chat.homeOf("o2");
-      expect(thread).toBeUndefined();
-      await f.watch.tell(userId, "o2", "直接说给它", "");
-      const recorded = (await f.sql(`select id from session_trigger where trigger_json like $1`, ["%直接说给它%"])).map((r) => ({ id: String(r["id"]) }));
-      expect(recorded).toHaveLength(1);
-      await until(async () => (await f.deliveryOf("o2", recorded[0]!.id)) !== undefined, "its delivery");
-      const delivered = await f.deliveryOf("o2", recorded[0]!.id);
-      expect(delivered).toMatchObject({ reason: "addressed", held_by: "" });
     }));
 
   test("helpers calling each other stop at the hop limit", () =>

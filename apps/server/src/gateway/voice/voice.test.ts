@@ -242,7 +242,7 @@ const farm = async (
   };
   const w = await world({ config });
   try {
-    await w.inbox.boot();
+    await w.watch.boot();
     const orchestrator = await makeOrchestrator({ ...w, tools: w.tool });
     w.closes.push(() => orchestrator.close());
     const provider =

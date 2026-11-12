@@ -110,7 +110,7 @@ export const IssueExistsResult = z.object({
 })
 export type IssueExistsResult = z.infer<typeof IssueExistsResult>
 
-export const IssueExistsSql = "-- name: IssueExists :one\n-- Whether an issue is there at all, for Mailbox routing before the core fact reaches it.\nselect id from issue where id = $1;"
+export const IssueExistsSql = "-- name: IssueExists :one\n-- Whether an issue is there at all, for the deliveries' routing before the core fact reaches it (Session.useIssues).\nselect id from issue where id = $1;"
 
 export async function issueExists(sql: Sql, params: IssueExistsParams): Promise<IssueExistsResult | undefined> {
   const [row] = await sql.query(IssueExistsSql, [params["id"]])

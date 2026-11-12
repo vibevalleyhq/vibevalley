@@ -14,11 +14,11 @@ import type { ServerConfig } from "#/infra/config.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
-import type { Inbox } from "#/modules/inbox/inbox.ts";
 import type { Orchestrator } from "#/modules/orchestrator/orchestrator.ts";
 import type { Account, Provider } from "#/modules/provider/provider.ts";
 import type { RealtimeEvents, RealtimeLink, RealtimeTransport } from "#/modules/provider/vendors.ts";
 import type { AgoraCredentials, Setting } from "#/modules/setting/setting.ts";
+import type { Watch } from "#/modules/watch/watch.ts";
 
 import {
   agentFor,
@@ -187,7 +187,7 @@ export interface VoiceDeps {
   readonly log: Logger;
   readonly fetch: typeof fetch;
   readonly core: Core;
-  readonly inbox: Inbox;
+  readonly watch: Watch;
   readonly setting: Setting;
   readonly provider: Provider;
   readonly channel: Channel;
@@ -202,7 +202,7 @@ interface Told {
 const mergedTold = (all: readonly Told[]) => ({ texts: all.flatMap((t) => t.texts), ring: all.findLast((t) => t.ring)?.ring });
 
 export async function makeVoice(deps: VoiceDeps, options: VoiceOptions = {}): Promise<Voice> {
-  const { config, core, inbox, clock, provider } = deps;
+  const { config, core, watch, clock, provider } = deps;
   const settings = deps.setting;
   const chat = deps.channel;
   const response = deps.orchestrator;
@@ -320,7 +320,7 @@ export async function makeVoice(deps: VoiceDeps, options: VoiceOptions = {}): Pr
     if (!stopped && (texts.length > 0 || ring)) told.offer({ texts, ring });
   };
 
-  const news = inbox.news();
+  const news = watch.inboxNews();
   tasks.run("inbox news", async (signal) => {
     try {
       for (;;) {

@@ -4,67 +4,65 @@ import { freshOf } from "@vibevalley/protocol/rules";
 
 import type { Core } from "#/core/core.ts";
 import type { ServerConfig } from "#/infra/config.ts";
-import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
-import { toMessage } from "#/modules/channel/contracts.ts";
 import type { Issue } from "#/modules/issue/issue.ts";
 import type { Session } from "#/modules/session/session.ts";
-import { messageByID, notificationReceipt, userReadReports } from "#db/channel_message.sql.ts";
+import type { Trigger } from "#/modules/session/shapes.ts";
 
 import { forUser, inbox, inboxEntries } from "./items.ts";
 import { emptyPatrol, type PatrolMemory, type PatrolNote, patrolStep } from "./patrol.ts";
 import { patrolText } from "./prompts.ts";
 
-export interface Inbox {
+/** The user's part of the watch: what is news to the user, the farm's talk the user hears off the farm, and the patrol. */
+export interface UserInbox {
   /** What came into the inbox, each item once; what stood when the farm came up is known, not news. */
-  readonly news: () => Subscription<readonly InboxItem[]>;
+  readonly inboxNews: () => Subscription<readonly InboxItem[]>;
   /** The farm's talk the user hears off the farm, as it is said (forUser); the chat apps carry it. */
   readonly toUser: () => Subscription<ChatMessage>;
   /** One round of the patrol, now. */
   readonly patrol: () => Promise<void>;
   readonly handoffState: (message: string) => Promise<"unseen" | "seen" | undefined>;
-  readonly prime: () => Promise<void>;
   /** Pending external deliveries changed: a later connector rereads them. */
   readonly externalChanges: () => Subscription<void>;
-  /** After the sessions and issues came back: the inbox as it stands is known, and the patrol starts its rounds. */
-  readonly boot: () => Promise<void>;
-  readonly close: () => Promise<void>;
 }
 
-export interface InboxDeps {
+interface UserInboxDeps {
   readonly config: ServerConfig;
   readonly clock: Time;
   readonly log: Logger;
-  readonly db: Db;
   readonly core: Core;
   readonly channel: Channel;
   readonly issue: Issue;
   readonly session: Session;
 }
 
-export async function makeInbox(deps: InboxDeps): Promise<Inbox> {
-  const { core, channel: chat, issue: issues, session: sessions, db, clock, config } = deps;
+/** route: how the patrol's trigger reaches who hears it (the watch's, through its brakes). boot: at startup, after the
+ * sessions and issues came back: the inbox as it stands is known, and the patrol starts its rounds. */
+export function userInbox(
+  deps: UserInboxDeps,
+  route: (trigger: Trigger) => Promise<void>,
+): UserInbox & { readonly boot: () => Promise<void>; readonly close: () => Promise<void> } {
+  const { core, channel: chat, issue: issues, session: sessions, clock, config } = deps;
   const log = deps.log.child("inbox");
   const tasks = new TaskGroup({ name: "inbox", onError: (task, e) => log.error(`${task} failed:`, e) });
   const turn = new Semaphore(1);
   const externalHub = new Hub<void>();
 
   const handoffState = async (id: string) => {
-    const row = await messageByID(db.sql, { id });
-    if (!row || row.deleted_at !== null) return undefined;
-    const message = toMessage(row);
+    const receipt = await chat.userReceipt(id);
+    if (!receipt) return undefined;
+    const { message } = receipt;
     if (!forUser(message, chat.notifyOf(message.channel))) return undefined;
-    const receipt = await notificationReceipt(db.sql, { id });
-    if (!receipt || receipt.superseded) return undefined;
+    if (receipt.superseded) return undefined;
     if (message.kind === "report") {
       const session = sessions.live(message.from).session;
       const issue = issues.onBoard().find((item) => item.id === session?.issue);
       if (issue && !["draft", "asking", "stuck", "reviewing"].includes(issue.stage.state)) return undefined;
       if (!issue && session?.phase._tag === "working") return undefined;
     }
-    return receipt.read_at === null ? ("unseen" as const) : ("seen" as const);
+    return receipt.readAt === null ? ("unseen" as const) : ("seen" as const);
   };
 
   let known: Set<string> | undefined;
@@ -78,7 +76,13 @@ export async function makeInbox(deps: InboxDeps): Promise<Inbox> {
         const event = r.value;
         await turn.with(() =>
           bestEffort(log, "vibevalley: user notifications failed", async () => {
-            if (event.type === "messageChanged" && (await handoffState(event.message.id)) === "unseen") toUserHub.publish(event.message);
+            // Not for the user (its own words, a notice): not read back to ask.
+            if (
+              event.type === "messageChanged" &&
+              forUser(event.message, chat.notifyOf(event.message.channel)) &&
+              (await handoffState(event.message.id)) === "unseen"
+            )
+              toUserHub.publish(event.message);
             if (event.type === "messageChanged" || event.type === "sessionReported" || event.type === "issueChanged") externalHub.publish(undefined);
             if (!primed) return;
             const news = freshOf(known, inbox(core.state()));
@@ -104,13 +108,13 @@ export async function makeInbox(deps: InboxDeps): Promise<Inbox> {
   const patrol = async () => {
     const state = core.state();
     const now = clock.now();
-    const read = await userReadReports(db.sql);
+    const read = await chat.userReadReports();
     const userSeen = Object.fromEntries(
       inboxEntries(state).flatMap((entry) => {
         const target = entry.item.target;
         if (target.kind !== "session") return [];
-        const receipt = read.find((row) => row.sender_id === target.id && row.created_at >= entry.item.at);
-        return receipt ? [[entry.item.id, receipt.updated_at]] : [];
+        const receipt = read.find((row) => row.from === target.id && row.at >= entry.item.at);
+        return receipt ? [[entry.item.id, receipt.readAt]] : [];
       }),
     );
     const [report, next] = patrolStep(state, now, memory, userSeen);
@@ -133,7 +137,7 @@ export async function makeInbox(deps: InboxDeps): Promise<Inbox> {
           at: now,
           text: patrolText(top.name, notes),
         });
-        await sessions.route(trigger);
+        await route(trigger);
       }
     });
   };
@@ -146,11 +150,10 @@ export async function makeInbox(deps: InboxDeps): Promise<Inbox> {
     });
 
   return {
-    news: () => newsHub.subscribe(),
+    inboxNews: () => newsHub.subscribe(),
     toUser: () => toUserHub.subscribe(),
     patrol,
     handoffState,
-    prime,
     externalChanges: () => externalHub.subscribe(),
     boot: async () => {
       await prime();

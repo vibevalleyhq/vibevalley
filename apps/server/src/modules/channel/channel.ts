@@ -476,6 +476,14 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         await publishChannel(channel);
       }),
     homeOf: async (participant) => homeOf(participant),
+    userReceipt: async (id) => {
+      const row = await qm.messageByID(db.sql, { id });
+      if (!row || row.deleted_at !== null) return undefined;
+      const receipt = await qm.notificationReceipt(db.sql, { id });
+      if (!receipt) return undefined;
+      return { message: toMessage(row), readAt: receipt.read_at, superseded: receipt.superseded };
+    },
+    userReadReports: async () => (await qm.userReadReports(db.sql)).map((r) => ({ from: r.sender_id, at: r.created_at, readAt: r.updated_at })),
     committed: w.committed,
     events: async (after, n = 1000) =>
       (await qe.eventsAfter(db.sql, { after, n })).map((e) => ({

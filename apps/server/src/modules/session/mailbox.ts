@@ -16,7 +16,7 @@ import * as qd from "#db/session_delivery.sql.ts";
 import * as qr from "#db/session_trigger.sql.ts";
 
 import { Deliveries, type DeliveryRow, type DeliveryDraft } from "./deliveries.ts";
-import { type AgentWakes, type ChannelEnvelopeRow, type ChatView, type Envelope, type Handed, type Hearer } from "./envelope.ts";
+import { type AgentWakes, type ChannelEnvelopeRow, type ChatView, type Envelope, type Handed, type Hearer, type IssueView } from "./envelope.ts";
 import type { Lifecycle, SessionNews } from "./lifecycle.ts";
 import { inputOf, orchestratorSource, deliveryScope, type InputContext, type SourceEvent, type TriggerInput, type TriggerResource } from "./payload.ts";
 import { wakeInput } from "./prompts.ts";
@@ -120,6 +120,8 @@ export interface Mailbox {
   readonly withdrawDispatches: (issue: string, at: number) => Promise<void>;
   /** The chat the mailbox reads its places from, told by the layer above it; until then, an empty one. */
   readonly useChat: (view: ChatView) => void;
+  /** The issues the mailbox reads, told by the layer above it; until then, none. */
+  readonly useIssues: (view: IssueView) => void;
   /** A session's pending inputs kept from waking it (held) or let wake it again: the wake breaker's, decided above. */
   readonly holdWakes: (session: string, held: boolean) => Promise<void>;
   /** What agents' words woke since the user last spoke, as kept: where the brakes start from at startup. */
@@ -144,7 +146,8 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
   const log = deps.log.child("mailbox");
   const journal = triggerJournal({ db, log });
   const tasks = new TaskGroup({ name: "mailbox", onError: (task, e) => log.error(`${task} failed:`, e) });
-  const issueOf = (id: string) => core.state().issues.find((issue) => issue.id === id);
+  let issueView: IssueView = { issues: () => [], exists: async () => false };
+  const issueOf = (id: string) => issueView.issues().find((issue) => issue.id === id);
   let chat: ChatView = { defaultChannel: () => "", orchestratorIn: () => defaultOrchestrator, unreadOf: async () => [] };
   const defaultChannelOf = async () => chat.defaultChannel();
   const orchestratorInChannel = async (channel: string) => chat.orchestratorIn(channel);
@@ -193,6 +196,7 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
       open,
       dispatch: (session) => later(`trigger:${session}`, 0, () => pump.kick(session)),
       issueOf,
+      issueKept: (id) => issueView.exists(id),
       orchestratorIn: orchestratorInChannel,
     },
   );
@@ -465,7 +469,7 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
     boot: async () => {
       await restore();
       await replay();
-      for (const issue of core.state().issues)
+      for (const issue of issueView.issues())
         await bestEffort(log, `mailbox: restore issue ${issue.id}`, async () => {
           await bindIssue(issue);
           await flushIssue(issue.id);
@@ -489,6 +493,9 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
     withdrawDispatches: (issue, at) => work.retireDispatches(issue, at),
     useChat: (view) => {
       chat = view;
+    },
+    useIssues: (view) => {
+      issueView = view;
     },
     holdWakes: async (session, held) => {
       if (held) braked.add(session);

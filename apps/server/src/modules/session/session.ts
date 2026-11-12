@@ -12,7 +12,7 @@ import type { Repo } from "#/modules/repo/repo.ts";
 import { RepoError, type WorkplaceCleanup, type WorkplaceRelease } from "#/modules/repo/workplace.ts";
 import type { Runtime } from "#/modules/runtime/runtime.ts";
 
-import type { Accepted, AgentWakes, ChatView, Envelope, Hearer } from "./envelope.ts";
+import type { Accepted, AgentWakes, ChatView, Envelope, Hearer, IssueView } from "./envelope.ts";
 import type { AgentHost, HostOptions } from "./host.ts";
 import { HireRefused, type Lifecycle, makeLifecycle, type SessionNews, type SessionOptions } from "./lifecycle.ts";
 import { type Machine, makeMachine } from "./machine.ts";
@@ -67,6 +67,9 @@ export interface Session {
   /** The chat the deliveries read their places from (the default channel, a place's orchestrator, a participant's unread),
    * told by the layer above the sessions; until then, an empty one. */
   readonly useChat: (view: ChatView) => void;
+  /** The issues the deliveries read (those on the board, whether one is kept), told by the issues above the sessions;
+   * until then, none. */
+  readonly useIssues: (view: IssueView) => void;
   /** A session's pending inputs kept from waking it, or let wake it again (and it is woken): the wake breaker's call. */
   readonly holdWakes: (session: string, held: boolean) => Promise<void>;
   /** What agents' words woke since the user last spoke, as the deliveries kept it. */
@@ -194,6 +197,7 @@ export function sessionOver(parts: {
     withdrawDeliveries: mailbox.withdrawDeliveries,
     withdrawDispatches: mailbox.withdrawDispatches,
     useChat: mailbox.useChat,
+    useIssues: mailbox.useIssues,
     holdWakes: mailbox.holdWakes,
     agentWakes: mailbox.agentWakes,
     decline: mailbox.decline,

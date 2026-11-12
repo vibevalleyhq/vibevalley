@@ -31,7 +31,6 @@ async function flowWorld(options: WorldOptions): Promise<FlowWorld> {
     await below.watch.boot();
     await below.session.wake();
     await below.media.boot();
-    await below.inbox.boot();
     return { ...below, game };
   } catch (e) {
     await below.close();

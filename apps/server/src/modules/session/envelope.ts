@@ -41,6 +41,13 @@ export interface ChatView {
   readonly unreadOf: (participant: string, channel: string) => Promise<readonly UnreadRow[]>;
 }
 
+/** What the mailbox reads of the issues, told by the layer above it (the issues): those on the board, and whether one
+ * is kept at all (an issue off the board still owns its threads). */
+export interface IssueView {
+  readonly issues: () => readonly T.Issue[];
+  readonly exists: (id: string) => Promise<boolean>;
+}
+
 type StoredMessageKind = "chat" | "dispatch" | "report" | "notice";
 
 export interface ChannelEnvelopeRow {

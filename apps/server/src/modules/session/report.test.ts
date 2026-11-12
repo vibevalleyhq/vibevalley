@@ -5,7 +5,6 @@ import type { Doing, Session } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { clip } from "#/base/clip.ts";
-import { conflictOf } from "#/modules/issue/status.ts";
 import { MergeFailure } from "#/modules/repo/workplace.ts";
 import { inCny } from "#/modules/runtime/price.ts";
 
@@ -275,11 +274,6 @@ describe("work that does not go in", () => {
     expect(notTakenIn(conflict, "阿狐", "user").user).toContain("要它解决就用 tell 告诉它");
     expect(notTakenIn(conflict, "阿狐", "helper").fix).toBe(conflictBrief("main", ["a.ts", "b.ts"]));
     expect(notTakenIn(MergeFailure.error("git 坏了"), "阿狐", "helper")).toMatchObject({ fix: "", short: "git 坏了" });
-  });
-
-  it("reads a conflict off a preview", () => {
-    expect(conflictOf({ base: "main", conflicts: [] })).toBeUndefined();
-    expect(conflictOf({ base: "main", conflicts: ["a.ts"] })).toEqual({ base: "main", files: ["a.ts"] });
   });
 });
 

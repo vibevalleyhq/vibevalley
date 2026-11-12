@@ -8,7 +8,7 @@ import { BizCode } from "@vibevalley/protocol/api";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { user } from "#/base/actor.ts";
-import { inbox } from "#/modules/inbox/items.ts";
+import { inbox } from "#/modules/watch/items.ts";
 import { gitSync } from "#/testing/git.ts";
 import { refuse } from "#/testing/refuse.ts";
 import { sqlOf } from "#/testing/sql.ts";

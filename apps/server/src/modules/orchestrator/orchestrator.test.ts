@@ -617,7 +617,7 @@ describe("the orchestrator", () => {
   it("hears the patrol once with the next user input", async () => {
     using clock = fakeDate();
     await using f = await farm(respond, testConfig());
-    const { channel: chat, inbox, inside: sessions } = f.farm;
+    const { channel: chat, watch: inbox, inside: sessions } = f.farm;
     await enableLab(f.farm);
     await chat.say({ text: "帮我在 notes 里加个 CHANGELOG", sendKey: "" });
     await until(

@@ -4,8 +4,8 @@ import { phaseWords } from "@vibevalley/protocol/rules";
 
 import type { Projection } from "#/core/core.ts";
 import { effectsOf, viewOf } from "#/modules/game/view.ts";
-import { inbox } from "#/modules/inbox/items.ts";
 import { nextText, whenText } from "#/modules/issue/when.ts";
+import { inbox } from "#/modules/watch/items.ts";
 
 import { reduce } from "./reduce.ts";
 

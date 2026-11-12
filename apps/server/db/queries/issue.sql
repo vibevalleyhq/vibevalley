@@ -24,7 +24,7 @@ from issue left join session_run latest_run on latest_run.id = (
 ) where issue.id = sqlc.arg(id);
 
 -- name: IssueExists :one
--- Whether an issue is there at all, for Mailbox routing before the core fact reaches it.
+-- Whether an issue is there at all, for the deliveries' routing before the core fact reaches it (Session.useIssues).
 select id from issue where id = sqlc.arg(id);
 
 -- name: IssueByNumber :one

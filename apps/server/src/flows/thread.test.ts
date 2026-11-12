@@ -11,6 +11,31 @@ import { testIssues } from "#/testing/world.ts";
 import { await_, farm, lab, until } from "./farm.ts";
 
 describe("an issue's thread", () => {
+  test("an agent's words to an issue's session are said where it works, a recorded trigger delivered to it", async () => {
+    // Issue.comment by an agent: once the watch's tell, now said in the session's home and routed (and braked) there.
+    const f = farm();
+    await using fw = await f.open();
+    await fw.agent.save(lab());
+    const issues = testIssues(fw.issue);
+    const issue = await issues.add({ title: "看看", repo: "told", agent: "lab" });
+    const started = await issues.start(issue.id, "");
+    const session = started.session!;
+    const thread = (await await_(
+      () => fw.channel.homeOf(session),
+      (id) => id !== undefined,
+      "its thread",
+    ))!;
+    const orchestrator = fw.channel.orchestratorIn(thread);
+    const receipt = await fw.issue.comment(issue.id, "直接说给它", "told", { kind: "agent", id: orchestrator, role: "orchestrator" });
+    expect(receipt.worker?.id).toBe(session);
+    const said = (await fw.channel.history(thread)).find((m) => m.text === "直接说给它")!;
+    expect(said.from).toBe(orchestrator);
+    expect(await fw.session.trigger(said.id)).toBeDefined();
+    // Delivered to its session (which takes it once its issue is not waiting on the user).
+    const [delivery] = await sqlOf(fw.db).unsafe(`select reason, held_by from session_delivery where session_id = $1 and envelope_id = $2`, [session, said.id]);
+    expect(delivery).toMatchObject({ reason: "own_thread", held_by: null });
+  });
+
   test("regression: closing an issue releases an unconsumed followup through the mailbox", async () => {
     const f = farm({
       runtime: scriptedRuntime({
@@ -173,7 +198,7 @@ describe("an issue's thread", () => {
     const issues = testIssues(issue2);
     const channels = fw.channel;
     const sessions = fw.inside;
-    const inbox = fw.inbox;
+    const inbox = fw.watch;
     const { in: saidIn } = fw.said;
     await fw.agent.save(lab());
     const issue = await issues.add({

@@ -29,10 +29,7 @@ const users: Readonly<Record<string, string>> = {
   connectors: "Gateway",
   machines: "Agent Sessions",
 };
-const reads: Readonly<Record<string, string>> = {
-  "modules/session/mailbox.ts -> issues":
-    "Tier 1 issue reservoir checks the issue's stage and assigned agent synchronously without keeping a second copy of the board",
-};
+const reads: Readonly<Record<string, string>> = {};
 
 const localEdges = (file: string, edges: readonly Edge[]) =>
   edges.flatMap(({ from: spec }) =>
@@ -64,22 +61,19 @@ const sources = () =>
     .filter((file) => !file.endsWith(".test.ts") && !outside.includes(rel(file).split("/")[0]!))
     .map((file) => inspect(file, readFileSync(file, "utf8"))));
 
-const foreignReads: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
-  session: { "issue.sql.ts": ["issueExists"] },
-  inbox: { "channel_message.sql.ts": ["messageByID", "notificationReceipt", "userReadReports"] },
-};
+const foreignReads: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {};
 const folders = containers.flatMap((c) => readdirSync(join(src, c)).filter((name) => statSync(join(src, c, name)).isDirectory()));
 const tableModule = (name: string) => {
   const table = name.replace(/\.sql\.ts$/u, "");
   return folders.find((module) => table === module || table.startsWith(`${module}_`));
 };
-const foreignQueries = (file: string, edges: readonly Edge[]) => {
+const foreignQueries = (file: string, edges: readonly Edge[], named: typeof foreignReads = foreignReads) => {
   const module = conceptOf(rel(file));
   return edges.flatMap((edge) => {
     if (!edge.from.startsWith("#db/")) return [];
     const name = edge.from.split("/").at(-1) ?? "";
     if (name === "types.ts" || tableModule(name) === module) return [];
-    const allowed = foreignReads[module]?.[name] ?? [];
+    const allowed = named[module]?.[name] ?? [];
     return edge.names.filter((symbol) => !allowed.includes(symbol)).map((symbol) => `${name}:${symbol}`);
   });
 };
@@ -115,6 +109,14 @@ const mailboxLeaks = (source: ReturnType<typeof inspect>) => {
 const chatLeaks = (source: ReturnType<typeof inspect>) => [
   ...source.local.filter((to) => unitOf(to) !== "modules/channel" && moduleOf(to)?.name !== "Platform"),
   ...source.edges.filter((edge) => edge.from.startsWith("#db/") && tableModule(edge.from.split("/").at(-1) ?? "") !== "channel").map((edge) => edge.from),
+];
+
+/** What a file of the sessions leans on of the chat or the issues (or the watch over both): their code, or their tables. */
+const sessionLeaks = (source: ReturnType<typeof inspect>) => [
+  ...source.local.filter((to) => ["modules/channel", "modules/issue", "modules/watch"].includes(unitOf(to))),
+  ...source.edges
+    .filter((edge) => edge.from.startsWith("#db/") && ["channel", "issue"].includes(tableModule(edge.from.split("/").at(-1) ?? "") ?? ""))
+    .map((edge) => edge.from),
 ];
 
 describe("the modules", () => {
@@ -178,7 +180,11 @@ describe("the modules", () => {
   it("regression: namespace imports and foreign writes cannot hide behind a read projection", () => {
     const file = join(src, "modules/session/mailbox.ts");
     const queries = (text: string) => foreignQueries(file, inspect(file, text).edges);
-    expect(queries('import { issueExists as known } from "#db/issue.sql.ts";')).toEqual([]);
+    // A read named for the module passes under another name; none is named today.
+    expect(
+      foreignQueries(file, inspect(file, 'import { issueExists as known } from "#db/issue.sql.ts";').edges, { session: { "issue.sql.ts": ["issueExists"] } }),
+    ).toEqual([]);
+    expect(queries('import { issueExists as known } from "#db/issue.sql.ts";')).toEqual(["issue.sql.ts:issueExists"]);
     expect(queries('import { topPlace as route } from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:topPlace"]);
     expect(queries('import * as q from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:*"]);
     expect(queries('import { renameChannel } from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:renameChannel"]);
@@ -213,6 +219,32 @@ describe("the modules", () => {
       leaks(
         'import type { Db } from "#/infra/db.ts";\nimport type { Attachment } from "#/modules/attachment/attachment.ts";\nimport { metaOf } from "./meta.ts";\nimport * as qm from "#db/channel_message.sql.ts";',
       ),
+    ).toEqual([]);
+  });
+
+  it("keep the sessions off the chat and the issues: modules/session imports neither, nor their tables, its tests included", () => {
+    const tests = files(join(src, "modules/session"))
+      .filter((file) => file.endsWith(".test.ts"))
+      .map((file) => inspect(file, readFileSync(file, "utf8")));
+    const found = [...sources().filter(({ from }) => from.startsWith("modules/session/")), ...tests].flatMap((source) =>
+      sessionLeaks(source).map((to) => `${source.from} -> ${to}`),
+    );
+    expect(
+      found,
+      "the sessions import the chat or the issues (or one of their tables), so the agent's execution leans on what sits above it. Fix: have the layer above hand the fact down as data (a hearer, a view the watch or the issues give), or move the test to the module it is about. See docs/subsystems/session.md",
+    ).toEqual([]);
+  });
+
+  it("regression: the sessions' check sees the chat, the issues, the watch and their tables, and lets the platform through", () => {
+    const file = join(src, "modules/session/mailbox.ts");
+    const leaks = (text: string) => sessionLeaks(inspect(file, text));
+    expect(leaks('import type { Channel } from "#/modules/channel/channel.ts";')).toEqual(["modules/channel/channel.ts"]);
+    expect(leaks('export { conflictOf } from "../issue/status.ts";')).toEqual(["modules/issue/status.ts"]);
+    expect(leaks('import { brakes } from "#/modules/watch/brakes.ts";')).toEqual(["modules/watch/brakes.ts"]);
+    expect(leaks('import { issueExists } from "#db/issue.sql.ts";')).toEqual(["#db/issue.sql.ts"]);
+    expect(leaks('import * as q from "#db/channel_message.sql.ts";')).toEqual(["#db/channel_message.sql.ts"]);
+    expect(
+      leaks('import type { Db } from "#/infra/db.ts";\nimport * as qd from "#db/session_delivery.sql.ts";\nimport { Repo } from "#/modules/repo/repo.ts";'),
     ).toEqual([]);
   });
 

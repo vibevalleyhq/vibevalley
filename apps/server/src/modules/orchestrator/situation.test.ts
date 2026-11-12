@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { patrolText } from "#/modules/inbox/prompts.ts";
+import { patrolText } from "#/modules/watch/prompts.ts";
 
 import { intake, orchestratorEnvelopeLines, situationDelta } from "./situation.ts";
 

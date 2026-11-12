@@ -18,7 +18,7 @@ import type { Channel } from "#/modules/channel/channel.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
 import type { Runtime } from "#/modules/runtime/runtime.ts";
 import type { Hired, HireOptions, SessionNews, Session } from "#/modules/session/session.ts";
-import type { Watch } from "#/modules/watch/watch.ts";
+import * as issueQ from "#db/issue.sql.ts";
 import * as cronQ from "#db/issue_cron.sql.ts";
 
 import { findingsOf, milestonesOf } from "./brief.ts";
@@ -176,7 +176,6 @@ export interface IssueDeps {
   readonly runtime: Runtime;
   readonly session: Session;
   readonly channel: Channel;
-  readonly watch: Watch;
 }
 
 export interface IssueReviewRequest {
@@ -238,6 +237,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
   const d = issueDispatch(r, joinChildren, { core, agent: store, repo: repos, runtime: runtimes, session: sessions, channel: chat, log });
   const { hire, start, refreshQueue, reopen, scheduled } = d;
   chat.guardRemoval(channelUses({ db, queued: () => sessions.queuedTriggers() }));
+  sessions.useIssues({ issues: () => core.state().issues, exists: async (id) => (await issueQ.issueExists(db.sql, { id })) !== undefined });
   const cron = await issueCron({ config, clock, log, db, core, agent: store, channel: chat, session: sessions, scheduled });
   const { withEdit, settledMove, stuckWords, movesWords } = issueSettling(r, d, {
     agent: store,
@@ -248,6 +248,19 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     landing,
   });
 
+  /** Words for a session: said in its home, or in its issue's thread when it has none (the watch routes them). */
+  const tellSession = async (from: string, session: string, text: string, sendKey = "") => {
+    const live = sessions.live(session);
+    let where = await chat.homeOf(session);
+    if (!where && live.reachable && live.session?.issue) {
+      const issue = await get(live.session.issue);
+      where = await chat.issueThread(issue.id, issue.title, live.session.channel);
+    }
+    if (!where) throw missing(t("server.channel.noHelper", { id: session }), [lookIn.session]);
+    const run = sessions.live(from).run;
+    await chat.post({ from, channel: where, text, sendKey, ...(run ? { run } : {}) });
+  };
+
   const {
     merge: mergeIssue,
     refreshPullRequests,
@@ -255,7 +268,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
   } = merging({
     core,
     sessions,
-    watch: deps.watch,
+    tell: tellSession,
     landing,
     get,
     list: everyIssue,
@@ -289,7 +302,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     const session = latest === undefined ? undefined : sessions.live(latest).session;
     if (by.kind === "agent") {
       if (!session) return {};
-      await deps.watch.tell(by.id, session.id, text, sendKey);
+      await tellSession(by.id, session.id, text, sendKey);
       return { worker: session };
     }
     if (isClosed(issue.status)) throw refused(t("server.issue.closedReopen"));

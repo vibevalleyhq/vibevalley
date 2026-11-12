@@ -8,7 +8,6 @@ import { ApiError, BizCode, refuseIn } from "#/base/errors.ts";
 import type { Core } from "#/core/core.ts";
 import { type CheckoutChecks, MergeFailure } from "#/modules/repo/workplace.ts";
 import { NotTakenIn, type Session } from "#/modules/session/session.ts";
-import type { Watch } from "#/modules/watch/watch.ts";
 
 import { acceptanceAncestors } from "./dependencies.ts";
 import type { IssueLanding } from "./landing.ts";
@@ -19,7 +18,8 @@ const refused = refuseIn(BizCode.IssueRefused);
 interface MergeDeps {
   readonly core: Core;
   readonly sessions: Session;
-  readonly watch: Watch;
+  /** Words for a session, said where it works (issue.ts tellSession). */
+  readonly tell: (from: string, session: string, text: string) => Promise<void>;
   readonly landing: IssueLanding;
   readonly get: (ref: string) => Promise<T.Issue>;
   readonly list: () => Promise<T.Issue[]>;
@@ -27,7 +27,7 @@ interface MergeDeps {
 }
 
 export function merging(d: MergeDeps) {
-  const { core, sessions, watch, landing, get, list, setConflict } = d;
+  const { core, sessions, tell, landing, get, list, setConflict } = d;
   /** Merges by pull request and the poll of their states, one at a time. */
   const prLock = new Semaphore(1);
 
@@ -38,7 +38,7 @@ export function merging(d: MergeDeps) {
     if (n.fix) {
       let untold = "";
       try {
-        await watch.tell(userId, id, n.fix, "");
+        await tell(userId, id, n.fix);
       } catch (e) {
         if (!(e instanceof ApiError)) throw e;
         untold = t("server.issue.merge.tellFailed", { why: e.message });

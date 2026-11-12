@@ -357,6 +357,11 @@ export interface ChannelService {
   readonly messageLocation: (id: T.MessageId) => Promise<{ readonly channel: T.Channel; readonly top: string } | undefined>;
   readonly envelopeResource: (id: T.MessageId) => Promise<EnvelopeResource | undefined>;
   readonly markRead: (channel: string, seq: number) => Promise<void>;
+  /** A message as the user's notice of it stands: when the user read it (null: not yet), and whether a later message
+   * there took its place (the user spoke after it, or its speaker reported again). None once it is deleted. */
+  readonly userReceipt: (id: string) => Promise<{ readonly message: T.ChatMessage; readonly readAt: number | null; readonly superseded: boolean } | undefined>;
+  /** Each speaker's newest report the user has read, and when the user read it. */
+  readonly userReadReports: () => Promise<readonly { readonly from: string; readonly at: number; readonly readAt: number }[]>;
   /** The place an empty target means for a participant: the home the layers above gave it. */
   readonly homeOf: (participant: string) => Promise<string | undefined>;
   /** Each event committed from now on, in the order committed: subscribed before it returns. A reader keeps its own

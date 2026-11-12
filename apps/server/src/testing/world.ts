@@ -11,7 +11,6 @@ import { makeTool, type Tool } from "#/gateway/tool/tool.ts";
 import { type ServerConfig } from "#/infra/config.ts";
 import type { PublicFetch } from "#/infra/publicHttp.ts";
 import { type Time, wallTime } from "#/infra/time.ts";
-import { type Inbox, makeInbox } from "#/modules/inbox/inbox.ts";
 import { explicitMandate } from "#/modules/issue/creation.ts";
 import { type Issue } from "#/modules/issue/issue.ts";
 import { type GitHubRun, type RepoHooks } from "#/modules/repo/repo.ts";
@@ -97,7 +96,7 @@ const fakeWorkerAccess = async (): Promise<WorkerAccess> => {
   };
 };
 
-/** The farm up to its issues (services.ts's buildModules), built and not started, with what the test hears. */
+/** The farm up to its watch (services.ts's buildModules), built and not started, with what the test hears. */
 export type ModuleWorld = Modules &
   AsyncDisposable & {
     /** The parts behind the session module, for the tests that drive them. */
@@ -110,7 +109,7 @@ export type ModuleWorld = Modules &
     readonly deepseek: Pick<ScriptedDeepSeek, "use">;
   };
 
-/** Core domain services below Inbox/Tool/Mcp for module tests: services.ts's buildModules, with the test's runtimes, repos and network. */
+/** Core domain services below Tool/Mcp for module tests: services.ts's buildModules, with the test's runtimes, repos and network. */
 export async function moduleWorld(options: WorldOptions = {}): Promise<ModuleWorld> {
   const base = options.config ?? testConfig();
   const config = options.stallMs !== undefined ? { ...base, session: { ...base.session, stallSeconds: options.stallMs / 1000 } } : base;
@@ -161,19 +160,18 @@ export async function moduleWorld(options: WorldOptions = {}): Promise<ModuleWor
   }
 }
 
-/** The farm up to its inbox, with the tools and /mcp: no orchestrator, gateway or game, and no startup (flows/farm.ts
+/** The farm up to its watch, with the tools and /mcp: no orchestrator, gateway or game, and no startup (flows/farm.ts
  * adds it). */
-export type World = ModuleWorld & { readonly inbox: Inbox; readonly tool: Tool; readonly mcp: Mcp };
+export type World = ModuleWorld & { readonly tool: Tool; readonly mcp: Mcp };
 
 export async function world(options: WorldOptions = {}): Promise<World> {
   const below = await moduleWorld(options);
   try {
-    const { config, clock, log, db, core, agent, memory, repo, session, channel, media, artifact, pkm, issue } = below;
+    const { clock, log, agent, memory, repo, session, channel, media, artifact, pkm, issue, config } = below;
     const own = owning(below.closes);
-    const inbox = own(await makeInbox({ config, clock, log, db, core, channel, issue, session }));
     const tool = own(await makeTool({ clock, log, agent, session, issue, channel, memory, media, pkm, artifact, repo }));
     const mcp = own(await makeMcp({ config, session, tool, log }, options.who ? { who: options.who } : {}));
-    return { ...below, inbox, tool, mcp };
+    return { ...below, tool, mcp };
   } catch (e) {
     await below.close();
     throw e;
