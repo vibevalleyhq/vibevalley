@@ -10,8 +10,7 @@ import type { Db } from "#/infra/db.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import type { Attachment } from "#/modules/attachment/attachment.ts";
-import { type Envelope, orchestratorIn } from "#/modules/mailbox/envelope.ts";
-import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
+import { type Envelope, orchestratorIn, unreadSummaryOf } from "#/modules/session/envelope.ts";
 import type { Session } from "#/modules/session/session.ts";
 import * as qc from "#db/channel.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
@@ -51,12 +50,11 @@ export interface ChannelHubDeps {
   readonly agent: Agent;
   readonly attachment: Attachment;
   readonly session: Session;
-  readonly mailbox: Mailbox;
 }
 
 /** The chat's shared state and the ways it is told: the store, the hubs of what was said and read, and the frames. */
 export async function makeChannelHub(deps: ChannelHubDeps) {
-  const { core, agent: agents, db, mailbox, session: sessions, clock } = deps;
+  const { core, agent: agents, db, session: sessions, clock } = deps;
   const store = await makeChannelStore(deps);
   // Every message once written, for the rooms: each follower reads it through a bounded relay of its own.
   const said = new Hub<T.ChatMessage>();
@@ -90,8 +88,11 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
     const ch = h.channel ? store.channel(h.channel) : undefined;
     return !h.issue && ch?.type === "direct" && ch.peer_id === profileId(h.agent) ? ch.id : undefined;
   };
-  const sessionOf = (id: string) => sessions.sessionOf(id);
+  const sessionOf = (id: string) => sessions.live(id).session;
   const hired = () => sessions.hired();
+  /** The helper working the issue now: the latest hired of those on it. */
+  const onIssue = (issue: string) =>
+    hired().reduce<T.Session | undefined>((on, h) => (h.issue === issue && (!on || h.hiredAt >= on.hiredAt) ? h : on), undefined);
   const talkSession = (channel: string) => hired().find((h) => directOfSession(h) === channel);
   const channelOfSession = (h: T.Session) => directOfSession(h) ?? (h.channel && channelName(h.channel) !== undefined ? h.channel : store.defaultId());
   const channelIdOf = (row: ChannelRow) => (row.type === "thread" ? (row.parent_id ?? row.id) : row.id);
@@ -212,7 +213,7 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
   const ownerOf = (ch: ChannelRow): string => {
     if (ch.type === "direct") return talkSession(ch.id)?.id ?? "";
     if (ch.type === "channel" || !ch.subject_id) return "";
-    if (ch.subject_kind === "issue") return sessions.onIssue(ch.subject_id) ?? "";
+    if (ch.subject_kind === "issue") return onIssue(ch.subject_id)?.id ?? "";
     if (ch.subject_kind === "talk") return sessionOf(ch.subject_id) ? ch.subject_id : "";
     return "";
   };
@@ -291,10 +292,10 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
     ...envelopeMore(r, filesAt),
   });
 
-  const inboxRows = (who: string) => {
+  const inboxRows = async (who: string) => {
     const h = sessionOf(who);
     const channel = h ? channelOfSession(h) : store.defaultId();
-    return mailbox.unreadSummary(who, channel);
+    return unreadSummaryOf(await qc.unreadOf(db.sql, { participant: who, channel }));
   };
 
   await store.locked(async () => {

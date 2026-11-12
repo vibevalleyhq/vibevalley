@@ -14,7 +14,6 @@ import { makeProvider, type Provider } from "#/modules/provider/provider.ts";
 import { NotAnswered } from "#/modules/session/host.ts";
 import type { Setting } from "#/modules/setting/setting.ts";
 import { defaultVoice } from "#/modules/setting/voice.ts";
-import { inboxBoot } from "#/services.ts";
 import { nextTurn, testConfig, until } from "#/testing/layers.ts";
 import { type World, world } from "#/testing/world.ts";
 
@@ -243,7 +242,7 @@ const farm = async (
   };
   const w = await world({ config });
   try {
-    await inboxBoot(w);
+    await w.inbox.boot();
     const orchestrator = await makeOrchestrator(w);
     w.closes.push(() => orchestrator.close());
     const provider =
@@ -460,7 +459,7 @@ describe("voice", () => {
     const grant = await voice.session();
     const agent = await voice.start(grant.channel, grant.uid);
     await voice.heard(agent.agentId, "语音消息", "", "voice-1");
-    const rows = await f.world.db.sql.query(`select d.source, m.meta from mailbox_delivery d
+    const rows = await f.world.db.sql.query(`select d.source, m.meta from session_delivery d
           join channel_message m on m.id = d.message_id where m.body = '语音消息'`);
     expect(rows).toEqual([{ source: "voice", meta: `{"ingressSource":"voice","spoken":true}` }]);
   });

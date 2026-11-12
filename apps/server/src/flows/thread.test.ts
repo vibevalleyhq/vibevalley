@@ -25,7 +25,7 @@ describe("an issue's thread", () => {
     const issue2 = fw.issue;
     const issues = testIssues(issue2);
     const chat = fw.channel;
-    const mailbox = fw.mailbox;
+    const mailbox = fw.inside;
     await fw.agent.save(lab());
     const issue = await issues.add({ title: "还在处理", repo: "release-input", agent: "lab" });
     const started = await issues.start(issue.id, "");
@@ -64,7 +64,7 @@ describe("an issue's thread", () => {
     const issue2 = fw.issue;
     const issues = testIssues(issue2);
     const channels = fw.channel;
-    const sessions = fw.session;
+    const sessions = fw.inside;
     await fw.agent.save(lab());
     const issue = await issues.add({ title: "等待派发", repo: "queued", agent: "lab" });
     await issues.comment(issue.id, "先记下验收要求", "queued-comment");
@@ -78,14 +78,14 @@ describe("an issue's thread", () => {
     expect(inputs[0]).toContain("先记下验收要求");
     const followup = (await channels.post({ _tag: "User", text: "另一个需求", channel: thread, sendKey: "handback-source" })).message;
     const session = sessions.hired()[0]!;
-    const mailbox = fw.mailbox;
+    const mailbox = fw.inside;
     await await_(
       () => Promise.resolve(mailbox.deliveriesOf(session.id).find((row) => row.envelope_id === followup.id)?.channel_id),
       (channel) => channel === thread,
       "the followup owned by the session",
     );
-    await fw.mailbox.decline(session.id, followup.id, "超出当前范围");
-    await fw.mailbox.decline(session.id, followup.id, "超出当前范围");
+    await fw.inside.decline(session.id, followup.id, "超出当前范围");
+    await fw.inside.decline(session.id, followup.id, "超出当前范围");
     const returned = mailbox.deliveriesOf(channels.orchestratorIn(thread)).filter((row) => row.envelope_id === `returned:${issue.id}:${followup.id}`);
     expect(returned).toHaveLength(1);
     expect(returned[0]!.payload.trigger.id).toBe(followup.id);
@@ -100,7 +100,7 @@ describe("an issue's thread", () => {
     const issue2 = fw.issue;
     const issues = testIssues(issue2);
     const channels = fw.channel;
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const core = fw.core;
     const { in: saidIn } = fw.said;
     const sql = sqlOf(fw.db);
@@ -133,9 +133,9 @@ describe("an issue's thread", () => {
     const kept = await channels.post({ _tag: "User", text: "先记一下：时区用东八区", channel: thread!.id, sendKey: "" });
     const woken = await sql<{
       n: number;
-    }>`select count(*) as n from mailbox_delivery where message_id = ${kept.message.id} and session_id = ${first}`;
+    }>`select count(*) as n from session_delivery where message_id = ${kept.message.id} and session_id = ${first}`;
     expect(woken[0]!.n).toBe(0);
-    const rows = await sql`select trigger_id from mailbox_issue where trigger_id = ${kept.message.id} and state = 'returned'`;
+    const rows = await sql`select trigger_id from session_issue_input where trigger_id = ${kept.message.id} and state = 'returned'`;
     expect(rows).toHaveLength(1);
 
     const setStatus2 = await issues.setStatus(issue.id, "todo", "接着做", "", user);
@@ -172,7 +172,7 @@ describe("an issue's thread", () => {
     const issue2 = fw.issue;
     const issues = testIssues(issue2);
     const channels = fw.channel;
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const inbox = fw.inbox;
     const { in: saidIn } = fw.said;
     await fw.agent.save(lab());

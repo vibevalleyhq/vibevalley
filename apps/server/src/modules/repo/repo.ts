@@ -115,6 +115,16 @@ const exists = async (path: string): Promise<boolean> => {
   }
 };
 
+/** Where an issue's checkout is: a worktree on the issue's branch forked from base ("" for main), or the repo's own
+ * folder. */
+export interface CheckoutAt {
+  readonly repo: string;
+  readonly issue: number;
+  readonly worktree: boolean;
+  readonly base: string;
+  readonly signal?: AbortSignal;
+}
+
 /** The repositories under the work root, their worktrees, checks, merges and pull requests. Long operations take a
  * signal: aborting stops the git commands and the check they run. */
 export interface Repo {
@@ -130,7 +140,14 @@ export interface Repo {
   readonly languages: (name: string, signal?: AbortSignal) => Promise<T.RepoLanguages | undefined>;
   readonly activity: (name: string) => Promise<T.RepoActivity | undefined>;
   readonly contributions: (extra: readonly string[]) => Promise<T.Repo[]>;
-  readonly workplace: (repo: string, issueNumber: number, worktree: boolean, baseBranch: string, signal?: AbortSignal) => Promise<Workplace>;
+  /** An issue's checkout, made when it is not there yet; only the session module makes and lets go of them. */
+  readonly checkout: (at: CheckoutAt) => Promise<Workplace>;
+  /** A checkout let go: kept when it holds work, and said why. */
+  readonly releaseCheckout: (place: Workplace) => Promise<WorkplaceRelease>;
+  /** A checkout's branch reset to main while it stays. */
+  readonly resetCheckout: (place: Workplace) => Promise<void>;
+  /** An issue's checkout cleared once no helper is on its issue (work "discard" by default). */
+  readonly clearCheckout: (repo: string, issue: number, work?: WorkplaceCleanup) => Promise<WorkplaceRelease>;
   readonly changes: (place: Workplace) => Promise<T.Changes>;
   readonly branchChanges: (repo: string, branch: string) => Promise<T.Changes | undefined>;
   readonly changedFiles: (cwd: string, baseBranch: string) => Promise<string[]>;
@@ -138,9 +155,6 @@ export interface Repo {
   readonly merge: (place: Workplace, signal?: AbortSignal) => Promise<Merged>;
   readonly mergeInto: (place: Workplace, target: string, targetCwd?: string, signal?: AbortSignal) => Promise<Merged>;
   readonly mergeBranch: (repo: string, branch: string, signal?: AbortSignal) => Promise<string>;
-  readonly release: (place: Workplace) => Promise<WorkplaceRelease>;
-  readonly reset: (place: Workplace) => Promise<void>;
-  readonly clear: (repo: string, issueNumber: number, work?: WorkplaceCleanup) => Promise<WorkplaceRelease>;
   readonly openBranch: (repo: string, branch: string, from?: string) => Promise<void>;
   readonly run: (cwd: string, command: string, signal?: AbortSignal) => Promise<{ readonly ok: boolean; readonly output: string }>;
   readonly houseRules: () => Promise<string>;
@@ -629,6 +643,19 @@ export async function makeRepo(deps: RepoDeps, hooks: RepoHooks = {}): Promise<R
       return removed ? { kept: true, reason: t("server.repo.clear.branchLeft", { branch: place.branch, why: removed }) } : { kept: false };
     });
 
+  const reset = async (place: Workplace): Promise<void> => {
+    const branch = place.branch;
+    if (!branch) throw fail(t("server.repo.clear.notWorktree", { cwd: place.cwd }));
+    await serially(place.repo, () =>
+      repoErrors(async () => {
+        const { git } = gitWith();
+        const main = await repository(join(root, place.repo)).main();
+        await git(place.cwd, "checkout", "-q", "-f", "-B", branch, main);
+        await git(place.cwd, "clean", "-q", "-f", "-d");
+      }),
+    );
+  };
+
   return {
     githubSnapshot,
     root,
@@ -698,7 +725,10 @@ export async function makeRepo(deps: RepoDeps, hooks: RepoHooks = {}): Promise<R
       return out;
     },
     contributions: (extra) => contributionsOf(root, extra),
-    workplace,
+    checkout: (at) => workplace(at.repo, at.issue, at.worktree, at.base, at.signal),
+    releaseCheckout: release,
+    resetCheckout: reset,
+    clearCheckout: clear,
     changes: (place) => describe(place.repo, place.cwd, place.branch),
     branchChanges: async (repo, branch) => {
       // An issue worked in a profile's own folder has no repo, and so no issue branch: none to read.
@@ -733,20 +763,6 @@ export async function makeRepo(deps: RepoDeps, hooks: RepoHooks = {}): Promise<R
     merge,
     mergeInto,
     mergeBranch,
-    release,
-    reset: async (place) => {
-      const branch = place.branch;
-      if (!branch) throw fail(t("server.repo.clear.notWorktree", { cwd: place.cwd }));
-      await serially(place.repo, () =>
-        repoErrors(async () => {
-          const { git } = gitWith();
-          const main = await repository(join(root, place.repo)).main();
-          await git(place.cwd, "checkout", "-q", "-f", "-B", branch, main);
-          await git(place.cwd, "clean", "-q", "-f", "-d");
-        }),
-      );
-    },
-    clear,
     openBranch: (repo, branch, from = "") =>
       serially(repo, async () => {
         const path = await ensure(repo);

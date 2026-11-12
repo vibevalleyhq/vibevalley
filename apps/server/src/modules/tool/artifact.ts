@@ -31,7 +31,7 @@ export function artifactTools(deps: Pick<ToolDeps, "session" | "channel" | "arti
   const warnings = (made: T.Artifact, content: string) => (made.body === "html" ? answers.artifact.warned(htmlCheck(content).warned) : "");
 
   const sessionArtifactScope = (session: string): { readonly channel?: string; readonly issue?: string } => {
-    const own = run.sessionOf(session);
+    const own = run.live(session).session;
     return own?.issue ? { issue: own.issue } : own?.channel ? { channel: own.channel } : {};
   };
 

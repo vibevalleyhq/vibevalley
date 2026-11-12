@@ -57,7 +57,7 @@ test("regression: splitting preserves the parent's assignment and branch ancestr
   try {
     const issue2 = fw.issue;
     const issues = testIssues(issue2);
-    const sessions = fw.session;
+    const sessions = fw.inside;
     await fw.agent.save(lab());
     const issue = await issues.add({ title: "整个看板重做", description: "像 Linear 那样", repo: "board", agent: "lab" });
     await issues.edit(issue.id, { criteria: ["卡片紧凑"] }, user);

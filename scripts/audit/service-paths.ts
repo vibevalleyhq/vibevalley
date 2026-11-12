@@ -42,8 +42,8 @@ const outerCallers = new Set(["http"]);
 const ground = new Set(["infra", "base"]);
 /** Tests and what only tests load (flows/farm.ts is the cross-module tests' farm). */
 const skipped = /\.(test|spec)\.ts$|\/testing\/|\/testdata\/|^apps\/server\/src\/flows\/|\.d\.ts$/u;
-/** Leaf gateway/gamification services reached only by HTTP, Core's late-bound Projection, and Machine (staged for apps/machine). */
-export const singleCallerServices = new Set(["Connector", "Game", "Lan", "Machine", "Mcp", "Projection", "Voice"]);
+/** Leaf gateway/gamification services reached only by HTTP, and Core's late-bound Projection. */
+export const singleCallerServices = new Set(["Connector", "Game", "Lan", "Mcp", "Projection", "Voice"]);
 /** Types that keep the members of their first argument. */
 const keeping = new Set(["Pick", "Omit", "Readonly", "Partial", "Required", "NonNullable"]);
 

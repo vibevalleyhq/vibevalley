@@ -3,11 +3,11 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { keptLog } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
-import { type RunEvent as CoreEvent } from "#/modules/session/inProcessRun.ts";
 import { assistantMessage, text, thinking } from "#/testing/model.ts";
 import { world } from "#/testing/world.ts";
 import * as qs from "#db/session.sql.ts";
 
+import { type RunEvent as CoreEvent } from "./inProcessRun.ts";
 import { makeInProcessRun, NotRecorded, recording } from "./inProcessRun.ts";
 import { makeTrajectories } from "./journal.ts";
 import { type RunFinished, type RunStore, runOf } from "./session.ts";
@@ -68,7 +68,7 @@ const records = async (farm: Farm) => {
 describe("the orchestrator's runs", () => {
   test("one loop is one run; its inputs' issues are all linked; failures and stops are said", async () => {
     await using farm = await world();
-    const sessions = farm.session;
+    const sessions = farm.inside;
     await issue(farm, "i1");
     await issue(farm, "i2");
     const { store, finished, journal, currentRun } = await records(farm);

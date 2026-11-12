@@ -51,9 +51,6 @@ export const findingsOf = (text: string) =>
     .map((l) => l.trim())
     .filter(Boolean);
 
-/** The structured issue_report carries the short result; the PR fallback keeps the worker's complete last answer. */
-export const pullRequestConclusion = (text: string) => text.trim();
-
 function startWords(trigger: T.RunTrigger, first: boolean): [T.Milestone["kind"], string] {
   switch (trigger.kind) {
     case "refine":

@@ -353,7 +353,7 @@ describe("GitHub", () => {
     return repos(
       reposDir(),
       async (p) => {
-        const place = await p.workplace("sample", 1, true, "");
+        const place = await p.checkout({ repo: "sample", issue: 1, worktree: true, base: "" });
         gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
         mkdirSync(join(place.cwd, ".vibevalley"));
         const check = join(place.cwd, ".vibevalley/check");
@@ -399,7 +399,7 @@ describe("GitHub", () => {
     return repos(
       reposDir(),
       async (p) => {
-        const place = await p.workplace("sample", 1, true, "");
+        const place = await p.checkout({ repo: "sample", issue: 1, worktree: true, base: "" });
         gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
         expect((await thrown(p.submitPullRequest(place, issue, "done"))).message).toContain("已推送");
         expect((await thrown(p.pullRequestState("sample", 3))).message).toBe("无法读取 PR #3 状态");
@@ -418,7 +418,7 @@ describe("GitHub", () => {
       await repos(
         reposDir(),
         async (p) => {
-          const place = await p.workplace("sample", 1, true, "");
+          const place = await p.checkout({ repo: "sample", issue: 1, worktree: true, base: "" });
           gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
           if (hasCheck) {
             mkdirSync(join(place.cwd, ".vibevalley"));
@@ -447,7 +447,7 @@ describe("GitHub", () => {
     return repos(
       reposDir(),
       async (p) => {
-        const place = await p.workplace("sample", 1, true, "");
+        const place = await p.checkout({ repo: "sample", issue: 1, worktree: true, base: "" });
         gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
         const file = gitSync(place.cwd, "rev-parse", "--path-format=absolute", "--git-path", "vibevalley-pr.md").trim();
         writeFileSync(file, "# The board keeps its order\n\n## What changed\n\nIt does.\n");
@@ -508,7 +508,7 @@ describe("GitHub", () => {
             want = old;
           }
           if (mode === "not-enabled") want = old;
-          const place = await p.workplace("sample", 1, true, "");
+          const place = await p.checkout({ repo: "sample", issue: 1, worktree: true, base: "" });
           expect([mode, gitSync(place.cwd, "rev-parse", "HEAD")]).toEqual([mode, want]);
           expect([mode, gitSync(path, "rev-parse", "main")]).toEqual([mode, want]);
           if (mode === "checked-out") {

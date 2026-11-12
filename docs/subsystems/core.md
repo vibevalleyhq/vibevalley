@@ -16,7 +16,7 @@
 | 位置 | 职责 |
 |---|---|
 | `apps/server/src/core/core.ts` | `Core` 服务：持有状态、盖时间戳、发布事实与三条流 |
-| `apps/server/src/gateway/projection/` | `reduce.ts`、`frame.ts`、`projection.ts`：组装各模块规则注入 `Core` |
+| `apps/server/src/gateway/projection/` | `reduce.ts`、`frame.ts`（`makeProjection`）：组装各模块规则注入 `Core` |
 | `packages/protocol/src/core/shapes.ts` | `SpaceState`、`Fact`、`StateFrame`、`ServerEvent`、`LiveEvent` |
 | `packages/protocol/src/api.ts`、`endpoint.ts` | 汇总各概念的 `endpoints`、`Handlers`、`Endpoint`、六位业务码 `BizCode`、`bizCodeMeta`、全信封 Schema 与 `ApiError` |
 | `apps/server/src/gateway/http/` | `app.ts` 挂全部路由；`api.ts` 命令接口、`requestKey` 去重、附件和网页 Artifact；`streams.ts` 三条全局 SSE 和工单观察流；`rpc.ts` 订阅流和来源校验 `fromTheFarm`；`media.ts` 媒体；`mcp.ts` 的 `/mcp` 和 `/v1/chat/completions`；`line.ts` 语音线路的 WebSocket；`handlers/<概念>.ts` |
@@ -88,13 +88,13 @@ SSE 以外的路由：
 
 1. `gateway/http/app.ts` 先绑定 HTTP 端口；配置为 `port: 0` 时在这里得到真实端口，再用它组装服务，恢复的会话和 `lan` 转发不会拿到 `:0`。
 2. `Core` 从空状态启动；各模块在构造阶段从数据库加载工单、频道、定时任务和在场会话并施加初始事实。
-3. `services.ts` 按模块顺序调各模块的 `boot()`：Repo 第一次看 GitHub、Session 接回或放走停机时在场的会话、Channel 恢复会话串、Mailbox 重放投递、Media、Issue 和 Cron 补跑、Inbox 开始巡查、Game 开始统计 commit。助手在构造时续接被重启打断的回合。
+3. `services.ts` 按模块顺序调各模块的 `boot()`：Repo 第一次看 GitHub、Session 接回或放走停机时在场的会话（`vibevalley` 农机上答到一半的帮工接着答）、Channel 恢复会话串、Session 恢复投递并叫醒（`wake`）、Media、Issue 和 Cron 补跑、Inbox 开始巡查、Game 开始统计 commit。助手在构造时续接被重启打断的回合。
 4. 写出 `server.json` 与就绪收据。
 
 ## 和谁打交道
 
-- **施加事实的模块**：`issue`、`session`、`channel`、`connector`、`cron`、`voice`、`game`。
-- **订阅事实的模块**：`game`、`inbox`、`issue`、`channel`。
+- **施加事实的模块**：`issue`、`session`、`channel`、`media`、`connector`、`cron`、`voice`、`game`。
+- **订阅事实的模块**：`game`、`inbox`、`issue`、`channel`、`media`。
 - **外部客户端**：`apps/web`、`apps/cli` 与经 `lan` 放行的配对设备。
 
 ## 为什么这样
@@ -108,7 +108,6 @@ SSE 以外的路由：
 ## 还没做的
 
 - `can` 只留 `user` 与 `remote`，agent 工具按档案配置：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
-- 状态提交与外部副作用统一为事务后任务：[状态先提交，副作用由 worker 在提交之后做](.agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md)。
 
 ## 怎么验证
 

@@ -12,25 +12,14 @@ import type { PublicFetch } from "#/infra/publicHttp.ts";
 import { type Time, wallTime } from "#/infra/time.ts";
 import { type Inbox, makeInbox } from "#/modules/inbox/inbox.ts";
 import { explicitMandate } from "#/modules/issue/creation.ts";
-import type { Issue } from "#/modules/issue/issue.ts";
+import { type Issue } from "#/modules/issue/issue.ts";
 import { type GitHubRun, type RepoHooks } from "#/modules/repo/repo.ts";
 import type { ModelAccess } from "#/modules/runtime/durable.ts";
 import { registryOf } from "#/modules/runtime/runtime.ts";
+import { type Inside, insideOf } from "#/modules/session/session.ts";
 import { type WorkerAccess, type workerAccess } from "#/modules/session/worker.ts";
 import { makeTool, type Tool } from "#/modules/tool/tool.ts";
-import {
-  agentSessions,
-  agents,
-  type Building,
-  closeAll,
-  collaboration,
-  issues,
-  type IssuesFarm,
-  mailbox,
-  platform,
-  type ServiceOptions,
-  sourceControl,
-} from "#/services.ts";
+import { buildModules, type Close, closeAll, type Modules, owning, type ServiceOptions } from "#/services.ts";
 
 import { scriptedDeepSeek, type ScriptedDeepSeek } from "./deepseek.ts";
 import { repo } from "./git.ts";
@@ -53,6 +42,8 @@ export interface WorldOptions {
   readonly config?: ServerConfig;
   /** The runtimes sessions run on; each is probed as installed. */
   readonly runtimes?: readonly Runtime[];
+  /** VibeValley's own runtime too, on the farm's harness, probed as installed. */
+  readonly ownRuntime?: boolean;
   readonly repoHooks?: RepoHooks;
   /** Repos made before the farm starts, each a git repository with one commit. */
   readonly repos?: readonly string[];
@@ -106,17 +97,20 @@ const fakeWorkerAccess = async (): Promise<WorkerAccess> => {
   };
 };
 
-/** The farm up to its issues, built and not started, with what the test hears. */
-export type ModuleWorld = IssuesFarm &
-  Building &
+/** The farm up to its issues (services.ts's buildModules), built and not started, with what the test hears. */
+export type ModuleWorld = Modules &
   AsyncDisposable & {
+    /** The parts behind the session module, for the tests that drive them. */
+    readonly inside: Inside;
+    readonly close: () => Promise<void>;
+    /** What the test's own services close with, after the farm's closes; each is called the last added first. */
+    readonly closes: Close[];
     readonly said: Said;
     /** What the farm's harness asks for DeepSeek: a test seats its scripted model here. */
     readonly deepseek: Pick<ScriptedDeepSeek, "use">;
-    readonly close: () => Promise<void>;
   };
 
-/** Core domain services below Inbox/Tool/Mcp for module tests. */
+/** Core domain services below Inbox/Tool/Mcp for module tests: services.ts's buildModules, with the test's runtimes, repos and network. */
 export async function moduleWorld(options: WorldOptions = {}): Promise<ModuleWorld> {
   const base = options.config ?? testConfig();
   const config = options.stallMs !== undefined ? { ...base, session: { ...base.session, stallSeconds: options.stallMs / 1000 } } : base;
@@ -126,30 +120,43 @@ export async function moduleWorld(options: WorldOptions = {}): Promise<ModuleWor
     repo(dir, 1, 0);
   }
   const given = options.runtimes ?? [];
-  const deepseek = scriptedDeepSeek(options.clock ?? wallTime);
+  const clock = options.clock ?? wallTime;
+  const deepseek = scriptedDeepSeek(clock);
   const o: ServiceOptions = {
     runtime: {
-      registry: registryOf(given),
+      registry: options.ownRuntime === true ? (own) => registryOf([...given, own]) : registryOf(given),
       background: false,
-      probe: installedOnly(given, options.usage),
+      probe: installedOnly(options.ownRuntime === true ? [...given, { id: "vibevalley" }] : given, options.usage),
       usageOf: async () => options.usage?.() ?? null,
       models: options.models ?? deepseek.models,
     },
     repo: { gh: noGitHub, ...options.repoHooks },
     session: { workerAccess: options.workerAccess ?? fakeWorkerAccess },
   };
-  const below = await platform(config, { ...(options.network ?? offlineNetwork), ...(options.clock ? { clock: options.clock } : {}) });
+  const network = options.network ?? offlineNetwork;
   // Closed last: after the harness, whose runs it may still be answering.
-  below.closes.unshift(() => deepseek.close());
+  const closes: Close[] = [() => deepseek.close()];
+  const ear: { heard?: ReturnType<typeof said> } = {};
   try {
-    const heard = said(below.core);
-    below.closes.push(heard.close);
-    const built = await issues(await collaboration(await mailbox(await agentSessions(await sourceControl(await agents(below, o), o), o))));
+    const modules = await buildModules(config, { ...o, platform: { ...network, clock } }, closes, (core) => {
+      ear.heard = said(core);
+      closes.push(ear.heard.close);
+    });
+    const heard = ear.heard;
+    if (heard === undefined) throw new Error("the farm was built without its core");
     let closing: Promise<void> | undefined;
-    const close = () => (closing ??= closeAll(built));
-    return Object.assign(built, { said: { in: heard.in, all: heard.all }, deepseek: { use: deepseek.use }, close, [Symbol.asyncDispose]: close });
+    const close = () => (closing ??= closeAll(closes));
+    return {
+      ...modules,
+      inside: insideOf(modules.session),
+      closes,
+      said: { in: heard.in, all: heard.all },
+      deepseek: { use: deepseek.use },
+      close,
+      [Symbol.asyncDispose]: close,
+    };
   } catch (e) {
-    await closeAll(below);
+    await closeAll(closes);
     throw e;
   }
 }
@@ -161,13 +168,12 @@ export type World = ModuleWorld & { readonly inbox: Inbox; readonly tool: Tool; 
 export async function world(options: WorldOptions = {}): Promise<World> {
   const below = await moduleWorld(options);
   try {
-    const inbox = await makeInbox(below);
-    below.closes.push(() => inbox.close());
-    const tool = await makeTool(below);
-    const withTool = Object.assign(below, { inbox, tool });
-    const mcp = await makeMcp(withTool, options.who ? { who: options.who } : {});
-    below.closes.push(() => mcp.close());
-    return Object.assign(withTool, { mcp });
+    const { config, clock, log, db, core, agent, memory, repo, session, channel, media, artifact, pkm, issue, cron } = below;
+    const own = owning(below.closes);
+    const inbox = own(await makeInbox({ config, clock, log, db, core, channel, issue, session }));
+    const tool = own(await makeTool({ clock, log, agent, session, issue, channel, cron, memory, media, pkm, artifact, repo }));
+    const mcp = own(await makeMcp({ config, session, tool, log }, options.who ? { who: options.who } : {}));
+    return { ...below, inbox, tool, mcp };
   } catch (e) {
     await below.close();
     throw e;

@@ -141,7 +141,7 @@ describe("mcp", () => {
       "session_list",
     ]);
     const extra = (await chat.post({ _tag: "User", text: "顺手做另一件事", channel: thread, sendKey: "extra" })).message;
-    const mailbox = farm.mailbox;
+    const mailbox = farm.inside;
     await waitFor(
       () => mailbox.deliveriesOf(id).find((row) => row.envelope_id === extra.id)?.channel_id,
       (channel) => channel === thread,
@@ -183,7 +183,7 @@ describe("mcp", () => {
     expect(tool8).toContain("没认出你是谁");
     const tool9 = await client(mcp, "hb_w1_forged").tool("channel_message_send", { text: "冒名" });
     expect(tool9).toContain("没认出你是谁");
-    await farm.session.dismiss(id);
+    await farm.inside.dismiss(id);
     expect((await c.result("channel_message_send", { text: "revoked" })).result?.isError).toBe(true);
     expect(saidIn(thread!).some((message) => ["revoked", "冒名"].includes(message.text))).toBe(false);
   });
@@ -236,9 +236,9 @@ describe("mcp", () => {
     const issues = farm.issue;
     const chat = farm.channel;
     const mcp = farm.mcp;
-    const sessions = farm.session;
+    const sessions = farm.inside;
     const artifacts = farm.artifact;
-    const library = farm.library;
+    const media = farm.media;
     const got = await issues.hire(lab(), "画两种详情", "chat-j");
     const id = got.session.id;
     await until(() => tokens.length > 0, "the session's token");
@@ -247,14 +247,14 @@ describe("mcp", () => {
       (t) => t !== undefined,
       "the session's thread",
     );
-    const cwd = sessions.cwdOf(id)!;
+    const cwd = sessions.live(id).cwd!;
     mkdirSync(join(cwd, "out"), { recursive: true });
     writeFileSync(join(cwd, "out", "two.html"), "<p>抽屉和整页</p>");
     const c = client(mcp, tokens[0]!);
     await c.init();
     const made = await c.tool("artifact_create", { title: "两种详情", kind: "html", file: "out/two.html", note: "抽屉和整页" });
     expect(made).toContain("做好了");
-    const issue = sessions.sessionOf(id)!.issue!;
+    const issue = sessions.live(id).session!.issue!;
     const [one] = await artifacts.list({ issue });
     expect(one).toMatchObject({ title: "两种详情", channel: thread, by: "lab", version: 1 });
     expect((await chat.history(thread!)).at(-1)!.artifact).toMatchObject({ id: one!.id, version: 1 });
@@ -289,7 +289,7 @@ describe("mcp", () => {
       const reply = await c.tool("library_item_add", { path });
       expect(reply).toContain("没成");
     }
-    const fetched = await library.list({ origin: "fetched" });
+    const fetched = await media.libraryItems({ origin: "fetched" });
     expect(fetched).toEqual([expect.objectContaining({ origin: { kind: "fetched", agent: "lab", session: id, from: { path: "out/two.html" } } })]);
   });
 

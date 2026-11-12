@@ -21,7 +21,7 @@ describe("a session", () => {
     await using fw = await f.open();
     const w = watch(fw);
     const issues = fw.issue;
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const hired = await issues.hire(lab(), "看看", "reach");
     const first = mustHire(hired);
     await w.nextReport();

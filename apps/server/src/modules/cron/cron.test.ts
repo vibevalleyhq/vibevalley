@@ -246,16 +246,16 @@ test("regression: a cron occurrence and its schedule advance commit together", a
   const crons = f.cron;
   const sql = f.db.sql;
   const item = await crons.add(req("atomic", "work", { kind: "once", at: now + 1 }), user);
-  await refuse(f.db, "reject_cron_input", "before insert on mailbox_trigger", "new.source = 'cron'", "rejected input");
+  await refuse(f.db, "reject_cron_input", "before insert on session_trigger", "new.source = 'cron'", "rejected input");
   await adjust(2);
   await crons.tick();
   const rows = await sql.query("select enabled, last_run from cron where id = $1", [item.id]);
   expect(rows).toEqual([{ enabled: true, last_run: null }]);
-  const rows2 = await sql.query("select id from mailbox_trigger where source = 'cron'");
+  const rows2 = await sql.query("select id from session_trigger where source = 'cron'");
   expect(rows2).toEqual([]);
   await allow(f.db, "reject_cron_input");
   await crons.tick();
-  expect((await sql.query("select id from mailbox_trigger where source = 'cron'")).length).toBe(1);
+  expect((await sql.query("select id from session_trigger where source = 'cron'")).length).toBe(1);
 });
 
 test("regression: a one-off cron resumes committed input after restart without a second issue", async () => {
@@ -272,7 +272,7 @@ test("regression: a one-off cron resumes committed input after restart without a
     await crons.tick();
     const rows = await sql.query("select enabled from cron");
     expect(rows).toEqual([{ enabled: false }]);
-    const rows2 = await sql.query("select routed_at from mailbox_trigger where source = 'cron'");
+    const rows2 = await sql.query("select routed_at from session_trigger where source = 'cron'");
     expect(rows2).toEqual([{ routed_at: null }]);
     await allow(f.db, "reject_cron_issue");
   }
@@ -284,7 +284,7 @@ test("regression: a one-off cron resumes committed input after restart without a
     await crons.tick();
     const rows = await sql.query("select title from issue");
     expect(rows).toEqual([{ title: "restart-once" }]);
-    const rows2 = await sql.query("select routed_at is not null as routed from mailbox_trigger where source = 'cron'");
+    const rows2 = await sql.query("select routed_at is not null as routed from session_trigger where source = 'cron'");
     expect(rows2).toEqual([{ routed: true }]);
   }
 });

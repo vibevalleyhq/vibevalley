@@ -16,12 +16,12 @@ import { messageOf } from "#/base/errors.ts";
 import type { Core } from "#/core/core.ts";
 import { causeMessage, SqlError } from "#/infra/db.ts";
 import { wallTime } from "#/infra/time.ts";
-import { watchStalls } from "#/modules/machine/executor.ts";
 import { MergeFailure } from "#/modules/repo/workplace.ts";
 import { gitIn } from "#/testing/git.ts";
 import { starter, testConfig, until, waitFor } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 
+import { watchStalls } from "./executor.ts";
 import { DeliveryRefused, HireRefused, NotRecorded } from "./session.ts";
 import type { SessionNews, DeliveryInput } from "./signals.ts";
 import type { WorkerAccess } from "./worker.ts";
@@ -95,7 +95,7 @@ describe("sessions", () => {
       },
     };
     await using farm = await world({ config: testConfig(), runtimes: [runtime], repos: ["demo"] });
-    const sessions = farm.session;
+    const sessions = farm.inside;
     await farm.agent.save(lab());
     const interrupt = new AbortController();
     const sending = sessions.hire(
@@ -134,7 +134,7 @@ describe("sessions", () => {
       },
     };
     await using farm = await world({ config: { ...testConfig(), repo: { maxSessions: 1, checkTimeoutSeconds: 60 } }, runtimes: [runtime], repos: ["demo"] });
-    const sessions = farm.session;
+    const sessions = farm.inside;
     const core = farm.core;
     await farm.agent.save(lab());
     const sent = await sessions.hire(lab(), "first run", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true });
@@ -192,7 +192,7 @@ describe("sessions", () => {
     };
     await using farm = await world({ config: { ...testConfig(), repo: { maxSessions: 1, checkTimeoutSeconds: 60 } }, runtimes: [runtime], repos: ["demo"] });
     try {
-      const sessions = farm.session;
+      const sessions = farm.inside;
       const core = farm.core;
       await farm.agent.save(lab());
       const sent = await sessions.hire(lab(), "first run", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true });
@@ -238,7 +238,7 @@ describe("sessions", () => {
     };
     await using farm = await world({ runtimes: [runtime], repos: ["demo"] });
     try {
-      const sessions = farm.session;
+      const sessions = farm.inside;
       const core = farm.core;
       const sent = await sessions.hire(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true });
       const id = sent.session.id;
@@ -266,7 +266,7 @@ describe("sessions", () => {
   test("a session is sent, works its run, reports, takes a word and is merged", async () => {
     const turns: ScriptedTurn[] = [];
     await using farm = await world({ runtimes: [worker(turns)], repos: ["demo"] });
-    const sessions = farm.session;
+    const sessions = farm.inside;
     const core = farm.core;
     const seen: SessionNews[] = [];
     const news = sessions.news();
@@ -359,7 +359,7 @@ describe("sessions", () => {
     };
     await using farm = await world({ config: { ...testConfig(), repo: { maxSessions: 1, checkTimeoutSeconds: 60 } }, runtimes: [runtime], repos: ["demo"] });
     try {
-      const sessions = farm.session;
+      const sessions = farm.inside;
       const core = farm.core;
       const sent = await sessions.hire(lab(), "first", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } } });
       const id = sent.session.id;
@@ -428,7 +428,7 @@ describe("sessions", () => {
   test("a registration SQL failure is refused rather than hidden as a defect", async () => {
     const config = testConfig();
     await using farm = await world({ config, runtimes: [worker([])], repos: ["demo"] });
-    const sessions = farm.session;
+    const sessions = farm.inside;
     const got = await failure(
       sessions.hire(lab(), "another", "demo", {
         context: { kind: "issue", issue: { id: issueId("i2"), number: 2 } },
@@ -449,7 +449,7 @@ describe("sessions", () => {
   test("a non-SQL registration defect is rethrown after the opened session is stopped", async () => {
     const config = testConfig();
     await using farm = await world({ config, runtimes: [worker([])], repos: ["demo"] });
-    const sessions = farm.session;
+    const sessions = farm.inside;
     const got = await failure(
       sessions.hire(lab(), "another", "demo", {
         context: { kind: "issue", issue: { id: issueId("i2"), number: 2 } },
@@ -484,7 +484,7 @@ describe("sessions", () => {
     };
     await using farm = await world({ config: { ...testConfig(), repo: { maxSessions: 1, checkTimeoutSeconds: 60 } }, runtimes: [runtime], repos: ["demo"] });
     try {
-      const sessions = farm.session;
+      const sessions = farm.inside;
       const core = farm.core;
       using events = core.subscribe();
       const got = await failure(
@@ -542,7 +542,7 @@ test("regression: failed CLI authentication revokes the credential and starts no
       },
     ),
   });
-  const sessions = farm.session;
+  const sessions = farm.inside;
   const hired = await failure(sessions.hire(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("probe"), number: 1 } }, worktree: true }));
   expect(hired).toBeInstanceOf(HireRefused);
   expect(hired).toMatchObject({ reason: expect.stringContaining("认证请求失败") });
@@ -570,7 +570,7 @@ test("regression: session service shutdown revokes issued credentials", async ()
         return { authenticated: true, command: "worker" };
       }),
     });
-    const sessions = farm.session;
+    const sessions = farm.inside;
     const result = await sessions.hire(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("scope"), number: 1 } }, worktree: true });
     expect(result.session).toBeDefined();
     expect(sessions.who(token)).not.toBe("");
@@ -612,7 +612,7 @@ for (const mode of ["refused", "failed", "interrupted"] as const) {
       runtimes: [runtime],
       repos: ["demo"],
     });
-    const sessions = farm.session;
+    const sessions = farm.inside;
     const agent = { ...starter("lab"), effort: "", runtime: mode === "refused" ? "missing" : "pi" };
     const interrupt = new AbortController();
     const send = sessions.hire(
@@ -654,7 +654,7 @@ test("regression: reopening a session rotates its credential before delivering t
       return { authenticated: true, command: "worker" };
     }),
   });
-  const sessions = farm.session;
+  const sessions = farm.inside;
   await farm.agent.save(lab());
   const result = await sessions.hire(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("rotation"), number: 1 } }, worktree: true });
   const id = result.session.id;
@@ -672,7 +672,7 @@ describe("orchestrator profiles", () => {
   test("regression: an orchestrator profile has its session as soon as it is kept, and its new name as soon as it is renamed", async () => {
     await using farm = await world({ runtimes: [], repos: [] });
     const agents = farm.agent;
-    const sessions = farm.session;
+    const sessions = farm.inside;
     const lead = await agents.create({ ...starter(defaultOrchestrator), id: "", name: "前端组长", role: "orchestrator", runtime: orchestratorRuntime });
     expect(sessions.sessionOf(lead.id)?.name).toBe("前端组长");
     await agents.save({ ...lead, name: "前端总管" });

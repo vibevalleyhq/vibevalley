@@ -4,10 +4,9 @@ import type { ScriptedTurn } from "@botiverse/oar/testing";
 import type * as T from "@vibevalley/protocol";
 
 import type { ServerConfig } from "#/infra/config.ts";
-import type { Game } from "#/modules/game/game.ts";
+import { type Game, makeGame } from "#/modules/game/game.ts";
 import { makeOrchestrator } from "#/modules/orchestrator/orchestrator.ts";
 import { type Hired } from "#/modules/session/session.ts";
-import { agentSessionsBoot, channelBoot, gamification, inboxBoot, mailboxBoot, mediaBoot } from "#/services.ts";
 import { gitIn } from "#/testing/git.ts";
 import { starter, testConfig, until as untilHeld, waitFor } from "#/testing/layers.ts";
 import { type ScriptedModel } from "#/testing/model.ts";
@@ -25,13 +24,15 @@ export type FlowWorld = World & { readonly game: Game };
 async function flowWorld(options: WorldOptions): Promise<FlowWorld> {
   const below = await world(options);
   try {
-    const built = await gamification(below);
-    await agentSessionsBoot(built);
-    await channelBoot(built);
-    await mailboxBoot(built);
-    await mediaBoot(built);
-    await inboxBoot(built);
-    return built;
+    const game = await makeGame(below);
+    below.closes.push(() => game.close());
+    // services.ts's startup order, for what is in it.
+    await below.session.boot();
+    await below.channel.boot();
+    await below.session.wake();
+    await below.media.boot();
+    await below.inbox.boot();
+    return { ...below, game };
   } catch (e) {
     await below.close();
     throw e;
@@ -118,7 +119,7 @@ export async function mediaFarm(llm: ScriptedModel) {
     w.deepseek.use(llm);
     const orchestrator = await makeOrchestrator(w);
     w.closes.push(() => orchestrator.close());
-    return Object.assign(w, { orchestrator });
+    return { ...w, orchestrator };
   } catch (e) {
     await w.close();
     throw e;

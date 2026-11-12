@@ -23,14 +23,14 @@ const RULES: readonly Rule[] = [
       /\bowner_?[iI]d\b|(?:\b(?:for|wants|by|on|from|needs|stopped|hands|source|conflict)|For|Wants|By|On|From|Needs|Stopped|Hands|Source|Conflict)Owner|\bowner(?:Mentions?|Required|Read|Last|Line|Late|Spoke|Said|Seen|Event|Only|AgentWord|sLanguage)|Owner(?:Mention|Face|Unread|Read|Did|Required|Only|Ask)|["']owner["']/u,
     says: "the one person a farm has is the user in code, tables and values: userId, actsForUser, stageWantsUser, the actor kind \"user\" (docs/subsystems/user.md); a thread's, a block's or a trigger's owner (ownerOf, threadOwnerOf) is another word and stays",
     // oar's acquired-session key, and the EverOS sender id that memories already stored outside are filed under.
-    except: /^apps\/server\/src\/modules\/(machine\/executor\.test|memory\/everos|memory\/outside\.test)\.ts$/u,
+    except: /^apps\/server\/src\/modules\/(session\/executor\.test|memory\/everos|memory\/outside\.test)\.ts$/u,
   },
   {
     name: "a delivery name the one-door plan retired",
     pattern:
       /\b(openDeliveries|returnOne|returnInput|registerTalk|registerInitialInputs|deliverDirect|breakerNotices|dropEnvelope|retireDispatches|queuedInputs|issueInputs|DeliveryChange|recordChannelTrigger|forOrchestrator|OrchestratorNews|ChannelMail|ChannelRouteInput|InboxMessage|asInbox|inboxLines|orchestratorInboxLines|inboxMore|InputConsumed|InputReturned|startedIssues|finishedRuns|inputsConsumed|inputsReturned|launchesHub)\b|\bsessions\.(register|launches|present|presentSessions|workers)\b|\b(presentSessions|registerOrchestrator|orchestratorOfRow|orchestratorForChannel|OrchestratorForChannel|setOrchestrator|SetOrchestrator|channel_follow|Follows|isForOrchestrator|beginOrchestrator|recordOrchestratorStart|recordWorkerStart|publishOrchestrator|orchestratorSays|tellSession|runSays)\b/u,
-    says: "Mailbox's door: recordTrigger, receive (a Trigger with ChannelHearers or a session, or a Hire), withdraw, news (Consumed, Braked, Handed), triggersOf, queuedTriggers, deliveriesOf, handBack, decline; an envelope as its helper reads it is Envelope; an orchestrator's session is registered by Session itself whenever its profile is kept (Agent.whenKept); everything a session does is one Session.news (Hired, Reported, Left, IssueStarted, RunFinished, Consumed, Returned and its launch's Spoke, Ended, HandedOff, Settling, Closed, Compacting) (.agents/notes/proposed/architecture/2026-11-09-one-door-to-a-helper.md); its own steps inside apps/server/src/mailbox are its business",
-    except: /apps\/server\/src\/modules\/mailbox\//u,
+    says: "the session module's door: receive (a Trigger with ChannelHearers or a session, a Record, an Event, or a Hire), withdraw, read (IssueTriggers, Queued, Digest…), handBack, decline, deliveries (Handed, Consumed, Braked); an envelope as its helper reads it is Envelope; an orchestrator's session is registered by Session itself whenever its profile is kept (Agent.whenKept); everything a session does is one Session.news (Hired, Reported, Left, IssueStarted, RunFinished, Consumed, Returned and its launch's Spoke, Ended, HandedOff, Settling, Closed, Compacting) (docs/subsystems/session.md); the deliveries' own steps inside apps/server/src/modules/session are their business",
+    except: /^apps\/server\/src\/modules\/session\/(mailbox|work|pump|deliveries|brakes|routing|triggers|envelope|payload)(\.test)?\.ts$/u,
   },
   {
     name: "send for hiring a helper",
@@ -154,7 +154,7 @@ const RULES: readonly Rule[] = [
   {
     name: "channel-owned delivery storage",
     pattern: /\bchannel_delivery\b/u,
-    says: "mailbox_delivery: delivery belongs to the Mailbox module",
+    says: "session_delivery: delivery belongs to the session module",
     dirs: ["apps/server/src"],
   },
   {
@@ -399,19 +399,19 @@ const RULES: readonly Rule[] = [
     name: "a service under a plural name",
     pattern:
       /\b(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Repos|Runtimes|Sessions|Tasks|Tools)(?=\.[A-Za-z]|\[|\s*[,;})]|$)|"(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Repos|Runtimes|Sessions|Tasks|Tools)\.\w+"|\b(makeMemories|makeBlocks|BlocksOptions)\b|memory\/memories\b/u,
-    says: "a service takes its concept's singular word (Agent, Artifact, Channel, Connector, Cron, Issue, Machine, Mailbox, Memory, Repo, Runtime, Session, Task, Tool; its deps key is the same word in lower case, deps.issue); the protocol shape of the same name is T.Issue; the stores are MemoryStore (memory/memory.ts, makeMemoryStore) and BlockStore (makeBlockStore) (docs/style/naming.md)",
+    says: "a service takes its concept's singular word (Agent, Artifact, Channel, Connector, Cron, Issue, Memory, Repo, Runtime, Session, Task, Tool; its deps key is the same word in lower case, deps.issue); the protocol shape of the same name is T.Issue; the stores are MemoryStore (memory/memory.ts, makeMemoryStore) and BlockStore (makeBlockStore) (docs/style/naming.md)",
     dirs: ["apps/server/src"],
   },
   {
     name: "a retired single-caller or pass-through server service",
     pattern: /["'`](?:\.\.?\/|#\/)(?:storage|executor|resource|ingress)\/|\b(Storage|Executor|Resource|Ingress|worldBelowIngress|ingress_github)\b/u,
-    says: "Attachment owns attachment/storage.ts, Machine owns machine/executor.ts, Tool owns tool/resource.ts (Tool.readResource), and Ingress split into Channel.{user,say}, Mailbox.{record,accept}, Repo.githubSnapshot and Issue.pollGitHub (issue_github); module tests use moduleWorld",
+    says: "Attachment owns attachment/storage.ts, Session owns session/executor.ts, Tool owns tool/resource.ts (Tool.readResource), and Ingress split into Channel.{user,say}, Session.{record,accept}, Repo.githubSnapshot and Issue.pollGitHub (issue_github); module tests use moduleWorld",
     dirs: ["apps/server/src"],
   },
   {
     name: "an issue's landing under the delivery type name",
     pattern: /\b(DeliveryValues|T\.Delivery)\b|\bexport\s+(?:const|type)\s+Delivery\b/u,
-    says: "an issue's completion landing is Landing (LandingValues, T.Landing; Issue.delivered keeps its wire field name); delivery is Mailbox's mailbox_delivery",
+    says: "an issue's completion landing is Landing (LandingValues, T.Landing; Issue.delivered keeps its wire field name); delivery is the session module's session_delivery",
   },
   {
     name: "a split sender or trigger actor shape",

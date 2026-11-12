@@ -6,7 +6,7 @@ Status: proposed
 
 用户定过三条（2026-11-10）：人可以设自己的名字；助手叫助手，名字能改；帮工也能改名字。第二条做完了（内置助手默认叫「管家」，在档案页改）。另两条没做：
 
-- **用户的名字只存在账号里。** 设置「设备」页能改名字（`user.update`），但频道里用户这个参与者的名字是死的：`channel/hub.ts` 建用户的参与者时写的是 `t("server.channel.name.user")`。助手的提示词也不知道用户叫什么。
+- **用户的名字只存在账号里。** 设置「设备」页能改名字（`user.update`），但频道与 Artifact 里用户这个参与者的名字仍是写死的：`apps/server/src/modules/channel/store.ts`（及 `artifact/artifact.ts`）写的是 `t("server.channel.name.user")`。助手的提示词也不知道用户叫什么。
 - **帮工不能单独改名。** 帮工的名字来自它的档案；同一份档案派出去的几个帮工名字一样，用户没法给某一个起名。
 
 ## Proposal
@@ -15,7 +15,7 @@ Status: proposed
 
 - `User` 往上给一个名字的流（`names`，改名时发），`Channel` 订阅它，更新用户参与者的名字；历史消息照旧按参与者显示，所以改名后旧消息也显示新名字。没设名字时照旧用词典里的默认叫法。
 - 助手的系统提示写上「用户叫 X」（`orchestrator/prompts.ts`），帮工的提示里提到用户的地方也用这个名字；没设名字就不写。
-- 页面上用户自己的头像写名字的第一个字（`ui/Face.tsx` 的 `UserFace`，今天是「你」）。
+- 页面上用户自己的头像写名字的第一个字（`apps/web/src/ui/domain/Face.tsx` 的 `UserFace`）。
 
 **帮工能改名。**
 

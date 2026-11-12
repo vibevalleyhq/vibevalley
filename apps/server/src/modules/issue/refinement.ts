@@ -109,10 +109,10 @@ export function refinement(d: RefinementDeps) {
     });
 
   const handedBack = async (f: { id: string; outcome: string; summary: string; questions?: readonly T.Question[] }) => {
-    const h = sessions.sessionOf(f.id);
+    const h = sessions.live(f.id).session;
     if (h?.refining !== true || !h.issue) return;
     const id = h.issue;
-    const said = sessions.lastTextOf(f.id);
+    const said = sessions.live(f.id).lastText;
     const thread = await chat.threadOfSession(f.id);
     const tell = async (text: string) => {
       if (thread) await chat.post({ _tag: "Notice", channel: thread, text: text, code: "issue_refinement" });

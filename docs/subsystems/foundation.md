@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 工作区、依赖 catalog、构建与类型检查 | 各包的对外约定（各包 `README.md`） |
-| 服务端 11 个模块的划分、依赖方向与两阶段启动 | 各模块的业务行为（对应子系统文档） |
+| 服务端 10 个模块的划分、依赖方向与两阶段启动 | 各模块的业务行为（对应子系统文档） |
 | `packages/protocol` 的概念目录、Schema 与客户端生成 | 核心状态折叠与接口路由（[核心状态](docs/subsystems/core.md)） |
 | Postgres 基线表结构、SQL 代码生成、主键与命名规范 | 业务表含义（各子系统）与家目录文件（[架构](docs/architecture.md#存了什么)） |
 | 测试金字塔、虚拟时钟与脚本化帮工 | 页面分层与宿主打包（[客户端](docs/subsystems/app.md)） |
@@ -23,12 +23,12 @@
 | `packages/async/` | 打断、后台任务、队列、广播、锁、重试与超时：服务端和各个包共用的异步原语 |
 | `scripts/audit/practice-audit.ts`、`service-paths.ts`、`protocol-surface.ts`、`schema-audit.ts` | 全仓语法树实践棘轮、服务调用矩阵与扇入检查、根协议导出面棘轮、SQL 枚举 / 品牌主键 / `Secret` / `BizCode` 注册表边界审计 |
 | `apps/server/src/{base,infra,core}/` | 服务端纯地基、外部系统适配与核心状态投影底座 |
-| `apps/server/src/modules/<概念>/`、`gateway/`、`modules.ts`、`services.ts` | 22 个纵向领域模块、6 个对外协议与出帧网关、11 层归属表与两阶段服务组装 |
+| `apps/server/src/modules/<概念>/`、`gateway/`、`modules.ts`、`services.ts` | 纵向领域模块、对外协议与出帧网关、10 层归属表与服务组装 |
 | `packages/protocol/src/<概念>/` | 按概念划分的 `shapes.ts`、`schema.ts`（Zod）、`api.ts` |
 | `packages/protocol/src/rules/` | 服务端与页面共用的纯函数规则 |
 | `packages/protocol/src/client.ts` | 由 `scripts/gen/api-client.ts` 生成的 HTTP 客户端 `VibeValleyApi` |
 | `apps/server/db/migrations/0001_schema.up.sql` | 唯一的 Postgres 表结构基线 |
-| `apps/server/db/queries/<表>.sql`、`db/generated/` | 按表拆分的 SQL 查询与 `scripts/pg-generate.ts` 生成代码 |
+| `apps/server/db/queries/<表>.sql`、`db/generated/` | 按表拆分的 SQL 查询与 `apps/server/scripts/pg-generate.ts` 生成代码 |
 | `apps/server/src/testing/`、`packages/testkit/` | 测试农场组装、虚拟时钟等待与测试金字塔分级 |
 | `packages/i18n/`、`scripts/gen/i18n.ts` | 中英双语词典 JSON、生成的 `src/catalogs.ts` 与词条检查工具 |
 
@@ -50,19 +50,19 @@
 
 架构、边界与测试如何共同设计，见[模块设计](docs/style/module-design.md)；本节记录现行结构与门禁。
 
-- **11 个有序模块单向依赖**：模块顺序定义在 `apps/server/src/modules.ts`。下层不得 import 上层，不得直接读 `core.state()` 中其他模块的数据（`apps/server/src/modules.test.ts` 检查）。
+- **10 个有序模块单向依赖**：模块顺序定义在 `apps/server/src/modules.ts`。下层不得 import 上层，不得直接读 `core.state()` 中其他模块的数据（`apps/server/src/modules.test.ts` 检查）。
 - **门禁共享一次源码分析**：`modules.test.ts` 在第一次检查内读取生产文件并用 `@vibevalley/testkit/source` 的 `analyzeSource` 各解析一次，依赖方向、表所有权与状态读取复用结果；同路径不同源码不共用缓存。读取和解析时间计入测试，提速按完整运行耗时与解析次数验证。
 - **单数概念名，拒绝单调用方顶层服务**：目录、表名和服务名均用单数概念词，协议同名类型统一写为 `T.Issue`（由 `singular-service` 与 `protocol-namespace` 规则检查）；仅有一个模块调用的内部设施留在调用方模块内（由 `scripts/audit/service-paths.ts` 扇入检查守住）。
-- **组装与启动分两阶段**：`services.ts` 照模块次序一个个 `await makeX(deps)` 拼成 `Farm` 并完成订阅，再按次序调各模块的 `start()`；`Farm` 是 `AsyncDisposable`，关的时候倒着调各服务的 `close()`，一个失败不挡别的。HTTP 监听就绪后才将地址注入 `Session` 和 `Lan`。
+- **组装与启动分两阶段**：`services.ts` 的 `buildModules` 照模块次序一行一个 `await makeX({ … })` 建到工单和定时任务，`makeFarm` 接着建后面的，每个服务的依赖在调用处按名字写明（没有分层的阶段类型，也不把「下面的全部」交给上面），拼成 `Farm` 并完成订阅，再按次序调各模块的 `boot()`；`Farm` 是 `AsyncDisposable`，关的时候倒着调各服务的 `close()`，一个失败不挡别的，建到一半失败也照此关掉已建的。测试的 `testing/world.ts` 用同一个 `buildModules` 建到工单（`moduleWorld`），再加 Inbox、工具和 `/mcp`（`world`）。HTTP 监听就绪后才将地址注入 `Session` 和 `Lan`。
 - **操作与发言主体统一用协议 `Actor`**：HTTP 与连接器入口构造 `user`（`base/actor.ts`），助手运行构造 `agent`（带 `role: "orchestrator"` 与 `forUser`），`/mcp` 构造 `agent`（带 `role: "worker"` 与会话 id），定时、巡查与 GitHub 轮询构造 `system`。协议消息、服务端 `Trigger` 与信箱共用同一个 `T.Actor`；落库列统一存 `ActorKind`（`user`、`agent`、`system`）与可选 `AgentRole`。
-- **模块之间的路径与服务扇入记成表**：`scripts/audit/service-paths.ts` 按语法树、照名字声明的类型（`deps.agent.list()`、从 `deps` 解构出来的 `agent`）读出哪个模块用了别的模块服务的哪个成员（存在 `scripts/audit/service-paths.json`）并校验顶层服务扇入；`vp run paths:check` 与 `docs:verify` 一并检查，多一条路或新增单调用方顶层服务即失败。一件事一条路：往频道写话只有 `Channel.post`（[频道](docs/subsystems/channel.md#模型和不变量)），到帮工只有 Mailbox。
+- **模块之间的路径与服务扇入记成表**：`scripts/audit/service-paths.ts` 按语法树、照名字声明的类型（`deps.agent.list()`、从 `deps` 解构出来的 `agent`）读出哪个模块用了别的模块服务的哪个成员（存在 `scripts/audit/service-paths.json`）并校验顶层服务扇入；`vp run paths:check` 与 `docs:verify` 一并检查，多一条路或新增单调用方顶层服务即失败。一件事一条路：往频道写话只有 `Channel.post`（[频道](docs/subsystems/channel.md#模型和不变量)），触发到帮工只有 `Session.route`（[帮工](docs/subsystems/session.md#对外的门)）。
 - **单实例家目录租约**：`infra/lease.ts` 在 `$VIBEVALLEY_HOME/.vibevalley.lock` 写入进程 pid；若旧进程仍在运行则拒绝启动，已退出则接管。
 
 ### 异步、资源与错误
 
 写法的细节和从 Effect 改过来的对照在 [vv-typescript](.agents/skills/vv-typescript/SKILL.md)；本节记录现行结构与门禁。
 
-- **服务是工厂加接口，依赖从参数进来**：每个模块导出接口 `X` 和 `makeX(deps: XDeps)`，`deps` 只放它用到的、排在它前面的服务，键是服务名的小驼峰（`deps.issue`）。没有全局单例：时钟、库、配置、`fetch` 都从 `deps` 进来，测试只换参数。
+- **服务是工厂加接口，依赖从参数进来**：每个模块对外一个深的服务：接口 `X` 只留调用方用的，里面的部分不露出去，和 `makeX(deps: XDeps)`，`deps` 只放它用到的、排在它前面的服务，键是服务名的小驼峰（`deps.issue`）。没有全局单例：时钟、库、配置、`fetch` 都从 `deps` 进来，测试只换参数。
 - **异步原语只有一套**：`@vibevalley/async` 给出 `TaskGroup`（后台任务归服务，`close()` 中止并等它们结束；同键只许一个在跑的 `keyed`）、`Queue`、`Hub`（先订后返的广播）、`Semaphore`、`retry`、`withTimeout` 和 `AsyncIterable` 的组合子。长操作收最后一个参数 `signal?: AbortSignal`，往下传给 `fetch`、子进程和 `clock.sleep`；资源返回 `AsyncDisposable`，调用方 `await using`。不 `void` 一个 Promise 放着不管（`typescript/no-floating-promises` 检查）。
 - **服务缓存按实例隔离**：`makeProjection()` 每个农场一份投影缓存，并发测试农场互不串用；`Core` 是同步的，`core.apply` 折完即返回，订阅返回 `Subscription`，慢读者经 `bounded` 限量。
 - **读接口错误边界**：附件与 Artifact 路由只将缺文件或 `ApiError`（`status === 404`）转为 `404`，其余故障记日志回 `500`。
@@ -94,7 +94,7 @@
 | 层 | 入口 | 真实部分 | 替身端口 | 预算 | 位置 |
 |---|---|---|---|---|---|
 | 规则 | 纯函数 | 被测代码 | 无 | 20ms | 不碰库、进程、网络的 `*.test.ts` |
-| 模块 | 模块服务接口 | 当前及下层模块、内存库、真 git | `scriptedRuntime`、照脚本回答的 DeepSeek、假聊天/声网 | 300ms | `apps/server/src/<模块>/*.test.ts` |
+| 模块 | 模块服务接口 | 当前及下层模块、内存库、真 git | `scriptedRuntime`、照脚本回答的 DeepSeek、假聊天/声网 | 300ms | `apps/server/src/modules/<模块>/*.test.ts`、`gateway/<门>/*.test.ts` |
 | 流程 | `flows/farm.ts` | 全部服务端模块与真 git | 同上 | 2s | `apps/server/src/flows/*.test.ts` |
 | 浏览器组件 | 组件 DOM 与 owner | Chromium、Solid、真实组件 | 故事数据，无服务端 | 3s | `apps/web/test/stories.spec.ts` |
 | 页面 | HTTP 与 SSE | 真服务端进程 + Chromium | 脚本化帮工、无外部密钥 | 3s | `apps/web/test/projects.ts` 的 integration 项目 |
@@ -143,14 +143,14 @@
 
 ## 为什么这样
 
-- **按限界上下文切成 11 个单向模块**：消除平铺服务的隐式启动耦合与跨模块状态直读，用 `modules.test.ts` 守住边界；放弃平铺加 lint 或粗粒度并成 5 个大模块。
+- **按限界上下文切成 10 个单向模块**：消除平铺服务的隐式启动耦合与跨模块状态直读，用 `modules.test.ts` 守住边界；放弃平铺加 lint 或粗粒度并成 5 个大模块。
 - **契约按概念分目录，不拆多包**：消除单大文件合并冲突，同时避免拆成十几个子包的构建开销。
-- **Postgres，不再是 `node:sqlite`**：一个服务端要管多台机器（[一个服务端管多台机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)），库要能放在服务器上、被多台机器的活同时写；只在一台电脑上用时仍开箱即用，靠同一种方言的 PGlite。生成器 `scripts/pg-generate.ts` 让 Postgres 自己说每个参数和结果列的类型（Parse、Describe），不再从文本里猜。代价：PGlite 是数十 MB 的 WASM，新起一个要近一秒（测试从模板拷贝，约 0.1 秒），也比 `node:sqlite` 吃 CPU，服务端测试只开一半的核。
+- **Postgres，不再是 `node:sqlite`**：一个服务端要管多台机器（[一个服务端管多台机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)），库要能放在服务器上、被多台机器的活同时写；只在一台电脑上用时仍开箱即用，靠同一种方言的 PGlite。生成器 `apps/server/scripts/pg-generate.ts` 让 Postgres 自己说每个参数和结果列的类型（Parse、Describe），不再从文本里猜。代价：PGlite 是数十 MB 的 WASM，新起一个要近一秒（测试从模板拷贝，约 0.1 秒），也比 `node:sqlite` 吃 CPU，服务端测试只开一半的核。
 - **单一表结构基线，内部不留兼容**：启动时按 `db.schema` 哈希自动归档旧库并重建，省去演进期的多步迁移负担。
 - **规则用手写的例子测，不录黄金数据**：录下的 `*.jsonl.gz` 有几十 MB，改了只看得到二进制，规则一改就整份重写，说不出哪里变对了、哪里变错了；拿不出它抓到过真问题的证据，就去掉了。
 - **不用 Effect，写普通 TypeScript**：Effect 的服务、错误通道和 fiber 让每个模块多一层要学的写法，agent 照抄时最常错在它身上（错误变成缺陷、fiber 不归作用域、`yield*` 漏写），而仓库要的打断、收尾和并发用 `AbortSignal`、`await using` 和一个小的 `@vibevalley/async` 就够；运行时校验换成 Zod，SQL 的结果行也由生成器写成 Zod。代价：错误不再写在类型里，靠 `ApiError` 的 `bizCode`、`instanceof` 和 `catching` 表守住。没选只把 Effect 收缩到服务端内核：两种写法的交界要长期养着；也没选换另一个效果库（fp-ts、neverthrow）：问题是写法离普通 TypeScript 太远，换一个库只是换一套写不对的 API。
 - **运行时校验只用 Zod**：agent 最熟、生态最全（Hono、MCP SDK、JSON Schema 输出都直接支持）；契约、查询的行、配置、工具入参用同一种，只有一套要学。没选 Valibot、ArkType（更小更快，但少有人熟）。
-- **查询仍由 SQL 生成，只换输出**：`scripts/pg-generate.ts` 让 Postgres 自己说参数和结果列的类型（Parse、Describe），写出 Zod 的行 Schema 和普通的 `async` 函数。没选 ORM 或查询构造器（Drizzle、Kysely）：类型会从库的推断来而不是从数据库来，44 个查询文件要改写成 TypeScript；也没选 sqlc 本身：它的 TypeScript 插件不写 Zod，驱动里没有 PGlite。
+- **查询仍由 SQL 生成，只换输出**：`apps/server/scripts/pg-generate.ts` 让 Postgres 自己说参数和结果列的类型（Parse、Describe），写出 Zod 的行 Schema 和普通的 `async` 函数。没选 ORM 或查询构造器（Drizzle、Kysely）：类型会从库的推断来而不是从数据库来，44 个查询文件要改写成 TypeScript；也没选 sqlc 本身：它的 TypeScript 插件不写 Zod，驱动里没有 PGlite。
 - **话进 JSON 词典并生成类型，提示词保持中文**：由 `scripts/gen/i18n.ts` 统一查漏翻与死键；提示词不翻，避免双份提示调优与评测漂移。
 
 ## 怎么验证

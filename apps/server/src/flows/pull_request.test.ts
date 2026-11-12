@@ -188,7 +188,7 @@ describe("a pull request", () => {
         {
           const w = watch(fw);
           const issues = fw.issue;
-          const sessions = fw.session;
+          const sessions = fw.inside;
           const repos = fw.repo;
           handoff = () => sessions.report(id, { summary: "ready for review", questions: [], checks: [], remember: [], prSubmit: false });
           await fw.agent.save(lab());
@@ -250,11 +250,11 @@ describe("a pull request", () => {
       {
         await using fw = await after.open();
         const issues = fw.issue;
-        const sessions = fw.session;
+        const sessions = fw.inside;
         await fw.repo.refreshGitHub();
         const restored = await issues.get(issue.id);
         expect(restored.pullRequest?.number).toBe(7);
-        const mailbox = fw.mailbox;
+        const mailbox = fw.inside;
         await mailbox.record({
           source: "github",
           key: "clock#7:review:R1",
@@ -270,7 +270,7 @@ describe("a pull request", () => {
         const sql = sqlOf(fw.db);
         const inputs = await sql<{ key: string; kind: string; reason: string | null }>`
             select t.source_key as key, t.trigger_json::jsonb->'meta'->>'kind' as kind, m.reason
-            from mailbox_trigger t join mailbox_issue m on m.trigger_id = t.id
+            from session_trigger t join session_issue_input m on m.trigger_id = t.id
             where m.issue_id = ${restored.id} and t.source = 'github'
             order by (t.trigger_json::jsonb->'meta'->>'botRound')::int nulls last`;
         expect(inputs.filter((input) => input.kind === "ci")).toHaveLength(1);
@@ -278,11 +278,11 @@ describe("a pull request", () => {
         expect(inputs.some((input) => input.key.includes("SELF"))).toBe(false);
         expect((await sql<{ n: number }>`select count(*) as n from channel_message where body like '%round 1%'`)[0]?.n).toBe(0);
         const inline = await sql<{ data: string }>`
-            select (payload_json::jsonb->'data')::text as data from mailbox_trigger where source_key = 'clock#7:comment:PRRC_9'`;
+            select (payload_json::jsonb->'data')::text as data from session_trigger where source_key = 'clock#7:comment:PRRC_9'`;
         const inlineData = await parsed(inline[0]?.data ?? "null");
         expect(inlineData).toMatchObject({ path: "src/a.ts", line: 12, diffHunk: "@@\n-old\n+new", threadId: "PRRT_9" });
         const rounds = await sql<{ round: number; reason: string }>`select (t.trigger_json::jsonb->'meta'->>'botRound')::int as round, m.reason
-            from mailbox_trigger t join mailbox_issue m on m.trigger_id = t.id where t.trigger_json::jsonb->'meta'->>'kind' = 'comment'`;
+            from session_trigger t join session_issue_input m on m.trigger_id = t.id where t.trigger_json::jsonb->'meta'->>'kind' = 'comment'`;
         expect(rounds).toHaveLength(6);
         expect(rounds.every((row) => row.round === 1 && row.reason === "human")).toBe(true);
         const resource = await fw.tool.readResource(id, { uri: "vv://github/clock/pulls/7/thread/9", limit: 16_000 });
@@ -293,14 +293,14 @@ describe("a pull request", () => {
         await issues.pollGitHub();
         const late = await sql<{
           round: number;
-        }>`select (trigger_json::jsonb->'meta'->>'botRound')::int as round from mailbox_trigger where source_key = 'clock#7:comment:PRRC_15'`;
+        }>`select (trigger_json::jsonb->'meta'->>'botRound')::int as round from session_trigger where source_key = 'clock#7:comment:PRRC_15'`;
         expect(late[0]?.round).toBe(1);
         expect(resolvedThreads).toEqual([]);
         conclusion = "SUCCESS";
         await issues.pollGitHub();
         conclusion = "FAILURE";
         await issues.pollGitHub();
-        expect((await sql<{ n: number }>`select count(*) as n from mailbox_trigger where trigger_json::jsonb->'meta'->>'kind' = 'ci'`)[0]?.n).toBe(4);
+        expect((await sql<{ n: number }>`select count(*) as n from session_trigger where trigger_json::jsonb->'meta'->>'kind' = 'ci'`)[0]?.n).toBe(4);
         expect(resolvedThreads).toEqual([]);
         const released = (await mailbox.accept({
           source: "connector",
@@ -313,12 +313,12 @@ describe("a pull request", () => {
         }))!;
         expect(
           (
-            await sql<{ state: string }>`select m.state from mailbox_issue m join mailbox_trigger t on t.id = m.trigger_id
+            await sql<{ state: string }>`select m.state from session_issue_input m join session_trigger t on t.id = m.trigger_id
             where m.issue_id = ${restored.id} and t.trigger_json::jsonb->'meta'->>'kind' = 'review'`
           ).every((row) => row.state === "forwarded"),
         ).toBe(true);
         await await_(
-          () => sql<{ state: string }>`select state from mailbox_delivery where session_id = ${id} and envelope_id = ${released.id}`,
+          () => sql<{ state: string }>`select state from session_delivery where session_id = ${id} and envelope_id = ${released.id}`,
           (rows) => rows[0]?.state === "consumed",
           "the user's release consumed",
         );

@@ -70,11 +70,9 @@ describe("issue observation", () => {
       watchIssue(
         issue,
         core,
-        {
-          events: async () => {
-            core.sessionEvent(sessionId("w1"), event(700, 1));
-            return [event(700)];
-          },
+        async () => {
+          core.sessionEvent(sessionId("w1"), event(700, 1));
+          return [event(700)];
         },
         log,
       ),
@@ -96,7 +94,7 @@ describe("issue observation", () => {
       yield { ...frame, seq: 0, state: { ...frame.state, issues: [next] } };
     }
     const rows = await taken(
-      watchIssue(issue, { subscribe: () => new Hub<T.ServerEvent>().subscribe(), states }, { events: async (id) => [event(id === "w1" ? 700 : 0)] }, log),
+      watchIssue(issue, { subscribe: () => new Hub<T.ServerEvent>().subscribe(), states }, async (id) => [event(id === "w1" ? 700 : 0)], log),
       5,
     );
     expect(rows.filter((r) => r.kind === "state").map((r) => r.issue.assignments[0]?.executions[0]?.session)).toEqual(["w1", "w2"]);
@@ -117,11 +115,9 @@ describe("issue observation", () => {
       watchIssue(
         many,
         core,
-        {
-          events: async (id) => {
-            read.push(id);
-            return Array.from({ length: 1000 }, (_, n) => event(n));
-          },
+        async (id) => {
+          read.push(id);
+          return Array.from({ length: 1000 }, (_, n) => event(n));
         },
         log,
       ),
@@ -136,7 +132,7 @@ describe("issue observation", () => {
   it("regression: an expired archived journal is reported as unavailable", async () => {
     const core = newCore();
     const closed: T.Issue = { ...issue, closedAt: 1, status: "done", stage: { state: "done", acts: [] } };
-    const rows = await untilState(watchIssue(closed, core, { events: async () => [] }, log));
+    const rows = await untilState(watchIssue(closed, core, async () => [], log));
     expect(rows).toContainEqual({ kind: "gap", session: sessionId("w1") });
     expect(rows.at(-1)).toMatchObject({ kind: "state", settled: true });
     core.close();

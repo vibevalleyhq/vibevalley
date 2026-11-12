@@ -61,12 +61,12 @@
 | 只说会怎样、不改东西 | `previewX` | `previewDelete`、`previewForget` |
 | 改东西 | 动词 | `issues.edit`、`channels.react`、`lan.forget` |
 | 新建、删掉 | `create`、`delete`（和接口的动词同一个词；不用 `open`、`remove`） | `channels.create`、`agents.delete`、`previewDelete` |
-| 服务开机时做的事 | `boot`（`services.ts` 在全部服务建好以后按次序调）；`start` 只指开始干一件事 | `mailbox.boot()`；`issue.start(id)`、`executor.start(…)` |
-| 一个服务往外说发生了什么 | 一个订阅，叫 `news`，类型 `<概念>News`，成员按 `_tag` 用领域里的过去时（`Hired`、`Left`、`Consumed`） | `session.news()`、`mailbox.news()`（`DeliveryNews`） |
+| 服务开机时做的事 | `boot`（`services.ts` 在全部服务建好以后按次序调）；`start` 只指开始干一件事 | `session.boot()`；`issue.start(id)`、`executor.start(…)` |
+| 一个服务往外说发生了什么 | 一个订阅，叫 `news`，类型 `<概念>News`，成员按 `_tag` 用领域里的过去时（`Hired`、`Left`、`Consumed`） | `session.news()`（`SessionNews`） |
 
 两条容易犯的：
 
-- **一个名字只答一个问题**：带标签的参数只用来给同一个动作不同的输入（`receive` 收下一个触发或开一个帮工，`withdraw` 撤回一个帮工、一封信或一张工单的待投递）；两个不同的问题（筛法、排序不同）起两个名字，不用标签把它们并成一个。
+- **一个名字只答一个问题**：带标签的参数只用来给同一个动作不同的输入（`Session.hireWith` 的 `envelopes` 是 `Talk` 或 `Queued`：都是帮工开工时带上的输入）；两个不同的问题（筛法、排序、结果不同）起两个名字，不用标签把它们并成一个（`Session` 的 `withdrawEnvelope`、`withdrawDeliveries`、`stop`、`dismiss` 各是一个名字，不并成一个 `withdraw`）。
 - **命令不只答一个是非**：做没做成要么抛一个说得出为什么的错误，要么返回做成的结果；只返回 `boolean` 的命令，调用方不知道没做成的原因。
 
 ## 单位、时刻和长短

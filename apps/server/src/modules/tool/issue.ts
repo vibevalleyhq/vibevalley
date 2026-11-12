@@ -65,8 +65,8 @@ const createRefusalWords = (refusal: IssueCreateRefused): string => {
   }
 };
 
-export function issueTools(deps: Pick<ToolDeps, "clock" | "log" | "agent" | "session" | "issue" | "mailbox">) {
-  const { clock, agent: agents, session: run, issue, mailbox } = deps;
+export function issueTools(deps: Pick<ToolDeps, "clock" | "log" | "agent" | "session" | "issue">) {
+  const { clock, agent: agents, session: run, issue } = deps;
   const log = deps.log.child("tool");
 
   // Resolves `#41`, `41`, an issue id, or the name or id of a helper working it via Issue.get / Issue.idOf.
@@ -96,7 +96,7 @@ export function issueTools(deps: Pick<ToolDeps, "clock" | "log" | "agent" | "ses
   /** The helper on the farm working the issue now, if any: its newest session. */
   const workerOf = (item: T.Issue) => {
     const last = latestSessionIdOf(item);
-    return last === undefined ? undefined : run.sessionOf(last);
+    return last === undefined ? undefined : run.live(last).session;
   };
 
   const whoOf = (item: T.Issue) => {
@@ -140,7 +140,7 @@ export function issueTools(deps: Pick<ToolDeps, "clock" | "log" | "agent" | "ses
   const issueHandback = (who: Who) =>
     customTool("issue_handback", issueHandbackDescription, IssueHandbackInput, async ({ envelope, reason }) => {
       const caller = callerOf(who);
-      await mailbox.decline(caller.session, envelope, reason);
+      await run.decline(caller.session, envelope, reason);
       return issueHandbackRecorded;
     });
 
@@ -162,7 +162,7 @@ export function issueTools(deps: Pick<ToolDeps, "clock" | "log" | "agent" | "ses
     }
     const now = clock.now();
     const lines = [issueDetail(item, whoOf(item), timeline, now)];
-    if (w) lines.push(sessionLine(w, now, item.number), answers.check.workdir(run.cwdOf(w.id) ?? ""), answers.check.lastReport(run.lastTextOf(w.id)));
+    if (w) lines.push(sessionLine(w, now, item.number), answers.check.workdir(run.live(w.id).cwd ?? ""), answers.check.lastReport(run.live(w.id).lastText));
     return lines.join("\n");
   });
 

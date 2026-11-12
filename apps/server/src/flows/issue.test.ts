@@ -46,7 +46,7 @@ describe("an issue", () => {
     const w = watch(fw);
     const issue2 = fw.issue;
     const issues = testIssues(issue2);
-    const sessions = fw.session;
+    const sessions = fw.inside;
     await fw.agent.save(lab());
     const repo = join(f.config.workRoot, "repos", "clock");
     const closed = (id: string) =>
@@ -99,7 +99,7 @@ describe("an issue", () => {
     const w = watch(fw);
     const issue2 = fw.issue;
     const issues = testIssues(issue2);
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const sql = sqlOf(fw.db);
     await fw.agent.save(lab());
     const hired = await issues.hire(lab(), "写打卡并提交", "clock-in");
@@ -176,7 +176,7 @@ describe("an issue", () => {
     const w = watch(fw);
     const issue2 = fw.issue;
     const issues = testIssues(issue2);
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const core = fw.core;
     await fw.agent.save(lab());
     const addedFailure = await failure(issues.add({ title: "  " }));
@@ -230,7 +230,7 @@ describe("an issue", () => {
     const w = watch(fw);
     const issue2 = fw.issue;
     const issues = testIssues(issue2);
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const core = fw.core;
     await fw.agent.save(lab());
     core.apply({
@@ -278,7 +278,7 @@ describe("an issue", () => {
     const w = watch(fw);
     const issue = fw.issue;
     const issues = testIssues(issue);
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const crons = fw.cron;
     await fw.agent.save({ ...lab(), enabled: true });
     const made = await crons.add(
@@ -291,7 +291,7 @@ describe("an issue", () => {
       },
       user,
     );
-    const mailbox = fw.mailbox;
+    const mailbox = fw.inside;
     const due = async () => {
       clock.adjust(5 * 60_000 + 1);
       await crons.tick();
@@ -312,7 +312,7 @@ describe("an issue", () => {
     const runs2 = await runs();
     expect(runs2).toHaveLength(1);
     const sql = sqlOf(fw.db);
-    const held = await sql.unsafe<{ state: string }>("select state from mailbox_issue where issue_id = $1 and state = 'held'", [first.id]);
+    const held = await sql.unsafe<{ state: string }>("select state from session_issue_input where issue_id = $1 and state = 'held'", [first.id]);
     expect(held).toHaveLength(1);
 
     await issues.setStatus(first.id, "done", "", "", user);
@@ -383,7 +383,7 @@ describe("an issue", () => {
     const w = watch(fw);
     const issue2 = fw.issue;
     const issues = testIssues(issue2);
-    const sessions = fw.session;
+    const sessions = fw.inside;
     await fw.agent.save(lab());
     const hired = await issues.hire(lab(), "写打卡并提交", "clock");
     const helper = mustHire(hired);
@@ -415,7 +415,7 @@ describe("an issue", () => {
     const w = watch(fw);
     const issue2 = fw.issue;
     const issues = testIssues(issue2);
-    const sessions = fw.session;
+    const sessions = fw.inside;
     await fw.agent.save(lab());
     const issue = await issues.add({
       title: "写打卡并提交",
@@ -545,7 +545,7 @@ describe("an issue", () => {
     const w = watch(fw);
     const issue = fw.issue;
     const issues = testIssues(issue);
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const { in: saidIn } = fw.said;
     const chat = fw.channel;
     await fw.agent.save(lab());
@@ -682,7 +682,7 @@ describe("an issue", () => {
     const issue2 = fw.issue;
     const issues = testIssues(issue2);
     const core = fw.core;
-    const sessions = fw.session;
+    const sessions = fw.inside;
     await fw.agent.save(lab());
     let issue = await issues.add({
       title: "先问清楚，再写打卡并提交",

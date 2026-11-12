@@ -16,16 +16,14 @@ import type { Agent } from "#/modules/agent/agent.ts";
 import { templateCatalog } from "#/modules/agent/seed.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { Due } from "#/modules/cron/cron.ts";
-import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
-import type { Trigger } from "#/modules/mailbox/shapes.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
 import type { Runtime } from "#/modules/runtime/runtime.ts";
 import type { Hired, HireOptions, SessionNews, Session } from "#/modules/session/session.ts";
+import type { Trigger } from "#/modules/session/shapes.ts";
 
 import { findingsOf, milestonesOf } from "./brief.ts";
 import { explicitMandate, filledKinds, inferredMandate, mandateNoteFits, sentTitles } from "./creation.ts";
 import { type Dispatched, issueDispatch } from "./dispatch.ts";
-import { makeGitHubPoller } from "./github.ts";
 import { issueLifecycle } from "./lifecycle.ts";
 import { merging } from "./merge.ts";
 import { nextSteps } from "./moves.ts";
@@ -163,7 +161,6 @@ export interface IssueDeps {
   readonly runtime: Runtime;
   readonly session: Session;
   readonly channel: Channel;
-  readonly mailbox: Mailbox;
 }
 
 export interface IssueReviewRequest {
@@ -181,10 +178,10 @@ function failedText(findings: readonly T.Finding[], text: string): string {
 }
 
 export async function makeIssue(deps: IssueDeps): Promise<Issue> {
-  const { config, clock, core, agent: store, repo: repos, runtime: runtimes, session: sessions, channel: chat, mailbox, db } = deps;
+  const { config, clock, core, agent: store, repo: repos, runtime: runtimes, session: sessions, channel: chat, db } = deps;
   const log = deps.log.child("issue");
   const tasks = new TaskGroup({ name: "issue", onError: (task, e) => log.error(`${task} failed:`, e) });
-  const r = await issueLifecycle({ core, agent: store, repo: repos, session: sessions, mailbox, db, clock, log });
+  const r = await issueLifecycle({ core, agent: store, session: sessions, db, clock, log });
   const {
     issueOfSession,
     loadKept,
@@ -213,8 +210,8 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     savePullRequest,
     finishPullRequest,
   } = r;
-  const { split, joinChildren } = issueSplitting(r, { agent: store, repo: repos, session: sessions, channel: chat });
-  const d = issueDispatch(r, joinChildren, { core, agent: store, repo: repos, runtime: runtimes, session: sessions, channel: chat, mailbox, log });
+  const { split, joinChildren } = issueSplitting(r, { agent: store, session: sessions, channel: chat });
+  const d = issueDispatch(r, joinChildren, { core, agent: store, repo: repos, runtime: runtimes, session: sessions, channel: chat, log });
   const { hire, start, refreshQueue, reopen, scheduled } = d;
   const { withEdit, settledMove, stuckWords, movesWords } = issueSettling(r, d, { agent: store, repo: repos, runtime: runtimes, session: sessions, clock });
 
@@ -224,18 +221,16 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     submit,
   } = merging({
     core,
-    log,
     sessions,
-    repos,
     chat,
     get,
     list: everyIssue,
-    liveSession,
     setConflict,
     savePullRequest,
     finishPullRequest,
   });
-  const { pollOpen: pollGitHub } = makeGitHubPoller(() => core.state().issues, { db, mailbox, repo: repos, clock, log });
+
+  const pollGitHub = () => sessions.pollGitHub(core.state().issues);
 
   const chooseAgent = async (brief: string, name: string, picked: string): Promise<T.Agent> => {
     const key = name.trim();
@@ -258,7 +253,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
   const comment = async (id: string, text: string, sendKey: string = "", by: Actor = userActor): Promise<CommentReceipt> => {
     const issue = await get(id);
     const latest = latestSessionIdOf(issue);
-    const session = latest === undefined ? undefined : sessions.sessionOf(latest);
+    const session = latest === undefined ? undefined : sessions.live(latest).session;
     if (by.kind === "agent") {
       if (!session) return {};
       await chat.post({ _tag: "Tell", from: by.id, session: session.id, text, sendKey });
@@ -277,7 +272,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
       await cancelAs(child.id, "dismissed");
     }
     const last = latestSessionIdOf(item);
-    if (last === undefined || !sessions.isReachable(last)) return;
+    if (last === undefined || !sessions.live(last).reachable) return;
     if (!(await sessions.dismiss(last))) throw missing(t("server.issue.helperRef", { id: last }), [lookIn.session]);
   };
 
@@ -364,7 +359,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
         if (error instanceof ApiError) return { issue: item, step: { _tag: "StartFailed", error } };
         throw error;
       }
-      const h = sent.session ? sessions.sessionOf(sent.session) : undefined;
+      const h = sent.session ? sessions.live(sent.session).session : undefined;
       return {
         issue: item,
         step: {
@@ -400,7 +395,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
         if (issue) {
           const conflict = (await get(issue)).conflict;
           if (conflict) {
-            const rechecked = await sessions.withWorkplace(e.id, (place) => repos.conflict(place, conflict.base));
+            const rechecked = await sessions.conflictOf(e.id, conflict.base);
             await setConflict(issue, rechecked);
           }
         }
@@ -454,7 +449,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
 
   const timeline = async (id: string) => {
     const issue = await get(id);
-    const runs = await sessions.issueRuns(issue.id);
+    const runs = await sessions.runsOf(issue.id);
     const names = new Map<string, string>();
     for (const s of new Set(runs.map((r) => r.session))) {
       const found = await sessions.get(s);
@@ -594,7 +589,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
           // Record completion before dismissing the helper so `Left` does not mark the issue canceled.
           await complete(id, acceptedDelivery);
           const last = latestSessionIdOf(item);
-          if (last !== undefined && sessions.isReachable(last)) await sessions.dismiss(last, "keep", "completed");
+          if (last !== undefined && sessions.live(last).reachable) await sessions.dismiss(last, "keep", "completed");
           break;
         }
         await mergeIssue(id, true);
@@ -685,14 +680,14 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
       if (!changes) throw refused(t("server.issue.notStarted"));
       await setConflict(id, conflictOf(changes));
       const session = latestSessionIdOf(item);
-      if (by.kind === "user" && session && sessions.isReachable(session)) core.did({ kind: "reviewed", session });
+      if (by.kind === "user" && session && sessions.live(session).reachable) core.did({ kind: "reviewed", session });
       return changes;
     },
     review,
     refine: draft,
     history: async () => {
       const all = await everyIssue();
-      const byId = new Map((await sessions.list("")).map((s) => [s.id, s]));
+      const byId = new Map((await sessions.list()).map((s) => [s.id, s]));
       return all.map((issue) => ({
         issue,
         sessions: sessionIdsOf(issue).flatMap((id) => {

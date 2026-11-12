@@ -113,7 +113,7 @@ export function issueSettling(r: IssueLifecycle, d: Pick<IssueDispatch, "readyOf
 
   const helperName = (issue: T.Issue) => {
     const last = latestSessionIdOf(issue);
-    return (last !== undefined ? sessions.sessionOf(last)?.name : undefined) ?? t("server.issue.helper");
+    return (last !== undefined ? sessions.live(last).session?.name : undefined) ?? t("server.issue.helper");
   };
 
   const stuckWords = async (issue: T.Issue) => {
@@ -125,11 +125,11 @@ export function issueSettling(r: IssueLifecycle, d: Pick<IssueDispatch, "readyOf
         return conflictBrief(conflict.base, conflict.files);
       }
       case "failed": {
-        const lastRun = last !== undefined ? sessions.sessionOf(last)?.lastRun : undefined;
+        const lastRun = last !== undefined ? sessions.live(last).session?.lastRun : undefined;
         const unread = issue.deliver === "answer" && lastRun?.outcome === "completed" && !lastRun.answer;
         return unread
           ? answerCureWords(t("server.session.answer.noBlock"))
-          : cureWords((last !== undefined ? sessions.sessionOf(last)?.brief : undefined) ?? issue.title);
+          : cureWords((last !== undefined ? sessions.live(last).session?.brief : undefined) ?? issue.title);
       }
       case "interrupted":
         return resumeWords();
@@ -148,7 +148,7 @@ export function issueSettling(r: IssueLifecycle, d: Pick<IssueDispatch, "readyOf
       case "start": {
         if (assignedOnDuty(item, store.isOrchestrator)) return [t("server.issue.does.toOrchestrator", { n })];
         const [, agent, repo] = await readyOf(item, p.taker?.id);
-        const full = sessions.noRoom(agent.runtime, repo);
+        const full = sessions.room(agent.runtime, repo);
         return full
           ? [t("server.issue.does.sendTo", { n, agent: agent.name }), t("server.issue.does.noRoom", { full })]
           : [repo ? t("server.issue.does.startIn", { n, agent: agent.name, repo }) : t("server.issue.does.start", { n, agent: agent.name })];

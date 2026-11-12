@@ -36,14 +36,14 @@
 | 助手 | `Orchestrator`（每个助手档案一个 `AgentHost`，`Session.host` 开在 `session/host.ts`） | `session` 表、`durable.db`、`agent/<档案 id>/` | 不经 oar：跑在 pi-durable 上，`AgentHost` 的一个会话是 `runtime/durable.ts` 开的 `Harness` 上的一个对话，工具来自 `packages/agent`（[VibeValley 自己的 agent](docs/subsystems/brain.md)） |
 | 档案、技能 | `Agent`（`agent/agent.ts`、`template.ts`） | `config.json`、`agent-templates/`、内置 `templates/` 与 `skills/` | — |
 | 农机 | `Runtime`（`runtime/runtime.ts`、`presets.ts`） | `config.json` 农机设置、`runtime_spend` 表 | `Runtime`、`RuntimeRegistry` |
-| 工单、父子工单 | `Issue`（`issue/issue.ts`、`lifecycle.ts`、`dependencies.ts`、`github.ts`） | `issue`、`issue_assignment`、`issue_assignment_execution`、`issue_github` 表 | 通用 DAG 在 `packages/agent/src/base/dag.ts` |
-| 帮工、一轮 | `Session`（`session/session.ts`、`inProcessRun.ts`、`journal.ts`），执行器在 `Machine`（`machine/executor.ts`） | `session`、`session_run` 表、`events/<id>.json` | 一个帮工是一个 `Subagent`，一轮对应一个 oar turn 与 `SubagentReport` |
-| 频道、附件、信箱 | `Channel`（`channel/channel.ts`）、`Attachment`（`attachment/attachment.ts`、`storage.ts`）、`Mailbox`（`mailbox/mailbox.ts`） | `channel`、`channel_participant`（`kind` + `role`）、`channel_message`、`attachment`、`mailbox_trigger`、`mailbox_delivery` 表 | 投递经 `Session` 送入执行实例 |
+| 工单、父子工单 | `Issue`（`issue/issue.ts`、`lifecycle.ts`、`dependencies.ts`） | `issue`、`issue_assignment`、`issue_assignment_execution` 表 | 通用 DAG 在 `packages/agent/src/base/dag.ts` |
+| 帮工、一轮 | `Session`（`session/session.ts`、`lifecycle.ts`、`inProcessRun.ts`、`journal.ts`），执行器在 `session/executor.ts` | `session`、`session_run` 表、`events/<id>.json` | 一个帮工是一个 `Subagent`，一轮对应一个 oar turn 与 `SubagentReport` |
+| 频道、附件、信箱 | `Channel`（`channel/channel.ts`）、`Attachment`（`attachment/attachment.ts`、`storage.ts`）、信箱在 `Session` 里（`session/mailbox.ts`） | `channel`、`channel_participant`（`kind` + `role`）、`channel_message`、`attachment`、`session_trigger`、`session_delivery` 表 | 投递经 `Session.route` 送入执行实例 |
 | Artifact | `Artifact`（`artifact/artifact.ts`） | `artifact`、`artifact_version`、`artifact_block`、`artifact_block_revision`、`artifact_change`、`artifact_suggestion` 表 | — |
 | 笔记 | `Pkm`（`pkm/pkm.ts`） | `pkm/` 下的 Markdown 页面、`pkm_comment`、`pkm_change` 表 | — |
 | 记性 | `Memory`（`memory/memory.ts`） | `memory` 表 | — |
 | 定时任务 | `Cron`（`cron/cron.ts`） | `cron` 表 | — |
-| 机器、「连接到本机」 | `Machine`（`machine/machine.ts`、`executor.ts`）、`Lan`（`lan/lan.ts`） | `machine`、`lan`、`user_device` 表 | 本机或远端执行后端 |
+| 机器、「连接到本机」 | 机器在 `Session` 里（`session/machine.ts`、`executor.ts`）、`Lan`（`lan/lan.ts`） | `session_machine`、`lan`、`user_device` 表 | 本机或远端执行后端 |
 
 ## oar 那一层
 

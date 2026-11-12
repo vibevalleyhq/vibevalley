@@ -50,17 +50,17 @@
   - 一旦用户在工作台已读、回复，或工单离开待人介入阶段，立即通知连接器撤回未发出的 `connector_outbox` 行。
 - **已读自动延长巡查宽限期**：
   - 若用户已读过报告所在的频道位置，巡查宽限期从已读时刻起至少延长 2 小时。
-  - 同一事项 4 小时内最多报一次，以 `source = "patrol"` Trigger 投入 `Mailbox` 随下次交互捎带，不直接发消息刷屏。
+  - 同一事项 4 小时内最多报一次，以 `source = "patrol"` Trigger 投入 `Session` 随下次交互捎带，不直接发消息刷屏。
 
 ## 怎么走
 
 1. **实时分发**：核心状态变化时更新 `StateFrame.inbox`；新增条目发往 `Inbox.news` 与 `Inbox.toUser`（驱动电话播报与连接器入队）。
-2. **定时巡查**：每 `patrol.heartbeat_minutes`（默认 10 分钟）运行 `patrolStep`，将超时条目按频道生成 `patrol` Trigger 交 `Mailbox`。
+2. **定时巡查**：每 `patrol.heartbeat_minutes`（默认 10 分钟）运行 `patrolStep`，将超时条目按频道生成 `patrol` Trigger 交 `Session`。
 
 ## 和谁打交道
 
 - **核心状态与频道（`core`、`channel`）**：读取工单、会话、`Chat.userMentions` 与 `channel_read_cursor`。
-- **信箱、语音与连接器（`mailbox`、`voice`、`connector`）**：巡查摘要投递给 `Mailbox`；`Voice` 订阅 `news`、`Connector` 订阅 `toUser`。
+- **帮工、语音与连接器（`session`、`voice`、`connector`）**：巡查摘要投递给 `Session`；`Voice` 订阅 `news`、`Connector` 订阅 `toUser`。
 
 ## 为什么这样
 

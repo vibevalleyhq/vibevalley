@@ -11,13 +11,14 @@ import type { Core } from "#/core/core.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
-import { type Started } from "#/modules/machine/executor.ts";
-import type { Machine } from "#/modules/machine/machine.ts";
 import type { Memory } from "#/modules/memory/memory.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
 import { type Merged, MergeFailure, type Workplace } from "#/modules/repo/workplace.ts";
+import { goOn } from "#/modules/runtime/vibevalley.ts";
 
 import { briefBreak, instructions, noRoom, notTakenIn, recallBlock, type SessionLimits, type Settle, toOarMcp, withRecall } from "./briefing.ts";
+import { type Started } from "./executor.ts";
+import type { Machine } from "./machine.ts";
 import { workerInstructions, channelRules, restartedContextNote, restartedNote, workplaceRules } from "./prompts.ts";
 import type { Hand, SessionRegistry } from "./registry.ts";
 import { isHired } from "./roster.ts";
@@ -112,7 +113,8 @@ export function makeLaunch(r: SessionRegistry, wt: SessionWatch, cli: WorkerAcce
       agent,
       owner,
       cwd: place.cwd,
-      input: text && agent.personaMode === "prompt" ? text + briefBreak + input : input,
+      // goOn adds nothing: the run it goes on with was asked with its persona already.
+      input: text && agent.personaMode === "prompt" && input !== goOn ? text + briefBreak + input : input,
       resume,
       options,
     });

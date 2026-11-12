@@ -1,154 +1,261 @@
-import { readFile, realpath, stat } from "node:fs/promises";
-
-import { Semaphore, type Subscription, TaskGroup, throwIfAborted } from "@vibevalley/async";
-import { t } from "@vibevalley/i18n";
+import type { Subscription } from "@vibevalley/async";
 import type * as T from "@vibevalley/protocol";
-import { dayMs, maxRunning } from "@vibevalley/protocol";
-import { isBusy } from "@vibevalley/protocol/rules";
-import { sessionId } from "@vibevalley/protocol/schema";
 
-import { worker as sessionActor } from "#/base/actor.ts";
-import { BizCode, errnoOf, messageOf, refuseIn } from "#/base/errors.ts";
-import { jsonText } from "#/base/json.ts";
 import type { Core } from "#/core/core.ts";
 import type { ServerConfig } from "#/infra/config.ts";
-import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
-import { bestEffort, type Logger } from "#/infra/log.ts";
+import type { Db } from "#/infra/db.ts";
+import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
-import type { Machine } from "#/modules/machine/machine.ts";
-import type { Trigger } from "#/modules/mailbox/shapes.ts";
 import type { Memory } from "#/modules/memory/memory.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
-import { type Merged, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "#/modules/repo/workplace.ts";
+import { RepoError, type WorkplaceCleanup, type WorkplaceRelease } from "#/modules/repo/workplace.ts";
 import type { Runtime } from "#/modules/runtime/runtime.ts";
-import * as qs from "#db/session.sql.ts";
-import * as qr from "#db/session_run.sql.ts";
 
-import { sessionName, type Settle, whoMakesRoom, withRecall } from "./briefing.ts";
-import { handStack } from "./hands.ts";
-import { endedSession, heardOf, pendingReportOf, placeOf, restoredSession, runOf, sessionState } from "./history.ts";
-import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
-import { NotRecorded } from "./inProcessRun.ts";
-import { makeLaunch, NotTakenIn, reasonText } from "./launch.ts";
-import { sourceBrief } from "./prompts.ts";
-import { type Hand, makeRegistry, type RunStore } from "./registry.ts";
-import { handsToUser, summaryOf } from "./report.ts";
-import { isHired, isOnDuty, sessionOnIssue } from "./roster.ts";
-import { contextPlace, releaseContextPlace } from "./shell.ts";
-import { type Delivered, type DeliveryInput, DeliveryRefused, type RunFinished, type SessionNews } from "./signals.ts";
-import { makeWatch } from "./watch.ts";
-import { type WorkerAccess, workerAccess } from "./worker.ts";
+import type { Accepted, ChannelHearers, ChannelRouteResult, Envelope } from "./envelope.ts";
+import { makeGitHubPoller } from "./github.ts";
+import type { AgentHost, HostOptions } from "./host.ts";
+import { type ChildChecks, type IssueRecord, type Landing, makeLanding } from "./landing.ts";
+import { HireRefused, type Lifecycle, makeLifecycle, type SessionNews, type SessionOptions } from "./lifecycle.ts";
+import { type Machine, makeMachine } from "./machine.ts";
+import { type DeliveryNews, type Dispatch, type HireArrival, type HiredReceipt, type Mailbox, makeMailbox, type QueuedInput } from "./mailbox.ts";
+import type { SourceEvent, TriggerInput, TriggerResource } from "./payload.ts";
+import { summaryOf } from "./report.ts";
+import type { Trigger } from "./shapes.ts";
 
-export type { SessionNews };
-export type { RunFinished, RunStore };
-export { DeliveryRefused, NotRecorded, NotTakenIn };
-export { runOf } from "./history.ts";
+export type { Accepted, ChildChecks, IssueRecord, QueuedInput, SessionOptions };
+export type { Hired, HireOptions, RunFinished, RunStore, SessionNews } from "./lifecycle.ts";
+export { DeliveryRefused, HireRefused, newsOf, NotRecorded, NotTakenIn, NotWorkFile, runOf } from "./lifecycle.ts";
 
-const endedListed = 200;
-const refused = refuseIn(BizCode.SessionRefused);
+/** A hire: the helper, its brief and where it works, and the inputs it starts with. parent: the issue in that repo
+ * whose branch its branch forks from; that issue's checkout is made first. */
+export type HireOrder = HireArrival & { readonly parent?: number };
 
-/** A helper not hired; retainedWork when a workplace or execution stays behind with the issue. */
-export class HireRefused extends Error {
-  override readonly name = "HireRefused";
-  readonly reason: string;
-  readonly retainedWork?: boolean;
-  constructor(reason: string, retainedWork?: boolean, options?: ErrorOptions) {
-    super(reason, options);
-    this.reason = reason;
-    if (retainedWork !== undefined) this.retainedWork = retainedWork;
-  }
+/** Who hears a routed trigger: a channel's hearers, or one session. */
+export type Audience = ChannelHearers | { readonly session: string };
+
+/** A session as this process has it now. */
+export interface Live {
+  /** In the core state: a helper hired, or an agent on duty. */
+  readonly session?: T.Session;
+  /** This process holds the helper (between launches too): it can be told, stopped, handed over. */
+  readonly reachable: boolean;
+  /** What its latest turn said, and its report's summary of that. */
+  readonly lastText: string;
+  readonly summary: string;
+  /** The run it is in, an in-process agent's too. */
+  readonly run?: string;
+  /** Its working directory. */
+  readonly cwd?: string;
 }
 
-const hireRefused = (reason: string, retainedWork: boolean) => (retainedWork ? new HireRefused(reason, true) : new HireRefused(reason));
-
-export type NotWorkFileReason = "noPlace" | "notFile" | "outside" | "tooBig" | "unreadable";
-
-/** A file asked of a session's working directory that is not one it may hand out. */
-export class NotWorkFile extends Error {
-  override readonly name = "NotWorkFile";
-  readonly reason: NotWorkFileReason;
-  constructor(reason: NotWorkFileReason, message: string) {
-    super(message);
-    this.reason = reason;
-  }
-}
-
-export interface Hired {
-  readonly session: T.Session;
-  readonly evicted?: string;
-}
-
-export interface HireOptions {
-  readonly inputs?: readonly Trigger[];
-  /** Base branch to fork from; "" uses the repo's main branch. */
-  readonly base?: string;
-  readonly worktree?: boolean;
-  readonly channel?: string;
-  readonly issue?: string;
-  readonly trigger?: T.RunTrigger;
-  readonly refining?: boolean;
-  /** Runs after the session row is written, before any report or hired fact is visible; throws NotRecorded when it cannot be kept. */
-  readonly hiring?: (s: T.Session, launch: string) => Promise<void>;
-}
-
-interface SendOptions extends Omit<HireOptions, "issue"> {
-  readonly envelopeIds?: readonly string[];
-  readonly context:
-    | { readonly kind: "issue"; readonly issue: Pick<T.Issue, "id" | "number"> & { readonly mandate?: T.IssueMandate } }
-    | { readonly kind: "channel"; readonly channel: string };
-}
-
+/** An agent profile doing a piece of work: what triggers it and its deliveries, the sessions and their runs, their
+ * workplaces, and the executions on the machine they run on. Refusals are ApiErrors unless a member says otherwise. */
 export interface Session {
-  readonly noRoom: (runtime: string, repo: string) => string;
-  /** Evicts the longest-idle session when at capacity; throws `HireRefused` when runtime or repo limits block admission. */
-  readonly makeRoom: (runtime: string, repo: string) => Promise<{ readonly evicted?: string }>;
-  /** Throws HireRefused. The signal stops the hire until it is committed: what it opened is closed again. */
-  readonly hire: (agent: T.Agent, brief: string, where: string, opt: SendOptions, signal?: AbortSignal) => Promise<{ readonly session: T.Session }>;
-  /** Throws DeliveryRefused. */
-  readonly deliver: (id: string, text: string, input: DeliveryInput) => Promise<Delivered>;
-  readonly stop: (id: string) => Promise<boolean>;
-  /** Closes an idle execution while preserving native session continuity for the next input. */
-  readonly suspend: (id: string, signal?: AbortSignal) => Promise<boolean>;
-  readonly withIdleWorkplace: <A>(id: string, use: (place: Workplace) => Promise<A>) => Promise<A>;
-  readonly withWorkplace: <A>(id: string, use: (place: Workplace) => Promise<A>) => Promise<A>;
-  /** `work: "discard"` resets the branch only after the runtime stops writing. */
-  readonly dismiss: (id: string, work?: "keep" | "discard", closed?: "dismissed" | "completed") => Promise<boolean>;
-  /** Resets a read-only turn's worktree back to main while keeping the session open. */
-  readonly discardWork: (id: string) => Promise<void>;
+  /** A trigger already recorded, routed to who hears it (its audience when given). */
+  readonly route: (trigger: Trigger, to?: Audience) => Promise<ChannelRouteResult>;
+  /** A trigger recorded in the caller's transaction; route it after. */
+  readonly recordTrigger: (input: TriggerInput) => Promise<Trigger>;
+  /** A dispatch held for the issue's next helper: recorded in the caller's transaction, routed once it commits. */
+  readonly queueDispatch: (dispatch: Dispatch) => Promise<void>;
+  /** A source's event recorded as a trigger and routed; the farm's own echo is neither. */
+  readonly receive: (event: SourceEvent) => Promise<Accepted>;
+  /** A helper hired with its first inputs; throws HireRefused (also when the parent's checkout cannot be made). */
+  readonly hireWith: (order: HireOrder) => Promise<HiredReceipt>;
+  /** A channel message's envelope taken back from every delivery that still waits on it. */
+  readonly withdrawEnvelope: (envelope: string) => Promise<void>;
+  /** A session's open deliveries dropped: it left. */
+  readonly withdrawDeliveries: (session: string, why: string) => Promise<void>;
+  /** An issue's dispatches recorded before `at` taken back; in its own transaction. */
+  readonly withdrawDispatches: (issue: string, at: number) => Promise<void>;
+  /** A helper says an input is not its to take; the orchestrator is told why. */
+  readonly decline: (session: string, envelope: string, reason: string) => Promise<void>;
+  /** An orchestrator's host gives back an input it did not take. */
+  readonly handBack: (session: string, envelope: string) => Promise<void>;
+  /** A session's running turn stopped; true when the stop was taken. */
+  readonly stop: (session: string) => Promise<boolean>;
+  /** The helper let go; true when it was there. Work "discard" resets its branch once the runtime stops writing. */
+  readonly dismiss: (session: string, work?: "keep" | "discard", closed?: "dismissed" | "completed") => Promise<boolean>;
+  /** The issue's work merged into main, or submitted as its pull request (one is open, or its repo goes by pull
+   * requests): from its helper's workplace, which then lets go; from the issue's own checkout when no helper holds it
+   * and fromCheckout. Throws NotTakenIn when the helper's work does not go in (the helper stays). */
+  readonly merge: Landing["merge"];
+  /** The helper's work submitted as the issue's pull request while it stays; read gives the issue under the helper's
+   * workplace lock (refused when it is closed). Throws MergeFailure. */
+  readonly submitPullRequest: Landing["submitPullRequest"];
+  /** Each followed pull request's state read; one merged or closed is kept, or finishes its issue. */
+  readonly refreshPullRequests: Landing["refreshPullRequests"];
+  /** The open pull requests of the issues on the board followed on GitHub: failed or finished CI, new reviews and
+   * comments taken in. */
+  readonly pollGitHub: (onBoard: readonly T.Issue[]) => Promise<void>;
+  /** A child's work checked and merged into its parent's branch, then its helper lets go; undefined when it waits.
+   * Throws NotTakenIn when the work does not go in. */
+  readonly mergeChild: Landing["mergeChild"];
+  /** The issue's work: in its helper's workplace while one holds it, else on its branch. Throws RepoError. */
+  readonly changesOf: Landing["changesOf"];
+  /** Whether the session's work still conflicts with base. */
+  readonly conflictOf: Landing["conflictOf"];
+  /** A session's branch reset to main while it stays. */
+  readonly discardWork: (session: string) => Promise<void>;
+  /** An issue's checkout let go once no helper is on it. */
   readonly clearWorkplace: (issue: string, repo: string, number: number, work?: WorkplaceCleanup) => Promise<WorkplaceRelease>;
-  readonly sessionOf: (id: string) => T.Session | undefined;
+  /** The helpers hired now. */
   readonly hired: () => readonly T.Session[];
-  /** True when this process holds the session's `Hand` (including between launches). */
-  readonly isReachable: (id: string) => boolean;
-  readonly lastTextOf: (id: string) => string;
-  readonly cwdOf: (id: string) => string | undefined;
+  readonly live: (session: string) => Live;
+  /** Why runtime has no room for one more helper on repo now; "" when it has. */
+  readonly room: (runtime: string, repo: string) => string;
+  /** A session, the ended too. */
+  readonly get: (session: string) => Promise<T.Session | undefined>;
+  /** The sessions, the ended too; every agent's when none is given. */
+  readonly list: (agent?: string) => Promise<T.Session[]>;
+  readonly runsOf: (issue: string) => Promise<T.Run[]>;
+  /** Undefined when the session is unknown; one run's when given. */
+  readonly eventsOf: (session: string, run?: string) => Promise<T.SessionEvent[] | undefined>;
+  readonly trigger: (id: string) => Promise<TriggerResource | undefined>;
+  readonly triggersOf: (issue: string) => Promise<readonly Trigger[]>;
+  /** Every queued trigger: dispatches first, then routed order. */
+  readonly queuedTriggers: () => Promise<readonly QueuedInput[]>;
+  /** The issue a trigger belongs to. */
+  readonly ownerOf: (trigger: string) => Promise<string | undefined>;
+  readonly isRouted: (trigger: string) => Promise<boolean>;
+  /** How many deliveries a message still waits in. */
+  readonly waitingOn: (envelope: string) => Promise<number>;
+  /** What an orchestrator has not read yet. */
+  readonly digest: (agent: string) => Promise<Envelope[]>;
+  /** A helper's report for its run's issue; refused when it has none. */
+  readonly report: (id: string, report: T.IssueReport) => Promise<void>;
   /** Rejects `..` segments and symlinks escaping the session's working directory; throws NotWorkFile. */
   readonly workFile: (id: string, path: string, max: number) => Promise<{ readonly name: string; readonly bytes: Uint8Array }>;
-  readonly runOf: (id: string) => string | undefined;
-  readonly reportOf: (id: string) => string;
-  readonly report: (id: string, report: T.IssueReport) => Promise<void>;
-  readonly onIssue: (issue: string) => string | undefined;
-  /** Throws NotTakenIn when use fails (the session stays), ApiError when the session cannot hand over now. */
-  readonly handOver: (id: string, closed: T.SessionClose, use: (place: Workplace, lastText: string) => Promise<Merged>, settle?: Settle) => Promise<Merged>;
-  /** Pass `""` for all agents. */
-  readonly list: (agent: string) => Promise<T.Session[]>;
-  readonly get: (id: string) => Promise<T.Session | undefined>;
-  readonly issueRuns: (issue: string) => Promise<T.Run[]>;
-  readonly events: (id: string, run?: string) => Promise<T.SessionEvent[] | undefined>;
-  /** Everything Session tells, subscribed before it returns: nothing told after is missed. */
+  /** The threads whose words reach the issue's helper. */
+  readonly subscribe: (issue: string, threads: readonly string[]) => Promise<void>;
+  /** Each cron trigger recorded and not routed, in order. */
+  readonly replayCronTriggers: (consume: (trigger: Trigger, data: unknown) => Promise<void>) => Promise<void>;
+  /** Everything the sessions tell, subscribed before it returns: nothing told after is missed. */
   readonly news: () => Subscription<SessionNews>;
+  /** What the deliveries tell, subscribed before it returns. */
+  readonly deliveries: () => Subscription<DeliveryNews>;
   /** Session id owning `token`, or `""` when unrecognized. */
   readonly who: (token: string) => string;
   readonly setAddress: (address: string) => void;
   /** An in-process agent's host; the caller owns it and closes it (`await using`). Throws NotRecorded. */
   readonly host: <R>(options: HostOptions<R>) => Promise<AgentHost<R>>;
-  /** Brings back the sessions a restart left: their hands, their interrupted runs. */
-  readonly restore: () => Promise<void>;
-  /** At startup, after the modules below it started: restore. */
+  /** At startup, after the modules below it started: the sessions back. */
   readonly boot: () => Promise<void>;
-  /** Saves what a restart needs, lets every hand go and removes the helpers' credentials. */
+  /** At startup, after the channels restored their threads: the open deliveries restored, what was left routed, who
+   * waits woken. */
+  readonly wake: () => Promise<void>;
+  /** The deliveries stop, then the sessions save what a restart needs, then every execution is let go. */
   readonly close: () => Promise<void>;
+}
+
+/** The parts behind Session, for the tests that drive them: the sessions, the deliveries and the machine. */
+export type Inside = Session &
+  Omit<Lifecycle, keyof Session | "restore"> &
+  Omit<Mailbox, keyof Session | "news" | "restore"> &
+  Omit<Machine, "close"> & {
+    readonly restore: Lifecycle["restore"];
+    readonly restoreDeliveries: Mailbox["restore"];
+  };
+
+const insides = new WeakMap<Session, Inside>();
+
+/** The parts behind a session module, for tests only (modules.test.ts keeps it so). */
+export function insideOf(session: Session): Inside {
+  const inside = insides.get(session);
+  if (inside === undefined) throw new Error("not a session module makeSession made");
+  return inside;
+}
+
+/** A source's event recorded as a trigger and routed; the farm's own echo is neither. */
+const receiving =
+  (mailbox: Pick<Mailbox, "record" | "route">) =>
+  async (event: SourceEvent): Promise<Accepted> => {
+    const trigger = await mailbox.record(event);
+    if (trigger === undefined) return { heldNotice: "" };
+    return { ...(await mailbox.route(trigger)), trigger };
+  };
+
+/** The door over the parts: what makeSession returns, and what a test that plays the sessions builds over its own. */
+export function sessionOver(parts: {
+  readonly lifecycle: Lifecycle;
+  readonly mailbox: Mailbox;
+  readonly repo: Pick<Repo, "checkout">;
+  readonly landing: Landing;
+  readonly pollGitHub: (onBoard: readonly T.Issue[]) => Promise<void>;
+  readonly close: () => Promise<void>;
+}): Session {
+  const { lifecycle, mailbox, repo, landing, close } = parts;
+  return {
+    route: mailbox.route,
+    recordTrigger: mailbox.recordTrigger,
+    receive: receiving(mailbox),
+    queueDispatch: mailbox.queueDispatch,
+    hireWith: async ({ parent, ...order }) => {
+      if (parent !== undefined)
+        try {
+          await repo.checkout({ repo: order.where, issue: parent, worktree: true, base: "" });
+        } catch (e) {
+          if (e instanceof RepoError) throw new HireRefused(e.message, undefined, { cause: e });
+          throw e;
+        }
+      return mailbox.hireWith(order);
+    },
+    withdrawEnvelope: mailbox.withdrawEnvelope,
+    withdrawDeliveries: mailbox.withdrawDeliveries,
+    withdrawDispatches: mailbox.withdrawDispatches,
+    decline: mailbox.decline,
+    handBack: mailbox.handBack,
+    stop: lifecycle.stop,
+    dismiss: lifecycle.dismiss,
+    merge: landing.merge,
+    submitPullRequest: landing.submitPullRequest,
+    refreshPullRequests: landing.refreshPullRequests,
+    pollGitHub: parts.pollGitHub,
+    mergeChild: landing.mergeChild,
+    changesOf: landing.changesOf,
+    conflictOf: landing.conflictOf,
+    discardWork: lifecycle.discardWork,
+    clearWorkplace: lifecycle.clearWorkplace,
+    hired: lifecycle.hired,
+    live: (id) => {
+      const session = lifecycle.sessionOf(id);
+      const lastText = lifecycle.lastTextOf(id);
+      const run = lifecycle.runOf(id);
+      const cwd = lifecycle.cwdOf(id);
+      return {
+        ...(session ? { session } : {}),
+        reachable: lifecycle.isReachable(id),
+        lastText,
+        summary: summaryOf(lastText),
+        ...(run === undefined ? {} : { run }),
+        ...(cwd === undefined ? {} : { cwd }),
+      };
+    },
+    room: lifecycle.noRoom,
+    get: lifecycle.get,
+    list: (agent) => lifecycle.list(agent ?? ""),
+    runsOf: lifecycle.issueRuns,
+    eventsOf: lifecycle.events,
+    trigger: mailbox.readTrigger,
+    triggersOf: mailbox.triggersOf,
+    queuedTriggers: mailbox.queuedTriggers,
+    ownerOf: mailbox.ownerOf,
+    isRouted: mailbox.isRouted,
+    waitingOn: mailbox.waitingOn,
+    digest: mailbox.orchestratorDigest,
+    report: lifecycle.report,
+    workFile: lifecycle.workFile,
+    subscribe: mailbox.subscribe,
+    replayCronTriggers: mailbox.replayCronTriggers,
+    news: lifecycle.news,
+    deliveries: mailbox.news,
+    who: lifecycle.who,
+    setAddress: lifecycle.setAddress,
+    host: lifecycle.host,
+    boot: lifecycle.boot,
+    wake: mailbox.boot,
+    close,
+  };
 }
 
 export interface SessionDeps {
@@ -160,627 +267,52 @@ export interface SessionDeps {
   readonly agent: Agent;
   readonly memory: Memory;
   readonly repo: Repo;
-  readonly machine: Machine;
   readonly runtime: Runtime;
 }
 
-export interface SessionOptions {
-  /** How helpers reach the worker CLI; a test gives its own. */
-  readonly workerAccess?: () => Promise<WorkerAccess>;
-}
-
-/** Whether a session's place is still on disk to go back to. */
-const placeThere = (cwd: string, log: Logger) =>
-  stat(cwd).then(
-    () => true,
-    (e: unknown) => {
-      if (errnoOf(e) !== "ENOENT") log.warn(`vibevalley: ${cwd} cannot be read`, e);
-      return false;
-    },
-  );
-
-export function newsOf(fact: T.Fact, after: T.SpaceState): SessionNews | undefined {
-  switch (fact.type) {
-    case "sessionChanged": {
-      const session = after.sessions.find((h) => h.id === fact.session.id);
-      return session !== undefined && isHired(session) ? { _tag: "Hired", session } : undefined;
-    }
-    case "sessionReported": {
-      const session = after.sessions.find((h) => h.id === fact.id);
-      return session !== undefined && isHired(session) ? { _tag: "Reported", report: fact, session } : undefined;
-    }
-    case "sessionLeft":
-      return { _tag: "Left", left: fact };
-    default:
-      return undefined;
-  }
-}
-
 export async function makeSession(deps: SessionDeps, options: SessionOptions = {}): Promise<Session> {
-  const { config, core, db, clock } = deps;
-  const log = deps.log.child("session");
-  const memories = deps.memory;
-  const repos = deps.repo;
-  const machines = deps.machine;
-  const executor = machines.executions(machines.here());
-  const r = await makeRegistry({ ...deps, log });
-  const wt = makeWatch(r, { ...deps, log });
-  let cli: WorkerAccess | undefined;
-  try {
-    cli = await (options.workerAccess ?? workerAccess)();
-  } catch (e) {
-    // No helper starts without it: each hire is refused with workerUnavailable.
-    log.warn("vibevalley: the worker CLI's credentials cannot be kept", e);
-  }
-  const l = makeLaunch(r, wt, cli, { ...deps, log });
-  const {
-    flushRuns,
-    later,
-    mcpEndpoint,
-    trajectories,
-    admission,
-    newsHub,
-    tell,
-    moves,
-    roster,
-    executions,
-    launchOf,
-    keepHands,
-    register,
-    ended,
-    forget,
-    logOf,
-    runs,
-    closeExecution,
-    runStore,
-  } = r;
-  const { open, leave, rest, accessWorkplace, capacity, roomFor, remind, deliver, handOver } = l;
-  const { closedLaunch, finishReport, attach, failedOpening } = wt;
-  const tasks = new TaskGroup({ name: "session news", onError: (task, e) => log.error(`${task} failed`, e) });
-
-  tasks.run("session news", async (signal) => {
-    for (let n = await moves.next(signal); n.done !== true; n = await moves.next(signal)) {
-      const { fact, after } = n.value;
-      const news = newsOf(fact, after);
-      if (news?._tag === "Reported" && news.session !== undefined && isHired(news.session) && news.session.issue === undefined) {
-        const id = news.session.id;
-        const deadline = fact.at + 10 * 60_000;
-        later(`idle:${id}`, (abort) =>
-          bestEffort(
-            log,
-            `vibevalley: suspending conversation ${id}`,
-            async () => {
-              await clock.sleep(Math.max(0, deadline - clock.now()), abort);
-              await suspend(id, abort);
-            },
-            abort,
-          ),
-        );
-      }
-      if (news) newsHub.publish(news);
-    }
-  });
-  let hired = 0;
-
-  const expireLogs = async (days: number) => {
-    if (days <= 0) return;
-    const ids = await qs.sessionsEndedBefore(db.sql, { before: clock.now() - days * dayMs });
-    for (const row of ids) await trajectories.forget(row.id);
-  };
-
-  const restore = async () => {
-    await expireLogs(config.session.trajectoryDays);
-    for (const row of await qr.openRuns(db.sql)) {
-      // Its durable conversation goes on with it: its host ends it once the answer comes.
-      if (await deps.runtime.durable.busy(row.session)) continue;
-      await bestEffort(log, `vibevalley: run ${row.id}`, async () => {
-        await runs.finish(row.id, "interrupted", t("server.session.log.restarted"));
-        const linked = await runs.issues(row.id);
-        tell({ _tag: "RunFinished", id: row.id, issues: linked, outcome: "interrupted" });
-      });
-    }
-    const kept = await qs.activeSessions(db.sql);
-    // Continue numbering past the highest historical session id so trajectory files are never reused.
-    hired = Math.max(
-      0,
-      (await qs.highestSessionNumber(db.sql))?.n ?? 0,
-      ...core
-        .state()
-        .sessions.map((s) => Number.parseInt(s.id.replace(/^w/u, ""), 10))
-        .filter((n) => Number.isFinite(n)),
-    );
-    for (const row of kept) {
-      if (isOnDuty(row)) continue;
-      const session = core.session(row.id) ?? restoredSession(row);
-      const place = row.place ? placeOf(row.place) : undefined;
-      if (!place || !(await placeThere(place.cwd, log))) {
-        core.apply({ type: "sessionLeft", id: session.id, closed: "lost" });
-        await trajectories.finish(session.id);
-        await ended(session.id, "lost");
-        core.notice(
-          "warn",
-          t("server.session.life.notBack", {
-            name: session.name,
-            why: place ? t("server.session.life.placeGone", { cwd: place.cwd }) : t("server.session.life.noRecord"),
-          }),
-        );
-        continue;
-      }
-      const s = {
-        place,
-        oarSessionId: row.oar_session ?? "",
-        lastText: row.last_text ?? "",
-        recalled: heardOf(row.recalled) ?? [],
-        report: pendingReportOf(row.pending_report),
-      };
-      const stack = handStack();
-      const trajectory = await trajectories.openLog(session.id);
-      stack.defer(() => trajectories.finish(session.id));
-      const journal = await logOf(session, trajectory);
-      const hand: Hand = {
-        id: session.id,
-        stack,
-        place: s.place,
-        issue: session.issue ?? "",
-        access: new Semaphore(1),
-        journal,
-        oarSessionId: s.oarSessionId,
-        lastText: s.lastText,
-        tracking: {},
-        launch: "",
-        spoke: false,
-        token: "",
-        recalled: new Set(s.recalled),
-        triggers: [],
-        inputs: new Map(),
-        run: "",
-        heard: [],
-        report: s.report,
-      };
-      stack.defer(() => l.revokeAccess(hand));
-      roster.set(hand);
-      if (isBusy(session)) {
-        core.apply({
-          type: "sessionReported",
-          id: session.id,
-          outcome: "interrupted",
-          summary: s.report?.summary ?? t("server.session.log.restarted"),
-          runs: session.runs,
-          questions: s.report?.questions ?? [],
-          checks: s.report?.checks ?? [],
-          ...(s.report?.answer ? { answer: s.report.answer } : {}),
-        });
-        const restoredReport = s.report;
-        if (restoredReport && restoredReport.remember.length > 0)
-          await bestEffort(log, `vibevalley: ${session.id}'s restored memories were not kept`, async () => {
-            for (const memory of restoredReport.remember)
-              await memories.write({ agent: session.agent, text: memory.text, repo: memory.scope === "all" ? "" : place.repo, by: sessionActor(session.id) });
-          });
-        await db.tx(async () => {
-          const restored = core.session(session.id);
-          if (restored) await qs.keepSessionState(db.sql, sessionState(restored));
-          await qs.clearPendingReport(db.sql, { id: session.id });
-        });
-        core.notice("info", t("server.session.life.restartedNotice", { name: session.name }));
-      }
-    }
-    if (roster.size > 0) log.info(`vibevalley: brought back ${roster.size} helpers`);
-  };
-
-  const workFile = async (id: string, path: string, max: number) => {
-    const cwd = roster.get(id)?.place.cwd;
-    if (cwd === undefined) throw new NotWorkFile("noPlace", path);
-    const unreadable = (e: unknown) => new NotWorkFile("unreadable", messageOf(e));
-    const root = await realpath(cwd).catch((e: unknown) => {
-      throw unreadable(e);
-    });
-    // Resolve `..` and symlinks via realpath before checking prefix containment.
-    const full = await realpath(root + "/" + path).catch(() => {
-      throw new NotWorkFile("notFile", path);
-    });
-    if (full !== root && !full.startsWith(root + "/")) throw new NotWorkFile("outside", path);
-    const info = await stat(full).catch((e: unknown) => {
-      throw unreadable(e);
-    });
-    if (!info.isFile()) throw new NotWorkFile("notFile", path);
-    if (info.size > max) throw new NotWorkFile("tooBig", path);
-    const bytes = await readFile(full).catch((e: unknown) => {
-      throw unreadable(e);
-    });
-    return { name: full.split("/").at(-1) ?? full, bytes };
-  };
-
-  const makeRoom = async (runtime: string, repo: string): Promise<{ readonly evicted?: string }> => {
-    const full = roomFor(runtime, repo);
-    if (full) throw new HireRefused(full);
-    const oldest = whoMakesRoom(
-      core.state().sessions.filter((s) => executor.find(s.id) !== undefined),
-      maxRunning,
-    );
-    if (!oldest) return {};
-    try {
-      await (oldest.issue ? dismiss(oldest.id) : suspend(oldest.id));
-    } catch (e) {
-      throw new HireRefused(messageOf(e), undefined, { cause: e });
-    }
-    return { evicted: oldest.name };
-  };
-
-  const hire = async (agent: T.Agent, brief: string, where: string, opt: SendOptions, signal?: AbortSignal): Promise<{ readonly session: T.Session }> => {
-    await admission.take(1, signal);
-    let admitted = true;
-    const releaseAdmission = () => {
-      if (!admitted) return;
-      admitted = false;
-      admission.release(1);
-    };
-    try {
-      const issue = opt.context.kind === "issue" ? opt.context.issue : undefined;
-      const channel = opt.context.kind === "channel" ? opt.context.channel : opt.channel;
-      const repo = issue ? where : "";
-      const unclosed = executor
-        .all()
-        .find((a) => (issue ? a.owner.issue === issue.id : !a.owner.issue && a.owner.agent === agent.id && a.owner.channel === channel));
-      if (unclosed) throw new HireRefused(unclosed.failure ?? t(issue ? "server.session.life.issueNotReturned" : "server.session.life.notReturned"), true);
-      const full = roomFor(agent.runtime, repo);
-      if (full) throw new HireRefused(full);
-      hired++;
-      const id = sessionId(`w${hired}`);
-      let place: Workplace;
-      try {
-        place =
-          issue && repo
-            ? await repos.workplace(repo, issue.number, opt.worktree ?? agent.worktree, opt.base ?? "", signal)
-            : await contextPlace(config.workRoot, id);
-      } catch (e) {
-        throw new HireRefused(t("server.session.life.noPlace", { name: agent.name, why: messageOf(e) }), undefined, { cause: e });
-      }
-      const releasePlace = () => (place.repo ? repos.release(place) : releaseContextPlace(place));
-      // The hand's own cleanups (its log, its credential) close when it leaves; the startup's undo an opening that did
-      // not commit. Both run last-deferred first.
-      const handScope = handStack();
-      const startupScope = handStack();
-      const startup: { phase: "opening" | "retained" | "committed"; releaseKept: boolean } = {
-        phase: "opening",
-        releaseKept: false,
-      };
-      startupScope.defer(async () => {
-        if (startup.phase !== "opening") return;
-        const result = await releasePlace();
-        if (!result.kept) return;
-        startup.releaseKept = true;
-        core.notice("warn", result.reason);
-      });
-      try {
-        const recalled = new Set<string>();
-        const journal = await trajectories.openLog(id);
-        handScope.defer(() => trajectories.finish(id));
-        const initial = opt.inputs ?? [];
-        const h: Hand = {
-          id,
-          stack: handScope,
-          place,
-          issue: issue?.id ?? "",
-          access: new Semaphore(1),
-          journal,
-          oarSessionId: "",
-          lastText: "",
-          tracking: {},
-          launch: "",
-          spoke: false,
-          token: "",
-          recalled,
-          triggers: [
-            {
-              trigger: opt.trigger ?? (issue ? { kind: "issue" } : { kind: "comment", ...(channel ? { channel } : {}) }),
-              envelopeIds: [...new Set([...(opt.envelopeIds ?? []), ...initial.map((input) => input.id)])],
-            },
-          ],
-          inputs: new Map(),
-          run: "",
-          heard: [],
-          report: undefined,
-        };
-        handScope.defer(async () => {
-          if (startup.phase !== "retained") await l.revokeAccess(h);
-        });
-        startupScope.defer(async () => {
-          if (startup.phase !== "committed") await handScope.disposeAsync();
-        });
-        startupScope.defer(async () => {
-          if (startup.phase !== "opening") return;
-          const allocation = executor.find(id);
-          if (allocation?.attached === true) {
-            startup.phase = "retained";
-            return;
-          }
-          if (allocation) {
-            let stopFailed = false;
-            try {
-              await executor.close(id);
-            } catch (e) {
-              core.notice("error", allocation.failure ?? messageOf(e));
-              stopFailed = true;
-            }
-            if (stopFailed) {
-              startup.phase = "retained";
-              return;
-            }
-          }
-          await forget(id);
-        });
-        const recall = await remind(agent.id, id, place.repo, brief, recalled);
-        const hiredAt = clock.now();
-        const session: T.Session = {
-          id,
-          role: "worker",
-          name: sessionName(capacity(), agent.id, agent.name),
-          agent: agent.id,
-          runtime: agent.runtime,
-          brief,
-          ...(place.repo ? { repo: place.repo } : {}),
-          hiredAt,
-          runs: 0,
-          phase: { _tag: "working", since: hiredAt, doing: { action: "none", label: "" } },
-          ...(channel ? { channel } : {}),
-          refining: issue ? (opt.refining ?? false) : false,
-          ...(issue ? { issue: issue.id } : {}),
-          ...(place.branch ? { branch: place.branch, worktree: place.cwd } : {}),
-          machine: machines.here().id,
-        };
-        const initialText = initial.map((input) => `${input.id}\n${input.card.summary}\n${input.card.readUri}`).join("\n\n");
-        const source = issue?.mandate?.originTriggerId;
-        const prompt = [brief, source ? sourceBrief(source) : "", initialText].filter(Boolean).join("\n\n");
-        const opened = await open(agent, session, h, place, withRecall(recall, prompt), "");
-        if (!opened.execution) {
-          if (opened.retained) startup.phase = "retained";
-          await startupScope.disposeAsync();
-          throw hireRefused(t("server.session.life.cannotSend", { name: agent.name, why: opened.refused }), opened.retained || startup.releaseKept);
-        }
-        throwIfAborted(signal);
-        // Release admission before `opt.hiring`, which may acquire channel locks whose delivery path waits on admission.
-        releaseAdmission();
-        const launch = launchOf(id);
-        try {
-          await db.tx(async () => {
-            await logOf(session, journal);
-            try {
-              await qs.keepHand(db.sql, {
-                id,
-                place: jsonText(place),
-                oar_session: opened.execution.sessionId,
-                last_text: null,
-                recalled: recalled.size > 0 ? jsonText([...recalled]) : null,
-              });
-            } catch (e) {
-              if (e instanceof SqlError) throw new NotRecorded(causeMessage(e), { cause: e });
-              throw e;
-            }
-          });
-          if (opt.hiring) await opt.hiring(session, launch);
-          throwIfAborted(signal);
-        } catch (error) {
-          if (!(error instanceof NotRecorded)) throw error;
-          const failed = await failedOpening(id, t("server.session.life.notRecorded", { name: agent.name, why: reasonText(error) }));
-          if (failed.retained) startup.phase = "retained";
-          await startupScope.disposeAsync();
-          throw hireRefused(failed.refused, failed.retained || startup.releaseKept);
-        }
-        // Committed in one go, with no await between: the hand is on the roster exactly when the core says it is hired.
-        roster.set(h);
-        core.apply({ type: "sessionChanged", session });
-        attach(h, opened.execution, agent.runtime, launch);
-        startup.phase = "committed";
-        await startupScope.disposeAsync();
-        return { session };
-      } finally {
-        await startupScope.disposeAsync();
-      }
-    } finally {
-      releaseAdmission();
-    }
-  };
-
-  const stop = async (id: string) => {
-    const execution = executor.find(id);
-    const hand = roster.get(id);
-    if (!hand || execution?.attached !== true || execution.closing || core.session(id)?.phase._tag !== "working") return false;
-    if (hand.settling) {
-      try {
-        return await roster.withHand(
-          id,
-          () => false,
-          async (locked) => {
-            const pending = locked.settling;
-            if (!pending) return false;
-            executor.detach(id);
-            await executor.close(id);
-            delete locked.settling;
-            finishReport(locked, { ...pending.report, outcome: { kind: "aborted" } }, pending.completedBefore);
-            closedLaunch(locked);
-            return true;
-          },
-        );
-      } catch (error) {
-        log.warn(`vibevalley: background work did not close: ${messageOf(error)}`);
-        return false;
-      }
-    }
-    const outcome = await executor.interrupt(id);
-    if (outcome.kind !== "accepted") {
-      log.warn(`vibevalley: the stop of ${id} was not taken: ${"reason" in outcome ? outcome.reason : ""}`);
-      return false;
-    }
-    return true;
-  };
-
-  const suspend = (id: string, signal?: AbortSignal) =>
-    roster.withHand(
-      id,
-      () => false,
-      async (h) => {
-        const session = core.session(id);
-        if (!session || isBusy(session) || h.triggers.length > 0) return false;
-        await rest(h);
-        await keepHands();
-        return true;
-      },
-      signal,
-    );
-
-  const dismiss = (id: string, work: "keep" | "discard" = "keep", closed: "dismissed" | "completed" = "dismissed") =>
-    roster.withHand(
-      id,
-      () => false,
-      async (h) => {
-        const current = core.session(id);
-        const name = current?.name ?? id;
-        if (work === "discard" && !current?.issue) throw refused(t("server.session.life.noIssue"));
-        await closeExecution(h);
-        if (work === "discard" && h.place.branch)
-          await repos.reset(h.place).catch((e: unknown) => core.notice("warn", t("server.session.life.notReset", { name, why: messageOf(e) })));
-        await leave(h, closed, 0);
-        const kept = h.place.repo ? await repos.release(h.place) : await releaseContextPlace(h.place);
-        if (kept.kept) core.notice("info", t("server.session.life.left", { name, why: kept.reason }));
-        return true;
-      },
-    );
-
-  const discardWork = async (id: string) => {
-    if (!core.session(id)?.issue) throw refused(t("server.session.life.noIssue"));
-    if (!roster.get(id)?.place.branch) return;
-    await roster.withHand(
-      id,
-      () => undefined,
-      async (h) => {
-        const s = core.session(id);
-        if (!s || isBusy(s) || !h.place.branch) return;
-        await repos.reset(h.place).catch((e: unknown) => core.notice("warn", t("server.session.life.notReset", { name: s.name, why: messageOf(e) })));
-      },
-    );
-  };
-
-  const clearWorkplace = (issue: string, repo: string, number: number, work?: WorkplaceCleanup) =>
-    admission.with(async () => {
-      const unclosed = executor.all().find((a) => a.owner.issue === issue);
-      if (unclosed) throw refused(unclosed.failure ?? t("server.session.life.issueNotReturned"));
-      if (core.state().sessions.some((s) => s.issue === issue)) throw refused(t("server.session.life.stillHasHelper"));
-      return repos.clear(repo, number, work);
-    });
-
-  const report = async (id: string, given: T.IssueReport) => {
-    const noReport = () => refused(t("server.session.life.noHelper", { id }));
-    if (!core.session(id)?.issue) throw noReport();
-    await roster.withHand(
-      id,
-      () => {
-        throw noReport();
-      },
-      async (h) => {
-        if (!core.session(id)?.issue || !h.run) throw noReport();
-        await flushRuns();
-        try {
-          await qs.setPendingReport(db.sql, { id, report: jsonText(given) });
-        } catch (e) {
-          if (e instanceof SqlError) throw refused(causeMessage(e));
-          throw e;
-        }
-        h.report = given;
-        if (h.settling && handsToUser(given)) {
-          const pending = h.settling;
-          delete h.settling;
-          finishReport(h, pending.report, pending.completedBefore);
-        }
-      },
-    );
-  };
-
-  const host = async <R>(o: HostOptions<R>): Promise<AgentHost<R>> => {
-    await register(o.session);
-    const hostedRuns: RunStore = {
-      ...runStore,
-      finish: async (run, outcome, summary, spent) => {
-        await runStore.finish(run, outcome, summary, spent);
-        const session = core.session(o.session.id);
-        if (session)
-          core.apply({
-            type: "sessionReported",
-            id: session.id,
-            run,
-            outcome,
-            summary,
-            runs: session.runs + 1,
-            questions: [],
-            checks: [],
-            ...(spent ? { spent } : {}),
-          });
-      },
-    };
-    const journal = await trajectories.openLog(o.session.id, o.keepEvents);
-    return makeHost({ ...o, memory: memories.forAgent(o.session.agent, o.session.id) }, journal, hostedRuns, {
-      core,
-      clock,
-      log,
-      durable: deps.runtime.durable,
-    });
-  };
-
+  const closes: (() => Promise<void>)[] = [];
+  // The last built first; one failing does not keep the others open.
   const close = async () => {
-    moves.close();
-    await tasks.close();
-    await cli?.close();
-    await r.close();
+    const failures: unknown[] = [];
+    for (const c of closes.splice(0).toReversed())
+      try {
+        await c();
+      } catch (e) {
+        failures.push(e);
+      }
+    if (failures.length > 0) throw failures.length === 1 ? failures[0] : new AggregateError(failures, "the sessions did not close cleanly");
   };
+  try {
+    const machine = await makeMachine(deps);
+    closes.push(machine.close);
+    const lifecycle = await makeLifecycle({ ...deps, machine }, options);
+    closes.push(lifecycle.close);
+    const mailbox = await makeMailbox({ ...deps, session: lifecycle });
+    closes.push(mailbox.close);
 
-  return {
-    noRoom: roomFor,
-    makeRoom,
-    hire,
-    deliver,
-    stop,
-    suspend,
-    dismiss,
-    discardWork,
-    clearWorkplace,
-    handOver,
-    withIdleWorkplace: (id, use) => accessWorkplace(id, use, true),
-    withWorkplace: (id, use) => accessWorkplace(id, use, false),
-    list: async (agent) => {
-      const out = core.state().sessions.filter((s) => !agent || s.agent === agent);
-      const rows = await qs.endedSessions(db.sql, { agent, n: endedListed });
-      const ran = await qr.runsOfSessions(db.sql, { sessions: rows.map((row) => row.id) });
-      const bySession = Map.groupBy(ran, (row) => row.session);
-      for (const row of rows) if (!out.some((s) => s.id === row.id)) out.push(endedSession(row, bySession.get(row.id) ?? []));
-      return out.toSorted((a, b) => b.hiredAt - a.hiredAt);
-    },
-    get: async (id) => {
-      const live = core.session(id);
-      if (live) return live;
-      const row = await qs.sessionByID(db.sql, { id });
-      if (row === undefined || row.ended_at === null) return undefined;
-      return endedSession(row, await qr.runsOfSession(db.sql, { session: id }));
-    },
-    issueRuns: async (issue) => (await qr.runsOfIssue(db.sql, { issue_id: issue })).map(runOf),
-    events: (id, run) => trajectories.events(id, run),
-    sessionOf: (id) => core.session(id),
-    hired: () => core.state().sessions.filter(isHired),
-    isReachable: (id) => roster.has(id),
-    lastTextOf: (id) => roster.get(id)?.lastText ?? "",
-    cwdOf: (id) => roster.get(id)?.place.cwd,
-    workFile,
-    runOf: (id) => {
-      const run = roster.get(id)?.run ?? executions.get(id)?.() ?? "";
-      return run === "" ? undefined : run;
-    },
-    reportOf: (id) => summaryOf(roster.get(id)?.lastText ?? ""),
-    report,
-    onIssue: (issue) => sessionOnIssue(core.state(), issue)?.id,
-    news: () => newsHub.subscribe(),
-    who: roster.who,
-    setAddress: (address) => void (mcpEndpoint.url = `http://${address}/mcp`),
-    host,
-    restore,
-    boot: restore,
-    close,
-  };
+    const landing = makeLanding({ core: deps.core, log: deps.log, repo: deps.repo, lifecycle });
+    const gitHub = makeGitHubPoller({
+      db: deps.db,
+      repo: deps.repo,
+      clock: deps.clock,
+      log: deps.log,
+      receive: receiving(mailbox),
+      knownGitHubEvents: mailbox.knownGitHubEvents,
+    });
+    const session = sessionOver({ lifecycle, mailbox, repo: deps.repo, landing, pollGitHub: gitHub.pollOpen, close });
+    insides.set(session, {
+      ...lifecycle,
+      ...mailbox,
+      ...session,
+      here: machine.here,
+      executions: machine.executions,
+      restore: lifecycle.restore,
+      restoreDeliveries: mailbox.restore,
+    });
+    return session;
+  } catch (e) {
+    await close();
+    throw e;
+  }
 }

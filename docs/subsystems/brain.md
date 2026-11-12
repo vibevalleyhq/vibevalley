@@ -62,7 +62,8 @@ pi-durable 自己压缩。模型的窗口按目录（100 万 token），一次�
   - 帮工的 `vibevalley.helper` 在 `Harness` 开的时候装上；会话自己的部分不在内存里，从对话本身读：工作目录是对话的 `cwd`，指令、环境变量和 oar 会话的 ID 在对话的 `vibevalley.helper` 文档里（建对话的同一个提交写进去，帮手的子对话照抄一份），自己的任务按会话 ID 去 `runtime_todo` 表找。会话没重新打开时，这一轮照样有它全部的提示和工具。
   - 助手的扩展由 `makeHost` 装：助手开机时先给每个助手造好宿主（宿主造的时候就从对话里读回最新输入的去处），再让任何一个接着跑。
   - `openDurable` 开完以后，凡是有没跑完的一轮、却选了没装上的扩展的对话，就照它转写里最后给模型看的样子给那个扩展装一个替身：工具照旧在，调用时回一个失败的结果，说明它所在的会话还没重新打开；提示的那几段照它上次显示的样子不变。宿主装上真的扩展（同名）就替换它。帮工的 MCP 服务是会话自己的进程，会话没打开前它的工具就是这样回答的。
-- 农机的会话被放下（`dispose`，或服务端关门时它的主人 `owner` 关掉）时停下这一轮，和 oar 的约定一样；进程没来得及放下就没了（崩溃）时，这一轮留在 `durable.db` 里，同一个 oar 会话再打开（`resume`）就作为这个会话的一轮报出来。农场开机时帮工那一侧仍按「打断了」处理，下一句话来时才用 `resume` 打开。
+- 农机的会话被放下（`dispose`）时停下这一轮，和 oar 的约定一样；农场关门时例外：会话模块先调 `Durable.leave`，之后放下的会话让这一轮留在 `durable.db` 里，崩溃时也一样留着。开机时帮工那一侧看到对话还有没跑完的一轮，就用同一个 oar 会话再打开（`resume`，输入是 `goOn`：不进对话，那一轮就是这次的回合），答完记在原来那一轮上（[帮工的重启](docs/subsystems/session.md#重启)）。
+- **两个持久存储按 `run` 去重对账**：核心状态事实仍只在 Postgres 一份，`durable.db` 只存对话转写；若一轮在 `durable.db` 已完成、事实尚未写入 Postgres 时进程重启，重开后 `watch` 从头重放该轮提交，`session/reaction.ts` 按 `run` id 幂等去重，不会记成两轮。
 - 终端对话不用服务端的 `durable.db`：pi-durable 没有跨进程的锁，它在 `agent/<名字>/` 下开自己的，开着时租着这个目录；同名的第二个对话只在内存里。
 
 ### 自己带的东西
@@ -81,12 +82,12 @@ pi-durable 自己压缩。模型的窗口按目录（100 万 token），一次�
 ## 和谁打交道
 
 - **四个宿主**：助手 `session/host.ts`、农机 `runtime/vibevalley.ts`、终端对话 `chat/chat.ts`、`spawn_agent` 的子对话。
-- **资源服务（`resource`）**：助手和帮工的 `resource_read` 经 `apps/server/src/resource/` 按会话的权限分页读 `vv://` 资源。
+- **资源读取（`Tool.readResource`）**：助手和帮工的 `resource_read` 经 `apps/server/src/modules/tool/resource.ts` 按会话的权限分页读 `vv://` 资源。
 - **评测**：`vp run --filter @vibevalley/server evals` 在测试农场上照农场的样子跑助手的一轮（`testing/evals.ts` 的 `orchestratorTurn`：助手的宿主、它的提示和工具，经 pi-ai 问真的 DeepSeek），工具答的是用例录下的结果；要 `DEEPSEEK_API_KEY`、花钱，先问用户。
 
 ## 为什么这样
 
-- **用上游的 harness，不自己写循环**：持久、断点续跑、压缩、子任务都是现成的，上游以后的新能力（并行工具、新的压缩）不用再追一遍。自己写的那一套不持久，重启后助手答不完这一轮（[计划](.agents/notes/proposed/architecture/2026-11-12-brain-on-upstream-pi-durable.md)）。
+- **用上游的 harness，不自己写循环，也不退守旧版或 `pi-coding-agent`**：持久、断点续跑、压缩、子任务在 `@earendil-works/pi-durable` 里都是现成的，省去重复追赶上游新能力；放弃保留自研不持久循环、放弃以不持久的 `pi-coding-agent` 为底，也放弃为了复用 oar 0.101 自带的 runtime 而把 `pi-durable` 锁死在 `~1.4.0`（1.5 改了事件与压缩字段，且助手本就不经 oar；`pnpm-workspace.yaml` 的 `peerDependencyRules` 仅放宽不用的子模块）。存储先用开箱即用的本机 SQLite `durable.db`，避免被 Postgres 存储后端的一致性实现阻塞。
 - **扩展在开机时就在**：pi-durable 只按名字找扩展，找不到就当没有；一轮在宿主重开以前接着跑时，没有提示和工具的模型会答错。能从持久状态拿到的（工作目录、指令、环境变量、任务）就从那里拿；只能活着才有的（MCP 服务的进程）明说用不了，不让工具消失。
 - **DeepSeek 只注册一次**：哪个宿主先让 `Harness` 跑起来，别的对话都找得到模型；钥匙每次请求现取，存了新的立刻用上。
 - **价目自己记**：花费按农场的价目表折成人民币，和 pi-ai 目录的价不绑在一起。
@@ -94,13 +95,13 @@ pi-durable 自己压缩。模型的窗口按目录（100 万 token），一次�
 ## 还没做的
 
 - 按档案 `toolsets` 分配工具、统一技能发现并让助手也能加载技能：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
-- 评测换之前、之后的对照表，Postgres 的存储后端，oar 跟上 pi-durable 1.5 以后换回它的 runtime：[计划](.agents/notes/proposed/architecture/2026-11-12-brain-on-upstream-pi-durable.md)。
+- Postgres 的 pi-durable 存储后端（换掉 `durable.db`），以及 oar 跟上 pi-durable 1.5 后将 `runtime/vibevalley.ts` 换回它的 runtime 并移除 `peerDependencyRules` 放宽项。
 
 ## 怎么验证
 
 - `apps/server/src/modules/runtime/durable.test.ts`：pi-ai 的 DeepSeek provider 在 `Harness` 下对录下的 DeepSeek 流的读法和发法、钥匙每次现取、没有钥匙的说法。
 - `apps/server/src/modules/runtime/vibevalley.test.ts`：农机的 oar 适配、编码工具、环境变量、帮手、MCP；一轮在会话重开前接着跑时 MCP 的工具回答用不了、提示不变。
-- `apps/server/src/flows/restart.test.ts`：助手和帮工都答到一半时崩溃，重开后两个都答完，帮工那一轮有它的提示和工具。
+- `apps/server/src/flows/restart.test.ts`：助手和帮工都答到一半时崩溃，重开后两个都答完，帮工那一轮有它的提示和工具；帮工答到一半时正常关门，重开后接着答完、记一轮。
 - `apps/server/src/modules/orchestrator/evals.test.ts`：评测的判法、录下的用例，以及评测走的那条路（`orchestratorTurn`）离线跑一遍。
 - `packages/agent/src/tools/tools.test.ts`、`todo.test.ts`、`declared.test.ts`：技能、记性、MCP、任务图，以及工具给模型看的样子不变。
 - 测试农场的 `Harness` 问的是 `testing/deepseek.ts` 照脚本回答的 `deepseek`（`farm.deepseek.use(scriptedLLM(…).llm)`，`testing/model.ts`），不连网。

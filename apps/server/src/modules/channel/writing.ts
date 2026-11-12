@@ -8,8 +8,8 @@ import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
-import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
-import { inputContext } from "#/modules/mailbox/payload.ts";
+import { inputContext } from "#/modules/session/payload.ts";
+import type { Session } from "#/modules/session/session.ts";
 import * as qc from "#db/channel.sql.ts";
 import * as qmn from "#db/channel_mention.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
@@ -37,12 +37,12 @@ export interface ChannelWritingDeps {
   readonly fetch: typeof fetch;
   readonly db: Db;
   readonly agent: Agent;
-  readonly mailbox: Mailbox;
+  readonly session: Session;
 }
 
 /** tasks: the channel's own, so the work a message sets off ends with the service. */
 export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: TaskGroup) {
-  const { agent: agents, db, mailbox, clock, log } = deps;
+  const { agent: agents, db, session: sessions, clock, log } = deps;
   const {
     store,
     orchestratorIds,
@@ -120,8 +120,8 @@ export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: T
     const input = channelTrigger(fact, inputContext(asEnvelope(fact.row)));
     let routed: { readonly heldNotice: string };
     try {
-      const original = await mailbox.recordTrigger(input);
-      routed = await mailbox.receive({ _tag: "Trigger", trigger: original, to: fact });
+      const original = await sessions.recordTrigger(input);
+      routed = await sessions.route(original, fact);
     } catch (error) {
       // A refusal is the route's answer: the message is kept, and one not routed now is routed again at startup
       // (unroutedChannelMessages). Anything else (the database failing) fails the write.

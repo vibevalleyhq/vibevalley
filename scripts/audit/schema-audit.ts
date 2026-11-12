@@ -13,7 +13,7 @@ const serverLiterals = (file: string, name: string): readonly string[] => {
   if (list === undefined) throw new Error(`${file} no longer declares ${name} as a literal array`);
   return [...list.matchAll(/\x22([^\x22]*)\x22/gu)].map((m) => m[1] ?? "");
 };
-const TriggerSourceValues = serverLiterals("apps/server/src/modules/mailbox/shapes.ts", "TriggerSourceValues");
+const TriggerSourceValues = serverLiterals("apps/server/src/modules/session/shapes.ts", "TriggerSourceValues");
 const sqlPath = "apps/server/db/migrations/0001_schema.up.sql";
 const boundaryDocs = "docs/subsystems/foundation.md#边界审计";
 
@@ -206,7 +206,7 @@ const storedEnums: readonly StoredEnum[] = [
   { column: "session.role", protocol: "AgentRoleValues", values: T.AgentRoleValues },
   { column: "session.closed", protocol: "SessionCloseValues", values: T.SessionCloseValues },
   { column: "session_run.outcome", protocol: "OutcomeValues", values: T.OutcomeValues },
-  { column: "mailbox_delivery.source", protocol: "TriggerSourceValues", values: TriggerSourceValues },
+  { column: "session_delivery.source", protocol: "TriggerSourceValues", values: TriggerSourceValues },
   { column: "cron.set_by", protocol: "ActorKindValues", values: T.ActorKindValues },
   { column: "memory.kind", protocol: "MemoryKindValues", values: T.MemoryKindValues },
   { column: "memory.author", protocol: "ActorKindValues", values: T.ActorKindValues },

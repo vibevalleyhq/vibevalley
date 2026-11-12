@@ -1,5 +1,5 @@
 import type { Spoken } from "#/modules/channel/channel.ts";
-import { envelopeLines } from "#/modules/mailbox/prompts.ts";
+import { envelopeLines } from "#/modules/session/prompts.ts";
 
 import { answers, channelLine } from "./prompts.ts";
 import { callerOf, participant, refuse, said, sessionSchemaTool, tool, type Orchestrator, type SessionInput, type Who } from "./schemas.ts";

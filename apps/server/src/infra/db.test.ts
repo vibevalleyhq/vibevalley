@@ -173,14 +173,14 @@ const catching: Readonly<Record<string, string>> = {
   "modules/issue/assignment.ts": "an assignment write inside an issue transaction hands its database failure up to the caller's refusal",
   "modules/issue/store.ts": "an execution write inside an issue transaction hands its database failure up to the caller's refusal",
   "modules/issue/lifecycle.ts": "an issue that is not saved, split, edited, or linked to its session or orchestrator is told as a refusal",
-  "modules/mailbox/triggers.ts": "the source cursor and trigger commit together; a failed cron input is logged and retried without advancing its clock",
-  "modules/mailbox/work.ts":
+  "modules/session/triggers.ts": "the source cursor and trigger commit together; a failed cron input is logged and retried without advancing its clock",
+  "modules/session/work.ts":
     "a Session's first direct deliveries are registered atomically; a failed insert is returned so Session startup can stop and report NotRecorded",
   "modules/media/inputs.ts": "a rejected input commit removes its newly published file; failed cleanup retains its tombstone for restart recovery",
   "modules/memory/memory.ts": "a memory read or write that fails is logged and taken as none",
   "modules/session/inProcessRun.ts": "a run write fails as NotRecorded so an in-process run retries its end before accepting another input",
   "modules/session/registry.ts": "a session's own record that is not kept is logged without discarding its live execution",
-  "modules/session/session.ts": "a report handed in that cannot be kept is told as a refusal, and the turn does not take it",
+  "modules/session/lifecycle.ts": "a report handed in that cannot be kept is told as a refusal, and the turn does not take it",
 };
 
 test("SqlError is caught only where a failed query is told or retried, each with its reason", () => {

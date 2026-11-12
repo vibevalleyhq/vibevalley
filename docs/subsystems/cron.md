@@ -1,13 +1,13 @@
 # 定时任务
 
-定时任务（`Cron`）是工单的时间触发器，每次到期在同一事务内更新运行时间并写入不可变 `Trigger`。服务端随后调用 `Issue.scheduled` 准备该定时任务绑定的同一张工单，交由 `Mailbox` 投递给帮工或助手。
+定时任务（`Cron`）是工单的时间触发器，每次到期在同一事务内更新运行时间并写入不可变 `Trigger`。服务端随后调用 `Issue.scheduled` 准备该定时任务绑定的同一张工单，交由 `Session` 投递给帮工或助手。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
 | 定时任务模型、五种时间规格（`CronWhen`）、时区解析与下次运行时间计算（`nextRun`） | 到期后工单如何创建、排队、重开或启动会话（[工单](docs/subsystems/issue.md)） |
-| 助手创建定时任务时的用户授权门禁（`needsOK`：是否进入 `pending` 待批） | 触发信封如何排队、受阻暂存与唤醒（[Mailbox](docs/subsystems/mailbox.md)） |
+| 助手创建定时任务时的用户授权门禁（`needsOK`：是否进入 `pending` 待批） | 触发信封如何排队、受阻暂存与唤醒（[帮工的信箱](docs/subsystems/session.md#触发与投递)） |
 | 周期性到期扫描（`tick`）、关机错过任务的单次补跑（`isMissed`）与未路由重放 | |
 
 ## 在哪
@@ -35,16 +35,16 @@
   - 其余后台创建的任务存为 `enabled: false, pending: true`，在 `Inbox` 生成 `cron-ask` 待用户点击同意。
 - **一个定时任务固定复用一张工单**：
   - 未指定帮工档案时指派给所属频道助手；指定帮工档案时必须同时指定仓库。
-  - 若绑定工单处于等待用户状态，新到期输入在 `Mailbox` 蓄水池中保持 `held`（同一工单只留最新一条，`mailbox_issue_one_held`）。
+  - 若绑定工单处于等待用户状态，新到期输入在 `Session` 蓄水池中保持 `held`（同一工单只留最新一条，`session_issue_input_one_held`）。
 
 ## 怎么走
 
 1. **扫描与补跑（`tick`）**：启动后及每 `cron.tick_ms` 在单锁内重放未路由 Trigger，并筛出 `nextRun <= now` 的已启用任务（错过多次只合并补跑一次）。
-2. **原子记录与投递**：在同一数据库事务内更新 `cron.last_run` 并写入 `mailbox_trigger`，随后调用 `Issue.scheduled` 准备工单并交 `Mailbox.receive` 投递。
+2. **原子记录与投递**：在同一数据库事务内更新 `cron.last_run` 并写入 `session_trigger`，随后调用 `Issue.scheduled` 准备工单并交 `Session.route` 投递。
 
 ## 和谁打交道
 
-- **工单与信箱（`issue`、`mailbox`）**：调用 `Issue.scheduled` 获取或创建绑定工单，通过 `Mailbox` 投递到期 `Trigger`。
+- **工单与帮工（`issue`、`session`）**：调用 `Issue.scheduled` 获取或创建绑定工单，通过 `Session` 投递到期 `Trigger`。
 - **通知（`inbox`）**：`pending` 状态的定时任务由 `inbox/items.ts` 派生为 `cron-ask` 提醒用户审批。
 
 ## 为什么这样

@@ -110,7 +110,7 @@ describe("repos", () => {
     const root = reposDir();
     return repos(root, async (p) => {
       await p.openBranch("task", "vibevalley/task-1");
-      const place = await p.workplace("task", 1, true, "vibevalley/task-1");
+      const place = await p.checkout({ repo: "task", issue: 1, worktree: true, base: "vibevalley/task-1" });
       writeFileSync(join(place.cwd, "a.txt"), "a\n");
       gitSync(place.cwd, "add", "a.txt");
       gitSync(place.cwd, "commit", "-qm", "a");
@@ -139,7 +139,7 @@ describe("repos", () => {
     gitSync(path, "add", ".");
     gitSync(path, "commit", "-qm", "base");
     return repos(root, async (p) => {
-      const place = await p.workplace("described", 1, true, "");
+      const place = await p.checkout({ repo: "described", issue: 1, worktree: true, base: "" });
       writeFileSync(join(place.cwd, "keep.txt"), "a\nB\nc\n");
       writeFileSync(join(place.cwd, "b.bin"), Buffer.from([0, 1, 2]));
       writeFileSync(join(place.cwd, "sp ace.txt"), "new\n");
@@ -169,14 +169,14 @@ describe("repos", () => {
       write(join(made.path, ".vibevalley/setup"), "#!/bin/sh\necho once >> ready.txt\n", 0o755);
       gitSync(made.path, "add", ".vibevalley/setup");
       gitSync(made.path, "commit", "-qm", "setup");
-      const place = await p.workplace("setup", 1, true, "");
+      const place = await p.checkout({ repo: "setup", issue: 1, worktree: true, base: "" });
       expect(readFileSync(join(place.cwd, "ready.txt"), "utf8")).toBe("once\n");
-      await p.workplace("setup", 1, true, "");
+      await p.checkout({ repo: "setup", issue: 1, worktree: true, base: "" });
       expect(readFileSync(join(place.cwd, "ready.txt"), "utf8")).toBe("once\n");
 
       write(join(made.path, ".vibevalley/setup"), "#!/bin/sh\nexit 3\n", 0o755);
       gitSync(made.path, "commit", "-qam", "a setup that fails");
-      const failed = await p.workplace("setup", 2, true, "");
+      const failed = await p.checkout({ repo: "setup", issue: 2, worktree: true, base: "" });
       expect(existsSync(failed.cwd)).toBe(true);
     });
   });
@@ -184,7 +184,7 @@ describe("repos", () => {
   test("a branch opens where another stands", () => {
     const root = reposDir();
     return repos(root, async (p) => {
-      const place = await p.workplace("task", 1, true, "");
+      const place = await p.checkout({ repo: "task", issue: 1, worktree: true, base: "" });
       writeFileSync(join(place.cwd, "a.txt"), "before the split\n");
       gitSync(place.cwd, "add", "a.txt");
       gitSync(place.cwd, "commit", "-qm", "a");
@@ -198,7 +198,7 @@ describe("repos", () => {
     return repos(root, async (p) => {
       await p.openBranch("task", "vibevalley/task-1");
       const work = (id: string, ...files: string[]) =>
-        p.workplace("task", Number(id.slice(1)), true, "vibevalley/task-1").then((place) => {
+        p.checkout({ repo: "task", issue: Number(id.slice(1)), worktree: true, base: "vibevalley/task-1" }).then((place) => {
           files.forEach((f) => writeFileSync(join(place.cwd, f), id + "\n"));
           return place;
         });
@@ -365,7 +365,7 @@ describe("repos", () => {
   test("a merge refuses uncommitted work, and caches stay out of what is committed", () => {
     const root = reposDir();
     return repos(root, async (p) => {
-      const place = await p.workplace("left", 1, true, "");
+      const place = await p.checkout({ repo: "left", issue: 1, worktree: true, base: "" });
       mkdirSync(join(place.cwd, "__pycache__"));
       writeFileSync(join(place.cwd, "__pycache__", "greet.cpython-312.pyc"), "cache");
       writeFileSync(join(place.cwd, "greet.py"), "def greet(): pass\n");
@@ -386,7 +386,7 @@ describe("repos", () => {
       await repos(root, async (p) => {
         const target = intoTask ? "task" : "main";
         if (intoTask) await p.openBranch("demo", target);
-        const place = await p.workplace("demo", 1, true, intoTask ? target : "");
+        const place = await p.checkout({ repo: "demo", issue: 1, worktree: true, base: intoTask ? target : "" });
         writeFileSync(join(place.cwd, "result.txt"), "kept");
         gitSync(place.cwd, "add", ".");
         gitSync(place.cwd, "commit", "-qm", "result");
@@ -407,7 +407,7 @@ describe("repos", () => {
         await repos(root, async (p) => {
           const target = into ? "vibevalley/task-1" : "main";
           if (into) await p.openBranch("checked", target);
-          const place = await p.workplace("checked", 1, true, into ? target : "");
+          const place = await p.checkout({ repo: "checked", issue: 1, worktree: true, base: into ? target : "" });
           const path = join(root, "checked");
           const before = gitSync(path, "rev-parse", target);
           writeFileSync(join(place.cwd, "work.txt"), "work");
@@ -442,7 +442,7 @@ describe("repos", () => {
     return repos(
       root,
       async (p) => {
-        const place = await p.workplace("timeout", 1, true, "");
+        const place = await p.checkout({ repo: "timeout", issue: 1, worktree: true, base: "" });
         mkdirSync(join(place.cwd, ".vibevalley"));
         write(
           join(place.cwd, ".vibevalley/check"),
@@ -468,7 +468,7 @@ describe("repos", () => {
   test("a check that cannot run refuses", () => {
     const root = reposDir();
     return repos(root, async (p) => {
-      const place = await p.workplace("permissions", 1, true, "");
+      const place = await p.checkout({ repo: "permissions", issue: 1, worktree: true, base: "" });
       mkdirSync(join(place.cwd, ".vibevalley"));
       write(join(place.cwd, ".vibevalley/check"), "#!/bin/sh\nexit 0\n", 0o644);
       gitSync(place.cwd, "add", ".");
@@ -486,7 +486,7 @@ describe("repos", () => {
       const path = join(root, "demo");
       renameSync(join(path, ".git"), join(path, ".git-held"));
       try {
-        const clear2 = await p.clear("demo", 9);
+        const clear2 = await p.clearCheckout("demo", 9);
         expect(clear2).toMatchObject({ kept: true });
       } finally {
         renameSync(join(path, ".git-held"), join(path, ".git"));
@@ -498,37 +498,37 @@ describe("repos", () => {
     const root = reposDir();
     return repos(root, async (p) => {
       const path = join(root, "demo");
-      const place = await p.workplace("demo", 7, true, "");
+      const place = await p.checkout({ repo: "demo", issue: 7, worktree: true, base: "" });
       const main = gitSync(path, "rev-parse", "main");
       writeFileSync(join(place.cwd, "refined.txt"), "x");
       gitSync(place.cwd, "add", ".");
       gitSync(place.cwd, "commit", "-qm", "not the draft's to keep");
       writeFileSync(join(place.cwd, "scratch.txt"), "y");
-      await p.reset(place);
+      await p.resetCheckout(place);
       expect([gitSync(place.cwd, "rev-parse", "HEAD"), gitSync(place.cwd, "status", "--porcelain"), gitSync(place.cwd, "branch", "--show-current")]).toEqual([
         main,
         "",
         place.branch,
       ]);
-      await thrown(p.reset({ repo: "demo", cwd: path }));
+      await thrown(p.resetCheckout({ repo: "demo", cwd: path }));
       writeFileSync(join(place.cwd, "scratch.txt"), "y");
-      const clear2 = await p.clear("demo", 7, "preserve");
+      const clear2 = await p.clearCheckout("demo", 7, "preserve");
       expect(clear2).toMatchObject({ kept: true });
       expect(existsSync(join(place.cwd, "scratch.txt"))).toBe(true);
-      const clear3 = await p.clear("demo", 7);
+      const clear3 = await p.clearCheckout("demo", 7);
       expect(clear3).toEqual({ kept: false });
       expect(existsSync(place.cwd)).toBe(false);
       expect(() => gitSync(path, "show-ref", "--verify", "refs/heads/" + place.branch)).toThrow();
-      const kept = await p.workplace("demo", 8, true, "");
+      const kept = await p.checkout({ repo: "demo", issue: 8, worktree: true, base: "" });
       writeFileSync(join(kept.cwd, "work.txt"), "z");
       gitSync(kept.cwd, "add", ".");
       gitSync(kept.cwd, "commit", "-qm", "work");
-      const clear4 = await p.clear("demo", 8);
+      const clear4 = await p.clearCheckout("demo", 8);
       expect(clear4).toMatchObject({
         kept: true,
         reason: expect.stringMatching(/分支留着/u),
       });
-      const clear5 = await p.clear("missing", 9);
+      const clear5 = await p.clearCheckout("missing", 9);
       expect(clear5).toEqual({ kept: false });
     });
   });
@@ -547,7 +547,7 @@ describe("repos", () => {
           baseHead = gitSync(path, "commit-tree", tree, "-p", "HEAD", "-m", "task only");
           gitSync(path, "update-ref", "refs/heads/" + base, baseHead);
         }
-        const first = await p.workplace("demo", 42, true, base);
+        const first = await p.checkout({ repo: "demo", issue: 42, worktree: true, base });
         if (baseHead) expect(gitSync(first.cwd, "rev-parse", "HEAD")).toBe(baseHead);
         expect(first.branch).toBe("vibevalley/issue-42");
         expect(first.cwd).toBe(join(dirname(root), "worktrees", "demo.42"));
@@ -557,13 +557,13 @@ describe("repos", () => {
           gitSync(first.cwd, "commit", "-qm", "previous");
         }
         let before = gitSync(first.cwd, "rev-parse", "HEAD");
-        if (mode === "cancelled" || mode === "dirty") await p.release(first);
+        if (mode === "cancelled" || mode === "dirty") await p.releaseCheckout(first);
         if (mode === "merged") {
           await p.merge(first);
           gitSync(path, "commit", "--allow-empty", "-m", "later");
           before = gitSync(path, "rev-parse", "HEAD");
         }
-        const second = await p.workplace("demo", 42, true, base);
+        const second = await p.checkout({ repo: "demo", issue: 42, worktree: true, base });
         expect(second).toEqual(first);
         expect(gitSync(second.cwd, "rev-parse", "HEAD")).toBe(before);
         expect(readFileSync(join(second.cwd, "previous.txt"), "utf8")).toBe("previous");
@@ -578,7 +578,7 @@ describe("repos", () => {
         await repos(root, async (p) => {
           const target = into ? "vibevalley/task-42" : "main";
           if (into) await p.openBranch("demo", target);
-          const place = await p.workplace("demo", 1, true, into ? target : "");
+          const place = await p.checkout({ repo: "demo", issue: 1, worktree: true, base: into ? target : "" });
           const before = gitSync(join(root, "demo"), "rev-parse", target);
           const signal = reposDir();
           const started = join(signal, "started");
@@ -589,7 +589,7 @@ describe("repos", () => {
           gitSync(place.cwd, "commit", "-qm", "check");
           const merging = settled(into ? p.mergeInto(place, target) : p.merge(place));
           await until(() => existsSync(started), "the check started");
-          await withTimeout(() => p.workplace("demo", 2, true, ""), 2000, { clock: wallTime });
+          await withTimeout(() => p.checkout({ repo: "demo", issue: 2, worktree: true, base: "" }), 2000, { clock: wallTime });
           if (changed) gitSync(place.cwd, "commit", "--allow-empty", "-m", "changed during check");
           writeFileSync(release, "");
           const result = await merging;
@@ -607,7 +607,7 @@ describe("repos", () => {
   test("a local merge checks the tree with main's changes in it", () => {
     const root = reposDir();
     return repos(root, async (p) => {
-      const place = await p.workplace("combined", 1, true, "");
+      const place = await p.checkout({ repo: "combined", issue: 1, worktree: true, base: "" });
       const path = join(root, "combined");
       writeFileSync(join(path, "main-only"), "main");
       gitSync(path, "add", ".");
@@ -626,7 +626,7 @@ describe("repos", () => {
     repo(join(outside, "elsewhere"), 1, 0);
     symlinkSync(join(outside, "elsewhere"), join(root, "linked"));
     return repos(root, async (p) => {
-      expect((await thrown(p.workplace("linked", 1, true, ""))).message).toMatch(/工作目录里面/u);
+      expect((await thrown(p.checkout({ repo: "linked", issue: 1, worktree: true, base: "" }))).message).toMatch(/工作目录里面/u);
     });
   });
 });

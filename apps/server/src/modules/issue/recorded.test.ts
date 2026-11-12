@@ -4,8 +4,9 @@ import { type Issue, defaultOrchestrator, type RepoStack, type Run } from "@vibe
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { templateCatalog } from "#/modules/agent/seed.ts";
+import { pullRequestConclusion } from "#/modules/session/landing.ts";
 
-import { pullRequestConclusion, issueBrief, milestonesOf, splitBrief } from "./brief.ts";
+import { issueBrief, milestonesOf, splitBrief } from "./brief.ts";
 import { filledKinds, filledTemplate, mandateNoteFits, sentTitles } from "./creation.ts";
 import { answerOpening, criteriaHead, refinementBrief, refinementOpening } from "./prompts.ts";
 import { refinementDescription, kept, parseRefinement } from "./refinement.ts";

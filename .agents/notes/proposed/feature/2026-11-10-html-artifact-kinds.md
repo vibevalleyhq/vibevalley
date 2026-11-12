@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-网页 Artifact（[Artifact](docs/subsystems/artifact.md)）已上线 `display` 字段（`page`、`slides`、`motion`）、`?shell=1` 的 `vv` 消息约定与 `slides` 幻灯片放映/打印，但 `display: "motion"` 尚未实现时间轴驱动与视频导出：帮工交上来的动画页缺少统一的播放条、逐帧定位与导出进[素材库](docs/subsystems/library.md)的能力。
+网页 Artifact（[Artifact](docs/subsystems/artifact.md)）已上线 `display` 字段（`page`、`slides`、`motion`）、`?shell=1` 的 `vv` 消息约定与 `slides` 幻灯片放映/打印，但 `display: "motion"` 尚未实现时间轴驱动与视频导出：帮工交上来的动画页缺少统一的播放条、逐帧定位与导出进[素材库](docs/subsystems/media.md#素材库)的能力。
 
 ## Proposal
 
@@ -25,7 +25,7 @@ Status: proposed
 ## Acceptance criteria
 
 - `display: "motion"` 的网页 Artifact 在聊天旁栏与 `/artifacts` 页均可播放、暂停、拖动时间轴与逐帧步进；切回 `page` 显示原整页。
-- 导出视频后[素材库](docs/subsystems/library.md)新增对应视频文件，来源指向该 Artifact 版本；超过时长上限时明确提示。
+- 导出视频后[素材库](docs/subsystems/media.md#素材库)新增对应视频文件，来源指向该 Artifact 版本；超过时长上限时明确提示。
 - Playwright 测试验证同一 `t` 两次 `seek(t)` 画面一致、控件可访问性通过 axe；更新 [Artifact](docs/subsystems/artifact.md) 后删除本 Note。
 
 ## Risks

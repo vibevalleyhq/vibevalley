@@ -148,7 +148,7 @@
 | `para` | `artifact.ts` |  |
 | `sample` | `artifact.ts` | Every kind of block, and inline marks, as the export writes them. |
 | `scriptedDeepSeek` | `deepseek.ts` |  |
-| `committedDelivery` | `deliveries.ts` | A delivery written and routed as Mailbox commits one, and nothing after: what a stop between commit and hand-off |
+| `committedDelivery` | `deliveries.ts` | A delivery written and routed as the session module commits one, and nothing after: what a stop between commit and hand-off |
 | `kinds` | `evals.ts` |  |
 | `orchestratorToolNames` | `evals.ts` | The orchestrator's tools by name, as its brain has them: the farm's and its own (no skills, subagents or crons). |
 | `problemOf` | `evals.ts` | "" when it is whole: the fields its kind reads are there. |
@@ -194,7 +194,7 @@
 | `helper` | `worker.ts` | The helper every flow hires: what it does is in the words of its brief (the part after the reminders). draft-only drafts. |
 | `installedOnly` | `worker.ts` | A probe that finds every runtime given, bundled, and no other. |
 | `quietApp` | `world.ts` | For a test that builds the whole app (http/app.ts): nothing of this machine's is asked in the background, and the |
-| `moduleWorld` | `world.ts` | Core domain services below Inbox/Tool/Mcp for module tests. |
+| `moduleWorld` | `world.ts` | Core domain services below Inbox/Tool/Mcp for module tests: services.ts's buildModules, with the test's runtimes, repos and network. |
 | `world` | `world.ts` |  |
 | `testIssues` | `world.ts` | Issues a test adds are ones the user sent, so their mandate is explicit. |
 

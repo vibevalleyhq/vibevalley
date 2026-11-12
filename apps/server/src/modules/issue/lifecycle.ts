@@ -11,11 +11,9 @@ import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
-import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
-import type { Trigger } from "#/modules/mailbox/shapes.ts";
-import { issueBranch, type Repo } from "#/modules/repo/repo.ts";
 import { RepoError } from "#/modules/repo/workplace.ts";
 import { NotRecorded, type Session } from "#/modules/session/session.ts";
+import type { Trigger } from "#/modules/session/shapes.ts";
 import * as q from "#db/issue.sql.ts";
 
 import { issueBrief, splitBrief } from "./brief.ts";
@@ -36,9 +34,7 @@ const closingOf = (closed: T.SessionClose | undefined): { delivered: T.Landing }
 export interface IssueParts {
   readonly core: Core;
   readonly agent: Agent;
-  readonly repo: Repo;
   readonly session: Session;
-  readonly mailbox: Mailbox;
   readonly db: Db;
   readonly clock: Time;
   readonly log: Logger;
@@ -47,7 +43,7 @@ export interface IssueParts {
 export type IssueLifecycle = Awaited<ReturnType<typeof issueLifecycle>>;
 
 export async function issueLifecycle(deps: IssueParts) {
-  const { core, agent: agents, repo: repos, session: sessions, mailbox, db, clock, log } = deps;
+  const { core, agent: agents, session: sessions, db, clock, log } = deps;
   const store = await makeIssueStore({ core, db });
 
   const loadKept = async () => {
@@ -100,7 +96,7 @@ export async function issueLifecycle(deps: IssueParts) {
 
   const liveSession = async (id: string) => {
     const session = await latest(id);
-    if (!sessions.isReachable(session)) throw missing(t("server.issue.helperRef", { id: session }), [lookIn.session]);
+    if (!sessions.live(session).reachable) throw missing(t("server.issue.helperRef", { id: session }), [lookIn.session]);
     return session;
   };
 
@@ -297,10 +293,8 @@ export async function issueLifecycle(deps: IssueParts) {
   const repoRefusal = (e: unknown) => (e instanceof RepoError ? refused(e.message) : e);
 
   const changesOf = async (item: T.Issue): Promise<T.Changes | undefined> => {
-    const session = latestSessionIdOf(item);
     try {
-      if (session && sessions.isReachable(session)) return await sessions.withWorkplace(session, (place) => repos.changes(place));
-      return item.repo ? await repos.branchChanges(item.repo, issueBranch(item.number)) : undefined;
+      return await sessions.changesOf(item);
     } catch (e) {
       throw repoRefusal(e);
     }
@@ -378,9 +372,7 @@ export async function issueLifecycle(deps: IssueParts) {
     });
   };
 
-  const withdrawDispatches = (id: string, at: number) => mailbox.withdraw({ _tag: "Issue", issue: id, at });
-
-  const route = (dispatch: Trigger) => bestEffort(log, `issue: route ${dispatch.id}`, () => mailbox.receive({ _tag: "Trigger", trigger: dispatch }));
+  const withdrawDispatches = (id: string, at: number) => sessions.withdrawDispatches(id, at);
 
   /** The issue already owns its number and workplace before its session starts. Throws NotRecorded when the database does not keep it. */
   const recordHiredStart = async (id: string, session: T.Session) => {
@@ -398,31 +390,17 @@ export async function issueLifecycle(deps: IssueParts) {
 
   const recordOnDutyStart = async (issue: T.Issue, agent: string, channel: string, input?: { readonly text: string; readonly by: T.RunTrigger }) => {
     const assignedAt = clock.now();
-    let dispatch: Trigger | undefined;
     await db.tx(async () => {
       if (isClosed(issue.status)) await q.reopenIssue(db.sql, { id: issue.id });
       await q.queueIssue(db.sql, { id: issue.id, at: assignedAt });
       await store.executeInTx(issue.id, agent, agent, assignedAt, () => publish(issue.id));
-      if (input)
-        dispatch = await mailbox.recordTrigger({
-          source: "workbench",
-          key: newId(),
-          actor: { kind: "system", id: "system" },
-          text: input.text,
-          threads: [`issue:${issue.id}`],
-          addressed: "thread_owner",
-          replyChannel: channel,
-          meta: { ingressRecipient: agent, issue: issue.id, trigger: input.by, dispatch: true },
-          at: assignedAt,
-        });
+      if (input) await sessions.queueDispatch({ issue: issue.id, agent, text: input.text, channel, by: input.by, at: assignedAt });
     });
-    if (dispatch) await route(dispatch);
   };
 
   const setQueued = async (id: string, queued: boolean, channel: string, by?: T.RunTrigger, source?: Trigger) => {
     const item = await unsent(id);
     const at = clock.now();
-    let dispatch: Trigger | undefined;
     await db.tx(async () => {
       if (!queued) {
         await withdrawDispatches(id, at);
@@ -432,20 +410,16 @@ export async function issueLifecycle(deps: IssueParts) {
       }
       const changed = await q.queueIssue(db.sql, { at, id });
       if (changed.length > 0 && !source)
-        dispatch = await mailbox.recordTrigger({
-          source: "workbench",
-          key: newId(),
-          actor: { kind: "system", id: "system" },
+        await sessions.queueDispatch({
+          issue: id,
+          agent: assignedAgentOf(item) ?? "",
           text: issueBrief(item),
-          threads: [`issue:${id}`],
-          addressed: "thread_owner",
-          replyChannel: channel,
-          meta: { ingressRecipient: assignedAgentOf(item) ?? "", issue: id, trigger: by ?? { kind: "issue" }, dispatch: true },
+          channel,
+          by: by ?? { kind: "issue" },
           at,
         });
       await db.afterCommit(() => publish(id));
     });
-    if (dispatch) await route(dispatch);
     return get(id);
   };
 
@@ -482,7 +456,6 @@ export async function issueLifecycle(deps: IssueParts) {
     rows: readonly { readonly id: T.IssueId; readonly req: T.IssueRequest }[],
   ) => {
     const at = clock.now();
-    const dispatches: Trigger[] = [];
     try {
       await db.tx(async () => {
         const current = await q.getIssue(db.sql, { id });
@@ -501,18 +474,14 @@ export async function issueLifecycle(deps: IssueParts) {
           });
         for (const row of rows) {
           await q.addIssue(db.sql, issueRow(row.id, row.req, parentMandate, at));
-          const triggerRecorded = await mailbox.recordTrigger({
-            source: "workbench",
-            key: newId(),
-            actor: { kind: "system", id: "system" },
+          await sessions.queueDispatch({
+            issue: row.id,
+            agent: row.req.agent ?? "",
             text: [row.req.title, row.req.description].filter(Boolean).join("\n\n"),
-            threads: [`issue:${row.id}`],
-            addressed: "thread_owner",
-            replyChannel: channel,
-            meta: { ingressRecipient: row.req.agent ?? "", issue: row.id, trigger: { kind: "issue" }, dispatch: true },
+            channel,
+            by: { kind: "issue" },
             at,
           });
-          dispatches.push(triggerRecorded);
           await q.queueIssue(db.sql, { id: row.id, at });
           await store.assignInTx(row.id, row.req.agent, at);
         }
@@ -522,8 +491,7 @@ export async function issueLifecycle(deps: IssueParts) {
       if (e instanceof SqlError) throw refused(causeMessage(e));
       throw e;
     }
-    for (const dispatch of dispatches) await route(dispatch);
-    // Children reach the board only once their dispatches are held: the queue reacts to their issueChanged, and an
+    // The dispatches were routed as the transaction committed (queueDispatch). Children reach the board only once their dispatches are held: the queue reacts to their issueChanged, and an
     // earlier one would find no queued input and, the issue then unchanged, never be told again.
     for (const row of rows) await publish(row.id);
   };

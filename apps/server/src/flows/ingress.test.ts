@@ -4,7 +4,7 @@ import { expect, test } from "vite-plus/test";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { explicitMandate } from "#/modules/issue/creation.ts";
-import { type InsertDelivery } from "#/modules/mailbox/mailbox.ts";
+import { type InsertDelivery } from "#/modules/session/mailbox.ts";
 import { committedDelivery } from "#/testing/deliveries.ts";
 import { sqlOf } from "#/testing/sql.ts";
 import { testIssues } from "#/testing/world.ts";
@@ -23,7 +23,7 @@ test("regression: the mandate grants its worker access to the original trigger w
     }),
   });
   await using fw = await f.open();
-  const mailbox = fw.mailbox;
+  const mailbox = fw.inside;
   const issues = fw.issue;
   const tools = fw.tool;
   await fw.agent.save(lab());
@@ -50,19 +50,19 @@ test("regression: chat triggers keep their original payload through edits and re
   const f = farm();
   await using fw = await f.open();
   const chat = fw.channel;
-  const mailbox = fw.mailbox;
+  const mailbox = fw.inside;
   const tools = fw.tool;
   const sql = sqlOf(fw.db);
   const before = await chat.post({ _tag: "User", text: "previous message", sendKey: "before" });
   const current = await chat.user({ source: "voice", text: "original voice input", envelope: "voice-source" });
   await chat.post({ _tag: "User", text: "next message", sendKey: "after" });
   await chat.edit(current.message.id, "edited voice input");
-  await sql`update mailbox_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${current.message.id}`;
-  await fw.mailbox.replay();
+  await sql`update session_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${current.message.id}`;
+  await fw.inside.replay();
   const registered2 = await mailbox.isRouted(current.message.id);
   expect(registered2).toBe(false);
   await chat.boot();
-  await mailbox.boot();
+  await mailbox.wake();
   const registered3 = await mailbox.isRouted(current.message.id);
   expect(registered3).toBe(true);
   const source = await mailbox.readTrigger(current.message.id);
@@ -89,8 +89,8 @@ test("regression: a persisted machine trigger reaches a worker without a chat me
   await using fw = await f.open();
   const issue2 = fw.issue;
   const issues = testIssues(issue2);
-  const sessions = fw.session;
-  const mailbox = fw.mailbox;
+  const sessions = fw.inside;
+  const mailbox = fw.inside;
   const chat = fw.channel;
   await fw.agent.save(lab());
   const issue = await issues.add({ title: "work", repo: "machine-trigger", agent: "lab" });
@@ -131,9 +131,9 @@ test("regression: a persisted machine trigger reaches a worker without a chat me
     },
   };
   await committedDelivery(fw.db, delivery);
-  await mailbox.restore();
+  await mailbox.restoreDeliveries();
   expect(mailbox.deliveriesOf(session).find((row) => row.envelope_id === trigger.id)?.message_id).toBeNull();
-  await mailbox.boot();
+  await mailbox.wake();
   expect(inputs.some((input) => input.includes(trigger.card.readUri))).toBe(false);
   await mailbox.accept({
     source: "connector",
@@ -171,8 +171,8 @@ test("regression: issue input waits without a session and a user followup releas
   await using fw = await f.open();
   const issue2 = fw.issue;
   const issues = testIssues(issue2);
-  const sessions = fw.session;
-  const mailbox = fw.mailbox;
+  const sessions = fw.inside;
+  const mailbox = fw.inside;
   const tools = fw.tool;
   const sql = sqlOf(fw.db);
   await fw.agent.save(lab());
@@ -189,7 +189,7 @@ test("regression: issue input waits without a session and a user followup releas
   };
   const queued = (await mailbox.accept(userEvent))!;
   expect(sessions.hired()).toHaveLength(0);
-  expect((await sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${queued.id}`)[0]?.state).toBe("held");
+  expect((await sql<{ state: string }>`select state from session_issue_input where trigger_id = ${queued.id}`)[0]?.state).toBe("held");
   const started = await issues.start(issue.id, "");
   await until(() => inputs.some((input) => input.includes("queued-user-detail")), "the queued input delivered");
   expect(inputs[0]).toContain("queued-user-detail");
@@ -203,16 +203,18 @@ test("regression: issue input waits without a session and a user followup releas
     addressed: "thread_owner",
     at: 2,
   }))!;
-  expect((await sql<{ state: string; reason: string }>`select state, reason from mailbox_issue where trigger_id = ${automatic.id}`)[0]).toEqual({
+  expect((await sql<{ state: string; reason: string }>`select state, reason from session_issue_input where trigger_id = ${automatic.id}`)[0]).toEqual({
     state: "held",
     reason: "human",
   });
   expect(inputs.some((input) => input.includes("frozen-ci-detail"))).toBe(false);
   await mailbox.accept(userEvent);
-  expect((await sql<{ state: string }>`select state from mailbox_issue where trigger_id = ${automatic.id}`)[0]?.state).toBe("held");
+  expect((await sql<{ state: string }>`select state from session_issue_input where trigger_id = ${automatic.id}`)[0]?.state).toBe("held");
   await mailbox.accept({ ...userEvent, key: "release-user", text: "release-user-detail", at: 3 });
   await until(() => inputs.some((input) => input.includes("frozen-ci-detail")), "the frozen input released");
   expect((await issues.list()).map((item) => item.id)).toEqual([issue.id]);
-  expect((await sql<{ session_id: string }>`select session_id from mailbox_issue where trigger_id = ${automatic.id}`)[0]?.session_id).toBe(started.session);
+  expect((await sql<{ session_id: string }>`select session_id from session_issue_input where trigger_id = ${automatic.id}`)[0]?.session_id).toBe(
+    started.session,
+  );
   expect((await tools.readResource(started.session!, { uri: automatic.card.readUri })).text).toContain("frozen-ci-detail");
 });

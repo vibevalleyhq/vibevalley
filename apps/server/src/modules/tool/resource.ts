@@ -136,11 +136,11 @@ function resourceRef(uri: string): ResourceRef | undefined {
 
 const textOf = (value: unknown): string => JSON.stringify(value, null, 2);
 
-export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "session" | "mailbox" | "repo">) {
-  const { channel: channels, issue: issues, session: sessions, mailbox, repo: repos } = deps;
+export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "session" | "repo">) {
+  const { channel: channels, issue: issues, session: sessions, repo: repos } = deps;
   const cache = new TextCache(cacheBytes);
 
-  const ownSession = (id: string) => sessions.sessionOf(id);
+  const ownSession = (id: string) => sessions.live(id).session;
 
   const mayReadChannel = async (session: T.Session, channel: string) => {
     if (session.channel === channel) return true;
@@ -178,7 +178,7 @@ export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "s
       case "trigger": {
         let resource;
         try {
-          resource = await mailbox.readTrigger(ref.id);
+          resource = await sessions.trigger(ref.id);
         } catch (error) {
           throw new ResourceError(messageOf(error), { cause: error });
         }
@@ -186,7 +186,7 @@ export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "s
         let permitted = orchestrator;
         if (session?.issue && !permitted) permitted = (await issues.get(session.issue)).mandate.originTriggerId === ref.id;
         if (session && !permitted) {
-          const owner = await mailbox.ownerOf(ref.id);
+          const owner = await sessions.ownerOf(ref.id);
           if (owner) {
             const ownerIssue = await issues.get(owner);
             permitted = await mayReadIssue(session, ownerIssue);
@@ -222,7 +222,7 @@ export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "s
       case "issue": {
         const issue = await issues.get(ref.id);
         if (!orchestrator && (session === undefined || !(await mayReadIssue(session, issue)))) throw refuse(resourceWords.forbidden(uri));
-        return textOf({ issue, runs: await sessions.issueRuns(issue.id), messages: await channels.issueMessages(issue.id) });
+        return textOf({ issue, runs: await sessions.runsOf(issue.id), messages: await channels.issueMessages(issue.id) });
       }
       case "channel": {
         if (!orchestrator && (session === undefined || !(await mayReadChannel(session, ref.id)))) throw refuse(resourceWords.forbidden(uri));
@@ -231,7 +231,7 @@ export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "s
       }
       case "session": {
         if (!orchestrator && session?.id !== ref.id) throw refuse(resourceWords.forbidden(uri));
-        const events = await sessions.events(ref.id);
+        const events = await sessions.eventsOf(ref.id);
         if (events === undefined) throw refuse(resourceWords.missing(uri));
         return textOf({ events });
       }

@@ -177,7 +177,7 @@
   "server: Gateway": {
     "nonNull": 0,
     "doubleCast": 0,
-    "cast": 3,
+    "cast": 2,
     "lintOff": 2,
     "swallowed": 4
   },
@@ -189,13 +189,6 @@
     "swallowed": 0
   },
   "server: Issues": {
-    "nonNull": 0,
-    "doubleCast": 0,
-    "cast": 0,
-    "lintOff": 0,
-    "swallowed": 0
-  },
-  "server: Mailbox": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,

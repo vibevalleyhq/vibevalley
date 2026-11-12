@@ -16,8 +16,8 @@ import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { Issue } from "#/modules/issue/issue.ts";
-import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
-import type { Trigger } from "#/modules/mailbox/shapes.ts";
+import type { Session } from "#/modules/session/session.ts";
+import type { Trigger } from "#/modules/session/shapes.ts";
 import * as q from "#db/cron.sql.ts";
 
 import { afterRun, cronProblem, dueCrons, dueText, givenZone, isMissed, needsOK, whenText } from "./when.ts";
@@ -56,7 +56,7 @@ export interface CronDeps {
   readonly agent: Agent;
   readonly channel: Channel;
   readonly issue: Issue;
-  readonly mailbox: Mailbox;
+  readonly session: Session;
 }
 
 /** $TZ when it names a zone, else the system's. */
@@ -68,7 +68,7 @@ const localZone = (): string => {
 const whenOf = jsonOrNone(S.CronWhen);
 
 export async function makeCron(deps: CronDeps): Promise<Cron> {
-  const { core, agent: store, channel: chat, issue: issues, mailbox, db, clock, config } = deps;
+  const { core, agent: store, channel: chat, issue: issues, session: sessions, db, clock, config } = deps;
   const log = deps.log.child("cron");
   const tasks = new TaskGroup({ name: "cron", onError: (task, e) => log.error(`${task} failed:`, e) });
   const now = () => clock.now();
@@ -110,7 +110,7 @@ export async function makeCron(deps: CronDeps): Promise<Cron> {
   const recordDue = (due: Due) => {
     const s = due.cron;
     const thread = `cron:${s.id}`;
-    return mailbox.recordTrigger({
+    return sessions.recordTrigger({
       source: "cron",
       key: due.id,
       actor: { kind: "system", id: s.id },
@@ -128,18 +128,18 @@ export async function makeCron(deps: CronDeps): Promise<Cron> {
     bestEffort(log, `cron occurrence ${due.id}`, async () => {
       const s = due.cron;
       const thread = `cron:${s.id}`;
-      if (!(await mailbox.isRouted(trigger.id))) {
+      if (!(await sessions.isRouted(trigger.id))) {
         const issue = await issues.scheduled(due, trigger);
-        await mailbox.subscribe(issue.id, [thread]);
-        await mailbox.receive({ _tag: "Trigger", trigger });
+        await sessions.subscribe(issue.id, [thread]);
+        await sessions.route(trigger);
       } else {
-        const issue = await mailbox.ownerOf(trigger.id);
-        if (issue) await mailbox.subscribe(issue, [thread]);
+        const issue = await sessions.ownerOf(trigger.id);
+        if (issue) await sessions.subscribe(issue, [thread]);
       }
     });
 
   const replay = () =>
-    mailbox.replayCronTriggers(async (trigger, data) => {
+    sessions.replayCronTriggers(async (trigger, data) => {
       const cron = S.Cron.parse(data);
       const by = trigger.meta.trigger;
       await handle({ id: trigger.id, cron, missed: by?.kind === "cron" && by.missed === true }, trigger);

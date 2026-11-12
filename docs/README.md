@@ -16,8 +16,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 文档 | 内容 |
 |---|---|
 | [issue.md](docs/subsystems/issue.md) | 工单：一块地：工单的模型、状态和派活、验收、完成与 PR 跟进 |
-| [mailbox.md](docs/subsystems/mailbox.md) | 信箱：来源触发去重、谁该听到、三道刹车、投递状态机、叫醒与工单蓄水池 |
-| [session.md](docs/subsystems/session.md) | 帮工：Session 和 Run、机器执行器、规矩和汇报、事件日志、额度和上限 |
+| [session.md](docs/subsystems/session.md) | 帮工：触发去重、谁该听到、三道刹车、投递和叫醒、工单蓄水池，Session 和 Run、工作目录、机器执行器、规矩和汇报、事件日志、额度和上限、重启后接着答 |
 | [repo.md](docs/subsystems/repo.md) | 仓库：工作目录、worktree、检查、GitHub 检测与 PR 快照、地契 |
 | [artifact.md](docs/subsystems/artifact.md) | Artifact：用户和帮工一起写的块、交上来的网页；按块存按 op 改，网页按版本存、隔离着看，带卡片说出来 |
 | [pkm.md](docs/subsystems/pkm.md) | 笔记：用户的 Logseq 式大纲页面，按 PARA 分文件夹；文件是真相，读进内存再写回，块引用、反链、搜索、闪念、剪藏、改写和撤销 |
@@ -33,8 +32,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [user.md](docs/subsystems/user.md) | 用户和设备：一个用户、名字和密码、每台设备一把钥匙、密码和确认码登录、收回和久不用作废 |
 | [setting.md](docs/subsystems/setting.md) | 设置：settings.json、配置和环境变量、钥匙和打码 |
 | [provider.md](docs/subsystems/provider.md) | AI 服务：供应商连接、模型目录、默认用途、凭据与配置版本 |
-| [library.md](docs/subsystems/library.md) | 素材库：生成的、你上传的、帮工拿回来的文件，一份文件一张卡，记着来路 |
-| [media.md](docs/subsystems/media.md) | 生图：持久化任务、独立下载、安全校验、本机附件与状态投影 |
+| [media.md](docs/subsystems/media.md) | 媒体和素材库：生图、语音、理解、转写任务与本机输入，独立下载与安全校验；生成的、你上传的、帮工拿回来的文件，一份文件一张卡，记着来路 |
 | [game.md](docs/subsystems/game.md) | 游戏：账本、金币和成就、等级、空地和特效 |
 | [core.md](docs/subsystems/core.md) | 核心状态：一份状态只因事实而变、SSE 流和全部路由、接口和能力表、重启 |
 | [foundation.md](docs/subsystems/foundation.md) | 地基：一个仓库、一块业务一个服务（工厂加接口）、异步原语、Zod 的形状和规则、Postgres 查询生成器、表结构、测试 |
@@ -81,7 +79,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 仓库 | repo | repo（`RepoSummary`） | 一块地 |
 | 空间 | space | `SpaceState`；目录是 `ServerConfig` 的 `workRoot` | 世界、全图 |
 | 宿主 | host | `ServerConfig.home`（`$VIBEVALLEY_HOME`） |  |
-| 空位 | spot | `ServerConfig.repo.maxSessions`（配置 `repo.max_sessions`）、`Session.makeRoom`；每台农机另有 `maxWorking` | 并发位、空地 |
+| 空位 | spot | `ServerConfig.repo.maxSessions`（配置 `repo.max_sessions`）、`Session.room`；每台农机另有 `maxWorking` | 并发位、空地 |
 | 档案模板 | profile template | `AgentTemplate`（`agent.template.*`） | 种子、预设 |
 | 工单模板 | ticket template | issue template（`IssueTemplate`、`repo.template.list`） | seed |
 | 阶段 | what it is doing | phase（`Session.phase`） | 状态（指阶段时） |
@@ -107,16 +105,16 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 子工单 | child issue | `Issue`（带 `parent`、`blockedBy`；拆单输入为 `IssueChildDraft`） | Task、步骤状态机 |
 | 派活 | dispatch | hire（`Issue.hire`、事实 `FactSessionChanged`） |  |
 | 派工关联 | assignment | `Assignment`（`issue_assignment`） |  |
-| 执行器 | executor | `Executions`（`Machine.executions`） |  |
+| 执行器 | executor | `Executions`（`executor.ts`） |  |
 | 起草 | refine | refine（`IssueRefinement`、`issue.refine`） |  |
 | 用户 | user | user（`User`、`userId`） | 主人、owner |
-| 田头 | the farm chat | 默认频道（`Channel.default`） | 群（指默认频道时） |
+| 田头 | the farm chat | 默认频道（`Channel.defaultChannel`） | 群（指默认频道时） |
 | 私聊 | direct message | direct | 私信 |
 | 和帮工私聊 | talk | `Channel.direct`、`Session.channel` |  |
 | 频道 | channel | channel（`Channel`） | 群（指频道时）、群聊 |
 | 串 | thread | thread | 子频道 |
 | 附件 | attachment | `Attachment`（`attachment` 表） |  |
-| 素材库 | library | `Library`（`library_item` 表） | 媒体（指这一页时） |
+| 素材库 | library | `Media` 的 `libraryItems` 等（`media_library_item` 表） | 媒体（指这一页时） |
 | 工作目录 | working folder | `Workplace`（`workdir`） | 工作区 |
 | 定时任务 | scheduled task | cron（`Cron`） | 定时（指定时任务时）、schedule（指定时任务时）、recurrence |
 | Inbox | inbox | `InboxItem`（`StateFrame.inbox`，服务是 `Inbox`） | 通知（指 Inbox 时）、来电（农场的皮里用） |

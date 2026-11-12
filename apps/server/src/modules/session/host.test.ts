@@ -77,7 +77,7 @@ describe("AgentHost", () => {
   test("says each answer once, whole, while the caller gets its words as they grow", async () => {
     const config = testConfig();
     await using farm = await world({ config });
-    const sessions = farm.session;
+    const sessions = farm.inside;
     const { llm, requests } = scriptedLLM([
       answer([text("我看一下"), toolCall("remember", { note: "remembered in database" }), toolCall("missing", {})]),
       answer("看完了，一切正常"),
@@ -161,7 +161,7 @@ describe("AgentHost", () => {
   test("waits for an input build before closing, without delivering it late", async () => {
     const config = testConfig();
     await using farm = await world({ config });
-    const sessions = farm.session;
+    const sessions = farm.inside;
     farm.deepseek.use(scriptedLLM().llm);
     const host = await sessions.host({
       session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "助手", runtime: "vibevalley", brief: "" },
@@ -208,7 +208,7 @@ describe("AgentHost", () => {
   test("regression: a later close still waits for the cleanup when the first closing caller is interrupted", async () => {
     const config = testConfig();
     await using farm = await world({ config });
-    const sessions = farm.session;
+    const sessions = farm.inside;
     farm.deepseek.use(scriptedLLM().llm);
     const host = await sessions.host({
       session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "助手", runtime: "vibevalley", brief: "" },

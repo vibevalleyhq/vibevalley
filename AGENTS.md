@@ -5,16 +5,16 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 ## 目录
 
 ```
-apps/server/               服务端（普通 TypeScript，Hono，Node 24；仓库里用 vpx 跑源码，桌面版带 vp pack 打的包）：src/modules 里一块业务一个文件夹，名字用单数，每个导出一个服务
-                           （接口加 make<服务>(deps)）：setting、user、attachment、provider、agent、memory、runtime、repo、machine、session、mailbox、channel、media、library、artifact、
+apps/server/               服务端（普通 TypeScript，Hono，Node 24；仓库里用 vpx 跑源码，桌面版带 vp pack 打的包）：src/modules 里一块业务一个文件夹，名字用单数，对外一个深的服务
+                           （接口加 make<服务>(deps)）：setting、user、attachment、provider、agent、memory、runtime、repo、session（触发和投递、会话和每一轮、工作目录、执行器）、channel、media（含素材库）、artifact、
                            pkm、issue、cron、inbox、tool、orchestrator、game；src/gateway 是对外的门：http、mcp、lan、voice、connector，projection 是核心状态的折法和拼帧（读各模块的
                            规则，组装时交给 core）；VibeValley 自己的 agent 跑在 pi-durable 上（runtime/durable.ts 开唯一的 Harness，
                            session/host.ts 是助手，runtime/vibevalley.ts 是 oar 的 vibevalley runtime）；base 是不碰外面的地基（id、JSON、排序、脱敏），infra 是和进程、机器打交道的
-                           （配置、库、文件、家目录的租约、日志、时间）；services.ts 按次序把它们组装起来，
+                           （配置、库、文件、家目录的租约、日志、时间）；services.ts 照模块次序一行一个 makeX({ 依赖写明 }) 组装（buildModules 建到工单供农场和模块测试共用，makeFarm 建完后面的并按次序 boot），
                            handlers.ts 把 http/handlers/<概念>.ts 合成全部接口的处理，http/ 是路由、流和 /mcp；chat/main.ts 是终端里的对话（和农机直接聊、
                            自己的 agent），由命令行交出终端来跑
 apps/server/db/            库（Postgres：database.url，或家目录里的 PGlite）：migrations/0001_schema.up.sql 是唯一的表结构，queries/<表>.sql 一张表一个文件，
-                           generated/ 是 scripts/pg-generate.ts 从它们写出的
+                           generated/ 是 apps/server/scripts/pg-generate.ts 从它们写出的
 apps/cli/                  命令行（vibevalley，commander）：照领域模型一条命令一个操作，经 VibeValleyApi 调服务端，不载入服务端（apps/cli/README.md）
 apps/web/                  页面（Solid 2 + Vite）：桌面、浏览器、手机三个宿主共用的一份，由服务端（--web）在 / 提供；/ 打开工作台，/farm 是像素农场
                            （src/farm，PixiJS），其余是工作台：一个概念一个 src/features/<概念>，名字和服务端的模块一样；分层
@@ -112,15 +112,15 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 
 - **先有概念，再有皮**：服务端按实际的概念分模块（工单、帮工、仓库、频道……，[概念](docs/concepts.md)）；农场只画它们，每个农场里的东西都对得上一件实际的事；游戏规则只读事件、算画面，业务不调它（[农场的皮](docs/subsystems/farm.md)）。
 - **核心状态只有一份**：帮工或农场的新状态，在 `packages/protocol/src/<概念>/shapes.ts` 里加字段、在 `core/shapes.ts` 加事实，在 `apps/server/src/gateway/projection/reduce.ts` 的 `reduce` 里折，只由服务端 `Core.apply` 施加。不要在服务端、页面里另存一份帮工的状态（[理由](docs/subsystems/core.md)）。
-- **`packages/protocol` 只放契约**：一个概念一个文件夹 `src/<概念>/`：线上的形状写在它的 `shapes.ts`，每个形状在同一个文件夹的 `schema.ts` 有一个由它定类型的 Schema（`Codec<T.X>`：两边对不上就编不过），接口写在它的 `api.ts`，`src/shapes.ts`、`schema.ts`、`api.ts` 只汇总；`src/rules` 只放页面和服务端都要跑的纯函数，只有服务端跑的规则归拥有它的模块（`apps/server/src/<模块>`），结论写进帧给页面，页面不为了展示去调规则（`rules/contract.test.ts` 查每个导出都有服务端以外的包在用）（[理由](docs/subsystems/foundation.md)）。
-- **生成的不手改**：`apps/server/db/generated` 由 `scripts/pg-generate.ts` 写（`vp run db:generate`），`server:check` 查它是不是最新；`packages/protocol/src/client.ts` 由 `vp run api:client` 写，`packages/i18n/src/catalogs.ts` 由 `vp run i18n:gen` 写，`docs:verify` 查它们（[理由](docs/subsystems/foundation.md)）。
+- **`packages/protocol` 只放契约**：一个概念一个文件夹 `src/<概念>/`：线上的形状写在它的 `shapes.ts`，每个形状在同一个文件夹的 `schema.ts` 有一个由它定类型的 Schema（`Codec<T.X>`：两边对不上就编不过），接口写在它的 `api.ts`，`src/shapes.ts`、`schema.ts`、`api.ts` 只汇总；`src/rules` 只放页面和服务端都要跑的纯函数，只有服务端跑的规则归拥有它的模块（`apps/server/src/modules/<模块>`），结论写进帧给页面，页面不为了展示去调规则（`rules/contract.test.ts` 查每个导出都有服务端以外的包在用）（[理由](docs/subsystems/foundation.md)）。
+- **生成的不手改**：`apps/server/db/generated` 由 `apps/server/scripts/pg-generate.ts` 写（`vp run db:generate`），`server:check` 查它是不是最新；`packages/protocol/src/client.ts` 由 `vp run api:client` 写，`packages/i18n/src/catalogs.ts` 由 `vp run i18n:gen` 写，`docs:verify` 查它们（[理由](docs/subsystems/foundation.md)）。
 - **包之间只经包名**：用别的包写它的名字、经它 `package.json` 的 `exports`，不写穿出包的相对路径（lint 的 `no-cross-package-path` 查）；自己的文件出了文件夹写 `#/…`（`imports`）；库给别人的是 `dist/` 里打好的声明，代码照源码跑（[地基](docs/subsystems/foundation.md)）。
-- **表名是「模块_概念」**：单数，`<模块>` 或 `<模块>_<概念>`，模块是拥有它的 `apps/server/src` 文件夹（`issue`、`issue_assignment`、`channel_message`、`session_run`）；索引以表名开头；SQL 只写在 `db/queries/<表>.sql`，一张表一个文件，代码里只调生成的；`src/infra/schema.test.ts` 查这几条（[理由](docs/subsystems/foundation.md)）。
+- **表名是「模块_概念」**：单数，`<模块>` 或 `<模块>_<概念>`，模块是拥有它的 `apps/server/src/modules`（或 `gateway`）文件夹（`issue`、`issue_assignment`、`channel_message`、`session_run`）；索引以表名开头；SQL 只写在 `db/queries/<表>.sql`，一张表一个文件，代码里只调生成的；`src/infra/schema.test.ts` 查这几条（[理由](docs/subsystems/foundation.md)）。
 - **内部不留兼容**：架构还在成形，不为兼容少走一步：改名、改形状、改存盘的格式（库里的表、家目录的文件、环境变量、存下的取值）都直接改，不写兼容层，不在读的地方兜底旧数据，也不写数据搬运；表结构直接改 `db/migrations/0001_schema.up.sql`，不另加迁移（`schema.test.ts` 查这条），本机的旧库和旧文件作废（库由服务端开机时挪到一边、新建一个），旧文件删掉重建；启动时只认今天的名字（[理由](docs/subsystems/foundation.md)）。对外 HTTP 的版本是唯一例外，v1 留到用户的设备都升上来（[接口版本](docs/subsystems/core.md#为什么这样)）。
 - **页面不折事实**：它读 `GET /api/v1/state` 折好的 `StateFrame`（`useCore()`、`useFrames()`）；要新的数据就加进 protocol 的字段和 `reduce`，页面里只写跟着时钟走的画面和摆法（各 feature 里的纯函数）；服务端的规则（能不能派、下回想起什么、冲突怎么交代）不在页面里重写，加一个字段或接口问服务端（[理由](docs/subsystems/app.md)）。
 - **封闭的联合穷尽处理**：按 `_tag`、`kind`、`type` 分支的地方，`switch` 覆盖每一种，或用 `default` 说明其余的有意不管（lint 的 `switch-exhaustiveness-check` 查）；成员表（`XValues`）要每种都处理时用 `Record<X, …>`，加新成员时编不过。
 - **类型驱动，全栈 Zod Fail-Fast**：运行时校验只用 Zod；前后端共用一份契约（HTTP 出入口与 `VibeValleyApi` 客户端、SSE 流、查询的每一行（`db:generate` 从 SQL 写出 Zod 的行 Schema）、落盘 JSON、配置与工具入参），在边界一次解码为品牌主键、受约束值与判别联合，不符当场 fail-fast（自有表可空 JSON 用 `storedJsonOrUndefined`，不用 `jsonOrNone` 吞损坏）；契约写成 `z.object({ … }) satisfies Codec<T.X>`，门内用铸造函数（`issueId(s)`）造品牌值，不写 `as`；密钥是 `Secret`（`toJSON` 抛错）（[模块设计](docs/style/module-design.md#类型驱动与进门解码)）。
-- **服务端的服务**：每个模块导出一个服务：接口是概念的单数词，和模块的文件夹、表同一个（`Issue`、`Session`），工厂是 `make<服务>(deps: <服务>Deps, options?)`，`deps` 只放它用到的、排在它前面的服务（键是小驼峰，`deps.issue`），不拿整个农场（`paths:check` 记着谁用了谁的哪个成员）；频道的大接口放同模块 `contracts.ts`；`services.ts` 照模块次序一个个 `await make…` 拼成 `Farm`，模块只用排在它前面的，往上走订阅（`Subscription`，新闻、变化）；开机要做的是接口上的 `boot()`，全部建好以后按次序调，拿着的东西在 `close()` 里放掉，倒着调；时钟、日志、`fetch` 也从 `deps` 进来，不用全局的；服务之间传的形状放在定义它的模块里；和服务同名的协议形状经 `import type * as T from "@vibevalley/protocol"` 写成 `T.Issue`（lint 的 `protocol-namespace` 查，[命名](docs/style/naming.md)）（[architecture.md](docs/architecture.md)）。
+- **服务端的服务**：一个模块对外一个深的服务：接口只留调用方真在用的成员，一个名字只答一个问题（`Session.route`、`Session.hireWith`、`Session.merge`），里面的部分不露出去（测试经 `insideOf` 一类的口子），判断写成纯函数；用户看得见的变化走核心事实，服务端模块之间的反应走 `news`。接口是概念的单数词，和模块的文件夹、表同一个（`Issue`、`Session`），工厂是 `make<服务>(deps: <服务>Deps, options?)`，`deps` 只放它用到的、排在它前面的服务（键是小驼峰，`deps.issue`），不拿整个农场（`paths:check` 记着谁用了谁的哪个成员）；频道的大接口放同模块 `contracts.ts`；`services.ts` 照模块次序一个个 `await make…` 拼成 `Farm`（`buildModules` 建到工单供模块测试共用），模块只用排在它前面的，往上走订阅（`Subscription`，新闻、变化）；开机要做的是接口上的 `boot()`，全部建好以后按次序调，拿着的东西在 `close()` 里放掉，倒着调；时钟、日志、`fetch` 也从 `deps` 进来，不用全局的；服务之间传的形状放在定义它的模块里；和服务同名的协议形状经 `import type * as T from "@vibevalley/protocol"` 写成 `T.Issue`（lint 的 `protocol-namespace` 查，[命名](docs/style/naming.md)）（[architecture.md](docs/architecture.md)）。
 - **处理函数要薄**：接口的处理（`http/handlers/<概念>.ts`、`http/`）和页面只做转发和展示，规则在拥有它的服务或纯函数里。
 - **帮工没有权限确认**：服务端只听 127.0.0.1，永远不要对外；帮工只在工作目录里开工（[理由](docs/subsystems/session.md)）。例外只有两个，都是单独的监听：语音线路只有一个接口、每通电话一把钥匙，经隧道给声网（[理由](docs/subsystems/voice.md)）；「连接到本机」默认关着，是从外面进来的唯一一道门：只放在本机点过头配对的设备（`remote` 那部分）和凭密码或确认码登录的设备（除了设密码），每台一把钥匙，不放 `/mcp`（[理由](docs/subsystems/lan.md)、[用户和设备](docs/subsystems/user.md)）。
 - **图标分两套**：工作台的按钮和标记用 reicon 的线条图标，一个意思一个图，写在 `apps/web/src/ui/icons.ts`，`<Icon name>` 只收表里的名字；像素皮（农场、记忆树、`ui/pixel`）用 `design/pixel` 生成的贴图（`SpriteIcon`；形状照 Hugeicons）；头像、农机的 logo 和插画在哪都是像素图；都不用 ▶、■、✓ 这类字符代替（[客户端](docs/subsystems/app.md)）。

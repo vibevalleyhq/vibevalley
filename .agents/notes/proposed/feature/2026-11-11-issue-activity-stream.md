@@ -52,7 +52,7 @@ Status: proposed
 
 - 一张走过「开工 → 提问 → 回答 → 交回 → 打回 → 交回 → 验收 → 关单」的工单，详情页只有一条活动：每件事出现一次，从上到下按时间，回答和打回意见是消息行，其余是事件行。
 - 事件行展开能看到那一轮的步骤，含之前帮工的轮次；不展开时不读 `session.event.list`。
-- 服务端测试：`milestonesOf` 不出 `told`、摘要在 `said` 不在 `text`、带 `run`、旧的在前（`apps/server/src/issue` 的规则测试）。命令行的 `issue timeline` 仍打出每轮的摘要（`apps/cli` 的 golden 测试）。
+- 服务端测试：`milestonesOf` 不出 `told`、摘要在 `said` 不在 `text`、带 `run`、旧的在前（`apps/server/src/modules/issue` 的规则测试）。命令行的 `issue timeline` 仍打出每轮的摘要（`apps/cli` 的 golden 测试）。
 - 页面：合并两列的纯函数在 `features/issue/*.ts` 用 vitest 测（同一毫秒、只读到一部分消息时的截断）；`issue-page.spec.ts` 的真实一轮断言活动里的事件和消息都在、展开一轮能看到步骤。
 - 截图验收（vv-acceptance 的页面分册）：1440 和 390 宽各一张。
 - `docs/subsystems/issue.md` 写下活动由什么组成、去重归服务端。

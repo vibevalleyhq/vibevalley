@@ -1,24 +1,27 @@
-# 媒体任务与输入
+# 媒体与素材库
 
-`Media` 服务管理生图、图片／视频理解、单人语音、多人对白、音色设计与克隆、长音频转写。用户在[AI 服务](docs/subsystems/provider.md)分别绑定连接与模型；任务先落库，页面通过同一状态流观察进度；表单收在[素材库](docs/subsystems/library.md)的「生成」对话框里，完成的结果进素材库。结果保留实际格式、元数据与厂商用量；实时 Live 与独立 Vision 的设备和会话归[语音](docs/subsystems/voice.md)。
+`Media` 服务管理生图、图片／视频理解、单人语音、多人对白、音色设计与克隆、长音频转写，以及集中展示生成结果、用户上传与帮工取回文件的[素材库](#素材库)（表 `media_library_item`，页面 `/library`）。用户在[AI 服务](docs/subsystems/provider.md)分别绑定连接与模型；任务先落库，页面通过同一状态流观察进度；生成的表单收在 `/library` 的「生成」对话框里，完成的结果自动记入素材库，`library.*` 接口和 `library_item_*` 工具由 `Media` 的 `libraryItems`、`addLibraryItem`、`removeLibraryItem`、`previewRemoveLibraryItem` 回答。结果保留实际格式、元数据与厂商用量；实时 Live 与独立 Vision 的设备和会话归[语音](docs/subsystems/voice.md)。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
-| 去重、排队、生成与下载的独立状态、重启恢复 | 连接与密钥（Provider、Setting） |
-| 下载地址、网络目标、时间、字节和媒体格式校验 | 厂商媒体协议与参数（`packages/provider`） |
-| 最近任务的核心状态投影 | 附件存储与访问（[Attachment](docs/subsystems/attachment.md)）、频道发布（Channel） |
+| 媒体任务去重、排队、生成与下载的独立状态、重启恢复，以及最近任务的核心状态投影 | 连接与密钥（[AI 服务](docs/subsystems/provider.md)、[设置和配置](docs/subsystems/setting.md)） |
+| 本机输入暂存、配额回收、远端文件记录，以及下载地址、公网目标、时间、字节和媒体格式校验 | 厂商媒体协议与参数（`packages/provider`） |
+| 素材库（`media_library_item`）：每个附件至多一条，记首次来路（任务生成、上传或聊天发出、帮工/助手交来），以及帮工网址公网下载 | 文件的字节、名字和类型存储（[附件](docs/subsystems/attachment.md)）；帮工工作目录路径边界检查（`Session.workFile`，[帮工](docs/subsystems/session.md)） |
+| `/library` 页面：三栏筛选、按比例缩略图、详情栏、搜索排序、拖拽/粘贴上传、键盘导航、生成与理解对话框 | 发到频道的消息存储与广播（[频道](docs/subsystems/channel.md)） |
 
-任务共用 `MediaJob` 联合类型与最近任务投影。多人对白的接口为 `media.dialogue.create`，助手工具为 `media_dialogue_create`，内部绑定与任务种类为 `speakers`。没有图片编辑、局部重绘或视频生成。
+任务共用 `MediaJob` 联合类型与最近任务投影。多人对白的接口为 `media.dialogue.create`，助手工具为 `media_dialogue_create`，内部绑定与任务种类为 `speakers`。没有图片编辑、局部重绘或视频生成。素材库不收通话和听写的录音、摄像头和屏幕的画面、头像、Artifact（有自己的页面）以及帮工改的代码。
 
 ## 在哪
 
 | 位置 | 职责 |
 |---|---|
 | `packages/provider/src/moss/image.ts` | 固定端点、参数与布局校验、URL 响应、安全错误 |
-| `packages/protocol/src/media/` | 任务、请求、事实、Schema 与接口权限 |
-| `apps/server/src/modules/media/` | Media 服务、任务、下载与文件校验 |
+| `packages/protocol/src/media/`、`packages/protocol/src/library/` | 媒体任务、输入与素材库（`LibraryItem`、`LibraryOrigin`、`LibraryListRequest`、`LibraryAddRequest`）形状、Schema 与接口权限 |
+| `apps/server/src/modules/media/` | `Media` 服务：任务、下载、文件校验与素材库 |
+| `apps/server/src/modules/media/library.ts`、`apps/server/db/queries/media_library_item.sql` | `Media` 的 `libraryItems`、`addLibraryItem`、`removeLibraryItem`、`previewRemoveLibraryItem`；听核心状态变化记下生成结果与聊天附件；表 `media_library_item` 查询 |
+| `apps/server/src/gateway/http/handlers/library.ts`、`apps/server/src/modules/tool/library.ts` | `library.item.*` 接口；助手和帮工的 `library_item_add`、`library_item_list` 工具 |
 | `apps/server/src/infra/publicHttp.ts` | 只拨号已校验公网 IPv4 的独立 HTTP 客户端 |
 | `apps/server/src/modules/media/machine.ts`、`job.ts`、`apps/server/db/queries/media_job.sql` | 所有种类共用的一台任务机：表 `media_job`（按 `kind` 分）、收任务、锁、执行槽、跑断了记未知、下载结果存成附件、跟厂商任务、取消、重取、接续、重启；查询除音频的远端清理外都是共用的 |
 | `apps/server/src/modules/media/image.ts` | 生图：请求、出图后存成附件、发回请它画图的频道 |
@@ -28,12 +31,13 @@
 | `apps/server/src/modules/media/input.ts`、`inputs.ts` | 流式输入校验、上传中的槽位与生成配额预留（暂存文件是 `AsyncDisposable`，`await using` 释放）、任务保留与本机回收 |
 | `apps/server/db/queries/media_input.sql`、`media_input_pin.sql` | 输入、删除标记与任务保留记录 |
 | `apps/server/src/gateway/http/media.ts` | 本机专用的二进制上传入口 |
-| `apps/server/src/modules/tool/media.ts` | 助手调用同一 Media 服务 |
+| `apps/server/src/modules/tool/media.ts` | 助手调用同一 `Media` 服务 |
+| `apps/web/src/features/library/` | `/library`：`Rail.tsx` 筛选栏、`Tiles.tsx` 缩略图、`Inspector.tsx` 详情栏、`LibraryPage.tsx` 工具条、上传、键盘和对话框（`?make=` 生成，`?understand=<附件 id>` 理解）；排法、计数、筛选和键盘落点在 `items.ts` 纯函数 |
 | `apps/web/src/features/media/` | 素材库「生成」对话框里的表单（生图、单人语音、音频工作台）与理解面板：任务、预览、保存与频道发布 |
 
-Media 在 Collaboration 中、Channel 之后组装；启动时在频道恢复后恢复任务。HTTP handler 只转发，接口权限见[接口清单](docs/reference/capabilities.md)。生图、语音及任务读取对 `user` 与 `orchestrator` 开放，remote 和帮工没有生成权限；助手只有承接用户输入的一轮才能生成，自主巡查不能生成。理解的直接发起、授权登记及清理仅对 `user` 开放；助手只能按已授权任务 ID 执行，模型不能自报上传许可或文件路径。
+Media 在 Collaboration 中、Channel 之后组装；启动时在频道恢复后恢复任务。HTTP handler 只转发，接口权限见[接口清单](docs/reference/capabilities.md)（`media.*`、`library.*`）。生图、语音及任务读取对 `user` 与 `orchestrator` 开放，remote 和帮工没有生成权限；助手只有承接用户输入的一轮才能生成，自主巡查不能生成。理解的直接发起、授权登记及清理仅对 `user` 开放；助手只能按已授权任务 ID 执行，模型不能自报上传许可或文件路径。
 
-## 不变量
+## 模型和不变量
 
 - **同一请求不重新生成**：调用者给出 1–80 位字母、数字、下划线或连字符的 ID。同一 ID、参数与调用来源返回原任务，参数或来源不同则拒绝。浏览器重试保持 ID 与参数；修改输入或再次生成须明确新建。
 - **一个 id 是一个任务**：各种任务在同一张表 `media_job`，按 `kind` 分；同一个 id 已是别种任务就拒绝。各种代码读行时只认自己的种类和自己有的阶段，别的当不是自己的。
@@ -122,23 +126,57 @@ Flash 流式由服务端请求厂商 SSE，从元数据与 PCM 分片生成有�
 
 音频下载沿用相同公网边界，限时 300 秒、最多 512,000,000 字节，MIME 与厂商报告的实际格式匹配。按格式检查容器、帧与元数据；裸 PCM 不凭空猜采样率。小结果成为频道附件，大结果留在 Media 输入存储。格式不符、截断或错误正文不能成为完整成功附件；浏览器是否支持该编码仍需实际解码与播放，不能只看后缀。
 
+## 素材库
+
+素材库（`apps/server/src/modules/media/library.ts`，页面 `/library`）把用户关心的文件放在一处：生成的、用户上传的、帮工和助手拿回来的。一份素材是一个[附件](docs/subsystems/attachment.md)加上它的来路。页面照 Eagle 那样分三栏：左边按来路和种类筛，中间是按比例排满一行的缩略图，右边是选中的那一份；生成的表单收在「生成」对话框里，理解从选中的那一份发起。
+
+- **一份文件一张卡**：主键是附件的 id（内容的 SHA-256）。同一份字节再来只更新 `last_at`，来路照第一次的；生成的那条的时间不再变。
+- **来路是封闭的联合**（`LibraryOrigin`，按 `kind`）：
+  - `generated`：媒体任务的 id 和种类；任务 `ready` 拿到附件时记，开机时按核心状态里已有的任务补齐。
+  - `uploaded`：用户在聊天里发出带附件的话（记频道和消息），或在这页上传（两样都没有）。这页的上传是 `attachment.create` 再 `library.item.add({ attachment })`。
+  - `fetched`：哪个档案、哪个帮工（会话）、从哪个网址或工作目录里的哪个文件。
+- **谁能给什么**：`library.item.add` 只收一种来源。经 HTTP 来的是用户，只能给已上传的附件；助手的工具只给网址，帮工的给网址或路径。网址只走公网 https（`PublicHttp`），最大 `attachmentMax`（25 MB），60 秒；路径解析了符号链接以后仍要在工作目录里（`Session.workFile`）。
+- **拿掉只删这一条**：`library.item.delete` 不删附件，发过它的消息照样能打开。
+- **进行中任务与理解结果实时对齐**：在做的生成任务读核心状态的 `media`，排在最前（麦色的虚线格）；完成的任务数一变，页面重读列表。详情栏显示这份文件最新一次理解的结果（任务的输入哈希就是附件 id）。
+- **搜和排在服务端，筛和数在页面**：`library.item.list` 的 `text` 按名字找（不分大小写），`sort` 是 `recent`（默认）、`name`、`size`；左栏的两组各按另一组选中的那项数（`countsOf`），来自频道、来自帮工两组照列表里出现的列出。
+- **一页只有一条栏**：壳子的页头在 `/library` 不画（和聊天一样，`app/Shell.tsx`），工具条（搜索、排序、缩略图大小、上传、生成）就是页头，66px 高。连接 AI 的入口只在生成被挡住时出现（各表单自己的提示）。
+- **缩略图按比例排满一行**（`justify`）：每行缩放到正好占满宽度，最后一行保持目标高度；比例夹在 1:2 到 3:1。缩略图的高度每个看的人自己记（`prefs` 的 `libraryTile`，96–280px）。每格按附件 id 绝对定位，排法变了格子不重建，图不会重载。图、视频的比例和像素、音频和视频的时长在它们加载后从元素上读。
+- **选和键盘**：点一下选一个，⌘/Ctrl 点加减，Shift 点选一段；← → 按顺序走，↑ ↓ 去上下一行中间最近的那格（`neighbor`）；空格全屏看（`Lightbox`，← → 翻）；Delete 在详情栏里原地问一遍再拿掉；Esc 不选。文件拖到页面上或粘贴进来就上传。
+- **手机宽**（40rem 以下）：工具条在最上，筛选栏变成两个选择框（来路、种类），详情栏是从底下出来的面板。
+
+**素材库流转**
+
+1. 用户在「生成」对话框里生图或合成语音；任务完成，`Media` 记一条 `generated`，网格里出现这张卡。
+2. 用户在聊天里发一张图，或在这页点「上传」；各记一条 `uploaded`。
+3. 帮工做活时调 `library_item_add`，给一个网址或 `out/report.png`；服务端取到字节，记一条 `fetched`。
+4. 用户选中一张图或视频，在详情栏点「理解」：`media.input.adopt` 把附件当作输入（照上传一样检查），再发起理解；结果挂在卡上。
+
+## 和谁打交道
+
+- **核心状态（`core`）**：任务状态变化经 `Core.apply(mediaChanged)` 发布；素材库监听 `Core.transitions` 的 `mediaChanged` 与 `messageChanged` 自动登记完成任务与聊天附件。
+- **AI 服务（`provider`）**：取各用途冻结的账号快照、模型与封着 Key 的调用。
+- **附件（`attachment`）**：经 `attach`、`keepStaged` 存任务结果、上传输入与帮工取回的字节，按 id 读回附件信息。
+- **频道与帮工（`channel`、`session`）**：助手触发的生图完成后经 `Channel.post({ _tag: "Announce" })` 发回来源频道；帮工按路径交素材时经 `Session.workFile` 读取工作目录内文件。
+
 ## 为什么这样
 
 - **一台共用任务机承载全部媒体种类**：排队去重、单执行槽、阶段单向迁移、未知状态保护和独立下载重试在 `media/machine.ts` 写一次，各媒体种类只提供厂商请求与结果解析，避免生图、语音、理解和转写各自维护状态机。
 - **频道 `/imagegen` 经 `SayRequest.to` 交助手，出图后由 Media 直接发回**：页面不直接调 `media.image.create`（保留助手 `imagegen` skill 的提示词扩写与比例选择），服务端也不解析正文里的斜杠技能名；下载完成那一刻在 Media 内经 `channel.post({ _tag: "Announce" })`（`sendKey: media:<id>`）发回来源频道，免去助手轮询等待。
+- **素材库与媒体合在一个模块，一个附件加来路而非给附件加字段**：素材库是媒体产出与外部收进文件的同一份目录，合在 `Media` 内省去薄透传模块；同时同一份字节可以既是生成的又被人发过，附件只管「这是什么文件」，来路记在 `media_library_item`。
+- **不直接列所有附件，删卡片不删附件**：生成结果和素材页直接上传都没有消息可推来路；从素材库拿掉一张卡也不应删掉附件字节或破坏发过它的消息。
+- **帮工给网址或路径，不传字节；页面以素材为主、工具收进对话框**：在 MCP 里传大段 base64 费 token 且易截断，由服务端拉取或读工作目录更稳妥；平时在聊天里让助手生成，页面聚焦浏览与复用素材。
 
 ## 怎么验证
 
 - `packages/provider/src/moss/image.test.ts`：固定端点、模型与参数、布局、响应、未知结果和安全错误。
-- `apps/server/src/modules/media/media.test.ts`：去重、来源与用量的持久化和投影、磁盘失败后的独立下载、提交者断线、取消与重试竞争、排队后换 Key、容量、未知结果与重启恢复。
-- `apps/server/src/flows/media.test.ts`：脚本模型经真实工具生成图片、执行限时理解授权、合成语音并读取同一任务结果；自主巡查被拒绝，帮工工具表不暴露媒体能力。
-- `apps/server/src/modules/media/download.test.ts`、`infra/publicHttp.test.ts`：PNG 校验、不跟随跳转、无凭据下载、超时、地址与实际拨号检查。
-- `apps/server/src/infra/files.test.ts`：中断写入不暴露半文件，并发发布和已有文件不覆盖。
-- `apps/server/src/modules/media/input.test.ts`、`inputs.test.ts`：分块签名、字节上限、磁盘失败、取消、配额竞争、引用事务、过期回收、删除恢复、真实数据库拒绝提交后的文件回滚，以及缺失或损坏输入的核对和修复。
+- `apps/server/src/modules/media/media.test.ts`、`library.test.ts`：去重、来源与用量的持久化和投影、磁盘失败后的独立下载、提交者断线、取消与重试竞争、排队后换 Key、容量、未知结果与重启恢复；素材库三种来路、去重、筛选、拿掉不删附件，以及内网/`file:` 地址与越权来源拒绝。
+- `apps/server/src/flows/media.test.ts`、`apps/server/src/gateway/mcp/mcp.test.ts`：脚本模型经真实工具生成图片、执行限时理解授权、合成语音并读取同一任务结果，自主巡查被拒绝；帮工经工具按路径放文件进素材库，工作目录外路径与逃逸符号链接被拒。
+- `apps/server/src/modules/media/download.test.ts`、`infra/publicHttp.test.ts`、`infra/files.test.ts`：PNG 校验、不跟随跳转、无凭据下载、超时、地址与实际拨号检查；中断写入不暴露半文件，并发发布和已有文件不覆盖。
+- `apps/server/src/modules/media/input.test.ts`、`inputs.test.ts`：分块签名、字节上限、磁盘失败、取消、配额竞争、引用事务、过期回收、删除恢复、真实数据库拒绝提交后的文件回滚、缺失或损坏输入的核对和修复，以及把素材库附件当作理解输入时拦截非图/视频/音频类型。
 - `apps/server/src/gateway/http/media.test.ts`：真实本机 HTTP 上的输入预留、跨来源拒绝、二进制上传、26 MiB 流式容器传输与断线重试；大文件样例只验证传输和容器头，不代表视频解码或理解验收。
+- `apps/web/src/features/library/items.test.ts`、`apps/web/test/library.spec.ts`、`narrow.spec.ts`：种类、筛选和两组计数、按比例排满一行、方向键落点、Shift 选一段、扩展名和时长、在做的任务与理解结果；选文件和拖拽上传、按来路和种类筛、发到频道、Delete 原地确认拿掉（带一次 axe）及 400px 窄屏不出界。
 - `apps/web/test/media.spec.ts`：真实隔离服务端上的文本与布局生成、状态流、PNG 预览和下载、频道去重发布、Artifact 引用、未知结果、取消、独立下载重试与表单拒绝。只由 `apps/server/src/testing/network.ts` 替换厂商请求与结果下载，任务、数据库、附件和 Core 都是真的；测试程序不读取用户的 Key、不访问厂商。
-- `apps/server/src/modules/media/understanding.test.ts`：授权版本、跨类型 ID 冲突、上传状态、结果与用量、共享容量、取消、清理预览与重试、换 Key、清理断线和重启恢复；委托额外覆盖可信来源、频道、过期、参数不可变、并发重复执行及排队期间换 Key。
-- `apps/web/test/understanding.spec.ts`：合成 PNG 与可解码 MP4 的真实本机上传、授权、理解文本、Artifact 保存、刷新、截断、未知与取消。厂商传输仍是替身，不验证实际识别质量。
+- `apps/server/src/modules/media/understanding.test.ts`、`apps/web/test/understanding.spec.ts`：授权版本、跨类型 ID 冲突、上传状态、结果与用量、共享容量、取消、清理预览与重试、换 Key、清理断线、重启恢复及委托理解边界；合成 PNG 与可解码 MP4 的真实本机上传、从素材库详情栏发起理解并写回结果、Artifact 保存、刷新、截断、未知与取消。厂商传输仍是替身，不验证实际识别质量。
 - `apps/server/src/modules/media/speech.test.ts`、`audio.test.ts`、`audioResult.test.ts`、`release.test.ts`：同步／异步、实际格式与用量、流式部分结果、账号隔离、恢复、下载与显式资源释放。
 - `apps/web/test/speech.spec.ts`、`flash.spec.ts`、`audio.spec.ts`：音频解码播放、流式播放、结构化对白、设计预览与克隆许可、转写分段定位与 Artifact 保存，以及刷新和播放器释放。
 - `apps/web/test/a11y.spec.ts`：表单及成功、失败、截断、未知、取消状态的浅深主题、桌面与窄屏检查。开发版同时检查响应式诊断；共享浮层只在打开时读取选中项的快照，值后来变化不抢焦点，`packages/base-ui/test/select.test.tsx` 覆盖这个回归。

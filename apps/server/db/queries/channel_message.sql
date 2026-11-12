@@ -50,7 +50,7 @@ select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send
 from channel_message m join channel_participant p on p.id = m.sender_id
 where m.channel_id = sqlc.arg(channel_id) and m.number > sqlc.arg(after_number)
   and m.sender_id = 'user' and m.kind = 'chat' and m.deleted_at is null
-  and not exists (select 1 from mailbox_delivery d where d.session_id = sqlc.arg(recipient_id) and d.message_id = m.id)
+  and not exists (select 1 from session_delivery d where d.session_id = sqlc.arg(recipient_id) and d.message_id = m.id)
 order by m.number;
 
 -- name: RecentReports :many
@@ -95,7 +95,7 @@ limit 1;
 select m.id from channel_message m
 where m.channel_id = sqlc.arg(channel) and m.sender_id <> sqlc.arg(participant)
   and m.number > coalesce((select read_number from channel_read_cursor where participant_id = sqlc.arg(participant) and channel_id = sqlc.arg(channel)), 0)
-  and not exists (select 1 from mailbox_delivery d where d.session_id = sqlc.arg(participant) and d.message_id = m.id and d.consumed_at is not null)
+  and not exists (select 1 from session_delivery d where d.session_id = sqlc.arg(participant) and d.message_id = m.id and d.consumed_at is not null)
 order by m.number;
 
 -- name: HoldNoticeSinceUser :one
@@ -187,7 +187,7 @@ from channel_message m
 join channel_participant p on p.id = m.sender_id
 join channel c on c.id = m.channel_id
 left join channel ch on ch.id = c.parent_id
-left join mailbox_trigger r on r.id = m.id
+left join session_trigger r on r.id = m.id
 where r.routed_at is null and m.deleted_at is null
   and (m.channel_id, m.number) > (sqlc.arg(after_channel)::text, sqlc.arg(after_number)::int)
 order by m.channel_id, m.number

@@ -9,12 +9,12 @@ import type { Core } from "#/core/core.ts";
 import type { ServerConfig } from "#/infra/config.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import { type Execution, type StartFailure } from "#/modules/machine/executor.ts";
-import type { Machine } from "#/modules/machine/machine.ts";
 import type { Memory } from "#/modules/memory/memory.ts";
 import type { Runtime } from "#/modules/runtime/runtime.ts";
 
+import { type Execution, type StartFailure } from "./executor.ts";
 import { type Journal } from "./journal.ts";
+import type { Machine } from "./machine.ts";
 import { reactionTo, phaseFact, type Op, since } from "./reaction.ts";
 import type { Hand, SessionRegistry } from "./registry.ts";
 import { handsToUser, readReport } from "./report.ts";

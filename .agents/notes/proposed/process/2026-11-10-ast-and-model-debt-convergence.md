@@ -6,7 +6,7 @@ Status: proposed
 
 仓库在向发布态过渡时存在 3 处存量工程张力：
 
-- **跨异步隐式状态机与手工回滚布尔群漏检**：[practice-audit.ts](scripts/audit/practice-audit.ts) 的 `loose-flags` 仅检查单个函数体顶层的 `let x = false` 与 `createSignal(false)`，未覆盖类字段包（如 [call.ts](apps/web/src/features/voice/model/call.ts) 的 `VoiceCall`）及跨异步边界的手工回滚标志。[session.ts](apps/server/src/modules/session/session.ts) 的开工流程已改成一个 `startup.phase` 联合（`opening`、`retained`、`committed`），别处的同类写法还没有规则拦。
+- **跨异步隐式状态机与手工回滚布尔群漏检**：[practice-audit.ts](scripts/audit/practice-audit.ts) 的 `loose-flags` 仅检查单个函数体顶层的 `let x = false` 与 `createSignal(false)`，未覆盖类字段包（如 [call.ts](apps/web/src/features/voice/model/call.ts) 的 `VoiceCall`）及跨异步边界的手工回滚标志。[lifecycle.ts](apps/server/src/modules/session/lifecycle.ts) 的开工流程已改成一个 `startup.phase` 联合（`opening`、`retained`、`committed`），别处的同类写法还没有规则拦。
 - **局部逃生口与静默吞错堆积**：[health.ratchet.json](scripts/audit/health.ratchet.json) 记着 `web: farm` 的 3 处 `nonNull`（`!`）断言（`vp run health` 现在也是 3）；[practice.ratchet.json](scripts/audit/practice.ratchet.json) 记着 `apps/server` 的 8 处 `swallow-without-record` 与 24 处 `failure-without-reason`。
 - **整库重置策略与桌面端用户数据留存冲突**：[db.ts](apps/server/src/infra/db.ts) 的 `setAsideStale` 在 [0001_schema.up.sql](apps/server/db/migrations/0001_schema.up.sql) 哈希变化时将旧 PGlite 目录移至 `<where>.<hash>-<now>` 并重建空库。进入外部测试与正式分发后，直接丢弃旧库会清空用户的设置、档案、记性、频道发言与工单记录。
 
@@ -25,7 +25,7 @@ Status: proposed
 1. 在 [practice-audit.ts](scripts/audit/practice-audit.ts) 新增两条源码规则并纳入 [practice.ratchet.json](scripts/audit/practice.ratchet.json)：
    - `manual-rollback-flags`：同一 `async` 函数体声明至少 2 个 `let flag = false`，且在 `catch` 或 `finally` 分支中读取这些标志决定清理动作时报错，`Fix:` 指向 `AsyncDisposableStack`（逐项 `use` / `defer`，提交时 `move()` 转交）。
    - `co-mutated-fields`：同一 `class` 或闭包工厂持有至少 3 个非 `readonly` 可变布尔或可空字段，且在至少 2 个方法中成组赋值时报错，`Fix:` 指向单一判别联合。
-2. 编写按需审查命令（仿 `comment-review.ts`），把 `co-mutated-fields` 命中的字段声明与写入语句切片交给模型判定：正交开关（如通话中的 `muted` 与 `phase`）标明独立维度依据；耦合状态输出判别联合拆分方案，指导重构（照 [session.ts](apps/server/src/modules/session/session.ts) 开工流程的 `startup.phase` 写法）。
+2. 编写按需审查命令（仿 `comment-review.ts`），把 `co-mutated-fields` 命中的字段声明与写入语句切片交给模型判定：正交开关（如通话中的 `muted` 与 `phase`）标明独立维度依据；耦合状态输出判别联合拆分方案，指导重构（照 [lifecycle.ts](apps/server/src/modules/session/lifecycle.ts) 开工流程的 `startup.phase` 写法）。
 
 ### 2. 分型清理 `web: farm` 非空断言与服务端静默吞错
 

@@ -161,7 +161,7 @@ describe("the orchestrator", () => {
 
   it("writes an issue down and starts it, and hears the user's voice in the default channel", async () => {
     await using f = await farm();
-    const { session: sessions, issue: issues, channel: chat } = f.farm;
+    const { inside: sessions, issue: issues, channel: chat } = f.farm;
     const saidIn = f.farm.said.in;
     await enableLab(f.farm);
     const words = said(f.farm);
@@ -176,7 +176,7 @@ describe("the orchestrator", () => {
     expect(first.system).not.toContain("【现状】");
     expect(lastLine(first)).toBe("[来源：用户]\n用户说：帮我在 demo 里加个 README");
     const trail = await waitFor(
-      async () => ((await sessions.events(defaultOrchestrator)) ?? []).filter((e) => e.type !== "llm/usage"),
+      async () => ((await sessions.eventsOf(defaultOrchestrator)) ?? []).filter((e) => e.type !== "llm/usage"),
       (events) => events.length >= 6 && events.at(-1)!.type === "run/end",
       "its log",
     );
@@ -291,7 +291,7 @@ describe("the orchestrator", () => {
     let got = "";
     for await (const piece of onPhone(response, "现在地里怎么样")) got += piece;
     expect(got).toBe("收到\n");
-    const rows = await f.farm.db.sql.query(`select d.source, m.meta from mailbox_delivery d
+    const rows = await f.farm.db.sql.query(`select d.source, m.meta from session_delivery d
           join channel_message m on m.id = d.message_id where m.body = '现在地里怎么样'`);
     expect(rows).toEqual([
       {
@@ -333,7 +333,7 @@ describe("the orchestrator", () => {
     expect(briefSaid).toContain("#41 交回来了");
     const rows = await f.farm.db.sql.query(`select id from channel_message where body like '%【要告诉用户】%'`);
     expect(rows).toHaveLength(0);
-    const rows2 = await f.farm.db.sql.query(`select id from mailbox_trigger where payload_json::jsonb ->> 'text' = '【要告诉用户】
+    const rows2 = await f.farm.db.sql.query(`select id from session_trigger where payload_json::jsonb ->> 'text' = '【要告诉用户】
 - #41 交回来了'`);
     expect(rows2).toHaveLength(1);
   });
@@ -359,7 +359,7 @@ describe("the orchestrator", () => {
 
   it("a new interactive response ends the previous port that is still open", async () => {
     await using f = await farm();
-    const responses = makeResponses(f.farm.mailbox, f.farm.channel, f.farm.clock);
+    const responses = makeResponses(f.farm.inside, f.farm.channel, f.farm.clock);
     const collect = async (words: AsyncIterable<string>) => {
       const out: string[] = [];
       for await (const w of words) out.push(w);
@@ -506,7 +506,7 @@ describe("the orchestrator", () => {
       if (line.includes("收下")) return answer([toolCall("issue_status_update", { id: "#" + number, status: "已完成" })]);
       return respond(c);
     });
-    const { issue: issues, session: sessions, channel: chat } = f.farm;
+    const { issue: issues, inside: sessions, channel: chat } = f.farm;
     const saidIn = f.farm.said.in;
     const lab = await enableLab(f.farm);
     const hired = await issues.hire({ ...lab, enabled: true, effort: "" }, "写个 hello", "notes");
@@ -617,7 +617,7 @@ describe("the orchestrator", () => {
   it("hears the patrol once with the next user input", async () => {
     using clock = fakeDate();
     await using f = await farm(respond, testConfig());
-    const { channel: chat, inbox, session: sessions } = f.farm;
+    const { channel: chat, inbox, inside: sessions } = f.farm;
     await enableLab(f.farm);
     await chat.say("帮我在 notes 里加个 CHANGELOG", {}, undefined, "");
     await until(
@@ -629,7 +629,7 @@ describe("the orchestrator", () => {
     expect(f.requests.some((c) => lastLine(c).includes("【巡查】"))).toBe(false);
     clock.adjust(3 * 3_600_000);
     await inbox.patrol();
-    expect(f.farm.mailbox.deliveriesOf(defaultOrchestrator).some((row) => row.source === "patrol" && row.urgency === "digest")).toBe(true);
+    expect(f.farm.inside.deliveriesOf(defaultOrchestrator).some((row) => row.source === "patrol" && row.urgency === "digest")).toBe(true);
     await marked(f);
     const line = await until(() => f.requests.map(lastInput).find((input) => input.includes("【巡查】")), "the patrol digest");
     expect(line).toContain("「加个 CHANGELOG」");
@@ -644,12 +644,12 @@ describe("the orchestrator", () => {
   it("saves a turn the user marks wrong as a case", async () => {
     const config = testConfig();
     await using f = await farm(respond, config);
-    const { channel: chat, session: sessions } = f.farm;
+    const { channel: chat, inside: sessions } = f.farm;
     const words = said(f.farm);
     await chat.say("地里怎么样", {}, undefined, "");
     await until(() => words().length >= 1, "its words");
     const asked = (await waitFor(
-      async () => ((await sessions.events(defaultOrchestrator)) ?? []).find((e) => e.type === "user/message"),
+      async () => ((await sessions.eventsOf(defaultOrchestrator)) ?? []).find((e) => e.type === "user/message"),
       (e) => e !== undefined,
       "its log",
     ))!;

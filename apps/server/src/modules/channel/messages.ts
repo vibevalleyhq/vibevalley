@@ -1,9 +1,9 @@
 import type * as T from "@vibevalley/protocol";
 
 import { compareText, or } from "#/base/order.ts";
-import { actorOfParticipant, type ChannelHearers, type Meta, metaOf, targetOf, channelType } from "#/modules/mailbox/envelope.ts";
-import type { InputContext, TriggerInput } from "#/modules/mailbox/payload.ts";
-import type { TriggerSource } from "#/modules/mailbox/shapes.ts";
+import { actorOfParticipant, type ChannelHearers, type Meta, metaOf, targetOf, channelType } from "#/modules/session/envelope.ts";
+import type { InputContext, TriggerInput } from "#/modules/session/payload.ts";
+import type { TriggerSource } from "#/modules/session/shapes.ts";
 
 import { chatNamed } from "./mentions.ts";
 

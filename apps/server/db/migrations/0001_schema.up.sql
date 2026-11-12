@@ -175,7 +175,7 @@ CREATE TABLE attachment (
   size        integer not null,
   created_at  double precision not null
 );
-CREATE TABLE library_item (
+CREATE TABLE media_library_item (
   -- A file in the library is a kept attachment: one item per file, however often it comes back.
   attachment_id text primary key references attachment (id),
   kind          text not null check (kind in ('generated', 'uploaded', 'fetched')),
@@ -184,7 +184,7 @@ CREATE TABLE library_item (
   added_at      double precision not null,
   last_at       double precision not null
 );
-CREATE INDEX library_item_recent on library_item (last_at desc, attachment_id);
+CREATE INDEX media_library_item_recent on media_library_item (last_at desc, attachment_id);
 CREATE TABLE channel_mention (
   message_id  text not null references channel_message (id) on delete cascade,
   target_id   text not null,
@@ -206,9 +206,9 @@ CREATE TABLE channel_read_cursor (
   updated_at       double precision not null,
   primary key (participant_id, channel_id)
 );
-CREATE TABLE mailbox_trigger (
+CREATE TABLE session_trigger (
   id text primary key,
-  seq integer not null default 0, -- the order they were recorded in (mailbox_trigger_seq)
+  seq integer not null default 0, -- the order they were recorded in (session_trigger_seq)
   source text not null,
   source_key text not null,
   trigger_json text not null,
@@ -221,7 +221,7 @@ CREATE TABLE mailbox_trigger (
          (routed_at is not null and routing_scope is not null and routing_position is not null)),
   unique (source, source_key)
 );
-CREATE TABLE issue_github (
+CREATE TABLE session_github_cursor (
   repo text not null,
   pr_number integer not null,
   check_fingerprint text not null default '',
@@ -271,14 +271,14 @@ CREATE TABLE issue_assignment (
   assigned_at     double precision not null,
   ended_at        double precision
 );
--- The computers helpers work on (machine/machine.ts): the server's own, and in time those let in from the command line.
-CREATE TABLE machine (
+-- The computers helpers work on (session/machine.ts): the server's own, and in time those let in from the command line.
+CREATE TABLE session_machine (
   id         text primary key,
   name       text not null,
   here       boolean not null default false,
   joined_at  double precision not null
 );
-CREATE UNIQUE INDEX machine_one_here ON machine (here) WHERE here;
+CREATE UNIQUE INDEX session_machine_one_here ON session_machine (here) WHERE here;
 CREATE TABLE session (
   id          text primary key,
   role        text not null check (role in ('orchestrator', 'worker')),
@@ -303,7 +303,7 @@ CREATE TABLE session (
   last_run text,
   spent text,
   -- The machine it works on; none for an agent hosted in the server's process.
-  machine text references machine (id)
+  machine text references session_machine (id)
 );
 CREATE INDEX session_by_machine on session (machine) where machine is not null;
 CREATE TABLE issue_assignment_execution (
@@ -313,12 +313,12 @@ CREATE TABLE issue_assignment_execution (
   primary key (assignment, executor)
 );
 CREATE INDEX session_by_agent on session (agent, hired_at);
--- One order across the deliveries and the routed triggers (mailbox_user_route reads both): each takes the next id here.
-CREATE TABLE mailbox_order (
+-- One order across the deliveries and the routed triggers (session_user_route reads both): each takes the next id here.
+CREATE TABLE session_order (
   id integer primary key
 );
-CREATE TABLE mailbox_delivery (
-  position integer not null default 0, -- the next of mailbox_order
+CREATE TABLE session_delivery (
+  position integer not null default 0, -- the next of session_order
   scope text not null,
   session_id     text not null references session (id) on delete cascade,
   envelope_id    text not null,
@@ -340,34 +340,34 @@ CREATE TABLE mailbox_delivery (
   check ((held_by is null) or wakes),
   check ((state = 'handed') = (launch is not null) or state in ('consumed', 'dropped'))
 );
-CREATE TABLE mailbox_subscription (
+CREATE TABLE session_subscription (
   thread_key text primary key,
   issue_id text not null references issue(id) on delete cascade
 );
-CREATE INDEX mailbox_subscription_by_issue on mailbox_subscription(issue_id);
-CREATE TABLE mailbox_issue (
-  trigger_id text primary key references mailbox_trigger(id) on delete cascade,
+CREATE INDEX session_subscription_by_issue on session_subscription(issue_id);
+CREATE TABLE session_issue_input (
+  trigger_id text primary key references session_trigger(id) on delete cascade,
   issue_id text not null references issue(id) on delete cascade,
   state text not null default 'held' check (state in ('held', 'forwarded', 'returned')),
   session_id text references session(id) on delete set null,
   reason text,
   created_at double precision not null
 );
-CREATE INDEX mailbox_issue_by_issue on mailbox_issue(issue_id, state, created_at);
+CREATE INDEX session_issue_input_by_issue on session_issue_input(issue_id, state, created_at);
 -- At most one held input per issue: a newer hold replaces the older one.
-CREATE FUNCTION mailbox_issue_one_held() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION session_issue_input_one_held() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-  DELETE FROM mailbox_issue WHERE issue_id = NEW.issue_id AND trigger_id <> NEW.trigger_id AND state = 'held'
-    AND EXISTS (SELECT 1 FROM mailbox_trigger t WHERE t.id = NEW.trigger_id AND t.source = 'cron');
+  DELETE FROM session_issue_input WHERE issue_id = NEW.issue_id AND trigger_id <> NEW.trigger_id AND state = 'held'
+    AND EXISTS (SELECT 1 FROM session_trigger t WHERE t.id = NEW.trigger_id AND t.source = 'cron');
   RETURN NEW;
 END $$;
-CREATE TRIGGER mailbox_issue_one_held BEFORE INSERT ON mailbox_issue
-  FOR EACH ROW WHEN (NEW.state = 'held' AND NEW.reason = 'human') EXECUTE FUNCTION mailbox_issue_one_held();
-CREATE TRIGGER mailbox_issue_one_held_again BEFORE UPDATE OF state ON mailbox_issue
-  FOR EACH ROW WHEN (NEW.state = 'held' AND NEW.reason = 'human') EXECUTE FUNCTION mailbox_issue_one_held();
+CREATE TRIGGER session_issue_input_one_held BEFORE INSERT ON session_issue_input
+  FOR EACH ROW WHEN (NEW.state = 'held' AND NEW.reason = 'human') EXECUTE FUNCTION session_issue_input_one_held();
+CREATE TRIGGER session_issue_input_one_held_again BEFORE UPDATE OF state ON session_issue_input
+  FOR EACH ROW WHEN (NEW.state = 'held' AND NEW.reason = 'human') EXECUTE FUNCTION session_issue_input_one_held();
 
-CREATE INDEX mailbox_trigger_route_order on mailbox_trigger (routing_scope, routing_position) where routed_at is not null;
-CREATE INDEX mailbox_delivery_scope_position on mailbox_delivery (scope, position);
+CREATE INDEX session_trigger_route_order on session_trigger (routing_scope, routing_position) where routed_at is not null;
+CREATE INDEX session_delivery_scope_position on session_delivery (scope, position);
 CREATE TABLE session_run (
   id           text primary key,
   session      text not null references session(id) on delete cascade,
@@ -498,7 +498,7 @@ CREATE INDEX channel_mention_by_target on channel_mention (target_id, message_id
 CREATE INDEX channel_message_by_channel on channel_message (channel_id, number);
 CREATE INDEX channel_message_by_sender on channel_message (sender_id, id);
 CREATE UNIQUE INDEX channel_message_send_key on channel_message (sender_id, send_key) where send_key is not null;
-CREATE INDEX mailbox_delivery_open on mailbox_delivery (session_id, envelope_id) where state in ('pending', 'handed');
+CREATE INDEX session_delivery_open on session_delivery (session_id, envelope_id) where state in ('pending', 'handed');
 CREATE INDEX session_run_by_issue on session_run (issue, started_at);
 CREATE INDEX session_run_by_session on session_run (session, started_at);
 CREATE TABLE session_run_issue (
@@ -623,9 +623,9 @@ CREATE INDEX artifact_suggestion_by_block on artifact_suggestion (block_id);
 CREATE INDEX channel_by_parent on channel (parent_id) where parent_id is not null;
 CREATE INDEX channel_member_by_participant on channel_member (participant_id);
 CREATE INDEX channel_read_cursor_by_channel on channel_read_cursor (channel_id);
-CREATE INDEX mailbox_delivery_by_message on mailbox_delivery (message_id);
-CREATE INDEX mailbox_issue_by_session on mailbox_issue (session_id) where session_id is not null;
-CREATE INDEX mailbox_delivery_by_channel on mailbox_delivery (channel_id) where channel_id is not null;
+CREATE INDEX session_delivery_by_message on session_delivery (message_id);
+CREATE INDEX session_issue_input_by_session on session_issue_input (session_id) where session_id is not null;
+CREATE INDEX session_delivery_by_channel on session_delivery (channel_id) where channel_id is not null;
 CREATE INDEX cron_by_channel on cron (channel_id);
 CREATE INDEX connector_account_by_channel on connector_account (channel_id) where channel_id is not null;
 CREATE INDEX connector_inbound_by_message on connector_inbound (message_id) where message_id is not null;
@@ -633,11 +633,11 @@ CREATE INDEX connector_outbox_by_message on connector_outbox (message_id);
 CREATE INDEX artifact_by_message on artifact (message_id) where message_id is not null;
 CREATE INDEX artifact_version_by_message on artifact_version (message_id) where message_id is not null;
 
-CREATE VIEW mailbox_user_route AS
-select routing_scope as scope, routing_position as position from mailbox_trigger
+CREATE VIEW session_user_route AS
+select routing_scope as scope, routing_position as position from session_trigger
 where routed_at is not null and trigger_json::jsonb -> 'actor' ->> 'kind' = 'user'
 union all
-select scope, position from mailbox_delivery
+select scope, position from session_delivery
 where payload_json::jsonb -> 'trigger' -> 'actor' ->> 'kind' = 'user'
   and envelope_id <> payload_json::jsonb -> 'trigger' ->> 'id';
 
@@ -695,31 +695,31 @@ BEGIN
   RETURN NEW;
 END $$;
 CREATE TRIGGER channel_participant_seq BEFORE INSERT ON channel_participant FOR EACH ROW EXECUTE FUNCTION next_seq();
-CREATE TRIGGER mailbox_trigger_seq BEFORE INSERT ON mailbox_trigger FOR EACH ROW EXECUTE FUNCTION next_seq();
+CREATE TRIGGER session_trigger_seq BEFORE INSERT ON session_trigger FOR EACH ROW EXECUTE FUNCTION next_seq();
 CREATE TRIGGER connector_inbound_seq BEFORE INSERT ON connector_inbound FOR EACH ROW EXECUTE FUNCTION next_seq();
--- A delivery's and a routed trigger's position is the next of mailbox_order, taken by their queries
--- (mailbox_delivery.sql, mailbox_trigger.sql); the order is moved past it here so nothing takes it again. A delivery
+-- A delivery's and a routed trigger's position is the next of session_order, taken by their queries
+-- (session_delivery.sql, session_trigger.sql); the order is moved past it here so nothing takes it again. A delivery
 -- written without one (position 0) is given the next here.
-CREATE FUNCTION mailbox_order_past(at integer) RETURNS void LANGUAGE plpgsql AS $$
+CREATE FUNCTION session_order_past(at integer) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN
-  IF at > (SELECT coalesce(max(id), 0) FROM mailbox_order) THEN
-    INSERT INTO mailbox_order (id) VALUES (at);
+  IF at > (SELECT coalesce(max(id), 0) FROM session_order) THEN
+    INSERT INTO session_order (id) VALUES (at);
   END IF;
 END $$;
-CREATE FUNCTION mailbox_delivery_position() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION session_delivery_position() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF NEW.position = 0 THEN
-    INSERT INTO mailbox_order (id) SELECT coalesce(max(id), 0) + 1 FROM mailbox_order RETURNING id INTO NEW.position;
+    INSERT INTO session_order (id) SELECT coalesce(max(id), 0) + 1 FROM session_order RETURNING id INTO NEW.position;
   ELSE
-    PERFORM mailbox_order_past(NEW.position);
+    PERFORM session_order_past(NEW.position);
   END IF;
   RETURN NEW;
 END $$;
-CREATE TRIGGER mailbox_delivery_position BEFORE INSERT ON mailbox_delivery FOR EACH ROW EXECUTE FUNCTION mailbox_delivery_position();
-CREATE FUNCTION mailbox_trigger_routed() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE TRIGGER session_delivery_position BEFORE INSERT ON session_delivery FOR EACH ROW EXECUTE FUNCTION session_delivery_position();
+CREATE FUNCTION session_trigger_routed() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-  PERFORM mailbox_order_past(NEW.routing_position);
+  PERFORM session_order_past(NEW.routing_position);
   RETURN NEW;
 END $$;
-CREATE TRIGGER mailbox_trigger_routed AFTER UPDATE OF routing_position ON mailbox_trigger
-  FOR EACH ROW WHEN (NEW.routing_position IS NOT NULL) EXECUTE FUNCTION mailbox_trigger_routed();
+CREATE TRIGGER session_trigger_routed AFTER UPDATE OF routing_position ON session_trigger
+  FOR EACH ROW WHEN (NEW.routing_position IS NOT NULL) EXECUTE FUNCTION session_trigger_routed();

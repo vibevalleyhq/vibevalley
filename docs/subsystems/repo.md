@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 空间（`repos/`、`worktrees/` 与全局 `AGENTS.md`）、仓库新建与 GitHub 克隆 | 工作目录根路径配置（`work_root`，[设置和配置](docs/subsystems/setting.md#模型和不变量)） |
-| 工单 worktree 与分支 `vibevalley/issue-<号>` 的创建、复用、重置与清理 | 何时派活、何时触发检查与合并、PR 轮询调度（[工单](docs/subsystems/issue.md#怎么走)） |
+| 工单 worktree 与分支 `vibevalley/issue-<号>` 的创建、复用、重置与清理 | 何时派活、何时合并（[工单](docs/subsystems/issue.md#怎么走)）；合并、提 PR、跟 PR 的编排（[帮工](docs/subsystems/session.md#对外的门)） |
 | 分支改动读取（`Changes`）、冲突预检（`git merge-tree`）、运行 `.vibevalley/check` | 会话生命周期与并发槽位准入控制（[帮工](docs/subsystems/session.md)） |
 | 本地合并、无检出合入父分支（`mergeInto`）、推送分支与 `gh` PR 创建/查询 | 经验值、等级与成就计算（[游戏](docs/subsystems/game.md#模型和不变量)） |
 | `gh` 状态检测缓存、语言统计（`tokei`）、年度提交日历与作者 commit 计数 | 仓库页与群岛地图的界面渲染（[客户端](docs/subsystems/app.md)、[农场的皮](docs/subsystems/farm.md)） |
@@ -31,7 +31,8 @@
 - **仓库即 `repos/<名字>` 下的直接子目录**：名字仅含字母、数字、`-`、`_`、`.`（最长 64 字符），禁止符号链接跳出 `repos/`。派活目标仓库不存在时自动 `git init -b main` 并生成初始提交。
 - **一张工单固定一个 worktree 与一条分支**：路径为 `worktrees/<仓库>.<工单号>`，分支为 `vibevalley/issue-<工单号>`；重开或换帮工直接复用，首次创建时从基分支切出，目标仓库有 `.vibevalley/setup` 就在锁外跑一次（脚本由目标仓库自己提供）。
 - **同仓库写操作串行，本地合并的耗时检查在锁外执行**：每个仓库一把信号量锁 `serially` 保护新建、开 worktree、合并与清理；`.vibevalley/check`（默认限时 1200 秒）在锁外运行，通过后重新进锁核对分支与基分支未变才执行合并。
-- **清理回执区分现场是否保留（`WorkplaceRelease`）**：`release` 与 `clear` 返回 `{ kept, why? }`；有未提交改动或未合入提交时保留现场，仅 `kept: false` 时允许删除工单身份。
+- **工单的检出四个操作各有名字，只给帮工模块用**：`checkout` 开（复用）一张工单的 worktree 或仓库本身的目录，`releaseCheckout` 放下，`resetCheckout` 把分支重置回主分支，`clearCheckout` 在工单上没有帮工时清掉；工单不碰检出，交付经 `Session`（[帮工](docs/subsystems/session.md#对外的门)）。
+- **清理回执区分现场是否保留（`WorkplaceRelease`）**：`releaseCheckout` 与 `clearCheckout` 返回 `{ kept, why? }`；有未提交改动或未合入提交时保留现场，仅 `kept: false` 时允许删除工单身份。
 - **冲突预检与合入父分支均不污染工作区**：
   - 冲突检测用 `git merge-tree --write-tree`；子工单合入父分支（`mergeInto`）用 `merge-tree` + `commit-tree` + 带旧值校验的 `update-ref`。
 - **合并和提 PR 前工作树必须干净**：`checkMerge` 先看 `git status --porcelain`；有未提交改动就以 `MergeFailure` 退回，让帮工按仓库自己的提交规范提交，不再代它生成不合规的提交说明。
@@ -66,7 +67,8 @@
 
 ## 和谁打交道
 
-- **工单与帮工（`issue`、`session`）**：提供 `workplace`、`release`、`reset`、`clear`、`Changes`、`merge`、`mergeInto`、`submitPullRequest`、`pullRequestState` 与 `githubSnapshot`。
+- **帮工（`session`）**：用 `checkout`、`releaseCheckout`、`resetCheckout`、`clearCheckout` 开、放、重置、清工单的检出，读 `houseRules`、`limit`、`usesPullRequests`；交付用 `changes`、`branchChanges`、`changedFiles`、`conflict`、`run`（跑子工单的检查）、`merge`、`mergeInto`、`submitPullRequest`、`pullRequestState`、`finishPullRequest`，跟 PR 用 `githubSnapshot`、`githubRemote`、`githubRequest`。
+- **工单（`issue`）**：只读 `usesPullRequests`、`branchChanges` 与 `stack`。
 - **工具与游戏（`tool`、`game`）**：向 `tool/resource.ts` 提供 `vv://github/...` 评审线程快照读取；向 Game 提供用户名下的 `contributions` commit 计数。
 
 ## 为什么这样
@@ -79,7 +81,7 @@
 ## 还没做的
 
 - 同一工单 worktree 内多帮工接力写锁交接：[一块地上几个人一起种](.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md)。
-- 将 `.vibevalley/check` 抽成测试端口、分支合并与释放决策抽成规则层纯函数：[把模块层往下压](.agents/notes/proposed/testing/2026-10-26-press-the-module-layer-down.md)。
+- 将 `.vibevalley/check` 抽成可注入测试端口，免去合并单测重复拉起 shell 子进程：[等待器真实时间上限、模块窄替身与测试时钟门禁收窄](.agents/notes/proposed/testing/2026-11-08-testable-module-boundaries.md)。
 
 ## 怎么验证
 

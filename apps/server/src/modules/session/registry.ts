@@ -12,14 +12,14 @@ import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
-import { type ExecutionInput } from "#/modules/machine/executor.ts";
-import type { Machine } from "#/modules/machine/machine.ts";
 import * as qs from "#db/session.sql.ts";
 
+import { type ExecutionInput } from "./executor.ts";
 import { type Hand, makeHandRoster } from "./hands.ts";
 import { restoredSession, sessionState } from "./history.ts";
 import { NotRecorded, recording } from "./inProcessRun.ts";
 import { type Journal, makeTrajectories } from "./journal.ts";
+import type { Machine } from "./machine.ts";
 import { isOnDuty } from "./roster.ts";
 import type { DeliveryInput, Consumed, LaunchActivity, RunFinished, SessionIdentity, SessionNews } from "./signals.ts";
 
@@ -197,6 +197,13 @@ export async function makeRegistry(deps: RegistryDeps) {
   const unexpect = (h: Hand) => void h.triggers.pop();
 
   const startRun = (h: Hand) => {
+    if (h.goesOn !== undefined) {
+      // Started before the restart, and recorded then: the turn takes it up as it was.
+      h.run = h.goesOn;
+      h.journal.runResumed(h.goesOn);
+      delete h.goesOn;
+      return;
+    }
     const expected = h.triggers.shift();
     const by = expected?.trigger ?? { kind: "runtime" };
     const issue = core.session(h.id)?.issue ?? h.issue;

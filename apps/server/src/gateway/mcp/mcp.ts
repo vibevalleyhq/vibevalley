@@ -44,7 +44,7 @@ export async function makeMcp(deps: McpDeps, options: McpOptions = {}): Promise<
   const stop = new AbortController();
 
   const callerOf = (id: string): Caller => {
-    const h = sessions.sessionOf(id);
+    const h = sessions.live(id).session;
     return { agent: h?.agent ?? "", session: id, repo: h?.repo ?? "", here: "", picked: "", envelope: "", actor: worker(id) };
   };
 
@@ -81,7 +81,8 @@ export async function makeMcp(deps: McpDeps, options: McpOptions = {}): Promise<
       const tool = list.find((t) => t.name === req.params.name);
       if (!tool) return { ...text(noTool(req.params.name)), isError: true };
       // Tools are never called for a caller nobody knows.
-      if (!id || who(token) !== id || (!sessions.sessionOf(id) && tool.name !== "session_list")) return { ...text(failedCall(unknownCaller)), isError: true };
+      if (!id || who(token) !== id || (!sessions.live(id).session && tool.name !== "session_list"))
+        return { ...text(failedCall(unknownCaller)), isError: true };
       return call(tool, req.params.arguments, token);
     });
     const transport = new WebStandardStreamableHTTPServerTransport({ enableJsonResponse: true });

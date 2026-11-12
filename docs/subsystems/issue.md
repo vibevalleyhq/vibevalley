@@ -26,8 +26,9 @@
 | 工单模型、状态派生、原生父子依赖（`parent` / `blockedBy`）与合法状态流转 | 会话如何跑一轮、轨迹日志记录（[帮工](docs/subsystems/session.md)） |
 | 起草（`refine`）：派帮工只读看代码生成草稿、写回工单、重置 worktree | worktree 创建、重置与清理实现（[仓库](docs/subsystems/repo.md)） |
 | 派活、排队重试、拆分子工单（`split`）、换人、重开与取消 | 档案选择算法（[档案和农机](docs/subsystems/agent.md#模型和不变量)） |
-| 验收、打回意见、问题清理与验收标准自评（`checks`） | 信箱投递、三道刹车与唤醒调度（[Mailbox](docs/subsystems/mailbox.md)） |
-| 完成与交付：冲突预检、跑 `.vibevalley/check`、合入父分支或主分支、提 PR 与轮询 | 农场地块渲染（[农场的皮](docs/subsystems/farm.md)） |
+| 验收、打回意见、问题清理与验收标准自评（`checks`） | 信箱投递、三道刹车与唤醒调度（[帮工的信箱](docs/subsystems/session.md#触发与投递)） |
+| 完成与交付的决定：何时完成、按 `deliver` 走哪条路、子工单要过哪些检查（`childChecks`）；工单上记下的冲突、PR 与结局（`IssueRecord`） | 农场地块渲染（[农场的皮](docs/subsystems/farm.md)） |
+| PR 状态刷新与 GitHub 观察的定时器（`Issue.refreshPullRequests`、`pollGitHub`） | 合并、提 PR、子工单合入父分支、PR 结局与 CI/评审观察怎么做（[帮工](docs/subsystems/session.md#对外的门)） |
 
 ## 在哪
 
@@ -35,12 +36,12 @@
 |---|---|
 | `apps/server/src/modules/issue/issue.ts`、`store.ts`、`lifecycle.ts` | 对外 `Issue` 服务、`IssueStore`（收拢工单表读写、家族子树级联删除与 `db.afterCommit` 下的 `Assignments` 内存同步）、生命周期写操作与事实发布 |
 | `apps/server/src/modules/issue/dispatch.ts`、`settle.ts` | 派活、排队刷新、重开、定时触发、状态流转前置判定与试跑预览 |
-| `apps/server/src/modules/issue/refinement.ts`、`split.ts`、`merge.ts`、`github.ts` | 工单起草、原生父子拆单与合入父分支、本地合并、PR 结局轮询与 CI/Review 增量观察（`Issue.pollGitHub`） |
+| `apps/server/src/modules/issue/refinement.ts`、`split.ts`、`merge.ts` | 工单起草、原生父子拆单（`childChecks` 算子工单要过的检查）、交付时工单这边的决定与记录（`IssueRecord`）；合并、提 PR 和跟 PR 的编排在帮工模块（`session/landing.ts`、`github.ts`） |
 | `apps/server/src/modules/issue/status.ts`、`moves.ts` | 状态派生（`issueStatusOf`）、展示阶段（`issueStageOf`）与合法挪动（`statusMove`） |
 | `apps/server/src/modules/issue/creation.ts`、`assignment.ts` | 建单（仓库推导、父单继承、选人）与档案指派 |
 | `apps/server/src/modules/issue/dependencies.ts`、`brief.ts`、`rows.ts` | 依赖环检测与解锁、任务说明和时间线拼装、行转换 |
 | `packages/protocol/src/rules/issues.ts`、`stage.ts` | 前后端共用的 `shortTitle`、`closedText` 与 `stageWantsUser` |
-| 表 `issue`、`issue_assignment`、`issue_assignment_execution`、`issue_github` | 工单主表、档案责任关系、实际执行的 `Session` 关联与 GitHub PR CI 指纹游标 |
+| 表 `issue`、`issue_assignment`、`issue_assignment_execution` | 工单主表、档案责任关系、实际执行的 `Session` 关联 |
 | `apps/web/src/features/issue/`、`apps/web/src/farm/issue/IssueView.tsx` | 工作台看板与工单详情、动作分发 `acts.ts`、农场工单详情 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`issue.*`），CLI 命令为 `vibevalley issue ...`。
@@ -57,7 +58,7 @@
 - **授权边界 `Mandate`**：工单绑定不可变的 `originTriggerId`，助手建单附言硬限 30 词；仅当 `autoSubmitPr` 为真时允许自动提 PR，`maxBotReviewRounds` 限制自动响应评审轮数。
 - **单轮结局只认结构化 `issue_report`**：帮工通过 `issue_report` 提交状态、问题、`checks`、`answer`、记性与 `prSubmit`，不解析自由正文。
 - **执行情况与生命周期分开**：提问、失败、中断及未明确交回的休息会话保持 `in_progress`，`stage` 提供回答、重试、继续动作；有效交回且没有待答问题才进入 `in_review`。看板、详情与 CLI 都读取同一投影；CLI 的 `issue show --watch` 在提问或受阻阶段也返回，stderr 同时给出生命周期和阶段。
-- **PR 在途自动跟进与同轮评审归并**：当 PR 在途且无待答问题时，回合结束后会话进 `resting` 并释放槽位，工单保持 `in_progress` 等待 CI/评审；`issue/github.ts` 按 `issue_github` 表比对 CI 指纹，且同一次 Review 及其附带的多条行内评论共享同一个 `botRoundKey`（只消耗一次 `maxBotReviewRounds` 额度）；仅 `prSubmit=false` 显式交接才进 `in_review`。
+- **PR 在途自动跟进与同轮评审归并**：当 PR 在途且无待答问题时，回合结束后会话进 `resting` 并释放槽位，工单保持 `in_progress` 等待 CI/评审；`session/github.ts` 按 `session_github_cursor` 表比对 CI 指纹，且同一次 Review 及其附带的多条行内评论共享同一个 `botRoundKey`（只消耗一次 `maxBotReviewRounds` 额度）；仅 `prSubmit=false` 显式交接才进 `in_review`。
 - **交付物类型 `deliver` 事先声明**：分 `change`（要求合入）、`pull_request`（提交 PR/MR 即交付）、`branch`（留分支）与只读调研 `answer`；`answer` 单将结论写入 `Issue.answer`，完成后重置 worktree 并记 `delivered: none`。
 - **原生父子工单与 DAG 依赖**：通过 `parent` 与 `blockedBy` 表达归属与前置依赖。子工单从父分支 `vibevalley/issue-<父编号>` 切出 worktree，完成后经 `mergeInto` 合入父分支。
 - **验收子工单先判红并冻结文件**：标记 `constraints.acceptance` 的子工单应先证明检查失败，合入父分支时将其改动文件记为 `frozen`；后继子工单不得修改冻结文件，且末端须通过全部祖先验收命令。
@@ -74,7 +75,7 @@
 
 **派活与排队（`issue.status.update` → `todo`）**
 
-1. 挪到 `todo` 时同事务写入排队 `Trigger` 并交 `Mailbox` 入池；若传入新 `agent` 则先结束旧 `Assignment` 完成换人。
+1. 挪到 `todo` 时同事务写入排队 `Trigger` 并交 `Session` 入池；若传入新 `agent` 则先结束旧 `Assignment` 完成换人。
 2. 若前置依赖已满足且有空位，立即启动 `Session` 并开启工单串。
 3. 若无空位，工单留在 `todo`（`stage: queued`）；`Issue.refreshQueue` 在空位释放或周期到期时按看板顺序自动补派。
 
@@ -99,9 +100,9 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 ## 和谁打交道
 
-- **帮工（`session`）**：经 `Mailbox.receive`（`Hire`）派工，调用 `withWorkplace`、`withIdleWorkplace`、`clearWorkplace`、`discardWork`、`handOver`、`dismiss`；订阅 `Session.news` 更新工单状态、问题与冲突。
-- **仓库（`repo`）**：管理 worktree、冲突预检、`.vibevalley/check`、分支合并、`gh` PR 操作与 `githubSnapshot` 快照拉取。
-- **信箱与频道（`mailbox`、`channel`）**：排队输入及轮询到的 GitHub PR CI/Review 事件经 `Mailbox` 投递；用户发言经 `Channel.userInThread` 清空问题并作废旧验收标记。
+- **帮工（`session`）**：经 `Session` 的门（[帮工](docs/subsystems/session.md#对外的门)）：派活（`hireWith`，子工单带上父工单号；`queueDispatch` 在工单的事务里留下排队的派活，`withdrawDispatches` 撤回，`triggersOf`、`queuedTriggers` 读排着的，`room` 问还能不能再开一个）、叫停放走（`stop`、`dismiss`）、交付（`merge`、`submitPullRequest`、`mergeChild`、`refreshPullRequests`、`pollGitHub`：工单交来它的决定，工单这边要记的经 `IssueRecord`）、改动和冲突（`changesOf`、`conflictOf`）、工作目录（`discardWork`、`clearWorkplace`）、在场与查询（`hired`、`live`、`get`、`list`、`runsOf`）、`news`（更新工单状态、问题与冲突）。
+- **仓库（`repo`）**：只读三样：`usesPullRequests`（这个仓库走不走 PR）、`branchChanges`（工单分支上的提交，定完成怎么交付、重开怎么说）、`stack`（模板）；冲突预检、检查、合并与 GitHub 都经帮工模块。
+- **频道（`channel`）**：用户发言经 `Channel.userInThread` 清空问题并作废旧验收标记。
 
 ## 为什么这样
 
@@ -114,7 +115,6 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 ## 还没做的
 
 - 多帮工协作同一块地、逐条勾选持久化验收标准：[一块地上几个人一起种](.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md)。
-- 故障自动回流成验收样本、退回超限换新会话：[先采样，再验收](.agents/notes/proposed/architecture/2026-10-14-sample-then-verify.md)。
 
 ## 怎么验证
 

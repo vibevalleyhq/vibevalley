@@ -49,7 +49,7 @@ describe("a talk with a helper profile", () => {
     await using fw = await f.open();
     const issues = fw.issue;
     const channels = fw.channel;
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const core = fw.core;
     const sql = sqlOf(fw.db);
     const { in: saidIn } = fw.said;
@@ -116,7 +116,7 @@ describe("a talk with a helper profile", () => {
     const f = farm({ runtime });
     await using fw = await f.open();
     const channels = fw.channel;
-    const sessions = fw.session;
+    const sessions = fw.inside;
     const sql = sqlOf(fw.db);
     const said = fw.said.in;
     await fw.agent.save(lab());
@@ -134,7 +134,7 @@ describe("a talk with a helper profile", () => {
       () =>
         sql<{
           state: string;
-        }>`select d.state from mailbox_delivery d join channel_message m on m.id = d.message_id where m.channel_id = ${dm} order by m.number`,
+        }>`select d.state from session_delivery d join channel_message m on m.id = d.message_id where m.channel_id = ${dm} order by m.number`,
       (rows) => rows.length === 2 && rows.every((row) => row.state === "consumed"),
       "both inputs consumed",
     );
@@ -144,7 +144,7 @@ describe("a talk with a helper profile", () => {
     const [first] = await sql<{
       handed_at: number;
       consumed_at: number;
-    }>`select d.handed_at, d.consumed_at from mailbox_delivery d join channel_message m on m.id = d.message_id where m.channel_id = ${dm} order by m.number limit 1`;
+    }>`select d.handed_at, d.consumed_at from session_delivery d join channel_message m on m.id = d.message_id where m.channel_id = ${dm} order by m.number limit 1`;
     const [run] = await sql<{ started_at: number }>`select started_at from session_run order by started_at limit 1`;
     expect(first && run).toBeTruthy();
     expect(first!.handed_at).toBeLessThanOrEqual(run!.started_at);
@@ -166,7 +166,7 @@ describe("a talk with a helper profile", () => {
     const first = await (async () => {
       await using fw = await farm({ config, runtime }).open();
       const channels = fw.channel;
-      const sessions = fw.session;
+      const sessions = fw.inside;
       const said = fw.said.in;
       await fw.agent.save(lab());
       const dm = await channels.direct("lab");
@@ -174,7 +174,7 @@ describe("a talk with a helper profile", () => {
       await until(() => said(dm).some((m) => m.kind === "report"), "the first report");
       const sql = sqlOf(fw.db);
       await waitFor(
-        () => sql<{ state: string }>`select d.state from mailbox_delivery d join channel_message m on m.id = d.message_id where m.channel_id = ${dm}`,
+        () => sql<{ state: string }>`select d.state from session_delivery d join channel_message m on m.id = d.message_id where m.channel_id = ${dm}`,
         (rows) => rows.length === 1 && rows[0]?.state === "consumed",
         "the input receipt persisted before restart",
       );
@@ -188,7 +188,7 @@ describe("a talk with a helper profile", () => {
     {
       await using fw = await farm({ config, runtime }).open();
       const channels = fw.channel;
-      const sessions = fw.session;
+      const sessions = fw.inside;
       const said = fw.said.in;
       await channels.boot();
       const direct2 = await channels.direct("lab");
@@ -244,7 +244,7 @@ describe("a talk with a helper profile", () => {
     );
     expect(starts).toBe(2);
     const delivered = await waitFor(
-      () => sql<{ state: string }>`select d.state from mailbox_delivery d join channel_message m on m.id = d.message_id where m.channel_id = ${starting}`,
+      () => sql<{ state: string }>`select d.state from session_delivery d join channel_message m on m.id = d.message_id where m.channel_id = ${starting}`,
       (rows) => rows.length === 1 && rows[0]?.state === "consumed",
       "the initial delivery seen",
     );

@@ -23,7 +23,7 @@ Status: proposed
 
 ## Alternatives considered
 
-- **照搬白皮书外部工具链（ast-grep、dependency-cruiser、bun）**：与本仓的 `vp`、oxlint 插件和 `apps/server/src/modules.ts` 的 11 个有序模块重复；复用 oxlint 与 oxc AST 即可。
+- **照搬白皮书外部工具链（ast-grep、dependency-cruiser、bun）**：与本仓的 `vp`、oxlint 插件和 `apps/server/src/modules.ts` 的 10 个有序模块重复；复用 oxlint 与 oxc AST 即可。
 - **对文件行数、函数行数或 3:1 重构比例设硬门槛**：会诱导机械切文件凑数；改由体检热点与逃生口棘轮指导重构。
 
 ## Acceptance criteria
