@@ -830,10 +830,9 @@ export const catalogs = {
     },
     "server.chat": {
       error: "\n出错了：{why}",
-      compacted: "（前面的对话压成了摘要，原文在 {archive}）",
-      usage: "{aborted, select, true {（停下了，输入 {input}，缓存 {cached}，输出 {output}）} other {（输入 {input}，缓存 {cached}，输出 {output}）}}",
-      hello: "{skills} 个技能，{tools} 个 MCP 工具。/reset 忘掉对话，/exit 退出，Ctrl+C 停下。",
+      hello: "{skills} 个技能。/reset 忘掉对话，/exit 退出，Ctrl+C 停下。",
       forgot: "忘掉了。",
+      notKept: "{home} 正被另一个对话占着：这次的对话只在这个进程里，不留存。",
       noRuntime: "没有 {id} 这个农机",
       unknownInstall: "{id} 看不出装没装",
       unusable: "{id} 用不了：{kind}",
@@ -5587,10 +5586,9 @@ export const catalogs = {
     },
     "server.chat": {
       error: "\nSomething went wrong: {why}",
-      compacted: "(the conversation so far was compacted into a summary; the original is in {archive})",
-      usage: "{aborted, select, true {(stopped, input {input}, cached {cached}, output {output})} other {(input {input}, cached {cached}, output {output})}}",
-      hello: "{skills} skills, {tools} MCP tools. /reset forgets the conversation, /exit quits, Ctrl+C stops.",
+      hello: "{skills} skills. /reset forgets the conversation, /exit quits, Ctrl+C stops.",
       forgot: "Forgotten.",
+      notKept: "{home} is taken by another conversation: this one lives only in this process and is not kept.",
       noRuntime: "There is no machine {id}",
       unknownInstall: "Cannot tell whether {id} is installed",
       unusable: "{id} cannot be used: {kind}",
@@ -10396,18 +10394,17 @@ export interface Messages {
   "server.channel.talkFailed": { readonly why: string | number };
   "server.channel.threadOnlyInChannel": undefined;
   "server.channel.threadOnlyTitle": undefined;
-  "server.chat.compacted": { readonly archive: string | number };
   "server.chat.direct": undefined;
   "server.chat.error": { readonly why: string | number };
   "server.chat.forgot": undefined;
-  "server.chat.hello": { readonly skills: string | number; readonly tools: string | number };
+  "server.chat.hello": { readonly skills: string | number };
   "server.chat.noRuntime": { readonly id: string | number };
+  "server.chat.notKept": { readonly home: string | number };
   "server.chat.notSent": { readonly why: string | number };
   "server.chat.rejected": { readonly why: string | number };
   "server.chat.resumed": undefined;
   "server.chat.unknownInstall": { readonly id: string | number };
   "server.chat.unusable": { readonly id: string | number; readonly kind: string | number };
-  "server.chat.usage": { readonly aborted: boolean; readonly cached: string | number; readonly input: string | number; readonly output: string | number };
   "server.connector.digest": { readonly lines: string | number; readonly n: string | number };
   "server.connector.disconnected": undefined;
   "server.connector.expired": undefined;

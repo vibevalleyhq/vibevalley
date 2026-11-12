@@ -12,8 +12,10 @@ export const layers: readonly Layer[] = ["rule", "module", "flow"];
 /** What a test of each layer may take, in ms. */
 export const budgetMs: Record<Layer, number> = { rule: 20, module: 300, flow: 2_000 };
 
-/** Imports that leave the process: the database, child processes, the network. */
-const outside = /^(node:child_process|node:net|node:http|node:https|node:sqlite|pg|@electric-sql\/pglite|@hono\/node-server)$/u;
+/** Imports that leave the process: the database, child processes, the network; pi-durable's SQLite storage and its
+ * environment of files and commands. */
+const outside =
+  /^(node:child_process|node:net|node:http|node:https|node:sqlite|pg|@electric-sql\/pglite|@hono\/node-server|@earendil-works\/pi-durable\/(storage\/sqlite\/node|env\/node))$/u;
 
 interface SpacePackage {
   readonly dir: string;

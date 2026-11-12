@@ -38,10 +38,16 @@ describe("the test pyramid", () => {
   });
 
   it("follows imports into the workspace's packages", () => {
-    expect(reach("src/modules/runtime/vibevalley.ts")).toEqual([
-      "src/modules/runtime/vibevalley.ts",
+    expect(reach("src/modules/orchestrator/orchestrator.test.ts")).toEqual([
+      "src/modules/orchestrator/orchestrator.test.ts",
+      "../../packages/agent/src/testing/testing.ts",
       "../../packages/agent/src/tools/coding.ts",
       "node:child_process",
+    ]);
+    expect(reach("src/modules/runtime/vibevalley.ts")).toEqual([
+      "src/modules/runtime/vibevalley.ts",
+      "src/modules/runtime/durable.ts",
+      "@earendil-works/pi-durable/env/node",
     ]);
   });
 });

@@ -23,17 +23,23 @@ import {
   type Conversation,
   type ConversationId,
   createRegistry,
+  type EntryRecord,
   defineDoc,
+  defineTool,
   Harness,
   InboxDoc,
   LiveDoc,
   MemoryStorage,
   type ModelRef,
   type Registry,
+  type ToolRegistration,
 } from "@earendil-works/pi-durable";
+import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import { z } from "zod";
 
+import { ToolFailed } from "@vibevalley/agent/core/errors";
+import type { Tool } from "@vibevalley/agent/core/loop";
 import type { ModelClient } from "@vibevalley/ai/client";
 import { failedMessage, LlmError } from "@vibevalley/ai/llm";
 import {
@@ -47,7 +53,7 @@ import {
   zeroUsage,
 } from "@vibevalley/ai/messages";
 import type { AssistantMessageEvent } from "@vibevalley/ai/response";
-import { isAbort, TaskGroup } from "@vibevalley/async";
+import { abortable, isAbort, TaskGroup } from "@vibevalley/async";
 
 import { messageOf } from "#/base/errors.ts";
 import { dbDir, type ServerConfig } from "#/infra/config.ts";
@@ -71,10 +77,14 @@ export interface Durable {
 }
 
 export interface DurableDeps {
-  readonly config: ServerConfig;
+  /** The SQLite file the conversations are kept in; none keeps them in memory. */
+  readonly file: string | undefined;
   readonly clock: Time;
   readonly log: Logger;
 }
+
+/** Where a farm keeps its conversations: durable.db in its home, or in memory with a database in memory. */
+export const durableFile = (config: ServerConfig) => (dbDir(config) === "memory" ? undefined : join(config.home, "durable.db"));
 
 const context = BACKGROUND_CONTEXT;
 
@@ -96,7 +106,7 @@ const foldWindow = 136_000;
 export async function openDurable(deps: DurableDeps): Promise<Durable> {
   const log = deps.log.child("durable");
   const tasks = new TaskGroup({ name: "durable", onError: (task, e) => log.error(`${task} failed`, e) });
-  const storage = dbDir(deps.config) === "memory" ? new MemoryStorage() : await openNodeSqliteStorage(join(deps.config.home, "durable.db"));
+  const storage = deps.file === undefined ? new MemoryStorage() : await openNodeSqliteStorage(deps.file);
   const models = createModels();
   const registry = createRegistry();
   const harness = await Harness.open(
@@ -110,6 +120,8 @@ export async function openDurable(deps: DurableDeps): Promise<Durable> {
       // A failed answer is not asked again: the assistant's own loop never was, and a retry can say a thing twice.
       settings: { extensions: [], retry: { enabled: false } },
       onReport: (report) => log.warn(`pi-durable: ${report.kind}`, report.error),
+      // Files and commands of a conversation with a working directory (a helper's) are there; one without has none.
+      env: ({ cwd }) => (cwd === undefined ? undefined : new NodeExecutionEnv({ cwd })),
     },
     context,
   );
@@ -162,6 +174,44 @@ export async function openDurable(deps: DurableDeps): Promise<Durable> {
   return { harness, registry, conversation, existing, busy, model, close };
 }
 
+/** An entry's one model message, read as packages/ai's; undefined for an entry the model does not see. */
+export function entryMessage(e: EntryRecord): Message | undefined {
+  const m = e.model?.[0];
+  if (m === undefined) return undefined;
+  switch (m.role) {
+    case "user":
+      return UserMessageSchema.parse(m);
+    case "assistant":
+      return AssistantMessageSchema.parse(m);
+    case "toolResult":
+      return ToolResultMessageSchema.parse(m);
+    case "system":
+      return undefined;
+  }
+}
+
+/** One of our tools, as a conversation calls it: a ToolFailed it throws is the failed result the model reads. It may
+ * change things, so a call a restart cuts off is not run again: the model reads that it was interrupted. */
+export const durableTool = (tool: Tool): ToolRegistration =>
+  defineTool({
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.parameters,
+    execute: async (args, api, called) => {
+      try {
+        const r = await tool.execute(args, { id: api.callId }, called.abortSignal);
+        return {
+          output: r.content.map((c) => (c.type === "text" ? { type: "text", text: c.text } : { type: "image", data: c.data, mimeType: c.mimeType })),
+          ...(r.isError === true ? { isError: true } : {}),
+          ...(r.terminate === true ? { control: { terminate: true } } : {}),
+        };
+      } catch (e) {
+        if (e instanceof ToolFailed) return { output: [{ type: "text", text: e.message }], isError: true };
+        throw e;
+      }
+    },
+  });
+
 /** A pi-ai provider whose one model is llm: today's DeepSeek wire (packages/ai) under pi-durable. */
 function bridge(provider: string, llm: () => ModelClient, clock: Time, tasks: TaskGroup): Provider {
   const answer = async (out: AssistantMessageEventStream, model: PiModel<Api>, transcript: TranscriptContext, options: SimpleStreamOptions) => {
@@ -193,7 +243,18 @@ function bridge(provider: string, llm: () => ModelClient, clock: Time, tasks: Ta
         { apiKey: client.apiKey?.() ?? "", ...(reasoning ? { reasoning } : {}), ...(options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens }) },
         options.signal,
       );
-      for await (const e of events) out.push(piEvent(e));
+      // A stream that takes no notice of the stop is let go of, not waited for: the run ends aborted at once.
+      const reading = events[Symbol.asyncIterator]();
+      for (let next = await abortable(reading.next(), options.signal); next.done !== true; next = await abortable(reading.next(), options.signal)) {
+        out.push(piEvent(next.value));
+        if (next.value.type === "done" || next.value.type === "error") {
+          out.end();
+          return;
+        }
+      }
+      // A stream that ends without its last event says nothing more: the answer it gave is over, stopped or failed.
+      if (options.signal?.aborted === true) out.push({ type: "error", reason: "aborted", error: failed(messageOf(options.signal.reason), "aborted") });
+      else out.push({ type: "error", reason: "error", error: failed("the model's answer ended without its end", "error") });
     } catch (e) {
       if (e instanceof LlmError) out.push({ type: "error", reason: "error", error: piMessage(failedMessage(client.model, asked, e)) });
       else if (isAbort(e, options.signal)) out.push({ type: "error", reason: "aborted", error: failed(messageOf(e), "aborted") });

@@ -23,6 +23,7 @@ export default defineConfig({
       "src/testing/testing.ts",
       "src/tools/todo.ts",
       "src/tools/todoStore.ts",
+      "src/tools/todoTools.ts",
     ],
     outDir: "dist",
     clean: true,

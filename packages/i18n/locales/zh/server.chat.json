@@ -1,9 +1,8 @@
 {
   "error": "\n出错了：{why}",
-  "compacted": "（前面的对话压成了摘要，原文在 {archive}）",
-  "usage": "{aborted, select, true {（停下了，输入 {input}，缓存 {cached}，输出 {output}）} other {（输入 {input}，缓存 {cached}，输出 {output}）}}",
-  "hello": "{skills} 个技能，{tools} 个 MCP 工具。/reset 忘掉对话，/exit 退出，Ctrl+C 停下。",
+  "hello": "{skills} 个技能。/reset 忘掉对话，/exit 退出，Ctrl+C 停下。",
   "forgot": "忘掉了。",
+  "notKept": "{home} 正被另一个对话占着：这次的对话只在这个进程里，不留存。",
   "noRuntime": "没有 {id} 这个农机",
   "unknownInstall": "{id} 看不出装没装",
   "unusable": "{id} 用不了：{kind}",

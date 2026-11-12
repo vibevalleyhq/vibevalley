@@ -23,7 +23,7 @@
 | `packages/agent/src/brain/brain.ts`、`session.ts`、`fs.ts`、`compaction.ts`、`prefix.ts` | `makeBrain` 入口（显式 `BrainState`）、`TranscriptStore` `.jsonl` 端口、`AgentFs` 文件端口、上下文压缩与前缀分段 SHA-256 校验 |
 | `packages/agent/src/tools/self.ts`、`skills.ts`、`memory.ts`、`mcp.ts`、`reminders.ts` | 收 `AbortSignal` 的内置工具、技能目录扫描、`MemoryPort`、MCP 客户端与定时提醒 |
 | `packages/agent/src/tools/todo.ts`、`todoTools.ts`、`coding.ts`、`dag.ts` | 自身任务图 `Todo`、本地文件/shell 编码工具与通用 DAG 算法 |
-| `apps/server/src/modules/session/host.ts`、`runtime/durable.ts`、`runtime/vibevalley.ts`、`chat/main.ts` | 助手宿主 `AgentHost`（跑在 pi-durable 上）、农场唯一的 `Harness` 与到 `ModelClient` 的模型桥、oar 农机适配（含 `runtime_todo` 表存储）与 CLI 终端对话 |
+| `apps/server/src/modules/session/host.ts`、`runtime/durable.ts`、`runtime/vibevalley.ts`、`chat/chat.ts` | 助手宿主 `AgentHost`、农场唯一的 `Harness`（`durableTool` 把 `Tool` 包成 pi-durable 的工具，模型桥接到 `ModelClient`）、`vibevalley` 农机（oar 的 `Runtime`，一个会话一个 pi-durable 对话，含 `runtime_todo` 表存储）与 CLI 终端对话（同一个农机，跑在自己的 `Harness` 上）；四者都跑在 pi-durable 上 |
 
 ## 模型和不变量
 
@@ -39,12 +39,12 @@
 | 能力项 | 助手 | 帮工（`vibevalley` 农机） | CLI 对话 | 子帮手（`spawn_agent`） |
 |---|---|---|---|---|
 | 农场业务工具 | `Tool` 助手工具表 | 经 `/mcp` 挂载帮工工具表 | 无 | 继承父 agent |
-| 本地编码工具（`coding.ts`） | 无 | 有 | 有 | 继承父 agent |
+| 本地编码工具 | 无 | pi-durable 的 `read`、`write`、`edit`、`bash`（工作目录是帮工的，`bash` 带会话的环境变量、默认 120 秒） | 同帮工 | 继承父 agent |
 | 目录技能扫描（`SKILL.md`） | 无（`noSkills`） | 有 | 有 | 继承父 agent |
-| 记忆（`MemoryPort`） | 数据库 `memory` 表 | 无（由 `Session` 管） | 本地 `MEMORY.md` | 无 |
-| 子帮手（`spawn_agent`） | 无 | 有 | 有 | 无（禁止嵌套） |
-| 自身任务图（`Todo`） | 无 | 有（存 `runtime_todo` 表） | 有（存内存） | 无 |
-| 对话文件（`.jsonl`） | 无（pi-durable 的对话，在 `durable.db`） | 有（按会话） | 有 | 无 |
+| 记忆（`MemoryPort`） | 数据库 `memory` 表 | 无（由 `Session` 管） | 本地 `MEMORY.md` | 继承父 agent |
+| 子帮手（`spawn_agent`） | 无 | 有（调用拥有的子对话） | 有 | 无（禁止嵌套） |
+| 自身任务图（`Todo`） | 无 | 有（存 `runtime_todo` 表；只记 `self`，不自动派子帮手） | 有（存内存） | 继承父 agent |
+| 对话 | pi-durable，在 `durable.db` | pi-durable，在 `durable.db`（一个 oar 会话一个，`resume` 找回） | pi-durable，在 `agent/<名字>/durable.db` | 父对话的调用拥有的子对话 |
 
 ### 提示分三段
 
@@ -64,7 +64,9 @@
 
 ### 接着做被打断的一轮
 
-- 助手不走下面两条：它跑在上游 pi-durable 的 `Harness` 上（`runtime/durable.ts`，`$VIBEVALLEY_HOME/durable.db`，测试农场在内存里），输入、每次回答、每个工具调用先落盘再显示；服务端在它答到一半时停掉，重开以后这一轮接着答完，`session_run` 里还是同一轮（[计划](.agents/notes/proposed/architecture/2026-11-12-brain-on-upstream-pi-durable.md)）。
+- 助手、`vibevalley` 农机和终端对话不走下面两条：它们跑在上游 pi-durable 的 `Harness` 上（`runtime/durable.ts`，`$VIBEVALLEY_HOME/durable.db`，测试农场在内存里），输入、每次回答、每个工具调用先落盘再显示；服务端在助手答到一半时停掉，重开以后这一轮接着答完，`session_run` 里还是同一轮（[计划](.agents/notes/proposed/architecture/2026-11-12-brain-on-upstream-pi-durable.md)）。
+- 农机的会话被放下（`dispose`，或服务端关门时它的主人 `owner` 关掉）时停下这一轮，和 oar 的约定一样；进程没来得及放下就没了（崩溃）时，这一轮留在 `durable.db` 里，同一个 oar 会话再打开（`resume`）就接着跑完，作为这个会话的一轮报出来；在那以前别处先让 `Harness` 接着跑（助手开机时有没答完的一轮）的话，这个会话的模型还没接上，这一轮以 `no_model` 结束。农场开机时帮工那一侧仍按「打断了」处理，下一句话来时才用 `resume` 打开。
+- 终端对话不用服务端的 `durable.db`：pi-durable 没有跨进程的锁，它在 `agent/<名字>/` 下开自己的，开着时租着这个目录；同名的第二个对话只在内存里。
 - 关闭或崩溃打断时，取消产生的半截消息不写入 `.jsonl`。
 - 调用 `resume(maxAgeMs)` 时，若最后一条是 `maxAgeMs` 内未完结的用户消息、工具结果或无结果的 `tool_calls`，自动补入「服务端重启，结果未知，请先核实」回执并继续跑完该轮。
 

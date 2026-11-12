@@ -22,7 +22,7 @@ import { type Agent, modelClient } from "#/modules/agent/agent.ts";
 import type { Setting } from "#/modules/setting/setting.ts";
 
 import { dshRuntime } from "./dsh.ts";
-import { type Durable, openDurable } from "./durable.ts";
+import { type Durable, durableFile, openDurable } from "./durable.ts";
 import { piBalance, type PiDefault, piSettings } from "./pi.ts";
 import { agentProblems, type Candidate, chooseAgent, supportOf, moneyStop, presetOf, runtimeIds, runtimeLabel, sessionOptions } from "./presets.ts";
 import { inCny, makeSpending, price, type Rate } from "./price.ts";
@@ -159,11 +159,12 @@ export async function makeRuntime(deps: RuntimeDeps, options: RuntimeOptions = {
   const log = deps.log.child("runtime");
   // The sessions of VibeValley's own runtime: closed last, after the probes and the spending.
   const owner = new TaskGroup({ name: "runtime sessions", onError: (task, e) => log.error(`${task} failed`, e) });
+  const durable = await openDurable({ file: durableFile(config), clock, log });
   const registry =
     options.registry ??
     registryOf([
       vibevalleyRuntimeOf({
-        home: () => config.home,
+        durable,
         llm: (model) => modelClient(model, deps.setting.deepseekApiKey, deps.llm),
         time: clock,
         owner,
@@ -202,7 +203,6 @@ export async function makeRuntime(deps: RuntimeDeps, options: RuntimeOptions = {
   const usageAsked = new Map<string, number>();
   const usageTaken = new Map<string, number>();
   let closed = false;
-  const durable = await openDurable({ config, clock, log });
 
   const daily = await makeSpending({ db: deps.db, clock, log });
   const tally = daily.tally;

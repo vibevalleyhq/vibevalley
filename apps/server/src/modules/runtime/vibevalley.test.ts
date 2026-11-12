@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -14,6 +14,7 @@ import { whenTrue } from "@vibevalley/testkit/until";
 import { keptLog } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
 
+import { type Durable, openDurable } from "./durable.ts";
 import { helperInstructions, vibevalleyRuntimeOf } from "./vibevalley.ts";
 
 const homes: (() => void)[] = [];
@@ -30,9 +31,17 @@ const owner = () => {
   return tasks;
 };
 const log = keptLog();
+const durables: Durable[] = [];
+/** A harness kept in memory, or in file. */
+const durable = async (file?: string) => {
+  const d = await openDurable({ file, clock: wallTime, log });
+  durables.push(d);
+  return d;
+};
 afterEach(async () => {
   await Promise.all(sessions.splice(0).map((s) => s.dispose()));
   await Promise.all(owners.splice(0).map((tasks) => tasks.close()));
+  await Promise.all(durables.splice(0).map((d) => d.close()));
   for (const done of homes.splice(0)) done();
 });
 
@@ -42,27 +51,31 @@ interface Opened {
   readonly requests: Request[];
   readonly pending: () => number;
   readonly cwd: string;
-  readonly home: string;
+  readonly durable: Durable;
 }
 
-async function open(steps: readonly Step[], extra: { resume?: string; home?: string; cwd?: string; mcp?: string; append?: string } = {}): Promise<Opened> {
+async function open(
+  steps: readonly Step[],
+  extra: { resume?: string; durable?: Durable; cwd?: string; mcp?: string; append?: string; env?: Record<string, string | null> } = {},
+): Promise<Opened> {
   const { llm, requests, pending } = scriptedLLM(steps);
-  const h = extra.home ?? home();
+  const d = extra.durable ?? (await durable());
   const cwd = extra.cwd ?? home();
-  const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: owner(), log, home: () => h, llm: () => llm });
+  const runtime = vibevalleyRuntimeOf({ durable: d, time: wallTime, owner: owner(), log, llm: () => llm });
   const session = await runtime.session(
     { kind: "available", via: "bundled" },
     {
       cwd,
       ...(extra.resume ? { resume: extra.resume } : {}),
       ...(extra.append ? { appendSystemPrompt: extra.append } : {}),
+      ...(extra.env ? { env: extra.env } : {}),
       ...(extra.mcp ? { mcpServers: [{ name: "farm", command: process.execPath, args: [extra.mcp] }] } : {}),
     },
   );
   sessions.push(session);
   const events: Event[] = [];
   session.events((e) => events.push(e), { cursor: { sessionId: session.id, afterSeq: -1 } });
-  return { session, events, requests, pending, cwd, home: h };
+  return { session, events, requests, pending, cwd, durable: d };
 }
 
 const ended = (r: Opened) => r.events.flatMap((e) => (e.kind === "turn_ended" ? [e.outcome] : []));
@@ -85,7 +98,7 @@ describe("VibeValley's runtime", () => {
         },
       },
     };
-    const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: owner(), log, home, llm: () => held });
+    const runtime = vibevalleyRuntimeOf({ durable: await durable(), time: wallTime, owner: owner(), log, llm: () => held });
     const session = await runtime.session({ kind: "available", via: "bundled" }, { cwd: home() });
     sessions.push(session);
     const events: Event[] = [];
@@ -137,7 +150,7 @@ describe("VibeValley's runtime", () => {
         },
       },
     };
-    const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: parent, log, home, llm: () => held });
+    const runtime = vibevalleyRuntimeOf({ durable: await durable(), time: wallTime, owner: parent, log, llm: () => held });
     const session = await runtime.session({ kind: "available", via: "bundled" }, { cwd: home() });
     sessions.push(session);
     await session.prompt("work");
@@ -148,7 +161,7 @@ describe("VibeValley's runtime", () => {
   });
 
   it("runs a prompt's tools and ends the turn completed", async () => {
-    const r = await open([answer([words("我来写"), toolCall("write_file", { path: "hello.txt", content: "hi" })]), answer("写好了 hello.txt")], {
+    const r = await open([answer([words("我来写"), toolCall("write", { path: "hello.txt", content: "hi" })]), answer("写好了 hello.txt")], {
       append: "你是后端老周。",
     });
     expect((await r.session.prompt("写个 hello.txt")).kind).toBe("accepted");
@@ -158,7 +171,7 @@ describe("VibeValley's runtime", () => {
     for (const k of ["model", "text_delta", "tool_call_started", "tool_call_ended", "turn_ended", "usage"]) expect(kinds).toContain(k);
     const started = r.events.find((e) => e.kind === "tool_call_started");
     expect(started).toMatchObject({
-      tool: "write_file",
+      tool: "write",
       input: `{"path":"hello.txt","content":"hi"}`,
     });
     expect(r.events.find((e) => e.kind === "tool_call_ended")).toMatchObject({ result: "ok" });
@@ -206,13 +219,66 @@ describe("VibeValley's runtime", () => {
     await first.session.dispose();
     const again = await open([count], {
       resume: first.session.id,
-      home: first.home,
+      durable: first.durable,
       cwd: first.cwd,
     });
     expect(again.session.id).toBe(first.session.id);
     await again.session.prompt("二");
     await whenTrue(() => ended(again).length === 1, "ended(again).length === 1");
     expect(text(again)).toBe("第 2 句");
+  });
+
+  it("goes on with the run a restart cut off, once its session is opened again", async () => {
+    const words = "地里都好，三块地在长";
+    const file = join(home(), "durable.db");
+    const cwd = home();
+    // The first process: the model is in the middle of its answer when the harness goes away, its session never let go.
+    const before = await open([answer(words, { hangAfter: 3 })], {
+      durable: await openDurable({ file, clock: wallTime, log }),
+      cwd,
+    });
+    await before.session.prompt("地里怎么样");
+    await whenTrue(() => text(before).length >= 3, "the answer under way");
+    await before.durable.close();
+
+    const after = await open([answer(words)], { durable: await durable(file), cwd, resume: before.session.id });
+    await whenTrue(() => ended(after).length === 1, "the turn after the restart");
+    expect(ended(after)[0]!.kind).toBe("completed");
+    expect(text(after)).toBe(words);
+    // Asked again once, on the input the first process took: nothing was sent twice.
+    expect(after.requests).toHaveLength(1);
+    expect(after.requests[0]!.messages.filter((m) => m.role === "user")).toHaveLength(1);
+    expect(after.requests[0]!.messages.at(-1)).toMatchObject({ role: "user" });
+  });
+
+  it("runs a command in the working directory with the session's variables, and one the session takes away gone", async () => {
+    process.env["VIBEVALLEY_TEST_GONE"] = "here";
+    try {
+      const r = await open([answer([toolCall("bash", { command: 'echo "$PWD|$FARM_TOKEN|${VIBEVALLEY_TEST_GONE:-none}"' })]), answer("好")], {
+        env: { FARM_TOKEN: "t0k", VIBEVALLEY_TEST_GONE: null },
+      });
+      await r.session.prompt("看看");
+      await whenTrue(() => ended(r).length === 1, "ended(r).length === 1");
+      const out = r.events.find((e) => e.kind === "tool_call_ended");
+      expect(out).toMatchObject({ result: "ok" });
+      expect(JSON.stringify(out)).toContain(`${await realpath(r.cwd)}|t0k|none`);
+    } finally {
+      delete process.env["VIBEVALLEY_TEST_GONE"];
+    }
+  });
+
+  it("gives a spawned helper its own conversation and the model its answer", async () => {
+    const r = await open([
+      answer([toolCall("spawn_agent", { brief: "数一下有几个文件", label: "数文件" })]),
+      (c) => answer(toolsOf(c).some((t) => t.name === "spawn_agent") ? "帮手也能派帮手" : "三个"),
+      (c) => answer("帮手说：" + (c.messages.at(-1)?.role === "toolResult" ? JSON.stringify(c.messages.at(-1)) : "没回来")),
+    ]);
+    await r.session.prompt("派个帮手数文件");
+    await whenTrue(() => ended(r).length === 1, "ended(r).length === 1");
+    expect(ended(r)[0]!.kind).toBe("completed");
+    expect(r.events.find((e) => e.kind === "tool_call_ended")).toMatchObject({ result: "ok", content: [{ type: "text", text: "三个" }] });
+    expect(lastUser(r.requests[1]!)).toBe("数一下有几个文件");
+    expect(r.pending()).toBe(0);
   });
 
   it("gives the model the tools of the session's MCP servers", async () => {
@@ -248,7 +314,7 @@ rl.on('line', (line) => {
 
   it("lists DeepSeek's models, is bundled, and says why it cannot run", async () => {
     const { llm } = scriptedLLM();
-    const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: owner(), log, llm: () => llm });
+    const runtime = vibevalleyRuntimeOf({ durable: await durable(), time: wallTime, owner: owner(), log, llm: () => llm });
     const models = await runtime.listModels();
     expect(models.kind === "ok" && models.models.some((m) => m.id === "deepseek-flash" && m.effortLevels.join(",") === "high,max" && m.default === true)).toBe(
       true,
@@ -256,6 +322,7 @@ rl.on('line', (line) => {
     expect(await runtime.installation()).toEqual({ kind: "available", via: "bundled" });
     await expect(runtime.session({ kind: "available", via: "bundled" }, { cwd: tmpdir(), effort: "low" })).rejects.toThrow(/只有 high、max/u);
     const keyless = vibevalleyRuntimeOf({
+      durable: await durable(),
       time: wallTime,
       owner: owner(),
       log,

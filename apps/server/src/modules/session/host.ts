@@ -7,31 +7,20 @@ import {
   type ConversationView,
   type ConversationWatch,
   defineExtension,
-  defineTool,
   type EntryId,
   type EntryRecord,
   section,
-  type ToolRegistration,
 } from "@earendil-works/pi-durable";
 import { z } from "zod";
 
 import type { CoreEvent } from "@vibevalley/agent/brain";
-import { ToolFailed } from "@vibevalley/agent/core/errors";
 import type { Tool } from "@vibevalley/agent/core/loop";
 import { type MemoryPort } from "@vibevalley/agent/memory";
 import { type BrainMessage, customMessage, messageText } from "@vibevalley/agent/messages";
 import { selfTools } from "@vibevalley/agent/self";
 import { scanSkills, skillIndex } from "@vibevalley/agent/skills";
 import type { ModelClient } from "@vibevalley/ai/client";
-import {
-  type AssistantMessage,
-  AssistantMessageSchema,
-  type Message,
-  ToolResultMessageSchema,
-  type Usage,
-  UserMessageSchema,
-  zeroUsage,
-} from "@vibevalley/ai/messages";
+import { type AssistantMessage, AssistantMessageSchema, ToolResultMessageSchema, type Usage, UserMessageSchema, zeroUsage } from "@vibevalley/ai/messages";
 import { abortable, Semaphore, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -42,7 +31,7 @@ import { newId } from "#/base/ids.ts";
 import { type Core } from "#/core/core.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Durable } from "#/modules/runtime/durable.ts";
+import { type Durable, durableTool, entryMessage } from "#/modules/runtime/durable.ts";
 
 import { makeInProcessRun, NotRecorded, RunBusy, type RunInput } from "./inProcessRun.ts";
 import type { Journal } from "./journal.ts";
@@ -280,44 +269,6 @@ const LiveView = z.object({
   runFailure: z.exactOptional(z.object({ reason: z.string(), detail: z.exactOptional(z.string()) })),
 });
 type LiveView = z.infer<typeof LiveView>;
-
-/** The host's own tool, as the conversation calls it: a ToolFailed it throws is the failed result the model reads. It
- * may change things, so a call a restart cuts off is not run again: the model reads that it was interrupted. */
-const durableTool = (tool: Tool): ToolRegistration =>
-  defineTool({
-    name: tool.name,
-    description: tool.description,
-    parameters: tool.parameters,
-    execute: async (args, api, called) => {
-      try {
-        const r = await tool.execute(args, { id: api.callId }, called.abortSignal);
-        return {
-          output: r.content.map((c) => (c.type === "text" ? { type: "text", text: c.text } : { type: "image", data: c.data, mimeType: c.mimeType })),
-          ...(r.isError === true ? { isError: true } : {}),
-          ...(r.terminate === true ? { control: { terminate: true } } : {}),
-        };
-      } catch (e) {
-        if (e instanceof ToolFailed) return { output: [{ type: "text", text: e.message }], isError: true };
-        throw e;
-      }
-    },
-  });
-
-/** An entry's one model message, read as packages/ai's; undefined for an entry the model does not see. */
-function entryMessage(e: EntryRecord): Message | undefined {
-  const m = e.model?.[0];
-  if (m === undefined) return undefined;
-  switch (m.role) {
-    case "user":
-      return UserMessageSchema.parse(m);
-    case "assistant":
-      return AssistantMessageSchema.parse(m);
-    case "toolResult":
-      return ToolResultMessageSchema.parse(m);
-    case "system":
-      return undefined;
-  }
-}
 
 const answerIn = (e: EntryRecord): AssistantMessage | undefined => {
   const m = entryMessage(e);

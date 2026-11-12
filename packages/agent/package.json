@@ -66,6 +66,10 @@
     "./todoStore": {
       "types": "./dist/tools/todoStore.d.ts",
       "default": "./src/tools/todoStore.ts"
+    },
+    "./todoTools": {
+      "types": "./dist/tools/todoTools.d.ts",
+      "default": "./src/tools/todoTools.ts"
     }
   },
   "dependencies": {

@@ -119,8 +119,8 @@ Host：
 | `vibevalley.yaml` | 可选的静态配置文件 |
 | `db/` | PGlite 的数据目录（配了 `database.url` 时不用它）：会话与运行（`session`、`session_run`）、信箱（`mailbox_trigger`、`mailbox_delivery`、`mailbox_subscription`、`mailbox_issue`）、工单 GitHub 观察游标（`issue_github`）、频道、工单、Artifact、游戏账本、记忆、定时任务、连接器、用户的账号和设备、笔记批注与撤销 |
 | `events/<id>.json` | 会话轨迹日志（帮工离开后保留 30 天） |
-| `helpers/<oar-id>.jsonl` | `vibevalley` 农机帮工的对话记录 |
-| `agent/<档案 id>/` | 助手对话 `<档案 id>.jsonl`、压缩归档 `archive/`、评测样例 `evals/` |
+| `durable.db` | pi-durable 的对话：助手的，和 `vibevalley` 农机上帮工的（一个 oar 会话一个）（测试农场在内存里） |
+| `agent/<档案 id>/` | 助手的评测样例 `evals/`；终端对话 `chat` 的 `durable.db`（它自己的，对话开着时租着这个目录）、`MEMORY.md` 和 `mcp.json` |
 | `logs/` | 帮工原始运行日志与桌面端服务端日志 |
 
 Space `$VIBEVALLEY_WORK_ROOT`（默认 `~/vibevalley-dev`）下：
