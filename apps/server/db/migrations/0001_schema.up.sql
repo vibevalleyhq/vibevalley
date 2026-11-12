@@ -21,6 +21,8 @@ CREATE TABLE channel_participant (
   name       text not null,
   agent_id   text,
   runtime    text,
+  -- Where an empty target means for it: the place the layers above gave it (its thread, its direct channel); none is the default channel.
+  home_id    text,
   joined_at  double precision not null,
   left_at    double precision,
   -- The order they joined in, for those who joined at the same millisecond (numbered by channel_participant_seq).
@@ -205,6 +207,19 @@ CREATE TABLE channel_read_cursor (
   read_number      integer not null,
   updated_at       double precision not null,
   primary key (participant_id, channel_id)
+);
+-- What happened in the chat, numbered in the order it was committed: the layers above read it after a cursor of their own.
+CREATE TABLE channel_event (
+  seq         integer generated always as identity primary key,
+  kind        text not null check (kind in ('posted', 'removed')),
+  channel_id  text not null,
+  message_id  text not null,
+  at          double precision not null
+);
+-- How far a reader of channel_event has handled it.
+CREATE TABLE watch_cursor (
+  name  text primary key,
+  seq   integer not null
 );
 CREATE TABLE session_trigger (
   id text primary key,
@@ -630,6 +645,7 @@ CREATE INDEX artifact_suggestion_open on artifact_suggestion (artifact_id, statu
 CREATE INDEX artifact_suggestion_by_block on artifact_suggestion (block_id);
 
 CREATE INDEX channel_by_parent on channel (parent_id) where parent_id is not null;
+CREATE INDEX channel_event_by_message on channel_event (message_id);
 CREATE INDEX channel_member_by_participant on channel_member (participant_id);
 CREATE INDEX channel_read_cursor_by_channel on channel_read_cursor (channel_id);
 CREATE INDEX session_delivery_by_message on session_delivery (message_id);

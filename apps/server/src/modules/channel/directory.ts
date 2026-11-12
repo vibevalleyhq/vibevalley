@@ -17,6 +17,7 @@ const refused = refuseIn(BizCode.ChannelRefused);
 
 type DirectoryMethods = Pick<
   ChannelService,
+  | "guardRemoval"
   | "channels"
   | "openChannel"
   | "updateChannel"
@@ -43,21 +44,16 @@ export interface ChannelDirectoryDeps {
 
 export function channelDirectory(deps: ChannelDirectoryDeps, r: ChannelHub): DirectoryMethods {
   const { core, agent: agents, db, clock } = deps;
-  const { store, orchestratorInRow, channelOfSession, hired, targetOfChannel, publishChannel, publishUserMentions } = r;
+  const { store, orchestratorInRow, targetOfChannel, publishChannel, publishUserMentions } = r;
+  const guards: ((channel: string) => Promise<readonly string[]>)[] = [];
 
   /** A channel nothing points at any more; refused with what still does. */
   const removable = async (id: string) => {
     const row = store.channel(id);
     if (!row || row.type !== "channel") throw missing(t("server.channel.noChannel", { id }), [lookIn.channel]);
     if (row.is_default) throw refused(t("server.channel.defaultStays"));
-    if (hired().some((h) => channelOfSession(h) === id)) throw refused(t("server.channel.inUse", { why: t("server.channel.helpersThere") }));
-    const used = theRow(await qc.channelInUse(db.sql, { id }), "ChannelInUse");
-    const why = [
-      used.crons != null && used.crons !== 0 ? t("server.channel.cronsThere", { n: used.crons }) : "",
-      used.connectors != null && used.connectors !== 0 ? t("server.channel.connectorsThere") : "",
-      used.queued != null && used.queued !== 0 ? t("server.channel.queuedThere", { n: used.queued }) : "",
-      used.issue_threads != null && used.issue_threads !== 0 ? t("server.channel.issuesThere", { n: used.issue_threads }) : "",
-    ].filter(Boolean);
+    const topics = theRow(await qc.topicThreadsIn(db.sql, { id }), "TopicThreadsIn").n ?? 0;
+    const why = [...(await Promise.all(guards.map((guard) => guard(id)))).flat(), ...(topics !== 0 ? [t("server.channel.issuesThere", { n: topics })] : [])];
     if (why.length > 0) throw refused(t("server.channel.inUse", { why: list(why) }));
     const threads = store.threadsOf(id);
     const said = (row.last_number ?? 0) + threads.reduce((n, thread) => n + thread.reply_count, 0);
@@ -77,6 +73,7 @@ export function channelDirectory(deps: ChannelDirectoryDeps, r: ChannelHub): Dir
           name: agent.name,
           agent_id: agent.id,
           runtime: null,
+          home_id: null,
           joined_at: clock.now(),
         });
       }
@@ -86,6 +83,9 @@ export function channelDirectory(deps: ChannelDirectoryDeps, r: ChannelHub): Dir
     });
 
   return {
+    guardRemoval: (guard) => {
+      guards.push(guard);
+    },
     channels: async () => store.channels().map(infoOf),
     openChannel: (name, description, repo) =>
       store.locked(async () => {

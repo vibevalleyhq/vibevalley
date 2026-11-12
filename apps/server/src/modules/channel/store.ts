@@ -4,10 +4,9 @@ import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator, userId } from "@vibevalley/protocol";
 
 import { newId } from "#/base/ids.ts";
-import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
+import type { Db } from "#/infra/db.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
-import { NotRecorded } from "#/modules/session/session.ts";
 import * as qc from "#db/channel.sql.ts";
 import * as qmb from "#db/channel_member.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
@@ -64,35 +63,24 @@ export async function makeChannelStore(deps: ChannelStoreDeps) {
     await db.afterCommit(() => model.joined(joined));
   };
 
-  /** As upsertParticipant, a failed write told as NotRecorded: the hire it is part of stops and says so. */
-  const attemptParticipant = async (joined: qp.UpsertParticipantParams) => {
-    try {
-      await qp.upsertParticipant(db.sql, joined);
-    } catch (e) {
-      if (e instanceof SqlError) throw new NotRecorded(causeMessage(e), { cause: e });
-      throw e;
-    }
-    await db.afterCommit(() => model.joined(joined));
-  };
-
   /** Ensures an orchestrator participant row matches its current profile name. */
   const seat = async (id: string) => {
     const agent = agents.agent(id);
     const name = agent?.name.trim() || t("server.channel.name.orchestrator");
     if (model.participant(id)?.name === name && model.participant(id)?.role === "orchestrator") return;
-    await upsertParticipant({ id, kind: "agent", role: "orchestrator", name, agent_id: null, runtime: null, joined_at: clock.now() });
+    await upsertParticipant({ id, kind: "agent", role: "orchestrator", name, agent_id: null, runtime: null, home_id: null, joined_at: clock.now() });
   };
 
   for (const [id, kind, name] of [
     [userId, "user", t("server.channel.name.user")],
     ["system", "system", "VibeValley"],
   ] as const)
-    await qp.upsertParticipant(db.sql, { id, kind, role: null, name, agent_id: null, runtime: null, joined_at: clock.now() });
+    await qp.upsertParticipant(db.sql, { id, kind, role: null, name, agent_id: null, runtime: null, home_id: null, joined_at: clock.now() });
   const initialOrchestrators = agents.orchestrators().map((a) => a.id);
   for (const id of initialOrchestrators) {
     const agent = agents.agent(id);
     const name = agent?.name.trim() || t("server.channel.name.orchestrator");
-    await qp.upsertParticipant(db.sql, { id, kind: "agent", role: "orchestrator", name, agent_id: null, runtime: null, joined_at: clock.now() });
+    await qp.upsertParticipant(db.sql, { id, kind: "agent", role: "orchestrator", name, agent_id: null, runtime: null, home_id: null, joined_at: clock.now() });
   }
   if ((await qc.defaultID(db.sql)) === undefined) {
     const id = newId();
@@ -158,7 +146,6 @@ export async function makeChannelStore(deps: ChannelStoreDeps) {
     },
     seat,
     upsertParticipant,
-    attemptParticipant,
     markParticipantLeft: (id: string, at: number) =>
       db.tx(async () => {
         await qp.participantLeft(db.sql, { left_at: at, id });

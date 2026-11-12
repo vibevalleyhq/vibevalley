@@ -7,8 +7,13 @@ import { answers } from "./prompts.ts";
 import { callerOf, participant, refuse, said, sessionSchemaTool, tool, type Orchestrator, type SessionInput } from "./schemas.ts";
 import type { ToolDeps } from "./tool.ts";
 
-export function channelTools(deps: Pick<ToolDeps, "channel">) {
+export function channelTools(deps: Pick<ToolDeps, "channel" | "session">) {
   const chat = deps.channel;
+  /** The run a speaker is in, for the message it says. */
+  const runOf = (who: string): { readonly run?: string } => {
+    const now = deps.session.live(who).run;
+    return now ? { run: now } : {};
+  };
 
   const channelList = tool("channel.list", async () => (await chat.channels()).map((c) => "- " + channelLine(c)).join("\n"));
 
@@ -35,6 +40,7 @@ export function channelTools(deps: Pick<ToolDeps, "channel">) {
         _tag: "Agent",
         from: participant(c),
         text: p.text,
+        ...runOf(participant(c)),
         ...(p.id ? { target: p.id } : {}),
         ...(p.anyway === true ? { anyway: true } : {}),
         ...(p.confirm === true ? { confirm: true } : {}),

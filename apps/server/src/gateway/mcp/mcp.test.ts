@@ -107,7 +107,7 @@ describe("mcp", () => {
     const id = got.session.id;
     await until(() => tokens.length > 0, "the session's token");
     const thread = await waitFor(
-      () => chat.threadOfSession(id),
+      () => chat.homeOf(id),
       (t) => t !== undefined,
       "the session's thread",
     );
@@ -243,7 +243,7 @@ describe("mcp", () => {
     const id = got.session.id;
     await until(() => tokens.length > 0, "the session's token");
     const thread = await waitFor(
-      () => chat.threadOfSession(id),
+      () => chat.homeOf(id),
       (t) => t !== undefined,
       "the session's thread",
     );

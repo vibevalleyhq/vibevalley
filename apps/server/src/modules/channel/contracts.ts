@@ -7,7 +7,7 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { Inconsistent } from "#/base/errors.ts";
 import { jsonText, storedJsonOrUndefined } from "#/base/json.ts";
-import { actorOfParticipant, type Envelope, type Meta, metaOf, type Picked } from "#/modules/session/envelope.ts";
+import { actorOfParticipant, type ChannelEnvelopeRow, type Envelope, type Meta, metaOf, type Picked } from "#/modules/session/envelope.ts";
 import type * as qm from "#db/channel_message.sql.ts";
 
 import { type ChannelRow } from "./rooms.ts";
@@ -15,7 +15,7 @@ import { type ChannelRow } from "./rooms.ts";
 export type { ChannelAudience, ChannelEnvelopeRow, ChannelHearers, Meta } from "#/modules/session/envelope.ts";
 export type { Envelope, Picked } from "#/modules/session/envelope.ts";
 export { actorOfParticipant, channelType, envelopeMore, metaOf, metaText } from "#/modules/session/envelope.ts";
-export type { Delivered, SessionNews } from "#/modules/session/signals.ts";
+export type { Delivered } from "#/modules/session/signals.ts";
 
 export type MsgRow = qm.MessageByIDResult;
 
@@ -160,9 +160,6 @@ export interface ThreadSubject {
   readonly owner: string;
 }
 
-/** Keyed by `issue` when working one so reassigned sessions reuse the same issue thread. */
-export const subjectOf = (h: T.Session): ThreadSubject => (h.issue ? { kind: "issue", id: h.issue, owner: h.id } : { kind: "talk", id: h.id, owner: h.id });
-
 export interface Write {
   readonly channel: string;
   readonly from: string;
@@ -181,10 +178,18 @@ export interface Write {
 
 export type Post =
   | ({ readonly _tag: "User"; readonly text: string; readonly channel?: string | undefined; readonly sendKey: string } & SayMore)
-  /** Delivered in the session's thread, or directly when it has none. */
-  | { readonly _tag: "Tell"; readonly from: string; readonly session: string; readonly text: string; readonly sendKey: string }
-  | ({ readonly _tag: "Agent"; readonly from: string; readonly text: string } & SpeakOptions)
-  | { readonly _tag: "Announce"; readonly from: string; readonly channel: string; readonly text: string; readonly made: Made; readonly sendKey?: string }
+  /** Said in the speaker's home (the place an empty target means), as `from` (its run, if any). */
+  | { readonly _tag: "Home"; readonly from: string; readonly home: string; readonly text: string; readonly sendKey: string; readonly run?: string }
+  | ({ readonly _tag: "Agent"; readonly from: string; readonly text: string; readonly run?: string } & SpeakOptions)
+  | {
+      readonly _tag: "Announce";
+      readonly from: string;
+      readonly channel: string;
+      readonly text: string;
+      readonly made: Made;
+      readonly sendKey?: string;
+      readonly run?: string;
+    }
   /** Recorded in the default channel without waking anyone. */
   | { readonly _tag: "Call"; readonly from: string; readonly text: string; readonly sendKey: string }
   | { readonly _tag: "Run"; readonly from: string; readonly channel: string; readonly text: string; readonly run: string }
@@ -196,11 +201,49 @@ export type PostOf<Tag extends Post["_tag"]> = Extract<Post, { readonly _tag: Ta
 /** Each kind of post with its answer; Run and Notice are best effort and never fail. */
 export interface PostDoor {
   (p: PostOf<"User">): Promise<{ message: T.ChatMessage; again: boolean }>;
-  (p: PostOf<"Tell">): Promise<T.ChatMessage | undefined>;
+  (p: PostOf<"Home">): Promise<T.ChatMessage>;
   (p: PostOf<"Agent">): Promise<Spoken>;
   (p: PostOf<"Announce">): Promise<T.ChatMessage>;
   (p: PostOf<"Call">): Promise<boolean>;
   (p: PostOf<"Run"> | PostOf<"Notice">): Promise<void>;
+}
+
+export interface Joining {
+  readonly id: string;
+  readonly role: "orchestrator" | "worker";
+  readonly name: string;
+  readonly agent: string | null;
+  readonly runtime: string | null;
+  readonly home?: string;
+}
+
+export interface Participant {
+  readonly id: string;
+  readonly role: string | null;
+  readonly agent: string | null;
+  readonly runtime: string | null;
+  readonly home: string | null;
+  readonly left: boolean;
+}
+
+export interface Place {
+  readonly id: string;
+  readonly type: T.ChannelType;
+  readonly peer: string | null;
+  readonly parent: string | null;
+  readonly name: string | null;
+  readonly lastNumber: number;
+  readonly topic?: { readonly kind: NonNullable<T.Channel["subjectKind"]>; readonly id: string };
+}
+
+export interface Note {
+  readonly channel: string;
+  readonly from: string;
+  readonly kind: "dispatch" | "report";
+  readonly text: string;
+  readonly meta: Meta;
+  readonly topic?: ThreadSubject;
+  readonly member?: string;
 }
 
 export interface Written {
@@ -209,6 +252,45 @@ export interface Written {
   thread: string;
   again: boolean;
   row: MsgRow;
+}
+
+/** One thing that happened in the chat, numbered in the order it was committed (channel_event). */
+export interface ChannelEvent {
+  readonly seq: number;
+  readonly kind: "posted" | "removed";
+  readonly channel: string;
+  readonly message: string;
+  readonly at: number;
+}
+
+/** A message just committed, with what the chat knows of where it was said: what the layers above route on. */
+export interface Committed {
+  readonly event: ChannelEvent;
+  /** Told again at startup, after the reader's cursor: it may have been handled before the farm stopped. */
+  readonly replayed: boolean;
+  readonly row: ChannelEnvelopeRow;
+  readonly mentions: readonly string[];
+  readonly channel: Pick<T.Channel, "type" | "peer">;
+  /** The orchestrator in the channel the place is in. */
+  readonly orchestrator: string;
+  readonly channelMembers: readonly string[];
+  /** A thread's members, the ones it named included. */
+  readonly members: readonly string[];
+  /** The place's topic, for a thread kept about something outside the chat. */
+  readonly topic?: { readonly kind: NonNullable<T.Channel["subjectKind"]>; readonly id: string };
+}
+
+/** What an observer asks the chat to say after the message it was told of. */
+export interface Followup {
+  /** The hop limit's notice: said once by the farm (code hop_limit), until the user next speaks there. */
+  readonly hopLimit?: string;
+}
+
+/** Told each committed event in order, under the chat's lock, before the write that made it returns: it must not
+ * call back into the chat's locked members. A throw (not an ApiError) fails that write; the event stays to replay. */
+export interface ChannelObserver {
+  readonly posted: (c: Committed) => Promise<Followup | undefined>;
+  readonly removed: (event: ChannelEvent) => Promise<void>;
 }
 
 /** A read of the user's: where, up to which number, when. */
@@ -250,7 +332,47 @@ export interface ChannelService {
   readonly messageLocation: (id: T.MessageId) => Promise<{ readonly channel: T.Channel; readonly top: string } | undefined>;
   readonly envelopeResource: (id: T.MessageId) => Promise<EnvelopeResource | undefined>;
   readonly markRead: (channel: string, seq: number) => Promise<void>;
-  readonly threadOfSession: (session: string) => Promise<string | undefined>;
+  /** The place an empty target means for a participant: the home the layers above gave it. */
+  readonly homeOf: (participant: string) => Promise<string | undefined>;
+  /** Each committed event from now on, told to `observer` (see ChannelObserver); one observer per chat. */
+  readonly observe: (observer: ChannelObserver) => void;
+  /** The events after `after`, oldest first, at most n. */
+  readonly events: (after: number, n?: number) => Promise<ChannelEvent[]>;
+  /** Tells the observer each event after `after` again, in order (Committed.replayed); one that fails is logged and passed. */
+  readonly replay: (after: number, handled: (event: ChannelEvent) => Promise<void>) => Promise<void>;
+  /** Seats a participant who speaks for the layers above (a session, a profile), with its home; joined again if it left. */
+  readonly join: (p: Joining) => Promise<void>;
+  /** A participant gone: in nothing, never back. */
+  readonly leave: (participant: string) => Promise<void>;
+  readonly participants: () => readonly Participant[];
+  /** Follows a place from its newest message on. */
+  readonly addFollower: (channel: string, participant: string) => Promise<void>;
+  readonly membersOf: (channel: string) => readonly string[];
+  /** The thread kept about a topic, if one was opened. */
+  readonly threadAbout: (kind: NonNullable<T.Channel["subjectKind"]>, id: string) => string | undefined;
+  /** A place as the chat keeps it. */
+  readonly place: (id: string) => Place | undefined;
+  /** Sets where a participant has read up to in a place. */
+  readonly readUpTo: (participant: string, channel: string, number: number) => Promise<void>;
+  /** The newest message number in a place, 0 for none. */
+  readonly latest: (channel: string) => Promise<number>;
+  /** How many dispatch notes a thread has. */
+  readonly dispatches: (thread: string) => Promise<number>;
+  /** The newest n messages of a place, oldest first, as rows the layers above route. */
+  readonly recentRows: (channel: string, n: number) => Promise<readonly MsgRow[]>;
+  /** A place's messages after number `after`, oldest first. */
+  readonly rowsAfter: (channel: string, after: number) => Promise<readonly MsgRow[]>;
+  /** Tells the observers a committed message again, as when it was written (not as a replay). */
+  readonly retell: (message: string) => Promise<void>;
+  readonly envelopeRow: (row: MsgRow) => ChannelEnvelopeRow;
+  readonly asEnvelope: (row: ChannelEnvelopeRow) => Envelope;
+  readonly envelopeOf: (row: MsgRow, target: string) => Envelope;
+  readonly targetOfPlace: (channel: string) => string;
+  /** A note the farm writes for the layers above: a dispatch under the orchestrator's name, or a report; `topic` opens
+   * the place's thread about it under the note, `member` follows the place from it. */
+  readonly note: (n: Note) => Promise<{ readonly thread: string }>;
+  /** Refused removals: each guard says what still points at a channel (none: nothing). */
+  readonly guardRemoval: (guard: (channel: string) => Promise<readonly string[]>) => void;
   readonly now: () => T.Chat | undefined;
   /** What changed in channel after revision `after`, then each change from now on. Emits `Reset` when more than
    * `catchUpMax` revisions were missed. A channel that is not there is refused (an ApiError) by the first `next()`,
@@ -277,7 +399,5 @@ export interface ChannelService {
   readonly topOf: (channel: string) => Promise<Info>;
   readonly addressOf: (channel: string) => Promise<{ readonly direct: boolean; readonly target: string }>;
   readonly channelByName: (name: string) => Promise<Info | undefined>;
-  /** Must run after sessions are restored on startup. */
-  readonly boot: () => Promise<void>;
   readonly close: () => Promise<void>;
 }

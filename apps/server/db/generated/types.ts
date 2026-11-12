@@ -20,6 +20,9 @@ export type Words_artifact_body = z.infer<typeof Words_artifact_body>
 export const Words_artifact_suggestion_status = z.enum(["open","accepted","rejected"])
 export type Words_artifact_suggestion_status = z.infer<typeof Words_artifact_suggestion_status>
 
+export const Words_channel_event_kind = z.enum(["posted","removed"])
+export type Words_channel_event_kind = z.infer<typeof Words_channel_event_kind>
+
 export const Words_channel_member_reason = z.enum(["user","replied","mentioned","manual"])
 export type Words_channel_member_reason = z.infer<typeof Words_channel_member_reason>
 

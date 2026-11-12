@@ -25,6 +25,7 @@ import { makeAgent } from "#/modules/agent/agent.ts";
 import builtIn from "#/modules/agent/templates/orchestrator/agent.json" with { type: "json" };
 import { type Attachment, makeAttachment } from "#/modules/attachment/attachment.ts";
 import { effectsOf } from "#/modules/game/view.ts";
+import { channelUses } from "#/modules/issue/issue.ts";
 import { wakeBreaker } from "#/modules/session/brakes.ts";
 import { type Handed, orchestratorIn } from "#/modules/session/envelope.ts";
 import { restoredSession, sessionState } from "#/modules/session/history.ts";
@@ -33,6 +34,7 @@ import { type Mailbox, makeMailbox } from "#/modules/session/mailbox.ts";
 import { summaryOf } from "#/modules/session/report.ts";
 import { DeliveryRefused, newsOf, sessionOver, type SessionNews } from "#/modules/session/session.ts";
 import type { Consumed, LaunchActivity } from "#/modules/session/signals.ts";
+import { makeWatch, type Watch } from "#/modules/watch/watch.ts";
 import { testConfig, until, waitFor } from "#/testing/layers.ts";
 import { topPlace } from "#db/channel.sql.ts";
 import { addMember, membersOf, removeMember } from "#db/channel_member.sql.ts";
@@ -130,6 +132,7 @@ const offline: typeof fetch = () => Promise.reject(new Error("a test farm reache
 interface Farm extends AsyncDisposable {
   readonly core: Core;
   readonly chat: Channel;
+  readonly watch: Watch;
   readonly mailbox: Mailbox;
   readonly attachment: Attachment;
   readonly db: Db;
@@ -197,7 +200,8 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
     close: () => mailbox.close(),
   });
   const attachment = await makeAttachment({ config: c, clock, db });
-  const chat = await makeChannel({ clock, log, fetch: offline, db, core, agent, attachment, session });
+  const chat = await makeChannel({ clock, log, fetch: offline, db, core, agent, attachment });
+  const watch = await makeWatch({ clock, log, db, agent, session, channel: chat });
   const { changes: moves } = core.transitions();
   const relay = (async () => {
     for await (const { fact, after } of moves) {
@@ -206,7 +210,7 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
       if (n) x.news.publish(n);
     }
   })();
-  await chat.boot();
+  await watch.boot();
   await mailbox.boot();
   const deliveries = async (recipient: string) =>
     (
@@ -218,6 +222,7 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
   return {
     core,
     chat,
+    watch,
     mailbox,
     attachment,
     db,
@@ -235,6 +240,7 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
       x.release();
       moves.close();
       await relay;
+      await watch.close();
       await chat.close();
       await mailbox.close();
       await agent.close();
@@ -285,7 +291,7 @@ const hire = async (f: Farm, _x: FakeSessions, id: string, brief: string, repo: 
   await keepSession(f, session);
   f.core.apply({ type: "sessionChanged", session });
   const thread = await waitFor(
-    async () => f.channel(await f.chat.threadOfSession(id)),
+    async () => f.channel(await f.chat.homeOf(id)),
     (c) => c !== undefined,
     "an issue thread",
   );
@@ -444,7 +450,7 @@ describe("the chat", () => {
       ]);
       expect(report.text).toContain("收到了");
       expect(report.text).not.toContain("结论");
-      const threadOfSession2 = await f.chat.threadOfSession("w1");
+      const threadOfSession2 = await f.chat.homeOf("w1");
       expect(threadOfSession2).toBe(thread.id);
     }));
 
@@ -565,7 +571,8 @@ describe("the chat", () => {
       await f.chat.markUnread(a, said.number);
       expect([f.channel(a)?.read, f.channel(a)?.unread]).toEqual([said.number - 1, 2]);
 
-      // A cron of the issue module's, as its table has it.
+      // A cron of the issue module's, as its table has it; the issues guard the channels they point at.
+      f.chat.guardRemoval(channelUses({ db: f.db, queued: async () => [] }));
       await f.sql(`insert into issue_cron (id, name, body, channel_id, spec, tz, created_at) values ('r1', '看看', '看一眼', $1, '{}', 'UTC', 0)`, [a]);
       const channelRemovedFailure = await failure(f.chat.removeChannel(a));
       expect(channelRemovedFailure).toMatchObject({ message: expect.stringContaining("定时任务") });
@@ -704,9 +711,9 @@ describe("the chat", () => {
       };
       await keepSession(f, session);
       f.core.apply({ type: "sessionChanged", session });
-      const thread = await f.chat.threadOfSession("o2");
+      const thread = await f.chat.homeOf("o2");
       expect(thread).toBeUndefined();
-      await f.chat.post({ _tag: "Tell", from: userId, session: "o2", text: "直接说给它", sendKey: "" });
+      await f.watch.tell(userId, "o2", "直接说给它", "");
       const recorded = (await f.sql(`select id from session_trigger where trigger_json like $1`, ["%直接说给它%"])).map((r) => ({ id: String(r["id"]) }));
       expect(recorded).toHaveLength(1);
       await until(async () => (await f.deliveryOf("o2", recorded[0]!.id)) !== undefined, "its delivery");
@@ -859,7 +866,7 @@ describe("the chat", () => {
       });
       await until(async () => (await g.deliveryOf("w14", said.id))?.state === "consumed", "seen after the restart");
       expect(y.runsOf("w14").at(-1)).toContain("再加一个文件");
-      const threadOfSession2 = await g.chat.threadOfSession("w14");
+      const threadOfSession2 = await g.chat.homeOf("w14");
       expect(threadOfSession2).toBe(thread.id);
       // The new farm has heard nothing yet: what was said before is in the room's history.
       expect((await g.chat.history(thread.id)).some((m) => m.id === said.id)).toBe(true);
@@ -877,6 +884,8 @@ describe("the chat", () => {
       await until(async () => (await f.deliveryOf("w15", message.id))?.state === "consumed", "the first route");
       await f.sql(`delete from session_delivery where envelope_id = $1`, [message.id]);
       await f.sql(`update session_trigger set routed_at = null, routing_scope = null, routing_position = null where id = $1`, [message.id]);
+      // As a crash before the route left it: the watch's cursor still before the message.
+      await f.sql(`update watch_cursor set seq = (select seq - 1 from channel_event where message_id = $1 and kind = 'posted')`, [message.id]);
     }, config);
     await run(async (_f, x) => {
       x.holds = false;
@@ -896,6 +905,8 @@ describe("the chat", () => {
       await f.sql(`update session_trigger set routed_at = null, routing_scope = null, routing_position = null, trigger_json = 'not json' where id = $1`, [
         stuck.id,
       ]);
+      // And the watch's cursor before it, so the next startup tries it.
+      await f.sql(`update watch_cursor set seq = (select seq - 1 from channel_event where message_id = $1 and kind = 'posted')`, [stuck.id]);
     }, config);
     // The farm comes up past the row it cannot route, and takes new words.
     await withTimeout(
@@ -1110,8 +1121,8 @@ describe("the chat", () => {
       expect(registered2).toBe(false);
       expect(f.mailbox.deliveriesOf("w1").some((row) => row.envelope_id === id)).toBe(false);
       await drop(f.db, "fail_second_recipient", "session_delivery");
-      await f.chat.boot();
-      await f.chat.boot();
+      await f.watch.boot();
+      await f.watch.boot();
       const rows2 = await f.sql(`select session_id from session_delivery where envelope_id = $1 order by session_id`, [id]);
       expect(rows2).toEqual([{ session_id: "w1" }, { session_id: "w2" }]);
       const registered3 = await f.mailbox.isRouted(id);
@@ -1186,7 +1197,7 @@ describe("the chat", () => {
           session: second,
         });
         await until(() => f.messagesOf(f.chat.defaultChannel()).filter((m) => m.kind === "dispatch").length === 2, "both dispatched");
-        const thread = (await f.chat.threadOfSession("w1"))!;
+        const thread = (await f.chat.homeOf("w1"))!;
         expect((await f.sql(`select participant_id from channel_member where channel_id = $1`, [thread])).map((r) => r.participant_id)).toEqual(["w1"]);
       },
       undefined,

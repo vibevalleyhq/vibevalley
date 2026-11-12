@@ -295,23 +295,20 @@ export async function topPlace(sql: Sql, params: TopPlaceParams): Promise<TopPla
   return row === undefined ? undefined : rowOf("TopPlace", TopPlaceResult, row)
 }
 
-export interface ChannelInUseParams {
+export interface TopicThreadsInParams {
   readonly ["id"]: string
 }
 
-export const ChannelInUseResult = z.object({
-  ["crons"]: z.number().int(),
-  ["connectors"]: z.number().int(),
-  ["queued"]: z.number().int(),
-  ["issue_threads"]: z.number().int(),
+export const TopicThreadsInResult = z.object({
+  ["n"]: z.number().int(),
 })
-export type ChannelInUseResult = z.infer<typeof ChannelInUseResult>
+export type TopicThreadsInResult = z.infer<typeof TopicThreadsInResult>
 
-export const ChannelInUseSql = "-- name: ChannelInUse :one\n-- What still points at a channel, so deleting it would take it from under them.\nselect (select count(*) from issue_cron r where r.channel_id = $1)::int as crons,\n       (select count(*) from connector_account a where a.channel_id = $1)::int as connectors,\n       (select count(distinct i.id) from issue i\n        left join session_issue_input m on m.issue_id = i.id and m.state = 'held'\n        left join session_trigger t on t.id = m.trigger_id\n        where i.queued_at is not null and (t.trigger_json::jsonb ->> 'replyChannel' = $1))::int as queued,\n       (select count(*) from channel t where t.parent_id = $1 and t.subject_kind = 'issue')::int as issue_threads;"
+export const TopicThreadsInSql = "-- name: TopicThreadsIn :one\n-- The threads in a channel kept about something outside the chat (a topic), so deleting it would take them from under it.\nselect count(*)::int as n from channel t where t.parent_id = $1 and t.subject_kind = 'issue';"
 
-export async function channelInUse(sql: Sql, params: ChannelInUseParams): Promise<ChannelInUseResult | undefined> {
-  const [row] = await sql.query(ChannelInUseSql, [params["id"]])
-  return row === undefined ? undefined : rowOf("ChannelInUse", ChannelInUseResult, row)
+export async function topicThreadsIn(sql: Sql, params: TopicThreadsInParams): Promise<TopicThreadsInResult | undefined> {
+  const [row] = await sql.query(TopicThreadsInSql, [params["id"]])
+  return row === undefined ? undefined : rowOf("TopicThreadsIn", TopicThreadsInResult, row)
 }
 
 export interface DeleteThreadsOfParams {

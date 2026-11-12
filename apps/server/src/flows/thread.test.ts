@@ -30,7 +30,7 @@ describe("an issue's thread", () => {
     const issue = await issues.add({ title: "还在处理", repo: "release-input", agent: "lab" });
     const started = await issues.start(issue.id, "");
     const thread = (await await_(
-      () => chat.threadOfSession(started.session!),
+      () => chat.homeOf(started.session!),
       (id) => id !== undefined,
       "the issue thread",
     ))!;
@@ -111,7 +111,7 @@ describe("an issue's thread", () => {
     expect(first).toBeDefined();
     const thread = await await_(
       async () => {
-        const id = await channels.threadOfSession(first);
+        const id = await channels.homeOf(first);
         return id ? channelOf(core.state().chat, id) : undefined;
       },
       (c): c is T.Channel => c !== undefined,
@@ -142,7 +142,7 @@ describe("an issue's thread", () => {
     const second = latestSessionIdOf(setStatus2);
     if (second === undefined) throw new Error("the issue has no reopened session");
     await until(() => reportsBy(second) === 1, "the second session's report in the same thread");
-    const threadOfSession2 = await channels.threadOfSession(second);
+    const threadOfSession2 = await channels.homeOf(second);
     expect(threadOfSession2).toBe(thread!.id);
     const handed = inThread().find((m) => m.kind === "dispatch" && m.session === second);
     expect(handed?.text).toContain("@" + second);
@@ -183,7 +183,7 @@ describe("an issue's thread", () => {
     });
     const sent = await issues.start(issue.id, "");
     const thread = (await await_(
-      () => channels.threadOfSession(sent.session!),
+      () => channels.homeOf(sent.session!),
       (id) => id !== undefined,
       "the issue's thread",
     ))!;

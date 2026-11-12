@@ -27,6 +27,8 @@ const refused = refuseIn(BizCode.ArtifactRefused);
 interface Maker {
   readonly from: string;
   readonly by: string;
+  /** The run it is made in, if a session's or an orchestrator's. */
+  readonly run?: string;
 }
 
 export interface Artifact {
@@ -184,6 +186,7 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
       channel: channel,
       text: words(t("server.artifact.made", { title }), note),
       made: { card },
+      ...(maker.run ? { run: maker.run } : {}),
     });
     const now = clock.now();
     await qa.addArtifact(db.sql, {
@@ -233,6 +236,7 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
       channel: row.channel_id ?? "",
       text: words(t("server.artifact.versioned", { title: row.title, version: next }), note),
       made: { card },
+      ...(maker.run ? { run: maker.run } : {}),
     });
     const now = clock.now();
     await qv.addArtifactVersion(db.sql, {

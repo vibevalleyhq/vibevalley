@@ -112,3 +112,19 @@ export const AccountChannelSql = "-- name: AccountChannel :exec\nupdate connecto
 export async function accountChannel(sql: Sql, params: AccountChannelParams): Promise<number> {
   return sql.exec(AccountChannelSql, [params["channel_id"], params["connector"]])
 }
+
+export interface AccountsInParams {
+  readonly ["channel_id"]: string
+}
+
+export const AccountsInResult = z.object({
+  ["n"]: z.number().int(),
+})
+export type AccountsInResult = z.infer<typeof AccountsInResult>
+
+export const AccountsInSql = "-- name: AccountsIn :one\n-- The connector accounts bridged to a channel, so deleting it would take it from under them.\nselect count(*)::int as n from connector_account where channel_id = $1;"
+
+export async function accountsIn(sql: Sql, params: AccountsInParams): Promise<AccountsInResult | undefined> {
+  const [row] = await sql.query(AccountsInSql, [params["channel_id"]])
+  return row === undefined ? undefined : rowOf("AccountsIn", AccountsInResult, row)
+}

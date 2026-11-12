@@ -27,3 +27,7 @@ update connector_account set reply_context = sqlc.narg(reply_context), reply_at 
 
 -- name: AccountChannel :exec
 update connector_account set channel_id = sqlc.narg(channel_id) where connector = sqlc.arg(connector);
+
+-- name: AccountsIn :one
+-- The connector accounts bridged to a channel, so deleting it would take it from under them.
+select count(*)::int as n from connector_account where channel_id = sqlc.arg(channel_id);

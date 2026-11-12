@@ -19,3 +19,7 @@ update issue_cron set enabled = sqlc.arg(enabled), pending = pending and not sql
 
 -- name: RemoveCron :exec
 delete from issue_cron where id = sqlc.arg(id);
+
+-- name: CronsIn :one
+-- The crons that post in a channel, so deleting it would take it from under them.
+select count(*)::int as n from issue_cron where channel_id = sqlc.arg(channel_id);

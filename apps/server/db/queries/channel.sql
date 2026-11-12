@@ -95,15 +95,9 @@ with recursive places as (
 select id::channel.id as id, type::channel.type as type, peer_id::channel.peer_id? as peer_id from places where type <> 'thread' limit 1;
 
 
--- name: ChannelInUse :one
--- What still points at a channel, so deleting it would take it from under them.
-select (select count(*) from issue_cron r where r.channel_id = sqlc.arg(id))::int as crons,
-       (select count(*) from connector_account a where a.channel_id = sqlc.arg(id))::int as connectors,
-       (select count(distinct i.id) from issue i
-        left join session_issue_input m on m.issue_id = i.id and m.state = 'held'
-        left join session_trigger t on t.id = m.trigger_id
-        where i.queued_at is not null and (t.trigger_json::jsonb ->> 'replyChannel' = sqlc.arg(id)))::int as queued,
-       (select count(*) from channel t where t.parent_id = sqlc.arg(id) and t.subject_kind = 'issue')::int as issue_threads;
+-- name: TopicThreadsIn :one
+-- The threads in a channel kept about something outside the chat (a topic), so deleting it would take them from under it.
+select count(*)::int as n from channel t where t.parent_id = sqlc.arg(id) and t.subject_kind = 'issue';
 
 -- name: DeleteThreadsOf :exec
 delete from channel where parent_id = sqlc.arg(id);

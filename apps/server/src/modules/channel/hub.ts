@@ -11,7 +11,6 @@ import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import type { Attachment } from "#/modules/attachment/attachment.ts";
 import { type Envelope, orchestratorIn, unreadSummaryOf } from "#/modules/session/envelope.ts";
-import type { Session } from "#/modules/session/session.ts";
 import * as qc from "#db/channel.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 
@@ -24,7 +23,6 @@ import {
   notifyOf,
   envelopeMore,
   type ThreadSubject,
-  subjectOf,
   type ChannelEnvelopeRow,
   theRow,
   type UserRead,
@@ -49,12 +47,11 @@ export interface ChannelHubDeps {
   readonly core: Core;
   readonly agent: Agent;
   readonly attachment: Attachment;
-  readonly session: Session;
 }
 
 /** The chat's shared state and the ways it is told: the store, the hubs of what was said and read, and the frames. */
 export async function makeChannelHub(deps: ChannelHubDeps) {
-  const { core, agent: agents, db, session: sessions, clock } = deps;
+  const { core, agent: agents, db, clock } = deps;
   const store = await makeChannelStore(deps);
   // Every message once written, for the rooms: each follower reads it through a bounded relay of its own.
   const said = new Hub<T.ChatMessage>();
@@ -84,17 +81,6 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
       .flatMap((c) => (c.name !== null ? [c] : []))
       .toSorted((a, b) => (a.id < b.id ? -1 : 1))
       .map((c) => "#" + c.name);
-  const directOfSession = (h: T.Session) => {
-    const ch = h.channel ? store.channel(h.channel) : undefined;
-    return !h.issue && ch?.type === "direct" && ch.peer_id === profileId(h.agent) ? ch.id : undefined;
-  };
-  const sessionOf = (id: string) => sessions.live(id).session;
-  const hired = () => sessions.hired();
-  /** The helper working the issue now: the latest hired of those on it. */
-  const onIssue = (issue: string) =>
-    hired().reduce<T.Session | undefined>((on, h) => (h.issue === issue && (!on || h.hiredAt >= on.hiredAt) ? h : on), undefined);
-  const talkSession = (channel: string) => hired().find((h) => directOfSession(h) === channel);
-  const channelOfSession = (h: T.Session) => directOfSession(h) ?? (h.channel && channelName(h.channel) !== undefined ? h.channel : store.defaultId());
   const channelIdOf = (row: ChannelRow) => (row.type === "thread" ? (row.parent_id ?? row.id) : row.id);
   /** Where the user talks with peer alone, from either side. */
   const directWith = (who: string, other: string) => {
@@ -204,18 +190,10 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
 
   const threadOf = (subject: ThreadSubject) => store.threadOfSubject(subject.kind, subject.id);
 
-  const threadOfSession = async (session: string): Promise<string | undefined> => {
-    const h = sessionOf(session);
-    return h ? (directOfSession(h) ?? threadOf(subjectOf(h))) : undefined;
-  };
-
-  /** Who a thread's words are for, worked out now rather than kept: the session on the issue, or a talk thread's own session. */
-  const ownerOf = (ch: ChannelRow): string => {
-    if (ch.type === "direct") return talkSession(ch.id)?.id ?? "";
-    if (ch.type === "channel" || !ch.subject_id) return "";
-    if (ch.subject_kind === "issue") return onIssue(ch.subject_id)?.id ?? "";
-    if (ch.subject_kind === "talk") return sessionOf(ch.subject_id) ? ch.subject_id : "";
-    return "";
+  /** Where an empty target means for a participant: the home it was given, while that place is there. */
+  const homeOf = (participant: string): string | undefined => {
+    const home = store.participant(participant)?.home_id ?? null;
+    return home !== null && store.channel(home) ? home : undefined;
   };
 
   /** Tool reads advance the cursor; passive input consumption belongs to Session receipts. */
@@ -293,8 +271,8 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
   });
 
   const inboxRows = async (who: string) => {
-    const h = sessionOf(who);
-    const channel = h ? channelOfSession(h) : store.defaultId();
+    const home = homeOf(who);
+    const channel = (home !== undefined ? topOfRow(store.channel(home))?.id : undefined) ?? store.defaultId();
     return unreadSummaryOf(await qc.unreadOf(db.sql, { participant: who, channel }));
   };
 
@@ -322,13 +300,8 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
     orchestratorInRow,
     membersOfRow,
     channelTags,
-    directOfSession,
-    talkSession,
-    channelOfSession,
     channelIdOf,
     directWith,
-    sessionOf,
-    hired,
     targetOfRow,
     targetOfChannel,
     toChannel,
@@ -337,8 +310,8 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
     publishUserMentions,
     publishMessage,
     threadOf,
-    threadOfSession,
-    ownerOf,
+    homeOf,
+    topOfRow,
     readUpTo,
     readThrough,
     change,

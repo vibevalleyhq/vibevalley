@@ -87,3 +87,19 @@ export const RemoveCronSql = "-- name: RemoveCron :exec\ndelete from issue_cron 
 export async function removeCron(sql: Sql, params: RemoveCronParams): Promise<number> {
   return sql.exec(RemoveCronSql, [params["id"]])
 }
+
+export interface CronsInParams {
+  readonly ["channel_id"]: string
+}
+
+export const CronsInResult = z.object({
+  ["n"]: z.number().int(),
+})
+export type CronsInResult = z.infer<typeof CronsInResult>
+
+export const CronsInSql = "-- name: CronsIn :one\n-- The crons that post in a channel, so deleting it would take it from under them.\nselect count(*)::int as n from issue_cron where channel_id = $1;"
+
+export async function cronsIn(sql: Sql, params: CronsInParams): Promise<CronsInResult | undefined> {
+  const [row] = await sql.query(CronsInSql, [params["channel_id"]])
+  return row === undefined ? undefined : rowOf("CronsIn", CronsInResult, row)
+}

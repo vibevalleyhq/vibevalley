@@ -167,7 +167,7 @@ test("a helper on the farm's own runtime cut off mid-answer by a restart finishe
     try {
       below.deepseek.use(llm);
       await below.session.boot();
-      await below.channel.boot();
+      await below.watch.boot();
       await below.session.wake();
       return below;
     } catch (e) {

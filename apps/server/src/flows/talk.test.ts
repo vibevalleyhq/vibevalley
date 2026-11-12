@@ -190,7 +190,7 @@ describe("a talk with a helper profile", () => {
       const channels = fw.channel;
       const sessions = fw.inside;
       const said = fw.said.in;
-      await channels.boot();
+      await fw.watch.boot();
       const direct2 = await channels.direct("lab");
       expect(direct2).toBe(first.dm);
       expect(sessions.hired().find((s) => s.channel === first.dm)?.id).toBe(first.session);

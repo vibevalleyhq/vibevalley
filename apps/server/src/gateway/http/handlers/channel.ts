@@ -9,6 +9,7 @@ import type { Time } from "#/infra/time.ts";
 import type { Artifact } from "#/modules/artifact/artifact.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { Game } from "#/modules/game/game.ts";
+import type { Watch } from "#/modules/watch/watch.ts";
 
 /** Snapshots the blocks quoted by the user so later edits or deletions remain visible on the message. */
 async function quoteBlocks(artifacts: Artifact, refs: readonly T.BlockRef[] | undefined, log: Logger): Promise<T.QuotedBlock[]> {
@@ -35,6 +36,7 @@ async function quoteBlocks(artifacts: Artifact, refs: readonly T.BlockRef[] | un
 export interface ChannelHandlersDeps {
   readonly artifact: Artifact;
   readonly channel: Channel;
+  readonly watch: Watch;
   readonly game: Game;
   readonly clock: Time;
   readonly log: Logger;
@@ -77,7 +79,7 @@ export function channelHandlers(deps: ChannelHandlersDeps): ChannelHandlers {
     },
     "channel.message.update": ({ id, text, attachments }) => channels.edit(id, text, attachments),
     "channel.message.delete": ({ id }) => channels.remove(id),
-    "channel.message.previewDelete": ({ id }) => channels.previewRemove(id),
+    "channel.message.previewDelete": ({ id }) => deps.watch.previewRemove(id),
     "channel.message.search": ({ text, channel }) => channels.search(text, channel),
     "channel.reaction.set": ({ id, emoji, on }) => channels.react(id, userId, emoji, on),
     "channel.pin.set": ({ id, on }) => channels.pin(id, on),

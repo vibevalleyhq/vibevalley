@@ -21,6 +21,7 @@ import { makeRuntime, type Runtime, type RuntimeOptions } from "#/modules/runtim
 import { makeSession, type Session, type SessionOptions } from "#/modules/session/session.ts";
 import { makeSetting, type Setting } from "#/modules/setting/setting.ts";
 import { makeUser, type User } from "#/modules/user/user.ts";
+import { makeWatch, type Watch } from "#/modules/watch/watch.ts";
 
 import { type Core, makeCore, type Projection } from "./core/core.ts";
 import type { ServerConfig } from "./infra/config.ts";
@@ -76,6 +77,7 @@ export interface Farm extends AsyncDisposable {
   readonly media: Media;
   readonly artifact: Artifact;
   readonly pkm: Pkm;
+  readonly watch: Watch;
   readonly issue: Issue;
   readonly inbox: Inbox;
   readonly tool: Tool;
@@ -147,6 +149,7 @@ export type Modules = Pick<
   | "media"
   | "artifact"
   | "pkm"
+  | "watch"
   | "issue"
 >;
 
@@ -178,12 +181,14 @@ export async function buildModules(config: ServerConfig, options: ServiceOptions
   // the machine they run on.
   const session = own(await makeSession({ config, clock, log, db, core, agent, memory, repo, runtime }, options.session));
   // Collaboration: channels, threads, messages, media and its library, documents, the user's notes.
-  const channel = own(await makeChannel({ clock, log, fetch, db, core, agent, attachment, session }));
+  const channel = own(await makeChannel({ clock, log, fetch, db, core, agent, attachment }));
   const media = own(await makeMedia({ db, core, clock, log, attachment, session, channel, provider, publicFetch }));
   const artifact = own(await makeArtifact({ db, clock, log, attachment, channel }));
   const pkm = own(await makePkm({ config, clock, log, db }));
+  // Watch: the chat's committed events routed to the sessions, and their threads, talks and receipts in the chat.
+  const watch = own(await makeWatch({ clock, log, db, agent, session, channel }));
   // Issues: the issues and what runs on a schedule.
-  const issue = own(await makeIssue({ config, clock, log, db, core, agent, repo, runtime, session, channel }));
+  const issue = own(await makeIssue({ config, clock, log, db, core, agent, repo, runtime, session, channel, watch }));
   return {
     config,
     clock,
@@ -206,6 +211,7 @@ export async function buildModules(config: ServerConfig, options: ServiceOptions
     media,
     artifact,
     pkm,
+    watch,
     issue,
   };
 }
@@ -217,7 +223,7 @@ export async function makeFarm(config: ServerConfig, options: ServiceOptions = {
   const own = owning(closes);
   try {
     const modules = await buildModules(config, options, closes);
-    const { clock, log, fetch, db, core, setting, user, agent, memory, runtime, repo, session, channel, media, artifact, pkm, issue } = modules;
+    const { clock, log, fetch, db, core, setting, user, agent, memory, runtime, repo, session, channel, media, artifact, pkm, watch, issue } = modules;
     const { provider } = modules;
     // Inbox: what is news to the user, and the patrol.
     const inbox = own(await makeInbox({ config, clock, log, db, core, channel, issue, session }));
@@ -239,9 +245,9 @@ export async function makeFarm(config: ServerConfig, options: ServiceOptions = {
     await repo.boot();
     // The sessions on the farm when it stopped are taken up again, or let go.
     await session.boot();
-    // Their threads, before the deliveries wake anyone.
-    await channel.boot();
-    // Open deliveries restored, committed messages without a route receipt replayed, then the sessions woken.
+    // Their threads, then the chat's events after the watch's cursor routed, before the deliveries wake anyone.
+    await watch.boot();
+    // Open deliveries restored, then the sessions woken.
     await session.wake();
     // What media waited for.
     await media.boot();

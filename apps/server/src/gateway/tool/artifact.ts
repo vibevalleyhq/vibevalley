@@ -27,6 +27,11 @@ const refusalAnswered = async (work: () => Promise<string>): Promise<string> => 
 export function artifactTools(deps: Pick<ToolDeps, "session" | "channel" | "artifact" | "log">, findIssue: (key: string) => Promise<T.Issue>) {
   const { session: run, channel: chat, artifact: artifacts } = deps;
   const log = deps.log.child("tool");
+  /** The run a maker is in, for the message that announces what it made. */
+  const runOf = (who: string): { readonly run?: string } => {
+    const now = run.live(who).run;
+    return now ? { run: now } : {};
+  };
 
   /** What a kept page will not do that its maker should hear about: the check let it through, the CSP stops it. */
   const warnings = (made: T.Artifact, content: string) => (made.body === "html" ? answers.artifact.warned(htmlCheck(content).warned) : "");
@@ -124,7 +129,7 @@ export function artifactTools(deps: Pick<ToolDeps, "session" | "channel" | "arti
         return refusalAnswered(async () => {
           const content = await artifactWords(c, p.content, undefined);
           const made = await artifacts.create(
-            { from: c.agent, by: c.agent },
+            { from: c.agent, by: c.agent, ...runOf(c.agent) },
             {
               title: p.title,
               kind: p.kind,
@@ -146,7 +151,7 @@ export function artifactTools(deps: Pick<ToolDeps, "session" | "channel" | "arti
       return refusalAnswered(async () => {
         const content = await artifactWords(c, p.content, p.file);
         const made = await artifacts.create(
-          { from: c.session, by: c.agent },
+          { from: c.session, by: c.agent, ...runOf(c.session) },
           {
             title: p.title,
             kind: p.kind,
@@ -167,7 +172,10 @@ export function artifactTools(deps: Pick<ToolDeps, "session" | "channel" | "arti
         const c = callerOf(who);
         return refusalAnswered(async () => {
           const content = await artifactWords(c, p.content, p.file);
-          const made = await artifacts.version({ from: c.session || c.agent, by: c.agent }, { id: p.id, content, ...(p.note ? { note: p.note } : {}) });
+          const made = await artifacts.version(
+            { from: c.session || c.agent, by: c.agent, ...runOf(c.session || c.agent) },
+            { id: p.id, content, ...(p.note ? { note: p.note } : {}) },
+          );
           return answers.artifact.versioned(made) + warnings(made, content);
         });
       },

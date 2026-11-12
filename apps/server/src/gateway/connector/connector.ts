@@ -11,6 +11,7 @@ import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { Inbox } from "#/modules/inbox/inbox.ts";
+import * as accountQ from "#db/connector_account.sql.ts";
 import * as inboundQ from "#db/connector_inbound.sql.ts";
 import * as outboxQ from "#db/connector_outbox.sql.ts";
 
@@ -60,6 +61,7 @@ export async function makeConnector(deps: ConnectorDeps, options: ConnectorOptio
   const { clock, db, core, inbox } = deps;
   const chat = deps.channel;
   const log = deps.log.child("connector");
+  chat.guardRemoval(async (id) => (((await accountQ.accountsIn(db.sql, { channel_id: id }))?.n ?? 0) !== 0 ? [t("server.channel.connectorsThere")] : []));
   const retryFirst = options.retryFirstMs ?? 30_000;
   const retryMost = options.retryMostMs ?? 30 * 60_000;
   // The bridges' tasks (each account's generation, the status said to the core) belong to this service.

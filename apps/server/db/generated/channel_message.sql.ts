@@ -5,7 +5,7 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, Words_channel_message_kind, Words_channel_participant_kind, Words_channel_participant_role, Words_channel_subject_kind, Words_channel_type } from "./types.js"
+import { rowOf, Words_channel_message_kind, Words_channel_participant_kind, Words_channel_participant_role, Words_channel_type } from "./types.js"
 
 export interface InsertMessageParams {
   readonly ["id"]: string
@@ -220,42 +220,6 @@ export const MessagesAfterSql = "-- name: MessagesAfter :many\nselect m.id, m.ch
 export async function messagesAfter(sql: Sql, params: MessagesAfterParams): Promise<MessagesAfterResult[]> {
   const rows = await sql.query(MessagesAfterSql, [params["channel_id"], params["number"], params["n"]])
   return rows.map((row) => rowOf("MessagesAfter", MessagesAfterResult, row))
-}
-
-export interface MissingDirectDeliveriesParams {
-  readonly ["channel_id"]: string
-  readonly ["after_number"]: number
-  readonly ["recipient_id"]: string
-}
-
-export const MissingDirectDeliveriesResult = z.object({
-  ["id"]: z.string(),
-  ["channel_id"]: z.string(),
-  ["number"]: z.number().int(),
-  ["sender_id"]: z.string(),
-  ["kind"]: Words_channel_message_kind,
-  ["body"]: z.string(),
-  ["meta"]: z.string().nullable(),
-  ["send_key"]: z.string().nullable(),
-  ["created_at"]: z.number(),
-  ["revision"]: z.number().int(),
-  ["reply_number"]: z.number().int().nullable(),
-  ["edited_at"]: z.number().nullable(),
-  ["deleted_at"]: z.number().nullable(),
-  ["pinned_at"]: z.number().nullable(),
-  ["reactions"]: z.string().nullable(),
-  ["sender_name"]: z.string(),
-  ["sender_kind"]: Words_channel_participant_kind,
-  ["sender_role"]: Words_channel_participant_role.nullable(),
-  ["sender_agent"]: z.string().nullable(),
-})
-export type MissingDirectDeliveriesResult = z.infer<typeof MissingDirectDeliveriesResult>
-
-export const MissingDirectDeliveriesSql = "-- name: MissingDirectDeliveries :many\n-- bound: user messages committed after a direct session's startup snapshot, without a delivery to that session.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent\nfrom channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number > $2\n  and m.sender_id = 'user' and m.kind = 'chat' and m.deleted_at is null\n  and not exists (select 1 from session_delivery d where d.session_id = $3 and d.message_id = m.id)\norder by m.number;"
-
-export async function missingDirectDeliveries(sql: Sql, params: MissingDirectDeliveriesParams): Promise<MissingDirectDeliveriesResult[]> {
-  const rows = await sql.query(MissingDirectDeliveriesSql, [params["channel_id"], params["after_number"], params["recipient_id"]])
-  return rows.map((row) => rowOf("MissingDirectDeliveries", MissingDirectDeliveriesResult, row))
 }
 
 export interface RecentReportsParams {
@@ -711,38 +675,4 @@ export const UserReadReportsSql = "-- name: UserReadReports :many\n-- bound: the
 export async function userReadReports(sql: Sql): Promise<UserReadReportsResult[]> {
   const rows = await sql.query(UserReadReportsSql, [])
   return rows.map((row) => rowOf("UserReadReports", UserReadReportsResult, row))
-}
-
-export interface UnroutedChannelMessagesParams {
-  readonly ["after_channel"]: string
-  readonly ["after_number"]: number
-}
-
-export const UnroutedChannelMessagesResult = z.object({
-  ["envelope_id"]: z.string(),
-  ["number"]: z.number().int(),
-  ["channel_id"]: z.string(),
-  ["sender_id"]: z.string(),
-  ["kind"]: Words_channel_message_kind,
-  ["body"]: z.string(),
-  ["meta"]: z.string().nullable(),
-  ["reply_number"]: z.number().int().nullable(),
-  ["created_at"]: z.number(),
-  ["name"]: z.string(),
-  ["sender_kind"]: Words_channel_participant_kind,
-  ["sender_role"]: Words_channel_participant_role.nullable(),
-  ["channel_type"]: Words_channel_type,
-  ["root_id"]: z.string().nullable(),
-  ["root_number"]: z.number().int().nullable(),
-  ["subject_kind"]: Words_channel_subject_kind.nullable(),
-  ["subject_id"]: z.string().nullable(),
-  ["channel_name"]: z.string(),
-})
-export type UnroutedChannelMessagesResult = z.infer<typeof UnroutedChannelMessagesResult>
-
-export const UnroutedChannelMessagesSql = "-- name: UnroutedChannelMessages :many\nselect m.id as envelope_id, m.number, m.channel_id, m.sender_id, m.kind, m.body, m.meta, m.reply_number, m.created_at,\n       p.name, p.kind as sender_kind, p.role as sender_role, c.type as channel_type, c.root_id, c.root_number, c.subject_kind, c.subject_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_message m\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nleft join session_trigger r on r.id = m.id\nwhere r.routed_at is null and m.deleted_at is null\n  and (m.channel_id, m.number) > ($1::text, $2::int)\norder by m.channel_id, m.number\nlimit 1000;"
-
-export async function unroutedChannelMessages(sql: Sql, params: UnroutedChannelMessagesParams): Promise<UnroutedChannelMessagesResult[]> {
-  const rows = await sql.query(UnroutedChannelMessagesSql, [params["after_channel"], params["after_number"]])
-  return rows.map((row) => rowOf("UnroutedChannelMessages", UnroutedChannelMessagesResult, row))
 }

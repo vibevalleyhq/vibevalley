@@ -58,10 +58,12 @@ test("regression: chat triggers keep their original payload through edits and re
   await chat.post({ _tag: "User", text: "next message", sendKey: "after" });
   await chat.edit(current.message.id, "edited voice input");
   await sql`update session_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${current.message.id}`;
+  // As a crash before the route left it: the watch's cursor still before the message.
+  await sql`update watch_cursor set seq = (select seq - 1 from channel_event where message_id = ${current.message.id} and kind = 'posted')`;
   await fw.inside.replay();
   const registered2 = await mailbox.isRouted(current.message.id);
   expect(registered2).toBe(false);
-  await chat.boot();
+  await fw.watch.boot();
   await mailbox.wake();
   const registered3 = await mailbox.isRouted(current.message.id);
   expect(registered3).toBe(true);
@@ -98,7 +100,7 @@ test("regression: a persisted machine trigger reaches a worker without a chat me
   const session = started.session!;
   await until(() => sessions.sessionOf(session)?.phase._tag === "done", "the worker waiting");
   const thread = (await await_(
-    () => chat.threadOfSession(session),
+    () => chat.homeOf(session),
     (id) => id !== undefined,
     "the worker thread",
   ))!;

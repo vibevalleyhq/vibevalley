@@ -145,7 +145,7 @@ export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "s
 
   const mayReadChannel = async (session: T.Session, channel: string) => {
     if (session.channel === channel) return true;
-    return (await channels.threadOfSession(session.id)) === channel;
+    return (await channels.homeOf(session.id)) === channel;
   };
 
   const mayReadIssue = async (session: T.Session, target: T.Issue) => {

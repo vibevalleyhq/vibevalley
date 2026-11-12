@@ -2,34 +2,33 @@ import { mapConcurrent, type TaskGroup } from "@vibevalley/async";
 import type * as T from "@vibevalley/protocol";
 import { everyone, userId } from "@vibevalley/protocol";
 
-import { ApiError, Inconsistent } from "#/base/errors.ts";
+import { Inconsistent } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
-import { inputContext } from "#/modules/session/payload.ts";
-import type { Session } from "#/modules/session/session.ts";
 import * as qc from "#db/channel.sql.ts";
+import * as qe from "#db/channel_event.sql.ts";
 import * as qmn from "#db/channel_mention.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 
 import {
-  actorOfParticipant,
+  type ChannelEvent,
+  type ChannelObserver,
+  type Committed,
+  channelType,
   metaOf,
   metaText,
   type MsgRow,
-  messageKind,
-  channelType,
+  subjectKind,
   type Write,
   type Written,
-  type ChannelHearers,
   theRow,
 } from "./contracts.ts";
 import { linksIn, readEmbed } from "./embeds.ts";
 import type { ChannelHub } from "./hub.ts";
 import { mentionsIn } from "./mentions.ts";
-import { channelTrigger } from "./messages.ts";
 
 export interface ChannelWritingDeps {
   readonly clock: Time;
@@ -37,29 +36,18 @@ export interface ChannelWritingDeps {
   readonly fetch: typeof fetch;
   readonly db: Db;
   readonly agent: Agent;
-  readonly session: Session;
 }
 
 /** tasks: the channel's own, so the work a message sets off ends with the service. */
 export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: TaskGroup) {
-  const { agent: agents, db, session: sessions, clock, log } = deps;
-  const {
-    store,
-    orchestratorIds,
-    orchestratorInRow,
-    membersOfRow,
-    channelOfSession,
-    hired,
-    publishChannel,
-    publishUserMentions,
-    publishMessage,
-    ownerOf,
-    readUpTo,
-    change,
-    channelEnvelope,
-    asEnvelope,
-  } = r;
-  const settle = async (inserted: MsgRow): Promise<Written> => {
+  const { db, clock, log } = deps;
+  const { store, orchestratorIds, orchestratorInRow, membersOfRow, publishChannel, publishUserMentions, publishMessage, readUpTo, change, channelEnvelope } = r;
+  const observers: ChannelObserver[] = [];
+  /** A session's seat in the chat: an agent's participant hired to work, there until it leaves. */
+  const isSession = (p: { readonly role: string | null; readonly runtime: string | null; readonly left_at: number | null }) =>
+    p.role === "worker" && p.runtime !== null && p.left_at === null;
+  /** The chat's part of a committed message (who it names, who follows the thread), then each observer's. */
+  const settle = async (inserted: MsgRow, event: ChannelEvent, replayed: boolean): Promise<Written> => {
     let row = inserted;
     const ch = store.channel(row.channel_id);
     if (!ch) throw new Inconsistent(`no channel ${row.channel_id}`);
@@ -68,13 +56,17 @@ export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: T
     const here = orchestratorInRow(ch);
     // No one else is in a direct channel to be named.
     const mentions = ch.type === "direct" ? [] : mentionsIn(row.body, { here, orchestrators });
-    const sessionsNow = hired();
-    // Participants are sessions, agents and the user alike: a mention is any of them.
-    const present: readonly string[] = sessionsNow.map((h) => h.id);
+    // Who is here to be named: the orchestrators, the user, everyone, and the sessions seated and not gone.
+    const present = new Set(
+      store
+        .participants()
+        .filter(isSession)
+        .map((p) => p.id),
+    );
     const known = new Set(store.participants().map((p) => p.id));
     const named: { id: string; how: "delivered" | "absent" | "unknown" }[] = [];
     for (const m of mentions) {
-      const how = orchestrators.includes(m) || m === userId || m === everyone || present.includes(m) ? "delivered" : known.has(m) ? "absent" : "unknown";
+      const how = orchestrators.includes(m) || m === userId || m === everyone || present.has(m) ? "delivered" : known.has(m) ? "absent" : "unknown";
       named.push({ id: m, how });
       await qmn.insertMention(db.sql, { message_id: row.id, target_id: m, resolved: how });
     }
@@ -87,58 +79,35 @@ export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: T
       // A dispatch handing the issue to its next session makes no one a member: the orchestrator would be woken by every word in it.
       if (row.sender_id !== "system" && row.kind !== "dispatch") await store.addMember(ch.id, row.sender_id, "replied", row.number);
       for (const m of named)
-        if (m.how === "delivered" && (orchestrators.includes(m.id) || present.includes(m.id))) await store.addMember(ch.id, m.id, "mentioned", row.number - 1);
+        if (m.how === "delivered" && (orchestrators.includes(m.id) || present.has(m.id))) await store.addMember(ch.id, m.id, "mentioned", row.number - 1);
       members = store.membersOf(ch.id);
     }
-    const audience = sessionsNow.filter((h) => ch.type === "thread" || channelOfSession(h) === ch.id).map((h) => h.id);
-    const heard = {
-      from: row.sender_id,
-      actor: actorOfParticipant(row.sender_kind, row.sender_role, row.sender_id, row.sender_name),
-      kind: messageKind(row.kind),
+    const kind = subjectKind(ch.subject_kind);
+    const topic = ch.type !== "channel" && kind !== undefined && ch.subject_id !== null ? { kind, id: ch.subject_id } : undefined;
+    const committed: Committed = {
+      event,
+      replayed,
+      row: channelEnvelope(row),
       mentions,
       channel: { type: channelType(ch.type), ...(ch.peer_id !== null ? { peer: ch.peer_id } : {}) },
       orchestrator: here,
       channelMembers: membersOfRow(ch),
-      orchestrators,
-      threadOwner: ownerOf(ch),
-      sessions: audience,
-      present,
       members,
-      ...(meta.outcome ? { outcome: meta.outcome } : {}),
-      spoken: meta.spoken === true && meta.ingressSource !== "voice",
+      ...(topic ? { topic } : {}),
     };
-    const addressed = meta.ingressRecipient;
-    const recipients = [...new Set([...present, ...orchestrators, ...(addressed ? [addressed] : [])])];
-    const fact: ChannelHearers = {
-      row: channelEnvelope(row),
-      audience: heard,
-      ...(addressed ? { addressed } : {}),
-      roles: Object.fromEntries(recipients.map((recipient) => [recipient, agents.isOrchestrator(recipient) ? "orchestrator" : "worker"])),
-
-      ...(meta.outcome ? { outcome: meta.outcome } : {}),
-    };
-    const input = channelTrigger(fact, inputContext(asEnvelope(fact.row)));
-    let routed: { readonly heldNotice: string };
-    try {
-      const original = await sessions.recordTrigger(input);
-      routed = await sessions.route(original, fact);
-    } catch (error) {
-      // A refusal is the route's answer: the message is kept, and one not routed now is routed again at startup
-      // (unroutedChannelMessages). Anything else (the database failing) fails the write.
-      if (!(error instanceof ApiError)) throw error;
-      log.warn(`chat: route ${fact.row.envelope_id}`, error);
-      routed = { heldNotice: "" };
-    }
     const written: Written = { absent: [], heldNotice: "", thread: "", again: false, row };
-    if (routed.heldNotice && theRow(await qm.holdNoticeSinceUser(db.sql, { channel: ch.id }), "HoldNoticeSinceUser").n === 0)
-      written.heldNotice = routed.heldNotice;
+    for (const o of observers) {
+      const follow = await o.posted(committed);
+      if (follow?.hopLimit && theRow(await qm.holdNoticeSinceUser(db.sql, { channel: ch.id }), "HoldNoticeSinceUser").n === 0)
+        written.heldNotice = follow.hopLimit;
+    }
     written.absent = named.filter((m) => m.how !== "delivered").map((m) => m.id);
     return written;
   };
 
   /** Routing follows the committed message, so startup can replay an interrupted handoff. */
   const write = async (w: Write): Promise<Written> => {
-    const written = await store.tx(async (): Promise<Written> => {
+    const written = await store.tx(async (): Promise<Written & { event?: ChannelEvent }> => {
       if (w.sendKey) {
         const seen = await qm.messageBySendKey(db.sql, { sender_id: w.from, send_key: w.sendKey });
         if (seen) return { absent: [], heldNotice: "", thread: "", again: true, row: seen };
@@ -166,6 +135,7 @@ export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: T
         "InsertMessage",
       );
       await store.touchChannel(w.channel, number);
+      const { seq } = theRow(await qe.insertEvent(db.sql, { kind: "posted", channel_id: w.channel, message_id: id, at: created_at }), "InsertEvent");
       const row: MsgRow = {
         id,
         channel_id: w.channel,
@@ -187,14 +157,15 @@ export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: T
         pinned_at: null,
         reactions: null,
       };
-      const out: Written = { absent: [], heldNotice: "", thread: "", again: false, row };
+      const out: Written & { event?: ChannelEvent } = { absent: [], heldNotice: "", thread: "", again: false, row };
+      out.event = { seq, kind: "posted", channel: w.channel, message: id, at: created_at };
       if (w.readBy) await readUpTo(w.readBy, w.channel, number);
       if (w.member) await store.addMember(w.channel, w.member, "user", number);
       if (w.thread) out.thread = await store.threadFor({ id, number, channel: w.channel }, w.thread);
       return out;
     });
-    if (written.again) return written;
-    const routed = await settle(written.row);
+    if (written.again || !written.event) return written;
+    const routed = await settle(written.row, written.event, false);
     const complete = { ...routed, thread: written.thread };
     await after(w.channel, complete, w.answers);
     return complete;
@@ -238,7 +209,12 @@ export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: T
     if (written.thread) await publishChannel(written.thread);
     if (written.heldNotice) await write({ channel, from: "system", kind: "notice", text: written.heldNotice, meta: { code: "hop_limit" } });
   };
-  return { settle, write, embedLater, after };
+  const observe = (o: ChannelObserver) => {
+    observers.push(o);
+  };
+  /** A removal told to the observers, after it is committed. */
+  const removed = async (event: ChannelEvent) => {
+    for (const o of observers) await o.removed(event);
+  };
+  return { settle, write, embedLater, after, observe, removed };
 }
-
-export type ChannelWriting = ReturnType<typeof channelWriting>;

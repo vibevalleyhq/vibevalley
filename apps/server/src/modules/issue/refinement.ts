@@ -113,7 +113,7 @@ export function refinement(d: RefinementDeps) {
     if (h?.refining !== true || !h.issue) return;
     const id = h.issue;
     const said = sessions.live(f.id).lastText;
-    const thread = await chat.threadOfSession(f.id);
+    const thread = await chat.homeOf(f.id);
     const tell = async (text: string) => {
       if (thread) await chat.post({ _tag: "Notice", channel: thread, text: text, code: "issue_refinement" });
       else core.notice("warn", text);

@@ -482,7 +482,7 @@ describe("an issue", () => {
     const issue3 = await issues.get(issue.id);
     const running = latestSessionIdOf(issue3);
     if (running === undefined) throw new Error("the issue has no execution session");
-    const thread = (await chat.threadOfSession(running))!;
+    const thread = (await chat.homeOf(running))!;
     await until(
       () => saidIn(thread).some((m) => m.from === "user" && m.text === "接着修：这一单必败。看一下报错，修好再跑一遍测试"),
       "the cure said once, by the server",
@@ -619,7 +619,7 @@ describe("an issue", () => {
     await issues.setStatus(garbled.id, "todo", "", "", user);
     const running = latestSessionIdOf(stuck);
     if (running === undefined) throw new Error("the issue has no execution session");
-    const thread = (await chat.threadOfSession(running))!;
+    const thread = (await chat.homeOf(running))!;
     await until(
       () => saidIn(thread).some((m) => m.from === "user" && m.text.startsWith("接着修：上一轮交回的结论读不出来（没有通过 issue_report")),
       "what was wrong with it, said",

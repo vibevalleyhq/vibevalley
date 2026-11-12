@@ -18,6 +18,8 @@ import type { Channel } from "#/modules/channel/channel.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
 import type { Runtime } from "#/modules/runtime/runtime.ts";
 import type { Hired, HireOptions, SessionNews, Session } from "#/modules/session/session.ts";
+import type { Watch } from "#/modules/watch/watch.ts";
+import * as cronQ from "#db/issue_cron.sql.ts";
 
 import { findingsOf, milestonesOf } from "./brief.ts";
 import { explicitMandate, filledKinds, inferredMandate, mandateNoteFits, sentTitles } from "./creation.ts";
@@ -174,6 +176,7 @@ export interface IssueDeps {
   readonly runtime: Runtime;
   readonly session: Session;
   readonly channel: Channel;
+  readonly watch: Watch;
 }
 
 export interface IssueReviewRequest {
@@ -189,6 +192,15 @@ function failedText(findings: readonly T.Finding[], text: string): string {
   if (text) out += "\n\n" + text;
   return out + t("server.issue.brief.failedEnd");
 }
+
+/** What of the issues' still points at a channel (its crons, the queued issues answering there), so deleting it is refused. */
+export const channelUses =
+  (deps: { readonly db: Db; readonly queued: () => Promise<readonly { readonly issue: string; readonly trigger: { readonly replyChannel?: string } }[]> }) =>
+  async (id: string): Promise<readonly string[]> => {
+    const crons = (await cronQ.cronsIn(deps.db.sql, { channel_id: id }))?.n ?? 0;
+    const queued = new Set((await deps.queued()).filter((q) => q.trigger.replyChannel === id).map((q) => q.issue)).size;
+    return [...(crons !== 0 ? [t("server.channel.cronsThere", { n: crons })] : []), ...(queued !== 0 ? [t("server.channel.queuedThere", { n: queued })] : [])];
+  };
 
 export async function makeIssue(deps: IssueDeps): Promise<Issue> {
   const { config, clock, core, agent: store, repo: repos, runtime: runtimes, session: sessions, channel: chat, db } = deps;
@@ -225,6 +237,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
   const { split, joinChildren } = issueSplitting(r, { agent: store, session: sessions, channel: chat, landing });
   const d = issueDispatch(r, joinChildren, { core, agent: store, repo: repos, runtime: runtimes, session: sessions, channel: chat, log });
   const { hire, start, refreshQueue, reopen, scheduled } = d;
+  chat.guardRemoval(channelUses({ db, queued: () => sessions.queuedTriggers() }));
   const cron = await issueCron({ config, clock, log, db, core, agent: store, channel: chat, session: sessions, scheduled });
   const { withEdit, settledMove, stuckWords, movesWords } = issueSettling(r, d, {
     agent: store,
@@ -242,7 +255,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
   } = merging({
     core,
     sessions,
-    chat,
+    watch: deps.watch,
     landing,
     get,
     list: everyIssue,
@@ -276,7 +289,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     const session = latest === undefined ? undefined : sessions.live(latest).session;
     if (by.kind === "agent") {
       if (!session) return {};
-      await chat.post({ _tag: "Tell", from: by.id, session: session.id, text, sendKey });
+      await deps.watch.tell(by.id, session.id, text, sendKey);
       return { worker: session };
     }
     if (isClosed(issue.status)) throw refused(t("server.issue.closedReopen"));
