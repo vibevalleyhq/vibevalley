@@ -22,7 +22,7 @@
 
 ### architecture
 
-- 2026-11-12 [大脑换回上游的 pi-durable](.agents/notes/proposed/architecture/2026-11-12-brain-on-upstream-pi-durable.md)
+- 2026-11-12 [大脑换成上游的 pi-durable](.agents/notes/proposed/architecture/2026-11-12-brain-on-upstream-pi-durable.md)
 - 2026-11-11 [扩展剩余跨模块品牌主键与 SQL 主外键自动品牌生成](.agents/notes/proposed/architecture/2026-11-11-type-driven-boundaries-and-branded-ids.md)
 - 2026-11-10 [一个服务端管多台机器，库换成 Postgres](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)
 - 2026-11-10 [事务提交尾段原子同步、监听地址就绪门与热路径增量投影](.agents/notes/proposed/architecture/2026-11-10-atomic-commits-and-hot-paths.md)
