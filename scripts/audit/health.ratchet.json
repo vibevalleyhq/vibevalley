@@ -293,13 +293,6 @@
     "lintOff": 0,
     "swallowed": 0
   },
-  "web: features/library": {
-    "nonNull": 0,
-    "doubleCast": 0,
-    "cast": 0,
-    "lintOff": 0,
-    "swallowed": 0
-  },
   "web: features/media": {
     "nonNull": 0,
     "doubleCast": 0,
