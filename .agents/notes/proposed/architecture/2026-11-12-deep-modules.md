@@ -18,7 +18,7 @@ Status: proposed
 
 1. **组装处摊平。** `services.ts` 是一个函数，照模块次序一行一个 `const issue = await makeIssue({ db, core, session, … })`，依赖写明；去掉阶段类型和 `add()`，只留 `Farm` 和 `close` 的倒序。测试的 `world()`、`flows/farm.ts` 跟着改。纯机械，不改行为。
 2. **工作合成一个深模块：session 吞下 mailbox 和 machine。** 一件活从触发、排队、投递、开 Session、跑、汇报到放掉都在一个模块里；对外只留调用方真要的几样：收一个触发（`receive`）、撤回（`withdraw`）、叫停和放掉、读一个 Session 的状态和汇报、新闻（`news`）。工作区的开、借、清一并归它，repo 只给「这个仓库在这张工单上的检出」这一个门。内部借这次重写把只为 Effect 作用域分出来的子对象（`registry`、`launch`、`recording`…）收拢；pi-durable 已经管了的持久（`session_run` 的接管）删掉，帮工在**正常重启**后也接着干（现在只有崩溃后才接着）。
-3. **repo 收下交付。** 把「这张工单的改动怎么交出去」整个放进 repo：`deliver(issue, how)`（本地合并、提 PR、跟进 PR、冲突）、`changes(issue)`；issue 不再调 `run`、`githubRequest`，只说要交付、读结果。目标：issue 用 Repo 的成员从 16 降到 5 个以内。
+3. **派活和交付也进 session，issue 只留工单本身。** 拆开门以后量出来（`service-paths.json`）：issue 用 Session 的 23 个成员、Repo 的 15 个，分三团：派活（`dispatch.ts`：`hireWith`、`room`、`triggersOf`、`queuedTriggers`、`withCheckout`）、交付（`merge.ts`、`settle.ts`、`split.ts` 的交出改动：`handOver`、`withWorkplace`、`withCheckout`，加 repo 的 `merge`、`submitPullRequest`、`finishPullRequest`、`run`…）、跟 PR（`github.ts`：`receive`、`knownGitHubEvents`，加 repo 的 `githubRequest`、`githubSnapshot`）。交付要工作区（session）也要 git（repo），repo 排在 session 下面，所以三团都归 session：session 是「派活 → 干活 → 交付」整件事的深模块。issue 只留工单本身：状态和它的规则、拆分的决定、细化、关系；对 session 只说派这张（`dispatch`）、叫停和放掉、交出去（`deliver(issue, how)`：本地合并、提 PR、跟进 PR、冲突），再读状态。repo 只给 session 用的 git 和 GitHub 门。目标：issue 用 Session 的成员不超过 8 个、用 Repo 的不超过 3 个，没有模块（session 以外）调 `repo.run` 或 `repo.githubRequest`。
 4. **library 并进 media。** 素材库是 media 产出和收进来的东西的目录，一个模块管：表 `library_item` 改名 `media_library_item`（表名「模块_概念」），接口并进 Media。
 5. **纯判断搬出服务。** 每个模块里不碰库、不碰网、不读时钟的判断写成导出的纯函数，测试直接测；服务里只留 IO 和编排。
 6. **规矩跟着改。** `AGENTS.md`「服务端的服务」从「每个模块导出一个服务」改成「一个模块对外一个深的服务：接口只留调用方用的，判断是纯函数」；写明事件的分工：用户看得见的变化走核心事实，服务端模块之间的反应走 `news`。`docs/subsystems/` 里 session、mailbox、machine、repo、issue、media 的文档合并改写。
@@ -43,7 +43,7 @@ Status: proposed
 ## Acceptance criteria
 
 - `services.ts` 没有阶段类型和 `add()`，每个 `makeX` 的依赖在调用处写明。
-- `modules.ts` 里没有 mailbox、machine、library 这几个模块；issue 用 Session 的成员和用 Repo 的成员各不超过 5 个（`service-paths.json`），没有模块调 `repo.run` 或 `repo.githubRequest`。
+- `modules.ts` 里没有 mailbox、machine、library 这几个模块；issue 用 Session 的成员不超过 8 个、用 Repo 的不超过 3 个（`service-paths.json`），session 以外没有模块调 `repo.run` 或 `repo.githubRequest`；`Repo.checkout` 这类带标签的门拆成具名成员。
 - 帮工在服务端正常重启后接着干（流程测试守着）；`session_run` 不再有「接管」的写法。
 - `server:check`、`web:check`、`paths:check`、`practice:check`、`health:verify`、`deadcode`、`docs:verify` 全过；服务端测试数不减（改名、挪地方的点名），`regression:` 测试名字不变。
 - `AGENTS.md` 和 `docs/subsystems/` 照新的样子写，删掉本 Note。
