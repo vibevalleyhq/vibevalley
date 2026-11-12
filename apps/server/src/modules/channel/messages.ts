@@ -1,11 +1,16 @@
 import type * as T from "@vibevalley/protocol";
+import { userId } from "@vibevalley/protocol";
 
 import { compareText, or } from "#/base/order.ts";
-import { targetOf } from "#/modules/session/envelope.ts";
 
 import { chatNamed } from "./mentions.ts";
 
-export { targetOf };
+/** A place's address as an agent writes it: #channel, #channel:root for a thread, @user for a direct channel. */
+export function targetOf(c: Pick<T.Channel, "type" | "rootNumber" | "name">, channelName: string): string {
+  if (c.type === "direct") return "@" + userId;
+  if (c.type === "thread" && c.rootNumber !== undefined) return "#" + channelName + ":" + c.rootNumber;
+  return "#" + (c.name ?? channelName);
+}
 /** The database keeps them all. the state these many. */
 export const keepChannels = 100;
 

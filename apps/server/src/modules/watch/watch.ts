@@ -17,7 +17,6 @@ import type { Agent } from "#/modules/agent/agent.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import {
   type ChannelEvent,
-  type ChannelHearers,
   type Committed,
   type Followup,
   type Meta,
@@ -26,14 +25,14 @@ import {
   type MsgRow,
   type ThreadSubject,
 } from "#/modules/channel/contracts.ts";
-import { actorOfParticipant } from "#/modules/session/envelope.ts";
+import { actorOfParticipant, type ChannelHearers } from "#/modules/session/envelope.ts";
 import { inputContext } from "#/modules/session/payload.ts";
 import { envelopeLines, talkBrief } from "#/modules/session/prompts.ts";
 import { HireRefused, NotRecorded, type Session } from "#/modules/session/session.ts";
 import type { SessionNews } from "#/modules/session/signals.ts";
 import * as qw from "#db/watch_cursor.sql.ts";
 
-import { channelTrigger } from "./trigger.ts";
+import { channelTrigger, envelopeRowOf } from "./trigger.ts";
 
 /** A helper profile's seat in the chat, the peer of its direct channel: apart from the assistants and the sessions. */
 const profileId = (agent: string) => `profile:${agent}`;
@@ -105,7 +104,8 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
 
   const route = async (c: Committed): Promise<Followup | undefined> => {
     // Told again at startup: routed before the farm stopped, past where the cursor was kept.
-    if (c.replayed && (await sessions.isRouted(c.row.envelope_id))) return undefined;
+    if (c.replayed && (await sessions.isRouted(c.row.id))) return undefined;
+    const row = envelopeRowOf(c.row, c.place, c.channelName);
     const meta = metaOf(c.row.meta);
     const sessionsNow = hired();
     const orchestrators = agents.orchestrators().map((a) => a.id);
@@ -114,10 +114,10 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
     const addressed = meta.ingressRecipient;
     const recipients = [...new Set([...present, ...orchestrators, ...(addressed ? [addressed] : [])])];
     const fact: ChannelHearers = {
-      row: c.row,
+      row,
       audience: {
-        from: c.row.sender_id,
-        actor: actorOfParticipant(c.row.sender_kind, c.row.sender_role, c.row.sender_id, c.row.name),
+        from: row.sender_id,
+        actor: actorOfParticipant(row.sender_kind, row.sender_role, row.sender_id, row.name),
         kind: messageKind(c.row.kind),
         mentions: c.mentions,
         channel: c.channel,
@@ -136,14 +136,14 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
       ...(meta.outcome ? { outcome: meta.outcome } : {}),
     };
     try {
-      const original = await sessions.recordTrigger(channelTrigger(fact, inputContext(chat.asEnvelope(fact.row))));
+      const original = await sessions.recordTrigger(channelTrigger(fact, inputContext(chat.addressedOf(c.row))));
       const answer = await sessions.route(original, fact);
       return answer.heldNotice ? { hopLimit: answer.heldNotice } : undefined;
     } catch (error) {
       // A refusal is the route's answer: the message is kept and passed. Anything else (the database failing) fails the
       // write, and the event is told again at startup.
       if (!(error instanceof ApiError)) throw error;
-      log.warn(`route ${c.row.envelope_id}`, error);
+      log.warn(`route ${c.row.id}`, error);
       return undefined;
     }
   };
@@ -174,20 +174,19 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
     const last = ordered.at(-1);
     const user = ordered.findLast(userChat);
     if (!user) return;
-    const target = chat.targetOfPlace(channel);
+    const channelName = place.name ?? "";
     let opened: string;
     try {
       const received = await sessions.hireWith({
         agent,
-        brief: talkBrief(agent.name, envelopeLines(ordered.map((m) => chat.envelopeOf(m, target)))),
+        brief: talkBrief(agent.name, envelopeLines(ordered.map(chat.addressedOf))),
         where: "",
         options: { context: { kind: "channel", channel }, trigger: { kind: "comment", channel, message: user.id } },
         envelopes: {
           _tag: "Talk",
-          rows: ordered.filter(userChat).map((message) => {
-            const row = chat.envelopeRow(message);
-            return { row, context: inputContext(chat.asEnvelope(row)) };
-          }),
+          rows: ordered
+            .filter(userChat)
+            .map((message) => ({ row: envelopeRowOf(message, place, channelName), context: inputContext(chat.addressedOf(message)) })),
         },
         hiring: (session) => joining(session, channel),
       });
@@ -218,7 +217,7 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
   /** A session's words answer the session that last named it there since it last spoke. */
   const answered = async (c: Committed): Promise<T.SessionId | undefined> => {
     if (c.replayed || c.row.kind !== "chat" || c.row.sender_kind !== "agent" || agents.isOrchestrator(c.row.sender_id)) return undefined;
-    const callers = await chat.callersOf(c.row.sender_id, c.row.channel_id, c.row.envelope_id);
+    const callers = await chat.callersOf(c.row.sender_id, c.row.channel_id, c.row.id);
     const caller = callers.find((id) => chat.participants().some((p) => p.id === id && p.agent !== null && p.id !== profileId(p.agent)));
     return caller === undefined ? undefined : sessionId(caller);
   };

@@ -39,7 +39,7 @@ export interface ChannelWritingDeps {
 /** tasks: the channel's own, so the work a message sets off ends with the service. */
 export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: TaskGroup) {
   const { db, clock, log } = deps;
-  const { store, assistantIds, orchestratorInRow, membersOfRow, publishChannel, publishUserMentions, publishMessage, readUpTo, change, channelEnvelope } = r;
+  const { store, assistantIds, orchestratorInRow, membersOfRow, publishChannel, publishUserMentions, publishMessage, readUpTo, change, placeOf } = r;
   const observers: ChannelObserver[] = [];
   /** A helper's seat in the chat: an agent's participant speaking for a profile, there until it leaves. */
   const isHelper = (p: { readonly kind: string; readonly agent_id: string | null; readonly left_at: number | null }) =>
@@ -85,7 +85,9 @@ export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: T
     const committed: Committed = {
       event,
       replayed,
-      row: channelEnvelope(row),
+      row,
+      place: placeOf(ch),
+      channelName: (ch.parent_id !== null ? store.channel(ch.parent_id)?.name : undefined) ?? ch.name ?? "",
       mentions,
       channel: { type: channelType(ch.type), ...(ch.peer_id !== null ? { peer: ch.peer_id } : {}) },
       orchestrator: here,

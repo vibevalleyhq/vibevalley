@@ -9,7 +9,6 @@ import type { Core } from "#/core/core.ts";
 import type { Db } from "#/infra/db.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Attachment } from "#/modules/attachment/attachment.ts";
-import { type Envelope, unreadSummaryOf } from "#/modules/session/envelope.ts";
 import * as qc from "#db/channel.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 
@@ -22,7 +21,8 @@ import {
   notifyOf,
   envelopeMore,
   type ThreadSubject,
-  type ChannelEnvelopeRow,
+  type AddressedMessage,
+  type Place,
   theRow,
   type UserRead,
 } from "./contracts.ts";
@@ -33,6 +33,8 @@ import { makeChannelStore } from "./store.ts";
 
 /** A thread named by the message it hangs under shows this much of it. */
 export const threadTitleMax = 24;
+/** How many places a participant's unread lists. */
+const unreadMax = 20;
 /** How much of a channel's newest message a list shows. */
 export const lastMax = 80;
 /** The first n units of text, on one line. */
@@ -220,71 +222,20 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
 
   const { messageOf, change, reacting } = messageMutations({ db, clock }, said, publishChannel);
 
-  const channelEnvelope = (row: MsgRow): ChannelEnvelopeRow => {
-    const channel = store.channel(row.channel_id);
-    if (!channel) throw new Error(`no channel ${row.channel_id}`);
-    return {
-      envelope_id: row.id,
-      number: row.number,
-      channel_id: channel.id,
-      sender_id: row.sender_id,
-      kind: row.kind,
-      body: row.body,
-      meta: row.meta,
-      reply_number: row.reply_number,
-      created_at: row.created_at,
-      name: row.sender_name,
-      sender_kind: row.sender_kind,
-      sender_role: row.sender_kind === "agent" ? (row.sender_agent !== null ? "worker" : "orchestrator") : null,
-      channel_type: channel.type,
-      root_id: channel.root_id,
-      root_number: channel.root_number,
-      subject_kind: channel.subject_kind,
-      subject_id: channel.subject_id,
-      channel_name: (channel.parent_id !== null ? store.channel(channel.parent_id)?.name : undefined) ?? channel.name ?? "",
-    };
-  };
-
-  const messageRow = (row: ChannelEnvelopeRow): MsgRow => ({
-    id: row.envelope_id,
-    channel_id: row.channel_id,
-    number: row.number,
-    sender_id: row.sender_id,
-    kind: row.kind,
-    body: row.body,
-    meta: row.meta,
-    send_key: null,
-    created_at: row.created_at,
-    sender_name: row.name,
-    sender_kind: row.sender_kind,
-    sender_agent: store.participant(row.sender_id)?.agent_id ?? null,
-    revision: 0,
-    reply_number: row.reply_number,
-    edited_at: null,
-    deleted_at: null,
-    pinned_at: null,
-    reactions: null,
-  });
-
   const files = deps.attachment;
   const filesAt = files.pathOf;
   const attachmentsOf = files.of;
-  const deliveryTarget = (r: ChannelEnvelopeRow) => targetOfRow(r.channel_type, r.root_number, null, null, r.channel_name || null);
-  const asEnvelope = (r: ChannelEnvelopeRow): Envelope => ({
-    id: r.envelope_id,
-    number: r.number,
-    target: deliveryTarget(r),
-    from: r.sender_id,
-    actor: actorOf(r.sender_kind, store.participant(r.sender_id)?.agent_id ?? null, r.sender_id, r.name),
-    name: r.name,
-    text: r.body,
-    ...envelopeMore(r, filesAt),
-  });
-
-  const inboxRows = async (who: string) => {
+  /** A participant's unread, as a wake-up and an inbox list them: the channel its home is in (or the default one) and
+   * the threads it follows, newest first, at most unreadMax. */
+  const unreadOf = async (who: string): Promise<T.ChannelUnread[]> => {
     const home = homeOf(who);
     const channel = (home !== undefined ? topOfRow(store.channel(home))?.id : undefined) ?? store.defaultId();
-    return unreadSummaryOf(await qc.unreadOf(db.sql, { participant: who, channel }));
+    return (await qc.unreadOf(db.sql, { participant: who, channel })).slice(0, unreadMax).map((row) => ({
+      channel: targetOf({ type: channelType(row.type), ...(row.root_number !== null ? { rootNumber: row.root_number } : {}) }, row.channel_name || ""),
+      unread: row.unread,
+      mentionsYou: row.mentions_you,
+      ...(row.latest_sender_name ? { latest: row.latest_sender_name } : {}),
+    }));
   };
 
   await store.locked(async () => {
@@ -293,16 +244,33 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
     await publishUserMentions();
   });
 
-  const envelopeOf = (row: MsgRow, target: string): Envelope => ({
-    id: S.messageId(row.id),
-    number: row.number,
-    target,
-    from: row.sender_id,
-    actor: actorOf(row.sender_kind, row.sender_agent, row.sender_id, row.sender_name),
-    name: row.sender_name,
-    text: row.body,
-    ...envelopeMore(row, filesAt),
-  });
+  const placeOf = (row: ChannelRow): Place => {
+    const kind = subjectKind(row.subject_kind);
+    return {
+      id: row.id,
+      type: channelType(row.type),
+      peer: row.peer_id,
+      parent: row.parent_id,
+      name: row.name,
+      lastNumber: row.last_number ?? 0,
+      ...(row.root_id !== null && row.root_number !== null ? { root: { id: row.root_id, number: row.root_number } } : {}),
+      ...(kind !== undefined && row.subject_id !== null ? { topic: { kind, id: row.subject_id } } : {}),
+    };
+  };
+
+  const addressedOf = (row: MsgRow): AddressedMessage => {
+    const place = store.channel(row.channel_id);
+    return {
+      id: S.messageId(row.id),
+      number: row.number,
+      target: place ? targetOfChannel(place) : "",
+      from: row.sender_id,
+      actor: actorOf(row.sender_kind, row.sender_agent, row.sender_id, row.sender_name),
+      name: row.sender_name,
+      text: row.body,
+      ...envelopeMore(row, filesAt),
+    };
+  };
   return {
     store,
     said,
@@ -329,13 +297,11 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
     change,
     messageOf,
     reacting,
-    channelEnvelope,
-    messageRow,
     attachmentsOf,
     filesAt,
-    asEnvelope,
-    inboxRows,
-    envelopeOf,
+    unreadOf,
+    addressedOf,
+    placeOf,
     /** Readers of the hubs see their end. */
     close: () => {
       said.end();

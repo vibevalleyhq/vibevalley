@@ -5,7 +5,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { analyzeSource, type Edge } from "@vibevalley/testkit/source";
 
-import { conceptOf, containers, moduleOf, modules, outside } from "./modules.ts";
+import { conceptOf, containers, moduleOf, modules, outside, unitOf } from "./modules.ts";
 
 const src = import.meta.dirname;
 const pending: Readonly<Record<string, string>> = {};
@@ -112,6 +112,12 @@ const mailboxLeaks = (source: ReturnType<typeof inspect>) => {
   return privateImports;
 };
 
+/** What a file of the chat leans on beyond the platform and the chat itself: another business module, or another's table. */
+const chatLeaks = (source: ReturnType<typeof inspect>) => [
+  ...source.local.filter((to) => unitOf(to) !== "modules/channel" && moduleOf(to)?.name !== "Platform"),
+  ...source.edges.filter((edge) => edge.from.startsWith("#db/") && tableModule(edge.from.split("/").at(-1) ?? "") !== "channel").map((edge) => edge.from),
+];
+
 describe("the modules", () => {
   it("hold every folder and file under src, with domain slices under modules/ and protocol doors under gateway/", () => {
     const tops = readdirSync(src).filter((f) => statSync(join(src, f)).isDirectory() || (f.endsWith(".ts") && !f.endsWith(".test.ts")));
@@ -181,6 +187,33 @@ describe("the modules", () => {
     expect(foreignQueries(github, inspect(github, 'import { recordTrigger } from "#db/session_trigger.sql.ts";').edges)).toEqual([
       "session_trigger.sql.ts:recordTrigger",
     ]);
+  });
+
+  it("keep the chat on the platform alone: modules/channel imports no other business module, its tests included", () => {
+    const tests = files(join(src, "modules/channel"))
+      .filter((file) => file.endsWith(".test.ts"))
+      .map((file) => inspect(file, readFileSync(file, "utf8")));
+    const found = [...sources().filter(({ from }) => from.startsWith("modules/channel/")), ...tests].flatMap((source) =>
+      chatLeaks(source).map((to) => `${source.from} -> ${to}`),
+    );
+    expect(
+      found,
+      "the chat imports a business module (or another module's table), so it leans on the layers above it again. Fix: pass the fact in as data (a seat, an observer's answer), or move the code that needs that module into modules/watch. See docs/subsystems/channel.md",
+    ).toEqual([]);
+  });
+
+  it("regression: the chat's check sees a business import, a re-export and another module's table, and lets the platform through", () => {
+    const file = join(src, "modules/channel/writing.ts");
+    const leaks = (text: string) => chatLeaks(inspect(file, text));
+    expect(leaks('import type { Session } from "#/modules/session/session.ts";')).toEqual(["modules/session/session.ts"]);
+    expect(leaks('export { profileId } from "../watch/watch.ts";')).toEqual(["modules/watch/watch.ts"]);
+    expect(leaks('import type { Agent } from "#/modules/agent/agent.ts";')).toEqual(["modules/agent/agent.ts"]);
+    expect(leaks('import * as qd from "#db/session_delivery.sql.ts";')).toEqual(["#db/session_delivery.sql.ts"]);
+    expect(
+      leaks(
+        'import type { Db } from "#/infra/db.ts";\nimport type { Attachment } from "#/modules/attachment/attachment.ts";\nimport { metaOf } from "./meta.ts";\nimport * as qm from "#db/channel_message.sql.ts";',
+      ),
+    ).toEqual([]);
   });
 
   it("keep base pure: it imports nothing else under src", () => {

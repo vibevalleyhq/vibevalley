@@ -24,6 +24,7 @@ import { wallTime } from "#/infra/time.ts";
 import { makeAgent } from "#/modules/agent/agent.ts";
 import builtIn from "#/modules/agent/templates/orchestrator/agent.json" with { type: "json" };
 import { type Attachment, makeAttachment } from "#/modules/attachment/attachment.ts";
+import { type Channel, catchUpMax, makeChannel } from "#/modules/channel/channel.ts";
 import { effectsOf } from "#/modules/game/view.ts";
 import { channelUses } from "#/modules/issue/issue.ts";
 import { wakeBreaker } from "#/modules/session/brakes.ts";
@@ -33,15 +34,14 @@ import type { Lifecycle } from "#/modules/session/lifecycle.ts";
 import { type Mailbox, makeMailbox } from "#/modules/session/mailbox.ts";
 import { summaryOf } from "#/modules/session/report.ts";
 import { DeliveryRefused, newsOf, sessionOver, type SessionNews } from "#/modules/session/session.ts";
-import type { Consumed, LaunchActivity } from "#/modules/session/signals.ts";
-import { makeWatch, type Watch } from "#/modules/watch/watch.ts";
+import type { Consumed, Delivered, LaunchActivity } from "#/modules/session/signals.ts";
 import { testConfig, until, waitFor } from "#/testing/layers.ts";
 import { topPlace } from "#db/channel.sql.ts";
 import { addMember, membersOf, removeMember } from "#db/channel_member.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qsession from "#db/session.sql.ts";
 
-import { type Channel, catchUpMax, type Delivered, makeChannel } from "./channel.ts";
+import { makeWatch, type Watch } from "./watch.ts";
 
 /** Sessions played: a turn takes its input, says it got it and reports. the slow mode is held until release (unless holds is off), the fail mode fails. */
 class FakeSessions {

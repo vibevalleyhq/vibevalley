@@ -1,4 +1,5 @@
-import { actorOfParticipant, type ChannelHearers, type Meta, metaOf, channelType } from "#/modules/session/envelope.ts";
+import { channelType, type Meta, metaOf, type MsgRow, type Place } from "#/modules/channel/contracts.ts";
+import { actorOfParticipant, type ChannelEnvelopeRow, type ChannelHearers } from "#/modules/session/envelope.ts";
 import type { InputContext, TriggerInput } from "#/modules/session/payload.ts";
 import type { TriggerSource } from "#/modules/session/shapes.ts";
 
@@ -10,6 +11,29 @@ const sourceByPurpose: Record<NonNullable<Meta["ingressSource"]>, TriggerSource>
   voice: "voice",
   github: "github",
 };
+
+/** A chat message as the mailbox takes it in: where it was said (`channelName`: the channel the place is in) and who
+ * said it, an agent speaking for a profile being a helper. */
+export const envelopeRowOf = (row: MsgRow, place: Place, channelName: string): ChannelEnvelopeRow => ({
+  envelope_id: row.id,
+  number: row.number,
+  channel_id: row.channel_id,
+  sender_id: row.sender_id,
+  kind: row.kind,
+  body: row.body,
+  meta: row.meta,
+  reply_number: row.reply_number,
+  created_at: row.created_at,
+  name: row.sender_name,
+  sender_kind: row.sender_kind,
+  sender_role: row.sender_kind === "agent" ? (row.sender_agent !== null ? "worker" : "orchestrator") : null,
+  channel_type: place.type,
+  root_id: place.root?.id ?? null,
+  root_number: place.root?.number ?? null,
+  subject_kind: place.topic?.kind ?? null,
+  subject_id: place.topic?.id ?? null,
+  channel_name: channelName,
+});
 
 /** The trigger a channel message is recorded as: its own id, its words, where it was said and who it is for. */
 export const channelTrigger = (fact: ChannelHearers, context: InputContext): TriggerInput => {

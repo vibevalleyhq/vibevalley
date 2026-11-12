@@ -10,24 +10,24 @@ import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Attachment } from "#/modules/attachment/attachment.ts";
-import { heldShown, type Envelope, type Picked, retryWindowMs } from "#/modules/session/envelope.ts";
 import * as qe from "#db/channel_event.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qr from "#db/channel_read_cursor.sql.ts";
 import * as qs from "#db/channel_seen.sql.ts";
 
 import {
+  type AddressedMessage,
   type ChannelEvent,
   type ChannelService,
   envelopeMore,
   type Meta,
   metaOf,
   metaText,
+  type Picked,
   type Post,
   type PostOf,
   type SayMore,
   type Spoken,
-  subjectKind,
   theRow,
   toMessage,
 } from "./contracts.ts";
@@ -41,6 +41,10 @@ import { channelWriting } from "./writing.ts";
 const refused = refuseIn(BizCode.ChannelRefused);
 
 const searchMax = 50;
+/** Identical text from the same sender and channel within this window is treated as a retry. */
+const retryWindowMs = 60_000;
+/** How many of the messages a speaker has not seen are shown instead of sending its words. */
+const heldShown = 3;
 /** How many of those who named a speaker since it last spoke a caller is looked for among. */
 const callersMax = 20;
 const readLimit = 30;
@@ -49,7 +53,7 @@ export { catchUpMax } from "./mutations.ts";
 /** The client's key for one send, so a retry of it is the same message. */
 const sendKeyMax = 64;
 
-export type { Spoken, Delivered } from "./contracts.ts";
+export type { Spoken } from "./contracts.ts";
 
 export type Channel = ChannelService;
 
@@ -120,8 +124,9 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
     reacting,
     attachmentsOf,
     filesAt,
-    inboxRows,
-    envelopeOf,
+    unreadOf,
+    addressedOf,
+    placeOf,
   } = r;
   const { write, embedLater, settle, removed } = w;
 
@@ -204,11 +209,9 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
     return { message: toMessage(written.row), again: false };
   };
 
-  const recent = async (channel: string, n: number): Promise<Envelope[]> => {
-    const row = store.channel(channel);
-    if (!row) return [];
-    const target = targetOfChannel(row);
-    return [...(await qm.messagesBefore(db.sql, { channel_id: channel, number: 2147483647, n }))].toReversed().map((m) => envelopeOf(m, target));
+  const recent = async (channel: string, n: number): Promise<AddressedMessage[]> => {
+    if (!store.channel(channel)) return [];
+    return [...(await qm.messagesBefore(db.sql, { channel_id: channel, number: 2147483647, n }))].toReversed().map(addressedOf);
   };
   const postUser = (p: PostOf<"User">) => store.locked(() => userSays(p.text, p.channel, p.sendKey, p, p.source, p.responsePort, p.voiceMode));
 
@@ -247,11 +250,11 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
       const unseen = (await qm.unseenIn(db.sql, { channel, participant: from })).map((r) => r.id);
       if (unseen.length > 0 && opt.anyway !== true) {
         const now = clock.now();
-        const shown: Envelope[] = [];
+        const shown: AddressedMessage[] = [];
         for (const id of unseen.slice(0, heldShown)) {
           const m = await qm.messageByID(db.sql, { id });
           if (!m) continue;
-          shown.push(envelopeOf(m, target));
+          shown.push(addressedOf(m));
         }
         const newest = shown.at(-1);
         if (newest) await store.setRead(from, channel, newest.number, now);
@@ -528,12 +531,12 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         store.rememberReadTarget(who, target, (participant) => store.participant(participant)?.left_at === null);
         const oldest = rows[0];
         const older = oldest !== undefined && (await qm.messagesBefore(db.sql, { channel_id: channel, number: oldest.number, n: 1 })).length > 0;
-        return { target, messages: rows.map((m) => envelopeOf(m, target)), older };
+        return { target, messages: rows.map(addressedOf), older };
       }),
     unread: (who) =>
       store.locked(async () => {
         try {
-          return (await inboxRows(who)).map(({ target, ...r }): T.ChannelUnread => ({ channel: target, ...r }));
+          return await unreadOf(who);
         } catch (c) {
           // What is unread is a hint for the one asking: none, said in the log, rather than a failed turn.
           log.warn(`chat: unread of ${who}: ${String(c)}`);
@@ -606,17 +609,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
     threadAbout: (kind, id) => store.threadOfSubject(kind, id),
     place: (id) => {
       const row = store.channel(id);
-      if (!row) return undefined;
-      const kind = subjectKind(row.subject_kind);
-      return {
-        id: row.id,
-        type: row.type === "thread" ? "thread" : row.type === "direct" ? "direct" : "channel",
-        peer: row.peer_id,
-        parent: row.parent_id,
-        name: row.name,
-        lastNumber: row.last_number ?? 0,
-        ...(kind !== undefined && row.subject_id !== null ? { topic: { kind, id: row.subject_id } } : {}),
-      };
+      return row ? placeOf(row) : undefined;
     },
     markSeen: async (participant, message) => {
       await qs.markSeen(db.sql, { participant_id: participant, message_id: message, seen_at: clock.now() });
@@ -633,13 +626,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         if (!row || !e || row.deleted_at !== null || !store.channel(row.channel_id)) return;
         await settle(row, { seq: e.seq, kind: "posted", channel: e.channel_id, message: e.message_id, at: e.at }, false);
       }),
-    envelopeRow: r.channelEnvelope,
-    asEnvelope: r.asEnvelope,
-    envelopeOf: r.envelopeOf,
-    targetOfPlace: (channel) => {
-      const row = store.channel(channel);
-      return row ? targetOfChannel(row) : "";
-    },
+    addressedOf,
     note: (n) =>
       store.locked(async () => {
         const written = await write({

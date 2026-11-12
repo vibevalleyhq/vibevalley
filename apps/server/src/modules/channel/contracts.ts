@@ -7,15 +7,13 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { Inconsistent } from "#/base/errors.ts";
 import { jsonText, storedJsonOrUndefined } from "#/base/json.ts";
-import { type ChannelEnvelopeRow, type Envelope, type Meta, metaOf, type Picked } from "#/modules/session/envelope.ts";
 import type * as qm from "#db/channel_message.sql.ts";
 
+import { type Meta, metaOf, type Picked } from "./meta.ts";
 import { type ChannelRow } from "./rooms.ts";
 
-export type { ChannelAudience, ChannelEnvelopeRow, ChannelHearers, Meta } from "#/modules/session/envelope.ts";
-export type { Envelope, Picked } from "#/modules/session/envelope.ts";
-export { channelType, envelopeMore, metaOf, metaText } from "#/modules/session/envelope.ts";
-export type { Delivered } from "#/modules/session/signals.ts";
+export type { Meta, Picked } from "./meta.ts";
+export { channelType, envelopeMore, metaOf, metaText } from "./meta.ts";
 
 export type MsgRow = qm.MessageByIDResult;
 
@@ -87,12 +85,32 @@ export interface Info {
   readonly default: boolean;
 }
 
+/** A message as an agent reads it: who said what, at which address (`target`), with what it carries. */
+export interface AddressedMessage {
+  readonly id: string;
+  readonly number: number;
+  readonly target: string;
+  readonly from: string;
+  readonly actor: T.Actor;
+  readonly name: string;
+  readonly text: string;
+  readonly replyTo?: number;
+  readonly edited?: boolean;
+  readonly deleted?: boolean;
+  readonly attachments?: readonly { readonly name: string; readonly path: string }[];
+  readonly artifact?: { readonly id: string; readonly title: string; readonly version: number };
+  readonly blocks?: readonly T.QuotedBlock[];
+  readonly picked?: Picked;
+  readonly responsePort?: string;
+  readonly voiceMode?: NonNullable<Meta["voiceMode"]>;
+}
+
 export interface Spoken {
   readonly kind: "sent" | "held" | "confirm";
   readonly message?: T.ChatMessage;
   readonly target: string;
   readonly absent?: string[];
-  readonly shown?: Envelope[];
+  readonly shown?: AddressedMessage[];
   readonly more?: number;
   readonly lastRead?: string;
 }
@@ -137,7 +155,7 @@ interface ReadOptions {
 
 interface ReadResult {
   readonly target: string;
-  readonly messages: Envelope[];
+  readonly messages: AddressedMessage[];
   readonly older: boolean;
 }
 
@@ -241,6 +259,8 @@ export interface Place {
   readonly parent: string | null;
   readonly name: string | null;
   readonly lastNumber: number;
+  /** A thread's message it hangs under. */
+  readonly root?: { readonly id: string; readonly number: number };
   readonly topic?: { readonly kind: NonNullable<T.Channel["subjectKind"]>; readonly id: string };
 }
 
@@ -277,7 +297,11 @@ export interface Committed {
   readonly event: ChannelEvent;
   /** Told again at startup, after the reader's cursor: it may have been handled before the farm stopped. */
   readonly replayed: boolean;
-  readonly row: ChannelEnvelopeRow;
+  readonly row: MsgRow;
+  /** Where it was said. */
+  readonly place: Place;
+  /** The name of the channel the place is in (a thread's parent's, a channel's own; none for a direct channel). */
+  readonly channelName: string;
   readonly mentions: readonly string[];
   readonly channel: Pick<T.Channel, "type" | "peer">;
   /** The orchestrator in the channel the place is in. */
@@ -331,7 +355,7 @@ export interface ChannelService {
   readonly threadUnder: (id: T.MessageId) => Promise<string>;
   readonly issueThread: (issue: string, title: string, channel?: string) => Promise<string>;
   readonly issueThreadId: (issue: string) => Promise<string | null>;
-  readonly issueMessages: (issue: string) => Promise<Envelope[]>;
+  readonly issueMessages: (issue: string) => Promise<AddressedMessage[]>;
   readonly search: (text: string, channel?: string) => Promise<T.MessageHit[]>;
   /** `""` resolves to `from`'s own session thread, or the default channel. */
   readonly placeOf: (from: string, channel: string) => Promise<string>;
@@ -380,10 +404,8 @@ export interface ChannelService {
   readonly rowsAfter: (channel: string, after: number) => Promise<readonly MsgRow[]>;
   /** Tells the observers a committed message again, as when it was written (not as a replay). */
   readonly retell: (message: string) => Promise<void>;
-  readonly envelopeRow: (row: MsgRow) => ChannelEnvelopeRow;
-  readonly asEnvelope: (row: ChannelEnvelopeRow) => Envelope;
-  readonly envelopeOf: (row: MsgRow, target: string) => Envelope;
-  readonly targetOfPlace: (channel: string) => string;
+  /** A message as an agent reads it, at its place's address. */
+  readonly addressedOf: (row: MsgRow) => AddressedMessage;
   /** A note the farm writes for the layers above: a dispatch under the orchestrator's name, or a report; `topic` opens
    * the place's thread about it under the note, `member` follows the place from it. */
   readonly note: (n: Note) => Promise<{ readonly thread: string }>;
