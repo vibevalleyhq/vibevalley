@@ -84,17 +84,6 @@ update channel set archived_at = sqlc.narg(archived_at) where id = sqlc.arg(id) 
 -- name: SetNotify :exec
 update channel set notify = sqlc.arg(notify) where id = sqlc.arg(id);
 
--- name: TopPlace :one
--- A place's channel or direct channel: itself, or the one a thread hangs in.
-with recursive places as (
-  select id, type, peer_id, parent_id from channel where id = sqlc.arg(id)
-  union
-  select c.id, c.type, c.peer_id, c.parent_id
-  from channel c join places p on c.id = p.parent_id where p.type = 'thread'
-)
-select id::channel.id as id, type::channel.type as type, peer_id::channel.peer_id? as peer_id from places where type <> 'thread' limit 1;
-
-
 -- name: TopicThreadsIn :one
 -- The threads in a channel kept about something outside the chat (a topic), so deleting it would take them from under it.
 select count(*)::int as n from channel t where t.parent_id = sqlc.arg(id) and t.subject_kind = 'issue';

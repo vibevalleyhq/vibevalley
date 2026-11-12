@@ -225,11 +225,11 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
   const files = deps.attachment;
   const filesAt = files.pathOf;
   const attachmentsOf = files.of;
-  /** A participant's unread, as a wake-up and an inbox list them: the channel its home is in (or the default one) and
+  /** A participant's unread, as a wake-up and an inbox list them: the channel given, or the one its home is in (or the default one), and
    * the threads it follows, newest first, at most unreadMax. */
-  const unreadOf = async (who: string): Promise<T.ChannelUnread[]> => {
+  const unreadOf = async (who: string, inChannel?: string): Promise<T.ChannelUnread[]> => {
     const home = homeOf(who);
-    const channel = (home !== undefined ? topOfRow(store.channel(home))?.id : undefined) ?? store.defaultId();
+    const channel = inChannel ?? (home !== undefined ? topOfRow(store.channel(home))?.id : undefined) ?? store.defaultId();
     return (await qc.unreadOf(db.sql, { participant: who, channel })).slice(0, unreadMax).map((row) => ({
       channel: targetOf({ type: channelType(row.type), ...(row.root_number !== null ? { rootNumber: row.root_number } : {}) }, row.channel_name || ""),
       unread: row.unread,

@@ -277,24 +277,6 @@ export async function setNotify(sql: Sql, params: SetNotifyParams): Promise<numb
   return sql.exec(SetNotifySql, [params["notify"], params["id"]])
 }
 
-export interface TopPlaceParams {
-  readonly ["id"]: string
-}
-
-export const TopPlaceResult = z.object({
-  ["id"]: z.string(),
-  ["type"]: Words_channel_type,
-  ["peer_id"]: z.string().nullable(),
-})
-export type TopPlaceResult = z.infer<typeof TopPlaceResult>
-
-export const TopPlaceSql = "-- name: TopPlace :one\n-- A place's channel or direct channel: itself, or the one a thread hangs in.\nwith recursive places as (\n  select id, type, peer_id, parent_id from channel where id = $1\n  union\n  select c.id, c.type, c.peer_id, c.parent_id\n  from channel c join places p on c.id = p.parent_id where p.type = 'thread'\n)\nselect id::text as id, type::text as type, peer_id::text as peer_id from places where type <> 'thread' limit 1;"
-
-export async function topPlace(sql: Sql, params: TopPlaceParams): Promise<TopPlaceResult | undefined> {
-  const [row] = await sql.query(TopPlaceSql, [params["id"]])
-  return row === undefined ? undefined : rowOf("TopPlace", TopPlaceResult, row)
-}
-
 export interface TopicThreadsInParams {
   readonly ["id"]: string
 }

@@ -65,7 +65,7 @@ const sources = () =>
     .map((file) => inspect(file, readFileSync(file, "utf8"))));
 
 const foreignReads: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
-  session: { "channel.sql.ts": ["defaultID", "topPlace", "unreadOf"], "channel_member.sql.ts": ["membersOf"], "issue.sql.ts": ["issueExists"] },
+  session: { "issue.sql.ts": ["issueExists"] },
   inbox: { "channel_message.sql.ts": ["messageByID", "notificationReceipt", "userReadReports"] },
 };
 const folders = containers.flatMap((c) => readdirSync(join(src, c)).filter((name) => statSync(join(src, c, name)).isDirectory()));
@@ -179,7 +179,8 @@ describe("the modules", () => {
   it("regression: namespace imports and foreign writes cannot hide behind a read projection", () => {
     const file = join(src, "modules/session/mailbox.ts");
     const queries = (text: string) => foreignQueries(file, inspect(file, text).edges);
-    expect(queries('import { topPlace as route } from "#db/channel.sql.ts";')).toEqual([]);
+    expect(queries('import { issueExists as known } from "#db/issue.sql.ts";')).toEqual([]);
+    expect(queries('import { topPlace as route } from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:topPlace"]);
     expect(queries('import * as q from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:*"]);
     expect(queries('import { renameChannel } from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:renameChannel"]);
     expect(queries('export * from "#db/issue_assignment.sql.ts";')).toEqual(["issue_assignment.sql.ts:*"]);

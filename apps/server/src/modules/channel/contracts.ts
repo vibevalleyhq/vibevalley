@@ -360,7 +360,8 @@ export interface ChannelService {
   /** `""` resolves to `from`'s own session thread, or the default channel. */
   readonly placeOf: (from: string, channel: string) => Promise<string>;
   readonly read: (who: string, opt?: ReadOptions) => Promise<ReadResult>;
-  readonly unread: (who: string) => Promise<T.ChannelUnread[]>;
+  /** A participant's unread: in `channel` (none: the channel its home is in, or the default one) and the threads it follows. */
+  readonly unread: (who: string, channel?: string) => Promise<T.ChannelUnread[]>;
   readonly list: () => Promise<T.Channel[]>;
   readonly history: (channel: string, before?: number, limit?: number) => Promise<T.ChatMessage[]>;
   /** Reads from DB because `SpaceState.chat` retains only recent channels. */

@@ -1,5 +1,4 @@
 import type * as T from "@vibevalley/protocol";
-import { defaultOrchestrator, userId } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { type Trigger, type TriggerContext } from "./shapes.ts";
@@ -10,12 +9,6 @@ export const actorOfParticipant = (kind: T.ActorKind, role: T.AgentRole | null, 
     : { kind, id, ...(name !== undefined ? { name } : {}) };
 
 export const channelType = (type: string): T.ChannelType => S.ChannelType.safeParse(type).data ?? "channel";
-
-function targetOf(c: Pick<T.Channel, "type" | "rootNumber" | "name">, channelName: string): string {
-  if (c.type === "direct") return "@" + userId;
-  if (c.type === "thread" && c.rootNumber !== undefined) return "#" + channelName + ":" + c.rootNumber;
-  return "#" + (c.name ?? channelName);
-}
 
 export interface Picked {
   readonly agent?: string;
@@ -40,24 +33,13 @@ export interface UnreadRow {
 
 export const summaryChannels = 20;
 
-/** The channels a participant has unread words in, as a wake-up and an inbox list them: the first summaryChannels of
- * the unread rows (channel.sql's unreadOf), in their order. */
-export const unreadSummaryOf = (
-  rows: readonly {
-    readonly type: string;
-    readonly root_number: number | null;
-    readonly channel_name: string;
-    readonly unread: number;
-    readonly mentions_you: boolean;
-    readonly latest_sender_name: string | null;
-  }[],
-): UnreadRow[] =>
-  rows.slice(0, summaryChannels).map((row) => ({
-    target: targetOf({ type: channelType(row.type), ...(row.root_number !== null ? { rootNumber: row.root_number } : {}) }, row.channel_name || ""),
-    unread: row.unread,
-    mentionsYou: row.mentions_you,
-    ...(row.latest_sender_name ? { latest: row.latest_sender_name } : {}),
-  }));
+/** What the mailbox reads of the chat, told by the layer above it (the watch): the default channel, the assistant a
+ * place's words that name no one go to, and a participant's unread (`channel`: the one it is in), newest first. */
+export interface ChatView {
+  readonly defaultChannel: () => string;
+  readonly orchestratorIn: (channel: string) => string;
+  readonly unreadOf: (participant: string, channel: string) => Promise<readonly UnreadRow[]>;
+}
 
 type StoredMessageKind = "chat" | "dispatch" | "report" | "notice";
 
@@ -81,18 +63,6 @@ export interface ChannelEnvelopeRow {
   readonly subject_id: string | null;
   readonly channel_name: string | null;
 }
-
-/** Direct channel peer if orchestrator; otherwise defaultOrchestrator if a member, first orchestrator member, or defaultOrchestrator. */
-export const orchestratorIn = (place: {
-  readonly top: { readonly type: string; readonly peer_id: string | null } | undefined;
-  readonly members: readonly string[];
-  readonly isOrchestrator: (agent: string) => boolean;
-}): string => {
-  const { top, members, isOrchestrator } = place;
-  if (top?.type === "direct") return top.peer_id !== null && isOrchestrator(top.peer_id) ? top.peer_id : defaultOrchestrator;
-  if (members.includes(defaultOrchestrator)) return defaultOrchestrator;
-  return members.find(isOrchestrator) ?? defaultOrchestrator;
-};
 
 export interface ChannelAudience {
   readonly from: string;

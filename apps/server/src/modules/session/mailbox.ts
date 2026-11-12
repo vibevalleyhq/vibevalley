@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Hub, Semaphore, type Subscription, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
+import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { BizCode, Inconsistent, lookIn, missing, refuseIn } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
@@ -13,23 +14,12 @@ import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
-import { defaultID, topPlace, unreadOf } from "#db/channel.sql.ts";
-import { membersOf } from "#db/channel_member.sql.ts";
 import * as qd from "#db/session_delivery.sql.ts";
 import * as qr from "#db/session_trigger.sql.ts";
 
 import { Reach, WakeBreaker } from "./brakes.ts";
 import { Deliveries, type DeliveryRow, type DeliveryDraft } from "./deliveries.ts";
-import {
-  type ChannelEnvelopeRow,
-  type ChannelRouteResult,
-  type Envelope,
-  type ChannelHearers,
-  type Handed,
-  unreadSummaryOf,
-  type UnreadRow,
-  orchestratorIn,
-} from "./envelope.ts";
+import { type ChannelEnvelopeRow, type ChannelRouteResult, type ChatView, type Envelope, type ChannelHearers, type Handed } from "./envelope.ts";
 import type { Lifecycle, SessionNews } from "./lifecycle.ts";
 import { inputOf, orchestratorSource, deliveryScope, type InputContext, type SourceEvent, type TriggerInput, type TriggerResource } from "./payload.ts";
 import { wakeInput } from "./prompts.ts";
@@ -134,6 +124,8 @@ export interface Mailbox {
   readonly withdrawDeliveries: (session: string, why: string) => Promise<void>;
   /** An issue's dispatches recorded before `at` taken back; in its own transaction, outside writeLock. */
   readonly withdrawDispatches: (issue: string, at: number) => Promise<void>;
+  /** The chat the mailbox reads its places from, told by the layer above it; until then, an empty one. */
+  readonly useChat: (view: ChatView) => void;
   readonly waitingOn: (envelope: string) => Promise<number>;
   readonly decline: (session: string, envelope: string, reason: string) => Promise<void>;
   readonly close: () => Promise<void>;
@@ -155,17 +147,12 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
   const journal = triggerJournal({ db, log });
   const tasks = new TaskGroup({ name: "mailbox", onError: (task, e) => log.error(`${task} failed:`, e) });
   const issueOf = (id: string) => core.state().issues.find((issue) => issue.id === id);
-  const defaultChannelOf = async () => (await defaultID(db.sql))?.id ?? "";
-  const orchestratorInChannel = async (channel: string) => {
-    const top = await topPlace(db.sql, { id: channel });
-    const rows = top === undefined || top.type === "direct" ? [] : await membersOf(db.sql, { channel_id: top.id });
-    return orchestratorIn({ top, members: rows.map((m) => m.participant_id), isOrchestrator: agents.isOrchestrator });
-  };
-  const unreadSummary = async (participant: string, channel: string): Promise<UnreadRow[]> => unreadSummaryOf(await unreadOf(db.sql, { participant, channel }));
+  let chat: ChatView = { defaultChannel: () => "", orchestratorIn: () => defaultOrchestrator, unreadOf: async () => [] };
+  const defaultChannelOf = async () => chat.defaultChannel();
+  const orchestratorInChannel = async (channel: string) => chat.orchestratorIn(channel);
   const deliveryUnread = async (who: string) => {
     const h = sessions.sessionOf(who);
-    const channel = h?.channel ?? (await defaultChannelOf());
-    return unreadSummary(who, channel);
+    return chat.unreadOf(who, h?.channel ?? chat.defaultChannel());
   };
   const open = new Deliveries();
   const reach = new Reach();
@@ -543,6 +530,9 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
         }),
       ),
     withdrawDispatches: (issue, at) => work.retireDispatches(issue, at),
+    useChat: (view) => {
+      chat = view;
+    },
     waitingOn: async (envelope) => (await qd.waitingOn(db.sql, { message_id: envelope })).length,
     decline: async (session, envelope, reason) => {
       const why = reason.trim();

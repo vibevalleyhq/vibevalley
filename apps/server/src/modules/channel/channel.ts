@@ -433,10 +433,10 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         const older = oldest !== undefined && (await qm.messagesBefore(db.sql, { channel_id: channel, number: oldest.number, n: 1 })).length > 0;
         return { target, messages: rows.map(addressedOf), older };
       }),
-    unread: (who) =>
+    unread: (who, channel) =>
       store.locked(async () => {
         try {
-          return await unreadOf(who);
+          return await unreadOf(who, channel);
         } catch (c) {
           // What is unread is a hint for the one asking: none, said in the log, rather than a failed turn.
           log.warn(`chat: unread of ${who}: ${String(c)}`);

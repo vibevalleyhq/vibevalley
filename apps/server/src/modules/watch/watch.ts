@@ -240,6 +240,17 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
     if (!stuck) await moveCursor(event.seq);
   };
   chat.observe({ posted, removed });
+  sessions.useChat({
+    defaultChannel: () => chat.defaultChannel(),
+    orchestratorIn: (channel) => chat.orchestratorIn(channel),
+    unreadOf: async (participant, channel) =>
+      (await chat.unread(participant, channel)).map((u) => ({
+        target: u.channel,
+        unread: u.unread,
+        mentionsYou: u.mentionsYou,
+        ...(u.latest !== undefined ? { latest: u.latest } : {}),
+      })),
+  });
 
   /** The assistants are seated under their profiles' names, each with its direct channel. */
   const seatAssistant = async (agent: T.Agent) => {

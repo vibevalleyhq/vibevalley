@@ -12,7 +12,7 @@ import type { Repo } from "#/modules/repo/repo.ts";
 import { RepoError, type WorkplaceCleanup, type WorkplaceRelease } from "#/modules/repo/workplace.ts";
 import type { Runtime } from "#/modules/runtime/runtime.ts";
 
-import type { Accepted, ChannelHearers, ChannelRouteResult, Envelope } from "./envelope.ts";
+import type { Accepted, ChannelHearers, ChannelRouteResult, ChatView, Envelope } from "./envelope.ts";
 import type { AgentHost, HostOptions } from "./host.ts";
 import { HireRefused, type Lifecycle, makeLifecycle, type SessionNews, type SessionOptions } from "./lifecycle.ts";
 import { type Machine, makeMachine } from "./machine.ts";
@@ -66,6 +66,9 @@ export interface Session {
   readonly withdrawDeliveries: (session: string, why: string) => Promise<void>;
   /** An issue's dispatches recorded before `at` taken back; in its own transaction. */
   readonly withdrawDispatches: (issue: string, at: number) => Promise<void>;
+  /** The chat the deliveries read their places from (the default channel, a place's assistant, a participant's unread),
+   * told by the layer above the sessions; until then, an empty one. */
+  readonly useChat: (view: ChatView) => void;
   /** A helper says an input is not its to take; the orchestrator is told why. */
   readonly decline: (session: string, envelope: string, reason: string) => Promise<void>;
   /** An orchestrator's host gives back an input it did not take. */
@@ -187,6 +190,7 @@ export function sessionOver(parts: {
     withdrawEnvelope: mailbox.withdrawEnvelope,
     withdrawDeliveries: mailbox.withdrawDeliveries,
     withdrawDispatches: mailbox.withdrawDispatches,
+    useChat: mailbox.useChat,
     decline: mailbox.decline,
     handBack: mailbox.handBack,
     stop: lifecycle.stop,

@@ -28,7 +28,7 @@ import { type Channel, catchUpMax, makeChannel } from "#/modules/channel/channel
 import { effectsOf } from "#/modules/game/view.ts";
 import { channelUses } from "#/modules/issue/issue.ts";
 import { wakeBreaker } from "#/modules/session/brakes.ts";
-import { type Handed, orchestratorIn } from "#/modules/session/envelope.ts";
+import type { Handed } from "#/modules/session/envelope.ts";
 import { restoredSession, sessionState } from "#/modules/session/history.ts";
 import type { Lifecycle } from "#/modules/session/lifecycle.ts";
 import { type Mailbox, makeMailbox } from "#/modules/session/mailbox.ts";
@@ -36,8 +36,6 @@ import { summaryOf } from "#/modules/session/report.ts";
 import { DeliveryRefused, newsOf, sessionOver, type SessionNews } from "#/modules/session/session.ts";
 import type { Consumed, Delivered, LaunchActivity } from "#/modules/session/signals.ts";
 import { testConfig, until, waitFor } from "#/testing/layers.ts";
-import { topPlace } from "#db/channel.sql.ts";
-import { addMember, membersOf, removeMember } from "#db/channel_member.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qsession from "#db/session.sql.ts";
 
@@ -1229,30 +1227,18 @@ describe("the chat", () => {
   });
 });
 
-test("regression: mailbox routing reads the current channel manager through threads and direct conversations", async () => {
-  await using db = await openDb(testConfig(), keptLog(), wallTime);
-  const sql = (text: string) => db.sql.exec(text);
-  await sql(
-    "insert into channel_participant (id, kind, name, joined_at) values ('manager', 'agent', 'manager', 0), ('first', 'agent', 'first', 0), ('second', 'agent', 'second', 0)",
-  );
-  await sql("insert into channel (id, type, name, created_at) values ('room', 'channel', 'room', 0)");
-  await addMember(db.sql, { channel_id: "room", participant_id: "first", reason: "manual", from_number: 0 });
-  await sql(`insert into channel_message (id, channel_id, number, sender_id, kind, body, created_at, revision)
-      values ('root', 'room', 1, 'manager', 'chat', '', 0, 1)`);
-  await sql("insert into channel (id, type, root_id, parent_id, created_at) values ('thread', 'thread', 'root', 'room', 0)");
-  await sql("insert into channel (id, type, peer_id, created_at) values ('direct', 'direct', 'manager', 0)");
-  // Every agent named here is taken for an orchestrator: what is under test is which place's members are read.
-  const orchestratorHere = async (id: string) => {
-    const top = await topPlace(db.sql, { id });
-    if (top === undefined) throw new Error(`no place ${id}`);
-    const rows = await membersOf(db.sql, { channel_id: top.id });
-    return orchestratorIn({ top, members: rows.map((m) => m.participant_id), isOrchestrator: () => true });
-  };
-  const before = await orchestratorHere("thread");
-  expect(before).toBe("first");
-  await removeMember(db.sql, { channel_id: "room", participant_id: "first", at: 1 });
-  await addMember(db.sql, { channel_id: "room", participant_id: "second", reason: "manual", from_number: 0 });
-  const after = await orchestratorHere("thread");
-  const direct = await orchestratorHere("direct");
-  expect([after, direct]).toEqual(["second", "manager"]);
-});
+test("regression: mailbox routing reads the current channel manager through threads and direct conversations", () =>
+  // The mailbox reads a place's assistant through the chat (Watch hands Session the chat's orchestratorIn).
+  run(async (f) => {
+    for (const id of ["manager", "first", "second"]) await f.chat.seat({ id, name: id });
+    const room = await f.chat.openChannel("room", "", "");
+    await f.chat.updateChannel(room.id, { members: ["first"] });
+    const { message: root } = await f.chat.say({ text: "根", channel: room.id, sendKey: "" });
+    const thread = await f.chat.threadUnder(root.id);
+    const before = f.chat.orchestratorIn(thread);
+    expect(before).toBe("first");
+    await f.chat.updateChannel(room.id, { members: ["second"] });
+    const after = f.chat.orchestratorIn(thread);
+    const direct = f.chat.orchestratorIn(await f.chat.createDirect("manager"));
+    expect([after, direct]).toEqual(["second", "manager"]);
+  }));
