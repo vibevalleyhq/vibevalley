@@ -100,7 +100,7 @@ Host：
 | `agent-templates/<id>/` | 从本机导入的档案模板（`agent.json`、`persona.md`） |
 | `settings.json` | 密钥、语音设置、记忆来源配置（权限 `0600`） |
 | `vibevalley.yaml` | 可选的静态配置文件 |
-| `db/` | PGlite 的数据目录（配了 `database.url` 时不用它）：会话、运行、触发和投递（`session`、`session_run`、`session_trigger`、`session_delivery`、`session_subscription`、`session_issue_input`、`session_machine`）、工单 GitHub 观察游标（`issue_github`）、频道、工单、Artifact、游戏账本、记忆、定时任务、连接器、用户的账号和设备、笔记批注与撤销 |
+| `db/` | PGlite 的数据目录（配了 `database.url` 时不用它）：会话、运行、触发和投递（`session`、`session_run`、`session_trigger`、`session_delivery`、`session_subscription`、`session_issue_input`、`session_machine`）、PR 的 GitHub 观察游标（`session_github_cursor`）、频道、工单、Artifact、游戏账本、记忆、定时任务、连接器、用户的账号和设备、笔记批注与撤销 |
 | `events/<id>.json` | 会话轨迹日志（帮工离开后保留 30 天） |
 | `durable.db` | pi-durable 的对话：助手的，和 `vibevalley` 农机上帮工的（一个 oar 会话一个）（测试农场在内存里） |
 | `agent/<档案 id>/` | 助手的评测样例 `evals/`；终端对话 `chat` 的 `durable.db`（它自己的，对话开着时租着这个目录）、`MEMORY.md` 和 `mcp.json` |

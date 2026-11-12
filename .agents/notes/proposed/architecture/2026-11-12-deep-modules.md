@@ -34,6 +34,14 @@ Status: proposed
 - `registry`、`launch`、`watch` 这些里面的部分没有收拢：它们现在只在模块里，收拢不改任何调用方，留给第 5 步和纯判断一起做。
 - 重启：`vibevalley` 农机上答到一半的帮工在正常关门以后接着答，记在原来那一轮上（`Durable.leave`、`goOn`、`Hand.goesOn`）；`session_run` 的开着的一轮仍是接上时认的那一轮，pi-durable 不记我们的轮次 ID，所以「接管」没有删。外部农机照旧记 `interrupted`。
 
+## Step 3 as done
+
+- **交付和跟 PR 进了 session**（`session/landing.ts`、`session/github.ts`）：`merge`（帮工交接后放走，或帮工不在、子工单已合进来时从工单自己的检出；合进主分支或提 PR 由仓库和 PR 的状态定）、`submitPullRequest`、`mergeChild`（跑子工单的检查、合进父工单帮工的工作目录或父工单的检出）、`refreshPullRequests`、`pollGitHub`、`changesOf`、`conflictOf`。工单留着决定，作为数据交过去：从检出合不合（有没有子工单）、`childChecks`（子工单过哪些检查、冻结哪些文件）、PR 结了算不算完（`FollowedPullRequest.finishes`）；工单表上要记的（冲突、PR 的链接和状态、结局、冻结的文件）经调用方给的 `IssueRecord` 回调，在帮工放走之前写下，先后和以前一样。PR 锁和拆单的锁还在工单（它们串的是工单这边的读和决定）。表 `issue_github` 改名 `session_github_cursor`。
+- **派活**：`hireWith` 收 `parent`（父工单号），子工单的父检出由 session 先建；工单留排队派活的三处（排队、当值的开工、拆单）改用 `queueDispatch`：在调用方的事务里记下触发，提交时（`db.afterCommit`）路由，触发的形状不再写在工单里。路由因此排在同一事务的 `publish` 之前（以前在之后），队列看到工单变化时派活已经路由好了。
+- **删掉和拆开**：Session 去掉只有工单用的 `withWorkplace`、`withIdleWorkplace`、`withCheckout`、`handOver`、`knownGitHubEvents`（`handOver` 等仍在模块里，测试经 `insideOf` 用）；`Repo.checkout` 的 `Open`/`Release`/`Reset`/`Clear` 拆成 `checkout`、`releaseCheckout`、`resetCheckout`、`clearCheckout`；信箱的 `receive`（`Trigger`/`Hire`）、`withdraw`（`Session`/`Envelope`/`Issue`）拆成 `route`、`hireWith`、`withdrawDeliveries`、`withdrawEnvelope`、`withdrawDispatches`。
+- **量出来**：issue 用 Repo 3 个（`usesPullRequests`、`branchChanges`、`stack`），达标；`repo.run`、`repo.githubRequest` 只有 session 调。issue 用 Session 23 个，没到 8 个：拿掉 8 个让工单自己编排的门（`withWorkplace`、`withIdleWorkplace`、`withCheckout`、`handOver`、`receive`、`knownGitHubEvents`、`recordTrigger`、`route`），换上 8 个高层操作（`merge`、`submitPullRequest`、`mergeChild`、`refreshPullRequests`、`pollGitHub`、`changesOf`、`conflictOf`、`queueDispatch`）。剩下的每个都答工单的一个问题，再并只能违反两条之一：读（`live`、`get`、`list`、`runsOf`、`hired`、`triggersOf`、`queuedTriggers`、`room`：派活的决定和时间线、历史要它们，`hired` 换成读核心状态里的会话会越界，`modules.test.ts` 拦）；叫停放走（`stop`、`dismiss`）；派活（`hireWith`、`withdrawDispatches`）；工作目录（`discardWork`：答案工单交回后重置，`deliver` 开着时能改，只能在汇报时由工单定；`clearWorkplace`：换仓库和起草收尾）；`news`。`deliver(issue, how)` 那样一个成员装几件事是带标签的门；把 `room`、`triggersOf` 并进派活要把排队和就绪的判断搬进 session，改了拒绝的先后。8 个的目标是按带标签的门估的，作废，记 23。
+- `merge.ts` 里的 `verifyChild` 拆成工单的 `childChecks`（纯函数）和 session 的检查；`pullRequestConclusion` 跟着提 PR 搬到 `session/landing.ts`。测试只改了调用的写法和 import（`Repo.checkout` 的拆分、`pullRequestConclusion` 的 import、频道测试的 `sessionOver` 替身多了交付的几样），断言没动，服务端 1185 个测试照旧全过。
+
 ## Alternatives considered
 
 - **把宽接口拆成很多小服务。** 每个小服务只有几个成员，看着整齐，实际是更多的浅模块：调用方要认识更多的门，一件事还是散在几处。没选：要的是少而深。
@@ -43,7 +51,7 @@ Status: proposed
 ## Acceptance criteria
 
 - `services.ts` 没有阶段类型和 `add()`，每个 `makeX` 的依赖在调用处写明。
-- `modules.ts` 里没有 mailbox、machine、library 这几个模块；issue 用 Session 的成员不超过 8 个、用 Repo 的不超过 3 个（`service-paths.json`），session 以外没有模块调 `repo.run` 或 `repo.githubRequest`；`Repo.checkout` 这类带标签的门拆成具名成员。
+- `modules.ts` 里没有 mailbox、machine、library 这几个模块；issue 用 Repo 的成员不超过 3 个（`service-paths.json`），session 以外没有模块调 `repo.run` 或 `repo.githubRequest`（issue 用 Session 的成员数见 [Step 3 as done](#step-3-as-done)：23 个，每个答一个问题）；`Repo.checkout` 这类带标签的门拆成具名成员。
 - 帮工在服务端正常重启后接着干（流程测试守着）；`session_run` 不再有「接管」的写法。
 - `server:check`、`web:check`、`paths:check`、`practice:check`、`health:verify`、`deadcode`、`docs:verify` 全过；服务端测试数不减（改名、挪地方的点名），`regression:` 测试名字不变。
 - `AGENTS.md` 和 `docs/subsystems/` 照新的样子写，删掉本 Note。
