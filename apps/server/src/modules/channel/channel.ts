@@ -10,7 +10,6 @@ import type { Core } from "#/core/core.ts";
 import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Agent } from "#/modules/agent/agent.ts";
 import type { Attachment } from "#/modules/attachment/attachment.ts";
 import { heldShown, type Envelope, type Picked, retryWindowMs } from "#/modules/session/envelope.ts";
 import * as qe from "#db/channel_event.sql.ts";
@@ -60,7 +59,6 @@ export interface ChannelDeps {
   readonly fetch: typeof fetch;
   readonly db: Db;
   readonly core: Core;
-  readonly agent: Agent;
   readonly attachment: Attachment;
 }
 
@@ -95,7 +93,7 @@ function mapped<A, B>(sub: Subscription<A>, f: (a: A) => B | undefined): Subscri
 }
 
 export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
-  const { core, agent: agents, db, clock } = deps;
+  const { core, db, clock } = deps;
   const log = deps.log.child("channel");
   const tasks = new TaskGroup({ name: "channel", onError: (task, e) => log.warn(`${task} failed`, e) });
   const own = { ...deps, log };
@@ -104,6 +102,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
   const w = channelWriting(own, r, tasks);
   const {
     store,
+    isAssistant,
     said,
     userReadHub,
     channelTags,
@@ -168,7 +167,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
     const files = await attachmentsOf(more.attachments ?? []);
     if (!text.trim() && files.length === 0) throw refused(t("server.channel.empty"));
     if (sendKey.length > sendKeyMax) throw refused(t("server.channel.sendKeyLong"));
-    if (more.to !== undefined && !agents.isOrchestrator(more.to)) throw refused(t("server.channel.notOrchestrator", { id: more.to }));
+    if (more.to !== undefined && !isAssistant(more.to)) throw refused(t("server.channel.notOrchestrator", { id: more.to }));
     // A channel as the user names it (general, #general, @fox) as well as by id; none is the default one.
     const where = channel === undefined || store.channel(channel) ? (channel ?? store.defaultId()) : await resolveTarget(userId, channel);
     if (!store.channel(where)) throw missing(t("server.channel.noChannel", { id: where }), [lookIn.channel]);
@@ -259,9 +258,8 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         return { kind: "held", target, shown, more: unseen.length - shown.length };
       }
       // calledBy finds only participants of kind agent, and those are sessions (their ids are session ids).
-      const caller = !agents.isOrchestrator(from) ? (await qm.calledBy(db.sql, { speaker: from, channel, before: afterAll }))?.sender_id : undefined;
+      const caller = !isAssistant(from) ? (await qm.calledBy(db.sql, { speaker: from, channel, before: afterAll }))?.sender_id : undefined;
       const answers = caller === undefined ? undefined : sessionId(caller);
-      if (agents.isOrchestrator(from)) await store.seat(from);
       await answered(channel, opt.reply);
       const written = await write({
         channel,
@@ -281,7 +279,6 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
     store.locked(async () => {
       const where = store.channel(channel) ? channel : await resolveTarget(from, channel);
       if (!store.channel(where)) throw refused(t("server.channel.channelGone"));
-      if (agents.isOrchestrator(from)) await store.seat(from);
       const shown = "card" in made ? { artifact: made.card } : { attachments: await attachmentsOf(made.attachments) };
       const written = await write({
         channel: where,
@@ -325,10 +322,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
   const postRun = ({ channel, text, run, from }: PostOf<"Run">) =>
     bestEffort(log, "chat: a run's words", async () => {
       if (!text.trim()) return;
-      await store.locked(async () => {
-        await store.seat(from);
-        await write({ channel, from, kind: "chat", text, meta: run ? { run } : {} });
-      });
+      await store.locked(() => write({ channel, from, kind: "chat", text, meta: run ? { run } : {} }));
     });
 
   const postNotice = ({ channel, text, code, sendKey = "" }: PostOf<"Notice">) =>
@@ -375,8 +369,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
       });
     },
     say: async (text, pick, channel, sendKey, more) => {
-      const a = pick.agent ? agents.agent(pick.agent) : undefined;
-      const picked: Picked = { ...(a ? { agent: a.id } : {}), ...(pick.repo?.trim() ? { repo: pick.repo.trim() } : {}) };
+      const picked: Picked = { ...(pick.agent ? { agent: pick.agent } : {}), ...(pick.repo?.trim() ? { repo: pick.repo.trim() } : {}) };
       core.open();
       await post({
         _tag: "User",
@@ -617,6 +610,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
           }),
         ),
       ),
+    seat: ({ id, name }) => store.locked(() => store.tx(() => store.seatAssistant(id, name))),
     leave: (participant) => store.locked(() => store.markParticipantLeft(participant, clock.now())),
     participants: () =>
       store.participants().map((p) => ({ id: p.id, role: p.role, agent: p.agent_id, runtime: p.runtime, home: p.home_id, left: p.left_at !== null })),
@@ -662,7 +656,6 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
     },
     note: (n) =>
       store.locked(async () => {
-        if (agents.isOrchestrator(n.from)) await store.seat(n.from);
         const written = await write({
           channel: n.channel,
           from: n.from,

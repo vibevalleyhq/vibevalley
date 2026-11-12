@@ -1,6 +1,6 @@
 import { Hub } from "@vibevalley/async";
 import type * as T from "@vibevalley/protocol";
-import { userId } from "@vibevalley/protocol";
+import { defaultOrchestrator, userId } from "@vibevalley/protocol";
 import { oneLine } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -8,9 +8,8 @@ import { head } from "#/base/clip.ts";
 import type { Core } from "#/core/core.ts";
 import type { Db } from "#/infra/db.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Agent } from "#/modules/agent/agent.ts";
 import type { Attachment } from "#/modules/attachment/attachment.ts";
-import { type Envelope, orchestratorIn, unreadSummaryOf } from "#/modules/session/envelope.ts";
+import { type Envelope, unreadSummaryOf } from "#/modules/session/envelope.ts";
 import * as qc from "#db/channel.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
 
@@ -32,8 +31,6 @@ import { messageMutations } from "./mutations.ts";
 import type { ChannelRow } from "./rooms.ts";
 import { makeChannelStore } from "./store.ts";
 
-/** A helper profile as the chat knows it: apart from the orchestrator and its sessions. */
-export const profileId = (agent: string) => `profile:${agent}`;
 /** A thread named by the message it hangs under shows this much of it. */
 export const threadTitleMax = 24;
 /** How much of a channel's newest message a list shows. */
@@ -45,19 +42,27 @@ export interface ChannelHubDeps {
   readonly clock: Time;
   readonly db: Db;
   readonly core: Core;
-  readonly agent: Agent;
   readonly attachment: Attachment;
 }
 
 /** The chat's shared state and the ways it is told: the store, the hubs of what was said and read, and the frames. */
 export async function makeChannelHub(deps: ChannelHubDeps) {
-  const { core, agent: agents, db, clock } = deps;
+  const { core, db, clock } = deps;
   const store = await makeChannelStore(deps);
   // Every message once written, for the rooms: each follower reads it through a bounded relay of its own.
   const said = new Hub<T.ChatMessage>();
   const userReadHub = new Hub<UserRead>();
 
-  const orchestratorIds = () => agents.orchestrators().map((a) => a.id);
+  /** An assistant: a profile seated to speak as itself (the layers above seat them), there and not gone. */
+  const isAssistant = (id: string) => {
+    const p = store.participant(id);
+    return p?.role === "orchestrator" && p.left_at === null;
+  };
+  const assistantIds = () =>
+    store
+      .participants()
+      .filter((p) => isAssistant(p.id))
+      .map((p) => p.id);
 
   /** A place's channel or direct channel: itself, or the one a thread hangs in. */
   const topOfRow = (row: ChannelRow | undefined): ChannelRow | undefined =>
@@ -67,8 +72,15 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
     const top = topOfRow(row);
     return top === undefined || top.type === "direct" ? [] : store.membersOf(top.id);
   };
-  const orchestratorInRow = (row: ChannelRow | undefined): string =>
-    orchestratorIn({ top: topOfRow(row), members: membersOfRow(row), isOrchestrator: agents.isOrchestrator });
+  /** The assistant a place's words go to when they name no one: a direct channel's peer when it is one; otherwise the
+   * default assistant when it is a member, the first assistant member, or the default assistant. */
+  const orchestratorInRow = (row: ChannelRow | undefined): string => {
+    const top = topOfRow(row);
+    if (top?.type === "direct") return top.peer_id !== null && isAssistant(top.peer_id) ? top.peer_id : defaultOrchestrator;
+    const members = membersOfRow(row);
+    if (members.includes(defaultOrchestrator)) return defaultOrchestrator;
+    return members.find(isAssistant) ?? defaultOrchestrator;
+  };
 
   /** A channel's name; none for a thread or what is not there. */
   const channelName = (id: string) => {
@@ -296,7 +308,8 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
     store,
     said,
     userReadHub,
-    orchestratorIds,
+    isAssistant,
+    assistantIds,
     orchestratorInRow,
     membersOfRow,
     channelTags,

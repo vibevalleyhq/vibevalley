@@ -181,7 +181,7 @@ export async function buildModules(config: ServerConfig, options: ServiceOptions
   // the machine they run on.
   const session = own(await makeSession({ config, clock, log, db, core, agent, memory, repo, runtime }, options.session));
   // Collaboration: channels, threads, messages, media and its library, documents, the user's notes.
-  const channel = own(await makeChannel({ clock, log, fetch, db, core, agent, attachment }));
+  const channel = own(await makeChannel({ clock, log, fetch, db, core, attachment }));
   const media = own(await makeMedia({ db, core, clock, log, attachment, session, channel, provider, publicFetch }));
   const artifact = own(await makeArtifact({ db, clock, log, attachment, channel }));
   const pkm = own(await makePkm({ config, clock, log, db }));

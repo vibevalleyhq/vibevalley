@@ -342,6 +342,8 @@ export interface ChannelService {
   readonly replay: (after: number, handled: (event: ChannelEvent) => Promise<void>) => Promise<void>;
   /** Seats a participant who speaks for the layers above (a session, a profile), with its home; joined again if it left. */
   readonly join: (p: Joining) => Promise<void>;
+  /** Seats an assistant (a profile that speaks as itself) under the name it goes by now. */
+  readonly seat: (assistant: { readonly id: string; readonly name: string }) => Promise<void>;
   /** A participant gone: in nothing, never back. */
   readonly leave: (participant: string) => Promise<void>;
   readonly participants: () => readonly Participant[];
@@ -392,7 +394,8 @@ export interface ChannelService {
   readonly setNotify: (id: string, notify: T.Notify) => Promise<void>;
   /** `"none"` on either the thread or its parent channel silences both. */
   readonly notifyOf: (id: string) => T.Notify;
-  readonly direct: (agent: string) => Promise<string>;
+  /** The direct channel with a seated agent (an assistant, a profile's seat), made when there is none. */
+  readonly createDirect: (peer: string) => Promise<string>;
   readonly orchestratorIn: (channel: string) => string;
   readonly markUnread: (channel: string, number: number) => Promise<void>;
   /** Parent channel for a thread, or the default channel for a direct conversation. */

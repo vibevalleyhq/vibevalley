@@ -24,6 +24,23 @@ export async function upsertParticipant(sql: Sql, params: UpsertParticipantParam
   return sql.exec(UpsertParticipantSql, [params["id"], params["kind"], params["role"], params["name"], params["agent_id"], params["runtime"], params["home_id"], params["joined_at"]])
 }
 
+export interface AddParticipantParams {
+  readonly ["id"]: string
+  readonly ["kind"]: Words_channel_participant_kind
+  readonly ["role"]: Words_channel_participant_role | null
+  readonly ["name"]: string
+  readonly ["agent_id"]: string | null
+  readonly ["runtime"]: string | null
+  readonly ["home_id"]: string | null
+  readonly ["joined_at"]: number
+}
+
+export const AddParticipantSql = "-- name: AddParticipant :exec\n-- One already there keeps its seat as it is.\ninsert into channel_participant (id, kind, role, name, agent_id, runtime, home_id, joined_at)\nvalues ($1, $2, $3, $4, $5, $6, $7, $8)\non conflict (id) do nothing;"
+
+export async function addParticipant(sql: Sql, params: AddParticipantParams): Promise<number> {
+  return sql.exec(AddParticipantSql, [params["id"], params["kind"], params["role"], params["name"], params["agent_id"], params["runtime"], params["home_id"], params["joined_at"]])
+}
+
 export interface ParticipantLeftParams {
   readonly ["left_at"]: number | null
   readonly ["id"]: string

@@ -238,7 +238,7 @@ describe("the orchestrator", () => {
     const from = (channel: string, who: string) => saidIn(channel).filter((m) => m.from === who && m.kind === "chat");
     const asked = (text: string) => f.requests.filter((c) => lastLine(c).includes(text));
 
-    const direct = await chat.direct(lead.name);
+    const direct = await f.farm.watch.direct(lead.name);
     expect(direct).not.toBe(chat.defaultChannel());
     await chat.say("私下问你", {}, direct, "");
     expect((await until(() => from(direct, lead.id)[0], "its answer in its direct channel")).name).toBe("阿青");

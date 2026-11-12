@@ -7,7 +7,6 @@ import { newId } from "#/base/ids.ts";
 import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Agent } from "#/modules/agent/agent.ts";
 import * as qc from "#db/channel.sql.ts";
 import * as qe from "#db/channel_event.sql.ts";
 import * as qmn from "#db/channel_mention.sql.ts";
@@ -35,13 +34,12 @@ export interface ChannelWritingDeps {
   readonly log: Logger;
   readonly fetch: typeof fetch;
   readonly db: Db;
-  readonly agent: Agent;
 }
 
 /** tasks: the channel's own, so the work a message sets off ends with the service. */
 export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: TaskGroup) {
   const { db, clock, log } = deps;
-  const { store, orchestratorIds, orchestratorInRow, membersOfRow, publishChannel, publishUserMentions, publishMessage, readUpTo, change, channelEnvelope } = r;
+  const { store, assistantIds, orchestratorInRow, membersOfRow, publishChannel, publishUserMentions, publishMessage, readUpTo, change, channelEnvelope } = r;
   const observers: ChannelObserver[] = [];
   /** A session's seat in the chat: an agent's participant hired to work, there until it leaves. */
   const isSession = (p: { readonly role: string | null; readonly runtime: string | null; readonly left_at: number | null }) =>
@@ -52,7 +50,7 @@ export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: T
     const ch = store.channel(row.channel_id);
     if (!ch) throw new Inconsistent(`no channel ${row.channel_id}`);
     const meta = metaOf(row.meta);
-    const orchestrators = orchestratorIds();
+    const orchestrators = assistantIds();
     const here = orchestratorInRow(ch);
     // No one else is in a direct channel to be named.
     const mentions = ch.type === "direct" ? [] : mentionsIn(row.body, { here, orchestrators });

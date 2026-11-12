@@ -6,6 +6,7 @@ import { lookIn, missing, reasonOf } from "#/base/errors.ts";
 import { requestKeys } from "#/gateway/http/api.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
+import type { Agent } from "#/modules/agent/agent.ts";
 import type { Artifact } from "#/modules/artifact/artifact.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { Game } from "#/modules/game/game.ts";
@@ -34,6 +35,7 @@ async function quoteBlocks(artifacts: Artifact, refs: readonly T.BlockRef[] | un
 }
 
 export interface ChannelHandlersDeps {
+  readonly agent: Agent;
   readonly artifact: Artifact;
   readonly channel: Channel;
   readonly watch: Watch;
@@ -43,14 +45,16 @@ export interface ChannelHandlersDeps {
 }
 
 export function channelHandlers(deps: ChannelHandlersDeps): ChannelHandlers {
-  const { artifact: artifacts, channel: channels, game } = deps;
+  const { agent: agents, artifact: artifacts, channel: channels, watch, game } = deps;
   const log = deps.log.child("http/channel");
   const threadOnce = requestKeys<string>(deps.clock);
   return {
     "channel.message.send": async (body) => {
       if (body.station !== undefined) game.want(body.station);
       const blocks = await quoteBlocks(artifacts, body.blocks, log);
-      await channels.say(body.text, { ...(body.agent ? { agent: body.agent } : {}), ...(body.repo ? { repo: body.repo } : {}) }, body.id, body.sendKey ?? "", {
+      // A profile picked that is not there is not passed on.
+      const picked = body.agent !== undefined ? agents.agent(body.agent)?.id : undefined;
+      await channels.say(body.text, { ...(picked ? { agent: picked } : {}), ...(body.repo ? { repo: body.repo } : {}) }, body.id, body.sendKey ?? "", {
         ...(body.replyTo !== undefined ? { replyTo: body.replyTo } : {}),
         ...(body.attachments ? { attachments: body.attachments } : {}),
         ...(blocks.length > 0 ? { blocks } : {}),
@@ -63,7 +67,7 @@ export function channelHandlers(deps: ChannelHandlersDeps): ChannelHandlers {
     "channel.delete": ({ id }) => channels.removeChannel(id),
     "channel.previewDelete": ({ id }) => channels.previewRemoveChannel(id),
     "channel.notify.set": ({ id, notify }) => channels.setNotify(id, notify),
-    "channel.direct.create": ({ agent }) => channels.direct(agent),
+    "channel.direct.create": ({ agent }) => watch.direct(agent),
     "channel.markUnread": ({ id, number }) => channels.markUnread(id, number),
     "channel.list": () => channels.list(),
     "channel.unread.list": () => channels.unread(userId),

@@ -27,7 +27,6 @@ import {
   type MsgRow,
   type ThreadSubject,
 } from "#/modules/channel/contracts.ts";
-import { profileId } from "#/modules/channel/hub.ts";
 import { inputContext } from "#/modules/session/payload.ts";
 import { envelopeLines, talkBrief } from "#/modules/session/prompts.ts";
 import { HireRefused, NotRecorded, type Session } from "#/modules/session/session.ts";
@@ -36,6 +35,8 @@ import * as qw from "#db/watch_cursor.sql.ts";
 
 import { channelTrigger } from "./trigger.ts";
 
+/** A helper profile's seat in the chat, the peer of its direct channel: apart from the assistants and the sessions. */
+const profileId = (agent: string) => `profile:${agent}`;
 /** What a participant says by reacting when a message that wakes it is handed to it. */
 const handedEmoji = "👀";
 const reportMax = 1500;
@@ -44,6 +45,8 @@ const talkContext = 12;
 const routed = "channel";
 
 export interface Watch {
+  /** The direct channel with a profile (by name or id): an assistant's own, or a helper profile's seat; made when there is none. */
+  readonly direct: (ref: string) => Promise<string>;
   /** Words for a session: said in its home, or heard by it alone when it has none. */
   readonly tell: (from: string, session: string, text: string, sendKey: string) => Promise<T.ChatMessage | undefined>;
   /** What deleting a message does, its waiting deliveries included. */
@@ -228,6 +231,15 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
     if (!stuck) await moveCursor(event.seq);
   };
   chat.observe({ posted, removed });
+
+  /** The assistants are seated under their profiles' names, each with its direct channel. */
+  const seatAssistant = async (agent: T.Agent) => {
+    if (!agents.isOrchestrator(agent.id)) return;
+    await chat.seat({ id: agent.id, name: agent.name.trim() || t("server.channel.name.orchestrator") });
+    await chat.createDirect(agent.id);
+  };
+  for (const agent of agents.orchestrators()) await seatAssistant(agent);
+  agents.whenKept(seatAssistant);
   chat.guardRemoval(async (id) => (hired().some((h) => channelOfSession(h) === id) ? [t("server.channel.helpersThere")] : []));
 
   const openThread = async (h: T.Session) => {
@@ -344,6 +356,17 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
   });
 
   return {
+    direct: async (ref) => {
+      const name = ref.trim();
+      const agent = agents.named(name) ?? agents.agent(name) ?? agents.orchestrators().find((o) => o.name === name);
+      if (!agent) throw missing(t("server.channel.noProfileNamed", { key: ref }), [lookIn.agent]);
+      if (agents.isOrchestrator(agent.id)) {
+        await seatAssistant(agent);
+        return chat.createDirect(agent.id);
+      }
+      await chat.join({ id: profileId(agent.id), role: "worker", name: agent.name, agent: agent.id, runtime: null });
+      return chat.createDirect(profileId(agent.id));
+    },
     tell: async (from, session, text, sendKey) => {
       const home = await chat.homeOf(session);
       if (home) return chat.post({ _tag: "Home", from, home, text, sendKey, ...(sessions.live(from).run ? { run: sessions.live(from).run } : {}) });

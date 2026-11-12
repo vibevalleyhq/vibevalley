@@ -318,7 +318,7 @@ describe("mcp", () => {
         channel: chat.defaultChannel(),
       },
     );
-    const direct = await chat.direct("lab");
+    const direct = await farm.watch.direct("lab");
     await chat.post({ _tag: "User", text: "在这里做一份", channel: direct, sendKey: "" });
     await until(() => tokens.length > 0, "the channel context's token");
     const c = client(mcp, tokens[0]!);

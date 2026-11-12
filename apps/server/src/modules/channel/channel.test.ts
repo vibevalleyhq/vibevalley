@@ -200,7 +200,7 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
     close: () => mailbox.close(),
   });
   const attachment = await makeAttachment({ config: c, clock, db });
-  const chat = await makeChannel({ clock, log, fetch: offline, db, core, agent, attachment });
+  const chat = await makeChannel({ clock, log, fetch: offline, db, core, attachment });
   const watch = await makeWatch({ clock, log, db, agent, session, channel: chat });
   const { changes: moves } = core.transitions();
   const relay = (async () => {

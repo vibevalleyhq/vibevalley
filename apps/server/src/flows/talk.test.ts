@@ -54,8 +54,8 @@ describe("a talk with a helper profile", () => {
     const sql = sqlOf(fw.db);
     const { in: saidIn } = fw.said;
     await fw.agent.save(lab());
-    const dm = await channels.direct("lab");
-    const direct2 = await channels.direct("lab");
+    const dm = await fw.watch.direct("lab");
+    const direct2 = await fw.watch.direct("lab");
     expect(direct2).toBe(dm);
     const channel = channelOf(core.state().chat, dm);
     expect([channel?.type, channel?.peer, channel?.subjectKind, channel?.subjectId]).toEqual(["direct", "profile:lab", null, undefined]);
@@ -120,7 +120,7 @@ describe("a talk with a helper profile", () => {
     const sql = sqlOf(fw.db);
     const said = fw.said.in;
     await fw.agent.save(lab());
-    const dm = await channels.direct("lab");
+    const dm = await fw.watch.direct("lab");
     await channels.post({ _tag: "User", text: "第一句", channel: dm, sendKey: "" });
     await opening.promise;
     await channels.post({ _tag: "User", text: "启动中的第二句", channel: dm, sendKey: "" });
@@ -169,7 +169,7 @@ describe("a talk with a helper profile", () => {
       const sessions = fw.inside;
       const said = fw.said.in;
       await fw.agent.save(lab());
-      const dm = await channels.direct("lab");
+      const dm = await fw.watch.direct("lab");
       await channels.post({ _tag: "User", text: "重启之前", channel: dm, sendKey: "" });
       await until(() => said(dm).some((m) => m.kind === "report"), "the first report");
       const sql = sqlOf(fw.db);
@@ -191,7 +191,7 @@ describe("a talk with a helper profile", () => {
       const sessions = fw.inside;
       const said = fw.said.in;
       await fw.watch.boot();
-      const direct2 = await channels.direct("lab");
+      const direct2 = await fw.watch.direct("lab");
       expect(direct2).toBe(first.dm);
       expect(sessions.hired().find((s) => s.channel === first.dm)?.id).toBe(first.session);
       expect(fw.core.state().plays?.[first.session]?.station).toBe(0);
@@ -228,8 +228,8 @@ describe("a talk with a helper profile", () => {
     const sql = sqlOf(fw.db);
     await agents.save(lab());
     await agents.save({ ...lab(), id: "lab2", name: "Lab Two" });
-    const existing = await channels.direct("lab");
-    const starting = await channels.direct("lab2");
+    const existing = await fw.watch.direct("lab");
+    const starting = await fw.watch.direct("lab2");
     await channels.post({ _tag: "User", text: "B first", channel: existing, sendKey: "" });
     await until(() => said(existing).filter((m) => m.kind === "report").length === 1, "the existing conversation ready");
     await channels.post({ _tag: "User", text: "A first", channel: starting, sendKey: "" });

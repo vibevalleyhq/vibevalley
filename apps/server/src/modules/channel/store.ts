@@ -6,7 +6,6 @@ import { defaultOrchestrator, userId } from "@vibevalley/protocol";
 import { newId } from "#/base/ids.ts";
 import type { Db } from "#/infra/db.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Agent } from "#/modules/agent/agent.ts";
 import * as qc from "#db/channel.sql.ts";
 import * as qmb from "#db/channel_member.sql.ts";
 import * as qm from "#db/channel_message.sql.ts";
@@ -40,14 +39,13 @@ const emptyChannelRow = (base: Pick<ChannelRow, "id" | "type" | "is_default" | "
 });
 
 export interface ChannelStoreDeps {
-  readonly agent: Agent;
   readonly db: Db;
   readonly clock: Time;
 }
 
 /** Owns `ChatModel`, serialization (`locked`), and `db.afterCommit` synchronization so the database and in-memory state never drift. */
 export async function makeChannelStore(deps: ChannelStoreDeps) {
-  const { agent: agents, db, clock } = deps;
+  const { db, clock } = deps;
   const model = new ChatModel();
   const lock = new Semaphore(1);
   /** Not reentrant: work under it never takes it again. */
@@ -63,11 +61,9 @@ export async function makeChannelStore(deps: ChannelStoreDeps) {
     await db.afterCommit(() => model.joined(joined));
   };
 
-  /** Ensures an orchestrator participant row matches its current profile name. */
-  const seat = async (id: string) => {
-    const agent = agents.agent(id);
-    const name = agent?.name.trim() || t("server.channel.name.orchestrator");
-    if (model.participant(id)?.name === name && model.participant(id)?.role === "orchestrator") return;
+  /** An assistant's seat under the name it goes by now; a seat already so is left as it is. */
+  const seatAssistant = async (id: string, name: string) => {
+    if (model.participant(id)?.name === name && model.participant(id)?.role === "orchestrator" && model.participant(id)?.left_at === null) return;
     await upsertParticipant({ id, kind: "agent", role: "orchestrator", name, agent_id: null, runtime: null, home_id: null, joined_at: clock.now() });
   };
 
@@ -76,18 +72,23 @@ export async function makeChannelStore(deps: ChannelStoreDeps) {
     ["system", "system", "VibeValley"],
   ] as const)
     await qp.upsertParticipant(db.sql, { id, kind, role: null, name, agent_id: null, runtime: null, home_id: null, joined_at: clock.now() });
-  const initialOrchestrators = agents.orchestrators().map((a) => a.id);
-  for (const id of initialOrchestrators) {
-    const agent = agents.agent(id);
-    const name = agent?.name.trim() || t("server.channel.name.orchestrator");
-    await qp.upsertParticipant(db.sql, { id, kind: "agent", role: "orchestrator", name, agent_id: null, runtime: null, home_id: null, joined_at: clock.now() });
-  }
+  // The default channel's member from its first day: seated under the assistant's word until the layers above seat it
+  // under its profile's name.
+  await qp.addParticipant(db.sql, {
+    id: defaultOrchestrator,
+    kind: "agent",
+    role: "orchestrator",
+    name: t("server.channel.name.orchestrator"),
+    agent_id: null,
+    runtime: null,
+    home_id: null,
+    joined_at: clock.now(),
+  });
   if ((await qc.defaultID(db.sql)) === undefined) {
     const id = newId();
     await qc.createChannel(db.sql, { id, is_default: true, name: firstChannelName, description: null, repo: null, created_at: clock.now() });
     await qmb.addMember(db.sql, { channel_id: id, participant_id: defaultOrchestrator, reason: "manual", from_number: 0 });
   }
-  for (const id of initialOrchestrators) await qc.createDirect(db.sql, { id: newId(), peer_id: id, created_at: clock.now() });
 
   await db.tx(async () => {
     const channels = await qc.allChannels(db.sql);
@@ -144,7 +145,7 @@ export async function makeChannelStore(deps: ChannelStoreDeps) {
       for (const participant of model.lastRead.keys()) if (!keepParticipant(participant)) model.lastRead.delete(participant);
       model.lastRead.set(who, target);
     },
-    seat,
+    seatAssistant,
     upsertParticipant,
     markParticipantLeft: (id: string, at: number) =>
       db.tx(async () => {
@@ -212,10 +213,7 @@ export async function makeChannelStore(deps: ChannelStoreDeps) {
         if (row.type === "channel") await qc.updateChannel(db.sql, { description, repo, id: row.id });
         if (name !== row.name) await qc.renameChannel(db.sql, { name, id: row.id });
         if (category !== row.category) await qc.setCategory(db.sql, { category, id: row.id });
-        for (const m of joining) {
-          await seat(m);
-          await addMember(row.id, m, "manual", 0);
-        }
+        for (const m of joining) await addMember(row.id, m, "manual", 0);
         const at = clock.now();
         for (const m of leaving) {
           await qmb.removeMember(db.sql, { channel_id: row.id, participant_id: m, at });
