@@ -207,7 +207,7 @@ const storedEnums: readonly StoredEnum[] = [
   { column: "session.closed", protocol: "SessionCloseValues", values: T.SessionCloseValues },
   { column: "session_run.outcome", protocol: "OutcomeValues", values: T.OutcomeValues },
   { column: "session_delivery.source", protocol: "TriggerSourceValues", values: TriggerSourceValues },
-  { column: "cron.set_by", protocol: "ActorKindValues", values: T.ActorKindValues },
+  { column: "issue_cron.set_by", protocol: "ActorKindValues", values: T.ActorKindValues },
   { column: "memory.kind", protocol: "MemoryKindValues", values: T.MemoryKindValues },
   { column: "memory.author", protocol: "ActorKindValues", values: T.ActorKindValues },
   { column: "connector_account.connector", protocol: "ConnectorIDValues", values: T.ConnectorIDValues },

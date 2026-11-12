@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 助手输入拼装：来源标记、时间、现状增量（`situationDelta`）、记忆增量与汇报摘要 | 谁该被唤醒、刹车与投递队列（[帮工的信箱](docs/subsystems/session.md#触发与投递)） |
-| 助手与帮工的工具表声明（`apps/server/src/gateway/tool/`，网关的一部分，助手经自己声明的 `OrchestratorTools` 在组装时拿到）及用户授权门禁（`actsForUser`） | 工具背后的业务执行（[工单](docs/subsystems/issue.md)、[频道](docs/subsystems/channel.md)、[定时任务](docs/subsystems/cron.md)） |
+| 助手与帮工的工具表声明（`apps/server/src/gateway/tool/`，网关的一部分，助手经自己声明的 `OrchestratorTools` 在组装时拿到）及用户授权门禁（`actsForUser`） | 工具背后的业务执行（[工单](docs/subsystems/issue.md)、[频道](docs/subsystems/channel.md)、[定时任务](docs/subsystems/issue.md#定时任务)） |
 | 按档案管理多个助手实例、将回复写回频道或语音响应端口 | 对话循环、前缀缓存、上下文压缩与断点续跑（[VibeValley 自己的 agent](docs/subsystems/brain.md)、[帮工](docs/subsystems/session.md)） |
 | 错轮评测录制（`orchestrator.eval.create`） | 挑档案算法 `Runtime.choose` 与农机可用性检查（[档案和农机](docs/subsystems/agent.md#模型和不变量)）、语音通话传输（[语音](docs/subsystems/voice.md)） |
 

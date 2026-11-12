@@ -15,7 +15,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 
 | 文档 | 内容 |
 |---|---|
-| [issue.md](docs/subsystems/issue.md) | 工单：一块地：工单的模型、状态和派活、验收、完成与 PR 跟进 |
+| [issue.md](docs/subsystems/issue.md) | 工单：一块地：工单的模型、状态和派活、验收、完成与 PR 跟进、定时任务 |
 | [session.md](docs/subsystems/session.md) | 帮工：触发去重、谁该听到、三道刹车、投递和叫醒、工单蓄水池，Session 和 Run、工作目录、机器执行器、规矩和汇报、事件日志、额度和上限、重启后接着答 |
 | [repo.md](docs/subsystems/repo.md) | 仓库：工作目录、worktree、检查、GitHub 检测与 PR 快照、地契 |
 | [artifact.md](docs/subsystems/artifact.md) | Artifact：用户和帮工一起写的块、交上来的网页；按块存按 op 改，网页按版本存、隔离着看，带卡片说出来 |
@@ -24,7 +24,6 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [inbox.md](docs/subsystems/inbox.md) | Inbox：要你处理的事、刚来的、巡查，经通话、手机、系统通知送到用户 |
 | [brain.md](docs/subsystems/brain.md) | VibeValley 自己的 agent：模型请求、循环、对话文件、提示开头、压缩、技能、记性、帮手、自己的任务，四种用法 |
 | [orchestrator.md](docs/subsystems/orchestrator.md) | 助手：收什么话、现状、工具与 `vv://` 资源读取、谁能让它合并、巡查、评测 |
-| [cron.md](docs/subsystems/cron.md) | 定时任务：一张工单的触发：间隔和 cron、补跑、回头看 |
 | [memory.md](docs/subsystems/memory.md) | 记性：想起、记下、主动查、外面的来源 |
 | [voice.md](docs/subsystems/voice.md) | 语音：通话（Agora ConvoAI）、听写、语音助手 |
 | [lan.md](docs/subsystems/lan.md) | 「连接到本机」：从外面进农场的唯一一道门，按钥匙的来路放行 |

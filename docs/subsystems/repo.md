@@ -7,8 +7,8 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 空间（`repos/`、`worktrees/` 与全局 `AGENTS.md`）、仓库新建与 GitHub 克隆 | 工作目录根路径配置（`work_root`，[设置和配置](docs/subsystems/setting.md#模型和不变量)） |
-| 工单 worktree 与分支 `vibevalley/issue-<号>` 的创建、复用、重置与清理 | 何时派活、何时合并（[工单](docs/subsystems/issue.md#怎么走)）；合并、提 PR、跟 PR 的编排（[帮工](docs/subsystems/session.md#对外的门)） |
-| 分支改动读取（`Changes`）、冲突预检（`git merge-tree`）、运行 `.vibevalley/check` | 会话生命周期与并发槽位准入控制（[帮工](docs/subsystems/session.md)） |
+| 工单 worktree 与分支 `vibevalley/issue-<号>` 的创建、复用、重置与清理 | 何时派活、何时合并、合并和跟 PR 的编排（[工单](docs/subsystems/issue.md#完成和交付)） |
+| 分支改动读取（`Changes`）、冲突预检（`git merge-tree`）、运行 `.vibevalley/check`、子工单的检查（`verifyCheckout`） | 会话生命周期与并发槽位准入控制（[帮工](docs/subsystems/session.md)） |
 | 本地合并、无检出合入父分支（`mergeInto`）、推送分支与 `gh` PR 创建/查询 | 经验值、等级与成就计算（[游戏](docs/subsystems/game.md#模型和不变量)） |
 | `gh` 状态检测缓存、语言统计（`tokei`）、年度提交日历与作者 commit 计数 | 仓库页与群岛地图的界面渲染（[客户端](docs/subsystems/app.md)、[农场的皮](docs/subsystems/farm.md)） |
 
@@ -16,7 +16,7 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/modules/repo/repo.ts` | 对外 `Repo` 服务：新建/克隆、worktree、检查与合并、PR 提交、GitHub 检测与 commit 计数 |
+| `apps/server/src/modules/repo/repo.ts` | 对外 `Repo` 服务：新建/克隆、worktree、检查（`verifyCheckout`）与合并、PR 提交、GitHub 检测、失败的 Actions 日志（`failedJobLog`）与 commit 计数 |
 | `apps/server/src/modules/repo/repository.ts`、`git.ts` | 底层 git 命令拼装（`merge-tree`、`commit-tree`、`update-ref`、清理）与子进程限时执行 |
 | `apps/server/src/modules/repo/publish.ts`、`hosting.ts`、`check.ts` | 已有分支与工单共用的检查、按 SHA 推送、平台适配与检查脚本执行 |
 | `apps/server/src/modules/repo/pullSnapshot.ts` | GitHub PR 检查、评审、评论与行内评审线程的 GraphQL/REST 分页快照（`Repo.githubSnapshot`）及失败 Actions 日志提取 |
@@ -31,7 +31,9 @@
 - **仓库即 `repos/<名字>` 下的直接子目录**：名字仅含字母、数字、`-`、`_`、`.`（最长 64 字符），禁止符号链接跳出 `repos/`。派活目标仓库不存在时自动 `git init -b main` 并生成初始提交。
 - **一张工单固定一个 worktree 与一条分支**：路径为 `worktrees/<仓库>.<工单号>`，分支为 `vibevalley/issue-<工单号>`；重开或换帮工直接复用，首次创建时从基分支切出，目标仓库有 `.vibevalley/setup` 就在锁外跑一次（脚本由目标仓库自己提供）。
 - **同仓库写操作串行，本地合并的耗时检查在锁外执行**：每个仓库一把信号量锁 `serially` 保护新建、开 worktree、合并与清理；`.vibevalley/check`（默认限时 1200 秒）在锁外运行，通过后重新进锁核对分支与基分支未变才执行合并。
-- **工单的检出四个操作各有名字，只给帮工模块用**：`checkout` 开（复用）一张工单的 worktree 或仓库本身的目录，`releaseCheckout` 放下，`resetCheckout` 把分支重置回主分支，`clearCheckout` 在工单上没有帮工时清掉；工单不碰检出，交付经 `Session`（[帮工](docs/subsystems/session.md#对外的门)）。
+- **工单的检出四个操作各有名字**：`checkout` 开（复用）一张工单的 worktree 或仓库本身的目录，`releaseCheckout` 放下，`resetCheckout` 把分支重置回主分支，`clearCheckout` 在工单上没有帮工时清掉；帮工的检出由帮工模块开、放、重置、清，工单只在没有帮工时从自己的检出交付（[完成和交付](docs/subsystems/issue.md#完成和交付)）。
+- **只给带类型的操作，不给裸命令**：别的模块要的检查、合并和 GitHub 各有一个名字（`verifyCheckout`、`merge`、`mergeInto`、`submitPullRequest`、`pullRequestState`、`finishPullRequest`、`githubSnapshot`、`failedJobLog`…），跑什么命令、调哪个 `gh` 留在本模块；`runCheck`、`changedFiles` 是模块里的函数，不在接口上。
+- **子工单的检查（`verifyCheckout`）**：工单算好要过的检查（`CheckoutChecks`）交来：验收检查要先失败（它是兄弟们要让它通过的测试），它改的文件（相对父分支，含未提交和未跟踪的）交回去冻结；否则每个检查都要过（`sh -c`，限时 10 分钟，留末尾 3000 字），过之前和之后冻结的文件都不许动；不过就抛 `MergeFailure`。
 - **清理回执区分现场是否保留（`WorkplaceRelease`）**：`releaseCheckout` 与 `clearCheckout` 返回 `{ kept, why? }`；有未提交改动或未合入提交时保留现场，仅 `kept: false` 时允许删除工单身份。
 - **冲突预检与合入父分支均不污染工作区**：
   - 冲突检测用 `git merge-tree --write-tree`；子工单合入父分支（`mergeInto`）用 `merge-tree` + `commit-tree` + 带旧值校验的 `update-ref`。
@@ -67,8 +69,8 @@
 
 ## 和谁打交道
 
-- **帮工（`session`）**：用 `checkout`、`releaseCheckout`、`resetCheckout`、`clearCheckout` 开、放、重置、清工单的检出，读 `houseRules`、`limit`、`usesPullRequests`；交付用 `changes`、`branchChanges`、`changedFiles`、`conflict`、`run`（跑子工单的检查）、`merge`、`mergeInto`、`submitPullRequest`、`pullRequestState`、`finishPullRequest`，跟 PR 用 `githubSnapshot`、`githubRemote`、`githubRequest`。
-- **工单（`issue`）**：只读 `usesPullRequests`、`branchChanges` 与 `stack`。
+- **帮工（`session`）**：用 `checkout`、`releaseCheckout`、`resetCheckout`、`clearCheckout` 开、放、重置、清帮工的检出，读 `houseRules`、`limit`、`usesPullRequests`。
+- **工单（`issue`）**：交付用 `changes`、`branchChanges`、`conflict`、`checkout`（没有帮工时工单自己的检出）、`verifyCheckout`、`merge`、`mergeInto`、`usesPullRequests`、`submitPullRequest`、`pullRequestState`、`finishPullRequest`，跟 PR 用 `githubSnapshot`、`failedJobLog`，模板读 `stack`。
 - **工具与游戏（`tool`、`game`）**：向 `tool/resource.ts` 提供 `vv://github/...` 评审线程快照读取；向 Game 提供用户名下的 `contributions` commit 计数。
 
 ## 为什么这样

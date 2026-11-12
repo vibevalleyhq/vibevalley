@@ -42,7 +42,7 @@
 | Artifact | `Artifact`（`artifact/artifact.ts`） | `artifact`、`artifact_version`、`artifact_block`、`artifact_block_revision`、`artifact_change`、`artifact_suggestion` 表 | — |
 | 笔记 | `Pkm`（`pkm/pkm.ts`） | `pkm/` 下的 Markdown 页面、`pkm_comment`、`pkm_change` 表 | — |
 | 记性 | `Memory`（`memory/memory.ts`） | `memory` 表 | — |
-| 定时任务 | `Cron`（`cron/cron.ts`） | `cron` 表 | — |
+| 定时任务 | 在 `Issue` 里（`issue/cron.ts`、`when.ts`） | `issue_cron` 表 | — |
 | 机器、「连接到本机」 | 机器在 `Session` 里（`session/machine.ts`、`executor.ts`）、`Lan`（`lan/lan.ts`） | `session_machine`、`lan`、`user_device` 表 | 本机或远端执行后端 |
 
 ## oar 那一层

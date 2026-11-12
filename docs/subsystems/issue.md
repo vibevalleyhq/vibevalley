@@ -27,8 +27,8 @@
 | 起草（`refine`）：派帮工只读看代码生成草稿、写回工单、重置 worktree | worktree 创建、重置与清理实现（[仓库](docs/subsystems/repo.md)） |
 | 派活、排队重试、拆分子工单（`split`）、换人、重开与取消 | 档案选择算法（[档案和农机](docs/subsystems/agent.md#模型和不变量)） |
 | 验收、打回意见、问题清理与验收标准自评（`checks`） | 信箱投递、三道刹车与唤醒调度（[帮工的信箱](docs/subsystems/session.md#触发与投递)） |
-| 完成与交付的决定：何时完成、按 `deliver` 走哪条路、子工单要过哪些检查（`childChecks`）；工单上记下的冲突、PR 与结局（`IssueRecord`） | 农场地块渲染（[农场的皮](docs/subsystems/farm.md)） |
-| PR 状态刷新与 GitHub 观察的定时器（`Issue.refreshPullRequests`、`pollGitHub`） | 合并、提 PR、子工单合入父分支、PR 结局与 CI/评审观察怎么做（[帮工](docs/subsystems/session.md#对外的门)） |
+| 完成与交付：何时完成、按 `deliver` 走哪条路、子工单要过哪些检查（`childChecks`）；合并或提 PR（从帮工的工作目录交接，或从工单自己的检出）、子工单合入父分支、PR 的结局与 CI、评审的跟进，以及工单上记下的冲突、PR 与结局 | 农场地块渲染（[农场的皮](docs/subsystems/farm.md)） |
+| 定时任务（[定时任务](#定时任务)）：规格、到期、补跑与用户点头，每个定时任务固定一张工单 | 帮工的工作目录在谁手里、交接时怎么歇下和放走（[帮工](docs/subsystems/session.md#对外的门)）；git 与 GitHub 的实现（[仓库](docs/subsystems/repo.md)） |
 
 ## 在哪
 
@@ -36,12 +36,14 @@
 |---|---|
 | `apps/server/src/modules/issue/issue.ts`、`store.ts`、`lifecycle.ts` | 对外 `Issue` 服务、`IssueStore`（收拢工单表读写、家族子树级联删除与 `db.afterCommit` 下的 `Assignments` 内存同步）、生命周期写操作与事实发布 |
 | `apps/server/src/modules/issue/dispatch.ts`、`settle.ts` | 派活、排队刷新、重开、定时触发、状态流转前置判定与试跑预览 |
-| `apps/server/src/modules/issue/refinement.ts`、`split.ts`、`merge.ts` | 工单起草、原生父子拆单（`childChecks` 算子工单要过的检查）、交付时工单这边的决定与记录（`IssueRecord`）；合并、提 PR 和跟 PR 的编排在帮工模块（`session/landing.ts`、`github.ts`） |
+| `apps/server/src/modules/issue/refinement.ts`、`split.ts`、`merge.ts` | 工单起草、原生父子拆单（`childChecks` 算子工单要过的检查）、交付的决定（看板挪到完成走哪条路、PR 的锁、退回帮工的话，`finishesWithPullRequest`） |
+| `apps/server/src/modules/issue/landing.ts`、`github.ts` | 交付的编排：合并或提 PR（`landingRouteOf` 定从哪合、`goesByPullRequest`）、子工单检查后合入父分支、PR 结局，经 `Session.handOver`、`withWorkplace`、`withIdleWorkplace` 借帮工的工作目录，经仓库带类型的操作做 git 和 GitHub，结果直接写在工单上；开着的 PR 的 CI 指纹（`checksVerdict`）与新评审、评论记成触发 |
+| `apps/server/src/modules/issue/cron.ts`、`when.ts` | 定时任务：增删改、到期与补跑判定（`dueCrons`、`isMissed`、`needsOK`）、到期事务与重放；五种时间规格解析、`nextRun`、`whenText` 与 `nextText` |
 | `apps/server/src/modules/issue/status.ts`、`moves.ts` | 状态派生（`issueStatusOf`）、展示阶段（`issueStageOf`）与合法挪动（`statusMove`） |
 | `apps/server/src/modules/issue/creation.ts`、`assignment.ts` | 建单（仓库推导、父单继承、选人）与档案指派 |
 | `apps/server/src/modules/issue/dependencies.ts`、`brief.ts`、`rows.ts` | 依赖环检测与解锁、任务说明和时间线拼装、行转换 |
 | `packages/protocol/src/rules/issues.ts`、`stage.ts` | 前后端共用的 `shortTitle`、`closedText` 与 `stageWantsUser` |
-| 表 `issue`、`issue_assignment`、`issue_assignment_execution` | 工单主表、档案责任关系、实际执行的 `Session` 关联 |
+| 表 `issue`、`issue_assignment`、`issue_assignment_execution`、`issue_cron`、`issue_github_cursor`、`issue_github_event` | 工单主表、档案责任关系、实际执行的 `Session` 关联、定时任务、PR 的 CI 指纹游标、收下过的评审和评论（带机器人轮次） |
 | `apps/web/src/features/issue/`、`apps/web/src/farm/issue/IssueView.tsx` | 工作台看板与工单详情、动作分发 `acts.ts`、农场工单详情 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`issue.*`），CLI 命令为 `vibevalley issue ...`。
@@ -58,7 +60,7 @@
 - **授权边界 `Mandate`**：工单绑定不可变的 `originTriggerId`，助手建单附言硬限 30 词；仅当 `autoSubmitPr` 为真时允许自动提 PR，`maxBotReviewRounds` 限制自动响应评审轮数。
 - **单轮结局只认结构化 `issue_report`**：帮工通过 `issue_report` 提交状态、问题、`checks`、`answer`、记性与 `prSubmit`，不解析自由正文。
 - **执行情况与生命周期分开**：提问、失败、中断及未明确交回的休息会话保持 `in_progress`，`stage` 提供回答、重试、继续动作；有效交回且没有待答问题才进入 `in_review`。看板、详情与 CLI 都读取同一投影；CLI 的 `issue show --watch` 在提问或受阻阶段也返回，stderr 同时给出生命周期和阶段。
-- **PR 在途自动跟进与同轮评审归并**：当 PR 在途且无待答问题时，回合结束后会话进 `resting` 并释放槽位，工单保持 `in_progress` 等待 CI/评审；`session/github.ts` 按 `session_github_cursor` 表比对 CI 指纹，且同一次 Review 及其附带的多条行内评论共享同一个 `botRoundKey`（只消耗一次 `maxBotReviewRounds` 额度）；仅 `prSubmit=false` 显式交接才进 `in_review`。
+- **PR 在途自动跟进与同轮评审归并**：当 PR 在途且无待答问题时，回合结束后会话进 `resting` 并释放槽位，工单保持 `in_progress` 等待 CI/评审；`issue/github.ts` 按 `issue_github_cursor` 表比对 CI 指纹，收下过的评审和评论记在 `issue_github_event`，同一次 Review 及其附带的多条行内评论共享同一个 `botRoundKey`（只消耗一次 `maxBotReviewRounds` 额度）；仅 `prSubmit=false` 显式交接才进 `in_review`。
 - **交付物类型 `deliver` 事先声明**：分 `change`（要求合入）、`pull_request`（提交 PR/MR 即交付）、`branch`（留分支）与只读调研 `answer`；`answer` 单将结论写入 `Issue.answer`，完成后重置 worktree 并记 `delivered: none`。
 - **原生父子工单与 DAG 依赖**：通过 `parent` 与 `blockedBy` 表达归属与前置依赖。子工单从父分支 `vibevalley/issue-<父编号>` 切出 worktree，完成后经 `mergeInto` 合入父分支。
 - **验收子工单先判红并冻结文件**：标记 `constraints.acceptance` 的子工单应先证明检查失败，合入父分支时将其改动文件记为 `frozen`；后继子工单不得修改冻结文件，且末端须通过全部祖先验收命令。
@@ -92,6 +94,13 @@
    - 进仓库锁复核分支未变：子工单合入父分支记 `merged_into_parent`；普通工单本地合入主分支记 `merged`，或推送分支创建/更新 PR。
 5. **要求合入的 PR 轮询结清**：每 `github.pr_poll_seconds` 秒轮询开放 PR；合并后记 `delivered: pull_request` 并清理 worktree，关闭未合则记 `canceled: dismissed`。
 
+交付在工单的 PR 锁里：帮工在场时经 `Session.handOver` 在它的会话锁内等它歇下，跑检查与合并或提 PR，冲突、PR 的链接、子工单冻结的文件在帮工放走之前直接写在工单上；失败时帮工留着（`NotTakenIn`），工单记下冲突、把要改的话带给帮工。帮工不在、子工单已合进来时，从工单自己的检出（`Repo.checkout`）合。子工单的检查由 `Repo.verifyCheckout` 跑：验收子工单的检查要先失败、它改的文件冻结；其余的检查要过、冻结的文件不许动；然后 `Repo.mergeInto` 合进父工单的分支（父工单的帮工在场时借它歇下的工作目录）。
+
+**跟 PR（`refreshPullRequests`、`pollGitHub`）**
+
+1. 定时器每 `github.pr_poll_seconds` 秒（默认 180）先读每个跟着的 PR 的状态：合了或关了时帮工在场就交接放走、不在就结掉检出，再结掉工单（交付的就是 PR、或工单已关的只记 PR 的状态）。读不到或结不掉的一个 PR 记一行日志，下一轮再试。
+2. 再看板上开着的 PR：比对 `issue_github_cursor` 里的 CI 指纹，失败或跑完的 CI 记成一条触发（失败的 Actions 日志由 `Repo.failedJobLog` 取末尾 40 行）；没收下过的评审和评论各记一条（同一次 Review 的行内评论共用 `botRoundKey`），经 `Session.receive` 路由给工单的帮工。
+
 ### 详情与讨论
 
 详情显式展示当前需求、验收条件、交付结果和讨论记录。讨论使用 Channel 的工单串，换人、重试、退回不更换历史来源；`issue.conversation.get` 查询持久化的串位置，消息分页读取并订阅更新。执行轨迹只在展开时加载，不进入讨论消息。
@@ -100,8 +109,8 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 ## 和谁打交道
 
-- **帮工（`session`）**：经 `Session` 的门（[帮工](docs/subsystems/session.md#对外的门)）：派活（`hireWith`，子工单带上父工单号；`queueDispatch` 在工单的事务里留下排队的派活，`withdrawDispatches` 撤回，`triggersOf`、`queuedTriggers` 读排着的，`room` 问还能不能再开一个）、叫停放走（`stop`、`dismiss`）、交付（`merge`、`submitPullRequest`、`mergeChild`、`refreshPullRequests`、`pollGitHub`：工单交来它的决定，工单这边要记的经 `IssueRecord`）、改动和冲突（`changesOf`、`conflictOf`）、工作目录（`discardWork`、`clearWorkplace`）、在场与查询（`hired`、`live`、`get`、`list`、`runsOf`）、`news`（更新工单状态、问题与冲突）。
-- **仓库（`repo`）**：只读三样：`usesPullRequests`（这个仓库走不走 PR）、`branchChanges`（工单分支上的提交，定完成怎么交付、重开怎么说）、`stack`（模板）；冲突预检、检查、合并与 GitHub 都经帮工模块。
+- **帮工（`session`）**：经 `Session` 的 26 个门（[帮工](docs/subsystems/session.md#对外的门)）：派活（`hireWith`，子工单带上父工单号；`queueDispatch` 在工单的事务里留下排队的派活，`withdrawDispatches` 撤回，`triggersOf`、`queuedTriggers` 读排着的，`room` 问还能不能再开一个）、叫停放走（`stop`、`dismiss`）、借工作目录交付（`handOver`、`withWorkplace`、`withIdleWorkplace`）、工作目录（`discardWork`、`clearWorkplace`）、记下并路由触发（定时任务的 `recordTrigger`、`route`、`isRouted`、`ownerOf`、`subscribe`、`replayCronTriggers`，跟 PR 的 `receive`）、在场与查询（`hired`、`live`、`get`、`list`、`runsOf`）、`news`（更新工单状态、问题与冲突）。
+- **仓库（`repo`）**：14 个带类型的操作：交付前后读改动和冲突（`changes`、`branchChanges`、`conflict`），工单自己的检出（`checkout`），检查（`verifyCheckout`），合并（`merge`、`mergeInto`），PR（`usesPullRequests`、`submitPullRequest`、`pullRequestState`、`finishPullRequest`、`githubSnapshot`、`failedJobLog`），模板（`stack`）；没有裸的命令或 GitHub 请求。
 - **频道（`channel`）**：用户发言经 `Channel.userInThread` 清空问题并作废旧验收标记。
 
 ## 为什么这样
@@ -118,8 +127,21 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 ## 怎么验证
 
-- `apps/server/src/modules/issue/issue.test.ts`、`apps/server/src/flows/issue.test.ts`、`apps/server/src/flows/refinement.test.ts`、`apps/server/src/flows/pull_request.test.ts`：派活、起草、父子拆单、检查与 PR 流程。
+- `apps/server/src/modules/issue/issue.test.ts`、`apps/server/src/flows/issue.test.ts`、`apps/server/src/flows/refinement.test.ts`、`apps/server/src/flows/pull_request.test.ts`、`pr-follow.test.ts`、`parent-pr.test.ts`：派活、起草、父子拆单、检查、交付与跟 PR。
+- `apps/server/src/modules/issue/landing.test.ts`、`merge.test.ts`、`github.test.ts`：交付从哪合、PR 的结局算不算完、CI 的判定（纯函数）。
+- `apps/server/src/modules/issue/cron.test.ts`、`when.test.ts`：五种时间规格与夏令时、错过合并补跑、`needsOK` 门禁与事务恢复。
 - `apps/web/test/issues.spec.ts`、`apps/web/test/farm-actions.spec.ts`：工作台看板与农场工单操作端到端测试。
+
+## 定时任务
+
+定时任务（`T.Cron`，表 `issue_cron`）是工单的时间触发器：每次到期，在同一事务内更新运行时间并写入不可变 `Trigger`，随后准备它固定的那张工单（`scheduled`：最近建的那张，或重开，或新建），经 `Session` 路由给帮工或助手。接口见 [capabilities.md](docs/reference/capabilities.md)（`cron.*`，其中 `cron.update` 仅对用户与 `remote` 开放），聊天页的「定时任务」标签页在 `apps/web/src/features/channel/views/Tabs.tsx`；服务端经 `Issue` 的 `crons`、`addCron`、`setCronEnabled`、`removeCron`、`previewRemoveCron`、`tickCrons`、`cronsDue`。
+
+- **五种时间规格（`CronWhen`）**：`once`、`every`、`daily`、`weekly` 与五段式 `cron`（`once` 跑完自动关闭）；每项携带 IANA 时区或偏移量，缺省取本机时区；8 年内无合法触发时刻的表达式（如 2 月 30 日）直接拒绝。
+- **下次运行时间不落库，实时从 `last_run` 推导**：`nextRun` 计算严格晚于 `last_run`（未运行过则取创建时间）的下一个匹配分钟；夏令时跳过的时刻顺延，重复的时刻取第一次；重新开启已关闭的周期任务时将 `last_run` 设为当前时间，不补跑关闭期间的时刻。
+- **助手非当轮授权创建的周期或派工任务须等用户同意（`needsOK`）**：用户创建、或助手在含用户原话的当轮（`Actor.forUser` 为真）创建的任务立即生效；助手在后台回合自行创建时，仅「不派帮工的 `once` 回头看」直接生效；其余存为 `enabled: false, pending: true`，在 `Inbox` 生成 `cron-ask` 待用户点击同意。
+- **一个定时任务固定复用一张工单**：未指定帮工档案时指派给所属频道助手；指定帮工档案时必须同时指定仓库。若绑定工单在等用户，新到期输入在 `Session` 蓄水池中保持 `held`（同一工单只留最新一条，`session_issue_input_one_held`）。
+- **扫描与补跑（`tickCrons`）**：开机（`Issue.boot` 的最后）后每 `cron.tick_ms` 在单锁内重放未路由的触发，并筛出 `nextRun <= now` 的已启用任务（错过多次只合并补跑一次）。
+- **为什么一个定时任务绑定一张工单**：避免高频任务淹没看板，让历次运行记录归集在同一条工单串下；到期状态更新与 `Trigger` 同事务落库，防止更新 `last_run` 后崩溃漏跑，或投递后未更新 `last_run` 重复触发。
 
 ## 观察执行
 

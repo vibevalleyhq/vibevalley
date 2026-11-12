@@ -65,7 +65,7 @@ flowchart LR
   3. `Source Control`（`repo`）
   4. `Agent Sessions`（`session`：触发和投递、会话和每一轮、工作目录、执行器）
   5. `Collaboration`（`channel`、`media`（含素材库）、`artifact`、`pkm`）
-  6. `Issues`（`issue`、`cron`）
+  6. `Issues`（`issue`，含定时任务）
   7. `Inbox`（`inbox`）
   8. `Orchestrator`（`orchestrator`）
   9. `Gamification`（`game`）
@@ -100,7 +100,7 @@ Host：
 | `agent-templates/<id>/` | 从本机导入的档案模板（`agent.json`、`persona.md`） |
 | `settings.json` | 密钥、语音设置、记忆来源配置（权限 `0600`） |
 | `vibevalley.yaml` | 可选的静态配置文件 |
-| `db/` | PGlite 的数据目录（配了 `database.url` 时不用它）：会话、运行、触发和投递（`session`、`session_run`、`session_run_issue`、`session_trigger`、`session_order`、`session_delivery`、`session_subscription`、`session_issue_input`、`session_machine`）、工单（`issue`）、PR 的 GitHub 观察游标（`session_github_cursor`）、频道、媒体任务与素材库（`media_job`、`media_input`、`media_library_item`）、Artifact、游戏账本、记忆、定时任务、连接器、用户的账号和设备、笔记批注与撤销 |
+| `db/` | PGlite 的数据目录（配了 `database.url` 时不用它）：会话、运行、触发和投递（`session`、`session_run`、`session_run_issue`、`session_trigger`、`session_order`、`session_delivery`、`session_subscription`、`session_issue_input`、`session_machine`）、工单（`issue`）、PR 的 GitHub 观察游标和收下过的评审（`issue_github_cursor`、`issue_github_event`）、频道、媒体任务与素材库（`media_job`、`media_input`、`media_library_item`）、Artifact、游戏账本、记忆、定时任务、连接器、用户的账号和设备、笔记批注与撤销 |
 | `events/<id>.json` | 会话轨迹日志（帮工离开后保留 30 天） |
 | `durable.db` | pi-durable 的对话：助手的，和 `vibevalley` 农机上帮工的（一个 oar 会话一个）（测试农场在内存里） |
 | `agent/<档案 id>/` | 助手的评测样例 `evals/`；终端对话 `chat` 的 `durable.db`（它自己的，对话开着时租着这个目录）、`MEMORY.md` 和 `mcp.json` |

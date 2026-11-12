@@ -10,7 +10,7 @@ Status: proposed
    - 表结构在 [0001_schema.up.sql](apps/server/db/migrations/0001_schema.up.sql) 中将私聊写死为「当前唯一人类 + `peer_id`」，并在 `channel_participant` 上强约束农机字段（`role in ('orchestrator', 'worker')`、`runtime`、`profile:<agent>` 假 ID）；农机和会话的角色本该是 `Session` 的事，却记在聊天的参与者上。
    - [writing.ts](apps/server/src/modules/channel/writing.ts)、[talk.ts](apps/server/src/modules/channel/talk.ts) 与 [threads.ts](apps/server/src/modules/channel/threads.ts) 在消息层内部反向调用 `Session` 路由消息、雇佣私聊帮工、发汇报与贴 `👀`，迫使 `Channel` 排在 `Session` 之上；而 `Session` 又只能靠 [modules.test.ts](apps/server/src/modules.test.ts) 的 `foreignReads` 白名单直读 `channel.sql.ts`，[channel.sql](apps/server/db/queries/channel.sql) 也反向关联 `session_delivery` 与 `issue`，启动被迫拆成 `session.boot() -> channel.boot() -> session.wake()` 三段交错。
 2. **`Session` 混入工单蓄水与代码交付，背离纯 Agent 执行维度**：
-   - 会话执行内核（[lifecycle.ts](apps/server/src/modules/session/lifecycle.ts)）本不依赖 `Channel` 或 `Issue`，但模块内塞入了 4 张工单表（`session_issue_input`、`session_subscription`、`session_run_issue`、`session_github_cursor`）、协议上的工单字段（[session/shapes.ts](packages/protocol/src/session/shapes.ts) 的 `issue`、`refining`、`IssueAnswer`）、直读 `core.state().issues` 的工单蓄水池（[work.ts](apps/server/src/modules/session/work.ts)）以及分支合并与跟 PR（[landing.ts](apps/server/src/modules/session/landing.ts)、[github.ts](apps/server/src/modules/session/github.ts)）。
+   - 会话执行内核（[lifecycle.ts](apps/server/src/modules/session/lifecycle.ts)）本不依赖 `Channel` 或 `Issue`，但模块内塞入了 4 张工单表（`session_issue_input`、`session_subscription`、`session_run_issue`、`session_github_cursor`）、协议上的工单字段（[session/shapes.ts](packages/protocol/src/session/shapes.ts) 的 `issue`、`refining`、`IssueAnswer`）、直读 `core.state().issues` 的工单蓄水池（[work.ts](apps/server/src/modules/session/work.ts)）以及分支合并与跟 PR（当时的 `session/landing.ts`、`session/github.ts`）。
    - 因为第 4 层的 `Session` 不拥有第 6 层的工单表，交付逻辑只能通过 4 个回调组成的 `IssueRecord` 反向写回工单，导致 `Session` 膨胀至 34 个生产文件、44 个接口成员，而 `Issue` 仍需调用 `Session` 的 23 个成员。
 3. **「Agent 观察事件」的规则散落在 5 个模块里**：聊天提及、私聊唤醒、工单蓄水、PR 巡检、Cron 到期与 Patrol 心跳分散在 `channel`、`session`、`issue`、`cron`、`inbox` 各处手工拼装触发器，缺少统一的持久化观察游标出口。
 4. **网关适配层与外围浅服务错位，跨端旧目录未收口**：
@@ -53,12 +53,21 @@ Status: proposed
    - 修改 [0001_schema.up.sql](apps/server/db/migrations/0001_schema.up.sql) 与 `apps/server/db/queries/channel*.sql`：`channel_participant` 只记说话的是谁（用户、档案、系统），不再记农机（`runtime`）和会话里的角色；私聊仍是用户和一个档案；重写 `UnreadOf` 与 `ChannelInUse`，移除对 `session_delivery`、`issue`、`cron`、`connector_account` 的跨表 `join`（要那些的读法搬到拥有它们的模块）。
    - 重构 `apps/server/src/modules/channel/{channel,contracts,hub,writing}.ts`：从 `ChannelDeps` 移除 `agent` 与 `session`；将 `Post` 收敛为统一 `post`（带可选乐观未读水位检查）并导出带单调 `seq` 的 `Channel.events()`；将 `talk.ts`、`threads.ts` 及 `👀` / `wake_breaker` 回写逻辑抽离至上层观察器。
 4. **第 4 步（`Session` 收窄为纯 Agent 执行层，工单蓄水与交付迁回 `Issue`）**：
-   - 将 [landing.ts](apps/server/src/modules/session/landing.ts) 与 [github.ts](apps/server/src/modules/session/github.ts) 迁回 `apps/server/src/modules/issue/`，删掉 `IssueRecord` 回调表；在 [repo.ts](apps/server/src/modules/repo/repo.ts) 用 `verifyCheckout` 替换裸 `repo.run`；将 `apps/server/src/modules/cron/*` 并入 `issue/`。
+   - 将 `session/landing.ts` 与 `session/github.ts` 迁回 `apps/server/src/modules/issue/`，删掉 `IssueRecord` 回调表；在 [repo.ts](apps/server/src/modules/repo/repo.ts) 用 `verifyCheckout` 替换裸 `repo.run`；将 `apps/server/src/modules/cron/*` 并入 `issue/`。
    - 将 [work.ts](apps/server/src/modules/session/work.ts) 中的工单蓄水与订阅迁入 `issue/`，表改名为 `issue_input`、`issue_subscription`、`issue_run`、`issue_github_cursor`；将协议 [session/shapes.ts](packages/protocol/src/session/shapes.ts) 的 `issue`、`refining` 改为透明 `scope`，`IssueAnswer` 移入 `protocol/src/issue/`。
    - 将 [session.ts](apps/server/src/modules/session/session.ts) 收窄至约 16 个纯 Agent 执行、单会话队列与工作区租约成员，并把 `session/`、`issue/`、`channel/` 中不碰 I/O 的判断提纯为导出纯函数直测。
 5. **第 5 步（收口 `Watch / Orchestrator` 事件观察层，锁死静态正交门禁）**：
    - 新建 `apps/server/src/modules/watch/`，吸纳 `modules/inbox/*` 与聊天观察器：用持久化游标订阅 `Channel.events()` 与定时/巡查触发，统一经 `brakes.ts` 三道刹车驱动聊天与当值助手 `Session`，回写 `Channel` 反应、已读游标与回复，并向外提供人类 `Inbox` 通知流。
    - 将 [services.ts](apps/server/src/services.ts) 的 `session.boot() -> channel.boot() -> session.wake()` 简化为单次正序 `boot()`；清空 [modules.test.ts](apps/server/src/modules.test.ts) 的 `reads` 与 `foreignReads` 白名单，新增静态断言禁止 `Channel` 依赖任何业务模块、禁止 `Session` 依赖 `Channel` 或 `Issue`。
+
+## Progress
+
+- **第 1 步：已做**（`tool` 归入网关，`protocol` 与页面的 `library`、`machine` 旧目录并入 `media`、`session`）。
+- **第 4 步：做了一部分，停在诚实能到的地方。**
+  - 4a 已做：`Repo` 给带类型的操作 `verifyCheckout`（子工单的检查，`CheckoutChecks`）与 `failedJobLog`（失败的 Actions 日志），接口上拿掉了 `run`、`changedFiles`、`githubRequest`、`githubRemote`；没有模块再对仓库跑裸命令。
+  - 4b 已做：`session/landing.ts`、`github.ts` 搬到 `issue/`，删掉 `IssueRecord`，冲突、PR 与结局由工单直接写；`Session` 拿掉 `merge`、`submitPullRequest`、`refreshPullRequests`、`pollGitHub`、`mergeChild`、`changesOf`、`conflictOf`，换上借工作目录的 `handOver`、`withWorkplace`、`withIdleWorkplace`；`cron` 并入 `issue`（表 `issue_cron`，`Issue.crons`、`addCron`…），`session_github_cursor` 改为 `issue_github_cursor`，收下过的评审和评论记在工单自己的 `issue_github_event`（不再查 `session_trigger` 的 GitHub 字段）。
+  - 4c 没做：工单蓄水池、订阅、派活队列和轮次关联（`session_issue_input`、`session_subscription`、`session_run_issue`）还在 `session`。频道排在工单前面，记下消息后同步调 `Session.route`，路由在同一个事务里查订阅、进蓄水池、转成投递；搬进工单只剩两条路：让 `Session` 回调工单（另一个 `IssueRecord`），或让工单异步观察触发（改了投递的先后，测试的时序跟着变），都不诚实。要等第 3 步频道不再路由、第 5 步观察层接管以后再搬。协议的 `scope` 也没改：`Session` 还在按工单分支（蓄水池、`report` 的 `IssueReport`、交接要求有工单），把 `issue`、`refining` 换成带 `kind` 的 `scope` 只是把同一个分支藏进标签；`IssueAnswer` 挪到 `protocol/src/issue` 要先拿掉 `LastRun.answer`，而工单判断「这一轮交没交结论」读的就是它。
+  - 4d 做了一部分：交付从哪合（`landingRouteOf`、`goesByPullRequest`）、PR 结局算不算完（`finishesWithPullRequest`）、CI 的判定（`checksVerdict`）、蓄水池的放行（`holdReasonOf`）提成纯函数并直接测。`Session` 是 43 个成员（第 4 步前 47 个），离 18 个差的是蓄水池和派活的门（`queueDispatch`、`withdrawDispatches`、`triggersOf`、`queuedTriggers`、`ownerOf`、`isRouted`、`subscribe`、`replayCronTriggers`、`decline`）和频道、助手用的投递的门（`withdrawEnvelope`、`withdrawDeliveries`、`waitingOn`、`digest`、`deliveries`、`handBack`），分别等 4c 和第 3、5 步。工单用 `Session` 26 个成员（原来工单 23 个加定时任务 6 个），用 `Repo` 14 个。
 
 ## Alternatives considered
 
