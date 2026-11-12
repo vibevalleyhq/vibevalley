@@ -78,7 +78,7 @@ type Farm = Awaited<ReturnType<typeof world>>;
 
 /** The farm with an orchestrator on it, closed orchestrator first. */
 const orchestrated = async (below: Farm, options: OrchestratorOptions = {}) => {
-  const orchestrator = await makeOrchestrator(below, options);
+  const orchestrator = await makeOrchestrator({ ...below, tools: below.tool }, options);
   return {
     farm: below,
     orchestrator,

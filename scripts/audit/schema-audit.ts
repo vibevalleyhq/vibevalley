@@ -299,7 +299,7 @@ export function reviewSchemaSources(sources: ReadonlyMap<string, string>): Findi
     if (path === secretPath) findings.push(...auditSecretClass(source, path));
     if (!path.startsWith("packages/protocol/") && !source.includes("z.lazy("))
       addMatches("subpackage-dual-shape", /\bconst\s+\w+\s*:\s*z\s*\.\s*Zod\w*<\w+>\s*=/gu);
-    if (path === "apps/server/src/modules/tool/schemas.ts")
+    if (path === "apps/server/src/gateway/tool/schemas.ts")
       addMatches(
         "tool-downgrade",
         /\b(?:priority|status|deliver|tier|afterBlock|parentId)\s*:\s*(?:z\s*\.\s*(?:exactOptional|optional)\s*\(\s*)?z\s*\.\s*string\s*\(/gu,

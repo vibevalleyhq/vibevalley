@@ -7,6 +7,7 @@ import type { AccountUsage, ChatMessage, IssueRequest } from "@vibevalley/protoc
 
 import type { Core } from "#/core/core.ts";
 import { makeMcp, type Mcp } from "#/gateway/mcp/mcp.ts";
+import { makeTool, type Tool } from "#/gateway/tool/tool.ts";
 import { type ServerConfig } from "#/infra/config.ts";
 import type { PublicFetch } from "#/infra/publicHttp.ts";
 import { type Time, wallTime } from "#/infra/time.ts";
@@ -18,7 +19,6 @@ import type { ModelAccess } from "#/modules/runtime/durable.ts";
 import { registryOf } from "#/modules/runtime/runtime.ts";
 import { type Inside, insideOf } from "#/modules/session/session.ts";
 import { type WorkerAccess, type workerAccess } from "#/modules/session/worker.ts";
-import { makeTool, type Tool } from "#/modules/tool/tool.ts";
 import { buildModules, type Close, closeAll, type Modules, owning, type ServiceOptions } from "#/services.ts";
 
 import { scriptedDeepSeek, type ScriptedDeepSeek } from "./deepseek.ts";

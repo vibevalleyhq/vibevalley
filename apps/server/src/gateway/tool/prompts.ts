@@ -9,6 +9,7 @@ import type { HtmlWarning } from "#/modules/artifact/check.ts";
 import { artifactMax, htmlSources } from "#/modules/artifact/policy.ts";
 import { nextText, whenText } from "#/modules/cron/when.ts";
 import { mandateNoteWordLimit } from "#/modules/issue/creation.ts";
+import { pkmHitLine } from "#/modules/orchestrator/prompts.ts";
 import { runtimeLabel } from "#/modules/runtime/presets.ts";
 import { yuan } from "#/modules/runtime/quota.ts";
 
@@ -84,9 +85,6 @@ export const priorityNames: Readonly<Record<string, T.Priority>> = {
   低: "low",
   ...Object.fromEntries(PriorityValues.map((p) => [p, p])),
 };
-
-export const channelLine = (c: { readonly name: string; readonly default?: boolean; readonly description?: string; readonly repo?: string }) =>
-  "#" + c.name + (c.default === true ? "（默认）" : "") + (c.description ? "：" + c.description : "") + (c.repo ? "（默认仓库 " + c.repo + "）" : "");
 
 /** How long, in round words. */
 function spanWords(ms: number): string {
@@ -616,7 +614,7 @@ export const answers = {
   },
   pkm: {
     none: (text: string) => `笔记里没找到「${text}」`,
-    hit: (h: T.PkmSearchHit) => `- 〔${h.block}〕《${h.pageTitle}》${h.path ? h.path + " › " : ""}${h.marker ? h.marker + " " : ""}${h.plain}`,
+    hit: pkmHitLine,
     page: (p: T.PkmPage, shown: readonly string[], more: number) =>
       [
         `《${p.title}》${pkmTierWord[p.tier]}${

@@ -37,7 +37,7 @@ test("the assistant cut off mid-answer by a restart finishes it once the farm is
     const below = await world({ config });
     try {
       below.deepseek.use(llm);
-      const orchestrator = await makeOrchestrator(below);
+      const orchestrator = await makeOrchestrator({ ...below, tools: below.tool });
       below.closes.push(() => orchestrator.close());
       await below.inside.boot();
       await below.inside.wake();
@@ -98,7 +98,7 @@ test("regression: the assistant and a helper both cut off mid-answer go on once 
       const script = scriptedLLM(steps);
       asked = script.requests;
       below.deepseek.use(script.llm);
-      const orchestrator = await makeOrchestrator(below);
+      const orchestrator = await makeOrchestrator({ ...below, tools: below.tool });
       below.closes.push(() => orchestrator.close());
       await below.inside.boot();
       await below.inside.wake();

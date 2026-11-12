@@ -1,10 +1,11 @@
+import type { Tool as LoopTool } from "@vibevalley/agent/core/tool";
 import { selfTools } from "@vibevalley/agent/self";
 import { Semaphore, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime, userId } from "@vibevalley/protocol";
 
-import { orchestrator } from "#/base/actor.ts";
+import { type Caller, orchestrator } from "#/base/actor.ts";
 import { serverFile } from "#/base/assets.ts";
 import { head } from "#/base/clip.ts";
 import { BizCode, refuseIn } from "#/base/errors.ts";
@@ -24,12 +25,11 @@ import { runtimeLabel } from "#/modules/runtime/presets.ts";
 import type { Runtime } from "#/modules/runtime/runtime.ts";
 import type { Handed, Picked } from "#/modules/session/envelope.ts";
 import { type AgentHost, SubmitRefused } from "#/modules/session/host.ts";
+import type { ToolStart } from "#/modules/session/reaction.ts";
 import type { Session } from "#/modules/session/session.ts";
-import { answers as toolAnswers, channelLine } from "#/modules/tool/prompts.ts";
-import type { Tool } from "#/modules/tool/tool.ts";
 
 import type { Answer } from "./openai.ts";
-import { agentPrompt, identityNote, lineWords, situationWords, systemPrompt, voiceNote } from "./prompts.ts";
+import { agentPrompt, channelLine, identityNote, lineWords, pkmHitLine, situationWords, systemPrompt, voiceNote } from "./prompts.ts";
 import { makeResponses } from "./response.ts";
 import { deepseekModel, intake, orchestratorEnvelopeLines, quotaText, situationDelta, type Source } from "./situation.ts";
 
@@ -92,6 +92,16 @@ export interface OrchestratorOptions {
   readonly listen?: boolean;
 }
 
+/** The farm's tools as the orchestrator holds them. gateway/tool serves them and reaches every module, the orchestrator
+ * among them, so they are built after the modules and handed in at assembly (services.ts), like Core's Projection. */
+export interface OrchestratorTools {
+  /** Its tools, in the order its prompt has always listed them: the order is part of the prompt's prefix. */
+  readonly orchestrator: (who: () => Caller) => LoopTool[];
+  /** How a tool call reads in its trajectory: its label and the first naming argument. */
+  readonly start: (name: string, args: unknown) => ToolStart;
+  readonly sessionLine: (session: T.Session) => string;
+}
+
 export interface OrchestratorDeps {
   readonly clock: Time;
   readonly log: Logger;
@@ -103,11 +113,11 @@ export interface OrchestratorDeps {
   readonly session: Session;
   readonly channel: Channel;
   readonly cron: Cron;
-  readonly tool: Tool;
+  readonly tools: OrchestratorTools;
 }
 
 export async function makeOrchestrator(deps: OrchestratorDeps, options: OrchestratorOptions = {}): Promise<Orchestrator> {
-  const { clock, config, agent: store, runtime: runtimes, repo: repos, pkm: notes, session: run, channel: chat, cron, tool } = deps;
+  const { clock, config, agent: store, runtime: runtimes, repo: repos, pkm: notes, session: run, channel: chat, cron, tools: tool } = deps;
   const log = deps.log.child("orchestrator");
   const responses = makeResponses(run, chat, clock);
   const tasks = new TaskGroup({ name: "orchestrator", onError: (task, e) => log.error(`vibevalley: the orchestrator's ${task} failed`, e) });
@@ -220,7 +230,7 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
   const recall = async (source: Source, line: string) => {
     if (source !== "user" || line.trim().length < 4) return "";
     const hits = await notes.search({ text: head(line, 200), limit: notesRecalled });
-    return situationWords.recalled(hits.map(toolAnswers.pkm.hit));
+    return situationWords.recalled(hits.map(pkmHitLine));
   };
 
   const pickedNote = (picked: Pick) => {

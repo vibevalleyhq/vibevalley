@@ -117,7 +117,7 @@ export async function mediaFarm(llm: ScriptedModel) {
   const w = await world({ config: testConfig({ patrol: { heartbeatMinutes: 0 } }), network: network() });
   try {
     w.deepseek.use(llm);
-    const orchestrator = await makeOrchestrator(w);
+    const orchestrator = await makeOrchestrator({ ...w, tools: w.tool });
     w.closes.push(() => orchestrator.close());
     return { ...w, orchestrator };
   } catch (e) {

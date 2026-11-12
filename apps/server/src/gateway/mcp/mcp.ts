@@ -5,14 +5,13 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprot
 import { coerceArguments } from "@vibevalley/agent/core/schema";
 import type { Tool as LoopTool } from "@vibevalley/agent/core/tool";
 
-import { worker } from "#/base/actor.ts";
+import { worker, type Caller } from "#/base/actor.ts";
 import { messageOf } from "#/base/errors.ts";
 import { redact, redactedHead } from "#/base/redact.ts";
+import type { Tool } from "#/gateway/tool/tool.ts";
 import type { ServerConfig } from "#/infra/config.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Session } from "#/modules/session/session.ts";
-import type { Caller } from "#/modules/tool/schemas.ts";
-import type { Tool } from "#/modules/tool/tool.ts";
 
 import { failedCall, noTool, unknownCaller } from "./prompts.ts";
 

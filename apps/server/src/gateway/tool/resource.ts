@@ -4,11 +4,12 @@ import type * as T from "@vibevalley/protocol";
 import { isApiError } from "@vibevalley/protocol/api";
 import * as S from "@vibevalley/protocol/schema";
 
+import type { Who } from "#/base/actor.ts";
 import { messageOf } from "#/base/errors.ts";
 import { jsonText } from "#/base/json.ts";
 
 import { resourceWords } from "./prompts.ts";
-import { callerOf, customTool, type Who } from "./schemas.ts";
+import { callerOf, customTool } from "./schemas.ts";
 import type { ToolDeps } from "./tool.ts";
 
 export interface ReadResource {

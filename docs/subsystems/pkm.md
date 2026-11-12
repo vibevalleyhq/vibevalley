@@ -8,7 +8,7 @@
 |---|---|
 | 笔记库目录管理、Markdown 与大纲树互转（`parse` / `print`） | 帮工和助手交付的文档与网页（[Artifact](docs/subsystems/artifact.md)） |
 | 块操作（`PkmBlockOp`）、双链、标签、块引用、反链与全文检索 | 档案的经验记忆存储（[记性](docs/subsystems/memory.md)） |
-| 闪念捕获、网页剪藏、话题聚类、改名合并、导出与按文件撤销 | 助手与帮工的 `pkm_*` 工具封装（`apps/server/src/modules/tool/pkm.ts`） |
+| 闪念捕获、网页剪藏、话题聚类、改名合并、导出与按文件撤销 | 助手与帮工的 `pkm_*` 工具封装（`apps/server/src/gateway/tool/pkm.ts`） |
 | 行内批注与改写建议（`pkm_comment`）的创建、接受与拒绝 | |
 
 ## 在哪

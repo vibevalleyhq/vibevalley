@@ -4,7 +4,7 @@
 
 ## 什么时候用
 
-- 改了 `systemPrompt`、`agentPrompt`、`apps/server/src/modules/tool` 里助手工具的名字、描述、参数或顺序。
+- 改了 `systemPrompt`、`agentPrompt`、`apps/server/src/gateway/tool` 里助手工具的名字、描述、参数或顺序。
 - 改了助手的提示怎么拼、对话怎么压缩（`session/host.ts` 的扩展、`runtime/durable.ts` 的压缩门槛），或升级了 pi-durable、pi-ai。
 - 往 `apps/server/src/modules/orchestrator/testdata/evals/` 加了样例。
 

@@ -16,7 +16,7 @@ import {
 import { isApiError, type Handlers } from "@vibevalley/protocol/api";
 import * as S from "@vibevalley/protocol/schema";
 
-import type { Actor } from "#/base/actor.ts";
+import type { Caller, Who } from "#/base/actor.ts";
 import { messageOf, reasonOf } from "#/base/errors.ts";
 import { problemOf } from "#/base/json.ts";
 import { maxChildren as maxTasks } from "#/modules/issue/creation.ts";
@@ -409,24 +409,6 @@ const sessionSchemas = shown(sessionParameters);
 export type Orchestrator<K extends keyof typeof parameters> = z.output<(typeof parameters)[K]>;
 
 export type SessionInput<K extends keyof typeof sessionParameters> = z.output<(typeof sessionParameters)[K]>;
-
-export interface Caller {
-  /** The profile: an orchestrator's own id for an orchestrator. */
-  readonly agent: string;
-  /** The session working as agent, and the repo it works in; both empty for the orchestrator. */
-  readonly session: string;
-  readonly repo: string;
-  /** The channel the orchestrator is answering. A session's default is its own issue thread, which the channel service knows. */
-  readonly here: string;
-  /** The profile the user picked for this input, if any: dispatch prefers it. */
-  readonly picked: string;
-  /** The ingress envelope currently being handled; empty when this run was not opened by one. */
-  readonly envelope: string;
-  /** Who calls, and on whose word: the services judge what it may do by it. */
-  readonly actor: Actor;
-}
-
-export type Who = () => Caller;
 
 /** A tool that will not do what it was asked: thrown, its message is what the model reads. */
 export class ToolRefusal extends Error {

@@ -1,8 +1,10 @@
+import type { Who } from "#/base/actor.ts";
 import type { Spoken } from "#/modules/channel/channel.ts";
+import { channelLine } from "#/modules/orchestrator/prompts.ts";
 import { envelopeLines } from "#/modules/session/prompts.ts";
 
-import { answers, channelLine } from "./prompts.ts";
-import { callerOf, participant, refuse, said, sessionSchemaTool, tool, type Orchestrator, type SessionInput, type Who } from "./schemas.ts";
+import { answers } from "./prompts.ts";
+import { callerOf, participant, refuse, said, sessionSchemaTool, tool, type Orchestrator, type SessionInput } from "./schemas.ts";
 import type { ToolDeps } from "./tool.ts";
 
 export function channelTools(deps: Pick<ToolDeps, "channel">) {

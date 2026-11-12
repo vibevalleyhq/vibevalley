@@ -111,7 +111,7 @@ describe("source review hints", () => {
     [protocolFile, "export interface Item {\n enabled?: boolean;\n}", "optional-collection-or-flag"],
     [protocolFile, "export interface Item {\n items?: readonly Item[];\n}", "optional-collection-or-flag"],
     [serverFile, "DeliverableValues\n .find(\n value => value === input)", "manual-enum-coercion"],
-    ["apps/server/src/modules/tool/schemas.ts", "priority:\n z.exactOptional(\n z.string())", "tool-downgrade"],
+    ["apps/server/src/gateway/tool/schemas.ts", "priority:\n z.exactOptional(\n z.string())", "tool-downgrade"],
     ["packages/ai/src/messages.ts", "const MessageSchema:\n z.ZodType<Message> = z.object({});", "subpackage-dual-shape"],
   ])("reports a candidate without treating it as a proven defect: %s / %s", (path, source, category) => {
     const findings = review(path, source);
@@ -124,7 +124,7 @@ describe("source review hints", () => {
     [serverFile, "const decode = jsonOrNone(localSchema);"],
     [protocolFile, "export interface Item {\n issue: IssueId;\n enabled: boolean;\n}"],
     [protocolFile, 'export const ModeValues = ["a", "b"] as const;\nexport interface ItemUpdate {\n mode?: Mode;\n enabled?: boolean;\n}'],
-    ["apps/server/src/modules/tool/schemas.ts", "priority: z.exactOptional(S.Priority)"],
+    ["apps/server/src/gateway/tool/schemas.ts", "priority: z.exactOptional(S.Priority)"],
     ["packages/ai/src/messages.ts", "const MessageSchema = z.object({}) satisfies z.ZodType<Message>;"],
   ])("does not report the corresponding explicit form: %s / %s", (path, source) => {
     expect(review(path, source)).toEqual([]);

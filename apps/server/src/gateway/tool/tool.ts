@@ -2,6 +2,7 @@ import type { Tool as LoopTool } from "@vibevalley/agent/core/tool";
 import { maybe, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
+import type { Who } from "#/base/actor.ts";
 import { head } from "#/base/clip.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
@@ -28,7 +29,6 @@ import { pkmTools } from "./pkm.ts";
 import { sessionLine } from "./prompts.ts";
 import { repoTools } from "./repo.ts";
 import { makeResourceReader, type ReadResource, type ResourcePage, resourceTools } from "./resource.ts";
-import type { Who } from "./schemas.ts";
 
 export interface Tool {
   /** The orchestrator's tools, in the order its prompt has always listed them: the order is part of the prompt's prefix. */

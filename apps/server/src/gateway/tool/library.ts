@@ -2,10 +2,11 @@ import type * as T from "@vibevalley/protocol";
 import { isApiError } from "@vibevalley/protocol/api";
 import * as S from "@vibevalley/protocol/schema";
 
+import type { Who } from "#/base/actor.ts";
 import { reasonOf } from "#/base/errors.ts";
 
 import { answers } from "./prompts.ts";
-import { callerOf, sessionSchemaTool, tool, type Who } from "./schemas.ts";
+import { callerOf, sessionSchemaTool, tool } from "./schemas.ts";
 import type { ToolDeps } from "./tool.ts";
 
 export function libraryTools(deps: Pick<ToolDeps, "media">) {

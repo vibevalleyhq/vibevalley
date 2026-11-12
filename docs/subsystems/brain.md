@@ -8,7 +8,7 @@
 |---|---|
 | 农场唯一的 `Harness`（`runtime/durable.ts`）：存储、注册一次的 DeepSeek、每个会话的对话、压缩的门槛 | 模型名称的选择和 DeepSeek 密钥的存放（[档案和农机](docs/subsystems/agent.md)、[设置和配置](docs/subsystems/setting.md)） |
 | 我们的工具（`Tool`：JSON Schema 加 `execute`）怎样成为 pi-durable 的工具（`durableTool`） | 输入什么时候送、有没有用户的授权、一轮怎样记进 `session_run`（[助手](docs/subsystems/orchestrator.md)、[帮工](docs/subsystems/session.md)） |
-| 每种宿主的扩展（提示的几段和工具），以及服务端重启后接着跑的一轮仍有它们 | 农场的业务工具（`apps/server/src/modules/tool`）、跨档案的数据库记忆（[记性](docs/subsystems/memory.md)） |
+| 每种宿主的扩展（提示的几段和工具），以及服务端重启后接着跑的一轮仍有它们 | 农场的业务工具（`apps/server/src/gateway/tool`）、跨档案的数据库记忆（[记性](docs/subsystems/memory.md)） |
 | 技能按需加载、`MemoryPort`、MCP 客户端、自己的任务图、帮手（`spawn_agent`） | 循环、工具并发、插话和排队、落盘、压缩、断点续跑（pi-durable 自己的） |
 
 ## 在哪
@@ -82,7 +82,7 @@ pi-durable 自己压缩。模型的窗口按目录（100 万 token），一次�
 ## 和谁打交道
 
 - **四个宿主**：助手 `session/host.ts`、农机 `runtime/vibevalley.ts`、终端对话 `chat/chat.ts`、`spawn_agent` 的子对话。
-- **资源读取（`Tool.readResource`）**：助手和帮工的 `resource_read` 经 `apps/server/src/modules/tool/resource.ts` 按会话的权限分页读 `vv://` 资源。
+- **资源读取（`Tool.readResource`）**：助手和帮工的 `resource_read` 经 `apps/server/src/gateway/tool/resource.ts` 按会话的权限分页读 `vv://` 资源。
 - **评测**：`vp run --filter @vibevalley/server evals` 在测试农场上照农场的样子跑助手的一轮（`testing/evals.ts` 的 `orchestratorTurn`：助手的宿主、它的提示和工具，经 pi-ai 问真的 DeepSeek），工具答的是用例录下的结果；要 `DEEPSEEK_API_KEY`、花钱，先问用户。
 
 ## 为什么这样

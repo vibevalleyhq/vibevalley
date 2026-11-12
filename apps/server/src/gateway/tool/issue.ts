@@ -6,6 +6,7 @@ import { isApiError } from "@vibevalley/protocol/api";
 import { assignedAgentOf, closedText, latestSessionIdOf, phaseText, shortTitle } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
+import type { Who } from "#/base/actor.ts";
 import { head } from "#/base/clip.ts";
 import { AgentChoiceRefused, IssueCreateRefused } from "#/modules/issue/issue.ts";
 import { openFindings } from "#/modules/issue/status.ts";
@@ -24,7 +25,7 @@ import {
   userAgentWord,
   sessionLine,
 } from "./prompts.ts";
-import { type Who, type Orchestrator, type SessionInput, said, answered, callerOf, customTool, tool, sessionSchemaTool } from "./schemas.ts";
+import { type Orchestrator, type SessionInput, said, answered, callerOf, customTool, tool, sessionSchemaTool } from "./schemas.ts";
 import type { ToolDeps } from "./tool.ts";
 
 type IssueTool = "issue.get" | "issue.diff.get" | "session.stop";

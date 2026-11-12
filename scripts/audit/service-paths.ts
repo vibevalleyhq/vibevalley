@@ -37,13 +37,14 @@ const keyName = (n: unknown): string | undefined =>
 
 const root = "apps/server/src/";
 const servicesFile = `${root}services.ts`;
-/** Handlers only forward (AGENTS.md); the ground (infra, base) is everyone's. */
-const outerCallers = new Set(["http"]);
+/** Adapters only forward (AGENTS.md): the HTTP handlers and the agents' tools; the ground (infra, base) is everyone's. */
+const outerCallers = new Set(["http", "tool"]);
 const ground = new Set(["infra", "base"]);
 /** Tests and what only tests load (flows/farm.ts is the cross-module tests' farm). */
 const skipped = /\.(test|spec)\.ts$|\/testing\/|\/testdata\/|^apps\/server\/src\/flows\/|\.d\.ts$/u;
-/** Leaf gateway/gamification services reached only by HTTP, and Core's late-bound Projection. */
-export const singleCallerServices = new Set(["Connector", "Game", "Lan", "Mcp", "Projection", "Voice"]);
+/** Leaf gateway/gamification services reached only by HTTP, the agents' tools reached by /mcp (the orchestrator holds them
+ * through its own OrchestratorTools), and Core's late-bound Projection. */
+export const singleCallerServices = new Set(["Connector", "Game", "Lan", "Mcp", "Projection", "Tool", "Voice"]);
 /** Types that keep the members of their first argument. */
 const keeping = new Set(["Pick", "Omit", "Readonly", "Partial", "Required", "NonNullable"]);
 

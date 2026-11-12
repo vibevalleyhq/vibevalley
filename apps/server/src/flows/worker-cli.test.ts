@@ -9,10 +9,10 @@ import { createAdaptorServer } from "@hono/node-server";
 import { expect, test } from "vite-plus/test";
 
 import { makeMcp, type Mcp } from "#/gateway/mcp/mcp.ts";
+import type { Tool } from "#/gateway/tool/tool.ts";
 import { explicitMandate } from "#/modules/issue/creation.ts";
 import { repository } from "#/modules/repo/repository.ts";
 import { workerAccess } from "#/modules/session/worker.ts";
-import type { Tool } from "#/modules/tool/tool.ts";
 import { gitIn } from "#/testing/git.ts";
 import { starter, testConfig, until, waitFor } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";

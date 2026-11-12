@@ -67,11 +67,11 @@ flowchart LR
   5. `Collaboration`（`channel`、`media`（含素材库）、`artifact`、`pkm`）
   6. `Issues`（`issue`、`cron`）
   7. `Inbox`（`inbox`）
-  8. `Orchestrator`（`orchestrator`、`tool`）
+  8. `Orchestrator`（`orchestrator`）
   9. `Gamification`（`game`）
-  10. `Gateway`（`http`、`mcp`、`lan`、`connector`、`voice`、`chat`、`projection`，及顶层入口 `main.ts`、`services.ts`、`modules.ts`）
+  10. `Gateway`（`http`、`mcp`、`tool`、`lan`、`connector`、`voice`、`chat`、`projection`，及顶层入口 `main.ts`、`services.ts`、`modules.ts`）
   模块只可 import 排在它前面的模块，不直接读其他模块在 `SpaceState` 里的字段（`apps/server/src/modules.test.ts` 检查）。反向通知走订阅（`AsyncIterable`）或窄端口。`apps/server/src/services.ts` 的 `buildModules` 照模块次序一行一个 `makeX({ … })`、依赖在调用处写明，建到工单和定时任务（模块测试的 `moduleWorld` 也用它）；`makeFarm` 接着建后面的，再按模块顺序调各模块的 `boot()`；建到一半失败就倒着关掉已建的。
-- **网关（`apps/server/src/gateway/http`、`mcp`）**：`http/api.ts` 按 `endpoints` 挂载路由，`http/handlers/<概念>.ts` 实现接口，`http/streams.ts`、`http/rpc.ts` 提供 SSE 流；`gateway/mcp/` 为帮工提供 `/mcp`（[核心状态](docs/subsystems/core.md)）。
+- **网关（`apps/server/src/gateway/http`、`mcp`、`tool`）**：`http/api.ts` 按 `endpoints` 挂载路由，`http/handlers/<概念>.ts` 实现接口，`http/streams.ts`、`http/rpc.ts` 提供 SSE 流；`gateway/tool/` 是助手和帮工的工具，`gateway/mcp/` 把它们经 `/mcp` 给帮工；助手经自己声明的 `OrchestratorTools` 在组装时拿到它们（[核心状态](docs/subsystems/core.md)、[助手](docs/subsystems/orchestrator.md)）。
 - **存储（Postgres + 文件）**：配了 `database.url` 连那个 Postgres，否则是进程内的 PGlite，同一种方言；表结构基线为 `apps/server/db/migrations/0001_schema.up.sql`，查询在 `apps/server/db/queries/<表>.sql`，由 `apps/server/scripts/pg-generate.ts` 生成 `apps/server/db/generated/`（[地基](docs/subsystems/foundation.md)）。
 - **客户端（`apps/web`、`apps/desktop`、`apps/mobile`、`apps/cli`）**：`apps/web` 按概念分 feature，层间单向依赖（`base` → `infra` → `state` → `ui` → `ui/domain` → `ui/pixel` → `features` → `farm`/`tree` → `app`）。桌面壳（Electron）、浏览器和手机壳（Expo WebView）共用同一份页面（[客户端](docs/subsystems/app.md)）。
 

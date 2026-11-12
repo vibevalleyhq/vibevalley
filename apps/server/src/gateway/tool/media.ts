@@ -1,9 +1,10 @@
 import { t } from "@vibevalley/i18n";
 
+import type { Who } from "#/base/actor.ts";
 import { jsonText } from "#/base/json.ts";
 import type { MediaCaller } from "#/modules/media/media.ts";
 
-import { callerOf, refuse, tool, type Who } from "./schemas.ts";
+import { callerOf, refuse, tool } from "./schemas.ts";
 import type { ToolDeps } from "./tool.ts";
 
 export function mediaTools(deps: Pick<ToolDeps, "media">) {

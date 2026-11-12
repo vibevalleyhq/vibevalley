@@ -1,7 +1,9 @@
 import type * as T from "@vibevalley/protocol";
 
+import type { Who } from "#/base/actor.ts";
+
 import { answers, cronLine, parseTime } from "./prompts.ts";
-import { answered, callerOf, refuse, tool, type Orchestrator, type Who } from "./schemas.ts";
+import { answered, callerOf, refuse, tool, type Orchestrator } from "./schemas.ts";
 import type { ToolDeps } from "./tool.ts";
 
 export function cronTools(deps: Pick<ToolDeps, "channel" | "cron">) {

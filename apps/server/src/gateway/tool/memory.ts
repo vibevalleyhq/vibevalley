@@ -1,7 +1,8 @@
+import type { Caller, Who } from "#/base/actor.ts";
 import { foundText, type SearchQuery } from "#/modules/memory/memory.ts";
 
 import { answers, memoryWhere, userAgentWord } from "./prompts.ts";
-import { answered, callerOf, refuse, sessionSchemaTool, tool, type Caller, type Orchestrator, type SessionInput, type Who } from "./schemas.ts";
+import { answered, callerOf, refuse, sessionSchemaTool, tool, type Orchestrator, type SessionInput } from "./schemas.ts";
 import type { ToolDeps } from "./tool.ts";
 
 export function memoryTools(deps: Pick<ToolDeps, "agent" | "memory">) {

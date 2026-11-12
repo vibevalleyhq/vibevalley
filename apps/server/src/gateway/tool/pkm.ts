@@ -1,7 +1,9 @@
 import type * as T from "@vibevalley/protocol";
 
+import type { Who } from "#/base/actor.ts";
+
 import { answers } from "./prompts.ts";
-import { answered, callerOf, sessionSchemaTool, tool, type Who } from "./schemas.ts";
+import { answered, callerOf, sessionSchemaTool, tool } from "./schemas.ts";
 import type { ToolDeps } from "./tool.ts";
 
 /** A page's blocks shown to a model at most: a long journal is read in part, and the search finds the rest. */

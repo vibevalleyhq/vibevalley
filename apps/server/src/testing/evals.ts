@@ -12,12 +12,11 @@ import { abortable } from "@vibevalley/async";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { orchestrator } from "#/base/actor.ts";
+import { type Op, schemas, toolName } from "#/gateway/tool/schemas.ts";
 import { orchestratorHost, orchestratorInput } from "#/modules/orchestrator/orchestrator.ts";
-import { noResult, situationWords } from "#/modules/orchestrator/prompts.ts";
+import { channelLine, noResult, situationWords } from "#/modules/orchestrator/prompts.ts";
 import { type ModelAccess, messageText, type ModelMessage } from "#/modules/runtime/durable.ts";
 import { type CaseInput, turnOf } from "#/modules/session/host.ts";
-import { channelLine } from "#/modules/tool/prompts.ts";
-import { type Op, schemas, toolName } from "#/modules/tool/schemas.ts";
 
 import { starter, testConfig } from "./layers.ts";
 import { type World, world } from "./world.ts";

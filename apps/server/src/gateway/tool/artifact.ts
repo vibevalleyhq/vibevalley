@@ -2,13 +2,14 @@ import type * as T from "@vibevalley/protocol";
 import { isApiError } from "@vibevalley/protocol/api";
 import * as S from "@vibevalley/protocol/schema";
 
+import type { Caller, Who } from "#/base/actor.ts";
 import { BizCode, reasonOf, refuseIn } from "#/base/errors.ts";
 import { htmlCheck } from "#/modules/artifact/check.ts";
 import { artifactMax } from "#/modules/artifact/policy.ts";
 import { NotWorkFile } from "#/modules/session/session.ts";
 
 import { answers, blockLine } from "./prompts.ts";
-import { answered, type Caller, type Who, type Orchestrator, type SessionInput, refuse, callerOf, tool, sessionSchemaTool } from "./schemas.ts";
+import { answered, type Orchestrator, type SessionInput, refuse, callerOf, tool, sessionSchemaTool } from "./schemas.ts";
 import type { ToolDeps } from "./tool.ts";
 
 const refused = refuseIn(BizCode.ArtifactRefused);

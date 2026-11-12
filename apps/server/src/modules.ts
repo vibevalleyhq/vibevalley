@@ -15,13 +15,14 @@ export const modules: readonly Module[] = [
   { name: "Collaboration", parts: ["modules/channel", "modules/media", "modules/artifact", "modules/pkm"] },
   { name: "Issues", parts: ["modules/issue", "modules/cron"] },
   { name: "Inbox", parts: ["modules/inbox"] },
-  { name: "Orchestrator", parts: ["modules/orchestrator", "modules/tool"] },
+  { name: "Orchestrator", parts: ["modules/orchestrator"] },
   { name: "Gamification", parts: ["modules/game"] },
   {
     name: "Gateway",
     parts: [
       "gateway/http",
       "gateway/mcp",
+      "gateway/tool",
       "gateway/lan",
       "gateway/connector",
       "gateway/voice",

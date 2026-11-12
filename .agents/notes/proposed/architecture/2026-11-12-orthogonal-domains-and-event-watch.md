@@ -14,7 +14,7 @@ Status: proposed
    - 因为第 4 层的 `Session` 不拥有第 6 层的工单表，交付逻辑只能通过 4 个回调组成的 `IssueRecord` 反向写回工单，导致 `Session` 膨胀至 34 个生产文件、44 个接口成员，而 `Issue` 仍需调用 `Session` 的 23 个成员。
 3. **「Agent 观察事件」的规则散落在 5 个模块里**：聊天提及、私聊唤醒、工单蓄水、PR 巡检、Cron 到期与 Patrol 心跳分散在 `channel`、`session`、`issue`、`cron`、`inbox` 各处手工拼装触发器，缺少统一的持久化观察游标出口。
 4. **网关适配层与外围浅服务错位，跨端旧目录未收口**：
-   - [tool.ts](apps/server/src/modules/tool/tool.ts) 无自有表与核心状态，仅服务于 `orchestrator` 与 `gateway/mcp`，却作为领域模块横跨 10 个服务扇出，在 [service-paths.json](scripts/audit/service-paths.json) 中制造 40 余条伪业务耦合边（掩盖了 `Artifact`、`Media`、`Pkm` 之间零互调的事实）。
+   - [tool.ts](apps/server/src/gateway/tool/tool.ts) 无自有表与核心状态，仅服务于 `orchestrator` 与 `gateway/mcp`，却作为领域模块横跨 10 个服务扇出，在 [service-paths.json](scripts/audit/service-paths.json) 中制造 40 余条伪业务耦合边（掩盖了 `Artifact`、`Media`、`Pkm` 之间零互调的事实）。
    - [agent.ts](apps/server/src/modules/agent/agent.ts) 与 [runtime.ts](apps/server/src/modules/runtime/runtime.ts) 共读写同一份 `config.json` 却拆成两个服务；[user.ts](apps/server/src/modules/user/user.ts) 除 HTTP 外仅被 `gateway/lan` 调用；`setting`、`attachment`、`provider` 属于平台底座原语；`packages/protocol/src/{library,machine}` 与 `apps/web/src/features/library` 仍保留合并前的旧目录。
 
 ## Proposal

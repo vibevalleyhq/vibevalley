@@ -2,6 +2,7 @@ import { type Connector, type ConnectorOptions, makeConnector } from "#/gateway/
 import { type Lan, type LanOptions, makeLan } from "#/gateway/lan/lan.ts";
 import { makeMcp, type Mcp, type McpOptions } from "#/gateway/mcp/mcp.ts";
 import { makeProjection } from "#/gateway/projection/frame.ts";
+import { makeTool, type Tool } from "#/gateway/tool/tool.ts";
 import { makeVoice, type Voice, type VoiceOptions } from "#/gateway/voice/voice.ts";
 import { type Agent, makeAgent } from "#/modules/agent/agent.ts";
 import { type Artifact, makeArtifact } from "#/modules/artifact/artifact.ts";
@@ -20,7 +21,6 @@ import { makeRepo, type Repo, type RepoHooks } from "#/modules/repo/repo.ts";
 import { makeRuntime, type Runtime, type RuntimeOptions } from "#/modules/runtime/runtime.ts";
 import { makeSession, type Session, type SessionOptions } from "#/modules/session/session.ts";
 import { makeSetting, type Setting } from "#/modules/setting/setting.ts";
-import { makeTool, type Tool } from "#/modules/tool/tool.ts";
 import { makeUser, type User } from "#/modules/user/user.ts";
 
 import { type Core, makeCore, type Projection } from "./core/core.ts";
@@ -226,9 +226,12 @@ export async function makeFarm(config: ServerConfig, options: ServiceOptions = {
     const { provider } = modules;
     // Inbox: what is news to the user, and the patrol.
     const inbox = own(await makeInbox({ config, clock, log, db, core, channel, issue, session }));
-    // Orchestrator: the agent that hands the user's work to helpers, and its tools.
+    // Gateway's tools first: the orchestrator holds them (OrchestratorTools), and /mcp serves them to sessions.
     const tool = own(await makeTool({ clock, log, agent, session, issue, channel, cron, memory, media, pkm, artifact, repo }));
-    const orchestrator = own(await makeOrchestrator({ clock, log, config, agent, runtime, repo, pkm, session, channel, cron, tool }, options.orchestrator));
+    // Orchestrator: the agent that hands the user's work to helpers.
+    const orchestrator = own(
+      await makeOrchestrator({ clock, log, config, agent, runtime, repo, pkm, session, channel, cron, tools: tool }, options.orchestrator),
+    );
     // Gamification: the ledger, progress and achievements, from events only.
     const game = own(await makeGame({ config, clock, log, db, core, repo }));
     // Gateway: every way in from outside; http/app.ts mounts the HTTP API on these services.
