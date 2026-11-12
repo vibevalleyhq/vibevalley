@@ -40,7 +40,6 @@ test("the assistant cut off mid-answer by a restart finishes it once the farm is
       const orchestrator = await makeOrchestrator({ ...below, tools: below.tool });
       below.closes.push(() => orchestrator.close());
       await below.inside.boot();
-      await below.inside.wake();
       return below;
     } catch (e) {
       await below.close();
@@ -101,7 +100,6 @@ test("regression: the assistant and a helper both cut off mid-answer go on once 
       const orchestrator = await makeOrchestrator({ ...below, tools: below.tool });
       below.closes.push(() => orchestrator.close());
       await below.inside.boot();
-      await below.inside.wake();
       return below;
     } catch (e) {
       await below.close();
@@ -161,14 +159,13 @@ test("a helper on the farm's own runtime cut off mid-answer by a restart finishe
   const config = testConfig({ db: "", patrol: { heartbeatMinutes: 0 } });
   const helperWords = "数过了，三块地";
   const profile = { ...starter("lab"), runtime: "vibevalley", effort: "" };
-  /** The farm on the same home each time: its sessions back, then their deliveries. */
+  /** The farm on the same home each time: its sessions and their deliveries back, then the watch. */
   const open = async (llm: ReturnType<typeof scriptedLLM>["llm"], repos: readonly string[] = []) => {
     const below = await world({ config, ownRuntime: true, repos });
     try {
       below.deepseek.use(llm);
       await below.session.boot();
       await below.watch.boot();
-      await below.session.wake();
       return below;
     } catch (e) {
       await below.close();

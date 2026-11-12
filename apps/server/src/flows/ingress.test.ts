@@ -64,7 +64,7 @@ test("regression: chat triggers keep their original payload through edits and re
   const registered2 = await mailbox.isRouted(current.message.id);
   expect(registered2).toBe(false);
   await fw.watch.boot();
-  await mailbox.wake();
+  await mailbox.bootDeliveries();
   const registered3 = await mailbox.isRouted(current.message.id);
   expect(registered3).toBe(true);
   const source = await mailbox.readTrigger(current.message.id);
@@ -135,7 +135,7 @@ test("regression: a persisted machine trigger reaches a worker without a chat me
   await committedDelivery(fw.db, delivery);
   await mailbox.restoreDeliveries();
   expect(mailbox.deliveriesOf(session).find((row) => row.envelope_id === trigger.id)?.message_id).toBeNull();
-  await mailbox.wake();
+  await mailbox.bootDeliveries();
   expect(inputs.some((input) => input.includes(trigger.card.readUri))).toBe(false);
   await mailbox.accept({
     source: "connector",

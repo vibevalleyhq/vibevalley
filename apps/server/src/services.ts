@@ -238,17 +238,18 @@ export async function makeFarm(config: ServerConfig, options: ServiceOptions = {
     const voice = own(await makeVoice({ config, clock, log, fetch, core, watch, setting, provider, channel, orchestrator }, options.voice));
     const connector = own(await makeConnector({ clock, db, log, fetch, core, channel, watch }, options.connector));
 
+    // Each module's startup once, in module order (modules.ts), each after the ones it is built on.
     // The first look at GitHub.
     await repo.boot();
-    // The sessions on the farm when it stopped are taken up again, or let go.
+    // The sessions on the farm when it stopped taken up again (or let go), their open deliveries restored, what was left
+    // routed, who waits woken.
     await session.boot();
-    // Their threads, then the chat's events after the watch's cursor routed, before the deliveries wake anyone.
-    await watch.boot();
-    // Open deliveries restored, then the sessions woken.
-    await session.wake();
     // What media waited for.
     await media.boot();
     await issue.boot();
+    // The sessions' threads, the chat's events after the watch's cursor (routed through the brakes, each once), then the
+    // inbox as it stands and the patrol's rounds.
+    await watch.boot();
     // Commits start being counted.
     await game.boot();
 

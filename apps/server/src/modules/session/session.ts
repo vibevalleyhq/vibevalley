@@ -133,11 +133,9 @@ export interface Session {
   readonly setAddress: (address: string) => void;
   /** An in-process agent's host; the caller owns it and closes it (`await using`). Throws NotRecorded. */
   readonly host: <R>(options: HostOptions<R>) => Promise<AgentHost<R>>;
-  /** At startup, after the modules below it started: the sessions back. */
+  /** At startup, after the modules below it started: the sessions back, then their open deliveries restored, what was
+   * left routed (not the chat's: the watch reads those again) and who waits woken. */
   readonly boot: () => Promise<void>;
-  /** At startup, after the channels restored their threads: the open deliveries restored, what was left routed, who
-   * waits woken. */
-  readonly wake: () => Promise<void>;
   /** The deliveries stop, then the sessions save what a restart needs, then every execution is let go. */
   readonly close: () => Promise<void>;
 }
@@ -149,6 +147,8 @@ export type Inside = Session &
   Omit<Machine, "close"> & {
     readonly restore: Lifecycle["restore"];
     readonly restoreDeliveries: Mailbox["restore"];
+    /** The deliveries' part of boot alone: restored, what was left routed, who waits woken. */
+    readonly bootDeliveries: Mailbox["boot"];
   };
 
 const insides = new WeakMap<Session, Inside>();
@@ -245,8 +245,10 @@ export function sessionOver(parts: {
     who: lifecycle.who,
     setAddress: lifecycle.setAddress,
     host: lifecycle.host,
-    boot: lifecycle.boot,
-    wake: mailbox.boot,
+    boot: async () => {
+      await lifecycle.boot();
+      await mailbox.boot();
+    },
     close,
   };
 }
@@ -293,6 +295,7 @@ export async function makeSession(deps: SessionDeps, options: SessionOptions = {
       executions: machine.executions,
       restore: lifecycle.restore,
       restoreDeliveries: mailbox.restore,
+      bootDeliveries: mailbox.boot,
     });
     return session;
   } catch (e) {

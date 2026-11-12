@@ -210,8 +210,9 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
       if (n) x.news.publish(n);
     }
   })();
-  await watch.boot();
+  // services.ts's startup order: the deliveries, then the watch.
   await mailbox.boot();
+  await watch.boot();
   const deliveries = async (recipient: string) =>
     (
       await db.sql.query(

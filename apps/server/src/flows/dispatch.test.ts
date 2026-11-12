@@ -35,7 +35,7 @@ test("regression: an orchestrator assignment survives startup and an acknowledge
   await sql`delete from session_delivery where envelope_id = ${triggerId}`;
   await sql`delete from session_issue_input where trigger_id = ${triggerId}`;
   await sql`update session_trigger set routed_at = null, routing_scope = null, routing_position = null where id = ${triggerId}`;
-  await mailbox.wake();
+  await mailbox.bootDeliveries();
   await fw.inside.replay();
   const deliveries = await sql`select session_id, envelope_id from session_delivery where envelope_id = ${triggerId}`;
   expect(deliveries).toHaveLength(1);
