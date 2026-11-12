@@ -31,16 +31,7 @@ import {
   orchestratorIn,
 } from "./envelope.ts";
 import type { Lifecycle, SessionNews } from "./lifecycle.ts";
-import {
-  inputOf,
-  orchestratorSource,
-  deliveryScope,
-  type InputContext,
-  type SourceEvent,
-  type TriggerInput,
-  type TriggerResource,
-  type KnownGitHubEvent,
-} from "./payload.ts";
+import { inputOf, orchestratorSource, deliveryScope, type InputContext, type SourceEvent, type TriggerInput, type TriggerResource } from "./payload.ts";
 import { wakeInput } from "./prompts.ts";
 import { makePump } from "./pump.ts";
 import { channelRecipients, waitsForHuman } from "./routing.ts";
@@ -116,7 +107,6 @@ export interface Mailbox {
   /** A dispatch held for the issue's next helper: recorded in the caller's transaction, routed once it commits. */
   readonly queueDispatch: (dispatch: Dispatch) => Promise<void>;
   readonly readTrigger: (id: string) => Promise<TriggerResource | undefined>;
-  readonly knownGitHubEvents: (repo: string, pr: number) => Promise<readonly KnownGitHubEvent[]>;
   readonly replayCronTriggers: (consume: (trigger: Trigger, data: unknown) => Promise<void>) => Promise<void>;
   readonly triggersOf: (issue: string) => Promise<readonly Trigger[]>;
   /** Dispatches first, then routed order. */

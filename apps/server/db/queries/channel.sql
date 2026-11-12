@@ -97,7 +97,7 @@ select id::channel.id as id, type::channel.type as type, peer_id::channel.peer_i
 
 -- name: ChannelInUse :one
 -- What still points at a channel, so deleting it would take it from under them.
-select (select count(*) from cron r where r.channel_id = sqlc.arg(id))::int as crons,
+select (select count(*) from issue_cron r where r.channel_id = sqlc.arg(id))::int as crons,
        (select count(*) from connector_account a where a.channel_id = sqlc.arg(id))::int as connectors,
        (select count(distinct i.id) from issue i
         left join session_issue_input m on m.issue_id = i.id and m.state = 'held'

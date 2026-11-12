@@ -14,6 +14,7 @@ import type { Session } from "#/modules/session/session.ts";
 
 import { answerCureWords, cureWords, findingsOf, resumeWords } from "./brief.ts";
 import type { IssueDispatch } from "./dispatch.ts";
+import type { IssueLanding } from "./landing.ts";
 import type { IssueLifecycle } from "./lifecycle.ts";
 import { type Move, nextSteps, statusMove } from "./moves.ts";
 import { nullText } from "./rows.ts";
@@ -32,6 +33,7 @@ export interface SettleDeps {
   readonly runtime: Runtime;
   readonly session: Session;
   readonly clock: Time;
+  readonly landing: Pick<IssueLanding, "changesOf">;
 }
 
 /** A status move settled before anything changes: what it is, the words it goes with, who takes the issue on. */
@@ -47,7 +49,8 @@ export interface SettledMove {
 
 export function issueSettling(r: IssueLifecycle, d: Pick<IssueDispatch, "readyOf">, deps: SettleDeps) {
   const { agent: store, repo: repos, runtime: runtimes, session: sessions, clock } = deps;
-  const { unsent, changesOf } = r;
+  const { changesOf } = deps.landing;
+  const { unsent } = r;
   const { readyOf } = d;
   /** The commits on the issue's branch that the main branch does not have. */
   const commitsOf = async (issue: T.Issue) => {

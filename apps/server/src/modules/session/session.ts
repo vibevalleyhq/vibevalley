@@ -13,9 +13,7 @@ import { RepoError, type WorkplaceCleanup, type WorkplaceRelease } from "#/modul
 import type { Runtime } from "#/modules/runtime/runtime.ts";
 
 import type { Accepted, ChannelHearers, ChannelRouteResult, Envelope } from "./envelope.ts";
-import { makeGitHubPoller } from "./github.ts";
 import type { AgentHost, HostOptions } from "./host.ts";
-import { type IssueRecord, type Landing, makeLanding } from "./landing.ts";
 import { HireRefused, type Lifecycle, makeLifecycle, type SessionNews, type SessionOptions } from "./lifecycle.ts";
 import { type Machine, makeMachine } from "./machine.ts";
 import { type DeliveryNews, type Dispatch, type HireArrival, type HiredReceipt, type Mailbox, makeMailbox, type QueuedInput } from "./mailbox.ts";
@@ -23,7 +21,7 @@ import type { SourceEvent, TriggerInput, TriggerResource } from "./payload.ts";
 import { summaryOf } from "./report.ts";
 import type { Trigger } from "./shapes.ts";
 
-export type { Accepted, IssueRecord, QueuedInput, SessionOptions };
+export type { Accepted, QueuedInput, SessionOptions };
 export type { Hired, HireOptions, RunFinished, RunStore, SessionNews } from "./lifecycle.ts";
 export { DeliveryRefused, HireRefused, newsOf, NotRecorded, NotTakenIn, NotWorkFile, runOf } from "./lifecycle.ts";
 
@@ -76,25 +74,13 @@ export interface Session {
   readonly stop: (session: string) => Promise<boolean>;
   /** The helper let go; true when it was there. Work "discard" resets its branch once the runtime stops writing. */
   readonly dismiss: (session: string, work?: "keep" | "discard", closed?: "dismissed" | "completed") => Promise<boolean>;
-  /** The issue's work merged into main, or submitted as its pull request (one is open, or its repo goes by pull
-   * requests): from its helper's workplace, which then lets go; from the issue's own checkout when no helper holds it
-   * and fromCheckout. Throws NotTakenIn when the helper's work does not go in (the helper stays). */
-  readonly merge: Landing["merge"];
-  /** The helper's work submitted as the issue's pull request while it stays; read gives the issue under the helper's
-   * workplace lock (refused when it is closed). Throws MergeFailure. */
-  readonly submitPullRequest: Landing["submitPullRequest"];
-  /** Each followed pull request's state read; one merged or closed is kept, or finishes its issue. */
-  readonly refreshPullRequests: Landing["refreshPullRequests"];
-  /** The open pull requests of the issues on the board followed on GitHub: failed or finished CI, new reviews and
-   * comments taken in. */
-  readonly pollGitHub: (onBoard: readonly T.Issue[]) => Promise<void>;
-  /** A child's work checked and merged into its parent's branch, then its helper lets go; undefined when it waits.
-   * Throws NotTakenIn when the work does not go in. */
-  readonly mergeChild: Landing["mergeChild"];
-  /** The issue's work: in its helper's workplace while one holds it, else on its branch. Throws RepoError. */
-  readonly changesOf: Landing["changesOf"];
-  /** Whether the session's work still conflicts with base. */
-  readonly conflictOf: Landing["conflictOf"];
+  /** The helper's work taken in by use under its workplace lock, then the helper lets go (it stays when use gives a
+   * pull request). Throws NotTakenIn when use fails (the helper stays), ApiError when it cannot hand over now. */
+  readonly handOver: Lifecycle["handOver"];
+  /** use run on the session's workplace under its lock. */
+  readonly withWorkplace: Lifecycle["withWorkplace"];
+  /** use run on the session's workplace under its lock once its execution rests; refused while it works. */
+  readonly withIdleWorkplace: Lifecycle["withIdleWorkplace"];
   /** A session's branch reset to main while it stays. */
   readonly discardWork: (session: string) => Promise<void>;
   /** An issue's checkout let go once no helper is on it. */
@@ -180,11 +166,9 @@ export function sessionOver(parts: {
   readonly lifecycle: Lifecycle;
   readonly mailbox: Mailbox;
   readonly repo: Pick<Repo, "checkout">;
-  readonly landing: Landing;
-  readonly pollGitHub: (onBoard: readonly T.Issue[]) => Promise<void>;
   readonly close: () => Promise<void>;
 }): Session {
-  const { lifecycle, mailbox, repo, landing, close } = parts;
+  const { lifecycle, mailbox, repo, close } = parts;
   return {
     route: mailbox.route,
     recordTrigger: mailbox.recordTrigger,
@@ -207,13 +191,9 @@ export function sessionOver(parts: {
     handBack: mailbox.handBack,
     stop: lifecycle.stop,
     dismiss: lifecycle.dismiss,
-    merge: landing.merge,
-    submitPullRequest: landing.submitPullRequest,
-    refreshPullRequests: landing.refreshPullRequests,
-    pollGitHub: parts.pollGitHub,
-    mergeChild: landing.mergeChild,
-    changesOf: landing.changesOf,
-    conflictOf: landing.conflictOf,
+    handOver: lifecycle.handOver,
+    withWorkplace: lifecycle.withWorkplace,
+    withIdleWorkplace: lifecycle.withIdleWorkplace,
     discardWork: lifecycle.discardWork,
     clearWorkplace: lifecycle.clearWorkplace,
     hired: lifecycle.hired,
@@ -291,16 +271,7 @@ export async function makeSession(deps: SessionDeps, options: SessionOptions = {
     const mailbox = await makeMailbox({ ...deps, session: lifecycle });
     closes.push(mailbox.close);
 
-    const landing = makeLanding({ core: deps.core, log: deps.log, repo: deps.repo, lifecycle });
-    const gitHub = makeGitHubPoller({
-      db: deps.db,
-      repo: deps.repo,
-      clock: deps.clock,
-      log: deps.log,
-      receive: receiving(mailbox),
-      knownGitHubEvents: mailbox.knownGitHubEvents,
-    });
-    const session = sessionOver({ lifecycle, mailbox, repo: deps.repo, landing, pollGitHub: gitHub.pollOpen, close });
+    const session = sessionOver({ lifecycle, mailbox, repo: deps.repo, close });
     insides.set(session, {
       ...lifecycle,
       ...mailbox,

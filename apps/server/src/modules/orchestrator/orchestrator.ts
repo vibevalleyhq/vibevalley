@@ -16,8 +16,8 @@ import { localeMinute, type Time } from "#/infra/time.ts";
 import { type Agent, noDeepSeekKey } from "#/modules/agent/agent.ts";
 import { traitsOf } from "#/modules/agent/prompts.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
-import type { Cron } from "#/modules/cron/cron.ts";
-import { nextRun } from "#/modules/cron/when.ts";
+import type { Issue } from "#/modules/issue/issue.ts";
+import { nextRun } from "#/modules/issue/when.ts";
 import type { Pkm } from "#/modules/pkm/pkm.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
 import { defaultModel } from "#/modules/runtime/durable.ts";
@@ -112,12 +112,12 @@ export interface OrchestratorDeps {
   readonly pkm: Pkm;
   readonly session: Session;
   readonly channel: Channel;
-  readonly cron: Cron;
+  readonly issue: Issue;
   readonly tools: OrchestratorTools;
 }
 
 export async function makeOrchestrator(deps: OrchestratorDeps, options: OrchestratorOptions = {}): Promise<Orchestrator> {
-  const { clock, config, agent: store, runtime: runtimes, repo: repos, pkm: notes, session: run, channel: chat, cron, tools: tool } = deps;
+  const { clock, config, agent: store, runtime: runtimes, repo: repos, pkm: notes, session: run, channel: chat, issue: issues, tools: tool } = deps;
   const log = deps.log.child("orchestrator");
   const responses = makeResponses(run, chat, clock);
   const tasks = new TaskGroup({ name: "orchestrator", onError: (task, e) => log.error(`vibevalley: the orchestrator's ${task} failed`, e) });
@@ -149,7 +149,7 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
       const modelOf = () => deepseekModel(store.agent(id)?.model.trim() ?? "", defaultModel);
       const wakeSoon = (withinMs: number) => {
         const by = clock.now() + withinMs;
-        return cron.list().some((s) => {
+        return issues.crons().some((s) => {
           const next = nextRun(s);
           return next !== undefined && (s.agent || chat.orchestratorIn(s.channel)) === id && next <= by;
         });

@@ -10,10 +10,10 @@ import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
-import * as q from "#db/session_github_cursor.sql.ts";
-
-import type { Accepted } from "./envelope.ts";
-import type { KnownGitHubEvent, SourceEvent } from "./payload.ts";
+import type { Accepted } from "#/modules/session/envelope.ts";
+import type { SourceEvent } from "#/modules/session/payload.ts";
+import * as q from "#db/issue_github_cursor.sql.ts";
+import * as qe from "#db/issue_github_event.sql.ts";
 
 const failedChecks = new Set(["FAILURE", "ERROR", "CANCELLED", "CANCELED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE", "STALE"]);
 const finishedChecks = new Set(["COMPLETED", "SUCCESS", "FAILURE", "ERROR"]);
@@ -25,14 +25,12 @@ export interface GitHubPollDeps {
   readonly log: Logger;
   /** A source's event recorded as a trigger and routed. */
   readonly receive: (event: SourceEvent) => Promise<Accepted>;
-  /** A pull request's GitHub events recorded. */
-  readonly knownGitHubEvents: (repo: string, pr: number) => Promise<readonly KnownGitHubEvent[]>;
 }
 
 /** The open pull requests on the board followed on GitHub: a CI run that failed or finished, and each review and
  * comment not seen before, taken in as triggers for the issue's thread. */
 export function makeGitHubPoller(deps: GitHubPollDeps) {
-  const { db, repo: repos, clock, log, receive, knownGitHubEvents } = deps;
+  const { db, repo: repos, clock, log, receive } = deps;
   const polling = new Semaphore(1);
 
   const poll = async (issue: T.Issue) => {
@@ -69,10 +67,10 @@ export function makeGitHubPoller(deps: GitHubPollDeps) {
         });
       await q.observeGitHubChecks(db.sql, { repo, pr_number: pr.number, check_fingerprint: fingerprint, check_revision: revision });
     }
-    const known = await knownGitHubEvents(repo, pr.number);
-    const keys = new Set(known.filter((event) => event.routed).map((event) => event.key));
+    const known = await qe.knownGitHubEvents(db.sql, { repo, pr_number: pr.number });
+    const keys = new Set(known.map((event) => event.key));
     const rounds = new Map(
-      known.flatMap((event) => (event.botRoundKey !== undefined && event.botRound !== undefined ? [[event.botRoundKey, event.botRound] as const] : [])),
+      known.flatMap((event) => (event.bot_round_key !== null && event.bot_round !== null ? [[event.bot_round_key, event.bot_round] as const] : [])),
     );
     let botRound = 0;
     for (const round of rounds.values()) botRound = Math.max(botRound, round);
@@ -117,6 +115,13 @@ export function makeGitHubPoller(deps: GitHubPollDeps) {
         meta: { ...scope, kind: event.kind, ...(round === undefined ? {} : { botRound: round, botRoundKey: event.round }) },
       });
       if (accepted.trigger) {
+        await qe.keepGitHubEvent(db.sql, {
+          repo,
+          pr_number: pr.number,
+          key: event.key,
+          bot_round_key: round === undefined ? null : event.round,
+          bot_round: round ?? null,
+        });
         keys.add(event.key);
         if (round !== undefined) {
           rounds.set(event.round, round);
@@ -129,7 +134,7 @@ export function makeGitHubPoller(deps: GitHubPollDeps) {
   const pollOpen = (onBoard: readonly T.Issue[]): Promise<void> =>
     polling.with(async () => {
       for (const issue of onBoard.filter((issue) => issue.pullRequest?.state === "open"))
-        await bestEffort(log, `session: GitHub issue #${issue.number}`, () => poll(issue));
+        await bestEffort(log, `issue: GitHub issue #${issue.number}`, () => poll(issue));
     });
   return { pollOpen };
 }

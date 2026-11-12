@@ -1,19 +1,19 @@
 import type { CronHandlers } from "@vibevalley/protocol/api";
 
 import { user } from "#/base/actor.ts";
-import type { Cron } from "#/modules/cron/cron.ts";
+import type { Issue } from "#/modules/issue/issue.ts";
 
-export function cronHandlers(deps: { readonly cron: Cron }): CronHandlers {
-  const crons = deps.cron;
+export function cronHandlers(deps: { readonly issue: Issue }): CronHandlers {
+  const issues = deps.issue;
   return {
-    "cron.create": (body) => crons.add(body, user),
-    "cron.list": async () => crons.list(),
+    "cron.create": (body) => issues.addCron(body, user),
+    "cron.list": async () => issues.crons(),
     "cron.update": async ({ id, ...body }) => {
-      if (body.enabled !== undefined) await crons.setEnabled(id, body.enabled);
+      if (body.enabled !== undefined) await issues.setCronEnabled(id, body.enabled);
     },
     "cron.delete": async ({ id }) => {
-      await crons.remove(id);
+      await issues.removeCron(id);
     },
-    "cron.previewDelete": ({ id }) => crons.previewRemove(id),
+    "cron.previewDelete": ({ id }) => issues.previewRemoveCron(id),
   };
 }

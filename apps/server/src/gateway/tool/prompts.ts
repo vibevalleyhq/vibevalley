@@ -7,8 +7,8 @@ import { phaseText, shortTitle, stageWantsUser } from "@vibevalley/protocol/rule
 import { head } from "#/base/clip.ts";
 import type { HtmlWarning } from "#/modules/artifact/check.ts";
 import { artifactMax, htmlSources } from "#/modules/artifact/policy.ts";
-import { nextText, whenText } from "#/modules/cron/when.ts";
 import { mandateNoteWordLimit } from "#/modules/issue/creation.ts";
+import { nextText, whenText } from "#/modules/issue/when.ts";
 import { pkmHitLine } from "#/modules/orchestrator/prompts.ts";
 import { runtimeLabel } from "#/modules/runtime/presets.ts";
 import { yuan } from "#/modules/runtime/quota.ts";

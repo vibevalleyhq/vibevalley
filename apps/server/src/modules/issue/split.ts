@@ -13,6 +13,7 @@ import type { Channel } from "#/modules/channel/channel.ts";
 import { NotTakenIn, type Session } from "#/modules/session/session.ts";
 
 import { maxChildren } from "./creation.ts";
+import type { IssueLanding } from "./landing.ts";
 import type { IssueLifecycle } from "./lifecycle.ts";
 import { childChecks } from "./merge.ts";
 import { needsUser } from "./prompts.ts";
@@ -24,13 +25,15 @@ export interface SplitDeps {
   readonly agent: Agent;
   readonly session: Session;
   readonly channel: Channel;
+  readonly landing: Pick<IssueLanding, "changesOf" | "mergeChild">;
 }
 
 export type IssueSplitting = ReturnType<typeof issueSplitting>;
 
 export function issueSplitting(r: IssueLifecycle, deps: SplitDeps) {
-  const { agent: store, session: sessions, channel: chat } = deps;
-  const { everyIssue, get, publish, issueWords, changesOf, setConflict, asked, saveSplit, completeChild } = r;
+  const { agent: store, session: sessions, channel: chat, landing } = deps;
+  const { changesOf } = landing;
+  const { everyIssue, get, publish, issueWords, setConflict, asked, saveSplit, completeChild } = r;
   const splitting = new Semaphore(1);
   const split = (id: string, title: string, drafts: readonly T.IssueChildDraft[], by: Actor): Promise<string> =>
     splitting.with(async () => {
@@ -98,7 +101,7 @@ export function issueSplitting(r: IssueLifecycle, deps: SplitDeps) {
     if (!parent.repo || isClosed(parent.status)) return;
     const checks = childChecks(child, all);
     try {
-      const merged = await sessions.mergeChild(child, parent, checks, (frozen) =>
+      const merged = await landing.mergeChild(child, parent, checks, (frozen) =>
         completeChild(child.id, checks.acceptance && child.constraints ? { ...child.constraints, frozen: [...(frozen ?? [])] } : child.constraints),
       );
       if (!merged) return;

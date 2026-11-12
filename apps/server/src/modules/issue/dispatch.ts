@@ -8,7 +8,6 @@ import type { Core } from "#/core/core.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
-import type { Due } from "#/modules/cron/cron.ts";
 import { issueBranch, type Repo } from "#/modules/repo/repo.ts";
 import { RepoError } from "#/modules/repo/workplace.ts";
 import type { Runtime } from "#/modules/runtime/runtime.ts";
@@ -19,6 +18,7 @@ import type { Trigger } from "#/modules/session/shapes.ts";
 
 import { issueBrief } from "./brief.ts";
 import { explicitMandate, inferredMandate } from "./creation.ts";
+import type { Due } from "./cron.ts";
 import { acceptanceAncestors, blockedIssues } from "./dependencies.ts";
 import type { IssueLifecycle } from "./lifecycle.ts";
 import { workConstraints } from "./prompts.ts";

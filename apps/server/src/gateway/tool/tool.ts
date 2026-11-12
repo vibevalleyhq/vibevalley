@@ -9,7 +9,6 @@ import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import type { Artifact } from "#/modules/artifact/artifact.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
-import type { Cron } from "#/modules/cron/cron.ts";
 import type { Issue } from "#/modules/issue/issue.ts";
 import type { Media } from "#/modules/media/media.ts";
 import type { Memory } from "#/modules/memory/memory.ts";
@@ -49,7 +48,6 @@ export interface ToolDeps {
   readonly session: Session;
   readonly issue: Issue;
   readonly channel: Channel;
-  readonly cron: Cron;
   readonly memory: Memory;
   readonly pkm: Pkm;
   readonly media: Media;

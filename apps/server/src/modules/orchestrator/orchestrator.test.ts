@@ -578,15 +578,15 @@ describe("the orchestrator", () => {
       if (line.includes("每天九点") || line.includes("定时任务")) return answer([toolCall("cron_create", daily)]);
       return respond(c);
     }, testConfig());
-    const { cron: crons, channel: chat } = f.farm;
+    const { issue: crons, channel: chat } = f.farm;
     const words = said(f.farm);
     // Woken by a cron, not the user: what it sets to come back daily waits.
-    await crons.add({ name: "看进度", text: "看看", when: { kind: "once", at: f.farm.clock.now() + 50 } }, user);
+    await crons.addCron({ name: "看进度", text: "看看", when: { kind: "once", at: f.farm.clock.now() + 50 } }, user);
     // The farm's clock, not a wait, brings it due.
     clock.adjust(100);
-    await crons.tick();
+    await crons.tickCrons();
     await until(() => words().some((w) => w.startsWith("定时任务：定好了，等用户同意才生效")), "the orchestrator told it waits");
-    const mine = (enabled: boolean) => crons.list().filter((s) => s.name === "每日测试" && s.enabled === enabled);
+    const mine = (enabled: boolean) => crons.crons().filter((s) => s.name === "每日测试" && s.enabled === enabled);
     expect(mine(false)).toMatchObject([{ pending: true, by: "agent" }]);
     await chat.say("每天九点跑一遍测试", {}, undefined, "");
     const on = await until(() => mine(true).length === 1 && mine(true), "the user's cron on");
@@ -598,11 +598,11 @@ describe("the orchestrator", () => {
   it("leaves its issue for the user to take as done", async () => {
     using clock = fakeDate();
     await using f = await farm(respond, testConfig());
-    const { cron: crons, issue: issues, core } = f.farm;
-    const s = await crons.add({ name: "看进度", text: "看看", when: { kind: "once", at: f.farm.clock.now() + 50 } }, user);
+    const { issue: issues, core } = f.farm;
+    const s = await issues.addCron({ name: "看进度", text: "看看", when: { kind: "once", at: f.farm.clock.now() + 50 } }, user);
     // The farm's clock, not a wait, brings it due.
     clock.adjust(100);
-    await crons.tick();
+    await issues.tickCrons();
     const handed = await until(() => core.state().issues.find((t) => t.cron === s.id && t.status === "in_review"), "handed back");
     const id = handed.id;
     expect(handed.closedAt).toBeUndefined();

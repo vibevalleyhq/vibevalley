@@ -279,9 +279,9 @@ describe("an issue", () => {
     const issue = fw.issue;
     const issues = testIssues(issue);
     const sessions = fw.inside;
-    const crons = fw.cron;
+    const crons = fw.issue;
     await fw.agent.save({ ...lab(), enabled: true });
-    const made = await crons.add(
+    const made = await crons.addCron(
       {
         name: "巡检",
         text: "看一眼",
@@ -294,7 +294,7 @@ describe("an issue", () => {
     const mailbox = fw.inside;
     const due = async () => {
       clock.adjust(5 * 60_000 + 1);
-      await crons.tick();
+      await crons.tickCrons();
       await mailbox.replay();
     };
     const ofCron = async () => withCron(await issues.list(), made.id);

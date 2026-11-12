@@ -6,7 +6,7 @@ import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import * as q from "#db/session_trigger.sql.ts";
 
-import { type KnownGitHubEvent, type TriggerInput, type TriggerResource, triggerOf } from "./payload.ts";
+import { type TriggerInput, type TriggerResource, triggerOf } from "./payload.ts";
 import * as S from "./schema.ts";
 import type { Trigger } from "./shapes.ts";
 
@@ -19,7 +19,6 @@ const decodePayload = jsonOf(Payload);
 export interface TriggerJournal {
   readonly readTrigger: (id: string) => Promise<TriggerResource | undefined>;
   readonly recordTrigger: (input: TriggerInput) => Promise<Trigger>;
-  readonly knownGitHubEvents: (repo: string, pr: number) => Promise<readonly KnownGitHubEvent[]>;
   readonly replayCronTriggers: (consume: (trigger: Trigger, data: unknown) => Promise<void>) => Promise<void>;
 }
 
@@ -54,15 +53,6 @@ export function triggerJournal(deps: { readonly db: Db; readonly log: Logger }):
   return {
     readTrigger,
     recordTrigger: (input) => keep(triggerOf(input), input.key, { text: input.text, data: input.data ?? null }),
-    knownGitHubEvents: async (repo, pr) => {
-      const rows = await q.knownGitHubEvents(db.sql, { repo, pr_number: pr });
-      return rows.map((row) => ({
-        key: row.source_key,
-        routed: row.routed,
-        ...(row.bot_round_key === null ? {} : { botRoundKey: row.bot_round_key }),
-        ...(row.bot_round === null ? {} : { botRound: row.bot_round }),
-      }));
-    },
     replayCronTriggers: async (consume) => {
       let after = 0;
       while (true) {

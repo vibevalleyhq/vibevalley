@@ -13,7 +13,7 @@ export const modules: readonly Module[] = [
   { name: "Source Control", parts: ["modules/repo"] },
   { name: "Agent Sessions", parts: ["modules/session"] },
   { name: "Collaboration", parts: ["modules/channel", "modules/media", "modules/artifact", "modules/pkm"] },
-  { name: "Issues", parts: ["modules/issue", "modules/cron"] },
+  { name: "Issues", parts: ["modules/issue"] },
   { name: "Inbox", parts: ["modules/inbox"] },
   { name: "Orchestrator", parts: ["modules/orchestrator"] },
   { name: "Gamification", parts: ["modules/game"] },

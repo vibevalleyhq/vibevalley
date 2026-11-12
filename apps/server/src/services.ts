@@ -8,7 +8,6 @@ import { type Agent, makeAgent } from "#/modules/agent/agent.ts";
 import { type Artifact, makeArtifact } from "#/modules/artifact/artifact.ts";
 import { type Attachment, makeAttachment } from "#/modules/attachment/attachment.ts";
 import { type Channel, makeChannel } from "#/modules/channel/channel.ts";
-import { type Cron, makeCron } from "#/modules/cron/cron.ts";
 import { type Game, makeGame } from "#/modules/game/game.ts";
 import { type Inbox, makeInbox } from "#/modules/inbox/inbox.ts";
 import { type Issue, makeIssue } from "#/modules/issue/issue.ts";
@@ -78,7 +77,6 @@ export interface Farm extends AsyncDisposable {
   readonly artifact: Artifact;
   readonly pkm: Pkm;
   readonly issue: Issue;
-  readonly cron: Cron;
   readonly inbox: Inbox;
   readonly tool: Tool;
   readonly orchestrator: Orchestrator;
@@ -150,7 +148,6 @@ export type Modules = Pick<
   | "artifact"
   | "pkm"
   | "issue"
-  | "cron"
 >;
 
 /** Builds the modules to the issues, each from the services before it, keeping each one's close in closes. heard is
@@ -187,7 +184,6 @@ export async function buildModules(config: ServerConfig, options: ServiceOptions
   const pkm = own(await makePkm({ config, clock, log, db }));
   // Issues: the issues and what runs on a schedule.
   const issue = own(await makeIssue({ config, clock, log, db, core, agent, repo, runtime, session, channel }));
-  const cron = own(await makeCron({ config, clock, log, db, core, agent, channel, issue, session }));
   return {
     config,
     clock,
@@ -211,7 +207,6 @@ export async function buildModules(config: ServerConfig, options: ServiceOptions
     artifact,
     pkm,
     issue,
-    cron,
   };
 }
 
@@ -222,15 +217,15 @@ export async function makeFarm(config: ServerConfig, options: ServiceOptions = {
   const own = owning(closes);
   try {
     const modules = await buildModules(config, options, closes);
-    const { clock, log, fetch, db, core, setting, user, agent, memory, runtime, repo, session, channel, media, artifact, pkm, issue, cron } = modules;
+    const { clock, log, fetch, db, core, setting, user, agent, memory, runtime, repo, session, channel, media, artifact, pkm, issue } = modules;
     const { provider } = modules;
     // Inbox: what is news to the user, and the patrol.
     const inbox = own(await makeInbox({ config, clock, log, db, core, channel, issue, session }));
     // Gateway's tools first: the orchestrator holds them (OrchestratorTools), and /mcp serves them to sessions.
-    const tool = own(await makeTool({ clock, log, agent, session, issue, channel, cron, memory, media, pkm, artifact, repo }));
+    const tool = own(await makeTool({ clock, log, agent, session, issue, channel, memory, media, pkm, artifact, repo }));
     // Orchestrator: the agent that hands the user's work to helpers.
     const orchestrator = own(
-      await makeOrchestrator({ clock, log, config, agent, runtime, repo, pkm, session, channel, cron, tools: tool }, options.orchestrator),
+      await makeOrchestrator({ clock, log, config, agent, runtime, repo, pkm, session, channel, issue, tools: tool }, options.orchestrator),
     );
     // Gamification: the ledger, progress and achievements, from events only.
     const game = own(await makeGame({ config, clock, log, db, core, repo }));
@@ -251,7 +246,6 @@ export async function makeFarm(config: ServerConfig, options: ServiceOptions = {
     // What media waited for.
     await media.boot();
     await issue.boot();
-    await cron.boot();
     // What stands is known: the patrol starts its rounds.
     await inbox.boot();
     // Commits start being counted.

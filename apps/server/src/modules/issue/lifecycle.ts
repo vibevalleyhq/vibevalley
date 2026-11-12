@@ -11,7 +11,6 @@ import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
-import { RepoError } from "#/modules/repo/workplace.ts";
 import { NotRecorded, type Session } from "#/modules/session/session.ts";
 import type { Trigger } from "#/modules/session/shapes.ts";
 import * as q from "#db/issue.sql.ts";
@@ -289,17 +288,6 @@ export async function issueLifecycle(deps: IssueParts) {
     await publish(id);
   };
 
-  /** A repo's failure to read the changes is told as a refusal. */
-  const repoRefusal = (e: unknown) => (e instanceof RepoError ? refused(e.message) : e);
-
-  const changesOf = async (item: T.Issue): Promise<T.Changes | undefined> => {
-    try {
-      return await sessions.changesOf(item);
-    } catch (e) {
-      throw repoRefusal(e);
-    }
-  };
-
   const setConflict = async (id: string, conflict: T.Conflict | undefined) => {
     const current = await store.byId(id);
     if (!current) return;
@@ -525,7 +513,6 @@ export async function issueLifecycle(deps: IssueParts) {
     cancelAs,
     closeIfOpen,
     endRun,
-    changesOf,
     setConflict,
     revive,
     unqueue,

@@ -8,9 +8,10 @@ import { ApiError, BizCode, refuseIn } from "#/base/errors.ts";
 import type { Core } from "#/core/core.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import { type CheckoutChecks, MergeFailure } from "#/modules/repo/workplace.ts";
-import { type IssueRecord, NotTakenIn, type Session } from "#/modules/session/session.ts";
+import { NotTakenIn, type Session } from "#/modules/session/session.ts";
 
 import { acceptanceAncestors } from "./dependencies.ts";
+import type { IssueLanding } from "./landing.ts";
 import { statusMove } from "./moves.ts";
 
 const refused = refuseIn(BizCode.IssueRefused);
@@ -19,39 +20,16 @@ interface MergeDeps {
   readonly core: Core;
   readonly sessions: Session;
   readonly chat: Channel;
+  readonly landing: IssueLanding;
   readonly get: (ref: string) => Promise<T.Issue>;
   readonly list: () => Promise<T.Issue[]>;
   readonly setConflict: (id: string, conflict: T.Conflict | undefined) => Promise<void>;
-  readonly savePullRequest: (id: string, pr: T.PullRequest) => Promise<void>;
-  readonly finishPullRequest: (issue: T.Issue, state: T.PullRequestState) => Promise<void>;
 }
 
 export function merging(d: MergeDeps) {
-  const { core, sessions, chat, get, list, setConflict, savePullRequest } = d;
+  const { core, sessions, chat, landing, get, list, setConflict } = d;
   /** Merges by pull request and the poll of their states, one at a time. */
   const prLock = new Semaphore(1);
-
-  const record: IssueRecord = {
-    conflict: setConflict,
-    pullRequestSubmitted: async (issue, pr) => {
-      let thread: string;
-      try {
-        thread = await chat.issueThread(issue.id, issue.title);
-      } catch (e) {
-        throw e instanceof ApiError ? MergeFailure.error(e.message) : e;
-      }
-      await chat.post({
-        _tag: "Notice",
-        channel: thread,
-        text: t("server.issue.prDelivered", { url: pr.url }),
-        code: "issue_pr_delivery",
-        sendKey: `issue-pr:${issue.id}:${pr.url}`,
-      });
-      await savePullRequest(issue.id, pr);
-    },
-    pullRequestState: savePullRequest,
-    pullRequestFinished: d.finishPullRequest,
-  };
 
   const notTaken = async (id: string, n: NotTakenIn) => {
     const issue = sessions.live(id).session?.issue;
@@ -82,7 +60,7 @@ export function merging(d: MergeDeps) {
       // A parent's children merged into its branch: it goes from its own checkout once its helper is gone.
       const fromCheckout = (await list()).some((child) => child.parent === issue.id);
       try {
-        return await sessions.merge(issue, fromCheckout, record);
+        return await landing.merge(issue, fromCheckout);
       } catch (e) {
         const last = latestSessionIdOf(issue);
         if (e instanceof NotTakenIn && last !== undefined) throw await notTaken(last, e);
@@ -93,13 +71,13 @@ export function merging(d: MergeDeps) {
   const refreshPullRequests = (): Promise<void> =>
     prLock.with(async () => {
       const followed = (await list()).map((issue) => ({ issue, finishes: issue.deliver !== "pull_request" && issue.closedAt === undefined }));
-      await sessions.refreshPullRequests(followed, record);
+      await landing.refreshPullRequests(followed);
     });
 
   const submit = (id: string, session: string, summary?: string): Promise<string> =>
     prLock.with(async () => {
       try {
-        return await sessions.submitPullRequest(
+        return await landing.submitPullRequest(
           session,
           async () => {
             const issue = await get(id);
@@ -107,7 +85,6 @@ export function merging(d: MergeDeps) {
             return issue;
           },
           summary,
-          record,
         );
       } catch (error) {
         if (error instanceof MergeFailure) throw refused(error.message);

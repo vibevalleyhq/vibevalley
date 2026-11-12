@@ -718,13 +718,13 @@ describe("issues", () => {
     const core = w.core;
     const chat = w.channel;
     const sessions = w.inside;
-    const crons = w.cron;
+    const crons = w.issue;
     await w.agent.save(lab());
     const channel = await chat.openChannel("scheduled", "", "demo");
     occupied(core, "pi");
-    const sc = await crons.add({ name: "scheduled", text: "work", channel: channel.id, agent: "lab", when: { kind: "every", minutes: 1 } }, user);
+    const sc = await crons.addCron({ name: "scheduled", text: "work", channel: channel.id, agent: "lab", when: { kind: "every", minutes: 1 } }, user);
     adjust(10 * 60_000);
-    await crons.tick();
+    await crons.tickCrons();
     const issue = await waitFor(
       async () => (await issues.list()).find((item) => item.cron === sc.id),
       (item) => item?.queuedAt !== undefined,

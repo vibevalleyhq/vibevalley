@@ -57,26 +57,6 @@ export async function unroutedTriggers(sql: Sql, params: UnroutedTriggersParams)
   return rows.map((row) => rowOf("UnroutedTriggers", UnroutedTriggersResult, row))
 }
 
-export interface KnownGitHubEventsParams {
-  readonly ["repo"]: string
-  readonly ["pr_number"]: number
-}
-
-export const KnownGitHubEventsResult = z.object({
-  ["source_key"]: z.string(),
-  ["bot_round_key"]: z.string().nullable(),
-  ["routed"]: z.boolean(),
-  ["bot_round"]: z.number().int().nullable(),
-})
-export type KnownGitHubEventsResult = z.infer<typeof KnownGitHubEventsResult>
-
-export const KnownGitHubEventsSql = "-- name: KnownGitHubEvents :many\n-- bound: accepted event identities for one pull request.\nselect source_key, (trigger_json::jsonb -> 'meta' ->> 'botRoundKey')::text as bot_round_key,\n       (routed_at is not null)::bool as routed,\n       (trigger_json::jsonb -> 'meta' ->> 'botRound')::int as bot_round\nfrom session_trigger where source = 'github' and trigger_json::jsonb -> 'meta' ->> 'repo' = $1::text\n  and (trigger_json::jsonb -> 'meta' ->> 'pr')::int = $2::int;"
-
-export async function knownGitHubEvents(sql: Sql, params: KnownGitHubEventsParams): Promise<KnownGitHubEventsResult[]> {
-  const rows = await sql.query(KnownGitHubEventsSql, [params["repo"], params["pr_number"]])
-  return rows.map((row) => rowOf("KnownGitHubEvents", KnownGitHubEventsResult, row))
-}
-
 export interface MarkRoutedParams {
   readonly ["scope"]: string
   readonly ["routed_at"]: number

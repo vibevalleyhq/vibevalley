@@ -221,12 +221,21 @@ CREATE TABLE session_trigger (
          (routed_at is not null and routing_scope is not null and routing_position is not null)),
   unique (source, source_key)
 );
-CREATE TABLE session_github_cursor (
+CREATE TABLE issue_github_cursor (
   repo text not null,
   pr_number integer not null,
   check_fingerprint text not null default '',
   check_revision integer not null default 0,
   primary key (repo, pr_number)
+);
+-- A pull request's reviews and comments taken in, with the bot round each counted against.
+CREATE TABLE issue_github_event (
+  repo text not null,
+  pr_number integer not null,
+  key text not null,
+  bot_round_key text,
+  bot_round integer,
+  primary key (repo, pr_number, key)
 );
 
 CREATE TABLE issue (
@@ -380,7 +389,7 @@ CREATE TABLE session_run (
   summary      text,
   spent        text
 );
-CREATE TABLE cron (
+CREATE TABLE issue_cron (
   id          text primary key,
   name        text not null,
   body        text not null,
@@ -392,7 +401,7 @@ CREATE TABLE cron (
   enabled     boolean not null default true,
   created_at  double precision not null,
   last_run    double precision,
-  -- Who set it, and whether it waits for the user to say yes (cron/rules.go's needsOK): a waiting one stays off
+  -- Who set it, and whether it waits for the user to say yes (issue/when.ts's needsOK): a waiting one stays off
   -- until the user turns it on, which clears pending.
   set_by      text not null default 'user' check (set_by in ('user', 'agent', 'system')),
   pending     boolean not null default false
@@ -626,7 +635,7 @@ CREATE INDEX channel_read_cursor_by_channel on channel_read_cursor (channel_id);
 CREATE INDEX session_delivery_by_message on session_delivery (message_id);
 CREATE INDEX session_issue_input_by_session on session_issue_input (session_id) where session_id is not null;
 CREATE INDEX session_delivery_by_channel on session_delivery (channel_id) where channel_id is not null;
-CREATE INDEX cron_by_channel on cron (channel_id);
+CREATE INDEX issue_cron_by_channel on issue_cron (channel_id);
 CREATE INDEX connector_account_by_channel on connector_account (channel_id) where channel_id is not null;
 CREATE INDEX connector_inbound_by_message on connector_inbound (message_id) where message_id is not null;
 CREATE INDEX connector_outbox_by_message on connector_outbox (message_id);

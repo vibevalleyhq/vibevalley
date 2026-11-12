@@ -3,8 +3,8 @@ import { expect, test } from "vite-plus/test";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { moduleWorld } from "#/testing/world.ts";
+import * as cursor from "#db/issue_github_cursor.sql.ts";
 import { allOpenDeliveries } from "#db/session_delivery.sql.ts";
-import * as cursor from "#db/session_github_cursor.sql.ts";
 
 import { type TriggerInput, triggerOf } from "./payload.ts";
 
@@ -62,8 +62,6 @@ test("regression: duplicate source and channel records keep the first trigger an
   const triggerRecorded = await mailbox.recordTrigger({ ...event, text: "changed", data: null, at: 20 });
   expect(triggerRecorded).toEqual(first);
   expect((await mailbox.readTrigger(first.id))?.payload).toEqual({ text: event.text, data: event.data });
-  const knownGitHubEvents2 = await mailbox.knownGitHubEvents("repo", 7);
-  expect(knownGitHubEvents2).toEqual([{ key: event.key, routed: false, botRound: 1, botRoundKey: "round-1" }]);
   const message = {
     ...event,
     id: "message",

@@ -17,14 +17,6 @@ where t.seq > sqlc.arg(after)
   and t.routed_at is null
 order by t.seq limit 1000;
 
--- name: KnownGitHubEvents :many
--- bound: accepted event identities for one pull request.
-select source_key, (trigger_json::jsonb -> 'meta' ->> 'botRoundKey')::text? as bot_round_key,
-       (routed_at is not null)::bool as routed,
-       (trigger_json::jsonb -> 'meta' ->> 'botRound')::int? as bot_round
-from session_trigger where source = 'github' and trigger_json::jsonb -> 'meta' ->> 'repo' = sqlc.arg(repo)::text
-  and (trigger_json::jsonb -> 'meta' ->> 'pr')::int = sqlc.arg(pr_number)::int;
-
 -- name: MarkRouted :one
 update session_trigger set
   routing_position = case when routed_at is null then (select coalesce(max(id), 0) + 1 from session_order) else routing_position end,

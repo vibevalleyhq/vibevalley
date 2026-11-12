@@ -194,15 +194,6 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
     lifecycle,
     mailbox,
     repo: { checkout: noRepos },
-    landing: {
-      merge: noRepos,
-      submitPullRequest: noRepos,
-      refreshPullRequests: noRepos,
-      mergeChild: noRepos,
-      changesOf: noRepos,
-      conflictOf: noRepos,
-    },
-    pollGitHub: noRepos,
     close: () => mailbox.close(),
   });
   const attachment = await makeAttachment({ config: c, clock, db });
@@ -574,8 +565,8 @@ describe("the chat", () => {
       await f.chat.markUnread(a, said.number);
       expect([f.channel(a)?.read, f.channel(a)?.unread]).toEqual([said.number - 1, 2]);
 
-      // A cron of the cron module's, as its table has it.
-      await f.sql(`insert into cron (id, name, body, channel_id, spec, tz, created_at) values ('r1', '看看', '看一眼', $1, '{}', 'UTC', 0)`, [a]);
+      // A cron of the issue module's, as its table has it.
+      await f.sql(`insert into issue_cron (id, name, body, channel_id, spec, tz, created_at) values ('r1', '看看', '看一眼', $1, '{}', 'UTC', 0)`, [a]);
       const channelRemovedFailure = await failure(f.chat.removeChannel(a));
       expect(channelRemovedFailure).toMatchObject({ message: expect.stringContaining("定时任务") });
       const channelRemovedFailure2 = await failure(f.chat.removeChannel(f.chat.defaultChannel()));

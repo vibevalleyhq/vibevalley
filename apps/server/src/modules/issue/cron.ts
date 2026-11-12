@@ -15,10 +15,9 @@ import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
-import type { Issue } from "#/modules/issue/issue.ts";
 import type { Session } from "#/modules/session/session.ts";
 import type { Trigger } from "#/modules/session/shapes.ts";
-import * as q from "#db/cron.sql.ts";
+import * as q from "#db/issue_cron.sql.ts";
 
 import { afterRun, cronProblem, dueCrons, dueText, givenZone, isMissed, needsOK, whenText } from "./when.ts";
 
@@ -30,7 +29,8 @@ export interface Due {
   readonly missed: boolean;
 }
 
-export interface Cron {
+/** The crons: each one, when it comes due, is a trigger for the one issue it keeps. */
+export interface IssueCron {
   readonly list: () => T.Cron[];
   /** by is who asks, and on whose word (needsOK). */
   readonly add: (req: T.CronRequest, by: Actor) => Promise<T.Cron>;
@@ -55,8 +55,9 @@ export interface CronDeps {
   readonly core: Core;
   readonly agent: Agent;
   readonly channel: Channel;
-  readonly issue: Issue;
   readonly session: Session;
+  /** The issue a due cron's trigger goes to: the one it made last, reopened, or a new one. */
+  readonly scheduled: (due: Due, input: Trigger) => Promise<T.Issue>;
 }
 
 /** $TZ when it names a zone, else the system's. */
@@ -67,8 +68,8 @@ const localZone = (): string => {
 
 const whenOf = jsonOrNone(S.CronWhen);
 
-export async function makeCron(deps: CronDeps): Promise<Cron> {
-  const { core, agent: store, channel: chat, issue: issues, session: sessions, db, clock, config } = deps;
+export async function issueCron(deps: CronDeps): Promise<IssueCron> {
+  const { core, agent: store, channel: chat, scheduled, session: sessions, db, clock, config } = deps;
   const log = deps.log.child("cron");
   const tasks = new TaskGroup({ name: "cron", onError: (task, e) => log.error(`${task} failed:`, e) });
   const now = () => clock.now();
@@ -129,7 +130,7 @@ export async function makeCron(deps: CronDeps): Promise<Cron> {
       const s = due.cron;
       const thread = `cron:${s.id}`;
       if (!(await sessions.isRouted(trigger.id))) {
-        const issue = await issues.scheduled(due, trigger);
+        const issue = await scheduled(due, trigger);
         await sessions.subscribe(issue.id, [thread]);
         await sessions.route(trigger);
       } else {

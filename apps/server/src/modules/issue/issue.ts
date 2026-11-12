@@ -1,4 +1,4 @@
-import { map, merge, TaskGroup } from "@vibevalley/async";
+import { map, merge, type Subscription, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { assignedAgentOf, latestSessionIdOf, sessionIdsOf, shortTitle } from "@vibevalley/protocol/rules";
@@ -15,15 +15,16 @@ import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import { templateCatalog } from "#/modules/agent/seed.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
-import type { Due } from "#/modules/cron/cron.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
 import type { Runtime } from "#/modules/runtime/runtime.ts";
 import type { Hired, HireOptions, SessionNews, Session } from "#/modules/session/session.ts";
-import type { Trigger } from "#/modules/session/shapes.ts";
 
 import { findingsOf, milestonesOf } from "./brief.ts";
 import { explicitMandate, filledKinds, inferredMandate, mandateNoteFits, sentTitles } from "./creation.ts";
+import { type Due, issueCron } from "./cron.ts";
 import { type Dispatched, issueDispatch } from "./dispatch.ts";
+import { makeGitHubPoller } from "./github.ts";
+import { issueLanding } from "./landing.ts";
 import { issueLifecycle } from "./lifecycle.ts";
 import { merging } from "./merge.ts";
 import { nextSteps } from "./moves.ts";
@@ -123,7 +124,6 @@ export interface Issue {
   readonly edit: (id: string, upd: T.IssueUpdate, by: Actor) => Promise<T.Issue>;
   readonly remove: (id: string) => Promise<void>;
   readonly start: (id: string, channel: string) => Promise<Dispatched>;
-  readonly scheduled: (due: Due, input: Trigger) => Promise<T.Issue>;
   readonly split: (id: string, title: string, drafts: readonly T.IssueChildDraft[], by: Actor) => Promise<string>;
   readonly setStatus: (id: string, to: T.IssueStatus, text: string, channel: string, by: Actor, opt?: StatusOptions) => Promise<T.Issue>;
   readonly stop: (id: string) => Promise<void>;
@@ -144,8 +144,21 @@ export interface Issue {
   readonly refreshPullRequests: () => Promise<void>;
   readonly refreshQueue: () => Promise<void>;
   readonly submitPullRequest: (session: string, summary?: string) => Promise<string>;
-  /** At startup, after the modules below it started: a first round of the queue, then the queue and the pull requests
-   * on their timers. (start is taken: it starts an issue.) */
+  /** The crons: each keeps one issue its due triggers go to. */
+  readonly crons: () => T.Cron[];
+  /** by is who asks, and on whose word (needsOK). */
+  readonly addCron: (req: T.CronRequest, by: Actor) => Promise<T.Cron>;
+  /** Turned on is the user's yes. */
+  readonly setCronEnabled: (id: string, enabled: boolean) => Promise<T.Cron>;
+  readonly removeCron: (id: string) => Promise<T.Cron>;
+  /** What removeCron would do, refused as it would be; nothing changes. */
+  readonly previewRemoveCron: (id: string) => Promise<T.Preview>;
+  /** The crons due now taken in, and those a restart left unrouted. */
+  readonly tickCrons: () => Promise<void>;
+  /** What comes due from now on, subscribed before it returns. */
+  readonly cronsDue: () => Subscription<Due>;
+  /** At startup, after the modules below it started: a first round of the queue, then the queue, the pull requests and
+   * the crons on their timers. (start is taken: it starts an issue.) */
   readonly boot: () => Promise<void>;
   readonly close: () => Promise<void>;
 }
@@ -198,7 +211,6 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     cancelAs,
     closeIfOpen,
     endRun,
-    changesOf,
     setConflict,
     revive,
     unqueue,
@@ -207,13 +219,21 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     userSaid,
     setQueued,
     drop,
-    savePullRequest,
-    finishPullRequest,
   } = r;
-  const { split, joinChildren } = issueSplitting(r, { agent: store, session: sessions, channel: chat });
+  const landing = issueLanding(r, { core, log, repo: repos, session: sessions, channel: chat });
+  const { changesOf } = landing;
+  const { split, joinChildren } = issueSplitting(r, { agent: store, session: sessions, channel: chat, landing });
   const d = issueDispatch(r, joinChildren, { core, agent: store, repo: repos, runtime: runtimes, session: sessions, channel: chat, log });
   const { hire, start, refreshQueue, reopen, scheduled } = d;
-  const { withEdit, settledMove, stuckWords, movesWords } = issueSettling(r, d, { agent: store, repo: repos, runtime: runtimes, session: sessions, clock });
+  const cron = await issueCron({ config, clock, log, db, core, agent: store, channel: chat, session: sessions, scheduled });
+  const { withEdit, settledMove, stuckWords, movesWords } = issueSettling(r, d, {
+    agent: store,
+    repo: repos,
+    runtime: runtimes,
+    session: sessions,
+    clock,
+    landing,
+  });
 
   const {
     merge: mergeIssue,
@@ -223,14 +243,14 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     core,
     sessions,
     chat,
+    landing,
     get,
     list: everyIssue,
     setConflict,
-    savePullRequest,
-    finishPullRequest,
   });
 
-  const pollGitHub = () => sessions.pollGitHub(core.state().issues);
+  const gitHub = makeGitHubPoller({ db, repo: repos, clock, log, receive: sessions.receive });
+  const pollGitHub = () => gitHub.pollOpen(core.state().issues);
 
   const chooseAgent = async (brief: string, name: string, picked: string): Promise<T.Agent> => {
     const key = name.trim();
@@ -395,7 +415,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
         if (issue) {
           const conflict = (await get(issue)).conflict;
           if (conflict) {
-            const rechecked = await sessions.conflictOf(e.id, conflict.base);
+            const rechecked = await landing.conflictOf(e.id, conflict.base);
             await setConflict(issue, rechecked);
           }
         }
@@ -630,10 +650,10 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
         await pollGitHub();
       }
     });
+    await cron.boot();
   };
 
   return {
-    scheduled,
     submitPullRequest,
     split,
     onBoard: () => core.state().issues,
@@ -707,7 +727,17 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     pollGitHub,
     refreshPullRequests,
     refreshQueue,
+    crons: cron.list,
+    addCron: cron.add,
+    setCronEnabled: cron.setEnabled,
+    removeCron: cron.remove,
+    previewRemoveCron: cron.previewRemove,
+    tickCrons: cron.tick,
+    cronsDue: cron.due,
     boot: startup,
-    close: () => tasks.close(),
+    close: async () => {
+      await cron.close();
+      await tasks.close();
+    },
   };
 }
