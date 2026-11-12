@@ -9,7 +9,7 @@ description: 在 VibeValley 里写、改、评审服务端和各个包的 TypeSc
 
 ## 1. 服务：工厂函数加一个接口
 
-一个模块导出一个服务：接口和模块同名（`Issue`、`Session`），工厂叫 `make<名字>`，依赖是一个对象参数，只放它用到的、排在它前面的服务（[architecture.md](docs/architecture.md)）。
+一个模块对外一个深的服务：接口和模块同名（`Issue`、`Session`），只留调用方用的（同一件事的几种做法是一个成员的标签），里面的部分不露出去，判断写成纯函数；工厂叫 `make<名字>`，依赖是一个对象参数，只放它用到的、排在它前面的服务（[architecture.md](docs/architecture.md)）。
 
 ```ts
 // apps/server/src/modules/issue/issue.ts

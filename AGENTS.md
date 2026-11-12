@@ -5,8 +5,8 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 ## 目录
 
 ```
-apps/server/               服务端（普通 TypeScript，Hono，Node 24；仓库里用 vpx 跑源码，桌面版带 vp pack 打的包）：src/modules 里一块业务一个文件夹，名字用单数，每个导出一个服务
-                           （接口加 make<服务>(deps)）：setting、user、attachment、provider、agent、memory、runtime、repo、machine、session、mailbox、channel、media（含素材库）、artifact、
+apps/server/               服务端（普通 TypeScript，Hono，Node 24；仓库里用 vpx 跑源码，桌面版带 vp pack 打的包）：src/modules 里一块业务一个文件夹，名字用单数，对外一个深的服务
+                           （接口加 make<服务>(deps)）：setting、user、attachment、provider、agent、memory、runtime、repo、session（触发和投递、会话和每一轮、工作目录、执行器）、channel、media（含素材库）、artifact、
                            pkm、issue、cron、inbox、tool、orchestrator、game；src/gateway 是对外的门：http、mcp、lan、voice、connector，projection 是核心状态的折法和拼帧（读各模块的
                            规则，组装时交给 core）；VibeValley 自己的 agent 跑在 pi-durable 上（runtime/durable.ts 开唯一的 Harness，
                            session/host.ts 是助手，runtime/vibevalley.ts 是 oar 的 vibevalley runtime）；base 是不碰外面的地基（id、JSON、排序、脱敏），infra 是和进程、机器打交道的
@@ -120,7 +120,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **页面不折事实**：它读 `GET /api/v1/state` 折好的 `StateFrame`（`useCore()`、`useFrames()`）；要新的数据就加进 protocol 的字段和 `reduce`，页面里只写跟着时钟走的画面和摆法（各 feature 里的纯函数）；服务端的规则（能不能派、下回想起什么、冲突怎么交代）不在页面里重写，加一个字段或接口问服务端（[理由](docs/subsystems/app.md)）。
 - **封闭的联合穷尽处理**：按 `_tag`、`kind`、`type` 分支的地方，`switch` 覆盖每一种，或用 `default` 说明其余的有意不管（lint 的 `switch-exhaustiveness-check` 查）；成员表（`XValues`）要每种都处理时用 `Record<X, …>`，加新成员时编不过。
 - **类型驱动，全栈 Zod Fail-Fast**：运行时校验只用 Zod；前后端共用一份契约（HTTP 出入口与 `VibeValleyApi` 客户端、SSE 流、查询的每一行（`db:generate` 从 SQL 写出 Zod 的行 Schema）、落盘 JSON、配置与工具入参），在边界一次解码为品牌主键、受约束值与判别联合，不符当场 fail-fast（自有表可空 JSON 用 `storedJsonOrUndefined`，不用 `jsonOrNone` 吞损坏）；契约写成 `z.object({ … }) satisfies Codec<T.X>`，门内用铸造函数（`issueId(s)`）造品牌值，不写 `as`；密钥是 `Secret`（`toJSON` 抛错）（[模块设计](docs/style/module-design.md#类型驱动与进门解码)）。
-- **服务端的服务**：每个模块导出一个服务：接口是概念的单数词，和模块的文件夹、表同一个（`Issue`、`Session`），工厂是 `make<服务>(deps: <服务>Deps, options?)`，`deps` 只放它用到的、排在它前面的服务（键是小驼峰，`deps.issue`），不拿整个农场（`paths:check` 记着谁用了谁的哪个成员）；频道的大接口放同模块 `contracts.ts`；`services.ts` 照模块次序一个个 `await make…` 拼成 `Farm`，模块只用排在它前面的，往上走订阅（`Subscription`，新闻、变化）；开机要做的是接口上的 `boot()`，全部建好以后按次序调，拿着的东西在 `close()` 里放掉，倒着调；时钟、日志、`fetch` 也从 `deps` 进来，不用全局的；服务之间传的形状放在定义它的模块里；和服务同名的协议形状经 `import type * as T from "@vibevalley/protocol"` 写成 `T.Issue`（lint 的 `protocol-namespace` 查，[命名](docs/style/naming.md)）（[architecture.md](docs/architecture.md)）。
+- **服务端的服务**：一个模块对外一个深的服务：接口只留调用方用的（同一件事的几种做法是一个成员的标签，`Session.receive`、`Session.workplace`），里面的部分不露出去（测试经 `insideOf` 一类的口子），判断写成纯函数；用户看得见的变化走核心事实，服务端模块之间的反应走 `news`。接口是概念的单数词，和模块的文件夹、表同一个（`Issue`、`Session`），工厂是 `make<服务>(deps: <服务>Deps, options?)`，`deps` 只放它用到的、排在它前面的服务（键是小驼峰，`deps.issue`），不拿整个农场（`paths:check` 记着谁用了谁的哪个成员）；频道的大接口放同模块 `contracts.ts`；`services.ts` 照模块次序一个个 `await make…` 拼成 `Farm`，模块只用排在它前面的，往上走订阅（`Subscription`，新闻、变化）；开机要做的是接口上的 `boot()`，全部建好以后按次序调，拿着的东西在 `close()` 里放掉，倒着调；时钟、日志、`fetch` 也从 `deps` 进来，不用全局的；服务之间传的形状放在定义它的模块里；和服务同名的协议形状经 `import type * as T from "@vibevalley/protocol"` 写成 `T.Issue`（lint 的 `protocol-namespace` 查，[命名](docs/style/naming.md)）（[architecture.md](docs/architecture.md)）。
 - **处理函数要薄**：接口的处理（`http/handlers/<概念>.ts`、`http/`）和页面只做转发和展示，规则在拥有它的服务或纯函数里。
 - **帮工没有权限确认**：服务端只听 127.0.0.1，永远不要对外；帮工只在工作目录里开工（[理由](docs/subsystems/session.md)）。例外只有两个，都是单独的监听：语音线路只有一个接口、每通电话一把钥匙，经隧道给声网（[理由](docs/subsystems/voice.md)）；「连接到本机」默认关着，是从外面进来的唯一一道门：只放在本机点过头配对的设备（`remote` 那部分）和凭密码或确认码登录的设备（除了设密码），每台一把钥匙，不放 `/mcp`（[理由](docs/subsystems/lan.md)、[用户和设备](docs/subsystems/user.md)）。
 - **图标分两套**：工作台的按钮和标记用 reicon 的线条图标，一个意思一个图，写在 `apps/web/src/ui/icons.ts`，`<Icon name>` 只收表里的名字；像素皮（农场、记忆树、`ui/pixel`）用 `design/pixel` 生成的贴图（`SpriteIcon`；形状照 Hugeicons）；头像、农机的 logo 和插画在哪都是像素图；都不用 ▶、■、✓ 这类字符代替（[客户端](docs/subsystems/app.md)）。

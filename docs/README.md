@@ -16,8 +16,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 文档 | 内容 |
 |---|---|
 | [issue.md](docs/subsystems/issue.md) | 工单：一块地：工单的模型、状态和派活、验收、完成与 PR 跟进 |
-| [mailbox.md](docs/subsystems/mailbox.md) | 信箱：来源触发去重、谁该听到、三道刹车、投递状态机、叫醒与工单蓄水池 |
-| [session.md](docs/subsystems/session.md) | 帮工：Session 和 Run、机器执行器、规矩和汇报、事件日志、额度和上限 |
+| [session.md](docs/subsystems/session.md) | 帮工：触发去重、谁该听到、三道刹车、投递和叫醒、工单蓄水池，Session 和 Run、工作目录、机器执行器、规矩和汇报、事件日志、额度和上限、重启后接着答 |
 | [repo.md](docs/subsystems/repo.md) | 仓库：工作目录、worktree、检查、GitHub 检测与 PR 快照、地契 |
 | [artifact.md](docs/subsystems/artifact.md) | Artifact：用户和帮工一起写的块、交上来的网页；按块存按 op 改，网页按版本存、隔离着看，带卡片说出来 |
 | [pkm.md](docs/subsystems/pkm.md) | 笔记：用户的 Logseq 式大纲页面，按 PARA 分文件夹；文件是真相，读进内存再写回，块引用、反链、搜索、闪念、剪藏、改写和撤销 |

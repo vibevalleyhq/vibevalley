@@ -26,7 +26,7 @@
 | 工单模型、状态派生、原生父子依赖（`parent` / `blockedBy`）与合法状态流转 | 会话如何跑一轮、轨迹日志记录（[帮工](docs/subsystems/session.md)） |
 | 起草（`refine`）：派帮工只读看代码生成草稿、写回工单、重置 worktree | worktree 创建、重置与清理实现（[仓库](docs/subsystems/repo.md)） |
 | 派活、排队重试、拆分子工单（`split`）、换人、重开与取消 | 档案选择算法（[档案和农机](docs/subsystems/agent.md#模型和不变量)） |
-| 验收、打回意见、问题清理与验收标准自评（`checks`） | 信箱投递、三道刹车与唤醒调度（[Mailbox](docs/subsystems/mailbox.md)） |
+| 验收、打回意见、问题清理与验收标准自评（`checks`） | 信箱投递、三道刹车与唤醒调度（[帮工的信箱](docs/subsystems/session.md#触发与投递)） |
 | 完成与交付：冲突预检、跑 `.vibevalley/check`、合入父分支或主分支、提 PR 与轮询 | 农场地块渲染（[农场的皮](docs/subsystems/farm.md)） |
 
 ## 在哪
@@ -74,7 +74,7 @@
 
 **派活与排队（`issue.status.update` → `todo`）**
 
-1. 挪到 `todo` 时同事务写入排队 `Trigger` 并交 `Mailbox` 入池；若传入新 `agent` 则先结束旧 `Assignment` 完成换人。
+1. 挪到 `todo` 时同事务写入排队 `Trigger` 并交 `Session` 入池；若传入新 `agent` 则先结束旧 `Assignment` 完成换人。
 2. 若前置依赖已满足且有空位，立即启动 `Session` 并开启工单串。
 3. 若无空位，工单留在 `todo`（`stage: queued`）；`Issue.refreshQueue` 在空位释放或周期到期时按看板顺序自动补派。
 
@@ -99,9 +99,9 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 ## 和谁打交道
 
-- **帮工（`session`）**：经 `Mailbox.receive`（`Hire`）派工，调用 `withWorkplace`、`withIdleWorkplace`、`clearWorkplace`、`discardWork`、`handOver`、`dismiss`；订阅 `Session.news` 更新工单状态、问题与冲突。
-- **仓库（`repo`）**：管理 worktree、冲突预检、`.vibevalley/check`、分支合并、`gh` PR 操作与 `githubSnapshot` 快照拉取。
-- **信箱与频道（`mailbox`、`channel`）**：排队输入及轮询到的 GitHub PR CI/Review 事件经 `Mailbox` 投递；用户发言经 `Channel.userInThread` 清空问题并作废旧验收标记。
+- **帮工（`session`）**：只经七样门（[帮工](docs/subsystems/session.md#对外的门)）：`receive`（记下并路由排队输入和轮询到的 GitHub PR CI/Review 事件，`Hire` 派工）、`withdraw`（撤回派活、叫停、放走帮工）、`workplace`（帮工的或工单自己的检出：看改动、合并、交接、重置、清理）、`live` 与 `read`（在场的帮工、各轮、事件、排队的触发）、`room`（还能不能再开一个）、`news`（更新工单状态、问题与冲突）。
+- **仓库（`repo`）**：管理冲突预检、`.vibevalley/check`、分支合并、`gh` PR 操作与 `githubSnapshot` 快照拉取。
+- **频道（`channel`）**：用户发言经 `Channel.userInThread` 清空问题并作废旧验收标记。
 
 ## 为什么这样
 

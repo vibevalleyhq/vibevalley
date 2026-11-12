@@ -6,7 +6,7 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 助手输入拼装：来源标记、时间、现状增量（`situationDelta`）、记忆增量与汇报摘要 | 谁该被唤醒、刹车与投递队列（[Mailbox](docs/subsystems/mailbox.md)） |
+| 助手输入拼装：来源标记、时间、现状增量（`situationDelta`）、记忆增量与汇报摘要 | 谁该被唤醒、刹车与投递队列（[帮工的信箱](docs/subsystems/session.md#触发与投递)） |
 | 助手与帮工的工具表声明（`apps/server/src/modules/tool/`）及用户授权门禁（`actsForUser`） | 工具背后的业务执行（[工单](docs/subsystems/issue.md)、[频道](docs/subsystems/channel.md)、[定时任务](docs/subsystems/cron.md)） |
 | 按档案管理多个助手实例、将回复写回频道或语音响应端口 | 对话循环、前缀缓存、上下文压缩与断点续跑（[VibeValley 自己的 agent](docs/subsystems/brain.md)、[帮工](docs/subsystems/session.md)） |
 | 错轮评测录制（`orchestrator.eval.create`） | 挑档案算法 `Runtime.choose` 与农机可用性检查（[档案和农机](docs/subsystems/agent.md#模型和不变量)）、语音通话传输（[语音](docs/subsystems/voice.md)） |
@@ -15,7 +15,7 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/modules/orchestrator/orchestrator.ts` | 管理各助手 `AgentHost` 实例、消费 `Mailbox.news` 的 `Handed`、拼装输入并写回回复 |
+| `apps/server/src/modules/orchestrator/orchestrator.ts` | 管理各助手 `AgentHost` 实例、消费 `Session.deliveries` 的 `Handed`、拼装输入并写回回复 |
 | `apps/server/src/modules/orchestrator/situation.ts` | 农场现状增量 `situationDelta` 与长汇报截断 |
 | `apps/server/src/modules/orchestrator/response.ts`、`openai.ts` | 电话与 `POST /v1/chat/completions` 的进程内流式响应端口（`Caller`） |
 | `apps/server/src/modules/orchestrator/prompts.ts` | 助手系统提示词 |
@@ -46,7 +46,7 @@
 
 **处理一条输入**
 
-1. `Mailbox.news` 的 `Handed` 交来待处理的信，并附上期间已完成汇报与巡查摘要（`orchestratorDigest`）。
+1. `Session.deliveries` 的 `Handed` 交来待处理的信，并附上期间已完成汇报与巡查摘要（`Session.read` 的 `Digest`）。
 2. 按 `intake` 表投递：纯用户发言、电话和 `chat/completions` 调 `send` 插话；含帮工发言的群聊、工单、定时和巡查调 `later` 排队。
 3. 模型调工具并生成回复，整条写入目标频道，在轨迹中记录 `llm/usage`（含缓存命中率）。
 
@@ -57,7 +57,7 @@
 
 ## 和谁打交道
 
-- **信箱与频道（`mailbox`、`channel`）**：从 `Mailbox` 收投递与摘要，经 `Channel.post` 的 `Run` 写回回复。
+- **信箱与频道（`session`、`channel`）**：从 `Session` 收投递（`deliveries`）与摘要（`read`），退回用 `handBack`，经 `Channel.post` 的 `Run` 写回回复。
 - **工单与定时任务（`issue`、`cron`）**：通过 `tool` 调用服务方法；指派给助手的工单跑完后进 `in_review` 等用户点头。
 - **帮工与大脑（`session`、`packages/agent`）**：经 `Session.host` 在农场的 `Harness` 上运行助手的对话，经 `MemoryPort` 读写 `memory` 表。
 - **语音（`voice`）**：经 `response.ts` 的 `Caller` 端口向电话流式推送回答文本。

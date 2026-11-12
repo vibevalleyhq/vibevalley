@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-服务端已在 [Mailbox](docs/subsystems/mailbox.md)（`mailbox_trigger`、`mailbox_delivery`、`mailbox_issue`）与连接器（`connector_outbox`）实现「同事务落盘、后台投递」，但工单派活、检查合并与外部通知仍存在两处缺口：
+服务端已在 [帮工的信箱](docs/subsystems/session.md#触发与投递)（`session_trigger`、`session_delivery`、`session_issue_input`）与连接器（`connector_outbox`）实现「同事务落盘、后台投递」，但工单派活、检查合并与外部通知仍存在两处缺口：
 - **状态提交与外部动作未同事务持久化**：派活（改 `issue` 表 → 启动 oar `Session`）、完成交付（跑 `.vibevalley/check` → `git merge` / `gh pr create`）和声网通话在请求内串行执行外部 I/O；若写库与外部调用之间进程退出，重启后靠各模块在 `services.ts` 里排定的开机步骤按固定顺序修补。
 - **多套后台循环各自轮询**：`Mailbox`、`Connector`、`Issue.refreshQueue` 和 `Cron.tick` 各自维护一套轮询与退避重试。
 

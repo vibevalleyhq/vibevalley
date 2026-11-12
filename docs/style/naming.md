@@ -61,8 +61,8 @@
 | 只说会怎样、不改东西 | `previewX` | `previewDelete`、`previewForget` |
 | 改东西 | 动词 | `issues.edit`、`channels.react`、`lan.forget` |
 | 新建、删掉 | `create`、`delete`（和接口的动词同一个词；不用 `open`、`remove`） | `channels.create`、`agents.delete`、`previewDelete` |
-| 服务开机时做的事 | `boot`（`services.ts` 在全部服务建好以后按次序调）；`start` 只指开始干一件事 | `mailbox.boot()`；`issue.start(id)`、`executor.start(…)` |
-| 一个服务往外说发生了什么 | 一个订阅，叫 `news`，类型 `<概念>News`，成员按 `_tag` 用领域里的过去时（`Hired`、`Left`、`Consumed`） | `session.news()`、`mailbox.news()`（`DeliveryNews`） |
+| 服务开机时做的事 | `boot`（`services.ts` 在全部服务建好以后按次序调）；`start` 只指开始干一件事 | `session.boot()`；`issue.start(id)`、`executor.start(…)` |
+| 一个服务往外说发生了什么 | 一个订阅，叫 `news`，类型 `<概念>News`，成员按 `_tag` 用领域里的过去时（`Hired`、`Left`、`Consumed`） | `session.news()`（`SessionNews`） |
 
 两条容易犯的：
 

@@ -9,7 +9,7 @@ Status: proposed
 - **长标题在冒号处被静默截断**：`apps/server/src/modules/issue/brief.ts` 的 `shortTitle` 与 `apps/server/src/modules/issue/lifecycle.ts` 会将带冒号的长标题截成 `test(issue)` 等前缀存入正式标题，原句退入正文。
 - **只读与起草靠提示词豁免而非权限收窄**：`apps/server/src/modules/issue/prompts.ts` 追加「不用提交」与通用执行规则相互抵消，且不等同于工具或文件写权限隔离。
 
-参考对照基线为 [dsh-superagent-prototype (`8c32a9dc`)](https://github.com/deepseek-ai/dsh-superagent-prototype/tree/8c32a9dc5d72c033816c6a8110b37f40cf94fba4)。[助手](docs/subsystems/orchestrator.md)、[工单](docs/subsystems/issue.md)与[Mailbox](docs/subsystems/mailbox.md)已有 `Trigger`、`IssueMandate`、`Assignment` 与结构化 `issue_report`，应在现有模块上对齐职责，不另建平行概念。
+参考对照基线为 [dsh-superagent-prototype (`8c32a9dc`)](https://github.com/deepseek-ai/dsh-superagent-prototype/tree/8c32a9dc5d72c033816c6a8110b37f40cf94fba4)。[助手](docs/subsystems/orchestrator.md)、[工单](docs/subsystems/issue.md)与[帮工的信箱](docs/subsystems/session.md#触发与投递)已有 `Trigger`、`IssueMandate`、`Assignment` 与结构化 `issue_report`，应在现有模块上对齐职责，不另建平行概念。
 
 ## Proposal
 
