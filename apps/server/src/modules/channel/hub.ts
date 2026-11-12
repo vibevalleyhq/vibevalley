@@ -15,7 +15,7 @@ import * as qm from "#db/channel_message.sql.ts";
 
 import {
   type MsgRow,
-  actorOfParticipant,
+  actorOf,
   channelType,
   subjectKind,
   toMessage,
@@ -53,10 +53,10 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
   const said = new Hub<T.ChatMessage>();
   const userReadHub = new Hub<UserRead>();
 
-  /** An assistant: a profile seated to speak as itself (the layers above seat them), there and not gone. */
+  /** An assistant: an agent seated to speak as itself, for no other profile (the layers above seat them), not gone. */
   const isAssistant = (id: string) => {
     const p = store.participant(id);
-    return p?.role === "orchestrator" && p.left_at === null;
+    return p?.kind === "agent" && p.agent_id === null && p.left_at === null;
   };
   const assistantIds = () =>
     store
@@ -235,7 +235,7 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
       created_at: row.created_at,
       name: row.sender_name,
       sender_kind: row.sender_kind,
-      sender_role: row.sender_role,
+      sender_role: row.sender_kind === "agent" ? (row.sender_agent !== null ? "worker" : "orchestrator") : null,
       channel_type: channel.type,
       root_id: channel.root_id,
       root_number: channel.root_number,
@@ -257,7 +257,6 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
     created_at: row.created_at,
     sender_name: row.name,
     sender_kind: row.sender_kind,
-    sender_role: row.sender_role,
     sender_agent: store.participant(row.sender_id)?.agent_id ?? null,
     revision: 0,
     reply_number: row.reply_number,
@@ -276,7 +275,7 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
     number: r.number,
     target: deliveryTarget(r),
     from: r.sender_id,
-    actor: actorOfParticipant(r.sender_kind, r.sender_role, r.sender_id, r.name),
+    actor: actorOf(r.sender_kind, store.participant(r.sender_id)?.agent_id ?? null, r.sender_id, r.name),
     name: r.name,
     text: r.body,
     ...envelopeMore(r, filesAt),
@@ -299,7 +298,7 @@ export async function makeChannelHub(deps: ChannelHubDeps) {
     number: row.number,
     target,
     from: row.sender_id,
-    actor: actorOfParticipant(row.sender_kind, row.sender_role, row.sender_id, row.sender_name),
+    actor: actorOf(row.sender_kind, row.sender_agent, row.sender_id, row.sender_name),
     name: row.sender_name,
     text: row.body,
     ...envelopeMore(row, filesAt),

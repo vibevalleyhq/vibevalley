@@ -38,9 +38,6 @@ export type Words_channel_notify = z.infer<typeof Words_channel_notify>
 export const Words_channel_participant_kind = z.enum(["user","agent","system"])
 export type Words_channel_participant_kind = z.infer<typeof Words_channel_participant_kind>
 
-export const Words_channel_participant_role = z.enum(["orchestrator","worker"])
-export type Words_channel_participant_role = z.infer<typeof Words_channel_participant_role>
-
 export const Words_channel_subject_kind = z.enum(["issue","talk"])
 export type Words_channel_subject_kind = z.infer<typeof Words_channel_subject_kind>
 

@@ -7,17 +7,24 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { Inconsistent } from "#/base/errors.ts";
 import { jsonText, storedJsonOrUndefined } from "#/base/json.ts";
-import { actorOfParticipant, type ChannelEnvelopeRow, type Envelope, type Meta, metaOf, type Picked } from "#/modules/session/envelope.ts";
+import { type ChannelEnvelopeRow, type Envelope, type Meta, metaOf, type Picked } from "#/modules/session/envelope.ts";
 import type * as qm from "#db/channel_message.sql.ts";
 
 import { type ChannelRow } from "./rooms.ts";
 
 export type { ChannelAudience, ChannelEnvelopeRow, ChannelHearers, Meta } from "#/modules/session/envelope.ts";
 export type { Envelope, Picked } from "#/modules/session/envelope.ts";
-export { actorOfParticipant, channelType, envelopeMore, metaOf, metaText } from "#/modules/session/envelope.ts";
+export { channelType, envelopeMore, metaOf, metaText } from "#/modules/session/envelope.ts";
 export type { Delivered } from "#/modules/session/signals.ts";
 
 export type MsgRow = qm.MessageByIDResult;
+
+/** Who said a message, as the page shows it: an agent's seat that speaks for a profile is a helper's, one that does not
+ * is an assistant's (a profile speaking as itself). */
+export const actorOf = (kind: T.ActorKind, agent: string | null, id: string, name?: string): T.Actor =>
+  kind === "agent"
+    ? { kind: "agent", id, role: agent !== null ? "worker" : "orchestrator", ...(name !== undefined ? { name } : {}) }
+    : { kind, id, ...(name !== undefined ? { name } : {}) };
 
 const ReactionsSchema = z.record(z.string(), z.array(z.string()));
 type Reactions = Record<string, string[]>;
@@ -46,7 +53,7 @@ export function toMessage(row: MsgRow): T.ChatMessage {
     number: row.number,
     channel: row.channel_id,
     from: row.sender_id,
-    actor: actorOfParticipant(row.sender_kind, row.sender_role, row.sender_id, row.sender_name),
+    actor: actorOf(row.sender_kind, row.sender_agent, row.sender_id, row.sender_name),
     name: row.sender_name,
     ...(row.sender_agent ? { agent: row.sender_agent } : {}),
     kind: messageKind(row.kind),
@@ -166,7 +173,6 @@ export interface Write {
   readonly kind: T.MessageKind;
   readonly text: string;
   readonly meta?: Meta;
-  readonly answers?: T.SessionId;
   readonly thread?: ThreadSubject;
   /** Added as a channel member in the same transaction. */
   readonly member?: string;
@@ -208,20 +214,22 @@ export interface PostDoor {
   (p: PostOf<"Run"> | PostOf<"Notice">): Promise<void>;
 }
 
-export interface Joining {
+/** An agent seated to speak in the chat: an assistant (a profile speaking as itself, no `agent`), or a helper speaking
+ * for the profile `agent` (a session, a profile's seat in its direct channel). */
+export interface Seat {
   readonly id: string;
-  readonly role: "orchestrator" | "worker";
   readonly name: string;
-  readonly agent: string | null;
-  readonly runtime: string | null;
+  readonly agent?: string;
+  /** The place an empty target means for it; none keeps the one it had. */
   readonly home?: string;
 }
 
 export interface Participant {
   readonly id: string;
-  readonly role: string | null;
+  readonly kind: T.ActorKind;
+  readonly name: string;
+  /** The profile it speaks for; none for the user, the farm and the assistants. */
   readonly agent: string | null;
-  readonly runtime: string | null;
   readonly home: string | null;
   readonly left: boolean;
 }
@@ -249,6 +257,7 @@ export interface Note {
 export interface Written {
   absent: string[];
   heldNotice: string;
+  answers?: T.SessionId;
   thread: string;
   again: boolean;
   row: MsgRow;
@@ -284,6 +293,8 @@ export interface Committed {
 export interface Followup {
   /** The hop limit's notice: said once by the farm (code hop_limit), until the user next speaks there. */
   readonly hopLimit?: string;
+  /** The session whose call the message answers (it named the speaker since the speaker last spoke), told with it. */
+  readonly answers?: T.SessionId;
 }
 
 /** Told each committed event in order, under the chat's lock, before the write that made it returns: it must not
@@ -332,6 +343,8 @@ export interface ChannelService {
   readonly messageLocation: (id: T.MessageId) => Promise<{ readonly channel: T.Channel; readonly top: string } | undefined>;
   readonly envelopeResource: (id: T.MessageId) => Promise<EnvelopeResource | undefined>;
   readonly markRead: (channel: string, seq: number) => Promise<void>;
+  /** Who named `speaker` in a place since it last spoke there, before message `before`: newest first. */
+  readonly callersOf: (speaker: string, channel: string, before: string) => Promise<readonly string[]>;
   /** The place an empty target means for a participant: the home the layers above gave it. */
   readonly homeOf: (participant: string) => Promise<string | undefined>;
   /** Each committed event from now on, told to `observer` (see ChannelObserver); one observer per chat. */
@@ -340,10 +353,8 @@ export interface ChannelService {
   readonly events: (after: number, n?: number) => Promise<ChannelEvent[]>;
   /** Tells the observer each event after `after` again, in order (Committed.replayed); one that fails is logged and passed. */
   readonly replay: (after: number, handled: (event: ChannelEvent) => Promise<void>) => Promise<void>;
-  /** Seats a participant who speaks for the layers above (a session, a profile), with its home; joined again if it left. */
-  readonly join: (p: Joining) => Promise<void>;
-  /** Seats an assistant (a profile that speaks as itself) under the name it goes by now. */
-  readonly seat: (assistant: { readonly id: string; readonly name: string }) => Promise<void>;
+  /** Seats an agent who speaks for the layers above under the name it goes by now; seated again if it left. */
+  readonly seat: (seat: Seat) => Promise<void>;
   /** A participant gone: in nothing, never back. */
   readonly leave: (participant: string) => Promise<void>;
   readonly participants: () => readonly Participant[];

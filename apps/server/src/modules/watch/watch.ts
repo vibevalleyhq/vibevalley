@@ -5,7 +5,7 @@ import { TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { userId } from "@vibevalley/protocol";
-import { messageId } from "@vibevalley/protocol/schema";
+import { messageId, sessionId } from "@vibevalley/protocol/schema";
 
 import { head } from "#/base/clip.ts";
 import { ApiError, lookIn, missing } from "#/base/errors.ts";
@@ -16,7 +16,6 @@ import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import {
-  actorOfParticipant,
   type ChannelEvent,
   type ChannelHearers,
   type Committed,
@@ -27,6 +26,7 @@ import {
   type MsgRow,
   type ThreadSubject,
 } from "#/modules/channel/contracts.ts";
+import { actorOfParticipant } from "#/modules/session/envelope.ts";
 import { inputContext } from "#/modules/session/payload.ts";
 import { envelopeLines, talkBrief } from "#/modules/session/prompts.ts";
 import { HireRefused, NotRecorded, type Session } from "#/modules/session/session.ts";
@@ -153,7 +153,7 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
   // A failed write is NotRecorded: the hire stops and says so.
   const joining = async (session: T.Session, home: string) => {
     try {
-      await chat.join({ id: session.id, role: "worker", name: session.name, agent: session.agent, runtime: session.runtime, home });
+      await chat.seat({ id: session.id, name: session.name, agent: session.agent, home });
     } catch (e) {
       if (e instanceof SqlError) throw new NotRecorded(causeMessage(e), { cause: e });
       throw e;
@@ -206,7 +206,7 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
   const onDirect = (c: Committed) => {
     if (c.row.sender_id !== userId || c.row.kind !== "chat" || c.channel.type !== "direct" || !c.channel.peer) return;
     const peer = chat.participants().find((p) => p.id === c.channel.peer);
-    if (peer?.role !== "worker" || peer.runtime !== null || !peer.agent) return;
+    if (!peer?.agent || peer.id !== profileId(peer.agent)) return;
     if (talkSession(c.row.channel_id)) return;
     const channel = c.row.channel_id;
     const agentId = peer.agent;
@@ -215,9 +215,19 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
     tasks.keyed(talkKey(channel), () => bestEffort(log, "opening a direct context", () => startTalk(channel, agentId)));
   };
 
+  /** A session's words answer the session that last named it there since it last spoke. */
+  const answered = async (c: Committed): Promise<T.SessionId | undefined> => {
+    if (c.replayed || c.row.kind !== "chat" || c.row.sender_kind !== "agent" || agents.isOrchestrator(c.row.sender_id)) return undefined;
+    const callers = await chat.callersOf(c.row.sender_id, c.row.channel_id, c.row.envelope_id);
+    const caller = callers.find((id) => chat.participants().some((p) => p.id === id && p.agent !== null && p.id !== profileId(p.agent)));
+    return caller === undefined ? undefined : sessionId(caller);
+  };
+
   const posted = async (c: Committed) => {
     try {
-      const follow = await route(c);
+      const routedTo = await route(c);
+      const answers = await answered(c);
+      const follow = answers ? { ...routedTo, answers } : routedTo;
       if (!c.replayed && !stuck) await moveCursor(c.event.seq);
       onDirect(c);
       return follow;
@@ -243,7 +253,7 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
   chat.guardRemoval(async (id) => (hired().some((h) => channelOfSession(h) === id) ? [t("server.channel.helpersThere")] : []));
 
   const openThread = async (h: T.Session) => {
-    await chat.join({ id: h.id, role: "worker", name: h.name, agent: h.agent, runtime: h.runtime });
+    await chat.seat({ id: h.id, name: h.name, agent: h.agent });
     const direct = directOfSession(h);
     if (direct) return handedOn(h, direct);
     const subject = subjectOf(h);
@@ -261,12 +271,12 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
       meta: { session: h.id },
       topic: subject,
     });
-    if (opened.thread) await chat.join({ id: h.id, role: "worker", name: h.name, agent: h.agent, runtime: h.runtime, home: opened.thread });
+    if (opened.thread) await chat.seat({ id: h.id, name: h.name, agent: h.agent, home: opened.thread });
   };
 
   /** The issue already has its thread (reopened, or sent to another session). */
   const handedOn = async (h: T.Session, thread: string) => {
-    await chat.join({ id: h.id, role: "worker", name: h.name, agent: h.agent, runtime: h.runtime, home: thread });
+    await chat.seat({ id: h.id, name: h.name, agent: h.agent, home: thread });
     if (chat.membersOf(thread).includes(h.id)) return;
     // A profile's talk: the session that answers there is not told of in it; it only follows.
     if (chat.place(thread)?.type === "direct") return chat.addFollower(thread, h.id);
@@ -283,7 +293,8 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
   const sessionsLeft = async () => {
     const on = new Set<string>(hired().map((h) => h.id));
     for (const p of chat.participants()) {
-      if (p.role !== "worker" || p.runtime === null || p.left || on.has(p.id)) continue;
+      // A session's seat: a helper's that is not a profile's seat in its direct channel.
+      if (!p.agent || p.id === profileId(p.agent) || p.left || on.has(p.id)) continue;
       await chat.leave(p.id);
       await sessions.withdrawDeliveries(p.id, "left");
     }
@@ -364,7 +375,7 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
         await seatAssistant(agent);
         return chat.createDirect(agent.id);
       }
-      await chat.join({ id: profileId(agent.id), role: "worker", name: agent.name, agent: agent.id, runtime: null });
+      await chat.seat({ id: profileId(agent.id), name: agent.name, agent: agent.id });
       return chat.createDirect(profileId(agent.id));
     },
     tell: async (from, session, text, sendKey) => {

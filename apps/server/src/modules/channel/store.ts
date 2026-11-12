@@ -12,7 +12,7 @@ import * as qm from "#db/channel_message.sql.ts";
 import * as qp from "#db/channel_participant.sql.ts";
 import * as qr from "#db/channel_read_cursor.sql.ts";
 
-import type { ThreadSubject } from "./contracts.ts";
+import type { Seat, ThreadSubject } from "./contracts.ts";
 import { ChatModel, type ChannelRow } from "./rooms.ts";
 
 /** The channel a new farm opens with. */
@@ -61,29 +61,22 @@ export async function makeChannelStore(deps: ChannelStoreDeps) {
     await db.afterCommit(() => model.joined(joined));
   };
 
-  /** An assistant's seat under the name it goes by now; a seat already so is left as it is. */
-  const seatAssistant = async (id: string, name: string) => {
-    if (model.participant(id)?.name === name && model.participant(id)?.role === "orchestrator" && model.participant(id)?.left_at === null) return;
-    await upsertParticipant({ id, kind: "agent", role: "orchestrator", name, agent_id: null, runtime: null, home_id: null, joined_at: clock.now() });
+  /** An agent's seat as it goes now; one already so (and there) is left as it is. */
+  const seat = async (p: Seat) => {
+    const held = model.participant(p.id);
+    const agent = p.agent ?? null;
+    if (held?.kind === "agent" && held.name === p.name && held.agent_id === agent && held.left_at === null && (p.home ?? held.home_id) === held.home_id) return;
+    await upsertParticipant({ id: p.id, kind: "agent", name: p.name, agent_id: agent, home_id: p.home ?? null, joined_at: clock.now() });
   };
 
   for (const [id, kind, name] of [
     [userId, "user", t("server.channel.name.user")],
     ["system", "system", "VibeValley"],
   ] as const)
-    await qp.upsertParticipant(db.sql, { id, kind, role: null, name, agent_id: null, runtime: null, home_id: null, joined_at: clock.now() });
+    await qp.upsertParticipant(db.sql, { id, kind, name, agent_id: null, home_id: null, joined_at: clock.now() });
   // The default channel's member from its first day: seated under the assistant's word until the layers above seat it
   // under its profile's name.
-  await qp.addParticipant(db.sql, {
-    id: defaultOrchestrator,
-    kind: "agent",
-    role: "orchestrator",
-    name: t("server.channel.name.orchestrator"),
-    agent_id: null,
-    runtime: null,
-    home_id: null,
-    joined_at: clock.now(),
-  });
+  await qp.addParticipant(db.sql, { id: defaultOrchestrator, kind: "agent", name: t("server.channel.name.orchestrator"), joined_at: clock.now() });
   if ((await qc.defaultID(db.sql)) === undefined) {
     const id = newId();
     await qc.createChannel(db.sql, { id, is_default: true, name: firstChannelName, description: null, repo: null, created_at: clock.now() });
@@ -145,8 +138,7 @@ export async function makeChannelStore(deps: ChannelStoreDeps) {
       for (const participant of model.lastRead.keys()) if (!keepParticipant(participant)) model.lastRead.delete(participant);
       model.lastRead.set(who, target);
     },
-    seatAssistant,
-    upsertParticipant,
+    seat,
     markParticipantLeft: (id: string, at: number) =>
       db.tx(async () => {
         await qp.participantLeft(db.sql, { left_at: at, id });

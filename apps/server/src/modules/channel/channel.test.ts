@@ -774,6 +774,20 @@ describe("the chat", () => {
       expect(under?.subjectKind).toBe("talk");
     }));
 
+  test("a session's words after another session named it answer that one; the assistant's answer no one", () =>
+    run(async (f, x) => {
+      const thread = await hireAndRun(f, x, "w17", "写 hello", "chat-q");
+      await hireAndRun(f, x, "w18", "写 world", "chat-r");
+      const facts = f.core.subscribe();
+      await f.chat.post({ _tag: "Agent", from: "w17", text: "@w18 帮我看一下", target: `#general:${thread.rootNumber}`, anyway: true });
+      const reply = await f.chat.post({ _tag: "Agent", from: "w18", text: "看过了", target: `#general:${thread.rootNumber}`, anyway: true });
+      const mine = await f.chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "@w18 好", target: `#general:${thread.rootNumber}`, anyway: true });
+      const told = facts.drain().flatMap((e) => (e.type === "messageChanged" ? [[e.message.id, e.answers ?? ""]] : []));
+      facts.close();
+      expect(told).toContainEqual([reply.message!.id, "w17"]);
+      expect(told).toContainEqual([mine.message!.id, ""]);
+    }));
+
   test("the orchestrator's words are written once, whole, and delivered", () =>
     run(async (f, x) => {
       await hireAndRun(f, x, "w11", "写 hello", "chat-k");
@@ -1210,7 +1224,7 @@ test("regression: mailbox routing reads the current channel manager through thre
   await using db = await openDb(testConfig(), keptLog(), wallTime);
   const sql = (text: string) => db.sql.exec(text);
   await sql(
-    "insert into channel_participant (id, kind, role, name, joined_at) values ('manager', 'agent', 'orchestrator', 'manager', 0), ('first', 'agent', 'orchestrator', 'first', 0), ('second', 'agent', 'orchestrator', 'second', 0)",
+    "insert into channel_participant (id, kind, name, joined_at) values ('manager', 'agent', 'manager', 0), ('first', 'agent', 'first', 0), ('second', 'agent', 'second', 0)",
   );
   await sql("insert into channel (id, type, name, created_at) values ('room', 'channel', 'room', 0)");
   await addMember(db.sql, { channel_id: "room", participant_id: "first", reason: "manual", from_number: 0 });

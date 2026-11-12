@@ -15,20 +15,18 @@ CREATE FUNCTION term_query(words text[], prefix boolean) RETURNS tsquery LANGUAG
 
 CREATE TABLE channel_participant (
   id         text primary key,
-  -- Direct-talk helper seats use id = profile:<agent> with runtime = null; hired sessions set runtime.
   kind       text not null check (kind in ('user', 'agent', 'system')),
-  role       text check (role in ('orchestrator', 'worker')),
   name       text not null,
+  -- The profile an agent's seat speaks for (a helper's: a session, or a profile's seat in its direct channel); none for
+  -- an assistant, a profile speaking as itself.
   agent_id   text,
-  runtime    text,
   -- Where an empty target means for it: the place the layers above gave it (its thread, its direct channel); none is the default channel.
   home_id    text,
   joined_at  double precision not null,
   left_at    double precision,
   -- The order they joined in, for those who joined at the same millisecond (numbered by channel_participant_seq).
   seq        integer not null default 0,
-  check ((kind = 'agent') = (role is not null)),
-  check ((role = 'worker') = (agent_id is not null))
+  check (kind = 'agent' or agent_id is null)
 );
 CREATE TABLE channel (
   id            text primary key,

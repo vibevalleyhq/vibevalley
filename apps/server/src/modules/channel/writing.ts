@@ -41,9 +41,9 @@ export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: T
   const { db, clock, log } = deps;
   const { store, assistantIds, orchestratorInRow, membersOfRow, publishChannel, publishUserMentions, publishMessage, readUpTo, change, channelEnvelope } = r;
   const observers: ChannelObserver[] = [];
-  /** A session's seat in the chat: an agent's participant hired to work, there until it leaves. */
-  const isSession = (p: { readonly role: string | null; readonly runtime: string | null; readonly left_at: number | null }) =>
-    p.role === "worker" && p.runtime !== null && p.left_at === null;
+  /** A helper's seat in the chat: an agent's participant speaking for a profile, there until it leaves. */
+  const isHelper = (p: { readonly kind: string; readonly agent_id: string | null; readonly left_at: number | null }) =>
+    p.kind === "agent" && p.agent_id !== null && p.left_at === null;
   /** The chat's part of a committed message (who it names, who follows the thread), then each observer's. */
   const settle = async (inserted: MsgRow, event: ChannelEvent, replayed: boolean): Promise<Written> => {
     let row = inserted;
@@ -54,11 +54,11 @@ export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: T
     const here = orchestratorInRow(ch);
     // No one else is in a direct channel to be named.
     const mentions = ch.type === "direct" ? [] : mentionsIn(row.body, { here, orchestrators });
-    // Who is here to be named: the orchestrators, the user, everyone, and the sessions seated and not gone.
+    // Who is here to be named: the assistants, the user, everyone, and the helpers seated and not gone.
     const present = new Set(
       store
         .participants()
-        .filter(isSession)
+        .filter(isHelper)
         .map((p) => p.id),
     );
     const known = new Set(store.participants().map((p) => p.id));
@@ -96,6 +96,7 @@ export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: T
     const written: Written = { absent: [], heldNotice: "", thread: "", again: false, row };
     for (const o of observers) {
       const follow = await o.posted(committed);
+      if (follow?.answers) written.answers = follow.answers;
       if (follow?.hopLimit && theRow(await qm.holdNoticeSinceUser(db.sql, { channel: ch.id }), "HoldNoticeSinceUser").n === 0)
         written.heldNotice = follow.hopLimit;
     }
@@ -146,7 +147,6 @@ export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: T
         created_at,
         sender_name: sender.name,
         sender_kind: sender.kind,
-        sender_role: sender.role,
         sender_agent: sender.agent_id,
         revision,
         reply_number: w.replyTo ?? null,
@@ -165,7 +165,7 @@ export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: T
     if (written.again || !written.event) return written;
     const routed = await settle(written.row, written.event, false);
     const complete = { ...routed, thread: written.thread };
-    await after(w.channel, complete, w.answers);
+    await after(w.channel, complete);
     return complete;
   };
 
@@ -198,8 +198,8 @@ export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: T
     );
   };
 
-  const after = async (channel: string, written: Written, answers: T.SessionId | undefined): Promise<void> => {
-    publishMessage(written.row, answers);
+  const after = async (channel: string, written: Written): Promise<void> => {
+    publishMessage(written.row, written.answers);
     embedLater(written.row);
     await publishChannel(channel);
     const meta = metaOf(written.row.meta);

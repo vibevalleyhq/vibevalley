@@ -3,7 +3,6 @@ import { type Subscription, TaskGroup } from "@vibevalley/async";
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { userId } from "@vibevalley/protocol";
-import { sessionId } from "@vibevalley/protocol/schema";
 
 import { ApiError, BizCode, lookIn, missing, refuseIn } from "#/base/errors.ts";
 import type { Core } from "#/core/core.ts";
@@ -41,13 +40,13 @@ import { channelWriting } from "./writing.ts";
 const refused = refuseIn(BizCode.ChannelRefused);
 
 const searchMax = 50;
+/** How many of those who named a speaker since it last spoke a caller is looked for among. */
+const callersMax = 20;
 const readLimit = 30;
 /** A follower further behind than this reads the room's newest page instead of every message since. */
 export { catchUpMax } from "./mutations.ts";
 /** The client's key for one send, so a retry of it is the same message. */
 const sendKeyMax = 64;
-/** Sorts after every uuidv7, for "since the last thing said". */
-const afterAll = "\uffff";
 
 export type { Spoken, Delivered } from "./contracts.ts";
 
@@ -258,15 +257,12 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         return { kind: "held", target, shown, more: unseen.length - shown.length };
       }
       // calledBy finds only participants of kind agent, and those are sessions (their ids are session ids).
-      const caller = !isAssistant(from) ? (await qm.calledBy(db.sql, { speaker: from, channel, before: afterAll }))?.sender_id : undefined;
-      const answers = caller === undefined ? undefined : sessionId(caller);
       await answered(channel, opt.reply);
       const written = await write({
         channel,
         from,
         kind: "chat",
         text: words,
-        ...(answers ? { answers } : {}),
         ...(opt.reply !== undefined ? { replyTo: opt.reply } : {}),
         meta: run ? { run } : {},
       });
@@ -561,6 +557,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         await publishChannel(channel);
       }),
     homeOf: async (participant) => homeOf(participant),
+    callersOf: async (speaker, channel, before) => (await qm.callersOf(db.sql, { speaker, channel, before, n: callersMax })).map((r) => r.sender_id),
     observe: w.observe,
     events: async (after, n = 1000) =>
       (await qe.eventsAfter(db.sql, { after, n })).map((e) => ({
@@ -595,25 +592,10 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         from = last.seq;
       }
     },
-    join: (p) =>
-      store.locked(() =>
-        store.tx(() =>
-          store.upsertParticipant({
-            id: p.id,
-            kind: "agent",
-            role: p.role,
-            name: p.name,
-            agent_id: p.agent,
-            runtime: p.runtime,
-            home_id: p.home ?? null,
-            joined_at: clock.now(),
-          }),
-        ),
-      ),
-    seat: ({ id, name }) => store.locked(() => store.tx(() => store.seatAssistant(id, name))),
+    seat: (p) => store.locked(() => store.tx(() => store.seat(p))),
     leave: (participant) => store.locked(() => store.markParticipantLeft(participant, clock.now())),
     participants: () =>
-      store.participants().map((p) => ({ id: p.id, role: p.role, agent: p.agent_id, runtime: p.runtime, home: p.home_id, left: p.left_at !== null })),
+      store.participants().map((p) => ({ id: p.id, kind: p.kind, name: p.name, agent: p.agent_id, home: p.home_id, left: p.left_at !== null })),
     addFollower: (channel, participant) =>
       store.locked(async () => {
         const row = store.channel(channel);
