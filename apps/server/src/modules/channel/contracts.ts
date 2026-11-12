@@ -1,11 +1,12 @@
-import { type Effect, Formatter, Schema, type Scope, type Stream } from "effect";
+import { z } from "zod";
 
+import type { Subscription } from "@vibevalley/async";
 import type * as T from "@vibevalley/protocol";
 import { userId } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { type ApiError } from "#/base/errors.ts";
-import { storedJsonOrUndefined } from "#/base/json.ts";
+import { Inconsistent } from "#/base/errors.ts";
+import { jsonText, storedJsonOrUndefined } from "#/base/json.ts";
 import { actorOfParticipant, type Envelope, type Meta, metaOf, type Picked } from "#/modules/mailbox/envelope.ts";
 import type * as qm from "#db/channel_message.sql.ts";
 
@@ -18,19 +19,25 @@ export type { Delivered, SessionNews } from "#/modules/session/signals.ts";
 
 export type MsgRow = qm.MessageByIDResult;
 
-const ReactionsSchema = Schema.Record(Schema.String, Schema.mutable(Schema.Array(Schema.String)));
+const ReactionsSchema = z.record(z.string(), z.array(z.string()));
 type Reactions = Record<string, string[]>;
 const decodeReactions = storedJsonOrUndefined(ReactionsSchema, "channel_message.reactions");
 export const reactionsOf = (raw: string | null): Reactions => decodeReactions(raw) ?? {};
 export const reactionsText = (r: Reactions) => {
   const kept = Object.entries(r).filter(([, by]) => by.length > 0);
-  return kept.length > 0 ? Formatter.formatJson(Object.fromEntries(kept)) : null;
+  return kept.length > 0 ? jsonText(Object.fromEntries(kept)) : null;
 };
 
-export const messageKind = (kind: string): T.MessageKind => (Schema.is(S.MessageKind)(kind) ? kind : "chat");
+export const messageKind = (kind: string): T.MessageKind => S.MessageKind.safeParse(kind).data ?? "chat";
 export const subjectKind = (kind: string | null): NonNullable<T.Channel["subjectKind"]> | undefined =>
-  kind !== null && Schema.is(S.SubjectKind)(kind) ? kind : undefined;
-export const notifyOf = (n: string): T.Notify => (Schema.is(S.Notify)(n) ? n : "all");
+  kind !== null ? S.SubjectKind.safeParse(kind).data : undefined;
+export const notifyOf = (n: string): T.Notify => S.Notify.safeParse(n).data ?? "all";
+
+/** A row a statement always gives (an insert's returning, a count): none is the database disagreeing with itself. */
+export const theRow = <A>(row: A | undefined, query: string): A => {
+  if (row === undefined) throw new Inconsistent(`${query} gave no row`);
+  return row;
+};
 
 export function toMessage(row: MsgRow): T.ChatMessage {
   const meta = metaOf(row.meta);
@@ -188,12 +195,12 @@ export type PostOf<Tag extends Post["_tag"]> = Extract<Post, { readonly _tag: Ta
 
 /** Each kind of post with its answer; Run and Notice are best effort and never fail. */
 export interface PostDoor {
-  (p: PostOf<"User">): Effect.Effect<{ message: T.ChatMessage; again: boolean }, ApiError>;
-  (p: PostOf<"Tell">): Effect.Effect<T.ChatMessage | undefined, ApiError>;
-  (p: PostOf<"Agent">): Effect.Effect<Spoken, ApiError>;
-  (p: PostOf<"Announce">): Effect.Effect<T.ChatMessage, ApiError>;
-  (p: PostOf<"Call">): Effect.Effect<boolean, ApiError>;
-  (p: PostOf<"Run"> | PostOf<"Notice">): Effect.Effect<void>;
+  (p: PostOf<"User">): Promise<{ message: T.ChatMessage; again: boolean }>;
+  (p: PostOf<"Tell">): Promise<T.ChatMessage | undefined>;
+  (p: PostOf<"Agent">): Promise<Spoken>;
+  (p: PostOf<"Announce">): Promise<T.ChatMessage>;
+  (p: PostOf<"Call">): Promise<boolean>;
+  (p: PostOf<"Run"> | PostOf<"Notice">): Promise<void>;
 }
 
 export interface Written {
@@ -204,60 +211,73 @@ export interface Written {
   row: MsgRow;
 }
 
+/** A read of the user's: where, up to which number, when. */
+export interface UserRead {
+  readonly channel: string;
+  readonly number: number;
+  readonly at: number;
+}
+
+/** Refusals are ApiErrors (thrown). */
 export interface ChannelService {
-  readonly userReads: Effect.Effect<Stream.Stream<{ readonly channel: string; readonly number: number; readonly at: number }>, never, Scope.Scope>;
+  /** Each read of the user's from now on. */
+  readonly userReads: () => Subscription<UserRead>;
   readonly defaultChannel: () => string;
-  readonly makeDefault: (id: string) => Effect.Effect<void, ApiError>;
-  readonly user: (input: UserInput) => Effect.Effect<{ message: T.ChatMessage; again: boolean }, ApiError>;
-  readonly say: (text: string, pick: Picked, channel: string | undefined, sendKey: string, more?: SayMore) => Effect.Effect<void, ApiError>;
+  readonly makeDefault: (id: string) => Promise<void>;
+  readonly user: (input: UserInput) => Promise<{ message: T.ChatMessage; again: boolean }>;
+  readonly say: (text: string, pick: Picked, channel: string | undefined, sendKey: string, more?: SayMore) => Promise<void>;
   readonly post: PostDoor;
   /** Edits do not wake participants. */
-  readonly edit: (id: T.MessageId, text: string, keep?: readonly string[]) => Effect.Effect<T.ChatMessage, ApiError>;
+  readonly edit: (id: T.MessageId, text: string, keep?: readonly string[]) => Promise<T.ChatMessage>;
   /** Clears content and withdraws pending deliveries while preserving the message number. */
-  readonly remove: (id: T.MessageId) => Effect.Effect<void, ApiError>;
-  readonly previewRemove: (id: T.MessageId) => Effect.Effect<T.Preview, ApiError>;
-  readonly react: (id: T.MessageId, who: string, emoji: string, on: boolean) => Effect.Effect<T.ChatMessage, ApiError>;
-  readonly pin: (id: T.MessageId, on: boolean) => Effect.Effect<T.ChatMessage, ApiError>;
-  readonly pins: (channel: string) => Effect.Effect<T.ChatMessage[], ApiError>;
-  readonly threadUnder: (id: T.MessageId) => Effect.Effect<string, ApiError>;
-  readonly issueThread: (issue: string, title: string, channel?: string) => Effect.Effect<string, ApiError>;
-  readonly issueThreadId: (issue: string) => Effect.Effect<string | null>;
-  readonly issueMessages: (issue: string) => Effect.Effect<Envelope[]>;
-  readonly search: (text: string, channel?: string) => Effect.Effect<T.MessageHit[], ApiError>;
+  readonly remove: (id: T.MessageId) => Promise<void>;
+  readonly previewRemove: (id: T.MessageId) => Promise<T.Preview>;
+  readonly react: (id: T.MessageId, who: string, emoji: string, on: boolean) => Promise<T.ChatMessage>;
+  readonly pin: (id: T.MessageId, on: boolean) => Promise<T.ChatMessage>;
+  readonly pins: (channel: string) => Promise<T.ChatMessage[]>;
+  readonly threadUnder: (id: T.MessageId) => Promise<string>;
+  readonly issueThread: (issue: string, title: string, channel?: string) => Promise<string>;
+  readonly issueThreadId: (issue: string) => Promise<string | null>;
+  readonly issueMessages: (issue: string) => Promise<Envelope[]>;
+  readonly search: (text: string, channel?: string) => Promise<T.MessageHit[]>;
   /** `""` resolves to `from`'s own session thread, or the default channel. */
-  readonly placeOf: (from: string, channel: string) => Effect.Effect<string, ApiError>;
-  readonly read: (who: string, opt?: ReadOptions) => Effect.Effect<ReadResult, ApiError>;
-  readonly unread: (who: string) => Effect.Effect<T.ChannelUnread[]>;
-  readonly list: () => Effect.Effect<T.Channel[]>;
-  readonly history: (channel: string, before?: number, limit?: number) => Effect.Effect<T.ChatMessage[], ApiError>;
+  readonly placeOf: (from: string, channel: string) => Promise<string>;
+  readonly read: (who: string, opt?: ReadOptions) => Promise<ReadResult>;
+  readonly unread: (who: string) => Promise<T.ChannelUnread[]>;
+  readonly list: () => Promise<T.Channel[]>;
+  readonly history: (channel: string, before?: number, limit?: number) => Promise<T.ChatMessage[]>;
   /** Reads from DB because `SpaceState.chat` retains only recent channels. */
-  readonly messageLocation: (id: T.MessageId) => Effect.Effect<{ readonly channel: T.Channel; readonly top: string } | undefined>;
-  readonly envelopeResource: (id: T.MessageId) => Effect.Effect<EnvelopeResource | undefined>;
-  readonly markRead: (channel: string, seq: number) => Effect.Effect<void, ApiError>;
-  readonly threadOfSession: (session: string) => Effect.Effect<string | undefined>;
+  readonly messageLocation: (id: T.MessageId) => Promise<{ readonly channel: T.Channel; readonly top: string } | undefined>;
+  readonly envelopeResource: (id: T.MessageId) => Promise<EnvelopeResource | undefined>;
+  readonly markRead: (channel: string, seq: number) => Promise<void>;
+  readonly threadOfSession: (session: string) => Promise<string | undefined>;
   readonly now: () => T.Chat | undefined;
-  /** Emits `Reset` when more than `catchUpMax` revisions were missed. */
-  readonly follow: (channel: string, after: number) => Stream.Stream<T.ChannelEvent, ApiError>;
-  readonly reports: (after?: string) => Stream.Stream<T.ChannelEvent>;
-  /** Subscribed before the outer `Effect` resolves. */
-  readonly userInThread: Effect.Effect<Stream.Stream<{ readonly thread: string; readonly message: T.ChatMessage }>, never, Scope.Scope>;
-  readonly channels: () => Effect.Effect<Info[]>;
-  readonly openChannel: (name: string, description: string, repo: string) => Effect.Effect<Info, ApiError>;
+  /** What changed in channel after revision `after`, then each change from now on. Emits `Reset` when more than
+   * `catchUpMax` revisions were missed. A channel that is not there is refused (an ApiError) by the first `next()`,
+   * before any event. */
+  readonly follow: (channel: string, after: number, signal?: AbortSignal) => AsyncIterable<T.ChannelEvent>;
+  /** The reports after the one with id `after` (the newest ones without it), then each one from now on. */
+  readonly reports: (after?: string, signal?: AbortSignal) => AsyncIterable<T.ChannelEvent>;
+  /** What the user says in a thread, from now on: subscribed before it returns. */
+  readonly userInThread: () => Subscription<{ readonly thread: string; readonly message: T.ChatMessage }>;
+  readonly channels: () => Promise<Info[]>;
+  readonly openChannel: (name: string, description: string, repo: string) => Promise<Info>;
   /** `description` undefined or `""` keeps existing; `repo` undefined keeps existing, `""` clears it. */
-  readonly updateChannel: (id: string, upd: T.ChannelUpdate) => Effect.Effect<void, ApiError>;
-  readonly archive: (id: string, on: boolean) => Effect.Effect<void, ApiError>;
-  readonly removeChannel: (id: string) => Effect.Effect<void, ApiError>;
-  readonly previewRemoveChannel: (id: string) => Effect.Effect<T.Preview, ApiError>;
-  readonly setNotify: (id: string, notify: T.Notify) => Effect.Effect<void, ApiError>;
+  readonly updateChannel: (id: string, upd: T.ChannelUpdate) => Promise<void>;
+  readonly archive: (id: string, on: boolean) => Promise<void>;
+  readonly removeChannel: (id: string) => Promise<void>;
+  readonly previewRemoveChannel: (id: string) => Promise<T.Preview>;
+  readonly setNotify: (id: string, notify: T.Notify) => Promise<void>;
   /** `"none"` on either the thread or its parent channel silences both. */
   readonly notifyOf: (id: string) => T.Notify;
-  readonly direct: (agent: string) => Effect.Effect<string, ApiError>;
+  readonly direct: (agent: string) => Promise<string>;
   readonly orchestratorIn: (channel: string) => string;
-  readonly markUnread: (channel: string, number: number) => Effect.Effect<void, ApiError>;
+  readonly markUnread: (channel: string, number: number) => Promise<void>;
   /** Parent channel for a thread, or the default channel for a direct conversation. */
-  readonly topOf: (channel: string) => Effect.Effect<Info>;
-  readonly addressOf: (channel: string) => Effect.Effect<{ readonly direct: boolean; readonly target: string }>;
-  readonly channelByName: (name: string) => Effect.Effect<Info | undefined>;
+  readonly topOf: (channel: string) => Promise<Info>;
+  readonly addressOf: (channel: string) => Promise<{ readonly direct: boolean; readonly target: string }>;
+  readonly channelByName: (name: string) => Promise<Info | undefined>;
   /** Must run after sessions are restored on startup. */
-  readonly start: Effect.Effect<void, ApiError>;
+  readonly boot: () => Promise<void>;
+  readonly close: () => Promise<void>;
 }

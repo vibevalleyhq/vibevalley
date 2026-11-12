@@ -1,4 +1,4 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
 import { toDom } from "hast-util-to-dom";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
@@ -8,12 +8,7 @@ import { type Plugin, unified } from "unified";
 
 import { useRouter } from "#/infra/router.ts";
 
-import { styleProps } from "./positioner";
 import { fragmentOf, remarkIssueRefs, remarkMentions, richen } from "./richText";
-
-const styles = stylex.create({
-  text: { minWidth: 0, fontSize: "var(--text-base)", lineHeight: "var(--leading-base)", overflowWrap: "break-word" },
-});
 
 // Raw HTML in the text is dropped (remark-rehype's default); the tree becomes DOM nodes directly, without innerHTML.
 const plain = unified()
@@ -32,11 +27,13 @@ const withMentions = unified()
   .use(remarkRehype);
 
 /** Chat text, descriptions and reports: GitHub markdown, made richer in place (richText.ts): safe links, code, Mermaid. */
-export function Markdown(props: { text: string; styles?: stylex.StyleXStyles; mentions?: boolean }) {
-  const appearance = () => {
-    const composed = styleProps([styles.text, props.styles]);
-    return { ...composed, class: ["markdown", composed.class] };
-  };
+export function Markdown(props: {
+  text: string;
+  /** Placement and colour only; the words' size is `size`: base (default), or sm in a denser place. */
+  class?: JSX.ClassValue | undefined;
+  size?: "base" | "sm";
+  mentions?: boolean;
+}) {
   const router = useRouter();
   // Read through a memo of the text alone.
   const text = createMemo(() => props.text);
@@ -47,5 +44,5 @@ export function Markdown(props: { text: string; styles?: stylex.StyleXStyles; me
     onCleanup(richen(root, { navigate: (to) => router.navigate(to) }));
     return [...root.childNodes];
   });
-  return <div {...appearance()}>{nodes()}</div>;
+  return <div class={["markdown min-w-0 wrap-break-word", props.size === "sm" ? "text-sm" : "text-base", props.class]}>{nodes()}</div>;
 }

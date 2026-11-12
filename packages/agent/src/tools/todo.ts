@@ -1,5 +1,3 @@
-import { Schema } from "effect";
-
 import { dagIDValid, dagProblems } from "../base/dag.ts";
 import { todoWords as words } from "../base/prompts.ts";
 
@@ -107,17 +105,20 @@ export interface Change {
 
 const stateWords: Record<State, string> = words.stateWords;
 
-export class TodoError extends Schema.TaggedError<TodoError, { readonly brand: unique symbol }>()("TodoError", { message: Schema.String }) {}
+export class TodoError extends Error {
+  override readonly name = "TodoError";
+  readonly _tag = "TodoError";
+}
 
 export function update(g: readonly Todo[], id: string, c: Change): Todo[] {
   const i = find(g, id);
   const was = g[i];
-  if (i < 0 || !was) throw TodoError.make({ message: words.notFound(id) });
+  if (i < 0 || !was) throw new TodoError(words.notFound(id));
   const open = was.state === "waiting" || was.state === "failed";
-  if ((c.brief !== undefined || c.after !== undefined) && !open) throw TodoError.make({ message: words.cannotChangeBrief(id, stateWords[was.state]) });
+  if ((c.brief !== undefined || c.after !== undefined) && !open) throw new TodoError(words.cannotChangeBrief(id, stateWords[was.state]));
   let t: Todo = { ...was };
   if (c.brief !== undefined) {
-    if (!c.brief.trim()) throw TodoError.make({ message: words.emptyBrief });
+    if (!c.brief.trim()) throw new TodoError(words.emptyBrief);
     t = { ...t, brief: c.brief.trim() };
   }
   if (c.after !== undefined) t = { ...t, after: [...c.after] };
@@ -126,13 +127,13 @@ export function update(g: readonly Todo[], id: string, c: Change): Todo[] {
     const to = c.state;
     if (to === "waiting" && (t.state === "failed" || t.state === "skipped")) t = { ...t, tries: (t.tries ?? 0) + 1, state: "waiting" };
     else if ((to === "done" || to === "failed" || to === "skipped") && (t.state === "waiting" || t.state === "working")) t = { ...t, state: to };
-    else throw TodoError.make({ message: words.cannotMove(id, stateWords[t.state], stateWords[to]) });
+    else throw new TodoError(words.cannotMove(id, stateWords[t.state], stateWords[to]));
   }
   const next = [...g];
   next[i] = t;
   if (c.after !== undefined) {
     const problems = edgeProblems(next);
-    if (problems.length > 0) throw TodoError.make({ message: words.problems(problems) });
+    if (problems.length > 0) throw new TodoError(words.problems(problems));
   }
   return next;
 }

@@ -3,4 +3,5 @@ node_modules
 .test
 test-results
 .screens
+.screens-baseline
 dist-stories

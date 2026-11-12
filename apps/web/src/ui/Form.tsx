@@ -1,41 +1,11 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { onCleanup, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
 import type { FormField as Binding } from "#/infra/form.ts";
 
-import { styleProps } from "./positioner";
 import { Hint } from "./Tip";
-
-const viewStyles = stylex.create({
-  formP: {
-    marginTop: "0.5rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-berry)",
-  },
-  formFieldDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.25rem",
-  },
-  formFieldLabel: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.375rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontWeight: "var(--font-weight-medium)",
-    color: "var(--color-muted)",
-  },
-  formFieldP: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-berry)",
-  },
-});
 
 export const formMessages = {
   issue: () => t("web.base.form.invalid"),
@@ -49,7 +19,7 @@ type Controls = {
   messages: () => readonly string[];
   submitError: () => string | undefined;
 };
-export function Form(props: { form: Controls; children: JSX.Element; styles?: stylex.StyleXStyles; testid?: string }) {
+export function Form(props: { form: Controls; children: JSX.Element; class?: JSX.ClassValue | undefined; testid?: string }) {
   let element: HTMLFormElement | undefined;
   let frame: number | undefined;
   let alive = true;
@@ -70,7 +40,7 @@ export function Form(props: { form: Controls; children: JSX.Element; styles?: st
         element = node;
       }}
       novalidate
-      {...styleProps(props.styles)}
+      class={props.class}
       data-testid={props.testid}
       aria-busy={props.form.submitting() ? "true" : undefined}
       onCompositionStart={() => props.form.composition(true)}
@@ -82,7 +52,7 @@ export function Form(props: { form: Controls; children: JSX.Element; styles?: st
     >
       {props.children}
       <Show when={props.form.messages().length > 0 || props.form.submitError() !== undefined}>
-        <p tabindex={-1} data-form-summary role="alert" {...stylex.attrs(viewStyles.formP)}>
+        <p tabindex={-1} data-form-summary role="alert" class="mt-2 text-sm text-berry">
           {props.form.submitError() ?? props.form.messages().join(" · ")}
         </p>
       </Show>
@@ -99,14 +69,14 @@ export function formControl<V>(field: Binding<V>) {
 }
 export function FormField(props: { field: Pick<Binding<unknown>, "id" | "messages">; label: string; hint?: string; children: JSX.Element }) {
   return (
-    <div {...stylex.attrs(viewStyles.formFieldDiv)}>
-      <label for={props.field.id} {...stylex.attrs(viewStyles.formFieldLabel)}>
+    <div class="flex flex-col gap-1">
+      <label for={props.field.id} class="flex items-center gap-1.5 text-xs font-medium text-muted">
         {props.label}
         <Show when={props.hint}>{(hint) => <Hint text={hint()} />}</Show>
       </label>
       {props.children}
       <Show when={props.field.messages().length > 0}>
-        <p id={`${props.field.id}-errors`} {...stylex.attrs(viewStyles.formFieldP)}>
+        <p id={`${props.field.id}-errors`} class="text-xs text-berry">
           {props.field.messages().join(" · ")}
         </p>
       </Show>

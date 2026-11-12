@@ -1,21 +1,26 @@
-import { Effect, Formatter, Schema } from "effect";
+import { z } from "zod";
 
 import type { MossTransport } from "@vibevalley/provider/moss/server";
 import { mossVisionModels } from "@vibevalley/provider/moss/vision-models";
 
-const decode = Schema.decodeUnknownOption(
-  Schema.fromJsonString(
-    Schema.Struct({
-      action: Schema.optionalKey(Schema.String),
-      type: Schema.optionalKey(Schema.String),
-      seq_no: Schema.optionalKey(Schema.Int),
-      timestamp: Schema.optionalKey(Schema.Finite),
-      run_id: Schema.optionalKey(Schema.String),
-      turn_id: Schema.optionalKey(Schema.String),
-      final: Schema.optionalKey(Schema.Boolean),
-    }),
-  ),
-);
+const ControlFrame = z.object({
+  action: z.exactOptional(z.string()),
+  type: z.exactOptional(z.string()),
+  seq_no: z.exactOptional(z.number().int()),
+  timestamp: z.exactOptional(z.number()),
+  run_id: z.exactOptional(z.string()),
+  turn_id: z.exactOptional(z.string()),
+  final: z.exactOptional(z.boolean()),
+});
+
+const decode = (frame: string) => {
+  try {
+    return ControlFrame.safeParse(JSON.parse(frame));
+  } catch {
+    // Not JSON: the same as a frame of the wrong shape, refused below.
+    return { success: false as const };
+  }
+};
 
 export const realtimeFixture: MossTransport = {
   connect: (_key, on, model) => {
@@ -29,7 +34,7 @@ export const realtimeFixture: MossTransport = {
     let promptPending = false;
     let responseSequence = 0;
     const emit = (event: object) => {
-      if (!closed) on.text(Formatter.formatJson(event));
+      if (!closed) on.text(JSON.stringify(event));
     };
     const liveAnswer = (run: string, turn: string, text: string) => {
       emit({ action: "response.audio.started", data: { run_id: run, turn_id: turn } });
@@ -91,8 +96,8 @@ export const realtimeFixture: MossTransport = {
           return;
         }
         const decoded = decode(frame);
-        if (decoded._tag === "None") throw new Error("Invalid realtime fixture control frame");
-        const event = decoded.value;
+        if (!decoded.success) throw new Error("Invalid realtime fixture control frame");
+        const event = decoded.data;
         switch (event.action ?? event.type) {
           case "attach_session":
             emit({ action: "session_attached", data: { session_id: "live-fixture", memory_scope: "session", delegation: "none" } });
@@ -149,5 +154,5 @@ export const realtimeFixture: MossTransport = {
       },
     };
   },
-  status: () => Effect.succeed({ code: 400, body: "" }),
+  status: async () => ({ code: 400, body: "" }),
 };

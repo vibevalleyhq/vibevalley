@@ -1,16 +1,14 @@
-import { Schema } from "effect";
-
 import { t } from "@vibevalley/i18n";
 import { VibeValleyApi, VibeValleyApiError } from "@vibevalley/protocol";
 import { type ApiErrorKind, bizCodeMeta, type BizErrorCode, type Next, type VoiceFix } from "@vibevalley/protocol/api";
 
 import { messageOf } from "#/base/format.ts";
 
-class ApiConnectionError extends Schema.TaggedError<ApiConnectionError, { readonly brand: unique symbol }>()("ApiConnectionError", {
-  cause: Schema.Defect(),
-}) {
-  override get message() {
-    return t("web.base.unreachable");
+/** The server could not be reached at all. */
+export class ApiConnectionError extends Error {
+  override readonly name = "ApiConnectionError";
+  constructor(cause: unknown) {
+    super(t("web.base.unreachable"), { cause });
   }
 }
 
@@ -28,7 +26,7 @@ export const api = new VibeValleyApi("", async (url, init) => {
   try {
     return await fetch(url, init);
   } catch (error) {
-    if (error instanceof TypeError) throw ApiConnectionError.make({ cause: error });
+    if (error instanceof TypeError) throw new ApiConnectionError(error);
     throw error;
   }
 });
@@ -55,7 +53,7 @@ export function faultOf(e: unknown): UiFault {
       retryable: e.status >= 500 || e.status === 408 || e.status === 429,
     };
   }
-  if (Schema.is(ApiConnectionError)(e)) {
+  if (e instanceof ApiConnectionError) {
     return { tag: "Network", reason: e.message, retryable: true };
   }
   return { tag: "Client", reason: messageOf(e), retryable: false };

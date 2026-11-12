@@ -1,26 +1,27 @@
-import { Clock, Context, Effect, Layer, PubSub, Stream } from "effect";
 // Every message is written to the database first. Mailbox is handed each committed message directly: it turns the message into durable Session deliveries.
-
+import { type Subscription, TaskGroup } from "@vibevalley/async";
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { userId } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { type ApiError, BizCode, lookIn, missing, refuseIn } from "#/base/errors.ts";
+import { ApiError, BizCode, lookIn, missing, refuseIn } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
-import { Core } from "#/core/core.ts";
-import { Db } from "#/infra/db.ts";
-import { bestEffort } from "#/infra/log.ts";
-import { Agent } from "#/modules/agent/agent.ts";
+import type { Core } from "#/core/core.ts";
+import type { Db } from "#/infra/db.ts";
+import { bestEffort, type Logger } from "#/infra/log.ts";
+import type { Time } from "#/infra/time.ts";
+import type { Agent } from "#/modules/agent/agent.ts";
+import type { Attachment } from "#/modules/attachment/attachment.ts";
 import { heldShown, type Envelope, type Picked, retryWindowMs } from "#/modules/mailbox/envelope.ts";
-import { Mailbox } from "#/modules/mailbox/mailbox.ts";
-import { Session } from "#/modules/session/session.ts";
+import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
+import type { Session } from "#/modules/session/session.ts";
 import * as qm from "#db/channel_message.sql.ts";
 import * as qr from "#db/channel_read_cursor.sql.ts";
 
 import { type Post, type PostOf, type SayMore, type Spoken, type Meta, metaOf, metaText, toMessage, envelopeMore, type ChannelService } from "./contracts.ts";
 import { channelDirectory } from "./directory.ts";
-import { channelHub, lastMax, lineOf } from "./hub.ts";
+import { makeChannelHub, lastMax, lineOf } from "./hub.ts";
 import { mentionOf, parseChatTarget } from "./mentions.ts";
 import { parseSearch } from "./messages.ts";
 import { channelStreams } from "./mutations.ts";
@@ -43,21 +44,60 @@ const afterAll = "\uffff";
 
 export type { Spoken, Delivered } from "./contracts.ts";
 
-export class Channel extends Context.Service<Channel, ChannelService>()("@vibevalley/server/modules/channel/channel") {
-  static readonly layer = Layer.effect(
-    Channel,
-    Effect.suspend(() => make),
-  );
+export type Channel = ChannelService;
+
+export interface ChannelDeps {
+  readonly clock: Time;
+  readonly log: Logger;
+  readonly fetch: typeof fetch;
+  readonly db: Db;
+  readonly core: Core;
+  readonly agent: Agent;
+  readonly attachment: Attachment;
+  readonly session: Session;
+  readonly mailbox: Mailbox;
 }
 
-const make = Effect.gen(function* () {
-  const sessions = yield* Session;
-  const mailbox = yield* Mailbox;
-  const r = yield* channelHub;
-  const dir = yield* channelDirectory(r);
-  const w = yield* channelWriting(r);
-  const th = yield* sessionThreads(r, w);
-  const talk = yield* directTalk(r, w, th, (channel, text, code) => post({ _tag: "Notice", channel, text, code }));
+/** A subscription's values that keep, as f makes them (undefined: dropped). */
+function mapped<A, B>(sub: Subscription<A>, f: (a: A) => B | undefined): Subscription<B> {
+  const next = async (signal?: AbortSignal): Promise<IteratorResult<B>> => {
+    for (;;) {
+      const r = await sub.next(signal);
+      if (r.done === true) return { done: true, value: undefined };
+      const b = f(r.value);
+      if (b !== undefined) return { done: false, value: b };
+    }
+  };
+  return {
+    next,
+    drain: () =>
+      sub.drain().flatMap((a) => {
+        const b = f(a);
+        return b === undefined ? [] : [b];
+      }),
+    size: () => sub.size(),
+    close: () => sub.close(),
+    [Symbol.dispose]: () => sub.close(),
+    [Symbol.asyncIterator]: () => ({
+      next: () => next(),
+      return: () => {
+        sub.close();
+        return Promise.resolve({ done: true, value: undefined });
+      },
+    }),
+  };
+}
+
+export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
+  const { core, agent: agents, db, clock, session: sessions, mailbox } = deps;
+  const log = deps.log.child("channel");
+  const tasks = new TaskGroup({ name: "channel", onError: (task, e) => log.warn(`${task} failed`, e) });
+  const own = { ...deps, log };
+  const r = await makeChannelHub(own);
+  const dir = channelDirectory(own, r);
+  const w = channelWriting(own, r, tasks);
+  const th = sessionThreads(own, r, w);
+  const talk = directTalk(own, r, w, th, (channel, text, code) => post({ _tag: "Notice", channel, text, code }), tasks);
   const {
     store,
     said,
@@ -84,47 +124,44 @@ const make = Effect.gen(function* () {
   const { write, embedLater } = w;
   const { onSessionNews, start } = th;
   const { onDirectMessage } = talk;
-  const core = yield* Core;
-  const agents = yield* Agent;
-  const db = yield* Db;
 
   /** A target as who would mean it: empty is a session's own thread (or the default channel), a channel by name, or a thread by its parent's number. */
-  const resolveTarget = Effect.fnUntraced(function* (who: string, target: string): Effect.fn.Return<string, ApiError> {
+  const resolveTarget = async (who: string, target: string): Promise<string> => {
     if (!target.trim()) {
       if (!agents.isOrchestrator(who) && who !== userId) {
-        const own = yield* threadOfSession(who);
+        const own = await threadOfSession(who);
         if (own) return own;
       }
       return store.defaultId();
     }
     const parsed = parseChatTarget(target);
-    if (!parsed) return yield* refused(t("server.channel.badTarget", { target }));
+    if (!parsed) throw refused(t("server.channel.badTarget", { target }));
     if (parsed.kind === "direct") {
       const direct = directWith(who, parsed.peer);
-      if (!direct) return yield* refused(t("server.channel.noDirect", { target: target.trim() }));
+      if (!direct) throw refused(t("server.channel.noDirect", { target: target.trim() }));
       return direct.id;
     }
     let channel = store.defaultId();
     const name = parsed.kind === "channel" ? parsed.name : (target.trim().replace(/^#/u, "").split(":")[0] ?? "");
     if (name) {
       const found = store.channelByName(name);
-      if (!found) return yield* missing(t("server.channel.noChannelNamed", { name, tags: list(channelTags()) }), [lookIn.channel]);
+      if (!found) throw missing(t("server.channel.noChannelNamed", { name, tags: list(channelTags()) }), [lookIn.channel]);
       channel = found.id;
     }
     if (parsed.kind === "channel") return channel;
-    const root = yield* db.one(qm.messageByNumber({ channel_id: channel, number: parsed.root }));
-    if (!root) return yield* refused(t("server.channel.noMessage", { n: parsed.root }));
-    const thread = yield* store.tx(store.threadFor({ id: root.id, number: root.number, channel: root.channel_id }, { kind: "talk", id: "", owner: "" }));
-    yield* publishChannel(thread);
+    const root = await qm.messageByNumber(db.sql, { channel_id: channel, number: parsed.root });
+    if (!root) throw refused(t("server.channel.noMessage", { n: parsed.root }));
+    const thread = await store.tx(() => store.threadFor({ id: root.id, number: root.number, channel: root.channel_id }, { kind: "talk", id: "", owner: "" }));
+    await publishChannel(thread);
     return thread;
-  });
+  };
 
-  const answered = Effect.fnUntraced(function* (channel: string, number: number | undefined) {
+  const answered = async (channel: string, number: number | undefined) => {
     if (number === undefined) return;
-    if (!(yield* db.one(qm.messageByNumber({ channel_id: channel, number })))) return yield* refused(t("server.channel.noMessage", { n: number }));
-  });
+    if (!(await qm.messageByNumber(db.sql, { channel_id: channel, number }))) throw refused(t("server.channel.noMessage", { n: number }));
+  };
 
-  const userSays = Effect.fnUntraced(function* (
+  const userSays = async (
     text: string,
     channel: string | undefined,
     sendKey: string,
@@ -132,16 +169,16 @@ const make = Effect.gen(function* () {
     source: Meta["ingressSource"],
     responsePort?: string,
     voiceMode?: Meta["voiceMode"],
-  ): Effect.fn.Return<{ message: T.ChatMessage; again: boolean }, ApiError> {
-    const files = yield* attachmentsOf(more.attachments ?? []);
-    if (!text.trim() && files.length === 0) return yield* refused(t("server.channel.empty"));
-    if (sendKey.length > sendKeyMax) return yield* refused(t("server.channel.sendKeyLong"));
-    if (more.to !== undefined && !agents.isOrchestrator(more.to)) return yield* refused(t("server.channel.notOrchestrator", { id: more.to }));
+  ): Promise<{ message: T.ChatMessage; again: boolean }> => {
+    const files = await attachmentsOf(more.attachments ?? []);
+    if (!text.trim() && files.length === 0) throw refused(t("server.channel.empty"));
+    if (sendKey.length > sendKeyMax) throw refused(t("server.channel.sendKeyLong"));
+    if (more.to !== undefined && !agents.isOrchestrator(more.to)) throw refused(t("server.channel.notOrchestrator", { id: more.to }));
     // A channel as the user names it (general, #general, @fox) as well as by id; none is the default one.
-    const where = channel === undefined || store.channel(channel) ? (channel ?? store.defaultId()) : yield* resolveTarget(userId, channel);
-    if (!store.channel(where)) return yield* missing(t("server.channel.noChannel", { id: where }), [lookIn.channel]);
-    yield* answered(where, more.replyTo);
-    const written = yield* write({
+    const where = channel === undefined || store.channel(channel) ? (channel ?? store.defaultId()) : await resolveTarget(userId, channel);
+    if (!store.channel(where)) throw missing(t("server.channel.noChannel", { id: where }), [lookIn.channel]);
+    await answered(where, more.replyTo);
+    const written = await write({
       channel: where,
       from: userId,
       kind: "chat",
@@ -166,185 +203,176 @@ const make = Effect.gen(function* () {
     });
     if (written.again) return { message: toMessage(written.row), again: true };
     if (written.absent.length > 0)
-      yield* core.notice(
+      core.notice(
         "warn",
         t("server.channel.absent", { who: list(written.absent.map((mention) => mentionOf(mention) ?? "@" + mention)), n: written.absent.length }),
       );
     return { message: toMessage(written.row), again: false };
-  });
+  };
 
-  const recent = Effect.fn("Channel.recent")(function* (channel: string, n: number) {
+  const recent = async (channel: string, n: number): Promise<Envelope[]> => {
     const row = store.channel(channel);
     if (!row) return [];
     const target = targetOfChannel(row);
-    return [...(yield* db.run(qm.messagesBefore({ channel_id: channel, number: 2147483647, n })))].toReversed().map((m) => envelopeOf(m, target));
-  });
-  const postUser = Effect.fn("Channel.post", { attributes: { post: "User" } })(
-    (p: PostOf<"User">) => userSays(p.text, p.channel, p.sendKey, p, p.source, p.responsePort, p.voiceMode),
-    store.locked,
-  );
+    return [...(await qm.messagesBefore(db.sql, { channel_id: channel, number: 2147483647, n }))].toReversed().map((m) => envelopeOf(m, target));
+  };
+  const postUser = (p: PostOf<"User">) => store.locked(() => userSays(p.text, p.channel, p.sendKey, p, p.source, p.responsePort, p.voiceMode));
 
-  const postTell = Effect.fn("Channel.post", { attributes: { post: "Tell" } })(function* ({ from, session, text, sendKey }: PostOf<"Tell">) {
-    const thread = yield* threadOfSession(session);
-    if (!thread) {
-      // Sent with no channel, so no thread to say it in: the session hears it as a trigger addressed to it alone.
-      if (!sessions.isReachable(session)) return yield* missing(t("server.channel.noHelper", { id: session }), [lookIn.session]);
-      const channel = sessionOf(session)?.channel;
-      const at = yield* Clock.currentTimeMillis;
-      const speaker = sessionOf(from);
-      const trigger = yield* mailbox.recordTrigger({
-        source: "channel",
-        key: sendKey || newId(at),
-        actor:
-          from === userId
-            ? { kind: "user", id: userId }
-            : { kind: "agent", role: agents.isOrchestrator(from) ? "orchestrator" : "worker", id: from, ...(speaker ? { name: speaker.name } : {}) },
-        text: text.trim(),
-        threads: [],
-        addressed: "direct",
-        ...(channel ? { replyChannel: channel } : {}),
-        at,
-      });
-      yield* mailbox.receive({ _tag: "Trigger", trigger, to: { session } });
-      return undefined;
-    }
-    const run = sessions.runOf(from);
-    const written = yield* write({
-      channel: thread,
-      from,
-      kind: "chat",
-      text: text.trim(),
-      meta: run ? { run } : {},
-      sendKey,
-      ...(from === userId ? { readBy: userId } : {}),
-    });
-    return toMessage(written.row);
-  }, store.locked);
-
-  const postAgent = Effect.fn("Channel.post", { attributes: { post: "Agent" } })(function* ({
-    from,
-    text,
-    ...opt
-  }: PostOf<"Agent">): Effect.fn.Return<Spoken, ApiError> {
-    const words = text.trim();
-    if (!words) return yield* refused(t("server.channel.empty"));
-    const channel = yield* resolveTarget(from, opt.target ?? "");
-    const row = store.channel(channel);
-    if (!row) return yield* refused(t("server.channel.channelGone"));
-    const target = targetOfChannel(row);
-    // A retry of the same words is the same message.
-    const again = yield* db.one(
-      qm.recentDuplicate({ sender_id: from, channel_id: channel, body: words, since: (yield* Clock.currentTimeMillis) - retryWindowMs }),
-    );
-    if (again) {
-      const m = yield* db.one(qm.messageByID({ id: again.id }));
-      if (m) return { kind: "sent", message: toMessage(m), target, absent: [] };
-    }
-    // Posting on a channel right after reading a thread: confirm once.
-    const last = store.lastReadOf(from);
-    if (row.type !== "thread" && opt.confirm !== true && last && last !== target) return { kind: "confirm", target, lastRead: last };
-    // Newer messages it has not seen: show them instead of sending.
-    const unseen = (yield* db.run(qm.unseenIn({ channel, participant: from }))).map((r) => r.id);
-    if (unseen.length > 0 && opt.anyway !== true) {
-      const now = yield* Clock.currentTimeMillis;
-      const shown: Envelope[] = [];
-      for (const id of unseen.slice(0, heldShown)) {
-        const m = yield* db.one(qm.messageByID({ id }));
-        if (!m) continue;
-        shown.push(envelopeOf(m, target));
+  const postTell = ({ from, session, text, sendKey }: PostOf<"Tell">) =>
+    store.locked(async (): Promise<T.ChatMessage | undefined> => {
+      const thread = await threadOfSession(session);
+      if (!thread) {
+        // Sent with no channel, so no thread to say it in: the session hears it as a trigger addressed to it alone.
+        if (!sessions.isReachable(session)) throw missing(t("server.channel.noHelper", { id: session }), [lookIn.session]);
+        const channel = sessionOf(session)?.channel;
+        const at = clock.now();
+        const speaker = sessionOf(from);
+        const trigger = await mailbox.recordTrigger({
+          source: "channel",
+          key: sendKey || newId(at),
+          actor:
+            from === userId
+              ? { kind: "user", id: userId }
+              : { kind: "agent", role: agents.isOrchestrator(from) ? "orchestrator" : "worker", id: from, ...(speaker ? { name: speaker.name } : {}) },
+          text: text.trim(),
+          threads: [],
+          addressed: "direct",
+          ...(channel ? { replyChannel: channel } : {}),
+          at,
+        });
+        await mailbox.receive({ _tag: "Trigger", trigger, to: { session } });
+        return undefined;
       }
-      const newest = shown.at(-1);
-      if (newest) yield* store.setRead(from, channel, newest.number, now);
-      return { kind: "held", target, shown, more: unseen.length - shown.length };
-    }
-    // calledBy finds only participants of kind agent, and those are sessions (their ids are session ids).
-    const caller = !agents.isOrchestrator(from) ? (yield* db.one(qm.calledBy({ speaker: from, channel, before: afterAll })))?.sender_id : undefined;
-    const answers = caller === undefined ? undefined : sessionId(caller);
-    const run = sessions.runOf(from);
-    if (agents.isOrchestrator(from)) yield* store.seat(from);
-    yield* answered(channel, opt.reply);
-    const written = yield* write({
-      channel,
-      from,
-      kind: "chat",
-      text: words,
-      ...(answers ? { answers } : {}),
-      ...(opt.reply !== undefined ? { replyTo: opt.reply } : {}),
-      meta: run ? { run } : {},
-    });
-    const now2 = yield* Clock.currentTimeMillis;
-    yield* store.setRead(from, channel, written.row.number, now2);
-    return { kind: "sent", message: toMessage(written.row), target, absent: written.absent };
-  }, store.locked);
-
-  const postAnnounce = Effect.fn("Channel.post", { attributes: { post: "Announce" } })(function* ({
-    from,
-    channel,
-    text,
-    made,
-    sendKey = "",
-  }: PostOf<"Announce">) {
-    const where = store.channel(channel) ? channel : yield* resolveTarget(from, channel);
-    if (!store.channel(where)) return yield* refused(t("server.channel.channelGone"));
-    const run = sessions.runOf(from);
-    if (agents.isOrchestrator(from)) yield* store.seat(from);
-    const shown = "card" in made ? { artifact: made.card } : { attachments: yield* attachmentsOf(made.attachments) };
-    const written = yield* write({
-      channel: where,
-      from,
-      kind: "chat",
-      text: text.trim(),
-      meta: { ...(run ? { run } : {}), ...shown },
-      sendKey,
-      ...(from === userId ? { readBy: userId } : {}),
-    });
-    if (from !== userId) {
-      const now = yield* Clock.currentTimeMillis;
-      yield* store.setRead(from, where, written.row.number, now);
-    }
-    return toMessage(written.row);
-  }, store.locked);
-
-  const postCall = Effect.fn("Channel.post", { attributes: { post: "Call" } })(
-    function* ({ from, text, sendKey }: PostOf<"Call">) {
-      if (sendKey.length > sendKeyMax) return yield* refused(t("server.channel.sendKeyLong"));
-      if (!text.trim()) return false;
-      const written = yield* write({
-        channel: store.defaultId(),
+      const run = sessions.runOf(from);
+      const written = await write({
+        channel: thread,
         from,
         kind: "chat",
         text: text.trim(),
-        meta: { spoken: true },
+        meta: run ? { run } : {},
         sendKey,
         ...(from === userId ? { readBy: userId } : {}),
       });
-      return written.again;
-    },
-    Effect.catchDefect((d) => Effect.as(Effect.logWarning(`chat: words said on a call: ${String(d)}`), false)),
-    store.locked,
-  );
+      return toMessage(written.row);
+    });
 
-  const postRun = Effect.fn("Channel.post", { attributes: { post: "Run" } })(function* ({ channel, text, run, from }: PostOf<"Run">) {
-    if (!text.trim()) return;
-    yield* store.locked(Effect.andThen(store.seat(from), write({ channel, from, kind: "chat", text, meta: run ? { run } : {} })));
-  }, bestEffort("chat: a run's words"));
+  const postAgent = ({ from, text, ...opt }: PostOf<"Agent">) =>
+    store.locked(async (): Promise<Spoken> => {
+      const words = text.trim();
+      if (!words) throw refused(t("server.channel.empty"));
+      const channel = await resolveTarget(from, opt.target ?? "");
+      const row = store.channel(channel);
+      if (!row) throw refused(t("server.channel.channelGone"));
+      const target = targetOfChannel(row);
+      // A retry of the same words is the same message.
+      const again = await qm.recentDuplicate(db.sql, { sender_id: from, channel_id: channel, body: words, since: clock.now() - retryWindowMs });
+      if (again) {
+        const m = await qm.messageByID(db.sql, { id: again.id });
+        if (m) return { kind: "sent", message: toMessage(m), target, absent: [] };
+      }
+      // Posting on a channel right after reading a thread: confirm once.
+      const last = store.lastReadOf(from);
+      if (row.type !== "thread" && opt.confirm !== true && last && last !== target) return { kind: "confirm", target, lastRead: last };
+      // Newer messages it has not seen: show them instead of sending.
+      const unseen = (await qm.unseenIn(db.sql, { channel, participant: from })).map((r) => r.id);
+      if (unseen.length > 0 && opt.anyway !== true) {
+        const now = clock.now();
+        const shown: Envelope[] = [];
+        for (const id of unseen.slice(0, heldShown)) {
+          const m = await qm.messageByID(db.sql, { id });
+          if (!m) continue;
+          shown.push(envelopeOf(m, target));
+        }
+        const newest = shown.at(-1);
+        if (newest) await store.setRead(from, channel, newest.number, now);
+        return { kind: "held", target, shown, more: unseen.length - shown.length };
+      }
+      // calledBy finds only participants of kind agent, and those are sessions (their ids are session ids).
+      const caller = !agents.isOrchestrator(from) ? (await qm.calledBy(db.sql, { speaker: from, channel, before: afterAll }))?.sender_id : undefined;
+      const answers = caller === undefined ? undefined : sessionId(caller);
+      const run = sessions.runOf(from);
+      if (agents.isOrchestrator(from)) await store.seat(from);
+      await answered(channel, opt.reply);
+      const written = await write({
+        channel,
+        from,
+        kind: "chat",
+        text: words,
+        ...(answers ? { answers } : {}),
+        ...(opt.reply !== undefined ? { replyTo: opt.reply } : {}),
+        meta: run ? { run } : {},
+      });
+      const now2 = clock.now();
+      await store.setRead(from, channel, written.row.number, now2);
+      return { kind: "sent", message: toMessage(written.row), target, absent: written.absent };
+    });
 
-  const postNotice = Effect.fn("Channel.post", { attributes: { post: "Notice" } })(
-    function* ({ channel, text, code, sendKey = "" }: PostOf<"Notice">) {
-      return yield* write({ channel, from: "system", kind: "notice", text, meta: { code }, sendKey });
-    },
-    store.locked,
-    bestEffort("chat: notice"),
-  );
+  const postAnnounce = ({ from, channel, text, made, sendKey = "" }: PostOf<"Announce">) =>
+    store.locked(async () => {
+      const where = store.channel(channel) ? channel : await resolveTarget(from, channel);
+      if (!store.channel(where)) throw refused(t("server.channel.channelGone"));
+      const run = sessions.runOf(from);
+      if (agents.isOrchestrator(from)) await store.seat(from);
+      const shown = "card" in made ? { artifact: made.card } : { attachments: await attachmentsOf(made.attachments) };
+      const written = await write({
+        channel: where,
+        from,
+        kind: "chat",
+        text: text.trim(),
+        meta: { ...(run ? { run } : {}), ...shown },
+        sendKey,
+        ...(from === userId ? { readBy: userId } : {}),
+      });
+      if (from !== userId) {
+        const now = clock.now();
+        await store.setRead(from, where, written.row.number, now);
+      }
+      return toMessage(written.row);
+    });
+
+  const postCall = ({ from, text, sendKey }: PostOf<"Call">) =>
+    store.locked(async () => {
+      if (sendKey.length > sendKeyMax) throw refused(t("server.channel.sendKeyLong"));
+      if (!text.trim()) return false;
+      try {
+        const written = await write({
+          channel: store.defaultId(),
+          from,
+          kind: "chat",
+          text: text.trim(),
+          meta: { spoken: true },
+          sendKey,
+          ...(from === userId ? { readBy: userId } : {}),
+        });
+        return written.again;
+      } catch (d) {
+        if (d instanceof ApiError) throw d;
+        // Words said on a call are best kept, never a reason the call fails: the call goes on without them.
+        log.warn(`chat: words said on a call: ${String(d)}`);
+        return false;
+      }
+    });
+
+  const postRun = ({ channel, text, run, from }: PostOf<"Run">) =>
+    bestEffort(log, "chat: a run's words", async () => {
+      if (!text.trim()) return;
+      await store.locked(async () => {
+        await store.seat(from);
+        await write({ channel, from, kind: "chat", text, meta: run ? { run } : {} });
+      });
+    });
+
+  const postNotice = ({ channel, text, code, sendKey = "" }: PostOf<"Notice">) =>
+    bestEffort(log, "chat: notice", () => store.locked(() => write({ channel, from: "system", kind: "notice", text, meta: { code }, sendKey })));
 
   // One door; each kind keeps its own checks and answer, and the overloads tie the answer to the kind.
-  function post(p: PostOf<"User">): Effect.Effect<{ message: T.ChatMessage; again: boolean }, ApiError>;
-  function post(p: PostOf<"Tell">): Effect.Effect<T.ChatMessage | undefined, ApiError>;
-  function post(p: PostOf<"Agent">): Effect.Effect<Spoken, ApiError>;
-  function post(p: PostOf<"Announce">): Effect.Effect<T.ChatMessage, ApiError>;
-  function post(p: PostOf<"Call">): Effect.Effect<boolean, ApiError>;
-  function post(p: PostOf<"Run"> | PostOf<"Notice">): Effect.Effect<void>;
-  function post(p: Post): Effect.Effect<{ message: T.ChatMessage; again: boolean } | T.ChatMessage | Spoken | boolean | undefined | void, ApiError> {
+  function post(p: PostOf<"User">): Promise<{ message: T.ChatMessage; again: boolean }>;
+  function post(p: PostOf<"Tell">): Promise<T.ChatMessage | undefined>;
+  function post(p: PostOf<"Agent">): Promise<Spoken>;
+  function post(p: PostOf<"Announce">): Promise<T.ChatMessage>;
+  function post(p: PostOf<"Call">): Promise<boolean>;
+  function post(p: PostOf<"Run"> | PostOf<"Notice">): Promise<void>;
+  function post(p: Post): Promise<{ message: T.ChatMessage; again: boolean } | T.ChatMessage | Spoken | boolean | undefined | void> {
     switch (p._tag) {
       case "User":
         return postUser(p);
@@ -363,10 +391,10 @@ const make = Effect.gen(function* () {
     }
   }
 
-  const shape = Channel.of({
-    user: Effect.fn("Channel.user")(function* (input) {
-      yield* core.open();
-      return yield* post({
+  const shape: Channel = {
+    user: (input) => {
+      core.open();
+      return post({
         _tag: "User",
         text: input.text,
         channel: input.channel,
@@ -376,12 +404,12 @@ const make = Effect.gen(function* () {
         ...(input.responsePort ? { responsePort: input.responsePort } : {}),
         ...(input.voiceMode ? { voiceMode: input.voiceMode } : {}),
       });
-    }),
-    say: Effect.fn("Channel.say")(function* (text, pick, channel, sendKey, more) {
+    },
+    say: async (text, pick, channel, sendKey, more) => {
       const a = pick.agent ? agents.agent(pick.agent) : undefined;
       const picked: Picked = { ...(a ? { agent: a.id } : {}), ...(pick.repo?.trim() ? { repo: pick.repo.trim() } : {}) };
-      yield* core.open();
-      yield* post({
+      core.open();
+      await post({
         _tag: "User",
         text,
         channel,
@@ -389,217 +417,244 @@ const make = Effect.gen(function* () {
         ...more,
         ...(picked.agent || picked.repo ? { picked } : {}),
       });
-    }),
+    },
     post,
-    userReads: Effect.map(PubSub.subscribe(userReadHub), Stream.fromSubscription),
+    userReads: () => userReadHub.subscribe(),
     now: () => core.state().chat,
-    ...channelStreams(db, store, said),
+    ...channelStreams(own, store, said),
     defaultChannel: () => store.defaultId(),
-    messageLocation: Effect.fn("Channel.messageLocation")(function* (id) {
-      const message = yield* db.one(qm.messageByID({ id }));
+    messageLocation: async (id) => {
+      const message = await qm.messageByID(db.sql, { id });
       if (!message) return undefined;
       const row = store.channel(message.channel_id);
       return row ? { channel: toChannel(row), top: channelIdOf(row) } : undefined;
-    }),
-    envelopeResource: Effect.fn("Channel.envelopeResource")(function* (id) {
-      const message = yield* db.one(qm.messageByID({ id }));
+    },
+    envelopeResource: async (id) => {
+      const message = await qm.messageByID(db.sql, { id });
       if (!message) return undefined;
-      const before = [...(yield* db.run(qm.messagesBefore({ channel_id: message.channel_id, number: message.number, n: 5 })))].toReversed();
-      const after = yield* db.run(qm.messagesAfter({ channel_id: message.channel_id, number: message.number, n: 5 }));
+      const before = [...(await qm.messagesBefore(db.sql, { channel_id: message.channel_id, number: message.number, n: 5 }))].toReversed();
+      const after = await qm.messagesAfter(db.sql, { channel_id: message.channel_id, number: message.number, n: 5 });
       const parent =
-        message.reply_number === null ? undefined : yield* db.one(qm.messageByNumber({ channel_id: message.channel_id, number: message.reply_number }));
+        message.reply_number === null ? undefined : await qm.messageByNumber(db.sql, { channel_id: message.channel_id, number: message.reply_number });
       return {
         message: toMessage(message),
         attachments: envelopeMore(message, filesAt).attachments ?? [],
         ...(parent === undefined ? {} : { parent: toMessage(parent) }),
         around: [...before, ...after].map(toMessage),
       };
-    }),
-    edit: Effect.fn("Channel.edit")(function* (id, text, keep) {
-      const row = yield* messageOf(id);
-      if (row.sender_id !== userId || row.kind !== "chat" || row.deleted_at !== null) return yield* refused(t("server.channel.notYours"));
-      const meta = metaOf(row.meta);
-      const files = keep === undefined ? (meta.attachments ?? []) : (meta.attachments ?? []).filter((a) => keep.includes(a.id));
-      const words = text.trim();
-      if (!words && files.length === 0) return yield* refused(t("server.channel.empty"));
-      if (words === row.body && files.length === (meta.attachments ?? []).length) return toMessage(row);
-      const changed = yield* change(row, (revision, now) =>
-        Effect.gen(function* () {
-          yield* db.run(qm.editMessage({ body: words, at: now, revision, id }));
-          if (files.length !== (meta.attachments ?? []).length) yield* db.run(qm.setEmbeds({ meta: metaText({ ...meta, attachments: files }), revision, id }));
-        }),
-      );
-      if (words !== row.body) embedLater({ ...row, body: words });
-      return changed;
-    }, store.locked),
-    remove: Effect.fn("Channel.remove")(function* (id) {
-      const row = yield* messageOf(id);
-      if (row.deleted_at !== null) return yield* refused(t("server.channel.messageGone"));
-      yield* change(row, (revision, now) => db.run(qm.deleteMessage({ at: now, revision, id })));
-      yield* mailbox.withdraw({ _tag: "Envelope", envelope: id });
-    }, store.locked),
-    previewRemove: Effect.fn("Channel.previewRemove")(function* (id) {
-      const row = yield* messageOf(id);
-      if (row.deleted_at !== null) return yield* refused(t("server.channel.messageGone"));
+    },
+    edit: (id, text, keep) =>
+      store.locked(async () => {
+        const row = await messageOf(id);
+        if (row.sender_id !== userId || row.kind !== "chat" || row.deleted_at !== null) throw refused(t("server.channel.notYours"));
+        const meta = metaOf(row.meta);
+        const files = keep === undefined ? (meta.attachments ?? []) : (meta.attachments ?? []).filter((a) => keep.includes(a.id));
+        const words = text.trim();
+        if (!words && files.length === 0) throw refused(t("server.channel.empty"));
+        if (words === row.body && files.length === (meta.attachments ?? []).length) return toMessage(row);
+        const changed = await change(row, async (revision, now) => {
+          await qm.editMessage(db.sql, { body: words, at: now, revision, id });
+          if (files.length !== (meta.attachments ?? []).length) await qm.setEmbeds(db.sql, { meta: metaText({ ...meta, attachments: files }), revision, id });
+        });
+        if (words !== row.body) embedLater({ ...row, body: words });
+        return changed;
+      }),
+    remove: (id) =>
+      store.locked(async () => {
+        const row = await messageOf(id);
+        if (row.deleted_at !== null) throw refused(t("server.channel.messageGone"));
+        await change(row, (revision, now) => qm.deleteMessage(db.sql, { at: now, revision, id }));
+        await mailbox.withdraw({ _tag: "Envelope", envelope: id });
+      }),
+    previewRemove: async (id) => {
+      const row = await messageOf(id);
+      if (row.deleted_at !== null) throw refused(t("server.channel.messageGone"));
       const ch = store.channel(row.channel_id);
-      const waiting = yield* mailbox.waitingOn(id);
+      const waiting = await mailbox.waitingOn(id);
       return {
         does: [
           t("server.channel.deletes", { target: ch ? targetOfChannel(ch) : "", number: row.number, name: row.sender_name, text: lineOf(row.body, lastMax) }),
           ...(waiting > 0 ? [t("server.channel.deletesDeliveries", { n: waiting })] : []),
         ],
       };
-    }),
-    react: Effect.fn("Channel.react")(function* (id, who, emoji, on) {
-      return yield* store.locked(reacting(id, who, emoji, on));
-    }),
-    pin: Effect.fn("Channel.pin")(function* (id, on) {
-      const row = yield* messageOf(id);
-      if (row.deleted_at !== null) return yield* refused(t("server.channel.messageGone"));
-      if ((row.pinned_at !== null) === on) return toMessage(row);
-      return yield* change(row, (revision, now) => db.run(qm.setPinned({ pinned_at: on ? now : null, revision, id })));
-    }, store.locked),
-    pins: Effect.fn("Channel.pins")(function* (channel) {
-      if (!store.channel(channel)) return yield* missing(t("server.channel.noChannel", { id: channel }), [lookIn.channel]);
-      return (yield* db.run(qm.pinnedIn({ channel_id: channel }))).map(toMessage);
-    }),
-    threadUnder: Effect.fn("Channel.threadUnder")(function* (id) {
-      const row = yield* messageOf(id);
-      if (store.channel(row.channel_id)?.type !== "channel") return yield* refused(t("server.channel.threadOnlyInChannel"));
-      const thread = yield* store.tx(store.threadFor({ id: row.id, number: row.number, channel: row.channel_id }, { kind: "talk", id: "", owner: "" }));
-      yield* publishChannel(thread);
-      return thread;
-    }, store.locked),
-    issueThread: Effect.fn("Channel.issueThread")(function* (issue, title, channel) {
-      const existing = store.threadOfSubject("issue", issue);
-      if (existing) return existing;
-      const where = channel ?? store.defaultId();
-      if (store.channel(where)?.type !== "channel") return yield* refused(t("server.channel.threadOnlyInChannel"));
-      const written = yield* write({
-        channel: where,
-        from: "system",
-        kind: "notice",
-        text: title,
-        thread: { kind: "issue", id: issue, owner: "" },
-      });
-      return written.thread;
-    }, store.locked),
-    issueThreadId: Effect.fn("Channel.issueThreadId")(function* (issue) {
-      return yield* Effect.sync(() => store.threadOfSubject("issue", issue) ?? null);
-    }),
-    issueMessages: Effect.fn("Channel.issueMessages")(function* (issue) {
+    },
+    react: (id, who, emoji, on) => store.locked(() => reacting(id, who, emoji, on)),
+    pin: (id, on) =>
+      store.locked(async () => {
+        const row = await messageOf(id);
+        if (row.deleted_at !== null) throw refused(t("server.channel.messageGone"));
+        if ((row.pinned_at !== null) === on) return toMessage(row);
+        return change(row, (revision, now) => qm.setPinned(db.sql, { pinned_at: on ? now : null, revision, id }));
+      }),
+    pins: async (channel) => {
+      if (!store.channel(channel)) throw missing(t("server.channel.noChannel", { id: channel }), [lookIn.channel]);
+      return (await qm.pinnedIn(db.sql, { channel_id: channel })).map(toMessage);
+    },
+    threadUnder: (id) =>
+      store.locked(async () => {
+        const row = await messageOf(id);
+        if (store.channel(row.channel_id)?.type !== "channel") throw refused(t("server.channel.threadOnlyInChannel"));
+        const thread = await store.tx(() => store.threadFor({ id: row.id, number: row.number, channel: row.channel_id }, { kind: "talk", id: "", owner: "" }));
+        await publishChannel(thread);
+        return thread;
+      }),
+    issueThread: (issue, title, channel) =>
+      store.locked(async () => {
+        const existing = store.threadOfSubject("issue", issue);
+        if (existing) return existing;
+        const where = channel ?? store.defaultId();
+        if (store.channel(where)?.type !== "channel") throw refused(t("server.channel.threadOnlyInChannel"));
+        const written = await write({
+          channel: where,
+          from: "system",
+          kind: "notice",
+          text: title,
+          thread: { kind: "issue", id: issue, owner: "" },
+        });
+        return written.thread;
+      }),
+    issueThreadId: async (issue) => store.threadOfSubject("issue", issue) ?? null,
+    issueMessages: async (issue) => {
       const thread = store.threadOfSubject("issue", issue);
       if (!thread) return [];
-      return yield* recent(thread, 50);
-    }),
-    search: Effect.fn("Channel.search")(function* (text, channel) {
+      return recent(thread, 50);
+    },
+    search: async (text, channel) => {
       const q = parseSearch(text);
-      if (!q.words && !q.from && !q.in && q.has.length === 0 && q.before === undefined && q.after === undefined)
-        return yield* refused(t("server.channel.empty"));
+      if (!q.words && !q.from && !q.in && q.has.length === 0 && q.before === undefined && q.after === undefined) throw refused(t("server.channel.empty"));
       let scope = channel ?? "";
       if (q.in) {
         const named = store.channelByName(q.in);
-        if (!named) return yield* missing(t("server.channel.noChannelNamed", { name: q.in, tags: list(channelTags()) }), [lookIn.channel]);
+        if (!named) throw missing(t("server.channel.noChannelNamed", { name: q.in, tags: list(channelTags()) }), [lookIn.channel]);
         scope = named.id;
       }
-      const rows = yield* db.run(
-        qm.searchMessages({
-          text: q.words,
-          channel: scope,
-          sender: q.from ?? "",
-          has_file: q.has.includes("file"),
-          has_image: q.has.includes("image"),
-          has_link: q.has.includes("link"),
-          after: q.after ?? 0,
-          before: q.before ?? Number.MAX_SAFE_INTEGER,
-          n: searchMax,
-        }),
-      );
+      const rows = await qm.searchMessages(db.sql, {
+        text: q.words,
+        channel: scope,
+        sender: q.from ?? "",
+        has_file: q.has.includes("file"),
+        has_image: q.has.includes("image"),
+        has_link: q.has.includes("link"),
+        after: q.after ?? 0,
+        before: q.before ?? Number.MAX_SAFE_INTEGER,
+        n: searchMax,
+      });
       return rows.map((r) => ({
         message: toMessage(r),
         channel: r.top_id ?? r.channel_id,
         address: targetOfRow(r.channel_type, r.root_number, null, r.top_id, r.channel_name),
       }));
-    }),
-    placeOf: Effect.fn("Channel.placeOf")(function* (from, channel) {
+    },
+    placeOf: async (from, channel) => {
       if (store.channel(channel)) return channel;
-      return yield* resolveTarget(from, channel);
-    }),
-    read: Effect.fn("Channel.read")(function* (who, opt = {}) {
-      const channel = yield* resolveTarget(who, opt.target ?? "");
-      const row = store.channel(channel);
-      if (!row) return yield* refused(t("server.channel.channelGone"));
-      const target = targetOfChannel(row);
-      const limit = opt.limit != null && opt.limit !== 0 ? Math.min(Math.max(opt.limit, 1), 100) : readLimit;
-      const cursor = (yield* db.one(qr.readCursor({ participant_id: who, channel_id: channel })))?.read_number ?? 0;
-      const rows =
-        opt.unread === true
-          ? yield* db.run(qm.messagesAfter({ channel_id: channel, number: cursor, n: limit }))
-          : [...(yield* db.run(qm.messagesBefore({ channel_id: channel, number: opt.before ?? 2147483647, n: limit })))].toReversed();
-      const newest = rows.at(-1);
-      if (newest && (opt.before == null || opt.before === 0)) yield* readThrough(who, channel, newest.number);
-      store.rememberReadTarget(who, target, (participant) => participant === userId || agents.isOrchestrator(participant) || sessions.isReachable(participant));
-      const oldest = rows[0];
-      const older = oldest !== undefined && (yield* db.run(qm.messagesBefore({ channel_id: channel, number: oldest.number, n: 1 }))).length > 0;
-      return { target, messages: rows.map((m) => envelopeOf(m, target)), older };
-    }, store.locked),
-    unread: Effect.fn("Channel.unread")(function* (who) {
-      return yield* store.locked(
-        inboxRows(who).pipe(
-          Effect.map((rows) => rows.map(({ target, ...r }): T.ChannelUnread => ({ channel: target, ...r }))),
-          Effect.catchCause((c) => Effect.as(Effect.logWarning(`chat: unread of ${who}: ${String(c)}`), [])),
-        ),
-      );
-    }),
-    list: Effect.fn("Channel.list")(function* () {
-      return yield* Effect.forEach([...store.channels("channel"), ...store.channels("direct")], counted);
-    }),
-    history: Effect.fn("Channel.history")(function* (channel, before, limit) {
+      return resolveTarget(from, channel);
+    },
+    read: (who, opt = {}) =>
+      store.locked(async () => {
+        const channel = await resolveTarget(who, opt.target ?? "");
+        const row = store.channel(channel);
+        if (!row) throw refused(t("server.channel.channelGone"));
+        const target = targetOfChannel(row);
+        const limit = opt.limit != null && opt.limit !== 0 ? Math.min(Math.max(opt.limit, 1), 100) : readLimit;
+        const cursor = (await qr.readCursor(db.sql, { participant_id: who, channel_id: channel }))?.read_number ?? 0;
+        const rows =
+          opt.unread === true
+            ? await qm.messagesAfter(db.sql, { channel_id: channel, number: cursor, n: limit })
+            : [...(await qm.messagesBefore(db.sql, { channel_id: channel, number: opt.before ?? 2147483647, n: limit }))].toReversed();
+        const newest = rows.at(-1);
+        if (newest && (opt.before == null || opt.before === 0)) await readThrough(who, channel, newest.number);
+        store.rememberReadTarget(
+          who,
+          target,
+          (participant) => participant === userId || agents.isOrchestrator(participant) || sessions.isReachable(participant),
+        );
+        const oldest = rows[0];
+        const older = oldest !== undefined && (await qm.messagesBefore(db.sql, { channel_id: channel, number: oldest.number, n: 1 })).length > 0;
+        return { target, messages: rows.map((m) => envelopeOf(m, target)), older };
+      }),
+    unread: (who) =>
+      store.locked(async () => {
+        try {
+          return (await inboxRows(who)).map(({ target, ...r }): T.ChannelUnread => ({ channel: target, ...r }));
+        } catch (c) {
+          // What is unread is a hint for the one asking: none, said in the log, rather than a failed turn.
+          log.warn(`chat: unread of ${who}: ${String(c)}`);
+          return [];
+        }
+      }),
+    list: async () => {
+      const out: T.Channel[] = [];
+      for (const row of [...store.channels("channel"), ...store.channels("direct")]) out.push(await counted(row));
+      return out;
+    },
+    history: async (channel, before, limit) => {
       // A channel as the user names it (general, #general, @fox) as well as by id.
-      const at = store.channel(channel) ? channel : yield* resolveTarget(userId, channel);
-      const rows = yield* db.run(qm.messagesBefore({ channel_id: at, number: before ?? 2147483647, n: Math.min(Math.max(limit ?? 50, 1), 200) }));
+      const at = store.channel(channel) ? channel : await resolveTarget(userId, channel);
+      const rows = await qm.messagesBefore(db.sql, { channel_id: at, number: before ?? 2147483647, n: Math.min(Math.max(limit ?? 50, 1), 200) });
       return [...rows].toReversed().map(toMessage);
-    }),
-    markRead: Effect.fn("Channel.markRead")(function* (channel, seq) {
-      if (!store.channel(channel)) return yield* missing(t("server.channel.noChannel", { id: channel }), [lookIn.channel]);
-      yield* readThrough(userId, channel, seq);
-      yield* publishChannel(channel);
-    }, store.locked),
+    },
+    markRead: (channel, seq) =>
+      store.locked(async () => {
+        if (!store.channel(channel)) throw missing(t("server.channel.noChannel", { id: channel }), [lookIn.channel]);
+        await readThrough(userId, channel, seq);
+        await publishChannel(channel);
+      }),
     threadOfSession,
-    userInThread: Effect.map(
-      core.subscribe,
-      Stream.flatMap((e) =>
+    userInThread: () =>
+      mapped(core.subscribe(), (e) =>
         e.type === "messageChanged" && e.thread && e.message.actor.kind === "user" && e.message.kind === "chat"
-          ? Stream.make({ thread: e.thread, message: e.message })
-          : Stream.empty,
+          ? { thread: e.thread, message: e.message }
+          : undefined,
       ),
-    ),
     ...dir,
-    start,
-  });
-  const news2 = yield* sessions.news;
-  yield* Effect.forkScoped(Stream.runForEach(news2, onSessionNews));
-  const subscribe2 = yield* PubSub.subscribe(said);
-  yield* Effect.forkScoped(Stream.runForEach(Stream.fromSubscription(subscribe2), onDirectMessage));
-  const news = yield* mailbox.news;
-  yield* Effect.forkScoped(
-    Stream.runForEach(news, (change) => {
-      switch (change._tag) {
-        case "Consumed":
-          return reacting(change.envelope, change.session, handedEmoji, true).pipe(Effect.asVoid, bestEffort(`chat: 👀 on ${change.envelope}`));
-        case "Handed":
-          return Effect.void;
-        case "Braked":
-          return Effect.gen(function* () {
-            const where = (yield* shape.threadOfSession(change.session)) ?? store.defaultId();
-            const name = sessions.sessionOf(change.session)?.name ?? change.session;
-            yield* post({ _tag: "Notice", channel: where, text: t("server.channel.breaker", { name, failed: change.failed }), code: "wake_breaker" });
-          }).pipe(bestEffort(`chat: wake breaker for ${change.session}`));
-      }
-    }),
-  );
-  return shape;
-});
+    boot: start,
+    close: async () => {
+      th.close();
+      await tasks.close();
+      r.close();
+    },
+  };
 
-/** The chat's startup, after the sessions came back: their threads, and what waited for them. */
-export const start = Layer.effectDiscard(Effect.flatMap(Channel, (c) => c.start));
+  // Subscribed now, so nothing told after the service is made is missed; each read one at a time, in order.
+  const sessionNews = sessions.news();
+  tasks.run("chat: session news", async (signal) => {
+    try {
+      for (let n = await sessionNews.next(signal); n.done !== true; n = await sessionNews.next(signal)) await onSessionNews(n.value);
+    } finally {
+      sessionNews.close();
+    }
+  });
+  const directs = said.subscribe();
+  tasks.run("chat: direct messages", async (signal) => {
+    try {
+      for (let m = await directs.next(signal); m.done !== true; m = await directs.next(signal)) onDirectMessage(m.value);
+    } finally {
+      directs.close();
+    }
+  });
+  const deliveries = mailbox.news();
+  tasks.run("chat: delivery news", async (signal) => {
+    try {
+      for (let n = await deliveries.next(signal); n.done !== true; n = await deliveries.next(signal)) {
+        const change = n.value;
+        switch (change._tag) {
+          case "Consumed":
+            await bestEffort(log, `chat: 👀 on ${change.envelope}`, () => reacting(change.envelope, change.session, handedEmoji, true));
+            break;
+          case "Handed":
+            break;
+          case "Braked":
+            await bestEffort(log, `chat: wake breaker for ${change.session}`, async () => {
+              const where = (await shape.threadOfSession(change.session)) ?? store.defaultId();
+              const name = sessions.sessionOf(change.session)?.name ?? change.session;
+              await post({ _tag: "Notice", channel: where, text: t("server.channel.breaker", { name, failed: change.failed }), code: "wake_breaker" });
+            });
+            break;
+        }
+      }
+    } finally {
+      deliveries.close();
+    }
+  });
+  return shape;
+}

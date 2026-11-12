@@ -1,6 +1,14 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { auditBizCodeRegistry, compareStoredEnums, formatFinding, isBoundaryViolation, reviewSchemaSources, scanSchemaBoundaries } from "./schema-audit.ts";
+import {
+  auditBizCodeRegistry,
+  auditSecretClass,
+  compareStoredEnums,
+  formatFinding,
+  isBoundaryViolation,
+  reviewSchemaSources,
+  scanSchemaBoundaries,
+} from "./schema-audit.ts";
 
 const contract = [{ column: "issue.priority", protocol: "PriorityValues", values: ["high", "low"] }];
 const issueSql = (column: string) => `CREATE TABLE issue (id text primary key, ${column});`;
@@ -59,7 +67,7 @@ describe("the stored enum contract", () => {
   });
 
   test("regression: generated schema text cannot satisfy an independent SQL comparison", () => {
-    const sources = new Map([["apps/server/db/generated/types.ts", 'export const Priority = Schema.Literals(["high"]);']]);
+    const sources = new Map([["apps/server/db/generated/types.ts", 'export const Priority = z.enum(["high"]);']]);
     expect(reviewSchemaSources(sources)).toEqual([]);
     expect(compareStoredEnums(issueSql("priority text check (priority in ('high'))"), contract).filter(isBoundaryViolation)).toHaveLength(1);
   });
@@ -95,15 +103,16 @@ describe("source review hints", () => {
   });
 
   test.each([
-    [serverFile, 'Schema.Literals(["a", "b"])', "inline-literals"],
-    [serverFile, 'Schema.Literals(\n [\n "a",\n "b"\n ]\n)', "inline-literals"],
+    [serverFile, 'z.enum(["a", "b"])', "inline-literals"],
+    [serverFile, 'z.enum(\n [\n "a",\n "b"\n ]\n)', "inline-literals"],
+    [serverFile, 'z.union([z.literal("a"), z.literal("b")])', "inline-literals"],
     [protocolFile, 'export interface Item { kind:\n "a" |\n "b"; }', "inline-union"],
     [protocolFile, 'export const ModeValues = ["a", "b"] as const;\nexport interface Item {\n mode?: Mode;\n}', "optional-enum"],
     [protocolFile, "export interface Item {\n enabled?: boolean;\n}", "optional-collection-or-flag"],
     [protocolFile, "export interface Item {\n items?: readonly Item[];\n}", "optional-collection-or-flag"],
     [serverFile, "DeliverableValues\n .find(\n value => value === input)", "manual-enum-coercion"],
-    ["apps/server/src/modules/tool/schemas.ts", "priority:\n Schema.optionalKey(\n Schema.String)", "tool-downgrade"],
-    ["packages/ai/src/messages.ts", "const MessageSchema:\n Schema.Codec<Message> = Schema.Struct({});", "subpackage-dual-shape"],
+    ["apps/server/src/modules/tool/schemas.ts", "priority:\n z.exactOptional(\n z.string())", "tool-downgrade"],
+    ["packages/ai/src/messages.ts", "const MessageSchema:\n z.ZodType<Message> = z.object({});", "subpackage-dual-shape"],
   ])("reports a candidate without treating it as a proven defect: %s / %s", (path, source, category) => {
     const findings = review(path, source);
     expect(findings.map((finding) => finding.category)).toContain(category);
@@ -111,11 +120,12 @@ describe("source review hints", () => {
   });
 
   test.each([
-    [serverFile, "Schema.Literals(ModeValues)"],
+    [serverFile, "z.enum(ModeValues)"],
     [serverFile, "const decode = jsonOrNone(localSchema);"],
     [protocolFile, "export interface Item {\n issue: IssueId;\n enabled: boolean;\n}"],
     [protocolFile, 'export const ModeValues = ["a", "b"] as const;\nexport interface ItemUpdate {\n mode?: Mode;\n enabled?: boolean;\n}'],
-    ["apps/server/src/modules/tool/schemas.ts", "priority: Schema.optionalKey(S.Priority)"],
+    ["apps/server/src/modules/tool/schemas.ts", "priority: z.exactOptional(S.Priority)"],
+    ["packages/ai/src/messages.ts", "const MessageSchema = z.object({}) satisfies z.ZodType<Message>;"],
   ])("does not report the corresponding explicit form: %s / %s", (path, source) => {
     expect(review(path, source)).toEqual([]);
   });
@@ -124,12 +134,33 @@ describe("source review hints", () => {
     expect(review(serverFile, "\n\njsonOrNone(\n S.Conflict\n)")[0]?.location).toBe(`${serverFile}:3`);
   });
 
-  test("rejects Schema.Redacted without disallowJsonEncode as a boundary violation", () => {
-    const unsafe = review(serverFile, "const ApiKey = Schema.Redacted(Schema.String);");
-    expect(unsafe.map((f) => f.category)).toEqual(["redacted-json-exposure"]);
+  test("rejects a secret revealed in the protocol as a boundary violation", () => {
+    const unsafe = review("packages/protocol/src/setting/schema.ts", "export const Key = secretOf(z.string()).transform((s) => s.reveal());");
+    expect(unsafe.map((f) => f.category)).toEqual(["secret-exposure"]);
     expect(unsafe.every(isBoundaryViolation)).toBe(true);
-    expect(formatFinding(unsafe[0]!)).toContain("disallowJsonEncode: true");
-    expect(review(serverFile, "const ApiKey = Schema.Redacted(\n  Schema.String,\n  { disallowJsonEncode: true },\n);")).toEqual([]);
+    expect(formatFinding(unsafe[0]!)).toContain("never calls `.reveal()`");
+    // The server reveals a secret where it uses it (a header, the file it is kept in): not on the wire.
+    expect(review(serverFile, "const header = key.reveal();")).toEqual([]);
+  });
+
+  test("rejects a Secret that would go into JSON or a log", () => {
+    const safe = [
+      "export class Secret {",
+      "  readonly #value: string;",
+      "  constructor(value: string) { this.#value = value; }",
+      "  reveal(): string { return this.#value; }",
+      '  toJSON(): never { throw new Error("never JSON"); }',
+      '  toString(): string { return "[secret]"; }',
+      '  [Symbol.for("nodejs.util.inspect.custom")](): string { return "[secret]"; }',
+      "}",
+    ].join("\n");
+    expect(auditSecretClass(safe)).toEqual([]);
+    const leaky = safe.replace('toJSON(): never { throw new Error("never JSON"); }', "toJSON(): string { return this.#value; }");
+    const found = auditSecretClass(leaky);
+    expect(found.map((f) => f.category)).toEqual(["secret-exposure"]);
+    expect(found[0]?.detail).toContain("toJSON");
+    expect(found.every(isBoundaryViolation)).toBe(true);
+    expect(auditSecretClass("export const Secret = String;").map((f) => f.detail)).toEqual(["no `export class Secret`"]);
   });
 
   test("rejects unbranded entity IDs on non-request protocol interfaces and type unions as boundary violations", () => {

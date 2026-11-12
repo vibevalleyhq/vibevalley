@@ -1,7 +1,7 @@
-import { Clock, Effect, Option } from "effect";
-
+import type { Clock } from "@vibevalley/async";
 import { isBusy } from "@vibevalley/protocol/rules";
 
+import type { Logger } from "#/infra/log.ts";
 import type { Session } from "#/modules/session/session.ts";
 import { type Consumed, type Delivered, DeliveryRefused, type LaunchActivity, type Returned } from "#/modules/session/signals.ts";
 
@@ -9,11 +9,11 @@ import type { DeliveryRow } from "./deliveries.ts";
 
 interface PumpPorts<Message> {
   readonly pending: (session: string) => readonly DeliveryRow[];
-  readonly hand: (session: string, envelope: string, launch: string, at: number) => Effect.Effect<void>;
-  readonly consume: (session: string, envelope: string, at: number) => Effect.Effect<void>;
-  readonly returnHanded: (session: string) => Effect.Effect<readonly string[]>;
-  readonly handBack: (session: string, envelope: string) => Effect.Effect<void>;
-  readonly dropSession: (session: string, why: string) => Effect.Effect<void>;
+  readonly hand: (session: string, envelope: string, launch: string, at: number) => Promise<void>;
+  readonly consume: (session: string, envelope: string, at: number) => Promise<void>;
+  readonly returnHanded: (session: string) => Promise<readonly string[]>;
+  readonly handBack: (session: string, envelope: string) => Promise<void>;
+  readonly dropSession: (session: string, why: string) => Promise<void>;
   readonly breakerSpoke: (session: string) => void;
   readonly breakerFailed: (session: string) => { readonly count: number; readonly tripped: boolean };
   readonly breakerOpen: (session: string) => boolean;
@@ -21,23 +21,24 @@ interface PumpPorts<Message> {
   readonly closed: () => boolean;
   readonly isHosted: (id: string) => boolean;
   readonly message: (row: DeliveryRow) => Message;
-  readonly wakeInput: (recipient: string, rows: readonly DeliveryRow[], messages: readonly Message[]) => Effect.Effect<string>;
-  readonly handToHost: (recipient: string, messages: readonly Message[], primary: DeliveryRow) => Effect.Effect<void>;
-  readonly consumedMessages: (recipient: string, envelopes: readonly string[]) => Effect.Effect<void>;
-  readonly breakerNotice: (recipient: string, failed: number) => Effect.Effect<void>;
-  readonly later: (key: string, ms: number, effect: () => Effect.Effect<void>) => void;
+  readonly wakeInput: (recipient: string, rows: readonly DeliveryRow[], messages: readonly Message[]) => Promise<string>;
+  readonly handToHost: (recipient: string, messages: readonly Message[], primary: DeliveryRow) => Promise<void>;
+  readonly consumedMessages: (recipient: string, envelopes: readonly string[]) => Promise<void>;
+  readonly breakerNotice: (recipient: string, failed: number) => Promise<void>;
+  readonly later: (key: string, ms: number, effect: () => Promise<void>) => void;
   readonly noticeBatchMs: number;
   readonly retryWakeMs: number;
 }
 
 interface Pump {
-  readonly kick: (recipient: string) => Effect.Effect<void>;
-  readonly activity: (activity: LaunchActivity) => Effect.Effect<void>;
-  readonly consumed: (input: Consumed) => Effect.Effect<void>;
-  readonly returned: (input: Returned) => Effect.Effect<void>;
+  readonly kick: (recipient: string) => Promise<void>;
+  readonly activity: (activity: LaunchActivity) => Promise<void>;
+  readonly consumed: (input: Consumed) => Promise<void>;
+  readonly returned: (input: Returned) => Promise<void>;
 }
 
-export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts<Message>): Pump => {
+export const makePump = <Message>(deps: { readonly session: Session; readonly clock: Clock; readonly log: Logger }, ports: PumpPorts<Message>): Pump => {
+  const { session: sessions, clock, log } = deps;
   const holds = new Map<string, Set<"compacting">>();
   const held = (session: string) => (holds.get(session)?.size ?? 0) > 0;
   const hold = (session: string, reason: "compacting", on: boolean) => {
@@ -51,42 +52,43 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
     }
   };
 
-  const deliver = (recipient: string, text: string, rows: readonly DeliveryRow[]): Effect.Effect<Delivered, DeliveryRefused> => {
+  /** What came of handing rows to recipient; refused says why it was not woken. */
+  const deliver = async (recipient: string, text: string, rows: readonly DeliveryRow[]): Promise<Delivered | { readonly refused: string }> => {
     const first = rows.findLast((row) => row.payload.trigger.actor.kind === "user") ?? rows.find((row) => row.wakes && row.held_by === null) ?? rows[0];
-    if (!first) return DeliveryRefused.make({ reason: "empty" });
-    return sessions.deliver(recipient, text, {
-      trigger:
-        first.payload.trigger.meta.trigger !== undefined
-          ? { ...first.payload.trigger.meta.trigger, message: first.envelope_id }
-          : { kind: "comment", message: first.envelope_id, ...(first.channel_id ? { channel: first.channel_id } : {}) },
-      envelopeIds: rows.map((row) => row.envelope_id),
-      byUserComment: rows.some((row) => row.payload.trigger.actor.kind === "user"),
-    });
+    if (!first) return { refused: "empty" };
+    try {
+      return await sessions.deliver(recipient, text, {
+        trigger:
+          first.payload.trigger.meta.trigger !== undefined
+            ? { ...first.payload.trigger.meta.trigger, message: first.envelope_id }
+            : { kind: "comment", message: first.envelope_id, ...(first.channel_id ? { channel: first.channel_id } : {}) },
+        envelopeIds: rows.map((row) => row.envelope_id),
+        byUserComment: rows.some((row) => row.payload.trigger.actor.kind === "user"),
+      });
+    } catch (e) {
+      if (e instanceof DeliveryRefused) return { refused: e.reason };
+      throw e;
+    }
   };
 
-  const kick = Effect.fnUntraced(function* (recipient: string): Effect.fn.Return<void> {
+  const kick = async (recipient: string): Promise<void> => {
     const rows = ports.readyInputs(recipient, ports.pending(recipient));
     if (held(recipient)) return;
     const waking = rows.filter((row) => row.wakes && row.held_by === null && row.state === "pending");
     if (ports.isHosted(recipient)) {
-      const now = yield* Clock.currentTimeMillis;
-      yield* Effect.forEach(
-        Map.groupBy(waking, (row) => row.scope),
-        ([scope, allowed]) =>
-          Effect.gen(function* () {
-            const grouped = rows.filter((row) => row.scope === scope && row.state === "pending");
-            const primary = allowed.findLast((row) => row.payload.trigger.actor.kind === "user") ?? allowed[0];
-            if (!primary) return;
-            const messages = grouped.map(ports.message);
-            yield* Effect.forEach(grouped, (row) => ports.hand(recipient, row.envelope_id, `orchestrator:${row.envelope_id}`, now), { discard: true });
-            yield* ports.handToHost(recipient, messages, primary);
-          }),
-        { discard: true },
-      );
+      const now = clock.now();
+      for (const [scope, allowed] of Map.groupBy(waking, (row) => row.scope)) {
+        const grouped = rows.filter((row) => row.scope === scope && row.state === "pending");
+        const primary = allowed.findLast((row) => row.payload.trigger.actor.kind === "user") ?? allowed[0];
+        if (!primary) continue;
+        const messages = grouped.map(ports.message);
+        for (const row of grouped) await ports.hand(recipient, row.envelope_id, `orchestrator:${row.envelope_id}`, now);
+        await ports.handToHost(recipient, messages, primary);
+      }
       return;
     }
     const session = sessions.sessionOf(recipient);
-    if (!session) return yield* ports.dropSession(recipient, "left");
+    if (!session) return ports.dropSession(recipient, "left");
     if (isBusy(session)) {
       if (rows.some((row) => row.state === "pending" && row.held_by === null)) ports.later(`notice:${recipient}`, ports.noticeBatchMs, () => notify(recipient));
       return;
@@ -94,30 +96,31 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
     if (waking.length === 0 || ports.breakerOpen(recipient)) return;
     const batch = rows.filter((row) => row.state === "pending");
     const messages = batch.map(ports.message);
-    const wakeInput2 = yield* ports.wakeInput(recipient, batch, messages);
-    const delivered = yield* deliver(recipient, wakeInput2, batch).pipe(
-      Effect.catchTag("DeliveryRefused", (refused) => Effect.as(Effect.logInfo(`mailbox: ${recipient} not woken: ${refused.reason}`), undefined)),
-    );
-    if (!delivered) return;
-    const now = yield* Clock.currentTimeMillis;
-    yield* Effect.forEach(batch, (row) => ports.hand(recipient, row.envelope_id, delivered.launch, now), { discard: true });
-  });
+    const input = await ports.wakeInput(recipient, batch, messages);
+    const delivered = await deliver(recipient, input, batch);
+    if ("refused" in delivered) {
+      log.info(`mailbox: ${recipient} not woken: ${delivered.refused}`);
+      return;
+    }
+    const now = clock.now();
+    for (const row of batch) await ports.hand(recipient, row.envelope_id, delivered.launch, now);
+  };
 
-  const notify = Effect.fnUntraced(function* (recipient: string): Effect.fn.Return<void> {
+  const notify = async (recipient: string): Promise<void> => {
     if (held(recipient)) return;
     const session = sessions.sessionOf(recipient);
     if (!session) return;
-    if (!isBusy(session)) return yield* kick(recipient);
+    if (!isBusy(session)) return kick(recipient);
     const rows = ports.readyInputs(recipient, ports.pending(recipient)).filter((row) => row.state === "pending" && row.urgency !== "queue");
     if (!rows.some((row) => row.urgency === "steer" && row.held_by === null)) return;
-    const wakeInput2 = yield* ports.wakeInput(recipient, rows, rows.map(ports.message));
-    const delivered = yield* Effect.option(deliver(recipient, wakeInput2, rows));
-    if (Option.isNone(delivered)) return;
-    const now = yield* Clock.currentTimeMillis;
-    yield* Effect.forEach(rows, (row) => ports.hand(recipient, row.envelope_id, delivered.value.launch, now), { discard: true });
-  });
+    const input = await ports.wakeInput(recipient, rows, rows.map(ports.message));
+    const delivered = await deliver(recipient, input, rows);
+    if ("refused" in delivered) return;
+    const now = clock.now();
+    for (const row of rows) await ports.hand(recipient, row.envelope_id, delivered.launch, now);
+  };
 
-  const activity = Effect.fnUntraced(function* (activity: LaunchActivity): Effect.fn.Return<void> {
+  const activity = async (activity: LaunchActivity): Promise<void> => {
     if (ports.closed()) return;
     switch (activity._tag) {
       case "Spoke":
@@ -127,38 +130,39 @@ export const makePump = <Message>(sessions: Session["Service"], ports: PumpPorts
         return;
       case "HandedOff":
       case "Ended": {
-        const rolled = yield* ports.returnHanded(activity.id);
+        const rolled = await ports.returnHanded(activity.id);
         if (rolled.length > 0) {
           if (!activity.spoke) {
             const { count, tripped } = ports.breakerFailed(activity.id);
-            if (tripped) yield* ports.breakerNotice(activity.id, count);
+            if (tripped) await ports.breakerNotice(activity.id, count);
           }
           ports.later(`wake:${activity.id}`, ports.retryWakeMs, () => kick(activity.id));
           return;
         }
-        return yield* kick(activity.id);
+        return kick(activity.id);
       }
       case "Closed":
-        yield* ports.returnHanded(activity.id);
+        await ports.returnHanded(activity.id);
         return;
       case "Compacting":
         hold(activity.id, "compacting", activity.on);
-        if (!activity.on && !held(activity.id)) yield* kick(activity.id);
+        if (!activity.on && !held(activity.id)) await kick(activity.id);
         return;
     }
-  });
+  };
 
   return {
     kick,
     activity,
-    consumed: (input) =>
-      Effect.gen(function* () {
-        const now = yield* Clock.currentTimeMillis;
-        const accepted = new Set(input.envelopeIds);
-        const messages = ports.pending(input.session).flatMap((row) => (accepted.has(row.envelope_id) && row.message_id !== null ? [row.message_id] : []));
-        yield* Effect.forEach(input.envelopeIds, (id) => ports.consume(input.session, id, now), { discard: true });
-        yield* ports.consumedMessages(input.session, messages);
-      }),
-    returned: (input) => Effect.forEach(input.envelopeIds, (id) => ports.handBack(input.session, id), { discard: true }),
+    consumed: async (input) => {
+      const now = clock.now();
+      const accepted = new Set(input.envelopeIds);
+      const messages = ports.pending(input.session).flatMap((row) => (accepted.has(row.envelope_id) && row.message_id !== null ? [row.message_id] : []));
+      for (const id of input.envelopeIds) await ports.consume(input.session, id, now);
+      await ports.consumedMessages(input.session, messages);
+    },
+    returned: async (input) => {
+      for (const id of input.envelopeIds) await ports.handBack(input.session, id);
+    },
   };
 };

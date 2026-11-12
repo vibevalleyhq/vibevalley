@@ -1,76 +1,9 @@
-import * as stylex from "@stylexjs/stylex";
 import { type ComponentProps, For, Show } from "solid-js";
 
 import { Menu } from "@vibevalley/base-ui";
 
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
-import { positionerAttrs } from "./positioner";
-
-const popIn = stylex.keyframes({
-  from: { opacity: 0, scale: 0.98 },
-});
-
-const styles = stylex.create({
-  trigger: {
-    display: "inline-flex",
-    width: "1.75rem",
-    height: "1.75rem",
-    flexShrink: 0,
-    cursor: "pointer",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-md)",
-    color: {
-      default: "var(--color-muted)",
-      "@media (hover: hover)": { default: null, ":hover": "var(--color-ink)" },
-      ":is([data-popup-open])": "var(--color-ink)",
-    },
-    backgroundColor: {
-      default: null,
-      "@media (hover: hover)": { default: null, ":hover": "var(--color-selected)" },
-      ":is([data-popup-open])": "var(--color-selected)",
-    },
-    transitionProperty: "color, background-color, border-color",
-    transitionDuration: "120ms",
-    transitionTimingFunction: "var(--ease-out)",
-  },
-  popup: {
-    display: "flex",
-    minWidth: "11rem",
-    animationName: { default: popIn, "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: "280ms",
-    animationTimingFunction: "var(--ease-out)",
-    animationFillMode: "both",
-    flexDirection: "column",
-    borderRadius: "var(--radius-lg)",
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-    padding: "0.25rem",
-    boxShadow: "var(--shadow-float)",
-    outlineStyle: "none",
-  },
-  above: { transformOrigin: "bottom right" },
-  below: { transformOrigin: "top right" },
-  separator: { marginBlock: "0.25rem", height: 1, backgroundColor: "var(--color-line)" },
-  item: {
-    display: "flex",
-    height: "1.75rem",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.5rem",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.5rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    outlineStyle: "none",
-    backgroundColor: { default: null, ":is([data-highlighted])": "var(--color-hover)" },
-  },
-  danger: { color: "var(--color-berry)" },
-  icon: { color: "var(--color-muted)" },
-});
 
 export interface MoreItem {
   /** Its data-key: what a test or a style finds it by. */
@@ -104,21 +37,34 @@ export function MoreMenu(props: {
         data-key={props.dataKey}
         aria-label={props.label}
         title={props.label}
-        {...stylex.attrs(styles.trigger)}
+        class="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted transition-[color,background-color,border-color] duration-120 ease-out hover:bg-selected hover:text-ink data-popup-open:bg-selected data-popup-open:text-ink"
       >
         <Icon name={props.icon ?? "more"} size={16} />
       </Menu.Trigger>
       <Menu.Portal>
-        <Menu.Positioner {...positionerAttrs()} side={props.side ?? "bottom"} align="end">
-          <Menu.Popup aria-label={props.label} {...stylex.attrs(styles.popup, props.side === "top" ? styles.above : styles.below)}>
+        <Menu.Positioner class="z-30" side={props.side ?? "bottom"} align="end">
+          <Menu.Popup
+            aria-label={props.label}
+            class={[
+              "flex min-w-44 animate-pop-in flex-col rounded-lg border border-line bg-page p-1 shadow-float outline-none",
+              props.side === "top" ? "origin-bottom-right" : "origin-top-right",
+            ]}
+          >
             <For each={props.items}>
               {(item) => (
                 <>
                   <Show when={item.danger}>
-                    <Menu.Separator {...stylex.attrs(styles.separator)} />
+                    <Menu.Separator class="my-1 h-px bg-line" />
                   </Show>
-                  <Menu.Item data-key={item.key} onClick={() => item.onSelect()} {...stylex.attrs(styles.item, item.danger === true && styles.danger)}>
-                    <Show when={item.icon}>{(icon) => <Icon name={icon()} size={14} styles={item.danger !== true && styles.icon} />}</Show>
+                  <Menu.Item
+                    data-key={item.key}
+                    onClick={() => item.onSelect()}
+                    class={[
+                      "flex h-7 cursor-pointer items-center gap-2 rounded-md px-2 text-sm outline-none data-highlighted:bg-hover",
+                      item.danger === true && "text-berry",
+                    ]}
+                  >
+                    <Show when={item.icon}>{(icon) => <Icon name={icon()} size={14} class={item.danger !== true && "text-muted"} />}</Show>
                     {item.label}
                   </Menu.Item>
                 </>

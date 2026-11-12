@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect, test } from "vite-plus/test";
 
 import { add, begin, finished, readyTodos, requeue, settle, type Todo, TodoError, text, update } from "./todo.ts";
 
@@ -18,13 +18,13 @@ const three = () => {
 };
 
 describe("an agent's own todos", () => {
-  it("added tasks wait, and the first is ready", () => {
+  test("added tasks wait, and the first is ready", () => {
     const g = three();
     expect(ids(readyTodos(g))).toEqual(["read"]);
     expect([g[0]!.by, g[0]!.title, g[0]!.after]).toEqual(["self", "读 auth 的代码", []]);
   });
 
-  it("a batch with any problem changes nothing", () => {
+  test("a batch with any problem changes nothing", () => {
     const g = three();
     for (const [more, want] of [
       [[{ id: "read", brief: "再读一遍" }], "id「read」重复了"],
@@ -49,7 +49,7 @@ describe("an agent's own todos", () => {
     ).toEqual(["这几件互相等，成了一个圈：a、b"]);
   });
 
-  it("done or skipped lets the next start", () => {
+  test("done or skipped lets the next start", () => {
     let g = update(three(), "read", { state: "done", result: "token 在 auth/jwt.go 里判断" });
     expect(ids(readyTodos(g))).toEqual(["fix"]);
     g = update(g, "fix", { state: "skipped" });
@@ -58,7 +58,7 @@ describe("an agent's own todos", () => {
     expect(finished(update(g, "test", { state: "done" }))).toBe(true);
   });
 
-  it("what a task may become", () => {
+  test("what a task may become", () => {
     let g = update(three(), "read", { state: "failed", result: "没权限读" });
     g = update(g, "read", { state: "waiting", brief: "用 sudo 读" });
     expect([g[0]!.tries, g[0]!.brief]).toEqual([1, "用 sudo 读"]);
@@ -69,7 +69,7 @@ describe("an agent's own todos", () => {
     expect(() => update(g, "fix", { after: ["test"] })).toThrow(/成了一个圈/u);
   });
 
-  it("the graph as the model reads it", () => {
+  test("the graph as the model reads it", () => {
     const g = update(three(), "read", { state: "done", result: "在\n  jwt.go" });
     expect(text(g)).toBe(
       [
@@ -82,7 +82,7 @@ describe("an agent's own todos", () => {
     expect(text([])).toBe("现在没有任务。");
   });
 
-  it("a subagent's task goes out and comes back", () => {
+  test("a subagent's task goes out and comes back", () => {
     let [g] = add(
       [],
       [

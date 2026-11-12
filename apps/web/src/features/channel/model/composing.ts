@@ -1,5 +1,5 @@
-import { Schema } from "effect";
 import { type Accessor, createMemo, createSignal, flush, onSettled } from "solid-js";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import { type Attachment, type ChatMessage, type Channel, defaultOrchestrator, type SayRequest, VibeValleyApi, type SpaceView } from "@vibevalley/protocol";
@@ -226,17 +226,17 @@ export function createComposer(core: () => SpaceView | undefined, input: () => H
   };
 }
 
-const DraftSchema = Schema.Struct({
-  text: Schema.optionalKey(Schema.String),
-  reply: Schema.optionalKey(Schema.Struct({ id: Schema.String, number: Schema.Int })),
-  files: orFallback(Schema.Array(S.Attachment), []),
+const DraftSchema = z.object({
+  text: z.exactOptional(z.string()),
+  reply: z.exactOptional(z.object({ id: z.string(), number: z.int() })),
+  files: orFallback(z.array(S.Attachment), []),
 });
 
-export type Draft = typeof DraftSchema.Type;
+export type Draft = z.output<typeof DraftSchema>;
 
 const none: Draft = { files: [] };
 
-const all = defineStored("chat.drafts", Schema.Record(Schema.String, DraftSchema), {});
+const all = defineStored("chat.drafts", z.record(z.string(), DraftSchema), {});
 
 const empty = (d: Draft) => !d.text && !d.reply && d.files.length === 0;
 
@@ -320,7 +320,6 @@ export async function attachFiles(channel: string, files: readonly File[], faile
     const key = ++lastUpload;
     uploads.update((u) => [...u, { key, channel, name: file.name || "file", percent: 0 }]);
     try {
-      // oxlint-disable-next-line eslint/no-await-in-loop -- one upload at a time, in the order picked: the drafts keep the files' order
       drafts.add(channel, await upload(file, (percent) => uploads.update((u) => u.map((x) => (x.key === key ? { ...x, percent } : x)))));
     } catch (e) {
       failed(reasonOf(e));

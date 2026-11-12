@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { Combobox } from "@vibevalley/base-ui";
@@ -18,76 +17,6 @@ import { createAct } from "#/ui/act.ts";
 import { Dialog } from "#/ui/Dialog.tsx";
 
 import { Count } from "./presence";
-
-const styles = stylex.create({
-  switcherBodyComboboxInput: {
-    height: "2.5rem",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: {
-      default: "var(--color-line)",
-      ":focus": "var(--color-focus)",
-    },
-    backgroundColor: "var(--color-page)",
-    paddingInline: "0.75rem",
-    fontSize: "var(--text-base)",
-    lineHeight: "var(--leading-base)",
-    outlineStyle: "none",
-  },
-  switcherBodyComboboxPopup: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.125rem",
-  },
-  switcherBodyComboboxEmpty: {
-    paddingInline: "0.5rem",
-    paddingBlock: "0.5rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  switcherBodyComboboxItem: {
-    display: "flex",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.5rem",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.375rem",
-    backgroundColor: {
-      default: null,
-      ":is([data-highlighted])": "var(--color-selected)",
-    },
-  },
-  switcherBodySpan: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  switcherBodySpanTone: {
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  switcherBodySpanAlt: {},
-  switcherBodyDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.5rem",
-  },
-  switcherBodySpan2: {
-    flexShrink: "0",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-});
 
 const shown = defineAtom(false);
 
@@ -138,16 +67,16 @@ function SwitcherBody(props: { onClose: () => void }) {
   };
   return (
     <Combobox.Root inline autoHighlight inputValue={query()} onInputValueChange={setQuery}>
-      <div {...stylex.attrs(styles.switcherBodyDiv)}>
+      <div class="flex flex-col gap-2">
         <Combobox.Input
           ref={autofocus()}
           data-testid="switcher-input"
           aria-label={t("web.channel.switcher.title")}
           placeholder={t("web.channel.switcher.hint")}
-          {...stylex.attrs(styles.switcherBodyComboboxInput)}
+          class="h-10 rounded-md border border-line focus:border-focus bg-page px-3 text-base outline-none"
         />
-        <Combobox.Popup aria-label={t("web.channel.switcher.title")} {...stylex.attrs(styles.switcherBodyComboboxPopup)}>
-          <Combobox.Empty {...stylex.attrs(styles.switcherBodyComboboxEmpty)}>{t("web.channel.switcher.none")}</Combobox.Empty>
+        <Combobox.Popup aria-label={t("web.channel.switcher.title")} class="flex flex-col gap-0.5">
+          <Combobox.Empty class="px-2 py-2 text-sm text-muted">{t("web.channel.switcher.none")}</Combobox.Empty>
           <For each={targets()} keyed={(t) => `${t.kind}:${t.id}`}>
             {(t) => (
               <Combobox.Item
@@ -159,10 +88,10 @@ function SwitcherBody(props: { onClose: () => void }) {
                   e.preventDefault();
                   go(t());
                 }}
-                {...stylex.attrs(styles.switcherBodyComboboxItem)}
+                class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 data-highlighted:bg-selected"
               >
-                <span {...stylex.attrs(styles.switcherBodySpan, t().unread > 0 ? styles.switcherBodySpanTone : styles.switcherBodySpanAlt)}>{t().label}</span>
-                <span {...stylex.attrs(styles.switcherBodySpan2)}>{t().hint}</span>
+                <span class={["min-w-0 flex-1 truncate text-sm", t().unread > 0 ? "font-semibold" : ""]}>{t().label}</span>
+                <span class="shrink-0 truncate text-xs text-muted">{t().hint}</span>
                 <Show when={t().unread > 0}>
                   <Count n={t().unread} />
                 </Show>

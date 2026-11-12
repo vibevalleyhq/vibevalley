@@ -1,116 +1,8 @@
 import type { JSX } from "@solidjs/web";
-/** @jsxImportSource @solidjs/web */
-import * as stylex from "@stylexjs/stylex";
 
 import type { Copy } from "../i18n/zh";
 import { createReveal, createScrollAnimation } from "../ui/scroll";
-import { Section, domAttrs } from "../ui/ui";
-
-const viewStyles = stylex.create({
-  drift: { position: "relative" },
-  phone: {
-    width: { default: "42%", "@media (width >= 64rem)": "25%" },
-    maxWidth: "180px",
-    position: { default: "relative", "@media (width >= 64rem)": "absolute" },
-  },
-  chatPhone: {
-    right: { default: null, "@media (width >= 64rem)": "17%" },
-    bottom: { default: null, "@media (width >= 64rem)": "-4px" },
-  },
-  issuePhone: {
-    right: { default: null, "@media (width >= 64rem)": "-7%" },
-    bottom: { default: null, "@media (width >= 64rem)": "-44px" },
-  },
-  devicesDiv: {
-    display: "grid",
-    alignItems: "center",
-    gap: "3rem",
-    gridTemplateColumns: {
-      default: null,
-      "@media (width>=64rem)": "minmax(0,.85fr) minmax(0,1.15fr)",
-    },
-  },
-  devicesP: {
-    maxWidth: "36em",
-  },
-  devicesUl: {
-    marginTop: "1.5rem",
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.75rem",
-  },
-  devicesLi: {
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-cream-50)",
-    boxShadow: "inset 0 0 0 2px var(--color-rim), 4px 4px 0 var(--color-drop)",
-    paddingInline: "0.875rem",
-    paddingBlock: "0.5rem",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "var(--text-lg)",
-    lineHeight: "1",
-  },
-  devicesP2: {
-    marginTop: "1.25rem",
-    fontSize: "15px",
-    color: "var(--color-bark-800)",
-  },
-  devicesDiv2: {
-    position: "relative",
-    marginInline: "auto",
-    width: "100%",
-    maxWidth: "640px",
-    paddingBottom: {
-      default: null,
-      "@media (width>=64rem)": "6rem",
-    },
-  },
-  devicesDiv3: {
-    marginTop: {
-      default: "2rem",
-      "@media (width>=64rem)": "0",
-    },
-    display: "flex",
-    justifyContent: "center",
-    gap: "1.5rem",
-  },
-  laptopDiv: {
-    borderStyle: "solid",
-    borderWidth: "6px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-bark-900)",
-    boxShadow: "4px 4px 0 var(--color-drop)",
-  },
-  laptopImg: {
-    display: "block",
-    height: "auto",
-    width: "100%",
-  },
-  laptopDiv2: {
-    marginInline: "-4%",
-    height: "0.75rem",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-cream-300)",
-    boxShadow: "3px 3px 0 var(--color-drop)",
-  },
-  phoneDiv: {
-    borderRadius: "18px",
-    borderStyle: "solid",
-    borderWidth: "7px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-bark-900)",
-    boxShadow: "4px 4px 0 var(--color-drop)",
-  },
-  phoneImg: {
-    display: "block",
-    height: "auto",
-    width: "100%",
-    borderRadius: "10px",
-  },
-});
+import { Section } from "../ui/ui";
 interface Shot {
   src: string;
   srcset: string;
@@ -126,29 +18,31 @@ export default function Devices(props: Props) {
   const root = createReveal<HTMLElement>();
   return (
     <Section ref={root.set} id="devices" title={props.copy.title}>
-      <div {...stylex.attrs(viewStyles.devicesDiv)}>
+      <div class="grid items-center gap-12 lg:grid-cols-[minmax(0,.85fr)_minmax(0,1.15fr)]">
         <div>
-          <p data-reveal {...stylex.attrs(viewStyles.devicesP)}>
+          <p data-reveal class="max-w-[36em]">
             {props.copy.text}
           </p>
-          <ul role="list" data-reveal {...stylex.attrs(viewStyles.devicesUl)}>
+          <ul role="list" data-reveal class="mt-6 flex flex-wrap gap-3">
             {props.copy.platforms.map((p) => (
-              <li {...stylex.attrs(viewStyles.devicesLi)}>{p}</li>
+              <li class="border-2 border-bark-900 bg-cream-50 [box-shadow:inset_0_0_0_2px_var(--color-rim),_4px_4px_0_var(--color-drop)] px-3.5 py-2 font-pixel text-lg leading-none">
+                {p}
+              </li>
             ))}
           </ul>
-          <p data-reveal {...stylex.attrs(viewStyles.devicesP2)}>
+          <p data-reveal class="mt-5 text-[length:15px] text-bark-800">
             {props.copy.note}
           </p>
         </div>
-        <div {...stylex.attrs(viewStyles.devicesDiv2)}>
+        <div class="relative mx-auto w-full max-w-160 lg:pb-24">
           <Drift rate={0.03}>
             <Laptop shot={props.mac} alt={props.copy.shots.mac} />
           </Drift>
-          <div {...stylex.attrs(viewStyles.devicesDiv3)}>
-            <Drift rate={-0.06} styles={[viewStyles.phone, viewStyles.chatPhone]}>
+          <div class="mt-8 lg:mt-0 flex justify-center gap-6">
+            <Drift rate={-0.06} class={["w-[42%] lg:w-1/4 max-w-45 relative lg:absolute", "lg:right-[17%] lg:-bottom-1"]}>
               <Phone shot={props.phones[0]} alt={props.copy.shots.chat} />
             </Drift>
-            <Drift rate={-0.11} styles={[viewStyles.phone, viewStyles.issuePhone]}>
+            <Drift rate={-0.11} class={["w-[42%] lg:w-1/4 max-w-45 relative lg:absolute", "lg:-right-[7%] lg:-bottom-11"]}>
               <Phone shot={props.phones[1]} alt={props.copy.shots.tickets} />
             </Drift>
           </div>
@@ -157,12 +51,12 @@ export default function Devices(props: Props) {
     </Section>
   );
 }
-function Drift(props: { rate: number; styles?: stylex.StyleXStyles; children: JSX.Element }) {
+function Drift(props: { rate: number; class?: JSX.ClassValue | undefined; children: JSX.Element }) {
   const ref = createScrollAnimation<HTMLDivElement>("self", ["start end", "end start"], () => [
     { keyframes: { transform: [`translateY(${600 * props.rate}px)`, `translateY(${-600 * props.rate}px)`] } },
   ]);
   return (
-    <div ref={ref.set} {...domAttrs(viewStyles.drift, props.styles)}>
+    <div ref={ref.set} class={["relative", props.class]}>
       {props.children}
     </div>
   );
@@ -170,7 +64,7 @@ function Drift(props: { rate: number; styles?: stylex.StyleXStyles; children: JS
 function Laptop(props: { shot: Shot; alt: string }) {
   return (
     <div>
-      <div {...stylex.attrs(viewStyles.laptopDiv)}>
+      <div class="border-6 border-bark-900 bg-bark-900 [box-shadow:4px_4px_0_var(--color-drop)]">
         <img
           loading="lazy"
           decoding="async"
@@ -180,16 +74,16 @@ function Laptop(props: { shot: Shot; alt: string }) {
           width={props.shot.width}
           height={props.shot.height}
           alt={props.alt}
-          {...stylex.attrs(viewStyles.laptopImg)}
+          class="block h-auto w-full"
         />
       </div>
-      <div {...stylex.attrs(viewStyles.laptopDiv2)} />
+      <div class="-mx-[4%] h-3 border-2 border-bark-900 bg-cream-300 [box-shadow:3px_3px_0_var(--color-drop)]" />
     </div>
   );
 }
 function Phone(props: { shot: Shot; alt: string }) {
   return (
-    <div {...stylex.attrs(viewStyles.phoneDiv)}>
+    <div class="rounded-[18px] border-7 border-bark-900 bg-bark-900 [box-shadow:4px_4px_0_var(--color-drop)]">
       <img
         loading="lazy"
         decoding="async"
@@ -197,7 +91,7 @@ function Phone(props: { shot: Shot; alt: string }) {
         width={props.shot.width}
         height={props.shot.height}
         alt={props.alt}
-        {...stylex.attrs(viewStyles.phoneImg)}
+        class="block h-auto w-full rounded-[10px]"
       />
     </div>
   );

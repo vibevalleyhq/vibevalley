@@ -6,7 +6,7 @@ Query、Router、Form、Table 的无样式实现和接口约定放在本目录�
 |---|---|---|---|
 | Query | [query/README.md](apps/web/src/infra/query/README.md) | REST 读取、去重、缓存、失效、刷新 | SSE 核心状态、写操作、乐观意图 |
 | Router | [router/README.md](apps/web/src/infra/router/README.md) | URL、匹配、历史、嵌套布局 | 请求缓存、业务权限、数据加载 |
-| Form | [form/README.md](apps/web/src/infra/form/README.md) | Effect Schema 解码、字段状态、校验和提交生命周期 | 服务端业务判断、持久化草稿、自动生成界面 |
+| Form | [form/README.md](apps/web/src/infra/form/README.md) | Zod 解码、字段状态、校验和提交生命周期 | 服务端业务判断、持久化草稿、自动生成界面 |
 | Table | [table/README.md](apps/web/src/infra/table/README.md) | 行列模型、排序、分页和选择 | 请求、URL、虚拟滚动、业务动作 |
 
 ## 共同接口约定
@@ -16,7 +16,7 @@ Query、Router、Form、Table 的无样式实现和接口约定放在本目录�
 - 非响应式命令使用普通方法，例如 `form.reset()`、`router.navigate()`。实例和命令的引用在其生命周期内稳定。
 - 创建实例不读取全局路由、缓存或登录状态。实例经 Provider 注入；测试、故事、每个应用根各自持有实例，卸载时释放订阅、计时器和控制器。
 - 输入快照不能被调用方原地修改；实现不依靠每次渲染全量深比较来补救。大列表通过稳定行 ID 和字段订阅限制更新范围。
-- 数据契约使用 Effect Schema：Query 从结果 Schema 推导并解码外部响应；Router 用 Codec 读写参数与 search；Form 区分 Encoded 输入和 Type 输出；Table 从领域行 Schema 推导列，不重复解码已验证的行。内部生命周期与受控状态保留 TypeScript 判别联合。
+- 数据契约使用 Zod：Query 从结果 Schema 推导并解码外部响应；Router 用 Zod codec（`z.codec`）读写参数与 search；Form 区分输入（`z.input`）和输出（`z.output`）；Table 从领域行 Schema 推导列，不重复解码已验证的行。内部生命周期与受控状态保留 TypeScript 判别联合。
 - 失败是可读的状态，不自动变成空列表、成功或 toast。基础设施不负责对用户的文案，文案通过词典和上层组件提供。
 - Promise 接现有浏览器/API 边界；Query、Form 的异步解码由对应实例的取消与代次管理，Router 使用同步 Codec。没有第二套后台 runtime、服务注册或插件系统。
 
@@ -27,13 +27,13 @@ Query、Router、Form、Table 的无样式实现和接口约定放在本目录�
 ```text
 infra/query/   缓存实例、查询定义、Solid 订阅
 infra/router/  History 适配、匹配、Provider、无样式路由组件
-infra/form/    Form 实例、Effect Schema 解码、字段绑定
+infra/form/    Form 实例、Zod 解码、字段绑定
 infra/table/   行列模型、受控状态、Solid 订阅
 ```
 
 `infra` 不向上 import `state`、`ui`、`features` 或农场。可复用的纯算法只在需要跨模块共享时移到 `base`，不为每个函数另造一层。
 
-- Effect Atom 仍只在 `state/`；这次不放开 `atom-door`，也不把业务共享状态搬进 `infra`。
+- 页面的原子（`Registry`、`defineAtom`）只在 `state/`；不把业务共享状态搬进 `infra`。
 - Query client 是应用根拥有的请求缓存资源，不是新增的模块级 UI store。现有意图、偏好与 SSE 帧继续由原有模块持有。
 - Router 中的 `Link`、`Outlet` 和 Form 字段模型不带视觉样式。导航外观、原生 form/field 组件、错误提示、输入框和 `DataTable` 在 `ui/`，农场可另接像素外观。
 - 基础设施不知道业务 API。查询定义、表单 Schema、列定义和写操作适配放在拥有它们的 feature；确实跨 feature 的现有读取入口可以由 `infra` 提供，但不得倒着依赖 feature。

@@ -1,26 +1,26 @@
-import { describe, expect, it } from "@effect/vitest";
-import { Effect, Fiber } from "effect";
-import { TestClock } from "effect/testing";
+import { afterEach, describe, expect, test, vi } from "vite-plus/test";
 
-import { timeHere } from "./time.ts";
+import { wallTime } from "./time.ts";
 
-describe("a Time from the service's Clock", () => {
-  it.effect("reads, waits and fires as TestClock moves", () =>
-    Effect.gen(function* () {
-      yield* TestClock.setTime(1_000);
-      const time = yield* timeHere;
-      expect(time.now()).toBe(1_000);
-      const fired: string[] = [];
-      time.after(500, () => fired.push("after"));
-      const cancel = time.after(500, () => fired.push("canceled"));
-      cancel();
-      const slept = yield* Effect.forkChild(Effect.promise(() => time.sleep(500).then(() => fired.push("slept"))));
-      yield* TestClock.adjust(499);
-      expect(fired).toEqual([]);
-      yield* TestClock.adjust(1);
-      yield* Fiber.join(slept);
-      expect(fired.toSorted()).toEqual(["after", "slept"]);
-      expect(time.now()).toBe(1_500);
-    }),
-  );
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe("the wall Time", () => {
+  test("reads, waits and fires as the timers move", async () => {
+    vi.useFakeTimers({ now: 1_000 });
+    const time = wallTime;
+    expect(time.now()).toBe(1_000);
+    const fired: string[] = [];
+    time.after(500, () => fired.push("after"));
+    const cancel = time.after(500, () => fired.push("canceled"));
+    cancel();
+    const slept = time.sleep(500).then(() => fired.push("slept"));
+    await vi.advanceTimersByTimeAsync(499);
+    expect(fired).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    await slept;
+    expect(fired.toSorted()).toEqual(["after", "slept"]);
+    expect(time.now()).toBe(1_500);
+  });
 });

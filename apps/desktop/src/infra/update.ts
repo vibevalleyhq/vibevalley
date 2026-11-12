@@ -7,7 +7,7 @@ import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { promisify } from "node:util";
 
-import { Schema } from "effect";
+import { z } from "zod";
 
 import type { UpdateState } from "@vibevalley/protocol/host";
 
@@ -36,8 +36,8 @@ const releaseList = "https://api.github.com/repos/vibevalleyhq/vibevalley/releas
 /** How often a running app asks again. */
 const everyMs = 4 * 60 * 60 * 1000;
 
-const readRelease = Schema.decodeUnknownSync(Release);
-const readList = Schema.decodeUnknownSync(Schema.Array(ListedRelease));
+const readRelease = (u: unknown) => Release.parse(u);
+const readList = (u: unknown) => z.array(ListedRelease).parse(u);
 
 const writable = (path: string) => {
   try {

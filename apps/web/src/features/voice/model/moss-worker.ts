@@ -1,4 +1,4 @@
-import { Predicate } from "effect";
+import { isObject } from "#/base/guards.ts";
 
 import { mossRelay, type RelayCommand, type RelayEvent } from "./moss-relay.ts";
 
@@ -29,7 +29,7 @@ export interface MossRelayBridge {
 /** The relay in a worker, or on the page where there is none: the same relay (moss-relay.ts) and the same events either way. */
 export function openMossRelayBridge(url: string, handlers: MossRelayHandlers): MossRelayBridge {
   const playbackMessage = (d: unknown) => {
-    if (!Predicate.isObject(d)) return;
+    if (!isObject(d)) return;
     if (
       d["type"] === "chunk_ended" &&
       typeof d["chunk"] === "string" &&

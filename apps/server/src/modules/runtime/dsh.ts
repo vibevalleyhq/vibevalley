@@ -10,7 +10,7 @@ import {
   type SessionOptions,
   type StartSession,
 } from "@botiverse/oar";
-import { Exit, Option, Predicate, Schema } from "effect";
+import { z } from "zod";
 
 import { jsonOrNone } from "#/base/json.ts";
 import { afterRealTime } from "#/infra/time.ts";
@@ -40,21 +40,15 @@ const { listingCwd } = await internal<{ listingCwd: (options: { cwd?: string }) 
 /** What dsh-acp has no channel for: its automation surface omits session prompts, tool denylists, names, tiers, extra
  * directories and output schemas. */
 /** A model option value as dsh writes it: ["provider", "model"]. */
-const ModelPair = Schema.Tuple([Schema.String, Schema.String]);
+const ModelPair = z.tuple([z.string(), z.string()]);
 const modelPair = jsonOrNone(ModelPair);
-const encodeModelPair = Schema.encodeOption(Schema.fromJsonString(ModelPair));
-const encodeRpcRequest = Schema.encodeExit(
-  Schema.fromJsonString(
-    Schema.Struct({ jsonrpc: Schema.Literal("2.0"), id: Schema.Finite, method: Schema.String, params: Schema.Record(Schema.String, Schema.Unknown) }),
-  ),
-);
 
 /** A JSON-RPC answer on dsh's stdout. */
 const rpcAnswer = jsonOrNone(
-  Schema.Struct({
-    id: Schema.optionalKey(Schema.Finite),
-    result: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
-    error: Schema.optionalKey(Schema.Struct({ code: Schema.optionalKey(Schema.Finite), message: Schema.optionalKey(Schema.String) })),
+  z.object({
+    id: z.exactOptional(z.number()),
+    result: z.exactOptional(z.record(z.string(), z.unknown())),
+    error: z.exactOptional(z.object({ code: z.exactOptional(z.number()), message: z.exactOptional(z.string()) })),
   }),
 );
 
@@ -81,8 +75,7 @@ export function optionValue(given: string): string {
   const provider = slash < 0 ? deepseek : model.slice(0, slash);
   let id = slash < 0 ? model : model.slice(slash + 1);
   if (isDeepseek(provider) && id === "deepseek-v4-flash") id = "deepseek-flash";
-  // A pair of strings always writes; were it not to, the model is passed as given.
-  return Option.getOrElse(encodeModelPair([provider, id]), () => model);
+  return JSON.stringify([provider, id]);
 }
 
 /** How a model is written outside dsh, provider/model, from its option value; a value that is no pair is itself. */
@@ -112,44 +105,43 @@ function displayName(id: string, name: string): string {
   return slash >= 0 && isDeepseek(id.slice(0, slash)) && id.slice(slash + 1) === "deepseek-flash" && name === "DeepSeek-V4.1-Flash" ? name + "-1017" : name;
 }
 
-const OptionLeaf = Schema.Struct({
-  value: Schema.optionalKey(Schema.String),
-  name: Schema.optionalKey(Schema.String),
+const OptionLeaf = z.object({
+  value: z.exactOptional(z.string()),
+  name: z.exactOptional(z.string()),
 });
-type OptionLeaf = typeof OptionLeaf.Type;
+type OptionLeaf = z.infer<typeof OptionLeaf>;
 
-const OptionGroup = Schema.Struct({
-  value: Schema.optionalKey(Schema.String),
-  name: Schema.optionalKey(Schema.String),
-  options: Schema.optionalKey(Schema.Array(Schema.Unknown)),
-});
-
-const ConfigOption = Schema.Struct({
-  id: Schema.optionalKey(Schema.String),
-  category: Schema.optionalKey(Schema.String),
-  currentValue: Schema.optionalKey(Schema.Unknown),
-  options: Schema.optionalKey(Schema.Array(Schema.Unknown)),
+const OptionGroup = z.object({
+  value: z.exactOptional(z.string()),
+  name: z.exactOptional(z.string()),
+  options: z.exactOptional(z.array(z.unknown())),
 });
 
-const SessionNewResponse = Schema.Struct({
-  sessionId: Schema.optionalKey(Schema.String),
-  configOptions: Schema.optionalKey(Schema.Array(Schema.Unknown)),
+const ConfigOption = z.object({
+  id: z.exactOptional(z.string()),
+  category: z.exactOptional(z.string()),
+  currentValue: z.exactOptional(z.unknown()),
+  options: z.exactOptional(z.array(z.unknown())),
 });
 
-const decodeItems = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, items: readonly unknown[] | undefined): S["Type"][] => {
+const SessionNewResponse = z.object({
+  sessionId: z.exactOptional(z.string()),
+  configOptions: z.exactOptional(z.array(z.unknown())),
+});
+
+const decodeItems = <A>(schema: z.ZodType<A>, items: readonly unknown[] | undefined): A[] => {
   if (!items) return [];
-  const decode = Schema.decodeUnknownOption(schema);
   return items.flatMap((item) => {
-    const r = decode(item);
-    return r._tag === "Some" ? [r.value] : [];
+    const r = schema.safeParse(item);
+    return r.success ? [r.data] : [];
   });
 };
 
 /** A session/new response's models. undefined when it has no `model` config option. */
 export function repoModels(response: unknown): ModelEntry[] | undefined {
-  const parsed = Schema.decodeUnknownOption(SessionNewResponse)(response);
-  if (parsed._tag === "None") return undefined;
-  const options = decodeItems(ConfigOption, parsed.value.configOptions);
+  const parsed = SessionNewResponse.safeParse(response);
+  if (!parsed.success) return undefined;
+  const options = decodeItems(ConfigOption, parsed.data.configOptions);
   const model = options.find((o) => o.id === "model");
   if (!model) return undefined;
   const thinking = options.find((o) => o.category === "thought_level");
@@ -206,14 +198,19 @@ async function readNewSession(command: string, cwd: string, timeoutMs: number): 
   const request = (method: string, params: Record<string, unknown>) =>
     new Promise<Record<string, unknown>>((resolve, reject) => {
       const id = ++next;
-      const line = encodeRpcRequest({ jsonrpc: "2.0", id, method, params });
-      if (Exit.isFailure(line)) return reject(new Error(`${method} could not be written`));
+      let line: string;
+      try {
+        line = JSON.stringify({ jsonrpc: "2.0", id, method, params });
+      } catch {
+        // A param that is no JSON (a cycle, a bigint): the request is refused here, not half written.
+        return reject(new Error(`${method} could not be written`));
+      }
       const cancel = afterRealTime(timeoutMs, () => reject(new Error(`${method} timed out`)));
       waiting.set(id, {
         resolve: (v) => (cancel(), resolve(v)),
         reject: (e) => (cancel(), reject(e)),
       });
-      child.stdin.write(line.value + "\n");
+      child.stdin.write(line + "\n");
     });
   try {
     await new Promise<void>((resolve, reject) => {
@@ -225,9 +222,9 @@ async function readNewSession(command: string, cwd: string, timeoutMs: number): 
       clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
     });
     const response = await request("session/new", { cwd, mcpServers: [] });
-    const decoded = Schema.decodeOption(SessionNewResponse)(response);
+    const decoded = SessionNewResponse.safeParse(response);
     // Best effort: the list is in hand, and the process is killed next.
-    if (decoded._tag === "Some" && decoded.value.sessionId) await Promise.allSettled([request("session/close", { sessionId: decoded.value.sessionId })]);
+    if (decoded.success && decoded.data.sessionId) await Promise.allSettled([request("session/close", { sessionId: decoded.data.sessionId })]);
     return response;
   } finally {
     child.kill();
@@ -268,7 +265,8 @@ export const dshRuntime = defineRuntime({
     try {
       response = await readNewSession(installation.command, listingCwd(options ?? {}), options?.timeoutMs ?? 30_000);
     } catch (e) {
-      if (Predicate.isObject(e) && "code" in e && e.code === -32601) return { kind: "unsupported", reason: "this dsh build has no session/new method" };
+      if (typeof e === "object" && e !== null && "code" in e && e.code === -32601)
+        return { kind: "unsupported", reason: "this dsh build has no session/new method" };
       throw e;
     }
     const models = repoModels(response);

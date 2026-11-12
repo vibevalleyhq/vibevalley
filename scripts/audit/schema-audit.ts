@@ -29,7 +29,7 @@ type ReviewCategory =
   | "json-parse-review";
 
 export interface Finding {
-  readonly category: ReviewCategory | "db-enum-mismatch" | "redacted-json-exposure" | "unbranded-id" | "bizcode-registry";
+  readonly category: ReviewCategory | "db-enum-mismatch" | "secret-exposure" | "unbranded-id" | "bizcode-registry";
   readonly location: string;
   readonly detail: string;
 }
@@ -50,8 +50,8 @@ export function formatFinding(finding: Finding): string {
   const advice =
     finding.category === "db-enum-mismatch"
       ? "Fix: align this column's CHECK with its named protocol enum; update the mapping only if the domain relationship changed"
-      : finding.category === "redacted-json-exposure"
-        ? "Fix: pass `{ disallowJsonEncode: true }` to `Schema.Redacted(...)` so encoding to JSON cannot leak the secret"
+      : finding.category === "secret-exposure"
+        ? "Fix: keep a secret a `Secret` (secretOf(...)) on the way out: the protocol never calls `.reveal()`, and `Secret` keeps a `toJSON` that throws and a `toString` that prints [secret]"
         : finding.category === "unbranded-id"
           ? "Fix: use the branded entity ID (`IssueId`, `SessionId`, `ArtifactId`, `BlockId`, `SuggestionId`, `MessageId`) on domain shapes; keep raw `string` only on `*Request` / `*Input` boundaries"
           : finding.category === "bizcode-registry"
@@ -63,7 +63,7 @@ export function formatFinding(finding: Finding): string {
 export function isBoundaryViolation(finding: Finding): boolean {
   return (
     finding.category === "db-enum-mismatch" ||
-    finding.category === "redacted-json-exposure" ||
+    finding.category === "secret-exposure" ||
     finding.category === "unbranded-id" ||
     finding.category === "bizcode-registry"
   );
@@ -159,6 +159,32 @@ export function auditBizCodeRegistry(source: string, path = "packages/protocol/s
   return findings;
 }
 
+const secretPath = "packages/protocol/src/common/schema.ts";
+
+/** What keeps a Secret out of JSON and logs (what `disallowJsonEncode` did for a Redacted): its toJSON throws, it prints as [secret]. */
+export function auditSecretClass(source: string, path = secretPath): Finding[] {
+  const at = /\bexport\s+class\s+Secret\b/u.exec(source);
+  const location = `${path}:${at === null ? 1 : source.slice(0, at.index).split("\n").length}`;
+  if (at === null) return [{ category: "secret-exposure", location, detail: "no `export class Secret`" }];
+  let depth = 0;
+  let end = source.indexOf("{", at.index);
+  for (let i = end; i < source.length; i++) {
+    if (source[i] === "{") depth++;
+    else if (source[i] === "}" && --depth === 0) {
+      end = i;
+      break;
+    }
+  }
+  const body = source.slice(at.index, end + 1);
+  const missing = [
+    /\btoJSON\s*\(\s*\)\s*:\s*never\s*\{\s*throw\b/u.test(body) ? undefined : "a toJSON(): never that throws",
+    /\btoString\s*\(\s*\)\s*:\s*string\s*\{\s*return\s+"\[secret\]"/u.test(body) ? undefined : 'a toString that returns "[secret]"',
+    /nodejs\.util\.inspect\.custom/u.test(body) ? undefined : "a nodejs.util.inspect.custom that hides it",
+    /#value\b/u.test(body) ? undefined : "its value in a private #field",
+  ].filter((m) => m !== undefined);
+  return missing.length === 0 ? [] : [{ category: "secret-exposure", location, detail: `Secret lacks ${missing.join(", ")}` }];
+}
+
 interface StoredEnum {
   readonly column: string;
   readonly protocol: string;
@@ -251,35 +277,33 @@ export function reviewSchemaSources(sources: ReadonlyMap<string, string>): Findi
         findings.push({ category, location: `${path}:${source.slice(0, match.index).split("\n").length}`, detail: match[0].replace(/\s+/gu, " ") });
       }
     };
-    if (path.startsWith("packages/protocol/src/") || path.startsWith("apps/server/src/"))
-      addMatches("inline-literals", /Schema\s*\.\s*Literals\s*\(\s*\[[^\]]+\]/gu);
+    if (path.startsWith("packages/protocol/src/") || path.startsWith("apps/server/src/")) {
+      addMatches("inline-literals", /\bz\s*\.\s*enum\s*\(\s*\[[^\]]+\]/gu);
+      addMatches("inline-literals", /\bz\s*\.\s*literal\s*\(\s*"[^"]*"\s*\)\s*,\s*z\s*\.\s*literal\s*\(/gu);
+    }
     if (path.startsWith("packages/protocol/src/") && path.endsWith("shapes.ts")) addMatches("inline-union", /:\s*"[^"]+"\s*\|\s*"[^"]+"/gu);
     if (path.startsWith("apps/server/src/")) {
       addMatches("db-schema-reuse", /\b(?:json(?:OrNone|Of)|storedJsonOrUndefined)\s*\(\s*S\.\w+/gu);
       addMatches("manual-enum-coercion", /\b(?:statusOf|priorityOf|\w+Values\s*\.\s*(?:find|includes))\s*\(/gu);
     }
     addMatches("json-parse-review", /\bJSON\s*\.\s*parse\s*\(/gu);
-    for (const match of source.matchAll(/\bSchema\s*\.\s*Redacted\s*\(/gu)) {
-      let depth = 1;
-      let cursor = match.index + match[0].length;
-      while (cursor < source.length && depth > 0) {
-        if (source[cursor] === "(") depth++;
-        else if (source[cursor] === ")") depth--;
-        cursor++;
-      }
-      const callText = source.slice(match.index, cursor);
-      if (!/\bdisallowJsonEncode\s*:\s*true\b/u.test(callText)) {
+    // The protocol is what goes to the page: a secret it reveals is a secret on the wire.
+    if (path.startsWith("packages/protocol/src/")) {
+      for (const match of source.matchAll(/\.\s*reveal\s*\(\s*\)/gu))
         findings.push({
-          category: "redacted-json-exposure",
+          category: "secret-exposure",
           location: `${path}:${source.slice(0, match.index).split("\n").length}`,
-          detail: callText.replace(/\s+/gu, " "),
+          detail: "a secret revealed in the protocol",
         });
-      }
     }
-    if (!path.startsWith("packages/protocol/") && !source.includes("Schema.suspend("))
-      addMatches("subpackage-dual-shape", /\bconst\s+\w+\s*:\s*Schema\.Codec<\w+>/gu);
+    if (path === secretPath) findings.push(...auditSecretClass(source, path));
+    if (!path.startsWith("packages/protocol/") && !source.includes("z.lazy("))
+      addMatches("subpackage-dual-shape", /\bconst\s+\w+\s*:\s*z\s*\.\s*Zod\w*<\w+>\s*=/gu);
     if (path === "apps/server/src/modules/tool/schemas.ts")
-      addMatches("tool-downgrade", /\b(?:priority|status|deliver|tier|afterBlock|parentId)\s*:\s*(?:Schema\.optionalKey\s*\(\s*)?Schema\.String/gu);
+      addMatches(
+        "tool-downgrade",
+        /\b(?:priority|status|deliver|tier|afterBlock|parentId)\s*:\s*(?:z\s*\.\s*(?:exactOptional|optional)\s*\(\s*)?z\s*\.\s*string\s*\(/gu,
+      );
 
     if (!path.startsWith("packages/protocol/src/") || !path.endsWith("shapes.ts")) continue;
     let currentInterface = "";

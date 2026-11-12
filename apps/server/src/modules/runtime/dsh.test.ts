@@ -1,9 +1,9 @@
+import { chmod, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { NodeServices } from "@effect/platform-node";
-import { Effect, FileSystem, Formatter, Schema } from "effect";
 import { describe, expect, it } from "vite-plus/test";
+import { z } from "zod";
 
 import { tempDir } from "@vibevalley/testkit/temp";
 
@@ -13,11 +13,10 @@ import { dshRuntime, modelId, optionValue, repoModels } from "./dsh.ts";
 
 const answersFile = resolve(import.meta.dirname, "testdata/dsh-acp-0.2.1-rc.2.json");
 const answers: Record<string, unknown> = recorded;
-const onDisk = <A, E>(work: (fs: FileSystem.FileSystem) => Effect.Effect<A, E>) =>
-  Effect.runPromise(Effect.flatMap(FileSystem.FileSystem, work).pipe(Effect.provide(NodeServices.layer)));
-const LoggedRequest = Schema.fromJsonString(
-  Schema.Struct({ method: Schema.String, params: Schema.Struct({ configId: Schema.optionalKey(Schema.String), value: Schema.optionalKey(Schema.String) }) }),
-);
+const LoggedRequest = z.object({
+  method: z.string(),
+  params: z.object({ configId: z.exactOptional(z.string()), value: z.exactOptional(z.string()) }),
+});
 
 /** `dsh --profile acp` played: it answers with what dsh 0.2.1-rc.2 answered (testdata), and logs every request. */
 async function fakeDsh() {
@@ -26,13 +25,13 @@ async function fakeDsh() {
   const script = join(dir, "dsh");
   const text = `#!${process.execPath}
 const fs = require("node:fs");
-const answers = JSON.parse(fs.readFileSync(${Formatter.format(answersFile)}, "utf8"));
+const answers = JSON.parse(fs.readFileSync(${JSON.stringify(answersFile)}, "utf8"));
 const rl = require("node:readline").createInterface({ input: process.stdin });
 rl.on("line", (line) => {
   let m;
   try { m = JSON.parse(line); } catch { return; }
   if (m.id === undefined || !m.method) return;
-  fs.appendFileSync(${Formatter.format(log)}, JSON.stringify({ method: m.method, params: m.params }) + "\\n");
+  fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ method: m.method, params: m.params }) + "\\n");
   let answer = answers[m.method] ?? {};
   if (m.method === "session/set_config_option") {
     const opened = answers["session/new"];
@@ -43,7 +42,8 @@ rl.on("line", (line) => {
   process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: m.id, result: answer }) + "\\n");
 });
 `;
-  await onDisk((fs) => Effect.andThen(fs.writeFileString(script, text), fs.chmod(script, 0o755)));
+  await writeFile(script, text);
+  await chmod(script, 0o755);
   return { dir, script, log };
 }
 
@@ -77,8 +77,11 @@ describe("DeepSeek Harness", () => {
     });
     await session.prompt("hi");
     await session.dispose();
-    const logged = await onDisk((fs) => fs.readFileString(fake.log));
-    const requests = await Effect.runPromise(Effect.forEach(logged.trim().split("\n"), (l) => Schema.decodeEffect(LoggedRequest)(l)));
+    const logged = await readFile(fake.log, "utf8");
+    const requests = logged
+      .trim()
+      .split("\n")
+      .map((l) => LoggedRequest.parse(JSON.parse(l)));
     const values = requests.filter((e) => e.method === "session/set_config_option").map((e) => `${e.params.configId}=${e.params.value}`);
     expect(values).toContain(`model=["deepseek-official","deepseek-flash"]`);
     expect(values).toContain("reasoning_effort=low");

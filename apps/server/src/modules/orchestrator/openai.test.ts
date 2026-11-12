@@ -1,31 +1,26 @@
-import { Effect, Schema, Stream } from "effect";
-import { HttpEffect } from "effect/http";
 import { describe, expect, it } from "vite-plus/test";
+import { z } from "zod";
 
-import { type Answer, type ChatCompletions, chatChunk, chatCompletions as handlerOf, newestUserText } from "./openai.ts";
+import { type Answer, chatChunk, chatCompletions, newestUserText } from "./openai.ts";
 
-const said = (...words: string[]) => Stream.make(...words);
-
-/** The handler as a web one, as the tests ask it. */
-const chatCompletions = (c: ChatCompletions) => HttpEffect.toWebHandler(handlerOf(c));
+const said = (...words: string[]) =>
+  async function* () {
+    yield* words;
+  };
 
 const only = (model: string, answer: Answer) => (m: string) => (m === model ? answer : undefined);
 
-const json = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
-const parsed = Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown));
-const Chunk = Schema.fromJsonString(
-  Schema.Struct({ choices: Schema.Array(Schema.Struct({ delta: Schema.Struct({ content: Schema.optionalKey(Schema.String) }) })) }),
-);
+const Chunk = z.object({ choices: z.array(z.object({ delta: z.object({ content: z.exactOptional(z.string()) }) })) });
 
 const ask = async (handle: (r: Request) => Promise<Response>, body: unknown, method = "POST") =>
   handle(
     new Request("http://127.0.0.1/v1/chat/completions", {
       method,
-      ...(method === "POST" ? { body: await Effect.runPromise(json(body)) } : {}),
+      ...(method === "POST" ? { body: JSON.stringify(body) } : {}),
     }),
   );
 /** The chunk's JSON, without the blank line after it. */
-const chunkOf = (chunk: Effect.Effect<string, Schema.SchemaError>) => Effect.runPromise(Effect.flatMap(chunk, (text) => parsed(text.slice("data: ".length))));
+const chunkOf = (chunk: string): unknown => JSON.parse(chunk.slice("data: ".length));
 
 describe("chat/completions", () => {
   it("takes the newest user text", () => {
@@ -59,14 +54,14 @@ describe("chat/completions", () => {
   });
 
   it("chunks as OpenAI does", async () => {
-    expect(await chunkOf(chatChunk("id1", 7, "m", "好", false, true))).toEqual({
+    expect(chunkOf(chatChunk("id1", 7, "m", "好", false, true))).toEqual({
       id: "id1",
       object: "chat.completion.chunk",
       created: 7,
       model: "m",
       choices: [{ index: 0, delta: { role: "assistant", content: "好" }, finish_reason: null }],
     });
-    expect(await chunkOf(chatChunk("id1", 7, "m", "", true, false))).toEqual({
+    expect(chunkOf(chatChunk("id1", 7, "m", "", true, false))).toEqual({
       id: "id1",
       object: "chat.completion.chunk",
       created: 7,
@@ -80,7 +75,7 @@ describe("chat/completions", () => {
     const handle = chatCompletions({
       answerer: only("m", (text) => {
         heard = text;
-        return said("好，", "这就去。");
+        return said("好，", "这就去。")();
       }),
     });
     const res = await ask(handle, { model: "m", messages: [{ role: "user", content: "跑测试" }] });
@@ -98,7 +93,7 @@ describe("chat/completions", () => {
   });
 
   it("streams its words, then stop and [DONE]", async () => {
-    const handle = chatCompletions({ answerer: only("m", () => said("好，", "这就去。")) });
+    const handle = chatCompletions({ answerer: only("m", said("好，", "这就去。")) });
     const res = await ask(handle, {
       model: "m",
       stream: true,
@@ -106,12 +101,12 @@ describe("chat/completions", () => {
     });
     const lines = (await res.text()).split("\n\n").filter(Boolean);
     expect(lines.at(-1)).toBe("data: [DONE]");
-    const chunks = await Effect.runPromise(Effect.forEach(lines.slice(0, 2), (l) => Schema.decodeEffect(Chunk)(l.slice(6))));
+    const chunks = lines.slice(0, 2).map((l) => Chunk.parse(JSON.parse(l.slice(6))));
     expect(chunks.map((c) => c.choices[0]?.delta.content)).toEqual(["好，", "这就去。"]);
   });
 
   it("refuses in OpenAI's shape", async () => {
-    const answer: Answer = () => said("在");
+    const answer: Answer = said("在");
     const strict = chatCompletions({ answerer: only("m", answer) });
     const lenient = chatCompletions({ answerer: only("m", answer), misheard: "没听清" });
     const cases: [typeof strict, unknown, number, string][] = [
@@ -136,7 +131,7 @@ describe("chat/completions", () => {
     const handle = chatCompletions({
       answerer: only("m", () => {
         calls++;
-        return said("不该回答");
+        return said("不该回答")();
       }),
     });
     const cases = [

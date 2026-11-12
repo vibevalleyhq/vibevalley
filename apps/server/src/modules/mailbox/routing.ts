@@ -1,5 +1,3 @@
-import { Effect } from "effect";
-
 import type * as T from "@vibevalley/protocol";
 import { everyone, userId } from "@vibevalley/protocol";
 
@@ -58,7 +56,7 @@ export function channelRecipients(trigger: Trigger, input: ChannelHearers): Outb
     session: delivery.recipient,
     delivery,
     role: input.roles[delivery.recipient] ?? "worker",
-    commit: Effect.void,
+    commit: async () => {},
     event:
       input.row.kind === "report"
         ? input.outcome === "failed" || input.outcome === "interrupted"

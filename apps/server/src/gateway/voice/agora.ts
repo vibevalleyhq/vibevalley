@@ -1,7 +1,7 @@
 import { t } from "@vibevalley/i18n";
 import type { VoiceSettings } from "@vibevalley/protocol";
 import type { ApiError } from "@vibevalley/protocol/api";
-import { alreadyStopping, clientOf, newChannel, newUid, type Run, retrying, sign, tokenSeconds } from "@vibevalley/provider/agora/server";
+import { alreadyStopping, clientOf, newChannel, newUid, retrying, sign, tokenSeconds } from "@vibevalley/provider/agora/server";
 
 import { orchestratorModel } from "#/modules/orchestrator/situation.ts";
 
@@ -9,7 +9,6 @@ import {
   agentFor,
   buildVendors,
   type CallLine,
-  CallStepFailed,
   callStepFailed,
   failed,
   speakPieces,
@@ -24,13 +23,11 @@ export {
   agentFor,
   alreadyStopping,
   type CallLine,
-  CallStepFailed,
   callStepFailed,
   clientOf,
   failed,
   newChannel,
   newUid,
-  type Run,
   retrying,
   sign,
   speakPieces,

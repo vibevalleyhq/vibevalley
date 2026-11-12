@@ -1,15 +1,12 @@
-import { Effect } from "effect";
-
 import type { SettingHandlers } from "@vibevalley/protocol/api";
 
-import { Setting } from "#/modules/setting/setting.ts";
+import type { Setting } from "#/modules/setting/setting.ts";
 
-export const settingHandlers = Effect.gen(function* () {
-  const setting = yield* Setting;
-  const done: SettingHandlers = {
-    "setting.get": () => Effect.sync(setting.status),
-    "setting.validate": (body) => Effect.sync(() => setting.validate(body)),
+export function settingHandlers(deps: { readonly setting: Setting }): SettingHandlers {
+  const { setting } = deps;
+  return {
+    "setting.get": async () => setting.status(),
+    "setting.validate": async (body) => setting.validate(body),
     "setting.update": (body) => setting.save(body),
   };
-  return done;
-});
+}

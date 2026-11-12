@@ -2,7 +2,6 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { scriptedRuntime } from "@botiverse/oar/testing";
-import { Effect, Formatter, Option, Predicate, Schema } from "effect";
 
 import { ToolFailed } from "@vibevalley/agent/core/errors";
 import type { Tool } from "@vibevalley/agent/core/loop";
@@ -12,16 +11,12 @@ import type { AssistantMessage, ToolCall } from "@vibevalley/ai/messages";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { orchestrator } from "#/base/actor.ts";
-import { Agent } from "#/modules/agent/agent.ts";
-import { Channel } from "#/modules/channel/channel.ts";
 import { noResult, situationWords } from "#/modules/orchestrator/prompts.ts";
-import { Repo } from "#/modules/repo/repo.ts";
 import { channelLine } from "#/modules/tool/prompts.ts";
 import { type Op, schemas, toolName } from "#/modules/tool/schemas.ts";
-import { Tool as FarmTool } from "#/modules/tool/tool.ts";
 
 import { starter, testConfig } from "./layers.ts";
-import { world } from "./world.ts";
+import { type World, world } from "./world.ts";
 
 /** One check on a turn, a closed set by kind. */
 export interface Expect {
@@ -56,7 +51,7 @@ export const kinds = ["called", "notCalled", "silent", "says", "saysNot", "brief
 /** The orchestrator's tools by name, as its brain has them: the farm's and its own (no skills, subagents or crons). */
 export const orchestratorToolNames = () => [
   ...(Object.keys(schemas) as Op[]).map(toolName),
-  ...selfTools({ home: "", skills: () => Effect.succeed([]), memory: true, now: () => 0 }).map((t) => t.name),
+  ...selfTools({ home: "", skills: async () => [], memory: true, now: () => 0 }).map((t) => t.name),
 ];
 
 type Checked =
@@ -81,7 +76,7 @@ function checkedOf(e: Expect): Checked | string {
     case "silent":
       return { kind: "silent" };
     default:
-      return `unknown kind ${Formatter.format(e.kind)}`;
+      return `unknown kind ${JSON.stringify(e.kind)}`;
   }
 }
 
@@ -106,7 +101,7 @@ export function check(expect: readonly Expect[], turn: readonly BrainMessage[]):
   const words = wordsOf(turn);
   const called = (tool: string, args = "", lacks?: string) =>
     calls.some((c) => {
-      const json = Formatter.formatJson(c.arguments);
+      const json = JSON.stringify(c.arguments);
       return c.name === tool && json.includes(args) && (lacks === undefined || !json.includes(lacks));
     });
   const missed: string[] = [];
@@ -137,7 +132,7 @@ export function check(expect: readonly Expect[], turn: readonly BrainMessage[]):
         ok = !words.includes(c.contains);
         break;
     }
-    if (!ok) missed.push(Formatter.formatJson(e));
+    if (!ok) missed.push(JSON.stringify(e));
   }
   return missed;
 }
@@ -157,13 +152,17 @@ export const isInput = (m: BrainMessage) => m.role === "custom" && (m as { custo
 
 export const committed = join(import.meta.dirname, "..", "modules", "orchestrator", "testdata", "evals");
 
-const encodeArgsKey = Schema.encodeOption(
-  Schema.fromJsonString(Schema.Unknown, {
-    replacer: (_, v: unknown) => (Predicate.isObject(v) ? Object.fromEntries(Object.entries(v).toSorted(([a], [b]) => (a < b ? -1 : 1))) : v),
-  }),
-);
+const sortedKeys = (_: string, v: unknown): unknown =>
+  typeof v === "object" && v !== null && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).toSorted(([a], [b]) => (a < b ? -1 : 1))) : v;
 /** Arguments as one string whatever order their keys came in; a model's arguments are parsed JSON, so they always write. */
-const argsKey = (args: unknown): string => Option.getOrElse(encodeArgsKey(args), () => "");
+const argsKey = (args: unknown): string => {
+  try {
+    return JSON.stringify(args, sortedKeys) ?? "";
+  } catch {
+    // A circular or unwritable value matches no recorded call; model arguments never are.
+    return "";
+  }
+};
 
 /** Every farm tool answers a call with what the case recorded for the same call (the same tool and arguments), each once, and nothing for another. */
 export function stubbed(tools: readonly Tool[], did: readonly BrainMessage[]): Tool[] {
@@ -177,13 +176,12 @@ export function stubbed(tools: readonly Tool[], did: readonly BrainMessage[]): T
   }
   return tools.map((t) => ({
     ...t,
-    execute: (args: unknown) =>
-      Effect.suspend(() => {
-        const next = recorded.get(t.name + " " + argsKey(args))?.shift();
-        if (!next) return Effect.succeed({ content: [{ type: "text" as const, text: noResult }] });
-        if (next.isError) return Effect.fail(ToolFailed.make({ message: next.content.map((c) => (c.type === "text" ? c.text : "")).join("") }));
-        return Effect.succeed({ content: next.content });
-      }),
+    execute: async (args: unknown) => {
+      const next = recorded.get(t.name + " " + argsKey(args))?.shift();
+      if (!next) return { content: [{ type: "text" as const, text: noResult }] };
+      if (next.isError) throw new ToolFailed(next.content.map((c) => (c.type === "text" ? c.text : "")).join(""));
+      return { content: next.content };
+    },
   }));
 }
 
@@ -202,19 +200,27 @@ export function replayWorld(c: EvalCase) {
   );
 }
 
-export const replaySetup = Effect.fn("Eval.replaySetup")(function* (c: EvalCase) {
-  const farm = yield* FarmTool;
-  const chat = yield* Channel;
+/** The orchestrator's tools on the farm, and its input: stubbed with what the case recorded, or, for a scenario, live
+ * on the farm with the situation it would have been told. */
+export async function replaySetup(farm: World, c: EvalCase) {
+  const chat = farm.channel;
   const here = chat.defaultChannel();
-  const tools = farm.orchestrator(() => ({ agent: defaultOrchestrator, session: "", repo: "", here, picked: "", envelope: "", actor: orchestrator(true) }));
+  const tools = farm.tool.orchestrator(() => ({
+    agent: defaultOrchestrator,
+    session: "",
+    repo: "",
+    here,
+    picked: "",
+    envelope: "",
+    actor: orchestrator(true),
+  }));
   if (!c.scenario) return { tools: stubbed(tools, c.did), input: c.input };
   if (c.input.role !== "custom") throw new Error("A scenario needs an orchestrator input");
-  const agents = yield* Agent;
-  const profile = yield* agents.save({ ...starter("lab"), enabled: true, effort: "" });
-  const repos = yield* Repo;
-  const folders = yield* repos.list();
-  const channels = yield* chat.channels();
-  const address = yield* chat.addressOf(here);
+  const profile = await farm.agent.save({ ...starter("lab"), enabled: true, effort: "" });
+  const repos = farm.repo;
+  const folders = await repos.list();
+  const channels = await chat.channels();
+  const address = await chat.addressOf(here);
   const situation = situationWords.whole(
     repos.root,
     situationWords.repos(folders.map((repo) => repo.name)),
@@ -225,4 +231,4 @@ export const replaySetup = Effect.fn("Eval.replaySetup")(function* (c: EvalCase)
     "zh",
   );
   return { tools, input: { ...c.input, content: situation + "\n\n" + messageText(c.input) } };
-});
+}

@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, Show } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
@@ -8,19 +7,6 @@ import { KeyField, SaveBar } from "#/ui/KeyField.tsx";
 import { SecretInput, Toggle } from "#/ui/layout.tsx";
 import { ToastHost } from "#/ui/ToastHost.tsx";
 import { toast } from "#/ui/toasts.ts";
-
-const styles = stylex.create({
-  formStoriesForm: {
-    display: "flex",
-    width: "100%",
-    maxWidth: "var(--container-lg)",
-    flexDirection: "column",
-    gap: "1rem",
-  },
-  formStoriesSpan: {
-    color: "var(--color-berry)",
-  },
-});
 
 interface Draft {
   name: string;
@@ -61,7 +47,7 @@ export default stories({
           }, 600);
         };
         return (
-          <form {...stylex.attrs(styles.formStoriesForm)} onSubmit={(e) => e.preventDefault()}>
+          <form class="flex w-full max-w-lg flex-col gap-4" onSubmit={(e) => e.preventDefault()}>
             <Field label="名字" hint="在田头和看板上叫它的">
               <TextInput value={draft().name} onInput={(e) => patch({ name: e.currentTarget.value })} />
             </Field>
@@ -87,7 +73,7 @@ export default stories({
               onUndo={() => setDraft(base())}
               left={
                 <Show when={problem()}>
-                  <span {...stylex.attrs(styles.formStoriesSpan)}>{problem()}</span>
+                  <span class="text-berry">{problem()}</span>
                 </Show>
               }
             />

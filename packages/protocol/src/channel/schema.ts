@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import { ArtifactCard, BlockRef, QuotedBlock } from "../artifact/schema";
 import { Attachment } from "../attachment/schema";
@@ -6,172 +6,175 @@ import type { Codec } from "../codec";
 import { Actor, MessageId, Outcome, SessionId, Spent } from "../common/schema";
 import * as T from "./shapes";
 
-export const MessageKind: Codec<T.MessageKind> = Schema.Literals(T.MessageKindValues);
+export const MessageKind = z.enum(T.MessageKindValues) satisfies Codec<T.MessageKind>;
 
-export const Notify: Codec<T.Notify> = Schema.Literals(T.NotifyValues);
+export const Notify = z.enum(T.NotifyValues) satisfies Codec<T.Notify>;
 
-export const Embed: Codec<T.Embed> = Schema.Struct({
-  url: Schema.String,
-  title: Schema.String,
-  description: Schema.String,
-  site: Schema.String,
-  image: Schema.String,
-});
+export const Embed = z.object({
+  url: z.string(),
+  title: z.string(),
+  description: z.string(),
+  site: z.string(),
+  image: z.string(),
+}) satisfies Codec<T.Embed>;
 
-const Reaction: Codec<T.Reaction> = Schema.Struct({ emoji: Schema.String, by: Schema.mutable(Schema.Array(Schema.String)) });
+const Reaction = z.object({ emoji: z.string(), by: z.array(z.string()) }) satisfies Codec<T.Reaction>;
 
-export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
+export const ChatMessage = z.object({
   id: MessageId,
-  number: Schema.Finite,
-  channel: Schema.String,
-  from: Schema.String,
+  number: z.number(),
+  channel: z.string(),
+  from: z.string(),
   actor: Actor,
-  name: Schema.String,
-  agent: Schema.optionalKey(Schema.String),
+  name: z.string(),
+  agent: z.exactOptional(z.string()),
   kind: MessageKind,
-  text: Schema.String,
-  mentions: Schema.mutable(Schema.Array(Schema.String)),
-  session: Schema.optionalKey(SessionId),
-  run: Schema.optionalKey(Schema.String),
-  outcome: Schema.NullOr(Outcome),
-  spent: Schema.optionalKey(Spent),
-  spoken: Schema.Boolean,
-  sendKey: Schema.optionalKey(Schema.String),
-  at: Schema.Finite,
-  revision: Schema.Finite,
-  replyTo: Schema.optionalKey(Schema.Finite),
-  edited: Schema.optionalKey(Schema.Finite),
-  deleted: Schema.optionalKey(Schema.Finite),
-  pinned: Schema.optionalKey(Schema.Finite),
-  reactions: Schema.mutable(Schema.Array(Reaction)),
-  attachments: Schema.mutable(Schema.Array(Attachment)),
-  embeds: Schema.mutable(Schema.Array(Embed)),
-  artifact: Schema.optionalKey(ArtifactCard),
-  blocks: Schema.optionalKey(Schema.mutable(Schema.Array(QuotedBlock))),
-});
+  text: z.string(),
+  mentions: z.array(z.string()),
+  session: z.exactOptional(SessionId),
+  run: z.exactOptional(z.string()),
+  outcome: Outcome.nullable(),
+  spent: z.exactOptional(Spent),
+  spoken: z.boolean(),
+  sendKey: z.exactOptional(z.string()),
+  at: z.number(),
+  revision: z.number(),
+  replyTo: z.exactOptional(z.number()),
+  edited: z.exactOptional(z.number()),
+  deleted: z.exactOptional(z.number()),
+  pinned: z.exactOptional(z.number()),
+  reactions: z.array(Reaction),
+  attachments: z.array(Attachment),
+  embeds: z.array(Embed),
+  artifact: z.exactOptional(ArtifactCard),
+  blocks: z.exactOptional(z.array(QuotedBlock)),
+}) satisfies Codec<T.ChatMessage>;
 
-export const ChannelType: Codec<T.ChannelType> = Schema.Literals(T.ChannelTypeValues);
+export const ChannelType = z.enum(T.ChannelTypeValues) satisfies Codec<T.ChannelType>;
 
-export const SubjectKind: Codec<T.SubjectKind> = Schema.Literals(T.SubjectKindValues);
+export const SubjectKind = z.enum(T.SubjectKindValues) satisfies Codec<T.SubjectKind>;
 
-export const Channel: Codec<T.Channel> = Schema.Struct({
-  id: Schema.String,
+export const Channel = z.object({
+  id: z.string(),
   type: ChannelType,
-  default: Schema.Boolean,
-  peer: Schema.optionalKey(Schema.String),
-  orchestrator: Schema.optionalKey(Schema.String),
-  members: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
-  parent: Schema.optionalKey(Schema.String),
-  category: Schema.String,
-  position: Schema.optionalKey(Schema.Finite),
-  archived: Schema.optionalKey(Schema.Finite),
+  default: z.boolean(),
+  peer: z.exactOptional(z.string()),
+  orchestrator: z.exactOptional(z.string()),
+  members: z.exactOptional(z.array(z.string())),
+  parent: z.exactOptional(z.string()),
+  category: z.string(),
+  position: z.exactOptional(z.number()),
+  archived: z.exactOptional(z.number()),
   notify: Notify,
-  root: Schema.optionalKey(MessageId),
-  rootNumber: Schema.optionalKey(Schema.Finite),
-  name: Schema.optionalKey(Schema.String),
-  description: Schema.String,
-  repo: Schema.optionalKey(Schema.String),
-  subjectKind: Schema.NullOr(SubjectKind),
-  subjectId: Schema.optionalKey(Schema.String),
-  lastNumber: Schema.optionalKey(Schema.Finite),
-  replies: Schema.Finite,
-  read: Schema.optionalKey(Schema.Finite),
-  unread: Schema.optionalKey(Schema.Finite),
-  title: Schema.String,
-  last: Schema.optionalKey(Schema.Struct({ from: Schema.String, name: Schema.String, text: Schema.String, at: Schema.Finite })),
-  at: Schema.Finite,
-});
+  root: z.exactOptional(MessageId),
+  rootNumber: z.exactOptional(z.number()),
+  name: z.exactOptional(z.string()),
+  description: z.string(),
+  repo: z.exactOptional(z.string()),
+  subjectKind: SubjectKind.nullable(),
+  subjectId: z.exactOptional(z.string()),
+  lastNumber: z.exactOptional(z.number()),
+  replies: z.number(),
+  read: z.exactOptional(z.number()),
+  unread: z.exactOptional(z.number()),
+  title: z.string(),
+  last: z.exactOptional(z.object({ from: z.string(), name: z.string(), text: z.string(), at: z.number() })),
+  at: z.number(),
+}) satisfies Codec<T.Channel>;
 
-const UserMention: Codec<T.UserMention> = Schema.Struct({
+const UserMention = z.object({
   message: ChatMessage,
-  channel: Schema.String,
-  address: Schema.String,
-});
+  channel: z.string(),
+  address: z.string(),
+}) satisfies Codec<T.UserMention>;
 
-export const Chat: Codec<T.Chat> = Schema.Struct({
-  channels: Schema.mutable(Schema.Array(Channel)),
-  userMentions: Schema.mutable(Schema.Array(UserMention)),
-});
+export const Chat = z.object({
+  channels: z.array(Channel),
+  userMentions: z.array(UserMention),
+}) satisfies Codec<T.Chat>;
 
-export const ChannelEvent: Codec<T.ChannelEvent> = Schema.Union([Schema.TaggedStruct("Message", { message: ChatMessage }), Schema.TaggedStruct("Reset", {})]);
+export const ChannelEvent = z.discriminatedUnion("_tag", [
+  z.object({ _tag: z.literal("Message"), message: ChatMessage }),
+  z.object({ _tag: z.literal("Reset") }),
+]) satisfies Codec<T.ChannelEvent>;
 
-export const SayRequest: Codec<T.SayRequest> = Schema.Struct({
-  id: Schema.String,
-  text: Schema.String,
-  blocks: Schema.optionalKey(Schema.mutable(Schema.Array(BlockRef))),
-  replyTo: Schema.optionalKey(Schema.Finite),
-  attachments: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
-  station: Schema.optionalKey(Schema.Finite),
-  agent: Schema.optionalKey(Schema.String),
-  repo: Schema.optionalKey(Schema.String),
-  sendKey: Schema.optionalKey(Schema.String),
-  to: Schema.optionalKey(Schema.String),
-});
+export const SayRequest = z.object({
+  id: z.string(),
+  text: z.string(),
+  blocks: z.exactOptional(z.array(BlockRef)),
+  replyTo: z.exactOptional(z.number()),
+  attachments: z.exactOptional(z.array(z.string())),
+  station: z.exactOptional(z.number()),
+  agent: z.exactOptional(z.string()),
+  repo: z.exactOptional(z.string()),
+  sendKey: z.exactOptional(z.string()),
+  to: z.exactOptional(z.string()),
+}) satisfies Codec<T.SayRequest>;
 
-export const ChannelUpdate: Codec<T.ChannelUpdate> = Schema.Struct({
-  description: Schema.optionalKey(Schema.String),
-  repo: Schema.optionalKey(Schema.String),
-  name: Schema.optionalKey(Schema.String),
-  category: Schema.optionalKey(Schema.String),
-  before: Schema.optionalKey(Schema.String),
-  members: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
-});
+export const ChannelUpdate = z.object({
+  description: z.exactOptional(z.string()),
+  repo: z.exactOptional(z.string()),
+  name: z.exactOptional(z.string()),
+  category: z.exactOptional(z.string()),
+  before: z.exactOptional(z.string()),
+  members: z.exactOptional(z.array(z.string())),
+}) satisfies Codec<T.ChannelUpdate>;
 
-export const ChannelRequest: Codec<T.ChannelRequest> = Schema.Struct({
-  name: Schema.String,
-  description: Schema.optionalKey(Schema.String),
-  repo: Schema.optionalKey(Schema.String),
-});
+export const ChannelRequest = z.object({
+  name: z.string(),
+  description: z.exactOptional(z.string()),
+  repo: z.exactOptional(z.string()),
+}) satisfies Codec<T.ChannelRequest>;
 
-export const ChatReadRequest: Codec<T.ChatReadRequest> = Schema.Struct({
-  number: Schema.Finite,
-});
+export const ChatReadRequest = z.object({
+  number: z.number(),
+}) satisfies Codec<T.ChatReadRequest>;
 
-export const MessageEdit: Codec<T.MessageEdit> = Schema.Struct({
+export const MessageEdit = z.object({
   id: MessageId,
-  text: Schema.String,
-  attachments: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
-});
+  text: z.string(),
+  attachments: z.exactOptional(z.array(z.string())),
+}) satisfies Codec<T.MessageEdit>;
 
-export const NotifyRequest: Codec<T.NotifyRequest> = Schema.Struct({ id: Schema.String, notify: Notify });
+export const NotifyRequest = z.object({ id: z.string(), notify: Notify }) satisfies Codec<T.NotifyRequest>;
 
-export const ReactionSet: Codec<T.ReactionSet> = Schema.Struct({ id: MessageId, emoji: Schema.String, on: Schema.Boolean });
+export const ReactionSet = z.object({ id: MessageId, emoji: z.string(), on: z.boolean() }) satisfies Codec<T.ReactionSet>;
 
-export const OnSet: Codec<T.OnSet> = Schema.Struct({ id: Schema.String, on: Schema.Boolean });
+export const OnSet = z.object({ id: z.string(), on: z.boolean() }) satisfies Codec<T.OnSet>;
 
-export const MessageSearch: Codec<T.MessageSearch> = Schema.Struct({ text: Schema.String, channel: Schema.optionalKey(Schema.String) });
+export const MessageSearch = z.object({ text: z.string(), channel: z.exactOptional(z.string()) }) satisfies Codec<T.MessageSearch>;
 
-export const ChannelUnread: Codec<T.ChannelUnread> = Schema.Struct({
-  channel: Schema.String,
-  unread: Schema.Finite,
-  mentionsYou: Schema.Boolean,
-  latest: Schema.optionalKey(Schema.String),
-});
+export const ChannelUnread = z.object({
+  channel: z.string(),
+  unread: z.number(),
+  mentionsYou: z.boolean(),
+  latest: z.exactOptional(z.string()),
+}) satisfies Codec<T.ChannelUnread>;
 
-export const MessageHit: Codec<T.MessageHit> = Schema.Struct({ message: ChatMessage, channel: Schema.String, address: Schema.String });
+export const MessageHit = z.object({ message: ChatMessage, channel: z.string(), address: z.string() }) satisfies Codec<T.MessageHit>;
 
-export const FactMessageChanged: Codec<T.FactMessageChanged> = Schema.Struct({
-  type: Schema.Literal("messageChanged"),
-  at: Schema.Finite,
+export const FactMessageChanged = z.object({
+  type: z.literal("messageChanged"),
+  at: z.number(),
   message: ChatMessage,
-  thread: Schema.optionalKey(Schema.String),
-  answers: Schema.optionalKey(SessionId),
-});
+  thread: z.exactOptional(z.string()),
+  answers: z.exactOptional(SessionId),
+}) satisfies Codec<T.FactMessageChanged>;
 
-export const FactChannelChanged: Codec<T.FactChannelChanged> = Schema.Struct({
-  type: Schema.Literal("channelChanged"),
-  at: Schema.Finite,
+export const FactChannelChanged = z.object({
+  type: z.literal("channelChanged"),
+  at: z.number(),
   channel: Channel,
-});
+}) satisfies Codec<T.FactChannelChanged>;
 
-export const FactChannelRemoved: Codec<T.FactChannelRemoved> = Schema.Struct({
-  type: Schema.Literal("channelRemoved"),
-  at: Schema.Finite,
-  id: Schema.String,
-});
+export const FactChannelRemoved = z.object({
+  type: z.literal("channelRemoved"),
+  at: z.number(),
+  id: z.string(),
+}) satisfies Codec<T.FactChannelRemoved>;
 
-export const FactUserMentionsChanged: Codec<T.FactUserMentionsChanged> = Schema.Struct({
-  type: Schema.Literal("userMentionsChanged"),
-  at: Schema.Finite,
-  mentions: Schema.mutable(Schema.Array(UserMention)),
-});
+export const FactUserMentionsChanged = z.object({
+  type: z.literal("userMentionsChanged"),
+  at: z.number(),
+  mentions: z.array(UserMention),
+}) satisfies Codec<T.FactUserMentionsChanged>;

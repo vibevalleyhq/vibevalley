@@ -1,16 +1,13 @@
-import { Effect } from "effect";
-
 import type { ProviderHandlers } from "@vibevalley/protocol/api";
 
-import { Provider } from "#/modules/provider/provider.ts";
+import type { Provider } from "#/modules/provider/provider.ts";
 
-export const providerHandlers = Effect.gen(function* () {
-  const provider = yield* Provider;
-  const done: ProviderHandlers = {
-    "provider.get": () => Effect.sync(provider.status),
+export function providerHandlers(deps: { readonly provider: Provider }): ProviderHandlers {
+  const { provider } = deps;
+  return {
+    "provider.get": async () => provider.status(),
     "provider.update": (body) => provider.update(body),
     "provider.voice.list": (body) => provider.voices(body),
     "provider.model.list": (body) => provider.models(body),
   };
-  return done;
-});
+}

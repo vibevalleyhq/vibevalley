@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -22,247 +21,13 @@ import type { IconName } from "#/ui/icons.ts";
 import { ActLines } from "./ActLines";
 import { Property } from "./Sheet";
 
-const styles = stylex.create({
-  workLogSpan: {
-    width: "3rem",
-    flexShrink: "0",
-  },
-  workLogSpanState: {
-    color: "var(--wb-muted)",
-  },
-  workLogSpanState2: {
-    color: "var(--wb-water)",
-  },
-  workLogSpanState3: {
-    color: "var(--wb-berry)",
-  },
-  storySpan: {
-    minWidth: "0",
-    flex: "1",
-    overflowWrap: "break-word",
-  },
-  storySpanPrimary: {
-    color: null,
-  },
-  storySpanSecondary: {
-    color: "var(--color-berry)",
-  },
-  storySpanStateA: {
-    fontWeight: null,
-  },
-  storySpanStateB: {
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  criteriaIcon: {
-    marginTop: "0.125rem",
-    flexShrink: "0",
-  },
-  criteriaSpan: {},
-  criteriaSpanTone: {
-    color: "var(--color-muted)",
-  },
-  runsSpan: {
-    marginTop: "0.125rem",
-    WebkitLineClamp: "2",
-    WebkitBoxOrient: "vertical",
-    display: "block",
-    overflow: "hidden",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  workLogSpan2: {
-    WebkitLineClamp: "3",
-    WebkitBoxOrient: "vertical",
-    display: "-webkit-box",
-    overflow: "hidden",
-    minWidth: "0",
-    flex: "1",
-    fontFamily: "var(--font-sans)",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    overflowWrap: "break-word",
-    whiteSpace: "pre-wrap",
-  },
-  checklistControl: { marginTop: "0.125rem" },
-  questionDiv: {
-    marginTop: "0.625rem",
-  },
-  questionDiv2: {
-    marginTop: "0.375rem",
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.375rem",
-  },
-  criteriaUl: {
-    display: "flex",
-    flexDirection: "column",
-  },
-  criteriaLi: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "0.625rem",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.375rem",
-    paddingBlock: "0.25rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  criteriaSpan2: {
-    marginTop: "0.25rem",
-    width: "0.75rem",
-    height: "0.75rem",
-    flexShrink: "0",
-    borderRadius: "9999px",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-  },
-  criteriaSpan22: {
-    minWidth: "0",
-    flex: "1",
-  },
-  criteriaSpan3: {
-    display: "block",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  milestone: {
-    display: "flex",
-    gap: "0.75rem",
-    paddingBlock: "0.25rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  storySpan2: {
-    width: "4rem",
-    flexShrink: "0",
-    color: "var(--color-muted)",
-  },
-  storySpan22: {
-    color: "var(--color-muted)",
-  },
-  runsP: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-faint)",
-  },
-  runsDiv: {
-    marginBottom: "0.5rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  runsDiv2: {
-    display: "flex",
-    gap: "0.75rem",
-    paddingBottom: "0.5rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  runsSpan2: {
-    width: "5rem",
-    flexShrink: "0",
-    color: "var(--color-muted)",
-  },
-  workLogOl: {
-    maxHeight: "420px",
-    overflowY: "auto",
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-  },
-  workLogLi: {
-    display: "flex",
-    gap: "0.625rem",
-    borderBottomStyle: {
-      default: "solid",
-      ":last-child": "solid",
-    },
-    borderBottomWidth: {
-      default: "1px",
-      ":last-child": "0",
-    },
-    borderColor: {
-      default: "var(--color-line)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-line) 60%, transparent)",
-    },
-    paddingBlock: "0.25rem",
-  },
-  workLogSpan3: {
-    width: "3.5rem",
-    flexShrink: "0",
-    color: "var(--color-faint)",
-  },
-  orchestratorIssueDetailDiv: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "0.75rem",
-    paddingRight: "2.5rem",
-  },
-  orchestratorIssueDetailH1: {
-    flex: "1",
-    fontSize: "var(--text-xl)",
-    lineHeight: "var(--leading-xl)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  orchestratorIssueDetailSpan: {
-    marginTop: "0.375rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  orchestratorIssueDetailDiv2: {
-    marginTop: "0.75rem",
-  },
-  orchestratorIssueDetailDiv3: {
-    marginTop: "0.75rem",
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  orchestratorIssueDetailSpan2: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-berry)",
-  },
-  orchestratorIssueDetailDiv4: {
-    marginTop: "1rem",
-  },
-  orchestratorIssueDetailSpan3: {
-    fontSize: "var(--text-base)",
-    lineHeight: "var(--leading-base)",
-  },
-  orchestratorIssueDetailH2: {
-    marginTop: "1.25rem",
-    marginBottom: "0.5rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  listDiv: {
-    marginTop: "0.5rem",
-  },
-  listDiv2: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  listDiv3: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-});
-
 /** A question of the helper's: its options are replies as they are, one click each. */
 export function Question(props: { ask: QuestionItem; busy: boolean; onPick: (words: string) => void }) {
   return (
-    <div {...stylex.attrs(styles.questionDiv)}>
+    <div class="mt-2.5">
       <div>{props.ask.question}</div>
       <Show when={props.ask.options.length}>
-        <div {...stylex.attrs(styles.questionDiv2)} role="group" aria-label={t("web.issue.detail.answerTo", { question: props.ask.question })}>
+        <div class="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-label={t("web.issue.detail.answerTo", { question: props.ask.question })}>
           <For each={props.ask.options}>
             {(o) => (
               <Button data-testid="answer-option" data-key={o} disabled={props.busy} onClick={() => props.onPick(o)}>
@@ -294,10 +59,10 @@ export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
       return n;
     });
   return (
-    <ul {...stylex.attrs(styles.criteriaUl)}>
+    <ul class="flex flex-col">
       <For each={props.rows} keyed={(r) => r.text}>
         {(r, i) => (
-          <li {...stylex.attrs(styles.criteriaLi)}>
+          <li class="flex items-start gap-2.5 rounded-md px-1.5 py-1 text-sm">
             <Show when={props.checking}>
               <Checkbox
                 testid="criterion-tick"
@@ -305,16 +70,16 @@ export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
                 label={t("web.issue.detail.ticked", { criterion: r().text })}
                 checked={ticked().has(i())}
                 onChange={() => tick(i())}
-                styles={styles.checklistControl}
+                class="mt-0.5"
               />
             </Show>
-            <Show when={r().result} fallback={<span {...stylex.attrs(styles.criteriaSpan2)} title={t("web.issue.detail.unsaid")} />}>
-              {(res) => <Icon name={resultMark[res()].icon} size={14} label={resultMark[res()].label} styles={[styles.criteriaIcon]} />}
+            <Show when={r().result} fallback={<span class="mt-1 w-3 h-3 shrink-0 rounded-full border border-line" title={t("web.issue.detail.unsaid")} />}>
+              {(res) => <Icon name={resultMark[res()].icon} size={14} label={resultMark[res()].label} class="mt-0.5 shrink-0" />}
             </Show>
-            <span {...stylex.attrs(styles.criteriaSpan22)}>
-              <span {...stylex.attrs(styles.criteriaSpan, ticked().has(i()) ? styles.criteriaSpanTone : styles.criteriaSpan)}>{r().text}</span>
+            <span class="min-w-0 flex-1">
+              <span class={["", ticked().has(i()) ? "text-muted" : ""]}>{r().text}</span>
               <Show when={r().proof}>
-                <span {...stylex.attrs(styles.criteriaSpan3)}>{r().proof}</span>
+                <span class="block text-xs text-muted">{r().proof}</span>
               </Show>
             </span>
           </li>
@@ -327,20 +92,20 @@ export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
 /** The milestones, newest first: when, who, what. */
 export function Story(props: { milestones: Milestone[] }) {
   return (
-    <ol {...stylex.attrs(styles.criteriaUl)}>
+    <ol class="flex flex-col">
       <For each={props.milestones}>
         {(m) => (
-          <li data-testid="milestone" data-kind={m.kind} {...stylex.attrs(styles.milestone)}>
-            <span {...stylex.attrs(styles.storySpan2)}>{wallClockText(m.at)}</span>
+          <li data-testid="milestone" data-kind={m.kind} class="flex gap-3 py-1 text-sm">
+            <span class="w-16 shrink-0 text-muted">{wallClockText(m.at)}</span>
             <span
-              {...stylex.attrs(
-                styles.storySpan,
-                m.kind === "failed" || m.kind === "rejected" ? styles.storySpanSecondary : styles.storySpanPrimary,
-                m.kind === "asked" ? styles.storySpanStateB : styles.storySpanStateA,
-              )}
+              class={[
+                "min-w-0 flex-1 wrap-break-word",
+                m.kind === "failed" || m.kind === "rejected" ? "text-berry" : "",
+                m.kind === "asked" ? "font-semibold" : "",
+              ]}
             >
               <Show when={m.who}>
-                <span {...stylex.attrs(styles.storySpan22)}>{m.who} · </span>
+                <span class="text-muted">{m.who} · </span>
               </Show>
               {plainText(m.text)}
             </span>
@@ -360,17 +125,17 @@ export function Runs(props: { issue: string; version: string }) {
   const runs = () => ready(query, []);
   const now = () => Date.now();
   return (
-    <Show when={runs().length > 0} fallback={<p {...stylex.attrs(styles.runsP)}>{t("web.issue.detail.noRuns")}</p>}>
+    <Show when={runs().length > 0} fallback={<p class="text-xs text-faint">{t("web.issue.detail.noRuns")}</p>}>
       <div>
-        <div {...stylex.attrs(styles.runsDiv)}>{t("web.issue.detail.runCount", { n: runs().length })}</div>
+        <div class="mb-2 text-xs text-muted">{t("web.issue.detail.runCount", { n: runs().length })}</div>
         <For each={[...runs()].toReversed()}>
           {(r) => (
-            <div {...stylex.attrs(styles.runsDiv2)}>
-              <span {...stylex.attrs(styles.runsSpan2)}>{wallClockText(r.startedAt)}</span>
-              <span {...stylex.attrs(styles.criteriaSpan22)}>
+            <div class="flex gap-3 pb-2 text-sm">
+              <span class="w-20 shrink-0 text-muted">{wallClockText(r.startedAt)}</span>
+              <span class="min-w-0 flex-1">
                 {runText(r, now(), tookText)}
                 <Show when={r.summary}>
-                  <span {...stylex.attrs(styles.runsSpan)}>{r.summary}</span>
+                  <span class="mt-0.5 line-clamp-2 block text-xs text-muted">{r.summary}</span>
                 </Show>
               </span>
             </div>
@@ -402,20 +167,17 @@ const stepWord: Partial<Record<SessionEvent["type"], string>> = {
 export function WorkLog(props: { steps: SessionEvent[] }) {
   const shown = () => props.steps.filter((e) => stepWord[e.type] !== undefined).slice(-240);
   return (
-    <ol {...stylex.attrs(styles.workLogOl)}>
+    <ol class="max-h-105 overflow-y-auto font-mono text-xs">
       <For each={shown()}>
         {(e) => (
-          <li {...stylex.attrs(styles.workLogLi)}>
-            <span {...stylex.attrs(styles.workLogSpan3)}>{wallClockText(e.time)}</span>
-            <span
-              {...stylex.attrs(
-                styles.workLogSpan,
-                e.type === "run/error" ? styles.workLogSpanState3 : e.type === "tool/call" ? styles.workLogSpanState2 : styles.workLogSpanState,
-              )}
-            >
+          <li class="flex gap-2.5 last:[border-bottom-style:solid] border-b last:border-b-0 border-line/60 py-1">
+            <span class="w-14 shrink-0 text-faint">{wallClockText(e.time)}</span>
+            <span class={["w-12 shrink-0", e.type === "run/error" ? "text-berry" : e.type === "tool/call" ? "text-water" : "text-muted"]}>
               {stepWord[e.type]}
             </span>
-            <span {...stylex.attrs(styles.workLogSpan2)}>{e.type === "tool/call" ? (e.actionText ?? e.text) : e.text}</span>
+            <span class="line-clamp-3 min-w-0 flex-1 font-sans text-sm wrap-break-word whitespace-pre-wrap">
+              {e.type === "tool/call" ? (e.actionText ?? e.text) : e.text}
+            </span>
           </li>
         )}
       </For>
@@ -438,17 +200,17 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
   };
   return (
     <div>
-      <div {...stylex.attrs(styles.orchestratorIssueDetailDiv)}>
-        <h1 {...stylex.attrs(styles.orchestratorIssueDetailH1)}>{props.issue.title}</h1>
-        <span {...stylex.attrs(styles.orchestratorIssueDetailSpan)}>{tagText(props.issue)}</span>
+      <div class="flex items-start gap-3 pr-10">
+        <h1 class="flex-1 text-xl font-semibold">{props.issue.title}</h1>
+        <span class="mt-1.5 text-xs text-muted">{tagText(props.issue)}</span>
       </div>
-      <div {...stylex.attrs(styles.orchestratorIssueDetailDiv2)}>
+      <div class="mt-3">
         <ActLines issue={props.issue.id} />
       </div>
       <Show when={props.issue.stage.acts.length > 0}>
-        <div {...stylex.attrs(styles.orchestratorIssueDetailDiv3)}>
+        <div class="mt-3 flex flex-wrap items-center gap-2">
           <Show when={props.issue.stage.state === "stuck"}>
-            <span {...stylex.attrs(styles.orchestratorIssueDetailSpan2)}>{t("web.issue.detail.orchestratorStuck")}</span>
+            <span class="text-sm text-berry">{t("web.issue.detail.orchestratorStuck")}</span>
           </Show>
           <For each={props.issue.stage.acts}>
             {(a) => (
@@ -459,11 +221,11 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
           </For>
         </div>
       </Show>
-      <div {...stylex.attrs(styles.orchestratorIssueDetailDiv4)}>
+      <div class="mt-4">
         <Property label={t("web.issue.detail.who")}>{t("web.issue.orchestrator")}</Property>
         <Show when={props.issue.description}>
           <Property label={t("web.issue.detail.job")}>
-            <span {...stylex.attrs(styles.orchestratorIssueDetailSpan3)}>{props.issue.description}</span>
+            <span class="text-base">{props.issue.description}</span>
           </Property>
         </Show>
         <Show when={props.issue.cron}>
@@ -473,7 +235,7 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
         <Show when={props.issue.closedAt}>{(at) => <Property label={t("web.issue.detail.closedAt")}>{wallClockText(at())}</Property>}</Show>
         <Property label={t("web.issue.detail.answer")}>{t("web.issue.detail.answered")}</Property>
       </div>
-      <h2 {...stylex.attrs(styles.orchestratorIssueDetailH2)}>{t("web.issue.detail.runs")}</h2>
+      <h2 class="mt-5 mb-2 text-sm font-semibold">{t("web.issue.detail.runs")}</h2>
       <Runs issue={props.issue.id} version={`${props.issue.status}:${props.issue.closedAt}:${tagOpen(tag())}`} />
     </div>
   );
@@ -483,15 +245,15 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
 export function AnswerView(props: { answer: IssueAnswer }) {
   const list = (head: string, lines: readonly string[]) => (
     <Show when={lines.length > 0}>
-      <div {...stylex.attrs(styles.listDiv)}>
-        <div {...stylex.attrs(styles.listDiv2)}>{head}</div>
-        <For each={lines}>{(l) => <div {...stylex.attrs(styles.listDiv3)}>· {l}</div>}</For>
+      <div class="mt-2">
+        <div class="text-xs text-muted">{head}</div>
+        <For each={lines}>{(l) => <div class="text-sm">· {l}</div>}</For>
       </div>
     </Show>
   );
   return (
     <div>
-      <p {...stylex.attrs(styles.orchestratorIssueDetailSpan3)}>{props.answer.conclusion}</p>
+      <p class="text-base">{props.answer.conclusion}</p>
       {list(t("web.issue.detail.evidence"), props.answer.evidence)}
       {list(t("web.issue.detail.unsure"), props.answer.unsure)}
       {list(t("web.issue.detail.next"), props.answer.next)}

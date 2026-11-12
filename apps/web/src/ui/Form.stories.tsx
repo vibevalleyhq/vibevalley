@@ -1,6 +1,5 @@
-import * as stylex from "@stylexjs/stylex";
-import { Schema } from "effect";
 import { createSignal, onCleanup } from "solid-js";
+import { z } from "zod";
 
 import { stories, story } from "@vibevalley/stories";
 
@@ -10,20 +9,9 @@ import { Button } from "./Button";
 import { TextInput } from "./Field";
 import { Form, FormField, formControl, formMessages } from "./Form";
 
-const viewStyles = stylex.create({
-  form: { display: "flex", flexDirection: "column", gap: "0.75rem" },
-  editorDiv: {
-    display: "flex",
-    maxWidth: "var(--container-md)",
-    flexDirection: "column",
-    gap: "0.75rem",
-    padding: "1rem",
-  },
-});
-
-const Input = Schema.Struct({
-  name: Schema.Trim.check(Schema.isMinLength(1)),
-  amount: Schema.Trim.check(Schema.isMinLength(1)).pipe(Schema.decodeTo(Schema.FiniteFromString)),
+const Input = z.object({
+  name: z.string().trim().min(1),
+  amount: z.string().trim().min(1).pipe(z.coerce.number<string>()),
 });
 function Editor() {
   const [writes, setWrites] = createSignal(0);
@@ -49,8 +37,8 @@ function Editor() {
   const name = form.field(["name"]);
   const amount = form.field(["amount"]);
   return (
-    <div {...stylex.attrs(viewStyles.editorDiv)}>
-      <Form form={form} testid="form-demo" styles={viewStyles.form}>
+    <div class="flex max-w-md flex-col gap-3 p-4">
+      <Form form={form} testid="form-demo" class="flex flex-col gap-3">
         <FormField field={name} label="Name">
           <TextInput {...formControl(name)} data-testid="form-name" value={name.value()} onInput={(event) => name.setValue(event.currentTarget.value)} />
         </FormField>

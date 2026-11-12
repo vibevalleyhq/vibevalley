@@ -1,250 +1,255 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { describe, expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Stream } from "effect";
+import { describe, expect, test } from "vite-plus/test";
 
 import { scriptedLLM } from "@vibevalley/agent/testing";
 import { answer, text, toolCall } from "@vibevalley/ai/testing";
+import { collect } from "@vibevalley/async";
 
 import { user } from "#/base/actor.ts";
-import { Core } from "#/core/core.ts";
-import { Db } from "#/infra/db.ts";
 import builtIn from "#/modules/agent/templates/orchestrator/agent.json" with { type: "json" };
-import { Memory } from "#/modules/memory/memory.ts";
-import { testConfig, aTurn, until } from "#/testing/layers.ts";
+import { testConfig, nextTurn, until } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 import * as qs from "#db/session.sql.ts";
 
-import { Caller } from "./host.ts";
-import { Session } from "./session.ts";
+import { Caller, NotAnswered, SubmitRefused } from "./host.ts";
 import type { SessionNews } from "./signals.ts";
+
+const words = async (caller: Caller) => (await collect(caller.words())).join("");
+/** Whether p has settled by now. */
+const settledBy = async (p: Promise<unknown>) => {
+  let settled = false;
+  void p.then(
+    () => (settled = true),
+    () => (settled = true),
+  );
+  await nextTurn();
+  return settled;
+};
+
 describe("Caller", () => {
-  it.effect("keeps what came before its reader, then streams until it ends", () =>
-    Effect.gen(function* () {
-      const caller = new Caller();
-      caller.push("early ");
-      const reading = yield* Effect.forkChild(Stream.mkString(caller.words));
-      caller.push("late");
-      caller.end();
-      caller.push("after the end");
-      const reading2 = yield* Fiber.join(reading);
-      expect(reading2).toBe("early late");
-    }),
-  );
+  test("keeps what came before its reader, then streams until it ends", async () => {
+    const caller = new Caller();
+    caller.push("early ");
+    const reading = words(caller);
+    caller.push("late");
+    caller.end();
+    caller.push("after the end");
+    const reading2 = await reading;
+    expect(reading2).toBe("early late");
+  });
 
-  it.effect("fails its reader with what failed it, as the cause", () =>
-    Effect.gen(function* () {
-      const caller = new Caller();
-      caller.push("partly");
-      caller.fail(new Error("no model"));
-      const read = yield* Effect.flip(Stream.mkString(caller.words));
-      expect(read).toMatchObject({ _tag: "NotAnswered", message: "no model", cause: new Error("no model") });
-    }),
-  );
-  it.effect("ended before its reader, still hands over what it kept, once", () =>
-    Effect.gen(function* () {
-      const caller = new Caller();
-      caller.push("kept");
-      caller.end();
-      caller.fail(new Error("too late"));
-      const mkString2 = yield* Stream.mkString(caller.words);
-      expect(mkString2).toBe("kept");
-      const mkString3 = yield* Stream.mkString(caller.words);
-      expect(mkString3).toBe("");
-    }),
-  );
+  test("fails its reader with what failed it, as the cause", async () => {
+    const caller = new Caller();
+    caller.push("partly");
+    caller.fail(new Error("no model"));
+    const read = await words(caller).catch((e: unknown) => e);
+    expect(read).toBeInstanceOf(NotAnswered);
+    expect(read).toMatchObject({ name: "NotAnswered", message: "no model", cause: new Error("no model") });
+  });
+  test("ended before its reader, still hands over what it kept, once", async () => {
+    const caller = new Caller();
+    caller.push("kept");
+    caller.end();
+    caller.fail(new Error("too late"));
+    const mkString2 = await words(caller);
+    expect(mkString2).toBe("kept");
+    const mkString3 = await words(caller);
+    expect(mkString3).toBe("");
+  });
 
-  it.effect("failed while streaming, the reader gets the words before the failure", () =>
-    Effect.gen(function* () {
-      const caller = new Caller();
-      const heard: string[] = [];
-      const reading = yield* Effect.forkChild(
-        Stream.runForEach(caller.words, (w) => Effect.sync(() => void heard.push(w))),
-        { startImmediately: true },
-      );
-      caller.push("partly");
-      caller.fail(new Error("no model"));
-      caller.end();
-      const readingFailure = yield* Effect.flip(Fiber.join(reading));
-      expect(readingFailure).toMatchObject({ _tag: "NotAnswered", message: "no model" });
-      expect(heard).toEqual(["partly"]);
-    }),
-  );
+  test("failed while streaming, the reader gets the words before the failure", async () => {
+    const caller = new Caller();
+    const heard: string[] = [];
+    const reading = (async () => {
+      for await (const w of caller.words()) heard.push(w);
+    })();
+    caller.push("partly");
+    caller.fail(new Error("no model"));
+    caller.end();
+    const readingFailure = await reading.catch((e: unknown) => e);
+    expect(readingFailure).toMatchObject({ name: "NotAnswered", message: "no model" });
+    expect(heard).toEqual(["partly"]);
+  });
 });
 
 describe("AgentHost", () => {
-  it.live("says each answer once, whole, while the caller gets its words as they grow", () => {
+  test("says each answer once, whole, while the caller gets its words as they grow", async () => {
     const config = testConfig();
-    return Effect.gen(function* () {
-      const sessions = yield* Session;
-      const { llm, requests } = scriptedLLM([
-        answer([text("我看一下"), toolCall("remember", { note: "remembered in database" }), toolCall("missing", {})]),
-        answer("看完了，一切正常"),
-      ]);
-      const memory = yield* Memory;
-      yield* memory.remember({ agent: "orchestrator", text: "database preference", repo: "", by: user });
-      const finished: Extract<SessionNews, { _tag: "RunFinished" }>[] = [];
-      const consumed: Extract<SessionNews, { _tag: "Consumed" }>[] = [];
-      const answeringRuns: (string | undefined)[] = [];
-      const news = yield* sessions.news;
-      yield* Effect.forkScoped(
-        Stream.runForEach(news, (n) =>
-          Effect.sync(() => {
-            if (n._tag === "RunFinished") finished.push(n);
-            else if (n._tag === "Consumed") consumed.push(n);
-          }),
-        ),
-      );
-      const said: string[] = [];
-      const states: string[] = [];
-      const core = yield* Core;
-      const subscribe2 = yield* core.subscribe;
-      yield* Effect.forkScoped(
-        Stream.runForEach(subscribe2, () =>
-          Effect.sync(() => {
-            const session = core.session("orchestrator");
-            if (!session) return;
-            const phase = session.phase;
-            states.push(phase._tag === "working" ? `${phase.doing.action}${session.channel ? " " + session.channel : ""}` : phase._tag);
-          }),
-        ),
-      );
-      const host = yield* sessions.host({
-        session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "助手", runtime: "vibevalley", brief: "" },
-        inputType: "testInput",
-        home: config.home,
-        cwd: config.workRoot,
-        instructions: "",
-        llm: () => llm,
-        tools: () => [],
-        first: "first",
-        quiet: () => false,
-        say: (_route, words) =>
-          Effect.sync(() => {
-            said.push(words);
-            answeringRuns.push(sessions.runOf("orchestrator"));
-          }),
-        channel: (route) => route,
-        fresh: () => {},
-        restored: () => ({ by: { kind: "" } }),
-        toolStart: (tool) => ({ text: tool, action: "other", tool }),
-      });
-      const kept = yield* (yield* Db).one(qs.sessionByID({ id: "orchestrator" }));
-      expect(kept).toMatchObject({ id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: builtIn.name, ended_at: null });
-      const caller = new Caller();
-      const heard: string[] = [];
-      const reading = yield* Effect.forkChild(Stream.runForEach(caller.words, (w) => Effect.sync(() => void heard.push(w))));
-      yield* host.submit(() => Effect.succeed({ text: "看看" }), { route: "r", run: { by: { kind: "" }, heard: ["m1"] }, caller }, true);
-      yield* until(() => core.session("orchestrator")?.phase._tag === "done" && said.length === 2, "the run settled");
-      yield* Fiber.join(reading);
-      expect(said).toEqual(["我看一下", "看完了，一切正常"]);
-      yield* until(() => finished.length === 1 && consumed.length === 1, "the public run events");
-      expect(finished).toEqual([{ _tag: "RunFinished", id: expect.any(String), issues: [], outcome: "completed" }]);
-      expect(consumed).toEqual([{ _tag: "Consumed", session: "orchestrator", envelopeIds: ["m1"] }]);
-      expect(answeringRuns).toEqual([finished[0]!.id, finished[0]!.id]);
-      expect(requests[0]!.system).toContain("database preference");
-      expect((yield* memory.list("orchestrator")).some((note) => note.text === "remembered in database")).toBe(true);
-      expect(existsSync(join(config.home, "MEMORY.md"))).toBe(false);
-      expect(sessions.runOf("orchestrator")).toBeUndefined();
-      // A character at a time from the script: more pushes than answers.
-      expect(heard.length).toBeGreaterThan(2);
-      expect(heard.join("")).toBe("我看一下\n看完了，一切正常\n");
-      // Where it works is said once it takes the input, and kept until it is done.
-      expect(states).toContain("thinking r");
-      expect(states).toContain("speaking_text r");
-      expect(core.session("orchestrator")).toMatchObject({ role: "orchestrator", phase: { _tag: "done" }, runs: 1 });
-      yield* host.close;
-    }).pipe(Effect.scoped, Effect.provide(world({ config })));
+    await using farm = await world({ config });
+    const sessions = farm.session;
+    const { llm, requests } = scriptedLLM([
+      answer([text("我看一下"), toolCall("remember", { note: "remembered in database" }), toolCall("missing", {})]),
+      answer("看完了，一切正常"),
+    ]);
+    const memory = farm.memory;
+    await memory.remember({ agent: "orchestrator", text: "database preference", repo: "", by: user });
+    const finished: Extract<SessionNews, { _tag: "RunFinished" }>[] = [];
+    const consumed: Extract<SessionNews, { _tag: "Consumed" }>[] = [];
+    const answeringRuns: (string | undefined)[] = [];
+    using news = sessions.news();
+    const followingNews = (async () => {
+      for await (const n of news) {
+        if (n._tag === "RunFinished") finished.push(n);
+        else if (n._tag === "Consumed") consumed.push(n);
+      }
+    })();
+    const said: string[] = [];
+    const states: string[] = [];
+    const core = farm.core;
+    using changes = core.subscribe();
+    const followingStates = (async () => {
+      for await (const _ of changes) {
+        const session = core.session("orchestrator");
+        if (!session) continue;
+        const phase = session.phase;
+        states.push(phase._tag === "working" ? `${phase.doing.action}${session.channel ? " " + session.channel : ""}` : phase._tag);
+      }
+    })();
+    const host = await sessions.host({
+      session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "助手", runtime: "vibevalley", brief: "" },
+      inputType: "testInput",
+      home: config.home,
+      cwd: config.workRoot,
+      instructions: "",
+      llm: () => llm,
+      tools: () => [],
+      first: "first",
+      quiet: () => false,
+      say: async (_route, words) => {
+        said.push(words);
+        answeringRuns.push(sessions.runOf("orchestrator"));
+      },
+      channel: (route) => route,
+      fresh: () => {},
+      restored: () => ({ by: { kind: "" } }),
+      toolStart: (tool) => ({ text: tool, action: "other", tool }),
+    });
+    const kept = await qs.sessionByID(farm.db.sql, { id: "orchestrator" });
+    expect(kept).toMatchObject({ id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: builtIn.name, ended_at: null });
+    const caller = new Caller();
+    const heard: string[] = [];
+    const reading = (async () => {
+      for await (const w of caller.words()) heard.push(w);
+    })();
+    await host.submit(async () => ({ text: "看看" }), { route: "r", run: { by: { kind: "" }, heard: ["m1"] }, caller }, true);
+    await until(() => core.session("orchestrator")?.phase._tag === "done" && said.length === 2, "the run settled");
+    await reading;
+    expect(said).toEqual(["我看一下", "看完了，一切正常"]);
+    await until(() => finished.length === 1 && consumed.length === 1, "the public run events");
+    expect(finished).toEqual([{ _tag: "RunFinished", id: expect.any(String), issues: [], outcome: "completed" }]);
+    expect(consumed).toEqual([{ _tag: "Consumed", session: "orchestrator", envelopeIds: ["m1"] }]);
+    expect(answeringRuns).toEqual([finished[0]!.id, finished[0]!.id]);
+    expect(requests[0]!.system).toContain("database preference");
+    expect((await memory.list("orchestrator")).some((note) => note.text === "remembered in database")).toBe(true);
+    expect(existsSync(join(config.home, "MEMORY.md"))).toBe(false);
+    expect(sessions.runOf("orchestrator")).toBeUndefined();
+    // A character at a time from the script: more pushes than answers.
+    expect(heard.length).toBeGreaterThan(2);
+    expect(heard.join("")).toBe("我看一下\n看完了，一切正常\n");
+    // Where it works is said once it takes the input, and kept until it is done.
+    expect(states).toContain("thinking r");
+    expect(states).toContain("speaking_text r");
+    expect(core.session("orchestrator")).toMatchObject({ role: "orchestrator", phase: { _tag: "done" }, runs: 1 });
+    await host.close();
+    news.close();
+    changes.close();
+    await Promise.all([followingNews, followingStates]);
   });
 
-  it.live("waits for an input build before closing, without delivering it late", () => {
+  test("waits for an input build before closing, without delivering it late", async () => {
     const config = testConfig();
-    return Effect.gen(function* () {
-      const sessions = yield* Session;
-      const { llm } = scriptedLLM();
-      const host = yield* sessions.host({
-        session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "助手", runtime: "vibevalley", brief: "" },
-        inputType: "testInput",
-        home: config.home,
-        cwd: config.workRoot,
-        instructions: "",
-        llm: () => llm,
-        tools: () => [],
-        first: "first",
-        quiet: () => true,
-        say: () => Effect.void,
-        channel: () => undefined,
-        fresh: () => {},
-        restored: () => ({ by: { kind: "" } }),
-        toolStart: (tool) => ({ text: tool, action: "other", tool }),
-      });
-      const building = yield* Deferred.make<void>();
-      const gate = yield* Deferred.make<void>();
-      const caller = new Caller();
-      const submitting = yield* Effect.forkChild(
-        host.submit(
-          () => Effect.as(Effect.andThen(Deferred.succeed(building, undefined), Deferred.await(gate)), { text: "late" }),
-          { route: "late", run: { by: { kind: "" } }, caller },
-          true,
-        ),
-      );
-      yield* Deferred.await(building);
-      const closing = yield* Effect.forkChild(host.close);
-      // A close that did not wait for the build would have ended by the next turn.
-      yield* aTurn;
-      expect(closing.pollUnsafe()).toBeUndefined();
-      yield* Deferred.succeed(gate, undefined);
-      const result = yield* Effect.flip(Fiber.join(submitting));
-      expect(result._tag).toBe("SubmitRefused");
-      yield* Fiber.join(closing);
-      // Every later close waits for the one close, which is over.
-      yield* host.close;
-      expect(host.current().route).toBe("first");
-      const mkString2 = yield* Stream.mkString(caller.words);
-      expect(mkString2).toBe("");
-    }).pipe(Effect.scoped, Effect.provide(world({ config })));
+    await using farm = await world({ config });
+    const sessions = farm.session;
+    const { llm } = scriptedLLM();
+    const host = await sessions.host({
+      session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "助手", runtime: "vibevalley", brief: "" },
+      inputType: "testInput",
+      home: config.home,
+      cwd: config.workRoot,
+      instructions: "",
+      llm: () => llm,
+      tools: () => [],
+      first: "first",
+      quiet: () => true,
+      say: async () => {},
+      channel: () => undefined,
+      fresh: () => {},
+      restored: () => ({ by: { kind: "" } }),
+      toolStart: (tool) => ({ text: tool, action: "other", tool }),
+    });
+    const building = Promise.withResolvers<void>();
+    const gate = Promise.withResolvers<void>();
+    const caller = new Caller();
+    const submitting = host.submit(
+      async () => {
+        building.resolve();
+        await gate.promise;
+        return { text: "late" };
+      },
+      { route: "late", run: { by: { kind: "" } }, caller },
+      true,
+    );
+    await building.promise;
+    const closing = host.close();
+    // A close that did not wait for the build would have ended by the next turn.
+    expect(await settledBy(closing)).toBe(false);
+    gate.resolve();
+    const result = await submitting.catch((e: unknown) => e);
+    expect(result).toBeInstanceOf(SubmitRefused);
+    await closing;
+    // Every later close waits for the one close, which is over.
+    await host.close();
+    expect(host.current().route).toBe("first");
+    const mkString2 = await words(caller);
+    expect(mkString2).toBe("");
   });
-  it.live("regression: a later close still waits for the cleanup when the first closing caller is interrupted", () => {
+  test("regression: a later close still waits for the cleanup when the first closing caller is interrupted", async () => {
     const config = testConfig();
-    return Effect.gen(function* () {
-      const sessions = yield* Session;
-      const { llm } = scriptedLLM();
-      const host = yield* sessions.host({
-        session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "助手", runtime: "vibevalley", brief: "" },
-        inputType: "testInput",
-        home: config.home,
-        cwd: config.workRoot,
-        instructions: "",
-        llm: () => llm,
-        tools: () => [],
-        first: "first",
-        quiet: () => true,
-        say: () => Effect.void,
-        channel: () => undefined,
-        fresh: () => {},
-        restored: () => ({ by: { kind: "" } }),
-        toolStart: (tool) => ({ text: tool, action: "other", tool }),
-      });
-      const building = yield* Deferred.make<void>();
-      const gate = yield* Deferred.make<void>();
-      yield* Effect.addFinalizer(() => Deferred.succeed(gate, undefined));
-      const submitting = yield* Effect.forkChild(
-        host.submit(
-          () => Effect.as(Effect.andThen(Deferred.succeed(building, undefined), Deferred.await(gate)), { text: "late" }),
-          { route: "late", run: { by: { kind: "" } } },
-          true,
-        ),
+    await using farm = await world({ config });
+    const sessions = farm.session;
+    const { llm } = scriptedLLM();
+    const host = await sessions.host({
+      session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "助手", runtime: "vibevalley", brief: "" },
+      inputType: "testInput",
+      home: config.home,
+      cwd: config.workRoot,
+      instructions: "",
+      llm: () => llm,
+      tools: () => [],
+      first: "first",
+      quiet: () => true,
+      say: async () => {},
+      channel: () => undefined,
+      fresh: () => {},
+      restored: () => ({ by: { kind: "" } }),
+      toolStart: (tool) => ({ text: tool, action: "other", tool }),
+    });
+    const building = Promise.withResolvers<void>();
+    const gate = Promise.withResolvers<void>();
+    try {
+      const submitting = host.submit(
+        async () => {
+          building.resolve();
+          await gate.promise;
+          return { text: "late" };
+        },
+        { route: "late", run: { by: { kind: "" } } },
+        true,
       );
-      yield* Deferred.await(building);
-      const first = yield* Effect.forkChild(host.close, { startImmediately: true });
-      yield* Fiber.interrupt(first);
-      const second = yield* Effect.forkChild(host.close, { startImmediately: true });
-      yield* aTurn;
-      expect(second.pollUnsafe()).toBeUndefined();
-      yield* Deferred.succeed(gate, undefined);
-      expect((yield* Effect.flip(Fiber.join(submitting)))._tag).toBe("SubmitRefused");
-      yield* Fiber.join(second);
-    }).pipe(Effect.scoped, Effect.provide(world({ config })));
+      await building.promise;
+      const interrupted = new AbortController();
+      const first = host.close(interrupted.signal);
+      interrupted.abort();
+      await first.catch(() => undefined);
+      const second = host.close();
+      expect(await settledBy(second)).toBe(false);
+      gate.resolve();
+      expect(await submitting.catch((e: unknown) => e)).toBeInstanceOf(SubmitRefused);
+      await second;
+    } finally {
+      gate.resolve();
+    }
   });
 });

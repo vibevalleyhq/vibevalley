@@ -1,8 +1,7 @@
-import { expect, it } from "@effect/vitest";
-import { Array as Arr, Effect, Redacted } from "effect";
+import { expect, test } from "vite-plus/test";
 
 import type { ProviderConnectionUpdate, ProviderUpdate } from "@vibevalley/protocol";
-import { BizCode } from "@vibevalley/protocol/api";
+import { ApiError, BizCode } from "@vibevalley/protocol/api";
 
 import { emptyProviders } from "#/modules/setting/provider.ts";
 
@@ -11,7 +10,7 @@ import { connectionsOver } from "./connections.ts";
 const connection: ProviderConnectionUpdate = { id: "moss", name: "MOSS", adapter: "moss", enabled: true, key: "test-key" };
 const update: ProviderUpdate = { ...emptyProviders, connections: [connection] };
 
-it.effect.each([
+test.each([
   { ...update, connections: [connection, connection] },
   { ...update, connections: [{ ...connection, id: "../invalid" }] },
   { ...update, connections: [{ ...connection, name: " " }] },
@@ -31,32 +30,36 @@ it.effect.each([
   { ...update, image: { connection: "missing", model: "moss-image-base-1.0" } },
   { ...update, image: { connection: "moss", model: "moss-transcribe-1.0" } },
   { ...update, image: { connection: "moss", model: "moss-image-base-1.0-2099-01-01" } },
-])("invalid connection changes are refused before persistence %#", (input) =>
-  Effect.gen(function* () {
-    const error = yield* connectionsOver(emptyProviders, input).pipe(Effect.flip);
-    expect(error.bizCode).toBe(BizCode.ProviderRefused);
-    expect(error.message).not.toContain("test-key");
-  }),
-);
+])("invalid connection changes are refused before persistence %#", (input) => {
+  const error = (() => {
+    try {
+      connectionsOver(emptyProviders, input);
+    } catch (e) {
+      return e;
+    }
+    return undefined;
+  })();
+  expect(error).toBeInstanceOf(ApiError);
+  expect(error).toMatchObject({ bizCode: BizCode.ProviderRefused });
+  expect(error instanceof Error ? error.message : "").not.toContain("test-key");
+});
 
-it.effect("new unconfigured connections can be saved without implying any usable default", () =>
-  Effect.gen(function* () {
-    const saved = yield* connectionsOver(emptyProviders, { ...update, connections: [{ id: "moss", name: " MOSS ", adapter: "moss", enabled: true }] });
-    const { connections, ...uses } = saved;
-    expect(Arr.map(connections, ({ key, ...rest }) => ({ ...rest, key: Redacted.value(key) }))).toEqual([
-      { id: "moss", name: "MOSS", adapter: "moss", enabled: true, key: "" },
-    ]);
-    expect(uses).toEqual({
-      revision: 1,
-      dictation: null,
-      image: null,
-      understanding: null,
-      speech: null,
-      live: null,
-      speakers: null,
-      voiceDesign: null,
-      transcription: null,
-      vision: null,
-    });
-  }),
-);
+test("new unconfigured connections can be saved without implying any usable default", () => {
+  const saved = connectionsOver(emptyProviders, { ...update, connections: [{ id: "moss", name: " MOSS ", adapter: "moss", enabled: true }] });
+  const { connections, ...uses } = saved;
+  expect(connections.map(({ key, ...rest }) => ({ ...rest, key: key.reveal() }))).toEqual([
+    { id: "moss", name: "MOSS", adapter: "moss", enabled: true, key: "" },
+  ]);
+  expect(uses).toEqual({
+    revision: 1,
+    dictation: null,
+    image: null,
+    understanding: null,
+    speech: null,
+    live: null,
+    speakers: null,
+    voiceDesign: null,
+    transcription: null,
+    vision: null,
+  });
+});

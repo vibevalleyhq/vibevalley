@@ -1,18 +1,9 @@
-import * as stylex from "@stylexjs/stylex";
 import { For } from "solid-js";
 
 import type { Attachment } from "@vibevalley/protocol";
 import { stories, story } from "@vibevalley/stories";
 
 import { AttachmentTile } from "./AttachmentTile";
-
-const viewStyles = stylex.create({
-  attachmentTileStoriesDiv: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.5rem",
-  },
-});
 
 // A picture's thumbnail is read from the server, which the stories do not have: the kinds drawn here are the others.
 const files: Attachment[] = [
@@ -28,7 +19,7 @@ export default stories({
     Kinds: story({
       args: { removable: true },
       render: (a) => (
-        <div {...stylex.attrs(viewStyles.attachmentTileStoriesDiv)}>
+        <div class="flex flex-wrap gap-2">
           <For each={files}>{(file) => <AttachmentTile file={file} onRemove={a.removable ? () => undefined : undefined} />}</For>
         </div>
       ),

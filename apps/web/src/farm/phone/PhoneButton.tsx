@@ -1,45 +1,16 @@
-import * as stylex from "@stylexjs/stylex";
 import { Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
 import { aria } from "#/base/dom.tsx";
-import { phoneAnimations } from "#/farm/interaction.stylex.ts";
 import { farm, useFarm } from "#/farm/store.ts";
 import { unreadTotal } from "#/features/channel/index.ts";
 import { useCore } from "#/infra/frame.ts";
 import { PixelCard } from "#/ui/pixel/index.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
-import { styleProps } from "#/ui/positioner.ts";
 
 import { missedOf, phoneState } from "./calls";
 import { phoneCells } from "./lcd";
-
-const viewStyles = stylex.create({
-  trigger: { pointerEvents: "auto", position: "relative", cursor: "pointer" },
-  phoneButtonSpan: {
-    position: "absolute",
-    top: "-0.375rem",
-    right: "-0.375rem",
-    backgroundColor: "var(--color-berry-500)",
-    paddingInline: "0.25rem",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "10px",
-    lineHeight: "14px",
-    color: "var(--color-cream-50)",
-  },
-  phoneButtonSpan2: {
-    position: "absolute",
-    top: "-0.375rem",
-    right: "-0.375rem",
-    backgroundColor: "var(--color-berry)",
-    paddingInline: "0.25rem",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "10px",
-    lineHeight: "14px",
-    color: "var(--color-cream-50)",
-  },
-});
 
 export function PhoneButton(props: { height: number }) {
   const open = useFarm((s) => s.phoneOpen);
@@ -65,7 +36,10 @@ export function PhoneButton(props: { height: number }) {
               : t("web.farm.phone.phone")
       }
       aria-expanded={aria(open())}
-      {...styleProps([viewStyles.trigger, ringing() && phoneAnimations.shake])}
+      class={[
+        "pointer-events-auto relative cursor-pointer",
+        ringing() && "[animation-name:shake] motion-reduce:[animation-name:none] [animation-duration:500ms] [animation-iteration-count:infinite]",
+      ]}
       onClick={() => {
         playSound("open");
         farm.phoneOpen(!open());
@@ -81,10 +55,10 @@ export function PhoneButton(props: { height: number }) {
         ]}
       />
       <Show when={count() > 0}>
-        <span {...stylex.attrs(viewStyles.phoneButtonSpan)}>{count()}</span>
+        <span class="absolute -top-1.5 -right-1.5 bg-berry-500 px-1 font-pixel text-[length:10px] leading-2xs text-cream-50">{count()}</span>
       </Show>
       <Show when={count() === 0 && unread() > 0}>
-        <span {...stylex.attrs(viewStyles.phoneButtonSpan2)}>{t("web.farm.phone.new")}</span>
+        <span class="absolute -top-1.5 -right-1.5 bg-berry px-1 font-pixel text-[length:10px] leading-2xs text-cream-50">{t("web.farm.phone.new")}</span>
       </Show>
     </button>
   );

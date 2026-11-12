@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { For, Show } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
@@ -8,13 +7,6 @@ import { Button } from "#/ui/Button.tsx";
 import { IconButton } from "#/ui/IconButton.tsx";
 import { Card, Empty, ListCard, ListRow, Quiet, Split } from "#/ui/layout.tsx";
 import { Dot, type DotTone } from "#/ui/Tag.tsx";
-
-const styles = stylex.create({
-  listAndDetailStoriesP: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-});
 
 const repos: { id: string; line: string; tone: DotTone; about?: string }[] = [
   { id: "vibevalley", line: "3 个在做 · 1 个等你", tone: "leaf", about: "本机管编码 agent 的工作台。" },
@@ -45,7 +37,7 @@ export default stories({
               {(p) => (
                 <Card title={p().id} action={<Button>打开目录</Button>}>
                   <Show when={p().about} fallback={<Quiet>还没有说明。</Quiet>}>
-                    <p {...stylex.attrs(styles.listAndDetailStoriesP)}>{p().about}</p>
+                    <p class="text-sm">{p().about}</p>
                   </Show>
                 </Card>
               )}

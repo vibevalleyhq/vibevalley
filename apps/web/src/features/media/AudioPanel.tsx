@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -35,51 +34,6 @@ import { Card, Quiet } from "#/ui/layout.tsx";
 import { audioTimestamp, dialogueComplete, supportsStreamingTranscription, transcriptContent } from "./audio.ts";
 import { ReleaseAssets } from "./ReleaseAssets.tsx";
 
-const viewStyles = stylex.create({
-  section: { display: "flex", minWidth: 0, flexDirection: "column", gap: "1rem" },
-  notice: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", color: "var(--color-muted)" },
-  actions: { display: "flex", flexWrap: "wrap", gap: "0.5rem" },
-  heading: { fontSize: "var(--text-base)", lineHeight: "var(--leading-base)", fontWeight: "var(--font-weight-semibold)" },
-  errorText: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", overflowWrap: "break-word", color: "var(--color-berry)" },
-  identifierDetail: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", wordBreak: "break-all", color: "var(--color-muted)" },
-  stack: { display: "flex", minWidth: 0, flexDirection: "column", gap: "0.5rem" },
-  compactStack: { display: "flex", minWidth: 0, flexDirection: "column", gap: "0.25rem" },
-  detail: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", color: "var(--color-muted)" },
-  subheading: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", fontWeight: "var(--font-weight-semibold)" },
-  form: { display: "flex", minWidth: 0, flexDirection: "column", gap: "0.75rem" },
-  consent: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "0.5rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  player: { width: "100%", maxWidth: "100%", minWidth: 0 },
-  metadataLabel: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", fontWeight: "var(--font-weight-medium)" },
-  metadata: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.5rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  source: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", overflowWrap: "break-word", color: "var(--color-muted)" },
-  prose: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", overflowWrap: "break-word", whiteSpace: "pre-wrap" },
-  noticeText: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", overflowWrap: "break-word", color: "var(--color-muted)" },
-  link: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", color: "var(--color-water)", textDecorationLine: "underline" },
-  identifier: { fontSize: "var(--text-sm)", lineHeight: "var(--leading-sm)", wordBreak: "break-all" },
-  speaker: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", fontWeight: "var(--font-weight-medium)", overflowWrap: "break-word" },
-  preview: {
-    listStylePosition: "inside",
-    listStyleType: "disc",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  wrapText: { overflowWrap: "break-word" },
-});
-
 const voicesQuery = defineQuery({
   schema: S.ProviderVoiceListing,
   key: (input: ProviderVoiceRequest) => ["provider-voices", input.connection, input.revision, input.after ?? null],
@@ -113,13 +67,13 @@ export function AudioPanel() {
       (job): job is MediaAudioJob => job.kind === "speakers" || job.kind === "voiceDesign" || job.kind === "clone" || job.kind === "transcription",
     ) ?? [];
   return (
-    <section {...stylex.attrs(viewStyles.section)} data-testid="audio-panel" aria-label={t("web.audio.title")}>
-      <p {...stylex.attrs(viewStyles.notice)}>{t("web.audio.notice")}</p>
+    <section class="flex min-w-0 flex-col gap-4" data-testid="audio-panel" aria-label={t("web.audio.title")}>
+      <p class="text-sm text-muted">{t("web.audio.notice")}</p>
       <Button data-testid="audio-refresh" disabled={act.busy() || query.fetching()} onClick={() => void act.run(() => query.refetch())}>
         {t("web.audio.refresh")}
       </Button>
       <AudioError error={error() ?? (query.error() ? reasonOf(query.error()) : undefined)} />
-      <div {...stylex.attrs(viewStyles.actions)}>
+      <div class="flex flex-wrap gap-2">
         <For each={modes}>
           {(kind) => (
             <Button
@@ -145,7 +99,7 @@ export function AudioPanel() {
       <Show when={mode() === "transcription"}>
         <UploadForm kind="transcription" status={status()} />
       </Show>
-      <h2 {...stylex.attrs(viewStyles.heading)}>{t("web.audio.history")}</h2>
+      <h2 class="text-base font-semibold">{t("web.audio.history")}</h2>
       <Show when={jobs().length > 0} fallback={<Quiet>{t("web.audio.empty")}</Quiet>}>
         <For each={jobs()} keyed={(job) => job.id}>
           {(job) => <AudioJob job={job()} />}
@@ -159,7 +113,7 @@ function AudioError(props: { error: string | undefined }) {
   return (
     <Show when={props.error}>
       {(error) => (
-        <p role="alert" data-testid="audio-error" {...stylex.attrs(viewStyles.errorText)}>
+        <p role="alert" data-testid="audio-error" class="text-sm wrap-break-word text-berry">
           {error()}
         </p>
       )}
@@ -175,7 +129,7 @@ function Binding(props: { connection: string | undefined; revision: number | und
         data-connection={props.connection}
         data-revision={props.revision}
         data-model={props.model}
-        {...stylex.attrs(viewStyles.identifierDetail)}
+        class="text-xs break-all text-muted"
       >
         {props.connection} · {props.model} · {props.revision}
       </p>
@@ -204,7 +158,7 @@ function VoicePicker(props: { connection: string; revision: number; value: strin
     return props.value && !items.some((item) => item.value === props.value) ? [{ value: props.value, label: props.value }, ...items] : items;
   };
   return (
-    <div {...stylex.attrs(viewStyles.stack)}>
+    <div class="flex min-w-0 flex-col gap-2">
       <Field label={t("web.audio.queryVoice")} hint={t("web.audio.queryHint")}>
         <TextInput
           data-testid={`${props.testid}-search`}
@@ -225,7 +179,7 @@ function VoicePicker(props: { connection: string; revision: number; value: strin
           onChange={(voice) => props.onChange(voice)}
         />
       </Field>
-      <div {...stylex.attrs(viewStyles.actions)}>
+      <div class="flex flex-wrap gap-2">
         <Button
           data-testid={`${props.testid}-first`}
           disabled={props.disabled || voices.fetching() || !props.connection}
@@ -276,16 +230,16 @@ function RequestActions(props: {
             data-id={request().id}
             data-connection={request().connection}
             data-revision={request().revision}
-            {...stylex.attrs(viewStyles.compactStack)}
+            class="flex min-w-0 flex-col gap-1"
           >
-            <p {...stylex.attrs(viewStyles.detail)}>{t("web.audio.pending")}</p>
-            <p {...stylex.attrs(viewStyles.identifierDetail)}>
+            <p class="text-xs text-muted">{t("web.audio.pending")}</p>
+            <p class="text-xs break-all text-muted">
               {request().id} · {request().connection} · {request().revision}
             </p>
           </div>
         )}
       </Show>
-      <div {...stylex.attrs(viewStyles.actions)}>
+      <div class="flex flex-wrap gap-2">
         <Button data-testid="audio-submit" tone="primary" disabled={props.busy || (!props.request && !props.valid)} onClick={() => props.submit()}>
           {props.request ? t("web.audio.check") : props.label}
         </Button>
@@ -353,12 +307,12 @@ function SpeakersForm(props: { status: ProviderStatus | undefined }) {
   };
   return (
     <Card title={t("web.audio.speakerTitle")}>
-      <p {...stylex.attrs(viewStyles.notice)}>{t("web.audio.speakerHint")}</p>
+      <p class="text-sm text-muted">{t("web.audio.speakerHint")}</p>
       <Binding connection={binding()?.connection} model={binding()?.model} revision={props.status?.revision} />
-      <fieldset disabled={disabled()} {...stylex.attrs(viewStyles.section)} aria-label={t("web.audio.speakerTitle")}>
+      <fieldset disabled={disabled()} class="flex min-w-0 flex-col gap-4" aria-label={t("web.audio.speakerTitle")}>
         <For each={speakers()} keyed={(speaker) => speaker.key}>
           {(speaker) => (
-            <div {...stylex.attrs(viewStyles.stack)} data-testid="audio-speaker">
+            <div class="flex min-w-0 flex-col gap-2" data-testid="audio-speaker">
               <Field label={t("web.audio.speaker")}>
                 <TextInput
                   data-testid="audio-speaker-name"
@@ -405,10 +359,10 @@ function SpeakersForm(props: { status: ProviderStatus | undefined }) {
         >
           {t("web.audio.addSpeaker")}
         </Button>
-        <h3 {...stylex.attrs(viewStyles.subheading)}>{t("web.audio.dialogue")}</h3>
+        <h3 class="text-sm font-semibold">{t("web.audio.dialogue")}</h3>
         <For each={segments()} keyed={(segment) => segment.key}>
           {(segment) => (
-            <div {...stylex.attrs(viewStyles.stack)} data-testid="audio-turn">
+            <div class="flex min-w-0 flex-col gap-2" data-testid="audio-turn">
               <Select
                 testid="audio-turn-speaker"
                 label={t("web.audio.speaker")}
@@ -501,9 +455,9 @@ function DesignForm(props: { status: ProviderStatus | undefined }) {
   };
   return (
     <Card title={t("web.audio.designTitle")}>
-      <p {...stylex.attrs(viewStyles.notice)}>{t("web.audio.designHint")}</p>
+      <p class="text-sm text-muted">{t("web.audio.designHint")}</p>
       <Binding connection={props.status?.voiceDesign?.connection} model={props.status?.voiceDesign?.model} revision={props.status?.revision} />
-      <fieldset disabled={disabled()} {...stylex.attrs(viewStyles.form)} aria-label={t("web.audio.designTitle")}>
+      <fieldset disabled={disabled()} class="flex min-w-0 flex-col gap-3" aria-label={t("web.audio.designTitle")}>
         <Field label={t("web.audio.instructions")}>
           <TextArea
             data-testid="audio-instructions"
@@ -612,11 +566,11 @@ function UploadForm(props: { kind: "clone" | "transcription"; status: ProviderSt
   };
   return (
     <Card title={title(props.kind)}>
-      <p {...stylex.attrs(viewStyles.notice)}>{props.kind === "clone" ? t("web.audio.cloneHint") : t("web.audio.transcriptionHint")}</p>
+      <p class="text-sm text-muted">{props.kind === "clone" ? t("web.audio.cloneHint") : t("web.audio.transcriptionHint")}</p>
       <Show when={props.kind === "transcription"}>
         <Binding connection={connection()} model={props.status?.transcription?.model} revision={props.status?.revision} />
       </Show>
-      <fieldset disabled={disabled()} {...stylex.attrs(viewStyles.form)} aria-label={title(props.kind)}>
+      <fieldset disabled={disabled()} class="flex min-w-0 flex-col gap-3" aria-label={title(props.kind)}>
         <Show when={props.kind === "clone"}>
           <Field label={t("web.audio.account")}>
             <Select
@@ -657,13 +611,13 @@ function UploadForm(props: { kind: "clone" | "transcription"; status: ProviderSt
         </Field>
         <Show when={selected()}>
           {(file) => (
-            <p {...stylex.attrs(viewStyles.identifierDetail)}>
+            <p class="text-xs break-all text-muted">
               {file().file.name} · {file().file.size}
             </p>
           )}
         </Show>
         <Show when={props.kind === "transcription"}>
-          <label {...stylex.attrs(viewStyles.consent)}>
+          <label class="flex items-start gap-2 text-sm">
             <Checkbox
               testid="audio-diarize"
               label={t("web.audio.diarize")}
@@ -689,7 +643,7 @@ function UploadForm(props: { kind: "clone" | "transcription"; status: ProviderSt
             />
           </Field>
         </Show>
-        <label {...stylex.attrs(viewStyles.consent)}>
+        <label class="flex items-start gap-2 text-sm">
           <Checkbox
             testid="audio-consent"
             label={t("web.audio.consent")}
@@ -705,7 +659,7 @@ function UploadForm(props: { kind: "clone" | "transcription"; status: ProviderSt
         </label>
       </fieldset>
       <Show when={act.busy() && !submitted()}>
-        <p role="status" data-testid="audio-uploading" {...stylex.attrs(viewStyles.notice)}>
+        <p role="status" data-testid="audio-uploading" class="text-sm text-muted">
           {t("web.audio.uploading")}
         </p>
         <Button onClick={() => transfer?.abort()}>{t("web.audio.stopUpload")}</Button>
@@ -724,7 +678,7 @@ function UploadForm(props: { kind: "clone" | "transcription"; status: ProviderSt
       />
       <AudioError error={error()} />
       <Show when={props.kind === "clone" && connection()}>
-        <h3 {...stylex.attrs(viewStyles.subheading)}>{t("web.audio.voices")}</h3>
+        <h3 class="text-sm font-semibold">{t("web.audio.voices")}</h3>
         <VoicePicker
           connection={connection()}
           revision={props.status?.revision ?? 0}
@@ -750,7 +704,7 @@ function AudioPlayer(props: { src: string; label: string; testid: string; mime?:
     };
   });
   return (
-    <Show when={playable()} fallback={<p {...stylex.attrs(viewStyles.notice)}>{t("web.audio.playbackUnsupported")}</p>}>
+    <Show when={playable()} fallback={<p class="text-sm text-muted">{t("web.audio.playbackUnsupported")}</p>}>
       <audio
         ref={(element) => {
           player = element;
@@ -762,7 +716,7 @@ function AudioPlayer(props: { src: string; label: string; testid: string; mime?:
         autoplay={false}
         preload="metadata"
         aria-label={props.label}
-        {...stylex.attrs(viewStyles.player)}
+        class="w-full max-w-full min-w-0"
         onError={() => setPlayable(false)}
       />
     </Show>
@@ -826,19 +780,19 @@ function AudioJob(props: { job: MediaAudioJob }) {
   };
   return (
     <Card title={props.job.phaseText}>
-      <div data-testid="audio-job" data-id={props.job.id} data-kind={props.job.kind} data-phase={props.job.phase} {...stylex.attrs(viewStyles.form)}>
-        <p {...stylex.attrs(viewStyles.metadataLabel)}>{title(props.job.kind)}</p>
-        <p {...stylex.attrs(viewStyles.identifierDetail)}>
+      <div data-testid="audio-job" data-id={props.job.id} data-kind={props.job.kind} data-phase={props.job.phase} class="flex min-w-0 flex-col gap-3">
+        <p class="text-xs font-medium">{title(props.job.kind)}</p>
+        <p class="text-xs break-all text-muted">
           {props.job.model} · {props.job.connection} · {props.job.revision} · {props.job.id}
         </p>
         <Show when={props.job.format}>
-          <p data-testid="audio-format-result" data-format={props.job.format} {...stylex.attrs(viewStyles.detail)}>
+          <p data-testid="audio-format-result" data-format={props.job.format} class="text-xs text-muted">
             {t("web.audio.format")}: {props.job.format?.toUpperCase()}
           </p>
         </Show>
         <Show when={props.job.metadata}>
           {(metadata) => (
-            <div data-testid="audio-metadata" data-source={metadata().source} {...stylex.attrs(viewStyles.metadata)}>
+            <div data-testid="audio-metadata" data-source={metadata().source} class="flex flex-wrap gap-2 text-xs text-muted">
               <span>{metadata().source === "file" ? t("web.audio.metadataFile") : t("web.audio.metadataProvider")}</span>
               <Show when={metadata().sampleRate !== undefined}>
                 <span>{t("web.audio.metadataRate", { value: metadata().sampleRate ?? "" })}</span>
@@ -855,31 +809,31 @@ function AudioJob(props: { job: MediaAudioJob }) {
             </div>
           )}
         </Show>
-        <p {...stylex.attrs(viewStyles.source)}>
+        <p class="text-xs wrap-break-word text-muted">
           {props.job.source.kind === "user"
             ? t("web.media.sourceUser")
             : t("web.media.sourceAgent", { agent: props.job.source.agent, channel: props.job.source.channel })}
         </p>
-        <p {...stylex.attrs(viewStyles.prose)}>{props.job.prompt}</p>
+        <p class="text-sm wrap-break-word whitespace-pre-wrap">{props.job.prompt}</p>
         <Show when={props.job.problem}>
-          <p data-testid="audio-problem" {...stylex.attrs(viewStyles.noticeText)}>
+          <p data-testid="audio-problem" class="text-sm wrap-break-word text-muted">
             {props.job.problem}
           </p>
         </Show>
         <Show when={audio()}>
           {(file) => (
             <>
-              <Show when={props.job.format !== "pcm"} fallback={<p {...stylex.attrs(viewStyles.notice)}>{t("web.audio.playbackUnsupported")}</p>}>
+              <Show when={props.job.format !== "pcm"} fallback={<p class="text-sm text-muted">{t("web.audio.playbackUnsupported")}</p>}>
                 <AudioPlayer src={file().src} label={file().name} mime={props.job.contentType ?? file().mime} testid="audio-result-player" />
               </Show>
-              <a data-testid="audio-download" href={file().src} download={file().name} {...stylex.attrs(viewStyles.link)}>
+              <a data-testid="audio-download" href={file().src} download={file().name} class="text-sm text-water underline">
                 {t("web.audio.downloadAudio")}
               </a>
             </>
           )}
         </Show>
         <Show when={props.job.kind === "voiceDesign" && props.job.previewInput}>
-          <p {...stylex.attrs(viewStyles.notice)}>{t("web.audio.designHint")}</p>
+          <p class="text-sm text-muted">{t("web.audio.designHint")}</p>
           <Field label={t("web.audio.voiceName")}>
             <TextInput
               data-testid="audio-save-name"
@@ -896,7 +850,7 @@ function AudioJob(props: { job: MediaAudioJob }) {
         </Show>
         <Show when={voice()}>
           {(result) => (
-            <p data-testid="audio-saved-voice" data-voice={result().id} {...stylex.attrs(viewStyles.identifier)}>
+            <p data-testid="audio-saved-voice" data-voice={result().id} class="text-sm break-all">
               {t("web.audio.savedVoice", { voice: result().name ? `${result().name} · ${result().id}` : result().id })}
             </p>
           )}
@@ -904,13 +858,13 @@ function AudioJob(props: { job: MediaAudioJob }) {
         <Show when={transcription()}>
           {(result) => (
             <>
-              <h3 {...stylex.attrs(viewStyles.subheading)}>{t("web.audio.transcript")}</h3>
+              <h3 class="text-sm font-semibold">{t("web.audio.transcript")}</h3>
               <Show when={partial()}>
-                <p role="status" data-testid="audio-partial" {...stylex.attrs(viewStyles.notice)}>
+                <p role="status" data-testid="audio-partial" class="text-sm text-muted">
                   {t("web.audio.partialTranscript")}
                 </p>
               </Show>
-              <p data-testid="audio-transcript" {...stylex.attrs(viewStyles.prose)}>
+              <p data-testid="audio-transcript" class="text-sm wrap-break-word whitespace-pre-wrap">
                 {result().text}
               </p>
               <Show when={props.job.input}>
@@ -925,12 +879,12 @@ function AudioJob(props: { job: MediaAudioJob }) {
                   />
                 )}
               </Show>
-              <h3 {...stylex.attrs(viewStyles.subheading)}>{t("web.audio.timeline")}</h3>
+              <h3 class="text-sm font-semibold">{t("web.audio.timeline")}</h3>
               <Show when={result().segments.length > 0} fallback={<Quiet>{t("web.audio.noTimestamps")}</Quiet>}>
-                <ol {...stylex.attrs(viewStyles.form)} data-testid="audio-timeline">
+                <ol class="flex min-w-0 flex-col gap-3" data-testid="audio-timeline">
                   <For each={result().segments}>
                     {(segment) => (
-                      <li {...stylex.attrs(viewStyles.compactStack)}>
+                      <li class="flex min-w-0 flex-col gap-1">
                         <Button
                           data-testid="audio-seek"
                           data-start={segment.start}
@@ -942,8 +896,8 @@ function AudioJob(props: { job: MediaAudioJob }) {
                         >
                           {audioTimestamp(segment.start)} – {audioTimestamp(segment.end)}
                         </Button>
-                        <span {...stylex.attrs(viewStyles.speaker)}>{segment.speaker || t("web.audio.unknownSpeaker")}</span>
-                        <p {...stylex.attrs(viewStyles.prose)}>{segment.text}</p>
+                        <span class="text-xs font-medium wrap-break-word">{segment.speaker || t("web.audio.unknownSpeaker")}</span>
+                        <p class="text-sm wrap-break-word whitespace-pre-wrap">{segment.text}</p>
                       </li>
                     )}
                   </For>
@@ -953,7 +907,7 @@ function AudioJob(props: { job: MediaAudioJob }) {
                 data-testid="audio-download-transcript"
                 href={`data:text/plain;charset=utf-8,${encodeURIComponent(content())}`}
                 download={`${props.job.id}${partial() ? "-partial" : ""}.txt`}
-                {...stylex.attrs(viewStyles.link)}
+                class="text-sm text-water underline"
               >
                 {partial() ? t("web.audio.downloadPartialTranscript") : t("web.audio.downloadTranscript")}
               </a>
@@ -971,7 +925,7 @@ function AudioJob(props: { job: MediaAudioJob }) {
               </Button>
               <Show when={saved()}>
                 {(id) => (
-                  <Link data-testid="audio-artifact" href={`/artifacts/${id()}`} {...stylex.attrs(viewStyles.link)}>
+                  <Link data-testid="audio-artifact" href={`/artifacts/${id()}`} class="text-sm text-water underline">
                     {t("web.audio.openTranscript")}
                   </Link>
                 )}
@@ -981,7 +935,7 @@ function AudioJob(props: { job: MediaAudioJob }) {
         </Show>
         <Show when={props.job.usage}>
           {(usage) => (
-            <div data-testid="audio-usage" {...stylex.attrs(viewStyles.metadata)}>
+            <div data-testid="audio-usage" class="flex flex-wrap gap-2 text-xs text-muted">
               <Show when={usage().inputAudioSeconds !== undefined}>
                 <span>{t("web.audio.usageAudioSeconds", { value: usage().inputAudioSeconds ?? "" })}</span>
               </Show>
@@ -1016,9 +970,9 @@ function AudioJob(props: { job: MediaAudioJob }) {
           </Button>
           <Show when={cleanup()}>
             {(preview) => (
-              <div {...stylex.attrs(viewStyles.stack)}>
-                <ul {...stylex.attrs(viewStyles.preview)}>
-                  <For each={preview().does}>{(step) => <li {...stylex.attrs(viewStyles.wrapText)}>{step}</li>}</For>
+              <div class="flex min-w-0 flex-col gap-2">
+                <ul class="list-inside list-disc text-sm text-muted">
+                  <For each={preview().does}>{(step) => <li class="wrap-break-word">{step}</li>}</For>
                 </ul>
                 <ConfirmButton
                   testid="audio-cleanup"
@@ -1037,7 +991,7 @@ function AudioJob(props: { job: MediaAudioJob }) {
             )}
           </Show>
         </Show>
-        <div {...stylex.attrs(viewStyles.actions)}>
+        <div class="flex flex-wrap gap-2">
           <Show when={props.job.canCancel}>
             <ConfirmButton
               testid="audio-cancel"

@@ -24,7 +24,8 @@
     "react-native": "catalog:expo",
     "react-native-agora": "catalog:",
     "react-native-safe-area-context": "catalog:expo",
-    "react-native-webview": "catalog:expo"
+    "react-native-webview": "catalog:expo",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

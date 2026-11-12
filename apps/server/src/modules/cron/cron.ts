@@ -1,23 +1,22 @@
-import { Clock, Config, Context, Effect, Layer, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
-
+import { Hub, Semaphore, type Subscription, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { userId } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import type { Actor } from "#/base/actor.ts";
-import { type ApiError, BizCode, lookIn, messageOf, missing, refuseIn } from "#/base/errors.ts";
+import { ApiError, BizCode, lookIn, messageOf, missing, refuseIn } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { jsonOrNone, jsonText } from "#/base/json.ts";
-import { scopedPubSub } from "#/base/pubsub.ts";
-import { Core } from "#/core/core.ts";
-import { ServerConfig } from "#/infra/config.ts";
-import { Db } from "#/infra/db.ts";
-import { bestEffort } from "#/infra/log.ts";
-import { Agent } from "#/modules/agent/agent.ts";
-import { Channel } from "#/modules/channel/channel.ts";
-import { Issue } from "#/modules/issue/issue.ts";
-import { Mailbox } from "#/modules/mailbox/mailbox.ts";
+import type { Core } from "#/core/core.ts";
+import type { ServerConfig } from "#/infra/config.ts";
+import { type Db, SqlError } from "#/infra/db.ts";
+import { bestEffort, type Logger } from "#/infra/log.ts";
+import type { Time } from "#/infra/time.ts";
+import type { Agent } from "#/modules/agent/agent.ts";
+import type { Channel } from "#/modules/channel/channel.ts";
+import type { Issue } from "#/modules/issue/issue.ts";
+import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
 import type { Trigger } from "#/modules/mailbox/shapes.ts";
 import * as q from "#db/cron.sql.ts";
 
@@ -31,55 +30,57 @@ export interface Due {
   readonly missed: boolean;
 }
 
-export class Cron extends Context.Service<
-  Cron,
-  {
-    readonly list: () => T.Cron[];
-    /** by is who asks, and on whose word (needsOK). */
-    readonly add: (req: T.CronRequest, by: Actor) => Effect.Effect<T.Cron, ApiError>;
-    /** Turned on is the user's yes. */
-    readonly setEnabled: (id: string, enabled: boolean) => Effect.Effect<T.Cron, ApiError>;
-    readonly remove: (id: string) => Effect.Effect<T.Cron, ApiError>;
-    /** What remove would do, refused as it would be; nothing changes. */
-    readonly previewRemove: (id: string) => Effect.Effect<T.Preview, ApiError>;
-    readonly tick: Effect.Effect<void>;
-    /** What comes due from now on, subscribed before it returns. */
-    readonly due: Effect.Effect<Stream.Stream<Due>, never, Scope.Scope>;
-  }
->()("@vibevalley/server/modules/cron/cron") {
-  static readonly layer = Layer.effect(
-    Cron,
-    Effect.suspend(() => make),
-  );
+export interface Cron {
+  readonly list: () => T.Cron[];
+  /** by is who asks, and on whose word (needsOK). */
+  readonly add: (req: T.CronRequest, by: Actor) => Promise<T.Cron>;
+  /** Turned on is the user's yes. */
+  readonly setEnabled: (id: string, enabled: boolean) => Promise<T.Cron>;
+  readonly remove: (id: string) => Promise<T.Cron>;
+  /** What remove would do, refused as it would be; nothing changes. */
+  readonly previewRemove: (id: string) => Promise<T.Preview>;
+  readonly tick: () => Promise<void>;
+  /** What comes due from now on, subscribed before it returns. */
+  readonly due: () => Subscription<Due>;
+  /** Ticks once every service is built, so what the first tick finds due reaches the orchestrator (once ready). */
+  readonly boot: () => Promise<void>;
+  readonly close: () => Promise<void>;
+}
+
+export interface CronDeps {
+  readonly config: ServerConfig;
+  readonly clock: Time;
+  readonly log: Logger;
+  readonly db: Db;
+  readonly core: Core;
+  readonly agent: Agent;
+  readonly channel: Channel;
+  readonly issue: Issue;
+  readonly mailbox: Mailbox;
 }
 
 /** $TZ when it names a zone, else the system's. */
-const localZone = Config.String("TZ").pipe(
-  Config.withDefault(""),
-  Effect.orElseSucceed(() => ""),
-  Effect.map((tz) => (tz && givenZone(tz) ? tz : Intl.DateTimeFormat().resolvedOptions().timeZone)),
-);
+const localZone = (): string => {
+  const tz = process.env["TZ"] ?? "";
+  return tz && givenZone(tz) ? tz : Intl.DateTimeFormat().resolvedOptions().timeZone;
+};
 
 const whenOf = jsonOrNone(S.CronWhen);
 
-const make = Effect.gen(function* () {
-  const core = yield* Core;
-  const store = yield* Agent;
-  const chat = yield* Channel;
-  const issues = yield* Issue;
-  const mailbox = yield* Mailbox;
-  const db = yield* Db;
-  // Read in callbacks too: the Clock the service was built with (a test turns it by hand).
-  const clock = yield* Clock.Clock;
-  const now = () => clock.currentTimeMillisUnsafe();
+export async function makeCron(deps: CronDeps): Promise<Cron> {
+  const { core, agent: store, channel: chat, issue: issues, mailbox, db, clock, config } = deps;
+  const log = deps.log.child("cron");
+  const tasks = new TaskGroup({ name: "cron", onError: (task, e) => log.error(`${task} failed:`, e) });
+  const now = () => clock.now();
   // The ticker, the tools and the pages all change the list.
-  const lock = yield* Semaphore.make(1);
-  const dueHub = yield* scopedPubSub<Due>();
+  const lock = new Semaphore(1);
+  const dueHub = new Hub<Due>();
 
-  for (const row of yield* db.run(q.crons())) {
+  for (const row of await q.crons(db.sql)) {
     const when = whenOf(row.spec);
     // A cron whose time or setter this code cannot read any more is left out.
-    if (!when || !Schema.is(S.ActorKind)(row.set_by)) continue;
+    const by = S.ActorKind.safeParse(row.set_by);
+    if (!when || !by.success) continue;
     const s: T.Cron = {
       id: row.id,
       name: row.name,
@@ -92,181 +93,173 @@ const make = Effect.gen(function* () {
       enabled: row.enabled,
       created: row.created_at,
       ...(row.last_run != null && row.last_run !== 0 ? { lastRun: row.last_run } : {}),
-      by: row.set_by,
+      by: by.data,
       pending: row.pending,
     };
-    yield* core.apply({ type: "cronChanged", cron: s });
+    core.apply({ type: "cronChanged", cron: s });
   }
 
-  const find = (id: string) => {
+  const find = (id: string): T.Cron => {
     const s = core.state().crons.find((x) => x.id === id);
-    return s ? Effect.succeed(s) : Effect.fail(missing(t("server.cron.noCron", { id }), [lookIn.cron]));
+    if (!s) throw missing(t("server.cron.noCron", { id }), [lookIn.cron]);
+    return s;
   };
 
-  const ran = (id: string, at: number, enabled: boolean) => db.run(q.cronRan({ last_run: at, enabled, id }));
+  const ran = (id: string, at: number, enabled: boolean) => q.cronRan(db.sql, { last_run: at, enabled, id });
 
-  const recordDue = (due: Due) =>
-    Effect.gen(function* () {
-      const s = due.cron;
-      const thread = `cron:${s.id}`;
-      return yield* mailbox.recordTrigger({
-        source: "cron",
-        key: due.id,
-        actor: { kind: "system", id: s.id },
-        text: dueText(s, due.missed),
-        threads: [thread],
-        addressed: "thread_owner",
-        replyChannel: s.channel,
-        meta: { cron: s.id, trigger: { kind: "cron", cron: s.id, ...(due.missed ? { missed: true } : {}) } },
-        at: s.lastRun ?? s.created,
-        data: s,
-      });
+  const recordDue = (due: Due) => {
+    const s = due.cron;
+    const thread = `cron:${s.id}`;
+    return mailbox.recordTrigger({
+      source: "cron",
+      key: due.id,
+      actor: { kind: "system", id: s.id },
+      text: dueText(s, due.missed),
+      threads: [thread],
+      addressed: "thread_owner",
+      replyChannel: s.channel,
+      meta: { cron: s.id, trigger: { kind: "cron", cron: s.id, ...(due.missed ? { missed: true } : {}) } },
+      at: s.lastRun ?? s.created,
+      data: s,
     });
+  };
 
   const handle = (due: Due, trigger: Trigger) =>
-    Effect.gen(function* () {
+    bestEffort(log, `cron occurrence ${due.id}`, async () => {
       const s = due.cron;
       const thread = `cron:${s.id}`;
-      if (!(yield* mailbox.isRouted(trigger.id))) {
-        const issue = yield* issues.scheduled(due, trigger);
-        yield* mailbox.subscribe(issue.id, [thread]);
-        yield* mailbox.receive({ _tag: "Trigger", trigger });
+      if (!(await mailbox.isRouted(trigger.id))) {
+        const issue = await issues.scheduled(due, trigger);
+        await mailbox.subscribe(issue.id, [thread]);
+        await mailbox.receive({ _tag: "Trigger", trigger });
       } else {
-        const issue = yield* mailbox.ownerOf(trigger.id);
-        if (issue) yield* mailbox.subscribe(issue, [thread]);
+        const issue = await mailbox.ownerOf(trigger.id);
+        if (issue) await mailbox.subscribe(issue, [thread]);
       }
-    }).pipe(bestEffort(`cron occurrence ${due.id}`));
+    });
 
-  const replay = mailbox.replayCronTriggers((trigger, data) =>
-    Effect.gen(function* () {
-      const cron = yield* Schema.decodeUnknownEffect(S.Cron)(data);
+  const replay = () =>
+    mailbox.replayCronTriggers(async (trigger, data) => {
+      const cron = S.Cron.parse(data);
       const by = trigger.meta.trigger;
-      yield* handle({ id: trigger.id, cron, missed: by?.kind === "cron" && by.missed === true }, trigger);
-    }),
-  );
+      await handle({ id: trigger.id, cron, missed: by?.kind === "cron" && by.missed === true }, trigger);
+    });
 
-  const tick = lock.withPermits(1)(
-    Effect.gen(function* () {
-      yield* replay;
+  const tick = () =>
+    lock.with(async () => {
+      await replay();
       const at = now();
-      yield* Effect.forEach(
-        dueCrons(core.state().crons, at),
-        (s) => {
-          const missed = isMissed(s, at);
-          const after = afterRun(s, at);
-          const occurrence = { id: newId(), cron: after, missed };
-          return db
-            .attemptTx(
-              Effect.gen(function* () {
-                yield* db.attempt(q.cronRan({ last_run: at, enabled: after.enabled, id: after.id }));
-                return yield* recordDue(occurrence);
-              }),
-            )
-            .pipe(
-              Effect.matchEffect({
-                onFailure: (failure) => Effect.logWarning(`vibevalley: cron ${s.id}'s run was not kept: ${messageOf(failure)}`),
-                onSuccess: (trigger) =>
-                  Effect.gen(function* () {
-                    yield* core.apply({ type: "cronChanged", cron: after });
-                    PubSub.publishUnsafe(dueHub, occurrence);
-                    yield* handle(occurrence, trigger);
-                  }),
-              }),
-            );
-        },
-        { discard: true },
-      );
-    }),
-  );
+      for (const s of dueCrons(core.state().crons, at)) {
+        const missed = isMissed(s, at);
+        const after = afterRun(s, at);
+        const occurrence = { id: newId(), cron: after, missed };
+        let trigger: Trigger;
+        try {
+          trigger = await db.tx(async () => {
+            await q.cronRan(db.sql, { last_run: at, enabled: after.enabled, id: after.id });
+            return recordDue(occurrence);
+          });
+        } catch (e) {
+          // A run that is not kept is said, and the next due cron goes on; this one is due again at the next tick.
+          if (!(e instanceof SqlError || e instanceof ApiError)) throw e;
+          log.warn(`vibevalley: cron ${s.id}'s run was not kept: ${messageOf(e)}`);
+          continue;
+        }
+        core.apply({ type: "cronChanged", cron: after });
+        dueHub.publish(occurrence);
+        await handle(occurrence, trigger);
+      }
+    });
 
-  const shape = Cron.of({
+  return {
     list: () => [...core.state().crons],
-    add: Effect.fn("Cron.add")(function* (req, by) {
-      const at = now();
-      const problem = cronProblem(req, at);
-      if (problem) return yield* refused(problem);
-      // A channel as the user names it (general, #general) as well as by id.
-      const want = req.channel === undefined ? chat.defaultChannel() : yield* chat.placeOf(userId, req.channel);
-      const channel = (yield* chat.channels()).find((c) => c.id === want);
-      if (!channel) return yield* refused(t("server.cron.noChannel", { name: want }), [lookIn.channel]);
-      const named = (req.agent ?? "").trim();
-      const agents = store.agents();
-      const agent = named ? (agents.find((a) => a.id === named) ?? agents.find((a) => a.name === named)) : undefined;
-      if (named && !agent) return yield* refused(t("server.cron.noProfile", { name: req.agent ?? "" }), [lookIn.agent]);
-      const repo = (req.repo ?? "").trim();
-      if (agent && !repo && !channel.repo) return yield* refused(t("server.cron.noRepo", { channel: channel.name }));
-      const tz = req.tz ?? (yield* localZone);
-      const pending = needsOK(req, by);
-      const s: T.Cron = {
-        id: newId(),
-        name: req.name.trim(),
-        text: req.text.trim(),
-        channel: channel.id,
-        ...(agent ? { agent: agent.id } : {}),
-        ...(repo ? { repo } : {}),
-        when: req.when,
-        tz,
-        // Counted from now, by the same clock that ticks.
-        enabled: !pending,
-        created: at,
-        by: by.kind,
-        pending,
-      };
-      yield* db.run(
-        Effect.flatMap(jsonText(s.when), (spec) =>
-          q.addCron({
-            id: s.id,
-            name: s.name,
-            body: s.text,
-            channel_id: s.channel,
-            agent: s.agent ?? null,
-            repo: s.repo ?? null,
-            spec,
-            tz,
-            set_by: by.kind,
-            pending,
-            created_at: at,
-          }),
-        ),
-      );
-      yield* core.apply({ type: "cronChanged", cron: s });
-      return s;
-    }, lock.withPermits(1)),
-    setEnabled: Effect.fn("Cron.setEnabled")(function* (id, enabled) {
-      const was = yield* find(id);
-      // Turned on is the user's yes (only the user may: cron.update); the queries clear pending the same way.
-      let s: T.Cron = { ...was, enabled, pending: was.pending && !enabled };
-      // Switched back on: it counts from now, not from runs it skipped while off.
-      if (enabled && !was.enabled && was.when.kind !== "once") {
+    add: (req, by) =>
+      lock.with(async () => {
         const at = now();
-        s = { ...s, lastRun: at };
-        yield* ran(id, at, enabled);
-      } else yield* db.run(q.enableCron({ enabled, id }));
-      yield* core.apply({ type: "cronChanged", cron: s });
-      return s;
-    }, lock.withPermits(1)),
-    remove: Effect.fn("Cron.remove")(function* (id) {
-      const was = yield* find(id);
-      yield* db.run(q.removeCron({ id }));
-      yield* core.apply({ type: "cronRemoved", id });
-      return was;
-    }, lock.withPermits(1)),
-    previewRemove: Effect.fn("Cron.previewRemove")(function* (id) {
-      const was = yield* find(id);
+        const problem = cronProblem(req, at);
+        if (problem) throw refused(problem);
+        // A channel as the user names it (general, #general) as well as by id.
+        const want = req.channel === undefined ? chat.defaultChannel() : await chat.placeOf(userId, req.channel);
+        const channel = (await chat.channels()).find((c) => c.id === want);
+        if (!channel) throw refused(t("server.cron.noChannel", { name: want }), [lookIn.channel]);
+        const named = (req.agent ?? "").trim();
+        const agents = store.agents();
+        const agent = named ? (agents.find((a) => a.id === named) ?? agents.find((a) => a.name === named)) : undefined;
+        if (named && !agent) throw refused(t("server.cron.noProfile", { name: req.agent ?? "" }), [lookIn.agent]);
+        const repo = (req.repo ?? "").trim();
+        if (agent && !repo && !channel.repo) throw refused(t("server.cron.noRepo", { channel: channel.name }));
+        const tz = req.tz ?? localZone();
+        const pending = needsOK(req, by);
+        const s: T.Cron = {
+          id: newId(),
+          name: req.name.trim(),
+          text: req.text.trim(),
+          channel: channel.id,
+          ...(agent ? { agent: agent.id } : {}),
+          ...(repo ? { repo } : {}),
+          when: req.when,
+          tz,
+          // Counted from now, by the same clock that ticks.
+          enabled: !pending,
+          created: at,
+          by: by.kind,
+          pending,
+        };
+        await q.addCron(db.sql, {
+          id: s.id,
+          name: s.name,
+          body: s.text,
+          channel_id: s.channel,
+          agent: s.agent ?? null,
+          repo: s.repo ?? null,
+          spec: jsonText(s.when),
+          tz,
+          set_by: by.kind,
+          pending,
+          created_at: at,
+        });
+        core.apply({ type: "cronChanged", cron: s });
+        return s;
+      }),
+    setEnabled: (id, enabled) =>
+      lock.with(async () => {
+        const was = find(id);
+        // Turned on is the user's yes (only the user may: cron.update); the queries clear pending the same way.
+        let s: T.Cron = { ...was, enabled, pending: was.pending && !enabled };
+        // Switched back on: it counts from now, not from runs it skipped while off.
+        if (enabled && !was.enabled && was.when.kind !== "once") {
+          const at = now();
+          s = { ...s, lastRun: at };
+          await ran(id, at, enabled);
+        } else await q.enableCron(db.sql, { enabled, id });
+        core.apply({ type: "cronChanged", cron: s });
+        return s;
+      }),
+    remove: (id) =>
+      lock.with(async () => {
+        const was = find(id);
+        await q.removeCron(db.sql, { id });
+        core.apply({ type: "cronRemoved", id });
+        return was;
+      }),
+    previewRemove: async (id) => {
+      const was = find(id);
       return { does: [t("server.cron.removeWhen", { name: was.name, when: whenText(was.when, was.tz) })] };
-    }),
+    },
     tick,
-    due: Effect.map(PubSub.subscribe(dueHub), Stream.fromSubscription),
-  });
-  return shape;
-});
-
-/** Ticks once every service is built, so what the first tick finds due reaches the orchestrator (once ready). */
-export const start = Layer.effectDiscard(
-  Effect.gen(function* () {
-    const config = yield* ServerConfig;
-    const crons = yield* Cron;
-    const every = Math.max(config.cron.tickMs, 1);
-    yield* Effect.forkScoped(crons.tick.pipe(Effect.repeat(Schedule.spaced(every))));
-  }),
-);
+    due: () => dueHub.subscribe(),
+    boot: async () => {
+      const every = Math.max(config.cron.tickMs, 1);
+      tasks.run("tick", async (signal) => {
+        while (true) {
+          await tick();
+          await clock.sleep(every, signal);
+        }
+      });
+    },
+    close: async () => {
+      await tasks.close();
+      dueHub.end();
+    },
+  };
+}

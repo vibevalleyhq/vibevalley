@@ -1,9 +1,10 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 // Nowledge Mem (https://mem.nowledge.co), a knowledge graph on this Mac, spoken to over MCP: memory_search reads, memory_add writes.
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { Clock, Effect, Option, Redacted, Schema } from "effect";
+import { z } from "zod";
 
 import { asTransport } from "@vibevalley/agent/mcpTransport";
+import { isAbort } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
@@ -13,7 +14,7 @@ import type { MemorySourceConfig } from "#/modules/setting/memorySources.ts";
 
 import { recallWords } from "./prompts.ts";
 import { recallCount, type MemoryScope } from "./recall.ts";
-import { prefetchTimeoutMs, type Source, SourceError, sourceError, sourceLife } from "./sources.ts";
+import { prefetchTimeoutMs, type Source, type SourceDeps, SourceError, sourceError, sourceLife } from "./sources.ts";
 
 const app = "vibevalley";
 // Its memory_search takes at most 20, and a query of at most 500 characters.
@@ -46,35 +47,46 @@ const scopeOf = (labels: readonly string[] | undefined): MemoryScope => {
   return Buffer.from(repo, "utf8").toString("hex") === encoded ? { kind: "repo", repo } : { kind: "unknown" };
 };
 
-const HitSchema = Schema.Struct({
-  id: Schema.optionalKey(Schema.String),
-  memory_id: Schema.optionalKey(Schema.String),
-  title: Schema.optionalKey(Schema.String),
-  content: Schema.optionalKey(Schema.String),
-  content_preview: Schema.optionalKey(Schema.String),
-  relevance_score: Schema.optionalKey(Schema.Finite),
+const HitSchema = z.object({
+  id: z.exactOptional(z.string()),
+  memory_id: z.exactOptional(z.string()),
+  title: z.exactOptional(z.string()),
+  content: z.exactOptional(z.string()),
+  content_preview: z.exactOptional(z.string()),
+  relevance_score: z.exactOptional(z.number()),
 });
-type Hit = typeof HitSchema.Type;
-const SearchResponse = Schema.fromJsonString(Schema.Struct({ results: Schema.optionalKey(Schema.mutable(Schema.Array(HitSchema))) }));
-const AddedResponse = Schema.fromJsonString(
-  Schema.Struct({
-    id: Schema.optionalKey(Schema.String),
-    memory_id: Schema.optionalKey(Schema.String),
-    memory: Schema.optionalKey(Schema.Struct({ id: Schema.optionalKey(Schema.String) })),
-  }),
-);
-const DetailResponse = Schema.fromJsonString(Schema.Struct({ labels: Schema.optionalKey(Schema.Array(Schema.String)) }));
-const ToolAnswer = Schema.Struct({
-  content: Schema.optionalKey(
-    Schema.Array(
-      Schema.Struct({
-        type: Schema.optionalKey(Schema.String),
-        text: Schema.optionalKey(Schema.String),
+type Hit = z.infer<typeof HitSchema>;
+const SearchResponse = z.object({ results: z.exactOptional(z.array(HitSchema)) });
+const AddedResponse = z.object({
+  id: z.exactOptional(z.string()),
+  memory_id: z.exactOptional(z.string()),
+  memory: z.exactOptional(z.object({ id: z.exactOptional(z.string()) })),
+});
+const DetailResponse = z.object({ labels: z.exactOptional(z.array(z.string())) });
+const ToolAnswer = z.object({
+  content: z.exactOptional(
+    z.array(
+      z.object({
+        type: z.exactOptional(z.string()),
+        text: z.exactOptional(z.string()),
       }),
     ),
   ),
-  isError: Schema.optionalKey(Schema.Boolean),
+  isError: z.exactOptional(z.boolean()),
 });
+
+/** text read as JSON of schema's shape, or undefined when it is not. */
+const decoded = <A>(schema: z.ZodType<A>, text: string): A | undefined => {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    // Not JSON: the caller tells it as an answer it should not have given.
+    return undefined;
+  }
+  const got = schema.safeParse(raw);
+  return got.success ? got.data : undefined;
+};
 
 const hitID = (h: Hit) => h.memory_id || h.id || "";
 
@@ -83,7 +95,7 @@ function hitText(h: Hit): string {
   return !h.title || body.startsWith(h.title) ? body : recallWords.titled(h.title, body);
 }
 
-export function nowledge(c: MemorySourceConfig): Source {
+export function nowledge(c: MemorySourceConfig, deps: Pick<SourceDeps, "clock" | "log">): Source {
   const life = sourceLife("Nowledge");
   // The session is the SDK's, shared by every call: connecting it is not any one call's to cancel, only stop's.
   const connecting = new AbortController();
@@ -92,7 +104,7 @@ export function nowledge(c: MemorySourceConfig): Source {
 
   // The session opens on first use: Nowledge not running when the farm starts must not keep it off until a restart. The SDK's connect is the one call.
   const connect = () => {
-    const key = c.key === undefined ? "" : Redacted.value(c.key);
+    const key = c.key === undefined ? "" : c.key.reveal();
     const wire = new StreamableHTTPClientTransport(new URL(c.url), key ? { requestInit: { headers: { Authorization: `Bearer ${key}` } } } : {});
     transport = wire;
     const one = new Client({ name: app, version: "1" });
@@ -114,30 +126,35 @@ export function nowledge(c: MemorySourceConfig): Source {
     }));
 
   /** One tool call. its answer is the text of the result. */
-  const call = (tool: "memory_search" | "memory_add" | "get_memory_by_id", args: Search | Add | Detail) =>
-    life.alive(
-      Effect.gen(function* () {
-        const pending = open();
-        const session = yield* Effect.tryPromise({ try: () => pending, catch: sourceError });
-        const res = yield* Effect.tryPromise({
-          try: (signal) => session.callTool({ name: tool, arguments: args }, undefined, { signal }),
-          catch: (e) => {
-            if (!life.stopped()) {
-              if (client === pending) client = undefined;
-              void session.close();
-            }
-            return sourceError(e);
-          },
-        });
-        const parsed = Option.getOrUndefined(Schema.decodeUnknownOption(ToolAnswer)(res));
-        const text = (parsed?.content ?? []).map((x) => (x.type === "text" ? (x.text ?? "") : "")).join("");
-        if (parsed?.isError === true) return yield* SourceError.make({ message: `${tool}: ${head(text, 300)}` });
-        return text;
-      }),
-    );
+  const call = (tool: "memory_search" | "memory_add" | "get_memory_by_id", args: Search | Add | Detail, signal: AbortSignal) =>
+    life.alive(async (s) => {
+      const pending = open();
+      let session: Client;
+      try {
+        session = await pending;
+      } catch (e) {
+        throw sourceError(e);
+      }
+      s.throwIfAborted();
+      let res: unknown;
+      try {
+        res = await session.callTool({ name: tool, arguments: args }, undefined, { signal: s });
+      } catch (e) {
+        if (!life.stopped()) {
+          if (client === pending) client = undefined;
+          void session.close().catch((closing: unknown) => deps.log.debug("closing a Nowledge session", closing));
+        }
+        throw sourceError(e);
+      }
+      const answered = ToolAnswer.safeParse(res);
+      const parsed = answered.success ? answered.data : undefined;
+      const text = (parsed?.content ?? []).map((x) => (x.type === "text" ? (x.text ?? "") : "")).join("");
+      if (parsed?.isError === true) throw new SourceError(`${tool}: ${head(text, 300)}`);
+      return text;
+    }, signal);
 
   /** agent "" reads what the farm wrote for any profile; everything reads all that is in it. */
-  const find = Effect.fnUntraced(function* (agent: string, query: string, limit: number, everything: boolean) {
+  const find = async (agent: string, query: string, limit: number, everything: boolean, signal: AbortSignal): Promise<Hit[]> => {
     // Its search without a query lists nothing; filtered by labels, any query finds all they hold.
     const asked = redactedHead(redact(query), queryMost);
     const q = asked !== "" ? asked : everything ? "" : redact("*");
@@ -147,64 +164,75 @@ export function nowledge(c: MemorySourceConfig): Source {
       ...(q !== "" ? { query: q } : {}),
       ...(everything ? {} : { filter_labels: agent ? label("agent", agent) : app }),
     };
-    const text = yield* call("memory_search", args);
-    return yield* Effect.mapBoth(Schema.decodeEffect(SearchResponse)(text), {
-      onFailure: () => SourceError.make({ message: "memory_search answered what it should not: " + head(text, 200) }),
-      onSuccess: (r): Hit[] => r.results ?? [],
-    });
-  });
+    const text = await call("memory_search", args, signal);
+    const r = decoded(SearchResponse, text);
+    if (!r) throw new SourceError("memory_search answered what it should not: " + head(text, 200));
+    return r.results ?? [];
+  };
 
-  const add = Effect.fnUntraced(function* (agent: string, text: string, repo: string) {
+  const add = async (agent: string, text: string, repo: string, signal: AbortSignal) => {
     const body = redact(text);
-    const answer = yield* call("memory_add", { content: body, title: redactedHead(body, 60), labels: nowledgeLabels(agent, repo), source_app: app });
+    const answer = await call("memory_add", { content: body, title: redactedHead(body, 60), labels: nowledgeLabels(agent, repo), source_app: app }, signal);
     // The new memory's id, at the top or under memory. none when it found the same memory there already.
-    const added = Option.getOrUndefined(Schema.decodeOption(AddedResponse)(answer));
-    if (!added) return yield* SourceError.make({ message: "memory_add answered what it should not: " + head(answer, 200) });
+    const added = decoded(AddedResponse, answer);
+    if (!added) throw new SourceError("memory_add answered what it should not: " + head(answer, 200));
     return added.memory_id || added.id || added.memory?.id || "";
-  });
+  };
+
+  /** Two details asked at a time. */
+  const scopesOf = async (hits: readonly Hit[], signal: AbortSignal): Promise<MemoryScope[]> => {
+    const scopes: MemoryScope[] = [];
+    let next = 0;
+    const worker = async () => {
+      while (next < hits.length) {
+        const index = next++;
+        const id = hitID(hits[index]!);
+        if (!id) {
+          scopes[index] = { kind: "unknown" };
+          continue;
+        }
+        try {
+          const detail = decoded(DetailResponse, await call("get_memory_by_id", { memory_id: id }, signal));
+          // An unreadable detail does not turn an unknown repo into a global memory.
+          scopes[index] = detail ? scopeOf(detail.labels) : { kind: "unknown" };
+        } catch (e) {
+          if (isAbort(e, signal)) throw e;
+          deps.log.debug(`the detail of Nowledge memory ${id}`, e);
+          scopes[index] = { kind: "unknown" };
+        }
+      }
+    };
+    await Promise.all([worker(), worker()]);
+    return scopes;
+  };
 
   return {
     name: "nowledge",
     unavailable: () => (c.url ? undefined : t("server.memory.noUrl")),
     // Closing the transport ends a connect still waiting on a Nowledge that does not answer.
-    stop: Effect.gen(function* () {
-      if (!(yield* life.stop)) return;
+    stop: async () => {
+      if (!life.stop()) return;
       connecting.abort(new Error("Nowledge source has stopped"));
       const was = transport;
       client = undefined;
       transport = undefined;
-      if (was) yield* Effect.tryPromise({ try: () => was.close(), catch: sourceError }).pipe(Effect.ignore({ log: "Debug" }));
-    }),
+      if (was) await was.close().catch((e: unknown) => deps.log.debug("closing the Nowledge transport", e));
+    },
     // Nothing to ask with, nothing asked: listing its newest would only be noise at the start of a run.
-    prefetch: Effect.fnUntraced(function* (cue) {
+    prefetch: async (cue, signal) => {
       if (c.read !== true || cue.text.trim() === "") return [];
-      const hits = yield* find(cue.agent, cue.text, recallCount, !(c.everything !== true));
+      const hits = await find(cue.agent, cue.text, recallCount, !(c.everything !== true), signal);
       return hits
         .filter((h) => cue.skip?.has(hitID(h)) !== true)
         .map((h) => ({ id: hitID(h), line: recallWords.sourceLine("Nowledge", clip(hitText(h), lineMost)), score: h.relevance_score ?? 0 }));
-    }),
+    },
     // Its memories are notes; it has no issues worked.
-    search: Effect.fnUntraced(function* (q) {
+    search: async (q, signal) => {
       if (c.read !== true || q.kind === "issue") return { found: [] };
-      const hits = yield* find(q.agent, q.text, q.limit, !(c.everything !== true));
+      const hits = await find(q.agent, q.text, q.limit, !(c.everything !== true), signal);
       const selected = hits.slice(0, most);
       // MCP search omits labels. only its detail result can prove a repo's scope.
-      const scopes = yield* Effect.forEach(
-        selected,
-        (h): Effect.Effect<MemoryScope> => {
-          const id = hitID(h);
-          if (!id) return Effect.succeed({ kind: "unknown" });
-          return Effect.gen(function* () {
-            const answer = yield* call("get_memory_by_id", { memory_id: id });
-            const detail = yield* Schema.decodeEffect(DetailResponse)(answer);
-            return scopeOf(detail.labels);
-          }).pipe(
-            // An unreadable detail does not turn an unknown repo into a global memory.
-            Effect.orElseSucceed((): MemoryScope => ({ kind: "unknown" })),
-          );
-        },
-        { concurrency: 2 },
-      );
+      const scopes = await scopesOf(selected, signal);
       return {
         found: selected.map((h, index) => ({
           id: hitID(h),
@@ -220,23 +248,25 @@ export function nowledge(c: MemorySourceConfig): Source {
           scope: scopes[index] ?? { kind: "unknown" },
         })),
       };
-    }),
+    },
     // The farm's own; Nowledge does not say which repo each is for.
-    list: Effect.fnUntraced(function* (agent) {
+    list: async (agent, signal) => {
       if (c.read !== true) return [];
-      const hits = yield* find(agent, "", most, false);
+      const hits = await find(agent, "", most, false, signal);
       return hits.map((h): T.Memory => ({ id: hitID(h), agent, kind: "note", text: hitText(h), author: "system", at: 0, recalled: 0, fading: false }));
-    }),
-    syncTurn: () => Effect.void,
-    sessionEnded: () => Effect.void,
-    add: Effect.fnUntraced(function* (n) {
+    },
+    syncTurn: async () => {},
+    sessionEnded: async () => {},
+    add: async (n, signal) => {
       if (c.write !== true) return undefined;
       const repo = n.repo.trim();
-      const id = yield* add(n.agent, n.text, repo);
-      const at = yield* Clock.currentTimeMillis;
+      const id = await add(n.agent, n.text, repo, signal);
+      const at = deps.clock.now();
       return { id, agent: n.agent, kind: "note", text: n.text, author: "system", at, recalled: 0, fading: false, ...(repo ? { repo } : {}) } satisfies T.Memory;
-    }),
-    forget: () => Effect.fail(SourceError.make({ message: t("server.memory.nowledgeForget") })),
+    },
+    forget: async () => {
+      throw new SourceError(t("server.memory.nowledgeForget"));
+    },
     can: { list: true, forget: false, transcripts: false },
   };
 }

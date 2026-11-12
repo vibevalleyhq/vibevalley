@@ -15,10 +15,8 @@ const out = join(mobile, ".screens");
 mkdirSync(out, { recursive: true });
 const run = (cmd: string, ...args: string[]) => execFileSync(cmd, args, { encoding: "utf8", maxBuffer: 64 << 20 }).trim();
 const until = async <T>(get: () => Promise<T | undefined> | T | undefined, what: string, ms = 120_000): Promise<T> => {
-  /* oxlint-disable eslint/no-await-in-loop -- a poll: each try waits for the one before */
   for (const end = Date.now() + ms; Date.now() < end; await sleep(500)) {
     const got = await get();
-    /* oxlint-enable eslint/no-await-in-loop */
     if (got !== undefined) return got;
   }
   throw new Error("waited for " + what);

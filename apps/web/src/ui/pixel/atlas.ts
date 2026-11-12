@@ -1,8 +1,8 @@
-import { Schema } from "effect";
 import { type Accessor, createSignal, onSettled } from "solid-js";
 // The village's pictures: /pixel/sprites.json (design/pixel/process.py writes it) and a PNG per name beside it.
 
 import { omitUndefined } from "@vibevalley/protocol/rules";
+import { jsonString } from "@vibevalley/protocol/schema";
 
 import { SpriteManifest } from "#/base/manifests.ts";
 
@@ -32,7 +32,7 @@ export class SpriteAtlas {
   }
 
   static parse(text: string): SpriteAtlas {
-    const raw = Schema.decodeSync(Schema.fromJsonString(SpriteManifest))(text);
+    const raw = jsonString(SpriteManifest).parse(text);
     const map = raw.map;
     if (!map) throw new Error("sprites.json: no map");
     const d = map.w / levelWidth;

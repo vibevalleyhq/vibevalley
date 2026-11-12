@@ -1,49 +1,49 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import type { Codec } from "../codec";
 import { KeyStatus, Locale } from "../common/schema";
 import { AgoraAppID, Dictation, SettingsUpdateVoice, VoiceSettings } from "../voice/schema";
 import * as T from "./shapes";
 
-export const MemorySourceInfo: Codec<T.MemorySourceInfo> = Schema.Struct({
-  name: Schema.String,
-  label: Schema.String,
-  on: Schema.Boolean,
-  off: Schema.String,
-  canList: Schema.Boolean,
-  canForget: Schema.Boolean,
-  transcripts: Schema.Boolean,
-});
+export const MemorySourceInfo = z.object({
+  name: z.string(),
+  label: z.string(),
+  on: z.boolean(),
+  off: z.string(),
+  canList: z.boolean(),
+  canForget: z.boolean(),
+  transcripts: z.boolean(),
+}) satisfies Codec<T.MemorySourceInfo>;
 
-export const MemorySourceKind: Codec<T.MemorySourceKind> = Schema.Literals(T.MemorySourceKindValues);
+export const MemorySourceKind = z.enum(T.MemorySourceKindValues) satisfies Codec<T.MemorySourceKind>;
 
-const MemorySource: Codec<T.MemorySource> = Schema.Struct({
+const MemorySource = z.object({
   kind: MemorySourceKind,
-  url: Schema.String,
-  enabled: Schema.Boolean,
-  read: Schema.Boolean,
-  write: Schema.Boolean,
-  everything: Schema.Boolean,
-  user: Schema.optionalKey(Schema.String),
+  url: z.string(),
+  enabled: z.boolean(),
+  read: z.boolean(),
+  write: z.boolean(),
+  everything: z.boolean(),
+  user: z.exactOptional(z.string()),
   key: KeyStatus,
-});
+}) satisfies Codec<T.MemorySource>;
 
-const SpacePaths: Codec<T.SpacePaths> = Schema.Struct({
-  repos: Schema.String,
-  worktrees: Schema.String,
-  pkm: Schema.String,
-});
+const SpacePaths = z.object({
+  repos: z.string(),
+  worktrees: z.string(),
+  pkm: z.string(),
+}) satisfies Codec<T.SpacePaths>;
 
-const Readiness: Codec<T.Readiness> = Schema.Union([
-  Schema.Struct({ ready: Schema.Literal(true) }),
-  Schema.Struct({ ready: Schema.Literal(false), missing: Schema.Literals(T.MissingValues) }),
-]);
+const Readiness = z.discriminatedUnion("ready", [
+  z.object({ ready: z.literal(true) }),
+  z.object({ ready: z.literal(false), missing: z.enum(T.MissingValues) }),
+]) satisfies Codec<T.Readiness>;
 
-export const SettingsStatus: Codec<T.SettingsStatus> = Schema.Struct({
-  file: Schema.String,
-  home: Schema.String,
+export const SettingsStatus = z.object({
+  file: z.string(),
+  home: z.string(),
   paths: SpacePaths,
-  version: Schema.String,
+  version: z.string(),
   locale: Locale,
   deepseekApiKey: KeyStatus,
   agoraAppId: AgoraAppID,
@@ -55,31 +55,31 @@ export const SettingsStatus: Codec<T.SettingsStatus> = Schema.Struct({
   ttsKey: KeyStatus,
   dictation: Dictation,
   dictationKey: KeyStatus,
-  readiness: Schema.Record(Schema.Literals(T.FeatureValues), Readiness),
-  memorySources: Schema.mutable(Schema.Array(MemorySource)),
-});
+  readiness: z.record(z.enum(T.FeatureValues), Readiness),
+  memorySources: z.array(MemorySource),
+}) satisfies Codec<T.SettingsStatus>;
 
-const MemorySourceUpdate: Codec<T.MemorySourceUpdate> = Schema.Struct({
+const MemorySourceUpdate = z.object({
   kind: MemorySourceKind,
-  url: Schema.String,
-  enabled: Schema.Boolean,
-  read: Schema.Boolean,
-  write: Schema.Boolean,
-  everything: Schema.optionalKey(Schema.Boolean),
-  user: Schema.optionalKey(Schema.String),
-  key: Schema.optionalKey(Schema.String),
-});
+  url: z.string(),
+  enabled: z.boolean(),
+  read: z.boolean(),
+  write: z.boolean(),
+  everything: z.exactOptional(z.boolean()),
+  user: z.exactOptional(z.string()),
+  key: z.exactOptional(z.string()),
+}) satisfies Codec<T.MemorySourceUpdate>;
 
-export const SettingsUpdate: Codec<T.SettingsUpdate> = Schema.Struct({
-  locale: Schema.optionalKey(Locale),
-  deepseekApiKey: Schema.optionalKey(Schema.String),
-  agoraAppId: Schema.optionalKey(Schema.String),
-  agoraAppCertificate: Schema.optionalKey(Schema.String),
-  voice: Schema.optionalKey(SettingsUpdateVoice),
-  asrKey: Schema.optionalKey(Schema.String),
-  llmKey: Schema.optionalKey(Schema.String),
-  ttsKey: Schema.optionalKey(Schema.String),
-  dictation: Schema.optionalKey(Dictation),
-  dictationKey: Schema.optionalKey(Schema.String),
-  memorySources: Schema.optionalKey(Schema.mutable(Schema.Array(MemorySourceUpdate))),
-});
+export const SettingsUpdate = z.object({
+  locale: z.exactOptional(Locale),
+  deepseekApiKey: z.exactOptional(z.string()),
+  agoraAppId: z.exactOptional(z.string()),
+  agoraAppCertificate: z.exactOptional(z.string()),
+  voice: z.exactOptional(SettingsUpdateVoice),
+  asrKey: z.exactOptional(z.string()),
+  llmKey: z.exactOptional(z.string()),
+  ttsKey: z.exactOptional(z.string()),
+  dictation: z.exactOptional(Dictation),
+  dictationKey: z.exactOptional(z.string()),
+  memorySources: z.exactOptional(z.array(MemorySourceUpdate)),
+}) satisfies Codec<T.SettingsUpdate>;

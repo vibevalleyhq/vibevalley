@@ -1,73 +1,73 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import type { Codec } from "../codec";
 import { ActorKind, SessionId } from "../common/schema";
 import { MemorySourceInfo } from "../setting/schema";
 import * as T from "./shapes";
 
-export const RecallPreview: Codec<T.RecallPreview> = Schema.Struct({
-  lines: Schema.mutable(Schema.Array(Schema.String)),
-  chars: Schema.Finite,
-  limit: Schema.Finite,
-});
+export const RecallPreview = z.object({
+  lines: z.array(z.string()),
+  chars: z.number(),
+  limit: z.number(),
+}) satisfies Codec<T.RecallPreview>;
 
-const ArchiveFile: Codec<T.ArchiveFile> = Schema.Struct({
-  name: Schema.String,
-  at: Schema.Finite,
-  chars: Schema.Finite,
-});
+const ArchiveFile = z.object({
+  name: z.string(),
+  at: z.number(),
+  chars: z.number(),
+}) satisfies Codec<T.ArchiveFile>;
 
-const ArchiveHit: Codec<T.ArchiveHit> = Schema.Struct({
-  file: Schema.String,
-  line: Schema.Finite,
-  text: Schema.String,
-});
+const ArchiveHit = z.object({
+  file: z.string(),
+  line: z.number(),
+  text: z.string(),
+}) satisfies Codec<T.ArchiveHit>;
 
-export const ArchiveListing: Codec<T.ArchiveListing> = Schema.Struct({
-  files: Schema.mutable(Schema.Array(ArchiveFile)),
-  hits: Schema.mutable(Schema.Array(ArchiveHit)),
-});
+export const ArchiveListing = z.object({
+  files: z.array(ArchiveFile),
+  hits: z.array(ArchiveHit),
+}) satisfies Codec<T.ArchiveListing>;
 
-const MemoryKind: Codec<T.MemoryKind> = Schema.Literals(T.MemoryKindValues);
+const MemoryKind = z.enum(T.MemoryKindValues) satisfies Codec<T.MemoryKind>;
 
 /** A memory's fields; a found one (MemoryFound) has them and more. */
 const memoryFields = {
-  id: Schema.String,
-  agent: Schema.String,
+  id: z.string(),
+  agent: z.string(),
   kind: MemoryKind,
-  text: Schema.String,
+  text: z.string(),
   author: ActorKind,
-  repo: Schema.optionalKey(Schema.String),
-  session: Schema.optionalKey(SessionId),
-  at: Schema.Finite,
-  recalled: Schema.Finite,
-  recalledAt: Schema.optionalKey(Schema.Finite),
-  fading: Schema.Boolean,
-  source: Schema.optionalKey(Schema.String),
+  repo: z.exactOptional(z.string()),
+  session: z.exactOptional(SessionId),
+  at: z.number(),
+  recalled: z.number(),
+  recalledAt: z.exactOptional(z.number()),
+  fading: z.boolean(),
+  source: z.exactOptional(z.string()),
 };
 
-export const Memory: Codec<T.Memory> = Schema.Struct(memoryFields);
+export const Memory = z.object(memoryFields) satisfies Codec<T.Memory>;
 
-export const MemoryRequest: Codec<T.MemoryRequest> = Schema.Struct({
-  text: Schema.String,
-  repo: Schema.optionalKey(Schema.String),
-  requestKey: Schema.optionalKey(Schema.String),
-});
+export const MemoryRequest = z.object({
+  text: z.string(),
+  repo: z.exactOptional(z.string()),
+  requestKey: z.exactOptional(z.string()),
+}) satisfies Codec<T.MemoryRequest>;
 
-const MemoryScope: Codec<T.MemoryScope> = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal("global") }),
-  Schema.Struct({ kind: Schema.Literal("repo"), repo: Schema.String }),
-  Schema.Struct({ kind: Schema.Literal("unknown") }),
-]);
+const MemoryScope = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("global") }),
+  z.object({ kind: z.literal("repo"), repo: z.string() }),
+  z.object({ kind: z.literal("unknown") }),
+]) satisfies Codec<T.MemoryScope>;
 
-const MemoryFound: Codec<T.MemoryFound> = Schema.Struct({ ...memoryFields, source: Schema.String, score: Schema.Finite, scope: MemoryScope });
+const MemoryFound = z.object({ ...memoryFields, source: z.string(), score: z.number(), scope: MemoryScope }) satisfies Codec<T.MemoryFound>;
 
-export const MemorySearch: Codec<T.MemorySearch> = Schema.Struct({
-  found: Schema.mutable(Schema.Array(MemoryFound)),
-  coverage: Schema.mutable(Schema.Array(Schema.String)),
-});
+export const MemorySearch = z.object({
+  found: z.array(MemoryFound),
+  coverage: z.array(z.string()),
+}) satisfies Codec<T.MemorySearch>;
 
-export const MemoryList: Codec<T.MemoryList> = Schema.Struct({
-  memories: Schema.mutable(Schema.Array(Memory)),
-  sources: Schema.mutable(Schema.Array(MemorySourceInfo)),
-});
+export const MemoryList = z.object({
+  memories: z.array(Memory),
+  sources: z.array(MemorySourceInfo),
+}) satisfies Codec<T.MemoryList>;

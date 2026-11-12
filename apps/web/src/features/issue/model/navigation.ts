@@ -1,8 +1,8 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import { search, searchParam } from "#/infra/router.ts";
 
 export const issueSearch = search({
-  repo: Schema.optional(searchParam(Schema.String)),
-  agent: Schema.optional(searchParam(Schema.String)),
+  repo: searchParam(z.string()).optional(),
+  agent: searchParam(z.string()).optional(),
 });

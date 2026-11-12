@@ -1,15 +1,7 @@
-import * as stylex from "@stylexjs/stylex";
-
 import type { CronView } from "@vibevalley/protocol";
 import { stories, story } from "@vibevalley/stories";
 
 import { CronCard } from "./Tabs";
-
-const viewStyles = stylex.create({
-  tabsStoriesDiv: {
-    width: "28rem",
-  },
-});
 
 const now = Date.now();
 
@@ -40,7 +32,7 @@ export default stories({
       args: { state: "enabled" },
       grid: { rows: ["state", ["enabled", "disabled", "pending"]] },
       render: (a) => (
-        <div {...stylex.attrs(viewStyles.tabsStoriesDiv)}>
+        <div class="w-112">
           <CronCard s={a.state === "disabled" ? cron({ enabled: false }) : a.state === "pending" ? neverRun(cron({ pending: true, by: "agent" })) : cron({})} />
         </div>
       ),

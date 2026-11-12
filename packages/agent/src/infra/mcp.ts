@@ -2,15 +2,17 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { Effect, Exit, type FileSystem, Option, Predicate, Result, Schema } from "effect";
+import { z } from "zod";
 
 import type { JsonSchema } from "@vibevalley/ai/tools";
 
+import { isRecord } from "../base/json.ts";
 import { mcpConfig, mcp as mcpWords } from "../base/prompts.ts";
 import { AgentFailed, messageOf, ToolFailed } from "../core/errors.ts";
 import type { Tool } from "../core/loop.ts";
-import { effectTool } from "../core/tool.ts";
-import { agentFsOf } from "./fs.ts";
+import { runTool } from "../core/tool.ts";
+import { type AgentFs, agentFsOf } from "./fs.ts";
+import { type AgentLog, consoleLog } from "./log.ts";
 import { asTransport } from "./mcpTransport.ts";
 import { failAfterRealTime } from "./realTime.ts";
 
@@ -18,13 +20,17 @@ import { failAfterRealTime } from "./realTime.ts";
 const callTimeoutMs = 120_000;
 
 // A tool's result as its server sends it: only the fields read here, the rest let through.
-const Block = Schema.Struct({
-  type: Schema.String,
-  text: Schema.optionalKey(Schema.String),
-  resource: Schema.optionalKey(Schema.Struct({ text: Schema.optionalKey(Schema.String), uri: Schema.optionalKey(Schema.String) })),
-});
-type Block = typeof Block.Type;
-const contentOf = Schema.decodeUnknownOption(Schema.Array(Block));
+interface Block {
+  readonly type: string;
+  readonly text?: string;
+  readonly resource?: { readonly text?: string; readonly uri?: string };
+}
+const Block = z.object({
+  type: z.string(),
+  text: z.exactOptional(z.string()),
+  resource: z.exactOptional(z.object({ text: z.exactOptional(z.string()), uri: z.exactOptional(z.string()) })),
+}) satisfies z.ZodType<Block>;
+const Content = z.array(Block);
 
 export function mcpContentText(content: readonly Block[]): string {
   const parts: string[] = [];
@@ -57,21 +63,28 @@ export const mcpToolName = (server: string, tool: string) => (server + "__" + to
 
 interface McpConnection {
   readonly tools: Tool[];
-  readonly close: Effect.Effect<void>;
+  readonly close: () => Promise<void>;
 }
 
 /** A server that could not be reached in time: its message is what mcpStatus says of it. */
-class McpUnreachable extends Schema.TaggedError<McpUnreachable, { readonly brand: unique symbol }>()("McpUnreachable", {
-  message: Schema.String,
-  cause: Schema.optionalKey(Schema.Defect()),
-}) {}
+class McpUnreachable extends Error {
+  override readonly name = "McpUnreachable";
+}
 
 /** What start gives, or a failure after callTimeoutMs of real time; the request it started is not cancelled. */
-const withinCallTimeout = <A>(start: () => Promise<A>) =>
-  Effect.raceFirst(
-    Effect.tryPromise({ try: start, catch: (cause) => McpUnreachable.make({ message: messageOf(cause), cause }) }),
-    failAfterRealTime(callTimeoutMs, () => McpUnreachable.make({ message: "timed out" })),
-  );
+async function withinCallTimeout<A>(start: () => Promise<A>): Promise<A> {
+  const gaveUp = new AbortController();
+  try {
+    return await Promise.race([
+      start().catch((cause: unknown) => {
+        throw new McpUnreachable(messageOf(cause), { cause });
+      }),
+      failAfterRealTime(callTimeoutMs, () => new McpUnreachable("timed out"), gaveUp.signal),
+    ]);
+  } finally {
+    gaveUp.abort();
+  }
+}
 
 interface Opened {
   readonly transport: Transport;
@@ -106,76 +119,74 @@ function openTransport(server: McpServer): Opened {
   return { transport: stdio, lastStderr: () => stderr.trim().split("\n").at(-1) ?? "" };
 }
 
-/** Interrupted or failed, what it opened is closed first. */
-const connectMcp = Effect.fnUntraced(function* (server: McpServer) {
+/** Failed, what it opened is closed first. */
+async function connectMcp(server: McpServer, log: AgentLog): Promise<McpConnection> {
   const { transport, lastStderr } = openTransport(server);
   const client = new Client({ name: "vibevalley-agent", version: "0.1.0" });
-  const close = Effect.andThen(
-    Effect.ignore(Effect.tryPromise({ try: () => client.close(), catch: messageOf }), { log: "Debug" }),
-    Effect.ignore(Effect.tryPromise({ try: () => transport.close(), catch: messageOf }), { log: "Debug" }),
-  );
-  return yield* Effect.gen(function* () {
-    yield* withinCallTimeout(() => client.connect(transport));
+  const close = async () => {
+    // Closing goes on whatever either half says: the server is going either way.
+    await client.close().catch((e: unknown) => log.debug(`agent: closing MCP client ${server.name}:`, messageOf(e)));
+    await transport.close().catch((e: unknown) => log.debug(`agent: closing MCP transport ${server.name}:`, messageOf(e)));
+  };
+  try {
+    await withinCallTimeout(() => client.connect(transport));
     const tools: Tool[] = [];
     let cursor: string | undefined;
     do {
       const asked = cursor ? { cursor } : {};
-      const page = yield* withinCallTimeout(() => client.listTools(asked));
+      const page = await withinCallTimeout(() => client.listTools(asked));
       for (const t of page.tools) tools.push(mcpTool(client, server.name, t));
       cursor = page.nextCursor;
     } while (cursor);
-    const connection: McpConnection = { tools, close };
-    return connection;
-  }).pipe(
-    Effect.onExit((exit) => (Exit.isFailure(exit) ? close : Effect.void)),
-    Effect.mapError((e) => McpUnreachable.make({ message: mcpWords.connectFailed(server.name, e.message, lastStderr()), cause: e })),
-  );
-});
-
-const encodeJson = Schema.encodeOption(Schema.fromJsonString(Schema.Unknown));
+    return { tools, close };
+  } catch (e) {
+    await close();
+    throw new McpUnreachable(mcpWords.connectFailed(server.name, messageOf(e), lastStderr()), { cause: e });
+  }
+}
 
 function mcpTool(client: Client, server: string, t: { name: string; description?: string | undefined; inputSchema?: object | undefined }): Tool {
   const parameters: JsonSchema = t.inputSchema ? Object.fromEntries(Object.entries(t.inputSchema)) : { type: "object", properties: {} };
-  return effectTool({
+  return runTool({
     name: mcpToolName(server, t.name),
     description: mcpWords.toolDescription(server, t.description || t.name),
     parameters,
-    run: (params) =>
-      Effect.gen(function* () {
-        const r = yield* Effect.tryPromise({
-          try: (signal) =>
-            client.callTool({ name: t.name, arguments: Predicate.isObject(params) ? params : {} }, undefined, {
-              timeout: callTimeoutMs,
-              signal,
-            }),
-          catch: (cause) => ToolFailed.make({ message: mcpWords.callFailed(server, t.name, messageOf(cause)), cause }),
+    run: async (params, signal) => {
+      let r: Awaited<ReturnType<Client["callTool"]>>;
+      try {
+        r = await client.callTool({ name: t.name, arguments: isRecord(params) ? params : {} }, undefined, {
+          timeout: callTimeoutMs,
+          ...(signal !== undefined ? { signal } : {}),
         });
-        let text = mcpContentText(Option.getOrElse(contentOf(r.content), () => []));
-        // structuredContent came over JSON-RPC, so it always encodes back.
-        if (text === "")
-          text = r.structuredContent !== undefined ? Option.getOrElse(encodeJson(r.structuredContent), () => mcpWords.noContent) : mcpWords.noContent;
-        if (r.isError === true) return yield* ToolFailed.make({ message: text });
-        return text;
-      }),
+      } catch (cause) {
+        throw new ToolFailed(mcpWords.callFailed(server, t.name, messageOf(cause)), cause);
+      }
+      let text = mcpContentText(Content.safeParse(r.content).data ?? []);
+      // structuredContent came over JSON-RPC, so it always encodes back.
+      if (text === "") text = r.structuredContent !== undefined ? (JSON.stringify(r.structuredContent) ?? mcpWords.noContent) : mcpWords.noContent;
+      if (r.isError === true) throw new ToolFailed(text);
+      return text;
+    },
   });
 }
 
 export interface McpConnections {
   readonly tools: Tool[];
   readonly failed: string[];
-  readonly close: Effect.Effect<void>;
+  readonly close: () => Promise<void>;
 }
 
 /** Each server at once; one that cannot be reached is in failed, in the order given. */
-export const connectAll = Effect.fnUntraced(function* (servers: readonly McpServer[]) {
-  const [connections, unreachable] = yield* Effect.partition(servers, (s) => connectMcp(s), { concurrency: "unbounded" });
-  const all: McpConnections = {
+export async function connectAll(servers: readonly McpServer[], log: AgentLog = consoleLog): Promise<McpConnections> {
+  const settled = await Promise.allSettled(servers.map((s) => connectMcp(s, log)));
+  const connections = settled.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
+  const failed = settled.flatMap((r) => (r.status === "rejected" ? [messageOf(r.reason)] : []));
+  return {
     tools: connections.flatMap((c) => c.tools),
-    failed: unreachable.map((e) => e.message),
-    close: Effect.forEach(connections, (c) => c.close, { concurrency: "unbounded", discard: true }),
+    failed,
+    close: async () => void (await Promise.all(connections.map((c) => c.close()))),
   };
-  return all;
-});
+}
 
 /** MCP servers in the shape Claude Code and Cursor use: { "mcpServers": { name: { command, args, env } | { url } } }. */
 export interface McpServer {
@@ -188,40 +199,44 @@ export interface McpServer {
   readonly cwd?: string;
 }
 
-const McpEntrySchema = Schema.Struct({
-  command: Schema.optionalKey(Schema.String),
-  args: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
-  env: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
-  cwd: Schema.optionalKey(Schema.String),
-  url: Schema.optionalKey(Schema.String),
-  headers: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
-  disabled: Schema.optionalKey(Schema.Boolean),
+const McpEntrySchema = z.object({
+  command: z.exactOptional(z.string()),
+  args: z.exactOptional(z.array(z.string())),
+  env: z.exactOptional(z.record(z.string(), z.string())),
+  cwd: z.exactOptional(z.string()),
+  url: z.exactOptional(z.string()),
+  headers: z.exactOptional(z.record(z.string(), z.string())),
+  disabled: z.exactOptional(z.boolean()),
 });
-type McpEntry = typeof McpEntrySchema.Type;
-const McpConfigSchema = Schema.fromJsonString(Schema.Struct({ mcpServers: Schema.optionalKey(Schema.Record(Schema.String, McpEntrySchema)) }));
+const McpConfigSchema = z.object({ mcpServers: z.exactOptional(z.record(z.string(), McpEntrySchema)) });
 
-/** A missing file has none; unreadable JSON or a wrong shape is an error. */
-export const readMcpConfig = (path: string, fs?: FileSystem.FileSystem): Effect.Effect<McpServer[], AgentFailed> =>
-  Effect.gen(function* () {
-    const raw = yield* agentFsOf(fs).readTextIfExists(path);
-    const data = raw ?? "{}";
-    if (data.trim() === "") return yield* AgentFailed.make({ message: mcpConfig.notJson(path) });
-    const config: Result.Result<{ mcpServers?: Record<string, McpEntry> }, Schema.SchemaError> = Schema.decodeResult(McpConfigSchema)(data);
-    if (Result.isFailure(config)) return yield* AgentFailed.make({ message: mcpConfig.badShape(path, String(config.failure)), cause: config.failure });
-    const entries = config.success.mcpServers ?? {};
-    const out: McpServer[] = [];
-    for (const name of Object.keys(entries).toSorted()) {
-      const e = entries[name];
-      if (!e || e.disabled === true) continue;
-      if (e.url) out.push({ name, url: e.url, ...(e.headers ? { headers: e.headers } : {}) });
-      else if (e.command)
-        out.push({
-          name,
-          command: e.command,
-          ...(e.args ? { args: e.args } : {}),
-          ...(e.env ? { env: e.env } : {}),
-          ...(e.cwd ? { cwd: e.cwd } : {}),
-        });
-    }
-    return out;
-  });
+/** A missing file has none; unreadable JSON or a wrong shape is an AgentFailed. */
+export async function readMcpConfig(path: string, fs?: AgentFs): Promise<McpServer[]> {
+  const raw = await agentFsOf(fs).readTextIfExists(path);
+  const data = raw ?? "{}";
+  if (data.trim() === "") throw new AgentFailed(mcpConfig.notJson(path));
+  let json: unknown;
+  try {
+    json = JSON.parse(data);
+  } catch (cause) {
+    throw new AgentFailed(mcpConfig.badShape(path, messageOf(cause)), cause);
+  }
+  const config = McpConfigSchema.safeParse(json);
+  if (!config.success) throw new AgentFailed(mcpConfig.badShape(path, config.error.message), config.error);
+  const entries = config.data.mcpServers ?? {};
+  const out: McpServer[] = [];
+  for (const name of Object.keys(entries).toSorted()) {
+    const e = entries[name];
+    if (!e || e.disabled === true) continue;
+    if (e.url) out.push({ name, url: e.url, ...(e.headers ? { headers: e.headers } : {}) });
+    else if (e.command)
+      out.push({
+        name,
+        command: e.command,
+        ...(e.args ? { args: e.args } : {}),
+        ...(e.env ? { env: e.env } : {}),
+        ...(e.cwd ? { cwd: e.cwd } : {}),
+      });
+  }
+  return out;
+}

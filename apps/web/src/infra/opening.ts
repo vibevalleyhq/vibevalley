@@ -48,7 +48,6 @@ async function pageReady(client: QueryClient, report: Report, signal: AbortSigna
   if (!(await until(() => !!frames.get().frame || frames.get().link === "lost", frames.subscribe, signal)) || !frames.get().frame) return false;
   report("reading", 30);
   for (let round = 0; round < 3; round++) {
-    /* oxlint-disable eslint/no-await-in-loop -- a mounted read can start another read on the next frame */
     let painted = false;
     if (
       !(await until(
@@ -66,7 +65,6 @@ async function pageReady(client: QueryClient, report: Report, signal: AbortSigna
       return false;
     await waitForReads(client, signal);
     if (signal.aborted) return false;
-    /* oxlint-enable eslint/no-await-in-loop */
   }
   report("loading", 50);
   const pictures = [...document.images].filter((image) => image.loading !== "lazy");

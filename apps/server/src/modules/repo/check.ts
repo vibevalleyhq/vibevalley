@@ -1,23 +1,19 @@
 import { delimiter, join } from "node:path";
 
-import { Config, Effect, type FileSystem } from "effect";
-
 import { t } from "@vibevalley/i18n";
 
 import { reason, type run } from "./git.ts";
 import { lexists } from "./stats.ts";
 import { MergeFailure } from "./workplace.ts";
 
-export const checkRepository = Effect.fn("Repo.checkRepository")(function* (fs: FileSystem.FileSystem, cwd: string, timeoutMs: number, execute: typeof run) {
+/** The repo's .vibevalley/check at cwd: not-run when there is none, passed, or a MergeFailure with its last lines. */
+export async function checkRepository(cwd: string, timeoutMs: number, execute: typeof run, signal?: AbortSignal): Promise<"not-run" | "passed"> {
   const file = join(cwd, ".vibevalley", "check");
-  if (!(yield* lexists(fs, file))) return "not-run" as const;
-  const inheritedPath = yield* Config.String("PATH").pipe(
-    Config.withDefault(""),
-    Effect.mapError((e) => MergeFailure.failedCheck(t("server.repo.check.failed", { why: e.message }))),
-  );
+  if (!(await lexists(file))) return "not-run";
+  const inheritedPath = process.env.PATH ?? "";
   const path = [join(cwd, "node_modules", ".bin"), ...inheritedPath.split(delimiter).filter((p) => !p.includes("node_modules/.bin"))];
-  const r = yield* execute(file, [], { cwd, timeoutMs, env: { ...process.env, PATH: path.join(delimiter) } });
-  if (r.code === 0) return "passed" as const;
+  const r = await execute(file, [], { cwd, timeoutMs, env: { ...process.env, PATH: path.join(delimiter) }, ...(signal === undefined ? {} : { signal }) });
+  if (r.code === 0) return "passed";
   const why = r.timedOut
     ? t("server.repo.check.timedOut", { seconds: timeoutMs / 1000 })
     : r.code < 0
@@ -28,5 +24,5 @@ export const checkRepository = Effect.fn("Repo.checkRepository")(function* (fs: 
     .trim()
     .split("\n")
     .slice(-40);
-  return yield* MergeFailure.failedCheck(why + "\n" + lines.join("\n"));
-});
+  throw MergeFailure.failedCheck(why + "\n" + lines.join("\n"));
+}

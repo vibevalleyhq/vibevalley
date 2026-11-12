@@ -1,86 +1,9 @@
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, For } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
 import { splitChips } from "./cells";
 import { SpriteIcon } from "./icons";
-import { pxStyle } from "./style";
-
-const styles = stylex.create({
-  pxChipsInputButton: {
-    cursor: {
-      default: "pointer",
-      ":disabled": "default",
-    },
-    paddingInline: "0.25rem",
-    paddingBlock: "0.125rem",
-    opacity: {
-      default: ".7",
-      "@media (hover:hover)": {
-        default: null,
-        ":enabled:hover": "1",
-      },
-    },
-    outlineStyle: {
-      default: "none",
-      ":focus-visible": "solid",
-    },
-    outlineWidth: {
-      default: null,
-      ":focus-visible": "2px",
-    },
-    outlineOffset: {
-      default: null,
-      ":focus-visible": "1px",
-    },
-    outlineColor: {
-      default: null,
-      ":focus-visible": "var(--color-leaf-500)",
-    },
-  },
-  box: {
-    display: "flex",
-    minHeight: "2.25rem",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.25rem",
-    backgroundColor: "var(--color-cream-100)",
-    padding: "0.375rem",
-  },
-  disabled: {
-    opacity: ".5",
-  },
-  chip: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "0.25rem",
-    backgroundColor: "var(--color-cream-300)",
-    paddingBlock: "0.125rem",
-    paddingRight: "0.25rem",
-    paddingLeft: "0.5rem",
-    color: "var(--color-bark-800)",
-  },
-  input: {
-    height: "1.5rem",
-    backgroundColor: "transparent",
-    paddingInline: "0.25rem",
-    color: {
-      default: "var(--color-bark-900)",
-      "::placeholder": "var(--color-bark-500)",
-    },
-    caretColor: "var(--color-bark-900)",
-    outlineStyle: "none",
-  },
-  inputAfterChips: {
-    width: "6rem",
-    flexGrow: "1",
-  },
-  inputEmpty: {
-    minWidth: "0",
-    flex: "1",
-  },
-});
 
 /** Enter or a comma adds what is typed, and so does leaving the box; Backspace in an empty box takes the last chip off. */
 export function PxChipsInput(props: {
@@ -98,17 +21,17 @@ export function PxChipsInput(props: {
     setDraft("");
   };
   return (
-    <div {...stylex.attrs(pxStyle.ring, styles.box, props.disabled === true && styles.disabled)}>
+    <div class={["flex min-h-9 flex-wrap items-center gap-1 bg-cream-100 p-1.5 pixel-ring", props.disabled === true && "opacity-50"]}>
       <For each={props.value}>
         {(chip) => (
-          <span {...stylex.attrs(pxStyle.xs, styles.chip)}>
+          <span class="inline-flex items-center gap-1 bg-cream-300 py-0.5 pr-1 pl-2 text-bark-800 pixel-xs">
             {chip}
             <button
               type="button"
               aria-label={t("web.ui.pixel.drop", { chip })}
               disabled={props.disabled}
               onClick={() => props.onChange(props.value.filter((c) => c !== chip))}
-              {...stylex.attrs(styles.pxChipsInputButton)}
+              class="cursor-pointer px-1 py-0.5 opacity-70 pixel-focus enabled:hover:opacity-100 disabled:cursor-default"
             >
               <SpriteIcon name="button-close" size={10} />
             </button>
@@ -134,7 +57,10 @@ export function PxChipsInput(props: {
           }
         }}
         // The box takes the whole row while there are no chips (room for the placeholder) and 96 px after them.
-        {...stylex.attrs(pxStyle.sm, styles.input, props.value.length === 0 ? styles.inputEmpty : styles.inputAfterChips)}
+        class={[
+          "h-6 bg-transparent px-1 text-bark-900 caret-bark-900 outline-none pixel-sm placeholder:text-bark-500",
+          props.value.length === 0 ? "min-w-0 flex-1" : "w-24 grow",
+        ]}
       />
     </div>
   );

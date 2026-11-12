@@ -1,14 +1,33 @@
-import { expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber } from "effect";
-import { HttpClient, HttpClientResponse } from "effect/http";
-import { TestClock } from "effect/testing";
+import { expect, test } from "vite-plus/test";
 
+import type { PublicFetch } from "#/infra/publicHttp.ts";
+import { wallTime } from "#/infra/time.ts";
 import { png } from "#/modules/media/testdata/png.ts";
 
-import { downloadImage } from "./download.ts";
+import { DownloadFailed, downloadImage } from "./download.ts";
 import { validPng } from "./png.ts";
 
-it("PNG validation checks dimensions, CRC, compressed data and complete framing", () => {
+/** A clock whose waits end only when the test says. */
+const heldClock = () => {
+  const waits: { readonly wake: () => void }[] = [];
+  return {
+    clock: {
+      ...wallTime,
+      sleep: (_ms: number, signal?: AbortSignal) =>
+        new Promise<void>((resolve, reject) => {
+          waits.push({ wake: resolve });
+          signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
+        }),
+    },
+    pass: () => {
+      for (const w of waits.splice(0)) w.wake();
+    },
+  };
+};
+
+const headersOf = (init?: RequestInit) => new Headers(init?.headers);
+
+test("PNG validation checks dimensions, CRC, compressed data and complete framing", () => {
   const bytes = png();
   expect(validPng(bytes, 256, 256)).toBe(true);
   expect(validPng(bytes, 512, 256)).toBe(false);
@@ -18,68 +37,55 @@ it("PNG validation checks dimensions, CRC, compressed data and complete framing"
   expect(validPng(bytes, 256, 256)).toBe(false);
 });
 
-it.effect("downloads send no credentials and return only checked PNG bytes", () => {
+test("downloads send no credentials and return only checked PNG bytes", async () => {
   const bytes = png();
-  const http = HttpClient.make((request) => {
-    expect(request.headers.authorization).toBeUndefined();
-    expect(request.method).toBe("GET");
-    return Effect.succeed(HttpClientResponse.fromWeb(request, new Response(bytes, { headers: { "content-type": "image/png" } })));
-  });
-  return Effect.gen(function* () {
-    const downloadImage2 = yield* downloadImage(http, "https://example.com/image.png", 256, 256);
-    expect(downloadImage2).toEqual(bytes);
-  });
+  const fetch: PublicFetch = async (_url, init) => {
+    expect(headersOf(init).get("authorization")).toBeNull();
+    expect(init?.method ?? "GET").toBe("GET");
+    return new Response(bytes, { headers: { "content-type": "image/png" } });
+  };
+  expect(await downloadImage(fetch, "https://example.com/image.png", 256, 256, { clock: wallTime })).toEqual(bytes);
 });
 
-it.effect.each(["https://127.0.0.1/image", "https://[::ffff:7f00:1]/image", "file:///etc/passwd", "http://example.com/image"])(
+test.each(["https://127.0.0.1/image", "https://[::ffff:7f00:1]/image", "file:///etc/passwd", "http://example.com/image"])(
   "unsafe URL %s is blocked before transport",
-  (url) =>
-    downloadImage(
-      HttpClient.make(() => Effect.die("Unexpected transport")),
-      url,
-      256,
-      256,
-    ).pipe(
-      Effect.flip,
-      Effect.tap((error) => Effect.sync(() => expect(error._tag).toBe("DownloadFailed"))),
-    ),
+  async (url) => {
+    const fetch: PublicFetch = () => {
+      throw new Error("Unexpected transport");
+    };
+    const error = await downloadImage(fetch, url, 256, 256, { clock: wallTime }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(DownloadFailed);
+  },
 );
-it.effect.each([301, 302, 401, 500])("HTTP %i is not followed or retried", (status) => {
+
+test.each([301, 302, 401, 500])("HTTP %i is not followed or retried", async (status) => {
   let calls = 0;
-  const http = HttpClient.make((request) => {
+  const fetch: PublicFetch = async () => {
     calls++;
-    return Effect.succeed(HttpClientResponse.fromWeb(request, new Response("", { status, headers: { location: "http://127.0.0.1/secret" } })));
-  });
-  return Effect.gen(function* () {
-    yield* downloadImage(http, "https://example.com/image", 256, 256).pipe(Effect.flip);
-    expect(calls).toBe(1);
-  });
+    return new Response("", { status, headers: { location: "http://127.0.0.1/secret" } });
+  };
+  expect(await downloadImage(fetch, "https://example.com/image", 256, 256, { clock: wallTime }).catch((e: unknown) => e)).toBeInstanceOf(DownloadFailed);
+  expect(calls).toBe(1);
 });
-it.effect("a stalled image body is canceled at the download deadline", () =>
-  Effect.gen(function* () {
-    const started = yield* Deferred.make<void>();
-    let canceled = false;
-    const http = HttpClient.make((request) =>
-      Deferred.succeed(started, undefined).pipe(
-        Effect.as(
-          HttpClientResponse.fromWeb(
-            request,
-            new Response(
-              new ReadableStream<Uint8Array>({
-                cancel() {
-                  canceled = true;
-                },
-              }),
-              { headers: { "content-type": "image/png" } },
-            ),
-          ),
-        ),
-      ),
+
+test("a stalled image body is canceled at the download deadline", async () => {
+  const { promise: started, resolve: start } = Promise.withResolvers<void>();
+  let canceled = false;
+  const fetch: PublicFetch = async () => {
+    start();
+    return new Response(
+      new ReadableStream<Uint8Array>({
+        cancel() {
+          canceled = true;
+        },
+      }),
+      { headers: { "content-type": "image/png" } },
     );
-    const fiber = yield* downloadImage(http, "https://example.com/image", 256, 256).pipe(Effect.flip, Effect.forkChild);
-    yield* Deferred.await(started);
-    yield* TestClock.adjust("60 seconds");
-    expect((yield* Fiber.join(fiber))._tag).toBe("DownloadFailed");
-    expect(canceled).toBe(true);
-  }),
-);
+  };
+  const held = heldClock();
+  const download = downloadImage(fetch, "https://example.com/image", 256, 256, { clock: held.clock }).catch((e: unknown) => e);
+  await started;
+  held.pass();
+  expect(await download).toBeInstanceOf(DownloadFailed);
+  expect(canceled).toBe(true);
+});

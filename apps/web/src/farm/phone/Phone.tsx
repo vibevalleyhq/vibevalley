@@ -1,5 +1,4 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -13,7 +12,6 @@ import { voiceCall } from "#/features/voice/index.ts";
 import { useCore } from "#/infra/frame.ts";
 import { useRouter } from "#/infra/router.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
-import { styleProps } from "#/ui/positioner.ts";
 
 import { missedOf, phoneCalls, phoneState } from "./calls";
 import { BlocksGame } from "./games/BlocksGame";
@@ -24,200 +22,13 @@ import { SokobanGame } from "./games/SokobanGame";
 import { type PadButton, padListening, pressPad } from "./pad";
 import { GamesScreen, HomeScreen, ListScreen, OrchestratorScreen, type PhoneApp, RingingScreen } from "./screens";
 
-const styles = stylex.create({
-  crossKey: { position: "absolute", width: "1rem", height: "1rem" },
-  crossKeyIdle: { backgroundColor: "var(--color-bark-900)" },
-  crossKeyDown: { backgroundColor: "var(--color-bark-950)" },
-  crossUp: { top: 0, left: "1rem" },
-  crossLeft: { top: "1rem", left: 0 },
-  crossRight: { top: "1rem", right: 0 },
-  crossDown: { bottom: 0, left: "1rem" },
-  phone: (width: number) => ({
-    pointerEvents: "auto",
-    position: "relative",
-    width,
-    backgroundColor: "var(--color-bark-600)",
-    paddingInline: "10px",
-    paddingTop: "10px",
-    paddingBottom: "0.75rem",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.5",
-    fontVariantNumeric: "tabular-nums",
-    color: "var(--color-lcd-ink)",
-    // The outline over a 4 px dark band at the bottom and right and a light one at the top and left.
-    boxShadow:
-      "inset 0 0 0 2px var(--color-bark-900), inset -4px -4px 0 0 var(--color-phone-shade), inset 4px 4px 0 0 var(--color-phone-lit), 3px 4px 0 0 var(--color-px-scrim)",
-  }),
-  speakerSlot: {
-    marginInline: "auto",
-    marginBottom: "0.5rem",
-    height: "0.25rem",
-    width: "2.5rem",
-    backgroundColor: "var(--color-bark-950)",
-  },
-  screen: (height: number) => ({
-    display: "flex",
-    height,
-    flexDirection: "column",
-    backgroundColor: "var(--color-lcd-paper)",
-    padding: "2px",
-    boxShadow: "inset 0 0 0 2px var(--color-bark-900), inset 3px 3px 0 0 var(--color-lcd-bevel)",
-  }),
-  statusBar: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.25rem",
-    borderBottomStyle: "solid",
-    borderBottomWidth: "2px",
-    borderColor: "var(--color-lcd-dark)",
-    paddingInline: "0.375rem",
-    paddingBlock: "0.125rem",
-  },
-  phoneHome: {
-    cursor: "pointer",
-    textDecorationLine: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "underline",
-      },
-    },
-  },
-  clock: {
-    marginLeft: "auto",
-  },
-  panes: {
-    display: "flex",
-    minHeight: "0",
-    flex: "1",
-  },
-  appsPane: (width: number) => ({
-    display: "flex",
-    width,
-    minHeight: "0",
-    flexShrink: "0",
-    flexDirection: "column",
-    overflow: "hidden",
-  }),
-  seam: {
-    display: "block",
-    width: "2px",
-    flexShrink: "0",
-    backgroundColor: "var(--color-lcd-dark)",
-  },
-  chatPane: (width: number) => ({
-    width,
-    minHeight: "0",
-    flexShrink: "0",
-  }),
-  pad: {
-    marginTop: "0.5rem",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingInline: "0.25rem",
-  },
-  abButtons: {
-    display: "flex",
-    gap: "0.5rem",
-  },
-  phoneChat: {
-    position: "absolute",
-    top: "4rem",
-    left: "100%",
-    display: "flex",
-    width: "2rem",
-    cursor: "pointer",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "0.125rem",
-    backgroundColor: "var(--color-bark-600)",
-    paddingBlock: "0.625rem",
-    fontSize: "13px",
-    lineHeight: "15px",
-    color: "var(--color-cream-50)",
-    boxShadow: "inset 0 0 0 2px var(--color-bark-900), inset -3px -3px 0 0 var(--color-phone-shade), 3px 4px 0 0 var(--color-px-scrim)",
-    translate: {
-      default: null,
-      ":active": "1px 0",
-    },
-  },
-  unreadDot: {
-    display: "block",
-    width: "0.625rem",
-    height: "0.625rem",
-    backgroundColor: "var(--color-berry)",
-    boxShadow: "inset 0 0 0 2px var(--color-px-dent)",
-  },
-  signal: {
-    display: "flex",
-    alignItems: "flex-end",
-    gap: "1px",
-  },
-  signalBar: (height: number) => ({
-    display: "block",
-    width: "2px",
-    height,
-    backgroundColor: "var(--color-lcd-ink)",
-  }),
-  battery: {
-    display: "flex",
-    alignItems: "center",
-  },
-  batteryBody: {
-    position: "relative",
-    display: "block",
-    height: "0.5rem",
-    width: "14px",
-    backgroundColor: "var(--color-lcd-ink)",
-  },
-  batteryGap: {
-    position: "absolute",
-    top: "2px",
-    right: "2px",
-    display: "block",
-    width: "0.25rem",
-    height: "0.25rem",
-    backgroundColor: "var(--color-lcd-light)",
-  },
-  batteryCap: {
-    display: "block",
-    height: "0.25rem",
-    width: "2px",
-    backgroundColor: "var(--color-lcd-ink)",
-  },
-  cross: {
-    position: "relative",
-    display: "block",
-    width: "3rem",
-    height: "3rem",
-  },
-  crossCenter: {
-    position: "absolute",
-    top: "1rem",
-    left: "1rem",
-    width: "1rem",
-    height: "1rem",
-    backgroundColor: "var(--color-bark-900)",
-  },
-  abKey: {
-    display: "grid",
-    width: "1.5rem",
-    height: "1.5rem",
-    placeItems: "center",
-    backgroundColor: "var(--color-berry-500)",
-    lineHeight: "1",
-    color: "var(--color-cream-50)",
-  },
-  abKeyIdle: {
-    boxShadow: "inset 0 0 0 2px var(--color-bark-900), inset -4px -4px 0 0 var(--color-phone-key-shade)",
-  },
-  abKeyDown: {
-    transform: "translateY(1px)",
-    boxShadow: "inset 0 0 0 2px var(--color-bark-900)",
-  },
-});
+const styles = {
+  phone: (width: number): JSX.CSSProperties => ({ width: `${width}px` }),
+  screen: (height: number): JSX.CSSProperties => ({ height: `${height}px` }),
+  appsPane: (width: number): JSX.CSSProperties => ({ width: `${width}px` }),
+  chatPane: (width: number): JSX.CSSProperties => ({ width: `${width}px` }),
+  signalBar: (height: number): JSX.CSSProperties => ({ height: `${height}px` }),
+};
 
 const games: ReadonlySet<PhoneApp> = new Set(["blocks", "dino", "sokoban", "bugs", "merge"]);
 
@@ -380,10 +191,19 @@ function Handset(props: {
   const chatWidth = () => (props.narrow ? props.room.w - 24 : props.large ? Math.max(320, Math.min(560, props.room.w - 380)) : 320);
   const width = () => (!props.unfolded ? appsWidth() : props.narrow ? chatWidth() : appsWidth() + 2 + chatWidth()) + 24;
   return (
-    <section aria-label={t("web.farm.phone.label")} data-testid="phone" data-screen={props.screen} {...styleProps(styles.phone(width()))}>
-      <div {...stylex.attrs(styles.speakerSlot)} />
-      <div {...styleProps(styles.screen(screen()))}>
-        <div {...stylex.attrs(styles.statusBar)}>
+    <section
+      aria-label={t("web.farm.phone.label")}
+      data-testid="phone"
+      data-screen={props.screen}
+      class="pointer-events-auto relative bg-bark-600 px-2.5 pt-2.5 pb-3 font-pixel text-xs leading-[1.5] tabular-nums text-lcd-ink [box-shadow:inset_0_0_0_2px_var(--color-bark-900),_inset_-4px_-4px_0_0_var(--color-phone-shade),_inset_4px_4px_0_0_var(--color-phone-lit),_3px_4px_0_0_var(--color-px-scrim)]"
+      style={styles.phone(width())}
+    >
+      <div class="mx-auto mb-2 h-1 w-10 bg-bark-950" />
+      <div
+        class="flex flex-col bg-lcd-paper p-0.5 [box-shadow:inset_0_0_0_2px_var(--color-bark-900),_inset_3px_3px_0_0_var(--color-lcd-bevel)]"
+        style={styles.screen(screen())}
+      >
+        <div class="flex items-center gap-1 border-b-2 border-lcd-dark px-1.5 py-0.5">
           <Signal />
           {/* The phone has no keys outside a game: its name in the status bar goes back to the home screen. */}
           <button
@@ -392,31 +212,35 @@ function Handset(props: {
             data-testid="phone-home"
             title={t("web.farm.phone.homeHint")}
             onClick={() => props.onHome()}
-            {...stylex.attrs(styles.phoneHome)}
+            class="cursor-pointer hover:underline"
           >
             {t("web.farm.phone.brand")}
           </button>
-          <span {...stylex.attrs(styles.clock)}>
+          <span class="ml-auto">
             {two(now().getHours())}:{two(now().getMinutes())}
           </span>
           <Battery />
         </div>
-        <div {...stylex.attrs(styles.panes)}>
+        <div class="flex min-h-0 flex-1">
           <Show when={!(props.unfolded && props.narrow)}>
-            <div {...styleProps(styles.appsPane(appsWidth()))}>{props.children}</div>
+            <div class="flex min-h-0 shrink-0 flex-col overflow-hidden" style={styles.appsPane(appsWidth())}>
+              {props.children}
+            </div>
           </Show>
           <Show when={props.unfolded}>
             <Show when={!props.narrow}>
-              <i {...stylex.attrs(styles.seam)} aria-hidden="true" />
+              <i class="block w-0.5 shrink-0 bg-lcd-dark" aria-hidden="true" />
             </Show>
-            <div {...styleProps(styles.chatPane(chatWidth()))}>{props.chat}</div>
+            <div class="min-h-0 shrink-0" style={styles.chatPane(chatWidth())}>
+              {props.chat}
+            </div>
           </Show>
         </div>
       </div>
       <Show when={pad()}>
-        <div data-testid="pad" {...stylex.attrs(styles.pad)}>
+        <div data-testid="pad" class="mt-2 flex items-center justify-between px-1">
           <Cross />
-          <span {...stylex.attrs(styles.abButtons)}>
+          <span class="flex gap-2">
             <AbKey button="b" label="B" />
             <AbKey button="a" label="A" />
           </span>
@@ -442,11 +266,11 @@ function UnfoldTab(props: { unread: number }) {
         playSound("open");
         farm.chatOpen(true);
       }}
-      {...stylex.attrs(styles.phoneChat)}
+      class="absolute top-16 left-full flex w-8 cursor-pointer flex-col items-center gap-0.5 bg-bark-600 py-2.5 text-sm leading-[15px] text-cream-50 [box-shadow:inset_0_0_0_2px_var(--color-bark-900),_inset_-3px_-3px_0_0_var(--color-phone-shade),_3px_4px_0_0_var(--color-px-scrim)] active:[translate:1px_0]"
     >
       <For each={[...t("web.farm.phone.chatTab")]}>{(c) => <span>{c}</span>}</For>
       <Show when={props.unread > 0}>
-        <span {...stylex.attrs(styles.unreadDot)} />
+        <span class="block w-2.5 h-2.5 bg-berry [box-shadow:inset_0_0_0_2px_var(--color-px-dent)]" />
       </Show>
     </button>
   );
@@ -454,19 +278,19 @@ function UnfoldTab(props: { unread: number }) {
 
 function Signal() {
   return (
-    <span {...stylex.attrs(styles.signal)} aria-hidden="true">
-      <For each={[3, 5, 7, 9]}>{(h) => <i {...styleProps(styles.signalBar(h))} />}</For>
+    <span class="flex items-end gap-px" aria-hidden="true">
+      <For each={[3, 5, 7, 9]}>{(h) => <i class="block w-0.5 bg-lcd-ink" style={styles.signalBar(h)} />}</For>
     </span>
   );
 }
 
 function Battery() {
   return (
-    <span {...stylex.attrs(styles.battery)} aria-hidden="true">
-      <i {...stylex.attrs(styles.batteryBody)}>
-        <i {...stylex.attrs(styles.batteryGap)} />
+    <span class="flex items-center" aria-hidden="true">
+      <i class="relative block h-2 w-3.5 bg-lcd-ink">
+        <i class="absolute top-0.5 right-0.5 block w-1 h-1 bg-lcd-light" />
       </i>
-      <i {...stylex.attrs(styles.batteryCap)} />
+      <i class="block h-1 w-0.5 bg-lcd-ink" />
     </span>
   );
 }
@@ -491,7 +315,7 @@ function createPress(button: () => PadButton) {
   };
 }
 
-function CrossKey(props: { button: PadButton; label: string; styles: stylex.StyleXStyles }) {
+function CrossKey(props: { button: PadButton; label: string; class: JSX.ClassValue | undefined }) {
   const key = createPress(() => props.button);
   return (
     <button
@@ -501,19 +325,19 @@ function CrossKey(props: { button: PadButton; label: string; styles: stylex.Styl
       onPointerUp={key.onPointerUp}
       onPointerCancel={key.onPointerCancel}
       onPointerLeave={key.onPointerLeave}
-      {...styleProps([styles.crossKey, props.styles, key.down() ? styles.crossKeyDown : styles.crossKeyIdle])}
+      class={["absolute w-4 h-4", props.class, key.down() ? "bg-bark-950" : "bg-bark-900"]}
     />
   );
 }
 
 function Cross() {
   return (
-    <span {...stylex.attrs(styles.cross)}>
-      <CrossKey button="up" label={t("web.farm.phone.key.up")} styles={styles.crossUp} />
-      <CrossKey button="left" label={t("web.farm.phone.key.left")} styles={styles.crossLeft} />
-      <CrossKey button="right" label={t("web.farm.phone.key.right")} styles={styles.crossRight} />
-      <CrossKey button="down" label={t("web.farm.phone.key.down")} styles={styles.crossDown} />
-      <i {...stylex.attrs(styles.crossCenter)} />
+    <span class="relative block w-12 h-12">
+      <CrossKey button="up" label={t("web.farm.phone.key.up")} class="top-0 left-4" />
+      <CrossKey button="left" label={t("web.farm.phone.key.left")} class="top-4 left-0" />
+      <CrossKey button="right" label={t("web.farm.phone.key.right")} class="top-4 right-0" />
+      <CrossKey button="down" label={t("web.farm.phone.key.down")} class="bottom-0 left-4" />
+      <i class="absolute top-4 left-4 w-4 h-4 bg-bark-900" />
     </span>
   );
 }
@@ -528,7 +352,12 @@ function AbKey(props: { button: PadButton; label: string }) {
       onPointerUp={key.onPointerUp}
       onPointerCancel={key.onPointerCancel}
       onPointerLeave={key.onPointerLeave}
-      {...stylex.attrs(styles.abKey, key.down() ? styles.abKeyDown : styles.abKeyIdle)}
+      class={[
+        "grid w-6 h-6 place-items-center bg-berry-500 leading-none text-cream-50",
+        key.down()
+          ? "[transform:translateY(1px)] [box-shadow:inset_0_0_0_2px_var(--color-bark-900)]"
+          : "[box-shadow:inset_0_0_0_2px_var(--color-bark-900),_inset_-4px_-4px_0_0_var(--color-phone-key-shade)]",
+      ]}
     >
       {props.label}
     </button>

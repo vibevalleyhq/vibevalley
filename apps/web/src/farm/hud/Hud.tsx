@@ -1,5 +1,4 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -24,7 +23,6 @@ import { titleBar } from "#/ui/layout.tsx";
 import { CardColors, createPixelAct, PixelCard, PxButton, SpriteIcon } from "#/ui/pixel/index.ts";
 import { RuntimeIcon } from "#/ui/pixel/RuntimeIcon.tsx";
 import { playSound } from "#/ui/pixel/sound.ts";
-import { styleProps } from "#/ui/positioner.ts";
 
 import { Friends } from "./Friends";
 import { FxLayer } from "./FxLayer";
@@ -37,361 +35,12 @@ const gap = 4;
 const top = 52;
 const bottom = 36;
 
-const styles = stylex.create({
-  quotaPopup: {
-    position: "absolute",
-    top: "100%",
-    right: "0",
-    zIndex: "10",
-    marginTop: "0.5rem",
-    width: "352px",
-    backgroundColor: "var(--color-cream-50)",
-    padding: "0.75rem",
-    boxShadow: "var(--shadow-px)",
-  },
-  hudTap: {
-    pointerEvents: "auto",
-    cursor: "pointer",
-  },
-  repoSign: {
-    pointerEvents: "auto",
-    position: "absolute",
-    display: "flex",
-    translate: "-50% -100%",
-    cursor: "pointer",
-    flexDirection: "column",
-    alignItems: "center",
-    fontFamily: "var(--font-pixel)",
-    filter: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "brightness(110%)",
-      },
-    },
-  },
-  repoSignBoard: {
-    display: "flex",
-    maxWidth: "10rem",
-    flexDirection: "column",
-    alignItems: "center",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-bark-500)",
-    paddingInline: "0.625rem",
-    paddingBlock: "0.25rem",
-    color: "var(--color-cream-50)",
-    boxShadow: "2px 2px 0 0 var(--color-px-shade)",
-  },
-  repoSignLabel: {
-    fontSize: "10px",
-    lineHeight: "0.75rem",
-    color: "var(--color-cream-200)",
-  },
-  repoSignName: {
-    maxWidth: "100%",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "13px",
-    lineHeight: "1rem",
-  },
-  repoSignPost: (height: number) => ({
-    width: "0.375rem",
-    backgroundColor: "var(--color-bark-900)",
-    height,
-  }),
-  hud: {
-    pointerEvents: "none",
-    position: "absolute",
-    inset: "0",
-  },
-  hudFrame: {
-    position: "absolute",
-    inset: "0",
-  },
-  topLeft: (offsetTop: number) => ({
-    position: "absolute",
-    left: edge,
-    top: offsetTop,
-    display: "flex",
-    alignItems: "flex-start",
-    gap,
-  }),
-  cardShadowWrap: {
-    display: "inline-block",
-    paddingRight: "0.125rem",
-    paddingBottom: "0.125rem",
-  },
-  faceBox: {
-    boxSizing: "border-box",
-    display: "flex",
-    width: top + 2,
-    height: top,
-    alignItems: "center",
-    justifyContent: "center",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-850)",
-    backgroundColor: "var(--color-glow-soft)",
-    boxShadow: "2px 2px 0 0 var(--color-px-shade)",
-  },
-  statusWrap: {
-    display: "inline-block",
-    paddingRight: "0.125rem",
-    paddingBottom: "0.125rem",
-    textAlign: "left",
-  },
-  statusBox: {
-    boxSizing: "border-box",
-    display: "flex",
-    height: top,
-    flexDirection: "column",
-    justifyContent: "center",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-850)",
-    backgroundColor: "var(--color-glow-soft)",
-    paddingInline: "0.375rem",
-    paddingBlock: "0.125rem",
-    boxShadow: "2px 2px 0 0 var(--color-px-shade)",
-  },
-  statusRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: "3px",
-    fontSize: "12px",
-    lineHeight: "14px",
-  },
-  levelGood: {
-    color: "var(--color-card-good)",
-  },
-  xpTrack: {
-    marginBlock: "0.125rem",
-    display: "block",
-    height: "0.375rem",
-    width: "150px",
-    backgroundColor: "var(--color-cream-200)",
-  },
-  barFill: {
-    display: "block",
-    height: "100%",
-  },
-  xpFill: {
-    backgroundColor: "var(--color-agent-stage-edge)",
-  },
-  statusNote: {
-    fontSize: "12px",
-    lineHeight: "14px",
-    color: "var(--color-card-muted)",
-  },
-  topRight: (offsetTop: number) => ({
-    position: "absolute",
-    right: edge,
-    top: offsetTop,
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "flex-start",
-    gap,
-  }),
-  topRightCompact: {
-    left: edge,
-  },
-  unreadCount: {
-    backgroundColor: "var(--color-berry)",
-    paddingInline: "0.25rem",
-    fontSize: "10px",
-    color: "var(--color-cream-50)",
-  },
-  bottomLeft: (offsetBottom: number) => ({
-    position: "absolute",
-    left: edge,
-    bottom: offsetBottom,
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-start",
-    gap,
-  }),
-  toolBar: {
-    position: "absolute",
-    insetInline: "0",
-    bottom: edge,
-    display: "flex",
-    justifyContent: "center",
-    gap,
-  },
-  toolSlot: {
-    boxSizing: "border-box",
-    display: "flex",
-    height: bottom,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "3px",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-850)",
-    boxShadow: "2px 2px 0 0 var(--color-px-shade)",
-  },
-  toolSlotWide: {
-    width: "52px",
-  },
-  toolSlotCompact: {
-    width: "44px",
-  },
-  toolSlotHeld: {
-    backgroundColor: "var(--color-leaf-300)",
-  },
-  toolSlotIdle: {
-    backgroundColor: "var(--color-cream-100)",
-  },
-  toolKey: {
-    fontSize: "12px",
-    color: "var(--color-card-muted)",
-  },
-  smallText: {
-    fontSize: "12px",
-  },
-  inkBark900: {
-    color: "var(--color-bark-900)",
-  },
-  inkBark800: {
-    color: "var(--color-bark-800)",
-  },
-  inkBark500: {
-    color: "var(--color-bark-500)",
-  },
-  inkBark400: {
-    color: "var(--color-bark-400)",
-  },
-  inkBerry: {
-    color: "var(--color-berry-500)",
-  },
-  inkPlenty: {
-    color: "var(--color-leaf-700)",
-  },
-  inkLow: {
-    color: "var(--color-px-quota-low)",
-  },
-  fillPlenty: {
-    backgroundColor: "var(--color-leaf-700)",
-  },
-  fillLow: {
-    backgroundColor: "var(--color-px-quota-low)",
-  },
-  fillEmpty: {
-    backgroundColor: "var(--color-berry-500)",
-  },
-  fillUnknown: {
-    backgroundColor: "var(--color-bark-500)",
-  },
-  usageMuted: {
-    fontSize: "12px",
-    color: "var(--color-bark-400)",
-  },
-  usageWarn: {
-    fontSize: "12px",
-    color: "var(--color-wheat-700)",
-  },
-  usageWindows: {
-    marginTop: "0.25rem",
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.25rem",
-  },
-  usageHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: "0.5rem",
-  },
-  usageLabel: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-  },
-  usageTrack: {
-    display: "block",
-    height: "0.375rem",
-    width: "100%",
-    backgroundColor: "var(--color-cream-200)",
-  },
-  usageReset: {
-    fontSize: "10px",
-    color: "var(--color-bark-400)",
-  },
-  quotaMachine: {
-    display: "flex",
-    gap: "0.625rem",
-    borderStyle: "solid",
-    borderWidth: "1.5px",
-    borderColor: "var(--color-cream-200)",
-    backgroundColor: "var(--color-cream-100)",
-    padding: "0.5rem",
-  },
-  machineBody: {
-    minWidth: "0",
-    flex: "1",
-  },
-  machineHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.375rem",
-  },
-  machineTitle: {
-    fontSize: "13px",
-  },
-  machineSub: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "12px",
-    color: "var(--color-bark-500)",
-  },
-  machineNote: {
-    marginTop: "0.125rem",
-    fontSize: "12px",
-    color: "var(--color-bark-500)",
-  },
-  machineStop: {
-    marginTop: "0.125rem",
-    fontSize: "12px",
-    color: "var(--color-berry)",
-  },
-  machineBottle: {
-    display: "flex",
-    width: "3rem",
-    flexDirection: "column",
-    alignItems: "center",
-  },
-  quotaPill: {
-    pointerEvents: "auto",
-    position: "relative",
-  },
-  quotaPillButton: {
-    cursor: "pointer",
-  },
-  quotaDialogHeader: {
-    display: "flex",
-    alignItems: "center",
-  },
-  quotaDialogTitle: {
-    flex: "1",
-    fontSize: "13px",
-  },
-  quotaMachineList: {
-    marginTop: "0.5rem",
-    display: "flex",
-    maxHeight: "min(512px,70vh)",
-    flexDirection: "column",
-    gap: "0.75rem",
-    overflowY: "auto",
-  },
-  quotaDialogNote: {
-    marginTop: "0.5rem",
-    fontSize: "12px",
-    color: "var(--color-bark-400)",
-  },
-});
+const styles = {
+  repoSignPost: (height: number): JSX.CSSProperties => ({ height: `${height}px` }),
+  topLeft: (offsetTop: number): JSX.CSSProperties => ({ top: `${offsetTop}px` }),
+  topRight: (offsetTop: number): JSX.CSSProperties => ({ top: `${offsetTop}px` }),
+  bottomLeft: (offsetBottom: number): JSX.CSSProperties => ({ bottom: `${offsetBottom}px` }),
+};
 
 /** A HUD part: a button with its words as a tooltip and an accessible name. */
 function HudTap(props: { label: string; testid?: string; onClick: () => void; selected?: boolean; children: JSX.Element }) {
@@ -403,7 +52,7 @@ function HudTap(props: { label: string; testid?: string; onClick: () => void; se
       aria-label={props.label}
       aria-pressed={props.selected === undefined ? undefined : aria(props.selected)}
       onClick={() => props.onClick()}
-      {...stylex.attrs(styles.hudTap)}
+      class="pointer-events-auto cursor-pointer"
     >
       {props.children}
     </button>
@@ -431,14 +80,14 @@ function RepoSign() {
             playSound("open");
             router.navigate("/repos");
           }}
-          {...stylex.attrs(styles.repoSign)}
+          class="pointer-events-auto absolute flex [translate:-50%_-100%] cursor-pointer flex-col items-center font-pixel hover:[filter:brightness(110%)]"
           style={{ left: `${at().x}px`, top: `${at().y}px` }}
         >
-          <span {...stylex.attrs(styles.repoSignBoard)}>
-            <span {...stylex.attrs(styles.repoSignLabel)}>{t("web.farm.sign.repo")}</span>
-            <span {...stylex.attrs(styles.repoSignName)}>{repo() || t("web.farm.sign.noRepo")}</span>
+          <span class="flex max-w-40 flex-col items-center border-2 border-bark-900 bg-bark-500 px-2.5 py-1 text-cream-50 pixel-shade">
+            <span class="text-[length:10px] leading-3 text-cream-200">{t("web.farm.sign.repo")}</span>
+            <span class="max-w-full truncate text-sm leading-xs">{repo() || t("web.farm.sign.noRepo")}</span>
           </span>
-          <span {...styleProps(styles.repoSignPost(Math.round((screen()?.scale ?? 3) * 5)))} />
+          <span class="w-1.5 bg-bark-900" style={styles.repoSignPost(Math.round((screen()?.scale ?? 3) * 5))} />
         </button>
       )}
     </Show>
@@ -448,13 +97,13 @@ function RepoSign() {
 export function Hud() {
   const shown = useFarm((s) => s.screen?.shown);
   return (
-    <div {...stylex.attrs(styles.hud)} aria-label={t("web.farm.hud.label")}>
+    <div class="pointer-events-none absolute inset-0" aria-label={t("web.farm.hud.label")}>
       <Overlay />
       <RepoSign />
       <Show when={shown()}>
         {(box) => (
           <div
-            {...stylex.attrs(styles.hudFrame)}
+            class="absolute inset-0"
             style={box().w < 680 ? undefined : { left: `${box().x}px`, top: `${box().y}px`, width: `${box().w}px`, height: `${box().h}px` }}
           >
             <TopLeft />
@@ -487,28 +136,28 @@ function TopLeft() {
     farm.panel(panel);
   };
   return (
-    <div {...styleProps(styles.topLeft(edge + titleBar.top))}>
+    <div class="absolute left-2 flex items-start gap-1" style={styles.topLeft(edge + titleBar.top)}>
       <HudTap label={t("web.farm.hud.look")} testid="hud-orchestrator" onClick={() => open("orchestrator")}>
-        <span {...stylex.attrs(styles.cardShadowWrap)}>
-          <span {...stylex.attrs(styles.faceBox)}>
+        <span class="inline-block pr-0.5 pb-0.5">
+          <span class="box-border flex w-13.5 h-13 items-center justify-center border-2 border-bark-850 bg-glow-soft pixel-shade">
             <SpriteIcon name={face()} size={top - 8} />
           </span>
         </span>
       </HudTap>
       <HudTap label={t("web.farm.panel.graphs")} testid="hud-graphs" onClick={() => open("graphs")}>
-        <span {...stylex.attrs(styles.statusWrap)}>
-          <span {...stylex.attrs(styles.statusBox)}>
-            <span {...stylex.attrs(styles.statusRow)}>
-              <span {...stylex.attrs(styles.levelGood)}>Lv.{level()}</span>
+        <span class="inline-block pr-0.5 pb-0.5 text-left">
+          <span class="box-border flex h-13 flex-col justify-center border-2 border-bark-850 bg-glow-soft px-1.5 py-0.5 pixel-shade">
+            <span class="flex items-center gap-0.75 text-xs leading-2xs">
+              <span class="text-card-good">Lv.{level()}</span>
               <SpriteIcon name="icon-coin" size={12} />
               <span>{thousands(coins())}</span>
               <SpriteIcon name="icon-clock" size={12} />
               <span data-testid="farm-clock">{clockText(tod())}</span>
             </span>
-            <span {...stylex.attrs(styles.xpTrack)}>
-              <span {...stylex.attrs(styles.barFill, styles.xpFill)} style={{ width: `${need() === 0 ? 0 : Math.min(100, (lv().xp / need()) * 100)}%` }} />
+            <span class="my-0.5 block h-1.5 w-37.5 bg-cream-200">
+              <span class={["block h-full", "bg-agent-stage-edge"]} style={{ width: `${need() === 0 ? 0 : Math.min(100, (lv().xp / need()) * 100)}%` }} />
             </span>
-            <span {...stylex.attrs(styles.statusNote)}>
+            <span class="text-xs leading-2xs text-card-muted">
               {(() => {
                 const target = next();
                 return target !== undefined
@@ -530,7 +179,7 @@ function TopLeft() {
           playSound("open");
           router.navigate("/issues");
         }}
-        {...stylex.attrs(styles.hudTap)}
+        class="pointer-events-auto cursor-pointer"
       >
         <HudCard height={top}>
           <SpriteIcon name="icon-tasks" size={20} />
@@ -550,7 +199,10 @@ function TopRight(props: { compact: boolean }) {
     router.navigate(path);
   };
   return (
-    <div {...styleProps([styles.topRight(edge + (props.compact ? top + gap + titleBar.top : 0)), props.compact && styles.topRightCompact])}>
+    <div
+      class={["absolute right-2 flex flex-wrap items-start gap-1", props.compact && "left-2"]}
+      style={styles.topRight(edge + (props.compact ? top + gap + titleBar.top : 0))}
+    >
       <HudTap label={t("web.farm.hud.treeHint")} testid="hud-tree" onClick={() => go("/tree")}>
         <HudCard height={top}>
           <SpriteIcon name="icon-tree" size={20} />
@@ -574,7 +226,7 @@ function TopRight(props: { compact: boolean }) {
           <SpriteIcon name="icon-board" size={20} />
           {t("web.farm.chat.channels")}
           <Show when={unread() > 0}>
-            <span {...stylex.attrs(styles.unreadCount)}>{unread()}</span>
+            <span class="bg-berry px-1 text-[length:10px] text-cream-50">{unread()}</span>
           </Show>
         </HudCard>
       </HudTap>
@@ -607,7 +259,7 @@ function BottomLeft(props: { compact: boolean }) {
   // The phone fits between the top row and the two buttons under it, inside the farm's box.
   const room = () => ({ w: (box()?.w ?? 0) - 2 * edge, h: (box()?.h ?? 0) - 2 * edge - top - 2 * bottom - 4 * gap });
   return (
-    <div {...styleProps(styles.bottomLeft(edge + (props.compact ? bottom + gap : 0)))}>
+    <div class="absolute left-2 flex flex-col items-start gap-1" style={styles.bottomLeft(edge + (props.compact ? bottom + gap : 0))}>
       <Show when={phoneOpen()}>
         <Phone room={room()} />
       </Show>
@@ -620,7 +272,7 @@ function BottomLeft(props: { compact: boolean }) {
 function ToolBar(props: { compact: boolean }) {
   const held = useFarm((s) => s.tool);
   return (
-    <div {...stylex.attrs(styles.toolBar)} role="toolbar" aria-label={t("web.farm.hud.tools")}>
+    <div class="absolute inset-x-0 bottom-2 flex justify-center gap-1" role="toolbar" aria-label={t("web.farm.hud.tools")}>
       <For each={tools}>
         {(tool, i) => (
           <HudTap
@@ -629,15 +281,15 @@ function ToolBar(props: { compact: boolean }) {
             selected={held() === tool.id}
             onClick={() => farm.hold(tool.id)}
           >
-            <span {...stylex.attrs(styles.cardShadowWrap)}>
+            <span class="inline-block pr-0.5 pb-0.5">
               <span
-                {...stylex.attrs(
-                  styles.toolSlot,
-                  props.compact ? styles.toolSlotCompact : styles.toolSlotWide,
-                  held() === tool.id ? styles.toolSlotHeld : styles.toolSlotIdle,
-                )}
+                class={[
+                  "box-border flex h-9 items-center justify-center gap-0.75 border-2 border-bark-850 pixel-shade",
+                  props.compact ? "w-11" : "w-13",
+                  held() === tool.id ? "bg-leaf-300" : "bg-cream-100",
+                ]}
               >
-                <span {...stylex.attrs(styles.toolKey)}>{i() + 1}</span>
+                <span class="text-(length:--text-xs) text-card-muted">{i() + 1}</span>
                 <SpriteIcon name={tool.icon} size={24} />
               </span>
             </span>
@@ -649,53 +301,53 @@ function ToolBar(props: { compact: boolean }) {
 }
 
 const levelInk = {
-  plenty: styles.inkPlenty,
-  low: styles.inkLow,
-  gold: styles.inkLow,
-  empty: styles.inkBerry,
-  unknown: styles.inkBark500,
+  plenty: "text-leaf-700",
+  low: "text-px-quota-low",
+  gold: "text-px-quota-low",
+  empty: "text-berry-500",
+  unknown: "text-bark-500",
 } as const;
 
 const levelFill = {
-  plenty: styles.fillPlenty,
-  low: styles.fillLow,
-  gold: styles.fillLow,
-  empty: styles.fillEmpty,
-  unknown: styles.fillUnknown,
+  plenty: "bg-leaf-700",
+  low: "bg-px-quota-low",
+  gold: "bg-px-quota-low",
+  empty: "bg-berry-500",
+  unknown: "bg-bark-500",
 } as const;
 
 function UsageLines(props: { usage: AccountUsage | null }) {
   return (
-    <Switch fallback={<p {...stylex.attrs(styles.usageMuted)}>{t("web.farm.quota.unreported")}</p>}>
+    <Switch fallback={<p class="text-(length:--text-xs) text-bark-400">{t("web.farm.quota.unreported")}</p>}>
       <Match when={props.usage?.status === "login_required"}>
-        <p {...stylex.attrs(styles.usageWarn)}>{t("web.farm.quota.signedOut")}</p>
+        <p class="text-(length:--text-xs) text-wheat-700">{t("web.farm.quota.signedOut")}</p>
       </Match>
       <Match when={props.usage?.status === "unavailable" ? props.usage : undefined}>
-        {(u) => <p {...stylex.attrs(styles.usageMuted)}>{t("web.farm.quota.unreadable", { why: u().reason })}</p>}
+        {(u) => <p class="text-(length:--text-xs) text-bark-400">{t("web.farm.quota.unreadable", { why: u().reason })}</p>}
       </Match>
       <Match when={props.usage?.status === "balance" ? props.usage : undefined}>
         {(u) => (
-          <p {...stylex.attrs(styles.smallText, u().available ? styles.inkBark900 : styles.inkBerry)}>
+          <p class={["text-(length:--text-xs)", u().available ? "text-bark-900" : "text-berry-500"]}>
             {t("web.farm.quota.balance", { provider: u().provider, enough: u().available })}
           </p>
         )}
       </Match>
       <Match when={props.usage?.status === "ok" ? props.usage : undefined}>
         {(u) => (
-          <div {...stylex.attrs(styles.usageWindows)}>
+          <div class="mt-1 flex flex-col gap-1">
             <For each={u().windows}>
               {(w) => {
                 const left = () => 100 - w.usedPercent;
                 return (
-                  <div {...stylex.attrs(styles.smallText)}>
-                    <div {...stylex.attrs(styles.usageHeader)}>
-                      <span {...stylex.attrs(styles.usageLabel)}>{windowLabel(w.label)}</span>
-                      <span {...stylex.attrs(levelInk[quotaLevel(left())])}>{Math.round(left())}%</span>
+                  <div class="text-(length:--text-xs)">
+                    <div class="flex justify-between gap-2">
+                      <span class="truncate">{windowLabel(w.label)}</span>
+                      <span class={levelInk[quotaLevel(left())]}>{Math.round(left())}%</span>
                     </div>
-                    <span {...stylex.attrs(styles.usageTrack)}>
-                      <span {...stylex.attrs(styles.barFill, levelFill[quotaLevel(left())])} style={{ width: `${Math.max(0, Math.min(100, left()))}%` }} />
+                    <span class="block h-1.5 w-full bg-cream-200">
+                      <span class={["block h-full", levelFill[quotaLevel(left())]]} style={{ width: `${Math.max(0, Math.min(100, left()))}%` }} />
                     </span>
-                    <Show when={w.resetsAt}>{(at) => <span {...stylex.attrs(styles.usageReset)}>{resetText(at())}</span>}</Show>
+                    <Show when={w.resetsAt}>{(at) => <span class="text-[length:10px] text-bark-400">{resetText(at())}</span>}</Show>
                   </div>
                 );
               }}
@@ -708,28 +360,25 @@ function UsageLines(props: { usage: AccountUsage | null }) {
 }
 
 function Machine(props: { info: RuntimeInfo }) {
-  // A function declaration: StyleX evaluates an arrow used in `stylex.attrs` at build time and fails on its body.
-  function quota() {
-    return quotaOf(props.info);
-  }
+  const quota = () => quotaOf(props.info);
   const usage = () => props.info.usage;
   const subscription = () => {
     const u = usage();
     return u?.status === "ok" ? u.subscription : undefined;
   };
   return (
-    <div {...stylex.attrs(styles.quotaMachine)} data-testid="quota-machine">
+    <div class="flex gap-2.5 border-[1.5px] border-cream-200 bg-cream-100 p-2" data-testid="quota-machine">
       <RuntimeIcon runtime={props.info.id} size={34} />
-      <div {...stylex.attrs(styles.machineBody)}>
-        <div {...stylex.attrs(styles.machineHeader)}>
-          <span {...stylex.attrs(styles.machineTitle)}>{props.info.preset.label}</span>
-          <Show when={subscription()}>{(sub) => <span {...stylex.attrs(styles.machineSub)}>{sub()}</span>}</Show>
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-1.5">
+          <span class="text-(length:--text-sm)">{props.info.preset.label}</span>
+          <Show when={subscription()}>{(sub) => <span class="truncate text-(length:--text-xs) text-bark-500">{sub()}</span>}</Show>
         </div>
         <UsageLines usage={usage()} />
         {/* Spent today may be 0, which is still said. */}
         <Show when={props.info.spentToday !== undefined ? { spent: props.info.spentToday } : undefined}>
           {(today) => (
-            <p {...stylex.attrs(styles.machineNote)}>
+            <p class="mt-0.5 text-(length:--text-xs) text-bark-500">
               {(props.info.settings.dailyBudget ?? 0) > 0
                 ? t("web.farm.quota.spentTodayBudget", { spent: yuan(today().spent), budget: yuan(props.info.settings.dailyBudget ?? 0) })
                 : t("web.farm.quota.spentToday", { spent: yuan(today().spent) })}
@@ -737,13 +386,13 @@ function Machine(props: { info: RuntimeInfo }) {
           )}
         </Show>
         <Show when={props.info.stop}>
-          <p {...stylex.attrs(styles.machineStop)}>{props.info.stop}</p>
+          <p class="mt-0.5 text-(length:--text-xs) text-berry">{props.info.stop}</p>
         </Show>
       </div>
-      <div {...stylex.attrs(styles.machineBottle)}>
+      <div class="flex w-12 flex-col items-center">
         <SpriteIcon name={bottleSprite(quota())} size={40} label={quota().text} />
         <span
-          {...stylex.attrs(styles.smallText, quota().level === "unknown" ? styles.inkBark400 : quota().level === "empty" ? styles.inkBerry : styles.inkBark800)}
+          class={["text-(length:--text-xs)", quota().level === "unknown" ? "text-bark-400" : quota().level === "empty" ? "text-berry-500" : "text-bark-800"]}
         >
           {quota().short || "—"}
         </span>
@@ -769,25 +418,25 @@ function QuotaPill(props: { height: number }) {
   };
   return (
     <Show when={runtimes().length > 0}>
-      <div ref={box} {...stylex.attrs(styles.quotaPill)}>
+      <div ref={box} class="pointer-events-auto relative">
         <button
           type="button"
           aria-label={shown() === undefined ? t("web.farm.quota.all") : t("web.farm.quota.lowest", { pct: String(shown()) })}
           aria-expanded={aria(open())}
           onClick={() => setOpen(!open())}
-          {...stylex.attrs(styles.quotaPillButton)}
+          class="cursor-pointer"
         >
           <HudCard height={props.height} bright={open()}>
             <SpriteIcon name={bottleSprite({ level: quotaLevel(lowest()), fill: (lowest() ?? 0) / 100, short: "", text: "" })} size={28} />
-            <span {...stylex.attrs(lowest() === undefined ? styles.inkBark900 : levelInk[quotaLevel(lowest())])}>
+            <span class={lowest() === undefined ? "text-bark-900" : levelInk[quotaLevel(lowest())]}>
               {shown() === undefined ? t("web.farm.quota.quota") : `${shown()}%`}
             </span>
           </HudCard>
         </button>
         <Show when={open()}>
-          <div {...stylex.attrs(styles.quotaPopup)} role="dialog" aria-label={t("web.farm.quota.left")}>
-            <div {...stylex.attrs(styles.quotaDialogHeader)}>
-              <span {...stylex.attrs(styles.quotaDialogTitle)}>{t("web.farm.quota.left")}</span>
+          <div class="absolute top-full right-0 z-10 mt-2 w-88 bg-cream-50 p-3 shadow-px" role="dialog" aria-label={t("web.farm.quota.left")}>
+            <div class="flex items-center">
+              <span class="flex-1 text-(length:--text-sm)">{t("web.farm.quota.left")}</span>
               <PxButton
                 size="icon"
                 label={t("web.farm.quota.refresh")}
@@ -800,12 +449,12 @@ function QuotaPill(props: { height: number }) {
                 <SpriteIcon name="button-refresh" size={14} />
               </PxButton>
             </div>
-            <div {...stylex.attrs(styles.quotaMachineList)}>
+            <div class="mt-2 flex max-h-[min(512px,70vh)] flex-col gap-3 overflow-y-auto">
               <For each={runtimes()} keyed={(r) => r.id}>
                 {(r) => <Machine info={r()} />}
               </For>
             </div>
-            <p {...stylex.attrs(styles.quotaDialogNote)}>{t("web.farm.quota.note")}</p>
+            <p class="mt-2 text-(length:--text-xs) text-bark-400">{t("web.farm.quota.note")}</p>
           </div>
         </Show>
       </div>

@@ -1,248 +1,248 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import type { Codec } from "../codec";
 import { ArtifactId, BlockId, IssueId, SuggestionId } from "../common/schema";
 import * as T from "./shapes";
 
-const ArtifactBody: Codec<T.ArtifactBody> = Schema.Literals(T.ArtifactBodyValues);
+const ArtifactBody = z.enum(T.ArtifactBodyValues) satisfies Codec<T.ArtifactBody>;
 
-const ArtifactKind: Codec<T.ArtifactKind> = Schema.Literals(T.ArtifactKindValues);
+const ArtifactKind = z.enum(T.ArtifactKindValues) satisfies Codec<T.ArtifactKind>;
 
-const ArtifactDisplay: Codec<T.ArtifactDisplay> = Schema.Literals(T.ArtifactDisplayValues);
+const ArtifactDisplay = z.enum(T.ArtifactDisplayValues) satisfies Codec<T.ArtifactDisplay>;
 
-export const ArtifactCard: Codec<T.ArtifactCard> = Schema.Struct({
+export const ArtifactCard = z.object({
   id: ArtifactId,
-  title: Schema.String,
+  title: z.string(),
   body: ArtifactBody,
-  version: Schema.Finite,
-  note: Schema.String,
-  display: Schema.optionalKey(ArtifactDisplay),
-});
+  version: z.number(),
+  note: z.string(),
+  display: z.exactOptional(ArtifactDisplay),
+}) satisfies Codec<T.ArtifactCard>;
 
-const ArtifactVersion: Codec<T.ArtifactVersion> = Schema.Struct({
-  version: Schema.Finite,
-  size: Schema.Finite,
-  note: Schema.String,
-  by: Schema.String,
-  byName: Schema.String,
-  at: Schema.Finite,
-  channel: Schema.String,
-  number: Schema.optionalKey(Schema.Finite),
-});
+const ArtifactVersion = z.object({
+  version: z.number(),
+  size: z.number(),
+  note: z.string(),
+  by: z.string(),
+  byName: z.string(),
+  at: z.number(),
+  channel: z.string(),
+  number: z.exactOptional(z.number()),
+}) satisfies Codec<T.ArtifactVersion>;
 
-export const Artifact: Codec<T.Artifact> = Schema.Struct({
+export const Artifact = z.object({
   id: ArtifactId,
-  title: Schema.String,
+  title: z.string(),
   body: ArtifactBody,
-  display: Schema.optionalKey(ArtifactDisplay),
-  channel: Schema.optionalKey(Schema.String),
-  said: Schema.optionalKey(Schema.Struct({ channel: Schema.String, number: Schema.Finite })),
-  issue: Schema.optionalKey(IssueId),
-  by: Schema.String,
-  byName: Schema.String,
-  version: Schema.Finite,
-  seq: Schema.Finite,
-  versions: Schema.mutable(Schema.Array(ArtifactVersion)),
-  at: Schema.Finite,
-  updated: Schema.Finite,
-});
+  display: z.exactOptional(ArtifactDisplay),
+  channel: z.exactOptional(z.string()),
+  said: z.exactOptional(z.object({ channel: z.string(), number: z.number() })),
+  issue: z.exactOptional(IssueId),
+  by: z.string(),
+  byName: z.string(),
+  version: z.number(),
+  seq: z.number(),
+  versions: z.array(ArtifactVersion),
+  at: z.number(),
+  updated: z.number(),
+}) satisfies Codec<T.Artifact>;
 
-export const ArtifactRequest: Codec<T.ArtifactRequest> = Schema.Struct({
-  title: Schema.String,
+export const ArtifactRequest = z.object({
+  title: z.string(),
   kind: ArtifactKind,
-  display: Schema.optionalKey(ArtifactDisplay),
-  content: Schema.optionalKey(Schema.String),
-  note: Schema.optionalKey(Schema.String),
-  channel: Schema.optionalKey(Schema.String),
-  issue: Schema.optionalKey(Schema.String),
-});
+  display: z.exactOptional(ArtifactDisplay),
+  content: z.exactOptional(z.string()),
+  note: z.exactOptional(z.string()),
+  channel: z.exactOptional(z.string()),
+  issue: z.exactOptional(z.string()),
+}) satisfies Codec<T.ArtifactRequest>;
 
-export const ArtifactVersionRequest: Codec<T.ArtifactVersionRequest> = Schema.Struct({
+export const ArtifactVersionRequest = z.object({
   id: ArtifactId,
-  content: Schema.String,
-  note: Schema.optionalKey(Schema.String),
-});
+  content: z.string(),
+  note: z.exactOptional(z.string()),
+}) satisfies Codec<T.ArtifactVersionRequest>;
 
-const HtmlAnchor: Codec<T.HtmlAnchor> = Schema.Struct({
-  kind: Schema.Literal("text"),
-  exact: Schema.String,
-  prefix: Schema.String,
-  suffix: Schema.String,
-});
+const HtmlAnchor = z.object({
+  kind: z.literal("text"),
+  exact: z.string(),
+  prefix: z.string(),
+  suffix: z.string(),
+}) satisfies Codec<T.HtmlAnchor>;
 
-export const ArtifactHtmlEdit: Codec<T.ArtifactHtmlEdit> = Schema.Struct({
+export const ArtifactHtmlEdit = z.object({
   id: ArtifactId,
-  version: Schema.Finite,
+  version: z.number(),
   anchor: HtmlAnchor,
-  text: Schema.String,
-});
+  text: z.string(),
+}) satisfies Codec<T.ArtifactHtmlEdit>;
 
-export const ArtifactUpdateRequest: Codec<T.ArtifactUpdateRequest> = Schema.Struct({
+export const ArtifactUpdateRequest = z.object({
   id: ArtifactId,
-  title: Schema.optionalKey(Schema.String),
-  display: Schema.optionalKey(ArtifactDisplay),
-});
+  title: z.exactOptional(z.string()),
+  display: z.exactOptional(ArtifactDisplay),
+}) satisfies Codec<T.ArtifactUpdateRequest>;
 
-const shellCount = Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 10_000 }));
-const shellTime = Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 86_400 }));
-const shellWords = Schema.mutable(Schema.Array(Schema.String.check(Schema.isMaxLength(10_000))).check(Schema.isMaxLength(10_000)));
+const shellCount = z.number().int().min(0).max(10_000);
+const shellTime = z.number().min(0).max(86_400);
+const shellWords = z.array(z.string().max(10_000)).max(10_000);
 
-export const HtmlShellMessage: Codec<T.HtmlShellMessage> = Schema.Union([
-  Schema.Struct({ vibevalley: Schema.Literal("selection"), anchor: HtmlAnchor }),
-  Schema.Struct({
-    vibevalley: Schema.Literal("ready"),
+export const HtmlShellMessage = z.discriminatedUnion("vibevalley", [
+  z.object({ vibevalley: z.literal("selection"), anchor: HtmlAnchor }),
+  z.object({
+    vibevalley: z.literal("ready"),
     display: ArtifactDisplay,
-    pages: Schema.optionalKey(shellCount),
-    titles: Schema.optionalKey(shellWords),
-    notes: Schema.optionalKey(shellWords),
-    duration: Schema.optionalKey(shellTime),
+    pages: z.exactOptional(shellCount),
+    titles: z.exactOptional(shellWords),
+    notes: z.exactOptional(shellWords),
+    duration: z.exactOptional(shellTime),
   }),
-  Schema.Struct({ vibevalley: Schema.Literal("at"), page: Schema.optionalKey(shellCount), time: Schema.optionalKey(shellTime) }),
-]);
+  z.object({ vibevalley: z.literal("at"), page: z.exactOptional(shellCount), time: z.exactOptional(shellTime) }),
+]) satisfies Codec<T.HtmlShellMessage>;
 
-export const ArtifactListRequest: Codec<T.ArtifactListRequest> = Schema.Struct({
-  channel: Schema.optionalKey(Schema.String),
-  issue: Schema.optionalKey(Schema.String),
-});
+export const ArtifactListRequest = z.object({
+  channel: z.exactOptional(z.string()),
+  issue: z.exactOptional(z.string()),
+}) satisfies Codec<T.ArtifactListRequest>;
 
-export const ArtifactReadRequest: Codec<T.ArtifactReadRequest> = Schema.Struct({
+export const ArtifactReadRequest = z.object({
   id: ArtifactId,
-  version: Schema.optionalKey(Schema.Finite),
-});
+  version: z.exactOptional(z.number()),
+}) satisfies Codec<T.ArtifactReadRequest>;
 
-export const ArtifactContent: Codec<T.ArtifactContent> = Schema.Struct({ version: Schema.Finite, content: Schema.String });
+export const ArtifactContent = z.object({ version: z.number(), content: z.string() }) satisfies Codec<T.ArtifactContent>;
 
-export const BlockRef: Codec<T.BlockRef> = Schema.Struct({
+export const BlockRef = z.object({
   artifactId: ArtifactId,
   blockId: BlockId,
-  rev: Schema.Finite,
-});
+  rev: z.number(),
+}) satisfies Codec<T.BlockRef>;
 
-export const QuotedBlock: Codec<T.QuotedBlock> = Schema.Struct({
+export const QuotedBlock = z.object({
   artifactId: ArtifactId,
   blockId: BlockId,
-  rev: Schema.Finite,
-  title: Schema.String,
-  type: Schema.optionalKey(Schema.String),
-  text: Schema.optionalKey(Schema.String),
-  nowRev: Schema.optionalKey(Schema.Finite),
-  deleted: Schema.optionalKey(Schema.Boolean),
-});
+  rev: z.number(),
+  title: z.string(),
+  type: z.exactOptional(z.string()),
+  text: z.exactOptional(z.string()),
+  nowRev: z.exactOptional(z.number()),
+  deleted: z.exactOptional(z.boolean()),
+}) satisfies Codec<T.QuotedBlock>;
 
-const SpanMarks: Codec<T.SpanMarks> = Schema.Struct({
-  bold: Schema.optionalKey(Schema.Boolean),
-  italic: Schema.optionalKey(Schema.Boolean),
-  code: Schema.optionalKey(Schema.Boolean),
-  strike: Schema.optionalKey(Schema.Boolean),
-  link: Schema.optionalKey(Schema.String),
-});
+const SpanMarks = z.object({
+  bold: z.exactOptional(z.boolean()),
+  italic: z.exactOptional(z.boolean()),
+  code: z.exactOptional(z.boolean()),
+  strike: z.exactOptional(z.boolean()),
+  link: z.exactOptional(z.string()),
+}) satisfies Codec<T.SpanMarks>;
 
-export const TextSpan: Codec<T.TextSpan> = Schema.Struct({
-  t: Schema.String,
+export const TextSpan = z.object({
+  t: z.string(),
   marks: SpanMarks,
-});
+}) satisfies Codec<T.TextSpan>;
 
-export const BlockAttrs: Codec<T.BlockAttrs> = Schema.Struct({
-  level: Schema.optionalKey(Schema.Finite),
-  checked: Schema.optionalKey(Schema.Boolean),
-  language: Schema.optionalKey(Schema.String),
-  src: Schema.optionalKey(Schema.String),
-  width: Schema.optionalKey(Schema.Finite),
-  height: Schema.optionalKey(Schema.Finite),
-  alt: Schema.optionalKey(Schema.String),
-  issueId: Schema.optionalKey(IssueId),
-  memoryId: Schema.optionalKey(Schema.String),
-});
+export const BlockAttrs = z.object({
+  level: z.exactOptional(z.number()),
+  checked: z.exactOptional(z.boolean()),
+  language: z.exactOptional(z.string()),
+  src: z.exactOptional(z.string()),
+  width: z.exactOptional(z.number()),
+  height: z.exactOptional(z.number()),
+  alt: z.exactOptional(z.string()),
+  issueId: z.exactOptional(IssueId),
+  memoryId: z.exactOptional(z.string()),
+}) satisfies Codec<T.BlockAttrs>;
 
-const BlockType: Codec<T.BlockType> = Schema.Literals(T.BlockTypeValues);
+const BlockType = z.enum(T.BlockTypeValues) satisfies Codec<T.BlockType>;
 
 const blockInputFields = {
   id: BlockId,
-  parentId: Schema.optionalKey(BlockId),
-  orderKey: Schema.String,
+  parentId: z.exactOptional(BlockId),
+  orderKey: z.string(),
   type: BlockType,
   attrs: BlockAttrs,
-  text: Schema.mutable(Schema.Array(TextSpan)),
+  text: z.array(TextSpan),
 };
 
-const BlockInput: Codec<T.BlockInput> = Schema.Struct(blockInputFields);
+const BlockInput = z.object(blockInputFields) satisfies Codec<T.BlockInput>;
 
-const Block: Codec<T.Block> = Schema.Struct({
+const Block = z.object({
   ...blockInputFields,
   artifactId: ArtifactId,
-  rev: Schema.Finite,
-  deleted: Schema.optionalKey(Schema.Boolean),
-  updatedBy: Schema.String,
-  updated: Schema.Finite,
-});
+  rev: z.number(),
+  deleted: z.exactOptional(z.boolean()),
+  updatedBy: z.string(),
+  updated: z.number(),
+}) satisfies Codec<T.Block>;
 
-export const BlockSnapshot: Codec<T.BlockSnapshot> = Schema.Struct({
+export const BlockSnapshot = z.object({
   artifact: Artifact,
-  blocks: Schema.mutable(Schema.Array(Block)),
-});
+  blocks: z.array(Block),
+}) satisfies Codec<T.BlockSnapshot>;
 
-export const ArtifactMarkdown: Codec<T.ArtifactMarkdown> = Schema.Struct({
-  markdown: Schema.String,
-});
+export const ArtifactMarkdown = z.object({
+  markdown: z.string(),
+}) satisfies Codec<T.ArtifactMarkdown>;
 
-const BlockOpInsertBlock: Codec<T.BlockOpInsertBlock> = Schema.Struct({
-  op: Schema.Literal("insert_block"),
+const BlockOpInsertBlock = z.object({
+  op: z.literal("insert_block"),
   block: BlockInput,
-});
+}) satisfies Codec<T.BlockOpInsertBlock>;
 
-const BlockOpUpdateText: Codec<T.BlockOpUpdateText> = Schema.Struct({
-  op: Schema.Literal("update_text"),
+const BlockOpUpdateText = z.object({
+  op: z.literal("update_text"),
   blockId: BlockId,
-  baseRev: Schema.Finite,
-  text: Schema.mutable(Schema.Array(TextSpan)),
-});
+  baseRev: z.number(),
+  text: z.array(TextSpan),
+}) satisfies Codec<T.BlockOpUpdateText>;
 
-const BlockOpSetAttrs: Codec<T.BlockOpSetAttrs> = Schema.Struct({
-  op: Schema.Literal("set_attrs"),
+const BlockOpSetAttrs = z.object({
+  op: z.literal("set_attrs"),
   blockId: BlockId,
   attrs: BlockAttrs,
-  unset: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
-});
+  unset: z.exactOptional(z.array(z.string())),
+}) satisfies Codec<T.BlockOpSetAttrs>;
 
-const BlockOpSetType: Codec<T.BlockOpSetType> = Schema.Struct({
-  op: Schema.Literal("set_type"),
+const BlockOpSetType = z.object({
+  op: z.literal("set_type"),
   blockId: BlockId,
   type: BlockType,
   attrs: BlockAttrs,
-});
+}) satisfies Codec<T.BlockOpSetType>;
 
-const BlockOpMoveBlock: Codec<T.BlockOpMoveBlock> = Schema.Struct({
-  op: Schema.Literal("move_block"),
+const BlockOpMoveBlock = z.object({
+  op: z.literal("move_block"),
   blockId: BlockId,
-  parentId: Schema.optionalKey(BlockId),
-  orderKey: Schema.String,
-});
+  parentId: z.exactOptional(BlockId),
+  orderKey: z.string(),
+}) satisfies Codec<T.BlockOpMoveBlock>;
 
-const BlockOpDeleteBlock: Codec<T.BlockOpDeleteBlock> = Schema.Struct({
-  op: Schema.Literal("delete_block"),
+const BlockOpDeleteBlock = z.object({
+  op: z.literal("delete_block"),
   blockId: BlockId,
-});
+}) satisfies Codec<T.BlockOpDeleteBlock>;
 
-const BlockOpRestoreBlock: Codec<T.BlockOpRestoreBlock> = Schema.Struct({
-  op: Schema.Literal("restore_block"),
+const BlockOpRestoreBlock = z.object({
+  op: z.literal("restore_block"),
   blockId: BlockId,
-});
+}) satisfies Codec<T.BlockOpRestoreBlock>;
 
-const BlockOpSplitBlock: Codec<T.BlockOpSplitBlock> = Schema.Struct({
-  op: Schema.Literal("split_block"),
+const BlockOpSplitBlock = z.object({
+  op: z.literal("split_block"),
   blockId: BlockId,
-  baseRev: Schema.Finite,
-  offset: Schema.Finite,
+  baseRev: z.number(),
+  offset: z.number(),
   newBlock: BlockInput,
-});
+}) satisfies Codec<T.BlockOpSplitBlock>;
 
-const BlockOpMergeBlocks: Codec<T.BlockOpMergeBlocks> = Schema.Struct({
-  op: Schema.Literal("merge_blocks"),
+const BlockOpMergeBlocks = z.object({
+  op: z.literal("merge_blocks"),
   targetId: BlockId,
   sourceId: BlockId,
-});
+}) satisfies Codec<T.BlockOpMergeBlocks>;
 
-const BlockOp: Codec<T.BlockOp> = Schema.Union([
+const BlockOp = z.discriminatedUnion("op", [
   BlockOpInsertBlock,
   BlockOpUpdateText,
   BlockOpSetAttrs,
@@ -252,89 +252,87 @@ const BlockOp: Codec<T.BlockOp> = Schema.Union([
   BlockOpRestoreBlock,
   BlockOpSplitBlock,
   BlockOpMergeBlocks,
-]);
+]) satisfies Codec<T.BlockOp>;
 
-export const BlockSubmit: Codec<T.BlockSubmit> = Schema.Struct({
-  batchId: Schema.String,
-  lastSeq: Schema.Finite,
-  ops: Schema.mutable(Schema.Array(BlockOp)),
-});
+export const BlockSubmit = z.object({
+  batchId: z.string(),
+  lastSeq: z.number(),
+  ops: z.array(BlockOp),
+}) satisfies Codec<T.BlockSubmit>;
 
-const BlockOpStatus: Codec<T.BlockOpStatus> = Schema.Literals(T.BlockOpStatusValues);
+const BlockOpStatus = z.enum(T.BlockOpStatusValues) satisfies Codec<T.BlockOpStatus>;
 
-export const BlockCreate: Codec<T.BlockCreate> = Schema.Struct({
-  type: Schema.optionalKey(Schema.String),
-  level: Schema.optionalKey(Schema.Finite),
-  checked: Schema.optionalKey(Schema.Boolean),
-  language: Schema.optionalKey(Schema.String),
-  text: Schema.String,
-  afterBlock: Schema.optionalKey(BlockId),
-  parentId: Schema.optionalKey(BlockId),
-});
+export const BlockCreate = z.object({
+  type: z.exactOptional(z.string()),
+  level: z.exactOptional(z.number()),
+  checked: z.exactOptional(z.boolean()),
+  language: z.exactOptional(z.string()),
+  text: z.string(),
+  afterBlock: z.exactOptional(BlockId),
+  parentId: z.exactOptional(BlockId),
+}) satisfies Codec<T.BlockCreate>;
 
-export const BlockUpdate: Codec<T.BlockUpdate> = Schema.Struct({
+export const BlockUpdate = z.object({
   block: BlockId,
-  baseRev: Schema.Finite,
-  text: Schema.optionalKey(Schema.String),
-  type: Schema.optionalKey(Schema.String),
-  level: Schema.optionalKey(Schema.Finite),
-  checked: Schema.optionalKey(Schema.Boolean),
-  language: Schema.optionalKey(Schema.String),
-});
+  baseRev: z.number(),
+  text: z.exactOptional(z.string()),
+  type: z.exactOptional(z.string()),
+  level: z.exactOptional(z.number()),
+  checked: z.exactOptional(z.boolean()),
+  language: z.exactOptional(z.string()),
+}) satisfies Codec<T.BlockUpdate>;
 
-export const BlockDelete: Codec<T.BlockDelete> = Schema.Struct({ block: BlockId });
+export const BlockDelete = z.object({ block: BlockId }) satisfies Codec<T.BlockDelete>;
 
-export const BlockOpResult: Codec<T.BlockOpResult> = Schema.Struct({
+export const BlockOpResult = z.object({
   status: BlockOpStatus,
   blockId: BlockId,
-  rev: Schema.optionalKey(Schema.Finite),
-  text: Schema.optionalKey(Schema.mutable(Schema.Array(TextSpan))),
-  yours: Schema.optionalKey(Schema.mutable(Schema.Array(TextSpan))),
-  reason: Schema.optionalKey(Schema.String),
-  suggestion: Schema.optionalKey(SuggestionId),
-});
+  rev: z.exactOptional(z.number()),
+  text: z.exactOptional(z.array(TextSpan)),
+  yours: z.exactOptional(z.array(TextSpan)),
+  reason: z.exactOptional(z.string()),
+  suggestion: z.exactOptional(SuggestionId),
+}) satisfies Codec<T.BlockOpResult>;
 
-export const BlockAck: Codec<T.BlockAck> = Schema.Struct({
-  batchId: Schema.String,
-  seq: Schema.Finite,
-  results: Schema.mutable(Schema.Array(BlockOpResult)),
-  blocks: Schema.mutable(Schema.Array(Block)),
-});
+export const BlockAck = z.object({
+  batchId: z.string(),
+  seq: z.number(),
+  results: z.array(BlockOpResult),
+  blocks: z.array(Block),
+}) satisfies Codec<T.BlockAck>;
 
-export const ArtifactEvent: Codec<T.ArtifactEvent> = Schema.Union([
-  Schema.TaggedStruct("Blocks", { seq: Schema.Finite, blocks: Schema.mutable(Schema.Array(Block)) }),
-  Schema.TaggedStruct("Reset", {}),
-]);
+export const ArtifactEvent = z.discriminatedUnion("_tag", [
+  z.object({ _tag: z.literal("Blocks"), seq: z.number(), blocks: z.array(Block) }),
+  z.object({ _tag: z.literal("Reset") }),
+]) satisfies Codec<T.ArtifactEvent>;
 
-const SuggestionStatus: Codec<T.SuggestionStatus> = Schema.Literals(T.SuggestionStatusValues);
+const SuggestionStatus = z.enum(T.SuggestionStatusValues) satisfies Codec<T.SuggestionStatus>;
 
-export const SuggestionChange: Codec<T.SuggestionChange> = Schema.Struct({
-  text: Schema.optionalKey(Schema.mutable(Schema.Array(TextSpan))),
-  type: Schema.optionalKey(BlockType),
-  attrs: Schema.optionalKey(BlockAttrs),
-  unset: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
-  delete: Schema.optionalKey(Schema.Boolean),
-});
+export const SuggestionChange = z.object({
+  text: z.exactOptional(z.array(TextSpan)),
+  type: z.exactOptional(BlockType),
+  attrs: z.exactOptional(BlockAttrs),
+  unset: z.exactOptional(z.array(z.string())),
+  delete: z.exactOptional(z.boolean()),
+}) satisfies Codec<T.SuggestionChange>;
 
-export const Suggestion: Codec<T.Suggestion> = Schema.Struct({
+export const Suggestion = z.object({
   id: SuggestionId,
   artifactId: ArtifactId,
   blockId: BlockId,
-  author: Schema.String,
-  baseRev: Schema.Finite,
+  author: z.string(),
+  baseRev: z.number(),
   change: SuggestionChange,
   status: SuggestionStatus,
-  createdAt: Schema.Finite,
-  resolvedAt: Schema.optionalKey(Schema.Finite),
-  resolvedBy: Schema.optionalKey(Schema.String),
-});
+  createdAt: z.number(),
+  resolvedAt: z.exactOptional(z.number()),
+  resolvedBy: z.exactOptional(z.string()),
+}) satisfies Codec<T.Suggestion>;
 
-export const SuggestionCreate: Codec<T.SuggestionCreate> = Schema.Struct({
+export const SuggestionCreate = z.object({
   block: BlockId,
-  baseRev: Schema.Finite,
+  baseRev: z.number(),
   change: SuggestionChange,
-});
+}) satisfies Codec<T.SuggestionCreate>;
 
-export const SuggestionEvent: Codec<T.SuggestionEvent> = Schema.TaggedStruct("Suggestions", {
-  suggestions: Schema.mutable(Schema.Array(Suggestion)),
-});
+export const SuggestionEvent = z.object({ _tag: z.literal("Suggestions"), suggestions: z.array(Suggestion) }) satisfies Codec<T.SuggestionEvent>;

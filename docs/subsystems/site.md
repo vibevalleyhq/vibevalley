@@ -16,7 +16,7 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/site/vite.config.ts` | Solid 的公开 SSR/start 入口、StyleX 编译与构建任务 |
+| `apps/site/vite.config.ts` | Solid 的公开 SSR/start 入口、Tailwind 与构建任务 |
 | `apps/site/scripts/build.ts`、`prerender.ts` | 构建客户端和临时服务端，调用页面处理函数，写出 HTML 与站点地图 |
 | `apps/site/src/Document.tsx`、`App.tsx`、`components/` | 文档、路由选择与页面区块 |
 | `apps/site/src/ui/` | 滚动、可见性、进入退出、图片展开和订阅清理 |
@@ -28,7 +28,7 @@
 
 - **一个文档一个接管根**：首屏和下方区块同时接管；可见性只控制动画，不另建延迟接管根。语言切换走完整文档导航，没有客户端路由器。
 - **无脚本内容完整**：页面、文案、图片地址、字体和提取的 CSS 在静态产物中。减少动画时暂停 CSS 循环，跳过视差和数字滚动。
-- **静态样式与运动各有归属**：StyleX 编译组件样式，`styles/global.css` 提供重置、字体、令牌、接管前规则和命名关键帧；Motion 与 DOM 写入的逐帧值保留给动画层，同一属性不交给两个写入者。
+- **静态样式与运动各有归属**：组件样式是元素上的 Tailwind v4 class，`src/ui/global.css` 提供令牌（`@theme`）、重置、字体、接管前规则和命名关键帧；Motion 与 DOM 写入的逐帧值保留给动画层，同一属性不交给两个写入者。
 - **构建失败不留下半套页面**：三个页面均成功返回 HTML 后，才写入发布目录；错误、重定向、非 HTML 和不完整文档都拒绝。
 - **动画资源随组件释放**：监听、观察器、计时器与动画有对应清理；截图对话框约束焦点，退出后恢复原焦点与滚动。
 - **只发布客户端目录**：`dist/server/` 用于构建时生成页面，部署只取 `dist/client/`，线上不运行 Node 渲染器。

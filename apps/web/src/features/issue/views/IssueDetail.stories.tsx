@@ -1,5 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
-
 import type { Changes, Issue, SessionView } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 import { stories, story, type Story } from "@vibevalley/stories";
@@ -10,17 +8,6 @@ import { ToastHost } from "#/ui/ToastHost.tsx";
 
 import { AnswerView, IssueDetail } from "./IssueDetail";
 import { TodoDetail } from "./TodoDetail";
-
-const viewStyles = stylex.create({
-  pageStoryDiv: {
-    display: "flex",
-    flexDirection: "column",
-  },
-  issueDetailStoriesDiv: {
-    width: "100%",
-    maxWidth: "var(--container-xl)",
-  },
-});
 
 const description = "过期的会话现在报错，页面一直转圈。\n\n要做的：过期就回到登录页，说清楚为什么。";
 const criteria = ["过期的会话回到登录页", "登录页说「登录过期了」", "补一条跨过期限的测试"];
@@ -176,7 +163,7 @@ const pageStory = (p: Page): Story =>
         "artifact/list": () => [],
       });
       return (
-        <div {...stylex.attrs(viewStyles.pageStoryDiv)}>
+        <div class="flex flex-col">
           {/* As the issues page does: one never sent to a helper opens as a draft to write and send. */}
           {p.sessions === undefined ? (
             <TodoDetail item={p.issue} onDone={() => undefined} />
@@ -196,7 +183,7 @@ export default stories({
     答案: story({
       note: "只要答案的工单交回来的样子：结论、依据、拿不准的、下一步。",
       render: () => (
-        <div {...stylex.attrs(viewStyles.issueDetailStoriesDiv)}>
+        <div class="w-full max-w-xl">
           <AnswerView
             answer={{
               conclusion: "登录过期是因为 cookie 的有效期比服务端的会话短一个小时。",

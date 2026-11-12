@@ -1,15 +1,12 @@
-import { Effect } from "effect";
-
 import type { AgentHandlers } from "@vibevalley/protocol/api";
 
-import { Agent } from "#/modules/agent/agent.ts";
-import { Runtime } from "#/modules/runtime/runtime.ts";
+import type { Agent } from "#/modules/agent/agent.ts";
+import type { Runtime } from "#/modules/runtime/runtime.ts";
 
-export const agentHandlers = Effect.gen(function* () {
-  const agents = yield* Agent;
-  const runtimes = yield* Runtime;
-  const done: AgentHandlers = {
-    "agent.list": () => Effect.sync(agents.all),
+export function agentHandlers(deps: { readonly agent: Agent; readonly runtime: Runtime }): AgentHandlers {
+  const { agent: agents, runtime: runtimes } = deps;
+  return {
+    "agent.list": async () => agents.all(),
     "agent.create": (body) => agents.create(body),
     "agent.update": (agent) => agents.save(agent),
     "agent.delete": ({ id }) => agents.remove(id),
@@ -20,12 +17,15 @@ export const agentHandlers = Effect.gen(function* () {
     "agent.template.add": ({ path }) => agents.addTemplate(path),
     "agent.template.delete": ({ id }) => agents.removeTemplate(id),
     "agent.template.previewDelete": ({ id }) => agents.previewRemoveTemplate(id),
-    "skill.list": () => Effect.sync(agents.skills),
+    "skill.list": async () => agents.skills(),
     "skill.create": (body) => agents.createSkill(body),
     "skill.update": (skill) => agents.saveSkill(skill),
     "skill.delete": ({ id }) => agents.removeSkill(id),
     "skill.previewDelete": ({ id }) => agents.previewRemoveSkill(id),
-    "agent.validate": (body) => Effect.forEach(body.agents, (agent) => Effect.map(runtimes.problemsOf(agent), (problems) => ({ id: agent.id, problems }))),
+    "agent.validate": async (body) => {
+      const out = [];
+      for (const agent of body.agents) out.push({ id: agent.id, problems: await runtimes.problemsOf(agent) });
+      return out;
+    },
   };
-  return done;
-});
+}

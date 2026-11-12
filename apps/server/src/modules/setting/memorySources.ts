@@ -1,12 +1,11 @@
-import type { Redacted } from "effect";
-
 import { t } from "@vibevalley/i18n";
 import { MemorySourceKindValues, type SettingsUpdate } from "@vibevalley/protocol";
-
-type MemorySourcePatch = NonNullable<SettingsUpdate["memorySources"]>[number];
 import { isOneOf } from "@vibevalley/protocol/rules";
+import type { Secret } from "@vibevalley/protocol/schema";
 
 import { voiceProblem, voiceURL } from "./voice.ts";
+
+type MemorySourcePatch = NonNullable<SettingsUpdate["memorySources"]>[number];
 
 export const keyHint = (key: string) => "…" + key.slice(-4);
 
@@ -26,9 +25,9 @@ export interface StoredMemorySource {
   readonly key?: string;
 }
 
-/** A memory source with its key, redacted until a call sends it: read together, so an address is never paired with another one's key. */
+/** A memory source with its key, a Secret until a call sends it: read together, so an address is never paired with another one's key. */
 export interface MemorySourceConfig extends Omit<StoredMemorySource, "key"> {
-  readonly key?: Redacted.Redacted;
+  readonly key?: Secret;
 }
 
 export function memorySourcesProblem(sources: readonly MemorySourcePatch[]): string {

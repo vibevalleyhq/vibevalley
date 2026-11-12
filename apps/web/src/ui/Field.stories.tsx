@@ -1,16 +1,12 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
 
 import { stories, story } from "@vibevalley/stories";
 
 import { Field, Select, TextArea, TextInput } from "./Field";
 
-const styles = stylex.create({
-  dynamicWidth: (width: number) => ({ maxWidth: width }),
-  states: { width: "12rem" },
-  text: { width: "20rem" },
-  longText: { width: "24rem" },
-  select: { width: "16rem" },
-});
+const styles = {
+  dynamicWidth: (width: number): JSX.CSSProperties => ({ "max-width": `${width}px` }),
+};
 
 const runtimes = [
   { value: "", label: "选一个" },
@@ -25,22 +21,20 @@ export default stories({
     "Dynamic controls": story({
       args: { width: 240, value: "draft" },
       render: (a, set) => (
-        <div {...stylex.attrs(styles.longText)}>
+        <div class="w-96">
           <TextInput
             data-testid="dynamic-input"
             aria-label="Input"
             value={a.value}
             onInput={(event) => set({ value: event.currentTarget.value })}
-            styles={styles.dynamicWidth(a.width)}
-            style={{ height: "48px" }}
+            style={{ ...styles.dynamicWidth(a.width), height: "48px" }}
           />
           <TextArea
             data-testid="dynamic-textarea"
             aria-label="Text area"
             value={a.value}
             onInput={(event) => set({ value: event.currentTarget.value })}
-            styles={styles.dynamicWidth(a.width)}
-            style={{ height: "80px" }}
+            style={{ ...styles.dynamicWidth(a.width), height: "80px" }}
           />
           <button type="button" data-testid="resize-controls" onClick={() => set({ width: a.width === 240 ? 320 : 240 })}>
             Resize
@@ -53,7 +47,7 @@ export default stories({
       args: { kind: "text", value: "vibevalley", disabled: false },
       grid: { rows: ["kind", ["text", "select"]], cols: "pseudo" },
       render: (a) => (
-        <div {...stylex.attrs(styles.states)}>
+        <div class="w-48">
           {a.kind === "select" ? (
             <Select label="农机" value="claude" options={runtimes} disabled={a.disabled} onChange={() => undefined} />
           ) : (
@@ -65,7 +59,7 @@ export default stories({
     Text: story({
       args: { label: "仓库名", hint: "工作目录下的文件夹名", placeholder: "vibevalley", disabled: false },
       render: (a) => (
-        <div {...stylex.attrs(styles.text)}>
+        <div class="w-80">
           <Field label={a.label} hint={a.hint || undefined}>
             <TextInput placeholder={a.placeholder} disabled={a.disabled} />
           </Field>
@@ -74,7 +68,7 @@ export default stories({
     }),
     "Long text": story({
       render: () => (
-        <div {...stylex.attrs(styles.longText)}>
+        <div class="w-96">
           <Field label="说明">
             <TextArea rows={4} placeholder="要做什么、做到什么样算完" />
           </Field>
@@ -86,7 +80,7 @@ export default stories({
       args: { value: "", quiet: false, filter: false, disabled: false },
       controls: { value: { kind: "choice", options: runtimes.map((r) => r.value) } },
       render: (a, set) => (
-        <div {...stylex.attrs(styles.select)}>
+        <div class="w-64">
           <Field label="农机">
             <Select
               label="农机"

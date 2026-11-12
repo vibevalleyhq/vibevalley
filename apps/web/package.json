@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@solidjs/web": "catalog:",
-    "@stylexjs/stylex": "catalog:",
+    "@tailwindcss/vite": "catalog:",
     "@vibevalley/ai": "workspace:*",
     "@vibevalley/artifact": "workspace:*",
     "@vibevalley/base-ui": "workspace:*",
@@ -29,7 +29,6 @@
     "@vibevalley/provider": "workspace:*",
     "@vibevalley/stories": "workspace:*",
     "agora-rtc-sdk-ng": "catalog:",
-    "effect": "catalog:",
     "hast-util-to-dom": "catalog:",
     "pele": "catalog:",
     "pinyin-pro": "catalog:",
@@ -40,14 +39,15 @@
     "remark-rehype": "catalog:",
     "shiki": "catalog:",
     "solid-js": "catalog:",
+    "tailwindcss": "catalog:",
     "unified": "catalog:",
-    "uqr": "catalog:"
+    "uqr": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@axe-core/playwright": "catalog:",
     "@playwright/test": "catalog:",
     "@solidjs/vite-plugin": "catalog:",
-    "@stylexjs/unplugin": "catalog:",
     "@types/node": "catalog:",
     "@vibevalley/testkit": "workspace:*",
     "typescript": "catalog:",

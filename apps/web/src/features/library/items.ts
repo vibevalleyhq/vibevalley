@@ -1,5 +1,3 @@
-import { Array as Arr, String as Str } from "effect";
-
 import { t } from "@vibevalley/i18n";
 import type { LibraryFileKind, LibraryItem, LibraryOrigin, LibraryOriginKind, MediaJob, MediaUnderstandingJob } from "@vibevalley/protocol";
 
@@ -25,7 +23,7 @@ export const whereKey = (where: Where): string => {
 };
 
 export const kindOf = (type: string): LibraryFileKind =>
-  Str.startsWith("image/")(type) ? "image" : Str.startsWith("audio/")(type) ? "audio" : Str.startsWith("video/")(type) ? "video" : "other";
+  type.startsWith("image/") ? "image" : type.startsWith("audio/") ? "audio" : type.startsWith("video/") ? "video" : "other";
 
 const channelOf = (origin: LibraryOrigin) => (origin.kind === "uploaded" ? origin.channel : undefined);
 const agentOf = (origin: LibraryOrigin) => (origin.kind === "fetched" ? origin.agent : undefined);
@@ -46,7 +44,7 @@ const isIn = (where: Where) => (item: LibraryItem) => {
 const isKind = (kind: KindFilter) => (item: LibraryItem) => kind === "all" || kindOf(item.attachment.type) === kind;
 
 export const shown = (given: { readonly items: readonly LibraryItem[]; readonly where: Where; readonly kind: KindFilter }): LibraryItem[] =>
-  Arr.filter(given.items, (item) => isIn(given.where)(item) && isKind(given.kind)(item));
+  given.items.filter((item) => isIn(given.where)(item) && isKind(given.kind)(item));
 
 export interface Counts {
   readonly where: ReadonlyMap<string, number>;
@@ -84,7 +82,7 @@ export const countsOf = (given: { readonly items: readonly LibraryItem[]; readon
 
 /** Excludes understanding jobs, which produce no file. */
 export const making = (jobs: readonly MediaJob[]): MediaJob[] =>
-  Arr.filter(jobs, (job) => job.kind !== "understanding" && (job.phase === "queued" || job.phase === "generating" || job.phase === "downloading"));
+  jobs.filter((job) => job.kind !== "understanding" && (job.phase === "queued" || job.phase === "generating" || job.phase === "downloading"));
 
 export interface Placed {
   readonly index: number;
@@ -168,10 +166,10 @@ export const between = (given: { readonly ids: readonly string[]; readonly from:
 
 export const extOf = (name: string): string => {
   const found = /[^./][^/]*\.([^./]+)$/u.exec(name);
-  return found?.[1] === undefined ? "" : Str.toUpperCase(found[1]);
+  return found?.[1] === undefined ? "" : found[1].toUpperCase();
 };
 
-const pad = Str.padStart(2, "0");
+const pad = (s: string) => s.padStart(2, "0");
 
 export const durationText = (seconds: number): string => {
   const s = Math.max(0, Math.round(seconds));
@@ -214,11 +212,13 @@ const none = (): MediaUnderstandingJob | undefined => undefined;
 export const understoodText =
   (attachment: string) =>
   (jobs: readonly MediaJob[]): string | undefined =>
-    Arr.reduce(jobs, none(), (newest, job) =>
-      job.kind === "understanding" &&
-      job.result !== null &&
-      Arr.some(job.inputs, (input) => input.hash === attachment) &&
-      (newest === undefined || job.updatedAt > newest.updatedAt)
-        ? job
-        : newest,
+    jobs.reduce(
+      (newest, job) =>
+        job.kind === "understanding" &&
+        job.result !== null &&
+        job.inputs.some((input) => input.hash === attachment) &&
+        (newest === undefined || job.updatedAt > newest.updatedAt)
+          ? job
+          : newest,
+      none(),
     )?.result?.text;

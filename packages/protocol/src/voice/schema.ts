@@ -1,166 +1,172 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import type { Codec } from "../codec";
 import { KeySource } from "../common/schema";
 import * as T from "./shapes";
 
-export const CallState: Codec<T.CallState> = Schema.Literals(T.CallStateValues);
+export const CallState = z.enum(T.CallStateValues) satisfies Codec<T.CallState>;
 
-export const FactCallChanged: Codec<T.FactCallChanged> = Schema.Struct({
-  type: Schema.Literal("callChanged"),
-  at: Schema.Finite,
+export const FactCallChanged = z.object({
+  type: z.literal("callChanged"),
+  at: z.number(),
   state: CallState,
-  reason: Schema.String,
-});
+  reason: z.string(),
+}) satisfies Codec<T.FactCallChanged>;
 
-export const VoiceCall: Codec<T.VoiceCall> = Schema.Struct({
-  agentId: Schema.String,
-});
+export const VoiceCall = z.object({
+  agentId: z.string(),
+}) satisfies Codec<T.VoiceCall>;
 
-export const AgoraGrant: Codec<T.AgoraGrant> = Schema.Struct({
-  appId: Schema.String,
-  channel: Schema.String,
-  uid: Schema.String,
-  token: Schema.String,
-});
+export const AgoraGrant = z.object({
+  appId: z.string(),
+  channel: z.string(),
+  uid: z.string(),
+  token: z.string(),
+}) satisfies Codec<T.AgoraGrant>;
 
-export const AgoraAppID: Codec<T.AgoraAppID> = Schema.Struct({
-  source: Schema.NullOr(KeySource),
-  value: Schema.optionalKey(Schema.String),
-});
+export const AgoraAppID = z.object({
+  source: KeySource.nullable(),
+  value: z.exactOptional(z.string()),
+}) satisfies Codec<T.AgoraAppID>;
 
-const Area: Codec<T.Area> = Schema.Literals(T.AreaValues);
+const Area = z.enum(T.AreaValues) satisfies Codec<T.Area>;
 
-const Language: Codec<T.Language> = Schema.Literals(T.LanguageValues);
+const Language = z.enum(T.LanguageValues) satisfies Codec<T.Language>;
 
-const VoiceASRAres: Codec<T.VoiceASRAres> = Schema.Struct({
-  vendor: Schema.Literal("ares"),
-});
+const VoiceASRAres = z.object({
+  vendor: z.literal("ares"),
+}) satisfies Codec<T.VoiceASRAres>;
 
-const Model: Codec<T.Model> = Schema.Literals(T.ModelValues);
+const Model = z.enum(T.ModelValues) satisfies Codec<T.Model>;
 
-const VoiceASRDeepgram: Codec<T.VoiceASRDeepgram> = Schema.Struct({
-  vendor: Schema.Literal("deepgram"),
+const VoiceASRDeepgram = z.object({
+  vendor: z.literal("deepgram"),
   model: Model,
-});
+}) satisfies Codec<T.VoiceASRDeepgram>;
 
-const VoiceASRMicrosoft: Codec<T.VoiceASRMicrosoft> = Schema.Struct({
-  vendor: Schema.Literal("microsoft"),
-  region: Schema.String,
-});
+const VoiceASRMicrosoft = z.object({
+  vendor: z.literal("microsoft"),
+  region: z.string(),
+}) satisfies Codec<T.VoiceASRMicrosoft>;
 
-const VoiceASR: Codec<T.VoiceASR> = Schema.Union([VoiceASRAres, VoiceASRDeepgram, VoiceASRMicrosoft]);
+const VoiceASR = z.discriminatedUnion("vendor", [VoiceASRAres, VoiceASRDeepgram, VoiceASRMicrosoft]) satisfies Codec<T.VoiceASR>;
 
-const VoiceAnswerOrchestrator: Codec<T.VoiceAnswerOrchestrator> = Schema.Struct({
-  vendor: Schema.Literal("orchestrator"),
-});
+const VoiceAnswerOrchestrator = z.object({
+  vendor: z.literal("orchestrator"),
+}) satisfies Codec<T.VoiceAnswerOrchestrator>;
 
-const VoiceAnswerMoss: Codec<T.VoiceAnswerMoss> = Schema.Struct({
-  vendor: Schema.Literal("moss"),
-});
+const VoiceAnswerMoss = z.object({
+  vendor: z.literal("moss"),
+}) satisfies Codec<T.VoiceAnswerMoss>;
 
-const VoiceAnswerAgoraModel: Codec<T.VoiceAnswerAgoraModel> = Schema.Literals(T.VoiceAnswerAgoraModelValues);
+const VoiceAnswerAgoraModel = z.enum(T.VoiceAnswerAgoraModelValues) satisfies Codec<T.VoiceAnswerAgoraModel>;
 
-const VoiceAnswerAgora: Codec<T.VoiceAnswerAgora> = Schema.Struct({
-  vendor: Schema.Literal("agora"),
+const VoiceAnswerAgora = z.object({
+  vendor: z.literal("agora"),
   model: VoiceAnswerAgoraModel,
-});
+}) satisfies Codec<T.VoiceAnswerAgora>;
 
-const VoiceAnswerDeepseek: Codec<T.VoiceAnswerDeepseek> = Schema.Struct({
-  vendor: Schema.Literal("deepseek"),
-  model: Schema.String,
-});
+const VoiceAnswerDeepseek = z.object({
+  vendor: z.literal("deepseek"),
+  model: z.string(),
+}) satisfies Codec<T.VoiceAnswerDeepseek>;
 
-const VoiceAnswerOpenai: Codec<T.VoiceAnswerOpenai> = Schema.Struct({
-  vendor: Schema.Literal("openai"),
-  url: Schema.String,
-  model: Schema.String,
-});
+const VoiceAnswerOpenai = z.object({
+  vendor: z.literal("openai"),
+  url: z.string(),
+  model: z.string(),
+}) satisfies Codec<T.VoiceAnswerOpenai>;
 
-const VoiceAnswer: Codec<T.VoiceAnswer> = Schema.Union([VoiceAnswerOrchestrator, VoiceAnswerMoss, VoiceAnswerAgora, VoiceAnswerDeepseek, VoiceAnswerOpenai]);
+const VoiceAnswer = z.discriminatedUnion("vendor", [
+  VoiceAnswerOrchestrator,
+  VoiceAnswerMoss,
+  VoiceAnswerAgora,
+  VoiceAnswerDeepseek,
+  VoiceAnswerOpenai,
+]) satisfies Codec<T.VoiceAnswer>;
 
-const VoiceTTSMinimaxModel: Codec<T.VoiceTTSMinimaxModel> = Schema.Literals(T.VoiceTTSMinimaxModelValues);
+const VoiceTTSMinimaxModel = z.enum(T.VoiceTTSMinimaxModelValues) satisfies Codec<T.VoiceTTSMinimaxModel>;
 
-const VoiceTTSMinimax: Codec<T.VoiceTTSMinimax> = Schema.Struct({
-  vendor: Schema.Literal("minimax"),
+const VoiceTTSMinimax = z.object({
+  vendor: z.literal("minimax"),
   model: VoiceTTSMinimaxModel,
-  voiceId: Schema.String,
-});
+  voiceId: z.string(),
+}) satisfies Codec<T.VoiceTTSMinimax>;
 
-const Voice: Codec<T.Voice> = Schema.Literals(T.VoiceValues);
+const Voice = z.enum(T.VoiceValues) satisfies Codec<T.Voice>;
 
-const VoiceTTSOpenai: Codec<T.VoiceTTSOpenai> = Schema.Struct({
-  vendor: Schema.Literal("openai"),
+const VoiceTTSOpenai = z.object({
+  vendor: z.literal("openai"),
   voice: Voice,
-});
+}) satisfies Codec<T.VoiceTTSOpenai>;
 
-const VoiceTTSMicrosoft: Codec<T.VoiceTTSMicrosoft> = Schema.Struct({
-  vendor: Schema.Literal("microsoft"),
-  region: Schema.String,
-  voiceName: Schema.String,
-});
+const VoiceTTSMicrosoft = z.object({
+  vendor: z.literal("microsoft"),
+  region: z.string(),
+  voiceName: z.string(),
+}) satisfies Codec<T.VoiceTTSMicrosoft>;
 
-const VoiceTTS: Codec<T.VoiceTTS> = Schema.Union([VoiceTTSMinimax, VoiceTTSOpenai, VoiceTTSMicrosoft]);
+const VoiceTTS = z.discriminatedUnion("vendor", [VoiceTTSMinimax, VoiceTTSOpenai, VoiceTTSMicrosoft]) satisfies Codec<T.VoiceTTS>;
 
-export const VoiceSettings: Codec<T.VoiceSettings> = Schema.Struct({
+export const VoiceSettings = z.object({
   area: Area,
   language: Language,
   asr: VoiceASR,
   answer: VoiceAnswer,
   tts: VoiceTTS,
-  persona: Schema.String,
-  greeting: Schema.String,
-  failureMessage: Schema.String,
-  silenceMs: Schema.Finite,
-  interruptMs: Schema.Finite,
-  idleSeconds: Schema.Finite,
-});
+  persona: z.string(),
+  greeting: z.string(),
+  failureMessage: z.string(),
+  silenceMs: z.number(),
+  interruptMs: z.number(),
+  idleSeconds: z.number(),
+}) satisfies Codec<T.VoiceSettings>;
 
-const DictationVia: Codec<T.DictationVia> = Schema.Literals(T.DictationViaValues);
+const DictationVia = z.enum(T.DictationViaValues) satisfies Codec<T.DictationVia>;
 
-export const Dictation: Codec<T.Dictation> = Schema.Struct({
+export const Dictation = z.object({
   via: DictationVia,
-  url: Schema.String,
-  model: Schema.String,
-});
+  url: z.string(),
+  model: z.string(),
+}) satisfies Codec<T.Dictation>;
 
-export const SettingsUpdateVoice: Codec<T.SettingsUpdateVoice> = Schema.Struct({
-  area: Schema.optionalKey(Area),
-  language: Schema.optionalKey(Language),
-  asr: Schema.optionalKey(VoiceASR),
-  answer: Schema.optionalKey(VoiceAnswer),
-  tts: Schema.optionalKey(VoiceTTS),
-  persona: Schema.optionalKey(Schema.String),
-  greeting: Schema.optionalKey(Schema.String),
-  failureMessage: Schema.optionalKey(Schema.String),
-  silenceMs: Schema.optionalKey(Schema.Finite),
-  interruptMs: Schema.optionalKey(Schema.Finite),
-  idleSeconds: Schema.optionalKey(Schema.Finite),
-});
+export const SettingsUpdateVoice = z.object({
+  area: z.exactOptional(Area),
+  language: z.exactOptional(Language),
+  asr: z.exactOptional(VoiceASR),
+  answer: z.exactOptional(VoiceAnswer),
+  tts: z.exactOptional(VoiceTTS),
+  persona: z.exactOptional(z.string()),
+  greeting: z.exactOptional(z.string()),
+  failureMessage: z.exactOptional(z.string()),
+  silenceMs: z.exactOptional(z.number()),
+  interruptMs: z.exactOptional(z.number()),
+  idleSeconds: z.exactOptional(z.number()),
+}) satisfies Codec<T.SettingsUpdateVoice>;
 
-const renewRequestFields = { channel: Schema.String, uid: Schema.String };
+const renewRequestFields = { channel: z.string(), uid: z.string() };
 
-export const VoiceGrantRenew: Codec<T.VoiceGrantRenew> = Schema.Struct(renewRequestFields);
+export const VoiceGrantRenew = z.object(renewRequestFields) satisfies Codec<T.VoiceGrantRenew>;
 
-export const DictateRequest: Codec<T.DictateRequest> = Schema.Struct({
-  audio: Schema.String,
-  format: Schema.String,
-});
+export const DictateRequest = z.object({
+  audio: z.string(),
+  format: z.string(),
+}) satisfies Codec<T.DictateRequest>;
 
-export const Dictated: Codec<T.Dictated> = Schema.Struct({
-  text: Schema.String,
-});
+export const Dictated = z.object({
+  text: z.string(),
+}) satisfies Codec<T.Dictated>;
 
-export const VoiceSaid: Codec<T.VoiceSaid> = Schema.Struct({
-  agentId: Schema.String,
-  text: Schema.String,
-});
+export const VoiceSaid = z.object({
+  agentId: z.string(),
+  text: z.string(),
+}) satisfies Codec<T.VoiceSaid>;
 
-export const VoiceHeard: Codec<T.VoiceHeard> = Schema.Struct({
-  agentId: Schema.String,
-  text: Schema.String,
-  agent: Schema.optionalKey(Schema.String),
-  sendKey: Schema.optionalKey(Schema.String),
-});
+export const VoiceHeard = z.object({
+  agentId: z.string(),
+  text: z.string(),
+  agent: z.exactOptional(z.string()),
+  sendKey: z.exactOptional(z.string()),
+}) satisfies Codec<T.VoiceHeard>;
 
-export const VoiceCallStart: Codec<T.VoiceCallStart> = Schema.Struct({ ...renewRequestFields, about: Schema.optionalKey(Schema.String) });
+export const VoiceCallStart = z.object({ ...renewRequestFields, about: z.exactOptional(z.string()) }) satisfies Codec<T.VoiceCallStart>;

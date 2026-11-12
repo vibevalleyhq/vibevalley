@@ -1,6 +1,4 @@
-import { Predicate, type Schema } from "effect";
-
-import { queryDecoder } from "./schema";
+import { QueryDecodeError, queryDecoder, type QuerySchema } from "./schema";
 
 export type QueryKey = readonly (string | number | boolean | null)[];
 export type QueryRecord<T> = { readonly value: T; readonly updatedAt: number };
@@ -216,7 +214,7 @@ class Entry<T> implements EntryBase {
       } catch (error) {
         if (!current()) throw canceled();
         if (invalidation !== this.invalidation) return run();
-        if (!Predicate.isTagged(error, "QueryDecodeError") && attempt < (this.policy.retry ?? 0) && this.policy.retryWhen?.(error) === true) {
+        if (!(error instanceof QueryDecodeError) && attempt < (this.policy.retry ?? 0) && this.policy.retryWhen?.(error) === true) {
           await wait(signal);
           return run(attempt + 1);
         }
@@ -285,8 +283,8 @@ class Entry<T> implements EntryBase {
   };
 }
 
-export function defineQuery<A = void, T = never, E = T>(
-  options: Policy & { schema: Schema.Codec<T, E>; key: (input: A) => QueryKey; fetch: (input: A, context: { signal: AbortSignal }) => Promise<unknown> },
+export function defineQuery<A = void, T = never>(
+  options: Policy & { schema: QuerySchema<T>; key: (input: A) => QueryKey; fetch: (input: A, context: { signal: AbortSignal }) => Promise<unknown> },
 ): (input: A) => QueryDescriptor<T> {
   for (const n of [options.staleTime ?? 0, options.gcTime ?? 300_000]) if (n < 0 || Number.isNaN(n)) throw new Error("Query durations must be nonnegative");
   if (!Number.isInteger(options.retry ?? 0) || (options.retry ?? 0) < 0) throw new Error("Query retry must be a nonnegative integer");

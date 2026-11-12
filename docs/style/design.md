@@ -1,6 +1,6 @@
 # 界面怎么做：田间工作台
 
-VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的书桌，近乎中性的纸和墨，颜色只留给几样庄稼的意思；看和玩的地方是画出来的像素农场。本篇写工作台怎么做：审美、令牌、原子和模式、和那份八篇大纲的对照、给 agent 的清单。令牌的值以 `apps/web/src/style.css` 与 `apps/web/src/ui/tokens.stylex.ts` 为准，本篇只说用途和挑法；写错了由 lint 拦（`vibevalley/stylex-only`、`vibevalley/no-hex-color`、`vibevalley/design-tokens`，`scripts/audit/oxlint-plugin.ts`、`scripts/audit/design-tokens.ts`）。像素皮怎么画见 [农场的皮](docs/subsystems/farm.md)，页面的分层和宿主见 [客户端](docs/subsystems/app.md)。整套的样子在零件的故事里（`vp run --filter @vibevalley/web stories`，[`packages/stories`](packages/stories/README.md)）：每个令牌和零件的每种状态，浅色、深色并排，换宽度看窄窗口，动效的曲线从样式表里读。
+VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的书桌，近乎中性的纸和墨，颜色只留给几样庄稼的意思；看和玩的地方是画出来的像素农场。本篇写工作台怎么做：审美、令牌、原子和模式、和那份八篇大纲的对照、给 agent 的清单。令牌的值以 `apps/web/src/style.css`（`@theme`，Tailwind 的 class 名就是令牌名）为准；本篇只说用途和挑法；写法照 [vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)，写错了由 lint 拦（`vibevalley/design-tokens`、`vibevalley/no-hex-color` 查 class 里的任意值和 `style` 里的散值，`vibevalley/style-attrs` 拦写死的 `style`，`scripts/audit/oxlint-plugin.ts`、`scripts/audit/design-tokens.ts`）。像素皮怎么画见 [农场的皮](docs/subsystems/farm.md)，页面的分层和宿主见 [客户端](docs/subsystems/app.md)。整套的样子在零件的故事里（`vp run --filter @vibevalley/web stories`，[`packages/stories`](packages/stories/README.md)）：每个令牌和零件的每种状态，浅色、深色并排，换宽度看窄窗口，动效的曲线从样式表里读。
 
 ## 审美
 
@@ -22,10 +22,10 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 | 在哪 | `apps/web/src/ui`、`features/*`、`app` | `farm`、`tree`、`ui/pixel` |
 | 字 | 系统的中文字体（`--font-sans`），13px 正文 | FusionPixel（`--font-pixel`），只在 12、24px 清楚 |
 | 图标 | reicon 的线条图标（`ui/Icon.tsx` 的 `<Icon name>`），跟着字的颜色 | `public/pixel` 的贴图（`SpriteIcon`） |
-| 线和影 | 1px 的 `--color-line`，`--shadow-raise`、`--shadow-float` | 2px 的树皮色框，`--shadow-px` 和 `ui/pixel/style.ts` 的 `pxStyle.window`、`pxStyle.frame` |
+| 线和影 | 1px 的 `--color-line`，`--shadow-raise`、`--shadow-float` | 2px 的树皮色框，`--shadow-px` 和 `pixel-window`、`pixel-frame`（style.css 的 `@utility`） |
 | 动效 | 缓动和三档时长（下面「动效」） | `steps()` 走帧，一像素一像素地动 |
 | 主题 | 浅色、深色（设置 › 外观） | 只有画出来的那一套 |
-| 令牌的检查 | `stylex-only`、`no-hex-color`、`design-tokens` | `stylex-only`、`no-hex-color`：画出来的颜色也有名字；尺寸是画的一部分，不查 |
+| 令牌的检查 | `no-hex-color`、`design-tokens`、`style-attrs` | `no-hex-color`、`style-attrs`：画出来的颜色也有名字；尺寸是画的一部分，不查 |
 
 头像（`ui/domain/Face.tsx`）、农机的 logo、仓库的岛、额度瓶在工作台里也是画，照像素皮。
 
@@ -34,15 +34,15 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 像素皮不跟着主题换，但它的值和工作台一样有名字、只写在一处：
 
 - **颜色**按家族起名（`style.css` 的 CSS 自定义属性）：`cream`（纸和木板的底）、`bark`（框和字）、`leaf`（好、主操作）、`wheat`（在等）、`berry`（坏、危险）、`water`、`ink`（夜和调试台），手机屏的 `lcd`（和 `farm/phone/lcd.ts` 画布用的同一组绿）、首页的 `dusk` 和 `glow`；阴影和暗幕的 `px-drop`、`px-shade`、`px-dent`、`px-scrim`。写死的颜色由 `no-hex-color` 拦，头像的颜色是数据（`ui/domain/cast.ts`），照原样。
-- **字**只有 12px 和 24px（FusionPixel 只在这两档清楚），由 `ui/pixel/style.ts` 的 `pxStyle` 给；读的长文字（汇报、说明）用 `pxStyle.read`，是系统字体。
-- **框和影**：`pxStyle.window`（窗）、`frame`（厚框）、`ring`（框里一圈 2px）、`drop`（浮在板子上的投影）、`shade`（地图上的牌子和卡片，更深一些，不然看不出来）。
-- **焦点**只有一种：`pxStyle.focus`，叶色的 2px 外框，离边一个像素。
+- **字**只有 12px 和 24px（FusionPixel 只在这两档清楚），由 `pixel-xs`…`pixel-2xl` 给（style.css 的 `@utility`）；读的长文字（汇报、说明）用 `pixel-read`，是系统字体。
+- **框和影**：`pixel-window`（窗）、`pixel-frame`（厚框）、`pixel-ring`（框里一圈 2px）、`pixel-drop`（浮在板子上的投影）、`pixel-shade`（地图上的牌子和卡片，更深一些，不然看不出来）。
+- **焦点**只有一种：`pixel-focus`，叶色的 2px 外框，离边一个像素。
 - **叶和麦上的字是树皮色**（`var(--color-bark-900)`）：奶油色的字在 `leaf-500` 上只有 2.5:1，读不清；只有 `berry` 和更深的叶（`leaf-700`）上用奶油色的字。
-- **动效**走帧：关键帧用 `stylex.keyframes()` 配合 `steps()`，一个像素一个像素地动，每个动画写自己的减少动效的停法。
+- **动效**走帧：关键帧写在 `style.css`，配合 `steps()`，一个像素一个像素地动，每个动画写自己的减少动效的停法。
 
 ## 令牌
 
-工作台常量集中在 `apps/web/src/ui/tokens.stylex.ts`（`colors`、`fonts`、`text`、`leading`、`radii`、`shadows`、`easing`、`durations`、`containers`、`media`），底层引用 `style.css` 的主题自定义属性。
+工作台的令牌都在 `apps/web/src/style.css` 的 `@theme`：class 名就是令牌名（`bg-page`、`text-sm`、`rounded-md`、`shadow-float`、`duration-180`、`ease-out`、`z-30`、`max-w-3xl`），`style` 里写 `var(--color-page)` 这些变量。
 
 ### 表面
 
@@ -74,12 +74,12 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 
 | 令牌 | 值 | 用在 |
 |---|---|---|
-| `--radius-xs`（`radii.xs`） | 3px | 一行字里的标记：键帽、@ 名、角标、像素格 |
-| `--radius-sm`（`radii.sm`） | 4px | 标签（`Tag`）、分段的选项 |
-| `--radius-md`（`radii.md`） | 6px | 控件：按钮、输入框、菜单项、小浮层 |
-| `--radius-lg`（`radii.lg`） | 8px | 卡片、面板、看板的栏、对话框、菜单 |
-| `--radius-xl`（`radii.xl`） | 12px | 大的浮层（工单详情）、栏上的格子 |
-| `"9999px"`（`radii.pill`） | | 胶囊、头像、状态点、计数 |
+| `--radius-xs`（`rounded-xs`） | 3px | 一行字里的标记：键帽、@ 名、角标、像素格 |
+| `--radius-sm`（`rounded-sm`） | 4px | 标签（`Tag`）、分段的选项 |
+| `--radius-md`（`rounded-md`） | 6px | 控件：按钮、输入框、菜单项、小浮层 |
+| `--radius-lg`（`rounded-lg`） | 8px | 卡片、面板、看板的栏、对话框、菜单 |
+| `--radius-xl`（`rounded-xl`） | 12px | 大的浮层（工单详情）、栏上的格子 |
+| `rounded-full` | | 胶囊、头像、状态点、计数 |
 
 套在一起时里面的圆角小一档（卡片 `lg` 里的按钮 `md`）。
 
@@ -124,20 +124,20 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 
 | 令牌 | 值 | 用在 |
 |---|---|---|
-| `durations.pointer` | `"120ms"` | 指针底下的：悬停、按下、展开的小箭头 |
-| `durations.state` | `"180ms"` | 状态变化：颜色、显示隐藏、选中 |
-| `durations.panel` | `"280ms"` | 面板、抽屉、对话框的进出 |
-| `--ease-out`（`easing.out`） | `cubic-bezier(0.2, 0, 0, 1)` | 进来的和大多数变化（默认） |
-| `--ease-in`（`easing.in`） | `cubic-bezier(0.4, 0, 1, 1)` | 离开的 |
-| `--ease-in-out`（`easing.inOut`） | `cubic-bezier(0.4, 0, 0.2, 1)` | 来回移动、变大小 |
-| `--ease-spring`（`easing.spring`） | `cubic-bezier(0.34, 1.4, 0.64, 1)` | 只给弹出来的小东西（一个角标、一个新标记） |
-| `popIn`（`stylex.keyframes`） | 280ms，98% 放大淡入 | 菜单、浮层、对话框、toast 进来 |
-| `fadeIn`（`stylex.keyframes`） | 180ms 淡入 | 提示（`Tip`）、对话框后面的暗幕 |
+| `duration-120` | 120ms | 指针底下的：悬停、按下、展开的小箭头 |
+| `duration-180` | 180ms | 状态变化：颜色、显示隐藏、选中 |
+| `duration-280` | 280ms | 面板、抽屉、对话框的进出 |
+| `--ease-out`（`ease-out`） | `cubic-bezier(0.2, 0, 0, 1)` | 进来的和大多数变化（默认） |
+| `--ease-in`（`ease-in`） | `cubic-bezier(0.4, 0, 1, 1)` | 离开的 |
+| `--ease-in-out`（`ease-in-out`） | `cubic-bezier(0.4, 0, 0.2, 1)` | 来回移动、变大小 |
+| `--ease-spring`（`ease-spring`） | `cubic-bezier(0.34, 1.4, 0.64, 1)` | 只给弹出来的小东西（一个角标、一个新标记） |
+| `animate-pop-in` | 280ms，98% 放大淡入 | 菜单、浮层、对话框、toast 进来 |
+| `animate-fade-in` | 180ms 淡入 | 提示（`Tip`）、对话框后面的暗幕 |
 
-- `transitionProperty` 只列真正要动的属性，如 `"background-color, border-color, translate"` 或 `"rotate"`；时长和缓动显式引用令牌。
+- `transition-[…]` 只列真正要动的属性，如 `transition-[background-color,border-color,translate]` 或 `transition-[rotate]`；时长和缓动写令牌（`duration-120 ease-out`）。
 - 按钮按下时下沉一个像素，120ms。
 - 弹出来的东西从它出来的地方长出来：下拉菜单从右上，输入框上面的菜单从底部。
-- 系统要求减少动效时，工作台的过渡由 `style.css` 停下；`stylex.keyframes` 入场与循环动画各自带 `"@media (prefers-reduced-motion: reduce)": "none"` 停法。
+- 系统要求减少动效时，工作台的过渡和 `animate-pop-in`、`animate-fade-in` 由 `style.css` 停下；别的入场与循环动画各自带 `motion-reduce:` 的停法。
 - 只动 `opacity`、`translate`、`scale`、`rotate`、颜色，不动会重新排版的属性（宽、高、`top`）。
 
 ### 层
@@ -216,7 +216,7 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 | 3.3 富文本输入框与指令引擎 | 回车、@、附件、拖进来；`/` 的命令，一条命令就是一个接口 | 有 |
 | 3.4 模型切换器与 Token 计量 | 模型属于档案（档案页里换），每次汇报带花费，额度瓶；不在输入框里换模型 | 有，不做输入框里的切换 |
 | 3.5 工具调用与 MCP 决策卡片 | 工具的每一步在干活的经过里；帮工没有权限确认（根目录 `AGENTS.md`），所以没有批准卡片 | 有，不做批准卡片 |
-| 4.1 动效引擎与关键帧 | `stylex.keyframes()` 自有关键帧加 `style.css` 的滚动时间轴关键帧 | 有 |
+| 4.1 动效引擎与关键帧 | `style.css` 的关键帧（入场、循环、滚动时间轴），元素上用 `animate-*` 或 `[animation-name:…]` | 有 |
 | 4.2 光效着色器与推理氛围 | 农场有 PixiJS 的像素光照和昼夜；工作台是安静的工具，不放光效 | 有（农场），工作台不做 |
 | 4.3 滚动边缘渐变遮罩 | `scroll-fade-y`、`scroll-fade-x`，工作台和田头都用它们 | 有 |
 | 5.1 语音模式与 Web Audio | 通话、听写、MOSS，农场的音效用 Web Audio 合成；工作台不出声 | 有 |
@@ -231,7 +231,7 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 | 6.5 容器查询与防挤压 | 工单页用容器查询，子项允许缩到 `minWidth: 0`，长字省略；每处在 400px 和 720px 宽都不出界（`test/narrow.spec.ts`） | 有 |
 | 6.6 全键盘与无障碍 | Ctrl+K、Esc、全页的焦点框、每个图标按钮有名字；`?` 打开快捷键一览，和认键的是同一张表 | 有 |
 | 6.7 异常、限流与状态机 | 状态由服务端折好：额度、卡住的原因、重试、连接的小灯 | 有 |
-| 7.1 样式编译与基础 CSS | StyleX 编译组件样式；`style.css` 提供令牌、字体和明确归属的全局规则，`reset.css` 提供重置 | 有 |
+| 7.1 样式编译与基础 CSS | Tailwind v4 由元素上的 class 生成组件样式；`style.css` 提供令牌（`@theme`）、字体和明确归属的全局规则，`reset.css` 提供重置 | 有 |
 | 7.2 工程源码清单 | `apps/web/README.md`、[客户端](docs/subsystems/app.md) | 有 |
 | 7.3 资产、字体和音频 | `design/` 的出图和切图、FusionPixel、合成的音效、reicon | 有 |
 | 8.1–8.7 给 agent 的指南 | 本篇「给 agent 的速查」和 lint | 有 |
@@ -249,9 +249,9 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 
 **样式怎么拼**：
 
-- 普通 DOM 节点用 `stylex.attrs(styles.root, on && styles.active)`；共享常量从 `ui/tokens.stylex.ts` 或 `ui/pixel/style.ts` 导入，不在消费文件里复制私有的皮肤块，也不跨层引用 `--wb-*` 内部变量（一律用 `--color-*` 和 `--shadow-*`）。
-- 接收外部 `styles?: stylex.StyleXStyles` 或需要合并原生 `style` 对象的原子零件，统一经 `ui/positioner.ts` 的 `styleProps(...)` 展开属性（内部单次调用 `stylex.props()`，把 `className` 映射成 `class` 并保留动态变量对象）。
-- 原子收的 `styles` 只管摆放（外边距、定位、宽、`flex`），它的样子（高、颜色、圆角、字号）由它自己的属性定（`tone`、`size`）；要一个新样子，给原子加一个属性，不在外面拿 `styles` 盖。
+- 普通 DOM 节点写 `class={["flex gap-2", on && "bg-selected"]}`；像素皮的框、字、焦点是 style.css 的 `pixel-*` class，不在消费文件里复制私有的皮肤块，也不跨层引用 `--wb-*` 内部变量（`style` 里一律用 `--color-*` 和 `--shadow-*`）。
+- 原子收 `class?: JSX.ClassValue`，接在自己的 class 后面；按数据算出的值写 `style` 或一个 CSS 变量（`w-(--width)` 加 `style={{ "--width": … }}`）。
+- 原子收的 `class` 只管摆放（外边距、定位、宽、`flex`），它的样子（高、颜色、圆角、字号）由它自己的属性定（`tone`、`size`、`text`）：同一属性的两个 class 谁赢看样式表，不看先后，所以要一个新样子，给原子加一个属性，不在外面拿 `class` 盖。
 
 **交之前自己查一遍**：
 

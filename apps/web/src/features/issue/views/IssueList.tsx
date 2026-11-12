@@ -1,5 +1,4 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -17,152 +16,6 @@ import { IconButton } from "#/ui/IconButton.tsx";
 import { EmptyNote, OlderLink } from "./Board";
 import { AgentFaceOf, CardFace, FlagChip, NoFaceMark, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 import type { NewIssueAt } from "./NewIssue";
-
-const styles = stylex.create({
-  rowSpan: {
-    display: {
-      default: "none",
-      "@container (width>=640px)": "block",
-    },
-    width: "2.75rem",
-    flexShrink: "0",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  rowSpanPrimary: {
-    display: null,
-  },
-  rowSpanSecondary: {
-    display: {
-      default: "none",
-      "@container (width>=640px)": "inline",
-    },
-  },
-  rowSpan2: {
-    display: {
-      default: "none",
-      "@container (width>=640px)": "block",
-    },
-    width: "120px",
-    flexShrink: "0",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  rowSpan3: {
-    width: {
-      default: "3.5rem",
-      "@container (width>=640px)": "72px",
-    },
-    flexShrink: "0",
-    textAlign: "right",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  issueListIcon: {},
-  issueListIconTone: {
-    rotate: "90deg",
-  },
-  rowDiv: {
-    display: "flex",
-    height: "38px",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.625rem",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.625rem",
-  },
-  rowDivTone: {
-    backgroundColor: "var(--color-selected)",
-  },
-  rowDivAlt: {
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  issueListDiv: {
-    containerType: "inline-size",
-    minHeight: "0",
-    flex: "1",
-    overflowY: "auto",
-    paddingInline: "0.75rem",
-    paddingBottom: "0.75rem",
-  },
-  issueGroup: {
-    marginBottom: "0.25rem",
-  },
-  issueListHeader: {
-    position: "sticky",
-    top: "0",
-    zIndex: "10",
-    marginTop: "0.5rem",
-    display: "flex",
-    height: "34px",
-    alignItems: "center",
-    borderBottomStyle: "solid",
-    borderBottomWidth: "1px",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-    paddingRight: "0.25rem",
-  },
-  issueListButton: {
-    display: "flex",
-    height: "100%",
-    minWidth: "0",
-    flex: "1",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.625rem",
-    paddingInline: "0.625rem",
-    textAlign: "left",
-  },
-  issueListSpan: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  issueListSpan2: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  rowSpan4: {
-    display: "flex",
-    width: "0.875rem",
-    flexShrink: "0",
-    justifyContent: "center",
-  },
-  rowSpan22: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  rowSpan32: {
-    display: "flex",
-    width: "18px",
-    flexShrink: "0",
-    justifyContent: "center",
-  },
-});
 
 /** The quick add, with the group's repo or helper when grouped by one. */
 export type ListAdd = (where: NewIssueAt) => void;
@@ -197,7 +50,7 @@ export function IssueList(props: {
 
   return (
     <Show when={!props.loading} fallback={<EmptyNote>{t("web.issue.reading")}</EmptyNote>}>
-      <div {...stylex.attrs(styles.issueListDiv)}>
+      <div class="@container min-h-0 flex-1 overflow-y-auto px-3 pb-3">
         <For each={groupRows(props.cards, props.grouping, rowKeys)} keyed={(g) => g.key}>
           {(g) => {
             const groupLane = () => g().lane;
@@ -242,19 +95,19 @@ export function IssueList(props: {
               }
             };
             return (
-              <section aria-label={label()} data-testid="issue-group" data-key={g().key} {...stylex.attrs(styles.issueGroup)}>
+              <section aria-label={label()} data-testid="issue-group" data-key={g().key} class="mb-1">
                 {/* A head of words on the page, not a bar: its line under it sets the group off. */}
-                <header {...stylex.attrs(styles.issueListHeader)}>
+                <header class="sticky top-0 z-10 mt-2 flex h-8.5 items-center border-b border-line bg-page pr-1">
                   <button
                     type="button"
                     onClick={() => fold(g().key)}
                     aria-label={isFolded() ? t("web.issue.list.unfold", { group: label() }) : t("web.issue.list.fold", { group: label() })}
-                    {...stylex.attrs(styles.issueListButton)}
+                    class="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-2.5 text-left"
                   >
-                    <Icon name="expand" size={10} styles={[styles.issueListIcon, !isFolded() ? styles.issueListIconTone : styles.issueListIcon]} />
+                    <Icon name="expand" size={10} class={["", !isFolded() ? "[rotate:90deg]" : ""]} />
                     {icon()}
-                    <span {...stylex.attrs(styles.issueListSpan)}>{label()}</span>
-                    <span {...stylex.attrs(styles.issueListSpan2)}>{g().rows.length}</span>
+                    <span class="truncate text-sm font-semibold">{label()}</span>
+                    <span class="text-xs text-muted">{g().rows.length}</span>
                   </button>
                   <Show when={canAdd(g())}>
                     <IconButton icon="add" label={t("web.issue.list.writeIn", { group: label() })} onClick={() => add(g())} />
@@ -316,37 +169,37 @@ function Row(props: {
       onKeyDown={(e) => {
         if (e.key === "Enter") props.onOpen(props.card.id);
       }}
-      {...stylex.attrs(styles.rowDiv, props.selected ? styles.rowDivTone : styles.rowDivAlt)}
+      class={["flex h-9.5 cursor-pointer items-center gap-2.5 rounded-md px-2.5", props.selected ? "bg-selected" : "hover:bg-hover"]}
     >
-      <span {...stylex.attrs(styles.rowSpan4)}>
+      <span class="flex w-3.5 shrink-0 justify-center">
         <Show when={look().priority === "urgent" || look().priority === "high" ? look().priority : undefined}>
           {(pr) => <PriorityMark priority={pr()} size={13} />}
         </Show>
       </span>
-      <span {...stylex.attrs(styles.rowSpan)}>{look().number}</span>
-      <span {...stylex.attrs(styles.rowSpan4)}>
+      <span class="hidden @min-[640px]:block w-11 shrink-0 truncate text-xs text-muted">{look().number}</span>
+      <span class="flex w-3.5 shrink-0 justify-center">
         <Show when={props.groupStatus === undefined || (look().status !== props.groupStatus && !(props.groupStatus === "todo" && look().status === "backlog"))}>
           <StatusMark status={look().status} tone={look().statusTone} size={13} />
         </Show>
       </span>
-      <span {...stylex.attrs(styles.rowSpan22)}>{look().title}</span>
+      <span class="min-w-0 flex-1 truncate text-sm">{look().title}</span>
       <Show when={look().progress}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</Show>
       <For each={look().flags}>
         {(f, i) => (
-          <span {...stylex.attrs(i() > 0 ? styles.rowSpanSecondary : styles.rowSpanPrimary)}>
+          <span class={i() > 0 ? "hidden @min-[640px]:inline" : ""}>
             <FlagChip text={f.text} tone={f.tone} />
           </span>
         )}
       </For>
       <Show when={props.showRepo}>
-        <span {...stylex.attrs(styles.rowSpan2)}>{repo()}</span>
+        <span class="hidden @min-[640px]:block w-30 shrink-0 truncate text-xs text-muted">{repo()}</span>
       </Show>
-      <span {...stylex.attrs(styles.rowSpan32)}>
+      <span class="flex w-4.5 shrink-0 justify-center">
         <Show when={cardAgent(props.card) || props.card.kind === "orchestrator"}>
           <CardFace card={props.card} size={18} />
         </Show>
       </span>
-      <span {...stylex.attrs(styles.rowSpan3)}>{ago(rowKeys(props.card).updatedAt, now())}</span>
+      <span class="w-14 @min-[640px]:w-18 shrink-0 text-right text-xs text-muted">{ago(rowKeys(props.card).updatedAt, now())}</span>
     </div>
   );
 }

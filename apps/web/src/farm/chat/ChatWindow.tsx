@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -37,377 +36,6 @@ import { ChannelMenu } from "./ChannelMenu";
 import { type ChatPhase, FarmComposer } from "./Composer";
 import { ChatBubble, ChatReport, ChatRow, FaceOf, ParentMessage, ThreadChip } from "./Messages";
 
-const typingPulse = stylex.keyframes({ "50%": { opacity: 0.5 } });
-
-const recipeStyles2 = stylex.create({
-  dotsSpan: {
-    height: "var(--spacing)",
-    width: "var(--spacing)",
-    animationName: { default: typingPulse, "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: "2s",
-    animationDelay: "0s",
-    animationTimingFunction: "cubic-bezier(.4, 0, .6, 1)",
-    animationIterationCount: "infinite",
-    animationDirection: "normal",
-    animationFillMode: "none",
-    animationPlayState: "running",
-    backgroundColor: "var(--color-bark-500)",
-  },
-  chatWindowSpan: {
-    marginLeft: "calc(var(--spacing) * .5)",
-    display: "inline-block",
-    height: "calc(var(--spacing) * 3)",
-    width: "calc(var(--spacing) * 1.5)",
-    animationName: { default: typingPulse, "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: "2s",
-    animationDelay: "0s",
-    animationTimingFunction: "cubic-bezier(.4, 0, .6, 1)",
-    animationIterationCount: "infinite",
-    animationDirection: "normal",
-    animationFillMode: "none",
-    animationPlayState: "running",
-    backgroundColor: "currentColor",
-    verticalAlign: "middle",
-  },
-  chatWindowDiv: {
-    display: "flex",
-    flexShrink: "0",
-    WebkitMaskImage: "linear-gradient(to right, transparent, black var(--fade-left), black calc(100% - var(--fade-right)), transparent)",
-    maskImage: "linear-gradient(to right, transparent, black var(--fade-left), black calc(100% - var(--fade-right)), transparent)",
-    animationName: "scroll-fade-x",
-    animationDuration: "0s",
-    animationDelay: "0s",
-    animationTimingFunction: "linear",
-    animationIterationCount: "1",
-    animationDirection: "normal",
-    animationFillMode: "both",
-    animationPlayState: "running",
-    animationTimeline: "scroll(self x)",
-    gap: "calc(var(--spacing) * 1.5)",
-    overflowX: "auto",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBottom: "calc(var(--spacing) * 2)",
-  },
-});
-
-const recipeStyles = stylex.create({
-  chatWindowP: {
-    display: "flex",
-    height: "calc(var(--spacing) * 4)",
-    alignItems: "center",
-    gap: "calc(var(--spacing) * 1.5)",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "calc(var(--spacing) * 4)",
-    color: "var(--color-bark-500)",
-  },
-  chatWindowButton: {
-    alignSelf: "center",
-    paddingInline: "calc(var(--spacing) * 2.5)",
-    paddingBlock: "calc(var(--spacing) * .5)",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "calc(var(--spacing) * 4)",
-    color: {
-      default: "var(--color-bark-500)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-bark-800)",
-      },
-    },
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-cream-200)",
-      },
-    },
-  },
-  chatWindowP2: {
-    paddingBlock: "calc(var(--spacing) * 4)",
-    textAlign: "center",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "calc(var(--spacing) * 4)",
-    color: "var(--color-bark-500)",
-  },
-  threadHeadP: {
-    height: "calc(var(--spacing) * 4)",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "calc(var(--spacing) * 4)",
-    color: "var(--color-bark-500)",
-  },
-  itemP: {
-    paddingInline: "calc(var(--spacing) * 4)",
-    textAlign: "center",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.625",
-    color: "var(--color-bark-500)",
-  },
-});
-
-const variantStyles = stylex.create({
-  chatWindowDiv: {
-    display: "flex",
-    minHeight: "0",
-    flex: "1",
-    flexDirection: "column-reverse",
-    overflowY: "auto",
-    padding: "calc(var(--spacing) * 3)",
-  },
-  chatWindowDiv2: {},
-  chatWindowDivVariant: {
-    opacity: ".7",
-  },
-});
-
-const viewStyles = stylex.create({
-  dotsSpan: {
-    display: "inline-flex",
-    gap: "calc(var(--spacing) * .5)",
-  },
-  headButtonButton: {
-    display: "flex",
-    height: "calc(var(--spacing) * 8)",
-    width: "calc(var(--spacing) * 8)",
-    flexShrink: "0",
-    cursor: "pointer",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-cream-200)",
-      },
-      ":active": "var(--color-cream-300)",
-    },
-  },
-  newElsewhereButton: {
-    marginLeft: "calc(var(--spacing) * 2)",
-    flexShrink: "0",
-    cursor: "pointer",
-    backgroundColor: {
-      default: "var(--color-berry)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-berry) 15%, transparent)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-berry)",
-        "@supports (color:color-mix(in lab, red, red))": {
-          default: null,
-          ":hover": "color-mix(in oklab, var(--color-berry) 25%, transparent)",
-        },
-      },
-    },
-    paddingInline: "calc(var(--spacing) * 2)",
-    paddingBlock: "1px",
-    fontSize: "12px",
-    color: "var(--color-berry)",
-  },
-  farmChat: {
-    position: "relative",
-    height: "100%",
-    width: "100%",
-  },
-  chatWindowDiv: {
-    display: "flex",
-    height: "100%",
-    flexDirection: "column",
-    overflow: "hidden",
-    backgroundColor: "var(--color-cream-50)",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.625",
-    color: "var(--color-bark-900)",
-  },
-  chatWindowDiv2: {
-    display: "flex",
-    flexShrink: "0",
-    alignItems: "center",
-    gap: "var(--spacing)",
-    borderBottomStyle: "solid",
-    borderBottomWidth: "1px",
-    borderColor: "var(--color-cream-200)",
-    paddingBlock: "calc(var(--spacing) * 2)",
-    paddingRight: "calc(var(--spacing) * 2)",
-    paddingLeft: "calc(var(--spacing) * 3)",
-  },
-  chatWindowDiv3: {
-    minWidth: "0",
-    flex: "1",
-  },
-  chatWindowDiv4: {
-    display: "flex",
-    alignItems: "center",
-  },
-  chatWindowSpan: {
-    marginLeft: "calc(var(--spacing) * 2)",
-    minWidth: "0",
-  },
-  chatWindowSpan2: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-  },
-  chatWindowDiv5: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
-  },
-  chatWindowSpan3: {
-    whiteSpace: "pre-line",
-  },
-  chatWindowDiv6: {
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: "calc(var(--spacing) * 1.5)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBottom: "var(--spacing)",
-    fontSize: "12px",
-  },
-  chatWindowSpan4: {
-    minWidth: "0",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    color: "var(--color-berry)",
-  },
-  pendingRetry: {
-    cursor: "pointer",
-    backgroundColor: {
-      default: "var(--color-cream-200)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-leaf-300)",
-      },
-    },
-    paddingInline: "calc(var(--spacing) * 1.5)",
-    color: "var(--color-bark-800)",
-  },
-  pendingDrop: {
-    cursor: "pointer",
-    backgroundColor: {
-      default: "var(--color-cream-200)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-cream-300)",
-      },
-    },
-    paddingInline: "calc(var(--spacing) * 1.5)",
-    color: "var(--color-bark-800)",
-  },
-  chatWindowDiv7: {
-    opacity: ".7",
-  },
-  chatWindowSpan5: {
-    display: "flex",
-    height: "calc(var(--spacing) * 5)",
-    alignItems: "center",
-    paddingInline: "var(--spacing)",
-  },
-  chatProblem: {
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * .5)",
-    fontSize: "12px",
-    color: "var(--color-berry)",
-  },
-  chatWindowButton: {
-    maxWidth: "calc(var(--spacing) * 40)",
-    flexShrink: "0",
-    cursor: "pointer",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    backgroundColor: {
-      default: "var(--color-cream-200)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-leaf-300)",
-      },
-    },
-    paddingInline: "calc(var(--spacing) * 2.5)",
-    paddingBlock: "calc(var(--spacing) * .5)",
-    fontSize: "12px",
-    color: {
-      default: "var(--color-bark-800)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-bark-900)",
-      },
-    },
-  },
-  chatWindowDiv8: {
-    marginTop: "auto",
-  },
-  callProblem: {
-    flexShrink: "0",
-    borderBottomStyle: "solid",
-    borderBottomWidth: "1px",
-    borderColor: "var(--color-cream-200)",
-    backgroundColor: {
-      default: "var(--color-berry)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-berry) 10%, transparent)",
-    },
-  },
-  callProblemDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "calc(var(--spacing) * 2)",
-    paddingInline: "calc(var(--spacing) * 3)",
-    paddingBlock: "calc(var(--spacing) * 2.5)",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    lineHeight: "1.625",
-    color: "var(--color-bark-900)",
-  },
-  callProblemDiv2: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "calc(var(--spacing) * 2)",
-  },
-  threadHeadDiv: {
-    display: "flex",
-    flexShrink: "0",
-    alignItems: "center",
-    gap: "var(--spacing)",
-    borderBottomStyle: "solid",
-    borderBottomWidth: "1px",
-    borderColor: "var(--color-cream-200)",
-    paddingBlock: "calc(var(--spacing) * 2)",
-    paddingRight: "calc(var(--spacing) * 2)",
-    paddingLeft: "var(--spacing)",
-  },
-  threadHeadDiv2: {
-    display: "flex",
-    alignItems: "center",
-    gap: "calc(var(--spacing) * 2)",
-  },
-  threadHeadSpan: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "13px",
-  },
-  threadHeadSpan2: {
-    flexShrink: "0",
-    backgroundColor: "var(--color-cream-200)",
-    paddingInline: "calc(var(--spacing) * 1.5)",
-    fontFamily: "var(--font-mono)",
-    fontSize: "12.5px",
-    color: "var(--color-bark-600)",
-  },
-  itemDiv: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-start",
-  },
-});
-
 const suggestions = ([0, 1, 2, 3] as const).map((i) => t(`web.farm.chat.suggestions.${i}`));
 
 const greeting = t("web.farm.chat.greeting");
@@ -436,8 +64,15 @@ const phaseOf = (v: VoiceCall, s: SpaceState | undefined): ChatPhase => {
 
 function Dots() {
   return (
-    <span {...stylex.attrs(viewStyles.dotsSpan)} aria-hidden="true">
-      <For each={[0, 1, 2]}>{(i) => <span {...stylex.attrs(recipeStyles2.dotsSpan)} style={{ "animation-delay": `${i * 0.2}s` }} />}</For>
+    <span class="inline-flex gap-0.5" aria-hidden="true">
+      <For each={[0, 1, 2]}>
+        {(i) => (
+          <span
+            class="h-1 w-1 [animation-name:pulse] motion-reduce:[animation-name:none] [animation-duration:2000ms] [animation-timing-function:cubic-bezier(.4,_0,_.6,_1)] [animation-iteration-count:infinite] bg-bark-500"
+            style={{ "animation-delay": `${i * 0.2}s` }}
+          />
+        )}
+      </For>
     </span>
   );
 }
@@ -451,7 +86,7 @@ function HeadButton(props: { label: string; testid: string; sprite: string; onCl
       title={props.label}
       onClick={() => props.onClick()}
       onDblClick={(e) => e.stopPropagation()}
-      {...stylex.attrs(viewStyles.headButtonButton)}
+      class="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center hover:bg-cream-200 active:bg-cream-300"
     >
       <SpriteIcon name={props.sprite} size={16} />
     </button>
@@ -472,7 +107,7 @@ function NewElsewhere(props: { except: string | undefined }) {
           type="button"
           onClick={() => farm.showChat(newest().default ? undefined : newest().id)}
           onDblClick={(e) => e.stopPropagation()}
-          {...stylex.attrs(viewStyles.newElsewhereButton)}
+          class="ml-2 shrink-0 cursor-pointer bg-berry/15 hover:bg-berry/25 px-2 py-px text-(length:--text-xs) text-berry"
         >
           {waiting().length > 1
             ? t("web.farm.chat.newIn", { n: waiting().length })
@@ -535,22 +170,22 @@ export function ChatWindow() {
   const showSuggestions = () => !thread() && (core()?.call === "live" || (said().ready && said().messages.length === 0));
 
   return (
-    <section aria-label={t("web.farm.chat.label")} data-testid="farm-chat" {...stylex.attrs(viewStyles.farmChat)}>
-      <div {...stylex.attrs(viewStyles.chatWindowDiv)}>
+    <section aria-label={t("web.farm.chat.label")} data-testid="farm-chat" class="relative h-full w-full">
+      <div class="flex h-full flex-col overflow-hidden bg-cream-50 font-pixel text-xs leading-relaxed text-bark-900">
         <Show
           when={thread()}
           fallback={
-            <div onDblClick={onHeadDouble} {...stylex.attrs(viewStyles.chatWindowDiv2)}>
-              <div {...stylex.attrs(viewStyles.chatWindowDiv3)}>
-                <div {...stylex.attrs(viewStyles.chatWindowDiv4)}>
+            <div onDblClick={onHeadDouble} class="flex shrink-0 items-center gap-1 border-b border-cream-200 py-2 pr-2 pl-3">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center">
                   <SpriteIcon name="icon-board" size={20} />
-                  <span {...stylex.attrs(viewStyles.chatWindowSpan)}>
+                  <span class="ml-2 min-w-0">
                     <ChannelMenu current={shown()} />
                   </span>
                   <NewElsewhere except={shown()?.id} />
                 </div>
-                <p {...stylex.attrs(recipeStyles.chatWindowP)} aria-live="polite">
-                  <span {...stylex.attrs(viewStyles.chatWindowSpan2)}>{phaseWords[phase()]}</span>
+                <p class="flex h-4 items-center gap-1.5 font-pixel text-xs leading-[1rem] text-bark-500" aria-live="polite">
+                  <span class="truncate">{phaseWords[phase()]}</span>
                   <Show when={phase() === "thinking" || phase() === "connecting"}>
                     <Dots />
                   </Show>
@@ -570,25 +205,29 @@ export function ChatWindow() {
         </Show>
         <CallProblem call={call()} />
         <div
-          {...stylex.attrs(variantStyles.chatWindowDiv)}
+          class="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto p-3"
           aria-label={thread() ? t("web.farm.chat.thread") : farmChannelLabel(shown())}
           role="log"
           data-testid="messages"
         >
-          <div {...stylex.attrs(viewStyles.chatWindowDiv5)}>
+          <div class="flex flex-col gap-2">
             <Show when={hasOlder() && shown()}>
-              <button type="button" onClick={() => void followed.loadOlder(shown()!.id)} {...stylex.attrs(recipeStyles.chatWindowButton)}>
+              <button
+                type="button"
+                onClick={() => void followed.loadOlder(shown()!.id)}
+                class="self-center px-2.5 py-0.5 font-pixel text-xs leading-[1rem] text-bark-500 hover:text-bark-800 hover:bg-cream-200"
+              >
                 {t("web.farm.chat.older")}
               </button>
             </Show>
             <Show when={parent()}>{(m) => <ParentMessage m={m()} face={<FaceOf m={m()} agents={agents()} />} />}</Show>
             <Show when={items().length === 0 && !thread()}>
               <ChatRow mine={false} first face={<OrchestratorFace size={30} />} name={t("web.farm.orchestrator")}>
-                <span {...stylex.attrs(viewStyles.chatWindowSpan3)}>{greeting}</span>
+                <span class="whitespace-pre-line">{greeting}</span>
               </ChatRow>
             </Show>
             <Show when={items().length === 0 && thread()}>
-              <p {...stylex.attrs(recipeStyles.chatWindowP2)}>{t("web.farm.chat.threadEmpty")}</p>
+              <p class="py-4 text-center font-pixel text-xs leading-[1rem] text-bark-500">{t("web.farm.chat.threadEmpty")}</p>
             </Show>
             <For each={items()} keyed={(item) => item.message.id}>
               {(item, i) => (
@@ -615,7 +254,7 @@ export function ChatWindow() {
             <For each={sending()} keyed={(p) => p.key}>
               {(p) => (
                 <div
-                  {...stylex.attrs(variantStyles.chatWindowDiv2, p().state === "failed" ? variantStyles.chatWindowDiv2 : variantStyles.chatWindowDivVariant)}
+                  class={["", p().state === "failed" ? "" : "opacity-70"]}
                   aria-label={p().state === "failed" ? t("web.farm.chat.notSentLine") : t("web.farm.chat.sending")}
                   data-testid="message"
                   data-key={p().key}
@@ -623,11 +262,11 @@ export function ChatWindow() {
                   data-state={p().state}
                 >
                   <ChatRow mine first title={p().state === "failed" ? (p().reason ?? t("web.farm.chat.notSentLine")) : t("web.farm.chat.sending")}>
-                    <span {...stylex.attrs(viewStyles.chatWindowSpan3)}>{p().text}</span>
+                    <span class="whitespace-pre-line">{p().text}</span>
                   </ChatRow>
                   <Show when={p().state === "failed"}>
-                    <div {...stylex.attrs(viewStyles.chatWindowDiv6)}>
-                      <span {...stylex.attrs(viewStyles.chatWindowSpan4)}>{p().reason ?? t("web.farm.chat.notSentLine")}</span>
+                    <div class="flex justify-end gap-1.5 px-3 pb-1 text-(length:--text-xs)">
+                      <span class="min-w-0 truncate text-berry">{p().reason ?? t("web.farm.chat.notSentLine")}</span>
                       <button
                         type="button"
                         data-testid="pending-retry"
@@ -635,11 +274,16 @@ export function ChatWindow() {
                           setProblem(undefined);
                           void says.retry(p().key).then((end) => end?.phase === "failed" && notSent(end.fault.reason));
                         }}
-                        {...stylex.attrs(viewStyles.pendingRetry)}
+                        class="cursor-pointer bg-cream-200 hover:bg-leaf-300 px-1.5 text-bark-800"
                       >
                         {t("web.farm.chat.retrySend")}
                       </button>
-                      <button type="button" data-testid="pending-drop" onClick={() => says.drop(p().key)} {...stylex.attrs(viewStyles.pendingDrop)}>
+                      <button
+                        type="button"
+                        data-testid="pending-drop"
+                        onClick={() => says.drop(p().key)}
+                        class="cursor-pointer bg-cream-200 hover:bg-cream-300 px-1.5 text-bark-800"
+                      >
                         {t("web.farm.chat.dropSend")}
                       </button>
                     </div>
@@ -649,7 +293,7 @@ export function ChatWindow() {
             </For>
             <For each={captions()} keyed={(caption) => caption.speaker + caption.turn}>
               {(caption) => (
-                <div {...stylex.attrs(viewStyles.chatWindowDiv7)} aria-label={t("web.farm.chat.captions")}>
+                <div class="opacity-70" aria-label={t("web.farm.chat.captions")}>
                   <ChatRow
                     mine={caption().speaker === "you"}
                     first
@@ -657,9 +301,12 @@ export function ChatWindow() {
                     name={caption().speaker === "you" ? undefined : t("web.farm.orchestrator")}
                     title={caption().done ? t("web.farm.chat.done") : t("web.farm.chat.speaking")}
                   >
-                    <span {...stylex.attrs(viewStyles.chatWindowSpan3)}>{caption().text}</span>
+                    <span class="whitespace-pre-line">{caption().text}</span>
                     <Show when={!caption().done}>
-                      <span {...stylex.attrs(recipeStyles2.chatWindowSpan)} aria-hidden="true" />
+                      <span
+                        class="ml-0.5 inline-block h-3 w-1.5 [animation-name:pulse] motion-reduce:[animation-name:none] [animation-duration:2000ms] [animation-timing-function:cubic-bezier(.4,_0,_.6,_1)] [animation-iteration-count:infinite] bg-current align-middle"
+                        aria-hidden="true"
+                      />
                     </Show>
                   </ChatRow>
                 </div>
@@ -667,7 +314,7 @@ export function ChatWindow() {
             </For>
             <Show when={thinking()}>
               <ChatRow mine={false} first face={<OrchestratorFace size={30} />}>
-                <span {...stylex.attrs(viewStyles.chatWindowSpan5)}>
+                <span class="flex h-5 items-center px-1">
                   <Dots />
                 </span>
               </ChatRow>
@@ -676,13 +323,13 @@ export function ChatWindow() {
         </div>
         <Show when={problem() ?? (said().error === undefined ? undefined : t("web.farm.chat.unread", { why: said().error ?? "" }))}>
           {(line) => (
-            <p role="alert" data-testid="chat-problem" {...stylex.attrs(viewStyles.chatProblem)}>
+            <p role="alert" data-testid="chat-problem" class="px-3 py-0.5 text-(length:--text-xs) text-berry">
               {line()}
             </p>
           )}
         </Show>
         <Show when={showSuggestions()}>
-          <div {...stylex.attrs(recipeStyles2.chatWindowDiv)}>
+          <div class="flex shrink-0 [mask-image:linear-gradient(to_right,_transparent,_black_var(--fade-left),_black_calc(100%_-_var(--fade-right)),_transparent)] [animation-name:scroll-fade-x] [animation-duration:0ms] [animation-timing-function:linear] [animation-fill-mode:both] [animation-timeline:scroll(self_x)] gap-1.5 overflow-x-auto px-3 pb-2">
             <For each={suggestions}>
               {(line) => (
                 <button
@@ -693,7 +340,7 @@ export function ChatWindow() {
                     if (!c) return;
                     void sendOnce(says, { id: c.id, text: line }).then((end) => end?.phase === "failed" && notSent(end.fault.reason));
                   }}
-                  {...stylex.attrs(viewStyles.chatWindowButton)}
+                  class="max-w-40 shrink-0 cursor-pointer truncate bg-cream-200 hover:bg-leaf-300 px-2.5 py-0.5 text-(length:--text-xs) text-bark-800 hover:text-bark-900"
                 >
                   {line}
                 </button>
@@ -701,7 +348,7 @@ export function ChatWindow() {
             </For>
           </div>
         </Show>
-        <div {...stylex.attrs(viewStyles.chatWindowDiv8)}>
+        <div class="mt-auto">
           <FarmComposer channel={shown()} thread={!!thread()} onProblem={setProblem} />
         </div>
       </div>
@@ -715,10 +362,10 @@ function CallProblem(props: { call: VoiceCall }) {
   const open = () => props.call.phase === "idle" && props.call.problem !== "";
   return (
     <Show when={open()}>
-      <div role="alert" data-testid="call-problem" {...stylex.attrs(viewStyles.callProblem)}>
-        <div {...stylex.attrs(viewStyles.callProblemDiv)}>
-          <div {...stylex.attrs(viewStyles.callProblemDiv2)}>
-            <span {...stylex.attrs(viewStyles.chatWindowDiv3)}>{t("web.farm.chat.noVoice", { why: props.call.problem })}</span>
+      <div role="alert" data-testid="call-problem" class="shrink-0 border-b border-cream-200 bg-berry/10">
+        <div class="flex flex-col gap-2 px-3 py-2.5 font-pixel text-xs leading-relaxed text-bark-900">
+          <div class="flex items-start gap-2">
+            <span class="min-w-0 flex-1">{t("web.farm.chat.noVoice", { why: props.call.problem })}</span>
             <PxButton size="sm" icon="button-close" data-testid="call-problem-dismiss" label={t("web.farm.chat.gotIt")} onClick={() => voiceCall.dismiss()} />
           </div>
           <Show when={props.call.problemAt}>
@@ -761,20 +408,20 @@ function ThreadHead(props: { thread: Channel; large: boolean; onLarge: () => voi
         : t("web.farm.chat.replies", { n: props.thread.replies });
   };
   return (
-    <div onDblClick={(e) => props.onDouble(e)} {...stylex.attrs(viewStyles.threadHeadDiv)}>
+    <div onDblClick={(e) => props.onDouble(e)} class="flex shrink-0 items-center gap-1 border-b border-cream-200 py-2 pr-2 pl-1">
       <HeadButton
         testid="chat-back"
         label={t("web.farm.chat.back", { channel: farmChannelLabel(channel()) })}
         sprite="button-back"
         onClick={() => farm.showChat(backTo())}
       />
-      <div {...stylex.attrs(viewStyles.chatWindowDiv3)}>
-        <div {...stylex.attrs(viewStyles.threadHeadDiv2)}>
-          <span {...stylex.attrs(viewStyles.threadHeadSpan)}>{title()}</span>
-          <Show when={session()}>{(s) => <span {...stylex.attrs(viewStyles.threadHeadSpan2)}>@{s().id}</span>}</Show>
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2">
+          <span class="truncate text-(length:--text-sm)">{title()}</span>
+          <Show when={session()}>{(s) => <span class="shrink-0 bg-cream-200 px-1.5 font-mono text-[length:12.5px] text-bark-600">@{s().id}</span>}</Show>
           <NewElsewhere except={props.thread.id} />
         </div>
-        <p {...stylex.attrs(recipeStyles.threadHeadP)}>{status()}</p>
+        <p class="h-4 truncate font-pixel text-xs leading-[1rem] text-bark-500">{status()}</p>
       </div>
       <HeadButton
         testid="chat-large"
@@ -809,7 +456,7 @@ function Item(props: { m: ChatMessage; thread?: Channel | undefined; first: bool
           tag={props.m.kind === "dispatch" ? t("web.farm.chat.dispatch") : undefined}
           folded={props.m.kind === "dispatch"}
           after={
-            <div {...stylex.attrs(viewStyles.itemDiv)}>
+            <div class="flex flex-col items-start">
               {turn()}
               {chip()}
             </div>
@@ -818,7 +465,7 @@ function Item(props: { m: ChatMessage; thread?: Channel | undefined; first: bool
       }
     >
       <Match when={props.m.kind === "notice" || props.m.actor.kind === "system"}>
-        <p {...stylex.attrs(recipeStyles.itemP)}>{props.m.text}</p>
+        <p class="px-4 text-center font-pixel text-xs leading-relaxed text-bark-500">{props.m.text}</p>
       </Match>
       <Match when={props.m.kind === "report"}>
         <ChatReport

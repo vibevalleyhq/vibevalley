@@ -1,18 +1,16 @@
-import type { Effect } from "effect";
-
-import type { ApiError, Endpoint } from "../endpoint";
+import type { Endpoint } from "../endpoint";
 import * as S from "../schema";
 import type * as T from "../shapes";
 
-export interface LanHandlers<R = never> {
-  readonly "lan.get": () => Effect.Effect<T.LanStatus, ApiError, R>;
-  readonly "lan.update": (a: T.SetOpenRequest) => Effect.Effect<T.LanStatus, ApiError, R>;
-  readonly "lan.pairing.start": () => Effect.Effect<T.LanStatus, ApiError, R>;
-  readonly "lan.pairing.stop": () => Effect.Effect<T.LanStatus, ApiError, R>;
+export interface LanHandlers {
+  readonly "lan.get": () => Promise<T.LanStatus>;
+  readonly "lan.update": (a: T.SetOpenRequest) => Promise<T.LanStatus>;
+  readonly "lan.pairing.start": () => Promise<T.LanStatus>;
+  readonly "lan.pairing.stop": () => Promise<T.LanStatus>;
   /** What stopPairing would do, refused as it would be; nothing changes. */
-  readonly "lan.pairing.previewStop": () => Effect.Effect<T.Preview, ApiError, R>;
-  readonly "lan.pairing.answer": (a: T.AnswerPairingRequest) => Effect.Effect<T.LanStatus, ApiError, R>;
-  readonly "lan.pair": (a: T.LanPairRequest) => Effect.Effect<T.LanPaired, ApiError, R>;
+  readonly "lan.pairing.previewStop": () => Promise<T.Preview>;
+  readonly "lan.pairing.answer": (a: T.AnswerPairingRequest) => Promise<T.LanStatus>;
+  readonly "lan.pair": (a: T.LanPairRequest) => Promise<T.LanPaired>;
 }
 
 export const lanEndpoints: readonly Endpoint[] = [

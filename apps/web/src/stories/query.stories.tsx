@@ -1,20 +1,10 @@
-import * as stylex from "@stylexjs/stylex";
-import { Schema } from "effect";
 import { createMemo, createSignal, Show } from "solid-js";
+import { z } from "zod";
 
 import { stories, story } from "@vibevalley/stories";
 
 import { createQueryClient, defineQuery, QueryProvider, useQuery, type QueryDescriptor } from "#/infra/query.ts";
 import { Button } from "#/ui/Button.tsx";
-
-const styles = stylex.create({
-  queriesDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
-    padding: "1rem",
-  },
-});
 
 function Observer(props: { id: () => number; query: (id: number) => QueryDescriptor<{ id: number }>; enabled: () => boolean; name: string }) {
   const result = useQuery(() => props.query(props.id()), { enabled: () => props.enabled(), keepPrevious: true });
@@ -44,7 +34,7 @@ function Queries() {
   const [aborts, setAborts] = createSignal(0);
   const pending: ((invalid: boolean) => void)[] = [];
   const query = defineQuery({
-    schema: Schema.Struct({ id: Schema.Finite }),
+    schema: z.object({ id: z.number() }),
     key: (id: number) => ["query-story", id],
     staleTime: Infinity,
     fetch: (id, { signal }) => {
@@ -55,7 +45,7 @@ function Queries() {
   });
   return (
     <QueryProvider client={createQueryClient()}>
-      <div {...stylex.attrs(styles.queriesDiv)}>
+      <div class="flex flex-col gap-3 p-4">
         <Observer name="one" id={id} query={query} enabled={enabled} />
         <Show when={second()}>
           <Observer name="two" id={id} query={query} enabled={enabled} />

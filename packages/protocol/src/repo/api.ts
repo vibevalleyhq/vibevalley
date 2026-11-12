@@ -1,20 +1,20 @@
-import { type Effect, Schema } from "effect";
+import { z } from "zod";
 
-import { type ApiError, type Endpoint, input } from "../endpoint";
+import { type Endpoint, input } from "../endpoint";
 import * as S from "../schema";
 import type * as T from "../shapes";
 
-export interface RepoHandlers<R = never> {
-  readonly "repo.pr.submit": (a: T.SubmitBranch) => Effect.Effect<T.BranchPublication, ApiError, R>;
-  readonly "github.get": () => Effect.Effect<T.GitHubStatus, ApiError, R>;
-  readonly "github.refresh": () => Effect.Effect<T.GitHubStatus, ApiError, R>;
-  readonly "repo.list": () => Effect.Effect<T.RepoSummary[], ApiError, R>;
+export interface RepoHandlers {
+  readonly "repo.pr.submit": (a: T.SubmitBranch) => Promise<T.BranchPublication>;
+  readonly "github.get": () => Promise<T.GitHubStatus>;
+  readonly "github.refresh": () => Promise<T.GitHubStatus>;
+  readonly "repo.list": () => Promise<T.RepoSummary[]>;
   /** The first thing Create would refuse in this repo, without making it. */
-  readonly "repo.validate": (a: T.NewRepo) => Effect.Effect<T.Validation, ApiError, R>;
-  readonly "repo.create": (a: T.NewRepo) => Effect.Effect<T.RepoSummary, ApiError, R>;
-  readonly "repo.language.list": (a: { readonly id: string }) => Effect.Effect<T.RepoLanguages, ApiError, R>;
-  readonly "repo.template.list": (a: { readonly id: string }) => Effect.Effect<T.RepoTemplates, ApiError, R>;
-  readonly "repo.activity.get": (a: { readonly id: string }) => Effect.Effect<T.RepoActivity, ApiError, R>;
+  readonly "repo.validate": (a: T.NewRepo) => Promise<T.Validation>;
+  readonly "repo.create": (a: T.NewRepo) => Promise<T.RepoSummary>;
+  readonly "repo.language.list": (a: { readonly id: string }) => Promise<T.RepoLanguages>;
+  readonly "repo.template.list": (a: { readonly id: string }) => Promise<T.RepoTemplates>;
+  readonly "repo.activity.get": (a: { readonly id: string }) => Promise<T.RepoActivity>;
 }
 
 export const repoEndpoints: readonly Endpoint[] = [
@@ -37,7 +37,7 @@ export const repoEndpoints: readonly Endpoint[] = [
     op: "repo.list",
     about: [],
     input: undefined,
-    result: Schema.mutable(Schema.Array(S.RepoSummary)),
+    result: z.array(S.RepoSummary),
     can: ["user", "remote", "orchestrator"],
   },
   {
@@ -57,21 +57,21 @@ export const repoEndpoints: readonly Endpoint[] = [
   {
     op: "repo.language.list",
     about: ["id"],
-    input: input({ id: Schema.String }),
+    input: input({ id: z.string() }),
     result: S.RepoLanguages,
     can: ["user", "remote"],
   },
   {
     op: "repo.template.list",
     about: ["id"],
-    input: input({ id: Schema.String }),
+    input: input({ id: z.string() }),
     result: S.RepoTemplates,
     can: ["user", "remote"],
   },
   {
     op: "repo.activity.get",
     about: ["id"],
-    input: input({ id: Schema.String }),
+    input: input({ id: z.string() }),
     result: S.RepoActivity,
     can: ["user", "remote"],
   },

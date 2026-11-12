@@ -5,11 +5,7 @@ import { says } from "./scripts/audit/oxlint-plugin.ts";
 // What no-restricted-imports says, each written once: what is wrong, how to fix it, and where to look
 // (scripts/audit/oxlint-plugin.ts, says; its test reads these too).
 export const refused = {
-  bunTest: says(
-    "tests run on vitest, not bun",
-    'import { describe, expect, it } from "vite-plus/test" (in the server, `it.effect` from "@effect/vitest")',
-    "docs/subsystems/foundation.md",
-  ),
+  bunTest: says("tests run on vitest, not bun", 'import { describe, expect, it } from "vite-plus/test"', "docs/subsystems/foundation.md"),
   tempDir: says(
     "a folder from mkdtempSync stays behind after the run",
     "`tempDir()` from @vibevalley/testkit/temp, which removes it when the run ends",
@@ -17,7 +13,7 @@ export const refused = {
   ),
   agentWords: says(
     "the agent says nothing to the owner: the server words what it did",
-    "return a value or a tagged error, and let apps/server turn it into words with t()",
+    "return a value or throw an Error subclass, and let apps/server turn it into words with t()",
     "packages/agent/README.md",
   ),
   agentContract: says(
@@ -80,8 +76,7 @@ export default defineConfig({
       "server:check": [
         "vp run packages:build",
         "vp check",
-        "vp run --filter @vibevalley/protocol --filter @vibevalley/home --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent --filter @vibevalley/provider --filter @vibevalley/pkm --filter @vibevalley/artifact test",
-        "vp run effect:check",
+        "vp run --filter @vibevalley/protocol --filter @vibevalley/async --filter @vibevalley/home --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent --filter @vibevalley/provider --filter @vibevalley/pkm --filter @vibevalley/artifact test",
         "vp run --filter @vibevalley/server db:check",
         "vp run --filter @vibevalley/server test",
         "vp run --filter @vibevalley/cli test",
@@ -95,10 +90,7 @@ export default defineConfig({
       ],
       // The health package's tests, then the escape ratchet (scripts/audit/health.config.ts); the report is `vp run health`.
       "health:verify": ["vp run --filter @vibevalley/health test", "vpx packages/health/src/cli.ts --config scripts/audit/health.config.ts --check"],
-      // Effect's own diagnostics (@effect/tsgo; which rules and how strict is tsconfig.base.json's plugins), a warning failing.
-      // Effect's diagnostics: the rules tsconfig.base.json names fail on any hit; the rest may only go down (scripts/audit/effect.ratchet.json).
-      "effect:check": ["vp run packages:build", "vpx scripts/audit/effect-check.ts"],
-      // The test and Effect practices the review lists (scripts/audit/practice-audit.ts): the findings may only go down
+      // The test and async practices the review lists (scripts/audit/practice-audit.ts): the findings may only go down
       // (scripts/audit/practice.ratchet.json).
       "practice:check": "vpx scripts/audit/practice-audit.ts --check",
       // Which server module uses which member of another module's service (scripts/audit/service-paths.ts): a new path fails until
@@ -127,7 +119,7 @@ export default defineConfig({
   },
   lint: {
     ignorePatterns: ["apps/server/db/generated/**"],
-    // oxlint's defaults and import for no-cycle; listing plugins replaces the defaults. Effect's own rules are effect:check's.
+    // oxlint's defaults and import for no-cycle; listing plugins replaces the defaults.
     plugins: ["eslint", "typescript", "unicorn", "oxc", "import"],
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
@@ -143,8 +135,6 @@ export default defineConfig({
       "typescript/no-misused-spread": "off",
       // A copy before changing what is iterated, on purpose.
       "unicorn/no-useless-spread": "off",
-      // const self = this before Effect.gen(function* () { … }).
-      "typescript/no-this-alias": "off",
       // Two of oxlint's suspicious rules: an `as` the type already is hides a real cast among the noise, and an error
       // thrown from a catch without { cause } loses the one that happened.
       "typescript/no-unnecessary-type-assertion": "error",
@@ -204,9 +194,9 @@ export default defineConfig({
       // Frames and the core state are shared: sorting or reversing one in place changes it for everyone holding it.
       "unicorn/no-array-sort": "error",
       "unicorn/no-array-reverse": "error",
-      // Awaits one after another in a loop: either the steps depend on each other, which the code says where it does it,
-      // or they could run together.
-      "eslint/no-await-in-loop": "error",
+      // Plain async code awaits in loops all the time (a transaction's writes, an ordered shutdown); steps that could run
+      // together are written with Promise.all (.agents/skills/vv-typescript), not caught by a rule that needs a comment on every loop.
+      "eslint/no-await-in-loop": "off",
       // ({ secret: _, ...rest }) leaves a field out.
       "eslint/no-unused-vars": ["error", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
@@ -279,13 +269,8 @@ export default defineConfig({
         rules: { "typescript/no-unsafe-type-assertion": "off" },
       },
       {
-        // Playwright drives one page: its steps cannot run together.
-        files: ["apps/*/test/**/*.spec.ts", "apps/*/test/fixtures.ts"],
-        rules: { "eslint/no-await-in-loop": "off" },
-      },
-      {
-        // The server logs through Effect (src/infra/log.ts for callbacks): levels, and the logger the layer gives; so does
-        // the agent it runs on. The command line prints.
+        // The server logs through the Logger it is handed (src/infra/log.ts): levels and the module's name; so does the
+        // agent it runs on. The command line prints.
         files: ["apps/server/src/**", "apps/cli/src/**", "packages/ai/src/**", "packages/agent/src/**"],
         rules: { "no-console": "error", "vibevalley/no-wall-clock": "error" },
       },
@@ -448,11 +433,10 @@ export default defineConfig({
         rules: { "vibevalley/no-hex-color": "error" },
       },
       {
-        // Component and story markup attaches styles exclusively through StyleX (`stylex.attrs` / `styleProps` / `domAttrs`),
-        // never raw JSX `class`, `className`, or `classList` attributes.
+        // Markup takes its looks from `class` (Tailwind utilities, vv-tailwind), never a written-out `style` (style-attrs).
         files: ["apps/web/src/**", "apps/site/src/**", "packages/stories/src/**"],
         excludeFiles: ["**/*.test.ts", "**/*.test.tsx"],
-        rules: { "vibevalley/stylex-only": "error" },
+        rules: { "vibevalley/style-attrs": "error" },
       },
       {
         // Page tests find elements by data-testid and state attributes, not by the interface's words
@@ -469,72 +453,6 @@ export default defineConfig({
         // The page's layers and its features' indexes (scripts/audit/oxlint-plugin.ts, page-layers).
         files: ["apps/web/src/**"],
         rules: { "vibevalley/page-layers": "error" },
-      },
-      {
-        // The server and the agent are Effect; a Promise is only a library's one call (scripts/audit/oxlint-plugin.ts, promise-boundary).
-        files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**"],
-        excludeFiles: [
-          "apps/server/src/**/*.test.ts",
-          "apps/cli/src/**/*.test.ts",
-          "apps/cli/src/testing/**",
-          "apps/server/src/testing/**",
-          "apps/server/src/flows/**",
-          "packages/agent/src/**/*.test.ts",
-          "packages/agent/src/testing/**",
-        ],
-        rules: { "vibevalley/promise-boundary": "error" },
-      },
-      {
-        // A tryPromise without catch fails with UnknownError and loses the real cause (scripts/audit/oxlint-plugin.ts, try-promise-catch).
-        files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**", "packages/ai/src/**"],
-        excludeFiles: ["**/*.test.ts"],
-        rules: { "vibevalley/try-promise-catch": "error" },
-      },
-      {
-        // Errors are told apart by their tag, not their class (scripts/audit/oxlint-plugin.ts, no-instanceof-tagged).
-        files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**", "packages/ai/src/**"],
-        excludeFiles: ["**/*.test.ts"],
-        rules: { "vibevalley/no-instanceof-tagged": "error" },
-      },
-      {
-        // Unknown values are read with Predicate or a Schema, not a hand-written object check (scripts/audit/oxlint-plugin.ts, no-object-guard).
-        files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**", "packages/ai/src/**", "packages/protocol/src/**"],
-        excludeFiles: ["**/*.test.ts"],
-        rules: { "vibevalley/no-object-guard": "error" },
-      },
-      {
-        // Every TaggedError's _tag literal matches its class name so catchTag and whole-repo tag checks stay exact (scripts/audit/oxlint-plugin.ts, tagged-error-tag).
-        files: ["apps/*/src/**", "packages/*/src/**"],
-        rules: { "vibevalley/tagged-error-tag": "error" },
-      },
-      {
-        // Effect v4 type-inference, Config, Match, and Schema decode idioms (scripts/audit/oxlint-plugin.ts, effect-idioms).
-        files: [
-          "apps/server/src/**",
-          "apps/cli/src/**",
-          "packages/agent/src/**",
-          "packages/ai/src/**",
-          "packages/provider/src/**",
-          "packages/pkm/src/**",
-          "packages/artifact/src/**",
-          "packages/protocol/src/**",
-        ],
-        excludeFiles: ["**/*.test.ts", "**/*.test.tsx"],
-        rules: { "vibevalley/effect-idioms": "error" },
-      },
-      {
-        // Interfaces that are Promises by the library's design: oar's runtimes (its runtime and session calls, pi's own
-        // files), the MCP SDK's request handlers, and time.ts, the service's Clock as Promises for the code on those
-        // interfaces (oar's vibevalley runtime, the journal).
-        files: [
-          "apps/server/src/modules/runtime/vibevalley.ts",
-          "apps/server/src/modules/runtime/dsh.ts",
-          "apps/server/src/modules/runtime/pi.ts",
-          "apps/server/src/modules/runtime/runtime.ts",
-          "apps/server/src/gateway/mcp/mcp.ts",
-          "apps/server/src/infra/time.ts",
-        ],
-        rules: { "vibevalley/promise-boundary": "off" },
       },
       {
         // A global is declared once in its door and read with its type (scripts/audit/oxlint-plugin.ts, global-doors).
@@ -558,13 +476,8 @@ export default defineConfig({
         rules: { "vibevalley/one-absent": "off" },
       },
       {
-        // A service's methods open a span named after them, so the traces show each call (scripts/audit/oxlint-plugin.ts, service-method-names).
-        files: ["apps/server/src/**"],
-        excludeFiles: ["apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
-        rules: { "vibevalley/service-method-names": "error" },
-      },
-      {
-        // A server service takes its concept's singular word (scripts/audit/oxlint-plugin.ts, singular-service).
+        // A server module's service is its folder's singular word: `export interface Issue` and `makeIssue` in
+        // modules/issue/issue.ts (scripts/audit/oxlint-plugin.ts, singular-service).
         files: ["apps/server/src/**"],
         rules: { "vibevalley/singular-service": "error" },
       },
@@ -573,16 +486,6 @@ export default defineConfig({
         files: ["apps/server/src/**", "apps/cli/src/**"],
         excludeFiles: ["apps/server/src/**/*.test.ts", "apps/cli/src/**/*.test.ts", "apps/cli/src/testing/**", "apps/server/src/testing/**"],
         rules: { "vibevalley/protocol-namespace": "error" },
-      },
-      {
-        // Only the page's state/ stands on Effect's Atom, whose API is unstable (scripts/audit/oxlint-plugin.ts, atom-door).
-        files: ["apps/web/src/**"],
-        rules: { "vibevalley/atom-door": "error" },
-      },
-      {
-        // Unstable and transport-specific Effect subpaths stay behind their adapter doors (scripts/audit/oxlint-plugin.ts, unstable-effect-door).
-        files: ["apps/*/src/**", "packages/*/src/**"],
-        rules: { "vibevalley/unstable-effect-door": "error" },
       },
       {
         // A value the page keeps for its life is an atom of the page's, not a signal made outside any function (scripts/audit/oxlint-plugin.ts, page-store).
@@ -607,27 +510,10 @@ export default defineConfig({
         rules: { "vibevalley/failure-tone": "error" },
       },
       {
-        // The server reaches the database through Db, which decides what a failed query becomes (scripts/audit/oxlint-plugin.ts, db-door).
+        // Only infra/db.ts imports the database's drivers (pg, PGlite); the rest reaches it through Db (scripts/audit/oxlint-plugin.ts, db-door).
         files: ["apps/server/src/**"],
         excludeFiles: ["apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
         rules: { "vibevalley/db-door": "error" },
-      },
-      {
-        // Effects over a list go through Effect.forEach (scripts/audit/oxlint-plugin.ts, yield-in-loop).
-        files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**"],
-        excludeFiles: ["**/*.test.ts", "apps/server/src/testing/**", "apps/server/src/flows/**"],
-        rules: { "vibevalley/yield-in-loop": "error" },
-      },
-      {
-        // A fiber belongs to a scope, so none outlives its service or a test (scripts/audit/oxlint-plugin.ts, scoped-fibers).
-        files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**"],
-        excludeFiles: ["**/*.test.ts", "apps/server/src/testing/**"],
-        rules: { "vibevalley/scoped-fibers": "error" },
-      },
-      {
-        // An Effect generator reads the time with yield* Clock.currentTimeMillis (scripts/audit/oxlint-plugin.ts, clock-in-effect).
-        files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**"],
-        rules: { "vibevalley/clock-in-effect": "error" },
       },
       {
         // The server and the brain read and write files off the event loop (scripts/audit/oxlint-plugin.ts, sync-fs). Before the
@@ -661,6 +547,8 @@ export default defineConfig({
           "apps/server/src/gateway/voice/line.ts",
           "apps/server/src/testing/git.ts",
           "apps/server/src/testing/worker.ts",
+          "apps/server/src/modules/session/worker.ts",
+          "apps/cli/src/infra/spawn.ts",
           "apps/desktop/src/infra/island.ts",
           "apps/desktop/src/infra/server.ts",
           "apps/desktop/src/infra/update.ts",

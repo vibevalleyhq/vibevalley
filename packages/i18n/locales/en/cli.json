@@ -138,11 +138,9 @@
     "startServer": "Start the server first (vp run --filter @vibevalley/server start), or point --server at one that runs",
     "openApp": "Open the desktop app first (vibevalley app open opens it too)"
   },
-  "and": "; ",
   "failure": {
     "unreachable": "Cannot reach {base}: {why}",
     "retry": "The server asked the stream to reconnect; the command line does not",
-    "stream": "The stream cannot be read: {why}",
     "gone": "Ticket #{n} is gone: it was deleted",
     "appNotOpen": "Cannot reach the desktop app of {home}: {why}",
     "noDryRun": "{command} has no dry run: drop --dry-run to do it",

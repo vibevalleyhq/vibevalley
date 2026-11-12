@@ -1,6 +1,3 @@
-import { Array as Arr, Option } from "effect";
-import { dual } from "effect/Function";
-
 import { type Applied, type AppliedIssue, type Issue, type IssueUpdate, VibeValleyApiError } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
@@ -55,13 +52,12 @@ export const issueSet = defineIntent<IssueSet, AppliedIssue>({
 
 type LabelSets = readonly Intent<IssueSet, AppliedIssue>[];
 
-const labelsOf = (p: IssueSet) => Arr.filter(["title", "priority", "deliver"] as const, (k) => p[k] !== undefined);
-const newestSet = (sets: LabelSets, id: string, label: IssueLabel) =>
-  Option.getOrUndefined(Arr.findLast(sets, (p) => p.input.id === id && p.input[label] !== undefined));
+const labelsOf = (p: IssueSet) => (["title", "priority", "deliver"] as const).filter((k) => p[k] !== undefined);
+const newestSet = (sets: LabelSets, id: string, label: IssueLabel) => sets.findLast((p) => p.input.id === id && p.input[label] !== undefined);
 
 /** A newer set of the same label of the same issue replaces the one still on its way. */
 export const sendLabel = (sets: Intents<IssueSet, AppliedIssue>, set: IssueSet) =>
-  sendReplacing(sets, set, (a, b) => a.id === b.id && Arr.every(labelsOf(a), (k) => Arr.contains(labelsOf(set), k)));
+  sendReplacing(sets, set, (a, b) => a.id === b.id && labelsOf(a).every((k) => labelsOf(set).includes(k)));
 
 const labeled = (issue: Issue, sets: LabelSets) => {
   const kept = (label: IssueLabel) => {
@@ -80,10 +76,15 @@ const labeled = (issue: Issue, sets: LabelSets) => {
  * The issue as its page shows it, with the labels the user set and the frame has not caught up with yet,
  * and whether each label's newest choice is on its way or was refused (the value shown is then the frame's again).
  */
-export const labeledIssue: {
-  (sets: LabelSets): (issue: Issue) => ReturnType<typeof labeled>;
-  (issue: Issue, sets: LabelSets): ReturnType<typeof labeled>;
-} = dual(2, labeled);
+export function labeledIssue(sets: LabelSets): (issue: Issue) => ReturnType<typeof labeled>;
+export function labeledIssue(issue: Issue, sets: LabelSets): ReturnType<typeof labeled>;
+export function labeledIssue(...args: [LabelSets] | [Issue, LabelSets]) {
+  if (args.length === 1) {
+    const [sets] = args;
+    return (issue: Issue) => labeled(issue, sets);
+  }
+  return labeled(...args);
+}
 
 // Words for the helper on an issue (an answer, reject's findings, a word mid-turn).
 

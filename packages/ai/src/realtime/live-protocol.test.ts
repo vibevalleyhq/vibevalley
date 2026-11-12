@@ -1,5 +1,5 @@
-import { Option, Schema } from "effect";
 import { describe, expect, it } from "vite-plus/test";
+import { z } from "zod";
 
 import { mossTaggedFrameBytes } from "@vibevalley/provider/moss";
 
@@ -7,8 +7,9 @@ import { jsonText, parsedJson } from "../base/json.ts";
 import { MossEngine } from "./moss.ts";
 import { Playback } from "./playback.ts";
 
-const actionOf = Schema.decodeOption(Schema.fromJsonString(Schema.Struct({ action: Schema.String })));
-const parsed = (text: string) => Option.getOrUndefined(parsedJson(text));
+const Action = z.object({ action: z.string() });
+const actionOf = (json: string) => Action.safeParse(parsedJson(json)).data;
+const parsed = (text: string) => parsedJson(text);
 
 const attached = { action: "session_attached", data: { session_id: "live-session-1", memory_scope: "session", delegation: "none" } };
 const updated = { action: "session.updated", data: { error: "", tools: ["ask_orchestrator"] } };
@@ -97,7 +98,7 @@ describe("official Live lifecycle fixtures", () => {
     f.receive(updated);
     expect(f.ready()).toBe(1);
     expect(f.sent.filter((json) => json.includes("session.update"))).toHaveLength(1);
-    expect(f.sent.slice(-2).map((json) => Option.getOrUndefined(actionOf(json))?.action)).toEqual(["media.mode", "mic_state"]);
+    expect(f.sent.slice(-2).map((json) => actionOf(json)?.action)).toEqual(["media.mode", "mic_state"]);
   });
 
   it("regression: closing never resumes a session or account, even when vendor permits reconnect", () => {

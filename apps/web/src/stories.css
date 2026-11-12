@@ -1,3 +1,5 @@
 @import "./style.css";
 @import "@vibevalley/stories/style.css";
 @layer story-layout;
+/* The viewer's own classes (packages/stories) are outside this app's folder, where Tailwind looks by itself. */
+@source "../../../packages/stories/src";

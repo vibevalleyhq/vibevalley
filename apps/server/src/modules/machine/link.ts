@@ -1,5 +1,3 @@
-import { Array as Arr, Effect } from "effect";
-
 import type { Executions } from "./executor.ts";
 
 // Clone every payload in-process so non-serializable values or shared-reference mutations surface in tests.
@@ -8,11 +6,11 @@ const across = <A>(value: A): A => structuredClone(value);
 export type { Executions };
 
 export const linked = (executor: Executions): Executions => ({
-  start: (input) => Effect.map(executor.start(across(input)), across),
-  deliver: (id, text, inputId) => Effect.map(executor.deliver(id, text, inputId), across),
-  interrupt: (id) => Effect.map(executor.interrupt(id), across),
-  close: (id) => executor.close(id),
-  failed: (id, why) => Effect.map(executor.failed(id, why), across),
+  start: async (input) => across(await executor.start(across(input))),
+  deliver: async (id, text, inputId) => across(await executor.deliver(id, text, inputId)),
+  interrupt: async (id) => across(await executor.interrupt(id)),
+  close: (id, signal) => executor.close(id, signal),
+  failed: async (id, why) => across(await executor.failed(id, why)),
   observe: (id, observer) =>
     executor.observe(id, {
       event: (event) => observer.event(across(event)),
@@ -28,5 +26,5 @@ export const linked = (executor: Executions): Executions => ({
     const execution = executor.find(id);
     return execution === undefined ? undefined : across(execution);
   },
-  all: () => Arr.map(executor.all(), across),
+  all: () => executor.all().map(across),
 });

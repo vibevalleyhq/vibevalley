@@ -57,12 +57,12 @@
     }
   },
   "dependencies": {
+    "@vibevalley/async": "workspace:*",
     "@vibevalley/provider": "workspace:*",
     "ai": "catalog:",
-    "effect": "catalog:"
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "@vibevalley/testkit": "workspace:*",
     "vite-plus": "catalog:"

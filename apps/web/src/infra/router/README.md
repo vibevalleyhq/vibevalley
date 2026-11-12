@@ -44,16 +44,16 @@ farm.build({ repo: "my repo" }); // /farm/my%20repo
 
 命名参数按段解码一次，构造时按段编码；空参数及 `.`、`..` 拒绝构造，不能经浏览器归一化跳到其他页面。`useParams(farm)` 的属性由 path 推导，不接受调用方任意填写的参数类型。
 
-需要领域类型时，参数 Codec 的 Encoded 对应路径字段，Type 决定 build 输入与 `useParams` 输出：
+需要领域类型时，参数 codec 的输入侧对应路径字段，输出侧决定 build 输入与 `useParams` 输出：
 
 ```ts
 const detail = route("/items/:id", {
-  params: Schema.Struct({ id: Schema.FiniteFromString.check(Schema.isGreaterThan(0)) }),
+  params: z.object({ id: z.codec(z.string(), z.number().positive(), { decode: Number, encode: String }) }),
 });
 detail.build({ id: 4 }); // /items/4
 ```
 
-路径结构匹配后才解码参数。`resolve(pathname, search)` 区分 missing、invalid 和 matched；高优先级模式匹配但 Codec 拒绝时进入 invalid，不落到较宽的 splat。build 经同一 Codec 编码并检查路径段；非法领域值不能生成链接。Router 使用无需服务的同步 Codec，不在匹配中发请求。
+路径结构匹配后才解码参数。`resolve(pathname, search)` 区分 missing、invalid 和 matched；高优先级模式匹配但 Codec 拒绝时进入 invalid，不落到较宽的 splat。build 经同一 Codec 编码并检查路径段；非法领域值不能生成链接。Router 只用同步 codec（`z.safeDecode`、`z.safeEncode`），异步的当作不匹配，不在匹配中发请求。
 
 splat 的 `rest` 保留编码后的剩余路径，由拥有子路径的 feature 解码；build 也接收已经编码的 remainder。这样 `/pkm/a%2Fb/100%25` 不会在 Router 和 feature 中解码两遍。非法编码仍在进入任何页面前拒绝。
 
@@ -94,8 +94,8 @@ Router 只持有 History 和它的响应式快照。根卸载后释放 popstate�
 
 ```ts
 const filters = search({
-  page: Schema.optional(searchParam(Schema.FiniteFromString.check(Schema.isGreaterThan(0)))),
-  tags: Schema.optional(Schema.Array(Schema.String)),
+  page: searchParam(z.codec(z.string(), z.number().positive(), { decode: Number, encode: String })).optional(),
+  tags: z.array(z.string()).optional(),
 });
 const list = route("/items", { search: filters });
 const [values, update] = useSearchValues(filters);
@@ -104,7 +104,7 @@ update((current) => ({ ...current, page: 2 }), { replace: true });
 
 URL 的每个字段先收集为字符串数组；`searchParam` 要求恰好一项，重复单值参数不是默默取第一个。数组字段保留一项或多项；undefined 和空数组编码为删除字段。未声明字段不参与业务解码，更新时保留；非法百分号编码拒绝。
 
-`useSearchValues` 只在声明相同 search 定义的有效路由内读取；离开分支时短暂保留初始快照，invalid 页面仍由 Routes 决定。更新先解码最新 History，再经同一 Schema 编码，只改本定义的字段并保留 hash。同一事件中连续更新不读尚未 flush 的旧信号。工单的 repo/agent 筛选已用此入口，不再经过 Atom 或无校验的单字段 helper。
+`useSearchValues` 只在声明相同 search 定义的有效路由内读取；离开分支时短暂保留初始快照，invalid 页面仍由 Routes 决定。更新先解码最新 History，再经同一 Schema 编码，只改本定义的字段并保留 hash。同一事件中连续更新不读尚未 flush 的旧信号。工单的 repo/agent 筛选已用此入口，不再经过原子或无校验的单字段 helper。
 
 Link 先调用调用方 onClick；已 preventDefault、非左键、修饰键、download、非 `_self` 的 target、外链不拦截。NavLink 默认匹配当前路径及子路径，`end` 限精确匹配；应用可显式指定 aria-current 表达别名页面。
 

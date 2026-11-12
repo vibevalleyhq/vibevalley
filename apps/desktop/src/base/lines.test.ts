@@ -1,7 +1,7 @@
 import { PassThrough } from "node:stream";
 
-import { Schema } from "effect";
 import { expect, test } from "vite-plus/test";
+import { z } from "zod";
 
 import { jsonLines } from "./lines";
 
@@ -12,7 +12,7 @@ test("each line that is one value of the Schema is heard; every line goes to the
   const ended = new Promise((resolve) => input.on("end", resolve));
   jsonLines(
     input,
-    Schema.Struct({ url: Schema.String }),
+    z.object({ url: z.string() }),
     ({ url }) => heard.push(url),
     (line) => logged.push(line),
   );

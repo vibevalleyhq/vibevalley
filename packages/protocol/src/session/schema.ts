@@ -1,183 +1,180 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import { AgentRoleValues } from "../agent/shapes";
 import type { Codec } from "../codec";
 import { IssueId, Outcome, Retry, SessionId, Spent } from "../common/schema";
 import * as T from "./shapes";
 
-const SessionAction: Codec<T.SessionAction> = Schema.Literals(T.SessionActionValues);
+const SessionAction = z.enum(T.SessionActionValues) satisfies Codec<T.SessionAction>;
 
 export const doingFields = {
   action: SessionAction,
-  label: Schema.String,
+  label: z.string(),
 };
 
-const Doing: Codec<T.Doing> = Schema.Struct(doingFields);
+const Doing = z.object(doingFields) satisfies Codec<T.Doing>;
 
-const DoingView: Codec<T.DoingView> = Schema.Struct({ ...doingFields, actionText: Schema.String });
+const DoingView = z.object({ ...doingFields, actionText: z.string() }) satisfies Codec<T.DoingView>;
 
 const workingFields = {
-  since: Schema.Finite,
-  quietSince: Schema.optionalKey(Schema.Finite),
-  retry: Schema.optionalKey(Retry),
+  since: z.number(),
+  quietSince: z.exactOptional(z.number()),
+  retry: z.exactOptional(Retry),
 };
 
-const PhaseWorking: Codec<T.PhaseWorking> = Schema.TaggedStruct("working", { ...workingFields, doing: Doing });
+const PhaseWorking = z.object({ _tag: z.literal("working"), ...workingFields, doing: Doing }) satisfies Codec<T.PhaseWorking>;
 
-const PhaseWorkingView: Codec<T.PhaseWorkingView> = Schema.TaggedStruct("working", { ...workingFields, doing: DoingView });
+const PhaseWorkingView = z.object({ _tag: z.literal("working"), ...workingFields, doing: DoingView }) satisfies Codec<T.PhaseWorkingView>;
 
-const PhaseDone: Codec<T.PhaseDone> = Schema.TaggedStruct("done", {});
+const PhaseDone = z.object({ _tag: z.literal("done") }) satisfies Codec<T.PhaseDone>;
 
-const PhaseFailed: Codec<T.PhaseFailed> = Schema.TaggedStruct("failed", {});
+const PhaseFailed = z.object({ _tag: z.literal("failed") }) satisfies Codec<T.PhaseFailed>;
 
-export const PhaseResting: Codec<T.PhaseResting> = Schema.TaggedStruct("resting", {});
+export const PhaseResting = z.object({ _tag: z.literal("resting") }) satisfies Codec<T.PhaseResting>;
 
-const SessionClose: Codec<T.SessionClose> = Schema.Literals(T.SessionCloseValues);
+const SessionClose = z.enum(T.SessionCloseValues) satisfies Codec<T.SessionClose>;
 
-const PhaseClosed: Codec<T.PhaseClosed> = Schema.TaggedStruct("closed", {
-  at: Schema.Finite,
-  closed: SessionClose,
-});
+const PhaseClosed = z.object({ _tag: z.literal("closed"), at: z.number(), closed: SessionClose }) satisfies Codec<T.PhaseClosed>;
 
-export const Phase: Codec<T.Phase> = Schema.Union([PhaseWorking, PhaseDone, PhaseFailed, PhaseResting, PhaseClosed]);
+export const Phase = z.discriminatedUnion("_tag", [PhaseWorking, PhaseDone, PhaseFailed, PhaseResting, PhaseClosed]) satisfies Codec<T.Phase>;
 
-const PhaseView: Codec<T.PhaseView> = Schema.Union([PhaseWorkingView, PhaseDone, PhaseFailed, PhaseResting, PhaseClosed]);
+const PhaseView = z.discriminatedUnion("_tag", [PhaseWorkingView, PhaseDone, PhaseFailed, PhaseResting, PhaseClosed]) satisfies Codec<T.PhaseView>;
 
-export const IssueAnswer: Codec<T.IssueAnswer> = Schema.Struct({
-  conclusion: Schema.String,
-  evidence: Schema.mutable(Schema.Array(Schema.String)),
-  unsure: Schema.mutable(Schema.Array(Schema.String)),
-  next: Schema.mutable(Schema.Array(Schema.String)),
-});
+export const IssueAnswer = z.object({
+  conclusion: z.string(),
+  evidence: z.array(z.string()),
+  unsure: z.array(z.string()),
+  next: z.array(z.string()),
+}) satisfies Codec<T.IssueAnswer>;
 
-export const LastRun: Codec<T.LastRun> = Schema.Struct({
+export const LastRun = z.object({
   outcome: Outcome,
-  summary: Schema.String,
-  at: Schema.Finite,
-  spent: Schema.optionalKey(Spent),
-  answer: Schema.optionalKey(IssueAnswer),
-});
+  summary: z.string(),
+  at: z.number(),
+  spent: z.exactOptional(Spent),
+  answer: z.exactOptional(IssueAnswer),
+}) satisfies Codec<T.LastRun>;
 
-const ToolConnection: Codec<T.ToolConnection> = Schema.Struct({
-  server: Schema.String,
-  status: Schema.Literals(T.ToolConnectionStatusValues),
-  reason: Schema.optionalKey(Schema.String),
-});
+const ToolConnection = z.object({
+  server: z.string(),
+  status: z.enum(T.ToolConnectionStatusValues),
+  reason: z.exactOptional(z.string()),
+}) satisfies Codec<T.ToolConnection>;
 
 const sessionFields = {
   id: SessionId,
-  role: Schema.Literals(AgentRoleValues),
-  name: Schema.String,
-  agent: Schema.String,
-  runtime: Schema.String,
-  brief: Schema.String,
-  repo: Schema.optionalKey(Schema.String),
-  branch: Schema.optionalKey(Schema.String),
-  worktree: Schema.optionalKey(Schema.String),
-  hiredAt: Schema.Finite,
-  runs: Schema.Finite,
-  lastRun: Schema.optionalKey(LastRun),
-  spent: Schema.optionalKey(Spent),
-  channel: Schema.optionalKey(Schema.String),
-  issue: Schema.optionalKey(IssueId),
-  refining: Schema.Boolean,
-  toolConnections: Schema.optionalKey(Schema.mutable(Schema.Array(ToolConnection))),
-  machine: Schema.optionalKey(Schema.String),
+  role: z.enum(AgentRoleValues),
+  name: z.string(),
+  agent: z.string(),
+  runtime: z.string(),
+  brief: z.string(),
+  repo: z.exactOptional(z.string()),
+  branch: z.exactOptional(z.string()),
+  worktree: z.exactOptional(z.string()),
+  hiredAt: z.number(),
+  runs: z.number(),
+  lastRun: z.exactOptional(LastRun),
+  spent: z.exactOptional(Spent),
+  channel: z.exactOptional(z.string()),
+  issue: z.exactOptional(IssueId),
+  refining: z.boolean(),
+  toolConnections: z.exactOptional(z.array(ToolConnection)),
+  machine: z.exactOptional(z.string()),
 };
 
-export const Session: Codec<T.Session> = Schema.Struct({ ...sessionFields, phase: Phase });
+export const Session = z.object({ ...sessionFields, phase: Phase }) satisfies Codec<T.Session>;
 
-export const SessionView: Codec<T.SessionView> = Schema.Struct({
+export const SessionView = z.object({
   ...sessionFields,
   phase: PhaseView,
-  phaseText: Schema.String,
-});
+  phaseText: z.string(),
+}) satisfies Codec<T.SessionView>;
 
-const SessionEventType: Codec<T.SessionEventType> = Schema.Literals(T.SessionEventTypeValues);
+const SessionEventType = z.enum(T.SessionEventTypeValues) satisfies Codec<T.SessionEventType>;
 
-const ToolAction: Codec<T.ToolAction> = Schema.Literals(T.ToolActionValues);
+const ToolAction = z.enum(T.ToolActionValues) satisfies Codec<T.ToolAction>;
 
-const EventTokens: Codec<T.EventTokens> = Schema.Struct({
-  input: Schema.Finite,
-  cacheRead: Schema.Finite,
-  output: Schema.Finite,
-});
+const EventTokens = z.object({
+  input: z.number(),
+  cacheRead: z.number(),
+  output: z.number(),
+}) satisfies Codec<T.EventTokens>;
 
-export const SessionEvent: Codec<T.SessionEvent> = Schema.Struct({
-  seq: Schema.Finite,
-  revision: Schema.Finite,
-  time: Schema.Finite,
+export const SessionEvent = z.object({
+  seq: z.number(),
+  revision: z.number(),
+  time: z.number(),
   type: SessionEventType,
-  run: Schema.optionalKey(Schema.String),
-  call: Schema.optionalKey(Schema.Finite),
-  under: Schema.optionalKey(Schema.Finite),
-  text: Schema.String,
-  action: Schema.optionalKey(ToolAction),
-  actionText: Schema.optionalKey(Schema.String),
-  tool: Schema.optionalKey(Schema.String),
-  input: Schema.optionalKey(Schema.String),
-  output: Schema.optionalKey(Schema.String),
-  ok: Schema.optionalKey(Schema.Boolean),
-  tokens: Schema.optionalKey(EventTokens),
-  connection: Schema.optionalKey(ToolConnection),
-});
+  run: z.exactOptional(z.string()),
+  call: z.exactOptional(z.number()),
+  under: z.exactOptional(z.number()),
+  text: z.string(),
+  action: z.exactOptional(ToolAction),
+  actionText: z.exactOptional(z.string()),
+  tool: z.exactOptional(z.string()),
+  input: z.exactOptional(z.string()),
+  output: z.exactOptional(z.string()),
+  ok: z.exactOptional(z.boolean()),
+  tokens: z.exactOptional(EventTokens),
+  connection: z.exactOptional(ToolConnection),
+}) satisfies Codec<T.SessionEvent>;
 
-const RunTriggerKind: Codec<T.RunTriggerKind> = Schema.Literals(T.RunTriggerKindValues);
+const RunTriggerKind = z.enum(T.RunTriggerKindValues) satisfies Codec<T.RunTriggerKind>;
 
-export const RunTrigger: Codec<T.RunTrigger> = Schema.Struct({
+export const RunTrigger = z.object({
   kind: RunTriggerKind,
-  message: Schema.optionalKey(Schema.String),
-  channel: Schema.optionalKey(Schema.String),
-  cron: Schema.optionalKey(Schema.String),
-  missed: Schema.optionalKey(Schema.Boolean),
-});
+  message: z.exactOptional(z.string()),
+  channel: z.exactOptional(z.string()),
+  cron: z.exactOptional(z.string()),
+  missed: z.exactOptional(z.boolean()),
+}) satisfies Codec<T.RunTrigger>;
 
-export const Run: Codec<T.Run> = Schema.Struct({
-  id: Schema.String,
+export const Run = z.object({
+  id: z.string(),
   session: SessionId,
-  issue: Schema.optionalKey(IssueId),
+  issue: z.exactOptional(IssueId),
   triggeredBy: RunTrigger,
-  heard: Schema.mutable(Schema.Array(Schema.String)),
-  startedAt: Schema.Finite,
-  endedAt: Schema.optionalKey(Schema.Finite),
-  outcome: Schema.optionalKey(Outcome),
-  summary: Schema.String,
-  spent: Schema.optionalKey(Spent),
-});
+  heard: z.array(z.string()),
+  startedAt: z.number(),
+  endedAt: z.exactOptional(z.number()),
+  outcome: z.exactOptional(Outcome),
+  summary: z.string(),
+  spent: z.exactOptional(Spent),
+}) satisfies Codec<T.Run>;
 
-export const FactSessionPhaseChanged: Codec<T.FactSessionPhaseChanged> = Schema.Struct({
-  type: Schema.Literal("sessionPhaseChanged"),
-  at: Schema.Finite,
+export const FactSessionPhaseChanged = z.object({
+  type: z.literal("sessionPhaseChanged"),
+  at: z.number(),
   id: SessionId,
   phase: Phase,
-  channel: Schema.optionalKey(Schema.String),
-  spent: Schema.optionalKey(Spent),
-  brief: Schema.optionalKey(Schema.String),
-});
+  channel: z.exactOptional(z.string()),
+  spent: z.exactOptional(Spent),
+  brief: z.exactOptional(z.string()),
+}) satisfies Codec<T.FactSessionPhaseChanged>;
 
-export const FactSessionChanged: Codec<T.FactSessionChanged> = Schema.Struct({
-  type: Schema.Literal("sessionChanged"),
-  at: Schema.Finite,
+export const FactSessionChanged = z.object({
+  type: z.literal("sessionChanged"),
+  at: z.number(),
   session: Session,
-});
+}) satisfies Codec<T.FactSessionChanged>;
 
-export const FactSessionLeft: Codec<T.FactSessionLeft> = Schema.Struct({
-  type: Schema.Literal("sessionLeft"),
-  at: Schema.Finite,
+export const FactSessionLeft = z.object({
+  type: z.literal("sessionLeft"),
+  at: z.number(),
   id: SessionId,
-  closed: Schema.optionalKey(SessionClose),
-  merged: Schema.optionalKey(Schema.Finite),
-});
+  closed: z.exactOptional(SessionClose),
+  merged: z.exactOptional(z.number()),
+}) satisfies Codec<T.FactSessionLeft>;
 
-export const FactSessionToolChanged: Codec<T.FactSessionToolChanged> = Schema.Struct({
-  type: Schema.Literal("sessionToolChanged"),
-  at: Schema.Finite,
+export const FactSessionToolChanged = z.object({
+  type: z.literal("sessionToolChanged"),
+  at: z.number(),
   id: SessionId,
   connection: ToolConnection,
-});
+}) satisfies Codec<T.FactSessionToolChanged>;
 
-export const FactSessionToolsReset: Codec<T.FactSessionToolsReset> = Schema.Struct({
-  type: Schema.Literal("sessionToolsReset"),
-  at: Schema.Finite,
+export const FactSessionToolsReset = z.object({
+  type: z.literal("sessionToolsReset"),
+  at: z.number(),
   id: SessionId,
-});
+}) satisfies Codec<T.FactSessionToolsReset>;

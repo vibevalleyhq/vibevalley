@@ -1,5 +1,5 @@
-import { Schema } from "effect";
 import { type Accessor, createEffect, createSignal } from "solid-js";
+import { z } from "zod";
 
 import type { SessionEvent } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
@@ -11,7 +11,7 @@ import { defineQuery, retryRead, useQueryClient, type QueryClient } from "#/infr
 import { SessionLogs } from "./runs";
 
 const eventQuery = defineQuery({
-  schema: Schema.mutable(Schema.Array(S.SessionEvent)),
+  schema: z.array(S.SessionEvent),
   key: (a: { id: string; read: number }) => ["session-events", a.id, a.read],
   fetch: (a, context) => api.session.event.list({ id: a.id }, context),
   gcTime: 0,

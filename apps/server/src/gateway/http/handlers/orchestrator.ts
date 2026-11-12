@@ -1,30 +1,23 @@
-import { Effect } from "effect";
-
 import { t } from "@vibevalley/i18n";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import type { OrchestratorHandlers } from "@vibevalley/protocol/api";
 
-import { missing, lookIn } from "#/base/errors.ts";
-import { Core } from "#/core/core.ts";
-import { Memory } from "#/modules/memory/memory.ts";
-import { Orchestrator } from "#/modules/orchestrator/orchestrator.ts";
+import { lookIn, missing } from "#/base/errors.ts";
+import type { Core } from "#/core/core.ts";
+import type { Memory } from "#/modules/memory/memory.ts";
+import type { Orchestrator } from "#/modules/orchestrator/orchestrator.ts";
 
-export const orchestratorHandlers = Effect.gen(function* () {
-  const core = yield* Core;
-  const memory = yield* Memory;
-  const orchestrator = yield* Orchestrator;
-  const done: OrchestratorHandlers = {
-    "orchestrator.open": () => core.open(),
+export function orchestratorHandlers(deps: { readonly core: Core; readonly memory: Memory; readonly orchestrator: Orchestrator }): OrchestratorHandlers {
+  const { core, memory, orchestrator } = deps;
+  return {
+    "orchestrator.open": async () => core.open(),
     "orchestrator.stop": ({ agent }) => orchestrator.stop(agent),
     "orchestrator.eval.create": (body) => orchestrator.markWrong(body.on, body.want, body.agent),
     "orchestrator.archive.list": ({ agent, q }) => memory.archive(agent || defaultOrchestrator, q ?? ""),
-    "orchestrator.archive.get": ({ agent, name }) =>
-      memory.archiveFile(agent || defaultOrchestrator, name).pipe(
-        Effect.filterOrFail(
-          (text) => text !== undefined,
-          () => missing(t("server.archiveRef", { name }), [lookIn.archive]),
-        ),
-      ),
+    "orchestrator.archive.get": async ({ agent, name }) => {
+      const text = await memory.archiveFile(agent || defaultOrchestrator, name);
+      if (text === undefined) throw missing(t("server.archiveRef", { name }), [lookIn.archive]);
+      return text;
+    },
   };
-  return done;
-});
+}

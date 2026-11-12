@@ -1,5 +1,3 @@
-import { Effect } from "effect";
-
 /** Runs f after ms of real time. unref: it does not keep the process alive. */
 export const afterRealTime = (ms: number, f: () => void, options: { readonly unref?: boolean } = {}): (() => void) => {
   const timer = setTimeout(f, Math.max(0, ms));
@@ -7,9 +5,10 @@ export const afterRealTime = (ms: number, f: () => void, options: { readonly unr
   return () => clearTimeout(timer);
 };
 
-/** Never succeeds: fails with timedOut() after ms of real time; interrupted, its timer is cleared. */
-export const failAfterRealTime = <E>(ms: number, timedOut: () => E): Effect.Effect<never, E> =>
-  Effect.callback<never, E>((resume) => {
-    const cancel = afterRealTime(ms, () => resume(Effect.fail(timedOut())));
-    return Effect.sync(cancel);
+/** Rejects with timedOut() after ms of real time, unless the signal aborts first (then it never settles and its timer is
+ * cleared): the deadline of something that takes no signal of its own. */
+export const failAfterRealTime = (ms: number, timedOut: () => unknown, signal?: AbortSignal): Promise<never> =>
+  new Promise<never>((_, reject) => {
+    const cancel = afterRealTime(ms, () => reject(timedOut()));
+    signal?.addEventListener("abort", cancel, { once: true });
   });

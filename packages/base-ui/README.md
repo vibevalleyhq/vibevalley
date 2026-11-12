@@ -6,7 +6,7 @@ field-workbench look (docs/style/design.md).
 
 Each component is parts (`Menu.Root`, `Menu.Trigger`, …); each part makes one element, and what else it is given
 (`class`, `data-testid`, handlers, `ref`) lands on that element. State is written as Base UI's data attributes, so styles
-(`[data-checked]` conditions in the host's StyleX styles) and page tests read the same thing:
+(`data-checked:` variants in the host's classes) and page tests read the same thing:
 
 | Attribute | On |
 |---|---|

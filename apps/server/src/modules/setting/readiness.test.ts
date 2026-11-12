@@ -1,10 +1,11 @@
-import { Redacted } from "effect";
 import { describe, expect, it } from "vite-plus/test";
+
+import { Secret } from "@vibevalley/protocol/schema";
 
 import { emptyProviders, type ProviderSettings } from "./provider.ts";
 import { type ReadinessInput, readinessOf } from "./readiness.ts";
 
-const moss = { id: "moss", name: "MOSS", adapter: "moss" as const, enabled: true, key: Redacted.make("k") };
+const moss = { id: "moss", name: "MOSS", adapter: "moss" as const, enabled: true, key: new Secret("k") };
 const bound = { connection: "moss", model: "m" };
 const providers = (change: Partial<ProviderSettings> = {}): ProviderSettings => ({ ...emptyProviders, connections: [moss], ...change });
 const input = (change: Partial<ReadinessInput> = {}): ReadinessInput => ({
@@ -25,7 +26,7 @@ describe("what each feature lacks", () => {
       ready: false,
       missing: "mossOff",
     });
-    expect(readinessOf(input({ providers: providers({ image: bound, connections: [{ ...moss, key: Redacted.make("") }] }) })).image).toEqual({
+    expect(readinessOf(input({ providers: providers({ image: bound, connections: [{ ...moss, key: new Secret("") }] }) })).image).toEqual({
       ready: false,
       missing: "mossKey",
     });

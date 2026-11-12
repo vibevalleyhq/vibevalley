@@ -1,25 +1,17 @@
 import { scriptedRuntime } from "@botiverse/oar/testing";
-import { describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
-import { SqlClient } from "effect/sql";
+import { describe, expect, test } from "vite-plus/test";
 
 import type * as T from "@vibevalley/protocol";
 import { channelOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { user } from "#/base/actor.ts";
-import { Core } from "#/core/core.ts";
-import { Agent } from "#/modules/agent/agent.ts";
-import { Channel } from "#/modules/channel/channel.ts";
-import { Inbox } from "#/modules/inbox/inbox.ts";
-import { Issue } from "#/modules/issue/issue.ts";
-import { Mailbox } from "#/modules/mailbox/mailbox.ts";
-import { Session } from "#/modules/session/session.ts";
-import { Said, testIssues } from "#/testing/world.ts";
+import { sqlOf } from "#/testing/sql.ts";
+import { testIssues } from "#/testing/world.ts";
 
 import { await_, farm, lab, until } from "./farm.ts";
 
 describe("an issue's thread", () => {
-  it.live("regression: closing an issue releases an unconsumed followup through the mailbox", () => {
+  test("regression: closing an issue releases an unconsumed followup through the mailbox", async () => {
     const f = farm({
       runtime: scriptedRuntime({
         id: "pi",
@@ -29,36 +21,35 @@ describe("an issue's thread", () => {
           }),
       }),
     });
-    return Effect.gen(function* () {
-      const issue2 = yield* Issue;
-      const issues = testIssues(issue2);
-      const chat = yield* Channel;
-      const mailbox = yield* Mailbox;
-      yield* (yield* Agent).save(lab());
-      const issue = yield* issues.add({ title: "还在处理", repo: "release-input", agent: "lab" });
-      const started = yield* issues.start(issue.id, "");
-      const thread = (yield* await_(
-        () => chat.threadOfSession(started.session!),
-        (id) => id !== undefined,
-        "the issue thread",
-      ))!;
-      const followup = (yield* chat.post({ _tag: "User", text: "这条还没处理", channel: thread, sendKey: "release-on-close" })).message;
-      yield* await_(
-        () => Effect.succeed(mailbox.deliveriesOf(started.session!).find((row) => row.envelope_id === followup.id)?.channel_id),
-        (id) => id === thread,
-        "the followup stored",
-      );
-      yield* (yield* Issue).setStatus(issue.id, "canceled", "", "", user);
-      const returned = yield* await_(
-        () => Effect.succeed(mailbox.deliveriesOf(chat.orchestratorIn(thread)).filter((row) => row.envelope_id === `returned:${issue.id}:${followup.id}`)),
-        (rows) => rows.length === 1,
-        "the unread followup returned",
-      );
-      expect(returned[0]!.payload.trigger.card.readUri).toBe(`vv://trigger/${followup.id}`);
-      expect((yield* chat.history(thread)).some((message) => message.text.includes(`vv://trigger/${followup.id}`))).toBe(false);
-    }).pipe(Effect.scoped, Effect.provide(f.layer));
+    await using fw = await f.open();
+    const issue2 = fw.issue;
+    const issues = testIssues(issue2);
+    const chat = fw.channel;
+    const mailbox = fw.mailbox;
+    await fw.agent.save(lab());
+    const issue = await issues.add({ title: "还在处理", repo: "release-input", agent: "lab" });
+    const started = await issues.start(issue.id, "");
+    const thread = (await await_(
+      () => chat.threadOfSession(started.session!),
+      (id) => id !== undefined,
+      "the issue thread",
+    ))!;
+    const followup = (await chat.post({ _tag: "User", text: "这条还没处理", channel: thread, sendKey: "release-on-close" })).message;
+    await await_(
+      () => Promise.resolve(mailbox.deliveriesOf(started.session!).find((row) => row.envelope_id === followup.id)?.channel_id),
+      (id) => id === thread,
+      "the followup stored",
+    );
+    await fw.issue.setStatus(issue.id, "canceled", "", "", user);
+    const returned = await await_(
+      () => Promise.resolve(mailbox.deliveriesOf(chat.orchestratorIn(thread)).filter((row) => row.envelope_id === `returned:${issue.id}:${followup.id}`)),
+      (rows) => rows.length === 1,
+      "the unread followup returned",
+    );
+    expect(returned[0]!.payload.trigger.card.readUri).toBe(`vv://trigger/${followup.id}`);
+    expect((await chat.history(thread)).some((message) => message.text.includes(`vv://trigger/${followup.id}`))).toBe(false);
   });
-  it.live("regression: a queued issue accepts comments before it has a session", () => {
+  test("regression: a queued issue accepts comments before it has a session", async () => {
     const inputs: string[] = [];
     const f = farm({
       runtime: scriptedRuntime({
@@ -69,102 +60,103 @@ describe("an issue's thread", () => {
         },
       }),
     });
-    return Effect.gen(function* () {
-      const issue2 = yield* Issue;
-      const issues = testIssues(issue2);
-      const channels = yield* Channel;
-      const sessions = yield* Session;
-      yield* (yield* Agent).save(lab());
-      const issue = yield* issues.add({ title: "等待派发", repo: "queued", agent: "lab" });
-      yield* issues.comment(issue.id, "先记下验收要求", "queued-comment");
-      yield* issues.comment(issue.id, "先记下验收要求", "queued-comment");
-      const thread = yield* channels.issueThread(issue.id, issue.title);
-      expect((yield* channels.history(thread)).map((message) => message.text)).toEqual(["先记下验收要求"]);
-      expect(sessions.hired()).toEqual([]);
-      expect((yield* issues.get(issue.id)).status).toBe("backlog");
-      yield* issues.start(issue.id, "");
-      yield* until(() => inputs.length > 0, "the queued input delivered with the first assignment");
-      expect(inputs[0]).toContain("先记下验收要求");
-      const followup = (yield* channels.post({ _tag: "User", text: "另一个需求", channel: thread, sendKey: "handback-source" })).message;
-      const session = sessions.hired()[0]!;
-      const mailbox = yield* Mailbox;
-      yield* await_(
-        () => Effect.succeed(mailbox.deliveriesOf(session.id).find((row) => row.envelope_id === followup.id)?.channel_id),
-        (channel) => channel === thread,
-        "the followup owned by the session",
-      );
-      yield* (yield* Mailbox).decline(session.id, followup.id, "超出当前范围");
-      yield* (yield* Mailbox).decline(session.id, followup.id, "超出当前范围");
-      const returned = mailbox.deliveriesOf(channels.orchestratorIn(thread)).filter((row) => row.envelope_id === `returned:${issue.id}:${followup.id}`);
-      expect(returned).toHaveLength(1);
-      expect(returned[0]!.payload.trigger.id).toBe(followup.id);
-    }).pipe(Effect.scoped, Effect.provide(f.layer));
+    await using fw = await f.open();
+    const issue2 = fw.issue;
+    const issues = testIssues(issue2);
+    const channels = fw.channel;
+    const sessions = fw.session;
+    await fw.agent.save(lab());
+    const issue = await issues.add({ title: "等待派发", repo: "queued", agent: "lab" });
+    await issues.comment(issue.id, "先记下验收要求", "queued-comment");
+    await issues.comment(issue.id, "先记下验收要求", "queued-comment");
+    const thread = await channels.issueThread(issue.id, issue.title);
+    expect((await channels.history(thread)).map((message) => message.text)).toEqual(["先记下验收要求"]);
+    expect(sessions.hired()).toEqual([]);
+    expect((await issues.get(issue.id)).status).toBe("backlog");
+    await issues.start(issue.id, "");
+    await until(() => inputs.length > 0, "the queued input delivered with the first assignment");
+    expect(inputs[0]).toContain("先记下验收要求");
+    const followup = (await channels.post({ _tag: "User", text: "另一个需求", channel: thread, sendKey: "handback-source" })).message;
+    const session = sessions.hired()[0]!;
+    const mailbox = fw.mailbox;
+    await await_(
+      () => Promise.resolve(mailbox.deliveriesOf(session.id).find((row) => row.envelope_id === followup.id)?.channel_id),
+      (channel) => channel === thread,
+      "the followup owned by the session",
+    );
+    await fw.mailbox.decline(session.id, followup.id, "超出当前范围");
+    await fw.mailbox.decline(session.id, followup.id, "超出当前范围");
+    const returned = mailbox.deliveriesOf(channels.orchestratorIn(thread)).filter((row) => row.envelope_id === `returned:${issue.id}:${followup.id}`);
+    expect(returned).toHaveLength(1);
+    expect(returned[0]!.payload.trigger.id).toBe(followup.id);
   });
   // One issue, one thread: sent out, cancelled and reopened, both sessions' dispatch, reports and the person's words are in the same thread.
-  it.live("is one across its sessions", () => {
+  test("is one across its sessions", async () => {
     // Says only that it is done: echoing its input would @ the orchestrator, who would then follow the thread.
     const f = farm({
       runtime: scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做好了") }),
     });
-    return Effect.gen(function* () {
-      const issue2 = yield* Issue;
-      const issues = testIssues(issue2);
-      const channels = yield* Channel;
-      const sessions = yield* Session;
-      const core = yield* Core;
-      const { in: saidIn } = yield* Said;
-      const sql = yield* SqlClient.SqlClient;
-      yield* (yield* Agent).save(lab());
-      const issue = yield* issues.add({ title: "写打卡", repo: "one-thread", agent: "lab" });
-      const sent = yield* issues.start(issue.id, "");
-      const first = sent.session!;
-      expect(first).toBeDefined();
-      const thread = yield* await_(
-        () => Effect.map(channels.threadOfSession(first), (id) => (id ? channelOf(core.state().chat, id) : undefined)),
-        (c): c is T.Channel => c !== undefined,
-        "the issue's thread",
-      );
-      expect([thread!.subjectKind, thread!.subjectId]).toEqual(["issue", issue.id]);
-      const inThread = (): T.ChatMessage[] => saidIn(thread!.id);
-      const reportsBy = (session: string) => inThread().filter((m) => m.kind === "report" && m.from === session).length;
-      yield* until(() => reportsBy(first) === 1, "the first session's report");
-      yield* channels.post({ _tag: "User", text: "把输出改成中文", channel: thread!.id, sendKey: "" });
-      yield* until(() => reportsBy(first) === 2, "the person's words wake the first session");
+    await using fw = await f.open();
+    const issue2 = fw.issue;
+    const issues = testIssues(issue2);
+    const channels = fw.channel;
+    const sessions = fw.session;
+    const core = fw.core;
+    const { in: saidIn } = fw.said;
+    const sql = sqlOf(fw.db);
+    await fw.agent.save(lab());
+    const issue = await issues.add({ title: "写打卡", repo: "one-thread", agent: "lab" });
+    const sent = await issues.start(issue.id, "");
+    const first = sent.session!;
+    expect(first).toBeDefined();
+    const thread = await await_(
+      async () => {
+        const id = await channels.threadOfSession(first);
+        return id ? channelOf(core.state().chat, id) : undefined;
+      },
+      (c): c is T.Channel => c !== undefined,
+      "the issue's thread",
+    );
+    expect([thread!.subjectKind, thread!.subjectId]).toEqual(["issue", issue.id]);
+    const inThread = (): T.ChatMessage[] => saidIn(thread!.id);
+    const reportsBy = (session: string) => inThread().filter((m) => m.kind === "report" && m.from === session).length;
+    await until(() => reportsBy(first) === 1, "the first session's report");
+    await channels.post({ _tag: "User", text: "把输出改成中文", channel: thread!.id, sendKey: "" });
+    await until(() => reportsBy(first) === 2, "the person's words wake the first session");
 
-      yield* sessions.dismiss(first);
-      yield* await_(
-        () => issues.get(issue.id),
-        (i) => i.closedAt !== undefined,
-        "cancelled",
-      );
-      const kept = yield* channels.post({ _tag: "User", text: "先记一下：时区用东八区", channel: thread!.id, sendKey: "" });
-      const woken = yield* sql<{
-        n: number;
-      }>`select count(*) as n from mailbox_delivery where message_id = ${kept.message.id} and session_id = ${first}`.pipe(Effect.orDie);
-      expect(woken[0]!.n).toBe(0);
-      const rows = yield* sql`select trigger_id from mailbox_issue where trigger_id = ${kept.message.id} and state = 'returned'`;
-      expect(rows).toHaveLength(1);
+    await sessions.dismiss(first);
+    await await_(
+      () => issues.get(issue.id),
+      (i) => i.closedAt !== undefined,
+      "cancelled",
+    );
+    const kept = await channels.post({ _tag: "User", text: "先记一下：时区用东八区", channel: thread!.id, sendKey: "" });
+    const woken = await sql<{
+      n: number;
+    }>`select count(*) as n from mailbox_delivery where message_id = ${kept.message.id} and session_id = ${first}`;
+    expect(woken[0]!.n).toBe(0);
+    const rows = await sql`select trigger_id from mailbox_issue where trigger_id = ${kept.message.id} and state = 'returned'`;
+    expect(rows).toHaveLength(1);
 
-      const setStatus2 = yield* issues.setStatus(issue.id, "todo", "接着做", "", user);
-      const second = latestSessionIdOf(setStatus2);
-      if (second === undefined) throw new Error("the issue has no reopened session");
-      yield* until(() => reportsBy(second) === 1, "the second session's report in the same thread");
-      const threadOfSession2 = yield* channels.threadOfSession(second);
-      expect(threadOfSession2).toBe(thread!.id);
-      const handed = inThread().find((m) => m.kind === "dispatch" && m.session === second);
-      expect(handed?.text).toContain("@" + second);
-      expect(handed?.text).toContain("第 2 次");
-      yield* channels.post({ _tag: "User", text: "时区记得改", channel: thread!.id, sendKey: "" });
-      yield* until(() => reportsBy(second) === 2, "the person's words wake the second session");
-      expect(reportsBy(first)).toBe(2);
+    const setStatus2 = await issues.setStatus(issue.id, "todo", "接着做", "", user);
+    const second = latestSessionIdOf(setStatus2);
+    if (second === undefined) throw new Error("the issue has no reopened session");
+    await until(() => reportsBy(second) === 1, "the second session's report in the same thread");
+    const threadOfSession2 = await channels.threadOfSession(second);
+    expect(threadOfSession2).toBe(thread!.id);
+    const handed = inThread().find((m) => m.kind === "dispatch" && m.session === second);
+    expect(handed?.text).toContain("@" + second);
+    expect(handed?.text).toContain("第 2 次");
+    await channels.post({ _tag: "User", text: "时区记得改", channel: thread!.id, sendKey: "" });
+    await until(() => reportsBy(second) === 2, "the person's words wake the second session");
+    expect(reportsBy(first)).toBe(2);
 
-      const threads = (core.state().chat?.channels ?? []).filter((c) => c.subjectKind === "issue" && c.subjectId === issue.id).map((c) => c.id);
-      expect(threads).toEqual([thread!.id]);
-    }).pipe(Effect.scoped, Effect.provide(f.layer));
+    const threads = (core.state().chat?.channels ?? []).filter((c) => c.subjectKind === "issue" && c.subjectId === issue.id).map((c) => c.id);
+    expect(threads).toEqual([thread!.id]);
   });
 
   // The issue hears the user in its thread whichever way the words came: said in the thread, they answer its question and void a pass as a comment does.
-  it.live("hears the user's words as a comment", () => {
+  test("hears the user's words as a comment", async () => {
     const first = Promise.withResolvers<void>();
     let turns = 0;
     const f = farm({
@@ -176,71 +168,70 @@ describe("an issue's thread", () => {
         },
       }),
     });
-    return Effect.gen(function* () {
-      const issue2 = yield* Issue;
-      const issues = testIssues(issue2);
-      const channels = yield* Channel;
-      const sessions = yield* Session;
-      const inbox = yield* Inbox;
-      const { in: saidIn } = yield* Said;
-      yield* (yield* Agent).save(lab());
-      const issue = yield* issues.add({
-        title: "先问清楚，再写打卡",
-        repo: "clock",
-        agent: "lab",
-      });
-      const sent = yield* issues.start(issue.id, "");
-      const thread = (yield* await_(
-        () => channels.threadOfSession(sent.session!),
-        (id) => id !== undefined,
-        "the issue's thread",
-      ))!;
-      const get = () => issues.get(issue.id);
-      yield* until(() => sessions.runOf(sent.session!) !== undefined, "the first run");
-      yield* sessions.report(sent.session!, {
-        summary: "需要端口",
-        questions: [{ question: "用 8787 还是 8797？", options: ["用 8787", "用 8797"] }],
-        checks: [],
-        remember: [],
-        prSubmit: false,
-      });
-      first.resolve();
-      yield* await_(get, (i) => i.questions.length === 1, "its question");
+    await using fw = await f.open();
+    const issue2 = fw.issue;
+    const issues = testIssues(issue2);
+    const channels = fw.channel;
+    const sessions = fw.session;
+    const inbox = fw.inbox;
+    const { in: saidIn } = fw.said;
+    await fw.agent.save(lab());
+    const issue = await issues.add({
+      title: "先问清楚，再写打卡",
+      repo: "clock",
+      agent: "lab",
+    });
+    const sent = await issues.start(issue.id, "");
+    const thread = (await await_(
+      () => channels.threadOfSession(sent.session!),
+      (id) => id !== undefined,
+      "the issue's thread",
+    ))!;
+    const get = () => issues.get(issue.id);
+    await until(() => sessions.runOf(sent.session!) !== undefined, "the first run");
+    await sessions.report(sent.session!, {
+      summary: "需要端口",
+      questions: [{ question: "用 8787 还是 8797？", options: ["用 8787", "用 8797"] }],
+      checks: [],
+      remember: [],
+      prSubmit: false,
+    });
+    first.resolve();
+    await await_(get, (i) => i.questions.length === 1, "its question");
 
-      const question = (yield* await_(
-        () => saidIn(thread).findLast((message) => message.kind === "report"),
-        (message) => message !== undefined,
-        "the question handoff",
-      ))!;
-      yield* await_(
-        () => inbox.handoffState(question.id),
-        (state) => state === "unseen",
-        "the question unseen",
-      );
-      yield* channels.markRead(thread, question.number);
-      yield* await_(
-        () => inbox.handoffState(question.id),
-        (state) => state === "seen",
-        "the question seen",
-      );
+    const question = (await await_(
+      () => saidIn(thread).findLast((message) => message.kind === "report"),
+      (message) => message !== undefined,
+      "the question handoff",
+    ))!;
+    await await_(
+      () => inbox.handoffState(question.id),
+      (state) => state === "unseen",
+      "the question unseen",
+    );
+    await channels.markRead(thread, question.number);
+    await await_(
+      () => inbox.handoffState(question.id),
+      (state) => state === "seen",
+      "the question seen",
+    );
 
-      yield* channels.post({ _tag: "User", text: "用 8797", channel: thread, sendKey: "" });
-      yield* await_(
-        () => inbox.handoffState(question.id),
-        (state) => state === undefined,
-        "the question acted on",
-      );
-      yield* await_(get, (i) => i.questions.length === 0, "answered in the thread");
-      yield* await_(get, (i) => i.status === "in_review", "handed back");
-      yield* issues.review(issue.id, { pass: true });
-      expect((yield* get()).reviewedAt).toBeDefined();
-      yield* channels.post({ _tag: "User", text: "标题再短一点", channel: thread, sendKey: "" });
-      yield* await_(get, (i) => i.reviewedAt === undefined, "another round voids the pass");
+    await channels.post({ _tag: "User", text: "用 8797", channel: thread, sendKey: "" });
+    await await_(
+      () => inbox.handoffState(question.id),
+      (state) => state === undefined,
+      "the question acted on",
+    );
+    await await_(get, (i) => i.questions.length === 0, "answered in the thread");
+    await await_(get, (i) => i.status === "in_review", "handed back");
+    await issues.review(issue.id, { pass: true });
+    expect((await get()).reviewedAt).toBeDefined();
+    await channels.post({ _tag: "User", text: "标题再短一点", channel: thread, sendKey: "" });
+    await await_(get, (i) => i.reviewedAt === undefined, "another round voids the pass");
 
-      const said = () => saidIn(thread).filter((m) => m.from === "user" && m.text === "顺手把注释删掉").length;
-      for (let i = 0; i < 2; i++) yield* issues.comment(issue.id, "顺手把注释删掉", "k1");
-      yield* until(() => said() > 0, "the comment in the thread");
-      expect(said()).toBe(1);
-    }).pipe(Effect.scoped, Effect.provide(f.layer));
+    const said = () => saidIn(thread).filter((m) => m.from === "user" && m.text === "顺手把注释删掉").length;
+    for (let i = 0; i < 2; i++) await issues.comment(issue.id, "顺手把注释删掉", "k1");
+    await until(() => said() > 0, "the comment in the thread");
+    expect(said()).toBe(1);
   });
 });

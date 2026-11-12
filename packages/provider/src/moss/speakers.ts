@@ -1,19 +1,28 @@
-import { Effect, Schema } from "effect";
+import { z } from "zod";
 
-import { AudioId, MossAudioError } from "./audio-response.ts";
-import { submitMossAudioTask } from "./audio-submission.ts";
+import type { ProviderHttp } from "../base/http.ts";
+import { codePoints } from "../base/json.ts";
+import { AudioId, invalidAudioInput } from "./audio-response.ts";
+import { type MossAudioSubmission, submitMossAudioTask } from "./audio-submission.ts";
 import { mossSpeakersModels } from "./speakers-models.ts";
 import { mossSpeechFormats } from "./speech-models.ts";
 
-const SpeakerId = Schema.String.check(Schema.isBetweenCodePoints(1, 256), Schema.isPattern(/\S/u));
-const Text = Schema.String.check(Schema.isBetweenCodePoints(1, 10000), Schema.isPattern(/\S/u));
-const Input = Schema.Struct({
-  model: Schema.Literals(mossSpeakersModels),
-  speakers: Schema.Array(Schema.Struct({ id: SpeakerId, voice: AudioId })).check(Schema.isMinLength(1), Schema.isMaxLength(100)),
-  segments: Schema.Array(Schema.Struct({ speaker: SpeakerId, text: Text })).check(Schema.isMinLength(1), Schema.isMaxLength(1000)),
-  format: Schema.Literals(mossSpeechFormats),
-}).check(
-  Schema.makeFilter((input) => {
+const SpeakerId = codePoints(1, 256).regex(/\S/u);
+const Text = codePoints(1, 10000).regex(/\S/u);
+const Input = z
+  .strictObject({
+    model: z.enum(mossSpeakersModels),
+    speakers: z
+      .array(z.strictObject({ id: SpeakerId, voice: AudioId }))
+      .min(1)
+      .max(100),
+    segments: z
+      .array(z.strictObject({ speaker: SpeakerId, text: Text }))
+      .min(1)
+      .max(1000),
+    format: z.enum(mossSpeechFormats),
+  })
+  .refine((input) => {
     const ids = new Set(input.speakers.map((speaker) => speaker.id));
     if (ids.size !== input.speakers.length) return false;
     let codePoints = 0;
@@ -25,13 +34,12 @@ const Input = Schema.Struct({
       }
     }
     return true;
-  }),
-);
+  });
 
-export const prepareMossSpeakers = Effect.fn("Provider.prepareMossSpeakers")(function* (input: unknown) {
-  const request = yield* Schema.decodeUnknownEffect(Input)(input, { onExcessProperty: "error" }).pipe(
-    Effect.mapError(() => MossAudioError.make({ reason: "InvalidInput", outcome: "NotSubmitted" })),
-  );
+export const prepareMossSpeakers = async (input: unknown) => {
+  const parsed = Input.safeParse(input);
+  if (!parsed.success) throw invalidAudioInput();
+  const request = parsed.data;
   return {
     model: request.model,
     speakers: request.speakers.map((speaker) => ({ id: speaker.id, voice_id: speaker.voice })),
@@ -40,9 +48,7 @@ export const prepareMossSpeakers = Effect.fn("Provider.prepareMossSpeakers")(fun
     delivery_method: "url" as const,
     async: true,
   };
-});
+};
 
-export const createMossSpeakersTask = Effect.fn("Provider.createMossSpeakersTask")(function* (key: string, input: unknown) {
-  const request = yield* prepareMossSpeakers(input);
-  return yield* submitMossAudioTask(key, "speech/speakers", request);
-});
+export const createMossSpeakersTask = async (key: string, input: unknown, http: ProviderHttp): Promise<MossAudioSubmission> =>
+  submitMossAudioTask(key, "speech/speakers", await prepareMossSpeakers(input), http);

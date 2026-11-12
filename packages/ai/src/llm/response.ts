@@ -1,7 +1,6 @@
-import { Predicate } from "effect";
-
 import { type DeepSeekChunk } from "@vibevalley/provider/deepseek/response";
 
+import { isRecord } from "../base/json.ts";
 import type { AssistantMessage, StopReason, TextContent, ThinkingContent, ToolCall, Usage } from "../base/messages.ts";
 import { zeroUsage } from "../base/messages.ts";
 import type { Model } from "../base/models.ts";
@@ -272,7 +271,7 @@ function toolCallArguments(json: string): { arguments: Readonly<Record<string, u
     return refused(e instanceof Error ? e.message : String(e));
   }
   // Each tool reads its own fields by its Schema; here the arguments only have to be an object.
-  return Predicate.isObject(parsed) ? { arguments: parsed } : refused("Tool arguments must be a JSON object");
+  return isRecord(parsed) ? { arguments: parsed } : refused("Tool arguments must be a JSON object");
 }
 
 /** While the arguments stream in: what parses so far, else what last did (pi-ai guesses at the unfinished JSON; nothing
@@ -280,7 +279,7 @@ function toolCallArguments(json: string): { arguments: Readonly<Record<string, u
 function streamingArguments(partial: string, last: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
   try {
     const parsed = parseWithRepair(partial);
-    return Predicate.isObject(parsed) ? parsed : last;
+    return isRecord(parsed) ? parsed : last;
   } catch {
     return last;
   }

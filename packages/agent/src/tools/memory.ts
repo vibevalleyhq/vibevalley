@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
 import { basename, join } from "node:path";
 
-import { DateTime, Effect, type FileSystem } from "effect";
+import { mapConcurrent } from "@vibevalley/async";
 
 import { memory as memoryWords } from "../base/prompts.ts";
-import { type AgentFailed } from "../core/errors.ts";
-import { agentFsOf } from "../infra/fs.ts";
+import { AgentFailed } from "../core/errors.ts";
+import { type AgentFs, agentFsOf } from "../infra/fs.ts";
+import { type AgentLog, consoleLog } from "../infra/log.ts";
 
 /** Cut from the top when the prompt carries it: the newest notes matter most. */
 const memoryPromptChars = 8_000;
@@ -30,23 +31,25 @@ export interface MemorySnapshot {
   readonly lineCount: number;
 }
 
+/** read never fails (a memory it cannot read is none, and is logged); remember and rewrite throw an AgentFailed. */
 export interface MemoryPort {
-  readonly read: () => Effect.Effect<{ readonly prompt: string; readonly lines: readonly string[] }>;
-  readonly remember: (note: string) => Effect.Effect<void, AgentFailed>;
-  readonly rewrite: (content: string) => Effect.Effect<number, AgentFailed>;
+  readonly read: () => Promise<{ readonly prompt: string; readonly lines: readonly string[] }>;
+  readonly remember: (note: string) => Promise<void>;
+  readonly rewrite: (content: string) => Promise<number>;
 }
 
-export const fileMemory = (home: string, now: () => number, fs?: FileSystem.FileSystem): MemoryPort => ({
-  read: () =>
-    Effect.gen(function* () {
-      const [snap, lines] = yield* Effect.all([readMemory(home, fs), memoryFileLines(home, fs)], { concurrency: 2 });
+export const fileMemory = (home: string, now: () => number, fs?: AgentFs, log: AgentLog = consoleLog): MemoryPort => ({
+  read: async () => {
+    try {
+      const [snap, lines] = await Promise.all([readMemory(home, fs), memoryFileLines(home, fs)]);
       return { prompt: snap.prompt, lines };
-    }).pipe(
-      Effect.tapError((e) => Effect.logWarning(`agent: cannot read memory in ${home}:`, e)),
-      Effect.orElseSucceed((): { readonly prompt: string; readonly lines: readonly string[] } => ({ prompt: "", lines: [] })),
-    ),
-  remember: (note) => Effect.asVoid(remember(home, note, now(), fs)),
-  rewrite: (content) => Effect.map(rewriteMemory(home, content, fs), (s) => s.lineCount),
+    } catch (e) {
+      log.warn(`agent: cannot read memory in ${home}:`, e);
+      return { prompt: "", lines: [] };
+    }
+  },
+  remember: async (note) => void (await remember(home, note, now(), fs)),
+  rewrite: async (content) => (await rewriteMemory(home, content, fs)).lineCount,
 });
 
 export const parseMemoryLines = (text: string): MemoryLine[] =>
@@ -94,83 +97,85 @@ function snapshotOf(file: string, raw: string, updatedAt: number): MemorySnapsho
   };
 }
 
-export const readMemory = (home: string, fs?: FileSystem.FileSystem): Effect.Effect<MemorySnapshot, AgentFailed> =>
-  Effect.gen(function* () {
-    const io = agentFsOf(fs);
-    const file = memoryFile(home);
-    const text = yield* io.readTextIfExists(file);
-    if (text === undefined) return snapshotOf(file, "", 0);
-    const info = yield* io.stat(file);
-    return snapshotOf(file, text, info.mtimeMs);
-  });
+export async function readMemory(home: string, fs?: AgentFs): Promise<MemorySnapshot> {
+  const io = agentFsOf(fs);
+  const file = memoryFile(home);
+  const text = await io.readTextIfExists(file);
+  if (text === undefined) return snapshotOf(file, "", 0);
+  const info = await io.stat(file);
+  return snapshotOf(file, text, info.mtimeMs);
+}
 
 /** MEMORY.md's lines as the model is told them: neither blank nor headings, without their bullet. */
-const memoryFileLines = (home: string, fs?: FileSystem.FileSystem): Effect.Effect<string[], AgentFailed> =>
-  Effect.map(agentFsOf(fs).readTextIfExists(memoryFile(home)), (raw) =>
-    (raw ?? "")
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((t) => t !== "" && !t.startsWith("#"))
-      .map((t) => t.replace(bulletHead, "")),
-  );
+const memoryFileLines = async (home: string, fs?: AgentFs): Promise<string[]> =>
+  ((await agentFsOf(fs).readTextIfExists(memoryFile(home))) ?? "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((t) => t !== "" && !t.startsWith("#"))
+    .map((t) => t.replace(bulletHead, ""));
 
-export const forgetLine = (home: string, id: string, fs?: FileSystem.FileSystem): Effect.Effect<void, AgentFailed> =>
-  Effect.gen(function* () {
-    const io = agentFsOf(fs);
-    const file = memoryFile(home);
-    const text = yield* io.readTextIfExists(file);
-    if (text === undefined) return;
-    const lines = text.split("\n");
-    const i = lines.findIndex((l) => l.trim() !== "" && lineID(l) === id);
-    if (i >= 0) yield* io.writeText(file, [...lines.slice(0, i), ...lines.slice(i + 1)].join("\n"));
-  });
+export async function forgetLine(home: string, id: string, fs?: AgentFs): Promise<void> {
+  const io = agentFsOf(fs);
+  const file = memoryFile(home);
+  const text = await io.readTextIfExists(file);
+  if (text === undefined) return;
+  const lines = text.split("\n");
+  const i = lines.findIndex((l) => l.trim() !== "" && lineID(l) === id);
+  if (i >= 0) await io.writeText(file, [...lines.slice(0, i), ...lines.slice(i + 1)].join("\n"));
+}
+
+const pad = (n: number, width = 2) => String(n).padStart(width, "0");
 
 /** YYYY-MM-DD where this machine is. */
-const localDate = (now: number) => DateTime.formatIsoDate(DateTime.makeZonedUnsafe(now, { timeZone: DateTime.zoneMakeLocal() }));
+function localDate(now: number): string {
+  const d = new Date(now);
+  return `${pad(d.getFullYear(), 4)}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
 /** now: epoch milliseconds. */
-export const remember = (home: string, note: string, now: number, fs?: FileSystem.FileSystem): Effect.Effect<MemoryLine, AgentFailed> =>
-  Effect.gen(function* () {
-    const io = agentFsOf(fs);
-    yield* io.makeDir(home);
-    const date = localDate(now);
-    const cleaned = note.replace(/\s*\n\s*/gu, " ").trim();
-    const line = `- ${date} ${cleaned}`;
-    yield* io.appendText(memoryFile(home), line + "\n");
-    return { id: lineID(line), date, text: cleaned };
-  });
+export async function remember(home: string, note: string, now: number, fs?: AgentFs): Promise<MemoryLine> {
+  const io = agentFsOf(fs);
+  await io.makeDir(home);
+  const date = localDate(now);
+  const cleaned = note.replace(/\s*\n\s*/gu, " ").trim();
+  const line = `- ${date} ${cleaned}`;
+  await io.appendText(memoryFile(home), line + "\n");
+  return { id: lineID(line), date, text: cleaned };
+}
 
-const rewriteMemory = (home: string, text: string, fs?: FileSystem.FileSystem): Effect.Effect<MemorySnapshot, AgentFailed> =>
-  Effect.gen(function* () {
-    const io = agentFsOf(fs);
-    const file = memoryFile(home);
-    yield* io.makeDir(home);
-    const body = text.endsWith("\n") ? text : text + "\n";
-    yield* io.writeText(file, body);
-    const info = yield* io.stat(file);
-    return snapshotOf(file, body, info.mtimeMs);
-  });
+async function rewriteMemory(home: string, text: string, fs?: AgentFs): Promise<MemorySnapshot> {
+  const io = agentFsOf(fs);
+  const file = memoryFile(home);
+  await io.makeDir(home);
+  const body = text.endsWith("\n") ? text : text + "\n";
+  await io.writeText(file, body);
+  const info = await io.stat(file);
+  return snapshotOf(file, body, info.mtimeMs);
+}
 
 const archiveDir = (home: string) => join(home, "archive");
 
 /** The UTC ISO time with its colons and dot made dashes. */
-const isoStamp = (now: number) => DateTime.formatIso(DateTime.makeUnsafe(now)).replace(/[:.]/gu, "-");
+const isoStamp = (now: number) => new Date(now).toISOString().replace(/[:.]/gu, "-");
 
 /** now: epoch milliseconds. */
-export const archive = (home: string, session: string, text: string, now: number, fs?: FileSystem.FileSystem): Effect.Effect<string, AgentFailed> =>
-  Effect.gen(function* () {
-    const io = agentFsOf(fs);
-    yield* io.makeDir(archiveDir(home));
-    const path = join(archiveDir(home), `${session}-${isoStamp(now)}.md`);
-    yield* io.writeText(path, text);
-    return path;
-  });
+export async function archive(home: string, session: string, text: string, now: number, fs?: AgentFs): Promise<string> {
+  const io = agentFsOf(fs);
+  await io.makeDir(archiveDir(home));
+  const path = join(archiveDir(home), `${session}-${isoStamp(now)}.md`);
+  await io.writeText(path, text);
+  return path;
+}
 
-const archiveNames = (io: ReturnType<typeof agentFsOf>, home: string): Effect.Effect<string[]> =>
-  io.readDir(archiveDir(home)).pipe(
-    Effect.map((names) => names.filter((n) => n.endsWith(".md"))),
-    Effect.catchTag("AgentFailed", () => Effect.succeed<string[]>([])),
-  );
+/** No archive folder (or one that cannot be read) is no archive. */
+async function archiveNames(io: AgentFs, home: string): Promise<string[]> {
+  try {
+    return (await io.readDir(archiveDir(home))).filter((n) => n.endsWith(".md"));
+  } catch (e) {
+    if (e instanceof AgentFailed) return [];
+    throw e;
+  }
+}
 
 export interface ArchiveFile {
   readonly name: string;
@@ -184,48 +189,41 @@ export interface ArchiveHit {
   readonly text: string;
 }
 
-export const archiveFiles = (home: string, fs?: FileSystem.FileSystem): Effect.Effect<ArchiveFile[], AgentFailed> =>
-  Effect.gen(function* () {
-    const io = agentFsOf(fs);
-    const names = yield* archiveNames(io, home);
-    const files = yield* Effect.forEach(
-      names,
-      (name) =>
-        Effect.gen(function* () {
-          const path = join(archiveDir(home), name);
-          const [info, text] = yield* Effect.all([io.stat(path), io.readText(path)], { concurrency: 2 });
-          return { name, at: Math.trunc(info.mtimeMs), chars: text.length };
-        }),
-      { concurrency: 16 },
-    );
-    return files.toSorted((a, b) => b.at - a.at);
+export async function archiveFiles(home: string, fs?: AgentFs): Promise<ArchiveFile[]> {
+  const io = agentFsOf(fs);
+  const names = await archiveNames(io, home);
+  const files = await mapConcurrent(names, 16, async (name) => {
+    const path = join(archiveDir(home), name);
+    const [info, text] = await Promise.all([io.stat(path), io.readText(path)]);
+    return { name, at: Math.trunc(info.mtimeMs), chars: text.length };
   });
+  return files.toSorted((a, b) => b.at - a.at);
+}
 
 /** A name with a path in it is none. */
-export const readArchive = (home: string, name: string, fs?: FileSystem.FileSystem): Effect.Effect<string | undefined, AgentFailed> =>
-  name !== basename(name) || !name.endsWith(".md") ? Effect.undefined : agentFsOf(fs).readTextIfExists(join(archiveDir(home), name));
+export const readArchive = async (home: string, name: string, fs?: AgentFs): Promise<string | undefined> =>
+  name !== basename(name) || !name.endsWith(".md") ? undefined : agentFsOf(fs).readTextIfExists(join(archiveDir(home), name));
 
 /** Any case; 20 hits when limit is 0. */
-export const searchArchive = (home: string, query: string, limit = 0, fs?: FileSystem.FileSystem): Effect.Effect<ArchiveHit[], AgentFailed> =>
-  Effect.gen(function* () {
-    const io = agentFsOf(fs);
-    const most = limit > 0 ? limit : 20;
-    const q = query.trim().toLowerCase();
-    const hits: ArchiveHit[] = [];
-    if (q === "") return hits;
-    const names = yield* archiveNames(io, home);
-    for (const file of names.toSorted().toReversed()) {
-      const content = yield* io.readText(join(archiveDir(home), file));
-      const lines = content.split("\n");
-      lines.forEach((l, i) => {
-        if (hits.length < most && l.toLowerCase().includes(q))
-          hits.push({
-            file,
-            line: i + 1,
-            text: lines.slice(Math.max(0, i - 2), Math.min(lines.length, i + 3)).join("\n"),
-          });
-      });
-      if (hits.length >= most) break;
-    }
-    return hits;
-  });
+export async function searchArchive(home: string, query: string, limit = 0, fs?: AgentFs): Promise<ArchiveHit[]> {
+  const io = agentFsOf(fs);
+  const most = limit > 0 ? limit : 20;
+  const q = query.trim().toLowerCase();
+  const hits: ArchiveHit[] = [];
+  if (q === "") return hits;
+  const names = await archiveNames(io, home);
+  for (const file of names.toSorted().toReversed()) {
+    const content = await io.readText(join(archiveDir(home), file));
+    const lines = content.split("\n");
+    lines.forEach((l, i) => {
+      if (hits.length < most && l.toLowerCase().includes(q))
+        hits.push({
+          file,
+          line: i + 1,
+          text: lines.slice(Math.max(0, i - 2), Math.min(lines.length, i + 3)).join("\n"),
+        });
+    });
+    if (hits.length >= most) break;
+  }
+  return hits;
+}

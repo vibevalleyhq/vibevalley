@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
@@ -11,25 +11,25 @@ import catalogEn from "./template_catalog.en.json";
 import catalogZh from "./template_catalog.json";
 
 /** An achievement as seeds.json defines it; the game says it in the user's words (game/view.ts). */
-const AchievementDef = Schema.Struct({
-  id: Schema.String,
+const AchievementDef = z.object({
+  id: z.string(),
   category: S.AchievementCategory,
-  title: Schema.String,
-  tierTitles: Schema.optionalKey(Schema.Array(Schema.String)),
-  detail: Schema.String,
-  tiers: Schema.Array(Schema.Finite),
-  coins: Schema.Array(Schema.Finite),
-  unit: Schema.optionalKey(Schema.String),
+  title: z.string(),
+  tierTitles: z.exactOptional(z.array(z.string())),
+  detail: z.string(),
+  tiers: z.array(z.number()),
+  coins: z.array(z.number()),
+  unit: z.exactOptional(z.string()),
 });
-export type AchievementDef = typeof AchievementDef.Type;
+export type AchievementDef = z.infer<typeof AchievementDef>;
 
-const Seeds = Schema.Struct({ achievements: Schema.Array(AchievementDef) });
+const Seeds = z.object({ achievements: z.array(AchievementDef) });
 /** A template as template_catalog.json writes it: done may still hold {test}, {lint} and {build}. */
-const WrittenTemplate = Schema.Struct({ id: Schema.String, title: Schema.String, done: Schema.String });
-export type WrittenTemplate = typeof WrittenTemplate.Type;
-const WrittenKind = Schema.Struct({ id: Schema.String, name: Schema.String, icon: Schema.String, templates: Schema.Array(WrittenTemplate) });
-export type WrittenKind = typeof WrittenKind.Type;
-const Catalog = Schema.Struct({ kinds: Schema.Array(WrittenKind) });
+const WrittenTemplate = z.object({ id: z.string(), title: z.string(), done: z.string() });
+export type WrittenTemplate = z.infer<typeof WrittenTemplate>;
+const WrittenKind = z.object({ id: z.string(), name: z.string(), icon: z.string(), templates: z.array(WrittenTemplate) });
+export type WrittenKind = z.infer<typeof WrittenKind>;
+const Catalog = z.object({ kinds: z.array(WrittenKind) });
 
 const seeds = localizedJson(Seeds, seedsZh, seedsEn);
 const catalog = localizedJson(Catalog, catalogZh, catalogEn);

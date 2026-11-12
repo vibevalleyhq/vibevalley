@@ -1,103 +1,158 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
-const TextContentSchema = Schema.Struct({
-  type: Schema.Literal("text"),
-  text: Schema.String,
-});
-export type TextContent = typeof TextContentSchema.Type;
+export interface TextContent {
+  readonly type: "text";
+  readonly text: string;
+}
 
-const ThinkingContentSchema = Schema.Struct({
-  type: Schema.Literal("thinking"),
-  thinking: Schema.String,
+export interface ThinkingContent {
+  readonly type: "thinking";
+  readonly thinking: string;
   /** The response field the thinking came in (reasoning_content): it goes back under that name. */
-  thinkingSignature: Schema.optionalKey(Schema.String),
-});
-export type ThinkingContent = typeof ThinkingContentSchema.Type;
+  readonly thinkingSignature?: string;
+}
 
-const ImageContentSchema = Schema.Struct({
-  type: Schema.Literal("image"),
+export interface ImageContent {
+  readonly type: "image";
   /** Base64. */
-  data: Schema.String,
-  mimeType: Schema.String,
-});
-export type ImageContent = typeof ImageContentSchema.Type;
+  readonly data: string;
+  readonly mimeType: string;
+}
 
-const ToolCallSchema = Schema.Struct({
-  type: Schema.Literal("toolCall"),
-  id: Schema.String,
-  name: Schema.String,
-  arguments: Schema.Record(Schema.String, Schema.Unknown),
+export interface ToolCall {
+  readonly type: "toolCall";
+  readonly id: string;
+  readonly name: string;
+  readonly arguments: { readonly [x: string]: unknown };
   /** Set when the model's arguments were not a JSON object; arguments is then {}. */
-  argumentsError: Schema.optionalKey(Schema.String),
-});
-export type ToolCall = typeof ToolCallSchema.Type;
+  readonly argumentsError?: string;
+}
 
-const UsageSchema = Schema.Struct({
+export interface Usage {
   /** Prompt tokens not read from the cache. */
-  input: Schema.Finite,
-  output: Schema.Finite,
-  cacheRead: Schema.Finite,
-  cacheWrite: Schema.Finite,
+  readonly input: number;
+  readonly output: number;
+  readonly cacheRead: number;
+  readonly cacheWrite: number;
   /** Of output; set when the provider reports it. */
-  reasoning: Schema.optionalKey(Schema.Finite),
-  totalTokens: Schema.Finite,
+  readonly reasoning?: number;
+  readonly totalTokens: number;
   /** Dollars. */
-  cost: Schema.Struct({
-    input: Schema.Finite,
-    output: Schema.Finite,
-    cacheRead: Schema.Finite,
-    cacheWrite: Schema.Finite,
-    total: Schema.Finite,
-  }),
-});
-export type Usage = typeof UsageSchema.Type;
+  readonly cost: {
+    readonly input: number;
+    readonly output: number;
+    readonly cacheRead: number;
+    readonly cacheWrite: number;
+    readonly total: number;
+  };
+}
 
-const StopReasonValues = ["stop", "length", "toolUse", "error", "aborted"] as const;
-const StopReasonSchema = Schema.Literals(StopReasonValues);
-export type StopReason = typeof StopReasonSchema.Type;
+export type StopReason = "stop" | "length" | "toolUse" | "error" | "aborted";
 
-export const UserContentSchema = Schema.Union([Schema.String, Schema.Array(Schema.Union([TextContentSchema, ImageContentSchema]))]);
-
-export const UserMessageSchema = Schema.Struct({
-  role: Schema.Literal("user"),
-  content: UserContentSchema,
+export interface UserMessage {
+  readonly role: "user";
+  readonly content: string | readonly (TextContent | ImageContent)[];
   /** Milliseconds. */
-  timestamp: Schema.Finite,
-});
-export type UserMessage = typeof UserMessageSchema.Type;
+  readonly timestamp: number;
+}
 
-export const AssistantMessageSchema = Schema.Struct({
-  role: Schema.Literal("assistant"),
-  content: Schema.Array(Schema.Union([TextContentSchema, ThinkingContentSchema, ToolCallSchema])),
-  api: Schema.String,
-  provider: Schema.String,
+export interface AssistantMessage {
+  readonly role: "assistant";
+  readonly content: readonly (TextContent | ThinkingContent | ToolCall)[];
+  readonly api: string;
+  readonly provider: string;
   /** The model asked; responseModel is the one that answered when it says another. */
-  model: Schema.String,
-  usage: UsageSchema,
-  stopReason: StopReasonSchema,
-  timestamp: Schema.Finite,
-  responseId: Schema.optionalKey(Schema.String),
-  responseModel: Schema.optionalKey(Schema.String),
+  readonly model: string;
+  readonly usage: Usage;
+  readonly stopReason: StopReason;
+  readonly timestamp: number;
+  readonly responseId?: string;
+  readonly responseModel?: string;
   /** The provider's own finish_reason. */
-  rawStopReason: Schema.optionalKey(Schema.String),
-  errorMessage: Schema.optionalKey(Schema.String),
+  readonly rawStopReason?: string;
+  readonly errorMessage?: string;
   /** The level the loop asked for, off when none. */
-  thinkingLevel: Schema.optionalKey(Schema.String),
+  readonly thinkingLevel?: string;
   /** From the request to the last of its stream. */
-  durationMs: Schema.optionalKey(Schema.Finite),
-});
-export type AssistantMessage = typeof AssistantMessageSchema.Type;
+  readonly durationMs?: number;
+}
 
-export const ToolResultMessageSchema = Schema.Struct({
-  role: Schema.Literal("toolResult"),
-  toolCallId: Schema.String,
-  toolName: Schema.String,
-  content: Schema.Array(Schema.Union([TextContentSchema, ImageContentSchema])),
-  isError: Schema.Boolean,
-  timestamp: Schema.Finite,
-  durationMs: Schema.optionalKey(Schema.Finite),
-});
-export type ToolResultMessage = typeof ToolResultMessageSchema.Type;
+export interface ToolResultMessage {
+  readonly role: "toolResult";
+  readonly toolCallId: string;
+  readonly toolName: string;
+  readonly content: readonly (TextContent | ImageContent)[];
+  readonly isError: boolean;
+  readonly timestamp: number;
+  readonly durationMs?: number;
+}
+
+const TextContentSchema = z.object({ type: z.literal("text"), text: z.string() }) satisfies z.ZodType<TextContent>;
+
+const ThinkingContentSchema = z.object({
+  type: z.literal("thinking"),
+  thinking: z.string(),
+  thinkingSignature: z.exactOptional(z.string()),
+}) satisfies z.ZodType<ThinkingContent>;
+
+const ImageContentSchema = z.object({ type: z.literal("image"), data: z.string(), mimeType: z.string() }) satisfies z.ZodType<ImageContent>;
+
+const ToolCallSchema = z.object({
+  type: z.literal("toolCall"),
+  id: z.string(),
+  name: z.string(),
+  arguments: z.record(z.string(), z.unknown()),
+  argumentsError: z.exactOptional(z.string()),
+}) satisfies z.ZodType<ToolCall>;
+
+const UsageSchema = z.object({
+  input: z.number(),
+  output: z.number(),
+  cacheRead: z.number(),
+  cacheWrite: z.number(),
+  reasoning: z.exactOptional(z.number()),
+  totalTokens: z.number(),
+  cost: z.object({ input: z.number(), output: z.number(), cacheRead: z.number(), cacheWrite: z.number(), total: z.number() }),
+}) satisfies z.ZodType<Usage>;
+
+const StopReasonValues = ["stop", "length", "toolUse", "error", "aborted"] as const satisfies readonly StopReason[];
+
+export const UserContentSchema = z.union([z.string(), z.array(z.discriminatedUnion("type", [TextContentSchema, ImageContentSchema]))]) satisfies z.ZodType<
+  UserMessage["content"]
+>;
+
+export const UserMessageSchema = z.object({
+  role: z.literal("user"),
+  content: UserContentSchema,
+  timestamp: z.number(),
+}) satisfies z.ZodType<UserMessage>;
+
+export const AssistantMessageSchema = z.object({
+  role: z.literal("assistant"),
+  content: z.array(z.discriminatedUnion("type", [TextContentSchema, ThinkingContentSchema, ToolCallSchema])),
+  api: z.string(),
+  provider: z.string(),
+  model: z.string(),
+  usage: UsageSchema,
+  stopReason: z.enum(StopReasonValues),
+  timestamp: z.number(),
+  responseId: z.exactOptional(z.string()),
+  responseModel: z.exactOptional(z.string()),
+  rawStopReason: z.exactOptional(z.string()),
+  errorMessage: z.exactOptional(z.string()),
+  thinkingLevel: z.exactOptional(z.string()),
+  durationMs: z.exactOptional(z.number()),
+}) satisfies z.ZodType<AssistantMessage>;
+
+export const ToolResultMessageSchema = z.object({
+  role: z.literal("toolResult"),
+  toolCallId: z.string(),
+  toolName: z.string(),
+  content: z.array(z.discriminatedUnion("type", [TextContentSchema, ImageContentSchema])),
+  isError: z.boolean(),
+  timestamp: z.number(),
+  durationMs: z.exactOptional(z.number()),
+}) satisfies z.ZodType<ToolResultMessage>;
 
 export type Message = UserMessage | AssistantMessage | ToolResultMessage;
 

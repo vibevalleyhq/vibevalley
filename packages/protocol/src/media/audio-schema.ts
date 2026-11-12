@@ -1,31 +1,36 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import { Attachment } from "../attachment/schema";
 import type { Codec } from "../codec";
+import { codePoints } from "../common/schema";
 import type * as T from "./audio-shapes";
 import { MediaAudioMetadata, MediaInputReference, MediaPhase, MediaSource, MediaAudioUsage } from "./common-schema";
 import { MediaAudioFormatValues } from "./shapes";
 
-const Id = Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9_-]{1,80}$/u));
-const VoiceId = Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9_-]{1,256}$/u));
-const SpeakerId = Schema.String.check(Schema.isBetweenCodePoints(1, 256), Schema.isPattern(/\S/u));
-const MediaAudioFormat = Schema.Literals(MediaAudioFormatValues);
-const MediaAudioAccountRequest = Schema.Struct({
+const Id = z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/u);
+const VoiceId = z.string().regex(/^[a-zA-Z0-9_-]{1,256}$/u);
+const SpeakerId = z.string().check(codePoints(1, 256)).regex(/\S/u);
+const MediaAudioFormat = z.enum(MediaAudioFormatValues);
+const MediaAudioAccountRequest = z.object({
   id: Id,
-  connection: Schema.NonEmptyString,
-  revision: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  connection: z.string().min(1),
+  revision: z.number().int().min(0),
 }) satisfies Codec<T.MediaAudioAccountRequest>;
 const SpeakersFields = {
-  ...MediaAudioAccountRequest.fields,
-  speakers: Schema.mutable(Schema.Array(Schema.Struct({ id: SpeakerId, voice: VoiceId })).check(Schema.isMinLength(1), Schema.isMaxLength(100))),
-  segments: Schema.mutable(
-    Schema.Array(
-      Schema.Struct({
+  ...MediaAudioAccountRequest.shape,
+  speakers: z
+    .array(z.object({ id: SpeakerId, voice: VoiceId }))
+    .min(1)
+    .max(100),
+  segments: z
+    .array(
+      z.object({
         speaker: SpeakerId,
-        text: Schema.String.check(Schema.isBetweenCodePoints(1, 10000), Schema.isPattern(/\S/u)),
+        text: z.string().check(codePoints(1, 10000)).regex(/\S/u),
       }),
-    ).check(Schema.isMinLength(1), Schema.isMaxLength(1000)),
-  ),
+    )
+    .min(1)
+    .max(1000),
   format: MediaAudioFormat,
 };
 const validSpeakers = (input: T.MediaSpeakersRequest) => {
@@ -41,80 +46,80 @@ const validSpeakers = (input: T.MediaSpeakersRequest) => {
   }
   return true;
 };
-export const MediaSpeakersRequest = Schema.Struct(SpeakersFields).check(Schema.makeFilter(validSpeakers)) satisfies Codec<T.MediaSpeakersRequest>;
-export const MediaVoiceDesignRequest = Schema.Struct({
-  ...MediaAudioAccountRequest.fields,
-  text: Schema.String.check(Schema.isBetweenCodePoints(1, 10000), Schema.isPattern(/\S/u)),
-  instruction: Schema.String.check(Schema.isBetweenCodePoints(1, 10000), Schema.isPattern(/\S/u)),
+export const MediaSpeakersRequest = z.object(SpeakersFields).refine(validSpeakers) satisfies Codec<T.MediaSpeakersRequest>;
+export const MediaVoiceDesignRequest = z.object({
+  ...MediaAudioAccountRequest.shape,
+  text: z.string().check(codePoints(1, 10000)).regex(/\S/u),
+  instruction: z.string().check(codePoints(1, 10000)).regex(/\S/u),
   format: MediaAudioFormat,
 }) satisfies Codec<T.MediaVoiceDesignRequest>;
-export const MediaCloneRequest = Schema.Struct({
-  ...MediaAudioAccountRequest.fields,
-  input: Schema.NonEmptyString,
-  name: Schema.optionalKey(Schema.String.check(Schema.isBetweenCodePoints(1, 1000))),
-  consent: Schema.Literal(true),
+export const MediaCloneRequest = z.object({
+  ...MediaAudioAccountRequest.shape,
+  input: z.string().min(1),
+  name: z.exactOptional(z.string().check(codePoints(1, 1000))),
+  consent: z.literal(true),
 }) satisfies Codec<T.MediaCloneRequest>;
-export const MediaTranscriptionRequest = Schema.Struct({
-  ...MediaAudioAccountRequest.fields,
-  input: Schema.NonEmptyString,
-  allowUpload: Schema.Literal(true),
-  diarize: Schema.optionalKey(Schema.Boolean),
-  keyterms: Schema.optionalKey(
-    Schema.mutable(Schema.Array(Schema.String.check(Schema.isBetweenCodePoints(1, 30), Schema.isPattern(/\S/u))).check(Schema.isMaxLength(20))),
-  ),
-  streaming: Schema.optionalKey(Schema.Boolean),
+export const MediaTranscriptionRequest = z.object({
+  ...MediaAudioAccountRequest.shape,
+  input: z.string().min(1),
+  allowUpload: z.literal(true),
+  diarize: z.exactOptional(z.boolean()),
+  keyterms: z.exactOptional(z.array(z.string().check(codePoints(1, 30)).regex(/\S/u)).max(20)),
+  streaming: z.exactOptional(z.boolean()),
 }) satisfies Codec<T.MediaTranscriptionRequest>;
-export const MediaAudioRequest: Codec<T.MediaAudioRequest> = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal("speakers"), ...SpeakersFields }).check(Schema.makeFilter(validSpeakers)),
-  Schema.Struct({ kind: Schema.Literal("voiceDesign"), ...MediaVoiceDesignRequest.fields }),
-  Schema.Struct({ kind: Schema.Literal("clone"), ...MediaCloneRequest.fields }),
-  Schema.Struct({ kind: Schema.Literal("transcription"), ...MediaTranscriptionRequest.fields }),
-]);
-const MediaAudioVoice: Codec<T.MediaAudioVoice> = Schema.Struct({
-  id: Schema.NonEmptyString,
-  name: Schema.String,
-  createdAtSeconds: Schema.Finite,
-});
-const MediaAudioSegment: Codec<T.MediaAudioSegment> = Schema.Struct({
-  speaker: Schema.String,
-  text: Schema.String,
-  start: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)),
-  end: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)),
-}).check(Schema.makeFilter((segment) => segment.end >= segment.start));
-export const MediaAudioResult: Codec<T.MediaAudioResult> = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal("clone"), voice: MediaAudioVoice }),
-  Schema.Struct({ kind: Schema.Literal("transcription"), text: Schema.String, segments: Schema.mutable(Schema.Array(MediaAudioSegment)) }),
-]);
+export const MediaAudioRequest = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("speakers"), ...SpeakersFields }).refine(validSpeakers),
+  z.object({ kind: z.literal("voiceDesign"), ...MediaVoiceDesignRequest.shape }),
+  z.object({ kind: z.literal("clone"), ...MediaCloneRequest.shape }),
+  z.object({ kind: z.literal("transcription"), ...MediaTranscriptionRequest.shape }),
+]) satisfies Codec<T.MediaAudioRequest>;
+const MediaAudioVoice = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  createdAtSeconds: z.number(),
+}) satisfies Codec<T.MediaAudioVoice>;
+const MediaAudioSegment = z
+  .object({
+    speaker: z.string(),
+    text: z.string(),
+    start: z.number().min(0),
+    end: z.number().min(0),
+  })
+  .refine((segment) => segment.end >= segment.start) satisfies Codec<T.MediaAudioSegment>;
+export const MediaAudioResult = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("clone"), voice: MediaAudioVoice }),
+  z.object({ kind: z.literal("transcription"), text: z.string(), segments: z.array(MediaAudioSegment) }),
+]) satisfies Codec<T.MediaAudioResult>;
 const Job = {
-  id: Schema.String,
-  prompt: Schema.String,
-  model: Schema.String,
-  connection: Schema.String,
-  revision: Schema.Int,
+  id: z.string(),
+  prompt: z.string(),
+  model: z.string(),
+  connection: z.string(),
+  revision: z.number().int(),
   source: MediaSource,
   phase: MediaPhase,
-  phaseText: Schema.String,
-  problem: Schema.String,
-  format: Schema.NullOr(MediaAudioFormat),
-  contentType: Schema.NullOr(Schema.String),
-  metadata: Schema.optionalKey(MediaAudioMetadata),
-  usage: Schema.optionalKey(MediaAudioUsage),
-  input: Schema.NullOr(MediaInputReference),
-  resultInput: Schema.NullOr(MediaInputReference),
-  attachment: Schema.optionalKey(Attachment),
-  previewInput: Schema.NullOr(Schema.String),
-  result: Schema.NullOr(MediaAudioResult),
-  canCancel: Schema.Boolean,
-  canRetryDownload: Schema.Boolean,
-  canResume: Schema.Boolean,
-  canCleanup: Schema.Boolean,
-  canRelease: Schema.Boolean,
-  createdAt: Schema.Finite,
-  updatedAt: Schema.Finite,
+  phaseText: z.string(),
+  problem: z.string(),
+  format: MediaAudioFormat.nullable(),
+  contentType: z.string().nullable(),
+  metadata: z.exactOptional(MediaAudioMetadata),
+  usage: z.exactOptional(MediaAudioUsage),
+  input: MediaInputReference.nullable(),
+  resultInput: MediaInputReference.nullable(),
+  attachment: z.exactOptional(Attachment),
+  previewInput: z.string().nullable(),
+  result: MediaAudioResult.nullable(),
+  canCancel: z.boolean(),
+  canRetryDownload: z.boolean(),
+  canResume: z.boolean(),
+  canCleanup: z.boolean(),
+  canRelease: z.boolean(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
 };
-export const MediaAudioJob: Codec<T.MediaAudioJob> = Schema.Union([
-  Schema.Struct({ ...Job, kind: Schema.Literal("speakers"), request: MediaSpeakersRequest }),
-  Schema.Struct({ ...Job, kind: Schema.Literal("voiceDesign"), request: MediaVoiceDesignRequest }),
-  Schema.Struct({ ...Job, kind: Schema.Literal("clone"), request: MediaCloneRequest }),
-  Schema.Struct({ ...Job, kind: Schema.Literal("transcription"), request: MediaTranscriptionRequest }),
-]);
+export const MediaAudioJob = z.discriminatedUnion("kind", [
+  z.object({ ...Job, kind: z.literal("speakers"), request: MediaSpeakersRequest }),
+  z.object({ ...Job, kind: z.literal("voiceDesign"), request: MediaVoiceDesignRequest }),
+  z.object({ ...Job, kind: z.literal("clone"), request: MediaCloneRequest }),
+  z.object({ ...Job, kind: z.literal("transcription"), request: MediaTranscriptionRequest }),
+]) satisfies Codec<T.MediaAudioJob>;

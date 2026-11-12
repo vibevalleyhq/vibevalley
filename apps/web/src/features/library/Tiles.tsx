@@ -1,12 +1,10 @@
-import * as stylex from "@stylexjs/stylex";
-import { Array as Arr } from "effect";
+import type { JSX } from "@solidjs/web";
 import { createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 
 import { attachmentPath, type LibraryItem, type MediaJob } from "@vibevalley/protocol";
 
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
-import { styleProps } from "#/ui/positioner.ts";
 
 import { durationText, extOf, justify, kindOf, type Placed } from "./items.ts";
 
@@ -26,91 +24,11 @@ export const knows = ({ had, learnt }: { readonly had: Seen; readonly learnt: Se
 export const tileGap = 12;
 const captionPx = 22;
 
-const styles = stylex.create({
-  rows: { display: "flex", flexDirection: "column", gap: tileGap },
-  row: { display: "flex", gap: tileGap },
-  // Absolute coordinates inside a fixed-height container keep tile DOM nodes (and decoded images) intact across row reflows.
-  field: (height: number) => ({ position: "relative", height }),
-  at: (x: number, y: number) => ({ position: "absolute", left: x, top: y }),
-  tile: (width: number, height: number) => ({
-    display: "flex",
-    flexShrink: 0,
-    flexDirection: "column",
-    width,
-    height: height + captionPx,
-    minWidth: 0,
-    cursor: "default",
-    outlineStyle: "none",
-  }),
-  thumb: {
-    position: "relative",
-    display: "flex",
-    flex: 1,
-    minHeight: 0,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    borderRadius: "var(--radius-md)",
-    outlineStyle: "solid",
-    outlineOffset: 2,
-    outlineWidth: 2,
-    outlineColor: {
-      default: "transparent",
-      "@media (hover: hover)": { default: "transparent", ":is([data-tile]:hover > *)": "var(--color-line)" },
-    },
-    transitionProperty: "outline-color",
-    transitionDuration: "120ms",
-    transitionTimingFunction: "var(--ease-out)",
-  },
-  picked: { outlineColor: "var(--color-accent)" },
-  active: { outlineColor: { default: "var(--color-focus)", ":is([data-picked] > *)": "var(--color-accent)" } },
-  plain: {
-    flexDirection: "column",
-    gap: "0.25rem",
-    backgroundColor: "var(--color-hover)",
-    color: "var(--color-muted)",
-  },
-  picture: { width: "100%", height: "100%", objectFit: "cover", display: "block" },
-  ext: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", fontWeight: "var(--font-weight-medium)", color: "var(--color-ink)" },
-  length: { fontSize: "var(--text-xs)", lineHeight: "var(--leading-xs)", color: "var(--color-faint)" },
-  badge: {
-    position: "absolute",
-    right: "0.25rem",
-    bottom: "0.25rem",
-    borderRadius: "var(--radius-xs)",
-    // High-contrast code tokens stay legible over bright or dark media in both themes.
-    backgroundColor: "var(--color-code-bg)",
-    paddingInline: "0.25rem",
-    fontSize: "var(--text-2xs)",
-    lineHeight: "var(--leading-2xs)",
-    color: "var(--color-code-ink)",
-  },
-  caption: {
-    overflow: "hidden",
-    paddingTop: 6,
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  captionPicked: { color: "var(--color-ink)" },
-  making: {
-    flexDirection: "column",
-    gap: "0.5rem",
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: "var(--color-wheat)",
-    backgroundColor: "color-mix(in srgb, var(--color-wheat) 14%, transparent)",
-    padding: "0.5rem",
-    textAlign: "center",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-ink)",
-  },
-  wait: { color: "var(--color-wheat)" },
-  hidden: { display: "none" },
-});
+const styles = {
+  field: (height: number): JSX.CSSProperties => ({ height: `${height}px` }),
+  at: (x: number, y: number): JSX.CSSProperties => ({ left: `${x}px`, top: `${y}px` }),
+  tile: (width: number, height: number): JSX.CSSProperties => ({ width: `${width}px`, height: `${height + captionPx}px` }),
+};
 
 const kindIcon: Record<"audio" | "video" | "other", IconName> = { audio: "audio", video: "video", other: "file" };
 
@@ -143,22 +61,33 @@ export function useWidth() {
 }
 
 export function MakingTiles(props: { jobs: readonly MediaJob[]; width: number; height: number; label: (job: MediaJob) => string }) {
-  const rows = () => justify({ ratios: Arr.map(props.jobs, () => 1), width: props.width, height: props.height, gap: tileGap });
+  const rows = () => justify({ ratios: props.jobs.map(() => 1), width: props.width, height: props.height, gap: tileGap });
   return (
-    <div {...stylex.attrs(styles.rows)}>
+    <div class="flex flex-col gap-3">
       <For each={rows()}>
         {(row) => (
-          <div {...stylex.attrs(styles.row)}>
+          <div class="flex gap-3">
             <For each={row}>
               {(p) => (
                 <Show when={props.jobs[p.index]}>
                   {(job) => (
-                    <div data-testid="library-making" data-id={job().id} data-phase={job().phase} {...styleProps(styles.tile(p.width, p.height))}>
-                      <div {...stylex.attrs(styles.thumb, styles.making)}>
-                        <Icon name="wait" size={20} styles={styles.wait} />
+                    <div
+                      data-testid="library-making"
+                      data-id={job().id}
+                      data-phase={job().phase}
+                      class="flex shrink-0 flex-col min-w-0 cursor-default outline-none"
+                      style={styles.tile(p.width, p.height)}
+                    >
+                      <div
+                        class={[
+                          "relative flex flex-1 min-h-0 items-center justify-center overflow-hidden rounded-md outline-solid outline-offset-2 outline-2 outline-transparent [[data-tile]:hover>&]:outline-line transition-[outline-color] duration-120 ease-out",
+                          "flex-col gap-2 border border-dashed border-wheat bg-wheat/14 p-2 text-center text-xs text-ink",
+                        ]}
+                      >
+                        <Icon name="wait" size={20} class="text-wheat" />
                         <span>{job().phaseText}</span>
                       </div>
-                      <p {...stylex.attrs(styles.caption)}>{props.label(job())}</p>
+                      <p class="pt-1.5 truncate text-xs text-muted">{props.label(job())}</p>
                     </div>
                   )}
                 </Show>
@@ -199,7 +128,7 @@ export function Tiles(props: {
 }) {
   const layout = () => stacked({ rows: props.rows, gap: tileGap });
   return (
-    <div {...styleProps(styles.field(layout().height))}>
+    <div class="relative" style={styles.field(layout().height)}>
       <For each={props.items} keyed={(item) => item.attachment.id}>
         {(item, index) => (
           <Show when={layout().at.get(index())}>
@@ -256,11 +185,21 @@ function Tile(props: {
       title={file().name}
       onClick={(e) => props.onPick({ add: e.metaKey || e.ctrlKey, range: e.shiftKey })}
       onDblClick={() => props.onLook()}
-      {...styleProps([styles.tile(props.width, props.height), styles.at(props.x, props.y)])}
+      class={["flex shrink-0 flex-col min-w-0 cursor-default outline-none", "absolute"]}
+      style={{ ...styles.tile(props.width, props.height), ...styles.at(props.x, props.y) }}
     >
       <Switch>
         <Match when={kind() === "image"}>
-          <div {...stylex.attrs(styles.thumb, props.picked && styles.picked, props.active && styles.active)}>
+          <div
+            class={[
+              "relative flex flex-1 min-h-0 items-center justify-center overflow-hidden rounded-md outline-solid outline-offset-2 outline-2 transition-[outline-color] duration-120 ease-out",
+              props.active
+                ? "outline-focus [[data-picked]>&]:outline-accent"
+                : props.picked
+                  ? "outline-accent"
+                  : "outline-transparent [[data-tile]:hover>&]:outline-line",
+            ]}
+          >
             <img
               src={src()}
               alt=""
@@ -271,12 +210,21 @@ function Tile(props: {
                 if (img.naturalWidth > 0 && img.naturalHeight > 0)
                   props.onSeen({ ratio: img.naturalWidth / img.naturalHeight, width: img.naturalWidth, height: img.naturalHeight });
               }}
-              {...stylex.attrs(styles.picture)}
+              class="w-full h-full object-cover block"
             />
           </div>
         </Match>
         <Match when={kind() === "video"}>
-          <div {...stylex.attrs(styles.thumb, props.picked && styles.picked, props.active && styles.active)}>
+          <div
+            class={[
+              "relative flex flex-1 min-h-0 items-center justify-center overflow-hidden rounded-md outline-solid outline-offset-2 outline-2 transition-[outline-color] duration-120 ease-out",
+              props.active
+                ? "outline-focus [[data-picked]>&]:outline-accent"
+                : props.picked
+                  ? "outline-accent"
+                  : "outline-transparent [[data-tile]:hover>&]:outline-line",
+            ]}
+          >
             <video
               src={src()}
               preload="metadata"
@@ -289,16 +237,28 @@ function Tile(props: {
                   ...(Number.isFinite(v.duration) ? { seconds: v.duration } : {}),
                 });
               }}
-              {...stylex.attrs(styles.picture)}
+              class="w-full h-full object-cover block"
             />
-            <Show when={props.seen?.seconds}>{(s) => <span {...stylex.attrs(styles.badge)}>{durationText(s())}</span>}</Show>
+            <Show when={props.seen?.seconds}>
+              {(s) => <span class="absolute right-1 bottom-1 rounded-xs bg-code-bg px-1 text-2xs text-code-ink">{durationText(s())}</span>}
+            </Show>
           </div>
         </Match>
         <Match when={kind() === "audio" || kind() === "other"}>
-          <div {...stylex.attrs(styles.thumb, styles.plain, props.picked && styles.picked, props.active && styles.active)}>
+          <div
+            class={[
+              "relative flex flex-1 min-h-0 items-center justify-center overflow-hidden rounded-md outline-solid outline-offset-2 outline-2 transition-[outline-color] duration-120 ease-out",
+              "flex-col gap-1 bg-hover text-muted",
+              props.active
+                ? "outline-focus [[data-picked]>&]:outline-accent"
+                : props.picked
+                  ? "outline-accent"
+                  : "outline-transparent [[data-tile]:hover>&]:outline-line",
+            ]}
+          >
             <Icon name={kindIcon[kind() === "audio" ? "audio" : "other"]} size={24} />
-            <Show when={extOf(file().name)}>{(ext) => <span {...stylex.attrs(styles.ext)}>{ext()}</span>}</Show>
-            <Show when={props.seen?.seconds}>{(s) => <span {...stylex.attrs(styles.length)}>{durationText(s())}</span>}</Show>
+            <Show when={extOf(file().name)}>{(ext) => <span class="text-xs font-medium text-ink">{ext()}</span>}</Show>
+            <Show when={props.seen?.seconds}>{(s) => <span class="text-xs text-faint">{durationText(s())}</span>}</Show>
             <Show when={kind() === "audio" && props.seen?.seconds === undefined}>
               <audio
                 src={src()}
@@ -308,13 +268,13 @@ function Tile(props: {
                   const d = e.currentTarget.duration;
                   if (Number.isFinite(d)) props.onSeen({ seconds: d });
                 }}
-                {...stylex.attrs(styles.hidden)}
+                class="hidden"
               />
             </Show>
           </div>
         </Match>
       </Switch>
-      <p {...stylex.attrs(styles.caption, props.picked && styles.captionPicked)}>{file().name}</p>
+      <p class={["pt-1.5 truncate text-xs", props.picked ? "text-ink" : "text-muted"]}>{file().name}</p>
     </div>
   );
 }

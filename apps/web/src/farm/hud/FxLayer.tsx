@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createEffect, createSignal, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -10,82 +9,6 @@ import { subscribeLive } from "#/infra/frame.ts";
 import { EarnedMedal, noticeTitle, type ToastData, ToastViewport, toasts, ToastType } from "#/ui/pixel/index.ts";
 
 import { clearingLevels } from "./readout";
-
-const levelUpKeyframes = stylex.keyframes({
-  "0%": { opacity: 0, transform: "translateY(-16px) scale(0.9)" },
-  "9%": { opacity: 1, transform: "translateY(0) scale(1.04)" },
-  "15%": { transform: "translateY(0) scale(1)" },
-  "86%": { opacity: 1 },
-  "100%": { opacity: 0, transform: "translateY(-10px) scale(1)" },
-});
-
-const styles = stylex.create({
-  fxLayerDiv: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    backgroundColor: "var(--color-cream-50)",
-    paddingInline: "1.75rem",
-    paddingTop: "0",
-    paddingBottom: "1rem",
-    boxShadow: "var(--shadow-px)",
-    animationName: {
-      default: null,
-      "@media (prefers-reduced-motion: no-preference)": levelUpKeyframes,
-    },
-    animationDuration: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "3.4s",
-    },
-    animationTimingFunction: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "cubic-bezier(.2,.9,.2,1)",
-    },
-    animationFillMode: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "forwards",
-    },
-  },
-  levelUp: {
-    pointerEvents: "none",
-    position: "absolute",
-    insetInline: "0",
-    top: "6rem",
-    display: "flex",
-    justifyContent: "center",
-  },
-  fxLayerSpan: {
-    display: "flex",
-    height: "1.25rem",
-    width: "3.5rem",
-    alignItems: "flex-end",
-    justifyContent: "center",
-    overflow: "visible",
-  },
-  fxLayerImg: {
-    marginTop: "-36px",
-    marginBottom: "0",
-    height: "3.5rem",
-    width: "3.5rem",
-    flexShrink: "0",
-    imageRendering: "pixelated",
-  },
-  fxLayerSpan2: {
-    marginTop: "0.125rem",
-    fontSize: "12px",
-    letterSpacing: ".3px",
-    color: "var(--color-leaf-700)",
-  },
-  fxLayerSpan3: {
-    fontSize: "24px",
-    color: "var(--color-bark-900)",
-  },
-  fxLayerSpan4: {
-    marginTop: "0.125rem",
-    fontSize: "12px",
-    color: "var(--color-bark-600)",
-  },
-});
 
 const bannerMs = 3400;
 
@@ -143,22 +66,22 @@ export function FxLayer() {
       <Show when={banner()} keyed>
         {(b) => (
           <div
-            {...stylex.attrs(styles.levelUp)}
+            class="pointer-events-none absolute inset-x-0 top-24 flex justify-center"
             role="status"
             data-testid="level-up"
             data-level={b.level}
             aria-label={t("web.farm.fx.levelUp", { level: b.level })}
           >
-            <div {...stylex.attrs(styles.fxLayerDiv)}>
-              <span {...stylex.attrs(styles.fxLayerSpan)}>
+            <div class="flex flex-col items-center bg-cream-50 px-7 pt-0 pb-4 shadow-px motion-safe:[animation-name:level-up] motion-safe:[animation-duration:3400ms] motion-safe:[animation-timing-function:cubic-bezier(.2,.9,.2,1)] motion-safe:[animation-fill-mode:forwards]">
+              <span class="flex h-5 w-14 items-end justify-center overflow-visible">
                 <Show when={loaded().village?.atlas.has("icon-star")}>
-                  <img src="/pixel/icon-star.png" alt="" {...stylex.attrs(styles.fxLayerImg)} />
+                  <img src="/pixel/icon-star.png" alt="" class="-mt-9 mb-0 h-14 w-14 shrink-0 [image-rendering:pixelated]" />
                 </Show>
               </span>
-              <span {...stylex.attrs(styles.fxLayerSpan2)}>LEVEL UP</span>
-              <span {...stylex.attrs(styles.fxLayerSpan3)}>{t("web.farm.fx.level", { level: b.level })}</span>
+              <span class="mt-0.5 text-(length:--text-xs) tracking-[.3px] text-leaf-700">LEVEL UP</span>
+              <span class="text-(length:--text-2xl) text-bark-900">{t("web.farm.fx.level", { level: b.level })}</span>
               <Show when={clearingLevels.has(b.level)}>
-                <span {...stylex.attrs(styles.fxLayerSpan4)}>{t("web.farm.fx.cleared")}</span>
+                <span class="mt-0.5 text-(length:--text-xs) text-bark-600">{t("web.farm.fx.cleared")}</span>
               </Show>
             </div>
           </div>

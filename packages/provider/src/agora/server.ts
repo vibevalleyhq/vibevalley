@@ -1,7 +1,8 @@
 import { AgoraClient, Area as AgoraArea } from "agora-agents";
 import agoraToken from "agora-token";
-import { Effect, Schedule, Schema } from "effect";
-import { SecureRandom } from "effect/crypto";
+import { z } from "zod";
+
+import type { Clock } from "@vibevalley/async";
 const { RtcRole, RtcTokenBuilder } = agoraToken;
 export const tokenSeconds = 3600;
 export interface AgoraCredentials {
@@ -12,32 +13,23 @@ export type Area = "US" | "EU" | "AP" | "CN";
 
 const areaOf = (area: Area) => ({ US: AgoraArea.US, EU: AgoraArea.EU, AP: AgoraArea.AP, CN: AgoraArea.CN } as const)[area];
 
-/** As Agora's SDK retries on its own: 408, 429 and 5xx, twice, after what Retry-After says (at most a minute), else 1 s then 2 s. */
-const agoraRetries = Schedule.exponential("1 second").pipe(
-  Schedule.setInputType<Response>(),
-  Schedule.while(({ input, attempt }) => attempt <= 2 && ([408, 429].includes(input.status) || input.status >= 500)),
-  Schedule.modifyDelay(({ input, duration }) => {
-    const after = Number(input.headers.get("Retry-After"));
-    return Effect.succeed(after > 0 ? Math.min(after * 1000, 60_000) : duration);
-  }),
-  Schedule.passthrough,
-);
+/** What Agora's retries wait on: the service's clock, so a test holding time still holds them too. */
+export type Run = Pick<Clock, "sleep">;
 
-/** Agora's REST calls retried as its SDK would, but sleeping on the service's Clock: the SDK's own retries wait on real
- * time, out of its reach. */
+const retryable = (response: Response) => [408, 429].includes(response.status) || response.status >= 500;
+
+/** Agora's REST calls retried as its SDK would: 408, 429 and 5xx, twice, after what Retry-After says (at most a minute),
+ * else 1 s then 2 s. The waits are on run's clock: the SDK's own retries wait on real time, out of its reach. */
 export const retrying =
   (fetcher: typeof fetch, run: Run): typeof fetch =>
-  (input, init) =>
-    run(
-      Effect.repeat(
-        Effect.promise(() => fetcher(input, init)),
-        agoraRetries,
-      ),
-      init?.signal ? { signal: init.signal } : undefined,
-    );
-
-/** Runs an Effect for the Promise side (the Agora SDK's fetch) on the service's fibers, so its sleeps are on its Clock. */
-export type Run = <A>(effect: Effect.Effect<A>, options?: { readonly signal: AbortSignal }) => Promise<A>;
+  async (input, init) => {
+    for (let attempt = 1; ; attempt++) {
+      const response = await fetcher(input, init);
+      if (attempt > 2 || !retryable(response)) return response;
+      const after = Number(response.headers.get("Retry-After"));
+      await run.sleep(after > 0 ? Math.min(after * 1000, 60_000) : 1000 * 2 ** (attempt - 1), init?.signal ?? undefined);
+    }
+  };
 
 export const clientOf = (c: AgoraCredentials, area: Area, run: Run, fetcher: typeof fetch = fetch) =>
   new AgoraClient({
@@ -48,22 +40,22 @@ export const clientOf = (c: AgoraCredentials, area: Area, run: Run, fetcher: typ
     fetch: retrying(fetcher, run),
   });
 
-const AgoraStopError = Schema.Struct({
-  statusCode: Schema.optionalKey(Schema.Finite),
-  message: Schema.optionalKey(Schema.String),
-  body: Schema.optionalKey(
-    Schema.Struct({
-      detail: Schema.optionalKey(Schema.String),
-      reason: Schema.optionalKey(Schema.String),
+const AgoraStopError = z.object({
+  statusCode: z.exactOptional(z.number()),
+  message: z.exactOptional(z.string()),
+  body: z.exactOptional(
+    z.object({
+      detail: z.exactOptional(z.string()),
+      reason: z.exactOptional(z.string()),
     }),
   ),
 });
 
 /** Already left or leaving counts as success, as the quickstart treats it. */
 export function alreadyStopping(e: unknown): boolean {
-  const decoded = Schema.decodeUnknownOption(AgoraStopError)(e);
-  if (decoded._tag === "None") return false;
-  const err = decoded.value;
+  const decoded = AgoraStopError.safeParse(e);
+  if (!decoded.success) return false;
+  const err = decoded.data;
   if (err.statusCode === 404) return true;
   const said = [err.body?.detail, err.body?.reason, err.message];
   return said.some((s) => s !== undefined && s.toLowerCase().includes("already in the process of shutting down"));
@@ -80,8 +72,7 @@ export const sign = (c: AgoraCredentials, channel: string, uid: string) => ({
 const randomBelow = (n: number): number => {
   const limit = 2 ** 32 - (2 ** 32 % n);
   for (;;) {
-    const bytes = SecureRandom.randomBytesUnsafe(4);
-    const value = new DataView(bytes.buffer, bytes.byteOffset, 4).getUint32(0);
+    const value = crypto.getRandomValues(new Uint32Array(1))[0]!;
     if (value < limit) return value % n;
   }
 };

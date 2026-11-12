@@ -1,5 +1,4 @@
-import { DateTime, Effect, Schema, Stream } from "effect";
-import { Argument, Command, Flag } from "effect/cli";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -8,14 +7,15 @@ import { actCommand } from "@vibevalley/protocol/api";
 import { latestSessionIdOf, stageWantsUser } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
-import { show, FormatFlag } from "#/base/format.ts";
+import { type Ctx, show } from "#/base/format.ts";
 import { err, exit, Failure, jsonText, stdinTextOrEmpty } from "#/base/output.ts";
-import { ask, change, frames, given, nameArg, optionalText, ServerFlag, words } from "#/infra/farm.ts";
+import { arg, command, group, opt } from "#/infra/command.ts";
+import { ask, change, frames } from "#/infra/farm.ts";
 
 import { observeIssue } from "./issue-watch.ts";
 
-const issueArg = nameArg("issue", "cli.arg.issue");
-const priorityFlag = Flag.Literals("priority", PriorityValues).pipe(Flag.optional, Flag.withDescription(t("cli.flag.priority")));
+const issueArg = arg.text("issue", "cli.arg.issue");
+const priorityFlag = opt.choice("priority", PriorityValues, "cli.flag.priority");
 
 /** #12 or 12: the issue's number, as the server takes it. */
 const ref = (said: string) => said.replace(/^#/u, "");
@@ -51,173 +51,160 @@ const issueText = (i: T.Issue) =>
     ...(doable(i).length === 0 ? [] : ["", t("cli.issue.can"), ...doable(i).map((c) => `  vibevalley ${c}`)]),
   ].join("\n");
 
-const listCommand = Command.make(
-  "list",
-  {
-    status: Flag.Literals("status", IssueStatusValues).pipe(Flag.optional, Flag.withDescription(t("cli.flag.issueStatus"))),
-    repo: optionalText("repo", "cli.flag.repo"),
-    text: optionalText("text", "cli.flag.text"),
-    wantsUser: Flag.Boolean("wants-user").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.wantsUser"))),
-    closed: Flag.Boolean("closed").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.closed"))),
-    limit: Flag.Int("limit").pipe(Flag.withDefault(20), Flag.withDescription(t("cli.flag.limit"))),
-  },
-  (o) =>
-    Effect.gen(function* () {
-      const status = given(o.status);
-      const repo = given(o.repo);
-      const text = given(o.text);
-      const issues = yield* ask((api) =>
-        api.issue.list({
-          limit: o.limit + 1,
-          ...(status ? { status } : {}),
-          ...(repo ? { repo } : {}),
-          ...(text ? { text } : {}),
-          ...(o.wantsUser ? { wantsUser: true } : {}),
-          ...(o.closed ? { closed: true } : {}),
-        }),
-      );
-      yield* show(
-        issues.slice(0, o.limit),
-        (list) =>
-          [...list.map(issueLine), ...(issues.length > o.limit ? [t("cli.more", { flag: `--limit ${o.limit * 2}` })] : [])].join("\n") || t("cli.issue.none"),
-      );
-    }),
-).pipe(
-  Command.withDescription(t("cli.command.issue.list")),
-  Command.withExamples([
+const listCommand = command("list", {
+  about: t("cli.command.issue.list"),
+  examples: [
     { command: "vibevalley issue list", description: t("cli.example.issueList.about") },
     { command: "vibevalley issue list --wants-user", description: t("cli.example.issueWantsUser.about") },
-  ]),
-);
+  ],
+  params: {
+    status: opt.choice("status", IssueStatusValues, "cli.flag.issueStatus"),
+    repo: opt.text("repo", "cli.flag.repo"),
+    text: opt.text("text", "cli.flag.text"),
+    wantsUser: opt.bool("wants-user", "cli.flag.wantsUser"),
+    closed: opt.bool("closed", "cli.flag.closed"),
+    limit: opt.intOr("limit", 20, "cli.flag.limit"),
+  },
+  run: async (o, ctx) => {
+    const issues = await ask(ctx, (api) =>
+      api.issue.list({
+        limit: o.limit + 1,
+        ...(o.status ? { status: o.status } : {}),
+        ...(o.repo ? { repo: o.repo } : {}),
+        ...(o.text ? { text: o.text } : {}),
+        ...(o.wantsUser ? { wantsUser: true } : {}),
+        ...(o.closed ? { closed: true } : {}),
+      }),
+    );
+    show(
+      ctx,
+      issues.slice(0, o.limit),
+      (list) =>
+        [...list.map(issueLine), ...(issues.length > o.limit ? [t("cli.more", { flag: `--limit ${o.limit * 2}` })] : [])].join("\n") || t("cli.issue.none"),
+    );
+  },
+});
 
 /** --description: as given, or `-` for what comes on stdin. */
-const descriptionOf = (said: string | undefined) => (said === "-" ? stdinTextOrEmpty : Effect.succeed(said));
+const descriptionOf = async (ctx: Ctx, said: string | undefined) => (said === "-" ? stdinTextOrEmpty(ctx) : said);
 
-const createCommand = Command.make(
-  "create",
-  {
-    title: words("cli.arg.title"),
-    description: optionalText("description", "cli.flag.description"),
-    repo: optionalText("repo", "cli.flag.repo"),
-    agent: optionalText("agent", "cli.flag.agent"),
+const createCommand = command("create", {
+  about: t("cli.command.issue.create"),
+  examples: [{ command: t("cli.example.issueCreate.run"), description: t("cli.example.issueCreate.about") }],
+  params: {
+    title: arg.words("cli.arg.title"),
+    description: opt.text("description", "cli.flag.description"),
+    repo: opt.text("repo", "cli.flag.repo"),
+    agent: opt.text("agent", "cli.flag.agent"),
     priority: priorityFlag,
-    criterion: Flag.String("criterion").pipe(Flag.atLeast(0), Flag.withDescription(t("cli.flag.criterion"))),
-    key: optionalText("key", "cli.flag.key"),
+    criterion: opt.many("criterion", "cli.flag.criterion"),
+    key: opt.text("key", "cli.flag.key"),
   },
-  (o) =>
-    Effect.gen(function* () {
-      const description = yield* o.description.pipe(given, descriptionOf);
-      const fields = { repo: given(o.repo), agent: given(o.agent), priority: given(o.priority), requestKey: given(o.key) };
-      const request: T.IssueRequest = {
-        title: o.title.join(" "),
-        ...(description ? { description } : {}),
-        ...(fields.repo ? { repo: fields.repo } : {}),
-        ...(fields.agent ? { agent: fields.agent } : {}),
-        ...(fields.priority ? { priority: fields.priority } : {}),
-        ...(o.criterion.length > 0 ? { criteria: [...o.criterion] } : {}),
-        ...(fields.requestKey ? { requestKey: fields.requestKey } : {}),
-      };
-      yield* change({ name: "issue create", does: (api) => api.issue.create(request), said: issueLine });
-    }),
-).pipe(
-  Command.withDescription(t("cli.command.issue.create")),
-  Command.withExamples([{ command: t("cli.example.issueCreate.run"), description: t("cli.example.issueCreate.about") }]),
-);
+  run: async (o, ctx) => {
+    const description = await descriptionOf(ctx, o.description);
+    const request: T.IssueRequest = {
+      title: o.title.join(" "),
+      ...(description ? { description } : {}),
+      ...(o.repo ? { repo: o.repo } : {}),
+      ...(o.agent ? { agent: o.agent } : {}),
+      ...(o.priority ? { priority: o.priority } : {}),
+      ...(o.criterion.length > 0 ? { criteria: [...o.criterion] } : {}),
+      ...(o.key ? { requestKey: o.key } : {}),
+    };
+    await change(ctx, { name: "issue create", does: (api) => api.issue.create(request), said: issueLine });
+  },
+});
 
-const editCommand = Command.make(
-  "edit",
-  {
+const editCommand = command("edit", {
+  about: t("cli.command.issue.edit"),
+  examples: [{ command: "vibevalley issue edit 12 --priority high", description: t("cli.example.issueEdit.about") }],
+  params: {
     issue: issueArg,
-    title: optionalText("title", "cli.flag.title"),
-    description: optionalText("description", "cli.flag.description"),
-    repo: optionalText("repo", "cli.flag.repo"),
-    agent: optionalText("agent", "cli.flag.agent"),
+    title: opt.text("title", "cli.flag.title"),
+    description: opt.text("description", "cli.flag.description"),
+    repo: opt.text("repo", "cli.flag.repo"),
+    agent: opt.text("agent", "cli.flag.agent"),
     priority: priorityFlag,
-    criterion: Flag.String("criterion").pipe(Flag.atLeast(0), Flag.withDescription(t("cli.flag.criteria"))),
+    criterion: opt.many("criterion", "cli.flag.criteria"),
   },
-  (o) =>
-    Effect.gen(function* () {
-      const description = yield* o.description.pipe(given, descriptionOf);
-      const fields = { title: given(o.title), repo: given(o.repo), agent: given(o.agent), priority: given(o.priority) };
-      const update: T.IssueUpdate = {
-        ...(fields.title ? { title: fields.title } : {}),
-        ...(description ? { description } : {}),
-        ...(fields.repo ? { repo: fields.repo } : {}),
-        ...(fields.agent ? { agent: fields.agent } : {}),
-        ...(fields.priority ? { priority: fields.priority } : {}),
-        ...(o.criterion.length > 0 ? { criteria: [...o.criterion] } : {}),
-      };
-      yield* change({ name: "issue edit", does: (api) => api.issue.update({ id: ref(o.issue), ...update }), said: issueLine });
-    }),
-).pipe(
-  Command.withDescription(t("cli.command.issue.edit")),
-  Command.withExamples([{ command: "vibevalley issue edit 12 --priority high", description: t("cli.example.issueEdit.about") }]),
-);
+  run: async (o, ctx) => {
+    const description = await descriptionOf(ctx, o.description);
+    const update: T.IssueUpdate = {
+      ...(o.title ? { title: o.title } : {}),
+      ...(description ? { description } : {}),
+      ...(o.repo ? { repo: o.repo } : {}),
+      ...(o.agent ? { agent: o.agent } : {}),
+      ...(o.priority ? { priority: o.priority } : {}),
+      ...(o.criterion.length > 0 ? { criteria: [...o.criterion] } : {}),
+    };
+    await change(ctx, { name: "issue edit", does: (api) => api.issue.update({ id: ref(o.issue), ...update }), said: issueLine });
+  },
+});
 
 /** `issue status 12 todo`: the issue moved to a status (sending it out, another round, done, canceled…), as the server allows from where it stands. */
-const statusCommand = Command.make(
-  "status",
-  {
+const statusCommand = command("status", {
+  about: t("cli.command.issue.status"),
+  examples: [
+    { command: "vibevalley issue status 12 todo", description: t("cli.example.issueStatus.about") },
+    { command: "vibevalley issue status 12 done --dry-run", description: t("cli.example.issueDone.about") },
+  ],
+  params: {
     issue: issueArg,
-    status: Argument.Literals("status", IssueStatusValues).pipe(Argument.withDescription(t("cli.arg.status"))),
-    comment: optionalText("comment", "cli.flag.statusComment"),
+    status: arg.choice("status", IssueStatusValues, "cli.arg.status"),
+    comment: opt.text("comment", "cli.flag.statusComment"),
   },
-  (o) => {
-    const text = given(o.comment);
-    const request = { id: ref(o.issue), status: o.status, ...(text ? { text } : {}) };
-    return change({
+  run: (o, ctx) => {
+    const request = { id: ref(o.issue), status: o.status, ...(o.comment ? { text: o.comment } : {}) };
+    return change(ctx, {
       name: "issue status",
       preview: (api) => api.issue.status.previewUpdate(request),
       does: (api) => api.issue.status.update(request),
       said: issueLine,
     });
   },
-).pipe(
-  Command.withDescription(t("cli.command.issue.status")),
-  Command.withExamples([
-    { command: "vibevalley issue status 12 todo", description: t("cli.example.issueStatus.about") },
-    { command: "vibevalley issue status 12 done --dry-run", description: t("cli.example.issueDone.about") },
-  ]),
-);
+});
 
-const commentCommand = Command.make("comment", { issue: issueArg, words: words("cli.arg.comment") }, (o) =>
-  change({
-    name: "issue comment",
-    does: (api) => api.issue.comment.create({ id: ref(o.issue), text: o.words.join(" ") }),
-    said: () => t("cli.issue.commented", { issue: `#${ref(o.issue)}` }),
-  }),
-).pipe(
-  Command.withDescription(t("cli.command.issue.comment")),
-  Command.withExamples([{ command: t("cli.example.issue.comment.run"), description: t("cli.example.issue.comment.about") }]),
-);
+const commentCommand = command("comment", {
+  about: t("cli.command.issue.comment"),
+  examples: [{ command: t("cli.example.issue.comment.run"), description: t("cli.example.issue.comment.about") }],
+  params: { issue: issueArg, words: arg.words("cli.arg.comment") },
+  run: (o, ctx) =>
+    change(ctx, {
+      name: "issue comment",
+      does: (api) => api.issue.comment.create({ id: ref(o.issue), text: o.words.join(" ") }),
+      said: () => t("cli.issue.commented", { issue: `#${ref(o.issue)}` }),
+    }),
+});
 
 /** `issue review 12 --pass`: the verdict on what was handed back; completing it is `issue status 12 done`. */
-const reviewCommand = Command.make(
-  "review",
-  {
+const reviewCommand = command("review", {
+  about: t("cli.command.issue.review"),
+  examples: [
+    { command: "vibevalley issue review 12 --pass", description: t("cli.example.issueReviewPass.about") },
+    { command: t("cli.example.issueReviewFail.run"), description: t("cli.example.issueReviewFail.about") },
+  ],
+  params: {
     issue: issueArg,
-    pass: Flag.Boolean("pass").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.pass"))),
-    fail: Flag.Boolean("fail").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.fail"))),
-    finding: Flag.String("finding").pipe(Flag.atLeast(0), Flag.withDescription(t("cli.flag.finding"))),
-    comment: optionalText("comment", "cli.flag.reviewComment"),
+    pass: opt.bool("pass", "cli.flag.pass"),
+    fail: opt.bool("fail", "cli.flag.fail"),
+    finding: opt.many("finding", "cli.flag.finding"),
+    comment: opt.text("comment", "cli.flag.reviewComment"),
   },
-  (o) => {
-    if (o.pass === o.fail) return Effect.fail(Failure.make({ code: exit.usage, tag: "InvalidValue", text: t("cli.issue.passOrFail") }));
-    const text = given(o.comment);
-    return change({
+  run: (o, ctx) => {
+    if (o.pass === o.fail) throw new Failure({ code: exit.usage, tag: "InvalidValue", text: t("cli.issue.passOrFail") });
+    return change(ctx, {
       name: "issue review",
       does: (api) =>
-        api.issue.review({ id: ref(o.issue), pass: o.pass, ...(o.finding.length > 0 ? { findings: [...o.finding] } : {}), ...(text ? { text } : {}) }),
+        api.issue.review({
+          id: ref(o.issue),
+          pass: o.pass,
+          ...(o.finding.length > 0 ? { findings: [...o.finding] } : {}),
+          ...(o.comment ? { text: o.comment } : {}),
+        }),
       said: issueLine,
     });
   },
-).pipe(
-  Command.withDescription(t("cli.command.issue.review")),
-  Command.withExamples([
-    { command: "vibevalley issue review 12 --pass", description: t("cli.example.issueReviewPass.about") },
-    { command: t("cli.example.issueReviewFail.run"), description: t("cli.example.issueReviewFail.about") },
-  ]),
-);
+});
 
 const changesText = (c: T.Changes) =>
   [
@@ -226,140 +213,148 @@ const changesText = (c: T.Changes) =>
     ...(c.conflicts.length > 0 ? [t("cli.issue.conflicts", { files: c.conflicts.join(", ") })] : []),
   ].join("\n") || t("cli.issue.noChanges");
 
-const diffCommand = Command.make("diff", { issue: issueArg }, (o) =>
-  Effect.flatMap(
-    ask((api) => api.issue.diff.get({ id: ref(o.issue) })),
-    (c) => show(c, changesText),
-  ),
-).pipe(
-  Command.withDescription(t("cli.command.issue.diff")),
-  Command.withExamples([{ command: "vibevalley issue diff 12", description: t("cli.example.issueDiff.about") }]),
-);
+const diffCommand = command("diff", {
+  about: t("cli.command.issue.diff"),
+  examples: [{ command: "vibevalley issue diff 12", description: t("cli.example.issueDiff.about") }],
+  params: { issue: issueArg },
+  run: async (o, ctx) => show(ctx, await ask(ctx, (api) => api.issue.diff.get({ id: ref(o.issue) })), changesText),
+});
 
-const timelineCommand = Command.make("timeline", { issue: issueArg }, (o) =>
-  Effect.flatMap(
-    ask((api) => api.issue.timeline.get({ id: ref(o.issue) })),
-    (tl) =>
-      show(tl, (x) =>
-        [
-          ...x.milestones.map(
-            (m) => `${DateTime.formatIso(DateTime.makeUnsafe(m.at)).slice(0, 16).replace("T", " ")}  ${m.kind}${m.who ? `  ${m.who}` : ""}  ${m.text}`,
-          ),
-          ...(x.spent ? [t("cli.issue.spent", { tokens: x.spent.tokens, cny: x.spent.cny?.toFixed(2) ?? "-" })] : []),
-        ].join("\n"),
-      ),
-  ),
-).pipe(
-  Command.withDescription(t("cli.command.issue.timeline")),
-  Command.withExamples([{ command: "vibevalley issue timeline 12", description: t("cli.example.issueTimeline.about") }]),
-);
+/** A moment as the timeline says it: YYYY-MM-DD HH:MM, in UTC. */
+const minuteOf = (at: number) => new Date(at).toISOString().slice(0, 16).replace("T", " ");
 
-const deleteCommand = Command.make("delete", { issue: issueArg }, (o) =>
-  change({
-    name: "issue delete",
-    preview: (api) => api.issue.previewDelete({ id: ref(o.issue) }),
-    does: (api) => api.issue.delete({ id: ref(o.issue) }),
-    said: () => t("cli.issue.deleted", { issue: `#${ref(o.issue)}` }),
-  }),
-).pipe(
-  Command.withDescription(t("cli.command.issue.delete")),
-  Command.withExamples([{ command: "vibevalley issue delete 12 --dry-run", description: t("cli.example.issueDelete.about") }]),
-);
+const timelineCommand = command("timeline", {
+  about: t("cli.command.issue.timeline"),
+  examples: [{ command: "vibevalley issue timeline 12", description: t("cli.example.issueTimeline.about") }],
+  params: { issue: issueArg },
+  run: async (o, ctx) => {
+    const tl = await ask(ctx, (api) => api.issue.timeline.get({ id: ref(o.issue) }));
+    show(ctx, tl, (x) =>
+      [
+        ...x.milestones.map((m) => `${minuteOf(m.at)}  ${m.kind}${m.who ? `  ${m.who}` : ""}  ${m.text}`),
+        ...(x.spent ? [t("cli.issue.spent", { tokens: x.spent.tokens, cny: x.spent.cny?.toFixed(2) ?? "-" })] : []),
+      ].join("\n"),
+    );
+  },
+});
+
+const deleteCommand = command("delete", {
+  about: t("cli.command.issue.delete"),
+  examples: [{ command: "vibevalley issue delete 12 --dry-run", description: t("cli.example.issueDelete.about") }],
+  params: { issue: issueArg },
+  run: (o, ctx) =>
+    change(ctx, {
+      name: "issue delete",
+      preview: (api) => api.issue.previewDelete({ id: ref(o.issue) }),
+      does: (api) => api.issue.delete({ id: ref(o.issue) }),
+      said: () => t("cli.issue.deleted", { issue: `#${ref(o.issue)}` }),
+    }),
+});
 
 /** Only what `issue show --watch` reads of a frame; the rest is left as it came. */
-const IssuesOfFrame = Schema.fromJsonString(
-  Schema.Struct({
-    state: Schema.Struct({
-      issues: Schema.Array(Schema.Struct({ id: Schema.String, status: S.IssueStatus, stage: Schema.Struct({ state: S.IssueStageKind }) })),
-    }),
+const IssuesOfFrame = z.object({
+  state: z.object({
+    issues: z.array(z.object({ id: z.string(), status: S.IssueStatus, stage: z.object({ state: S.IssueStageKind }) })),
   }),
-);
+});
 /** Where it waits on the user or is over: what --watch waits for. */
 const settled = new Set<T.IssueStatus>(["in_review", "done", "canceled"]);
 
+const frameOf = (data: string) => {
+  try {
+    return IssuesOfFrame.parse(JSON.parse(data));
+  } catch (e) {
+    throw new Failure({ code: exit.other, tag: "Server", text: e instanceof Error ? e.message : String(e) });
+  }
+};
+
 /** Follows the issue in the core state until it waits on the user or is over, each status on stderr; one that already
  * does is not waited for. */
-const followed = Effect.fn("Cli.followed")(function* (issue: T.Issue, timeout: number | undefined) {
-  const base = yield* ServerFlag;
-  const follow = frames(base, statePath).pipe(
-    Stream.mapEffect((data) =>
-      Schema.decodeEffect(IssuesOfFrame)(data).pipe(Effect.mapError((e) => Failure.make({ code: exit.other, tag: "Server", text: e.message }))),
-    ),
-    Stream.mapEffect((frame) => {
-      const now = frame.state.issues.find((i) => i.id === issue.id);
-      return now ? Effect.succeed(now) : Effect.fail(Failure.make({ code: exit.missing, tag: "Missing", text: t("cli.failure.gone", { n: issue.number }) }));
-    }),
-    Stream.changesWith((a, b) => a.status === b.status && a.stage.state === b.stage.state),
-    Stream.tap((now) => Effect.flatMap(jsonText({ issue: issue.number, status: now.status, stage: now.stage.state }), err)),
-    Stream.takeUntil((now) => settled.has(now.status) || stageWantsUser(now.stage.state)),
-    Stream.runDrain,
-  );
-  yield* timeout === undefined
-    ? follow
-    : follow.pipe(
-        Effect.timeoutOrElse({
-          duration: `${timeout} seconds`,
-          orElse: () => Failure.make({ code: exit.other, tag: "Timeout", text: t("cli.issue.timeout", { issue: `#${issue.number}`, seconds: timeout }) }),
-        }),
-      );
-});
+async function followed(ctx: Ctx, issue: T.Issue, timeout: number | undefined): Promise<void> {
+  const held = new AbortController();
+  const stop = () => held.abort(ctx.signal.reason);
+  ctx.signal.addEventListener("abort", stop, { once: true });
+  let timedOut = false;
+  const timer = new AbortController();
+  const ticking =
+    timeout === undefined
+      ? undefined
+      : ctx.clock.sleep(timeout * 1000, timer.signal).then(
+          () => {
+            timedOut = true;
+            held.abort();
+          },
+          // The follow ended first and stopped the timer: nothing to time out.
+          () => undefined,
+        );
+  try {
+    let last: { status: T.IssueStatus; stage: T.IssueStageKind } | undefined;
+    for await (const data of frames(ctx, ctx.flags.server, statePath, held.signal)) {
+      const now = frameOf(data).state.issues.find((i) => i.id === issue.id);
+      if (!now) throw new Failure({ code: exit.missing, tag: "Missing", text: t("cli.failure.gone", { n: issue.number }) });
+      if (last?.status === now.status && last.stage === now.stage.state) continue;
+      last = { status: now.status, stage: now.stage.state };
+      err(ctx, jsonText({ issue: issue.number, status: now.status, stage: now.stage.state }));
+      if (settled.has(now.status) || stageWantsUser(now.stage.state)) return;
+    }
+  } catch (e) {
+    if (timedOut && !ctx.signal.aborted)
+      throw new Failure({ code: exit.other, tag: "Timeout", text: t("cli.issue.timeout", { issue: `#${issue.number}`, seconds: timeout ?? 0 }) });
+    throw e;
+  } finally {
+    timer.abort();
+    await ticking;
+    ctx.signal.removeEventListener("abort", stop);
+  }
+  if (timedOut) throw new Failure({ code: exit.other, tag: "Timeout", text: t("cli.issue.timeout", { issue: `#${issue.number}`, seconds: timeout ?? 0 }) });
+}
 
 /** `issue show 12`: the issue; --watch follows it first, until it waits on the user or is over (as `kubectl get -w`). */
-const showCommand = Command.make(
-  "show",
-  {
-    issue: issueArg,
-    watch: Flag.Boolean("watch").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.issueWatch"))),
-    timeout: Flag.Int("timeout").pipe(Flag.optional, Flag.withDescription(t("cli.flag.timeout"))),
-  },
-  (o) =>
-    Effect.gen(function* () {
-      const issue = yield* ask((api) => api.issue.get({ id: ref(o.issue) }));
-      if (!o.watch) return yield* show(issue, issueText);
-      yield* followed(issue, given(o.timeout));
-      const answer = yield* ask((api) => api.issue.get({ id: issue.id }));
-      yield* show(answer, issueText);
-    }),
-).pipe(
-  Command.withDescription(t("cli.command.issue.show")),
-  Command.withExamples([
+const showCommand = command("show", {
+  about: t("cli.command.issue.show"),
+  examples: [
     { command: "vibevalley issue show 12", description: t("cli.example.issueShow.about") },
     { command: "vibevalley issue show 12 --watch --timeout 600", description: t("cli.example.issueWatch.about") },
-  ]),
-);
-
-const watchCommand = Command.make(
-  "watch",
-  {
+  ],
+  params: {
     issue: issueArg,
-    follow: Flag.Boolean("follow").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.follow"))),
-    jsonl: Flag.Boolean("jsonl").pipe(Flag.withDefault(false), Flag.withDescription(t("cli.flag.jsonl"))),
+    watch: opt.bool("watch", "cli.flag.issueWatch"),
+    timeout: opt.int("timeout", "cli.flag.timeout"),
   },
-  (o) =>
-    Effect.gen(function* () {
-      if ((yield* FormatFlag) === "json") return yield* Failure.make({ code: exit.usage, tag: "WatchFormat", text: t("cli.issue.watchFormat") });
-      const issue = yield* ask((api) => api.issue.get({ id: ref(o.issue) }));
-      const serverFlag = yield* ServerFlag;
-      yield* observeIssue(serverFlag, issue.id, o.follow, o.jsonl);
-    }),
-).pipe(
-  Command.withDescription(t("cli.command.issue.watch")),
-  Command.withExamples([{ command: "vibevalley issue watch 12 --jsonl", description: t("cli.example.issueObserve.about") }]),
-);
+  run: async (o, ctx) => {
+    const issue = await ask(ctx, (api) => api.issue.get({ id: ref(o.issue) }));
+    if (!o.watch) return show(ctx, issue, issueText);
+    await followed(ctx, issue, o.timeout);
+    const answer = await ask(ctx, (api) => api.issue.get({ id: issue.id }));
+    show(ctx, answer, issueText);
+  },
+});
 
-export const issueCommand = Command.make("issue").pipe(
-  Command.withSubcommands([
-    listCommand,
-    showCommand,
-    watchCommand,
-    createCommand,
-    editCommand,
-    statusCommand,
-    commentCommand,
-    reviewCommand,
-    diffCommand,
-    timelineCommand,
-    deleteCommand,
-  ]),
-  Command.withDescription(t("cli.group.issue.about")),
-);
+const watchCommand = command("watch", {
+  about: t("cli.command.issue.watch"),
+  examples: [{ command: "vibevalley issue watch 12 --jsonl", description: t("cli.example.issueObserve.about") }],
+  params: {
+    issue: issueArg,
+    follow: opt.bool("follow", "cli.flag.follow"),
+    jsonl: opt.bool("jsonl", "cli.flag.jsonl"),
+  },
+  run: async (o, ctx) => {
+    if (ctx.flags.format === "json") throw new Failure({ code: exit.usage, tag: "WatchFormat", text: t("cli.issue.watchFormat") });
+    const issue = await ask(ctx, (api) => api.issue.get({ id: ref(o.issue) }));
+    await observeIssue(ctx, ctx.flags.server, issue.id, o.follow, o.jsonl);
+  },
+});
+
+export const issueCommand = group("issue", t("cli.group.issue.about"), [
+  listCommand,
+  showCommand,
+  watchCommand,
+  createCommand,
+  editCommand,
+  statusCommand,
+  commentCommand,
+  reviewCommand,
+  diffCommand,
+  timelineCommand,
+  deleteCommand,
+]);

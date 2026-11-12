@@ -1,15 +1,16 @@
-import { Clock, Effect, Semaphore } from "effect";
-
+import { Semaphore } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 
 import { BizCode, refuseIn } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
-import { Db } from "#/infra/db.ts";
-import { bestEffort } from "#/infra/log.ts";
+import type { Db } from "#/infra/db.ts";
+import { bestEffort, type Logger } from "#/infra/log.ts";
+import type { Time } from "#/infra/time.ts";
 import type { Account } from "#/modules/provider/provider.ts";
+import { FileFailure } from "#/modules/provider/vendors.ts";
 import * as q from "#db/media_remote_file.sql.ts";
 
-import type { makeInputs } from "./inputs.ts";
+import type { Inputs } from "./inputs.ts";
 
 const refused = refuseIn(BizCode.MediaRefused);
 
@@ -34,111 +35,109 @@ const extensions = new Map([
   ["audio/webm", "webm"],
 ]);
 
-export const makeRemoteFiles = Effect.fnUntraced(function* (inputs: Effect.Success<typeof makeInputs>) {
-  const db = yield* Db;
-  const lock = yield* Semaphore.make(1);
+export interface RemoteFilesDeps {
+  readonly db: Db;
+  readonly clock: Time;
+  readonly log: Logger;
+}
+
+export function makeRemoteFiles(deps: RemoteFilesDeps, inputs: Inputs) {
+  const { db, clock, log } = deps;
+  const lock = new Semaphore(1);
   const changed = () => refused(t("server.media.remoteAccountChanged"));
   const unknown = () => refused(t("server.media.remoteUploadUnknown"));
-  const checkAccount = (row: q.RemoteFileResult, account: Account) =>
-    row.connection === account.connection && row.credential_hash === account.fingerprint ? Effect.void : Effect.fail(changed());
-  const change = Effect.fnUntraced(function* (row: q.RemoteFileResult, phase: q.RemoteFileResult["phase"], remoteId: string | null = row.remote_id) {
-    yield* db.run(q.changeRemoteFile({ id: row.id, phase, remote_id: remoteId, now: yield* Clock.currentTimeMillis }));
-  });
+  const checkAccount = (row: q.RemoteFileResult, account: Account) => {
+    if (row.connection !== account.connection || row.credential_hash !== account.fingerprint) throw changed();
+  };
+  const change = async (row: q.RemoteFileResult, phase: q.RemoteFileResult["phase"], remoteId: string | null = row.remote_id) => {
+    await q.changeRemoteFile(db.sql, { id: row.id, phase, remote_id: remoteId, now: clock.now() });
+  };
+
+  /** The input uploaded to the vendor under account, once per holder: only reading the input and the upload itself are
+   * stopped by the signal, so what was sent is always recorded. */
+  const upload = (holder: string, inputId: string, account: Account, signal?: AbortSignal) =>
+    lock.with(async (): Promise<string> => {
+      const previous = await q.remoteFile(db.sql, { holder, input: inputId });
+      if (previous) {
+        checkAccount(previous, account);
+        if (previous.phase === "ready" && previous.remote_id !== null) return previous.remote_id;
+        throw unknown();
+      }
+      if ((await q.remoteFiles(db.sql, { holder })).length >= 5) throw refused(t("server.media.inputInvalid"));
+      const input = await inputs.get(inputId);
+      const extension = extensions.get(input.mime);
+      if (extension === undefined || input.hash === null) throw refused(t("server.media.inputInvalid"));
+      signal?.throwIfAborted();
+      const file = await inputs.blob(inputId, holder);
+      signal?.throwIfAborted();
+      const now = clock.now();
+      const id = newId(now);
+      // A unique upload name records intent without disclosing the user's original filename.
+      const filename = `vv-${id}.${extension}`;
+      await q.insertRemoteFile(db.sql, {
+        id,
+        holder,
+        input: inputId,
+        connection: account.connection,
+        revision: account.revision,
+        credential_hash: account.fingerprint,
+        filename,
+        purpose: input.kind,
+        size: input.size,
+        content_hash: input.hash,
+        now,
+      });
+      try {
+        let result;
+        try {
+          result = await account.files.upload({ file, filename, purpose: input.kind }, signal);
+        } catch (error) {
+          if (!(error instanceof FileFailure) || signal?.aborted === true) throw error;
+          await q.changeRemoteFile(db.sql, { id, phase: error.outcome === "Unknown" ? "unknown" : "rejected", remote_id: null, now: clock.now() });
+          throw error.outcome === "Unknown" ? unknown() : refused(t("server.media.remoteUploadRejected"));
+        }
+        const phase = result.state;
+        await q.changeRemoteFile(db.sql, { id, phase, remote_id: result.id, now: clock.now() });
+        if (phase !== "ready") throw phase === "rejected" ? refused(t("server.media.remoteUploadRejected")) : unknown();
+        return result.id;
+      } catch (e) {
+        await bestEffort(log, "Media remote upload interruption could not be recorded", () => q.interruptRemoteFile(db.sql, { id, now: clock.now() }));
+        throw e;
+      }
+    });
+
+  /** The vendor's copy deleted: only the deletion itself is stopped by the signal. */
+  const remove = (holder: string, inputId: string, account: Account, signal?: AbortSignal) =>
+    lock.with(async () => {
+      const row = await q.remoteFile(db.sql, { holder, input: inputId });
+      if (!row) return;
+      checkAccount(row, account);
+      if (row.phase === "deleted") return;
+      if (row.phase === "rejected" && row.remote_id === null) {
+        await change(row, "deleted");
+        return;
+      }
+      if (row.remote_id === null) throw unknown();
+      await change(row, "deleting");
+      try {
+        await account.files.delete(row.remote_id, signal);
+      } catch (e) {
+        if (signal?.aborted === true) throw e;
+        log.warn(`media: the vendor's copy of ${inputId} could not be deleted`, e);
+        throw refused(t("server.media.remoteCleanupFailed"));
+      }
+      await change(row, "deleted");
+    });
 
   return {
-    list: Effect.fn("Media.remoteFileList")((holder: string) => db.run(q.remoteFiles({ holder }))),
-    upload: Effect.fn("Media.remoteFileUpload")(
-      (holder: string, inputId: string, account: Account) =>
-        Effect.uninterruptibleMask((resume) =>
-          Effect.gen(function* () {
-            const previous = yield* db.one(q.remoteFile({ holder, input: inputId }));
-            if (previous) {
-              yield* checkAccount(previous, account);
-              if (previous.phase === "ready" && previous.remote_id !== null) return previous.remote_id;
-              return yield* unknown();
-            }
-            if ((yield* db.run(q.remoteFiles({ holder }))).length >= 5) return yield* refused(t("server.media.inputInvalid"));
-            const input = yield* inputs.get(inputId);
-            const extension = extensions.get(input.mime);
-            if (extension === undefined || input.hash === null) return yield* refused(t("server.media.inputInvalid"));
-            const file = yield* resume(inputs.blob(inputId, holder));
-            const now = yield* Clock.currentTimeMillis;
-            const id = newId(now);
-            // A unique upload name records intent without disclosing the user's original filename.
-            const filename = `vv-${id}.${extension}`;
-            yield* db.run(
-              q.insertRemoteFile({
-                id,
-                holder,
-                input: inputId,
-                connection: account.connection,
-                revision: account.revision,
-                credential_hash: account.fingerprint,
-                filename,
-                purpose: input.kind,
-                size: input.size,
-                content_hash: input.hash,
-                now,
-              }),
-            );
-            return yield* resume(account.files.upload({ file, filename, purpose: input.kind })).pipe(
-              Effect.flatMap((result) =>
-                Effect.gen(function* () {
-                  const phase = result.state;
-                  yield* db.run(q.changeRemoteFile({ id, phase, remote_id: result.id, now: yield* Clock.currentTimeMillis }));
-                  if (phase !== "ready") return yield* phase === "rejected" ? refused(t("server.media.remoteUploadRejected")) : unknown();
-                  return result.id;
-                }),
-              ),
-              Effect.catchTag("FileFailure", (error) =>
-                Effect.gen(function* () {
-                  yield* db.run(
-                    q.changeRemoteFile({
-                      id,
-                      phase: error.outcome === "Unknown" ? "unknown" : "rejected",
-                      remote_id: null,
-                      now: yield* Clock.currentTimeMillis,
-                    }),
-                  );
-                  return yield* error.outcome === "Unknown" ? unknown() : refused(t("server.media.remoteUploadRejected"));
-                }),
-              ),
-              Effect.onError(() =>
-                Effect.gen(function* () {
-                  yield* db.run(q.interruptRemoteFile({ id, now: yield* Clock.currentTimeMillis }));
-                }).pipe(bestEffort("Media remote upload interruption could not be recorded")),
-              ),
-            );
-          }),
-        ),
-      lock.withPermits(1),
-    ),
-    remove: Effect.fn("Media.remoteFileRemove")(
-      (holder: string, inputId: string, account: Account) =>
-        Effect.uninterruptibleMask((resume) =>
-          Effect.gen(function* () {
-            const row = yield* db.one(q.remoteFile({ holder, input: inputId }));
-            if (!row) return;
-            yield* checkAccount(row, account);
-            if (row.phase === "deleted") return;
-            if (row.phase === "rejected" && row.remote_id === null) {
-              yield* change(row, "deleted");
-              return;
-            }
-            if (row.remote_id === null) return yield* unknown();
-            yield* change(row, "deleting");
-            yield* resume(account.files.delete(row.remote_id).pipe(Effect.mapError(() => refused(t("server.media.remoteCleanupFailed")))));
-            yield* change(row, "deleted");
-          }),
-        ),
-      lock.withPermits(1),
-    ),
-    restore: Effect.fn("Media.remoteFileRestore")(
-      function* () {
-        yield* db.run(q.interruptRemoteFiles({ now: yield* Clock.currentTimeMillis }));
-      },
-      lock.withPermits(1),
-      Effect.uninterruptible,
-    ),
+    list: (holder: string) => q.remoteFiles(db.sql, { holder }),
+    upload,
+    remove,
+    restore: () =>
+      lock.with(async () => {
+        await q.interruptRemoteFiles(db.sql, { now: clock.now() });
+      }),
   };
-});
+}
+
+export type RemoteFiles = ReturnType<typeof makeRemoteFiles>;

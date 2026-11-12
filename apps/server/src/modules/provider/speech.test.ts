@@ -1,24 +1,30 @@
-import { NodeServices } from "@effect/platform-node";
-import { expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Layer, Schema } from "effect";
-import { HttpClient, HttpClientResponse } from "effect/http";
+import { expect, test } from "vite-plus/test";
 
 import type { ProviderUpdate } from "@vibevalley/protocol";
-import { BizCode, endpoints } from "@vibevalley/protocol/api";
+import { ApiError, BizCode, endpoints } from "@vibevalley/protocol/api";
 import { mossSpeechModels } from "@vibevalley/provider/moss/speech-models";
 
 import { providerHandlers } from "#/gateway/http/handlers/provider.ts";
-import { ServerConfig } from "#/infra/config.ts";
-import { Setting } from "#/modules/setting/setting.ts";
+import { keptLog } from "#/infra/log.ts";
+import { wallTime } from "#/infra/time.ts";
+import { makeSetting } from "#/modules/setting/setting.ts";
 import { testConfig } from "#/testing/layers.ts";
 
-import { type Account, type Dictation, Provider } from "./provider.ts";
+import { type Account, type Dictation, makeProvider } from "./provider.ts";
 
-const json = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
-const notIn = (value: unknown, secret: string) =>
-  Effect.map(json(value), (text) => {
-    expect(text).not.toContain(secret);
-  });
+const notIn = (value: unknown, secret: string) => {
+  expect(JSON.stringify(value)).not.toContain(secret);
+};
+/** A refusal by the providers; the test fails when p was not refused. */
+const refusedBy = async (p: Promise<unknown>) => {
+  const e = await p.then(
+    () => expect.unreachable("it was not refused"),
+    (e: unknown) => e,
+  );
+  expect(e).toBeInstanceOf(ApiError);
+  expect(e).toMatchObject({ bizCode: BizCode.ProviderRefused });
+  return e instanceof ApiError ? e : expect.unreachable(String(e));
+};
 
 const config: ProviderUpdate = {
   revision: 0,
@@ -36,31 +42,33 @@ const config: ProviderUpdate = {
   transcription: null,
   vision: null,
 };
-const layer = (http: HttpClient.HttpClient) =>
-  Provider.layer.pipe(
-    Layer.provideMerge(Setting.layer.pipe(Layer.provide(Layer.succeed(ServerConfig, testConfig())), Layer.provide(NodeServices.layer))),
-    Layer.provide(Layer.succeed(HttpClient.HttpClient, http)),
-  );
+/** The settings and providers over a fresh home, the vendor answering as http does; closed when the test is done. */
+const farmOver = async (http: typeof fetch) => {
+  const log = keptLog();
+  const setting = await makeSetting({ config: testConfig(), clock: wallTime, log });
+  const provider = await makeProvider({ setting, fetch: http, clock: wallTime, log });
+  return { setting, provider, [Symbol.asyncDispose]: () => setting.close() };
+};
+/** A vendor answered by answer, as a Request the call would send. */
+const vendor =
+  (answer: (request: Request) => Response | Promise<Response>): typeof fetch =>
+  async (input, init) =>
+    answer(new Request(input, init));
 /** A vendor that answers 503 and keeps each request's key: what a bound account's call sends, run once. */
 const recording = () => {
   const keys: string[] = [];
-  const http = HttpClient.make((request) => {
-    keys.push(request.headers.authorization ?? "");
-    return Effect.succeed(HttpClientResponse.fromWeb(request, new Response("", { status: 503 })));
+  const http = vendor((request) => {
+    keys.push(request.headers.get("authorization") ?? "");
+    return new Response("", { status: 503 });
   });
-  const keyUsedBy = (account: Account | Dictation) =>
-    ("tasks" in account
-      ? account.tasks.get("task").pipe(Effect.ignore)
-      : Effect.scoped(
-          account
-            .transcriber("wav")
-            .pipe(
-              Effect.flatMap((model) =>
-                Effect.tryPromise({ try: () => model.doGenerate({ audio: new Uint8Array([1]), mediaType: "audio/wav" }), catch: () => "not transcribed" }),
-              ),
-            ),
-        ).pipe(Effect.ignore)
-    ).pipe(Effect.map(() => keys.at(-1) ?? ""));
+  const keyUsedBy = async (account: Account | Dictation) => {
+    await (
+      "tasks" in account
+        ? account.tasks.get("task")
+        : account.transcriber("wav").then((model) => model.doGenerate({ audio: new Uint8Array([1]), mediaType: "audio/wav" }))
+    ).catch(() => "whatever the vendor answers");
+    return keys.at(-1) ?? "";
+  };
   return { http, keyUsedBy };
 };
 const page = {
@@ -72,130 +80,113 @@ const page = {
   next_cursor: "next-page",
 };
 
-it.effect.each(mossSpeechModels)("speech binding %s is independent, immutable and protected while in use", (model) => {
+test.each(mossSpeechModels)("speech binding %s is independent, immutable and protected while in use", async (model) => {
   const { http, keyUsedBy } = recording();
-  return Effect.gen(function* () {
-    const provider = yield* Provider;
-    const speechFailure = yield* provider.speech().pipe(Effect.flip);
-    expect(speechFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.ProviderRefused });
-    const input = { ...config, speech: { connection: "second", model } };
-    const saved = yield* provider.update(input);
-    expect(saved.speechModels).toEqual(mossSpeechModels);
-    const frozen = yield* provider.speech();
-    expect(frozen).toMatchObject({ connection: "second", revision: 1, model });
-    const frozenKey = yield* keyUsedBy(frozen);
-    expect(frozenKey).toBe("Bearer test-second-private");
-    yield* notIn(frozen, "test-second-private");
-    const dictation = yield* provider.dictation();
-    const live = yield* provider.live();
-    const others = [yield* keyUsedBy(dictation), yield* keyUsedBy(live)];
-    expect(others).toEqual(["Bearer test-first-private", "Bearer test-first-private"]);
-    yield* notIn(saved, "test-second-private");
-    if (saved.speech) saved.speech.model = "caller-mutated";
-    expect(provider.status().speech?.model).toBe(model);
-    for (const connections of [
-      config.connections.slice(0, 1),
-      config.connections.map((c) => (c.id === "second" ? { ...c, key: null } : c)),
-      config.connections.map((c) => (c.id === "second" ? { ...c, enabled: false } : c)),
-    ]) {
-      const updatedFailure = yield* provider.update({ ...input, revision: 1, connections }).pipe(Effect.flip);
-      expect(updatedFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.ProviderRefused });
-      expect(provider.status().revision).toBe(1);
-    }
-    yield* provider.update({
-      ...input,
-      revision: 1,
-      connections: config.connections.map((c) => (c.id === "second" ? { ...c, key: "test-rotated-private" } : c)),
-    });
-    const rotated = yield* provider.speech();
-    const keys = [yield* keyUsedBy(rotated), yield* keyUsedBy(frozen)];
-    expect(keys).toEqual(["Bearer test-rotated-private", "Bearer test-second-private"]);
-    yield* provider.update({ ...input, revision: 2, speech: null });
-    const speechFailure2 = yield* provider.speech().pipe(Effect.flip);
-    expect(speechFailure2).toMatchObject({ _tag: "ApiError", bizCode: BizCode.ProviderRefused });
-  }).pipe(Effect.provide(layer(http)));
-});
-
-it.effect("voice listing uses only the selected account and forwards one page, not the default binding", () => {
-  const keys: (string | undefined)[] = [];
-  const http = HttpClient.make((request) => {
-    expect(request.url).toBe("https://api.mosi.cn/v1/audio/voices");
-    keys.push(request.headers.authorization);
-    if (keys.length === 2) expect(request.urlParams.params).toContainEqual(["after", "next-page"]);
-    return Effect.succeed(HttpClientResponse.fromWeb(request, Response.json(page)));
+  await using farm = await farmOver(http);
+  const { provider } = farm;
+  await refusedBy(provider.speech());
+  const input = { ...config, speech: { connection: "second", model } };
+  const saved = await provider.update(input);
+  expect(saved.speechModels).toEqual(mossSpeechModels);
+  const frozen = await provider.speech();
+  expect(frozen).toMatchObject({ connection: "second", revision: 1, model });
+  const frozenKey = await keyUsedBy(frozen);
+  expect(frozenKey).toBe("Bearer test-second-private");
+  notIn(frozen, "test-second-private");
+  const dictation = await provider.dictation();
+  const live = await provider.live();
+  const others = [await keyUsedBy(dictation), await keyUsedBy(live)];
+  expect(others).toEqual(["Bearer test-first-private", "Bearer test-first-private"]);
+  notIn(saved, "test-second-private");
+  if (saved.speech) saved.speech.model = "caller-mutated";
+  expect(provider.status().speech?.model).toBe(model);
+  for (const connections of [
+    config.connections.slice(0, 1),
+    config.connections.map((c) => (c.id === "second" ? { ...c, key: null } : c)),
+    config.connections.map((c) => (c.id === "second" ? { ...c, enabled: false } : c)),
+  ]) {
+    await refusedBy(provider.update({ ...input, revision: 1, connections }));
+    expect(provider.status().revision).toBe(1);
+  }
+  await provider.update({
+    ...input,
+    revision: 1,
+    connections: config.connections.map((c) => (c.id === "second" ? { ...c, key: "test-rotated-private" } : c)),
   });
-  return Effect.gen(function* () {
-    const provider = yield* Provider;
-    const api = yield* providerHandlers;
-    expect(endpoints.find((endpoint) => endpoint.op === "provider.voice.list")?.can).toEqual(["user"]);
-    yield* provider.update(config);
-    const first = yield* api["provider.voice.list"]({ connection: "first", revision: 1 });
-    expect(first).toEqual({
-      connection: "first",
-      revision: 1,
-      voices: [{ id: "voice-one", name: "One", createdAtSeconds: 1 }],
-      hasMore: true,
-      nextCursor: "next-page",
-    });
-    const second = yield* api["provider.voice.list"]({ connection: "second", revision: 1, after: "next-page", limit: 1 });
-    expect(second.connection).toBe("second");
-    expect(keys).toEqual(["Bearer test-first-private", "Bearer test-second-private"]);
-    yield* notIn([first, second], "private");
-    for (const request of [
-      { connection: "first", revision: 0 },
-      { connection: "missing", revision: 1 },
-      { connection: "first", revision: 1, after: "next-page", offset: 0 },
-    ]) {
-      const listFailure = yield* api["provider.voice.list"](request).pipe(Effect.flip);
-      expect(listFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.ProviderRefused });
-    }
-    expect(keys).toHaveLength(2);
-  }).pipe(Effect.provide(layer(http)));
+  const rotated = await provider.speech();
+  const keys = [await keyUsedBy(rotated), await keyUsedBy(frozen)];
+  expect(keys).toEqual(["Bearer test-rotated-private", "Bearer test-second-private"]);
+  await provider.update({ ...input, revision: 2, speech: null });
+  await refusedBy(provider.speech());
 });
 
-it.effect("regression: an in-flight voice listing cannot outlive the configuration revision that authorized it", () =>
-  Effect.gen(function* () {
-    const started = yield* Deferred.make<void>();
-    const finish = yield* Deferred.make<void>();
-    let calls = 0;
-    const http = HttpClient.make((request) =>
-      Effect.gen(function* () {
-        calls++;
-        yield* Deferred.succeed(started, undefined);
-        yield* Deferred.await(finish);
-        return HttpClientResponse.fromWeb(request, Response.json(page));
-      }),
-    );
-    yield* Effect.gen(function* () {
-      const provider = yield* Provider;
-      yield* provider.update(config);
-      const fiber = yield* provider.voices({ connection: "second", revision: 1 }).pipe(Effect.flip, Effect.forkChild);
-      yield* Deferred.await(started);
-      yield* provider.update({ ...config, revision: 1, speech: null, connections: config.connections.slice(0, 1) });
-      yield* Deferred.succeed(finish, undefined);
-      const fiber2 = yield* Fiber.join(fiber);
-      expect(fiber2).toMatchObject({ _tag: "ApiError", bizCode: BizCode.ProviderRefused });
-      const voicesFailure = yield* provider.voices({ connection: "second", revision: 2 }).pipe(Effect.flip);
-      expect(voicesFailure).toMatchObject({ _tag: "ApiError", bizCode: BizCode.ProviderRefused });
-      expect(calls).toBe(1);
-    }).pipe(Effect.provide(layer(http)));
-  }),
-);
+test("voice listing uses only the selected account and forwards one page, not the default binding", async () => {
+  const keys: (string | null)[] = [];
+  const http = vendor((request) => {
+    const url = new URL(request.url);
+    expect(url.origin + url.pathname).toBe("https://api.mosi.cn/v1/audio/voices");
+    keys.push(request.headers.get("authorization"));
+    if (keys.length === 2) expect([...url.searchParams]).toContainEqual(["after", "next-page"]);
+    return Response.json(page);
+  });
+  await using farm = await farmOver(http);
+  const { provider } = farm;
+  const api = providerHandlers({ provider });
+  expect(endpoints.find((endpoint) => endpoint.op === "provider.voice.list")?.can).toEqual(["user"]);
+  await provider.update(config);
+  const first = await api["provider.voice.list"]({ connection: "first", revision: 1 });
+  expect(first).toEqual({
+    connection: "first",
+    revision: 1,
+    voices: [{ id: "voice-one", name: "One", createdAtSeconds: 1 }],
+    hasMore: true,
+    nextCursor: "next-page",
+  });
+  const second = await api["provider.voice.list"]({ connection: "second", revision: 1, after: "next-page", limit: 1 });
+  expect(second.connection).toBe("second");
+  expect(keys).toEqual(["Bearer test-first-private", "Bearer test-second-private"]);
+  notIn([first, second], "private");
+  for (const request of [
+    { connection: "first", revision: 0 },
+    { connection: "missing", revision: 1 },
+    { connection: "first", revision: 1, after: "next-page", offset: 0 },
+  ]) {
+    await refusedBy(api["provider.voice.list"](request));
+  }
+  expect(keys).toHaveLength(2);
+});
 
-it.effect("voice listing errors never expose the account secret or vendor response", () =>
-  Effect.gen(function* () {
-    const provider = yield* Provider;
-    yield* provider.update(config);
-    const error = yield* provider.voices({ connection: "second", revision: 1 }).pipe(Effect.flip);
-    expect(error.bizCode).toBe(BizCode.ProviderRefused);
-    yield* notIn(error, "private");
-  }).pipe(
-    Effect.provide(
-      layer(
-        HttpClient.make((request) =>
-          Effect.succeed(HttpClientResponse.fromWeb(request, Response.json({ error: { message: "test-second-private", code: "private" } }, { status: 403 }))),
-        ),
-      ),
-    ),
-  ),
-);
+test("regression: an in-flight voice listing cannot outlive the configuration revision that authorized it", async () => {
+  const started = Promise.withResolvers<void>();
+  const finish = Promise.withResolvers<void>();
+  let calls = 0;
+  const http = vendor(async () => {
+    calls++;
+    started.resolve();
+    await finish.promise;
+    return Response.json(page);
+  });
+  await using farm = await farmOver(http);
+  const { provider } = farm;
+  await provider.update(config);
+  const listing = provider.voices({ connection: "second", revision: 1 }).then(
+    () => expect.unreachable("it was not refused"),
+    (e: unknown) => e,
+  );
+  await started.promise;
+  await provider.update({ ...config, revision: 1, speech: null, connections: config.connections.slice(0, 1) });
+  finish.resolve();
+  const outlived = await listing;
+  expect(outlived).toMatchObject({ name: "ApiError", bizCode: BizCode.ProviderRefused });
+  await refusedBy(provider.voices({ connection: "second", revision: 2 }));
+  expect(calls).toBe(1);
+});
+
+test("voice listing errors never expose the account secret or vendor response", async () => {
+  await using farm = await farmOver(vendor(() => Response.json({ error: { message: "test-second-private", code: "private" } }, { status: 403 })));
+  const { provider } = farm;
+  await provider.update(config);
+  const error = await refusedBy(provider.voices({ connection: "second", revision: 1 }));
+  expect(error.bizCode).toBe(BizCode.ProviderRefused);
+  notIn(error, "private");
+});

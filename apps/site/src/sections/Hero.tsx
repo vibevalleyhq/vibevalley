@@ -1,740 +1,31 @@
 import type { JSX } from "@solidjs/web";
-/** @jsxImportSource @solidjs/web */
-import * as stylex from "@stylexjs/stylex";
 import { animate, springValue, type MotionValue } from "motion";
 import { createEffect, createMemo, createSignal, onCleanup, onSettled } from "solid-js";
 
 import { CHIMNEY, CLOUDS, DOG, MANAGER, PET, PLANTS, PUFF_SECONDS, PUFFS, SCENES, SEEDS, firefliesOf, managerOf, pct, sprite, type Scene } from "../base/scene";
 import type { Copy } from "../i18n/zh";
 import { createElementRef, createScrollPosition, readMotion, reducedMotion, type ElementRef, observeVisibility, createScrollAnimation } from "../ui/scroll";
-import { PixelLink, domAttrs } from "../ui/ui";
+import { PixelLink } from "../ui/ui";
 
-const sceneStyles = stylex.create({
-  firefly: {
-    position: "absolute",
-    animationName: "title-firefly, title-blink",
-    animationDuration: "6s, 2s",
-    animationDelay: "0s, 0s",
-    animationTimingFunction: "ease-in-out, ease-in-out",
-    animationIterationCount: "infinite, infinite",
-    animationDirection: "alternate, alternate",
-    animationFillMode: "none, none",
-    animationPlayState: "running, running",
-    backgroundColor: "var(--color-firefly)",
-    boxShadow: "var(--shadow-firefly)",
-  },
-  lantern: {
-    position: "absolute",
-    top: "70%",
-    left: "4%",
-    aspectRatio: "1",
-    width: "34%",
-    translate: "-50% -50%",
-    animationName: "title-lantern",
-    animationDuration: "2.4s",
-    animationDelay: "0s",
-    animationTimingFunction: "steps(6)",
-    animationIterationCount: "infinite",
-    animationDirection: "alternate",
-    animationFillMode: "none",
-    animationPlayState: "running",
-    borderRadius: "9999px",
-    backgroundImage: "var(--scene-lantern-background)",
-    mixBlendMode: "screen",
-  },
-  title: {
-    fontSize: "clamp(48px,7vw,96px)",
-    textShadow: "var(--text-shadow-title)",
-  },
-  lead: {
-    maxWidth: "34em",
-    fontSize: {
-      default: "var(--text-base)",
-      "@media (width>=40rem)": "var(--text-lg)",
-    },
-    lineHeight: {
-      default: "var(--leading-base)",
-      "@media (width>=40rem)": "var(--leading-lg)",
-    },
-    textShadow: "var(--text-shadow-thin)",
-    animationName: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "title-in",
-    },
-    animationDuration: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": ".45s",
-    },
-    animationDelay: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "0s",
-    },
-    animationTimingFunction: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "steps(5)",
-    },
-    animationIterationCount: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "1",
-    },
-    animationDirection: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "normal",
-    },
-    animationFillMode: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "both",
-    },
-    animationPlayState: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "running",
-    },
-    pointerEvents: "auto",
-  },
-  verse: {
-    fontFamily: "var(--font-pixel)",
-    fontSize: "clamp(34px,5.2vw,72px)",
-    lineHeight: "1.25",
-    textShadow: "var(--text-shadow-title)",
-  },
-  sceneLayer: {
-    position: "absolute",
-    inset: "0",
-    transitionProperty: "opacity",
-    transitionTimingFunction: "var(--ease-out)",
-    transitionDuration: ".9s",
-  },
-  farmer: {
-    position: "absolute",
-    transformOrigin: "bottom",
-    animationName: "title-breathe",
-    animationDuration: "3.2s",
-    animationDelay: "0s",
-    animationTimingFunction: "ease-in-out",
-    animationIterationCount: "infinite",
-    animationDirection: "normal",
-    animationFillMode: "none",
-    animationPlayState: "running",
-    transitionProperty: "opacity",
-    transitionTimingFunction: "var(--ease-out)",
-    transitionDuration: ".9s",
-  },
-  seeds: {
-    position: "absolute",
-    inset: "0",
-    transitionProperty: "opacity",
-    transitionTimingFunction: "var(--ease-out)",
-    transitionDuration: ".9s",
-    opacity: "var(--scene-seed-opacity, 1)",
-  },
-  words: {
-    pointerEvents: "none",
-    position: "absolute",
-    inset: "0",
-    zIndex: 2,
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: {
-      default: "flex-end",
-      "@media (width>=48rem)": "center",
-    },
-    gap: "18px",
-    paddingInline: "clamp(16px,6vw,96px)",
-    paddingTop: "6rem",
-    paddingBottom: {
-      default: "6rem",
-      "@media (width>=48rem)": "120px",
-    },
-    color: "var(--color-cream-50)",
-  },
-  interactive: {
-    pointerEvents: "auto",
-  },
-  hourButton: {
-    cursor: "pointer",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    paddingInline: "0.625rem",
-    paddingBlock: "0.375rem",
-    color: "var(--color-bark-900)",
-    boxShadow: "2px 2px 0 var(--color-drop)",
-  },
-  shade: {
-    pointerEvents: "none",
-    position: "absolute",
-    inset: "0",
-    zIndex: 2,
-    backgroundImage: "var(--scene-hero-shade)",
-  },
-});
-
-const styles = stylex.create({
-  heroDiv: {
-    position: "absolute",
-    inset: "0",
-    transformOrigin: "60% 55%",
-    animationName: "title-pan",
-    animationDuration: "70s",
-    animationDelay: "0s",
-    animationTimingFunction: "ease-in-out",
-    animationIterationCount: "infinite",
-    animationDirection: "alternate",
-    animationFillMode: "none",
-    animationPlayState: "running",
-  },
-  heroImg: {
-    position: "absolute",
-    inset: "0",
-    width: "100%",
-    height: "100%",
-    maxWidth: "none",
-    WebkitUserSelect: "none",
-    userSelect: "none",
-    imageRendering: "pixelated",
-  },
-  heroImg2: {
-    position: "absolute",
-    top: "var(--y0)",
-    left: "var(--x0)",
-    maxWidth: "none",
-    transformOrigin: "bottom",
-    translate: "-50% -100%",
-    animationName: "title-puff",
-    animationDuration: "8s",
-    animationDelay: "0s",
-    animationTimingFunction: "linear",
-    animationIterationCount: "infinite",
-    animationDirection: "normal",
-    animationFillMode: "none",
-    animationPlayState: "running",
-    opacity: "0",
-    filter: "var(--smoke)",
-    transition: "filter .9s",
-    WebkitUserSelect: "none",
-    userSelect: "none",
-    imageRendering: "pixelated",
-  },
-  heroImg3: {
-    display: "block",
-    width: "100%",
-    height: "100%",
-    maxWidth: "none",
-    filter: "var(--farmer)",
-    transition: "filter .9s",
-    WebkitUserSelect: "none",
-    userSelect: "none",
-    imageRendering: "pixelated",
-  },
-  heroImg4: {
-    position: "absolute",
-    left: "0",
-    maxWidth: "none",
-    animationName: "title-cloud",
-    animationDuration: "160s",
-    animationDelay: "0s",
-    animationTimingFunction: "linear",
-    animationIterationCount: "infinite",
-    animationDirection: "normal",
-    animationFillMode: "none",
-    animationPlayState: "running",
-    filter: "var(--sky)",
-    transition: "filter .9s",
-    WebkitUserSelect: "none",
-    userSelect: "none",
-    imageRendering: "pixelated",
-  },
-  heroSpan: {
-    position: "absolute",
-    top: "86%",
-    left: "var(--x0)",
-    animationName: "title-seed-x, title-seed-y",
-    animationDuration: "18s, 18s",
-    animationDelay: "0s, 0s",
-    animationTimingFunction: "ease-in-out, ease-in-out",
-    animationIterationCount: "infinite, infinite",
-    animationDirection: "normal, normal",
-    animationFillMode: "none, none",
-    animationPlayState: "running, running",
-    opacity: "0",
-  },
-  heroImg5: {
-    display: "block",
-    width: "100%",
-    maxWidth: "none",
-    animationName: "title-seed-spin",
-    animationDuration: "3s",
-    animationDelay: "0s",
-    animationTimingFunction: "ease-in-out",
-    animationIterationCount: "infinite",
-    animationDirection: "alternate",
-    animationFillMode: "none",
-    animationPlayState: "running",
-    filter: "var(--ground)",
-    transition: "filter .9s",
-    imageRendering: "pixelated",
-  },
-  heroImg6: {
-    position: "absolute",
-    bottom: "0",
-    maxWidth: "none",
-    transformOrigin: "bottom",
-    animationName: "title-sway",
-    animationDuration: "4s",
-    animationDelay: "0s",
-    animationTimingFunction: "ease-in-out",
-    animationIterationCount: "infinite",
-    animationDirection: "alternate",
-    animationFillMode: "none",
-    animationPlayState: "running",
-    filter: "var(--ground)",
-    transition: "filter .9s",
-    WebkitUserSelect: "none",
-    userSelect: "none",
-    imageRendering: "pixelated",
-  },
-  heroDiv2: {
-    animationName: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "title-float",
-    },
-    animationDuration: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "5s",
-    },
-    animationDelay: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "0s",
-    },
-    animationTimingFunction: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "ease-in-out",
-    },
-    animationIterationCount: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "infinite",
-    },
-    animationDirection: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "normal",
-    },
-    animationFillMode: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "none",
-    },
-    animationPlayState: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "running",
-    },
-  },
-  heroSpan2: {
-    display: "inline-block",
-    animationName: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "title-pop",
-    },
-    animationDuration: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": ".5s",
-    },
-    animationDelay: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "0s",
-    },
-    animationTimingFunction: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "steps(5)",
-    },
-    animationIterationCount: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "1",
-    },
-    animationDirection: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "normal",
-    },
-    animationFillMode: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "both",
-    },
-    animationPlayState: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "running",
-    },
-  },
-  heroP: {
-    fontFamily: "var(--font-pixel)",
-    fontSize: "clamp(30px,4.2vw,54px)",
-    lineHeight: "1.15",
-    color: "var(--color-wheat)",
-    textShadow: "2px 2px 0 var(--color-bark-900)",
-    animationName: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "title-in",
-    },
-    animationDuration: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": ".45s",
-    },
-    animationDelay: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "0s",
-    },
-    animationTimingFunction: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "steps(5)",
-    },
-    animationIterationCount: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "1",
-    },
-    animationDirection: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "normal",
-    },
-    animationFillMode: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "both",
-    },
-    animationPlayState: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "running",
-    },
-  },
-  heroP2: {
-    fontFamily: "var(--font-pixel)",
-    fontSize: "clamp(20px,2.4vw,30px)",
-    lineHeight: "1.3",
-    textShadow: "2px 2px 0 var(--color-bark-900)",
-    animationName: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "title-in",
-    },
-    animationDuration: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": ".45s",
-    },
-    animationDelay: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "0s",
-    },
-    animationTimingFunction: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "steps(5)",
-    },
-    animationIterationCount: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "1",
-    },
-    animationDirection: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "normal",
-    },
-    animationFillMode: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "both",
-    },
-    animationPlayState: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "running",
-    },
-  },
-  heroDiv3: {
-    marginTop: "0.5rem",
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.875rem",
-    animationName: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "title-in",
-    },
-    animationDuration: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": ".45s",
-    },
-    animationDelay: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "0s",
-    },
-    animationTimingFunction: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "steps(5)",
-    },
-    animationIterationCount: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "1",
-    },
-    animationDirection: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "normal",
-    },
-    animationFillMode: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "both",
-    },
-    animationPlayState: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "running",
-    },
-  },
-  heroImg7: {
-    width: "1.25rem",
-    rotate: "90deg",
-    imageRendering: "pixelated",
-    animationName: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "hint-bob",
-    },
-    animationDuration: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "1.2s",
-    },
-    animationDelay: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "0s",
-    },
-    animationTimingFunction: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "steps(2)",
-    },
-    animationIterationCount: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "infinite",
-    },
-    animationDirection: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "normal",
-    },
-    animationFillMode: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "none",
-    },
-    animationPlayState: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "running",
-    },
-  },
-  comesImg: {
-    position: "absolute",
-    inset: "0",
-    width: "100%",
-    height: "100%",
-    maxWidth: "none",
-    opacity: "0",
-    WebkitUserSelect: "none",
-    userSelect: "none",
-    imageRendering: "pixelated",
-  },
-  dogImg: {
-    position: "absolute",
-    maxWidth: "none",
-    translate: "-50% 0",
-    filter: "var(--ground)",
-    transition: "filter .9s",
-    WebkitUserSelect: "none",
-    userSelect: "none",
-    imageRendering: "pixelated",
-  },
-  layer: { position: "absolute", inset: 0 },
-  framingLayer: { pointerEvents: "none" },
-  framingImage: {
-    filter: "var(--ground)",
-    transitionProperty: "filter",
-    transitionDuration: "0.9s",
-    transitionTimingFunction: "ease",
-    imageRendering: "pixelated",
-    position: "absolute",
-    maxWidth: "none",
-    userSelect: "none",
-  },
-  heroSection: {
-    position: "relative",
-    height: "200svh",
-    minHeight: "1120px",
-  },
-  heroDiv4: {
-    containerType: "size",
-    position: "sticky",
-    top: "0",
-    isolation: "isolate",
-    height: "100svh",
-    minHeight: "560px",
-    overflow: "hidden",
-    backgroundColor: "var(--color-dusk)",
-  },
-  heroDiv22: {
-    containerType: "size",
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    aspectRatio: "3/2",
-    width: "max(108cqw,162cqh)",
-    translate: "-50% -50%",
-  },
-  heroImg8: {
-    position: "absolute",
-    inset: "0",
-    width: "100%",
-    height: "100%",
-    maxWidth: "none",
-    imageRendering: "pixelated",
-  },
-  heroSpan3: {
-    clipPath: "inset(50%)",
-    whiteSpace: "nowrap",
-    borderWidth: "0",
-    width: "1px",
-    height: "1px",
-    margin: "-1px",
-    padding: "0",
-    position: "absolute",
-    overflow: "hidden",
-  },
-  heroSpan22: {
-    marginTop: "0.625rem",
-    display: "block",
-    fontSize: "var(--text-2xl)",
-    lineHeight: "1",
-    color: "var(--color-wheat)",
-    textShadow: "2px 2px 0 var(--color-bark-900)",
-  },
-  heroDiv32: {
-    position: "absolute",
-    bottom: {
-      default: "1.25rem",
-      "@media (width>=48rem)": "1.75rem",
-    },
-    left: {
-      default: "1rem",
-      "@media (width>=48rem)": "auto",
-    },
-    zIndex: "3",
-    display: "flex",
-    alignItems: "center",
-    gap: "0.375rem",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "var(--text-lg)",
-    lineHeight: "1",
-    color: "var(--color-cream-50)",
-    textShadow: "2px 2px 0 var(--color-bark-900)",
-    right: {
-      default: null,
-      "@media (width>=48rem)": "clamp(16px,4vw,40px)",
-    },
-  },
-  heroSpan32: {
-    display: {
-      default: "none",
-      "@media (width>=48rem)": "inline",
-    },
-  },
-  heroA: {
-    position: "absolute",
-    bottom: "22px",
-    left: "50%",
-    zIndex: "3",
-    display: {
-      default: "none",
-      "@media (width>=48rem)": "grid",
-    },
-    translate: "-50% 0",
-    justifyItems: "center",
-    gap: "0.25rem",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "var(--text-lg)",
-    lineHeight: "1",
-    color: "var(--color-cream-50)",
-    textShadow: "2px 2px 0 var(--color-bark-900)",
-  },
-  lineDiv: {
-    pointerEvents: "none",
-    position: "absolute",
-    inset: "0",
-    zIndex: "2",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: {
-      default: "flex-end",
-      "@media (width>=48rem)": "center",
-    },
-    paddingInline: "clamp(16px,6vw,96px)",
-    paddingTop: "6rem",
-    paddingBottom: {
-      default: "7rem",
-      "@media (width>=48rem)": "120px",
-    },
-    color: "var(--color-cream-50)",
-    opacity: "0",
-  },
-  lineSpan: {
-    display: "block",
-  },
-  layerDiv: {
-    position: "absolute",
-    inset: "0",
-  },
-  layerDiv2: {
-    position: "absolute",
-    inset: "0",
-    willChange: "transform",
-  },
-});
-
-const hourVisibility = stylex.create({
-  morning: { opacity: "var(--scene-morning-opacity, 0)" },
-  day: { opacity: "var(--scene-day-opacity, 0)" },
-  evening: { opacity: "var(--scene-evening-opacity, 0)" },
-  night: { opacity: "var(--scene-night-opacity, 0)" },
-});
-const hourButtonColors = stylex.create({
-  morning: {
-    backgroundColor: {
-      default: "var(--scene-morning-button, var(--color-cream-50))",
-      "@media (hover: hover)": { default: null, ":hover": "var(--color-cream-hover)" },
-    },
-  },
-  day: {
-    backgroundColor: {
-      default: "var(--scene-day-button, var(--color-cream-50))",
-      "@media (hover: hover)": { default: null, ":hover": "var(--color-cream-hover)" },
-    },
-  },
-  evening: {
-    backgroundColor: {
-      default: "var(--scene-evening-button, var(--color-cream-50))",
-      "@media (hover: hover)": { default: null, ":hover": "var(--color-cream-hover)" },
-    },
-  },
-  night: {
-    backgroundColor: {
-      default: "var(--scene-night-button, var(--color-cream-50))",
-      "@media (hover: hover)": { default: null, ":hover": "var(--color-cream-hover)" },
-    },
-  },
-});
+const hourVisibility = {
+  morning: "opacity-[var(--scene-morning-opacity,0)]",
+  day: "opacity-[var(--scene-day-opacity,0)]",
+  evening: "opacity-[var(--scene-evening-opacity,0)]",
+  night: "opacity-[var(--scene-night-opacity,0)]",
+};
+const hourButtonColors = {
+  morning: "bg-[var(--scene-morning-button,_var(--color-cream-50))] hover:bg-cream-hover",
+  day: "bg-[var(--scene-day-button,_var(--color-cream-50))] hover:bg-cream-hover",
+  evening: "bg-[var(--scene-evening-button,_var(--color-cream-50))] hover:bg-cream-hover",
+  night: "bg-[var(--scene-night-button,_var(--color-cream-50))] hover:bg-cream-hover",
+};
 /** The plants in front of the camera that frame the village in the game (apps/web/src/farm/canvas): at the hero's corners, mostly past its edges. */
-const framingStyles = stylex.create({
-  branchLeft: {
-    top: { default: "-44px", "@media (width >= 64rem)": "-66px" },
-    left: { default: "-60px", "@media (width >= 64rem)": "-90px" },
-    width: { default: "206px", "@media (width >= 64rem)": "309px" },
-  },
-  branchRight: {
-    top: { default: "-48px", "@media (width >= 64rem)": "-72px" },
-    right: { default: "-52px", "@media (width >= 64rem)": "-78px" },
-    width: { default: "194px", "@media (width >= 64rem)": "291px" },
-  },
-  bushLeft: {
-    bottom: { default: "-72px", "@media (width >= 64rem)": "-108px" },
-    left: { default: "-64px", "@media (width >= 64rem)": "-96px" },
-    width: { default: "232px", "@media (width >= 64rem)": "348px" },
-  },
-  bushRight: {
-    right: { default: "-68px", "@media (width >= 64rem)": "-102px" },
-    bottom: { default: "-64px", "@media (width >= 64rem)": "-96px" },
-    width: { default: "236px", "@media (width >= 64rem)": "354px" },
-  },
-});
+const framingStyles = {
+  branchLeft: "-top-11 lg:-top-16.5 -left-15 lg:-left-22.5 w-51.5 lg:w-77.25",
+  branchRight: "-top-12 lg:-top-18 -right-13 lg:-right-19.5 w-48.5 lg:w-72.75",
+  bushLeft: "-bottom-18 lg:-bottom-27 -left-16 lg:-left-24 w-58 lg:w-87",
+  bushRight: "-right-17 lg:-right-25.5 -bottom-16 lg:-bottom-24 w-59 lg:w-88.5",
+};
 const FRAME = ["branchLeft", "branchRight", "bushLeft", "bushRight"] as const;
 export type Frame = Record<(typeof FRAME)[number], string>;
 /** The first screen of scrolling, while the scene holds on the screen (the hero is two screens high). */
@@ -868,25 +159,25 @@ export default function Hero(props: Props) {
   return (
     <>
       {/* Two screens high: the scene holds on the first screen of scrolling, and goes up off the screen on the second. */}
-      <section ref={root.set} id="top" aria-label={props.copy.name} {...stylex.attrs(styles.heroSection)}>
-        <div onPointerMove={point} onPointerLeave={leave} {...stylex.attrs(styles.heroDiv4)}>
+      <section ref={root.set} id="top" aria-label={props.copy.name} class="relative h-[200svh] min-h-280">
+        <div onPointerMove={point} onPointerLeave={leave} class="@container-[size] sticky top-0 isolate h-svh min-h-140 overflow-hidden bg-(--color-dusk)">
           {/* The scene keeps its 3:2 and covers the hero, a little bigger, so the layers have room to part. */}
-          <div aria-hidden="true" {...stylex.attrs(styles.heroDiv22)}>
+          <div aria-hidden="true" class="@container-[size] absolute top-1/2 left-1/2 aspect-[3/2] w-[max(108cqw,162cqh)] -translate-1/2">
             <Layer lag={0.5} zoom={1.06} origin="62% 60%" point={16} hero={root} px={px} py={py}>
-              <div {...stylex.attrs(styles.heroDiv)}>
+              <div class="absolute inset-0 [transform-origin:60%_55%] [animation-name:title-pan] [animation-duration:70000ms] [animation-timing-function:ease-in-out] [animation-iteration-count:infinite] [animation-direction:alternate]">
                 <img
                   data-scene="morning"
                   data-src={props.backgrounds.morning}
                   src={props.backgrounds.morning}
                   alt=""
                   draggable={false}
-                  {...stylex.attrs(styles.heroImg)}
+                  class="absolute inset-0 w-full h-full max-w-none select-none [image-rendering:pixelated]"
                 />
                 <Comes hour="day" src={props.backgrounds.day} hero={root} />
                 <Comes hour="evening" src={props.backgrounds.evening} hero={root} />
                 <Comes hour="night" src={props.backgrounds.night} hero={root} />
                 <noscript>
-                  <img src={props.backgrounds.morning} alt="" {...stylex.attrs(styles.heroImg8)} />
+                  <img src={props.backgrounds.morning} alt="" class="absolute inset-0 w-full h-full max-w-none [image-rendering:pixelated]" />
                 </noscript>
                 {PUFFS.map((p, i) => {
                   const s = sprite(p.sprite, p.scale);
@@ -896,7 +187,7 @@ export default function Hero(props: Props) {
                       alt=""
                       draggable={false}
                       fetchpriority="low"
-                      {...stylex.attrs(styles.heroImg2)}
+                      class="absolute top-(--y0) left-(--x0) max-w-none [transform-origin:bottom] [translate:-50%_-100%] [animation-name:title-puff] [animation-duration:8000ms] [animation-timing-function:linear] [animation-iteration-count:infinite] opacity-0 [filter:var(--smoke)] [transition:filter_.9s] select-none [image-rendering:pixelated]"
                       style={{
                         "--x0": pct(CHIMNEY.x),
                         "--y0": pct(CHIMNEY.y),
@@ -908,10 +199,10 @@ export default function Hero(props: Props) {
                   );
                 })}
                 {(["evening", "night"] as const).map((at) => (
-                  <div {...stylex.attrs(sceneStyles.sceneLayer, hourVisibility[at])}>
+                  <div class={["absolute inset-0 transition-[opacity] ease-out duration-900", hourVisibility[at]]}>
                     {flies[at].map((f, i) => (
                       <span
-                        {...stylex.attrs(sceneStyles.firefly)}
+                        class="absolute [animation-name:title-firefly,_title-blink] [animation-duration:6000ms,_2000ms] [animation-delay:0ms,_0ms] [animation-timing-function:ease-in-out,_ease-in-out] [animation-iteration-count:infinite,_infinite] [animation-direction:alternate,_alternate] [animation-fill-mode:none,_none] [animation-play-state:running,_running] bg-(--color-firefly) shadow-firefly"
                         style={{
                           left: `${f.x}%`,
                           top: `${f.y}%`,
@@ -928,7 +219,10 @@ export default function Hero(props: Props) {
               {SCENES.map((s) => (
                 <div
                   data-scene={s}
-                  {...stylex.attrs(sceneStyles.farmer, hourVisibility[s])}
+                  class={[
+                    "absolute [transform-origin:bottom] [animation-name:title-breathe] [animation-duration:3200ms] [animation-timing-function:ease-in-out] [animation-iteration-count:infinite] transition-[opacity] ease-out duration-900",
+                    hourVisibility[s],
+                  ]}
                   style={{
                     left: pct(MANAGER.x - farmers[s].w / 2),
                     top: pct(MANAGER.bottom - farmers[s].h),
@@ -941,9 +235,11 @@ export default function Hero(props: Props) {
                     data-src={props.art[farmers[s].name]}
                     alt=""
                     draggable={false}
-                    {...stylex.attrs(styles.heroImg3)}
+                    class="block w-full h-full max-w-none [filter:var(--farmer)] [transition:filter_.9s] select-none [image-rendering:pixelated]"
                   />
-                  {s === "night" && <span {...stylex.attrs(sceneStyles.lantern)} />}
+                  {s === "night" && (
+                    <span class="absolute top-[70%] left-[4%] aspect-square w-[34%] -translate-1/2 [animation-name:title-lantern] [animation-duration:2400ms] [animation-timing-function:steps(6)] [animation-iteration-count:infinite] [animation-direction:alternate] rounded-full bg-[image:var(--scene-lantern-background)] mix-blend-screen" />
+                  )}
                 </div>
               ))}
               <Dog scene={scene()} art={props.art} />
@@ -957,7 +253,7 @@ export default function Hero(props: Props) {
                     alt=""
                     draggable={false}
                     fetchpriority="low"
-                    {...stylex.attrs(styles.heroImg4)}
+                    class="absolute left-0 max-w-none [animation-name:title-cloud] [animation-duration:160000ms] [animation-timing-function:linear] [animation-iteration-count:infinite] [filter:var(--sky)] [transition:filter_.9s] select-none [image-rendering:pixelated]"
                     style={{
                       top: pct(c.y),
                       width: pct(s.w),
@@ -969,12 +265,12 @@ export default function Hero(props: Props) {
               })}
             </Layer>
             <Layer lag={0.28} zoom={1.12} origin="50% 100%" point={36} hero={root} px={px} py={py}>
-              <div {...stylex.attrs(sceneStyles.seeds)}>
+              <div class="absolute inset-0 transition-[opacity] ease-out duration-900 opacity-[var(--scene-seed-opacity,1)]">
                 {SEEDS.map((seed) => {
                   const s = sprite(seed.sprite, 0.22);
                   return (
                     <span
-                      {...stylex.attrs(styles.heroSpan)}
+                      class="absolute top-[86%] left-(--x0) [animation-name:title-seed-x,_title-seed-y] [animation-duration:18000ms,_18000ms] [animation-delay:0ms,_0ms] [animation-timing-function:ease-in-out,_ease-in-out] [animation-iteration-count:infinite,_infinite] [animation-direction:normal,_normal] [animation-fill-mode:none,_none] [animation-play-state:running,_running] opacity-0"
                       style={{
                         "--x0": pct(seed.from),
                         width: pct(s.w),
@@ -987,7 +283,7 @@ export default function Hero(props: Props) {
                         alt=""
                         draggable={false}
                         fetchpriority="low"
-                        {...stylex.attrs(styles.heroImg5)}
+                        class="block w-full max-w-none [animation-name:title-seed-spin] [animation-duration:3000ms] [animation-timing-function:ease-in-out] [animation-iteration-count:infinite] [animation-direction:alternate] [filter:var(--ground)] [transition:filter_.9s] [image-rendering:pixelated]"
                         style={{
                           "animation-delay": `${seed.delay}s`,
                         }}
@@ -1004,7 +300,7 @@ export default function Hero(props: Props) {
                     alt=""
                     draggable={false}
                     fetchpriority="low"
-                    {...stylex.attrs(styles.heroImg6)}
+                    class="absolute bottom-0 max-w-none [transform-origin:bottom] [animation-name:title-sway] [animation-duration:4000ms] [animation-timing-function:ease-in-out] [animation-iteration-count:infinite] [animation-direction:alternate] [filter:var(--ground)] [transition:filter_.9s] select-none [image-rendering:pixelated]"
                     style={{
                       "--lean": `${p.lean}deg`,
                       left: pct(p.x - s.w / 2),
@@ -1018,22 +314,39 @@ export default function Hero(props: Props) {
             </Layer>
           </div>
           {/* In front of the camera, ahead of the page: the frame's plants, pushed out past the corners as the camera goes in. */}
-          <Layer lag={-0.08} zoom={1.3} origin="50% 50%" point={64} hero={root} px={px} py={py} styles={styles.framingLayer}>
+          <Layer lag={-0.08} zoom={1.3} origin="50% 50%" point={64} hero={root} px={px} py={py} class="pointer-events-none">
             {FRAME.map((f) => (
-              <img src={props.frame[f]} alt="" aria-hidden="true" draggable={false} {...domAttrs(styles.framingImage, framingStyles[f])} />
+              <img
+                src={props.frame[f]}
+                alt=""
+                aria-hidden="true"
+                draggable={false}
+                class={[
+                  "[filter:var(--ground)] transition-[filter] duration-900 ease-[ease] [image-rendering:pixelated] absolute max-w-none select-none",
+                  framingStyles[f],
+                ]}
+              />
             ))}
           </Layer>
 
           {/* The shade stays while the words change. */}
-          <div aria-hidden="true" {...stylex.attrs(sceneStyles.shade)} />
-          <div ref={words.set} {...stylex.attrs(sceneStyles.words)}>
-            <div {...stylex.attrs(styles.heroDiv2, sceneStyles.interactive)}>
-              <h1 {...stylex.attrs(sceneStyles.title)}>
-                <span {...stylex.attrs(styles.heroSpan3)}>{props.copy.name}</span>
+          <div aria-hidden="true" class="pointer-events-none absolute inset-0 z-2 bg-[image:var(--scene-hero-shade)]" />
+          <div
+            ref={words.set}
+            class="pointer-events-none absolute inset-0 z-2 flex flex-col justify-end md:justify-center gap-4.5 px-[clamp(16px,6vw,96px)] pt-24 pb-24 md:pb-30 text-cream-50"
+          >
+            <div
+              class={[
+                "motion-safe:[animation-name:title-float] motion-safe:[animation-duration:5000ms] motion-safe:[animation-delay:0ms] motion-safe:[animation-timing-function:ease-in-out] motion-safe:[animation-iteration-count:infinite] motion-safe:[animation-direction:normal] motion-safe:[animation-fill-mode:none] motion-safe:[animation-play-state:running]",
+                "pointer-events-auto",
+              ]}
+            >
+              <h1 class="text-[length:clamp(48px,7vw,96px)] [text-shadow:var(--text-shadow-title)]">
+                <span class="[clip-path:inset(50%)] whitespace-nowrap border-0 w-px h-px -m-px p-0 absolute overflow-hidden">{props.copy.name}</span>
                 <span aria-hidden="true">
                   {[...props.copy.name].map((ch, i) => (
                     <span
-                      {...stylex.attrs(styles.heroSpan2)}
+                      class="inline-block motion-safe:[animation-name:title-pop] motion-safe:[animation-duration:500ms] motion-safe:[animation-delay:0ms] motion-safe:[animation-timing-function:steps(5)] motion-safe:[animation-iteration-count:1] motion-safe:[animation-direction:normal] motion-safe:[animation-fill-mode:both] motion-safe:[animation-play-state:running]"
                       style={{
                         "animation-delay": `${i * stagger}ms`,
                       }}
@@ -1042,11 +355,14 @@ export default function Hero(props: Props) {
                     </span>
                   ))}
                 </span>
-                <span {...stylex.attrs(styles.heroSpan22)}>{props.copy.aka}</span>
+                <span class="mt-2.5 block text-2xl leading-none text-wheat [text-shadow:2px_2px_0_var(--color-bark-900)]">{props.copy.aka}</span>
               </h1>
             </div>
             <p
-              {...stylex.attrs(styles.heroP, sceneStyles.interactive)}
+              class={[
+                "font-pixel text-[length:clamp(30px,4.2vw,54px)] leading-[1.15] text-wheat [text-shadow:2px_2px_0_var(--color-bark-900)] motion-safe:[animation-name:title-in] motion-safe:[animation-duration:450ms] motion-safe:[animation-delay:0ms] motion-safe:[animation-timing-function:steps(5)] motion-safe:[animation-iteration-count:1] motion-safe:[animation-direction:normal] motion-safe:[animation-fill-mode:both] motion-safe:[animation-play-state:running]",
+                "pointer-events-auto",
+              ]}
               style={{
                 "animation-delay": `${after}ms`,
               }}
@@ -1054,7 +370,10 @@ export default function Hero(props: Props) {
               {props.copy.tagline}
             </p>
             <p
-              {...stylex.attrs(styles.heroP2, sceneStyles.interactive)}
+              class={[
+                "font-pixel text-[length:clamp(20px,2.4vw,30px)] leading-[1.3] [text-shadow:2px_2px_0_var(--color-bark-900)] motion-safe:[animation-name:title-in] motion-safe:[animation-duration:450ms] motion-safe:[animation-delay:0ms] motion-safe:[animation-timing-function:steps(5)] motion-safe:[animation-iteration-count:1] motion-safe:[animation-direction:normal] motion-safe:[animation-fill-mode:both] motion-safe:[animation-play-state:running]",
+                "pointer-events-auto",
+              ]}
               style={{
                 "animation-delay": `${after + 90}ms`,
               }}
@@ -1062,7 +381,7 @@ export default function Hero(props: Props) {
               {props.copy.verses.morning.join("")}
             </p>
             <p
-              {...stylex.attrs(sceneStyles.lead)}
+              class="max-w-[34em] text-base sm:text-lg [text-shadow:var(--text-shadow-thin)] motion-safe:[animation-name:title-in] motion-safe:[animation-duration:450ms] motion-safe:[animation-delay:0ms] motion-safe:[animation-timing-function:steps(5)] motion-safe:[animation-iteration-count:1] motion-safe:[animation-direction:normal] motion-safe:[animation-fill-mode:both] motion-safe:[animation-play-state:running] pointer-events-auto"
               style={{
                 "animation-delay": `${after + 180}ms`,
               }}
@@ -1070,7 +389,10 @@ export default function Hero(props: Props) {
               {props.copy.lead}
             </p>
             <div
-              {...stylex.attrs(styles.heroDiv3, sceneStyles.interactive)}
+              class={[
+                "mt-2 flex flex-wrap gap-3.5 motion-safe:[animation-name:title-in] motion-safe:[animation-duration:450ms] motion-safe:[animation-delay:0ms] motion-safe:[animation-timing-function:steps(5)] motion-safe:[animation-iteration-count:1] motion-safe:[animation-direction:normal] motion-safe:[animation-fill-mode:both] motion-safe:[animation-play-state:running]",
+                "pointer-events-auto",
+              ]}
               style={{
                 "animation-delay": `${after + 270}ms`,
               }}
@@ -1086,23 +408,35 @@ export default function Hero(props: Props) {
             <Line verse={props.copy.verses[h]} at={SAYS[h]} stays={h === "night"} hero={root} />
           ))}
 
-          <div role="group" aria-label={props.copy.hours} {...stylex.attrs(styles.heroDiv32)}>
-            <span {...stylex.attrs(styles.heroSpan32)}>{props.copy.hours}</span>
+          <div
+            role="group"
+            aria-label={props.copy.hours}
+            class="absolute bottom-5 md:bottom-7 left-4 md:left-auto z-3 flex items-center gap-1.5 font-pixel text-lg leading-none text-cream-50 [text-shadow:2px_2px_0_var(--color-bark-900)] md:right-[clamp(16px,4vw,40px)]"
+          >
+            <span class="hidden md:inline">{props.copy.hours}</span>
             {SCENES.map((s) => (
               <button
                 type="button"
                 data-testid={`hero-hour-${s}`}
                 aria-pressed={s === scene() ? "true" : "false"}
                 onClick={() => go(s)}
-                {...stylex.attrs(sceneStyles.hourButton, hourButtonColors[s])}
+                class={["cursor-pointer border-2 border-bark-900 px-2.5 py-1.5 text-bark-900 [box-shadow:2px_2px_0_var(--color-drop)]", hourButtonColors[s]]}
               >
                 {props.copy.hour[s]}
               </button>
             ))}
           </div>
-          <a ref={hint.set} href="#parade" {...stylex.attrs(styles.heroA)}>
+          <a
+            ref={hint.set}
+            href="#parade"
+            class="absolute bottom-5.5 left-1/2 z-3 hidden md:grid -translate-x-1/2 justify-items-center gap-1 font-pixel text-lg leading-none text-cream-50 [text-shadow:2px_2px_0_var(--color-bark-900)]"
+          >
             {props.copy.scroll}
-            <img src={props.hint} alt="" {...stylex.attrs(styles.heroImg7)} />
+            <img
+              src={props.hint}
+              alt=""
+              class="w-5 [rotate:90deg] [image-rendering:pixelated] motion-safe:[animation-name:hint-bob] motion-safe:[animation-duration:1200ms] motion-safe:[animation-delay:0ms] motion-safe:[animation-timing-function:steps(2)] motion-safe:[animation-iteration-count:infinite] motion-safe:[animation-direction:normal] motion-safe:[animation-fill-mode:none] motion-safe:[animation-play-state:running]"
+            />
           </a>
         </div>
       </section>
@@ -1115,7 +449,16 @@ function Comes(props: { hour: Exclude<Scene, "morning">; src: string; hero: Elem
   const ref = createScrollAnimation<HTMLImageElement>(props.hero, HOLDING, () => [{ keyframes: { opacity: [0, 0, 1, 1] }, times: [0, from, to, 1] }], {
     still: true,
   });
-  return <img ref={ref.set} data-scene={props.hour} data-src={props.src} alt="" draggable={false} {...stylex.attrs(styles.comesImg)} />;
+  return (
+    <img
+      ref={ref.set}
+      data-scene={props.hour}
+      data-src={props.src}
+      alt=""
+      draggable={false}
+      class="absolute inset-0 w-full h-full max-w-none opacity-0 select-none [image-rendering:pixelated]"
+    />
+  );
 }
 function Line(props: { verse: string[]; at: [number, number, number, number]; stays: boolean; hero: ElementRef<HTMLElement> }) {
   const [a, b, c, d] = props.at;
@@ -1136,10 +479,13 @@ function Line(props: { verse: string[]; at: [number, number, number, number]; st
         },
   ]);
   return (
-    <div ref={seen.set} {...stylex.attrs(styles.lineDiv)}>
-      <p ref={rise.set} {...stylex.attrs(sceneStyles.verse)}>
+    <div
+      ref={seen.set}
+      class="pointer-events-none absolute inset-0 z-2 flex flex-col justify-end md:justify-center px-[clamp(16px,6vw,96px)] pt-24 pb-28 md:pb-30 text-cream-50 opacity-0"
+    >
+      <p ref={rise.set} class="font-pixel text-[length:clamp(34px,5.2vw,72px)] leading-[1.25] [text-shadow:var(--text-shadow-title)]">
         {props.verse.map((half) => (
-          <span {...stylex.attrs(styles.lineSpan)}>{half}</span>
+          <span class="block">{half}</span>
         ))}
       </p>
     </div>
@@ -1154,7 +500,7 @@ function Layer(props: {
   hero: ElementRef<HTMLElement>;
   px: MotionValue<number>;
   py: MotionValue<number>;
-  styles?: stylex.StyleXStyles;
+  class?: JSX.ClassValue | undefined;
   children: JSX.Element;
 }) {
   const away = createScrollAnimation<HTMLDivElement>(props.hero, LEAVING, () => [
@@ -1164,16 +510,16 @@ function Layer(props: {
   const x = readMotion(props.px);
   const y = readMotion(props.py);
   return (
-    <div ref={away.set} {...domAttrs(styles.layer, props.styles)}>
+    <div ref={away.set} class={["absolute inset-0", props.class]}>
       <div
         ref={closer.set}
-        {...stylex.attrs(styles.layerDiv)}
+        class="absolute inset-0"
         style={{
           "transform-origin": props.origin,
         }}
       >
         <div
-          {...stylex.attrs(styles.layerDiv2)}
+          class="absolute inset-0 will-change-transform"
           style={{
             transform: `translate(${reducedMotion() ? 0 : -x() * props.point}px, ${reducedMotion() ? 0 : -y() * props.point * 0.6}px)`,
           }}
@@ -1233,7 +579,7 @@ function Dog(props: { scene: Scene; art: Readonly<Record<string, string>> }) {
       draggable={false}
       onPointerEnter={() => setNoticed(true)}
       onPointerLeave={() => setNoticed(false)}
-      {...stylex.attrs(styles.dogImg)}
+      class="absolute max-w-none -translate-x-1/2 [filter:var(--ground)] [transition:filter_.9s] select-none [image-rendering:pixelated]"
       style={{
         left: pct(PET.x),
         bottom: pct(1 - PET.bottom),

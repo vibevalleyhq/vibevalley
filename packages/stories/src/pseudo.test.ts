@@ -12,6 +12,12 @@ test("a state becomes an ancestor's attribute", () => {
   expect(forcedSelector(".x:enabled:active", "active")).toBe('[data-pseudo~="active"] .x:enabled');
 });
 
+test("regression: a state named inside an escaped class name stays in the name", () => {
+  expect(forcedSelector(".enabled\\:hover\\:bg-cream-hover:enabled:hover", "hover")).toBe('[data-pseudo~="hover"] .enabled\\:hover\\:bg-cream-hover:enabled');
+  expect(forcedSelector(".enabled\\:active\\:shadow-none:enabled:active", "active")).toBe('[data-pseudo~="active"] .enabled\\:active\\:shadow-none:enabled');
+  expect(forcedSelector(".focus-visible\\:outline-focus:focus-visible", "focus")).toBe('[data-pseudo~="focus"] .focus-visible\\:outline-focus');
+});
+
 test("only the parts that wait on the state are kept", () => {
   expect(forcedSelector(".a, .b:hover", "hover")).toBe('[data-pseudo~="hover"] .b');
   expect(forcedSelector(".a:focus-within", "focus")).toBeUndefined();

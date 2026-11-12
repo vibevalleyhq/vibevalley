@@ -1,26 +1,19 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { Schema } from "effect";
+import { z } from "zod";
 
 const packages = join(import.meta.dirname, "../..", "packages");
-const Manifest = Schema.fromJsonString(
-  Schema.Struct({
-    exports: Schema.optionalKey(
-      Schema.Record(
-        Schema.String,
-        Schema.Union([Schema.String, Schema.Struct({ types: Schema.optionalKey(Schema.String), default: Schema.optionalKey(Schema.String) })]),
-      ),
-    ),
-  }),
-);
+const Manifest = z.object({
+  exports: z.exactOptional(z.record(z.string(), z.union([z.string(), z.object({ types: z.exactOptional(z.string()), default: z.exactOptional(z.string()) })]))),
+});
 
 const wrong: string[] = [];
 for (const name of readdirSync(packages)) {
   const manifest = join(packages, name, "package.json");
   if (!existsSync(manifest) || !existsSync(join(packages, name, "vite.config.ts"))) continue;
   if (!readFileSync(join(packages, name, "vite.config.ts"), "utf8").includes("pack:")) continue;
-  const { exports } = Schema.decodeUnknownSync(Manifest)(readFileSync(manifest, "utf8"));
+  const { exports } = Manifest.parse(JSON.parse(readFileSync(manifest, "utf8")));
   for (const [path, target] of Object.entries(exports ?? {})) {
     if (path.endsWith(".css") && typeof target === "string") {
       if (!target.startsWith("./src/") || !target.endsWith(".css") || !existsSync(join(packages, name, target))) {

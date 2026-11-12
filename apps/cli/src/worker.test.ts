@@ -1,34 +1,33 @@
-import { NodeServices } from "@effect/platform-node";
-import { expect, it } from "@effect/vitest";
-import { Effect, FileSystem, Schema } from "effect";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { expect, it } from "vite-plus/test";
 
 import { cli, farm } from "#/testing/testing.ts";
 
-it.effect("regression: worker commands refuse missing credentials without user fallback", () =>
-  Effect.gen(function* () {
-    const result = yield* cli(["worker", "report", "{}"]);
-    expect(result.code).not.toBe(0);
-    expect(result.failure?.tag).toBe("WorkerAccess");
-  }),
-);
+it("regression: worker commands refuse missing credentials without user fallback", async () => {
+  const result = await cli(["worker", "report", "{}"]);
+  expect(result.code).not.toBe(0);
+  expect(result.failure?.tag).toBe("WorkerAccess");
+});
 
-it.live("regression: HTTP 200 with MCP isError refuses forged worker reports and PR submissions", () =>
-  Effect.gen(function* () {
-    const server = yield* farm;
-    const fs = yield* FileSystem.FileSystem;
-    const directory = yield* fs.makeTempDirectoryScoped();
+it("regression: HTTP 200 with MCP isError refuses forged worker reports and PR submissions", async () => {
+  await using running = await farm();
+  const server = running.url;
+  const directory = await mkdtemp(join(tmpdir(), "vv-worker-"));
+  try {
     const file = directory + "/access.json";
-    const access = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Struct({ token: Schema.String, endpoint: Schema.String })))({
-      token: "forged-secret",
-      endpoint: server + "/mcp",
-    });
-    yield* fs.writeFileString(file, access, { mode: 0o600 });
+    const access = JSON.stringify({ token: "forged-secret", endpoint: server + "/mcp" });
+    await writeFile(file, access, { mode: 0o600 });
     const env = { VIBEVALLEY_WORKER_ACCESS_FILE: file };
     for (const operation of ["report", "pr-submit", "doctor"]) {
-      const result = yield* cli(["worker", operation, '{"summary":"forged","session":"w1"}'], "", env);
+      const result = await cli(["worker", operation, '{"summary":"forged","session":"w1"}'], "", env);
       expect(result.code).not.toBe(0);
       expect(result.failure?.tag).toBe("WorkerTool");
       expect(result.out + result.err).not.toContain("forged-secret");
     }
-  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
-);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

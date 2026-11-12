@@ -1,23 +1,29 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
-import { NodeServices } from "@effect/platform-node";
-import { expect, it } from "@effect/vitest";
-import { Effect, Fiber, FileSystem, Formatter, Layer } from "effect";
+import { expect, test } from "vite-plus/test";
 
 import type * as T from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 import { waitFor } from "@vibevalley/testkit/until";
 
-import { ServerConfig } from "#/infra/config.ts";
+import type { ServerConfig } from "#/infra/config.ts";
+import { keptLog } from "#/infra/log.ts";
+import { wallTime } from "#/infra/time.ts";
 import { gitSync, repo, write } from "#/testing/git.ts";
 import { testConfig } from "#/testing/layers.ts";
 
 import { GitError, run } from "./git.ts";
 import { type GitHubRun } from "./github.ts";
 import { hostedOrigin } from "./hosting.ts";
-import { Repo, type RepoHooks } from "./repo.ts";
+import { makeRepo, type RepoHooks } from "./repo.ts";
 import { repository } from "./repository.ts";
+
+const fmt = (v: unknown) => JSON.stringify(v, null, 2);
+
+/** The repos of a farm with this config, as a test makes them. */
+const repos = (hooks: RepoHooks, config: ServerConfig = testConfig()) => makeRepo({ config, clock: wallTime, log: keptLog() }, hooks);
 
 function fixture(platform: T.BranchPublication["platform"] = "github", script = "#!/bin/sh\nexit 0\n", existing = false) {
   const dir = tempDir("publish-");
@@ -37,19 +43,18 @@ function fixture(platform: T.BranchPublication["platform"] = "github", script = 
   let created = existing;
   const url = `https://${platform}.com/team/repo/${platform === "github" ? "pull" : "-/merge_requests"}/7`;
   const command: GitHubRun = (...args) =>
-    Effect.sync(() => {
+    Promise.resolve().then(() => {
       calls.push(args);
       if (args[0] === "auth") return { ok: true, missing: false, out: "" };
-      if (args.includes("defaultBranchRef")) return { ok: true, missing: false, out: Formatter.formatJson({ defaultBranchRef: { name: "main" } }) };
-      if (args[1] === "projects/team%2Frepo") return { ok: true, missing: false, out: Formatter.formatJson({ default_branch: "main" }) };
+      if (args.includes("defaultBranchRef")) return { ok: true, missing: false, out: fmt({ defaultBranchRef: { name: "main" } }) };
+      if (args[1] === "projects/team%2Frepo") return { ok: true, missing: false, out: fmt({ default_branch: "main" }) };
       const item =
         platform === "github"
           ? { number: 7, url, isCrossRepository: false, state: "OPEN" }
           : { iid: 7, web_url: url, source_project_id: 1, target_project_id: 1, state: "opened" };
-      if (args[1] === "list" || args[1]?.includes("?state=opened") === true)
-        return { ok: true, missing: false, out: Formatter.formatJson(created ? [item] : []) };
+      if (args[1] === "list" || args[1]?.includes("?state=opened") === true) return { ok: true, missing: false, out: fmt(created ? [item] : []) };
       created = true;
-      return { ok: true, missing: false, out: platform === "github" ? url : Formatter.formatJson(item) };
+      return { ok: true, missing: false, out: platform === "github" ? url : fmt(item) };
     });
   const pushed: string[][] = [];
   const hooks: RepoHooks = {
@@ -65,35 +70,33 @@ function fixture(platform: T.BranchPublication["platform"] = "github", script = 
       },
     },
   };
-  const layer = Repo.layer(hooks).pipe(
-    Layer.provide(Layer.merge(NodeServices.layer, Layer.succeed(ServerConfig, testConfig({ workRoot: join(dir, "space") })))),
-  );
-  return { cwd, bare, req, calls, url, pushed, hooks, layer };
+  const made = () => repos(hooks, testConfig({ workRoot: join(dir, "space") }));
+  return { cwd, bare, req, calls, url, pushed, hooks, made };
 }
 
 for (const platform of ["github", "gitlab"] as const) {
   for (const existing of [false, true]) {
-    it.effect(`${platform} publishes the checked SHA and ${existing ? "reuses" : "creates"} an open request`, () => {
+    test(`${platform} publishes the checked SHA and ${existing ? "reuses" : "creates"} an open request`, async () => {
       const f = fixture(platform, "#!/bin/sh\nexit 0\n", existing);
-      return Effect.gen(function* () {
-        const result = yield* (yield* Repo).submitBranch(f.req);
+      {
+        const result = await (await f.made()).submitBranch(f.req);
         expect(result).toMatchObject({ url: f.url, check: "passed", pushed: true, reused: existing });
         expect(f.pushed).toEqual([[`https://${platform}.com/team/repo.git`, f.req.branch, f.req.sha]]);
         expect(gitSync(f.bare, "rev-parse", f.req.branch)).toBe(f.req.sha);
         expect(gitSync(f.cwd, "status", "--porcelain")).toBe("");
-      }).pipe(Effect.provide(f.layer));
+      }
     });
   }
 }
 
-it.effect("preview does not run the check or contact the Git network", () => {
+test("preview does not run the check or contact the Git network", async () => {
   const f = fixture("github", "#!/bin/sh\nexit 1\n");
-  return Effect.gen(function* () {
-    const branchSubmitted = yield* (yield* Repo).submitBranch({ ...f.req, dryRun: true });
+  {
+    const branchSubmitted = await (await f.made()).submitBranch({ ...f.req, dryRun: true });
     expect(branchSubmitted).toMatchObject({ pushed: false, check: "preview" });
     expect(f.pushed).toEqual([]);
     expect(f.calls.map((args) => args[0])).toEqual(["auth", "repo"]);
-  }).pipe(Effect.provide(f.layer));
+  }
 });
 
 for (const scenario of [
@@ -112,7 +115,7 @@ for (const scenario of [
   "check-remote",
   "check-base",
 ] as const) {
-  it.effect(`publication refuses ${scenario} without pushing or removing the checkout`, () => {
+  test(`publication refuses ${scenario} without pushing or removing the checkout`, async () => {
     const scripts: Partial<Record<typeof scenario, string>> = {
       "check-failed": "exit 1",
       "check-dirty": "echo changed > new-file",
@@ -135,34 +138,37 @@ for (const scenario of [
     if (scenario === "ambiguous") gitSync(f.cwd, "remote", "add", "other", "https://gitlab.com/other/repo.git");
     if (scenario === "rewrite") gitSync(f.cwd, "config", "url.https://github.com/other/.pushInsteadOf", "https://github.com/team/");
 
-    return Effect.gen(function* () {
-      yield* Effect.flip((yield* Repo).submitBranch(req));
+    {
+      const e = await (await f.made()).submitBranch(req).catch((e: unknown) => e);
+      expect(e).toBeInstanceOf(Error);
       expect(f.pushed).toEqual([]);
       expect(existsSync(f.cwd)).toBe(true);
       expect(gitSync(f.bare, "branch", "--list", f.req.branch)).toBe("");
-    }).pipe(Effect.provide(f.layer));
+    }
   });
 }
 
 for (const stage of ["missing", "auth", "decode", "create"] as const) {
-  it.effect(`platform ${stage} failures report whether pushing happened`, () => {
+  test(`platform ${stage} failures report whether pushing happened`, async () => {
     const f = fixture("gitlab");
-    const original = f.hooks.glab ?? (() => Effect.succeed({ ok: false, missing: true, out: "" }));
+    const original = f.hooks.glab ?? (() => Promise.resolve({ ok: false, missing: true, out: "" }));
     const glab: GitHubRun = (...args) =>
       stage === "create" && !args.includes("POST")
         ? original(...args)
-        : Effect.succeed({ ok: stage === "decode", missing: stage === "missing", out: "untrusted token must stay private" });
-    const layer = Repo.layer({ ...f.hooks, glab }).pipe(Layer.provide(Layer.merge(NodeServices.layer, Layer.succeed(ServerConfig, testConfig()))));
-    return Effect.gen(function* () {
-      const error = yield* Effect.flip((yield* Repo).submitBranch(f.req));
+        : Promise.resolve({ ok: stage === "decode", missing: stage === "missing", out: "untrusted token must stay private" });
+    {
+      const error = await (await repos({ ...f.hooks, glab })).submitBranch(f.req).then(
+        () => expect.unreachable("published"),
+        (e: unknown) => (e instanceof Error ? e : expect.unreachable(String(e))),
+      );
       expect(error.message).not.toContain("untrusted token");
       expect(f.pushed.length).toBe(stage === "create" ? 1 : 0);
       if (stage === "create") expect(error.message).toContain("已推送");
-    }).pipe(Effect.provide(layer));
+    }
   });
 }
 
-it("only known hosting domains are recognized", () => {
+test("only known hosting domains are recognized", () => {
   expect(hostedOrigin("git@gitlab.com:group/subgroup/repo.git")).toMatchObject({ platform: "gitlab", name: "group/subgroup/repo" });
   for (const url of [
     "git@github.com/team/repo",
@@ -175,80 +181,81 @@ it("only known hosting domains are recognized", () => {
     expect(hostedOrigin(url)).toBeUndefined();
 });
 
-it.effect("canceling a running check kills its process and retains the checkout", () => {
+test("canceling a running check kills its process and retains the checkout", async () => {
   const f = fixture("github", "#!/bin/sh\necho $$ > ../check.pid\nexec sleep 60\n");
   const pidFile = join(f.cwd, "..", "check.pid");
-  return Effect.gen(function* () {
-    const service = yield* Repo;
-    const fiber = yield* service.submitBranch(f.req).pipe(Effect.forkChild);
-    yield* waitFor(
-      Effect.sync(() => existsSync(pidFile)),
-      Boolean,
-      "check started",
-    );
+  {
+    const service = await f.made();
+    const cancel = new AbortController();
+    const submitting = service.submitBranch(f.req, cancel.signal).catch((e: unknown) => e);
+    await waitFor(() => existsSync(pidFile), Boolean, "check started");
     const pid = readFileSync(pidFile, "utf8").trim();
-    yield* Fiber.interrupt(fiber);
-    yield* waitFor(run("kill", ["-0", pid]), (r) => r.code !== 0, "check stopped");
+    cancel.abort();
+    await submitting;
+    await waitFor(
+      () => run("kill", ["-0", pid]),
+      (r) => r.code !== 0,
+      "check stopped",
+    );
     expect(f.pushed).toEqual([]);
     expect(existsSync(f.cwd)).toBe(true);
     expect(gitSync(f.cwd, "rev-parse", "HEAD")).toBe(f.req.sha);
-  }).pipe(Effect.scoped, Effect.provide(f.layer));
+  }
 });
 
-it.effect("a missing check is reported as not-run", () => {
+test("a missing check is reported as not-run", async () => {
   const f = fixture();
   gitSync(f.cwd, "rm", ".vibevalley/check");
   gitSync(f.cwd, "commit", "-m", "no check");
-  return Effect.gen(function* () {
-    const result = yield* (yield* Repo).submitBranch({ ...f.req, sha: gitSync(f.cwd, "rev-parse", "HEAD") });
+  {
+    const result = await (await f.made()).submitBranch({ ...f.req, sha: gitSync(f.cwd, "rev-parse", "HEAD") });
     expect(result.check).toBe("not-run");
     expect(result.url).toBe(f.url);
-  }).pipe(Effect.provide(f.layer));
+  }
 });
 
-it.effect("a branch moved at the network boundary cannot change the pushed SHA", () => {
+test("a branch moved at the network boundary cannot change the pushed SHA", async () => {
   const f = fixture();
-  const layer = Repo.layer({
+  const made = await repos({
     ...f.hooks,
     publication: {
       tip: (_cwd, _url, branch) => repository(f.bare).tip(branch),
       fetch: (cwd, _url, branch) => repository(cwd).fetch(f.bare, branch),
-      push: Effect.fnUntraced(function* (cwd, _url, branch, sha) {
+      push: (cwd, _url, branch, sha) => {
         gitSync(cwd, "commit", "--allow-empty", "-m", "external process moved branch");
-        return yield* repository(cwd).push(f.bare, branch, sha);
-      }),
+        return repository(cwd).push(f.bare, branch, sha);
+      },
     },
-  }).pipe(Layer.provide(Layer.merge(NodeServices.layer, Layer.succeed(ServerConfig, testConfig()))));
-  return Effect.gen(function* () {
-    yield* (yield* Repo).submitBranch(f.req);
+  });
+  {
+    await made.submitBranch(f.req);
     expect(gitSync(f.bare, "rev-parse", f.req.branch)).toBe(f.req.sha);
     expect(gitSync(f.cwd, "rev-parse", "HEAD")).not.toBe(f.req.sha);
-  }).pipe(Effect.provide(layer));
+  }
 });
 
-it.effect("worktrees list their branch and safe removal preserves dirty files and the original checkout", () => {
+test("worktrees list their branch and safe removal preserves dirty files and the original checkout", async () => {
   const f = fixture();
   const other = join(f.cwd, "..", "other");
-  return Effect.gen(function* () {
+  {
     const r = repository(f.cwd);
-    yield* r.addWorktree(other, "feat/other", f.req.sha);
-    const worktrees2 = yield* r.worktrees;
+    await r.addWorktree(other, "feat/other", f.req.sha);
+    const worktrees2 = await r.worktrees();
     expect(worktrees2).toContain("branch refs/heads/feat/other\0");
     write(join(other, "keep"), "uncommitted");
-    const worktreeRemoved = yield* r.removeWorktree(other, false);
+    const worktreeRemoved = await r.removeWorktree(other, false);
     expect(worktreeRemoved).not.toBe("");
     expect(readFileSync(join(other, "keep"), "utf8")).toBe("uncommitted");
-    const fs = yield* FileSystem.FileSystem;
-    yield* fs.remove(join(other, "keep"));
-    const worktreeRemoved2 = yield* r.removeWorktree(other, false);
+    await rm(join(other, "keep"));
+    const worktreeRemoved2 = await r.removeWorktree(other, false);
     expect(worktreeRemoved2).toBe("");
     expect(existsSync(f.cwd)).toBe(true);
-    const head2 = yield* r.head;
+    const head2 = await r.head();
     expect(head2).toBe(f.req.sha);
-  }).pipe(Effect.provide(NodeServices.layer));
+  }
 });
 
-it.effect("conflicting base changes are refused before running a check or pushing", () => {
+test("conflicting base changes are refused before running a check or pushing", async () => {
   const f = fixture();
   gitSync(f.cwd, "checkout", "main");
   write(join(f.cwd, ".vibevalley"), "base owns this path");
@@ -256,29 +263,32 @@ it.effect("conflicting base changes are refused before running a check or pushin
   gitSync(f.cwd, "commit", "-m", "base change");
   gitSync(f.cwd, "push", f.bare, "main");
   gitSync(f.cwd, "checkout", "feat/publish");
-  return Effect.gen(function* () {
-    const error = yield* Effect.flip((yield* Repo).submitBranch(f.req));
-    expect(error).toMatchObject({ _tag: "MergeFailure", kind: "conflict" });
+  {
+    const error = await (await f.made()).submitBranch(f.req).catch((e: unknown) => e);
+    expect(error).toMatchObject({ name: "MergeFailure", kind: "conflict" });
     expect(f.pushed).toEqual([]);
     expect(gitSync(f.cwd, "status", "--porcelain")).toBe("");
-  }).pipe(Effect.provide(f.layer));
+  }
 });
 
-it.effect("a failed push is reported separately from a failed PR creation", () => {
+test("a failed push is reported separately from a failed PR creation", async () => {
   const f = fixture();
-  const layer = Repo.layer({
+  const made = await repos({
     ...f.hooks,
     publication: {
       tip: (_cwd, _url, branch) => repository(f.bare).tip(branch),
       fetch: (cwd, _url, branch) => repository(cwd).fetch(f.bare, branch),
-      push: () => Effect.fail(GitError.of(1, "transport closed")),
+      push: () => Promise.reject(GitError.of(1, "transport closed")),
     },
-  }).pipe(Layer.provide(Layer.merge(NodeServices.layer, Layer.succeed(ServerConfig, testConfig()))));
-  return Effect.gen(function* () {
-    const error = yield* Effect.flip((yield* Repo).submitBranch(f.req));
+  });
+  {
+    const error = await made.submitBranch(f.req).then(
+      () => expect.unreachable("pushed"),
+      (e: unknown) => (e instanceof Error ? e : expect.unreachable(String(e))),
+    );
     expect(error.message).toContain(f.req.sha);
     expect(error.message).toContain("推送未确认成功");
     expect(f.calls.some((args) => args[0] === "pr")).toBe(false);
     expect(existsSync(f.cwd)).toBe(true);
-  }).pipe(Effect.provide(layer));
+  }
 });

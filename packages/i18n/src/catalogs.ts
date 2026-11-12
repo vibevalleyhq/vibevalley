@@ -110,11 +110,9 @@ export const catalogs = {
         startServer: "先起服务端（vp run --filter @vibevalley/server start），或用 --server 指到在跑的那个",
         openApp: "先打开桌面版（vibevalley app open 也会打开它）",
       },
-      and: "；",
       failure: {
         unreachable: "连不上 {base}：{why}",
         retry: "服务端要流重连，命令行不接着连",
-        stream: "流读不下去：{why}",
         gone: "工单 #{n} 不在了：被删掉了",
         appNotOpen: "连不上 {home} 的桌面版：{why}",
         noDryRun: "{command} 没有试跑：去掉 --dry-run 才会做",
@@ -4798,11 +4796,9 @@ export const catalogs = {
         startServer: "Start the server first (vp run --filter @vibevalley/server start), or point --server at one that runs",
         openApp: "Open the desktop app first (vibevalley app open opens it too)",
       },
-      and: "; ",
       failure: {
         unreachable: "Cannot reach {base}: {why}",
         retry: "The server asked the stream to reconnect; the command line does not",
-        stream: "The stream cannot be read: {why}",
         gone: "Ticket #{n} is gone: it was deleted",
         appNotOpen: "Cannot reach the desktop app of {home}: {why}",
         noDryRun: "{command} has no dry run: drop --dry-run to do it",
@@ -9653,7 +9649,6 @@ export const catalogs = {
 /** Every key, and the params its zh message names (undefined: none). */
 export interface Messages {
   "cli.agent.deleted": { readonly agent: string | number };
-  "cli.and": undefined;
   "cli.arg.agent": undefined;
   "cli.arg.agentName": undefined;
   "cli.arg.appPath": undefined;
@@ -9839,7 +9834,6 @@ export interface Messages {
   "cli.failure.noChat": undefined;
   "cli.failure.noDryRun": { readonly command: string | number };
   "cli.failure.retry": undefined;
-  "cli.failure.stream": { readonly why: string | number };
   "cli.failure.unreachable": { readonly base: string | number; readonly why: string | number };
   "cli.flag.agent": undefined;
   "cli.flag.at": undefined;

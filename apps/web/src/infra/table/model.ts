@@ -1,14 +1,14 @@
-import type { Schema } from "effect";
+import type { z } from "zod";
 
 export type Column<T, K extends string, V = unknown> = {
-  readonly schema: Schema.Schema<T>;
+  readonly schema: z.ZodType<T>;
   readonly id: K;
   readonly value: (row: T) => V;
   readonly compareRows: ((a: T, b: T) => number) | undefined;
   readonly hideable: boolean;
 };
 export const defineColumns =
-  <T>(schema: Schema.Schema<T>) =>
+  <T>(schema: z.ZodType<T>) =>
   <const K extends string, V>(
     id: K,
     definition: { value: (row: T) => V; compare?: (a: NoInfer<V>, b: NoInfer<V>) => number; hideable?: boolean },

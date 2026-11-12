@@ -1,13 +1,11 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { phoneAnimations } from "#/farm/interaction.stylex.ts";
 import { drawPattern, lcd } from "#/farm/phone/lcd.ts";
 import { kept, usePad, useTicks } from "#/farm/phone/pad.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
-import { styleProps } from "#/ui/positioner.ts";
 
 import {
   type BugSnake,
@@ -26,65 +24,9 @@ const zoom = 3;
 const width = bugSnakeWidth * cell;
 const height = bugSnakeHeight * cell;
 
-const styles = stylex.create({
-  overlay: {
-    position: "absolute",
-    inset: "0",
-    display: "grid",
-    placeItems: "center",
-    backgroundColor: {
-      default: "var(--color-lcd-panel)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-lcd-paper) 80%, transparent)",
-    },
-    textAlign: "center",
-  },
-  root: {
-    display: "flex",
-    minHeight: "0",
-    flex: "1",
-    flexDirection: "column",
-    alignItems: "center",
-    paddingInline: "0.25rem",
-    paddingTop: "0.75rem",
-  },
-  topRow: {
-    display: "flex",
-    width: "100%",
-    paddingInline: "0.5rem",
-  },
-  bestScore: {
-    marginLeft: "auto",
-    fontVariantNumeric: "tabular-nums",
-  },
-  subRow: {
-    marginTop: "0.25rem",
-    display: "flex",
-    width: "100%",
-    paddingInline: "0.5rem",
-    fontVariantNumeric: "tabular-nums",
-  },
-  score: {
-    marginLeft: "auto",
-  },
-  fieldFrame: {
-    position: "relative",
-    marginTop: "0.5rem",
-    boxShadow: "0 0 0 2px var(--color-lcd-ink)",
-  },
-  canvas: (w: number, h: number) => ({
-    display: "block",
-    width: w,
-    height: h,
-    imageRendering: "pixelated",
-  }),
-  help: {
-    marginTop: "auto",
-    marginBottom: "0.5rem",
-    textAlign: "center",
-    lineHeight: "1.625",
-    color: "var(--color-lcd-dark)",
-  },
-});
+const styles = {
+  canvas: (w: number, h: number): JSX.CSSProperties => ({ width: `${w}px`, height: `${h}px` }),
+};
 
 const game = kept<BugSnake | undefined>(undefined);
 const best = kept(0);
@@ -190,35 +132,36 @@ export function BugSnakeGame() {
 
   const score = () => g()?.score ?? 0;
   return (
-    <div {...stylex.attrs(styles.root)}>
-      <div {...stylex.attrs(styles.topRow)}>
+    <div class="flex min-h-0 flex-1 flex-col items-center px-1 pt-3">
+      <div class="flex w-full px-2">
         <span>{t("web.farm.phone.game.bugs")}</span>
-        <span {...stylex.attrs(styles.bestScore)}>
+        <span class="ml-auto tabular-nums">
           {t("web.farm.phone.blocks.best")} {five(Math.max(top(), score()))}
         </span>
       </div>
-      <div {...stylex.attrs(styles.subRow)}>
+      <div class="mt-1 flex w-full px-2 tabular-nums">
         <span>{t("web.farm.phone.bugs.tally", { seeds: g()?.eaten ?? 0, bugs: g()?.bugs ?? 0 })}</span>
-        <span {...stylex.attrs(styles.score)}>{five(score())}</span>
+        <span class="ml-auto">{five(score())}</span>
       </div>
-      <div {...stylex.attrs(styles.fieldFrame)}>
+      <div class="relative mt-2 [box-shadow:0_0_0_2px_var(--color-lcd-ink)]">
         <canvas
           ref={(el) => (canvas = el)}
           width={width}
           height={height}
           role="img"
           aria-label={t("web.farm.phone.bugs.field")}
-          {...stylex.attrs(styles.canvas(width * zoom, height * zoom))}
+          class="block [image-rendering:pixelated]"
+          style={styles.canvas(width * zoom, height * zoom)}
         />
         <Show when={!g() || g()?.over !== undefined || !playing()}>
-          <div {...stylex.attrs(styles.overlay)}>
+          <div class="absolute inset-0 grid place-items-center bg-lcd-paper/80 text-center">
             <span>
               {(() => {
                 const over = g()?.over;
                 return over ? ended[over] : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.bugs");
               })()}
               <br />
-              <span {...styleProps(phoneAnimations.blink)}>
+              <span class="[animation-name:blink] motion-reduce:[animation-name:none] [animation-duration:1000ms] [animation-iteration-count:infinite]">
                 {t("web.farm.phone.pressA", {
                   what: g() && g()?.over === undefined ? t("web.farm.phone.resume") : g() ? t("web.farm.phone.again") : t("web.farm.phone.start"),
                 })}
@@ -227,7 +170,7 @@ export function BugSnakeGame() {
           </div>
         </Show>
       </div>
-      <p {...stylex.attrs(styles.help)}>
+      <p class="mt-auto mb-2 text-center leading-relaxed text-lcd-dark">
         {t("web.farm.phone.bugs.help")}
         <br />
         {t("web.farm.phone.bugs.help2")}

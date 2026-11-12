@@ -1,162 +1,34 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, onSettled, Show } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
 
 import { Button } from "./Button";
-import { styleProps } from "./positioner";
-import { colors, durations, easing, fonts, leading, media, radii, shadows as shadowTokens, text } from "./tokens.stylex";
 
-const popIn = stylex.keyframes({
-  from: { opacity: 0, scale: 0.98 },
-});
-
-const fadeIn = stylex.keyframes({
-  from: { opacity: 0 },
-});
-
-const styles = stylex.create({
-  popSample: {
-    width: "2.5rem",
-    height: "2.5rem",
-    animationName: { default: popIn, [media.reducedMotion]: "none" },
-    animationDuration: durations.panel,
-    animationTimingFunction: easing.out,
-    animationFillMode: "both",
-    borderRadius: radii.md,
-    backgroundColor: colors.accent,
-  },
-  fadeSample: {
-    width: "2.5rem",
-    height: "2.5rem",
-    animationName: { default: fadeIn, [media.reducedMotion]: "none" },
-    animationDuration: durations.state,
-    animationTimingFunction: easing.out,
-    animationFillMode: "both",
-    borderRadius: radii.md,
-    backgroundColor: colors.accent,
-  },
-  colour: (value: string) => ({ backgroundColor: value }),
-  radius: (value: string) => ({ borderRadius: value }),
-  shadow: (value: string) => ({ boxShadow: value }),
-  timing: (value: string) => ({ transitionTimingFunction: value }),
-  swatch: { height: "2rem", borderRadius: radii.md, borderWidth: 1, borderStyle: "solid", borderColor: colors.line },
-  pixelSwatch: { width: "1.75rem", height: "1.75rem" },
-  typeSample: { textOverflow: "ellipsis", whiteSpace: "nowrap", overflow: "hidden" },
-  shape: {
-    width: "2.5rem",
-    height: "2.5rem",
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: colors.line,
-    backgroundColor: colors.side,
-  },
-  raised: { backgroundColor: colors.page, borderRadius: radii.md },
-  hidden: { display: "none" },
-  tokenName: {
-    fontFamily: fonts.mono,
-    fontSize: text["2xs"],
-    lineHeight: leading["2xs"],
-    color: colors.muted,
-  },
-  rowGrid: {
-    display: "flex",
-    width: "100%",
-    flexWrap: "wrap",
-    alignItems: "flex-end",
-    gap: "0.75rem",
-  },
-  sampleColumn: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "0.25rem",
-  },
-  curvePlot: {
-    width: "3rem",
-    height: "3rem",
-    color: colors.line,
-  },
-  easePath: {
-    stroke: colors.accent,
-  },
-  swatchGrid: {
-    display: "grid",
-    width: "100%",
-    gridTemplateColumns: "repeat(auto-fill, minmax(5.5rem, 1fr))",
-    gap: "0.5rem",
-  },
-  swatchItem: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.25rem",
-  },
-  pixelFrame: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "1rem",
-    borderRadius: radii.lg,
-    backgroundColor: "var(--color-cream-50)",
-    padding: "1rem",
-  },
-  pixelStrip: {
-    display: "flex",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-500)",
-  },
-  pixelLabel: {
-    fontFamily: fonts.mono,
-    fontSize: text["2xs"],
-    lineHeight: leading["2xs"],
-    color: "var(--color-bark-600)",
-  },
-  typeList: {
-    display: "flex",
-    width: "100%",
-    flexDirection: "column",
-    gap: "0.25rem",
-  },
-  typeRow: {
-    display: "flex",
-    alignItems: "baseline",
-    gap: "0.75rem",
-  },
-  typeLabel: {
-    width: "4rem",
-    flexShrink: "0",
-  },
-  motionPair: {
-    display: "flex",
-    alignItems: "flex-end",
-    gap: "0.75rem",
-  },
-});
-
+// Each swatch reads the colour's variable, so it is the colour the pages get in this theme.
 const colours: [string, string][] = [
-  ["page", colors.page],
-  ["side", colors.side],
-  ["hover", colors.hover],
-  ["selected", colors.selected],
-  ["line", colors.line],
-  ["faint", colors.faint],
-  ["muted", colors.muted],
-  ["ink", colors.ink],
-  ["accent", colors.accent],
-  ["focus", colors.focus],
-  ["leaf", colors.leaf],
-  ["wheat", colors.wheat],
-  ["berry", colors.berry],
-  ["water", colors.water],
-  ["bark", colors.bark],
-  ["idle", colors.idle],
-  ["ok-soft", colors.okSoft],
-  ["ok-ink", colors.okInk],
-  ["bad-soft", colors.badSoft],
-  ["warn-ink", colors.warnInk],
-  ["rail", colors.rail],
-  ["code-bg", colors.codeBg],
+  ["page", "var(--color-page)"],
+  ["side", "var(--color-side)"],
+  ["hover", "var(--color-hover)"],
+  ["selected", "var(--color-selected)"],
+  ["line", "var(--color-line)"],
+  ["faint", "var(--color-faint)"],
+  ["muted", "var(--color-muted)"],
+  ["ink", "var(--color-ink)"],
+  ["accent", "var(--color-accent)"],
+  ["focus", "var(--color-focus)"],
+  ["leaf", "var(--color-leaf)"],
+  ["wheat", "var(--color-wheat)"],
+  ["berry", "var(--color-berry)"],
+  ["water", "var(--color-water)"],
+  ["bark", "var(--color-bark)"],
+  ["idle", "var(--color-idle)"],
+  ["ok-soft", "var(--color-ok-soft)"],
+  ["ok-ink", "var(--color-ok-ink)"],
+  ["bad-soft", "var(--color-bad-soft)"],
+  ["warn-ink", "var(--color-warn-ink)"],
+  ["rail", "var(--color-rail)"],
+  ["code-bg", "var(--color-code-bg)"],
 ];
 
 // The pixel skin's families, darkest last.
@@ -169,50 +41,41 @@ const palette: [string, string[]][] = [
   ["lcd · dusk · glow", ["var(--color-lcd-pale)", "var(--color-lcd-paper)", "var(--color-lcd-light)", "var(--color-dusk-800)", "var(--color-glow)"]],
 ];
 
-const typography = stylex.create({
-  tiny: { fontSize: text["2xs"], lineHeight: leading["2xs"] },
-  xs: { fontSize: text.xs, lineHeight: leading.xs },
-  sm: { fontSize: text.sm, lineHeight: leading.sm },
-  base: { fontSize: text.base, lineHeight: leading.base },
-  lg: { fontSize: text.lg, lineHeight: leading.lg },
-  xl: { fontSize: text.xl, lineHeight: leading.xl },
-});
-
-const sizes: [string, stylex.StyleXStyles][] = [
-  ["text-2xs", typography.tiny],
-  ["text-xs", typography.xs],
-  ["text-sm", typography.sm],
-  ["text-base", typography.base],
-  ["text-lg", typography.lg],
-  ["text-xl", typography.xl],
+const sizes: [string, JSX.ClassValue][] = [
+  ["text-2xs", "text-2xs"],
+  ["text-xs", "text-xs"],
+  ["text-sm", "text-sm"],
+  ["text-base", "text-base"],
+  ["text-lg", "text-lg"],
+  ["text-xl", "text-xl"],
 ];
 
 const radiiList: [string, string][] = [
-  ["xs", radii.xs],
-  ["sm", radii.sm],
-  ["md", radii.md],
-  ["lg", radii.lg],
-  ["xl", radii.xl],
+  ["xs", "rounded-xs"],
+  ["sm", "rounded-sm"],
+  ["md", "rounded-md"],
+  ["lg", "rounded-lg"],
+  ["xl", "rounded-xl"],
 ];
 
 const shadows: [string, string][] = [
-  ["raise", shadowTokens.raise],
-  ["float", shadowTokens.float],
+  ["raise", "shadow-raise"],
+  ["float", "shadow-float"],
 ];
 
 const eases: [string, string][] = [
-  ["out", easing.out],
-  ["in", easing.in],
-  ["in-out", easing.inOut],
-  ["spring", easing.spring],
+  ["out", "ease-out"],
+  ["in", "ease-in"],
+  ["in-out", "ease-in-out"],
+  ["spring", "ease-spring"],
 ];
 
 function Name(props: { children: string }) {
-  return <span {...stylex.attrs(styles.tokenName)}>{props.children}</span>;
+  return <span class="font-mono text-2xs text-muted">{props.children}</span>;
 }
 
 function Grid(props: { children: JSX.Element }) {
-  return <div {...stylex.attrs(styles.rowGrid)}>{props.children}</div>;
+  return <div class="flex w-full flex-wrap items-end gap-3">{props.children}</div>;
 }
 
 /** cubic-bezier(a, b, c, d) as its four numbers. */
@@ -223,7 +86,7 @@ const bezier = (v: string) => {
 
 /** The curve on a 0–1 square, with room for spring's overshoot, read off a styled element: the curve drawn
  * is the one the pages get. */
-function Curve(props: { name: string; styles: stylex.StyleXStyles }) {
+function Curve(props: { name: string; class: JSX.ClassValue | undefined }) {
   let probe!: HTMLSpanElement;
   const [p, setP] = createSignal<[number, number, number, number]>();
   onSettled(() => {
@@ -231,16 +94,16 @@ function Curve(props: { name: string; styles: stylex.StyleXStyles }) {
   });
   const y = (v: number) => 44 - v * 32;
   return (
-    <div {...stylex.attrs(styles.sampleColumn)}>
-      <span ref={(el) => (probe = el)} {...styleProps([styles.hidden, props.styles])} />
-      <svg viewBox="0 0 48 56" {...stylex.attrs(styles.curvePlot)} aria-hidden="true">
+    <div class="flex flex-col items-center gap-1">
+      <span ref={(el) => (probe = el)} class={["hidden", props.class]} />
+      <svg viewBox="0 0 48 56" class="w-12 h-12 text-line" aria-hidden="true">
         <rect x="8" y="12" width="32" height="32" fill="none" stroke="currentColor" />
         <Show when={p()}>
           {(c) => (
             <path
               d={`M8 ${y(0)} C${8 + c()[0] * 32} ${y(c()[1])} ${8 + c()[2] * 32} ${y(c()[3])} 40 ${y(1)}`}
               fill="none"
-              {...stylex.attrs(styles.easePath)}
+              class="stroke-accent"
               stroke-width="2"
               data-testid="ease"
             />
@@ -257,11 +120,11 @@ export default stories({
   stories: {
     Colour: story({
       render: () => (
-        <div {...stylex.attrs(styles.swatchGrid)}>
+        <div class="grid w-full grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-2">
           <For each={colours}>
             {([name, appearance]) => (
-              <div {...stylex.attrs(styles.swatchItem)}>
-                <span {...styleProps([styles.swatch, styles.colour(appearance)])} />
+              <div class="flex flex-col gap-1">
+                <span class="h-8 rounded-md border border-line" style={{ "background-color": appearance }} />
                 <Name>{name}</Name>
               </div>
             )}
@@ -272,14 +135,14 @@ export default stories({
     "Pixel palette": story({
       note: "像素皮的颜色不跟主题走。",
       render: () => (
-        <div data-theme="light" {...stylex.attrs(styles.pixelFrame)}>
+        <div data-theme="light" class="flex flex-wrap gap-4 rounded-lg bg-cream-50 p-4">
           <For each={palette}>
             {([name, list]) => (
-              <div {...stylex.attrs(styles.swatchItem)}>
-                <div {...stylex.attrs(styles.pixelStrip)}>
-                  <For each={list}>{(appearance) => <span {...styleProps([styles.pixelSwatch, styles.colour(appearance)])} />}</For>
+              <div class="flex flex-col gap-1">
+                <div class="flex border-2 border-bark-500">
+                  <For each={list}>{(appearance) => <span class="w-7 h-7" style={{ "background-color": appearance }} />}</For>
                 </div>
-                <span {...stylex.attrs(styles.pixelLabel)}>{name}</span>
+                <span class="font-mono text-2xs text-bark-600">{name}</span>
               </div>
             )}
           </For>
@@ -289,14 +152,14 @@ export default stories({
     Type: story({
       args: { sample: "工单派给帮工，用户看改动 Ship it" },
       render: (a) => (
-        <div {...stylex.attrs(styles.typeList)}>
+        <div class="flex w-full flex-col gap-1">
           <For each={sizes}>
             {([name, appearance]) => (
-              <div {...stylex.attrs(styles.typeRow)}>
-                <span {...stylex.attrs(styles.typeLabel)}>
+              <div class="flex items-baseline gap-3">
+                <span class="w-16 shrink-0">
                   <Name>{name}</Name>
                 </span>
-                <span {...styleProps([styles.typeSample, appearance])}>{a.sample}</span>
+                <span class={["truncate", appearance]}>{a.sample}</span>
               </div>
             )}
           </For>
@@ -308,16 +171,16 @@ export default stories({
         <Grid>
           <For each={radiiList}>
             {([name, appearance]) => (
-              <div {...stylex.attrs(styles.sampleColumn)}>
-                <span {...styleProps([styles.shape, styles.radius(appearance)])} />
+              <div class="flex flex-col items-center gap-1">
+                <span class={["w-10 h-10 border border-line bg-side", appearance]} />
                 <Name>{name}</Name>
               </div>
             )}
           </For>
           <For each={shadows}>
             {([name, appearance]) => (
-              <div {...stylex.attrs(styles.sampleColumn)}>
-                <span {...styleProps([styles.shape, styles.raised, styles.shadow(appearance)])} />
+              <div class="flex flex-col items-center gap-1">
+                <span class={["w-10 h-10 rounded-md border border-line bg-page", appearance]} />
                 <Name>{name}</Name>
               </div>
             )}
@@ -330,17 +193,17 @@ export default stories({
         const [replay, setReplay] = createSignal(0);
         return (
           <Grid>
-            <For each={eases}>{([name, appearance]) => <Curve name={name} styles={styles.timing(appearance)} />}</For>
+            <For each={eases}>{([name, appearance]) => <Curve name={name} class={appearance} />}</For>
             {/* Keyed by the count, so each press mounts them again and they play again. */}
             <For each={[replay()]}>
               {() => (
-                <div {...stylex.attrs(styles.motionPair)}>
-                  <div {...stylex.attrs(styles.sampleColumn)}>
-                    <span {...stylex.attrs(styles.popSample)} />
+                <div class="flex items-end gap-3">
+                  <div class="flex flex-col items-center gap-1">
+                    <span class="animate-pop-in w-10 h-10 rounded-md bg-accent" />
                     <Name>pop-in</Name>
                   </div>
-                  <div {...stylex.attrs(styles.sampleColumn)}>
-                    <span {...stylex.attrs(styles.fadeSample)} />
+                  <div class="flex flex-col items-center gap-1">
+                    <span class="animate-fade-in w-10 h-10 rounded-md bg-accent" />
                     <Name>fade-in</Name>
                   </div>
                 </div>

@@ -17,11 +17,11 @@
 
 | 位置 | 职责 |
 |---|---|
-| `packages/provider/src/deepseek/` | 模型目录、请求编码、`Sse.decode` 分帧与厂商增量、显式 `HttpClient` 连接 |
+| `packages/provider/src/deepseek/` | 模型目录、请求编码、`Sse.decode` 分帧与厂商增量、显式 `fetch` 连接 |
 | `packages/ai/src/` | `models.ts`、`client.ts`（`ModelClient`）、`llm.ts`（`Llm` 服务）、`request.ts`、`response.ts`、`tools.ts`、`testing.ts` |
-| `packages/agent/src/core/` | `loop.ts`（单轮纤程循环、默认上限 `8` 的工具并发与取消竞态）、`tool.ts`（`schemaTool`、`effectTool`）、`prompts.ts` |
+| `packages/agent/src/core/` | `loop.ts`（单轮循环、默认上限 `8` 的工具并发与取消竞态）、`tool.ts`（`textTool`、`runTool`、`schemaTool`）、`prompts.ts` |
 | `packages/agent/src/brain/brain.ts`、`session.ts`、`fs.ts`、`compaction.ts`、`prefix.ts` | `makeBrain` 入口（显式 `BrainState`）、`TranscriptStore` `.jsonl` 端口、`AgentFs` 文件端口、上下文压缩与前缀分段 SHA-256 校验 |
-| `packages/agent/src/tools/self.ts`、`skills.ts`、`memory.ts`、`mcp.ts`、`reminders.ts` | 全链路 Effect 化的内置工具、技能目录扫描、`MemoryPort`、MCP 客户端与定时提醒 |
+| `packages/agent/src/tools/self.ts`、`skills.ts`、`memory.ts`、`mcp.ts`、`reminders.ts` | 收 `AbortSignal` 的内置工具、技能目录扫描、`MemoryPort`、MCP 客户端与定时提醒 |
 | `packages/agent/src/tools/todo.ts`、`todoTools.ts`、`coding.ts`、`dag.ts` | 自身任务图 `Todo`、本地文件/shell 编码工具与通用 DAG 算法 |
 | `apps/server/src/modules/session/host.ts`、`runtime/vibevalley.ts`、`chat/main.ts` | 助手宿主 `AgentHost`、oar 农机适配（含 `runtime_todo` 表存储）与 CLI 终端对话 |
 
@@ -29,7 +29,7 @@
 
 ### 模型边界
 
-- Provider 的 `makeDeepSeekModel` 只收显式 `model`、`baseUrl`、`key` 与调用者的 Effect `HttpClient`；不读环境、登录或农场配置，不重试、不换供应商。返回 DeepSeek 增量和带标签错误，不依赖 agent 消息。
+- Provider 的 `makeDeepSeekModel` 只收显式 `model`、`baseUrl`、`key` 与调用者的 `fetch`；不读环境、登录或农场配置，不重试、不换供应商。返回 DeepSeek 增量和带标签错误，不依赖 agent 消息。
 - AI 的 `Llm` 保留 `start`、thinking/text/tool 增量、`done/error`，失败保留已到达的内容；消费结束或打断时释放响应 reader。`ModelClient` 每次请求读取调用者提供的当前 key。
 - 历史重放、缺失工具结果补齐、图片降级、上下文预算、工具参数修补与成本计算留在 AI；模型目录、wire 字段、usage 和 finish reason 解码归 Provider。
 - 官方 `@ai-sdk/deepseek@3.0.80` 不是现有桥的等价替代：离线 fixture 中它将纯工具 assistant 的 `content: null` 编为 `""`，忽略 `reasoning_text` 与 choice 内 usage。现有流还接受迟到的工具 ID。为保持这些契约，语言保留单一专有适配器，不加 SDK 旁路；SDK Core 用于转写，不接管 agent 循环。
@@ -74,7 +74,7 @@
 - **子帮手与自身任务（`Todo`）**：
   - `spawn_agent` 在子作用域内跑最多 30 步。
   - `todo_add|update|list` 维护最多 30 节点的 DAG，标为 `subagent` 的节点在前置完成后自动并发派生子帮手（最多 3 并发，失败重试 1 次）。
-- **全链路 Effect 边界与作用域生命周期**：`packages/agent` 受 `vibevalley/promise-boundary` 约束，宿主可注入 `FileSystem`、`HttpClient` 与 `TranscriptStore`；`makeBrain` 绑定 Effect `Scope`，关闭时自动中断模型流、子帮手、MCP 连接与压缩计时器。
+- **打断一路往下传，关了就收干净**：宿主可注入 `AgentFs`、`fetch` 与 `TranscriptStore`；每一轮、每个工具调用收同一个 `AbortSignal`，`Brain` 是 `AsyncDisposable`，`close()` 中止模型流、子帮手、MCP 连接与压缩计时器并等它们结束。
 
 ## 怎么走
 
@@ -89,7 +89,7 @@
 
 ## 为什么这样
 
-- **厂商接入与 agent 契约分开**：语言只接 DeepSeek，协议留在 Provider；AI 和循环继续用 Effect 作用域保证取消与插话。
+- **厂商接入与 agent 契约分开**：语言只接 DeepSeek，协议留在 Provider；AI 和循环用 `AbortSignal` 与 `@vibevalley/async` 的 `TaskGroup` 保证取消与插话。
 - **包与服务端解耦，一份 `Brain` 配置出四种用法**：`packages/ai` 与 `packages/agent` 不依赖农场协议或词典，通过 `BrainOptions` 组合工具集与存储端口。
 - **严守前缀不变与空闲压缩**：将动态时间、现状和新增记忆全部后置到当轮输入中，并在空闲 10 分钟后复用原前缀写摘要，最大化 DeepSeek 缓存命中率。
 

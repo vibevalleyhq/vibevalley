@@ -1,11 +1,11 @@
-import { Brand } from "effect";
-
 import { head } from "./clip.ts";
 
+declare const redactedBrand: unique symbol;
 /** Text that went through redact: only this module makes one, so whatever sends text off the farm asks for this type and
  * a caller cannot forget to redact. */
-export type RedactedString = string & Brand.Brand<"RedactedString">;
-const redactedString = Brand.nominal<RedactedString>();
+export type RedactedString = string & { readonly [redactedBrand]: true };
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the one place text becomes RedactedString: after redact ran on it
+const redactedString = (text: string): RedactedString => text as RedactedString;
 
 const shapes = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/gu,

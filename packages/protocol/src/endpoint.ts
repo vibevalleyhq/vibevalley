@@ -1,4 +1,4 @@
-import { Predicate, Schema } from "effect";
+import { z } from "zod";
 
 import type { Handlers } from "./api";
 import { pathOf, type VoiceFix, VoiceFixValues } from "./shapes";
@@ -198,12 +198,12 @@ export const bizCodeMeta: Readonly<Record<BizErrorCode, { readonly status: numbe
   [BizCode.SettingRefused]: { status: 409, kind: "Refused", retryable: false },
 };
 
-const NextSchema: Schema.Codec<Next> = Schema.Struct({
-  say: Schema.String,
-  run: Schema.optionalKey(Schema.Array(Schema.String)),
+const NextSchema: z.ZodType<Next> = z.object({
+  say: z.string(),
+  run: z.exactOptional(z.array(z.string()).readonly()),
 });
 
-const BizErrorCodeSchema: Schema.Codec<BizErrorCode> = Schema.Literals(BizErrorCodeValues);
+const BizErrorCodeSchema: z.ZodType<BizErrorCode> = z.literal(BizErrorCodeValues);
 
 /** Structured remediation metadata carried inside an error envelope's optional `error` field. */
 export interface ApiErrorDetail {
@@ -211,39 +211,66 @@ export interface ApiErrorDetail {
   readonly settings?: VoiceFix;
 }
 
-const ApiErrorDetailSchema: Schema.Codec<ApiErrorDetail> = Schema.Struct({
-  next: Schema.optionalKey(Schema.Array(NextSchema)),
-  settings: Schema.optionalKey(Schema.Literals(VoiceFixValues)),
+const ApiErrorDetailSchema: z.ZodType<ApiErrorDetail> = z.object({
+  next: z.exactOptional(z.array(NextSchema).readonly()),
+  settings: z.exactOptional(z.enum(VoiceFixValues)),
 });
 
+export interface ApiErrorEnvelopeShape {
+  readonly bizCode: BizErrorCode;
+  readonly message: string;
+  readonly error?: ApiErrorDetail;
+}
+
 /** Wire envelope for every failed JSON HTTP response: `{ bizCode, message, error? }`. */
-export const ApiErrorEnvelope = Schema.Struct({
+export const ApiErrorEnvelope: z.ZodType<ApiErrorEnvelopeShape> = z.object({
   bizCode: BizErrorCodeSchema,
-  message: Schema.String,
-  error: Schema.optionalKey(ApiErrorDetailSchema),
+  message: z.string(),
+  error: z.exactOptional(ApiErrorDetailSchema),
 });
 
 /** Wire envelope for successful JSON HTTP responses with no payload: `{ bizCode: 0, message: "ok" }`. */
-export const ApiVoidEnvelope = Schema.Struct({
-  bizCode: Schema.Literal(0),
-  message: Schema.String,
+export const ApiVoidEnvelope = z.object({
+  bizCode: z.literal(0),
+  message: z.string(),
 });
 
 /** Wire envelope for successful JSON HTTP responses carrying `data`: `{ bizCode: 0, message: "ok", data }`. */
-export const apiSuccessEnvelope = <A, I>(data: Schema.Codec<A, I>) =>
-  Schema.Struct({
-    bizCode: Schema.Literal(0),
-    message: Schema.String,
+export const apiSuccessEnvelope = <A, I>(data: z.ZodType<A, I>) =>
+  z.object({
+    bizCode: z.literal(0),
+    message: z.string(),
     data,
   });
 
-/** What a route refuses with: directly yieldable inside Effect.gen, and encoded as ApiErrorEnvelope on the wire. */
-export class ApiError extends Schema.TaggedError<ApiError, { readonly brand: unique symbol }>()("ApiError", {
-  bizCode: BizErrorCodeSchema,
-  message: Schema.String,
-  next: Schema.optionalKey(Schema.Array(NextSchema)),
-  settings: Schema.optionalKey(Schema.Literals(VoiceFixValues)),
-}) {
+export interface ApiErrorOptions {
+  readonly next?: readonly Next[];
+  readonly settings?: VoiceFix;
+  readonly cause?: unknown;
+}
+
+/** What a route refuses with: thrown by a service, and written as ApiErrorEnvelope on the wire. */
+export class ApiError extends Error {
+  override readonly name = "ApiError";
+  readonly bizCode: BizErrorCode;
+  readonly next?: readonly Next[];
+  readonly settings?: VoiceFix;
+
+  constructor(bizCode: BizErrorCode, message: string, options: ApiErrorOptions = {}) {
+    super(message, options.cause === undefined ? undefined : { cause: options.cause });
+    this.bizCode = bizCode;
+    if (options.next !== undefined) this.next = options.next;
+    if (options.settings !== undefined) this.settings = options.settings;
+  }
+
+  /** The envelope read back as the error it says. */
+  static of(envelope: ApiErrorEnvelopeShape): ApiError {
+    return new ApiError(envelope.bizCode, envelope.message, {
+      ...(envelope.error?.next === undefined ? {} : { next: envelope.error.next }),
+      ...(envelope.error?.settings === undefined ? {} : { settings: envelope.error.settings }),
+    });
+  }
+
   get status(): number {
     return bizCodeMeta[this.bizCode].status;
   }
@@ -256,7 +283,7 @@ export class ApiError extends Schema.TaggedError<ApiError, { readonly brand: uni
   get reason(): string {
     return this.message;
   }
-  toEnvelope(): typeof ApiErrorEnvelope.Type {
+  toEnvelope(): ApiErrorEnvelopeShape {
     const hasNext = this.next !== undefined && this.next.length > 0;
     const hasSettings = this.settings !== undefined;
     return {
@@ -274,24 +301,22 @@ export class ApiError extends Schema.TaggedError<ApiError, { readonly brand: uni
   }
 }
 
+export const isApiError = (e: unknown): e is ApiError => e instanceof ApiError;
+
 export interface Endpoint {
   readonly op: keyof Handlers;
   /** The input's fields that say what it is about (the issue's id…): the command line takes them as its arguments. */
   readonly about: readonly string[];
   /** The one argument, ids and all, sent as the POST's JSON body; none when it takes nothing. */
-  readonly input: Schema.Codec<unknown> | undefined;
-  readonly result: Schema.Codec<unknown> | undefined;
+  readonly input: z.ZodObject | undefined;
+  readonly result: z.ZodType | undefined;
   readonly can: readonly Caller[];
   /** It changes what cannot be taken back (deletes, merges, closes, sends helpers home). */
   readonly dryRun?: keyof Handlers;
 }
 
-export const input = (ids: Schema.Struct.Fields, body?: Schema.Codec<unknown>): Schema.Codec<unknown> =>
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- every body is a Struct in schema.ts, typed Codec<T.X> there to tie it to its shape
-  Schema.Struct({ ...ids, ...(body ? (body as unknown as Schema.Struct<Schema.Struct.Fields>).fields : {}) }) as unknown as Schema.Codec<unknown>;
+/** An endpoint's input: the ids it is about, and its body's fields beside them. */
+export const input = (ids: z.ZodRawShape, body?: z.ZodObject): z.ZodObject => z.object({ ...ids, ...(body ? body.shape : {}) });
 
 /** The fields an endpoint's input takes, what it is about among them; none when it takes nothing. */
-export const fieldsOf = (e: Endpoint): readonly string[] => {
-  const s: unknown = e.input;
-  return Predicate.hasProperty(s, "fields") && Predicate.isObject(s.fields) ? Object.keys(s.fields) : [];
-};
+export const fieldsOf = (e: Endpoint): readonly string[] => (e.input === undefined ? [] : Object.keys(e.input.shape));

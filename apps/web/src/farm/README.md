@@ -110,7 +110,7 @@ Served from `public/`: `/village.ldtk`, `/pixel/<name>.png` and `/pixel/sprites.
 `/cursors/<name>.png` and `/cursors/cursors.json` (CSS cursor hotspots `hx`, `hy`),
 `/fonts/fusion-pixel-12px-proportional-zh_hans.otf` (the `font-pixel` family; sharp at 12 and 24 px),
 `/title/`. The farm's colours are CSS custom properties in `src/style.css` (`--color-cream-100`, `--color-bark-900`,
-`--color-leaf-600`, `--shadow-px`…), consumed by StyleX.
+`--color-leaf-600`, `--shadow-px`…), used as classes (`bg-cream-100`, `shadow-px`).
 
 ## Tests
 

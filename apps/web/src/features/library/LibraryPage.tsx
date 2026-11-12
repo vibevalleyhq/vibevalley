@@ -1,5 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
-import { Array as Arr, Option, String as Str } from "effect";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
 
 import { Slider } from "@vibevalley/base-ui";
@@ -30,119 +28,12 @@ import { libraryQuery } from "./listing.ts";
 import { Rail } from "./Rail.tsx";
 import { knows, MakingTiles, ratioOf, type Seen, tileGap, Tiles, useWidth } from "./Tiles.tsx";
 
-const fadeIn = stylex.keyframes({
-  from: { opacity: 0 },
-});
-
-const styles = stylex.create({
-  page: {
-    position: "relative",
-    display: "grid",
-    height: "100%",
-    minHeight: 0,
-    minWidth: 0,
-    gridTemplateColumns: { default: "auto minmax(0, 1fr) auto", "@media (width < 40rem)": "minmax(0, 1fr)" },
-    gridTemplateRows: { default: "auto minmax(0, 1fr)", "@media (width < 40rem)": "auto auto minmax(0, 1fr)" },
-    gridTemplateAreas: { default: '"rail bar side" "rail files side"', "@media (width < 40rem)": '"bar" "rail" "files"' },
-  },
-  toolbar: {
-    gridArea: "bar",
-    display: "flex",
-    flexShrink: 0,
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.5rem",
-    borderBottomWidth: 1,
-    borderBottomStyle: "solid",
-    borderBottomColor: "var(--color-line)",
-    // Matches app/Shell.tsx's 66px desktop header.
-    minHeight: 66,
-    paddingBlock: "0.5rem",
-    paddingInline: "1rem",
-  },
-  search: {
-    position: "relative",
-    display: "flex",
-    alignItems: "center",
-    flex: { default: "0 1 16rem", "@media (width < 40rem)": "1 1 100%" },
-    minWidth: "10rem",
-  },
-  searchIcon: { position: "absolute", left: "0.625rem", color: "var(--color-faint)", pointerEvents: "none" },
-  searchInput: { width: "100%", paddingLeft: "2rem" },
-  grow: { flex: 1 },
-  size: {
-    display: { default: "flex", "@media (width < 40rem)": "none" },
-    alignItems: "center",
-    gap: "0.5rem",
-    color: "var(--color-faint)",
-  },
-  sliderRoot: { width: "6rem" },
-  sliderControl: { position: "relative", display: "flex", height: "1rem", cursor: "pointer", alignItems: "center" },
-  sliderTrack: {
-    position: "relative",
-    height: "0.25rem",
-    width: "100%",
-    borderRadius: "9999px",
-    backgroundColor: "var(--color-selected)",
-  },
-  sliderIndicator: { height: "100%", borderRadius: "9999px", backgroundColor: "var(--color-muted)" },
-  sliderThumb: {
-    position: "absolute",
-    // Base UI Slider writes translate for horizontal position, so center vertically via top.
-    top: "calc(50% - 0.375rem)",
-    width: "0.75rem",
-    height: "0.75rem",
-    borderRadius: "9999px",
-    borderStyle: "solid",
-    borderWidth: 1,
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-    boxShadow: "var(--shadow-raise)",
-  },
-  scroller: {
-    gridArea: "files",
-    position: "relative",
-    display: "flex",
-    minHeight: 0,
-    flex: 1,
-    flexDirection: "column",
-    // Must match tileGap in Tiles.tsx (StyleX requires a file-local literal).
-    gap: 12,
-    overflowY: "auto",
-    padding: "1rem",
-    outlineStyle: "none",
-  },
-  hidden: { display: "none" },
-  emptyHow: { maxWidth: "24rem", color: "var(--color-muted)" },
-  emptyActions: { display: "flex", justifyContent: "center", gap: "0.5rem" },
-  drop: {
-    position: "absolute",
-    inset: "0.5rem",
-    zIndex: 20,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "0.5rem",
-    borderRadius: "var(--radius-xl)",
-    borderWidth: 2,
-    borderStyle: "dashed",
-    borderColor: "var(--color-accent)",
-    backgroundColor: "color-mix(in srgb, var(--color-page) 88%, transparent)",
-    color: "var(--color-ink)",
-    fontSize: "var(--text-base)",
-    lineHeight: "var(--leading-base)",
-    pointerEvents: "none",
-    animationName: { default: fadeIn, "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: "180ms",
-  },
-});
-
 type Make = "image" | "speech" | "audio";
 const makes: readonly Make[] = ["image", "speech", "audio"];
 const tileMin = 96;
 const tileMax = 280;
 
-const hasFiles = (e: DragEvent) => Arr.contains(Array.from(e.dataTransfer?.types ?? []), "Files");
+const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
 
 export function LibraryPage() {
   const core = useCore();
@@ -151,7 +42,7 @@ export function LibraryPage() {
   const [text, setText] = createSignal("");
   const typed = createSettled(text, 250);
   const [sort, setSort] = createSignal<LibrarySort>("recent");
-  const items = useQuery(() => libraryQuery({ text: Str.trim(typed()), sort: sort() }), { interval: () => 10_000, keepPrevious: true });
+  const items = useQuery(() => libraryQuery({ text: typed().trim(), sort: sort() }), { interval: () => 10_000, keepPrevious: true });
   const [where, setWhere] = createSignal<Where>({ by: "all" });
   const [kind, setKind] = createSignal<KindFilter>("all");
   const [picked, setPicked] = createSignal<readonly string[]>([]);
@@ -166,43 +57,37 @@ export function LibraryPage() {
   const jobs = (): readonly MediaJob[] => core()?.media ?? [];
   const working = () => making(jobs());
   const list = createMemo(() => shown({ items: all(), where: where(), kind: kind() }));
-  const ids = createMemo(() => Arr.map(list(), (item) => item.attachment.id));
+  const ids = createMemo(() => list().map((item) => item.attachment.id));
   const counts = createMemo(() => countsOf({ items: all(), where: where(), kind: kind() }));
   const area = useWidth();
   const inner = () => Math.max(0, area.width() - 2 * 16);
   const rows = createMemo(() => {
     const known = seen();
-    return justify({ ratios: Arr.map(list(), (item) => ratioOf({ item, seen: known.get(item.attachment.id) })), width: inner(), height: tile(), gap: tileGap });
+    return justify({ ratios: list().map((item) => ratioOf({ item, seen: known.get(item.attachment.id) })), width: inner(), height: tile(), gap: tileGap });
   });
   const chosen = createMemo(() => {
     const on = picked();
-    return Arr.filter(all(), (item) => on.includes(item.attachment.id));
+    return all().filter((item) => on.includes(item.attachment.id));
   });
   const active = () => anchor() ?? picked().at(-1);
   const pictures = createMemo(() =>
-    Arr.map(
-      Arr.filter(list(), (item) => kindOf(item.attachment.type) === "image"),
-      (item) => ({
+    list()
+      .filter((item) => kindOf(item.attachment.type) === "image")
+      .map((item) => ({
         id: item.attachment.id,
         src: attachmentPath(item.attachment.id),
         name: item.attachment.name,
-      }),
-    ),
+      })),
   );
   const names: Names = {
-    agent: (id) =>
-      Arr.findFirst(ready(agents, undefined) ?? [], (a) => a.id === id).pipe(
-        Option.map((a) => a.name),
-        Option.getOrElse(() => id),
-      ),
-    channel: (id) =>
-      Arr.findFirst(core()?.chat?.channels ?? [], (x) => x.id === id).pipe(
-        Option.map((c) => `#${c.name ?? c.id}`),
-        Option.getOrElse(() => id),
-      ),
+    agent: (id) => (ready(agents, undefined) ?? []).find((a) => a.id === id)?.name ?? id,
+    channel: (id) => {
+      const c = (core()?.chat?.channels ?? []).find((x) => x.id === id);
+      return c === undefined ? id : `#${c.name ?? c.id}`;
+    },
   };
   createEffect(
-    () => Arr.filter(jobs(), (job) => job.phase === "ready").length,
+    () => jobs().filter((job) => job.phase === "ready").length,
     (n, was) => {
       if (was !== undefined && n !== was) void items.refetch();
     },
@@ -210,7 +95,7 @@ export function LibraryPage() {
   createEffect(
     () => ids(),
     (now) => {
-      const kept = Arr.filter(picked(), (id) => now.includes(id));
+      const kept = picked().filter((id) => now.includes(id));
       if (kept.length !== picked().length) {
         setPicked(kept);
         setAsking(false);
@@ -219,15 +104,12 @@ export function LibraryPage() {
   );
   const make = (): Make | undefined => {
     const m = search().get("make");
-    return Option.getOrUndefined(Arr.findFirst(makes, (x) => x === m));
+    return makes.find((x) => x === m);
   };
   const understanding = () => {
     const id = search().get("understand");
     if (id === null || id === "") return undefined;
-    return Arr.findFirst(all(), (item) => item.attachment.id === id).pipe(
-      Option.map((item) => item.attachment),
-      Option.getOrElse(() => ({ id, name: id, type: "", size: 0 })),
-    );
+    return all().find((item) => item.attachment.id === id)?.attachment ?? { id, name: id, type: "", size: 0 };
   };
   const [picker, setPicker] = createSignal<HTMLInputElement>();
   const upload = (files: readonly File[]) =>
@@ -235,7 +117,7 @@ export function LibraryPage() {
       ? Promise.resolve()
       : act.run(() =>
           Promise.all(
-            Arr.map(files, (file) =>
+            files.map((file) =>
               attachmentData(file)
                 .then((data) =>
                   api.attachment.create({
@@ -260,7 +142,7 @@ export function LibraryPage() {
     const from = anchor();
     if (how.range && from !== undefined) setPicked(between({ ids: ids(), from, to: id }));
     else if (how.add) {
-      setPicked((was) => (was.includes(id) ? Arr.filter(was, (x) => x !== id) : [...was, id]));
+      setPicked((was) => (was.includes(id) ? was.filter((x) => x !== id) : [...was, id]));
       setAnchor(id);
     } else {
       setPicked([id]);
@@ -268,18 +150,15 @@ export function LibraryPage() {
     }
   };
   const look = (id: string | undefined) => {
-    const at = Arr.findFirstIndex(pictures(), (p) => p.id === id);
-    if (Option.isSome(at)) setLooking(at.value);
+    const at = pictures().findIndex((p) => p.id === id);
+    if (at >= 0) setLooking(at);
   };
   const send = (channel: string) => {
     const files = chosen();
-    const attachments = Arr.map(files, (item) => item.attachment.id);
-    const words = Arr.join(
-      Arr.map(files, (item) => item.attachment.name),
-      "\n",
-    );
+    const attachments = files.map((item) => item.attachment.id);
+    const words = files.map((item) => item.attachment.name).join("\n");
     return act.run(() =>
-      publicationKey(`library:${Arr.join(attachments, ",")}`, channel)
+      publicationKey(`library:${attachments.join(",")}`, channel)
         .then((sendKey) => api.channel.message.send({ id: channel, text: words, attachments, sendKey }))
         .then(() => toast(t("web.library.sentTo", { channel: names.channel(channel) }))),
     );
@@ -287,7 +166,7 @@ export function LibraryPage() {
   const remove = () => {
     const gone = picked();
     return act.run(() =>
-      Promise.all(Arr.map(gone, (id) => api.library.item.delete({ id }))).then(() => {
+      Promise.all(gone.map((id) => api.library.item.delete({ id }))).then(() => {
         setAsking(false);
         setPicked([]);
         setAnchor(undefined);
@@ -335,11 +214,13 @@ export function LibraryPage() {
     window.addEventListener("paste", paste);
     return () => window.removeEventListener("paste", paste);
   });
-  const empty = () => all().length === 0 && working().length === 0 && Str.isEmpty(Str.trim(typed()));
+  const empty = () => all().length === 0 && working().length === 0 && typed().trim() === "";
   return (
     <div
       data-testid="library-page"
-      {...stylex.attrs(styles.page)}
+      class={
+        'relative grid h-full min-h-0 min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] max-sm:grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] max-sm:grid-rows-[auto_auto_minmax(0,1fr)] [grid-template-areas:"rail_bar_side"_"rail_files_side"] max-sm:[grid-template-areas:"bar"_"rail"_"files"]'
+      }
       onDragOver={(e) => {
         if (!hasFiles(e)) return;
         e.preventDefault();
@@ -369,9 +250,13 @@ export function LibraryPage() {
           setAsking(false);
         }}
       />
-      <div role="toolbar" aria-label={t("web.library.title")} {...stylex.attrs(styles.toolbar)}>
-        <label {...stylex.attrs(styles.search)}>
-          <Icon name="search" size={14} styles={styles.searchIcon} />
+      <div
+        role="toolbar"
+        aria-label={t("web.library.title")}
+        class="[grid-area:bar] flex shrink-0 flex-wrap items-center gap-2 border-b border-b-line min-h-16.5 py-2 px-4"
+      >
+        <label class="relative flex items-center flex-[0_1_16rem] max-sm:flex-[1_1_100%] min-w-40">
+          <Icon name="search" size={14} class="absolute left-2.5 text-faint pointer-events-none" />
           <TextInput
             type="search"
             data-testid="library-search"
@@ -379,7 +264,7 @@ export function LibraryPage() {
             aria-label={t("web.library.search")}
             value={text()}
             onInput={(e) => setText(e.currentTarget.value)}
-            styles={styles.searchInput}
+            class="w-full pl-8"
           />
         </label>
         <Select
@@ -389,16 +274,20 @@ export function LibraryPage() {
           quiet
           value={sort()}
           onChange={setSort}
-          options={Arr.map(LibrarySortValues, (value) => ({ value, label: t(`web.library.sort.${value}`) }))}
+          options={LibrarySortValues.map((value) => ({ value, label: t(`web.library.sort.${value}`) }))}
         />
-        <span {...stylex.attrs(styles.grow)} />
-        <div {...stylex.attrs(styles.size)}>
+        <span class="flex-1" />
+        <div class="flex max-sm:hidden items-center gap-2 text-faint">
           <Icon name="image" size={12} />
-          <Slider.Root min={tileMin} max={tileMax} step={8} value={tile()} onValueChange={setLibraryTile} {...stylex.attrs(styles.sliderRoot)}>
-            <Slider.Control {...stylex.attrs(styles.sliderControl)}>
-              <Slider.Track {...stylex.attrs(styles.sliderTrack)}>
-                <Slider.Indicator {...stylex.attrs(styles.sliderIndicator)} />
-                <Slider.Thumb aria-label={t("web.library.tileSize")} data-testid="library-tile-size" {...stylex.attrs(styles.sliderThumb)} />
+          <Slider.Root min={tileMin} max={tileMax} step={8} value={tile()} onValueChange={setLibraryTile} class="w-24">
+            <Slider.Control class="relative flex h-4 cursor-pointer items-center">
+              <Slider.Track class="relative h-1 w-full rounded-full bg-selected">
+                <Slider.Indicator class="h-full rounded-full bg-muted" />
+                <Slider.Thumb
+                  aria-label={t("web.library.tileSize")}
+                  data-testid="library-tile-size"
+                  class="absolute top-[calc(50%_-_0.375rem)] w-3 h-3 rounded-full border border-line bg-page shadow-raise"
+                />
               </Slider.Track>
             </Slider.Control>
           </Slider.Root>
@@ -410,7 +299,7 @@ export function LibraryPage() {
           multiple
           data-testid="library-file"
           aria-label={t("web.library.upload")}
-          {...stylex.attrs(styles.hidden)}
+          class="hidden"
           onChange={(event) => {
             const files = Array.from(event.currentTarget.files ?? []);
             event.currentTarget.value = "";
@@ -440,7 +329,7 @@ export function LibraryPage() {
             setAsking(false);
           }
         }}
-        {...stylex.attrs(styles.scroller)}
+        class="[grid-area:files] relative flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 outline-none"
       >
         <Show
           when={!empty()}
@@ -450,8 +339,8 @@ export function LibraryPage() {
               testid="library-empty"
               action={
                 <>
-                  <p {...stylex.attrs(styles.emptyHow)}>{t("web.library.emptyHow")}</p>
-                  <div {...stylex.attrs(styles.emptyActions)}>
+                  <p class="max-w-96 text-muted">{t("web.library.emptyHow")}</p>
+                  <div class="flex justify-center gap-2">
                     <Button icon="upload" onClick={() => picker()?.click()}>
                       {t("web.library.upload")}
                     </Button>
@@ -519,7 +408,10 @@ export function LibraryPage() {
         />
       </Show>
       <Show when={dragging()}>
-        <div data-testid="library-drop" {...stylex.attrs(styles.drop)}>
+        <div
+          data-testid="library-drop"
+          class="animate-fade-in absolute inset-2 z-20 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-accent bg-page/88 text-ink text-base pointer-events-none"
+        >
           <Icon name="upload" size={20} />
           {t("web.library.drop")}
         </div>
@@ -531,7 +423,7 @@ export function LibraryPage() {
           testid="library-make-form"
           value={make() ?? "image"}
           onChange={(value) => setSearch({ make: value })}
-          options={Arr.map(makes, (value) => ({ value, label: t(`web.library.makeTabs.${value}`) }))}
+          options={makes.map((value) => ({ value, label: t(`web.library.makeTabs.${value}`) }))}
         />
         <Show when={make() === "image"}>
           <ImagePanel />

@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -8,60 +7,6 @@ import { kept, usePad } from "#/farm/phone/pad.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
 
 import { moveWarehouse, newWarehouse, undoWarehouse, warehouseDone, warehouses } from "./sokoban";
-
-const styles = stylex.create({
-  root: {
-    display: "flex",
-    minHeight: "0",
-    flex: "1",
-    flexDirection: "column",
-    gap: "0.5rem",
-    paddingInline: "0.75rem",
-    paddingBlock: "0.5rem",
-  },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-  },
-  centered: {
-    textAlign: "center",
-  },
-  board: {
-    marginInline: "auto",
-    display: "block",
-    width: "100%",
-    maxWidth: "224px",
-  },
-  actions: {
-    marginTop: "auto",
-    display: "flex",
-    justifyContent: "center",
-    gap: "0.75rem",
-  },
-  undoButton: {
-    cursor: {
-      default: "pointer",
-      ":disabled": "default",
-    },
-    paddingInline: "0.5rem",
-    paddingBlock: "0.25rem",
-    boxShadow: "inset 0 0 0 1px var(--color-lcd-ink)",
-    opacity: {
-      default: null,
-      ":disabled": ".4",
-    },
-  },
-  actionButton: {
-    cursor: "pointer",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.25rem",
-    boxShadow: "inset 0 0 0 1px var(--color-lcd-ink)",
-  },
-  help: {
-    textAlign: "center",
-    color: "var(--color-lcd-dark)",
-  },
-});
 
 const warehouse = kept(newWarehouse());
 
@@ -104,17 +49,17 @@ export function SokobanGame() {
   const tiles = () => level().rows.flatMap((row, y) => [...row].map((tile, x) => ({ tile, x, y, p: y * width() + x })));
 
   return (
-    <div {...stylex.attrs(styles.root)}>
-      <div {...stylex.attrs(styles.header)}>
+    <div class="flex min-h-0 flex-1 flex-col gap-2 px-3 py-2">
+      <div class="flex justify-between">
         <span>{t("web.farm.phone.sokoban.title", { level: g().level + 1, of: warehouses.length })}</span>
         <span>{t("web.farm.phone.sokoban.moves", { moves: g().moves, pushes: g().pushes })}</span>
       </div>
-      <p {...stylex.attrs(styles.centered)}>{level().name}</p>
+      <p class="text-center">{level().name}</p>
       <svg
         role="img"
         aria-label={t("web.farm.phone.sokoban.board", { placed: placed(), of: g().boxes.length })}
         viewBox={`0 0 ${width() * 16} ${level().rows.length * 16}`}
-        {...stylex.attrs(styles.board)}
+        class="mx-auto block w-full max-w-56"
         shape-rendering="crispEdges"
       >
         <For each={tiles()} keyed={false}>
@@ -146,18 +91,27 @@ export function SokobanGame() {
           )}
         </For>
       </svg>
-      <p role="status" {...stylex.attrs(styles.centered)}>
+      <p role="status" class="text-center">
         {done() ? (last() ? t("web.farm.phone.sokoban.allIn") : t("web.farm.phone.sokoban.done")) : t("web.farm.phone.sokoban.goal")}
       </p>
-      <div {...stylex.attrs(styles.actions)}>
-        <button type="button" onClick={undo} disabled={g().history.length === 0} {...stylex.attrs(styles.undoButton)}>
+      <div class="mt-auto flex justify-center gap-3">
+        <button
+          type="button"
+          onClick={undo}
+          disabled={g().history.length === 0}
+          class="cursor-pointer disabled:cursor-default px-2 py-1 [box-shadow:inset_0_0_0_1px_var(--color-lcd-ink)] disabled:opacity-40"
+        >
           {t("web.farm.phone.sokoban.undo")}
         </button>
-        <button type="button" onClick={() => (done() ? advance() : restart())} {...stylex.attrs(styles.actionButton)}>
+        <button
+          type="button"
+          onClick={() => (done() ? advance() : restart())}
+          class="cursor-pointer px-2 py-1 [box-shadow:inset_0_0_0_1px_var(--color-lcd-ink)]"
+        >
           A {done() ? (last() ? t("web.farm.phone.sokoban.again") : t("web.farm.phone.sokoban.next")) : t("web.farm.phone.sokoban.restart")}
         </button>
       </div>
-      <p {...stylex.attrs(styles.help)}>{t("web.farm.phone.sokoban.help")}</p>
+      <p class="text-center text-lcd-dark">{t("web.farm.phone.sokoban.help")}</p>
     </div>
   );
 }

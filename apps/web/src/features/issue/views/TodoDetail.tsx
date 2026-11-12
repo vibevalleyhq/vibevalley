@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -24,184 +23,6 @@ import { toast } from "#/ui/toasts.ts";
 import { ActLines } from "./ActLines";
 import { IssueThread } from "./IssueThread";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
-
-const styles = stylex.create({
-  todoDetailNote: {
-    marginTop: "0.5rem",
-    padding: "0.625rem",
-  },
-  todoDetailTextArea: {
-    marginTop: "0.625rem",
-  },
-  todoDetailSpan: {
-    width: "0.5rem",
-    height: "0.5rem",
-    borderRadius: "9999px",
-  },
-  todoDetailSpanTone: {
-    backgroundColor: "var(--color-wheat)",
-  },
-  todoDetailSpanAlt: {
-    backgroundColor: "var(--color-water)",
-  },
-  unqueueAction: { marginTop: "0.375rem" },
-  parentIssue: {
-    marginBottom: "0.5rem",
-    cursor: "pointer",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-water)",
-    textDecorationLine: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "underline",
-      },
-    },
-  },
-  todoDetailDiv: {
-    marginBottom: "1rem",
-    paddingRight: "2.5rem",
-  },
-  issueTitle: {
-    width: "100%",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: {
-      default: "transparent",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-line)",
-      },
-      ":focus": "var(--color-focus)",
-    },
-    backgroundColor: "transparent",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.25rem",
-    fontSize: "var(--text-xl)",
-    lineHeight: "var(--leading-xl)",
-    fontWeight: "var(--font-weight-semibold)",
-    outlineStyle: "none",
-    color: {
-      default: null,
-      "::placeholder": "var(--color-faint)",
-    },
-  },
-  todoDetailDiv2: {
-    fontSize: "var(--text-base)",
-    lineHeight: "var(--leading-base)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  todoDetailDiv3: {
-    marginTop: "0.25rem",
-  },
-  todoDetailDiv4: {
-    marginTop: "0.375rem",
-  },
-  todoDetailDiv5: {
-    marginTop: "0.25rem",
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.375rem",
-    paddingLeft: "0.75rem",
-  },
-  todoDetailDiv6: {
-    marginTop: "0.625rem",
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.5rem",
-  },
-  issueWriteOwn: {
-    marginTop: "0.75rem",
-    display: "block",
-    cursor: "pointer",
-    borderRadius: "var(--radius-sm)",
-    textAlign: "left",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: {
-      default: "var(--color-muted)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-ink)",
-      },
-    },
-    textDecorationLine: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "underline",
-      },
-    },
-  },
-  issueDescription: {
-    width: "100%",
-    resize: "vertical",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: {
-      default: "transparent",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-line)",
-      },
-      ":focus": "var(--color-focus)",
-    },
-    backgroundColor: "transparent",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.375rem",
-    fontSize: "var(--text-base)",
-    lineHeight: "var(--leading-base)",
-    outlineStyle: "none",
-    color: {
-      default: null,
-      "::placeholder": "var(--color-faint)",
-    },
-  },
-  todoDetailDiv7: {
-    marginTop: "0.75rem",
-    borderTopStyle: "solid",
-    borderTopWidth: "1px",
-    borderColor: "var(--color-line)",
-  },
-  todoDetailSpan2: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  todoDetailButton: {
-    marginBottom: "0.25rem",
-    marginLeft: "76px",
-    cursor: "pointer",
-    alignSelf: "flex-start",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-water)",
-    textDecorationLine: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "underline",
-      },
-    },
-  },
-  todoDetailDiv8: {
-    marginTop: "1rem",
-  },
-  todoDetailDiv9: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.5rem",
-  },
-  newRepoDialogDiv: {
-    marginTop: "1.25rem",
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: "0.5rem",
-  },
-});
 
 interface Draft {
   title: string;
@@ -343,13 +164,18 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     <div>
       <Show when={props.item.parent}>
         {(parent) => (
-          <button type="button" data-testid="parent-issue" {...stylex.attrs(styles.parentIssue)} onClick={() => props.onDone(parent())}>
+          <button
+            type="button"
+            data-testid="parent-issue"
+            class="mb-2 cursor-pointer text-xs text-water hover:underline"
+            onClick={() => props.onDone(parent())}
+          >
             {t("web.issue.family.parent")}
           </button>
         )}
       </Show>
       <Show when={backlog()}>
-        <div {...stylex.attrs(styles.todoDetailDiv)}>
+        <div class="mb-4 pr-10">
           <Stages at="talk" />
         </div>
       </Show>
@@ -359,7 +185,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         onInput={(e) => edit({ title: e.currentTarget.value })}
         placeholder={t("web.issue.todo.titleHint")}
         aria-label={t("web.issue.todo.title")}
-        {...stylex.attrs(styles.issueTitle)}
+        class="w-full rounded-md border border-transparent hover:border-line focus:border-focus bg-transparent px-2 py-1 text-xl font-semibold outline-none placeholder:text-faint"
       />
     </div>
   );
@@ -374,14 +200,14 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       <Show when={backlog()}>
         <SheetLabel>{t("web.issue.todo.talk")}</SheetLabel>
         <Note tone={drafting() ? "water" : "wheat"}>
-          <div {...stylex.attrs(styles.todoDetailDiv2)}>{said()[0]}</div>
-          <div {...stylex.attrs(styles.todoDetailDiv3)}>{said()[1]}</div>
+          <div class="text-base font-semibold">{said()[0]}</div>
+          <div class="mt-1">{said()[1]}</div>
           <For each={questions()}>
             {(a) => (
-              <div {...stylex.attrs(styles.todoDetailDiv4)}>
+              <div class="mt-1.5">
                 <div>· {a.question}</div>
                 <Show when={a.options.length}>
-                  <div {...stylex.attrs(styles.todoDetailDiv5)} role="group" aria-label={t("web.issue.todo.answerTo", { question: a.question })}>
+                  <div class="mt-1 flex flex-wrap gap-1.5 pl-3" role="group" aria-label={t("web.issue.todo.answerTo", { question: a.question })}>
                     <For each={a.options}>
                       {(o) => (
                         <Button disabled={busy()} onClick={() => setWord(o)}>
@@ -396,7 +222,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           </For>
         </Note>
         <TextArea
-          styles={styles.todoDetailTextArea}
+          class="mt-2.5"
           rows={2}
           value={word()}
           onInput={(e) => setWord(e.currentTarget.value)}
@@ -409,7 +235,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           placeholder={questions().length > 0 ? t("web.issue.todo.answerHint") : refined() ? t("web.issue.todo.againHint") : t("web.issue.todo.whatHint")}
           aria-label={t("web.issue.todo.whatLabel")}
         />
-        <div {...stylex.attrs(styles.todoDetailDiv6)}>
+        <div class="mt-2.5 flex flex-wrap gap-2">
           <Show when={backlog()}>
             <Button
               tone={written() ? "primary" : "plain"}
@@ -435,7 +261,12 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         fallback={
           <>
             {talk}
-            <button type="button" data-testid="issue-write-own" onClick={() => setOwn(true)} {...stylex.attrs(styles.issueWriteOwn)}>
+            <button
+              type="button"
+              data-testid="issue-write-own"
+              onClick={() => setOwn(true)}
+              class="mt-3 block cursor-pointer rounded-sm text-left text-sm text-muted hover:text-ink hover:underline"
+            >
               {t("web.issue.todo.writeOwn")}
             </button>
           </>
@@ -448,9 +279,9 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           rows={6}
           placeholder={t("web.issue.todo.descriptionHint")}
           aria-label={t("web.issue.todo.description")}
-          {...stylex.attrs(styles.issueDescription)}
+          class="w-full resize-y rounded-md border border-transparent hover:border-line focus:border-focus bg-transparent px-2 py-1.5 text-base outline-none placeholder:text-faint"
         />
-        <div {...stylex.attrs(styles.todoDetailDiv7)}>
+        <div class="mt-3 border-t border-line">
           <Fold
             label={t("web.issue.todo.criteria")}
             summary={
@@ -479,8 +310,8 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const side = (
     <>
       <Property label={t("web.issue.todo.status")}>
-        <span {...stylex.attrs(styles.todoDetailSpan2)}>
-          <span {...stylex.attrs(styles.todoDetailSpan, backlog() ? styles.todoDetailSpanTone : styles.todoDetailSpanAlt)} />
+        <span class="flex items-center gap-2">
+          <span class={["w-2 h-2 rounded-full", backlog() ? "bg-wheat" : "bg-water"]} />
           {backlog() ? t("web.issue.todo.draftStatus") : t("web.issue.todo.todoStatus")}
         </span>
       </Property>
@@ -504,7 +335,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           options={[...new Set([...repos(), ...(d().repo ? [d().repo] : [])])].map((p) => ({ value: p, label: p }))}
         />
       </Property>
-      <button type="button" onClick={() => setNewRepo(true)} {...stylex.attrs(styles.todoDetailButton)}>
+      <button type="button" onClick={() => setNewRepo(true)} class="mb-1 ml-19 cursor-pointer self-start text-xs text-water hover:underline">
         {repos().length === 0 ? t("web.issue.todo.firstRepo") : t("web.issue.todo.newRepoLink")}
       </button>
       <Property label={t("web.issue.todo.priority")}>
@@ -530,18 +361,18 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       </More>
       <Show when={queued()}>
         {(at) => (
-          <Note tone="water" styles={[styles.todoDetailNote]}>
+          <Note tone="water" class="mt-2 p-2.5">
             <div>{t("web.issue.todo.inQueue", { ago: ago(at(), Date.now()) })}</div>
-            <Button styles={styles.unqueueAction} disabled={busy()} onClick={() => void unqueue()}>
+            <Button class="mt-1.5" disabled={busy()} onClick={() => void unqueue()}>
               {t("web.issue.todo.unqueue")}
             </Button>
           </Note>
         )}
       </Show>
-      <div {...stylex.attrs(styles.todoDetailDiv8)}>
+      <div class="mt-4">
         <ActLines issue={props.item.id} />
       </div>
-      <div {...stylex.attrs(styles.todoDetailDiv9)}>
+      <div class="flex flex-wrap gap-2">
         <Show when={edited()}>
           <Button
             data-testid="issue-save"
@@ -594,7 +425,7 @@ function NewRepoDialog(props: { onClose: () => void; onMade: (name: string) => v
         placeholder={t("web.issue.todo.repoHint")}
         aria-label={t("web.issue.todo.repoName")}
       />
-      <div {...stylex.attrs(styles.newRepoDialogDiv)}>
+      <div class="mt-5 flex justify-end gap-2">
         <Button onClick={() => props.onClose()}>{t("web.issue.never")}</Button>
         <Button tone="primary" disabled={!name().trim() || act.busy()} onClick={() => void make()}>
           {t("web.issue.todo.create")}

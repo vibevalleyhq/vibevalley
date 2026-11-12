@@ -1,5 +1,3 @@
-import { Option, Schema } from "effect";
-
 import { type ArtifactDisplay, artifactPath, type HtmlAnchor, type HtmlShellMessage } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -191,9 +189,10 @@ export const shellPath = (
 
 export const shellThemeOf = (asked: string | null): ShellTheme => (asked === "dark" ? "dark" : "light");
 
-const decodeShellMessage = Schema.decodeUnknownOption(S.HtmlShellMessage);
-
-export const shellMessageOf = (data: unknown): HtmlShellMessage | undefined => Option.getOrUndefined(decodeShellMessage(data));
+export const shellMessageOf = (data: unknown): HtmlShellMessage | undefined => {
+  const got = S.HtmlShellMessage.safeParse(data);
+  return got.success ? got.data : undefined;
+};
 
 const wordsMax = 10_000;
 const contextMax = 64;

@@ -1,6 +1,6 @@
 ---
 name: vv-simplify
-description: 在 VibeValley 里找可以简化的地方：删掉以后什么都不少的代码、只是转手的一层、几份重复的帮手、只给测试开的选项、兼容旧数据的兜底、手写的 Effect 已经有的东西、多余的注释；每一处核实过、带证据，排好序列给用户，用户点了哪几处再改。用在：用户说「看看哪里能简化」「找找冗余」「这块是不是写复杂了」「simplify」；做完一块功能想收一收；评审时觉得一块代码比它做的事复杂。默认只列清单，不动代码。
+description: 在 VibeValley 里找可以简化的地方：删掉以后什么都不少的代码、只是转手的一层、几份重复的帮手、只给测试开的选项、兼容旧数据的兜底、手写了 `@vibevalley/async` 已经有的东西、多余的注释；每一处核实过、带证据，排好序列给用户，用户点了哪几处再改。用在：用户说「看看哪里能简化」「找找冗余」「这块是不是写复杂了」「simplify」；做完一块功能想收一收；评审时觉得一块代码比它做的事复杂。默认只列清单，不动代码。
 ---
 
 # 找可以简化的地方
@@ -13,7 +13,7 @@ description: 在 VibeValley 里找可以简化的地方：删掉以后什么都�
 - 没说，就看当前分支相对 `origin/main` 的改动：`git diff origin/main...HEAD --stat`，再读改到的文件和它们的调用方。
 - 也没有改动，问用户看哪块，不要一口气扫整个仓库。
 
-先读那块的子系统文档（[docs/subsystems](docs/subsystems/README.md)），特别是「为什么这样」：那里记着有意的取舍，不要把它们当成冗余再提一遍。写 Effect 的，先读 `node_modules/effect/AGENTS.md`。
+先读那块的子系统文档（[docs/subsystems](docs/subsystems/README.md)），特别是「为什么这样」：那里记着有意的取舍，不要把它们当成冗余再提一遍。异步代码先读 [vv-typescript](.agents/skills/vv-typescript/SKILL.md)。
 
 ## 2. 找什么
 
@@ -23,8 +23,8 @@ description: 在 VibeValley 里找可以简化的地方：删掉以后什么都�
 2. **死的东西**：没人调的导出、函数、参数、选项、字段，永远走不到的分支。用 `git grep -n '<名字>'` 数调用方，别只信编辑器。
 3. **只转手的一层**：一个函数或模块只是把参数原样递给另一个。删掉它试试，复杂度是消失了，还是挪到了每个调用方？消失了才算。
 4. **重复的帮手**：几个模块各写一份做同一件事的（以前的十份 `db` 帮手就是这样收成一个 `Db` 服务的）。收到拥有它的那个模块，别的用它的。
-5. **只给测试开的口子**：服务的 `options` 里只有测试才传的选项（以前的 `now`、`patrolNow`），换成测试已经有的接缝（`testing/world.ts` 的选项、`Clock`、layer）。
-6. **手写了 Effect 已经有的**：`forever` 加 `sleep`（用 `Schedule`）、自己管 fiber 的集合（`FiberSet`、`FiberMap`）、手写解析 JSON 再 `as`（`Schema`）、自己数时间（`Clock`）。照仓库里已有的写法，不引进新的。
+5. **只给测试开的口子**：服务的 `options` 里只有测试才传的选项（以前的 `now`、`patrolNow`），换成测试已经有的接缝（`testing/world.ts` 的选项、`deps.clock`、`deps` 里换掉的服务）。
+6. **手写了 `@vibevalley/async` 已经有的**：自己写的重试循环（`retry`、`exponential`）、自己管的一组后台 Promise 或按键的定时器（`TaskGroup` 的 `run`、`keyed`）、自己拼的超时（`withTimeout`）、手写解析 JSON 再 `as`（Zod 的 `jsonString`、`jsonOf`）、自己数时间（`deps.clock`）。照仓库里已有的写法，不引进新的。
 7. **状态多存了一份**：页面或服务端在核心状态以外另存了帮工、工单的状态（AGENTS.md「核心状态只有一份」）。
 8. **封闭联合的长 `if`/`else`**：换成穷尽的 `switch` 或 `Record<X, …>`，加新成员时编不过。
 9. **多余的注释**：复述代码、写历史、写概述的（[docs/style/code.md](docs/style/code.md)「不建议写」）；整块清的话交给 [vv-comments](.agents/skills/vv-comments/SKILL.md)。
@@ -33,7 +33,7 @@ description: 在 VibeValley 里找可以简化的地方：删掉以后什么都�
 
 - 为了少几行把清楚的代码写成难读的。
 - 新造一个通用的框架、基类、配置项，只为把两处相似的代码合起来（两处不一样的理由可能就在明天）。
-- 子系统文档「为什么这样」里已经否决过的（比如 foundation.md 记着不把 `ApiError` 换成 `TaggedError`、`repo/git.ts` 的子进程留在 `Effect.callback`、外面的库的一次调用留在 Promise）。
+- 子系统文档「为什么这样」里已经否决过的（比如 foundation.md 记着契约按概念分目录、不拆成多个包，规则用手写的例子测、不录黄金数据）。
 - 只是个人口味的写法。
 
 ## 3. 核实每一处

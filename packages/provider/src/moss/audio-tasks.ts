@@ -1,7 +1,19 @@
-import { Effect, Schema } from "effect";
-import { type HttpClient, HttpClientRequest } from "effect/http";
+import { z } from "zod";
 
-import { AudioId, AudioResult, AudioUsage, audioRequest, audioUsage, MossAudioError, type MossAudioUsage } from "./audio-response.ts";
+import type { ProviderHttp } from "../base/http.ts";
+import { codePoints, fromJson, int } from "../base/json.ts";
+import {
+  AudioId,
+  audioMimeMatches,
+  audioRequest,
+  audioResultShape,
+  AudioUsage,
+  audioUsage,
+  boundedAudio,
+  invalidAudioInput,
+  invalidAudioResponse,
+  type MossAudioUsage,
+} from "./audio-response.ts";
 import { type mossSpeechFormats } from "./speech-models.ts";
 
 export interface MossTranscriptionSegment {
@@ -37,44 +49,45 @@ export type MossAudioTask = TaskBase &
       }
   );
 
-const Time = Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }));
+const Time = int();
 const Base = { id: AudioId, created_at: Time, updated_at: Time };
-const ObjectType = Schema.Literals(["audio.speech", "audio.voice_generation", "audio.transcription"]);
-const Waiting = Schema.Struct({ ...Base, object: ObjectType, status: Schema.Literals(["PENDING", "PROCESSING"]) });
-const Failed = Schema.Struct({ ...Base, object: ObjectType, status: Schema.Literal("FAILED") });
-const Audio = Schema.Struct({
+const ObjectType = z.enum(["audio.speech", "audio.voice_generation", "audio.transcription"]);
+const Waiting = z.object({ ...Base, object: ObjectType, status: z.enum(["PENDING", "PROCESSING"]) });
+const Failed = z.object({ ...Base, object: ObjectType, status: z.literal("FAILED") });
+const Audio = z
+  .object({
+    ...Base,
+    object: z.enum(["audio.speech", "audio.voice_generation"]),
+    status: z.literal("SUCCESS"),
+    ...audioResultShape,
+    usage: z.exactOptional(AudioUsage),
+  })
+  .refine(audioMimeMatches);
+const Segment = z
+  .object({
+    speaker: codePoints(1, 256),
+    text: z.string(),
+    start: z.number().min(0),
+    end: z.number().min(0),
+  })
+  .refine((segment) => segment.end >= segment.start);
+const Transcription = z.object({
   ...Base,
-  object: Schema.Literals(["audio.speech", "audio.voice_generation"]),
-  status: Schema.Literal("SUCCESS"),
-  ...AudioResult.fields,
-  usage: Schema.optionalKey(AudioUsage),
-}).check(Schema.makeFilter(Schema.is(AudioResult)));
-const Segment = Schema.Struct({
-  speaker: Schema.String.check(Schema.isBetweenCodePoints(1, 256)),
-  text: Schema.String,
-  start: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)),
-  end: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)),
-}).check(Schema.makeFilter((segment) => segment.end >= segment.start));
-const Transcription = Schema.Struct({
-  ...Base,
-  object: Schema.Literal("audio.transcription"),
-  status: Schema.Literal("SUCCESS"),
-  text: Schema.String,
-  segments: Schema.optionalKey(Schema.Array(Segment).check(Schema.isMaxLength(10000))),
-  usage: Schema.optionalKey(AudioUsage),
+  object: z.literal("audio.transcription"),
+  status: z.literal("SUCCESS"),
+  text: z.string(),
+  segments: z.exactOptional(z.array(Segment).max(10000)),
+  usage: z.exactOptional(AudioUsage),
 });
-const Task = Schema.fromJsonString(
-  Schema.Union([Waiting, Failed, Audio, Transcription]).check(Schema.makeFilter((task) => task.updated_at >= task.created_at)),
-);
+const Task = z.union([Waiting, Failed, Audio, Transcription]).refine((task) => task.updated_at >= task.created_at);
 
-export const getMossAudioTask = Effect.fn("Provider.getMossAudioTask")(
-  function* (key: string, id: string): Effect.fn.Return<MossAudioTask, MossAudioError, HttpClient.HttpClient> {
-    const checked = yield* Schema.decodeEffect(AudioId)(id).pipe(
-      Effect.mapError(() => MossAudioError.make({ reason: "InvalidInput", outcome: "NotSubmitted" })),
-    );
-    const raw = yield* audioRequest(key, HttpClientRequest.get(`https://api.mosi.cn/v1/audio/tasks/${checked}`));
-    const task = yield* Schema.decodeEffect(Task)(raw).pipe(Effect.mapError(() => MossAudioError.make({ reason: "InvalidResponse", outcome: "Unknown" })));
-    if (task.id !== checked) return yield* MossAudioError.make({ reason: "InvalidResponse", outcome: "Unknown" });
+export const getMossAudioTask = (key: string, id: string, http: ProviderHttp): Promise<MossAudioTask> =>
+  boundedAudio(30_000, http, async (signal): Promise<MossAudioTask> => {
+    const checked = AudioId.safeParse(id);
+    if (!checked.success) throw invalidAudioInput();
+    const raw = await audioRequest(key, { method: "GET", url: `https://api.mosi.cn/v1/audio/tasks/${checked.data}` }, http, signal);
+    const task = fromJson(Task, raw);
+    if (task === undefined || task.id !== checked.data) throw invalidAudioResponse();
     const base = { id: task.id, createdAtSeconds: task.created_at, updatedAtSeconds: task.updated_at };
     switch (task.status) {
       case "PENDING":
@@ -105,9 +118,4 @@ export const getMossAudioTask = Effect.fn("Provider.getMossAudioTask")(
             };
         }
     }
-  },
-  Effect.timeoutOrElse({
-    duration: "30 seconds",
-    orElse: () => Effect.fail(MossAudioError.make({ reason: "Timeout", outcome: "Unknown" })),
-  }),
-);
+  });

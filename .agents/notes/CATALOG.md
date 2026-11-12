@@ -22,8 +22,8 @@
 
 ### architecture
 
+- 2026-11-12 [大脑换回上游的 pi-durable](.agents/notes/proposed/architecture/2026-11-12-brain-on-upstream-pi-durable.md)
 - 2026-11-11 [扩展剩余跨模块品牌主键与 SQL 主外键自动品牌生成](.agents/notes/proposed/architecture/2026-11-11-type-driven-boundaries-and-branded-ids.md)
-- 2026-11-11 [普通 TypeScript：不用 Effect、Schema 用 Zod、查询由 SQL 生成 Zod、样式回到 Tailwind v4](.agents/notes/proposed/architecture/2026-11-11-plain-typescript-without-effect.md)
 - 2026-11-10 [一个服务端管多台机器，库换成 Postgres](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)
 - 2026-11-10 [事务提交尾段原子同步、监听地址就绪门与热路径增量投影](.agents/notes/proposed/architecture/2026-11-10-atomic-commits-and-hot-paths.md)
 - 2026-11-07 [让获授权的工作持续推进并可信交付](.agents/notes/proposed/architecture/2026-11-07-authorized-work-and-prompt-design.md)
@@ -37,7 +37,7 @@
 
 ### process
 
-- 2026-11-10 [用 AST 切片、模型判别与单向棘轮收敛五大存量工程债](.agents/notes/proposed/process/2026-11-10-ast-and-model-debt-convergence.md)
+- 2026-11-10 [用 AST 切片、模型判别与单向棘轮收敛三类存量工程债](.agents/notes/proposed/process/2026-11-10-ast-and-model-debt-convergence.md)
 - 2026-10-30 [白皮书里还没做的：骨架、重复 lint、流切片、常驻集合和体检，各在什么时候做](.agents/notes/proposed/process/2026-10-30-whitepaper-checks-that-say-how.md)
 - 2026-10-29 [给仓库做体检：跨区共改、模块深度与代码存活率读数](.agents/notes/proposed/process/2026-10-29-repo-health-readings.md)
 - 2026-10-25 [PR Review：日常评审看证据，同题比较再评分](.agents/notes/proposed/process/2026-10-25-pr-review-scoring.md)

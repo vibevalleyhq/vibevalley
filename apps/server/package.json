@@ -24,31 +24,34 @@
   "dependencies": {
     "@botiverse/oar": "catalog:",
     "@earendil-works/pi-ai": "catalog:",
-    "@effect/platform-node": "catalog:",
-    "@effect/sql-pg": "catalog:",
-    "@effect/sql-pglite": "catalog:",
     "@electric-sql/pglite": "catalog:",
+    "@hono/node-server": "catalog:",
     "@larksuiteoapi/node-sdk": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
     "@vibevalley/agent": "workspace:*",
     "@vibevalley/ai": "workspace:*",
     "@vibevalley/artifact": "workspace:*",
+    "@vibevalley/async": "workspace:*",
     "@vibevalley/home": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/pkm": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
     "@vibevalley/provider": "workspace:*",
     "agora-agents": "catalog:",
-    "effect": "catalog:",
+    "hono": "catalog:",
     "music-metadata": "catalog:",
-    "yaml": "catalog:"
+    "pg": "catalog:",
+    "undici": "catalog:",
+    "ws": "catalog:",
+    "yaml": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "@types/ws": "catalog:",
     "@vibevalley/testkit": "workspace:*",
     "typescript": "catalog:",
-    "vite-plus": "catalog:",
-    "vitest": "catalog:"
+    "vite-plus": "catalog:"
   }
 }

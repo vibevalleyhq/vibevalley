@@ -1,5 +1,6 @@
-import { Effect, Schema } from "effect";
+import { z } from "zod";
 
+import { mapConcurrent, Semaphore } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 
 import type { GitHubRun } from "./github.ts";
@@ -45,60 +46,60 @@ export interface GitHubPullSnapshot {
   readonly comments: readonly GitHubComment[];
 }
 
-const Actor = Schema.NullOr(Schema.Struct({ login: Schema.String, __typename: Schema.String }));
-const Review = Schema.Struct({ id: Schema.String, author: Actor, state: Schema.String, body: Schema.String, submittedAt: Schema.NullOr(Schema.String) });
-const commentFields = { id: Schema.String, author: Actor, body: Schema.String, url: Schema.String, createdAt: Schema.String };
-const Comment = Schema.Struct(commentFields);
-const ReviewComment = Schema.Struct({
+const Actor = z.object({ login: z.string(), __typename: z.string() }).nullable();
+const Review = z.object({ id: z.string(), author: Actor, state: z.string(), body: z.string(), submittedAt: z.string().nullable() });
+const commentFields = { id: z.string(), author: Actor, body: z.string(), url: z.string(), createdAt: z.string() };
+const Comment = z.object(commentFields);
+const ReviewComment = z.object({
   ...commentFields,
-  fullDatabaseId: Schema.NullOr(Schema.Union([Schema.String, Schema.Int])),
-  path: Schema.String,
-  line: Schema.NullOr(Schema.Int),
-  originalLine: Schema.NullOr(Schema.Int),
-  diffHunk: Schema.String,
-  pullRequestReview: Schema.NullOr(Schema.Struct({ id: Schema.String })),
+  fullDatabaseId: z.union([z.string(), z.number().int()]).nullable(),
+  path: z.string(),
+  line: z.number().int().nullable(),
+  originalLine: z.number().int().nullable(),
+  diffHunk: z.string(),
+  pullRequestReview: z.object({ id: z.string() }).nullable(),
 });
-const Thread = Schema.Struct({
-  id: Schema.String,
-  isResolved: Schema.Boolean,
-  comments: Schema.Struct({ totalCount: Schema.Int, edges: Schema.Array(Schema.Struct({ cursor: Schema.String, node: ReviewComment })) }),
+const Thread = z.object({
+  id: z.string(),
+  isResolved: z.boolean(),
+  comments: z.object({ totalCount: z.number().int(), edges: z.array(z.object({ cursor: z.string(), node: ReviewComment })) }),
 });
-const Check = Schema.Union([
-  Schema.Struct({
-    __typename: Schema.Literal("CheckRun"),
-    name: Schema.String,
-    status: Schema.String,
-    conclusion: Schema.NullOr(Schema.String),
-    detailsUrl: Schema.NullOr(Schema.String),
+const Check = z.discriminatedUnion("__typename", [
+  z.object({
+    __typename: z.literal("CheckRun"),
+    name: z.string(),
+    status: z.string(),
+    conclusion: z.string().nullable(),
+    detailsUrl: z.string().nullable(),
   }),
-  Schema.Struct({ __typename: Schema.Literal("StatusContext"), context: Schema.String, state: Schema.String, targetUrl: Schema.NullOr(Schema.String) }),
+  z.object({ __typename: z.literal("StatusContext"), context: z.string(), state: z.string(), targetUrl: z.string().nullable() }),
 ]);
-const connection = <A, I>(node: Schema.Codec<A, I>) => Schema.Struct({ nodes: Schema.Array(node) });
-const pullPages = <A, I>(pull: Schema.Codec<A, I>) =>
-  Schema.Array(
-    Schema.Struct({
-      data: Schema.Struct({
-        repository: Schema.Struct({ pullRequest: pull }),
+const connection = <A extends z.ZodType>(node: A) => z.object({ nodes: z.array(node) });
+const pullPages = <A extends z.ZodType>(pull: A) =>
+  z.array(
+    z.object({
+      data: z.object({
+        repository: z.object({ pullRequest: pull }),
       }),
     }),
   );
-const checkPages = Schema.Array(
-  Schema.Struct({
-    data: Schema.Struct({
-      repository: Schema.Struct({
-        object: Schema.Struct({ statusCheckRollup: Schema.NullOr(Schema.Struct({ contexts: connection(Check) })) }),
+const checkPages = z.array(
+  z.object({
+    data: z.object({
+      repository: z.object({
+        object: z.object({ statusCheckRollup: z.object({ contexts: connection(Check) }).nullable() }),
       }),
     }),
   }),
 );
-const commentPages = Schema.Array(Schema.Struct({ data: Schema.Struct({ node: Schema.Struct({ comments: connection(ReviewComment) }) }) }));
+const commentPages = z.array(z.object({ data: z.object({ node: z.object({ comments: connection(ReviewComment) }) }) }));
 const actorFields = "author{login __typename}";
 const reviewCommentFields = `id fullDatabaseId ${actorFields} body url createdAt path line originalLine diffHunk pullRequestReview{id}`;
 const pageInfo = "pageInfo{hasNextPage endCursor}";
 const pullQuery = (operation: string, fields: string) =>
   `query ${operation}($owner:String!,$repo:String!,$number:Int!,$endCursor:String){repository(owner:$owner,name:$repo){pullRequest(number:$number){${fields}}}}`;
 
-const authorOf = (author: typeof Actor.Type) => ({
+const authorOf = (author: z.infer<typeof Actor>) => ({
   author: author?.login ?? "",
   bot: author?.__typename === "Bot" || author?.login.endsWith("[bot]") === true,
 });
@@ -106,22 +107,34 @@ const authorOf = (author: typeof Actor.Type) => ({
 /** The Actions job id in a check's details URL, or "" for a check that is not an Actions job. */
 export const actionsJobOf = (url: string) => /\/job\/(\d+)/u.exec(url)?.[1] ?? "";
 
-export const makeGithubSnapshot = (gh: GitHubRun, githubRemote: (name: string) => Effect.Effect<string, RepoError>) =>
-  Effect.fn("Repo.githubSnapshot")(function* (name: string, n: number): Effect.fn.Return<GitHubPullSnapshot, RepoError> {
-    const repo = yield* githubRemote(name);
-    const unread = () => RepoError.make({ message: t("server.repo.github.stateUnread", { n }) });
-    const read = Effect.fn("Repo.githubRead")(function* <A, I>(schema: Schema.Codec<A, I>, args: readonly string[]) {
-      const response = yield* gh(...args);
-      if (!response.ok) return yield* unread();
-      return yield* Schema.decodeEffect(Schema.fromJsonString(schema))(response.out).pipe(Effect.mapError(unread));
-    });
-    const head = (yield* read(Schema.Struct({ headRefOid: Schema.String }), ["pr", "view", String(n), "--repo", repo, "--json", "headRefOid"])).headRefOid;
+export const makeGithubSnapshot =
+  (gh: GitHubRun, githubRemote: (name: string) => Promise<string>) =>
+  async (name: string, n: number): Promise<GitHubPullSnapshot> => {
+    const repo = await githubRemote(name);
+    const unread = () => new RepoError(t("server.repo.github.stateUnread", { n }));
+    const read = async <S extends z.ZodType>(schema: S, args: readonly string[]): Promise<z.output<S>> => {
+      const response = await gh(...args);
+      if (!response.ok) throw unread();
+      let raw: unknown;
+      try {
+        raw = JSON.parse(response.out);
+      } catch {
+        // gh said something that is not JSON: not its answer.
+        throw unread();
+      }
+      const got = schema.safeParse(raw);
+      if (!got.success) throw unread();
+      return got.data;
+    };
+    const head = (await read(z.object({ headRefOid: z.string() }), ["pr", "view", String(n), "--repo", repo, "--json", "headRefOid"])).headRefOid;
     const [owner = "", repository = ""] = repo.split("/", 2);
     const variables = ["-f", `owner=${owner}`, "-f", `repo=${repository}`, "-F", `number=${n}`];
     const graphql = (query: string, fields: readonly string[] = variables) => ["api", "graphql", "--paginate", "--slurp", "-f", `query=${query}`, ...fields];
-    const [viewer, checks, reviews, comments, threads] = yield* Effect.all(
-      [
-        read(Schema.Struct({ login: Schema.String }), ["api", "user"]),
+    // Four of the five reads at a time, as gh is asked elsewhere too.
+    const four = new Semaphore(4);
+    const [viewer, checks, reviews, comments, threads] = await Promise.all([
+      four.with(() => read(z.object({ login: z.string() }), ["api", "user"])),
+      four.with(() =>
         read(
           checkPages,
           graphql(
@@ -129,16 +142,22 @@ export const makeGithubSnapshot = (gh: GitHubRun, githubRemote: (name: string) =
             ["-f", `owner=${owner}`, "-f", `repo=${repository}`, "-f", `head=${head}`],
           ),
         ),
+      ),
+      four.with(() =>
         read(
-          pullPages(Schema.Struct({ reviews: connection(Review) })),
+          pullPages(z.object({ reviews: connection(Review) })),
           graphql(pullQuery("PullReviews", `reviews(first:100,after:$endCursor){nodes{id ${actorFields} state body submittedAt} ${pageInfo}}`)),
         ),
+      ),
+      four.with(() =>
         read(
-          pullPages(Schema.Struct({ comments: connection(Comment) })),
+          pullPages(z.object({ comments: connection(Comment) })),
           graphql(pullQuery("PullComments", `comments(first:100,after:$endCursor){nodes{id ${actorFields} body url createdAt} ${pageInfo}}`)),
         ),
+      ),
+      four.with(() =>
         read(
-          pullPages(Schema.Struct({ reviewThreads: connection(Thread) })),
+          pullPages(z.object({ reviewThreads: connection(Thread) })),
           graphql(
             pullQuery(
               "PullThreads",
@@ -146,48 +165,46 @@ export const makeGithubSnapshot = (gh: GitHubRun, githubRemote: (name: string) =
             ),
           ),
         ),
-      ],
-      { concurrency: 4 },
-    );
-    if (!viewer.login) return yield* unread();
-    const inline = yield* Effect.forEach(
+      ),
+    ]);
+    if (!viewer.login) throw unread();
+    const inline = await mapConcurrent(
       threads.flatMap((page) => page.data.repository.pullRequest.reviewThreads.nodes),
-      (thread) =>
-        Effect.gen(function* () {
-          const nodes = thread.comments.edges.map((edge) => edge.node);
-          if (thread.comments.totalCount > nodes.length) {
-            const cursor = thread.comments.edges.at(-1)?.cursor;
-            if (!cursor) return yield* unread();
-            const more = yield* read(
-              commentPages,
-              graphql(
-                `query PullThreadComments($id:ID!,$endCursor:String){node(id:$id){... on PullRequestReviewThread{comments(first:100,after:$endCursor){nodes{${reviewCommentFields}} ${pageInfo}}}}}`,
-                ["-f", `id=${thread.id}`, "-f", `endCursor=${cursor}`],
-              ),
-            );
-            for (const page of more) nodes.push(...page.data.node.comments.nodes);
-          }
-          return nodes.map((comment): GitHubComment => {
-            const line = comment.line ?? comment.originalLine;
-            const fullId = comment.fullDatabaseId;
-            const databaseId = typeof fullId === "string" ? fullId : fullId !== null && Number.isSafeInteger(fullId) ? String(fullId) : undefined;
-            return {
-              id: comment.id,
-              ...(databaseId === undefined ? {} : { databaseId }),
-              ...authorOf(comment.author),
-              body: comment.body,
-              url: comment.url,
-              at: comment.createdAt,
-              ...(comment.pullRequestReview ? { reviewId: comment.pullRequestReview.id } : {}),
-              path: comment.path,
-              ...(line === null ? {} : { line }),
-              diffHunk: comment.diffHunk,
-              threadId: thread.id,
-              resolved: thread.isResolved,
-            };
-          });
-        }),
-      { concurrency: 4 },
+      4,
+      async (thread) => {
+        const nodes = thread.comments.edges.map((edge) => edge.node);
+        if (thread.comments.totalCount > nodes.length) {
+          const cursor = thread.comments.edges.at(-1)?.cursor;
+          if (!cursor) throw unread();
+          const more = await read(
+            commentPages,
+            graphql(
+              `query PullThreadComments($id:ID!,$endCursor:String){node(id:$id){... on PullRequestReviewThread{comments(first:100,after:$endCursor){nodes{${reviewCommentFields}} ${pageInfo}}}}}`,
+              ["-f", `id=${thread.id}`, "-f", `endCursor=${cursor}`],
+            ),
+          );
+          for (const page of more) nodes.push(...page.data.node.comments.nodes);
+        }
+        return nodes.map((comment): GitHubComment => {
+          const line = comment.line ?? comment.originalLine;
+          const fullId = comment.fullDatabaseId;
+          const databaseId = typeof fullId === "string" ? fullId : fullId !== null && Number.isSafeInteger(fullId) ? String(fullId) : undefined;
+          return {
+            id: comment.id,
+            ...(databaseId === undefined ? {} : { databaseId }),
+            ...authorOf(comment.author),
+            body: comment.body,
+            url: comment.url,
+            at: comment.createdAt,
+            ...(comment.pullRequestReview ? { reviewId: comment.pullRequestReview.id } : {}),
+            path: comment.path,
+            ...(line === null ? {} : { line }),
+            diffHunk: comment.diffHunk,
+            threadId: thread.id,
+            resolved: thread.isResolved,
+          };
+        });
+      },
     );
     return {
       viewer: viewer.login,
@@ -222,4 +239,4 @@ export const makeGithubSnapshot = (gh: GitHubRun, githubRemote: (name: string) =
         ...inline.flat(),
       ],
     };
-  });
+  };

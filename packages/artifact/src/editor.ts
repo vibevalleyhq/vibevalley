@@ -533,7 +533,6 @@ export class BlockEditor {
         }
         let ack;
         try {
-          // oxlint-disable-next-line eslint/no-await-in-loop -- one batch in flight at a time: the next is built on this one's ack
           ack = await this.api.artifact.submit({ id: this.artifactId, batchId: batch.id, lastSeq: this.seq, ops: batch.ops });
         } catch (e) {
           this.error = t("web.artifact.blocks.notSaved", { why: this.formatError(e) });

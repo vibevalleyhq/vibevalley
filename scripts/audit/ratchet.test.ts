@@ -2,7 +2,7 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { grownRules, ratchetProblems, type RatchetWords } from "./ratchet.ts";
 
-const words: RatchetWords = { write: "vp run effect:write", see: "See x.md", cleared: () => 'Fix: set it to "error".' };
+const words: RatchetWords = { write: "vp run health:write", see: "See x.md", cleared: () => 'Fix: set it to "error".' };
 
 describe("a ratchet", () => {
   const kept = { globalJson: { "apps/server": 3, "packages/ai": 1 } };
@@ -25,7 +25,7 @@ describe("a ratchet", () => {
 
   test("fewer hits fail too, until the ratchet is written down", () => {
     const problems = ratchetProblems(kept, { globalJson: { "apps/server": 2, "packages/ai": 1 } }, words);
-    expect(problems).toEqual([expect.stringMatching(/down to 2 .*vp run effect:write/u)]);
+    expect(problems).toEqual([expect.stringMatching(/down to 2 .*vp run health:write/u)]);
   });
 
   test("a rule with nothing left says what to do, when the check has something to say", () => {

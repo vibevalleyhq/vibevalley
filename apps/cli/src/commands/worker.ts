@@ -1,27 +1,25 @@
-import { Config, Effect, FileSystem, Schema } from "effect";
-import { Argument, Command, Flag, GlobalFlag } from "effect/cli";
-import { HttpClient, HttpClientRequest } from "effect/http";
+import { readFile } from "node:fs/promises";
+
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 
-import { DryRunFlag, show } from "#/base/format.ts";
+import { show } from "#/base/format.ts";
 import { exit, Failure } from "#/base/output.ts";
+import { arg, command, group, type Spec } from "#/infra/command.ts";
 
-export const WorkerAccessFlag = GlobalFlag.Setting("worker-access-file")({
-  flag: Flag.String("worker-access-file").pipe(Flag.withFallbackConfig(Config.String("VIBEVALLEY_WORKER_ACCESS_FILE")), Flag.withDefault("")),
-});
-const credentials = Schema.fromJsonString(Schema.Struct({ endpoint: Schema.String, token: Schema.String }));
+const Credentials = z.object({ endpoint: z.string(), token: z.string() });
 
-const response = Schema.Struct({
-  result: Schema.optionalKey(
-    Schema.Struct({
-      isError: Schema.optionalKey(Schema.Boolean),
-      content: Schema.Array(Schema.Struct({ type: Schema.Literal("text"), text: Schema.String })),
+const Response = z.object({
+  result: z.exactOptional(
+    z.object({
+      isError: z.exactOptional(z.boolean()),
+      content: z.array(z.object({ type: z.literal("text"), text: z.string() })),
     }),
   ),
-  error: Schema.optionalKey(Schema.Unknown),
+  error: z.exactOptional(z.unknown()),
 });
-const refused = () => Failure.make({ code: exit.refused, tag: "WorkerAccess", text: t("cli.worker.failed") });
+const refused = () => new Failure({ code: exit.refused, tag: "WorkerAccess", text: t("cli.worker.failed") });
 const operations = {
   report: { tool: "issue_report", about: "cli.worker.report" },
   "pr-submit": { tool: "issue_pr_submit", about: "cli.worker.pr" },
@@ -30,52 +28,60 @@ const operations = {
   doctor: { tool: "session_list", about: "cli.worker.doctor" },
 } as const;
 
-export const workerCommand = Command.make("worker").pipe(
-  Command.withDescription(t("cli.worker.about")),
-  Command.withSubcommands(
-    Object.entries(operations).map(([name, { tool, about }]) =>
-      Command.make(name, { input: Argument.String("json").pipe(Argument.withDefault("{}"), Argument.withDescription(t("cli.worker.json"))) }, ({ input }) =>
-        Effect.gen(function* () {
-          const file = yield* WorkerAccessFlag;
-          if (!file || (yield* DryRunFlag)) return yield* refused();
-          const fs = yield* FileSystem.FileSystem;
-          const { endpoint, token } = yield* fs.readFileString(file).pipe(Effect.flatMap(Schema.decodeEffect(credentials)), Effect.mapError(refused));
-          if (!token || !/^http:\/\/127\.0\.0\.1:\d+\/mcp$/u.test(endpoint)) return yield* refused();
-          const args = yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)))(input).pipe(Effect.mapError(refused));
-          const request = yield* HttpClientRequest.bodyJson(HttpClientRequest.post(endpoint), {
-            jsonrpc: "2.0",
-            id: 1,
-            method: "tools/call",
-            params: { name: tool, arguments: args },
+/** text as JSON decoded by schema; any failure (unreadable, not JSON, not that shape) is the same refusal, saying nothing of why. */
+const decodedOr = <A>(schema: z.ZodType<A>, text: string): A => {
+  try {
+    return schema.parse(JSON.parse(text));
+  } catch {
+    // Said as one refusal: the credential's contents are never echoed.
+    throw refused();
+  }
+};
+
+export const workerCommand: Spec = group(
+  "worker",
+  t("cli.worker.about"),
+  Object.entries(operations).map(([name, { tool, about }]) =>
+    command(name, {
+      about: t(about),
+      params: { input: arg.textOr("json", "{}", "cli.worker.json") },
+      run: async ({ input }, ctx) => {
+        const file = ctx.flags.workerAccessFile;
+        if (!file || ctx.flags.dryRun) throw refused();
+        const text = await readFile(file, "utf8").catch(() => {
+          throw refused();
+        });
+        const { endpoint, token } = decodedOr(Credentials, text);
+        if (!token || !/^http:\/\/127\.0\.0\.1:\d+\/mcp$/u.test(endpoint)) throw refused();
+        const args = decodedOr(z.record(z.string(), z.unknown()), input);
+        let reply: globalThis.Response;
+        try {
+          reply = await ctx.fetch(endpoint, {
+            method: "POST",
+            headers: { authorization: "Bearer " + token, accept: "application/json, text/event-stream", "content-type": "application/json" },
+            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: tool, arguments: args } }),
+            signal: ctx.signal,
           });
-          const client = yield* HttpClient.HttpClient;
-          const reply = yield* client
-            .execute(
-              request.pipe(
-                HttpClientRequest.setHeaders({
-                  authorization: "Bearer " + token,
-                  accept: "application/json, text/event-stream",
-                }),
-              ),
-            )
-            .pipe(Effect.mapError(refused));
-          if (reply.status !== 200) return yield* refused();
-          const body = yield* reply.json.pipe(Effect.flatMap(Schema.decodeUnknownEffect(response)), Effect.mapError(refused));
-          if (body.error !== undefined || !body.result) return yield* refused();
-          if (body.result.isError === true)
-            return yield* Failure.make({
-              code: exit.refused,
-              tag: "WorkerTool",
-              text:
-                body.result.content
-                  .map((item) => item.text)
-                  .join("")
-                  .replaceAll(token, "[redacted]")
-                  .slice(0, 8000) || t("cli.worker.failed"),
-            });
-          yield* show(body.result, (result) => result.content.map((item) => item.text).join(""));
-        }).pipe(Effect.scoped),
-      ).pipe(Command.withDescription(t(about))),
-    ),
+        } catch {
+          // Unreachable: the same refusal, without the endpoint's details.
+          throw refused();
+        }
+        if (reply.status !== 200) throw refused();
+        const body = decodedOr(Response, await reply.text().catch(() => ""));
+        if (body.error !== undefined || !body.result) throw refused();
+        if (body.result.isError === true)
+          throw new Failure({
+            code: exit.refused,
+            tag: "WorkerTool",
+            text:
+              body.result.content
+                .map((item) => item.text)
+                .join("")
+                .replaceAll(token, "[redacted]")
+                .slice(0, 8000) || t("cli.worker.failed"),
+          });
+        show(ctx, body.result, (result) => result.content.map((item) => item.text).join(""));
+      },
+    }),
   ),
 );

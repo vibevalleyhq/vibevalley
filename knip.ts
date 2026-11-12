@@ -17,10 +17,8 @@ const config: KnipConfig = {
     ".": {
       entry: ["scripts/*/*.ts"],
       project: ["scripts/**/*.ts"],
-      // Named by tools, not imports: effect-tsgo runs in vite.config.ts's effect:check, effect is the version it checks
-      // against, tsconfig.base.json names the editor plugin @effect/language-service, and lightningcss/parse5 stay in the
-      // root catalog until the next lockfile prune.
-      ignoreDependencies: ["@effect/tsgo", "effect", "@effect/language-service", "lightningcss", "parse5"],
+      // lightningcss/parse5 stay in the root catalog until the next lockfile prune.
+      ignoreDependencies: ["lightningcss", "parse5"],
     },
     "apps/server": {
       // main.ts and chat.ts run through vpx (`vp run start`, `vp run chat`, the desktop app and the e2e), which knip does
@@ -37,11 +35,15 @@ const config: KnipConfig = {
     "apps/web": {
       entry: ["index.html", "stories.html", "src/stories.tsx", "vite.stories.config.ts", "test/**/*.ts"],
       project: ["src/**/*.{ts,tsx}", "test/**/*.ts"],
+      // Imported by src/style.css (@import "tailwindcss/…"), which knip does not read.
+      ignoreDependencies: ["tailwindcss"],
     },
     "apps/site": {
       // scripts/images.ts reads the scene exports through Vite's ssrLoadModule.
       entry: ["src/{App,Document}.tsx", "src/base/scene.ts", "scripts/*.ts", "test/**/*.ts", "test/prerender/fixture/{App,Document}.tsx"],
       project: ["src/**/*.{ts,tsx}", "scripts/**/*.ts", "test/**/*.{ts,tsx}"],
+      // Imported by the site's stylesheet once it is on Tailwind (vv-tailwind); knip does not read CSS either way.
+      ignoreDependencies: ["tailwindcss"],
     },
     "apps/desktop": {
       entry: ["src/main.ts", "src/preload/preload.ts", "scripts/*.ts", "test/**/*.ts"],
@@ -61,7 +63,7 @@ const config: KnipConfig = {
     },
     "packages/tsrs": {
       // Run by path from its shell scripts (bin/tsgolint, tsdk/tsgo), which knip does not read.
-      ignoreDependencies: ["tsrs", "@effect/tsgo"],
+      ignoreDependencies: ["tsrs"],
     },
     "packages/base-ui": {
       project: ["src/**/*.{ts,tsx}"],

@@ -1,7 +1,6 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
-import { Schema } from "effect";
 import { Match, Switch, untrack } from "solid-js";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 
@@ -34,31 +33,7 @@ import { places } from "./places";
 import { Root } from "./Root";
 import { Shell } from "./Shell";
 
-const styles = stylex.create({
-  missingPageLink: {
-    color: "var(--color-accent)",
-    textDecorationLine: "underline",
-  },
-  routeMissing: {
-    display: "grid",
-    height: "100%",
-    placeContent: "center",
-    gap: "1rem",
-    backgroundColor: "var(--color-page)",
-    padding: "1.5rem",
-    color: "var(--color-ink)",
-  },
-  missingPageH1: {
-    fontSize: "var(--text-lg)",
-    lineHeight: "var(--leading-lg)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  appDiv: {
-    height: "100%",
-  },
-});
-
-const farmRoute = route("/farm/:repo", { params: Schema.Struct({ repo: Schema.String.check(Schema.isMinLength(1)) }) });
+const farmRoute = route("/farm/:repo", { params: z.object({ repo: z.string().min(1) }) });
 
 function page(path: string, place: string, render: (rest: () => string) => JSX.Element, search?: SearchCheck): RouteDefinition {
   const pattern = route(`${path}/*`, search ? { search } : undefined);
@@ -95,9 +70,9 @@ function RepoFarm() {
 
 function MissingPage(props: { invalid?: boolean }) {
   return (
-    <main data-testid="route-missing" {...stylex.attrs(styles.routeMissing)}>
-      <h1 {...stylex.attrs(styles.missingPageH1)}>{props.invalid === true ? t("web.base.route.invalid") : t("web.base.route.missing")}</h1>
-      <Link href="/" {...stylex.attrs(styles.missingPageLink)}>
+    <main data-testid="route-missing" class="grid h-full place-content-center gap-4 bg-page p-6 text-ink">
+      <h1 class="text-lg font-semibold">{props.invalid === true ? t("web.base.route.invalid") : t("web.base.route.missing")}</h1>
+      <Link href="/" class="text-accent underline">
         {t("web.base.route.home")}
       </Link>
     </main>
@@ -118,7 +93,7 @@ const routes: readonly RouteDefinition[] = [
       { path: farmRoute, meta: { skin: "farm" }, component: RepoFarm },
       page("/issues", "issues", (rest) => <IssuesPage rest={rest()} />, issueSearch),
       page("/chat", "chat", () => (
-        <div {...stylex.attrs(styles.appDiv)}>
+        <div class="h-full">
           <ChatPage />
         </div>
       )),

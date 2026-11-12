@@ -1,7 +1,7 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
-export const SkillInput = Schema.Struct({
-  name: Schema.Trim.check(Schema.isMinLength(1)),
-  description: Schema.String,
-  body: Schema.String.check(Schema.isPattern(/\S/u)),
+export const SkillInput = z.object({
+  name: z.string().trim().min(1),
+  description: z.string(),
+  body: z.string().regex(/\S/u),
 });

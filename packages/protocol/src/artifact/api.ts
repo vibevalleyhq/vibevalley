@@ -1,6 +1,6 @@
-import { type Effect, Schema } from "effect";
+import { z } from "zod";
 
-import { type ApiError, type Endpoint, input } from "../endpoint";
+import { type Endpoint, input } from "../endpoint";
 import * as S from "../schema";
 import type * as T from "../shapes";
 
@@ -8,46 +8,46 @@ const artifactDeleteInput = input({ id: S.ArtifactId });
 const artifactBlockDeleteInput = input({ id: S.ArtifactId }, S.BlockDelete);
 const artifactSuggestionInput = input({ id: S.ArtifactId, suggestion: S.SuggestionId });
 
-export interface ArtifactHandlers<R = never> {
+export interface ArtifactHandlers {
   /** The artifacts announced in a channel or made for an issue, newest change first; every one the farm has when neither is given. */
-  readonly "artifact.list": (a: T.ArtifactListRequest) => Effect.Effect<T.Artifact[], ApiError, R>;
-  readonly "artifact.get": (a: { readonly id: T.ArtifactId }) => Effect.Effect<T.Artifact, ApiError, R>;
+  readonly "artifact.list": (a: T.ArtifactListRequest) => Promise<T.Artifact[]>;
+  readonly "artifact.get": (a: { readonly id: T.ArtifactId }) => Promise<T.Artifact>;
   /** Its words: an html one's version as made, a blocks one's Markdown now (its version is its seq). What an agent reads
    * to make the next one. */
-  readonly "artifact.content.get": (a: T.ArtifactReadRequest) => Effect.Effect<T.ArtifactContent, ApiError, R>;
+  readonly "artifact.content.get": (a: T.ArtifactReadRequest) => Promise<T.ArtifactContent>;
   /** Without content, an empty blocks one to write in; with content, a hand-in its maker announces with its card. */
-  readonly "artifact.create": (a: T.ArtifactRequest) => Effect.Effect<T.Artifact, ApiError, R>;
+  readonly "artifact.create": (a: T.ArtifactRequest) => Promise<T.Artifact>;
   /** An html one's new version over the latest. the old ones stay. */
-  readonly "artifact.version.create": (a: T.ArtifactVersionRequest) => Effect.Effect<T.Artifact, ApiError, R>;
+  readonly "artifact.version.create": (a: T.ArtifactVersionRequest) => Promise<T.Artifact>;
   /** The user's words in place of some in an html one's page: the next version, the rest of its bytes as they were. */
-  readonly "artifact.html.edit": (a: T.ArtifactHtmlEdit) => Effect.Effect<T.Artifact, ApiError, R>;
+  readonly "artifact.html.edit": (a: T.ArtifactHtmlEdit) => Promise<T.Artifact>;
   /** Its title, as the user renames it. */
-  readonly "artifact.update": (a: T.ArtifactUpdateRequest) => Effect.Effect<T.Artifact, ApiError, R>;
-  readonly "artifact.delete": (a: { readonly id: T.ArtifactId }) => Effect.Effect<void, ApiError, R>;
-  readonly "artifact.previewDelete": (a: { readonly id: T.ArtifactId }) => Effect.Effect<T.Preview, ApiError, R>;
+  readonly "artifact.update": (a: T.ArtifactUpdateRequest) => Promise<T.Artifact>;
+  readonly "artifact.delete": (a: { readonly id: T.ArtifactId }) => Promise<void>;
+  readonly "artifact.previewDelete": (a: { readonly id: T.ArtifactId }) => Promise<T.Preview>;
   /** A blocks artifact and every live block (no tombstones), in order. */
-  readonly "artifact.block.list": (a: { readonly id: T.ArtifactId }) => Effect.Effect<T.BlockSnapshot, ApiError, R>;
+  readonly "artifact.block.list": (a: { readonly id: T.ArtifactId }) => Promise<T.BlockSnapshot>;
   /** A batch of ops, as the user: taken in order, in one transaction, one batch at a time. */
-  readonly "artifact.submit": (a: { readonly id: T.ArtifactId } & T.BlockSubmit) => Effect.Effect<T.BlockAck, ApiError, R>;
+  readonly "artifact.submit": (a: { readonly id: T.ArtifactId } & T.BlockSubmit) => Promise<T.BlockAck>;
   /** One block inserted, as one batch of one op. */
-  readonly "artifact.block.create": (a: { readonly id: T.ArtifactId } & T.BlockCreate) => Effect.Effect<T.BlockOpResult, ApiError, R>;
+  readonly "artifact.block.create": (a: { readonly id: T.ArtifactId } & T.BlockCreate) => Promise<T.BlockOpResult>;
   /** One block's words, type or attrs changed, as one batch. */
-  readonly "artifact.block.update": (a: { readonly id: T.ArtifactId } & T.BlockUpdate) => Effect.Effect<T.BlockOpResult, ApiError, R>;
+  readonly "artifact.block.update": (a: { readonly id: T.ArtifactId } & T.BlockUpdate) => Promise<T.BlockOpResult>;
   /** One block and its children put in their tombstones. */
-  readonly "artifact.block.delete": (a: { readonly id: T.ArtifactId } & T.BlockDelete) => Effect.Effect<T.BlockOpResult, ApiError, R>;
-  readonly "artifact.block.previewDelete": (a: { readonly id: T.ArtifactId } & T.BlockDelete) => Effect.Effect<T.Preview, ApiError, R>;
+  readonly "artifact.block.delete": (a: { readonly id: T.ArtifactId } & T.BlockDelete) => Promise<T.BlockOpResult>;
+  readonly "artifact.block.previewDelete": (a: { readonly id: T.ArtifactId } & T.BlockDelete) => Promise<T.Preview>;
   /** The open and resolved suggestions on an artifact, oldest first. */
-  readonly "artifact.suggestion.list": (a: { readonly id: T.ArtifactId }) => Effect.Effect<T.Suggestion[], ApiError, R>;
+  readonly "artifact.suggestion.list": (a: { readonly id: T.ArtifactId }) => Promise<T.Suggestion[]>;
   /** A change an agent proposes to a block the user wrote. */
-  readonly "artifact.suggestion.create": (a: { readonly id: T.ArtifactId } & T.SuggestionCreate) => Effect.Effect<T.Suggestion, ApiError, R>;
+  readonly "artifact.suggestion.create": (a: { readonly id: T.ArtifactId } & T.SuggestionCreate) => Promise<T.Suggestion>;
   /** The user takes a suggestion; a block that moved on since it was read comes back stale, and is not changed. */
-  readonly "artifact.suggestion.accept": (a: { readonly id: T.ArtifactId; readonly suggestion: T.SuggestionId }) => Effect.Effect<T.Suggestion, ApiError, R>;
-  readonly "artifact.suggestion.reject": (a: { readonly id: T.ArtifactId; readonly suggestion: T.SuggestionId }) => Effect.Effect<T.Suggestion, ApiError, R>;
+  readonly "artifact.suggestion.accept": (a: { readonly id: T.ArtifactId; readonly suggestion: T.SuggestionId }) => Promise<T.Suggestion>;
+  readonly "artifact.suggestion.reject": (a: { readonly id: T.ArtifactId; readonly suggestion: T.SuggestionId }) => Promise<T.Suggestion>;
   /** A blocks artifact as Markdown: the format artifacts trade with agents and MEMORY.md in, not how they are stored. */
-  readonly "artifact.markdown.get": (a: { readonly id: T.ArtifactId }) => Effect.Effect<T.ArtifactMarkdown, ApiError, R>;
+  readonly "artifact.markdown.get": (a: { readonly id: T.ArtifactId }) => Promise<T.ArtifactMarkdown>;
   /** Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
    * one already running is refused. */
-  readonly "artifact.demo": (a: { readonly id: T.ArtifactId }) => Effect.Effect<void, ApiError, R>;
+  readonly "artifact.demo": (a: { readonly id: T.ArtifactId }) => Promise<void>;
 }
 
 export const artifactEndpoints: readonly Endpoint[] = [
@@ -55,7 +55,7 @@ export const artifactEndpoints: readonly Endpoint[] = [
     op: "artifact.list",
     about: [],
     input: S.ArtifactListRequest,
-    result: Schema.mutable(Schema.Array(S.Artifact)),
+    result: z.array(S.Artifact),
     can: ["user", "remote", "orchestrator", "session"],
   },
   {
@@ -162,7 +162,7 @@ export const artifactEndpoints: readonly Endpoint[] = [
     op: "artifact.suggestion.list",
     about: ["id"],
     input: input({ id: S.ArtifactId }),
-    result: Schema.mutable(Schema.Array(S.Suggestion)),
+    result: z.array(S.Suggestion),
     can: ["user", "remote"],
   },
   {

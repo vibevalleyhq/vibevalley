@@ -10,7 +10,7 @@ flowchart LR
     RTC[Agora Web SDK<br/>音频和字幕]
   end
 
-  subgraph Server[apps/server · Effect · 127.0.0.1:8787]
+  subgraph Server[apps/server · Hono · 127.0.0.1:8787]
     API[handlers<br/>VibeValleyApi、三条 SSE]
     SITE[Core<br/>核心状态 SpaceState]
     FM[助手<br/>VibeValley agent + 派活工具]

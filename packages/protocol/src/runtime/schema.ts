@@ -1,126 +1,136 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import { Look } from "../agent/schema";
 import type { Codec } from "../codec";
 import * as T from "./shapes";
 
-const RuntimeQuota: Codec<T.RuntimeQuota> = Schema.Struct({
-  left: Schema.optionalKey(Schema.Finite),
-  text: Schema.String,
-});
+const RuntimeQuota = z.object({
+  left: z.exactOptional(z.number()),
+  text: z.string(),
+}) satisfies Codec<T.RuntimeQuota>;
 
-export const RuntimePreset: Codec<T.RuntimePreset> = Schema.Struct({
-  id: Schema.String,
-  label: Schema.String,
-  blurb: Schema.String,
+export const RuntimePreset = z.object({
+  id: z.string(),
+  label: z.string(),
+  blurb: z.string(),
   look: Look,
-});
+}) satisfies Codec<T.RuntimePreset>;
 
-const RuntimeCapability: Codec<T.RuntimeCapability> = Schema.Literals(T.RuntimeCapabilityValues);
+const RuntimeCapability = z.enum(T.RuntimeCapabilityValues) satisfies Codec<T.RuntimeCapability>;
 
-export const RuntimeSupport: Codec<T.RuntimeSupport> = Schema.Struct({
-  steer: Schema.Boolean,
-  refused: Schema.Record(Schema.String, Schema.String),
-  capabilities: Schema.mutable(Schema.Array(RuntimeCapability)),
-  inProcess: Schema.Boolean,
-});
+export const RuntimeSupport = z.object({
+  steer: z.boolean(),
+  refused: z.record(z.string(), z.string()),
+  capabilities: z.array(RuntimeCapability),
+  inProcess: z.boolean(),
+}) satisfies Codec<T.RuntimeSupport>;
 
-const Via: Codec<T.Via> = Schema.Literals(T.ViaValues);
+const Via = z.enum(T.ViaValues) satisfies Codec<T.Via>;
 
-const InstallationAvailable: Codec<T.InstallationAvailable> = Schema.Struct({
-  status: Schema.Literal("available"),
+const InstallationAvailable = z.object({
+  status: z.literal("available"),
   via: Via,
-  command: Schema.String,
-  version: Schema.NullOr(Schema.String),
-});
+  command: z.string(),
+  version: z.string().nullable(),
+}) satisfies Codec<T.InstallationAvailable>;
 
-const InstallationNotFound: Codec<T.InstallationNotFound> = Schema.Struct({
-  status: Schema.Literal("not_found"),
-});
+const InstallationNotFound = z.object({
+  status: z.literal("not_found"),
+}) satisfies Codec<T.InstallationNotFound>;
 
-const InstallationChecking: Codec<T.InstallationChecking> = Schema.Struct({
-  status: Schema.Literal("checking"),
-});
+const InstallationChecking = z.object({
+  status: z.literal("checking"),
+}) satisfies Codec<T.InstallationChecking>;
 
-const InstallationUnsupported: Codec<T.InstallationUnsupported> = Schema.Struct({
-  status: Schema.Literal("unsupported"),
-  reason: Schema.String,
-});
+const InstallationUnsupported = z.object({
+  status: z.literal("unsupported"),
+  reason: z.string(),
+}) satisfies Codec<T.InstallationUnsupported>;
 
-const Installation: Codec<T.Installation> = Schema.Union([InstallationAvailable, InstallationNotFound, InstallationChecking, InstallationUnsupported]);
+const Installation = z.discriminatedUnion("status", [
+  InstallationAvailable,
+  InstallationNotFound,
+  InstallationChecking,
+  InstallationUnsupported,
+]) satisfies Codec<T.Installation>;
 
-export const ModelEntry: Codec<T.ModelEntry> = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  effortLevels: Schema.mutable(Schema.Array(Schema.String)),
-  isDefault: Schema.Boolean,
-});
+export const ModelEntry = z.object({
+  id: z.string(),
+  name: z.string(),
+  effortLevels: z.array(z.string()),
+  isDefault: z.boolean(),
+}) satisfies Codec<T.ModelEntry>;
 
-const UsageWindow: Codec<T.UsageWindow> = Schema.Struct({
-  label: Schema.String,
-  usedPercent: Schema.Finite,
-  resetsAt: Schema.NullOr(Schema.Finite),
-});
+const UsageWindow = z.object({
+  label: z.string(),
+  usedPercent: z.number(),
+  resetsAt: z.number().nullable(),
+}) satisfies Codec<T.UsageWindow>;
 
-const Balance: Codec<T.Balance> = Schema.Struct({
-  currency: Schema.String,
-  amount: Schema.Finite,
-});
+const Balance = z.object({
+  currency: z.string(),
+  amount: z.number(),
+}) satisfies Codec<T.Balance>;
 
-const AccountUsageOk: Codec<T.AccountUsageOk> = Schema.Struct({
-  status: Schema.Literal("ok"),
-  subscription: Schema.NullOr(Schema.String),
-  windows: Schema.mutable(Schema.Array(UsageWindow)),
-});
+const AccountUsageOk = z.object({
+  status: z.literal("ok"),
+  subscription: z.string().nullable(),
+  windows: z.array(UsageWindow),
+}) satisfies Codec<T.AccountUsageOk>;
 
-const AccountUsageBalance: Codec<T.AccountUsageBalance> = Schema.Struct({
-  status: Schema.Literal("balance"),
-  provider: Schema.String,
-  available: Schema.Boolean,
-  balances: Schema.mutable(Schema.Array(Balance)),
-});
+const AccountUsageBalance = z.object({
+  status: z.literal("balance"),
+  provider: z.string(),
+  available: z.boolean(),
+  balances: z.array(Balance),
+}) satisfies Codec<T.AccountUsageBalance>;
 
-const AccountUsageLoginRequired: Codec<T.AccountUsageLoginRequired> = Schema.Struct({
-  status: Schema.Literal("login_required"),
-});
+const AccountUsageLoginRequired = z.object({
+  status: z.literal("login_required"),
+}) satisfies Codec<T.AccountUsageLoginRequired>;
 
-const AccountUsageUnavailable: Codec<T.AccountUsageUnavailable> = Schema.Struct({
-  status: Schema.Literal("unavailable"),
-  reason: Schema.String,
-});
+const AccountUsageUnavailable = z.object({
+  status: z.literal("unavailable"),
+  reason: z.string(),
+}) satisfies Codec<T.AccountUsageUnavailable>;
 
-const AccountUsage: Codec<T.AccountUsage> = Schema.Union([AccountUsageOk, AccountUsageBalance, AccountUsageLoginRequired, AccountUsageUnavailable]);
+const AccountUsage = z.discriminatedUnion("status", [
+  AccountUsageOk,
+  AccountUsageBalance,
+  AccountUsageLoginRequired,
+  AccountUsageUnavailable,
+]) satisfies Codec<T.AccountUsage>;
 
-const InventoryEntry: Codec<T.InventoryEntry> = Schema.Struct({
-  name: Schema.String,
-  description: Schema.String,
-  source: Schema.String,
-  enabled: Schema.Boolean,
-});
+const InventoryEntry = z.object({
+  name: z.string(),
+  description: z.string(),
+  source: z.string(),
+  enabled: z.boolean(),
+}) satisfies Codec<T.InventoryEntry>;
 
-export const RuntimeSettings: Codec<T.RuntimeSettings> = Schema.Struct({
-  enabled: Schema.Boolean,
-  binPath: Schema.String,
-  defaultModel: Schema.String,
-  defaultEffort: Schema.String,
-  env: Schema.Record(Schema.String, Schema.String),
-  dailyBudget: Schema.optionalKey(Schema.Finite),
-  maxWorking: Schema.optionalKey(Schema.Finite),
-});
+export const RuntimeSettings = z.object({
+  enabled: z.boolean(),
+  binPath: z.string(),
+  defaultModel: z.string(),
+  defaultEffort: z.string(),
+  env: z.record(z.string(), z.string()),
+  dailyBudget: z.exactOptional(z.number()),
+  maxWorking: z.exactOptional(z.number()),
+}) satisfies Codec<T.RuntimeSettings>;
 
-export const RuntimeInfo: Codec<T.RuntimeInfo> = Schema.Struct({
-  id: Schema.String,
+export const RuntimeInfo = z.object({
+  id: z.string(),
   preset: RuntimePreset,
   support: RuntimeSupport,
   installation: Installation,
-  models: Schema.NullOr(Schema.mutable(Schema.Array(ModelEntry))),
-  usage: Schema.NullOr(AccountUsage),
-  skills: Schema.NullOr(Schema.mutable(Schema.Array(InventoryEntry))),
-  mcpServers: Schema.NullOr(Schema.mutable(Schema.Array(InventoryEntry))),
-  tools: Schema.NullOr(Schema.mutable(Schema.Array(InventoryEntry))),
+  models: z.array(ModelEntry).nullable(),
+  usage: AccountUsage.nullable(),
+  skills: z.array(InventoryEntry).nullable(),
+  mcpServers: z.array(InventoryEntry).nullable(),
+  tools: z.array(InventoryEntry).nullable(),
   settings: RuntimeSettings,
-  spentToday: Schema.optionalKey(Schema.Finite),
-  quota: Schema.optionalKey(RuntimeQuota),
-  stop: Schema.String,
-  checkedAt: Schema.Finite,
-});
+  spentToday: z.exactOptional(z.number()),
+  quota: z.exactOptional(RuntimeQuota),
+  stop: z.string(),
+  checkedAt: z.number(),
+}) satisfies Codec<T.RuntimeInfo>;

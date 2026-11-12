@@ -1,11 +1,12 @@
 export const pseudoStates = ["rest", "hover", "focus", "active"] as const;
 export type PseudoState = (typeof pseudoStates)[number];
 
+// Not after a backslash: `\:hover\:` is part of an escaped class name (Tailwind's `enabled:hover:bg-x`), not a state.
 const tokens: Record<Exclude<PseudoState, "rest">, RegExp> = {
-  hover: /:hover(?![-\w])/gu,
+  hover: /(?<!\\):hover(?![-\w])/gu,
   // :focus-within is a parent's state, not the part's own.
-  focus: /:focus-visible(?![-\w])|:focus(?![-\w])/gu,
-  active: /:active(?![-\w])/gu,
+  focus: /(?<!\\):focus-visible(?![-\w])|(?<!\\):focus(?![-\w])/gu,
+  active: /(?<!\\):active(?![-\w])/gu,
 };
 
 /** What a rule left with no selector of its own (a bare :focus-visible) applies to: what can take the focus. */

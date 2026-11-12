@@ -1,19 +1,15 @@
-import { Effect, Schema } from "effect";
+import { z } from "zod";
 
 import type * as T from "@vibevalley/protocol";
+import { isApiError } from "@vibevalley/protocol/api";
 import * as S from "@vibevalley/protocol/schema";
 
-import { type ApiError } from "#/base/errors.ts";
+import { messageOf } from "#/base/errors.ts";
 import { jsonText } from "#/base/json.ts";
-import { Channel } from "#/modules/channel/channel.ts";
-import { Issue } from "#/modules/issue/issue.ts";
-import { Mailbox } from "#/modules/mailbox/mailbox.ts";
-import { Repo } from "#/modules/repo/repo.ts";
-import type { RepoError } from "#/modules/repo/workplace.ts";
-import { Session } from "#/modules/session/session.ts";
 
 import { resourceWords } from "./prompts.ts";
-import { callerOf, customTool, toolParameters, type Who } from "./schemas.ts";
+import { callerOf, customTool, type Who } from "./schemas.ts";
+import type { ToolDeps } from "./tool.ts";
 
 export interface ReadResource {
   readonly uri: string;
@@ -29,8 +25,11 @@ export interface ResourcePage {
   readonly text: string;
 }
 
-export class ResourceError extends Schema.TaggedError<ResourceError, { readonly brand: unique symbol }>()("ResourceError", { message: Schema.String }) {}
-const refuse = (message: string) => Effect.fail(ResourceError.make({ message }));
+/** A resource read refused: a bad URI or offset, one this session may not read, or a snapshot gone. */
+class ResourceError extends Error {
+  override readonly name = "ResourceError";
+}
+const refuse = (message: string) => new ResourceError(message);
 
 type ResourceRef =
   | { readonly kind: "trigger"; readonly id: string }
@@ -87,11 +86,11 @@ export class TextCache {
   }
 }
 
-const ResourceRequest = Schema.Struct({
-  uri: Schema.String.annotate({ description: resourceWords.uri }),
-  offset: Schema.optionalKey(Schema.Int.annotate({ description: resourceWords.offset })),
-  limit: Schema.optionalKey(Schema.Int.annotate({ description: resourceWords.limit })),
-}) satisfies Schema.Codec<ReadResource>;
+const ResourceRequest = z.object({
+  uri: z.string().describe(resourceWords.uri),
+  offset: z.exactOptional(z.number().int().describe(resourceWords.offset)),
+  limit: z.exactOptional(z.number().int().describe(resourceWords.limit)),
+}) satisfies z.ZodType<ReadResource>;
 
 function resourceRef(uri: string): ResourceRef | undefined {
   let parsed: URL;
@@ -135,30 +134,25 @@ function resourceRef(uri: string): ResourceRef | undefined {
   }
 }
 
-const encodePretty = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown, { space: 2 }));
-const textOf = (value: unknown) => encodePretty(value).pipe(Effect.mapError((e) => ResourceError.make({ message: e.message })));
+const textOf = (value: unknown): string => JSON.stringify(value, null, 2);
 
-export const makeResourceReader = Effect.gen(function* () {
-  const channels = yield* Channel;
-  const issues = yield* Issue;
-  const sessions = yield* Session;
-  const mailbox = yield* Mailbox;
-  const repos = yield* Repo;
+export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "session" | "mailbox" | "repo">) {
+  const { channel: channels, issue: issues, session: sessions, mailbox, repo: repos } = deps;
   const cache = new TextCache(cacheBytes);
 
   const ownSession = (id: string) => sessions.sessionOf(id);
 
-  const mayReadChannel = Effect.fnUntraced(function* (session: T.Session, channel: string) {
+  const mayReadChannel = async (session: T.Session, channel: string) => {
     if (session.channel === channel) return true;
-    return (yield* channels.threadOfSession(session.id)) === channel;
-  });
+    return (await channels.threadOfSession(session.id)) === channel;
+  };
 
-  const mayReadIssue = Effect.fnUntraced(function* (session: T.Session, target: T.Issue) {
+  const mayReadIssue = async (session: T.Session, target: T.Issue) => {
     if (session.issue === target.id) return true;
     if (session.issue === undefined) return false;
-    const own = yield* issues.get(session.issue);
+    const own = await issues.get(session.issue);
     if (target.id === own.parent) return true;
-    const all = new Map<string, T.Issue>((yield* issues.list()).map((item) => [item.id, item]));
+    const all = new Map<string, T.Issue>((await issues.list()).map((item) => [item.id, item]));
     const upstream = new Set<string>();
     const visit = (id: string) => {
       if (upstream.has(id)) return;
@@ -167,103 +161,115 @@ export const makeResourceReader = Effect.gen(function* () {
     };
     for (const need of own.blockedBy) visit(need);
     return upstream.has(target.id);
-  });
+  };
 
-  const load = Effect.fnUntraced(function* (ref: ResourceRef, session: T.Session | undefined, orchestrator: boolean, uri: string) {
+  const issueOrUndefined = async (id: string) => {
+    try {
+      return await issues.get(id);
+    } catch (e) {
+      // A thread naming an issue since removed just does not grant the read.
+      if (isApiError(e)) return undefined;
+      throw e;
+    }
+  };
+
+  const load = async (ref: ResourceRef, session: T.Session | undefined, orchestrator: boolean, uri: string): Promise<string> => {
     switch (ref.kind) {
       case "trigger": {
-        const resource = yield* mailbox.readTrigger(ref.id).pipe(Effect.mapError((error) => ResourceError.make({ message: error.message })));
-        if (!resource) return yield* refuse(resourceWords.missing(uri));
+        let resource;
+        try {
+          resource = await mailbox.readTrigger(ref.id);
+        } catch (error) {
+          throw new ResourceError(messageOf(error), { cause: error });
+        }
+        if (!resource) throw refuse(resourceWords.missing(uri));
         let permitted = orchestrator;
-        if (session?.issue && !permitted) permitted = (yield* issues.get(session.issue)).mandate.originTriggerId === ref.id;
+        if (session?.issue && !permitted) permitted = (await issues.get(session.issue)).mandate.originTriggerId === ref.id;
         if (session && !permitted) {
-          const owner = yield* mailbox.ownerOf(ref.id);
+          const owner = await mailbox.ownerOf(ref.id);
           if (owner) {
-            const ownerIssue = yield* issues.get(owner);
-            permitted = yield* mayReadIssue(session, ownerIssue);
+            const ownerIssue = await issues.get(owner);
+            permitted = await mayReadIssue(session, ownerIssue);
           }
         }
         if (session && !permitted) {
           for (const thread of resource.trigger.threads) {
             if (thread.startsWith("issue:")) {
-              const issue = yield* Effect.option(issues.get(thread.slice(6)));
-              if (issue._tag === "Some" && (yield* mayReadIssue(session, issue.value))) {
+              const issue = await issueOrUndefined(thread.slice(6));
+              if (issue !== undefined && (await mayReadIssue(session, issue))) {
                 permitted = true;
                 break;
               }
-            } else if (thread.startsWith("channel:") && (yield* mayReadChannel(session, thread.slice(8)))) {
+            } else if (thread.startsWith("channel:") && (await mayReadChannel(session, thread.slice(8)))) {
               permitted = true;
               break;
             }
           }
         }
-        if (!permitted) return yield* refuse(resourceWords.forbidden(uri));
+        if (!permitted) throw refuse(resourceWords.forbidden(uri));
         const context =
           resource.trigger.source === "channel" || resource.trigger.source === "voice" || resource.trigger.source === "connector"
-            ? yield* channels.envelopeResource(S.messageId(ref.id))
+            ? await channels.envelopeResource(S.messageId(ref.id))
             : undefined;
-        return yield* textOf({ ...resource, ...(context ? { around: context.around, ...(context.parent ? { parent: context.parent } : {}) } : {}) });
+        return textOf({ ...resource, ...(context ? { around: context.around, ...(context.parent ? { parent: context.parent } : {}) } : {}) });
       }
       case "envelope": {
-        const resource = yield* channels.envelopeResource(S.messageId(ref.id));
-        if (resource === undefined) return yield* refuse(resourceWords.missing(uri));
-        if (!orchestrator && (session === undefined || !(yield* mayReadChannel(session, resource.message.channel))))
-          return yield* refuse(resourceWords.forbidden(uri));
-        return yield* textOf(resource);
+        const resource = await channels.envelopeResource(S.messageId(ref.id));
+        if (resource === undefined) throw refuse(resourceWords.missing(uri));
+        if (!orchestrator && (session === undefined || !(await mayReadChannel(session, resource.message.channel)))) throw refuse(resourceWords.forbidden(uri));
+        return textOf(resource);
       }
       case "issue": {
-        const issue = yield* issues.get(ref.id);
-        if (!orchestrator && (session === undefined || !(yield* mayReadIssue(session, issue)))) return yield* refuse(resourceWords.forbidden(uri));
-        return yield* textOf({ issue, runs: yield* sessions.issueRuns(issue.id), messages: yield* channels.issueMessages(issue.id) });
+        const issue = await issues.get(ref.id);
+        if (!orchestrator && (session === undefined || !(await mayReadIssue(session, issue)))) throw refuse(resourceWords.forbidden(uri));
+        return textOf({ issue, runs: await sessions.issueRuns(issue.id), messages: await channels.issueMessages(issue.id) });
       }
       case "channel": {
-        if (!orchestrator && (session === undefined || !(yield* mayReadChannel(session, ref.id)))) return yield* refuse(resourceWords.forbidden(uri));
-        const messages = yield* channels.history(ref.id, undefined, 200);
-        return yield* textOf({ messages, latestPage: messages.length === 200 });
+        if (!orchestrator && (session === undefined || !(await mayReadChannel(session, ref.id)))) throw refuse(resourceWords.forbidden(uri));
+        const messages = await channels.history(ref.id, undefined, 200);
+        return textOf({ messages, latestPage: messages.length === 200 });
       }
       case "session": {
-        if (!orchestrator && session?.id !== ref.id) return yield* refuse(resourceWords.forbidden(uri));
-        const events = yield* sessions.events(ref.id);
-        if (events === undefined) return yield* refuse(resourceWords.missing(uri));
-        return yield* textOf({ events });
+        if (!orchestrator && session?.id !== ref.id) throw refuse(resourceWords.forbidden(uri));
+        const events = await sessions.events(ref.id);
+        if (events === undefined) throw refuse(resourceWords.missing(uri));
+        return textOf({ events });
       }
       case "github": {
-        const issue = (yield* issues.list()).find((item) => item.repo === ref.repo && item.pullRequest?.number === ref.pull);
-        if (!issue) return yield* refuse(resourceWords.missing(uri));
-        if (!orchestrator && (session === undefined || !(yield* mayReadIssue(session, issue)))) return yield* refuse(resourceWords.forbidden(uri));
-        const snapshot = yield* repos.githubSnapshot(ref.repo, ref.pull);
-        if (ref.resource === "checks") return yield* textOf({ head: snapshot.head, checks: snapshot.checks });
+        const issue = (await issues.list()).find((item) => item.repo === ref.repo && item.pullRequest?.number === ref.pull);
+        if (!issue) throw refuse(resourceWords.missing(uri));
+        if (!orchestrator && (session === undefined || !(await mayReadIssue(session, issue)))) throw refuse(resourceWords.forbidden(uri));
+        const snapshot = await repos.githubSnapshot(ref.repo, ref.pull);
+        if (ref.resource === "checks") return textOf({ head: snapshot.head, checks: snapshot.checks });
         const review = snapshot.reviews.find((item) => item.id === ref.id);
         const comment = snapshot.comments.find((item) => item.id === ref.id || item.databaseId === ref.id || item.threadId === ref.id);
-        if (!review && !comment) return yield* refuse(resourceWords.missing(uri));
-        if (review) return yield* textOf({ review, comments: snapshot.comments.filter((item) => item.reviewId === review.id) });
-        return yield* textOf(
+        if (!review && !comment) throw refuse(resourceWords.missing(uri));
+        if (review) return textOf({ review, comments: snapshot.comments.filter((item) => item.reviewId === review.id) });
+        return textOf(
           comment?.threadId
             ? { threadId: comment.threadId, resolved: comment.resolved, comments: snapshot.comments.filter((item) => item.threadId === comment.threadId) }
             : comment,
         );
       }
     }
-  });
+  };
 
-  return Effect.fn("Tool.readResource")(function* (
-    sessionId: string,
-    input: ReadResource,
-  ): Effect.fn.Return<ResourcePage, ResourceError | ApiError | RepoError> {
+  /** Throws ResourceError, or what the reads under it throw (ApiError, RepoError). */
+  return async (sessionId: string, input: ReadResource): Promise<ResourcePage> => {
     const ref = resourceRef(input.uri);
-    if (ref === undefined) return yield* refuse(resourceWords.invalidUri(input.uri));
+    if (ref === undefined) throw refuse(resourceWords.invalidUri(input.uri));
     const offset = input.offset ?? 0;
-    if (!Number.isSafeInteger(offset) || offset < 0) return yield* refuse(resourceWords.badOffset);
+    if (!Number.isSafeInteger(offset) || offset < 0) throw refuse(resourceWords.badOffset);
     const session = ownSession(sessionId);
-    if (!session) return yield* refuse(resourceWords.forbidden(input.uri));
+    if (!session) throw refuse(resourceWords.forbidden(input.uri));
     const key = `${session.id}:${input.uri}`;
     let text: string;
     if (offset === 0) {
-      text = yield* load(ref, session, session.role === "orchestrator", input.uri);
-      if (!cache.put(key, text)) return yield* refuse(resourceWords.snapshotTooLarge);
+      text = await load(ref, session, session.role === "orchestrator", input.uri);
+      if (!cache.put(key, text)) throw refuse(resourceWords.snapshotTooLarge);
     } else {
       const snapshot = cache.get(key);
-      if (snapshot === undefined) return yield* refuse(resourceWords.snapshotMissing);
+      if (snapshot === undefined) throw refuse(resourceWords.snapshotMissing);
       text = snapshot;
     }
     const limit = Math.min(Math.max(input.limit ?? defaultLimit, 1), maxLimit);
@@ -275,18 +281,12 @@ export const makeResourceReader = Effect.gen(function* () {
       ...(end < text.length ? { nextOffset: end } : {}),
       text: text.slice(offset, end),
     };
-  });
-});
+  };
+}
 
-export const resourceTools = (readResource: Effect.Success<typeof makeResourceReader>) => (who: Who) =>
-  customTool(
-    "resource_read",
-    resourceWords.description,
-    toolParameters(ResourceRequest),
-    Schema.decodeUnknownEffect(ResourceRequest),
-    Effect.fn("Tool.resourceRead")(function* (input) {
-      const caller = yield* callerOf(who);
-      const page = yield* readResource(caller.session || caller.agent, input);
-      return yield* jsonText(page);
-    }),
-  );
+export const resourceTools = (readResource: ReturnType<typeof makeResourceReader>) => (who: Who) =>
+  customTool("resource_read", resourceWords.description, ResourceRequest, async (input) => {
+    const caller = callerOf(who);
+    const page = await readResource(caller.session || caller.agent, input);
+    return jsonText(page);
+  });

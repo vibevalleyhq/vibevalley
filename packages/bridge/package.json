@@ -17,7 +17,7 @@
     }
   },
   "dependencies": {
-    "effect": "catalog:"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

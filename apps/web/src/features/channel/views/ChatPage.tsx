@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -22,305 +21,6 @@ import { Composer, FileDrop, type QuotedBlockDraft } from "./Composer";
 import { ChannelSettingsDialog, NewChannelDialog } from "./Dialogs";
 import { MessageList } from "./MessageList";
 import { Crons, Sessions } from "./Tabs";
-
-const styles = stylex.create({
-  chatDiv: {
-    position: "absolute",
-    insetBlock: "0",
-    left: "0",
-    display: "flex",
-    width: "18rem",
-    boxShadow: "var(--shadow-float)",
-    transitionProperty: "translate",
-    transitionTimingFunction: "var(--ease-out)",
-    transitionDuration: "280ms",
-    translate: {
-      default: null,
-      "@starting-style": "-100% 0",
-    },
-  },
-  chatDiv2: {
-    position: {
-      default: "absolute",
-      "@media (width>=64rem)": "relative",
-    },
-    inset: "0",
-    zIndex: {
-      default: 20,
-      "@media (width>=64rem)": "auto",
-    },
-    display: "flex",
-    borderLeftStyle: "solid",
-    borderLeftWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
-    transitionProperty: "translate",
-    transitionTimingFunction: "var(--ease-out)",
-    transitionDuration: "180ms",
-    width: {
-      default: null,
-      "@media (width>=64rem)": "var(--pane-w)",
-    },
-    flexShrink: {
-      default: null,
-      "@media (width>=64rem)": "0",
-    },
-    translate: {
-      default: null,
-      "@starting-style": "100% 0",
-    },
-  },
-  channelMainHeader: {
-    display: "flex",
-    height: "66px",
-    flexShrink: "0",
-    alignItems: "center",
-    gap: "0.75rem",
-    borderBottomStyle: "solid",
-    borderBottomWidth: "1px",
-    borderColor: "var(--color-line)",
-    paddingInline: "1rem",
-  },
-  channelMainButton: {
-    display: {
-      default: "inline-flex",
-      "@media (width>=48rem)": "none",
-    },
-    width: "2rem",
-    height: "2rem",
-    flexShrink: "0",
-    cursor: {
-      default: "pointer",
-      ":disabled": "default",
-    },
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-md)",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-    opacity: {
-      default: null,
-      ":disabled": ".5",
-    },
-  },
-  channelMainButton2: {
-    display: "inline-flex",
-    width: "2rem",
-    height: "2rem",
-    flexShrink: "0",
-    cursor: {
-      default: "pointer",
-      ":disabled": "default",
-    },
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-md)",
-    opacity: {
-      default: null,
-      ":disabled": ".5",
-    },
-  },
-  channelMainButtonPrimary: {
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  channelMainButtonSecondary: {
-    backgroundColor: {
-      default: "var(--color-selected)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  channelMainButton3: {
-    display: {
-      default: "inline-flex",
-      "@media not all and (width>=48rem)": "none",
-    },
-    width: "auto",
-    height: "2rem",
-    flexShrink: "0",
-    cursor: {
-      default: "pointer",
-      ":disabled": "default",
-    },
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.5rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    opacity: {
-      default: null,
-      ":disabled": ".5",
-    },
-  },
-  channelMainButton4: {
-    display: "inline-flex",
-    width: "2rem",
-    height: "2rem",
-    flexShrink: "0",
-    cursor: {
-      default: "pointer",
-      ":disabled": "default",
-    },
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-md)",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-    opacity: {
-      default: null,
-      ":disabled": ".5",
-    },
-  },
-  chatDiv3: {
-    position: "relative",
-    display: "flex",
-    height: "100%",
-    overflow: "hidden",
-  },
-  chatDiv22: {
-    display: {
-      default: "none",
-      "@media (width>=48rem)": "flex",
-    },
-    width: "18rem",
-    flexShrink: "0",
-  },
-  chatDiv32: {
-    position: "absolute",
-    inset: "0",
-    zIndex: "30",
-    display: {
-      default: null,
-      "@media (width>=48rem)": "none",
-    },
-  },
-  chatDiv4: {
-    position: "absolute",
-    inset: "0",
-    backgroundColor: "var(--color-scrim)",
-  },
-  chatDiv5: {
-    display: {
-      default: "none",
-      "@media (width>=64rem)": "block",
-    },
-  },
-  chatDiv6: {
-    position: {
-      default: "absolute",
-      "@media (width>=64rem)": "relative",
-    },
-    inset: "0",
-    zIndex: {
-      default: "20",
-      "@media (width>=64rem)": "auto",
-    },
-    display: "flex",
-    borderLeftStyle: "solid",
-    borderLeftWidth: "1px",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-    width: {
-      default: null,
-      "@media (width>=64rem)": "520px",
-    },
-    flexShrink: {
-      default: null,
-      "@media (width>=64rem)": "0",
-    },
-  },
-  channelMainSection: {
-    display: "flex",
-    minWidth: "0",
-    flex: "1",
-    flexDirection: "column",
-  },
-  channelMainSpan: {
-    display: "flex",
-    width: "2rem",
-    height: "2rem",
-    flexShrink: "0",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-lg)",
-    backgroundColor: "var(--color-selected)",
-    fontSize: "var(--text-lg)",
-    lineHeight: "var(--leading-lg)",
-    fontWeight: "var(--font-weight-semibold)",
-    color: "var(--color-muted)",
-  },
-  channelMainH1: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-lg)",
-    lineHeight: "var(--leading-lg)",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  channelMainP: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  channelMainLabel: {
-    display: "flex",
-    height: "2rem",
-    width: "12rem",
-    alignItems: "center",
-    gap: "0.375rem",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: {
-      default: "var(--color-line)",
-      ":focus-within": "var(--color-focus)",
-    },
-    paddingInline: "0.5rem",
-  },
-  messageSearch: {
-    minWidth: "0",
-    flex: "1",
-    backgroundColor: "transparent",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    outlineStyle: "none",
-    color: {
-      default: null,
-      "::placeholder": "var(--color-faint)",
-    },
-  },
-  channelMainDiv: {
-    position: "relative",
-  },
-  channelMainDiv2: {
-    display: "flex",
-    minHeight: "0",
-    flex: "1",
-  },
-  tabs: { flexShrink: 0, borderBottomWidth: 1, borderBottomStyle: "solid", borderColor: "var(--color-line)", paddingInline: "0.75rem" },
-});
 
 /** /chat is the general; /chat/<id> a channel, or a thread shown beside its channel. */
 export function ChatPage() {
@@ -367,12 +67,14 @@ function Chat() {
     <Sidebar channel={channel()} thread={thread()} onNew={() => setDialog("new")} onSearch={() => setDialog("search")} onPick={() => setDrawer(false)} />
   );
   return (
-    <div {...stylex.attrs(styles.chatDiv3)}>
-      <div {...stylex.attrs(styles.chatDiv22)}>{sidebar()}</div>
+    <div class="relative flex h-full overflow-hidden">
+      <div class="hidden md:flex w-72 shrink-0">{sidebar()}</div>
       <Show when={drawer()}>
-        <div {...stylex.attrs(styles.chatDiv32)}>
-          <div {...stylex.attrs(styles.chatDiv4)} onClick={() => setDrawer(false)} />
-          <div {...stylex.attrs(styles.chatDiv)}>{sidebar()}</div>
+        <div class="absolute inset-0 z-30 md:hidden">
+          <div class="absolute inset-0 bg-scrim" onClick={() => setDrawer(false)} />
+          <div class="absolute inset-y-0 left-0 flex w-72 shadow-float transition-[translate] ease-out duration-280 starting:-translate-x-full">
+            {sidebar()}
+          </div>
         </div>
       </Show>
       {/* Only once the chat is in: keyed before it, the channel's arrival would start a tab picked meanwhile over. */}
@@ -392,8 +94,11 @@ function Chat() {
       </Show>
       <Show when={thread()}>
         {(shown) => (
-          <div {...stylex.attrs(styles.chatDiv2)} style={{ "--pane-w": `${threadWidth()}px` }}>
-            <div {...stylex.attrs(styles.chatDiv5)}>
+          <div
+            class="absolute lg:relative inset-0 z-20 lg:z-auto flex border-l border-line bg-page transition-[translate] ease-out duration-180 lg:w-(--pane-w) lg:shrink-0 starting:translate-x-full"
+            style={{ "--pane-w": `${threadWidth()}px` }}
+          >
+            <div class="hidden lg:block">
               <Splitter pane="thread" side="left" width={threadWidth()} min={320} max={720} label={t("web.channel.threadWidth")} />
             </div>
             <Keyed key={shown().id}>{() => <ThreadPane thread={shown()} point={point()} onClose={() => router.navigate(chatPath(channel()))} />}</Keyed>
@@ -402,7 +107,7 @@ function Chat() {
       </Show>
       <Show when={artifact()}>
         {(id) => (
-          <div {...stylex.attrs(styles.chatDiv6)}>
+          <div class="absolute lg:relative inset-0 z-20 lg:z-auto flex border-l border-line bg-page lg:w-130 lg:shrink-0">
             <ArtifactCanvas id={id()} onClose={closeArtifact} onQuote={(block) => quote(id(), block)} />
           </div>
         )}
@@ -448,22 +153,27 @@ function ChannelMain(props: {
   const about = () =>
     [props.channel?.description, props.channel?.repo ? t("web.channel.defaultRepo", { repo: props.channel.repo }) : ""].filter(Boolean).join(" · ");
   return (
-    <section {...stylex.attrs(styles.channelMainSection)} aria-label={channelLabel(props.channel)}>
-      <header data-testid="channel-head" data-key={props.channel?.id} {...stylex.attrs(styles.channelMainHeader)}>
-        <button type="button" {...stylex.attrs(styles.channelMainButton)} aria-label={t("web.channel.channels")} onClick={() => props.onDrawer()}>
+    <section class="flex min-w-0 flex-1 flex-col" aria-label={channelLabel(props.channel)}>
+      <header data-testid="channel-head" data-key={props.channel?.id} class="flex h-16.5 shrink-0 items-center gap-3 border-b border-line px-4">
+        <button
+          type="button"
+          class="inline-flex md:hidden w-8 h-8 shrink-0 cursor-pointer disabled:cursor-default items-center justify-center rounded-md hover:bg-hover disabled:opacity-50"
+          aria-label={t("web.channel.channels")}
+          onClick={() => props.onDrawer()}
+        >
           <Icon name="chat" size={20} />
         </button>
-        <span {...stylex.attrs(styles.channelMainSpan)}>{markOf(props.channel)}</span>
-        <div {...stylex.attrs(styles.channelMainSection)}>
-          <h1 {...stylex.attrs(styles.channelMainH1)} title={props.channel?.default === true ? t("web.channel.defaultHint") : undefined}>
+        <span class="flex w-8 h-8 shrink-0 items-center justify-center rounded-lg bg-selected text-lg font-semibold text-muted">{markOf(props.channel)}</span>
+        <div class="flex min-w-0 flex-1 flex-col">
+          <h1 class="truncate text-lg font-semibold" title={props.channel?.default === true ? t("web.channel.defaultHint") : undefined}>
             {name()}
           </h1>
           <Show when={about()}>
-            <p {...stylex.attrs(styles.channelMainP)}>{about()}</p>
+            <p class="truncate text-xs text-muted">{about()}</p>
           </Show>
         </div>
         <Show when={search() !== undefined}>
-          <label {...stylex.attrs(styles.channelMainLabel)}>
+          <label class="flex h-8 w-48 items-center gap-1.5 rounded-md border border-line focus-within:border-focus px-2">
             <Icon name="search" size={14} />
             <input
               ref={autofocus()}
@@ -473,13 +183,16 @@ function ChannelMain(props: {
               onKeyDown={(e) => e.key === "Escape" && setSearch(undefined)}
               placeholder={t("web.channel.findHint")}
               aria-label={t("web.channel.find")}
-              {...stylex.attrs(styles.messageSearch)}
+              class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
             />
           </label>
         </Show>
         <button
           type="button"
-          {...stylex.attrs(styles.channelMainButton2, search() !== undefined ? styles.channelMainButtonSecondary : styles.channelMainButtonPrimary)}
+          class={[
+            "inline-flex w-8 h-8 shrink-0 cursor-pointer disabled:cursor-default items-center justify-center rounded-md disabled:opacity-50",
+            search() !== undefined ? "bg-selected hover:bg-hover" : "hover:bg-hover",
+          ]}
           data-testid="message-search-toggle"
           aria-label={t("web.channel.findMessages")}
           aria-pressed={aria(search() !== undefined)}
@@ -493,10 +206,13 @@ function ChannelMain(props: {
         </button>
         <Show when={props.channel?.type === "channel" ? props.channel : undefined}>
           {(c) => (
-            <div {...stylex.attrs(styles.channelMainDiv)}>
+            <div class="relative">
               <button
                 type="button"
-                {...stylex.attrs(styles.channelMainButton2, threadsOpen() ? styles.channelMainButtonSecondary : styles.channelMainButtonPrimary)}
+                class={[
+                  "inline-flex w-8 h-8 shrink-0 cursor-pointer disabled:cursor-default items-center justify-center rounded-md disabled:opacity-50",
+                  threadsOpen() ? "bg-selected hover:bg-hover" : "hover:bg-hover",
+                ]}
                 data-testid="threads-toggle"
                 aria-label={t("web.channel.threadList.title")}
                 aria-expanded={aria(threadsOpen())}
@@ -511,10 +227,13 @@ function ChannelMain(props: {
             </div>
           )}
         </Show>
-        <div {...stylex.attrs(styles.channelMainDiv)}>
+        <div class="relative">
           <button
             type="button"
-            {...stylex.attrs(styles.channelMainButton2, pinsOpen() ? styles.channelMainButtonSecondary : styles.channelMainButtonPrimary)}
+            class={[
+              "inline-flex w-8 h-8 shrink-0 cursor-pointer disabled:cursor-default items-center justify-center rounded-md disabled:opacity-50",
+              pinsOpen() ? "bg-selected hover:bg-hover" : "hover:bg-hover",
+            ]}
             data-testid="pins-toggle"
             aria-label={t("web.channel.pins.open")}
             aria-expanded={aria(pinsOpen())}
@@ -529,7 +248,10 @@ function ChannelMain(props: {
         <button
           type="button"
           // The members panel is beside the list, which a phone has no room for.
-          {...stylex.attrs(styles.channelMainButton3, membersOpen() ? styles.channelMainButtonSecondary : styles.channelMainButtonPrimary)}
+          class={[
+            "inline-flex max-md:hidden w-auto h-8 shrink-0 cursor-pointer disabled:cursor-default items-center justify-center rounded-md px-2 text-sm disabled:opacity-50",
+            membersOpen() ? "bg-selected hover:bg-hover" : "hover:bg-hover",
+          ]}
           data-testid="members-toggle"
           aria-pressed={aria(membersOpen())}
           disabled={!props.channel}
@@ -543,7 +265,7 @@ function ChannelMain(props: {
         </button>
         <button
           type="button"
-          {...stylex.attrs(styles.channelMainButton4)}
+          class="inline-flex w-8 h-8 shrink-0 cursor-pointer disabled:cursor-default items-center justify-center rounded-md hover:bg-hover disabled:opacity-50"
           data-testid="channel-settings-open"
           aria-label={t("web.channel.settings")}
           title={t("web.channel.settings")}
@@ -563,10 +285,10 @@ function ChannelMain(props: {
           label: e.label,
           icon: e.icon,
         }))}
-        styles={styles.tabs}
+        class="shrink-0 border-b border-line px-3"
       />
       <Show when={tab() === "chat"}>
-        <div {...stylex.attrs(styles.channelMainDiv2)}>
+        <div class="flex min-h-0 flex-1">
           <FileDrop channel={props.channel}>
             <MessageList
               channel={props.channel}

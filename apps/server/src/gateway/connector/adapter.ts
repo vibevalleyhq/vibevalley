@@ -1,34 +1,53 @@
-import { type Effect, Schema } from "effect";
+import { z } from "zod";
 
+import { type Clock, isAbort, withTimeout } from "@vibevalley/async";
 import type { ConnectorID, ConnectorLogin, ConnectorState } from "@vibevalley/protocol";
 
 import { messageOf } from "#/base/errors.ts";
+import { problemOf } from "#/base/json.ts";
 
-export const Inbound = Schema.Struct({
+export const Inbound = z.object({
   /** Each is taken once. */
-  id: Schema.String,
-  from: Schema.String,
-  text: Schema.String,
+  id: z.string(),
+  from: z.string(),
+  text: z.string(),
   /** WeChat's context token, QQ's message id; "" for none. */
-  reply: Schema.String,
+  reply: z.string(),
   /** The app's id of the message this one quotes; "" for none. */
-  quoted: Schema.String,
+  quoted: z.string(),
 });
-export type Inbound = typeof Inbound.Type;
+export type Inbound = z.output<typeof Inbound>;
 
-const AppFailedKindValues = ["restricted", "stale", "failed"] as const;
+export type AppFailedKind = "restricted" | "stale" | "failed";
 
 /** Why an app did not do what it was asked. The message is what the user sees. */
-export class AppFailed extends Schema.TaggedError<AppFailed, { readonly brand: unique symbol }>()("AppFailed", {
-  kind: Schema.Literals(AppFailedKindValues),
-  message: Schema.String,
-  cause: Schema.optionalKey(Schema.Defect()),
-}) {}
+export class AppFailed extends Error {
+  override readonly name = "AppFailed";
+  readonly kind: AppFailedKind;
+  constructor(kind: AppFailedKind, message: string, options?: { readonly cause?: unknown }) {
+    super(message, options?.cause === undefined ? undefined : { cause: options.cause });
+    this.kind = kind;
+  }
+}
 
-export const failedWith = (message: string) => AppFailed.make({ kind: "failed", message });
+export const failedWith = (message: string) => new AppFailed("failed", message);
 
-/** A thrown or rejected value, as an app's failure. */
-export const failedOf = (e: unknown) => AppFailed.make({ kind: "failed", message: messageOf(e), cause: e });
+/** A thrown or rejected value, as an app's failure: one already is stays as it is. */
+export const failedOf = (e: unknown): AppFailed => (e instanceof AppFailed ? e : new AppFailed("failed", messageOf(e), { cause: e }));
+
+/** f with a deadline of ms on clock: past it, what onLate gives (or throws). An abort of signal itself goes on up. */
+export async function timed<A>(f: (signal: AbortSignal) => Promise<A>, ms: number, clock: Clock, signal: AbortSignal | undefined, onLate: () => A): Promise<A> {
+  try {
+    return await withTimeout(f, ms, { clock, ...(signal ? { signal } : {}) });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "TimeoutError" && signal?.aborted !== true) return onLate();
+    throw e;
+  }
+}
+
+/** A failure as an app's, in label's words; an abort goes on up as it is. */
+export const appFailure = (e: unknown, signal: AbortSignal | undefined, words: (why: string) => string): unknown =>
+  e instanceof AppFailed || isAbort(e, signal) ? e : failedWith(words(e instanceof z.ZodError ? problemOf(e) : messageOf(e)));
 
 export type Secrets = Readonly<Record<string, string>>;
 
@@ -44,20 +63,17 @@ export interface Progress {
   readonly qr: string;
 }
 
-interface Receiving {
+export interface Receiving {
   readonly cursor: string;
-  /** Kept durably before it returns: only then may the app consider them taken. */
-  readonly accept: (messages: readonly Inbound[], cursor: string) => Effect.Effect<void, AppFailed>;
+  /** Kept durably before it returns: only then may the app consider them taken. Throws AppFailed. */
+  readonly accept: (messages: readonly Inbound[], cursor: string) => Promise<void>;
 }
 
+/** Each throws AppFailed when the app did not do it; an abort of signal goes on up. */
 export interface Adapter {
   readonly id: ConnectorID;
-  readonly login: (
-    input: ConnectorLogin,
-    progress: (p: Progress) => Effect.Effect<void>,
-    verifyCode: Effect.Effect<string>,
-  ) => Effect.Effect<Linked, AppFailed>;
+  readonly login: (input: ConnectorLogin, progress: (p: Progress) => void, verifyCode: () => string, signal: AbortSignal) => Promise<Linked>;
   /** Until the connection ends: as a failure, or as the end of the app's stream. */
-  readonly receive: (secrets: Secrets, io: Receiving) => Effect.Effect<void, AppFailed>;
-  readonly send: (secrets: Secrets, to: string, text: string, reply: string) => Effect.Effect<string, AppFailed>;
+  readonly receive: (secrets: Secrets, io: Receiving, signal: AbortSignal) => Promise<void>;
+  readonly send: (secrets: Secrets, to: string, text: string, reply: string) => Promise<string>;
 }

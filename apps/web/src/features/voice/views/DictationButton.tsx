@@ -1,4 +1,4 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -9,198 +9,6 @@ import { ready, useSettings } from "#/infra/query.ts";
 import { useRouter } from "#/infra/router.ts";
 import { Icon, type IconSize } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
-import { styleProps } from "#/ui/positioner.ts";
-
-const recordingPulse = stylex.keyframes({ "50%": { opacity: 0.5 } });
-
-const styles = stylex.create({
-  dictationBarSpan: {
-    display: "flex",
-    animationName: { default: recordingPulse, "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: "2s",
-    animationDelay: "0s",
-    animationTimingFunction: "cubic-bezier(.4, 0, .6, 1)",
-    animationIterationCount: "infinite",
-    animationDirection: "normal",
-    animationFillMode: "none",
-    animationPlayState: "running",
-    alignItems: "center",
-    gap: "0.5rem",
-    paddingInline: "0.25rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--wb-muted)",
-  },
-  dictationBarSpan2: {
-    marginLeft: "0.25rem",
-    width: "0.5rem",
-    height: "0.5rem",
-    flexShrink: "0",
-    animationName: { default: recordingPulse, "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: "2s",
-    animationDelay: "0s",
-    animationTimingFunction: "cubic-bezier(.4, 0, .6, 1)",
-    animationIterationCount: "infinite",
-    animationDirection: "normal",
-    animationFillMode: "none",
-    animationPlayState: "running",
-    borderRadius: "9999px",
-    backgroundColor: "var(--wb-berry)",
-  },
-  dictationBarSpan3: {
-    marginInline: "0.25rem",
-    display: "flex",
-    height: "1.25rem",
-    minWidth: "0",
-    flex: "1",
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    justifyContent: "space-between",
-    overflow: "hidden",
-  },
-  mark: {
-    display: "inline-flex",
-    flexShrink: 0,
-    cursor: { default: "pointer", ":disabled": "default" },
-    touchAction: "none",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "0.25rem",
-    WebkitUserSelect: "none",
-    userSelect: "none",
-    opacity: { default: null, ":disabled": 0.5 },
-  },
-  unset: { color: "var(--color-faint)" },
-  recording: {
-    color: "var(--color-berry)",
-    backgroundColor: {
-      default: "var(--color-berry)",
-      "@supports (color: color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-berry) 12%, transparent)",
-    },
-    animationName: { default: recordingPulse, "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: { default: "2s", "@media (prefers-reduced-motion: reduce)": "0s" },
-    animationTimingFunction: { default: "cubic-bezier(0.4,0,0.6,1)", "@media (prefers-reduced-motion: reduce)": "ease" },
-    animationIterationCount: { default: "infinite", "@media (prefers-reduced-motion: reduce)": 1 },
-  },
-  recordingBar: { backgroundColor: { default: "var(--color-accent)", "@media (hover: hover)": { default: null, ":hover": "var(--color-accent-hover)" } } },
-  surface: { backgroundColor: { default: null, "@media (hover: hover)": { default: null, ":hover": "var(--color-hover)" } } },
-  recordingSurface: { backgroundColor: { default: "var(--color-accent)", "@media (hover: hover)": { default: null, ":hover": "var(--color-hover)" } } },
-  dictationBar: {
-    display: "flex",
-    minWidth: "0",
-    flex: "1",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  dictationBarSpan4: {
-    width: "2.25rem",
-    flexShrink: "0",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-    fontVariantNumeric: "tabular-nums",
-  },
-  dictationBarSpan22: {
-    width: "0.1875rem",
-    flexShrink: "0",
-    borderRadius: "9999px",
-    backgroundColor: {
-      default: "var(--color-ink)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink) 55%, transparent)",
-    },
-  },
-  dictationBarSpan32: {
-    display: {
-      default: "none",
-      "@media (width>=40rem)": "inline",
-    },
-    flexShrink: "0",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-faint)",
-  },
-  dictationCancel: {
-    display: "inline-flex",
-    width: "1.75rem",
-    height: "1.75rem",
-    flexShrink: "0",
-    cursor: "pointer",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-md)",
-    color: {
-      default: "var(--color-muted)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-ink)",
-      },
-    },
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  dictationProblem: {
-    marginInline: "0.5rem",
-    marginBottom: "0.25rem",
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--color-hover)",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.25rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-  },
-  dictationProblemSpan: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    color: "var(--color-muted)",
-  },
-  dictationProblemButton: {
-    flexShrink: "0",
-    cursor: "pointer",
-    borderRadius: "var(--radius-sm)",
-    paddingInline: "0.375rem",
-    paddingBlock: "0.125rem",
-    fontWeight: "var(--font-weight-medium)",
-    color: "var(--color-ink)",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-page)",
-      },
-    },
-  },
-  dictationProblemButton2: {
-    flexShrink: "0",
-    cursor: "pointer",
-    borderRadius: "var(--radius-sm)",
-    padding: "0.125rem",
-    color: {
-      default: "var(--color-muted)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-ink)",
-      },
-    },
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-page)",
-      },
-    },
-  },
-});
 
 export type DictationState = "unset" | DictationPhase;
 
@@ -250,7 +58,13 @@ export type Dictating = ReturnType<typeof useDictation>;
 const holdMs = 400;
 
 /** Tap to start talking, tap again to stop, or hold to talk and let go. not set up, it opens where it is set. */
-export function DictationKey(props: { dictating: Dictating; bar?: boolean; surface?: boolean; size?: IconSize | undefined; styles?: stylex.StyleXStyles }) {
+export function DictationKey(props: {
+  dictating: Dictating;
+  bar?: boolean;
+  surface?: boolean;
+  size?: IconSize | undefined;
+  class?: JSX.ClassValue | undefined;
+}) {
   const d = () => props.dictating;
   // The press that started a recording, and whether letting go of it stopped it: its click is then not a tap.
   let pressed: number | undefined;
@@ -261,7 +75,7 @@ export function DictationKey(props: { dictating: Dictating; bar?: boolean; surfa
       problem={d().problem()}
       bar={props.bar === true}
       size={props.size}
-      styles={props.styles}
+      class={props.class}
       surface={props.surface}
       onPointerDown={(e) => {
         if (e.button !== 0 || d().state() !== "idle") return;
@@ -292,10 +106,10 @@ export function DictationButton(props: {
   value: string;
   onValue: (v: string, caret: number) => void;
   size?: IconSize;
-  styles?: stylex.StyleXStyles;
+  class?: JSX.ClassValue | undefined;
 }) {
   const dictating = useDictation({ input: () => props.field(), value: () => props.value, onValue: (v, c) => props.onValue(v, c) });
-  return <DictationKey dictating={dictating} size={props.size} styles={props.styles} />;
+  return <DictationKey dictating={dictating} size={props.size} class={props.class} />;
 }
 
 /** The key as it looks in each state, the microphone and the server kept out: what DictationKey draws. */
@@ -305,7 +119,7 @@ export function DictationMark(props: {
   /** The box shows the recording (DictationBar): the key is its done, not a pulsing stop. */
   bar?: boolean | undefined;
   size?: IconSize | undefined;
-  styles?: stylex.StyleXStyles;
+  class?: JSX.ClassValue | undefined;
   surface?: boolean | undefined;
   onClick: () => void;
   onPointerDown?: ((e: PointerEvent & { currentTarget: HTMLButtonElement }) => void) | undefined;
@@ -330,18 +144,18 @@ export function DictationMark(props: {
       onClick={() => props.onClick()}
       onPointerDown={(e) => props.onPointerDown?.(e)}
       onPointerUp={() => props.onPointerUp?.()}
-      {...styleProps([
-        styles.mark,
-        props.state === "unset" && styles.unset,
+      class={[
+        "inline-flex shrink-0 cursor-pointer disabled:cursor-default touch-none items-center justify-center p-1 select-none disabled:opacity-50",
+        props.state === "unset" && "text-faint",
         props.state === "recording"
           ? props.bar === true
             ? props.surface === true
-              ? styles.recordingSurface
-              : styles.recordingBar
-            : styles.recording
-          : props.surface === true && styles.surface,
-        props.styles,
-      ])}
+              ? "bg-accent hover:bg-hover"
+              : "bg-accent hover:bg-accent-hover"
+            : "text-berry bg-berry/12 [animation-name:pulse] motion-reduce:[animation-name:none] [animation-duration:2000ms] motion-reduce:[animation-duration:0ms] [animation-timing-function:cubic-bezier(0.4,0,0.6,1)] motion-reduce:[animation-timing-function:ease] [animation-iteration-count:infinite] motion-reduce:[animation-iteration-count:1]"
+          : props.surface === true && "hover:bg-hover",
+        props.class,
+      ]}
     >
       <Icon name={look()[0]} size={props.size ?? 20} />
     </button>
@@ -383,33 +197,36 @@ export function DictationBar(props: { dictating: Dictating }) {
     return () => cancelAnimationFrame(frame);
   });
   return (
-    <div data-testid="dictation-bar" data-state={d().state()} {...stylex.attrs(styles.dictationBar)}>
+    <div data-testid="dictation-bar" data-state={d().state()} class="flex min-w-0 flex-1 items-center gap-2">
       <Show
         when={listening()}
         fallback={
-          <span {...stylex.attrs(styles.dictationBarSpan)}>
+          <span class="flex [animation-name:pulse] motion-reduce:[animation-name:none] [animation-duration:2000ms] [animation-timing-function:cubic-bezier(.4,_0,_.6,_1)] [animation-iteration-count:infinite] items-center gap-2 px-1 text-sm text-muted">
             <Icon name="wait" size={14} />
             {t("web.voice.dictation.transcribing")}
           </span>
         }
       >
-        <span aria-hidden="true" {...stylex.attrs(styles.dictationBarSpan2)} />
-        <span {...stylex.attrs(styles.dictationBarSpan4)} role="timer" aria-label={t("web.voice.dictation.listening")}>
+        <span
+          aria-hidden="true"
+          class="ml-1 w-2 h-2 shrink-0 [animation-name:pulse] motion-reduce:[animation-name:none] [animation-duration:2000ms] [animation-timing-function:cubic-bezier(.4,_0,_.6,_1)] [animation-iteration-count:infinite] rounded-full bg-berry"
+        />
+        <span class="w-9 shrink-0 text-xs text-muted tabular-nums" role="timer" aria-label={t("web.voice.dictation.listening")}>
           {clock(elapsed())}
         </span>
-        <span aria-hidden="true" {...stylex.attrs(styles.dictationBarSpan3)}>
+        <span aria-hidden="true" class="mx-1 flex h-5 min-w-0 flex-1 flex-row-reverse items-center justify-between overflow-hidden">
           <For each={bars().toReversed()} keyed={false}>
-            {(level) => <span {...stylex.attrs(styles.dictationBarSpan22)} style={{ height: `${Math.max(3, level() * 20)}px` }} />}
+            {(level) => <span class="w-0.75 shrink-0 rounded-full bg-ink/55" style={{ height: `${Math.max(3, level() * 20)}px` }} />}
           </For>
         </span>
-        <span {...stylex.attrs(styles.dictationBarSpan32)}>{t("web.voice.dictation.keys")}</span>
+        <span class="hidden sm:inline shrink-0 text-xs text-faint">{t("web.voice.dictation.keys")}</span>
         <button
           type="button"
           data-testid="dictation-cancel"
           onClick={() => d().cancel()}
           aria-label={t("web.voice.dictation.cancel")}
           title={t("web.voice.dictation.cancel")}
-          {...stylex.attrs(styles.dictationCancel)}
+          class="inline-flex w-7 h-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted hover:text-ink hover:bg-hover"
         >
           <Icon name="close" size={16} />
         </button>
@@ -424,17 +241,17 @@ export function DictationProblem(props: { dictating: Dictating }) {
   return (
     <Show when={d().problem()}>
       {(why) => (
-        <div data-testid="dictation-problem" role="status" {...stylex.attrs(styles.dictationProblem)}>
+        <div data-testid="dictation-problem" role="status" class="mx-2 mb-1 flex items-center gap-2 rounded-md bg-hover px-2 py-1 text-xs">
           <Icon name="warn" size={14} />
-          <span {...stylex.attrs(styles.dictationProblemSpan)} title={why()}>
+          <span class="min-w-0 flex-1 truncate text-muted" title={why()}>
             {why()}
           </span>
-          <button type="button" {...stylex.attrs(styles.dictationProblemButton)} onClick={() => d().toggle()}>
+          <button type="button" class="shrink-0 cursor-pointer rounded-sm px-1.5 py-0.5 font-medium text-ink hover:bg-page" onClick={() => d().toggle()}>
             {t("web.voice.dictation.again")}
           </button>
           <button
             type="button"
-            {...stylex.attrs(styles.dictationProblemButton2)}
+            class="shrink-0 cursor-pointer rounded-sm p-0.5 text-muted hover:text-ink hover:bg-page"
             aria-label={t("web.voice.dictation.dismiss")}
             title={t("web.voice.dictation.dismiss")}
             onClick={() => d().dismiss()}

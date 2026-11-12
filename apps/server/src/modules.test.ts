@@ -1,7 +1,6 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, normalize, relative } from "node:path";
 
-import { Array as Arr, String as Str } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 import { analyzeSource, type Edge } from "@vibevalley/testkit/source";
@@ -15,9 +14,9 @@ const pending: Readonly<Record<string, string>> = {
 };
 
 function files(dir: string): string[] {
-  return Arr.flatMap(readdirSync(dir), (f) => {
+  return readdirSync(dir).flatMap((f) => {
     const p = join(dir, f);
-    return statSync(p).isDirectory() ? files(p) : Str.endsWith(".ts")(p) ? [p] : [];
+    return statSync(p).isDirectory() ? files(p) : p.endsWith(".ts") ? [p] : [];
   });
 }
 
@@ -39,21 +38,26 @@ const reads: Readonly<Record<string, string>> = {
 };
 
 const localEdges = (file: string, edges: readonly Edge[]) =>
-  Arr.flatMap(edges, ({ from: spec }) =>
-    Str.startsWith("#/")(spec)
-      ? [normalize(spec.slice(2))]
-      : Str.startsWith("./")(spec) || Str.startsWith("../")(spec)
-        ? [rel(normalize(join(dirname(file), spec)))]
-        : [],
+  edges.flatMap(({ from: spec }) =>
+    spec.startsWith("#/") ? [normalize(spec.slice(2))] : spec.startsWith("./") || spec.startsWith("../") ? [rel(normalize(join(dirname(file), spec)))] : [],
   );
 
-function inspect(file: string, text: string) {
+/** The services a module is handed (DepsOf: `readonly session: Session`), each by its deps key. */
+const depsOf = (text: string) =>
+  [...text.matchAll(/interface \w*Deps\b[^{]*\{([^}]*)\}/gu)].flatMap((m) => [...(m[1] ?? "").matchAll(/readonly (\w+)\??:/gu)].map((k) => k[1] ?? ""));
+
+/** The unit a deps key names: the module or gateway of that name. */
+const unitOfKey = (key: string) => [`modules/${key}`, `gateway/${key}`].find((unit) => moduleOf(unit) !== undefined);
+
+function inspect(file: string, unread: string) {
+  // A service reads the core state off its deps as well as off a const it took from them: both are core.state().
+  const text = unread.replaceAll(/\bdeps\.core\b/gu, "core");
   const source = analyzeSource(file, text);
   const local = localEdges(file, source.edges);
   const sessionSnapshot = source.calls("core", "state") && local.includes("modules/session/roster.ts");
   const parts = source.reads("core", "state");
   if (source.calls("core", "session") || sessionSnapshot) parts.push("sessions");
-  return { file, from: rel(file), edges: source.edges, local, parts: [...new Set(parts)], sessionSnapshot };
+  return { file, from: rel(file), edges: source.edges, local, parts: [...new Set(parts)], sessionSnapshot, deps: depsOf(text) };
 }
 
 // Built inside the first check, so its time includes reading and parsing, not hidden in test collection.
@@ -67,15 +71,15 @@ const foreignReads: Readonly<Record<string, Readonly<Record<string, readonly str
   mailbox: { "channel.sql.ts": ["defaultID", "topPlace", "unreadOf"], "channel_member.sql.ts": ["membersOf"], "issue.sql.ts": ["issueExists"] },
   inbox: { "channel_message.sql.ts": ["messageByID", "notificationReceipt", "userReadReports"] },
 };
-const folders = Arr.flatMap(containers, (c) => Arr.filter(readdirSync(join(src, c)), (name) => statSync(join(src, c, name)).isDirectory()));
+const folders = containers.flatMap((c) => readdirSync(join(src, c)).filter((name) => statSync(join(src, c, name)).isDirectory()));
 const tableModule = (name: string) => {
   const table = name.replace(/\.sql\.ts$/u, "");
   return folders.find((module) => table === module || table.startsWith(`${module}_`));
 };
 const foreignQueries = (file: string, edges: readonly Edge[]) => {
   const module = conceptOf(rel(file));
-  return Arr.flatMap(edges, (edge) => {
-    if (!Str.startsWith("#db/")(edge.from)) return [];
+  return edges.flatMap((edge) => {
+    if (!edge.from.startsWith("#db/")) return [];
     const name = edge.from.split("/").at(-1) ?? "";
     if (name === "types.ts" || tableModule(name) === module) return [];
     const allowed = foreignReads[module]?.[name] ?? [];
@@ -129,6 +133,27 @@ describe("the modules", () => {
       Object.keys(pending).filter((p) => !found.includes(p)),
       "an import listed in pending is gone. Fix: drop it from pending. See apps/server/src/modules.test.ts",
     ).toEqual([]);
+  });
+
+  it("are handed only the services of the modules before them", () => {
+    const found = sources().flatMap(({ from, deps }) =>
+      deps.flatMap((key) => {
+        const unit = unitOfKey(key);
+        return unit !== undefined && moduleOf(unit) !== moduleOf(from) && rank(unit) > rank(from) ? [`${from} -> ${key}`] : [];
+      }),
+    );
+    expect(
+      found,
+      "a module's deps name the service of a module after it in modules.ts, so services.ts cannot build it first. Fix: move what both need into the earlier module, or have the later one hand it down (a Subscription the earlier one offers). See docs/architecture.md",
+    ).toEqual([]);
+  });
+
+  it("regression: a deps interface names its services by key", () => {
+    const file = join(src, "modules/repo/repo.ts");
+    expect(
+      inspect(file, "export interface RepoDeps {\n  readonly config: ServerConfig;\n  readonly issue: Issue;\n  readonly session?: Session;\n}").deps,
+    ).toEqual(["config", "issue", "session"]);
+    expect(inspect(file, "const issues = deps.core.state().issues;").parts).toEqual(["issues"]);
   });
 
   it("use only their own tables' queries, besides named read projections", () => {

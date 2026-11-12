@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -13,26 +12,6 @@ import { Card, Quiet } from "#/ui/layout.tsx";
 import { toast } from "#/ui/toasts.ts";
 
 import { userQuery } from "./signIns";
-
-const viewStyles = stylex.create({
-  row: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "flex-end",
-    gap: "0.5rem",
-  },
-  grow: { minWidth: "12rem", flex: "1" },
-  note: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  body: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "1rem",
-  },
-});
 
 /** The user's name, the password (set only at this computer), and signing this device out. */
 export function Account() {
@@ -49,9 +28,9 @@ export function Account() {
     <Card title={t("web.user.account.title")} testid="account">
       <Show when={s()} fallback={<Quiet>{status.error() ? reasonOf(status.error()) : t("web.base.form.asking")}</Quiet>}>
         {(s) => (
-          <div {...stylex.attrs(viewStyles.body)}>
+          <div class="flex flex-col gap-4">
             <form
-              {...stylex.attrs(viewStyles.row)}
+              class="flex flex-wrap items-end gap-2"
               onSubmit={(e) => {
                 e.preventDefault();
                 const next = shownName();
@@ -64,7 +43,7 @@ export function Account() {
                 );
               }}
             >
-              <div {...stylex.attrs(viewStyles.grow)}>
+              <div class="min-w-48 flex-1">
                 <Field label={t("web.user.account.name")} hint={t("web.user.account.nameHint")}>
                   <TextInput data-testid="account-name" value={shownName()} onInput={(e) => setName(e.currentTarget.value)} maxlength={40} />
                 </Field>
@@ -73,9 +52,9 @@ export function Account() {
                 {t("web.user.account.save")}
               </Button>
             </form>
-            <Show when={s().here} fallback={<p {...stylex.attrs(viewStyles.note)}>{t("web.user.account.passwordHere")}</p>}>
+            <Show when={s().here} fallback={<p class="text-sm text-muted">{t("web.user.account.passwordHere")}</p>}>
               <form
-                {...stylex.attrs(viewStyles.row)}
+                class="flex flex-wrap items-end gap-2"
                 onSubmit={(e) => {
                   e.preventDefault();
                   const next = password();
@@ -88,7 +67,7 @@ export function Account() {
                   );
                 }}
               >
-                <div {...stylex.attrs(viewStyles.grow)}>
+                <div class="min-w-48 flex-1">
                   <Field label={t("web.user.account.password")} hint={t("web.user.account.passwordHint")}>
                     <TextInput
                       data-testid="account-password"
@@ -106,8 +85,8 @@ export function Account() {
             </Show>
             <Show when={s().device}>
               {(device) => (
-                <div {...stylex.attrs(viewStyles.row)}>
-                  <p {...stylex.attrs(viewStyles.note, viewStyles.grow)}>{t("web.user.account.thisDevice", { name: device().name })}</p>
+                <div class="flex flex-wrap items-end gap-2">
+                  <p class={["text-sm text-muted", "min-w-48 flex-1"]}>{t("web.user.account.thisDevice", { name: device().name })}</p>
                   <Button
                     data-testid="account-sign-out"
                     disabled={act.busy()}

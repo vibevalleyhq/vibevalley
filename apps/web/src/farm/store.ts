@@ -1,5 +1,5 @@
-import { Schema } from "effect";
 import { type Accessor, createMemo } from "solid-js";
+import { z } from "zod";
 
 import { dayClock } from "@vibevalley/engine/clock";
 import { t } from "@vibevalley/i18n";
@@ -75,7 +75,7 @@ export interface FarmUi {
 }
 
 /** The repo whose farm was on the page last ("" for the sessions without one), the one `/farm` opens; null before any. */
-const lastFarm = defineStored("farm.repo", Schema.NullOr(Schema.String), null);
+const lastFarm = defineStored("farm.repo", z.string().nullable(), null);
 
 const farmUi = defineAtom<FarmUi>({
   overlays: [],

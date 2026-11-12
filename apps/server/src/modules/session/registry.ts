@@ -1,5 +1,4 @@
-import { Clock, Deferred, Effect, Exit, FiberMap, FiberSet, Queue, PubSub, Scope, Semaphore, Stream, String as Str } from "effect";
-
+import { Hub, Semaphore, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
@@ -7,14 +6,14 @@ import { sessionId } from "@vibevalley/protocol/schema";
 import { BizCode, refuseIn } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { jsonText } from "#/base/json.ts";
-import { scopedPubSub } from "#/base/pubsub.ts";
-import { Core, type FactIn } from "#/core/core.ts";
-import { serverAddress, ServerConfig } from "#/infra/config.ts";
-import { causeMessage, Db } from "#/infra/db.ts";
-import { bestEffort } from "#/infra/log.ts";
-import { Agent } from "#/modules/agent/agent.ts";
+import type { Core } from "#/core/core.ts";
+import { serverAddress, type ServerConfig } from "#/infra/config.ts";
+import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
+import { bestEffort, type Logger } from "#/infra/log.ts";
+import type { Time } from "#/infra/time.ts";
+import type { Agent } from "#/modules/agent/agent.ts";
 import { type ExecutionInput } from "#/modules/machine/executor.ts";
-import { Machine } from "#/modules/machine/machine.ts";
+import type { Machine } from "#/modules/machine/machine.ts";
 import * as qs from "#db/session.sql.ts";
 
 import { type Hand, makeHandRoster } from "./hands.ts";
@@ -31,50 +30,55 @@ export type { Hand };
 const saveAfterMs = 300;
 
 export interface RunStore {
-  readonly start: (id: string, session: string, issue: string, trigger: T.RunTrigger) => Effect.Effect<void, NotRecorded>;
-  readonly link: (run: string, issue: string) => Effect.Effect<void, NotRecorded>;
-  readonly heard: (run: string, heard: readonly string[]) => Effect.Effect<void, NotRecorded>;
-  readonly issues: (run: string) => Effect.Effect<T.IssueId[], NotRecorded>;
-  readonly finish: (id: string, outcome: T.Outcome, summary: string, spent?: T.Spent) => Effect.Effect<void, NotRecorded>;
+  readonly start: (id: string, session: string, issue: string, trigger: T.RunTrigger) => Promise<void>;
+  readonly link: (run: string, issue: string) => Promise<void>;
+  readonly heard: (run: string, heard: readonly string[]) => Promise<void>;
+  readonly issues: (run: string) => Promise<T.IssueId[]>;
+  readonly finish: (id: string, outcome: T.Outcome, summary: string, spent?: T.Spent) => Promise<void>;
   readonly finished: (r: RunFinished) => void;
   readonly consumed: (c: Consumed) => void;
   readonly register: (session: string, currentRun: () => string) => void;
 }
 
-export const sessionRegistry = Effect.gen(function* () {
-  const config = yield* ServerConfig;
-  const core = yield* Core;
-  const store = yield* Agent;
-  const machines = yield* Machine;
-  const executor = machines.executions(machines.here());
-  const db = yield* Db;
-  const clock = yield* Clock.Clock;
-  const context2 = yield* Effect.context();
-  const runSync = Effect.runSyncWith(context2);
-  const forkHere = yield* FiberSet.makeRuntime();
-  const fire = <A, E>(e: Effect.Effect<A, E>) => void forkHere(e);
-  const pendingRuns = yield* Queue.unbounded<Effect.Effect<void>>();
-  yield* Effect.forkScoped(Effect.forever(Effect.flatten(Queue.take(pendingRuns))));
-  const recordRun = (write: Effect.Effect<void>) => void Queue.offerUnsafe(pendingRuns, write);
-  const flushRuns = Effect.gen(function* () {
-    const done = yield* Deferred.make<void>();
-    recordRun(Effect.asVoid(Deferred.succeed(done, undefined)));
-    yield* Deferred.await(done);
-  });
-  const timers = yield* FiberMap.make<string>();
-  const later = yield* FiberMap.runtime(timers)();
-  // Synchronous bridge for non-Effect `oar` observer callbacks so facts commit in callback order.
-  const apply = (...facts: FactIn[]) => runSync(core.apply(...facts));
-  const notice = (level: "info" | "warn" | "error", text: string) => runSync(core.notice(level, text));
-  const mcpEndpoint = { url: `http://${serverAddress(config)}/mcp` };
-  const trajectories = yield* makeTrajectories(config.home, (id, e) => runSync(core.sessionEvent(sessionId(id), e)));
-  const admission = yield* Semaphore.make(1);
-  const roster = makeHandRoster(admission);
-  yield* Effect.addFinalizer(() => Effect.sync(() => roster.clearTokens()));
+export interface RegistryDeps {
+  readonly config: ServerConfig;
+  readonly clock: Time;
+  readonly log: Logger;
+  readonly db: Db;
+  readonly core: Core;
+  readonly agent: Agent;
+  readonly machine: Machine;
+}
 
-  const newsHub = yield* scopedPubSub<SessionNews>();
-  const [, moves] = yield* core.transitions;
-  const tell = (news: SessionNews) => void PubSub.publishUnsafe(newsHub, news);
+export async function makeRegistry(deps: RegistryDeps) {
+  const { config, core, db, clock } = deps;
+  const log = deps.log;
+  const store = deps.agent;
+  const machines = deps.machine;
+  const executor = machines.executions(machines.here());
+  const tasks = new TaskGroup({ name: "session", onError: (task, e) => log.error(`${task} failed`, e) });
+  /** Background work nobody waits for (a run's memories kept). */
+  const fire = (name: string, work: () => Promise<unknown>) => void tasks.run(name, work);
+  // Run records are written one at a time, in the order asked: a run's start before its end.
+  let runWrites: Promise<void> = Promise.resolve();
+  const recordRun = (what: string, write: () => Promise<unknown>) => {
+    runWrites = runWrites.then(write).then(
+      () => undefined,
+      (e: unknown) => log.warn(what, e),
+    );
+  };
+  /** Every run record asked for before this, written. */
+  const flushRuns = () => runWrites;
+  /** One timer per key (the save, each conversation's idle suspension): a new one stops the one before. */
+  const later = (key: string, work: (signal: AbortSignal) => Promise<unknown>) => void tasks.keyed(key, work);
+  const mcpEndpoint = { url: `http://${serverAddress(config)}/mcp` };
+  const trajectories = makeTrajectories(config.home, (id, e) => core.sessionEvent(sessionId(id), e), { clock, log });
+  const admission = new Semaphore(1);
+  const roster = makeHandRoster(admission);
+
+  const newsHub = new Hub<SessionNews>();
+  const moves = core.transitions().changes;
+  const tell = (news: SessionNews) => newsHub.publish(news);
   const signal = (a: LaunchActivity) => tell(a);
 
   const executions = new Map<string, () => string>();
@@ -82,50 +86,47 @@ export const sessionRegistry = Effect.gen(function* () {
   const launchOf = (id: string) => `${id}#${++launches}`;
   let closing = false;
 
-  const handRow = (h: Hand) =>
-    Effect.map(
-      Effect.all({ place: jsonText(h.place), recalled: h.recalled.size > 0 ? jsonText([...h.recalled].toSorted()) : Effect.succeed(null) }),
-      ({ place, recalled }) => ({ id: h.id, place, oar_session: h.oarSessionId || null, last_text: h.lastText || null, recalled }),
-    );
-  const keepHands = Effect.suspend(() =>
-    db.inTx(
-      Effect.gen(function* () {
-        yield* Effect.forEach(core.state().sessions, (session) => db.run(Effect.flatMap(sessionState(session), qs.keepSessionState)), { discard: true });
-        yield* Effect.forEach(roster.values(), (h) => db.run(Effect.flatMap(handRow(h), qs.keepHand)), { discard: true });
+  const handRow = (h: Hand): qs.KeepHandParams => ({
+    id: h.id,
+    place: jsonText(h.place),
+    oar_session: h.oarSessionId || null,
+    last_text: h.lastText || null,
+    recalled: h.recalled.size > 0 ? jsonText([...h.recalled].toSorted()) : null,
+  });
+  const keepHands = () =>
+    bestEffort(log, "session: recovery state was not saved", () =>
+      db.tx(async () => {
+        for (const session of core.state().sessions) await qs.keepSessionState(db.sql, sessionState(session));
+        for (const h of roster.values()) await qs.keepHand(db.sql, handRow(h));
       }),
-    ),
-  ).pipe(bestEffort("session: recovery state was not saved"));
+    );
 
   const save = () => {
     if (closing) return;
-    later("save", Effect.delay(keepHands, saveAfterMs));
+    later("save", async (abort) => {
+      await clock.sleep(saveAfterMs, abort);
+      await keepHands();
+    });
   };
 
-  const [, changedSessions] = yield* core.transitions;
-  yield* Effect.forkScoped(
-    Stream.runForEach(changedSessions, (change) =>
-      Effect.sync(() => {
-        if (change.before.sessions !== change.after.sessions) save();
-      }),
-    ),
-  );
-  const activeSessions2 = yield* db.run(qs.activeSessions());
-  yield* Effect.forEach(
-    activeSessions2,
-    (row) =>
-      Effect.gen(function* () {
-        const session = restoredSession(row);
-        yield* core.apply({ type: "sessionChanged", session });
-      }),
-    { discard: true },
-  );
+  const changedSessions = core.transitions().changes;
+  tasks.run("sessions saved", async () => {
+    for await (const change of changedSessions) if (change.before.sessions !== change.after.sessions) save();
+  });
+  for (const row of await qs.activeSessions(db.sql)) core.apply({ type: "sessionChanged", session: restoredSession(row) });
 
-  const keepRow = (row: qs.KeepSessionParams) =>
-    db.attempt(qs.keepSession(row)).pipe(Effect.mapError((cause) => NotRecorded.make({ message: causeMessage(cause), cause })));
+  const keepRow = async (row: qs.KeepSessionParams) => {
+    try {
+      await qs.keepSession(db.sql, row);
+    } catch (e) {
+      if (e instanceof SqlError) throw new NotRecorded(causeMessage(e), { cause: e });
+      throw e;
+    }
+  };
 
-  const register = Effect.fn("Session.register")(function* (session: SessionIdentity) {
-    const hiredAt = yield* Clock.currentTimeMillis;
-    yield* keepRow({
+  const register = async (session: SessionIdentity) => {
+    const hiredAt = clock.now();
+    await keepRow({
       ...session,
       repo: null,
       issue: null,
@@ -135,24 +136,31 @@ export const sessionRegistry = Effect.gen(function* () {
     });
     const kept = core.session(session.id);
     if (kept === undefined || kept.name !== session.name)
-      yield* core.apply({
+      core.apply({
         type: "sessionChanged",
         session:
           kept === undefined
             ? { ...session, id: sessionId(session.id), hiredAt, runs: 0, refining: false, phase: { _tag: "resting" } }
             : { ...kept, name: session.name },
       });
-  });
+  };
 
   // Ensure on-duty orchestrators have a persisted `session` row before any Run foreign key or mailbox delivery references them.
-  const keepOnDuty = Effect.fn("Session.keepOnDuty")(function* (profile: T.Agent) {
+  const keepOnDuty = async (profile: T.Agent) => {
     if (!isOnDuty(profile)) return;
-    const name = Str.trim(profile.name) || t("server.channel.name.orchestrator");
+    const name = profile.name.trim() || t("server.channel.name.orchestrator");
     if (core.session(profile.id)?.name === name) return;
-    yield* register({ id: profile.id, agent: profile.id, name, role: profile.role, runtime: profile.runtime, brief: profile.duty });
+    await register({ id: profile.id, agent: profile.id, name, role: profile.role, runtime: profile.runtime, brief: profile.duty });
+  };
+  for (const profile of store.all()) await keepOnDuty(profile);
+  store.whenKept(async (profile) => {
+    try {
+      await keepOnDuty(profile);
+    } catch (e) {
+      if (e instanceof NotRecorded) throw refused(e.message);
+      throw e;
+    }
   });
-  yield* Effect.forEach(store.all(), keepOnDuty, { discard: true });
-  store.whenKept((profile) => keepOnDuty(profile).pipe(Effect.mapError((error) => refused(error.message))));
 
   const keep = (s: T.Session) =>
     keepRow({
@@ -170,13 +178,17 @@ export const sessionRegistry = Effect.gen(function* () {
     });
 
   const ended = (id: string, closed: T.SessionClose) =>
-    db.attempt(qs.endSession({ ended_at: clock.currentTimeMillisUnsafe(), closed, id })).pipe(bestEffort(`vibevalley: session ${id}'s end not kept`));
+    bestEffort(log, `vibevalley: session ${id}'s end not kept`, () => qs.endSession(db.sql, { ended_at: clock.now(), closed, id }));
 
-  const forget = (id: string) => db.attempt(qs.forgetSession({ id })).pipe(bestEffort(`vibevalley: unstarted session ${id} not forgotten`));
+  const forget = (id: string) => bestEffort(log, `vibevalley: unstarted session ${id} not forgotten`, () => qs.forgetSession(db.sql, { id }));
 
-  const logOf = (s: T.Session, journal: Journal) => Effect.as(Effect.andThen(keep(s), db.run(Effect.flatMap(sessionState(s), qs.keepSessionState))), journal);
+  const logOf = async (s: T.Session, journal: Journal) => {
+    await keep(s);
+    await qs.keepSessionState(db.sql, sessionState(s));
+    return journal;
+  };
 
-  const runs = yield* recording;
+  const runs = recording({ db, clock });
 
   /** Queued before dispatching to the runtime so `startRun` finds it if the turn opens synchronously. */
   const expect = (h: Hand, input: DeliveryInput, inputId?: string) =>
@@ -188,13 +200,14 @@ export const sessionRegistry = Effect.gen(function* () {
     const by = expected?.trigger ?? { kind: "runtime" };
     const issue = core.session(h.id)?.issue ?? h.issue;
     const id = newId();
+    const at = clock.now();
     // Assign `h.run` synchronously before async DB persistence so an immediate `report` finds it.
     h.run = id;
     h.heard = [];
     h.report = undefined;
-    recordRun(db.run(qs.clearPendingReport({ id: h.id })).pipe(bestEffort(`vibevalley: ${h.id}'s previous report was not cleared`)));
+    recordRun(`vibevalley: ${h.id}'s previous report was not cleared`, () => qs.clearPendingReport(db.sql, { id: h.id }));
     h.journal.runStarted(id);
-    recordRun(runs.start(id, h.id, issue, by).pipe(bestEffort("vibevalley: a run not kept"), Effect.annotateLogs({ session: h.id })));
+    recordRun(`vibevalley: a run not kept (session ${h.id})`, () => runs.start(id, h.id, issue, by, at));
     if (expected?.inputId === undefined && expected !== undefined && expected.envelopeIds.length > 0) consume(h, expected.envelopeIds);
   };
 
@@ -202,7 +215,11 @@ export const sessionRegistry = Effect.gen(function* () {
     const fresh = envelopeIds.filter((id) => !h.heard.includes(id));
     if (fresh.length === 0) return;
     h.heard.push(...fresh);
-    if (h.run) recordRun(runs.heard(h.run, h.heard).pipe(bestEffort(`vibevalley: run ${h.run}`)));
+    if (h.run) {
+      const run = h.run;
+      const heard = [...h.heard];
+      recordRun(`vibevalley: run ${run}`, () => runs.heard(run, heard));
+    }
     tell({ _tag: "Consumed", session: h.id, envelopeIds: fresh });
   };
 
@@ -221,25 +238,15 @@ export const sessionRegistry = Effect.gen(function* () {
     if (!id) return;
     h.journal.runEnded(id, outcome);
     const issue = core.session(h.id)?.issue;
-    recordRun(
-      db
-        .inTx(
-          Effect.gen(function* () {
-            yield* runs.finish(id, outcome, summary, spent);
-            const session = core.session(h.id);
-            if (session) yield* db.run(Effect.flatMap(sessionState(session), qs.keepSessionState));
-            yield* db.run(qs.clearPendingReport({ id: h.id }));
-          }),
-        )
-        .pipe(
-          Effect.tap(() =>
-            Effect.sync(() => {
-              if (issue) tell({ _tag: "RunFinished", id, issues: [issue], outcome });
-            }),
-          ),
-          bestEffort(`vibevalley: run ${id}`),
-        ),
-    );
+    recordRun(`vibevalley: run ${id}`, async () => {
+      await db.tx(async () => {
+        await runs.finish(id, outcome, summary, spent);
+        const session = core.session(h.id);
+        if (session) await qs.keepSessionState(db.sql, sessionState(session));
+        await qs.clearPendingReport(db.sql, { id: h.id });
+      });
+      if (issue) tell({ _tag: "RunFinished", id, issues: [issue], outcome });
+    });
   };
 
   const release = (h: Hand) => executor.detach(h.id);
@@ -247,48 +254,44 @@ export const sessionRegistry = Effect.gen(function* () {
   const closeExecution = (h: Hand) => executor.close(h.id);
 
   // Flush recovery state and detach before executor shutdown so interrupted turns reconcile on next startup rather than mid-exit.
-  yield* Effect.addFinalizer(() =>
-    Effect.andThen(
-      Effect.suspend(() => {
-        closing = true;
-        return Effect.andThen(FiberMap.remove(timers, "save"), Effect.andThen(flushRuns, keepHands));
-      }),
-      Effect.forEach(
-        roster.values(),
-        (h) =>
-          Effect.andThen(
-            Effect.sync(() => {
-              h.journal.close();
-              release(h);
-            }),
-            Scope.close(h.scope, Exit.void),
-          ),
-        { discard: true },
-      ),
-    ),
-  );
+  const close = async () => {
+    closing = true;
+    await tasks.stop("save");
+    await flushRuns();
+    await keepHands();
+    for (const h of roster.values()) {
+      h.journal.close();
+      release(h);
+      await h.stack.disposeAsync();
+    }
+    moves.close();
+    changedSessions.close();
+    newsHub.end();
+    roster.clearTokens();
+    await tasks.close();
+    await flushRuns();
+    await trajectories.close();
+  };
 
   const runStore: RunStore = {
     ...runs,
-    start: Effect.fn("Session.startHostedRun")(function* (id, session, issue, trigger) {
-      yield* runs.start(id, session, issue, trigger);
+    start: async (id, session, issue, trigger) => {
+      await runs.start(id, session, issue, trigger);
       if (issue) tell({ _tag: "IssueStarted", issue });
-    }),
-    link: Effect.fn("Session.linkHostedIssue")(function* (run, issue) {
-      yield* runs.link(run, issue);
+    },
+    link: async (run, issue) => {
+      await runs.link(run, issue);
       tell({ _tag: "IssueStarted", issue });
-    }),
+    },
     finished: (r) => tell({ _tag: "RunFinished", ...r }),
     consumed: (c) => tell({ _tag: "Consumed", ...c }),
     register: (session, current) => void executions.set(session, current),
   };
   return {
+    tasks,
     fire,
     flushRuns,
-    timers,
     later,
-    apply,
-    notice,
     mcpEndpoint,
     trajectories,
     admission,
@@ -315,7 +318,8 @@ export const sessionRegistry = Effect.gen(function* () {
     release,
     closeExecution,
     runStore,
+    close,
   };
-});
+}
 
-export type SessionRegistry = Effect.Success<typeof sessionRegistry>;
+export type SessionRegistry = Awaited<ReturnType<typeof makeRegistry>>;

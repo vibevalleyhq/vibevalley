@@ -6,7 +6,7 @@ Status: proposed
 
 截至 2026-11-10，除已沉淀至 [地基](docs/subsystems/foundation.md) 的概念与契约表面收敛、以及已立项的 [状态先提交，副作用由 worker 在提交之后做](.agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md) 与 [页面的连接接着带上在线状态和工单的增量](.agents/notes/proposed/architecture/2026-10-27-presence-and-entity-deltas.md) 外，服务端与客户端主干还存在 5 处结构性缺陷：
 
-- **写库与内存镜像及 `Core.apply` 缺乏原子提交边界**：[lifecycle.ts](apps/server/src/modules/issue/lifecycle.ts)（第 95–99、156–158、200–202 行）在 `db.attemptTx` 提交后，分步于事务外更新进程内 `Assignments` 索引（`worked.changed`）并经 `bestEffort` 重读数据库调用 `Core.apply`。若纤程在 `COMMIT` 后被中断或重读失败，数据库与内存 `worked`、`SpaceState` 即永久分叉直至重启。[mailbox.ts](apps/server/src/modules/mailbox/mailbox.ts)（第 171–195、300–346 行）同样在表外维护 `Deliveries`、`Reach`、`WakeBreaker` 三个可变镜像，靠 `routeLock`、`pumpLock`、`writeLock` 三把独立 `Semaphore` 手工同步。
+- **写库与内存镜像及 `Core.apply` 缺乏原子提交边界**：[lifecycle.ts](apps/server/src/modules/issue/lifecycle.ts)（第 95–99、156–158、200–202 行）在 `db.attemptTx` 提交后，分步于事务外更新进程内 `Assignments` 索引（`worked.changed`）并经 `bestEffort` 重读数据库调用 `Core.apply`。若任务在 `COMMIT` 后被中断或重读失败，数据库与内存 `worked`、`SpaceState` 即永久分叉直至重启。[mailbox.ts](apps/server/src/modules/mailbox/mailbox.ts)（第 171–195、300–346 行）同样在表外维护 `Deliveries`、`Reach`、`WakeBreaker` 三个可变镜像，靠 `routeLock`、`pumpLock`、`writeLock` 三把独立 `Semaphore` 手工同步。
 - **随机端口启动期存在监听回填与恢复派活竞态**：[registry.ts](apps/server/src/modules/session/registry.ts) 第 94 行按初始配置初始化 `mcpEndpoint`（`port: 0` 时为 `:0`）。在 [app.ts](apps/server/src/gateway/http/app.ts) 第 37–62 行，`services` 层先于 `HttpServer` 端口绑定完成构建并执行尾部的 `mailboxReady` 与 `issuesStart`（[services.ts](apps/server/src/services.ts) 第 157–165 行），随后 `ready` 才调用 `Session.setAddress` 与 `Lan.setUpstream`。若启动恢复期间立即拉起帮工（[launch.ts](apps/server/src/modules/session/launch.ts) 第 86、101 行），帮工将拿到未绑定的 `:0/mcp` 地址。
 - **HTTP、Tool 与 CLI 三套入口重写工单编排**：[http/handlers/issue.ts](apps/server/src/gateway/http/handlers/issue.ts) 与 [tool/issue.ts](apps/server/src/modules/tool/issue.ts)（第 66–80、212–227、252–313 行）及 [cli/src/commands/issue.ts](apps/cli/src/commands/issue.ts) 各自实现引用解析、默认仓库继承与留言逻辑。`tool/issue.ts` 支持按帮工名字匹配工单及创建时组合 `start` / `draft`，HTTP 入口不支持；`Issue.comment` 允许在无在场帮工时向工单串留言，`tool/issue.ts` 却在无在场帮工时直接拒绝。
 - **单连接数据库锁下的 $O(N)$ 排序写放大**：[db.ts](apps/server/src/infra/db.ts) 第 58、145 行固定单连接串行执行事务，而 [lifecycle.ts](apps/server/src/modules/issue/lifecycle.ts) 第 169–175 行的 `place` 每次移动工单均全表读取并在单事务内循环执行 $N$ 次 `UPDATE`，随后在事务外触发 $N$ 次重读与 `Core.apply`，阻塞全局查询。
@@ -16,7 +16,7 @@ Status: proposed
 
 ### 1. 事务提交尾段钩子（`Db` Post-Commit Hook）与单出口镜像更新
 
-1. 在 [db.ts](apps/server/src/infra/db.ts) 新增 `inTxCommit`（或为事务块提供 `afterCommit` 登记回调），在 `Effect.uninterruptibleMask` 内紧随 SQL `COMMIT` 成功同步执行已登记的内存索引变更与 `Core.apply` 事实折叠；若事务回滚则丢弃回调。
+1. 在 [db.ts](apps/server/src/infra/db.ts) 新增 `inTxCommit`（或为事务块提供 `afterCommit` 登记回调），紧随 SQL `COMMIT` 成功、不经打断地同步执行已登记的内存索引变更与 `Core.apply` 事实折叠；若事务回滚则丢弃回调。
 2. 将 [lifecycle.ts](apps/server/src/modules/issue/lifecycle.ts) 的 `worked.changed`、`worked.executed` 与 `publish` 收进提交尾段，直接由写入行构造 `T.Issue` 折叠进 `Core`，消除事务外二次查询与 `bestEffort` 吞错。
 3. 将 `Mailbox` 对 `Deliveries` 与 `Reach` 的变更统一收口至 `writtenLocked` 事务出口，逐步将 `routeLock`、`pumpLock`、`writeLock` 收敛为单一有序状态机门面。
 

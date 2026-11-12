@@ -71,10 +71,10 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "catalog:",
     "@vibevalley/ai": "workspace:*",
-    "effect": "catalog:"
+    "@vibevalley/async": "workspace:*",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "@vibevalley/testkit": "workspace:*",
     "vite-plus": "catalog:"

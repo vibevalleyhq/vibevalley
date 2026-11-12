@@ -1,72 +1,17 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { phoneAnimations } from "#/farm/interaction.stylex.ts";
 import { drawPattern, lcd } from "#/farm/phone/lcd.ts";
 import { kept, usePad, useTicks } from "#/farm/phone/pad.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
-import { styleProps } from "#/ui/positioner.ts";
 
 import { type Dino, dinoBox, dinoGround, dinoHeight, dinoScore, dinoWidth, duck, jump, newDino, type Obstacle, run } from "./dino";
 
-const styles = stylex.create({
-  root: {
-    display: "flex",
-    minHeight: "0",
-    flex: "1",
-    flexDirection: "column",
-    alignItems: "center",
-    paddingInline: "0.25rem",
-    paddingTop: "0.75rem",
-  },
-  topRow: {
-    display: "flex",
-    width: "100%",
-    paddingInline: "0.25rem",
-  },
-  bestScore: {
-    marginLeft: "auto",
-    fontVariantNumeric: "tabular-nums",
-  },
-  scoreRow: {
-    marginTop: "0.25rem",
-    width: "100%",
-    paddingInline: "0.25rem",
-    textAlign: "right",
-    fontVariantNumeric: "tabular-nums",
-  },
-  roadFrame: {
-    position: "relative",
-    marginTop: "0.5rem",
-    boxShadow: "0 0 0 2px var(--color-lcd-ink)",
-  },
-  canvas: (zoom: number) => ({
-    display: "block",
-    width: dinoWidth * zoom,
-    height: dinoHeight * zoom,
-    imageRendering: "pixelated",
-  }),
-  overlay: {
-    position: "absolute",
-    inset: "0",
-    display: "grid",
-    placeItems: "center",
-    textAlign: "center",
-  },
-  banner: {
-    backgroundColor: "var(--color-lcd-paper)",
-    paddingInline: "0.5rem",
-  },
-  help: {
-    marginTop: "auto",
-    marginBottom: "0.5rem",
-    textAlign: "center",
-    lineHeight: "1.625",
-    color: "var(--color-lcd-dark)",
-  },
-});
+const styles = {
+  canvas: (zoom: number): JSX.CSSProperties => ({ width: `${dinoWidth * zoom}px`, height: `${dinoHeight * zoom}px` }),
+};
 
 const best = kept(0);
 
@@ -209,35 +154,36 @@ export function DinoGame(props: { big?: boolean }) {
     return now ? dinoScore(now) : 0;
   };
   return (
-    <div {...stylex.attrs(styles.root)}>
-      <div {...stylex.attrs(styles.topRow)}>
+    <div class="flex min-h-0 flex-1 flex-col items-center px-1 pt-3">
+      <div class="flex w-full px-1">
         <span>{t("web.farm.phone.game.dino")}</span>
-        <span {...stylex.attrs(styles.bestScore)}>
+        <span class="ml-auto tabular-nums">
           {t("web.farm.phone.blocks.best")} {five(Math.max(top(), score()))}
         </span>
       </div>
-      <div {...stylex.attrs(styles.scoreRow)}>{five(score())}</div>
-      <div {...stylex.attrs(styles.roadFrame)}>
+      <div class="mt-1 w-full px-1 text-right tabular-nums">{five(score())}</div>
+      <div class="relative mt-2 [box-shadow:0_0_0_2px_var(--color-lcd-ink)]">
         <canvas
           ref={(el) => (canvas = el)}
           width={dinoWidth}
           height={dinoHeight}
           role="img"
           aria-label={t("web.farm.phone.dino.road")}
-          {...styleProps(styles.canvas(zoom()))}
+          class="block [image-rendering:pixelated]"
+          style={styles.canvas(zoom())}
         />
         <Show when={!playing()}>
-          <div {...stylex.attrs(styles.overlay)}>
-            <span {...stylex.attrs(styles.banner)}>
+          <div class="absolute inset-0 grid place-items-center text-center">
+            <span class="bg-lcd-paper px-2">
               {d()?.over === true ? t("web.farm.phone.dino.crashed") : t("web.farm.phone.game.dino")} ·{" "}
-              <span {...styleProps(phoneAnimations.blink)}>
+              <span class="[animation-name:blink] motion-reduce:[animation-name:none] [animation-duration:1000ms] [animation-iteration-count:infinite]">
                 {t("web.farm.phone.pressA", { what: d()?.over === true ? t("web.farm.phone.again") : t("web.farm.phone.start") })}
               </span>
             </span>
           </div>
         </Show>
       </div>
-      <p {...stylex.attrs(styles.help)}>
+      <p class="mt-auto mb-2 text-center leading-relaxed text-lcd-dark">
         {t("web.farm.phone.dino.help")}
         <br />
         {t("web.farm.phone.dino.help2")}

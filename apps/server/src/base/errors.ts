@@ -1,18 +1,15 @@
-import { Array as Arr, Effect, Predicate, Schema } from "effect";
-
 import { t } from "@vibevalley/i18n";
 import { ApiError, BizCode, type BizErrorCode, type Next, type VoiceFix } from "@vibevalley/protocol/api";
 
 export { ApiError, BizCode, type BizErrorCode, type Next };
 
+// A hint's say is a getter read in the locale of the moment (listed below): copied here, when the error is made.
 const materializeNext = (items: readonly Next[]): readonly Next[] =>
-  Arr.map(items, (item) => ({ say: item.say, ...(item.run !== undefined ? { run: [...item.run] } : {}) }));
+  items.map((item) => ({ say: item.say, ...(item.run !== undefined ? { run: [...item.run] } : {}) }));
 
-/** Builds a yieldable ApiError with a six-digit business error code, message, and optional remediation detail. */
+/** An ApiError with a six-digit business error code, message, and optional remediation detail: thrown, never returned. */
 export const bizError = (bizCode: BizErrorCode, message: string, options?: { readonly next?: readonly Next[]; readonly settings?: VoiceFix }): ApiError =>
-  ApiError.make({
-    bizCode,
-    message,
+  new ApiError(bizCode, message, {
     ...(options?.next !== undefined && options.next.length > 0 ? { next: materializeNext(options.next) } : {}),
     ...(options?.settings !== undefined ? { settings: options.settings } : {}),
   });
@@ -100,10 +97,14 @@ export const messageOf = (e: unknown): string => (e instanceof Error ? e.message
 export const errnoOf = (e: unknown): string | undefined => (e instanceof Error && "code" in e && typeof e.code === "string" ? e.code : undefined);
 
 /** A defect, never an expected failure: the farm's own records disagree with each other, or a caller broke a rule it is held to. */
-export class Inconsistent extends Schema.TaggedError<Inconsistent, { readonly brand: unique symbol }>()("Inconsistent", { message: Schema.String }) {}
+export class Inconsistent extends Error {
+  override readonly name = "Inconsistent";
+}
 
-/** A lookup's answer, or Missing (what was not found, and where to look) when it found none. */
+/** A lookup's answer, or Missing (what was not found, and where to look) thrown when it found none. */
 export const orMissing =
   (what: string, look: readonly Next[], bizCode?: BizErrorCode) =>
-  <A, E, R>(found: Effect.Effect<A | undefined, E, R>): Effect.Effect<A, E | ApiError, R> =>
-    Effect.filterOrFail(found, Predicate.isNotUndefined, () => missing(what, look, bizCode));
+  <A>(found: A | undefined): A => {
+    if (found === undefined) throw missing(what, look, bizCode);
+    return found;
+  };

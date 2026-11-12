@@ -1,10 +1,9 @@
 import { join } from "node:path";
 
-import { Cause, Clock, Deferred, Effect, FiberHandle, FiberSet, type FileSystem, PubSub, Ref, type Scope, Stream } from "effect";
-
 import type { ModelClient } from "@vibevalley/ai/client";
 import type { ToolCall, ToolDeclaration, Usage } from "@vibevalley/ai/messages";
 import type { ThinkingLevel } from "@vibevalley/ai/models";
+import { abortable, type Clock, Hub, isAbort, type Subscription, systemClock, TaskGroup } from "@vibevalley/async";
 
 import {
   type BrainMessage,
@@ -17,9 +16,11 @@ import {
 } from "../base/messages.ts";
 import { changedParts, joinParts, prefixHashes, type PromptPart } from "../base/prefix.ts";
 import { agent as words } from "../base/prompts.ts";
-import { AgentClosed, type AgentFailed, toolFailed } from "../core/errors.ts";
+import { AgentBusy, AgentClosed, CannotContinue, toolFailed } from "../core/errors.ts";
 import { type Agent, type AgentEvent, make, type Tool } from "../core/loop.ts";
 import { stopped } from "../core/tool.ts";
+import type { AgentFs } from "../infra/fs.ts";
+import { type AgentLog, consoleLog } from "../infra/log.ts";
 import { type McpServer, connectAll } from "../infra/mcp.ts";
 import { fileMemory, type MemoryPort } from "../tools/memory.ts";
 import { makeReminders } from "../tools/reminders.ts";
@@ -61,7 +62,11 @@ export interface BrainOptions {
   readonly thinkingLevel?: ThinkingLevel;
   readonly home: string;
   readonly cwd: string;
-  readonly fs?: FileSystem.FileSystem;
+  readonly fs?: AgentFs;
+  /** Timestamps, how old a conversation is, when an idle fold and a reminder come. Default: the system clock. */
+  readonly clock?: Clock;
+  /** What goes wrong that the agent carries on without. Default: the console. */
+  readonly log?: AgentLog;
   readonly transcript?: TranscriptStore;
   readonly tools?: readonly Tool[];
   readonly disallowedTools?: readonly string[];
@@ -146,31 +151,33 @@ function unfinished(messages: readonly BrainMessage[]): {
   }
 }
 
-export const sessionUnfinished = (file: string, fs?: FileSystem.FileSystem): Effect.Effect<boolean> =>
-  Effect.map(loadSession(file, fs), (messages) => unfinished(messages).ok);
+export const sessionUnfinished = async (file: string, fs?: AgentFs): Promise<boolean> => unfinished(await loadSession(file, fs)).ok;
 
 const sameMessages = (a: readonly BrainMessage[], b: readonly BrainMessage[]) => a.length === b.length && a.at(-1)?.timestamp === b.at(-1)?.timestamp;
 
-export interface Brain {
+export interface Brain extends AsyncDisposable {
   /** Starts a run when idle, or steers into the active run. */
-  readonly send: (message: BrainMessage) => Effect.Effect<void>;
+  readonly send: (message: BrainMessage) => Promise<void>;
   /** Starts a run when idle, or queues as a follow-up after the active run. */
-  readonly later: (message: BrainMessage) => Effect.Effect<void>;
-  readonly ask: (message: BrainMessage) => Effect.Effect<string, AgentClosed>;
-  /** Its events, in order, from the moment this is run: subscribed before it returns. */
-  readonly events: Effect.Effect<Stream.Stream<BrainEvent>, never, Scope.Scope>;
+  readonly later: (message: BrainMessage) => Promise<void>;
+  /** The run's answer once it settles; AgentClosed when the agent is closed. The signal stops the waiting, not the run. */
+  readonly ask: (message: BrainMessage, signal?: AbortSignal) => Promise<string>;
+  /** Its events, in order, from the moment this is called; it ends after agent_closed. */
+  readonly events: () => Subscription<BrainEvent>;
   readonly busy: () => boolean;
   readonly progress: () => RunSnapshot;
-  readonly stop: Effect.Effect<void>;
+  readonly stop: () => Promise<void>;
   readonly history: () => BrainMessage[];
-  readonly queued: Effect.Effect<boolean>;
+  readonly queued: () => Promise<boolean>;
   readonly tools: () => readonly Tool[];
-  readonly reset: Effect.Effect<void>;
-  readonly skills: Effect.Effect<SkillInfo[]>;
+  readonly reset: () => Promise<void>;
+  readonly skills: () => Promise<SkillInfo[]>;
   readonly mcpStatus: () => McpStatus;
   /** Diff of `MEMORY.md` (`+` / `−` lines) since last seen by the model, or `""` when unchanged. */
-  readonly memoryNews: Effect.Effect<string>;
-  readonly resume: (maxAgeMs: number) => Effect.Effect<boolean>;
+  readonly memoryNews: () => Promise<string>;
+  readonly resume: (maxAgeMs: number) => Promise<boolean>;
+  /** Stops the run under way and settles it, then lets go of its tools servers; closing again waits for the first. */
+  readonly close: () => Promise<void>;
 }
 
 interface BrainState {
@@ -188,410 +195,450 @@ interface BrainState {
   folding: CompactionOptions;
 }
 
-export const makeBrain = (options: BrainOptions): Effect.Effect<Brain, AgentFailed, Scope.Scope> =>
-  Effect.gen(function* () {
-    const mcp = yield* Effect.acquireRelease(connectAll(options.mcpServers ?? []), (m) => m.close);
-    const clock = yield* Clock.Clock;
-    const now = () => clock.currentTimeMillisUnsafe();
-    const maxSteps = options.maxSteps ?? 40;
-    const sessionName = options.session || options.name;
-    const transcriptStore =
-      options.noSession === true ? undefined : (options.transcript ?? fileTranscriptStore(join(options.home, sessionName + ".jsonl"), options.fs));
-    const skillDirs = options.noSkills === true ? [] : (options.skills ?? defaultSkillDirs(options.cwd));
-    const scanned = () => scanSkills(skillDirs, options.fs);
+export async function makeBrain(options: BrainOptions): Promise<Brain> {
+  const log = options.log ?? consoleLog;
+  const mcp = await connectAll(options.mcpServers ?? [], log);
+  try {
+    return await openBrain(options, mcp, log);
+  } catch (e) {
+    await mcp.close();
+    throw e;
+  }
+}
 
-    const state: BrainState = {
-      lifecycle: "open",
-      steps: 0,
-      sent: undefined,
-      prefix: "",
-      parts: [],
-      requestPrefix: "",
-      requestTools: [],
-      knownMemory: [],
-      toolList: [],
-      core: undefined,
-      todos: undefined,
-      folding: {
-        home: options.home,
-        session: sessionName,
-        llm: options.llm,
-        budget: options.contextTokens ?? 120_000,
-        keepRecent: options.keepRecent ?? 12,
-        keepSaid: 3,
-        now,
-        ...(options.fs ? { fs: options.fs } : {}),
-      },
-    };
+async function openBrain(options: BrainOptions, mcp: Awaited<ReturnType<typeof connectAll>>, log: AgentLog): Promise<Brain> {
+  const clock = options.clock ?? systemClock;
+  const now = () => clock.now();
+  const maxSteps = options.maxSteps ?? 40;
+  const sessionName = options.session || options.name;
+  const transcriptStore =
+    options.noSession === true ? undefined : (options.transcript ?? fileTranscriptStore(join(options.home, sessionName + ".jsonl"), options.fs, log));
+  const skillDirs = options.noSkills === true ? [] : (options.skills ?? defaultSkillDirs(options.cwd));
+  const scanned = () => scanSkills(skillDirs, options.fs);
 
-    const hub = yield* PubSub.unbounded<BrainEvent>();
-    const publish = (e: BrainEvent) => PubSub.publish(hub, e);
-    const accounting = new RunAccounting();
-    const fibers = yield* FiberSet.make();
-    const idleFold = yield* FiberHandle.make();
-    const waiters = yield* Ref.make<Deferred.Deferred<RunResult>[]>([]);
-    const folds = yield* Ref.make(new Map<string, CompactionSummaryMessage>());
-    const loop = () => {
-      if (!state.core) throw new Error("the agent loop is not ready");
-      return state.core;
-    };
-
-    const hostTools = [...(options.tools ?? []), ...mcp.tools];
-    const memoryPort = options.noMemory === true ? undefined : (options.memory ?? fileMemory(options.home, now, options.fs));
-    const own = selfTools({
-      now,
+  const state: BrainState = {
+    lifecycle: "open",
+    steps: 0,
+    sent: undefined,
+    prefix: "",
+    parts: [],
+    requestPrefix: "",
+    requestTools: [],
+    knownMemory: [],
+    toolList: [],
+    core: undefined,
+    todos: undefined,
+    folding: {
       home: options.home,
-      skills: scanned,
-      memory: memoryPort ?? false,
+      session: sessionName,
+      llm: options.llm,
+      budget: options.contextTokens ?? 120_000,
+      keepRecent: options.keepRecent ?? 12,
+      keepSaid: 3,
+      now,
+      log,
       ...(options.fs ? { fs: options.fs } : {}),
-    });
-    const subagent: Subagent | undefined =
-      options.noSubagents === true
-        ? undefined
-        : (brief, label) =>
-            Effect.scoped(
-              Effect.gen(function* () {
-                const h = yield* makeBrain({
-                  name: options.name + words.subagentNameSuffix,
-                  instructions: subagentInstructions(options.name),
-                  llm: options.llm,
-                  ...(options.thinkingLevel ? { thinkingLevel: options.thinkingLevel } : {}),
-                  home: options.home,
-                  cwd: options.cwd,
-                  ...(options.fs ? { fs: options.fs } : {}),
-                  tools: hostTools,
-                  ...(options.disallowedTools ? { disallowedTools: options.disallowedTools } : {}),
-                  skills: skillDirs,
-                  noMemory: true,
-                  maxSteps: 30,
-                  noSession: true,
-                  noSubagents: true,
-                  reminders: false,
-                });
-                const askedAt = yield* Clock.currentTimeMillis;
-                const said = yield* h.ask(userMessage(brief, askedAt));
-                return said || words.subagentNoAnswer(label);
-              }),
-            ).pipe(Effect.mapError(toolFailed));
-    if (subagent) own.push(subagentTool(subagent));
-    const todoStore = options.todos ? watchedStore(options.todos, (g) => publish({ type: "todos_changed", todos: finished(g) ? [] : g })) : undefined;
-    if (todoStore) {
-      own.push(
-        ...todoTools(
-          todoStore,
-          subagent !== undefined,
-          Effect.suspend(() => state.todos?.advance ?? Effect.void),
-        ),
-      );
-      // Preserve the active todo graph across compaction when earlier turns are summarized away.
-      state.folding = { ...state.folding, append: () => Effect.suspend(() => state.todos?.summary ?? Effect.succeed("")) };
-    }
+    },
+  };
 
-    const promptParts = Effect.gen(function* () {
-      const found = yield* scanned();
-      const memory = memoryPort ? (yield* memoryPort.read()).prompt : "";
-      const all: PromptPart[] = [
-        { name: "instructions", text: options.instructions.trim() },
-        { name: "env", text: words.envSection(options.cwd) },
-      ];
-      if (found.length > 0) all.push({ name: "skills", text: words.skillsSection(skillIndex(found)) });
-      if (memory) all.push({ name: "memory", text: words.memorySection(memory) });
-      return all.filter((p) => p.text !== "");
-    });
-    const memoryLines = memoryPort ? Effect.map(memoryPort.read(), (r) => [...r.lines]) : Effect.succeed<string[]>([]);
+  const hub = new Hub<BrainEvent>();
+  const publish = (e: BrainEvent) => hub.publish(e);
+  const accounting = new RunAccounting();
+  const tasks = new TaskGroup({ name: `agent ${options.name}`, onError: (task, e) => log.error(`agent ${options.name}: ${task} failed:`, e) });
+  let waiters: PromiseWithResolvers<RunResult>[] = [];
+  let folds = new Map<string, CompactionSummaryMessage>();
+  const loop = () => {
+    if (!state.core) throw new Error("the agent loop is not ready");
+    return state.core;
+  };
 
-    /** Rebuild system prefix only at startup and post-compaction so prompt cache stays warm mid-run. */
-    const refreshPrefix = Effect.gen(function* () {
-      state.parts = yield* promptParts;
-      state.prefix = joinParts(state.parts);
-      state.knownMemory = yield* memoryLines;
-      state.sent = undefined;
-    });
-
-    const noteChanges = (all: readonly PromptPart[], tools: readonly ToolDeclaration[]) => {
-      const hashes = prefixHashes(all, tools);
-      const changed = changedParts(state.sent, hashes);
-      state.sent = hashes;
-      return changed.length > 0 ? publish({ type: "prefix_changed", parts: changed }) : Effect.void;
-    };
-
-    const save = (message: BrainMessage) =>
-      transcriptStore === undefined
-        ? Effect.void
-        : transcriptStore.append(message).pipe(Effect.catch((err) => Effect.logError(`agent ${options.name}: cannot save the conversation:`, err)));
-
-    /** Compacts using the prior request's prefix and tools so the summary call hits the prompt cache. */
-    const fold = Effect.fnUntraced(function* (
-      messages: readonly BrainMessage[],
-      tools: readonly ToolDeclaration[],
-      with_: CompactionOptions,
-      reason: FoldReason,
-    ): Effect.fn.Return<Folded> {
-      const plan = planCompaction(messages, with_);
-      if (!plan) return { fresh: false };
-      const key = `${plan.cut}:${messages[plan.cut]?.timestamp ?? 0}`;
-      const known = (yield* Ref.get(folds)).get(key);
-      if (known) return { result: applyPlan(plan, known), fresh: false };
-      yield* publish({ type: "compaction_start", reason });
-      const { summary, usage } = yield* compactInPlace(plan, with_, state.prefix, tools).pipe(
-        Effect.catchCauseIf(
-          (cause) => !Cause.hasInterruptsOnly(cause),
-          (cause) => Effect.map(Effect.logError(`agent ${options.name}: cannot fold the conversation:`, Cause.pretty(cause)), (): Summarized => ({})),
-        ),
-        Effect.onInterrupt(() => publish({ type: "compaction_end", reason })),
-      );
-      yield* publish({ type: "compaction_end", reason, ...(summary ? { compaction: summary } : {}), ...(usage ? { usage } : {}) });
-      if (!summary) return { fresh: false };
-      yield* Ref.update(folds, (m) => new Map(m).set(key, summary));
-      return { result: applyPlan(plan, summary), fresh: true };
-    });
-
-    const history = () => [...Ref.getUnsafe(loop().messages)];
-    const toolset = () => state.toolList;
-
-    const settleFold = Effect.gen(function* () {
-      const { result, fresh } = yield* fold(history(), declared(toolset()), state.folding, "threshold");
-      if (!result) return;
-      if (fresh) yield* refreshPrefix;
-      yield* Ref.set(folds, new Map());
-      yield* Ref.set(loop().messages, result.messages);
-      yield* save(result.summary);
-    });
-
-    const observeRun = (e: CoreEvent) => {
-      switch (e.type) {
-        case "agent_start":
-          accounting.begin();
-          break;
-        case "message_start":
-        case "message_update":
-          if (e.message.role === "assistant") accounting.partial(e.message);
-          break;
-        case "message_end":
-          if (e.message.role === "assistant") accounting.message(e.message);
-          else if (e.message.role === "user" || e.message.role === "custom") accounting.heard();
-          break;
-        default:
-          break;
-      }
-    };
-
-    const quiet = Effect.map(
-      Effect.suspend(() => loop().hasQueued),
-      (queued) => !accounting.active() && !queued,
-    );
-    const idleAfter = () => options.idleFoldAfterMs ?? 10 * 60_000;
-    const idleAt = () => options.idleFoldAt ?? Math.trunc((state.folding.budget * 4) / 5);
-    const stopIdle = FiberHandle.clear(idleFold);
-
-    // A function, not a read: the lifecycle can close while a fold is out.
-    const closed = () => state.lifecycle === "closed";
-    const foldIdle = Effect.gen(function* () {
-      if (closed() || !(yield* quiet)) return;
-      if (options.wakeSoon?.(idleAfter()) === true) return;
-      const before = history();
-      const { result } = yield* fold(before, declared(toolset()), { ...state.folding, budget: idleAt() }, "idle");
-      if (!result) return;
-      yield* Ref.set(folds, new Map());
-      // Drop the idle summary if new messages arrived while summarizing.
-      if (closed() || !(yield* quiet) || !sameMessages(history(), before)) return;
-      yield* Ref.set(loop().messages, result.messages);
-      yield* save(result.summary);
-      yield* refreshPrefix;
-    });
-
-    const idleLater = Effect.suspend(() => {
-      const after = idleAfter();
-      if (after < 0 || estimateTokens(history()) <= idleAt()) return Effect.void;
-      return Effect.asVoid(FiberHandle.run(idleFold, Effect.andThen(Effect.sleep(after), FiberSet.run(fibers, foldIdle))));
-    });
-
-    const continueRun: Effect.Effect<void> = Effect.suspend(() => {
-      state.steps = 0;
-      // `stop` can drain the queue right after `hasQueued`; settle directly when nothing remains to continue.
-      return Effect.catchTags(loop().continue, {
-        CannotContinue: () => ended,
-        AgentBusy: (err) => Effect.logWarning(`agent ${options.name}: cannot continue run:`, err),
-      });
-    });
-
-    const ended: Effect.Effect<void> = Effect.gen(function* () {
-      const alive = () => state.lifecycle !== "closed";
-      if (alive() && (yield* loop().hasQueued)) return yield* continueRun;
-      // Persist threshold compactions already used mid-run; otherwise defer compaction until idle.
-      const folded = (yield* Ref.get(folds)).size > 0;
-      if (alive() && folded) yield* settleFold;
-      if (alive() && (yield* loop().hasQueued)) return yield* continueRun;
-      if (!accounting.active()) return;
-      const result = accounting.settle(state.lifecycle !== "open");
-      if (state.lifecycle === "stopping") state.lifecycle = "open";
-      if (alive() && !folded) yield* idleLater;
-      const settled = yield* Ref.getAndSet(waiters, []);
-      yield* publish({ type: "agent_settled", run: result, progress: accounting.snapshot() });
-      yield* Effect.forEach(settled, (w) => Deferred.succeed(w, result), { discard: true });
-      if (state.todos && !result.aborted && !result.failed && alive()) {
-        const text = yield* state.todos.nudge;
-        if (text) {
-          const at = yield* Clock.currentTimeMillis;
-          yield* later(taskMessage(text, at));
-        }
-      }
-    });
-
-    /** The loop's events, in order: each message saved before it is passed on; after a run's end, what follows it. */
-    const follow = (e: CoreEvent) =>
-      Effect.gen(function* () {
-        observeRun(e);
-        // Skip persisting partial/aborted messages during shutdown so the next startup can resume from the cut point.
-        if (e.type === "message_end" && state.lifecycle !== "closed") yield* save(e.message);
-        yield* publish(e);
-        if (e.type === "agent_end") yield* FiberSet.run(fibers, Effect.andThen(loop().idle, ended));
-      });
-
-    const prepare = (messages: readonly BrainMessage[], stoppedRun: boolean) =>
-      Effect.gen(function* () {
-        const tools = declared(toolset());
-        const { result, fresh }: Folded = stoppedRun ? { fresh: false } : yield* fold(messages, tools, state.folding, "threshold");
-        if (result && fresh) yield* refreshPrefix;
-        state.requestPrefix = state.prefix;
-        state.requestTools = tools;
-        yield* noteChanges(state.parts, tools);
-        return result?.messages;
-      });
-
-    const deliver = (message: BrainMessage, steer: boolean): Effect.Effect<void> =>
-      Effect.suspend(() => {
-        if (state.lifecycle === "closed") return Effect.void;
-        if (accounting.active()) return steer ? loop().steer(message) : loop().followUp(message);
-        // Begun at once: what comes before the run starts joins it.
-        accounting.begin();
-        state.steps = 0;
-        return Effect.andThen(
-          stopIdle,
-          Effect.catch(loop().prompt([message]), (err) => Effect.logError(`agent ${options.name}: cannot start a run:`, err)),
-        );
-      });
-    const later = (message: BrainMessage) => deliver(message, false);
-
-    yield* refreshPrefix;
-    let tools = allowed([...hostTools, ...own], options.disallowedTools);
-    if (options.reminders ?? transcriptStore !== undefined) {
-      const reminders = yield* makeReminders(
-        options.home,
-        (due) => Effect.forEach(due, (text) => Effect.flatMap(Clock.currentTimeMillis, (at) => later(customMessage("reminder", text, at))), { discard: true }),
-        options.fs,
-      );
-      tools = allowed([...tools, ...reminders.tools], options.disallowedTools);
-    }
-    if (todoStore)
-      state.todos = yield* makeTodoRunner(
-        todoStore,
-        subagent,
-        (text) => Effect.flatMap(Clock.currentTimeMillis, (at) => later(taskMessage(text, at))),
-        options.maxSubagents ?? 3,
-        options.maxNudges ?? 3,
-      );
-    state.toolList = tools;
-    state.core = yield* make<Own>({
-      llm: options.llm.service,
-      model: options.llm.model,
-      thinkingLevel: options.thinkingLevel ?? "off",
-      tools,
-      messages: transcriptStore === undefined ? [] : yield* transcriptStore.load,
-      apiKey: () => options.llm.apiKey?.() ?? "",
-      toLlm: (messages) => requestContext(state.requestPrefix, state.requestTools, messages),
-      prepareRequest: prepare,
-      finishTurn: (turn) =>
-        Effect.sync(() => {
-          state.steps++;
-          return state.steps >= maxSteps || turn.stopped ? "end" : undefined;
-        }),
-      onEvent: follow,
-      stoppedText: stopped,
-    });
-    const brainCore = state.core;
-    // Registered last so LIFO finalization aborts and settles the brain while `core`, `fibers`, and `mcp` are still alive.
-    yield* Effect.addFinalizer(() =>
-      Effect.gen(function* () {
-        state.lifecycle = "closed";
-        yield* stopIdle;
-        yield* brainCore.abort;
-        yield* brainCore.idle;
-        if (state.todos) yield* state.todos.close;
-        // A queued continuation cancelled before it starts has no end event.
-        yield* ended;
-        yield* publish({ type: "agent_closed" });
-      }),
-    );
-    if (state.todos) yield* FiberSet.run(fibers, state.todos.recover);
-
-    return {
-      send: (message) => deliver(message, true),
-      later,
-      ask: (message) =>
-        Effect.gen(function* () {
-          if (state.lifecycle === "closed") return yield* AgentClosed.make({ message: "the agent is closed" });
-          const answer = yield* Deferred.make<RunResult>();
-          yield* Ref.update(waiters, (all) => [...all, answer]);
-          yield* deliver(message, true);
-          const r = yield* Effect.ensuring(
-            Deferred.await(answer),
-            Ref.update(waiters, (all) => all.filter((w) => w !== answer)),
-          );
-          return r.text;
-        }),
-      events: Effect.map(PubSub.subscribe(hub), (sub) => Stream.fromSubscription(sub).pipe(Stream.takeUntil((e) => e.type === "agent_closed"))),
-      busy: () => accounting.active(),
-      progress: () => accounting.snapshot(),
-      stop: Effect.gen(function* () {
-        if (state.todos) yield* state.todos.stop;
-        yield* brainCore.clearQueues;
-        if (accounting.active() && state.lifecycle === "open") state.lifecycle = "stopping";
-        yield* brainCore.abort;
-      }),
-      history,
-      queued: brainCore.hasQueued,
-      tools: toolset,
-      reset: Effect.andThen(
-        Effect.all([stopIdle, brainCore.clearQueues, Ref.set(brainCore.messages, [])]),
-        transcriptStore === undefined
-          ? Effect.void
-          : transcriptStore.clear.pipe(Effect.catch((err) => Effect.logError(`agent ${options.name}: cannot clear the conversation:`, err))),
-      ),
-      skills: scanned(),
-      mcpStatus: () => ({ toolCount: mcp.tools.length, failed: [...mcp.failed] }),
-      memoryNews: Effect.gen(function* () {
-        if (options.noMemory === true) return "";
-        const current = yield* memoryLines;
-        const before = state.knownMemory;
-        state.knownMemory = current;
-        const lines = [...current.filter((l) => !before.includes(l)).map((l) => "+ " + l), ...before.filter((l) => !current.includes(l)).map((l) => "− " + l)];
-        return lines.length === 0 ? "" : words.memoryNews(lines.join("\n"));
-      }),
-      resume: (maxAgeMs) =>
-        Effect.gen(function* () {
-          if (!(yield* quiet)) return false;
-          const messages = history();
-          const { missing, ok } = unfinished(messages);
-          const last = messages.at(-1);
-          const at = yield* Clock.currentTimeMillis;
-          if (!ok || !last || at - last.timestamp > maxAgeMs) return false;
-          if (missing.length > 0) {
-            const more: BrainMessage[] = missing.map((call) => ({
-              role: "toolResult",
-              toolCallId: call.id,
-              toolName: call.name,
-              content: [{ type: "text", text: resumedUnknown }],
-              isError: true,
-              timestamp: at,
-            }));
-            yield* Effect.forEach(more, (m) => save(m), { discard: true });
-            yield* Ref.update(brainCore.messages, (all) => [...all, ...more]);
-          }
-          yield* stopIdle;
-          accounting.begin();
-          yield* continueRun;
-          return true;
-        }),
-    } satisfies Brain;
+  const hostTools = [...(options.tools ?? []), ...mcp.tools];
+  const memoryPort = options.noMemory === true ? undefined : (options.memory ?? fileMemory(options.home, now, options.fs, log));
+  const own = selfTools({
+    now,
+    home: options.home,
+    skills: scanned,
+    memory: memoryPort ?? false,
+    log,
+    ...(options.fs ? { fs: options.fs } : {}),
   });
+  const subagent: Subagent | undefined =
+    options.noSubagents === true
+      ? undefined
+      : async (brief, label, signal) => {
+          try {
+            await using h = await makeBrain({
+              name: options.name + words.subagentNameSuffix,
+              instructions: subagentInstructions(options.name),
+              llm: options.llm,
+              ...(options.thinkingLevel ? { thinkingLevel: options.thinkingLevel } : {}),
+              home: options.home,
+              cwd: options.cwd,
+              ...(options.fs ? { fs: options.fs } : {}),
+              clock,
+              log,
+              tools: hostTools,
+              ...(options.disallowedTools ? { disallowedTools: options.disallowedTools } : {}),
+              skills: skillDirs,
+              noMemory: true,
+              maxSteps: 30,
+              noSession: true,
+              noSubagents: true,
+              reminders: false,
+            });
+            // Called back, it stops waiting; closing the subagent (await using) stops its run.
+            const said = await abortable(h.ask(userMessage(brief, now())), signal);
+            return said || words.subagentNoAnswer(label);
+          } catch (e) {
+            if (isAbort(e, signal)) throw e;
+            throw toolFailed(e);
+          }
+        };
+  if (subagent) own.push(subagentTool(subagent));
+  const todoStore = options.todos ? watchedStore(options.todos, (g) => publish({ type: "todos_changed", todos: finished(g) ? [] : g })) : undefined;
+  if (todoStore) {
+    own.push(...todoTools(todoStore, subagent !== undefined, async () => state.todos?.advance()));
+    // Preserve the active todo graph across compaction when earlier turns are summarized away.
+    state.folding = { ...state.folding, append: async () => (await state.todos?.summary()) ?? "" };
+  }
+
+  const promptParts = async () => {
+    const found = await scanned();
+    const memory = memoryPort ? (await memoryPort.read()).prompt : "";
+    const all: PromptPart[] = [
+      { name: "instructions", text: options.instructions.trim() },
+      { name: "env", text: words.envSection(options.cwd) },
+    ];
+    if (found.length > 0) all.push({ name: "skills", text: words.skillsSection(skillIndex(found)) });
+    if (memory) all.push({ name: "memory", text: words.memorySection(memory) });
+    return all.filter((p) => p.text !== "");
+  };
+  const memoryLines = async (): Promise<string[]> => (memoryPort ? [...(await memoryPort.read()).lines] : []);
+
+  /** Rebuild system prefix only at startup and post-compaction so prompt cache stays warm mid-run. */
+  const refreshPrefix = async () => {
+    state.parts = await promptParts();
+    state.prefix = joinParts(state.parts);
+    state.knownMemory = await memoryLines();
+    state.sent = undefined;
+  };
+
+  const noteChanges = (all: readonly PromptPart[], tools: readonly ToolDeclaration[]) => {
+    const hashes = prefixHashes(all, tools);
+    const changed = changedParts(state.sent, hashes);
+    state.sent = hashes;
+    if (changed.length > 0) publish({ type: "prefix_changed", parts: changed });
+  };
+
+  const save = async (message: BrainMessage) => {
+    if (transcriptStore === undefined) return;
+    try {
+      await transcriptStore.append(message);
+    } catch (err) {
+      log.error(`agent ${options.name}: cannot save the conversation:`, err);
+    }
+  };
+
+  /** Compacts using the prior request's prefix and tools so the summary call hits the prompt cache. */
+  const fold = async (
+    messages: readonly BrainMessage[],
+    tools: readonly ToolDeclaration[],
+    with_: CompactionOptions,
+    reason: FoldReason,
+    signal?: AbortSignal,
+  ): Promise<Folded> => {
+    const plan = planCompaction(messages, with_);
+    if (!plan) return { fresh: false };
+    const key = `${plan.cut}:${messages[plan.cut]?.timestamp ?? 0}`;
+    const known = folds.get(key);
+    if (known) return { result: applyPlan(plan, known), fresh: false };
+    publish({ type: "compaction_start", reason });
+    let summarized: Summarized;
+    try {
+      summarized = await compactInPlace(plan, with_, state.prefix, tools, signal);
+    } catch (e) {
+      if (isAbort(e, signal) || signal?.aborted === true) {
+        publish({ type: "compaction_end", reason });
+        throw e;
+      }
+      log.error(`agent ${options.name}: cannot fold the conversation:`, e);
+      summarized = {};
+    }
+    const { summary, usage } = summarized;
+    publish({ type: "compaction_end", reason, ...(summary ? { compaction: summary } : {}), ...(usage ? { usage } : {}) });
+    if (!summary) return { fresh: false };
+    folds = new Map(folds).set(key, summary);
+    return { result: applyPlan(plan, summary), fresh: true };
+  };
+
+  const history = () => [...loop().messages()];
+  const toolset = () => state.toolList;
+
+  const settleFold = async () => {
+    const { result, fresh } = await fold(history(), declared(toolset()), state.folding, "threshold");
+    if (!result) return;
+    if (fresh) await refreshPrefix();
+    folds = new Map();
+    loop().setMessages(result.messages);
+    await save(result.summary);
+  };
+
+  const observeRun = (e: CoreEvent) => {
+    switch (e.type) {
+      case "agent_start":
+        accounting.begin();
+        break;
+      case "message_start":
+      case "message_update":
+        if (e.message.role === "assistant") accounting.partial(e.message);
+        break;
+      case "message_end":
+        if (e.message.role === "assistant") accounting.message(e.message);
+        else if (e.message.role === "user" || e.message.role === "custom") accounting.heard();
+        break;
+      default:
+        break;
+    }
+  };
+
+  const quiet = async () => !accounting.active() && !(await loop().hasQueued());
+  const idleAfter = () => options.idleFoldAfterMs ?? 10 * 60_000;
+  const idleAt = () => options.idleFoldAt ?? Math.trunc((state.folding.budget * 4) / 5);
+  const idleKey = "idle fold";
+  const stopIdle = () => tasks.stop(idleKey);
+
+  // A function, not a read: the lifecycle can close while a fold is out.
+  const closed = () => state.lifecycle === "closed";
+  const foldIdle = async () => {
+    if (closed() || !(await quiet())) return;
+    if (options.wakeSoon?.(idleAfter()) === true) return;
+    const before = history();
+    const { result } = await fold(before, declared(toolset()), { ...state.folding, budget: idleAt() }, "idle");
+    if (!result) return;
+    folds = new Map();
+    // Drop the idle summary if new messages arrived while summarizing.
+    if (closed() || !(await quiet()) || !sameMessages(history(), before)) return;
+    loop().setMessages(result.messages);
+    await save(result.summary);
+    await refreshPrefix();
+  };
+
+  const idleLater = () => {
+    const after = idleAfter();
+    if (after < 0 || estimateTokens(history()) <= idleAt()) return;
+    // The wait is the one stopIdle calls off; the fold, once it starts, goes on as the brain's own.
+    tasks.keyed(idleKey, async (signal) => {
+      await clock.sleep(after, signal);
+      tasks.run("fold while idle", foldIdle);
+    });
+  };
+
+  const continueRun = async (): Promise<void> => {
+    state.steps = 0;
+    // `stop` can drain the queue right after `hasQueued`; settle directly when nothing remains to continue.
+    try {
+      await loop().continue();
+    } catch (err) {
+      if (err instanceof CannotContinue) return ended();
+      if (err instanceof AgentBusy) {
+        log.warn(`agent ${options.name}: cannot continue run:`, err);
+        return;
+      }
+      throw err;
+    }
+  };
+
+  const ended = async (): Promise<void> => {
+    const alive = () => state.lifecycle !== "closed";
+    if (alive() && (await loop().hasQueued())) return continueRun();
+    // Persist threshold compactions already used mid-run; otherwise defer compaction until idle.
+    const folded = folds.size > 0;
+    if (alive() && folded) await settleFold();
+    if (alive() && (await loop().hasQueued())) return continueRun();
+    if (!accounting.active()) return;
+    const result = accounting.settle(state.lifecycle !== "open");
+    if (state.lifecycle === "stopping") state.lifecycle = "open";
+    if (alive() && !folded) idleLater();
+    const settled = waiters;
+    waiters = [];
+    publish({ type: "agent_settled", run: result, progress: accounting.snapshot() });
+    for (const w of settled) w.resolve(result);
+    if (state.todos && !result.aborted && !result.failed && alive()) {
+      const text = await state.todos.nudge();
+      if (text) await later(taskMessage(text, now()));
+    }
+  };
+
+  /** The loop's events, in order: each message saved before it is passed on; after a run's end, what follows it. */
+  const follow = async (e: CoreEvent) => {
+    observeRun(e);
+    // Skip persisting partial/aborted messages during shutdown so the next startup can resume from the cut point.
+    if (e.type === "message_end" && state.lifecycle !== "closed") await save(e.message);
+    publish(e);
+    if (e.type === "agent_end")
+      tasks.run("settle", async () => {
+        await loop().idle();
+        await ended();
+      });
+  };
+
+  const prepare = async (messages: readonly BrainMessage[], stoppedRun: boolean, signal: AbortSignal) => {
+    const tools = declared(toolset());
+    const { result, fresh }: Folded = stoppedRun ? { fresh: false } : await fold(messages, tools, state.folding, "threshold", signal);
+    if (result && fresh) await refreshPrefix();
+    state.requestPrefix = state.prefix;
+    state.requestTools = tools;
+    noteChanges(state.parts, tools);
+    return result?.messages;
+  };
+
+  const deliver = async (message: BrainMessage, steer: boolean): Promise<void> => {
+    if (state.lifecycle === "closed") return;
+    if (accounting.active()) return steer ? loop().steer(message) : loop().followUp(message);
+    // Begun at once: what comes before the run starts joins it.
+    accounting.begin();
+    state.steps = 0;
+    await stopIdle();
+    try {
+      await loop().prompt([message]);
+    } catch (err) {
+      log.error(`agent ${options.name}: cannot start a run:`, err);
+    }
+  };
+  const later = (message: BrainMessage) => deliver(message, false);
+
+  await refreshPrefix();
+  let tools = allowed([...hostTools, ...own], options.disallowedTools);
+  let reminders: Awaited<ReturnType<typeof makeReminders>> | undefined;
+  if (options.reminders ?? transcriptStore !== undefined) {
+    reminders = await makeReminders(
+      options.home,
+      async (due) => {
+        for (const text of due) await later(customMessage("reminder", text, now()));
+      },
+      { clock, log, ...(options.fs ? { fs: options.fs } : {}) },
+    );
+    tools = allowed([...tools, ...reminders.tools], options.disallowedTools);
+  }
+  if (todoStore)
+    state.todos = makeTodoRunner(todoStore, subagent, (text) => later(taskMessage(text, now())), options.maxSubagents ?? 3, options.maxNudges ?? 3, log);
+  state.toolList = tools;
+  state.core = make<Own>({
+    llm: options.llm.service,
+    model: options.llm.model,
+    thinkingLevel: options.thinkingLevel ?? "off",
+    tools,
+    messages: transcriptStore === undefined ? [] : await transcriptStore.load(),
+    apiKey: () => options.llm.apiKey?.() ?? "",
+    toLlm: (messages) => requestContext(state.requestPrefix, state.requestTools, messages),
+    prepareRequest: prepare,
+    finishTurn: (turn) => {
+      state.steps++;
+      return state.steps >= maxSteps || turn.stopped ? "end" : undefined;
+    },
+    onEvent: follow,
+    stoppedText: stopped,
+    clock,
+  });
+  const brainCore = state.core;
+
+  // The run is stopped and settled while the loop, the background tasks and the tools servers are still there; then
+  // each is let go of, the tools servers last.
+  let closing: Promise<void> | undefined;
+  const close = () =>
+    (closing ??= (async () => {
+      state.lifecycle = "closed";
+      await stopIdle();
+      await brainCore.abort();
+      await brainCore.idle();
+      if (state.todos) await state.todos.close();
+      // A queued continuation cancelled before it starts has no end event.
+      await ended();
+      publish({ type: "agent_closed" });
+      hub.end();
+      await brainCore.close();
+      await reminders?.close();
+      await tasks.close();
+      await mcp.close();
+    })());
+  if (state.todos) {
+    const runner = state.todos;
+    tasks.run("recover", () => runner.recover());
+  }
+
+  return {
+    send: (message) => deliver(message, true),
+    later,
+    ask: async (message, signal) => {
+      if (state.lifecycle === "closed") throw new AgentClosed("the agent is closed");
+      const answer = Promise.withResolvers<RunResult>();
+      waiters = [...waiters, answer];
+      try {
+        await deliver(message, true);
+        const r = await abortable(answer.promise, signal);
+        return r.text;
+      } finally {
+        waiters = waiters.filter((w) => w !== answer);
+      }
+    },
+    events: () => hub.subscribe(),
+    busy: () => accounting.active(),
+    progress: () => accounting.snapshot(),
+    stop: async () => {
+      if (state.todos) await state.todos.stop();
+      await brainCore.clearQueues();
+      if (accounting.active() && state.lifecycle === "open") state.lifecycle = "stopping";
+      await brainCore.abort();
+    },
+    history,
+    queued: () => brainCore.hasQueued(),
+    tools: toolset,
+    reset: async () => {
+      await stopIdle();
+      await brainCore.clearQueues();
+      brainCore.setMessages([]);
+      if (transcriptStore === undefined) return;
+      try {
+        await transcriptStore.clear();
+      } catch (err) {
+        log.error(`agent ${options.name}: cannot clear the conversation:`, err);
+      }
+    },
+    skills: scanned,
+    mcpStatus: () => ({ toolCount: mcp.tools.length, failed: [...mcp.failed] }),
+    memoryNews: async () => {
+      if (options.noMemory === true) return "";
+      const current = await memoryLines();
+      const before = state.knownMemory;
+      state.knownMemory = current;
+      const lines = [...current.filter((l) => !before.includes(l)).map((l) => "+ " + l), ...before.filter((l) => !current.includes(l)).map((l) => "− " + l)];
+      return lines.length === 0 ? "" : words.memoryNews(lines.join("\n"));
+    },
+    resume: async (maxAgeMs) => {
+      if (!(await quiet())) return false;
+      const messages = history();
+      const { missing, ok } = unfinished(messages);
+      const last = messages.at(-1);
+      const at = now();
+      if (!ok || !last || at - last.timestamp > maxAgeMs) return false;
+      if (missing.length > 0) {
+        const more: BrainMessage[] = missing.map((call) => ({
+          role: "toolResult",
+          toolCallId: call.id,
+          toolName: call.name,
+          content: [{ type: "text", text: resumedUnknown }],
+          isError: true,
+          timestamp: at,
+        }));
+        for (const m of more) await save(m);
+        brainCore.setMessages([...brainCore.messages(), ...more]);
+      }
+      await stopIdle();
+      accounting.begin();
+      await continueRun();
+      return true;
+    },
+    close,
+    [Symbol.asyncDispose]: close,
+  };
+}

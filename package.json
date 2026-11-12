@@ -14,12 +14,10 @@
     "i18n:gen": "vpx scripts/gen/i18n.ts gen",
     "health": "vpx packages/health/src/cli.ts --config scripts/audit/health.config.ts",
     "health:write": "vpx packages/health/src/cli.ts --config scripts/audit/health.config.ts --write",
-    "effect:write": "vpx scripts/audit/effect-check.ts --write",
     "practice:write": "vpx scripts/audit/practice-audit.ts --write",
     "paths:write": "vpx scripts/audit/service-paths.ts --write"
   },
   "devDependencies": {
-    "@effect/tsgo": "catalog:",
     "@types/node": "catalog:",
     "@vibevalley/desktop": "workspace:*",
     "@vibevalley/health": "workspace:*",
@@ -27,7 +25,6 @@
     "@vibevalley/protocol": "workspace:*",
     "@vibevalley/server": "workspace:*",
     "@vibevalley/testkit": "workspace:*",
-    "effect": "catalog:",
     "eslint-plugin-solid": "catalog:",
     "knip": "catalog:",
     "lightningcss": "catalog:",
@@ -35,7 +32,8 @@
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:",
-    "yaml": "catalog:"
+    "yaml": "catalog:",
+    "zod": "catalog:"
   },
   "packageManager": "pnpm@12.15.0"
 }

@@ -1,5 +1,4 @@
 import { type JSX, Portal } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -14,367 +13,9 @@ import { Checkbox } from "#/ui/Checkbox.tsx";
 import { hexColor, swatches } from "#/ui/domain/cast.ts";
 import { AgentFace } from "#/ui/domain/Face.tsx";
 import { Icon } from "#/ui/Icon.tsx";
-import { styleProps } from "#/ui/positioner.ts";
 
 import { knownTypes, plainOf } from "./blocks";
-import { blockRow } from "./blocks.stylex";
 import { BlockEditor, type EditBlock } from "./editor";
-
-const blockStyles = stylex.create({
-  row: {
-    display: "flex",
-    alignItems: "flex-start",
-    paddingBottom: "0.125rem",
-  },
-  headingRow: {
-    paddingTop: "0.625rem",
-  },
-  bodyRow: {
-    paddingTop: "0.125rem",
-  },
-  content: {
-    display: "flex",
-    alignItems: "flex-start",
-  },
-  quote: {
-    borderLeftStyle: "solid",
-    borderLeftWidth: "3px",
-    borderColor: "var(--wb-line)",
-    paddingLeft: "0.75rem",
-  },
-  code: {
-    borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--wb-code-bg)",
-    paddingInline: "0.75rem",
-    paddingBlock: "0.5rem",
-    color: "var(--wb-code-ink)",
-  },
-  quoteButton: {
-    marginTop: "0.125rem",
-    marginLeft: "0.25rem",
-    display: "inline-flex",
-    width: "1.5rem",
-    height: "1.5rem",
-    flexShrink: "0",
-    cursor: "pointer",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-md)",
-    color: "var(--wb-muted)",
-    opacity: {
-      default: "0",
-      ":focus-visible": "1",
-      "@media (hover: hover)": {
-        default: null,
-        [stylex.when.ancestor(":hover", blockRow)]: 1,
-      },
-    },
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--wb-hover)",
-      },
-    },
-  },
-  title: {
-    fontSize: "var(--text-2xl)",
-    lineHeight: "2rem",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  heading: {
-    fontSize: "var(--text-xl)",
-    lineHeight: "1.75rem",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  subheading: {
-    fontSize: "var(--text-lg)",
-    lineHeight: "1.75rem",
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  codeText: {
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-sm)",
-    lineHeight: "1.5rem",
-  },
-  quoteText: {
-    fontSize: "var(--text-base)",
-    lineHeight: "1.5rem",
-    color: "var(--wb-muted)",
-  },
-  completeText: {
-    fontSize: "var(--text-base)",
-    lineHeight: "1.5rem",
-    color: "var(--wb-muted)",
-    textDecorationLine: "line-through",
-  },
-  bodyText: {
-    fontSize: "var(--text-base)",
-    lineHeight: "1.5rem",
-  },
-  bold: {
-    fontWeight: "var(--font-weight-semibold)",
-  },
-  italic: {
-    fontStyle: "italic",
-  },
-  inlineCode: {
-    borderRadius: "var(--radius-xs)",
-    backgroundColor: "var(--wb-hover)",
-    paddingInline: "0.125rem",
-    fontFamily: "var(--font-mono)",
-  },
-  strike: {
-    textDecorationLine: "line-through",
-  },
-  link: {
-    color: "var(--wb-water)",
-    textDecorationLine: "underline",
-  },
-  field: {
-    minHeight: "1.5rem",
-    cursor: "text",
-    overflowWrap: "break-word",
-    whiteSpace: "pre-wrap",
-  },
-  editor: {
-    display: "block",
-    width: "100%",
-    resize: "none",
-    overflow: "hidden",
-    backgroundColor: "transparent",
-    outlineStyle: "none",
-    "::placeholder": {
-      color: "var(--wb-faint)",
-    },
-  },
-});
-
-const writingPulse = stylex.keyframes({ "50%": { opacity: 0.5 } });
-
-const viewStyles = stylex.create({
-  blockRowSpan: {
-    marginTop: "0.125rem",
-    marginRight: "0.625rem",
-    flexShrink: "0",
-    borderRadius: "var(--radius-sm)",
-  },
-  blockRowSpanPrimary: {
-    width: "3px",
-    animationName: null,
-    animationDuration: null,
-    animationDelay: null,
-    animationTimingFunction: null,
-    animationIterationCount: null,
-    animationDirection: null,
-    animationFillMode: null,
-    animationPlayState: null,
-  },
-  blockRowSpanSecondary: {
-    width: "0.25rem",
-    animationName: { default: writingPulse, "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: "2s",
-    animationDelay: "0s",
-    animationTimingFunction: "cubic-bezier(.4, 0, .6, 1)",
-    animationIterationCount: "infinite",
-    animationDirection: "normal",
-    animationFillMode: "none",
-    animationPlayState: "running",
-  },
-  blocksViewArticle: {
-    display: "flex",
-    minHeight: "0",
-    flex: "1",
-    flexDirection: "column",
-  },
-  blocksViewP: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    paddingBottom: "0.5rem",
-    paddingLeft: "35px",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-  },
-  blocksViewPTone: {
-    color: "var(--color-berry)",
-  },
-  blocksViewPAlt: {
-    color: "var(--color-muted)",
-  },
-  taskCheckbox: { marginTop: "0.25rem" },
-  blocksViewDiv: {
-    minHeight: "0",
-    flex: "1",
-    overflowY: "auto",
-    paddingRight: "0.75rem",
-  },
-  artifactAppend: {
-    display: "block",
-    height: "4rem",
-    width: "100%",
-    cursor: "text",
-    paddingLeft: "35px",
-    textAlign: "left",
-    fontSize: "var(--text-base)",
-    lineHeight: "var(--leading-base)",
-    color: "var(--color-faint)",
-  },
-  artifactSuggestions: {
-    marginBottom: "0.5rem",
-    flexShrink: "0",
-    borderRadius: "var(--radius-lg)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-    padding: "0.5rem",
-  },
-  suggestionsListH2: {
-    paddingInline: "0.25rem",
-    paddingBottom: "0.25rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontWeight: "var(--font-weight-semibold)",
-    color: "var(--color-muted)",
-  },
-  artifactSuggestion: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.25rem",
-    borderTopStyle: {
-      default: "solid",
-      ":first-child": "solid",
-    },
-    borderTopWidth: {
-      default: "1px",
-      ":first-child": "0",
-    },
-    borderColor: "var(--color-line)",
-    paddingInline: "0.25rem",
-    paddingBlock: "0.375rem",
-  },
-  suggestionsListDiv: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.375rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  suggestionsListSpan: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-  },
-  suggestionsListSpan2: {
-    marginLeft: "0.25rem",
-  },
-  suggestionsListP: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-berry)",
-  },
-  suggestionsListDiv2: {
-    display: "flex",
-    gap: "0.375rem",
-  },
-  suggestionAccept: {
-    cursor: {
-      default: "pointer",
-      ":disabled": "default",
-    },
-    borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--color-leaf)",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.125rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-page)",
-    opacity: {
-      default: null,
-      ":disabled": ".5",
-    },
-  },
-  suggestionReject: {
-    cursor: {
-      default: "pointer",
-      ":disabled": "default",
-    },
-    borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--color-hover)",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.125rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-    opacity: {
-      default: null,
-      ":disabled": ".5",
-    },
-  },
-  suggestionDiffDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.125rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  suggestionDiffP: {
-    whiteSpace: "pre-wrap",
-    color: "var(--color-muted)",
-    textDecorationLine: "line-through",
-  },
-  suggestionDiffP2: {
-    whiteSpace: "pre-wrap",
-    color: "var(--color-leaf)",
-  },
-  suggestionDiffP3: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-berry)",
-  },
-  markSpan: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  blockRowSpan2: {
-    width: "22px",
-    flexShrink: "0",
-    paddingTop: "3px",
-  },
-  blockRowSpan22: {
-    flexShrink: "0",
-  },
-  blockRowDiv: {
-    minWidth: "0",
-    flex: "1",
-  },
-  blockRowHr: {
-    marginBlock: "0.5rem",
-    borderColor: "var(--color-line)",
-  },
-  blockRowSpan3: {
-    width: "26px",
-    flexShrink: "0",
-    paddingTop: "1px",
-  },
-  placeholderDiv: {
-    borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--color-hover)",
-    paddingInline: "0.625rem",
-    paddingBlock: "0.375rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  blockFieldSpan: {
-    color: "var(--color-faint)",
-  },
-});
 
 /** The user's lines on the attribution bar. */
 const userColor = "var(--color-cream-300)";
@@ -527,18 +168,15 @@ export function BlocksView(props: {
       data-state={(version(), editor.error ? "error" : editor.busy ? "saving" : "saved")}
       data-blocks={(version(), editor.blocks.length)}
       data-writing={(version(), editor.othersWriting) ? "" : undefined}
-      {...stylex.attrs(viewStyles.blocksViewArticle)}
+      class="flex min-h-0 flex-1 flex-col"
     >
       <Show when={props.suggestionsAt} fallback={suggestionsList()}>
         {(at) => <Portal mount={at()}>{suggestionsList()}</Portal>}
       </Show>
-      <p
-        role="status"
-        {...stylex.attrs(viewStyles.blocksViewP, (version(), editor.error !== undefined) ? viewStyles.blocksViewPTone : viewStyles.blocksViewPAlt)}
-      >
+      <p role="status" class={["truncate pb-2 pl-8.75 text-xs", (version(), editor.error !== undefined) ? "text-berry" : "text-muted"]}>
         {(version(), editor.blocks.length > 0 || editor.busy || editor.error !== undefined) ? status() : ""}
       </p>
-      <div {...stylex.attrs(viewStyles.blocksViewDiv)}>
+      <div class="min-h-0 flex-1 overflow-y-auto pr-3">
         <For each={rows()} keyed={(r) => r.block.id}>
           {(row) => <BlockRow editor={editor} row={row()} agent={agents().get(row().updatedBy)} onQuote={props.onQuote} />}
         </For>
@@ -547,7 +185,7 @@ export function BlocksView(props: {
           type="button"
           data-testid="artifact-append"
           aria-label={t("web.artifact.blocks.append")}
-          {...stylex.attrs(viewStyles.artifactAppend)}
+          class="block h-16 w-full cursor-text pl-8.75 text-left text-base text-faint"
           onClick={() => editor.append()}
         >
           {(version(), editor.blocks.length === 0 && !editor.busy) ? t("web.artifact.blocks.start") : ""}
@@ -568,8 +206,8 @@ function SuggestionsList(props: {
   const open = () => props.list.filter((s) => s.status === "open");
   return (
     <Show when={open().length > 0}>
-      <section data-testid="artifact-suggestions" {...stylex.attrs(viewStyles.artifactSuggestions)}>
-        <h2 {...stylex.attrs(viewStyles.suggestionsListH2)}>{t("web.artifact.suggestions.title", { n: open().length })}</h2>
+      <section data-testid="artifact-suggestions" class="mb-2 shrink-0 rounded-lg border border-line bg-page p-2">
+        <h2 class="px-1 pb-1 text-xs font-semibold text-muted">{t("web.artifact.suggestions.title", { n: open().length })}</h2>
         <For each={open()} keyed={(s) => s.id}>
           {(s) => {
             const block = () => props.blocks.find((b) => b.id === s().blockId);
@@ -587,25 +225,25 @@ function SuggestionsList(props: {
                 data-key={s().id}
                 data-status={stale() ? "stale" : "open"}
                 data-change={changeKind()}
-                {...stylex.attrs(viewStyles.artifactSuggestion)}
+                class="flex flex-col gap-1 first:[border-top-style:solid] border-t first:border-t-0 border-line px-1 py-1.5"
               >
-                <div {...stylex.attrs(viewStyles.suggestionsListDiv)}>
+                <div class="flex items-center gap-1.5 text-xs text-muted">
                   <AgentFace agentId={s().author} look={agent()?.look} runtime={agent()?.runtime} size={16} />
-                  <span {...stylex.attrs(viewStyles.suggestionsListSpan)}>
+                  <span class="min-w-0 flex-1 truncate">
                     {t("web.artifact.suggestions.by", { name: who() })}
-                    <span {...stylex.attrs(viewStyles.suggestionsListSpan2)}>{t("web.artifact.suggestions.rev", { rev: s().baseRev })}</span>
+                    <span class="ml-1">{t("web.artifact.suggestions.rev", { rev: s().baseRev })}</span>
                   </span>
                 </div>
                 <SuggestionDiff suggestion={s()} block={block()} />
                 <Show when={stale()}>
-                  <p {...stylex.attrs(viewStyles.suggestionsListP)}>{t("web.artifact.suggestions.stale")}</p>
+                  <p class="text-xs text-berry">{t("web.artifact.suggestions.stale")}</p>
                 </Show>
-                <div {...stylex.attrs(viewStyles.suggestionsListDiv2)}>
+                <div class="flex gap-1.5">
                   <button
                     type="button"
                     data-testid="suggestion-accept"
                     disabled={stale() || props.working === s().id}
-                    {...stylex.attrs(viewStyles.suggestionAccept)}
+                    class="cursor-pointer disabled:cursor-default rounded-md bg-leaf px-2 py-0.5 text-xs text-page disabled:opacity-50"
                     onClick={() => props.onAccept(s())}
                   >
                     {t("web.artifact.suggestions.accept")}
@@ -614,7 +252,7 @@ function SuggestionsList(props: {
                     type="button"
                     data-testid="suggestion-reject"
                     disabled={props.working === s().id}
-                    {...stylex.attrs(viewStyles.suggestionReject)}
+                    class="cursor-pointer disabled:cursor-default rounded-md bg-hover px-2 py-0.5 text-xs text-muted disabled:opacity-50"
                     onClick={() => props.onReject(s())}
                   >
                     {t("web.artifact.suggestions.reject")}
@@ -680,7 +318,7 @@ function SuggestionDiff(props: { suggestion: Suggestion; block: EditBlock | unde
     <Show
       when={change().delete === true}
       fallback={
-        <div {...stylex.attrs(viewStyles.suggestionDiffDiv)}>
+        <div class="flex flex-col gap-0.5 text-sm">
           <Show when={change().type !== undefined}>
             <p>{t("web.artifact.suggestions.type", { type: typeName(change().type ?? "") })}</p>
           </Show>
@@ -688,13 +326,13 @@ function SuggestionDiff(props: { suggestion: Suggestion; block: EditBlock | unde
             <p>{t("web.artifact.suggestions.attrs", { attrs: attrText(change().attrs ?? {}) })}</p>
           </Show>
           <Show when={change().text !== undefined}>
-            <p {...stylex.attrs(viewStyles.suggestionDiffP)}>{props.block?.text ?? ""}</p>
-            <p {...stylex.attrs(viewStyles.suggestionDiffP2)}>{plainOf(change().text ?? [])}</p>
+            <p class="whitespace-pre-wrap text-muted line-through">{props.block?.text ?? ""}</p>
+            <p class="whitespace-pre-wrap text-leaf">{plainOf(change().text ?? [])}</p>
           </Show>
         </div>
       }
     >
-      <p {...stylex.attrs(viewStyles.suggestionDiffP3)}>{t("web.artifact.suggestions.delete")}</p>
+      <p class="text-sm text-berry">{t("web.artifact.suggestions.delete")}</p>
     </Show>
   );
 }
@@ -711,11 +349,11 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
       case "numbered":
         return `${r().number ?? 1}.`;
       case "memory_item":
-        return <span {...stylex.attrs(viewStyles.markSpan)}>{t("web.artifact.blocks.memoryItem")}</span>;
+        return <span class="text-xs text-muted">{t("web.artifact.blocks.memoryItem")}</span>;
       case "todo":
         return (
           <Checkbox
-            styles={viewStyles.taskCheckbox}
+            class="mt-1"
             checked={r().attrs.checked ?? false}
             label={r().attrs.checked === true ? t("web.artifact.blocks.done") : t("web.artifact.blocks.notDone")}
             onChange={() => props.editor.toggle(r().block)}
@@ -725,7 +363,7 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
         return undefined;
     }
   };
-  const box = () => (r().type === "quote" ? blockStyles.quote : r().type === "code" ? blockStyles.code : undefined);
+  const box = () => (r().type === "quote" ? "border-l-3 border-line pl-3" : r().type === "code" ? "rounded-md bg-code-bg px-3 py-2 text-code-ink" : undefined);
   const kind = () =>
     !knownTypes.has(r().type) ? "unknown" : r().type === "divider" ? "divider" : r().type === "image" ? "image" : r().type === "issue_ref" ? "issue" : "text";
   return (
@@ -733,9 +371,9 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
       data-block={r().block.id}
       data-type={r().type}
       data-writing={r().writing ? "" : undefined}
-      {...styleProps([blockRow, blockStyles.row, r().type === "heading" ? blockStyles.headingRow : blockStyles.bodyRow])}
+      class={["group/block-row", "flex items-start pb-0.5", r().type === "heading" ? "pt-2.5" : "pt-0.5"]}
     >
-      <span {...stylex.attrs(viewStyles.blockRowSpan2)}>
+      <span class="w-5.5 shrink-0 pt-0.75">
         <Show when={r().showFace}>
           <AgentFace agentId={r().updatedBy} look={props.agent?.look} runtime={props.agent?.runtime} size={18} />
         </Show>
@@ -743,16 +381,21 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
       <span
         title={r().writing ? t("web.artifact.blocks.writing", { who: writer() }) : t("web.artifact.blocks.wrote", { who: writer() })}
         aria-label={r().writing ? t("web.artifact.blocks.writing", { who: writer() }) : undefined}
-        {...stylex.attrs(viewStyles.blockRowSpan, r().writing ? viewStyles.blockRowSpanSecondary : viewStyles.blockRowSpanPrimary)}
+        class={[
+          "mt-0.5 mr-2.5 shrink-0 rounded-sm",
+          r().writing
+            ? "w-1 [animation-name:pulse] motion-reduce:[animation-name:none] [animation-duration:2000ms] [animation-timing-function:cubic-bezier(.4,_0,_.6,_1)] [animation-iteration-count:infinite]"
+            : "w-0.75",
+        ]}
         style={{ height: `${barHeight(r().type)}px`, background: authorColor(r().updatedBy, props.agent) }}
       />
-      <span {...stylex.attrs(viewStyles.blockRowSpan22)} style={{ width: `${20 * r().depth}px` }} />
-      <div {...stylex.attrs(viewStyles.blockRowDiv)}>
+      <span class="shrink-0" style={{ width: `${20 * r().depth}px` }} />
+      <div class="min-w-0 flex-1">
         {/* One shape for every text block: a block that changes type keeps its field, and the field its focus. */}
         <Show
           when={kind() === "text"}
           fallback={
-            <Show when={kind() !== "divider"} fallback={<hr {...stylex.attrs(viewStyles.blockRowHr)} />}>
+            <Show when={kind() !== "divider"} fallback={<hr class="my-2 border-line" />}>
               <Placeholder
                 text={
                   kind() === "image"
@@ -765,17 +408,17 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
             </Show>
           }
         >
-          <div {...styleProps([blockStyles.content, box()])}>
+          <div class={["flex items-start", box()]}>
             <Show when={mark() !== undefined}>
-              <span {...stylex.attrs(viewStyles.blockRowSpan3)}>{mark()}</span>
+              <span class="w-6.5 shrink-0 pt-px">{mark()}</span>
             </Show>
-            <div {...stylex.attrs(viewStyles.blockRowDiv)}>
+            <div class="min-w-0 flex-1">
               <BlockField editor={props.editor} row={r()} />
             </div>
           </div>
         </Show>
         <Show when={r().problem}>
-          <p {...stylex.attrs(viewStyles.suggestionsListP)}>{r().problem}</p>
+          <p class="text-xs text-berry">{r().problem}</p>
         </Show>
       </div>
       <Show when={props.onQuote}>
@@ -784,7 +427,7 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
           data-testid="artifact-quote-block"
           aria-label={t("web.artifact.canvas.quote")}
           title={t("web.artifact.canvas.quote")}
-          {...styleProps(blockStyles.quoteButton)}
+          class="mt-0.5 ml-1 inline-flex w-6 h-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted opacity-0 focus-visible:opacity-100 group-hover/block-row:opacity-100 hover:bg-hover"
           onClick={() => props.onQuote?.({ id: r().block.id, rev: r().block.rev, type: r().type, text: r().text })}
         >
           <Icon name="chat" size={14} />
@@ -795,20 +438,20 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
 }
 
 function Placeholder(props: { text: string }) {
-  return <div {...stylex.attrs(viewStyles.placeholderDiv)}>{props.text}</div>;
+  return <div class="rounded-md bg-hover px-2.5 py-1.5 text-sm text-muted">{props.text}</div>;
 }
 
 /** A block's whole type: size, line height and weight from one place, so no two font sizes meet on one element. */
-function typeStyle(r: Row): stylex.StyleXStyles {
+function typeStyle(r: Row): JSX.ClassValue {
   switch (r.type) {
     case "heading":
-      return (r.attrs.level ?? 1) <= 1 ? blockStyles.title : r.attrs.level === 2 ? blockStyles.heading : blockStyles.subheading;
+      return (r.attrs.level ?? 1) <= 1 ? "text-2xl font-semibold" : r.attrs.level === 2 ? "text-xl font-semibold" : "text-lg leading-xl font-semibold";
     case "code":
-      return blockStyles.codeText;
+      return "font-mono text-sm leading-lg";
     case "quote":
-      return blockStyles.quoteText;
+      return "text-base leading-lg text-muted";
     default:
-      return r.type === "todo" && r.attrs.checked === true ? blockStyles.completeText : blockStyles.bodyText;
+      return r.type === "todo" && r.attrs.checked === true ? "text-base leading-lg text-muted line-through" : "text-base leading-lg";
   }
 }
 
@@ -816,17 +459,17 @@ function Marked(props: { spans: readonly TextSpan[] }) {
   return (
     <For each={props.spans}>
       {(s) => {
-        const styles: stylex.StyleXStyles = [
-          s.marks.bold === true && blockStyles.bold,
-          s.marks.italic === true && blockStyles.italic,
-          s.marks.code === true && blockStyles.inlineCode,
-          s.marks.strike === true && blockStyles.strike,
-          !!s.marks.link && blockStyles.link,
+        const styles: JSX.ClassValue = [
+          s.marks.bold === true && "font-semibold",
+          s.marks.italic === true && "italic",
+          s.marks.code === true && "rounded-xs bg-hover px-0.5 font-mono",
+          s.marks.strike === true && "line-through",
+          !!s.marks.link && "text-water underline",
         ];
         return (
-          <Show when={s.marks.link} fallback={<span {...styleProps(styles)}>{s.t}</span>}>
+          <Show when={s.marks.link} fallback={<span class={styles}>{s.t}</span>}>
             {(link) => (
-              <a href={link()} target="_blank" rel="noreferrer" {...styleProps(styles)}>
+              <a href={link()} target="_blank" rel="noreferrer" class={styles}>
                 {s.t}
               </a>
             )}
@@ -852,12 +495,9 @@ function BlockField(props: { editor: BlockEditor; row: Row }) {
           aria-label={t("web.artifact.blocks.block", { id: props.row.block.id })}
           onFocus={() => setEditing(true)}
           onClick={() => setEditing(true)}
-          {...styleProps([blockStyles.field, typeStyle(props.row)])}
+          class={["min-h-6 cursor-text wrap-break-word whitespace-pre-wrap", typeStyle(props.row)]}
         >
-          <Show
-            when={props.row.text}
-            fallback={<span {...stylex.attrs(viewStyles.blockFieldSpan)}>{props.row.type === "heading" ? t("web.artifact.blocks.heading") : " "}</span>}
-          >
+          <Show when={props.row.text} fallback={<span class="text-faint">{props.row.type === "heading" ? t("web.artifact.blocks.heading") : " "}</span>}>
             <Marked spans={props.row.spans} />
           </Show>
         </div>
@@ -925,7 +565,7 @@ function Field(props: { editor: BlockEditor; row: Row; focusNow: boolean; onLeav
       onCompositionEnd={(e) => props.editor.composition(b(), false, e.currentTarget.value)}
       onInput={(e) => props.editor.edited(b(), e.currentTarget.value, e.currentTarget.selectionStart)}
       onKeyDown={key}
-      {...styleProps([blockStyles.editor, typeStyle(props.row)])}
+      class={["block w-full resize-none overflow-hidden bg-transparent outline-none placeholder:text-faint", typeStyle(props.row)]}
     />
   );
 }

@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -14,145 +13,6 @@ import { Card, Quiet } from "#/ui/layout.tsx";
 import { Qr } from "#/ui/Qr.tsx";
 import { toast } from "#/ui/toasts.ts";
 
-const styles = stylex.create({
-  lanPageSpan: {
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    WebkitUserSelect: "all",
-    userSelect: "all",
-  },
-  pairingP: {
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-2xs)",
-    lineHeight: "var(--leading-2xs)",
-    wordBreak: "break-all",
-    WebkitUserSelect: "all",
-    userSelect: "all",
-  },
-  lanPageDiv: {
-    display: "flex",
-    maxWidth: "var(--container-3xl)",
-    flexDirection: "column",
-    gap: "0.75rem",
-  },
-  lanPageSpan2: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  lanPageP: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  lanPageDiv2: {
-    display: "flex",
-    gap: "0.75rem",
-  },
-  lanPageSpan22: {
-    width: "4.5rem",
-    flexShrink: "0",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  lanPageDiv3: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.5rem",
-  },
-  lanPageP2: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-berry)",
-  },
-  lanPageUl: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.375rem",
-    borderTopStyle: "solid",
-    borderTopWidth: "1px",
-    borderColor: "var(--color-line)",
-    paddingTop: "0.75rem",
-  },
-  lanPageLi: {
-    display: "flex",
-    gap: "0.625rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: "var(--color-muted)",
-  },
-  lanPageSpan3: {
-    marginTop: "0.5rem",
-    width: "0.25rem",
-    height: "0.25rem",
-    flexShrink: "0",
-    borderRadius: "9999px",
-    backgroundColor: "var(--color-faint)",
-  },
-  lanPageDiv4: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  lanPageSpan4: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    fontWeight: "var(--font-weight-medium)",
-  },
-  lanPageSpan5: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  pairing: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "1.25rem",
-  },
-  pairingQr: {
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-white)",
-    padding: "0.5rem",
-  },
-  pairingDiv: {
-    display: "flex",
-    maxWidth: "var(--container-md)",
-    minWidth: "12.5rem",
-    flexDirection: "column",
-    gap: "0.5rem",
-  },
-  pairingP2: {
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  pairingDiv2: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.5rem",
-    paddingTop: "0.25rem",
-  },
-  pairingDiv3: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
-  },
-  pairingDiv4: {
-    display: "flex",
-    gap: "0.5rem",
-  },
-});
-
 const notes = [0, 1, 2, 3] as const;
 
 const lanQuery = defineQuery({ schema: S.LanStatus, key: () => ["lan"], fetch: (_: void, context) => api.lan.get(context), ...retryRead });
@@ -166,12 +26,10 @@ export function LanPage() {
   const keep = (status: LanStatus) => client.setData(lanQuery(), () => ({ value: status }));
   const s = () => ready(status, undefined);
   return (
-    <div {...stylex.attrs(styles.lanPageDiv)}>
+    <div class="flex max-w-3xl flex-col gap-3">
       <Card
         title={t("web.lan.lan.section.label")}
-        action={
-          <Show when={s()}>{(s) => <span {...stylex.attrs(styles.lanPageSpan2)}>{s().open ? t("web.lan.lan.open") : t("web.lan.lan.closed")}</span>}</Show>
-        }
+        action={<Show when={s()}>{(s) => <span class="text-sm text-muted">{s().open ? t("web.lan.lan.open") : t("web.lan.lan.closed")}</span>}</Show>}
       >
         <Show when={s()} fallback={<Quiet>{status.error() ? reasonOf(status.error()) : t("web.base.form.asking")}</Quiet>}>
           {(s) => (
@@ -180,7 +38,7 @@ export function LanPage() {
                 when={s().open}
                 fallback={
                   <>
-                    <p {...stylex.attrs(styles.lanPageP)}>{t("web.lan.lan.intro")}</p>
+                    <p class="text-sm">{t("web.lan.lan.intro")}</p>
                     <div>
                       <Button
                         tone="primary"
@@ -194,16 +52,16 @@ export function LanPage() {
                   </>
                 }
               >
-                <div {...stylex.attrs(styles.lanPageDiv2)}>
-                  <span {...stylex.attrs(styles.lanPageSpan22)}>{t("web.lan.lan.address")}</span>
-                  <span data-testid="lan-url" {...stylex.attrs(styles.lanPageSpan)}>
+                <div class="flex gap-3">
+                  <span class="w-18 shrink-0 text-sm text-muted">{t("web.lan.lan.address")}</span>
+                  <span data-testid="lan-url" class="font-mono text-sm select-all">
                     {s().url ?? "—"}
                   </span>
                 </div>
                 <Show
                   when={s().pairing}
                   fallback={
-                    <div {...stylex.attrs(styles.lanPageDiv3)}>
+                    <div class="flex flex-wrap gap-2">
                       <Button
                         tone="primary"
                         data-testid="lan-add"
@@ -226,13 +84,13 @@ export function LanPage() {
                 </Show>
               </Show>
               <Show when={s().problem}>
-                <p {...stylex.attrs(styles.lanPageP2)}>{s().problem}</p>
+                <p class="text-sm text-berry">{s().problem}</p>
               </Show>
-              <ul {...stylex.attrs(styles.lanPageUl)}>
+              <ul class="flex flex-col gap-1.5 border-t border-line pt-3">
                 <For each={notes}>
                   {(n) => (
-                    <li {...stylex.attrs(styles.lanPageLi)}>
-                      <span {...stylex.attrs(styles.lanPageSpan3)} aria-hidden="true" />
+                    <li class="flex gap-2.5 text-sm text-muted">
+                      <span class="mt-2 w-1 h-1 shrink-0 rounded-full bg-faint" aria-hidden="true" />
                       {t(`web.lan.lan.notes.${n}`)}
                     </li>
                   )}
@@ -264,17 +122,17 @@ function Pairing(props: { pairing: LanPairing; act: Act; keep: (status: LanStatu
     <Show
       when={props.pairing.asking}
       fallback={
-        <div data-testid="pairing" data-left={left()} {...stylex.attrs(styles.pairing)}>
-          <div data-testid="pairing-qr" {...stylex.attrs(styles.pairingQr)}>
+        <div data-testid="pairing" data-left={left()} class="flex flex-wrap gap-5">
+          <div data-testid="pairing-qr" class="rounded-md border border-line bg-white p-2">
             <Qr text={props.pairing.link} label={t("web.lan.lan.qr")} />
           </div>
-          <div {...stylex.attrs(styles.pairingDiv)}>
-            <p {...stylex.attrs(styles.lanPageP)}>{t("web.lan.lan.scan")}</p>
-            <p data-testid="pairing-link" {...stylex.attrs(styles.pairingP)}>
+          <div class="flex max-w-md min-w-50 flex-col gap-2">
+            <p class="text-sm">{t("web.lan.lan.scan")}</p>
+            <p data-testid="pairing-link" class="font-mono text-2xs break-all select-all">
               {props.pairing.link}
             </p>
-            <p {...stylex.attrs(styles.pairingP2)}>{t("web.lan.lan.left", { s: left() })}</p>
-            <div {...stylex.attrs(styles.pairingDiv2)}>
+            <p class="text-xs text-muted">{t("web.lan.lan.left", { s: left() })}</p>
+            <div class="flex flex-wrap gap-2 pt-1">
               <Button icon="copy" onClick={() => void copy(props.pairing.link)}>
                 {t("web.lan.lan.copy")}
               </Button>
@@ -290,9 +148,9 @@ function Pairing(props: { pairing: LanPairing; act: Act; keep: (status: LanStatu
       }
     >
       {(asking) => (
-        <div {...stylex.attrs(styles.pairingDiv3)}>
-          <p {...stylex.attrs(styles.lanPageP)}>{t("web.lan.lan.asking", { name: asking() })}</p>
-          <div {...stylex.attrs(styles.pairingDiv4)}>
+        <div class="flex flex-col gap-3">
+          <p class="text-sm">{t("web.lan.lan.asking", { name: asking() })}</p>
+          <div class="flex gap-2">
             <Button
               tone="primary"
               disabled={props.act.busy()}

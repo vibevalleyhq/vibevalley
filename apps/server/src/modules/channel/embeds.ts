@@ -1,8 +1,6 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
-
-import { Effect, Option, Stream } from "effect";
-import { FetchHttpClient, type HttpClient } from "effect/http";
+import type { ReadableStreamDefaultReader } from "node:stream/web";
 
 import type { Embed } from "@vibevalley/protocol";
 import { cut } from "@vibevalley/protocol/rules";
@@ -55,24 +53,26 @@ export function privateAddress(ip: string): boolean {
 }
 
 /** The addresses a name has; none when it does not resolve. */
-export type Resolve = (host: string) => Effect.Effect<readonly string[]>;
-const resolveAll: Resolve = (host) =>
-  isIP(host) !== 0
-    ? Effect.succeed([host])
-    : Effect.tryPromise({ try: () => lookup(host, { all: true }), catch: (e) => String(e) }).pipe(
-        Effect.map((all) => all.map((a) => a.address)),
-        Effect.orElseSucceed(() => []),
-      );
+export type Resolve = (host: string) => Promise<readonly string[]>;
+const resolveAll: Resolve = async (host) => {
+  if (isIP(host) !== 0) return [host];
+  try {
+    return (await lookup(host, { all: true })).map((a) => a.address);
+  } catch {
+    // A name that does not resolve has no addresses: no preview is read, which is all it means here.
+    return [];
+  }
+};
 
 /** May the server ask for this address: http(s), and every address its name has is on the public web. */
-export const reachable = Effect.fn("Embeds.reachable")(function* (url: URL, resolve: Resolve = resolveAll): Effect.fn.Return<boolean> {
+export async function reachable(url: URL, resolve: Resolve = resolveAll): Promise<boolean> {
   if (url.protocol !== "http:" && url.protocol !== "https:") return false;
   if (url.username || url.password) return false;
   const host = url.hostname.replace(/^\[|\]$/gu, "");
   if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return false;
-  const addresses = yield* resolve(host);
+  const addresses = await resolve(host);
   return addresses.length > 0 && addresses.every((a) => !privateAddress(a));
-});
+}
 
 const entities: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", apos: "'", nbsp: " " };
 const decode = (s: string) => s.replace(/&(amp|lt|gt|quot|#39|apos|nbsp);/gu, (_, e: string) => entities[e] ?? _).trim();
@@ -113,40 +113,63 @@ export function embedOf(url: string, html: string): Embed | undefined {
 }
 
 /** A link's preview, or none when it cannot be read: not public, not a page, too slow, too big. */
-export const readEmbed = Effect.fn("Embeds.read")(function* (client: HttpClient.HttpClient, link: string, resolve: Resolve = resolveAll) {
+export async function readEmbed(get: typeof fetch, link: string, resolve: Resolve = resolveAll): Promise<Embed | undefined> {
   if (!URL.canParse(link)) return undefined;
   let url = new URL(link);
   for (let hop = 0; hop <= redirectsMax; hop++) {
     const at = url;
-    if (!(yield* reachable(at, resolve))) return undefined;
-    const answered = yield* client
-      .get(at, { headers: { accept: "text/html", "user-agent": "VibeValley link preview" } })
-      .pipe(Effect.provideService(FetchHttpClient.RequestInit, { redirect: "manual" }), Effect.timeout(timeoutMs), Effect.option);
-    if (Option.isNone(answered)) return undefined;
-    const res = answered.value;
+    if (!(await reachable(at, resolve))) return undefined;
+    let res: Response;
+    try {
+      // Real time: the deadline is on a request to the web, not on the farm's clock.
+      res = await get(at, {
+        headers: { accept: "text/html", "user-agent": "VibeValley link preview" },
+        redirect: "manual",
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch {
+      // Not answered, or not in time: the link has no preview, which is what the caller is told.
+      return undefined;
+    }
     if (res.status >= 300 && res.status < 400) {
-      const next = res.headers["location"];
+      await discard(res);
+      const next = res.headers.get("location");
       if (!next) return undefined;
       url = new URL(next, at);
       continue;
     }
-    if (res.status < 200 || res.status >= 300 || !(res.headers["content-type"] ?? "").includes("text/html")) return undefined;
-    // Only the head is wanted: reading stops at bodyMax, and the rest is never fetched.
+    if (res.status < 200 || res.status >= 300 || !(res.headers.get("content-type") ?? "").includes("text/html")) {
+      await discard(res);
+      return undefined;
+    }
+    // Only the head is wanted: reading stops at bodyMax (or after timeoutMs), and the rest is never fetched.
     const chunks: Uint8Array[] = [];
     let size = 0;
-    const read = yield* res.stream.pipe(
-      Stream.takeWhile(() => size < bodyMax),
-      Stream.runForEach((chunk) =>
-        Effect.sync(() => {
-          chunks.push(chunk);
-          size += chunk.length;
-        }),
-      ),
-      Effect.timeoutOption(timeoutMs),
-      Effect.result,
-    );
-    if (read._tag === "Failure" && chunks.length === 0) return undefined;
+    let failed = false;
+    // The body is bytes: what fetch gives is typed as any chunk.
+    const reader: ReadableStreamDefaultReader<Uint8Array> | undefined = res.body?.getReader();
+    if (reader) {
+      const deadline = AbortSignal.timeout(timeoutMs);
+      const late = new Promise<"late">((done) => deadline.addEventListener("abort", () => done("late"), { once: true }));
+      try {
+        while (size < bodyMax) {
+          const r = await Promise.race([reader.read(), late]);
+          if (r === "late" || r.done) break;
+          chunks.push(r.value);
+          size += r.value.length;
+        }
+      } catch {
+        // A body cut off midway: what was read is still read for the head.
+        failed = true;
+      } finally {
+        await reader.cancel().catch(() => undefined);
+      }
+    }
+    if (failed && chunks.length === 0) return undefined;
     return embedOf(link, new TextDecoder().decode(Buffer.concat(chunks).subarray(0, bodyMax)));
   }
   return undefined;
-});
+}
+
+/** A body not read is let go of, so its connection is. */
+const discard = (res: Response) => res.body?.cancel().catch(() => undefined);

@@ -1,5 +1,4 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { For, Match, Show, Switch } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -21,123 +20,6 @@ import { FarmLog } from "./FarmLog";
 import { HarvestReview, Warehouse } from "./Harvest";
 import { Menu } from "./Menu";
 import { SowForm, WaterForm } from "./SeedForms";
-
-const styles = stylex.create({
-  tile: {
-    display: "flex",
-    width: "100%",
-    flexDirection: "column",
-    alignItems: "center",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    padding: "0.625rem",
-    cursor: {
-      default: null,
-      ":enabled": "pointer",
-    },
-    opacity: {
-      default: null,
-      ":disabled": ".5",
-    },
-  },
-  tileIdle: {
-    borderColor: "transparent",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":enabled:hover": "var(--color-cream-200)",
-      },
-    },
-  },
-  tileChosen: {
-    borderColor: "var(--color-leaf-500)",
-    backgroundColor: "color-mix(in srgb, var(--color-leaf-300) 60%, var(--color-cream-50))",
-  },
-  column: {
-    display: "flex",
-    flexDirection: "column",
-  },
-  lead: {
-    fontSize: "13px",
-    color: "var(--color-bark-900)",
-  },
-  looksGrid: {
-    marginTop: "0.75rem",
-    display: "grid",
-    gridTemplateColumns: {
-      default: "repeat(2,minmax(0,1fr))",
-      "@media (width>=40rem)": "repeat(3,minmax(0,1fr))",
-    },
-    gap: "0.625rem",
-  },
-  lookPreview: {
-    height: "7rem",
-  },
-  tileName: {
-    marginTop: "0.375rem",
-    fontSize: "13px",
-  },
-  tileBlurb: {
-    textAlign: "center",
-    fontSize: "12px",
-    color: "var(--color-bark-600)",
-  },
-  petsHeading: {
-    marginTop: "0.5rem",
-    fontSize: "13px",
-  },
-  petsRow: {
-    marginTop: "0.5rem",
-    display: "flex",
-    gap: "0.625rem",
-  },
-  petSlot: {
-    flex: "1",
-    backgroundColor: "var(--color-cream-100)",
-  },
-  petPreview: {
-    height: "4rem",
-  },
-  petDrawing: {
-    fontSize: "12px",
-    color: "var(--color-bark-600)",
-  },
-  shopText: {
-    fontSize: "13px",
-    color: "var(--color-bark-800)",
-  },
-  shopGrid: {
-    marginTop: "0.75rem",
-    display: "grid",
-    gridTemplateColumns: "repeat(2,minmax(0,1fr))",
-    gap: "0.5rem",
-  },
-  shopCard: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    backgroundColor: "var(--color-cream-100)",
-    padding: "0.625rem",
-    opacity: ".8",
-  },
-  shopBody: {
-    minWidth: "0",
-    flex: "1",
-  },
-  shopName: {
-    display: "block",
-    fontSize: "13px",
-  },
-  shopNote: {
-    display: "block",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "12px",
-    color: "var(--color-bark-600)",
-  },
-});
 
 const panelTitle: Record<FarmPanel, [title: string, icon: string, size: FarmDialogSize]> = {
   shop: [t("web.farm.panel.shop"), "icon-shop", "sm"],
@@ -252,7 +134,12 @@ function Tile(props: { item: string; chosen: boolean; ready: boolean; onClick: (
       aria-pressed={aria(props.chosen)}
       disabled={!props.ready}
       onClick={() => props.onClick()}
-      {...stylex.attrs(styles.tile, props.chosen ? styles.tileChosen : styles.tileIdle)}
+      class={[
+        "flex w-full flex-col items-center border-2 p-2.5 enabled:cursor-pointer disabled:opacity-50",
+        props.chosen
+          ? "border-leaf-500 bg-[color-mix(in_srgb,_var(--color-leaf-300)_60%,_var(--color-cream-50))]"
+          : "border-transparent enabled:hover:bg-cream-200",
+      ]}
     >
       {props.children}
     </button>
@@ -277,37 +164,37 @@ function OrchestratorLooks() {
   const pet = usePrefs((p) => p.pet);
   const has = (name: string) => loaded().village?.atlas.has(name) ?? false;
   return (
-    <div {...stylex.attrs(styles.column)}>
-      <p {...stylex.attrs(styles.lead)}>{t("web.farm.panel.pickLook")}</p>
-      <div {...stylex.attrs(styles.looksGrid)}>
+    <div class="flex flex-col">
+      <p class="text-(length:--text-sm) text-bark-900">{t("web.farm.panel.pickLook")}</p>
+      <div class="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2.5">
         <For each={orchestratorLooks}>
           {(look) => (
             <Tile item={look.id} chosen={look.id === current()} ready={lookReady(look.id, has)} onClick={() => void choose(look.id)}>
-              <span {...stylex.attrs(styles.lookPreview)}>
+              <span class="h-28">
                 <Show when={loaded().village}>
                   <SpriteIcon name={orchestratorSprite(look.id, "", has)} size={112} />
                 </Show>
               </span>
-              <span {...stylex.attrs(styles.tileName)}>{look.name}</span>
-              <span {...stylex.attrs(styles.tileBlurb)}>{lookReady(look.id, has) ? look.blurb : t("web.farm.panel.drawing")}</span>
+              <span class="mt-1.5 text-(length:--text-sm)">{look.name}</span>
+              <span class="text-center text-(length:--text-xs) text-bark-600">{lookReady(look.id, has) ? look.blurb : t("web.farm.panel.drawing")}</span>
             </Tile>
           )}
         </For>
       </div>
-      <p {...stylex.attrs(styles.petsHeading)}>{t("web.farm.panel.pets")}</p>
-      <div {...stylex.attrs(styles.petsRow)}>
+      <p class="mt-2 text-(length:--text-sm)">{t("web.farm.panel.pets")}</p>
+      <div class="mt-2 flex gap-2.5">
         <For each={pets}>
           {(p) => (
-            <div {...stylex.attrs(styles.petSlot)}>
+            <div class="flex-1 bg-cream-100">
               <Tile item={p} chosen={p === pet()} ready={has(`${p}-awake`)} onClick={() => setPet(p)}>
-                <span {...stylex.attrs(styles.petPreview)}>
+                <span class="h-16">
                   <Show when={has(`${p}-awake`)}>
                     <SpriteIcon name={`${p}-awake`} size={64} />
                   </Show>
                 </span>
-                <span {...stylex.attrs(styles.tileName)}>{petName[p]}</span>
+                <span class="mt-1.5 text-(length:--text-sm)">{petName[p]}</span>
                 <Show when={!has(`${p}-awake`)}>
-                  <span {...stylex.attrs(styles.petDrawing)}>{t("web.farm.panel.drawing")}</span>
+                  <span class="text-(length:--text-xs) text-bark-600">{t("web.farm.panel.drawing")}</span>
                 </Show>
               </Tile>
             </div>
@@ -328,19 +215,19 @@ const shop = [
 function Shop() {
   const core = useCore();
   return (
-    <div {...stylex.attrs(styles.column)}>
-      <p {...stylex.attrs(styles.shopText)}>{t("web.farm.panel.shopClosed", { coins: Math.round(core()?.progress?.coins ?? 0) })}</p>
-      <div {...stylex.attrs(styles.shopGrid)}>
+    <div class="flex flex-col">
+      <p class="text-(length:--text-sm) text-bark-800">{t("web.farm.panel.shopClosed", { coins: Math.round(core()?.progress?.coins ?? 0) })}</p>
+      <div class="mt-3 grid grid-cols-2 gap-2">
         <For each={shop}>
           {(item) => (
-            <div {...stylex.attrs(styles.shopCard)}>
+            <div class="flex items-center gap-2 bg-cream-100 p-2.5 opacity-80">
               <SpriteIcon name={item.icon} size={36} />
-              <span {...stylex.attrs(styles.shopBody)}>
-                <span {...stylex.attrs(styles.shopName)}>{item.name}</span>
-                <span {...stylex.attrs(styles.shopNote)}>{item.note}</span>
+              <span class="min-w-0 flex-1">
+                <span class="block text-(length:--text-sm)">{item.name}</span>
+                <span class="block truncate text-(length:--text-xs) text-bark-600">{item.note}</span>
               </span>
               <SpriteIcon name="icon-coin" size={16} />
-              <span {...stylex.attrs(styles.shopText)}>{item.price}</span>
+              <span class="text-(length:--text-sm) text-bark-800">{item.price}</span>
             </div>
           )}
         </For>

@@ -1,39 +1,37 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { NodeServices } from "@effect/platform-node";
-import { describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
-import { TestClock } from "effect/testing";
-import { test } from "vite-plus/test";
+import { describe, expect, test, vi } from "vite-plus/test";
 
 import { tempDir } from "@vibevalley/testkit/temp";
-import { waitFor } from "@vibevalley/testkit/until";
 
 import { keptFile } from "./files.ts";
 import { HomeTaken, leaseHome } from "./lease.ts";
+import { keptLog } from "./log.ts";
+import { wallTime } from "./time.ts";
 
 describe("a kept file", () => {
-  it.effect("is saved whole at once, written soon after the first change with the later ones joining, and last as its scope closes", () =>
-    Effect.gen(function* () {
+  test("is saved whole at once, written soon after the first change with the later ones joining, and last as its scope closes", async () => {
+    vi.useFakeTimers();
+    try {
       const path = join(tempDir("vibevalley-files-"), "deep", "state.json");
       const read = () => (existsSync(path) ? readFileSync(path, "utf8") : undefined);
-      yield* Effect.scoped(
-        Effect.gen(function* () {
-          const kept = yield* keptFile(path, { soonMs: 100 });
-          yield* kept.save("one");
-          expect(read()).toBe("one");
-          let state = "two";
-          kept.soon(() => state);
-          state = "three";
-          yield* TestClock.adjust(100);
-          yield* waitFor(Effect.sync(read), (text) => text === "three", "the soon write");
-          kept.soon(() => "last");
-        }),
-      );
+      const kept = keptFile(path, { clock: wallTime, log: keptLog() }, { soonMs: 100 });
+      await kept.save("one");
+      expect(read()).toBe("one");
+      let state = "two";
+      kept.soon(() => state);
+      state = "three";
+      await vi.advanceTimersByTimeAsync(100);
+      vi.useRealTimers();
+      await vi.waitFor(() => expect(read()).toBe("three"));
+      kept.soon(() => "last");
+      await kept.close();
       expect(read()).toBe("last");
-    }).pipe(Effect.provide(NodeServices.layer)),
-  );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 test("one server per home; a stale lock is taken over", () => {

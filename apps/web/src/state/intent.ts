@@ -1,4 +1,3 @@
-import { Atom, type AtomRegistry } from "effect/reactivity";
 import { type Accessor } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -6,9 +5,9 @@ import type { StateFrame } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
 import { faultOf, newSendKey, type UiFault } from "#/infra/api.ts";
-import type { Frames, Link } from "#/infra/frame.ts";
+import type { Link } from "#/infra/frame.ts";
 
-import { framesAtom, useAtom, useRegistry } from "./atom";
+import { atom, type Atom, framesIn, type Registry, subscribeFrames, useAtom, useRegistry } from "./atom";
 
 /** An intent as the page reads it: its phase says where it is, and only a failed one has a fault. */
 export type Intent<I, R> = {
@@ -63,18 +62,14 @@ export const bySeq = <I>(frame: StateFrame | undefined, intent: Intent<I, { read
 
 export interface IntentType<I, R> {
   readonly kind: IntentKind<I, R>;
-  readonly one: (key: string) => Atom.Writable<Intent<I, R> | undefined>;
-  readonly keys: Atom.Writable<readonly string[]>;
-  readonly all: Atom.Atom<readonly Intent<I, R>[]>;
-  readonly runners: WeakMap<AtomRegistry.AtomRegistry, Intents<I, R>>;
+  /** The kept intents by key, in the order they were first sent; a settled one leaves nothing behind. */
+  readonly kept: Atom<ReadonlyMap<string, Intent<I, R>>>;
+  readonly all: Atom<readonly Intent<I, R>[]>;
+  readonly runners: WeakMap<Registry, Intents<I, R>>;
 }
 
 export function defineIntent<I, R>(kind: IntentKind<I, R>): IntentType<I, R> {
-  // Not kept alive: a runner mounts each while it keeps the intent, so a settled one leaves nothing behind.
-  const one = Atom.family((_key: string) => Atom.make<Intent<I, R> | undefined>(undefined));
-  const keys = Atom.keepAlive(Atom.make<readonly string[]>([]));
-  const all = Atom.make((get) => get(keys).flatMap((k) => get(one(k)) ?? []));
-  return { kind, one, keys, all, runners: new WeakMap() };
+  return { kind, kept: atom<ReadonlyMap<string, Intent<I, R>>>(new Map()), all: atom<readonly Intent<I, R>[]>([]), runners: new WeakMap() };
 }
 
 /** An intent on its way: `done` is the intent once the server answered (`replied`) or it failed (`status`), undefined when it was let go first. */
@@ -107,7 +102,7 @@ export function sendReplacing<I, R>(intents: Intents<I, R>, input: I, sameTarget
 }
 
 /** A type's intents in one registry; the same object for every caller, so its timers and watches are kept once. */
-export function intentsIn<I, R>(registry: AtomRegistry.AtomRegistry, type: IntentType<I, R>): Intents<I, R> {
+export function intentsIn<I, R>(registry: Registry, type: IntentType<I, R>): Intents<I, R> {
   const made = type.runners.get(registry);
   if (made) return made;
   const runner = makeRunner(registry, type);
@@ -121,24 +116,25 @@ export function useIntents<I, R>(type: IntentType<I, R>): Intents<I, R> & { read
   return { ...intentsIn(registry, type), list: useAtom(type.all, registry) };
 }
 
-function makeRunner<I, R>(registry: AtomRegistry.AtomRegistry, type: IntentType<I, R>): Intents<I, R> {
+function makeRunner<I, R>(registry: Registry, type: IntentType<I, R>): Intents<I, R> {
   const { kind } = type;
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
   const watches = new Map<string, () => void>();
   // A retry starts a new attempt: what an earlier one comes back with no longer decides the intent.
   const attempts = new Map<string, number>();
   const waiting = new Map<string, ((answered: Intent<I, R> | undefined) => void)[]>();
-  const mounts = new Map<string, () => void>();
   let unframe: (() => void) | undefined;
   let link: Link | undefined;
 
-  const get = (key: string) => registry.get(type.one(key));
-  const frames = (): Frames => registry.get(framesAtom);
+  const get = (key: string) => registry.get(type.kept).get(key);
+  const frames = () => framesIn(registry);
+  const keep = (kept: ReadonlyMap<string, Intent<I, R>>) => {
+    registry.set(type.kept, kept);
+    registry.set(type.all, [...kept.values()]);
+  };
   const put = (key: string, input: I, state: IntentState<R>): Intent<I, R> => {
     const intent = projectIntent(key, input, state);
-    if (!mounts.has(key)) mounts.set(key, registry.mount(type.one(key)));
-    registry.set(type.one(key), intent);
-    if (!registry.get(type.keys).includes(key)) registry.update(type.keys, (all) => [...all, key]);
+    keep(new Map(registry.get(type.kept)).set(key, intent));
     return intent;
   };
   const answer = (key: string, answered: Intent<I, R> | undefined) => {
@@ -154,11 +150,10 @@ function makeRunner<I, R>(registry: AtomRegistry.AtomRegistry, type: IntentType<
     watches.delete(key);
     attempts.delete(key);
     answer(key, undefined);
-    registry.update(type.keys, (all) => all.filter((k) => k !== key));
-    registry.set(type.one(key), undefined);
-    mounts.get(key)?.();
-    mounts.delete(key);
-    if (registry.get(type.keys).length === 0) {
+    const kept = new Map(registry.get(type.kept));
+    kept.delete(key);
+    keep(kept);
+    if (kept.size === 0) {
       unframe?.();
       unframe = undefined;
     }
@@ -195,10 +190,10 @@ function makeRunner<I, R>(registry: AtomRegistry.AtomRegistry, type: IntentType<
   const follow = () => {
     if (unframe) return;
     link = frames().link;
-    unframe = registry.subscribe(framesAtom, (now) => {
+    unframe = subscribeFrames(registry, (now) => {
       const back = now.link === "open" && link !== "open";
       link = now.link;
-      for (const key of registry.get(type.keys)) {
+      for (const key of [...registry.get(type.kept).keys()]) {
         if (back && get(key)?.phase === "queued") dispatch(key);
         else check(key);
       }

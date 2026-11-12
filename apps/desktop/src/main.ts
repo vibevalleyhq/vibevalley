@@ -1,9 +1,9 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { Effect } from "effect";
 import { app, dialog, globalShortcut, nativeImage } from "electron";
 
+import { sleep } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import { desktopVoiceShortcut } from "@vibevalley/protocol/host";
 
@@ -84,7 +84,7 @@ if (!app.requestSingleInstanceLock()) {
       const cover = { next: ready.next, newFarm: ready.newFarm, page: ready.page };
       await window.updating(cover, "stopping");
       // Long enough to read: the server may stop at once.
-      await Promise.all([server?.stop(), Effect.runPromise(Effect.sleep(coverAtLeastMs))]);
+      await Promise.all([server?.stop(), sleep(coverAtLeastMs)]);
       stopped = true;
       await window.updating(cover, "swapping");
       let failed: string | undefined;

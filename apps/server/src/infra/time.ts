@@ -1,46 +1,16 @@
-import { Clock, DateTime, Effect, FiberSet, type Scope } from "effect";
+import type { Clock } from "@vibevalley/async";
+import { sleep } from "@vibevalley/async";
 
-export interface Time {
-  /** Unix milliseconds. */
-  readonly now: () => number;
-  /** Resolves after ms; rejects when signal aborts first. */
-  readonly sleep: (ms: number, signal?: AbortSignal) => Promise<void>;
+/** The time as the server reads it: a Clock, and a timer that can be called off. */
+export interface Time extends Clock {
   /** Runs f after ms unless the function it returns is called first. */
   readonly after: (ms: number, f: () => void) => () => void;
 }
 
-/** The Clock of the service that asks, as a Time. */
-export const timeHere: Effect.Effect<Time, never, Scope.Scope> = Effect.gen(function* () {
-  const clock = yield* Clock.Clock;
-  const run = yield* FiberSet.makeRuntimePromise();
-  const fork = yield* FiberSet.makeRuntime();
-  return {
-    now: () => clock.currentTimeMillisUnsafe(),
-    sleep: (ms, signal) => run(Effect.sleep(Math.max(0, ms)), signal ? { signal } : undefined),
-    after: (ms, f) => {
-      const fiber = fork(Effect.andThen(Effect.sleep(Math.max(0, ms)), Effect.sync(f)));
-      return () => fiber.interruptUnsafe();
-    },
-  };
-});
-
 /** The wall clock, for code with no service to ask: a class tested on its own, the command line. */
 export const wallTime: Time = {
   now: () => Date.now(),
-  sleep: (ms, signal) =>
-    new Promise<void>((resolve, reject) => {
-      if (signal?.aborted === true) return reject(signal.reason);
-      const timer = setTimeout(done, Math.max(0, ms));
-      function done() {
-        signal?.removeEventListener("abort", abort);
-        resolve();
-      }
-      function abort() {
-        clearTimeout(timer);
-        reject(signal?.reason);
-      }
-      signal?.addEventListener("abort", abort, { once: true });
-    }),
+  sleep,
   // Kept alive by nothing: a command line's pending fold or tick does not hold it open.
   after: (ms, f) => {
     const timer = setTimeout(f, Math.max(0, ms));
@@ -70,4 +40,16 @@ export const localeMinute = (ms: number) => {
 };
 
 /** An instant's calendar and clock in this machine's zone; month counts from 1. */
-export const localParts = (ms: number) => DateTime.toParts(DateTime.makeZonedUnsafe(ms, { timeZone: DateTime.zoneMakeLocal() }));
+export const localParts = (ms: number) => {
+  const d = new Date(ms);
+  return {
+    year: d.getFullYear(),
+    month: d.getMonth() + 1,
+    day: d.getDate(),
+    hour: d.getHours(),
+    minute: d.getMinutes(),
+    second: d.getSeconds(),
+    millis: d.getMilliseconds(),
+    weekDay: d.getDay(),
+  };
+};

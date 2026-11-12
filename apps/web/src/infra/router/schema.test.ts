@@ -1,20 +1,20 @@
-import { Effect, Schema, SchemaGetter } from "effect";
 import { expect, expectTypeOf, test } from "vite-plus/test";
+import { z } from "zod";
 
 import { memoryHistory } from "./history";
 import { route } from "./matching";
 import { search, searchParam } from "./search";
 
-const Positive = Schema.FiniteFromString.check(Schema.isGreaterThan(0));
+const Positive = z.codec(z.string(), z.number().positive(), { decode: Number, encode: String });
 const filters = search({
-  page: Schema.optional(searchParam(Positive)),
-  order: Schema.optional(searchParam(Schema.Literals(["asc", "desc"]))),
-  tags: Schema.optional(Schema.Array(Schema.String)),
+  page: searchParam(Positive).optional(),
+  order: searchParam(z.enum(["asc", "desc"])).optional(),
+  tags: z.array(z.string()).optional(),
 });
-const item = route("/items/:id", { params: Schema.Struct({ id: Positive }), search: filters });
+const item = route("/items/:id", { params: z.object({ id: Positive }), search: filters });
 
 test("route codecs infer decoded params and encode links through the same schema", () => {
-  expectTypeOf(item.build).parameter(0).toEqualTypeOf<{ readonly id: number }>();
+  expectTypeOf(item.build).parameter(0).toEqualTypeOf<{ id: number }>();
   expectTypeOf(item.match("/items/4")?.id).toEqualTypeOf<number | undefined>();
   expect(item.match("/items/4")).toEqual({ id: 4 });
   expect(item.build({ id: 4 })).toBe("/items/4");
@@ -26,10 +26,8 @@ test("route codecs infer decoded params and encode links through the same schema
 });
 
 test("asynchronous route codecs cannot admit a page before validation", () => {
-  const waiting = Schema.String.pipe(
-    Schema.decodeTo(Schema.String, { decode: SchemaGetter.transformEffect(() => Effect.never), encode: SchemaGetter.passthrough() }),
-  );
-  const path = route("/waiting/:id", { params: Schema.Struct({ id: waiting }) });
+  const waiting = z.codec(z.string(), z.string(), { decode: () => new Promise<string>(() => {}), encode: (value) => value });
+  const path = route("/waiting/:id", { params: z.object({ id: waiting }) });
   expect(path.resolve("/waiting/value", "")).toBe("invalid");
   const waitingSearch = search({ value: searchParam(waiting) });
   expect(waitingSearch.valid("?value=one")).toBe(false);

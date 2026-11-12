@@ -1,4 +1,3 @@
-import { Formatter } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 import { Deliveries, type DeliveryRow } from "./deliveries.ts";
@@ -38,7 +37,7 @@ describe("the open deliveries", () => {
   it("move pending → handed, go back when a launch closes, and leave once seen", () => {
     const d = new Deliveries();
     const { payload, ...stored } = row("m2", 2);
-    d.load([{ ...stored, session_id: "w1", payload_json: Formatter.formatJson(payload) }]);
+    d.load([{ ...stored, session_id: "w1", payload_json: JSON.stringify(payload) }]);
     d.inserted("w1", row("m1", 1));
     d.inserted("w1", { ...row("m1", 1), payload: row("another", 3).payload });
     expect(d.of("w1").map((r) => r.payload.trigger.card.summary)).toEqual(["话", "话"]);

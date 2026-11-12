@@ -1,5 +1,3 @@
-import { Schema } from "effect";
-
 import type * as T from "@vibevalley/protocol";
 
 export interface SessionIdentity {
@@ -11,9 +9,15 @@ export interface SessionIdentity {
   readonly brief: string;
 }
 
-export class DeliveryRefused extends Schema.TaggedError<DeliveryRefused, { readonly brand: unique symbol }>()("DeliveryRefused", {
-  reason: Schema.String,
-}) {}
+/** A message the helper was not handed; reason is what the sender is told. */
+export class DeliveryRefused extends Error {
+  override readonly name = "DeliveryRefused";
+  readonly reason: string;
+  constructor(reason: string, options?: ErrorOptions) {
+    super(reason, options);
+    this.reason = reason;
+  }
+}
 
 /** What came of handing a helper a message. */
 export interface Delivered {

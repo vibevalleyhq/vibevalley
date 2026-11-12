@@ -1,12 +1,10 @@
-import { describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { describe, expect, it } from "vite-plus/test";
 
 import type { Tool } from "@vibevalley/agent/core/loop";
 import type { BrainMessage } from "@vibevalley/agent/messages";
 import { assistantMessage, toolCall } from "@vibevalley/ai/testing";
 import { executionsOf } from "@vibevalley/protocol/rules";
 
-import { Issue } from "#/modules/issue/issue.ts";
 import {
   check,
   committed,
@@ -106,45 +104,45 @@ describe("the orchestrator's evals", () => {
     expect(check(c.expect, [...noted, assistantMessage([toolCall("issue_status_update", { id: "#1", status: "待办" })])])).not.toEqual([]);
   });
 
-  it.live.each(casesIn(committed).filter(({ case: c }) => c.scenario !== undefined))(
+  it.each(casesIn(committed).filter(({ case: c }) => c.scenario !== undefined))(
     "regression: replay $case.id executes paraphrased requests in an isolated farm",
-    ({ case: c }) =>
-      Effect.gen(function* () {
-        const repo = c.scenario?.repos[0];
-        if (!repo) throw new Error("The replay repository is missing");
-        const { tools } = yield* replaySetup(c);
-        const issues = yield* Issue;
-        const create = tools.find((tool) => tool.name === "issue_create");
-        const list = tools.find((tool) => tool.name === "issue_list");
-        if (!create || !list) throw new Error("Issue tools are missing");
-        const issues2 = yield* issues.list();
-        expect(issues2).toEqual([]);
-        const before = yield* list.execute({ text: "白屏", repo }, { id: "read" });
-        expect(before.content).not.toEqual([{ type: "text", text: noResult }]);
-        const start = c.id !== "note-without-starting";
-        const args = {
-          title: c.id === "one-line-after-starting" ? "登录会话记忆" : c.id === "start-when-asked" ? "补充 README 文档" : "登录页间歇性白屏",
-          description: c.id === "one-line-after-starting" ? "勾选后 token 保留 30 天；未勾选关闭浏览器即失效；登录测试通过" : "",
-          repo,
-          ...(start ? { start: true } : {}),
-        };
-        const receipt = yield* create.execute(args, { id: "create" });
-        const added = yield* issues.list();
-        expect(added).toHaveLength(1);
-        const item = added[0];
-        if (!item) throw new Error("The request did not create an issue");
-        expect(item).toMatchObject({ title: args.title, description: args.description, repo: args.repo });
-        expect(executionsOf(item)).toHaveLength(start ? 1 : 0);
-        if (!start) expect(item.status).toBe("backlog");
-        expect(receipt.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("")).toContain(`#${item.number}`);
-        const after = yield* list.execute({ text: args.title }, { id: "read-after" });
-        expect(after.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("")).toContain(`#${item.number}`);
-      }).pipe(Effect.provide(replayWorld(c))),
+    async ({ case: c }) => {
+      await using farm = await replayWorld(c);
+      const repo = c.scenario?.repos[0];
+      if (!repo) throw new Error("The replay repository is missing");
+      const { tools } = await replaySetup(farm, c);
+      const issues = farm.issue;
+      const create = tools.find((tool) => tool.name === "issue_create");
+      const list = tools.find((tool) => tool.name === "issue_list");
+      if (!create || !list) throw new Error("Issue tools are missing");
+      const issues2 = await issues.list();
+      expect(issues2).toEqual([]);
+      const before = await list.execute({ text: "白屏", repo }, { id: "read" });
+      expect(before.content).not.toEqual([{ type: "text", text: noResult }]);
+      const start = c.id !== "note-without-starting";
+      const args = {
+        title: c.id === "one-line-after-starting" ? "登录会话记忆" : c.id === "start-when-asked" ? "补充 README 文档" : "登录页间歇性白屏",
+        description: c.id === "one-line-after-starting" ? "勾选后 token 保留 30 天；未勾选关闭浏览器即失效；登录测试通过" : "",
+        repo,
+        ...(start ? { start: true } : {}),
+      };
+      const receipt = await create.execute(args, { id: "create" });
+      const added = await issues.list();
+      expect(added).toHaveLength(1);
+      const item = added[0];
+      if (!item) throw new Error("The request did not create an issue");
+      expect(item).toMatchObject({ title: args.title, description: args.description, repo: args.repo });
+      expect(executionsOf(item)).toHaveLength(start ? 1 : 0);
+      if (!start) expect(item.status).toBe("backlog");
+      expect(receipt.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("")).toContain(`#${item.number}`);
+      const after = await list.execute({ text: args.title }, { id: "read-after" });
+      expect(after.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("")).toContain(`#${item.number}`);
+    },
   );
 
   // A replay answers a call only as the case recorded that same call.
   it("answer in a replay only the call the case recorded, once", async () => {
-    const issueCreate: Tool = { name: "issue_create", description: "", parameters: {}, execute: () => Effect.die("not stubbed") };
+    const issueCreate: Tool = { name: "issue_create", description: "", parameters: {}, execute: () => Promise.reject(new Error("not stubbed")) };
     const recorded: BrainMessage[] = [
       assistantMessage([toolCall("issue_create", { title: "白屏", start: true }, "c1"), toolCall("issue_create", { title: "坏了" }, "c2")]),
       { role: "toolResult", toolCallId: "c1", toolName: "issue_create", content: [{ type: "text", text: "派了" }], isError: false, timestamp: 0 },
@@ -152,11 +150,9 @@ describe("the orchestrator's evals", () => {
     ];
     const [tool] = stubbed([issueCreate], recorded);
     const answer = (args: unknown) =>
-      Effect.runPromise(
-        tool!.execute(args, { id: "x" }).pipe(
-          Effect.map((r) => r.content.map((c) => (c.type === "text" ? c.text : "")).join("")),
-          Effect.catch((e: Error) => Effect.succeed("error: " + e.message)),
-        ),
+      tool!.execute(args, { id: "x" }).then(
+        (r) => r.content.map((c) => (c.type === "text" ? c.text : "")).join(""),
+        (e: Error) => "error: " + e.message,
       );
     expect(await answer({ title: "白屏" })).toBe(noResult);
     expect(await answer({ start: true, title: "白屏" })).toBe("派了");

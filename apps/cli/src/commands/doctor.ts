@@ -1,11 +1,9 @@
-import { Effect, Schema } from "effect";
-import { Command } from "effect/cli";
-
 import { announced } from "@vibevalley/home";
 import { t } from "@vibevalley/i18n";
 
 import { exit, Failure, jsonText, type Next, printBody } from "#/base/output.ts";
-import { appStatus, ask, farmHome, ServerFlag } from "#/infra/farm.ts";
+import { command } from "#/infra/command.ts";
+import { appStatus, ask, farmHome } from "#/infra/farm.ts";
 
 interface Check {
   readonly check: string;
@@ -15,37 +13,38 @@ interface Check {
 
 const failed = (check: string, why: string, next: readonly Next[], more: Record<string, unknown> = {}): Check => ({ check, ok: false, why, next, ...more });
 
-const whyOf = (e: unknown) => (Schema.is(Failure)(e) ? e.text : String(e));
+const whyOf = (e: unknown) => (e instanceof Failure ? e.text : String(e));
 
-export const doctorCommand = Command.make("doctor", {}, () =>
-  Effect.gen(function* () {
-    const base = yield* ServerFlag;
-    const home = yield* farmHome;
+export const doctorCommand = command("doctor", {
+  about: t("cli.command.doctor"),
+  examples: [{ command: "vibevalley doctor", description: t("cli.example.doctor.about") }],
+  run: async (_, ctx) => {
+    const base = ctx.flags.server;
+    const home = farmHome(ctx);
     const checks: Check[] = [{ check: "farm", ok: true, home, server: base, from: announced(home) === base ? "server.json" : "default" }];
 
-    const health = yield* ask((api) => api.server.health.get()).pipe(
-      Effect.match({
-        onSuccess: (h): Check => ({ check: "server", ok: h.ok, version: h.version }),
-        onFailure: (e) => failed("server", whyOf(e), [{ say: t("cli.next.openApp"), run: ["app", "open"] }, { say: t("cli.next.startServer") }]),
-      }),
-    );
+    let health: Check;
+    try {
+      const h = await ask(ctx, (api) => api.server.health.get());
+      health = { check: "server", ok: h.ok, version: h.version };
+    } catch (e) {
+      health = failed("server", whyOf(e), [{ say: t("cli.next.openApp"), run: ["app", "open"] }, { say: t("cli.next.startServer") }]);
+    }
     checks.push(health);
     if ("why" in health) {
-      const text = yield* jsonText(checks);
-      yield* printBody(text);
-      return yield* Failure.make({ code: exit.unreachable, tag: "Doctor", text: t("cli.doctor.unreachable", { base }) });
+      printBody(ctx, jsonText(checks));
+      throw new Failure({ code: exit.unreachable, tag: "Doctor", text: t("cli.doctor.unreachable", { base }) });
     }
 
-    const appStatus2 = yield* appStatus.pipe(
-      Effect.match({
-        onSuccess: (s): Check => ({ check: "app", ok: true, open: true, ...s }),
-        onFailure: (): Check => ({ check: "app", ok: true, open: false }),
-      }),
-    );
     // The desktop app not being open is fine: a farm runs without it too (vp run start).
-    checks.push(appStatus2);
+    try {
+      checks.push({ check: "app", ok: true, open: true, ...(await appStatus(ctx)) });
+    } catch {
+      // Not open (or not answering): said as such in the check itself.
+      checks.push({ check: "app", ok: true, open: false });
+    }
 
-    const runtimes = yield* ask((api) => api.runtime.list());
+    const runtimes = await ask(ctx, (api) => api.runtime.list());
     const installed = runtimes.flatMap((r) => (r.installation.status === "available" ? [r.id] : []));
     checks.push(
       installed.length > 0
@@ -53,23 +52,22 @@ export const doctorCommand = Command.make("doctor", {}, () =>
         : failed("runtimes", t("cli.doctor.noRuntime"), [{ say: t("cli.doctor.installRuntime"), run: ["runtime", "list"] }]),
     );
 
-    const settings = yield* ask((api) => api.setting.get());
+    const settings = await ask(ctx, (api) => api.setting.get());
     checks.push(
       settings.deepseekApiKey.source !== undefined
         ? { check: "model", ok: true, from: settings.deepseekApiKey.source }
         : failed("model", t("cli.doctor.noModelKey"), [{ say: t("cli.doctor.setModelKey"), run: ["app", "open", "/settings/models"] }]),
     );
 
-    const lan = yield* ask((api) => api.lan.get());
+    const lan = await ask(ctx, (api) => api.lan.get());
     checks.push(
       lan.problem === ""
         ? { check: "lan", ok: true, open: lan.open }
         : failed("lan", lan.problem, [{ say: t("cli.doctor.lanSettings"), run: ["app", "open", "/settings/devices"] }]),
     );
 
-    const text = yield* jsonText(checks);
-    yield* printBody(text);
+    printBody(ctx, jsonText(checks));
     const wrong = checks.filter((c) => !c.ok).map((c) => c.check);
-    if (wrong.length > 0) return yield* Failure.make({ code: exit.other, tag: "Doctor", text: t("cli.doctor.wrong", { checks: wrong.join(", ") }) });
-  }),
-).pipe(Command.withDescription(t("cli.command.doctor")), Command.withExamples([{ command: "vibevalley doctor", description: t("cli.example.doctor.about") }]));
+    if (wrong.length > 0) throw new Failure({ code: exit.other, tag: "Doctor", text: t("cli.doctor.wrong", { checks: wrong.join(", ") }) });
+  },
+});

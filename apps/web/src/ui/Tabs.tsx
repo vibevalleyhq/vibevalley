@@ -1,4 +1,4 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
 import { For, Show } from "solid-js";
 
 import { Tabs as Base } from "@vibevalley/base-ui";
@@ -7,8 +7,6 @@ import { Link as A } from "#/infra/router.ts";
 
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
-import { styleProps } from "./positioner";
-import { lineTab } from "./tabs.stylex";
 
 interface TabItem<T extends string> {
   readonly value: T;
@@ -20,58 +18,16 @@ interface TabItem<T extends string> {
 
 export type TabsLook = "pills" | "line";
 
-const styles = stylex.create({
-  pillList: { display: "flex", flexWrap: "wrap", gap: "0.125rem" },
-  lineList: { display: "flex", gap: "0.25rem" },
-  tab: {
-    display: "flex",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.375rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    color: {
-      default: "var(--color-muted)",
-      "@media (hover: hover)": { default: null, ":hover": "var(--color-ink)" },
-      ":is([data-selected])": "var(--color-ink)",
-    },
-    fontWeight: { default: null, ":is([data-selected])": "var(--font-weight-semibold)" },
-  },
-  pill: {
-    height: "1.75rem",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.625rem",
-    backgroundColor: {
-      default: null,
-      "@media (hover: hover)": {
-        default: null,
-        // Equal specificity keeps selected after hover without excluding selected tabs from hover rules.
-        ':where([role="tab"]:hover)': "var(--color-hover)",
-        ":is([data-selected])": "var(--color-selected)",
-      },
-      ":is([data-selected])": "var(--color-selected)",
-    },
+// A line tab is the group its icon reads: the icon is full only on the tab under the pointer or selected.
+const looks: Record<TabsLook, { list: string; tab: string }> = {
+  pills: {
+    list: "flex flex-wrap gap-0.5",
+    tab: "h-7 rounded-md px-2.5 hover:bg-hover data-selected:bg-selected",
   },
   line: {
-    marginBottom: -1,
-    borderBottomWidth: 2,
-    borderBottomStyle: "solid",
-    borderColor: { default: "transparent", ":is([data-selected])": "var(--color-ink)" },
-    paddingInline: "0.5rem",
-    paddingTop: "0.5rem",
-    paddingBottom: "0.375rem",
+    list: "flex gap-1",
+    tab: "group/tab -mb-px border-b-2 border-transparent px-2 pt-2 pb-1.5 data-selected:border-ink",
   },
-  icon: {
-    opacity: {
-      default: 0.7,
-      "@media (hover: hover)": { default: null, [stylex.when.ancestor(":hover", lineTab)]: 1 },
-      [stylex.when.ancestor("[data-selected]", lineTab)]: 1,
-    },
-  },
-});
-const looks: Record<TabsLook, { list: stylex.StyleXStyles; tab: stylex.StyleXStyles }> = {
-  pills: { list: styles.pillList, tab: styles.pill },
-  line: { list: styles.lineList, tab: styles.line },
 };
 
 export function Tabs<T extends string>(props: {
@@ -80,7 +36,7 @@ export function Tabs<T extends string>(props: {
   onChange?: (v: T) => void;
   items: readonly TabItem<T>[];
   look?: TabsLook;
-  styles?: stylex.StyleXStyles;
+  class?: JSX.ClassValue | undefined;
 }) {
   return (
     <Base.Root
@@ -90,16 +46,27 @@ export function Tabs<T extends string>(props: {
         if (item) props.onChange?.(item.value);
       }}
     >
-      <Base.List aria-label={props.label} {...styleProps([looks[props.look ?? "pills"].list, props.styles])}>
+      <Base.List aria-label={props.label} class={[looks[props.look ?? "pills"].list, props.class]}>
         <For each={props.items}>
           {(item) => (
             <Base.Tab
               value={item.value}
               data-key={item.value}
               render={item.href === undefined ? undefined : (p) => <A {...p} href={item.href ?? ""} />}
-              {...stylex.attrs(styles.tab, looks[props.look ?? "pills"].tab, props.look === "line" && lineTab)}
+              class={[
+                "flex cursor-pointer items-center gap-1.5 text-sm text-muted hover:text-ink data-selected:font-semibold data-selected:text-ink",
+                looks[props.look ?? "pills"].tab,
+              ]}
             >
-              <Show when={item.icon}>{(icon) => <Icon name={icon()} size={props.look === "line" ? 16 : 14} styles={styles.icon} />}</Show>
+              <Show when={item.icon}>
+                {(icon) => (
+                  <Icon
+                    name={icon()}
+                    size={props.look === "line" ? 16 : 14}
+                    class="opacity-70 group-hover/tab:opacity-100 group-data-selected/tab:opacity-100"
+                  />
+                )}
+              </Show>
               {item.label}
             </Base.Tab>
           )}

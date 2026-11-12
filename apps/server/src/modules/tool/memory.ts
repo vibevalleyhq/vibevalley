@@ -1,33 +1,20 @@
-import { Effect } from "effect";
-
-import { Agent } from "#/modules/agent/agent.ts";
-import { foundText, Memory, type SearchQuery } from "#/modules/memory/memory.ts";
+import { foundText, type SearchQuery } from "#/modules/memory/memory.ts";
 
 import { answers, memoryWhere, userAgentWord } from "./prompts.ts";
-import {
-  answered,
-  callerOf,
-  refuse,
-  sessionSchemaTool,
-  tool,
-  type Caller,
-  type Orchestrator,
-  type SessionInput,
-  type ToolRefusal,
-  type Who,
-} from "./schemas.ts";
+import { answered, callerOf, refuse, sessionSchemaTool, tool, type Caller, type Orchestrator, type SessionInput, type Who } from "./schemas.ts";
+import type { ToolDeps } from "./tool.ts";
 
-export const memoryTools = Effect.gen(function* () {
-  const agents = yield* Agent;
-  const memory = yield* Memory;
+export function memoryTools(deps: Pick<ToolDeps, "agent" | "memory">) {
+  const { agent: agents, memory } = deps;
 
-  // The orchestrator may say a profile's name or id.
-  const profile = (key: string): Effect.Effect<string, ToolRefusal> => {
+  // The orchestrator may say a profile's name or id. Throws ToolRefusal.
+  const profile = (key: string): string => {
     const k = key.trim();
-    if (k === userAgentWord) return refuse(answers.rememberOwnNote);
+    if (k === userAgentWord) throw refuse(answers.rememberOwnNote);
     const a = agents.named(k) ?? agents.agent(k) ?? agents.orchestrators().find((o) => o.name === k);
-    if (a && agents.isOrchestrator(a.id)) return refuse(answers.rememberOwnNote);
-    return a ? Effect.succeed(a.id) : refuse(answers.noProfileNamed(k));
+    if (a && agents.isOrchestrator(a.id)) throw refuse(answers.rememberOwnNote);
+    if (!a) throw refuse(answers.noProfileNamed(k));
+    return a.id;
   };
 
   const notWorking = answers.notWorking;
@@ -39,45 +26,35 @@ export const memoryTools = Effect.gen(function* () {
 
   const memorySearch = (who: Who, asOrchestrator: boolean) =>
     asOrchestrator
-      ? tool(
-          "memory.search",
-          Effect.fn("Tool.memorySearch")(function* (p: Orchestrator<"memory.search">) {
-            const agent = p.agent?.trim() ? yield* profile(p.agent) : "";
+      ? tool("memory.search", (p: Orchestrator<"memory.search">) =>
+          answered(async () => {
+            const agent = p.agent?.trim() ? profile(p.agent) : "";
             const q = query({ text: p.text ?? "", repo: (p.repo ?? "").trim(), ...(agent ? { agent } : {}) });
-            const memorys = yield* memory.search(q);
-            return foundText(memorys, q);
-          }, answered),
-        )
-      : sessionSchemaTool(
-          "memory.search",
-          Effect.fn("Tool.memorySearch")(function* (p: SessionInput<"memory.search">) {
-            const c = yield* callerOf(who);
-            if (!c.agent) return yield* refuse(notWorking);
-            const q = query({ agent: c.agent, repo: sessionScope(c, p.repo), text: p.text ?? "" });
-            const memorys = yield* memory.search(q);
-            return foundText(memorys, q);
+            return foundText(await memory.search(q), q);
           }),
-        );
+        )
+      : sessionSchemaTool("memory.search", async (p: SessionInput<"memory.search">) => {
+          const c = callerOf(who);
+          if (!c.agent) throw refuse(notWorking);
+          const q = query({ agent: c.agent, repo: sessionScope(c, p.repo), text: p.text ?? "" });
+          return foundText(await memory.search(q), q);
+        });
 
   const memoryCreate = (who: Who, asOrchestrator: boolean) =>
     asOrchestrator
-      ? tool(
-          "memory.create",
-          Effect.fn("Tool.memoryCreate")(function* (p: Orchestrator<"memory.create">) {
-            const id = yield* profile(p.agent);
-            const c = yield* callerOf(who);
-            const m = yield* memory.remember({ agent: id, text: p.text, repo: p.repo ?? "", by: c.actor });
+      ? tool("memory.create", (p: Orchestrator<"memory.create">) =>
+          answered(async () => {
+            const id = profile(p.agent);
+            const c = callerOf(who);
+            const m = await memory.remember({ agent: id, text: p.text, repo: p.repo ?? "", by: c.actor });
             return answers.memory.rememberedFor(id, memoryWhere(m), m.id);
-          }, answered),
-        )
-      : sessionSchemaTool(
-          "memory.create",
-          Effect.fn("Tool.memoryCreate")(function* (p: SessionInput<"memory.create">) {
-            const c = yield* callerOf(who);
-            if (!c.agent) return yield* refuse(notWorking);
-            const m = yield* memory.remember({ agent: c.agent, text: p.text, repo: sessionScope(c, p.repo), by: c.actor });
-            return answers.memory.remembered(memoryWhere(m), m.id);
           }),
-        );
+        )
+      : sessionSchemaTool("memory.create", async (p: SessionInput<"memory.create">) => {
+          const c = callerOf(who);
+          if (!c.agent) throw refuse(notWorking);
+          const m = await memory.remember({ agent: c.agent, text: p.text, repo: sessionScope(c, p.repo), by: c.actor });
+          return answers.memory.remembered(memoryWhere(m), m.id);
+        });
   return { memorySearch, memoryCreate };
-});
+}

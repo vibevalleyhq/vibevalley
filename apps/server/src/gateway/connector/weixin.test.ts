@@ -1,15 +1,18 @@
 import { createServer, type Server } from "node:http";
 
-import { Effect, Exit } from "effect";
-import { FetchHttpClient, HttpClient } from "effect/http";
-import { afterEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, describe, expect, test } from "vite-plus/test";
 
 import { failedWith } from "./adapter.ts";
 import { decodeUpdates, type WeixinApi, weixinAdapter, WeixinClient } from "./weixin.ts";
 
-const http = Effect.runSync(Effect.service(HttpClient.HttpClient).pipe(Effect.provide(FetchHttpClient.layer)));
-const run = Effect.runPromise;
-const refusal = <A, E>(e: Effect.Effect<A, E>) => Effect.runPromise(Effect.flip(e));
+const refusal = (p: Promise<unknown>) =>
+  p.then(
+    () => {
+      throw new Error("it went through");
+    },
+    (e: unknown) => e,
+  );
+const never = () => new AbortController().signal;
 
 const servers: Server[] = [];
 afterEach(() => {
@@ -25,14 +28,14 @@ const serve = async (answer: (path: string) => string) => {
     res.end(answer(req.url ?? ""));
   });
   servers.push(server);
-  await run(Effect.callback<void>((resume) => void server.listen(0, "127.0.0.1", () => resume(Effect.void))));
+  await new Promise<void>((resolve) => void server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   if (address === null || typeof address === "string") throw new Error("no test port");
   return `http://127.0.0.1:${address.port}`;
 };
 
 describe("WeChat updates", () => {
-  it("decodes nested messages and rejects a wrong messages shape", async () => {
+  test("decodes nested messages and rejects a wrong messages shape", () => {
     const valid = {
       ret: 0,
       msgs: [
@@ -46,71 +49,90 @@ describe("WeChat updates", () => {
         },
       ],
     };
-    expect(await run(decodeUpdates(valid))).toEqual(valid);
-    expect(Exit.isFailure(await Effect.runPromiseExit(decodeUpdates({ ret: 0, msgs: {} })))).toBe(true);
+    expect(decodeUpdates(valid)).toEqual(valid);
+    expect(() => decodeUpdates({ ret: 0, msgs: {} })).toThrow();
   });
 
-  it("returns a failure without accepting malformed updates", async () => {
+  test("returns a failure without accepting malformed updates", async () => {
     let accepted = 0;
     const api: WeixinApi = {
-      login: () => Effect.die("not used"),
-      getUpdates: () => decodeUpdates({ ret: 0, msgs: {} }).pipe(Effect.mapError((e) => failedWith(e.message))),
-      sendText: () => Effect.die("not used"),
+      login: () => Promise.reject(new Error("not used")),
+      getUpdates: async () => {
+        try {
+          return decodeUpdates({ ret: 0, msgs: {} });
+        } catch (e) {
+          throw failedWith(e instanceof Error ? e.message : String(e));
+        }
+      },
+      sendText: () => Promise.reject(new Error("not used")),
     };
     const adapter = weixinAdapter(api);
-    const exit = await Effect.runPromiseExit(
+    await expect(
       adapter.receive(
         {},
         {
           cursor: "",
-          accept: () =>
-            Effect.sync(() => {
-              accepted++;
-            }),
+          accept: async () => {
+            accepted++;
+          },
         },
+        never(),
       ),
-    );
-    expect(exit._tag).toBe("Failure");
+    ).rejects.toBeDefined();
     expect(accepted).toBe(0);
   });
 });
 
 describe("WeChat HTTP responses", () => {
-  it("decodes QR and confirmation responses", async () => {
+  test("decodes QR and confirmation responses", async () => {
     const base = await serve((path) =>
       path.includes("get_bot_qrcode")
         ? `{"qrcode":"code","qrcode_img_content":"https://qr.example"}`
         : `{"status":"confirmed","bot_token":"tok","ilink_bot_id":"bot","ilink_user_id":"user"}`,
     );
-    const client = new WeixinClient(http, base);
-    const got = await run(client.login(() => Effect.void, Effect.succeed("")));
+    const client = new WeixinClient(fetch, base);
+    const got = await client.login(
+      () => undefined,
+      () => "",
+      never(),
+    );
     expect(got).toEqual({ account: { baseUrl: base, token: "tok" }, botId: "bot", user: "user" });
   });
 
-  it("rejects a QR response with the wrong shape", async () => {
+  test("rejects a QR response with the wrong shape", async () => {
     const base = await serve(() => `{"qrcode":42,"qrcode_img_content":"https://qr.example"}`);
-    const client = new WeixinClient(http, base);
-    expect((await refusal(client.login(() => Effect.void, Effect.succeed("")))).message).toMatch(/拿不到登录二维码/u);
+    const client = new WeixinClient(fetch, base);
+    expect(
+      (
+        (await refusal(
+          client.login(
+            () => undefined,
+            () => "",
+            never(),
+          ),
+        )) as Error
+      ).message,
+    ).toMatch(/拿不到登录二维码/u);
   });
 
-  it("keeps a 64-bit sent message id and rejects a wrong id shape", async () => {
+  test("keeps a 64-bit sent message id and rejects a wrong id shape", async () => {
     let answer = `{"ret":0,"message_id":9007199254740993}`;
     const base = await serve(() => answer);
-    const client = new WeixinClient(http, base);
+    const client = new WeixinClient(fetch, base);
     const account = { baseUrl: base, token: "tok" };
-    expect(await run(client.sendText(account, "user", "hello", "ctx"))).toBe("9007199254740993");
+    expect(await client.sendText(account, "user", "hello", "ctx")).toBe("9007199254740993");
     answer = `{"ret":0,"message_id":{}}`;
-    expect(await refusal(client.sendText(account, "user", "hello", "ctx"))).toMatchObject({ _tag: "AppFailed", kind: "failed" });
+    expect(await refusal(client.sendText(account, "user", "hello", "ctx"))).toMatchObject({ name: "AppFailed", kind: "failed" });
   });
 
-  it("rejects malformed updates and decodes a later valid page", async () => {
+  test("rejects malformed updates and decodes a later valid page", async () => {
     let answer = `{"ret":0,"msgs":{}}`;
     const base = await serve(() => answer);
-    const client = new WeixinClient(http, base);
+    const client = new WeixinClient(fetch, base);
     const account = { baseUrl: base, token: "tok" };
-    expect(await refusal(client.getUpdates(account, "", 1_000))).toMatchObject({ _tag: "AppFailed" });
+    expect(await refusal(client.getUpdates(account, "", 1_000))).toMatchObject({ name: "AppFailed" });
     answer = `{"ret":0,"msgs":[{"message_id":9007199254740993,"item_list":[]}]}`;
-    const got = await run(client.getUpdates(account, "", 1_000));
+    const got = await client.getUpdates(account, "", 1_000);
     expect(got.msgs?.[0]?.message_id).toBe("9007199254740993");
   });
 });

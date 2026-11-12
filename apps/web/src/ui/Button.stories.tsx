@@ -1,4 +1,4 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
 import { createSignal, For } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
@@ -6,15 +6,9 @@ import { stories, story } from "@vibevalley/stories";
 import { Button, type Tone } from "./Button";
 import { icons, type IconName } from "./icons";
 
-const viewStyles = stylex.create({
-  dynamic: (width: number) => ({ width, maxWidth: width }),
-  buttonStoriesDiv: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-});
+const viewStyles = {
+  dynamic: (width: number): JSX.CSSProperties => ({ width: `${width}px`, "max-width": `${width}px` }),
+};
 
 const tones: Tone[] = ["plain", "primary", "quiet", "danger"];
 
@@ -25,11 +19,10 @@ export default stories({
       render: () => {
         const [wide, setWide] = createSignal(false);
         return (
-          <div {...stylex.attrs(viewStyles.buttonStoriesDiv)}>
+          <div class="flex flex-wrap items-center gap-2">
             <Button
               data-testid="button-style-vars"
-              styles={viewStyles.dynamic(wide() ? 280 : 200)}
-              style={{ "margin-left": "12px" }}
+              style={{ ...viewStyles.dynamic(wide() ? 280 : 200), "margin-left": "12px" }}
               onClick={() => setWide(!wide())}
             >
               Resize
@@ -63,7 +56,7 @@ export default stories({
     Tones: story({
       note: "主色一页只有一个；危险的动作用 danger，不用红色的主色。",
       render: () => (
-        <div {...stylex.attrs(viewStyles.buttonStoriesDiv)}>
+        <div class="flex flex-wrap items-center gap-2">
           <For each={tones}>{(tone) => <Button tone={tone}>{tone}</Button>}</For>
           <Button disabled>disabled</Button>
         </div>
@@ -71,7 +64,7 @@ export default stories({
     }),
     "With icon": story({
       render: () => (
-        <div {...stylex.attrs(viewStyles.buttonStoriesDiv)}>
+        <div class="flex flex-wrap items-center gap-2">
           <Button tone="primary" icon="add">
             新工单
           </Button>

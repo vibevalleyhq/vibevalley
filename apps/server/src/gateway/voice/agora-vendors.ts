@@ -1,5 +1,5 @@
 import { Agent, type AgoraClient, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
-import { Schema } from "effect";
+import { z } from "zod";
 
 import type { VoiceSettings } from "@vibevalley/protocol";
 import { ApiError, BizCode, type VoiceFix } from "@vibevalley/protocol/api";
@@ -33,24 +33,18 @@ export interface VendorMessages {
 }
 
 /** settings: the Settings section the user fixes it in, when a setting does; the page offers to go there. */
-export const unavailable = (reason: string, settings?: VoiceFix): ApiError =>
-  ApiError.make({
-    bizCode: BizCode.VoiceUnavailable,
-    message: reason,
-    ...(settings ? { settings } : {}),
-  });
+export const unavailable = (reason: string, settings?: VoiceFix): ApiError => new ApiError(BizCode.VoiceUnavailable, reason, settings ? { settings } : {});
 
 const errorMessage = (u: unknown): string => (u instanceof Error ? u.message : String(u));
 
 /** A step of a call outside the farm (Agora, the orchestrator's answer) that did not go; cause is what it threw. */
-export class CallStepFailed extends Schema.TaggedError<CallStepFailed, { readonly brand: unique symbol }>()("CallStepFailed", {
-  message: Schema.String,
-  cause: Schema.Defect(),
-}) {}
+class CallStepFailed extends Error {
+  override readonly name = "CallStepFailed";
+}
 
-export const callStepFailed = (cause: unknown) => CallStepFailed.make({ message: errorMessage(cause), cause });
+export const callStepFailed = (cause: unknown) => new CallStepFailed(errorMessage(cause), { cause });
 
-export const failed = (reason: string): ApiError => ApiError.make({ bizCode: BizCode.VoiceCallFailed, message: reason });
+export const failed = (reason: string): ApiError => new ApiError(BizCode.VoiceCallFailed, reason);
 
 export type Vendors = {
   stt: AresSTT | DeepgramSTT | MicrosoftSTT;
@@ -58,10 +52,10 @@ export type Vendors = {
   tts: MiniMaxTTS | OpenAITTS | MicrosoftTTS;
 };
 
-const UnknownVendor = Schema.Struct({ vendor: Schema.optionalKey(Schema.String) });
+const UnknownVendor = z.object({ vendor: z.exactOptional(z.string()) });
 const unknownVendorOf = (v: unknown) => {
-  const decoded = Schema.decodeUnknownOption(UnknownVendor)(v);
-  return decoded._tag === "Some" ? (decoded.value.vendor ?? "") : "";
+  const decoded = UnknownVendor.safeParse(v);
+  return decoded.success ? (decoded.data.vendor ?? "") : "";
 };
 
 /** The three vendors the voice page chose, or why they cannot be: a vendor whose key is missing. Agora-hosted ones need no key of their own. */

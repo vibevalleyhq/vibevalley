@@ -1,9 +1,14 @@
+import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 
-import { Effect, FileSystem, Option } from "effect";
-import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
+import { Hono } from "hono";
 
 import { currentLocale } from "@vibevalley/i18n";
+
+import { errnoOf } from "#/base/errors.ts";
+import type { Logger } from "#/infra/log.ts";
+
+import { fileResponse, notFound } from "./respond.ts";
 
 const htmlLang = { zh: "zh-Hans", en: "en" } as const;
 
@@ -13,24 +18,35 @@ const withLocale = (html: string) => {
   return html.replace(/<html[^>]*>/u, `<html lang="${htmlLang[locale]}" data-locale="${locale}">`);
 };
 
-export const page = (dir: string) =>
-  HttpRouter.add(
-    "GET",
-    "*",
-    Effect.gen(function* () {
-      const request = yield* HttpServerRequest.HttpServerRequest;
-      const path = new URL(request.url, "http://farm").pathname;
-      if (path.startsWith("/api/v1/")) return HttpServerResponse.text("404 page not found\n", { status: 404 });
+const isFile = async (path: string) => {
+  try {
+    return (await stat(path)).isFile();
+  } catch (e) {
+    // Not there is not a file: the page's own routes fall through to index.html.
+    if (errnoOf(e) === "ENOENT" || errnoOf(e) === "ENOTDIR") return false;
+    throw e;
+  }
+};
+
+export function page(dir: string, log: Logger): Hono {
+  const app = new Hono();
+  app.get("*", async (c) => {
+    try {
+      const path = new URL(c.req.url).pathname;
+      if (path.startsWith("/api/v1/")) return notFound();
       const clean = normalize("/" + decodeURIComponent(path));
       const file = join(dir, clean);
-      const fs = yield* FileSystem.FileSystem;
-      const info = yield* Effect.option(fs.stat(file));
-      if (clean !== "/index.html" && Option.isSome(info) && info.value.type === "File") return yield* HttpServerResponse.file(file);
+      if (clean !== "/index.html" && (await isFile(file))) return (await fileResponse(file)) ?? notFound();
       // The page itself is asked again every time (its assets carry their hash).
       if (extname(clean) === "" || clean === "/index.html") {
-        const html = yield* fs.readFileString(join(dir, "index.html"));
-        return HttpServerResponse.text(withLocale(html), { contentType: "text/html; charset=utf-8", headers: { "cache-control": "no-cache" } });
+        const html = await readFile(join(dir, "index.html"), "utf8");
+        return new Response(withLocale(html), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" } });
       }
-      return HttpServerResponse.text("404 page not found\n", { status: 404 });
-    }).pipe(Effect.orElseSucceed(() => HttpServerResponse.text("404 page not found\n", { status: 404 }))),
-  );
+      return notFound();
+    } catch (e) {
+      log.debug("page: not served", e);
+      return notFound();
+    }
+  });
+  return app;
+}

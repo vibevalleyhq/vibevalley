@@ -10,7 +10,7 @@
 | MOSS 账号模型目录查询、用途模型校验和解析 | 录音设备、通话、中继与字幕（[语音](docs/subsystems/voice.md)） |
 | 脱敏的公共状态、配置版本冲突与迟到查询结果 | 外部编码农机的登录、模型和凭据（[档案和农机](docs/subsystems/agent.md)） |
 
-当前适配器为 MOSS；供应商目录（`apps/server/src/modules/provider/vendors.ts`）还列出 DeepSeek（助手的对话模型）与声网（通话线路），它们的钥匙仍在各自的设置里。用的地方只拿到不认供应商的账号：连接、revision、模型、Key 的指纹，和封着 Key 与 Provider 自己 HttpClient 的调用。自建兼容转写地址仍由听写设置配置，Provider 统一解析调用配置，不把任意地址当成 MOSS 官方连接。媒体任务由 Media 管；Provider 只选择账号和模型、查询目录与音色，不因保存设置自动发起生成或上传。
+当前适配器为 MOSS；供应商目录（`apps/server/src/modules/provider/vendors.ts`）还列出 DeepSeek（助手的对话模型）与声网（通话线路），它们的钥匙仍在各自的设置里。用的地方只拿到不认供应商的账号：连接、revision、模型、Key 的指纹，和封着 Key 与 Provider 自己 `fetch` 的调用。自建兼容转写地址仍由听写设置配置，Provider 统一解析调用配置，不把任意地址当成 MOSS 官方连接。媒体任务由 Media 管；Provider 只选择账号和模型、查询目录与音色，不因保存设置自动发起生成或上传。
 
 ## 在哪
 
@@ -56,7 +56,7 @@
 ## 为什么这样
 
 - **Provider 管选择，Setting 管存储**：目录与用途被多种能力使用，不放进 Voice；私有配置留在现有原子文件中，避免两个存储所有者互相同步。
-- **能力挂在单一 `Provider` 服务上，供应商作数据目录（`vendors.ts`）**：遵循一模块一服务，不为每个能力另起 `Context.Service`，也不在启动时定死供应商 `Layer`（绑定可在运行期切换）；调用方只拿不认供应商的 `Account` 快照（连接、revision、模型、Key 指纹和封着 `Provider` 自身 `HttpClient` 的调用）与能力自己的错误类型，Media 等模块不直接依赖 `@vibevalley/provider/moss/*`。
+- **能力挂在单一 `Provider` 服务上，供应商作数据目录（`vendors.ts`）**：遵循一模块一服务，不为每个能力另起服务，也不在启动时定死供应商（绑定可在运行期切换）；调用方只拿不认供应商的 `Account` 快照（连接、revision、模型、Key 指纹和封着 `Provider` 自身 `fetch` 的调用）与能力自己的错误类型，Media 等模块不直接依赖 `@vibevalley/provider/moss/*`。
 - **整组配置加版本检查**：连接数量有上限，用户可在一次保存中解绑再删除，引用校验不会出现中间失效状态；不为小目录引入多表事务或事件流。
 - **不自动迁移散置凭据**：内部格式直接采用连接与用途，不保留两套 Key 的回退优先级。已有旧配置需由用户重新填写，开发和验收只使用隔离家目录。
 - **目录查询不复用实时握手验证**：查询账号模型不需要建立语音会话；MOSS Live 的握手检查留在语音页，只验证绑定的实时连接。

@@ -1,10 +1,8 @@
-import { Effect, Layer } from "effect";
-
 import { currentLocale, type Locale, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { phaseWords } from "@vibevalley/protocol/rules";
 
-import { Projection } from "#/core/core.ts";
+import type { Projection } from "#/core/core.ts";
 import { nextText, whenText } from "#/modules/cron/when.ts";
 import { effectsOf, viewOf } from "#/modules/game/view.ts";
 import { inbox } from "#/modules/inbox/items.ts";
@@ -107,11 +105,8 @@ export function makeFrameOf(): (state: T.SpaceState, effects?: T.GameEffect[], s
   };
 }
 
-// Each Core layer build receives its own Projection closure so concurrent farms never thrash or share memo slots.
-export const layer = Layer.effect(
-  Projection,
-  Effect.sync(() => ({ reduce, effects: effectsOf, frame: makeFrameOf() })),
-);
+// Each Core gets its own Projection so concurrent farms never thrash or share memo slots.
+export const makeProjection = (): Projection => ({ reduce, effects: effectsOf, frame: makeFrameOf() });
 
 export function frameOf(state: T.SpaceState, effects: T.GameEffect[] = [], seq = 0): T.StateFrame {
   return makeFrameOf()(state, effects, seq);

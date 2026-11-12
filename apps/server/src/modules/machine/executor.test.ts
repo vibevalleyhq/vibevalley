@@ -1,18 +1,12 @@
 import { scriptedRuntime } from "@botiverse/oar/testing";
-import { it } from "@effect/vitest";
-import { Effect, Fiber } from "effect";
-import { expect } from "vite-plus/test";
+import { expect, test } from "vite-plus/test";
 
 import { issueId } from "@vibevalley/protocol/schema";
 
-import { Agent } from "#/modules/agent/agent.ts";
-import { Session } from "#/modules/session/session.ts";
 import { starter, until } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 
-import { Machine } from "./machine.ts";
-
-it.live("regression: cancelling a close caller leaves disposal owned by the executor", () => {
+test("regression: cancelling a close caller leaves disposal owned by the executor", async () => {
   const { promise: disposing, resolve: entered } = Promise.withResolvers<void>();
   const { promise: gate, resolve: release } = Promise.withResolvers<void>();
   let disposed = 0;
@@ -40,40 +34,44 @@ it.live("regression: cancelling a close caller leaves disposal owned by the exec
         },
       })),
   };
-  return Effect.gen(function* () {
-    const machines = yield* Machine;
+  await using farm = await world({ runtimes: [runtime], repos: ["demo"] });
+  try {
+    const machines = farm.machine;
     const executor = machines.executions(machines.here());
-    const sessions = yield* Session;
+    const sessions = farm.session;
     const agent = { ...starter("lab"), effort: "" };
-    yield* (yield* Agent).save(agent);
-    const { session: hired } = yield* sessions.hire(agent, "work", "demo", {
+    await farm.agent.save(agent);
+    const { session: hired } = await sessions.hire(agent, "work", "demo", {
       context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } },
-      hiring: (session) =>
-        Effect.gen(function* () {
-          expect(executor.find(session.id)?.attached).toBe(false);
-          const stopped2 = yield* sessions.stop(session.id);
-          expect(stopped2).toBe(false);
-          expect(interrupted).toBe(0);
-        }),
+      hiring: async (session) => {
+        expect(executor.find(session.id)?.attached).toBe(false);
+        const stopped2 = await sessions.stop(session.id);
+        expect(stopped2).toBe(false);
+        expect(interrupted).toBe(0);
+      },
     });
     const id = hired.id;
-    yield* until(() => sessions.sessionOf(id)?.phase._tag === "working", "the active turn");
+    await until(() => sessions.sessionOf(id)?.phase._tag === "working", "the active turn");
     const acquired = executor.find(id)!;
     expect(Object.keys(acquired.owner).toSorted()).toEqual(["agent", "id", "issue", "repo", "runtime"]);
     expect(Object.keys(acquired).toSorted()).toEqual(["attached", "closing", "owner", "pendingTasks", "sessionId"]);
-    const closing = yield* Effect.forkChild(executor.close(id));
-    yield* Effect.promise(() => disposing);
-    yield* Fiber.interrupt(closing);
+    const caller = new AbortController();
+    const closing = executor.close(id, caller.signal).catch((e: unknown) => e);
+    await disposing;
+    caller.abort();
+    await closing;
     expect(executor.find(id)?.closing).toBe(true);
     expect(acquired.closing).toBe(false);
     expect(sessions.sessionOf(id)?.phase._tag).toBe("working");
-    const stopped = yield* sessions.stop(id);
+    const stopped = await sessions.stop(id);
     expect(stopped).toBe(false);
     expect(interrupted).toBe(0);
     expect(disposed).toBe(1);
     release();
-    yield* executor.close(id);
+    await executor.close(id);
     expect(executor.find(id)).toBeUndefined();
     expect(disposed).toBe(1);
-  }).pipe(Effect.ensuring(Effect.sync(release)), Effect.scoped, Effect.provide(world({ runtimes: [runtime], repos: ["demo"] })));
+  } finally {
+    release();
+  }
 });

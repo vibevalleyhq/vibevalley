@@ -1,4 +1,4 @@
-import { Formatter, Schema } from "effect";
+import { z } from "zod";
 
 import {
   AssistantMessageSchema,
@@ -18,36 +18,52 @@ import { imagePlaceholder, summary as summaryWords, transcript as transcriptWord
 
 type UserContent = string | readonly (TextContent | ImageContent)[];
 
-const CustomMessageSchema = Schema.Struct({
-  role: Schema.Literal("custom"),
-  customType: Schema.String,
-  content: UserContentSchema,
+export interface CustomMessage {
+  readonly role: "custom";
+  readonly customType: string;
+  readonly content: UserContent;
   /** false: hidden. */
-  display: Schema.Boolean,
-  details: Schema.optionalKey(Schema.Unknown),
-  timestamp: Schema.Finite,
-});
-export type CustomMessage = typeof CustomMessageSchema.Type;
+  readonly display: boolean;
+  readonly details?: unknown;
+  readonly timestamp: number;
+}
 
-const CompactionSummaryMessageSchema = Schema.Struct({
-  role: Schema.Literal("compactionSummary"),
-  summary: Schema.String,
-  tokensBefore: Schema.Finite,
-  timestamp: Schema.Finite,
+const CustomMessageSchema = z.object({
+  role: z.literal("custom"),
+  customType: z.string(),
+  content: UserContentSchema,
+  display: z.boolean(),
+  details: z.exactOptional(z.unknown()),
+  timestamp: z.number(),
+}) satisfies z.ZodType<CustomMessage>;
+
+export interface CompactionSummaryMessage {
+  readonly role: "compactionSummary";
+  readonly summary: string;
+  readonly tokensBefore: number;
+  readonly timestamp: number;
   /** Absent when not archived. */
-  archive: Schema.optionalKey(Schema.String),
+  readonly archive?: string;
   /** How many messages before it in the session file stay after it, as they were. */
-  kept: Schema.Finite,
-});
-export type CompactionSummaryMessage = typeof CompactionSummaryMessageSchema.Type;
+  readonly kept: number;
+}
 
-export const BrainMessageSchema = Schema.Union([
+const CompactionSummaryMessageSchema = z.object({
+  role: z.literal("compactionSummary"),
+  summary: z.string(),
+  tokensBefore: z.number(),
+  timestamp: z.number(),
+  archive: z.exactOptional(z.string()),
+  kept: z.number(),
+}) satisfies z.ZodType<CompactionSummaryMessage>;
+
+export const BrainMessageSchema = z.discriminatedUnion("role", [
   UserMessageSchema,
   AssistantMessageSchema,
   ToolResultMessageSchema,
   CustomMessageSchema,
   CompactionSummaryMessageSchema,
-]);
+]) satisfies z.ZodType<BrainMessage>;
 export type BrainMessage = AgentMessage<CustomMessage | CompactionSummaryMessage>;
 
 export const customMessage = (customType: string, content: UserContent, now: number, options: { hidden?: boolean; details?: unknown } = {}): CustomMessage => ({
@@ -136,7 +152,7 @@ export function transcript(messages: readonly BrainMessage[]): string {
       case "assistant":
         for (const c of m.content) {
           if (c.type === "text" && c.text.trim() !== "") out.push(transcriptWords.replyHeading(c.text));
-          if (c.type === "toolCall") out.push(transcriptWords.toolCallHeading(c.name, Formatter.formatJson(c.arguments)));
+          if (c.type === "toolCall") out.push(transcriptWords.toolCallHeading(c.name, JSON.stringify(c.arguments)));
         }
         break;
       case "toolResult":

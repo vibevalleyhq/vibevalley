@@ -1,14 +1,13 @@
 import { createHash } from "node:crypto";
 
-import { Clock, Context, Effect, Layer, Stream } from "effect";
-
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { attachmentMax } from "@vibevalley/protocol";
-import type { ApiError } from "@vibevalley/protocol/api";
 
-import { BizCode, missing, refuseIn } from "#/base/errors.ts";
-import { Db } from "#/infra/db.ts";
+import { BizCode, messageOf, missing, refuseIn } from "#/base/errors.ts";
+import type { ServerConfig } from "#/infra/config.ts";
+import type { Db } from "#/infra/db.ts";
+import type { Time } from "#/infra/time.ts";
 import * as q from "#db/attachment.sql.ts";
 
 import { makeStorage } from "./storage.ts";
@@ -21,94 +20,100 @@ export interface KeptFile {
   readonly name: string;
 }
 
-export class Attachment extends Context.Service<
-  Attachment,
-  {
-    readonly attach: (upload: T.AttachmentUpload) => Effect.Effect<T.Attachment, ApiError>;
-    /** Enforces no size limit; callers enforce their own. */
-    readonly keep: (bytes: Uint8Array, name: string, type: string) => Effect.Effect<T.Attachment, ApiError>;
-    /** Enforces no size limit; media inputs hold their own streaming quota. */
-    readonly keepStaged: (
-      staged: { readonly path: string; readonly hash: string; readonly size: number; readonly name: string; readonly type: string },
-      retain?: boolean,
-    ) => Effect.Effect<T.Attachment, ApiError>;
-    readonly staging: string;
-    readonly get: (id: string) => Effect.Effect<KeptFile | undefined>;
-    readonly of: (ids: readonly string[]) => Effect.Effect<T.Attachment[], ApiError>;
-    readonly bytes: (id: string) => Effect.Effect<Uint8Array, ApiError>;
-    readonly pathOf: (id: string) => string;
-  }
->()("@vibevalley/server/modules/attachment/attachment") {
-  static readonly layer = Layer.effect(
-    Attachment,
-    Effect.suspend(() => make),
-  );
+export interface Attachment {
+  readonly attach: (upload: T.AttachmentUpload) => Promise<T.Attachment>;
+  /** Enforces no size limit; callers enforce their own. */
+  readonly keep: (bytes: Uint8Array, name: string, type: string) => Promise<T.Attachment>;
+  /** Enforces no size limit; media inputs hold their own streaming quota. */
+  readonly keepStaged: (
+    staged: { readonly path: string; readonly hash: string; readonly size: number; readonly name: string; readonly type: string },
+    retain?: boolean,
+  ) => Promise<T.Attachment>;
+  readonly staging: string;
+  readonly get: (id: string) => Promise<KeptFile | undefined>;
+  readonly of: (ids: readonly string[]) => Promise<T.Attachment[]>;
+  readonly bytes: (id: string) => Promise<Uint8Array>;
+  readonly pathOf: (id: string) => string;
 }
 
-const make = Effect.gen(function* () {
-  const db = yield* Db;
-  const storage = yield* makeStorage;
-  const unkept = (e: { readonly message: string }) => refused(e.message);
+export interface AttachmentDeps {
+  readonly config: ServerConfig;
+  readonly clock: Time;
+  readonly db: Db;
+}
 
-  const sha256Of = (key: string) =>
-    Effect.map(
-      storage.stream(key).pipe(
-        Stream.runFold(
-          () => createHash("sha256"),
-          (hash, chunk) => hash.update(chunk),
-        ),
-      ),
-      (hash) => hash.digest("hex"),
-    );
+export async function makeAttachment(deps: AttachmentDeps): Promise<Attachment> {
+  const { db } = deps;
+  const storage = makeStorage(deps.config);
+  /** work, a storage failure refused with its words. */
+  const unkept = async <A>(work: () => Promise<A>): Promise<A> => {
+    try {
+      return await work();
+    } catch (e) {
+      throw refused(messageOf(e));
+    }
+  };
 
-  const record = Effect.fnUntraced(function* (id: string, given: string, givenType: string, size: number) {
+  const sha256Of = async (key: string) => {
+    const hash = createHash("sha256");
+    for await (const chunk of storage.stream(key)) hash.update(chunk);
+    return hash.digest("hex");
+  };
+
+  const record = async (id: string, given: string, givenType: string, size: number) => {
     const name = given.trim() || "file";
     const type = givenType.trim() || "application/octet-stream";
-    yield* db.run(q.insertAttachment({ id, name, type, size, created_at: yield* Clock.currentTimeMillis }));
+    await q.insertAttachment(db.sql, { id, name, type, size, created_at: deps.clock.now() });
     return { id, name, type, size };
-  });
+  };
 
-  const keep = Effect.fn("Attachment.keep")(function* (bytes: Uint8Array, name: string, type: string) {
-    if (bytes.length === 0) return yield* refused(t("server.attachment.emptyFile"));
+  const keep = async (bytes: Uint8Array, name: string, type: string) => {
+    if (bytes.length === 0) throw refused(t("server.attachment.emptyFile"));
     const id = createHash("sha256").update(bytes).digest("hex");
-    yield* storage.put(id, bytes).pipe(Effect.mapError(unkept));
-    return yield* record(id, name, type, bytes.length);
-  });
+    await unkept(() => storage.put(id, bytes));
+    return record(id, name, type, bytes.length);
+  };
 
-  return Attachment.of({
+  const noAttachment = (id: string) => missing(t("server.attachment.noAttachment", { id }), []);
+
+  return {
     pathOf: storage.pathOf,
     staging: storage.scratch,
-    attach: Effect.fn("Attachment.attach")(function* (upload) {
+    attach: async (upload) => {
       const bytes = Buffer.from(upload.data, "base64");
-      if (bytes.length > attachmentMax) return yield* refused(t("server.attachment.fileTooBig", { mb: Math.round(attachmentMax / 1024 / 1024) }));
-      return yield* keep(bytes, upload.name, upload.type);
-    }),
+      if (bytes.length > attachmentMax) throw refused(t("server.attachment.fileTooBig", { mb: Math.round(attachmentMax / 1024 / 1024) }));
+      return keep(bytes, upload.name, upload.type);
+    },
     keep,
-    keepStaged: Effect.fn("Attachment.keepStaged")(function* (staged, retain = false) {
-      yield* Effect.gen(function* () {
+    keepStaged: async (staged, retain = false) => {
+      await unkept(async () => {
         // Re-verify existing file hash so corrupted bytes on disk are replaced rather than trusted.
-        if ((yield* storage.exists(staged.hash)) && (yield* sha256Of(staged.hash)) === staged.hash) return;
-        yield* storage.adopt(staged.hash, staged.path, retain);
-      }).pipe(Effect.mapError(unkept));
-      return yield* record(staged.hash, staged.name, staged.type, staged.size);
-    }),
-    get: Effect.fn("Attachment.get")(function* (id) {
-      const a = yield* db.one(q.attachmentByID({ id }));
+        if ((await storage.exists(staged.hash)) && (await sha256Of(staged.hash)) === staged.hash) return;
+        await storage.adopt(staged.hash, staged.path, retain);
+      });
+      return record(staged.hash, staged.name, staged.type, staged.size);
+    },
+    get: async (id) => {
+      const a = await q.attachmentByID(db.sql, { id });
       return a ? { path: storage.pathOf(a.id), type: a.type, name: a.name } : undefined;
-    }),
-    bytes: Effect.fn("Attachment.bytes")(function* (id) {
-      const blob = yield* storage.open(id, "application/octet-stream").pipe(Effect.mapError(() => missing(t("server.attachment.noAttachment", { id }), [])));
-      const buffer = yield* Effect.tryPromise({ try: () => blob.arrayBuffer(), catch: () => missing(t("server.attachment.noAttachment", { id }), []) });
-      return new Uint8Array(buffer);
-    }),
-    of: Effect.fn("Attachment.of")(function* (ids) {
+    },
+    bytes: async (id) => {
+      try {
+        const blob = await storage.open(id, "application/octet-stream");
+        return new Uint8Array(await blob.arrayBuffer());
+      } catch {
+        // Not there, or not readable: either way there is no such attachment to give.
+        throw noAttachment(id);
+      }
+    },
+    of: async (ids) => {
       const out: T.Attachment[] = [];
       for (const id of new Set(ids)) {
-        const a = yield* db.one(q.attachmentByID({ id }));
-        if (!a) return yield* missing(t("server.attachment.noAttachment", { id }), []);
+        const a = await q.attachmentByID(db.sql, { id });
+        if (!a) throw noAttachment(id);
         out.push(a);
       }
       return out;
-    }),
-  });
-});
+    },
+  };
+}

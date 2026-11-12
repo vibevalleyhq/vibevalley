@@ -1,13 +1,13 @@
-import { Schema } from "effect";
 import { expect, test, vi } from "vite-plus/test";
+import { z } from "zod";
 
 import { BridgeError, call, callTimeoutMs, connect, push, serve } from "../src/index";
 import { linkPair } from "../src/testing";
 
 const contract = {
-  add: call({ input: Schema.Struct({ a: Schema.Finite, b: Schema.Finite }), output: Schema.Finite }),
-  say: call({ input: Schema.String, output: Schema.Void }),
-  ticked: push(Schema.Struct({ n: Schema.Finite })),
+  add: call({ input: z.object({ a: z.number(), b: z.number() }), output: z.number() }),
+  say: call({ input: z.string(), output: z.void() }),
+  ticked: push(z.object({ n: z.number() })),
 };
 
 test("a call is answered by its handler, typed both ways", async () => {
@@ -35,7 +35,7 @@ test("an input that does not decode is refused on the answering side, and the ha
   await both;
   expect(ran).toEqual([]);
   expect(answers).toEqual([
-    { id: 1, ok: false, error: expect.stringContaining("Expected number") },
+    { id: 1, ok: false, error: expect.stringMatching(/expected number/iu) },
     { id: 2, ok: false, error: "no call nothing" },
   ]);
 });
@@ -81,7 +81,7 @@ test("a call not answered in its time is refused, and a slow call waits as long 
   vi.useFakeTimers();
   try {
     const [near] = linkPair();
-    const slow = { ...contract, wait: call({ input: Schema.Void, output: Schema.Void, timeoutMs: Infinity }) };
+    const slow = { ...contract, wait: call({ input: z.void(), output: z.void(), timeoutMs: Infinity }) };
     const client = connect(slow, near);
     const hung = client.call.add({ a: 1, b: 2 });
     let waited = false;

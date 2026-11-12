@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 
-import { Schema } from "effect";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import { type IssueStageKind, readStream, type StateFrame, statePath } from "@vibevalley/protocol";
@@ -106,7 +106,7 @@ export function startIsland(o: IslandOptions): { stop: () => void; probe: Island
       probe.helper = false;
       if (!abort.signal.aborted) console.error(`vibevalley: the island quit (${code}); it is not started again until the app is`);
     });
-    jsonLines(child.stdout, Schema.Struct({ open: Schema.String }), ({ open }) => o.open(open));
+    jsonLines(child.stdout, z.object({ open: z.string() }), ({ open }) => o.open(open));
   }
 
   // Reconnects a second after the stream drops (the server restarting, in development).

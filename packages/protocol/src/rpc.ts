@@ -1,19 +1,36 @@
-import { Schema } from "effect";
-import { Rpc, RpcGroup } from "effect/rpc";
+import { z } from "zod";
 
-import { ApiError } from "./api";
 import * as S from "./schema";
 
-export const rpcPath = "/api/v1/rpc";
+/** Where the subscriptions are served. One is read as `GET <subscriptionPath>/<name>?payload=<JSON of its payload>`,
+ * answered `text/event-stream`: each event one `data: <JSON>` line decoded with its `event` Schema. A payload that does
+ * not decode, or a refusal before the first event (no such channel…), is answered as any route is: a JSON ApiError
+ * envelope with its status, not a stream. Once streaming, the server ends the stream rather than send an error. */
+export const subscriptionPath = "/api/v1/subscribe";
 
-export class Subscriptions extends RpcGroup.make(
+/** Each subscription's payload and the Schema of each event it then sends, by name. */
+export const subscriptions = {
   /** What changed in a channel after the revision after, then each change from now on, each the message as it now is. */
-  Rpc.make("channel.follow", { payload: { id: Schema.String, after: Schema.Finite }, success: S.ChannelEvent, error: ApiError, stream: true }),
+  "channel.follow": { payload: z.object({ id: z.string(), after: z.number() }), event: S.ChannelEvent },
   /** The turn reports in any channel after the one with this id (by message id, which sorts by time), or the newest
    * when absent, then each report from now on. */
-  Rpc.make("channel.reports", { payload: { after: Schema.optionalKey(Schema.String) }, success: S.ChannelEvent, error: ApiError, stream: true }),
+  "channel.reports": { payload: z.object({ after: z.exactOptional(z.string()) }), event: S.ChannelEvent },
   /** A blocks artifact's changes after this seq, then each batch from now on. */
-  Rpc.make("artifact.follow", { payload: { id: Schema.String, after: Schema.Finite }, success: S.ArtifactEvent, error: ApiError, stream: true }),
+  "artifact.follow": { payload: z.object({ id: z.string(), after: z.number() }), event: S.ArtifactEvent },
   /** An artifact's suggestions as they now are, then the whole list after each change. */
-  Rpc.make("artifact.suggestion.follow", { payload: { id: Schema.String }, success: S.SuggestionEvent, error: ApiError, stream: true }),
-) {}
+  "artifact.suggestion.follow": { payload: z.object({ id: z.string() }), event: S.SuggestionEvent },
+} as const;
+
+export type SubscriptionName = keyof typeof subscriptions;
+
+/** Each subscription's payload and event, as types. */
+export type Subscriptions = {
+  readonly [K in SubscriptionName]: {
+    readonly payload: z.output<(typeof subscriptions)[K]["payload"]>;
+    readonly event: z.output<(typeof subscriptions)[K]["event"]>;
+  };
+};
+
+/** The URL path one subscription with this payload is read at. */
+export const subscriptionUrl = <K extends SubscriptionName>(name: K, payload: Subscriptions[K]["payload"]): string =>
+  `${subscriptionPath}/${name}?payload=${encodeURIComponent(JSON.stringify(payload))}`;

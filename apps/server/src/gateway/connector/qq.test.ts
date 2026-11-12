@@ -1,67 +1,69 @@
 import { createServer } from "node:http";
-import type { AddressInfo } from "node:net";
 
-import { describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
-import { FetchHttpClient, HttpClient, HttpClientResponse } from "effect/http";
-import { TestClock } from "effect/testing";
+import { describe, expect, test } from "vite-plus/test";
 
 import { decodeGatewayEvent, nextReplySeq, QQClient } from "./qq.ts";
 
-const http = Effect.runSync(Effect.service(HttpClient.HttpClient).pipe(Effect.provide(FetchHttpClient.layer)));
-
 describe("QQ gateway events", () => {
-  it("decodes an event and rejects null and wrong field types", () => {
+  test("decodes an event and rejects null and wrong field types", () => {
     const raw = `{"op":0,"s":7,"t":"C2C_MESSAGE_CREATE","d":{"id":"m1"}}`;
-    expect(Effect.runSync(decodeGatewayEvent(raw))).toEqual({
+    expect(decodeGatewayEvent(raw)).toEqual({
       op: 0,
       s: 7,
       t: "C2C_MESSAGE_CREATE",
       d: { id: "m1" },
     });
-    expect(() => Effect.runSync(decodeGatewayEvent("null"))).toThrow();
-    expect(() => Effect.runSync(decodeGatewayEvent(`{"op":"0"}`))).toThrow();
+    expect(() => decodeGatewayEvent("null")).toThrow();
+    expect(() => decodeGatewayEvent(`{"op":"0"}`)).toThrow();
   });
 
-  it("takes a frame that is not a dispatch, with s and t null", () => {
-    expect(Effect.runSync(decodeGatewayEvent(`{"op":11,"s":null,"t":null}`))).toEqual({ op: 11, s: null, t: null });
+  test("takes a frame that is not a dispatch, with s and t null", () => {
+    expect(decodeGatewayEvent(`{"op":11,"s":null,"t":null}`)).toEqual({ op: 11, s: null, t: null });
   });
 });
 
 describe("QQ sign-in", () => {
-  it.effect("regression: rotating QQ credentials evicts the previous token and expired tokens refresh", () =>
-    Effect.gen(function* () {
-      let requests = 0;
-      const client = new QQClient(
-        HttpClient.make((request) =>
-          Effect.sync(() => {
-            requests++;
-            return HttpClientResponse.fromWeb(request, Response.json({ access_token: `token-${requests}`, expires_in: 120 }));
-          }),
-        ),
-      );
-      const first = { appId: "a", secret: "old" };
-      yield* client.check(first);
-      yield* client.check(first);
-      expect(requests).toBe(1);
-      yield* client.check({ appId: "a", secret: "new" });
-      yield* client.check(first);
-      expect(requests).toBe(3);
-      yield* TestClock.adjust(60_000);
-      yield* client.check(first);
-      expect(requests).toBe(4);
-    }),
-  );
+  test("regression: rotating QQ credentials evicts the previous token and expired tokens refresh", async () => {
+    let requests = 0;
+    let now = 0;
+    // Time moves only when the test says: no deadline is reached on its own.
+    const clock = {
+      now: () => now,
+      sleep: (_ms: number, signal?: AbortSignal) =>
+        new Promise<void>((_resolve, reject) => signal?.addEventListener("abort", () => reject(signal.reason), { once: true })),
+    };
+    const client = new QQClient(
+      async () => {
+        requests++;
+        return Response.json({ access_token: `token-${requests}`, expires_in: 120 });
+      },
+      undefined,
+      undefined,
+      clock,
+    );
+    const first = { appId: "a", secret: "old" };
+    await client.check(first);
+    await client.check(first);
+    expect(requests).toBe(1);
+    await client.check({ appId: "a", secret: "new" });
+    await client.check(first);
+    expect(requests).toBe(3);
+    now += 60_000;
+    await client.check(first);
+    expect(requests).toBe(4);
+  });
 
-  it("a refused AppID or secret says QQ's own reason", async () => {
+  test("a refused AppID or secret says QQ's own reason", async () => {
     const server = createServer((_req, res) => {
       res.writeHead(200, { "content-type": "application/json" }).end(`{"code":100016,"message":"invalid appid or secret"}`);
     });
-    await Effect.runPromise(Effect.callback<void>((resume) => void server.listen(0, "127.0.0.1", () => resume(Effect.void))));
+    await new Promise<void>((resolve) => void server.listen(0, "127.0.0.1", resolve));
     try {
-      const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-      const refused = await Effect.runPromise(Effect.flip(new QQClient(http, url, url + "/token").check({ appId: "a1", secret: "bad" })));
-      expect(refused).toMatchObject({ _tag: "AppFailed", kind: "failed", message: "QQ 鉴权：invalid appid or secret" });
+      const address = server.address();
+      if (address === null || typeof address === "string") throw new Error("no test port");
+      const url = `http://127.0.0.1:${address.port}`;
+      const refused = await new QQClient(fetch, url, url + "/token").check({ appId: "a1", secret: "bad" }).catch((e: unknown) => e);
+      expect(refused).toMatchObject({ name: "AppFailed", kind: "failed", message: "QQ 鉴权：invalid appid or secret" });
     } finally {
       server.close();
     }
@@ -69,7 +71,7 @@ describe("QQ sign-in", () => {
 });
 
 describe("QQ reply numbers", () => {
-  it("counts each message's replies and keeps only the latest messages", () => {
+  test("counts each message's replies and keeps only the latest messages", () => {
     const seqs = new Map<string, number>();
     expect([nextReplySeq(seqs, "a"), nextReplySeq(seqs, "a"), nextReplySeq(seqs, "b")]).toEqual([1, 2, 1]);
     for (let i = 0; i < 300; i++) nextReplySeq(seqs, `m${i}`);

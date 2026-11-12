@@ -1,69 +1,9 @@
 import { Portal } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { For, onSettled, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import { type ChatMessage, userId } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
-
-const popIn = stylex.keyframes({
-  from: { opacity: 0, scale: 0.98 },
-});
-
-const styles = stylex.create({
-  emojiPickerDiv: {
-    position: "fixed",
-    zIndex: 30,
-    display: "flex",
-    animationName: { default: popIn, "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: "280ms",
-    animationTimingFunction: "var(--ease-out)",
-    animationFillMode: "both",
-    flexDirection: "column",
-    gap: "0.5rem",
-    overflowY: "auto",
-    borderRadius: "var(--radius-lg)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--wb-line)",
-    backgroundColor: "var(--wb-page)",
-    padding: "0.5rem",
-    color: "var(--wb-ink)",
-    boxShadow: "var(--shadow-float)",
-  },
-  emojiPickerP: {
-    paddingInline: "0.25rem",
-    paddingBottom: "0.25rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontWeight: "var(--font-weight-semibold)",
-    color: "var(--color-muted)",
-  },
-  emojiPickerDiv2: {
-    display: "grid",
-    gridTemplateColumns: "repeat(8,minmax(0,1fr))",
-    gap: "0.125rem",
-  },
-  emojiPickerButton: {
-    display: "inline-flex",
-    width: "2rem",
-    height: "2rem",
-    cursor: "pointer",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-sm)",
-    fontFamily: "var(--font-sans)",
-    fontSize: "var(--text-lg)",
-    lineHeight: "var(--leading-lg)",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-});
 
 /** What pressing an emoji on a message asks for: the user's reaction off when it is on the message now, else on. */
 export const reactionOn = (m: Pick<ChatMessage, "reactions">, emoji: string) => !(m.reactions.find((r) => r.emoji === emoji)?.by.includes(userId) ?? false);
@@ -325,13 +265,13 @@ export function EmojiPicker(props: { anchor: HTMLElement | undefined; onPick: (e
         data-testid="emoji-picker"
         aria-label={t("web.channel.emoji.open")}
         style={{ left: `${at.left}px`, top: `${at.top}px`, width: `${width}px`, "max-height": `${height}px` }}
-        {...stylex.attrs(styles.emojiPickerDiv)}
+        class="animate-pop-in fixed z-30 flex flex-col gap-2 overflow-y-auto rounded-lg border border-line bg-page p-2 text-ink shadow-float"
       >
         <For each={groups}>
           {(g) => (
             <section aria-label={groupName(g.id)}>
-              <p {...stylex.attrs(styles.emojiPickerP)}>{groupName(g.id)}</p>
-              <div {...stylex.attrs(styles.emojiPickerDiv2)}>
+              <p class="px-1 pb-1 text-xs font-semibold text-muted">{groupName(g.id)}</p>
+              <div class="grid grid-cols-8 gap-0.5">
                 <For each={g.emoji}>
                   {(e) => (
                     <button
@@ -341,7 +281,7 @@ export function EmojiPicker(props: { anchor: HTMLElement | undefined; onPick: (e
                       // Keeps the focus, and with it a box's caret, where it was.
                       onMouseDown={(ev) => ev.preventDefault()}
                       onClick={() => props.onPick(e)}
-                      {...stylex.attrs(styles.emojiPickerButton)}
+                      class="inline-flex w-8 h-8 cursor-pointer items-center justify-center rounded-sm font-sans text-lg hover:bg-hover"
                     >
                       {e}
                     </button>

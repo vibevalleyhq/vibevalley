@@ -1,15 +1,21 @@
-import { Clock, Context, Effect, FiberHandle, Layer, Schedule, type Stream } from "effect";
-
+import { TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
-import { type ApiError, BizCode, refuseIn } from "#/base/errors.ts";
-import { Db } from "#/infra/db.ts";
+import { BizCode, refuseIn } from "#/base/errors.ts";
+import type { Core } from "#/core/core.ts";
+import type { Db } from "#/infra/db.ts";
+import { bestEffort, type Logger } from "#/infra/log.ts";
+import type { PublicFetch } from "#/infra/publicHttp.ts";
+import type { Time } from "#/infra/time.ts";
+import type { Attachment } from "#/modules/attachment/attachment.ts";
+import type { Channel } from "#/modules/channel/channel.ts";
+import type { Provider } from "#/modules/provider/provider.ts";
 import * as q from "#db/media_job.sql.ts";
 
 import { audioKinds, makeAudio } from "./audio.ts";
 import { makeImage } from "./image.ts";
-import { makeInputs } from "./inputs.ts";
+import { type Inputs, makeInputs } from "./inputs.ts";
 import { makeMachine } from "./machine.ts";
 import { makeRemoteFiles } from "./remoteFiles.ts";
 import { makeSpeech } from "./speech.ts";
@@ -21,78 +27,90 @@ export type MediaCaller =
   | { readonly kind: "user" }
   | { readonly kind: "orchestrator"; readonly agent: string; readonly channel: string; readonly forUser: boolean };
 
-export class Media extends Context.Service<
-  Media,
-  {
-    readonly inputs: Pick<Effect.Success<typeof makeInputs>, "create" | "adopt" | "upload" | "get" | "list" | "delete" | "previewDelete" | "content">;
-    readonly createImage: (input: T.MediaImageRequest, caller: MediaCaller) => Effect.Effect<T.MediaImageJob, ApiError>;
-    readonly createUnderstanding: (input: T.MediaUnderstandingRequest) => Effect.Effect<T.MediaUnderstandingJob, ApiError>;
-    readonly authorizeUnderstanding: (input: T.MediaUnderstandingAuthorizationRequest) => Effect.Effect<T.MediaUnderstandingJob, ApiError>;
-    readonly startUnderstanding: (id: string, caller: MediaCaller) => Effect.Effect<T.MediaUnderstandingJob, ApiError>;
-    readonly createSpeech: (input: T.MediaSpeechRequest, caller: MediaCaller) => Effect.Effect<T.MediaSpeechJob, ApiError>;
-    readonly speechResume: (id: string) => Effect.Effect<T.MediaSpeechJob, ApiError>;
-    readonly speechEvents: (id: string) => Effect.Effect<Stream.Stream<T.MediaSpeechEvent>, ApiError>;
-    readonly createSpeakers: (input: T.MediaSpeakersRequest, caller: MediaCaller) => Effect.Effect<T.MediaAudioJob, ApiError>;
-    readonly createVoiceDesign: (input: T.MediaVoiceDesignRequest, caller: MediaCaller) => Effect.Effect<T.MediaAudioJob, ApiError>;
-    readonly createClone: (input: T.MediaCloneRequest) => Effect.Effect<T.MediaAudioJob, ApiError>;
-    readonly createTranscription: (input: T.MediaTranscriptionRequest) => Effect.Effect<T.MediaAudioJob, ApiError>;
-    readonly audioResume: (id: string) => Effect.Effect<T.MediaAudioJob, ApiError>;
-    readonly audioPreviewCleanup: (id: string) => Effect.Effect<T.Preview, ApiError>;
-    readonly audioCleanup: (id: string) => Effect.Effect<T.MediaAudioJob, ApiError>;
-    readonly previewUnderstandingCleanup: (id: string) => Effect.Effect<T.Preview, ApiError>;
-    readonly cleanupUnderstanding: (id: string) => Effect.Effect<T.MediaUnderstandingJob, ApiError>;
-    readonly get: (id: string) => Effect.Effect<T.MediaJob, ApiError>;
-    readonly list: () => Effect.Effect<T.MediaJob[], ApiError>;
-    readonly cancel: (id: string) => Effect.Effect<T.MediaJob, ApiError>;
-    readonly retryDownload: (id: string) => Effect.Effect<T.MediaJob, ApiError>;
-    readonly previewRelease: (id: string) => Effect.Effect<T.Preview, ApiError>;
-    readonly release: (id: string) => Effect.Effect<T.MediaJob, ApiError>;
-    readonly restore: () => Effect.Effect<void, ApiError>;
-  }
->()("@vibevalley/server/modules/media/media") {
-  static readonly layer = Layer.effect(
-    Media,
-    Effect.suspend(() => make),
-  );
+export interface Media {
+  readonly inputs: Pick<Inputs, "create" | "adopt" | "upload" | "get" | "list" | "delete" | "previewDelete" | "content">;
+  readonly createImage: (input: T.MediaImageRequest, caller: MediaCaller) => Promise<T.MediaImageJob>;
+  readonly createUnderstanding: (input: T.MediaUnderstandingRequest) => Promise<T.MediaUnderstandingJob>;
+  readonly authorizeUnderstanding: (input: T.MediaUnderstandingAuthorizationRequest) => Promise<T.MediaUnderstandingJob>;
+  readonly startUnderstanding: (id: string, caller: MediaCaller) => Promise<T.MediaUnderstandingJob>;
+  readonly createSpeech: (input: T.MediaSpeechRequest, caller: MediaCaller) => Promise<T.MediaSpeechJob>;
+  readonly speechResume: (id: string) => Promise<T.MediaSpeechJob>;
+  /** A streamed speech job's events for the one page that claims them: refused on the first next() when it cannot. */
+  readonly speechEvents: (id: string, signal?: AbortSignal) => AsyncIterable<T.MediaSpeechEvent>;
+  readonly createSpeakers: (input: T.MediaSpeakersRequest, caller: MediaCaller) => Promise<T.MediaAudioJob>;
+  readonly createVoiceDesign: (input: T.MediaVoiceDesignRequest, caller: MediaCaller) => Promise<T.MediaAudioJob>;
+  readonly createClone: (input: T.MediaCloneRequest) => Promise<T.MediaAudioJob>;
+  readonly createTranscription: (input: T.MediaTranscriptionRequest) => Promise<T.MediaAudioJob>;
+  readonly audioResume: (id: string) => Promise<T.MediaAudioJob>;
+  readonly audioPreviewCleanup: (id: string) => Promise<T.Preview>;
+  readonly audioCleanup: (id: string) => Promise<T.MediaAudioJob>;
+  readonly previewUnderstandingCleanup: (id: string) => Promise<T.Preview>;
+  /** The signal stops it while it deletes at the vendor: the cleanup is then blocked, to be asked for again. */
+  readonly cleanupUnderstanding: (id: string, signal?: AbortSignal) => Promise<T.MediaUnderstandingJob>;
+  readonly get: (id: string) => Promise<T.MediaJob>;
+  readonly list: () => Promise<T.MediaJob[]>;
+  readonly cancel: (id: string) => Promise<T.MediaJob>;
+  readonly retryDownload: (id: string) => Promise<T.MediaJob>;
+  readonly previewRelease: (id: string) => Promise<T.Preview>;
+  readonly release: (id: string) => Promise<T.MediaJob>;
+  /** At startup: jobs and inputs a stop cut short are marked as such, and the ones still out at the vendor are followed again. */
+  readonly boot: () => Promise<void>;
+  /** Stops every job's work, the input sweep and the streams' timers. */
+  readonly close: () => Promise<void>;
 }
 
-const make = Effect.gen(function* () {
-  const db = yield* Db;
-  const inputs = yield* makeInputs;
-  const remoteFiles = yield* makeRemoteFiles(inputs);
-  const cleanup = yield* FiberHandle.make<void>();
-  const machine = yield* makeMachine;
-  const image = yield* makeImage(machine);
-  const understanding = yield* makeUnderstanding({ inputs, remote: remoteFiles, machine });
-  const speech = yield* makeSpeech({ inputs, machine });
-  const audio = yield* makeAudio({ inputs, remote: remoteFiles, machine });
+export interface MediaDeps {
+  readonly db: Db;
+  readonly core: Core;
+  readonly clock: Time;
+  readonly log: Logger;
+  readonly attachment: Attachment;
+  readonly channel: Channel;
+  readonly provider: Provider;
+  readonly publicFetch: PublicFetch;
+}
 
-  const releasable = Effect.fnUntraced(function* (id: string) {
-    const job = yield* machine.get(id);
-    if (job.kind === "image" || job.kind === "understanding" || machine.active(job.phase)) return yield* refused(t("server.media.releaseUnavailable"));
+const sweepMs = 60_000;
+
+export async function makeMedia(deps: MediaDeps): Promise<Media> {
+  const { db, clock } = deps;
+  const log = deps.log.child("media");
+  const inputs = makeInputs(deps);
+  const remoteFiles = makeRemoteFiles(deps, inputs);
+  // The minute's input sweep, one at a time.
+  const cleanup = new TaskGroup({ name: "media.cleanup", onError: (task, e) => log.warn(`${task} failed`, e) });
+  const machine = makeMachine(deps);
+  const image = makeImage(deps, machine);
+  const understanding = makeUnderstanding(deps, { inputs, remote: remoteFiles, machine });
+  const speech = makeSpeech(deps, { inputs, machine });
+  const audio = makeAudio(deps, { inputs, remote: remoteFiles, machine });
+
+  const releasable = async (id: string) => {
+    const job = await machine.get(id);
+    if (job.kind === "image" || job.kind === "understanding" || machine.active(job.phase)) throw refused(t("server.media.releaseUnavailable"));
     return job;
-  });
+  };
 
-  return Media.of({
+  return {
     inputs,
     createImage: image.create,
     createUnderstanding: understanding.create,
     authorizeUnderstanding: understanding.authorize,
     startUnderstanding: understanding.start,
     createSpeech: speech.create,
-    speechResume: Effect.fn("Media.speechResume")(function* (id) {
-      yield* machine.resume(id, ["speech"]);
-      return yield* speech.get(id);
-    }),
-    speechEvents: speech.events,
+    speechResume: async (id) => {
+      await machine.resume(id, ["speech"]);
+      return speech.get(id);
+    },
+    speechEvents: (id, signal) => speech.events(id, signal),
     createSpeakers: audio.createSpeakers,
     createVoiceDesign: audio.createVoiceDesign,
-    createClone: Effect.fn("Media.createClone")((input) => audio.createClone(input, { kind: "user" })),
-    createTranscription: Effect.fn("Media.createTranscription")((input) => audio.createTranscription(input, { kind: "user" })),
-    audioResume: Effect.fn("Media.audioResume")(function* (id) {
-      yield* machine.resume(id, audioKinds);
-      return yield* audio.get(id);
-    }),
+    createClone: (input) => audio.createClone(input, { kind: "user" }),
+    createTranscription: (input) => audio.createTranscription(input, { kind: "user" }),
+    audioResume: async (id) => {
+      await machine.resume(id, audioKinds);
+      return audio.get(id);
+    },
     audioPreviewCleanup: audio.previewCleanup,
     audioCleanup: audio.cleanup,
     cleanupUnderstanding: understanding.cleanup,
@@ -101,50 +119,54 @@ const make = Effect.gen(function* () {
     list: machine.list,
     cancel: machine.cancel,
     retryDownload: machine.retryDownload,
-    previewRelease: Effect.fn("Media.previewRelease")(function* (id) {
-      const job = yield* releasable(id);
-      return { does: job.canRelease ? [t("server.media.releasePreview"), t("server.media.releasePreserves"), t("server.media.releaseAbandons")] : [] };
-    }, machine.lock.withPermits(1)),
-    release: Effect.fn("Media.release")(
-      function* (id) {
-        const job = yield* releasable(id);
+    previewRelease: (id) =>
+      machine.lock.with(async () => {
+        const job = await releasable(id);
+        return { does: job.canRelease ? [t("server.media.releasePreview"), t("server.media.releasePreserves"), t("server.media.releaseAbandons")] : [] };
+      }),
+    // Not stopped by the caller: assets once being released are released, and the farm told.
+    release: (id) =>
+      machine.lock.with(async () => {
+        const job = await releasable(id);
         if (!job.canRelease) return job;
         const ids = job.kind === "speech" ? [job.resultInput?.id] : [job.input?.id, job.resultInput?.id, job.previewInput];
-        const now = yield* Clock.currentTimeMillis;
-        const clear = db.run(q.releaseMediaJobAssets({ id, now }));
-        yield* inputs
-          .releaseAssets(
+        const now = clock.now();
+        try {
+          await inputs.releaseAssets(
             ids.filter((value): value is string => value != null),
             [id],
-            clear,
-          )
-          .pipe(Effect.ensuring(machine.publish().pipe(Effect.catch(() => Effect.logError("Media asset release could not be published")))));
-        return yield* machine.get(id);
-      },
-      machine.lock.withPermits(1),
-      Effect.uninterruptible,
-    ),
-    restore: Effect.fn("Media.restore")(function* () {
-      yield* remoteFiles.restore();
-      yield* machine.interrupt();
-      yield* inputs.restore();
-      yield* inputs.sweep();
-      yield* understanding.sweep();
-      yield* FiberHandle.run(
-        cleanup,
-        Effect.andThen(understanding.sweep(), inputs.sweep()).pipe(
-          Effect.catch(() => Effect.logError("Media input cleanup failed")),
-          Effect.repeat(Schedule.spaced("1 minute")),
-          Effect.asVoid,
-        ),
-      );
-      yield* machine.pickUp();
-    }),
-  });
-});
-
-export const start = Layer.effectDiscard(
-  Effect.gen(function* () {
-    yield* (yield* Media).restore();
-  }),
-);
+            async () => {
+              await q.releaseMediaJobAssets(db.sql, { id, now });
+            },
+          );
+        } finally {
+          await bestEffort(log, "Media asset release could not be published", () => machine.publish());
+        }
+        return machine.get(id);
+      }),
+    boot: async () => {
+      await remoteFiles.restore();
+      await machine.interrupt();
+      await inputs.restore();
+      await inputs.sweep();
+      await understanding.sweep();
+      cleanup.keyed("sweep", async (signal) => {
+        for (;;) {
+          try {
+            await understanding.sweep();
+            await inputs.sweep();
+          } catch (e) {
+            log.error("Media input cleanup failed", e);
+          }
+          await clock.sleep(sweepMs, signal);
+        }
+      });
+      await machine.pickUp();
+    },
+    close: async () => {
+      await cleanup.close();
+      await machine.close();
+      await speech.close();
+    },
+  };
+}

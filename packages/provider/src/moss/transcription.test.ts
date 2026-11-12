@@ -1,64 +1,52 @@
-import { expect, it } from "@effect/vitest";
-import { Effect, Option, Schema } from "effect";
-import { HttpClient, HttpClientResponse } from "effect/http";
+import { expect, it } from "vite-plus/test";
 
+import { answering, failure, unreachable } from "../base/testing.ts";
 import { mossTranscriptionModels } from "./transcription-models.ts";
 import { createMossTranscriptionTask, prepareMossTranscription } from "./transcription.ts";
 
-const bodyOf = Schema.decodeOption(Schema.fromJsonString(Schema.Unknown));
-
 const input = { model: "moss-transcribe-1.0", fileId: "file-one" };
 
-it.effect.each(mossTranscriptionModels)("%s submits a stored file once without inline media or fake streaming", (model) => {
+it.for(mossTranscriptionModels)("%s submits a stored file once without inline media or fake streaming", async (model) => {
   let calls = 0;
-  const http = HttpClient.make((request) =>
-    Effect.gen(function* () {
-      calls++;
-      expect(request.method).toBe("POST");
-      expect(request.url).toBe("https://api.mosi.cn/v1/audio/transcriptions");
-      expect(request.headers.authorization).toBe("Bearer transcription-account");
-      if (request.body._tag !== "Uint8Array") return yield* Effect.die("Expected JSON");
-      expect(Option.getOrUndefined(bodyOf(new TextDecoder().decode(request.body.body)))).toEqual({
-        model,
-        file_id: "file-one",
-        response_format: "json",
-        stream: false,
-        async: true,
-      });
-      return HttpClientResponse.fromWeb(request, Response.json({ task_id: "transcription-one", retry_after: 0 }, { status: 202 }));
-    }),
-  );
-  return Effect.gen(function* () {
-    const mossTranscriptionTaskCreated = yield* createMossTranscriptionTask("transcription-account", { ...input, model });
-    expect(mossTranscriptionTaskCreated).toEqual({ taskId: "transcription-one", retryAfterSeconds: 0 });
-    expect(calls).toBe(1);
-  }).pipe(Effect.provideService(HttpClient.HttpClient, http));
-});
-
-it.effect.each(["moss-transcribe-diarize-pro", "moss-transcribe-diarize-pro-2026-07-03"])("%s preserves diarization and Unicode keyterms", (model) =>
-  Effect.gen(function* () {
-    const keyterms = ["MOSS", "𝄞".repeat(30)];
-    const mossTranscriptionPrepared = yield* prepareMossTranscription({ ...input, model, diarize: true, keyterms });
-    expect(mossTranscriptionPrepared).toEqual({
+  const fetch = answering(async (request) => {
+    calls++;
+    expect(request.method).toBe("POST");
+    expect(request.url).toBe("https://api.mosi.cn/v1/audio/transcriptions");
+    expect(request.headers.get("authorization")).toBe("Bearer transcription-account");
+    expect(await request.json()).toEqual({
       model,
       file_id: "file-one",
       response_format: "json",
       stream: false,
       async: true,
-      diarize: true,
-      keyterms,
     });
-  }),
-);
+    return Response.json({ task_id: "transcription-one", retry_after: 0 }, { status: 202 });
+  });
+  const mossTranscriptionTaskCreated = await createMossTranscriptionTask("transcription-account", { ...input, model }, { fetch });
+  expect(mossTranscriptionTaskCreated).toEqual({ taskId: "transcription-one", retryAfterSeconds: 0 });
+  expect(calls).toBe(1);
+});
 
-it.effect("standard transcription preserves explicit false and an empty keyterm list", () =>
-  Effect.gen(function* () {
-    const mossTranscriptionPrepared = yield* prepareMossTranscription({ ...input, diarize: false, keyterms: [] });
-    expect(mossTranscriptionPrepared).toMatchObject({ diarize: false, keyterms: [] });
-  }),
-);
+it.for(["moss-transcribe-diarize-pro", "moss-transcribe-diarize-pro-2026-07-03"])("%s preserves diarization and Unicode keyterms", async (model) => {
+  const keyterms = ["MOSS", "𝄞".repeat(30)];
+  const mossTranscriptionPrepared = await prepareMossTranscription({ ...input, model, diarize: true, keyterms });
+  expect(mossTranscriptionPrepared).toEqual({
+    model,
+    file_id: "file-one",
+    response_format: "json",
+    stream: false,
+    async: true,
+    diarize: true,
+    keyterms,
+  });
+});
 
-it.effect.each([
+it("standard transcription preserves explicit false and an empty keyterm list", async () => {
+  const mossTranscriptionPrepared = await prepareMossTranscription({ ...input, diarize: false, keyterms: [] });
+  expect(mossTranscriptionPrepared).toMatchObject({ diarize: false, keyterms: [] });
+});
+
+it.for([
   { fileId: "" },
   { fileId: "../file" },
   { model: "moss-tts-1.0-pro" },
@@ -74,17 +62,12 @@ it.effect.each([
   { stream: true },
   { async: false },
   { response_format: "verbose_json" },
-])("invalid transcription options %# cannot reach the vendor", (patch) =>
-  Effect.gen(function* () {
-    const mossTranscriptionTaskCreatedFailure = yield* createMossTranscriptionTask("transcription-account", { ...input, ...patch }).pipe(Effect.flip);
-    expect(mossTranscriptionTaskCreatedFailure).toMatchObject({
-      reason: "InvalidInput",
-      outcome: "NotSubmitted",
-    });
-  }).pipe(
-    Effect.provideService(
-      HttpClient.HttpClient,
-      HttpClient.make(() => Effect.die("Must not submit")),
-    ),
-  ),
-);
+])("invalid transcription options %# cannot reach the vendor", async (patch) => {
+  const mossTranscriptionTaskCreatedFailure = await failure(
+    createMossTranscriptionTask("transcription-account", { ...input, ...patch }, { fetch: unreachable }),
+  );
+  expect(mossTranscriptionTaskCreatedFailure).toMatchObject({
+    reason: "InvalidInput",
+    outcome: "NotSubmitted",
+  });
+});

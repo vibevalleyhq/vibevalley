@@ -1,15 +1,7 @@
-import * as stylex from "@stylexjs/stylex";
-
 import type { Agent, AgentTally, Installation, Look, RuntimeInfo } from "@vibevalley/protocol";
 import { stories, story } from "@vibevalley/stories";
 
 import { AgentCard } from "./AgentsPage";
-
-const viewStyles = stylex.create({
-  agentsPageStoriesDiv: {
-    width: "18rem",
-  },
-});
 
 const look: Look = { species: "bear", outfit: "farmer", orchestrator: null, build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" };
 
@@ -61,7 +53,7 @@ export default stories({
       args: { state: "working" },
       grid: { rows: ["state", ["working", "idle", "disabled", "no runtime", "problems"]], cols: "pseudo" },
       render: (a) => (
-        <div {...stylex.attrs(viewStyles.agentsPageStoriesDiv)}>
+        <div class="w-72">
           <AgentCard
             agent={agent({ enabled: a.state !== "disabled" })}
             runtime={a.state === "no runtime" ? runtime({ status: "not_found" }) : installed}

@@ -1,6 +1,4 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
-import { String as Str } from "effect";
 import { createSignal, flush, For, Show, untrack } from "solid-js";
 
 import { Progress } from "@vibevalley/base-ui";
@@ -25,330 +23,6 @@ import { toast } from "#/ui/toasts.ts";
 
 import { EmojiPicker } from "./EmojiPicker";
 import { HelperFace } from "./presence";
-
-const popIn = stylex.keyframes({
-  from: { opacity: 0, scale: 0.98 },
-});
-
-const styles = stylex.create({
-  // Floats over the messages just above the box: opening it moves nothing on the page.
-  composerDiv: {
-    position: "absolute",
-    insetInline: "1rem",
-    bottom: "calc(100% - 0.5rem)",
-    zIndex: 30,
-    maxHeight: "18rem",
-    overflowY: "auto",
-    display: "flex",
-    transformOrigin: "bottom",
-    animationName: { default: popIn, "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: "280ms",
-    animationTimingFunction: "var(--ease-out)",
-    animationFillMode: "both",
-    flexDirection: "column",
-    borderRadius: "var(--radius-lg)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-    padding: "0.25rem",
-    boxShadow: "var(--shadow-float)",
-  },
-  composerDictationKey: {
-    width: "1.75rem",
-    height: "1.75rem",
-    borderRadius: "var(--radius-md)",
-  },
-  composerProgressRoot: {
-    position: "relative",
-    display: "flex",
-    height: "2.5rem",
-    alignItems: "center",
-    overflow: "hidden",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-page)",
-    paddingInline: "0.5rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  composerProgressIndicator: {
-    position: "absolute",
-    insetBlock: "0",
-    left: "0",
-    backgroundColor: {
-      default: "var(--color-leaf)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf) 20%, transparent)",
-    },
-  },
-  composerDiv2: {
-    display: "flex",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.5rem",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.25rem",
-  },
-  composerDivTone: {
-    backgroundColor: "var(--color-selected)",
-  },
-  composerDivAlt: {},
-  composerButton: {
-    display: "inline-flex",
-    width: "1.75rem",
-    height: "1.75rem",
-    cursor: {
-      default: "pointer",
-      ":disabled": "default",
-    },
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-  },
-  composerButtonTone: {
-    borderColor: "var(--color-accent)",
-    backgroundColor: {
-      default: "var(--color-accent)",
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-accent-hover)",
-      },
-    },
-  },
-  composerButtonAlt: {
-    borderColor: "transparent",
-    opacity: ".5",
-  },
-  fileDropDiv: {
-    position: "relative",
-    display: "flex",
-    minWidth: "0",
-    flex: "1",
-    flexDirection: "column",
-  },
-  composer: {
-    position: "relative",
-    borderTopStyle: "solid",
-    borderTopWidth: "1px",
-    borderColor: "var(--color-line)",
-    paddingInline: "1rem",
-    paddingTop: "0.75rem",
-    paddingBottom: "1rem",
-  },
-  composerSpan: {
-    display: "inline-flex",
-    flexShrink: 0,
-    width: "1.25rem",
-    height: "1.25rem",
-    alignItems: "center",
-    justifyContent: "center",
-    color: "var(--color-muted)",
-  },
-  commandArgs: {
-    color: "var(--color-faint)",
-  },
-  composerSpan2: {
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-  },
-  composerSpan3: {
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-  },
-  composerSpan4: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  chatProblem: {
-    marginBottom: "0.375rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-berry)",
-  },
-  composerDiv3: {
-    marginBottom: "0.375rem",
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.25rem",
-  },
-  quotedBlock: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--color-hover)",
-    paddingInline: "0.75rem",
-    paddingBlock: "0.375rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  composerSpan5: {
-    minWidth: "0",
-    flex: "1",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-  },
-  quotedBlockRemove: {
-    cursor: "pointer",
-    borderRadius: "var(--radius-sm)",
-    padding: "0.125rem",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-page)",
-      },
-    },
-  },
-  replying: {
-    marginBottom: "0.375rem",
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    borderRadius: "var(--radius-md)",
-    backgroundColor: "var(--color-hover)",
-    paddingInline: "0.75rem",
-    paddingBlock: "0.375rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    color: "var(--color-muted)",
-  },
-  composerDiv22: {
-    marginBottom: "0.375rem",
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.375rem",
-  },
-  composerSpan6: {
-    position: "relative",
-    maxWidth: "12rem",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-  },
-  composerDiv32: {
-    borderRadius: "var(--radius-lg)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: {
-      default: "var(--color-line)",
-      ":focus-within": "var(--color-focus)",
-    },
-    backgroundColor: "var(--color-page)",
-  },
-  composerInput: {
-    display: "block",
-    fieldSizing: "content",
-    maxHeight: "200px",
-    minHeight: "52px",
-    width: "100%",
-    resize: "none",
-    backgroundColor: "transparent",
-    paddingInline: "0.75rem",
-    paddingTop: "0.625rem",
-    paddingBottom: "0.25rem",
-    fontSize: "var(--text-base)",
-    lineHeight: "var(--leading-base)",
-    outlineStyle: "none",
-    color: {
-      default: null,
-      "::placeholder": "var(--color-faint)",
-    },
-  },
-  composerDiv4: {
-    display: "flex",
-    height: "2.25rem",
-    alignItems: "center",
-    gap: "0.25rem",
-    paddingInline: "0.5rem",
-    paddingBottom: "0.5rem",
-  },
-  composerSpan8: {
-    flex: "1",
-  },
-  composerInput2: {
-    display: "none",
-  },
-  attach: {
-    display: "inline-flex",
-    width: "1.75rem",
-    height: "1.75rem",
-    cursor: {
-      default: "pointer",
-      ":disabled": "default",
-    },
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-md)",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-    opacity: {
-      default: null,
-      ":disabled": ".5",
-    },
-  },
-  stop: {
-    display: "inline-flex",
-    width: "1.75rem",
-    height: "1.75rem",
-    cursor: "pointer",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-md)",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: "var(--color-line)",
-    color: "var(--color-berry)",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hover)",
-      },
-    },
-  },
-  dropHint: {
-    pointerEvents: "none",
-    position: "absolute",
-    inset: "0.5rem",
-    zIndex: "20",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "var(--radius-lg)",
-    borderStyle: "dashed",
-    borderWidth: "2px",
-    borderColor: "var(--color-accent)",
-    backgroundColor: {
-      default: "var(--color-page)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-page) 85%, transparent)",
-    },
-    fontSize: "var(--text-base)",
-    lineHeight: "var(--leading-base)",
-    fontWeight: "var(--font-weight-semibold)",
-    color: "var(--color-accent)",
-  },
-});
 
 /** The box for saying a sentence in a channel: Enter sends, Shift+Enter starts a line, @ names someone. */
 export interface QuotedBlockDraft {
@@ -422,11 +96,11 @@ export function Composer(props: {
   /** An @ at the caret, apart from the word before it: the names menu opens. */
   const startMention = () => {
     const from = input?.selectionStart ?? box.text().length;
-    const before = Str.slice(0, from)(box.text());
+    const before = box.text().slice(0, from);
     insert(before === "" || /\s$/u.test(before) ? "@" : " @");
   };
   /** A command is the line's first word: a / at its start opens the commands menu, the words after it kept. */
-  const startCommand = () => put(Str.startsWith("/")(box.text()) ? box.text() : "/" + box.text(), 1);
+  const startCommand = () => put(box.text().startsWith("/") ? box.text() : "/" + box.text(), 1);
   // ↑ in an empty box changes the user's last message here; Esc lets go of the message being answered.
   const dictating = useDictation({ input: () => input, value: () => box.text(), onValue: (v, c) => box.edit(v, c) });
   // While this box listens, its row is the recording's: cancel or done in place of attach and send.
@@ -460,9 +134,14 @@ export function Composer(props: {
   };
 
   return (
-    <div data-testid="composer" data-key={props.channel?.id} {...stylex.attrs(styles.composer)}>
+    <div data-testid="composer" data-key={props.channel?.id} class="relative border-t border-line px-4 pt-3 pb-4">
       <Show when={box.offered().length > 0}>
-        <div role="listbox" aria-label={t("web.channel.composer.who")} data-testid="mentions" {...stylex.attrs(styles.composerDiv)}>
+        <div
+          role="listbox"
+          aria-label={t("web.channel.composer.who")}
+          data-testid="mentions"
+          class="animate-pop-in absolute inset-x-4 bottom-[calc(100%_-_0.5rem)] z-30 max-h-72 overflow-y-auto flex [transform-origin:bottom] flex-col rounded-lg border border-line bg-page p-1 shadow-float"
+        >
           <For each={box.offered()} keyed={(n) => n.token}>
             {(n, i) => (
               <div
@@ -475,7 +154,7 @@ export function Composer(props: {
                   e.preventDefault();
                   box.choose(n());
                 }}
-                {...stylex.attrs(styles.composerDiv2, i() === box.active() ? styles.composerDivTone : styles.composerDivAlt)}
+                class={["flex cursor-pointer items-center gap-2 rounded-md px-2 py-1", i() === box.active() ? "bg-selected" : ""]}
               >
                 <Show
                   when={n().session}
@@ -483,7 +162,7 @@ export function Composer(props: {
                     n().orchestrator ? (
                       <OrchestratorFace size={20} agent={n().orchestrator} />
                     ) : (
-                      <span {...stylex.attrs(styles.composerSpan)}>
+                      <span class="inline-flex shrink-0 w-5 h-5 items-center justify-center text-muted">
                         <Show when={n().args !== undefined}>
                           <Icon name="command" size={14} />
                         </Show>
@@ -493,16 +172,16 @@ export function Composer(props: {
                 >
                   {(s) => <HelperFace agent={s().agent} runtime={s().runtime} size={20} />}
                 </Show>
-                <span {...stylex.attrs(styles.composerSpan2)}>
+                <span class="font-mono text-xs">
                   {n().token}
                   <Show when={n().args !== undefined && n().args !== ""}>
-                    <span {...stylex.attrs(styles.commandArgs)}> {n().args}</span>
+                    <span class="text-faint"> {n().args}</span>
                   </Show>
                 </span>
                 <Show when={n().session !== undefined || n().args !== undefined}>
-                  <span {...stylex.attrs(styles.composerSpan3)}>{n().name}</span>
+                  <span class="text-sm">{n().name}</span>
                 </Show>
-                <span {...stylex.attrs(styles.composerSpan4)}>{n().note}</span>
+                <span class="min-w-0 flex-1 truncate text-xs text-muted">{n().note}</span>
               </div>
             )}
           </For>
@@ -510,21 +189,21 @@ export function Composer(props: {
       </Show>
       <Show when={problem()}>
         {(p) => (
-          <p role="alert" data-testid="chat-problem" {...stylex.attrs(styles.chatProblem)}>
+          <p role="alert" data-testid="chat-problem" class="mb-1.5 text-xs text-berry">
             {p()}
           </p>
         )}
       </Show>
       <Show when={(props.quoted?.length ?? 0) > 0}>
-        <div {...stylex.attrs(styles.composerDiv3)}>
+        <div class="mb-1.5 flex flex-col gap-1">
           <For each={props.quoted} keyed={(q) => q.ref.blockId}>
             {(q) => (
-              <div data-testid="quoted-block" data-key={q().ref.blockId} {...stylex.attrs(styles.quotedBlock)}>
+              <div data-testid="quoted-block" data-key={q().ref.blockId} class="flex items-center gap-2 rounded-md bg-hover px-3 py-1.5 text-xs text-muted">
                 <Icon name="artifacts" size={12} />
-                <span {...stylex.attrs(styles.composerSpan5)}>{t("web.channel.composer.quotedBlock", { text: q().text })}</span>
+                <span class="min-w-0 flex-1 truncate">{t("web.channel.composer.quotedBlock", { text: q().text })}</span>
                 <button
                   type="button"
-                  {...stylex.attrs(styles.quotedBlockRemove)}
+                  class="cursor-pointer rounded-sm p-0.5 hover:bg-page"
                   data-testid="quoted-block-remove"
                   aria-label={t("web.channel.composer.cancelQuote")}
                   title={t("web.channel.composer.cancelQuote")}
@@ -539,9 +218,9 @@ export function Composer(props: {
       </Show>
       <Show when={replying()}>
         {(m) => (
-          <div data-testid="replying" data-key={m().number} {...stylex.attrs(styles.replying)}>
+          <div data-testid="replying" data-key={m().number} class="mb-1.5 flex items-center gap-2 rounded-md bg-hover px-3 py-1.5 text-xs text-muted">
             <Icon name="reply" size={12} />
-            <span {...stylex.attrs(styles.composerSpan5)}>
+            <span class="min-w-0 flex-1 truncate">
               {t("shared.join.labeled", {
                 label: t("web.channel.composer.replying", { name: m().from === userId ? t("web.channel.messages.user") : m().name }),
                 text: m().text,
@@ -549,7 +228,7 @@ export function Composer(props: {
             </span>
             <button
               type="button"
-              {...stylex.attrs(styles.quotedBlockRemove)}
+              class="cursor-pointer rounded-sm p-0.5 hover:bg-page"
               data-testid="cancel-reply"
               aria-label={t("web.channel.composer.cancelReply")}
               title={t("web.channel.composer.cancelReply")}
@@ -561,21 +240,25 @@ export function Composer(props: {
         )}
       </Show>
       <Show when={draft().files.length > 0 || uploading().length > 0}>
-        <div {...stylex.attrs(styles.composerDiv22)}>
+        <div class="mb-1.5 flex flex-wrap gap-1.5">
           <For each={draft().files} keyed={(f) => f.id}>
             {(f) => <AttachmentTile testid="pending-file" file={f()} onRemove={() => props.channel && drafts.drop(props.channel.id, f().id)} />}
           </For>
           <For each={uploading()} keyed={(u) => u.key}>
             {(u) => (
-              <Progress.Root value={u().percent} aria-label={u().name} {...stylex.attrs(styles.composerProgressRoot)}>
-                <Progress.Indicator {...stylex.attrs(styles.composerProgressIndicator)} />
-                <span {...stylex.attrs(styles.composerSpan6)}>{t("web.channel.media.uploadingFile", { name: u().name, percent: u().percent })}</span>
+              <Progress.Root
+                value={u().percent}
+                aria-label={u().name}
+                class="relative flex h-10 items-center overflow-hidden rounded-md border border-line bg-page px-2 text-xs text-muted"
+              >
+                <Progress.Indicator class="absolute inset-y-0 left-0 bg-leaf/20" />
+                <span class="relative max-w-48 truncate">{t("web.channel.media.uploadingFile", { name: u().name, percent: u().percent })}</span>
               </Progress.Root>
             )}
           </For>
         </div>
       </Show>
-      <div {...stylex.attrs(styles.composerDiv32)}>
+      <div class="rounded-lg border border-line focus-within:border-focus bg-page">
         <textarea
           ref={(el) => (input = el)}
           value={box.text()}
@@ -598,10 +281,10 @@ export function Composer(props: {
             e.preventDefault();
             attach(files);
           }}
-          {...stylex.attrs(styles.composerInput)}
+          class="block field-sizing-content max-h-50 min-h-13 w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-base outline-none placeholder:text-faint"
         />
         <DictationProblem dictating={dictating} />
-        <div {...stylex.attrs(styles.composerDiv4)}>
+        <div class="flex h-9 items-center gap-1 px-2 pb-2">
           <Show
             when={listening()}
             fallback={
@@ -614,7 +297,7 @@ export function Composer(props: {
                     disabled={props.channel === undefined}
                     aria-label={t("web.channel.composer.mention")}
                     title={t("web.channel.composer.mention")}
-                    {...stylex.attrs(styles.attach)}
+                    class="inline-flex w-7 h-7 cursor-pointer disabled:cursor-default items-center justify-center rounded-md hover:bg-hover disabled:opacity-50"
                   >
                     <Icon name="mention" size={16} />
                   </button>
@@ -626,16 +309,16 @@ export function Composer(props: {
                   disabled={props.channel === undefined}
                   aria-label={t("web.channel.composer.command")}
                   title={t("web.channel.composer.command")}
-                  {...stylex.attrs(styles.attach)}
+                  class="inline-flex w-7 h-7 cursor-pointer disabled:cursor-default items-center justify-center rounded-md hover:bg-hover disabled:opacity-50"
                 >
                   <Icon name="command" size={16} />
                 </button>
-                <span {...stylex.attrs(styles.composerSpan8)} />
+                <span class="flex-1" />
                 <input
                   ref={(el) => (picker = el)}
                   type="file"
                   multiple
-                  {...stylex.attrs(styles.composerInput2)}
+                  class="hidden"
                   aria-hidden="true"
                   tabindex={-1}
                   onChange={(e) => {
@@ -651,7 +334,7 @@ export function Composer(props: {
                   disabled={!props.channel}
                   aria-label={t("web.channel.composer.attach")}
                   title={t("web.channel.composer.attach")}
-                  {...stylex.attrs(styles.attach)}
+                  class="inline-flex w-7 h-7 cursor-pointer disabled:cursor-default items-center justify-center rounded-md hover:bg-hover disabled:opacity-50"
                 >
                   <Icon name="attach" size={16} />
                 </button>
@@ -665,7 +348,7 @@ export function Composer(props: {
                     aria-label={t("web.channel.emoji.open")}
                     aria-expanded={aria(emoji())}
                     title={t("web.channel.emoji.open")}
-                    {...stylex.attrs(styles.attach)}
+                    class="inline-flex w-7 h-7 cursor-pointer disabled:cursor-default items-center justify-center rounded-md hover:bg-hover disabled:opacity-50"
                   >
                     <Icon name="react" size={16} />
                   </button>
@@ -685,7 +368,7 @@ export function Composer(props: {
           >
             <DictationBar dictating={dictating} />
           </Show>
-          <DictationKey dictating={dictating} bar surface size={16} styles={[styles.composerDictationKey]} />
+          <DictationKey dictating={dictating} bar surface size={16} class="w-7 h-7 rounded-md" />
           <Show when={!listening()}>
             <Show when={box.stoppable()}>
               <button
@@ -694,7 +377,7 @@ export function Composer(props: {
                 onClick={() => void stop()}
                 aria-label={t("web.channel.composer.stop")}
                 title={t("web.channel.composer.stopHint")}
-                {...stylex.attrs(styles.stop)}
+                class="inline-flex w-7 h-7 cursor-pointer items-center justify-center rounded-md border border-line text-berry hover:bg-hover"
               >
                 <Icon name="stop" size={16} />
               </button>
@@ -706,7 +389,10 @@ export function Composer(props: {
               disabled={!box.canSend()}
               aria-label={t("web.channel.composer.send")}
               title={t("web.channel.composer.sendHint")}
-              {...stylex.attrs(styles.composerButton, box.canSend() ? styles.composerButtonTone : styles.composerButtonAlt)}
+              class={[
+                "inline-flex w-7 h-7 cursor-pointer disabled:cursor-default items-center justify-center rounded-md border",
+                box.canSend() ? "border-accent bg-accent hover:bg-accent-hover" : "border-transparent opacity-50",
+              ]}
             >
               <Icon name="send" size={16} />
             </button>
@@ -723,7 +409,7 @@ export function FileDrop(props: { channel: Channel | undefined; children: JSX.El
   const files = (e: DragEvent) => [...(e.dataTransfer?.types ?? [])].includes("Files");
   return (
     <div
-      {...stylex.attrs(styles.fileDropDiv)}
+      class="relative flex min-w-0 flex-1 flex-col"
       onDragOver={(e) => {
         if (!files(e) || !props.channel) return;
         e.preventDefault();
@@ -742,7 +428,10 @@ export function FileDrop(props: { channel: Channel | undefined; children: JSX.El
     >
       {props.children}
       <Show when={over()}>
-        <div data-testid="drop-hint" {...stylex.attrs(styles.dropHint)}>
+        <div
+          data-testid="drop-hint"
+          class="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg border-dashed border-2 border-accent bg-page/85 text-base font-semibold text-accent"
+        >
           {t("web.channel.media.drop")}
         </div>
       </Show>

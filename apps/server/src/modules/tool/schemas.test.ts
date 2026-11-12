@@ -1,5 +1,3 @@
-import { it } from "@effect/vitest";
-import { Effect, Exit, Formatter, Schema } from "effect";
 import { expect, test } from "vite-plus/test";
 
 import { parameters, tool } from "./schemas.ts";
@@ -12,24 +10,25 @@ for (const [op, input] of [
   ["issue.create", { title: "audit", priority: "" }],
   ["issue.list", { status: "constructor" }],
 ] as const) {
-  it.effect(`regression: ${op} rejects invalid enum ${Formatter.formatJson(input)} before running`, () =>
-    Effect.gen(function* () {
-      let ran = false;
-      const entry = tool(op, () => Effect.sync(() => ((ran = true), "ran")));
-      const result = yield* Effect.exit(entry.execute(input, { id: "audit" }));
-      expect(Exit.isFailure(result)).toBe(true);
-      expect(ran).toBe(false);
-    }),
-  );
+  test(`regression: ${op} rejects invalid enum ${JSON.stringify(input)} before running`, async () => {
+    let ran = false;
+    const entry = tool(op, () => ((ran = true), "ran"));
+    const result = await entry.execute(input, { id: "audit" }).then(
+      () => "succeeded",
+      () => "failed",
+    );
+    expect(result).toBe("failed");
+    expect(ran).toBe(false);
+  });
 }
 
 test("omitted tool enums stay omitted and accepted aliases become protocol values", () => {
-  const create = Schema.decodeUnknownSync(parameters["issue.create"]);
-  const list = Schema.decodeUnknownSync(parameters["issue.list"]);
+  const create = (v: unknown) => parameters["issue.create"].parse(v);
+  const list = (v: unknown) => parameters["issue.list"].parse(v);
   expect(create({ title: "audit" })).toEqual({ title: "audit" });
   expect(list({})).toEqual({});
   expect(create({ title: "audit", priority: " high " })).toEqual({ title: "audit", priority: "high" });
-  expect(create({ title: "audit", priority: "\u9ad8" })).toEqual({ title: "audit", priority: "high" });
+  expect(create({ title: "audit", priority: "高" })).toEqual({ title: "audit", priority: "high" });
   expect(list({ status: " done " })).toEqual({ status: "done" });
-  expect(list({ status: "\u5b8c\u6210" })).toEqual({ status: "done" });
+  expect(list({ status: "完成" })).toEqual({ status: "done" });
 });

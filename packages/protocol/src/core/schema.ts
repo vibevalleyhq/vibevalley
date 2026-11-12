@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import { Chat, FactChannelChanged, FactChannelRemoved, FactMessageChanged, FactUserMentionsChanged } from "../channel/schema";
 import type { Codec } from "../codec";
@@ -26,45 +26,45 @@ import * as T from "./shapes";
 
 const spaceFields = {
   call: CallState,
-  callReason: Schema.String,
-  media: Schema.optionalKey(Schema.mutable(Schema.Array(MediaJob))),
-  chat: Schema.optionalKey(Chat),
-  commits: Schema.optionalKey(CommitCount),
-  progress: Schema.optionalKey(Progress),
-  issues: Schema.mutable(Schema.Array(Issue)),
-  connectors: Schema.mutable(Schema.Array(ConnectorStatus)),
-  machines: Schema.mutable(Schema.Array(Machine)),
+  callReason: z.string(),
+  media: z.exactOptional(z.array(MediaJob)),
+  chat: z.exactOptional(Chat),
+  commits: z.exactOptional(CommitCount),
+  progress: z.exactOptional(Progress),
+  issues: z.array(Issue),
+  connectors: z.array(ConnectorStatus),
+  machines: z.array(Machine),
 };
 
-const SpaceState: Codec<T.SpaceState> = Schema.Struct({
+const SpaceState = z.object({
   ...spaceFields,
-  sessions: Schema.mutable(Schema.Array(Session)),
-  crons: Schema.mutable(Schema.Array(Cron)),
-  plays: Schema.optionalKey(Schema.Record(Schema.String, SessionPlay)),
-});
+  sessions: z.array(Session),
+  crons: z.array(Cron),
+  plays: z.exactOptional(z.record(z.string(), SessionPlay)),
+}) satisfies Codec<T.SpaceState>;
 
-const SpaceView: Codec<T.SpaceView> = Schema.Struct({
+const SpaceView = z.object({
   ...spaceFields,
-  sessions: Schema.mutable(Schema.Array(SessionView)),
-  crons: Schema.mutable(Schema.Array(CronView)),
-});
+  sessions: z.array(SessionView),
+  crons: z.array(CronView),
+}) satisfies Codec<T.SpaceView>;
 
-const NoticeLevel: Codec<T.NoticeLevel> = Schema.Literals(T.NoticeLevelValues);
+const NoticeLevel = z.enum(T.NoticeLevelValues) satisfies Codec<T.NoticeLevel>;
 
-export const StateFrame: Codec<T.StateFrame> = Schema.Struct({
-  seq: Schema.Finite,
+export const StateFrame = z.object({
+  seq: z.number(),
   state: SpaceView,
-  inbox: Schema.mutable(Schema.Array(InboxItem)),
+  inbox: z.array(InboxItem),
   view: FarmView,
-  effects: Schema.mutable(Schema.Array(GameEffect)),
-});
+  effects: z.array(GameEffect),
+}) satisfies Codec<T.StateFrame>;
 
-export const Health: Codec<T.Health> = Schema.Struct({
-  ok: Schema.Boolean,
-  version: Schema.String,
-});
+export const Health = z.object({
+  ok: z.boolean(),
+  version: z.string(),
+}) satisfies Codec<T.Health>;
 
-export const Fact: Codec<T.Fact> = Schema.Union([
+export const Fact = z.discriminatedUnion("type", [
   FactCallChanged,
   FactSessionToolChanged,
   FactSessionToolsReset,
@@ -84,37 +84,37 @@ export const Fact: Codec<T.Fact> = Schema.Union([
   FactConnectorChanged,
   FactMachineChanged,
   FactMediaChanged,
-]);
+]) satisfies Codec<T.Fact>;
 
-const ServerEventSnapshot: Codec<T.ServerEventSnapshot> = Schema.Struct({
-  type: Schema.Literal("snapshot"),
-  at: Schema.Finite,
+const ServerEventSnapshot = z.object({
+  type: z.literal("snapshot"),
+  at: z.number(),
   state: SpaceState,
-});
+}) satisfies Codec<T.ServerEventSnapshot>;
 
-const LiveEventSession: Codec<T.LiveEventSession> = Schema.Struct({
-  type: Schema.Literal("event"),
-  at: Schema.Finite,
+const LiveEventSession = z.object({
+  type: z.literal("event"),
+  at: z.number(),
   id: SessionId,
   activity: SessionEvent,
-});
+}) satisfies Codec<T.LiveEventSession>;
 
-const LiveEventNotice: Codec<T.LiveEventNotice> = Schema.Struct({
-  type: Schema.Literal("notice"),
-  at: Schema.Finite,
+const LiveEventNotice = z.object({
+  type: z.literal("notice"),
+  at: z.number(),
   level: NoticeLevel,
-  text: Schema.String,
-});
+  text: z.string(),
+}) satisfies Codec<T.LiveEventNotice>;
 
-const LiveEventRuntime: Codec<T.LiveEventRuntime> = Schema.Struct({
-  type: Schema.Literal("runtime"),
-  at: Schema.Finite,
+const LiveEventRuntime = z.object({
+  type: z.literal("runtime"),
+  at: z.number(),
   info: RuntimeInfo,
-});
+}) satisfies Codec<T.LiveEventRuntime>;
 
-export const LiveEvent: Codec<T.LiveEvent> = Schema.Union([LiveEventSession, LiveEventNotice, LiveEventRuntime]);
+export const LiveEvent = z.discriminatedUnion("type", [LiveEventSession, LiveEventNotice, LiveEventRuntime]) satisfies Codec<T.LiveEvent>;
 
-export const ServerEvent: Codec<T.ServerEvent> = Schema.Union([
+export const ServerEvent = z.discriminatedUnion("type", [
   FactCallChanged,
   FactSessionToolChanged,
   FactSessionToolsReset,
@@ -138,4 +138,4 @@ export const ServerEvent: Codec<T.ServerEvent> = Schema.Union([
   LiveEventSession,
   LiveEventNotice,
   LiveEventRuntime,
-]);
+]) satisfies Codec<T.ServerEvent>;

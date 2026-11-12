@@ -1,44 +1,44 @@
-import { type Effect, Schema } from "effect";
+import { z } from "zod";
 
-import { type ApiError, type Endpoint, input } from "../endpoint";
+import { type Endpoint, input } from "../endpoint";
 import * as S from "../schema";
 import type * as T from "../shapes";
 
-export interface PkmHandlers<R = never> {
+export interface PkmHandlers {
   /** Every page in the vault, newest first; files changed on disk are read again first. */
-  readonly "pkm.page.list": () => Effect.Effect<T.PkmVault, ApiError, R>;
+  readonly "pkm.page.list": () => Promise<T.PkmVault>;
   /** The page with its ((refs)) read out, the blocks linking to it and its open remarks; read again from its file when that changed. */
-  readonly "pkm.page.get": (a: T.PkmPageRef) => Effect.Effect<T.PkmPageView, ApiError, R>;
+  readonly "pkm.page.get": (a: T.PkmPageRef) => Promise<T.PkmPageView>;
   /** Makes the page, or sets the props and tier of the one with that title (its file moves to the tier's folder). */
-  readonly "pkm.page.save": (a: T.PkmPageRequest) => Effect.Effect<T.PkmPage, ApiError, R>;
-  readonly "pkm.page.move": (a: T.PkmMoveRequest) => Effect.Effect<T.PkmPage, ApiError, R>;
-  readonly "pkm.page.rename": (a: T.PkmRenameRequest) => Effect.Effect<T.PkmRename, ApiError, R>;
+  readonly "pkm.page.save": (a: T.PkmPageRequest) => Promise<T.PkmPage>;
+  readonly "pkm.page.move": (a: T.PkmMoveRequest) => Promise<T.PkmPage>;
+  readonly "pkm.page.rename": (a: T.PkmRenameRequest) => Promise<T.PkmRename>;
   /** The page as plain Markdown: refs read out, links and remarks taken off. */
-  readonly "pkm.page.export": (a: T.PkmPageRef) => Effect.Effect<T.PkmMarkdown, ApiError, R>;
+  readonly "pkm.page.export": (a: T.PkmPageRef) => Promise<T.PkmMarkdown>;
   /** The ops in order on the page as its file is now, written back once. */
-  readonly "pkm.block.apply": (a: T.PkmMutation) => Effect.Effect<T.PkmPage, ApiError, R>;
-  readonly "pkm.search": (a: T.PkmSearchRequest) => Effect.Effect<T.PkmSearchHit[], ApiError, R>;
+  readonly "pkm.block.apply": (a: T.PkmMutation) => Promise<T.PkmPage>;
+  readonly "pkm.search": (a: T.PkmSearchRequest) => Promise<T.PkmSearchHit[]>;
   /** Into today's journal as LATER lines tagged #inbox (an agent's says who noted it), or at the end of a page. */
-  readonly "pkm.capture": (a: T.PkmCaptureRequest) => Effect.Effect<T.PkmPage, ApiError, R>;
+  readonly "pkm.capture": (a: T.PkmCaptureRequest) => Promise<T.PkmPage>;
   /** The page's file as written, ids and all, with when it was written. */
-  readonly "pkm.source.get": (a: T.PkmPageRef) => Effect.Effect<T.PkmSource, ApiError, R>;
+  readonly "pkm.source.get": (a: T.PkmPageRef) => Promise<T.PkmSource>;
   /** The page written anew from its file's text; refused when the file changed after it was read. */
-  readonly "pkm.source.update": (a: T.PkmSourceUpdate) => Effect.Effect<T.PkmPage, ApiError, R>;
+  readonly "pkm.source.update": (a: T.PkmSourceUpdate) => Promise<T.PkmPage>;
   /** The journal of a day, made empty when it has none yet. */
-  readonly "pkm.journal.open": (a: T.PkmJournalRequest) => Effect.Effect<T.PkmPage, ApiError, R>;
-  readonly "pkm.radar.get": (a: { readonly staleDays?: number }) => Effect.Effect<T.PkmRadar, ApiError, R>;
-  readonly "pkm.comment.list": (a: { readonly page?: string }) => Effect.Effect<T.PkmComment[], ApiError, R>;
+  readonly "pkm.journal.open": (a: T.PkmJournalRequest) => Promise<T.PkmPage>;
+  readonly "pkm.radar.get": (a: { readonly staleDays?: number }) => Promise<T.PkmRadar>;
+  readonly "pkm.comment.list": (a: { readonly page?: string }) => Promise<T.PkmComment[]>;
   /** A rewrite of a block for the user to accept: it keeps every [[link]] and ((ref)) the block had. */
-  readonly "pkm.comment.suggest": (a: T.PkmProposalRequest) => Effect.Effect<T.PkmProposal, ApiError, R>;
+  readonly "pkm.comment.suggest": (a: T.PkmProposalRequest) => Promise<T.PkmProposal>;
   /** Accepted, the suggested text replaces the block's and its remarks come off; rejected, the block stays. */
-  readonly "pkm.comment.resolve": (a: T.PkmResolveRequest) => Effect.Effect<T.PkmPage, ApiError, R>;
-  readonly "pkm.clip.create": (a: T.PkmClipRequest) => Effect.Effect<T.PkmClip, ApiError, R>;
+  readonly "pkm.comment.resolve": (a: T.PkmResolveRequest) => Promise<T.PkmPage>;
+  readonly "pkm.clip.create": (a: T.PkmClipRequest) => Promise<T.PkmClip>;
   /** A resource page of ((refs)) to the inbox, journal and resource blocks about the topic. */
-  readonly "pkm.cluster.create": (a: T.PkmClusterRequest) => Effect.Effect<T.PkmCluster, ApiError, R>;
+  readonly "pkm.cluster.create": (a: T.PkmClusterRequest) => Promise<T.PkmCluster>;
   /** Puts back the file the last change wrote. */
-  readonly "pkm.undo": () => Effect.Effect<T.PkmUndo, ApiError, R>;
+  readonly "pkm.undo": () => Promise<T.PkmUndo>;
   /** Reads again every file that changed on disk. */
-  readonly "pkm.scan": () => Effect.Effect<T.PkmScan, ApiError, R>;
+  readonly "pkm.scan": () => Promise<T.PkmScan>;
 }
 
 export const pkmEndpoints: readonly Endpoint[] = [
@@ -95,7 +95,7 @@ export const pkmEndpoints: readonly Endpoint[] = [
     op: "pkm.search",
     about: [],
     input: S.PkmSearchRequest,
-    result: Schema.mutable(Schema.Array(S.PkmSearchHit)),
+    result: z.array(S.PkmSearchHit),
     can: ["user", "remote", "orchestrator", "session"],
   },
   {
@@ -129,15 +129,15 @@ export const pkmEndpoints: readonly Endpoint[] = [
   {
     op: "pkm.radar.get",
     about: [],
-    input: input({ staleDays: Schema.optionalKey(Schema.Int) }),
+    input: input({ staleDays: z.exactOptional(z.number().int()) }),
     result: S.PkmRadar,
     can: ["user", "remote"],
   },
   {
     op: "pkm.comment.list",
     about: [],
-    input: input({ page: Schema.optionalKey(Schema.String) }),
-    result: Schema.mutable(Schema.Array(S.PkmComment)),
+    input: input({ page: z.exactOptional(z.string()) }),
+    result: z.array(S.PkmComment),
     can: ["user", "remote"],
   },
   {

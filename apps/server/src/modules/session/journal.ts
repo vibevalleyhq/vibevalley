@@ -1,15 +1,18 @@
+import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 
-import { Effect, Exit, FileSystem, Formatter, Schema, Scope } from "effect";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import type { EventTokens, Outcome, SessionEvent, SessionEventType, ToolConnection } from "@vibevalley/protocol";
 import { cut } from "@vibevalley/protocol/rules";
 import { SessionEvent as SessionEventSchema } from "@vibevalley/protocol/schema";
 
+import { errnoOf } from "#/base/errors.ts";
 import { jsonOrNone } from "#/base/json.ts";
 import { type KeptFile, keptFile } from "#/infra/files.ts";
-import { type Time, timeHere } from "#/infra/time.ts";
+import type { Logger } from "#/infra/log.ts";
+import type { Time } from "#/infra/time.ts";
 
 import type { From, ToolStart } from "./reaction.ts";
 
@@ -23,7 +26,7 @@ const outputHead = 2000;
 const outputTail = 4000;
 const pushAfterMs = 300;
 const saveAfterMs = 1500;
-const decodeEvents = jsonOrNone(Schema.Array(SessionEventSchema));
+const decodeEvents = jsonOrNone(z.array(SessionEventSchema));
 
 function clipOutput(text: string): string {
   const n = text.length;
@@ -32,17 +35,20 @@ function clipOutput(text: string): string {
 }
 
 /** A log kept on disk. none when there is none. */
-export const readJournal = (file: string): Effect.Effect<SessionEvent[] | undefined, never, FileSystem.FileSystem> =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const body = yield* Effect.option(fs.readFileString(file));
-    if (body._tag === "None") return undefined;
-    const events = decodeEvents(body.value);
-    if (events !== undefined) return [...events];
-    // Another reader may already have removed it.
-    yield* Effect.ignore(fs.remove(file), { log: "Debug" });
+export async function readJournal(file: string, log?: Logger): Promise<SessionEvent[] | undefined> {
+  let body: string;
+  try {
+    body = await readFile(file, "utf8");
+  } catch (e) {
+    if (errnoOf(e) !== "ENOENT") log?.debug(`${file} could not be read`, e);
     return undefined;
-  });
+  }
+  const events = decodeEvents(body);
+  if (events !== undefined) return events;
+  // Another reader may already have removed it.
+  await rm(file, { force: true }).catch((e: unknown) => log?.debug(`${file} could not be removed`, e));
+  return undefined;
+}
 
 const callKey = (from: From | undefined, callId: string) => (from ?? []).join("/") + "|" + callId;
 const who = (from: From | undefined) => (from ?? []).join("/");
@@ -72,7 +78,7 @@ function makeJournal(disk: KeptFile, initial: readonly SessionEvent[], push: (e:
     return [...steps, ...(d ? [{ ...d }] : [])];
   }
 
-  const body = () => Formatter.formatJson(steps);
+  const body = () => JSON.stringify(steps);
 
   const flush = () => {
     pushing?.();
@@ -233,7 +239,7 @@ function makeJournal(disk: KeptFile, initial: readonly SessionEvent[], push: (e:
     add({ type: "llm/usage", text, tokens }, from);
   }
 
-  /** Seals what is being written; the log's scope, closed after this, writes it out. */
+  /** Seals what is being written; the log's file, closed after this, writes it out. */
   function close() {
     seal();
     flush();
@@ -249,56 +255,56 @@ const knownId = /^[A-Za-z0-9_-]+$/u;
 /** Each session's log, events/<id>.json: the open ones in memory as they grow, the others on disk. */
 export interface Trajectories {
   /** A session's log, carried on from what it kept: a session back from a restart goes on where it was. */
-  readonly openLog: (id: string, keep?: number) => Effect.Effect<Journal>;
+  readonly openLog: (id: string, keep?: number) => Promise<Journal>;
   /** Writes the log out and lets it go; it stays on disk. */
-  readonly finish: (id: string) => Effect.Effect<void>;
+  readonly finish: (id: string) => Promise<void>;
   /** A session's log, oldest first: from memory while it is open, else from disk; a run's only when run is given. */
-  readonly events: (id: string, run?: string) => Effect.Effect<SessionEvent[] | undefined>;
+  readonly events: (id: string, run?: string) => Promise<SessionEvent[] | undefined>;
   /** Deletes a session's log; who it was stays in the table. */
-  readonly forget: (id: string) => Effect.Effect<void>;
+  readonly forget: (id: string) => Promise<void>;
+  /** Seals and writes out every log still open. */
+  readonly close: () => Promise<void>;
 }
 
-export const makeTrajectories = (home: string, push: (id: string, e: SessionEvent) => void) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const time = yield* timeHere;
-    const scope = yield* Effect.scope;
-    const dir = join(home, "events");
-    const fileOf = (id: string) => join(dir, id + ".json");
-    const open = new Map<string, { readonly journal: Journal; readonly scope: Scope.Closeable }>();
-    const withFs = Effect.provideService(FileSystem.FileSystem, fs);
-    // The logs' scopes are made before the finalizer that seals them, so they close after it: each draft sealed first.
-    const logs = yield* Scope.fork(scope);
+export function makeTrajectories(
+  home: string,
+  push: (id: string, e: SessionEvent) => void,
+  deps: { readonly clock: Time; readonly log: Logger },
+): Trajectories {
+  const dir = join(home, "events");
+  const fileOf = (id: string) => join(dir, id + ".json");
+  const open = new Map<string, { readonly journal: Journal; readonly disk: KeptFile }>();
 
-    const finish = (id: string) =>
-      Effect.suspend(() => {
-        const o = open.get(id);
-        open.delete(id);
-        if (!o) return Effect.void;
-        o.journal.close();
-        return Scope.close(o.scope, Exit.void);
-      });
+  // Each draft sealed first, then its file's last write.
+  const finish = async (id: string) => {
+    const o = open.get(id);
+    open.delete(id);
+    if (!o) return;
+    o.journal.close();
+    await o.disk.close();
+  };
 
-    yield* Effect.addFinalizer(() => Effect.forEach([...open.keys()], finish, { discard: true }));
-
-    return {
-      openLog: (id, keep = 0) =>
-        Effect.gen(function* () {
-          // A log opened again (a session taken up again) is a new one read from disk.
-          const own = yield* Scope.fork(logs);
-          const disk = yield* keptFile(fileOf(id), { soonMs: saveAfterMs }).pipe(Scope.provide(own), withFs);
-          const initial = (yield* withFs(readJournal(fileOf(id)))) ?? [];
-          const journal = makeJournal(disk, initial, (e) => push(id, e), time, keep > 0 ? keep : keepEvents);
-          open.set(id, { journal, scope: own });
-          return journal;
-        }),
-      finish,
-      events: (id, run = "") =>
-        Effect.gen(function* () {
-          if (!knownId.test(id)) return undefined;
-          const all = open.get(id)?.journal.events() ?? (yield* withFs(readJournal(fileOf(id)))) ?? [];
-          return run ? all.filter((e) => e.run === run) : all;
-        }),
-      forget: (id) => (knownId.test(id) ? Effect.ignore(fs.remove(fileOf(id)), { log: "Debug" }) : Effect.void),
-    } satisfies Trajectories;
-  });
+  return {
+    openLog: async (id, keep = 0) => {
+      // A log opened again (a session taken up again) is a new one read from disk.
+      const disk = keptFile(fileOf(id), deps, { soonMs: saveAfterMs });
+      const initial = (await readJournal(fileOf(id), deps.log)) ?? [];
+      const journal = makeJournal(disk, initial, (e) => push(id, e), deps.clock, keep > 0 ? keep : keepEvents);
+      open.set(id, { journal, disk });
+      return journal;
+    },
+    finish,
+    events: async (id, run = "") => {
+      if (!knownId.test(id)) return undefined;
+      const all = open.get(id)?.journal.events() ?? (await readJournal(fileOf(id), deps.log)) ?? [];
+      return run ? all.filter((e) => e.run === run) : all;
+    },
+    forget: async (id) => {
+      if (!knownId.test(id)) return;
+      await rm(fileOf(id), { force: true }).catch((e: unknown) => deps.log.debug(`${id}'s log could not be removed`, e));
+    },
+    close: async () => {
+      for (const id of [...open.keys()]) await finish(id);
+    },
+  };
+}

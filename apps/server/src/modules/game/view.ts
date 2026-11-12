@@ -1,5 +1,3 @@
-import { Function } from "effect";
-
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { maxRunning } from "@vibevalley/protocol";
@@ -45,20 +43,14 @@ const isToolAction = (action: T.SessionAction) =>
   action === "wait" ||
   action === "other";
 
-export const playedRun: {
-  (at: number): (p: T.SessionPlay) => T.SessionPlay;
-  (p: T.SessionPlay, at: number): T.SessionPlay;
-} = Function.dual(2, (p: T.SessionPlay, at: number): T.SessionPlay => ({
+export const playedRun = (p: T.SessionPlay, at: number): T.SessionPlay => ({
   ...p,
   toolsThisRun: 0,
   runStartedAt: at,
   history: lastN([...p.history, { at, action: "thinking", label: "" }], historyLimit),
-}));
+});
 
-export const playedDoing: {
-  (f: { readonly at: number; readonly action: T.SessionAction; readonly label: string }): (p: T.SessionPlay) => T.SessionPlay;
-  (p: T.SessionPlay, f: { readonly at: number; readonly action: T.SessionAction; readonly label: string }): T.SessionPlay;
-} = Function.dual(2, (p: T.SessionPlay, f: { readonly at: number; readonly action: T.SessionAction; readonly label: string }): T.SessionPlay => {
+export const playedDoing = (p: T.SessionPlay, f: { readonly at: number; readonly action: T.SessionAction; readonly label: string }): T.SessionPlay => {
   const history = p.history;
   const last = history[history.length - 1];
   if (last && last.action === f.action && last.label === f.label) return p;
@@ -69,13 +61,10 @@ export const playedDoing: {
   if ((f.action === "edit_file" || f.action === "read_file") && f.label !== "") next.files = remember(p.files, f.label, fileLimit);
   else if (f.action === "run_command" && f.label !== "") next.commands = remember(p.commands, f.label, commandLimit);
   return next;
-});
+};
 
 /** Only to a bed that is free on its own farm; a session already there, or a bed taken, changes nothing. */
-export const stationed: {
-  (f: { readonly id: T.SessionId; readonly station: number }): (state: T.SpaceState) => [T.SpaceState, boolean];
-  (state: T.SpaceState, f: { readonly id: T.SessionId; readonly station: number }): [T.SpaceState, boolean];
-} = Function.dual(2, (state: T.SpaceState, f: { readonly id: T.SessionId; readonly station: number }): [T.SpaceState, boolean] => {
+export const stationed = (state: T.SpaceState, f: { readonly id: T.SessionId; readonly station: number }): [T.SpaceState, boolean] => {
   const h = sessionOf(state, f.id);
   const plays = state.plays ?? {};
   const play = playOf(plays, f.id);
@@ -83,7 +72,7 @@ export const stationed: {
   const others = state.sessions.filter((x) => x.id !== f.id);
   if (freeStation(state.plays, others, farmOf(h), f.station) !== f.station) return [state, false];
   return [{ ...state, plays: { ...plays, [f.id]: { ...play, station: f.station } } }, true];
-});
+};
 
 const xpToNext = (level: number) => 10 * level;
 

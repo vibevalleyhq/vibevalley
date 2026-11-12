@@ -19,7 +19,7 @@ Status: proposed
 ## Alternatives considered
 
 - **全量事件溯源**：需重写全部现有业务表与查询；现有业务表已是唯一真相，仅缺外部副作用同事务落盘。
-- **引入 `@effect/workflow` / cluster**：对当前单连接 Postgres / PGlite 架构过重，一张 `core_job` 表加作用域纤程即可满足。
+- **引入 `@effect/workflow` / cluster**：对当前单连接 Postgres / PGlite 架构过重，一张 `core_job` 表加服务 `TaskGroup` 里的任务即可满足。
 - **各模块继续各自维护 outbox 表**：每新增一种外部动作就多一套轮询与启动顺序依赖。
 
 ## Acceptance criteria

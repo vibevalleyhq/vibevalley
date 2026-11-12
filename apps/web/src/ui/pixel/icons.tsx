@@ -1,47 +1,12 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
 
 import type { Phase, SessionAction } from "@vibevalley/protocol";
 
 import { useInterval } from "#/base/timer.ts";
-import { styleProps } from "#/ui/positioner.ts";
-
-const styles = stylex.create({
-  bob: {
-    display: "inline-flex",
-    flexShrink: "0",
-  },
-  bobUp: {
-    translate: "0 -1px",
-  },
-  sprite: {
-    display: "inline-block",
-    flexShrink: 0,
-    objectFit: "contain",
-    imageRendering: "pixelated",
-  },
-  size: (size: number) => ({ width: size, height: size }),
-  phasePlaceholder: {
-    display: "inline-block",
-    flexShrink: "0",
-  },
-  marked: {
-    display: "inline-flex",
-    minWidth: "0",
-    alignItems: "flex-start",
-    gap: "0.375rem",
-  },
-  markedIcon: (marginTop: number) => ({
-    marginTop,
-  }),
-  markedBody: {
-    minWidth: "0",
-  },
-});
 
 /** A drawing from apps/web/public/pixel; decorative unless it has a label. */
-export function SpriteIcon(props: { name: string; size: number; label?: string; styles?: stylex.StyleXStyles; style?: JSX.CSSProperties }) {
+export function SpriteIcon(props: { name: string; size: number; label?: string; class?: JSX.ClassValue | undefined; style?: JSX.CSSProperties }) {
   return (
     <img
       src={`/pixel/${props.name}.png`}
@@ -50,7 +15,12 @@ export function SpriteIcon(props: { name: string; size: number; label?: string; 
       alt={props.label ?? ""}
       aria-hidden={props.label ? undefined : "true"}
       draggable="false"
-      {...styleProps([styles.sprite, props.styles, styles.size(props.size)], props.style)}
+      class={["inline-block shrink-0 object-contain [image-rendering:pixelated]", props.class]}
+      style={{
+        ...props.style,
+        width: `${props.size}px`,
+        height: `${props.size}px`,
+      }}
     />
   );
 }
@@ -70,7 +40,7 @@ export function PhaseGlyph(props: { phase: Phase; size?: number }) {
   return (
     <Switch>
       <Match when={props.phase._tag === "working" && doing() === "none"}>
-        <span {...styleProps([styles.phasePlaceholder, styles.size(size())])} />
+        <span class="inline-block shrink-0" style={{ width: `${size()}px`, height: `${size()}px` }} />
       </Match>
       <Match when={props.phase._tag === "working"}>
         <Bob>
@@ -112,15 +82,15 @@ function Bob(props: { children: JSX.Element }) {
   const still = reducedMotion();
   const [up, setUp] = createSignal(false);
   useInterval(() => setUp((u) => !still() && !u), 450);
-  return <span {...stylex.attrs(styles.bob, up() && styles.bobUp)}>{props.children}</span>;
+  return <span class={["inline-flex shrink-0", up() && "-translate-y-px"]}>{props.children}</span>;
 }
 
 /** A sprite before a line, at its first line's height. */
 export function Marked(props: { mark: string; children: JSX.Element; size?: number; top?: number }) {
   return (
-    <span {...stylex.attrs(styles.marked)}>
-      <SpriteIcon name={props.mark} size={props.size ?? 12} styles={styles.markedIcon(props.top ?? 2)} />
-      <span {...stylex.attrs(styles.markedBody)}>{props.children}</span>
+    <span class="inline-flex min-w-0 items-start gap-1.5">
+      <SpriteIcon name={props.mark} size={props.size ?? 12} style={{ "margin-top": `${props.top ?? 2}px` }} />
+      <span class="min-w-0">{props.children}</span>
     </span>
   );
 }

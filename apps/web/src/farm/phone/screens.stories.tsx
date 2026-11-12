@@ -1,32 +1,16 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 
 import type { InboxItem, InboxKind } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 import { stories, story } from "@vibevalley/stories";
 
 import type { CallPhase } from "#/features/voice/index.ts";
-import { storyFrame } from "#/ui/pixel/story.stylex.ts";
 
 import { OrchestratorLine, RingingScreen } from "./screens";
 
-const styles = stylex.create({
-  screen: {
-    display: "flex",
-    height: "25rem",
-    width: "15rem",
-    flexDirection: "column",
-    backgroundColor: "var(--color-lcd-paper)",
-    padding: "2px",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    color: "var(--color-lcd-ink)",
-  },
-});
-
 /** The handset's screen, without the handset: the farm's store and the room are not here. */
 function Screen(props: { children: JSX.Element }) {
-  return <div {...stylex.attrs(styles.screen)}>{props.children}</div>;
+  return <div class="flex h-100 w-60 flex-col bg-lcd-paper p-0.5 font-pixel text-(length:--text-xs) text-lcd-ink">{props.children}</div>;
 }
 
 const ring = (kind: InboxKind, label: string, text: string): InboxItem => ({
@@ -43,7 +27,7 @@ const ring = (kind: InboxKind, label: string, text: string): InboxItem => ({
 export default stories({
   title: "界面/农场/电话",
   themes: ["light"],
-  frame: storyFrame.pixel,
+  frame: "bg-cream-50 font-pixel text-(length:--text-xs) text-bark-900",
   stories: {
     "Call the orchestrator": story({
       note: "打给助手的每一步：没打、在接、接通了助手还没来、在说、在挂，和没打通（原因写在屏上）。",

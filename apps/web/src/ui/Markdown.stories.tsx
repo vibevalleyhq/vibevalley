@@ -1,16 +1,12 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
 
 import { stories, story } from "@vibevalley/stories";
 
 import { Markdown } from "./Markdown";
 
-const viewStyles = stylex.create({
-  dynamicWidth: (width: number) => ({ maxWidth: width }),
-  markdownStoriesDiv: {
-    width: "100%",
-    maxWidth: "var(--container-2xl)",
-  },
-});
+const viewStyles = {
+  dynamicWidth: (width: number): JSX.CSSProperties => ({ "--width": `${width}px` }),
+};
 
 const sample = [
   "## 修好登录",
@@ -41,8 +37,8 @@ export default stories({
     Composition: story({
       args: { width: 240 },
       render: (a, set) => (
-        <div data-testid="markdown-composition">
-          <Markdown text="A paragraph with [a link](https://example.com)." styles={viewStyles.dynamicWidth(a.width)} />
+        <div data-testid="markdown-composition" style={viewStyles.dynamicWidth(a.width)}>
+          <Markdown text="A paragraph with [a link](https://example.com)." class="max-w-(--width)" />
           <button type="button" data-testid="resize-markdown" onClick={() => set({ width: 320 })}>
             Resize
           </button>
@@ -54,7 +50,7 @@ export default stories({
       args: { text: sample, mentions: true },
       controls: { text: { kind: "text", long: true } },
       render: (a) => (
-        <div {...stylex.attrs(viewStyles.markdownStoriesDiv)}>
+        <div class="w-full max-w-2xl">
           <Markdown text={a.text} mentions={a.mentions} />
         </div>
       ),
@@ -64,14 +60,14 @@ export default stories({
       args: { text: diagram },
       controls: { text: { kind: "text", long: true } },
       render: (a) => (
-        <div {...stylex.attrs(viewStyles.markdownStoriesDiv)}>
+        <div class="w-full max-w-2xl">
           <Markdown text={a.text} />
         </div>
       ),
     }),
     "Folded code": story({
       render: () => (
-        <div {...stylex.attrs(viewStyles.markdownStoriesDiv)}>
+        <div class="w-full max-w-2xl">
           <Markdown text={long} />
         </div>
       ),

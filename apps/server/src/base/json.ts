@@ -1,58 +1,71 @@
-import { Option, Result, Schema, type SchemaIssue } from "effect";
+import { z } from "zod";
 
 import { currentLocale } from "@vibevalley/i18n";
 
 import { Inconsistent, messageOf } from "./errors.ts";
 
-/** Read where unreadable JSON is already a defect: a value that does not fit the Schema is one too. */
-export const jsonOf = <T, E = T>(schema: Schema.Codec<T, E>, where?: string) => {
-  const decode = Schema.decodeUnknownSync(Schema.fromJsonString(schema));
-  return where === undefined
-    ? decode
-    : (text: string): T => {
-        try {
-          return decode(text);
-        } catch (cause) {
-          throw Inconsistent.make({ message: `${where}: ${messageOf(cause)}` });
-        }
-      };
+const parsed = (text: string): unknown => JSON.parse(text);
+
+/** A Zod failure in one line: the path of the first issue and what it says. */
+export const problemOf = (e: z.ZodError): string => {
+  const first = e.issues[0];
+  if (first === undefined) return e.message;
+  return first.path.length > 0 ? `${first.path.join(".")}: ${first.message}` : first.message;
 };
 
+/** Read where unreadable JSON is already a defect: a value that does not fit the Schema is one too. */
+export const jsonOf =
+  <T>(schema: z.ZodType<T>, where?: string) =>
+  (text: string): T => {
+    try {
+      return schema.parse(parsed(text));
+    } catch (cause) {
+      const why = cause instanceof z.ZodError ? problemOf(cause) : messageOf(cause);
+      throw where === undefined ? cause : new Inconsistent(`${where}: ${why}`, { cause });
+    }
+  };
+
 /** Read a nullable JSON column written by this server: null stays undefined, while corrupt JSON fails fast as Inconsistent. */
-export const storedJsonOrUndefined = <T, E = T>(schema: Schema.Codec<T, E>, where: string) => {
+export const storedJsonOrUndefined = <T>(schema: z.ZodType<T>, where: string) => {
   const decode = jsonOf(schema, where);
   return (text: string | null | undefined): T | undefined => (text == null ? undefined : decode(text));
 };
 
 /** Validate an in-memory row or value that must fit schema; a mismatch fails fast as Inconsistent. */
-export const valueOf = <T, E = T>(schema: Schema.Codec<T, E>, where = "stored value") => {
-  const decode = Schema.decodeUnknownSync(schema);
-  return (value: unknown): T => {
-    try {
-      return decode(value);
-    } catch (cause) {
-      throw Inconsistent.make({ message: `${where}: ${messageOf(cause)}` });
-    }
+export const valueOf =
+  <T>(schema: z.ZodType<T>, where = "stored value") =>
+  (value: unknown): T => {
+    const got = schema.safeParse(value);
+    if (!got.success) throw new Inconsistent(`${where}: ${problemOf(got.error)}`, { cause: got.error });
+    return got.data;
   };
-};
 
-/** As JSON.stringify writes it; a cycle or a bigint fails instead of throws. */
-export const jsonText = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
+/** As JSON.stringify writes it; a cycle or a bigint throws. */
+export const jsonText = (value: unknown): string => JSON.stringify(value);
 
 /** Read untrusted external JSON where unreadable or misfit input is taken as none. */
-export const jsonOrNone = <T, E = T>(schema: Schema.Codec<T, E>) => {
-  const decode = Schema.decodeUnknownOption(Schema.fromJsonString(schema));
-  return (text: string | null | undefined): T | undefined => (text == null ? undefined : Option.getOrUndefined(decode(text)));
-};
+export const jsonOrNone =
+  <T>(schema: z.ZodType<T>) =>
+  (text: string | null | undefined): T | undefined => {
+    if (text == null) return undefined;
+    let raw: unknown;
+    try {
+      raw = parsed(text);
+    } catch {
+      return undefined;
+    }
+    const got = schema.safeParse(raw);
+    return got.success ? got.data : undefined;
+  };
 
 /** A data file kept in each language (seeds.json and seeds.en.json), read once per language; one that does not fit its
  * shape stops the server at its first use. */
-export const localizedJson = <A, I>(schema: Schema.Codec<A, I>, zh: unknown, en: unknown) => {
+export const localizedJson = <A>(schema: z.ZodType<A>, zh: unknown, en: unknown) => {
   const kept = new Map<string, A>();
   return (): A => {
     const locale = currentLocale() === "en" ? "en" : "zh";
     let got = kept.get(locale);
-    if (got === undefined) kept.set(locale, (got = Schema.decodeUnknownSync(schema)(locale === "en" ? en : zh)));
+    if (got === undefined) kept.set(locale, (got = schema.parse(locale === "en" ? en : zh)));
     return got;
   };
 };
@@ -67,41 +80,41 @@ export interface BlockWords<A> {
   /** The block is not JSON; e is what JSON.parse threw. */
   readonly unparsed: (e: unknown) => string;
   /** The block is JSON of another shape. */
-  readonly misfit: (issue: SchemaIssue.Issue) => string;
+  readonly misfit: (error: z.ZodError) => string;
   /** The block fits but still is not taken (a draft with no title); undefined takes it. */
   readonly refuse?: (value: A) => string | undefined;
 }
 
+export type BlockRead<A> = { readonly ok: true; readonly value: A } | { readonly ok: false; readonly problem: string };
+
 /** The last fenced block of a model's text that decodes with schema and is not refused, or the words for why the last one tried was not. */
-export function lastJsonBlock<A>(text: string, schema: Schema.Decoder<A>, words: BlockWords<A>): Result.Result<A, string> {
+export function lastJsonBlock<A>(text: string, schema: z.ZodType<A>, words: BlockWords<A>): BlockRead<A> {
   const blocks = [...text.matchAll(fencedBlock)].map((m) => m[1] ?? "");
-  const decode = Schema.decodeUnknownResult(schema);
   let problem = words.none;
   for (const block of blocks.toReversed()) {
     let raw: unknown;
     try {
-      raw = JSON.parse(block);
+      raw = parsed(block);
     } catch (e) {
       problem = words.unparsed(e);
       continue;
     }
-    const decoded = decode(raw);
-    if (Result.isFailure(decoded)) {
-      problem = words.misfit(decoded.failure.issue);
+    const decoded = schema.safeParse(raw);
+    if (!decoded.success) {
+      problem = words.misfit(decoded.error);
       continue;
     }
-    const refused = words.refuse?.(decoded.success);
-    if (refused === undefined) return Result.succeed(decoded.success);
+    const refused = words.refuse?.(decoded.data);
+    if (refused === undefined) return { ok: true, value: decoded.data };
     problem = refused;
   }
-  return Result.fail(problem);
+  return { ok: false, problem };
 }
 
 /** The field a decoding first failed on, undefined when the value itself was not an object. */
-export function misfitField(issue: SchemaIssue.Issue): string | undefined {
-  if (issue._tag === "Composite") return issue.issues[0] === undefined ? undefined : misfitField(issue.issues[0]);
-  if (issue._tag === "Pointer") return issue.path[0] === undefined ? undefined : String(issue.path[0]);
-  return undefined;
+export function misfitField(error: z.ZodError): string | undefined {
+  const first = error.issues[0]?.path[0];
+  return first === undefined ? undefined : String(first);
 }
 
 // What goes on the wire is JSON: a key whose value is undefined is not there.
@@ -119,9 +132,13 @@ export const wireOf = <A>(value: A): A => {
   return out as A;
 };
 
-/** The JSON text of value as the wire carries it: wireOf, then encoded by schema (which still fails on a missing required
+/** The JSON text of value as the wire carries it: wireOf, then checked by schema (which still fails on a missing required
  * field or a wrong type). */
-export const wireJson = <A>(schema: Schema.Codec<A>) => {
-  const encode = Schema.encodeEffect(Schema.fromJsonString(schema));
-  return (value: A) => encode(wireOf(value));
-};
+export const wireJson =
+  <A>(schema: z.ZodType<unknown, A>) =>
+  (value: A): string => {
+    const wire = wireOf(value);
+    const got = schema.safeParse(wire);
+    if (!got.success) throw new Inconsistent(`not of its wire shape: ${problemOf(got.error)}`, { cause: got.error });
+    return JSON.stringify(wire);
+  };

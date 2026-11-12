@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -12,169 +11,6 @@ import { ready, useRepos } from "#/infra/query.ts";
 import { useRouter } from "#/infra/router.ts";
 import { PxButton, PxTextInput, SpriteIcon } from "#/ui/pixel/index.ts";
 import { playSound } from "#/ui/pixel/sound.ts";
-
-const styles = stylex.create({
-  channelArrow: { rotate: "90deg" },
-  channelMenuDiv: {
-    position: "absolute",
-    top: "100%",
-    left: "0",
-    zIndex: "20",
-    marginTop: "0.375rem",
-    width: "18rem",
-    backgroundColor: "var(--color-cream-50)",
-    padding: "0.5rem",
-    boxShadow: "var(--shadow-px)",
-  },
-  channelItemButton: {
-    display: "flex",
-    cursor: "pointer",
-    alignItems: "flex-start",
-    gap: "0.5rem",
-    paddingInline: "0.5rem",
-    paddingBlock: "0.375rem",
-    textAlign: "left",
-  },
-  channelItemButtonPrimary: {
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-cream-200)",
-      },
-    },
-  },
-  channelItemButtonSecondary: {
-    backgroundColor: {
-      default: "var(--color-px-leaf-soft)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-leaf-300) 50%, transparent)",
-    },
-  },
-  channelMenuDiv2: {
-    position: "relative",
-    minWidth: "0",
-  },
-  channelMenu: {
-    display: "flex",
-    maxWidth: "100%",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.375rem",
-    paddingInline: "0.25rem",
-    backgroundColor: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-cream-200)",
-      },
-    },
-  },
-  channelMenuSpan: {
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "13px",
-  },
-  channelMenuSpan2: {
-    fontSize: "12px",
-    color: "var(--color-berry)",
-  },
-  channelMenuDiv22: {
-    display: "flex",
-    maxHeight: "18rem",
-    flexDirection: "column",
-    gap: "0.125rem",
-    overflowY: "auto",
-  },
-  channelMenuP: {
-    paddingInline: "0.5rem",
-    paddingTop: "0.375rem",
-    fontSize: "12px",
-    color: "var(--color-bark-500)",
-  },
-  channelMenuDiv3: {
-    marginTop: "0.375rem",
-    display: "flex",
-    flexWrap: "wrap",
-    columnGap: "0.75rem",
-    rowGap: "0.25rem",
-    borderTopStyle: "solid",
-    borderTopWidth: "1px",
-    borderColor: "var(--color-cream-200)",
-    paddingTop: "0.375rem",
-    fontSize: "12px",
-    color: "var(--color-leaf-700)",
-  },
-  newChannel: {
-    display: "flex",
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.25rem",
-    textDecorationLine: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "underline",
-      },
-    },
-  },
-  channelItemSpan: {
-    minWidth: "0",
-    flex: "1",
-  },
-  channelItemSpan2: {
-    display: "block",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "13px",
-  },
-  channelItemSpan3: {
-    display: "block",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    fontSize: "12px",
-    color: "var(--color-bark-500)",
-  },
-  channelItemSpan4: {
-    backgroundColor: "var(--color-berry)",
-    paddingInline: "0.375rem",
-    fontSize: "12px",
-    color: "var(--color-cream-50)",
-  },
-  formButtonsDiv: {
-    marginTop: "0.5rem",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    gap: "0.5rem",
-  },
-  formBack: {
-    cursor: "pointer",
-    fontSize: "12px",
-    color: "var(--color-leaf-700)",
-    textDecorationLine: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "underline",
-      },
-    },
-  },
-  newChannelDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.375rem",
-  },
-  newChannelP: {
-    fontSize: "13px",
-  },
-  newChannelP2: {
-    fontSize: "12px",
-    color: "var(--color-bark-500)",
-  },
-});
 
 type Mode = "list" | "create" | "settings";
 
@@ -190,7 +26,7 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
   const elsewhere = () => [...channels(), ...directs()].filter((c) => c.id !== props.current?.id).reduce((n, c) => n + unreadUnder(chat(), c), 0);
   const close = () => setOpen(false);
   return (
-    <div ref={box} {...stylex.attrs(styles.channelMenuDiv2)}>
+    <div ref={box} class="relative min-w-0">
       <button
         type="button"
         data-testid="channel-menu"
@@ -202,36 +38,56 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
           setOpen(!open());
           setMode("list");
         }}
-        {...stylex.attrs(styles.channelMenu)}
+        class="flex max-w-full cursor-pointer items-center gap-1.5 px-1 hover:bg-cream-200"
       >
-        <span {...stylex.attrs(styles.channelMenuSpan)}>{farmChannelLabel(props.current)}</span>
+        <span class="truncate text-(length:--text-sm)">{farmChannelLabel(props.current)}</span>
         <Show when={elsewhere() > 0}>
-          <span {...stylex.attrs(styles.channelMenuSpan2)}>{elsewhere()}</span>
+          <span class="text-(length:--text-xs) text-berry">{elsewhere()}</span>
         </Show>
-        <SpriteIcon name="button-next" size={10} styles={styles.channelArrow} />
+        <SpriteIcon name="button-next" size={10} class="[rotate:90deg]" />
       </button>
       <Show when={open()}>
-        <div {...stylex.attrs(styles.channelMenuDiv)} role="dialog" aria-label={t("web.farm.chat.channels")} data-testid="channels">
+        <div
+          class="absolute top-full left-0 z-20 mt-1.5 w-72 bg-cream-50 p-2 shadow-px"
+          role="dialog"
+          aria-label={t("web.farm.chat.channels")}
+          data-testid="channels"
+        >
           <Switch>
             <Match when={mode() === "list"}>
-              <div {...stylex.attrs(styles.channelMenuDiv22)}>
+              <div class="flex max-h-72 flex-col gap-0.5 overflow-y-auto">
                 <For each={channels()}>{(c) => <ChannelItem channel={c} current={props.current} onPick={close} />}</For>
                 <Show when={directs().length > 0}>
-                  <p {...stylex.attrs(styles.channelMenuP)}>{t("web.farm.chat.directs")}</p>
+                  <p class="px-2 pt-1.5 text-(length:--text-xs) text-bark-500">{t("web.farm.chat.directs")}</p>
                   <For each={directs()}>{(c) => <ChannelItem channel={c} current={props.current} onPick={close} />}</For>
                 </Show>
               </div>
-              <div {...stylex.attrs(styles.channelMenuDiv3)}>
-                <button type="button" data-testid="new-channel" onClick={() => setMode("create")} {...stylex.attrs(styles.newChannel)}>
+              <div class="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 border-t border-cream-200 pt-1.5 text-(length:--text-xs) text-leaf-700">
+                <button
+                  type="button"
+                  data-testid="new-channel"
+                  onClick={() => setMode("create")}
+                  class="flex cursor-pointer items-center gap-1 hover:underline"
+                >
                   <SpriteIcon name="button-add" size={12} />
                   {t("web.farm.chat.newChannel")}
                 </button>
-                <button type="button" data-testid="channel-page" onClick={() => router.navigate(chatPath(props.current))} {...stylex.attrs(styles.newChannel)}>
+                <button
+                  type="button"
+                  data-testid="channel-page"
+                  onClick={() => router.navigate(chatPath(props.current))}
+                  class="flex cursor-pointer items-center gap-1 hover:underline"
+                >
                   <SpriteIcon name="button-open" size={12} />
                   {t("web.farm.chat.pageAndSchedules")}
                 </button>
                 <Show when={props.current?.type === "channel"}>
-                  <button type="button" data-testid="channel-settings" onClick={() => setMode("settings")} {...stylex.attrs(styles.newChannel)}>
+                  <button
+                    type="button"
+                    data-testid="channel-settings"
+                    onClick={() => setMode("settings")}
+                    class="flex cursor-pointer items-center gap-1 hover:underline"
+                  >
                     <SpriteIcon name="button-settings" size={12} />
                     {t("web.farm.chat.settingsLink")}
                   </button>
@@ -269,16 +125,16 @@ function ChannelItem(props: { channel: Channel; current: Channel | undefined; on
         props.onPick();
         farm.showChat(c().default ? undefined : c().id);
       }}
-      {...stylex.attrs(styles.channelItemButton, here() ? styles.channelItemButtonSecondary : styles.channelItemButtonPrimary)}
+      class={["flex cursor-pointer items-start gap-2 px-2 py-1.5 text-left", here() ? "bg-leaf-300/50" : "hover:bg-cream-200"]}
     >
-      <span {...stylex.attrs(styles.channelItemSpan)}>
-        <span {...stylex.attrs(styles.channelItemSpan2)}>{farmChannelLabel(c())}</span>
+      <span class="min-w-0 flex-1">
+        <span class="block truncate text-(length:--text-sm)">{farmChannelLabel(c())}</span>
         <Show when={line()}>
-          <span {...stylex.attrs(styles.channelItemSpan3)}>{line()}</span>
+          <span class="block truncate text-(length:--text-xs) text-bark-500">{line()}</span>
         </Show>
       </span>
       <Show when={unread() > 0}>
-        <span {...stylex.attrs(styles.channelItemSpan4)}>{unread()}</span>
+        <span class="bg-berry px-1.5 text-(length:--text-xs) text-cream-50">{unread()}</span>
       </Show>
     </button>
   );
@@ -286,8 +142,8 @@ function ChannelItem(props: { channel: Channel; current: Channel | undefined; on
 
 function FormButtons(props: { onBack: () => void; submit: string; onSubmit?: (() => void) | undefined }) {
   return (
-    <div {...stylex.attrs(styles.formButtonsDiv)}>
-      <button type="button" data-testid="form-back" onClick={() => props.onBack()} {...stylex.attrs(styles.formBack)}>
+    <div class="mt-2 flex items-center justify-end gap-2">
+      <button type="button" data-testid="form-back" onClick={() => props.onBack()} class="cursor-pointer text-(length:--text-xs) text-leaf-700 hover:underline">
         {t("web.farm.chat.back2")}
       </button>
       <PxButton tone="primary" size="sm" data-testid="form-submit" disabled={!props.onSubmit} onClick={props.onSubmit && (() => props.onSubmit?.())}>
@@ -309,9 +165,9 @@ function NewChannel(props: { onDone: () => void; onBack: () => void }) {
     props.onDone();
   };
   return (
-    <div {...stylex.attrs(styles.newChannelDiv)}>
-      <p {...stylex.attrs(styles.newChannelP)}>{t("web.farm.chat.newChannel")}</p>
-      <p {...stylex.attrs(styles.newChannelP2)}>{t("web.farm.chat.newChannelLine")}</p>
+    <div class="flex flex-col gap-1.5">
+      <p class="text-(length:--text-sm)">{t("web.farm.chat.newChannel")}</p>
+      <p class="text-(length:--text-xs) text-bark-500">{t("web.farm.chat.newChannelLine")}</p>
       <PxTextInput
         testid="channel-name"
         value={form.name()}
@@ -334,7 +190,7 @@ function NewChannel(props: { onDone: () => void; onBack: () => void }) {
         suggestions={names()}
       />
       <Show when={form.error()}>
-        <p {...stylex.attrs(styles.channelMenuSpan2)}>{form.error()}</p>
+        <p class="text-(length:--text-xs) text-berry">{form.error()}</p>
       </Show>
       <FormButtons onBack={() => props.onBack()} submit={t("web.farm.chat.open")} onSubmit={form.ready() ? () => void submit() : undefined} />
     </div>
@@ -350,8 +206,8 @@ function ChannelSettings(props: { channel: Channel; onDone: () => void; onBack: 
     if ((await form.save()) !== undefined) props.onDone();
   };
   return (
-    <div {...stylex.attrs(styles.newChannelDiv)}>
-      <p {...stylex.attrs(styles.newChannelP)}>{t("web.farm.chat.settingsOf", { channel: farmChannelLabel(props.channel) })}</p>
+    <div class="flex flex-col gap-1.5">
+      <p class="text-(length:--text-sm)">{t("web.farm.chat.settingsOf", { channel: farmChannelLabel(props.channel) })}</p>
       <PxTextInput value={form.description()} onChange={form.setDescription} placeholder={t("web.farm.chat.what")} label={t("web.farm.chat.description")} />
       <PxTextInput
         value={form.repo()}
@@ -361,7 +217,7 @@ function ChannelSettings(props: { channel: Channel; onDone: () => void; onBack: 
         suggestions={names()}
       />
       <Show when={form.error()}>
-        <p {...stylex.attrs(styles.channelMenuSpan2)}>{form.error()}</p>
+        <p class="text-(length:--text-xs) text-berry">{form.error()}</p>
       </Show>
       <FormButtons onBack={() => props.onBack()} submit={t("web.farm.chat.save")} onSubmit={form.ready() ? () => void submit() : undefined} />
     </div>

@@ -1,4 +1,4 @@
-import * as stylex from "@stylexjs/stylex";
+import type { JSX } from "@solidjs/web";
 import { For } from "solid-js";
 
 import { stories, story } from "@vibevalley/stories";
@@ -6,28 +6,9 @@ import { stories, story } from "@vibevalley/stories";
 import { icons, type IconName } from "./icons";
 import { Dot, type DotTone, Tag, type TagTone } from "./Tag";
 
-const viewStyles = stylex.create({
-  dotPlacement: (offset: number) => ({ marginLeft: offset }),
-  tagStoriesDiv: {
-    display: "flex",
-    gap: "0.5rem",
-  },
-  tagStoriesDiv2: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "1rem",
-  },
-  tagStoriesSpan: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.375rem",
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-2xs)",
-    lineHeight: "var(--leading-2xs)",
-    color: "var(--color-muted)",
-  },
-});
+const viewStyles = {
+  dotPlacement: (offset: number): JSX.CSSProperties => ({ "--offset": `${offset}px` }),
+};
 
 const dotTones: DotTone[] = ["leaf", "wheat", "berry", "water", "idle", "faint", "muted"];
 
@@ -46,7 +27,7 @@ export default stories({
     }),
     Tones: story({
       render: () => (
-        <div {...stylex.attrs(viewStyles.tagStoriesDiv)}>
+        <div class="flex gap-2">
           <Tag tone="ok" icon="check" label="完成" />
           <Tag tone="bad" icon="close" label="失败" />
           <Tag tone="wait" icon="send" label="已发" />
@@ -56,16 +37,20 @@ export default stories({
     "Dot placement": story({
       args: { ring: true, size: 9, offset: 12 },
       controls: { size: { kind: "number", min: 4, max: 16 }, offset: { kind: "number", min: 0, max: 32 } },
-      render: (a) => <Dot tone="leaf" ring={a.ring} size={a.size} styles={viewStyles.dotPlacement(a.offset)} />,
+      render: (a) => (
+        <div class="contents" style={viewStyles.dotPlacement(a.offset)}>
+          <Dot tone="leaf" ring={a.ring} size={a.size} class="ml-(--offset)" />
+        </div>
+      ),
     }),
     "Dot tones": story({
       args: { ring: false, size: 8 },
       controls: { size: { kind: "number", min: 4, max: 16 } },
       render: (a) => (
-        <div {...stylex.attrs(viewStyles.tagStoriesDiv2)}>
+        <div class="flex flex-wrap items-center gap-4">
           <For each={dotTones}>
             {(tone) => (
-              <span {...stylex.attrs(viewStyles.tagStoriesSpan)}>
+              <span class="flex items-center gap-1.5 font-mono text-2xs text-muted">
                 <Dot tone={tone} ring={a.ring} size={a.size} />
                 {tone}
               </span>

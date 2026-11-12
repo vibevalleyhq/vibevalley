@@ -1,11 +1,11 @@
-import { Predicate, Schema } from "effect";
+import { z } from "zod";
 
 import { VibeValleyApiError } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { CursorManifest, SpriteManifest } from "#/base/manifests.ts";
 
-import { api } from "./api";
+import { api, ApiConnectionError } from "./api";
 import type { FramesSource } from "./frame";
 import { defineQuery, type QueryClient } from "./query/cache";
 import { useQuery } from "./query/solid";
@@ -15,7 +15,7 @@ export { QueryProvider, ready, useQuery, useQueryClient, type QueryResult } from
 export const retryRead = {
   retry: 1,
   retryWhen: (error: unknown) =>
-    Predicate.isTagged(error, "ApiConnectionError") || error instanceof TypeError || (error instanceof VibeValleyApiError && error.status >= 500),
+    error instanceof ApiConnectionError || error instanceof TypeError || (error instanceof VibeValleyApiError && error.status >= 500),
 };
 export function refetchOnRelink(source: FramesSource, client: QueryClient) {
   let was = source.get().link;
@@ -40,19 +40,19 @@ export const cursorsQuery = defineQuery({
   ...retryRead,
 });
 export const agentsQuery = defineQuery({
-  schema: Schema.mutable(Schema.Array(S.Agent)),
+  schema: z.array(S.Agent),
   key: () => ["agents"],
   fetch: (_: void, context) => api.agent.list(context),
   ...retryRead,
 });
 export const templatesQuery = defineQuery({
-  schema: Schema.mutable(Schema.Array(S.AgentTemplate)),
+  schema: z.array(S.AgentTemplate),
   key: () => ["agent-templates"],
   fetch: (_: void, context) => api.agent.template.list(context),
   ...retryRead,
 });
 export const reposQuery = defineQuery({
-  schema: Schema.mutable(Schema.Array(S.RepoSummary)),
+  schema: z.array(S.RepoSummary),
   key: () => ["repos"],
   fetch: (_: void, context) => api.repo.list(context),
   ...retryRead,
@@ -70,13 +70,13 @@ export const settingsQuery = defineQuery({
   ...retryRead,
 });
 export const runtimesQuery = defineQuery({
-  schema: Schema.mutable(Schema.Array(S.RuntimeInfo)),
+  schema: z.array(S.RuntimeInfo),
   key: () => ["runtimes"],
   fetch: (_: void, context) => api.runtime.list(context),
   ...retryRead,
 });
 export const achievementsQuery = defineQuery({
-  schema: Schema.mutable(Schema.Array(S.Achievement)),
+  schema: z.array(S.Achievement),
   key: () => ["achievements"],
   fetch: (_: void, context) => api.game.achievement.list(context),
   staleTime: Infinity,

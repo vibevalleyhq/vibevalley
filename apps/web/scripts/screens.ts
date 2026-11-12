@@ -17,7 +17,6 @@ const page = await browser.newPage({ viewport: { width, height } });
 const errors: string[] = [];
 page.on("pageerror", (e) => errors.push(e.message));
 for (const path of pages) {
-  /* oxlint-disable eslint/no-await-in-loop -- one page, shown one path at a time */
   await page.goto(server + path);
   // The state stream stays open, so the network is never idle: give the first frame and the pictures a moment.
   await page.waitForLoadState("load");
@@ -26,7 +25,6 @@ for (const path of pages) {
   const name = path.replace(/^\//u, "").replace(/[/?=&]/gu, "-");
   const file = join(out, `${name}-${width}x${height}.png`);
   await page.screenshot({ path: file });
-  /* oxlint-enable eslint/no-await-in-loop */
   console.log(file);
 }
 await browser.close();

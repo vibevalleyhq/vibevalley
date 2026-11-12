@@ -6,65 +6,71 @@ const found = (rule: Rule, ...texts: string[]) =>
   audit(texts.map((text, i) => ({ path: `f${i}.test.ts`, text })))
     .filter((f) => f.rule === rule)
     .map((f) => `${f.file}:${f.line}`);
+/** Lines of a rule's hits in one source file (not a test). */
+const inSource = (rule: Rule, text: string, path = "src.ts") =>
+  audit([{ path, text }])
+    .filter((f) => f.rule === rule)
+    .map((f) => f.line);
+const inTest = (rule: Rule, text: string) =>
+  audit([{ path: "a.test.ts", text }])
+    .filter((f) => f.rule === rule)
+    .map((f) => f.line);
 
 describe("turn-as-absence", () => {
   test("an assertion that nothing happened, straight after one turn", () => {
-    expect(found("turn-as-absence", "Effect.gen(function* () {\n  yield* aTurn;\n  expect(f.pollUnsafe()).toBeUndefined();\n});")).toEqual(["f0.test.ts:3"]);
+    expect(found("turn-as-absence", "async () => {\n  await aTurn();\n  expect(f.result).toBeUndefined();\n}")).toEqual(["f0.test.ts:3"]);
     expect(found("turn-as-absence", "async () => {\n  await nextTurn();\n  expect(a).toBe(1);\n  expect(spy).not.toHaveBeenCalled();\n}")).toEqual([
       "f0.test.ts:4",
     ]);
-    expect(found("turn-as-absence", "Effect.gen(function* () {\n  yield* Effect.yieldNow;\n  expect(seen).toEqual([]);\n});")).toEqual(["f0.test.ts:3"]);
+    expect(found("turn-as-absence", "async () => {\n  await Promise.resolve();\n  expect(seen).toEqual([]);\n}")).toEqual(["f0.test.ts:3"]);
+    expect(found("turn-as-absence", "async () => {\n  await new Promise((r) => setImmediate(r));\n  expect(seen).toHaveLength(0);\n}")).toEqual([
+      "f0.test.ts:3",
+    ]);
+    expect(found("turn-as-absence", "async () => {\n  await new Promise((r) => setTimeout(r, 0));\n  expect(seen).toHaveLength(0);\n}")).toEqual([
+      "f0.test.ts:3",
+    ]);
   });
 
-  test("not a turn's wait, something done in between, or a positive assertion", () => {
-    expect(found("turn-as-absence", "Effect.gen(function* () {\n  yield* aTurn;\n  expect(seen).toEqual([1]);\n});")).toEqual([]);
-    expect(found("turn-as-absence", "Effect.gen(function* () {\n  yield* aTurn;\n  yield* run;\n  expect(seen).toHaveLength(0);\n});")).toEqual([]);
-    expect(found("turn-as-absence", "Effect.gen(function* () {\n  yield* until(() => done);\n  expect(seen).toHaveLength(0);\n});")).toEqual([]);
-    expect(found("turn-as-absence", '// yield* aTurn;\nexpect(x).toBeUndefined();\nconst s = "yield* aTurn; expect(x).toBeUndefined()";')).toEqual([]);
+  test("not a turn's wait, something done in between, a real wait or a positive assertion", () => {
+    expect(found("turn-as-absence", "async () => {\n  await aTurn();\n  expect(seen).toEqual([1]);\n}")).toEqual([]);
+    expect(found("turn-as-absence", "async () => {\n  await aTurn();\n  await run();\n  expect(seen).toHaveLength(0);\n}")).toEqual([]);
+    expect(found("turn-as-absence", "async () => {\n  await until(() => done);\n  expect(seen).toHaveLength(0);\n}")).toEqual([]);
+    expect(found("turn-as-absence", "async () => {\n  await new Promise((r) => setTimeout(r, 50));\n  expect(seen).toHaveLength(0);\n}")).toEqual([]);
+    expect(found("turn-as-absence", '// await aTurn();\nexpect(x).toBeUndefined();\nconst s = "await aTurn(); expect(x).toBeUndefined()";')).toEqual([]);
   });
 });
 
 describe("unreleased-gate", () => {
-  test("a Deferred or gate() waited on and never opened", () => {
-    expect(found("unreleased-gate", "Effect.gen(function* () {\n  const g = yield* Deferred.make<void>();\n  yield* Deferred.await(g);\n});")).toEqual([
+  test("a withResolvers or gate() waited on and never opened", () => {
+    expect(found("unreleased-gate", "async () => {\n  const g = Promise.withResolvers<void>();\n  await g.promise;\n}")).toEqual(["f0.test.ts:2"]);
+    expect(found("unreleased-gate", "async () => {\n  const { promise, resolve } = Promise.withResolvers<void>();\n  await promise;\n}")).toEqual([
       "f0.test.ts:2",
     ]);
     expect(found("unreleased-gate", "async () => {\n  const g = gate();\n  fake.answer = () => g.opened;\n}")).toEqual(["f0.test.ts:2"]);
     expect(found("unreleased-gate", "async () => {\n  const { opened, open } = gate();\n  await opened;\n}")).toEqual(["f0.test.ts:2"]);
   });
 
-  test("opened anywhere in scope, in a finalizer, or handed on", () => {
+  test("opened anywhere in scope, in a finally, or handed on", () => {
     expect(
       found(
         "unreleased-gate",
-        "Effect.gen(function* () {\n  const g = yield* Deferred.make<void>();\n  yield* Effect.addFinalizer(() => Deferred.succeed(g, undefined));\n  yield* Deferred.await(g);\n});",
+        "async () => {\n  const g = Promise.withResolvers<void>();\n  try {\n    await g.promise;\n  } finally {\n    g.resolve();\n  }\n}",
       ),
     ).toEqual([]);
     expect(found("unreleased-gate", "async () => {\n  const g = gate();\n  fake.answer = () => g.opened;\n  g.open();\n}")).toEqual([]);
     expect(
-      found("unreleased-gate", "Effect.gen(function* () {\n  const g = yield* Deferred.make<void>();\n  yield* Deferred.await(g);\n  yield* opener(g);\n});"),
+      found("unreleased-gate", "async () => {\n  const { promise, resolve } = Promise.withResolvers<void>();\n  fake.onDone = resolve;\n  await promise;\n}"),
     ).toEqual([]);
-    expect(
-      found(
-        "unreleased-gate",
-        "Effect.gen(function* () {\n  const g = yield* Deferred.make<void>();\n  yield* work.pipe(Effect.intoDeferred(g));\n  yield* Deferred.await(g);\n});",
-      ),
-    ).toEqual([]);
+    expect(found("unreleased-gate", "async () => {\n  const g = Promise.withResolvers<void>();\n  await g.promise;\n  opener(g);\n}")).toEqual([]);
   });
 
   test("a function's own binding of the name is another gate", () => {
-    const text = [
-      "Effect.gen(function* () {",
-      "  const g = yield* Deferred.make<void>();",
-      "  const open = (g: Deferred.Deferred<void>) => Deferred.succeed(g, undefined);",
-      "  yield* Deferred.await(g);",
-      "});",
-    ].join("\n");
+    const text = ["async () => {", "  const g = gate();", "  const open = (g: Gate) => g.open();", "  await g.opened;", "}"].join("\n");
     expect(found("unreleased-gate", text)).toEqual(["f0.test.ts:2"]);
   });
 
   test("never waited on is not this rule's", () => {
-    expect(found("unreleased-gate", "Effect.gen(function* () {\n  const g = yield* Deferred.make<void>();\n});")).toEqual([]);
+    expect(found("unreleased-gate", "async () => {\n  const g = Promise.withResolvers<void>();\n}")).toEqual([]);
   });
 });
 
@@ -73,9 +79,9 @@ describe("duplicated-setup", () => {
 
   test("the same object to the same call, across files, however it is spaced", () => {
     expect(found("duplicated-setup", host("llm"), `\n\n${host("llm", "\n    ")}`)).toEqual(["f0.test.ts:1"]);
-    const register = "function* f() { (yield* Session).register({ a: 1, b: 2, c: 3, d: 4, e: 5, f: 6 }); }";
+    const register = "async function f() { (await farm()).session.register({ a: 1, b: 2, c: 3, d: 4, e: 5, f: 6 }); }";
     expect(audit([register, register].map((text, i) => ({ path: `f${i}.test.ts`, text }))).map((f) => f.message.split(" ")[0])).toEqual([
-      "Session.register({…})",
+      "?.session.register({…})",
     ]);
   });
 
@@ -86,214 +92,133 @@ describe("duplicated-setup", () => {
   });
 });
 
-const effectImport = 'import { Effect } from "effect";\n';
-/** Hits of a rule in one source file (not a test) that imports effect; lines count after the import. */
-const inSource = (rule: Rule, text: string) =>
-  audit([{ path: "src.ts", text: effectImport + text }])
-    .filter((f) => f.rule === rule)
-    .map((f) => f.line - 1);
-const inTest = (rule: Rule, text: string) =>
-  audit([{ path: "a.test.ts", text: 'import { it } from "@effect/vitest";\n' + effectImport + text }])
-    .filter((f) => f.rule === rule)
-    .map((f) => f.line - 2);
-
-describe("effect practices in source", () => {
-  test("fork-then-join: a fiber joined by the next statement", () => {
-    expect(
-      inSource("fork-then-join", "Effect.gen(function* () {\n  const f = yield* Effect.forkChild(load);\n  const page = yield* Fiber.join(f);\n});"),
-    ).toEqual([3]);
-    expect(
-      inSource("fork-then-join", "Effect.gen(function* () {\n  const f = yield* Effect.forkChild(load);\n  yield* other;\n  yield* Fiber.join(f);\n});"),
-    ).toEqual([]);
-  });
-
-  test("span-after-result: the span outside a step that turns failure into a value", () => {
-    expect(inSource("span-after-result", 'send.pipe(Effect.result, Effect.withSpan("Feishu.send"));')).toEqual([1]);
-    expect(inSource("span-after-result", 'send.pipe(Effect.withSpan("Feishu.send"), Effect.result);')).toEqual([]);
-  });
-
-  test("unbounded-retry: a schedule written here that never stops", () => {
-    expect(inSource("unbounded-retry", 'call.pipe(Effect.retry(Schedule.exponential("200 millis")));')).toEqual([1]);
-    expect(inSource("unbounded-retry", "call.pipe(Effect.retry({ while: (e) => e.transient }));")).toEqual([1]);
-    expect(inSource("unbounded-retry", 'const forever = Schedule.spaced("1 second");\ncall.pipe(Effect.retry(forever));')).toEqual([2]);
-    expect(inSource("unbounded-retry", 'call.pipe(Effect.retry(Schedule.exponential("200 millis").pipe(Schedule.upTo({ times: 5 }))));')).toEqual([]);
-    expect(inSource("unbounded-retry", "call.pipe(Effect.retry({ times: 3 }));")).toEqual([]);
-    // A policy from elsewhere may be bounded: not known here, not reported.
-    expect(inSource("unbounded-retry", "call.pipe(Effect.retry(transient));")).toEqual([]);
-  });
-
-  test("ref-read-modify-write: a get, other effects, then a set of the same Ref", () => {
-    expect(
-      inSource(
-        "ref-read-modify-write",
-        "Effect.gen(function* () {\n  const now = yield* Ref.get(held);\n  const next = yield* reload(now);\n  yield* Ref.set(held, next);\n});",
-      ),
-    ).toEqual([4]);
-    expect(inSource("ref-read-modify-write", "Effect.gen(function* () {\n  const now = yield* Ref.get(held);\n  yield* Ref.set(held, now + 1);\n});")).toEqual(
+describe("practices in tests", () => {
+  test("expect-in-floating-promise: an assertion that can fail where no one sees it", () => {
+    expect(inTest("expect-in-floating-promise", 'test("x", async () => {\n  void (async () => expect(await f()).toBe(2))();\n});')).toEqual([2]);
+    expect(inTest("expect-in-floating-promise", 'test("x", async () => {\n  load().then((v) => expect(v).toBe(1));\n});')).toEqual([2]);
+    expect(inTest("expect-in-floating-promise", 'test("x", () => {\n  setTimeout(() => expect(seen).toEqual([1]), 10);\n});')).toEqual([2]);
+    expect(inTest("expect-in-floating-promise", 'test("x", async () => {\n  const p = (async () => expect(await f()).toBe(1))();\n});')).toEqual([2]);
+    expect(inTest("expect-in-floating-promise", 'test("x", async () => {\n  await load().then((v) => expect(v).toBe(1));\n});')).toEqual([]);
+    expect(inTest("expect-in-floating-promise", 'test("x", async () => {\n  const p = (async () => expect(await f()).toBe(1))();\n  await p;\n});')).toEqual(
       [],
     );
-    expect(
-      inSource(
-        "ref-read-modify-write",
-        "Effect.gen(function* () {\n  const now = yield* Ref.get(held);\n  yield* reload(now);\n  yield* Ref.set(other, 1);\n});",
-      ),
-    ).toEqual([]);
-  });
-
-  test("pipe-on-effect-fn: piping the function Effect.fn made", () => {
-    expect(inSource("pipe-on-effect-fn", 'const say = Effect.fn("Channel.say")(function* () {}).pipe(locked);')).toEqual([1]);
-    expect(inSource("pipe-on-effect-fn", 'const say = Effect.fn("Channel.say")(function* () {}, locked);')).toEqual([]);
-  });
-
-  test("logic-in-pipe: two steps of logic chained in .pipe, not behaviour attached to the whole", () => {
-    expect(inSource("logic-in-pipe", "const x = read.pipe(Effect.map((a) => a + 1), Effect.flatMap(save));")).toEqual([1]);
-    expect(inSource("logic-in-pipe", "const x = read.pipe(Effect.map((a) => a + 1), Effect.retry(policy), Effect.timeout(1000));")).toEqual([]);
-  });
-
-  test("loose-flags: three let flags in one function, in any source file, Effect or not", () => {
-    const flags = "function start() {\n  let starting = false;\n  let ending = false;\n  let gone = false;\n}";
-    expect(inSource("loose-flags", flags)).toEqual([1]);
-    expect(audit([{ path: "Page.tsx", text: flags }]).filter((f) => f.rule === "loose-flags")).toHaveLength(1);
-    expect(inSource("loose-flags", 'function start() {\n  let phase = "idle";\n  let open = false;\n}')).toEqual([]);
-    expect(audit([{ path: "a.test.ts", text: flags }]).filter((f) => f.rule === "loose-flags")).toEqual([]);
-    const signals =
-      "function Page() {\n  const [open, setOpen] = createSignal(false);\n  const [busy, setBusy] = createSignal<boolean>(false);\n  let shown = true;\n}";
-    expect(audit([{ path: "Page.tsx", text: signals }]).filter((f) => f.rule === "loose-flags")).toHaveLength(1);
-  });
-
-  test("option-get-or-throw and die-with-plain-error", () => {
-    expect(inSource("option-get-or-throw", "const v = Option.getOrThrow(found);")).toEqual([1]);
-    expect(inSource("option-get-or-throw", "const v = Option.getOrElse(found, () => 0);")).toEqual([]);
-    expect(inSource("die-with-plain-error", 'Effect.die(new Error("missing"));')).toEqual([1]);
-    expect(inSource("die-with-plain-error", 'Effect.die(new Inconsistent({ message: "missing" }));')).toEqual([]);
-  });
-
-  test("swallow-without-record: every failure turned into a value with nothing noted", () => {
-    expect(inSource("swallow-without-record", "source.search(text).pipe(Effect.catch(() => Effect.succeed([])));")).toEqual([1]);
-    expect(
-      inSource(
-        "swallow-without-record",
-        'source.search(text).pipe(Effect.tapError((e) => Effect.logWarning("down", e)), Effect.catch(() => Effect.succeed([])));',
-      ),
-    ).toEqual([]);
-    expect(inSource("swallow-without-record", "source.search(text).pipe(Effect.catch((e) => Effect.succeed([e])));")).toEqual([]);
-    expect(inSource("swallow-without-record", 'source.search(text).pipe(Effect.catchTag("Missing", () => Effect.succeed([])));')).toEqual([]);
-  });
-
-  test("cause-as-string: the outside failure kept only as text", () => {
-    expect(inSource("cause-as-string", "Effect.tryPromise({ try: () => call(), catch: (e) => new SourceFailed({ message: String(e) }) });")).toEqual([1]);
-    expect(inSource("cause-as-string", "Effect.tryPromise({ try: () => call(), catch: (cause) => new SourceFailed({ source, cause }) });")).toEqual([]);
-    expect(inSource("cause-as-string", "Effect.tryPromise({ try: () => call(), catch: (e) => new SourceFailed({ message: e.message, cause: e }) });")).toEqual(
-      [],
-    );
-  });
-
-  test("uninterruptible-wait: no timeout or race can stop what it waits for", () => {
-    expect(inSource("uninterruptible-wait", "Effect.uninterruptible(Effect.gen(function* () {\n  yield* write;\n  yield* Deferred.await(peer);\n}));")).toEqual(
-      [1],
-    );
-    expect(inSource("uninterruptible-wait", "Effect.uninterruptible(Effect.gen(function* () {\n  yield* write;\n}));")).toEqual([]);
-  });
-
-  test("layer-built-twice: the same constructor call twice in one function", () => {
-    expect(
-      inSource(
-        "layer-built-twice",
-        "const app = Layer.mergeAll(Issue.layer.pipe(Layer.provide(Db.layerAt(path))), Channel.layer.pipe(Layer.provide(Db.layerAt(path))));",
-      ),
-    ).toEqual([1]);
-    expect(
-      inSource(
-        "layer-built-twice",
-        "const db = Db.layerAt(path);\nconst app = Layer.mergeAll(Issue.layer.pipe(Layer.provide(db)), Channel.layer.pipe(Layer.provide(db)));",
-      ),
-    ).toEqual([]);
-  });
-
-  test("source rules leave tests and files without effect alone", () => {
-    expect(inTest("die-with-plain-error", 'Effect.die(new Error("missing"));')).toEqual([]);
-    expect(audit([{ path: "plain.ts", text: 'Effect.die(new Error("missing"));' }])).toEqual([]);
-  });
-
-  test("duplicate-error-tag: two source files declaring TaggedError with the same _tag", () => {
-    const a = 'export class IssueMissing extends Schema.TaggedError<IssueMissing>()("Missing", {}) {}';
-    const b = 'export class SessionMissing extends Schema.TaggedError<SessionMissing>()("Missing", {}) {}';
-    const distinct = 'export class SessionMissing extends Schema.TaggedError<SessionMissing>()("SessionMissing", {}) {}';
-    expect(
-      audit([
-        { path: "a.ts", text: a },
-        { path: "b.ts", text: b },
-      ])
-        .filter((f) => f.rule === "duplicate-error-tag")
-        .map((f) => `${f.file}:${f.line}`),
-    ).toEqual(["a.ts:1"]);
-    expect(
-      audit([
-        { path: "a.ts", text: a },
-        { path: "b.ts", text: distinct },
-      ]).filter((f) => f.rule === "duplicate-error-tag"),
-    ).toEqual([]);
-    expect(
-      audit([
-        { path: "a.ts", text: a },
-        { path: "b.test.ts", text: b },
-      ]).filter((f) => f.rule === "duplicate-error-tag"),
-    ).toEqual([]);
-  });
-
-  test("provide-in-loop: building a Layer inside a loop instead of hoisting it", () => {
-    expect(
-      inSource(
-        "provide-in-loop",
-        "Effect.gen(function* () {\n  for (const item of items) {\n    yield* send(item).pipe(Effect.provide(Http.layer));\n  }\n});",
-      ),
-    ).toEqual([3]);
-    expect(
-      inSource(
-        "provide-in-loop",
-        "Effect.gen(function* () {\n  for (const item of items) {\n    yield* send(item);\n  }\n}).pipe(Effect.provide(Http.layer));",
-      ),
-    ).toEqual([]);
-    expect(
-      inSource(
-        "provide-in-loop",
-        "Effect.gen(function* () {\n  for (const item of items) {\n    yield* send(item).pipe(Effect.provide(Context.make(Http, fake)));\n  }\n});",
-      ),
-    ).toEqual([]);
-  });
-
-  test("cached-per-call: allocating a fresh Effect.cached on each call or loop turn", () => {
-    expect(inSource("cached-per-call", "const getSettings = () => Effect.cached(loadSettings);")).toEqual([1]);
-    expect(inSource("cached-per-call", 'const svc = { get: () => Effect.cachedWithTTL(loadSettings, "5 minutes") };')).toEqual([1]);
-    expect(inSource("cached-per-call", "Effect.gen(function* () {\n  for (const k of keys) {\n    yield* Effect.cached(load(k));\n  }\n});")).toEqual([3]);
-    expect(inSource("cached-per-call", "Effect.gen(function* () {\n  const get = yield* Effect.cached(loadSettings);\n  return { get };\n});")).toEqual([]);
-  });
-});
-
-describe("effect practices in tests", () => {
-  test("expect-in-unjoined-fiber: an assertion that can fail where no one sees it", () => {
-    expect(inTest("expect-in-unjoined-fiber", "Effect.gen(function* () {\n  yield* Effect.forkChild(Effect.sync(() => expect(1).toBe(2)));\n});")).toEqual([2]);
-    expect(
-      inTest(
-        "expect-in-unjoined-fiber",
-        "Effect.gen(function* () {\n  const f = yield* Effect.forkChild(Effect.sync(() => expect(1).toBe(1)));\n  yield* Fiber.join(f);\n});",
-      ),
-    ).toEqual([]);
+    expect(inTest("expect-in-floating-promise", 'test("x", async () => {\n  expect(await f()).toBe(1);\n});')).toEqual([]);
   });
 
   test("failure-without-reason: failed, but not how", () => {
-    expect(inTest("failure-without-reason", "expect(Exit.isFailure(exit)).toBe(true);")).toEqual([1]);
-    expect(inTest("failure-without-reason", 'expect(exit._tag).toBe("Failure");')).toEqual([1]);
-    expect(inTest("failure-without-reason", 'expect(exit).toMatchObject({ _tag: "Failure" });')).toEqual([1]);
-    expect(inTest("failure-without-reason", "expect(Exit.isSuccess(exit)).toBe(true);")).toEqual([]);
-    expect(inTest("failure-without-reason", 'expect(error).toMatchObject({ _tag: "Refused" });')).toEqual([]);
+    expect(inTest("failure-without-reason", "expect(() => decode(x)).toThrow();")).toEqual([1]);
+    expect(inTest("failure-without-reason", "await expect(load()).rejects.toThrow();")).toEqual([1]);
+    expect(inTest("failure-without-reason", "await expect(load()).rejects.toThrow(Error);")).toEqual([1]);
+    expect(inTest("failure-without-reason", "await expect(load()).rejects.toBeDefined();")).toEqual([1]);
+    expect(inTest("failure-without-reason", "expect(e).toBeInstanceOf(Error);")).toEqual([1]);
+    expect(inTest("failure-without-reason", "expect(() => decode(x)).toThrow(ZodError);")).toEqual([]);
+    expect(inTest("failure-without-reason", "await expect(load()).rejects.toThrow(/not found/);")).toEqual([]);
+    expect(inTest("failure-without-reason", "expect(e).toBeInstanceOf(ApiError);")).toEqual([]);
+    expect(inTest("failure-without-reason", "expect(() => decode(x)).not.toThrow();")).toEqual([]);
   });
 
-  test("run-in-effect-test, shared-runtime-in-test and live-with-test-clock", () => {
-    expect(inTest("run-in-effect-test", 'it("x", async () => {\n  await Effect.runPromise(work);\n});')).toEqual([2]);
-    expect(inTest("shared-runtime-in-test", "const world = Effect.runSync(Layer.build(World.layer));")).toEqual([1]);
-    expect(inTest("shared-runtime-in-test", 'it.effect("x", () => work.pipe(Effect.provide(World.layer)));')).toEqual([]);
-    expect(inTest("live-with-test-clock", 'it.live("x", () => TestClock.adjust("1 minute"));')).toEqual([1]);
-    expect(inTest("live-with-test-clock", 'it.effect("x", () => TestClock.adjust("1 minute"));')).toEqual([]);
+  test("shared-farm-in-test: built once at the top of the file", () => {
+    expect(inTest("shared-farm-in-test", "const farm = await world();")).toEqual([1]);
+    expect(inTest("shared-farm-in-test", "const db = testDb();")).toEqual([1]);
+    expect(inTest("shared-farm-in-test", 'test("x", async () => {\n  await using farm = await world();\n});')).toEqual([]);
+    expect(inTest("shared-farm-in-test", "const options = { issues: 2 };")).toEqual([]);
+  });
+});
+
+describe("practices in source", () => {
+  test("unbounded-retry: a retry that never gives up", () => {
+    expect(inSource("unbounded-retry", "await retry(call, { retries: Infinity, delay: exponential(200) });")).toEqual([1]);
+    expect(inSource("unbounded-retry", "await retry(call, { retries: Number.POSITIVE_INFINITY });")).toEqual([1]);
+    expect(
+      inSource(
+        "unbounded-retry",
+        "async function f() {\n  while (true) {\n    try {\n      return await call();\n    } catch {\n      await sleep(1000);\n    }\n  }\n}",
+      ),
+    ).toEqual([2]);
+    expect(inSource("unbounded-retry", "await retry(call, { retries: 3, delay: exponential(200) });")).toEqual([]);
+    expect(
+      inSource(
+        "unbounded-retry",
+        "async function f() {\n  for (let n = 0; ; n++) {\n    try {\n      return await call();\n    } catch (e) {\n      if (n >= 3) throw e;\n    }\n  }\n}",
+      ),
+    ).toEqual([]);
+    // A loop that goes round on success too is a patrol, not a retry.
+    expect(
+      inSource("unbounded-retry", "async function f() {\n  for (;;) {\n    try {\n      await tick();\n    } catch (e) {\n      log.warn(e);\n    }\n  }\n}"),
+    ).toEqual([]);
+  });
+
+  test("read-modify-write: a get, an await, then a set made from what was read", () => {
+    expect(inSource("read-modify-write", "async function f() {\n  const n = counts.get(k);\n  await save(k);\n  counts.set(k, n + 1);\n}")).toEqual([4]);
+    expect(inSource("read-modify-write", "async function f() {\n  const n = counts.get(k);\n  counts.set(k, n + 1);\n  await save(k);\n}")).toEqual([]);
+    // A cache filled after its miss writes nothing it read.
+    expect(
+      inSource(
+        "read-modify-write",
+        "async function f() {\n  const kept = done.get(k);\n  if (kept) return kept;\n  const got = await load(k);\n  done.set(k, got);\n}",
+      ),
+    ).toEqual([]);
+    // Read again after the await: the re-check.
+    expect(
+      inSource(
+        "read-modify-write",
+        "async function f() {\n  const n = counts.get(k);\n  await save(k);\n  const m = counts.get(k);\n  counts.set(k, m + n);\n}",
+      ),
+    ).toEqual([]);
+    expect(
+      inSource(
+        "read-modify-write",
+        "async function f() {\n  await lock.with(async () => {\n    const n = counts.get(k);\n    await save(k);\n    counts.set(k, n + 1);\n  });\n}",
+      ),
+    ).toEqual([]);
+    expect(inSource("read-modify-write", "async function f() {\n  const n = counts.get(k);\n  await save(k);\n  other.set(k, n + 1);\n}")).toEqual([]);
+  });
+
+  test("loose-flags: three let flags in one function, in any source file", () => {
+    const flags = "function start() {\n  let starting = false;\n  let ending = false;\n  let gone = false;\n}";
+    expect(inSource("loose-flags", flags)).toEqual([1]);
+    expect(inSource("loose-flags", flags, "Page.tsx")).toEqual([1]);
+    expect(inSource("loose-flags", 'function start() {\n  let phase = "idle";\n  let open = false;\n}')).toEqual([]);
+    expect(inTest("loose-flags", flags)).toEqual([]);
+    const signals =
+      "function Page() {\n  const [open, setOpen] = createSignal(false);\n  const [busy, setBusy] = createSignal<boolean>(false);\n  let shown = true;\n}";
+    expect(inSource("loose-flags", signals, "Page.tsx")).toEqual([1]);
+  });
+
+  test("swallow-without-record: every failure turned into a value with nothing said", () => {
+    expect(inSource("swallow-without-record", "try {\n  return JSON.parse(text);\n} catch {\n  return undefined;\n}")).toEqual([3]);
+    expect(inSource("swallow-without-record", "try {\n  work();\n} catch {}")).toEqual([3]);
+    expect(inSource("swallow-without-record", "const hits = await source.search(text).catch(() => []);")).toEqual([1]);
+    expect(inSource("swallow-without-record", "const hits = await source.search(text).catch(() => {});")).toEqual([1]);
+    expect(inSource("swallow-without-record", "try {\n  work();\n} catch {\n  // Not there yet: the next poll sees it.\n}")).toEqual([]);
+    expect(inSource("swallow-without-record", "// A missing file is an empty list.\nconst hits = await read(path).catch(() => []);")).toEqual([]);
+    expect(inSource("swallow-without-record", "try {\n  work();\n} catch (e) {\n  log.warn(e);\n}")).toEqual([]);
+    expect(inSource("swallow-without-record", "const hits = await source.search(text).catch((e) => [e]);")).toEqual([]);
+    expect(inSource("swallow-without-record", "await reader.cancel().catch(() => undefined);")).toEqual([]);
+    expect(inTest("swallow-without-record", "try {\n  work();\n} catch {}")).toEqual([]);
+  });
+
+  test("cause-as-string: the outside failure kept only as text", () => {
+    expect(inSource("cause-as-string", "try {\n  await call();\n} catch (e) {\n  throw new SourceFailed(String(e));\n}")).toEqual([4]);
+    expect(inSource("cause-as-string", "await call().catch((e) => {\n  throw new SourceFailed(`down: ${e.message}`);\n});")).toEqual([2]);
+    expect(inSource("cause-as-string", "try {\n  await call();\n} catch (e) {\n  throw new SourceFailed(messageOf(e), { cause: e });\n}")).toEqual([]);
+    expect(inSource("cause-as-string", "try {\n  await call();\n} catch (e) {\n  throw new SourceFailed(e);\n}")).toEqual([]);
+    expect(inSource("cause-as-string", 'try {\n  await call();\n} catch (e) {\n  throw new SourceFailed("down");\n}')).toEqual([]);
+  });
+
+  test("duplicate-error-class: two Error subclasses going by one name", () => {
+    const a = 'export class Missing extends Error {\n  override readonly name = "Missing";\n}';
+    const b = 'export class SessionMissing extends ApiError {\n  override readonly name = "Missing";\n}';
+    const c = "export class Missing extends Error {}";
+    const distinct = 'export class SessionMissing extends Error {\n  override readonly name = "SessionMissing";\n}';
+    const hits = (...texts: [string, string][]) =>
+      audit(texts.map(([path, text]) => ({ path, text })))
+        .filter((f) => f.rule === "duplicate-error-class")
+        .map((f) => `${f.file}:${f.line}`);
+    expect(hits(["a.ts", a], ["b.ts", b])).toEqual(["a.ts:1"]);
+    expect(hits(["a.ts", a], ["c.ts", c])).toEqual(["a.ts:1"]);
+    expect(hits(["a.ts", a], ["b.ts", distinct])).toEqual([]);
+    expect(hits(["a.ts", a], ["b.test.ts", b])).toEqual([]);
+    expect(hits(["a.ts", "class Missing extends Base {}"], ["c.ts", c])).toEqual([]);
   });
 });

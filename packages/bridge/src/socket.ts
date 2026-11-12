@@ -1,12 +1,15 @@
 import type { Socket } from "node:net";
 
-import { Option, Result, Schema } from "effect";
-
 import type { Link } from "./index";
 
-const Json = Schema.fromJsonString(Schema.Unknown);
-const parse = Schema.decodeOption(Json);
-const stringify = Schema.encodeResult(Json);
+const parse = (line: string): { readonly ok: true; readonly value: unknown } | { readonly ok: false } => {
+  try {
+    return { ok: true, value: JSON.parse(line) as unknown };
+  } catch {
+    // A line that is not JSON is the other side's noise: it is passed over.
+    return { ok: false };
+  }
+};
 
 export function socketLink(socket: Socket): Link {
   const ears = new Set<(m: unknown) => void>();
@@ -19,7 +22,7 @@ export function socketLink(socket: Socket): Link {
       rest = rest.slice(at + 1);
       if (line.trim() === "") continue;
       const message = parse(line);
-      if (Option.isNone(message)) continue;
+      if (!message.ok) continue;
       for (const fn of ears) fn(message.value);
     }
   });
@@ -27,7 +30,7 @@ export function socketLink(socket: Socket): Link {
     send: (message) => {
       if (socket.destroyed) return;
       // A message that is not JSON is the sender's mistake: it throws to the one sending it.
-      socket.write(Result.getOrThrow(stringify(message)) + "\n");
+      socket.write(JSON.stringify(message) + "\n");
     },
     receive: (fn) => {
       ears.add(fn);

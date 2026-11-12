@@ -1,13 +1,15 @@
 # packages/provider
 
+每个请求经调用者给的 `fetch`（`typeof fetch`）发出，带可选的 `signal` 和时钟；流（SSE、分片）是 `AsyncIterable`；失败是 `Error` 子类（名字和字段照旧），用 `instanceof` 接。
+
 `@vibevalley/provider` 管厂商协议和显式连接，不读环境密钥、runtime 登录或应用设置，不依赖 AI Core、agent、农场协议和应用。根目录 lint 检查这个依赖方向。
 
 | 子路径 | 对外约定 |
 | --- | --- |
 | `./deepseek/models` | DeepSeek 模型目录、能力和单价；不选择调用者的模型 |
 | `./deepseek/request`、`./deepseek/response` | 窄的 DeepSeek 输入/增量契约、请求编码、SSE 分帧、usage/finish reason 解码；不接收 agent 消息类型 |
-| `./deepseek/server` | `deepseekModel` 显式接收 model/baseUrl/key，经调用者的 Effect HttpClient 请求；无重试、环境回退和第二网络实现 |
-| `./transcription` | Effect 作用域内的 `TranscriptionModelV4` 工厂，使用 `@ai-sdk/provider@4.0.36`；显式接收 endpoint/model/key/格式，无重试或 URL 下载 |
+| `./deepseek/server` | `deepseekModel` 显式接收 model/baseUrl/key，经调用者给的 `fetch` 请求，返回 `AsyncIterable` 的增量；无重试、环境回退和第二网络实现 |
+| `./transcription` | `TranscriptionModelV4` 工厂，经调用者给的 `fetch`，使用 `@ai-sdk/provider@4.0.36`；显式接收 endpoint/model/key/格式，无重试或 URL 下载 |
 | `./moss` | MOSS 帧 Schema、PCM/tagged-v1 编码；浏览器可用 |
 | `./moss/server`、`./moss/live-models` | Live 显式鉴权连接、握手与稳定模型／快照目录 |
 | `./moss/image` | `prepareMossImage` 校验参数；`generateMossImage` 显式凭据提交一次生成，返回 URL，不重试、不下载 |
@@ -30,7 +32,7 @@
 
 DeepSeek 保留代理返回的 reasoning 字段、choice usage、迟到的工具 ID 和拒绝细节。它是单一的专有适配器，不是通用语言 SDK；AI 层负责 agent 历史重放和消息折叠。为什么不直接换官方适配器，见 [模型边界](docs/subsystems/brain.md#模型边界)。
 
-转写保留 `response_format=json`、`dictation.<format>`、六种格式与 120 秒请求头超时；响应体保留独立的失败通道。作用域内的 FiberSet 将 Core 的 Promise 调用接到调用者的 Effect 服务，测试时钟和取消可到达 HTTP 客户端。默认 OpenAI 适配器的 verbose 格式不是这个接口的契约，因此这里实现上游模型接口。结果保留响应头、原始正文和 usage；缺失的时长、语言和时间戳不猜。
+转写保留 `response_format=json`、`dictation.<format>`、六种格式与 120 秒请求头超时；响应体保留独立的失败通道。请求经调用者给的 `fetch` 和时钟，`abortSignal` 和测试时钟都到得了 HTTP 请求。默认 OpenAI 适配器的 verbose 格式不是这个接口的契约，因此这里实现上游模型接口。结果保留响应头、原始正文和 usage；缺失的时长、语言和时间戳不猜。
 
 生图协议 `src/moss/image.ts` 接受显式 Key 与文生图或布局输入，固定官方端点，返回单张图片 URL 和用量，不下载文件。请求及响应体共用 900 秒上限，JSON 响应限制 1 MiB；不跟随重定向、不重试。错误区分未提交、明确拒绝和结果未知，只有白名单错误码能跨出边界。任务和本地资产的接入见[生图任务](docs/subsystems/media.md)；调用者必须持久化结果 URL 后独立下载，不能因下载失败重新提交生成。
 
@@ -44,4 +46,4 @@ DeepSeek 保留代理返回的 reasoning 字段、choice usage、迟到的工具
 
 浏览器只导入纯协议子路径，不导入服务端工厂。`ask_orchestrator`、页面中继、设置到厂商配置的组装及 RTC 设备由应用负责。实时内核的保留边界见 [语音](docs/subsystems/voice.md#为什么这样)。
 
-检查：`vp run --filter @vibevalley/provider test`；参与 `packages:build`、`server:check` 和 `effect:check`。服务端 voice 测试检查经 Core 的真实转写接线和声网通话生命周期。
+检查：`vp run --filter @vibevalley/provider test`；参与 `packages:build` 和 `server:check`。服务端 voice 测试检查经 Core 的真实转写接线和声网通话生命周期。

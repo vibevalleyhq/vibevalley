@@ -1,27 +1,34 @@
-import { Effect, Option, Predicate, Schema, Stream } from "effect";
-import { Sse } from "effect/encoding";
-import { HttpClient, type HttpClientError, HttpClientRequest } from "effect/http";
+import { z } from "zod";
 
+import { isAbort } from "@vibevalley/async";
+
+import { bodyChunks, decodeText, ProviderTransportError } from "../base/http.ts";
+import { fromJson, jsonText } from "../base/json.ts";
+import { SseRetry, SseTooLarge, sseEvents } from "../base/sse.ts";
 import { type DeepSeekInput, encodeDeepSeekRequest } from "./request.ts";
-import { decodeDeepSeekChunk } from "./response.ts";
+import { type DeepSeekChunk, decodeDeepSeekChunk } from "./response.ts";
 
 const maxEventSize = 4 << 20;
 
-class DeepSeekError extends Schema.TaggedError<DeepSeekError, { readonly brand: unique symbol }>()("DeepSeekError", {
-  reason: Schema.Literals(["network", "status", "stream"]),
-  status: Schema.optionalKey(Schema.Int),
-  message: Schema.String,
-  cause: Schema.optionalKey(Schema.Defect()),
-}) {}
+class DeepSeekError extends Error {
+  override readonly name = "DeepSeekError";
+  readonly reason: "network" | "status" | "stream";
+  declare readonly status?: number;
 
-const decodeErrorBody = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ error: Schema.Record(Schema.String, Schema.Unknown) })));
-const decodeStreamChunk = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
-const encodeJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
-const encodeErrorBody = Schema.encodeOption(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)));
+  constructor(fields: { readonly reason: "network" | "status" | "stream"; readonly status?: number; readonly message: string; readonly cause?: unknown }) {
+    super(fields.message, fields.cause === undefined ? undefined : { cause: fields.cause });
+    this.reason = fields.reason;
+    if (fields.status !== undefined) this.status = fields.status;
+  }
+}
+
+const ErrorBody = z.object({ error: z.record(z.string(), z.unknown()) });
+
+const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 function statusMessage(status: number, text: string): string {
-  const shown = Option.flatMap(decodeErrorBody(text), (body) => encodeErrorBody(body.error));
-  if (Option.isSome(shown)) return `${status}: ${shown.value}`;
+  const body = fromJson(ErrorBody, text);
+  if (body !== undefined) return `${status}: ${jsonText(body.error)}`;
   return `${status} ${text.trim() || "status code (no body)"}`;
 }
 
@@ -31,54 +38,62 @@ export interface DeepSeekConnection {
   readonly key: string;
 }
 
-export function makeDeepSeekModel(http: HttpClient.HttpClient, connection: DeepSeekConnection) {
-  const stream = Effect.fn("DeepSeek.stream")(function* (input: DeepSeekInput) {
-    const request = HttpClientRequest.post(`${connection.baseUrl}/chat/completions`).pipe(
-      HttpClientRequest.bearerToken(connection.key),
-      HttpClientRequest.bodyJsonUnsafe(encodeDeepSeekRequest(connection.model, input)),
-    );
-    const res = yield* http
-      .execute(request)
-      .pipe(Effect.mapError((cause) => DeepSeekError.make({ reason: "network", message: `Connection error: ${cause.message}`, cause })));
-    if (res.status >= 400) {
-      const text = yield* res.text.pipe(
-        Effect.tapError((e) => Effect.logDebug("DeepSeek error body could not be read", e)),
-        Effect.orElseSucceed(() => ""),
-      );
-      return yield* DeepSeekError.make({ reason: "status", status: res.status, message: statusMessage(res.status, text) });
+export function makeDeepSeekModel(fetcher: typeof fetch, connection: DeepSeekConnection) {
+  async function* events(response: Response, signal: AbortSignal): AsyncGenerator<DeepSeekChunk> {
+    try {
+      for await (const event of sseEvents(decodeText(bodyChunks(response, signal)), { maxEventSize })) {
+        if (event.data.startsWith("[DONE]")) return;
+        let chunk: unknown;
+        try {
+          chunk = JSON.parse(event.data);
+        } catch {
+          throw new DeepSeekError({ reason: "stream", message: `Not JSON in the stream: ${event.data.slice(0, 200)}` });
+        }
+        const error: unknown = typeof chunk === "object" && chunk !== null && "error" in chunk ? chunk.error : undefined;
+        if (error === undefined || error === null) {
+          yield decodeDeepSeekChunk(chunk);
+          continue;
+        }
+        const said = typeof error === "object" && "message" in error && typeof error.message === "string" ? error.message : jsonText(error);
+        throw new DeepSeekError({ reason: "stream", message: said });
+      }
+    } catch (e) {
+      // A retry field is the server's to act on; this client does not reconnect, so it is the end of the answer.
+      if (e instanceof SseRetry) return;
+      if (e instanceof SseTooLarge) throw new DeepSeekError({ reason: "stream", message: `SSE frame too large: ${e.message}`, cause: e });
+      if (e instanceof ProviderTransportError)
+        throw new DeepSeekError({ reason: "stream", message: `The stream broke: ${messageOf(e.cause)}`, cause: e.cause });
+      throw e;
     }
-    return res.stream.pipe(
-      Stream.decodeText(),
-      Stream.pipeThroughChannel(Sse.decode<DeepSeekError | HttpClientError.HttpClientError, unknown>({ maxEventSize })),
-      Stream.catchTags({
-        HttpClientError: (e) => Stream.fail(DeepSeekError.make({ reason: "stream", message: `The stream broke: ${e.message}`, cause: e })),
-        SseError: (e) => Stream.fail(DeepSeekError.make({ reason: "stream", message: `SSE frame too large: ${e.message}`, cause: e })),
-        Retry: () => Stream.empty,
-      }),
-      Stream.takeWhile((event) => !event.data.startsWith("[DONE]")),
-      Stream.mapEffect((event) =>
-        decodeStreamChunk(event.data).pipe(
-          Effect.mapError(() => DeepSeekError.make({ reason: "stream", message: `Not JSON in the stream: ${event.data.slice(0, 200)}` })),
-          Effect.flatMap((chunk) => {
-            const error: unknown = Predicate.hasProperty(chunk, "error") ? chunk.error : undefined;
-            if (error === undefined || error === null) return Effect.succeed(decodeDeepSeekChunk(chunk));
-            const message =
-              Predicate.hasProperty(error, "message") && typeof error.message === "string"
-                ? Effect.succeed(error.message)
-                : encodeJson(error).pipe(
-                    Effect.tapError((e) => Effect.logDebug("DeepSeek stream error could not be serialized", e)),
-                    Effect.orElseSucceed(() => "The stream reported an error that is not JSON"),
-                  );
-            return Effect.flatMap(message, (said) => Effect.fail(DeepSeekError.make({ reason: "stream", message: said })));
-          }),
-        ),
-      ),
-    );
-  });
+  }
+
+  /** Sends the request and answers once the response has a status: a refusal rejects here, the answer is the iterable. */
+  const stream = async (input: DeepSeekInput, signal: AbortSignal = new AbortController().signal): Promise<AsyncIterable<DeepSeekChunk>> => {
+    let response: Response;
+    try {
+      response = await fetcher(`${connection.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${connection.key}`, "content-type": "application/json" },
+        body: JSON.stringify(encodeDeepSeekRequest(connection.model, input)),
+        signal,
+      });
+    } catch (cause) {
+      if (isAbort(cause, signal)) throw cause;
+      throw new DeepSeekError({ reason: "network", message: `Connection error: ${messageOf(cause)}`, cause });
+    }
+    if (response.status >= 400) {
+      let text = "";
+      try {
+        text = await response.text();
+      } catch (e) {
+        if (isAbort(e, signal)) throw e;
+        // The status alone still says what went wrong; the body was only its detail.
+      }
+      throw new DeepSeekError({ reason: "status", status: response.status, message: statusMessage(response.status, text) });
+    }
+    return events(response, signal);
+  };
   return { stream };
 }
 
-export const deepseekModel = Effect.fn("Provider.deepseekModel")(function* (connection: DeepSeekConnection) {
-  const http = yield* HttpClient.HttpClient;
-  return makeDeepSeekModel(http, connection);
-});
+export const deepseekModel = (connection: DeepSeekConnection, fetcher: typeof fetch = globalThis.fetch) => makeDeepSeekModel(fetcher, connection);

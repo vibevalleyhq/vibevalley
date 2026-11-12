@@ -1,15 +1,7 @@
-import * as stylex from "@stylexjs/stylex";
-
 import type { Memory } from "@vibevalley/protocol";
 import { stories, story } from "@vibevalley/stories";
 
 import { MemoryItem } from "./Memory";
-
-const viewStyles = stylex.create({
-  memoryStoriesDiv: {
-    width: "30rem",
-  },
-});
 
 const now = Date.now();
 const day = 86_400_000;
@@ -35,7 +27,7 @@ export default stories({
       args: { state: "kept" },
       grid: { rows: ["state", ["kept", "fading", "forgettable"]], cols: "pseudo" },
       render: (a) => (
-        <div {...stylex.attrs(viewStyles.memoryStoriesDiv)}>
+        <div class="w-120">
           <MemoryItem
             memory={memory("这个仓库的测试用 vp test；不要开 next dev。", { fading: a.state === "fading" })}
             meta={["用户写的", "vibevalley", "想起过 4 次"]}

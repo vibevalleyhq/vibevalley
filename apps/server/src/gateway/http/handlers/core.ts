@@ -1,13 +1,9 @@
-import { Effect } from "effect";
-
 import type { CoreHandlers } from "@vibevalley/protocol/api";
 
-import { ServerConfig } from "#/infra/config.ts";
+import type { ServerConfig } from "#/infra/config.ts";
 
-export const coreHandlers = Effect.gen(function* () {
-  const config = yield* ServerConfig;
-  const done: CoreHandlers = {
-    "server.health.get": () => Effect.succeed({ ok: true, version: config.version }),
+export function coreHandlers(deps: { readonly config: ServerConfig }): CoreHandlers {
+  return {
+    "server.health.get": async () => ({ ok: true, version: deps.config.version }),
   };
-  return done;
-});
+}

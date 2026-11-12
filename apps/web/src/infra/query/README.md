@@ -19,7 +19,7 @@ const query = useQuery(settingsQuery, { enabled: () => props.open });
 
 生成的 `VibeValleyApi` 方法接受可选请求选项 `{ signal }`，无参数方法把它放在第一个参数，有输入的方法放在第二个参数；生成器是 `scripts/gen/api-client.ts`。Query 把 signal 交给传输，同时用代次阻止不理会取消的读取回写。取消不表示服务端已经停止执行。
 
-定义把 key、输入、结果 Schema、fetch 和缓存策略绑定在一起。Schema 必填，优先复用 protocol 的 Codec；fetch 返回 unknown，缓存和 data 类型取 Schema 的 Type。响应先解码再提交成功缓存，转换、异步解码与传输共用 signal 和代次；解码失败保留旧成功记录，不重试，也不在错误中保留可能含密钥的 actual 值或 issues。`setData` 校验 Type 侧，不重复执行 wire 转换。调用定义返回只读描述，不发请求。`useQuery` 持有订阅。定义时校验策略，执行时不反复创建 Query client。
+定义把 key、输入、结果 Schema、fetch 和缓存策略绑定在一起。Schema（Zod）必填，优先复用 protocol 的 Schema；fetch 返回 unknown，缓存和 data 类型取 Schema 的输出。响应先解码再提交成功缓存，转换、异步解码与传输共用 signal 和代次；解码失败保留旧成功记录，不重试，也不在错误中保留可能含密钥的 actual 值或 issues。`setData` 用同一 Schema 同步校验写入的值；异步解码的 Schema 同步校验不了，写入的值照原样留下。调用定义返回只读描述，不发请求。`useQuery` 持有订阅。定义时校验策略，执行时不反复创建 Query client。
 
 Key 只允许字符串、有限数字、布尔和 null 组成的只读元组；用保留类型与边界的编码，不用 `join()`。复杂过滤条件由领域查询定义归一化为这些段，不允许隐式序列化函数、Date、undefined 或任意对象。前缀失效按元组段匹配，不按字符串前缀匹配。
 
@@ -47,7 +47,7 @@ Key 只允许字符串、有限数字、布尔和 null 组成的只读元组；�
 - disabled 只停止自动读取和轮询，不删除已经收到的数据；手动 refetch 是明确读取请求。
 - 切 key 默认不显示前一个结果。`keepPrevious` 只保留在订阅者的 `previous()`，不写入新 key，不冒充当前 key 成功。跨对象的编辑与保存不能使用 previous 数据。
 
-成功提交时使用结果 Schema 的 `toEquivalence` 比较同 key 的领域值；相同结果保留缓存引用，`data()` 另有 memo，不因 fetching 或更新时间改变就重建列表子树。这只在读取完成或 setData 边界运行，不在渲染时深比较，也不替调用方原地修改输入兜底。网络错误由 API 层的 `ApiConnectionError` 标记，包装成人话后仍能被有限重试识别。
+成功提交时按 JSON 比较同 key 的领域值；相同结果保留缓存引用，`data()` 另有 memo，不因 fetching 或更新时间改变就重建列表子树。这只在读取完成或 setData 边界运行，不在渲染时深比较，也不替调用方原地修改输入兜底。网络错误由 API 层的 `ApiConnectionError` 标记，包装成人话后仍能被有限重试识别。
 
 `stale()` 是响应式的：已订阅的过期时刻由可测试的时钟触发；不靠下次无关渲染碰巧发现过期。过期只改变状态，不自动不停刷新。
 

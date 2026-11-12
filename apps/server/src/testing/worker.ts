@@ -4,10 +4,10 @@ import { join } from "node:path";
 
 import { type Runtime } from "@botiverse/oar";
 import { scriptedRuntime, type ScriptedTurn } from "@botiverse/oar/testing";
-import { Clock, Effect, Formatter } from "effect";
 
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
 
+import { wallTime } from "#/infra/time.ts";
 import { answerOpening, criteriaHead } from "#/modules/issue/prompts.ts";
 import { supportOf, presetOf } from "#/modules/runtime/presets.ts";
 import { briefBreak } from "#/modules/session/briefing.ts";
@@ -23,13 +23,10 @@ const version = /写版本(\w)/u;
 const held = new Set<() => void>();
 
 /** Once n turns are held, lets every held turn go on: a turn not yet at its hold would miss a release made before. */
-export const releaseHeld = (n = 1) =>
-  Effect.andThen(
-    until(() => held.size >= n, `${n} held turn${n === 1 ? "" : "s"}`),
-    Effect.sync(() => {
-      for (const go of [...held]) go();
-    }),
-  );
+export async function releaseHeld(n = 1): Promise<void> {
+  await until(() => held.size >= n, `${n} held turn${n === 1 ? "" : "s"}`);
+  for (const go of [...held]) go();
+}
 
 /** Holds the turn as above: true when it was stopped. */
 const hold = (turn: ScriptedTurn) =>
@@ -92,7 +89,7 @@ async function answer(turn: ScriptedTurn, input: string) {
   }
   if (input.includes("乱写")) return turn.say("看了一圈，说不清。\n\n结论：没查出来");
   const found = { conclusion: "打卡慢是因为每次都重读配置", evidence: ["clock.ts:1 每次调用都读一遍配置"], unsure: [], next: ["把配置读一次缓存起来"] };
-  turn.say("查过了。\n\n```json\n" + Formatter.formatJson(found) + "\n```\n\n结论：查清楚了");
+  turn.say("查过了。\n\n```json\n" + JSON.stringify(found) + "\n```\n\n结论：查清楚了");
 }
 
 /** The helper every flow hires: what it does is in the words of its brief (the part after the reminders). draft-only drafts. */
@@ -172,5 +169,5 @@ export const installedOnly =
     mcpServers: null,
     tools: null,
     settings: { enabled: true, binPath: "", defaultModel: "", defaultEffort: "", env: {} },
-    checkedAt: await Effect.runPromise(Clock.currentTimeMillis),
+    checkedAt: wallTime.now(),
   });

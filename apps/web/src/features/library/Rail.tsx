@@ -1,5 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
-import { Array as Arr } from "effect";
 import { For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -9,74 +7,6 @@ import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
 
 import { type Counts, type KindFilter, type Names, type Where, whereKey } from "./items.ts";
-
-const styles = stylex.create({
-  rail: {
-    gridArea: "rail",
-    display: "flex",
-    flexShrink: 0,
-    flexDirection: { default: "column", "@media (width < 40rem)": "row" },
-    gap: { default: "1.25rem", "@media (width < 40rem)": "0.75rem" },
-    width: { default: "13rem", "@media (width < 40rem)": "auto" },
-    overflowX: "hidden",
-    overflowY: { default: "auto", "@media (width < 40rem)": "visible" },
-    borderRightWidth: { default: 1, "@media (width < 40rem)": 0 },
-    borderBottomWidth: { default: 0, "@media (width < 40rem)": 1 },
-    borderStyle: "solid",
-    borderColor: "var(--color-line)",
-    backgroundColor: "var(--color-side)",
-    padding: { default: "0.75rem", "@media (width < 40rem)": "0.5rem" },
-  },
-  // On a phone the groups give way to two selects: a row of every choice would run past the screen's edge.
-  group: {
-    display: { default: "flex", "@media (width < 40rem)": "none" },
-    flexShrink: 0,
-    flexDirection: { default: "column", "@media (width < 40rem)": "row" },
-    gap: { default: "1px", "@media (width < 40rem)": "0.25rem" },
-  },
-  narrow: { display: { default: "none", "@media (width < 40rem)": "flex" }, minWidth: 0, flex: 1, gap: "0.5rem" },
-  select: { minWidth: 0, flex: 1 },
-  heading: {
-    display: { default: "block", "@media (width < 40rem)": "none" },
-    paddingInline: "0.5rem",
-    paddingBottom: "0.25rem",
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontWeight: "var(--font-weight-medium)",
-    color: "var(--color-faint)",
-  },
-  row: {
-    display: "flex",
-    height: "1.75rem",
-    flexShrink: 0,
-    cursor: "pointer",
-    alignItems: "center",
-    gap: "0.5rem",
-    borderRadius: "var(--radius-md)",
-    paddingInline: "0.5rem",
-    fontSize: "var(--text-sm)",
-    lineHeight: "var(--leading-sm)",
-    whiteSpace: "nowrap",
-    textAlign: "start",
-    color: "var(--color-ink)",
-    transitionProperty: "background-color",
-    transitionDuration: "120ms",
-    transitionTimingFunction: "var(--ease-out)",
-  },
-  idle: {
-    backgroundColor: { default: null, "@media (hover: hover)": { default: null, ":hover": "var(--color-hover)" } },
-  },
-  here: { backgroundColor: "var(--color-selected)", fontWeight: "var(--font-weight-medium)" },
-  icon: { flexShrink: 0, color: "var(--color-muted)" },
-  label: { minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis" },
-  count: {
-    flexShrink: 0,
-    fontSize: "var(--text-xs)",
-    lineHeight: "var(--leading-xs)",
-    fontVariantNumeric: "tabular-nums",
-    color: "var(--color-faint)",
-  },
-});
 
 const originIcons: Record<"generated" | "uploaded" | "fetched", IconName> = { generated: "generate", uploaded: "upload", fetched: "download" };
 const kindIcons: Record<KindFilter, IconName> = { all: "media", image: "image", audio: "audio", video: "video", other: "file" };
@@ -90,11 +20,14 @@ function Row(props: { testid: string; dataKey: string; icon: IconName; label: st
       data-key={props.dataKey}
       aria-pressed={props.here ? "true" : "false"}
       onClick={() => props.onPick()}
-      {...stylex.attrs(styles.row, props.here ? styles.here : styles.idle)}
+      class={[
+        "flex h-7 shrink-0 cursor-pointer items-center gap-2 rounded-md px-2 text-sm whitespace-nowrap text-start text-ink transition-[background-color] duration-120 ease-out",
+        props.here ? "bg-selected font-medium" : "hover:bg-hover",
+      ]}
     >
-      <Icon name={props.icon} size={14} styles={styles.icon} />
-      <span {...stylex.attrs(styles.label)}>{props.label}</span>
-      <span {...stylex.attrs(styles.count)}>{props.count}</span>
+      <Icon name={props.icon} size={14} class="shrink-0 text-muted" />
+      <span class="min-w-0 flex-1 overflow-hidden text-ellipsis">{props.label}</span>
+      <span class="shrink-0 text-xs tabular-nums text-faint">{props.count}</span>
     </button>
   );
 }
@@ -114,12 +47,12 @@ export function Rail(props: {
     const names = props.names;
     return [
       { where: { by: "all" }, label: t("web.library.origin.all") },
-      ...Arr.map(["generated", "uploaded", "fetched"] as const, (origin) => ({
+      ...(["generated", "uploaded", "fetched"] as const).map((origin) => ({
         where: { by: "origin", origin } as const,
         label: t(`web.library.origin.${origin}`),
       })),
-      ...Arr.map(props.counts.channels, (channel) => ({ where: { by: "channel", channel } as const, label: names.channel(channel) })),
-      ...Arr.map(props.counts.agents, (agent) => ({ where: { by: "agent", agent } as const, label: names.agent(agent) })),
+      ...props.counts.channels.map((channel) => ({ where: { by: "channel", channel } as const, label: names.channel(channel) })),
+      ...props.counts.agents.map((agent) => ({ where: { by: "agent", agent } as const, label: names.agent(agent) })),
     ];
   };
   const n = (key: string) => props.counts.where.get(key) ?? 0;
@@ -135,16 +68,20 @@ export function Rail(props: {
     />
   );
   return (
-    <nav aria-label={t("web.library.rail.label")} data-testid="library-rail" {...stylex.attrs(styles.rail)}>
-      <div role="group" aria-label={t("web.library.rail.where")} {...stylex.attrs(styles.group)}>
-        <p {...stylex.attrs(styles.heading)}>{t("web.library.rail.where")}</p>
+    <nav
+      aria-label={t("web.library.rail.label")}
+      data-testid="library-rail"
+      class="[grid-area:rail] flex shrink-0 flex-col max-sm:flex-row gap-5 max-sm:gap-3 w-52 max-sm:w-auto overflow-x-hidden overflow-y-auto max-sm:overflow-y-visible border-r max-sm:border-r-0 border-b-0 max-sm:border-b border-line bg-side p-3 max-sm:p-2"
+    >
+      <div role="group" aria-label={t("web.library.rail.where")} class="flex max-sm:hidden shrink-0 flex-col max-sm:flex-row gap-px max-sm:gap-1">
+        <p class="block max-sm:hidden px-2 pb-1 text-xs font-medium text-faint">{t("web.library.rail.where")}</p>
         {whereRow({ by: "all" }, "media", t("web.library.origin.all"))}
         <For each={["generated", "uploaded", "fetched"] as const}>
           {(origin) => whereRow({ by: "origin", origin: origin }, originIcons[origin], t(`web.library.origin.${origin}`))}
         </For>
       </div>
-      <div role="group" aria-label={t("web.library.rail.kind")} {...stylex.attrs(styles.group)}>
-        <p {...stylex.attrs(styles.heading)}>{t("web.library.rail.kind")}</p>
+      <div role="group" aria-label={t("web.library.rail.kind")} class="flex max-sm:hidden shrink-0 flex-col max-sm:flex-row gap-px max-sm:gap-1">
+        <p class="block max-sm:hidden px-2 pb-1 text-xs font-medium text-faint">{t("web.library.rail.kind")}</p>
         <For each={kinds}>
           {(kind) => (
             <Row
@@ -159,33 +96,33 @@ export function Rail(props: {
           )}
         </For>
       </div>
-      <Show when={Arr.isReadonlyArrayNonEmpty(props.counts.channels)}>
-        <div role="group" aria-label={t("web.library.rail.channels")} {...stylex.attrs(styles.group)}>
-          <p {...stylex.attrs(styles.heading)}>{t("web.library.rail.channels")}</p>
+      <Show when={props.counts.channels.length > 0}>
+        <div role="group" aria-label={t("web.library.rail.channels")} class="flex max-sm:hidden shrink-0 flex-col max-sm:flex-row gap-px max-sm:gap-1">
+          <p class="block max-sm:hidden px-2 pb-1 text-xs font-medium text-faint">{t("web.library.rail.channels")}</p>
           <For each={props.counts.channels}>{(channel) => whereRow({ by: "channel", channel: channel }, "chat", props.names.channel(channel))}</For>
         </div>
       </Show>
-      <Show when={Arr.isReadonlyArrayNonEmpty(props.counts.agents)}>
-        <div role="group" aria-label={t("web.library.rail.agents")} {...stylex.attrs(styles.group)}>
-          <p {...stylex.attrs(styles.heading)}>{t("web.library.rail.agents")}</p>
+      <Show when={props.counts.agents.length > 0}>
+        <div role="group" aria-label={t("web.library.rail.agents")} class="flex max-sm:hidden shrink-0 flex-col max-sm:flex-row gap-px max-sm:gap-1">
+          <p class="block max-sm:hidden px-2 pb-1 text-xs font-medium text-faint">{t("web.library.rail.agents")}</p>
           <For each={props.counts.agents}>{(agent) => whereRow({ by: "agent", agent: agent }, "agents", props.names.agent(agent))}</For>
         </div>
       </Show>
-      <div {...stylex.attrs(styles.narrow)}>
+      <div class="hidden max-sm:flex min-w-0 flex-1 gap-2">
         <Select
           label={t("web.library.rail.where")}
           testid="library-where-select"
           size="control"
           value={whereKey(props.where)}
           onChange={(key) => {
-            const found = Arr.findFirst(wheres(), (w) => whereKey(w.where) === key);
-            if (found._tag === "Some") props.onWhere(found.value.where);
+            const found = wheres().find((w) => whereKey(w.where) === key);
+            if (found) props.onWhere(found.where);
           }}
-          options={Arr.map(wheres(), (w) => ({
+          options={wheres().map((w) => ({
             value: whereKey(w.where),
             label: `${w.where.by === "all" ? t("web.library.rail.anyWhere") : w.label} · ${n(whereKey(w.where))}`,
           }))}
-          styles={styles.select}
+          class="min-w-0 flex-1"
         />
         <Select
           label={t("web.library.rail.kind")}
@@ -193,11 +130,11 @@ export function Rail(props: {
           size="control"
           value={props.kind}
           onChange={props.onKind}
-          options={Arr.map(kinds, (kind) => ({
+          options={kinds.map((kind) => ({
             value: kind,
             label: `${kind === "all" ? t("web.library.rail.anyKind") : t(`web.library.kind.${kind}`)} · ${props.counts.kind.get(kind) ?? 0}`,
           }))}
-          styles={styles.select}
+          class="min-w-0 flex-1"
         />
       </div>
     </nav>

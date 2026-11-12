@@ -1,9 +1,11 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { Effect, Schema } from "effect";
-import { FetchHttpClient, HttpClient } from "effect/http";
 import { afterEach, expect, test, vi } from "vite-plus/test";
+import { z } from "zod";
 
-import { whenTrue } from "#/testing/layers.ts";
+import { systemClock } from "@vibevalley/async";
+import { whenTrue } from "@vibevalley/testkit/until";
+
+import { keptLog } from "#/infra/log.ts";
 
 import { everos } from "./everos.ts";
 import { nowledge } from "./nowledge.ts";
@@ -13,13 +15,14 @@ afterEach(() => {
 });
 
 /** What an operation came to: its message when it failed. */
-const ended = <A, E extends Error>(e: Effect.Effect<A, E>) =>
-  Effect.runPromise(
-    Effect.match(e, {
-      onFailure: (err) => err.message,
-      onSuccess: () => "completed",
-    }),
+const ended = (p: Promise<unknown>) =>
+  p.then(
+    () => "completed",
+    (err: unknown) => (err instanceof Error ? err.message : String(err)),
   );
+
+const signal = new AbortController().signal;
+const deps = { clock: systemClock, log: keptLog() };
 
 test("a late Nowledge connection cannot issue a tool call or reopen after the source stopped", async () => {
   const { promise: held, resolve: release } = Promise.withResolvers<void>();
@@ -29,19 +32,19 @@ test("a late Nowledge connection cannot issue a tool call or reopen after the so
     await held;
   });
   const call = vi.spyOn(Client.prototype, "callTool");
-  const source = nowledge({ kind: "nowledge", url: "http://unused/mcp", enabled: true, read: true });
+  const source = nowledge({ kind: "nowledge", url: "http://unused/mcp", enabled: true, read: true }, deps);
   const query = { agent: "lab", repo: "", text: "query", kind: "" as const, limit: 1 };
-  const pending = ended(source.search(query));
+  const pending = ended(source.search(query, signal));
   await started;
-  await Effect.runPromise(source.stop);
+  await source.stop();
   release();
   expect(await pending).toContain("stopped");
-  expect(await ended(source.search(query))).toContain("stopped");
+  expect(await ended(source.search(query, signal))).toContain("stopped");
   expect(call).not.toHaveBeenCalled();
   expect(connect).toHaveBeenCalledTimes(1);
 });
 
-const decodeSession = Schema.decodeEffect(Schema.fromJsonString(Schema.Struct({ session_id: Schema.String })));
+const Session = z.object({ session_id: z.string() });
 
 test("EverOS flushes completed writes but a canceled late response creates no new pending session", async () => {
   const requests: { path: string; session: string }[] = [];
@@ -49,7 +52,7 @@ test("EverOS flushes completed writes but a canceled late response creates no ne
   const { promise: started, resolve: entered } = Promise.withResolvers<void>();
   const fetch = async (url: string | URL | Request, init?: RequestInit) => {
     const href = url instanceof Request ? url.url : url.toString();
-    const body = await Effect.runPromise(decodeSession(new TextDecoder().decode(init?.body as Uint8Array)));
+    const body = Session.parse(JSON.parse(typeof init?.body === "string" ? init.body : ""));
     requests.push({ path: new URL(href).pathname, session: body.session_id });
     if (body.session_id === "vibevalley-late" && href.endsWith("/add")) {
       entered();
@@ -57,18 +60,16 @@ test("EverOS flushes completed writes but a canceled late response creates no ne
     }
     return new Response("{}", { status: 200 });
   };
-  const http = Effect.runSync(Effect.service(HttpClient.HttpClient).pipe(Effect.provide(FetchHttpClient.layer)));
-  const run = <A, E>(e: Effect.Effect<A, E>) => Effect.provideService(e, FetchHttpClient.Fetch, fetch);
-  const source = everos({ kind: "everos", url: "http://unused", enabled: true, write: true }, http);
+  const source = everos({ kind: "everos", url: "http://unused", enabled: true, write: true }, { ...deps, fetch });
   const turn = { agent: "lab", session: "done", repo: "demo", brief: "brief", outcome: "completed" as const, said: "done", summary: "done" };
-  expect(await source.syncTurn(turn).pipe(run, ended)).toBe("completed");
-  const pending = source.syncTurn({ ...turn, session: "late" }).pipe(run, ended);
+  expect(await ended(source.syncTurn(turn, signal))).toBe("completed");
+  const pending = ended(source.syncTurn({ ...turn, session: "late" }, signal));
   await started;
-  await Effect.runPromise(run(source.stop));
+  await source.stop();
   release(new Response("{}", { status: 200 }));
   expect(await pending).toContain("stopped");
-  await Effect.runPromise(run(source.stop));
-  expect(await source.syncTurn({ ...turn, session: "later" }).pipe(run, ended)).toContain("stopped");
+  await source.stop();
+  expect(await ended(source.syncTurn({ ...turn, session: "later" }, signal))).toContain("stopped");
   expect(requests).toEqual([
     { path: "/api/v2/memory/add", session: "vibevalley-done" },
     { path: "/api/v2/memory/add", session: "vibevalley-late" },
@@ -86,8 +87,8 @@ test("regression: a late failed Nowledge call does not discard a replacement con
     calls.push({ client: this, result });
     return result.promise;
   });
-  const source = nowledge({ kind: "nowledge", url: "http://unused/mcp", enabled: true, read: true });
-  const search = () => ended(source.search({ agent: "lab", repo: "", text: "query", kind: "", limit: 1 }));
+  const source = nowledge({ kind: "nowledge", url: "http://unused/mcp", enabled: true, read: true }, deps);
+  const search = () => ended(source.search({ agent: "lab", repo: "", text: "query", kind: "", limit: 1 }, signal));
   const first = search(),
     second = search();
   await whenTrue(() => calls.length === 2, "two original calls");
@@ -103,5 +104,5 @@ test("regression: a late failed Nowledge call does not discard a replacement con
   expect(connect).toHaveBeenCalledTimes(2);
   for (const call of calls) call.result.resolve({ content: [{ type: "text", text: '{"results":[]}' }] });
   await Promise.all([third, fourth]);
-  await Effect.runPromise(source.stop);
+  await source.stop();
 });

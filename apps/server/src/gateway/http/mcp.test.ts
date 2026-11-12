@@ -1,17 +1,19 @@
-import { Effect, Layer } from "effect";
-import { HttpRouter } from "effect/http";
-import { expect, it } from "vite-plus/test";
+import { expect, test } from "vite-plus/test";
 
-import { Mcp } from "#/gateway/mcp/mcp.ts";
-import { Orchestrator } from "#/modules/orchestrator/orchestrator.ts";
+import { until } from "@vibevalley/testkit/until";
+
+import type { Mcp } from "#/gateway/mcp/mcp.ts";
+import { keptLog } from "#/infra/log.ts";
+import { wallTime } from "#/infra/time.ts";
+import type { Orchestrator } from "#/modules/orchestrator/orchestrator.ts";
 
 import { mcpRoute } from "./mcp.ts";
 
-it("forwards a disconnect to the Web handler", async () => {
+test("forwards a disconnect to the Web handler", async () => {
   let aborted = false;
-  const handler = Mcp.of({
+  const mcp: Mcp = {
     handle: (request) =>
-      Effect.callback<Response>(() => {
+      new Promise<Response>(() => {
         request.signal.addEventListener(
           "abort",
           () => {
@@ -20,31 +22,19 @@ it("forwards a disconnect to the Web handler", async () => {
           { once: true },
         );
       }),
-  });
-  const routes = mcpRoute.pipe(
-    Layer.provide(
-      Layer.mergeAll(
-        Layer.succeed(Mcp, handler),
-        Layer.succeed(
-          Orchestrator,
-          Orchestrator.of({
-            stop: () => Effect.void,
-            markWrong: () => Effect.never,
-            answerer: () => () => undefined,
-            brief: () => Effect.never,
-          }),
-        ),
-      ),
-    ),
-  );
-  const { handler: handle, dispose } = HttpRouter.toWebHandler(routes);
-  try {
-    const controller = new AbortController();
-    const pending = handle(new Request("http://farm/mcp", { method: "POST", body: "{}", signal: controller.signal }));
-    controller.abort();
-    await pending.catch(() => undefined);
-    expect(aborted).toBe(true);
-  } finally {
-    await dispose();
-  }
+    close: async () => {},
+  };
+  const orchestrator: Orchestrator = {
+    stop: async () => {},
+    markWrong: () => new Promise(() => {}),
+    answerer: () => () => undefined,
+    brief: () => new Promise(() => {}),
+    close: async () => {},
+  };
+  const routes = mcpRoute({ mcp, orchestrator, clock: wallTime, log: keptLog() });
+  const controller = new AbortController();
+  void Promise.resolve(routes.fetch(new Request("http://farm/mcp", { method: "POST", body: "{}", signal: controller.signal }))).catch(() => undefined);
+  controller.abort();
+  await until(() => aborted, "the disconnect");
+  expect(aborted).toBe(true);
 });

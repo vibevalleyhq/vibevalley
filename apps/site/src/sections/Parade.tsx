@@ -1,129 +1,6 @@
-import * as stylex from "@stylexjs/stylex";
-
 /** @jsxImportSource @solidjs/web */
 import type { Copy } from "../i18n/zh";
 import { observeVisibility, createReveal, createScrollAnimation } from "../ui/scroll";
-
-const sceneStyles = stylex.create({
-  field: {
-    containerType: "inline-size",
-    position: "relative",
-    height: "400px",
-    overflow: "hidden",
-    borderBlockStyle: "solid",
-    borderBlockWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundImage: "var(--scene-parade-background)",
-  },
-});
-
-const styles = stylex.create({
-  paradeDiv: {
-    position: "absolute",
-    bottom: "54px",
-    left: "0",
-    height: "84px",
-    width: "3rem",
-    animationName: "walk-across",
-    animationDuration: "30s",
-    animationDelay: "0s",
-    animationTimingFunction: "linear",
-    animationIterationCount: "infinite",
-    animationDirection: "normal",
-    animationFillMode: "none",
-    animationPlayState: "running",
-  },
-  paradeImg: {
-    position: "absolute",
-    inset: "0",
-    width: "100%",
-    height: "100%",
-    animationName: "walk-frame",
-    animationDuration: ".6s",
-    animationDelay: "0s",
-    animationTimingFunction: "steps(1)",
-    animationIterationCount: "infinite",
-    animationDirection: "normal",
-    animationFillMode: "none",
-    animationPlayState: "running",
-    objectFit: "contain",
-    objectPosition: "bottom",
-    opacity: "0",
-    imageRendering: "pixelated",
-  },
-  paradeDiv2: {
-    position: "absolute",
-    bottom: "108px",
-    left: "-10%",
-    display: "flex",
-    width: "120%",
-    alignItems: "flex-end",
-    gap: "1.5rem",
-  },
-  paradeImg2: {
-    width: "102px",
-    maxWidth: "none",
-    imageRendering: "pixelated",
-  },
-  paradeDiv22: {
-    position: "absolute",
-    bottom: "38px",
-    height: "4rem",
-    width: "100%",
-    borderBlockStyle: "solid",
-    borderBlockWidth: "2px",
-    borderColor: "var(--color-path-edge)",
-    backgroundImage: "repeating-linear-gradient(90deg,var(--color-path) 0 22px,var(--color-path-groove) 22px 26px)",
-  },
-  paradeDiv3: {
-    position: "absolute",
-    bottom: "-18px",
-    left: "-10%",
-    display: "flex",
-    width: "120%",
-    alignItems: "flex-end",
-    gap: "120px",
-  },
-  paradeImg22: {
-    width: "150px",
-    maxWidth: "none",
-    imageRendering: "pixelated",
-  },
-  paradeDiv4: {
-    position: "absolute",
-    insetInline: "0",
-    top: "22px",
-    zIndex: "2",
-    marginInline: "auto",
-    width: "min(760px,100% - 32px)",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: "var(--color-cream-50)",
-    boxShadow: "inset 0 0 0 2px var(--color-rim), 4px 4px 0 var(--color-drop)",
-    paddingInline: "22px",
-    paddingBlock: "0.875rem",
-    textAlign: "center",
-  },
-  paradeH2: {
-    fontSize: {
-      default: "var(--text-2xl)",
-      "@media (width>=40rem)": "30px",
-    },
-    lineHeight: "var(--leading-2xl)",
-  },
-  paradeP: {
-    marginTop: "0.375rem",
-    fontSize: {
-      default: "var(--text-sm)",
-      "@media (width>=40rem)": "var(--text-base)",
-    },
-    lineHeight: {
-      default: "var(--leading-sm)",
-      "@media (width>=40rem)": "var(--leading-base)",
-    },
-  },
-});
 
 /** While the section crosses the screen, from its top at the screen's bottom to its bottom at the screen's top. */
 const CROSSING: ["start end", "end start"] = ["start end", "end start"];
@@ -142,17 +19,25 @@ export default function Parade(props: Props) {
   observeVisibility(ref);
   return (
     <>
-      <section ref={ref.set} id="parade" aria-labelledby="parade-title" {...stylex.attrs(sceneStyles.field)}>
-        <div ref={back.set} aria-hidden="true" {...stylex.attrs(styles.paradeDiv2)}>
+      <section
+        ref={ref.set}
+        id="parade"
+        aria-labelledby="parade-title"
+        class="@container relative h-100 overflow-hidden border-y-2 border-bark-900 bg-[image:var(--scene-parade-background)]"
+      >
+        <div ref={back.set} aria-hidden="true" class="absolute bottom-27 -left-[10%] flex w-[120%] items-end gap-6">
           {props.plots.map((src) => (
-            <img loading="lazy" src={src} alt="" {...stylex.attrs(styles.paradeImg2)} />
+            <img loading="lazy" src={src} alt="" class="w-25.5 max-w-none [image-rendering:pixelated]" />
           ))}
         </div>
-        <div aria-hidden="true" {...stylex.attrs(styles.paradeDiv22)} />
+        <div
+          aria-hidden="true"
+          class="absolute bottom-9.5 h-16 w-full border-y-2 border-(--color-path-edge) bg-[image:repeating-linear-gradient(90deg,var(--color-path)_0_22px,var(--color-path-groove)_22px_26px)]"
+        />
         {props.walkers.map((frames, i) => (
           <div
             aria-hidden="true"
-            {...stylex.attrs(styles.paradeDiv)}
+            class="absolute bottom-13.5 left-0 h-21 w-12 [animation-name:walk-across] [animation-duration:30000ms] [animation-timing-function:linear] [animation-iteration-count:infinite]"
             style={{
               "animation-duration": `${26 + (i % 3) * 7}s`,
               "animation-delay": `${-i * 5.3}s`,
@@ -163,7 +48,7 @@ export default function Parade(props: Props) {
                 src={src}
                 alt=""
                 loading="lazy"
-                {...stylex.attrs(styles.paradeImg)}
+                class="absolute inset-0 w-full h-full [animation-name:walk-frame] [animation-duration:600ms] [animation-timing-function:steps(1)] [animation-iteration-count:infinite] object-contain object-bottom opacity-0 [image-rendering:pixelated]"
                 style={{
                   "animation-delay": `${j * 0.15}s`,
                 }}
@@ -171,16 +56,19 @@ export default function Parade(props: Props) {
             ))}
           </div>
         ))}
-        <div ref={near.set} aria-hidden="true" {...stylex.attrs(styles.paradeDiv3)}>
+        <div ref={near.set} aria-hidden="true" class="absolute -bottom-4.5 -left-[10%] flex w-[120%] items-end gap-30">
           {props.front.map((src) => (
-            <img loading="lazy" src={src} alt="" {...stylex.attrs(styles.paradeImg22)} />
+            <img loading="lazy" src={src} alt="" class="w-37.5 max-w-none [image-rendering:pixelated]" />
           ))}
         </div>
-        <div data-reveal {...stylex.attrs(styles.paradeDiv4)}>
-          <h2 id="parade-title" {...stylex.attrs(styles.paradeH2)}>
+        <div
+          data-reveal
+          class="absolute inset-x-0 top-5.5 z-2 mx-auto w-[min(760px,100%_-_32px)] border-2 border-bark-900 bg-cream-50 [box-shadow:inset_0_0_0_2px_var(--color-rim),_4px_4px_0_var(--color-drop)] px-5.5 py-3.5 text-center"
+        >
+          <h2 id="parade-title" class="text-2xl sm:text-[length:30px]">
             {props.copy.title}
           </h2>
-          <p {...stylex.attrs(styles.paradeP)}>{props.copy.text}</p>
+          <p class="mt-1.5 text-sm sm:text-base">{props.copy.text}</p>
         </div>
       </section>
     </>

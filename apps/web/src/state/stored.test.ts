@@ -1,5 +1,5 @@
-import { Schema } from "effect";
 import { afterEach, expect, test, vi } from "vite-plus/test";
+import { z } from "zod";
 
 import { createRegistry } from "./atom";
 import { orFallback, storedAtom } from "./stored";
@@ -35,7 +35,7 @@ class StorageEvent extends Event {
   }
 }
 
-const Look = Schema.Struct({ view: orFallback(Schema.Literals(["board", "list"]), "board"), dense: orFallback(Schema.Boolean, false) });
+const Look = z.object({ view: orFallback(z.enum(["board", "list"]), "board"), dense: orFallback(z.boolean(), false) });
 const fallback = { view: "board" as const, dense: false };
 
 test("a choice is read under the page's namespace, and a set is written there", () => {
@@ -54,7 +54,7 @@ test("what does not decode reads as the fallback, a field at a time where the sc
   vi.stubGlobal("localStorage", memoryStorage({ "vibevalley.look": JSON.stringify({ view: "grid", dense: true }), "vibevalley.count": "not json" }));
   const registry = createRegistry();
   const look = storedAtom("look", Look, fallback);
-  const count = storedAtom("count", Schema.Finite, 7);
+  const count = storedAtom("count", z.number(), 7);
   expect(registry.get(look)).toEqual({ view: "board", dense: true });
   expect(registry.get(count)).toBe(7);
 });
@@ -62,7 +62,7 @@ test("what does not decode reads as the fallback, a field at a time where the sc
 test("a storage that throws leaves the choice for the page's life", () => {
   vi.stubGlobal("localStorage", memoryStorage({}, true));
   const registry = createRegistry();
-  const count = storedAtom("count", Schema.Finite, 1);
+  const count = storedAtom("count", z.number(), 1);
   const off = registry.subscribe(count, () => {}, { immediate: true });
   expect(registry.get(count)).toBe(1);
   registry.set(count, 2);
@@ -73,7 +73,7 @@ test("a storage that throws leaves the choice for the page's life", () => {
 test("no storage at all reads the fallback", () => {
   vi.stubGlobal("localStorage", undefined);
   const registry = createRegistry();
-  expect(registry.get(storedAtom("count", Schema.Finite, 3))).toBe(3);
+  expect(registry.get(storedAtom("count", z.number(), 3))).toBe(3);
 });
 
 test("every reader hears a set, and a write from another tab", () => {
@@ -81,7 +81,7 @@ test("every reader hears a set, and a write from another tab", () => {
   const tab = new EventTarget();
   vi.stubGlobal("window", tab);
   const registry = createRegistry();
-  const count = storedAtom("count", Schema.Finite, 0);
+  const count = storedAtom("count", z.number(), 0);
   const first = vi.fn();
   const second = vi.fn();
   const offFirst = registry.subscribe(count, first, { immediate: true });

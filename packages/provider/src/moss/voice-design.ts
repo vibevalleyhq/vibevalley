@@ -1,22 +1,24 @@
-import { Effect, Schema } from "effect";
+import { z } from "zod";
 
-import { MossAudioError } from "./audio-response.ts";
-import { submitMossAudioTask } from "./audio-submission.ts";
+import type { ProviderHttp } from "../base/http.ts";
+import { codePoints } from "../base/json.ts";
+import { invalidAudioInput } from "./audio-response.ts";
+import { type MossAudioSubmission, submitMossAudioTask } from "./audio-submission.ts";
 import { mossSpeechFormats } from "./speech-models.ts";
 import { mossVoiceDesignModels } from "./voice-design-models.ts";
 
-const Text = Schema.String.check(Schema.isBetweenCodePoints(1, 10000), Schema.isPattern(/\S/u));
-const Input = Schema.Struct({
-  model: Schema.Literals(mossVoiceDesignModels),
+const Text = codePoints(1, 10000).regex(/\S/u);
+const Input = z.strictObject({
+  model: z.enum(mossVoiceDesignModels),
   text: Text,
   instruction: Text,
-  format: Schema.Literals(mossSpeechFormats),
+  format: z.enum(mossSpeechFormats),
 });
 
-export const prepareMossVoiceDesign = Effect.fn("Provider.prepareMossVoiceDesign")(function* (input: unknown) {
-  const request = yield* Schema.decodeUnknownEffect(Input)(input, { onExcessProperty: "error" }).pipe(
-    Effect.mapError(() => MossAudioError.make({ reason: "InvalidInput", outcome: "NotSubmitted" })),
-  );
+export const prepareMossVoiceDesign = async (input: unknown) => {
+  const parsed = Input.safeParse(input);
+  if (!parsed.success) throw invalidAudioInput();
+  const request = parsed.data;
   return {
     model: request.model,
     input: request.text,
@@ -27,9 +29,7 @@ export const prepareMossVoiceDesign = Effect.fn("Provider.prepareMossVoiceDesign
     create_voice: false,
     async: true,
   };
-});
+};
 
-export const createMossVoiceDesignTask = Effect.fn("Provider.createMossVoiceDesignTask")(function* (key: string, input: unknown) {
-  const request = yield* prepareMossVoiceDesign(input);
-  return yield* submitMossAudioTask(key, "voice/generations", request);
-});
+export const createMossVoiceDesignTask = async (key: string, input: unknown, http: ProviderHttp): Promise<MossAudioSubmission> =>
+  submitMossAudioTask(key, "voice/generations", await prepareMossVoiceDesign(input), http);

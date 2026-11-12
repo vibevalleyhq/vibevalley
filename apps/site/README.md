@@ -1,6 +1,6 @@
 # site
 
-官网 vibevalley.dev：中文在 `/`，英文在 `/en/`，未找到的页面用 `/404.html`。Vite 与 Solid 2 在构建时生成完整 HTML；每个文档只有一个接管根，语言链接加载另一个文档。组件样式使用 StyleX（[vv-stylex](.agents/skills/vv-stylex/SKILL.md)），重置、令牌和接管前的规则由 `src/ui/global.css` 提供；动画使用 Motion DOM API。架构约定见[官网](docs/subsystems/site.md)。
+官网 vibevalley.dev：中文在 `/`，英文在 `/en/`，未找到的页面用 `/404.html`。Vite 与 Solid 2 在构建时生成完整 HTML；每个文档只有一个接管根，语言链接加载另一个文档。组件样式是元素上的 Tailwind v4 class（[vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)），令牌（`@theme`）、重置和接管前的规则由 `src/ui/global.css` 提供；动画使用 Motion DOM API。架构约定见[官网](docs/subsystems/site.md)。
 
 `apps/site` 属于根 workspace，共用根 catalog、锁文件和检查。在根目录 `vp install`，再运行：
 
@@ -19,7 +19,7 @@ vp run site:deploy                                    # 构建，再发到 Cloud
 
 `src/Document.tsx` 管文档、分享元信息、首屏资源与字体；`src/App.tsx` 选择首页或 404，`src/sections/Home.tsx` 拼出两种语言的首页。所有区块都在构建时写进 HTML，无脚本也能阅读。屏幕内外的节点随整个文档一起接管，不按可见性另建根。
 
-`src/ui/global.css` 持有颜色、字体、硬阴影、动画和 `<html data-scene>` 的时辰规则；`tokens.stylex.ts` 引用这些变量，不另存一份值。共用组件在 `src/ui/ui.tsx`，动画的订阅与清理在 `src/animation/`。
+`src/ui/global.css` 持有颜色、字体、硬阴影、动画和 `<html data-scene>` 的时辰规则；颜色、字号、阴影写在它的 `@theme` 里，class 名就是令牌名（`bg-cream-100`、`text-sm`、`shadow-hard`），不另存一份值。共用组件在 `src/ui/ui.tsx`，动画的订阅与清理在 `src/animation/`。
 
 ## 素材
 

@@ -1,8 +1,8 @@
-import { NodeServices } from "@effect/platform-node";
-import { expect, layer } from "@effect/vitest";
-import { Array as Arr, Deferred, Effect, Fiber, FileSystem, Layer, Path, Stream } from "effect";
+import { readdir } from "node:fs/promises";
+import { dirname } from "node:path";
 
-import { ServerConfig } from "#/infra/config.ts";
+import { describe, expect, test } from "vite-plus/test";
+
 import { testConfig } from "#/testing/layers.ts";
 
 import { makeStorage } from "./storage.ts";
@@ -11,47 +11,55 @@ const bytes = new TextEncoder().encode("a kept file");
 // makeStorage takes the key it is given; the caller (Attachment) hashes the bytes.
 const key = "d686580a17015eb1824fae75642d75248f1b50ee5147941530f117716243330d";
 
-layer(NodeServices.layer.pipe(Layer.provideMerge(Layer.succeed(ServerConfig, testConfig()))), { excludeTestServices: true })(
-  "storage on the local disk",
-  (it) => {
-    it.effect("keeps a key once, reads it back, and deletes it", () =>
-      Effect.gen(function* () {
-        const storage = yield* makeStorage;
-        yield* storage.put(key, bytes);
-        yield* storage.put(key, bytes);
-        const fs = yield* FileSystem.FileSystem;
-        const { dirname } = yield* Path.Path;
-        const kept = yield* fs.readDirectory(dirname(storage.pathOf(key)));
-        expect(Arr.filter(kept, (name) => name === key)).toEqual([key]);
-        const size = yield* storage.size(key);
-        expect(size).toBe(bytes.length);
-        const blob = yield* storage.open(key, "text/plain");
-        const read = yield* Effect.promise(() => blob.text());
-        expect([read, blob.type]).toEqual(["a kept file", "text/plain"]);
-        yield* storage.delete(key);
-        const gone = yield* storage.exists(key);
-        expect(gone).toBe(false);
-      }),
-    );
+/** Everything source gives, as text. */
+const text = async (source: AsyncIterable<Uint8Array>) => {
+  const decoder = new TextDecoder();
+  let out = "";
+  for await (const chunk of source) out += decoder.decode(chunk, { stream: true });
+  return out + decoder.decode();
+};
 
-    it.effect("a streamed put is published whole, and a cancelled one leaves nothing at its key", () =>
-      Effect.gen(function* () {
-        const storage = yield* makeStorage;
-        const other = "0000000000000000000000000000000000000000000000000000000000000000";
-        const started = yield* Deferred.make<void>();
-        const endless = Stream.concat(Stream.make(bytes), Stream.fromEffect(Deferred.succeed(started, undefined).pipe(Effect.andThen(Effect.never))));
-        const fiber = yield* storage.putStream(other, endless).pipe(Effect.forkChild);
-        yield* Deferred.await(started);
-        yield* Fiber.interrupt(fiber);
-        const left = yield* storage.exists(other);
-        expect(left).toBe(false);
-        const fs = yield* FileSystem.FileSystem;
-        const staged = yield* fs.readDirectory(storage.scratch);
-        expect(staged).toEqual([]);
-        yield* storage.putStream(key, Stream.make(bytes.subarray(0, 4), bytes.subarray(4)));
-        const read = yield* Stream.mkString(Stream.decodeText(storage.stream(key)));
-        expect(read).toBe("a kept file");
-      }),
-    );
-  },
-);
+describe("storage on the local disk", () => {
+  test("keeps a key once, reads it back, and deletes it", async () => {
+    const storage = makeStorage(testConfig());
+    await storage.put(key, bytes);
+    await storage.put(key, bytes);
+    const kept = await readdir(dirname(storage.pathOf(key)));
+    expect(kept.filter((name) => name === key)).toEqual([key]);
+    const size = await storage.size(key);
+    expect(size).toBe(bytes.length);
+    const blob = await storage.open(key, "text/plain");
+    const read = await blob.text();
+    expect([read, blob.type]).toEqual(["a kept file", "text/plain"]);
+    await storage.delete(key);
+    const gone = await storage.exists(key);
+    expect(gone).toBe(false);
+  });
+
+  test("a streamed put is published whole, and a cancelled one leaves nothing at its key", async () => {
+    const storage = makeStorage(testConfig());
+    const other = "0000000000000000000000000000000000000000000000000000000000000000";
+    const started = Promise.withResolvers<void>();
+    const stop = new AbortController();
+    async function* endless() {
+      yield bytes;
+      started.resolve();
+      await new Promise<never>((_, reject) => stop.signal.addEventListener("abort", () => reject(stop.signal.reason), { once: true }));
+    }
+    const put = storage.putStream(other, endless(), stop.signal).catch((e: unknown) => e);
+    await started.promise;
+    stop.abort();
+    await put;
+    const left = await storage.exists(other);
+    expect(left).toBe(false);
+    const staged = await readdir(storage.scratch);
+    expect(staged).toEqual([]);
+    async function* halves() {
+      yield bytes.subarray(0, 4);
+      yield bytes.subarray(4);
+    }
+    await storage.putStream(key, halves());
+    const read = await text(storage.stream(key));
+    expect(read).toBe("a kept file");
+  });
+});

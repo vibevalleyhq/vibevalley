@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
@@ -16,48 +15,6 @@ import { useFrames } from "#/infra/frame.ts";
 import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "#/ui/pixel/index.ts";
 
 import { doingOf, harvestedOf, lastOrchestratorSaid, plotTitle } from "./readout";
-
-const hopKeyframes = stylex.keyframes({
-  "0%, 88%": { transform: "translateY(0)" },
-  "89%, 100%": { transform: "translateY(-3px)" },
-});
-
-const styles = stylex.create({
-  hop: {
-    display: "block",
-    animationName: {
-      default: null,
-      "@media (prefers-reduced-motion: no-preference)": hopKeyframes,
-    },
-    animationDuration: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "3.2s",
-    },
-    animationTimingFunction: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "step-end",
-    },
-    animationIterationCount: {
-      default: null,
-      "@media (prefers-reduced-motion:no-preference)": "infinite",
-    },
-  },
-  pin: {
-    position: "absolute",
-  },
-  overlay: {
-    pointerEvents: "none",
-    position: "absolute",
-    inset: "0",
-    overflow: "hidden",
-  },
-  head: {
-    position: "absolute",
-    top: "0",
-    left: "0",
-    visibility: "hidden",
-  },
-});
 
 /** Rows of art pixels above the plot's bottom where its rail is. */
 const rail = 5;
@@ -117,9 +74,12 @@ function PinView(props: { pin: Pin }) {
     />
   );
   return (
-    <div {...stylex.attrs(styles.pin)} style={{ left: `${props.pin.x}px`, top: `${props.pin.y}px`, transform: `translate(-50%, ${-props.pin.ay * 100}%)` }}>
+    <div class="absolute" style={{ left: `${props.pin.x}px`, top: `${props.pin.y}px`, transform: `translate(-50%, ${-props.pin.ay * 100}%)` }}>
       <Show when={props.pin.hop !== undefined} fallback={card()}>
-        <span {...stylex.attrs(styles.hop)} style={{ "animation-delay": `${props.pin.hop}s` }}>
+        <span
+          class="block motion-safe:[animation-name:hop] motion-safe:[animation-duration:3200ms] motion-safe:[animation-timing-function:step-end] motion-safe:[animation-iteration-count:infinite]"
+          style={{ "animation-delay": `${props.pin.hop}s` }}
+        >
           {card()}
         </span>
       </Show>
@@ -240,7 +200,7 @@ export function Overlay() {
   return (
     <Show when={pins()}>
       {(p) => (
-        <div {...stylex.attrs(styles.overlay)} aria-hidden="true">
+        <div class="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
           <For each={p().back} keyed={(pin) => pin.key}>
             {(pin) => <PinView pin={pin()} />}
           </For>
@@ -307,7 +267,7 @@ function Head(props: { session: SessionView; village: Village; placed: Map<strin
   return (
     <Show when={rows()}>
       {(r) => (
-        <div ref={(div) => (el = div)} {...stylex.attrs(styles.head)} data-testid={`head-${props.session.id}`}>
+        <div ref={(div) => (el = div)} class="absolute top-0 left-0 invisible" data-testid={`head-${props.session.id}`}>
           <PixelCard padX={3} padY={2} rows={[r()]} />
         </div>
       )}

@@ -1,6 +1,5 @@
-import * as stylex from "@stylexjs/stylex";
-import { Schema } from "effect";
 import { createSignal, Show, snapshot, untrack } from "solid-js";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import type { SettingsStatus } from "@vibevalley/protocol";
@@ -13,9 +12,7 @@ import { Form, formControl, formMessages } from "#/ui/Form.tsx";
 import { SaveBar } from "#/ui/KeyField.tsx";
 import { toast } from "#/ui/toasts.ts";
 
-const styles = stylex.create({ form: { display: "flex", flexDirection: "column", gap: "1rem" } });
-
-const Input = Schema.Struct({ key: Schema.Trim, removing: Schema.Boolean });
+const Input = z.object({ key: z.string().trim(), removing: z.boolean() });
 const blank = { key: "", removing: false };
 export function DeepseekForm(props: { status: SettingsStatus }) {
   const [status, setStatus] = createSignal(untrack(() => snapshot(props.status)));
@@ -39,7 +36,7 @@ export function DeepseekForm(props: { status: SettingsStatus }) {
   const removing = form.field(["removing"]);
   const dirty = () => key.value().trim() !== "" || removing.value();
   return (
-    <Form form={form} styles={styles.form} testid="deepseek-form">
+    <Form form={form} class="flex flex-col gap-4" testid="deepseek-form">
       <SettingsGroup title="DeepSeek">
         <KeyRow
           label="API Key"

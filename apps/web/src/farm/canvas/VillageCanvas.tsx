@@ -1,4 +1,3 @@
-import * as stylex from "@stylexjs/stylex";
 import { createEffect, createMemo, createSignal, Show, snapshot, untrack } from "solid-js";
 // The village on the farm page: starts the scene (farm/canvas/scene.ts) once the level is loaded, feeds it the latest frame and the profiles, turns its clicks into the farm's commands, publishes where things are on the page for the DOM over it (store screen), and wears the tool's cursor.
 
@@ -22,69 +21,6 @@ import { playSound } from "#/ui/pixel/sound.ts";
 
 import { startScene, type Scene } from "./scene";
 import { background, cssCursor, holdTimeOfDay, lightOn, screenOf } from "./screen";
-
-const styles = stylex.create({
-  enteringDiv: {
-    height: "1rem",
-    width: "16rem",
-    borderStyle: "solid",
-    borderWidth: "2px",
-    borderColor: "var(--color-bark-900)",
-    backgroundColor: {
-      default: "var(--color-px-canvas-shade)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-bark-900) 60%, transparent)",
-    },
-    padding: "0.125rem",
-    boxShadow: "2px 2px 0 0 var(--color-px-shade)",
-  },
-  villageCanvasDiv: {
-    position: "absolute",
-    inset: "0",
-    overflow: "hidden",
-  },
-  villageCanvasDiv2: {
-    position: "absolute",
-    inset: "0",
-    backgroundSize: "cover",
-    backgroundPosition: "50%",
-    opacity: ".3",
-    imageRendering: "pixelated",
-  },
-  village: {
-    position: "absolute",
-    inset: "0",
-  },
-  villageError: {
-    position: "absolute",
-    inset: "0",
-    display: "grid",
-    placeItems: "center",
-    fontFamily: "var(--font-pixel)",
-    color: "var(--color-cream-200)",
-  },
-  enteringDiv2: {
-    position: "absolute",
-    inset: "0",
-    display: "grid",
-    placeItems: "center",
-  },
-  enteringDiv22: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "0.5rem",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "12px",
-    color: "var(--color-cream-100)",
-  },
-  enteringDiv3: {
-    height: "100%",
-    backgroundColor: "var(--color-leaf-500)",
-    transitionProperty: "width",
-    transitionTimingFunction: "var(--ease-out)",
-    transitionDuration: ".2s",
-  },
-});
 
 export function VillageCanvas() {
   let host!: HTMLDivElement;
@@ -193,14 +129,18 @@ export function VillageCanvas() {
   );
 
   return (
-    <div {...stylex.attrs(styles.villageCanvasDiv)} style={{ background }} aria-label={t("web.farm.canvas.label")} role="region">
+    <div class="absolute inset-0 overflow-hidden" style={{ background }} aria-label={t("web.farm.canvas.label")} role="region">
       <Show when={loaded().village}>
-        <div aria-hidden="true" {...stylex.attrs(styles.villageCanvasDiv2)} style={{ "background-image": `url(${spriteUrl("map")})` }} />
+        <div
+          aria-hidden="true"
+          class="absolute inset-0 bg-cover [background-position:50%] opacity-30 [image-rendering:pixelated]"
+          style={{ "background-image": `url(${spriteUrl("map")})` }}
+        />
       </Show>
-      <div ref={(el) => (host = el)} {...stylex.attrs(styles.village)} data-testid="village" />
+      <div ref={(el) => (host = el)} class="absolute inset-0" data-testid="village" />
       <Show when={loaded().error ?? failed()} fallback={<Show when={!drawn()}>{<Entering mapped={!!loaded().village} />}</Show>}>
         {(why) => (
-          <p data-testid="village-error" data-opening="failed" {...stylex.attrs(styles.villageError)}>
+          <p data-testid="village-error" data-opening="failed" class="absolute inset-0 grid place-items-center font-pixel text-cream-200">
             {t("web.farm.canvas.noMap", { why: why() })}
           </p>
         )}
@@ -223,8 +163,8 @@ function Entering(props: { mapped: boolean }) {
     return done < total ? t("web.farm.canvas.moving", { done, total }) : t("web.farm.canvas.lights");
   };
   return (
-    <div {...stylex.attrs(styles.enteringDiv2)} data-opening="pending" data-opening-progress={fill()}>
-      <div {...stylex.attrs(styles.enteringDiv22)}>
+    <div class="absolute inset-0 grid place-items-center" data-opening="pending" data-opening-progress={fill()}>
+      <div class="flex flex-col items-center gap-2 font-pixel text-(length:--text-xs) text-cream-100">
         <div
           role="progressbar"
           data-testid="village-loading"
@@ -232,9 +172,9 @@ function Entering(props: { mapped: boolean }) {
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(fill() * 100)}
-          {...stylex.attrs(styles.enteringDiv)}
+          class="h-4 w-64 border-2 border-bark-900 bg-bark-900/60 p-0.5 pixel-shade"
         >
-          <div {...stylex.attrs(styles.enteringDiv3)} style={{ width: `${fill() * 100}%` }} />
+          <div class="h-full bg-leaf-500 transition-[width] ease-out duration-200" style={{ width: `${fill() * 100}%` }} />
         </div>
         <span>{words()}</span>
       </div>

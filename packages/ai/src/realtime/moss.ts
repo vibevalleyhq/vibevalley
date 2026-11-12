@@ -194,9 +194,8 @@ export class MossEngine {
     if (this.phase === "idle" || this.phase === "ending") return;
     if (data.length > maxJsonChars) return this.end("live_event_limit");
     this.window.down += data.length;
-    const decoded = decodeMossFrame(data);
-    if (decoded._tag === "None") return;
-    const m = decoded.value;
+    const m = decodeMossFrame(data);
+    if (m === undefined) return;
     const action = m.action ?? "";
     const d = m.data ?? {};
     const text = d.text ?? "";

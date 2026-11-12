@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { z } from "zod";
 
 import type { Codec } from "../codec";
 import { IssueId, SessionId } from "../common/schema";
@@ -6,231 +6,236 @@ import { Repo } from "../repo/schema";
 import { doingFields } from "../session/schema";
 import * as T from "./shapes";
 
-export const AchievementCategory: Codec<T.AchievementCategory> = Schema.Literals(T.AchievementCategoryValues);
+export const AchievementCategory = z.enum(T.AchievementCategoryValues) satisfies Codec<T.AchievementCategory>;
 
-const AchievementTier: Codec<T.AchievementTier> = Schema.Struct({
-  need: Schema.Finite,
-  title: Schema.String,
-  coins: Schema.Finite,
-  reached: Schema.String,
-});
+const AchievementTier = z.object({
+  need: z.number(),
+  title: z.string(),
+  coins: z.number(),
+  reached: z.string(),
+}) satisfies Codec<T.AchievementTier>;
 
-export const Achievement: Codec<T.Achievement> = Schema.Struct({
-  id: Schema.String,
+export const Achievement = z.object({
+  id: z.string(),
   category: AchievementCategory,
-  title: Schema.String,
-  detail: Schema.String,
-  unit: Schema.optionalKey(Schema.String),
-  wearable: Schema.Boolean,
-  tiers: Schema.mutable(Schema.Array(AchievementTier)),
-});
+  title: z.string(),
+  detail: z.string(),
+  unit: z.exactOptional(z.string()),
+  wearable: z.boolean(),
+  tiers: z.array(AchievementTier),
+}) satisfies Codec<T.Achievement>;
 
-const AchievementStanding: Codec<T.AchievementStanding> = Schema.Struct({
-  id: Schema.String,
-  tier: Schema.Finite,
-  count: Schema.Finite,
-  next: Schema.optionalKey(Schema.Finite),
-});
+const AchievementStanding = z.object({
+  id: z.string(),
+  tier: z.number(),
+  count: z.number(),
+  next: z.exactOptional(z.number()),
+}) satisfies Codec<T.AchievementStanding>;
 
-const PlayAction: Codec<T.PlayAction> = Schema.Struct({ at: Schema.Finite, ...doingFields });
+const PlayAction = z.object({ at: z.number(), ...doingFields }) satisfies Codec<T.PlayAction>;
 
-const PlayActionView: Codec<T.PlayActionView> = Schema.Struct({ at: Schema.Finite, ...doingFields, actionText: Schema.String });
+const PlayActionView = z.object({ at: z.number(), ...doingFields, actionText: z.string() }) satisfies Codec<T.PlayActionView>;
 
 const playFields = {
-  station: Schema.Finite,
-  toolsThisRun: Schema.Finite,
-  counts: Schema.Record(Schema.String, Schema.Finite),
-  files: Schema.mutable(Schema.Array(Schema.String)),
-  commands: Schema.mutable(Schema.Array(Schema.String)),
-  runStartedAt: Schema.optionalKey(Schema.Finite),
+  station: z.number(),
+  toolsThisRun: z.number(),
+  counts: z.record(z.string(), z.number()),
+  files: z.array(z.string()),
+  commands: z.array(z.string()),
+  runStartedAt: z.exactOptional(z.number()),
 };
 
-export const SessionPlay: Codec<T.SessionPlay> = Schema.Struct({ ...playFields, history: Schema.mutable(Schema.Array(PlayAction)) });
+export const SessionPlay = z.object({ ...playFields, history: z.array(PlayAction) }) satisfies Codec<T.SessionPlay>;
 
-const SessionPlayView: Codec<T.SessionPlayView> = Schema.Struct({ ...playFields, history: Schema.mutable(Schema.Array(PlayActionView)) });
+const SessionPlayView = z.object({ ...playFields, history: z.array(PlayActionView) }) satisfies Codec<T.SessionPlayView>;
 
-export const CommitCount: Codec<T.CommitCount> = Schema.Struct({
-  total: Schema.Finite,
-  repos: Schema.mutable(Schema.Array(Repo)),
-});
+export const CommitCount = z.object({
+  total: z.number(),
+  repos: z.array(Repo),
+}) satisfies Codec<T.CommitCount>;
 
-const Unlock: Codec<T.Unlock> = Schema.Struct({
-  id: Schema.String,
-  tier: Schema.Finite,
-  at: Schema.Finite,
-});
+const Unlock = z.object({
+  id: z.string(),
+  tier: z.number(),
+  at: z.number(),
+}) satisfies Codec<T.Unlock>;
 
-const AgentTally: Codec<T.AgentTally> = Schema.Struct({
-  hired: Schema.Finite,
-  harvested: Schema.Finite,
-  failed: Schema.Finite,
-});
+const AgentTally = z.object({
+  hired: z.number(),
+  harvested: z.number(),
+  failed: z.number(),
+}) satisfies Codec<T.AgentTally>;
 
-const ProgressTitle: Codec<T.ProgressTitle> = Schema.Struct({
-  id: Schema.String,
-  tier: Schema.Finite,
-});
+const ProgressTitle = z.object({
+  id: z.string(),
+  tier: z.number(),
+}) satisfies Codec<T.ProgressTitle>;
 
-export const Progress: Codec<T.Progress> = Schema.Struct({
-  coins: Schema.Finite,
-  streak: Schema.Finite,
-  bestStreak: Schema.Finite,
-  counts: Schema.Record(Schema.String, Schema.Finite),
-  unlocked: Schema.mutable(Schema.Array(Unlock)),
-  title: Schema.optionalKey(ProgressTitle),
-  agents: Schema.Record(Schema.String, AgentTally),
-  multiplier: Schema.optionalKey(Schema.Finite),
-});
+export const Progress = z.object({
+  coins: z.number(),
+  streak: z.number(),
+  bestStreak: z.number(),
+  counts: z.record(z.string(), z.number()),
+  unlocked: z.array(Unlock),
+  title: z.exactOptional(ProgressTitle),
+  agents: z.record(z.string(), AgentTally),
+  multiplier: z.exactOptional(z.number()),
+}) satisfies Codec<T.Progress>;
 
-const ProgressNews: Codec<T.ProgressNews> = Schema.Struct({
-  coins: Schema.optionalKey(Schema.Finite),
-  session: Schema.optionalKey(SessionId),
-  unlocked: Schema.mutable(Schema.Array(Unlock)),
-});
+const ProgressNews = z.object({
+  coins: z.exactOptional(z.number()),
+  session: z.exactOptional(SessionId),
+  unlocked: z.array(Unlock),
+}) satisfies Codec<T.ProgressNews>;
 
-const FarmLevel: Codec<T.FarmLevel> = Schema.Struct({
-  level: Schema.Finite,
-  xp: Schema.Finite,
-  need: Schema.Finite,
-});
+const FarmLevel = z.object({
+  level: z.number(),
+  xp: z.number(),
+  need: z.number(),
+}) satisfies Codec<T.FarmLevel>;
 
-const Crop: Codec<T.Crop> = Schema.Literals(T.CropValues);
+const Crop = z.enum(T.CropValues) satisfies Codec<T.Crop>;
 
-const BadgeTone: Codec<T.BadgeTone> = Schema.Literals(T.BadgeToneValues);
+const BadgeTone = z.enum(T.BadgeToneValues) satisfies Codec<T.BadgeTone>;
 
-const Badge: Codec<T.Badge> = Schema.Struct({
-  text: Schema.String,
+const Badge = z.object({
+  text: z.string(),
   tone: BadgeTone,
-});
+}) satisfies Codec<T.Badge>;
 
-const PlotView: Codec<T.PlotView> = Schema.Struct({
+const PlotView = z.object({
   crop: Crop,
-  badge: Schema.optionalKey(Badge),
-});
+  badge: z.exactOptional(Badge),
+}) satisfies Codec<T.PlotView>;
 
-export const FarmView: Codec<T.FarmView> = Schema.Struct({
+export const FarmView = z.object({
   level: FarmLevel,
-  plots: Schema.Record(Schema.String, PlotView),
-  plays: Schema.Record(Schema.String, SessionPlayView),
-  achievements: Schema.mutable(Schema.Array(AchievementStanding)),
-});
+  plots: z.record(z.string(), PlotView),
+  plays: z.record(z.string(), SessionPlayView),
+  achievements: z.array(AchievementStanding),
+}) satisfies Codec<T.FarmView>;
 
-const GameEffectReward: Codec<T.GameEffectReward> = Schema.Struct({
-  kind: Schema.Literal("reward"),
-  sessionId: Schema.optionalKey(SessionId),
-  coins: Schema.Finite,
-  streak: Schema.Finite,
-});
+const GameEffectReward = z.object({
+  kind: z.literal("reward"),
+  sessionId: z.exactOptional(SessionId),
+  coins: z.number(),
+  streak: z.number(),
+}) satisfies Codec<T.GameEffectReward>;
 
-const GameEffectPenalty: Codec<T.GameEffectPenalty> = Schema.Struct({
-  kind: Schema.Literal("penalty"),
+const GameEffectPenalty = z.object({
+  kind: z.literal("penalty"),
   sessionId: SessionId,
-});
+}) satisfies Codec<T.GameEffectPenalty>;
 
-const GameEffectLevelUp: Codec<T.GameEffectLevelUp> = Schema.Struct({
-  kind: Schema.Literal("levelUp"),
-  level: Schema.Finite,
-});
+const GameEffectLevelUp = z.object({
+  kind: z.literal("levelUp"),
+  level: z.number(),
+}) satisfies Codec<T.GameEffectLevelUp>;
 
-const GameEffectAchievement: Codec<T.GameEffectAchievement> = Schema.Struct({
-  kind: Schema.Literal("achievement"),
-  achievement: Schema.String,
-  tier: Schema.Finite,
-  title: Schema.String,
-  reached: Schema.String,
-  detail: Schema.String,
-  coins: Schema.Finite,
-  oneOff: Schema.Boolean,
-});
+const GameEffectAchievement = z.object({
+  kind: z.literal("achievement"),
+  achievement: z.string(),
+  tier: z.number(),
+  title: z.string(),
+  reached: z.string(),
+  detail: z.string(),
+  coins: z.number(),
+  oneOff: z.boolean(),
+}) satisfies Codec<T.GameEffectAchievement>;
 
-export const GameEffect: Codec<T.GameEffect> = Schema.Union([GameEffectReward, GameEffectPenalty, GameEffectLevelUp, GameEffectAchievement]);
+export const GameEffect = z.discriminatedUnion("kind", [
+  GameEffectReward,
+  GameEffectPenalty,
+  GameEffectLevelUp,
+  GameEffectAchievement,
+]) satisfies Codec<T.GameEffect>;
 
-const LedgerEntryHarvested: Codec<T.LedgerEntryHarvested> = Schema.Struct({
-  kind: Schema.Literal("harvested"),
-  at: Schema.Finite,
+const LedgerEntryHarvested = z.object({
+  kind: z.literal("harvested"),
+  at: z.number(),
   session: SessionId,
-  agent: Schema.optionalKey(Schema.String),
-  repo: Schema.String,
-  runtime: Schema.String,
-  commits: Schema.Finite,
-  cny: Schema.optionalKey(Schema.Finite),
-  runs: Schema.Finite,
-});
+  agent: z.exactOptional(z.string()),
+  repo: z.string(),
+  runtime: z.string(),
+  commits: z.number(),
+  cny: z.exactOptional(z.number()),
+  runs: z.number(),
+}) satisfies Codec<T.LedgerEntryHarvested>;
 
-const LedgerEntryFailed: Codec<T.LedgerEntryFailed> = Schema.Struct({
-  kind: Schema.Literal("failed"),
-  at: Schema.Finite,
+const LedgerEntryFailed = z.object({
+  kind: z.literal("failed"),
+  at: z.number(),
   session: SessionId,
-  agent: Schema.optionalKey(Schema.String),
-});
+  agent: z.exactOptional(z.string()),
+}) satisfies Codec<T.LedgerEntryFailed>;
 
-const LedgerEntryConflicted: Codec<T.LedgerEntryConflicted> = Schema.Struct({
-  kind: Schema.Literal("conflicted"),
-  at: Schema.Finite,
+const LedgerEntryConflicted = z.object({
+  kind: z.literal("conflicted"),
+  at: z.number(),
   session: SessionId,
-});
+}) satisfies Codec<T.LedgerEntryConflicted>;
 
-const LedgerEntryTold: Codec<T.LedgerEntryTold> = Schema.Struct({
-  kind: Schema.Literal("told"),
-  at: Schema.Finite,
+const LedgerEntryTold = z.object({
+  kind: z.literal("told"),
+  at: z.number(),
   session: SessionId,
-});
+}) satisfies Codec<T.LedgerEntryTold>;
 
-const LedgerEntryReviewed: Codec<T.LedgerEntryReviewed> = Schema.Struct({
-  kind: Schema.Literal("reviewed"),
-  at: Schema.Finite,
+const LedgerEntryReviewed = z.object({
+  kind: z.literal("reviewed"),
+  at: z.number(),
   session: SessionId,
-});
+}) satisfies Codec<T.LedgerEntryReviewed>;
 
-const LedgerEntryFamily: Codec<T.LedgerEntryFamily> = Schema.Struct({
-  kind: Schema.Literal("family"),
-  at: Schema.Finite,
+const LedgerEntryFamily = z.object({
+  kind: z.literal("family"),
+  at: z.number(),
   issue: IssueId,
-  merged: Schema.Finite,
-  parallel: Schema.Boolean,
-});
+  merged: z.number(),
+  parallel: z.boolean(),
+}) satisfies Codec<T.LedgerEntryFamily>;
 
-const LedgerEntryHandoff: Codec<T.LedgerEntryHandoff> = Schema.Struct({
-  kind: Schema.Literal("handoff"),
-  at: Schema.Finite,
+const LedgerEntryHandoff = z.object({
+  kind: z.literal("handoff"),
+  at: z.number(),
   session: SessionId,
-  to: Schema.String,
-});
+  to: z.string(),
+}) satisfies Codec<T.LedgerEntryHandoff>;
 
-const LedgerEntryCalled: Codec<T.LedgerEntryCalled> = Schema.Struct({
-  kind: Schema.Literal("called"),
-  at: Schema.Finite,
+const LedgerEntryCalled = z.object({
+  kind: z.literal("called"),
+  at: z.number(),
   session: SessionId,
-});
+}) satisfies Codec<T.LedgerEntryCalled>;
 
-const LedgerEntryHired: Codec<T.LedgerEntryHired> = Schema.Struct({
-  kind: Schema.Literal("hired"),
-  at: Schema.Finite,
+const LedgerEntryHired = z.object({
+  kind: z.literal("hired"),
+  at: z.number(),
   session: SessionId,
-  agent: Schema.optionalKey(Schema.String),
-});
+  agent: z.exactOptional(z.string()),
+}) satisfies Codec<T.LedgerEntryHired>;
 
-const LedgerEntryMomentKind: Codec<T.LedgerEntryMomentKind> = Schema.Literals(T.LedgerEntryMomentKindValues);
+const LedgerEntryMomentKind = z.enum(T.LedgerEntryMomentKindValues) satisfies Codec<T.LedgerEntryMomentKind>;
 
-const LedgerEntryMoment: Codec<T.LedgerEntryMoment> = Schema.Struct({
+const LedgerEntryMoment = z.object({
   kind: LedgerEntryMomentKind,
-  at: Schema.Finite,
-});
+  at: z.number(),
+}) satisfies Codec<T.LedgerEntryMoment>;
 
-const LedgerEntryLevel: Codec<T.LedgerEntryLevel> = Schema.Struct({
-  kind: Schema.Literal("level"),
-  at: Schema.Finite,
-  level: Schema.Finite,
-});
+const LedgerEntryLevel = z.object({
+  kind: z.literal("level"),
+  at: z.number(),
+  level: z.number(),
+}) satisfies Codec<T.LedgerEntryLevel>;
 
-const LedgerEntryTitled: Codec<T.LedgerEntryTitled> = Schema.Struct({
-  kind: Schema.Literal("titled"),
-  at: Schema.Finite,
-  achievement: Schema.optionalKey(Schema.String),
-  tier: Schema.optionalKey(Schema.Finite),
-});
+const LedgerEntryTitled = z.object({
+  kind: z.literal("titled"),
+  at: z.number(),
+  achievement: z.exactOptional(z.string()),
+  tier: z.exactOptional(z.number()),
+}) satisfies Codec<T.LedgerEntryTitled>;
 
-export const LedgerEntry: Codec<T.LedgerEntry> = Schema.Union([
+export const LedgerEntry = z.discriminatedUnion("kind", [
   LedgerEntryHarvested,
   LedgerEntryFailed,
   LedgerEntryConflicted,
@@ -243,18 +248,18 @@ export const LedgerEntry: Codec<T.LedgerEntry> = Schema.Union([
   LedgerEntryMoment,
   LedgerEntryLevel,
   LedgerEntryTitled,
-]);
+]) satisfies Codec<T.LedgerEntry>;
 
-export const ChooseTitleRequest: Codec<T.ChooseTitleRequest> = Schema.Struct({
-  achievement: Schema.optionalKey(Schema.String),
-  tier: Schema.optionalKey(Schema.Finite),
-});
+export const ChooseTitleRequest = z.object({
+  achievement: z.exactOptional(z.string()),
+  tier: z.exactOptional(z.number()),
+}) satisfies Codec<T.ChooseTitleRequest>;
 
-export const FactProgressChanged: Codec<T.FactProgressChanged> = Schema.Struct({
-  type: Schema.Literal("progressChanged"),
-  at: Schema.Finite,
-  progress: Schema.optionalKey(Progress),
-  news: Schema.optionalKey(ProgressNews),
-  commits: Schema.optionalKey(CommitCount),
-  station: Schema.optionalKey(Schema.Struct({ id: SessionId, station: Schema.Finite })),
-});
+export const FactProgressChanged = z.object({
+  type: z.literal("progressChanged"),
+  at: z.number(),
+  progress: z.exactOptional(Progress),
+  news: z.exactOptional(ProgressNews),
+  commits: z.exactOptional(CommitCount),
+  station: z.exactOptional(z.object({ id: SessionId, station: z.number() })),
+}) satisfies Codec<T.FactProgressChanged>;

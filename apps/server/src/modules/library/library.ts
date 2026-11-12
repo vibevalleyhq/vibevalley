@@ -1,18 +1,18 @@
-import { Array as Arr, Clock, Context, Effect, Formatter, Layer, Schema, Stream, String as Str } from "effect";
-
+import { TaskGroup, withTimeout } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import { attachmentMax } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
-import type { ApiError } from "@vibevalley/protocol/api";
 import * as S from "@vibevalley/protocol/schema";
 
-import { BizCode, lookIn, missing, refuseIn } from "#/base/errors.ts";
+import { ApiError, BizCode, lookIn, messageOf, missing, refuseIn } from "#/base/errors.ts";
 import { jsonOf } from "#/base/json.ts";
-import { Core } from "#/core/core.ts";
-import { Db } from "#/infra/db.ts";
-import { PublicHttp, publicHttps } from "#/infra/publicHttp.ts";
-import { Attachment } from "#/modules/attachment/attachment.ts";
-import { Session } from "#/modules/session/session.ts";
+import type { Core } from "#/core/core.ts";
+import type { Db } from "#/infra/db.ts";
+import type { Logger } from "#/infra/log.ts";
+import { type PublicFetch, publicHttps } from "#/infra/publicHttp.ts";
+import type { Time } from "#/infra/time.ts";
+import type { Attachment } from "#/modules/attachment/attachment.ts";
+import { NotWorkFile, type Session } from "#/modules/session/session.ts";
 import * as q from "#db/library_item.sql.ts";
 
 const refused = refuseIn(BizCode.LibraryRefused);
@@ -43,11 +43,11 @@ const typeByExtension: Readonly<Record<string, string>> = {
   json: "application/json",
   html: "text/html",
 };
-const lastOf = (text: string, separator: string) => Arr.lastNonEmpty(Str.split(separator)(text));
-const typeOfName = (name: string) => (Str.includes(".")(name) ? typeByExtension[Str.toLowerCase(lastOf(name, "."))] : undefined) ?? "application/octet-stream";
-const given = (text: string | undefined): text is string => text !== undefined && Str.trim(text) !== "";
+const lastOf = (text: string, separator: string) => text.split(separator).at(-1) ?? "";
+const typeOfName = (name: string) => (name.includes(".") ? typeByExtension[lastOf(name, ".").toLowerCase()] : undefined) ?? "application/octet-stream";
+const given = (text: string | undefined): text is string => text !== undefined && text.trim() !== "";
 
-const originText = (origin: T.LibraryOrigin) => Formatter.formatJson(origin);
+const originText = (origin: T.LibraryOrigin) => JSON.stringify(origin);
 const originOf = jsonOf(S.LibraryOrigin);
 
 const itemOf = (row: q.LibraryItemResult): T.LibraryItem => ({
@@ -58,152 +58,204 @@ const itemOf = (row: q.LibraryItemResult): T.LibraryItem => ({
 });
 
 const madeFiles = (jobs: readonly T.MediaJob[]) =>
-  Arr.flatMap(jobs, (job) => ("attachment" in job && job.attachment !== undefined && job.phase === "ready" ? [{ job, attachment: job.attachment }] : []));
+  jobs.flatMap((job) => ("attachment" in job && job.attachment !== undefined && job.phase === "ready" ? [{ job, attachment: job.attachment }] : []));
 
-class MangledName extends Schema.TaggedError<MangledName, { readonly brand: unique symbol }>()("MangledName", {}) {}
-
-export class Library extends Context.Service<
-  Library,
-  {
-    readonly list: (req: T.LibraryListRequest) => Effect.Effect<T.LibraryItem[]>;
-    readonly add: (req: T.LibraryAddRequest, by: AddedBy) => Effect.Effect<T.LibraryItem, ApiError>;
-    /** Removes the library entry only; messages referencing the attachment still open it. */
-    readonly remove: (id: string) => Effect.Effect<void, ApiError>;
-    readonly previewRemove: (id: string) => Effect.Effect<T.Preview, ApiError>;
-  }
->()("@vibevalley/server/modules/library/library") {
-  static readonly layer = Layer.effect(
-    Library,
-    Effect.suspend(() => make),
-  );
+export interface Library {
+  readonly list: (req: T.LibraryListRequest) => Promise<T.LibraryItem[]>;
+  readonly add: (req: T.LibraryAddRequest, by: AddedBy, signal?: AbortSignal) => Promise<T.LibraryItem>;
+  /** Removes the library entry only; messages referencing the attachment still open it. */
+  readonly remove: (id: string) => Promise<void>;
+  readonly previewRemove: (id: string) => Promise<T.Preview>;
+  /** Stops recording what the farm hears. */
+  readonly close: () => Promise<void>;
 }
 
-const make = Effect.gen(function* () {
-  const db = yield* Db;
-  const core = yield* Core;
-  const files = yield* Attachment;
-  const sessions = yield* Session;
-  const http = yield* PublicHttp;
+export interface LibraryDeps {
+  readonly db: Db;
+  readonly core: Core;
+  readonly attachment: Attachment;
+  readonly session: Session;
+  readonly publicFetch: PublicFetch;
+  readonly clock: Time;
+  readonly log: Logger;
+}
 
-  const found = Effect.fnUntraced(function* (id: string) {
-    const row = yield* db.one(q.libraryItem({ id }));
-    if (row === undefined) return yield* missing(t("server.library.noItem", { id }), [lookIn.library]);
+const downloadMs = 60_000;
+
+export async function makeLibrary(deps: LibraryDeps): Promise<Library> {
+  const { db, core, clock } = deps;
+  const files = deps.attachment;
+  const sessions = deps.session;
+  const log = deps.log.child("library");
+  const tasks = new TaskGroup({ name: "library", onError: (task, e) => log.error(`library: ${task} failed`, e) });
+
+  const found = async (id: string) => {
+    const row = await q.libraryItem(db.sql, { id });
+    if (row === undefined) throw missing(t("server.library.noItem", { id }), [lookIn.library]);
     return itemOf(row);
-  });
+  };
 
-  const keep = (id: string, origin: T.LibraryOrigin, at: number) => db.run(q.addLibraryItem({ id, kind: origin.kind, origin: originText(origin), at }));
+  const keep = (id: string, origin: T.LibraryOrigin, at: number) => q.addLibraryItem(db.sql, { id, kind: origin.kind, origin: originText(origin), at });
 
   // Deduplicate across repeated mediaChanged facts for already-ready jobs.
   const recordedJobs = new Set<string>();
-  const recordMade = Effect.fnUntraced(function* (jobs: readonly T.MediaJob[]) {
+  const recordMade = async (jobs: readonly T.MediaJob[]) => {
     for (const { job, attachment } of madeFiles(jobs)) {
       if (recordedJobs.has(job.id)) continue;
       recordedJobs.add(job.id);
       const origin: T.LibraryOrigin = { kind: "generated", job: job.id, jobKind: job.kind };
-      yield* db.run(q.knownLibraryItem({ id: attachment.id, kind: origin.kind, origin: originText(origin), at: job.updatedAt }));
+      await q.knownLibraryItem(db.sql, { id: attachment.id, kind: origin.kind, origin: originText(origin), at: job.updatedAt });
+    }
+  };
+  const recordSaid = async (message: T.ChatMessage) => {
+    if (message.actor.kind !== "user" || message.kind !== "chat") return;
+    for (const a of message.attachments) await keep(a.id, { kind: "uploaded", channel: message.channel, message: message.id }, message.at);
+  };
+
+  const { state, changes } = core.transitions();
+  try {
+    await recordMade(state.media ?? []);
+  } catch (e) {
+    changes.close();
+    throw e;
+  }
+  tasks.run("record", async (signal) => {
+    try {
+      for (;;) {
+        const next = await changes.next(signal);
+        if (next.done === true) return;
+        const { fact } = next.value;
+        if (fact.type === "mediaChanged") await recordMade(fact.jobs);
+        else if (fact.type === "messageChanged") await recordSaid(fact.message);
+      }
+    } finally {
+      changes.close();
     }
   });
-  const recordSaid = (message: T.ChatMessage) =>
-    message.actor.kind === "user" && message.kind === "chat"
-      ? Effect.forEach(message.attachments, (a) => keep(a.id, { kind: "uploaded", channel: message.channel, message: message.id }, message.at), {
-          discard: true,
-        })
-      : Effect.void;
 
-  const [state, transitions] = yield* core.transitions;
-  yield* recordMade(state.media ?? []);
-  yield* Effect.forkScoped(
-    Stream.runForEach(transitions, ({ fact }) =>
-      fact.type === "mediaChanged" ? recordMade(fact.jobs) : fact.type === "messageChanged" ? recordSaid(fact.message) : Effect.void,
-    ),
-  );
+  const tooBig = () => refused(t("server.library.tooBig", { mb: attachmentMax / 1024 / 1024 }));
 
-  const download = Effect.fn("Library.download")(
-    function* (address: string) {
-      const url = yield* Schema.decodeEffect(Schema.URLFromString)(address).pipe(Effect.mapError(() => refused(t("server.library.badUrl", { url: address }))));
-      if (!publicHttps(url)) return yield* refused(t("server.library.badUrl", { url: address }));
-      const response = yield* http.get(url);
-      if (response.status !== 200) return yield* refused(t("server.library.notFetched", { url: address, why: String(response.status) }));
-      let size = 0;
-      const chunks = yield* response.stream.pipe(
-        Stream.mapEffect((chunk) => {
+  const fetchFile = async (address: string, url: URL, signal: AbortSignal) => {
+    const response = await deps.publicFetch(url, { signal, redirect: "manual" });
+    if (response.status !== 200) {
+      await response.body?.cancel();
+      throw refused(t("server.library.notFetched", { url: address, why: String(response.status) }));
+    }
+    let size = 0;
+    const chunks: Uint8Array[] = [];
+    const reader = response.body?.getReader();
+    if (reader !== undefined)
+      try {
+        for (let read = await reader.read(); !read.done; read = await reader.read()) {
+          const chunk: unknown = read.value;
+          if (!(chunk instanceof Uint8Array)) throw new TypeError("a response body gave something other than bytes");
           size += chunk.byteLength;
-          return size > attachmentMax ? Effect.fail(refused(t("server.library.tooBig", { mb: attachmentMax / 1024 / 1024 }))) : Effect.succeed(chunk);
-        }),
-        Stream.runCollect,
-      );
-      const header = response.headers["content-type"];
-      const type = header === undefined ? "" : Str.trim(Arr.headNonEmpty(Str.split(";")(header)));
-      const segment = lastOf(url.pathname, "/");
-      const named = yield* Effect.try({ try: () => decodeURIComponent(segment), catch: () => MangledName.make() }).pipe(
-        Effect.catchTag("MangledName", () => Effect.succeed(segment)),
-      );
-      return { bytes: Buffer.concat(chunks), type, name: named === "" ? url.hostname : named };
-    },
-    Effect.timeout("60 seconds"),
-    Effect.catchTags({
-      HttpClientError: (e) => Effect.fail(refused(t("server.library.notFetched", { url: "", why: e.message }))),
-      TimeoutError: () => Effect.fail(refused(t("server.library.slow"))),
-    }),
-  );
-
-  const readWorkFile = (session: string | undefined, path: string) =>
-    sessions.workFile(session ?? "", path, attachmentMax).pipe(
-      Effect.mapError((e) => {
-        switch (e.reason) {
-          case "noPlace":
-            return refused(t("server.library.noPlace"));
-          case "outside":
-            return refused(t("server.library.outside", { path }));
-          case "notFile":
-            return refused(t("server.library.notFile", { path }));
-          case "tooBig":
-            return refused(t("server.library.tooBig", { mb: attachmentMax / 1024 / 1024 }));
-          case "unreadable":
-            return refused(t("server.library.unreadable", { path, why: e.message }));
+          if (size > attachmentMax) throw tooBig();
+          chunks.push(chunk);
         }
-      }),
-    );
+      } finally {
+        // Cut short (too big, aborted): the rest of the body is not wanted.
+        await reader.cancel().catch((e: unknown) => log.debug("library: the download's body did not cancel", e));
+      }
+    const header = response.headers.get("content-type");
+    const type = header === null ? "" : (header.split(";")[0] ?? "").trim();
+    const segment = lastOf(url.pathname, "/");
+    const named = (() => {
+      try {
+        return decodeURIComponent(segment);
+      } catch {
+        // A mangled escape in the address: the segment as it is still names the file.
+        return segment;
+      }
+    })();
+    return { bytes: Buffer.concat(chunks), type, name: named === "" ? url.hostname : named };
+  };
+
+  const download = async (address: string, signal?: AbortSignal) => {
+    let url: URL;
+    try {
+      url = new URL(address);
+    } catch {
+      throw refused(t("server.library.badUrl", { url: address }));
+    }
+    if (!publicHttps(url)) throw refused(t("server.library.badUrl", { url: address }));
+    try {
+      return await withTimeout((bounded) => fetchFile(address, url, bounded), downloadMs, {
+        clock,
+        ...(signal !== undefined ? { signal } : {}),
+        what: "the download",
+      });
+    } catch (e) {
+      if (e instanceof ApiError || signal?.aborted === true) throw e;
+      if (e instanceof DOMException && e.name === "TimeoutError") throw refused(t("server.library.slow"));
+      throw refused(t("server.library.notFetched", { url: "", why: messageOf(e) }));
+    }
+  };
+
+  const readWorkFile = async (session: string | undefined, path: string) => {
+    try {
+      return await sessions.workFile(session ?? "", path, attachmentMax);
+    } catch (e) {
+      if (!(e instanceof NotWorkFile)) throw e;
+      switch (e.reason) {
+        case "noPlace":
+          throw refused(t("server.library.noPlace"));
+        case "outside":
+          throw refused(t("server.library.outside", { path }));
+        case "notFile":
+          throw refused(t("server.library.notFile", { path }));
+        case "tooBig":
+          throw tooBig();
+        case "unreadable":
+          throw refused(t("server.library.unreadable", { path, why: e.message }));
+      }
+    }
+  };
 
   const stored = (bytes: Uint8Array, name: string, type: string) =>
     files.attach({ name, type: type === "" ? typeOfName(name) : type, data: Buffer.from(bytes).toString("base64") });
 
-  const add = Effect.fn("Library.add")(function* (req: T.LibraryAddRequest, by: AddedBy) {
-    if (Arr.filter([req.attachment, req.url, req.path], given).length !== 1) return yield* refused(t("server.library.oneSource"));
-    const at = yield* Clock.currentTimeMillis;
-    const name = given(req.name) ? Str.trim(req.name) : "";
+  const add = async (req: T.LibraryAddRequest, by: AddedBy, signal?: AbortSignal) => {
+    if ([req.attachment, req.url, req.path].filter(given).length !== 1) throw refused(t("server.library.oneSource"));
+    const at = clock.now();
+    const name = given(req.name) ? req.name.trim() : "";
     if (given(req.attachment)) {
-      if (by.kind !== "user") return yield* refused(t("server.library.agentAttachment"));
-      const kept = yield* files.get(req.attachment);
-      if (kept === undefined) return yield* missing(t("server.attachment.noAttachment", { id: req.attachment }), []);
-      yield* keep(req.attachment, { kind: "uploaded" }, at);
-      return yield* found(req.attachment);
+      if (by.kind !== "user") throw refused(t("server.library.agentAttachment"));
+      const kept = await files.get(req.attachment);
+      if (kept === undefined) throw missing(t("server.attachment.noAttachment", { id: req.attachment }), []);
+      await keep(req.attachment, { kind: "uploaded" }, at);
+      return found(req.attachment);
     }
-    if (by.kind !== "agent") return yield* refused(t("server.library.userFetch"));
-    const url = given(req.url) ? Str.trim(req.url) : undefined;
+    if (by.kind !== "agent") throw refused(t("server.library.userFetch"));
+    const url = given(req.url) ? req.url.trim() : undefined;
     const path = req.path ?? "";
-    const fetched = url === undefined ? yield* readWorkFile(by.session, path) : yield* download(url);
-    const attachment = yield* stored(fetched.bytes, name === "" ? fetched.name : name, "type" in fetched ? fetched.type : "");
+    const fetched = url === undefined ? await readWorkFile(by.session, path) : await download(url, signal);
+    const attachment = await stored(fetched.bytes, name === "" ? fetched.name : name, "type" in fetched ? fetched.type : "");
     const from = url === undefined ? { path } : { url };
-    yield* keep(attachment.id, { kind: "fetched", agent: by.agent, ...(by.session === undefined ? {} : { session: by.session }), from }, at);
-    return yield* found(attachment.id);
-  });
+    await keep(attachment.id, { kind: "fetched", agent: by.agent, ...(by.session === undefined ? {} : { session: by.session }), from }, at);
+    return found(attachment.id);
+  };
 
-  return Library.of({
-    list: Effect.fn("Library.list")(function* (req) {
-      const rows = yield* db.run(
-        q.libraryItems({ kind: req.origin ?? "", top: req.type ?? "", text: Str.trim(req.text ?? ""), sort: req.sort ?? "recent", n: listMax }),
-      );
-      return Arr.map(rows, itemOf);
-    }),
+  return {
+    list: async (req) => {
+      const rows = await q.libraryItems(db.sql, {
+        kind: req.origin ?? "",
+        top: req.type ?? "",
+        text: (req.text ?? "").trim(),
+        sort: req.sort ?? "recent",
+        n: listMax,
+      });
+      return rows.map(itemOf);
+    },
     add,
-    remove: Effect.fn("Library.remove")(function* (id) {
-      yield* found(id);
-      yield* db.run(q.removeLibraryItem({ id }));
-    }),
-    previewRemove: Effect.fn("Library.previewRemove")(function* (id) {
-      const item = yield* found(id);
+    remove: async (id) => {
+      await found(id);
+      await q.removeLibraryItem(db.sql, { id });
+    },
+    previewRemove: async (id) => {
+      const item = await found(id);
       return { does: [t("server.library.preview.remove", { name: item.attachment.name })] };
-    }),
-  });
-});
+    },
+    close: () => tasks.close(),
+  };
+}

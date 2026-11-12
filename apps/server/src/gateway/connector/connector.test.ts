@@ -1,21 +1,20 @@
-import { NodeFileSystem } from "@effect/platform-node";
-import { describe, expect, it } from "@effect/vitest";
-import { Clock, Deferred, Effect, FileSystem, Layer, Queue, Schema, Stream } from "effect";
-import { SqlClient } from "effect/sql";
-import { TestClock } from "effect/testing";
+import { rmSync } from "node:fs";
 
+import { describe, expect, test } from "vite-plus/test";
+
+import { abortable, anySignal, Queue, reasonOf } from "@vibevalley/async";
 import { type ConnectorID, type ConnectorState, type ConnectorStatus, defaultOrchestrator } from "@vibevalley/protocol";
 
-import { Channel } from "#/modules/channel/channel.ts";
-import { Mailbox } from "#/modules/mailbox/mailbox.ts";
-import { testConfig, gate, untilGot as until, waitFor, whenState } from "#/testing/layers.ts";
+import type { ServerConfig } from "#/infra/config.ts";
+import type { Time } from "#/infra/time.ts";
+import { gate, nextTurn, testConfig, until, untilGot, waitFor, whenState } from "#/testing/layers.ts";
 import { allow, refuse } from "#/testing/refuse.ts";
-import { world } from "#/testing/world.ts";
+import { type World, world } from "#/testing/world.ts";
 import * as accountQ from "#db/connector_account.sql.ts";
 import * as inboundQ from "#db/connector_inbound.sql.ts";
 
 import { AppFailed, failedWith } from "./adapter.ts";
-import { Connector } from "./connector.ts";
+import { type Connector, makeConnector } from "./connector.ts";
 import type { FeishuApi, Message as FeishuMessage } from "./feishu.ts";
 import { type QQApi, type Message as QQMessage } from "./qq.ts";
 import { type Message as WeixinMessage, type Updates, type WeixinApi, baseUrl } from "./weixin.ts";
@@ -29,25 +28,74 @@ interface Sent {
   readonly reply: string;
 }
 
+/** The connector's clock, held still: it moves only when the test moves it, and every wait due by then wakes in order. */
+function heldTime(start: number): Time & { readonly adjust: (ms: number) => Promise<void> } {
+  let at = start;
+  const sleepers = new Set<{ readonly until: number; readonly wake: () => void }>();
+  const sleep = (ms: number, signal?: AbortSignal) => {
+    if (signal?.aborted === true) return Promise.reject(reasonOf(signal));
+    if (ms <= 0) return Promise.resolve();
+    const { promise, resolve, reject } = Promise.withResolvers<void>();
+    const sleeper = { until: at + ms, wake: resolve };
+    sleepers.add(sleeper);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        sleepers.delete(sleeper);
+        reject(reasonOf(signal));
+      },
+      { once: true },
+    );
+    return promise;
+  };
+  return {
+    now: () => at,
+    sleep,
+    after: (ms, f) => {
+      const stop = new AbortController();
+      sleep(ms, stop.signal).then(f, () => undefined);
+      return () => stop.abort();
+    },
+    adjust: async (ms) => {
+      const end = at + ms;
+      for (;;) {
+        for (let i = 0; i < 5; i++) await nextTurn();
+        const due = [...sleepers].filter((s) => s.until <= end).toSorted((a, b) => a.until - b.until)[0];
+        if (due === undefined) break;
+        sleepers.delete(due);
+        at = due.until;
+        due.wake();
+      }
+      at = end;
+    },
+  };
+}
+
 /** Messages waiting to be taken, one at a time: a take waits, as a long poll does, until one is pushed or it is called off. */
-class Inbox<A> {
-  private readonly queue = Effect.runSync(Queue.unbounded<A>());
-  private ended = Deferred.makeUnsafe<void>();
+class Waiting<A> {
+  private readonly queue = new Queue<A>();
+  private ended = Promise.withResolvers<void>();
   push(a: A) {
-    Queue.offerUnsafe(this.queue, a);
+    this.queue.offer(a);
   }
   /** Ends the poll waiting now with nothing, as the platform's long poll does in time. */
   end() {
-    Deferred.doneUnsafe(this.ended, Effect.void);
-    this.ended = Deferred.makeUnsafe<void>();
+    this.ended.resolve();
+    this.ended = Promise.withResolvers<void>();
   }
-  readonly take: Effect.Effect<A | undefined> = Effect.suspend(() =>
-    Effect.raceFirst(Queue.take(this.queue), Effect.as(Deferred.await(this.ended), undefined)),
-  );
+  async take(signal?: AbortSignal): Promise<A | undefined> {
+    const done = new AbortController();
+    const both = anySignal(signal, done.signal);
+    try {
+      return await Promise.race([this.queue.take(both), this.ended.promise.then(() => undefined)]);
+    } finally {
+      done.abort();
+    }
+  }
 }
 
-/** Until the test opens the gate; a login called off first is interrupted there. */
-const past = (g: { readonly opened: Promise<void> }) => Effect.promise(() => g.opened);
+/** Until the test opens the gate; a login called off first is aborted there. */
+const past = (g: { readonly opened: Promise<void> }, signal: AbortSignal) => abortable(g.opened, signal);
 
 /** The three apps, played: what they are sent is kept. */
 class Script {
@@ -56,9 +104,9 @@ class Script {
   /** The reply context of the user's fresh message: a reply to it goes through while restricted. */
   opened = "";
   private refuses = (reply: string) => this.restricted && reply !== this.opened;
-  readonly weixinIn = new Inbox<WeixinMessage>();
-  readonly feishuIn = new Inbox<FeishuMessage>();
-  readonly qqIn = new Inbox<QQMessage>();
+  readonly weixinIn = new Waiting<WeixinMessage>();
+  readonly feishuIn = new Waiting<FeishuMessage>();
+  readonly qqIn = new Waiting<QQMessage>();
   /** Each app's code is scanned once the test opens its gate, after it has seen the code. */
   readonly weixinScan = gate();
   readonly feishuScan = gate();
@@ -68,42 +116,54 @@ class Script {
   }
   by = (app: ConnectorID) => this.sent.filter((s) => s.app === app);
   /** WeChat's long poll: the next message, or nothing when the poll is ended; a test may answer otherwise. */
-  updates = (buf: string): Effect.Effect<Updates> =>
-    Effect.map(this.weixinIn.take, (m) => (m ? { ret: 0, msgs: [m], get_updates_buf: buf + "+" } : { ret: 0, get_updates_buf: buf }));
+  updates = async (buf: string, signal?: AbortSignal): Promise<Updates> => {
+    const m = await this.weixinIn.take(signal);
+    return m ? { ret: 0, msgs: [m], get_updates_buf: buf + "+" } : { ret: 0, get_updates_buf: buf };
+  };
 
   readonly weixin: WeixinApi = {
-    login: (progress) =>
-      Effect.gen({ self: this }, function* () {
-        yield* progress("waiting", "https://liteapp.weixin.qq.com/q/q1");
-        yield* past(this.weixinScan);
-        yield* progress("scanned", "https://liteapp.weixin.qq.com/q/q1");
-        return { account: { baseUrl, token: "tok" }, botId: "bot1@im.bot", user };
-      }),
-    getUpdates: (_account, buf) => Effect.suspend(() => this.updates(buf)),
-    sendText: (_account, to, text, contextToken) =>
-      this.refuses(contextToken)
-        ? Effect.fail(AppFailed.make({ kind: "restricted", message: "sendmessage: -2" }))
-        : Effect.sync(() => "wx" + this.record({ app: "weixin", to, text, reply: contextToken })),
+    login: async (progress, _verification, signal) => {
+      progress("waiting", "https://liteapp.weixin.qq.com/q/q1");
+      await past(this.weixinScan, signal);
+      progress("scanned", "https://liteapp.weixin.qq.com/q/q1");
+      return { account: { baseUrl, token: "tok" }, botId: "bot1@im.bot", user };
+    },
+    getUpdates: (_account, buf, _timeout, signal) => this.updates(buf, signal),
+    sendText: async (_account, to, text, contextToken) => {
+      if (this.refuses(contextToken)) throw new AppFailed("restricted", "sendmessage: -2");
+      return "wx" + this.record({ app: "weixin", to, text, reply: contextToken });
+    },
   };
 
   readonly feishu: FeishuApi = {
-    login: (progress) =>
-      Effect.gen({ self: this }, function* () {
-        yield* progress("https://open.feishu.cn/page/cli?user_code=AB");
-        yield* past(this.feishuScan);
-        return { app: { appId: "cli_1", appSecret: "s", domain: "feishu" as const }, user: "" };
-      }),
-    listen: (_app, got) => Effect.forever(Effect.flatMap(this.feishuIn.take, (m) => (m ? got(m) : Effect.void))),
-    sendText: (_app, openId, text) => Effect.sync(() => "om_" + this.record({ app: "feishu", to: openId, text, reply: "" })),
+    login: async (progress, signal) => {
+      progress("https://open.feishu.cn/page/cli?user_code=AB");
+      await past(this.feishuScan, signal);
+      return { app: { appId: "cli_1", appSecret: "s", domain: "feishu" as const }, user: "" };
+    },
+    listen: async (_app, got, signal) => {
+      for (;;) {
+        const m = await this.feishuIn.take(signal);
+        if (m) await got(m);
+      }
+    },
+    sendText: async (_app, openId, text) => "om_" + this.record({ app: "feishu", to: openId, text, reply: "" }),
   };
 
-  readonly qq: QQApi = {
-    check: (app) => (app.secret !== "right" ? Effect.fail(failedWith("QQ 鉴权：AppID 或 AppSecret 不对")) : Effect.void),
-    listen: (_app, got) => Effect.forever(Effect.flatMap(this.qqIn.take, (m) => (m ? got(m) : Effect.void))),
-    sendText: (_app, openId, text, msgId) =>
-      this.refuses(msgId)
-        ? Effect.fail(AppFailed.make({ kind: "restricted", message: "QQ 发消息：被动回复超时" }))
-        : Effect.sync(() => "qq" + this.record({ app: "qq", to: openId, text, reply: msgId })),
+  qq: QQApi = {
+    check: async (app) => {
+      if (app.secret !== "right") throw failedWith("QQ 鉴权：AppID 或 AppSecret 不对");
+    },
+    listen: async (_app, got, signal) => {
+      for (;;) {
+        const m = await this.qqIn.take(signal);
+        if (m) await got(m);
+      }
+    },
+    sendText: async (_app, openId, text, msgId) => {
+      if (this.refuses(msgId)) throw new AppFailed("restricted", "QQ 发消息：被动回复超时");
+      return "qq" + this.record({ app: "qq", to: openId, text, reply: msgId });
+    },
   };
 }
 
@@ -124,637 +184,567 @@ const qqMsg = (from: string, content: string): QQMessage => ({
   content,
   attachments: 0,
 });
-const encodeFeishuText = Schema.encodeEffect(Schema.fromJsonString(Schema.Struct({ text: Schema.String })));
-const feishuMsg = Effect.fnUntraced(function* (from: string, text: string, chatType = "p2p") {
-  const message: FeishuMessage = {
-    messageId: `om${++ids}`,
-    from,
-    chatType,
-    messageType: "text",
-    content: yield* encodeFeishuText({ text }),
-    parentId: "",
-  };
-  return message;
+const feishuMsg = (from: string, text: string, chatType = "p2p"): FeishuMessage => ({
+  messageId: `om${++ids}`,
+  from,
+  chatType,
+  messageType: "text",
+  content: JSON.stringify({ text }),
+  parentId: "",
 });
-const removeHome = (home: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    yield* fs.remove(home, { recursive: true, force: true });
-  }).pipe(Effect.provide(NodeFileSystem.layer), Effect.ignore({ log: "Warn" }));
-
-/** The orchestrator, played: what it hears goes into the channel, and it answers acknowledged at once. */
-const farm = (script: Script, config = testConfig(), retry: { retryFirstMs?: number; retryMostMs?: number } = {}) =>
-  Connector.layer({ weixin: script.weixin, feishu: script.feishu, qq: script.qq, ...retry }).pipe(
-    Layer.provideMerge(echoing),
-    Layer.provideMerge(world({ config })),
-    Layer.provide(Layer.effectDiscard(TestClock.setTime(1_800_000_000_000))),
-  );
 
 /** The orchestrator consumer as the chat apps meet it here: each durable Mailbox input is answered at once. */
-const echoing = Layer.effectDiscard(
-  Effect.gen(function* () {
-    const chat = yield* Channel;
-    const mailbox = yield* Mailbox;
-    const news2 = yield* mailbox.news;
-    yield* Effect.forkScoped(
-      Stream.runForEach(news2, (news) =>
-        news._tag === "Handed"
-          ? Effect.forEach(
-              news.messages,
-              (message) => chat.post({ _tag: "Run", from: defaultOrchestrator, channel: news.channel, text: "收到：**" + message.text + "**", run: "" }),
-              {
-                discard: true,
-              },
-            )
-          : Effect.void,
-      ),
-    );
-  }),
-);
+const echoing = (w: World) => {
+  const news = w.mailbox.news();
+  const reading = (async () => {
+    for await (const n of news)
+      if (n._tag === "Handed")
+        for (const message of n.messages)
+          await w.channel.post({ _tag: "Run", from: defaultOrchestrator, channel: n.channel, text: "收到：**" + message.text + "**", run: "" });
+  })();
+  return async () => {
+    news.close();
+    await reading;
+  };
+};
 
-const statusOf = (id: ConnectorID) =>
-  Effect.gen(function* () {
-    const context2 = yield* Effect.context();
-    const runPromise = Effect.runPromiseWith(context2);
-    const c = yield* Connector;
-    return () => runPromise(Effect.map(c.list(), (all) => all.find((s) => s.id === id)!));
-  });
+interface ConnectorFarm extends AsyncDisposable {
+  readonly world: World;
+  readonly connector: Connector;
+  readonly clock: ReturnType<typeof heldTime>;
+}
+
+/** The orchestrator, played: what it hears goes into the channel, and it answers acknowledged at once. */
+const farm = async (
+  script: Script,
+  config: ServerConfig = testConfig(),
+  retry: { retryFirstMs?: number; retryMostMs?: number } = {},
+): Promise<ConnectorFarm> => {
+  const w = await world({ config });
+  const clock = heldTime(1_800_000_000_000);
+  const stopEcho = echoing(w);
+  const connector = await makeConnector({ ...w, clock }, { weixin: script.weixin, feishu: script.feishu, qq: script.qq, ...retry });
+  return {
+    world: w,
+    connector,
+    clock,
+    [Symbol.asyncDispose]: async () => {
+      await connector.close();
+      await stopEcho();
+      await w.close();
+    },
+  };
+};
+
+const statusOf = (f: ConnectorFarm, id: ConnectorID) => async () => (await f.connector.list()).find((s) => s.id === id)!;
 
 /** The chat app's status once ok holds for it, as the connectors say it to the core whenever it changes. */
-const statusIs = (id: ConnectorID, ok: (s: ConnectorStatus) => boolean, what: string) =>
-  whenState((state) => {
-    const s = state.connectors.find((c) => c.id === id);
-    return s && ok(s) ? s : undefined;
-  }, `${id}: ${what}`);
+const statusIs = (f: ConnectorFarm, id: ConnectorID, ok: (s: ConnectorStatus) => boolean, what: string) =>
+  whenState(
+    f.world.core,
+    (state) => {
+      const s = state.connectors.find((c) => c.id === id);
+      return s && ok(s) ? s : undefined;
+    },
+    `${id}: ${what}`,
+  );
 
-const reaches = (id: ConnectorID, state: ConnectorState) => statusIs(id, (s) => s.state === state, state);
+const reaches = (f: ConnectorFarm, id: ConnectorID, state: ConnectorState) => statusIs(f, id, (s) => s.state === state, state);
 
-const nth = (script: Script, app: ConnectorID, n: number, what: string) => until(async () => script.by(app)[n], what);
+const nth = (script: Script, app: ConnectorID, n: number, what: string) => untilGot(async () => script.by(app)[n], what);
 
-const saidIn = (channel: string) =>
-  Effect.gen(function* () {
-    const chat = yield* Channel;
-    return (yield* chat.history(channel)).filter((m) => m.from === "user").map((m) => m.text);
-  });
+const saidIn = async (f: ConnectorFarm, channel: string) => (await f.world.channel.history(channel)).filter((m) => m.from === "user").map((m) => m.text);
 
-const weixinConnected = (script: Script) =>
-  Effect.gen(function* () {
-    const c = yield* Connector;
-    const first = yield* c.login("weixin", {});
-    expect(first.qr).toBe("https://liteapp.weixin.qq.com/q/q1");
-    script.weixinScan.open();
-    return yield* reaches("weixin", "connected");
-  });
+const weixinConnected = async (f: ConnectorFarm, script: Script) => {
+  const first = await f.connector.login("weixin", {});
+  expect(first.qr).toBe("https://liteapp.weixin.qq.com/q/q1");
+  script.weixinScan.open();
+  return reaches(f, "weixin", "connected");
+};
 
-const qqPaired = (script: Script) =>
-  Effect.gen(function* () {
-    const c = yield* Connector;
-    yield* c.login("qq", { appId: "102", secret: "right" });
-    const code = (yield* reaches("qq", "pairing")).pairCode;
-    script.qqIn.push(qqMsg("user-openid", code));
-    yield* reaches("qq", "connected");
-  });
+const qqPaired = async (f: ConnectorFarm, script: Script) => {
+  await f.connector.login("qq", { appId: "102", secret: "right" });
+  const code = (await reaches(f, "qq", "pairing")).pairCode;
+  script.qqIn.push(qqMsg("user-openid", code));
+  await reaches(f, "qq", "connected");
+};
 
 describe("the chat apps", () => {
-  it.effect("take the user's WeChat words to the default channel and answer there", () => {
+  test("take the user's WeChat words to the default channel and answer there", async () => {
     const script = new Script();
-    return Effect.gen(function* () {
-      const chat = yield* Channel;
-      const status = yield* weixinConnected(script);
-      expect(status.user).toBe("o9cq…chat");
-      script.weixinIn.push(wx(user, "帮我看看打卡页", "ctx-a"));
-      const nth2 = yield* nth(script, "weixin", 0, "the answer in WeChat");
-      expect(nth2).toEqual({
-        app: "weixin",
-        to: user,
-        text: "【助手】\n收到：帮我看看打卡页",
-        reply: "ctx-a",
-      });
-      const saidIn2 = yield* saidIn(chat.defaultChannel());
-      expect(saidIn2).toEqual(["帮我看看打卡页"]);
-      const sql = yield* SqlClient.SqlClient;
-      const rows = yield* sql<{
-        source: string;
-        meta: string | null;
-      }>`select d.source, m.meta from mailbox_delivery d
-          join channel_message m on m.id = d.message_id where m.body = '帮我看看打卡页'`;
-      expect(rows).toEqual([{ source: "connector", meta: `{"ingressSource":"connector"}` }]);
-      const statusOf2 = yield* statusOf("weixin");
-      const value2 = yield* Effect.promise(statusOf2);
-      expect(value2).toMatchObject({
-        lastInbound: expect.any(Number),
-      });
-    }).pipe(Effect.scoped, Effect.provide(farm(script)));
+    await using f = await farm(script);
+    const chat = f.world.channel;
+    const status = await weixinConnected(f, script);
+    expect(status.user).toBe("o9cq…chat");
+    script.weixinIn.push(wx(user, "帮我看看打卡页", "ctx-a"));
+    expect(await nth(script, "weixin", 0, "the answer in WeChat")).toEqual({
+      app: "weixin",
+      to: user,
+      text: "【助手】\n收到：帮我看看打卡页",
+      reply: "ctx-a",
+    });
+    expect(await saidIn(f, chat.defaultChannel())).toEqual(["帮我看看打卡页"]);
+    const rows = await f.world.db.sql.query(`select d.source, m.meta from mailbox_delivery d
+          join channel_message m on m.id = d.message_id where m.body = '帮我看看打卡页'`);
+    expect(rows).toEqual([{ source: "connector", meta: `{"ingressSource":"connector"}` }]);
+    expect(await statusOf(f, "weixin")()).toMatchObject({
+      lastInbound: expect.any(Number),
+    });
   });
 
-  it.effect("a malformed durable inbound is settled without blocking later valid messages", () => {
+  test("a malformed durable inbound is settled without blocking later valid messages", async () => {
     const script = new Script();
-    return Effect.gen(function* () {
-      const chat = yield* Channel;
-      yield* weixinConnected(script);
-      yield* Effect.orDie(
-        inboundQ.acceptInbound({
-          connector: "weixin",
-          ext_id: "poison",
-          payload: `{"id":"poison","from":42}`,
-          created_at: yield* Clock.currentTimeMillis,
-        }),
-      );
-      script.weixinIn.push(wx(user, "后面的正常消息", "ctx-good"));
-      const nth2 = yield* nth(script, "weixin", 0, "the valid message after a bad row");
-      expect(nth2).toMatchObject({
-        text: "【助手】\n收到：后面的正常消息",
-      });
-      const saidIn2 = yield* saidIn(chat.defaultChannel());
-      expect(saidIn2).toEqual(["后面的正常消息"]);
-      // Settled once the words are in, which is after the answer went out.
-      yield* waitFor(Effect.orDie(inboundQ.pendingInbound({ connector: "weixin" })), (rows) => rows.length === 0, "both rows settled");
-    }).pipe(Effect.scoped, Effect.provide(farm(script)));
+    await using f = await farm(script);
+    const chat = f.world.channel;
+    await weixinConnected(f, script);
+    await inboundQ.acceptInbound(f.world.db.sql, {
+      connector: "weixin",
+      ext_id: "poison",
+      payload: `{"id":"poison","from":42}`,
+      created_at: f.clock.now(),
+    });
+    script.weixinIn.push(wx(user, "后面的正常消息", "ctx-good"));
+    expect(await nth(script, "weixin", 0, "the valid message after a bad row")).toMatchObject({
+      text: "【助手】\n收到：后面的正常消息",
+    });
+    expect(await saidIn(f, chat.defaultChannel())).toEqual(["后面的正常消息"]);
+    // Settled once the words are in, which is after the answer went out.
+    await waitFor(
+      () => inboundQ.pendingInbound(f.world.db.sql, { connector: "weixin" }),
+      (rows) => rows.length === 0,
+      "both rows settled",
+    );
   });
 
-  it.effect("a workbench read withdraws an unsent human handoff", () => {
+  test("a workbench read withdraws an unsent human handoff", async () => {
     const script = new Script();
     script.restricted = true;
     script.opened = "different-window";
-    return Effect.gen(function* () {
-      const chat = yield* Channel;
-      yield* weixinConnected(script);
-      const channel = chat.defaultChannel();
-      yield* chat.post({ _tag: "Run", from: defaultOrchestrator, channel: channel, text: "已经接下来了", run: "" });
-      const statusOf2 = yield* statusOf("weixin");
-      yield* waitFor(Effect.promise(statusOf2), (status) => status.pending === 1, "the handoff waiting outside");
-      const [message] = yield* chat.history(channel);
-      yield* chat.markRead(channel, message!.number);
-      const statusOf3 = yield* statusOf("weixin");
-      yield* waitFor(Effect.promise(statusOf3), (status) => status.pending === 0, "the seen handoff withdrawn");
-      const sql = yield* SqlClient.SqlClient;
-      const rows = yield* sql<{
-        state: string;
-      }>`select state from connector_outbox where message_id = ${message!.id}`;
-      expect(rows).toEqual([{ state: "dropped" }]);
-      expect(script.sent).toEqual([]);
-    }).pipe(Effect.scoped, Effect.provide(farm(script, testConfig(), { retryFirstMs: 10_000 })));
+    await using f = await farm(script, testConfig(), { retryFirstMs: 10_000 });
+    const chat = f.world.channel;
+    await weixinConnected(f, script);
+    const channel = chat.defaultChannel();
+    await chat.post({ _tag: "Run", from: defaultOrchestrator, channel: channel, text: "已经接下来了", run: "" });
+    await waitFor(statusOf(f, "weixin"), (status) => status.pending === 1, "the handoff waiting outside");
+    const [message] = await chat.history(channel);
+    await chat.markRead(channel, message!.number);
+    await waitFor(statusOf(f, "weixin"), (status) => status.pending === 0, "the seen handoff withdrawn");
+    const rows = await f.world.db.sql.query(`select state from connector_outbox where message_id = $1`, [message!.id]);
+    expect(rows).toEqual([{ state: "dropped" }]);
+    expect(script.sent).toEqual([]);
   });
 
-  it.effect("saved connector secrets must be a string map", () => {
+  test("saved connector secrets must be a string map", async () => {
     const config = { ...testConfig(), db: "" };
     const first = new Script();
-    return Effect.gen(function* () {
-      yield* Effect.gen(function* () {
-        yield* weixinConnected(first);
-        yield* Effect.orDie(
-          accountQ.connectAccount({
-            connector: "weixin",
-            secrets: `{"token":42}`,
-            user_id: user,
-            pair_code: null,
-            connected_at: yield* Clock.currentTimeMillis,
-          }),
-        );
-      }).pipe(Effect.scoped, Effect.provide(farm(first, config)));
-      yield* Effect.gen(function* () {
-        const statusOf2 = yield* statusOf("weixin");
-        const status = yield* Effect.promise(statusOf2);
-        expect(status.error).toContain("存着的登录信息读不出来");
-      }).pipe(Effect.scoped, Effect.provide(farm(new Script(), config)));
+    {
+      await using f = await farm(first, config);
+      await weixinConnected(f, first);
+      await accountQ.connectAccount(f.world.db.sql, {
+        connector: "weixin",
+        secrets: `{"token":42}`,
+        user_id: user,
+        pair_code: null,
+        connected_at: f.clock.now(),
+      });
+    }
+    await using f = await farm(new Script(), config);
+    const status = await statusOf(f, "weixin")();
+    expect(status.error).toContain("存着的登录信息读不出来");
+  });
+
+  test("tie WeChat to another channel", async () => {
+    const script = new Script();
+    await using f = await farm(script);
+    const chat = f.world.channel;
+    const c = f.connector;
+    await weixinConnected(f, script);
+    const channel = await chat.openChannel("clock-in", "", "");
+    expect((await c.setChannel("weixin", "#clock-in")).channel).toBe("clock-in");
+    const setChannelFailure = await c.setChannel("weixin", "#nowhere").catch((e: unknown) => e);
+    expect(setChannelFailure).toMatchObject({
+      reason: expect.stringContaining("没有叫"),
     });
+    await chat.post({ _tag: "Run", from: defaultOrchestrator, channel: chat.defaultChannel(), text: "默认频道里的话", run: "" });
+    script.weixinIn.push(wx(user, "打卡页怎么样了", "ctx-c"));
+    expect(await nth(script, "weixin", 0, "the answer in WeChat")).toEqual({
+      app: "weixin",
+      to: user,
+      text: "【助手】\n收到：打卡页怎么样了",
+      reply: "ctx-c",
+    });
+    expect(await saidIn(f, channel.id)).toEqual(["打卡页怎么样了"]);
+    expect(await saidIn(f, chat.defaultChannel())).toEqual([]);
+    // What goes out is offered in the order it was said: the answer is out, so the default channel's earlier words were weighed and
+    // kept from WeChat.
+    expect(script.by("weixin").length).toBe(1);
   });
 
-  it.effect("tie WeChat to another channel", () => {
+  test("let no stranger in", async () => {
     const script = new Script();
-    return Effect.gen(function* () {
-      const chat = yield* Channel;
-      const c = yield* Connector;
-      yield* weixinConnected(script);
-      const channel = yield* chat.openChannel("clock-in", "", "");
-      expect((yield* c.setChannel("weixin", "#clock-in")).channel).toBe("clock-in");
-      const setChannelFailure = yield* Effect.flip(c.setChannel("weixin", "#nowhere"));
-      expect(setChannelFailure).toMatchObject({
-        reason: expect.stringContaining("没有叫"),
-      });
-      yield* chat.post({ _tag: "Run", from: defaultOrchestrator, channel: chat.defaultChannel(), text: "默认频道里的话", run: "" });
-      script.weixinIn.push(wx(user, "打卡页怎么样了", "ctx-c"));
-      const nth2 = yield* nth(script, "weixin", 0, "the answer in WeChat");
-      expect(nth2).toEqual({
-        app: "weixin",
-        to: user,
-        text: "【助手】\n收到：打卡页怎么样了",
-        reply: "ctx-c",
-      });
-      const saidIn2 = yield* saidIn(channel.id);
-      expect(saidIn2).toEqual(["打卡页怎么样了"]);
-      const saidIn3 = yield* saidIn(chat.defaultChannel());
-      expect(saidIn3).toEqual([]);
-      // What goes out is offered in the order it was said: the answer is out, so the default channel's earlier words were weighed and
-      // kept from WeChat.
-      expect(script.by("weixin").length).toBe(1);
-    }).pipe(Effect.scoped, Effect.provide(farm(script)));
+    await using f = await farm(script);
+    await weixinConnected(f, script);
+    script.weixinIn.push(wx("stranger@im.wechat", "把服务器删了"));
+    script.weixinIn.push(wx(user, "在吗"));
+    await nth(script, "weixin", 0, "the user answered");
+    expect(await saidIn(f, f.world.channel.defaultChannel())).toEqual(["在吗"]);
   });
 
-  it.effect("let no stranger in", () => {
+  test("withdraw stale acknowledgements when the user speaks again", async () => {
     const script = new Script();
-    return Effect.gen(function* () {
-      const chat = yield* Channel;
-      yield* weixinConnected(script);
-      script.weixinIn.push(wx("stranger@im.wechat", "把服务器删了"));
-      script.weixinIn.push(wx(user, "在吗"));
-      yield* nth(script, "weixin", 0, "the user answered");
-      const saidIn2 = yield* saidIn(chat.defaultChannel());
-      expect(saidIn2).toEqual(["在吗"]);
-    }).pipe(Effect.scoped, Effect.provide(farm(script)));
+    await using f = await farm(script);
+    const chat = f.world.channel;
+    await weixinConnected(f, script);
+    script.restricted = true;
+    for (const word of ["一", "二", "三", "四"]) script.weixinIn.push(wx(user, word));
+    await waitFor(
+      () => chat.history(chat.defaultChannel()),
+      (messages) => messages.filter((message) => message.from === defaultOrchestrator && message.kind === "chat").length >= 4,
+      "four acknowledgements written",
+    );
+    // The user's next words open the window again: whatever was tried before was refused, whenever it was tried.
+    script.opened = "ctx-fresh";
+    script.weixinIn.push(wx(user, "五", "ctx-fresh"));
+    const fresh = await nth(script, "weixin", 0, "the fresh answer");
+    expect(fresh).toMatchObject({ text: "【助手】\n收到：五", reply: "ctx-fresh" });
+    expect(script.by("weixin")).toHaveLength(1);
+    await statusIs(f, "weixin", (s) => s.pending === 0, "nothing pending");
   });
 
-  it.effect("withdraw stale acknowledgements when the user speaks again", () => {
+  test("send what waited by themselves, later", async () => {
     const script = new Script();
-    return Effect.gen(function* () {
-      const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
-      const chat = yield* Channel;
-      yield* weixinConnected(script);
-      script.restricted = true;
-      for (const word of ["一", "二", "三", "四"]) script.weixinIn.push(wx(user, word));
-      yield* waitFor(
-        chat.history(chat.defaultChannel()),
-        (messages) => messages.filter((message) => message.from === defaultOrchestrator && message.kind === "chat").length >= 4,
-        "four acknowledgements written",
-      );
-      // The user's next words open the window again: whatever was tried before was refused, whenever it was tried.
-      script.opened = "ctx-fresh";
-      script.weixinIn.push(wx(user, "五", "ctx-fresh"));
-      const fresh = yield* nth(script, "weixin", 0, "the fresh answer");
-      expect(fresh).toMatchObject({ text: "【助手】\n收到：五", reply: "ctx-fresh" });
-      expect(script.by("weixin")).toHaveLength(1);
-      yield* status((s) => s.pending === 0, "nothing pending");
-    }).pipe(Effect.scoped, Effect.provide(farm(script)));
+    await using f = await farm(script);
+    await weixinConnected(f, script);
+    script.restricted = true;
+    script.weixinIn.push(wx(user, "一", "ctx-1"));
+    await statusIs(f, "weixin", (s) => s.pending === 1, "held");
+    script.restricted = false;
+    await f.clock.adjust(30_000);
+    expect(await nth(script, "weixin", 0, "the held answer")).toMatchObject({
+      text: "【助手】\n收到：一",
+      reply: "ctx-1",
+    });
+    await statusIs(f, "weixin", (s) => s.pending === 0, "nothing pending");
   });
 
-  it.effect("send what waited by themselves, later", () => {
+  test("forget what waited on a logout", async () => {
     const script = new Script();
-    return Effect.gen(function* () {
-      const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
-      yield* weixinConnected(script);
-      script.restricted = true;
-      script.weixinIn.push(wx(user, "一", "ctx-1"));
-      yield* status((s) => s.pending === 1, "held");
-      script.restricted = false;
-      yield* TestClock.adjust(30_000);
-      const nth2 = yield* nth(script, "weixin", 0, "the held answer");
-      expect(nth2).toMatchObject({
-        text: "【助手】\n收到：一",
-        reply: "ctx-1",
-      });
-      yield* status((s) => s.pending === 0, "nothing pending");
-    }).pipe(Effect.scoped, Effect.provide(farm(script)));
+    await using f = await farm(script);
+    await weixinConnected(f, script);
+    script.restricted = true;
+    script.weixinIn.push(wx(user, "一"));
+    await statusIs(f, "weixin", (s) => s.pending === 1, "held");
+    const after = await f.connector.logout("weixin");
+    expect(after).toMatchObject({ state: "off", pending: 0 });
+    expect(after.user).toBeUndefined();
   });
 
-  it.effect("forget what waited on a logout", () => {
+  test("pair QQ by its code, and take only the user's words", async () => {
     const script = new Script();
-    return Effect.gen(function* () {
-      const c = yield* Connector;
-      const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
-      yield* weixinConnected(script);
-      script.restricted = true;
-      script.weixinIn.push(wx(user, "一"));
-      yield* status((s) => s.pending === 1, "held");
-      const after = yield* c.logout("weixin");
-      expect(after).toMatchObject({ state: "off", pending: 0 });
-      expect(after.user).toBeUndefined();
-    }).pipe(Effect.scoped, Effect.provide(farm(script)));
+    await using f = await farm(script);
+    const c = f.connector;
+    await c.login("qq", { appId: "102", secret: "wrong" });
+    const refused = await statusIs(f, "qq", (s) => s.state === "off" && !!s.error, "refused");
+    expect(refused.error).toContain("不对");
+    await c.login("qq", { appId: "102", secret: "right" });
+    const pairing = await reaches(f, "qq", "pairing");
+    expect(pairing.pairCode).toMatch(/^\d{6}$/u);
+    script.qqIn.push(qqMsg("someone", "你好"));
+    script.qqIn.push(qqMsg("user-openid", "配对 " + pairing.pairCode));
+    const paired = await reaches(f, "qq", "connected");
+    expect(paired.user).toBe("user…enid");
+    expect((await nth(script, "qq", 0, "the welcome")).text.startsWith("配对好了")).toBe(true);
+    script.qqIn.push(qqMsg("someone", "我也想派活"));
+    const last = qqMsg("user-openid", "跑一下测试");
+    script.qqIn.push(last);
+    expect(await nth(script, "qq", 1, "the answer in QQ")).toEqual({
+      app: "qq",
+      to: "user-openid",
+      text: "【助手】\n收到：跑一下测试",
+      reply: last.id,
+    });
+    expect(await saidIn(f, f.world.channel.defaultChannel())).toEqual(["跑一下测试"]);
   });
 
-  it.effect("pair QQ by its code, and take only the user's words", () => {
-    const script = new Script();
-    return Effect.gen(function* () {
-      const c = yield* Connector;
-      const chat = yield* Channel;
-      yield* c.login("qq", { appId: "102", secret: "wrong" });
-      const refused = yield* statusIs("qq", (s) => s.state === "off" && !!s.error, "refused");
-      expect(refused.error).toContain("不对");
-      yield* c.login("qq", { appId: "102", secret: "right" });
-      const pairing = yield* reaches("qq", "pairing");
-      expect(pairing.pairCode).toMatch(/^\d{6}$/u);
-      script.qqIn.push(qqMsg("someone", "你好"));
-      script.qqIn.push(qqMsg("user-openid", "配对 " + pairing.pairCode));
-      const paired = yield* reaches("qq", "connected");
-      expect(paired.user).toBe("user…enid");
-      expect((yield* nth(script, "qq", 0, "the welcome")).text.startsWith("配对好了")).toBe(true);
-      script.qqIn.push(qqMsg("someone", "我也想派活"));
-      const last = qqMsg("user-openid", "跑一下测试");
-      script.qqIn.push(last);
-      const nth2 = yield* nth(script, "qq", 1, "the answer in QQ");
-      expect(nth2).toEqual({
-        app: "qq",
-        to: "user-openid",
-        text: "【助手】\n收到：跑一下测试",
-        reply: last.id,
-      });
-      const saidIn2 = yield* saidIn(chat.defaultChannel());
-      expect(saidIn2).toEqual(["跑一下测试"]);
-    }).pipe(Effect.scoped, Effect.provide(farm(script)));
-  });
-
-  it.effect("a QQ gateway that fails mid-message: what it was handing over arrives, a late handover is refused, and it listens again", () => {
+  test("a QQ gateway that fails mid-message: what it was handing over arrives, a late handover is refused, and it listens again", async () => {
     const script = new Script();
     let listens = 0;
-    let late: ((m: QQMessage) => Effect.Effect<void, AppFailed>) | undefined;
+    let late: ((m: QQMessage) => Promise<void>) | undefined;
     const qq = script.qq;
     // The SDK's handler can outlive its listen: this one keeps got, and fails the gateway once a message is handed over.
-    (script as { qq: QQApi }).qq = {
+    script.qq = {
       ...script.qq,
-      listen: (app, got) => {
+      listen: (app, got, signal) => {
         listens++;
-        return qq.listen(app, (m) => {
-          if (m.content !== "断开") return got(m);
-          late = got;
-          return Effect.andThen(got(qqMsg("user-openid", "断开前的一句")), Effect.fail(failedWith("网关断了")));
-        });
+        return qq.listen(
+          app,
+          async (m) => {
+            if (m.content !== "断开") return got(m);
+            late = got;
+            await got(qqMsg("user-openid", "断开前的一句"));
+            throw failedWith("网关断了");
+          },
+          signal,
+        );
       },
     };
-    return Effect.gen(function* () {
-      const chat = yield* Channel;
-      yield* qqPaired(script);
-      const before = listens;
-      script.qqIn.push(qqMsg("user-openid", "断开"));
-      // A failed receive is tried again after its backoff on the farm's Clock: moved through each time it is asked, as the test cannot see when the backoff starts.
-      yield* waitFor(
-        Effect.map(TestClock.adjust(2_000), () => listens),
-        (n) => n > before,
-        "it listens again",
-      );
-      const saidIn2 = yield* saidIn(chat.defaultChannel());
-      expect(saidIn2).toContain("断开前的一句");
-      const refused = yield* Effect.flip(late!(qqMsg("user-openid", "迟到的一句")));
-      expect(refused.message).toBe("canceled");
-      script.qqIn.push(qqMsg("user-openid", "重连后的一句"));
-      yield* waitFor(saidIn(chat.defaultChannel()), (said) => said.includes("重连后的一句"), "the next words");
-      const saidIn3 = yield* saidIn(chat.defaultChannel());
-      expect(saidIn3).not.toContain("迟到的一句");
-    }).pipe(Effect.scoped, Effect.provide(farm(script)));
+    await using f = await farm(script);
+    const chat = f.world.channel;
+    await qqPaired(f, script);
+    const before = listens;
+    script.qqIn.push(qqMsg("user-openid", "断开"));
+    // A failed receive is tried again after its backoff on the connector's clock: moved through each time it is asked, as the test cannot see when the backoff starts.
+    await waitFor(
+      async () => {
+        await f.clock.adjust(2_000);
+        return listens;
+      },
+      (n) => n > before,
+      "it listens again",
+    );
+    expect(await saidIn(f, chat.defaultChannel())).toContain("断开前的一句");
+    const refused = await late!(qqMsg("user-openid", "迟到的一句")).catch((e: unknown) => e);
+    expect(refused).toMatchObject({ message: "canceled" });
+    script.qqIn.push(qqMsg("user-openid", "重连后的一句"));
+    await waitFor(
+      () => saidIn(f, chat.defaultChannel()),
+      (said) => said.includes("重连后的一句"),
+      "the next words",
+    );
+    expect(await saidIn(f, chat.defaultChannel())).not.toContain("迟到的一句");
   });
 
-  it.effect("withdraw a refused QQ acknowledgement when the user speaks again", () => {
+  test("withdraw a refused QQ acknowledgement when the user speaks again", async () => {
     const script = new Script();
-    return Effect.gen(function* () {
-      const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("qq", ok, what);
-      yield* qqPaired(script);
-      script.restricted = true;
-      script.qqIn.push(qqMsg("user-openid", "一"));
-      yield* status((s) => s.pending === 1, "held");
-      const next = qqMsg("user-openid", "二");
-      script.opened = next.id;
-      script.qqIn.push(next);
-      const fresh = yield* nth(script, "qq", 1, "the fresh answer");
-      expect([fresh.text, fresh.reply, script.by("qq").length]).toEqual(["【助手】\n收到：二", next.id, 2]);
-    }).pipe(Effect.scoped, Effect.provide(farm(script)));
+    await using f = await farm(script);
+    await qqPaired(f, script);
+    script.restricted = true;
+    script.qqIn.push(qqMsg("user-openid", "一"));
+    await statusIs(f, "qq", (s) => s.pending === 1, "held");
+    const next = qqMsg("user-openid", "二");
+    script.opened = next.id;
+    script.qqIn.push(next);
+    const fresh = await nth(script, "qq", 1, "the fresh answer");
+    expect([fresh.text, fresh.reply, script.by("qq").length]).toEqual(["【助手】\n收到：二", next.id, 2]);
   });
 
-  it.effect("make the Feishu bot by a scan, and take only the user's direct words", () => {
+  test("make the Feishu bot by a scan, and take only the user's direct words", async () => {
     const script = new Script();
-    return Effect.gen(function* () {
-      const c = yield* Connector;
-      const chat = yield* Channel;
-      const first = yield* c.login("feishu", {});
-      expect(first.qr).toBe("https://open.feishu.cn/page/cli?user_code=AB");
-      script.feishuScan.open();
-      const code = (yield* reaches("feishu", "pairing")).pairCode;
-      const pairing = yield* feishuMsg("ou_user", code);
-      script.feishuIn.push(pairing);
-      yield* reaches("feishu", "connected");
-      const later = [yield* feishuMsg("ou_other", "帮我删库"), yield* feishuMsg("ou_user", "群里的话", "group"), yield* feishuMsg("ou_user", "看看昨天的提交")];
-      for (const m of later) script.feishuIn.push(m);
-      const answer = yield* until(async () => script.by("feishu").find((m) => m.text.startsWith("【助手】")), "the answer in Feishu");
-      expect(answer).toEqual({
-        app: "feishu",
-        to: "ou_user",
-        text: "【助手】\n收到：看看昨天的提交",
-        reply: "",
-      });
-      const saidIn2 = yield* saidIn(chat.defaultChannel());
-      expect(saidIn2).toEqual(["看看昨天的提交"]);
-    }).pipe(Effect.scoped, Effect.provide(farm(script)));
-  });
-
-  it.effect("send one farm message to every user", () => {
-    const script = new Script();
-    return Effect.gen(function* () {
-      yield* weixinConnected(script);
-      yield* qqPaired(script);
-      script.weixinIn.push(wx(user, "大家好"));
-      yield* nth(script, "weixin", 0, "WeChat answered");
-      expect((yield* nth(script, "qq", 1, "QQ answered")).text).toBe("【助手】\n收到：大家好");
-    }).pipe(Effect.scoped, Effect.provide(farm(script)));
-  });
-
-  it.effect("drops what came in and went through long ago, keeping what still waits", () => {
-    const config = { ...testConfig(), db: "" };
-    return Effect.gen(function* () {
-      const before = new Script();
-      yield* Effect.scoped(
-        Effect.provide(
-          Effect.gen(function* () {
-            for (const ext_id of ["old-done", "old-waiting"]) yield* inboundQ.acceptInbound({ connector: "weixin", ext_id, payload: "{}", created_at: 1 });
-            yield* inboundQ.deliverInbound({ connector: "weixin", ext_id: "old-done" });
-          }).pipe(Effect.orDie),
-          farm(before, config),
-        ),
-      );
-      yield* Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient;
-        const left = Effect.orDie(sql<{ ext_id: string }>`select ext_id from connector_inbound order by ext_id`);
-        yield* waitFor(left, (rows) => rows.length === 1, "the old delivered row dropped at start");
-        const left2 = yield* left;
-        expect(left2).toEqual([{ ext_id: "old-waiting" }]);
-      }).pipe(Effect.scoped, Effect.provide(farm(new Script(), config)));
+    await using f = await farm(script);
+    const first = await f.connector.login("feishu", {});
+    expect(first.qr).toBe("https://open.feishu.cn/page/cli?user_code=AB");
+    script.feishuScan.open();
+    const code = (await reaches(f, "feishu", "pairing")).pairCode;
+    script.feishuIn.push(feishuMsg("ou_user", code));
+    await reaches(f, "feishu", "connected");
+    for (const m of [feishuMsg("ou_other", "帮我删库"), feishuMsg("ou_user", "群里的话", "group"), feishuMsg("ou_user", "看看昨天的提交")])
+      script.feishuIn.push(m);
+    const answer = await untilGot(async () => script.by("feishu").find((m) => m.text.startsWith("【助手】")), "the answer in Feishu");
+    expect(answer).toEqual({
+      app: "feishu",
+      to: "ou_user",
+      text: "【助手】\n收到：看看昨天的提交",
+      reply: "",
     });
+    expect(await saidIn(f, f.world.channel.defaultChannel())).toEqual(["看看昨天的提交"]);
   });
 
-  it.effect("go on with an account after a restart", () => {
+  test("send one farm message to every user", async () => {
+    const script = new Script();
+    await using f = await farm(script);
+    await weixinConnected(f, script);
+    await qqPaired(f, script);
+    script.weixinIn.push(wx(user, "大家好"));
+    await nth(script, "weixin", 0, "WeChat answered");
+    expect((await nth(script, "qq", 1, "QQ answered")).text).toBe("【助手】\n收到：大家好");
+  });
+
+  test("drops what came in and went through long ago, keeping what still waits", async () => {
     const config = { ...testConfig(), db: "" };
-    return Effect.gen(function* () {
-      const before = new Script();
-      yield* Effect.scoped(Effect.provide(weixinConnected(before), farm(before, config)));
-      const script = new Script();
-      yield* Effect.gen(function* () {
-        const context2 = yield* Effect.context();
-        const runPromise = Effect.runPromiseWith(context2);
-        const chat = yield* Channel;
-        const statusOf2 = yield* statusOf("weixin");
-        expect((yield* Effect.promise(statusOf2)).state).toBe("connected");
-        script.weixinIn.push(wx(user, "又见面了"));
-        yield* until(async () => {
-          const got = await runPromise(Effect.provideService(saidIn(chat.defaultChannel()), Channel, chat));
-          return got.length === 1 && got[0] === "又见面了";
-        }, "heard after a restart");
-      }).pipe(Effect.scoped, Effect.provide(farm(script, config)));
-    });
+    {
+      await using f = await farm(new Script(), config);
+      for (const ext_id of ["old-done", "old-waiting"])
+        await inboundQ.acceptInbound(f.world.db.sql, { connector: "weixin", ext_id, payload: "{}", created_at: 1 });
+      await inboundQ.deliverInbound(f.world.db.sql, { connector: "weixin", ext_id: "old-done" });
+    }
+    await using f = await farm(new Script(), config);
+    const left = () => f.world.db.sql.query(`select ext_id from connector_inbound order by ext_id`);
+    await waitFor(left, (rows) => rows.length === 1, "the old delivered row dropped at start");
+    expect(await left()).toEqual([{ ext_id: "old-waiting" }]);
   });
 
-  it.effect("route quoted replies to an old thread before and after a restart", () => {
+  test("go on with an account after a restart", async () => {
+    const config = { ...testConfig(), db: "" };
+    const before = new Script();
+    {
+      await using f = await farm(before, config);
+      await weixinConnected(f, before);
+    }
+    const script = new Script();
+    await using f = await farm(script, config);
+    expect((await statusOf(f, "weixin")()).state).toBe("connected");
+    script.weixinIn.push(wx(user, "又见面了"));
+    await until(async () => {
+      const got = await saidIn(f, f.world.channel.defaultChannel());
+      return got.length === 1 && got[0] === "又见面了";
+    }, "heard after a restart");
+  });
+
+  test("route quoted replies to an old thread before and after a restart", async () => {
     const config = { ...testConfig(), db: "" };
     let thread = "";
     // The app's id the old answer went out under: which send was first depends on when the orchestrator's other reply went.
     let answered = "";
-    const reply = (script: Script, text: string, sent: number) =>
-      Effect.gen(function* () {
-        const chat = yield* Channel;
-        const inbound = wx(user, text);
-        script.weixinIn.push({
-          ...inbound,
-          item_list: [...inbound.item_list!, { ref_msg: { svr_id: answered } }],
-        });
-        yield* nth(script, "weixin", sent, "the quoted reply answered");
-        yield* waitFor(saidIn(thread), (messages) => messages.includes(text), "the quoted reply kept in its thread");
-        const saidIn2 = yield* saidIn(chat.defaultChannel());
-        expect(saidIn2).not.toContain(text);
-        const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
-        yield* status((s) => s.pending === 0, "the reply saved");
+    const reply = async (f: ConnectorFarm, script: Script, text: string, sent: number) => {
+      const inbound = wx(user, text);
+      script.weixinIn.push({
+        ...inbound,
+        item_list: [...inbound.item_list!, { ref_msg: { svr_id: answered } }],
       });
-    return Effect.gen(function* () {
+      await nth(script, "weixin", sent, "the quoted reply answered");
+      await waitFor(
+        () => saidIn(f, thread),
+        (messages) => messages.includes(text),
+        "the quoted reply kept in its thread",
+      );
+      expect(await saidIn(f, f.world.channel.defaultChannel())).not.toContain(text);
+      await statusIs(f, "weixin", (s) => s.pending === 0, "the reply saved");
+    };
+    try {
       const first = new Script();
-      yield* Effect.gen(function* () {
-        const chat = yield* Channel;
-        yield* weixinConnected(first);
-        const parent = (yield* chat.post({ _tag: "User", text: "这个话题", sendKey: "" })).message;
-        const written = yield* chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "旧的答复", target: `#general:${parent.number}`, anyway: true });
+      {
+        await using f = await farm(first, config);
+        const chat = f.world.channel;
+        await weixinConnected(f, first);
+        const parent = (await chat.post({ _tag: "User", text: "这个话题", sendKey: "" })).message;
+        const written = await chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "旧的答复", target: `#general:${parent.number}`, anyway: true });
         thread = written.message!.channel;
-        yield* nth(first, "weixin", 0, "the original answer sent");
-        const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
-        yield* status((s) => s.pending === 0, "the external identity saved");
-        const sql = yield* SqlClient.SqlClient;
-        const sent = yield* waitFor(
-          sql<{ readonly ext_id: string }>`select ext_id from connector_outbox where message_id = ${written.message!.id} and ext_id is not null`.pipe(
-            Effect.orDie,
-          ),
+        await nth(first, "weixin", 0, "the original answer sent");
+        await statusIs(f, "weixin", (s) => s.pending === 0, "the external identity saved");
+        const sent = await waitFor(
+          () => f.world.db.sql.query(`select ext_id from connector_outbox where message_id = $1 and ext_id is not null`, [written.message!.id]),
           (rows) => rows.length > 0,
           "the old answer sent",
         );
-        answered = sent[0]?.ext_id ?? "";
-        for (let i = 0; i < 301; i++) yield* chat.post({ _tag: "Notice", channel: chat.defaultChannel(), text: `动静 ${i}`, code: "history" });
-        yield* reply(first, "继续这个话题", 1);
-      }).pipe(Effect.scoped, Effect.provide(farm(first, config)));
+        const ext = sent[0]?.["ext_id"];
+        answered = typeof ext === "string" ? ext : "";
+        for (let i = 0; i < 301; i++) await chat.post({ _tag: "Notice", channel: chat.defaultChannel(), text: `动静 ${i}`, code: "history" });
+        await reply(f, first, "继续这个话题", 1);
+      }
       const second = new Script();
-      yield* reply(second, "重启后继续", 0).pipe(Effect.scoped, Effect.provide(farm(second, config)));
-    }).pipe(Effect.ensuring(removeHome(config.home)));
+      await using f = await farm(second, config);
+      await reply(f, second, "重启后继续", 0);
+    } finally {
+      rmSync(config.home, { recursive: true, force: true });
+    }
   });
 
-  it.effect("send an old thread's answer only to its linked channel after a restart", () => {
+  test("send an old thread's answer only to its linked channel after a restart", async () => {
     const config = { ...testConfig(), db: "" };
     let thread = "";
-    return Effect.gen(function* () {
+    try {
       const first = new Script();
-      yield* Effect.gen(function* () {
-        const chat = yield* Channel;
-        const c = yield* Connector;
-        yield* weixinConnected(first);
-        const linked = yield* chat.openChannel("linked", "", "");
-        yield* c.setChannel("weixin", "linked");
-        const parent = (yield* chat.post({ _tag: "User", text: "旧话题", channel: linked.id, sendKey: "" })).message;
-        thread = (yield* chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "旧的答复", target: `#linked:${parent.number}`, anyway: true })).message!
+      {
+        await using f = await farm(first, config);
+        const chat = f.world.channel;
+        await weixinConnected(f, first);
+        const linked = await chat.openChannel("linked", "", "");
+        await f.connector.setChannel("weixin", "linked");
+        const parent = (await chat.post({ _tag: "User", text: "旧话题", channel: linked.id, sendKey: "" })).message;
+        thread = (await chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "旧的答复", target: `#linked:${parent.number}`, anyway: true })).message!
           .channel;
-        yield* nth(first, "weixin", 0, "the old answer sent");
-        const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
-        yield* status((s) => s.pending === 0, "the old answer saved");
+        await nth(first, "weixin", 0, "the old answer sent");
+        await statusIs(f, "weixin", (s) => s.pending === 0, "the old answer saved");
         for (let i = 0; i < 100; i++) {
-          const other = (yield* chat.post({ _tag: "User", text: `其他话题 ${i}`, sendKey: "" })).message;
-          const fresh = (yield* chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "其他答复", target: `#general:${other.number}`, anyway: true }))
+          const other = (await chat.post({ _tag: "User", text: `其他话题 ${i}`, sendKey: "" })).message;
+          const fresh = (await chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "其他答复", target: `#general:${other.number}`, anyway: true }))
             .message!.channel;
-          yield* chat.post({ _tag: "Notice", channel: fresh, text: "第一条动静", code: "history" });
-          yield* chat.post({ _tag: "Notice", channel: fresh, text: "第二条动静", code: "history" });
+          await chat.post({ _tag: "Notice", channel: fresh, text: "第一条动静", code: "history" });
+          await chat.post({ _tag: "Notice", channel: fresh, text: "第二条动静", code: "history" });
         }
         expect(chat.now()?.channels.some((c) => c.id === thread)).toBe(false);
-      }).pipe(Effect.scoped, Effect.provide(farm(first, config)));
+      }
       const second = new Script();
-      yield* Effect.gen(function* () {
-        const chat = yield* Channel;
-        expect(chat.now()?.channels.some((c) => c.id === thread)).toBe(false);
-        yield* qqPaired(second);
-        yield* chat.post({ _tag: "Run", from: defaultOrchestrator, channel: thread, text: "在旧串里继续答复", run: "" });
-        expect((yield* nth(second, "weixin", 0, "the old thread's new answer sent")).text).toBe("【助手 · 在工单串里】\n在旧串里继续答复");
-        expect(second.by("weixin")).toHaveLength(1);
-        expect(second.by("qq").map((m) => m.text)).toEqual(["配对好了：以后在这里说的话，就是你在默认频道里说的。"]);
-      }).pipe(Effect.scoped, Effect.provide(farm(second, config)));
-    }).pipe(Effect.ensuring(removeHome(config.home)));
+      await using f = await farm(second, config);
+      const chat = f.world.channel;
+      expect(chat.now()?.channels.some((c) => c.id === thread)).toBe(false);
+      await qqPaired(f, second);
+      await chat.post({ _tag: "Run", from: defaultOrchestrator, channel: thread, text: "在旧串里继续答复", run: "" });
+      expect((await nth(second, "weixin", 0, "the old thread's new answer sent")).text).toBe("【助手 · 在工单串里】\n在旧串里继续答复");
+      expect(second.by("weixin")).toHaveLength(1);
+      expect(second.by("qq").map((m) => m.text)).toEqual(["配对好了：以后在这里说的话，就是你在默认频道里说的。"]);
+    } finally {
+      rmSync(config.home, { recursive: true, force: true });
+    }
   });
 
-  it.effect("keeps a quoted message pending when its lookup fails, then delivers it after recovery", () => {
+  test("keeps a quoted message pending when its lookup fails, then delivers it after recovery", async () => {
     const script = new Script();
-    return Effect.gen(function* () {
-      const chat = yield* Channel;
-      const sql = yield* SqlClient.SqlClient;
-      yield* weixinConnected(script);
-      yield* sql.unsafe("alter table connector_outbox rename to connector_outbox_broken").pipe(Effect.orDie);
-      const inbound = wx(user, "引用读取失败");
-      script.weixinIn.push({
-        ...inbound,
-        item_list: [...inbound.item_list!, { ref_msg: { svr_id: "missing" } }],
-      });
-      const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
-      yield* status((s) => s.error !== "", "the failed quote lookup");
-      expect(script.by("weixin")).toEqual([]);
-      const saidIn2 = yield* saidIn(chat.defaultChannel());
-      expect(saidIn2).toEqual([]);
-      const rows = yield* sql`select ext_id from connector_inbound where not delivered`.pipe(Effect.orDie);
-      expect(rows).toHaveLength(1);
-      yield* sql.unsafe("alter table connector_outbox_broken rename to connector_outbox").pipe(Effect.orDie);
-      yield* TestClock.adjust(1_000);
-      yield* nth(script, "weixin", 0, "the quoted message after recovery");
-      const saidIn3 = yield* saidIn(chat.defaultChannel());
-      expect(saidIn3).toContain("引用读取失败");
-    }).pipe(Effect.scoped, Effect.provide(farm(script)));
+    await using f = await farm(script);
+    const sql = f.world.db.sql;
+    const chat = f.world.channel;
+    await weixinConnected(f, script);
+    await sql.exec("alter table connector_outbox rename to connector_outbox_broken");
+    const inbound = wx(user, "引用读取失败");
+    script.weixinIn.push({
+      ...inbound,
+      item_list: [...inbound.item_list!, { ref_msg: { svr_id: "missing" } }],
+    });
+    await statusIs(f, "weixin", (s) => s.error !== "", "the failed quote lookup");
+    expect(script.by("weixin")).toEqual([]);
+    expect(await saidIn(f, chat.defaultChannel())).toEqual([]);
+    expect(await sql.query(`select ext_id from connector_inbound where not delivered`)).toHaveLength(1);
+    await sql.exec("alter table connector_outbox_broken rename to connector_outbox");
+    await f.clock.adjust(1_000);
+    await nth(script, "weixin", 0, "the quoted message after recovery");
+    expect(await saidIn(f, chat.defaultChannel())).toContain("引用读取失败");
   });
 
-  it.effect("backs off instead of spinning when a stale pause cannot be saved", () => {
+  test("backs off instead of spinning when a stale pause cannot be saved", async () => {
     const script = new Script();
     let polls = 0;
-    return Effect.gen(function* () {
-      const sql = yield* SqlClient.SqlClient;
-      yield* weixinConnected(script);
-      yield* sql.unsafe(`select 1`).pipe(Effect.orDie);
-      yield* refuse(sql, "fail_pause", "before update of paused_until on connector_account", "", "pause failure").pipe(Effect.orDie);
-      script.updates = () =>
-        Effect.sync(() => {
-          polls++;
-          return { ret: -14 };
-        });
-      script.weixinIn.end();
-      yield* until(() => polls === 1, "the first stale poll");
-      yield* TestClock.adjust(29_999);
-      expect(polls).toBe(1);
-      yield* allow(sql, "fail_pause").pipe(Effect.orDie);
-      yield* TestClock.adjust(1);
-      yield* until(() => polls >= 2, "polling after the backoff");
-    }).pipe(Effect.scoped, Effect.provide(farm(script)));
+    await using f = await farm(script);
+    const sql = f.world.db.sql;
+    await weixinConnected(f, script);
+    await sql.query(`select 1`);
+    await refuse(sql, "fail_pause", "before update of paused_until on connector_account", "", "pause failure");
+    script.updates = async () => {
+      polls++;
+      return { ret: -14 };
+    };
+    script.weixinIn.end();
+    await until(() => polls === 1, "the first stale poll");
+    await f.clock.adjust(29_999);
+    expect(polls).toBe(1);
+    await allow(sql, "fail_pause");
+    await f.clock.adjust(1);
+    await until(() => polls >= 2, "polling after the backoff");
   });
 
-  it.effect("keep the account when retiring what waited fails", () => {
+  test("keep the account when retiring what waited fails", async () => {
     const script = new Script();
-    return Effect.gen(function* () {
-      const context2 = yield* Effect.context();
-      const runPromise = Effect.runPromiseWith(context2);
-      const c = yield* Connector;
-      const chat = yield* Channel;
-      const sql = yield* SqlClient.SqlClient;
-      yield* c.login("qq", { appId: "102", secret: "right" });
-      yield* reaches("qq", "pairing");
-      yield* Effect.orDie(sql.unsafe(`select 1`));
-      yield* Effect.orDie(refuse(sql, "fail_outbox", "before update on connector_outbox", "", "disk failure"));
-      const { message } = yield* chat.post({ _tag: "User", text: "pending", sendKey: "" });
-      yield* Effect.orDie(
-        sql.unsafe(`insert into connector_outbox (id, connector, message_id, body, created_at) values ('pending-test', 'qq', $1, 'pending', 1)`, [message.id]),
-      );
-      const status: ConnectorStatus = yield* c.logout("qq");
-      expect(status.state).toBe("pairing");
-      expect(status.error).toContain("disk failure");
-      const rows = yield* Effect.orDie(sql<{ secrets: string }>`select secrets from connector_account where connector = 'qq'`);
-      expect(rows[0]?.secrets).toContain("102");
-      // A new successful login must not replace the account if retiring its outbox fails.
-      yield* c.login("qq", { force: true, appId: "new-app", secret: "right" });
-      const again = yield* until(async () => {
-        const s = await runPromise(Effect.map(c.list(), (all) => all.find((x) => x.id === "qq")!));
-        return s.state === "pairing" && s.error ? s : undefined;
-      }, "the failed login");
-      expect(again.error).toContain("disk failure");
-      const after = yield* Effect.orDie(sql<{ secrets: string }>`select secrets from connector_account where connector = 'qq'`);
-      expect(after[0]?.secrets).not.toContain("new-app");
-    }).pipe(Effect.scoped, Effect.provide(farm(script)));
+    await using f = await farm(script);
+    const c = f.connector;
+    const sql = f.world.db.sql;
+    await c.login("qq", { appId: "102", secret: "right" });
+    await reaches(f, "qq", "pairing");
+    await sql.query(`select 1`);
+    await refuse(sql, "fail_outbox", "before update on connector_outbox", "", "disk failure");
+    const { message } = await f.world.channel.post({ _tag: "User", text: "pending", sendKey: "" });
+    await sql.exec(`insert into connector_outbox (id, connector, message_id, body, created_at) values ('pending-test', 'qq', $1, 'pending', 1)`, [message.id]);
+    const status: ConnectorStatus = await c.logout("qq");
+    expect(status.state).toBe("pairing");
+    expect(status.error).toContain("disk failure");
+    const rows = await sql.query(`select secrets from connector_account where connector = 'qq'`);
+    expect(rows[0]?.["secrets"]).toContain("102");
+    // A new successful login must not replace the account if retiring its outbox fails.
+    await c.login("qq", { force: true, appId: "new-app", secret: "right" });
+    const again = await untilGot(async () => {
+      const s = await statusOf(f, "qq")();
+      return s.state === "pairing" && s.error ? s : undefined;
+    }, "the failed login");
+    expect(again.error).toContain("disk failure");
+    const after = await sql.query(`select secrets from connector_account where connector = 'qq'`);
+    expect(after[0]?.["secrets"]).not.toContain("new-app");
   });
 });

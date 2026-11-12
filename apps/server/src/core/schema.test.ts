@@ -1,11 +1,10 @@
-import { Schema } from "effect";
 import { expect, test } from "vite-plus/test";
 
 import * as S from "@vibevalley/protocol/schema";
 
 test("a fact naming an action the farm does not know is refused", () => {
   expect(() =>
-    Schema.decodeUnknownSync(S.Fact)({
+    S.Fact.parse({
       type: "sessionPhaseChanged",
       at: 1,
       id: "w1",

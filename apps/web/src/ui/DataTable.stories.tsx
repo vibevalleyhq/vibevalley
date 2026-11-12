@@ -1,6 +1,5 @@
-import * as stylex from "@stylexjs/stylex";
-import { Schema } from "effect";
 import { createSignal } from "solid-js";
+import { z } from "zod";
 
 import { stories, story } from "@vibevalley/stories";
 
@@ -10,16 +9,7 @@ import { defineColumns, useTable, type Page, type Sort } from "#/infra/table.ts"
 import { Button } from "./Button";
 import { DataTable, tableCell } from "./DataTable";
 
-const viewStyles = stylex.create({
-  localDiv: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
-    padding: "1rem",
-  },
-});
-
-const Row = Schema.Struct({ id: Schema.String, name: Schema.String, count: Schema.Finite });
+const Row = z.object({ id: z.string(), name: z.string(), count: z.number() });
 const column = defineColumns(Row);
 const name = column("name", { value: (row) => row.name, compare: (a, b) => a.localeCompare(b), hideable: false });
 const count = column("count", { value: (row) => row.count, compare: (a, b) => a - b });
@@ -41,7 +31,7 @@ function Local() {
   const [filtered, setFiltered] = createSignal(false);
   const table = useTable({ mode: "local", rows: () => (filtered() ? records.slice(0, 3) : records), rowId: (row) => row.id, columns });
   return (
-    <div {...stylex.attrs(viewStyles.localDiv)}>
+    <div class="flex flex-col gap-3 p-4">
       <Button data-testid="table-filter" onClick={() => setFiltered(!filtered())}>
         Toggle filter
       </Button>
@@ -50,13 +40,13 @@ function Local() {
     </div>
   );
 }
-const Loaded = Schema.Struct({
-  rows: Schema.Array(Row),
-  page: Schema.Struct({ index: Schema.Int, size: Schema.Int }),
-  sort: Schema.UndefinedOr(Schema.Struct({ column: Schema.Literals(["name", "count"]), direction: Schema.Literals(["asc", "desc"]) })),
-  scope: Schema.String,
+const Loaded = z.object({
+  rows: z.array(Row),
+  page: z.object({ index: z.int(), size: z.int() }),
+  sort: z.object({ column: z.enum(["name", "count"]), direction: z.enum(["asc", "desc"]) }).or(z.undefined()),
+  scope: z.string(),
 });
-type Loaded = typeof Loaded.Type;
+type Loaded = z.output<typeof Loaded>;
 function Remote() {
   const [page, setPage] = createSignal<Page>({ index: 0, size: 2 });
   const [sort, setSort] = createSignal<Sort<"name" | "count">>();
@@ -83,7 +73,7 @@ function Remote() {
     sort: { value: sort, onChange: setSort },
   });
   return (
-    <div {...stylex.attrs(viewStyles.localDiv)}>
+    <div class="flex flex-col gap-3 p-4">
       <Button data-testid="table-deliver" onClick={() => finish?.()}>
         Deliver requested page
       </Button>

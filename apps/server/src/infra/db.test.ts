@@ -1,165 +1,156 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { describe, expect, it } from "@effect/vitest";
-import { Cause, Effect, Exit, Layer, Metric } from "effect";
-import { SqlClient } from "effect/sql";
+import { describe, expect, test } from "vite-plus/test";
 
+import { systemClock } from "@vibevalley/async";
 import { tempDir } from "@vibevalley/testkit/temp";
 
-import { testDatabase } from "#/testing/layers.ts";
 import { lanOpen, setLanOpen } from "#db/lan.sql.ts";
 import { addUserDevice, seenUserDevice, userDevices } from "#db/user_device.sql.ts";
 
-import { Db, dbQueries, setAsideStale } from "./db.ts";
+import { defaults } from "./config.ts";
+import { type Db, dbQueries, openDb, setAsideStale, SqlError } from "./db.ts";
+import { keptLog } from "./log.ts";
+
+const open = (db = "memory") => openDb({ ...defaults(tempDir("vibevalley-db-home-")), db }, keptLog(), systemClock);
+const device = (id: string, added_at: number) => ({ id, name: id, came: "paired" as const, key_hash: `h-${id}`, added_at });
 
 describe("the database", () => {
-  it.effect("has the schema, and the generated queries run on it", () =>
-    Effect.gen(function* () {
-      yield* setLanOpen({ open: true });
-      expect((yield* lanOpen()).open).toBe(true);
-      yield* addUserDevice({ id: "d1", name: "手机", came: "paired", key_hash: "h", added_at: 1_700_000_000_123 });
-      yield* seenUserDevice({ last_seen: 1_700_000_000_456, id: "d1" });
-      const devices = yield* userDevices();
-      expect(devices).toEqual([{ id: "d1", name: "手机", came: "paired", key_hash: "h", added_at: 1_700_000_000_123, last_seen: 1_700_000_000_456 }]);
-    }).pipe(Effect.provide(testDatabase())),
-  );
-
-  it.effect("one is the row, or undefined when there is none; a query that fails is still a defect", () =>
-    Effect.gen(function* () {
-      const db = yield* Db;
-      const lanOpen2 = yield* db.one(lanOpen());
-      expect(lanOpen2).toBeUndefined();
-      yield* db.run(setLanOpen({ open: true }));
-      expect((yield* db.one(lanOpen()))?.open).toBe(true);
-      const sql = yield* SqlClient.SqlClient;
-      yield* sql.unsafe("drop table lan").pipe(Effect.orDie);
-      const failed = yield* Effect.exit(db.one(lanOpen()));
-      expect(Exit.isFailure(failed) && Cause.hasDies(failed.cause)).toBe(true);
-    }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
-  );
-
-  it.effect("a transaction inside a transaction is a savepoint: its rollback keeps the outer work", () =>
-    Effect.gen(function* () {
-      const db = yield* Db;
-      yield* db.inTx(
-        Effect.gen(function* () {
-          yield* db.run(addUserDevice({ id: "outer", name: "外层", came: "paired", key_hash: "a", added_at: 1 }));
-          const inner = yield* Effect.exit(
-            db.attemptTx(Effect.andThen(db.run(addUserDevice({ id: "inner", name: "内层", came: "paired", key_hash: "b", added_at: 2 })), Effect.fail("no"))),
-          );
-          expect(Exit.isFailure(inner)).toBe(true);
-        }),
-      );
-      expect((yield* db.run(userDevices())).map((d) => d.id)).toEqual(["outer"]);
-    }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
-  );
-
-  it.effect("a failed outer transaction keeps none of its work, and the inner work with it", () =>
-    Effect.gen(function* () {
-      const db = yield* Db;
-      yield* Effect.exit(
-        db.inTx(
-          Effect.gen(function* () {
-            yield* db.run(addUserDevice({ id: "outer", name: "外层", came: "paired", key_hash: "a", added_at: 1 }));
-            yield* db.inTx(Effect.andThen(db.run(addUserDevice({ id: "inner", name: "内层", came: "paired", key_hash: "b", added_at: 2 })), Effect.void));
-            return yield* Effect.fail("no");
-          }),
-        ),
-      );
-      const devices = yield* db.run(userDevices());
-      expect(devices).toEqual([]);
-    }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
-  );
-
-  it.effect("attemptTx keeps the database's failure as a value, counts each query, and keeps none of the work", () =>
-    Effect.gen(function* () {
-      const db = yield* Db;
-      const sql = yield* SqlClient.SqlClient;
-      const before = (yield* Metric.value(dbQueries)).count;
-      yield* db.attemptTx(
-        Effect.gen(function* () {
-          yield* db.attempt(addUserDevice({ id: "m1", name: "甲", came: "paired", key_hash: "a", added_at: 1 }));
-          yield* db.attempt(seenUserDevice({ last_seen: 2, id: "m1" }));
-        }),
-      );
-      const afterCommit = (yield* Metric.value(dbQueries)).count;
-      expect(afterCommit - before).toBe(2);
-      const failed = yield* Effect.flip(db.attemptTx(Effect.andThen(db.attempt(setLanOpen({ open: true })), sql.unsafe("select * from nowhere"))));
-      expect(failed._tag).toBe("SqlError");
-      const lanOpen2 = yield* db.one(lanOpen());
-      expect(lanOpen2).toBeUndefined();
-    }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
-  );
-
-  it.effect("afterCommit runs once the outermost transaction commits, and drops hooks from rolled-back savepoints or transactions", () =>
-    Effect.gen(function* () {
-      const db = yield* Db;
-      const seen: string[] = [];
-      yield* db.inTx(
-        Effect.gen(function* () {
-          yield* db.run(addUserDevice({ id: "outer", name: "外层", came: "paired", key_hash: "a", added_at: 1 }));
-          yield* db.afterCommit(Effect.sync(() => void seen.push("outer")));
-          yield* Effect.exit(
-            db.attemptTx(
-              Effect.gen(function* () {
-                yield* db.attempt(addUserDevice({ id: "rolled", name: "回滚", came: "paired", key_hash: "b", added_at: 2 }));
-                yield* db.afterCommit(Effect.sync(() => void seen.push("rolled")));
-                return yield* Effect.fail("abort-inner");
-              }),
-            ),
-          );
-          yield* db.inTx(
-            Effect.gen(function* () {
-              yield* db.run(addUserDevice({ id: "inner", name: "内层", came: "paired", key_hash: "c", added_at: 3 }));
-              yield* db.afterCommit(Effect.sync(() => void seen.push("inner")));
-            }),
-          );
-          expect(seen).toEqual([]);
-        }),
-      );
-      expect(seen).toEqual(["outer", "inner"]);
-      yield* Effect.exit(
-        db.inTx(
-          Effect.gen(function* () {
-            yield* db.afterCommit(Effect.sync(() => void seen.push("aborted-outer")));
-            return yield* Effect.fail("abort-outer");
-          }),
-        ),
-      );
-      expect(seen).toEqual(["outer", "inner"]);
-    }).pipe(Effect.provide(Db.layer.pipe(Layer.provideMerge(testDatabase())))),
-  );
-
-  it.effect("every farm in memory has a database of its own, numbered from the start", () => {
-    const farm = Effect.gen(function* () {
-      const sql = yield* SqlClient.SqlClient;
-      const before = yield* sql<{ count: number }>`SELECT count(*) AS count FROM channel_participant`.pipe(Effect.orDie);
-      yield* sql`INSERT INTO channel_participant (id, kind, name, joined_at) VALUES ('u', 'user', '用户', 1)`.pipe(Effect.orDie);
-      const seq = yield* sql<{ seq: number }>`SELECT seq FROM channel_participant WHERE id = 'u'`.pipe(Effect.orDie);
-      return [before[0]!.count, seq[0]!.seq];
-    });
-    return Effect.gen(function* () {
-      for (let n = 0; n < 3; n++) {
-        const counts = yield* farm.pipe(Effect.provide(testDatabase()));
-        expect(counts).toEqual([0, 1]);
-      }
-    });
+  test("has the schema, and the generated queries run on it", async () => {
+    await using db = await open();
+    await setLanOpen(db.sql, { open: true });
+    expect((await lanOpen(db.sql))?.open).toBe(true);
+    await addUserDevice(db.sql, { id: "d1", name: "手机", came: "paired", key_hash: "h", added_at: 1_700_000_000_123 });
+    await seenUserDevice(db.sql, { last_seen: 1_700_000_000_456, id: "d1" });
+    expect(await userDevices(db.sql)).toEqual([
+      { id: "d1", name: "手机", came: "paired", key_hash: "h", added_at: 1_700_000_000_123, last_seen: 1_700_000_000_456 },
+    ]);
   });
 
-  it.effect("a new database on disk keeps what is written, across a reopen", () => {
+  test("one is the row, or undefined when there is none; a query that fails throws", async () => {
+    await using db = await open();
+    expect(await lanOpen(db.sql)).toBeUndefined();
+    await setLanOpen(db.sql, { open: true });
+    expect((await lanOpen(db.sql))?.open).toBe(true);
+    await db.sql.exec("drop table lan");
+    await expect(lanOpen(db.sql)).rejects.toBeInstanceOf(SqlError);
+  });
+
+  test("a transaction inside a transaction is a savepoint: its rollback keeps the outer work", async () => {
+    await using db = await open();
+    await db.tx(async () => {
+      await addUserDevice(db.sql, device("outer", 1));
+      await expect(
+        db.tx(async () => {
+          await addUserDevice(db.sql, device("inner", 2));
+          throw new Error("no");
+        }),
+      ).rejects.toThrow("no");
+    });
+    expect((await userDevices(db.sql)).map((d) => d.id)).toEqual(["outer"]);
+  });
+
+  test("a failed outer transaction keeps none of its work, and the inner work with it", async () => {
+    await using db = await open();
+    await expect(
+      db.tx(async () => {
+        await addUserDevice(db.sql, device("outer", 1));
+        await db.tx(() => addUserDevice(db.sql, device("inner", 2)));
+        throw new Error("no");
+      }),
+    ).rejects.toThrow("no");
+    expect(await userDevices(db.sql)).toEqual([]);
+  });
+
+  test("a failed query in a transaction throws SqlError, each query is counted, and none of the work is kept", async () => {
+    await using db = await open();
+    const before = dbQueries.count();
+    await db.tx(async () => {
+      await addUserDevice(db.sql, device("m1", 1));
+      await seenUserDevice(db.sql, { last_seen: 2, id: "m1" });
+    });
+    expect(dbQueries.count() - before).toBe(2);
+    const failed = await db
+      .tx(async () => {
+        await setLanOpen(db.sql, { open: true });
+        await db.sql.query("select * from nowhere");
+      })
+      .catch((e: unknown) => e);
+    expect(failed).toBeInstanceOf(SqlError);
+    expect(await lanOpen(db.sql)).toBeUndefined();
+  });
+
+  test("afterCommit runs once the outermost transaction commits, and drops hooks from rolled-back savepoints or transactions", async () => {
+    await using db = await open();
+    const seen: string[] = [];
+    await db.tx(async () => {
+      await addUserDevice(db.sql, device("outer", 1));
+      await db.afterCommit(() => void seen.push("outer"));
+      await db
+        .tx(async () => {
+          await addUserDevice(db.sql, device("rolled", 2));
+          await db.afterCommit(() => void seen.push("rolled"));
+          throw new Error("abort-inner");
+        })
+        .catch(() => undefined);
+      await db.tx(async () => {
+        await addUserDevice(db.sql, device("inner", 3));
+        await db.afterCommit(() => void seen.push("inner"));
+      });
+      expect(seen).toEqual([]);
+    });
+    expect(seen).toEqual(["outer", "inner"]);
+    await db
+      .tx(async () => {
+        await db.afterCommit(() => void seen.push("aborted-outer"));
+        throw new Error("abort-outer");
+      })
+      .catch(() => undefined);
+    expect(seen).toEqual(["outer", "inner"]);
+  });
+
+  test("a hook after the commit can query the database, and a statement outside waits for a transaction to end", async () => {
+    await using db = await open();
+    const order: string[] = [];
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const tx = db.tx(async () => {
+      await addUserDevice(db.sql, device("a", 1));
+      await db.afterCommit(async () => void order.push(`hook sees ${(await userDevices(db.sql)).length}`));
+      await held;
+      order.push("tx done");
+    });
+    const outside = userDevices(db.sql).then((ds) => void order.push(`outside sees ${ds.length}`));
+    await new Promise((resolve) => setImmediate(resolve));
+    release();
+    await Promise.all([tx, outside]);
+    expect(order).toEqual(["tx done", "outside sees 1", "hook sees 1"]);
+  });
+
+  test("every farm in memory has a database of its own, numbered from the start", async () => {
+    for (let n = 0; n < 3; n++) {
+      await using db: Db = await open();
+      const before = await db.sql.query("select count(*)::int as count from channel_participant");
+      await db.sql.exec("insert into channel_participant (id, kind, name, joined_at) values ('u', 'user', '用户', 1)");
+      const seq = await db.sql.query("select seq from channel_participant where id = 'u'");
+      expect([before[0]?.["count"], seq[0]?.["seq"]]).toEqual([0, 1]);
+    }
+  });
+
+  test("a new database on disk keeps what is written, across a reopen", async () => {
     const where = join(tempDir("vibevalley-db-"), "db");
-    const open = <A, E>(f: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.orDie(f).pipe(Effect.provide(testDatabase({ db: where })));
-    return Effect.gen(function* () {
-      yield* open(addUserDevice({ id: "d1", name: "手机", came: "paired", key_hash: "h", added_at: 1 }));
-      expect(readFileSync(where + ".schema", "utf8").trim()).not.toBe("");
-      expect(readdirSync(where)).toContain("PG_VERSION");
-      const opened = yield* open(userDevices());
-      expect(opened).toMatchObject([{ id: "d1", name: "手机" }]);
-    });
+    {
+      await using db = await open(where);
+      await addUserDevice(db.sql, { id: "d1", name: "手机", came: "paired", key_hash: "h", added_at: 1 });
+    }
+    expect(readFileSync(where + ".schema", "utf8").trim()).not.toBe("");
+    expect(readdirSync(where)).toContain("PG_VERSION");
+    await using reopened = await open(where);
+    expect(await userDevices(reopened.sql)).toMatchObject([{ id: "d1", name: "手机" }]);
   });
 
-  it("a database from another baseline is set aside, not deleted; one without a mark is taken as today's", () => {
+  test("a database from another baseline is set aside, not deleted; one without a mark is taken as today's", () => {
     const home = tempDir("vibevalley-db-");
     const db = join(home, "db");
     mkdirSync(db);
@@ -173,8 +164,8 @@ describe("the database", () => {
   });
 });
 
-/** Where a failed query is a value, not a defect (Db.attempt, Db.attemptTx), and why. */
-const attempting: Readonly<Record<string, string>> = {
+/** Where a failed query is told or retried rather than a defect (a `catch` that tells SqlError apart), and why. */
+const catching: Readonly<Record<string, string>> = {
   "modules/channel/store.ts": "a direct context whose initial delivery cannot be kept is refused as NotRecorded before its events are attached",
   "gateway/connector/connector.ts": "a bridge write that fails is shown on the connector's status and tried again",
   "modules/cron/cron.ts": "a cron's run that is not kept is logged, and the next due cron goes on",
@@ -192,12 +183,12 @@ const attempting: Readonly<Record<string, string>> = {
   "modules/session/session.ts": "a report handed in that cannot be kept is told as a refusal, and the turn does not take it",
 };
 
-it("attempt and attemptTx are used only where a failed query is told or retried, each with its reason", () => {
+test("SqlError is caught only where a failed query is told or retried, each with its reason", () => {
   const src = join(import.meta.dirname, "..");
   const using = readdirSync(src, { recursive: true, encoding: "utf8" })
-    .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
-    .filter((f) => /\bdb\s*\.attempt(?:Tx)?\(/u.test(readFileSync(join(src, f), "utf8")))
+    .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts") && !f.startsWith("infra/db.ts") && !f.includes("testing/"))
+    .filter((f) => /\binstanceof\s+SqlError\b/u.test(readFileSync(join(src, f), "utf8")))
     .map((f) => f.split("\\").join("/"))
     .toSorted();
-  expect(using).toEqual(Object.keys(attempting).toSorted());
+  expect(using).toEqual(Object.keys(catching).toSorted());
 });

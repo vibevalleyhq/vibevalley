@@ -1,17 +1,16 @@
-import { Clock, Cause, Effect, Stream } from "effect";
-
+import type { Clock } from "@vibevalley/async";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { newId } from "#/base/ids.ts";
-import { type Channel } from "#/modules/channel/channel.ts";
-import { type Mailbox } from "#/modules/mailbox/mailbox.ts";
-import { Caller, type NotAnswered } from "#/modules/session/host.ts";
+import type { Channel } from "#/modules/channel/channel.ts";
+import type { Mailbox } from "#/modules/mailbox/mailbox.ts";
+import { Caller } from "#/modules/session/host.ts";
 
 import type { Answer } from "./openai.ts";
 import { orchestratorModel } from "./situation.ts";
 
 /** The live API/phone responses, from opening a port to dropping it once its words are read. */
-export const makeResponses = (mailbox: Mailbox["Service"], channel: Channel["Service"]) => {
+export const makeResponses = (mailbox: Mailbox, channel: Channel, clock: Clock) => {
   const responses = new Map<string, Caller>();
   let latestResponse = "";
 
@@ -44,41 +43,46 @@ export const makeResponses = (mailbox: Mailbox["Service"], channel: Channel["Ser
     latestResponse = "";
   };
 
-  const closeResponse = (id: string, caller: Caller) =>
-    Effect.sync(() => {
-      caller.end();
-      drop(id);
-    });
+  const closeResponse = (id: string, caller: Caller) => {
+    caller.end();
+    drop(id);
+  };
 
   /** A live API/phone response whose durable input goes through Channel before the orchestrator sees it. */
   const answerer =
     (on: "api" | "phone") =>
-    (model: string): Answer<NotAnswered> | undefined => {
+    (model: string): Answer | undefined => {
       if (model !== orchestratorModel) return undefined;
-      return (text) =>
-        Stream.unwrap(
-          Effect.gen(function* () {
-            const response = open(true);
-            yield* channel
-              .user({
-                source: "voice",
-                text,
-                envelope: newId(),
-                responsePort: response.id,
-                voiceMode: on === "phone" ? "conversation" : "api",
-              })
-              .pipe(Effect.catchCause((cause) => Effect.sync(() => response.caller.fail(Cause.squash(cause)))));
-            return response.caller.words.pipe(Stream.ensuring(closeResponse(response.id, response.caller)));
-          }),
-        );
+      return async function* (text, signal) {
+        const response = open(true);
+        try {
+          try {
+            await channel.user({
+              source: "voice",
+              text,
+              envelope: newId(),
+              responsePort: response.id,
+              voiceMode: on === "phone" ? "conversation" : "api",
+            });
+          } catch (e) {
+            // Not taken in: the reader below gets the failure as NotAnswered.
+            response.caller.fail(e);
+          }
+          yield* response.caller.words(signal);
+        } finally {
+          closeResponse(response.id, response.caller);
+        }
+      };
     };
 
-  /** A call-side update or ring reason. The response port is process-local. */
-  const brief = (line: string): Effect.Effect<string, NotAnswered> =>
-    Effect.gen(function* () {
-      const response = open(false);
-      yield* mailbox
-        .accept({
+  /** A call-side update or ring reason. The response port is process-local. Throws NotAnswered. */
+  const brief = async (line: string, signal?: AbortSignal): Promise<string> => {
+    // A caller that left before it began takes no line: nothing is started to wait for.
+    signal?.throwIfAborted();
+    const response = open(false);
+    try {
+      try {
+        await mailbox.accept({
           source: "workbench",
           key: newId(),
           actor: { kind: "system", id: "system" },
@@ -87,14 +91,19 @@ export const makeResponses = (mailbox: Mailbox["Service"], channel: Channel["Ser
           replyChannel: channel.defaultChannel(),
           text: line,
           meta: { ingressRecipient: defaultOrchestrator, responsePort: response.id },
-          at: yield* Clock.currentTimeMillis,
-        })
-        .pipe(Effect.catchCause((cause) => Effect.sync(() => response.caller.fail(Cause.squash(cause)))));
-      return yield* Stream.mkString(response.caller.words).pipe(
-        Effect.map((said) => said.trim()),
-        Effect.ensuring(closeResponse(response.id, response.caller)),
-      );
-    });
+          at: clock.now(),
+        });
+      } catch (e) {
+        // Not taken in: the reader below gets the failure as NotAnswered.
+        response.caller.fail(e);
+      }
+      let said = "";
+      for await (const words of response.caller.words(signal)) said += words;
+      return said.trim();
+    } finally {
+      closeResponse(response.id, response.caller);
+    }
+  };
 
   return { open, take, drop, closeAll, answerer, brief };
 };

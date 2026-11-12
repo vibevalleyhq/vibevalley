@@ -1,79 +1,22 @@
 /** @jsxImportSource @solidjs/web */
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { animate, inView, steps } from "motion";
 import { createSignal, omit, onSettled } from "solid-js";
 
 import { createElementRef, reducedMotion } from "./scroll";
-import { colors, shadows } from "./tokens.stylex";
-
-const styles = stylex.create({
-  link: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "0.625rem",
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: "var(--color-bark-900)",
-    paddingInline: "1.25rem",
-    paddingBlock: "0.625rem",
-    fontFamily: "var(--font-pixel)",
-    fontSize: "var(--text-2xl)",
-    lineHeight: "1",
-    translate: { default: null, ":active": "0.125rem 0.125rem" },
-  },
-  primary: {
-    backgroundColor: { default: "var(--color-leaf-500)", "@media (hover: hover)": { default: null, ":hover": "var(--color-leaf-hover)" } },
-    color: "var(--color-cream-50)",
-    boxShadow: { default: "inset 2px 2px 0 var(--color-leaf-hover), var(--shadow-hard)", ":active": "inset 2px 2px 0 var(--color-leaf-hover)" },
-  },
-  secondary: {
-    backgroundColor: { default: "var(--color-cream-50)", "@media (hover: hover)": { default: null, ":hover": "var(--color-cream-hover)" } },
-    color: "var(--color-bark-900)",
-    boxShadow: { default: "var(--inset-shadow-lit), var(--shadow-hard)", ":active": "var(--inset-shadow-lit)" },
-  },
-  count: { fontVariantNumeric: "tabular-nums" },
-  section: {
-    position: "relative",
-    paddingInline: "clamp(16px, 5vw, 64px)",
-    paddingBlock: "clamp(64px, 9vw, 120px)",
-  },
-  alternate: {
-    borderBlockWidth: "2px",
-    borderBlockStyle: "solid",
-    borderBlockColor: colors.bark,
-    backgroundColor: colors.cream,
-  },
-  content: { marginInline: "auto", maxWidth: "1120px" },
-  heading: {
-    marginBottom: "2.25rem",
-    display: "flex",
-    alignItems: "center",
-    gap: "0.875rem",
-    fontSize: "clamp(30px, 3.6vw, 42px)",
-    "::before": {
-      content: "''",
-      width: "0.875rem",
-      height: "0.875rem",
-      flexShrink: 0,
-      borderWidth: "2px",
-      borderStyle: "solid",
-      borderColor: colors.bark,
-      backgroundColor: colors.wheat,
-      boxShadow: shadows.small,
-    },
-  },
-});
-
-export function domAttrs(...values: readonly stylex.StyleXStyles[]) {
-  const { className, ...attributes } = stylex.props(values);
-  return { ...attributes, class: className };
-}
 
 export function PixelLink(props: { primary?: boolean; children: JSX.Element } & Omit<JSX.AnchorHTMLAttributes<HTMLAnchorElement>, "class" | "style">) {
   const rest = omit(props, "primary", "children");
   return (
-    <a {...stylex.attrs(styles.link, props.primary === true ? styles.primary : styles.secondary)} {...rest}>
+    <a
+      class={[
+        "inline-flex items-center gap-2.5 border-2 border-bark-900 px-5 py-2.5 font-pixel text-2xl leading-none active:[translate:0.125rem_0.125rem]",
+        props.primary === true
+          ? "bg-leaf-500 hover:bg-leaf-hover text-cream-50 [box-shadow:inset_2px_2px_0_var(--color-leaf-hover),_var(--shadow-hard)] active:[box-shadow:inset_2px_2px_0_var(--color-leaf-hover)]"
+          : "bg-cream-50 hover:bg-cream-hover text-bark-900 [box-shadow:var(--inset-shadow-lit),_var(--shadow-hard)] active:[box-shadow:var(--inset-shadow-lit)]",
+      ]}
+      {...rest}
+    >
       {props.children}
     </a>
   );
@@ -81,8 +24,13 @@ export function PixelLink(props: { primary?: boolean; children: JSX.Element } & 
 
 export function Section(props: { id: string; title: string; alt?: boolean; ref?: JSX.IntrinsicElements["section"]["ref"]; children: JSX.Element }) {
   return (
-    <section ref={props.ref} id={props.id} aria-labelledby={`${props.id}-title`} {...stylex.attrs(styles.section, props.alt === true && styles.alternate)}>
-      <div {...stylex.attrs(styles.content)}>
+    <section
+      ref={props.ref}
+      id={props.id}
+      aria-labelledby={`${props.id}-title`}
+      class={["relative px-[clamp(16px,_5vw,_64px)] py-[clamp(64px,_9vw,_120px)]", props.alt === true && "border-y-2 border-y-bark-900 bg-cream-100"]}
+    >
+      <div class="mx-auto max-w-280">
         <Heading id={`${props.id}-title`}>{props.title}</Heading>
         {props.children}
       </div>
@@ -90,9 +38,16 @@ export function Section(props: { id: string; title: string; alt?: boolean; ref?:
   );
 }
 
-export function Heading(props: { id?: string; styles?: stylex.StyleXStyles; children: JSX.Element }) {
+export function Heading(props: { id?: string; class?: JSX.ClassValue | undefined; children: JSX.Element }) {
   return (
-    <h2 id={props.id} data-reveal {...domAttrs(styles.heading, props.styles)}>
+    <h2
+      id={props.id}
+      data-reveal
+      class={[
+        "mb-9 flex items-center gap-3.5 text-[length:clamp(30px,_3.6vw,_42px)] before:content-[''] before:w-3.5 before:h-3.5 before:shrink-0 before:border-2 before:border-solid before:border-bark-900 before:bg-wheat before:shadow-hard-sm",
+        props.class,
+      ]}
+    >
       {props.children}
     </h2>
   );
@@ -120,7 +75,7 @@ export function CountUp(props: { to: number }) {
     };
   });
   return (
-    <span ref={ref.set} {...stylex.attrs(styles.count)}>
+    <span ref={ref.set} class="tabular-nums">
       {shown()}
     </span>
   );

@@ -1,5 +1,4 @@
 import type { JSX } from "@solidjs/web";
-import * as stylex from "@stylexjs/stylex";
 import { createEffect, createSignal, For, onSettled, Show, untrack } from "solid-js";
 
 import { clockText } from "@vibevalley/engine/clock";
@@ -14,162 +13,17 @@ import { typing } from "#/farm/tools.ts";
 import { api } from "#/infra/api.ts";
 import { orchestratorMood, useCore, useFrames, rawFrame, subscribeLive } from "#/infra/frame.ts";
 import { achievementsQuery as achievementCatalog, ready, useQuery } from "#/infra/query.ts";
+import { cx } from "#/ui/cx.ts";
 import { createPixelAct } from "#/ui/pixel/index.ts";
 import { playSound, SOUND_GROUPS, SOUND_LABEL } from "#/ui/pixel/sound.ts";
-import { styleProps } from "#/ui/positioner.ts";
 
-const buttonStyles = stylex.create({
-  base: { height: "1.75rem", cursor: "pointer", paddingInline: "0.625rem", fontSize: "12px" },
-  plain: {
-    backgroundColor: { default: "var(--color-ink-800)", "@media (hover:hover)": { default: null, ":hover": "var(--color-ink-700)" } },
-    color: "var(--color-paper)",
-  },
-  hat: {
-    backgroundColor: "var(--color-hat)",
-    color: "var(--color-ink-950)",
-    filter: { default: null, "@media (hover:hover)": { default: null, ":hover": "brightness(110%)" } },
-  },
-  bad: {
-    backgroundColor: { default: "var(--color-berry-900)", "@media (hover:hover)": { default: null, ":hover": "var(--color-berry-800)" } },
-    color: "var(--color-paper)",
-  },
-  speed: {
-    backgroundColor: {
-      default: "var(--color-ink-800)",
-      "@media (hover:hover)": { default: null, ":hover": "var(--color-ink-700)" },
-      ":is([aria-pressed=true])": "var(--color-hat)",
-    },
-    color: { default: "var(--color-paper)", ":is([aria-pressed=true])": "var(--color-ink-950)" },
-  },
-});
-
-const styles = stylex.create({
-  panelAside: {
-    position: "absolute",
-    top: "0.5rem",
-    right: "0.5rem",
-    bottom: "0.5rem",
-    zIndex: "50",
-    display: "flex",
-    width: "380px",
-    flexDirection: "column",
-    gap: "0.5rem",
-    overflow: "hidden",
-    backgroundColor: {
-      default: "var(--color-px-debug-surface)",
-      "@supports (color:color-mix(in lab, red, red))": "color-mix(in oklab, var(--color-ink-950) 96%, transparent)",
-    },
-    padding: "0.75rem",
-    fontFamily: "var(--font-mono)",
-    fontSize: "12px",
-    color: "var(--color-paper)",
-    boxShadow: "var(--shadow-px)",
-  },
-  panelDiv: {
-    display: "flex",
-    minHeight: "0",
-    flex: "1",
-    flexDirection: "column",
-    gap: "0.5rem",
-    overflowY: "auto",
-  },
-  sectionSection: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.375rem",
-    borderTopStyle: "solid",
-    borderTopWidth: "1px",
-    borderColor: "var(--color-ink-700)",
-    paddingTop: "0.5rem",
-  },
-  sectionHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    fontSize: "11px",
-    letterSpacing: "var(--tracking-wide)",
-    color: "var(--color-ink-300)",
-  },
-  sectionSpan: {
-    flex: "1",
-  },
-  panelHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-  },
-  panelSpan: {
-    flex: "1",
-    fontSize: "13px",
-    color: "var(--color-hat)",
-  },
-  panelDiv2: {
-    display: "flex",
-    gap: "0.375rem",
-  },
-  panelInput: {
-    accentColor: "var(--color-hat)",
-  },
-  panelDiv22: {
-    display: "flex",
-    gap: "0.25rem",
-  },
-  panelSpan2: {
-    color: "var(--color-ink-300)",
-  },
-  panelDiv3: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: "0.375rem",
-  },
-  panelButton: {
-    minWidth: "0",
-    flex: "1",
-    cursor: "pointer",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textAlign: "left",
-    color: {
-      default: null,
-      "@media (hover:hover)": {
-        default: null,
-        ":hover": "var(--color-hat)",
-      },
-    },
-  },
-  panelDiv4: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.25rem",
-  },
-  panelOl: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.125rem",
-  },
-  debugFrame: {
-    display: "flex",
-    gap: "0.5rem",
-  },
-  panelSpan3: {
-    width: "2rem",
-    flexShrink: "0",
-    textAlign: "right",
-    color: "var(--color-ink-500)",
-  },
-  panelSpan4: {
-    width: "3rem",
-    flexShrink: "0",
-    color: "var(--color-hat)",
-  },
-  panelSpan5: {
-    minWidth: "0",
-    wordBreak: "break-all",
-    color: "var(--color-ink-100)",
-  },
-});
+const buttonStyles = {
+  base: "h-7 cursor-pointer px-2.5 text-(length:--text-xs)",
+  plain: "bg-ink-800 hover:bg-ink-700 text-paper",
+  hat: "bg-hat text-ink-950 hover:[filter:brightness(110%)]",
+  bad: "bg-berry-900 hover:bg-berry-800 text-paper",
+  speed: "bg-ink-800 hover:bg-ink-700 [&:where([aria-pressed=true])]:bg-hat text-paper aria-pressed:text-ink-950",
+};
 
 const keep = 2000;
 
@@ -225,13 +79,13 @@ function createLog() {
   return { entries, paused, setPaused, clear: () => setEntries([]) };
 }
 
-const btn = (tone: "plain" | "hat" | "bad" = "plain") => styleProps([buttonStyles.base, buttonStyles[tone]]);
+const btn = (tone: "plain" | "hat" | "bad" = "plain") => ({ class: cx("h-7 cursor-pointer px-2.5 text-(length:--text-xs)", buttonStyles[tone]) });
 
 function Section(props: { title: string; aside?: JSX.Element; children: JSX.Element }) {
   return (
-    <section aria-label={props.title} {...stylex.attrs(styles.sectionSection)}>
-      <header {...stylex.attrs(styles.sectionHeader)}>
-        <span {...stylex.attrs(styles.sectionSpan)}>{props.title}</span>
+    <section aria-label={props.title} class="flex flex-col gap-1.5 border-t border-ink-700 pt-2">
+      <header class="flex items-center gap-2 text-(length:--text-2xs) tracking-wide text-ink-300">
+        <span class="flex-1">{props.title}</span>
         {props.aside}
       </header>
       {props.children}
@@ -257,14 +111,18 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
     });
   const level = () => Math.round(frames.frame?.view.level.level ?? 1);
   return (
-    <aside aria-label={t("web.farm.debug.title")} data-testid="debug" {...stylex.attrs(styles.panelAside)}>
-      <header {...stylex.attrs(styles.panelHeader)}>
-        <span {...stylex.attrs(styles.panelSpan)}>{t("web.farm.debug.title")}</span>
+    <aside
+      aria-label={t("web.farm.debug.title")}
+      data-testid="debug"
+      class="absolute top-2 right-2 bottom-2 z-50 flex w-95 flex-col gap-2 overflow-hidden bg-ink-950/96 p-3 font-mono text-(length:--text-xs) text-paper shadow-px"
+    >
+      <header class="flex items-center gap-2">
+        <span class="flex-1 text-(length:--text-sm) text-hat">{t("web.farm.debug.title")}</span>
         <button type="button" data-testid="debug-close" {...btn()} onClick={() => props.onClose()}>
           {t("web.farm.debug.close")}
         </button>
       </header>
-      <div {...stylex.attrs(styles.panelDiv)}>
+      <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
         <Section
           title={t("web.farm.debug.call")}
           aside={
@@ -273,7 +131,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
             </span>
           }
         >
-          <div {...stylex.attrs(styles.panelDiv2)}>
+          <div class="flex gap-1.5">
             <button type="button" {...btn("hat")} onClick={() => void act.run(() => api.orchestrator.open())}>
               {t("web.farm.debug.open")}
             </button>
@@ -291,9 +149,9 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
             step={0.005}
             value={day().tod}
             onInput={(e) => clock.setTimeOfDay(Number(e.currentTarget.value))}
-            {...stylex.attrs(styles.panelInput)}
+            class="accent-hat"
           />
-          <div {...stylex.attrs(styles.panelDiv22)}>
+          <div class="flex gap-1">
             <For
               each={
                 [
@@ -309,7 +167,10 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
                   type="button"
                   data-key={speed}
                   aria-pressed={aria((speed === 0 && day().paused) || (!day().paused && day().speed === speed))}
-                  {...styleProps([buttonStyles.base, buttonStyles.speed])}
+                  class={[
+                    "h-7 cursor-pointer px-2.5 text-(length:--text-xs)",
+                    "bg-ink-800 hover:bg-ink-700 [&:where([aria-pressed=true])]:bg-hat text-paper aria-pressed:text-ink-950",
+                  ]}
                   onClick={() => clock.setSpeed(speed)}
                 >
                   {label}
@@ -319,7 +180,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
           </div>
         </Section>
         <Section title={t("web.farm.debug.progress")} aside={<span>Lv.{level()}</span>}>
-          <div {...stylex.attrs(styles.panelDiv2)}>
+          <div class="flex gap-1.5">
             <button type="button" data-testid="debug-level-up" {...btn()} onClick={() => localEffects.add({ kind: "levelUp", level: level() + 1 })}>
               {t("web.farm.debug.levelUp")}
             </button>
@@ -351,12 +212,12 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
         </Section>
         <Section title={t("web.farm.debug.helpers", { n: sessions().length })}>
           <Show when={sessions().length === 0}>
-            <span {...stylex.attrs(styles.panelSpan2)}>{t("web.farm.debug.nobody")}</span>
+            <span class="text-ink-300">{t("web.farm.debug.nobody")}</span>
           </Show>
           <For each={sessions()}>
             {(h) => (
-              <div {...stylex.attrs(styles.panelDiv3)}>
-                <button type="button" {...stylex.attrs(styles.panelButton)} onClick={() => farm.select(h.id)}>
+              <div class="flex flex-wrap items-center gap-1.5">
+                <button type="button" class="min-w-0 flex-1 cursor-pointer truncate text-left hover:text-hat" onClick={() => farm.select(h.id)}>
                   {h.id} {h.name} · {h.phase._tag}
                 </button>
                 <Show when={h.phase._tag === "done"}>
@@ -375,7 +236,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
           </For>
         </Section>
         <Section title={t("web.farm.debug.all")}>
-          <div {...stylex.attrs(styles.panelDiv2)}>
+          <div class="flex gap-1.5">
             <button type="button" {...btn()} onClick={() => void everyone("stop")}>
               {t("web.farm.debug.haltAll")}
             </button>
@@ -387,7 +248,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
         <For each={SOUND_GROUPS}>
           {(g) => (
             <Section title={g.title}>
-              <div {...stylex.attrs(styles.panelDiv4)}>
+              <div class="flex flex-wrap gap-1">
                 <For each={g.names}>
                   {(n) => (
                     <button type="button" title={n} {...btn()} onClick={() => playSound(n)}>
@@ -402,7 +263,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
         <Section
           title={t("web.farm.debug.frames", { n: props.log.entries().length })}
           aside={
-            <span {...stylex.attrs(styles.panelDiv22)}>
+            <span class="flex gap-1">
               <button type="button" {...btn()} onClick={() => props.log.setPaused(!props.log.paused())}>
                 {props.log.paused() ? t("web.farm.debug.resume") : t("web.farm.debug.pause")}
               </button>
@@ -425,13 +286,13 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
             </span>
           }
         >
-          <ol {...stylex.attrs(styles.panelOl)}>
+          <ol class="flex flex-col gap-0.5">
             <For each={props.log.entries().slice(-200).toReversed()} keyed={(e) => e.seq}>
               {(e) => (
-                <li data-testid="debug-frame" data-type={e().type} {...stylex.attrs(styles.debugFrame)}>
-                  <span {...stylex.attrs(styles.panelSpan3)}>{e().seq}</span>
-                  <span {...stylex.attrs(styles.panelSpan4)}>{e().type}</span>
-                  <span {...stylex.attrs(styles.panelSpan5)}>{e().summary}</span>
+                <li data-testid="debug-frame" data-type={e().type} class="flex gap-2">
+                  <span class="w-8 shrink-0 text-right text-ink-500">{e().seq}</span>
+                  <span class="w-12 shrink-0 text-hat">{e().type}</span>
+                  <span class="min-w-0 break-all text-ink-100">{e().summary}</span>
                 </li>
               )}
             </For>
