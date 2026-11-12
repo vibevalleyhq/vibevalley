@@ -34,7 +34,6 @@ type LookIn =
   | "template"
   | "cron"
   | "device"
-  | "archive"
   | "channel"
   | "graph"
   | "memories"
@@ -73,7 +72,6 @@ export const lookIn = {
   template: listed("template", BizCode.AgentNotFound),
   cron: listed("cron", BizCode.CronNotFound, ["cron", "list"]),
   device: listed("device", BizCode.UserNotFound),
-  archive: listed("archive", BizCode.OrchestratorNotFound),
   channel: listed("channel", BizCode.ChannelNotFound, ["channel", "list"]),
   artifact: listed("artifact", BizCode.ArtifactNotFound, ["artifact", "list"]),
   library: listed("library", BizCode.LibraryNotFound, ["library", "item", "list"]),

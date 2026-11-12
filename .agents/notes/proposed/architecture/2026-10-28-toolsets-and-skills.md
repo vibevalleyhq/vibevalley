@@ -5,15 +5,15 @@ Status: proposed
 ## Problem
 
 内置只读技能（`apps/server/src/modules/agent/skills/`）、助手内置技能（`apps/server/src/modules/orchestrator/skills/`）及输入框固定斜杠命令（`/stop`、`/issue`、`/remember`、`/imagegen`）已上线（见 [档案和农机](docs/subsystems/agent.md)），但还剩三处能力缺口：
-- **用户技能仍存单字符串并整段拼入提示词**：`config.json` 的用户自定义技能每勾一个就每轮全量拼进人设（`session/briefing.ts`），不能携带附属参考文件，且未与仓库 `.agents/skills/`、本机 `~/.agents/skills/` 统一按需加载。
+- **用户技能仍存单字符串并整段拼入提示词**：帮工经 `load_skill` 按需读 `~/.agents/skills`、`~/.claude/skills`、`<工作目录>/.agents/skills` 下的 `SKILL.md`（[思考](docs/subsystems/brain.md#自己带的东西)），但档案里勾的用户自定义技能（`agent/agent.ts` 存的 `skills`）仍由 `session/briefing.ts` 的 `instructions` 整段拼进人设，不能携带附属参考文件，也不在那三个目录里。
 - **工具按角色硬编码二分**：`apps/server/src/modules/tool/` 固定按 `orchestrator` 与 `session` 两张表切分，无法给领班帮工档案开放 `issue` 拆单工具，也无法裁剪某个助手档案的工具。
 - **输入框 `/` 不能直接点名调用技能**：用户无法在频道输入 `/<技能名> <说明>` 让目标 agent 在当轮按指定技能执行。
 
 ## Proposal
 
 1. **统一技能目录与按需读取（`skill` 模块）**：
-   - 将农场用户技能从 `config.json` 字符串迁为 `$VIBEVALLEY_HOME/skills/<name>/SKILL.md` 文件夹（可在设置页新建、编辑、删除、导入），与仓库 `.agents/skills/`、内置只读技能、本机全局技能按优先级合并。
-   - 进程内 `Brain` 仅将已勾选技能的名称与简介放入系统提示，经 `load_skill` 按需读正文；外部农机在任务说明末尾附上 `SKILL.md` 绝对路径供其按需读取。
+   - 将农场用户技能从档案里的字符串迁为 `$VIBEVALLEY_HOME/skills/<name>/SKILL.md` 文件夹（可在设置页新建、编辑、删除、导入），加进 `defaultSkillDirs` 的扫描，与内置只读技能按优先级合并；`briefing.ts` 不再把正文拼进人设。
+   - 外部农机在任务说明末尾附上勾选技能的 `SKILL.md` 绝对路径供其按需读取。
 2. **档案级工具集（`Agent.toolsets`）**：
    - `Agent` 档案增加 `toolsets: Toolset[]`（`chat`、`memory`、`look`、`issue`、`cron`、`channel`、`coding`），`tool/` 用 `Record<工具名, Toolset>` 编译期强制全覆盖。
    - `toolsets` 仅用户可经 `agent.update` 修改；助手工具表与帮工 `/mcp` 在列出与执行时均按档案 `toolsets` 二次校验，接口权限 `can` 收窄为 `user`、`remote`、`agent`。

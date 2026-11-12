@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, test } from "vite-plus/test";
@@ -114,23 +114,6 @@ describe("memory", () => {
       await m.forget(defaultOrchestrator, written.id);
       expect((await m.memoriesOf(defaultOrchestrator)).memories.map((note) => note.text)).toEqual(["replacement note"]);
     }
-  });
-
-  test("the orchestrator's archive", async () => {
-    const config = testConfig();
-    const folder = join(agentHome(config, defaultOrchestrator), "archive");
-    mkdirSync(folder, { recursive: true });
-    writeFileSync(join(folder, "orchestrator-2026-10-12.md"), "用户：给 clock-in 加分页\n助手：派给老周了\n");
-    await using w = await memoryWorld(config);
-    const m = w.memory;
-    const listing = await m.archive(defaultOrchestrator, "CLOCK-IN");
-    expect(listing.files.map((f) => f.name)).toEqual(["orchestrator-2026-10-12.md"]);
-    expect(listing.hits.map((h) => [h.file, h.line])).toEqual([["orchestrator-2026-10-12.md", 1]]);
-    expect((await m.archive(defaultOrchestrator, "")).hits).toEqual([]);
-    const archiveFile2 = await m.archiveFile(defaultOrchestrator, "orchestrator-2026-10-12.md");
-    expect(archiveFile2).toContain("派给老周");
-    const archiveFile3 = await m.archiveFile(defaultOrchestrator, "../MEMORY.md");
-    expect(archiveFile3).toBeUndefined();
   });
 
   test("a preview picks without counting, and the longest unused fade", async () => {

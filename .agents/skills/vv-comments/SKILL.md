@@ -1,6 +1,6 @@
 ---
 name: vv-comments
-description: 去掉 VibeValley 代码里没价值的注释：用 scripts/comment-review.ts 让模型照 docs/style/code.md 初审，再逐条对着代码核实，能删的删、能让名字说的改名、只剩一句有用的改短。用在：写完代码、提 PR 前审这个分支新加的注释；用户说「清理注释」「注释太多」「去掉废话注释」「这块的注释看看」时清一块已有的注释；评审时看到复述代码、分节标题、测试旁白、文件开头的概述。
+description: 去掉 VibeValley 代码里没价值的注释：用 scripts/audit/comment-review.ts 让模型照 docs/style/code.md 初审，再逐条对着代码核实，能删的删、能让名字说的改名、只剩一句有用的改短。用在：写完代码、提 PR 前审这个分支新加的注释；用户说「清理注释」「注释太多」「去掉废话注释」「这块的注释看看」时清一块已有的注释；评审时看到复述代码、分节标题、测试旁白、文件开头的概述。
 ---
 
 # 去掉没价值的注释
@@ -16,8 +16,8 @@ description: 去掉 VibeValley 代码里没价值的注释：用 scripts/comment
 先 `--dry-run` 数一数，不调模型：
 
 ```bash
-vpx scripts/comment-review.ts --dry-run                          # 这个分支新加的
-vpx scripts/comment-review.ts --all apps/server/src/issue --dry-run   # 一块已有的
+vpx scripts/audit/comment-review.ts --dry-run                          # 这个分支新加的
+vpx scripts/audit/comment-review.ts --all apps/server/src/issue --dry-run   # 一块已有的
 ```
 
 花钱的量级：一个模块一两百条注释、十次以内的请求，一分钱上下。新加的直接跑；`--all` 超过 500 条，先把条数告诉用户再跑。
@@ -25,8 +25,8 @@ vpx scripts/comment-review.ts --all apps/server/src/issue --dry-run   # 一块�
 ## 2. 跑
 
 ```bash
-vpx scripts/comment-review.ts                                    # 要 DEEPSEEK_API_KEY
-vpx scripts/comment-review.ts --all apps/server/src/issue
+vpx scripts/audit/comment-review.ts                                    # 要 DEEPSEEK_API_KEY
+vpx scripts/audit/comment-review.ts --all apps/server/src/issue
 ```
 
 每条不该留的打三行：`文件:行  delete|rewrite  <对上的规矩那一行>: <理由>`、注释原文、`rewrite` 的话 `→ 改好的写法`。判 `keep` 的不打。有不该留的退出码 1；模型漏答或答得不成格式，脚本报错退出，重跑一次，还错就看报错。

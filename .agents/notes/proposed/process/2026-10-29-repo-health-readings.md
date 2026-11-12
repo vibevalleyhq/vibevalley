@@ -24,7 +24,7 @@ Status: proposed
 | 反复返工 | 代码存活率 | 统计 14 天前的 PR 新增行在当前 HEAD `git blame` 中仍归属原提交的比例 |
 
 1. **分步落地与回测**：先落地 import 图、跨区一起改与隐性耦合，再落地模块深度、只转一手与 blame 读数；最后用第 `t` 周读数回测第 `t+1` 周的低存活率与修复热点，删掉无预测力的读数。
-2. **结构化输出**：`vp run health --json` 输出带症状分类与目标文件的 JSON，供助手直接按排第一的病灶开重构工单。
+2. **按症状分类的 JSON**：`--json`（`packages/health/src/cli.ts`）现在输出 `{ now, hotspots, escapes, kept }`；新读数按上表的症状分组加进去，每条带目标文件，供助手直接按排第一的病灶开重构工单。
 
 ## Alternatives considered
 

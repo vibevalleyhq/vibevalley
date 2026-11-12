@@ -256,5 +256,5 @@ export const reposDir = (c: ServerConfig) => join(c.workRoot, "repos");
 /** Where the issues' worktrees are: <repo>.<issue number> under it. */
 export const worktreesDir = (c: ServerConfig) => join(c.workRoot, "worktrees");
 
-/** A profile's folder for conversation logs, archives and evals; memory rows live in the database. */
+/** A profile's folder for conversation logs and evals; memory rows live in the database. */
 export const agentHome = (c: ServerConfig, agent: string) => join(c.home, "agent", agent);

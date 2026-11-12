@@ -43,5 +43,5 @@ cd android && JAVA_HOME=<a JDK 17> ./gradlew assembleRelease -PreactNativeArchit
 CI=1 vp exec expo prebuild -p ios --no-install && (cd ios && pod install)   # ios/, then:
 cd ios && xcodebuild -workspace VibeValley.xcworkspace -scheme VibeValley -configuration Release -sdk iphonesimulator \
   -arch arm64 -derivedDataPath build CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=YES
-vpx scripts/verify-server.ts -- vpx apps/mobile/scripts/e2e.ts android   # from the root, with an emulator running and apps/web/dist built; ios likewise
+vpx scripts/release/verify-server.ts -- vpx apps/mobile/scripts/e2e.ts android   # from the root, with an emulator running and apps/web/dist built; ios likewise
 ```

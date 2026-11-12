@@ -27,8 +27,6 @@
     "@vibevalley/testkit": "workspace:*",
     "eslint-plugin-solid": "catalog:",
     "knip": "catalog:",
-    "lightningcss": "catalog:",
-    "parse5": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:",

@@ -19,7 +19,7 @@
 1. 在仓库根目录造一张工单，截工单页：
 
    ```bash
-   vpx scripts/verify-server.ts -- sh -c '
+   vpx scripts/release/verify-server.ts -- sh -c '
      "$VIBEVALLEY_VERIFY_CLI" issue create 截图验收 &&
      VIBEVALLEY_PAGES=/issues vpx apps/web/scripts/screens.ts
    '

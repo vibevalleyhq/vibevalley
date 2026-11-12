@@ -1,1 +1,1 @@
-export { ArchivePanel, MemoryPanel, OrchestratorMemoryPanel } from "./Memory";
+export { MemoryPanel, OrchestratorMemoryPanel } from "./Memory";

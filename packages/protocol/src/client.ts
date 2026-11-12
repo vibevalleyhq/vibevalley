@@ -74,12 +74,6 @@ export class VibeValleyApi {
     open: (options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/orchestrator/open", undefined, options),
     /** Ends the orchestrator's run under way and drops what waits for it; the sessions it sent keep working. */
     stop: (a: { agent?: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/orchestrator/stop", a, options),
-    archive: {
-      list: (a: { agent?: string; q?: string }, options?: { signal?: AbortSignal }): Promise<T.ArchiveListing> =>
-        this.call<T.ArchiveListing>("/api/v1/orchestrator/archive/list", a, options),
-      get: (a: { agent?: string; name: string }, options?: { signal?: AbortSignal }): Promise<string> =>
-        this.call<string>("/api/v1/orchestrator/archive/get", a, options),
-    },
     eval: {
       /** Saves the turn begun at a step of the orchestrator's log as a case for its evals, with what it should have done. */
       create: (a: T.OrchestratorEvalRequest, options?: { signal?: AbortSignal }): Promise<T.OrchestratorEval> =>

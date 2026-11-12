@@ -56,10 +56,10 @@ description: 给 VibeValley 开、改、合 PR：默认把同一批工作的改�
 
    ```bash
    gh pr view <号> --json title,body,headRefName > /tmp/pr.json
-   vpx scripts/commit-msg.ts --title "$(jq -r .title /tmp/pr.json)"
-   vpx scripts/commit-msg.ts --body "$(jq -r .body /tmp/pr.json)"
-   vpx scripts/commit-msg.ts --branch "$(jq -r .headRefName /tmp/pr.json)"
-   vpx scripts/regression.ts --base origin/main --branch "$(jq -r .headRefName /tmp/pr.json)" --body "$(jq -r .body /tmp/pr.json)"
+   vpx scripts/docs/commit-msg.ts --title "$(jq -r .title /tmp/pr.json)"
+   vpx scripts/docs/commit-msg.ts --body "$(jq -r .body /tmp/pr.json)"
+   vpx scripts/docs/commit-msg.ts --branch "$(jq -r .headRefName /tmp/pr.json)"
+   vpx scripts/release/regression.ts --base origin/main --branch "$(jq -r .headRefName /tmp/pr.json)" --body "$(jq -r .body /tmp/pr.json)"
    ```
 
 5. 合不合听用户的。要合时只用 squash：`gh pr merge <号> --squash`。合完删掉本机的分支和 worktree；远端的分支 GitHub 会自动删。

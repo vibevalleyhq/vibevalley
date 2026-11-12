@@ -1,6 +1,6 @@
 # `@vibevalley/artifact`
 
-Artifact（结构化块文档与 HTML 交互页）纯领域引擎包，供 `apps/server` 与 `apps/web` 消费，与 SQLite 快照存储解耦：
+Artifact（结构化块文档与 HTML 交互页）纯领域引擎包，供 `apps/server` 与 `apps/web` 消费，与库里的快照存储解耦：
 
 - `./ops`：块级文档状态机 `Page`（支持 `insert_block`、`update_text`、`set_attrs`、`set_type`、`move_block`、`delete_block`、`restore_block`、`split_block`、`merge_blocks` 并发版本对账与冲突保留）、顺序遍历 `ordered` 与富文本 Span 码点切分 `splitAt`。
 - `./markdown`：块文档与 CommonMark Markdown 双向无损互转（`markdownOf`、`blocksOfMarkdown`、`inlineSpans`）。

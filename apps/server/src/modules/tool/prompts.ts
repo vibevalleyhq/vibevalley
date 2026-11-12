@@ -498,7 +498,7 @@ export const answers = {
   nobodyOn: (number: number) => `#${number} 现在没有帮工在做：要它接着做，用户说了以后用 issue_status_update 挪到待办`,
   noAgentToDispatch: "没有能派的帮工：先去「帮工」页面建一个，或者把 runtime 装好。",
   noAgentOrRuntime: (key: string) => "没有叫 " + key + " 的帮工档案或 runtime",
-  rememberOwnNote: "你自己的记性在系统提示里：要记用 remember，要找旧对话用 search_archive",
+  rememberOwnNote: "你自己的记性在系统提示里：要记用 remember",
   noProfileNamed: (key: string) => "没有叫 " + key + " 的帮工档案",
   notWorking: "你不在场：记性只给在干活的帮工用",
 

@@ -9,7 +9,6 @@
     "template": "List the templates and find its id",
     "cron": "List the scheduled tasks and find its id",
     "device": "See the connected devices and find its id",
-    "archive": "List the assistant's archive",
     "channel": "List the channels and find its id",
     "graph": "List the plans and find its id",
     "memories": "List its memories and find that one's id",
@@ -18,6 +17,5 @@
     "pkm": "List the notes’ pages to find its name"
   },
   "repoRef": "repo {id}",
-  "helperRef": "helper {id}",
-  "archiveRef": "archive {name}"
+  "helperRef": "helper {id}"
 }

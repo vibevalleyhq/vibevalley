@@ -1,6 +1,6 @@
 ---
 name: vv-acceptance
-description: 改完 VibeValley 的代码之后，在真的程序上验收、拿到证据再汇报：起一个和用户的数据隔开的服务端，看接口和 /api/v1/state（apps/server/**、apps/server/db、packages/protocol）、截页面的图（apps/web/**）、在模拟器上走手机壳的配对（apps/mobile/**、packages/protocol/src/host.ts、apps/server/src/lan）、在真的打包上走桌面版的自己更新（apps/desktop/src/update.ts、scripts/package.ts）、用真模型重放助手的评测（助手的提示、工具描述、packages/agent，花钱，先问用户）。用在：用户说「验证一下」「验收」「跑起来看看」「截个图」「手机上看看」「跑一下助手的评测」；改了接口、服务、表结构、开机流程、页面、手机壳、桌面的更新之后，说「做完了」之前，即使用户没开口；写 PR 的 Checks 要附证据时。只改了纯函数、测试已经覆盖的，或只改了注释和文档，跑测试就够。
+description: 改完 VibeValley 的代码之后，在真的程序上验收、拿到证据再汇报：起一个和用户的数据隔开的服务端，看接口和 /api/v1/state（apps/server/**、apps/server/db、packages/protocol）、截页面的图（apps/web/**）、在模拟器上走手机壳的配对（apps/mobile/**、packages/protocol/src/host.ts、apps/server/src/lan）、在真的打包上走桌面版的自己更新（apps/desktop/src/infra/update.ts、apps/desktop/scripts/package.ts）、用真模型重放助手的评测（助手的提示、工具描述、packages/agent，花钱，先问用户）。用在：用户说「验证一下」「验收」「跑起来看看」「截个图」「手机上看看」「跑一下助手的评测」；改了接口、服务、表结构、开机流程、页面、手机壳、桌面的更新之后，说「做完了」之前，即使用户没开口；写 PR 的 Checks 要附证据时。只改了纯函数、测试已经覆盖的，或只改了注释和文档，跑测试就够。
 ---
 
 # 验收
@@ -37,7 +37,7 @@ description: 改完 VibeValley 的代码之后，在真的程序上验收、拿�
 2. 除了助手的评测，都用同一个沙箱，在仓库根目录跑：
 
    ```bash
-   vpx scripts/verify-server.ts [--scripted-helper] -- <这一轮的子命令>
+   vpx scripts/release/verify-server.ts [--scripted-helper] -- <这一轮的子命令>
    ```
 
    它用服务端的 `vpx` 从 `apps/server` 起服务端，临时的家目录和工作目录、回环地址的空闲端口，环境里去掉一切钥匙，不碰 `~/.vibevalley`，也不占用户的 8787；`apps/web/dist` 在的话一起提供页面。子命令拿到 `VIBEVALLEY_SERVER`（服务端的地址）和 `VIBEVALLEY_VERIFY_CLI`（连着它的命令行，`help` 列出全部接口）。每次调用是一个新农场，要的数据在同一个子命令里造。

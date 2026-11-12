@@ -11,23 +11,6 @@ export const RecallPreview = z.object({
   limit: z.number(),
 }) satisfies Codec<T.RecallPreview>;
 
-const ArchiveFile = z.object({
-  name: z.string(),
-  at: z.number(),
-  chars: z.number(),
-}) satisfies Codec<T.ArchiveFile>;
-
-const ArchiveHit = z.object({
-  file: z.string(),
-  line: z.number(),
-  text: z.string(),
-}) satisfies Codec<T.ArchiveHit>;
-
-export const ArchiveListing = z.object({
-  files: z.array(ArchiveFile),
-  hits: z.array(ArchiveHit),
-}) satisfies Codec<T.ArchiveListing>;
-
 const MemoryKind = z.enum(T.MemoryKindValues) satisfies Codec<T.MemoryKind>;
 
 /** A memory's fields; a found one (MemoryFound) has them and more. */

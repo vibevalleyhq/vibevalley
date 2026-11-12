@@ -12,23 +12,6 @@ export interface RecallPreview {
   limit: number;
 }
 
-export interface ArchiveListing {
-  files: ArchiveFile[];
-  hits: ArchiveHit[];
-}
-
-export interface ArchiveHit {
-  file: string;
-  line: number;
-  text: string;
-}
-
-export interface ArchiveFile {
-  name: string;
-  at: number;
-  chars: number;
-}
-
 export interface Memory {
   id: string;
   agent: string;

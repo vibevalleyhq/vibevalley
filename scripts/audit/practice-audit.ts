@@ -692,7 +692,7 @@ const scanned = /\.tsx?$/u;
 const skipped = /(^|\/)(node_modules|dist|generated)\/|\.d\.ts$/u;
 
 export const ratchetPath = "scripts/audit/practice.ratchet.json";
-const words: RatchetWords = { write: "vp run practice:write", see: "See scripts/practice-audit.ts (each rule's message says where it is written)" };
+const words: RatchetWords = { write: "vp run practice:write", see: "See scripts/audit/practice-audit.ts (each rule's message says where it is written)" };
 
 /** Where a finding counts: apps/<app> and packages/<package>, else its top folder. */
 export const areaOf = (file: string) => (/^(apps|packages)\//u.test(file) ? file.split("/").slice(0, 2).join("/") : (file.split("/")[0] ?? file));

@@ -1,10 +1,7 @@
 import { createHash } from "node:crypto";
-import { basename, join } from "node:path";
-
-import { mapConcurrent } from "@vibevalley/async";
+import { join } from "node:path";
 
 import { memory as memoryWords } from "../base/prompts.ts";
-import { AgentFailed } from "../core/errors.ts";
 import { type AgentFs, agentFsOf } from "../infra/fs.ts";
 import { type AgentLog, consoleLog } from "../infra/log.ts";
 
@@ -151,67 +148,4 @@ async function rewriteMemory(home: string, text: string, fs?: AgentFs): Promise<
   await io.writeText(file, body);
   const info = await io.stat(file);
   return snapshotOf(file, body, info.mtimeMs);
-}
-
-const archiveDir = (home: string) => join(home, "archive");
-
-/** No archive folder (or one that cannot be read) is no archive. */
-async function archiveNames(io: AgentFs, home: string): Promise<string[]> {
-  try {
-    return (await io.readDir(archiveDir(home))).filter((n) => n.endsWith(".md"));
-  } catch (e) {
-    if (e instanceof AgentFailed) return [];
-    throw e;
-  }
-}
-
-export interface ArchiveFile {
-  readonly name: string;
-  readonly at: number;
-  readonly chars: number;
-}
-
-export interface ArchiveHit {
-  readonly file: string;
-  readonly line: number;
-  readonly text: string;
-}
-
-export async function archiveFiles(home: string, fs?: AgentFs): Promise<ArchiveFile[]> {
-  const io = agentFsOf(fs);
-  const names = await archiveNames(io, home);
-  const files = await mapConcurrent(names, 16, async (name) => {
-    const path = join(archiveDir(home), name);
-    const [info, text] = await Promise.all([io.stat(path), io.readText(path)]);
-    return { name, at: Math.trunc(info.mtimeMs), chars: text.length };
-  });
-  return files.toSorted((a, b) => b.at - a.at);
-}
-
-/** A name with a path in it is none. */
-export const readArchive = async (home: string, name: string, fs?: AgentFs): Promise<string | undefined> =>
-  name !== basename(name) || !name.endsWith(".md") ? undefined : agentFsOf(fs).readTextIfExists(join(archiveDir(home), name));
-
-/** Any case; 20 hits when limit is 0. */
-export async function searchArchive(home: string, query: string, limit = 0, fs?: AgentFs): Promise<ArchiveHit[]> {
-  const io = agentFsOf(fs);
-  const most = limit > 0 ? limit : 20;
-  const q = query.trim().toLowerCase();
-  const hits: ArchiveHit[] = [];
-  if (q === "") return hits;
-  const names = await archiveNames(io, home);
-  for (const file of names.toSorted().toReversed()) {
-    const content = await io.readText(join(archiveDir(home), file));
-    const lines = content.split("\n");
-    lines.forEach((l, i) => {
-      if (hits.length < most && l.toLowerCase().includes(q))
-        hits.push({
-          file,
-          line: i + 1,
-          text: lines.slice(Math.max(0, i - 2), Math.min(lines.length, i + 3)).join("\n"),
-        });
-    });
-    if (hits.length >= most) break;
-  }
-  return hits;
 }

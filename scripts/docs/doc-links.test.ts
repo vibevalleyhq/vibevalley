@@ -45,3 +45,14 @@ test("a maintained doc linked with an anchor passes the check", () => {
   expect(result.status).toBe(0);
   expect(result.stderr).toBe("");
 });
+
+test("a command block that runs a script no longer there fails the check", () => {
+  const result = checkDocs({
+    "docs/README.md": "[开发](docs/development.md)\n",
+    "docs/development.md": "# 开发\n\n```bash\nvpx scripts/release/verify-server.ts\nvpx scripts/verify-server.ts\n```\n",
+    "scripts/release/verify-server.ts": "",
+  });
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain("docs/development.md:5: `vpx scripts/verify-server.ts`");
+  expect(result.stderr).not.toContain("release/verify-server.ts`");
+});

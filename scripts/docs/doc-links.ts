@@ -7,9 +7,12 @@ const root = resolve(import.meta.dirname, "../..");
 const LINK = /\]\(([^)\s]+)\)/gu;
 
 /** A path with a folder and a source file's extension; files in the user's home (`orchestrator/orchestrator.jsonl`) have none of these. */
-const CODE_PATH = /`((?:\.\.?\/)*[\w-][\w.-]*\/[\w./-]+\.(?:go|dart|ts|tsx|astro|sql|json|yaml|sh|py|gz))`/gu;
+const CODE_PATH = /`((?:\.\.?\/)*[\w-][\w.-]*\/[\w./-]+\.(?:ts|tsx|css|swift|sql|json|yaml|sh|py|gz))`/gu;
 
-/** Tracked and new files: a path may be written from the repository root or from inside a package (`internal/core/core.go`). */
+/** A script a command block runs (`vpx scripts/release/verify-server.ts …`): from the root, or from inside a package. */
+const RUN_PATH = /\bvpx\s+((?:[\w-][\w.-]*\/)+[\w.-]+\.ts)\b/gu;
+
+/** Tracked and new files: a path may be written from the repository root or from inside a package (`src/infra/db.ts`). */
 const repoFiles = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], { cwd: root, encoding: "utf8" }).split("\n");
 const inRepo = (path: string) => repoFiles.some((f) => (f === path || f.endsWith(`/${path}`)) && existsSync(resolve(root, f)));
 
@@ -33,7 +36,15 @@ for (const file of files) {
   let fenced = false;
   for (const [i, line] of readFileSync(resolve(root, file), "utf8").split("\n").entries()) {
     if (line.startsWith("```")) fenced = !fenced;
-    if (fenced) continue;
+    if (fenced) {
+      // A command block is copied and run as it is: a script it names that moved fails whoever runs it.
+      if (!file.startsWith(".agents/notes/"))
+        for (const match of line.matchAll(RUN_PATH)) {
+          const path = match[1] ?? "";
+          if (!inRepo(path)) broken.push(`${file}:${i + 1}: \`vpx ${path}\` runs a script that is not in the repository`);
+        }
+      continue;
+    }
     // Links inside `inline code` are examples, not links.
     for (const match of line.replace(/`[^`]*`/gu, "").matchAll(LINK)) {
       const target = match[1] ?? "";

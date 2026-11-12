@@ -6,14 +6,14 @@ Status: proposed
 
 用户在查看网页 Artifact（[Artifact](docs/subsystems/artifact.md)）时，虽然已支持划词替换文字（`artifact.html.edit`），但还缺三项视觉审阅交互：
 - 指着图表、按钮或容器让帮工改样式时，无法在画面上直接点选 DOM 元素并将评论钉在该元素上。
-- 聊天旁栏（`ArtifactCanvas.tsx`）尚未挂载 `?shell=1` 外壳脚本。
+- 聊天旁栏（`ArtifactCanvas.tsx`）已经经 `HtmlFrame` 载入 `?shell=1` 外壳，但没接 `PageWords`，旁栏里不能划词改字。
 - 聊天流中的网页卡片尚不能按实际内容高度自适应展开。
 
 ## Proposal
 
 1. **元素选择器锚点**：`HtmlAnchor` 扩展 `{ kind: "element", css: string }`。用户在预览工具栏开启「点选元素」后点击页面元素，外壳脚本计算唯一定位的 CSS 选择器并经 `postMessage` 传给工作台。
 2. **画布内评论角标与定位**：工作台将带锚点的评论列表传给外壳脚本，在对应文字或元素旁绘制编号角标；点击角标高亮评论，点击评论滚动定位至该锚点并闪烁提示。
-3. **对话旁栏接入与高度回报**：在 `ArtifactCanvas.tsx` 中挂载 `?shell=1` 外壳以支持旁栏内划词改字与点选元素；外壳监听尺寸变化并经 `postMessage` 回报高度。
+3. **对话旁栏接入与高度回报**：`ArtifactCanvas.tsx` 接上 `PageWords`，旁栏里也能划词改字与点选元素；外壳（`packages/artifact/src/shell.ts`）监听尺寸变化并经 `postMessage` 回报高度。
 
 ## Alternatives considered
 

@@ -10,9 +10,9 @@ MOSS Live 已打通经本机 WebSocket（`/api/v1/voice/moss/line`）免声网�
 
 ## Proposal
 
-1. **拆分通话协调与传输通道**：`voice/voice.ts` 与前端 `features/voice/call.ts` 面向统一 `OpenCall` 通道接口管理单通状态、静音、字幕与 `Inbox.news` 播报队列；声网（`agora.ts`、`line.ts`）、MOSS（`moss-relay.ts`）与 OpenAI Realtime（`realtime.ts`）各自实现传输层。
+1. **拆分通话协调与传输通道**：`voice/voice.ts` 与前端 `features/voice/model/call.ts` 面向统一 `OpenCall` 通道接口管理单通状态、静音、字幕与 `Inbox.news` 播报队列；声网（`agora.ts`、`line.ts`）、MOSS（`moss-relay.ts`）与 OpenAI Realtime（`realtime.ts`）各自实现传输层。
 2. **接入通用 OpenAI Realtime（`vendor: "realtime"`）**：
-   - `VoiceAnswer` 增加 `{ vendor: "realtime"; url: string; model: string; voice: string }`，主监听 `8787` 提供仅限本机同源回环升级的 `GET /api/v1/voice/realtime`（`lan` 不转发）。
+   - `VoiceAnswer` 增加 `{ vendor: "realtime"; url: string; model: string; voice: string }`，主监听 `8787` 提供只接本机同源升级的 `GET /api/v1/voice/realtime`；「连接到本机」的监听对任何 WebSocket 升级都回 `404`（[lan.ts](apps/server/src/gateway/lan/lan.ts)），配对设备连不到它。
    - 复用与 MOSS 通话一致的 `ask_orchestrator` 工具注入与 `quick` 字幕落库；收到 `input_audio_buffer.speech_started` 时立即通知前端停播并按已播放毫秒数发 `conversation.item.truncate`。
 
 ## Alternatives considered
@@ -23,7 +23,7 @@ MOSS Live 已打通经本机 WebSocket（`/api/v1/voice/moss/line`）免声网�
 ## Acceptance criteria
 
 - 仅配置 OpenAI Realtime 地址、模型名与密钥（无 Agora 凭据、不开 `8788` 隧道）即可在桌面端拨通、调 `ask_orchestrator` 派单并挂断。
-- 插话时前端立即停播并按已播放毫秒数截断服务端上下文；跨源或经 `lan` 连接 `/api/v1/voice/realtime` 被拒绝。
+- 插话时前端立即停播并按已播放毫秒数截断服务端上下文；跨源连接 `/api/v1/voice/realtime` 被拒绝。
 
 ## Risks
 

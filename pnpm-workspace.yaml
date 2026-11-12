@@ -67,7 +67,6 @@ catalog:
   vitest: "5.1.0"
   yaml: "^2.9.1"
   knip: 6.44.1
-  lightningcss: "1.33.0"
   parse5: 8.1.0
   undici: "8.12.3"
   zod: ^4.6.7
@@ -105,8 +104,8 @@ overrides:
   "framer-motion>react": "-"
   "framer-motion>react-dom": "-"
   "react-native-agora@4.6.4>base64-js": "catalog:"
-  # One undici 8 for the server's dependencies: with two (oar's and Effect's), openai and pi-ai were installed once for
-  # each, 33 MB more in the app. Electron's build tools keep their undici 6 and 7.
+  # One undici 8 for the server and its dependencies (oar, pi-ai, openai): two copies would install those once for each,
+  # tens of MB more in the app. Electron's build tools keep their undici 6 and 7.
   "undici@8": 8.12.3
   vite@*: "catalog:"
   vitest@*: "catalog:"
@@ -153,74 +152,6 @@ packageExtensions:
     dependencies:
       "@types/react": "~19.3.0"
 
+# Releases newer than pnpm's minimumReleaseAge (a day) that the catalog takes on purpose; drop each once it is older.
 minimumReleaseAgeExclude:
-  - knip@6.44.0
-  - "@formatjs/intl-locale@5.4.1"
-  - "@formatjs/intl-supportedvaluesof@2.5.0"
-  - "@oxlint/binding-android-arm-eabi@1.91.0"
-  - "@oxlint/binding-android-arm64@1.91.0"
-  - "@oxlint/binding-darwin-arm64@1.91.0"
-  - "@oxlint/binding-darwin-x64@1.91.0"
-  - "@oxlint/binding-freebsd-x64@1.91.0"
-  - "@oxlint/binding-linux-arm-gnueabihf@1.91.0"
-  - "@oxlint/binding-linux-arm-musleabihf@1.91.0"
-  - "@oxlint/binding-linux-arm64-gnu@1.91.0"
-  - "@oxlint/binding-linux-arm64-musl@1.91.0"
-  - "@oxlint/binding-linux-ppc64-gnu@1.91.0"
-  - "@oxlint/binding-linux-riscv64-gnu@1.91.0"
-  - "@oxlint/binding-linux-riscv64-musl@1.91.0"
-  - "@oxlint/binding-linux-s390x-gnu@1.91.0"
-  - "@oxlint/binding-linux-x64-gnu@1.91.0"
-  - "@oxlint/binding-linux-x64-musl@1.91.0"
-  - "@oxlint/binding-openharmony-arm64@1.91.0"
-  - "@oxlint/binding-win32-arm64-msvc@1.91.0"
-  - "@oxlint/binding-win32-ia32-msvc@1.91.0"
-  - "@oxlint/binding-win32-x64-msvc@1.91.0"
-  - "@oxlint/plugins@1.91.0"
-  - "@solidjs/signals@2.0.0-rc.21"
-  - "@solidjs/vite-plugin@3.0.0-next.56"
-  - "@solidjs/web@2.0.0-rc.21"
-  - "@voidzero-dev/vite-plus-core@1.5.0"
-  - "@voidzero-dev/vite-plus-darwin-arm64@1.5.0"
-  - "@voidzero-dev/vite-plus-darwin-x64@1.5.0"
-  - "@voidzero-dev/vite-plus-linux-arm64-gnu@1.5.0"
-  - "@voidzero-dev/vite-plus-linux-arm64-musl@1.5.0"
-  - "@voidzero-dev/vite-plus-linux-x64-gnu@1.5.0"
-  - "@voidzero-dev/vite-plus-linux-x64-musl@1.5.0"
-  - "@voidzero-dev/vite-plus-win32-arm64-msvc@1.5.0"
-  - "@voidzero-dev/vite-plus-win32-x64-msvc@1.5.0"
-  - oxlint@1.91.0
-  - solid-js@2.0.0-rc.21
-  - vite-plus@1.5.0
-  - "@expo/cli@58.1.19"
-  - "@expo/config-plugins@58.0.12"
-  - "@expo/config@58.0.11"
-  - "@expo/env@2.5.4"
-  - "@expo/fingerprint@0.21.9"
-  - "@expo/inline-modules@0.2.9"
-  - "@expo/local-build-cache-provider@58.0.11"
-  - "@expo/log-box@58.0.15"
-  - "@expo/metro-config@58.0.21"
-  - "@expo/prebuild-config@58.0.19"
-  - "@expo/router-server@58.0.21"
-  - babel-preset-expo@58.0.24
-  - expo-asset@58.0.20
-  - expo-constants@58.0.15
-  - expo-linking@58.0.16
-  - expo-modules-autolinking@58.0.17
-  - expo-modules-core@58.0.30
-  - expo-modules-jsi@58.0.22
-  - expo-notifications@58.1.8
-  - expo@58.0.23
-  - "@tsrs/darwin-arm64@0.21.0-ts7.1.0-beta"
-  - "@tsrs/darwin-x64@0.21.0-ts7.1.0-beta"
-  - "@tsrs/linux-arm64-gnu@0.21.0-ts7.1.0-beta"
-  - "@tsrs/linux-arm64-musl@0.21.0-ts7.1.0-beta"
-  - "@tsrs/linux-x64-gnu@0.21.0-ts7.1.0-beta"
-  - "@tsrs/linux-x64-musl@0.21.0-ts7.1.0-beta"
-  - "@tsrs/win32-x64@0.21.0-ts7.1.0-beta"
-  - tsrs@0.21.0-ts7.1.0-beta
-  - "@ai-sdk/gateway@4.0.137"
-  - ai@7.0.164
-  - "@electric-sql/pglite@0.5.16"
   - "@botiverse/oar@0.101.0"

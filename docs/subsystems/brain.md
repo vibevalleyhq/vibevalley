@@ -67,7 +67,7 @@ pi-durable 自己压缩。模型的窗口按目录（100 万 token），一次�
 
 ### 自己带的东西
 
-- **技能按需加载**：扫技能目录下 `SKILL.md` 的 frontmatter，提示里只列名字和 160 字以内的简介，`load_skill` 时才读正文。
+- **技能按需加载**：扫技能目录下 `SKILL.md` 的 frontmatter，提示里只列名字和 160 字以内的简介，`load_skill` 时才读正文。帮工和终端对话扫的目录是 `~/.agents/skills`、`~/.claude/skills`、`<工作目录>/.agents/skills`（`packages/agent/src/tools/skills.ts` 的 `defaultSkillDirs`，`runtime/helperExtension.ts` 用它）。
 - **记性**：`remember`、`rewrite_memory` 经 `MemoryPort`（服务端接 `memory` 表，终端对话接 `MEMORY.md`）。
 - **帮手**：`spawn_agent` 开一个这次调用拥有的子对话，抄父对话的 agent、去掉 `spawn_agent`，它的回答就是结果。
 - **自己的任务**：`todo_add|update|list` 维护最多 30 件的 DAG（`dag.ts` 查圈和缺的前置），全由自己做；帮工的图变了经 oar 的原始记录（`vibevalley/todos`）进轨迹。

@@ -38,7 +38,7 @@ flowchart LR
   server -- SSE：折好的核心状态 --> app
   subgraph server[TypeScript 服务端 127.0.0.1:8787]
     manager[助手<br/>vibevalley 自己的 agent]
-    chat[田头<br/>SQLite]
+    chat[田头<br/>Postgres]
     site[核心状态<br/>只由事实改变]
     sessions[帮工<br/>oar]
   end

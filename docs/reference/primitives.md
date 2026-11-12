@@ -109,7 +109,7 @@
 | `serverAddress` | `config.ts` | The main API and its MCP endpoint share a fixed local identity; remote devices use the separate lan listener. |
 | `reposDir` | `config.ts` | Where the space's repositories are: each folder in it is one. |
 | `worktreesDir` | `config.ts` | Where the issues' worktrees are: <repo>.<issue number> under it. |
-| `agentHome` | `config.ts` | A profile's folder for conversation logs, archives and evals; memory rows live in the database. |
+| `agentHome` | `config.ts` | A profile's folder for conversation logs and evals; memory rows live in the database. |
 | `dbQueries` | `db.ts` | Every query run: what a test holds a hot path's budget to, and a reading of the farm's load. |
 | `SqlError` | `db.ts` | The database failed a statement: what it said, with the statement's first words. |
 | `causeMessage` | `db.ts` | What the database said, from under the errors around it. |

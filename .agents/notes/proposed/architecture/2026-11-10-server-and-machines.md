@@ -15,7 +15,7 @@ Status: proposed
 1. **完成机器链路抽象（3b–3d）**：
    - **3b 仓库过链路**：工单（改动、冲突、合并）、帮工（工作目录、释放、清理）、`ingress`（GitHub）、游戏（提交统计）与工具对 `Repo` 的调用改为经链路定位拥有该仓库的机器。
    - **3c 探测过链路**：每台机器上报已装农机、额度与可用性并合入 `Machine` 状态；派活按档案所需农机与工单仓库挑选在线机器。
-   - **3d 搬入 `apps/machine`**：链路消息在 `packages/protocol/src/machine` 定义 Schema（oar 事件按记录格式过线，仍由服务端 `reaction.ts` 折成事实）；执行器、仓库与探测迁入 `apps/machine`。单进程模式与整农场测试通过内存链路共跑两头。
+   - **3d 搬入 `apps/machine`**：链路消息在 `packages/protocol/src/machine` 定义 Zod schema（oar 事件按记录格式过线，仍由服务端 `reaction.ts` 折成事实）；执行器、仓库与探测迁入 `apps/machine`。单进程模式与整农场测试通过内存链路共跑两头。
 2. **命令行注册与三类钥匙隔离（第 4 步）**：
    - 机器主动外连服务端（WebSocket 长连接，穿透 NAT 和睡眠唤醒），服务端从不反向连机器。
    - `vibevalley machine join <服务端地址>` 复用 `user.approval.*` 确认码流程，用户在页面批准后签发机器钥匙（存于机器家目录，可随时吊销断连）。

@@ -272,9 +272,6 @@ catalogs:
     knip:
       specifier: 6.44.1
       version: 6.44.1
-    lightningcss:
-      specifier: 1.33.0
-      version: 1.33.0
     motion:
       specifier: ^14.9.0
       version: 14.10.1
@@ -444,12 +441,6 @@ importers:
       knip:
         specifier: 'catalog:'
         version: 6.44.1
-      lightningcss:
-        specifier: 'catalog:'
-        version: 1.33.0
-      parse5:
-        specifier: 'catalog:'
-        version: 8.1.0
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

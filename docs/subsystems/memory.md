@@ -11,7 +11,7 @@
 | 档案记忆的增删查、去重、300 条容量淘汰与中英文分词（`gse` + FTS5） | 召回文本如何拼入会话提示与轨迹事件（[帮工](docs/subsystems/session.md)） |
 | 开工前相关性召回（`pick`）及页面「下回想起什么」预览（`memory.recall`） | 单个 `Session` 已召回记忆 ID 的记录（`session.recalled` 列，[帮工](docs/subsystems/session.md)） |
 | 本地的库与 Nowledge Mem、EverOS 并发读取、按名次合并与后台异步写入 | 外部来源地址与密钥在 `settings.json` 中的保存与校验（[设置和配置](docs/subsystems/setting.md)） |
-| 助手与帮工共用的 `MemoryPort` 及助手压缩归档（`archive/`）读取 | 程序性操作手册与技能书（[档案和农机](docs/subsystems/agent.md)） |
+| 助手与帮工共用的 `MemoryPort` | 程序性操作手册与技能书（[档案和农机](docs/subsystems/agent.md)） |
 
 ## 在哪
 
@@ -24,13 +24,13 @@
 | `apps/server/src/modules/memory/nowledge.ts`、`everos.ts` | Nowledge Mem（MCP）与 EverOS（HTTP）外部来源适配器 |
 | `apps/web/src/features/memory/Memory.tsx`、`tree/` | 工作台「记忆」页与记忆树视图 |
 
-接口清单见 [capabilities.md](docs/reference/capabilities.md)（`memory.*`、`orchestrator.archive.*`）。
+接口清单见 [capabilities.md](docs/reference/capabilities.md)（`memory.*`）。
 
 ## 模型和不变量
 
 - **所有档案共用 `memory` 表，按档案 ID 归属**：
   - 帮工与助手统一读写 `memory` 表，同档案的多个 `Session` 共享记忆。
-  - 用户在界面添加的条目记 `author: "owner"`，在助手提示中标为「用户交代」，agent 整理时不得覆盖。
+  - 用户在界面添加的条目记 `author: "user"`，在助手提示中标为「用户交代」，agent 整理时不得覆盖。
 - **两种条目类型（`kind`）与容量上限**：
   - `note`：来自 `issue_report.remember`、`memory_create` 工具或用户手动添加。
   - `issue`：帮工完成工单回合时由服务端自动生成的工单经历（每个 `Session` 更新同一条）。
@@ -61,7 +61,7 @@
 
 ## 还没做的
 
-- 用户全局画像（`profile`）、完整对话提炼与记忆树真实数据接入：[记忆都存在库里](.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)、[记忆树](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)。
+- 用户全局画像（`profile`）、完整对话提炼与记忆树真实数据接入：[记忆都存在库里](.agents/notes/proposed/architecture/2026-10-18-profile-and-episode-memories.md)、[记忆树](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)。
 
 ## 怎么验证
 
