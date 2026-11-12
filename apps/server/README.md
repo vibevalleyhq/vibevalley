@@ -34,8 +34,8 @@ Runtime assets resolve from the package root through `#package` in both source a
   aborts it and waits for it; nothing is left as a floating promise. Logs go through `deps.log` (`src/infra/log.ts`): lint
   refuses `console.*` outside the command line.
 - **Facts are read typed**: a subscriber switches on `ServerEvent`'s `type`, without casting its fields.
-- **Tests never reach a model or this machine's runtimes**: oar's `scriptedRuntime` plays the helpers, a scripted `Llm`
-  (`packages/ai/src/testing/testing.ts`) the model, `gh` answers that it is not there.
+- **Tests never reach a model or this machine's runtimes**: oar's `scriptedRuntime` plays the helpers, a scripted DeepSeek
+  (`src/testing/model.ts`, seated on the farm's harness by `src/testing/deepseek.ts`) the model, `gh` answers that it is not there.
 
 ## Commands
 

@@ -6,20 +6,17 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { LiveDoc } from "@earendil-works/pi-durable";
 import { expect, test } from "vite-plus/test";
 
-import { messageText } from "@vibevalley/agent/messages";
-import { lastUser, scriptedLLM, type Step } from "@vibevalley/agent/testing";
-import { answer } from "@vibevalley/ai/testing";
 import { TaskGroup } from "@vibevalley/async";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 
 import { keptLog } from "#/infra/log.ts";
-import { wallTime } from "#/infra/time.ts";
 import { makeOrchestrator } from "#/modules/orchestrator/orchestrator.ts";
-import { entryMessage } from "#/modules/runtime/durable.ts";
-import { helperKey, vibevalleyRuntimeOf } from "#/modules/runtime/vibevalley.ts";
+import { entryMessage, messageText } from "#/modules/runtime/durable.ts";
+import { helperInstructions, helperKey, vibevalleyRuntimeOf } from "#/modules/runtime/vibevalley.ts";
 import { agentSessionsBoot, mailboxBoot } from "#/services.ts";
 import { testConfig } from "#/testing/layers.ts";
+import { answer, lastUser, type Request, scriptedLLM, type Step } from "#/testing/model.ts";
 import { sqlOf } from "#/testing/sql.ts";
 import { type World, world } from "#/testing/world.ts";
 
@@ -88,15 +85,20 @@ test("regression: the assistant and a helper both cut off mid-answer go on once 
   const config = testConfig({ db: "", patrol: { heartbeatMinutes: 0 } });
   const helperWords = "数过了，三块地";
   const helperAsk = "数一下地";
+  const helperCwd = tempDir("vibevalley-helper-");
   /** One model for the whole farm, as DeepSeek is: the helper's request and the assistant's each get their own answer. */
   const both =
     (hang: boolean): Step =>
     (r) =>
       lastUser(r).includes(helperAsk) ? answer(helperWords, hang ? { hangAfter: 3 } : {}) : answer(words, hang ? { hangAfter: 3 } : {});
+  /** What the model was asked, from the newest farm opened. */
+  let asked: Request[] = [];
   const open = async (steps: readonly Step[]) => {
     const below = await world({ config });
     try {
-      below.deepseek.use(scriptedLLM(steps).llm);
+      const script = scriptedLLM(steps);
+      asked = script.requests;
+      below.deepseek.use(script.llm);
       const orchestrator = await makeOrchestrator(below);
       below.closes.push(() => orchestrator.close());
       await agentSessionsBoot(below);
@@ -114,8 +116,11 @@ test("regression: the assistant and a helper both cut off mid-answer go on once 
   let helper = "";
   try {
     await using farm = await open([both(true), both(true)]);
-    const runtime = vibevalleyRuntimeOf({ durable: farm.runtime.durable, time: wallTime, owner, log: keptLog() });
-    const session = await runtime.session({ kind: "available", via: "bundled" }, { cwd: tempDir("vibevalley-helper-") });
+    const runtime = vibevalleyRuntimeOf({ durable: farm.runtime.durable, helpers: farm.runtime.helpers, owner, log: keptLog() });
+    const session = await runtime.session(
+      { kind: "available", via: "bundled" },
+      { cwd: helperCwd, appendSystemPrompt: "你是后端老周。", env: { FARM_TOKEN: "t0k" } },
+    );
     helper = session.id;
     const told: Event[] = [];
     session.events((e) => told.push(e), { cursor: { sessionId: session.id, afterSeq: -1 } });
@@ -144,4 +149,11 @@ test("regression: the assistant and a helper both cut off mid-answer go on once 
   const last = (await conversation.entries({ order: "descending" }, 1, undefined, BACKGROUND_CONTEXT)).items[0];
   const m = last === undefined ? undefined : entryMessage(last);
   expect(m?.role === "assistant" ? messageText(m) : "").toBe(helperWords);
+  // Asked again before its session opened: with its own prompt and tools, as the session gave them.
+  const again = asked.find((r) => lastUser(r).includes(helperAsk));
+  if (!again) throw new Error("the helper's run was not asked again");
+  expect(again.system.startsWith(helperInstructions())).toBe(true);
+  expect(again.system).toContain("你是后端老周。");
+  expect(again.system).toContain(helperCwd);
+  expect(again.tools.map((t) => t.name)).toEqual(expect.arrayContaining(["read", "write", "edit", "bash", "todo_add", "load_skill", "spawn_agent"]));
 });

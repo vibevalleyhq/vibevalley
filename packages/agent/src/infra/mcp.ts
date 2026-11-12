@@ -4,13 +4,11 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { z } from "zod";
 
-import type { JsonSchema } from "@vibevalley/ai/tools";
-
 import { isRecord } from "../base/json.ts";
 import { mcpConfig, mcp as mcpWords } from "../base/prompts.ts";
 import { AgentFailed, messageOf, ToolFailed } from "../core/errors.ts";
-import type { Tool } from "../core/loop.ts";
-import { runTool } from "../core/tool.ts";
+import type { JsonSchema } from "../core/schema.ts";
+import { runTool, type Tool } from "../core/tool.ts";
 import { type AgentFs, agentFsOf } from "./fs.ts";
 import { type AgentLog, consoleLog } from "./log.ts";
 import { asTransport } from "./mcpTransport.ts";

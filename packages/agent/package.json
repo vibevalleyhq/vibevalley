@@ -3,21 +3,13 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./brain": {
-      "types": "./dist/brain/brain.d.ts",
-      "default": "./src/brain/brain.ts"
-    },
-    "./coding": {
-      "types": "./dist/tools/coding.d.ts",
-      "default": "./src/tools/coding.ts"
-    },
     "./core/errors": {
       "types": "./dist/core/errors.d.ts",
       "default": "./src/core/errors.ts"
     },
-    "./core/loop": {
-      "types": "./dist/core/loop.d.ts",
-      "default": "./src/core/loop.ts"
+    "./core/schema": {
+      "types": "./dist/core/schema.d.ts",
+      "default": "./src/core/schema.ts"
     },
     "./core/tool": {
       "types": "./dist/core/tool.d.ts",
@@ -39,25 +31,13 @@
       "types": "./dist/tools/memory.d.ts",
       "default": "./src/tools/memory.ts"
     },
-    "./messages": {
-      "types": "./dist/base/messages.d.ts",
-      "default": "./src/base/messages.ts"
-    },
     "./self": {
       "types": "./dist/tools/self.d.ts",
       "default": "./src/tools/self.ts"
     },
-    "./session": {
-      "types": "./dist/brain/session.d.ts",
-      "default": "./src/brain/session.ts"
-    },
     "./skills": {
       "types": "./dist/tools/skills.d.ts",
       "default": "./src/tools/skills.ts"
-    },
-    "./testing": {
-      "types": "./dist/testing/testing.d.ts",
-      "default": "./src/testing/testing.ts"
     },
     "./todo": {
       "types": "./dist/tools/todo.d.ts",
@@ -74,7 +54,6 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "catalog:",
-    "@vibevalley/ai": "workspace:*",
     "@vibevalley/async": "workspace:*",
     "zod": "catalog:"
   },

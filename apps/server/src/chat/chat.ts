@@ -21,6 +21,7 @@ import { makeLogger } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
 import { dshRuntime } from "#/modules/runtime/dsh.ts";
 import { deepseekAccess, openDurable } from "#/modules/runtime/durable.ts";
+import { makeHelpers } from "#/modules/runtime/helperExtension.ts";
 import { registryOf } from "#/modules/runtime/runtime.ts";
 import { helperKey, vibevalleyRuntimeOf } from "#/modules/runtime/vibevalley.ts";
 
@@ -106,17 +107,11 @@ export async function ownChat(values: OwnChat): Promise<void> {
   }
   const log = makeLogger({ name: "chat", level: "warn", write: (_level, _name, line) => process.stderr.write(dim(line) + "\n") });
   try {
-    const durable = await openDurable({ file: release ? join(home, "durable.db") : undefined, clock: wallTime, log, models });
+    const helpers = makeHelpers({ memory: fileMemory(home, () => wallTime.now()), todos: () => memoryStore(), time: wallTime, log });
+    const durable = await openDurable({ file: release ? join(home, "durable.db") : undefined, clock: wallTime, log, models, extensions: [helpers.extension] });
     const owner = new TaskGroup({ name: "chat" });
     try {
-      const runtime = vibevalleyRuntimeOf({
-        durable,
-        time: wallTime,
-        owner,
-        log,
-        memory: fileMemory(home, () => wallTime.now()),
-        todos: () => memoryStore(),
-      });
+      const runtime = vibevalleyRuntimeOf({ durable, helpers, owner, log });
       const id = `chat.${values.name}`;
       const session = await runtime.session(
         { kind: "available", via: "bundled" },

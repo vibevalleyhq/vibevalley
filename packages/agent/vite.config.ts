@@ -1,26 +1,21 @@
 import { defineConfig } from "vite-plus";
 import { configDefaults } from "vite-plus/test/config";
 
-// The agent's tests start real child processes and MCP servers: a slow machine under that load needs more than 5 s.
+// The agent's tests start real MCP servers as child processes: a slow machine under that load needs more than 5 s.
 export default defineConfig({
   test: { include: ["src/**/*.test.ts"], testTimeout: 20_000, reporters: [...configDefaults.reporters, "@vibevalley/testkit/budgets"] },
   // The types other packages check against (package.json's exports.
   pack: {
     entry: [
-      "src/brain/brain.ts",
-      "src/tools/coding.ts",
       "src/core/errors.ts",
-      "src/core/loop.ts",
+      "src/core/schema.ts",
       "src/core/tool.ts",
       "src/base/dag.ts",
       "src/infra/mcp.ts",
       "src/infra/mcpTransport.ts",
       "src/tools/memory.ts",
-      "src/base/messages.ts",
       "src/tools/self.ts",
-      "src/brain/session.ts",
       "src/tools/skills.ts",
-      "src/testing/testing.ts",
       "src/tools/todo.ts",
       "src/tools/todoStore.ts",
       "src/tools/todoTools.ts",

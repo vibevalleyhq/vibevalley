@@ -19,14 +19,13 @@ oar 0.101（最新）带的 pi-durable runtime 写在 1.4 上（peer `~1.4.0`）
 
 **一个 Harness，归 runtime 模块**：`apps/server/src/modules/runtime/durable.ts` 开、关这个 `Harness`（`Harness.open(storage, { models, registry })`），`models` 由 Provider 的 DeepSeek 连接每次现取（钥匙换了就用新的）；它是 Runtime 服务的一部分，`close()` 时关。
 
-1. **P0 助手持久（不花钱）。** `makeHost` 的接口（`AgentHost`）不变，里面从 `makeBrain` 换成 Harness 的一个 conversation：
-   - 一个会话一个 conversation，id 记在会话上；`submit` 是 `conversation.submit`（忙时 steer，闲时开一轮），`stop` 是 `abort`，`resume` 是重开以后 Harness 自己接着跑。
-   - 我们的工具（`Tool`：JSON Schema 加 `execute`）由一个函数包成 `defineTool`，`ToolFailed` 照旧是模型读到的失败结果；会改东西的工具不声明 `replay: "safe"`，断在中间时模型读到 `interrupted`。
-   - 事件：`conversation.watch()` 的提交读成现在 `BrainEvent` 喂给 `journal` 和 `reaction` 的那几样（开始、文字、工具开始和结束、一轮结束、用量），核心状态的事实不变。
-   - 流程测试：pi-ai 的 faux provider 照脚本答；说一句话，在模型答到一半时 `farm.close()`，用同一个家目录再起，它答完，这一轮只记一次。原来 `host` 的测试照旧过。
-2. **P1 助手换模型的那一侧。** 用 pi-ai 的 DeepSeek provider 取代 `packages/ai` 的桥；先用离线的录制核对 `brain.md` 记的几处（纯工具的 `content: null`、`reasoning_text`、choice 里的 usage、迟到的工具 id），不对的在 provider 外面补。读 1.5.2 的代码（`api/openai-completions.js`）四处都已处理：助手消息默认 `content: null`，`reasoning_content`/`reasoning`/`reasoning_text` 都读、DeepSeek 的模型带 `requiresReasoningContentOnAssistantMessages`，`choice.usage` 在 `chunk.usage` 缺时读，迟到的工具 id 补到已开的调用上；模型 id（`deepseek-flash`、`deepseek-v4-pro`）和我们的一样。`Harness` 开的时候注册一次 `deepseek`（`runtime/durable.ts` 的 `deepseekAccess`：pi-ai 的 `deepseekProvider`，钥匙在每次请求的 auth 里从设置现取，`fetch` 是农场的；没钥匙这一轮以 `noDeepSeekKey` 的话失败，不是 `no_model`），不再每个会话注册一个桥，所以哪个宿主先让 `Harness` 接着跑，别的会话的一轮也接得上（`flows/restart.test.ts` 的 regression）。对话写 `{ provider: "deepseek", modelId }`，目录外的名字用默认模型；effort `high`、`max` 原样是 thinking level。窗口按目录（100 万），压缩仍在 12 万（`compaction.modelOverrides`）。录制核对在 `runtime/durable.test.ts`（四处都对，不用补）。测试农场的 `Harness` 问 `testing/deepseek.ts` 的照脚本回答的 `deepseek`。真模型的助手评测在换之前、之后各跑一遍（花钱，先问用户），还没跑。
-3. **P2 农机。** `runtime/vibevalley.ts` 改成在同一个 Harness 上开 conversation（一个 oar 会话一个，`resume` 找回）、装 pi-durable 的 `read`、`write`、`edit`、`bash`（环境是帮工的工作目录，`bash` 带会话的环境变量、默认 120 秒），MCP、`runtime_todo` 的任务和 `spawn_agent`（调用拥有的子对话）经 `durableTool`，照 oar 的 `Runtime` 契约出事件。放下会话时照 oar 的约定停下这一轮；崩溃留下的一轮在会话再打开时接着跑完。命令行的 `chat` 跑同一个农机，但在 `agent/<名字>/durable.db` 开自己的 Harness（pi-durable 没有跨进程的锁，服务端的那个不能共用）。
-4. **P3 删。** `packages/agent` 里自己的循环、压缩、前缀、会话文件、子帮手和任务图，`packages/ai` 里模型的桥和重放，`session`、`mailbox` 里只为它做的恢复；还要的（技能的读法、`dag` 的校验、记性的端口、转写和 MOSS）留在原处或挪到用它的模块。`brain.md` 改成新的样子。
+P0–P3 已做完，现在的样子沉淀在 [VibeValley 自己的 agent](docs/subsystems/brain.md)：助手（`session/host.ts`）、农机（`runtime/vibevalley.ts`）、终端对话（`chat/chat.ts`）和帮手都跑在这个 `Harness` 上；pi-ai 的 DeepSeek provider 注册一次；帮工的扩展 `vibevalley.helper` 在 `Harness` 开的时候就装上，会话自己的部分记在对话里，没装上的扩展照转写站岗，所以重启后接着跑的一轮不会没有提示和工具（`flows/restart.test.ts`）；评测在 `Harness` 上跑助手的一轮（`testing/evals.ts` 的 `orchestratorTurn`）；`packages/agent` 里自己的循环、压缩、前缀、会话文件、提醒和编码工具，`packages/ai` 里的模型桥和重放，`packages/provider` 的 DeepSeek 协议都删了。
+
+还剩：
+
+1. **评测的对照表。** 真模型的助手评测（`vp run --filter @vibevalley/server evals`，花钱，先问用户）在换之前、之后各跑一遍，两张 `| case | model | passed | tokens |` 放进 PR。
+2. **Postgres 的存储后端。** 过 pi-durable 的一致性测试，换掉 `durable.db`；换后端只碰 `runtime/durable.ts`。
+3. **农机换回 oar 的 runtime。** oar 的 pi-durable runtime 跟上 1.5 以后，`runtime/vibevalley.ts` 换回它，删掉 `pnpm-workspace.yaml` 里放宽 peer 的那条。
 
 ## Alternatives considered
 
@@ -39,7 +38,7 @@ oar 0.101（最新）带的 pi-durable runtime 写在 1.4 上（peer `~1.4.0`）
 
 - P0 的流程测试在：答到一半关掉、重起、答完、只记一次；`session/host` 原有的测试和全部流程测试照旧过。
 - 助手和农机都跑在 Harness 上，`durable.db` 在家目录；`packages/agent`、`packages/ai` 里不再有自己的循环、会话文件和模型桥。
-- 真模型的助手评测换之前、之后各一张表，放进 PR（花钱，先问用户）。
+- 真模型的助手评测换之前、之后各一张表，放进 PR（花钱，先问用户）。（还没跑）
 - `vp check`、`server:check`、`web:check`、`desktop:test`、`docs:verify`、`deadcode` 全过；[vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 的服务端分册走通。
 - `docs/subsystems/brain.md`、`session.md` 改成新的样子，删掉本 Note。
 

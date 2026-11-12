@@ -8,7 +8,7 @@
 |---|---|
 | 定时任务模型、五种时间规格（`CronWhen`）、时区解析与下次运行时间计算（`nextRun`） | 到期后工单如何创建、排队、重开或启动会话（[工单](docs/subsystems/issue.md)） |
 | 助手创建定时任务时的用户授权门禁（`needsOK`：是否进入 `pending` 待批） | 触发信封如何排队、受阻暂存与唤醒（[Mailbox](docs/subsystems/mailbox.md)） |
-| 周期性到期扫描（`tick`）、关机错过任务的单次补跑（`isMissed`）与未路由重放 | CLI 独立对话的本地提醒（`packages/agent/src/tools/reminders.ts`） |
+| 周期性到期扫描（`tick`）、关机错过任务的单次补跑（`isMissed`）与未路由重放 | |
 
 ## 在哪
 

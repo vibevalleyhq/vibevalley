@@ -3,13 +3,12 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "vite-plus/test";
 
-import { scriptedLLM } from "@vibevalley/agent/testing";
-import { answer, text, toolCall } from "@vibevalley/ai/testing";
 import { collect } from "@vibevalley/async";
 
 import { user } from "#/base/actor.ts";
 import builtIn from "#/modules/agent/templates/orchestrator/agent.json" with { type: "json" };
 import { testConfig, nextTurn, until } from "#/testing/layers.ts";
+import { answer, scriptedLLM, text, toolCall } from "#/testing/model.ts";
 import { world } from "#/testing/world.ts";
 import * as qs from "#db/session.sql.ts";
 

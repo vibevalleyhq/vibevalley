@@ -6,9 +6,6 @@
 
 | 子路径 | 对外约定 |
 | --- | --- |
-| `./deepseek/models` | DeepSeek 模型目录、能力和单价；不选择调用者的模型 |
-| `./deepseek/request`、`./deepseek/response` | 窄的 DeepSeek 输入/增量契约、请求编码、SSE 分帧、usage/finish reason 解码；不接收 agent 消息类型 |
-| `./deepseek/server` | `deepseekModel` 显式接收 model/baseUrl/key，经调用者给的 `fetch` 请求，返回 `AsyncIterable` 的增量；无重试、环境回退和第二网络实现 |
 | `./transcription` | `TranscriptionModelV4` 工厂，经调用者给的 `fetch`，使用 `@ai-sdk/provider@4.0.36`；显式接收 endpoint/model/key/格式，无重试或 URL 下载 |
 | `./moss` | MOSS 帧 Schema、PCM/tagged-v1 编码；浏览器可用 |
 | `./moss/server`、`./moss/live-models` | Live 显式鉴权连接、握手与稳定模型／快照目录 |
@@ -30,7 +27,7 @@
 | `./agora/server` | 声网 SDK 客户端、RTC token 和协议错误 |
 | `./agora/captions` | 声网字幕包解码与分片；浏览器可用 |
 
-DeepSeek 保留代理返回的 reasoning 字段、choice usage、迟到的工具 ID 和拒绝细节。它是单一的专有适配器，不是通用语言 SDK；AI 层负责 agent 历史重放和消息折叠。为什么不直接换官方适配器，见 [模型边界](docs/subsystems/brain.md#模型边界)。
+对话模型（DeepSeek）不在这里：助手和帮工经 pi-ai 的 DeepSeek provider 问它（[模型边界](docs/subsystems/brain.md#模型边界)）。
 
 转写保留 `response_format=json`、`dictation.<format>`、六种格式与 120 秒请求头超时；响应体保留独立的失败通道。请求经调用者给的 `fetch` 和时钟，`abortSignal` 和测试时钟都到得了 HTTP 请求。默认 OpenAI 适配器的 verbose 格式不是这个接口的契约，因此这里实现上游模型接口。结果保留响应头、原始正文和 usage；缺失的时长、语言和时间戳不猜。
 

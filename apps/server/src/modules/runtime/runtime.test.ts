@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { defineRuntime, type InstallationSnapshot, RuntimeRegistry } from "@botiverse/oar";
 import { afterEach, describe, expect, test } from "vite-plus/test";
 
-import { testClock } from "@vibevalley/agent/testing";
+import { reasonOf } from "@vibevalley/async";
 import { setLocale, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { ApiError, BizCode } from "@vibevalley/protocol/api";
@@ -54,9 +54,44 @@ const notFound = async (id: string): Promise<T.RuntimeInfo> => ({
 
 /** The test's clock, moved by the test (adjust) rather than waited on. */
 type TestTime = Time & { readonly adjust: (ms: number) => Promise<void> };
+/** A clock that stands still until adjust moves it on; a sleep wakes once its time has come, and what it wakes runs as
+ * far as it can before adjust returns. */
 const testTime = (start = 0): TestTime => {
-  const c = testClock(start);
-  return { ...wallTime, now: c.now, sleep: c.sleep, adjust: c.adjust };
+  let now = start;
+  const sleepers = new Set<{ readonly at: number; readonly wake: () => void }>();
+  const wakeDue = () => {
+    for (const s of [...sleepers].toSorted((a, b) => a.at - b.at))
+      if (s.at <= now) {
+        sleepers.delete(s);
+        s.wake();
+      }
+  };
+  const sleep = (ms: number, signal?: AbortSignal) => {
+    if (signal?.aborted === true) return Promise.reject(reasonOf(signal));
+    const { promise, resolve, reject } = Promise.withResolvers<void>();
+    const sleeper = { at: now + Math.max(0, ms), wake: resolve };
+    sleepers.add(sleeper);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        sleepers.delete(sleeper);
+        reject(reasonOf(signal));
+      },
+      { once: true },
+    );
+    wakeDue();
+    return promise;
+  };
+  return {
+    ...wallTime,
+    now: () => now,
+    sleep,
+    adjust: async (ms) => {
+      now += ms;
+      wakeDue();
+      for (let i = 0; i < 10; i++) await new Promise<void>((resolve) => setImmediate(resolve));
+    },
+  };
 };
 
 interface World extends AsyncDisposable {

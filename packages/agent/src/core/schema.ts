@@ -1,10 +1,10 @@
 import { z } from "zod";
 
-import { isRecord, jsonText } from "./json.ts";
+import { isRecord, jsonText } from "../base/json.ts";
 
 export type JsonSchema = Readonly<Record<string, unknown>>;
 
-/** An object's parameters in the shape the model has always been shown (brain/tool.ts's objectSchema): no properties is an open object. */
+/** An object's parameters in the shape the model has always been shown: no properties is an open object. */
 export function objectSchema(properties: Record<string, JsonSchema> = {}, ...required: string[]): JsonSchema {
   if (Object.keys(properties).length === 0) return { type: "object", properties: {} };
   return { type: "object", properties, additionalProperties: true, ...(required.length > 0 ? { required } : {}) };
@@ -140,32 +140,4 @@ function coerce(value: unknown, schema: JsonSchema): unknown {
     for (let i = 0; i < next.length; i++) next[i] = coerce(next[i], items);
   }
   return next;
-}
-
-/** A model's arguments for a tool as pi-ai's validateToolArguments takes them. */
-export function toolArguments(name: string, args: unknown, schema: JsonSchema): { readonly ok: unknown } | { readonly refused: string } {
-  const coerced = coerceArguments(args, schema);
-  const problems = problemsOf(coerced, schema, "");
-  if (problems.length === 0) return { ok: coerced };
-  return {
-    refused: `Validation failed for tool "${name}":\n${problems.map((p) => `  - ${p}`).join("\n")}\n\nReceived arguments:\n${jsonText(args, { indent: true })}`,
-  };
-}
-
-const at = (path: string, key: string | number) => (path ? `${path}.${key}` : String(key));
-
-/** TypeBox's messages, for the JSON Schema parametersOf writes: types, required properties, enums, nested. */
-function problemsOf(value: unknown, schema: JsonSchema, path: string): string[] {
-  const types = typesOf(schema);
-  if (types.length > 0 && !types.some((t) => matches(value, t))) return [`${path || "root"}: must be ${types.join(",")}`];
-  if (Array.isArray(schema.enum) && !schema.enum.includes(value)) return [`${path || "root"}: must be equal to one of the allowed values`];
-  if (matches(value, "object") && isRecord(value) && isRecord(schema.properties)) {
-    const object = value;
-    const missing = requiredOf(schema).filter((k) => !(k in object));
-    if (missing[0] !== undefined) return [`${at(path, missing[0])}: must have required properties ${missing.join(", ")}`];
-    return Object.entries(propertiesOf(schema)).flatMap(([k, p]) => (k in object ? problemsOf(object[k], p, at(path, k)) : []));
-  }
-  const items = schema.items;
-  if (Array.isArray(value) && isRecord(items)) return value.flatMap((v, i) => problemsOf(v, items, at(path, i)));
-  return [];
 }

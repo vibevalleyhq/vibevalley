@@ -22,6 +22,7 @@ import type { Setting } from "#/modules/setting/setting.ts";
 
 import { dshRuntime } from "./dsh.ts";
 import { deepseekAccess, type Durable, durableFile, type ModelAccess, openDurable } from "./durable.ts";
+import { type Helpers, makeHelpers } from "./helperExtension.ts";
 import { piBalance, type PiDefault, piSettings } from "./pi.ts";
 import { agentProblems, type Candidate, chooseAgent, supportOf, moneyStop, presetOf, runtimeIds, runtimeLabel, sessionOptions } from "./presets.ts";
 import { inCny, makeSpending, price, type Rate } from "./price.ts";
@@ -70,6 +71,8 @@ export interface Runtime {
   readonly usageSoon: (id: string) => void;
   /** The conversations of the agents that run in this server (the assistant's), kept across restarts. */
   readonly durable: Durable;
+  /** The helpers' side of that harness, which VibeValley's own runtime runs its sessions with. */
+  readonly helpers: Helpers;
   /** Stops the probes and timers, writes the day's spending, closes the sessions of VibeValley's own runtime, then the
    * durable conversations. */
   readonly close: () => Promise<void>;
@@ -162,19 +165,11 @@ export async function makeRuntime(deps: RuntimeDeps, options: RuntimeOptions = {
   // The sessions of VibeValley's own runtime: closed last, after the probes and the spending.
   const owner = new TaskGroup({ name: "runtime sessions", onError: (task, e) => log.error(`${task} failed`, e) });
   const models = options.models ?? deepseekAccess({ key: deps.setting.deepseekApiKey, fetch: deps.fetch, clock });
-  const durable = await openDurable({ file: durableFile(config), clock, log, models });
-  const registry =
-    options.registry ??
-    registryOf([
-      vibevalleyRuntimeOf({
-        durable,
-        time: clock,
-        owner,
-        log,
-        todos: dbTodoStores({ db: deps.db, clock }),
-      }),
-      dshRuntime,
-    ]);
+  // The helpers' extension is there before anything runs: a helper's run the harness goes on with before its session
+  // opens again has its tools and prompt.
+  const helpers = makeHelpers({ todos: dbTodoStores({ db: deps.db, clock }), time: clock, log });
+  const durable = await openDurable({ file: durableFile(config), clock, log, models, extensions: [helpers.extension] });
+  const registry = options.registry ?? registryOf([vibevalleyRuntimeOf({ durable, helpers, owner, log }), dshRuntime]);
   const tasks = new TaskGroup({ name: "runtime", onError: (task, e) => log.warn(`${task} failed`, e) });
   const usageOf = async (id: string, runtime: OarRuntime, found: AvailableInstallation, settings: T.RuntimeSettings): Promise<T.AccountUsage | null> => {
     if (!options.usageOf && id === "pi") return piBalance(settings, process.env);
@@ -523,6 +518,7 @@ export async function makeRuntime(deps: RuntimeDeps, options: RuntimeOptions = {
       later(`usage:${id}`, usageAfterRunMs, () => warned(`reading the usage of ${id}`, () => refreshUsage(id)));
     },
     durable,
+    helpers,
     close: async () => {
       closed = true;
       await tasks.close();

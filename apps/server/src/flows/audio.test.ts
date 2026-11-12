@@ -1,13 +1,12 @@
 import { expect, test } from "vite-plus/test";
 
-import { messageText } from "@vibevalley/agent/messages";
-import { scriptedLLM } from "@vibevalley/agent/testing";
-import { answer, toolCall } from "@vibevalley/ai/testing";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { orchestrator, worker } from "#/base/actor.ts";
 import type { Provider } from "#/modules/provider/provider.ts";
+import { messageText } from "#/modules/runtime/durable.ts";
 import { until, waitFor } from "#/testing/layers.ts";
+import { answer, scriptedLLM, toolCall } from "#/testing/model.ts";
 
 import { failure, mediaFarm } from "./farm.ts";
 

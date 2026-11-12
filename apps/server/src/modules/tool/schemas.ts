@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 import { ToolFailed } from "@vibevalley/agent/core/errors";
+import type { JsonSchema } from "@vibevalley/agent/core/schema";
 import { runTool } from "@vibevalley/agent/core/tool";
-import type { JsonSchema } from "@vibevalley/ai/tools";
 import { isAbort } from "@vibevalley/async";
 import {
   ArtifactDisplayValues,

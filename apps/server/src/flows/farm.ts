@@ -1,7 +1,6 @@
 import { type Runtime } from "@botiverse/oar";
 import type { ScriptedTurn } from "@botiverse/oar/testing";
 
-import type { ModelClient } from "@vibevalley/ai/client";
 import type * as T from "@vibevalley/protocol";
 
 import type { ServerConfig } from "#/infra/config.ts";
@@ -11,6 +10,7 @@ import { type Hired } from "#/modules/session/session.ts";
 import { agentSessionsBoot, channelBoot, gamification, inboxBoot, mailboxBoot, mediaBoot } from "#/services.ts";
 import { gitIn } from "#/testing/git.ts";
 import { starter, testConfig, until as untilHeld, waitFor } from "#/testing/layers.ts";
+import { type ScriptedModel } from "#/testing/model.ts";
 import { network } from "#/testing/network.ts";
 import { helper } from "#/testing/worker.ts";
 import { type World, world, type WorldOptions } from "#/testing/world.ts";
@@ -112,7 +112,7 @@ export async function failure(p: Promise<unknown>): Promise<Error & { readonly b
 
 /** The farm up to its tools on the offline vendors (testing/network.ts), and the orchestrator answering with llm; no
  * startup. */
-export async function mediaFarm(llm: ModelClient) {
+export async function mediaFarm(llm: ScriptedModel) {
   const w = await world({ config: testConfig({ patrol: { heartbeatMinutes: 0 } }), network: network() });
   try {
     w.deepseek.use(llm);

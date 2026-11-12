@@ -94,7 +94,7 @@
 | 层 | 入口 | 真实部分 | 替身端口 | 预算 | 位置 |
 |---|---|---|---|---|---|
 | 规则 | 纯函数 | 被测代码 | 无 | 20ms | 不碰库、进程、网络的 `*.test.ts` |
-| 模块 | 模块服务接口 | 当前及下层模块、内存库、真 git | `scriptedRuntime`、假 `Llm`、假聊天/声网 | 300ms | `apps/server/src/<模块>/*.test.ts` |
+| 模块 | 模块服务接口 | 当前及下层模块、内存库、真 git | `scriptedRuntime`、照脚本回答的 DeepSeek、假聊天/声网 | 300ms | `apps/server/src/<模块>/*.test.ts` |
 | 流程 | `flows/farm.ts` | 全部服务端模块与真 git | 同上 | 2s | `apps/server/src/flows/*.test.ts` |
 | 浏览器组件 | 组件 DOM 与 owner | Chromium、Solid、真实组件 | 故事数据，无服务端 | 3s | `apps/web/test/stories.spec.ts` |
 | 页面 | HTTP 与 SSE | 真服务端进程 + Chromium | 脚本化帮工、无外部密钥 | 3s | `apps/web/test/projects.ts` 的 integration 项目 |

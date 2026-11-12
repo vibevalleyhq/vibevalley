@@ -1,11 +1,10 @@
 import { expect, test } from "vite-plus/test";
 
-import { scriptedLLM } from "@vibevalley/agent/testing";
-import { answer } from "@vibevalley/ai/testing";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { waitFor } from "#/testing/layers.ts";
+import { answer, scriptedLLM } from "#/testing/model.ts";
 import { sqlOf } from "#/testing/sql.ts";
 import { moduleWorld, testIssues } from "#/testing/world.ts";
 

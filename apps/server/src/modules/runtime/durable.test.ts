@@ -1,8 +1,8 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
+import { type AssistantMessage } from "@earendil-works/pi-ai";
 import { defineExtension, defineTool } from "@earendil-works/pi-durable";
 import { describe, expect, test } from "vite-plus/test";
 
-import type { AssistantMessage } from "@vibevalley/ai/messages";
 import { Secret } from "@vibevalley/protocol/schema";
 
 import { keptLog } from "#/infra/log.ts";

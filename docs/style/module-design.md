@@ -206,7 +206,7 @@ Clock 的读取不应推进时间；同刻事件的顺序应由业务已有的�
 | 交错控制 | `Promise.withResolvers()`、[gate](packages/testkit/src/until.ts) | 挡住明确的一步；不靠缩短业务超时制造竞争 |
 | 状态与事件观察 | `Subscription`、`AsyncIterable`、[whenState](apps/server/src/testing/layers.ts) | 确认订阅和匹配目标；不假设全系统能被 drain |
 | 真实边界等待 | [waitFor 与 within](packages/testkit/src/until.ts) | 有界等待和防挂死，不替代业务完成契约 |
-| 外部 agent 与模型 | oar 的 scriptedRuntime、[模型替身](packages/ai/src/testing/testing.ts)、[agent 夹具](packages/agent/src/testing/testing.ts) | 控制端口协议，不复制业务；意外调用应失败 |
+| 外部 agent 与模型 | oar 的 scriptedRuntime、[模型替身](apps/server/src/testing/model.ts)（经 [testing/deepseek.ts](apps/server/src/testing/deepseek.ts) 坐上 Harness） | 控制端口协议，不复制业务；意外调用应失败 |
 | 浏览器时间与交互 | Playwright Clock、组件与页面测试 | 浏览器时间独立于服务端；截图不证明动态行为 |
 | 边界防退化 | [lint](scripts/audit/oxlint-plugin.ts)、[全仓实践审计](scripts/audit/practice-audit.ts)、[服务路径](scripts/audit/service-paths.ts)与[协议导出面](scripts/audit/protocol-surface.ts)棘轮、[模块检查](apps/server/src/modules.test.ts)与 health 棘轮 | 检查守住已确定的边界，不用行数或覆盖率指标代替设计判断 |
 

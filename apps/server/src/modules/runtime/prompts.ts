@@ -15,3 +15,8 @@ export const helperWords = {
   emptyBrief: "brief 是空的。",
   noAnswer: (label: string, why: string) => "帮手「" + label + "」没有交回结果（" + why + "）。",
 };
+
+/** What a tool of a conversation left mid-run answers while the host it belongs to has not opened it again (durable.ts). */
+export const durableWords = {
+  notOpen: (tool: string) => "工具 " + tool + " 这会儿用不了：服务端重启了，它所在的会话还没重新打开。不要再调它；能用别的办法就用别的，做不了的在回答里说明。",
+};

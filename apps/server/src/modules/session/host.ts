@@ -2,10 +2,12 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
+import type { AssistantMessage, Message, Usage } from "@earendil-works/pi-ai";
 import {
   type Conversation,
   type ConversationView,
   type ConversationWatch,
+  type Cursor,
   defineExtension,
   type EntryId,
   type EntryRecord,
@@ -13,13 +15,10 @@ import {
 } from "@earendil-works/pi-durable";
 import { z } from "zod";
 
-import type { CoreEvent } from "@vibevalley/agent/brain";
-import type { Tool } from "@vibevalley/agent/core/loop";
+import type { Tool } from "@vibevalley/agent/core/tool";
 import { type MemoryPort } from "@vibevalley/agent/memory";
-import { type BrainMessage, customMessage, messageText } from "@vibevalley/agent/messages";
 import { selfTools } from "@vibevalley/agent/self";
 import { scanSkills, skillIndex } from "@vibevalley/agent/skills";
-import { type AssistantMessage, AssistantMessageSchema, ToolResultMessageSchema, type Usage, UserMessageSchema, zeroUsage } from "@vibevalley/ai/messages";
 import { abortable, Semaphore, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -30,9 +29,9 @@ import { newId } from "#/base/ids.ts";
 import { type Core } from "#/core/core.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import { type DeepSeekModel, type Durable, durableTool, entryMessage } from "#/modules/runtime/durable.ts";
+import { type DeepSeekModel, type Durable, durableTool, entryMessage, messageText, type ModelMessage } from "#/modules/runtime/durable.ts";
 
-import { makeInProcessRun, NotRecorded, RunBusy, type RunInput } from "./inProcessRun.ts";
+import { makeInProcessRun, NotRecorded, RunBusy, type RunEvent, type RunInput } from "./inProcessRun.ts";
 import type { Journal } from "./journal.ts";
 import { hostWords } from "./prompts.ts";
 import type { ToolStart } from "./reaction.ts";
@@ -275,6 +274,15 @@ const answerIn = (e: EntryRecord): AssistantMessage | undefined => {
   return m?.role === "assistant" ? m : undefined;
 };
 
+const zeroUsage = (): Usage => ({
+  input: 0,
+  output: 0,
+  cacheRead: 0,
+  cacheWrite: 0,
+  totalTokens: 0,
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+});
+
 /** The message a run that ended without one says it with: why it failed, or that it was stopped. */
 const endedWith = (stopReason: "error" | "aborted", why: string, at: number): AssistantMessage => ({
   role: "assistant",
@@ -319,6 +327,10 @@ export async function makeHost<R>(
   const skills = () => scanSkills(o.skills ?? []);
   const tools = [...o.tools(() => current().route), ...selfTools({ now: () => clock.now(), home: o.home, skills, memory: o.memory, log: logger })];
   // The assistant's prompt, part by part as its own loop wrote it; a part that changes is sent again as itself.
+  const routeOf = (data: z.infer<typeof InputData>): R =>
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- an entry of this host's input kind carries the route this host put in it
+    data.route as R;
+
   const extension = defineExtension({
     name: `vibevalley.${o.session.id}`,
     tools: tools.map(durableTool),
@@ -347,6 +359,10 @@ export async function makeHost<R>(
     ],
   });
   durable.registry.install(extension);
+  // The route of the newest input as the conversation kept it: a run the harness goes on with before this host starts
+  // calls its tools with it.
+  const keptRoute = await newestRoute(durable, o.session.id, o.inputType);
+  if (keptRoute !== undefined) input = { route: routeOf(keptRoute), run: { by: { kind: "" } } };
 
   const current = (): Hosted<R> => input;
 
@@ -409,7 +425,7 @@ export async function makeHost<R>(
     journal.usage(tokens, usageText(tokens, []));
   };
 
-  const observe = async (e: CoreEvent, run?: RunInput) => {
+  const observe = async (e: RunEvent, run?: RunInput) => {
     try {
       await inProcess.observe(e, run);
     } catch (err) {
@@ -422,10 +438,6 @@ export async function makeHost<R>(
   let seen: EntryId | undefined;
   const toolsStarted = new Set<string>();
 
-  const routeOf = (data: z.infer<typeof InputData>): R =>
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- an entry of this host's input kind carries the route this host put in it
-    data.route as R;
-
   const placed = async (e: EntryRecord, live: LiveView | undefined) => {
     const data = InputData.parse(e.data);
     if (run._tag === "running" && (run.answered || e.id === live?.run?.first)) await ended(undefined);
@@ -434,7 +446,7 @@ export async function makeHost<R>(
     const next = local.get(data.key) ?? { route: routeOf(data), run: { by: { kind: "" } } };
     local.delete(data.key);
     going().answered = false;
-    await observe({ type: "message_start", message: customMessage(o.inputType, user ? messageText(user) : "", at, { details: data.route }) }, next.run);
+    await observe({ type: "message_start", message: { role: "user", content: user ? messageText(user) : "", timestamp: at } }, next.run);
     if (input.caller && input.caller !== next.caller) input.caller.end();
     input = next;
     toCaller = 0;
@@ -724,21 +736,50 @@ export async function makeHost<R>(
   };
 }
 
-/** The model's messages as packages/ai's, its prompt left out. */
-function modelMessages(messages: readonly unknown[]): BrainMessage[] {
-  const out: BrainMessage[] = [];
-  for (const m of messages) {
-    const read = z.union([UserMessageSchema, AssistantMessageSchema, ToolResultMessageSchema]).safeParse(m);
-    if (read.success) out.push(read.data);
-  }
-  return out;
+/** What the newest input of inputType in key's conversation carries, if it has one. */
+async function newestRoute(durable: Durable, key: string, inputType: string): Promise<z.infer<typeof InputData> | undefined> {
+  const found = await durable.existing(key);
+  if (!found) return undefined;
+  let cursor: Cursor | undefined;
+  do {
+    const page = await found.entries({ order: "descending" }, 100, cursor, context);
+    const input = page.items.find((e) => e.kind === inputType);
+    if (input !== undefined) {
+      const data = InputData.safeParse(input.data);
+      return data.success ? data.data : undefined;
+    }
+    cursor = page.next;
+  } while (cursor !== undefined);
+  return undefined;
 }
 
-/** A hosted input's entry as its own loop kept it: a custom message of the input kind, with its route. */
-function inputMessage(e: EntryRecord, inputType: string): BrainMessage {
+/** A hosted input in an eval case, as it was kept: the input's kind, its words and its route. */
+export interface CaseInput {
+  readonly role: "custom";
+  readonly customType: string;
+  readonly content: string;
+  readonly display: boolean;
+  readonly details?: unknown;
+  readonly timestamp: number;
+}
+
+/** The model's messages, its prompt left out. */
+function modelMessages(messages: readonly Message[]): ModelMessage[] {
+  return messages.filter((m): m is ModelMessage => m.role !== "system");
+}
+
+/** A hosted input's entry as an eval case keeps it: a message of the input kind, with its route. */
+function inputMessage(e: EntryRecord, inputType: string): CaseInput {
   const user = entryMessage(e);
   const data = InputData.safeParse(e.data);
-  return customMessage(inputType, user ? messageText(user) : "", user?.timestamp ?? 0, data.success ? { details: data.data.route } : {});
+  return {
+    role: "custom",
+    customType: inputType,
+    content: user ? messageText(user) : "",
+    display: true,
+    ...(data.success ? { details: data.data.route } : {}),
+    timestamp: user?.timestamp ?? 0,
+  };
 }
 
 /** The newest input of this host's kind asked by then whose words hold text (cut with … in the log). */
@@ -754,8 +795,8 @@ function turnAt(entries: readonly EntryRecord[], text: string, time: number, inp
 }
 
 /** What the model did after an input, until the next one. */
-function turnOf(rest: readonly EntryRecord[], inputType: string): BrainMessage[] {
-  const out: BrainMessage[] = [];
+export function turnOf(rest: readonly EntryRecord[], inputType: string): ModelMessage[] {
+  const out: ModelMessage[] = [];
   for (const e of rest) {
     if (e.kind === inputType) break;
     if (e.kind !== "pi.assistant" && e.kind !== "pi.tool-result") continue;

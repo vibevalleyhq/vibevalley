@@ -1,31 +1,14 @@
 import { defineRuntime, type McpServer as OarMcpServer, type SessionOptions, type TurnOutcome, UnsupportedOptionError } from "@botiverse/oar";
 import { createSessionKernel, inputImagesRefusal, sealSession, withdrawHeld } from "@botiverse/oar/kernel";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import {
-  configure,
-  ConversationBusy,
-  ConversationIdle,
-  type ConversationView,
-  defineExtension,
-  defineTool,
-  type EntryId,
-  type EntryRecord,
-  section,
-  type ToolRegistration,
-} from "@earendil-works/pi-durable";
-import { createBashTool, createEditTool, createReadTool, createWriteTool } from "@earendil-works/pi-durable/tools";
+import type { AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai";
+import { ConversationBusy, ConversationIdle, type ConversationView, defineExtension, type EntryId, type EntryRecord } from "@earendil-works/pi-durable";
 import { z } from "zod";
 
 import { ToolFailed, toolFailed } from "@vibevalley/agent/core/errors";
 import { connectAll, type McpServer } from "@vibevalley/agent/mcp";
-import type { MemoryPort } from "@vibevalley/agent/memory";
-import { messageText } from "@vibevalley/agent/messages";
-import { selfTools, subagentInstructions, subagentTool } from "@vibevalley/agent/self";
-import { defaultSkillDirs, scanSkills, skillIndex } from "@vibevalley/agent/skills";
 import { finished, type Todo } from "@vibevalley/agent/todo";
 import type { TodoStore } from "@vibevalley/agent/todoStore";
-import { todoTools, watchedStore } from "@vibevalley/agent/todoTools";
-import type { AssistantMessage, ToolResultMessage } from "@vibevalley/ai/messages";
 import { abortable, type Clock, isAbort, type TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import { isOneOf } from "@vibevalley/protocol/rules";
@@ -34,19 +17,17 @@ import { newId } from "#/base/ids.ts";
 import { storedJsonOrUndefined } from "#/base/json.ts";
 import type { Db } from "#/infra/db.ts";
 import type { Logger } from "#/infra/log.ts";
-import type { Time } from "#/infra/time.ts";
 import * as q from "#db/runtime_todo.sql.ts";
 
-import { deepseekModels, defaultModel, type Durable, durableTool, entryMessage } from "./durable.ts";
-import { helperInstructions, helperWords } from "./prompts.ts";
+import { deepseekModels, defaultModel, type Durable, durableTool, entryMessage, messageText } from "./durable.ts";
+import type { Helpers } from "./helperExtension.ts";
+import { helperInstructions } from "./prompts.ts";
 
 const vibevalleyRuntime = "vibevalley";
 
 /** DeepSeek's two. */
 const efforts = ["high", "max"] as const;
 
-/** A command the model gives no time limit ends after it: two minutes, as the agent's own bash always had. */
-const commandTimeoutSeconds = 120;
 /** The tool rounds one turn takes at most, as the agent's own loop had. */
 const maxTurns = 40;
 
@@ -60,12 +41,8 @@ export const helperKey = (session: string) => `helper:${session}`;
 export interface RuntimeOptions {
   /** The harness the sessions' conversations are kept in, and the model they ask. */
   readonly durable: Durable;
-  /** Where a session keeps its own todos; absent, it keeps none. */
-  readonly todos?: (session: string) => TodoStore;
-  /** What the agent remembers, with the tools to add to it; absent, it remembers nothing. */
-  readonly memory?: MemoryPort;
-  /** The sessions' clock: the Runtime service's, or the wall clock on the command line. */
-  readonly time: Time;
+  /** The helpers' extension the harness opened with. */
+  readonly helpers: Helpers;
   /** The caller's tasks: closing them stops each session's turn and lets the session go. */
   readonly owner: TaskGroup;
   /** Where a send or a stop that fails in the background is said. */
@@ -81,71 +58,6 @@ const toMcp = (s: OarMcpServer): McpServer =>
         ...(s.args ? { args: [...s.args] } : {}),
         ...(s.env ? { env: { ...s.env } } : {}),
       };
-
-/** The environment a command runs with: the server's, with the session's variables over it (null takes one away). */
-function commandEnv(env: Readonly<Record<string, string | null>> = {}): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [k, v] of Object.entries(process.env)) if (v !== undefined) out[k] = v;
-  for (const [k, v] of Object.entries(env)) {
-    if (v === null) delete out[k];
-    else out[k] = v;
-  }
-  return out;
-}
-
-/** pi-durable's read, write, edit and bash, in the conversation's working directory; bash with the session's variables
- * and a time limit when the model gives none. */
-function codingTools(env: Readonly<Record<string, string | null>> | undefined): ToolRegistration[] {
-  const vars = commandEnv(env);
-  const bash = createBashTool({
-    prepare: (execution) => {
-      execution.env = { ...vars };
-      execution.inheritEnv = false;
-    },
-  });
-  const timed: typeof bash = {
-    ...bash,
-    execute: (args, api, called) => bash.execute({ ...args, timeout: args.timeout ?? commandTimeoutSeconds }, api, called),
-  };
-  return [createReadTool(), createWriteTool(), createEditTool(), timed];
-}
-
-const SpawnArgs = z.object({ brief: z.string(), label: z.exactOptional(z.string()) });
-
-/** spawn_agent as a child conversation the call owns: it starts as a copy of the helper, without spawn_agent, and its
- * answer is the result. A restart finds the same child and the same input again. */
-function spawnAgentTool(): ToolRegistration {
-  const shape = subagentTool(async () => "");
-  const tool: ToolRegistration = defineTool({
-    name: shape.name,
-    description: shape.description,
-    parameters: shape.parameters,
-    replay: "safe",
-    execute: async (args, api, called) => {
-      const p = SpawnArgs.parse(args);
-      const label = p.label ?? [...p.brief].slice(0, 20).join("");
-      if (!p.brief.trim()) return { output: [{ type: "text", text: helperWords.emptyBrief }], isError: true };
-      const child = await api.commit(async (tx) => {
-        const had = (await tx.scanConversations({ ownerTaskId: api.taskId }, 1)).items[0];
-        if (had !== undefined) return had.id;
-        const made = await tx.createConversation({ ownership: { kind: "task", taskId: api.taskId } });
-        await configure(tx, made.id, { tools: { remove: [tool] }, instructions: subagentInstructions("helper") });
-        return made.id;
-      }, called);
-      const handle = await api.conversation(child, called);
-      if (!handle) throw new Error(`spawn_agent: its conversation ${child} is gone`);
-      const settled = await (await handle.submit({ type: "input", content: p.brief, requestId: `spawn:${api.taskId}` }, called)).wait(called);
-      if (settled.status !== "done" || settled.answer === undefined)
-        return { output: [{ type: "text", text: helperWords.noAnswer(label, settled.reason ?? settled.status) }], isError: true };
-      const answer = settled.answer;
-      const entry = await api.commit((tx) => tx.entry(answer), called);
-      const said = entry === undefined ? undefined : entryMessage(entry);
-      const text = said?.role === "assistant" ? messageText(said).trim() : "";
-      return { output: [{ type: "text", text: text || helperWords.noAnswer(label, "") }], ...(text ? {} : { isError: true }) };
-    },
-  });
-  return tool;
-}
 
 /** As much of pi.live as a session follows. */
 const LiveView = z.object({
@@ -178,7 +90,7 @@ const spent = (view: ConversationView): Tokens => {
 const contextOf = (m: AssistantMessage) => m.usage.input + m.usage.cacheRead + m.usage.output;
 
 export function vibevalleyRuntimeOf(options: RuntimeOptions) {
-  const { durable, owner, log } = options;
+  const { durable, helpers, owner, log } = options;
 
   const start = async (_installation: unknown, o: SessionOptions) => {
     // oar's refusableOrder, for these two.
@@ -199,60 +111,28 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
 
     const mcp = await connectAll((o.mcpServers ?? []).map(toMcp), log);
     for (const why of mcp.failed) log.warn(`vibevalley runtime: an MCP server of ${kernel.sessionId} did not connect: ${why}`);
+    let unwatch: (() => void) | undefined;
+    // The session's MCP servers are its own processes: their tools, as this extension, run only while it is open.
+    const servers = defineExtension({ name: `vibevalley.mcp.${key}`, tools: mcp.tools.map(durableTool) });
     try {
-      const store = options.todos?.(kernel.sessionId);
       // oar has no event for a todo: the graph goes in the raw record, where the session's trajectory keeps it.
-      const todos = store
-        ? todoTools(
-            watchedStore(store, (g) => frame("vibevalley/todos", { todos: finished(g) ? [] : g })),
-            false,
-            async () => {},
-          )
-        : [];
-      const skills = () => scanSkills(defaultSkillDirs(o.cwd));
-      const own = selfTools({ now: () => options.time.now(), home: o.cwd, skills, memory: options.memory ?? false, log }).filter(
-        (s) => s.name !== "search_archive",
-      );
+      unwatch = helpers.watch(kernel.sessionId, (todos) => frame("vibevalley/todos", { todos }));
+      durable.registry.install(servers);
       const disallowed = new Set(o.disallowedTools ?? []);
-      const tools = [...codingTools(o.env), ...[...mcp.tools, ...todos, ...own].map(durableTool), spawnAgentTool()].filter((s) => !disallowed.has(s.name));
-      const memory = options.memory;
-      const extension = defineExtension({
-        name: `vibevalley.${key}`,
-        tools,
-        sections: [
-          section("helper", () => instructions.trim() || undefined, { tag: false }),
-          section("env", () => helperWords.env(o.cwd), { tag: false }),
-          section(
-            "skills",
-            async () => {
-              const found = await skills();
-              return found.length > 0 ? helperWords.skills(skillIndex(found)) : undefined;
-            },
-            { tag: false },
-          ),
-          ...(memory
-            ? [
-                section(
-                  "memory",
-                  async () => {
-                    const read = await memory.read();
-                    return read.prompt ? helperWords.memory(read.prompt) : undefined;
-                  },
-                  { tag: false },
-                ),
-              ]
-            : []),
-        ],
-      });
-      durable.registry.install(extension);
-      const conversation = await durable.conversation(key, {
-        model: model.ref,
-        extensions: [extension],
-        // DeepSeek's own two: pi-ai sends high and max as themselves.
-        thinkingLevel: effort ?? "off",
-        cwd: o.cwd,
-        maxTurns,
-      });
+      const removed = [...(helpers.extension.tools ?? []), ...(servers.tools ?? [])].filter((t) => disallowed.has(t.name));
+      const conversation = await durable.conversation(
+        key,
+        {
+          model: model.ref,
+          extensions: [helpers.extension, servers],
+          // DeepSeek's own two: pi-ai sends high and max as themselves.
+          thinkingLevel: effort ?? "off",
+          cwd: o.cwd,
+          maxTurns,
+          tools: removed.length > 0 ? { remove: removed } : null,
+        },
+        (tx, id) => helpers.keep(tx, id, { session: kernel.sessionId, instructions, env: o.env ?? {} }),
+      );
       const watch = await conversation.watch(context);
 
       /** A turn this session tells of is under way: from the input it took (or the run it found going) to the run's end. */
@@ -442,7 +322,8 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
           }
           await watch.stop();
           disposed = true;
-          if (durable.registry.snapshot().extension(extension.name) === extension) durable.registry.uninstall(extension);
+          unwatch?.();
+          if (durable.registry.snapshot().extension(servers.name) === servers) durable.registry.uninstall(servers);
           await mcp.close();
           end({ kind: "aborted" });
           kernel.respond(request.id, { kind: "exited", code: 0 });
@@ -509,6 +390,8 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
         dispose,
       });
     } catch (cause) {
+      unwatch?.();
+      if (durable.registry.snapshot().extension(servers.name) === servers) durable.registry.uninstall(servers);
       await mcp.close();
       throw cause;
     }

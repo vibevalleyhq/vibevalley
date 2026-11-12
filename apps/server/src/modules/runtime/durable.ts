@@ -3,10 +3,13 @@ import { join } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import {
   type Api,
-  type AssistantMessage as PiAssistantMessage,
+  type AssistantMessage,
   type AssistantMessageEventStream,
   createAssistantMessageEventStream,
   createModels,
+  getCurrentSystemMessage,
+  getCurrentTools,
+  type Message,
   type Model as PiModel,
   type Provider,
   type SimpleStreamOptions,
@@ -15,27 +18,31 @@ import {
 import { deepseekProvider } from "@earendil-works/pi-ai/providers/deepseek";
 import {
   type AgentChange,
+  AgentDoc,
   configure,
   type Conversation,
   type ConversationId,
   createRegistry,
   type EntryRecord,
   defineDoc,
+  defineExtension,
   defineTool,
+  type Extension,
   Harness,
   InboxDoc,
   LiveDoc,
   MemoryStorage,
   type ModelRef,
   type Registry,
+  section,
+  type Tx,
   type ToolRegistration,
 } from "@earendil-works/pi-durable";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 
 import { ToolFailed } from "@vibevalley/agent/core/errors";
-import type { Tool } from "@vibevalley/agent/core/loop";
-import { AssistantMessageSchema, type Message, ToolResultMessageSchema, UserMessageSchema } from "@vibevalley/ai/messages";
+import type { Tool } from "@vibevalley/agent/core/tool";
 import type { Secret } from "@vibevalley/protocol/schema";
 
 import { dbDir, type ServerConfig } from "#/infra/config.ts";
@@ -43,13 +50,16 @@ import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import { noDeepSeekKey } from "#/modules/agent/agent.ts";
 
+import { durableWords } from "./prompts.ts";
+
 /** The farm's one durable harness: every conversation of an agent that runs in this server, kept in durable.db. */
 export interface Durable {
   readonly harness: Harness;
   readonly registry: Registry;
   /** The conversation kept for key (a session's id), made with agent the first time it is asked for; agent is applied
-   * again each time, so a changed extension or model is taken up. */
-  readonly conversation: (key: string, agent: AgentChange) => Promise<Conversation>;
+   * again each time, so a changed extension or model is taken up. init writes the host's own documents in the same
+   * commit. */
+  readonly conversation: (key: string, agent: AgentChange, init?: (tx: Tx, id: ConversationId) => Promise<void>) => Promise<Conversation>;
   /** The conversation kept for key, if one was ever made. */
   readonly existing: (key: string) => Promise<Conversation | undefined>;
   /** Whether key's conversation has a run, or input waiting for one, that the harness goes on with once it runs. */
@@ -77,6 +87,9 @@ export interface ModelAccess {
 export interface DurableDeps {
   /** The SQLite file the conversations are kept in; none keeps them in memory. */
   readonly file: string | undefined;
+  /** In the registry before anything runs: the extensions whose conversations the harness may go on with before their
+   * host opens them again (a helper's). */
+  readonly extensions?: readonly Extension[];
   readonly clock: Time;
   readonly log: Logger;
   readonly models: ModelAccess;
@@ -143,7 +156,7 @@ export function deepseekAccess(deps: { readonly key: () => Secret | undefined; r
 /** An answer that failed before it was asked: why is what the run ends with. */
 function failedAnswer(model: PiModel<Api>, why: string, at: number): AssistantMessageEventStream {
   const out = createAssistantMessageEventStream();
-  const error: PiAssistantMessage = {
+  const error: AssistantMessage = {
     role: "assistant",
     content: [],
     api: model.api,
@@ -189,37 +202,41 @@ export async function openDurable(deps: DurableDeps): Promise<Durable> {
     },
     context,
   );
+  for (const extension of deps.extensions ?? []) registry.install(extension);
 
   const existing = async (key: string) => {
     const id = (await harness.snapshot(Kept, context))?.conversations[key];
     return id === undefined ? undefined : harness.conversation(id, context);
   };
 
-  const conversation = async (key: string, agent: AgentChange) => {
+  const conversation = async (key: string, agent: AgentChange, init?: (tx: Tx, id: ConversationId) => Promise<void>) => {
     const id = await harness.commit(async (tx) => {
       const kept = await tx.doc(Kept);
       const had = kept.conversations[key];
-      if (had !== undefined) {
-        await configure(tx, had, agent);
-        return had;
-      }
-      const made = await tx.createConversation({ ownership: { kind: "ownerless" } });
-      kept.conversations[key] = made.id;
-      await configure(tx, made.id, agent);
-      return made.id;
+      const id = had ?? (await tx.createConversation({ ownership: { kind: "ownerless" } })).id;
+      kept.conversations[key] = id;
+      await configure(tx, id, agent);
+      await init?.(tx, id);
+      return id;
     }, context);
     const found = await harness.conversation(id, context);
     if (!found) throw new Error(`the conversation of ${key} is not in durable.db`);
     return found;
   };
 
-  const busy = async (key: string) => {
-    const found = await existing(key);
-    if (!found) return false;
-    const live = await harness.snapshot(LiveDoc, found.id, context);
-    const inbox = await harness.snapshot(InboxDoc, found.id, context);
+  const pending = async (id: ConversationId) => {
+    const live = await harness.snapshot(LiveDoc, id, context);
+    const inbox = await harness.snapshot(InboxDoc, id, context);
     return live?.run !== undefined || (inbox?.items.some((item) => item.mode !== "write") ?? false);
   };
+  const busy = async (key: string) => {
+    const found = await existing(key);
+    return found !== undefined && (await pending(found.id));
+  };
+
+  // Before anything runs: an extension a conversation left mid-run selects that no host has installed yet is stood in for
+  // from its transcript, so its tools and prompt never vanish from the run that goes on.
+  for (const id of Object.values((await harness.snapshot(Kept, context))?.conversations ?? {})) if (await pending(id)) await standIn(harness, registry, id);
 
   const model = (id: string): DeepSeekModel => {
     const found = deepseekModels.find((m) => m.id === id) ?? deepseekModels.find((m) => m.id === defaultModel);
@@ -234,20 +251,55 @@ export async function openDurable(deps: DurableDeps): Promise<Durable> {
   return { harness, registry, conversation, existing, busy, model, cannotAsk: deps.models.cannotAsk, close };
 }
 
-/** An entry's one model message, read as packages/ai's; undefined for an entry the model does not see. */
-export function entryMessage(e: EntryRecord): Message | undefined {
+/** The extensions conv selects that are not installed, each as it last showed itself to the model: the tools and
+ * prompt sections in the transcript that no installed extension of conv's gives. A tool answers that it cannot run until
+ * its host opens the conversation again; a section stays as it was shown. Its host's install replaces it (the same name). */
+async function standIn(harness: Harness, registry: Registry, conv: ConversationId) {
+  const names = (await harness.snapshot(AgentDoc, conv, context))?.extensions;
+  if (!Array.isArray(names)) return;
+  const installed = names.flatMap((n) => registry.snapshot().extension(n) ?? []);
+  const missing = names.filter((n) => registry.snapshot().extension(n) === undefined);
+  const found = missing.length === 0 ? undefined : await harness.conversation(conv, context);
+  if (!found) return;
+  const { messages } = await found.context(context);
+  const given = new Set(installed.flatMap((e) => (e.tools ?? []).map((t) => t.name)));
+  const shown = new Set(installed.flatMap((e) => (e.sections ?? []).map((s) => s.key)));
+  const tools = getCurrentTools(messages).filter((t) => !given.has(t.name));
+  // pi-durable's own section: the conversation's instructions, rendered whatever is installed.
+  const keys = Object.keys(getCurrentSystemMessage(messages)?.sections ?? {}).filter((k) => !shown.has(k) && k !== "instructions");
+  // Which missing extension gave what is not in the transcript: the first stands in for all of it.
+  for (const [i, name] of missing.entries())
+    registry.install(
+      defineExtension({
+        name,
+        tools: (i === 0 ? tools : []).map((t) =>
+          defineTool({
+            name: t.name,
+            description: t.description,
+            parameters: t.parameters,
+            execute: async () => ({ output: [{ type: "text", text: durableWords.notOpen(t.name) }], isError: true }),
+          }),
+        ),
+        sections: (i === 0 ? keys : []).map((key) => section(key, (input) => input.shown[key], { tag: false })),
+      }),
+    );
+}
+
+/** A message the model sees, as an entry holds it: a user's, an answer, or a tool's result. */
+export type ModelMessage = Exclude<Message, { readonly role: "system" }>;
+
+/** An entry's one model message; undefined for an entry the model does not see. */
+export function entryMessage(e: EntryRecord): ModelMessage | undefined {
   const m = e.model?.[0];
-  if (m === undefined) return undefined;
-  switch (m.role) {
-    case "user":
-      return UserMessageSchema.parse(m);
-    case "assistant":
-      return AssistantMessageSchema.parse(m);
-    case "toolResult":
-      return ToolResultMessageSchema.parse(m);
-    case "system":
-      return undefined;
-  }
+  return m === undefined || m.role === "system" ? undefined : m;
+}
+
+/** A message's words: its text parts, one after another. */
+export function messageText(m: ModelMessage): string {
+  if (typeof m.content === "string") return m.content;
+  let out = "";
+  for (const c of m.content) if (c.type === "text") out += c.text;
+  return out;
 }
 
 /** One of our tools, as a conversation calls it: a ToolFailed it throws is the failed result the model reads. It may

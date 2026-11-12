@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { rmSync } from "node:fs";
 import { readFile, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,25 +7,26 @@ import { join } from "node:path";
 import type { Event, Session } from "@botiverse/oar";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 
-import { lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf } from "@vibevalley/agent/testing";
-import type { ModelClient } from "@vibevalley/ai/client";
-import { answer, text as words, toolCall } from "@vibevalley/ai/testing";
 import { TaskGroup } from "@vibevalley/async";
+import { tempDir } from "@vibevalley/testkit/temp";
 import { whenTrue } from "@vibevalley/testkit/until";
 
 import { keptLog } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
 import { noDeepSeekKey } from "#/modules/agent/agent.ts";
 import { type ScriptedDeepSeek, scriptedDeepSeek } from "#/testing/deepseek.ts";
+import { answer, lastUser, type Request, scriptedLLM, type ScriptedModel, type Step, systemPrompt, text as words, toolCall, toolsOf } from "#/testing/model.ts";
 
 import { type Durable, openDurable } from "./durable.ts";
+import { type Helpers, makeHelpers } from "./helperExtension.ts";
+import { durableWords } from "./prompts.ts";
 import { helperInstructions, vibevalleyRuntimeOf } from "./vibevalley.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {
-  const h = tempHome();
-  homes.push(h.done);
-  return h.dir;
+  const dir = tempDir("vibevalley-agent-");
+  homes.push(() => rmSync(dir, { recursive: true, force: true }));
+  return dir;
 };
 const sessions: Session[] = [];
 const owners: TaskGroup[] = [];
@@ -37,16 +39,26 @@ const log = keptLog();
 const durables: Durable[] = [];
 /** The scripted DeepSeek each harness asks. */
 const seats = new Map<Durable, ScriptedDeepSeek>();
-/** A harness kept in memory, or in file, asking a scripted DeepSeek with nothing seated yet. */
+/** The helpers' side each harness opened with. */
+const sides = new Map<Durable, Helpers>();
+/** A harness kept in memory, or in file, with the helpers' extension, asking a scripted DeepSeek with nothing seated yet. */
 const durable = async (file?: string) => {
   const seat = scriptedDeepSeek(wallTime);
-  const d = await openDurable({ file, clock: wallTime, log, models: seat.models });
+  const helpers = makeHelpers({ time: wallTime, log });
+  const d = await openDurable({ file, clock: wallTime, log, models: seat.models, extensions: [helpers.extension] });
   durables.push(d);
   seats.set(d, seat);
+  sides.set(d, helpers);
   return d;
 };
+/** VibeValley's runtime on d. */
+const runtimeOn = (d: Durable, owner: TaskGroup) => {
+  const helpers = sides.get(d);
+  if (!helpers) throw new Error("a harness this file did not open");
+  return vibevalleyRuntimeOf({ durable: d, helpers, owner, log });
+};
 /** From now on, d's conversations are answered by llm. */
-const seat = (d: Durable, llm: ModelClient) => {
+const seat = (d: Durable, llm: ScriptedModel) => {
   const found = seats.get(d);
   if (!found) throw new Error("a harness this file did not open");
   found.use(llm);
@@ -57,6 +69,7 @@ afterEach(async () => {
   await Promise.all(durables.splice(0).map((d) => d.close()));
   await Promise.all([...seats.values()].map((s) => s.close()));
   seats.clear();
+  sides.clear();
   for (const done of homes.splice(0)) done();
 });
 
@@ -77,7 +90,7 @@ async function open(
   const d = extra.durable ?? (await durable());
   seat(d, llm);
   const cwd = extra.cwd ?? home();
-  const runtime = vibevalleyRuntimeOf({ durable: d, time: wallTime, owner: owner(), log });
+  const runtime = runtimeOn(d, owner());
   const session = await runtime.session(
     { kind: "available", via: "bundled" },
     {
@@ -101,22 +114,17 @@ const toolStarted = (r: Opened) => r.events.some((e) => e.kind === "tool_call_st
 describe("VibeValley's runtime", () => {
   it("shares the actual close with every concurrent caller", async () => {
     const gate = Promise.withResolvers<void>();
-    const { llm } = scriptedLLM();
     let started = false;
-    const held = {
-      ...llm,
-      service: {
-        ...llm.service,
-        stream: async function* () {
-          started = true;
-          await gate.promise;
-          yield* [];
-        },
+    const held: ScriptedModel = {
+      stream: async function* () {
+        started = true;
+        await gate.promise;
+        yield* [];
       },
     };
     const d = await durable();
     seat(d, held);
-    const runtime = vibevalleyRuntimeOf({ durable: d, time: wallTime, owner: owner(), log });
+    const runtime = runtimeOn(d, owner());
     const session = await runtime.session({ kind: "available", via: "bundled" }, { cwd: home() });
     sessions.push(session);
     const events: Event[] = [];
@@ -145,32 +153,27 @@ describe("VibeValley's runtime", () => {
 
   it("cuts off a runtime's active model when its owner's scope closes", async () => {
     const parent = owner();
-    const { llm } = scriptedLLM();
     let started = false;
     let cut = false;
-    const held = {
-      ...llm,
-      service: {
-        ...llm.service,
-        stream: async function* (_model: unknown, _context: unknown, _options: unknown, signal?: AbortSignal) {
-          started = true;
-          await new Promise<never>((_, reject) =>
-            signal?.addEventListener(
-              "abort",
-              () => {
-                cut = true;
-                reject(signal.reason as unknown);
-              },
-              { once: true },
-            ),
-          );
-          yield* [];
-        },
+    const held: ScriptedModel = {
+      stream: async function* (_request, signal) {
+        started = true;
+        await new Promise<never>((_, reject) =>
+          signal?.addEventListener(
+            "abort",
+            () => {
+              cut = true;
+              reject(signal.reason as unknown);
+            },
+            { once: true },
+          ),
+        );
+        yield* [];
       },
     };
     const d = await durable();
     seat(d, held);
-    const runtime = vibevalleyRuntimeOf({ durable: d, time: wallTime, owner: parent, log });
+    const runtime = runtimeOn(d, parent);
     const session = await runtime.session({ kind: "available", via: "bundled" }, { cwd: home() });
     sessions.push(session);
     await session.prompt("work");
@@ -325,6 +328,40 @@ rl.on('line', (line) => {
     });
   });
 
+  it("keeps a cut-off run's MCP tools while its session is not open again, each answering that it cannot run yet", async () => {
+    const dir = home();
+    await writeFile(
+      join(dir, "farm.cjs"),
+      `const rl = require('node:readline').createInterface({ input: process.stdin })
+const send = (m) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...m }) + '\\n')
+rl.on('line', (line) => {
+  const m = JSON.parse(line)
+  if (m.method === 'initialize') send({ id: m.id, result: { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'farm', version: '1' } } })
+  else if (m.method === 'tools/list') send({ id: m.id, result: { tools: [{ name: 'say', description: '在田头说话', inputSchema: { type: 'object', properties: { text: { type: 'string' } } } }] } })
+})`,
+    );
+    const file = join(home(), "durable.db");
+    const before = await open([answer("汇报一下", { hangAfter: 2 })], { durable: await durable(file), mcp: join(dir, "farm.cjs") });
+    await before.session.prompt("汇报");
+    await whenTrue(() => text(before).length >= 2, "the answer under way");
+    await before.durable.close();
+
+    // The harness goes on with the run before the session is opened again: the MCP server is the session's own process.
+    const after = await durable(file);
+    const { llm, requests } = scriptedLLM([answer([toolCall("farm__say", { text: "做完了" })]), answer("好")]);
+    seat(after, llm);
+    after.harness.resume();
+    await whenTrue(() => requests.length === 2, "the run asked again, after its call");
+    expect(toolsOf(requests[0]!).map((t) => t.name)).toEqual(expect.arrayContaining(["farm__say", "bash"]));
+    expect(requests[1]!.messages.at(-1)).toMatchObject({
+      role: "toolResult",
+      toolName: "farm__say",
+      isError: true,
+      content: [{ type: "text", text: durableWords.notOpen("farm__say") }],
+    });
+    expect(requests[1]!.system).toBe(requests[0]!.system);
+  });
+
   it("fails the turn when the model fails", async () => {
     const r = await open([answer("", { stopReason: "error", errorMessage: "DeepSeek 回了 503" })]);
     await r.session.prompt("试试");
@@ -335,7 +372,7 @@ rl.on('line', (line) => {
   it("lists DeepSeek's models, is bundled, and says why it cannot run", async () => {
     const d = await durable();
     seat(d, scriptedLLM().llm);
-    const runtime = vibevalleyRuntimeOf({ durable: d, time: wallTime, owner: owner(), log });
+    const runtime = runtimeOn(d, owner());
     const models = await runtime.listModels();
     expect(models.kind === "ok" && models.models.some((m) => m.id === "deepseek-flash" && m.effortLevels.join(",") === "high,max" && m.default === true)).toBe(
       true,
@@ -343,7 +380,7 @@ rl.on('line', (line) => {
     expect(await runtime.installation()).toEqual({ kind: "available", via: "bundled" });
     await expect(runtime.session({ kind: "available", via: "bundled" }, { cwd: tmpdir(), effort: "low" })).rejects.toThrow(/只有 high、max/u);
     // Nothing seated: a farm without a DeepSeek key.
-    const keyless = vibevalleyRuntimeOf({ durable: await durable(), time: wallTime, owner: owner(), log });
+    const keyless = runtimeOn(await durable(), owner());
     expect(await keyless.installation()).toEqual({ kind: "unsupported", reason: noDeepSeekKey() });
     await expect(keyless.session({ kind: "available", via: "bundled" }, { cwd: tmpdir() })).rejects.toThrow(noDeepSeekKey());
   });

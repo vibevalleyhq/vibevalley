@@ -14,6 +14,7 @@ import { type Inbox, makeInbox } from "#/modules/inbox/inbox.ts";
 import { explicitMandate } from "#/modules/issue/creation.ts";
 import type { Issue } from "#/modules/issue/issue.ts";
 import { type GitHubRun, type RepoHooks } from "#/modules/repo/repo.ts";
+import type { ModelAccess } from "#/modules/runtime/durable.ts";
 import { registryOf } from "#/modules/runtime/runtime.ts";
 import { type WorkerAccess, type workerAccess } from "#/modules/session/worker.ts";
 import { makeTool, type Tool } from "#/modules/tool/tool.ts";
@@ -64,6 +65,8 @@ export interface WorldOptions {
   readonly network?: { readonly fetch: typeof fetch; readonly publicFetch: PublicFetch };
   /** The farm's clock (testing/layers.ts's shiftedTime); the wall clock when absent. */
   readonly clock?: Time;
+  /** The DeepSeek the farm's harness asks (the real one, for an eval); the scripted one a test seats when absent. */
+  readonly models?: ModelAccess;
 }
 
 /** What is said in a test farm, from the farm's start. */
@@ -130,7 +133,7 @@ export async function moduleWorld(options: WorldOptions = {}): Promise<ModuleWor
       background: false,
       probe: installedOnly(given, options.usage),
       usageOf: async () => options.usage?.() ?? null,
-      models: deepseek.models,
+      models: options.models ?? deepseek.models,
     },
     repo: { gh: noGitHub, ...options.repoHooks },
     session: { workerAccess: options.workerAccess ?? fakeWorkerAccess },

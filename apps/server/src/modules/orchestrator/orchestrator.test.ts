@@ -2,20 +2,19 @@ import { readFile } from "node:fs/promises";
 
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
+import { type Message } from "@earendil-works/pi-ai";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { z } from "zod";
 
-import { messageText } from "@vibevalley/agent/messages";
-import { type Reply, type Request, scriptedLLM } from "@vibevalley/agent/testing";
-import type { Message } from "@vibevalley/ai/messages";
-import { type Answer, answer, toolCall } from "@vibevalley/ai/testing";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import { ApiError, BizCode } from "@vibevalley/protocol/api";
 import { executionsOf } from "@vibevalley/protocol/rules";
 
 import { user } from "#/base/actor.ts";
 import type { ServerConfig } from "#/infra/config.ts";
+import { messageText } from "#/modules/runtime/durable.ts";
 import { starter, testConfig, nextTurn, gate, untilGot as until, waitFor, whenTrue, within } from "#/testing/layers.ts";
+import { type Answer, answer, type Reply, type Request, scriptedLLM, toolCall } from "#/testing/model.ts";
 import { world } from "#/testing/world.ts";
 
 import { makeOrchestrator, type Orchestrator, type OrchestratorOptions } from "./orchestrator.ts";

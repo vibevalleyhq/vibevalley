@@ -1,13 +1,26 @@
 import type { z } from "zod";
 
-import { type JsonSchema, parametersOf } from "@vibevalley/ai/tools";
-
 import { toolFailed } from "./errors.ts";
-import type { Tool, ToolResult } from "./loop.ts";
 import { toolResult } from "./prompts.ts";
+import { type JsonSchema, parametersOf } from "./schema.ts";
 
-/** A tool result when the run was stopped while it worked, and the end of a tool the stop cut off. */
-export const stopped = toolResult.stopped;
+export interface ToolResult {
+  readonly content: readonly (
+    | { readonly type: "text"; readonly text: string }
+    | { readonly type: "image"; readonly data: string; readonly mimeType: string }
+  )[];
+  readonly isError?: boolean;
+  /** Ends the run after the round when every tool call in it sets `terminate: true`. */
+  readonly terminate?: boolean;
+}
+
+export interface Tool {
+  readonly name: string;
+  readonly description: string;
+  readonly parameters: JsonSchema;
+  /** A ToolFailed it throws is the failed result the model reads. The signal aborts when the run is stopped. */
+  readonly execute: (args: unknown, call: { readonly id: string }, signal?: AbortSignal) => Promise<ToolResult>;
+}
 
 /** The model gets the head and the tail, and a note. */
 const maxResultChars = 30_000;
@@ -20,39 +33,12 @@ function clip(text: string, limit = maxResultChars): string {
   return r.slice(0, head).join("") + toolResult.clippedNote(r.length - limit) + r.slice(r.length - tail).join("");
 }
 
-interface ToolContext {
-  readonly callId: string;
-  /** Aborted when the run is stopped. */
-  readonly signal: AbortSignal;
-}
+const answered = (text: string): ToolResult => ({ content: [{ type: "text", text: clip(text) }] });
 
-interface TextToolSpec {
+interface RunToolSpec {
   readonly name: string;
   readonly description: string;
   readonly parameters: JsonSchema;
-  readonly run: (params: unknown, tc: ToolContext) => string | Promise<string>;
-}
-
-const answered = (text: string): ToolResult => ({ content: [{ type: "text", text: clip(text) }] });
-
-/** A signal for a call made without one: never aborted. */
-const never = () => new AbortController().signal;
-
-/** run's thrown or rejected error is the failed result. */
-export const textTool = (spec: TextToolSpec): Tool => ({
-  name: spec.name,
-  description: spec.description,
-  parameters: spec.parameters,
-  execute: async (params, call, signal) => {
-    try {
-      return answered(await spec.run(params, { callId: call.id, signal: signal ?? never() }));
-    } catch (e) {
-      throw toolFailed(e);
-    }
-  },
-});
-
-interface RunToolSpec extends Omit<TextToolSpec, "run"> {
   /** Throws a ToolFailed: its message is the failed result the model reads. The signal aborts when the run stops. */
   readonly run: (params: unknown, signal?: AbortSignal) => Promise<string>;
 }

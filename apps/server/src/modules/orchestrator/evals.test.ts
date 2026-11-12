@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import type { Tool } from "@vibevalley/agent/core/loop";
-import type { BrainMessage } from "@vibevalley/agent/messages";
-import { assistantMessage, toolCall } from "@vibevalley/ai/testing";
+import type { Tool } from "@vibevalley/agent/core/tool";
 import { executionsOf } from "@vibevalley/protocol/rules";
 
 import {
+  orchestratorTurn,
+  type CaseMessage,
   check,
   committed,
   type Expect,
@@ -18,11 +18,12 @@ import {
   replayWorld,
   stubbed,
 } from "#/testing/evals.ts";
+import { scriptedLLM, answer, assistantMessage, toolCall } from "#/testing/model.ts";
 
-import { noResult } from "./prompts.ts";
+import { noResult, systemPrompt } from "./prompts.ts";
 
 const call = assistantMessage([toolCall("issue_create", { title: "加个 README", repo: "demo", start: true }, "c1")]);
-const turn: BrainMessage[] = [
+const turn: CaseMessage[] = [
   call,
   { role: "toolResult", toolCallId: "c1", toolName: "issue_create", content: [{ type: "text", text: "派了" }], isError: false, timestamp: 0 },
   assistantMessage("派给了 Kimi"),
@@ -32,7 +33,7 @@ const quiet = turn.slice(0, 2);
 describe("the orchestrator's evals", () => {
   it("judge every kind", () => {
     const passed = new Set<string>();
-    const cases: [Expect, BrainMessage[], boolean][] = [
+    const cases: [Expect, CaseMessage[], boolean][] = [
       [{ kind: "called", tool: "issue_create" }, turn, true],
       [{ kind: "called", tool: "issue_create", argContains: `"repo":"demo"` }, turn, true],
       [{ kind: "called", tool: "issue_create", argContains: `"repo":"notes"` }, turn, false],
@@ -143,7 +144,7 @@ describe("the orchestrator's evals", () => {
   // A replay answers a call only as the case recorded that same call.
   it("answer in a replay only the call the case recorded, once", async () => {
     const issueCreate: Tool = { name: "issue_create", description: "", parameters: {}, execute: () => Promise.reject(new Error("not stubbed")) };
-    const recorded: BrainMessage[] = [
+    const recorded: CaseMessage[] = [
       assistantMessage([toolCall("issue_create", { title: "白屏", start: true }, "c1"), toolCall("issue_create", { title: "坏了" }, "c2")]),
       { role: "toolResult", toolCallId: "c1", toolName: "issue_create", content: [{ type: "text", text: "派了" }], isError: false, timestamp: 0 },
       { role: "toolResult", toolCallId: "c2", toolName: "issue_create", content: [{ type: "text", text: "没记" }], isError: true, timestamp: 0 },
@@ -159,4 +160,26 @@ describe("the orchestrator's evals", () => {
     expect(await answer({ title: "白屏", start: true })).toBe(noResult);
     expect(await answer({ title: "坏了" })).toBe("error: 没记");
   });
+});
+
+// The live evals' path, offline: the assistant's turn on the farm's harness, its host's prompt and tools, the case's
+// recorded results answering its calls.
+it("replay a case's turn on the farm's harness, as the live evals do", async () => {
+  const c = casesIn(committed).find(({ case: item }) => item.id === "hand-over-in-place")?.case;
+  if (!c) throw new Error("The hand-over fixture is missing");
+  await using farm = await replayWorld(c);
+  const script = scriptedLLM([
+    answer([toolCall("issue_get", { id: "41" }, "g1")], { usage: { input: 10, output: 2 } }),
+    answer("好", { usage: { input: 20, output: 1 } }),
+  ]);
+  farm.deepseek.use(script.llm);
+  const setup = await replaySetup(farm, c);
+  const { turn, tokens } = await orchestratorTurn(farm, { model: c.model, tools: setup.tools, memory: c.memory, before: c.before, input: setup.input });
+  expect(turn.map((m) => m.role)).toEqual(["assistant", "toolResult", "assistant"]);
+  expect(turn[1]).toMatchObject({ toolName: "issue_get", isError: false });
+  expect(tokens).toBe(33);
+  const asked = script.requests[0];
+  expect(asked?.system).toContain(systemPrompt.slice(0, 40));
+  expect(asked?.tools.map((t) => t.name)).toEqual(expect.arrayContaining(["issue_get", "remember"]));
+  expect(asked?.messages.at(-1)).toMatchObject({ role: "user", content: setup.input });
 });

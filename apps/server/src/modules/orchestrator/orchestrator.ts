@@ -1,7 +1,7 @@
 import { selfTools } from "@vibevalley/agent/self";
 import { Semaphore, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
-import type { OrchestratorEval } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime, userId } from "@vibevalley/protocol";
 
 import { orchestrator } from "#/base/actor.ts";
@@ -54,10 +54,33 @@ interface HostContext {
   readonly user?: boolean;
 }
 
+/** What an assistant's host is made with, but for its model, its tools and where it speaks: the same for the farm and
+ * its evals (testing/evals.ts). */
+export const orchestratorHost = (config: ServerConfig, id: string, profile: T.Agent | undefined) => ({
+  session: {
+    id,
+    role: "orchestrator" as const,
+    agent: id,
+    name: profile?.name || t("server.orchestrator.label"),
+    runtime: orchestratorRuntime,
+    brief: profile?.duty ?? "",
+  },
+  inputType: orchestratorInput,
+  home: agentHome(config, id),
+  cwd: reposDir(config),
+  // Append custom profile identity after the shared prefix so default orchestrator eval caches stay stable.
+  instructions: systemPrompt + agentPrompt + (id === defaultOrchestrator || !profile ? "" : identityNote(profile.name, profile.persona)),
+  skills: [orchestratorSkills],
+  keepEvents,
+});
+
+/** The kind of entry an input to the assistant is kept as. */
+export const orchestratorInput = "orchestratorInput";
+
 export interface Orchestrator {
   /** Aborts the orchestrator's own turn and queued inputs without stopping helper sessions. */
   readonly stop: (agent?: string) => Promise<void>;
-  readonly markWrong: (on: number, want: string, agent?: string) => Promise<OrchestratorEval>;
+  readonly markWrong: (on: number, want: string, agent?: string) => Promise<T.OrchestratorEval>;
   readonly answerer: (on: "api" | "phone") => (model: string) => Answer | undefined;
   /** Throws NotAnswered. */
   readonly brief: (line: string, signal?: AbortSignal) => Promise<string>;
@@ -123,24 +146,10 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
           return next !== undefined && (s.agent || chat.orchestratorIn(s.channel)) === id && next <= by;
         });
       };
-      const profile = store.agent(id);
       const host = await run.host<HostContext>({
-        session: {
-          id,
-          role: "orchestrator",
-          agent: id,
-          name: profile?.name || t("server.orchestrator.label"),
-          runtime: orchestratorRuntime,
-          brief: profile?.duty ?? "",
-        },
-        inputType: "orchestratorInput",
-        home,
-        cwd: reposDir(config),
-        // Append custom profile identity after the shared prefix so default orchestrator eval caches stay stable.
-        instructions: systemPrompt + agentPrompt + (id === defaultOrchestrator || !profile ? "" : identityNote(profile.name, profile.persona)),
+        ...orchestratorHost(config, id, store.agent(id)),
         model: modelOf,
         tools: toolsFor(id),
-        skills: [orchestratorSkills],
         wakeSoon,
         first: { channel: chat.defaultChannel(), envelope: "", source: "user" },
         quiet: () => false,
@@ -152,7 +161,6 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
           me.shown = "";
         },
         restored: (r) => ({ ...(r.issue ? { issue: r.issue } : {}), by: { kind: intake[r.source].trigger, channel: r.channel } }),
-        keepEvents,
         toolStart: tool.start,
       });
       const me: Instance = { id, home, cannot: new Map(), shown: "", host };
@@ -319,10 +327,14 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
         heard.close();
       }
     });
+    // Every host first, then the resumes: the first resume lets the harness go on with every conversation left mid-run,
+    // and each needs its host's extension installed by then.
+    const unfinished: Instance[] = [];
     for (const a of store.orchestrators()) {
       const me = await instanceOf(a.id);
-      if (await me.host.unfinished()) tasks.run(`resume ${a.id}`, () => me.host.resume(resumeWithinMs));
+      if (await me.host.unfinished()) unfinished.push(me);
     }
+    for (const me of unfinished) tasks.run(`resume ${me.id}`, () => me.host.resume(resumeWithinMs));
   }
 
   const modelId = (id: string) => {
