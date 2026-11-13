@@ -55,6 +55,12 @@ pub trait Drivers: Send + Sync {
     fn rules(&self, _place: &HelperPlace, deliver: Deliverable) -> String {
         crate::report::instructions(deliver)
     }
+    /// The rules a helper talks by in a channel, with no issue.
+    fn talk_rules(&self, cwd: &str, channel: &str, id: &str) -> String {
+        format!(
+            "You are @{id}, talking with the user in {channel}. Your own folder is {cwd}; write files only there. Your last answer of a round is posted in the channel."
+        )
+    }
     /// What a helper's report asks it to remember.
     fn remember(&self, _agent: &str, _session: &str, _repo: &str, _memories: &[IssueReportMemory]) {}
 }

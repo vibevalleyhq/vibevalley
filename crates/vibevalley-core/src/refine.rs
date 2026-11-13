@@ -100,12 +100,9 @@ pub fn refinement_description(d: &Draft) -> String {
     parts.join("\n\n")
 }
 
-pub const REFINEMENT_OPENING: &str = "This round you only draft an issue: read the code and write what the user wants \
-done as an issue another agent can be sent to do. Do not change files and do not commit; whatever you change is \
-thrown away when you hand back.";
+pub use crate::prompts::REFINEMENT_OPENING;
 
-/// The drafting session's prompt. The draft so far goes in when there is
-/// one: the user may have edited it.
+/// The drafting session's prompt (`refinementBrief`).
 pub fn refinement_brief(
     title: &str,
     description: &str,
@@ -115,92 +112,5 @@ pub fn refinement_brief(
     repo: Option<&str>,
     discussion: &str,
 ) -> String {
-    let word = word.trim();
-    let answering = !word.is_empty() && !questions.is_empty();
-    let redraft = !description.is_empty() || !criteria.is_empty();
-    let mut lines: Vec<String> = vec![REFINEMENT_OPENING.into(), String::new()];
-    lines.push(match repo {
-        Some(repo) => format!("Repository: {repo} (you are in a checkout of it now)."),
-        None => "No repository is chosen: discuss only the goal, scope, what is not done, acceptance criteria and \
-                 the deliverable; do not create a repository and do not implement anything."
-            .into(),
-    });
-    lines.push(format!("What the user wants: {}", if !word.is_empty() && !redraft { word } else { title }));
-    if !discussion.is_empty() {
-        let tail: String = {
-            let chars: Vec<char> = discussion.chars().collect();
-            chars[chars.len().saturating_sub(24_000)..].iter().collect()
-        };
-        lines.extend([
-            "".into(),
-            "The issue's discussion so far (context; it does not replace the request):".into(),
-            tail,
-        ]);
-    }
-    if redraft {
-        lines.extend(["".into(), "The previous draft (the user may have edited it; it is the one to go by):".into()]);
-        lines.push(format!("Title: {title}"));
-        if !description.is_empty() {
-            lines.push(description.into());
-        }
-        if !criteria.is_empty() {
-            lines.push(format!("Acceptance criteria:\n- {}", criteria.join("\n- ")));
-        }
-    }
-    if answering {
-        let asked: Vec<&str> = questions.iter().map(|q| q.question.as_str()).collect();
-        lines.extend([
-            "".into(),
-            format!("What you asked the user last time:\n- {}", asked.join("\n- ")),
-            format!("The user's answer: {word}"),
-            "".into(),
-            "Draft it again from the user's answer; rewrite the whole issue.".into(),
-        ]);
-    } else if redraft && !word.is_empty() {
-        lines.extend([
-            "".into(),
-            format!("The user says now: {word}"),
-            "".into(),
-            "Draft it again as the user says; rewrite the whole issue.".into(),
-        ]);
-    } else if redraft {
-        lines.extend(["".into(), "Draft it again; rewrite the whole issue.".into()]);
-    }
-    lines.extend([
-        "".into(),
-        if repo.is_some() {
-            "Read the code first to learn how things are, then write. The rules:"
-        } else {
-            "Put the request in order from the discussion; assume nothing about a repository. The rules:"
-        }
-        .into(),
-        "- title: a short title saying what to do, at most 10 words; details go in why and todo.".into(),
-        "- why: why it is wanted, a sentence or two.".into(),
-        "- todo: the things to do, one per line, down to where the change goes.".into(),
-        "- criteria: how to tell it is done, each one a point the user can check (a command to run and what it \
-         prints, what a page looks like)."
-            .into(),
-        "- notDoing: what this issue does not do, so no more gets done; an empty array when nothing.".into(),
-        "- files: the files or directories it will likely touch.".into(),
-        "- What you are unsure of and the user must decide: write it before the code block, one question per \
-         line, each line starting with `Ask the user:`; put the answers you can think of at the end as \
-         `(options: A | B)`. Do not ask what you can find out yourself. Write the whole draft from your best guess \
-         anyway."
-            .into(),
-        "".into(),
-        "End your reply with the draft in a json code block shaped like this:".into(),
-        "```json".into(),
-        r#"{
-  "title": "Drag on the board calls issue.status",
-  "why": "Dragging a card still calls the old start endpoint, so moving it to done does nothing.",
-  "todo": ["board.rs: call issue.status on drop", "remove the old endpoint's caller"],
-  "criteria": ["dragging a backlog card to todo starts it", "cargo test -p board passes"],
-  "notDoing": ["the board's look"],
-  "files": ["crates/board/src/board.rs"]
-}"#
-        .into(),
-        "```".into(),
-        "After the block, say in one sentence whether the draft is ready and what you still ask the user.".into(),
-    ]);
-    lines.join("\n")
+    crate::prompts::refinement_brief(title, description, criteria, questions, word, repo.unwrap_or(""), discussion)
 }

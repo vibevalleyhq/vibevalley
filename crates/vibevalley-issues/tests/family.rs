@@ -175,7 +175,7 @@ fn a_split_queues_its_children_in_dependency_order() {
     assert_eq!(w.board.issue(&parent.id).unwrap().status, IssueStatus::InProgress);
     wait_issue(&w.board, &children[1].id, "B merged", |t| t.status == IssueStatus::Done);
     let b_prompt = prompts.lock().unwrap().iter().find(|p| p.contains("Part B")).cloned().unwrap();
-    assert!(b_prompt.contains("Check command: test -f a.txt"), "{b_prompt}");
+    assert!(b_prompt.contains("检查命令：test -f a.txt"), "{b_prompt}");
     wait_stage(&w.board, &parent.id, StageKind::Reviewing);
     // Canceling a parent cancels its open children; here all are done.
     w.board.move_to(&parent.id, IssueStatus::Done, None).unwrap();
@@ -189,7 +189,7 @@ fn a_draft_writes_the_issue_up_and_leaves_no_trace() {
         \"criteria\": [\"app --port 8080 serves\"], \"notDoing\": [], \"files\": [\"src/main.rs\"]}\n```\n\nReady.";
     let script = Script::new().turn(vec![Step::sleep_ms(100), Step::text(said)]);
     let rt = HookRuntime::new("t", script, |turn| {
-        assert!(turn.prompt.contains("What the user wants: it should listen somewhere"), "{}", turn.prompt);
+        assert!(turn.prompt.contains("用户想做的：it should listen somewhere"), "{}", turn.prompt);
         turn.write("scratch.txt", "drafts leave no files");
     });
     let w = world(vec![rt], |_| {});

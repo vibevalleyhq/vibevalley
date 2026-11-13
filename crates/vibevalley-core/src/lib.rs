@@ -18,6 +18,7 @@ pub mod moves;
 pub mod patrol;
 pub mod pr;
 pub mod progress;
+pub mod prompts;
 pub mod refine;
 pub mod rules;
 pub mod status;

@@ -35,6 +35,7 @@ mod edits;
 mod git;
 mod report;
 mod runs;
+mod talk;
 
 pub use drivers::{Drive, Drivers, HelperPlace, Persona, RuntimeDrivers};
 pub use report::{ANSWER_ONLY, Report, ReportQuestion, ReportStatus};
@@ -1212,7 +1213,7 @@ impl Board {
                 // Working from now, not from when the pump reads the turn's
                 // start: the room is counted by it.
                 let phase = Phase::working(now(), SessionAction::Thinking, "");
-                self.apply(vec![Fact::session_phase_changed(now(), session.id.clone(), phase, None)])?;
+                self.apply(vec![self.phase_changed(session.id.clone(), phase)])?;
                 self.begin_run(&session.id, &issue.id, trigger)?;
                 let words = self.with_recall(session, words);
                 self.facts.log(&session.id, Step::Asked { text: words.clone() });
@@ -1276,7 +1277,7 @@ impl Board {
                     said.clear();
                     asked.clear();
                     let phase = Phase::working(now(), SessionAction::Thinking, "");
-                    let _ = self.apply(vec![Fact::session_phase_changed(now(), session_id, phase, None)]);
+                    let _ = self.apply(vec![self.phase_changed(session_id, phase)]);
                 }
                 EventKind::TextDelta { text } if root => said.push_str(&text),
                 EventKind::ToolCallStarted { name, .. } if root => self.set_doing(
@@ -1312,6 +1313,14 @@ impl Board {
         }
     }
 
+    /// A phase change keeps the session where it talks: the fact carries
+    /// the channel, and an absent one would clear it.
+    fn phase_changed(&self, id: impl Into<String>, phase: Phase) -> Fact {
+        let id = id.into();
+        let channel = self.session(&id).and_then(|s| s.channel);
+        Fact::session_phase_changed(now(), id, phase, channel)
+    }
+
     fn working(&self, session_id: &str) -> Option<PhaseWorking> {
         self.read(|s| {
             s.sessions.iter().find(|s| s.id == session_id).and_then(|s| match &s.phase {
@@ -1324,7 +1333,7 @@ impl Board {
     fn set_doing(&self, session_id: &str, doing: Doing) {
         let Some(p) = self.working(session_id) else { return };
         let phase = Phase::Working(PhaseWorking { doing, quiet_since: None, ..p });
-        let _ = self.apply(vec![Fact::session_phase_changed(now(), session_id, phase, None)]);
+        let _ = self.apply(vec![self.phase_changed(session_id, phase)]);
     }
 
     fn set_quiet(&self, session_id: &str, quiet: Option<Millis>) {
@@ -1333,11 +1342,15 @@ impl Board {
             return;
         }
         let phase = Phase::Working(PhaseWorking { quiet_since: quiet, ..p });
-        let _ = self.apply(vec![Fact::session_phase_changed(now(), session_id, phase, None)]);
+        let _ = self.apply(vec![self.phase_changed(session_id, phase)]);
     }
 
     fn finish_run(&self, session_id: &str, reason: StopReason, said: &str, asked: &[Question]) {
         let Some(session) = self.session(session_id) else { return };
+        if session.issue.is_none() && session.channel.is_some() {
+            self.finish_talk(&session, reason, said);
+            return;
+        }
         let Some(issue) = session.issue.as_deref().and_then(|i| self.issue(i)) else {
             return;
         };
@@ -2048,35 +2061,15 @@ fn default_words(issue: &Issue) -> String {
 
 /// What the agent is told to do.
 fn brief(issue: &Issue, all: &[Issue], words: Option<&str>) -> String {
-    let mut out = String::new();
-    if let Some(words) = words {
-        out.push_str(words);
-        out.push_str("\n\n---\nThe issue, for reference:\n\n");
-    }
-    out.push_str(&format!("# Issue #{}: {}\n", issue.number, issue.title));
-    if !issue.description.trim().is_empty() {
-        out.push('\n');
-        out.push_str(issue.description.trim());
-        out.push('\n');
-    }
-    if !issue.criteria.is_empty() {
-        out.push_str("\nAcceptance criteria (the user accepts the work by these):\n");
-        for (i, c) in issue.criteria.iter().enumerate() {
-            out.push_str(&format!("{}. {c}\n", i + 1));
-        }
-    }
     let frozen: Vec<String> = vibevalley_core::acceptance_ancestors(issue, all)
         .iter()
         .flat_map(|t| t.constraints.as_ref().map(|c| c.frozen.clone()).unwrap_or_default())
         .collect();
+    let brief = vibevalley_core::prompts::issue_brief(&issue.title, &issue.description, &issue.criteria, issue.deliver);
     let constraints = vibevalley_core::work_constraints(issue.constraints.as_ref(), &frozen);
-    if !constraints.is_empty() {
-        out.push('\n');
-        out.push_str(&constraints);
-        out.push('\n');
+    let brief = [brief, constraints].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join("\n\n");
+    match words.map(str::trim).filter(|w| !w.is_empty()) {
+        Some(words) => format!("{words}{}", vibevalley_i18n::t("server.issue.brief.original", &[("brief", brief.into())])),
+        None => brief,
     }
-    if issue.deliver == Deliverable::Answer {
-        out.push_str("\nThis issue asks for an answer: put your conclusion and evidence in the report's answer.\n");
-    }
-    out
 }

@@ -44,6 +44,8 @@ const prompts = {
     pullRequest: H.workplaceRules({ repo: "{repo}", branch: "{branch}", cwd: "{cwd}" }, "{house}", "{id}", true),
     folder: H.workplaceRules({ repo: "{repo}", branch: "", cwd: "{cwd}" }, "{house}", "{id}", false),
   },
+  // A helper talking in a channel without an issue (channelRules).
+  talk: H.channelRules("{cwd}", "{channel}", "{id}"),
 };
 writeFileSync(join(out, "prompts.json"), JSON.stringify(prompts, null, 1) + "\n");
 console.log(`tools: ${tools.length}`);

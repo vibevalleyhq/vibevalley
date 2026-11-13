@@ -121,6 +121,16 @@ impl Drivers for Agents {
         rules
     }
 
+    fn talk_rules(&self, cwd: &str, channel: &str, id: &str) -> String {
+        let rules = crate::modules::orchestrator::words::PROMPTS
+            .talk
+            .replace("{cwd}", cwd)
+            .replace("{channel}", channel)
+            .replace("{id}", id);
+        let language = crate::modules::orchestrator::words::users_language();
+        if language != "中文" { rules.replace("中文", &language) } else { rules }
+    }
+
     fn remember(&self, agent: &str, session: &str, repo: &str, memories: &[IssueReportMemory]) {
         let Some(store) = self.memories() else { return };
         for m in memories {

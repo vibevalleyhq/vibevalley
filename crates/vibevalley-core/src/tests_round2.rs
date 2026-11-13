@@ -117,8 +117,8 @@ fn a_childs_checks_inherit_frozen_files_and_the_leaf_runs_every_acceptance_check
         }
     );
     let text = work_constraints(Some(&seed), &[]);
-    assert!(text.contains("sh check.sh") && text.contains("must fail"));
-    assert!(work_constraints(None, &["check.sh".into()]).contains("frozen"));
+    assert!(text.contains("sh check.sh") && text.contains("检查应当失败"));
+    assert!(work_constraints(None, &["check.sh".into()]).contains("已经冻结"));
 }
 
 #[test]
@@ -255,36 +255,6 @@ fn drafts_are_read_from_the_last_block() {
             options: vec![]
         }]
     );
-}
-
-#[test]
-fn briefs_for_a_draft() {
-    let first = refinement_brief("New issue", "", &[], &[], "dragging still calls the old endpoint", Some("board"), "");
-    for want in [
-        REFINEMENT_OPENING,
-        "Repository: board",
-        "What the user wants: dragging still calls the old endpoint",
-        "```json",
-        "\"criteria\"",
-        "Ask the user:",
-    ] {
-        assert!(first.contains(want), "{want}");
-    }
-    let q = [Question {
-        question: "Which port?".into(),
-        options: vec![],
-    }];
-    let again = refinement_brief("T", "D", &["c".into()], &q, "8080", None, "earlier talk");
-    for want in [
-        "No repository is chosen",
-        "The previous draft",
-        "Title: T",
-        "What you asked the user last time",
-        "The user's answer: 8080",
-        "earlier talk",
-    ] {
-        assert!(again.contains(want), "{want}");
-    }
 }
 
 #[test]

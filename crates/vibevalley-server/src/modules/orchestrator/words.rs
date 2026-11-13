@@ -22,6 +22,8 @@ pub struct Prompts {
     pub skills: String,
     pub memory: String,
     pub workplace: Workplaces,
+    /// A helper's rules talking in a channel (`channelRules`): `{cwd}`, `{channel}`, `{id}`.
+    pub talk: String,
 }
 
 /// A helper's rules on an issue (`workplaceRules`), with `{repo}`, `{branch}`,

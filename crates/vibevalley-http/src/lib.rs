@@ -91,8 +91,7 @@ pub fn serve_with(server: Shared, addr: SocketAddr, web: Option<std::path::PathB
                 return;
             };
             let app = match web {
-                Some(dir) => router(server)
-                    .fallback_service(tower_http::services::ServeDir::new(&dir).fallback(tower_http::services::ServeFile::new(dir.join("index.html")))),
+                Some(dir) => router(server).fallback(move |uri: axum::http::Uri| page(dir.clone(), uri)),
                 None => router(server),
             };
             let _ = axum::serve(listener, app)
@@ -163,6 +162,40 @@ async fn not_found() -> Response {
 
 async fn not_allowed() -> Response {
     refuse(BizCode::MethodNotAllowed, "use POST")
+}
+
+/// The built page: its files as they are; any other path without an
+/// extension is one of its routes and gets `index.html`, with the farm's
+/// locale on `<html>` (it is read again each time: assets carry their hash).
+async fn page(dir: std::path::PathBuf, uri: axum::http::Uri) -> Response {
+    let path = uri.path();
+    if path.starts_with("/api/") {
+        return refuse(BizCode::RouteNotFound, "no such route");
+    }
+    let clean: std::path::PathBuf = path.split('/').filter(|p| !p.is_empty() && *p != "." && *p != "..").collect();
+    let file = dir.join(&clean);
+    let is_index = clean.as_os_str().is_empty() || clean == std::path::Path::new("index.html");
+    if !is_index && tokio::fs::metadata(&file).await.is_ok_and(|m| m.is_file()) {
+        let kind = mime_guess::from_path(&file).first_or_octet_stream().to_string();
+        return match tokio::fs::read(&file).await {
+            Ok(bytes) => ([("content-type", kind)], bytes).into_response(),
+            Err(_) => refuse(BizCode::RouteNotFound, "no such file"),
+        };
+    }
+    if !is_index && clean.extension().is_some() {
+        return refuse(BizCode::RouteNotFound, "no such file");
+    }
+    let Ok(html) = tokio::fs::read_to_string(dir.join("index.html")).await else {
+        return refuse(BizCode::RouteNotFound, "no page");
+    };
+    let locale = vibevalley_i18n::locale();
+    let lang = if locale == "en" { "en" } else { "zh-Hans" };
+    let tag = html.find("<html").and_then(|at| html[at..].find('>').map(|end| (at, at + end)));
+    let html = match tag {
+        Some((at, end)) => format!("{}<html lang=\"{lang}\" data-locale=\"{locale}\">{}", &html[..at], &html[end + 1..]),
+        None => html,
+    };
+    ([("content-type", "text/html; charset=utf-8"), ("cache-control", "no-cache")], html).into_response()
 }
 
 /// A helper's MCP messages (streamable HTTP, answered as plain JSON): one

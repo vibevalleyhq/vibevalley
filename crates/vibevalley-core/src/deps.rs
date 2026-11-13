@@ -217,24 +217,5 @@ pub fn child_checks(child: &Issue, all: &[Issue]) -> CheckoutChecks {
 /// What a child's brief says about its constraints. Ported from
 /// `workConstraints` in `apps/server/src/modules/issue/prompts.ts`.
 pub fn work_constraints(constraints: Option<&IssueConstraints>, frozen: &[String]) -> String {
-    let mut lines = Vec::new();
-    if let Some(c) = constraints {
-        if !c.scope.is_empty() {
-            lines.push(format!("Scope of the work: {}", c.scope.join(", ")));
-        }
-        if let Some(check) = c.check.as_deref().filter(|c| !c.is_empty()) {
-            lines.push(format!("Check command: {check}"));
-        }
-        if c.acceptance {
-            lines.push(
-                "First write acceptance tests that catch the requirement not being met yet. The check must fail; \
-                 the tests are then frozen for the later child issues."
-                    .to_string(),
-            );
-        }
-    }
-    if !frozen.is_empty() {
-        lines.push(format!("These acceptance files are frozen; do not change them: {}", frozen.join(", ")));
-    }
-    lines.join("\n")
+    crate::prompts::work_constraints(constraints, frozen)
 }

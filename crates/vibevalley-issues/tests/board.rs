@@ -62,7 +62,7 @@ fn an_issue_goes_from_backlog_to_merged() {
     assert_eq!(w.board.base_branch(&session.id).as_deref(), Some("main"));
     let worktree = session.worktree.clone().unwrap();
     assert!(worktree.ends_with("worktrees/app.1"), "{worktree}");
-    assert!(prompts.lock().unwrap()[0].contains("# Issue #1: Add the feature"));
+    assert!(prompts.lock().unwrap()[0].starts_with("Add the feature"));
     assert!(prompts.lock().unwrap()[0].contains("1. it is there"));
     let inbox = w.board.frame().inbox;
     assert_eq!(inbox.len(), 1);
@@ -304,7 +304,10 @@ fn words_for_a_queued_issue_go_with_it() {
     w.board.tell("2", "mind the tests").unwrap();
     wait_stage(&w.board, "2", StageKind::Reviewing);
     let all = prompts.lock().unwrap().clone();
-    assert!(all.iter().any(|p| p.starts_with("mind the tests") && p.contains("Issue #2")), "{all:?}");
+    assert!(
+        all.iter().any(|p| p.starts_with("mind the tests") && p.contains("这张工单原来是：Two")),
+        "{all:?}"
+    );
 }
 
 #[test]
@@ -549,7 +552,7 @@ fn frames_reach_subscribers_newest_first() {
 #[test]
 fn a_queued_issue_waits_for_the_issue_it_is_blocked_by() {
     let rt = HookRuntime::new("t", quick(), |turn| {
-        turn.commit(&format!("{}.txt", turn.prompt.lines().find(|l| l.starts_with("# Issue")).unwrap().len()), "x\n");
+        turn.commit(&format!("{}.txt", turn.prompt.lines().next().unwrap().len()), "x\n");
         turn.done("ok");
     });
     let w = world(vec![rt], |_| {});

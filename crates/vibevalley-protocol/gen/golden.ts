@@ -332,3 +332,39 @@ scenario("reviewed_and_answers", [
   { type: "issueChanged", at: T0, issue: issueWith(54, "todo", [], { lastRun: { startedAt: T0, endedAt: T0 + min, outcome: "interrupted" }, assignments: [] }) },
   { type: "sessionChanged", at: T0, session: { ...worker("w55", "i55", { _tag: "closed", at: T0, closed: "merged" }) } },
 ]);
+
+// What the issues say to helpers (modules/issue/prompts.ts, brief.ts): the board's briefs must say the same.
+{
+  const P = await import(`${VV}/apps/server/src/modules/issue/prompts.ts`);
+  const B = await import(`${VV}/apps/server/src/modules/issue/brief.ts`);
+  const picks = [
+    { title: "加上打卡", description: "", criteria: [], deliver: "change" },
+    { title: "加上打卡", description: "用户要一个打卡按钮。\n\n第二段", criteria: ["点一下就打卡", "cargo test 通过"], deliver: "change" },
+    { title: "为什么慢", description: "打卡很慢", criteria: ["说清原因"], deliver: "answer" },
+    { title: "开 PR", description: "", criteria: ["CI 绿"], deliver: "pull_request" },
+  ];
+  const constraints = [
+    [undefined, []],
+    [{ scope: ["src/a.ts", "src/b.ts"], check: "vp test", acceptance: true, frozen: [] }, ["test/a.test.ts"]],
+    [{ scope: [], acceptance: false, frozen: [] }, ["x.test.ts"]],
+  ];
+  const drafts = [
+    [{ title: "New issue", description: "", criteria: [] }, "拖卡还在调旧接口", "board", ""],
+    [{ title: "T", description: "D", criteria: ["c"], questions: [{ question: "用哪个端口？", options: [] }] }, "8080", "", "早先的讨论"],
+    [{ title: "T", description: "D", criteria: ["c"] }, "再短一点", "board", ""],
+    [{ title: "T", description: "", criteria: ["c"] }, "", "", ""],
+  ];
+  writeFileSync(
+    join(out, "prompts.json"),
+    JSON.stringify(
+      {
+        issueBrief: picks.map((p) => ({ input: p, output: B.issueBrief(p) })),
+        workConstraints: constraints.map(([c, frozen]) => ({ input: { constraints: c ?? null, frozen }, output: P.workConstraints(c, frozen) })),
+        refinementBrief: drafts.map(([t, word, repo, discussion]) => ({ input: { ...t, word, repo, discussion }, output: P.refinementBrief(t, word, repo, discussion) })),
+      },
+      null,
+      1,
+    ) + "\n",
+  );
+  console.log("prompts: issueBrief, workConstraints, refinementBrief");
+}

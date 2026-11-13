@@ -584,8 +584,8 @@ impl Watch {
         }
     }
 
-    /// The user speaking to a helper profile in its direct channel: no
-    /// session can be hired without an issue in VibeValley yet, so it says so.
+    /// The user speaking to a helper profile in its direct channel: its
+    /// talking session hears it (hired the first time); a refusal is said there.
     fn on_direct(&self, c: &Committed) {
         if c.row.sender_id != USER_ID || c.row.kind != "chat" || c.channel_type != ChannelType::Direct {
             return;
@@ -600,8 +600,10 @@ impl Watch {
         }
         let why = match self.agents.profiles.agent(agent) {
             Some(a) if !a.enabled => t("server.channel.profileDisabled", &[("name", a.name.into())]),
-            _ if vibevalley_i18n::locale().starts_with("zh") => "VibeValley 还不能和帮工私聊；发一张工单给它".to_string(),
-            _ => "VibeValley cannot talk with a helper directly yet; send it an issue".to_string(),
+            _ => match self.board.talk(agent, &c.row.channel_id, &c.row.body) {
+                Ok(_) => return,
+                Err(e) => e.to_string(),
+            },
         };
         self.chat.notice(Noticing {
             channel: c.row.channel_id.clone(),
