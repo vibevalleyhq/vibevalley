@@ -29,6 +29,7 @@ pub mod home;
 pub mod modules;
 mod public_http;
 mod start;
+pub mod testing;
 
 pub use start::{ServerConfig, StartError, Started, start};
 

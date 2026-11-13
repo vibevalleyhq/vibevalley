@@ -70,11 +70,34 @@ impl Step {
     }
 }
 
+/// What a computed turn is given: the prompt, which turn of the session it
+/// is, and how the session was opened.
+pub struct TurnAsk {
+    pub prompt: String,
+    pub turn: usize,
+    pub cwd: PathBuf,
+    pub append_system_prompt: Option<String>,
+}
+
+/// A turn computed when it is asked (tests' stand-in agents): its steps, or
+/// the error that fails it. It runs on the turn's own thread.
+pub type ComputedTurn = Arc<dyn Fn(&TurnAsk) -> std::result::Result<Vec<Step>, String> + Send + Sync>;
+
 /// One step list per turn; the last list repeats for further prompts. A turn
 /// whose steps do not end it is ended with `StopReason::Completed`.
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct Script {
     turns: Vec<Vec<Step>>,
+    computed: Option<ComputedTurn>,
+}
+
+impl std::fmt::Debug for Script {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Script")
+            .field("turns", &self.turns)
+            .field("computed", &self.computed.is_some())
+            .finish()
+    }
 }
 
 impl Script {
@@ -85,6 +108,14 @@ impl Script {
     pub fn turn(mut self, steps: Vec<Step>) -> Self {
         self.turns.push(steps);
         self
+    }
+
+    /// Every turn computed by `turn` when it is asked.
+    pub fn computed(turn: ComputedTurn) -> Self {
+        Self {
+            turns: vec![],
+            computed: Some(turn),
+        }
     }
 
     /// Every prompt is answered with its own text.
@@ -238,6 +269,8 @@ struct TurnControl {
 struct ScriptedDriver {
     core: Arc<SessionCore>,
     script: Script,
+    /// The session's folder and appended system prompt, for computed turns.
+    opened: (PathBuf, Option<String>),
     turn_index: AtomicUsize,
     current: Mutex<Option<Arc<TurnControl>>>,
     answers: flume::Sender<PermissionDecision>,
@@ -325,6 +358,8 @@ impl Driver for ScriptedDriver {
     fn start_turn(&self, content: Vec<ContentBlock>) -> Result<()> {
         let index = self.turn_index.fetch_add(1, Ordering::SeqCst);
         let steps = self.script.turns.get(index).or_else(|| self.script.turns.last()).cloned().unwrap_or_default();
+        let computed = self.script.computed.clone();
+        let opened = self.opened.clone();
         while self.answers_rx.try_recv().is_ok() {}
         let control = Arc::new(TurnControl {
             abort: AtomicBool::new(false),
@@ -336,6 +371,25 @@ impl Driver for ScriptedDriver {
         std::thread::Builder::new()
             .name("vibevalley-agent-scripted".into())
             .spawn(move || {
+                let steps = match &computed {
+                    None => steps,
+                    Some(turn) => match turn(&TurnAsk {
+                        prompt: prompt.clone(),
+                        turn: index,
+                        cwd: opened.0.clone(),
+                        append_system_prompt: opened.1.clone(),
+                    }) {
+                        Ok(steps) => steps,
+                        Err(message) => {
+                            core.emit_root(EventKind::Error { message });
+                            core.emit_root(EventKind::TurnFinished {
+                                reason: StopReason::Error,
+                                usage: Usage::default(),
+                            });
+                            return;
+                        }
+                    },
+                };
                 let reason = match run_steps(&core, &control, &steps, &prompt) {
                     Flow::Finished => return,
                     Flow::Aborted => StopReason::Aborted,
@@ -424,6 +478,7 @@ impl Runtime for ScriptedRuntime {
         let driver = ScriptedDriver {
             core: core.clone(),
             script: self.script.clone(),
+            opened: (opts.cwd.clone(), opts.append_system_prompt.clone()),
             turn_index: AtomicUsize::new(0),
             current: Mutex::new(None),
             answers,

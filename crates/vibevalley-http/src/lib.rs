@@ -70,6 +70,12 @@ impl Drop for Listener {
 /// its own. Only loopback addresses are accepted: this is not a network
 /// service.
 pub fn serve(server: Shared, addr: SocketAddr) -> std::io::Result<Listener> {
+    serve_with(server, addr, None)
+}
+
+/// `serve`, with the page's built files (`--web`) at `/`: a path that is no
+/// file is the page's own route and gets its `index.html`.
+pub fn serve_with(server: Shared, addr: SocketAddr, web: Option<std::path::PathBuf>) -> std::io::Result<Listener> {
     if !addr.ip().is_loopback() {
         return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "loopback addresses only"));
     }
@@ -84,7 +90,12 @@ pub fn serve(server: Shared, addr: SocketAddr) -> std::io::Result<Listener> {
             let Ok(listener) = tokio::net::TcpListener::from_std(std_listener) else {
                 return;
             };
-            let _ = axum::serve(listener, router(server))
+            let app = match web {
+                Some(dir) => router(server)
+                    .fallback_service(tower_http::services::ServeDir::new(&dir).fallback(tower_http::services::ServeFile::new(dir.join("index.html")))),
+                None => router(server),
+            };
+            let _ = axum::serve(listener, app)
                 .with_graceful_shutdown(async {
                     let _ = stop_rx.await;
                 })
