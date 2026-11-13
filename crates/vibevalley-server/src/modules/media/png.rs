@@ -1,6 +1,6 @@
 //! Generated PNG validation, ported from media/png.ts (CRC, size, filters).
 use std::io::Read;
-pub(super) fn valid(bytes: &[u8], width: i64, height: i64) -> bool {
+pub fn valid(bytes: &[u8], width: i64, height: i64) -> bool {
     if bytes.len() < 45 || !bytes.starts_with(b"\x89PNG\r\n\x1a\n") || width <= 0 || height <= 0 {
         return false;
     }

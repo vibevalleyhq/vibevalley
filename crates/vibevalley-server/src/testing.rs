@@ -246,3 +246,106 @@ mod tests {
         assert!(String::from_utf8_lossy(&log.stdout).contains("版本 A"));
     }
 }
+
+/// MOSS images answered offline (`testing/network.ts`): the request is
+/// prepared and checked as the real backend does, then `[media:hold]` never
+/// answers, `[media:unknown]` is an unknown outcome, `[media:download-failure]`
+/// fails its first download, and anything else is a PNG of the asked size.
+pub struct OfflineImages {
+    pub real: crate::modules::media::image_provider::Moss,
+    failing: std::sync::Mutex<std::collections::HashSet<String>>,
+    next: std::sync::atomic::AtomicUsize,
+}
+
+impl OfflineImages {
+    pub fn new(setting: Arc<crate::modules::setting::Setting>) -> Arc<OfflineImages> {
+        Arc::new(OfflineImages {
+            real: crate::modules::media::image_provider::Moss::new(setting),
+            failing: Default::default(),
+            next: Default::default(),
+        })
+    }
+}
+
+impl crate::modules::media::image_provider::ImageBackend for OfflineImages {
+    fn prepare(
+        &self,
+        request: &vibevalley_protocol::MediaImageRequest,
+    ) -> Result<crate::modules::media::image_provider::Prepared, vibevalley_protocol::ApiError> {
+        self.real.prepare(request)
+    }
+
+    fn generate<'a>(
+        &'a self,
+        p: crate::modules::media::image_provider::Prepared,
+    ) -> crate::modules::media::image_provider::Work<'a, crate::modules::media::image_provider::Generated> {
+        use crate::modules::media::image_provider::{Failure, Generated};
+        Box::pin(async move {
+            let prompt = p.body["prompt"].as_str().unwrap_or("").to_string();
+            if prompt.contains("[media:hold]") {
+                return std::future::pending().await;
+            }
+            if prompt.contains("[media:unknown]") {
+                return Err(Failure::Unknown);
+            }
+            let size = p.body["size"].as_str().unwrap_or("");
+            let (w, h) = size.split_once('x').ok_or(Failure::Unknown)?;
+            let (width, height): (i64, i64) = (w.parse().map_err(|_| Failure::Unknown)?, h.parse().map_err(|_| Failure::Unknown)?);
+            let n = self.next.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+            let url = format!("https://media.example.com/{n}-{width}x{height}.png");
+            if prompt.contains("[media:download-failure]") {
+                self.failing.lock().unwrap_or_else(|e| e.into_inner()).insert(url.clone());
+            }
+            Ok(Generated {
+                url,
+                usage: vibevalley_protocol::MediaImageUsage { images: 1, width, height },
+            })
+        })
+    }
+
+    fn download<'a>(&'a self, url: &'a str, width: i64, height: i64) -> crate::modules::media::image_provider::Work<'a, Vec<u8>> {
+        use crate::modules::media::image_provider::Failure;
+        Box::pin(async move {
+            if self.failing.lock().unwrap_or_else(|e| e.into_inner()).remove(url) {
+                return Err(Failure::Unknown);
+            }
+            Ok(png(width as u32, height as u32))
+        })
+    }
+}
+
+/// A grey PNG of the size: IHDR, one IDAT (zlib, no filter), IEND.
+pub fn png(width: u32, height: u32) -> Vec<u8> {
+    use std::io::Write;
+    fn chunk(out: &mut Vec<u8>, kind: &[u8; 4], data: &[u8]) {
+        out.extend_from_slice(&(data.len() as u32).to_be_bytes());
+        let mut crc = crc32fast::Hasher::new();
+        crc.update(kind);
+        crc.update(data);
+        out.extend_from_slice(kind);
+        out.extend_from_slice(data);
+        out.extend_from_slice(&crc.finalize().to_be_bytes());
+    }
+    let mut out = b"\x89PNG\r\n\x1a\n".to_vec();
+    let mut ihdr = Vec::new();
+    ihdr.extend_from_slice(&width.to_be_bytes());
+    ihdr.extend_from_slice(&height.to_be_bytes());
+    ihdr.extend_from_slice(&[8, 2, 0, 0, 0]);
+    chunk(&mut out, b"IHDR", &ihdr);
+    let row: Vec<u8> = std::iter::once(0u8).chain(std::iter::repeat_n(0x88u8, width as usize * 3)).collect();
+    let mut z = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::fast());
+    for _ in 0..height {
+        let _ = z.write_all(&row);
+    }
+    chunk(&mut out, b"IDAT", &z.finish().unwrap_or_default());
+    chunk(&mut out, b"IEND", &[]);
+    out
+}
+
+#[cfg(test)]
+mod png_tests {
+    #[test]
+    fn the_offline_png_is_valid_at_its_size() {
+        assert!(crate::modules::media::png::valid(&super::png(256, 512), 256, 512));
+    }
+}

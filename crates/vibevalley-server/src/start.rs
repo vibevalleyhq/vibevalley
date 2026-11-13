@@ -44,6 +44,8 @@ pub struct ServerConfig {
     pub git_emails: Vec<String>,
     /// Media execution backend; defaults to MOSS. Tests inject a deterministic backend.
     pub media_backend: Option<Arc<dyn modules::media::image_provider::ImageBackend>>,
+    /// The vendors answered offline (the page's tests): `testing::OfflineImages`.
+    pub offline_media: bool,
     /// The orchestrator talks to this model instead of DeepSeek (tests).
     pub model_client: Option<Arc<dyn vibevalley_agent::ModelClient>>,
     /// The orchestrator hears the farm (VibeValley `listen`); a test without
@@ -75,6 +77,7 @@ impl ServerConfig {
             git_emails: vec![],
             model_client: None,
             media_backend: None,
+            offline_media: false,
             orchestrator_listens: true,
             pkm_root: None,
             watch_pkm: true,
@@ -227,7 +230,13 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         config
             .media_backend
             .clone()
-            .unwrap_or_else(|| Arc::new(modules::media::image_provider::Moss::new(setting.clone()))),
+            .unwrap_or_else(|| -> Arc<dyn modules::media::image_provider::ImageBackend> {
+                if config.offline_media {
+                    crate::testing::OfflineImages::new(setting.clone())
+                } else {
+                    Arc::new(modules::media::image_provider::Moss::new(setting.clone()))
+                }
+            }),
     )
     .map_err(|e| failed("media jobs")(&e.message))?;
     modules::media::machine::install(&hub, media.clone());

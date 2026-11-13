@@ -4,6 +4,6 @@ pub mod inputs;
 mod validate;
 
 pub mod image_provider;
-mod png;
+pub mod png;
 
 pub mod machine;

@@ -60,6 +60,7 @@ fn run() -> Result<(), String> {
         config.registry = Some(Arc::new(registry));
         config.probe_runtimes = false;
         config.link_previews = false;
+        config.offline_media = true;
     }
     for dir in [config.work_root.join("repos"), config.work_root.join("worktrees"), config.work_root.join("pkm")] {
         std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
