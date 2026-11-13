@@ -32,7 +32,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use futures_util::Stream;
 use regex::Regex;
-use serde_json::Value;
+use serde_json::{Value, json};
 use vibevalley_protocol::{ApiError, BizCode, Envelope};
 use vibevalley_server_api::Server;
 
@@ -110,6 +110,7 @@ pub fn router(server: Shared) -> Router {
         .route("/api/v1/artifact/{id}/{version}", get(artifact_page).post(command))
         .route("/api/v1/media/input/{id}/content", get(media::content).put(media::upload).post(command))
         .route("/api/v1/{*path}", post(command).get(not_allowed))
+        .route("/mcp", post(mcp).get(not_allowed))
         .fallback(not_found)
         .with_state(server)
 }
@@ -151,6 +152,40 @@ async fn not_found() -> Response {
 
 async fn not_allowed() -> Response {
     refuse(BizCode::MethodNotAllowed, "use POST")
+}
+
+/// A helper's MCP messages (streamable HTTP, answered as plain JSON): one
+/// message or a batch. Notifications alone are answered 202.
+async fn mcp(State(server): State<Shared>, headers: HeaderMap, body: Bytes) -> Response {
+    if !from_the_farm(&headers) {
+        return refuse(BizCode::Forbidden, "forbidden");
+    }
+    let Some(door) = server.mcp() else {
+        return refuse(BizCode::ServiceUnavailable, "no MCP here");
+    };
+    let token = headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .unwrap_or("")
+        .to_string();
+    let Ok(message) = serde_json::from_slice::<Value>(&body) else {
+        let error = json!({ "jsonrpc": "2.0", "id": null, "error": { "code": -32700, "message": "parse error" } });
+        return (StatusCode::BAD_REQUEST, axum::Json(error)).into_response();
+    };
+    let answered = tokio::task::spawn_blocking(move || match message {
+        Value::Array(batch) => {
+            let answers: Vec<Value> = batch.into_iter().filter_map(|m| door.message(&token, m)).collect();
+            if answers.is_empty() { None } else { Some(Value::Array(answers)) }
+        }
+        one => door.message(&token, one),
+    })
+    .await
+    .unwrap_or(None);
+    match answered {
+        Some(answer) => (StatusCode::OK, axum::Json(answer)).into_response(),
+        None => StatusCode::ACCEPTED.into_response(),
+    }
 }
 
 /// The op is read from the URL, not a route parameter: the GET routes

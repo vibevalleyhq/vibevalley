@@ -26,7 +26,7 @@ impl BridgeHub {
     /// The real server under VibeValley's own data folder, started off the UI
     /// thread. `VIBEVALLEY_FAKE_SERVER=<dir>` serves fixtures instead
     /// (`state.json`, `responses.json`) for tests and debug scripts;
-    /// `VIBEVALLEY_SERVER_HOME=<dir>` moves the real one.
+    /// `VIBEVALLEY_HOME=<dir>` moves the real one.
     pub fn install(cx: &mut App) {
         let server: std::sync::Arc<dyn vibevalley_bridge::Server> = match std::env::var_os("VIBEVALLEY_FAKE_SERVER") {
             Some(dir) => std::sync::Arc::new(vibevalley_bridge::fake::FakeServer::from_dir(std::path::Path::new(&dir)).unwrap_or_else(|e| {
@@ -35,9 +35,21 @@ impl BridgeHub {
             })),
             None => std::sync::Arc::new(late::LateServer::spawn(|| {
                 let home = server_home();
-                match vibevalley_server::start(vibevalley_server::ServerConfig::under(home)) {
+                match vibevalley_server::start(vibevalley_server::ServerConfig::under(home.clone())) {
                     Ok(started) => {
                         let hub: std::sync::Arc<dyn vibevalley_bridge::Server> = started.hub.clone();
+                        // The loopback API: the CLI finds it through server.json, the helpers' MCP door is on it.
+                        match vibevalley_http::serve(started.hub.clone(), "127.0.0.1:0".parse().expect("an address")) {
+                            Ok(listener) => {
+                                started.board.set_mcp_url(format!("{}/mcp", listener.url()));
+                                match vibevalley_server::home::announce(&home, &listener.url()) {
+                                    Ok(announced) => std::mem::forget(announced),
+                                    Err(e) => eprintln!("server.json: {e}"),
+                                }
+                                std::mem::forget(listener);
+                            }
+                            Err(e) => eprintln!("vibevalley http: {e}"),
+                        }
                         // The board, profiles and settings live as long as the app.
                         std::mem::forget(started);
                         hub
@@ -82,11 +94,9 @@ impl Replier {
     }
 }
 
-/// The real server's farm: `VIBEVALLEY_SERVER_HOME`, else `<app support>/farm`.
+/// The farm's home: `VIBEVALLEY_HOME`, else `~/.vibevalley` (packages/home).
 pub fn server_home() -> std::path::PathBuf {
-    std::env::var_os("VIBEVALLEY_SERVER_HOME")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| vibevalley_workspace::util::app_support_dir().join("farm"))
+    vibevalley_server::home::home()
 }
 
 /// The bundle's capabilities with the folders the views show files from

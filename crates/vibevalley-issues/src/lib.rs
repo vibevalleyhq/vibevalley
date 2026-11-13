@@ -21,7 +21,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use vibevalley_core::{Applied, CheckoutChecks, Core, Move, Refusal, status_move};
 use vibevalley_git::{MergeCheck, Repo};
-use vibevalley_oar::{ContentBlock, EventKind, PermissionDecision, PermissionMode, Registry, SessionOptions, StopReason};
+use vibevalley_oar::{ContentBlock, EventKind, McpServer, PermissionDecision, PermissionMode, Registry, SessionOptions, StopReason};
 use vibevalley_protocol::{
     Assignment, Conflict, Deliverable, Doing, Execution, Fact, Issue, IssueAnswer, IssueCanceled, IssueConstraints, IssueStageKind as StageKind, IssueStatus,
     Landing, LastRun, Millis, Outcome, Phase, PhaseWorking, Priority, Question, RunTriggerKind, Session, SessionAction, SpaceState, StateFrame as Frame,
@@ -36,8 +36,8 @@ mod git;
 mod report;
 mod runs;
 
-pub use drivers::{Drive, Drivers, Persona, RuntimeDrivers};
-pub use report::{REPORT_ENV, Report, ReportQuestion, ReportStatus};
+pub use drivers::{Drive, Drivers, HelperPlace, Persona, RuntimeDrivers};
+pub use report::{ANSWER_ONLY, Report, ReportQuestion, ReportStatus};
 
 #[derive(Debug, thiserror::Error)]
 pub enum BoardError {
@@ -315,9 +315,18 @@ struct Inner {
     generation: u64,
 }
 
+/// The helpers' MCP door as the board hands it out: where it is, and which
+/// helper each bearer token names.
+#[derive(Default)]
+struct Door {
+    url: Option<String>,
+    tokens: HashMap<String, String>,
+}
+
 #[derive(Clone)]
 pub struct Board {
     inner: Arc<Mutex<Inner>>,
+    door: Arc<Mutex<Door>>,
     facts: Arc<dyn Facts>,
     /// Held by every change to the workflow (not by event pumps), so rooms
     /// are counted and issues sent one at a time. Taken before `inner`.
@@ -432,6 +441,7 @@ impl Board {
         };
         let board = Board {
             inner: Arc::new(Mutex::new(inner)),
+            door: Arc::new(Mutex::new(Door::default())),
             facts,
             work: Arc::new(Mutex::new(())),
             lock: Arc::new(Mutex::new(Some(file))),
@@ -522,6 +532,64 @@ impl Board {
 
     pub fn report_path(&self, session: &str) -> PathBuf {
         self.config.data_dir.join("reports").join(format!("{session}.json"))
+    }
+
+    /// `<work root>/AGENTS.md`, the rules every repo on this machine shares.
+    fn house_rules(&self) -> String {
+        let Some(root) = self.config.repos_dir.as_deref().and_then(Path::parent) else {
+            return String::new();
+        };
+        std::fs::read_to_string(root.join("AGENTS.md")).unwrap_or_default()
+    }
+
+    /// Where helpers reach the farm's MCP door (`http://<addr>/mcp`); a helper
+    /// started before it is known gets no door.
+    pub fn set_mcp_url(&self, url: String) {
+        lock(&self.door).url = Some(url);
+    }
+
+    /// The helper a bearer token names.
+    pub fn who(&self, token: &str) -> Option<String> {
+        if token.is_empty() {
+            return None;
+        }
+        lock(&self.door).tokens.get(token).cloned()
+    }
+
+    /// The helper's door entry, minting its token once.
+    fn door_for(&self, session: &str) -> Option<McpServer> {
+        let mut door = lock(&self.door);
+        let url = door.url.clone()?;
+        let token = match door.tokens.iter().find(|(_, s)| s.as_str() == session) {
+            Some((t, _)) => t.clone(),
+            None => {
+                let t = uuid::Uuid::new_v4().simple().to_string();
+                door.tokens.insert(t.clone(), session.to_string());
+                t
+            }
+        };
+        Some(McpServer::Http {
+            name: "vibevalley".into(),
+            url,
+            headers: vec![("authorization".into(), format!("Bearer {token}"))],
+        })
+    }
+
+    fn close_door(&self, session: &str) {
+        lock(&self.door).tokens.retain(|_, s| s != session);
+    }
+
+    /// What the helper hands back at the end of its round (`issue_report`),
+    /// read when the round ends.
+    pub fn report(&self, session: &str, report: &Report) -> Result<()> {
+        let path = self.report_path(session);
+        let failed = |e: &dyn std::fmt::Display| BoardError::Other(format!("the report for {session}: {e}"));
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir).map_err(|e| failed(&e))?;
+        }
+        let tmp = path.with_extension("json.tmp");
+        std::fs::write(&tmp, serde_json::to_vec(report).map_err(|e| failed(&e))?).map_err(|e| failed(&e))?;
+        std::fs::rename(tmp, path).map_err(|e| failed(&e))
     }
 
     fn stored(&self, reference: &str) -> Result<Issue> {
@@ -1041,7 +1109,15 @@ impl Board {
         let instructions = if session.refining {
             "You are drafting an issue for VibeValley's board. Do not change or commit files.".to_string()
         } else {
-            report::instructions(issue.deliver)
+            let place = HelperPlace {
+                repo: session.repo.clone().unwrap_or_default(),
+                branch: session.branch.clone(),
+                cwd: session.worktree.clone().unwrap_or_default(),
+                id: session.id.clone(),
+                pull_request: issue.deliver == Deliverable::PullRequest,
+                house: self.house_rules(),
+            };
+            self.drivers.rules(&place, issue.deliver)
         };
         let system_prompt = match &drive.persona {
             Some(Persona::Replace(persona)) => Some(persona.clone()),
@@ -1052,8 +1128,9 @@ impl Board {
             Some(Persona::Prompt(persona)) if !resume => (instructions, format!("{persona}\n\n---\n\n{prompt}")),
             _ => (instructions, prompt),
         };
-        let mut env = drive.env.clone();
-        env.push((REPORT_ENV.to_string(), report.to_string_lossy().into_owned()));
+        let env = drive.env.clone();
+        let mut mcp_servers: Vec<McpServer> = self.door_for(&session.id).into_iter().collect();
+        mcp_servers.extend(drive.mcp_servers.iter().cloned());
         #[allow(clippy::needless_update, reason = "fields vibevalley-oar adds later")]
         let opts = SessionOptions {
             cwd,
@@ -1064,7 +1141,7 @@ impl Board {
             env,
             record_to: Some(self.record_path(&session.id)),
             effort: drive.effort.clone(),
-            mcp_servers: drive.mcp_servers.clone(),
+            mcp_servers,
             disallowed_tools: drive.disallowed_tools.clone(),
             system_prompt,
             ..Default::default()
@@ -1329,11 +1406,16 @@ impl Board {
                     runs,
                     spent: None,
                     questions: vec![],
-                    checks: vec![],
+                    checks: report.as_ref().map(|r| r.checks.clone()).unwrap_or_default(),
                     answer,
                 }),
             ],
         );
+        drop(inner);
+        if let Some(r) = report.as_ref().filter(|r| !r.remember.is_empty()) {
+            self.drivers
+                .remember(&session.agent, session_id, session.repo.as_deref().unwrap_or(""), &r.remember);
+        }
     }
 
     /// After every round: children in review merge into their parents,
@@ -1552,6 +1634,7 @@ impl Board {
             }
         }
         let _ = std::fs::remove_file(self.report_path(session_id));
+        self.close_door(session_id);
         if session.is_some() {
             self.apply(vec![Fact::session_left(now(), session_id, None)])?;
         }

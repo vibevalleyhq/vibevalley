@@ -39,6 +39,7 @@ pub struct Farm {
     pub agents: Arc<Agents>,
     pub repos: Arc<Repos>,
     pub crons: Arc<Crons>,
+    pub resources: Arc<crate::modules::mcp::Resources>,
 }
 
 impl Farm {
@@ -217,6 +218,7 @@ impl FarmTool {
                 }
                 serde_json::to_string(&f.call(&self.words.op, payload)?).map_err(|e| e.to_string())
             }
+            "resource.read" => f.resources.read(None, p),
             "issue.list" => {
                 let mut filter = json!({});
                 for k in ["text", "repo", "closed", "wantsUser"] {

@@ -102,6 +102,7 @@ pub struct Parts {
     pub crons: Arc<Crons>,
     pub trajectories: Arc<Trajectories>,
     pub memories: Arc<crate::modules::memory::Memories>,
+    pub resources: Arc<crate::modules::mcp::Resources>,
     /// The DeepSeek key, read at each turn.
     pub key: Arc<dyn Fn() -> Option<String> + Send + Sync>,
     /// Talks to this model instead of DeepSeek (tests).
@@ -119,6 +120,7 @@ impl Orchestrator {
             repos: p.repos,
             crons: p.crons,
             memories: p.memories,
+            resources: p.resources,
         });
         let o = Arc::new(Orchestrator {
             farm,

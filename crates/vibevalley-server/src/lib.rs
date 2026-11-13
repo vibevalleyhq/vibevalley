@@ -25,6 +25,7 @@ use vibevalley_protocol::{
 pub use vibevalley_server_api::{Server, refusal};
 
 pub mod base;
+pub mod home;
 pub mod modules;
 mod public_http;
 mod start;
@@ -89,6 +90,7 @@ pub struct Hub {
     subscriptions: Mutex<HashMap<u64, flume::Sender<()>>>,
     next_id: AtomicU64,
     media_inputs: RwLock<Option<vibevalley_server_api::media::SharedMediaInputs>>,
+    mcp: RwLock<Option<vibevalley_server_api::SharedMcp>>,
     /// Each fold's effects, for the frame thread.
     kicks: flume::Sender<Vec<GameEffect>>,
 }
@@ -98,6 +100,11 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl Hub {
+    /// The helpers' MCP door (`modules::mcp::Door`).
+    pub fn attach_mcp(&self, door: vibevalley_server_api::SharedMcp) {
+        *self.mcp.write().unwrap_or_else(|e| e.into_inner()) = Some(door);
+    }
+
     pub fn attach_media_inputs(&self, inputs: vibevalley_server_api::media::SharedMediaInputs) {
         *self.media_inputs.write().unwrap_or_else(|e| e.into_inner()) = Some(inputs);
     }
@@ -115,6 +122,7 @@ impl Hub {
             subscriptions: Mutex::default(),
             next_id: AtomicU64::new(1),
             media_inputs: RwLock::new(None),
+            mcp: RwLock::new(None),
             kicks,
         });
         let weak = Arc::downgrade(&hub);
@@ -314,6 +322,9 @@ impl vibevalley_issues::Facts for Hub {
 }
 
 impl Server for Hub {
+    fn mcp(&self) -> Option<vibevalley_server_api::SharedMcp> {
+        self.mcp.read().unwrap_or_else(|e| e.into_inner()).clone()
+    }
     fn media_inputs(&self) -> Option<vibevalley_server_api::media::SharedMediaInputs> {
         self.media_inputs.read().unwrap_or_else(|e| e.into_inner()).clone()
     }

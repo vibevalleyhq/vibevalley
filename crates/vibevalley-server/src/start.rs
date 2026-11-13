@@ -111,6 +111,8 @@ pub struct Started {
     pub media_inputs: Arc<modules::media::inputs::Inputs>,
     /// Kept attachments as material.
     pub library: Arc<modules::library::Library>,
+    /// `vv://` reads for the orchestrator's and the helpers' `resource_read`.
+    pub resources: Arc<modules::mcp::Resources>,
 }
 
 impl Started {
@@ -247,6 +249,20 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     if config.watch_pkm {
         pkm.watch();
     }
+    let resources = modules::mcp::Resources::new(board.clone(), chat.clone(), trajectories.clone());
+    hub.attach_mcp(modules::mcp::Door::new(
+        modules::mcp::Helpers {
+            hub: Arc::downgrade(&hub),
+            board: board.clone(),
+            chat: chat.clone(),
+            memories: memories.clone(),
+            pkm: pkm.clone(),
+            artifacts: artifacts.clone(),
+            library: library.clone(),
+            resources: resources.clone(),
+        },
+        config.version.clone(),
+    ));
     modules::issue::install_conversation(&hub, board.clone(), chat.clone());
     modules::issue::install_reviewed(&hub, board.clone(), game.clone());
     let key = setting.clone();
@@ -261,6 +277,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         crons: crons.clone(),
         trajectories,
         memories: memories.clone(),
+        resources: resources.clone(),
         key: Arc::new(move || key.deepseek_api_key()),
         client: config.model_client.clone(),
     });
@@ -287,6 +304,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         artifacts,
         pkm,
         library,
+        resources,
         media_inputs,
         media,
     })

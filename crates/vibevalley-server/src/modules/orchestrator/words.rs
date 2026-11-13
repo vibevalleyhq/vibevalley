@@ -21,6 +21,17 @@ pub struct Prompts {
     pub env: String,
     pub skills: String,
     pub memory: String,
+    pub workplace: Workplaces,
+}
+
+/// A helper's rules on an issue (`workplaceRules`), with `{repo}`, `{branch}`,
+/// `{cwd}`, `{id}` and `{house}` to fill.
+#[derive(Deserialize)]
+pub struct Workplaces {
+    pub branch: String,
+    #[serde(rename = "pullRequest")]
+    pub pull_request: String,
+    pub folder: String,
 }
 
 pub static PROMPTS: LazyLock<Prompts> =

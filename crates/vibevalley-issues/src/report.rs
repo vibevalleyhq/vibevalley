@@ -1,15 +1,11 @@
-//! The structured report an agent hands back at the end of a round.
-//! VibeValley takes it through an MCP tool (`issue_report`); here the agent
-//! writes it as JSON to the file named by `$VIBEVALLEY_REPORT`, which needs no
-//! server and works for every runtime. A round with no report is read from
-//! what the agent said (as VibeValley reads an undeclared one).
+//! The structured report an agent hands back at the end of a round through
+//! the `issue_report` tool (`Board::report`). A round with no report is read
+//! from what the agent said.
 
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
-use vibevalley_protocol::{Deliverable, IssueAnswer, Question};
-
-pub const REPORT_ENV: &str = "VIBEVALLEY_REPORT";
+use vibevalley_protocol::{CriterionCheck, Deliverable, IssueAnswer, IssueReportMemory, Question};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -58,6 +54,8 @@ pub struct Report {
     pub questions: Vec<ReportQuestion>,
     #[serde(deserialize_with = "lenient_answer")]
     pub answer: Option<IssueAnswer>,
+    pub checks: Vec<CriterionCheck>,
+    pub remember: Vec<IssueReportMemory>,
 }
 
 /// An answer as the agent writes it: only `conclusion` is required, the
@@ -89,26 +87,23 @@ impl Report {
     }
 }
 
-/// Appended to the agent's system prompt.
+/// Appended to the agent's system prompt when the drivers have no rules of
+/// their own (standalone boards).
 pub fn instructions(deliver: Deliverable) -> String {
     let work = match deliver {
         Deliverable::Change | Deliverable::Branch | Deliverable::PullRequest => {
             "You work in a git worktree on the issue's own branch. Commit your work there with a clear message; \
              do not switch branches, push or merge."
         }
-        Deliverable::Answer => {
-            "This issue asks for an answer, not a change: investigate read-only (read code, run read-only \
-             commands) and do not modify or commit files; anything you change is thrown away."
-        }
+        Deliverable::Answer => ANSWER_ONLY,
     };
     format!(
         "You are working on an issue from VibeValley's board. {work}\n\n\
-         When you finish a round, write a JSON report to the file named by the environment variable ${REPORT_ENV} \
-         (overwrite it), for example:\n\
-         {{\"status\": \"done\", \"summary\": \"one or two sentences\", \"questions\": [], \"answer\": null}}\n\
-         status is \"done\" when the work is complete, \"blocked\" when you need the user to answer the questions \
-         you list, \"failed\" when you could not do it. For an answer issue, put \
-         {{\"conclusion\": \"one or two sentences\", \"evidence\": [\"file:line what you saw\", \"command and its output\"]}} \
-         in answer. Write the report with a shell command, e.g. cat > \"${REPORT_ENV}\" <<'EOF' ... EOF."
+         When you finish a round, call the issue_report tool of the vibevalley MCP server with a one or two \
+         sentence summary, any questions for the user, and for an answer issue the answer."
     )
 }
+
+/// What an answer issue's helper is told beside its rules.
+pub const ANSWER_ONLY: &str = "This issue asks for an answer, not a change: investigate read-only (read code, run read-only \
+     commands) and do not modify or commit files; anything you change is thrown away.";

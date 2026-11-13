@@ -257,6 +257,7 @@ fn orchestrator_image_tool_requires_user_intent_and_posts_once_to_its_channel() 
         agents: s.agents.clone(),
         repos: s.repos.clone(),
         crons: s.crons.clone(),
+        resources: s.resources.clone(),
     });
     let route = Arc::new(Mutex::new(Route {
         agent: "orchestrator".into(),

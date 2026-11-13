@@ -5,7 +5,7 @@
 use std::sync::Arc;
 
 use vibevalley_oar::{Installation, Registry, Runtime};
-use vibevalley_protocol::Issue;
+use vibevalley_protocol::{Deliverable, Issue, IssueReportMemory};
 
 use crate::{BoardError, Result};
 
@@ -51,6 +51,25 @@ pub trait Drivers: Send + Sync {
     fn recall(&self, _agent: &str, _session: &str, _repo: &str, _input: &str) -> String {
         String::new()
     }
+    /// The rules a helper works an issue by (its appended system prompt).
+    fn rules(&self, _place: &HelperPlace, deliver: Deliverable) -> String {
+        crate::report::instructions(deliver)
+    }
+    /// What a helper's report asks it to remember.
+    fn remember(&self, _agent: &str, _session: &str, _repo: &str, _memories: &[IssueReportMemory]) {}
+}
+
+/// Where a helper works an issue, for its rules.
+pub struct HelperPlace {
+    pub repo: String,
+    /// None: the repo's own folder, no branch of its own.
+    pub branch: Option<String>,
+    pub cwd: String,
+    /// The helper's own id (`@w3`).
+    pub id: String,
+    pub pull_request: bool,
+    /// The work root's AGENTS.md: rules for every repo on this machine.
+    pub house: String,
 }
 
 /// An agent is a runtime id; nobody assigned runs `claude`.

@@ -10,6 +10,7 @@ vibevalley-bridge = { version = "0.1.0", path = "../../crates/vibevalley-bridge"
 vibevalley-files = { version = "0.1.0", path = "../../crates/vibevalley-files" }
 vibevalley-git = { version = "0.1.0", path = "../../crates/vibevalley-git" }
 vibevalley-server = { version = "0.1.0", path = "../../crates/vibevalley-server" }
+vibevalley-http = { version = "0.1.0", path = "../../crates/vibevalley-http" }
 vibevalley-store = { version = "0.1.0", path = "../../crates/vibevalley-store" }
 vibevalley-terminal = { version = "0.1.0", path = "../../crates/vibevalley-terminal" }
 vibevalley-workspace = { version = "0.1.0", path = "../../crates/vibevalley-workspace" }

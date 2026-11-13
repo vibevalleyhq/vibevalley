@@ -1,11 +1,18 @@
-//! The in-process server's contract (approved 2026-11-13; see
-//! `docs/vibevalley-port.md` § Bridge). `vibevalley-bridge` and `vibevalley-http`
+//! The in-process server's contract. `vibevalley-bridge` and `vibevalley-http`
 //! serve views through [`Server`]; `vibevalley-server` implements it. Payloads,
 //! frames and events are VibeValley's protocol JSON.
 
 pub use vibevalley_protocol::{ApiError, BizCode, Envelope, LiveEvent};
 
 pub mod media;
+
+/// The helpers' MCP door (`POST /mcp`): one JSON-RPC message from a helper
+/// with the bearer token it was given. `None` answers a notification.
+pub trait Mcp: Send + Sync {
+    fn message(&self, token: &str, message: serde_json::Value) -> Option<serde_json::Value>;
+}
+
+pub type SharedMcp = std::sync::Arc<dyn Mcp>;
 
 /// What the server provides to the views.
 pub trait Server: Send + Sync {
@@ -25,6 +32,10 @@ pub trait Server: Send + Sync {
     fn unsubscribe(&self, id: u64);
     /// Optional local binary media transport.
     fn media_inputs(&self) -> Option<media::SharedMediaInputs> {
+        None
+    }
+    /// The helpers' MCP door, when the server has one.
+    fn mcp(&self) -> Option<SharedMcp> {
         None
     }
 }

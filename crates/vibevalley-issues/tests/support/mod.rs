@@ -98,7 +98,14 @@ impl Runtime for HookRuntime {
         Ok(vec![])
     }
     fn open(&self, opts: SessionOptions) -> vibevalley_oar::Result<Arc<dyn Session>> {
-        let report = opts.env.iter().find(|(k, _)| k == "VIBEVALLEY_REPORT").map(|(_, v)| PathBuf::from(v)).unwrap();
+        // Where `Board::report` keeps this session's report: beside its record, by the same name.
+        let record = opts.record_to.clone().expect("the board records every session");
+        let report = record
+            .parent()
+            .and_then(|d| d.parent())
+            .unwrap()
+            .join("reports")
+            .join(record.with_extension("json").file_name().unwrap());
         let cwd = opts.cwd.clone();
         let n = self.opened.fetch_add(1, Ordering::SeqCst);
         let script = if n == 0 {

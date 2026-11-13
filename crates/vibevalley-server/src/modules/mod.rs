@@ -13,6 +13,7 @@ pub mod game;
 pub mod issue;
 pub mod lan;
 pub mod library;
+pub mod mcp;
 pub mod media;
 pub mod memory;
 pub mod orchestrator;

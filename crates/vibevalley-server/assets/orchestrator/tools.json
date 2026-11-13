@@ -285,6 +285,32 @@
   }
  },
  {
+  "op": "resource.read",
+  "name": "resource_read",
+  "description": "按 URI 分页读取完整资源。输入里只有摘要和 vv:// 指针时用；offset 是 UTF-16 字符偏移，第一页从 0 开始，后续照回答的 nextOffset 继续。同一会话从 offset 0 读到的动态内容会固定成快照。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "uri": {
+     "description": "要读取的 vv:// URI。",
+     "type": "string"
+    },
+    "offset": {
+     "description": "UTF-16 字符偏移；默认 0。",
+     "type": "integer"
+    },
+    "limit": {
+     "description": "这一页最多返回多少字符；默认 4000，上限 16000。",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "uri"
+   ],
+   "type": "object"
+  }
+ },
+ {
   "op": "session.list",
   "name": "session_list",
   "description": "列出在场的所有帮工：在做什么、上一轮的结果。",
@@ -721,9 +747,9 @@
   }
  },
  {
-  "op": "media.job.get",
-  "name": "media_job_get",
-  "description": "读取一次媒体任务。图片和语音 ready 才有本机附件；理解结果保留文本和截断信息。unknown 表示厂商可能仍在执行或已计费，不要自动重做。用用户的语言回答。",
+  "op": "media.understanding.start",
+  "name": "media_understanding_start",
+  "description": "按任务 id 执行用户预先登记的图片或视频理解授权。只能在授权频道替用户执行；输入、问题、模型和输出上限已冻结，不能自报上传许可、换参数或提供服务器路径。过期、取消或重启后不能启动。重复同一 id 不重复上传或计费；用 media_job_get 看结果，勿密集轮询。用用户的语言回答。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
@@ -738,12 +764,228 @@
   }
  },
  {
-  "op": "media.job.list",
-  "name": "media_job_list",
-  "description": "查看最近 100 次媒体任务，包括授权、来源、结果、状态和可用操作。用用户的语言回答。",
+  "op": "media.speech.create",
+  "name": "media_speech_create",
+  "description": "用户明确要求时生成一次 Flash 或 Pro 单人语音。输入文字、账号与 revision、该账号音色和音频格式，可选择 asynchronous 持久异步任务；文字会发给 MOSS，可能计费。id 与全部参数在重试时保持不变，unknown 不自动重做。返回本机任务，ready 后可用附件；非流式结果不会冒充流式播放，PCM 仅下载。用用户的语言回答。",
   "parameters": {
    "additionalProperties": true,
-   "properties": {},
+   "properties": {
+    "id": {
+     "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+     "type": "string"
+    },
+    "text": {
+     "maxLength": 10000,
+     "minLength": 1,
+     "pattern": "\\S",
+     "type": "string"
+    },
+    "voice": {
+     "pattern": "^[a-zA-Z0-9_-]{1,256}$",
+     "type": "string"
+    },
+    "format": {
+     "enum": [
+      "wav",
+      "mp3",
+      "flac",
+      "aac",
+      "opus",
+      "pcm"
+     ],
+     "type": "string"
+    },
+    "asynchronous": {
+     "type": "boolean"
+    },
+    "streaming": {
+     "type": "boolean"
+    },
+    "connection": {
+     "minLength": 1,
+     "type": "string"
+    },
+    "revision": {
+     "maximum": 9007199254740991,
+     "minimum": 0,
+     "type": "integer"
+    }
+   },
+   "required": [
+    "id",
+    "text",
+    "voice",
+    "format",
+    "connection",
+    "revision"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "media.dialogue.create",
+  "name": "media_dialogue_create",
+  "description": "用户明确要求时生成多人对话语音。给定唯一说话人 id 与该账号 voice 的映射，以及引用这些 id 的 segments。冻结 id、账号 revision、文字、格式；重复提交只读取同一任务，不重新计费。通过 media_job_get 查询，ready 后取得本机附件。不能替用户确认样本克隆授权。用用户的语言回答。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "id": {
+     "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+     "type": "string"
+    },
+    "connection": {
+     "minLength": 1,
+     "type": "string"
+    },
+    "revision": {
+     "maximum": 9007199254740991,
+     "minimum": 0,
+     "type": "integer"
+    },
+    "speakers": {
+     "items": {
+      "additionalProperties": true,
+      "properties": {
+       "id": {
+        "maxLength": 256,
+        "minLength": 1,
+        "pattern": "\\S",
+        "type": "string"
+       },
+       "voice": {
+        "pattern": "^[a-zA-Z0-9_-]{1,256}$",
+        "type": "string"
+       }
+      },
+      "required": [
+       "id",
+       "voice"
+      ],
+      "type": "object"
+     },
+     "maxItems": 100,
+     "minItems": 1,
+     "type": "array"
+    },
+    "segments": {
+     "items": {
+      "additionalProperties": true,
+      "properties": {
+       "speaker": {
+        "maxLength": 256,
+        "minLength": 1,
+        "pattern": "\\S",
+        "type": "string"
+       },
+       "text": {
+        "maxLength": 10000,
+        "minLength": 1,
+        "pattern": "\\S",
+        "type": "string"
+       }
+      },
+      "required": [
+       "speaker",
+       "text"
+      ],
+      "type": "object"
+     },
+     "maxItems": 1000,
+     "minItems": 1,
+     "type": "array"
+    },
+    "format": {
+     "enum": [
+      "wav",
+      "mp3",
+      "flac",
+      "aac",
+      "opus",
+      "pcm"
+     ],
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "connection",
+    "revision",
+    "speakers",
+    "segments",
+    "format"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "media.voiceDesign.create",
+  "name": "media_voice_design_create",
+  "description": "用户明确要求时，提交文字和音色描述生成预览语音。预览不是可复用 voice_id；保存为音色必须由用户在页面明确授权上传。保持同一请求 id 和参数，结果未知不能重复提交新请求。用 media_job_get 查询本机任务。用用户的语言回答。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "id": {
+     "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+     "type": "string"
+    },
+    "connection": {
+     "minLength": 1,
+     "type": "string"
+    },
+    "revision": {
+     "maximum": 9007199254740991,
+     "minimum": 0,
+     "type": "integer"
+    },
+    "text": {
+     "maxLength": 10000,
+     "minLength": 1,
+     "pattern": "\\S",
+     "type": "string"
+    },
+    "instruction": {
+     "maxLength": 10000,
+     "minLength": 1,
+     "pattern": "\\S",
+     "type": "string"
+    },
+    "format": {
+     "enum": [
+      "wav",
+      "mp3",
+      "flac",
+      "aac",
+      "opus",
+      "pcm"
+     ],
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "connection",
+    "revision",
+    "text",
+    "instruction",
+    "format"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "media.job.get",
+  "name": "media_job_get",
+  "description": "读取一次媒体任务。图片和语音 ready 才有本机附件；理解结果保留文本和截断信息。unknown 表示厂商可能仍在执行或已计费，不要自动重做。用用户的语言回答。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "id": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "id"
+   ],
    "type": "object"
   }
  },
@@ -778,6 +1020,16 @@
    "required": [
     "id"
    ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "media.job.list",
+  "name": "media_job_list",
+  "description": "查看最近 100 次媒体任务，包括授权、来源、结果、状态和可用操作。用用户的语言回答。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {},
    "type": "object"
   }
  },

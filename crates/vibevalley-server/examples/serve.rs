@@ -10,8 +10,11 @@ fn main() {
         deepseek_api_key: std::env::var("DEEPSEEK_API_KEY").unwrap_or_default(),
         ..vibevalley_server::ServerConfig::under(dir)
     };
+    let home = config.home.clone();
     let started = vibevalley_server::start(config).expect("the server");
-    let listener = vibevalley_http::serve(started.hub, "127.0.0.1:0".parse().unwrap()).expect("listen");
+    let listener = vibevalley_http::serve(started.hub.clone(), "127.0.0.1:0".parse().unwrap()).expect("listen");
+    started.board.set_mcp_url(format!("{}/mcp", listener.url()));
+    let _announced = vibevalley_server::home::announce(&home, &listener.url()).expect("server.json");
     println!("{}", listener.url());
     std::thread::park();
 }
