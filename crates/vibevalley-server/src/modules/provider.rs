@@ -18,6 +18,8 @@ use crate::Hub;
 
 const MOSS: &str = "https://api.mosi.cn/v1";
 
+use crate::modules::media::vendor::{Fetch, FetchError, Request};
+
 pub const IMAGE_MODELS: [&str; 4] = [
     "moss-image-base-1.0",
     "moss-image-sft-1.0",
@@ -192,43 +194,53 @@ pub fn connections_over(current: &Value, update: &ProviderUpdate) -> Result<Valu
     Ok(next)
 }
 
-/// A MOSS call's failure in the user's words (`refusal`).
-fn vendor_refusal(e: ureq::Error) -> ApiError {
-    match e {
-        ureq::Error::Timeout(_) => refuse("server.provider.timeout"),
-        ureq::Error::StatusCode(401) => refuse("server.provider.authentication"),
-        ureq::Error::StatusCode(403) => refuse("server.provider.forbidden"),
-        ureq::Error::StatusCode(429) => refuse("server.provider.rateLimited"),
-        ureq::Error::StatusCode(status) => ApiError::new(BizCode::ProviderRefused, t("server.provider.httpStatus", &[("status", (status as i64).into())])),
-        ureq::Error::BodyExceedsLimit(_) => refuse("server.provider.tooLarge"),
-        ureq::Error::Json(_) => refuse("server.provider.invalidResponse"),
-        _ => refuse("server.provider.network"),
-    }
-}
-
-fn moss_get(key: &str, url: &str, query: &[(&str, String)], timeout: Duration) -> Result<Value, ApiError> {
+/// A GET to MOSS: the parsed 2xx body, else its failure in the user's words (`refusal`).
+fn moss_get(fetch: &dyn Fetch, key: &str, url: &str, query: &[(&str, String)], timeout: Duration) -> Result<Value, ApiError> {
     if key.trim().is_empty() || key.chars().any(char::is_whitespace) {
         return Err(refuse("server.provider.noKey"));
     }
-    let agent: ureq::Agent = ureq::Agent::config_builder().timeout_global(Some(timeout)).max_redirects(0).build().into();
-    let mut req = agent
-        .get(url)
-        .header("authorization", format!("Bearer {key}"))
-        .header("accept", "application/json");
+    let mut target = url::Url::parse(url).map_err(|_| refuse("server.provider.network"))?;
     for (k, v) in query {
-        req = req.query(*k, v);
+        target.query_pairs_mut().append_pair(k, v);
     }
-    let mut resp = req.call().map_err(vendor_refusal)?;
-    resp.body_mut().with_config().limit(1 << 20).read_json::<Value>().map_err(vendor_refusal)
+    let response = fetch
+        .fetch(Request {
+            method: "GET",
+            url: target.to_string(),
+            headers: vec![("authorization".into(), format!("Bearer {key}")), ("accept".into(), "application/json".into())],
+            body: None,
+            timeout,
+        })
+        .map_err(|e| match e {
+            FetchError::Timeout => refuse("server.provider.timeout"),
+            FetchError::Network(_) => refuse("server.provider.network"),
+        })?;
+    match response.status {
+        200..=299 => {}
+        401 => return Err(refuse("server.provider.authentication")),
+        403 => return Err(refuse("server.provider.forbidden")),
+        429 => return Err(refuse("server.provider.rateLimited")),
+        status => {
+            return Err(ApiError::new(
+                BizCode::ProviderRefused,
+                t("server.provider.httpStatus", &[("status", (status as i64).into())]),
+            ));
+        }
+    }
+    let mut body = response.body;
+    let bytes = crate::modules::media::vendor::read_max(&mut body, 1 << 20, None).map_err(|_| refuse("server.provider.tooLarge"))?;
+    serde_json::from_slice(&bytes).map_err(|_| refuse("server.provider.invalidResponse"))
 }
 
 pub struct Provider {
     setting: Arc<Setting>,
+    /// How MOSS is reached (offline in the page's tests).
+    fetch: Arc<dyn Fetch>,
 }
 
 impl Provider {
-    pub fn new(setting: Arc<Setting>) -> Provider {
-        Provider { setting }
+    pub fn new(setting: Arc<Setting>, fetch: Arc<dyn Fetch>) -> Provider {
+        Provider { setting, fetch }
     }
 
     pub fn status(&self) -> ProviderStatus {
@@ -259,7 +271,7 @@ impl Provider {
 
     pub fn models(&self, connection: &str, revision: i64) -> Result<ProviderModelListing, ApiError> {
         let key = self.key_at(connection, revision)?;
-        let list = moss_get(&key, &format!("{MOSS}/models"), &[], Duration::from_secs(15))?;
+        let list = moss_get(&*self.fetch, &key, &format!("{MOSS}/models"), &[], Duration::from_secs(15))?;
         let data = list["data"]
             .as_array()
             .filter(|_| list["object"] == "list")
@@ -304,7 +316,7 @@ impl Provider {
         if let Some(st) = &r.status {
             query.push(("status", st.clone()));
         }
-        let got = moss_get(&key, &format!("{MOSS}/audio/voices"), &query, Duration::from_secs(30))?;
+        let got = moss_get(&*self.fetch, &key, &format!("{MOSS}/audio/voices"), &query, Duration::from_secs(30))?;
         let bad = || refuse("server.provider.invalidResponse");
         let data = got["data"]
             .as_array()

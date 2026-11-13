@@ -85,9 +85,7 @@ impl Fetch for Ureq {
                     b = b.header(k, v);
                 }
                 match r.body {
-                    Some((kind, body)) => {
-                        b.header("content-type", kind).send(ureq::SendBody::from_owned_reader(body)).map_err(failed)?
-                    }
+                    Some((kind, body)) => b.header("content-type", kind).send(ureq::SendBody::from_owned_reader(body)).map_err(failed)?,
                     None => b.send_empty().map_err(failed)?,
                 }
             }
@@ -98,7 +96,11 @@ impl Fetch for Ureq {
             .iter()
             .filter_map(|(k, v)| Some((k.as_str().to_string(), v.to_str().ok()?.to_string())))
             .collect();
-        Ok(Response { status, headers, body: Box::new(response.into_body().into_reader()) })
+        Ok(Response {
+            status,
+            headers,
+            body: Box::new(response.into_body().into_reader()),
+        })
     }
 }
 
@@ -131,7 +133,12 @@ pub struct VendorError {
 
 impl VendorError {
     pub fn new(reason: Reason, outcome: Outcome) -> VendorError {
-        VendorError { reason, outcome, status: None, code: None }
+        VendorError {
+            reason,
+            outcome,
+            status: None,
+            code: None,
+        }
     }
 
     /// `outcomeOf`: nothing sent counts as refused.
@@ -141,8 +148,7 @@ impl VendorError {
 
     /// Network, timeout, 429 and 5xx (`AudioFailure.retryable`).
     pub fn retryable(&self) -> bool {
-        matches!(self.reason, Reason::Network | Reason::Timeout)
-            || (self.reason == Reason::HttpStatus && self.status.is_some_and(|s| s == 429 || s >= 500))
+        matches!(self.reason, Reason::Network | Reason::Timeout) || (self.reason == Reason::HttpStatus && self.status.is_some_and(|s| s == 429 || s >= 500))
     }
 }
 
@@ -327,29 +333,62 @@ fn multipart(parts: Vec<Part>) -> (String, Box<dyn Read + Send>) {
 }
 
 impl Moss {
-    fn send(&self, key: &str, method: &'static str, url: String, body: Option<(String, Box<dyn Read + Send>)>, accept: &str, timeout: Duration) -> Result<Response, VendorError> {
+    fn send(
+        &self,
+        key: &str,
+        method: &'static str,
+        url: String,
+        body: Option<(String, Box<dyn Read + Send>)>,
+        accept: &str,
+        timeout: Duration,
+    ) -> Result<Response, VendorError> {
         if bad_key(key) {
             return Err(VendorError::new(Reason::Credentials, Outcome::NotSubmitted));
         }
         let headers = vec![("authorization".into(), format!("Bearer {key}")), ("accept".into(), accept.into())];
-        self.fetch.fetch(Request { method, url, headers, body, timeout }).map_err(|e| match e {
-            FetchError::Timeout => VendorError::new(Reason::Timeout, Outcome::Unknown),
-            FetchError::Network(_) => VendorError::new(Reason::Network, Outcome::Unknown),
-        })
+        self.fetch
+            .fetch(Request {
+                method,
+                url,
+                headers,
+                body,
+                timeout,
+            })
+            .map_err(|e| match e {
+                FetchError::Timeout => VendorError::new(Reason::Timeout, Outcome::Unknown),
+                FetchError::Network(_) => VendorError::new(Reason::Network, Outcome::Unknown),
+            })
     }
 
     /// A JSON call: the parsed 2xx body, or a `HttpStatus` failure saying
     /// whether MOSS refused it (`audio` also takes a 404 for a missing voice
     /// or task as refused).
-    fn call(&self, key: &str, method: &'static str, path: &str, body: Option<(String, Box<dyn Read + Send>)>, timeout: Duration, audio: bool) -> Result<Value, VendorError> {
+    fn call(
+        &self,
+        key: &str,
+        method: &'static str,
+        path: &str,
+        body: Option<(String, Box<dyn Read + Send>)>,
+        timeout: Duration,
+        audio: bool,
+    ) -> Result<Value, VendorError> {
         let mut r = self.send(key, method, format!("{MOSS}{path}"), body, "application/json", timeout)?;
         let raw = read_max(&mut r.body, 1 << 20, None)?;
         let parsed: Option<Value> = serde_json::from_slice(&raw).ok();
         if !(200..300).contains(&r.status) {
             let code = parsed.as_ref().and_then(|v| v["error"]["code"].as_str()).map(str::to_string);
             let missing = r.status == 404 && audio && matches!(code.as_deref(), Some("voice_not_found" | "task_not_found"));
-            let outcome = if REJECTED.contains(&r.status) || missing { Outcome::Rejected } else { Outcome::Unknown };
-            return Err(VendorError { reason: Reason::HttpStatus, outcome, status: Some(r.status), code });
+            let outcome = if REJECTED.contains(&r.status) || missing {
+                Outcome::Rejected
+            } else {
+                Outcome::Unknown
+            };
+            return Err(VendorError {
+                reason: Reason::HttpStatus,
+                outcome,
+                status: Some(r.status),
+                code,
+            });
         }
         parsed.ok_or_else(invalid_response)
     }
@@ -403,7 +442,12 @@ impl Moss {
             "prompt_enhance": extra["enhance"].as_bool().unwrap_or(false),
             "output_watermark": { "enabled": extra["watermark"].as_bool().unwrap_or(true) },
         });
-        for (from, to) in [("seed", "seed"), ("steps", "num_inference_steps"), ("guidance", "guidance_scale"), ("negativePrompt", "negative_prompt")] {
+        for (from, to) in [
+            ("seed", "seed"),
+            ("steps", "num_inference_steps"),
+            ("guidance", "guidance_scale"),
+            ("negativePrompt", "negative_prompt"),
+        ] {
             if !extra[from].is_null() {
                 body[to] = extra[from].clone();
             }
@@ -414,7 +458,9 @@ impl Moss {
     /// `generateMossImage`: the signed address and usage.
     pub fn image(&self, key: &str, body: &Value, width: i64, height: i64) -> Result<(String, Value), VendorError> {
         let r = self.call(key, "POST", "/images/generations", json_body(body), Duration::from_secs(900), false)?;
-        let url = r["data"][0]["url"].as_str().filter(|u| https_url(u, 8192) && r["data"].as_array().is_some_and(|d| d.len() == 1));
+        let url = r["data"][0]["url"]
+            .as_str()
+            .filter(|u| https_url(u, 8192) && r["data"].as_array().is_some_and(|d| d.len() == 1));
         let usage = &r["usage"];
         match url {
             Some(url) if usage["generated_images"] == 1 && usage["output_width"] == width && usage["output_height"] == height => {
@@ -451,7 +497,12 @@ impl Moss {
             return None;
         }
         let usage = if r["usage"].is_null() { None } else { Some(usage_of(&r["usage"])?) };
-        Some(Generated { url: url.into(), format: format.into(), content_type: kind.into(), usage })
+        Some(Generated {
+            url: url.into(),
+            format: format.into(),
+            content_type: kind.into(),
+            usage,
+        })
     }
 
     pub fn speech_generate(&self, key: &str, body: &Value) -> Result<Generated, VendorError> {
@@ -505,11 +556,17 @@ impl Moss {
                                 return Err(invalid_response());
                             }
                         }
-                        a.iter().map(|s| json!({ "speaker": s["speaker"], "text": s["text"], "start": s["start"], "end": s["end"] })).collect()
+                        a.iter()
+                            .map(|s| json!({ "speaker": s["speaker"], "text": s["text"], "start": s["start"], "end": s["end"] }))
+                            .collect()
                     }
                     _ => return Err(invalid_response()),
                 };
-                let usage = if r["usage"].is_null() { None } else { Some(usage_of(&r["usage"]).ok_or_else(invalid_response)?) };
+                let usage = if r["usage"].is_null() {
+                    None
+                } else {
+                    Some(usage_of(&r["usage"]).ok_or_else(invalid_response)?)
+                };
                 Ok(Task::Transcription { text, segments, usage })
             }
             Some("SUCCESS") => Ok(Task::Audio(kind, Self::audio_result(&r).ok_or_else(invalid_response)?)),
@@ -532,12 +589,28 @@ impl Moss {
         b["stream_format"] = json!("sse");
         b["async"] = json!(false);
         let started = Instant::now();
-        let mut r = self.send(key, "POST", format!("{MOSS}/audio/speech"), json_body(&b), "text/event-stream", Duration::from_secs(300))?;
+        let mut r = self.send(
+            key,
+            "POST",
+            format!("{MOSS}/audio/speech"),
+            json_body(&b),
+            "text/event-stream",
+            Duration::from_secs(300),
+        )?;
         if !(200..300).contains(&r.status) {
             let raw = read_max(&mut r.body, 1 << 20, None)?;
             let missing = serde_json::from_slice::<Value>(&raw).is_ok_and(|v| v["error"]["code"] == "voice_not_found");
-            let outcome = if REJECTED.contains(&r.status) || (r.status == 404 && missing) { Outcome::Rejected } else { Outcome::Unknown };
-            return Err(StreamError::Vendor(VendorError { reason: Reason::HttpStatus, outcome, status: Some(r.status), code: None }));
+            let outcome = if REJECTED.contains(&r.status) || (r.status == 404 && missing) {
+                Outcome::Rejected
+            } else {
+                Outcome::Unknown
+            };
+            return Err(StreamError::Vendor(VendorError {
+                reason: Reason::HttpStatus,
+                outcome,
+                status: Some(r.status),
+                code: None,
+            }));
         }
         if r.media_type() != "text/event-stream" {
             return Err(StreamError::Vendor(invalid_response()));
@@ -564,12 +637,20 @@ impl Moss {
                     SpeechEvent::TaskCreated(v["task_id"].as_str().unwrap_or("").into())
                 }
                 "speech.created" => {
-                    let (rate, ch, depth) = (v["sample_rate"].as_i64().unwrap_or(0), v["channels"].as_i64().unwrap_or(0), v["bit_depth"].as_i64().unwrap_or(0));
+                    let (rate, ch, depth) = (
+                        v["sample_rate"].as_i64().unwrap_or(0),
+                        v["channels"].as_i64().unwrap_or(0),
+                        v["bit_depth"].as_i64().unwrap_or(0),
+                    );
                     if frame != 0 || v["format"] != "pcm" || !(8000..=192000).contains(&rate) || !(1..=8).contains(&ch) || ![8, 16, 24, 32].contains(&depth) {
                         return Err(bad());
                     }
                     frame = ch * depth / 8;
-                    SpeechEvent::Created { sample_rate: rate, channels: ch, bit_depth: depth }
+                    SpeechEvent::Created {
+                        sample_rate: rate,
+                        channels: ch,
+                        bit_depth: depth,
+                    }
                 }
                 "speech.audio.delta" => {
                     use base64::Engine;
@@ -593,7 +674,10 @@ impl Moss {
                     }
                     done = true;
                     let usage = if v["usage"].is_null() { None } else { usage_of(&v["usage"]) };
-                    SpeechEvent::Done { usage, duration: v["meta_info"]["performance"]["audio_duration_s"].as_f64() }
+                    SpeechEvent::Done {
+                        usage,
+                        duration: v["meta_info"]["performance"]["audio_duration_s"].as_f64(),
+                    }
                 }
                 _ => return Err(bad()),
             };
@@ -639,10 +723,13 @@ impl Moss {
 
     /// `prepareMossVoiceDesign`.
     pub fn prepare_design(model: &str, text: &str, instruction: &str, format: &str) -> Result<Value, VendorError> {
-        if !super::super::provider::VOICE_DESIGN_MODELS.contains(&model) || !text_ok(text, 10000) || !text_ok(instruction, 10000) || !FORMATS.contains(&format) {
+        if !super::super::provider::VOICE_DESIGN_MODELS.contains(&model) || !text_ok(text, 10000) || !text_ok(instruction, 10000) || !FORMATS.contains(&format)
+        {
             return Err(invalid_input());
         }
-        Ok(json!({ "model": model, "input": text, "instruction": instruction, "response_format": format, "delivery_method": "url", "create_voice": false, "async": true }))
+        Ok(
+            json!({ "model": model, "input": text, "instruction": instruction, "response_format": format, "delivery_method": "url", "create_voice": false, "async": true }),
+        )
     }
 
     /// `prepareMossTranscription`.
@@ -667,7 +754,13 @@ impl Moss {
     }
 
     /// `streamMossTranscription`.
-    pub fn transcription_stream(&self, key: &str, body: &Value, stop: &Stop, on: &mut dyn FnMut(TranscriptionEvent) -> Result<(), String>) -> Result<(), StreamError> {
+    pub fn transcription_stream(
+        &self,
+        key: &str,
+        body: &Value,
+        stop: &Stop,
+        on: &mut dyn FnMut(TranscriptionEvent) -> Result<(), String>,
+    ) -> Result<(), StreamError> {
         if !body["model"].as_str().is_some_and(|m| m.starts_with("moss-transcribe-diarize-pro")) {
             return Err(StreamError::Vendor(invalid_input()));
         }
@@ -676,11 +769,23 @@ impl Moss {
         b["stream"] = json!(true);
         b["async"] = json!(false);
         let started = Instant::now();
-        let mut r = self.send(key, "POST", format!("{MOSS}/audio/transcriptions"), json_body(&b), "text/event-stream", Duration::from_secs(900))?;
+        let mut r = self.send(
+            key,
+            "POST",
+            format!("{MOSS}/audio/transcriptions"),
+            json_body(&b),
+            "text/event-stream",
+            Duration::from_secs(900),
+        )?;
         if !(200..300).contains(&r.status) {
             read_max(&mut r.body, 1 << 20, None)?;
             let outcome = if REJECTED.contains(&r.status) { Outcome::Rejected } else { Outcome::Unknown };
-            return Err(StreamError::Vendor(VendorError { reason: Reason::HttpStatus, outcome, status: Some(r.status), code: None }));
+            return Err(StreamError::Vendor(VendorError {
+                reason: Reason::HttpStatus,
+                outcome,
+                status: Some(r.status),
+                code: None,
+            }));
         }
         if r.media_type() != "text/event-stream" {
             return Err(StreamError::Vendor(invalid_response()));
@@ -771,14 +876,29 @@ impl Moss {
 
     /// `understandMossMedia`: the answer as `MediaUnderstandingResult`.
     pub fn understand(&self, key: &str, body: &Value) -> Result<Value, VendorError> {
-        let mut r = self.send(key, "POST", format!("{MOSS}/responses"), json_body(body), "application/json", Duration::from_secs(180))?;
+        let mut r = self.send(
+            key,
+            "POST",
+            format!("{MOSS}/responses"),
+            json_body(body),
+            "application/json",
+            Duration::from_secs(180),
+        )?;
         let raw = read_max(&mut r.body, 1 << 20, None)?;
         if r.status != 200 {
             let outcome = if REJECTED.contains(&r.status) { Outcome::Rejected } else { Outcome::Unknown };
-            return Err(VendorError { reason: Reason::HttpStatus, outcome, status: Some(r.status), code: None });
+            return Err(VendorError {
+                reason: Reason::HttpStatus,
+                outcome,
+                status: Some(r.status),
+                code: None,
+            });
         }
         let v: Value = serde_json::from_slice(&raw).map_err(|_| invalid_response())?;
-        let status = v["status"].as_str().filter(|s| *s == "completed" || *s == "incomplete").ok_or_else(invalid_response)?;
+        let status = v["status"]
+            .as_str()
+            .filter(|s| *s == "completed" || *s == "incomplete")
+            .ok_or_else(invalid_response)?;
         let output = v["output"].as_array().filter(|o| !o.is_empty()).ok_or_else(invalid_response)?;
         let mut texts = vec![];
         for item in output {
@@ -815,8 +935,18 @@ impl Moss {
             return Err(invalid_input());
         }
         let parts = vec![
-            Part { name: "purpose".into(), filename: None, kind: String::new(), bytes: Box::new(std::io::Cursor::new(purpose.as_bytes().to_vec())) },
-            Part { name: "file".into(), filename: Some(filename.into()), kind: "application/octet-stream".into(), bytes: Box::new(file) },
+            Part {
+                name: "purpose".into(),
+                filename: None,
+                kind: String::new(),
+                bytes: Box::new(std::io::Cursor::new(purpose.as_bytes().to_vec())),
+            },
+            Part {
+                name: "file".into(),
+                filename: Some(filename.into()),
+                kind: "application/octet-stream".into(),
+                bytes: Box::new(file),
+            },
         ];
         let r = self.call(key, "POST", "/files", Some(multipart(parts)), Duration::from_secs(300), false)?;
         let id = r["id"].as_str().filter(|i| file_id_ok(i)).ok_or_else(invalid_response)?;
@@ -847,9 +977,19 @@ impl Moss {
 
     /// `createMossVoice`: the cloned voice as `MediaAudioVoice`.
     pub fn clone_voice(&self, key: &str, audio: Vec<u8>, filename: &str, name: Option<&str>) -> Result<Value, VendorError> {
-        let mut parts = vec![Part { name: "audio_sample".into(), filename: Some(filename.into()), kind: "application/octet-stream".into(), bytes: Box::new(std::io::Cursor::new(audio)) }];
+        let mut parts = vec![Part {
+            name: "audio_sample".into(),
+            filename: Some(filename.into()),
+            kind: "application/octet-stream".into(),
+            bytes: Box::new(std::io::Cursor::new(audio)),
+        }];
         if let Some(n) = name {
-            parts.push(Part { name: "name".into(), filename: None, kind: String::new(), bytes: Box::new(std::io::Cursor::new(n.as_bytes().to_vec())) });
+            parts.push(Part {
+                name: "name".into(),
+                filename: None,
+                kind: String::new(),
+                bytes: Box::new(std::io::Cursor::new(n.as_bytes().to_vec())),
+            });
         }
         let r = self.call(key, "POST", "/audio/voices", Some(multipart(parts)), Duration::from_secs(300), true)?;
         match (r["id"].as_str().filter(|i| audio_id(i)), r["name"].as_str(), r["created_at"].as_i64()) {
@@ -899,7 +1039,9 @@ fn sse(
         if started.elapsed() > deadline {
             return Err(StreamError::Vendor(VendorError::new(Reason::Timeout, Outcome::Unknown)));
         }
-        let n = body.read(&mut buf).map_err(|_| StreamError::Vendor(VendorError::new(Reason::Network, Outcome::Unknown)))?;
+        let n = body
+            .read(&mut buf)
+            .map_err(|_| StreamError::Vendor(VendorError::new(Reason::Network, Outcome::Unknown)))?;
         if n == 0 {
             return Ok(());
         }

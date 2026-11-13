@@ -30,6 +30,19 @@ struct Record {
     job: MediaImageJob,
     url: Option<String>,
 }
+/// Jobs of the kinds the image machine does not run (speech, audio,
+/// understanding): it lists them with its own and hands their calls over.
+pub trait OtherJobs: Send + Sync {
+    /// Their views, newest first.
+    fn list(&self) -> Result<Vec<MediaJob>, ApiError>;
+    /// `None`: not one of theirs.
+    fn get(&self, id: &str) -> Option<Result<MediaJob, ApiError>>;
+    fn cancel(&self, id: &str) -> Option<Result<MediaJob, ApiError>>;
+    fn retry_download(&self, id: &str) -> Option<Result<MediaJob, ApiError>>;
+    fn preview_release(&self, id: &str) -> Option<Result<vibevalley_protocol::Preview, ApiError>>;
+    fn release(&self, id: &str) -> Option<Result<MediaJob, ApiError>>;
+}
+
 struct Run {
     prepared: Option<Prepared>,
     stop: watch::Sender<bool>,
@@ -47,6 +60,7 @@ pub struct Machine {
     wake: flume::Sender<()>,
     closed: AtomicBool,
     worker: Mutex<Option<std::thread::JoinHandle<()>>>,
+    others: std::sync::RwLock<Option<Arc<dyn OtherJobs>>>,
 }
 fn failed(e: impl std::fmt::Display) -> ApiError {
     ApiError::new(BizCode::InternalError, format!("media job storage: {e}"))
@@ -56,7 +70,7 @@ fn active(p: MediaPhase) -> bool {
 }
 fn read(db: &Connection, id: &str) -> Result<Option<Record>, ApiError> {
     let data: Option<String> = db
-        .query_row("select data from media_job where id=?1", [id], |r| r.get(0))
+        .query_row("select data from media_job where id=?1 and kind='image'", [id], |r| r.get(0))
         .optional()
         .map_err(failed)?;
     data.map(|s| serde_json::from_str(&s).map_err(|_| refused("corrupt"))).transpose()
@@ -65,7 +79,9 @@ fn found(db: &Connection, id: &str) -> Result<Record, ApiError> {
     read(db, id)?.ok_or_else(|| refused("missing"))
 }
 fn recent(db: &Connection) -> Result<Vec<Record>, ApiError> {
-    let mut q = db.prepare("select data from media_job order by created_at desc,id limit 100").map_err(failed)?;
+    let mut q = db
+        .prepare("select data from media_job where kind='image' order by created_at desc,id limit 100")
+        .map_err(failed)?;
     q.query_map([], |r| r.get::<_, String>(0))
         .map_err(failed)?
         .map(|r| serde_json::from_str(&r.map_err(failed)?).map_err(|_| refused("corrupt")))
@@ -91,12 +107,13 @@ impl Machine {
             wake,
             closed: AtomicBool::new(false),
             worker: Mutex::new(None),
+            others: std::sync::RwLock::new(None),
         });
         {
             let mut inner = machine.inner();
             let ids = inner
                 .db
-                .prepare("select id from media_job where phase in ('queued','generating','downloading')")
+                .prepare("select id from media_job where kind='image' and phase in ('queued','generating','downloading')")
                 .map_err(failed)?
                 .query_map([], |r| r.get::<_, String>(0))
                 .map_err(failed)?
@@ -166,17 +183,53 @@ impl Machine {
         inner.db.execute("insert into media_job(id,kind,phase,data,created_at,updated_at) values (?1,'image',?2,?3,?4,?5) on conflict(id) do update set phase=excluded.phase,data=excluded.data,updated_at=excluded.updated_at",params![r.job.id,r.job.phase.as_str(),serde_json::to_string(r).map_err(failed)?,r.job.created_at,r.job.updated_at]).map_err(failed)?;
         self.publish(inner)
     }
+    /// The kinds this machine does not run.
+    pub fn attach_others(&self, others: Arc<dyn OtherJobs>) {
+        *self.others.write().unwrap_or_else(|e| e.into_inner()) = Some(others);
+    }
+
+    fn others(&self) -> Option<Arc<dyn OtherJobs>> {
+        self.others.read().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+
+    /// Every kind's jobs, newest first, at most 100 (`mediaChanged`).
+    fn all(&self, images: Vec<Record>) -> Result<Vec<MediaJob>, ApiError> {
+        let mut jobs: Vec<MediaJob> = images.into_iter().map(|r| MediaJob::MediaImageJob(shown(r))).collect();
+        if let Some(o) = self.others() {
+            jobs.extend(o.list()?);
+        }
+        let created = |j: &MediaJob| match j {
+            MediaJob::MediaImageJob(j) => (j.created_at, j.id.clone()),
+            MediaJob::MediaSpeechJob(j) => (j.created_at, j.id.clone()),
+            MediaJob::MediaUnderstandingJob(j) => (j.created_at, j.id.clone()),
+            MediaJob::MediaAudioJob(j) => (serde_json::to_value(j).ok().and_then(|v| v["createdAt"].as_i64()).unwrap_or(0), String::new()),
+        };
+        jobs.sort_by_key(|j| std::cmp::Reverse(created(j)));
+        jobs.truncate(100);
+        Ok(jobs)
+    }
+
+    /// Tells the state of every kind's jobs now.
+    pub fn publish_all(&self) -> Result<(), ApiError> {
+        let inner = self.inner();
+        self.publish(&inner)
+    }
+
     fn publish(&self, inner: &Inner) -> Result<(), ApiError> {
-        let jobs = recent(&inner.db)?.into_iter().map(|r| MediaJob::MediaImageJob(shown(r))).collect();
+        let jobs = self.all(recent(&inner.db)?)?;
         if let Some(hub) = self.hub.upgrade() {
             hub.apply(vec![Fact::MediaChanged(vibevalley_protocol::FactMediaChanged { at: now(), jobs })]);
         }
         Ok(())
     }
     pub fn list(&self) -> Result<Vec<MediaJob>, ApiError> {
-        Ok(recent(&self.inner().db)?.into_iter().map(|r| MediaJob::MediaImageJob(shown(r))).collect())
+        let images = recent(&self.inner().db)?;
+        self.all(images)
     }
     pub fn get(&self, id: &str) -> Result<MediaJob, ApiError> {
+        if let Some(r) = self.others().and_then(|o| o.get(id)) {
+            return r;
+        }
         Ok(MediaJob::MediaImageJob(shown(found(&self.inner().db, id)?)))
     }
     fn capacity(inner: &Inner) -> Result<(), ApiError> {
@@ -249,6 +302,9 @@ impl Machine {
         Ok(shown(record))
     }
     pub fn cancel(&self, id: &str) -> Result<MediaJob, ApiError> {
+        if let Some(r) = self.others().and_then(|o| o.cancel(id)) {
+            return r;
+        }
         let mut inner = self.inner();
         let mut r = found(&inner.db, id)?;
         if active(r.job.phase) {
@@ -262,6 +318,9 @@ impl Machine {
         Ok(MediaJob::MediaImageJob(shown(r)))
     }
     pub fn retry_download(&self, id: &str) -> Result<MediaJob, ApiError> {
+        if let Some(r) = self.others().and_then(|o| o.retry_download(id)) {
+            return r;
+        }
         if self.closed.load(Ordering::SeqCst) {
             return Err(ApiError::new(BizCode::ServiceUnavailable, "media closed"));
         }
@@ -292,7 +351,7 @@ impl Machine {
             let id: Option<String> = inner
                 .db
                 .query_row(
-                    "select id from media_job where phase in ('queued','downloading') order by created_at,id limit 1",
+                    "select id from media_job where kind='image' and phase in ('queued','downloading') order by created_at,id limit 1",
                     [],
                     |r| r.get(0),
                 )
@@ -461,11 +520,17 @@ pub fn install(hub: &Hub, m: Arc<Machine>) {
     hub.on::<ops::MediaJobPreviewRelease>({
         let m = m.clone();
         move |_, r| {
+            if let Some(r) = m.others().and_then(|o| o.preview_release(&r.id)) {
+                return r;
+            }
             m.get(&r.id)?;
             Err(refused("releaseUnavailable"))
         }
     });
     hub.on::<ops::MediaJobRelease>(move |_, r| {
+        if let Some(r) = m.others().and_then(|o| o.release(&r.id)) {
+            return r;
+        }
         m.get(&r.id)?;
         Err(refused("releaseUnavailable"))
     });

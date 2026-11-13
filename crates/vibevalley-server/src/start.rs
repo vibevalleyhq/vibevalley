@@ -110,6 +110,8 @@ pub struct Started {
     pub pkm: Arc<modules::pkm::Pkm>,
     /// Durable media jobs and their executor.
     pub media: Arc<modules::media::machine::Machine>,
+    /// Speech and the other audio jobs.
+    pub audio: Arc<modules::media::audio::Audio>,
     /// Media reservations, binary uploads and job references.
     pub media_inputs: Arc<modules::media::inputs::Inputs>,
     /// Kept attachments as material.
@@ -130,6 +132,7 @@ impl Started {
         self.artifacts.close();
         self.pkm.close();
         self.media.close();
+        self.audio.close();
         self.media_inputs.close();
         self.board.close();
     }
@@ -185,7 +188,13 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     modules::setting::install(&hub, setting.clone());
     let game = modules::game::Game::open(&config.home, &hub);
     modules::game::install(&hub, game.clone());
-    modules::provider::install(&hub, Arc::new(modules::provider::Provider::new(setting.clone())));
+    // How MOSS is reached, and its results fetched; the page's tests answer it offline.
+    let (vendor, download): (Arc<dyn modules::media::vendor::Fetch>, Arc<dyn modules::media::vendor::Fetch>) = if config.offline_media {
+        crate::offline::network()
+    } else {
+        (Arc::new(modules::media::vendor::Ureq), Arc::new(modules::media::vendor::Ureq))
+    };
+    modules::provider::install(&hub, Arc::new(modules::provider::Provider::new(setting.clone(), vendor.clone())));
     let registry = config.registry.clone().unwrap_or_else(|| Arc::new(runtimes(&setting, &config.home)));
     let agents = Agents::open(&hub, &config.home, &config.starters, registry.clone(), config.probe_runtimes).map_err(|e| failed("the profiles")(&e))?;
     modules::agent::install(&hub, agents.clone());
@@ -240,6 +249,17 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     )
     .map_err(|e| failed("media jobs")(&e.message))?;
     modules::media::machine::install(&hub, media.clone());
+    let audio = modules::media::audio::Audio::open(
+        &config.home,
+        setting.clone(),
+        attachments.clone(),
+        media_inputs.clone(),
+        &media,
+        vendor,
+        download,
+    )
+    .map_err(|e| failed("audio jobs")(&e.message))?;
+    modules::media::audio::install(&hub, audio.clone());
     modules::channel::install(&hub, chat.clone(), agents.clone(), Some(game.clone()));
     crons.attach_chat(&chat);
     let artifacts = modules::artifact::Artifacts::open(&config.home, attachments.clone(), chat.clone()).map_err(|e| failed("the artifacts")(&e.message))?;
@@ -314,6 +334,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         pkm,
         library,
         resources,
+        audio,
         media_inputs,
         media,
     })

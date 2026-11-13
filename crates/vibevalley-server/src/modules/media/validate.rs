@@ -53,22 +53,33 @@ pub(super) fn container(mime: &str, b: &[u8]) -> bool {
 /// Inspect audio containers without loading the whole upload in memory.
 /// Packet durations are counted when the container has no declared duration.
 pub(super) fn audio(path: &Path, mime: &str) -> Result<(), ApiError> {
-    use symphonia::core::{
-        formats::{TrackType, probe::Hint},
-        io::MediaSourceStream,
-    };
-    let bad = || refused("inputInvalid");
+    use symphonia::core::io::MediaSourceStream;
     if mime == "audio/wav" {
         wave(path)?;
     }
     let file = std::fs::File::open(path).map_err(|_| refused("inputStorage"))?;
+    inspect(MediaSourceStream::new(Box::new(file), Default::default()), mime).map(|_| ())
+}
+
+/// What an audio container says of itself: sample rate, channels, bits per sample (when it says), seconds.
+pub struct AudioFacts {
+    pub sample_rate: u32,
+    pub channels: usize,
+    pub bits: Option<u32>,
+    pub seconds: f64,
+}
+
+/// `audio`'s reading of bytes in memory (a result just fetched), refused as it would be.
+pub fn audio_facts(bytes: Vec<u8>, mime: &str) -> Result<AudioFacts, ApiError> {
+    use symphonia::core::io::MediaSourceStream;
+    inspect(MediaSourceStream::new(Box::new(std::io::Cursor::new(bytes)), Default::default()), mime)
+}
+
+fn inspect(source: symphonia::core::io::MediaSourceStream<'static>, mime: &str) -> Result<AudioFacts, ApiError> {
+    use symphonia::core::formats::{TrackType, probe::Hint};
+    let bad = || refused("inputInvalid");
     let mut format = symphonia::default::get_probe()
-        .probe(
-            &Hint::new(),
-            MediaSourceStream::new(Box::new(file), Default::default()),
-            Default::default(),
-            Default::default(),
-        )
+        .probe(&Hint::new(), source, Default::default(), Default::default())
         .map_err(|_| bad())?;
     if format.default_track(TrackType::Video).is_some() {
         return Err(bad());
@@ -86,6 +97,17 @@ pub(super) fn audio(path: &Path, mime: &str) -> Result<(), ApiError> {
     {
         return Err(bad());
     }
+    let (sample_rate, channels, bits) = (
+        params.sample_rate.unwrap_or(0),
+        params.channels.as_ref().map(|c| c.count()).unwrap_or(0),
+        params.bits_per_sample,
+    );
+    let facts = |seconds| AudioFacts {
+        sample_rate,
+        channels,
+        bits,
+        seconds,
+    };
     let id = track.id;
     let base = track.time_base.ok_or_else(bad)?;
     let mut seconds = 0.0;
@@ -102,7 +124,7 @@ pub(super) fn audio(path: &Path, mime: &str) -> Result<(), ApiError> {
     if seconds <= 0.0 || !seconds.is_finite() {
         return Err(bad());
     }
-    Ok(())
+    Ok(facts(seconds))
 }
 
 /// VibeValley's inspectWave: RIFF lengths, PCM layout and data alignment.

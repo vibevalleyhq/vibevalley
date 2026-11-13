@@ -27,6 +27,7 @@ pub use vibevalley_server_api::{Server, refusal};
 pub mod base;
 pub mod home;
 pub mod modules;
+pub mod offline;
 mod public_http;
 mod start;
 pub mod testing;

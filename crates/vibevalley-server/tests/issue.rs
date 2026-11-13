@@ -94,7 +94,9 @@ fn an_issue_goes_through_the_endpoints_from_create_to_done() {
     assert_eq!(done["data"]["status"], "done");
     assert_eq!(done["data"]["delivered"], "merged");
     let history = call(&hub, "issue.history.list", Value::Null);
-    assert_eq!(history["data"][0]["missingSessions"].as_array().unwrap().len(), 1, "{history}");
+    // A session that left is kept as it was: the history still has it.
+    assert_eq!(history["data"][0]["missingSessions"].as_array().unwrap().len(), 0, "{history}");
+    assert_eq!(history["data"][0]["sessions"][0]["id"], "w1", "{history}");
     let closed = call(&hub, "issue.comment.create", json!({ "id": id, "text": "more" }));
     assert_eq!(closed["bizCode"], 300002);
 }
@@ -106,7 +108,7 @@ fn an_unsent_issue_is_updated_and_deleted() {
     let hub = served(&w);
     let made = call(&hub, "issue.create", json!({ "title": "An answer" }));
     let id = made["data"]["id"].as_str().unwrap().to_string();
-    assert_eq!(made["data"]["deliver"], "answer", "no repo: an answer");
+    assert_eq!(made["data"]["deliver"], "change", "a change unless it is the orchestrator's, repo or none");
     let updated = call(&hub, "issue.update", json!({ "id": id, "title": "A better question", "criteria": ["x"] }));
     assert_eq!(updated["data"]["title"], "A better question", "{updated}");
     let no_title = call(&hub, "issue.update", json!({ "id": id, "title": "  " }));
