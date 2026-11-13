@@ -357,7 +357,9 @@ fn take_over(board: &Board, item: &Issue, to: IssueStatus, agent: &str) -> Resul
 }
 
 fn changes_of(board: &Board, item: &Issue) -> Result<Changes, ApiError> {
-    if item.repo.is_none() || !item.was_sent() {
+    // A parent is worked through its children: their merges are its changes.
+    let has_children = board.read(|s| s.issues.iter().any(|i| i.parent.as_deref() == Some(item.id.as_str())));
+    if item.repo.is_none() || !(item.was_sent() || has_children) {
         return Err(refused("server.issue.notStarted", &[]));
     }
     let c = board.changes(&item.id).map_err(|e| api(board, e))?;
@@ -486,13 +488,19 @@ pub fn install_on(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Agents>>) {
                 Some(agents) => agents.agent_key(&agent),
                 None => agent,
             };
+            let on_duty = profiles.as_ref().is_some_and(|a| a.profiles.is_orchestrator(&agent));
             let new = NewIssue {
                 title: req.title.clone(),
                 description: req.description.clone().unwrap_or_default(),
                 criteria: req.criteria.clone().unwrap_or_default(),
                 repo: req.repo.as_deref().map(str::trim).filter(|r| !r.is_empty()).map(PathBuf::from),
                 agent,
-                deliver: req.deliver.unwrap_or_default(),
+                // An issue for the orchestrator asks for an answer; any other a change (lifecycle.ts `create`).
+                deliver: req.deliver.unwrap_or(if on_duty {
+                    vibevalley_protocol::Deliverable::Answer
+                } else {
+                    vibevalley_protocol::Deliverable::Change
+                }),
                 priority: req.priority.unwrap_or_default(),
                 parent: req.parent.clone(),
                 blocked_by: req.blocked_by.clone().unwrap_or_default(),
@@ -646,7 +654,11 @@ pub fn install_on(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Agents>>) {
                 .iter()
                 .map(|issue| {
                     let ids: Vec<String> = issue.executions().map(|e| e.session().to_string()).collect();
-                    let sessions: Vec<_> = ids.iter().filter_map(|id| s.sessions.iter().find(|x| &x.id == id).cloned()).collect();
+                    // A session that left is read from the board's past ones (lifecycle.ts keeps them in its table).
+                    let sessions: Vec<_> = ids
+                        .iter()
+                        .filter_map(|id| s.sessions.iter().find(|x| &x.id == id).cloned().or_else(|| b.past_session(id)))
+                        .collect();
                     let missing_sessions = ids.iter().filter(|id| !sessions.iter().any(|x| &x.id == *id)).cloned().collect();
                     IssueHistory {
                         issue: issue.clone(),
@@ -681,7 +693,39 @@ pub fn install_reviewed(hub: &Hub, board: Board, game: Arc<crate::modules::game:
 /// `issue.conversation.get`: the issue's thread in the chat, if one was
 /// opened.
 pub fn install_conversation(hub: &Hub, board: Board, chat: Arc<crate::modules::channel::Chat>) {
-    hub.on::<ops::IssueConversationGet>(move |_, input| Ok(chat.issue_thread_id(&get(&board, &input.id)?.id)));
+    let (b, c) = (board.clone(), chat.clone());
+    hub.on::<ops::IssueConversationGet>(move |_, input| Ok(c.issue_thread_id(&get(&b, &input.id)?.id)));
+    // refinement.ts `draft`: the issue's thread is opened, the user's words go in it, and what was said there is the
+    // draft's discussion.
+    hub.on::<ops::IssueRefine>(move |_, input| {
+        let mut item = get(&board, &input.id)?;
+        if let Some(edit) = &input.edit {
+            item = board.edit(&item.id, edit).map_err(|e| api(&board, e))?;
+        }
+        if item.status != IssueStatus::Backlog {
+            return Err(refused("server.issue.refinement.onlyBacklog", &[]).with_next(next_steps(&item)));
+        }
+        if let Some(r) = &item.refining {
+            return Err(refused("server.issue.refinement.drafting", &[("name", r.name.clone().into())]));
+        }
+        let said = input.text.as_deref().unwrap_or("").trim().to_string();
+        let thread = chat.issue_thread(&item.id, &item.title, None)?;
+        let discussion = chat
+            .history(&thread, None, Some(40))?
+            .into_iter()
+            .map(|m| m.text)
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        if !said.is_empty() {
+            chat.say(crate::modules::channel::Saying {
+                text: said.clone(),
+                channel: Some(thread),
+                ..Default::default()
+            })?;
+        }
+        board.refine_with(&item.id, &said, &discussion).map_err(|e| api(&board, e))?;
+        get(&board, &item.id)
+    });
 }
 
 fn edit_rewords(edit: &IssueUpdate) -> bool {

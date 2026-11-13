@@ -758,7 +758,20 @@ impl Watch {
     }
 
     fn post_report(&self, h: &Session, f: &FactSessionReported) -> Result<(), ApiError> {
-        if h.refining || f.outcome == Outcome::Interrupted {
+        if h.refining {
+            // The draft, or why there is none, in the issue's thread (the session itself is let go already).
+            let Some(thread) = h.issue.as_deref().and_then(|i| self.chat.issue_thread_id(i)) else {
+                return Ok(());
+            };
+            self.chat.notice(Noticing {
+                channel: thread,
+                text: f.summary.clone(),
+                code: "issue_refinement".into(),
+                ..Noticing::default()
+            });
+            return Ok(());
+        }
+        if f.outcome == Outcome::Interrupted {
             return Ok(());
         }
         let Some(thread) = self.chat.home_of(&h.id) else { return Ok(()) };

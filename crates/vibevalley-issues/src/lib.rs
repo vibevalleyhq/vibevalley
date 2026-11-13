@@ -214,6 +214,8 @@ pub struct Changes {
 
 const ISSUE: &str = "issue";
 const SESSION: &str = "issue-session";
+/// Sessions that left, as they were when they did: an issue's history still names them.
+const PAST_SESSION: &str = "issue-session-past";
 const WORDS: &str = "issue-words";
 /// What the board keeps of a session beyond its wire shape.
 const SESSION_EXTRA: &str = "issue-session-extra";
@@ -522,6 +524,12 @@ impl Board {
     }
 
     /// Whether this process drives the session now.
+    /// A session that left the board, as it was when it did.
+    pub fn past_session(&self, id: &str) -> Option<Session> {
+        let value = self.store.doc(PAST_SESSION, id).ok()??;
+        serde_json::from_value(value).ok()
+    }
+
     pub fn is_live(&self, session: &str) -> bool {
         lock(&self.inner).live.contains_key(session)
     }
@@ -614,7 +622,15 @@ impl Board {
                     self.store.put_doc(ISSUE, &issue.id, &serde_json::to_value(issue).unwrap_or_default())?
                 }
                 Fact::IssueRemoved(vibevalley_protocol::FactIssueRemoved { id, .. }) => self.store.delete_doc(ISSUE, id)?,
-                Fact::SessionLeft(vibevalley_protocol::FactSessionLeft { id, .. }) => self.store.delete_doc(SESSION, id)?,
+                Fact::SessionLeft(vibevalley_protocol::FactSessionLeft { id, closed, .. }) => {
+                    if let Some(mut past) = self.session(id) {
+                        if let Some(closed) = closed {
+                            past.phase = Phase::Closed(vibevalley_protocol::PhaseClosed { at: now(), closed: *closed });
+                        }
+                        self.store.put_doc(PAST_SESSION, id, &serde_json::to_value(&past).unwrap_or_default())?;
+                    }
+                    self.store.delete_doc(SESSION, id)?
+                }
                 _ => {}
             }
         }
@@ -741,7 +757,7 @@ impl Board {
         let mut issue = Issue::new(&id, number, title, at);
         issue.description = description;
         issue.criteria = vibevalley_core::refine::kept(&new.criteria);
-        issue.deliver = if repo_root.is_none() { Deliverable::Answer } else { new.deliver };
+        issue.deliver = new.deliver;
         issue.repo = repo_root;
         issue.priority = parent.as_ref().map(|p| p.priority).unwrap_or(new.priority);
         let parent_agent = parent.as_ref().and_then(|p| p.assigned_agent()).map(String::from);
@@ -1397,10 +1413,19 @@ impl Board {
                 next: vec![],
             })
         });
+        let checks = report
+            .as_ref()
+            .map(|r| r.checks.clone())
+            .filter(|c| !c.is_empty())
+            .unwrap_or_else(|| vibevalley_core::text::checks_from_text(said));
         let _ = self.end_run(session_id, outcome, &summary, None);
         let mut inner = lock(&self.inner);
         let Some(mut issue) = self.issue(&issue.id) else { return };
         issue.questions = if outcome == Outcome::Interrupted { issue.questions } else { questions };
+        // The helper's word on each criterion is the issue's (lifecycle.ts `recordReport`).
+        if !checks.is_empty() {
+            issue.checks = checks.clone();
+        }
         if answer.is_some() {
             issue.answer = answer.clone();
         }
@@ -1419,7 +1444,7 @@ impl Board {
                     runs,
                     spent: None,
                     questions: vec![],
-                    checks: report.as_ref().map(|r| r.checks.clone()).unwrap_or_default(),
+                    checks,
                     answer,
                 }),
             ],
@@ -1448,13 +1473,22 @@ impl Board {
     pub fn changes(&self, reference: &str) -> Result<Changes> {
         let issue = self.stored(reference)?;
         let main = self.main_repo(&issue)?.ok_or_else(|| BoardError::Other("the issue has no repository".into()))?;
-        let place = self.place_of(&issue, &main, false)?.ok_or_else(|| BoardError::Other("never sent".into()))?;
         let base = self.session_base(&issue, &main)?;
         let branch = issue_branch(issue.number);
-        let from = git::merge_base(place.root(), &base, "HEAD")?;
-        let commits = place.log(Some(&format!("{from}..HEAD")), 0, 200)?;
-        let files = place.diff(&vibevalley_git::DiffTarget::Range { from, to: "HEAD".into() }, None)?;
-        let uncommitted = place.diff(&vibevalley_git::DiffTarget::Uncommitted, None)?;
+        // A parent no session worked has no checkout: its children merged into its branch, read in the repo itself.
+        let (place, head) = match self.place_of(&issue, &main, false)? {
+            Some(place) => (place, "HEAD".to_string()),
+            None if git::branch_exists(main.root(), &branch)? => (main.clone(), branch.clone()),
+            None => return Err(BoardError::Other("never sent".into())),
+        };
+        let from = git::merge_base(place.root(), &base, &head)?;
+        let commits = place.log(Some(&format!("{from}..{head}")), 0, 200)?;
+        let files = place.diff(&vibevalley_git::DiffTarget::Range { from, to: head.clone() }, None)?;
+        let uncommitted = if head == "HEAD" {
+            place.diff(&vibevalley_git::DiffTarget::Uncommitted, None)?
+        } else {
+            vec![]
+        };
         let target = if issue.parent.is_some() { base.clone() } else { Self::main_branch(&main)? };
         let conflicts = match merge_check_into(&main, &target, &branch)? {
             MergeCheck::Conflicts(files) => files,
@@ -1856,6 +1890,11 @@ impl Board {
     /// criteria and questions, which are written onto the issue. Ported from
     /// VibeValley `refinement.ts`.
     pub fn refine(&self, reference: &str, words: &str) -> Result<String> {
+        self.refine_with(reference, words, "")
+    }
+
+    /// `refine`, with the issue's discussion so far for the drafting prompt.
+    pub fn refine_with(&self, reference: &str, words: &str, discussion: &str) -> Result<String> {
         let _work = lock(&self.work);
         let issue = self.stored(reference)?;
         if issue.status != IssueStatus::Backlog {
@@ -1895,7 +1934,7 @@ impl Board {
             &issue.questions,
             word,
             issue.repo.as_deref(),
-            "",
+            discussion,
         );
         let number = self.next("session", 0)?;
         let mut session = Session::worker(format!("w{number}"), format!("{} (draft #{})", drive.name, issue.number), now());
@@ -1945,29 +1984,49 @@ impl Board {
             ),
         };
         let _ = self.end_run(&session.id, outcome, &said_back, None);
-        let result = match read {
+        // What the issue's thread is told (refinement.ts `handedBack`).
+        let name = |key: &str, extra: (&str, String)| vibevalley_i18n::t(key, &[("name", session.name.clone().into()), (extra.0, extra.1.into())]);
+        let told = match read {
             Ok(draft) => {
                 let mut questions = vibevalley_core::text::questions_from_text(said);
                 questions.extend(asked.iter().cloned());
+                let questions = vibevalley_core::refine::open_questions(&questions);
                 let description = vibevalley_core::refine::refinement_description(&draft);
                 let criteria = vibevalley_core::refine::kept(&draft.criteria);
-                self.update(&issue.id, |t| {
+                let mut parts = vec![draft.title.clone(), description.clone()];
+                parts.extend(criteria.iter().cloned());
+                parts.extend(questions.iter().map(|q| {
+                    std::iter::once(q.question.clone())
+                        .chain(q.options.iter().cloned())
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                }));
+                if let Err(e) = self.update(&issue.id, |t| {
                     t.title = draft.title.clone();
                     t.description = description;
                     t.criteria = criteria;
-                    t.questions = vibevalley_core::refine::open_questions(&questions);
-                })
+                    t.questions = questions;
+                }) {
+                    eprintln!("vibevalley: draft of issue {}: {e}", issue.id);
+                }
+                parts.join("\n\n")
             }
-            Err(problem) => self.update(&issue.id, |t| {
-                t.questions = vec![Question {
-                    question: format!("The draft could not be read: {problem}"),
-                    options: vec![],
-                }];
-            }),
+            Err(problem) if reason == StopReason::Completed => name("server.issue.refinement.unread", ("problem", problem)),
+            Err(_) => name("server.issue.refinement.unfinished", ("summary", vibevalley_core::text::summary_of(said))),
         };
-        if let Err(e) = result {
-            eprintln!("vibevalley: draft of issue {}: {e}", issue.id);
-        }
+        let _ = self.apply(vec![Fact::SessionReported(vibevalley_protocol::FactSessionReported {
+            at: now(),
+            id: session.id.clone(),
+            run: None,
+            outcome,
+            phase: None,
+            summary: told,
+            runs: session.runs + 1,
+            spent: None,
+            questions: vec![],
+            checks: vec![],
+            answer: None,
+        })]);
         // Not under `work`: a draft only touches its own issue and session.
         if let Err(e) = self.dismiss(&session.id, Workplace::Discard) {
             eprintln!("vibevalley: draft session {}: {e}", session.id);

@@ -55,9 +55,6 @@ impl Board {
         issue.title = title;
         issue.description = description;
         issue.repo = repo;
-        if issue.repo.is_none() {
-            issue.deliver = vibevalley_protocol::Deliverable::Answer;
-        }
         if let Some(p) = upd.priority {
             issue.priority = p;
         }

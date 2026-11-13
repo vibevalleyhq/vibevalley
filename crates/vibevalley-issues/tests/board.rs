@@ -456,7 +456,13 @@ fn an_answer_issue_is_acknowledged_with_its_conclusion() {
         turn.report(r#"{"status":"done","summary":"found it","answer":{"conclusion":"It is 42.","evidence":["README.md:1"]}}"#);
     });
     let w = world(vec![rt], |_| {});
-    let issue = w.board.create(new("What is it?", None)).unwrap();
+    let issue = w
+        .board
+        .create(NewIssue {
+            deliver: Deliverable::Answer,
+            ..new("What is it?", None)
+        })
+        .unwrap();
     assert_eq!(issue.deliver, Deliverable::Answer);
     w.board.move_to("1", IssueStatus::Todo, None).unwrap();
     let reviewing = wait_stage(&w.board, "1", StageKind::Reviewing);

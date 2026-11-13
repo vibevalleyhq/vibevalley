@@ -171,8 +171,18 @@ fn turn(ask: &TurnAsk) -> Result<Vec<Step>, String> {
             notes += "（选项：用 8787｜用 8797）";
         }
     }
-    if let Some(at) = ask.prompt.find(CRITERIA_HEAD) {
-        let criteria = ask.prompt[at..]
+    // Its brief as an agent remembers it: an answer later in the session is still checked against its criteria.
+    static BRIEFS: std::sync::Mutex<Option<std::collections::HashMap<std::path::PathBuf, String>>> = std::sync::Mutex::new(None);
+    let brief = {
+        let mut briefs = BRIEFS.lock().unwrap_or_else(|e| e.into_inner());
+        let briefs = briefs.get_or_insert_with(Default::default);
+        if ask.prompt.contains(CRITERIA_HEAD) {
+            briefs.insert(ask.cwd.clone(), ask.prompt.clone());
+        }
+        briefs.get(&ask.cwd).cloned().unwrap_or_default()
+    };
+    if let Some(at) = brief.find(CRITERIA_HEAD) {
+        let criteria = brief[at..]
             .lines()
             .filter(|l| l.split_once(". ").is_some_and(|(n, _)| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit())))
             .count();

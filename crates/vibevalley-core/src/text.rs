@@ -6,12 +6,39 @@
 
 use serde::de::DeserializeOwned;
 
-use vibevalley_protocol::Question;
+use vibevalley_protocol::{CheckResult, CriterionCheck, Question};
 
 const ASK_MARKERS: [&str; 2] = ["ask the user", "要问用户"];
 
 fn strip_emphasis(s: &str) -> &str {
     s.trim().trim_start_matches("**").trim_end_matches("**").trim()
+}
+
+/// `checksFromText`: a helper's word on each criterion, one `标准 N：做到了|没做到|不确定 —— 依据` line each;
+/// explicit `issue_report.checks` win over these.
+pub fn checks_from_text(said: &str) -> Vec<CriterionCheck> {
+    said.split('\n')
+        .filter_map(|line| {
+            let rest = line.strip_prefix("标准")?.trim_start();
+            let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+            let n: i64 = digits.parse().ok()?;
+            let rest = rest[digits.len()..].trim_start();
+            let rest = rest.strip_prefix('：').or_else(|| rest.strip_prefix(':'))?.trim_start();
+            let (result, rest) = [("做到了", CheckResult::Met), ("没做到", CheckResult::Unmet), ("不确定", CheckResult::Unsure)]
+                .into_iter()
+                .find_map(|(word, result)| rest.strip_prefix(word).map(|r| (result, r)))?;
+            let proof = match rest.trim_start().strip_prefix("——") {
+                Some(p) => p.trim().to_string(),
+                None if rest.trim().is_empty() => String::new(),
+                None => return None,
+            };
+            (n >= 1).then(|| CriterionCheck {
+                criterion: n - 1,
+                result,
+                proof,
+            })
+        })
+        .collect()
 }
 
 /// The questions an agent's question lines ask, one per line. A tail
@@ -133,4 +160,17 @@ pub fn last_json_block<T: DeserializeOwned>(text: &str, refuse: impl Fn(&T) -> O
         }
     }
     Err(problem)
+}
+
+#[cfg(test)]
+mod checks_tests {
+    use vibevalley_protocol::CheckResult;
+
+    #[test]
+    fn criteria_lines_read_as_checks() {
+        let c = super::checks_from_text("做完了\n\n标准 1：做到了 —— 跑了 echo hi\n标准2:不确定\n标准 0：做到了\n标准 3：大概吧");
+        assert_eq!(c.len(), 2);
+        assert_eq!((c[0].criterion, c[0].result, c[0].proof.as_str()), (0, CheckResult::Met, "跑了 echo hi"));
+        assert_eq!((c[1].criterion, c[1].result), (1, CheckResult::Unsure));
+    }
 }

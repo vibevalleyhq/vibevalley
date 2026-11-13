@@ -490,6 +490,14 @@ impl Orchestrator {
         };
         *lock(&me.route) = route.clone();
         let cannot = |why: String| {
+            // The round is still in its log, failed: what it was told can be read and judged there.
+            let run = Run::new(self, me, &route);
+            run.asked(&self.input_of(me, &batch));
+            run.step(Step::RunEnded {
+                run: run.run.clone(),
+                outcome: Outcome::Failed,
+            });
+            run.phase(None);
             let mut said = lock(&me.cannot);
             if said.get(&route.channel) != Some(&why) {
                 said.insert(route.channel.clone(), why.clone());

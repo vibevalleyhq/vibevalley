@@ -69,8 +69,9 @@ test("a repo's farm names it on the sign; an empty plot sows in it, and a draft 
   await expect(sow.getByTestId("sow-start")).toBeEnabled();
   await sow.getByTestId("sow-draft").click();
   await expect(page).toHaveURL(/\/issues\/.+/u);
-  const made = (await api.issue.list({})).find((i) => i.title.includes("night mode"));
-  expect([made?.repo, made?.status]).toEqual(["farm-hud", "backlog"]);
+  // By the id the page opened: the draft retitles the issue as soon as it is written.
+  const made = await api.issue.get({ id: decodeURIComponent(new URL(page.url()).pathname.split("/").at(-1)!) });
+  expect([made.repo, made.status]).toEqual(["farm-hud", "backlog"]);
   await page.goto("/farm/farm-hud");
   await page.getByTestId("repo-sign").click();
   await expect(page).toHaveURL(/\/repos$/u);
