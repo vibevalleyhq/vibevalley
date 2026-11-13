@@ -125,8 +125,9 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
     assert_eq!(names.len(), 25, "{names:?}");
     assert!(names.contains(&"issue_report"));
 
-    let stranger = rpc(&door, "not-a-token", 3, "tools/list", json!({}));
-    assert_eq!(stranger["error"]["code"], -32001);
+    let stranger = rpc(&door, "not-a-token", 3, "tools/call", json!({ "name": "session_list", "arguments": {} }));
+    assert_eq!(stranger["result"]["isError"], true);
+    assert_eq!(text_of(&stranger), "没认出你是谁：这些工具只给帮工用");
 
     let said = rpc(
         &door,

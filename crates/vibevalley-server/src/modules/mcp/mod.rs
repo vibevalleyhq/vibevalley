@@ -34,8 +34,8 @@ impl Door {
                 "serverInfo": { "name": "vibevalley", "version": self.version },
             })),
             "ping" => Ok(json!({})),
+            // The list is anyone's; a call names its caller (mcp.ts: the tools refuse an unknown one themselves).
             "tools/list" => {
-                self.caller(token)?;
                 let tools: Vec<Value> = helper::TOOLS
                     .iter()
                     .map(|t| {
@@ -47,7 +47,9 @@ impl Door {
                 Ok(json!({ "tools": tools }))
             }
             "tools/call" => {
-                let me = self.caller(token)?;
+                let Some(me) = self.caller(token) else {
+                    return Ok(json!({ "content": [{ "type": "text", "text": UNKNOWN_CALLER }], "isError": true }));
+                };
                 let name = params["name"].as_str().unwrap_or("");
                 let args = params.get("arguments").cloned().filter(Value::is_object).unwrap_or_else(|| json!({}));
                 let (text, error) = match self.helpers.call(&me, name, &args) {
@@ -62,9 +64,8 @@ impl Door {
         }
     }
 
-    fn caller(&self, token: &str) -> Result<vibevalley_protocol::Session, (i64, String)> {
-        let id = self.helpers.board.who(token).ok_or((-32001, UNKNOWN_CALLER.to_string()))?;
-        self.helpers.board.session(&id).ok_or((-32001, UNKNOWN_CALLER.to_string()))
+    fn caller(&self, token: &str) -> Option<vibevalley_protocol::Session> {
+        self.helpers.board.session(&self.helpers.board.who(token)?)
     }
 }
 

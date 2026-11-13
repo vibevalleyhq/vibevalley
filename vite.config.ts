@@ -559,6 +559,7 @@ export default defineConfig({
           "apps/server/src/testing/worker.ts",
           "apps/server/src/modules/session/worker.ts",
           "apps/cli/src/infra/spawn.ts",
+          "apps/cli/src/testing/rust.ts",
           "apps/desktop/src/infra/island.ts",
           "apps/desktop/src/infra/server.ts",
           "apps/desktop/src/infra/update.ts",
