@@ -91,16 +91,25 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
             label={t("web.base.farm")}
             current={props.farm}
             icon={() => (
-              <If
-                when={pixelDir()}
-                else={
-                  <View class="h-9.5 w-9.5 items-center justify-center rounded-full bg-page">
-                    <Icon name="farm" size={20} tone="leaf" />
-                  </View>
-                }
-              >
-                <OrchestratorFace size={38} />
-              </If>
+              <View class="relative">
+                <If
+                  when={pixelDir()}
+                  else={
+                    <View class="h-9.5 w-9.5 items-center justify-center rounded-full bg-page">
+                      <Icon name="farm" size={20} tone="leaf" />
+                    </View>
+                  }
+                >
+                  <OrchestratorFace size={38} />
+                </If>
+                {/* The link to the server, on the face: a ring of the rail's colour sets it off the picture. */}
+                <View
+                  testID="link"
+                  accessibilityLabel={linkWords[frames.link]}
+                  accessible
+                  class={`absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full border-2 border-rail ${frames.link === "open" ? "bg-leaf" : frames.link === "lost" ? "bg-berry" : "bg-faint"}`}
+                />
+              </View>
             )}
           />
         </View>
@@ -156,9 +165,6 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
           current={props.farm}
           icon={railIcon("farm", () => props.farm)}
         />
-        <View testID="link" accessibilityLabel={linkWords[frames.link]} accessible class="h-4 items-center justify-center">
-          <View class={`h-2 w-2 rounded-full ${frames.link === "open" ? "bg-leaf" : frames.link === "lost" ? "bg-berry" : "bg-faint"}`} />
-        </View>
       </View>
     </View>
   );
