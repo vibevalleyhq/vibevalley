@@ -122,8 +122,8 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 ```bash
 design/art.sh
 design/pixel/gen.sh <名字>             # 生成原图；两倍密用 hd-<名字>
-python3 design/pixel/process.py         # 切全部原图到 apps/web/public/pixel/ 与 sprites.json
+python3 design/pixel/process.py         # 切全部原图到 assets/pixel/ 与 sprites.json
 python3 design/pixel/process.py map plots  # 仅切指定素材
 ```
 
-切图规则见[工程流程](docs/subsystems/process.md#怎么走)。应用图标位于 `apps/web/public/icons/` 与 `apps/desktop/resources/icon.icns`。音效配方在 `apps/web/src/ui/pixel/sound.ts`（[农场的皮](docs/subsystems/farm.md#模型和不变量)）。官网位于 [apps/site/README.md](apps/site/README.md)，通过 `vp run site:deploy` 部署。
+切图规则见[工程流程](docs/subsystems/process.md#怎么走)。应用图标位于 `assets/icons/` 与 `apps/desktop/resources/icon.icns`。音效配方在 `apps/web/src/ui/pixel/sound.ts`（[农场的皮](docs/subsystems/farm.md#模型和不变量)）。官网位于 [apps/site/README.md](apps/site/README.md)，通过 `vp run site:deploy` 部署。

@@ -1,0 +1,5 @@
+{
+  "name": "Tester Wu",
+  "duty": "Runs tests, fixes tests, watches CI",
+  "tags": ["test", "test", "ci", "run them", "failing"]
+}

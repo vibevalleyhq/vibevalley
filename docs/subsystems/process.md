@@ -58,7 +58,7 @@
 
 1. 运行 `design/art.sh` 链接 `vibevalley-art` 原图目录。
 2. 运行 `design/pixel/gen.sh <名字>` 生成品红底整图到 `design/pixel/raw/`。
-3. 在 `design/pixel/process.py` 登记行列与名称，运行脚本输出 `apps/web/public/pixel/` 与 `sprites.json`。
+3. 在 `design/pixel/process.py` 登记行列与名称，运行脚本输出 `assets/pixel/` 与 `sprites.json`。
 
 ## 和谁打交道
 

@@ -1,0 +1,102 @@
+{
+ "ConnectorID": [
+  "weixin",
+  "feishu",
+  "qq"
+ ],
+ "ConnectorState": [
+  "off",
+  "waiting",
+  "scanned",
+  "verify",
+  "pairing",
+  "connected",
+  "paused"
+ ],
+ "ConnectorStatus": [
+  {
+   "id": "weixin",
+   "state": "off",
+   "qr": "s2089",
+   "pairCode": "s2090",
+   "channel": "s2091",
+   "user": "s2092",
+   "since": 2093,
+   "lastInbound": 2094,
+   "pausedUntil": 2095,
+   "pending": 2096,
+   "error": "s2097"
+  },
+  {
+   "id": "weixin",
+   "state": "off",
+   "qr": "s2098",
+   "pairCode": "s2099",
+   "pending": 2100,
+   "error": "s2101"
+  }
+ ],
+ "ConnectorLogin": [
+  {
+   "force": true,
+   "appId": "s2103",
+   "secret": "s2104"
+  },
+  {}
+ ],
+ "VerifyRequest": [
+  {
+   "code": "s2105"
+  },
+  {
+   "code": "s2106"
+  }
+ ],
+ "ConnectorsChannelRequest": [
+  {
+   "channel": "s2107"
+  },
+  {
+   "channel": "s2108"
+  }
+ ],
+ "ConnectorLoginInput": [
+  {
+   "id": "s7085",
+   "force": true,
+   "appId": "s7087",
+   "secret": "s7088"
+  },
+  {
+   "id": "s7089"
+  }
+ ],
+ "ConnectorVerifyInput": [
+  {
+   "id": "s7090",
+   "code": "s7091"
+  },
+  {
+   "id": "s7092",
+   "code": "s7093"
+  }
+ ],
+ "ConnectorLogoutInput": [
+  {
+   "id": "s7094"
+  },
+  {
+   "id": "s7095"
+  }
+ ],
+ "ConnectorChannelSetInput": [
+  {
+   "id": "s7096",
+   "channel": "s7097"
+  },
+  {
+   "id": "s7098",
+   "channel": "s7099"
+  }
+ ]
+}

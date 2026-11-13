@@ -24,5 +24,5 @@ closed and open into that folder (it must exist) (`closed.png`, `open.png`) and 
 
 ```bash
 mkdir -p /tmp/island && echo '{"glance":{"working":1,"waiting":1,"rows":[{"issue":"i1","number":41,"title":"修登录页","doing":"等你验收","tone":"waiting"}]}}' |
-  apps/island/.build/release/VibeValleyIsland --font apps/web/public/fonts/fusion-pixel-12px-proportional-zh_hans.otf --snapshot /tmp/island
+  apps/island/.build/release/VibeValleyIsland --font assets/fonts/fusion-pixel-12px-proportional-zh_hans.otf --snapshot /tmp/island
 ```

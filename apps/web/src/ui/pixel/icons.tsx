@@ -5,7 +5,7 @@ import type { Phase, SessionAction } from "@vibevalley/protocol";
 
 import { useInterval } from "#/base/timer.ts";
 
-/** A drawing from apps/web/public/pixel; decorative unless it has a label. */
+/** A drawing from assets/pixel; decorative unless it has a label. */
 export function SpriteIcon(props: { name: string; size: number; label?: string; class?: JSX.ClassValue | undefined; style?: JSX.CSSProperties }) {
   return (
     <img

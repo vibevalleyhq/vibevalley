@@ -1,4 +1,4 @@
-/** ax/ay anchor the sprite's feet (apps/web/public/pixel/sprites.json). */
+/** ax/ay anchor the sprite's feet (assets/pixel/sprites.json). */
 export interface Art {
   src: string;
   w: number;

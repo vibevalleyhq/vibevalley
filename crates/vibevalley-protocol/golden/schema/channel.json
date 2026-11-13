@@ -1,0 +1,1040 @@
+{
+ "MessageKind": [
+  "chat",
+  "dispatch",
+  "report",
+  "notice"
+ ],
+ "Notify": [
+  "all",
+  "mentions",
+  "none"
+ ],
+ "Embed": [
+  {
+   "url": "s1577",
+   "title": "s1578",
+   "description": "s1579",
+   "site": "s1580",
+   "image": "s1581"
+  },
+  {
+   "url": "s1582",
+   "title": "s1583",
+   "description": "s1584",
+   "site": "s1585",
+   "image": "s1586"
+  }
+ ],
+ "Reaction": [
+  {
+   "emoji": "s1587",
+   "by": [
+    "s1588"
+   ]
+  },
+  {
+   "emoji": "s1589",
+   "by": [
+    "s1590"
+   ]
+  }
+ ],
+ "ChatMessage": [
+  {
+   "id": "s1591",
+   "number": 1592,
+   "channel": "s1593",
+   "from": "s1594",
+   "actor": {
+    "kind": "user",
+    "id": "s1595",
+    "name": "s1596"
+   },
+   "name": "s1597",
+   "agent": "s1598",
+   "kind": "chat",
+   "text": "s1599",
+   "mentions": [
+    "s1600"
+   ],
+   "session": "s1601",
+   "run": "s1602",
+   "outcome": "completed",
+   "spent": {
+    "tokens": 1603,
+    "cny": 1604
+   },
+   "spoken": false,
+   "sendKey": "s1606",
+   "at": 1607,
+   "revision": 1608,
+   "replyTo": 1609,
+   "edited": 1610,
+   "deleted": 1611,
+   "pinned": 1612,
+   "reactions": [
+    {
+     "emoji": "s1613",
+     "by": [
+      "s1614"
+     ]
+    }
+   ],
+   "attachments": [
+    {
+     "id": "s1615",
+     "name": "s1616",
+     "type": "s1617",
+     "size": 1618
+    }
+   ],
+   "embeds": [
+    {
+     "url": "s1619",
+     "title": "s1620",
+     "description": "s1621",
+     "site": "s1622",
+     "image": "s1623"
+    }
+   ],
+   "artifact": {
+    "id": "s1624",
+    "title": "s1625",
+    "body": "blocks",
+    "version": 1626,
+    "note": "s1627",
+    "display": "page"
+   },
+   "blocks": [
+    {
+     "artifactId": "s1628",
+     "blockId": "s1629",
+     "rev": 1630,
+     "title": "s1631",
+     "type": "s1632",
+     "text": "s1633",
+     "nowRev": 1634,
+     "deleted": false
+    }
+   ]
+  },
+  {
+   "id": "s1636",
+   "number": 1637,
+   "channel": "s1638",
+   "from": "s1639",
+   "actor": {
+    "kind": "user",
+    "id": "s1640"
+   },
+   "name": "s1641",
+   "kind": "chat",
+   "text": "s1642",
+   "mentions": [
+    "s1643"
+   ],
+   "outcome": null,
+   "spoken": true,
+   "at": 1645,
+   "revision": 1646,
+   "reactions": [
+    {
+     "emoji": "s1647",
+     "by": [
+      "s1648"
+     ]
+    }
+   ],
+   "attachments": [
+    {
+     "id": "s1649",
+     "name": "s1650",
+     "type": "s1651",
+     "size": 1652
+    }
+   ],
+   "embeds": [
+    {
+     "url": "s1653",
+     "title": "s1654",
+     "description": "s1655",
+     "site": "s1656",
+     "image": "s1657"
+    }
+   ]
+  }
+ ],
+ "ChannelType": [
+  "channel",
+  "direct",
+  "thread"
+ ],
+ "SubjectKind": [
+  "issue",
+  "talk"
+ ],
+ "Channel": [
+  {
+   "id": "s1686",
+   "type": "channel",
+   "default": false,
+   "peer": "s1688",
+   "orchestrator": "s1689",
+   "members": [
+    "s1690"
+   ],
+   "parent": "s1691",
+   "category": "s1692",
+   "position": 1693,
+   "archived": 1694,
+   "notify": "all",
+   "root": "s1695",
+   "rootNumber": 1696,
+   "name": "s1697",
+   "description": "s1698",
+   "repo": "s1699",
+   "subjectKind": "issue",
+   "subjectId": "s1700",
+   "lastNumber": 1701,
+   "replies": 1702,
+   "read": 1703,
+   "unread": 1704,
+   "title": "s1705",
+   "last": {
+    "from": "s1706",
+    "name": "s1707",
+    "text": "s1708",
+    "at": 1709
+   },
+   "at": 1710
+  },
+  {
+   "id": "s1711",
+   "type": "channel",
+   "default": true,
+   "category": "s1713",
+   "notify": "all",
+   "description": "s1714",
+   "subjectKind": null,
+   "replies": 1715,
+   "title": "s1716",
+   "at": 1717
+  }
+ ],
+ "ChannelLast": [
+  {
+   "from": "s1718",
+   "name": "s1719",
+   "text": "s1720",
+   "at": 1721
+  },
+  {
+   "from": "s1722",
+   "name": "s1723",
+   "text": "s1724",
+   "at": 1725
+  }
+ ],
+ "UserMention": [
+  {
+   "message": {
+    "id": "s1726",
+    "number": 1727,
+    "channel": "s1728",
+    "from": "s1729",
+    "actor": {
+     "kind": "user",
+     "id": "s1730",
+     "name": "s1731"
+    },
+    "name": "s1732",
+    "agent": "s1733",
+    "kind": "chat",
+    "text": "s1734",
+    "mentions": [
+     "s1735"
+    ],
+    "session": "s1736",
+    "run": "s1737",
+    "outcome": "completed",
+    "spent": {
+     "tokens": 1738,
+     "cny": 1739
+    },
+    "spoken": true,
+    "sendKey": "s1741",
+    "at": 1742,
+    "revision": 1743,
+    "replyTo": 1744,
+    "edited": 1745,
+    "deleted": 1746,
+    "pinned": 1747,
+    "reactions": [
+     {
+      "emoji": "s1748",
+      "by": [
+       "s1749"
+      ]
+     }
+    ],
+    "attachments": [
+     {
+      "id": "s1750",
+      "name": "s1751",
+      "type": "s1752",
+      "size": 1753
+     }
+    ],
+    "embeds": [
+     {
+      "url": "s1754",
+      "title": "s1755",
+      "description": "s1756",
+      "site": "s1757",
+      "image": "s1758"
+     }
+    ],
+    "artifact": {
+     "id": "s1759",
+     "title": "s1760",
+     "body": "blocks",
+     "version": 1761,
+     "note": "s1762",
+     "display": "page"
+    },
+    "blocks": [
+     {
+      "artifactId": "s1763",
+      "blockId": "s1764",
+      "rev": 1765,
+      "title": "s1766",
+      "type": "s1767",
+      "text": "s1768",
+      "nowRev": 1769,
+      "deleted": true
+     }
+    ]
+   },
+   "channel": "s1771",
+   "address": "s1772"
+  },
+  {
+   "message": {
+    "id": "s1773",
+    "number": 1774,
+    "channel": "s1775",
+    "from": "s1776",
+    "actor": {
+     "kind": "user",
+     "id": "s1777"
+    },
+    "name": "s1778",
+    "kind": "chat",
+    "text": "s1779",
+    "mentions": [
+     "s1780"
+    ],
+    "outcome": null,
+    "spoken": false,
+    "at": 1782,
+    "revision": 1783,
+    "reactions": [
+     {
+      "emoji": "s1784",
+      "by": [
+       "s1785"
+      ]
+     }
+    ],
+    "attachments": [
+     {
+      "id": "s1786",
+      "name": "s1787",
+      "type": "s1788",
+      "size": 1789
+     }
+    ],
+    "embeds": [
+     {
+      "url": "s1790",
+      "title": "s1791",
+      "description": "s1792",
+      "site": "s1793",
+      "image": "s1794"
+     }
+    ]
+   },
+   "channel": "s1795",
+   "address": "s1796"
+  }
+ ],
+ "Chat": [
+  {
+   "channels": [
+    {
+     "id": "s1797",
+     "type": "channel",
+     "default": true,
+     "peer": "s1799",
+     "orchestrator": "s1800",
+     "members": [
+      "s1801"
+     ],
+     "parent": "s1802",
+     "category": "s1803",
+     "position": 1804,
+     "archived": 1805,
+     "notify": "all",
+     "root": "s1806",
+     "rootNumber": 1807,
+     "name": "s1808",
+     "description": "s1809",
+     "repo": "s1810",
+     "subjectKind": "issue",
+     "subjectId": "s1811",
+     "lastNumber": 1812,
+     "replies": 1813,
+     "read": 1814,
+     "unread": 1815,
+     "title": "s1816",
+     "last": {
+      "from": "s1817",
+      "name": "s1818",
+      "text": "s1819",
+      "at": 1820
+     },
+     "at": 1821
+    }
+   ],
+   "userMentions": [
+    {
+     "message": {
+      "id": "s1822",
+      "number": 1823,
+      "channel": "s1824",
+      "from": "s1825",
+      "actor": {
+       "kind": "user",
+       "id": "s1826"
+      },
+      "name": "s1827",
+      "agent": "s1828",
+      "kind": "chat",
+      "text": "s1829",
+      "mentions": [
+       "s1830"
+      ],
+      "session": "s1831",
+      "run": "s1832",
+      "outcome": "completed",
+      "spent": {
+       "tokens": 1833
+      },
+      "spoken": true,
+      "sendKey": "s1835",
+      "at": 1836,
+      "revision": 1837,
+      "replyTo": 1838,
+      "edited": 1839,
+      "deleted": 1840,
+      "pinned": 1841,
+      "reactions": [
+       {
+        "emoji": "s1842",
+        "by": []
+       }
+      ],
+      "attachments": [
+       {
+        "id": "s1843",
+        "name": "s1844",
+        "type": "s1845",
+        "size": 1846
+       }
+      ],
+      "embeds": [
+       {
+        "url": "s1847",
+        "title": "s1848",
+        "description": "s1849",
+        "site": "s1850",
+        "image": "s1851"
+       }
+      ],
+      "artifact": {
+       "id": "s1852",
+       "title": "s1853",
+       "body": "blocks",
+       "version": 1854,
+       "note": "s1855"
+      },
+      "blocks": [
+       {
+        "artifactId": "s1856",
+        "blockId": "s1857",
+        "rev": 1858,
+        "title": "s1859"
+       }
+      ]
+     },
+     "channel": "s1860",
+     "address": "s1861"
+    }
+   ]
+  },
+  {
+   "channels": [
+    {
+     "id": "s1862",
+     "type": "channel",
+     "default": false,
+     "category": "s1864",
+     "notify": "all",
+     "description": "s1865",
+     "subjectKind": null,
+     "replies": 1866,
+     "title": "s1867",
+     "at": 1868
+    }
+   ],
+   "userMentions": [
+    {
+     "message": {
+      "id": "s1869",
+      "number": 1870,
+      "channel": "s1871",
+      "from": "s1872",
+      "actor": {
+       "kind": "user",
+       "id": "s1873"
+      },
+      "name": "s1874",
+      "kind": "chat",
+      "text": "s1875",
+      "mentions": [
+       "s1876"
+      ],
+      "outcome": null,
+      "spoken": false,
+      "at": 1878,
+      "revision": 1879,
+      "reactions": [
+       {
+        "emoji": "s1880",
+        "by": []
+       }
+      ],
+      "attachments": [
+       {
+        "id": "s1881",
+        "name": "s1882",
+        "type": "s1883",
+        "size": 1884
+       }
+      ],
+      "embeds": [
+       {
+        "url": "s1885",
+        "title": "s1886",
+        "description": "s1887",
+        "site": "s1888",
+        "image": "s1889"
+       }
+      ]
+     },
+     "channel": "s1890",
+     "address": "s1891"
+    }
+   ]
+  }
+ ],
+ "ChannelEvent": [
+  {
+   "_tag": "Message",
+   "message": {
+    "id": "s1892",
+    "number": 1893,
+    "channel": "s1894",
+    "from": "s1895",
+    "actor": {
+     "kind": "user",
+     "id": "s1896",
+     "name": "s1897"
+    },
+    "name": "s1898",
+    "agent": "s1899",
+    "kind": "chat",
+    "text": "s1900",
+    "mentions": [
+     "s1901"
+    ],
+    "session": "s1902",
+    "run": "s1903",
+    "outcome": "completed",
+    "spent": {
+     "tokens": 1904,
+     "cny": 1905
+    },
+    "spoken": true,
+    "sendKey": "s1907",
+    "at": 1908,
+    "revision": 1909,
+    "replyTo": 1910,
+    "edited": 1911,
+    "deleted": 1912,
+    "pinned": 1913,
+    "reactions": [
+     {
+      "emoji": "s1914",
+      "by": [
+       "s1915"
+      ]
+     }
+    ],
+    "attachments": [
+     {
+      "id": "s1916",
+      "name": "s1917",
+      "type": "s1918",
+      "size": 1919
+     }
+    ],
+    "embeds": [
+     {
+      "url": "s1920",
+      "title": "s1921",
+      "description": "s1922",
+      "site": "s1923",
+      "image": "s1924"
+     }
+    ],
+    "artifact": {
+     "id": "s1925",
+     "title": "s1926",
+     "body": "blocks",
+     "version": 1927,
+     "note": "s1928",
+     "display": "page"
+    },
+    "blocks": [
+     {
+      "artifactId": "s1929",
+      "blockId": "s1930",
+      "rev": 1931,
+      "title": "s1932",
+      "type": "s1933",
+      "text": "s1934",
+      "nowRev": 1935,
+      "deleted": true
+     }
+    ]
+   }
+  },
+  {
+   "_tag": "Message",
+   "message": {
+    "id": "s1937",
+    "number": 1938,
+    "channel": "s1939",
+    "from": "s1940",
+    "actor": {
+     "kind": "user",
+     "id": "s1941"
+    },
+    "name": "s1942",
+    "kind": "chat",
+    "text": "s1943",
+    "mentions": [
+     "s1944"
+    ],
+    "outcome": null,
+    "spoken": false,
+    "at": 1946,
+    "revision": 1947,
+    "reactions": [
+     {
+      "emoji": "s1948",
+      "by": [
+       "s1949"
+      ]
+     }
+    ],
+    "attachments": [
+     {
+      "id": "s1950",
+      "name": "s1951",
+      "type": "s1952",
+      "size": 1953
+     }
+    ],
+    "embeds": [
+     {
+      "url": "s1954",
+      "title": "s1955",
+      "description": "s1956",
+      "site": "s1957",
+      "image": "s1958"
+     }
+    ]
+   }
+  },
+  {
+   "_tag": "Reset"
+  }
+ ],
+ "SayRequest": [
+  {
+   "id": "s1959",
+   "text": "s1960",
+   "blocks": [
+    {
+     "artifactId": "s1961",
+     "blockId": "s1962",
+     "rev": 1963
+    }
+   ],
+   "replyTo": 1964,
+   "attachments": [
+    "s1965"
+   ],
+   "station": 1966,
+   "agent": "s1967",
+   "repo": "s1968",
+   "sendKey": "s1969",
+   "to": "s1970"
+  },
+  {
+   "id": "s1971",
+   "text": "s1972"
+  }
+ ],
+ "ChannelUpdate": [
+  {
+   "description": "s1979",
+   "repo": "s1980",
+   "name": "s1981",
+   "category": "s1982",
+   "before": "s1983",
+   "members": [
+    "s1984"
+   ]
+  },
+  {}
+ ],
+ "ChannelRequest": [
+  {
+   "name": "s1985",
+   "description": "s1986",
+   "repo": "s1987"
+  },
+  {
+   "name": "s1988"
+  }
+ ],
+ "ChatReadRequest": [
+  {
+   "number": 1989
+  },
+  {
+   "number": 1990
+  }
+ ],
+ "MessageEdit": [
+  {
+   "id": "s1991",
+   "text": "s1992",
+   "attachments": [
+    "s1993"
+   ]
+  },
+  {
+   "id": "s1994",
+   "text": "s1995"
+  }
+ ],
+ "NotifyRequest": [
+  {
+   "id": "s1996",
+   "notify": "all"
+  },
+  {
+   "id": "s1997",
+   "notify": "all"
+  }
+ ],
+ "ReactionSet": [
+  {
+   "id": "s1998",
+   "emoji": "s1999",
+   "on": true
+  },
+  {
+   "id": "s2001",
+   "emoji": "s2002",
+   "on": false
+  }
+ ],
+ "OnSet": [
+  {
+   "id": "s2004",
+   "on": false
+  },
+  {
+   "id": "s2006",
+   "on": false
+  }
+ ],
+ "MessageSearch": [
+  {
+   "text": "s2008",
+   "channel": "s2009"
+  },
+  {
+   "text": "s2010"
+  }
+ ],
+ "ChannelUnread": [
+  {
+   "channel": "s2011",
+   "unread": 2012,
+   "mentionsYou": false,
+   "latest": "s2014"
+  },
+  {
+   "channel": "s2015",
+   "unread": 2016,
+   "mentionsYou": false
+  }
+ ],
+ "MessageHit": [
+  {
+   "message": {
+    "id": "s2018",
+    "number": 2019,
+    "channel": "s2020",
+    "from": "s2021",
+    "actor": {
+     "kind": "user",
+     "id": "s2022",
+     "name": "s2023"
+    },
+    "name": "s2024",
+    "agent": "s2025",
+    "kind": "chat",
+    "text": "s2026",
+    "mentions": [
+     "s2027"
+    ],
+    "session": "s2028",
+    "run": "s2029",
+    "outcome": "completed",
+    "spent": {
+     "tokens": 2030,
+     "cny": 2031
+    },
+    "spoken": true,
+    "sendKey": "s2033",
+    "at": 2034,
+    "revision": 2035,
+    "replyTo": 2036,
+    "edited": 2037,
+    "deleted": 2038,
+    "pinned": 2039,
+    "reactions": [
+     {
+      "emoji": "s2040",
+      "by": [
+       "s2041"
+      ]
+     }
+    ],
+    "attachments": [
+     {
+      "id": "s2042",
+      "name": "s2043",
+      "type": "s2044",
+      "size": 2045
+     }
+    ],
+    "embeds": [
+     {
+      "url": "s2046",
+      "title": "s2047",
+      "description": "s2048",
+      "site": "s2049",
+      "image": "s2050"
+     }
+    ],
+    "artifact": {
+     "id": "s2051",
+     "title": "s2052",
+     "body": "blocks",
+     "version": 2053,
+     "note": "s2054",
+     "display": "page"
+    },
+    "blocks": [
+     {
+      "artifactId": "s2055",
+      "blockId": "s2056",
+      "rev": 2057,
+      "title": "s2058",
+      "type": "s2059",
+      "text": "s2060",
+      "nowRev": 2061,
+      "deleted": true
+     }
+    ]
+   },
+   "channel": "s2063",
+   "address": "s2064"
+  },
+  {
+   "message": {
+    "id": "s2065",
+    "number": 2066,
+    "channel": "s2067",
+    "from": "s2068",
+    "actor": {
+     "kind": "user",
+     "id": "s2069"
+    },
+    "name": "s2070",
+    "kind": "chat",
+    "text": "s2071",
+    "mentions": [
+     "s2072"
+    ],
+    "outcome": null,
+    "spoken": false,
+    "at": 2074,
+    "revision": 2075,
+    "reactions": [
+     {
+      "emoji": "s2076",
+      "by": [
+       "s2077"
+      ]
+     }
+    ],
+    "attachments": [
+     {
+      "id": "s2078",
+      "name": "s2079",
+      "type": "s2080",
+      "size": 2081
+     }
+    ],
+    "embeds": [
+     {
+      "url": "s2082",
+      "title": "s2083",
+      "description": "s2084",
+      "site": "s2085",
+      "image": "s2086"
+     }
+    ]
+   },
+   "channel": "s2087",
+   "address": "s2088"
+  }
+ ],
+ "ChannelUpdateInput": [
+  {
+   "id": "s7050",
+   "description": "s7051",
+   "repo": "s7052",
+   "name": "s7053",
+   "category": "s7054",
+   "before": "s7055",
+   "members": [
+    "s7056"
+   ]
+  },
+  {
+   "id": "s7057"
+  }
+ ],
+ "ChannelDefaultSetInput": [
+  {
+   "id": "s7058"
+  },
+  {
+   "id": "s7059"
+  }
+ ],
+ "ChannelMessageListInput": [
+  {
+   "id": "s7060",
+   "before": 7061,
+   "limit": 7062
+  },
+  {
+   "id": "s7063"
+  }
+ ],
+ "ChannelMarkReadInput": [
+  {
+   "id": "s7064",
+   "number": 7065
+  },
+  {
+   "id": "s7066",
+   "number": 7067
+  }
+ ],
+ "ChannelMessageDeleteInput": [
+  {
+   "id": "s7068"
+  },
+  {
+   "id": "s7069"
+  }
+ ],
+ "ChannelPinSetInput": [
+  {
+   "id": "s7070",
+   "on": false
+  },
+  {
+   "id": "s7072",
+   "on": false
+  }
+ ],
+ "ChannelPinListInput": [
+  {
+   "id": "s7074"
+  },
+  {
+   "id": "s7075"
+  }
+ ],
+ "ChannelThreadCreateInput": [
+  {
+   "id": "s7076",
+   "requestKey": "s7077"
+  },
+  {
+   "id": "s7078"
+  }
+ ],
+ "ChannelDirectCreateInput": [
+  {
+   "agent": "s7079"
+  },
+  {
+   "agent": "s7080"
+  }
+ ],
+ "ChannelMarkUnreadInput": [
+  {
+   "id": "s7081",
+   "number": 7082
+  },
+  {
+   "id": "s7083",
+   "number": 7084
+  }
+ ]
+}

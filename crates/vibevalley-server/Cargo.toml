@@ -1,0 +1,45 @@
+[package]
+name = "vibevalley-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "VibeValley's server in process: the state, the endpoint table, frames, live events and subscriptions"
+
+[dependencies]
+base64 = "0.23.1"
+vibevalley-oar = { version = "0.1.0", path = "../vibevalley-oar" }
+vibevalley-artifact = { version = "0.1.0", path = "../vibevalley-artifact" }
+vibevalley-agent = { version = "0.1.0", path = "../vibevalley-agent" }
+vibevalley-cron = { version = "0.1.0", path = "../vibevalley-cron" }
+vibevalley-core = { version = "0.1.0", path = "../vibevalley-core" }
+vibevalley-git = { version = "0.1.0", path = "../vibevalley-git" }
+vibevalley-i18n = { version = "0.1.0", path = "../vibevalley-i18n" }
+vibevalley-memory = { version = "0.1.0", path = "../vibevalley-memory" }
+vibevalley-issues = { version = "0.1.0", path = "../vibevalley-issues" }
+vibevalley-protocol = { version = "0.1.0", path = "../vibevalley-protocol" }
+vibevalley-server-api = { version = "0.1.0", path = "../vibevalley-server-api" }
+vibevalley-store = { version = "0.1.0", path = "../vibevalley-store" }
+flume = "0.12.0"
+include_dir = "0.7.4"
+jiff = "0.2.43"
+regex = "1.13.1"
+rusqlite = { version = "0.42", features = ["bundled"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+serde_path_to_error = "0.1.20"
+sha2 = "0.11.1"
+ureq = { version = "3.5.2", features = ["json"] }
+url = "2.5.8"
+uuid = { version = "1.29.2", features = ["v4", "v7"] }
+vibevalley-pkm = { version = "0.1.0", path = "../vibevalley-pkm" }
+vibevalley-files = { version = "0.1.0", path = "../vibevalley-files" }
+symphonia = { version = "0.6.1", features = ["all"] }
+flate2 = "1.1.11"
+crc32fast = "1.5.5"
+
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider", "json"] }
+tokio = { version = "1.54.1", features = ["rt", "time", "net", "sync", "macros"] }
+
+[dev-dependencies]
+vibevalley-http = { path = "../vibevalley-http" }
+tempfile = "3.27.0"

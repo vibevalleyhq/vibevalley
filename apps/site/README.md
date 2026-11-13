@@ -23,7 +23,7 @@ vp run site:deploy                                    # 构建，再发到 Cloud
 
 ## 素材
 
-不另存原图：场景素材来自 `apps/web/public/`，截图来自 `docs/images/`，摆放的数据在 `src/base/scene.ts`。
+不另存原图：场景素材来自 `assets/`，截图来自 `docs/images/`，摆放的数据在 `src/base/scene.ts`。
 
 - `scripts/images.ts` 读取 `scene.ts` 的 `SHOWN` 和时辰清单，用 Sharp 生成 WebP 与多尺寸截图；缺图、尺寸或清单就失败。
 - 转换后的图写到 `public/gen/images/`，路径和尺寸由同一步写入 `src/base/images.generated.json`；不要手改生成清单。

@@ -1,0 +1,44 @@
+[
+  {
+    "seq": 1,
+    "agent_path": [],
+    "at_ms": 1794499420000,
+    "kind": {
+      "type": "session_started",
+      "session_id": "ses_e2efdf212ffeKagrujdaRA8SH0",
+      "model": "opencode/gemini-4-carbon"
+    }
+  },
+  {
+    "seq": 2,
+    "agent_path": [],
+    "at_ms": 1794499420020,
+    "kind": {
+      "type": "turn_started",
+      "prompt": "Reply with the single word ok"
+    }
+  },
+  {
+    "seq": 3,
+    "agent_path": [],
+    "at_ms": 1794499420660,
+    "kind": {
+      "type": "error",
+      "message": "Internal error: Insufficient balance. Top up at https://opencode.ai/console/org_REDACTED/billing?credits=1."
+    }
+  },
+  {
+    "seq": 4,
+    "agent_path": [],
+    "at_ms": 1794499420662,
+    "kind": {
+      "type": "turn_finished",
+      "reason": "Error",
+      "usage": {
+        "input_tokens": null,
+        "output_tokens": null,
+        "cost_usd": null
+      }
+    }
+  }
+]

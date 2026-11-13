@@ -542,6 +542,36 @@ importers:
 
   apps/island: {}
 
+  apps/mac/ui:
+    dependencies:
+      '@vibevalley/artifact':
+        specifier: workspace:*
+        version: link:../../../packages/artifact
+      '@vibevalley/i18n':
+        specifier: workspace:*
+        version: link:../../../packages/i18n
+      '@vibevalley/pkm':
+        specifier: workspace:*
+        version: link:../../../packages/pkm
+      '@vibevalley/protocol':
+        specifier: workspace:*
+        version: link:../../../packages/protocol
+      pele:
+        specifier: 'catalog:'
+        version: 1.13.0
+      pinyin-pro:
+        specifier: 'catalog:'
+        version: 3.29.5
+      reicon:
+        specifier: 'catalog:'
+        version: 1.2.5
+      uqr:
+        specifier: 'catalog:'
+        version: 0.1.3
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.7
+
   apps/mobile:
     dependencies:
       '@formatjs/intl-getcanonicallocales':

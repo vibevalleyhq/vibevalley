@@ -1,0 +1,1864 @@
+[
+ {
+  "md": "# 周报：VibeValley 🌾\n\n这周把**块编辑器**的第一步做完了，_顺利_ 😀。见 [设计](https://example.com/a_b) 和 `artifact.submit`，~~不用 CRDT~~。\n\n## 做了什么\n\n- 按块存\n  - 子项：中文、emoji 👍🏽\n- [x] 合并段落\n- [ ] 三方合并\n1. 第一\n2. 第二\n\n> 引用一句\n> 第二行\n\n```go\nfunc main() {\n\tfmt.Println(\"**不是粗体**\")\n}\n```\n\n---\n\n![农场](https://example.com/farm.png \"640x480\")\n\n<!-- issue:0192f -->\n\n<!-- memory:m1 --> 记住：测试用 `make check`\n\n\\# 不是标题，\\*也不是\\* 列表 \\\\ 反斜杠\n\n### 结尾\n",
+  "parsed": [
+   {
+    "depth": 0,
+    "type": "heading",
+    "attrs": {
+     "level": 1
+    },
+    "text": [
+     {
+      "t": "周报：VibeValley 🌾",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "这周把",
+      "marks": {}
+     },
+     {
+      "t": "块编辑器",
+      "marks": {
+       "bold": true
+      }
+     },
+     {
+      "t": "的第一步做完了，",
+      "marks": {}
+     },
+     {
+      "t": "顺利",
+      "marks": {
+       "italic": true
+      }
+     },
+     {
+      "t": " 😀。见 ",
+      "marks": {}
+     },
+     {
+      "t": "设计",
+      "marks": {
+       "link": "https://example.com/a_b"
+      }
+     },
+     {
+      "t": " 和 ",
+      "marks": {}
+     },
+     {
+      "t": "artifact.submit",
+      "marks": {
+       "code": true
+      }
+     },
+     {
+      "t": "，",
+      "marks": {}
+     },
+     {
+      "t": "不用 CRDT",
+      "marks": {
+       "strike": true
+      }
+     },
+     {
+      "t": "。",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "text": [
+     {
+      "t": "做了什么",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "按块存",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 1,
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "子项：中文、emoji 👍🏽",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "todo",
+    "attrs": {
+     "checked": true
+    },
+    "text": [
+     {
+      "t": "合并段落",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "todo",
+    "attrs": {
+     "checked": false
+    },
+    "text": [
+     {
+      "t": "三方合并",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "numbered",
+    "attrs": {},
+    "text": [
+     {
+      "t": "第一",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "numbered",
+    "attrs": {},
+    "text": [
+     {
+      "t": "第二",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "quote",
+    "attrs": {},
+    "text": [
+     {
+      "t": "引用一句\n第二行",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "code",
+    "attrs": {
+     "language": "go"
+    },
+    "text": [
+     {
+      "t": "func main() {\n\tfmt.Println(\"**不是粗体**\")\n}",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "divider",
+    "attrs": {},
+    "text": []
+   },
+   {
+    "depth": 0,
+    "type": "image",
+    "attrs": {
+     "alt": "农场",
+     "src": "https://example.com/farm.png",
+     "width": 640,
+     "height": 480
+    },
+    "text": []
+   },
+   {
+    "depth": 0,
+    "type": "issue_ref",
+    "attrs": {
+     "issueId": "0192f"
+    },
+    "text": []
+   },
+   {
+    "depth": 0,
+    "type": "memory_item",
+    "attrs": {
+     "memoryId": "m1"
+    },
+    "text": [
+     {
+      "t": "记住：测试用 ",
+      "marks": {}
+     },
+     {
+      "t": "make check",
+      "marks": {
+       "code": true
+      }
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "# 不是标题，*也不是* 列表 \\ 反斜杠",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "heading",
+    "attrs": {
+     "level": 3
+    },
+    "text": [
+     {
+      "t": "结尾",
+      "marks": {}
+     }
+    ]
+   }
+  ],
+  "blocks": [
+   {
+    "id": "b1",
+    "orderKey": "V",
+    "type": "heading",
+    "attrs": {
+     "level": 1
+    },
+    "text": [
+     {
+      "t": "周报：VibeValley 🌾",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b2",
+    "orderKey": "W",
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "这周把",
+      "marks": {}
+     },
+     {
+      "t": "块编辑器",
+      "marks": {
+       "bold": true
+      }
+     },
+     {
+      "t": "的第一步做完了，",
+      "marks": {}
+     },
+     {
+      "t": "顺利",
+      "marks": {
+       "italic": true
+      }
+     },
+     {
+      "t": " 😀。见 ",
+      "marks": {}
+     },
+     {
+      "t": "设计",
+      "marks": {
+       "link": "https://example.com/a_b"
+      }
+     },
+     {
+      "t": " 和 ",
+      "marks": {}
+     },
+     {
+      "t": "artifact.submit",
+      "marks": {
+       "code": true
+      }
+     },
+     {
+      "t": "，",
+      "marks": {}
+     },
+     {
+      "t": "不用 CRDT",
+      "marks": {
+       "strike": true
+      }
+     },
+     {
+      "t": "。",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b3",
+    "orderKey": "X",
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "text": [
+     {
+      "t": "做了什么",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b4",
+    "orderKey": "Y",
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "按块存",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b5",
+    "parentId": "b4",
+    "orderKey": "V",
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "子项：中文、emoji 👍🏽",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b6",
+    "orderKey": "Z",
+    "type": "todo",
+    "attrs": {
+     "checked": true
+    },
+    "text": [
+     {
+      "t": "合并段落",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b7",
+    "orderKey": "a",
+    "type": "todo",
+    "attrs": {
+     "checked": false
+    },
+    "text": [
+     {
+      "t": "三方合并",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b8",
+    "orderKey": "b",
+    "type": "numbered",
+    "attrs": {},
+    "text": [
+     {
+      "t": "第一",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b9",
+    "orderKey": "c",
+    "type": "numbered",
+    "attrs": {},
+    "text": [
+     {
+      "t": "第二",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b10",
+    "orderKey": "d",
+    "type": "quote",
+    "attrs": {},
+    "text": [
+     {
+      "t": "引用一句\n第二行",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b11",
+    "orderKey": "e",
+    "type": "code",
+    "attrs": {
+     "language": "go"
+    },
+    "text": [
+     {
+      "t": "func main() {\n\tfmt.Println(\"**不是粗体**\")\n}",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b12",
+    "orderKey": "f",
+    "type": "divider",
+    "attrs": {},
+    "text": [],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b13",
+    "orderKey": "g",
+    "type": "image",
+    "attrs": {
+     "alt": "农场",
+     "src": "https://example.com/farm.png",
+     "width": 640,
+     "height": 480
+    },
+    "text": [],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b14",
+    "orderKey": "h",
+    "type": "issue_ref",
+    "attrs": {
+     "issueId": "0192f"
+    },
+    "text": [],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b15",
+    "orderKey": "i",
+    "type": "memory_item",
+    "attrs": {
+     "memoryId": "m1"
+    },
+    "text": [
+     {
+      "t": "记住：测试用 ",
+      "marks": {}
+     },
+     {
+      "t": "make check",
+      "marks": {
+       "code": true
+      }
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b16",
+    "orderKey": "j",
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "# 不是标题，*也不是* 列表 \\ 反斜杠",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b17",
+    "orderKey": "k",
+    "type": "heading",
+    "attrs": {
+     "level": 3
+    },
+    "text": [
+     {
+      "t": "结尾",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   }
+  ],
+  "out": "# 周报：VibeValley 🌾\n\n这周把**块编辑器**的第一步做完了，_顺利_ 😀。见 [设计](https://example.com/a_b) 和 `artifact.submit`，~~不用 CRDT~~。\n\n## 做了什么\n\n- 按块存\n  - 子项：中文、emoji 👍🏽\n- [x] 合并段落\n- [ ] 三方合并\n1. 第一\n2. 第二\n\n> 引用一句\n> 第二行\n\n```go\nfunc main() {\n\tfmt.Println(\"**不是粗体**\")\n}\n```\n\n---\n\n![农场](https://example.com/farm.png \"640x480\")\n\n<!-- issue:0192f -->\n\n<!-- memory:m1 --> 记住：测试用 `make check`\n\n\\# 不是标题，\\*也不是\\* 列表 \\\\ 反斜杠\n\n### 结尾\n"
+ },
+ {
+  "md": "",
+  "parsed": [],
+  "blocks": [],
+  "out": ""
+ },
+ {
+  "md": "plain words\nsecond line\n\nnext paragraph",
+  "parsed": [
+   {
+    "depth": 0,
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "plain words\nsecond line",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "next paragraph",
+      "marks": {}
+     }
+    ]
+   }
+  ],
+  "blocks": [
+   {
+    "id": "b1",
+    "orderKey": "V",
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "plain words\nsecond line",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b2",
+    "orderKey": "W",
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "next paragraph",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   }
+  ],
+  "out": "plain words\nsecond line\n\nnext paragraph\n"
+ },
+ {
+  "md": "- a\n  - b\n    - c\n- d\n\n1. x\n2) y\n10. z",
+  "parsed": [
+   {
+    "depth": 0,
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "a",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 1,
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "b",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 2,
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "c",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "d",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "numbered",
+    "attrs": {},
+    "text": [
+     {
+      "t": "x",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "numbered",
+    "attrs": {},
+    "text": [
+     {
+      "t": "y",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "numbered",
+    "attrs": {},
+    "text": [
+     {
+      "t": "z",
+      "marks": {}
+     }
+    ]
+   }
+  ],
+  "blocks": [
+   {
+    "id": "b1",
+    "orderKey": "V",
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "a",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b2",
+    "parentId": "b1",
+    "orderKey": "V",
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "b",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b3",
+    "parentId": "b2",
+    "orderKey": "V",
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "c",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b4",
+    "orderKey": "W",
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "d",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b5",
+    "orderKey": "X",
+    "type": "numbered",
+    "attrs": {},
+    "text": [
+     {
+      "t": "x",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b6",
+    "orderKey": "Y",
+    "type": "numbered",
+    "attrs": {},
+    "text": [
+     {
+      "t": "y",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b7",
+    "orderKey": "Z",
+    "type": "numbered",
+    "attrs": {},
+    "text": [
+     {
+      "t": "z",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   }
+  ],
+  "out": "- a\n  - b\n    - c\n- d\n1. x\n2. y\n3. z\n"
+ },
+ {
+  "md": "> q1\n> q2\n\n> other",
+  "parsed": [
+   {
+    "depth": 0,
+    "type": "quote",
+    "attrs": {},
+    "text": [
+     {
+      "t": "q1\nq2",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "quote",
+    "attrs": {},
+    "text": [
+     {
+      "t": "other",
+      "marks": {}
+     }
+    ]
+   }
+  ],
+  "blocks": [
+   {
+    "id": "b1",
+    "orderKey": "V",
+    "type": "quote",
+    "attrs": {},
+    "text": [
+     {
+      "t": "q1\nq2",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b2",
+    "orderKey": "W",
+    "type": "quote",
+    "attrs": {},
+    "text": [
+     {
+      "t": "other",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   }
+  ],
+  "out": "> q1\n> q2\n\n> other\n"
+ },
+ {
+  "md": "```\nno lang\n  indented\n```\n\n```ts\nunclosed",
+  "parsed": [
+   {
+    "depth": 0,
+    "type": "code",
+    "attrs": {},
+    "text": [
+     {
+      "t": "no lang\n  indented",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "code",
+    "attrs": {
+     "language": "ts"
+    },
+    "text": [
+     {
+      "t": "unclosed",
+      "marks": {}
+     }
+    ]
+   }
+  ],
+  "blocks": [
+   {
+    "id": "b1",
+    "orderKey": "V",
+    "type": "code",
+    "attrs": {},
+    "text": [
+     {
+      "t": "no lang\n  indented",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b2",
+    "orderKey": "W",
+    "type": "code",
+    "attrs": {
+     "language": "ts"
+    },
+    "text": [
+     {
+      "t": "unclosed",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   }
+  ],
+  "out": "```\nno lang\n  indented\n```\n\n```ts\nunclosed\n```\n"
+ },
+ {
+  "md": "* star item\n+ plus item\n* [ ] todo\n- [X] done",
+  "parsed": [
+   {
+    "depth": 0,
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "star item",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "plus item",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "todo",
+    "attrs": {
+     "checked": false
+    },
+    "text": [
+     {
+      "t": "todo",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "todo",
+    "attrs": {
+     "checked": true
+    },
+    "text": [
+     {
+      "t": "done",
+      "marks": {}
+     }
+    ]
+   }
+  ],
+  "blocks": [
+   {
+    "id": "b1",
+    "orderKey": "V",
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "star item",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b2",
+    "orderKey": "W",
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "plus item",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b3",
+    "orderKey": "X",
+    "type": "todo",
+    "attrs": {
+     "checked": false
+    },
+    "text": [
+     {
+      "t": "todo",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b4",
+    "orderKey": "Y",
+    "type": "todo",
+    "attrs": {
+     "checked": true
+    },
+    "text": [
+     {
+      "t": "done",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   }
+  ],
+  "out": "- star item\n- plus item\n- [ ] todo\n- [x] done\n"
+ },
+ {
+  "md": "***\n___\n----",
+  "parsed": [
+   {
+    "depth": 0,
+    "type": "divider",
+    "attrs": {},
+    "text": []
+   },
+   {
+    "depth": 0,
+    "type": "divider",
+    "attrs": {},
+    "text": []
+   },
+   {
+    "depth": 0,
+    "type": "divider",
+    "attrs": {},
+    "text": []
+   }
+  ],
+  "blocks": [
+   {
+    "id": "b1",
+    "orderKey": "V",
+    "type": "divider",
+    "attrs": {},
+    "text": [],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b2",
+    "orderKey": "W",
+    "type": "divider",
+    "attrs": {},
+    "text": [],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b3",
+    "orderKey": "X",
+    "type": "divider",
+    "attrs": {},
+    "text": [],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   }
+  ],
+  "out": "---\n\n---\n\n---\n"
+ },
+ {
+  "md": "![a \\] b](https://x/y.png)\n![](none)",
+  "parsed": [
+   {
+    "depth": 0,
+    "type": "image",
+    "attrs": {
+     "alt": "a ] b",
+     "src": "https://x/y.png"
+    },
+    "text": []
+   },
+   {
+    "depth": 0,
+    "type": "image",
+    "attrs": {
+     "alt": "",
+     "src": "none"
+    },
+    "text": []
+   }
+  ],
+  "blocks": [
+   {
+    "id": "b1",
+    "orderKey": "V",
+    "type": "image",
+    "attrs": {
+     "alt": "a ] b",
+     "src": "https://x/y.png"
+    },
+    "text": [],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b2",
+    "orderKey": "W",
+    "type": "image",
+    "attrs": {
+     "alt": "",
+     "src": "none"
+    },
+    "text": [],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   }
+  ],
+  "out": "![a \\] b](https://x/y.png)\n\n![](none)\n"
+ },
+ {
+  "md": "<!-- memory:m2 -->\n<!-- issue:abc -->",
+  "parsed": [
+   {
+    "depth": 0,
+    "type": "memory_item",
+    "attrs": {
+     "memoryId": "m2"
+    },
+    "text": []
+   },
+   {
+    "depth": 0,
+    "type": "issue_ref",
+    "attrs": {
+     "issueId": "abc"
+    },
+    "text": []
+   }
+  ],
+  "blocks": [
+   {
+    "id": "b1",
+    "orderKey": "V",
+    "type": "memory_item",
+    "attrs": {
+     "memoryId": "m2"
+    },
+    "text": [],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b2",
+    "orderKey": "W",
+    "type": "issue_ref",
+    "attrs": {
+     "issueId": "abc"
+    },
+    "text": [],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   }
+  ],
+  "out": "<!-- memory:m2 --> \n\n<!-- issue:abc -->\n"
+ },
+ {
+  "md": "    deep para\n  half\nflush",
+  "parsed": [
+   {
+    "depth": 0,
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "deep para",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 1,
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "half",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "flush",
+      "marks": {}
+     }
+    ]
+   }
+  ],
+  "blocks": [
+   {
+    "id": "b1",
+    "orderKey": "V",
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "deep para",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b2",
+    "parentId": "b1",
+    "orderKey": "V",
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "half",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b3",
+    "orderKey": "W",
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "flush",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   }
+  ],
+  "out": "deep para\n\n  half\n\nflush\n"
+ },
+ {
+  "md": "# h1\n## h2\n### h3\n#### h4 is a paragraph",
+  "parsed": [
+   {
+    "depth": 0,
+    "type": "heading",
+    "attrs": {
+     "level": 1
+    },
+    "text": [
+     {
+      "t": "h1",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "text": [
+     {
+      "t": "h2",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "heading",
+    "attrs": {
+     "level": 3
+    },
+    "text": [
+     {
+      "t": "h3",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "#### h4 is a paragraph",
+      "marks": {}
+     }
+    ]
+   }
+  ],
+  "blocks": [
+   {
+    "id": "b1",
+    "orderKey": "V",
+    "type": "heading",
+    "attrs": {
+     "level": 1
+    },
+    "text": [
+     {
+      "t": "h1",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b2",
+    "orderKey": "W",
+    "type": "heading",
+    "attrs": {
+     "level": 2
+    },
+    "text": [
+     {
+      "t": "h2",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b3",
+    "orderKey": "X",
+    "type": "heading",
+    "attrs": {
+     "level": 3
+    },
+    "text": [
+     {
+      "t": "h3",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b4",
+    "orderKey": "Y",
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "#### h4 is a paragraph",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   }
+  ],
+  "out": "# h1\n\n## h2\n\n### h3\n\n#### h4 is a paragraph\n"
+ },
+ {
+  "md": "snake_case_word and _italic_ and *star* and **bold _inner_** and ~~gone~~ and [link **b**](u) and `` co`de `` and \\*esc\\*",
+  "parsed": [
+   {
+    "depth": 0,
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "snake_case_word and ",
+      "marks": {}
+     },
+     {
+      "t": "italic",
+      "marks": {
+       "italic": true
+      }
+     },
+     {
+      "t": " and ",
+      "marks": {}
+     },
+     {
+      "t": "star",
+      "marks": {
+       "italic": true
+      }
+     },
+     {
+      "t": " and ",
+      "marks": {}
+     },
+     {
+      "t": "bold ",
+      "marks": {
+       "bold": true
+      }
+     },
+     {
+      "t": "inner",
+      "marks": {
+       "bold": true,
+       "italic": true
+      }
+     },
+     {
+      "t": " and ",
+      "marks": {}
+     },
+     {
+      "t": "gone",
+      "marks": {
+       "strike": true
+      }
+     },
+     {
+      "t": " and ",
+      "marks": {}
+     },
+     {
+      "t": "link ",
+      "marks": {
+       "link": "u"
+      }
+     },
+     {
+      "t": "b",
+      "marks": {
+       "bold": true,
+       "link": "u"
+      }
+     },
+     {
+      "t": " and ",
+      "marks": {}
+     },
+     {
+      "t": "co`de",
+      "marks": {
+       "code": true
+      }
+     },
+     {
+      "t": " and *esc*",
+      "marks": {}
+     }
+    ]
+   }
+  ],
+  "blocks": [
+   {
+    "id": "b1",
+    "orderKey": "V",
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "snake_case_word and ",
+      "marks": {}
+     },
+     {
+      "t": "italic",
+      "marks": {
+       "italic": true
+      }
+     },
+     {
+      "t": " and ",
+      "marks": {}
+     },
+     {
+      "t": "star",
+      "marks": {
+       "italic": true
+      }
+     },
+     {
+      "t": " and ",
+      "marks": {}
+     },
+     {
+      "t": "bold ",
+      "marks": {
+       "bold": true
+      }
+     },
+     {
+      "t": "inner",
+      "marks": {
+       "bold": true,
+       "italic": true
+      }
+     },
+     {
+      "t": " and ",
+      "marks": {}
+     },
+     {
+      "t": "gone",
+      "marks": {
+       "strike": true
+      }
+     },
+     {
+      "t": " and ",
+      "marks": {}
+     },
+     {
+      "t": "link ",
+      "marks": {
+       "link": "u"
+      }
+     },
+     {
+      "t": "b",
+      "marks": {
+       "bold": true,
+       "link": "u"
+      }
+     },
+     {
+      "t": " and ",
+      "marks": {}
+     },
+     {
+      "t": "co`de",
+      "marks": {
+       "code": true
+      }
+     },
+     {
+      "t": " and *esc*",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   }
+  ],
+  "out": "snake\\_case\\_word and _italic_ and _star_ and **bold ****_inner_** and ~~gone~~ and [link ](u)[**b**](u) and `` co`de `` and \\*esc\\*\n"
+ },
+ {
+  "md": "unclosed **bold and `code and [link]( and _x",
+  "parsed": [
+   {
+    "depth": 0,
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "unclosed **bold and `code and [link]( and _x",
+      "marks": {}
+     }
+    ]
+   }
+  ],
+  "blocks": [
+   {
+    "id": "b1",
+    "orderKey": "V",
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "unclosed **bold and `code and [link]( and _x",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   }
+  ],
+  "out": "unclosed \\*\\*bold and \\`code and \\[link\\]( and \\_x\n"
+ },
+ {
+  "md": "a\r\nb\r\n\r\n- c",
+  "parsed": [
+   {
+    "depth": 0,
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "a\nb",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "c",
+      "marks": {}
+     }
+    ]
+   }
+  ],
+  "blocks": [
+   {
+    "id": "b1",
+    "orderKey": "V",
+    "type": "paragraph",
+    "attrs": {},
+    "text": [
+     {
+      "t": "a\nb",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b2",
+    "orderKey": "W",
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "c",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   }
+  ],
+  "out": "a\nb\n\n- c\n"
+ },
+ {
+  "md": "  - indented first\n- then flush\n    - too deep",
+  "parsed": [
+   {
+    "depth": 0,
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "indented first",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 0,
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "then flush",
+      "marks": {}
+     }
+    ]
+   },
+   {
+    "depth": 1,
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "too deep",
+      "marks": {}
+     }
+    ]
+   }
+  ],
+  "blocks": [
+   {
+    "id": "b1",
+    "orderKey": "V",
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "indented first",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b2",
+    "orderKey": "W",
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "then flush",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   },
+   {
+    "id": "b3",
+    "parentId": "b2",
+    "orderKey": "V",
+    "type": "bulleted",
+    "attrs": {},
+    "text": [
+     {
+      "t": "too deep",
+      "marks": {}
+     }
+    ],
+    "artifactId": "d",
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 0
+   }
+  ],
+  "out": "- indented first\n- then flush\n  - too deep\n"
+ }
+]

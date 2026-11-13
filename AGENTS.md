@@ -22,7 +22,7 @@ apps/web/                  页面（Solid 2 + Vite）：桌面、浏览器、手
 apps/desktop/              Electron 壳：用自己的 Node 带着服务端起来，打开它提供的页面；宿主能力经 preload 给页面
 apps/island/               刘海上的灵动岛（Swift、AppKit、SwiftUI）：桌面壳带起来的原生小程序，显示在做和等你的工单，点一行打开它
 apps/mobile/               手机壳（Expo、React Native）：扫码配对，WebView 打开那台电脑「连接到本机」放出的页面；通知、锁屏不断的通话经桥给页面
-apps/site/                 官网 vibevalley.dev（Vite + Solid 2 静态生成，每个文档一个接管根）：图和像素字直接用 apps/web/public 的
+apps/site/                 官网 vibevalley.dev（Vite + Solid 2 静态生成，每个文档一个接管根）：图和像素字直接用 assets 的
 packages/protocol/         契约：一个概念一个文件夹 src/<概念>/（名字同服务端的模块），里面是形状（shapes.ts）、它们的 Zod Schema（schema.ts）、
                            接口（api.ts），src/ 下同名的三个文件只显式汇总跨端契约；订阅（rpc.ts，SSE）和两边都跑的规则（src/rules）：服务端和页面都用；只有服务端跑的规则在 apps/server/src/modules 各自的模块里。宿主接口（host.ts）：页面能向桌面壳、手机壳要的东西和桥
 packages/base-ui/          无样式的组件（照 Base UI 的 Solid 2 版）：键盘、焦点、ARIA、开合和选中的状态、浮层的定位；样子在 apps/web/src/ui
@@ -43,7 +43,7 @@ packages/tsrs/             TypeScript 跑在 tsrs（TypeScript 7 的 Rust 移植
 packages/async/            异步原语：打断（AbortSignal）、TaskGroup、Queue、Hub、Semaphore、重试与超时、AsyncIterable 的组合子；时钟（Clock）
 packages/health/           仓库的体检：热点（改动次数乘行数）和逃生口（类型的、吞掉错误的）的棘轮；这个仓库的配置在 scripts/audit/health.config.ts
 packages/stories/          零件的故事（像 Storybook）：故事的格式和查看器；页面的故事分四层：设计体系、组件（ui/ 每个零件旁边一个 X.stories.tsx）、交互、界面
-design/                    生图提示词、脚本和切图规则（写进 apps/web/public）；原图和效果图在单独的仓库 vibevalley-art，design/art.sh 链接进来
+design/                    生图提示词、脚本和切图规则（写进 assets）；原图和效果图在单独的仓库 vibevalley-art，design/art.sh 链接进来
 docs/                      当前的行为和约定；subsystems/ 是各子系统从架构角度沉淀下来的样子（docs/AGENTS.md）
 .agents/notes/             Agent Notes：具体的计划，做完沉淀进 docs/subsystems
 .agents/skills/            仓库自己的 skill：验收（vv-acceptance，入口加 references/ 下按块的分册）等；.claude/skills 链接到这里

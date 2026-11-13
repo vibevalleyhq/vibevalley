@@ -1,0 +1,9 @@
+What gen.ts could not map exactly:
+
+- union MediaJob has no discriminator: untagged
+- union LibraryOriginFetchedFrom has no discriminator: untagged
+- union Readiness is told apart by a non-string "ready" (true, false): untagged, the tag kept as a literal field
+- sample of MediaSpeakersRequest does not parse: : Invalid input
+- sample of MediaAudioRequest does not parse: : Invalid input
+- sample of MediaAudioJob does not parse: request: Invalid input
+- sample of MediaInputRequest does not parse: mime: not one of image/png, image/jpeg, image/webp, image/gif, image/bmp, image/tiff

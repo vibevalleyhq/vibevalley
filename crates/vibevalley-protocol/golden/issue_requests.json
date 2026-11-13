@@ -1,0 +1,27 @@
+[
+ {
+  "title": "t"
+ },
+ {
+  "constraints": {
+   "scope": [],
+   "acceptance": false,
+   "frozen": []
+  },
+  "title": "child",
+  "parent": "i1",
+  "blockedBy": [
+   "i2"
+  ],
+  "description": "d",
+  "repo": "demo",
+  "agent": "lab",
+  "priority": "urgent",
+  "deliver": "pull_request",
+  "autoSubmitPr": true,
+  "criteria": [
+   "c"
+  ],
+  "requestKey": "k"
+ }
+]

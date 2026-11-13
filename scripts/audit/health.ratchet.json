@@ -13,6 +13,13 @@
     "lintOff": 1,
     "swallowed": 2
   },
+  "apps/mac": {
+    "nonNull": 18,
+    "doubleCast": 21,
+    "cast": 89,
+    "lintOff": 6,
+    "swallowed": 4
+  },
   "apps/mobile": {
     "nonNull": 0,
     "doubleCast": 1,

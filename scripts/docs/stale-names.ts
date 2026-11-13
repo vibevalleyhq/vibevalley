@@ -2,7 +2,10 @@ import { existsSync, globSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "../..");
-const DIRS = ["apps/server/src", "apps/web/src", "apps/web/test", "packages/protocol/src"];
+const TS_DIRS = ["apps/server/src", "apps/web/src", "apps/web/test", "packages/protocol/src"];
+// The native port keeps oar's and its own words for now; only the rules that name a `dirs` reach it.
+const NATIVE_DIRS = ["crates", "apps/mac/src", "apps/mac/ui"];
+const DIRS = [...TS_DIRS, ...NATIVE_DIRS];
 
 interface Rule {
   /** What the hit is. */
@@ -17,6 +20,12 @@ interface Rule {
 }
 
 const RULES: readonly Rule[] = [
+  {
+    name: "the name the native port had before it moved in",
+    pattern: /epona|Epona|EPONA/u,
+    says: "it is VibeValley: crates are vibevalley-<concept>, the app is apps/mac, variables are VIBEVALLEY_* (.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)",
+    dirs: DIRS,
+  },
   {
     name: "the farm's person under the owner name",
     pattern:
@@ -456,7 +465,7 @@ export function staleNamesIn(source: string, text: string): string[] {
   const file = source.startsWith("packages/i18n/locales/") ? placeOf(source.split("/").pop()!.slice(0, -".json".length)) : source;
   for (const [i, line] of lines.entries()) {
     for (const rule of RULES) {
-      if (rule.dirs && !rule.dirs.some((dir) => file.startsWith(dir + "/"))) continue;
+      if (!(rule.dirs ?? TS_DIRS).some((dir) => file.startsWith(dir + "/"))) continue;
       if (rule.except?.test(file) === true) continue;
       if (userWords(source) && !han.test(rule.pattern.source)) continue;
       if (rule.pattern.test(line)) hits.push(`${source}:${i + 1}: ${rule.name} — ${rule.says}`);
@@ -467,7 +476,9 @@ export function staleNamesIn(source: string, text: string): string[] {
 
 if (import.meta.main) {
   const catalogs = globSync("packages/i18n/locales/*/*.json", { cwd: root }).toSorted();
-  const files = DIRS.flatMap((dir) => globSync(`${dir}/**/*.{ts,tsx}`, { cwd: root })).toSorted();
+  const files = DIRS.flatMap((dir) =>
+    globSync(`${dir}/**/*.{ts,tsx,rs}`, { cwd: root, exclude: (f) => f.includes("node_modules") || f.endsWith("/build") }),
+  ).toSorted();
   const hits = [...files, ...catalogs].flatMap((source) => staleNamesIn(source, readFileSync(resolve(root, source), "utf8")));
   for (const hit of hits) console.error(`stale names: ${hit}`);
   if (hits.length > 0) process.exit(1);

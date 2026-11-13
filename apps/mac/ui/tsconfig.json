@@ -1,0 +1,24 @@
+{
+  "extends": "./.nsh/tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "nsh": ["./.nsh/types/nsh/index.d.ts"],
+      "nsh/*": ["./.nsh/types/nsh/*.d.ts"],
+      "*": ["./.nsh/types/*.d.ts", "./node_modules/*"],
+      "@vibevalley/protocol": ["../../../packages/protocol/src/index.ts"],
+      "@vibevalley/protocol/*": ["../../../packages/protocol/src/*", "../../../packages/protocol/src/*/index.ts"],
+      "@vibevalley/i18n": ["../../../packages/i18n/src/index.ts"],
+      "@vibevalley/i18n/*": ["../../../packages/i18n/src/*", "../../../packages/i18n/src/*/index.ts"],
+      "@vibevalley/pkm": ["../../../packages/pkm/src/index.ts"],
+      "@vibevalley/pkm/*": ["../../../packages/pkm/src/*", "../../../packages/pkm/src/*/index.ts"],
+      "@vibevalley/artifact": ["../../../packages/artifact/src/index.ts"],
+      "@vibevalley/artifact/*": ["../../../packages/artifact/src/*", "../../../packages/artifact/src/*/index.ts"],
+      "@vibevalley/bridge": ["../../../packages/bridge/src/index.ts"],
+      "@vibevalley/bridge/*": ["../../../packages/bridge/src/*", "../../../packages/bridge/src/*/index.ts"]
+    },
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules"]
+}

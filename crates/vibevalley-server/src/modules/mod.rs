@@ -1,0 +1,31 @@
+//! VibeValley's server modules (`apps/server/src/modules/*`), each
+//! registering its endpoints on the hub.
+
+use crate::Hub;
+
+pub mod agent;
+pub mod artifact;
+pub mod attachment;
+pub mod channel;
+pub mod core;
+pub mod cron;
+pub mod game;
+pub mod issue;
+pub mod lan;
+pub mod library;
+pub mod media;
+pub mod memory;
+pub mod orchestrator;
+pub mod pkm;
+pub mod provider;
+pub mod publish;
+pub mod repo;
+pub mod session;
+pub mod setting;
+pub mod watch;
+
+/// Every module this build serves.
+pub fn install(hub: &Hub) {
+    core::install(hub);
+    lan::install(hub);
+}

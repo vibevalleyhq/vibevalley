@@ -1,0 +1,21 @@
+{
+  "id": "tester",
+  "version": 1,
+  "role": "worker",
+  "name": "测试小吴",
+  "duty": "跑测试、修测试、盯 CI",
+  "tags": ["测试", "test", "ci", "跑一遍", "挂"],
+  "runtime": "pi",
+  "effort": "medium",
+  "worktree": true,
+  "look": {
+    "eye": "#9dffb0",
+    "build": "hopper",
+    "head": "dome",
+    "body": "#f4e6d4",
+    "trim": "#b0503f",
+    "hat": "#f4f3ee",
+    "species": "rabbit",
+    "outfit": "gardener"
+  }
+}

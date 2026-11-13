@@ -31,3 +31,8 @@ design/mockups/v2
 
 # What a workspace package builds for the others (its vite.config.ts pack block).
 packages/*/dist/
+
+# Rust
+target/
+target-*/
+.tools/

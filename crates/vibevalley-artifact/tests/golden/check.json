@@ -1,0 +1,289 @@
+[
+ {
+  "page": "<!doctype html><html><head>\n<script src=\"https://cdn.jsdelivr.net/npm/chart.js@4\"></script>\n<link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/x/1/x.css\">\n<link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Inter\">\n<style>@font-face { font-family: X; src: url(https://fonts.gstatic.com/x.woff2) } body { background: url(data:image/png;base64,AA) }</style>\n</head><body><img src=\"data:image/png;base64,AA\"><svg><use href=\"#dot\"/></svg>\n<form onsubmit=\"return false\"><button>go</button></form><a href=\"https://example.com\" target=\"_blank\">elsewhere</a>\n<script type=module>import { a } from 'https://cdn.jsdelivr.net/npm/a/+esm'; a()</script>\n<script type=\"application/json\">{\"url\": \"https://example.com/x.png\"}</script>\n</body></html>",
+  "check": {
+   "refused": [],
+   "warned": []
+  },
+  "problem": ""
+ },
+ {
+  "page": "<html><head>\n<script src=\"https://unpkg.com/react\"></script>\n<script src=\"/api/v1/state\"></script>\n<link rel=\"stylesheet\" href=\"//cdn.jsdelivr.net.evil.example/x.css\">\n<style>\n  @import url('https://example.com/a.css');\n  body { background: url(https://example.com/bg.png) }\n  @font-face { src: url('https://example.com/f.woff') }\n</style>\n</head><body><img srcset=\"data:image/png;base64,AA 1x, https://example.com/x@2x.png 2x\">\n<div style=\"background-image: url(https://example.com/t.gif)\"></div>\n<video poster=https://example.com/p.jpg></video>\n<script type=module>import x from \"https://esm.sh/x\"; import('https://esm.sh/y')</script>\n<link rel=\"icon\" href=\"https://example.com/favicon.ico\">\n</body></html>",
+  "check": {
+   "refused": [
+    {
+     "kind": "load",
+     "need": "script",
+     "line": 2,
+     "url": "https://unpkg.com/react"
+    },
+    {
+     "kind": "load",
+     "need": "script",
+     "line": 3,
+     "url": "/api/v1/state"
+    },
+    {
+     "kind": "load",
+     "need": "style",
+     "line": 4,
+     "url": "//cdn.jsdelivr.net.evil.example/x.css"
+    },
+    {
+     "kind": "load",
+     "need": "style",
+     "line": 6,
+     "url": "https://example.com/a.css"
+    },
+    {
+     "kind": "load",
+     "need": "inline",
+     "line": 7,
+     "url": "https://example.com/bg.png"
+    },
+    {
+     "kind": "load",
+     "need": "font",
+     "line": 8,
+     "url": "https://example.com/f.woff"
+    },
+    {
+     "kind": "load",
+     "need": "inline",
+     "line": 10,
+     "url": "https://example.com/x@2x.png"
+    },
+    {
+     "kind": "load",
+     "need": "inline",
+     "line": 11,
+     "url": "https://example.com/t.gif"
+    },
+    {
+     "kind": "load",
+     "need": "inline",
+     "line": 12,
+     "url": "https://example.com/p.jpg"
+    },
+    {
+     "kind": "load",
+     "need": "script",
+     "line": 13,
+     "url": "https://esm.sh/x"
+    },
+    {
+     "kind": "load",
+     "need": "script",
+     "line": 13,
+     "url": "https://esm.sh/y"
+    },
+    {
+     "kind": "load",
+     "need": "inline",
+     "line": 14,
+     "url": "https://example.com/favicon.ico"
+    }
+   ],
+   "warned": []
+  },
+  "problem": "页面里有 12 处在沙箱里显示不了，改完再交：\n- 第 2 行的脚本来自 https://unpkg.com/react：脚本写在页面里，或者从 cdn.jsdelivr.net、cdnjs.cloudflare.com 加载\n- 第 3 行的脚本来自 /api/v1/state：脚本写在页面里，或者从 cdn.jsdelivr.net、cdnjs.cloudflare.com 加载\n- 第 4 行的样式来自 //cdn.jsdelivr.net.evil.example/x.css：样式写在页面里，或者从 cdn.jsdelivr.net、cdnjs.cloudflare.com、fonts.googleapis.com 加载\n- 第 6 行的样式来自 https://example.com/a.css：样式写在页面里，或者从 cdn.jsdelivr.net、cdnjs.cloudflare.com、fonts.googleapis.com 加载\n- 第 7 行的图片或音视频来自 https://example.com/bg.png：页面不从外面加载图片，内联成 data:\n- 第 8 行的字体来自 https://example.com/f.woff：字体内联成 data:，或者从 cdn.jsdelivr.net、cdnjs.cloudflare.com、fonts.gstatic.com 加载\n- 第 10 行的图片或音视频来自 https://example.com/x@2x.png：页面不从外面加载图片，内联成 data:\n- 第 11 行的图片或音视频来自 https://example.com/t.gif：页面不从外面加载图片，内联成 data:\n还有 4 处，改完这些再交会列出来"
+ },
+ {
+  "page": "<meta http-equiv=\"Refresh\" content=\"0; url=https://example.com\">\n<base href=\"https://example.com/\">\n<form action=\"https://example.com/collect\"><input type=submit formaction=\"/x\"></form>\n<iframe src=\"https://example.com\"></iframe><object data=\"x.pdf\"></object>\n<template><embed src=x></template>\n<form action=\"#\"></form><base target=\"_blank\">",
+  "check": {
+   "refused": [
+    {
+     "kind": "refresh",
+     "line": 1
+    },
+    {
+     "kind": "base",
+     "line": 2
+    },
+    {
+     "kind": "form",
+     "line": 3,
+     "url": "https://example.com/collect"
+    },
+    {
+     "kind": "form",
+     "line": 3,
+     "url": "/x"
+    },
+    {
+     "kind": "frame",
+     "line": 4,
+     "tag": "iframe"
+    },
+    {
+     "kind": "frame",
+     "line": 4,
+     "tag": "object"
+    },
+    {
+     "kind": "frame",
+     "line": 5,
+     "tag": "embed"
+    }
+   ],
+   "warned": []
+  },
+  "problem": "页面里有 7 处在沙箱里显示不了，改完再交：\n- 第 1 行的 <meta http-equiv=\"refresh\"> 会把页面带走：删掉它\n- 第 2 行的 <base href>：删掉它，地址写全\n- 第 3 行的表单提交到 https://example.com/collect：页面不能提交表单，用脚本处理它\n- 第 3 行的表单提交到 /x：页面不能提交表单，用脚本处理它\n- 第 4 行的 <iframe>：页面里不能再嵌一个页面\n- 第 4 行的 <object>：页面里不能再嵌一个页面\n- 第 5 行的 <embed>：页面里不能再嵌一个页面"
+ },
+ {
+  "page": "<style>/* url(https://example.com/x.png) */</style>\n<script>\nfetch('/a'); fetch('/b')\nnew WebSocket('wss://x')\n</script>",
+  "check": {
+   "refused": [],
+   "warned": [
+    {
+     "line": 3,
+     "call": "fetch"
+    },
+    {
+     "line": 4,
+     "call": "WebSocket"
+    }
+   ]
+  },
+  "problem": ""
+ },
+ {
+  "page": "<script src=\"https://unpkg.com/react\"></script>",
+  "check": {
+   "refused": [
+    {
+     "kind": "load",
+     "need": "script",
+     "line": 1,
+     "url": "https://unpkg.com/react"
+    }
+   ],
+   "warned": []
+  },
+  "problem": "页面里有 1 处在沙箱里显示不了，改完再交：\n- 第 1 行的脚本来自 https://unpkg.com/react：脚本写在页面里，或者从 cdn.jsdelivr.net、cdnjs.cloudflare.com 加载"
+ },
+ {
+  "page": "<img src=\"https://example.com/0.png\">\n<img src=\"https://example.com/1.png\">\n<img src=\"https://example.com/2.png\">\n<img src=\"https://example.com/3.png\">\n<img src=\"https://example.com/4.png\">\n<img src=\"https://example.com/5.png\">\n<img src=\"https://example.com/6.png\">\n<img src=\"https://example.com/7.png\">\n<img src=\"https://example.com/8.png\">\n<img src=\"https://example.com/9.png\">",
+  "check": {
+   "refused": [
+    {
+     "kind": "load",
+     "need": "inline",
+     "line": 1,
+     "url": "https://example.com/0.png"
+    },
+    {
+     "kind": "load",
+     "need": "inline",
+     "line": 2,
+     "url": "https://example.com/1.png"
+    },
+    {
+     "kind": "load",
+     "need": "inline",
+     "line": 3,
+     "url": "https://example.com/2.png"
+    },
+    {
+     "kind": "load",
+     "need": "inline",
+     "line": 4,
+     "url": "https://example.com/3.png"
+    },
+    {
+     "kind": "load",
+     "need": "inline",
+     "line": 5,
+     "url": "https://example.com/4.png"
+    },
+    {
+     "kind": "load",
+     "need": "inline",
+     "line": 6,
+     "url": "https://example.com/5.png"
+    },
+    {
+     "kind": "load",
+     "need": "inline",
+     "line": 7,
+     "url": "https://example.com/6.png"
+    },
+    {
+     "kind": "load",
+     "need": "inline",
+     "line": 8,
+     "url": "https://example.com/7.png"
+    },
+    {
+     "kind": "load",
+     "need": "inline",
+     "line": 9,
+     "url": "https://example.com/8.png"
+    },
+    {
+     "kind": "load",
+     "need": "inline",
+     "line": 10,
+     "url": "https://example.com/9.png"
+    }
+   ],
+   "warned": []
+  },
+  "problem": "页面里有 10 处在沙箱里显示不了，改完再交：\n- 第 1 行的图片或音视频来自 https://example.com/0.png：页面不从外面加载图片，内联成 data:\n- 第 2 行的图片或音视频来自 https://example.com/1.png：页面不从外面加载图片，内联成 data:\n- 第 3 行的图片或音视频来自 https://example.com/2.png：页面不从外面加载图片，内联成 data:\n- 第 4 行的图片或音视频来自 https://example.com/3.png：页面不从外面加载图片，内联成 data:\n- 第 5 行的图片或音视频来自 https://example.com/4.png：页面不从外面加载图片，内联成 data:\n- 第 6 行的图片或音视频来自 https://example.com/5.png：页面不从外面加载图片，内联成 data:\n- 第 7 行的图片或音视频来自 https://example.com/6.png：页面不从外面加载图片，内联成 data:\n- 第 8 行的图片或音视频来自 https://example.com/7.png：页面不从外面加载图片，内联成 data:\n还有 2 处，改完这些再交会列出来"
+ },
+ {
+  "page": "<!doctype html><html><body><p>First paragraph</p><iframe src='https://evil.example'></iframe></body></html>",
+  "check": {
+   "refused": [
+    {
+     "kind": "frame",
+     "line": 1,
+     "tag": "iframe"
+    }
+   ],
+   "warned": []
+  },
+  "problem": "页面里有 1 处在沙箱里显示不了，改完再交：\n- 第 1 行的 <iframe>：页面里不能再嵌一个页面"
+ },
+ {
+  "page": "<img\n  alt=\"x\"\n  src=\"https://example.com/late.png\"><input type=\"IMAGE\" src=\"https://e.x/i.png\"><link rel=\"preload\" as=\"font\" href=\"https://e.x/f\"><link rel=\"modulepreload\" href=\"https://cdn.jsdelivr.net/m.js\"><script href=\"https://e.x/h.js\"></script><a href=\"javascript:void 0\"><button formaction=\"javascript:go()\">x</button></a>",
+  "check": {
+   "refused": [
+    {
+     "kind": "load",
+     "need": "inline",
+     "line": 3,
+     "url": "https://example.com/late.png"
+    },
+    {
+     "kind": "load",
+     "need": "inline",
+     "line": 3,
+     "url": "https://e.x/i.png"
+    },
+    {
+     "kind": "load",
+     "need": "font",
+     "line": 3,
+     "url": "https://e.x/f"
+    },
+    {
+     "kind": "load",
+     "need": "script",
+     "line": 3,
+     "url": "https://e.x/h.js"
+    }
+   ],
+   "warned": []
+  },
+  "problem": "页面里有 4 处在沙箱里显示不了，改完再交：\n- 第 3 行的图片或音视频来自 https://example.com/late.png：页面不从外面加载图片，内联成 data:\n- 第 3 行的图片或音视频来自 https://e.x/i.png：页面不从外面加载图片，内联成 data:\n- 第 3 行的字体来自 https://e.x/f：字体内联成 data:，或者从 cdn.jsdelivr.net、cdnjs.cloudflare.com、fonts.gstatic.com 加载\n- 第 3 行的脚本来自 https://e.x/h.js：脚本写在页面里，或者从 cdn.jsdelivr.net、cdnjs.cloudflare.com 加载"
+ },
+ {
+  "page": "<p>just words &amp; more</p>",
+  "check": {
+   "refused": [],
+   "warned": []
+  },
+  "problem": ""
+ }
+]

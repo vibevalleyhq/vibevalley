@@ -25,6 +25,7 @@
   "swallow-without-record": {
     "apps/cli": 1,
     "apps/desktop": 3,
+    "apps/mac": 7,
     "apps/mobile": 4,
     "apps/server": 8,
     "apps/web": 6,
@@ -34,5 +35,7 @@
   },
   "cause-as-string": {},
   "loose-flags": {},
-  "duplicate-error-class": {}
+  "duplicate-error-class": {
+    "apps/mac": 3
+  }
 }

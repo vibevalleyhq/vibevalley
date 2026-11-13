@@ -1,0 +1,11 @@
+[package]
+name = "vibevalley-protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "VibeValley's wire protocol (packages/protocol) in Rust: shapes that serialize to exactly its JSON"
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+serde_with = "3.24.0"

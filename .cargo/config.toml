@@ -1,0 +1,2 @@
+[env]
+LIBGHOSTTY_VT_SYS_OPTIMIZE = "ReleaseFast"

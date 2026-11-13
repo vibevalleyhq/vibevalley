@@ -1,0 +1,27 @@
+{
+ "repo.list": [
+  {
+   "name": "vibevalley",
+   "path": "/Users/me/vibevalley",
+   "maxSessions": 4,
+   "last": 1794496400000
+  },
+  {
+   "name": "vibevalley",
+   "path": "/Users/me/vibevalley",
+   "maxSessions": 3,
+   "last": 1794240800000
+  },
+  {
+   "name": "notes",
+   "path": "/Users/me/notes",
+   "maxSessions": 2,
+   "last": 1791044000000
+  },
+  {
+   "name": "site",
+   "path": "/Users/me/site",
+   "maxSessions": 2
+  }
+ ]
+}

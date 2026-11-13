@@ -1,0 +1,113 @@
+[
+  {
+    "seq": 1,
+    "agent_path": [],
+    "at_ms": 1794499420000,
+    "kind": {
+      "type": "session_started",
+      "session_id": "01a1d082-8706-7b31-9604-c5317914845a",
+      "model": "gpt-5.5-codex"
+    }
+  },
+  {
+    "seq": 2,
+    "agent_path": [],
+    "at_ms": 1794499420030,
+    "kind": {
+      "type": "turn_started",
+      "prompt": "Create a file named hello.txt containing the single word ok, then reply with the single word done."
+    }
+  },
+  {
+    "seq": 3,
+    "agent_path": [],
+    "at_ms": 1794499423105,
+    "kind": {
+      "type": "text_delta",
+      "text": "I’ll create hello.txt with the requested content.\n"
+    }
+  },
+  {
+    "seq": 4,
+    "agent_path": [],
+    "at_ms": 1794499423739,
+    "kind": {
+      "type": "permission_requested",
+      "request_id": "0",
+      "tool": "commandExecution",
+      "input": {
+        "command": "/bin/zsh -lc 'printf ok > hello.txt'",
+        "cwd": "/tmp/tmp.S2NNjqYT1L"
+      },
+      "summary": "Run: /bin/zsh -lc 'printf ok > hello.txt'"
+    }
+  },
+  {
+    "seq": 5,
+    "agent_path": [],
+    "at_ms": 1794499423740,
+    "kind": {
+      "type": "tool_call_started",
+      "id": "exec-0893a359-78ec-4c82-99f1-d7c3f8d34154",
+      "name": "commandExecution",
+      "input": {
+        "command": "/bin/zsh -lc 'printf ok > hello.txt'",
+        "cwd": "/tmp/tmp.S2NNjqYT1L"
+      }
+    }
+  },
+  {
+    "seq": 6,
+    "agent_path": [],
+    "at_ms": 1794499426140,
+    "kind": {
+      "type": "permission_resolved",
+      "request_id": "0",
+      "decision": "AllowOnce"
+    }
+  },
+  {
+    "seq": 7,
+    "agent_path": [],
+    "at_ms": 1794499428940,
+    "kind": {
+      "type": "tool_call_finished",
+      "id": "exec-0893a359-78ec-4c82-99f1-d7c3f8d34154",
+      "ok": true,
+      "output": "completed"
+    }
+  },
+  {
+    "seq": 8,
+    "agent_path": [],
+    "at_ms": 1794499428945,
+    "kind": {
+      "type": "file_changed",
+      "path": "/tmp/tmp.S2NNjqYT1L/hello.txt",
+      "change": "Created"
+    }
+  },
+  {
+    "seq": 9,
+    "agent_path": [],
+    "at_ms": 1794499429045,
+    "kind": {
+      "type": "text_delta",
+      "text": "done"
+    }
+  },
+  {
+    "seq": 10,
+    "agent_path": [],
+    "at_ms": 1794499429055,
+    "kind": {
+      "type": "turn_finished",
+      "reason": "Completed",
+      "usage": {
+        "input_tokens": 38590,
+        "output_tokens": 52,
+        "cost_usd": null
+      }
+    }
+  }
+]

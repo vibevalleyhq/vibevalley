@@ -1,0 +1,329 @@
+{
+ "seq": 1,
+ "state": {
+  "call": "idle",
+  "callReason": "",
+  "sessions": [
+   {
+    "id": "s-read",
+    "role": "worker",
+    "name": "owl",
+    "agent": "agent-owl",
+    "runtime": "claude",
+    "brief": "",
+    "repo": "vibevalley",
+    "branch": "vv/i-101",
+    "hiredAt": 1794499940000,
+    "runs": 1,
+    "phase": {
+     "_tag": "working",
+     "doing": {
+      "action": "read_file",
+      "label": "read_file",
+      "actionText": "read_file"
+     }
+    },
+    "issue": "i-101",
+    "refining": false
+   },
+   {
+    "id": "s-cmd",
+    "role": "worker",
+    "name": "bear",
+    "agent": "agent-bear",
+    "runtime": "claude",
+    "brief": "",
+    "repo": "vibevalley",
+    "branch": "vv/i-102",
+    "hiredAt": 1794499880000,
+    "runs": 1,
+    "phase": {
+     "_tag": "working",
+     "doing": {
+      "action": "run_command",
+      "label": "run_command",
+      "actionText": "run_command"
+     }
+    },
+    "issue": "i-102",
+    "refining": false
+   },
+   {
+    "id": "s-edit",
+    "role": "worker",
+    "name": "fox",
+    "agent": "agent-fox",
+    "runtime": "claude",
+    "brief": "",
+    "repo": "vibevalley",
+    "branch": "vv/i-103",
+    "hiredAt": 1794499820000,
+    "runs": 1,
+    "phase": {
+     "_tag": "working",
+     "doing": {
+      "action": "edit_file",
+      "label": "edit_file",
+      "actionText": "edit_file"
+     }
+    },
+    "issue": "i-103",
+    "refining": false
+   },
+   {
+    "id": "s-ask",
+    "role": "worker",
+    "name": "cat",
+    "agent": "agent-cat",
+    "runtime": "claude",
+    "brief": "",
+    "repo": "vibevalley",
+    "branch": "vv/i-104",
+    "hiredAt": 1794499760000,
+    "runs": 1,
+    "phase": {
+     "_tag": "working",
+     "doing": {
+      "action": "wait",
+      "label": "wait",
+      "actionText": "wait"
+     }
+    },
+    "issue": "i-104",
+    "refining": false
+   },
+   {
+    "id": "s-ripe",
+    "role": "worker",
+    "name": "rabbit",
+    "agent": "agent-rabbit",
+    "runtime": "claude",
+    "brief": "",
+    "repo": "vibevalley",
+    "branch": "vv/i-105",
+    "hiredAt": 1794499700000,
+    "runs": 1,
+    "phase": {
+     "_tag": "done",
+     "at": 1794500000000
+    },
+    "issue": "i-105",
+    "refining": false
+   },
+   {
+    "id": "s-stuck",
+    "role": "worker",
+    "name": "raccoon",
+    "agent": "agent-raccoon",
+    "runtime": "claude",
+    "brief": "",
+    "repo": "notes",
+    "branch": "vv/i-106",
+    "hiredAt": 1794499640000,
+    "runs": 1,
+    "phase": {
+     "_tag": "failed",
+     "at": 1794500000000,
+     "reason": "tests failed"
+    },
+    "issue": "i-106",
+    "refining": false
+   },
+   {
+    "id": "s-queue",
+    "role": "worker",
+    "name": "hedgehog",
+    "agent": "agent-hedgehog",
+    "runtime": "claude",
+    "brief": "",
+    "repo": "vibevalley",
+    "branch": "vv/i-107",
+    "hiredAt": 1794499580000,
+    "runs": 1,
+    "phase": {
+     "_tag": "working",
+     "doing": {
+      "action": "web",
+      "label": "web",
+      "actionText": "web"
+     }
+    },
+    "issue": "i-107",
+    "refining": false
+   }
+  ],
+  "issues": [
+   {
+    "id": "i-101",
+    "number": 101,
+    "title": "Issue 101",
+    "repo": "vibevalley",
+    "status": "doing",
+    "priority": "normal"
+   },
+   {
+    "id": "i-102",
+    "number": 102,
+    "title": "Issue 102",
+    "repo": "vibevalley",
+    "status": "doing",
+    "priority": "normal"
+   },
+   {
+    "id": "i-103",
+    "number": 103,
+    "title": "Issue 103",
+    "repo": "vibevalley",
+    "status": "doing",
+    "priority": "normal"
+   },
+   {
+    "id": "i-104",
+    "number": 104,
+    "title": "Issue 104",
+    "repo": "vibevalley",
+    "status": "doing",
+    "priority": "normal"
+   },
+   {
+    "id": "i-105",
+    "number": 105,
+    "title": "Issue 105",
+    "repo": "vibevalley",
+    "status": "doing",
+    "priority": "normal"
+   },
+   {
+    "id": "i-106",
+    "number": 106,
+    "title": "Issue 106",
+    "repo": "notes",
+    "status": "doing",
+    "priority": "normal"
+   },
+   {
+    "id": "i-107",
+    "number": 107,
+    "title": "Issue 107",
+    "repo": "vibevalley",
+    "status": "doing",
+    "priority": "normal"
+   },
+   {
+    "id": "i-108",
+    "number": 108,
+    "title": "Queued work",
+    "repo": "vibevalley",
+    "status": "todo",
+    "queuedAt": 1794499999000,
+    "priority": "normal"
+   }
+  ],
+  "crons": [],
+  "connectors": [],
+  "machines": [],
+  "progress": {
+   "coins": 240,
+   "streak": 3,
+   "bestStreak": 5,
+   "counts": {},
+   "unlocked": [],
+   "agents": {}
+  }
+ },
+ "inbox": [],
+ "effects": [],
+ "view": {
+  "level": {
+   "level": 6,
+   "xp": 23,
+   "need": 60
+  },
+  "plots": {
+   "i-101": {
+    "crop": "sprout"
+   },
+   "i-102": {
+    "crop": "leafy"
+   },
+   "i-103": {
+    "crop": "flowering"
+   },
+   "i-104": {
+    "crop": "dry",
+    "badge": {
+     "text": "等你回答",
+     "tone": "wait"
+    }
+   },
+   "i-105": {
+    "crop": "wheat",
+    "badge": {
+     "text": "可收获",
+     "tone": "ripe"
+    }
+   },
+   "i-106": {
+    "crop": "withered",
+    "badge": {
+     "text": "有虫",
+     "tone": "bug"
+    }
+   },
+   "i-107": {
+    "crop": "seeded"
+   }
+  },
+  "plays": {
+   "s-read": {
+    "station": 0,
+    "history": [],
+    "toolsThisRun": 3,
+    "counts": {},
+    "files": [],
+    "commands": []
+   },
+   "s-cmd": {
+    "station": 1,
+    "history": [],
+    "toolsThisRun": 3,
+    "counts": {},
+    "files": [],
+    "commands": []
+   },
+   "s-edit": {
+    "station": 2,
+    "history": [],
+    "toolsThisRun": 3,
+    "counts": {},
+    "files": [],
+    "commands": []
+   },
+   "s-ask": {
+    "station": 3,
+    "history": [],
+    "toolsThisRun": 3,
+    "counts": {},
+    "files": [],
+    "commands": []
+   },
+   "s-ripe": {
+    "station": 4,
+    "history": [],
+    "toolsThisRun": 3,
+    "counts": {},
+    "files": [],
+    "commands": []
+   },
+   "s-stuck": {
+    "station": 5,
+    "history": [],
+    "toolsThisRun": 3,
+    "counts": {},
+    "files": [],
+    "commands": []
+   }
+  },
+  "achievements": []
+ }
+}

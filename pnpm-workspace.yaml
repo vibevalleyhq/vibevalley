@@ -2,6 +2,7 @@
 packages:
   - apps/*
   - packages/*
+  - apps/mac/ui
 
 # Every version the workspace's packages use, written once: their package.json say "catalog:" (or "catalog:expo"). With
 # catalogMode strict, pnpm add puts a new version here and writes "catalog:" there; scripts/catalog.test.ts refuses a

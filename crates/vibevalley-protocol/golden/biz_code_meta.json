@@ -1,0 +1,259 @@
+[
+ {
+  "100001": {
+   "status": 400,
+   "kind": "InvalidInput",
+   "retryable": false
+  },
+  "100002": {
+   "status": 413,
+   "kind": "InvalidInput",
+   "retryable": false
+  },
+  "100003": {
+   "status": 415,
+   "kind": "InvalidInput",
+   "retryable": false
+  },
+  "100004": {
+   "status": 405,
+   "kind": "InvalidInput",
+   "retryable": false
+  },
+  "100005": {
+   "status": 404,
+   "kind": "Missing",
+   "retryable": false
+  },
+  "100006": {
+   "status": 409,
+   "kind": "Refused",
+   "retryable": false
+  },
+  "100007": {
+   "status": 500,
+   "kind": "InternalError",
+   "retryable": true
+  },
+  "100008": {
+   "status": 502,
+   "kind": "BadGateway",
+   "retryable": true
+  },
+  "100009": {
+   "status": 503,
+   "kind": "ServiceUnavailable",
+   "retryable": true
+  },
+  "100010": {
+   "status": 404,
+   "kind": "Missing",
+   "retryable": false
+  },
+  "100011": {
+   "status": 409,
+   "kind": "Refused",
+   "retryable": false
+  },
+  "200001": {
+   "status": 401,
+   "kind": "Unauthorized",
+   "retryable": false
+  },
+  "200002": {
+   "status": 403,
+   "kind": "Forbidden",
+   "retryable": false
+  },
+  "200003": {
+   "status": 403,
+   "kind": "Forbidden",
+   "retryable": false
+  },
+  "200004": {
+   "status": 404,
+   "kind": "Missing",
+   "retryable": false
+  },
+  "200005": {
+   "status": 403,
+   "kind": "Forbidden",
+   "retryable": false
+  },
+  "200006": {
+   "status": 503,
+   "kind": "ServiceUnavailable",
+   "retryable": true
+  },
+  "300001": {
+   "status": 404,
+   "kind": "Missing",
+   "retryable": false
+  },
+  "300002": {
+   "status": 409,
+   "kind": "Refused",
+   "retryable": false
+  },
+  "300003": {
+   "status": 404,
+   "kind": "Missing",
+   "retryable": false
+  },
+  "300004": {
+   "status": 409,
+   "kind": "Refused",
+   "retryable": false
+  },
+  "400001": {
+   "status": 404,
+   "kind": "Missing",
+   "retryable": false
+  },
+  "400002": {
+   "status": 409,
+   "kind": "Refused",
+   "retryable": false
+  },
+  "400003": {
+   "status": 404,
+   "kind": "Missing",
+   "retryable": false
+  },
+  "400004": {
+   "status": 409,
+   "kind": "Refused",
+   "retryable": false
+  },
+  "400005": {
+   "status": 404,
+   "kind": "Missing",
+   "retryable": false
+  },
+  "400006": {
+   "status": 409,
+   "kind": "Refused",
+   "retryable": false
+  },
+  "400007": {
+   "status": 409,
+   "kind": "Refused",
+   "retryable": false
+  },
+  "400008": {
+   "status": 404,
+   "kind": "Missing",
+   "retryable": false
+  },
+  "500001": {
+   "status": 404,
+   "kind": "Missing",
+   "retryable": false
+  },
+  "500002": {
+   "status": 409,
+   "kind": "Refused",
+   "retryable": false
+  },
+  "500003": {
+   "status": 409,
+   "kind": "Refused",
+   "retryable": false
+  },
+  "500004": {
+   "status": 404,
+   "kind": "Missing",
+   "retryable": false
+  },
+  "500005": {
+   "status": 409,
+   "kind": "Refused",
+   "retryable": false
+  },
+  "500006": {
+   "status": 409,
+   "kind": "Refused",
+   "retryable": false
+  },
+  "600001": {
+   "status": 404,
+   "kind": "Missing",
+   "retryable": false
+  },
+  "600002": {
+   "status": 409,
+   "kind": "Refused",
+   "retryable": false
+  },
+  "600003": {
+   "status": 404,
+   "kind": "Missing",
+   "retryable": false
+  },
+  "600004": {
+   "status": 409,
+   "kind": "Refused",
+   "retryable": false
+  },
+  "600005": {
+   "status": 404,
+   "kind": "Missing",
+   "retryable": false
+  },
+  "600006": {
+   "status": 409,
+   "kind": "Refused",
+   "retryable": false
+  },
+  "600007": {
+   "status": 404,
+   "kind": "Missing",
+   "retryable": false
+  },
+  "600008": {
+   "status": 409,
+   "kind": "Refused",
+   "retryable": false
+  },
+  "600009": {
+   "status": 409,
+   "kind": "Refused",
+   "retryable": false
+  },
+  "700001": {
+   "status": 503,
+   "kind": "VoiceUnavailable",
+   "retryable": false
+  },
+  "700002": {
+   "status": 502,
+   "kind": "VoiceCallFailed",
+   "retryable": true
+  },
+  "700003": {
+   "status": 409,
+   "kind": "Refused",
+   "retryable": false
+  },
+  "700004": {
+   "status": 404,
+   "kind": "Missing",
+   "retryable": false
+  },
+  "700005": {
+   "status": 409,
+   "kind": "Refused",
+   "retryable": false
+  },
+  "700006": {
+   "status": 409,
+   "kind": "Refused",
+   "retryable": false
+  },
+  "700007": {
+   "status": 409,
+   "kind": "Refused",
+   "retryable": false
+  }
+ }
+]

@@ -13,7 +13,7 @@ function imageNames(input: unknown): string[] {
 
 export async function prepareImages() {
   const root = resolve(import.meta.dirname, "..");
-  const game = resolve(root, "../web/public");
+  const game = resolve(root, "../../assets");
   const output = resolve(root, "public/gen/images");
   await mkdir(output, { recursive: true });
   const server = await createServer({

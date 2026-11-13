@@ -1,0 +1,470 @@
+{
+  "seq": 1,
+  "state": {
+    "call": "live",
+    "callReason": "",
+    "sessions": [
+      {
+        "id": "w1",
+        "role": "worker",
+        "name": "老周",
+        "agent": "laozhou",
+        "runtime": "claude",
+        "brief": "",
+        "hiredAt": 1794573195364,
+        "runs": 2,
+        "phase": {
+          "_tag": "working",
+          "since": 1794575535364,
+          "doing": {
+            "action": "edit_file",
+            "label": "改 session.ts",
+            "actionText": "改文件"
+          }
+        },
+        "refining": false,
+        "phaseText": "",
+        "spent": {
+          "tokens": 182400,
+          "cny": 0.42
+        }
+      },
+      {
+        "id": "w2",
+        "role": "worker",
+        "name": "小林",
+        "agent": "xiaolin",
+        "runtime": "claude",
+        "brief": "",
+        "hiredAt": 1794573195364,
+        "runs": 2,
+        "phase": {
+          "_tag": "resting"
+        },
+        "refining": false,
+        "phaseText": "",
+        "lastRun": {
+          "outcome": "completed",
+          "summary": "登录过期回到登录页，加了两条测试。",
+          "at": 1794575235364
+        }
+      },
+      {
+        "id": "w3",
+        "role": "worker",
+        "name": "老周",
+        "agent": "laozhou",
+        "runtime": "claude",
+        "brief": "",
+        "hiredAt": 1794557715364,
+        "runs": 2,
+        "phase": {
+          "_tag": "done"
+        },
+        "refining": false,
+        "phaseText": ""
+      }
+    ],
+    "issues": [
+      {
+        "id": "i21",
+        "number": 21,
+        "title": "写一句话就能起草工单",
+        "priority": "medium",
+        "status": "backlog",
+        "createdAt": 1794529095364,
+        "assignments": [],
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "moves": [],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "description": "",
+        "blockedBy": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "draft",
+          "acts": []
+        }
+      },
+      {
+        "id": "i22",
+        "number": 22,
+        "title": "看板拖拽的手感",
+        "priority": "high",
+        "status": "todo",
+        "createdAt": 1794526875364,
+        "assignments": [
+          {
+            "id": "a22",
+            "issue": "i22",
+            "agent": "laozhou",
+            "assignedAt": 1794526875364,
+            "executions": []
+          }
+        ],
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "moves": ["todo"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "description": "",
+        "blockedBy": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "acts": []
+        },
+        "repo": "vibevalley",
+        "queuedAt": 1794575415364
+      },
+      {
+        "id": "i23",
+        "number": 23,
+        "title": "灵动岛的动画",
+        "priority": "low",
+        "status": "todo",
+        "createdAt": 1794524655364,
+        "assignments": [],
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "moves": [],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "description": "",
+        "blockedBy": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "acts": []
+        }
+      },
+      {
+        "id": "i24",
+        "number": 24,
+        "title": "首页的加载条",
+        "priority": "medium",
+        "status": "todo",
+        "createdAt": 1794522435364,
+        "assignments": [
+          {
+            "id": "a24",
+            "issue": "i24",
+            "agent": "xiaolin",
+            "assignedAt": 1794522435364,
+            "executions": []
+          }
+        ],
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "moves": [],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "description": "",
+        "blockedBy": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "acts": []
+        },
+        "repo": "vibevalley"
+      },
+      {
+        "id": "i18",
+        "number": 18,
+        "title": "修好登录",
+        "priority": "urgent",
+        "status": "in_progress",
+        "createdAt": 1794535755364,
+        "assignments": [
+          {
+            "id": "a18",
+            "issue": "i18",
+            "agent": "laozhou",
+            "assignedAt": 1794535755364,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w1",
+                "startedAt": 1794574515364
+              }
+            ]
+          }
+        ],
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "moves": [],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "description": "",
+        "blockedBy": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "working",
+          "acts": []
+        },
+        "repo": "vibevalley"
+      },
+      {
+        "id": "i17",
+        "number": 17,
+        "title": "补齐看板的测试",
+        "priority": "medium",
+        "status": "in_review",
+        "createdAt": 1794537975364,
+        "assignments": [
+          {
+            "id": "a17",
+            "issue": "i17",
+            "agent": "xiaolin",
+            "assignedAt": 1794537975364,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w2",
+                "startedAt": 1794574515364
+              }
+            ]
+          }
+        ],
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "moves": [],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "description": "",
+        "blockedBy": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "reviewing",
+          "acts": []
+        },
+        "repo": "vibevalley"
+      },
+      {
+        "id": "i12",
+        "number": 12,
+        "title": "设置按用途分组",
+        "priority": "medium",
+        "status": "done",
+        "createdAt": 1794549075364,
+        "assignments": [
+          {
+            "id": "a12",
+            "issue": "i12",
+            "agent": "laozhou",
+            "assignedAt": 1794549075364,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w3",
+                "startedAt": 1794574515364
+              }
+            ]
+          }
+        ],
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "moves": [],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "description": "",
+        "blockedBy": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "acts": []
+        },
+        "repo": "vibevalley",
+        "closedAt": 1794568515364,
+        "delivered": "merged"
+      }
+    ],
+    "crons": [
+      {
+        "id": "c1",
+        "name": "每天的站会",
+        "text": "看一眼昨天交的活，写三行进展发到这里。",
+        "channel": "general",
+        "when": {
+          "kind": "daily",
+          "time": "09:30"
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": true,
+        "created": 1793970915364,
+        "lastRun": 1794489315364,
+        "by": "user",
+        "pending": false,
+        "whenText": "每天 09:30",
+        "nextText": "明天 09:30"
+      }
+    ],
+    "chat": {
+      "channels": [
+        {
+          "id": "general",
+          "type": "channel",
+          "default": true,
+          "category": "",
+          "notify": "all",
+          "name": "general",
+          "description": "田头的大家",
+          "subjectKind": null,
+          "replies": 0,
+          "title": "general",
+          "at": 1794572115364,
+          "repo": "vibevalley",
+          "lastNumber": 11,
+          "read": 8,
+          "unread": 3,
+          "last": {
+            "from": "orchestrator",
+            "name": "助手",
+            "text": "记下了：周五之前。",
+            "at": 1794573915364
+          }
+        },
+        {
+          "id": "design",
+          "type": "channel",
+          "default": false,
+          "category": "产品",
+          "notify": "all",
+          "name": "设计",
+          "description": "",
+          "subjectKind": null,
+          "replies": 0,
+          "title": "设计",
+          "at": 1794572115364,
+          "unread": 2,
+          "lastNumber": 4,
+          "read": 2
+        },
+        {
+          "id": "release",
+          "type": "channel",
+          "default": false,
+          "category": "产品",
+          "notify": "mentions",
+          "name": "发版",
+          "description": "",
+          "subjectKind": null,
+          "replies": 0,
+          "title": "发版",
+          "at": 1794572115364
+        },
+        {
+          "id": "t-login",
+          "type": "thread",
+          "default": false,
+          "category": "",
+          "notify": "all",
+          "name": "修好登录",
+          "description": "",
+          "subjectKind": "issue",
+          "replies": 4,
+          "title": "修好登录",
+          "at": 1794572115364,
+          "parent": "general",
+          "root": "m2",
+          "rootNumber": 2,
+          "subjectId": "i18",
+          "lastNumber": 4,
+          "read": 4,
+          "last": {
+            "from": "w1",
+            "name": "老周",
+            "text": "先看 session.ts。",
+            "at": 1794575115364
+          }
+        },
+        {
+          "id": "d-xiaolin",
+          "type": "direct",
+          "default": false,
+          "category": "",
+          "notify": "all",
+          "name": "小林",
+          "description": "",
+          "subjectKind": null,
+          "replies": 0,
+          "title": "小林",
+          "at": 1794572115364,
+          "peer": "xiaolin"
+        }
+      ],
+      "userMentions": []
+    },
+    "connectors": [
+      {
+        "id": "weixin",
+        "state": "connected",
+        "qr": "",
+        "pairCode": "",
+        "user": "用户",
+        "channel": "general",
+        "since": 1794316515364,
+        "lastInbound": 1794574995364,
+        "pending": 2,
+        "error": ""
+      },
+      {
+        "id": "feishu",
+        "state": "waiting",
+        "qr": "https://open.feishu.cn/qr/story-sample",
+        "pairCode": "",
+        "pending": 0,
+        "error": ""
+      }
+    ],
+    "machines": []
+  },
+  "inbox": [],
+  "effects": [],
+  "view": {
+    "level": {
+      "level": 3,
+      "xp": 40,
+      "need": 300
+    },
+    "plots": {},
+    "plays": {},
+    "achievements": []
+  }
+}

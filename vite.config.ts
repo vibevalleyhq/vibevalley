@@ -99,6 +99,16 @@ export default defineConfig({
       // Files, exports and dependencies nothing uses (knip.ts says what runs; scripts/audit/deadcode.ts says what to do).
       deadcode: "vpx scripts/audit/deadcode.ts",
       "desktop:test": { command: "vp run --filter @vibevalley/desktop e2e", cache: false },
+      // The Rust workspace (crates/, apps/mac): format, clippy, tests. protocol:rust:check regenerates the wire types and
+      // goldens from packages/protocol and apps/server and fails when they differ from what is committed.
+      "rust:check": { command: "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace", cache: false },
+      "protocol:rust:check": {
+        command:
+          "sh crates/vibevalley-protocol/gen/run.sh && git diff --exit-code -- crates/vibevalley-protocol/src/generated crates/vibevalley-protocol/golden crates/vibevalley-server/assets/orchestrator crates/vibevalley-artifact crates/vibevalley-pkm/golden",
+        cache: false,
+      },
+      // The native views: nsh's own type check, then a bundle.
+      "mac:check": { command: "cd apps/mac/ui && ../../../.tools/bin/nsh check && ../../../.tools/bin/nsh build App.tsx -o build", cache: false },
       // What a beta and a release must pass before scripts/release/release.ts tags them (alphas are tagged on CI being green).
       "release:verify": ["vp run server:check", "vp run web:check", "vp run docs:verify", "vp run desktop:test"],
     },
@@ -110,7 +120,7 @@ export default defineConfig({
   fmt: {
     printWidth: 160,
     // Generated files and data keep their source format; docs keep their compact tables.
-    ignorePatterns: ["**/*.md", "apps/server/db/generated/**", "**/testdata/**", "apps/web/public/**", ".agents/**", "design/**"],
+    ignorePatterns: ["**/*.md", "apps/server/db/generated/**", "**/testdata/**", "assets/**", ".agents/**", "design/**", "crates/**", "apps/mac/ui/build/**"],
     // Imports from farthest to nearest: Node, packages, the workspace's own, this app's #/, then the same folder.
     sortImports: {
       customGroups: [{ groupName: "workspace", elementNamePattern: ["@vibevalley/**"] }],
@@ -118,7 +128,8 @@ export default defineConfig({
     },
   },
   lint: {
-    ignorePatterns: ["apps/server/db/generated/**"],
+    // The native views run on nsh, not the DOM: `nsh check` types them (vp run mac:check) until the lint rules know nsh.
+    ignorePatterns: ["apps/server/db/generated/**", "crates/**", "apps/mac/ui/**"],
     // oxlint's defaults and import for no-cycle; listing plugins replaces the defaults.
     plugins: ["eslint", "typescript", "unicorn", "oxc", "import"],
     jsPlugins: [

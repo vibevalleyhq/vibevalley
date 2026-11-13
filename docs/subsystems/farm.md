@@ -24,7 +24,7 @@
 | `apps/web/src/farm/map/` | 仓库群岛地图 `RepoMap.tsx` 与纯函数 `islands.ts` |
 | `apps/web/src/farm/tools.ts`、`commands.ts`、`cues.ts` | 农具定义、点击命令映射与状态驱动音效 |
 | `packages/engine/` | `nav`（网格 A* 寻路）、`pixi`（法线光照、天色、粒子）、`audio`（K 计权合成器）、`clock.ts`、`framing.ts` |
-| `apps/web/src/features/catalog/` | 素材图鉴（读取 `apps/web/public/pixel/sprites.json`、`apps/web/public/cursors/cursors.json` 与 `apps/web/src/ui/pixel/sound.ts`） |
+| `apps/web/src/features/catalog/` | 素材图鉴（读取 `assets/pixel/sprites.json`、`assets/cursors/cursors.json` 与 `apps/web/src/ui/pixel/sound.ts`） |
 
 ## 模型和不变量
 

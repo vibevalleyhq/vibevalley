@@ -1,0 +1,371 @@
+Every number field and its Rust type:
+
+JsNumber Balance.amount
+JsNumber LedgerEntryHarvested.cny
+JsNumber MediaAudioMetadata.duration
+JsNumber MediaAudioMetadata.sampleRate
+JsNumber MediaAudioSegment.end
+JsNumber MediaAudioSegment.start
+JsNumber MediaAudioUsage.inputAudioSeconds
+JsNumber MediaAudioVoice.createdAtSeconds
+JsNumber MediaImageRequest.guidance
+JsNumber MemoryFound.score
+JsNumber OrchestratorEvalRequest.on
+JsNumber PkmSearchHit.score
+JsNumber Progress.multiplier
+JsNumber RuntimeInfo.spentToday
+JsNumber RuntimeQuota.left
+JsNumber RuntimeSettingUpdateInput.dailyBudget
+JsNumber RuntimeSettings.dailyBudget
+JsNumber SettingsUpdateVoice.idleSeconds
+JsNumber ShellTime.?
+JsNumber Spent.cny
+JsNumber TemplateBlank.end
+JsNumber TemplateBlank.start
+JsNumber UsageWindow.usedPercent
+JsNumber VoiceSettings.idleSeconds
+i64      AchievementStanding.count
+i64      AchievementStanding.next
+i64      AchievementStanding.tier
+i64      AchievementTier.coins
+i64      AchievementTier.need
+i64      AgentFrom.version
+i64      AgentTally.failed
+i64      AgentTally.harvested
+i64      AgentTally.hired
+i64      AgentTemplate.version
+i64      Applied.seq
+i64      AppliedIssue.closedAt
+i64      AppliedIssue.createdAt
+i64      AppliedIssue.number
+i64      AppliedIssue.queuedAt
+i64      AppliedIssue.rank
+i64      AppliedIssue.reviewedAt
+i64      AppliedIssue.seq
+i64      Approval.askedAt
+i64      Approval.expiresAt
+i64      ApprovalCollected.every
+i64      ApprovalCreated.every
+i64      ApprovalCreated.expiresAt
+i64      Artifact.at
+i64      Artifact.seq
+i64      Artifact.updated
+i64      Artifact.version
+i64      ArtifactBlockCreateInput.level
+i64      ArtifactBlockUpdateInput.baseRev
+i64      ArtifactBlockUpdateInput.level
+i64      ArtifactCard.version
+i64      ArtifactContent.version
+i64      ArtifactEventBlocks.seq
+i64      ArtifactFollowPayload.after
+i64      ArtifactHtmlEdit.version
+i64      ArtifactReadRequest.version
+i64      ArtifactSaid.number
+i64      ArtifactSubmitInput.lastSeq
+i64      ArtifactSuggestionCreateInput.baseRev
+i64      ArtifactVersion.at
+i64      ArtifactVersion.number
+i64      ArtifactVersion.size
+i64      ArtifactVersion.version
+i64      Assignment.assignedAt
+i64      Assignment.endedAt
+i64      Attachment.size
+i64      Author.commits
+i64      Block.rev
+i64      Block.updated
+i64      BlockAck.seq
+i64      BlockAttrs.height
+i64      BlockAttrs.level
+i64      BlockAttrs.width
+i64      BlockCreate.level
+i64      BlockOpResult.rev
+i64      BlockOpSplitBlock.baseRev
+i64      BlockOpSplitBlock.offset
+i64      BlockOpUpdateText.baseRev
+i64      BlockRef.rev
+i64      BlockSubmit.lastSeq
+i64      BlockUpdate.baseRev
+i64      BlockUpdate.level
+i64      BranchPublication.number (int)
+i64      ChangedFile.added
+i64      ChangedFile.removed
+i64      Changes.behind
+i64      Channel.archived
+i64      Channel.at
+i64      Channel.lastNumber
+i64      Channel.position
+i64      Channel.read
+i64      Channel.replies
+i64      Channel.rootNumber
+i64      Channel.unread
+i64      ChannelFollowPayload.after
+i64      ChannelLast.at
+i64      ChannelMarkReadInput.number
+i64      ChannelMarkUnreadInput.number
+i64      ChannelMessageListInput.before
+i64      ChannelMessageListInput.limit
+i64      ChannelUnread.unread
+i64      ChatMessage.at
+i64      ChatMessage.deleted
+i64      ChatMessage.edited
+i64      ChatMessage.number
+i64      ChatMessage.pinned
+i64      ChatMessage.replyTo
+i64      ChatMessage.revision
+i64      ChatReadRequest.number
+i64      ChooseTitleRequest.tier
+i64      Commit.at
+i64      CommitCount.total
+i64      ConnectorStatus.lastInbound
+i64      ConnectorStatus.pausedUntil
+i64      ConnectorStatus.pending
+i64      ConnectorStatus.since
+i64      CriterionCheck.criterion
+i64      Cron.created
+i64      Cron.lastRun
+i64      CronView.created
+i64      CronView.lastRun
+i64      CronWhenEvery.minutes
+i64      CronWhenOnce.at
+i64      CronWhenWeekly.days (int)
+i64      DayCount.commits
+i64      EventTokens.cacheRead
+i64      EventTokens.input
+i64      EventTokens.output
+i64      ExecutionOrchestrator.startedAt
+i64      ExecutionWorker.startedAt
+i64      FactCallChanged.at
+i64      FactChannelChanged.at
+i64      FactChannelRemoved.at
+i64      FactConnectorChanged.at
+i64      FactCronChanged.at
+i64      FactCronRemoved.at
+i64      FactIssueChanged.at
+i64      FactIssueRemoved.at
+i64      FactMachineChanged.at
+i64      FactMediaChanged.at
+i64      FactMessageChanged.at
+i64      FactProgressChanged.at
+i64      FactProgressChangedStation.station
+i64      FactSessionChanged.at
+i64      FactSessionLeft.at
+i64      FactSessionLeft.merged
+i64      FactSessionPhaseChanged.at
+i64      FactSessionReported.at
+i64      FactSessionReported.runs
+i64      FactSessionToolChanged.at
+i64      FactSessionToolsReset.at
+i64      FactUserMentionsChanged.at
+i64      FarmLevel.level
+i64      FarmLevel.need
+i64      FarmLevel.xp
+i64      Finding.at
+i64      GameEffectAchievement.coins
+i64      GameEffectAchievement.tier
+i64      GameEffectLevelUp.level
+i64      GameEffectReward.coins
+i64      GameEffectReward.streak
+i64      GitHubStatus.checkedAt
+i64      InboxItem.at
+i64      Issue.closedAt
+i64      Issue.createdAt
+i64      Issue.number
+i64      Issue.queuedAt
+i64      Issue.rank
+i64      Issue.reviewedAt
+i64      IssueFilter.limit
+i64      IssueLastRun.endedAt
+i64      IssueLastRun.startedAt
+i64      IssueMandate.maxBotReviewRounds (int)
+i64      IssueStage.since
+i64      IssueWatchGap.before (int)
+i64      IssueWatchState.omittedSessions (int)
+i64      LanPairing.expiresAt
+i64      LanguageCount.blanks
+i64      LanguageCount.code
+i64      LanguageCount.comments
+i64      LanguageCount.files
+i64      LastRun.at
+i64      LedgerEntryCalled.at
+i64      LedgerEntryConflicted.at
+i64      LedgerEntryFailed.at
+i64      LedgerEntryFamily.at
+i64      LedgerEntryFamily.merged
+i64      LedgerEntryHandoff.at
+i64      LedgerEntryHarvested.at
+i64      LedgerEntryHarvested.commits
+i64      LedgerEntryHarvested.runs
+i64      LedgerEntryHired.at
+i64      LedgerEntryLevel.at
+i64      LedgerEntryLevel.level
+i64      LedgerEntryMoment.at
+i64      LedgerEntryReviewed.at
+i64      LedgerEntryTitled.at
+i64      LedgerEntryTitled.tier
+i64      LedgerEntryTold.at
+i64      LibraryItem.addedAt
+i64      LibraryItem.lastAt
+i64      LiveEventNotice.at
+i64      LiveEventRuntime.at
+i64      LiveEventSession.at
+i64      Machine.joinedAt
+i64      MediaAudioAccountRequest.revision (int)
+i64      MediaAudioJobClone.createdAt
+i64      MediaAudioJobClone.revision (int)
+i64      MediaAudioJobClone.updatedAt
+i64      MediaAudioJobSpeakers.createdAt
+i64      MediaAudioJobSpeakers.revision (int)
+i64      MediaAudioJobSpeakers.updatedAt
+i64      MediaAudioJobTranscription.createdAt
+i64      MediaAudioJobTranscription.revision (int)
+i64      MediaAudioJobTranscription.updatedAt
+i64      MediaAudioJobVoiceDesign.createdAt
+i64      MediaAudioJobVoiceDesign.revision (int)
+i64      MediaAudioJobVoiceDesign.updatedAt
+i64      MediaAudioMetadata.bitDepth (int)
+i64      MediaAudioMetadata.channels (int)
+i64      MediaAudioRequestClone.revision (int)
+i64      MediaAudioRequestSpeakers.revision (int)
+i64      MediaAudioRequestTranscription.revision (int)
+i64      MediaAudioRequestVoiceDesign.revision (int)
+i64      MediaAudioUsage.completionTokens (int)
+i64      MediaAudioUsage.inputCharacters (int)
+i64      MediaAudioUsage.promptTokens (int)
+i64      MediaAudioUsage.totalTokens (int)
+i64      MediaCloneRequest.revision (int)
+i64      MediaImageJob.createdAt
+i64      MediaImageJob.revision (int)
+i64      MediaImageJob.updatedAt
+i64      MediaImageRequest.height (int)
+i64      MediaImageRequest.seed (int)
+i64      MediaImageRequest.steps (int)
+i64      MediaImageRequest.width (int)
+i64      MediaImageUsage.height (int)
+i64      MediaImageUsage.width (int)
+i64      MediaInput.createdAt
+i64      MediaInput.expiresAt
+i64      MediaInput.size (int)
+i64      MediaInputReference.size (int)
+i64      MediaInputRequest.size (int)
+i64      MediaSpeakersRequest.revision (int)
+i64      MediaSpeechEventAudio.sequence (int)
+i64      MediaSpeechEventFormat.channels (int)
+i64      MediaSpeechEventFormat.sampleRate (int)
+i64      MediaSpeechJob.createdAt
+i64      MediaSpeechJob.revision (int)
+i64      MediaSpeechJob.updatedAt
+i64      MediaSpeechRequest.revision (int)
+i64      MediaTranscriptionRequest.revision (int)
+i64      MediaUnderstandingAuthorization.expiresAt
+i64      MediaUnderstandingAuthorizationRequest.maxOutputTokens (int)
+i64      MediaUnderstandingAuthorizationRequest.revision (int)
+i64      MediaUnderstandingJob.createdAt
+i64      MediaUnderstandingJob.revision (int)
+i64      MediaUnderstandingJob.updatedAt
+i64      MediaUnderstandingRequest.maxOutputTokens (int)
+i64      MediaUnderstandingRequest.revision (int)
+i64      MediaVoiceDesignRequest.revision (int)
+i64      Memory.at
+i64      Memory.recalled
+i64      Memory.recalledAt
+i64      MemoryFound.at
+i64      MemoryFound.recalled
+i64      MemoryFound.recalledAt
+i64      Milestone.at
+i64      PhaseClosed.at
+i64      PhaseWorking.quietSince
+i64      PhaseWorking.since
+i64      PhaseWorkingView.quietSince
+i64      PhaseWorkingView.since
+i64      PkmBlock.depth (int)
+i64      PkmComment.created
+i64      PkmComment.resolved
+i64      PkmPage.updated
+i64      PkmPageSummary.open (int)
+i64      PkmPageSummary.updated
+i64      PkmRadar.inbox (int)
+i64      PkmRadarGetInput.staleDays (int)
+i64      PkmScan.removed (int)
+i64      PkmScan.scanned (int)
+i64      PkmScan.updated (int)
+i64      PkmSearchRequest.limit (int)
+i64      PkmSource.updated
+i64      PkmSourceUpdate.updated
+i64      PkmStaleProject.days (int)
+i64      PkmStaleProject.doing (int)
+i64      PkmStaleProject.done (int)
+i64      PkmStaleProject.todo (int)
+i64      PlayAction.at
+i64      PlayActionView.at
+i64      Progress.bestStreak
+i64      Progress.coins
+i64      Progress.counts
+i64      Progress.streak
+i64      ProgressNews.coins
+i64      ProgressTitle.tier
+i64      ProviderModelListing.revision (int)
+i64      ProviderModelRequest.revision (int)
+i64      ProviderStatus.revision (int)
+i64      ProviderUpdate.revision (int)
+i64      ProviderVoiceListing.revision (int)
+i64      ProviderVoiceListingVoices.createdAtSeconds (int)
+i64      ProviderVoiceRequest.limit (int)
+i64      ProviderVoiceRequest.offset (int)
+i64      ProviderVoiceRequest.revision (int)
+i64      PullRequest.number
+i64      QuotedBlock.nowRev
+i64      QuotedBlock.rev
+i64      RecallPreview.chars
+i64      RecallPreview.limit
+i64      Repo.commits
+i64      RepoActivity.at
+i64      RepoActivity.first
+i64      RepoActivity.last
+i64      RepoActivity.total
+i64      RepoLanguages.at
+i64      RepoSummary.last
+i64      RepoSummary.maxSessions
+i64      Retry.attempt
+i64      Retry.of
+i64      Run.endedAt
+i64      Run.startedAt
+i64      RuntimeInfo.checkedAt
+i64      RuntimeSettingUpdateInput.maxWorking
+i64      RuntimeSettings.maxWorking
+i64      SayRequest.replyTo
+i64      SayRequest.station
+i64      ServerEventSnapshot.at
+i64      Session.hiredAt
+i64      Session.runs
+i64      SessionEvent.call
+i64      SessionEvent.revision
+i64      SessionEvent.seq
+i64      SessionEvent.time
+i64      SessionEvent.under
+i64      SessionPlay.counts
+i64      SessionPlay.runStartedAt
+i64      SessionPlay.station
+i64      SessionPlay.toolsThisRun
+i64      SessionPlayView.counts
+i64      SessionPlayView.runStartedAt
+i64      SessionPlayView.station
+i64      SessionPlayView.toolsThisRun
+i64      SessionView.hiredAt
+i64      SessionView.runs
+i64      SettingsUpdateVoice.interruptMs
+i64      SettingsUpdateVoice.silenceMs
+i64      ShellCount.? (int)
+i64      Spent.tokens
+i64      StateFrame.seq
+i64      Suggestion.baseRev
+i64      Suggestion.createdAt
+i64      Suggestion.resolvedAt
+i64      SuggestionCreate.baseRev
+i64      Tokens.? (int)
+i64      Unlock.at
+i64      Unlock.tier
+i64      UsageWindow.resetsAt
+i64      UserDevice.addedAt
+i64      UserDevice.lastSeen
+i64      VoiceSettings.interruptMs
+i64      VoiceSettings.silenceMs

@@ -1,0 +1,1415 @@
+{
+ "files": [
+  [
+   "01_Projects/VibeValley__Design.md",
+   "alias:: ep, VibeValley Plan\ntldr:: A **GPU** terminal\ndeadline:: 2026-12-01\n\n- TODO [#A] Draw the [[VibeValley]] farm with #gpu\n  deadline:: 2026-11-01\n  - DOING wire it, see ((6a1b2c3d-0000-4000-a000-000000000001))\n- ## Notes\n  - plain _words_ and `code` and [a link](http://x.y)\n- LATER ship\n",
+   1000
+  ],
+  [
+   "journals/2026_11_13.md",
+   "- 读了 [[VibeValley/Design]] 和 [[Ann|Ann Lee]]，终端 渲染 很快\n  - TODO call about ((deadbeef-0000-4000-a000-00000000dead))\n    deadline:: 2026-10-01\n- DONE gpu notes [[VibeValley/Design|the design]]\n  deadline:: 2026-01-01\n",
+   5000
+  ],
+  [
+   "02_Areas/VibeValley.md",
+   "status:: active\n\n- the board\n  id:: 6a1b2c3d-0000-4000-a000-000000000001\n  - loops back ((6a1b2c3d-0000-4000-a000-000000000002))\n- other\n  id:: 6a1b2c3d-0000-4000-a000-000000000002\n  - and on ((6a1b2c3d-0000-4000-a000-000000000001))\n",
+   3000
+  ],
+  [
+   "00_Inbox/clip.md",
+   "source-url:: https://example.com/gpu\n\n- a clip about GPU text\n- see [[vibevalley/design]]\n",
+   5000
+  ],
+  [
+   "04_Archives/Old.md",
+   "- old link to [[VibeValley/Design|design]]\n- WAITING forever\n",
+   200
+  ],
+  [
+   "03_Resources/终端.md",
+   "- 终端 的 渲染 笔记 [[VibeValley/Design]]\n",
+   4000
+  ]
+ ],
+ "pageOf": [
+  [
+   "vibevalley/design",
+   "vibevalley__design"
+  ],
+  [
+   "VIBEVALLEY/DESIGN",
+   "vibevalley__design"
+  ],
+  [
+   "ep",
+   "vibevalley__design"
+  ],
+  [
+   "VibeValley Plan",
+   "vibevalley__design"
+  ],
+  [
+   "VibeValley",
+   "vibevalley"
+  ],
+  [
+   "nope",
+   null
+  ]
+ ],
+ "blockOf": [
+  [
+   "6a1b2c3d-0000-4000-a000-000000000001",
+   {
+    "page": "vibevalley",
+    "block": {
+     "id": "6a1b2c3d-0000-4000-a000-000000000001",
+     "depth": 0,
+     "body": "the board",
+     "props": {},
+     "path": ""
+    }
+   }
+  ],
+  [
+   "6a1b2c3d-0000-4000-a000-000000000002",
+   {
+    "page": "vibevalley",
+    "block": {
+     "id": "6a1b2c3d-0000-4000-a000-000000000002",
+     "depth": 0,
+     "body": "other",
+     "props": {},
+     "path": ""
+    }
+   }
+  ],
+  [
+   "nope",
+   null
+  ]
+ ],
+ "refsInto": [
+  "6a1b2c3d-0000-4000-a000-000000000001",
+  "6a1b2c3d-0000-4000-a000-000000000002",
+  "deadbeef-0000-4000-a000-00000000dead"
+ ],
+ "transclusions": [
+  [
+   "vibevalley__design",
+   [
+    {
+     "block": "6a1b2c3d-0000-4000-a000-000000000001",
+     "found": true,
+     "circular": false,
+     "page": "vibevalley",
+     "pageTitle": "VibeValley",
+     "body": "the board"
+    },
+    {
+     "block": "6a1b2c3d-0000-4000-a000-000000000002",
+     "found": true,
+     "circular": false,
+     "page": "vibevalley",
+     "pageTitle": "VibeValley",
+     "body": "other"
+    }
+   ]
+  ],
+  [
+   "2026_11_13",
+   [
+    {
+     "block": "deadbeef-0000-4000-a000-00000000dead",
+     "found": false,
+     "circular": false,
+     "body": "(断了 dead)"
+    },
+    {
+     "block": "6a1b2c3d-0000-4000-a000-000000000002",
+     "found": true,
+     "circular": false,
+     "page": "vibevalley",
+     "pageTitle": "VibeValley",
+     "body": "other"
+    }
+   ]
+  ],
+  [
+   "vibevalley",
+   [
+    {
+     "block": "6a1b2c3d-0000-4000-a000-000000000002",
+     "found": true,
+     "circular": false,
+     "page": "vibevalley",
+     "pageTitle": "VibeValley",
+     "body": "other"
+    },
+    {
+     "block": "6a1b2c3d-0000-4000-a000-000000000001",
+     "found": true,
+     "circular": false,
+     "page": "vibevalley",
+     "pageTitle": "VibeValley",
+     "body": "the board"
+    }
+   ]
+  ],
+  [
+   "clip",
+   [
+    {
+     "block": "6a1b2c3d-0000-4000-a000-000000000002",
+     "found": true,
+     "circular": false,
+     "page": "vibevalley",
+     "pageTitle": "VibeValley",
+     "body": "other"
+    }
+   ]
+  ],
+  [
+   "old",
+   [
+    {
+     "block": "6a1b2c3d-0000-4000-a000-000000000002",
+     "found": true,
+     "circular": false,
+     "page": "vibevalley",
+     "pageTitle": "VibeValley",
+     "body": "other"
+    }
+   ]
+  ],
+  [
+   "终端",
+   [
+    {
+     "block": "6a1b2c3d-0000-4000-a000-000000000002",
+     "found": true,
+     "circular": false,
+     "page": "vibevalley",
+     "pageTitle": "VibeValley",
+     "body": "other"
+    }
+   ]
+  ]
+ ],
+ "backlinks": [
+  [
+   "vibevalley__design",
+   {
+    "projects": [],
+    "journals": [
+     {
+      "block": "96a0598b-ff9f-4530-a9f4-1fd88a61eb74",
+      "page": "2026_11_13",
+      "pageTitle": "2026_11_13",
+      "tier": "journal",
+      "path": "",
+      "body": "读了 [[VibeValley/Design]] 和 [[Ann|Ann Lee]]，终端 渲染 很快"
+     },
+     {
+      "block": "825b7585-76ee-4667-a2f5-b3aeadeeebde",
+      "page": "2026_11_13",
+      "pageTitle": "2026_11_13",
+      "tier": "journal",
+      "path": "",
+      "body": "gpu notes [[VibeValley/Design|the design]]"
+     }
+    ],
+    "areas": [
+     {
+      "block": "b8a90ee0-d9f4-4609-a420-2bb7ead78ac5",
+      "page": "clip",
+      "pageTitle": "clip",
+      "tier": "inbox",
+      "path": "",
+      "body": "see [[vibevalley/design]]"
+     },
+     {
+      "block": "2216b3a6-957e-48e3-a6d4-9d1522074d14",
+      "page": "终端",
+      "pageTitle": "终端",
+      "tier": "resource",
+      "path": "",
+      "body": "终端 的 渲染 笔记 [[VibeValley/Design]]"
+     }
+    ],
+    "archives": [
+     {
+      "block": "a750a74a-75d0-4fd8-a17d-34f7eda6951c",
+      "page": "old",
+      "pageTitle": "Old",
+      "tier": "archive",
+      "path": "",
+      "body": "old link to [[VibeValley/Design|design]]"
+     }
+    ]
+   }
+  ],
+  [
+   "2026_11_13",
+   {
+    "projects": [],
+    "journals": [],
+    "areas": [],
+    "archives": []
+   }
+  ],
+  [
+   "vibevalley",
+   {
+    "projects": [
+     {
+      "block": "50adc3c8-6696-47c9-a713-0c40bc233569",
+      "page": "vibevalley__design",
+      "pageTitle": "VibeValley/Design",
+      "tier": "project",
+      "path": "",
+      "body": "Draw the [[VibeValley]] farm with #gpu"
+     }
+    ],
+    "journals": [],
+    "areas": [],
+    "archives": []
+   }
+  ],
+  [
+   "clip",
+   {
+    "projects": [],
+    "journals": [],
+    "areas": [],
+    "archives": []
+   }
+  ],
+  [
+   "old",
+   {
+    "projects": [],
+    "journals": [],
+    "areas": [],
+    "archives": []
+   }
+  ],
+  [
+   "终端",
+   {
+    "projects": [],
+    "journals": [],
+    "areas": [],
+    "archives": []
+   }
+  ]
+ ],
+ "summaries": [
+  {
+   "slug": "vibevalley__design",
+   "title": "VibeValley/Design",
+   "tier": "project",
+   "file": "01_Projects/VibeValley__Design.md",
+   "tldr": "A **GPU** terminal",
+   "updated": 1000,
+   "open": 3
+  },
+  {
+   "slug": "2026_11_13",
+   "title": "2026_11_13",
+   "tier": "journal",
+   "file": "journals/2026_11_13.md",
+   "tldr": "",
+   "updated": 5000,
+   "open": 1,
+   "day": "2026-11-13"
+  },
+  {
+   "slug": "vibevalley",
+   "title": "VibeValley",
+   "tier": "area",
+   "file": "02_Areas/VibeValley.md",
+   "tldr": "",
+   "updated": 3000,
+   "open": 0
+  },
+  {
+   "slug": "clip",
+   "title": "clip",
+   "tier": "inbox",
+   "file": "00_Inbox/clip.md",
+   "tldr": "",
+   "updated": 5000,
+   "open": 0
+  },
+  {
+   "slug": "old",
+   "title": "Old",
+   "tier": "archive",
+   "file": "04_Archives/Old.md",
+   "tldr": "",
+   "updated": 200,
+   "open": 1
+  },
+  {
+   "slug": "终端",
+   "title": "终端",
+   "tier": "resource",
+   "file": "03_Resources/终端.md",
+   "tldr": "",
+   "updated": 4000,
+   "open": 0
+  }
+ ],
+ "wire": [
+  {
+   "slug": "vibevalley__design",
+   "title": "VibeValley/Design",
+   "tier": "project",
+   "file": "01_Projects/VibeValley__Design.md",
+   "props": {
+    "alias": "ep, VibeValley Plan",
+    "tldr": "A **GPU** terminal",
+    "deadline": "2026-12-01"
+   },
+   "tldr": "A **GPU** terminal",
+   "blocks": [
+    {
+     "id": "50adc3c8-6696-47c9-a713-0c40bc233569",
+     "depth": 0,
+     "marker": "TODO",
+     "priority": "A",
+     "body": "Draw the [[VibeValley]] farm with #gpu",
+     "props": {
+      "deadline": "2026-11-01"
+     },
+     "path": ""
+    },
+    {
+     "id": "17a7199b-6870-4cf1-a04d-8f00ba539dec",
+     "parent": "50adc3c8-6696-47c9-a713-0c40bc233569",
+     "depth": 1,
+     "marker": "DOING",
+     "body": "wire it, see ((6a1b2c3d-0000-4000-a000-000000000001))",
+     "props": {},
+     "path": "Draw the [[VibeValley]] farm with #gpu"
+    },
+    {
+     "id": "b0ad2180-17ad-4b6d-acad-8b30ff078e0e",
+     "depth": 0,
+     "body": "## Notes",
+     "props": {},
+     "path": ""
+    },
+    {
+     "id": "19cd6c72-3a5b-4ecf-a8a2-bd0844f360b7",
+     "parent": "b0ad2180-17ad-4b6d-acad-8b30ff078e0e",
+     "depth": 1,
+     "body": "plain _words_ and `code` and [a link](http://x.y)",
+     "props": {},
+     "path": "Notes"
+    },
+    {
+     "id": "5908155f-bb7b-47a0-ad74-510e3fcc4b69",
+     "depth": 0,
+     "marker": "LATER",
+     "body": "ship",
+     "props": {},
+     "path": ""
+    }
+   ],
+   "updated": 1000
+  },
+  {
+   "slug": "2026_11_13",
+   "title": "2026_11_13",
+   "tier": "journal",
+   "file": "journals/2026_11_13.md",
+   "props": {},
+   "tldr": "",
+   "blocks": [
+    {
+     "id": "96a0598b-ff9f-4530-a9f4-1fd88a61eb74",
+     "depth": 0,
+     "body": "读了 [[VibeValley/Design]] 和 [[Ann|Ann Lee]]，终端 渲染 很快",
+     "props": {},
+     "path": ""
+    },
+    {
+     "id": "c0dccc9c-d1a0-4929-a955-6c579bfef8a1",
+     "parent": "96a0598b-ff9f-4530-a9f4-1fd88a61eb74",
+     "depth": 1,
+     "marker": "TODO",
+     "body": "call about ((deadbeef-0000-4000-a000-00000000dead))",
+     "props": {
+      "deadline": "2026-10-01"
+     },
+     "path": "读了 [[VibeValley/Design]] 和 [[Ann|Ann Lee]]，终端 渲染 很快"
+    },
+    {
+     "id": "825b7585-76ee-4667-a2f5-b3aeadeeebde",
+     "depth": 0,
+     "marker": "DONE",
+     "body": "gpu notes [[VibeValley/Design|the design]]",
+     "props": {
+      "deadline": "2026-01-01"
+     },
+     "path": ""
+    }
+   ],
+   "updated": 5000
+  },
+  {
+   "slug": "vibevalley",
+   "title": "VibeValley",
+   "tier": "area",
+   "file": "02_Areas/VibeValley.md",
+   "props": {
+    "status": "active"
+   },
+   "tldr": "",
+   "blocks": [
+    {
+     "id": "6a1b2c3d-0000-4000-a000-000000000001",
+     "depth": 0,
+     "body": "the board",
+     "props": {},
+     "path": ""
+    },
+    {
+     "id": "011e399b-69bb-4fb8-aff5-f428cb07a46a",
+     "parent": "6a1b2c3d-0000-4000-a000-000000000001",
+     "depth": 1,
+     "body": "loops back ((6a1b2c3d-0000-4000-a000-000000000002))",
+     "props": {},
+     "path": "the board"
+    },
+    {
+     "id": "6a1b2c3d-0000-4000-a000-000000000002",
+     "depth": 0,
+     "body": "other",
+     "props": {},
+     "path": ""
+    },
+    {
+     "id": "a33fe345-c9ca-4ab2-a348-a52c40c4b7bd",
+     "parent": "6a1b2c3d-0000-4000-a000-000000000002",
+     "depth": 1,
+     "body": "and on ((6a1b2c3d-0000-4000-a000-000000000001))",
+     "props": {},
+     "path": "other"
+    }
+   ],
+   "updated": 3000
+  },
+  {
+   "slug": "clip",
+   "title": "clip",
+   "tier": "inbox",
+   "file": "00_Inbox/clip.md",
+   "props": {
+    "source-url": "https://example.com/gpu"
+   },
+   "tldr": "",
+   "blocks": [
+    {
+     "id": "68e191a0-640d-4bf2-a7db-3c5e1ec096d8",
+     "depth": 0,
+     "body": "a clip about GPU text",
+     "props": {},
+     "path": ""
+    },
+    {
+     "id": "b8a90ee0-d9f4-4609-a420-2bb7ead78ac5",
+     "depth": 0,
+     "body": "see [[vibevalley/design]]",
+     "props": {},
+     "path": ""
+    }
+   ],
+   "updated": 5000
+  },
+  {
+   "slug": "old",
+   "title": "Old",
+   "tier": "archive",
+   "file": "04_Archives/Old.md",
+   "props": {},
+   "tldr": "",
+   "blocks": [
+    {
+     "id": "a750a74a-75d0-4fd8-a17d-34f7eda6951c",
+     "depth": 0,
+     "body": "old link to [[VibeValley/Design|design]]",
+     "props": {},
+     "path": ""
+    },
+    {
+     "id": "20109274-b007-4391-aaa8-bd787e50d590",
+     "depth": 0,
+     "marker": "WAITING",
+     "body": "forever",
+     "props": {},
+     "path": ""
+    }
+   ],
+   "updated": 200
+  },
+  {
+   "slug": "终端",
+   "title": "终端",
+   "tier": "resource",
+   "file": "03_Resources/终端.md",
+   "props": {},
+   "tldr": "",
+   "blocks": [
+    {
+     "id": "2216b3a6-957e-48e3-a6d4-9d1522074d14",
+     "depth": 0,
+     "body": "终端 的 渲染 笔记 [[VibeValley/Design]]",
+     "props": {},
+     "path": ""
+    }
+   ],
+   "updated": 4000
+  }
+ ],
+ "flat": [
+  [
+   {
+    "id": "50adc3c8-6696-47c9-a713-0c40bc233569",
+    "depth": 0,
+    "marker": "TODO",
+    "priority": "A",
+    "body": "Draw the [[VibeValley]] farm with #gpu",
+    "props": {
+     "deadline": "2026-11-01"
+    },
+    "path": ""
+   },
+   {
+    "id": "17a7199b-6870-4cf1-a04d-8f00ba539dec",
+    "parent": "50adc3c8-6696-47c9-a713-0c40bc233569",
+    "depth": 1,
+    "marker": "DOING",
+    "body": "wire it, see ((6a1b2c3d-0000-4000-a000-000000000001))",
+    "props": {},
+    "path": "Draw the [[VibeValley]] farm with #gpu"
+   },
+   {
+    "id": "b0ad2180-17ad-4b6d-acad-8b30ff078e0e",
+    "depth": 0,
+    "body": "## Notes",
+    "props": {},
+    "path": ""
+   },
+   {
+    "id": "19cd6c72-3a5b-4ecf-a8a2-bd0844f360b7",
+    "parent": "b0ad2180-17ad-4b6d-acad-8b30ff078e0e",
+    "depth": 1,
+    "body": "plain _words_ and `code` and [a link](http://x.y)",
+    "props": {},
+    "path": "Notes"
+   },
+   {
+    "id": "5908155f-bb7b-47a0-ad74-510e3fcc4b69",
+    "depth": 0,
+    "marker": "LATER",
+    "body": "ship",
+    "props": {},
+    "path": ""
+   }
+  ],
+  [
+   {
+    "id": "96a0598b-ff9f-4530-a9f4-1fd88a61eb74",
+    "depth": 0,
+    "body": "读了 [[VibeValley/Design]] 和 [[Ann|Ann Lee]]，终端 渲染 很快",
+    "props": {},
+    "path": ""
+   },
+   {
+    "id": "c0dccc9c-d1a0-4929-a955-6c579bfef8a1",
+    "parent": "96a0598b-ff9f-4530-a9f4-1fd88a61eb74",
+    "depth": 1,
+    "marker": "TODO",
+    "body": "call about ((deadbeef-0000-4000-a000-00000000dead))",
+    "props": {
+     "deadline": "2026-10-01"
+    },
+    "path": "读了 [[VibeValley/Design]] 和 [[Ann|Ann Lee]]，终端 渲染 很快"
+   },
+   {
+    "id": "825b7585-76ee-4667-a2f5-b3aeadeeebde",
+    "depth": 0,
+    "marker": "DONE",
+    "body": "gpu notes [[VibeValley/Design|the design]]",
+    "props": {
+     "deadline": "2026-01-01"
+    },
+    "path": ""
+   }
+  ],
+  [
+   {
+    "id": "6a1b2c3d-0000-4000-a000-000000000001",
+    "depth": 0,
+    "body": "the board",
+    "props": {},
+    "path": ""
+   },
+   {
+    "id": "011e399b-69bb-4fb8-aff5-f428cb07a46a",
+    "parent": "6a1b2c3d-0000-4000-a000-000000000001",
+    "depth": 1,
+    "body": "loops back ((6a1b2c3d-0000-4000-a000-000000000002))",
+    "props": {},
+    "path": "the board"
+   },
+   {
+    "id": "6a1b2c3d-0000-4000-a000-000000000002",
+    "depth": 0,
+    "body": "other",
+    "props": {},
+    "path": ""
+   },
+   {
+    "id": "a33fe345-c9ca-4ab2-a348-a52c40c4b7bd",
+    "parent": "6a1b2c3d-0000-4000-a000-000000000002",
+    "depth": 1,
+    "body": "and on ((6a1b2c3d-0000-4000-a000-000000000001))",
+    "props": {},
+    "path": "other"
+   }
+  ],
+  [
+   {
+    "id": "68e191a0-640d-4bf2-a7db-3c5e1ec096d8",
+    "depth": 0,
+    "body": "a clip about GPU text",
+    "props": {},
+    "path": ""
+   },
+   {
+    "id": "b8a90ee0-d9f4-4609-a420-2bb7ead78ac5",
+    "depth": 0,
+    "body": "see [[vibevalley/design]]",
+    "props": {},
+    "path": ""
+   }
+  ],
+  [
+   {
+    "id": "a750a74a-75d0-4fd8-a17d-34f7eda6951c",
+    "depth": 0,
+    "body": "old link to [[VibeValley/Design|design]]",
+    "props": {},
+    "path": ""
+   },
+   {
+    "id": "20109274-b007-4391-aaa8-bd787e50d590",
+    "depth": 0,
+    "marker": "WAITING",
+    "body": "forever",
+    "props": {},
+    "path": ""
+   }
+  ],
+  [
+   {
+    "id": "2216b3a6-957e-48e3-a6d4-9d1522074d14",
+    "depth": 0,
+    "body": "终端 的 渲染 笔记 [[VibeValley/Design]]",
+    "props": {},
+    "path": ""
+   }
+  ]
+ ],
+ "plainOf": [
+  [
+   "see ((6a1b2c3d-0000-4000-a000-000000000001)) and [[Ann|Ann Lee]] ==hi==^[note]",
+   "see the board and Ann Lee hi"
+  ],
+  [
+   "**b** *i* __u__ _e_ ~~s~~ a*b c_d_e",
+   "b i u e s a*b cde"
+  ],
+  [
+   "# head\n> quote\n1. one | two\n```js\nx\n```",
+   "head quote one two"
+  ]
+ ],
+ "plainText": [
+  [
+   "**a** and **b",
+   "a and **b"
+  ],
+  [
+   "*x\ny*",
+   "*x y*"
+  ],
+  [
+   "a_b_c and __x__",
+   "abc and x"
+  ],
+  [
+   "- item\n  * nested\n10) ten",
+   "item nested ten"
+  ]
+ ],
+ "queryWords": [
+  [
+   "  GPU Render ",
+   [
+    "gpu",
+    "render"
+   ]
+  ],
+  [
+   "终端渲染 很快",
+   [
+    "终端渲染",
+    "很快"
+   ]
+  ],
+  [
+   "a.b-c/d_e x",
+   [
+    "a.b-c/d_e",
+    "x"
+   ]
+  ]
+ ],
+ "search": [
+  [
+   {
+    "text": "gpu"
+   },
+   [
+    {
+     "block": "50adc3c8-6696-47c9-a713-0c40bc233569",
+     "page": "vibevalley__design",
+     "pageTitle": "VibeValley/Design",
+     "tier": "project",
+     "marker": "TODO",
+     "path": "",
+     "body": "Draw the [[VibeValley]] farm with #gpu",
+     "plain": "Draw the VibeValley farm with #gpu",
+     "score": 6,
+     "children": [
+      {
+       "id": "17a7199b-6870-4cf1-a04d-8f00ba539dec",
+       "parent": "50adc3c8-6696-47c9-a713-0c40bc233569",
+       "depth": 1,
+       "marker": "DOING",
+       "body": "wire it, see ((6a1b2c3d-0000-4000-a000-000000000001))",
+       "props": {},
+       "path": "Draw the [[VibeValley]] farm with #gpu"
+      }
+     ]
+    },
+    {
+     "block": "17a7199b-6870-4cf1-a04d-8f00ba539dec",
+     "page": "vibevalley__design",
+     "pageTitle": "VibeValley/Design",
+     "tier": "project",
+     "marker": "DOING",
+     "path": "Draw the VibeValley farm with #gpu",
+     "body": "wire it, see ((6a1b2c3d-0000-4000-a000-000000000001))",
+     "plain": "wire it, see the board",
+     "score": 6,
+     "children": []
+    },
+    {
+     "block": "825b7585-76ee-4667-a2f5-b3aeadeeebde",
+     "page": "2026_11_13",
+     "pageTitle": "2026_11_13",
+     "tier": "journal",
+     "marker": "DONE",
+     "path": "",
+     "body": "gpu notes [[VibeValley/Design|the design]]",
+     "plain": "gpu notes the design",
+     "score": 4.199999999999999,
+     "children": []
+    },
+    {
+     "block": "68e191a0-640d-4bf2-a7db-3c5e1ec096d8",
+     "page": "clip",
+     "pageTitle": "clip",
+     "tier": "inbox",
+     "path": "",
+     "body": "a clip about GPU text",
+     "plain": "a clip about GPU text",
+     "score": 3,
+     "children": []
+    }
+   ]
+  ],
+  [
+   {
+    "text": "终端 渲染"
+   },
+   [
+    {
+     "block": "96a0598b-ff9f-4530-a9f4-1fd88a61eb74",
+     "page": "2026_11_13",
+     "pageTitle": "2026_11_13",
+     "tier": "journal",
+     "path": "",
+     "body": "读了 [[VibeValley/Design]] 和 [[Ann|Ann Lee]]，终端 渲染 很快",
+     "plain": "读了 VibeValley/Design 和 Ann Lee，终端 渲染 很快",
+     "score": 5.6,
+     "children": [
+      {
+       "id": "c0dccc9c-d1a0-4929-a955-6c579bfef8a1",
+       "parent": "96a0598b-ff9f-4530-a9f4-1fd88a61eb74",
+       "depth": 1,
+       "marker": "TODO",
+       "body": "call about ((deadbeef-0000-4000-a000-00000000dead))",
+       "props": {
+        "deadline": "2026-10-01"
+       },
+       "path": "读了 [[VibeValley/Design]] 和 [[Ann|Ann Lee]]，终端 渲染 很快"
+      }
+     ]
+    },
+    {
+     "block": "c0dccc9c-d1a0-4929-a955-6c579bfef8a1",
+     "page": "2026_11_13",
+     "pageTitle": "2026_11_13",
+     "tier": "journal",
+     "marker": "TODO",
+     "path": "读了 VibeValley/Design 和 Ann Lee，终端 渲染 很快",
+     "body": "call about ((deadbeef-0000-4000-a000-00000000dead))",
+     "plain": "call about …",
+     "score": 5.6,
+     "children": []
+    },
+    {
+     "block": "2216b3a6-957e-48e3-a6d4-9d1522074d14",
+     "page": "终端",
+     "pageTitle": "终端",
+     "tier": "resource",
+     "path": "",
+     "body": "终端 的 渲染 笔记 [[VibeValley/Design]]",
+     "plain": "终端 的 渲染 笔记 VibeValley/Design",
+     "score": 2.4,
+     "children": []
+    }
+   ]
+  ],
+  [
+   {
+    "text": "design",
+    "tier": "journal"
+   },
+   [
+    {
+     "block": "96a0598b-ff9f-4530-a9f4-1fd88a61eb74",
+     "page": "2026_11_13",
+     "pageTitle": "2026_11_13",
+     "tier": "journal",
+     "path": "",
+     "body": "读了 [[VibeValley/Design]] 和 [[Ann|Ann Lee]]，终端 渲染 很快",
+     "plain": "读了 VibeValley/Design 和 Ann Lee，终端 渲染 很快",
+     "score": 4.199999999999999,
+     "children": [
+      {
+       "id": "c0dccc9c-d1a0-4929-a955-6c579bfef8a1",
+       "parent": "96a0598b-ff9f-4530-a9f4-1fd88a61eb74",
+       "depth": 1,
+       "marker": "TODO",
+       "body": "call about ((deadbeef-0000-4000-a000-00000000dead))",
+       "props": {
+        "deadline": "2026-10-01"
+       },
+       "path": "读了 [[VibeValley/Design]] 和 [[Ann|Ann Lee]]，终端 渲染 很快"
+      }
+     ]
+    },
+    {
+     "block": "c0dccc9c-d1a0-4929-a955-6c579bfef8a1",
+     "page": "2026_11_13",
+     "pageTitle": "2026_11_13",
+     "tier": "journal",
+     "marker": "TODO",
+     "path": "读了 VibeValley/Design 和 Ann Lee，终端 渲染 很快",
+     "body": "call about ((deadbeef-0000-4000-a000-00000000dead))",
+     "plain": "call about …",
+     "score": 4.199999999999999,
+     "children": []
+    },
+    {
+     "block": "825b7585-76ee-4667-a2f5-b3aeadeeebde",
+     "page": "2026_11_13",
+     "pageTitle": "2026_11_13",
+     "tier": "journal",
+     "marker": "DONE",
+     "path": "",
+     "body": "gpu notes [[VibeValley/Design|the design]]",
+     "plain": "gpu notes the design",
+     "score": 4.199999999999999,
+     "children": []
+    }
+   ]
+  ],
+  [
+   {
+    "marker": "TODO"
+   },
+   [
+    {
+     "block": "50adc3c8-6696-47c9-a713-0c40bc233569",
+     "page": "vibevalley__design",
+     "pageTitle": "VibeValley/Design",
+     "tier": "project",
+     "marker": "TODO",
+     "path": "",
+     "body": "Draw the [[VibeValley]] farm with #gpu",
+     "plain": "Draw the VibeValley farm with #gpu",
+     "score": 2,
+     "children": [
+      {
+       "id": "17a7199b-6870-4cf1-a04d-8f00ba539dec",
+       "parent": "50adc3c8-6696-47c9-a713-0c40bc233569",
+       "depth": 1,
+       "marker": "DOING",
+       "body": "wire it, see ((6a1b2c3d-0000-4000-a000-000000000001))",
+       "props": {},
+       "path": "Draw the [[VibeValley]] farm with #gpu"
+      }
+     ]
+    },
+    {
+     "block": "c0dccc9c-d1a0-4929-a955-6c579bfef8a1",
+     "page": "2026_11_13",
+     "pageTitle": "2026_11_13",
+     "tier": "journal",
+     "marker": "TODO",
+     "path": "读了 VibeValley/Design 和 Ann Lee，终端 渲染 很快",
+     "body": "call about ((deadbeef-0000-4000-a000-00000000dead))",
+     "plain": "call about …",
+     "score": 1.4,
+     "children": []
+    }
+   ]
+  ],
+  [
+   {
+    "linkedTo": "VibeValley/Design"
+   },
+   [
+    {
+     "block": "96a0598b-ff9f-4530-a9f4-1fd88a61eb74",
+     "page": "2026_11_13",
+     "pageTitle": "2026_11_13",
+     "tier": "journal",
+     "path": "",
+     "body": "读了 [[VibeValley/Design]] 和 [[Ann|Ann Lee]]，终端 渲染 很快",
+     "plain": "读了 VibeValley/Design 和 Ann Lee，终端 渲染 很快",
+     "score": 1.4,
+     "children": [
+      {
+       "id": "c0dccc9c-d1a0-4929-a955-6c579bfef8a1",
+       "parent": "96a0598b-ff9f-4530-a9f4-1fd88a61eb74",
+       "depth": 1,
+       "marker": "TODO",
+       "body": "call about ((deadbeef-0000-4000-a000-00000000dead))",
+       "props": {
+        "deadline": "2026-10-01"
+       },
+       "path": "读了 [[VibeValley/Design]] 和 [[Ann|Ann Lee]]，终端 渲染 很快"
+      }
+     ]
+    },
+    {
+     "block": "825b7585-76ee-4667-a2f5-b3aeadeeebde",
+     "page": "2026_11_13",
+     "pageTitle": "2026_11_13",
+     "tier": "journal",
+     "marker": "DONE",
+     "path": "",
+     "body": "gpu notes [[VibeValley/Design|the design]]",
+     "plain": "gpu notes the design",
+     "score": 1.4,
+     "children": []
+    },
+    {
+     "block": "2216b3a6-957e-48e3-a6d4-9d1522074d14",
+     "page": "终端",
+     "pageTitle": "终端",
+     "tier": "resource",
+     "path": "",
+     "body": "终端 的 渲染 笔记 [[VibeValley/Design]]",
+     "plain": "终端 的 渲染 笔记 VibeValley/Design",
+     "score": 1.2,
+     "children": []
+    },
+    {
+     "block": "b8a90ee0-d9f4-4609-a420-2bb7ead78ac5",
+     "page": "clip",
+     "pageTitle": "clip",
+     "tier": "inbox",
+     "path": "",
+     "body": "see [[vibevalley/design]]",
+     "plain": "see vibevalley/design",
+     "score": 1,
+     "children": []
+    },
+    {
+     "block": "a750a74a-75d0-4fd8-a17d-34f7eda6951c",
+     "page": "old",
+     "pageTitle": "Old",
+     "tier": "archive",
+     "path": "",
+     "body": "old link to [[VibeValley/Design|design]]",
+     "plain": "old link to design",
+     "score": 0.5,
+     "children": []
+    }
+   ]
+  ],
+  [
+   {
+    "text": "the",
+    "limit": 2
+   },
+   [
+    {
+     "block": "50adc3c8-6696-47c9-a713-0c40bc233569",
+     "page": "vibevalley__design",
+     "pageTitle": "VibeValley/Design",
+     "tier": "project",
+     "marker": "TODO",
+     "path": "",
+     "body": "Draw the [[VibeValley]] farm with #gpu",
+     "plain": "Draw the VibeValley farm with #gpu",
+     "score": 6,
+     "children": [
+      {
+       "id": "17a7199b-6870-4cf1-a04d-8f00ba539dec",
+       "parent": "50adc3c8-6696-47c9-a713-0c40bc233569",
+       "depth": 1,
+       "marker": "DOING",
+       "body": "wire it, see ((6a1b2c3d-0000-4000-a000-000000000001))",
+       "props": {},
+       "path": "Draw the [[VibeValley]] farm with #gpu"
+      }
+     ]
+    },
+    {
+     "block": "17a7199b-6870-4cf1-a04d-8f00ba539dec",
+     "page": "vibevalley__design",
+     "pageTitle": "VibeValley/Design",
+     "tier": "project",
+     "marker": "DOING",
+     "path": "Draw the VibeValley farm with #gpu",
+     "body": "wire it, see ((6a1b2c3d-0000-4000-a000-000000000001))",
+     "plain": "wire it, see the board",
+     "score": 6,
+     "children": []
+    }
+   ]
+  ]
+ ],
+ "ranked": [
+  {
+   "block": "6a1b2c3d-0000-4000-a000-000000000001",
+   "page": "vibevalley",
+   "pageTitle": "VibeValley",
+   "tier": "area",
+   "path": "",
+   "body": "the board",
+   "plain": "the board",
+   "score": 4.5,
+   "children": [
+    {
+     "id": "011e399b-69bb-4fb8-aff5-f428cb07a46a",
+     "parent": "6a1b2c3d-0000-4000-a000-000000000001",
+     "depth": 1,
+     "body": "loops back ((6a1b2c3d-0000-4000-a000-000000000002))",
+     "props": {},
+     "path": "the board"
+    }
+   ]
+  },
+  {
+   "block": "6a1b2c3d-0000-4000-a000-000000000002",
+   "page": "vibevalley",
+   "pageTitle": "VibeValley",
+   "tier": "area",
+   "path": "",
+   "body": "other",
+   "plain": "other",
+   "score": 1.5,
+   "children": [
+    {
+     "id": "a33fe345-c9ca-4ab2-a348-a52c40c4b7bd",
+     "parent": "6a1b2c3d-0000-4000-a000-000000000002",
+     "depth": 1,
+     "body": "and on ((6a1b2c3d-0000-4000-a000-000000000001))",
+     "props": {},
+     "path": "other"
+    }
+   ]
+  }
+ ],
+ "radar": {
+  "inbox": 1,
+  "stale": [
+   {
+    "slug": "vibevalley__design",
+    "title": "VibeValley/Design",
+    "days": 20770,
+    "deadline": "2026-12-01",
+    "todo": 2,
+    "doing": 1,
+    "done": 0
+   }
+  ],
+  "overdue": [
+   {
+    "block": "c0dccc9c-d1a0-4929-a955-6c579bfef8a1",
+    "page": "2026_11_13",
+    "body": "call about ((deadbeef-0000-4000-a000-00000000dead))",
+    "plain": "call about …",
+    "deadline": "2026-10-01"
+   },
+   {
+    "block": "50adc3c8-6696-47c9-a713-0c40bc233569",
+    "page": "vibevalley__design",
+    "body": "Draw the [[VibeValley]] farm with #gpu",
+    "plain": "Draw the VibeValley farm with #gpu",
+    "deadline": "2026-11-01"
+   }
+  ]
+ },
+ "export": [
+  [
+   "vibevalley__design",
+   "# VibeValley/Design\n\n> A **GPU** terminal\n\n### Draw the VibeValley farm with #gpu\n\n- wire it, see the board\n\n## Notes\n\n- plain _words_ and `code` and [a link](http://x.y)\n\n- ship\n"
+  ],
+  [
+   "2026_11_13",
+   "# 2026_11_13\n\n### 读了 VibeValley/Design 和 Ann Lee，终端 渲染 很快\n\n- call about \n\n- gpu notes the design\n"
+  ],
+  [
+   "vibevalley",
+   "# VibeValley\n\n### the board\n\n- loops back other\n\n### other\n\n- and on the board\n"
+  ],
+  [
+   "clip",
+   "# clip\n\n- a clip about GPU text\n- see vibevalley/design\n"
+  ],
+  [
+   "old",
+   "# Old\n\n- old link to design\n- forever\n"
+  ],
+  [
+   "终端",
+   "# 终端\n\n- 终端 的 渲染 笔记 VibeValley/Design\n"
+  ]
+ ],
+ "renamed": [
+  [
+   "vibevalley__design",
+   null
+  ],
+  [
+   "2026_11_13",
+   {
+    "slug": "2026_11_13",
+    "title": "2026_11_13",
+    "tier": "journal",
+    "file": "journals/2026_11_13.md",
+    "props": {},
+    "blocks": [
+     {
+      "id": "96a0598b-ff9f-4530-a9f4-1fd88a61eb74",
+      "depth": 0,
+      "body": "读了 [[VibeValley/Plan]] 和 [[Ann|Ann Lee]]，终端 渲染 很快",
+      "props": {},
+      "explicit": false,
+      "children": [
+       {
+        "id": "c0dccc9c-d1a0-4929-a955-6c579bfef8a1",
+        "depth": 1,
+        "marker": "TODO",
+        "body": "call about ((deadbeef-0000-4000-a000-00000000dead))",
+        "props": {
+         "deadline": "2026-10-01"
+        },
+        "explicit": false,
+        "children": []
+       }
+      ]
+     },
+     {
+      "id": "825b7585-76ee-4667-a2f5-b3aeadeeebde",
+      "depth": 0,
+      "marker": "DONE",
+      "body": "gpu notes [[VibeValley/Plan|the design]]",
+      "props": {
+       "deadline": "2026-01-01"
+      },
+      "explicit": false,
+      "children": []
+     }
+    ],
+    "sha": "8887d05b8c9a5ffe77002e56ff5c330fc9efa622825ab93c3ba2ffc98783348c",
+    "mtime": 5000
+   }
+  ],
+  [
+   "vibevalley",
+   null
+  ],
+  [
+   "clip",
+   {
+    "slug": "clip",
+    "title": "clip",
+    "tier": "inbox",
+    "file": "00_Inbox/clip.md",
+    "props": {
+     "source-url": "https://example.com/gpu"
+    },
+    "blocks": [
+     {
+      "id": "68e191a0-640d-4bf2-a7db-3c5e1ec096d8",
+      "depth": 0,
+      "body": "a clip about GPU text",
+      "props": {},
+      "explicit": false,
+      "children": []
+     },
+     {
+      "id": "b8a90ee0-d9f4-4609-a420-2bb7ead78ac5",
+      "depth": 0,
+      "body": "see [[VibeValley/Plan]]",
+      "props": {},
+      "explicit": false,
+      "children": []
+     }
+    ],
+    "sha": "79b2fa454472138a6442b7a662e1754075636a1f2054d6ed94d3cd64a5b12b3d",
+    "mtime": 5000
+   }
+  ],
+  [
+   "old",
+   {
+    "slug": "old",
+    "title": "Old",
+    "tier": "archive",
+    "file": "04_Archives/Old.md",
+    "props": {},
+    "blocks": [
+     {
+      "id": "a750a74a-75d0-4fd8-a17d-34f7eda6951c",
+      "depth": 0,
+      "body": "old link to [[VibeValley/Plan|design]]",
+      "props": {},
+      "explicit": false,
+      "children": []
+     },
+     {
+      "id": "20109274-b007-4391-aaa8-bd787e50d590",
+      "depth": 0,
+      "marker": "WAITING",
+      "body": "forever",
+      "props": {},
+      "explicit": false,
+      "children": []
+     }
+    ],
+    "sha": "1bd2352a7c3285627e795f026cd0a994a0356314d85f4e8a8ce8c40c09c49097",
+    "mtime": 200
+   }
+  ],
+  [
+   "终端",
+   {
+    "slug": "终端",
+    "title": "终端",
+    "tier": "resource",
+    "file": "03_Resources/终端.md",
+    "props": {},
+    "blocks": [
+     {
+      "id": "2216b3a6-957e-48e3-a6d4-9d1522074d14",
+      "depth": 0,
+      "body": "终端 的 渲染 笔记 [[VibeValley/Plan]]",
+      "props": {},
+      "explicit": false,
+      "children": []
+     }
+    ],
+    "sha": "29fb90ed40eae94b38d339668429644a8e481d80b4cf26d885433ff9ca2013f9",
+    "mtime": 4000
+   }
+  ]
+ ],
+ "keepLinks": [
+  {
+   "text": "a rewrite [[X]] ((6a1b2c3d-0000-4000-a000-000000000001))",
+   "kept": [
+    "[[X]]",
+    "((6a1b2c3d-0000-4000-a000-000000000001))"
+   ],
+   "restored": [
+    "[[X]]",
+    "((6a1b2c3d-0000-4000-a000-000000000001))"
+   ]
+  },
+  {
+   "text": "has [[Y]]",
+   "kept": [
+    "[[Y]]"
+   ],
+   "restored": []
+  }
+ ],
+ "clustered": [
+  [
+   "gpu",
+   [
+    [
+     "2026_11_13",
+     "825b7585-76ee-4667-a2f5-b3aeadeeebde"
+    ],
+    [
+     "clip",
+     "68e191a0-640d-4bf2-a7db-3c5e1ec096d8"
+    ]
+   ]
+  ],
+  [
+   "终端",
+   [
+    [
+     "2026_11_13",
+     "96a0598b-ff9f-4530-a9f4-1fd88a61eb74"
+    ],
+    [
+     "终端",
+     "2216b3a6-957e-48e3-a6d4-9d1522074d14"
+    ]
+   ]
+  ],
+  [
+   "nothing",
+   []
+  ]
+ ],
+ "clipOf": [
+  [
+   "https://example.com/gpu",
+   "clip"
+  ],
+  [
+   "https://none",
+   null
+  ]
+ ]
+}

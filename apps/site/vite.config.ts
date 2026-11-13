@@ -6,7 +6,7 @@ import { defineConfig, lazyPlugins } from "vite-plus";
 
 export default defineConfig({
   plugins: lazyPlugins(() => [tailwindcss(), solid({ ssr: true, start: { renderMode: "async" } })]) ?? [],
-  resolve: { alias: { "@game": fileURLToPath(new URL("../web/public", import.meta.url)) } },
+  resolve: { alias: { "@game": fileURLToPath(new URL("../../assets", import.meta.url)) } },
   build: { assetsInlineLimit: 0 },
   test: { include: ["test/**/*.test.ts"], environment: "node" },
   run: {

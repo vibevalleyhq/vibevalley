@@ -1,0 +1,3022 @@
+{
+ "folds": [
+  {
+   "fact": {
+    "type": "channelChanged",
+    "at": 1794500000000,
+    "channel": {
+     "id": "c1",
+     "type": "channel",
+     "default": true,
+     "category": "work",
+     "notify": "all",
+     "description": "",
+     "subjectKind": null,
+     "replies": 0,
+     "title": "c1",
+     "at": 1794500000000,
+     "name": "general"
+    }
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [],
+    "issues": [],
+    "connectors": [],
+    "machines": [],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      }
+     ],
+     "userMentions": []
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "channelChanged",
+    "at": 1794500000000,
+    "channel": {
+     "id": "c2",
+     "type": "channel",
+     "default": false,
+     "category": "work",
+     "notify": "all",
+     "description": "",
+     "subjectKind": null,
+     "replies": 0,
+     "title": "c2",
+     "at": 1794500000000,
+     "name": "dev"
+    }
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [],
+    "issues": [],
+    "connectors": [],
+    "machines": [],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      },
+      {
+       "id": "c2",
+       "type": "channel",
+       "default": false,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c2",
+       "at": 1794500000000,
+       "name": "dev"
+      }
+     ],
+     "userMentions": []
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "channelChanged",
+    "at": 1794500000000,
+    "channel": {
+     "id": "c2",
+     "type": "channel",
+     "default": false,
+     "category": "work",
+     "notify": "all",
+     "description": "",
+     "subjectKind": null,
+     "replies": 0,
+     "title": "c2",
+     "at": 1794500000000,
+     "name": "dev"
+    }
+   },
+   "changed": false,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [],
+    "issues": [],
+    "connectors": [],
+    "machines": [],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      },
+      {
+       "id": "c2",
+       "type": "channel",
+       "default": false,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c2",
+       "at": 1794500000000,
+       "name": "dev"
+      }
+     ],
+     "userMentions": []
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "channelChanged",
+    "at": 1794500000000,
+    "channel": {
+     "id": "t1",
+     "type": "thread",
+     "default": false,
+     "category": "work",
+     "notify": "all",
+     "description": "",
+     "subjectKind": null,
+     "replies": 0,
+     "title": "t1",
+     "at": 1794500000000,
+     "parent": "c2",
+     "root": "m1",
+     "rootNumber": 1
+    }
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [],
+    "issues": [],
+    "connectors": [],
+    "machines": [],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      },
+      {
+       "id": "c2",
+       "type": "channel",
+       "default": false,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c2",
+       "at": 1794500000000,
+       "name": "dev"
+      },
+      {
+       "id": "t1",
+       "type": "thread",
+       "default": false,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "t1",
+       "at": 1794500000000,
+       "parent": "c2",
+       "root": "m1",
+       "rootNumber": 1
+      }
+     ],
+     "userMentions": []
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "messageChanged",
+    "at": 1794500000000,
+    "message": {
+     "id": "m1",
+     "number": 1,
+     "channel": "c2",
+     "from": "w1",
+     "actor": {
+      "kind": "agent",
+      "id": "w1",
+      "role": "worker",
+      "name": "Helper w1"
+     },
+     "name": "Helper w1",
+     "kind": "chat",
+     "text": "message 1 @user",
+     "mentions": [
+      "user"
+     ],
+     "outcome": null,
+     "spoken": false,
+     "at": 1794500060000,
+     "revision": 1,
+     "reactions": [],
+     "attachments": [],
+     "embeds": []
+    }
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [],
+    "issues": [],
+    "connectors": [],
+    "machines": [],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      },
+      {
+       "id": "c2",
+       "type": "channel",
+       "default": false,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c2",
+       "at": 1794500000000,
+       "name": "dev",
+       "lastNumber": 1
+      },
+      {
+       "id": "t1",
+       "type": "thread",
+       "default": false,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "t1",
+       "at": 1794500000000,
+       "parent": "c2",
+       "root": "m1",
+       "rootNumber": 1
+      }
+     ],
+     "userMentions": []
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "messageChanged",
+    "at": 1794500000000,
+    "message": {
+     "id": "m1",
+     "number": 1,
+     "channel": "c2",
+     "from": "w1",
+     "actor": {
+      "kind": "agent",
+      "id": "w1",
+      "role": "worker",
+      "name": "Helper w1"
+     },
+     "name": "Helper w1",
+     "kind": "chat",
+     "text": "message 1 @user",
+     "mentions": [
+      "user"
+     ],
+     "outcome": null,
+     "spoken": false,
+     "at": 1794500060000,
+     "revision": 1,
+     "reactions": [],
+     "attachments": [],
+     "embeds": []
+    }
+   },
+   "changed": false,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [],
+    "issues": [],
+    "connectors": [],
+    "machines": [],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      },
+      {
+       "id": "c2",
+       "type": "channel",
+       "default": false,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c2",
+       "at": 1794500000000,
+       "name": "dev",
+       "lastNumber": 1
+      },
+      {
+       "id": "t1",
+       "type": "thread",
+       "default": false,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "t1",
+       "at": 1794500000000,
+       "parent": "c2",
+       "root": "m1",
+       "rootNumber": 1
+      }
+     ],
+     "userMentions": []
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "messageChanged",
+    "at": 1794500000000,
+    "message": {
+     "id": "m9",
+     "number": 9,
+     "channel": "nowhere",
+     "from": "w1",
+     "actor": {
+      "kind": "agent",
+      "id": "w1",
+      "role": "worker",
+      "name": "Helper w1"
+     },
+     "name": "Helper w1",
+     "kind": "chat",
+     "text": "message 9 @user",
+     "mentions": [
+      "user"
+     ],
+     "outcome": null,
+     "spoken": false,
+     "at": 1794500540000,
+     "revision": 1,
+     "reactions": [],
+     "attachments": [],
+     "embeds": []
+    }
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [],
+    "issues": [],
+    "connectors": [],
+    "machines": [],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      },
+      {
+       "id": "c2",
+       "type": "channel",
+       "default": false,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c2",
+       "at": 1794500000000,
+       "name": "dev",
+       "lastNumber": 1
+      },
+      {
+       "id": "t1",
+       "type": "thread",
+       "default": false,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "t1",
+       "at": 1794500000000,
+       "parent": "c2",
+       "root": "m1",
+       "rootNumber": 1
+      }
+     ],
+     "userMentions": []
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "userMentionsChanged",
+    "at": 1794500000000,
+    "mentions": [
+     {
+      "message": {
+       "id": "m1",
+       "number": 1,
+       "channel": "c2",
+       "from": "w1",
+       "actor": {
+        "kind": "agent",
+        "id": "w1",
+        "role": "worker",
+        "name": "Helper w1"
+       },
+       "name": "Helper w1",
+       "kind": "chat",
+       "text": "message 1 @user",
+       "mentions": [
+        "user"
+       ],
+       "outcome": null,
+       "spoken": false,
+       "at": 1794500060000,
+       "revision": 1,
+       "reactions": [],
+       "attachments": [],
+       "embeds": []
+      },
+      "channel": "c2",
+      "address": "#dev"
+     },
+     {
+      "message": {
+       "id": "m2",
+       "number": 2,
+       "channel": "c1",
+       "from": "orchestrator",
+       "actor": {
+        "kind": "agent",
+        "id": "orchestrator",
+        "role": "orchestrator"
+       },
+       "name": "管家",
+       "kind": "chat",
+       "text": "message 2 @user",
+       "mentions": [
+        "user"
+       ],
+       "outcome": null,
+       "spoken": false,
+       "at": 1794500120000,
+       "revision": 1,
+       "reactions": [],
+       "attachments": [],
+       "embeds": []
+      },
+      "channel": "c1",
+      "address": "#general"
+     }
+    ]
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [],
+    "issues": [],
+    "connectors": [],
+    "machines": [],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      },
+      {
+       "id": "c2",
+       "type": "channel",
+       "default": false,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c2",
+       "at": 1794500000000,
+       "name": "dev",
+       "lastNumber": 1
+      },
+      {
+       "id": "t1",
+       "type": "thread",
+       "default": false,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "t1",
+       "at": 1794500000000,
+       "parent": "c2",
+       "root": "m1",
+       "rootNumber": 1
+      }
+     ],
+     "userMentions": [
+      {
+       "message": {
+        "id": "m1",
+        "number": 1,
+        "channel": "c2",
+        "from": "w1",
+        "actor": {
+         "kind": "agent",
+         "id": "w1",
+         "role": "worker",
+         "name": "Helper w1"
+        },
+        "name": "Helper w1",
+        "kind": "chat",
+        "text": "message 1 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500060000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c2",
+       "address": "#dev"
+      },
+      {
+       "message": {
+        "id": "m2",
+        "number": 2,
+        "channel": "c1",
+        "from": "orchestrator",
+        "actor": {
+         "kind": "agent",
+         "id": "orchestrator",
+         "role": "orchestrator"
+        },
+        "name": "管家",
+        "kind": "chat",
+        "text": "message 2 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500120000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c1",
+       "address": "#general"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "channelRemoved",
+    "at": 1794500000000,
+    "id": "c2"
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [],
+    "issues": [],
+    "connectors": [],
+    "machines": [],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      }
+     ],
+     "userMentions": [
+      {
+       "message": {
+        "id": "m1",
+        "number": 1,
+        "channel": "c2",
+        "from": "w1",
+        "actor": {
+         "kind": "agent",
+         "id": "w1",
+         "role": "worker",
+         "name": "Helper w1"
+        },
+        "name": "Helper w1",
+        "kind": "chat",
+        "text": "message 1 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500060000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c2",
+       "address": "#dev"
+      },
+      {
+       "message": {
+        "id": "m2",
+        "number": 2,
+        "channel": "c1",
+        "from": "orchestrator",
+        "actor": {
+         "kind": "agent",
+         "id": "orchestrator",
+         "role": "orchestrator"
+        },
+        "name": "管家",
+        "kind": "chat",
+        "text": "message 2 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500120000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c1",
+       "address": "#general"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "channelRemoved",
+    "at": 1794500000000,
+    "id": "c2"
+   },
+   "changed": false,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [],
+    "issues": [],
+    "connectors": [],
+    "machines": [],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      }
+     ],
+     "userMentions": [
+      {
+       "message": {
+        "id": "m1",
+        "number": 1,
+        "channel": "c2",
+        "from": "w1",
+        "actor": {
+         "kind": "agent",
+         "id": "w1",
+         "role": "worker",
+         "name": "Helper w1"
+        },
+        "name": "Helper w1",
+        "kind": "chat",
+        "text": "message 1 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500060000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c2",
+       "address": "#dev"
+      },
+      {
+       "message": {
+        "id": "m2",
+        "number": 2,
+        "channel": "c1",
+        "from": "orchestrator",
+        "actor": {
+         "kind": "agent",
+         "id": "orchestrator",
+         "role": "orchestrator"
+        },
+        "name": "管家",
+        "kind": "chat",
+        "text": "message 2 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500120000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c1",
+       "address": "#general"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "cronChanged",
+    "at": 1794500000000,
+    "cron": {
+     "id": "k1",
+     "name": "Daily digest",
+     "text": "summarize",
+     "channel": "c1",
+     "when": {
+      "kind": "daily",
+      "time": "09:00"
+     },
+     "tz": "Asia/Shanghai",
+     "enabled": false,
+     "created": 1794500000000,
+     "by": "agent",
+     "pending": true
+    }
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [
+     {
+      "id": "k1",
+      "name": "Daily digest",
+      "text": "summarize",
+      "channel": "c1",
+      "when": {
+       "kind": "daily",
+       "time": "09:00"
+      },
+      "tz": "Asia/Shanghai",
+      "enabled": false,
+      "created": 1794500000000,
+      "by": "agent",
+      "pending": true
+     }
+    ],
+    "issues": [],
+    "connectors": [],
+    "machines": [],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      }
+     ],
+     "userMentions": [
+      {
+       "message": {
+        "id": "m1",
+        "number": 1,
+        "channel": "c2",
+        "from": "w1",
+        "actor": {
+         "kind": "agent",
+         "id": "w1",
+         "role": "worker",
+         "name": "Helper w1"
+        },
+        "name": "Helper w1",
+        "kind": "chat",
+        "text": "message 1 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500060000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c2",
+       "address": "#dev"
+      },
+      {
+       "message": {
+        "id": "m2",
+        "number": 2,
+        "channel": "c1",
+        "from": "orchestrator",
+        "actor": {
+         "kind": "agent",
+         "id": "orchestrator",
+         "role": "orchestrator"
+        },
+        "name": "管家",
+        "kind": "chat",
+        "text": "message 2 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500120000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c1",
+       "address": "#general"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "cronChanged",
+    "at": 1794500000000,
+    "cron": {
+     "id": "k2",
+     "name": "Once",
+     "text": "o",
+     "channel": "c1",
+     "when": {
+      "kind": "once",
+      "at": 1794499940000
+     },
+     "tz": "UTC",
+     "enabled": false,
+     "created": 1794500000000,
+     "by": "user",
+     "pending": false
+    }
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [
+     {
+      "id": "k1",
+      "name": "Daily digest",
+      "text": "summarize",
+      "channel": "c1",
+      "when": {
+       "kind": "daily",
+       "time": "09:00"
+      },
+      "tz": "Asia/Shanghai",
+      "enabled": false,
+      "created": 1794500000000,
+      "by": "agent",
+      "pending": true
+     },
+     {
+      "id": "k2",
+      "name": "Once",
+      "text": "o",
+      "channel": "c1",
+      "when": {
+       "kind": "once",
+       "at": 1794499940000
+      },
+      "tz": "UTC",
+      "enabled": false,
+      "created": 1794500000000,
+      "by": "user",
+      "pending": false
+     }
+    ],
+    "issues": [],
+    "connectors": [],
+    "machines": [],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      }
+     ],
+     "userMentions": [
+      {
+       "message": {
+        "id": "m1",
+        "number": 1,
+        "channel": "c2",
+        "from": "w1",
+        "actor": {
+         "kind": "agent",
+         "id": "w1",
+         "role": "worker",
+         "name": "Helper w1"
+        },
+        "name": "Helper w1",
+        "kind": "chat",
+        "text": "message 1 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500060000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c2",
+       "address": "#dev"
+      },
+      {
+       "message": {
+        "id": "m2",
+        "number": 2,
+        "channel": "c1",
+        "from": "orchestrator",
+        "actor": {
+         "kind": "agent",
+         "id": "orchestrator",
+         "role": "orchestrator"
+        },
+        "name": "管家",
+        "kind": "chat",
+        "text": "message 2 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500120000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c1",
+       "address": "#general"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "cronChanged",
+    "at": 1794500000000,
+    "cron": {
+     "id": "k2",
+     "name": "Once",
+     "text": "o",
+     "channel": "c1",
+     "when": {
+      "kind": "once",
+      "at": 1794499940000
+     },
+     "tz": "UTC",
+     "enabled": false,
+     "created": 1794500000000,
+     "by": "user",
+     "pending": false
+    }
+   },
+   "changed": false,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [
+     {
+      "id": "k1",
+      "name": "Daily digest",
+      "text": "summarize",
+      "channel": "c1",
+      "when": {
+       "kind": "daily",
+       "time": "09:00"
+      },
+      "tz": "Asia/Shanghai",
+      "enabled": false,
+      "created": 1794500000000,
+      "by": "agent",
+      "pending": true
+     },
+     {
+      "id": "k2",
+      "name": "Once",
+      "text": "o",
+      "channel": "c1",
+      "when": {
+       "kind": "once",
+       "at": 1794499940000
+      },
+      "tz": "UTC",
+      "enabled": false,
+      "created": 1794500000000,
+      "by": "user",
+      "pending": false
+     }
+    ],
+    "issues": [],
+    "connectors": [],
+    "machines": [],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      }
+     ],
+     "userMentions": [
+      {
+       "message": {
+        "id": "m1",
+        "number": 1,
+        "channel": "c2",
+        "from": "w1",
+        "actor": {
+         "kind": "agent",
+         "id": "w1",
+         "role": "worker",
+         "name": "Helper w1"
+        },
+        "name": "Helper w1",
+        "kind": "chat",
+        "text": "message 1 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500060000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c2",
+       "address": "#dev"
+      },
+      {
+       "message": {
+        "id": "m2",
+        "number": 2,
+        "channel": "c1",
+        "from": "orchestrator",
+        "actor": {
+         "kind": "agent",
+         "id": "orchestrator",
+         "role": "orchestrator"
+        },
+        "name": "管家",
+        "kind": "chat",
+        "text": "message 2 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500120000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c1",
+       "address": "#general"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "cronRemoved",
+    "at": 1794500000000,
+    "id": "k2"
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [
+     {
+      "id": "k1",
+      "name": "Daily digest",
+      "text": "summarize",
+      "channel": "c1",
+      "when": {
+       "kind": "daily",
+       "time": "09:00"
+      },
+      "tz": "Asia/Shanghai",
+      "enabled": false,
+      "created": 1794500000000,
+      "by": "agent",
+      "pending": true
+     }
+    ],
+    "issues": [],
+    "connectors": [],
+    "machines": [],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      }
+     ],
+     "userMentions": [
+      {
+       "message": {
+        "id": "m1",
+        "number": 1,
+        "channel": "c2",
+        "from": "w1",
+        "actor": {
+         "kind": "agent",
+         "id": "w1",
+         "role": "worker",
+         "name": "Helper w1"
+        },
+        "name": "Helper w1",
+        "kind": "chat",
+        "text": "message 1 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500060000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c2",
+       "address": "#dev"
+      },
+      {
+       "message": {
+        "id": "m2",
+        "number": 2,
+        "channel": "c1",
+        "from": "orchestrator",
+        "actor": {
+         "kind": "agent",
+         "id": "orchestrator",
+         "role": "orchestrator"
+        },
+        "name": "管家",
+        "kind": "chat",
+        "text": "message 2 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500120000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c1",
+       "address": "#general"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "cronRemoved",
+    "at": 1794500000000,
+    "id": "k2"
+   },
+   "changed": false,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [
+     {
+      "id": "k1",
+      "name": "Daily digest",
+      "text": "summarize",
+      "channel": "c1",
+      "when": {
+       "kind": "daily",
+       "time": "09:00"
+      },
+      "tz": "Asia/Shanghai",
+      "enabled": false,
+      "created": 1794500000000,
+      "by": "agent",
+      "pending": true
+     }
+    ],
+    "issues": [],
+    "connectors": [],
+    "machines": [],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      }
+     ],
+     "userMentions": [
+      {
+       "message": {
+        "id": "m1",
+        "number": 1,
+        "channel": "c2",
+        "from": "w1",
+        "actor": {
+         "kind": "agent",
+         "id": "w1",
+         "role": "worker",
+         "name": "Helper w1"
+        },
+        "name": "Helper w1",
+        "kind": "chat",
+        "text": "message 1 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500060000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c2",
+       "address": "#dev"
+      },
+      {
+       "message": {
+        "id": "m2",
+        "number": 2,
+        "channel": "c1",
+        "from": "orchestrator",
+        "actor": {
+         "kind": "agent",
+         "id": "orchestrator",
+         "role": "orchestrator"
+        },
+        "name": "管家",
+        "kind": "chat",
+        "text": "message 2 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500120000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c1",
+       "address": "#general"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "connectorChanged",
+    "at": 1794500000000,
+    "status": {
+     "id": "weixin",
+     "state": "off",
+     "qr": "",
+     "pairCode": "",
+     "pending": 0,
+     "error": ""
+    }
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [
+     {
+      "id": "k1",
+      "name": "Daily digest",
+      "text": "summarize",
+      "channel": "c1",
+      "when": {
+       "kind": "daily",
+       "time": "09:00"
+      },
+      "tz": "Asia/Shanghai",
+      "enabled": false,
+      "created": 1794500000000,
+      "by": "agent",
+      "pending": true
+     }
+    ],
+    "issues": [],
+    "connectors": [
+     {
+      "id": "weixin",
+      "state": "off",
+      "qr": "",
+      "pairCode": "",
+      "pending": 0,
+      "error": ""
+     }
+    ],
+    "machines": [],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      }
+     ],
+     "userMentions": [
+      {
+       "message": {
+        "id": "m1",
+        "number": 1,
+        "channel": "c2",
+        "from": "w1",
+        "actor": {
+         "kind": "agent",
+         "id": "w1",
+         "role": "worker",
+         "name": "Helper w1"
+        },
+        "name": "Helper w1",
+        "kind": "chat",
+        "text": "message 1 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500060000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c2",
+       "address": "#dev"
+      },
+      {
+       "message": {
+        "id": "m2",
+        "number": 2,
+        "channel": "c1",
+        "from": "orchestrator",
+        "actor": {
+         "kind": "agent",
+         "id": "orchestrator",
+         "role": "orchestrator"
+        },
+        "name": "管家",
+        "kind": "chat",
+        "text": "message 2 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500120000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c1",
+       "address": "#general"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "connectorChanged",
+    "at": 1794500000000,
+    "status": {
+     "id": "weixin",
+     "state": "off",
+     "qr": "",
+     "pairCode": "",
+     "pending": 0,
+     "error": ""
+    }
+   },
+   "changed": false,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [
+     {
+      "id": "k1",
+      "name": "Daily digest",
+      "text": "summarize",
+      "channel": "c1",
+      "when": {
+       "kind": "daily",
+       "time": "09:00"
+      },
+      "tz": "Asia/Shanghai",
+      "enabled": false,
+      "created": 1794500000000,
+      "by": "agent",
+      "pending": true
+     }
+    ],
+    "issues": [],
+    "connectors": [
+     {
+      "id": "weixin",
+      "state": "off",
+      "qr": "",
+      "pairCode": "",
+      "pending": 0,
+      "error": ""
+     }
+    ],
+    "machines": [],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      }
+     ],
+     "userMentions": [
+      {
+       "message": {
+        "id": "m1",
+        "number": 1,
+        "channel": "c2",
+        "from": "w1",
+        "actor": {
+         "kind": "agent",
+         "id": "w1",
+         "role": "worker",
+         "name": "Helper w1"
+        },
+        "name": "Helper w1",
+        "kind": "chat",
+        "text": "message 1 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500060000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c2",
+       "address": "#dev"
+      },
+      {
+       "message": {
+        "id": "m2",
+        "number": 2,
+        "channel": "c1",
+        "from": "orchestrator",
+        "actor": {
+         "kind": "agent",
+         "id": "orchestrator",
+         "role": "orchestrator"
+        },
+        "name": "管家",
+        "kind": "chat",
+        "text": "message 2 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500120000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c1",
+       "address": "#general"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "connectorChanged",
+    "at": 1794500000000,
+    "status": {
+     "id": "weixin",
+     "state": "connected",
+     "qr": "",
+     "pairCode": "",
+     "pending": 0,
+     "error": ""
+    }
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [
+     {
+      "id": "k1",
+      "name": "Daily digest",
+      "text": "summarize",
+      "channel": "c1",
+      "when": {
+       "kind": "daily",
+       "time": "09:00"
+      },
+      "tz": "Asia/Shanghai",
+      "enabled": false,
+      "created": 1794500000000,
+      "by": "agent",
+      "pending": true
+     }
+    ],
+    "issues": [],
+    "connectors": [
+     {
+      "id": "weixin",
+      "state": "connected",
+      "qr": "",
+      "pairCode": "",
+      "pending": 0,
+      "error": ""
+     }
+    ],
+    "machines": [],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      }
+     ],
+     "userMentions": [
+      {
+       "message": {
+        "id": "m1",
+        "number": 1,
+        "channel": "c2",
+        "from": "w1",
+        "actor": {
+         "kind": "agent",
+         "id": "w1",
+         "role": "worker",
+         "name": "Helper w1"
+        },
+        "name": "Helper w1",
+        "kind": "chat",
+        "text": "message 1 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500060000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c2",
+       "address": "#dev"
+      },
+      {
+       "message": {
+        "id": "m2",
+        "number": 2,
+        "channel": "c1",
+        "from": "orchestrator",
+        "actor": {
+         "kind": "agent",
+         "id": "orchestrator",
+         "role": "orchestrator"
+        },
+        "name": "管家",
+        "kind": "chat",
+        "text": "message 2 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500120000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c1",
+       "address": "#general"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "machineChanged",
+    "at": 1794500000000,
+    "machine": {
+     "id": "here",
+     "name": "Mac",
+     "here": true,
+     "online": true,
+     "joinedAt": 1794500000000
+    }
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [
+     {
+      "id": "k1",
+      "name": "Daily digest",
+      "text": "summarize",
+      "channel": "c1",
+      "when": {
+       "kind": "daily",
+       "time": "09:00"
+      },
+      "tz": "Asia/Shanghai",
+      "enabled": false,
+      "created": 1794500000000,
+      "by": "agent",
+      "pending": true
+     }
+    ],
+    "issues": [],
+    "connectors": [
+     {
+      "id": "weixin",
+      "state": "connected",
+      "qr": "",
+      "pairCode": "",
+      "pending": 0,
+      "error": ""
+     }
+    ],
+    "machines": [
+     {
+      "id": "here",
+      "name": "Mac",
+      "here": true,
+      "online": true,
+      "joinedAt": 1794500000000
+     }
+    ],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      }
+     ],
+     "userMentions": [
+      {
+       "message": {
+        "id": "m1",
+        "number": 1,
+        "channel": "c2",
+        "from": "w1",
+        "actor": {
+         "kind": "agent",
+         "id": "w1",
+         "role": "worker",
+         "name": "Helper w1"
+        },
+        "name": "Helper w1",
+        "kind": "chat",
+        "text": "message 1 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500060000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c2",
+       "address": "#dev"
+      },
+      {
+       "message": {
+        "id": "m2",
+        "number": 2,
+        "channel": "c1",
+        "from": "orchestrator",
+        "actor": {
+         "kind": "agent",
+         "id": "orchestrator",
+         "role": "orchestrator"
+        },
+        "name": "管家",
+        "kind": "chat",
+        "text": "message 2 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500120000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c1",
+       "address": "#general"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "machineChanged",
+    "at": 1794500000000,
+    "machine": {
+     "id": "here",
+     "name": "Mac",
+     "here": true,
+     "online": true,
+     "joinedAt": 1794500000000
+    }
+   },
+   "changed": false,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [
+     {
+      "id": "k1",
+      "name": "Daily digest",
+      "text": "summarize",
+      "channel": "c1",
+      "when": {
+       "kind": "daily",
+       "time": "09:00"
+      },
+      "tz": "Asia/Shanghai",
+      "enabled": false,
+      "created": 1794500000000,
+      "by": "agent",
+      "pending": true
+     }
+    ],
+    "issues": [],
+    "connectors": [
+     {
+      "id": "weixin",
+      "state": "connected",
+      "qr": "",
+      "pairCode": "",
+      "pending": 0,
+      "error": ""
+     }
+    ],
+    "machines": [
+     {
+      "id": "here",
+      "name": "Mac",
+      "here": true,
+      "online": true,
+      "joinedAt": 1794500000000
+     }
+    ],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      }
+     ],
+     "userMentions": [
+      {
+       "message": {
+        "id": "m1",
+        "number": 1,
+        "channel": "c2",
+        "from": "w1",
+        "actor": {
+         "kind": "agent",
+         "id": "w1",
+         "role": "worker",
+         "name": "Helper w1"
+        },
+        "name": "Helper w1",
+        "kind": "chat",
+        "text": "message 1 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500060000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c2",
+       "address": "#dev"
+      },
+      {
+       "message": {
+        "id": "m2",
+        "number": 2,
+        "channel": "c1",
+        "from": "orchestrator",
+        "actor": {
+         "kind": "agent",
+         "id": "orchestrator",
+         "role": "orchestrator"
+        },
+        "name": "管家",
+        "kind": "chat",
+        "text": "message 2 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500120000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c1",
+       "address": "#general"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "machineChanged",
+    "at": 1794500000000,
+    "machine": {
+     "id": "here",
+     "name": "Mac",
+     "here": true,
+     "online": false,
+     "joinedAt": 1794500000000
+    }
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [
+     {
+      "id": "k1",
+      "name": "Daily digest",
+      "text": "summarize",
+      "channel": "c1",
+      "when": {
+       "kind": "daily",
+       "time": "09:00"
+      },
+      "tz": "Asia/Shanghai",
+      "enabled": false,
+      "created": 1794500000000,
+      "by": "agent",
+      "pending": true
+     }
+    ],
+    "issues": [],
+    "connectors": [
+     {
+      "id": "weixin",
+      "state": "connected",
+      "qr": "",
+      "pairCode": "",
+      "pending": 0,
+      "error": ""
+     }
+    ],
+    "machines": [
+     {
+      "id": "here",
+      "name": "Mac",
+      "here": true,
+      "online": false,
+      "joinedAt": 1794500000000
+     }
+    ],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      }
+     ],
+     "userMentions": [
+      {
+       "message": {
+        "id": "m1",
+        "number": 1,
+        "channel": "c2",
+        "from": "w1",
+        "actor": {
+         "kind": "agent",
+         "id": "w1",
+         "role": "worker",
+         "name": "Helper w1"
+        },
+        "name": "Helper w1",
+        "kind": "chat",
+        "text": "message 1 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500060000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c2",
+       "address": "#dev"
+      },
+      {
+       "message": {
+        "id": "m2",
+        "number": 2,
+        "channel": "c1",
+        "from": "orchestrator",
+        "actor": {
+         "kind": "agent",
+         "id": "orchestrator",
+         "role": "orchestrator"
+        },
+        "name": "管家",
+        "kind": "chat",
+        "text": "message 2 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500120000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c1",
+       "address": "#general"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "callChanged",
+    "at": 1794500000000,
+    "state": "live",
+    "reason": ""
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "live",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [
+     {
+      "id": "k1",
+      "name": "Daily digest",
+      "text": "summarize",
+      "channel": "c1",
+      "when": {
+       "kind": "daily",
+       "time": "09:00"
+      },
+      "tz": "Asia/Shanghai",
+      "enabled": false,
+      "created": 1794500000000,
+      "by": "agent",
+      "pending": true
+     }
+    ],
+    "issues": [],
+    "connectors": [
+     {
+      "id": "weixin",
+      "state": "connected",
+      "qr": "",
+      "pairCode": "",
+      "pending": 0,
+      "error": ""
+     }
+    ],
+    "machines": [
+     {
+      "id": "here",
+      "name": "Mac",
+      "here": true,
+      "online": false,
+      "joinedAt": 1794500000000
+     }
+    ],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      }
+     ],
+     "userMentions": [
+      {
+       "message": {
+        "id": "m1",
+        "number": 1,
+        "channel": "c2",
+        "from": "w1",
+        "actor": {
+         "kind": "agent",
+         "id": "w1",
+         "role": "worker",
+         "name": "Helper w1"
+        },
+        "name": "Helper w1",
+        "kind": "chat",
+        "text": "message 1 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500060000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c2",
+       "address": "#dev"
+      },
+      {
+       "message": {
+        "id": "m2",
+        "number": 2,
+        "channel": "c1",
+        "from": "orchestrator",
+        "actor": {
+         "kind": "agent",
+         "id": "orchestrator",
+         "role": "orchestrator"
+        },
+        "name": "管家",
+        "kind": "chat",
+        "text": "message 2 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500120000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c1",
+       "address": "#general"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "callChanged",
+    "at": 1794500000000,
+    "state": "live",
+    "reason": ""
+   },
+   "changed": false,
+   "effects": [],
+   "state": {
+    "call": "live",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [
+     {
+      "id": "k1",
+      "name": "Daily digest",
+      "text": "summarize",
+      "channel": "c1",
+      "when": {
+       "kind": "daily",
+       "time": "09:00"
+      },
+      "tz": "Asia/Shanghai",
+      "enabled": false,
+      "created": 1794500000000,
+      "by": "agent",
+      "pending": true
+     }
+    ],
+    "issues": [],
+    "connectors": [
+     {
+      "id": "weixin",
+      "state": "connected",
+      "qr": "",
+      "pairCode": "",
+      "pending": 0,
+      "error": ""
+     }
+    ],
+    "machines": [
+     {
+      "id": "here",
+      "name": "Mac",
+      "here": true,
+      "online": false,
+      "joinedAt": 1794500000000
+     }
+    ],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      }
+     ],
+     "userMentions": [
+      {
+       "message": {
+        "id": "m1",
+        "number": 1,
+        "channel": "c2",
+        "from": "w1",
+        "actor": {
+         "kind": "agent",
+         "id": "w1",
+         "role": "worker",
+         "name": "Helper w1"
+        },
+        "name": "Helper w1",
+        "kind": "chat",
+        "text": "message 1 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500060000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c2",
+       "address": "#dev"
+      },
+      {
+       "message": {
+        "id": "m2",
+        "number": 2,
+        "channel": "c1",
+        "from": "orchestrator",
+        "actor": {
+         "kind": "agent",
+         "id": "orchestrator",
+         "role": "orchestrator"
+        },
+        "name": "管家",
+        "kind": "chat",
+        "text": "message 2 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500120000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c1",
+       "address": "#general"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "fact": {
+    "type": "mediaChanged",
+    "at": 1794500000000,
+    "jobs": []
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "live",
+    "callReason": "",
+    "sessions": [],
+    "plays": {},
+    "crons": [
+     {
+      "id": "k1",
+      "name": "Daily digest",
+      "text": "summarize",
+      "channel": "c1",
+      "when": {
+       "kind": "daily",
+       "time": "09:00"
+      },
+      "tz": "Asia/Shanghai",
+      "enabled": false,
+      "created": 1794500000000,
+      "by": "agent",
+      "pending": true
+     }
+    ],
+    "issues": [],
+    "connectors": [
+     {
+      "id": "weixin",
+      "state": "connected",
+      "qr": "",
+      "pairCode": "",
+      "pending": 0,
+      "error": ""
+     }
+    ],
+    "machines": [
+     {
+      "id": "here",
+      "name": "Mac",
+      "here": true,
+      "online": false,
+      "joinedAt": 1794500000000
+     }
+    ],
+    "chat": {
+     "channels": [
+      {
+       "id": "c1",
+       "type": "channel",
+       "default": true,
+       "category": "work",
+       "notify": "all",
+       "description": "",
+       "subjectKind": null,
+       "replies": 0,
+       "title": "c1",
+       "at": 1794500000000,
+       "name": "general"
+      }
+     ],
+     "userMentions": [
+      {
+       "message": {
+        "id": "m1",
+        "number": 1,
+        "channel": "c2",
+        "from": "w1",
+        "actor": {
+         "kind": "agent",
+         "id": "w1",
+         "role": "worker",
+         "name": "Helper w1"
+        },
+        "name": "Helper w1",
+        "kind": "chat",
+        "text": "message 1 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500060000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c2",
+       "address": "#dev"
+      },
+      {
+       "message": {
+        "id": "m2",
+        "number": 2,
+        "channel": "c1",
+        "from": "orchestrator",
+        "actor": {
+         "kind": "agent",
+         "id": "orchestrator",
+         "role": "orchestrator"
+        },
+        "name": "管家",
+        "kind": "chat",
+        "text": "message 2 @user",
+        "mentions": [
+         "user"
+        ],
+        "outcome": null,
+        "spoken": false,
+        "at": 1794500120000,
+        "revision": 1,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "c1",
+       "address": "#general"
+      }
+     ]
+    },
+    "media": []
+   }
+  }
+ ],
+ "frame": {
+  "seq": 16,
+  "state": {
+   "call": "live",
+   "callReason": "",
+   "media": [],
+   "chat": {
+    "channels": [
+     {
+      "id": "c1",
+      "type": "channel",
+      "default": true,
+      "category": "work",
+      "notify": "all",
+      "name": "general",
+      "description": "",
+      "subjectKind": null,
+      "replies": 0,
+      "title": "c1",
+      "at": 1794500000000
+     }
+    ],
+    "userMentions": [
+     {
+      "message": {
+       "id": "m1",
+       "number": 1,
+       "channel": "c2",
+       "from": "w1",
+       "actor": {
+        "kind": "agent",
+        "id": "w1",
+        "role": "worker",
+        "name": "Helper w1"
+       },
+       "name": "Helper w1",
+       "kind": "chat",
+       "text": "message 1 @user",
+       "mentions": [
+        "user"
+       ],
+       "outcome": null,
+       "spoken": false,
+       "at": 1794500060000,
+       "revision": 1,
+       "reactions": [],
+       "attachments": [],
+       "embeds": []
+      },
+      "channel": "c2",
+      "address": "#dev"
+     },
+     {
+      "message": {
+       "id": "m2",
+       "number": 2,
+       "channel": "c1",
+       "from": "orchestrator",
+       "actor": {
+        "kind": "agent",
+        "id": "orchestrator",
+        "role": "orchestrator"
+       },
+       "name": "管家",
+       "kind": "chat",
+       "text": "message 2 @user",
+       "mentions": [
+        "user"
+       ],
+       "outcome": null,
+       "spoken": false,
+       "at": 1794500120000,
+       "revision": 1,
+       "reactions": [],
+       "attachments": [],
+       "embeds": []
+      },
+      "channel": "c1",
+      "address": "#general"
+     }
+    ]
+   },
+   "issues": [],
+   "connectors": [
+    {
+     "id": "weixin",
+     "state": "connected",
+     "qr": "",
+     "pairCode": "",
+     "pending": 0,
+     "error": ""
+    }
+   ],
+   "machines": [
+    {
+     "id": "here",
+     "name": "Mac",
+     "here": true,
+     "online": false,
+     "joinedAt": 1794500000000
+    }
+   ],
+   "sessions": [],
+   "crons": [
+    {
+     "id": "k1",
+     "name": "Daily digest",
+     "text": "summarize",
+     "channel": "c1",
+     "when": {
+      "kind": "daily",
+      "time": "09:00"
+     },
+     "tz": "Asia/Shanghai",
+     "enabled": false,
+     "created": 1794500000000,
+     "by": "agent",
+     "pending": true,
+     "whenText": "每天 09:00",
+     "nextText": "等你同意"
+    }
+   ]
+  },
+  "inbox": [
+   {
+    "id": "m2",
+    "kind": "mention",
+    "from": {
+     "kind": "orchestrator"
+    },
+    "who": "助手",
+    "text": "message 2 @user",
+    "at": 1794500120000,
+    "target": {
+     "kind": "chat",
+     "channel": "c1"
+    },
+    "words": {
+     "label": "找你",
+     "title": "助手 叫你",
+     "body": "message 2 @user",
+     "tray": ""
+    }
+   },
+   {
+    "id": "m1",
+    "kind": "mention",
+    "from": {
+     "kind": "session",
+     "id": "w1",
+     "name": "Helper w1",
+     "agent": ""
+    },
+    "who": "Helper w1",
+    "text": "message 1 @user",
+    "at": 1794500060000,
+    "target": {
+     "kind": "chat",
+     "channel": "c2"
+    },
+    "words": {
+     "label": "找你",
+     "title": "Helper w1 叫你",
+     "body": "message 1 @user",
+     "tray": ""
+    }
+   },
+   {
+    "id": "k1:ask",
+    "kind": "cron-ask",
+    "from": {
+     "kind": "orchestrator"
+    },
+    "who": "助手",
+    "text": "Daily digest",
+    "at": 1794500000000,
+    "target": {
+     "kind": "chat",
+     "channel": "c1"
+    },
+    "words": {
+     "label": "定时任务等你同意",
+     "title": "助手想定一个定时任务",
+     "body": "「Daily digest」：同意了才开始",
+     "tray": "定时任务「Daily digest」等你同意"
+    }
+   }
+  ],
+  "view": {
+   "level": {
+    "level": 1,
+    "xp": 0,
+    "need": 10
+   },
+   "plots": {},
+   "plays": {},
+   "achievements": [
+    {
+     "id": "s_open",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "s_hire",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "s_tell",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "s_review",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "s_voice",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "s_split",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "s_call",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "harvests",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "first_try",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "big_graph",
+     "tier": 0,
+     "count": 0,
+     "next": 3
+    },
+    {
+     "id": "farm_level",
+     "tier": 0,
+     "count": 0,
+     "next": 5
+    },
+    {
+     "id": "steady",
+     "tier": 0,
+     "count": 0,
+     "next": 5
+    },
+    {
+     "id": "untangle",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "comeback",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "thrifty",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "every_machine",
+     "tier": 0,
+     "count": 0,
+     "next": 2
+    },
+    {
+     "id": "handoff",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "parallel_graph",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "night_owl",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "weekend",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "full_house",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    }
+   ]
+  },
+  "effects": []
+ }
+}
