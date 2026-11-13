@@ -77,6 +77,23 @@ struct Fonts {
     bold_italic: Font,
 }
 
+/// The configured family when it is installed, else the first installed of a
+/// few that every Mac or most developers have. A family that is not there
+/// resolves to a proportional font, whose `m` is not the width of the cells
+/// the glyphs are drawn in.
+fn installed_mono(family: SharedString, text_system: &gpui_kit::gpui::WindowTextSystem) -> SharedString {
+    static INSTALLED: std::sync::OnceLock<std::collections::HashSet<String>> = std::sync::OnceLock::new();
+    let installed = INSTALLED.get_or_init(|| text_system.all_font_names().into_iter().collect());
+    if installed.contains(family.as_ref()) {
+        return family;
+    }
+    ["SF Mono", "JetBrains Maple Mono", "JetBrainsMono Nerd Font", "Menlo", "Monaco"]
+        .into_iter()
+        .find(|f| installed.contains(*f))
+        .map(SharedString::from)
+        .unwrap_or(family)
+}
+
 impl Fonts {
     fn new(family: SharedString) -> Self {
         let mut regular = font(family);
@@ -320,9 +337,9 @@ impl Element for TerminalElement {
         let colors = ui.colors.clone();
         let epoch = ui.epoch;
         let font_size = px(ui.settings.terminal_font_size);
-        let fonts = Fonts::new(ui.mono());
-
         let text_system = window.text_system().clone();
+        let fonts = Fonts::new(installed_mono(ui.mono(), &text_system));
+
         let font_id = text_system.resolve_font(&fonts.regular);
         let cell_width = text_system.advance(font_id, font_size, 'm').map(|s| s.width).unwrap_or(font_size * 0.6);
         let line_height = px((ui.settings.terminal_font_size * 1.35).round());
