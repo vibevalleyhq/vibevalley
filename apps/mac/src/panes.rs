@@ -9,7 +9,7 @@ use gpui_kit::{
     AnyElement, App, Bounds, Context, Entity, FocusHandle, Focusable, InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Pixels, Point,
     StatefulInteractiveElement as _, Styled as _, Window, canvas, div, px, relative,
 };
-use vibevalley_workspace::{Axis, Group, Layout, Node, PaneKind, Tab};
+use vibevalley_workspace::{Axis, Group, Layout, Node, PaneKind, Tab, TabId};
 
 use crate::diff::DiffView;
 use crate::hosted::HostedView;
@@ -156,13 +156,59 @@ impl FlexDir for gpui_kit::Div {
     }
 }
 
+/// What a terminal is called in the sidebar: what runs in it, else a title
+/// the program set, else the shell and its folder. A shell's default title
+/// (`user@host:path`) says nothing and is not used.
+pub fn terminal_name(t: &crate::terminal::TerminalView) -> String {
+    if let Some((_, label)) = t.running_status() {
+        return label;
+    }
+    match t.title().map(str::trim).filter(|s| !s.is_empty() && !is_default_title(s)) {
+        Some(title) => title.to_string(),
+        None => shell_name(),
+    }
+}
+
+/// Every tab's title in a project, with a number after names that repeat, so
+/// the tab bar and the sidebar tell the same shells apart the same way.
+pub fn numbered_titles<'a>(shell: &Shell, tabs: impl Iterator<Item = &'a Tab>, cx: &App) -> std::collections::HashMap<TabId, String> {
+    let titled: Vec<(TabId, String)> = tabs.map(|t| (t.id, tab_title(shell, t, cx))).collect();
+    let mut total: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+    for (_, title) in &titled {
+        *total.entry(title.as_str()).or_default() += 1;
+    }
+    let mut seen: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut out = std::collections::HashMap::new();
+    for (id, title) in &titled {
+        let name = if total[title.as_str()] > 1 {
+            let n = seen.entry(title.clone()).or_default();
+            *n += 1;
+            format!("{title} {n}")
+        } else {
+            title.clone()
+        };
+        out.insert(*id, name);
+    }
+    out
+}
+
+/// `user@host`, `user@host:~/dir` and the like.
+fn is_default_title(title: &str) -> bool {
+    let first = title.split_whitespace().next().unwrap_or("");
+    first.contains('@') && !first.starts_with('@') && first.split('@').next().is_some_and(|u| !u.is_empty() && !u.contains('/'))
+}
+
+fn shell_name() -> String {
+    std::env::var("SHELL")
+        .ok()
+        .and_then(|s| s.rsplit('/').next().map(String::from))
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "shell".into())
+}
+
 pub fn tab_title(shell: &Shell, tab: &Tab, cx: &App) -> String {
     match &tab.kind {
-        PaneKind::Terminal { terminal_id } => shell
-            .terminals
-            .get(terminal_id)
-            .and_then(|t| t.read(cx).title().map(str::to_string))
-            .unwrap_or_else(|| "Terminal".into()),
+        PaneKind::Terminal { terminal_id } => shell.terminals.get(terminal_id).map(|t| terminal_name(t.read(cx))).unwrap_or_else(shell_name),
         PaneKind::File { path } => path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
         PaneKind::Diff { spec, path, .. } => {
             let what = match spec {
@@ -237,10 +283,11 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                 .on_mouse_down(MouseButton::Left, cx.listener(|s, _, _, cx| s.toggle_sidebar(cx))),
         );
     }
+    let names = shell.ws.active().map(|p| numbered_titles(shell, p.layout.tabs(), cx)).unwrap_or_default();
     for (i, tab) in g.tabs.iter().enumerate() {
         let active = i == g.active;
         let tab_id = tab.id;
-        let title = tab_title(shell, tab, cx);
+        let title = names.get(&tab.id).cloned().unwrap_or_else(|| tab_title(shell, tab, cx));
         let attention = match &tab.kind {
             PaneKind::Terminal { terminal_id } => shell.ws.active().and_then(|p| p.terminal(terminal_id)).is_some_and(|t| t.attention),
             _ => false,
@@ -388,5 +435,16 @@ trait TabLook {
 impl TabLook for gpui_kit::Stateful<gpui_kit::Div> {
     fn when_active(self, active: bool, bg: gpui_kit::Hsla, text: gpui_kit::Hsla, muted: gpui_kit::Hsla) -> Self {
         if active { self.bg(bg).text_color(text) } else { self.text_color(muted) }
+    }
+}
+
+#[cfg(test)]
+mod name_tests {
+    #[test]
+    fn a_shells_own_title_is_not_a_name() {
+        assert!(super::is_default_title("lucasay@Caos-MacBook-Pro:~/epona"));
+        assert!(super::is_default_title("me@host"));
+        assert!(!super::is_default_title("vim notes.md"));
+        assert!(!super::is_default_title("@team"));
     }
 }

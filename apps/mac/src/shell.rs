@@ -156,6 +156,12 @@ pub struct Palette {
     _sub: Subscription,
 }
 
+/// A project's git state as the sidebar shows it.
+pub struct GitSummary {
+    pub branch: Option<String>,
+    pub worktrees: Vec<vibevalley_git::Worktree>,
+}
+
 pub struct Shell {
     pub store: Option<Arc<Store>>,
     pub ws: Workspace<TermSession>,
@@ -164,6 +170,9 @@ pub struct Shell {
     pub launch: Option<Entity<crate::pixel::view::PixelView>>,
     pub load_error: Option<String>,
     pub projects: HashMap<ProjectId, ProjectView>,
+    /// Every project's branch and worktrees, read for the sidebar whether or
+    /// not the project was opened (its full view is built on first open).
+    pub git_summaries: HashMap<ProjectId, GitSummary>,
     pub terminals: HashMap<String, Entity<TerminalView>>,
     pub panes: HashMap<(ProjectId, TabId), PaneEntity>,
     pub sidebar: Entity<HostedView>,
@@ -258,6 +267,7 @@ impl Shell {
                 .then(|| cx.new(|cx| crate::pixel::view::PixelView::new("opening:launch", json!({}), cx))),
             load_error: None,
             projects: HashMap::new(),
+            git_summaries: HashMap::new(),
             terminals: HashMap::new(),
             panes: HashMap::new(),
             sidebar,
@@ -360,6 +370,7 @@ impl Shell {
                     if let Some(id) = this.ws.active_id() {
                         this.ensure_project_view(id, cx);
                     }
+                    this.refresh_summaries(cx);
                     this.push_sidebar(cx);
                     this.finish_opening(true, cx);
                     cx.notify();
@@ -516,6 +527,7 @@ impl Shell {
                     Ok(p) => {
                         let id = s.ws.open(p);
                         s.activate_project(id, window, cx);
+                        s.refresh_summaries(cx);
                     }
                     Err(e) => eprintln!("add project: {e}"),
                 });
@@ -543,6 +555,7 @@ impl Shell {
         if let Some(active) = self.ws.active_id() {
             self.ensure_project_view(active, cx);
         }
+        self.refresh_summaries(cx);
         self.push_sidebar(cx);
         cx.notify();
     }
@@ -643,6 +656,29 @@ impl Shell {
                         }
                     }
                 }
+                s.push_sidebar(cx);
+            },
+        );
+    }
+
+    /// Reads the branch and worktrees of every project the sidebar lists.
+    pub fn refresh_summaries(&mut self, cx: &mut Context<Self>) {
+        let roots: Vec<(ProjectId, std::path::PathBuf)> = self.ws.projects().iter().map(|p| (p.id(), p.root().to_path_buf())).collect();
+        Self::bg(
+            cx,
+            move || {
+                roots
+                    .into_iter()
+                    .filter_map(|(id, root)| {
+                        let repo = Repo::discover(&root).ok()??;
+                        let branch = repo.status().ok().and_then(|s| s.branch);
+                        let worktrees = repo.worktrees().unwrap_or_default();
+                        Some((id, GitSummary { branch, worktrees }))
+                    })
+                    .collect::<Vec<_>>()
+            },
+            |s, read, cx| {
+                s.git_summaries = read.into_iter().collect();
                 s.push_sidebar(cx);
             },
         );
@@ -762,29 +798,35 @@ impl Shell {
             for (i, p) in self.ws.projects().iter().enumerate() {
                 let Some(item) = arr.get_mut(i) else { continue };
                 let pv = self.projects.get(&p.id());
-                item["branch"] = json!(pv.and_then(|v| v.status.as_ref()?.branch.clone()));
-                item["mainRoot"] = json!(pv.and_then(|v| v.worktrees.iter().find(|w| w.is_main).map(|w| w.path.to_string_lossy().into_owned())));
+                let summary = self.git_summaries.get(&p.id());
+                let worktrees = pv.map(|v| &v.worktrees).filter(|w| !w.is_empty()).or(summary.map(|s| &s.worktrees));
+                item["branch"] = json!(
+                    pv.and_then(|v| v.status.as_ref()?.branch.clone())
+                        .or_else(|| summary.and_then(|s| s.branch.clone()))
+                );
+                item["mainRoot"] = json!(worktrees.and_then(|ws| ws.iter().find(|w| w.is_main).map(|w| w.path.to_string_lossy().into_owned())));
                 item["worktrees"] = json!(
-                    pv.map(|v| {
-                        v.worktrees
-                            .iter()
-                            .map(|w| {
-                                json!({
-                                    "path": w.path.to_string_lossy(),
-                                    "branch": w.branch,
-                                    "main": w.is_main,
+                    worktrees
+                        .map(|ws| {
+                            ws.iter()
+                                .map(|w| {
+                                    json!({
+                                        "path": w.path.to_string_lossy(),
+                                        "branch": w.branch,
+                                        "main": w.is_main,
+                                    })
                                 })
-                            })
-                            .collect::<Vec<_>>()
-                    })
-                    .unwrap_or_default()
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default()
                 );
                 let active_tab = p.layout.active_tab().map(|t| t.id);
+                let names = crate::panes::numbered_titles(self, p.layout.tabs(), cx);
                 let tabs: Vec<Value> = p
                     .layout
                     .tabs()
                     .map(|t| {
-                        let title = crate::panes::tab_title(self, t, cx);
+                        let title = names.get(&t.id).cloned().unwrap_or_else(|| crate::panes::tab_title(self, t, cx));
                         let (kind, running, running_agent, running_label, attention) = match &t.kind {
                             PaneKind::Terminal { terminal_id } => {
                                 let status = self.terminals.get(terminal_id).and_then(|v| v.read(cx).running_status());

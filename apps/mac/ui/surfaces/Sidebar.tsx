@@ -53,6 +53,8 @@ type RepoNode = {
   branch?: string | null;
   active: boolean;
   groups: WorktreeGroup[];
+  /** One of VibeValley's repos (repo.list), not a folder opened for its terminals. */
+  vibevalley: boolean;
 };
 
 const KNOWN_RUNTIME_LOGOS = new Set(["claude", "codex", "opencode", "cursor", "kimi", "pi", "dsh", "grok", "antigravity"]);
@@ -235,13 +237,15 @@ export function Sidebar() {
       seenRoots.add(rp);
     }
 
+    const vvPaths = new Set(vvRepos().map((r) => normPath(r.path)));
     const issueMap = new Map(issues().map((i) => [i.id, i]));
     const curPath = activePath();
 
     return roots.map((root) => {
       const mainProj = byPath.get(root.path);
       const mainSession = sessions().find((s) => s.repo === root.name && (!s.worktree || normPath(s.worktree) === root.path) && s.phase._tag !== "closed");
-      const defaultTabs: RailTab[] = mainProj?.tabs ?? [{ id: 1, title: "Terminal", active: curPath === root.path, kind: "terminal" }];
+      // Only terminals that are open get a row: a repo with none shows its header alone.
+      const defaultTabs: RailTab[] = mainProj?.tabs ?? [];
       const defaultGroup: WorktreeGroup = {
         id: `main:${root.path}`,
         label: mainProj?.branch || "main",
@@ -265,16 +269,7 @@ export function Sidebar() {
         const wtProj = byPath.get(wp);
         const issue = s.issue ? issueMap.get(s.issue) : undefined;
         const label = issue ? `#${issue.number} ${issue.title}` : s.branch || s.brief || s.name;
-        const tabs: RailTab[] = wtProj?.tabs ?? [
-          {
-            id: 1,
-            title: s.branch || "Terminal",
-            active: curPath === wp,
-            kind: "terminal",
-            running: s.phase._tag === "working",
-            runningAgent: s.runtime,
-          },
-        ];
+        const tabs: RailTab[] = wtProj?.tabs ?? [];
         extraGroups.push({
           id: `session:${s.id}`,
           label,
@@ -295,7 +290,7 @@ export function Sidebar() {
         seenGroupPaths.add(wp);
         const wtProj = byPath.get(wp);
         const folder = wp.split("/").pop() || wp;
-        const tabs: RailTab[] = wtProj?.tabs ?? [{ id: 1, title: "Terminal", active: curPath === wp, kind: "terminal" }];
+        const tabs: RailTab[] = wtProj?.tabs ?? [];
         extraGroups.push({
           id: `wt:${wp}`,
           label: w.branch || folder,
@@ -334,8 +329,21 @@ export function Sidebar() {
         branch: mainProj?.branch,
         active: repoActive,
         groups: allGroups,
+        vibevalley: vvPaths.has(root.path),
       };
     });
+  };
+
+  /** VibeValley's repos first; folders opened only for their terminals after them. */
+  const sections = (): { title: string; repos: RepoNode[] }[] => {
+    const all = repoTree();
+    const own = all.filter((r) => r.vibevalley);
+    const other = all.filter((r) => !r.vibevalley);
+    if (own.length === 0 || other.length === 0) return [{ title: "", repos: all }];
+    return [
+      { title: "", repos: own },
+      { title: "其他文件夹", repos: other },
+    ];
   };
 
   const renderTabRow = (group: WorktreeGroup, tab: RailTab, indent: number) => {
@@ -400,7 +408,7 @@ export function Sidebar() {
             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: p().alert }} />
           ) : null}
         </Button>
-        {group.tabs.length > 1 ? (
+        {tab.kind === "terminal" || group.tabs.length > 1 ? (
           <Button
             onPress={() => act({ type: "close_tab_at", path: group.path, tab_id: tab.id })}
             accessibilityLabel={`关闭 ${tab.title}`}
@@ -438,82 +446,89 @@ export function Sidebar() {
 
       <Scroll style={{ flex: 1 }}>
         <View style={{ padding: 8, gap: 10 }}>
-          {repoTree().map((repo) => {
-            const hasMultipleWorktrees = repo.groups.length > 1;
-            const plotSrc = spriteSrc(repo.active ? "plot-flowering" : "plot-leafy");
-            return (
-              <View
-                style={{
-                  borderRadius: radius.md,
-                  borderWidth: 1,
-                  borderColor: repo.active ? p().border : "transparent",
-                  backgroundColor: repo.active ? p().surface : "transparent",
-                  paddingVertical: 6,
-                  paddingHorizontal: 6,
-                  gap: 4,
-                }}
-              >
-                {/* Repo Header */}
-                <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 4, height: 26, gap: 6 }}>
-                  <Button
-                    onPress={() => act({ type: "activate_path", path: repo.path })}
-                    style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6, height: 26 }}
+          {sections().map((section) => (
+            <View style={{ gap: 6 }}>
+              {section.title ? (
+                <Text style={{ ...ty.label, fontSize: 11, fontWeight: "600", color: p().muted, paddingHorizontal: 10, paddingTop: 6 }}>{section.title}</Text>
+              ) : null}
+              {section.repos.map((repo) => {
+                const hasMultipleWorktrees = repo.groups.length > 1;
+                const plotSrc = spriteSrc(repo.active ? "plot-flowering" : "plot-leafy");
+                return (
+                  <View
+                    style={{
+                      borderRadius: radius.md,
+                      borderWidth: 1,
+                      borderColor: repo.active ? p().border : "transparent",
+                      backgroundColor: repo.active ? p().surface : "transparent",
+                      paddingVertical: 6,
+                      paddingHorizontal: 6,
+                      gap: 4,
+                    }}
                   >
-                    {plotSrc ? <Image src={plotSrc} style={{ width: 15, height: 15, objectFit: "contain" }} /> : null}
-                    <Text style={{ fontSize: 13, fontWeight: "600", color: p().ink, flex: 1, numberOfLines: 1 }}>{repo.name}</Text>
-                    {!hasMultipleWorktrees && repo.branch ? <Text style={{ ...ty.mono, fontSize: 11, color: p().muted }}>⑂ {repo.branch}</Text> : null}
-                  </Button>
-                  <Button
-                    onPress={() => act({ type: "new_terminal_at", path: repo.path })}
-                    accessibilityLabel={`在 ${repo.name} 新建终端`}
-                    style={{ width: 22, height: 22, borderRadius: 5, alignItems: "center", justifyContent: "center" }}
-                  >
-                    <Text style={{ fontSize: 14, color: p().muted }}>＋</Text>
-                  </Button>
-                </View>
+                    {/* Repo Header */}
+                    <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 4, height: 26, gap: 6 }}>
+                      <Button
+                        onPress={() => act({ type: "activate_path", path: repo.path })}
+                        style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6, height: 26 }}
+                      >
+                        {plotSrc ? <Image src={plotSrc} style={{ width: 15, height: 15, objectFit: "contain" }} /> : null}
+                        <Text style={{ fontSize: 13, fontWeight: "600", color: p().ink, flex: 1, numberOfLines: 1 }}>{repo.name}</Text>
+                        {!hasMultipleWorktrees && repo.branch ? <Text style={{ ...ty.mono, fontSize: 11, color: p().muted }}>⑂ {repo.branch}</Text> : null}
+                      </Button>
+                      <Button
+                        onPress={() => act({ type: "new_terminal_at", path: repo.path })}
+                        accessibilityLabel={`新终端：${repo.name}`}
+                        style={{ width: 22, height: 22, borderRadius: 5, alignItems: "center", justifyContent: "center" }}
+                      >
+                        <Text style={{ fontSize: 14, color: p().muted }}>＋</Text>
+                      </Button>
+                    </View>
 
-                {/* Default case: no extra worktrees -> render terminal tabs directly under Repo */}
-                {!hasMultipleWorktrees ? (
-                  <View style={{ gap: 2 }}>{(repo.groups[0]?.tabs ?? []).map((tab) => renderTabRow(repo.groups[0]!, tab, 12))}</View>
-                ) : (
-                  /* Multiple worktrees -> render each worktree as a group with its terminal tabs */
-                  <View style={{ gap: 6, paddingLeft: 6 }}>
-                    {repo.groups.map((group) => (
-                      <View style={{ gap: 2 }}>
-                        <View style={{ flexDirection: "row", alignItems: "center", height: 24, paddingHorizontal: 6, gap: 6 }}>
-                          <Button
-                            onPress={() => act({ type: "activate_path", path: group.path })}
-                            style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 5, height: 24 }}
-                          >
-                            <Text style={{ ...ty.mono, fontSize: 11, color: group.active ? p().ink : p().muted }}>⑂</Text>
-                            <Text
-                              style={{
-                                fontSize: 12,
-                                fontWeight: group.active ? "600" : "500",
-                                color: group.active ? p().ink : p().muted,
-                                flex: 1,
-                                numberOfLines: 1,
-                              }}
-                            >
-                              {group.isMain ? `默认 (${group.label})` : group.label}
-                            </Text>
-                          </Button>
-                          <Button
-                            onPress={() => act({ type: "new_terminal_at", path: group.path })}
-                            accessibilityLabel={`在 ${group.label} 新建终端`}
-                            style={{ width: 20, height: 20, borderRadius: 4, alignItems: "center", justifyContent: "center" }}
-                          >
-                            <Text style={{ fontSize: 13, color: p().muted }}>＋</Text>
-                          </Button>
-                        </View>
-                        <View style={{ gap: 2 }}>{group.tabs.map((tab) => renderTabRow(group, tab, 18))}</View>
+                    {/* Default case: no extra worktrees -> render terminal tabs directly under Repo */}
+                    {!hasMultipleWorktrees ? (
+                      <View style={{ gap: 2 }}>{(repo.groups[0]?.tabs ?? []).map((tab) => renderTabRow(repo.groups[0]!, tab, 12))}</View>
+                    ) : (
+                      /* Multiple worktrees -> render each worktree as a group with its terminal tabs */
+                      <View style={{ gap: 6, paddingLeft: 6 }}>
+                        {repo.groups.map((group) => (
+                          <View style={{ gap: 2 }}>
+                            <View style={{ flexDirection: "row", alignItems: "center", height: 24, paddingHorizontal: 6, gap: 6 }}>
+                              <Button
+                                onPress={() => act({ type: "activate_path", path: group.path })}
+                                style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 5, height: 24 }}
+                              >
+                                <Text style={{ ...ty.mono, fontSize: 11, color: group.active ? p().ink : p().muted }}>⑂</Text>
+                                <Text
+                                  style={{
+                                    fontSize: 12,
+                                    fontWeight: group.active ? "600" : "500",
+                                    color: group.active ? p().ink : p().muted,
+                                    flex: 1,
+                                    numberOfLines: 1,
+                                  }}
+                                >
+                                  {group.isMain ? `${group.label} · 主目录` : group.label}
+                                </Text>
+                              </Button>
+                              <Button
+                                onPress={() => act({ type: "new_terminal_at", path: group.path })}
+                                accessibilityLabel={`新终端：${group.label}`}
+                                style={{ width: 20, height: 20, borderRadius: 4, alignItems: "center", justifyContent: "center" }}
+                              >
+                                <Text style={{ fontSize: 13, color: p().muted }}>＋</Text>
+                              </Button>
+                            </View>
+                            <View style={{ gap: 2 }}>{group.tabs.map((tab) => renderTabRow(group, tab, 18))}</View>
+                          </View>
+                        ))}
                       </View>
-                    ))}
+                    )}
                   </View>
-                )}
-              </View>
-            );
-          })}
+                );
+              })}
+            </View>
+          ))}
         </View>
       </Scroll>
     </View>
