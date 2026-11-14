@@ -103,7 +103,7 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl Hub {
-    /// Streamed speech (`modules::media::audio::Audio`).
+    /// Streamed speech (`modules::media::jobs::Jobs`).
     pub fn attach_speech_streams(&self, streams: vibevalley_server_api::media::SharedSpeechStreams) {
         *self.speech.write().unwrap_or_else(|e| e.into_inner()) = Some(streams);
     }

@@ -6,8 +6,7 @@ pub mod validate;
 pub mod image_provider;
 pub mod png;
 
-pub mod audio;
-pub mod machine;
+pub mod jobs;
 pub mod vendor;
 
 /// Tells blocking vendor work to give up (a cancel, the farm closing).

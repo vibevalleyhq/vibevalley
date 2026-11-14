@@ -52,7 +52,7 @@ pub fn image(f: &Farm, who: &Who, w: &Words, raw: &Value) -> Result<String, Stri
         agent: here.agent.clone(),
         channel: here.channel.clone(),
     };
-    text(&f.media.create(read(w, raw)?, source).map_err(|e| e.message)?)
+    text(&f.media.image(read(w, raw)?, source).map_err(|e| e.message)?)
 }
 
 pub fn jobs(f: &Farm, _: &Who, w: &Words, raw: &Value) -> Result<String, String> {

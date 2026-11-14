@@ -69,7 +69,7 @@ pub struct Farm {
     pub repos: Arc<Repos>,
     pub crons: Arc<Crons>,
     pub memories: Arc<crate::modules::memory::Memories>,
-    pub media: Arc<crate::modules::media::machine::Machine>,
+    pub media: Arc<crate::modules::media::jobs::Jobs>,
     pub pkm: Arc<crate::modules::pkm::Pkm>,
     pub artifacts: Arc<crate::modules::artifact::Artifacts>,
     pub library: Arc<crate::modules::library::Library>,

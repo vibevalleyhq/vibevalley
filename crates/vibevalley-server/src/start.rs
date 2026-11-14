@@ -109,9 +109,7 @@ pub struct Started {
     /// The user's notes.
     pub pkm: Arc<modules::pkm::Pkm>,
     /// Durable media jobs and their executor.
-    pub media: Arc<modules::media::machine::Machine>,
-    /// Speech and the other audio jobs.
-    pub audio: Arc<modules::media::audio::Audio>,
+    pub media: Arc<modules::media::jobs::Jobs>,
     /// Media reservations, binary uploads and job references.
     pub media_inputs: Arc<modules::media::inputs::Inputs>,
     /// Kept attachments as material.
@@ -132,7 +130,6 @@ impl Started {
         self.artifacts.close();
         self.pkm.close();
         self.media.close();
-        self.audio.close();
         self.media_inputs.close();
         self.board.close();
     }
@@ -231,12 +228,14 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     let chat = modules::channel::Chat::open(&config.home, &hub, attachments.clone(), config.link_previews).map_err(|e| failed("the chat")(&e.message))?;
     let library = modules::library::Library::open(&config.home, attachments.clone()).map_err(|e| failed("the library")(&e.message))?;
     modules::library::install(&hub, library.clone());
-    let media = modules::media::machine::Machine::open(
-        &config.home,
-        &hub,
-        attachments.clone(),
-        chat.clone(),
-        config
+    let media = modules::media::jobs::Jobs::open(modules::media::jobs::Parts {
+        home: config.home.clone(),
+        hub: Arc::downgrade(&hub),
+        setting: setting.clone(),
+        files: attachments.clone(),
+        inputs: media_inputs.clone(),
+        chat: chat.clone(),
+        images: config
             .media_backend
             .clone()
             .unwrap_or_else(|| -> Arc<dyn modules::media::image_provider::ImageBackend> {
@@ -246,21 +245,12 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
                     Arc::new(modules::media::image_provider::Moss::new(setting.clone()))
                 }
             }),
-    )
-    .map_err(|e| failed("media jobs")(&e.message))?;
-    modules::media::machine::install(&hub, media.clone());
-    let audio = modules::media::audio::Audio::open(
-        &config.home,
-        setting.clone(),
-        attachments.clone(),
-        media_inputs.clone(),
-        &media,
         vendor,
         download,
-    )
-    .map_err(|e| failed("audio jobs")(&e.message))?;
-    modules::media::audio::install(&hub, audio.clone());
-    hub.attach_speech_streams(audio.clone());
+    })
+    .map_err(|e| failed("media jobs")(&e.message))?;
+    modules::media::jobs::install(&hub, media.clone());
+    hub.attach_speech_streams(media.clone());
     modules::channel::install(&hub, chat.clone(), agents.clone(), Some(game.clone()));
     crons.attach_chat(&chat);
     let artifacts = modules::artifact::Artifacts::open(&config.home, attachments.clone(), chat.clone()).map_err(|e| failed("the artifacts")(&e.message))?;
@@ -329,7 +319,6 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         pkm,
         library,
         resources,
-        audio,
         media_inputs,
         media,
     })

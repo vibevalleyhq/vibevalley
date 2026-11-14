@@ -31,6 +31,8 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 | 服务端补齐 | `/mcp` 帮工门与 `issue_report`；独立的 `vibevalley-server` 二进制（`--web`、`--ready-json`）与测试用替身 agent `pi`；私聊帮工；起草讨论串；验收标准结果；已离开的会话进历史；父工单的改动；离线 MOSS；图片、语音（含流式）任务 |
 | 原生界面 | 侧栏按主仓库归并 worktree、只列真实终端、终端命名去重；终端字体回退；连接状态点移到头像 |
 | R1 工具 | `modules/tool`：助手和帮工共用一套工具，每个工具一个参数结构体，宽松解析写一处（`tool::args`），按调用者（`Who`）分支；`/mcp` 与助手的循环都从它取；工具说明在 `assets/tools/`，以 Rust 为准，不再从 TS 生成；助手的语音、多人对话、音色设计、理解工具接到任务端点 |
+| R2 设置 | `settings.json` 一次读成 `Stored`，MOSS 账户是 `Providers`/`Connection`，钥匙是 `Secret`（打印只出提示）；`provider.rs` 与 `setting.rs` 不再传 `Value`。工单板存储改表、工具不再绕 hub 调本服务，并进 R4 |
+| R3 媒体 | `media/jobs.rs` 一个任务机：存储、准入（8 个）、按种类的槽位（图片 1、语音 8）、取消、重下、释放、重启接续写一次；图片与语音在上面，去掉 `OtherJobs`。多人对话、音色设计、克隆、转写、理解按 `Ask` 加一个变体即可，暂不做 |
 | 对照 | web e2e 在 Rust 上 243 个过约 207 个（失败的是媒体其余种类、语音、手机/局域网，及 4 个在 TS 上同样失败的）；CLI 测试 22 个过 21 个 |
 
 ### 重构（按顺序）
@@ -66,6 +68,7 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 - **pi-ai / pi-durable**：自研 agent 只接 DeepSeek（OpenAI 兼容接口），不做多厂商路由、价格表与对话持久化的完整语义；压缩用最简单的截断摘要。
 - **语音（声网 RTC）与外部聊天接入（微信、飞书、QQ）**：不在 TS 删除的闸里；先删，日后按需在 Rust 上重做。
 - **手机壳与「连接到本机」**：随 `apps/mobile` 删除，`lan.*` 与远程登录相关的 `user.*` 一并删除。
+- **媒体其余种类**：多人对话、音色设计、克隆、转写、理解暂不做（vendor 调用已有），要时在 `Ask` 里加。
 - **一个 CLI 测试**：`CLI watch returns for questions` 只在整份文件跑时多出一轮，暂不追。
 
 ### 闸与删除
