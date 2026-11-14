@@ -1,119 +1,101 @@
-# Agent Note: 原生的 VibeValley：把 epona 的 Rust 改写迁进来，去掉 Electron、TS 服务端、页面和手机壳
+# Agent Note: 原生的 VibeValley：Rust 服务端为准，激进重构，删掉 Electron、TS 服务端、页面和手机壳
 
 Status: proposed
 
 ## Problem
 
-VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web`）+ Electron 壳（`apps/desktop`）+ Expo 手机壳（`apps/mobile`）。用户在单独的仓库 `~/epona`（182 个提交，冻结于 2026-11-14）里已经把它原生改写了大半，基线是本仓库的 `2649ec3f7`：
+VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web`）+ Electron 壳（`apps/desktop`）+ Expo 手机壳（`apps/mobile`）。用户在 `~/epona` 里把它原生改写了大半（冻结于 `fbc43d4`），已经迁进本仓库：Rust 库在 `crates/vibevalley-*`，原生应用在 `apps/mac`（GPUI 窗口 + nsh TSX 页面）。
 
-- **服务端**：Rust，进程内一个 `Server`（`call(op, payload) → Envelope`、`state`、`live`、`subscribe`），另有可选的回环 HTTP。线上格式和 `packages/protocol` 逐字节一致：类型由 zod Schema 生成（598 个类型、202 个操作），golden 测试覆盖。`reduce`/`effectsOf`/`frameOf` 用本仓库写出的 98 条事实做 golden。issue、session、watch、repo、agent、setting、provider、channel、memory、orchestrator（DeepSeek）、cron、game、pkm、artifact、library 都已提供；本仓库未改动的 `apps/cli`（`doctor` 等）对着它跑通。存储用 SQLite。
-- **编码 agent 驱动**：Rust 版 oar（Claude Code、Codex、ACP），自带 agent 循环（相当于 pi-durable 加 `packages/agent`）。
-- **界面**：GPUI 原生窗口。`apps/web` 的页面逐行移植成 nsh TSX（Solid 式的响应式，跑在 nsh 的 JS 引擎里），由宿主经桥接到 `Server`。农场、地图、树、开场、图鉴由 GPU 直接画，美术沿用 `apps/web/public`。
-- **epona 自己加的**：终端（libghostty-vt）、文件树和只读预览、git 状态与 diff、多项目。凡是出现工作目录、仓库、会话、工单的地方都能「在这里开终端」。
+迁进来以后看到两个问题：
 
-两边分着长：epona 靠 `git archive 2649ec3f7` 拷贝本仓库的 protocol、i18n、pkm、artifact 和页面文件（`ui/vv/sync*.sh`、`fetch-vv.sh`），本仓库每改一次契约，Rust 侧都要手工追一批，而且没有检查告诉它漏了什么。
+- **Rust 服务端是照 TS 逐行搬的，没用上 Rust。**工具按字符串匹配 op、参数靠 `p["id"].as_str()` 手取；设置和 provider 配置全是 `serde_json::Value`（`vibevalley-server` 里约 200 处）；`vibevalley-issues/src/lib.rs` 一个 `Board` 两千多行，揉着工单、会话、工作目录、合并、起草、私聊；媒体是"图片任务机 + 其他种类打补丁"。
+- **追求逐项复刻 TS 太慢。**每补一处都要先读一遍 TS 再照搬，还常发现 epona "看着做了其实没做"（厂商调用层从没编译过、简报是另一套英文措辞、私聊帮工缺失）。
 
-用户的决定（2026-11-14）：epona 整个迁进本仓库，名字统一叫 VibeValley；终态全原生，删掉 `apps/desktop`、`apps/server`、`apps/web`、`apps/mobile`；先合掉 [正交领域](.agents/notes/proposed/architecture/2026-11-12-orthogonal-domains-and-event-watch.md) 的重构再迁。
+用户的决定（2026-11-14）：Rust 服务端为准；激进重构，速度优先；允许暂时回退；不需要完整复刻 oar / pi-ai 的功能。终态仍是全原生，删掉 `apps/desktop`、`apps/server`、`apps/web`、`apps/mobile`。所有改动合成一个 PR，分段写成提交。
 
 ## Proposal
 
-### 终态
+### 原则
 
-```
-crates/                  Rust 库，一个 Cargo workspace（根 Cargo.toml），名字 vibevalley-<概念>
-apps/mac/                原生 macOS 应用：Rust 二进制 VibeValley（GPUI）+ ui/（nsh TSX 的工作台页面）
-apps/cli/                命令行（仍是 TypeScript，经 HTTP 调 Rust 服务端）
-apps/island/             灵动岛（Swift），由 apps/mac 带起
-apps/site/               官网
-packages/protocol        仍是契约的唯一源头：zod Schema 生成 Rust 类型；nsh 页面和 CLI 直接用 TS
-packages/i18n            词典：Rust（服务端、shared）和 nsh 页面共用同一份 locales
-packages/pkm、artifact   页面侧的编辑器状态机（TS）；服务端侧是 crates 里的 Rust 实现，两边由 golden 对齐
-assets/                  原 apps/web/public：像素图、像素字、指针、样音，app 和官网共用
-```
+- **Rust 为准。**服务端的行为以 Rust 为准；TS 服务端只在删除前用作对照和 e2e 安全网，不再追逐它的新改动。契约在 TS 服务端删掉后翻转为 Rust 生成 TS（见 R5）。
+- **速度优先，回退可接受。**一处 TS 行为如果照搬成本高、价值低，就砍掉或简化，在本 Note 的「砍掉的」里记一行，不阻塞进度。
+- **边界解码一次，门内全是类型。**HTTP、文件、厂商响应、模型给的工具参数，各在进门处解码成结构体和 enum；门内不传 `Value`，不按字符串分支。
+- **深模块。**每个模块对外一个窄接口；不靠一个带 `kind` 的入口复用多种操作（沿用 [模块设计](docs/style/module-design.md) 的规矩）。
+- **每段可回退。**每个重构段一组提交，`rust:check` 全绿、web e2e 核心部分不退步才进下一段。
 
-只剩一个服务端，就是 Rust 的；不再有 Node 运行时（CLI 和脚本仍走 `vpx`）。不迁 epona 的「终端优先工作台」定位：终端、文件、git 是 VibeValley 的新功能，挂在工单、会话、仓库上。
+### 已完成（截至 2026-11-14，分支 `refactor/native-vibevalley`）
 
-### 改名
+| 段 | 结果 |
+|---|---|
+| 迁入 | crates 与 `apps/mac` 改名迁入；生成器读仓库内的 `packages/protocol` 与 `apps/server`；页面直接引用 workspace 包；`apps/web/public` 移到根 `assets/`；`rust:check`、`protocol:rust:check`、`mac:check` 与 macOS CI job |
+| 服务端补齐 | `/mcp` 帮工门与 `issue_report`；独立的 `vibevalley-server` 二进制（`--web`、`--ready-json`）与测试用替身 agent `pi`；私聊帮工；起草讨论串；验收标准结果；已离开的会话进历史；父工单的改动；离线 MOSS；图片、语音（含流式）任务 |
+| 原生界面 | 侧栏按主仓库归并 worktree、只列真实终端、终端命名去重；终端字体回退；连接状态点移到头像 |
+| 对照 | web e2e 在 Rust 上 243 个过约 207 个（失败的是媒体其余种类、语音、手机/局域网，及 4 个在 TS 上同样失败的）；CLI 测试 22 个过 21 个 |
 
-`epona` 这个词在代码、环境变量、路径、文档里一个不留（加进 `scripts/docs/stale-names.ts`）。crate 照本仓库的概念命名：
+### 重构（按顺序）
 
-| epona | VibeValley | 说明 |
-| --- | --- | --- |
-| `epona-protocol` | `vibevalley-protocol` | 生成的线上类型、信封、BizCode |
-| `epona-server-api` | `vibevalley-server-api` | `Server` trait：桥和 HTTP 经它找服务端（不依赖服务端本身） |
-| `epona-flow` | `vibevalley-core` | reduce、effectsOf、frameOf、双端规则 |
-| `epona-server` | `vibevalley-server` | 按 `apps/server/src/modules` 分模块 |
-| `epona-issues` | `vibevalley-issues`，第 2 段并入 `vibevalley-server` 的 issue、session 模块 | 「board」不是本仓库的概念；照正交领域的边界拆进去 |
-| `epona-http` | `vibevalley-http` | 对外的门：`/api/v1`、SSE、附件、artifact 页 |
-| `epona-agents`（含 `roar`） | `vibevalley-oar` | Rust 版 oar |
-| `epona-brain` | `vibevalley-agent` | 自研 agent 的循环、压缩和工具（原 pi-durable + `packages/agent`） |
-| `epona-cron`、`epona-memory`、`epona-pkm`、`epona-artifact`、`epona-i18n`、`epona-git`、`epona-files` | `vibevalley-<同名>` | |
-| `epona-term` | `vibevalley-terminal` | |
-| `epona-store`、`epona-workspace` | `vibevalley-store`、`vibevalley-workspace` | app 侧：项目、布局、存下的终端 |
-| `epona-bridge` | `vibevalley-bridge` | 页面和 `Server` 之间的桥（对应 `packages/bridge` 的角色） |
-| `epona-app` | `apps/mac`（crate `vibevalley-mac`） | |
+**R1 工具：一套带类型的工具，助手和帮工共用**
+- `trait Tool { type Args: DeserializeOwned + JsonSchema; fn run(&self, who: &Caller, args: Self::Args) -> Result<String, Refusal>; }`，每个工具一个参数结构体，`schemars` 从结构体出 JSON Schema，文档注释即参数说明。
+- 宽松解析只写一层：数字字符串、`"true"`、`null` 当缺省、多余字段忽略；解析失败给模型的话统一一处写。
+- 助手（`orchestrator/tools.rs` 按 op 字符串匹配）与帮工（`mcp/helper.rs`）合并成一个工具集，按调用者选子集；`/mcp` 与助手的循环都从它取。
+- 工具说明以 Rust 为准，删掉 `tools.json`、`session_tools.json` 及其生成。
 
-环境变量 `EPONA_*` 改为 `VIBEVALLEY_*`；家目录照 `packages/home` 的约定（位置、`server.json`、`settings.json`），不另起一个 epona 家目录。
+**R2 去掉门内的 `serde_json::Value`**
+- 设置与 provider 配置：`settings.json` 一次读成 `Settings`/`Providers` 结构体（连接、绑定、钥匙用 `Secret`），所有 `p["speech"]["connection"]` 改成字段访问。
+- 工单板的存储：`Store` 里按 JSON 文档存的工单、会话、额外信息，改成各自的表（SQLite，和 `server.db` 合并成一个库）。
+- 厂商响应在 `vendor.rs` 进门即成结构体（大多已是），任务机不再传 `Value`。
 
-### 分段（一个 PR，每段一组提交；每道闸过了才进下一段）
+**R3 媒体：一个任务机**
+- `trait JobKind`：校验与准备、执行（立即 / 任务轮询 / 流式）、结果怎么存、视图；排队、并发上限、取消、下载重试、恢复、释放、重启接续由任务机写一次。
+- 图片、语音、多人对话、音色设计、克隆、转写、理解都实现它；拆掉现在的 `OtherJobs` 补丁。
+- 存储按列（种类、阶段、远端任务、结果附件或输入、用量、元数据），不再一行一个 JSON。
 
-**0. 准备**
-- [正交领域](.agents/notes/proposed/architecture/2026-11-12-orthogonal-domains-and-event-watch.md) 合进 `main`。
-- epona 停止开发：把未提交的约 30 个文件在 epona 里提交，记下最终提交号，作为迁入来源。
+**R4 拆 `Board`：工单、会话、工作目录三个模块**
+- `vibevalley-issues` 并进 `vibevalley-server`，按正交领域的边界拆：issue（状态、指派、起草、拆分、验收）、session（雇佣、每一轮、私聊、投递）、workplace（worktree、合并、冲突、分支清理）。
+- 每个迁移是一个带类型的命令，状态变化只经事实；去掉散落的 `self.update(|t| ...)`。
+- 会话的轨迹、报告、记性经事实流出，watch、频道、游戏只订阅。
 
-**1. 迁入**：只搬家和改名，不改行为，Electron 照常能用。
-- 照上表拷贝 crates，`ui/` 放到 `apps/mac/ui`。epona 的 `docs/handoff/*` 是工作日志，不搬：其中仍成立的「与 VibeValley 的偏差」和「缺口」并进本 Note 的第 3、4 段清单；`docs/design/components.md` 并进 `docs/style/design.md`。
-- 去掉所有拷贝：生成器（`vibevalley-protocol/gen`、orchestrator 的提示和工具描述）直接读仓库里的 `packages/protocol`、`apps/server`；`apps/mac/ui` 经 workspace 包名引用 `packages/protocol`、`i18n`、`pkm`、`artifact`，不再有 `vv/pkg`；从 `apps/web` 复制来的纯文件（`vv/web/VENDORED` 列的那些）归 `apps/mac/ui` 所有，不再同步，因为 `apps/web` 在第 5 段删除；`apps/web/public` 现在就移到根目录 `assets/`（页面、官网和 app 共用），删掉 `fetch-vv.sh`。nsh 不打包 app 目录以外的媒体文件，所以试听样音移到 `apps/mac/ui/assets/voice-samples`。
-- 工具链：`rust-toolchain.toml`（1.99）、Zig 0.17.1（libghostty-vt 构建要用）、根 `.gitignore` 加 `target*/`。`vp run rust:check`（`cargo fmt --check`、`clippy -D warnings`、`cargo test --workspace`）；`vp run protocol:rust` 重新生成，`server:check` 检查生成物是否最新；CI 加一个 macOS 的 Rust job（带缓存）。
-- 验收：`rust:check` 通过；Rust 服务端在隔离的家目录上起来，`apps/cli` 的 `doctor` 和 issue、channel、pkm、artifact 命令跑通；`apps/mac` 起来，用 `shot:` 截工单看板和农场。
+**R5 契约翻转**
+- `apps/server` 删除后，`packages/protocol` 的 zod 不再是源头：Rust 类型为准，用 `specta` 或 `ts-rs` 生成 TS 类型给 `apps/mac/ui` 和 `apps/cli`；删掉 `gen/gen.ts`、`gen/golden.ts` 与 projection golden。
+- 改契约只改 Rust 一处，生成物由检查保证最新。
 
-**2. 追上本仓库**：从 `2649ec3f7` 追到 `main`（含正交领域）。重新生成 protocol，用 `apps/server` 重写 projection golden，失败的逐个改；`epona-issues` 照新的 issue、session、watch 边界拆进 `vibevalley-server`。从这里起，**改 `packages/protocol` 或 `apps/server` 行为的 PR 要同时改 Rust**，`server:check` 的 golden 会拦。
+### 砍掉的（不复刻，或简化）
 
-**3. 服务端补齐，删掉 TS 服务端**
-- 补齐：帮工用的 `/mcp`（帮工经 MCP 调 VibeValley 工具，现在没有）；media 剩下的部分（speech、audio、understanding，共 27 个操作）；助手剩下的工具（pkm、library、artifact、media、`search_archive`、`resource_read`）、巡查和收件箱轮次、进行中注入、`orchestrator.eval.create`；memory 的外部源；voice（声网）；connector（微信、飞书、QQ）；用户和设备里桌面仍要的部分。
-- epona 记下的约 20 条偏差逐条处理：要么改成和 VibeValley 一样，要么作为新行为写进 `docs/subsystems`。例如 comment 直接投给会话而不经工单串、`session.list` 不含已结束的会话、`issue.status.update` 不能改派已发出的工单、cron 触发的轮次 trigger 记错类型、没有每仓库串行锁和 `.vibevalley/setup`。
-- 存储：SQLite 的表照「模块_概念」命名，SQL 照表放；`db/queries` + 生成的做法换成 Rust 的等价物（如 sqlx 的编译期检查）。
-- 闸：`apps/web` 的 Playwright e2e 全部跑在 Rust 服务端（`vibevalley-http` 提供页面）上并通过；`apps/cli` 的测试改成起 Rust 服务端并通过；照 vv-acceptance 在真程序上验收。过闸后，Electron 改为带 Rust 服务端；删掉 `apps/server`，以及只有它用的 `packages/agent`、`packages/ai`、`packages/provider`。
+- **oar**：只保留 Claude Code、Codex、通用 ACP 与测试用 scripted；不做运行时的 skills / MCP / tools 清单、额度与花费的逐厂商细节、记录回放的完整格式。
+- **pi-ai / pi-durable**：自研 agent 只接 DeepSeek（OpenAI 兼容接口），不做多厂商路由、价格表与对话持久化的完整语义；压缩用最简单的截断摘要。
+- **语音（声网 RTC）与外部聊天接入（微信、飞书、QQ）**：不在 TS 删除的闸里；先删，日后按需在 Rust 上重做。
+- **手机壳与「连接到本机」**：随 `apps/mobile` 删除，`lan.*` 与远程登录相关的 `user.*` 一并删除。
+- **一个 CLI 测试**：`CLI watch returns for questions` 只在整份文件跑时多出一轮，暂不追。
 
-**4. 原生界面补齐**
-- 页面：素材库与生成面板、笔记的拖动和雷达跳转、快捷键表；手机壳和语音相关的页面（拨号、实时字幕）。
-- 农场：工具栏、面板、手机、田头聊天、帮工外观，夜间遮罩和树 HUD 两个已知缺陷。
-- 宿主：菜单栏图标（tray）、全局语音快捷键、开场、安装命令行、带起灵动岛、自动更新、签名公证与 `.dmg`/`.zip`/`release.json`。`vp run package:mac`、`release`、`update-check` 改成走 Rust 的打包。
-- 闸：每个 `apps/web` 路由在 `apps/mac` 都有对应页，两种主题、几种宽度截图对过；在两个真包上走一遍自动更新。
+### 闸与删除
 
-**5. 删除**
-- 删掉 `apps/desktop`、`apps/web`、`apps/mobile`，以及 lan 模块（只有手机壳用）。
-- 删掉没人用的包：`engine`、`base-ui`、`stories`、`bridge`（如 CLI 还要，只留它用的部分）、`testkit` 中只服务旧服务端的部分；`vp run deadcode` 清干净。
-- 规矩和文档改成 Rust 的版本：`AGENTS.md`（目录、命令、规矩中只适用于 TS 服务端的那些条，例如 `make<服务>(deps)`、Zod 进门解码、`db:generate`、`paths:check`、`no-wall-clock`，各自给出 Rust 侧的对应：clippy 规则、`deny(...)`、模块依赖检查）、`docs/architecture.md`、`docs/subsystems/*`；vv-acceptance 改成对 `apps/mac` 截图（`shot:`、`hosted:`、`key:`、`mouse:` 调试脚本）。
-- 闸：`vp check`、`rust:check`、`docs:verify`、`deadcode` 通过；从空家目录起 `apps/mac` 走完开场、建仓库、派工单、帮工干完、合并的整条主线。
+1. R1–R3 完成后，web e2e 除媒体其余种类、语音、手机/局域网外全绿，CLI 测试全绿：删 `apps/server`、`packages/agent`、`packages/ai`、`packages/provider`，Electron 改带 Rust 服务端过渡。
+2. R4、R5 完成，`apps/mac` 覆盖 `apps/web` 每个路由（截图对过）：删 `apps/desktop`、`apps/web`、`apps/mobile` 与只为它们存在的包；`AGENTS.md`、`docs/architecture.md`、`docs/subsystems/*`、vv-acceptance 改写成 Rust 与原生的现状。
+3. 打包、签名公证、自动更新、带起灵动岛在 `apps/mac` 上补齐后，发版。
 
 ## Alternatives considered
 
-**只删 Electron，TS 服务端和 Rust 服务端并存**：同一套 200 个接口有两份实现，契约每改一次都要改两遍，违背「核心状态只有一份」。
+**原生 app + TS 服务端（不写 Rust 服务端）**：服务端只有一份、保留 TS 生态与仓库护栏，代价是带 Node 运行时。用户选了 Rust 服务端为准。
 
-**保留 `apps/web` 给手机和浏览器**：页面有两份（Solid 和 nsh），而 `apps/web` 只剩远程访问一个用途。用户选了全原生；以后如要远程访问，再从 `apps/mac/ui` 出发另做。
+**先忠实复刻 TS，再重构**：每一处都要先对照 TS 搬一遍，再改一遍，比直接按 Rust 的方式写慢；对照的价值由 e2e 安全网提供就够了。
 
-**把 Rust 改成契约源头，生成 TS**：nsh 页面和 CLI 本来就用 TS，zod 已经是源头，生成器和 golden 都已经有了；把源头翻过来要重写生成器，又没有新的好处。等到 TS 只剩页面的时候再考虑。
+**现在就把契约翻转成 Rust 为准**：TS 服务端还在跑 e2e 对照，它需要 zod 契约；等 `apps/server` 删掉再翻转，只翻一次。
 
-**用 git subtree 把 epona 的历史带进来**：本仓库只用 squash 合入 `main`，历史反正会压成一个提交；Note 里记下 epona 的最终提交号就够追溯。
-
-**每段一个 PR**：每次合入时 `main` 都能用，但第 2 到第 5 段之间 TS 和 Rust 两个服务端会在 `main` 上并存很久，每个改契约的 PR 都要改两边。用户选了一个 PR：分段写成提交，闸照旧，过不了闸就不往下走。
-
-**crate 先只把前缀换成 vibevalley-，概念对齐以后再说**：要改两次名，第二次还得改所有引用；第 1 段就照概念命名，只有 `epona-issues` 拆进 `vibevalley-server` 这一项留到第 2 段，因为它要跟着正交领域的新边界走。
+**保留 `OtherJobs`，按种类各写各的任务机**：每种都要重写排队、取消、恢复、释放，正是现在重复与不一致的来源。
 
 ## Acceptance criteria
 
-- 仓库里没有 `apps/desktop`、`apps/server`、`apps/web`、`apps/mobile`，没有 Electron、Expo、PixiJS 依赖；`epona` 这个词不出现（`stale-names.ts` 查）。
-- `packages/protocol` 是唯一的契约源头：改了 Schema 而没重新生成 Rust 类型，`server:check` 失败；Rust 服务端的线上 JSON 由 golden 对齐。
-- 只有一个服务端（Rust）；`apps/cli` 的测试和 `doctor` 对着它通过。
-- `apps/mac` 打出签名公证过的包，能自动更新，能带起灵动岛；工单、会话、助手、田头、农场、笔记、artifact、素材库、设置、终端都能用，截图证据附在各 PR 的 Checks 里。
-- `AGENTS.md`、`docs/architecture.md`、`docs/subsystems/*` 写的是 Rust 和原生的现状；长期成立的部分沉淀进子系统文档后删掉本 Note。
+- 仓库里没有 `apps/desktop`、`apps/server`、`apps/web`、`apps/mobile`，没有 Electron、Expo、PixiJS；`epona` 这个词不出现（`stale-names.ts` 查）。
+- `vibevalley-server` 门内没有 `serde_json::Value` 的业务传递（只在进出边界）；没有按 op 字符串分支的工具分发；没有 `Board` 这样的跨领域大对象。
+- 契约以 Rust 为准，TS 类型由它生成，检查保证最新。
+- 只有一个服务端；`apps/cli` 的测试与 `doctor` 对着它通过；`apps/mac` 打出签名公证的包，能自动更新。
+- 「砍掉的」里每一项要么在文档里写明不做，要么已在 Rust 上实现。
 
 ## Risks
 
-- **用户已有数据**：TS 服务端存在 PGlite 或 Postgres，Rust 服务端用 SQLite。照「内部不留兼容」不写迁移，已发版的用户升级后看不到旧工单和聊天。第 3 段之前要用户拍板：照规矩归档旧家目录从空开始，还是破例写一次性导入。
-- **与 [服务端和机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md) 冲突**：那篇要外部 Postgres 和多机长连接，Rust 服务端是单机 SQLite。第 3 段之前要决定：那篇改成在 Rust 上做（sqlx 同时支持 Postgres 和 SQLite），还是删掉。
-- **nsh、gpui-kit、libghostty-vt 的成熟度**：三个都是 0.x 并且变得快（nsh 0.5、gpui-kit 0.9，libghostty-vt 钉在某个 git 提交上，构建要 Zig）。nsh 能否从 workspace 包和别名解析 import，第 1 段要先验证；不行就得在 nsh 那边补，不能回到复制文件。
-- **只支持 macOS**：GPUI 和 epona 只做 macOS，删掉 `apps/web` 和 `apps/mobile` 之后，Windows、Linux、手机和浏览器都用不了。
-- **规矩的保护变弱**：本仓库的护栏多数是 TS 的 AST 和 lint（`practice:check`、`paths:check`、`schema-audit.ts`、`health`、`no-cjk-literal`……），Rust 侧现在几乎没有。第 5 段之前，每条要么有 Rust 侧的对应，要么明确放弃，不能悄悄丢掉。
-- **追同步期间的漂移**：第 2 到第 5 段之间，TS 服务端和 Rust 服务端并存。golden 只能查契约和 projection，不能查模块里的行为。第 3 段要尽快过闸，在那之前冻结 `apps/server` 的新功能。
+- **重构期间回退**：允许，但核心 e2e（工单、会话、频道、助手、笔记、artifact）退步就停下修；媒体其余种类与语音按砍掉的处理。
+- **用户已有数据**：TS 服务端在 PGlite/Postgres，Rust 用 SQLite；照「内部不留兼容」不迁移，已发版用户升级后从空开始。发版前要用户确认。
+- **与 [服务端和机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md) 冲突**：那篇的外部 Postgres 与多机长连接不在本计划内；删 `apps/server` 前要决定在 Rust 上重做还是删掉那篇。
+- **nsh、gpui-kit、libghostty-vt 都是 0.x**：升级可能要跟着改；nsh 能解析 workspace 包已验证。
+- **只支持 macOS**：删掉页面与手机壳后，Windows、Linux、手机与浏览器都用不了。
+- **仓库护栏**：TS 的 AST 与 lint 审计对 Rust 不适用；R1–R4 里每段都要把对应的约束写成 clippy 规则、类型或测试，不能只靠文字。
