@@ -204,7 +204,7 @@ impl HostedView {
         let (tx, rx) = flume::unbounded::<Value>();
         let (err_tx, err_rx) = flume::unbounded::<String>();
         let options = AppOptions {
-            appearance: if dark { Appearance::Dark } else { Appearance::Light },
+            appearance: Appearance::System,
             data_dir: Some(vibevalley_workspace::util::app_support_dir().join("nsh")),
             ..Default::default()
         };
@@ -213,6 +213,7 @@ impl HostedView {
         let mut client = None;
         let app = cx.new(|cx| {
             let app = AppView::new(options, window, cx);
+            app.set_appearance(if dark { Appearance::Dark } else { Appearance::Light }, cx);
             let host = app.host();
             let mut params = params;
             params.insert("view".into(), json!(name));

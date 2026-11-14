@@ -18,9 +18,10 @@ export function VibeValley() {
   // The shell can move the page: `route:<path>` from Rust.
   host.on("route", (to) => typeof to === "string" && appHistory.navigate(to));
   if (host.params.globalShell === true) {
-    const changed = () => host.post("action", { type: "global_route", path: appHistory.read().pathname, rail_width: windowSize().width < 640 ? 68 : 76 });
+    const changed = () => host.post("action", { type: "global_route", path: appHistory.read().pathname });
     cleanup(appHistory.subscribe(changed));
-    effect(changed);
+    changed();
+    effect(() => host.post("action", { type: "global_rail", rail_width: windowSize().width < 640 ? 68 : 76 }));
   }
   return <App />;
 }

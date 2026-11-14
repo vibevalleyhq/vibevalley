@@ -60,6 +60,8 @@ pub enum Action {
     /// The single application router selects a native content surface.
     GlobalRoute {
         path: String,
+    },
+    GlobalRail {
         rail_width: f32,
     },
     /// The view applied frame `rev` of `topic` (debug bookkeeping).

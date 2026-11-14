@@ -5,7 +5,7 @@
 import "../polyfill";
 import { expect, open, test } from "nsh/test";
 
-import { boundProvider } from "../fixtures/library";
+import { boundProvider, mediaJobs } from "../fixtures/library";
 import { responses, state } from "../fixtures/workbench";
 import { fakeHost } from "./fakeHost";
 
@@ -142,7 +142,7 @@ test("regression: a large speech result plays and saves its local input file wit
     ...state,
     state: {
       ...state.state,
-      media: state.state.media.map((job) =>
+      media: mediaJobs.map((job) =>
         job.kind === "speech"
           ? {
               ...job,
@@ -166,7 +166,7 @@ test("regression: a large speech result plays and saves its local input file wit
 test("regression: a transcript timestamp starts the source file at that offset", async () => {
   const file = { path: "/tmp/standup.m4a", type: "audio/mp4", name: "standup.m4a" };
   const { app, fake } = await start("/library?make=audio", { "media.input.file": file, "host.playAudio": null });
-  const job = state.state.media.find((j) => j.kind === "transcription");
+  const job = mediaJobs.find((j) => j.kind === "transcription");
   if (job?.kind !== "transcription" || job.result?.kind !== "transcription") throw new Error("transcription fixture missing");
   const segment = job.result.segments[1];
   await app.press(`id:audio-seek-${segment.start}`);

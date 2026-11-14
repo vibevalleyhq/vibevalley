@@ -1024,8 +1024,11 @@ impl Shell {
     pub fn on_action(&mut self, action: Action, window: &mut Window, cx: &mut Context<Self>) {
         let active = self.ws.active_id();
         match action {
-            Action::GlobalRoute { path, rail_width } => {
+            Action::GlobalRail { rail_width } => {
                 self.global_rail_width = rail_width.clamp(56.0, 80.0);
+                cx.notify();
+            }
+            Action::GlobalRoute { path } => {
                 self.native_workspace = path == "/workspace";
                 if !path.starts_with("/farm") && path != "/tree" {
                     self.native_pixel = None;

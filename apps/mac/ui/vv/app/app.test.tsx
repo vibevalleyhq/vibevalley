@@ -70,6 +70,17 @@ test("narrow", async () => {
   await shoot(app, "issues-narrow");
 });
 
+test("regression: resizing the global shell changes its rail without navigating", async () => {
+  const fake = fakeHost({ state, responses }, { route: "/issues", globalShell: true });
+  const app = await open("./main.tsx", { width: 1200, height: 720, platform: "macos", host: fake.options });
+  await fake.pump(app);
+  const routes = fake.acts.filter((a) => a.type === "global_route").length;
+  await app.setViewport(600, 600);
+  await fake.pump(app);
+  expect(fake.acts.filter((a) => a.type === "global_route").length).toBe(routes);
+  expect(fake.acts.filter((a) => a.type === "global_rail").at(-1)).toEqual({ type: "global_rail", rail_width: 68 });
+});
+
 test("/farm goes to the repo worked in most recently and asks the shell for its farm; /tree asks for the tree", async () => {
   const fake = fakeHost({ state, responses: { ...responses, "repo.list": repos } }, { route: "/farm" });
   const app = await open("./main.tsx", { width: 1200, height: 720, colorScheme: "light", platform: "macos", host: fake.options });
