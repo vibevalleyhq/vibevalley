@@ -43,4 +43,3 @@ DeepSeek（助手的对话模型）的钥匙在设置里，不是连接。
 
 - `crates/vibevalley-server/tests/provider.rs`：不对的连接修改被拒、没配好的连接不当默认、保留钥匙、跟着 revision 走。
 - `crates/vibevalley-server/tests/setting.rs`：语音厂商的钥匙只给提示，就绪状态跟着连接走。
-- `apps/web/test/providers.spec.ts`：隔离服务端上的表单保存、刷新、钥匙脱敏、冲突草稿与解绑。

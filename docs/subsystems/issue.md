@@ -131,7 +131,7 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 - `crates/vibevalley-server/tests/issue_edits.rs`：改字段、排位与删单。
 - `crates/vibevalley-server/tests/issue.rs`、`crates/vibevalley-server/tests/cron.rs`：经端点走一张工单；定时任务的增删、拒绝与到期。
 - `crates/vibevalley-core/src/tests.rs`：状态派生、挪动与依赖的纯函数。
-- `apps/web/test/issues.spec.ts`、`apps/web/test/farm-actions.spec.ts`：工作台看板与农场工单操作端到端（对着 Rust 服务端）。
+- `apps/mac/ui/vv/app/issues.test.tsx`：工单页在样例数据上的页面测试（`nsh/test`）。
 
 ## 定时任务
 

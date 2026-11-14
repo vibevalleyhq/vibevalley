@@ -99,4 +99,4 @@
 
 - `crates/vibevalley-server/tests/agent.rs`：删技能清引用、损坏配置留着、外观补齐、角色约束、新农场的档案、模板安装与更新、自带技能只读、农机经 hub、额度刷新。
 - `crates/vibevalley-server/src/modules/agent/presets.rs` 里的单元测试：预设、挑档案。
-- `apps/web/test/agents.spec.ts`、`runtimes.spec.ts`：档案与农机设置端到端（对着 Rust 服务端）。
+- `apps/mac/ui/vv/app/agents.test.tsx`：档案页在样例数据上的页面测试（`nsh/test`）。

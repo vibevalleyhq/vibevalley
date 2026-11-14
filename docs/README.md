@@ -6,8 +6,8 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 
 | 文档 | 讲什么 |
 |---|---|
-| [guide.md](docs/guide.md) | 教程：派第一张工单，看着它干，完成它，处理冲突和失败，管住花费，用语音 |
-| [development.md](docs/development.md) | 教程：本机跑起来（Rust 服务端、原生应用），检查和测试，改形状、规则和表，打包 |
+| [guide.md](docs/guide.md) | 教程：派第一张工单，看着它干，完成它，处理冲突和失败，管住花费 |
+| [development.md](docs/development.md) | 教程：本机跑起来（原生应用、单独的服务端、命令行），检查和测试，改形状、规则和表，发版 |
 | [concepts.md](docs/concepts.md) | 概念：实际是什么，农场怎么画它们 |
 | [architecture.md](docs/architecture.md) | 架构：分层、核心状态、事件流、接口和存储。改 `crates/`、`apps/`、`packages/` 之前读 |
 
@@ -25,18 +25,16 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [brain.md](docs/subsystems/brain.md) | VibeValley 自己的 agent（`vibevalley-agent`）：模型请求、循环、对话文件、压缩、工具、技能、记性、自己的任务 |
 | [orchestrator.md](docs/subsystems/orchestrator.md) | 助手：收什么话、现状、工具与 `vv://` 资源读取、谁能让它合并、巡查、评测 |
 | [memory.md](docs/subsystems/memory.md) | 记性：想起、记下、主动查、外面的来源 |
-| [voice.md](docs/subsystems/voice.md) | 语音：通话和听写随原生改写砍掉了，剩下的是语音合成任务 |
-| [lan.md](docs/subsystems/lan.md) | 「连接到本机」：随手机壳砍掉了，Rust 服务端只回「关着」 |
+| [voice.md](docs/subsystems/voice.md) | 语音：语音设置、语音合成任务、要守住的约束 |
 | [attachment.md](docs/subsystems/attachment.md) | 附件：农场留下的一份文件，按 SHA-256 内容寻址落盘存一次；消息、媒体结果和素材库都引用它 |
-| [user.md](docs/subsystems/user.md) | 用户和设备：远程登录与设备钥匙随「连接到本机」砍掉了 |
 | [setting.md](docs/subsystems/setting.md) | 设置：settings.json、配置和环境变量、钥匙和打码 |
 | [provider.md](docs/subsystems/provider.md) | AI 服务：供应商连接、模型目录、默认用途、凭据与配置版本 |
 | [media.md](docs/subsystems/media.md) | 媒体和素材库：一个任务机上的生图与语音任务、本机输入、独立下载与安全校验；素材库一份文件一张卡，记着来路 |
 | [game.md](docs/subsystems/game.md) | 游戏：账本、金币和成就、等级、空地和特效 |
 | [core.md](docs/subsystems/core.md) | 核心状态：一份状态只因事实而变、SSE 流和全部路由、接口和能力表、重启 |
 | [foundation.md](docs/subsystems/foundation.md) | 地基：Cargo 与 pnpm 工作区、深模块、边界一次解码的类型、契约的生成、SQLite 存储、测试分层 |
-| [app.md](docs/subsystems/app.md) | 客户端：原生应用 `apps/mac`、过渡期的 Solid 页面和 Electron 桌面版、问服务端、打包 |
-| [farm.md](docs/subsystems/farm.md) | 农场的皮：像素村、地里长什么、走路、手机、音效、图鉴 |
+| [app.md](docs/subsystems/app.md) | 客户端：原生应用 `apps/mac`（GPUI 窗口、进程里的服务端、页面和服务端之间的桥、nsh TSX 的工作台、宿主能力） |
+| [farm.md](docs/subsystems/farm.md) | 农场的皮：Rust 画的像素村、地里长什么、走路、地图、记忆树、图鉴 |
 | [agent.md](docs/subsystems/agent.md) | 档案和农机：档案和它的角色、种子、农机的探测和清单、技能书 |
 | [process.md](docs/subsystems/process.md) | 工程流程：文档分层、Note 和子系统、检查、skill、写作规范、素材流水线 |
 | [site.md](docs/subsystems/site.md) | 官网：Vite + Solid 2 静态生成、图从游戏来 |
@@ -46,7 +44,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 文档 | 讲什么 |
 |---|---|
 | [concept-map.md](docs/reference/concept-map.md) | 概念在各层的名字：农场里、界面、协议、HTTP、服务端、存储、oar |
-| [capabilities.md](docs/reference/capabilities.md) | 每个接口谁能调：用户、「连接到本机」、助手；`scripts/gen/capabilities.ts` 写出 |
+| [capabilities.md](docs/reference/capabilities.md) | 每个接口谁能调；`scripts/gen/capabilities.ts` 写出 |
 | [farm-ui.md](docs/reference/farm-ui.md) | 界面清单、角色、轨迹和精力瓶 |
 | [primitives.md](docs/reference/primitives.md) | TS 地基文件夹导出的共用原语和一句话说明；写帮手之前先查；`scripts/gen/primitives.ts` 写出 |
 
@@ -57,12 +55,12 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [module-design.md](docs/style/module-design.md) | 架构、模块边界与测试设计：责任和边界、类型驱动与进门解码、显式状态、错误契约与测试证据、检查工具 |
 | [code.md](docs/style/code.md) | 代码：格式、叫法、注释写什么不写什么 |
 | [naming.md](docs/style/naming.md) | 命名：名字站在领域的视角，不用的名字，文件、代码、接口、表、词典的键和测试标记的形状，改名 |
-| [design.md](docs/style/design.md) | 界面：田间工作台的审美、令牌（表面、颜色、圆角、控件、线和影、字、图标、动效、层）、原子和模式、给 agent 的清单 |
+| [design.md](docs/style/design.md) | 界面：田间工作台的审美、令牌（表面、颜色、圆角、控件、线和影、字、图标、动效）、原子和模式、给 agent 的清单 |
 | [writing.md](docs/style/writing.md) | 文字：写什么、删什么，词和格式怎么写；文档、Note、skill、提交说明、注释和回复都用 |
 
 ## 用语
 
-叫法分两张表。下面这张是活本身的叫法：工作台、命令行、助手、工具和提醒都用它，中文界面用左边一列，英文界面用 English 一列。「不用」一列只管对用户说的话：中文界面不用其中的词，英文界面不用其中的英文词，English 一列里有的照用；代码和讲服务端的文档照「代码里」一列和实际的概念来（[concepts.md](docs/concepts.md)），代码里碰到「不用」里的词，只有指的是这一行的东西才算错。带括号说明的词只在那个意思上不用，「（中文界面）」的只在中文界面不用。界面上的字写在词典里（`packages/i18n/locales`），中英各一份（[话放在哪](docs/subsystems/foundation.md#话放在哪)）；工单的状态和动作只有一套词，在 `packages/i18n/locales/*/shared.json`（[状态和用语](docs/subsystems/issue.md#状态和用语)）。农场把这些画成种地，种地的词在[第二张表](#农场的皮)，只在农场的画面和游戏里用。`vpx scripts/gen/i18n.ts check` 照「不用」一列和种地的词查皮（农场、记忆树、像素零件、游戏和素材图鉴）以外的词典，`scripts/docs/glossary.ts` 查「代码里」一列的名字都还在代码里。
+叫法分两张表。下面这张是活本身的叫法：工作台、命令行、助手、工具和提醒都用它，中文界面用左边一列，英文界面用 English 一列。「不用」一列只管对用户说的话：中文界面不用其中的词，英文界面不用其中的英文词，English 一列里有的照用；代码和讲服务端的文档照「代码里」一列和实际的概念来（[concepts.md](docs/concepts.md)），代码里碰到「不用」里的词，只有指的是这一行的东西才算错。带括号说明的词只在那个意思上不用，「（中文界面）」的只在中文界面不用。界面上的字写在词典里（`crates/vibevalley-i18n/locales`），中英各一份（[话放在哪](docs/subsystems/foundation.md#话放在哪)）；工单的状态和动作只有一套词，在 `crates/vibevalley-i18n/locales/*/shared.json`（[状态和用语](docs/subsystems/issue.md#状态和用语)）。农场把这些画成种地，种地的词在[第二张表](#农场的皮)，只在农场的画面和游戏里用。`vpx scripts/gen/i18n.ts check` 照「不用」一列和种地的词查皮（农场、记忆树、像素零件、游戏和素材图鉴）以外的词典，`scripts/docs/glossary.ts` 查「代码里」一列的名字都还在代码里。
 
 | 叫法 | English | 代码里 | 不用 |
 |---|---|---|---|
@@ -103,7 +101,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 父工单 | parent issue | `Issue`（有子工单） | 计划图、TaskGraph |
 | 子工单 | child issue | `Issue`（带 `parent`、`blockedBy`；拆单输入为 `IssueChildDraft`） | Task、步骤状态机 |
 | 派活 | dispatch | hire（`Issue.hire`、事实 `FactSessionChanged`） |  |
-| 派工关联 | assignment | `Assignment`（`issue_assignment`） |  |
+| 派工关联 | assignment | `Assignment`（`Issue.assignments`） |  |
 | 执行器 | executor | `Drivers`（档案经 oar 开会话） |  |
 | 起草 | refine | refine（`refine`、`refinement_brief`） |  |
 | 用户 | user | user（`User`、`userId`） | 主人、owner |
@@ -122,11 +120,10 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 通话 | call | `VoiceCall`（`voice.call.*`） |  |
 | 听写 | dictation | dictation（`Dictation`） |  |
 | 花费 | spending | `Spent`、`RuntimeQuota` |  |
-| 连接到本机 | connect to this machine | lan | 远程模式 |
 
 ### 农场的皮
 
-农场把上面的东西画成种地。这些词只在农场的画面（`apps/web/src/farm`）和游戏（`crates/vibevalley-server/src/modules/game.rs`、账本、成就）里用，工单的状态、动作、拒绝、提醒、工具和助手的话都不用；代码由 `scripts/docs/stale-names.ts` 查，词典由 `vpx scripts/gen/i18n.ts check` 查（皮的命名空间除外）。地长什么样见[农场的皮](docs/subsystems/farm.md)。
+农场把上面的东西画成种地。这些词只在农场的画面（`apps/mac/src/pixel`）和游戏（`crates/vibevalley-server/src/modules/game.rs`、账本、成就）里用，工单的状态、动作、拒绝、提醒、工具和助手的话都不用；代码由 `scripts/docs/stale-names.ts` 查，词典由 `vpx scripts/gen/i18n.ts check` 查（皮的命名空间除外）。地长什么样见[农场的皮](docs/subsystems/farm.md)。
 
 | 农场里 | English | 实际是 | 代码里 |
 |---|---|---|---|
@@ -149,4 +146,4 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 账本 | ledger | 值得记的事；金币、连胜、成就由它折出来 | `LedgerEntry`（家目录的 `ledger.jsonl`） |
 | 成就 | achievement | 从账本折出来的里程碑 | `Achievement` |
 | 等级 | level | 一共提交了多少次 | `CommitCount`、`FarmView.level` |
-| 农场 | the farm | 这张皮本身（`/` 的像素农场）；说系统时是 VibeValley | |
+| 农场 | the farm | 这张皮本身（`/farm` 的像素农场）；说系统时是 VibeValley | |

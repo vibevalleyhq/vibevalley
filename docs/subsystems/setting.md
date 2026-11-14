@@ -38,7 +38,7 @@
 | `--web <目录>` | 在 `/` 提供构建好的页面 | 无 |
 | `--ready-json` | 开始监听后打印一行 `{"url","pid"}` | 关 |
 
-TS 版的 `vibevalley.yaml` 和其余配置键（Postgres、声网、巡查间隔、PR 轮询、OTLP 等）Rust 不读；对应的值写在代码里或已砍掉。
+没有 `vibevalley.yaml`；巡查间隔、PR 轮询这类值写在代码里。
 
 ### 设置与钥匙
 
@@ -62,4 +62,4 @@ TS 版的 `vibevalley.yaml` 和其余配置键（Postgres、声网、巡查间�
 ## 怎么验证
 
 - `crates/vibevalley-server/tests/setting.rs`：这里存的钥匙压过启动配置且只显示末四位、有一项不对整份不存、语音只存差异、语音厂商的钥匙只给提示且就绪跟着连接走。
-- `apps/web/test/settings.spec.ts`：设置页端到端。
+- `apps/mac/ui/vv/app/settings.test.tsx`：设置页在样例数据上的页面测试（`nsh/test`）。
