@@ -192,27 +192,6 @@ pub(super) async fn content(State(server): State<Shared>, Path(id): Path<String>
         .body(Body::from_stream(stream))
         .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
-#[cfg(test)]
-mod tests {
-    use super::range;
-    #[test]
-    fn byte_ranges() {
-        for (s, want) in [
-            ("bytes=2-4", Some((2, 4))),
-            ("bytes=-3", Some((7, 9))),
-            ("bytes=7-", Some((7, 9))),
-            ("bytes=0-99", Some((0, 9))),
-            ("bytes=-0", None),
-            ("bytes=10-", None),
-            ("bytes=5-2", None),
-            ("bytes=0-1,2-3", None),
-            ("bytes=+1-2", None),
-        ] {
-            assert_eq!(range(Some(s), 10), want, "{s}");
-        }
-    }
-}
-
 /// Calls `gone` when the response body is dropped: the page went away.
 struct Gone(Option<Box<dyn FnOnce() + Send>>);
 
@@ -253,3 +232,25 @@ pub async fn speech(State(server): State<Shared>, Path(id): Path<String>, header
     )
         .into_response()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::range;
+    #[test]
+    fn byte_ranges() {
+        for (s, want) in [
+            ("bytes=2-4", Some((2, 4))),
+            ("bytes=-3", Some((7, 9))),
+            ("bytes=7-", Some((7, 9))),
+            ("bytes=0-99", Some((0, 9))),
+            ("bytes=-0", None),
+            ("bytes=10-", None),
+            ("bytes=5-2", None),
+            ("bytes=0-1,2-3", None),
+            ("bytes=+1-2", None),
+        ] {
+            assert_eq!(range(Some(s), 10), want, "{s}");
+        }
+    }
+}
+
