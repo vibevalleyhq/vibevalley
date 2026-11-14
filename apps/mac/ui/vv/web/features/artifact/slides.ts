@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 export const presenterHref = (deck: { readonly id: string; readonly version: number }) => `/present?artifact=${encodeURIComponent(deck.id)}&v=${deck.version}`;
 
 export function presenterOf(search: string): { readonly id: string; readonly version: number } | undefined {
@@ -19,9 +17,3 @@ export function elapsedText(ms: number): string {
   const m = Math.floor((s % 3600) / 60);
   return h > 0 ? `${h}:${two(m)}:${two(s % 60)}` : `${m}:${two(s % 60)}`;
 }
-
-const SlidePost = z.object({ page: z.int().min(0).max(10_000) });
-
-export const slidePostOf = (data: unknown): number | undefined => SlidePost.safeParse(data).data?.page;
-
-export const slidesChannelName = (deck: { readonly id: string; readonly version: number }) => `vibevalley-slides:${deck.id}:${deck.version}`;

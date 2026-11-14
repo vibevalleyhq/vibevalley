@@ -339,7 +339,7 @@ mod tests {
     fn looks_up_vibevalley_words_and_fills_placeholders() {
         assert_eq!(t("server.cron.when.daily", &[("time", "09:00".into())]), "每天 09:00");
         assert_eq!(t("server.cron.weekdays.0", &[]), "日");
-        assert_eq!(t("no.such.key", &[]), "no.such.key");
+        assert_eq!(t(&["no", "such", "key"].join("."), &[]), "no.such.key");
         let due = t(
             "server.cron.due",
             &[("name", "早报".into()), ("missed", true.into()), ("text", "跑测试".into())],

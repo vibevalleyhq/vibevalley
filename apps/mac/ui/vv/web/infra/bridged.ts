@@ -9,7 +9,7 @@ import type { LiveEvent, StateFrame } from "@vibevalley/protocol";
 import { call, frame, onLive, subscribe, type FrameEnvelope } from "../../../bridge";
 import { setTransport, type Transport } from "./transport";
 
-export const bridged: Transport = {
+const bridged: Transport = {
   call: (op, payload) => call(op, payload ?? null),
   state: (listener) => {
     // frame() asks the server once and keeps the newest; the current one comes first.

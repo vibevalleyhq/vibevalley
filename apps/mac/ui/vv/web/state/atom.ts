@@ -64,7 +64,7 @@ export class Registry {
   }
 }
 
-export const createRegistry = (): Registry => new Registry();
+const createRegistry = (): Registry => new Registry();
 
 /** The page's one registry. */
 export const pageRegistry: Registry = createRegistry();
@@ -155,16 +155,10 @@ export function onPage<A>(kept: Atom<A>): PageAtom<A> {
   return page;
 }
 
-/** Binds a page atom's reads and writes to the active `RegistryContext`, for component callbacks in tests and stories. */
-export function usePageAtom<A>(atom: PageAtom<A>): PageAtom<A> {
-  const registry = useRegistry();
-  return registry === pageRegistry ? atom : atom.inRegistry(registry);
-}
-
 /** A value of the page's that lasts until it closes (a dialog the shell and a page both open, the farm's overlays). */
 export const defineAtom = <A>(initial: A): PageAtom<A> => onPage(atom(initial));
 
-export const framesSource: Atom<FramesSource> = atom<FramesSource>(frames);
+const framesSource: Atom<FramesSource> = atom<FramesSource>(frames);
 
 /** Whether the state stream is up now, read from its source: subscribing would open and close the stream. */
 export const linkIn = (registry: Registry): Link => registry.get(framesSource).get().link;
@@ -200,7 +194,7 @@ interface Reader<K> {
 }
 
 /** The answer to the newest ask only, a failure told as a failure rather than "nothing found". */
-export function latestReader<K, T>(read: (key: K) => Promise<T>, waitMs: number, told: (answer: Answer<T> | undefined) => void): Reader<K> {
+function latestReader<K, T>(read: (key: K) => Promise<T>, waitMs: number, told: (answer: Answer<T> | undefined) => void): Reader<K> {
   let asked = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const stop = () => {

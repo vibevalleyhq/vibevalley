@@ -27,7 +27,7 @@ export type Palette = {
   canvas: string;
 };
 
-export const light: Palette = {
+const light: Palette = {
   ink: "#171717",
   text: "#6b6b6b",
   muted: "#8a8a8a",
@@ -49,7 +49,7 @@ export const light: Palette = {
   canvas: "#fafafa",
 };
 
-export const dark: Palette = {
+const dark: Palette = {
   ink: "#ededed",
   text: "#a1a1a1",
   muted: "#7c7c7c",
@@ -76,8 +76,7 @@ export function tok(): Palette {
   return colorScheme() === "dark" ? dark : light;
 }
 
-export const font = "Inter";
-export const fontMono = "Menlo";
+const fontMono = "Menlo";
 
 export const type = {
   title: { fontSize: 14, lineHeight: 20 },
@@ -88,8 +87,6 @@ export const type = {
 } as const;
 
 export const radius = { sm: 7, md: 10, lg: 16, button: 9, card: 12, tray: 22 } as const;
-
-export const hit = { row: 44, groupHead: 36, button: 30, icon: 24 } as const;
 
 /** Card ring: an inset 1 px border ring plus a faint drop in light mode. */
 export function cardShadow(p: Palette) {

@@ -1,15 +1,13 @@
 // Fixture data for the stories and tests. The JSON files are written by
 // `gen/` from the real Rust types (vibevalley_core, vibevalley_oar); times in them
 // are relative to FIXTURE_NOW and are moved to the wall clock here.
-import type { AgentEvent, Frame } from "../shapes";
+import type { AgentEvent } from "../shapes";
 import claude from "./events-claude.json";
 import codex from "./events-codex.json";
 import failed from "./events-error.json";
 import long from "./events-long.json";
-import board from "./frame-board.json";
-import empty from "./frame-empty.json";
 
-export const FIXTURE_NOW = 1_794_499_600_000;
+const FIXTURE_NOW = 1_794_499_600_000;
 
 const TIME_KEYS = new Set([
   "at",
@@ -37,16 +35,6 @@ function shifted<T>(value: T, by: number): T {
   }
   return value;
 }
-
-/** The fixture as if FIXTURE_NOW were `now`. */
-export function atNow<T>(value: T, now: number = Date.now()): T {
-  return shifted(value, now - FIXTURE_NOW);
-}
-
-export const frames = {
-  board: board as unknown as Frame,
-  empty: empty as unknown as Frame,
-};
 
 export const events = {
   /** A Claude Code turn: reads, a failing test, an edit, a permission, a passing test. */

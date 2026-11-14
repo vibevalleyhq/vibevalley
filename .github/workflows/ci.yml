@@ -73,7 +73,7 @@ jobs:
       # A warning fails too: none are let in to pile up.
       - run: vp check --deny-warnings
       - run: vp run docs:verify
-      - run: vp run scripts:test
+      - run: vp test run --exclude scripts/release/verify-server.test.ts
       - run: vp run deadcode
       # The TS packages' tests (the native views and the generators use them).
       - run: vp run --filter @vibevalley/protocol --filter @vibevalley/bridge --filter @vibevalley/i18n --filter @vibevalley/testkit --filter @vibevalley/pkm --filter @vibevalley/artifact test
@@ -139,9 +139,11 @@ jobs:
             target
           key: cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           restore-keys: cargo-${{ runner.os }}-${{ runner.arch }}-
+      - run: git config --global user.name ci && git config --global user.email ci@example.com
       - run: vp run nsh:install
       - run: vp run protocol:check
       - run: vp run rust:check
+      - run: vp test run scripts/release/verify-server.test.ts
       - run: vp run mac:check
       - name: Save cargo cache
         if: success()

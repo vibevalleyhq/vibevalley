@@ -243,66 +243,6 @@ export const apiSuccessEnvelope = <A, I>(data: z.ZodType<A, I>) =>
     data,
   });
 
-export interface ApiErrorOptions {
-  readonly next?: readonly Next[];
-  readonly settings?: VoiceFix;
-  readonly cause?: unknown;
-}
-
-/** What a route refuses with: thrown by a service, and written as ApiErrorEnvelope on the wire. */
-export class ApiError extends Error {
-  override readonly name = "ApiError";
-  readonly bizCode: BizErrorCode;
-  readonly next?: readonly Next[];
-  readonly settings?: VoiceFix;
-
-  constructor(bizCode: BizErrorCode, message: string, options: ApiErrorOptions = {}) {
-    super(message, options.cause === undefined ? undefined : { cause: options.cause });
-    this.bizCode = bizCode;
-    if (options.next !== undefined) this.next = options.next;
-    if (options.settings !== undefined) this.settings = options.settings;
-  }
-
-  /** The envelope read back as the error it says. */
-  static of(envelope: ApiErrorEnvelopeShape): ApiError {
-    return new ApiError(envelope.bizCode, envelope.message, {
-      ...(envelope.error?.next === undefined ? {} : { next: envelope.error.next }),
-      ...(envelope.error?.settings === undefined ? {} : { settings: envelope.error.settings }),
-    });
-  }
-
-  get status(): number {
-    return bizCodeMeta[this.bizCode].status;
-  }
-  get kind(): ApiErrorKind {
-    return bizCodeMeta[this.bizCode].kind;
-  }
-  get retryable(): boolean {
-    return bizCodeMeta[this.bizCode].retryable;
-  }
-  get reason(): string {
-    return this.message;
-  }
-  toEnvelope(): ApiErrorEnvelopeShape {
-    const hasNext = this.next !== undefined && this.next.length > 0;
-    const hasSettings = this.settings !== undefined;
-    return {
-      bizCode: this.bizCode,
-      message: this.message,
-      ...(hasNext || hasSettings
-        ? {
-            error: {
-              ...(hasNext ? { next: this.next } : {}),
-              ...(hasSettings ? { settings: this.settings } : {}),
-            },
-          }
-        : {}),
-    };
-  }
-}
-
-export const isApiError = (e: unknown): e is ApiError => e instanceof ApiError;
-
 export interface Endpoint {
   readonly op: keyof Handlers;
   /** The input's fields that say what it is about (the issue's id…): the command line takes them as its arguments. */

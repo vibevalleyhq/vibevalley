@@ -8,7 +8,7 @@ const day = 86_400_000;
 const hour = 3_600_000;
 const sid = (id: string) => id as SessionId;
 
-export const memories: MemoryList = {
+const memories: MemoryList = {
   memories: [
     {
       id: "m-issue-1",

@@ -43,7 +43,7 @@ export function Link(props: LinkProps) {
 }
 
 /** Whether `href` is the place shown now (or above it, unless `end`). */
-export function useActive(href: () => string, end?: () => boolean | undefined): () => boolean {
+function useActive(href: () => string, end?: () => boolean | undefined): () => boolean {
   const location = useLocation();
   return () => {
     const url = internalUrl(href(), new URL(location().href, base).href);

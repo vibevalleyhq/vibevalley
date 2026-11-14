@@ -39,13 +39,5 @@
       "voiceOff": "语音挂断",
       "ring": "来电"
     }
-  },
-  "close": "关上",
-  "optional": "  可选",
-  "drop": "去掉 {chip}",
-  "noticeTitle": {
-    "info": "提示",
-    "warn": "没派成",
-    "error": "出错了"
   }
 }

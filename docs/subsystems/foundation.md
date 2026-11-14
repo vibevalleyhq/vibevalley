@@ -80,6 +80,7 @@
 ### 话放在哪
 
 - **对用户的话进词典**：`crates/vibevalley-i18n/locales/{zh,en}/<命名空间>.json`；TS 调 `t("key")`（`vibevalley/no-cjk-literal` 拦硬编码中文），Rust 调 `vibevalley_i18n::t`。
+- **词典检查覆盖两端**：`vpx scripts/gen/i18n.ts check` 检查缺键、未用键、语言与占位符；识别 TS 模板键和 Rust `format!` 动态键的字面量前缀。Rust 与 TS 的缺键都使检查失败，删词条时两种语言一起删，再运行 `vp run i18n:gen`。
 - **对模型的话在 `assets/`**：助手的提示在 `crates/vibevalley-server/assets/orchestrator/prompts.json`，工具说明在 `crates/vibevalley-server/assets/tools/`，以 Rust 为准；中文编写，要求模型按用户的语言回答。
 - **语言**：存于家目录 `settings.json` 的 `locale`（`vibevalley-home`）。
 

@@ -233,8 +233,7 @@ export const SOUND_LABEL: Readonly<Record<SoundName, string>> = {
 /** Whether the sounds are off, kept on this machine; another tab turning them off turns them off here too. */
 const muted = defineStored("farm.muted", z.boolean(), false);
 
-export const isMuted = muted.get;
-export const setMuted = muted.set;
+const isMuted = muted.get;
 
 let plays = 0;
 

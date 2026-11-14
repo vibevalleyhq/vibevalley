@@ -10,7 +10,6 @@
   "nothingShown": "没有符合筛选的素材。",
   "drop": "松开，放进素材库",
   "rail": {
-    "label": "筛选",
     "where": "来路",
     "kind": "种类",
     "channels": "来自频道",
@@ -39,7 +38,6 @@
     "size": "大小"
   },
   "tileSize": "缩略图大小",
-  "grid": "素材",
   "job": {
     "image": "生图",
     "speech": "单人语音",
@@ -57,7 +55,6 @@
     "fetchedPath": "{agent} 从工作目录的 {path} 拿回来的"
   },
   "inspector": {
-    "label": "详情",
     "kind": "种类",
     "pixels": "尺寸",
     "bytes": "大小",

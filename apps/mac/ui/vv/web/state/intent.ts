@@ -100,7 +100,7 @@ export function sendReplacing<I, R>(intents: Intents<I, R>, input: I, sameTarget
 }
 
 /** A type's intents in one registry; the same object for every caller, so its timers and watches are kept once. */
-export function intentsIn<I, R>(registry: Registry, type: IntentType<I, R>): Intents<I, R> {
+function intentsIn<I, R>(registry: Registry, type: IntentType<I, R>): Intents<I, R> {
   const made = type.runners.get(registry);
   if (made) return made;
   const runner = makeRunner(registry, type);

@@ -11,5 +11,7 @@
   "outside": "{path} 不在你的工作目录里：只能放工作目录里的文件",
   "notFile": "{path} 不是工作目录里的一个文件",
   "unreadable": "读不了 {path}：{why}",
-  "preview": { "remove": "从素材库拿掉「{name}」；发过它的消息仍能打开它" }
+  "preview": {
+    "remove": "从素材库拿掉「{name}」；发过它的消息仍能打开它"
+  }
 }

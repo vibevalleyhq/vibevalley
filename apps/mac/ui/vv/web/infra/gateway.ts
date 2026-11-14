@@ -12,7 +12,7 @@ import { type SubscriptionName, subscriptions } from "@vibevalley/protocol/rpc";
 import { transport } from "./transport";
 
 /** The wait before connecting again after a connection could not be opened: 500 ms, growing by half each time, at most 5 s. */
-export const reconnectDelayMs = (attempt: number) => Math.min(500 * 1.5 ** attempt, 5000);
+const reconnectDelayMs = (attempt: number) => Math.min(500 * 1.5 ** attempt, 5000);
 
 /** VibeValley's ServiceUnavailable: the bridge had no server to ask. */
 const unreachable = 100009;
@@ -20,7 +20,7 @@ const unreachable = 100009;
 /** Each event of one subscription (each decoded with its `event` Schema) until stop() is called, or until it ends: the
  * farm ended it or refused it, or an event was not in its shape. A subscription that could not be opened is tried
  * again, with the same payload, after reconnectDelayMs. */
-export function subscribe<E>(name: SubscriptionName, payload: unknown, event: z.ZodType<E>, on: (e: E) => void, ended?: () => void): () => void {
+function subscribe<E>(name: SubscriptionName, payload: unknown, event: z.ZodType<E>, on: (e: E) => void, ended?: () => void): () => void {
   let stopped = false;
   let stop: (() => void) | undefined;
   let again: ReturnType<typeof setTimeout> | undefined;
@@ -64,10 +64,6 @@ export function subscribe<E>(name: SubscriptionName, payload: unknown, event: z.
 /** What is said in a channel after the message numbered after, then from now on. */
 export const followChannel = (id: string, after: number, on: (e: ChannelEvent) => void, ended: () => void) =>
   subscribe("channel.follow", { id, after }, subscriptions["channel.follow"].event, on, ended);
-
-/** The farm's reports after the one with this id (the newest when absent), then each from now on. */
-export const followReports = (after: string | undefined, on: (e: ChannelEvent) => void, ended: () => void) =>
-  subscribe("channel.reports", after === undefined ? {} : { after }, subscriptions["channel.reports"].event, on, ended);
 
 /** A blocks artifact's changes after this seq, then each batch from now on. */
 export const followArtifact = (id: string, after: number, on: (e: ArtifactEvent) => void, ended: () => void) =>

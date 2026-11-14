@@ -1,1 +1,1 @@
-export { selectionOf, shellMessageOf, shellPath } from "@vibevalley/artifact/shell";
+export { selectionOf, shellMessageOf } from "@vibevalley/artifact/shell";

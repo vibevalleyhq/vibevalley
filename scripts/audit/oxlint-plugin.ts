@@ -34,8 +34,8 @@ const noTestSleep = defineRule({
     messages: {
       sleep: says(
         "a test that waits a set time guesses how long the work takes: slow when it is quick, flaky when it is slow",
-        "wait for the thing itself: `until(() => …)`, `untilGot` or `waitFor` for work in the background, `vi.advanceTimersByTimeAsync(ms)` under fake timers, `gate()` to hold a fake until the test lets it go, `nextTurn` before checking nothing happened",
-        "packages/testkit/src/until.ts",
+        "wait for a condition with `vi.waitFor` or the native app's `waitUntil`; advance fake timers with `vi.advanceTimersByTimeAsync(ms)`",
+        "apps/mac/ui/vv/app/app.test.tsx",
       ),
     },
   },

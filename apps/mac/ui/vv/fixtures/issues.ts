@@ -77,7 +77,7 @@ const askingSession = sampleSession(
   { name: "小林", repo: "vibevalley", runs: 1, lastRun: lastRun("completed", "两种做法，要你挑一个。") },
 );
 
-export const sessions: SessionView[] = [workingSession, reviewSession, askingSession];
+const sessions: SessionView[] = [workingSession, reviewSession, askingSession];
 
 // The helpers a profile sent (the trajectories view), by op only: every profile has these.
 responses["session.list"] = [
@@ -85,7 +85,7 @@ responses["session.list"] = [
   { ...reviewSession, brief: "修好登录过期", phase: { _tag: "closed", at: now - 5 * min, closed: "merged" } },
 ];
 
-export const issues: Issue[] = [
+const issues: Issue[] = [
   base(32, "设置页按用途分组", {
     status: "in_progress",
     description: "设置太散了，找一个开关要翻很久。\n\n按用途分成几组：帮工、模型、外观、连接。",

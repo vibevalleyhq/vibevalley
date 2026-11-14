@@ -232,7 +232,7 @@ const groupKeys = ["frequent", "faces", "hands", "things", "nature", "signs"] as
 const groupName = (id: string) => (isOneOf(groupKeys, id) ? t(`web.channel.emoji.groups.${id}`) : id);
 
 /** Every emoji the farm offers, the usual ones first. */
-export function EmojiPicker(props: { onPick: (emoji: string) => void; onClose?: () => void }) {
+function EmojiPicker(props: { onPick: (emoji: string) => void; onClose?: () => void }) {
   const groups = [{ id: "frequent", emoji: quickReactions }, ...emojiGroups];
   return (
     <View testID="emoji-picker" accessibilityLabel={t("web.channel.emoji.open")} class="gap-2" style={{ width: width - 16 }}>

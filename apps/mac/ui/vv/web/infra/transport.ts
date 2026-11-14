@@ -27,7 +27,7 @@ export interface Transport {
 }
 
 /** No server: every call fails as an unreachable one would, no frame comes. */
-export const offline: Transport = {
+const offline: Transport = {
   call: () => Promise.reject(new TypeError("no server")),
   state: () => () => {},
   live: () => () => {},
@@ -54,7 +54,7 @@ export function onTransportChange(fn: () => void): () => void {
 }
 
 /** `/api/v1/issue/status/update` → `issue.status.update`. */
-export const opOf = (path: string): string => path.replace(/^.*\/api\/v1\//, "").replaceAll("/", ".");
+const opOf = (path: string): string => path.replace(/^.*\/api\/v1\//, "").replaceAll("/", ".");
 
 /**
  * A `fetch` for VibeValley's API client: the call goes through the

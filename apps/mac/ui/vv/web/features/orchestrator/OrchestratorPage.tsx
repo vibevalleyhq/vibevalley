@@ -33,7 +33,7 @@ function orchestratorPath(rest: string): { readonly agent: string; readonly tab:
 }
 
 /** The page of an orchestrator's tab. */
-export const orchestratorHref = (agent: string, tab: Tab = "memory") =>
+const orchestratorHref = (agent: string, tab: Tab = "memory") =>
   agent === defaultOrchestrator ? `/orchestrator/${tab}` : `/orchestrator/${encodeURIComponent(agent)}/${tab}`;
 
 /** `rest` is the path after /orchestrator/. */

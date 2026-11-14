@@ -30,7 +30,7 @@ const palette = (): Record<string, string> => ({
 });
 
 /** The SVG with its variables resolved, for a renderer without CSS. */
-export function inlineSvg(svg: string, colors: Record<string, string>): string {
+function inlineSvg(svg: string, colors: Record<string, string>): string {
   return svg
     .replace(/style="rx:var\(--_r\)"/gu, `rx="${colors.r}"`)
     .replace(/var\(--_([a-z]+)\)/gu, (whole, name: string) => colors[name] ?? whole)

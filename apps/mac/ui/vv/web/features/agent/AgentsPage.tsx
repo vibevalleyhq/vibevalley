@@ -165,7 +165,7 @@ function OrchestratorCard(props: { agent: Agent }) {
   );
 }
 
-export function AgentCard(props: {
+function AgentCard(props: {
   agent: Agent;
   runtime?: RuntimeInfo | undefined;
   tally?: AgentTally | undefined;

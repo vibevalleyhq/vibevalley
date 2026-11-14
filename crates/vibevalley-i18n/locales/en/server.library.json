@@ -11,5 +11,7 @@
   "outside": "{path} is outside your working directory: only files in it can go in",
   "notFile": "{path} is not a file in your working directory",
   "unreadable": "Cannot read {path}: {why}",
-  "preview": { "remove": "Take \"{name}\" out of the library; messages that have it still open it" }
+  "preview": {
+    "remove": "Take \"{name}\" out of the library; messages that have it still open it"
+  }
 }

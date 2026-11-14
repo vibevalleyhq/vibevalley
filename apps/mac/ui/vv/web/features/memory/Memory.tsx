@@ -385,7 +385,7 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
   );
 }
 
-export function MemoryItem(props: { memory: Memory; onForget?: (() => void) | undefined; meta: string[]; faded?: boolean; warning?: string | undefined }) {
+function MemoryItem(props: { memory: Memory; onForget?: (() => void) | undefined; meta: string[]; faded?: boolean; warning?: string | undefined }) {
   const hovered = signal(false);
   return (
     <View

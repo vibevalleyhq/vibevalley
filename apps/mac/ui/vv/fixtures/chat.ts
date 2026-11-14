@@ -162,7 +162,7 @@ const readiness = Object.fromEntries(
   features.map((f): [Feature, Readiness] => [f, f === "orchestrator" ? { ready: true } : f === "call" ? { ready: false, missing: "agora" } : { ready: true }]),
 ) as Record<Feature, Readiness>;
 
-export const settings = {
+const settings = {
   file: "~/.vibevalley/settings.json",
   home: "~/.vibevalley",
   paths: { repos: "~/.vibevalley/repos", worktrees: "~/.vibevalley/worktrees", pkm: "~/.vibevalley/pkm" },

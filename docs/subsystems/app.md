@@ -28,7 +28,7 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 | `apps/mac/src/debug.rs` | 不看屏幕检查应用的两个入口：状态转储和脚本（[验收](.agents/skills/vv-acceptance/references/app.md)） |
 | `apps/mac/ui/App.tsx`、`bridge.ts`、`surfaces/`、`components/` | TSX 包的入口（按 `host.params.view` 挑视图）、桥的页面一半、外壳的面（侧栏、命令面板、agent 窗格、Markdown 窗格）和它们的零件 |
 | `apps/mac/ui/vv/VibeValley.tsx`、`vv/web/` | 工作台：`app/`（路由表 `App.tsx`、导航 `places.ts`、外框 `Shell.tsx`）、`features/<概念>/`、`ui/`、`state/`、`infra/`、`base/` |
-| `apps/mac/ui/vv/solid.ts`、`solidweb.ts`、`polyfill.ts` | 工作台的页面沿用 Solid 的写法；这三个文件在 nsh 的响应式上给出它们用到的那部分 |
+| `apps/mac/ui/vv/solid.ts`、`polyfill.ts` | 工作台的页面沿用 Solid 的写法；这两个文件在 nsh 的响应式上给出它们用到的那部分 |
 | `apps/mac/ui/vv/theme.json`、`apps/mac/ui/nsh.json` | 工作台的令牌：颜色（浅色、深色各一套）、字号、圆角、缓动、阴影（[界面](docs/style/design.md#令牌)） |
 | `crates/vibevalley-bridge/` | 桥的 Rust 一半：`Hub` 把一个 `Server` 分给多个视图；`fake::FakeServer` 用样例状态和写好的回答顶替服务端 |
 | `crates/vibevalley-workspace/`、`crates/vibevalley-store/` | 项目、布局、终端和 agent 任务的模型，和它们存的库 |

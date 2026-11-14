@@ -15,7 +15,7 @@ function attempt<T>(f: () => T): T | undefined {
 }
 
 /** A choice's atom, for a registry of the caller's (the tests); the page's are made by defineStored. */
-export function storedAtom<S extends z.ZodType>(name: string, schema: S, fallback: z.output<S>): Atom<z.output<S>> {
+function storedAtom<S extends z.ZodType>(name: string, schema: S, fallback: z.output<S>): Atom<z.output<S>> {
   const key = storedPrefix + name;
   const decode = (text: string | undefined): { readonly value: z.output<S> } | undefined => {
     if (typeof text !== "string") return undefined;

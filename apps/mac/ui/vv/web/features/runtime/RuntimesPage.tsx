@@ -105,7 +105,7 @@ export function RuntimesPage(props: { rest: string }) {
   );
 }
 
-export function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
+function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
   const client = useQueryClient();
   const refreshing = createAct();
   const inst = () => props.info.installation;

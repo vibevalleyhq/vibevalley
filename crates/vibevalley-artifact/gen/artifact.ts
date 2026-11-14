@@ -4,16 +4,15 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
-const VV = process.argv[2]!;
-const out = process.argv[3]!;
+import * as A from "@vibevalley/artifact";
+import * as H from "@vibevalley/artifact/html";
+import * as Sh from "@vibevalley/artifact/shell";
+import { setLocale } from "@vibevalley/i18n";
+import { keyBetween } from "@vibevalley/protocol/rules";
+import { sample } from "./sample.ts";
 
-const { setLocale } = await import(`${VV}/packages/i18n/src/index.ts`);
+const out = process.argv[2]!;
 setLocale("zh");
-const A = await import(`${VV}/packages/artifact/src/index.ts`);
-const H = await import(`${VV}/packages/artifact/src/html.ts`);
-const Sh = await import(`${VV}/packages/artifact/src/shell.ts`);
-const { keyBetween } = await import(`${VV}/packages/protocol/src/rules/index.ts`);
-const { sample } = await import("./sample.ts");
 
 const golden = join(out, "tests/golden");
 mkdirSync(golden, { recursive: true });

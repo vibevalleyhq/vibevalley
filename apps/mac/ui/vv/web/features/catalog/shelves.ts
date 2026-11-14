@@ -77,7 +77,7 @@ export const shelves: readonly Shelf[] = [
 export const shelfOf = (name: string) => shelves.find((s) => s.match(name))?.id ?? "other";
 
 /** Case-insensitive, runs of digits by their value. */
-export function naturalCompare(a: string, b: string): number {
+function naturalCompare(a: string, b: string): number {
   const parts = (s: string) => s.toLowerCase().match(/\d+|\D+/gu) ?? [];
   const pa = parts(a);
   const pb = parts(b);

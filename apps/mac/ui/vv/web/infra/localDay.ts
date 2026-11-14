@@ -5,7 +5,7 @@ import { effect, lifecycle } from "nsh";
 
 import { dayKey } from "@vibevalley/pkm/days";
 
-export function nextLocalMidnight(now: number): number {
+function nextLocalMidnight(now: number): number {
   const next = new Date(now);
   next.setHours(24, 0, 0, 0);
   return next.getTime();

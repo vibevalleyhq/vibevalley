@@ -53,8 +53,8 @@ description: 在 VibeValley 的工作台（apps/mac/ui/vv/web，nsh 的 Tailwind
 
 ## 零件收调用方的样式
 
-- 零件收 `class?: string`，接在自己的 class 后面；要从字符串、数组、`{ "x": on }` 拼成一个字符串时用 [`cx()`](apps/mac/ui/vv/web/ui/cx.ts)。
-- `cx` 只拼接，不判冲突。调用方的 `class` 只补零件没设的（位置、宽度、外边距、`grow`）；要改零件已经设了的（颜色、高度、内边距），给零件加一个变体属性（`tone`、`size`）。
+- 零件收 `class?: string`，接在自己的 class 后面。
+- class 拼接不判冲突。调用方的 `class` 只补零件没设的（位置、宽度、外边距、`grow`）；要改零件已经设了的（颜色、高度、内边距），给零件加一个变体属性（`tone`、`size`）。
 
 ## 验证
 

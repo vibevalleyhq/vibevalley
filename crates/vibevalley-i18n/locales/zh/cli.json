@@ -1,13 +1,8 @@
 {
   "about": "VibeValley 的命令行：一条命令是服务端的一个操作，<资源> [<子资源>] <动作>",
   "flag": {
-    "prompt": "问一句就走，不进对话",
     "model": "模型",
     "effort": "思考的力度",
-    "resume": "接着这个会话",
-    "cwd": "在哪个文件夹；不填是当前的",
-    "name": "自己的 agent 的名字（家目录 ~/.vibevalley/agent/<名字>）",
-    "mcp": "MCP 配置文件；不填用家目录里的 mcp.json",
     "server": "服务端的地址；不填用 VIBEVALLEY_SERVER，再没有是这台电脑上开着的那个（家目录的 server.json），都没有是 {fallback}",
     "dryRun": "只说会做什么，不动手（会删、会合、会关、会让帮工走的命令）",
     "format": "md 是给人读的 Markdown（默认），json 是接口的答复",
@@ -51,15 +46,6 @@
     "jsonl": "输出独立的版本化 JSONL 事件流"
   },
   "command": {
-    "root": "VibeValley 的命令行，一条命令一个操作：答复是短文字，--format json 给接口的形状；在终端里对话用 chat",
-    "app": {
-      "about": "桌面版自己的事：状态、打开到某一页、退出、重启、更新",
-      "open": "让桌面版的窗口到这一页（/issues/12）；没开就先打开",
-      "quit": "退出桌面版（服务端先存好）",
-      "restart": "重启桌面版",
-      "update": "桌面版的更新：不带参数说现在的样子，check 去查，install 装上并重启",
-      "status": "桌面版是哪个、什么版本、农场在哪"
-    },
     "doctor": "一条命令看清这台电脑上的农场：找到的是哪个、连不连得上、桌面版、农机、模型的 key、连接到本机",
     "pkm": {
       "capture": "记一句话进今天的日记（--page 记到那一页）；不给字就读标准输入，多行按缩进拆成块",
@@ -125,28 +111,16 @@
       "list": "列出帮工：id、名字、档案、在做什么",
       "show": "看一个帮工",
       "stop": "停下帮工这一轮"
-    },
-    "chat": "在终端里对话：不给农机是 VibeValley 自己的 agent，给了就和那个农机直接聊（不记轨迹和花费）",
-    "auth": {
-      "about": "登录到别处的服务端，像 gh auth login：在页面上点同意，这台电脑就拿到自己的钥匙",
-      "login": "登录到一个服务端：显示确认码，等你在已登录的页面上同意，钥匙存在家目录的 auth.json",
-      "status": "现在连哪个服务端、用的是哪台设备的钥匙",
-      "logout": "退出：服务端收回这台电脑的钥匙，本机忘掉它"
     }
   },
   "next": {
     "help": "看这条命令怎么写",
-    "startServer": "先起服务端（vp run --filter @vibevalley/server start），或用 --server 指到在跑的那个",
-    "openApp": "先打开桌面版（vibevalley app open 也会打开它）"
+    "startServer": "先起服务端（vp run --filter @vibevalley/server start），或用 --server 指到在跑的那个"
   },
   "failure": {
     "unreachable": "连不上 {base}：{why}",
-    "retry": "服务端要流重连，命令行不接着连",
     "gone": "工单 #{n} 不在了：被删掉了",
-    "appNotOpen": "连不上 {home} 的桌面版：{why}",
-    "noDryRun": "{command} 没有试跑：去掉 --dry-run 才会做",
-    "noChat": "这里找不到 VibeValley 的对话程序：从桌面版装的命令行里用它，或在仓库里经 vp run --filter @vibevalley/cli start",
-    "chatFlag": "{flags} 不能和 {runtime} 一起用：--name、--mcp 是 VibeValley 自己的 agent 的，--effort、--resume 是农机的"
+    "noDryRun": "{command} 没有试跑：去掉 --dry-run 才会做"
   },
   "op": {
     "user": {
@@ -598,7 +572,6 @@
     "installRuntime": "装一个编码 agent（Claude Code、Codex……），装好以后让农场再找一遍",
     "noModelKey": "没有 DeepSeek 的 key：助手和自己的 agent 起不来",
     "setModelKey": "在「设置 › 模型」里填 DeepSeek 的 key",
-    "lanSettings": "看「设置 › 设备」",
     "wrong": "这几项不对：{checks}"
   },
   "pkm": {
@@ -622,8 +595,6 @@
     "page": "页：标题、slug 或别名",
     "repoName": "新仓库的名字",
     "session": "帮工的 id，比如 w3",
-    "chatRuntime": "农机（claude、codex…）；不给是 VibeValley 自己的 agent",
-    "appPath": "桌面版里的一页，比如 /issues/12；不填是首页",
     "capture": "要记的话；不给就读标准输入",
     "comment": "评论的话",
     "cronText": "到点时说的话：交给助手或档案去做的事",
@@ -634,10 +605,8 @@
     "search": "要找的词",
     "status": "要挪到的状态",
     "title": "工单的标题",
-    "updateStep": "check 去查有没有新版本，install 装上并重启；不填只说现在的样子",
     "pageTitle": "页的标题",
-    "agentName": "档案的名字",
-    "authServer": "服务端的地址（https://farm.example.com）；不给就用 --server"
+    "agentName": "档案的名字"
   },
   "channel": {
     "sent": "发到了 {channel}"
@@ -709,27 +678,6 @@
     },
     "doctor": {
       "about": "看这台电脑上的农场好不好"
-    },
-    "appOpen": {
-      "about": "让窗口到 12 号工单"
-    },
-    "appQuit": {
-      "about": "退出桌面版"
-    },
-    "appRestart": {
-      "about": "重启桌面版"
-    },
-    "appUpdate": {
-      "about": "现在去查更新"
-    },
-    "runtimeChat": {
-      "about": "直接和 Claude Code 聊"
-    },
-    "chat": {
-      "about": "和 VibeValley 自己的 agent 对话"
-    },
-    "appStatus": {
-      "about": "桌面版开着没有、是哪个"
     },
     "artifactRead": {
       "about": "读 a1 的正文"
@@ -838,15 +786,6 @@
     },
     "issueObserve": {
       "about": "以 JSONL 跟随工单执行"
-    },
-    "authLogin": {
-      "about": "登录到那个服务端，之后的命令都连它"
-    },
-    "authStatus": {
-      "about": "看登录到了哪里"
-    },
-    "authLogout": {
-      "about": "退出，回到这台电脑上的服务端"
     }
   },
   "issue": {
@@ -889,16 +828,5 @@
     "read": "读取上下文资源。JSON 必填 uri（vv:// 资源地址）。 可选 offset、limit（整数）。",
     "doctor": "通过认证调用只读 session_list，验证凭证与工具通路；不代表编码 agent 已加载可选 MCP。JSON 默认为空对象。",
     "json": "工具输入的 JSON 对象；参数格式见本命令说明。"
-  },
-  "auth": {
-    "here": "{server} 是这台电脑上的服务端：命令行直接就能用，不用登录",
-    "approve": "在浏览器里打开 {link}\n确认码 {code}：页面上的码一样就点同意。等你同意……",
-    "noBrowser": "没能打开浏览器：自己打开上面的链接",
-    "signedIn": "已登录 {server}，这台电脑在设备列表里叫「{device}」",
-    "notSignedIn": "没有登录：命令连的是 {server}",
-    "revoked": "{server} 收回了这台电脑的钥匙：重新运行 vibevalley auth login",
-    "status": "已登录 {server}，以「{device}」的身份；你叫「{name}」",
-    "signedOut": "已退出 {server}",
-    "logoutUnsaid": "没能让服务端收回钥匙（{why}）：本机已经忘掉它，到设备页上收回它"
   }
 }

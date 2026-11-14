@@ -31,15 +31,6 @@ export function pressTransition() {
   } as const;
 }
 
-/** Style fragment for a status swap (opacity + a 3 px rise). */
-export function swapTransition() {
-  return {
-    transitionProperty: "opacity,transform",
-    transitionDuration: ms(durations.statusSwap),
-    transitionTimingFunction: ease,
-  } as const;
-}
-
 /** Elapsed time as the live timer shows it: tenths below a minute. */
 export function formatElapsed(msElapsed: number): string {
   if (msElapsed < 60_000) return `${(msElapsed / 1000).toFixed(1)}s`;

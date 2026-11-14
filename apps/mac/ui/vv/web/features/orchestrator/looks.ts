@@ -13,18 +13,6 @@ export const orchestratorLooks: readonly { readonly id: OrchestratorLook; readon
   { id: "robot", name: t("web.orchestrator.looks.robot.name"), blurb: t("web.orchestrator.looks.robot.blurb") },
 ];
 
-/** The young farmer stands in for a look not painted. */
-export const orchestratorSprite = (look: string, suffix: string, has: (name: string) => boolean) =>
-  has(`manager-${look}${suffix}`) ? `manager-${look}${suffix}` : `manager${suffix}`;
-
-export const lookReady = (look: string, has: (name: string) => boolean) => look === "farmer" || has(`manager-${look}`);
-
-export const petName: Record<string, string> = {
-  dog: t("web.orchestrator.pet.dog"),
-  ragdoll: t("web.orchestrator.pet.ragdoll"),
-  bluecat: t("web.orchestrator.pet.bluecat"),
-};
-
 export const markWrongOf =
   (agent: string) =>
   (on: number, want: string): Promise<OrchestratorEval> =>

@@ -3,7 +3,6 @@ import { z } from "zod";
 import { ThemeChoice } from "@vibevalley/protocol/host";
 
 import type { Accessor } from "../../solid";
-import { currentHost } from "../infra/host";
 import { defineStored, orFallback } from "./stored";
 
 /** The workbench's size, in percent; the farm keeps its own whole-number scaling. */
@@ -45,12 +44,8 @@ const prefs = defineStored("prefs", PrefsSchema, {
 /** The choices now; read in a computation or a component, it follows them. */
 export const prefsNow = prefs.get;
 
-const subscribePrefs = prefs.subscribe;
-
 const set = (patch: Partial<Prefs>) => prefs.update((p) => ({ ...p, ...patch }));
 
-export const setPick = (pick: string) => set({ pick });
-export const setPet = (pet: string) => set({ pet });
 export const setTheme = (theme: ThemeChoice) => set({ theme });
 export const setScale = (scale: Scale) => set({ scale });
 export const setStart = (start: Start) => set({ start });
@@ -81,19 +76,3 @@ export const shownTheme = (): "light" | "dark" => {
   const { theme } = prefs.get();
   return theme === "system" ? (dark().matches ? "dark" : "light") : theme;
 };
-
-// The theme goes on <html> as data-theme and is told to the host so its own parts follow.
-function apply() {
-  const { theme, scale } = prefsNow();
-  const root = document.documentElement;
-  root.dataset.theme = shownTheme();
-  root.style.setProperty("--workbench-zoom", String(scale / 100));
-  currentHost().theme?.(theme);
-}
-
-/** Once, as the page starts: applied now and whenever the choice or the system's theme changes. */
-export function followAppearance() {
-  apply();
-  subscribePrefs(apply);
-  dark().addEventListener("change", apply);
-}

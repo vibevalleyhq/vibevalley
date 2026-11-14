@@ -12,12 +12,8 @@
 | `channelOf` | `channel.ts` | A channel by its id; none when no id is given. |
 | `actorRoleOf` | `channel.ts` | The agent's role when an actor is an agent; undefined for the user or the system. |
 | `mentionLead` | `channel.ts` | What an @name may follow: anything but a Latin letter, a digit, _ or @, so a@b.com names no one while cjk@w3 does (Chinese runs on without spaces). |
-| `slice` | `cut.ts` | s.slice(start, end), a surrogate pair cut in half made U+FFFD. |
-| `cut` | `cut.ts` | s as it is when it fits in max units; else its first max units and an ellipsis. |
 | `oneLine` | `cut.ts` | Runs of white space are one space. |
-| `htmlSandbox` | `display.ts` | The <iframe>'s sandbox attribute; the server's CSP sandbox directive is the same tokens. |
 | `freshOf` | `inbox.ts` | The items of now that are news to known: undefined known is the first look, which knows them all and has no news. An id is news once. |
-| `assignmentOf` | `issues.ts` | The responsibility in force now. |
 | `assignedAgentOf` | `issues.ts` |  |
 | `executionsOf` | `issues.ts` | Every execution, in assignment and start order. |
 | `sessionIdsOf` | `issues.ts` | The external helper contexts that executed it, in order. |
@@ -29,14 +25,7 @@
 | `validKey` | `order.ts` |  |
 | `keyBetween` | `order.ts` | A key after a and before b; "" for a is the start, "" for b the end. |
 | `spanText` | `phase.ts` | A short span: seconds under a minute (at least one), else minutes. |
-| `isBusy` | `phase.ts` |  |
-| `roomLeft` | `phase.ts` | How many more may start working now: on the whole farm (space at once), and in the repo (perRepo at once, 0 for no limit of its own). |
-| `needOf` | `phase.ts` |  |
-| `phaseText` | `phase.ts` | phaseWords as said at now. |
-| `phaseWords` | `phase.ts` | What a session is doing in words, how long it has been quiet left as {span}. |
 | `plainText` | `plain.ts` |  |
-| `farmOf` | `play.ts` | The farm a session's bed is on: each repo has its own, and the sessions without one share one. |
-| `plotKeyOf` | `play.ts` | The plot a session works, the key of `FarmView.plots`: its issue, so a reopened issue keeps its plot; one with no issue is its own. |
 | `githubRepository` | `repo.ts` | Only repository home URLs: never credentials, other git transports or command-line options. |
 | `same` | `same.ts` |  |
 | `stageWantsUser` | `stage.ts` | Questions the user for something: the page leads with it, the board flags it. |
@@ -49,8 +38,6 @@
 |---|---|---|
 | `useNow` | `dom.tsx` | The time, a new reading every `ms`: for "3m ago" that keeps up without anything else changing. |
 | `Keyed` | `dom.tsx` | Rebuilds its children whenever `key` changes, as a React key does: their state starts over. |
-| `aria` | `dom.tsx` | aria-expanded, aria-pressed, aria-selected: "true" or "false", as a boolean false would drop the attribute. |
-| `useViewport` | `dom.tsx` | The window's size, following it as it is resized. |
 | `createSettled` | `dom.tsx` | The value once it has stopped changing for `ms`: what is asked of the server while someone types. |
 | `variant` | `dom.tsx` |  |
 | `createExternal` | `external.ts` | A store outside Solid (subscribe, get) as an accessor. it notifies when `get` returns a different value. |
@@ -68,7 +55,6 @@
 | `isObjectOrArray` | `guards.ts` | An object or an array. |
 | `SpriteManifest` | `manifests.ts` |  |
 | `CursorManifest` | `manifests.ts` |  |
-| `pinyinLoaded` | `search.ts` | Settles once pinyin matches too (tests wait on it). |
 | `spelled` | `search.ts` | The text holds the query, ignoring case, or spells it in pinyin; query is lower case. |
 | `matches` | `search.ts` | Every word of the query is somewhere in the texts (spelled), ignoring case; an empty query matches everything. |
 | `compareText` | `search.ts` |  |
@@ -76,8 +62,6 @@
 | `shortcutPlaces` | `shortcuts.ts` |  |
 | `shortcuts` | `shortcuts.ts` |  |
 | `keyCap` | `shortcuts.ts` | A key's cap on the sheet. |
-| `inField` | `shortcuts.ts` |  |
-| `pressed` | `shortcuts.ts` | The chords matched here (mod+K, ?, C): the rest are each place's own. |
 | `useInterval` | `timer.ts` | fn every ms for as long as the reactive owner lives. |
 | `useTimeout` | `timer.ts` | A timeout to set from a handler: setting it again replaces the one waiting, and the reactive owner's end clears it. |
 | `typedMarks` | `typedMarks.ts` | The text with the marks just typed before the caret as the syntax they stand for. undefined when there are none. |
@@ -105,7 +89,11 @@
 | `useAttachmentUrl` | `attachmentFile.ts` | The file's `file:` URL once the server said where it is. |
 | `openAttachment` | `attachmentFile.ts` | Opens the attachment in the system's app for its kind (VibeValley opens it in a browser tab). |
 | `playAudio` | `attachmentFile.ts` | Plays a sound file through the host (nsh has no audio on GPUI); one at a time, host.stopAudio stops it. |
-| `bridged` | `bridged.ts` |  |
+| `saveFile` | `attachmentFile.ts` |  |
+| `pickFile` | `attachmentFile.ts` |  |
+| `uploadAudio` | `attachmentFile.ts` |  |
+| `playInput` | `attachmentFile.ts` |  |
+| `useInputFile` | `attachmentFile.ts` |  |
 | `useBridge` | `bridged.ts` |  |
 | `fixtureTransport` | `fixtures.ts` | `subscriptions`: the events each subscription (by name) sends at once; it then stays open, as a quiet stream would. |
 | `useForm` | `form.ts` |  |
@@ -125,32 +113,24 @@
 | `orchestratorMood` | `frame.ts` |  |
 | `rawFrame` | `frame.ts` | The frame as it came: a new object each time. |
 | `subscribeLive` | `frame.ts` | Listens to the live events; returns how to stop. |
-| `reconnectDelayMs` | `gateway.ts` | The wait before connecting again after a connection could not be opened: 500 ms, growing by half each time, at most 5 s. |
-| `subscribe` | `gateway.ts` | Each event of one subscription (each decoded with its `event` Schema) until stop() is called, or until it ends: the |
 | `followChannel` | `gateway.ts` | What is said in a channel after the message numbered after, then from now on. |
-| `followReports` | `gateway.ts` | The farm's reports after the one with this id (the newest when absent), then each from now on. |
 | `followArtifact` | `gateway.ts` | A blocks artifact's changes after this seq, then each batch from now on. |
 | `followSuggestions` | `gateway.ts` | An artifact's suggestions as they now are, then the whole list after each change. |
 | `currentHost` | `host.ts` |  |
-| `nextLocalMidnight` | `localDay.ts` |  |
 | `localDay` | `localDay.ts` |  |
 | `retryRead` | `query.ts` |  |
 | `refetchOnRelink` | `query.ts` |  |
 | `cursorsQuery` | `query.ts` |  |
 | `agentsQuery` | `query.ts` |  |
-| `templatesQuery` | `query.ts` |  |
-| `reposQuery` | `query.ts` |  |
 | `providerQuery` | `query.ts` |  |
 | `settingsQuery` | `query.ts` |  |
 | `runtimesQuery` | `query.ts` |  |
-| `achievementsQuery` | `query.ts` |  |
 | `useSprites` | `query.ts` |  |
 | `useAgents` | `query.ts` |  |
 | `useAgentTemplates` | `query.ts` |  |
 | `useRepos` | `query.ts` |  |
 | `useSettings` | `query.ts` |  |
 | `useRuntimes` | `query.ts` |  |
-| `waitForReads` | `query/activity.ts` |  |
 | `defineQuery` | `query/cache.ts` |  |
 | `createQueryClient` | `query/cache.ts` |  |
 | `QueryDecodeError` | `query/schema.ts` | A response that is not in the query's shape. Carries none of the issues: they can contain credentials. |
@@ -170,11 +150,9 @@
 | `useSearchParams` | `router/context.tsx` |  |
 | `internalUrl` | `router/history.ts` |  |
 | `linkHref` | `router/history.ts` |  |
-| `browserHistory` | `router/history.ts` |  |
 | `memoryHistory` | `router/history.ts` |  |
 | `updateSearch` | `router/history.ts` |  |
 | `Link` | `router/link.tsx` |  |
-| `useActive` | `router/link.tsx` | Whether `href` is the place shown now (or above it, unless `end`). |
 | `NavLink` | `router/link.tsx` |  |
 | `Navigate` | `router/link.tsx` |  |
 | `pathSegments` | `router/matching.ts` |  |
@@ -190,15 +168,12 @@
 | `searchParam` | `router/search.ts` | One value of a search key, read with `schema`: a key given twice does not decode. |
 | `search` | `router/search.ts` |  |
 | `useSaveSettings` | `settings.ts` | Saves, and the settings the server answers with are the cached ones from then on. |
-| `useUpdates` | `settings.ts` | The desktop's own update as it is now and as it changes (Host.update); undefined where the host is not updated from |
 | `useTable` | `table.ts` |  |
 | `defineColumns` | `table/model.ts` |  |
 | `createTable` | `table/model.ts` |  |
-| `offline` | `transport.ts` | No server: every call fails as an unreachable one would, no frame comes. |
 | `transport` | `transport.ts` |  |
 | `setTransport` | `transport.ts` | Swaps the transport (at start-up: the bridge, or a story's fixtures). |
 | `onTransportChange` | `transport.ts` |  |
-| `opOf` | `transport.ts` | `/api/v1/issue/status/update` → `issue.status.update`. |
 | `transportFetch` | `transport.ts` | A `fetch` for VibeValley's API client: the call goes through the |
 
 ## `apps/mac/ui/vv/web/state`
@@ -209,31 +184,24 @@
 |---|---|---|
 | `atom` | `atom.ts` |  |
 | `Registry` | `atom.ts` | Where atoms' values live: the page's one, or a test's or a story's own. |
-| `createRegistry` | `atom.ts` |  |
 | `pageRegistry` | `atom.ts` | The page's one registry. |
 | `RegistryContext` | `atom.ts` | Every atom's value lives in one registry for the page; the page's own unless a test or a story gives another. |
 | `useRegistry` | `atom.ts` |  |
 | `useAtom` | `atom.ts` | An atom's value as an accessor: subscribed while the component lives, never suspending. |
 | `onPage` | `atom.ts` | The atom held for the registry's life, built and subscribed lazily on first access rather than at module import. |
-| `usePageAtom` | `atom.ts` | Binds a page atom's reads and writes to the active `RegistryContext`, for component callbacks in tests and stories. |
 | `defineAtom` | `atom.ts` | A value of the page's that lasts until it closes (a dialog the shell and a page both open, the farm's overlays). |
-| `framesSource` | `atom.ts` |  |
 | `linkIn` | `atom.ts` | Whether the state stream is up now, read from its source: subscribing would open and close the stream. |
 | `framesIn` | `atom.ts` | The registry's frames now. |
 | `subscribeFrames` | `atom.ts` | Hears each frame of the registry's source, and follows the source when a test swaps it; the stream stays open meanwhile. |
-| `latestReader` | `atom.ts` | The answer to the newest ask only, a failure told as a failure rather than "nothing found". |
 | `useLatest` | `atom.ts` | The answer to the newest `key()` while the component lives; undefined while there is nothing to ask. |
 | `bySeq` | `intent.ts` | A reply that carries the seq of the fold with its change (an issue moved): shown once a frame has caught up. |
 | `defineIntent` | `intent.ts` |  |
 | `sendOnce` | `intent.ts` | An intent made by a button rather than typed (a suggestion, the repo map's sow, an artifact's reply). |
 | `sendReplacing` | `intent.ts` | A setting the user changes again before the first change showed (a reaction off and on, a level picked twice). |
-| `intentsIn` | `intent.ts` | A type's intents in one registry; the same object for every caller, so its timers and watches are kept once. |
 | `useIntents` | `intent.ts` | A type's intents in the page's registry, with the list as an accessor. |
 | `ScaleValues` | `prefs.ts` | The workbench's size, in percent; the farm keeps its own whole-number scaling. |
 | `StartValues` | `prefs.ts` | Where / opens. |
 | `prefsNow` | `prefs.ts` | The choices now; read in a computation or a component, it follows them. |
-| `setPick` | `prefs.ts` |  |
-| `setPet` | `prefs.ts` |  |
 | `setTheme` | `prefs.ts` |  |
 | `setScale` | `prefs.ts` |  |
 | `setStart` | `prefs.ts` |  |
@@ -242,8 +210,6 @@
 | `rememberPick` | `prefs.ts` | Who and where an issue was given to, for the next quick add and the farm's next job: "" for no one is the orchestrator's. |
 | `usePrefs` | `prefs.ts` | One of the choices, following it. |
 | `shownTheme` | `prefs.ts` | The theme the workbench shows: "system" worked out from the system's own. Read again when the choice changes. |
-| `followAppearance` | `prefs.ts` | Once, as the page starts: applied now and whenever the choice or the system's theme changes. |
-| `storedAtom` | `stored.ts` | A choice's atom, for a registry of the caller's (the tests); the page's are made by defineStored. |
 | `defineStored` | `stored.ts` | A choice kept on this machine, read and set as the page's value; `name` is unique across the page. |
 | `orFallback` | `stored.ts` | A field of a stored struct that reads as `fallback` when it is missing or does not decode, so one bad field does not throw away the others. |
 
@@ -264,11 +230,3 @@
 | `readsOf` | `source.ts` | The fields read off what object.method() returns: right off the call (`core.state().issues`, `?.` too), through a const it is kept in (`const s = core.state(). |
 | `analyzeSource` | `source.ts` |  |
 | `calls` | `source.ts` | Whether the file calls object.method(…) anywhere. |
-| `tempDir` | `temp.ts` |  |
-| `waitFor` | `until.ts` | What get answers once ok holds for it. what is said if it never does (a function: read when it is given up on). |
-| `untilGot` | `until.ts` | The value get gives once it is something. |
-| `until` | `until.ts` | Once ok holds. |
-| `whenTrue` | `until.ts` | until under the name the promise-written tests (a fake runtime, a fake model) already use. |
-| `within` | `until.ts` | What p settles to, or a rejection naming what took longer than ms (real time): a deadline on something the test |
-| `gate` | `until.ts` | A gate a fake waits at until the test opens it: a fake that should be busy is busy until the test says, not for a |
-| `nextTurn` | `until.ts` | One turn of the event loop: whatever was set going before it (a publish taken by a forked reader, a promise already resolved) has run. |

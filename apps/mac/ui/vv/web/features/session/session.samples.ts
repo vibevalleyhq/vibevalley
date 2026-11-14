@@ -60,16 +60,4 @@ export const failedRun: SessionEvent[] = inRun("run-3", [
   ev(506, "run/error", "这一轮没跑完：模型的钥匙没设（设置 › 模型）"),
 ]);
 
-/** A word carried to it while the run went on: still the same run. */
-export const toldTwiceRun: SessionEvent[] = inRun("run-4", [
-  ev(700, "run/start", ""),
-  ev(700, "user/message", "把登录页的提示改得短一点。"),
-  ev(702, "assistant/thinking", "提示在 LoginPage.tsx。"),
-  ...tool(704, 1, "edit_file", "edit", "apps/web/src/LoginPage.tsx", "+1 −1"),
-  ev(707, "user/message", "顺便把按钮的字也改成「重新登录」。"),
-  ...tool(709, 1, "edit_file", "edit", "apps/web/src/LoginPage.tsx", "+1 −1"),
-  ev(712, "assistant/message", "两处都改了：提示短了，按钮写「重新登录」。"),
-  ev(712, "run/end", ""),
-]);
-
 export const nowAfter = (log: readonly SessionEvent[]) => (log.at(-1)?.time ?? start) + 20_000;

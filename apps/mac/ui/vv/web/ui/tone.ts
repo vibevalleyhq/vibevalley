@@ -2,8 +2,6 @@
 // nsh has no color-mix, so the theme token is read and given an alpha.
 import { token } from "nsh";
 
-export type ToneName = "ink" | "muted" | "faint" | "line" | "leaf" | "wheat" | "berry" | "water" | "bark" | "idle" | "page" | "side" | "accent";
-
 /** The theme color `name` (follows light and dark). */
 export const tone = (name: string): string => String((token as (n: string) => unknown)(name) ?? "#888888");
 

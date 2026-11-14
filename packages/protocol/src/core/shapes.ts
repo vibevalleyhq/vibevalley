@@ -9,9 +9,3 @@ export const statePath = "/api/v1/state";
 export const eventsPath = "/api/v1/events";
 
 export const livePath = "/api/v1/live";
-
-/** The line the server prints on stdout once it listens, with --ready-json (the desktop shell waits for it). */
-export interface ServerReady {
-  url: string;
-  pid: number;
-}

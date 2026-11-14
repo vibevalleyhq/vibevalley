@@ -1,3 +1,4 @@
+export * from "./cut";
 export * from "./inbox";
 export * from "./issues";
 export * from "./phase";
@@ -7,7 +8,5 @@ export * from "./same";
 export * from "./plain";
 export * from "./omit";
 export * from "./oneOf";
-export * from "./cut";
-export * from "./display";
 export * from "./channel";
 export * from "./repo";

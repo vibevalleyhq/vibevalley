@@ -1,18 +1,10 @@
 {
   "misheard": "Hm? I didn't catch that. Could you say it again?",
-  "unknownSuffix": "the server cannot use it yet",
-  "unknown": "{vendor} for {what}: the server cannot use it yet",
-  "part": {
-    "asr": "recognition",
-    "llm": "the model",
-    "tts": "speech"
-  },
   "noAsrKey": "Microsoft recognition has no key yet: fill it in under Recognition on the Voice page",
   "noLine": "The assistant's voice line is not connected",
   "noDeepseekKey": "DeepSeek needs a DeepSeek key first: fill it in under Settings",
   "noLlmKey": "Your own model has no key yet: fill it in under Think on the Voice page",
   "noTtsKey": "Microsoft speech has no key yet: fill it in under Speak on the Voice page",
-  "unusable": "The voice settings cannot be used: {why}",
   "tunnel": {
     "timedOut": "cloudflared gave no address within 30 seconds",
     "missing": "cloudflared is not installed: brew install cloudflared, or set voice.line.url in the configuration to use your own tunnel",
@@ -21,7 +13,6 @@
   "noAgora": "No Agora credentials yet: fill in the App ID and the App Certificate under Settings",
   "lineDown": "The voice line cannot open: {why}",
   "lineClosed": "The voice line is closed",
-  "lineNotOpen": "The voice line is not open yet",
   "hungUp": "This call has already hung up",
   "noToken": "Could not sign a voice token: {why}",
   "stopped": "The voice service has stopped",

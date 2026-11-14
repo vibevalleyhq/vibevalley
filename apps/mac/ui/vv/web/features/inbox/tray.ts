@@ -20,10 +20,3 @@ export function traySummary(state: SpaceState, inbox: readonly InboxItem[]): Tra
 
 /** How many calls wait on the user at an issue; a mention is counted with the chat's unread instead. */
 export const waitingOnUser = (inbox: readonly InboxItem[]) => inbox.filter((c) => c.target.kind !== "chat").length;
-
-/** The window's title: what waits on the user, then the unread, before the app's name, so a tab in the background says
- * there is something to do. */
-export const tabTitle = (waiting: number, unread: number) => {
-  const marks = [...(waiting > 0 ? [`${waiting}!`] : []), ...(unread > 0 ? [`${unread}`] : [])];
-  return marks.length > 0 ? `(${marks.join(" · ")}) VibeValley` : "VibeValley";
-};

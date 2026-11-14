@@ -18,7 +18,7 @@ export function ShortcutSheet() {
   );
 }
 
-export function Kbd(props: { children: string }) {
+function Kbd(props: { children: string }) {
   return (
     <View class="min-w-6 items-center justify-center rounded-xs border border-line bg-hover px-1.5 py-0.5">
       <Text class="font-mono text-2xs text-ink">{props.children}</Text>
@@ -26,7 +26,7 @@ export function Kbd(props: { children: string }) {
   );
 }
 
-export function Shortcuts() {
+function Shortcuts() {
   return (
     <Scroll class="max-h-120">
       <View class="gap-4">

@@ -38,7 +38,7 @@ import { AnswerView, Criteria, OrchestratorIssueDetail, Question, Runs, stepsLin
 import { IssueThread } from "./IssueThread";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
 
-export { AnswerView, OrchestratorIssueDetail };
+export { OrchestratorIssueDetail };
 
 /** The workbench's issue page, answering the user top to bottom. the side holds the facts. */
 export function IssueDetail(props: {

@@ -3,7 +3,7 @@ import { omitUndefined } from "@vibevalley/protocol/rules";
 
 import { type Accessor, createEffect, createSignal } from "../../../../solid";
 import { api, reasonOf } from "../../../infra/api";
-import { followReports, followChannel } from "../../../infra/gateway";
+import { followChannel } from "../../../infra/gateway";
 import { chatPage } from "./places";
 export interface Followed {
   /** By number, oldest first. */
@@ -221,49 +221,4 @@ export function useMessage(at: Accessor<{ channel: string; number: number } | un
     return followed.subscribe(p.channel, read);
   });
   return message;
-}
-
-/** How many reports the farm's log keeps. */
-const logKeep = 80;
-
-let reports: readonly ChatMessage[] = [];
-const reportListeners = new Set<() => void>();
-let stopReports: (() => void) | undefined;
-let reportsRetry: ReturnType<typeof setTimeout> | undefined;
-
-function startReports() {
-  stopReports = followReports(
-    reports.at(-1)?.id,
-    (ev) => {
-      if (ev._tag === "Reset") reports = [];
-      else if (!reports.some((m) => m.id === ev.message.id)) reports = [...reports, ev.message].slice(-logKeep);
-      for (const l of reportListeners) l();
-    },
-    () => {
-      stopReports = undefined;
-      if (reportListeners.size > 0) reportsRetry = setTimeout(() => void (reportListeners.size > 0 && startReports()), againMs);
-    },
-  );
-}
-
-/** The farm's turn reports, oldest first, while shown. */
-export function useReports(): Accessor<readonly ChatMessage[]> {
-  const [got, setGot] = createSignal<readonly ChatMessage[]>(reports);
-  createEffect(
-    () => true,
-    () => {
-      const listener = () => setGot(reports);
-      reportListeners.add(listener);
-      if (reportListeners.size === 1) startReports();
-      setGot(reports);
-      return () => {
-        reportListeners.delete(listener);
-        if (reportListeners.size > 0) return;
-        clearTimeout(reportsRetry);
-        stopReports?.();
-        stopReports = undefined;
-      };
-    },
-  );
-  return got;
 }

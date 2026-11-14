@@ -156,7 +156,7 @@ Clock 的读取不应推进时间；同刻事件的顺序应由业务已有的�
 | 形状与进门解码 | Rust 结构体与 enum、serde、`Secret`；页面的 TypeScript 联合与 Zod（`satisfies Codec<T.X>`） | 类型不能独自表达事务、完成与取消语义 |
 | 依赖与组合 | [start.rs](crates/vibevalley-server/src/start.rs) 照次序建模块；集成测试起真的服务端（[tests/](crates/vibevalley-server/tests/issue.rs)） | 在服务建好前替换依赖；不另建一套测试业务装配 |
 | 外部 agent 与模型 | oar 的 scripted 运行时（[scripted.rs](crates/vibevalley-oar/src/scripted.rs)）、测试用替身 agent `pi`（[testing.rs](crates/vibevalley-server/src/testing.rs)） | 控制端口协议，不复制业务；意外调用应失败 |
-| 任务与资源（页面） | `AbortSignal`、作用域的 `cleanup`、[gate 与 waitFor](packages/testkit/src/until.ts) | 关闭语义由业务定义，工具只实现归属与释放；有界等待不替代完成契约 |
+| 任务与资源（页面） | `AbortSignal`、作用域的 `cleanup` | 关闭语义由业务定义，工具只实现归属与释放；有界等待不替代完成契约 |
 | 页面的时间与交互 | `nsh/test` 的页面测试、应用的调试脚本（[验收](.agents/skills/vv-acceptance/references/app.md)） | 页面的时间独立于服务端；截图不证明动态行为 |
 | 边界防退化 | `rust:check`（clippy `-D warnings`）、[lint](scripts/audit/oxlint-plugin.ts)、`mac:check` | 检查守住已确定的边界，不用行数或覆盖率指标代替设计判断 |
 

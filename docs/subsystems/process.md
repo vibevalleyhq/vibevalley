@@ -34,7 +34,7 @@
 - **报错信息给出改法**：自定义 lint 规则与门禁报错应包含原因、`Fix:` 改法与 `See` 参考文件路径（`scripts/audit/oxlint-plugin.test.ts` 检查）。
 - **静态门禁按语言分**：Rust 靠类型、clippy（`-D warnings`）和测试（`rust:check`）；TS 靠严格的 TypeScript（tsrs）和 oxlint 插件（`vp check`），`apps/mac/ui` 靠 nsh 的类型检查（`mac:check`，lint 不扫它）。Rust 上的约束写成类型、clippy 规则或测试。
 - **死代码零容忍，回归测试受保护**：`vp run deadcode` 拦截未使用导出与依赖。修改或删除 `regression: ` 测试，或 `fix/` 分支未补回归测试，须在 PR 正文 `## Regression` 说明（`scripts/release/regression.ts` 检查）。
-- **命名一致**：展示名用 `VibeValley`；中文名取词典的 `web.opening.name`（`crates/vibevalley-i18n/locales/zh/web.json`，开屏用它），不在代码里另写；代码、目录、环境变量 `VIBEVALLEY_*` 和分支前缀 `vibevalley/` 统一用小写 `vibevalley`。
+- **命名一致**：展示名用 `VibeValley`；代码、目录、环境变量 `VIBEVALLEY_*` 和分支前缀 `vibevalley/` 统一用小写 `vibevalley`。
 
 ## 怎么走
 

@@ -79,15 +79,6 @@
   "complete": {
     "newPage": "New page"
   },
-  "toolbar": {
-    "label": "Edit this block",
-    "indent": "Indent",
-    "outdent": "Outdent",
-    "up": "Move up",
-    "down": "Move down",
-    "todo": "Toggle to do",
-    "link": "Insert a link"
-  },
   "rail": {
     "label": "Beside this page",
     "show": "Show the side panel",

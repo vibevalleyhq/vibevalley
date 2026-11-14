@@ -9,7 +9,6 @@
 import { computed } from "nsh";
 import { z } from "zod";
 
-import { t } from "@vibevalley/i18n";
 import { type Attachment, type ChatMessage, type Channel, defaultOrchestrator, type SayRequest, type SpaceView } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 

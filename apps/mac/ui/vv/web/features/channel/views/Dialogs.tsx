@@ -97,7 +97,7 @@ function Form(props: {
 
 // Making a channel or changing one, as both chat windows carry it out: the workbench's dialogs (here) and the farm's menu (farm/chat/ChannelMenu.tsx).
 /** The form for a new channel, or for the one given as it is when opened (the form edits its own copy). */
-export function createChannelForm(channel?: Channel) {
+function createChannelForm(channel?: Channel) {
   const was = untracked(() => ({
     name: channel?.name ?? "",
     description: channel?.description ?? "",

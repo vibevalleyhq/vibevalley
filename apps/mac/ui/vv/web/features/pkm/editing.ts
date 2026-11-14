@@ -1,12 +1,10 @@
 export {
   type Around,
-  applied,
   type Caret,
   type Command,
   commandAction,
   type Completion,
   completed,
-  completionAt,
   type EditAction,
   editAction,
   type Focus,

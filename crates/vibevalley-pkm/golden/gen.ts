@@ -3,9 +3,8 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const vv = process.cwd();
-const md = await import(join(vv, "packages/pkm/src/markdown.ts"));
-const outline = await import(join(vv, "packages/pkm/src/outline.ts"));
+import * as md from "@vibevalley/pkm/markdown";
+import * as outline from "@vibevalley/pkm/outline";
 
 const files: Record<string, string> = {
   "01_Projects/VibeValley__Design.md": "title:: VibeValley/Design\ntags:: [[Rust]], #gpu\nzeta:: last\nAlpha:: first\n\n- TODO [#A] Write the spec\n  deadline:: 2026-11-20\n  - DONE port [[VibeValley]] board\n    id:: 6a1b2c3d-0000-4000-a000-000000000001\n  - see ((6a1b2c3d-0000-4000-a000-000000000001)) and #ideas, not C# or issue#12\n- A block with code\n  ```rust\n  - not a bullet\n  id:: not-a-prop\n  ```\n  after the fence\n- ==important words==^[💬 check this] trailing   \n-\n- [#B] priority only\n",

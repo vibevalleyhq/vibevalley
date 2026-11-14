@@ -1,4 +1,4 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { closeSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -78,8 +78,13 @@ export async function runVerification(command: string[] = [], options: Verificat
   // The Rust workspace's binaries (cargo build -p vibevalley-server -p vibevalley-cli); VIBEVALLEY_SERVER_BIN names another server.
   const built = join(process.env.CARGO_TARGET_DIR ?? join(root, "target"), "debug");
   const serverBin = process.env.VIBEVALLEY_SERVER_BIN ?? join(built, "vibevalley-server");
+  const cliBin = join(built, "vibevalley");
+  if (process.env.VIBEVALLEY_SERVER_BIN === undefined && (!existsSync(serverBin) || !existsSync(cliBin))) {
+    const build = spawnSync("cargo", ["build", "-q", "-p", "vibevalley-server", "-p", "vibevalley-cli"], { cwd: root, stdio: "inherit" });
+    if (build.status !== 0) throw new Error(`cargo build failed (${String(build.status ?? build.error)})`);
+  }
   const cli = join(binaries, "vv");
-  writeFileSync(cli, `#!/bin/sh\nexec ${JSON.stringify(join(built, "vibevalley"))} "$@"\n`, { mode: 0o755 });
+  writeFileSync(cli, `#!/bin/sh\nexec ${JSON.stringify(cliBin)} "$@"\n`, { mode: 0o755 });
   const log = join(evidence, "server.stdout.log");
   /** A child in a process group of its own; exited settles with its exit code. */
   interface Child {

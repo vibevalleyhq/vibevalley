@@ -9,7 +9,7 @@ import { api, ApiConnectionError } from "./api";
 import type { FramesSource } from "./frame";
 import { defineQuery, type QueryClient } from "./query/cache";
 import { useQuery } from "./query/solid";
-export { createQueryClient, defineQuery, type QueryClient, type QueryDescriptor } from "./query/cache";
+export { defineQuery, type QueryClient } from "./query/cache";
 export { QueryProvider, ready, useQuery, useQueryClient, type QueryResult } from "./query/solid";
 
 export const retryRead = {
@@ -45,13 +45,13 @@ export const agentsQuery = defineQuery({
   fetch: (_: void, context) => api.agent.list(context),
   ...retryRead,
 });
-export const templatesQuery = defineQuery({
+const templatesQuery = defineQuery({
   schema: z.array(S.AgentTemplate),
   key: () => ["agent-templates"],
   fetch: (_: void, context) => api.agent.template.list(context),
   ...retryRead,
 });
-export const reposQuery = defineQuery({
+const reposQuery = defineQuery({
   schema: z.array(S.RepoSummary),
   key: () => ["repos"],
   fetch: (_: void, context) => api.repo.list(context),
@@ -75,13 +75,7 @@ export const runtimesQuery = defineQuery({
   fetch: (_: void, context) => api.runtime.list(context),
   ...retryRead,
 });
-export const achievementsQuery = defineQuery({
-  schema: z.array(S.Achievement),
-  key: () => ["achievements"],
-  fetch: (_: void, context) => api.game.achievement.list(context),
-  staleTime: Infinity,
-  ...retryRead,
-});
+
 export const useSprites = () => useQuery(spritesQuery);
 export const useAgents = () => useQuery(agentsQuery);
 export const useAgentTemplates = () => useQuery(templatesQuery);

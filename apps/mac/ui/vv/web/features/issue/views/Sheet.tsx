@@ -13,7 +13,7 @@ import type { Tone } from "../model/cards";
 import { type Stage, stageLabel, stages } from "../model/issue";
 
 /** A string or number child as words in `class`; anything else as it is. */
-export function Say(props: { children?: JSX.Element; class?: string }) {
+function Say(props: { children?: JSX.Element; class?: string }) {
   return (
     <If when={typeof props.children === "string" || typeof props.children === "number"} else={props.children}>
       <Text class={props.class ?? "text-sm text-ink"}>{props.children as string}</Text>

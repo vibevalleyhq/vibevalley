@@ -43,7 +43,7 @@ const agent = (more: Partial<Agent> & Pick<Agent, "id" | "name">): Agent => ({
   ...more,
 });
 
-export const agents: Agent[] = [
+const agents: Agent[] = [
   agent({
     id: "orchestrator",
     name: "老村长",
@@ -101,7 +101,7 @@ const runtime = (more: Partial<RuntimeInfo> & Pick<RuntimeInfo, "id" | "preset">
   ...more,
 });
 
-export const runtimes: RuntimeInfo[] = [
+const runtimes: RuntimeInfo[] = [
   runtime({
     id: "claude",
     preset: {
@@ -165,7 +165,7 @@ export const runtimes: RuntimeInfo[] = [
   }),
 ];
 
-export const templates: AgentTemplate[] = [
+const templates: AgentTemplate[] = [
   {
     id: "backend",
     version: 2,
@@ -222,7 +222,7 @@ export const templates: AgentTemplate[] = [
   },
 ];
 
-export const skills: Skill[] = [
+const skills: Skill[] = [
   {
     id: "review",
     name: "审改动",
@@ -256,7 +256,7 @@ const days = Array.from({ length: 300 }, (_, i) => {
   return { day: dayKey(at), commits };
 }).filter((d) => d.commits > 0);
 
-export const activity: RepoActivity = {
+const activity: RepoActivity = {
   repo: "vibevalley",
   at: now - 10 * 60_000,
   days,
@@ -270,7 +270,7 @@ export const activity: RepoActivity = {
   last: now - 3 * hour,
 };
 
-export const languages: RepoLanguages = {
+const languages: RepoLanguages = {
   repo: "vibevalley",
   at: now - 10 * 60_000,
   languages: [

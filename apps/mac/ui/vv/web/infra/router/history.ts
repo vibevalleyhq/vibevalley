@@ -42,45 +42,6 @@ export function linkHref(to: string, base: string): string | undefined {
   }
 }
 
-export function browserHistory(browser: {
-  readonly location: { readonly href: string };
-  readonly history: Pick<History, "pushState" | "replaceState" | "back" | "forward">;
-  readonly addEventListener: (type: string, listener: () => void) => void;
-  readonly removeEventListener: (type: string, listener: () => void) => void;
-}): RouterHistory {
-  const listeners = new Set<() => void>();
-  const changed = () => {
-    for (const listener of listeners) listener();
-  };
-  return {
-    read: () => locationOf(new URL(browser.location.href)),
-    navigate: (to, options) => {
-      const url = internalUrl(to, browser.location.href);
-      if (!url) throw new Error(`Navigation must stay within the application: ${to}`);
-      const href = locationOf(url).href;
-      if (options?.replace === true) browser.history.replaceState(null, "", href);
-      else if (url.href !== browser.location.href) browser.history.pushState(null, "", href);
-      changed();
-    },
-    back: () => browser.history.back(),
-    forward: () => browser.history.forward(),
-    subscribe: (listener) => {
-      if (listeners.size === 0) {
-        browser.addEventListener("popstate", changed);
-        browser.addEventListener("hashchange", changed);
-      }
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-        if (listeners.size === 0) {
-          browser.removeEventListener("popstate", changed);
-          browser.removeEventListener("hashchange", changed);
-        }
-      };
-    },
-  };
-}
-
 export function memoryHistory(initial = "/"): RouterHistory {
   const origin = "http://router.local";
   const first = internalUrl(initial, origin);

@@ -2,7 +2,7 @@
 // (VIBEVALLEY_FAKE_SERVER=ui/vv/fixtures/workbench, written by fixtures.test.ts):
 // the issues and helpers of VibeValley's Board story (issue.samples.ts),
 // as a StateFrame and the answers of the reads the pages make.
-import type { Agent, IssueHistory, Session, StateFrame } from "@vibevalley/protocol";
+import type { Agent, IssueHistory, StateFrame } from "@vibevalley/protocol";
 
 import { min, now, sampleIssue as issue, sampleSession as session, working } from "../web/features/issue/model/issue.samples";
 import { responses as agentsResponses } from "./agents";
@@ -24,7 +24,7 @@ const r = session(
 );
 const d = session("w3", "laozhou", { _tag: "done" }, { name: "老周", hiredAt: now - 300 * min });
 
-export const issues = [
+const issues = [
   issue(21, "写一句话就能起草工单", "backlog", "medium"),
   // Startable: the server lists the moves an issue may make; the samples list none.
   { ...issue(22, "看板拖拽的手感", "todo", "high", { agent: "laozhou", repo: "vibevalley", queuedAt: now - 5 * min }), moves: ["todo"] },
@@ -35,7 +35,7 @@ export const issues = [
   issue(12, "设置按用途分组", "done", "medium", { agent: "laozhou", repo: "vibevalley", sessionIds: [d.id], closedAt: now - 120 * min, delivered: "merged" }),
 ];
 
-export const sessions = [w, r, d];
+const sessions = [w, r, d];
 
 export const state: StateFrame = {
   seq: 1,

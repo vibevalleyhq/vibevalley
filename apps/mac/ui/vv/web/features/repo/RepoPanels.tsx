@@ -57,7 +57,7 @@ function LangMark(props: { color: string; size: number }) {
 }
 
 /** A calendar day's tile: bare to in flower in the leaf's shades. */
-export function DayTile(props: { level: number; dir: string | undefined }) {
+function DayTile(props: { level: number; dir: string | undefined }) {
   // A year of tiles: one folder lookup for the calendar (props.dir), not one query per tile.
   return (
     <If when={props.dir} else={<DayStandIn level={props.level} />}>

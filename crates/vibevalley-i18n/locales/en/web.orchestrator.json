@@ -25,11 +25,6 @@
       "blurb": "A round farm robot whose face screen smiles."
     }
   },
-  "pet": {
-    "dog": "Puppy",
-    "ragdoll": "Colorpoint ragdoll",
-    "bluecat": "Blue cat"
-  },
   "orchestrator": {
     "tab": {
       "memory": "Memory",

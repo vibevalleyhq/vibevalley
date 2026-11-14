@@ -3,9 +3,6 @@ import { quotaLow, type RuntimeInfo } from "@vibevalley/protocol";
 
 import { numberText } from "../../base/format";
 
-/** A switched-off runtime's account is not the farm's business. */
-export const usableRuntimes = (all: readonly RuntimeInfo[]) => all.filter((r) => r.installation.status === "available" && r.settings.enabled);
-
 type QuotaLevel = "plenty" | "low" | "gold" | "empty" | "unknown";
 
 /** How full a quota's bottle is drawn, by the share left. */
@@ -18,17 +15,6 @@ export function windowLabel(label: string) {
   const week = /^Current week \((.+)\)$/u.exec(label);
   if (week?.[1]) return t("web.runtime.quota.week", { models: week[1] });
   return label.replace(/·\s*1 week/u, t("web.runtime.quota.oneWeek"));
-}
-
-const weekdayKeys = ["0", "1", "2", "3", "4", "5", "6"] as const;
-
-export function resetText(at: number, now = Date.now()) {
-  const ms = at - now;
-  if (ms <= 0) return t("web.runtime.quota.now");
-  const hours = ms / 3600000;
-  if (hours < 1) return t("web.runtime.quota.minutes", { m: Math.min(60, Math.max(1, Math.round(ms / 60000))) });
-  if (hours < 24) return t("web.runtime.quota.hours", { h: Math.round(hours) });
-  return t("web.runtime.quota.on", { weekday: t(`web.runtime.quota.weekdays.${weekdayKeys[new Date(at).getDay()] ?? "0"}`) });
 }
 
 export interface Quota {

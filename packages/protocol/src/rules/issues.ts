@@ -5,7 +5,7 @@ import type { Assignment, Issue, SessionId } from "../shapes";
 const titleMax = 40;
 
 /** The responsibility in force now. */
-export const assignmentOf = (issue: Pick<Issue, "assignments">): Assignment | undefined =>
+const assignmentOf = (issue: Pick<Issue, "assignments">): Assignment | undefined =>
   issue.assignments.findLast((assignment) => assignment.endedAt === undefined);
 
 export const assignedAgentOf = (issue: Pick<Issue, "assignments">): string | undefined => assignmentOf(issue)?.agent;

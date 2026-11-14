@@ -25,7 +25,7 @@ export const laneStatus: Record<Lane, IssueStatus> = { todo: "todo", working: "i
 /** A card says its own status only where its lane does not: a draft in todo says so by its draft flag instead. */
 export const ownStatus = (lane: Lane, status: IssueStatus) => status !== laneStatus[lane] && !(lane === "todo" && status === "backlog");
 
-export function laneOf(s: IssueStatus): Lane {
+function laneOf(s: IssueStatus): Lane {
   if (s === "backlog" || s === "todo") return "todo";
   if (s === "in_progress") return "working";
   if (s === "in_review") return "waiting";
@@ -35,7 +35,7 @@ export function laneOf(s: IssueStatus): Lane {
 export type Move = "start" | "close" | "reopen";
 
 /** A drop between lanes, if the server lets the issue go there (`Issue.moves`). A task's issue has no moves. */
-export function moveOf(from: Lane, to: Lane, moves: IssueStatus[]): Move | undefined {
+function moveOf(from: Lane, to: Lane, moves: IssueStatus[]): Move | undefined {
   if (from === "todo" && to === "working" && moves.includes("todo")) return "start";
   if ((from === "working" || from === "waiting") && to === "closed" && (moves.includes("done") || moves.includes("canceled"))) return "close";
   if (from === "closed" && to === "working" && moves.includes("todo")) return "reopen";

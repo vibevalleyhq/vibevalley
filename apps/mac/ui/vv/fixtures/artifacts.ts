@@ -39,7 +39,7 @@ const version = (v: number, note: string, by: string, byName: string, at: number
   ...(number !== undefined ? { number } : {}),
 });
 
-export const artifacts: Artifact[] = [
+const artifacts: Artifact[] = [
   {
     id: id("art-plan"),
     title: "看板拖拽的方案",

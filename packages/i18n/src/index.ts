@@ -2,7 +2,7 @@ import { catalogs, type Messages } from "./catalogs";
 import { format, type Params } from "./format";
 import { currentLocale, type Locale } from "./locale";
 
-export { currentLocale, LocaleValues, setLocale, type Locale } from "./locale";
+export { currentLocale, setLocale, type Locale } from "./locale";
 export { format, placeholders, type Params } from "./format";
 export type { Messages } from "./catalogs";
 

@@ -1,7 +1,7 @@
 import { createEffect, createMemo, onCleanup, untrack } from "../../solid";
 import { createExternal } from "../base/external";
 import { createTable, type TableOptions } from "./table/model";
-export { defineColumns, type Column, type Page, type Sort, type TableOptions, type TableModel } from "./table/model";
+export { defineColumns, type Column, type TableOptions, type TableModel } from "./table/model";
 
 export function useTable<T, const K extends string>(options: TableOptions<T, K>) {
   const model = untrack(() => createTable(options));

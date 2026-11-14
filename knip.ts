@@ -15,8 +15,9 @@ const config: KnipConfig = {
   ignoreExportsUsedInFile: { interface: true, type: true },
   workspaces: {
     ".": {
-      entry: ["scripts/*/*.ts"],
-      project: ["scripts/**/*.ts"],
+      // The Rust golden generators run through the root goldens script.
+      entry: ["scripts/*/*.ts", "crates/vibevalley-artifact/gen/artifact.ts", "crates/vibevalley-pkm/golden/{gen,graph}.ts"],
+      project: ["scripts/**/*.ts", "crates/**/*.ts"],
     },
     "apps/site": {
       // scripts/images.ts reads the scene exports through Vite's ssrLoadModule.
@@ -24,6 +25,13 @@ const config: KnipConfig = {
       project: ["src/**/*.{ts,tsx}", "scripts/**/*.ts", "test/**/*.{ts,tsx}"],
       // Imported by src/ui/global.css (@import "tailwindcss"), which knip does not read.
       ignoreDependencies: ["tailwindcss"],
+    },
+    "apps/mac/ui": {
+      // nsh loads App.tsx, and its tests open the app and story entry points by filename.
+      entry: ["App.tsx", "**/*.{test,story,stories}.{ts,tsx}", "**/main.tsx", "**/story.tsx"],
+      project: ["**/*.{ts,tsx}", "!.nsh/**", "!build/**"],
+      // nsh provides these modules inside its runtime, without npm packages.
+      ignoreDependencies: ["nsh", "nsh/*"],
     },
     "packages/*": {
       project: ["src/**/*.{ts,tsx}"],
@@ -36,9 +44,11 @@ const config: KnipConfig = {
   },
   // Programs on the machine, not packages: Xcode's swift and Rust's cargo.
   ignoreBinaries: ["swift", "cargo"],
+  // Rust owns the complete wire contract; unused TS projections are not dead Rust API types.
+  // Handwritten re-exports and schemas remain checked.
+  ignoreIssues: { "packages/protocol/src/**/*.gen.ts": ["exports", "types"] },
   // Swift, with its own tools.
-  // apps/mac/ui is bundled by nsh from App.tsx and its stories, which knip does not read.
-  ignoreWorkspaces: ["apps/island", "apps/mac/ui"],
+  ignoreWorkspaces: ["apps/island"],
 };
 
 export default config;

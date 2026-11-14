@@ -18,7 +18,7 @@ export type ErrorDetail = { next?: readonly Next[]; settings?: string };
 export type Envelope<T = unknown> = { bizCode: number; message: string; data?: T; error?: ErrorDetail };
 
 /** Envelope codes the bridge itself produces (VibeValley's BizCode values). */
-export const BridgeCode = { Ok: 0, ServiceUnavailable: 100009 } as const;
+const BridgeCode = { Ok: 0, ServiceUnavailable: 100009 } as const;
 
 let counter = 0;
 const nextId = () => `${Date.now().toString(36)}.${(++counter).toString(36)}`;
@@ -45,22 +45,6 @@ export function call<T = unknown>(op: string, payload: unknown = null, options?:
     }
     host.post("action", { type: "call", id, op, payload });
   });
-}
-
-/** An envelope's data, or a thrown error carrying the envelope (for code written against throwing clients). */
-export class BridgeError extends Error {
-  constructor(readonly envelope: Envelope) {
-    super(envelope.message);
-  }
-  get bizCode(): number {
-    return this.envelope.bizCode;
-  }
-}
-
-export async function unwrap<T>(pending: Promise<Envelope<T>>): Promise<T> {
-  const envelope = await pending;
-  if (envelope.bizCode !== 0) throw new BridgeError(envelope);
-  return envelope.data as T;
 }
 
 export type FrameEnvelope<T> = { rev: number; data: T };

@@ -6,7 +6,6 @@
   "dictationUrl": "The dictation address is a full address starting with http(s), up to /v1, such as http://127.0.0.1:8080/v1 on this machine",
   "dictationModel": "Dictation needs a model name, such as qwen3 for a local speech-server, or OpenAI's gpt-4o-mini-transcribe",
   "memory": {
-    "unknown": "Unknown memory source: {kind}",
     "twice": "Only one memory source of each kind: {kind}",
     "noUrl": "To connect a memory source, fill in its address first",
     "url": "A memory source's address is a full address starting with http(s), such as http://127.0.0.1:14242/mcp/ for Nowledge Mem",

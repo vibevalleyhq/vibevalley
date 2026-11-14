@@ -39,13 +39,5 @@
       "voiceOff": "Call ended",
       "ring": "Ringing"
     }
-  },
-  "close": "Close",
-  "optional": "  optional",
-  "drop": "Remove {chip}",
-  "noticeTitle": {
-    "info": "Notice",
-    "warn": "Not sent",
-    "error": "Something went wrong"
   }
 }

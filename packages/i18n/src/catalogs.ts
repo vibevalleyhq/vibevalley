@@ -6,13 +6,8 @@ export const catalogs = {
     cli: {
       about: "VibeValley 的命令行：一条命令是服务端的一个操作，<资源> [<子资源>] <动作>",
       flag: {
-        prompt: "问一句就走，不进对话",
         model: "模型",
         effort: "思考的力度",
-        resume: "接着这个会话",
-        cwd: "在哪个文件夹；不填是当前的",
-        name: "自己的 agent 的名字（家目录 ~/.vibevalley/agent/<名字>）",
-        mcp: "MCP 配置文件；不填用家目录里的 mcp.json",
         server: "服务端的地址；不填用 VIBEVALLEY_SERVER，再没有是这台电脑上开着的那个（家目录的 server.json），都没有是 {fallback}",
         dryRun: "只说会做什么，不动手（会删、会合、会关、会让帮工走的命令）",
         format: "md 是给人读的 Markdown（默认），json 是接口的答复",
@@ -56,15 +51,6 @@ export const catalogs = {
         jsonl: "输出独立的版本化 JSONL 事件流",
       },
       command: {
-        root: "VibeValley 的命令行，一条命令一个操作：答复是短文字，--format json 给接口的形状；在终端里对话用 chat",
-        app: {
-          about: "桌面版自己的事：状态、打开到某一页、退出、重启、更新",
-          open: "让桌面版的窗口到这一页（/issues/12）；没开就先打开",
-          quit: "退出桌面版（服务端先存好）",
-          restart: "重启桌面版",
-          update: "桌面版的更新：不带参数说现在的样子，check 去查，install 装上并重启",
-          status: "桌面版是哪个、什么版本、农场在哪",
-        },
         doctor: "一条命令看清这台电脑上的农场：找到的是哪个、连不连得上、桌面版、农机、模型的 key、连接到本机",
         pkm: {
           capture: "记一句话进今天的日记（--page 记到那一页）；不给字就读标准输入，多行按缩进拆成块",
@@ -98,28 +84,9 @@ export const catalogs = {
         repo: { list: "列出仓库", create: "新建仓库（--repo 从 GitHub 克隆）" },
         runtime: { list: "列出农机：装没装、版本", refresh: "重新探测一台农机：装了新的或升了版本以后" },
         session: { list: "列出帮工：id、名字、档案、在做什么", show: "看一个帮工", stop: "停下帮工这一轮" },
-        chat: "在终端里对话：不给农机是 VibeValley 自己的 agent，给了就和那个农机直接聊（不记轨迹和花费）",
-        auth: {
-          about: "登录到别处的服务端，像 gh auth login：在页面上点同意，这台电脑就拿到自己的钥匙",
-          login: "登录到一个服务端：显示确认码，等你在已登录的页面上同意，钥匙存在家目录的 auth.json",
-          status: "现在连哪个服务端、用的是哪台设备的钥匙",
-          logout: "退出：服务端收回这台电脑的钥匙，本机忘掉它",
-        },
       },
-      next: {
-        help: "看这条命令怎么写",
-        startServer: "先起服务端（vp run --filter @vibevalley/server start），或用 --server 指到在跑的那个",
-        openApp: "先打开桌面版（vibevalley app open 也会打开它）",
-      },
-      failure: {
-        unreachable: "连不上 {base}：{why}",
-        retry: "服务端要流重连，命令行不接着连",
-        gone: "工单 #{n} 不在了：被删掉了",
-        appNotOpen: "连不上 {home} 的桌面版：{why}",
-        noDryRun: "{command} 没有试跑：去掉 --dry-run 才会做",
-        noChat: "这里找不到 VibeValley 的对话程序：从桌面版装的命令行里用它，或在仓库里经 vp run --filter @vibevalley/cli start",
-        chatFlag: "{flags} 不能和 {runtime} 一起用：--name、--mcp 是 VibeValley 自己的 agent 的，--effort、--resume 是农机的",
-      },
+      next: { help: "看这条命令怎么写", startServer: "先起服务端（vp run --filter @vibevalley/server start），或用 --server 指到在跑的那个" },
+      failure: { unreachable: "连不上 {base}：{why}", gone: "工单 #{n} 不在了：被删掉了", noDryRun: "{command} 没有试跑：去掉 --dry-run 才会做" },
       op: {
         user: {
           approval: {
@@ -383,7 +350,6 @@ export const catalogs = {
         installRuntime: "装一个编码 agent（Claude Code、Codex……），装好以后让农场再找一遍",
         noModelKey: "没有 DeepSeek 的 key：助手和自己的 agent 起不来",
         setModelKey: "在「设置 › 模型」里填 DeepSeek 的 key",
-        lanSettings: "看「设置 › 设备」",
         wrong: "这几项不对：{checks}",
       },
       pkm: {
@@ -407,8 +373,6 @@ export const catalogs = {
         page: "页：标题、slug 或别名",
         repoName: "新仓库的名字",
         session: "帮工的 id，比如 w3",
-        chatRuntime: "农机（claude、codex…）；不给是 VibeValley 自己的 agent",
-        appPath: "桌面版里的一页，比如 /issues/12；不填是首页",
         capture: "要记的话；不给就读标准输入",
         comment: "评论的话",
         cronText: "到点时说的话：交给助手或档案去做的事",
@@ -419,10 +383,8 @@ export const catalogs = {
         search: "要找的词",
         status: "要挪到的状态",
         title: "工单的标题",
-        updateStep: "check 去查有没有新版本，install 装上并重启；不填只说现在的样子",
         pageTitle: "页的标题",
         agentName: "档案的名字",
-        authServer: "服务端的地址（https://farm.example.com）；不给就用 --server",
       },
       channel: { sent: "发到了 {channel}" },
       cron: { when: "什么时候跑：--every、--daily、--cron、--at 正好给一个", deleted: "删掉了定时任务 {cron}", edited: "改好了定时任务 {cron}" },
@@ -446,13 +408,6 @@ export const catalogs = {
         sessionStop: { about: "停下 w3 这一轮" },
         issue: { comment: { run: "vibevalley issue comment 12 用 8797", about: "回答 12 号在问的，或者捎一句话给它的帮工" } },
         doctor: { about: "看这台电脑上的农场好不好" },
-        appOpen: { about: "让窗口到 12 号工单" },
-        appQuit: { about: "退出桌面版" },
-        appRestart: { about: "重启桌面版" },
-        appUpdate: { about: "现在去查更新" },
-        runtimeChat: { about: "直接和 Claude Code 聊" },
-        chat: { about: "和 VibeValley 自己的 agent 对话" },
-        appStatus: { about: "桌面版开着没有、是哪个" },
         artifactRead: { about: "读 a1 的正文" },
         channelMessageList: { about: "读 #general 最近十条" },
         channelMessageSearch: { run: "vibevalley channel message search 端口", about: "Find “端口” in every channel" },
@@ -485,9 +440,6 @@ export const catalogs = {
         agentCreate: { about: "新建一份用 Claude Code 的档案" },
         agentDelete: { about: "先试删，看会删掉什么" },
         issueObserve: { about: "以 JSONL 跟随工单执行" },
-        authLogin: { about: "登录到那个服务端，之后的命令都连它" },
-        authStatus: { about: "看登录到了哪里" },
-        authLogout: { about: "退出，回到这台电脑上的服务端" },
       },
       issue: {
         can: "能做：",
@@ -525,61 +477,13 @@ export const catalogs = {
         doctor: "通过认证调用只读 session_list，验证凭证与工具通路；不代表编码 agent 已加载可选 MCP。JSON 默认为空对象。",
         json: "工具输入的 JSON 对象；参数格式见本命令说明。",
       },
-      auth: {
-        here: "{server} 是这台电脑上的服务端：命令行直接就能用，不用登录",
-        approve: "在浏览器里打开 {link}\n确认码 {code}：页面上的码一样就点同意。等你同意……",
-        noBrowser: "没能打开浏览器：自己打开上面的链接",
-        signedIn: "已登录 {server}，这台电脑在设备列表里叫「{device}」",
-        notSignedIn: "没有登录：命令连的是 {server}",
-        revoked: "{server} 收回了这台电脑的钥匙：重新运行 vibevalley auth login",
-        status: "已登录 {server}，以「{device}」的身份；你叫「{name}」",
-        signedOut: "已退出 {server}",
-        logoutUnsaid: "没能让服务端收回钥匙（{why}）：本机已经忘掉它，到设备页上收回它",
-      },
     },
     desktop: {
       open: "打开 VibeValley",
       quit: "退出",
-      cannotStart: "VibeValley 起不来",
-      seeLog: "{reason}，日志在 {log}",
-      noAddress: "服务端 {seconds} 秒内没有发布就绪地址",
-      failed: "服务端启动失败：{why}",
-      exited: "服务端退出了（{code}）",
       waiting: "{n} 等你",
       working: "{n} 在干",
-      idle: "没在干",
-      updateGone: "下好的新版本不在了，再查一次更新",
-      menu: {
-        about: "关于 {app}",
-        hide: "隐藏 {app}",
-        hideOthers: "隐藏其他",
-        unhide: "全部显示",
-        quit: "退出 {app}",
-        edit: "编辑",
-        undo: "撤销",
-        redo: "重做",
-        cut: "剪切",
-        copy: "拷贝",
-        paste: "粘贴",
-        selectAll: "全选",
-        view: "显示",
-        reload: "重新载入",
-        devTools: "开发者工具",
-        resetZoom: "实际大小",
-        zoomIn: "放大",
-        zoomOut: "缩小",
-        fullScreen: "进入全屏幕",
-        window: "窗口",
-        minimize: "最小化",
-        zoom: "缩放",
-        front: "前置全部窗口",
-        close: "关闭窗口",
-      },
-      media: {
-        camera: "仅在你开始实时视觉理解时使用摄像头，画面会发送到你选择的 AI 服务。",
-        microphone: "仅在你开始听写或通话时使用麦克风，音频会发送到你选择的 AI 服务。",
-      },
-      commandLine: { taken: "{link} 已经有别的文件，没有换掉：先挪开它再装" },
+      menu: { view: "显示", resetZoom: "实际大小", zoomIn: "放大", zoomOut: "缩小", window: "窗口", close: "关闭窗口" },
     },
     server: {
       lookIn: {
@@ -628,13 +532,8 @@ export const catalogs = {
       newSkillId: "新技能的 id 要留空；指定 id 请用保存",
       removeAgent: "删掉档案「{name}」（{id}，跑在 {runtime} 上）：已经派给它的工单不跟着改",
       removeSkill: "删掉技能「{name}」",
-      modelFailed: "模型出错了",
-      noDeepSeekKey: "没有 DeepSeek 的密钥：设 DEEPSEEK_API_KEY，或者写进 vibevalley.yaml 的 deepseek.api_key。",
-      refused: { launchArgs: "VibeValley 跑在 server 进程里，没有命令行参数", serviceTier: "DeepSeek 没有服务档位" },
       unequip: "从 {holders} 的档案里摘掉它",
       quoted: "「{name}」",
-      efforts: "{runtime} 只有 {efforts} 两档思考强度，没有「{asked}」",
-      effortsAnd: "、",
     },
     "server.artifact": {
       noTitle: "Artifact 要有个标题",
@@ -746,21 +645,13 @@ export const catalogs = {
       },
     },
     "server.attachment": { noAttachment: "没有 {id} 这个附件：先上传，再带着它说话", emptyFile: "这个文件是空的", fileTooBig: "文件太大了：至多 {mb} MB" },
-    "server.base": {
-      noFile: "{path}: 没有这个文件",
-      notPort: "{path}: {name} 不是端口：{port}",
-      prPoll: "github.pr_poll_seconds 必须大于 0",
-      homeTaken: "家目录 {home} 正被另一个服务端使用；请连接现有的服务端，或先停掉它",
-      homeUnlocked: "锁不住家目录 {home}",
-      requestKeyLong: "requestKey 太长（最多 {max} 个字符）",
-    },
+    "server.base": { requestKeyLong: "requestKey 太长（最多 {max} 个字符）" },
     "server.channel": {
       name: { user: "用户", orchestrator: "助手" },
       mention: { orchestrator: "@助手", user: "@用户", everyone: "@所有人" },
       channelName: "频道名只能是字母、数字、汉字、- 和 _，最多 24 个字",
       channelTaken: "已经有叫 {name} 的频道了",
       hopLimit: "帮工之间已经来回 {limit} 次了，先停一停：等用户说一句再接着叫人。",
-      breaker: "{name} 连续 {failed} 次一叫醒就失败了，先不再叫它；你直接给它带句话会再试。",
       dispatch: {
         draft: "看代码，起草这张工单",
         repo: "仓库",
@@ -773,7 +664,6 @@ export const catalogs = {
       empty: "没说什么",
       sendKeyLong: "sendKey 太长",
       channelGone: "找不到这个频道",
-      noHelper: "没有 {id} 这个帮工",
       noChannel: "没有 {id} 这个频道",
       notOrchestrator: "{id} 不是助手的档案：频道只能交给助手照看",
       noMessageId: "没有 {id} 这条消息",
@@ -782,9 +672,7 @@ export const catalogs = {
       deletesChannel: "删掉 {target}，连同它的 {threads} 个串和 {said} 条消息",
       inUse: "删不了：{why}。可以归档它",
       helpersThere: "还有帮工在这个频道里干活",
-      cronsThere: "还有 {n} 个定时任务在这里",
       connectorsThere: "接着连接器",
-      queuedThere: "还有 {n} 张工单排着队要在这里开工",
       issuesThere: "这里派过 {n} 张工单的活",
       messageGone: "这条消息已经删了",
       notYours: "只能改你自己说的话",
@@ -799,19 +687,6 @@ export const catalogs = {
       noProfileNamed: "没有叫 {key} 的档案",
       talkFailed: "没有接上这个会话：{why}",
       profileDisabled: "{name}已停用",
-    },
-    "server.chat": {
-      error: "\n出错了：{why}",
-      hello: "{skills} 个技能。/reset 忘掉对话，/exit 退出，Ctrl+C 停下。",
-      forgot: "忘掉了。",
-      notKept: "{home} 正被另一个对话占着：这次的对话只在这个进程里，不留存。",
-      noRuntime: "没有 {id} 这个农机",
-      unknownInstall: "{id} 看不出装没装",
-      unusable: "{id} 用不了：{kind}",
-      resumed: "（接着）",
-      direct: "直接聊：不经过 VibeValley，不记轨迹和花费。Ctrl+C 停这一轮，空着时再按退出。",
-      rejected: "没接住：{why}",
-      notSent: "没送进去：{why}",
     },
     "server.connector": {
       media: { image: "[图片]", file: "[文件]", audio: "[语音]", video: "[视频]", sticker: "[表情]", message: "[消息]", attachment: "[附件]" },
@@ -921,77 +796,30 @@ export const catalogs = {
       },
     },
     "server.issue": {
-      waitingDispatch: "已排队，正在等待派发。",
-      split: {
-        notCurrent: "只有当前负责这张工单的帮工可以拆单。",
-        already: "工单已经关闭或已有子工单。",
-        invalid: "请提供 1–{max} 张子工单，短 ID 唯一合法，依赖只引用这次拆单且不能成环。",
-        agent: "每张子工单需要指定已启用、角色为帮工的档案：{agent}",
-        commitFirst: "请先提交父工单的改动，再拆成子工单。",
-        needsBranch: "父工单需要独立工作分支才能拆单；当前帮工直接在仓库目录工作。",
-        created: "已在 #{n} 下创建 {count} 张子工单。",
-      },
-      verification: {
-        acceptanceNeedsCheck: "验收工单必须填写检查命令。",
-        acceptancePassed: "实现之前验收检查就已经通过：{check}",
-        frozen: "修改了冻结的验收文件：{files}",
-        failed: "检查未通过：{check}\n{output}",
-      },
-      dependencies: {
-        closedParent: "父工单已经关闭，不能再加子工单",
-        repo: "子工单必须和父工单使用同一个仓库",
-        invalid: "工单依赖不能成环，也不能引用不存在的工单",
-        waiting: "等待前置工单完成：{issues}",
-      },
+      split: { created: "已在 #{n} 下创建 {count} 张子工单。" },
       issueNumbered: "工单 #{n}",
       issueRef: "工单 {ref}",
-      helperRef: "帮工 {id}",
       repoRef: "仓库 {name}",
       helper: "帮工",
       notStarted: "这张工单还没开工",
       started: "这张工单已经开工了",
       noTitle: "工单没有标题",
-      orchestratorNotHelper: "助手不当帮工：派给一个帮工",
-      disabled: "{name} 被停用了",
-      cannotSend: "{name} 派不出去：{why}",
-      noRepo: "没说在哪个仓库里做：仓库是工作目录下的一个文件夹",
-      notRecorded: "{name} 的工单没记下来：{why}",
-      workKept: "{refused}；工单 #{n} 和它的改动留着，可以接着派这张工单",
-      drafting: "{name} 正在起草：等它交回来再开工",
       pickHint: "挑好以后：issue edit {n} --agent <档案>，再 issue status {n} todo",
       noAssignee: "还没选派给哪个帮工",
       profileGone: "档案 {id} 不在了",
-      queued: "{full}：排上队了，有空位就自动开工",
-      queuedStarted: "排队的「{title}」开工了：{session}",
-      queuedStuck: "排队的「{title}」开不了工：{why}；也没能退回待办，还在队里",
-      queuedBack: "排队的「{title}」开不了工，留在待办里：{why}",
-      mergedChildRetry: "这张子工单已经合入父工单，请通过父工单继续安排工作。",
-      neverStarted: "这张工单还没开过工：直接开工",
-      stillOpen: "这张工单还开着：挪回待办就是再来一轮",
-      stillWorking: "{name} 还在做这张工单：直接给它带话",
-      senderGone: "派它的档案 {id} 不在了",
       closedReopen: "这张工单关上了：带一句话重开它",
       handOverOnTodo: "换人是挪到待办时的事：挪到待办，填上谁来接手",
-      stopFirst: "#{n} 还在干这一轮：先叫停，等它停下再换人",
-      noStatus: "没有这个状态：{to}",
       roundNeedsWords: "再干一轮要说一句：这一轮要它做什么",
       closed: "这张工单关上了",
-      cannotMoveRepo: "工单 #{n} 还不能换仓库：{why}",
       cannotDelete: "工单 #{n} 还不能删：{why}",
-      noConflict: "{name} 和主分支没有冲突",
-      orchestratorAnswers: "这是派给助手的工单：助手答完就关",
       nothingToAccept: "还没交回来，没有东西可验收",
       failNeedsFindings: "没过验收要说哪里不行：至少写一条意见",
       does: {
-        toOrchestrator: "{n} 交给助手答",
         sendTo: "{n} 派给 {agent}",
         noRoom: "现在没空位（{full}）：排进待办，有空位就自动开工",
         startIn: "{n} 派 {agent} 去 {repo} 开工",
         start: "{n} 派 {agent} 开工",
         unqueue: "{n} 不排了，挪回备选",
-        leaves: "{helper} 收工，分支留着",
-        takesOver: "{taker} 接手，在同一条分支上接着做",
-        orchestratorRound: "{n} 再交给助手答一轮：{said}",
         round: "把这句话带给 {helper}，再干一轮：{said}",
         thisTime: "这一次要做的：{said}",
         revive: "{n} 挪回备选",
@@ -1000,7 +828,6 @@ export const catalogs = {
         helperLeaves: "{helper} 收工",
         commitFirst: "先替 {helper} 提交 {files} 个没提交的文件",
         check: "合之前跑仓库的检查（.vibevalley/check，有的话）：没过就不合，工单留在等你看",
-        pullRequest: "推分支、开 PR（{commits} 个提交）：PR 合了才关成已完成",
         cancel: "{n} 关成已取消",
         cancelLeaves: "{helper} 收工，分支上有提交就留着",
         drop: "{n} 关成已取消：还没派过",
@@ -1012,29 +839,17 @@ export const catalogs = {
         deleteIssue: "删掉工单 #{n}「{title}」",
         cleanWorktree: "清掉它的 worktree 和没有提交的分支；还有改动就不删",
         reopen: "{n} 重开：派同一个档案的新帮工接着做",
-        reopenBy: "{n} 重开：派 {taker} 接着做",
         conflicts: "合进 {base} 会冲突（{files}）：不会合，标上冲突，工单留在等你看",
         merge: "合进 {base}（{commits} 个提交），关成已完成，{helper} 收工",
-        mainBranch: "主分支",
       },
       brief: {
-        reopenDefault: "接着把这张工单做完",
-        handedOver: "这张工单换你接手了，之前是 {name}（{id}）在做",
-        reopened: "这张工单重开了，上一次是 {name}（{id}）做的",
-        how: "\n\n（{how}。）",
         original: "\n这张工单原来是：{brief}",
-        answer: "\n上一次的结论：{conclusion}",
-        closed: "\n它是怎么关的：{closed}",
-        lastRun: "\n最后一轮{outcome}：{summary}",
-        previous: "\n这条分支上已经有上次的提交，接着做。",
-        end: "\n先看看仓库现在的样子，再接着做。",
         failedHead: "验收没过，这几处要修：",
         failedEnd: "\n\n修好以后在结论里逐条说怎么修的。",
         resume: "上一轮停在了半路，接着把它做完。",
         cure: "接着修：{brief}。看一下报错，修好再跑一遍测试",
         cureHead: "接着修：",
         cureTail: "。看一下报错，修好再跑一遍测试",
-        answerUnread: "接着修：上一轮交回的结论读不出来（{problem}）。接着查清楚，最后照这个格式交：",
       },
       move: {
         inGraph: "这是计划里的工单，跟着计划走：在计划里改",
@@ -1067,34 +882,17 @@ export const catalogs = {
         rejected: "打回：{lines}",
         rejectedSeparator: "；",
       },
-      merge: { tellFailed: "\n给帮工带话失败：{why}", merged: "{name} 的活合进去了：{text}" },
       refinement: {
         noDrafter: "没有能派的帮工来起草",
-        orchestrator: "这是派给助手的工单：助手自己会看",
         onlyBacklog: "只有备选里的工单能起草：先挪回备选",
         drafting: "{name} 正在起草：等它交回来",
         unread: "{name} 交回来的草稿读不出来（{problem}），工单没动：再起草一次",
         unfinished: "{name} 没起草完（{summary}），工单没动：再起草一次",
-        canceled: "「{title}」取消了：{why}",
-        noBlock: "没找到草稿：要用一个 json 代码块给出",
-        notObject: "要是一个对象",
-        unreadable: "json 读不了：{why}",
-        noTitle: "草稿没有标题",
-        lines: "{field}：要是字符串或字符串的数组",
-        text: "{field}：要是字符串",
-        why: "为什么：",
-        todo: "要做的：",
-        notDoing: "不做的：",
-        files: "可能涉及：",
       },
-      noProfileNamed: "没有叫 {key} 的档案",
       prSubmitNotAllowed: "这张工单没有用户明确授予的自行提交 PR 权限",
       prSubmitNotCurrent: "只有当前处理这张工单的帮工能提交 PR",
       prSubmitUnavailable: "这张工单的仓库没有启用 PR 交付",
       deliveryNeedsPr: "请先交付一个有效的 PR/MR，再验收完成",
-      acceptSubmittedPr: "验收已提交的 PR/MR，保留未合入的分支和未提交的改动",
-      prDelivered: "已交付 PR/MR：{url}",
-      confirmedRequirements: "已确认并派发：{title}\n\n{description}\n\n验收标准：\n{criteria}",
       notFound: "没有工单 {id}",
       wordsRequired: "要说点什么：话不能是空的",
     },
@@ -1112,11 +910,6 @@ export const catalogs = {
       notFile: "{path} 不是工作目录里的一个文件",
       unreadable: "读不了 {path}：{why}",
       preview: { remove: "从素材库拿掉「{name}」；发过它的消息仍能打开它" },
-    },
-    "server.mailbox": {
-      notOwned: "这条输入不归当前会话处理，不能退回",
-      subscriptionTaken: "话题 {thread} 已归属于另一张工单",
-      ambiguous: "这条输入同时对应多张工单，需要明确归属",
     },
     "server.media": {
       speechInvalid: "语音合成参数无效，请检查文字、音色与音频格式；Pro 不支持停顿标签。",
@@ -1203,28 +996,12 @@ export const catalogs = {
     },
     "server.memory": {
       source: { local: "本地", nowledge: "Nowledge Mem", everos: "EverOS" },
-      noUrl: "没填地址",
-      off: "没打开",
-      unknownSource: "不认识这种来源",
-      stopped: "记性来源已经停下",
-      forgetThere: "{source} 里的记忆到它自己那里删",
-      coverage: {
-        failed: "读取失败、已取消或超时，未包含此来源",
-        everosAcross: "不支持跨仓库检索，请指定一个仓库；本次未包含 EverOS",
-        everosAgent: "此查询需要指定档案，本次未包含 EverOS",
-        unconfirmed: "有命中的仓库范围未经确认，已从本仓库检索中排除",
-        note: "{source}：{note}",
-      },
-      everosList: "EverOS 的记忆不在这里列出",
-      everosForget: "EverOS 里的记忆到 EverOS 里删",
-      nowledgeForget: "Nowledge Mem 里的记忆到 Nowledge Mem 里删",
       empty: "要记的话是空的",
       dbFailed: "没记下来：数据库写不进去",
       noMemory: "{agent} 的记性里没有 {id}",
       forget: "从 {agent} 的记性里忘掉：「{text}」",
     },
     "server.orchestrator": {
-      label: "助手",
       noKey: "我还没有 DeepSeek 的钥匙，想不了事。到首页的「设置」里填上 DeepSeek 的 API Key（工作台左栏最下面的「设置」也能去），填好再跟我说一遍。",
       cannotStart: "我这边起不来：{why}",
       onlyDeepseek: "助手只接 DeepSeek 的模型：助手档案的模型设成 deepseek/<模型> 或直接写模型名，{configured} 用不了",
@@ -1279,75 +1056,26 @@ export const catalogs = {
       tooLarge: "MOSS 模型目录超过读取上限（1 MiB 或 1000 个模型），未返回不完整结果。",
     },
     "server.repo": {
-      parentBranchChanged: "父工单工作目录已切换分支，不能自动合入",
-      parentHasChanges: "父工单还有未提交的改动，提交后再合入子工单",
       badName: "仓库名用字母或数字开头，只含字母、数字、-、_、.，最多 64 个字符",
       badGithub: "请填 GitHub 仓库地址，例如 https://github.com/botiverse/raft-source",
-      branchMoved: "分支在检查以后又变了，请重新检查再合",
-      mainMoved: "主分支在检查期间又变了，请重新检查再合",
-      mergedWorktreeLeft: "改动已合并，worktree {cwd} 和分支 {branch} 尚未清理：{why}",
-      mergedBranchLeft: "改动已合并，分支 {branch} 尚未清理：{why}",
       noTokei: "统计代码要用 tokei，这台机器上没找到：装一个（brew install tokei，或 cargo install tokei）再点统计",
       noName: "无名",
       gh: { missing: "没装 gh", failed: "gh 检测失败", signedOut: "没登录 GitHub", noAccount: "无法确认 GitHub 登录账号" },
       notRepoName: "「{name}」不能当仓库名：用一个简单的英文文件夹名，比如 clock-in",
       outside: "仓库必须在工作目录里面，不能链接到外面",
-      commit: {
-        initial: "初始提交（VibeValley 建的仓库）",
-        initialShort: "初始提交",
-        uncommitted: "工作树里还有没提交的改动。请自己按仓库的提交规范提交，然后再来合并或提 PR。",
-        merge: "合并 {branch}",
-      },
+      commit: { initial: "初始提交（VibeValley 建的仓库）", initialShort: "初始提交" },
       notChecked: "尚未检测仓库，请刷新 GitHub 状态",
       check: {
         timedOut: "仓库检查 .vibevalley/check 超时（{seconds}s）",
         failed: "仓库检查 .vibevalley/check 没通过：{why}",
         exited: "仓库检查 .vibevalley/check 没通过：exit status {code}",
       },
-      mergeFailed: "合并进 {main} 没成功，{kept}：{why}",
-      mergeStuck: "合并进 {main} 没成功，{kept}：{why}；退出合并也没成功（{abort}），{main} 停在合并到一半，要手动收拾",
       exists: "「{name}」已经存在，请换个仓库名",
       cloneFailedGh: "下载失败：请确认 GitHub 登录、仓库权限和网络后重试",
       cloneFailed: "下载失败：请确认仓库公开、地址正确且网络可用；超过 3 分钟会停止，可重试",
       tokeiFailed: "tokei 没数完：{why}",
       tokeiUnread: "tokei 的输出读不懂：换个新一点的 tokei 试试",
-      noBranchRead: "没能读取分支 {branch}：{why}",
-      inRepoNoBranch: "它直接在仓库里干活，没有要合并的分支",
-      inRepoNothing: "它直接在仓库里干活，没有分支可合",
-      keptBoth: "{branch} 分支和 worktree 都留着",
-      keptBranch: "{branch} 分支留着",
-      merged: "{ahead} 个提交合进了 {repo} 的 {main}",
-      nothingNew: "这一单没有新的提交",
-      nothingNewInPlan: "计划分支上没有新的提交",
-      branchLeft: "；改动已合并，分支 {branch} 尚未清理：{why}",
-      clear: {
-        uncommitted: "{branch} 还有没提交的改动，worktree 留在 {cwd}",
-        branchLeft: "{branch} 没清掉：{why}",
-        unmerged: "{branch} 上有 {ahead} 个没合的提交，分支留着，worktree 清掉了",
-        notWorktree: "不是 worktree，不能重置：{cwd}",
-        worktreeLeft: "worktree {cwd} 没清掉：{why}",
-        unconfirmed: "没能确认 {branch} 已清掉：{why}",
-        unmergedKept: "{branch} 上有没合的提交，分支留着",
-      },
-      github: {
-        unchecked: "尚未检测 GitHub",
-        notGithub: "不是 GitHub 仓库",
-        noPermission: "无法检测 GitHub 仓库权限",
-        readOnly: "没有写权限",
-        wrongBranch: "工单分支不匹配",
-        checked: ".vibevalley/check 通过。",
-        noCheck: "这个仓库没有 .vibevalley/check，没跑检查。",
-        body: "工单 #{n}\n\n{conclusion}\n\n{check}",
-        urlUnread: "无法读取新建 PR 的地址；可重试查询",
-        viewFailed: "查询 PR #{n} 失败",
-        stateUnread: "无法读取 PR #{n} 状态",
-        stateUnknown: "无法识别 PR #{n} 状态",
-        resolveFailed: "解决 GitHub Review 讨论失败",
-        worktreeLeft: "PR 已结束，清理 worktree 失败：{why}",
-        branchLeft: "PR 已结束，清理本地分支失败：{why}",
-      },
-      mergeTree: "git merge-tree 出错（{code}）",
-      moreLines: "… 还有 {n} 行没显示",
+      github: { unchecked: "尚未检测 GitHub", notGithub: "不是 GitHub 仓库", noPermission: "无法检测 GitHub 仓库权限", readOnly: "没有写权限" },
       conflict: "合进 {base} 有冲突",
       "publish.refused": "分支发布被拒绝：{detail}",
       "publish.platformFailed": "托管平台调用失败：{stage}。请检查工具安装与登录状态。",
@@ -1382,122 +1110,22 @@ export const catalogs = {
       noUsage: "这台农机 不报用量",
       cursor: "Cursor 要单独装它的 SDK（@cursor/sdk），VibeValley 还没接",
       oarUnknown: "oar 不认识这台农机",
-      tools: "{n} 个工具",
       notSaved: "没存下 {id} 的设置：{why}",
       cannotDrive: "oar 驱动不了 {runtime}",
       cannotSend: "{name} 派不出去：{why}",
       defaultModel: "{runtime} 没有 {model} 这个模型，{name} 先用默认模型",
-      piNoBalance: "{provider} 不报余额",
-      piNoModel: "pi 没有设默认模型",
-      piUnread: "没读到 DeepSeek 余额",
       effort: "{model} 没有 {effort} 这一档，可选：{levels}",
-      piTimedOut: "问 DeepSeek 余额超时了",
     },
     "server.session": {
-      failure: {
-        auth: "登录或密钥有问题",
-        quota: "额度用完了",
-        rate_limited: "请求太频繁，被限流了",
-        billing: "余额不够了",
-        model_unavailable: "这个模型用不了",
-        input_too_large: "上下文太长，装不下了",
-        invalid_request: "请求被服务商拒绝了",
-        overloaded: "服务商太忙",
-        provider: "服务商出错了",
-        runtime_exited: "农机进程中途退出了",
-        unknown: "出错了",
-      },
-      failureNext: { userAction: "要你先处理一下", now: "可以让它再试一次", later: "过一阵再试" },
-      failureStatus: "（HTTP {status}）",
-      failureReason: "：{reason}",
-      failureThen: "。{next}",
-      done: "做完了",
-      unfinished: "没做完",
-      answer: { noBlock: "没有通过 issue_report 交结构化 answer" },
-      noRoom: {
-        farm: "已经有 {max} 个帮工在干活了",
-        runtime: "{runtime} 上已经有 {on} 个帮工在干活，最多同时 {max} 个（在「农机」页可以改）",
-        repo: "仓库 {repo} 里已经有 {on} 个帮工在干活，最多同时 {max} 个：人多了容易改到同一个文件",
-      },
-      notTaken: {
-        conflictUser: "没合进去：合进 {base} 会冲突（{files}）。{name} 还在，分支和 worktree 都在。要它解决就用 tell 告诉它：{brief}",
-        conflictNotice: "{name} 的分支合进 {base} 会冲突（{files}），先没合。可以让它自己把冲突解决掉",
-        conflictShort: "合进 {base} 会冲突：{files}",
-        checkFix: "{reason}\n请修好检查，再交回来。",
-        user: "没合进去：{why}。{name} 还在",
-        notice: "{name} 的活没合进去：{why}",
-        checkShort: "仓库检查没通过",
-      },
-      log: {
-        stopped: "VibeValley 停下了，这一轮中断了",
-        image: "[图片]",
-        exitedNotice: "{name} 的 {why}",
-        staleRun: "上一轮停在了半路，太久了，没有接着做",
-        stoppedByUser: "你叫停了",
-        clipped: "… 省略 {n} 个字 …",
-        quiet: "已经 {span}没动静了{last}。可能在跑很久的命令，也可能卡住了",
-        quietLast: "（最后在：{label}）",
-        restarted: "VibeValley 重启了，这一轮停在了半路",
-        retry: "调用模型没成功，第 {attempt} 次重试",
-        retryOf: "调用模型没成功，第 {attempt}/{of} 次重试",
-        retryIn: "，{s} 秒后",
-        retryWhy: "：{reason}",
-        exited: "{runtime} 进程退出了",
-        exitedCode: "{runtime} 进程退出了（退出码 {code}）",
-      },
-      usage: {
-        parts: { instructions: "说明", env: "环境", skills: "技能", memory: "记性", tools: "工具" },
-        cached: "缓存命中 {percent}%：读缓存 {read}，没命中 {missed}，输出 {output}",
-        unread: "没报读了多少：输出 {output}",
-        changed: "；开头变了：{parts}",
-      },
+      noRoom: { farm: "已经有 {max} 个帮工在干活了", repo: "仓库 {repo} 里已经有 {on} 个帮工在干活，最多同时 {max} 个：人多了容易改到同一个文件" },
+      log: { clipped: "… 省略 {n} 个字 …" },
       host: {
-        stopped: "{label}已经停下",
-        cannotStart: "起不来：{why}",
-        notRecorded: "{label}的这一轮没能记下：{why}",
-        startFailed: "{label}起不来：{why}",
-        callerStart: "我这边起不来：{why}",
         failed: "{label}出错了：{why}",
         markNeedsWords: "写一句它应该怎样",
         noStep: "{label}轨迹里没有第 {on} 步",
-        stepHint: "步数在页面上它的日志里，每一步前面的编号",
         notAsked: "第 {on} 步不是{label}收到的话",
         notInConversation: "第 {on} 步收到的话没进{label}的对话（那时{label}没起来？）",
       },
-      life: {
-        stoppedNeedsYou: "{name} 停下了：{why}",
-        quietNotice: "{name} 已经 {span}没动静了{last}：点它的地看看过程，不对就叫停",
-        notStopped: "农机没能停止，工作目录留着：{why}",
-        notReturned: "上一次农机还没交回工作目录",
-        agentGone: "{name} 的 agent 已经删掉了，叫不醒",
-        cannotWake: "{name} 叫不醒：{why}",
-        noHelper: "没有 {id} 这个帮工",
-        helperRef: "帮工 {id}",
-        stillClosing: "{name} 的农机没能停止：工作目录留着，不能再开一轮",
-        noRoom: "{name} 先不接着干：{full}",
-        notReceived: "{name} 没收到：{why}",
-        stillWorking: "{name} 还在干活：等这一轮做完，或者先叫停，再收",
-        notBack: "{name} 没接回来：{why}",
-        placeGone: "干活的目录不见了（{cwd}）",
-        noRecord: "库里没有它的记录",
-        restartedNotice: "VibeValley 重启过，{name} 那一轮停下了；给它带句话就能接着干",
-        issueNotReturned: "这张工单的农机还没交回工作目录",
-        noPlace: "{name} 没地方干活：{why}",
-        cannotSend: "{name} 派不出去：{why}",
-        notRecorded: "{name} 的工单没记下来：{why}",
-        notReset: "{name} 的工作目录没能重置：{why}",
-        left: "{name} 收工了：{why}",
-        stillHasHelper: "这张工单还有帮工，不能清掉工作目录",
-        seconds: "{n} 秒",
-        minutes: "{n} 分钟",
-        noIssue: "这个会话不关联工单，不能交付或清理工单的改动。",
-        contextKept: "上下文目录保留在 {cwd}：{why}",
-        contextHasFiles: "目录里已有文件",
-        workerUnavailable: "必需的帮工 CLI 无法执行；本轮未启动",
-        workerAuthenticationFailed: "帮工 CLI 的会话认证请求失败；本轮未启动，请检查服务监听与会话接入",
-      },
-      conflictBrief:
-        "把 {base} 合进你的分支时有冲突（{files}）。请在你的分支上运行 git merge {base}，把冲突解决掉，跑一遍测试，再提交。结论里说清楚每个冲突是怎么取舍的。",
     },
     "server.setting": {
       deepseekKey: "DeepSeek 的 API Key 看着不对：一串不带空格的字，通常以 sk- 开头",
@@ -1507,7 +1135,6 @@ export const catalogs = {
       dictationUrl: "听写的地址要是 http(s) 开头的完整地址，到 /v1 为止，比如本机的 http://127.0.0.1:8080/v1",
       dictationModel: "听写要填模型名，比如本机 speech-server 的 qwen3，或 OpenAI 的 gpt-4o-mini-transcribe",
       memory: {
-        unknown: "不认识的记性来源：{kind}",
         twice: "同一种记性来源只能接一个：{kind}",
         noUrl: "要接上记性来源，先填它的地址",
         url: "记性来源的地址要是 http(s) 开头的完整地址，比如 Nowledge Mem 的 http://127.0.0.1:14242/mcp/",
@@ -1526,59 +1153,13 @@ export const catalogs = {
       defaults: { failureMessage: "我这边卡了一下，你再说一遍？" },
       notSaved: "存不进 {file}：{why}",
     },
-    "server.tool": {
-      labels: {
-        library_item_list: "素材库",
-        library_item_add: "放进素材库",
-        media_image_create: "提交生图",
-        media_understanding_start: "执行已授权理解",
-        media_speech_create: "生成单人语音",
-        media_job_get: "查看生成任务",
-        media_job_list: "查看最近生成任务",
-        media_job_cancel: "取消生成等待",
-        media_job_download: "重试媒体下载",
-        repo_list: "仓库",
-        channel_list: "频道",
-        channel_create: "开频道",
-        channel_update: "改频道",
-        cron_create: "新建定时任务",
-        cron_list: "看定时任务",
-        cron_delete: "取消定时任务",
-        issue_review: "验收",
-        issue_diff_get: "看改动",
-        session_list: "花名册",
-        issue_get: "看进度",
-        issue_comment_create: "带话",
-        channel_message_list: "看对话",
-        channel_message_send: "说话",
-        channel_unread_list: "看没读的",
-        session_stop: "叫停",
-        issue_list: "找工单",
-        issue_create: "记一张工单",
-        issue_update: "改工单",
-        issue_status_update: "挪工单",
-        issue_split: "拆工单",
-        remember: "记一条",
-        rewrite_memory: "整理记性",
-        memory_search: "翻记性",
-        memory_create: "替帮工记",
-        artifact_block_create: "往 Artifact 里加一块",
-        artifact_block_update: "改 Artifact 的一块",
-        artifact_block_delete: "删 Artifact 的一块",
-      },
-      about: "{label}：{about}",
-    },
     "server.voice": {
       misheard: "嗯？我没听清，你再说一遍？",
-      unknownSuffix: "服务端还不会用",
-      unknown: "{what}用的 {vendor} 服务端还不会用",
-      part: { asr: "识别", llm: "大模型", tts: "合成" },
       noAsrKey: "微软识别还没有 key：在声音页的「识别」里填",
       noLine: "助手的语音线路没接通",
       noDeepseekKey: "用 DeepSeek 要先有 DeepSeek 的 key：在首页「设置」里填",
       noLlmKey: "自己的大模型还没有 key：在声音页的「想」里填",
       noTtsKey: "微软合成还没有 key：在声音页的「说」里填",
-      unusable: "语音设置用不了：{why}",
       tunnel: {
         timedOut: "cloudflared 30 秒没给出地址",
         missing: "没有 cloudflared：先 brew install cloudflared，或者在配置里设 voice.line.url，用你自己的隧道",
@@ -1587,7 +1168,6 @@ export const catalogs = {
       noAgora: "还没有 Agora 的凭据：在首页的「设置」里填 App ID 和 App Certificate",
       lineDown: "语音线路开不起来：{why}",
       lineClosed: "语音线路已经关闭",
-      lineNotOpen: "语音线路还没开",
       hungUp: "这通电话已经挂了",
       noToken: "签不出语音令牌：{why}",
       stopped: "语音服务已经停下",
@@ -1679,29 +1259,7 @@ export const catalogs = {
       serverAnswered: "服务端答 {status}",
       seconds: "{n} 秒",
       minutes: "{n} 分钟",
-      join: { labeled: "{label}：{text}", aside: "{text}（{aside}）", sentence: "{text}。", and: "{a}，{b}", clauses: "{a}；{b}", separator: "、" },
-    },
-    web: {
-      opening: {
-        name: "码农场物语",
-        waking: "加载中……",
-        label: "正在加载码农场物语",
-        cannotStart: "码农场物语起不来：{why}",
-        starting: "正在唤醒农场……",
-        connecting: "正在连接……",
-        reading: "正在准备工作台……",
-        loading: "加载中……",
-        ready: "准备好了",
-        waiting: "还在等待连接……",
-        failed: "加载遇到问题",
-        updating: "正在更新到 {next}",
-        stopping: "停下帮工，存好农场……",
-        swapping: "换上新版本……",
-        kept: "农场的数据都在；干到一半的帮工停在原处，带句话就接着干",
-        keptNewFarm: "新版本从新的数据开始，旧的留在家目录里",
-        updateFailed: "没装上：{why}",
-        download: "去下载最新版",
-      },
+      join: { labeled: "{label}：{text}", aside: "{text}（{aside}）", sentence: "{text}。", separator: "、" },
     },
     "web.agent": {
       newName: "新的 {runtime}",
@@ -1873,7 +1431,6 @@ export const catalogs = {
         by: "{name} 做的",
         updated: "{when}更新",
         versions: "每一稿",
-        open: "在新标签页打开",
         delete: "删掉",
         deleteAsk: "删掉「{title}」？对话里的卡片还在。",
         deleted: "删掉了「{title}」",
@@ -1889,8 +1446,6 @@ export const catalogs = {
         nothingFound: "没有标题对得上的",
         title: "标题",
         more: "更多",
-        copyLink: "复制链接",
-        copied: "链接复制好了",
         group: { delivered: "帮工和助手交的", mine: "我写的" },
         rail: "这篇的旁注",
         railShow: "打开旁注",
@@ -1973,12 +1528,10 @@ export const catalogs = {
         at: "{at} / {pages}",
         present: "全屏放映",
         presenter: "演讲者视图",
-        pdf: "存成 PDF",
         thumbnails: "每一页",
         slide: "第 {at} 页 {title}",
       },
       presenter: {
-        title: "演讲者视图：{title}",
         missing: "没说要讲哪一份幻灯片：从 Artifact 的「演讲者视图」打开。",
         current: "这一页",
         next: "下一页",
@@ -2039,20 +1592,16 @@ export const catalogs = {
       partialTitle: "部分转写",
       partialTranscript: "部分转写——并非完整结果。",
       savePartialTranscript: "将部分转写保存为 Artifact",
-      downloadPartialTranscript: "下载部分转写",
       chooseFile: "选一个音频文件",
       copyTranscript: "复制转写",
       copyPartialTranscript: "复制部分转写",
       usageAudioSeconds: "输入音频：{value} 秒",
       input: "音频文件",
       transcribe: "开始转写",
-      localPlayback: "本机输入回放",
       timeline: "说话人时间轴",
-      seek: "定位到 {time}",
       noTimestamps: "厂商没有返回带时间戳的分段。",
       saveTranscript: "将转写保存为 Artifact",
       openTranscript: "打开已保存的转写 Artifact",
-      downloadTranscript: "下载转写",
       downloadAudio: "下载音频",
       history: "音频任务",
       empty: "还没有音频任务。",
@@ -2074,19 +1623,7 @@ export const catalogs = {
         "明确开始后，边生成边播放收到的 PCM 音频。仅支持 Flash，完整结果保存为 WAV，最多缓冲五秒播放。停止、离开页面或切换设备都会关闭流，不能重连，厂商仍可能计费。",
       flashStart: "开始生成并播放",
       flashStop: "停止播放和本机任务",
-      flashIdle: "尚未开始流式播放。",
-      flashConnecting: "正在打开原请求的音频流…",
-      flashPlaying: "正在播放收到的音频…",
       flashDraining: "音频流已完整接收，正在播完缓冲内容…",
-      flashDone: "音频流和播放均已完成，保存结果见下方。",
-      flashStopped: "已停止。听到的音频可能不完整，此音频流不会重连。",
-      flashIncomplete: "音频流在结果完整前结束。听到的内容只是部分音频，不能据此判断请求未计费。",
-      flashInvalid: "音频流包含无效或乱序数据，已停止。",
-      flashUnavailable: "无法打开原请求的音频流，不会重连或自动重新生成。",
-      flashUnsupported: "此浏览器无法实时播放音频，请改用非流式格式。",
-      flashDeviceChanged: "音频设备或播放环境发生变化，已停止原音频流。",
-      flashProgress: "已接收 {received} 秒 · 已播放 {played} 秒",
-      playbackUnsupported: "此浏览器无法播放这个格式，请下载后使用兼容的播放器收听。",
       metadataFile: "从已保存音频测得",
       metadataProvider: "厂商报告",
       metadataRate: "{value} Hz",
@@ -2114,7 +1651,6 @@ export const catalogs = {
       rail: "工作台",
       farm: "回农场",
       farmShort: "农场",
-      update: "更新",
       working: "开工中 · {n} 个在干活",
       off: "没开工",
       chips: { drop: "去掉 {v}", valueOf: "{k} 的值", removeKey: "删除 {k}", remove: "删除", name: "变量名", value: "变量的值", valueHint: "值", add: "添加" },
@@ -2237,10 +1773,7 @@ export const catalogs = {
         diagramFailed: "这张图画不出来：{why}",
         longMore: "展开全文",
         longLess: "收起",
-        taskDone: "已完成",
-        taskOpen: "没完成",
       },
-      updateReady: "{next} 已下好，去「关于」重启",
       intent: { timedOut: "等了太久没回音，可以重试", offline: "没连上农场，这一下没发出去" },
     },
     "web.catalog": {
@@ -2351,7 +1884,6 @@ export const catalogs = {
         label: "定时任务「{name}」",
         on: "开着",
         off: "关着",
-        remove: "删掉",
         removeWhich: "删掉定时任务「{name}」",
         sure: "确定删？",
         approveWhich: "同意定时任务「{name}」",
@@ -2415,7 +1947,6 @@ export const catalogs = {
         notSent: "没发出去：{why}",
         who: "叫谁",
         mention: "叫人",
-        stop: "叫停助手",
         stopHint: "叫助手停下这一轮，派出去的帮工照常干活",
         send: "发送",
         sendHint: "回车发送 · Shift+回车换行",
@@ -2466,7 +1997,6 @@ export const catalogs = {
         none: "没有找到",
         direct: "私聊",
         newDirect: "开一个私聊",
-        keys: "{mac, select, true {⌘K} other {Ctrl K}}",
         note: "笔记 · {tier}",
         searchNotes: "在笔记里搜「{q}」",
       },
@@ -2585,414 +2115,22 @@ export const catalogs = {
       },
     },
     "web.farm": {
-      reading: "在读……",
-      unread: "读不到。",
-      notNow: "先不收",
-      orchestrator: "助手",
-      plotOf: "{name}的地",
-      plot: {
-        unread: "这块地的工单还没读到。",
-        failed: "没办成",
-        now: "现在怎样",
-        yours: "要你做的",
-        answerTo: "回答：{question}",
-        rejectWhere: "哪里没过，一行一条",
-        sayIt: "自己说……",
-        reopenWhat: "这次要它做什么（不填就是接着做完）",
-        tellWorking: "干着活也能收到这句话",
-        tellIdle: "说一句，它接着做一轮",
-        rejectLabel: "哪里没过",
-        answer: "回答",
-        reopen: "重开这张工单",
-        tell: "给{who}带句话",
-        onBoard: "在看板上看",
-        progress: "做到哪了",
-        progressMet: "做到哪了 · {met} / {of} 条做到了",
-        noCriteria: "{answer, select, true {这张工单没写做完的标准：交回来时看结论判断。} other {这张工单没写做完的标准：交回来时看改动判断。}}",
-        rejected: "上次打回 · {text}",
-        conclusion: "结论",
-        evidence: "依据 · {line}",
-        next: "接着做 · {line}",
-        made: "做出了什么",
-        madeNothing: "做出了什么：还没有改动",
-        madeFiles: "做出了什么（{n} 个文件）",
-        changesUnread: "读不到改动。",
-        moreFiles: "还有 {n} 个文件",
-        story: "怎么走到这一步",
-        steps: "帮工的每一步",
-        runs: "每一轮",
-        details: "详情",
-        job: "要做的",
-        who: "谁在做",
-        crew: "地上的人",
-        deliver: "交付",
-        reviewed: "已验收 {clock}",
-        weeded: "拔了的草",
-        weed: "已拔 · {text}",
-        model: "模型",
-        branch: "分支",
-        copyPath: "复制路径",
-        opened: "开单",
-        closed: "关单",
-        history: "做过",
-        took: "用时",
-        thread: "看工单串",
-        where: "第 {plot} 块地 · 第 {round} 轮",
-        result: { met: "它说做到了", unmet: "它说没做到", unsure: "它说不确定" },
-        ticked: "看过了",
-        noRuns: "还没有干过。",
-        runCount: "{n} 次",
-        conflict: "合进 {base} 会冲突：{files}",
-        moving: "正在改状态…",
-        notMoved: "没改成",
-        moveAgain: "再试",
-        letGo: "算了",
-        sending: "发送中…",
-        notSaid: "没说出去",
-        sayAgain: "再说一次",
-        takeBack: "放回输入框",
-      },
-      graph: { unreadable: "看不了改动：", commits: "提交" },
-      achievements: {
-        tier: { "1": "铜", "2": "银", "3": "金" },
-        category: { starter: "新手任务", harvest: "收成", craft: "手艺", thrift: "精打细算", team: "协作", secret: "彩蛋" },
-        clearing: "开垦",
-        clearAt: "Lv.{level} 开垦一块地",
-        toLevel: "再 {left} 个 commit 升级 · 共 {total} 个",
-        toNext: "到下一级的 commit",
-        streak: "连胜 {n} · 收成金币 ×{multiplier}",
-        coinsOnMerge: "收进主分支才给金币",
-        title: "称号",
-        pick: "挑一个",
-        earnFirst: "拿到成就就有",
-        titles: "挂在农场卡上的称号",
-        worn: "挂着",
-        none: "不挂称号",
-        starterDone: "新手任务都做完了。",
-        starter: "新手任务 {done}/{of}",
-        perStarter: "每做完一个 +{coins} 金币",
-        done: "做完了",
-        tiers: "{tier}/{of} 档",
-        toTier: "到{tier}档",
-        secrets: "还有 {n} 个彩蛋",
-        secretsLine: "碰上了才知道是什么。",
-        day: "{month}月{day}日",
-        earned: "{day}拿到",
-        earnedTier: "{day}拿到{tier}牌",
-      },
-      sow: {
-        notDrafted: "先没起草",
-        homeless: "这座农场不是哪个仓库的",
-        toMap: "种地要先进一个仓库的农场：回地图挑一座岛。",
-        noRepos: "工作台里还没有仓库：先在「仓库」页开一个。",
-        map: "去地图",
-        makeRepo: "去开一个仓库",
-        plantIn: "种在 {repo}",
-        rummaging: "在翻种子袋……",
-        noSeeds: "种子袋没拿到：",
-        retry: "重新拿种子袋",
-        recent: "最近",
-        kinds: "常见的活",
-        own: "自己写",
-        jobHint: "要做什么，做到什么程度算完",
-        job: "工单",
-        who: "谁来种",
-        orchestratorPicks: "助手挑",
-        how: "开始：助手把这句话交给帮工，在 {repo} 里马上开工。草稿：帮工读过代码写成工单，你看过再开工。",
-        draft: "草稿",
-        start: "开始",
-      },
-      water: {
-        drops: { "0": "改动小一点", "1": "先别动测试", "2": "做完跟我说一声", "3": "顺便补个测试" },
-        working: "它正在干活，这句话会在下一步之前收到。",
-        idle: "它现在没在干活，这句话会让它接着干一轮。",
-        thread: "这句话记在它的工单串里，它回的话也在那儿。",
-        job: "现在的活：{brief}",
-        hint: "带句话……",
-        water: "浇水",
-        moved: "工单状态变了，先回到地块看看要你做的事。",
-      },
-      harvest: {
-        reading: "正在看它改了什么…",
-        repo: "仓库 {repo}",
-        counts: "{commits} 个提交 · {files} 个文件",
-        none: "这一单没有改动。收获就是请它收工。",
-        conflict: "合进 {base} 会冲突，先没法收",
-        resolveHow: "让它在自己的分支上把 {base} 合进来、解决冲突、跑一遍测试再提交；做完再来收。",
-        behind: "它干活这段时间，{base} 上多了 {n} 个提交；收获时会合在一起（多一个合并提交）。",
-        uncommitted: "还有 {n} 个文件没提交，收获时会先帮它提交：",
-        letGo: "请它收工",
-        take: "确认收获，合进 {base}",
-        resolve: "让它解决冲突",
-        files: "改了的文件",
-        empty: "仓库还空着。收获进主分支的活会放在这里。",
-        taken: "{ago}收的",
-      },
       panel: {
         shop: "商店",
         warehouse: "仓库",
         graphs: "任务与成就",
         log: "农场日志",
         orchestrator: "助手和宠物",
-        harvest: "收获{name}的地",
-        sow: "播种 · 第 {plot} 块地",
-        water: "给{name}浇水",
-        menu: "菜单",
-        pickLook: "挑一个你喜欢的助手，农场和对话里马上换上。",
-        drawing: "还在画……",
-        pets: "宠物",
-        shopItems: {
-          scarecrow: { name: "稻草人", note: "吓跑乌鸦，好看" },
-          seeds: { name: "新种子包", note: "常用工单模板" },
-          bunting: { name: "彩旗", note: "挂在篱笆上" },
-          doghouse: { name: "狗窝", note: "给助手的狗" },
-        },
         shopClosed: "商店还在装修，下一版开张。现在有 {coins} 金币，先攒着。",
       },
-      menu: {
-        chat: "田头（频道）",
-        agents: "帮工名册",
-        runtimes: "农具",
-        skills: "技能书",
-        connectors: "连接器",
-        repos: "仓库",
-        catalog: "图鉴",
-        resume: "继续",
-        soundOn: "打开音效",
-        soundOff: "关闭音效",
-        elsewhere: "去别处",
-        issues: "工单",
-        yard: "院子里能点的",
-      },
-      log: { empty: "还没有事。开工以后，你和助手说的话、谁做完了什么，都记在这里。", you: "你", said: "说", answered: "答", spent: "这一轮花了 {spent}" },
-      conflictTag: "冲突",
-      binary: "二进制",
-      chat: {
-        actions: {
-          open: "这条消息能做的",
-          react: "回应",
-          moreEmoji: "更多表情",
-          reply: "回复",
-          copyLink: "复制链接",
-          copied: "链接已复制",
-          edit: "改",
-          remove: "删掉",
-          sure: "再点一次删掉",
-          editHint: "回车存下 · Esc 不改了",
-          cancelReply: "不回复了",
-        },
-        edited: "（已编辑）",
-        deleted: "这条消息已删除",
-        suggestions: { "0": "让阿郑做字幕面板", "1": "让小吴跑测试", "2": "进度怎么样？", "3": "大家收工" },
-        greeting:
-          "这里是田头，你、助手和帮工都在这儿说话。跟我说一句要做的活，比如「让测试小吴跑一遍测试」。\n\n帮工来了以后，写 @w1 这样的名字就是直接叫它；每张工单下面挂着它的工单串。",
-        phase: {
-          off: "打字或者按麦克风，就开工",
-          connecting: "正在接通助手…",
-          listening: "助手在听",
-          thinking: "助手在想…",
-          speaking: "助手在说",
-          error: "没接通，再试一次",
-        },
-        newIn: "{n} 处有新话",
-        newInThread: "串里有新话",
-        newInChannel: "{channel}有新话",
-        label: "田头",
-        restore: "还原对话窗口",
-        enlarge: "放大对话窗口",
-        fold: "收起对话",
-        thread: "工单串",
-        older: "更早的消息",
-        threadEmpty: "串里还没人说话。在这里说的话，它的帮工会看到。",
-        sending: "发送中",
-        captions: "实时字幕",
-        done: "说完了",
-        speaking: "正在说",
-        notSent: "没发出去：{why}",
-        noVoice: "语音没接通：{why}",
-        gotIt: "知道了",
-        settings: "去设置",
-        nobodyOnIt: "现在没有帮工在干，串还留着",
-        replies: "{n} 条回复",
-        back: "回到{channel}",
-        dispatch: "派活",
-        channel: "频道：{channel}，点开切换或开新频道",
-        channels: "频道",
-        directs: "私聊",
-        repoTag: "仓库 {repo}",
-        newChannel: "开新频道",
-        pageAndSchedules: "频道页和定时任务",
-        settingsLink: "设置",
-        back2: "返回",
-        newChannelLine: "一件长期的事、一个仓库，单独一个地方说话、派活。在这里叫助手，活就派在这里。",
-        nameHint: "名字，比如 clock-in",
-        name: "频道名",
-        descriptionHint: "做什么的（可以不填）",
-        description: "频道说明",
-        repoHint: "默认仓库（可以不填）",
-        repo: "默认仓库",
-        open: "开",
-        settingsOf: "{channel} 的设置",
-        what: "做什么的",
-        repoNone: "默认仓库（空着就没有）",
-        save: "存",
-        sendTo: "派给{name}",
-        anyone: "不指定帮工",
-        inThread: "在串里说，{name}会看到…",
-        inThreadAnyone: "在串里说…",
-        toOrchestrator: "对助手说，@ 叫帮工…",
-        toOrchestratorAlone: "只对助手说…",
-        who: "叫谁",
-        stop: "叫助手停下",
-        stopHint: "叫助手停下这一轮，派出去的帮工照常干活",
-        send: "发送",
-        less: "收起",
-        more: "展开阅读",
-        foldDispatch: "收起派活",
-        unfoldDispatch: "展开派活",
-        spent: "这一轮花了 {spent}",
-        newCount: "{n} 新",
-        replyTo: "回复 {name}",
-        replyToText: "回复 {name}：{text}",
-        notSentLine: "没发出去",
-        retrySend: "再发",
-        dropSend: "不发了",
-        unread: "消息没读到：{why}，稍后再试",
-      },
+      menu: { agents: "帮工名册", runtimes: "农具", skills: "技能书", issues: "工单" },
       tool: {
-        hand: { label: "手", hint: "点一块地看详情，点空地播种" },
+        hand: { hint: "点一块地看详情，点空地播种" },
         water: { hint: "给帮工带句话，正在干活的会中途收到" },
-        bug: { label: "杀虫", hint: "活没做成（地里有虫）：让它接着修" },
-        weed: { label: "除草", hint: "没过验收的意见会长成杂草：帮工修完、下一次验收通过就拔掉" },
-        harvest: { label: "收获", hint: "熟了的地：收下成果，帮工收工" },
-        shovel: { label: "铲除", hint: "正在干活的叫停；没在干活的请它收工" },
-      },
-      aim: {
-        flowerbed: "开垦好的花坛",
-        clearAt: "Lv.{level} 开垦这块地",
-        unread: "这块地的工单还没读到",
-        look: "看看这块地",
-        sow: "播种",
-        water: "给{name}浇水（带句话）",
-        nothingYet: "还没种东西，先用手播种",
-        bug: "杀虫：让它接着修",
-        noBugs: "这块地没有虫",
-        weeds: "帮工修完、验收通过草就拔了",
-        noWeeds: "没有杂草",
-        harvestRipe: "收获，帮工收工",
-        harvestLook: "收获：看看它改了什么",
-        nothingToHarvest: "空地没有东西可收",
-        shovelStop: "铲除：叫停",
-        shovelDismiss: "铲除：请它收工",
-        noShovel: "空地不用铲",
-        unavailable: "这张工单{state}，先打开地块看看",
-      },
-      command: { cannot: "这张工单现在不能「{act}」", stored: "收进仓库", noShovel: "这张工单现在不能铲除", changed: "这块地已经变了，请重新点一次" },
-      page: { lost: "连不上农场，重连中……（server 开着吗？）", waiting: "在等农场……" },
-      hud: {
-        label: "农场的 HUD",
-        look: "换助手的样子",
-        workbenchHint: "工单、聊天……管活的页面",
-        workbench: "工作台",
-        treeHint: "记忆树：农场学会了什么",
-        tree: "记忆树",
-        mapHint: "地图：每个仓库一座岛",
-        map: "地图",
-        channelsUnread: "频道，{n} 条没读",
-        menuHint: "菜单（Esc）",
-        tools: "农具",
-        toLevel: "{xp}/{need} commit",
-        toLevelNext: "{xp}/{need} commit · Lv.{next} 开垦",
-      },
-      quota: {
-        unreported: "不报额度",
-        signedOut: "没登录，额度读不到",
-        unreadable: "读不到：{why}",
-        balance: "{enough, select, true {按量计费 · {provider} 余额} other {按量计费 · {provider} 余额，不够用了}}",
-        all: "各台农机 的剩余额度",
-        lowest: "剩余额度，最少的还剩 {pct}%",
-        quota: "额度",
-        left: "剩余额度",
-        refresh: "现在读一次额度",
-        note: "从各家账户读来，几分钟更新一次；帮工干完一轮也会更新。",
-        spentToday: "今天花了约 {spent}",
-        spentTodayBudget: "今天花了约 {spent} / 预算 {budget}",
-      },
-      friends: {
-        status: { bug: "地里有虫", ripe: "熟了，等你收", busy: "在干活", rest: "在地里歇着", away: "没在农场" },
-        tally: " · 请过 {hired} 次，收成 {harvested} 次",
-        energy: "精力 {short}",
-        disabled: "停用了，派不出去",
-        unpick: "不再指定",
-        pick: "下一单派它",
-        profile: "档案",
-        helpers: "帮工",
-      },
-      fx: { coins: "{detail} · +{coins} 金币", notice: "提示", levelUp: "农场升到 Lv.{level}", level: "农场 Lv.{level}", cleared: "开垦了一块新地" },
-      sign: { label: "仓库牌：{repo}", noRepo: "没有仓库", hint: "这座农场是这个仓库的；点它回地图，进别的岛", repo: "仓库" },
-      overlay: {
-        click: "点击：{text}",
-        clearAt: "Lv.{level} 开垦",
-        idle: "今天种点什么？",
-        unclaimed: "没开垦的地",
-        flowerbed: "花坛",
-        bare: "第 {plot} 块地 · 空地",
-      },
-      crop: {
-        empty: "空地",
-        seeded: "刚播种",
-        sprout: "发芽",
-        leafy: "长叶",
-        flowering: "开花",
-        wheat: "成熟",
-        withered: "枯萎",
-        weeds: "长草",
-        dry: "干旱",
-        harvested: "收完了",
-        locked: "没开垦",
-      },
-      yard: {
-        shop: { hint: "种子、装饰、开垦新地" },
-        warehouse: { hint: "收进来的成果" },
-        tasks: { hint: "新手任务、开垦、成就墙" },
-        log: { hint: "说过的话和收成，按时间倒着排" },
-        taskBoard: { hint: "一件长活拆成几步，交给几个帮工" },
-        agents: { hint: "每个帮工用哪台农机、带什么人设和技能、长什么样" },
-        manager: { hint: "跟助手说话" },
-        runtimes: { label: "工坊 · 农具", hint: "每台农机是一种 runtime：装没装、用量" },
-        skills: { label: "书屋 · 技能书", hint: "帮工能带的技能" },
-      },
-      canvas: {
-        label: "码农场物语的像素农场",
-        noMap: "没拿到村子的地图：{why}",
-        map: "看地图……",
-        moving: "搬东西进村 {done}/{total}",
-        lights: "点灯……",
-        entering: "进村",
-      },
-      debug: {
-        title: "调试台",
-        close: "关闭 `",
-        call: "通话",
-        open: "开工",
-        dismiss: "收工",
-        sky: "天色",
-        time: "时间",
-        stop: "停",
-        progress: "游戏进度",
-        levelUp: "升一级（带横幅）",
-        achievement: "弹一个成就",
-        helpers: "帮工 · {n}",
-        nobody: "地里没人。",
-        halt: "叫停",
-        all: "全部",
-        haltAll: "全部叫停",
-        dismissAll: "全部收工",
-        frames: "帧和事件 · {n}",
-        resume: "接着记",
-        pause: "暂停",
-        clear: "清空",
-        copy: "复制 .jsonl",
+        bug: { hint: "活没做成（地里有虫）：让它接着修" },
+        weed: { hint: "没过验收的意见会长成杂草：帮工修完、下一次验收通过就拔掉" },
+        harvest: { hint: "熟了的地：收下成果，帮工收工" },
+        shovel: { hint: "正在干活的叫停；没在干活的请它收工" },
       },
       native: {
         ledger: "账本与时间",
@@ -3029,145 +2167,6 @@ export const catalogs = {
         fruit: "果实原则",
         seed: "种子习惯",
       },
-    },
-    "web.farm.map": {
-      finding: "在找……",
-      islands: "{n} 座岛",
-      peopled: "{n} 座有人",
-      working: "在做 {n}/{of} 张",
-      queued: "排队 {n}",
-      stake: "空位，点了派活",
-      locked: "空位都占着",
-      sack: "排队的活",
-      send: "派一件活 · {repo}",
-      plot: "{name}的地",
-      open: "空位，派一件活到 {repo}",
-      wait: "等地",
-      queuedTip: "排队：{title}",
-      queuedLabel: "排队的活：{title}",
-      enter: "进{repo}的农场",
-      enterWord: "进岛",
-      homeless: "不在哪个仓库里：",
-      sea: "工作目录下还没有仓库，地图上还是一片海。",
-      notDrafted: "先没起草：{why}",
-      sowIntro: "种在 {repo}：写一句要做的事，助手派帮工来干；或者先写成待办，看过再开工。",
-      job: "要做的事",
-      jobExample: "比如：登录页加一个「记住我」",
-      todo: "先写成待办",
-      sow: "种下",
-      gone: "工作目录里没有这个仓库了，只剩还在岛上的帮工。",
-      worktrees: "worktree · {n} 个",
-      noHelpers: "岛上还没有帮工：每派一件活来，就多一个 worktree。",
-      noMore: "不再往这里派活。",
-      canSend: "还能再派 {n} 件活，马上开工（这个仓库最多同时 {of} 个帮工）。",
-      shut: "已经有 {n} 张工单在做，派来的活先排队。",
-      full: "满了：{n} 个帮工都在干活，派来的活先排队。",
-      queue: "排队 · {n} 件",
-      see: "看这张工单",
-      growth: "长势 · {label}",
-      growthSince: "长势 · {label} · 最近一次提交：{since}",
-      crop: { never: "还没动过土", day: "正旺", week: "在长", month: "冒着芽", quarter: "有点干了", older: "荒了" },
-      island: {
-        branch: "\n分支 {branch}",
-        open: "空位：派一件活来，马上开工",
-        shut: "已经有 {n} 张工单在做，等有工单做完",
-        gone: "不在工作目录里了",
-        working: "{full, select, true {在干 {n}/{of}（满了）} other {在干 {n}/{of}}}",
-        queued: "排队 {n}",
-      },
-    },
-    "web.farm.phone": {
-      ringing: "来电…",
-      decline: "挂断",
-      answer: "接听",
-      callOrchestrator: "打给助手",
-      missed: "未接 {n}",
-      log: "记录",
-      noCalls: "还没有通话。",
-      answered: "接了",
-      declined: "挂了",
-      noMissed: "没有未接来电。地里都好好的。",
-      phase: {
-        connecting: "正在接通……",
-        live: "通话中：说吧，助手在听",
-        coming: "通话中：助手在路上",
-        ending: "挂断中……",
-        failed: "没接通：{why}",
-        idle: "有事直接说，工单交回来、卡住了，助手也会打过来。",
-      },
-      manager: "助手",
-      hangUp: "挂断",
-      app: { missed: "未接", channels: "频道", games: "游戏" },
-      game: { blocks: "方块", sokoban: "推箱子", dino: "小恐龙", bugs: "贪吃虫", merge: "种田 2048" },
-      phone: "手机",
-      phoneRinging: "手机：来电",
-      phoneMissed: "手机，{n} 个未接来电",
-      phoneUnread: "手机，田头 {n} 条新消息",
-      ring: "来电",
-      new: "新",
-      label: "农场手机",
-      home: "主屏",
-      homeHint: "回主屏",
-      brand: "农场通",
-      openChat: "展开田头",
-      openChatUnread: "展开田头，{n} 条新消息",
-      key: { up: "上", left: "左", right: "右", down: "下" },
-      pressA: "按 A {what}",
-      again: "再来",
-      start: "开始",
-      resume: "继续",
-      paused: "暂停",
-      sokoban: {
-        levels: { "0": "第一箱种子", "1": "绕到后面", "2": "两箱收成", "3": "仓库拐角", "4": "丰收入仓" },
-        title: "推箱子 {level}/{of}",
-        moves: "{moves} 步 · {pushes} 推",
-        board: "仓库棋盘，{placed}/{of} 箱已归位",
-        allIn: "收成全部入仓！",
-        done: "这一仓收拾好了！",
-        goal: "把木箱推到 ◆ 上",
-        undo: "B 撤销",
-        again: "再玩一轮",
-        next: "下一关",
-        restart: "重开",
-        help: "方向键走动 · 箱子只能推",
-      },
-      dino: { road: "小恐龙的路", crashed: "撞上了", help: "A 或 ↑ 跳，↓ 或 B 蹲", help2: "跑得越远越快，后面会有鸟" },
-      merge: {
-        start: "按 A 开始",
-        restartAsk: "重新种这块地？",
-        restartKeys: "A 重开 · B 接着种",
-        harvest: "丰收了！",
-        goOn: "按 A 接着种",
-        full: "地种满了 · {score} 分",
-        overKeys: "按 A 再来 · B 悔一步",
-        reached: "种到 {stage}",
-        field: "田里：{n} 株，最高 {top}",
-        stages: "收成图鉴",
-        help: "方向键或划一下：一样的两株长成下一样",
-        help2: "B 悔一步 · A 重开",
-        stage: { "0": "种子", "1": "芽", "2": "叶", "3": "花", "4": "麦子", "5": "胡萝卜", "6": "麦捆", "7": "一筐", "8": "一车", "9": "粮仓", "10": "丰收" },
-        past: "丰收{n}",
-      },
-      bugs: {
-        ended: { wall: "撞到田埂了", self: "咬到自己了", full: "田里爬满了" },
-        tally: "种子 {seeds} · 虫 {bugs}",
-        field: "贪吃虫的田",
-        help: "方向键转弯，B 暂停",
-        help2: "吃种子长一节，虫子飞走前吃掉多得分",
-      },
-      blocks: {
-        well: "方块的井",
-        noRoom: "没地方了",
-        score: "分数",
-        lines: "行",
-        level: "级",
-        best: "最好",
-        help: "←→ 移 ↑ 转",
-        help2: "↓ 落 A 到底",
-        help3: "B 暂停",
-        next: "下一个",
-      },
-      chatTab: "田头",
     },
     "web.inbox": { tray: { working: "{n} 个帮工在干活", idle: "开工了，没有在干的活", off: "还没开工", unread: "频道 {n} 条没读" } },
     "web.issue": {
@@ -3478,14 +2477,13 @@ export const catalogs = {
       emptyHow: "生成一张图或一段语音、上传或拖进来一个文件，或者在聊天里让帮工把找到的东西放进来。",
       nothingShown: "没有符合筛选的素材。",
       drop: "松开，放进素材库",
-      rail: { label: "筛选", where: "来路", kind: "种类", channels: "来自频道", agents: "来自帮工", anyWhere: "全部来路", anyKind: "全部种类" },
+      rail: { where: "来路", kind: "种类", channels: "来自频道", agents: "来自帮工", anyWhere: "全部来路", anyKind: "全部种类" },
       origin: { all: "全部", generated: "生成的", uploaded: "你上传的", fetched: "帮工拿回来的" },
       kind: { all: "全部", image: "图片", audio: "音频", video: "视频", other: "其它" },
       search: "搜索名字",
       sortLabel: "排序",
       sort: { recent: "最近", name: "名字", size: "大小" },
       tileSize: "缩略图大小",
-      grid: "素材",
       job: {
         image: "生图",
         speech: "单人语音",
@@ -3503,7 +2501,6 @@ export const catalogs = {
         fetchedPath: "{agent} 从工作目录的 {path} 拿回来的",
       },
       inspector: {
-        label: "详情",
         kind: "种类",
         pixels: "尺寸",
         bytes: "大小",
@@ -3529,7 +2526,6 @@ export const catalogs = {
       makeTabs: { image: "生图", speech: "单人语音", audio: "音频工作台" },
     },
     "web.media": {
-      image: "生成图片",
       speech: {
         title: "单人语音生成",
         notice:
@@ -3577,7 +2573,6 @@ export const catalogs = {
         consent: "我同意将这些文件和问题发送到上方的 MOSS 连接。",
         uploading: "正在将选中的文件保存到本机…",
         stopUpload: "停止本机上传",
-        uploadFailed: "本机上传失败，这次提交尚未开始理解；请重试或重新选择文件。",
         submit: "提交理解",
         new: "新的理解请求",
         newAsk: "开始新的请求？这可能再次上传并产生费用，不会找回先前未知的结果。",
@@ -3690,7 +2685,6 @@ export const catalogs = {
         gardener: { name: "园艺师", blurb: "宽檐草帽别朵小花，剪刀揣在围裙兜里。" },
         robot: { name: "机器人管家", blurb: "圆滚滚的农场机器人，脸上的屏会笑。" },
       },
-      pet: { dog: "小狗", ragdoll: "重点色布偶猫", bluecat: "蓝猫" },
       orchestrator: {
         tab: { memory: "记性", trajectory: "轨迹", voice: "声音" },
         all: "← 全部档案",
@@ -3745,7 +2739,6 @@ export const catalogs = {
       marker: { TODO: "待办", DOING: "在做", DONE: "做完了", NOW: "现在做", LATER: "以后做", WAITING: "在等", CANCELED: "不做了" },
       command: { todo: "标成待办", doing: "标成在做", done: "标成做完了", clear: "去掉标记", h1: "大标题", h2: "小标题", today: "链到今天的日记" },
       complete: { newPage: "新页面" },
-      toolbar: { label: "编辑这一块", indent: "缩进", outdent: "取消缩进", up: "上移", down: "下移", todo: "切换待办", link: "插入链接" },
       rail: { label: "这一页的旁注", show: "打开旁注", hide: "收起旁注", contents: "这页的大纲" },
       search: {
         title: "搜笔记",
@@ -4000,19 +2993,7 @@ export const catalogs = {
         who: "谁在用",
         nobody: "还没有 agent 带这个技能。到 agent 的「技能」页签里勾上。",
       },
-      quota: {
-        session: "当前会话",
-        weekly: "本周额度",
-        week: "本周（{models}）",
-        oneWeek: "· 一周",
-        weekdays: { "0": "周日", "1": "周一", "2": "周二", "3": "周三", "4": "周四", "5": "周五", "6": "周六" },
-        now: "马上重置",
-        minutes: "{m} 分钟后重置",
-        hours: "{h} 小时后重置",
-        on: "{weekday}重置",
-        unreported: "不报额度",
-        signedOut: "没登录",
-      },
+      quota: { session: "当前会话", weekly: "本周额度", week: "本周（{models}）", oneWeek: "· 一周", unreported: "不报额度", signedOut: "没登录" },
       spentToday: "今天帮工花了约 {spent}，没设每日预算。",
       spentTodayBudget: "今天帮工花了约 {spent}，每日预算 {budget}。",
     },
@@ -4145,7 +3126,6 @@ export const catalogs = {
         call: "通话线路",
         dictation: "听写",
         chat: "聊天软件",
-        devices: "设备",
         width: "导航的宽窄（拖动，双击回默认）",
         accounts: "账号与钥匙",
       },
@@ -4161,7 +3141,6 @@ export const catalogs = {
         dictation: "听写 转写 语音输入",
         github: "gh PR 登录",
         chat: "微信 飞书 QQ 连接器 配对",
-        devices: "手机 配对 连接到本机 局域网 名字 密码 登录 退出",
         accounts: "钥匙 账号 DeepSeek MOSS 声网 Agora API Key 模型",
       },
       scope: { farm: "对整个 VibeValley", device: "只对这台设备" },
@@ -4198,33 +3177,6 @@ export const catalogs = {
         copy: "复制路径",
         copied: "路径复制好了",
         reveal: "在访达里显示",
-        update: "更新",
-        updateHint: "桌面版从 GitHub 上的发布自己更新",
-        upToDate: "已是最新",
-        checking: "正在查有没有新版本…",
-        downloading: "正在下载 {next}（{percent}%）",
-        ready: "{next} 已下好，退出时装上",
-        readyNewFarm: "{next} 已下好：它会从新的数据开始，旧的留在一边",
-        manual: {
-          diskImage: "{next} 要手动装：应用还在安装盘里运行，先拖进「应用程序」",
-          translocated: "{next} 要手动装：macOS 把应用挪到了临时的地方运行，先拖进「应用程序」再打开",
-          readOnly: "{next} 要手动装：应用所在的文件夹不能写",
-          noBuild: "{next} 没有这台 Mac 的版本",
-        },
-        failed: "没查成：{why}",
-        check: "检查更新",
-        restart: "重启更新",
-        restartQuestion: "重启到新版本？",
-        workingQuestion: "{n} 个帮工在干活，重启会打断它们。现在重启？",
-        newFarmQuestion: "新版本从新的数据开始，旧的留在家目录里。现在重启？",
-        download: "去下载",
-        cli: "命令行",
-        cliHint: "装上以后，在终端里用 {command} 读写这个农场，本机的 agent 也能用",
-        cliReady: "在终端里用 {command}；本机的 agent 也能用它读写这个农场",
-        cliNotOnPath: '已经装到 {link}，但 ~/.local/bin 不在 PATH 里：在 ~/.zshrc 里加一行 export PATH="$HOME/.local/bin:$PATH"',
-        cliTaken: "{link} 已经有别的文件，没有换掉：先挪开它再装",
-        cliInstall: "安装",
-        cliRemove: "移除",
       },
       missing: {
         deepseekKey: "还没填 DeepSeek 的钥匙",
@@ -4251,54 +3203,7 @@ export const catalogs = {
       readiness: { ready: "{feature}：可以用了", lacks: "{feature}：{why}", fix: "去设置" },
       accounts: { intro: "所有供应商的账号和钥匙都在这里；每个账号能用哪些模型也在这里看。每个功能用哪个账号，在「用途」里选。" },
     },
-    "web.tree": {
-      kind: { leaf: "叶", fruit: "果", seed: "种子" },
-      stage: { "1": "芽", "2": "小苗", "3": "小树", "4": "大树", "5": "老树" },
-      distilled: "提炼自 {n} 次经验",
-      noted: "这件活记下了 {n} 片叶",
-      seeds: "长出了 {n} 颗种子",
-      grew: "长成了 {n} 次经验",
-      together: "常和 {n} 条一起想起",
-      sown: "「{body}」播进了技能书（还是假的，接上服务端以后才真写进去）",
-      sky: "农场的记忆星空",
-      skyHint: "中间是种子，往外是果和叶，越远越旧；拖动可以转",
-      back: "回到树下",
-      farm: "回农场",
-      earliest: "最早",
-      past: "看看从前：拖到哪天，树就长回那天的样子",
-      now: "现在",
-      day: "第 {n} 天",
-      byHelper: "只看哪个帮工的",
-      allHelpers: "全部帮工",
-      byRepo: "只看哪个仓库的",
-      allRepos: "全部仓库",
-      everyRepo: "所有仓库",
-      title: "农场的记忆树",
-      stats: "第 {days} 天 · {rounds} 轮 · 想起 {recalls} 次",
-      nextStage: "再干 {rounds} 轮长成{stage}",
-      grown: "长成了",
-      experience: "一次经验",
-      fold: "收起",
-      intent: "想做什么",
-      approach: "怎么做的",
-      insight: "关键心得",
-      recalled: "想起过 {n} 次",
-      recent: "最近长出的",
-      fading: "快落的叶 {n}",
-      look: "看看",
-      fadingNote: "最久没想起的会先落；落了就忘了。",
-      waiting: "待播种的手艺",
-      noSeeds: "没有新的手艺；好几次经验说的是一件事时，会提炼出一颗种子。",
-      sow: "播种",
-      lookUp: "抬头看星空",
-      from: "提炼自",
-      notedBy: "这件活记下的",
-      grewInto: "长出了",
-      grewTo: "长成了",
-      often: "常一起想起",
-      aboutToFall: " · 快落了",
-      scene: "记忆树：每片叶是记下的一句话，每颗果是一次经验，树下的种子是手艺；抬头是同一份记忆的星空",
-    },
+    "web.tree": { sky: "农场的记忆星空" },
     "web.ui.pixel": {
       sound: {
         group: { ui: "界面", tools: "农具", field: "地里", yard: "院子", reward: "奖励", voice: "语音" },
@@ -4334,10 +3239,6 @@ export const catalogs = {
           ring: "来电",
         },
       },
-      close: "关上",
-      optional: "  可选",
-      drop: "去掉 {chip}",
-      noticeTitle: { info: "提示", warn: "没派成", error: "出错了" },
     },
     "web.voice": {
       voice: {
@@ -4416,7 +3317,6 @@ export const catalogs = {
           minimaxVoice: "点名字选它，点左边的播放键先听一句；也可以在下面填别的 MiniMax 系统音色 id。",
           voiceId: "音色 id",
           sample: "试听：{greeting}",
-          noSample: "没有样音",
           stop: "停下 {name}",
           play: "试听 {name}",
         },
@@ -4448,99 +3348,13 @@ export const catalogs = {
         },
         number: { silenceMs: "停顿多久算说完（毫秒）", interruptMs: "说多久能打断他（毫秒）", idleSeconds: "没人时多久离开（秒）" },
       },
-      dictation: {
-        unset: "听写还没配：在「声音」页的「听写」里填地址和模型",
-        recording: "在听…再点一下停",
-        transcribing: "在认字…",
-        failed: "上次没认出来：{why}",
-        start: "听写：点一下开始，再点一下停；也可以按住说，松开就停",
-        stop: "停下听写",
-        label: "听写",
-        noMic: "录不了音：没有麦克风权限",
-        cannot: "录不了音：{why}",
-        nothing: "没录上",
-        listening: "已经听了多久",
-        keys: "Esc 取消 · Enter 完成",
-        cancel: "不要这段",
-        done: "说完了，转成字",
-        again: "再说一次",
-        dismiss: "知道了",
-      },
-      call: { renew: "令牌续期失败：{why}", noMic: "没有麦克风权限", cannotHear: "声网：听不到对面：{why}", agora: "声网：{code} {msg}" },
-      vision: {
-        silence: "本轮没有回答，会话仍然连接。",
-        interrupted: "回答已被打断",
-        title: "实时视觉理解",
-        liveTitle: "向 Live 通话分享画面",
-        notice:
-          "开始后会请求摄像头或屏幕权限。选中的画面经本机服务端上传至配置的 MOSS 账号，每秒至多一张 JPEG，每张不超过 256 KiB。展示隐私内容前请停止分享。内容不存入田头。",
-        hostNotice: "需要安全的本机浏览器环境和可用的采集能力。桌面摄像头需要系统授权；桌面屏幕采集和手机壳视觉输入尚不可用。离开此页或切到后台会停止采集。",
-        source: "画面来源",
-        camera: "摄像头",
-        screen: "屏幕或窗口",
-        unavailable: "当前宿主或浏览器环境不支持画面采集。",
-        denied: "摄像头或屏幕权限被拒绝。",
-        deviceLost: "采集设备或屏幕分享已停止。",
-        captureFailed: "无法采集所选画面。",
-        closed: "视觉会话已断开。请检查 AI 服务中独立的视觉模型用途，再重新开始。",
-        start: "开始分享",
-        stop: "停止分享",
-        idle: "尚未连接",
-        connecting: "正在请求权限并连接…",
-        ready: "已连接",
-        ended: "会话已结束",
-        error: "会话失败",
-        prompt: "询问分享的画面",
-        final: "回答此问题后结束会话",
-        send: "发送问题",
-        transcript: "视觉回答",
-      },
       moss: {
-        busy: "已有 Live 会话正在连接或通话，请先结束它，再开始新的会话。",
-        localOnly: "浏览器实时会话仅在本机（localhost）可用，配对的远程浏览器无法打开这些线路。",
-        requestFailed: "MOSS Live 未能完成此请求。请检查通话配置后再试。",
         intro: "直接和 MOSS Live 说话，听它怎么答；连线经本机服务端，key 不出这台电脑。说的话不进田头。",
-        persona: "人设（不填用 MOSS 默认的）",
-        personaHint: "比如：你是我的助手，说话简短。",
-        instructions: "规则",
-        defaultInstructions: "用简短的中文回答。",
         talk: "开始说话",
         connecting: "在接通…",
         hangUp: "挂断",
         mute: "静音",
         unmute: "取消静音",
-        you: "你",
-        said: "对话",
-        nothingSaid: "接通后直接说话，这里显示双方说的。",
-        events: "线路上的消息",
-        eventsHint: "发出的动作和收到的事件，原样的 JSON；正在变的字和音频的通告不列。",
-        up: "发",
-        down: "收",
-        closed: "MOSS Live 断开了",
-        qos: {
-          title: "线路质量",
-          hint: "每秒算一次，只算这次通话。",
-          reply: "应答",
-          ms: "{last} ms · 平均 {mean}",
-          replyTip: "从你说完（MOSS 判断你停了）到它的第一段声音到这里；已经算了 {n} 轮。超过 2.5 秒标红。",
-          up: "上行",
-          upTip: "这一秒发出去的：麦克风的声音和发的消息。16 kHz 的声音约 256 kbps。",
-          down: "下行",
-          downTip: "这一秒收到的：回答的声音和事件。48 kHz 的声音在说话时约 768 kbps。",
-          frames: "麦克风帧",
-          framesTip: "这一秒发出的 20 ms 声音帧，正常是 50；少了说明录音或页面跟不上。",
-          backlog: "发送积压",
-          backlogTip: "还在本机等着发出去的字节；一直涨说明上行太慢。",
-          ahead: "播放缓冲",
-          aheadTip: "已经收到、还没放完的回答，毫秒。",
-          gaps: "断音",
-          gapsTip: "同一个回答里，上一段放完了下一段还没到的次数。",
-          stopsTip: "MOSS 自己停下回答的次数，悬停看原因（比如 playback_timeout：没及时报告播放进度）。",
-          stops: "被停",
-        },
-        tryIt: "试音",
-        notInChat: "说的话不进田头",
-        debug: "调试：线路质量与线路上的消息",
         nativeCall: "MOSS Live 通话",
         nativeNotice:
           "先在通话设置中选择 MOSS Live 接话并保存。开始后采集麦克风，音频发送到已配置的 MOSS 账号，可能产生费用；双方最终字幕记进田头。离开本页会挂断。",
@@ -4551,13 +3365,8 @@ export const catalogs = {
     cli: {
       about: "VibeValley's command line: one command is one operation of the server's, <resource> [<sub-resource>] <verb>",
       flag: {
-        prompt: "Ask once and leave, without a conversation",
         model: "The model",
         effort: "How hard to think",
-        resume: "Go on with this session",
-        cwd: "Which folder; the current one when empty",
-        name: "The own agent's name (its home is ~/.vibevalley/agent/<name>)",
-        mcp: "The MCP configuration file; mcp.json in the home when empty",
         server: "The server's address; VIBEVALLEY_SERVER when empty, else the one running on this machine (the home's server.json), else {fallback}",
         dryRun: "Only say what it would do, without doing it (commands that delete, merge, close or send a helper away)",
         format: "md: Markdown to read (the default); json: the endpoint's answer",
@@ -4601,15 +3410,6 @@ export const catalogs = {
         jsonl: "Write the versioned JSONL event stream",
       },
       command: {
-        root: "VibeValley's command line, one operation a command: answers are short text, --format json gives the protocol's shape; chat talks in the terminal",
-        app: {
-          about: "The desktop app's own: its status, opening a page, quitting, restarting, updating",
-          open: "Bring the desktop window to this page (/issues/12), opening the app if it is not",
-          quit: "Quit the desktop app (its server saves first)",
-          restart: "Restart the desktop app",
-          update: "The desktop app's update: as it stands with no argument, check to look now, install to put it in place and restart",
-          status: "Which desktop app this is, its version, where its farm is",
-        },
         doctor: "See this machine's farm at once: which one was found, whether it answers, the desktop app, runtimes, the model's key, the LAN listener",
         pkm: {
           capture: "Note something in today's journal (--page: on that page); no words reads stdin, lines split into blocks by indentation",
@@ -4662,28 +3462,15 @@ export const catalogs = {
         repo: { list: "List repos", create: "Make a repo (--repo clones it from GitHub)" },
         runtime: { list: "List the runtimes: installed or not, their versions", refresh: "Look for a runtime again, after installing or upgrading it" },
         session: { list: "List helpers: id, name, profile, what it is doing", show: "Show a helper", stop: "Stop a helper's round" },
-        chat: "Talk in the terminal: with no runtime, VibeValley's own agent; with one, that runtime directly (no trajectory, no spending)",
-        auth: {
-          about: "Sign in to a server elsewhere, like gh auth login: approve on a page, and this computer gets a key of its own",
-          login: "Sign in to a server: show a code, wait for approval on a signed-in page, keep the key in the home's auth.json",
-          status: "Which server commands reach, and which device's key they carry",
-          logout: "Sign out: the server takes this computer's key back, and this computer forgets it",
-        },
       },
       next: {
         help: "See how this command is written",
         startServer: "Start the server first (vp run --filter @vibevalley/server start), or point --server at one that runs",
-        openApp: "Open the desktop app first (vibevalley app open opens it too)",
       },
       failure: {
         unreachable: "Cannot reach {base}: {why}",
-        retry: "The server asked the stream to reconnect; the command line does not",
         gone: "Ticket #{n} is gone: it was deleted",
-        appNotOpen: "Cannot reach the desktop app of {home}: {why}",
         noDryRun: "{command} has no dry run: drop --dry-run to do it",
-        noChat:
-          "VibeValley's conversation program is not found here: use the command line the desktop app installs, or vp run --filter @vibevalley/cli start in the repository",
-        chatFlag: "{flags} cannot go with {runtime}: --name and --mcp are VibeValley's own agent's, --effort and --resume a runtime's",
       },
       op: {
         user: {
@@ -4988,7 +3775,6 @@ export const catalogs = {
         installRuntime: "Install a coding agent (Claude Code, Codex…), then have the farm look again",
         noModelKey: "No DeepSeek key: the assistant and your own agent cannot start",
         setModelKey: "Fill in the DeepSeek key under Settings › Models",
-        lanSettings: "See Settings › Devices",
         wrong: "These are not right: {checks}",
       },
       pkm: {
@@ -5012,8 +3798,6 @@ export const catalogs = {
         page: "A page: its title, slug or an alias",
         repoName: "The new repo's name",
         session: "The helper's id, such as w3",
-        chatRuntime: "A runtime (claude, codex…); none for VibeValley's own agent",
-        appPath: "A page of the desktop app, such as /issues/12; the start page if none",
         capture: "What to note; stdin if none",
         comment: "The comment",
         cronText: "What is said when it comes due: the work for the assistant or a profile",
@@ -5024,10 +3808,8 @@ export const catalogs = {
         search: "The words to find",
         status: "The status to move it to",
         title: "The issue's title",
-        updateStep: "check looks for a new version, install installs it and restarts; none says how it stands",
         pageTitle: "The page's title",
         agentName: "The profile's name",
-        authServer: "The server's address (https://farm.example.com); --server when not given",
       },
       channel: { sent: "Sent to {channel}" },
       cron: {
@@ -5055,13 +3837,6 @@ export const catalogs = {
         sessionStop: { about: "Stop w3's round" },
         issue: { comment: { run: "vibevalley issue comment 12 'use 8797'", about: "Answer what #12 asks, or pass a word to its helper" } },
         doctor: { about: "How this machine's farm is" },
-        appOpen: { about: "Bring the window to issue 12" },
-        appQuit: { about: "Quit the desktop app" },
-        appRestart: { about: "Restart the desktop app" },
-        appUpdate: { about: "Look for an update now" },
-        runtimeChat: { about: "Talk to Claude Code directly" },
-        chat: { about: "Talk to VibeValley's own agent" },
-        appStatus: { about: "Whether the desktop app is open, and which" },
         artifactRead: { about: "Read a1's words" },
         channelMessageList: { about: "Read #general's last ten" },
         channelMessageSearch: { run: "vibevalley channel message search port", about: "Find “port” in every channel" },
@@ -5106,9 +3881,6 @@ export const catalogs = {
         agentCreate: { about: "Create a profile on Claude Code" },
         agentDelete: { about: "Try it first: what it would delete" },
         issueObserve: { about: "Follow execution as JSONL" },
-        authLogin: { about: "Sign in to that server; every command after reaches it" },
-        authStatus: { about: "See where you are signed in" },
-        authLogout: { about: "Sign out and go back to the server on this computer" },
       },
       issue: {
         can: "What can be done:",
@@ -5147,61 +3919,13 @@ export const catalogs = {
           "Authenticate a read-only session_list call to check credentials and tool access; this does not prove the coding agent loaded optional MCP. JSON defaults to an empty object.",
         json: "Tool input as a JSON object; see the command description for fields.",
       },
-      auth: {
-        here: "{server} is the server on this computer: the command line uses it as is, no sign-in needed",
-        approve: "Open {link} in a browser\nCode {code}: approve if the page shows the same code. Waiting for approval…",
-        noBrowser: "Could not open a browser: open the link above yourself",
-        signedIn: "Signed in to {server}; this computer is “{device}” in the device list",
-        notSignedIn: "Not signed in: commands reach {server}",
-        revoked: "{server} took this computer's key back: run vibevalley auth login again",
-        status: "Signed in to {server} as “{device}”; you are “{name}”",
-        signedOut: "Signed out of {server}",
-        logoutUnsaid: "Could not have the server take the key back ({why}): this computer forgot it; take it back on the devices page",
-      },
     },
     desktop: {
       open: "Open VibeValley",
       quit: "Quit",
-      cannotStart: "VibeValley cannot start",
-      seeLog: "{reason}; the log is at {log}",
-      noAddress: "The server gave no ready address within {seconds} seconds",
-      failed: "The server failed to start: {why}",
-      exited: "The server exited ({code})",
       waiting: "{n} for you",
       working: "{n} working",
-      idle: "idle",
-      updateGone: "The downloaded version is gone; check for updates again",
-      menu: {
-        about: "About {app}",
-        hide: "Hide {app}",
-        hideOthers: "Hide Others",
-        unhide: "Show All",
-        quit: "Quit {app}",
-        edit: "Edit",
-        undo: "Undo",
-        redo: "Redo",
-        cut: "Cut",
-        copy: "Copy",
-        paste: "Paste",
-        selectAll: "Select All",
-        view: "View",
-        reload: "Reload",
-        devTools: "Developer Tools",
-        resetZoom: "Actual Size",
-        zoomIn: "Zoom In",
-        zoomOut: "Zoom Out",
-        fullScreen: "Toggle Full Screen",
-        window: "Window",
-        minimize: "Minimize",
-        zoom: "Zoom",
-        front: "Bring All to Front",
-        close: "Close Window",
-      },
-      media: {
-        camera: "Use the camera only when you start realtime visual understanding. Frames are sent to your selected AI provider.",
-        microphone: "Use the microphone only when you start dictation or a call. Audio is sent to your selected AI provider.",
-      },
-      commandLine: { taken: "{link} is another program's file and was not replaced: move it away, then install again" },
+      menu: { view: "View", resetZoom: "Actual Size", zoomIn: "Zoom In", zoomOut: "Zoom Out", window: "Window", close: "Close Window" },
     },
     server: {
       lookIn: {
@@ -5251,13 +3975,8 @@ export const catalogs = {
       newSkillId: "Leave a new skill's id empty; to choose the id, save it instead",
       removeAgent: 'Delete the profile "{name}" ({id}, on {runtime}): tickets already sent to it keep it',
       removeSkill: 'Delete the skill "{name}"',
-      modelFailed: "the model failed",
-      noDeepSeekKey: "No DeepSeek key: set DEEPSEEK_API_KEY, or put it in vibevalley.yaml under deepseek.api_key.",
-      refused: { launchArgs: "VibeValley runs inside the server process and takes no command-line arguments", serviceTier: "DeepSeek has no service tiers" },
       unequip: "Take it off the profiles of {holders}",
       quoted: '"{name}"',
-      efforts: '{runtime} has only the {efforts} thinking efforts, not "{asked}"',
-      effortsAnd: " and ",
     },
     "server.artifact": {
       noTitle: "An artifact needs a title",
@@ -5373,21 +4092,13 @@ export const catalogs = {
       emptyFile: "The file is empty",
       fileTooBig: "The file is too big: {mb} MB at most",
     },
-    "server.base": {
-      noFile: "{path}: no such file",
-      notPort: "{path}: {name} is not a port: {port}",
-      prPoll: "github.pr_poll_seconds must be above 0",
-      homeTaken: "The home {home} is used by another server: connect to that one, or stop it first",
-      homeUnlocked: "Could not lock the home {home}",
-      requestKeyLong: "requestKey is too long (at most {max} characters)",
-    },
+    "server.base": { requestKeyLong: "requestKey is too long (at most {max} characters)" },
     "server.channel": {
       name: { user: "You", orchestrator: "Assistant" },
       mention: { orchestrator: "@assistant", user: "@user", everyone: "@everyone" },
       channelName: "A channel name has only letters, digits, - and _, up to 24 characters",
       channelTaken: "There is already a channel called {name}",
       hopLimit: "The helpers have gone back and forth {limit} times: they pause here until you say something.",
-      breaker: "{name} failed {failed} times in a row as soon as it was woken, so it is not woken again for now; telling it something directly tries again.",
       dispatch: {
         draft: "reading the code and drafting this ticket",
         repo: "the repo",
@@ -5400,7 +4111,6 @@ export const catalogs = {
       empty: "Nothing was said",
       sendKeyLong: "The sendKey is too long",
       channelGone: "The channel cannot be found",
-      noHelper: "There is no helper {id}",
       noChannel: "There is no channel {id}",
       notOrchestrator: "{id} is not an assistant's profile: only an assistant can look after a channel",
       noMessageId: "There is no message {id}",
@@ -5409,9 +4119,7 @@ export const catalogs = {
       deletesChannel: "Delete {target}, with its {threads} threads and {said} messages",
       inUse: "Cannot delete it: {why}. It can be archived",
       helpersThere: "helpers still work in this channel",
-      cronsThere: "{n} scheduled tasks are here",
       connectorsThere: "a connector is bound to it",
-      queuedThere: "{n} tickets wait in the queue to start here",
       issuesThere: "{n} tickets were worked here",
       messageGone: "This message is deleted already",
       notYours: "Only your own words can be changed",
@@ -5426,19 +4134,6 @@ export const catalogs = {
       noProfileNamed: "No profile is named {key}",
       talkFailed: "Could not start this conversation: {why}",
       profileDisabled: "{name} is disabled",
-    },
-    "server.chat": {
-      error: "\nSomething went wrong: {why}",
-      hello: "{skills} skills. /reset forgets the conversation, /exit quits, Ctrl+C stops.",
-      forgot: "Forgotten.",
-      notKept: "{home} is taken by another conversation: this one lives only in this process and is not kept.",
-      noRuntime: "There is no machine {id}",
-      unknownInstall: "Cannot tell whether {id} is installed",
-      unusable: "{id} cannot be used: {kind}",
-      resumed: " (resumed)",
-      direct: "Talking directly: not through VibeValley, no trajectory, no spending. Ctrl+C stops this turn; again when idle quits.",
-      rejected: "Not taken: {why}",
-      notSent: "Not delivered: {why}",
     },
     "server.connector": {
       media: { image: "[image]", file: "[file]", audio: "[voice]", video: "[video]", sticker: "[sticker]", message: "[message]", attachment: "[attachment]" },
@@ -5558,77 +4253,30 @@ export const catalogs = {
       },
     },
     "server.issue": {
-      waitingDispatch: "Queued and waiting for dispatch.",
-      split: {
-        notCurrent: "Only the helper currently assigned to this issue can split it.",
-        already: "This issue is closed or already has child issues.",
-        invalid: "Provide 1–{max} child issues with unique valid IDs and acyclic dependencies within this split.",
-        agent: "Choose an enabled helper profile for each child issue: {agent}",
-        commitFirst: "Commit the parent issue's changes before splitting it.",
-        needsBranch: "The parent issue needs its own working branch before splitting; its helper is currently working directly in the repo directory.",
-        created: "Created {count} child issues under #{n}.",
-      },
-      verification: {
-        acceptanceNeedsCheck: "An acceptance issue needs a check command.",
-        acceptancePassed: "The acceptance check already passes before implementation: {check}",
-        frozen: "Frozen acceptance files were changed: {files}",
-        failed: "Check failed: {check}\n{output}",
-      },
-      dependencies: {
-        closedParent: "A closed parent issue cannot accept child issues",
-        repo: "A child issue must use its parent's repo",
-        invalid: "Issue dependencies must be acyclic and refer to existing issues",
-        waiting: "Waiting for prerequisite issues: {issues}",
-      },
+      split: { created: "Created {count} child issues under #{n}." },
       issueNumbered: "ticket #{n}",
       issueRef: "ticket {ref}",
-      helperRef: "helper {id}",
       repoRef: "repo {name}",
       helper: "the helper",
       notStarted: "This ticket has not started yet",
       started: "This ticket has already started",
       noTitle: "The ticket has no title",
-      orchestratorNotHelper: "The assistant is not a helper: send it to a helper",
-      disabled: "{name} is disabled",
-      cannotSend: "{name} cannot be sent: {why}",
-      noRepo: "No repo was named: a repo is a folder in the work folder",
-      notRecorded: "{name}'s ticket was not recorded: {why}",
-      workKept: "{refused}; ticket #{n} and its changes are kept, and it can be sent again",
-      drafting: "{name} is drafting it: start it once the draft comes back",
       pickHint: "Once picked: issue edit {n} --agent <profile>, then issue status {n} todo",
       noAssignee: "No helper has been picked yet",
       profileGone: "The profile {id} is gone",
-      queued: "{full}: queued, it starts as soon as there is room",
-      queuedStarted: 'The queued "{title}" has started: {session}',
-      queuedStuck: 'The queued "{title}" could not start: {why}; it could not go back to To do either, and stays in the queue',
-      queuedBack: 'The queued "{title}" could not start and stays in To do: {why}',
-      mergedChildRetry: "This child issue has already merged into its parent. Continue work through the parent issue.",
-      neverStarted: "This ticket has never started: just start it",
-      stillOpen: "This ticket is still open: moving it back to To do is another round",
-      stillWorking: "{name} is still on this ticket: tell it directly",
-      senderGone: "The profile it was sent to, {id}, is gone",
       closedReopen: "This ticket is closed: reopen it with a few words",
       handOverOnTodo: "Handing over happens when moving to To do: move it there and say who takes over",
-      stopFirst: "#{n} is still in this round: stop it, and hand it over once it has stopped",
-      noStatus: "There is no such status: {to}",
       roundNeedsWords: "Another round needs a few words: what it should do this round",
       closed: "This ticket is closed",
-      cannotMoveRepo: "Ticket #{n} cannot change repo yet: {why}",
       cannotDelete: "Ticket #{n} cannot be deleted yet: {why}",
-      noConflict: "{name} has no conflict with main",
-      orchestratorAnswers: "This ticket is the assistant's: it closes once the assistant answers",
       nothingToAccept: "Nothing has been handed back yet, so there is nothing to accept",
       failNeedsFindings: "Failing the acceptance needs what is wrong: write at least one point",
       does: {
-        toOrchestrator: "{n} goes to the assistant to answer",
         sendTo: "{n} is sent to {agent}",
         noRoom: "No room now ({full}): it is queued in To do and starts as soon as there is room",
         startIn: "{n} sends {agent} to work in {repo}",
         start: "{n} sends {agent} to work",
         unqueue: "{n} leaves the queue, back to Backlog",
-        leaves: "{helper} leaves, the branch is kept",
-        takesOver: "{taker} takes over and carries on on the same branch",
-        orchestratorRound: "{n} goes back to the assistant for another answer: {said}",
         round: "Tell {helper} this, for another round: {said}",
         thisTime: "What to do this time: {said}",
         revive: "{n} goes back to Backlog",
@@ -5637,7 +4285,6 @@ export const catalogs = {
         helperLeaves: "{helper} leaves",
         commitFirst: "First commit {helper}'s {files} uncommitted files for it",
         check: "Run the repo's check before merging (.vibevalley/check, if any): if it fails nothing is merged and the ticket stays for you to see",
-        pullRequest: "Push the branch and open a PR ({commits} commits): it closes as done once the PR is merged",
         cancel: "{n} closes as canceled",
         cancelLeaves: "{helper} leaves; a branch with commits is kept",
         drop: "{n} closes as canceled: it was never sent",
@@ -5649,29 +4296,17 @@ export const catalogs = {
         deleteIssue: 'Delete ticket #{n} "{title}"',
         cleanWorktree: "Clear its worktree and its branch with no commits; with changes left it is not deleted",
         reopen: "{n} reopens: a new helper of the same profile carries on",
-        reopenBy: "{n} reopens: {taker} carries on",
         conflicts: "Merging into {base} would conflict ({files}): nothing is merged, the conflict is marked, and the ticket stays for you to see",
         merge: "Merge into {base} ({commits} commits), close as done, and {helper} leaves",
-        mainBranch: "main",
       },
       brief: {
-        reopenDefault: "Finish this ticket",
-        handedOver: "This ticket is handed over to you; {name} ({id}) was on it before",
-        reopened: "This ticket is reopened; {name} ({id}) did it last time",
-        how: "\n\n({how}.)",
         original: "\nThe ticket was: {brief}",
-        answer: "\nLast time's answer: {conclusion}",
-        closed: "\nHow it was closed: {closed}",
-        lastRun: "\nThe last round {outcome}: {summary}",
-        previous: "\nThis branch already has last time's commits; carry on from them.",
-        end: "\nFirst look at the repo as it is now, then carry on.",
         failedHead: "The acceptance failed; these need fixing:",
         failedEnd: "\n\nOnce fixed, say how each was fixed in your conclusion.",
         resume: "The last round stopped halfway; carry on and finish it.",
         cure: "Fix it: {brief}. Look at the errors, fix them, and run the tests again",
         cureHead: "Fix it: ",
         cureTail: ". Look at the errors, fix them, and run the tests again",
-        answerUnread: "Fix it: the answer handed back last round could not be read ({problem}). Find it out, and hand it back in this format at the end:",
       },
       move: {
         inGraph: "This ticket belongs to a plan and follows it: change it in the plan",
@@ -5704,34 +4339,17 @@ export const catalogs = {
         rejected: "Sent back: {lines}",
         rejectedSeparator: "; ",
       },
-      merge: { tellFailed: "\nCould not tell the helper: {why}", merged: "{name}'s work is merged: {text}" },
       refinement: {
         noDrafter: "No helper can be sent to draft it",
-        orchestrator: "This ticket is the assistant's: the assistant reads it itself",
         onlyBacklog: "Only a ticket in Backlog can be drafted: move it back to Backlog first",
         drafting: "{name} is drafting it: wait for it to come back",
         unread: "The draft {name} handed back could not be read ({problem}); the ticket is unchanged: draft it again",
         unfinished: "{name} did not finish the draft ({summary}); the ticket is unchanged: draft it again",
-        canceled: '"{title}" was canceled: {why}',
-        noBlock: "No draft found: it goes in a json code block",
-        notObject: "it must be an object",
-        unreadable: "the json cannot be read: {why}",
-        noTitle: "the draft has no title",
-        lines: "{field}: must be a string or an array of strings",
-        text: "{field}: must be a string",
-        why: "Why:",
-        todo: "To do:",
-        notDoing: "Not doing:",
-        files: "May touch:",
       },
-      noProfileNamed: "No profile is named {key}",
       prSubmitNotAllowed: "The user did not explicitly authorize this ticket to submit its own pull request",
       prSubmitNotCurrent: "Only the helper currently handling this ticket can submit its pull request",
       prSubmitUnavailable: "Pull-request delivery is not enabled for this ticket's repo",
       deliveryNeedsPr: "Deliver a valid PR/MR before accepting this issue",
-      acceptSubmittedPr: "Accept the submitted PR/MR and retain the unmerged branch and uncommitted changes",
-      prDelivered: "Delivered PR/MR: {url}",
-      confirmedRequirements: "Confirmed and dispatched: {title}\n\n{description}\n\nAcceptance criteria:\n{criteria}",
       notFound: "No issue {id}",
       wordsRequired: "Say something: the words cannot be empty",
     },
@@ -5749,11 +4367,6 @@ export const catalogs = {
       notFile: "{path} is not a file in your working directory",
       unreadable: "Cannot read {path}: {why}",
       preview: { remove: 'Take "{name}" out of the library; messages that have it still open it' },
-    },
-    "server.mailbox": {
-      notOwned: "This input does not belong to the current session and cannot be returned",
-      subscriptionTaken: "Thread {thread} already belongs to another issue",
-      ambiguous: "This input matches multiple issues and needs to be told which one it belongs to",
     },
     "server.media": {
       speechInvalid: "Invalid speech parameters. Check the text, voice and audio format; Pro does not support pause tags.",
@@ -5844,28 +4457,12 @@ export const catalogs = {
     },
     "server.memory": {
       source: { local: "Local", nowledge: "Nowledge Mem", everos: "EverOS" },
-      noUrl: "no address",
-      off: "off",
-      unknownSource: "unknown kind of source",
-      stopped: "The memory sources have stopped",
-      forgetThere: "Memories in {source} are deleted there",
-      coverage: {
-        failed: "reading failed, was canceled or timed out; this source is not included",
-        everosAcross: "searching across repos is not supported: name a repo; EverOS is not included this time",
-        everosAgent: "this search needs a profile; EverOS is not included this time",
-        unconfirmed: "some hits' repo could not be confirmed and were left out of this repo's search",
-        note: "{source}: {note}",
-      },
-      everosList: "EverOS memories are not listed here",
-      everosForget: "EverOS memories are deleted in EverOS",
-      nowledgeForget: "Nowledge Mem memories are deleted in Nowledge Mem",
       empty: "There is nothing to remember",
       dbFailed: "Not remembered: the database could not be written",
       noMemory: "{agent}'s memory has no {id}",
       forget: 'Forget from {agent}\'s memory: "{text}"',
     },
     "server.orchestrator": {
-      label: "The assistant",
       noKey:
         "I don't have a DeepSeek key yet, so I can't think. Put a DeepSeek API Key in Settings (also at the bottom of the workbench's left bar), then tell me again.",
       cannotStart: "I can't start on my side: {why}",
@@ -5928,14 +4525,8 @@ export const catalogs = {
       tooLarge: "The MOSS model catalog exceeds the read limit (1 MiB or 1000 models). No incomplete result was returned.",
     },
     "server.repo": {
-      parentBranchChanged: "The parent worktree changed branches; the child cannot be merged automatically",
-      parentHasChanges: "Commit the parent's outstanding changes before merging the child",
       badName: "A repo name starts with a letter or a digit and has only letters, digits, -, _ and ., up to 64 characters",
       badGithub: "Give a GitHub repository address, such as https://github.com/botiverse/raft-source",
-      branchMoved: "The branch changed after the check: check again before merging",
-      mainMoved: "Main changed during the check: check again before merging",
-      mergedWorktreeLeft: "The changes are merged; the worktree {cwd} and the branch {branch} are not cleared yet: {why}",
-      mergedBranchLeft: "The changes are merged; the branch {branch} is not cleared yet: {why}",
       noTokei: "Counting code needs tokei, which is not on this machine: install it (brew install tokei, or cargo install tokei) and count again",
       noName: "unnamed",
       gh: {
@@ -5946,63 +4537,25 @@ export const catalogs = {
       },
       notRepoName: '"{name}" cannot be a repo name: use a simple English folder name, such as clock-in',
       outside: "A repo must be inside the work folder, not linked to somewhere outside it",
-      commit: {
-        initial: "Initial commit (a repo VibeValley made)",
-        initialShort: "Initial commit",
-        uncommitted: "The worktree has uncommitted changes. Commit them yourself, with a message that follows this repository's rules, then ask again.",
-        merge: "Merge {branch}",
-      },
+      commit: { initial: "Initial commit (a repo VibeValley made)", initialShort: "Initial commit" },
       notChecked: "The repo has not been checked: refresh GitHub's state",
       check: {
         timedOut: "The repo's check .vibevalley/check timed out ({seconds}s)",
         failed: "The repo's check .vibevalley/check failed: {why}",
         exited: "The repo's check .vibevalley/check failed: exit status {code}",
       },
-      mergeFailed: "Merging into {main} failed, {kept}: {why}",
-      mergeStuck: "Merging into {main} failed, {kept}: {why}; aborting the merge failed too ({abort}), and {main} is stuck halfway: it needs tidying by hand",
       exists: '"{name}" already exists: pick another repo name',
       cloneFailedGh: "The download failed: check the GitHub sign-in, the repository's permissions and the network, then retry",
       cloneFailed:
         "The download failed: check that the repository is public, the address is right and the network works; it stops after 3 minutes, and can be retried",
       tokeiFailed: "tokei did not finish counting: {why}",
       tokeiUnread: "tokei's output cannot be read: try a newer tokei",
-      noBranchRead: "Could not read the branch {branch}: {why}",
-      inRepoNoBranch: "It works right in the repo, so there is no branch to merge",
-      inRepoNothing: "It works right in the repo, so there is no branch to merge",
-      keptBoth: "the {branch} branch and its worktree are kept",
-      keptBranch: "the {branch} branch is kept",
-      merged: "{ahead} commits merged into {repo}'s {main}",
-      nothingNew: "This one has no new commits",
-      nothingNewInPlan: "The plan's branch has no new commits",
-      branchLeft: "; the changes are merged, the branch {branch} is not cleared yet: {why}",
-      clear: {
-        uncommitted: "{branch} has uncommitted changes; its worktree stays at {cwd}",
-        branchLeft: "{branch} was not cleared: {why}",
-        unmerged: "{branch} has {ahead} unmerged commits: the branch is kept, the worktree cleared",
-        notWorktree: "Not a worktree, so it cannot be reset: {cwd}",
-        worktreeLeft: "The worktree {cwd} was not cleared: {why}",
-        unconfirmed: "Could not confirm {branch} was cleared: {why}",
-        unmergedKept: "{branch} has unmerged commits: the branch is kept",
-      },
       github: {
         unchecked: "GitHub has not been checked",
         notGithub: "Not a GitHub repository",
         noPermission: "The repository's permissions could not be checked",
         readOnly: "No write permission",
-        wrongBranch: "The ticket's branch does not match",
-        checked: ".vibevalley/check passed.",
-        noCheck: "This repo has no .vibevalley/check, so no check was run.",
-        body: "Ticket #{n}\n\n{conclusion}\n\n{check}",
-        urlUnread: "The new PR's address could not be read; the lookup can be retried",
-        viewFailed: "Looking up PR #{n} failed",
-        stateUnread: "PR #{n}'s state could not be read",
-        stateUnknown: "PR #{n}'s state is not one VibeValley knows",
-        resolveFailed: "Could not resolve the GitHub review thread",
-        worktreeLeft: "The PR is over, but clearing the worktree failed: {why}",
-        branchLeft: "The PR is over, but clearing the local branch failed: {why}",
       },
-      mergeTree: "git merge-tree failed ({code})",
-      moreLines: "… {n} more lines not shown",
       conflict: "merging into {base} conflicts",
       "publish.refused": "Branch publication refused: {detail}",
       "publish.platformFailed": "Hosting platform failed: {stage}. Check installation and login.",
@@ -6037,123 +4590,25 @@ export const catalogs = {
       noUsage: "This runtime reports no usage",
       cursor: "Cursor needs its own SDK (@cursor/sdk), which VibeValley does not use yet",
       oarUnknown: "oar does not know this runtime",
-      tools: "{n, plural, one {# tool} other {# tools}}",
       notSaved: "{id}'s settings were not saved: {why}",
       cannotDrive: "oar cannot drive {runtime}",
       cannotSend: "{name} cannot be sent: {why}",
       defaultModel: "{runtime} has no model {model}; {name} uses the default for now",
-      piNoBalance: "{provider} reports no balance",
-      piNoModel: "pi has no default model set",
-      piUnread: "The DeepSeek balance could not be read",
       effort: "{model} has no {effort} effort; it has: {levels}",
-      piTimedOut: "The DeepSeek balance took too long",
     },
     "server.session": {
-      failure: {
-        auth: "something is wrong with the sign-in or the key",
-        quota: "the quota is used up",
-        rate_limited: "too many requests, rate limited",
-        billing: "not enough balance",
-        model_unavailable: "this model cannot be used",
-        input_too_large: "the context is too long to fit",
-        invalid_request: "the provider refused the request",
-        overloaded: "the provider is too busy",
-        provider: "the provider failed",
-        runtime_exited: "the runtime process exited halfway",
-        unknown: "something went wrong",
-      },
-      failureNext: { userAction: "it needs you first", now: "it can try again", later: "try again in a while" },
-      failureStatus: " (HTTP {status})",
-      failureReason: ": {reason}",
-      failureThen: ". {next}",
-      done: "done",
-      unfinished: "unfinished",
-      answer: { noBlock: "No structured answer was submitted through issue_report" },
       noRoom: {
         farm: "{max} helpers are already at work",
-        runtime: "{on} helpers are already at work on {runtime}, at most {max} at once (the Runtimes page can change it)",
         repo: "{on} helpers are already at work in {repo}, at most {max} at once: more would edit the same files",
       },
-      notTaken: {
-        conflictUser:
-          "Not merged: merging into {base} would conflict ({files}). {name} is still here, with its branch and worktree. To have it resolve this, tell it: {brief}",
-        conflictNotice: "{name}'s branch would conflict with {base} ({files}), so it was not merged. It can resolve the conflict itself",
-        conflictShort: "Merging into {base} would conflict: {files}",
-        checkFix: "{reason}\nFix the check and hand it back.",
-        user: "Not merged: {why}. {name} is still here",
-        notice: "{name}'s work was not merged: {why}",
-        checkShort: "the repo's check failed",
-      },
-      log: {
-        stopped: "VibeValley stopped, and this round was cut short",
-        image: "[image]",
-        exitedNotice: "{name}: {why}",
-        staleRun: "The last round stopped halfway too long ago, and was not carried on",
-        stoppedByUser: "You stopped it",
-        clipped: "… {n} characters left out …",
-        quiet: "Quiet for {span}{last}. It may be running a long command, or it may be stuck",
-        quietLast: " (last: {label})",
-        restarted: "VibeValley restarted, and this round stopped halfway",
-        retry: "The model call failed, retry {attempt}",
-        retryOf: "The model call failed, retry {attempt}/{of}",
-        retryIn: " in {s} s",
-        retryWhy: ": {reason}",
-        exited: "{runtime} exited",
-        exitedCode: "{runtime} exited (exit code {code})",
-      },
-      usage: {
-        parts: { instructions: "instructions", env: "environment", skills: "skills", memory: "memory", tools: "tools" },
-        cached: "cache hit {percent}%: read from cache {read}, missed {missed}, output {output}",
-        unread: "how much was read was not reported: output {output}",
-        changed: "; the start changed: {parts}",
-      },
+      log: { clipped: "… {n} characters left out …" },
       host: {
-        stopped: "{label} has stopped",
-        cannotStart: "cannot start: {why}",
-        notRecorded: "{label}'s run could not be recorded: {why}",
-        startFailed: "{label} cannot start: {why}",
-        callerStart: "I cannot start on my side: {why}",
         failed: "{label} failed: {why}",
         markNeedsWords: "Write a line on what it should be",
         noStep: "{label}'s log has no step {on}",
-        stepHint: "The step numbers are in its log on the page, before each step",
         notAsked: "Step {on} is not something {label} was told",
         notInConversation: "What step {on} told {label} did not reach its conversation (was {label} not up then?)",
       },
-      life: {
-        stoppedNeedsYou: "{name} stopped: {why}",
-        quietNotice: "{name} has been quiet for {span}{last}: open its plot to see what it is doing, and stop it if it is wrong",
-        notStopped: "The machine did not stop, and its working folder is kept: {why}",
-        notReturned: "The machine has not handed the working folder back from last time",
-        agentGone: "{name}'s profile was deleted; it cannot be woken",
-        cannotWake: "{name} cannot be woken: {why}",
-        noHelper: "There is no helper {id}",
-        helperRef: "helper {id}",
-        stillClosing: "{name}'s machine did not stop: its working folder is kept, and no new round can start",
-        noRoom: "{name} does not carry on for now: {full}",
-        notReceived: "{name} did not get it: {why}",
-        stillWorking: "{name} is still working: wait for this round to finish, or stop it first, then collect it",
-        notBack: "{name} did not come back: {why}",
-        placeGone: "its working folder is gone ({cwd})",
-        noRecord: "there is no record of it",
-        restartedNotice: "VibeValley restarted and {name}'s round stopped; tell it something to carry on",
-        issueNotReturned: "This ticket's machine has not handed the working folder back",
-        noPlace: "{name} has nowhere to work: {why}",
-        cannotSend: "{name} cannot be sent: {why}",
-        notRecorded: "{name}'s ticket was not recorded: {why}",
-        notReset: "{name}'s working folder could not be reset: {why}",
-        left: "{name} has left: {why}",
-        stillHasHelper: "This ticket still has a helper; its working folder cannot be cleared",
-        seconds: "{n} s",
-        minutes: "{n} min",
-        noIssue: "This session has no issue whose changes can be delivered or discarded.",
-        contextKept: "Context directory kept at {cwd}: {why}",
-        contextHasFiles: "The directory already contains files",
-        workerUnavailable: "Required helper CLI cannot execute; launch blocked",
-        workerAuthenticationFailed: "Helper CLI session authentication failed; launch blocked, check the server listener and session access",
-      },
-      conflictBrief:
-        "Merging {base} into your branch conflicts ({files}). On your branch, run git merge {base}, resolve the conflicts, run the tests, and commit. In your conclusion, say how each conflict was settled.",
     },
     "server.setting": {
       deepseekKey: "The DeepSeek API Key does not look right: a string with no spaces, usually starting with sk-",
@@ -6163,7 +4618,6 @@ export const catalogs = {
       dictationUrl: "The dictation address is a full address starting with http(s), up to /v1, such as http://127.0.0.1:8080/v1 on this machine",
       dictationModel: "Dictation needs a model name, such as qwen3 for a local speech-server, or OpenAI's gpt-4o-mini-transcribe",
       memory: {
-        unknown: "Unknown memory source: {kind}",
         twice: "Only one memory source of each kind: {kind}",
         noUrl: "To connect a memory source, fill in its address first",
         url: "A memory source's address is a full address starting with http(s), such as http://127.0.0.1:14242/mcp/ for Nowledge Mem",
@@ -6186,59 +4640,13 @@ export const catalogs = {
       defaults: { failureMessage: "I got stuck for a moment. Could you say that again?" },
       notSaved: "Could not save {file}: {why}",
     },
-    "server.tool": {
-      labels: {
-        library_item_list: "Library",
-        library_item_add: "Put in the library",
-        media_image_create: "Submit image generation",
-        media_understanding_start: "Execute authorized understanding",
-        media_speech_create: "Generate single-speaker speech",
-        media_job_get: "Read a generation task",
-        media_job_list: "List recent generation tasks",
-        media_job_cancel: "Cancel generation waiting",
-        media_job_download: "Retry media download",
-        repo_list: "Repos",
-        channel_list: "Channels",
-        channel_create: "Open a channel",
-        channel_update: "Change a channel",
-        cron_create: "New scheduled task",
-        cron_list: "See the scheduled tasks",
-        cron_delete: "Cancel a scheduled task",
-        issue_review: "Review",
-        issue_diff_get: "See the changes",
-        session_list: "Helper roster",
-        issue_get: "See the progress",
-        issue_comment_create: "Tell a helper",
-        channel_message_list: "Read the chat",
-        channel_message_send: "Say",
-        channel_unread_list: "See what is unread",
-        session_stop: "Stop",
-        issue_list: "Find tickets",
-        issue_create: "Write a ticket",
-        issue_update: "Change a ticket",
-        issue_status_update: "Move a ticket",
-        issue_split: "Split a ticket",
-        remember: "Remember",
-        rewrite_memory: "Tidy the memory",
-        memory_search: "Search the memory",
-        memory_create: "Remember for a helper",
-        artifact_block_create: "Add to an artifact",
-        artifact_block_update: "Change an artifact's block",
-        artifact_block_delete: "Delete an artifact's block",
-      },
-      about: "{label}: {about}",
-    },
     "server.voice": {
       misheard: "Hm? I didn't catch that. Could you say it again?",
-      unknownSuffix: "the server cannot use it yet",
-      unknown: "{vendor} for {what}: the server cannot use it yet",
-      part: { asr: "recognition", llm: "the model", tts: "speech" },
       noAsrKey: "Microsoft recognition has no key yet: fill it in under Recognition on the Voice page",
       noLine: "The assistant's voice line is not connected",
       noDeepseekKey: "DeepSeek needs a DeepSeek key first: fill it in under Settings",
       noLlmKey: "Your own model has no key yet: fill it in under Think on the Voice page",
       noTtsKey: "Microsoft speech has no key yet: fill it in under Speak on the Voice page",
-      unusable: "The voice settings cannot be used: {why}",
       tunnel: {
         timedOut: "cloudflared gave no address within 30 seconds",
         missing: "cloudflared is not installed: brew install cloudflared, or set voice.line.url in the configuration to use your own tunnel",
@@ -6247,7 +4655,6 @@ export const catalogs = {
       noAgora: "No Agora credentials yet: fill in the App ID and the App Certificate under Settings",
       lineDown: "The voice line cannot open: {why}",
       lineClosed: "The voice line is closed",
-      lineNotOpen: "The voice line is not open yet",
       hungUp: "This call has already hung up",
       noToken: "Could not sign a voice token: {why}",
       stopped: "The voice service has stopped",
@@ -6353,29 +4760,7 @@ export const catalogs = {
       serverAnswered: "the server answered {status}",
       seconds: "{n} s",
       minutes: "{n} min",
-      join: { labeled: "{label}: {text}", aside: "{text} ({aside})", sentence: "{text}.", and: "{a}, {b}", clauses: "{a}; {b}", separator: ", " },
-    },
-    web: {
-      opening: {
-        name: "VibeValley",
-        waking: "Loading…",
-        label: "Loading VibeValley",
-        cannotStart: "VibeValley cannot start: {why}",
-        starting: "Waking the farm…",
-        connecting: "Connecting…",
-        reading: "Preparing your workspace…",
-        loading: "Loading…",
-        ready: "Ready",
-        waiting: "Still waiting for a connection…",
-        failed: "Unable to finish loading",
-        updating: "Updating to {next}",
-        stopping: "Stopping helpers and saving the farm…",
-        swapping: "Putting the new version in place…",
-        kept: "Your farm's data stays; a helper cut off mid-task waits where it stopped, and one message sets it going again",
-        keptNewFarm: "The new version starts from new data; the old data stays in your home folder",
-        updateFailed: "Not installed: {why}",
-        download: "Download the latest version",
-      },
+      join: { labeled: "{label}: {text}", aside: "{text} ({aside})", sentence: "{text}.", separator: ", " },
     },
     "web.agent": {
       newName: "New {runtime}",
@@ -6552,7 +4937,6 @@ export const catalogs = {
         by: "Made by {name}",
         updated: "Updated {when}",
         versions: "Versions",
-        open: "Open in a new tab",
         delete: "Delete",
         deleteAsk: "Delete “{title}”? Its cards stay in the conversation.",
         deleted: 'Deleted "{title}"',
@@ -6568,8 +4952,6 @@ export const catalogs = {
         nothingFound: "No title matches",
         title: "Title",
         more: "More",
-        copyLink: "Copy link",
-        copied: "Link copied",
         group: { delivered: "Handed in by helpers", mine: "Written by you" },
         rail: "Beside this artifact",
         railShow: "Show the side panel",
@@ -6652,12 +5034,10 @@ export const catalogs = {
         at: "{at} / {pages}",
         present: "Present full screen",
         presenter: "Presenter view",
-        pdf: "Save as PDF",
         thumbnails: "Slides",
         slide: "Slide {at} {title}",
       },
       presenter: {
-        title: "Presenter view: {title}",
         missing: "No deck named: open the presenter view from an artifact's controls.",
         current: "This slide",
         next: "Next slide",
@@ -6719,20 +5099,16 @@ export const catalogs = {
       partialTitle: "Partial transcript",
       partialTranscript: "Partial transcript — not a completed result.",
       savePartialTranscript: "Save partial transcript as artifact",
-      downloadPartialTranscript: "Download partial transcript",
       chooseFile: "Choose an audio file",
       copyTranscript: "Copy transcript",
       copyPartialTranscript: "Copy partial transcript",
       usageAudioSeconds: "Input audio: {value} s",
       input: "Audio file",
       transcribe: "Start transcription",
-      localPlayback: "Local input playback",
       timeline: "Speaker timeline",
-      seek: "Seek to {time}",
       noTimestamps: "The provider returned no timestamped segments.",
       saveTranscript: "Save transcript as artifact",
       openTranscript: "Open saved transcript",
-      downloadTranscript: "Download transcript",
       downloadAudio: "Download audio",
       history: "Audio tasks",
       empty: "No audio tasks yet.",
@@ -6754,19 +5130,7 @@ export const catalogs = {
         "Start explicitly to generate and play PCM as it arrives. Flash only; the completed stream is saved as WAV. Playback buffers at most five seconds. Stopping, leaving this page or changing devices closes the stream; it cannot reconnect, and charges may still apply.",
       flashStart: "Start generation and playback",
       flashStop: "Stop playback and local task",
-      flashIdle: "No stream started.",
-      flashConnecting: "Opening the original stream…",
-      flashPlaying: "Playing incoming audio…",
       flashDraining: "Stream complete; playing the remaining buffered audio…",
-      flashDone: "Stream and playback complete. The saved result is below.",
-      flashStopped: "Stopped. Any audio heard may be incomplete; this stream will not reconnect.",
-      flashIncomplete: "The stream ended without a complete result. Any audio heard is partial; do not assume the request was unbilled.",
-      flashInvalid: "The audio stream contained invalid or out-of-order data and was stopped.",
-      flashUnavailable: "The original audio stream could not be opened. It will not be reconnected or automatically regenerated.",
-      flashUnsupported: "This browser cannot play live audio. Use a non-streaming format instead.",
-      flashDeviceChanged: "Audio devices or the playback context changed. The original stream was stopped.",
-      flashProgress: "Received {received} s · played {played} s",
-      playbackUnsupported: "This browser cannot play this format. Download the audio to listen in a compatible player.",
       metadataFile: "Measured from saved audio",
       metadataProvider: "Reported by the provider",
       metadataRate: "{value} Hz",
@@ -6794,7 +5158,6 @@ export const catalogs = {
       rail: "Workbench",
       farm: "Back to the farm",
       farmShort: "Farm",
-      update: "Update",
       working: "Open · {n} working",
       off: "Not open",
       chips: {
@@ -6932,10 +5295,7 @@ export const catalogs = {
         diagramFailed: "This diagram cannot be drawn: {why}",
         longMore: "Show all",
         longLess: "Show less",
-        taskDone: "Done",
-        taskOpen: "Not done",
       },
-      updateReady: "{next} is ready: restart from About",
       intent: { timedOut: "No answer in time; try again", offline: "Not connected to the farm, so this was not sent" },
     },
     "web.catalog": {
@@ -7049,7 +5409,6 @@ export const catalogs = {
         label: 'Scheduled task "{name}"',
         on: "On",
         off: "Off",
-        remove: "Delete",
         removeWhich: 'Delete the scheduled task "{name}"',
         sure: "Delete it?",
         approveWhich: 'Approve the scheduled task "{name}"',
@@ -7113,7 +5472,6 @@ export const catalogs = {
         notSent: "Not sent: {why}",
         who: "Who",
         mention: "Mention someone",
-        stop: "Stop the assistant",
         stopHint: "Stops the assistant's round; helpers already sent keep working",
         send: "Send",
         sendHint: "Enter sends · Shift+Enter for a new line",
@@ -7164,7 +5522,6 @@ export const catalogs = {
         none: "Nothing found",
         direct: "Direct message",
         newDirect: "New direct message",
-        keys: "{mac, select, true {⌘K} other {Ctrl K}}",
         note: "Note · {tier}",
         searchNotes: "Search notes for “{q}”",
       },
@@ -7294,442 +5651,22 @@ export const catalogs = {
       },
     },
     "web.farm": {
-      reading: "Reading…",
-      unread: "Cannot be read.",
-      notNow: "Not yet",
-      orchestrator: "Assistant",
-      plotOf: "{name}'s plot",
-      plot: {
-        unread: "This plot's ticket has not been read yet.",
-        failed: "Did not work",
-        now: "Where it is",
-        yours: "For you to do",
-        answerTo: "Answer: {question}",
-        rejectWhere: "What did not pass, one per line",
-        sayIt: "Say it yourself…",
-        reopenWhat: "What to do this time (empty to finish what was left)",
-        tellWorking: "It hears this even while it works",
-        tellIdle: "Say something and it works another round",
-        rejectLabel: "What did not pass",
-        answer: "Answer",
-        reopen: "Reopen this ticket",
-        tell: "Tell {who}",
-        onBoard: "See it on the board",
-        progress: "How far it got",
-        progressMet: "How far it got · {met} / {of} met",
-        noCriteria:
-          "{answer, select, true {This ticket has no criteria for done: judge by its answer when it comes back.} other {This ticket has no criteria for done: judge by its changes when it comes back.}}",
-        rejected: "Sent back · {text}",
-        conclusion: "Answer",
-        evidence: "Evidence · {line}",
-        next: "Next · {line}",
-        made: "What it made",
-        madeNothing: "What it made: no changes yet",
-        madeFiles: "What it made ({n} files)",
-        changesUnread: "The changes cannot be read.",
-        moreFiles: "{n} more files",
-        story: "How it got here",
-        steps: "The helper's every step",
-        runs: "Every round of work",
-        details: "Details",
-        job: "To do",
-        who: "Who",
-        crew: "On the plot",
-        deliver: "Delivers",
-        reviewed: "Accepted {clock}",
-        weeded: "Weeds pulled",
-        weed: "Pulled · {text}",
-        model: "Model",
-        branch: "Branch",
-        copyPath: "Copy the path",
-        opened: "Opened",
-        closed: "Closed",
-        history: "Worked by",
-        took: "Took",
-        thread: "See the ticket thread",
-        where: "Plot {plot} · round {round}",
-        result: { met: "It says this is met", unmet: "It says this is not met", unsure: "It is not sure" },
-        ticked: "Checked",
-        noRuns: "No work yet.",
-        runCount: "{n, plural, one {# round} other {# rounds}}",
-        conflict: "Merging into {base} would conflict: {files}",
-        moving: "Changing the status…",
-        notMoved: "Not changed",
-        moveAgain: "Again",
-        letGo: "Let it go",
-        sending: "Sending…",
-        notSaid: "Not said",
-        sayAgain: "Say it again",
-        takeBack: "Back into the box",
-      },
-      graph: { unreadable: "The changes cannot be read: ", commits: "Commits" },
-      achievements: {
-        tier: { "1": "Bronze", "2": "Silver", "3": "Gold" },
-        category: { starter: "Starter tasks", harvest: "Harvest", craft: "Craft", thrift: "Thrift", team: "Teamwork", secret: "Secrets" },
-        clearing: "Clearing",
-        clearAt: "Lv.{level} clears a plot",
-        toLevel: "{left} more commits to level up · {total} in all",
-        toNext: "Commits to the next level",
-        streak: "Streak {n} · harvest coins ×{multiplier}",
-        coinsOnMerge: "Coins only for what is merged into main",
-        title: "Title",
-        pick: "Pick one",
-        earnFirst: "Earn an achievement to get one",
-        titles: "Title on the farm card",
-        worn: "Worn",
-        none: "No title",
-        starterDone: "All starter tasks done.",
-        starter: "Starter tasks {done}/{of}",
-        perStarter: "+{coins} coins each",
-        done: "Done",
-        tiers: "tier {tier}/{of}",
-        toTier: "To {tier}",
-        secrets: "{n} secrets left",
-        secretsLine: "You find out what they are when you come across them.",
-        day: "{month, select, 1 {Jan} 2 {Feb} 3 {Mar} 4 {Apr} 5 {May} 6 {Jun} 7 {Jul} 8 {Aug} 9 {Sep} 10 {Oct} 11 {Nov} other {Dec}} {day}",
-        earned: "earned {day}",
-        earnedTier: "{tier} earned {day}",
-      },
-      sow: {
-        notDrafted: "Not drafted",
-        homeless: "This farm belongs to no repo",
-        toMap: "To plant, enter a repo's farm first: go back to the map and pick an island.",
-        noRepos: "No repos in the workbench yet: make one on the Repos page first.",
-        map: "Go to the map",
-        makeRepo: "Make a repo",
-        plantIn: "Planting in {repo}",
-        rummaging: "Rummaging in the seed bags…",
-        noSeeds: "The seed bags could not be fetched: ",
-        retry: "Fetch the seed bags again",
-        recent: "Recent",
-        kinds: "Common jobs",
-        own: "Write your own",
-        jobHint: "What to do, and what counts as done",
-        job: "Ticket",
-        who: "Who plants it",
-        orchestratorPicks: "Assistant picks",
-        how: "Start: the assistant hands this to a helper, who starts in {repo} at once. Draft: a helper reads the code and writes it up as a ticket for you to look over before starting.",
-        draft: "Draft",
-        start: "Start",
-      },
-      water: {
-        drops: { "0": "Keep the change small", "1": "Leave the tests alone for now", "2": "Tell me when done", "3": "Add a test while at it" },
-        working: "It is working: it hears this before its next step.",
-        idle: "It is not working: this has it work another round.",
-        thread: "This is kept in its ticket thread, with its replies.",
-        job: "Its job now: {brief}",
-        hint: "A word to pass on…",
-        water: "Water",
-        moved: "The ticket's status changed: go back to the plot and see what it asks of you.",
-      },
-      harvest: {
-        reading: "Looking at what it changed…",
-        repo: "Repo {repo}",
-        counts: "{commits} commits · {files} files",
-        none: "This one has no changes. Harvesting just lets it go.",
-        conflict: "Merging into {base} would conflict, so it cannot be harvested yet",
-        resolveHow: "Have it merge {base} into its own branch, resolve the conflicts, run the tests and commit; then harvest it.",
-        behind: "While it worked, {base} got {n} more commits; harvesting joins them (with one merge commit).",
-        uncommitted: "{n} files are not committed yet; harvesting commits them first:",
-        letGo: "Let it go",
-        take: "Harvest, merge into {base}",
-        resolve: "Have it resolve the conflict",
-        files: "Changed files",
-        empty: "The warehouse is empty. Work harvested into main is kept here.",
-        taken: "harvested {ago}",
-      },
       panel: {
         shop: "Shop",
         warehouse: "Warehouse",
         graphs: "Tasks and achievements",
         log: "Farm log",
         orchestrator: "Assistant and pets",
-        harvest: "Harvest {name}'s plot",
-        sow: "Sow · plot {plot}",
-        water: "Water {name}",
-        menu: "Menu",
-        pickLook: "Pick an assistant you like; the farm and the chat change at once.",
-        drawing: "Still being drawn…",
-        pets: "Pets",
-        shopItems: {
-          scarecrow: { name: "Scarecrow", note: "Scares off crows, looks nice" },
-          seeds: { name: "Seed pack", note: "Common ticket templates" },
-          bunting: { name: "Bunting", note: "Hangs on the fence" },
-          doghouse: { name: "Doghouse", note: "For the assistant's dog" },
-        },
         shopClosed: "The shop is being done up and opens in the next version. You have {coins} coins: save them for now.",
       },
-      menu: {
-        chat: "Farm chat (channels)",
-        agents: "Helper roster",
-        runtimes: "Machines",
-        skills: "Skill book",
-        connectors: "Connectors",
-        repos: "Repos",
-        catalog: "Catalog",
-        resume: "Resume",
-        soundOn: "Sound on",
-        soundOff: "Sound off",
-        elsewhere: "Go elsewhere",
-        issues: "Tickets",
-        yard: "What you can click in the yard",
-      },
-      log: {
-        empty: "Nothing yet. Once you open, what you and the assistant say and who finished what are kept here.",
-        you: "You",
-        said: "said",
-        answered: "answered",
-        spent: "This round spent {spent}",
-      },
-      conflictTag: "Conflict",
-      binary: "binary",
-      chat: {
-        actions: {
-          open: "What this message can do",
-          react: "React",
-          moreEmoji: "More emoji",
-          reply: "Reply",
-          copyLink: "Copy link",
-          copied: "Link copied",
-          edit: "Edit",
-          remove: "Delete",
-          sure: "Click again to delete",
-          editHint: "Enter saves · Esc keeps it",
-          cancelReply: "Don't reply",
-        },
-        edited: "(edited)",
-        deleted: "This message was deleted",
-        suggestions: {
-          "0": "Have the writer make the captions panel",
-          "1": "Have the tester run the tests",
-          "2": "How is it going?",
-          "3": "Everyone, call it a day",
-        },
-        greeting:
-          'This is the farm chat, where you, the assistant and the helpers talk. Tell me something to do, such as "have the tester run the tests".\n\nOnce helpers arrive, write a name like @w1 to call one directly; each ticket has its own thread under it.',
-        phase: {
-          off: "Type or press the mic to open",
-          connecting: "Reaching the assistant…",
-          listening: "The assistant is listening",
-          thinking: "The assistant is thinking…",
-          speaking: "The assistant is speaking",
-          error: "Not connected: try again",
-        },
-        newIn: "new words in {n} places",
-        newInThread: "New words in a thread",
-        newInChannel: "New words in {channel}",
-        label: "Farm chat",
-        restore: "Restore the chat window",
-        enlarge: "Enlarge the chat window",
-        fold: "Fold the chat",
-        thread: "Ticket thread",
-        older: "Older messages",
-        threadEmpty: "Nobody has spoken in this thread yet. Its helper sees what is said here.",
-        sending: "Sending",
-        captions: "Live captions",
-        done: "Done speaking",
-        speaking: "Speaking",
-        notSent: "Not sent: {why}",
-        noVoice: "The voice did not connect: {why}",
-        gotIt: "Got it",
-        settings: "Settings",
-        nobodyOnIt: "No helper is on it now; the thread stays",
-        replies: "{n, plural, one {# reply} other {# replies}}",
-        back: "Back to {channel}",
-        dispatch: "Sent work",
-        channel: "Channel: {channel}; click to switch or open a new one",
-        channels: "Channels",
-        directs: "Direct messages",
-        repoTag: "repo {repo}",
-        newChannel: "New channel",
-        pageAndSchedules: "Channel page and scheduled tasks",
-        settingsLink: "Settings",
-        back2: "Back",
-        newChannelLine: "A long-running matter or a repo gets a place of its own to talk and send work. Call the assistant here and the work is sent here.",
-        nameHint: "Name, such as clock-in",
-        name: "Channel name",
-        descriptionHint: "What it is for (optional)",
-        description: "Channel description",
-        repoHint: "Default repo (optional)",
-        repo: "Default repo",
-        open: "Open",
-        settingsOf: "Settings of {channel}",
-        what: "What it is for",
-        repoNone: "Default repo (empty for none)",
-        save: "Save",
-        sendTo: "Send to {name}",
-        anyone: "Any helper",
-        inThread: "Say it in the thread; {name} sees it…",
-        inThreadAnyone: "Say it in the thread…",
-        toOrchestrator: "Tell the assistant; @ calls a helper…",
-        toOrchestratorAlone: "Just between you and the assistant…",
-        who: "Who",
-        stop: "Stop the assistant",
-        stopHint: "Stops the assistant's round; helpers already sent keep working",
-        send: "Send",
-        less: "Less",
-        more: "Read more",
-        foldDispatch: "Fold the dispatch",
-        unfoldDispatch: "Unfold the dispatch",
-        spent: "This round spent {spent}",
-        newCount: "{n} new",
-        replyTo: "Replying to {name}",
-        replyToText: "Replying to {name}: {text}",
-        notSentLine: "Not sent",
-        retrySend: "Send again",
-        dropSend: "Drop it",
-        unread: "Could not read the messages: {why}; trying again shortly",
-      },
+      menu: { agents: "Helper roster", runtimes: "Machines", skills: "Skill book", issues: "Tickets" },
       tool: {
-        hand: { label: "Hand", hint: "Click a plot for its details, an empty one to sow" },
+        hand: { hint: "Click a plot for its details, an empty one to sow" },
         water: { hint: "Pass a helper a word; one at work hears it on the way" },
-        bug: { label: "Spray", hint: "The job failed (bugs in the plot): have it go on fixing" },
-        weed: { label: "Weed", hint: "Review notes that did not pass grow as weeds: pulled when the helper fixes them and the next review passes" },
-        harvest: { label: "Harvest", hint: "A ripe plot: bring in the result and let the helper go" },
-        shovel: { label: "Shovel", hint: "Stops one at work; lets one not at work go" },
-      },
-      aim: {
-        flowerbed: "A cleared flowerbed",
-        clearAt: "Lv.{level} clears this plot",
-        unread: "This plot's ticket has not been read yet",
-        look: "Look at this plot",
-        sow: "Sow",
-        water: "Water {name} (pass a word)",
-        nothingYet: "Nothing planted yet: sow with the hand first",
-        bug: "Spray: have it go on fixing",
-        noBugs: "No bugs in this plot",
-        weeds: "Weeds are pulled once the helper fixes them and the review passes",
-        noWeeds: "No weeds",
-        harvestRipe: "Harvest, let the helper go",
-        harvestLook: "Harvest: see what it changed",
-        nothingToHarvest: "Nothing to harvest on an empty plot",
-        shovelStop: "Shovel: stop it",
-        shovelDismiss: "Shovel: let it go",
-        noShovel: "Nothing to shovel on an empty plot",
-        unavailable: "This ticket is {state}: open the plot to see",
-      },
-      command: {
-        cannot: 'This ticket cannot "{act}" now',
-        stored: "Into the warehouse",
-        noShovel: "This ticket cannot be shoveled now",
-        changed: "This plot has changed: click again",
-      },
-      page: { lost: "Cannot reach the farm, reconnecting… (is the server running?)", waiting: "Waiting for the farm…" },
-      hud: {
-        label: "The farm's HUD",
-        look: "Change the assistant's look",
-        workbenchHint: "Tickets, chat… the pages for managing work",
-        workbench: "Workbench",
-        treeHint: "Memory tree: what the farm has learned",
-        tree: "Memory tree",
-        mapHint: "Map: an island for each repo",
-        map: "Map",
-        channelsUnread: "Channels, {n} unread",
-        menuHint: "Menu (Esc)",
-        tools: "Tools",
-        toLevel: "{xp}/{need} commits",
-        toLevelNext: "{xp}/{need} commits · Lv.{next} clears a plot",
-      },
-      quota: {
-        unreported: "reports no allowance",
-        signedOut: "Not signed in: the allowance cannot be read",
-        unreadable: "Cannot be read: {why}",
-        balance: "{enough, select, true {Pay as you go · {provider} balance} other {Pay as you go · {provider} balance, running out}}",
-        all: "Allowance left on each runtime",
-        lowest: "Allowance left: the lowest has {pct}%",
-        quota: "Allowance",
-        left: "Allowance left",
-        refresh: "Read the allowance now",
-        note: "Read from each account every few minutes, and after each round a helper works.",
-        spentToday: "About {spent} spent today",
-        spentTodayBudget: "About {spent} spent today / budget {budget}",
-      },
-      friends: {
-        status: { bug: "Bugs in its plot", ripe: "Ripe, waiting for you", busy: "Working", rest: "Resting in its plot", away: "Not on the farm" },
-        tally: " · hired {hired} times, harvested {harvested}",
-        energy: "Energy {short}",
-        disabled: "Disabled: cannot be sent",
-        unpick: "Stop picking it",
-        pick: "Send it the next job",
-        profile: "Profile",
-        helpers: "Helpers",
-      },
-      fx: {
-        coins: "{detail} · +{coins} coins",
-        notice: "Notice",
-        levelUp: "The farm reached Lv.{level}",
-        level: "Farm Lv.{level}",
-        cleared: "A new plot was cleared",
-      },
-      sign: {
-        label: "Repo sign: {repo}",
-        noRepo: "No repo",
-        hint: "This farm belongs to this repo; click it to go back to the map and visit another island",
-        repo: "Repo",
-      },
-      overlay: {
-        click: "Click: {text}",
-        clearAt: "Lv.{level} clears it",
-        idle: "What shall we plant today?",
-        unclaimed: "Uncleared plot",
-        flowerbed: "Flowerbed",
-        bare: "Plot {plot} · empty",
-      },
-      crop: {
-        empty: "empty",
-        seeded: "just sown",
-        sprout: "sprouting",
-        leafy: "leafy",
-        flowering: "flowering",
-        wheat: "ripe",
-        withered: "withered",
-        weeds: "weedy",
-        dry: "dry",
-        harvested: "harvested",
-        locked: "uncleared",
-      },
-      yard: {
-        shop: { hint: "Seeds, decorations, clearing new plots" },
-        warehouse: { hint: "What was harvested" },
-        tasks: { hint: "Starter tasks, clearing, the wall of achievements" },
-        log: { hint: "What was said and harvested, newest first" },
-        taskBoard: { hint: "A long job split into steps for several helpers" },
-        agents: { hint: "Which machine each helper uses, its persona and skills, how it looks" },
-        manager: { hint: "Talk to the assistant" },
-        runtimes: { label: "Workshop · machines", hint: "Each machine is a runtime: installed or not, usage" },
-        skills: { label: "Library · skill book", hint: "Skills helpers can carry" },
-      },
-      canvas: {
-        label: "VibeValley's pixel farm",
-        noMap: "The village map could not be fetched: {why}",
-        map: "Reading the map…",
-        moving: "Moving into the village {done}/{total}",
-        lights: "Lighting up…",
-        entering: "Entering the village",
-      },
-      debug: {
-        title: "Debug console",
-        close: "Close `",
-        call: "Call",
-        open: "Open",
-        dismiss: "Dismiss",
-        sky: "Sky",
-        time: "Time",
-        stop: "Stop",
-        progress: "Game progress",
-        levelUp: "Level up (with banner)",
-        achievement: "Pop an achievement",
-        helpers: "Helpers · {n}",
-        nobody: "Nobody in the field.",
-        halt: "Stop",
-        all: "All",
-        haltAll: "Stop all",
-        dismissAll: "Dismiss all",
-        frames: "Frames and events · {n}",
-        resume: "Resume",
-        pause: "Pause",
-        clear: "Clear",
-        copy: "Copy .jsonl",
+        bug: { hint: "The job failed (bugs in the plot): have it go on fixing" },
+        weed: { hint: "Review notes that did not pass grow as weeds: pulled when the helper fixes them and the next review passes" },
+        harvest: { hint: "A ripe plot: bring in the result and let the helper go" },
+        shovel: { hint: "Stops one at work; lets one not at work go" },
       },
       native: {
         ledger: "Ledger & clock",
@@ -7766,162 +5703,6 @@ export const catalogs = {
         fruit: "Principle",
         seed: "Habit",
       },
-    },
-    "web.farm.map": {
-      finding: "Looking…",
-      islands: "{n, plural, one {# island} other {# islands}}",
-      peopled: "{n} with helpers",
-      working: "{n}/{of} being worked on",
-      queued: "{n} queued",
-      stake: "A free spot: click to send work",
-      locked: "Every spot taken",
-      sack: "Queued work",
-      send: "Send a ticket · {repo}",
-      plot: "{name}'s plot",
-      open: "A free spot: send a ticket to {repo}",
-      wait: "Waiting for a plot",
-      queuedTip: "Queued: {title}",
-      queuedLabel: "Queued work: {title}",
-      enter: "Enter {repo}'s farm",
-      enterWord: "Enter",
-      homeless: "Not in any repo: ",
-      sea: "No repos in the work folder yet: the map is all sea.",
-      notDrafted: "Not drafted: {why}",
-      sowIntro: "Planting in {repo}: write a line on what to do, and the assistant sends a helper; or write it as a to-do first and start it after a look.",
-      job: "What to do",
-      jobExample: "Such as: add Remember me to the sign-in page",
-      todo: "Write it as a to-do",
-      sow: "Plant it",
-      gone: "This repo is no longer in the work folder; only the helpers still on the island are left.",
-      worktrees: "worktrees · {n}",
-      noHelpers: "No helpers on the island yet: each ticket sent here adds a worktree.",
-      noMore: "No more work is sent here.",
-      canSend: "{n} more tickets can start at once (this repo takes at most {of} helpers at a time).",
-      shut: "{n} tickets are already being worked on: new work queues.",
-      full: "Full: all {n} helpers are working, so new work queues.",
-      queue: "Queued · {n}",
-      see: "See this ticket",
-      growth: "Growth · {label}",
-      growthSince: "Growth · {label} · last commit {since}",
-      crop: { never: "never dug", day: "thriving", week: "growing", month: "sprouting", quarter: "drying out", older: "gone wild" },
-      island: {
-        branch: "\nbranch {branch}",
-        open: "Free spot: send a ticket here and it starts at once",
-        shut: "{n} tickets are already being worked on: wait for one to finish",
-        gone: "no longer in the work folder",
-        working: "{full, select, true {working {n}/{of} (full)} other {working {n}/{of}}}",
-        queued: "{n} queued",
-      },
-    },
-    "web.farm.phone": {
-      ringing: "Incoming…",
-      decline: "Decline",
-      answer: "Answer",
-      callOrchestrator: "Call the assistant",
-      missed: "Missed {n}",
-      log: "Log",
-      noCalls: "No calls yet.",
-      answered: "answered",
-      declined: "declined",
-      noMissed: "No missed calls. All is well in the field.",
-      phase: {
-        connecting: "Connecting…",
-        live: "On the call: go ahead, the assistant is listening",
-        coming: "On the call: the assistant is on the way",
-        ending: "Hanging up…",
-        failed: "Not connected: {why}",
-        idle: "Just say it. When a ticket comes back or gets stuck, the assistant calls you too.",
-      },
-      manager: "Assistant",
-      hangUp: "Hang up",
-      app: { missed: "Missed", channels: "Chat", games: "Games" },
-      game: { blocks: "Blocks", sokoban: "Sokoban", dino: "Dino", bugs: "Bug snake", merge: "Farm 2048" },
-      phone: "Phone",
-      phoneRinging: "Phone: incoming call",
-      phoneMissed: "Phone, {n} missed calls",
-      phoneUnread: "Phone, {n} new in the farm chat",
-      ring: "Call",
-      new: "new",
-      label: "Farm phone",
-      home: "Home",
-      homeHint: "Back to the home screen",
-      brand: "FarmTel",
-      openChat: "Open the farm chat",
-      openChatUnread: "Open the farm chat, {n} new",
-      key: { up: "Up", left: "Left", right: "Right", down: "Down" },
-      pressA: "Press A to {what}",
-      again: "play again",
-      start: "start",
-      resume: "resume",
-      paused: "Paused",
-      sokoban: {
-        levels: { "0": "First crate of seeds", "1": "Round the back", "2": "Two crates of harvest", "3": "Warehouse corner", "4": "Harvest home" },
-        title: "Sokoban {level}/{of}",
-        moves: "{moves} moves · {pushes} pushes",
-        board: "Warehouse board, {placed}/{of} crates in place",
-        allIn: "The whole harvest is in!",
-        done: "This store is tidied!",
-        goal: "Push the crates onto ◆",
-        undo: "B undo",
-        again: "Play again",
-        next: "Next level",
-        restart: "Restart",
-        help: "Arrows walk · crates can only be pushed",
-      },
-      dino: {
-        road: "The dino's road",
-        crashed: "Crashed",
-        help: "A or ↑ jumps, ↓ or B ducks",
-        help2: "The further it runs the faster it goes; birds come later",
-      },
-      merge: {
-        start: "Press A to start",
-        restartAsk: "Replant this plot?",
-        restartKeys: "A restart · B keep planting",
-        harvest: "Bumper harvest!",
-        goOn: "Press A to keep planting",
-        full: "The plot is full · {score} points",
-        overKeys: "A again · B take back a move",
-        reached: "Grew {stage}",
-        field: "In the field: {n} plants, best {top}",
-        stages: "Harvest catalog",
-        help: "Arrows or a swipe: two of a kind grow into the next",
-        help2: "B take back · A restart",
-        stage: {
-          "0": "Seed",
-          "1": "Sprout",
-          "2": "Leaf",
-          "3": "Flower",
-          "4": "Wheat",
-          "5": "Carrot",
-          "6": "Sheaf",
-          "7": "Basket",
-          "8": "Cart",
-          "9": "Granary",
-          "10": "Harvest",
-        },
-        past: "Harvest {n}",
-      },
-      bugs: {
-        ended: { wall: "Hit the ridge", self: "Bit itself", full: "The field is full" },
-        tally: "Seeds {seeds} · bugs {bugs}",
-        field: "The bug snake's field",
-        help: "Arrows turn, B pauses",
-        help2: "Seeds add a segment; eat a bug before it flies off for more points",
-      },
-      blocks: {
-        well: "The blocks' well",
-        noRoom: "No room left",
-        score: "Score",
-        lines: "Lines",
-        level: "Level",
-        best: "Best",
-        help: "←→ move ↑ turn",
-        help2: "↓ drop A to the bottom",
-        help3: "B pause",
-        next: "Next",
-      },
-      chatTab: "CHAT",
     },
     "web.inbox": {
       tray: {
@@ -8248,14 +6029,13 @@ export const catalogs = {
       emptyHow: "Generate an image or speech, upload or drop in a file, or ask a helper in the chat to put what it found here.",
       nothingShown: "Nothing matches these filters.",
       drop: "Let go to put it in the library",
-      rail: { label: "Filters", where: "From", kind: "Kind", channels: "From channels", agents: "From helpers", anyWhere: "Any origin", anyKind: "Any kind" },
+      rail: { where: "From", kind: "Kind", channels: "From channels", agents: "From helpers", anyWhere: "Any origin", anyKind: "Any kind" },
       origin: { all: "All", generated: "Generated", uploaded: "Uploaded", fetched: "Brought back" },
       kind: { all: "All", image: "Images", audio: "Audio", video: "Video", other: "Other" },
       search: "Search names",
       sortLabel: "Sort",
       sort: { recent: "Recent", name: "Name", size: "Size" },
       tileSize: "Thumbnail size",
-      grid: "Files",
       job: {
         image: "image",
         speech: "speech",
@@ -8273,7 +6053,6 @@ export const catalogs = {
         fetchedPath: "{agent} brought it back from {path} in its working directory",
       },
       inspector: {
-        label: "Details",
         kind: "Kind",
         pixels: "Size",
         bytes: "File size",
@@ -8299,7 +6078,6 @@ export const catalogs = {
       makeTabs: { image: "Image", speech: "Speech", audio: "Audio workbench" },
     },
     "web.media": {
-      image: "Image generation",
       speech: {
         title: "Single-speaker speech",
         notice:
@@ -8348,7 +6126,6 @@ export const catalogs = {
         consent: "I approve sending these files and this prompt to the displayed MOSS connection.",
         uploading: "Storing selected files on this computer…",
         stopUpload: "Stop local upload",
-        uploadFailed: "Local upload failed. This submission has not started understanding; retry or select the files again.",
         submit: "Submit understanding",
         new: "New understanding request",
         newAsk: "Start a new request? This may upload again and incur another charge. It will not recover an unknown earlier result.",
@@ -8468,7 +6245,6 @@ export const catalogs = {
         gardener: { name: "Gardener", blurb: "A flower in a wide straw hat, shears in the apron pocket." },
         robot: { name: "Robot butler", blurb: "A round farm robot whose face screen smiles." },
       },
-      pet: { dog: "Puppy", ragdoll: "Colorpoint ragdoll", bluecat: "Blue cat" },
       orchestrator: {
         tab: { memory: "Memory", trajectory: "Trajectory", voice: "Voice" },
         all: "← All profiles",
@@ -8531,15 +6307,6 @@ export const catalogs = {
         today: "Link today's journal",
       },
       complete: { newPage: "New page" },
-      toolbar: {
-        label: "Edit this block",
-        indent: "Indent",
-        outdent: "Outdent",
-        up: "Move up",
-        down: "Move down",
-        todo: "Toggle to do",
-        link: "Insert a link",
-      },
       rail: { label: "Beside this page", show: "Show the side panel", hide: "Hide the side panel", contents: "On this page" },
       search: {
         title: "Search notes",
@@ -8819,11 +6586,6 @@ export const catalogs = {
         weekly: "This week's allowance",
         week: "This week ({models})",
         oneWeek: "· a week",
-        weekdays: { "0": "Sunday", "1": "Monday", "2": "Tuesday", "3": "Wednesday", "4": "Thursday", "5": "Friday", "6": "Saturday" },
-        now: "resets now",
-        minutes: "resets in {m} min",
-        hours: "{h, plural, one {resets in an hour} other {resets in # hours}}",
-        on: "resets {weekday}",
         unreported: "reports no allowance",
         signedOut: "Not signed in",
       },
@@ -8969,7 +6731,6 @@ export const catalogs = {
         call: "Call line",
         dictation: "Dictation",
         chat: "Chat apps",
-        devices: "Devices",
         width: "Navigation width (drag; double-click for the default)",
         accounts: "Accounts and keys",
       },
@@ -8985,7 +6746,6 @@ export const catalogs = {
         dictation: "dictation transcription voice input",
         github: "gh PR login",
         chat: "WeChat Feishu Lark QQ connectors pairing",
-        devices: "phone pairing connect to this machine LAN name password sign in sign out",
         accounts: "keys accounts DeepSeek MOSS Agora API key models",
       },
       scope: { farm: "For all of VibeValley", device: "This device only" },
@@ -9022,33 +6782,6 @@ export const catalogs = {
         copy: "Copy the path",
         copied: "Path copied",
         reveal: "Show in Finder",
-        update: "Updates",
-        updateHint: "The desktop app updates itself from the releases on GitHub",
-        upToDate: "Up to date",
-        checking: "Looking for a new version…",
-        downloading: "Downloading {next} ({percent}%)",
-        ready: "{next} is ready and goes in when you quit",
-        readyNewFarm: "{next} is ready: it starts from fresh data and keeps the old aside",
-        manual: {
-          diskImage: "{next} needs installing by hand: the app runs from its disk image; drag it to Applications first",
-          translocated: "{next} needs installing by hand: macOS runs the app from a temporary place; drag it to Applications and open it again",
-          readOnly: "{next} needs installing by hand: the app's folder cannot be written",
-          noBuild: "{next} has no build for this Mac",
-        },
-        failed: "Could not check: {why}",
-        check: "Check for updates",
-        restart: "Restart to update",
-        restartQuestion: "Restart into the new version?",
-        workingQuestion: "{n} helpers are working; restarting cuts them off. Restart now?",
-        newFarmQuestion: "The new version starts from fresh data; the old stays in the home folder. Restart now?",
-        download: "Download",
-        cli: "Command line",
-        cliHint: "Once installed, {command} reads and writes this farm from a terminal, for agents on this Mac too",
-        cliReady: "Use {command} in a terminal; agents on this Mac can read and write this farm with it",
-        cliNotOnPath: 'Installed at {link}, but ~/.local/bin is not on your PATH: add export PATH="$HOME/.local/bin:$PATH" to ~/.zshrc',
-        cliTaken: "{link} is another program's file and was not replaced: move it away, then install",
-        cliInstall: "Install",
-        cliRemove: "Remove",
       },
       missing: {
         deepseekKey: "No DeepSeek key yet",
@@ -9077,54 +6810,7 @@ export const catalogs = {
         intro: "Every vendor's accounts and keys are here, with the models each account can use. Which account each feature uses is chosen under Uses.",
       },
     },
-    "web.tree": {
-      kind: { leaf: "Leaf", fruit: "Fruit", seed: "Seed" },
-      stage: { "1": "sprout", "2": "seedling", "3": "young tree", "4": "big tree", "5": "old tree" },
-      distilled: "Distilled from {n} experiences",
-      noted: "This job noted {n} leaves",
-      seeds: "Grew {n} seeds",
-      grew: "Grew into {n} experiences",
-      together: "Often recalled with {n} others",
-      sown: '"{body}" was sown into the skill book (still pretend: it is really written once the server is hooked up)',
-      sky: "The farm's sky of memories",
-      skyHint: "Seeds in the middle, fruit and leaves further out, older the further; drag to turn",
-      back: "Back under the tree",
-      farm: "Back to the farm",
-      earliest: "Earliest",
-      past: "Look back: drag to a day and the tree grows back to how it was",
-      now: "Now",
-      day: "Day {n}",
-      byHelper: "Only one helper's",
-      allHelpers: "All helpers",
-      byRepo: "Only one repo's",
-      allRepos: "All repos",
-      everyRepo: "Every repo",
-      title: "The farm's memory tree",
-      stats: "Day {days} · {rounds} rounds · recalled {recalls} times",
-      nextStage: "{rounds} more rounds to a {stage}",
-      grown: "Fully grown",
-      experience: "An experience",
-      fold: "Fold",
-      intent: "Wanted",
-      approach: "Did",
-      insight: "Learned",
-      recalled: "recalled {n} times",
-      recent: "Newly grown",
-      fading: "Leaves about to fall {n}",
-      look: "Look",
-      fadingNote: "The longest unrecalled fall first; fallen, they are forgotten.",
-      waiting: "Crafts waiting to be sown",
-      noSeeds: "No new crafts; when several experiences say the same thing, a seed is distilled.",
-      sow: "Sow",
-      lookUp: "Look up at the sky",
-      from: "Distilled from",
-      notedBy: "Noted by this job",
-      grewInto: "Grew",
-      grewTo: "Grew into",
-      often: "Often recalled together",
-      aboutToFall: " · about to fall",
-      scene: "The memory tree: each leaf a note, each fruit an experience, the seeds under it crafts; looking up, the same memories as a sky",
-    },
+    "web.tree": { sky: "The farm's sky of memories" },
     "web.ui.pixel": {
       sound: {
         group: { ui: "Interface", tools: "Tools", field: "In the field", yard: "Yard", reward: "Rewards", voice: "Voice" },
@@ -9160,10 +6846,6 @@ export const catalogs = {
           ring: "Ringing",
         },
       },
-      close: "Close",
-      optional: "  optional",
-      drop: "Remove {chip}",
-      noticeTitle: { info: "Notice", warn: "Not sent", error: "Something went wrong" },
     },
     "web.voice": {
       voice: {
@@ -9243,7 +6925,6 @@ export const catalogs = {
           minimaxVoice: "Click a name to pick it, the play button on its left to hear it first; or fill in another MiniMax system voice id below.",
           voiceId: "Voice id",
           sample: "Listen: {greeting}",
-          noSample: "No sample",
           stop: "Stop {name}",
           play: "Listen to {name}",
         },
@@ -9282,106 +6963,14 @@ export const catalogs = {
         },
         number: { silenceMs: "Pause that ends a turn (ms)", interruptMs: "Speech that interrupts it (ms)", idleSeconds: "Leave when nobody is there (s)" },
       },
-      dictation: {
-        unset: "Dictation is not set up: fill in the address and the model under Dictation on the Voice page",
-        recording: "Listening… click again to stop",
-        transcribing: "Transcribing…",
-        failed: "Last time it was not recognized: {why}",
-        start: "Dictation: click to start and again to stop, or hold to talk and let go",
-        stop: "Stop dictation",
-        label: "Dictation",
-        noMic: "Cannot record: no microphone permission",
-        cannot: "Cannot record: {why}",
-        nothing: "Nothing was recorded",
-        listening: "How long it has listened",
-        keys: "Esc cancel · Enter done",
-        cancel: "Discard this recording",
-        done: "Done, turn it into text",
-        again: "Try again",
-        dismiss: "Dismiss",
-      },
-      call: {
-        renew: "Renewing the token failed: {why}",
-        noMic: "No microphone permission",
-        cannotHear: "Agora: cannot hear the other side: {why}",
-        agora: "Agora: {code} {msg}",
-      },
-      vision: {
-        silence: "No response for this turn; the session remains connected.",
-        interrupted: "Response interrupted",
-        title: "Realtime visual understanding",
-        liveTitle: "Share a picture with the Live call",
-        notice:
-          "Starting requests camera or screen permission. Selected images are uploaded through this server to the configured MOSS account, at most once a second (JPEG, up to 256 KiB). Stop sharing before showing private content. Nothing is saved to chat.",
-        hostNotice:
-          "Requires a secure local browser and available capture support. Desktop camera requires system permission; desktop screen capture and mobile-shell visual input are unavailable. Leaving this page or moving it to the background stops capture.",
-        source: "Picture source",
-        camera: "Camera",
-        screen: "Screen or window",
-        unavailable: "Capture is unavailable in this host or browser context.",
-        denied: "Camera or screen permission was denied.",
-        deviceLost: "The capture device or screen share stopped.",
-        captureFailed: "Could not capture the selected source.",
-        closed: "The visual session disconnected. Check the independent visual model binding in AI services before starting again.",
-        start: "Start sharing",
-        stop: "Stop sharing",
-        idle: "Not connected",
-        connecting: "Requesting permission and connecting…",
-        ready: "Connected",
-        ended: "Session ended",
-        error: "Session failed",
-        prompt: "Ask about the shared picture",
-        final: "Finish the session after this question",
-        send: "Send question",
-        transcript: "Visual responses",
-      },
       moss: {
-        busy: "Another Live session is already open or connecting. End it before starting this one.",
-        localOnly: "Realtime browser sessions are available only on this computer (localhost). Paired remote browsers cannot open these relays.",
-        requestFailed: "MOSS Live could not complete this request. Check the call setup before trying again.",
         intro:
           "Talk to MOSS Live directly and hear how it answers; the line goes through this machine's server, and the key never leaves it. Nothing goes to the chat.",
-        persona: "Persona (MOSS's own when empty)",
-        personaHint: "E.g.: You are my steward; keep it short.",
-        instructions: "Rules",
-        defaultInstructions: "Answer briefly, in English.",
         talk: "Start talking",
         connecting: "Connecting…",
         hangUp: "Hang up",
         mute: "Mute",
         unmute: "Unmute",
-        you: "You",
-        said: "Conversation",
-        nothingSaid: "Once connected, just talk; both sides' words show here.",
-        events: "Messages on the line",
-        eventsHint: "Actions sent and events received, as raw JSON; growing words and audio announcements are left out.",
-        up: "out",
-        down: "in",
-        closed: "MOSS Live hung up",
-        qos: {
-          title: "Line quality",
-          hint: "Worked out every second, for this call only.",
-          reply: "Reply",
-          ms: "{last} ms · mean {mean}",
-          replyTip: "From the end of your words (as MOSS judged it) to its first sound arriving here; {n} turns so far. Red past 2.5 s.",
-          up: "Up",
-          upTip: "Sent in the last second: the microphone and the messages. 16 kHz audio is about 256 kbps.",
-          down: "Down",
-          downTip: "Received in the last second: the answer's audio and the events. 48 kHz audio is about 768 kbps while it speaks.",
-          frames: "Mic frames",
-          framesTip: "20 ms audio frames sent in the last second; 50 is right, fewer means recording or the page cannot keep up.",
-          backlog: "Send backlog",
-          backlogTip: "Bytes still waiting on this machine to go out; growing means the way up is too slow.",
-          ahead: "Play buffer",
-          aheadTip: "Answer audio received and not yet played, ms.",
-          gaps: "Gaps",
-          gapsTip: "Times, within one answer, a piece finished playing before the next arrived.",
-          stopsTip: "Answers MOSS stopped itself; hover for the reasons (playback_timeout: playback was not reported in time).",
-          stops: "Stopped",
-        },
-        tryIt: "Try it",
-        notInChat: "Nothing goes to the chat",
-        debug: "Debugging: line quality and messages on the line",
         nativeCall: "MOSS Live call",
         nativeNotice:
           "Choose MOSS Live as the call answer provider and save the configuration first. Starting captures your microphone and sends audio to the configured MOSS account; charges may apply. Final transcripts are recorded in the chat. Leaving this page hangs up.",
@@ -9396,12 +6985,9 @@ export interface Messages {
   "cli.agent.deleted": { readonly agent: string | number };
   "cli.arg.agent": undefined;
   "cli.arg.agentName": undefined;
-  "cli.arg.appPath": undefined;
   "cli.arg.artifact": undefined;
-  "cli.arg.authServer": undefined;
   "cli.arg.capture": undefined;
   "cli.arg.channel": undefined;
-  "cli.arg.chatRuntime": undefined;
   "cli.arg.comment": undefined;
   "cli.arg.cron": undefined;
   "cli.arg.cronName": undefined;
@@ -9418,38 +7004,17 @@ export interface Messages {
   "cli.arg.session": undefined;
   "cli.arg.status": undefined;
   "cli.arg.title": undefined;
-  "cli.arg.updateStep": undefined;
-  "cli.auth.approve": { readonly code: string | number; readonly link: string | number };
-  "cli.auth.here": { readonly server: string | number };
-  "cli.auth.logoutUnsaid": { readonly why: string | number };
-  "cli.auth.noBrowser": undefined;
-  "cli.auth.notSignedIn": { readonly server: string | number };
-  "cli.auth.revoked": { readonly server: string | number };
-  "cli.auth.signedIn": { readonly device: string | number; readonly server: string | number };
-  "cli.auth.signedOut": { readonly server: string | number };
-  "cli.auth.status": { readonly device: string | number; readonly name: string | number; readonly server: string | number };
   "cli.channel.sent": { readonly channel: string | number };
   "cli.command.agent.create": undefined;
   "cli.command.agent.delete": undefined;
   "cli.command.agent.list": undefined;
-  "cli.command.app.about": undefined;
-  "cli.command.app.open": undefined;
-  "cli.command.app.quit": undefined;
-  "cli.command.app.restart": undefined;
-  "cli.command.app.status": undefined;
-  "cli.command.app.update": undefined;
   "cli.command.artifact.list": undefined;
   "cli.command.artifact.read": undefined;
   "cli.command.artifact.show": undefined;
-  "cli.command.auth.about": undefined;
-  "cli.command.auth.login": undefined;
-  "cli.command.auth.logout": undefined;
-  "cli.command.auth.status": undefined;
   "cli.command.channel.list": undefined;
   "cli.command.channel.messageList": undefined;
   "cli.command.channel.messageSearch": undefined;
   "cli.command.channel.messageSend": undefined;
-  "cli.command.chat": undefined;
   "cli.command.cron.create": undefined;
   "cli.command.cron.delete": undefined;
   "cli.command.cron.edit": undefined;
@@ -9481,7 +7046,6 @@ export interface Messages {
   "cli.command.pkm.search": undefined;
   "cli.command.repo.create": undefined;
   "cli.command.repo.list": undefined;
-  "cli.command.root": undefined;
   "cli.command.runtime.list": undefined;
   "cli.command.runtime.refresh": undefined;
   "cli.command.session.list": undefined;
@@ -9491,7 +7055,6 @@ export interface Messages {
   "cli.cron.edited": { readonly cron: string | number };
   "cli.cron.when": undefined;
   "cli.doctor.installRuntime": undefined;
-  "cli.doctor.lanSettings": undefined;
   "cli.doctor.noModelKey": undefined;
   "cli.doctor.noRuntime": undefined;
   "cli.doctor.setModelKey": undefined;
@@ -9500,24 +7063,15 @@ export interface Messages {
   "cli.example.agentCreate.about": undefined;
   "cli.example.agentDelete.about": undefined;
   "cli.example.agentList.about": undefined;
-  "cli.example.appOpen.about": undefined;
-  "cli.example.appQuit.about": undefined;
-  "cli.example.appRestart.about": undefined;
-  "cli.example.appStatus.about": undefined;
-  "cli.example.appUpdate.about": undefined;
   "cli.example.artifactList.about": undefined;
   "cli.example.artifactRead.about": undefined;
   "cli.example.artifactShow.about": undefined;
-  "cli.example.authLogin.about": undefined;
-  "cli.example.authLogout.about": undefined;
-  "cli.example.authStatus.about": undefined;
   "cli.example.channelList.about": undefined;
   "cli.example.channelMessageList.about": undefined;
   "cli.example.channelMessageSearch.about": undefined;
   "cli.example.channelMessageSearch.run": undefined;
   "cli.example.channelMessageSend.about": undefined;
   "cli.example.channelMessageSend.run": undefined;
-  "cli.example.chat.about": undefined;
   "cli.example.cronCreate.about": undefined;
   "cli.example.cronCreate.run": undefined;
   "cli.example.cronDelete.about": undefined;
@@ -9567,18 +7121,13 @@ export interface Messages {
   "cli.example.pkmSearch.run": undefined;
   "cli.example.repoCreate.about": undefined;
   "cli.example.repoList.about": undefined;
-  "cli.example.runtimeChat.about": undefined;
   "cli.example.runtimeList.about": undefined;
   "cli.example.runtimeRefresh.about": undefined;
   "cli.example.sessionList.about": undefined;
   "cli.example.sessionShow.about": undefined;
   "cli.example.sessionStop.about": undefined;
-  "cli.failure.appNotOpen": { readonly home: string | number; readonly why: string | number };
-  "cli.failure.chatFlag": { readonly flags: string | number; readonly runtime: string | number };
   "cli.failure.gone": { readonly n: string | number };
-  "cli.failure.noChat": undefined;
   "cli.failure.noDryRun": { readonly command: string | number };
-  "cli.failure.retry": undefined;
   "cli.failure.unreachable": { readonly base: string | number; readonly why: string | number };
   "cli.flag.agent": undefined;
   "cli.flag.at": undefined;
@@ -9589,7 +7138,6 @@ export interface Messages {
   "cli.flag.criteria": undefined;
   "cli.flag.criterion": undefined;
   "cli.flag.cronExpr": undefined;
-  "cli.flag.cwd": undefined;
   "cli.flag.daily": undefined;
   "cli.flag.day": undefined;
   "cli.flag.description": undefined;
@@ -9609,15 +7157,11 @@ export interface Messages {
   "cli.flag.key": undefined;
   "cli.flag.limit": undefined;
   "cli.flag.marker": undefined;
-  "cli.flag.mcp": undefined;
   "cli.flag.model": undefined;
-  "cli.flag.name": undefined;
   "cli.flag.pass": undefined;
   "cli.flag.priority": undefined;
-  "cli.flag.prompt": undefined;
   "cli.flag.reply": undefined;
   "cli.flag.repo": undefined;
-  "cli.flag.resume": undefined;
   "cli.flag.reviewComment": undefined;
   "cli.flag.role": undefined;
   "cli.flag.runtime": undefined;
@@ -9669,7 +7213,6 @@ export interface Messages {
   "cli.memory.deleted": { readonly memory: string | number };
   "cli.more": { readonly flag: string | number };
   "cli.next.help": undefined;
-  "cli.next.openApp": undefined;
   "cli.next.startServer": undefined;
   "cli.op.agent.create": undefined;
   "cli.op.agent.delete": undefined;
@@ -9894,60 +7437,26 @@ export interface Messages {
   "cli.worker.pr": undefined;
   "cli.worker.read": undefined;
   "cli.worker.report": undefined;
-  "desktop.cannotStart": undefined;
-  "desktop.commandLine.taken": { readonly link: string | number };
-  "desktop.exited": { readonly code: string | number };
-  "desktop.failed": { readonly why: string | number };
-  "desktop.idle": undefined;
-  "desktop.media.camera": undefined;
-  "desktop.media.microphone": undefined;
-  "desktop.menu.about": { readonly app: string | number };
   "desktop.menu.close": undefined;
-  "desktop.menu.copy": undefined;
-  "desktop.menu.cut": undefined;
-  "desktop.menu.devTools": undefined;
-  "desktop.menu.edit": undefined;
-  "desktop.menu.front": undefined;
-  "desktop.menu.fullScreen": undefined;
-  "desktop.menu.hide": { readonly app: string | number };
-  "desktop.menu.hideOthers": undefined;
-  "desktop.menu.minimize": undefined;
-  "desktop.menu.paste": undefined;
-  "desktop.menu.quit": { readonly app: string | number };
-  "desktop.menu.redo": undefined;
-  "desktop.menu.reload": undefined;
   "desktop.menu.resetZoom": undefined;
-  "desktop.menu.selectAll": undefined;
-  "desktop.menu.undo": undefined;
-  "desktop.menu.unhide": undefined;
   "desktop.menu.view": undefined;
   "desktop.menu.window": undefined;
-  "desktop.menu.zoom": undefined;
   "desktop.menu.zoomIn": undefined;
   "desktop.menu.zoomOut": undefined;
-  "desktop.noAddress": { readonly seconds: string | number };
   "desktop.open": undefined;
   "desktop.quit": undefined;
-  "desktop.seeLog": { readonly log: string | number; readonly reason: string | number };
-  "desktop.updateGone": undefined;
   "desktop.waiting": { readonly n: string | number };
   "desktop.working": { readonly n: string | number };
   "server.agent.builtInSkill": { readonly name: string | number };
   "server.agent.defaultStaysOrchestrator": undefined;
-  "server.agent.efforts": { readonly asked: string | number; readonly efforts: string | number; readonly runtime: string | number };
-  "server.agent.effortsAnd": undefined;
-  "server.agent.modelFailed": undefined;
   "server.agent.newAgentId": undefined;
   "server.agent.newSkillId": undefined;
   "server.agent.noAgent": { readonly id: string | number };
-  "server.agent.noDeepSeekKey": undefined;
   "server.agent.noSkill": { readonly id: string | number };
   "server.agent.notSaved": { readonly file: string | number; readonly why: string | number };
   "server.agent.orchestratorRuntime": { readonly runtime: string | number };
   "server.agent.orchestratorStays": undefined;
   "server.agent.quoted": { readonly name: string | number };
-  "server.agent.refused.launchArgs": undefined;
-  "server.agent.refused.serviceTier": undefined;
   "server.agent.removeAgent": { readonly id: string | number; readonly name: string | number; readonly runtime: string | number };
   "server.agent.removeSkill": { readonly name: string | number };
   "server.agent.template.badId": { readonly file: string | number; readonly id: string | number };
@@ -10049,21 +7558,14 @@ export interface Messages {
   "server.attachment.emptyFile": undefined;
   "server.attachment.fileTooBig": { readonly mb: string | number };
   "server.attachment.noAttachment": { readonly id: string | number };
-  "server.base.homeTaken": { readonly home: string | number };
-  "server.base.homeUnlocked": { readonly home: string | number };
-  "server.base.noFile": { readonly path: string | number };
-  "server.base.notPort": { readonly name: string | number; readonly path: string | number; readonly port: string | number };
-  "server.base.prPoll": undefined;
   "server.base.requestKeyLong": { readonly max: string | number };
   "server.channel.absent": { readonly n: number; readonly who: string | number };
   "server.channel.badEmoji": undefined;
   "server.channel.badTarget": { readonly target: string | number };
-  "server.channel.breaker": { readonly failed: string | number; readonly name: string | number };
   "server.channel.channelGone": undefined;
   "server.channel.channelName": undefined;
   "server.channel.channelTaken": { readonly name: string | number };
   "server.channel.connectorsThere": undefined;
-  "server.channel.cronsThere": { readonly n: string | number };
   "server.channel.defaultIsChannel": undefined;
   "server.channel.defaultStays": undefined;
   "server.channel.deletes": {
@@ -10098,29 +7600,16 @@ export interface Messages {
   "server.channel.noChannel": { readonly id: string | number };
   "server.channel.noChannelNamed": { readonly name: string | number; readonly tags: string | number };
   "server.channel.noDirect": { readonly target: string | number };
-  "server.channel.noHelper": { readonly id: string | number };
   "server.channel.noMessage": { readonly n: string | number };
   "server.channel.noMessageId": { readonly id: string | number };
   "server.channel.noProfileNamed": { readonly key: string | number };
   "server.channel.notOrchestrator": { readonly id: string | number };
   "server.channel.notYours": undefined;
   "server.channel.profileDisabled": { readonly name: string | number };
-  "server.channel.queuedThere": { readonly n: string | number };
   "server.channel.sendKeyLong": undefined;
   "server.channel.talkFailed": { readonly why: string | number };
   "server.channel.threadOnlyInChannel": undefined;
   "server.channel.threadOnlyTitle": undefined;
-  "server.chat.direct": undefined;
-  "server.chat.error": { readonly why: string | number };
-  "server.chat.forgot": undefined;
-  "server.chat.hello": { readonly skills: string | number };
-  "server.chat.noRuntime": { readonly id: string | number };
-  "server.chat.notKept": { readonly home: string | number };
-  "server.chat.notSent": { readonly why: string | number };
-  "server.chat.rejected": { readonly why: string | number };
-  "server.chat.resumed": undefined;
-  "server.chat.unknownInstall": { readonly id: string | number };
-  "server.chat.unusable": { readonly id: string | number; readonly kind: string | number };
   "server.connector.digest": { readonly lines: string | number; readonly n: string | number };
   "server.connector.disconnected": undefined;
   "server.connector.expired": undefined;
@@ -10253,36 +7742,17 @@ export interface Messages {
   "server.inbox.item.review.title": { readonly who: string | number };
   "server.inbox.item.review.tray": { readonly who: string | number };
   "server.inbox.orchestrator": undefined;
-  "server.issue.acceptSubmittedPr": undefined;
-  "server.issue.brief.answer": { readonly conclusion: string | number };
-  "server.issue.brief.answerUnread": { readonly problem: string | number };
-  "server.issue.brief.closed": { readonly closed: string | number };
   "server.issue.brief.cure": { readonly brief: string | number };
   "server.issue.brief.cureHead": undefined;
   "server.issue.brief.cureTail": undefined;
-  "server.issue.brief.end": undefined;
   "server.issue.brief.failedEnd": undefined;
   "server.issue.brief.failedHead": undefined;
-  "server.issue.brief.handedOver": { readonly id: string | number; readonly name: string | number };
-  "server.issue.brief.how": { readonly how: string | number };
-  "server.issue.brief.lastRun": { readonly outcome: string | number; readonly summary: string | number };
   "server.issue.brief.original": { readonly brief: string | number };
-  "server.issue.brief.previous": undefined;
-  "server.issue.brief.reopenDefault": undefined;
-  "server.issue.brief.reopened": { readonly id: string | number; readonly name: string | number };
   "server.issue.brief.resume": undefined;
   "server.issue.cannotDelete": { readonly n: string | number; readonly why: string | number };
-  "server.issue.cannotMoveRepo": { readonly n: string | number; readonly why: string | number };
-  "server.issue.cannotSend": { readonly name: string | number; readonly why: string | number };
   "server.issue.closed": undefined;
   "server.issue.closedReopen": undefined;
-  "server.issue.confirmedRequirements": { readonly criteria: string | number; readonly description: string | number; readonly title: string | number };
   "server.issue.deliveryNeedsPr": undefined;
-  "server.issue.dependencies.closedParent": undefined;
-  "server.issue.dependencies.invalid": undefined;
-  "server.issue.dependencies.repo": undefined;
-  "server.issue.dependencies.waiting": { readonly issues: string | number };
-  "server.issue.disabled": { readonly name: string | number };
   "server.issue.does.cancel": { readonly n: string | number };
   "server.issue.does.cancelLeaves": { readonly helper: string | number };
   "server.issue.does.check": undefined;
@@ -10296,15 +7766,10 @@ export interface Messages {
   "server.issue.does.drafterLeaves": { readonly name: string | number };
   "server.issue.does.drop": { readonly n: string | number };
   "server.issue.does.helperLeaves": { readonly helper: string | number };
-  "server.issue.does.leaves": { readonly helper: string | number };
-  "server.issue.does.mainBranch": undefined;
   "server.issue.does.merge": { readonly base: string | number; readonly commits: string | number; readonly helper: string | number };
   "server.issue.does.noRoom": { readonly full: string | number };
-  "server.issue.does.orchestratorRound": { readonly n: string | number; readonly said: string | number };
-  "server.issue.does.pullRequest": { readonly commits: string | number };
   "server.issue.does.reject": { readonly findings: string | number; readonly helper: string | number; readonly n: string | number };
   "server.issue.does.reopen": { readonly n: string | number };
-  "server.issue.does.reopenBy": { readonly n: string | number; readonly taker: string | number };
   "server.issue.does.resolve": { readonly helper: string | number };
   "server.issue.does.resume": { readonly helper: string | number; readonly words: string | number };
   "server.issue.does.revive": { readonly n: string | number };
@@ -10312,20 +7777,13 @@ export interface Messages {
   "server.issue.does.sendTo": { readonly agent: string | number; readonly n: string | number };
   "server.issue.does.start": { readonly agent: string | number; readonly n: string | number };
   "server.issue.does.startIn": { readonly agent: string | number; readonly n: string | number; readonly repo: string | number };
-  "server.issue.does.takesOver": { readonly taker: string | number };
   "server.issue.does.thisTime": { readonly said: string | number };
-  "server.issue.does.toOrchestrator": { readonly n: string | number };
   "server.issue.does.unqueue": { readonly n: string | number };
-  "server.issue.drafting": { readonly name: string | number };
   "server.issue.failNeedsFindings": undefined;
   "server.issue.handOverOnTodo": undefined;
   "server.issue.helper": undefined;
-  "server.issue.helperRef": { readonly id: string | number };
   "server.issue.issueNumbered": { readonly n: string | number };
   "server.issue.issueRef": { readonly ref: string | number };
-  "server.issue.merge.merged": { readonly name: string | number; readonly text: string | number };
-  "server.issue.merge.tellFailed": { readonly why: string | number };
-  "server.issue.mergedChildRetry": undefined;
   "server.issue.move.byHelpers": undefined;
   "server.issue.move.cannot": { readonly from: string | number; readonly to: string | number };
   "server.issue.move.drafting": { readonly name: string | number };
@@ -10338,60 +7796,25 @@ export interface Messages {
   "server.issue.move.same": undefined;
   "server.issue.move.withWords": { readonly command: string | number; readonly say: string | number };
   "server.issue.move.working": undefined;
-  "server.issue.neverStarted": undefined;
   "server.issue.noAssignee": undefined;
-  "server.issue.noConflict": { readonly name: string | number };
-  "server.issue.noProfileNamed": { readonly key: string | number };
-  "server.issue.noRepo": undefined;
-  "server.issue.noStatus": { readonly to: string | number };
   "server.issue.noTitle": undefined;
   "server.issue.notFound": { readonly id: string | number };
-  "server.issue.notRecorded": { readonly name: string | number; readonly why: string | number };
   "server.issue.notStarted": undefined;
   "server.issue.nothingToAccept": undefined;
-  "server.issue.orchestratorAnswers": undefined;
-  "server.issue.orchestratorNotHelper": undefined;
   "server.issue.pickHint": { readonly n: string | number };
-  "server.issue.prDelivered": { readonly url: string | number };
   "server.issue.prSubmitNotAllowed": undefined;
   "server.issue.prSubmitNotCurrent": undefined;
   "server.issue.prSubmitUnavailable": undefined;
   "server.issue.profileGone": { readonly id: string | number };
-  "server.issue.queued": { readonly full: string | number };
-  "server.issue.queuedBack": { readonly title: string | number; readonly why: string | number };
-  "server.issue.queuedStarted": { readonly session: string | number; readonly title: string | number };
-  "server.issue.queuedStuck": { readonly title: string | number; readonly why: string | number };
-  "server.issue.refinement.canceled": { readonly title: string | number; readonly why: string | number };
   "server.issue.refinement.drafting": { readonly name: string | number };
-  "server.issue.refinement.files": undefined;
-  "server.issue.refinement.lines": { readonly field: string | number };
-  "server.issue.refinement.noBlock": undefined;
   "server.issue.refinement.noDrafter": undefined;
-  "server.issue.refinement.noTitle": undefined;
-  "server.issue.refinement.notDoing": undefined;
-  "server.issue.refinement.notObject": undefined;
   "server.issue.refinement.onlyBacklog": undefined;
-  "server.issue.refinement.orchestrator": undefined;
-  "server.issue.refinement.text": { readonly field: string | number };
-  "server.issue.refinement.todo": undefined;
   "server.issue.refinement.unfinished": { readonly name: string | number; readonly summary: string | number };
   "server.issue.refinement.unread": { readonly name: string | number; readonly problem: string | number };
-  "server.issue.refinement.unreadable": { readonly why: string | number };
-  "server.issue.refinement.why": undefined;
   "server.issue.repoRef": { readonly name: string | number };
   "server.issue.roundNeedsWords": undefined;
-  "server.issue.senderGone": { readonly id: string | number };
-  "server.issue.split.agent": { readonly agent: string | number };
-  "server.issue.split.already": undefined;
-  "server.issue.split.commitFirst": undefined;
   "server.issue.split.created": { readonly count: string | number; readonly n: string | number };
-  "server.issue.split.invalid": { readonly max: string | number };
-  "server.issue.split.needsBranch": undefined;
-  "server.issue.split.notCurrent": undefined;
   "server.issue.started": undefined;
-  "server.issue.stillOpen": undefined;
-  "server.issue.stillWorking": { readonly name: string | number };
-  "server.issue.stopFirst": { readonly n: string | number };
   "server.issue.template.commands.build": undefined;
   "server.issue.template.commands.lint": undefined;
   "server.issue.template.commands.test": undefined;
@@ -10410,13 +7833,7 @@ export interface Messages {
   "server.issue.timeline.said": { readonly summary: string | number };
   "server.issue.timeline.start": undefined;
   "server.issue.timeline.told": undefined;
-  "server.issue.verification.acceptanceNeedsCheck": undefined;
-  "server.issue.verification.acceptancePassed": { readonly check: string | number };
-  "server.issue.verification.failed": { readonly check: string | number; readonly output: string | number };
-  "server.issue.verification.frozen": { readonly files: string | number };
-  "server.issue.waitingDispatch": undefined;
   "server.issue.wordsRequired": undefined;
-  "server.issue.workKept": { readonly n: string | number; readonly refused: string | number };
   "server.library.agentAttachment": undefined;
   "server.library.badUrl": { readonly url: string | number };
   "server.library.noItem": { readonly id: string | number };
@@ -10445,9 +7862,6 @@ export interface Messages {
   "server.lookIn.session": undefined;
   "server.lookIn.skill": undefined;
   "server.lookIn.template": undefined;
-  "server.mailbox.ambiguous": undefined;
-  "server.mailbox.notOwned": undefined;
-  "server.mailbox.subscriptionTaken": { readonly thread: string | number };
   "server.media.audioAccountChanged": undefined;
   "server.media.audioCleanupPending": undefined;
   "server.media.audioInvalid": undefined;
@@ -10523,28 +7937,14 @@ export interface Messages {
   "server.media.understandingUnknown": undefined;
   "server.media.unknown": undefined;
   "server.media.userRequired": undefined;
-  "server.memory.coverage.everosAcross": undefined;
-  "server.memory.coverage.everosAgent": undefined;
-  "server.memory.coverage.failed": undefined;
-  "server.memory.coverage.note": { readonly note: string | number; readonly source: string | number };
-  "server.memory.coverage.unconfirmed": undefined;
   "server.memory.dbFailed": undefined;
   "server.memory.empty": undefined;
-  "server.memory.everosForget": undefined;
-  "server.memory.everosList": undefined;
   "server.memory.forget": { readonly agent: string | number; readonly text: string | number };
-  "server.memory.forgetThere": { readonly source: string | number };
   "server.memory.noMemory": { readonly agent: string | number; readonly id: string | number };
-  "server.memory.noUrl": undefined;
-  "server.memory.nowledgeForget": undefined;
-  "server.memory.off": undefined;
   "server.memory.source.everos": undefined;
   "server.memory.source.local": undefined;
   "server.memory.source.nowledge": undefined;
-  "server.memory.stopped": undefined;
-  "server.memory.unknownSource": undefined;
   "server.orchestrator.cannotStart": { readonly why: string | number };
-  "server.orchestrator.label": undefined;
   "server.orchestrator.noKey": undefined;
   "server.orchestrator.onlyDeepseek": { readonly configured: string | number };
   "server.pkm.brokenRef": { readonly id: string | number };
@@ -10598,67 +7998,28 @@ export interface Messages {
   "server.provider.voiceQuery": undefined;
   "server.repo.badGithub": undefined;
   "server.repo.badName": undefined;
-  "server.repo.branchLeft": { readonly branch: string | number; readonly why: string | number };
-  "server.repo.branchMoved": undefined;
   "server.repo.check.exited": { readonly code: string | number };
   "server.repo.check.failed": { readonly why: string | number };
   "server.repo.check.timedOut": { readonly seconds: string | number };
-  "server.repo.clear.branchLeft": { readonly branch: string | number; readonly why: string | number };
-  "server.repo.clear.notWorktree": { readonly cwd: string | number };
-  "server.repo.clear.uncommitted": { readonly branch: string | number; readonly cwd: string | number };
-  "server.repo.clear.unconfirmed": { readonly branch: string | number; readonly why: string | number };
-  "server.repo.clear.unmerged": { readonly ahead: string | number; readonly branch: string | number };
-  "server.repo.clear.unmergedKept": { readonly branch: string | number };
-  "server.repo.clear.worktreeLeft": { readonly cwd: string | number; readonly why: string | number };
   "server.repo.cloneFailed": undefined;
   "server.repo.cloneFailedGh": undefined;
   "server.repo.commit.initial": undefined;
   "server.repo.commit.initialShort": undefined;
-  "server.repo.commit.merge": { readonly branch: string | number };
-  "server.repo.commit.uncommitted": undefined;
   "server.repo.conflict": { readonly base: string | number };
   "server.repo.exists": { readonly name: string | number };
   "server.repo.gh.failed": undefined;
   "server.repo.gh.missing": undefined;
   "server.repo.gh.noAccount": undefined;
   "server.repo.gh.signedOut": undefined;
-  "server.repo.github.body": { readonly check: string | number; readonly conclusion: string | number; readonly n: string | number };
-  "server.repo.github.branchLeft": { readonly why: string | number };
-  "server.repo.github.checked": undefined;
-  "server.repo.github.noCheck": undefined;
   "server.repo.github.noPermission": undefined;
   "server.repo.github.notGithub": undefined;
   "server.repo.github.readOnly": undefined;
-  "server.repo.github.resolveFailed": undefined;
-  "server.repo.github.stateUnknown": { readonly n: string | number };
-  "server.repo.github.stateUnread": { readonly n: string | number };
   "server.repo.github.unchecked": undefined;
-  "server.repo.github.urlUnread": undefined;
-  "server.repo.github.viewFailed": { readonly n: string | number };
-  "server.repo.github.worktreeLeft": { readonly why: string | number };
-  "server.repo.github.wrongBranch": undefined;
-  "server.repo.inRepoNoBranch": undefined;
-  "server.repo.inRepoNothing": undefined;
-  "server.repo.keptBoth": { readonly branch: string | number };
-  "server.repo.keptBranch": { readonly branch: string | number };
-  "server.repo.mainMoved": undefined;
-  "server.repo.mergeFailed": { readonly kept: string | number; readonly main: string | number; readonly why: string | number };
-  "server.repo.mergeStuck": { readonly abort: string | number; readonly kept: string | number; readonly main: string | number; readonly why: string | number };
-  "server.repo.mergeTree": { readonly code: string | number };
-  "server.repo.merged": { readonly ahead: string | number; readonly main: string | number; readonly repo: string | number };
-  "server.repo.mergedBranchLeft": { readonly branch: string | number; readonly why: string | number };
-  "server.repo.mergedWorktreeLeft": { readonly branch: string | number; readonly cwd: string | number; readonly why: string | number };
-  "server.repo.moreLines": { readonly n: string | number };
-  "server.repo.noBranchRead": { readonly branch: string | number; readonly why: string | number };
   "server.repo.noName": undefined;
   "server.repo.noTokei": undefined;
   "server.repo.notChecked": undefined;
   "server.repo.notRepoName": { readonly name: string | number };
-  "server.repo.nothingNew": undefined;
-  "server.repo.nothingNewInPlan": undefined;
   "server.repo.outside": undefined;
-  "server.repo.parentBranchChanged": undefined;
-  "server.repo.parentHasChanges": undefined;
   "server.repo.publish.platformFailed": { readonly stage: string | number };
   "server.repo.publish.pushUnconfirmed": { readonly sha: string | number };
   "server.repo.publish.pushedWithoutLink": { readonly sha: string | number; readonly why: string | number };
@@ -10683,10 +8044,6 @@ export interface Messages {
   "server.runtime.notSaved": { readonly id: string | number; readonly why: string | number };
   "server.runtime.oarUnknown": undefined;
   "server.runtime.persona": { readonly refused: string | number };
-  "server.runtime.piNoBalance": { readonly provider: string | number };
-  "server.runtime.piNoModel": undefined;
-  "server.runtime.piTimedOut": undefined;
-  "server.runtime.piUnread": undefined;
   "server.runtime.quota.balance": { readonly balances: string | number; readonly provider: string | number };
   "server.runtime.quota.balanceLow": { readonly balances: string | number; readonly provider: string | number };
   "server.runtime.quota.noBalance": { readonly provider: string | number };
@@ -10699,113 +8056,15 @@ export interface Messages {
   "server.runtime.quotaGone": { readonly resets: string | number; readonly runtime: string | number; readonly window: string | number };
   "server.runtime.resets": { readonly when: string | number };
   "server.runtime.runtimeDefault": { readonly model: string | number; readonly runtime: string | number };
-  "server.runtime.tools": { readonly n: number };
   "server.runtime.unknownRuntime": { readonly runtime: string | number };
-  "server.session.answer.noBlock": undefined;
-  "server.session.conflictBrief": { readonly base: string | number; readonly files: string | number };
-  "server.session.done": undefined;
-  "server.session.failure.auth": undefined;
-  "server.session.failure.billing": undefined;
-  "server.session.failure.input_too_large": undefined;
-  "server.session.failure.invalid_request": undefined;
-  "server.session.failure.model_unavailable": undefined;
-  "server.session.failure.overloaded": undefined;
-  "server.session.failure.provider": undefined;
-  "server.session.failure.quota": undefined;
-  "server.session.failure.rate_limited": undefined;
-  "server.session.failure.runtime_exited": undefined;
-  "server.session.failure.unknown": undefined;
-  "server.session.failureNext.later": undefined;
-  "server.session.failureNext.now": undefined;
-  "server.session.failureNext.userAction": undefined;
-  "server.session.failureReason": { readonly reason: string | number };
-  "server.session.failureStatus": { readonly status: string | number };
-  "server.session.failureThen": { readonly next: string | number };
-  "server.session.host.callerStart": { readonly why: string | number };
-  "server.session.host.cannotStart": { readonly why: string | number };
   "server.session.host.failed": { readonly label: string | number; readonly why: string | number };
   "server.session.host.markNeedsWords": undefined;
   "server.session.host.noStep": { readonly label: string | number; readonly on: string | number };
   "server.session.host.notAsked": { readonly label: string | number; readonly on: string | number };
   "server.session.host.notInConversation": { readonly label: string | number; readonly on: string | number };
-  "server.session.host.notRecorded": { readonly label: string | number; readonly why: string | number };
-  "server.session.host.startFailed": { readonly label: string | number; readonly why: string | number };
-  "server.session.host.stepHint": undefined;
-  "server.session.host.stopped": { readonly label: string | number };
-  "server.session.life.agentGone": { readonly name: string | number };
-  "server.session.life.cannotSend": { readonly name: string | number; readonly why: string | number };
-  "server.session.life.cannotWake": { readonly name: string | number; readonly why: string | number };
-  "server.session.life.contextHasFiles": undefined;
-  "server.session.life.contextKept": { readonly cwd: string | number; readonly why: string | number };
-  "server.session.life.helperRef": { readonly id: string | number };
-  "server.session.life.issueNotReturned": undefined;
-  "server.session.life.left": { readonly name: string | number; readonly why: string | number };
-  "server.session.life.minutes": { readonly n: string | number };
-  "server.session.life.noHelper": { readonly id: string | number };
-  "server.session.life.noIssue": undefined;
-  "server.session.life.noPlace": { readonly name: string | number; readonly why: string | number };
-  "server.session.life.noRecord": undefined;
-  "server.session.life.noRoom": { readonly full: string | number; readonly name: string | number };
-  "server.session.life.notBack": { readonly name: string | number; readonly why: string | number };
-  "server.session.life.notReceived": { readonly name: string | number; readonly why: string | number };
-  "server.session.life.notRecorded": { readonly name: string | number; readonly why: string | number };
-  "server.session.life.notReset": { readonly name: string | number; readonly why: string | number };
-  "server.session.life.notReturned": undefined;
-  "server.session.life.notStopped": { readonly why: string | number };
-  "server.session.life.placeGone": { readonly cwd: string | number };
-  "server.session.life.quietNotice": { readonly last: string | number; readonly name: string | number; readonly span: string | number };
-  "server.session.life.restartedNotice": { readonly name: string | number };
-  "server.session.life.seconds": { readonly n: string | number };
-  "server.session.life.stillClosing": { readonly name: string | number };
-  "server.session.life.stillHasHelper": undefined;
-  "server.session.life.stillWorking": { readonly name: string | number };
-  "server.session.life.stoppedNeedsYou": { readonly name: string | number; readonly why: string | number };
-  "server.session.life.workerAuthenticationFailed": undefined;
-  "server.session.life.workerUnavailable": undefined;
   "server.session.log.clipped": { readonly n: string | number };
-  "server.session.log.exited": { readonly runtime: string | number };
-  "server.session.log.exitedCode": { readonly code: string | number; readonly runtime: string | number };
-  "server.session.log.exitedNotice": { readonly name: string | number; readonly why: string | number };
-  "server.session.log.image": undefined;
-  "server.session.log.quiet": { readonly last: string | number; readonly span: string | number };
-  "server.session.log.quietLast": { readonly label: string | number };
-  "server.session.log.restarted": undefined;
-  "server.session.log.retry": { readonly attempt: string | number };
-  "server.session.log.retryIn": { readonly s: string | number };
-  "server.session.log.retryOf": { readonly attempt: string | number; readonly of: string | number };
-  "server.session.log.retryWhy": { readonly reason: string | number };
-  "server.session.log.staleRun": undefined;
-  "server.session.log.stopped": undefined;
-  "server.session.log.stoppedByUser": undefined;
   "server.session.noRoom.farm": { readonly max: string | number };
   "server.session.noRoom.repo": { readonly max: string | number; readonly on: string | number; readonly repo: string | number };
-  "server.session.noRoom.runtime": { readonly max: string | number; readonly on: string | number; readonly runtime: string | number };
-  "server.session.notTaken.checkFix": { readonly reason: string | number };
-  "server.session.notTaken.checkShort": undefined;
-  "server.session.notTaken.conflictNotice": { readonly base: string | number; readonly files: string | number; readonly name: string | number };
-  "server.session.notTaken.conflictShort": { readonly base: string | number; readonly files: string | number };
-  "server.session.notTaken.conflictUser": {
-    readonly base: string | number;
-    readonly brief: string | number;
-    readonly files: string | number;
-    readonly name: string | number;
-  };
-  "server.session.notTaken.notice": { readonly name: string | number; readonly why: string | number };
-  "server.session.notTaken.user": { readonly name: string | number; readonly why: string | number };
-  "server.session.unfinished": undefined;
-  "server.session.usage.cached": {
-    readonly missed: string | number;
-    readonly output: string | number;
-    readonly percent: string | number;
-    readonly read: string | number;
-  };
-  "server.session.usage.changed": { readonly parts: string | number };
-  "server.session.usage.parts.env": undefined;
-  "server.session.usage.parts.instructions": undefined;
-  "server.session.usage.parts.memory": undefined;
-  "server.session.usage.parts.skills": undefined;
-  "server.session.usage.parts.tools": undefined;
-  "server.session.usage.unread": { readonly output: string | number };
   "server.setting.agoraCertificate": undefined;
   "server.setting.agoraId": undefined;
   "server.setting.deepseekKey": undefined;
@@ -10815,7 +8074,6 @@ export interface Messages {
   "server.setting.memory.keySpace": undefined;
   "server.setting.memory.noUrl": undefined;
   "server.setting.memory.twice": { readonly kind: string | number };
-  "server.setting.memory.unknown": { readonly kind: string | number };
   "server.setting.memory.url": undefined;
   "server.setting.notSaved": { readonly file: string | number; readonly why: string | number };
   "server.setting.voice.label.idleSeconds": undefined;
@@ -10829,44 +8087,6 @@ export interface Messages {
   "server.setting.voice.url": undefined;
   "server.setting.voice.voiceId": undefined;
   "server.setting.voiceKeySpace": undefined;
-  "server.tool.about": { readonly about: string | number; readonly label: string | number };
-  "server.tool.labels.artifact_block_create": undefined;
-  "server.tool.labels.artifact_block_delete": undefined;
-  "server.tool.labels.artifact_block_update": undefined;
-  "server.tool.labels.channel_create": undefined;
-  "server.tool.labels.channel_list": undefined;
-  "server.tool.labels.channel_message_list": undefined;
-  "server.tool.labels.channel_message_send": undefined;
-  "server.tool.labels.channel_unread_list": undefined;
-  "server.tool.labels.channel_update": undefined;
-  "server.tool.labels.cron_create": undefined;
-  "server.tool.labels.cron_delete": undefined;
-  "server.tool.labels.cron_list": undefined;
-  "server.tool.labels.issue_comment_create": undefined;
-  "server.tool.labels.issue_create": undefined;
-  "server.tool.labels.issue_diff_get": undefined;
-  "server.tool.labels.issue_get": undefined;
-  "server.tool.labels.issue_list": undefined;
-  "server.tool.labels.issue_review": undefined;
-  "server.tool.labels.issue_split": undefined;
-  "server.tool.labels.issue_status_update": undefined;
-  "server.tool.labels.issue_update": undefined;
-  "server.tool.labels.library_item_add": undefined;
-  "server.tool.labels.library_item_list": undefined;
-  "server.tool.labels.media_image_create": undefined;
-  "server.tool.labels.media_job_cancel": undefined;
-  "server.tool.labels.media_job_download": undefined;
-  "server.tool.labels.media_job_get": undefined;
-  "server.tool.labels.media_job_list": undefined;
-  "server.tool.labels.media_speech_create": undefined;
-  "server.tool.labels.media_understanding_start": undefined;
-  "server.tool.labels.memory_create": undefined;
-  "server.tool.labels.memory_search": undefined;
-  "server.tool.labels.remember": undefined;
-  "server.tool.labels.repo_list": undefined;
-  "server.tool.labels.rewrite_memory": undefined;
-  "server.tool.labels.session_list": undefined;
-  "server.tool.labels.session_stop": undefined;
   "server.voice.connecting": undefined;
   "server.voice.dictation.cut": { readonly why: string | number };
   "server.voice.dictation.empty": undefined;
@@ -10883,7 +8103,6 @@ export interface Messages {
   "server.voice.lineClosed": undefined;
   "server.voice.lineDown": { readonly why: string | number };
   "server.voice.lineFailed": { readonly why: string | number };
-  "server.voice.lineNotOpen": undefined;
   "server.voice.manyCalls": undefined;
   "server.voice.misheard": undefined;
   "server.voice.moss.failed": { readonly why: string | number };
@@ -10900,16 +8119,10 @@ export interface Messages {
   "server.voice.noLlmKey": undefined;
   "server.voice.noToken": { readonly why: string | number };
   "server.voice.noTtsKey": undefined;
-  "server.voice.part.asr": undefined;
-  "server.voice.part.llm": undefined;
-  "server.voice.part.tts": undefined;
   "server.voice.stopped": undefined;
   "server.voice.tunnel.exited": undefined;
   "server.voice.tunnel.missing": undefined;
   "server.voice.tunnel.timedOut": undefined;
-  "server.voice.unknown": { readonly vendor: string | number; readonly what: string | number };
-  "server.voice.unknownSuffix": undefined;
-  "server.voice.unusable": { readonly why: string | number };
   "shared.act.acknowledge": undefined;
   "shared.act.answer": undefined;
   "shared.act.close": undefined;
@@ -10948,9 +8161,7 @@ export interface Messages {
   "shared.delivered.submitted": undefined;
   "shared.doneWith": { readonly what: string | number };
   "shared.greeting": undefined;
-  "shared.join.and": { readonly a: string | number; readonly b: string | number };
   "shared.join.aside": { readonly aside: string | number; readonly text: string | number };
-  "shared.join.clauses": { readonly a: string | number; readonly b: string | number };
   "shared.join.labeled": { readonly label: string | number; readonly text: string | number };
   "shared.join.sentence": { readonly text: string | number };
   "shared.join.separator": undefined;
@@ -11194,8 +8405,6 @@ export interface Messages {
   "web.artifact.issue.title": undefined;
   "web.artifact.page.all": undefined;
   "web.artifact.page.by": { readonly name: string | number };
-  "web.artifact.page.copied": undefined;
-  "web.artifact.page.copyLink": undefined;
   "web.artifact.page.delete": undefined;
   "web.artifact.page.deleteAsk": { readonly title: string | number };
   "web.artifact.page.deleted": { readonly title: string | number };
@@ -11210,7 +8419,6 @@ export interface Messages {
   "web.artifact.page.new": undefined;
   "web.artifact.page.none": undefined;
   "web.artifact.page.nothingFound": undefined;
-  "web.artifact.page.open": undefined;
   "web.artifact.page.rail": undefined;
   "web.artifact.page.railHide": undefined;
   "web.artifact.page.railShow": undefined;
@@ -11229,10 +8437,8 @@ export interface Messages {
   "web.artifact.presenter.noNotes": undefined;
   "web.artifact.presenter.notes": undefined;
   "web.artifact.presenter.restart": undefined;
-  "web.artifact.presenter.title": { readonly title: string | number };
   "web.artifact.slides.at": { readonly at: string | number; readonly pages: string | number };
   "web.artifact.slides.next": undefined;
-  "web.artifact.slides.pdf": undefined;
   "web.artifact.slides.present": undefined;
   "web.artifact.slides.presenter": undefined;
   "web.artifact.slides.previous": undefined;
@@ -11291,8 +8497,6 @@ export interface Messages {
   "web.audio.dialogue": undefined;
   "web.audio.diarize": undefined;
   "web.audio.downloadAudio": undefined;
-  "web.audio.downloadPartialTranscript": undefined;
-  "web.audio.downloadTranscript": undefined;
   "web.audio.empty": undefined;
   "web.audio.emptyVoices": undefined;
   "web.audio.execution": undefined;
@@ -11300,28 +8504,16 @@ export interface Messages {
   "web.audio.executionHint": undefined;
   "web.audio.executionStreaming": undefined;
   "web.audio.first": undefined;
-  "web.audio.flashConnecting": undefined;
-  "web.audio.flashDeviceChanged": undefined;
-  "web.audio.flashDone": undefined;
   "web.audio.flashDraining": undefined;
-  "web.audio.flashIdle": undefined;
-  "web.audio.flashIncomplete": undefined;
-  "web.audio.flashInvalid": undefined;
   "web.audio.flashNotice": undefined;
-  "web.audio.flashPlaying": undefined;
-  "web.audio.flashProgress": { readonly played: string | number; readonly received: string | number };
   "web.audio.flashStart": undefined;
   "web.audio.flashStop": undefined;
-  "web.audio.flashStopped": undefined;
   "web.audio.flashTitle": undefined;
-  "web.audio.flashUnavailable": undefined;
-  "web.audio.flashUnsupported": undefined;
   "web.audio.format": undefined;
   "web.audio.generate": undefined;
   "web.audio.history": undefined;
   "web.audio.input": undefined;
   "web.audio.instructions": undefined;
-  "web.audio.localPlayback": undefined;
   "web.audio.metadataBits": { readonly value: string | number };
   "web.audio.metadataChannels": { readonly value: string | number };
   "web.audio.metadataDuration": { readonly value: string | number };
@@ -11337,7 +8529,6 @@ export interface Messages {
   "web.audio.partialTitle": undefined;
   "web.audio.partialTranscript": undefined;
   "web.audio.pending": undefined;
-  "web.audio.playbackUnsupported": undefined;
   "web.audio.preview": undefined;
   "web.audio.previewText": undefined;
   "web.audio.queryHint": undefined;
@@ -11349,7 +8540,6 @@ export interface Messages {
   "web.audio.saveTranscript": undefined;
   "web.audio.saveVoice": undefined;
   "web.audio.savedVoice": { readonly voice: string | number };
-  "web.audio.seek": { readonly time: string | number };
   "web.audio.speaker": undefined;
   "web.audio.speakerHint": undefined;
   "web.audio.speakerTitle": undefined;
@@ -11464,8 +8654,6 @@ export interface Messages {
   "web.base.rich.longLess": undefined;
   "web.base.rich.longMore": undefined;
   "web.base.rich.more": undefined;
-  "web.base.rich.taskDone": undefined;
-  "web.base.rich.taskOpen": undefined;
   "web.base.route.home": undefined;
   "web.base.route.invalid": undefined;
   "web.base.route.missing": undefined;
@@ -11541,8 +8729,6 @@ export interface Messages {
   "web.base.time.yesterday": undefined;
   "web.base.toasts": undefined;
   "web.base.unreachable": undefined;
-  "web.base.update": undefined;
-  "web.base.updateReady": { readonly next: string | number };
   "web.base.user": undefined;
   "web.base.working": { readonly n: string | number };
   "web.base.write": undefined;
@@ -11654,7 +8840,6 @@ export interface Messages {
   "web.channel.composer.replying": { readonly name: string | number };
   "web.channel.composer.send": undefined;
   "web.channel.composer.sendHint": undefined;
-  "web.channel.composer.stop": undefined;
   "web.channel.composer.stopHint": undefined;
   "web.channel.composer.uploadFailed": { readonly why: string | number };
   "web.channel.composer.who": undefined;
@@ -11669,7 +8854,6 @@ export interface Messages {
   "web.channel.crons.on": undefined;
   "web.channel.crons.refuse": undefined;
   "web.channel.crons.refuseWhich": { readonly name: string | number };
-  "web.channel.crons.remove": undefined;
   "web.channel.crons.removeWhich": { readonly name: string | number };
   "web.channel.crons.sure": undefined;
   "web.channel.defaultHint": undefined;
@@ -11816,7 +9000,6 @@ export interface Messages {
   "web.channel.side": undefined;
   "web.channel.switcher.direct": undefined;
   "web.channel.switcher.hint": undefined;
-  "web.channel.switcher.keys": { readonly mac: boolean };
   "web.channel.switcher.newDirect": undefined;
   "web.channel.switcher.none": undefined;
   "web.channel.switcher.note": { readonly tier: string | number };
@@ -11903,300 +9086,10 @@ export interface Messages {
   "web.connector.connectors.user": undefined;
   "web.connector.connectors.weixinIntro": undefined;
   "web.connector.connectors.whichChannel": undefined;
-  "web.farm.achievements.category.craft": undefined;
-  "web.farm.achievements.category.harvest": undefined;
-  "web.farm.achievements.category.secret": undefined;
-  "web.farm.achievements.category.starter": undefined;
-  "web.farm.achievements.category.team": undefined;
-  "web.farm.achievements.category.thrift": undefined;
-  "web.farm.achievements.clearAt": { readonly level: string | number };
-  "web.farm.achievements.clearing": undefined;
-  "web.farm.achievements.coinsOnMerge": undefined;
-  "web.farm.achievements.day": { readonly day: string | number; readonly month: string | number };
-  "web.farm.achievements.done": undefined;
-  "web.farm.achievements.earnFirst": undefined;
-  "web.farm.achievements.earned": { readonly day: string | number };
-  "web.farm.achievements.earnedTier": { readonly day: string | number; readonly tier: string | number };
-  "web.farm.achievements.none": undefined;
-  "web.farm.achievements.perStarter": { readonly coins: string | number };
-  "web.farm.achievements.pick": undefined;
-  "web.farm.achievements.secrets": { readonly n: string | number };
-  "web.farm.achievements.secretsLine": undefined;
-  "web.farm.achievements.starter": { readonly done: string | number; readonly of: string | number };
-  "web.farm.achievements.starterDone": undefined;
-  "web.farm.achievements.streak": { readonly multiplier: string | number; readonly n: string | number };
-  "web.farm.achievements.tier.1": undefined;
-  "web.farm.achievements.tier.2": undefined;
-  "web.farm.achievements.tier.3": undefined;
-  "web.farm.achievements.tiers": { readonly of: string | number; readonly tier: string | number };
-  "web.farm.achievements.title": undefined;
-  "web.farm.achievements.titles": undefined;
-  "web.farm.achievements.toLevel": { readonly left: string | number; readonly total: string | number };
-  "web.farm.achievements.toNext": undefined;
-  "web.farm.achievements.toTier": { readonly tier: string | number };
-  "web.farm.achievements.worn": undefined;
-  "web.farm.aim.bug": undefined;
-  "web.farm.aim.clearAt": { readonly level: string | number };
-  "web.farm.aim.flowerbed": undefined;
-  "web.farm.aim.harvestLook": undefined;
-  "web.farm.aim.harvestRipe": undefined;
-  "web.farm.aim.look": undefined;
-  "web.farm.aim.noBugs": undefined;
-  "web.farm.aim.noShovel": undefined;
-  "web.farm.aim.noWeeds": undefined;
-  "web.farm.aim.nothingToHarvest": undefined;
-  "web.farm.aim.nothingYet": undefined;
-  "web.farm.aim.shovelDismiss": undefined;
-  "web.farm.aim.shovelStop": undefined;
-  "web.farm.aim.sow": undefined;
-  "web.farm.aim.unavailable": { readonly state: string | number };
-  "web.farm.aim.unread": undefined;
-  "web.farm.aim.water": { readonly name: string | number };
-  "web.farm.aim.weeds": undefined;
-  "web.farm.binary": undefined;
-  "web.farm.canvas.entering": undefined;
-  "web.farm.canvas.label": undefined;
-  "web.farm.canvas.lights": undefined;
-  "web.farm.canvas.map": undefined;
-  "web.farm.canvas.moving": { readonly done: string | number; readonly total: string | number };
-  "web.farm.canvas.noMap": { readonly why: string | number };
-  "web.farm.chat.actions.cancelReply": undefined;
-  "web.farm.chat.actions.copied": undefined;
-  "web.farm.chat.actions.copyLink": undefined;
-  "web.farm.chat.actions.edit": undefined;
-  "web.farm.chat.actions.editHint": undefined;
-  "web.farm.chat.actions.moreEmoji": undefined;
-  "web.farm.chat.actions.open": undefined;
-  "web.farm.chat.actions.react": undefined;
-  "web.farm.chat.actions.remove": undefined;
-  "web.farm.chat.actions.reply": undefined;
-  "web.farm.chat.actions.sure": undefined;
-  "web.farm.chat.anyone": undefined;
-  "web.farm.chat.back": { readonly channel: string | number };
-  "web.farm.chat.back2": undefined;
-  "web.farm.chat.captions": undefined;
-  "web.farm.chat.channel": { readonly channel: string | number };
-  "web.farm.chat.channels": undefined;
-  "web.farm.chat.deleted": undefined;
-  "web.farm.chat.description": undefined;
-  "web.farm.chat.descriptionHint": undefined;
-  "web.farm.chat.directs": undefined;
-  "web.farm.chat.dispatch": undefined;
-  "web.farm.chat.done": undefined;
-  "web.farm.chat.dropSend": undefined;
-  "web.farm.chat.edited": undefined;
-  "web.farm.chat.enlarge": undefined;
-  "web.farm.chat.fold": undefined;
-  "web.farm.chat.foldDispatch": undefined;
-  "web.farm.chat.gotIt": undefined;
-  "web.farm.chat.greeting": undefined;
-  "web.farm.chat.inThread": { readonly name: string | number };
-  "web.farm.chat.inThreadAnyone": undefined;
-  "web.farm.chat.label": undefined;
-  "web.farm.chat.less": undefined;
-  "web.farm.chat.more": undefined;
-  "web.farm.chat.name": undefined;
-  "web.farm.chat.nameHint": undefined;
-  "web.farm.chat.newChannel": undefined;
-  "web.farm.chat.newChannelLine": undefined;
-  "web.farm.chat.newCount": { readonly n: string | number };
-  "web.farm.chat.newIn": { readonly n: string | number };
-  "web.farm.chat.newInChannel": { readonly channel: string | number };
-  "web.farm.chat.newInThread": undefined;
-  "web.farm.chat.noVoice": { readonly why: string | number };
-  "web.farm.chat.nobodyOnIt": undefined;
-  "web.farm.chat.notSent": { readonly why: string | number };
-  "web.farm.chat.notSentLine": undefined;
-  "web.farm.chat.older": undefined;
-  "web.farm.chat.open": undefined;
-  "web.farm.chat.pageAndSchedules": undefined;
-  "web.farm.chat.phase.connecting": undefined;
-  "web.farm.chat.phase.error": undefined;
-  "web.farm.chat.phase.listening": undefined;
-  "web.farm.chat.phase.off": undefined;
-  "web.farm.chat.phase.speaking": undefined;
-  "web.farm.chat.phase.thinking": undefined;
-  "web.farm.chat.replies": { readonly n: number };
-  "web.farm.chat.replyTo": { readonly name: string | number };
-  "web.farm.chat.replyToText": { readonly name: string | number; readonly text: string | number };
-  "web.farm.chat.repo": undefined;
-  "web.farm.chat.repoHint": undefined;
-  "web.farm.chat.repoNone": undefined;
-  "web.farm.chat.repoTag": { readonly repo: string | number };
-  "web.farm.chat.restore": undefined;
-  "web.farm.chat.retrySend": undefined;
-  "web.farm.chat.save": undefined;
-  "web.farm.chat.send": undefined;
-  "web.farm.chat.sendTo": { readonly name: string | number };
-  "web.farm.chat.sending": undefined;
-  "web.farm.chat.settings": undefined;
-  "web.farm.chat.settingsLink": undefined;
-  "web.farm.chat.settingsOf": { readonly channel: string | number };
-  "web.farm.chat.speaking": undefined;
-  "web.farm.chat.spent": { readonly spent: string | number };
-  "web.farm.chat.stop": undefined;
-  "web.farm.chat.stopHint": undefined;
-  "web.farm.chat.suggestions.0": undefined;
-  "web.farm.chat.suggestions.1": undefined;
-  "web.farm.chat.suggestions.2": undefined;
-  "web.farm.chat.suggestions.3": undefined;
-  "web.farm.chat.thread": undefined;
-  "web.farm.chat.threadEmpty": undefined;
-  "web.farm.chat.toOrchestrator": undefined;
-  "web.farm.chat.toOrchestratorAlone": undefined;
-  "web.farm.chat.unfoldDispatch": undefined;
-  "web.farm.chat.unread": { readonly why: string | number };
-  "web.farm.chat.what": undefined;
-  "web.farm.chat.who": undefined;
-  "web.farm.command.cannot": { readonly act: string | number };
-  "web.farm.command.changed": undefined;
-  "web.farm.command.noShovel": undefined;
-  "web.farm.command.stored": undefined;
-  "web.farm.conflictTag": undefined;
-  "web.farm.crop.dry": undefined;
-  "web.farm.crop.empty": undefined;
-  "web.farm.crop.flowering": undefined;
-  "web.farm.crop.harvested": undefined;
-  "web.farm.crop.leafy": undefined;
-  "web.farm.crop.locked": undefined;
-  "web.farm.crop.seeded": undefined;
-  "web.farm.crop.sprout": undefined;
-  "web.farm.crop.weeds": undefined;
-  "web.farm.crop.wheat": undefined;
-  "web.farm.crop.withered": undefined;
-  "web.farm.debug.achievement": undefined;
-  "web.farm.debug.all": undefined;
-  "web.farm.debug.call": undefined;
-  "web.farm.debug.clear": undefined;
-  "web.farm.debug.close": undefined;
-  "web.farm.debug.copy": undefined;
-  "web.farm.debug.dismiss": undefined;
-  "web.farm.debug.dismissAll": undefined;
-  "web.farm.debug.frames": { readonly n: string | number };
-  "web.farm.debug.halt": undefined;
-  "web.farm.debug.haltAll": undefined;
-  "web.farm.debug.helpers": { readonly n: string | number };
-  "web.farm.debug.levelUp": undefined;
-  "web.farm.debug.nobody": undefined;
-  "web.farm.debug.open": undefined;
-  "web.farm.debug.pause": undefined;
-  "web.farm.debug.progress": undefined;
-  "web.farm.debug.resume": undefined;
-  "web.farm.debug.sky": undefined;
-  "web.farm.debug.stop": undefined;
-  "web.farm.debug.time": undefined;
-  "web.farm.debug.title": undefined;
-  "web.farm.friends.disabled": undefined;
-  "web.farm.friends.energy": { readonly short: string | number };
-  "web.farm.friends.helpers": undefined;
-  "web.farm.friends.pick": undefined;
-  "web.farm.friends.profile": undefined;
-  "web.farm.friends.status.away": undefined;
-  "web.farm.friends.status.bug": undefined;
-  "web.farm.friends.status.busy": undefined;
-  "web.farm.friends.status.rest": undefined;
-  "web.farm.friends.status.ripe": undefined;
-  "web.farm.friends.tally": { readonly harvested: string | number; readonly hired: string | number };
-  "web.farm.friends.unpick": undefined;
-  "web.farm.fx.cleared": undefined;
-  "web.farm.fx.coins": { readonly coins: string | number; readonly detail: string | number };
-  "web.farm.fx.level": { readonly level: string | number };
-  "web.farm.fx.levelUp": { readonly level: string | number };
-  "web.farm.fx.notice": undefined;
-  "web.farm.graph.commits": undefined;
-  "web.farm.graph.unreadable": undefined;
-  "web.farm.harvest.behind": { readonly base: string | number; readonly n: string | number };
-  "web.farm.harvest.conflict": { readonly base: string | number };
-  "web.farm.harvest.counts": { readonly commits: string | number; readonly files: string | number };
-  "web.farm.harvest.empty": undefined;
-  "web.farm.harvest.files": undefined;
-  "web.farm.harvest.letGo": undefined;
-  "web.farm.harvest.none": undefined;
-  "web.farm.harvest.reading": undefined;
-  "web.farm.harvest.repo": { readonly repo: string | number };
-  "web.farm.harvest.resolve": undefined;
-  "web.farm.harvest.resolveHow": { readonly base: string | number };
-  "web.farm.harvest.take": { readonly base: string | number };
-  "web.farm.harvest.taken": { readonly ago: string | number };
-  "web.farm.harvest.uncommitted": { readonly n: string | number };
-  "web.farm.hud.channelsUnread": { readonly n: string | number };
-  "web.farm.hud.label": undefined;
-  "web.farm.hud.look": undefined;
-  "web.farm.hud.map": undefined;
-  "web.farm.hud.mapHint": undefined;
-  "web.farm.hud.menuHint": undefined;
-  "web.farm.hud.toLevel": { readonly need: string | number; readonly xp: string | number };
-  "web.farm.hud.toLevelNext": { readonly need: string | number; readonly next: string | number; readonly xp: string | number };
-  "web.farm.hud.tools": undefined;
-  "web.farm.hud.tree": undefined;
-  "web.farm.hud.treeHint": undefined;
-  "web.farm.hud.workbench": undefined;
-  "web.farm.hud.workbenchHint": undefined;
-  "web.farm.log.answered": undefined;
-  "web.farm.log.empty": undefined;
-  "web.farm.log.said": undefined;
-  "web.farm.log.spent": { readonly spent: string | number };
-  "web.farm.log.you": undefined;
-  "web.farm.map.canSend": { readonly n: string | number; readonly of: string | number };
-  "web.farm.map.crop.day": undefined;
-  "web.farm.map.crop.month": undefined;
-  "web.farm.map.crop.never": undefined;
-  "web.farm.map.crop.older": undefined;
-  "web.farm.map.crop.quarter": undefined;
-  "web.farm.map.crop.week": undefined;
-  "web.farm.map.enter": { readonly repo: string | number };
-  "web.farm.map.enterWord": undefined;
-  "web.farm.map.finding": undefined;
-  "web.farm.map.full": { readonly n: string | number };
-  "web.farm.map.gone": undefined;
-  "web.farm.map.growth": { readonly label: string | number };
-  "web.farm.map.growthSince": { readonly label: string | number; readonly since: string | number };
-  "web.farm.map.homeless": undefined;
-  "web.farm.map.island.branch": { readonly branch: string | number };
-  "web.farm.map.island.gone": undefined;
-  "web.farm.map.island.open": undefined;
-  "web.farm.map.island.queued": { readonly n: string | number };
-  "web.farm.map.island.shut": { readonly n: string | number };
-  "web.farm.map.island.working": { readonly full: boolean; readonly n: string | number; readonly of: string | number };
-  "web.farm.map.islands": { readonly n: number };
-  "web.farm.map.job": undefined;
-  "web.farm.map.jobExample": undefined;
-  "web.farm.map.locked": undefined;
-  "web.farm.map.noHelpers": undefined;
-  "web.farm.map.noMore": undefined;
-  "web.farm.map.notDrafted": { readonly why: string | number };
-  "web.farm.map.open": { readonly repo: string | number };
-  "web.farm.map.peopled": { readonly n: string | number };
-  "web.farm.map.plot": { readonly name: string | number };
-  "web.farm.map.queue": { readonly n: string | number };
-  "web.farm.map.queued": { readonly n: string | number };
-  "web.farm.map.queuedLabel": { readonly title: string | number };
-  "web.farm.map.queuedTip": { readonly title: string | number };
-  "web.farm.map.sack": undefined;
-  "web.farm.map.sea": undefined;
-  "web.farm.map.see": undefined;
-  "web.farm.map.send": { readonly repo: string | number };
-  "web.farm.map.shut": { readonly n: string | number };
-  "web.farm.map.sow": undefined;
-  "web.farm.map.sowIntro": { readonly repo: string | number };
-  "web.farm.map.stake": undefined;
-  "web.farm.map.todo": undefined;
-  "web.farm.map.wait": undefined;
-  "web.farm.map.working": { readonly n: string | number; readonly of: string | number };
-  "web.farm.map.worktrees": { readonly n: string | number };
   "web.farm.menu.agents": undefined;
-  "web.farm.menu.catalog": undefined;
-  "web.farm.menu.chat": undefined;
-  "web.farm.menu.connectors": undefined;
-  "web.farm.menu.elsewhere": undefined;
   "web.farm.menu.issues": undefined;
-  "web.farm.menu.repos": undefined;
-  "web.farm.menu.resume": undefined;
   "web.farm.menu.runtimes": undefined;
   "web.farm.menu.skills": undefined;
-  "web.farm.menu.soundOff": undefined;
-  "web.farm.menu.soundOn": undefined;
-  "web.farm.menu.yard": undefined;
   "web.farm.native.accepted": undefined;
   "web.farm.native.achievements": undefined;
   "web.farm.native.chat": undefined;
@@ -12230,280 +9123,18 @@ export interface Messages {
   "web.farm.native.warehouse": undefined;
   "web.farm.native.workbench": undefined;
   "web.farm.native.workers": { readonly count: string | number };
-  "web.farm.notNow": undefined;
-  "web.farm.orchestrator": undefined;
-  "web.farm.overlay.bare": { readonly plot: string | number };
-  "web.farm.overlay.clearAt": { readonly level: string | number };
-  "web.farm.overlay.click": { readonly text: string | number };
-  "web.farm.overlay.flowerbed": undefined;
-  "web.farm.overlay.idle": undefined;
-  "web.farm.overlay.unclaimed": undefined;
-  "web.farm.page.lost": undefined;
-  "web.farm.page.waiting": undefined;
-  "web.farm.panel.drawing": undefined;
   "web.farm.panel.graphs": undefined;
-  "web.farm.panel.harvest": { readonly name: string | number };
   "web.farm.panel.log": undefined;
-  "web.farm.panel.menu": undefined;
   "web.farm.panel.orchestrator": undefined;
-  "web.farm.panel.pets": undefined;
-  "web.farm.panel.pickLook": undefined;
   "web.farm.panel.shop": undefined;
   "web.farm.panel.shopClosed": { readonly coins: string | number };
-  "web.farm.panel.shopItems.bunting.name": undefined;
-  "web.farm.panel.shopItems.bunting.note": undefined;
-  "web.farm.panel.shopItems.doghouse.name": undefined;
-  "web.farm.panel.shopItems.doghouse.note": undefined;
-  "web.farm.panel.shopItems.scarecrow.name": undefined;
-  "web.farm.panel.shopItems.scarecrow.note": undefined;
-  "web.farm.panel.shopItems.seeds.name": undefined;
-  "web.farm.panel.shopItems.seeds.note": undefined;
-  "web.farm.panel.sow": { readonly plot: string | number };
   "web.farm.panel.warehouse": undefined;
-  "web.farm.panel.water": { readonly name: string | number };
-  "web.farm.phone.again": undefined;
-  "web.farm.phone.answer": undefined;
-  "web.farm.phone.answered": undefined;
-  "web.farm.phone.app.channels": undefined;
-  "web.farm.phone.app.games": undefined;
-  "web.farm.phone.app.missed": undefined;
-  "web.farm.phone.blocks.best": undefined;
-  "web.farm.phone.blocks.help": undefined;
-  "web.farm.phone.blocks.help2": undefined;
-  "web.farm.phone.blocks.help3": undefined;
-  "web.farm.phone.blocks.level": undefined;
-  "web.farm.phone.blocks.lines": undefined;
-  "web.farm.phone.blocks.next": undefined;
-  "web.farm.phone.blocks.noRoom": undefined;
-  "web.farm.phone.blocks.score": undefined;
-  "web.farm.phone.blocks.well": undefined;
-  "web.farm.phone.brand": undefined;
-  "web.farm.phone.bugs.ended.full": undefined;
-  "web.farm.phone.bugs.ended.self": undefined;
-  "web.farm.phone.bugs.ended.wall": undefined;
-  "web.farm.phone.bugs.field": undefined;
-  "web.farm.phone.bugs.help": undefined;
-  "web.farm.phone.bugs.help2": undefined;
-  "web.farm.phone.bugs.tally": { readonly bugs: string | number; readonly seeds: string | number };
-  "web.farm.phone.callOrchestrator": undefined;
-  "web.farm.phone.chatTab": undefined;
-  "web.farm.phone.decline": undefined;
-  "web.farm.phone.declined": undefined;
-  "web.farm.phone.dino.crashed": undefined;
-  "web.farm.phone.dino.help": undefined;
-  "web.farm.phone.dino.help2": undefined;
-  "web.farm.phone.dino.road": undefined;
-  "web.farm.phone.game.blocks": undefined;
-  "web.farm.phone.game.bugs": undefined;
-  "web.farm.phone.game.dino": undefined;
-  "web.farm.phone.game.merge": undefined;
-  "web.farm.phone.game.sokoban": undefined;
-  "web.farm.phone.hangUp": undefined;
-  "web.farm.phone.home": undefined;
-  "web.farm.phone.homeHint": undefined;
-  "web.farm.phone.key.down": undefined;
-  "web.farm.phone.key.left": undefined;
-  "web.farm.phone.key.right": undefined;
-  "web.farm.phone.key.up": undefined;
-  "web.farm.phone.label": undefined;
-  "web.farm.phone.log": undefined;
-  "web.farm.phone.manager": undefined;
-  "web.farm.phone.merge.field": { readonly n: string | number; readonly top: string | number };
-  "web.farm.phone.merge.full": { readonly score: string | number };
-  "web.farm.phone.merge.goOn": undefined;
-  "web.farm.phone.merge.harvest": undefined;
-  "web.farm.phone.merge.help": undefined;
-  "web.farm.phone.merge.help2": undefined;
-  "web.farm.phone.merge.overKeys": undefined;
-  "web.farm.phone.merge.past": { readonly n: string | number };
-  "web.farm.phone.merge.reached": { readonly stage: string | number };
-  "web.farm.phone.merge.restartAsk": undefined;
-  "web.farm.phone.merge.restartKeys": undefined;
-  "web.farm.phone.merge.stage.0": undefined;
-  "web.farm.phone.merge.stage.1": undefined;
-  "web.farm.phone.merge.stage.10": undefined;
-  "web.farm.phone.merge.stage.2": undefined;
-  "web.farm.phone.merge.stage.3": undefined;
-  "web.farm.phone.merge.stage.4": undefined;
-  "web.farm.phone.merge.stage.5": undefined;
-  "web.farm.phone.merge.stage.6": undefined;
-  "web.farm.phone.merge.stage.7": undefined;
-  "web.farm.phone.merge.stage.8": undefined;
-  "web.farm.phone.merge.stage.9": undefined;
-  "web.farm.phone.merge.stages": undefined;
-  "web.farm.phone.merge.start": undefined;
-  "web.farm.phone.missed": { readonly n: string | number };
-  "web.farm.phone.new": undefined;
-  "web.farm.phone.noCalls": undefined;
-  "web.farm.phone.noMissed": undefined;
-  "web.farm.phone.openChat": undefined;
-  "web.farm.phone.openChatUnread": { readonly n: string | number };
-  "web.farm.phone.paused": undefined;
-  "web.farm.phone.phase.coming": undefined;
-  "web.farm.phone.phase.connecting": undefined;
-  "web.farm.phone.phase.ending": undefined;
-  "web.farm.phone.phase.failed": { readonly why: string | number };
-  "web.farm.phone.phase.idle": undefined;
-  "web.farm.phone.phase.live": undefined;
-  "web.farm.phone.phone": undefined;
-  "web.farm.phone.phoneMissed": { readonly n: string | number };
-  "web.farm.phone.phoneRinging": undefined;
-  "web.farm.phone.phoneUnread": { readonly n: string | number };
-  "web.farm.phone.pressA": { readonly what: string | number };
-  "web.farm.phone.resume": undefined;
-  "web.farm.phone.ring": undefined;
-  "web.farm.phone.ringing": undefined;
-  "web.farm.phone.sokoban.again": undefined;
-  "web.farm.phone.sokoban.allIn": undefined;
-  "web.farm.phone.sokoban.board": { readonly of: string | number; readonly placed: string | number };
-  "web.farm.phone.sokoban.done": undefined;
-  "web.farm.phone.sokoban.goal": undefined;
-  "web.farm.phone.sokoban.help": undefined;
-  "web.farm.phone.sokoban.levels.0": undefined;
-  "web.farm.phone.sokoban.levels.1": undefined;
-  "web.farm.phone.sokoban.levels.2": undefined;
-  "web.farm.phone.sokoban.levels.3": undefined;
-  "web.farm.phone.sokoban.levels.4": undefined;
-  "web.farm.phone.sokoban.moves": { readonly moves: string | number; readonly pushes: string | number };
-  "web.farm.phone.sokoban.next": undefined;
-  "web.farm.phone.sokoban.restart": undefined;
-  "web.farm.phone.sokoban.title": { readonly level: string | number; readonly of: string | number };
-  "web.farm.phone.sokoban.undo": undefined;
-  "web.farm.phone.start": undefined;
-  "web.farm.plot.answer": undefined;
-  "web.farm.plot.answerTo": { readonly question: string | number };
-  "web.farm.plot.branch": undefined;
-  "web.farm.plot.changesUnread": undefined;
-  "web.farm.plot.closed": undefined;
-  "web.farm.plot.conclusion": undefined;
-  "web.farm.plot.conflict": { readonly base: string | number; readonly files: string | number };
-  "web.farm.plot.copyPath": undefined;
-  "web.farm.plot.crew": undefined;
-  "web.farm.plot.deliver": undefined;
-  "web.farm.plot.details": undefined;
-  "web.farm.plot.evidence": { readonly line: string | number };
-  "web.farm.plot.failed": undefined;
-  "web.farm.plot.history": undefined;
-  "web.farm.plot.job": undefined;
-  "web.farm.plot.letGo": undefined;
-  "web.farm.plot.made": undefined;
-  "web.farm.plot.madeFiles": { readonly n: string | number };
-  "web.farm.plot.madeNothing": undefined;
-  "web.farm.plot.model": undefined;
-  "web.farm.plot.moreFiles": { readonly n: string | number };
-  "web.farm.plot.moveAgain": undefined;
-  "web.farm.plot.moving": undefined;
-  "web.farm.plot.next": { readonly line: string | number };
-  "web.farm.plot.noCriteria": { readonly answer: boolean };
-  "web.farm.plot.noRuns": undefined;
-  "web.farm.plot.notMoved": undefined;
-  "web.farm.plot.notSaid": undefined;
-  "web.farm.plot.now": undefined;
-  "web.farm.plot.onBoard": undefined;
-  "web.farm.plot.opened": undefined;
-  "web.farm.plot.progress": undefined;
-  "web.farm.plot.progressMet": { readonly met: string | number; readonly of: string | number };
-  "web.farm.plot.rejectLabel": undefined;
-  "web.farm.plot.rejectWhere": undefined;
-  "web.farm.plot.rejected": { readonly text: string | number };
-  "web.farm.plot.reopen": undefined;
-  "web.farm.plot.reopenWhat": undefined;
-  "web.farm.plot.result.met": undefined;
-  "web.farm.plot.result.unmet": undefined;
-  "web.farm.plot.result.unsure": undefined;
-  "web.farm.plot.reviewed": { readonly clock: string | number };
-  "web.farm.plot.runCount": { readonly n: number };
-  "web.farm.plot.runs": undefined;
-  "web.farm.plot.sayAgain": undefined;
-  "web.farm.plot.sayIt": undefined;
-  "web.farm.plot.sending": undefined;
-  "web.farm.plot.steps": undefined;
-  "web.farm.plot.story": undefined;
-  "web.farm.plot.takeBack": undefined;
-  "web.farm.plot.tell": { readonly who: string | number };
-  "web.farm.plot.tellIdle": undefined;
-  "web.farm.plot.tellWorking": undefined;
-  "web.farm.plot.thread": undefined;
-  "web.farm.plot.ticked": undefined;
-  "web.farm.plot.took": undefined;
-  "web.farm.plot.unread": undefined;
-  "web.farm.plot.weed": { readonly text: string | number };
-  "web.farm.plot.weeded": undefined;
-  "web.farm.plot.where": { readonly plot: string | number; readonly round: string | number };
-  "web.farm.plot.who": undefined;
-  "web.farm.plot.yours": undefined;
-  "web.farm.plotOf": { readonly name: string | number };
-  "web.farm.quota.all": undefined;
-  "web.farm.quota.balance": { readonly enough: boolean; readonly provider: string | number };
-  "web.farm.quota.left": undefined;
-  "web.farm.quota.lowest": { readonly pct: string | number };
-  "web.farm.quota.note": undefined;
-  "web.farm.quota.quota": undefined;
-  "web.farm.quota.refresh": undefined;
-  "web.farm.quota.signedOut": undefined;
-  "web.farm.quota.spentToday": { readonly spent: string | number };
-  "web.farm.quota.spentTodayBudget": { readonly budget: string | number; readonly spent: string | number };
-  "web.farm.quota.unreadable": { readonly why: string | number };
-  "web.farm.quota.unreported": undefined;
-  "web.farm.reading": undefined;
-  "web.farm.sign.hint": undefined;
-  "web.farm.sign.label": { readonly repo: string | number };
-  "web.farm.sign.noRepo": undefined;
-  "web.farm.sign.repo": undefined;
-  "web.farm.sow.draft": undefined;
-  "web.farm.sow.homeless": undefined;
-  "web.farm.sow.how": { readonly repo: string | number };
-  "web.farm.sow.job": undefined;
-  "web.farm.sow.jobHint": undefined;
-  "web.farm.sow.kinds": undefined;
-  "web.farm.sow.makeRepo": undefined;
-  "web.farm.sow.map": undefined;
-  "web.farm.sow.noRepos": undefined;
-  "web.farm.sow.noSeeds": undefined;
-  "web.farm.sow.notDrafted": undefined;
-  "web.farm.sow.orchestratorPicks": undefined;
-  "web.farm.sow.own": undefined;
-  "web.farm.sow.plantIn": { readonly repo: string | number };
-  "web.farm.sow.recent": undefined;
-  "web.farm.sow.retry": undefined;
-  "web.farm.sow.rummaging": undefined;
-  "web.farm.sow.start": undefined;
-  "web.farm.sow.toMap": undefined;
-  "web.farm.sow.who": undefined;
   "web.farm.tool.bug.hint": undefined;
-  "web.farm.tool.bug.label": undefined;
   "web.farm.tool.hand.hint": undefined;
-  "web.farm.tool.hand.label": undefined;
   "web.farm.tool.harvest.hint": undefined;
-  "web.farm.tool.harvest.label": undefined;
   "web.farm.tool.shovel.hint": undefined;
-  "web.farm.tool.shovel.label": undefined;
   "web.farm.tool.water.hint": undefined;
   "web.farm.tool.weed.hint": undefined;
-  "web.farm.tool.weed.label": undefined;
-  "web.farm.unread": undefined;
-  "web.farm.water.drops.0": undefined;
-  "web.farm.water.drops.1": undefined;
-  "web.farm.water.drops.2": undefined;
-  "web.farm.water.drops.3": undefined;
-  "web.farm.water.hint": undefined;
-  "web.farm.water.idle": undefined;
-  "web.farm.water.job": { readonly brief: string | number };
-  "web.farm.water.moved": undefined;
-  "web.farm.water.thread": undefined;
-  "web.farm.water.water": undefined;
-  "web.farm.water.working": undefined;
-  "web.farm.yard.agents.hint": undefined;
-  "web.farm.yard.log.hint": undefined;
-  "web.farm.yard.manager.hint": undefined;
-  "web.farm.yard.runtimes.hint": undefined;
-  "web.farm.yard.runtimes.label": undefined;
-  "web.farm.yard.shop.hint": undefined;
-  "web.farm.yard.skills.hint": undefined;
-  "web.farm.yard.skills.label": undefined;
-  "web.farm.yard.taskBoard.hint": undefined;
-  "web.farm.yard.tasks.hint": undefined;
-  "web.farm.yard.warehouse.hint": undefined;
   "web.inbox.tray.idle": undefined;
   "web.inbox.tray.off": undefined;
   "web.inbox.tray.unread": { readonly n: string | number };
@@ -12831,14 +9462,12 @@ export interface Messages {
   "web.library.from.generated": { readonly job: string | number };
   "web.library.from.uploadedHere": undefined;
   "web.library.from.uploadedIn": { readonly channel: string | number };
-  "web.library.grid": undefined;
   "web.library.hint": undefined;
   "web.library.inspector.added": undefined;
   "web.library.inspector.bytes": undefined;
   "web.library.inspector.clear": undefined;
   "web.library.inspector.from": undefined;
   "web.library.inspector.kind": undefined;
-  "web.library.inspector.label": undefined;
   "web.library.inspector.length": undefined;
   "web.library.inspector.more": undefined;
   "web.library.inspector.openChannel": { readonly channel: string | number };
@@ -12872,7 +9501,6 @@ export interface Messages {
   "web.library.rail.anyWhere": undefined;
   "web.library.rail.channels": undefined;
   "web.library.rail.kind": undefined;
-  "web.library.rail.label": undefined;
   "web.library.rail.where": undefined;
   "web.library.remove": undefined;
   "web.library.removeAsk": { readonly name: string | number };
@@ -12904,7 +9532,6 @@ export interface Messages {
   "web.media.guidance": undefined;
   "web.media.height": undefined;
   "web.media.history": undefined;
-  "web.media.image": undefined;
   "web.media.layout": undefined;
   "web.media.negative": undefined;
   "web.media.new": undefined;
@@ -12980,7 +9607,6 @@ export interface Messages {
   "web.media.understanding.title": undefined;
   "web.media.understanding.tokens": undefined;
   "web.media.understanding.truncated": undefined;
-  "web.media.understanding.uploadFailed": undefined;
   "web.media.understanding.uploading": undefined;
   "web.media.understanding.usage": { readonly input: string | number; readonly output: string | number; readonly total: string | number };
   "web.media.usage": { readonly height: string | number; readonly images: string | number; readonly width: string | number };
@@ -13036,24 +9662,6 @@ export interface Messages {
   "web.memory.memory.words": undefined;
   "web.memory.memory.wordsHint": undefined;
   "web.memory.memory.yours": undefined;
-  "web.opening.cannotStart": { readonly why: string | number };
-  "web.opening.connecting": undefined;
-  "web.opening.download": undefined;
-  "web.opening.failed": undefined;
-  "web.opening.kept": undefined;
-  "web.opening.keptNewFarm": undefined;
-  "web.opening.label": undefined;
-  "web.opening.loading": undefined;
-  "web.opening.name": undefined;
-  "web.opening.reading": undefined;
-  "web.opening.ready": undefined;
-  "web.opening.starting": undefined;
-  "web.opening.stopping": undefined;
-  "web.opening.swapping": undefined;
-  "web.opening.updateFailed": { readonly why: string | number };
-  "web.opening.updating": { readonly next: string | number };
-  "web.opening.waiting": undefined;
-  "web.opening.waking": undefined;
   "web.orchestrator.looks.auntie.blurb": undefined;
   "web.orchestrator.looks.auntie.name": undefined;
   "web.orchestrator.looks.farmer.blurb": undefined;
@@ -13079,9 +9687,6 @@ export interface Messages {
   "web.orchestrator.orchestrator.tabs": undefined;
   "web.orchestrator.orchestrator.title": undefined;
   "web.orchestrator.orchestrator.trajectory": undefined;
-  "web.orchestrator.pet.bluecat": undefined;
-  "web.orchestrator.pet.dog": undefined;
-  "web.orchestrator.pet.ragdoll": undefined;
   "web.pkm.backlinks.archives": undefined;
   "web.pkm.backlinks.areas": undefined;
   "web.pkm.backlinks.journals": undefined;
@@ -13173,13 +9778,6 @@ export interface Messages {
   "web.pkm.tierOne.journal": undefined;
   "web.pkm.tierOne.project": undefined;
   "web.pkm.tierOne.resource": undefined;
-  "web.pkm.toolbar.down": undefined;
-  "web.pkm.toolbar.indent": undefined;
-  "web.pkm.toolbar.label": undefined;
-  "web.pkm.toolbar.link": undefined;
-  "web.pkm.toolbar.outdent": undefined;
-  "web.pkm.toolbar.todo": undefined;
-  "web.pkm.toolbar.up": undefined;
   "web.provider.adapted": undefined;
   "web.provider.add": undefined;
   "web.provider.bindingHint": undefined;
@@ -13394,22 +9992,11 @@ export interface Messages {
   "web.runtime.ownDefault": undefined;
   "web.runtime.ownProcess": undefined;
   "web.runtime.queries": undefined;
-  "web.runtime.quota.hours": { readonly h: number };
-  "web.runtime.quota.minutes": { readonly m: string | number };
-  "web.runtime.quota.now": undefined;
-  "web.runtime.quota.on": { readonly weekday: string | number };
   "web.runtime.quota.oneWeek": undefined;
   "web.runtime.quota.session": undefined;
   "web.runtime.quota.signedOut": undefined;
   "web.runtime.quota.unreported": undefined;
   "web.runtime.quota.week": { readonly models: string | number };
-  "web.runtime.quota.weekdays.0": undefined;
-  "web.runtime.quota.weekdays.1": undefined;
-  "web.runtime.quota.weekdays.2": undefined;
-  "web.runtime.quota.weekdays.3": undefined;
-  "web.runtime.quota.weekdays.4": undefined;
-  "web.runtime.quota.weekdays.5": undefined;
-  "web.runtime.quota.weekdays.6": undefined;
   "web.runtime.quota.weekly": undefined;
   "web.runtime.reading": undefined;
   "web.runtime.recheck": undefined;
@@ -13515,45 +10102,20 @@ export interface Messages {
   "web.session.trajectory.want": undefined;
   "web.session.trajectory.wantHint": undefined;
   "web.session.trajectory.wrong": undefined;
-  "web.setting.about.check": undefined;
-  "web.setting.about.checking": undefined;
-  "web.setting.about.cli": undefined;
-  "web.setting.about.cliHint": { readonly command: string | number };
-  "web.setting.about.cliInstall": undefined;
-  "web.setting.about.cliNotOnPath": { readonly link: string | number };
-  "web.setting.about.cliReady": { readonly command: string | number };
-  "web.setting.about.cliRemove": undefined;
-  "web.setting.about.cliTaken": { readonly link: string | number };
   "web.setting.about.copied": undefined;
   "web.setting.about.copy": undefined;
-  "web.setting.about.download": undefined;
-  "web.setting.about.downloading": { readonly next: string | number; readonly percent: string | number };
-  "web.setting.about.failed": { readonly why: string | number };
   "web.setting.about.files": undefined;
   "web.setting.about.home": undefined;
   "web.setting.about.homeHint": undefined;
-  "web.setting.about.manual.diskImage": { readonly next: string | number };
-  "web.setting.about.manual.noBuild": { readonly next: string | number };
-  "web.setting.about.manual.readOnly": { readonly next: string | number };
-  "web.setting.about.manual.translocated": { readonly next: string | number };
-  "web.setting.about.newFarmQuestion": undefined;
   "web.setting.about.pkm": undefined;
   "web.setting.about.pkmHint": undefined;
-  "web.setting.about.ready": { readonly next: string | number };
-  "web.setting.about.readyNewFarm": { readonly next: string | number };
   "web.setting.about.repos": undefined;
   "web.setting.about.reposHint": undefined;
-  "web.setting.about.restart": undefined;
-  "web.setting.about.restartQuestion": undefined;
   "web.setting.about.reveal": undefined;
   "web.setting.about.settings": undefined;
   "web.setting.about.settingsHint": undefined;
-  "web.setting.about.upToDate": undefined;
-  "web.setting.about.update": undefined;
-  "web.setting.about.updateHint": undefined;
   "web.setting.about.version": undefined;
   "web.setting.about.versionHint": undefined;
-  "web.setting.about.workingQuestion": { readonly n: string | number };
   "web.setting.about.worktrees": undefined;
   "web.setting.about.worktreesHint": undefined;
   "web.setting.accounts.intro": undefined;
@@ -13614,7 +10176,6 @@ export interface Messages {
   "web.setting.nav.appearance": undefined;
   "web.setting.nav.call": undefined;
   "web.setting.nav.chat": undefined;
-  "web.setting.nav.devices": undefined;
   "web.setting.nav.dictation": undefined;
   "web.setting.nav.general": undefined;
   "web.setting.nav.label": undefined;
@@ -13650,71 +10211,13 @@ export interface Messages {
   "web.setting.words.appearance": undefined;
   "web.setting.words.call": undefined;
   "web.setting.words.chat": undefined;
-  "web.setting.words.devices": undefined;
   "web.setting.words.dictation": undefined;
   "web.setting.words.general": undefined;
   "web.setting.words.github": undefined;
   "web.setting.words.memory": undefined;
   "web.setting.words.moss": undefined;
   "web.setting.words.skills": undefined;
-  "web.tree.aboutToFall": undefined;
-  "web.tree.allHelpers": undefined;
-  "web.tree.allRepos": undefined;
-  "web.tree.approach": undefined;
-  "web.tree.back": undefined;
-  "web.tree.byHelper": undefined;
-  "web.tree.byRepo": undefined;
-  "web.tree.day": { readonly n: string | number };
-  "web.tree.distilled": { readonly n: string | number };
-  "web.tree.earliest": undefined;
-  "web.tree.everyRepo": undefined;
-  "web.tree.experience": undefined;
-  "web.tree.fading": { readonly n: string | number };
-  "web.tree.fadingNote": undefined;
-  "web.tree.farm": undefined;
-  "web.tree.fold": undefined;
-  "web.tree.from": undefined;
-  "web.tree.grew": { readonly n: string | number };
-  "web.tree.grewInto": undefined;
-  "web.tree.grewTo": undefined;
-  "web.tree.grown": undefined;
-  "web.tree.insight": undefined;
-  "web.tree.intent": undefined;
-  "web.tree.kind.fruit": undefined;
-  "web.tree.kind.leaf": undefined;
-  "web.tree.kind.seed": undefined;
-  "web.tree.look": undefined;
-  "web.tree.lookUp": undefined;
-  "web.tree.nextStage": { readonly rounds: string | number; readonly stage: string | number };
-  "web.tree.noSeeds": undefined;
-  "web.tree.noted": { readonly n: string | number };
-  "web.tree.notedBy": undefined;
-  "web.tree.now": undefined;
-  "web.tree.often": undefined;
-  "web.tree.past": undefined;
-  "web.tree.recalled": { readonly n: string | number };
-  "web.tree.recent": undefined;
-  "web.tree.scene": undefined;
-  "web.tree.seeds": { readonly n: string | number };
   "web.tree.sky": undefined;
-  "web.tree.skyHint": undefined;
-  "web.tree.sow": undefined;
-  "web.tree.sown": { readonly body: string | number };
-  "web.tree.stage.1": undefined;
-  "web.tree.stage.2": undefined;
-  "web.tree.stage.3": undefined;
-  "web.tree.stage.4": undefined;
-  "web.tree.stage.5": undefined;
-  "web.tree.stats": { readonly days: string | number; readonly recalls: string | number; readonly rounds: string | number };
-  "web.tree.title": undefined;
-  "web.tree.together": { readonly n: string | number };
-  "web.tree.waiting": undefined;
-  "web.ui.pixel.close": undefined;
-  "web.ui.pixel.drop": { readonly chip: string | number };
-  "web.ui.pixel.noticeTitle.error": undefined;
-  "web.ui.pixel.noticeTitle.info": undefined;
-  "web.ui.pixel.noticeTitle.warn": undefined;
-  "web.ui.pixel.optional": undefined;
   "web.ui.pixel.sound.group.field": undefined;
   "web.ui.pixel.sound.group.reward": undefined;
   "web.ui.pixel.sound.group.tools": undefined;
@@ -13750,10 +10253,6 @@ export interface Messages {
   "web.ui.pixel.sound.label.weed": undefined;
   "web.ui.pixel.sound.label.woof": undefined;
   "web.ui.pixel.sound.label.yip": undefined;
-  "web.voice.call.agora": { readonly code: string | number; readonly msg: string | number };
-  "web.voice.call.cannotHear": { readonly why: string | number };
-  "web.voice.call.noMic": undefined;
-  "web.voice.call.renew": { readonly why: string | number };
   "web.voice.choices.answer.agora": undefined;
   "web.voice.choices.answer.openai": undefined;
   "web.voice.choices.area.AP": undefined;
@@ -13784,92 +10283,14 @@ export interface Messages {
   "web.voice.choices.number.idleSeconds": undefined;
   "web.voice.choices.number.interruptMs": undefined;
   "web.voice.choices.number.silenceMs": undefined;
-  "web.voice.dictation.again": undefined;
-  "web.voice.dictation.cancel": undefined;
-  "web.voice.dictation.cannot": { readonly why: string | number };
-  "web.voice.dictation.dismiss": undefined;
-  "web.voice.dictation.done": undefined;
-  "web.voice.dictation.failed": { readonly why: string | number };
-  "web.voice.dictation.keys": undefined;
-  "web.voice.dictation.label": undefined;
-  "web.voice.dictation.listening": undefined;
-  "web.voice.dictation.noMic": undefined;
-  "web.voice.dictation.nothing": undefined;
-  "web.voice.dictation.recording": undefined;
-  "web.voice.dictation.start": undefined;
-  "web.voice.dictation.stop": undefined;
-  "web.voice.dictation.transcribing": undefined;
-  "web.voice.dictation.unset": undefined;
-  "web.voice.moss.busy": undefined;
-  "web.voice.moss.closed": undefined;
   "web.voice.moss.connecting": undefined;
-  "web.voice.moss.debug": undefined;
-  "web.voice.moss.defaultInstructions": undefined;
-  "web.voice.moss.down": undefined;
-  "web.voice.moss.events": undefined;
-  "web.voice.moss.eventsHint": undefined;
   "web.voice.moss.hangUp": undefined;
-  "web.voice.moss.instructions": undefined;
   "web.voice.moss.intro": undefined;
-  "web.voice.moss.localOnly": undefined;
   "web.voice.moss.mute": undefined;
   "web.voice.moss.nativeCall": undefined;
   "web.voice.moss.nativeNotice": undefined;
-  "web.voice.moss.notInChat": undefined;
-  "web.voice.moss.nothingSaid": undefined;
-  "web.voice.moss.persona": undefined;
-  "web.voice.moss.personaHint": undefined;
-  "web.voice.moss.qos.ahead": undefined;
-  "web.voice.moss.qos.aheadTip": undefined;
-  "web.voice.moss.qos.backlog": undefined;
-  "web.voice.moss.qos.backlogTip": undefined;
-  "web.voice.moss.qos.down": undefined;
-  "web.voice.moss.qos.downTip": undefined;
-  "web.voice.moss.qos.frames": undefined;
-  "web.voice.moss.qos.framesTip": undefined;
-  "web.voice.moss.qos.gaps": undefined;
-  "web.voice.moss.qos.gapsTip": undefined;
-  "web.voice.moss.qos.hint": undefined;
-  "web.voice.moss.qos.ms": { readonly last: string | number; readonly mean: string | number };
-  "web.voice.moss.qos.reply": undefined;
-  "web.voice.moss.qos.replyTip": { readonly n: string | number };
-  "web.voice.moss.qos.stops": undefined;
-  "web.voice.moss.qos.stopsTip": undefined;
-  "web.voice.moss.qos.title": undefined;
-  "web.voice.moss.qos.up": undefined;
-  "web.voice.moss.qos.upTip": undefined;
-  "web.voice.moss.requestFailed": undefined;
-  "web.voice.moss.said": undefined;
   "web.voice.moss.talk": undefined;
-  "web.voice.moss.tryIt": undefined;
   "web.voice.moss.unmute": undefined;
-  "web.voice.moss.up": undefined;
-  "web.voice.moss.you": undefined;
-  "web.voice.vision.camera": undefined;
-  "web.voice.vision.captureFailed": undefined;
-  "web.voice.vision.closed": undefined;
-  "web.voice.vision.connecting": undefined;
-  "web.voice.vision.denied": undefined;
-  "web.voice.vision.deviceLost": undefined;
-  "web.voice.vision.ended": undefined;
-  "web.voice.vision.error": undefined;
-  "web.voice.vision.final": undefined;
-  "web.voice.vision.hostNotice": undefined;
-  "web.voice.vision.idle": undefined;
-  "web.voice.vision.interrupted": undefined;
-  "web.voice.vision.liveTitle": undefined;
-  "web.voice.vision.notice": undefined;
-  "web.voice.vision.prompt": undefined;
-  "web.voice.vision.ready": undefined;
-  "web.voice.vision.screen": undefined;
-  "web.voice.vision.send": undefined;
-  "web.voice.vision.silence": undefined;
-  "web.voice.vision.source": undefined;
-  "web.voice.vision.start": undefined;
-  "web.voice.vision.stop": undefined;
-  "web.voice.vision.title": undefined;
-  "web.voice.vision.transcript": undefined;
-  "web.voice.vision.unavailable": undefined;
   "web.voice.voice.address": undefined;
   "web.voice.voice.answer.agora": undefined;
   "web.voice.voice.answer.deepseek": { readonly from: string | number };
@@ -13927,7 +10348,6 @@ export interface Messages {
   "web.voice.voice.persona.intro": undefined;
   "web.voice.voice.persona.microsoftVoice": undefined;
   "web.voice.voice.persona.minimaxVoice": undefined;
-  "web.voice.voice.persona.noSample": undefined;
   "web.voice.voice.persona.open": undefined;
   "web.voice.voice.persona.openParts": undefined;
   "web.voice.voice.persona.openaiVoice": undefined;

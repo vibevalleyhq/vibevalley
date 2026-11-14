@@ -455,7 +455,7 @@ function Dispatch(props: { m: ChatMessage }) {
   );
 }
 
-export function MessageRow(props: {
+function MessageRow(props: {
   m: ChatMessage;
   continues: boolean;
   thread?: Channel | undefined;

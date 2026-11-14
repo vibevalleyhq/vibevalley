@@ -17,6 +17,7 @@
       "@vibevalley/bridge/*": ["../../../packages/bridge/src/*", "../../../packages/bridge/src/*/index.ts"]
     },
     "allowImportingTsExtensions": true,
+    "noUnusedLocals": true,
     "noEmit": true
   },
   "include": ["**/*.ts", "**/*.tsx"],

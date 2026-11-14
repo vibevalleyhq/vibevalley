@@ -42,9 +42,6 @@ export interface RtcLine {
 
 export type Rtc = (grant: AgoraGrant, events: RtcEvents) => Promise<RtcLine>;
 
-/** Art-pixel dimensions and max fractional crop per edge when integer-scaled. */
-export const farmFraming = { picture: { w: 384, h: 256 }, cut: { across: 0.05, down: 0.08 } } as const;
-
 const UpdateManualValues = ["diskImage", "translocated", "readOnly", "noBuild"] as const;
 export type UpdateManual = (typeof UpdateManualValues)[number];
 
@@ -140,10 +137,6 @@ declare global {
   }
 }
 
-export const hostKey = "vibevalleyHost" satisfies keyof Window;
-
-export const desktopVoiceShortcut = "Alt+Shift+Space";
-
 export const desktopBridge = {
   notify: call({ input: Notice, output: z.void() }),
   tray: call({ input: TraySummary, output: z.void() }),
@@ -199,7 +192,7 @@ export const desktopReach: Readonly<Record<keyof typeof desktopBridge, "control"
 
 const Line = { line: z.number() };
 
-export const mobileBridge = {
+const mobileBridge = {
   // First call awaits OS notification permission prompt.
   notify: call({ input: Notice, output: z.void(), timeoutMs: Infinity }),
   rtcJoin: call({ input: z.object({ ...Line, grant: AgoraGrantSchema }), output: z.void(), timeoutMs: 60_000 }),
@@ -213,8 +206,6 @@ export const mobileBridge = {
   rtcProblem: push(z.object({ ...Line, text: z.string() })),
   rtcExpiring: push(z.object(Line)),
 };
-
-export const fromNativeKey = "vibevalleyFromHost" satisfies keyof Window;
 
 export function mobileHost(link: Link): Host {
   const native = connect(mobileBridge, link);

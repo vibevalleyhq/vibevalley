@@ -2,7 +2,7 @@
 // calls, on nsh's own reactivity. nsh's bundler refuses `solid-js`; the
 // The views import `solid-js` from here.
 // Views ported to nsh use nsh directly (signal, computed, effect, If, Each).
-import { batch as nshBatch, cleanup, computed, context, effect, signal, untracked, type Context as NshContext } from "nsh";
+import { cleanup, computed, context, effect, signal, untracked, type Context as NshContext } from "nsh";
 
 export type Accessor<T> = () => T;
 export type Setter<T> = (value: T | ((prev: T) => T)) => T;
@@ -62,8 +62,6 @@ export function createEffect<T>(
   });
 }
 
-export const createRenderEffect = createEffect;
-
 /** Runs once the owner has mounted; its returned function runs when the owner goes. */
 export function onSettled(fn: () => void | (() => void)): void {
   effect(() => untracked(fn) ?? undefined);
@@ -71,12 +69,9 @@ export function onSettled(fn: () => void | (() => void)): void {
 
 export const onCleanup = cleanup;
 export const untrack = untracked;
-export const batch = nshBatch;
-/** nsh applies writes at once; there is nothing pending to flush. */
-export const flush = (): void => {};
+
 /** Tracks a value as a whole; nsh's plain objects are not reactive, so the value is returned as it is. */
 export const deep = <T>(value: T): T => value;
-export const snapshot = <T>(value: T): T => value;
 
 export type Context<T> = NshContext<T>;
 export function createContext<T>(defaultValue?: T): Context<T> {

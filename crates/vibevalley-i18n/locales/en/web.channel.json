@@ -60,7 +60,6 @@
     "label": "Scheduled task \"{name}\"",
     "on": "On",
     "off": "Off",
-    "remove": "Delete",
     "removeWhich": "Delete the scheduled task \"{name}\"",
     "sure": "Delete it?",
     "approveWhich": "Approve the scheduled task \"{name}\"",
@@ -135,7 +134,6 @@
     "notSent": "Not sent: {why}",
     "who": "Who",
     "mention": "Mention someone",
-    "stop": "Stop the assistant",
     "stopHint": "Stops the assistant's round; helpers already sent keep working",
     "send": "Send",
     "sendHint": "Enter sends · Shift+Enter for a new line",
@@ -192,7 +190,6 @@
     "none": "Nothing found",
     "direct": "Direct message",
     "newDirect": "New direct message",
-    "keys": "{mac, select, true {⌘K} other {Ctrl K}}",
     "note": "Note · {tier}",
     "searchNotes": "Search notes for “{q}”"
   },

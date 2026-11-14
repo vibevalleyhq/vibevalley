@@ -11,7 +11,6 @@
     "by": "{name} 做的",
     "updated": "{when}更新",
     "versions": "每一稿",
-    "open": "在新标签页打开",
     "delete": "删掉",
     "deleteAsk": "删掉「{title}」？对话里的卡片还在。",
     "deleted": "删掉了「{title}」",
@@ -27,8 +26,6 @@
     "nothingFound": "没有标题对得上的",
     "title": "标题",
     "more": "更多",
-    "copyLink": "复制链接",
-    "copied": "链接复制好了",
     "group": {
       "delivered": "帮工和助手交的",
       "mine": "我写的"
@@ -126,12 +123,10 @@
     "at": "{at} / {pages}",
     "present": "全屏放映",
     "presenter": "演讲者视图",
-    "pdf": "存成 PDF",
     "thumbnails": "每一页",
     "slide": "第 {at} 页 {title}"
   },
   "presenter": {
-    "title": "演讲者视图：{title}",
     "missing": "没说要讲哪一份幻灯片：从 Artifact 的「演讲者视图」打开。",
     "current": "这一页",
     "next": "下一页",

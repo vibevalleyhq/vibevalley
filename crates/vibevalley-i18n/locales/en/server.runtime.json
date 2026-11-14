@@ -25,14 +25,9 @@
   "noUsage": "This runtime reports no usage",
   "cursor": "Cursor needs its own SDK (@cursor/sdk), which VibeValley does not use yet",
   "oarUnknown": "oar does not know this runtime",
-  "tools": "{n, plural, one {# tool} other {# tools}}",
   "notSaved": "{id}'s settings were not saved: {why}",
   "cannotDrive": "oar cannot drive {runtime}",
   "cannotSend": "{name} cannot be sent: {why}",
   "defaultModel": "{runtime} has no model {model}; {name} uses the default for now",
-  "piNoBalance": "{provider} reports no balance",
-  "piNoModel": "pi has no default model set",
-  "piUnread": "The DeepSeek balance could not be read",
-  "effort": "{model} has no {effort} effort; it has: {levels}",
-  "piTimedOut": "The DeepSeek balance took too long"
+  "effort": "{model} has no {effort} effort; it has: {levels}"
 }

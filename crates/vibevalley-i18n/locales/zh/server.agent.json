@@ -24,14 +24,6 @@
   "newSkillId": "新技能的 id 要留空；指定 id 请用保存",
   "removeAgent": "删掉档案「{name}」（{id}，跑在 {runtime} 上）：已经派给它的工单不跟着改",
   "removeSkill": "删掉技能「{name}」",
-  "modelFailed": "模型出错了",
-  "noDeepSeekKey": "没有 DeepSeek 的密钥：设 DEEPSEEK_API_KEY，或者写进 vibevalley.yaml 的 deepseek.api_key。",
-  "refused": {
-    "launchArgs": "VibeValley 跑在 server 进程里，没有命令行参数",
-    "serviceTier": "DeepSeek 没有服务档位"
-  },
   "unequip": "从 {holders} 的档案里摘掉它",
-  "quoted": "「{name}」",
-  "efforts": "{runtime} 只有 {efforts} 两档思考强度，没有「{asked}」",
-  "effortsAnd": "、"
+  "quoted": "「{name}」"
 }

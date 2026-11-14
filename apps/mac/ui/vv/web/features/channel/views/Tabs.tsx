@@ -91,7 +91,7 @@ export function Crons(props: { channel: Channel }) {
 /** How long the first press of delete waits for the second. */
 const sureMs = 4000;
 
-export function CronCard(props: { s: CronView }) {
+function CronCard(props: { s: CronView }) {
   const deleting = signal(false);
   const act = createAct();
   const setEnabled = (enabled: boolean) => {

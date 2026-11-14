@@ -12,8 +12,7 @@ import { announce, cleanup, colorScheme, createMotion, effect, reduceMotion, sig
 
 import { animateLayout, durations, ease, ms } from "../motion";
 import { radius, tok, type as ty } from "../tokens";
-import { intentOf, type Act, type Action, type AgentEvent, type Frame, type InboxKind, type IssueIntent, type PermissionIntent } from "./shapes";
-import { words } from "./words";
+import { type Act, type InboxKind, type IssueIntent, type PermissionIntent } from "./shapes";
 
 export type DecisionKind = InboxKind | "permission";
 
@@ -51,94 +50,10 @@ export type DecisionInboxProps = {
   openFirst?: number;
 };
 
-// ---- Building decisions from the frame and the agents' events ----
-
-function choiceOf(issue: string, a: Action, label: string): Choice {
-  // A button that takes the user's words cannot answer from here: it opens the issue there.
-  if (a.does === "say" || (a.does === "move" && a.words === "required")) {
-    return { label: `${label}…`, intent: { type: "open", issue, act: a.act } };
-  }
-  return { label, intent: { type: "issue", ...intentOf(issue, a) }, done: words().done[a.act] };
-}
-
-/** The frame's inbox as decisions. The buttons are the issue's own actions: the lead first. */
-export function decisionsFromFrame(frame: Frame): Decision[] {
-  const w = words();
-  const out: Decision[] = [];
-  for (const item of frame.inbox) {
-    const issue = item.issue ? frame.issues.find((t) => t.id === item.issue) : undefined;
-    if (!issue) continue;
-    const session = item.target.kind === "session" ? frame.sessions.find((s) => s.id === item.target.id) : undefined;
-    const acts = issue.stage.acts;
-    const lead = acts.find((a) => a.act === issue.stage.lead) ?? acts.find((a) => a.act !== "close");
-    let primary: Choice | undefined;
-    let secondary: Choice | null = null;
-    let detail: string | null = session?.last_run?.summary || item.text || null;
-
-    if (item.kind === "ask") {
-      const q = issue.questions[0];
-      detail = q?.question ?? detail;
-      const answer = acts.find((a) => a.act === "answer");
-      const options = q?.options ?? [];
-      if (answer && options.length > 0) {
-        primary = { label: options[0], intent: { type: "issue", ...intentOf(issue.id, answer, options[0]) }, done: options[0] };
-        secondary =
-          options.length === 2
-            ? { label: options[1], intent: { type: "issue", ...intentOf(issue.id, answer, options[1]) }, done: options[1] }
-            : { label: w.answerMore, intent: { type: "open", issue: issue.id, act: "answer" } };
-      }
-    } else if (item.kind === "conflict") {
-      const files = issue.conflict?.files ?? [];
-      detail = `${w.conflictFiles(files.length)} (${issue.conflict?.base ?? "main"}): ${files.join(", ")}`;
-      if (session) secondary = { label: w.openTerminal, intent: { type: "open_terminal", session: session.id } };
-    } else if (item.kind === "quiet" && session?.phase.tag === "working") {
-      detail = session.phase.doing || session.brief;
-    }
-
-    if (!primary && lead) primary = choiceOf(issue.id, lead, w.act[lead.act]);
-    if (!primary) primary = { label: w.open, intent: { type: "open", issue: issue.id } };
-    if (!secondary) {
-      const other = acts.find((a) => a.act !== "close" && a.act !== lead?.act);
-      secondary = other ? choiceOf(issue.id, other, w.act[other.act]) : { label: w.open, intent: { type: "open", issue: issue.id } };
-    }
-    out.push({ id: item.id, kind: item.kind, title: issue.title, source: item.who, atMs: item.at, detail, primary, secondary });
-  }
-  return out;
-}
-
-/** Permission requests in an agent's events that are not answered yet. */
-export function decisionsFromEvents(events: AgentEvent[], session?: { id: string; name: string }): Decision[] {
-  const open = new Map<string, Decision>();
-  for (const e of events) {
-    const k = e.kind;
-    if (k.type === "permission_requested") {
-      const input = k.input as Record<string, unknown> | null;
-      const command = input && typeof input.command === "string" ? input.command : null;
-      open.set(k.request_id, {
-        id: `${session?.id ?? "session"}:${k.request_id}`,
-        kind: "permission",
-        title: k.summary || `Use ${k.tool}`,
-        source: session?.name ?? k.tool,
-        atMs: e.at_ms,
-        detail: command ?? (input ? JSON.stringify(input, null, 2) : null),
-        primary: { label: "Allow", intent: { type: "permission", session: session?.id, request_id: k.request_id, decision: "AllowOnce" }, done: "Allowed" },
-        secondary: {
-          label: "Deny",
-          intent: { type: "permission", session: session?.id, request_id: k.request_id, decision: { Deny: { message: null } } },
-          done: "Denied",
-        },
-      });
-    } else if (k.type === "permission_resolved") {
-      open.delete(k.request_id);
-    }
-  }
-  return [...open.values()];
-}
-
 // ---- The view ----
 
 /** "3 need your input" with the user's locale digits; the header is the live region. */
-export function countLabel(n: number): string {
+function countLabel(n: number): string {
   if (n === 0) return "All caught up";
   return `${n.toLocaleString()} ${n === 1 ? "needs" : "need"} your input`;
 }
@@ -176,7 +91,7 @@ function DoneMark(props: { color: string }) {
 const focusRing = () => ({ outlineWidth: 2, outlineColor: tok().focus, outlineOffset: 2, outlineStyle: "solid" as const });
 
 /** The dark gradient button; inverted in dark mode. */
-export function PrimaryButton(props: { label: string; onPress: () => void; testID?: string }) {
+function PrimaryButton(props: { label: string; onPress: () => void; testID?: string }) {
   const p = () => tok();
   const dark = () => colorScheme() === "dark";
   return (
@@ -216,7 +131,7 @@ export function PrimaryButton(props: { label: string; onPress: () => void; testI
 }
 
 /** The light ringed button. */
-export function SecondaryButton(props: { label: string; onPress: () => void; testID?: string }) {
+function SecondaryButton(props: { label: string; onPress: () => void; testID?: string }) {
   const p = () => tok();
   return (
     <View

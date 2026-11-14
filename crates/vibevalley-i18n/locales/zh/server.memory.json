@@ -4,21 +4,6 @@
     "nowledge": "Nowledge Mem",
     "everos": "EverOS"
   },
-  "noUrl": "没填地址",
-  "off": "没打开",
-  "unknownSource": "不认识这种来源",
-  "stopped": "记性来源已经停下",
-  "forgetThere": "{source} 里的记忆到它自己那里删",
-  "coverage": {
-    "failed": "读取失败、已取消或超时，未包含此来源",
-    "everosAcross": "不支持跨仓库检索，请指定一个仓库；本次未包含 EverOS",
-    "everosAgent": "此查询需要指定档案，本次未包含 EverOS",
-    "unconfirmed": "有命中的仓库范围未经确认，已从本仓库检索中排除",
-    "note": "{source}：{note}"
-  },
-  "everosList": "EverOS 的记忆不在这里列出",
-  "everosForget": "EverOS 里的记忆到 EverOS 里删",
-  "nowledgeForget": "Nowledge Mem 里的记忆到 Nowledge Mem 里删",
   "empty": "要记的话是空的",
   "dbFailed": "没记下来：数据库写不进去",
   "noMemory": "{agent} 的记性里没有 {id}",

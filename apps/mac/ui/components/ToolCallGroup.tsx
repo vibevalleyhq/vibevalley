@@ -22,7 +22,7 @@ export type ToolCallGroupProps = {
   onRetry?: (call: ToolCall) => void;
 };
 
-export function groupLabel(calls: ToolCall[]): string {
+function groupLabel(calls: ToolCall[]): string {
   if (calls.some((c) => c.status === "running")) return "Using tools…";
   const n = calls.length;
   return `Used ${n.toLocaleString()} ${n === 1 ? "tool" : "tools"}`;

@@ -9,7 +9,6 @@ import { createMotion, effect, reduceMotion, Text, View } from "nsh";
 
 import { durations, ease, ms } from "../motion";
 import { tok, type Palette } from "../tokens";
-import type { Phase, Stage } from "./shapes";
 
 /** The spec's three status forms plus `alert` (needs you) and `idle`. */
 export type Tone = "running" | "done" | "failed" | "alert" | "idle";
@@ -22,32 +21,8 @@ export type StatusBadgeProps = {
   testID?: string;
 };
 
-/** An issue stage as a badge tone: what the frame says, nothing worked out. */
-export function stageTone(stage: Stage): Tone {
-  switch (stage.state) {
-    case "working":
-      return "running";
-    case "asking":
-    case "reviewing":
-      return "alert";
-    case "stuck":
-      return stage.stuck === "quiet" ? "alert" : "failed";
-    case "done":
-      return "done";
-    default:
-      return "idle";
-  }
-}
-
-export function phaseTone(phase: Phase): Tone {
-  if (phase.tag === "working") return phase.quiet_since ? "alert" : "running";
-  if (phase.tag === "done") return "done";
-  if (phase.tag === "failed") return "failed";
-  return "idle";
-}
-
 /** `#rrggbb` or `rgba(...)` token at `a` opacity, for tints of a token. */
-export function tint(color: string, a: number): string {
+function tint(color: string, a: number): string {
   if (color.startsWith("#") && color.length === 7) {
     const n = parseInt(color.slice(1), 16);
     return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;

@@ -10,7 +10,6 @@
     "@vibevalley/protocol": "workspace:*",
     "pele": "catalog:",
     "pinyin-pro": "catalog:",
-    "reicon": "catalog:",
     "uqr": "catalog:",
     "zod": "catalog:"
   }

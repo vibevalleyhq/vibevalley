@@ -51,7 +51,6 @@
     "call": "Call line",
     "dictation": "Dictation",
     "chat": "Chat apps",
-    "devices": "Devices",
     "width": "Navigation width (drag; double-click for the default)",
     "accounts": "Accounts and keys"
   },
@@ -72,7 +71,6 @@
     "dictation": "dictation transcription voice input",
     "github": "gh PR login",
     "chat": "WeChat Feishu Lark QQ connectors pairing",
-    "devices": "phone pairing connect to this machine LAN name password sign in sign out",
     "accounts": "keys accounts DeepSeek MOSS Agora API key models"
   },
   "scope": {
@@ -122,34 +120,7 @@
     "pkmHint": "The space's PARA folders and journals",
     "copy": "Copy the path",
     "copied": "Path copied",
-    "reveal": "Show in Finder",
-    "update": "Updates",
-    "updateHint": "The desktop app updates itself from the releases on GitHub",
-    "upToDate": "Up to date",
-    "checking": "Looking for a new version…",
-    "downloading": "Downloading {next} ({percent}%)",
-    "ready": "{next} is ready and goes in when you quit",
-    "readyNewFarm": "{next} is ready: it starts from fresh data and keeps the old aside",
-    "manual": {
-      "diskImage": "{next} needs installing by hand: the app runs from its disk image; drag it to Applications first",
-      "translocated": "{next} needs installing by hand: macOS runs the app from a temporary place; drag it to Applications and open it again",
-      "readOnly": "{next} needs installing by hand: the app's folder cannot be written",
-      "noBuild": "{next} has no build for this Mac"
-    },
-    "failed": "Could not check: {why}",
-    "check": "Check for updates",
-    "restart": "Restart to update",
-    "restartQuestion": "Restart into the new version?",
-    "workingQuestion": "{n} helpers are working; restarting cuts them off. Restart now?",
-    "newFarmQuestion": "The new version starts from fresh data; the old stays in the home folder. Restart now?",
-    "download": "Download",
-    "cli": "Command line",
-    "cliHint": "Once installed, {command} reads and writes this farm from a terminal, for agents on this Mac too",
-    "cliReady": "Use {command} in a terminal; agents on this Mac can read and write this farm with it",
-    "cliNotOnPath": "Installed at {link}, but ~/.local/bin is not on your PATH: add export PATH=\"$HOME/.local/bin:$PATH\" to ~/.zshrc",
-    "cliTaken": "{link} is another program's file and was not replaced: move it away, then install",
-    "cliInstall": "Install",
-    "cliRemove": "Remove"
+    "reveal": "Show in Finder"
   },
   "missing": {
     "deepseekKey": "No DeepSeek key yet",

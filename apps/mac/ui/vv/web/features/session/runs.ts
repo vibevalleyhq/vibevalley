@@ -9,10 +9,10 @@ import { jsonString } from "@vibevalley/protocol/schema";
 import { big, tookText } from "../../base/format";
 
 /** The steps kept for one session's log in the page. */
-export const stepLimit = 240;
+const stepLimit = 240;
 
 /** By seq and revision, independent of HTTP/live arrival order; the last stepLimit kept. */
-export function mergeSteps(log: SessionEvent[], incoming: SessionEvent[]) {
+function mergeSteps(log: SessionEvent[], incoming: SessionEvent[]) {
   const bySeq = new Map(log.map((s) => [s.seq, s]));
   for (const s of incoming) {
     const before = bySeq.get(s.seq);

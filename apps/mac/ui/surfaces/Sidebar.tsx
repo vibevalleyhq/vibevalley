@@ -102,7 +102,6 @@ export function Sidebar() {
 
   const p = () => tok();
   const panel = () => rail()?.panel ?? "files";
-  const waiting = () => inbox()?.entries.length ?? 0;
 
   const spriteSrc = (name: string | undefined) => {
     const dir = pixelDir();

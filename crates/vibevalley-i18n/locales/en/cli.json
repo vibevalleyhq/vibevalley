@@ -1,13 +1,8 @@
 {
   "about": "VibeValley's command line: one command is one operation of the server's, <resource> [<sub-resource>] <verb>",
   "flag": {
-    "prompt": "Ask once and leave, without a conversation",
     "model": "The model",
     "effort": "How hard to think",
-    "resume": "Go on with this session",
-    "cwd": "Which folder; the current one when empty",
-    "name": "The own agent's name (its home is ~/.vibevalley/agent/<name>)",
-    "mcp": "The MCP configuration file; mcp.json in the home when empty",
     "server": "The server's address; VIBEVALLEY_SERVER when empty, else the one running on this machine (the home's server.json), else {fallback}",
     "dryRun": "Only say what it would do, without doing it (commands that delete, merge, close or send a helper away)",
     "format": "md: Markdown to read (the default); json: the endpoint's answer",
@@ -51,15 +46,6 @@
     "jsonl": "Write the versioned JSONL event stream"
   },
   "command": {
-    "root": "VibeValley's command line, one operation a command: answers are short text, --format json gives the protocol's shape; chat talks in the terminal",
-    "app": {
-      "about": "The desktop app's own: its status, opening a page, quitting, restarting, updating",
-      "open": "Bring the desktop window to this page (/issues/12), opening the app if it is not",
-      "quit": "Quit the desktop app (its server saves first)",
-      "restart": "Restart the desktop app",
-      "update": "The desktop app's update: as it stands with no argument, check to look now, install to put it in place and restart",
-      "status": "Which desktop app this is, its version, where its farm is"
-    },
     "doctor": "See this machine's farm at once: which one was found, whether it answers, the desktop app, runtimes, the model's key, the LAN listener",
     "pkm": {
       "capture": "Note something in today's journal (--page: on that page); no words reads stdin, lines split into blocks by indentation",
@@ -125,28 +111,16 @@
       "list": "List helpers: id, name, profile, what it is doing",
       "show": "Show a helper",
       "stop": "Stop a helper's round"
-    },
-    "chat": "Talk in the terminal: with no runtime, VibeValley's own agent; with one, that runtime directly (no trajectory, no spending)",
-    "auth": {
-      "about": "Sign in to a server elsewhere, like gh auth login: approve on a page, and this computer gets a key of its own",
-      "login": "Sign in to a server: show a code, wait for approval on a signed-in page, keep the key in the home's auth.json",
-      "status": "Which server commands reach, and which device's key they carry",
-      "logout": "Sign out: the server takes this computer's key back, and this computer forgets it"
     }
   },
   "next": {
     "help": "See how this command is written",
-    "startServer": "Start the server first (vp run --filter @vibevalley/server start), or point --server at one that runs",
-    "openApp": "Open the desktop app first (vibevalley app open opens it too)"
+    "startServer": "Start the server first (vp run --filter @vibevalley/server start), or point --server at one that runs"
   },
   "failure": {
     "unreachable": "Cannot reach {base}: {why}",
-    "retry": "The server asked the stream to reconnect; the command line does not",
     "gone": "Ticket #{n} is gone: it was deleted",
-    "appNotOpen": "Cannot reach the desktop app of {home}: {why}",
-    "noDryRun": "{command} has no dry run: drop --dry-run to do it",
-    "noChat": "VibeValley's conversation program is not found here: use the command line the desktop app installs, or vp run --filter @vibevalley/cli start in the repository",
-    "chatFlag": "{flags} cannot go with {runtime}: --name and --mcp are VibeValley's own agent's, --effort and --resume a runtime's"
+    "noDryRun": "{command} has no dry run: drop --dry-run to do it"
   },
   "op": {
     "user": {
@@ -598,7 +572,6 @@
     "installRuntime": "Install a coding agent (Claude Code, Codex…), then have the farm look again",
     "noModelKey": "No DeepSeek key: the assistant and your own agent cannot start",
     "setModelKey": "Fill in the DeepSeek key under Settings › Models",
-    "lanSettings": "See Settings › Devices",
     "wrong": "These are not right: {checks}"
   },
   "pkm": {
@@ -622,8 +595,6 @@
     "page": "A page: its title, slug or an alias",
     "repoName": "The new repo's name",
     "session": "The helper's id, such as w3",
-    "chatRuntime": "A runtime (claude, codex…); none for VibeValley's own agent",
-    "appPath": "A page of the desktop app, such as /issues/12; the start page if none",
     "capture": "What to note; stdin if none",
     "comment": "The comment",
     "cronText": "What is said when it comes due: the work for the assistant or a profile",
@@ -634,10 +605,8 @@
     "search": "The words to find",
     "status": "The status to move it to",
     "title": "The issue's title",
-    "updateStep": "check looks for a new version, install installs it and restarts; none says how it stands",
     "pageTitle": "The page's title",
-    "agentName": "The profile's name",
-    "authServer": "The server's address (https://farm.example.com); --server when not given"
+    "agentName": "The profile's name"
   },
   "channel": {
     "sent": "Sent to {channel}"
@@ -709,27 +678,6 @@
     },
     "doctor": {
       "about": "How this machine's farm is"
-    },
-    "appOpen": {
-      "about": "Bring the window to issue 12"
-    },
-    "appQuit": {
-      "about": "Quit the desktop app"
-    },
-    "appRestart": {
-      "about": "Restart the desktop app"
-    },
-    "appUpdate": {
-      "about": "Look for an update now"
-    },
-    "runtimeChat": {
-      "about": "Talk to Claude Code directly"
-    },
-    "chat": {
-      "about": "Talk to VibeValley's own agent"
-    },
-    "appStatus": {
-      "about": "Whether the desktop app is open, and which"
     },
     "artifactRead": {
       "about": "Read a1's words"
@@ -838,15 +786,6 @@
     },
     "issueObserve": {
       "about": "Follow execution as JSONL"
-    },
-    "authLogin": {
-      "about": "Sign in to that server; every command after reaches it"
-    },
-    "authStatus": {
-      "about": "See where you are signed in"
-    },
-    "authLogout": {
-      "about": "Sign out and go back to the server on this computer"
     }
   },
   "issue": {
@@ -889,16 +828,5 @@
     "read": "Read a context resource. JSON requires uri (vv:// resource address). Optional offset and limit (integers).",
     "doctor": "Authenticate a read-only session_list call to check credentials and tool access; this does not prove the coding agent loaded optional MCP. JSON defaults to an empty object.",
     "json": "Tool input as a JSON object; see the command description for fields."
-  },
-  "auth": {
-    "here": "{server} is the server on this computer: the command line uses it as is, no sign-in needed",
-    "approve": "Open {link} in a browser\nCode {code}: approve if the page shows the same code. Waiting for approval…",
-    "noBrowser": "Could not open a browser: open the link above yourself",
-    "signedIn": "Signed in to {server}; this computer is “{device}” in the device list",
-    "notSignedIn": "Not signed in: commands reach {server}",
-    "revoked": "{server} took this computer's key back: run vibevalley auth login again",
-    "status": "Signed in to {server} as “{device}”; you are “{name}”",
-    "signedOut": "Signed out of {server}",
-    "logoutUnsaid": "Could not have the server take the key back ({why}): this computer forgot it; take it back on the devices page"
   }
 }

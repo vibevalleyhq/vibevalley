@@ -1,1 +1,1 @@
-export { codePointOffset, editSpans, knownTypes, listNumbers, markdownShortcut, plainOf } from "@vibevalley/artifact/blocks";
+export { knownTypes, plainOf } from "@vibevalley/artifact/blocks";

@@ -79,15 +79,6 @@
   "complete": {
     "newPage": "新页面"
   },
-  "toolbar": {
-    "label": "编辑这一块",
-    "indent": "缩进",
-    "outdent": "取消缩进",
-    "up": "上移",
-    "down": "下移",
-    "todo": "切换待办",
-    "link": "插入链接"
-  },
   "rail": {
     "label": "这一页的旁注",
     "show": "打开旁注",

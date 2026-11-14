@@ -12,7 +12,7 @@ const mine = { kind: "user" } as const;
 const moss = { model: "moss", connection: "moss-main", revision: 3 } as const;
 const stamps = (ago: number) => ({ createdAt: now - ago * min, updatedAt: now - ago * min + 20_000 });
 
-export const libraryItems: LibraryItem[] = [
+const libraryItems: LibraryItem[] = [
   {
     attachment: { id: "lib-poster", name: "海报.png", type: "image/png", size: 482_113 },
     origin: { kind: "generated", job: "job-image", jobKind: "image" },

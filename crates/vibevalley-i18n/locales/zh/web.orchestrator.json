@@ -25,11 +25,6 @@
       "blurb": "圆滚滚的农场机器人，脸上的屏会笑。"
     }
   },
-  "pet": {
-    "dog": "小狗",
-    "ragdoll": "重点色布偶猫",
-    "bluecat": "蓝猫"
-  },
   "orchestrator": {
     "tab": {
       "memory": "记性",

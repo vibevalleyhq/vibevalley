@@ -25,14 +25,9 @@
   "noUsage": "这台农机 不报用量",
   "cursor": "Cursor 要单独装它的 SDK（@cursor/sdk），VibeValley 还没接",
   "oarUnknown": "oar 不认识这台农机",
-  "tools": "{n} 个工具",
   "notSaved": "没存下 {id} 的设置：{why}",
   "cannotDrive": "oar 驱动不了 {runtime}",
   "cannotSend": "{name} 派不出去：{why}",
   "defaultModel": "{runtime} 没有 {model} 这个模型，{name} 先用默认模型",
-  "piNoBalance": "{provider} 不报余额",
-  "piNoModel": "pi 没有设默认模型",
-  "piUnread": "没读到 DeepSeek 余额",
-  "effort": "{model} 没有 {effort} 这一档，可选：{levels}",
-  "piTimedOut": "问 DeepSeek 余额超时了"
+  "effort": "{model} 没有 {effort} 这一档，可选：{levels}"
 }

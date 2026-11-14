@@ -2,7 +2,7 @@
 // nsh has the thing. There is no DOM: focus refs, click-away and the
 // viewport come from nsh (autoFocus props, Overlay's onPressOutside,
 // windowSize).
-import { untracked, windowSize, type Accessor, type JSX } from "nsh";
+import { untracked, type Accessor, type JSX } from "nsh";
 
 import { createEffect, createSignal } from "../../solid";
 import { useInterval } from "./timer";
@@ -17,14 +17,6 @@ export function useNow(ms = 30_000): Accessor<number> {
 /** Rebuilds its children whenever `key` changes, as a React key does: their state starts over. */
 export function Keyed(props: { key: unknown; children: () => JSX.Element }) {
   return <Each of={[props.key]}>{() => untracked(() => props.children())}</Each>;
-}
-
-/** aria-expanded, aria-pressed, aria-selected: "true" or "false", as a boolean false would drop the attribute. */
-export const aria = (on: boolean) => (on ? "true" : "false");
-
-/** The window's size, following it as it is resized. */
-export function useViewport(): Accessor<{ w: number; h: number }> {
-  return () => ({ w: windowSize().width, h: windowSize().height });
 }
 
 /** The value once it has stopped changing for `ms`: what is asked of the server while someone types. */

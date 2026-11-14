@@ -14,8 +14,6 @@ import { mix, tone } from "../../../ui/tone";
 import type { BoardCard, Tone } from "../model/cards";
 import { cardAgent } from "../model/cards";
 
-export const toneVar = (name: Tone) => tone(name);
-
 const statusTone: Record<IssueStatus, Tone> = { backlog: "faint", todo: "muted", in_progress: "water", in_review: "wheat", done: "leaf", canceled: "faint" };
 
 /** A ring that fills as the work goes on, as Linear draws it. */

@@ -1,5 +1,4 @@
 {
-  "image": "Image generation",
   "speech": {
     "title": "Single-speaker speech",
     "notice": "Send text to the displayed MOSS account to generate one speaker. Charges may apply. Playback never starts automatically; Flash streaming plays only when requested. Canceling stops local waiting, not necessarily provider work or charges. Generated audio supports up to 512 MB per file. Results over 25 MiB stay in Media storage only you can reach, share its 2 GiB quota with uploaded inputs, and cannot be published to a channel.",
@@ -44,7 +43,6 @@
     "consent": "I approve sending these files and this prompt to the displayed MOSS connection.",
     "uploading": "Storing selected files on this computer…",
     "stopUpload": "Stop local upload",
-    "uploadFailed": "Local upload failed. This submission has not started understanding; retry or select the files again.",
     "submit": "Submit understanding",
     "new": "New understanding request",
     "newAsk": "Start a new request? This may upload again and incur another charge. It will not recover an unknown earlier result.",

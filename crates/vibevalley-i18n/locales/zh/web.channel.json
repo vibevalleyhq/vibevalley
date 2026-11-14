@@ -60,7 +60,6 @@
     "label": "定时任务「{name}」",
     "on": "开着",
     "off": "关着",
-    "remove": "删掉",
     "removeWhich": "删掉定时任务「{name}」",
     "sure": "确定删？",
     "approveWhich": "同意定时任务「{name}」",
@@ -135,7 +134,6 @@
     "notSent": "没发出去：{why}",
     "who": "叫谁",
     "mention": "叫人",
-    "stop": "叫停助手",
     "stopHint": "叫助手停下这一轮，派出去的帮工照常干活",
     "send": "发送",
     "sendHint": "回车发送 · Shift+回车换行",
@@ -192,7 +190,6 @@
     "none": "没有找到",
     "direct": "私聊",
     "newDirect": "开一个私聊",
-    "keys": "{mac, select, true {⌘K} other {Ctrl K}}",
     "note": "笔记 · {tier}",
     "searchNotes": "在笔记里搜「{q}」"
   },

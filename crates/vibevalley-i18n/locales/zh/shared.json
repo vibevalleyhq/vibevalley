@@ -105,8 +105,6 @@
     "labeled": "{label}：{text}",
     "aside": "{text}（{aside}）",
     "sentence": "{text}。",
-    "and": "{a}，{b}",
-    "clauses": "{a}；{b}",
     "separator": "、"
   }
 }

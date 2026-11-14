@@ -12,7 +12,7 @@ import { transport } from "../../infra/transport";
 
 const PixelDir = z.object({ path: z.string() });
 
-export const pixelDirQuery = defineQuery({
+const pixelDirQuery = defineQuery({
   schema: PixelDir,
   key: () => ["pixel-dir"],
   fetch: async (): Promise<unknown> => {

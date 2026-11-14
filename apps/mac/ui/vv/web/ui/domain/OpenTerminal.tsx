@@ -5,7 +5,7 @@ import { currentLocale } from "@vibevalley/i18n";
 import { hostApi } from "../../../../bridge";
 import { IconButton } from "../IconButton";
 
-export const openTerminalLabel = () => (currentLocale() === "zh" ? "在这里打开终端" : "Open a terminal here");
+const openTerminalLabel = () => (currentLocale() === "zh" ? "在这里打开终端" : "Open a terminal here");
 
 export function OpenTerminal(props: { cwd: string; title?: string; testid?: string }) {
   return (

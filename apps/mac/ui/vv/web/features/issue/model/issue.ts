@@ -1,5 +1,5 @@
 import { t } from "@vibevalley/i18n";
-import type { Issue, IssueStatus, Run, RunTrigger, Session, SessionView, SpaceView } from "@vibevalley/protocol";
+import type { Issue, Run, RunTrigger, Session, SessionView, SpaceView } from "@vibevalley/protocol";
 import { assignedAgentOf, closedText, latestSessionIdOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 /** Assigned to an agent on duty (the orchestrators today): it answers it, no helper is hired for it. */
 export const assignedOnDuty = (issue: Issue, onDuty: ReadonlySet<string>) => onDuty.has(assignedAgentOf(issue) ?? "");
@@ -27,12 +27,6 @@ export const stageLabel: Record<Stage, string> = {
   work: t("web.issue.boardLabels.stage.work"),
   finish: t("web.issue.boardLabels.stage.finish"),
 };
-
-export function stageOf(s: IssueStatus): Stage {
-  if (s === "backlog") return "talk";
-  if (s === "todo" || s === "in_progress") return "work";
-  return "finish";
-}
 
 export type IssueTag = "queued" | "working" | "waiting" | "closed";
 

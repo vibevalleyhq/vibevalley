@@ -3,11 +3,10 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const vv = process.cwd();
-const md = await import(join(vv, "packages/pkm/src/markdown.ts"));
-const g = await import(join(vv, "packages/pkm/src/graph.ts"));
-const outline = await import(join(vv, "packages/pkm/src/outline.ts"));
-const rules = await import(join(vv, "packages/protocol/src/rules/index.ts"));
+import * as md from "@vibevalley/pkm/markdown";
+import * as outline from "@vibevalley/pkm/outline";
+import * as g from "@vibevalley/pkm/graph";
+import * as rules from "@vibevalley/protocol/rules";
 
 const R1 = "6a1b2c3d-0000-4000-a000-000000000001";
 const R2 = "6a1b2c3d-0000-4000-a000-000000000002";

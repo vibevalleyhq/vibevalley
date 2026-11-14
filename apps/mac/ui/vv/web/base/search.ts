@@ -1,7 +1,6 @@
 let spell: ((text: string, query: string) => boolean) | undefined;
 
-/** Settles once pinyin matches too (tests wait on it). */
-export const pinyinLoaded: Promise<void> = import("pinyin-pro").then(({ match }) => {
+void import("pinyin-pro").then(({ match }) => {
   spell = (text, query) => match(text, query, { continuous: true }) !== null;
 });
 

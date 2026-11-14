@@ -153,7 +153,7 @@ function Row(props: { label: string; children: JSX.Element }) {
   );
 }
 
-export function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
+function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
   const core = useCore();
   // What an action changes comes back in the core state, where the connectors say each status.
   const act = createAct();

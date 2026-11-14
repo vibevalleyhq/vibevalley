@@ -6,10 +6,6 @@ import { pkmTag, slugOf } from "./outline.ts";
 /** The tiers in the list's order: what is worked on first, what is done with last. */
 export const tierOrder: readonly PkmTier[] = ["project", "area", "resource", "inbox", "journal", "archive"];
 
-export function byTier(pages: readonly PkmPageSummary[]): { readonly tier: PkmTier; readonly pages: readonly PkmPageSummary[] }[] {
-  return tierOrder.map((tier) => ({ tier, pages: pages.filter((p) => p.tier === tier) })).filter((g) => g.pages.length > 0);
-}
-
 /** Whether the block at i has blocks under it (the list is in the page's order, pre-order). */
 export const hasChildren = (blocks: readonly PkmBlock[], i: number) => (blocks[i + 1]?.depth ?? -1) > (blocks[i]?.depth ?? 0);
 

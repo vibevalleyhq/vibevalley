@@ -7,7 +7,7 @@ import { type CoreHandlers, coreEndpoints } from "./core/api";
 import { type CronHandlers, cronEndpoints } from "./cron/api";
 import type { Endpoint } from "./endpoint";
 import { type GameHandlers, gameEndpoints } from "./game/api";
-import { actCommand, type IssueHandlers, issueEndpoints } from "./issue/api";
+import { type IssueHandlers, issueEndpoints } from "./issue/api";
 import { type MediaHandlers, mediaEndpoints } from "./media/api";
 import { type MemoryHandlers, memoryEndpoints } from "./memory/api";
 import { type OrchestratorHandlers, orchestratorEndpoints } from "./orchestrator/api";
@@ -20,7 +20,6 @@ import { type SettingHandlers, settingEndpoints } from "./setting/api";
 import { type VoiceHandlers, voiceEndpoints } from "./voice/api";
 
 export * from "./endpoint";
-export { actCommand };
 export type { AgentHandlers } from "./agent/api";
 export type { ArtifactHandlers } from "./artifact/api";
 export type { ChannelHandlers } from "./channel/api";

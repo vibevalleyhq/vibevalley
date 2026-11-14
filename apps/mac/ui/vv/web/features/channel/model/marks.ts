@@ -98,7 +98,7 @@ export function markUnread(intents: Intents<ReadMark, void>, mark: ReadMark, say
   });
 }
 
-export function markedRead(c: Channel, unreads: readonly Intent<ReadMark, void>[]): Channel {
+function markedRead(c: Channel, unreads: readonly Intent<ReadMark, void>[]): Channel {
   const mark = unreads.findLast((u) => u.input.channel === c.id);
   if (mark === undefined) return c;
   const read = unreadUpTo(mark.input.number);
@@ -167,7 +167,7 @@ function withReaction(m: ChatMessage, emoji: string, on: boolean): ChatMessage {
   return { ...m, reactions };
 }
 
-export function markedMessages(
+function markedMessages(
   messages: readonly ChatMessage[],
   reactions: readonly Intent<ReactionMark, ChatMessage>[],
   pins: readonly Intent<PinMark, ChatMessage>[],
@@ -202,7 +202,7 @@ interface ChannelMarks {
   readonly unreads: readonly Intent<ReadMark, void>[];
 }
 
-export function markedChannel(c: Channel, marks: ChannelMarks): Channel {
+function markedChannel(c: Channel, marks: ChannelMarks): Channel {
   let shown = markedRead(c, marks.unreads);
   const archive = marks.archives.findLast((a) => a.input.id === c.id);
   if (archive && (shown.archived !== undefined) !== archive.input.on) {

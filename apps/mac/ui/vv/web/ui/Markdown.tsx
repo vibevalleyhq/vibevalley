@@ -35,7 +35,7 @@ const classes = {
 const headings = (size: string) => ({ heading2: size, heading3: size, heading4: size, heading5: size, heading6: size });
 
 /** `#12` outside code and links becomes a link to /issues/12; `@name` with mentions becomes **@name**. */
-export function richenText(text: string, mentions: boolean): string {
+function richenText(text: string, mentions: boolean): string {
   return text
     .split(/(```[\s\S]*?```|`[^`]*`|\[[^\]]*\]\([^)]*\))/u)
     .map((part, i) => {

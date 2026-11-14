@@ -45,7 +45,7 @@ const CAP = 220;
 const OPEN_MAX = 640;
 
 /** The short human line for a call, read from its arguments. */
-export function callSummary(name: string, input: unknown): string {
+function callSummary(name: string, input: unknown): string {
   if (input === null || typeof input !== "object") return typeof input === "string" ? input : "";
   const o = input as Record<string, unknown>;
   for (const key of ["description", "command", "file_path", "path", "pattern", "query", "url", "prompt"]) {
@@ -57,7 +57,7 @@ export function callSummary(name: string, input: unknown): string {
 }
 
 /** The line of a failed call's output that says what went wrong: its last; the whole output stays under Result. */
-export function errorLine(output: string): string {
+function errorLine(output: string): string {
   const lines = output
     .split("\n")
     .map((l) => l.trim())
@@ -173,7 +173,7 @@ export function IconTile(props: { glyph: string; size?: number }) {
   );
 }
 
-export function Spinner(props: { color?: string }) {
+function Spinner(props: { color?: string }) {
   const p = () => tok();
   return (
     <View
@@ -193,7 +193,7 @@ export function Spinner(props: { color?: string }) {
   );
 }
 
-export function ErrorMark() {
+function ErrorMark() {
   const p = () => tok();
   return (
     <View
@@ -215,7 +215,7 @@ export function ErrorMark() {
 }
 
 /** Running: spinner + live timer. Done: check + duration. Failed: error mark + "Failed". */
-export function CallStatus(props: { status: ToolCallStatus; startedMs: number; endedMs: number | null }) {
+function CallStatus(props: { status: ToolCallStatus; startedMs: number; endedMs: number | null }) {
   const p = () => tok();
   const live = useStopwatch(
     () => props.status === "running",
@@ -306,7 +306,7 @@ function highlight(text: string, p: Palette): JSX.Element[] {
   return out;
 }
 
-export function CopyButton(props: { text: string; label: string }) {
+function CopyButton(props: { text: string; label: string }) {
   const p = () => tok();
   const copied = signal(false);
   let timer: number | undefined;
@@ -343,7 +343,7 @@ export function CopyButton(props: { text: string; label: string }) {
 }
 
 /** A labelled block of code: copy on the right, capped at 220 px with a fade and "Show all", 640 px with an inner scroll when open. */
-export function CodeSection(props: { label: string; value: unknown; tone?: "danger"; testID?: string }) {
+function CodeSection(props: { label: string; value: unknown; tone?: "danger"; testID?: string }) {
   const p = () => tok();
   const shown = () => toText(props.value);
   const full = signal(false);
