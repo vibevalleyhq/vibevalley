@@ -4,6 +4,7 @@ mod host;
 mod hosted;
 mod panes;
 mod pixel;
+mod serving;
 mod shell;
 mod terminal;
 mod theme;
@@ -12,6 +13,7 @@ mod viewer;
 use gpui_kit::{AppContext as _, Bounds, TitlebarOptions, WindowBounds, WindowOptions, point, px, size};
 
 fn main() {
+    serving::install_tls();
     gpui_kit::application().run(|cx| {
         gpui_kit::init(cx);
         host::set_app_icon();
