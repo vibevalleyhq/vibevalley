@@ -1,27 +1,289 @@
 {
- "repo.list": [
-  {
-   "name": "vibevalley",
-   "path": "/Users/me/vibevalley",
-   "maxSessions": 4,
-   "last": 1794496400000
-  },
-  {
-   "name": "vibevalley",
-   "path": "/Users/me/vibevalley",
-   "maxSessions": 3,
-   "last": 1794240800000
-  },
-  {
-   "name": "notes",
-   "path": "/Users/me/notes",
-   "maxSessions": 2,
-   "last": 1791044000000
-  },
-  {
-   "name": "site",
-   "path": "/Users/me/site",
-   "maxSessions": 2
-  }
- ]
+  "repo.list": [
+    {
+      "name": "vibevalley",
+      "path": "/Users/me/vibevalley",
+      "maxSessions": 4,
+      "last": 1794496400000
+    },
+    {
+      "name": "vibevalley",
+      "path": "/Users/me/vibevalley",
+      "maxSessions": 3,
+      "last": 1794240800000
+    },
+    {
+      "name": "notes",
+      "path": "/Users/me/notes",
+      "maxSessions": 2,
+      "last": 1791044000000
+    },
+    {
+      "name": "site",
+      "path": "/Users/me/site",
+      "maxSessions": 2
+    }
+  ],
+  "agent.list": [
+    {
+      "id": "agent-owl",
+      "name": "owl",
+      "role": "worker",
+      "duty": "",
+      "enabled": true,
+      "runtime": "codex",
+      "model": "",
+      "effort": "",
+      "persona": "",
+      "personaMode": "append",
+      "skills": [],
+      "mcpServers": [],
+      "disallowedTools": [],
+      "env": {},
+      "workdir": "",
+      "worktree": true,
+      "tags": [],
+      "look": {
+        "species": "owl",
+        "outfit": "farmer",
+        "build": "biped",
+        "head": "rounded",
+        "body": "#718c5f",
+        "trim": "#d6c49b",
+        "hat": "#718c5f",
+        "eye": "#1b291b",
+        "orchestrator": null
+      }
+    },
+    {
+      "id": "agent-bear",
+      "name": "bear",
+      "role": "worker",
+      "duty": "",
+      "enabled": true,
+      "runtime": "codex",
+      "model": "",
+      "effort": "",
+      "persona": "",
+      "personaMode": "append",
+      "skills": [],
+      "mcpServers": [],
+      "disallowedTools": [],
+      "env": {},
+      "workdir": "",
+      "worktree": true,
+      "tags": [],
+      "look": {
+        "species": "bear",
+        "outfit": "farmer",
+        "build": "biped",
+        "head": "rounded",
+        "body": "#718c5f",
+        "trim": "#d6c49b",
+        "hat": "#718c5f",
+        "eye": "#1b291b",
+        "orchestrator": null
+      }
+    },
+    {
+      "id": "agent-fox",
+      "name": "fox",
+      "role": "worker",
+      "duty": "",
+      "enabled": true,
+      "runtime": "codex",
+      "model": "",
+      "effort": "",
+      "persona": "",
+      "personaMode": "append",
+      "skills": [],
+      "mcpServers": [],
+      "disallowedTools": [],
+      "env": {},
+      "workdir": "",
+      "worktree": true,
+      "tags": [],
+      "look": {
+        "species": "fox",
+        "outfit": "farmer",
+        "build": "biped",
+        "head": "rounded",
+        "body": "#718c5f",
+        "trim": "#d6c49b",
+        "hat": "#718c5f",
+        "eye": "#1b291b",
+        "orchestrator": null
+      }
+    },
+    {
+      "id": "agent-cat",
+      "name": "cat",
+      "role": "worker",
+      "duty": "",
+      "enabled": true,
+      "runtime": "codex",
+      "model": "",
+      "effort": "",
+      "persona": "",
+      "personaMode": "append",
+      "skills": [],
+      "mcpServers": [],
+      "disallowedTools": [],
+      "env": {},
+      "workdir": "",
+      "worktree": true,
+      "tags": [],
+      "look": {
+        "species": "cat",
+        "outfit": "farmer",
+        "build": "biped",
+        "head": "rounded",
+        "body": "#718c5f",
+        "trim": "#d6c49b",
+        "hat": "#718c5f",
+        "eye": "#1b291b",
+        "orchestrator": null
+      }
+    },
+    {
+      "id": "agent-rabbit",
+      "name": "rabbit",
+      "role": "worker",
+      "duty": "",
+      "enabled": true,
+      "runtime": "codex",
+      "model": "",
+      "effort": "",
+      "persona": "",
+      "personaMode": "append",
+      "skills": [],
+      "mcpServers": [],
+      "disallowedTools": [],
+      "env": {},
+      "workdir": "",
+      "worktree": true,
+      "tags": [],
+      "look": {
+        "species": "rabbit",
+        "outfit": "farmer",
+        "build": "biped",
+        "head": "rounded",
+        "body": "#718c5f",
+        "trim": "#d6c49b",
+        "hat": "#718c5f",
+        "eye": "#1b291b",
+        "orchestrator": null
+      }
+    },
+    {
+      "id": "agent-raccoon",
+      "name": "raccoon",
+      "role": "worker",
+      "duty": "",
+      "enabled": true,
+      "runtime": "codex",
+      "model": "",
+      "effort": "",
+      "persona": "",
+      "personaMode": "append",
+      "skills": [],
+      "mcpServers": [],
+      "disallowedTools": [],
+      "env": {},
+      "workdir": "",
+      "worktree": true,
+      "tags": [],
+      "look": {
+        "species": "raccoon",
+        "outfit": "farmer",
+        "build": "biped",
+        "head": "rounded",
+        "body": "#718c5f",
+        "trim": "#d6c49b",
+        "hat": "#718c5f",
+        "eye": "#1b291b",
+        "orchestrator": null
+      }
+    },
+    {
+      "id": "agent-hedgehog",
+      "name": "hedgehog",
+      "role": "worker",
+      "duty": "",
+      "enabled": true,
+      "runtime": "codex",
+      "model": "",
+      "effort": "",
+      "persona": "",
+      "personaMode": "append",
+      "skills": [],
+      "mcpServers": [],
+      "disallowedTools": [],
+      "env": {},
+      "workdir": "",
+      "worktree": true,
+      "tags": [],
+      "look": {
+        "species": "hedgehog",
+        "outfit": "farmer",
+        "build": "biped",
+        "head": "rounded",
+        "body": "#718c5f",
+        "trim": "#d6c49b",
+        "hat": "#718c5f",
+        "eye": "#1b291b",
+        "orchestrator": null
+      }
+    }
+  ],
+  "game.achievement.list": [],
+  "channel.list": [
+    {
+      "id": "farm-chat",
+      "type": "channel",
+      "default": true,
+      "category": "",
+      "notify": "all",
+      "description": "农场验收频道",
+      "subjectKind": null,
+      "replies": 0,
+      "title": "田头验收",
+      "at": 0,
+      "unread": 1,
+      "last": {
+        "id": "m1",
+        "number": 1,
+        "from": "u",
+        "name": "验收",
+        "text": "农场入口保留频道上下文",
+        "at": 1
+      },
+      "name": "田头验收"
+    }
+  ],
+  "channel.message.list": [
+    {
+      "id": "farm-message",
+      "number": 1,
+      "channel": "farm-chat",
+      "from": "user",
+      "actor": {
+        "kind": "user",
+        "id": "user"
+      },
+      "name": "验收",
+      "kind": "chat",
+      "text": "农场入口保留频道上下文",
+      "mentions": [],
+      "outcome": null,
+      "spoken": false,
+      "at": 1,
+      "revision": 1,
+      "reactions": [],
+      "attachments": [],
+      "embeds": []
+    }
+  ],
+  "channel.markRead": null,
+  "issue.history.list": []
 }

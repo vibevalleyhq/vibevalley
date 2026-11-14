@@ -62,6 +62,7 @@
    | `new_terminal`、`split_right`、`split_down`、`close_tab`、`activate:<n>` | 终端、分栏、关标签页、切项目 |
    | `send:<文字>` | 敲进当前终端并回车 |
    | `palette:<files\|commands\|search>`、`query:<文字>`、`close_palette` | 命令面板 |
+   | `resize:<宽>,<高>` | 调整窗口尺寸（点），验窄窗布局 |
    | `toggle_theme`、`save`、`wait:<毫秒>`、`quit` | 换主题、存布局、等、退出 |
    | `close_kind:<pixel\|hosted\|terminal>[@<标题里的字>]`、`close_tab_id:<id>` | 关掉脚本自己开的窗格（布局会存下来） |
    | 不带 `shell` 的一行 JSON | 当成页面发来的动作（`apps/mac/src/hosted/bridge.rs` 的 `Action`），如 `{"type":"openFarm","repo":""}` |

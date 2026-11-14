@@ -141,3 +141,142 @@ fn catalog_shelves_every_sprite() {
     assert_eq!(c.debug_state()["ground"], "夜里");
     save("catalog-map-night", &raster(&c.draw(), Some(&atlas), 2.0));
 }
+
+#[test]
+fn regression_night_tints_ground_but_keeps_hud_readable() {
+    let (world, atlas) = load_village().unwrap();
+    let mut scene = FarmScene::new(world, atlas.clone());
+    scene.frame = Frame::parse(&fixture("state.json"));
+    scene.clock.set_time_of_day(0.50);
+    let day = scene.draw(2.0);
+    scene.clock.set_time_of_day(0.92);
+    let night = scene.draw(2.0);
+    assert!(night.lit > 0);
+    assert!(night.ops[night.lit..].iter().all(|op| matches!(op, draw::Op::Glow { .. })));
+    let energy = |img: image::RgbaImage| img.pixels().map(|p| p.0[..3].iter().map(|c| *c as u64).sum::<u64>()).sum::<u64>();
+    assert!(energy(raster(&night, Some(&atlas), 1.0)) < energy(raster(&day, Some(&atlas), 1.0)));
+    let paper = |list: &draw::DrawList| {
+        list.hud
+            .iter()
+            .find_map(|op| match op {
+                draw::HudOp::Rect { color, .. } => Some(*color),
+                _ => None,
+            })
+            .unwrap()
+    };
+    assert_eq!(paper(&day), paper(&night));
+    save("farm-hud-night", &draw::raster_view(&night, Some(&atlas), scene.view_size));
+}
+
+#[test]
+fn regression_farm_controls_stay_in_the_pane_and_modal_blocks_the_ground() {
+    use farm::hud::{Action, Layout, Panel, hit};
+    let (world, atlas) = load_village().unwrap();
+    let mut scene = FarmScene::new(world, atlas.clone());
+    scene.frame = Frame::parse(&fixture("state.json"));
+    for size in [(320.0, 400.0), (768.0, 512.0), (1200.0, 700.0)] {
+        scene.view_size = size;
+        let layout = Layout::new(size);
+        for b in layout.nav.iter().chain(&layout.tools) {
+            assert!(b.x >= 0.0 && b.y >= 0.0 && b.x + b.w <= size.0 && b.y + b.h <= size.1);
+            assert!(hit(&scene, b.x + b.w / 2.0, b.y + b.h / 2.0).is_some());
+        }
+        scene.panel = Some(Panel::Chat);
+        assert_eq!(hit(&scene, 0.0, 0.0), Some(Action::Block));
+        let list = scene.draw(2.0);
+        assert!(list.hud_view);
+        save(&format!("farm-chat-{}", size.0 as u32), &draw::raster_view(&list, Some(&atlas), size));
+        scene.panel = None;
+        scene.phone_open = true;
+        assert_eq!(hit(&scene, layout.phone.x + 40.0, layout.phone.y + 40.0), Some(Action::Block));
+        scene.phone_open = false;
+    }
+}
+
+#[test]
+fn regression_tree_hud_is_anchored_to_the_pane() {
+    let mut tree = tree::TreeScene::new(load_atlas().unwrap());
+    tree.view_size = (320.0, 400.0);
+    let list = tree.draw();
+    assert!(list.hud_view);
+    assert!(list.hud.iter().any(|op| matches!(op, draw::HudOp::TextIn { text, .. } if !text.is_empty())));
+    for op in &list.hud {
+        if let draw::HudOp::Rect { x, y, w, h, .. } = op {
+            assert!(*x >= 0.0 && *y >= 0.0 && x + w <= 320.0 && y + h <= 400.0);
+        }
+    }
+}
+
+#[test]
+fn regression_tools_only_choose_actions_supplied_by_the_server() {
+    use farm::scene::FarmTool;
+    use vibevalley_protocol::{IssueAct, IssueAction, IssueStage, IssueStageKind};
+    let mut stage = IssueStage {
+        state: IssueStageKind::Working,
+        since: None,
+        stuck: None,
+        lead: None,
+        acts: vec![],
+    };
+    assert!(FarmTool::Shovel.action(&stage).is_none());
+    stage.acts.push(IssueAction::Stop { act: IssueAct::Stop });
+    assert!(matches!(FarmTool::Shovel.action(&stage), Some(IssueAction::Stop { .. })));
+    assert!(FarmTool::Bug.action(&stage).is_none());
+    for tool in [FarmTool::Hand, FarmTool::Water, FarmTool::Weed, FarmTool::Harvest] {
+        assert!(tool.action(&stage).is_none());
+    }
+}
+
+#[test]
+fn regression_helper_outfits_change_on_the_next_frame() {
+    let (world, atlas) = load_village().unwrap();
+    let mut scene = FarmScene::new(world, atlas);
+    scene.frame = Frame::parse(&fixture("state.json"));
+    let worker = scene.frame.state.sessions.iter().find(|s| s.is_worker()).unwrap().clone();
+    scene.agent_looks.insert(worker.agent.clone(), ("fox".into(), "farmer".into()));
+    scene.tick(0.1);
+    let list = scene.draw(2.0);
+    assert!(
+        list.ops
+            .iter()
+            .any(|op| matches!(op, draw::Op::Sprite { name, .. } if name.starts_with("fox-farmer")))
+    );
+    scene.agent_looks.insert(worker.agent, ("rabbit".into(), "farmer".into()));
+    scene.tick(0.1);
+    assert!(
+        scene
+            .draw(2.0)
+            .ops
+            .iter()
+            .any(|op| matches!(op, draw::Op::Sprite { name, .. } if name.starts_with("rabbit-farmer")))
+    );
+}
+
+#[test]
+fn regression_native_farm_labels_are_embedded_for_both_languages() {
+    for locale in ["zh", "en"] {
+        for key in ["web.farm.native.progress", "web.farm.native.treeCounts", "web.farm.tool.hand.hint"] {
+            assert_ne!(vibevalley_i18n::t_in(locale, key, &[]), key);
+        }
+    }
+}
+
+#[test]
+fn farm_fixture_supplies_typed_chat_and_profiles() {
+    let frame = Frame::parse(&fixture("state.json"));
+    assert!(!frame.state.chat.channels.is_empty());
+    let replies = fixture("responses.json");
+    let agents: Vec<vibevalley_protocol::Agent> = serde_json::from_value(replies["agent.list"].clone()).unwrap();
+    let messages: Vec<vibevalley_protocol::ChatMessage> = serde_json::from_value(replies["channel.message.list"].clone()).unwrap();
+    assert!(!agents.is_empty());
+    assert_eq!(messages[0].channel, frame.state.chat.channels[0].id);
+    let (world, atlas) = load_village().unwrap();
+    let mut scene = FarmScene::new(world, atlas);
+    scene.frame = frame;
+    scene.panel = Some(farm::hud::Panel::Chat);
+    let p = farm::hud::Layout::new(scene.view_size).panel;
+    assert_eq!(
+        farm::hud::hit(&scene, p.x + 20.0, p.y + 50.0),
+        Some(farm::hud::Action::Route(format!("/chat/{}", messages[0].channel)))
+    );
+}

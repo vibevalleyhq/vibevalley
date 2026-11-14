@@ -21,6 +21,7 @@
 | `apps/mac/src/pixel/farm/frame.rs` | 场景读的那部分 `StateFrame`，宽松解码 |
 | `apps/mac/src/pixel/farm/world.rs` | 院子的地点和规则：9 块地 `BEDS`、院内建筑 `YARD_PLACES`、去处 `place_of_action`、`Whereabouts`、姿势 `pose_of` 与 `PoseHold`、命中 `village_hit_at` |
 | `apps/mac/src/pixel/farm/scene.rs` | `FarmScene`：照最新一帧画村子并让它一直动；六把农具 `FarmTool` |
+| `apps/mac/src/pixel/farm/hud.rs`、`snake.rs` | 按窗格排工具栏、面板和手机；手机里的贪吃蛇只留本地分数 |
 | `apps/mac/src/pixel/farm/islands.rs` | 仓库群岛地图：规则 `islands_of`、`plots_in`，画面 `MapScene` |
 | `apps/mac/src/pixel/nav.rs`、`sky.rs` | 网格 A* 与沿路走的 `Walker`；日钟 `DayClock`、天色、整像素取景 `frame_whole` |
 | `apps/mac/src/pixel/tree.rs`、`opening.rs`、`catalog.rs` | 记忆树、开场、图鉴的贴图书架 |
@@ -47,7 +48,11 @@
   - 2 倍密贴图按密度映射回逻辑坐标（`atlas.rs`）。
   - 画面只取整数倍缩放，农场左右每边最多裁 5%、上下最多裁 8%（`FARM_CUT`）。
 - **像素保持锐利**：GPUI 采样是线性的，所以每张图先在 CPU 上最近邻重采样到它盖住的设备像素再 1:1 画（`element.rs`）。
-- **六把农具对应数字键 1–6**（`FarmTool`）：手、浇水、捉虫、除草、收获、铲子。
+- **六把农具对应数字键 1–6**（`FarmTool`）：手、浇水、捉虫、除草、收获、铲子。捉虫、铲子只执行服务端 `Issue.stage.acts` 给出的重试或叫停；需带话、需验收的动作打开工单页。一次只发一条命令，失败显示服务端原因，成功后才亮地块。
+- **HUD 按窗格定位**：工具栏和树的文字不随像素村裁边；窄窗导航分两行，文字裁切，面板分页，打开面板时挡住背后的地块点击。夜间乘色只作用于地面和角色，灯光与 HUD 保持自己的颜色。
+- **帮工外观来自档案**：进农场和打开面板时读 `agent.list`，动物与服装在下一帧更新；没有配置或素材时用现有的农夫贴图。
+- **田头和农场日志读频道**：田头列未归档的频道，日志包含串，显示最近一条话与未读数；点一行打开对应的聊天页，编辑器、输入法与发言沿用工作台。仓库面板列当前仓库工单，成就面板读服务端成就与进度。小摊只显示金币和未开张提示。
+- **像素手机**：点手机或按 P 开合；方向键或 WASD 玩贪吃蛇，游戏结束后点击或按空格重开。分数只属于这次小游戏，不写游戏账本。
 - **院内建筑即入口（`YARD_PLACES`）**：「工单」去 `/issues`，「档案」去 `/agents`，「工坊」去 `/runtimes`，「书屋」去 `/settings/skills`，点助手去 `/chat`；「小摊」「仓库」「任务与成就」「农场日志」是农场自己的面板。
 - **地图上一座岛一个仓库**（`islands.rs`）：点岛进那个仓库的农场，点空位去建工单（`/issues/new?repo=…`），点地块去它的工单，右键点岛在仓库目录开终端。
 - **音效没有音频文件**：配方在 `apps/mac/ui/vv/web/ui/pixel/sound.ts`，每次播放由 `synth.ts` 把配方合成一段 WAV，交宿主播放（`host.playAudio`）。

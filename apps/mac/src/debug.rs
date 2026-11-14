@@ -105,6 +105,7 @@ pub fn dump(shell: &Shell, cx: &App) -> Value {
         "projects": projects,
         "sidebar": shell.sidebar.read(cx).debug_state(),
         "workbench": shell.workbench.read(cx).debug_state(),
+        "pixel": shell.native_pixel.as_ref().map(|v| v.read(cx).debug_state()),
         "palette": shell.palette.as_ref().map(|p| json!({
             "open": p.open, "mode": p.mode.name(), "query": p.query, "view": p.view.read(cx).debug_state(),
         })),
@@ -302,6 +303,9 @@ fn shot(_: &mut Window, path: &str) {
 
 fn active_pixel(s: &Shell, cx: &App) -> Option<Entity<crate::pixel::view::PixelView>> {
     let _ = cx;
+    if let Some(view) = &s.native_pixel {
+        return Some(view.clone());
+    }
     let project = s.ws.active()?;
     let tab = project.layout.active_tab()?;
     match s.panes.get(&(project.id(), tab.id)) {
@@ -318,6 +322,13 @@ fn dump_pixels(
     cx: &mut App,
 ) -> Vec<(PathBuf, crate::pixel::draw::DrawList, Option<std::sync::Arc<crate::pixel::atlas::Atlas>>)> {
     let mut out = Vec::new();
+    if let Some(view) = &shell.native_pixel {
+        view.update(cx, |v, _| v.draw_unpainted());
+        let v = view.read(cx);
+        if let Some((list, atlas)) = v.snapshot() {
+            out.push((path.with_extension(format!("{}-native.png", v.kind)), list, atlas));
+        }
+    }
     for ((_, tab), pane) in &shell.panes {
         if let PaneEntity::Pixel(view) = pane {
             view.update(cx, |v, _| v.draw_unpainted());
@@ -333,6 +344,17 @@ fn dump_pixels(
 fn run(s: &mut Shell, cmd: &str, window: &mut Window, cx: &mut gpui_kit::Context<Shell>) {
     let (name, arg) = cmd.split_once(':').unwrap_or((cmd, ""));
     match name {
+        "resize" => {
+            if let Some((w, h)) = arg.split_once(',')
+                && let (Ok(w), Ok(h)) = (w.parse::<f32>(), h.parse::<f32>())
+                && w.is_finite()
+                && h.is_finite()
+                && w > 0.0
+                && h > 0.0
+            {
+                window.resize(gpui_kit::size(gpui_kit::px(w), gpui_kit::px(h)));
+            }
+        }
         "new_terminal" => s.new_terminal(None, window, cx),
         "split_right" => s.on_action(Action::PaletteSelect { id: "pane.split_right".into() }, window, cx),
         "split_down" => s.on_action(Action::PaletteSelect { id: "pane.split_down".into() }, window, cx),

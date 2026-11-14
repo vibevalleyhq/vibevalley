@@ -6,11 +6,13 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use super::super::atlas::Atlas;
-use super::super::draw::{DrawList, HudOp, Op, rgba};
+use super::super::draw::{DrawList, Op, rgba};
 use super::super::level::{Box2, Point, pt};
 use super::super::nav::{Facing, Walker, frame_at};
 use super::super::sky::{DayClock, clock_text, flat_light, sky_at};
 use super::frame::{Crop, Frame, Session};
+use super::hud::{self, Panel};
+use super::snake::SnakeGame;
 use super::world::{
     BEDS, Bed, Goal, GoalInput, PLOT_H, PLOT_W, Pose, PoseHold, REST_SPOTS, Stroll, StrollSpot, VillageHit, VillageWorld, Whereabouts, YARD_PLACES,
     bed_of_station, place_of_action, plot_calls, pose_of, spots_for, village_hit_at,
@@ -109,26 +111,30 @@ impl FarmTool {
         Self::ALL.get(i).copied()
     }
 
-    pub fn label(self) -> &'static str {
-        match self {
-            FarmTool::Hand => "手 · 查看与播种",
-            FarmTool::Water => "浇水 · 对话补充",
-            FarmTool::Bug => "捉虫 · 故障重试",
-            FarmTool::Weed => "除草 · 清理杂草",
-            FarmTool::Harvest => "收获 · 验收完成",
-            FarmTool::Shovel => "铲子 · 停止关闭",
-        }
+    pub fn label(self) -> String {
+        vibevalley_i18n::t(
+            match self {
+                FarmTool::Hand => "web.farm.tool.hand.hint",
+                FarmTool::Water => "web.farm.tool.water.hint",
+                FarmTool::Bug => "web.farm.tool.bug.hint",
+                FarmTool::Weed => "web.farm.tool.weed.hint",
+                FarmTool::Harvest => "web.farm.tool.harvest.hint",
+                FarmTool::Shovel => "web.farm.tool.shovel.hint",
+            },
+            &[],
+        )
     }
 
-    pub fn short(self) -> &'static str {
-        match self {
-            FarmTool::Hand => "查看",
-            FarmTool::Water => "浇水",
-            FarmTool::Bug => "捉虫",
-            FarmTool::Weed => "除草",
-            FarmTool::Harvest => "收获",
-            FarmTool::Shovel => "铲除",
-        }
+    pub fn action(self, stage: &vibevalley_protocol::IssueStage) -> Option<&vibevalley_protocol::IssueAction> {
+        use vibevalley_protocol::{IssueAct, IssueAction};
+        let wanted = match self {
+            Self::Bug => IssueAct::Cure,
+            Self::Shovel => IssueAct::Stop,
+            Self::Hand | Self::Water | Self::Weed | Self::Harvest => return None,
+        };
+        stage.acts.iter().find(|action| match action {
+            IssueAction::Move { act, .. } | IssueAction::Say { act } | IssueAction::Stop { act } => *act == wanted,
+        })
     }
 
     pub fn icon(self) -> &'static str {
@@ -160,71 +166,6 @@ pub enum FarmTap {
     Ground,
 }
 
-#[derive(Debug, Clone)]
-pub struct SnakeGame {
-    pub body: Vec<(i32, i32)>,
-    pub dir: (i32, i32),
-    pub bug: (i32, i32),
-    pub score: u32,
-    pub over: bool,
-    step_at: f32,
-}
-
-impl Default for SnakeGame {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl SnakeGame {
-    pub fn new() -> Self {
-        SnakeGame {
-            body: vec![(6, 5), (5, 5), (4, 5)],
-            dir: (1, 0),
-            bug: (11, 5),
-            score: 0,
-            over: false,
-            step_at: 0.0,
-        }
-    }
-
-    pub fn steer(&mut self, dx: i32, dy: i32) {
-        if self.dir.0 + dx != 0 || self.dir.1 + dy != 0 {
-            self.dir = (dx, dy);
-        }
-    }
-
-    pub fn tick(&mut self, t: f32, rng: u64) {
-        if self.over || t < self.step_at {
-            return;
-        }
-        self.step_at = t + 0.18;
-        let head = self.body[0];
-        let nx = (head.0 + self.dir.0).rem_euclid(16);
-        let ny = (head.1 + self.dir.1).rem_euclid(10);
-        if self.body.contains(&(nx, ny)) {
-            self.over = true;
-            return;
-        }
-        self.body.insert(0, (nx, ny));
-        if (nx, ny) == self.bug {
-            self.score += 10;
-            let mut h = rng.wrapping_add(self.score as u64 * 0x9e3779b9);
-            for _ in 0..32 {
-                h = h.wrapping_mul(6364136223846793005).wrapping_add(1);
-                let bx = ((h >> 16) % 16) as i32;
-                let by = ((h >> 32) % 10) as i32;
-                if !self.body.contains(&(bx, by)) {
-                    self.bug = (bx, by);
-                    break;
-                }
-            }
-        } else {
-            self.body.pop();
-        }
-    }
-}
-
 pub struct FarmScene {
     pub world: VillageWorld,
     pub atlas: Arc<Atlas>,
@@ -232,13 +173,16 @@ pub struct FarmScene {
     pub frame: Frame,
     pub agent_looks: HashMap<String, (String, String)>,
     pub tool: FarmTool,
-    pub panel_open: bool,
+    pub panel: Option<Panel>,
+    pub panel_page: usize,
+    pub view_size: (f32, f32),
+    pub achievements: Vec<vibevalley_protocol::Achievement>,
     pub phone_open: bool,
     pub snake: SnakeGame,
     pub bed_fx: Option<(usize, u32, f32)>,
     pub toast: Option<(String, f32)>,
     actors: HashMap<String, Actor>,
-    t: f32,
+    pub(super) t: f32,
     where_at: f32,
     stroll_at: f32,
     pub hover: Option<VillageHit>,
@@ -257,7 +201,10 @@ impl FarmScene {
             frame: Frame::default(),
             agent_looks: HashMap::new(),
             tool: FarmTool::Hand,
-            panel_open: false,
+            panel: None,
+            panel_page: 0,
+            view_size: (768.0, 512.0),
+            achievements: Vec::new(),
             phone_open: false,
             snake: SnakeGame::new(),
             bed_fx: None,
@@ -288,7 +235,7 @@ impl FarmScene {
         (self.rng >> 40) as f32 / (1u64 << 24) as f32
     }
 
-    fn workers(&self) -> Vec<Session> {
+    pub(super) fn workers(&self) -> Vec<Session> {
         let mut v: Vec<Session> = self
             .frame
             .state
@@ -536,11 +483,7 @@ impl FarmScene {
     pub fn draw(&mut self, scale: f32) -> DrawList {
         let w = &self.world;
         let atlas = self.atlas.clone();
-        let sky = sky_at(self.clock.tod);
-        let flat = flat_light(&sky);
-        let bg = rgba(BACKGROUND, 1.0);
-        let stage_bg = [bg[0] * flat[0], bg[1] * flat[1], bg[2] * flat[2], 1.0];
-        let mut list = DrawList::new(w.level.width, w.level.height, stage_bg);
+        let mut list = DrawList::new(w.level.width, w.level.height, rgba(BACKGROUND, 1.0));
         list.sprite(&atlas, "map", 0.0, 0.0, false, 1.0);
         if let Some(Op::Sprite { x, y, .. }) = list.ops.last_mut() {
             *x = 0.0;
@@ -717,16 +660,8 @@ impl FarmScene {
         // Light: the sky darkens the picture, lamps and lanterns shine through.
         let sky = sky_at(self.clock.tod);
         let flat = flat_light(&sky);
-        // A multiply by the flat light, as an overlay: darken by its weakest
-        // channel and lean the rest towards its hue (an average pixel ~0.4).
-        let low = flat[0].min(flat[1]).min(flat[2]);
-        let dark = (1.0 - low).clamp(0.0, 0.8);
-        if dark > 0.01 {
-            let hue = |c: f32| ((c - low).max(0.0) * 0.4 / dark).min(1.0);
-            // Exactly the level: the painter does not clip, so anything wider
-            // shows as a dark band in the pane around the farm.
-            list.rect(0.0, 0.0, w.level.width, w.level.height, [hue(flat[0]), hue(flat[1]), hue(flat[2]), dark]);
-        }
+        list.light = Some(flat);
+        list.lit = list.ops.len();
         let night = sky.night;
         if night > 0.02 {
             for (i, (at, r)) in w.lights.iter().enumerate() {
@@ -755,274 +690,8 @@ impl FarmScene {
                 list.rect(x - 1.0, y, 2.0, 1.0, rgba(0xfff1c2, alpha));
             }
         }
-        self.hud(&mut list, scale);
+        hud::draw(self, &mut list, scale);
         list
-    }
-
-    fn hud(&self, list: &mut DrawList, scale: f32) {
-        let ink = rgba(0x3b2a1a, 1.0);
-        let cream = rgba(0xfdf6e3, 0.94);
-        let leaf_sel = rgba(0xb8d88c, 0.96);
-        let level = &self.frame.view.level;
-        let coins = self.frame.state.progress.as_ref().map(|p| p.coins).unwrap_or(0.0);
-        // Top-left status card
-        list.hud.push(HudOp::Rect {
-            x: 12.0,
-            y: 12.0,
-            w: 196.0,
-            h: 60.0,
-            color: cream,
-            border: Some(ink),
-        });
-        list.text(22.0, 18.0, format!("Lv.{}", level.level.round()), 24.0, ink);
-        list.text(96.0, 22.0, format!("金币 {}", coins.round()), 12.0, ink);
-        list.text(96.0, 38.0, format!("经验 {}/{}", level.xp.round(), level.need.round()), 12.0, ink);
-        list.text(22.0, 50.0, clock_text(self.clock.tod), 12.0, ink);
-        if let Some(repo) = &self.repo {
-            list.text(96.0, 54.0, repo.clone(), 12.0, ink);
-        }
-
-        // Top-left action buttons: 工作台 & 群岛图 & 记忆树 & 聊天 & 账本 & 手机
-        let top_buttons: [(&str, &str, f32, f32); 6] = [
-            ("icon-tasks", "工作台", 216.0, 76.0),
-            ("icon-map", "群岛图", 298.0, 76.0),
-            ("icon-tree", "记忆树", 380.0, 76.0),
-            ("icon-board", "聊天", 462.0, 64.0),
-            ("icon-trophy", "账本", 532.0, 64.0),
-            ("icon-bell", "手机", 602.0, 64.0),
-        ];
-        for (icon, label, bx, bw) in top_buttons {
-            let active = (label == "账本" && self.panel_open) || (label == "手机" && self.phone_open);
-            list.hud.push(HudOp::Rect {
-                x: bx,
-                y: 12.0,
-                w: bw,
-                h: 34.0,
-                color: if active { leaf_sel } else { cream },
-                border: Some(ink),
-            });
-            if let Some(img) = self.atlas.image(icon) {
-                list.hud_images.push((format!("hud:{icon}"), img, bx + 6.0, 19.0, 18.0, 18.0));
-            }
-            list.text(bx + 28.0, 22.0, label, 12.0, ink);
-        }
-
-        // Plot badges & hover tool aim hint
-        for bed in BEDS {
-            let at = self.world.plot_at(bed.index);
-            let session = self.frame.session_at_station(bed.station);
-            let hover_this = matches!(self.hover, Some(VillageHit::Plot(b)) if b == bed.index);
-            if hover_this {
-                let aim_text = match (self.tool, session) {
-                    (FarmTool::Hand, Some(s)) => format!("查看 {}", s.name),
-                    (FarmTool::Hand, None) => "点击播种新工单".to_string(),
-                    (FarmTool::Water, Some(s)) => format!("给 {} 浇水补充", s.name),
-                    (FarmTool::Bug, Some(_)) => "除虫重试".to_string(),
-                    (FarmTool::Harvest, Some(_)) => "收获验收".to_string(),
-                    (FarmTool::Shovel, Some(_)) => "铲除/停止".to_string(),
-                    (tool, None) => format!("{} · 空地点击播种", tool.short()),
-                    (tool, Some(s)) => format!("{} · {}", tool.short(), s.name),
-                };
-                let width = 12.0 + aim_text.chars().count() as f32 * 11.0;
-                let (x, y) = (at.x * scale - width / 2.0, (at.y - PLOT_H - 6.0) * scale - 42.0);
-                list.hud.push(HudOp::Rect {
-                    x,
-                    y,
-                    w: width,
-                    h: 18.0,
-                    color: leaf_sel,
-                    border: Some(ink),
-                });
-                list.text(x + 5.0, y + 2.0, aim_text, 12.0, ink);
-            }
-            let Some(s) = session else { continue };
-            let Some(badge) = self.frame.plot_of(s).and_then(|p| p.badge.clone()) else {
-                continue;
-            };
-            let tone = match badge.tone.as_str() {
-                "ripe" => 0x4f8a2c,
-                "bug" | "stuck" => 0xc4320a,
-                "wait" => 0xe6730e,
-                _ => 0x6b5a45,
-            };
-            let width = 8.0 + badge.text.chars().count() as f32 * 12.0;
-            let (x, y) = (at.x * scale - width / 2.0, (at.y - PLOT_H - 6.0) * scale - 20.0);
-            list.hud.push(HudOp::Rect {
-                x,
-                y,
-                w: width,
-                h: 18.0,
-                color: cream,
-                border: Some(rgba(tone, 1.0)),
-            });
-            list.text(x + 4.0, y + 2.0, badge.text, 12.0, rgba(tone, 1.0));
-        }
-        if let Some(VillageHit::Spot(id)) = &self.hover
-            && let Some(place) = YARD_PLACES.iter().find(|p| p.id == *id)
-            && let Some((_, b)) = self.world.spot_boxes.iter().find(|(s, _)| s == id)
-        {
-            let width = 8.0 + place.label.chars().count() as f32 * 12.0;
-            let (x, y) = (((b.x0 + b.x1) / 2.0) * scale - width / 2.0, b.y0 * scale - 22.0);
-            list.hud.push(HudOp::Rect {
-                x,
-                y,
-                w: width,
-                h: 18.0,
-                color: cream,
-                border: Some(ink),
-            });
-            list.text(x + 4.0, y + 2.0, place.label, 12.0, ink);
-        }
-
-        // Bottom 6-slot Tool Hotbar (1..6)
-        let view_w = list.width * scale;
-        let view_h = list.height * scale;
-        let slot_w = 48.0;
-        let slot_h = 38.0;
-        let slot_gap = 4.0;
-        let total_w = 6.0 * slot_w + 5.0 * slot_gap;
-        let start_x = (view_w - total_w) / 2.0;
-        let bar_y = (view_h - slot_h - 12.0).max(60.0);
-
-        let status_line = self
-            .toast
-            .as_ref()
-            .filter(|(_, until)| self.t < *until)
-            .map(|(msg, _)| msg.as_str())
-            .unwrap_or_else(|| self.tool.label());
-        let pill_w = (16.0 + status_line.chars().count() as f32 * 11.0).max(150.0);
-        let pill_x = (view_w - pill_w) / 2.0;
-        list.hud.push(HudOp::Rect {
-            x: pill_x,
-            y: bar_y - 24.0,
-            w: pill_w,
-            h: 20.0,
-            color: cream,
-            border: Some(ink),
-        });
-        list.text(pill_x + 8.0, bar_y - 21.0, status_line, 12.0, ink);
-
-        for (i, tool) in FarmTool::ALL.iter().enumerate() {
-            let sx = start_x + i as f32 * (slot_w + slot_gap);
-            let selected = *tool == self.tool;
-            list.hud.push(HudOp::Rect {
-                x: sx,
-                y: bar_y,
-                w: slot_w,
-                h: slot_h,
-                color: if selected { leaf_sel } else { cream },
-                border: Some(ink),
-            });
-            list.text(sx + 5.0, bar_y + 4.0, format!("{}", i + 1), 11.0, ink);
-            if let Some(img) = self.atlas.image(tool.icon()) {
-                list.hud_images.push((format!("tool:{}", tool.icon()), img, sx + 18.0, bar_y + 8.0, 22.0, 22.0));
-            }
-        }
-
-        // In-farm Ledger / Achievements & Clock panel when `panel_open` is true
-        if self.panel_open {
-            let pw = 280.0;
-            let ph = 166.0;
-            let px = (view_w - pw) / 2.0;
-            let py = ((view_h - ph) / 2.0).max(64.0);
-            list.hud.push(HudOp::Rect {
-                x: px,
-                y: py,
-                w: pw,
-                h: ph,
-                color: cream,
-                border: Some(ink),
-            });
-            list.text(px + 14.0, py + 12.0, "农场账本与时间", 16.0, ink);
-            list.text(px + pw - 22.0, py + 12.0, "×", 16.0, ink);
-            let workers = self.workers().len();
-            let working = self.workers().iter().filter(|s| s.phase.tag == "working").count();
-            let ripe = BEDS.iter().filter(|b| matches!(self.crop_of_bed(**b, false), Crop::Flowering)).count();
-            list.text(
-                px + 14.0,
-                py + 40.0,
-                format!("当前等级: Lv.{} (经验 {}/{})", level.level.round(), level.xp.round(), level.need.round()),
-                12.0,
-                ink,
-            );
-            list.text(px + 14.0, py + 60.0, format!("农场金币: {} 枚", coins.round()), 12.0, ink);
-            list.text(px + 14.0, py + 80.0, format!("在田帮工: {} 名 ({} 名干活中)", workers, working), 12.0, ink);
-            list.text(px + 14.0, py + 100.0, format!("成熟待收: {} 块菜地", ripe), 12.0, ink);
-            for (idx, (label, tod)) in [("清晨", 0.30f32), ("正午", 0.50), ("黄昏", 0.76), ("夜晚", 0.92)].iter().enumerate() {
-                let bx = px + 14.0 + idx as f32 * 64.0;
-                let by = py + 126.0;
-                let near = (self.clock.tod - *tod).abs() < 0.08;
-                list.hud.push(HudOp::Rect {
-                    x: bx,
-                    y: by,
-                    w: 56.0,
-                    h: 24.0,
-                    color: if near { leaf_sel } else { cream },
-                    border: Some(ink),
-                });
-                list.text(bx + 14.0, by + 5.0, *label, 12.0, ink);
-            }
-        }
-
-        // Bottom-left retro LCD Pixel Phone + BugSnake mini-game when `phone_open` is true
-        if self.phone_open {
-            let pw = 216.0;
-            let ph = 224.0;
-            let px = 12.0;
-            let py = (view_h - ph - 12.0).max(80.0);
-            let shell_bg = rgba(0x4a3b2c, 0.98);
-            let lcd_bg = rgba(0x9bbc0f, 1.0);
-            let lcd_ink = rgba(0x0f380f, 1.0);
-            list.hud.push(HudOp::Rect {
-                x: px,
-                y: py,
-                w: pw,
-                h: ph,
-                color: shell_bg,
-                border: Some(ink),
-            });
-            list.text(px + 12.0, py + 8.0, "像素手机 · 捉虫贪吃蛇", 12.0, cream);
-            list.text(px + pw - 20.0, py + 8.0, "×", 12.0, cream);
-            let sx = px + 12.0;
-            let sy = py + 28.0;
-            let cell = 12.0;
-            list.hud.push(HudOp::Rect {
-                x: sx,
-                y: sy,
-                w: 16.0 * cell,
-                h: 10.0 * cell,
-                color: lcd_bg,
-                border: Some(lcd_ink),
-            });
-            // Bug target
-            list.hud.push(HudOp::Rect {
-                x: sx + self.snake.bug.0 as f32 * cell + 2.0,
-                y: sy + self.snake.bug.1 as f32 * cell + 2.0,
-                w: cell - 4.0,
-                h: cell - 4.0,
-                color: rgba(0xc4320a, 1.0),
-                border: None,
-            });
-            // Snake body
-            for (bi, (bx, by)) in self.snake.body.iter().enumerate() {
-                list.hud.push(HudOp::Rect {
-                    x: sx + *bx as f32 * cell + 1.0,
-                    y: sy + *by as f32 * cell + 1.0,
-                    w: cell - 2.0,
-                    h: cell - 2.0,
-                    color: if bi == 0 { lcd_ink } else { rgba(0x306230, 1.0) },
-                    border: None,
-                });
-            }
-            let foot = if self.snake.over {
-                format!("得分 {} · 按空格重开", self.snake.score)
-            } else {
-                format!("得分 {} · WASD/方向键控制", self.snake.score)
-            };
-            list.text(px + 12.0, sy + 10.0 * cell + 8.0, foot, 12.0, cream);
-            let waiting = self.workers().iter().filter(|s| s.phase.tag != "working").count();
-            list.text(px + 12.0, sy + 10.0 * cell + 26.0, format!("田间通知: {} 位帮工待命", waiting), 12.0, cream);
-        }
     }
 
     pub fn debug_state(&self) -> serde_json::Value {
@@ -1042,6 +711,8 @@ impl FarmScene {
         serde_json::json!({
             "seq": self.frame.seq, "t": self.t, "clock": clock_text(self.clock.tod), "actors": actors, "beds": beds,
             "hover": format!("{:?}", self.hover), "level": self.frame.view.level.level,
+            "panel": format!("{:?}", self.panel), "page": self.panel_page, "tool": format!("{:?}", self.tool),
+            "hud": [self.view_size.0, self.view_size.1], "toast": self.toast,
         })
     }
 }

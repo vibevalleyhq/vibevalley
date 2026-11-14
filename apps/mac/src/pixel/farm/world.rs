@@ -86,47 +86,47 @@ pub struct YardPlace {
 pub const YARD_PLACES: [YardPlace; 9] = [
     YardPlace {
         id: "shop",
-        label: "小摊",
+        label: "web.farm.panel.shop",
         opens: "panel:shop",
     },
     YardPlace {
         id: "warehouse",
-        label: "仓库",
+        label: "web.farm.panel.warehouse",
         opens: "panel:warehouse",
     },
     YardPlace {
         id: "tasks",
-        label: "任务与成就",
+        label: "web.farm.panel.graphs",
         opens: "panel:graphs",
     },
     YardPlace {
         id: "log",
-        label: "农场日志",
+        label: "web.farm.panel.log",
         opens: "panel:log",
     },
     YardPlace {
         id: "taskBoard",
-        label: "工单",
+        label: "web.farm.menu.issues",
         opens: "/issues",
     },
     YardPlace {
         id: "agents",
-        label: "档案",
+        label: "web.farm.menu.agents",
         opens: "/agents",
     },
     YardPlace {
         id: "manager",
-        label: "助手",
+        label: "web.farm.panel.orchestrator",
         opens: "chat",
     },
     YardPlace {
         id: "runtimes",
-        label: "工坊",
+        label: "web.farm.menu.runtimes",
         opens: "/runtimes",
     },
     YardPlace {
         id: "skills",
-        label: "书屋",
+        label: "web.farm.menu.skills",
         opens: "/settings/skills",
     },
 ];
