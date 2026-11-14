@@ -7,19 +7,6 @@ import type { Conflict, Retry, Session } from "../shapes";
 /** A short span: seconds under a minute (at least one), else minutes. */
 export const spanText = (ms: number) =>
   ms < 60_000 ? t("shared.seconds", { n: Math.max(1, Math.round(ms / 1000)) }) : t("shared.minutes", { n: Math.round(ms / 60_000) });
-export const isBusy = (h: Pick<Session, "phase">) => h.phase._tag === "working";
-
-/** How many more may start working now: on the whole farm (space at once), and in the repo (perRepo at once, 0 for no limit of its own). */
-export function roomLeft(sessions: readonly Pick<Session, "id" | "repo" | "phase">[], repo: string, space: number, perRepo: number, except = "") {
-  const busy = sessions.filter((h) => isBusy(h) && h.id !== except);
-  const inRepo = busy.filter((h) => h.repo === repo).length;
-  return {
-    farm: Math.max(0, space - busy.length),
-    repo: perRepo > 0 ? Math.max(0, perRepo - inRepo) : Infinity,
-    busy: busy.length,
-    inRepo,
-  };
-}
 
 export type Need =
   | { readonly kind: "quiet"; readonly since: number }
@@ -48,13 +35,6 @@ export function needOf(h: Session, conflict?: Conflict): Need | undefined {
 
 /** The span placeholder in phaseWords. */
 const phaseSpan = "{span}";
-
-/** phaseWords as said at now. */
-export function phaseText(h: Session, now: number, conflict?: Conflict): string {
-  const said = phaseWords(h, conflict);
-  const need = needOf(h, conflict);
-  return need?.kind === "quiet" ? said.replaceAll(phaseSpan, spanText(now - need.since)) : said;
-}
 
 /** What a session is doing in words, how long it has been quiet left as {span}. */
 export function phaseWords(h: Session, conflict?: Conflict): string {
