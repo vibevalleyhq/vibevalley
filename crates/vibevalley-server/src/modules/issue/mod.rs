@@ -21,8 +21,8 @@ use vibevalley_core::brief::{findings_of, milestones_of, resume_words};
 use vibevalley_core::rules::short_title;
 use vibevalley_i18n::{Params, t};
 use vibevalley_protocol::{
-    ActWords, ApiError, Applied, AppliedIssue, BizCode, ChangedFile, Changes, Commit, Issue, IssueAction, IssueHistory, IssueStageKind, IssueStatus,
-    IssueUpdate, Next, Preview, StuckReason, UncommittedItem, ops,
+    ActWords, ApiError, Applied, AppliedIssue, BizCode, ChangedFile, Changes, Commit, Issue, IssueAction, IssueHistory, IssueReviewInput, IssueStageKind,
+    IssueStatus, IssueUpdate, Next, Preview, StuckReason, UncommittedItem, ops,
 };
 
 use crate::base::LookIn;
@@ -438,6 +438,26 @@ fn patch_of(d: &vibevalley_git::FileDiff, path: &str) -> String {
     out
 }
 
+/// `issue.review`: the verdict on what was handed back.
+pub(crate) fn review(board: &Board, input: IssueReviewInput) -> Result<Issue, ApiError> {
+    let item = get(board, &input.id)?;
+    if item.status != IssueStatus::InReview {
+        return Err(refused("server.issue.nothingToAccept", &[]).with_next(next_steps(&item)));
+    }
+    board
+        .review(&item.id, input.pass, &input.findings.unwrap_or_default(), input.text.as_deref().unwrap_or(""))
+        .map_err(|e| api(board, e))
+}
+
+/// `issue.comment.create`: words to the issue's helper.
+pub(crate) fn comment(board: &Board, id: &str, text: &str) -> Result<(), ApiError> {
+    let item = get(board, id)?;
+    if item.status.is_closed() {
+        return Err(refused("server.issue.closedReopen", &[]));
+    }
+    board.tell(&item.id, text).map_err(|e| api(board, e))
+}
+
 fn split(board: &Board, id: &str, tasks: &[vibevalley_protocol::IssueChildDraft]) -> Result<String, ApiError> {
     let parent = get(board, id)?;
     let drafts = tasks
@@ -592,22 +612,11 @@ pub fn install_on(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Agents>>) {
     });
 
     let b = board.clone();
-    hub.on::<ops::IssueReview>(move |_, input| {
-        let item = get(&b, &input.id)?;
-        if item.status != IssueStatus::InReview {
-            return Err(refused("server.issue.nothingToAccept", &[]).with_next(next_steps(&item)));
-        }
-        b.review(&item.id, input.pass, &input.findings.unwrap_or_default(), input.text.as_deref().unwrap_or(""))
-            .map_err(|e| api(&b, e))
-    });
+    hub.on::<ops::IssueReview>(move |_, input| review(&b, input));
 
     let b = board.clone();
     hub.on::<ops::IssueCommentCreate>(move |ctx, input| {
-        let item = get(&b, &input.id)?;
-        if item.status.is_closed() {
-            return Err(refused("server.issue.closedReopen", &[]));
-        }
-        b.tell(&item.id, &input.text).map_err(|e| api(&b, e))?;
+        comment(&b, &input.id, &input.text)?;
         Ok(Applied { seq: ctx.hub.seq() })
     });
 
