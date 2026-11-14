@@ -606,52 +606,6 @@ export class VibeValleyApi {
     },
   };
 
-  readonly lan = {
-    get: (options?: { signal?: AbortSignal }): Promise<T.LanStatus> => this.call<T.LanStatus>("/api/v1/lan/get", undefined, options),
-    update: (a: T.SetOpenRequest, options?: { signal?: AbortSignal }): Promise<T.LanStatus> => this.call<T.LanStatus>("/api/v1/lan/update", a, options),
-    pair: (a: T.LanPairRequest, options?: { signal?: AbortSignal }): Promise<T.LanPaired> => this.call<T.LanPaired>("/api/v1/lan/pair", a, options),
-    pairing: {
-      start: (options?: { signal?: AbortSignal }): Promise<T.LanStatus> => this.call<T.LanStatus>("/api/v1/lan/pairing/start", undefined, options),
-      stop: (options?: { signal?: AbortSignal }): Promise<T.LanStatus> => this.call<T.LanStatus>("/api/v1/lan/pairing/stop", undefined, options),
-      /** What stopPairing would do, refused as it would be; nothing changes. */
-      previewStop: (options?: { signal?: AbortSignal }): Promise<T.Preview> => this.call<T.Preview>("/api/v1/lan/pairing/previewStop", undefined, options),
-      answer: (a: T.AnswerPairingRequest, options?: { signal?: AbortSignal }): Promise<T.LanStatus> =>
-        this.call<T.LanStatus>("/api/v1/lan/pairing/answer", a, options),
-    },
-  };
-
-  readonly user = {
-    get: (options?: { signal?: AbortSignal }): Promise<T.UserStatus> => this.call<T.UserStatus>("/api/v1/user/get", undefined, options),
-    update: (a: T.UserUpdateRequest, options?: { signal?: AbortSignal }): Promise<T.UserStatus> => this.call<T.UserStatus>("/api/v1/user/update", a, options),
-    login: (a: T.UserLoginRequest, options?: { signal?: AbortSignal }): Promise<T.UserLogin> => this.call<T.UserLogin>("/api/v1/user/login", a, options),
-    /** Takes back the key the request came with. */
-    logout: (options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/user/logout", undefined, options),
-    password: {
-      /** Only on this machine: never through the gate. */
-      set: (a: T.UserPasswordRequest, options?: { signal?: AbortSignal }): Promise<T.UserStatus> =>
-        this.call<T.UserStatus>("/api/v1/user/password/set", a, options),
-    },
-    device: {
-      list: (options?: { signal?: AbortSignal }): Promise<T.UserDevice[]> => this.call<T.UserDevice[]>("/api/v1/user/device/list", undefined, options),
-      delete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.UserDevice[]> =>
-        this.call<T.UserDevice[]>("/api/v1/user/device/delete", a, options),
-      /** What deleting the device would do, refused as it would be; nothing changes. */
-      previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
-        this.call<T.Preview>("/api/v1/user/device/previewDelete", a, options),
-    },
-    approval: {
-      /** A device asks to be signed in (the command line's auth login); no key needed. */
-      create: (a: T.ApprovalCreateRequest, options?: { signal?: AbortSignal }): Promise<T.ApprovalCreated> =>
-        this.call<T.ApprovalCreated>("/api/v1/user/approval/create", a, options),
-      /** The asking device collects its key once approved; no key needed, the claim is its proof. */
-      collect: (a: T.ApprovalCollectRequest, options?: { signal?: AbortSignal }): Promise<T.ApprovalCollected> =>
-        this.call<T.ApprovalCollected>("/api/v1/user/approval/collect", a, options),
-      list: (options?: { signal?: AbortSignal }): Promise<T.Approval[]> => this.call<T.Approval[]>("/api/v1/user/approval/list", undefined, options),
-      answer: (a: T.ApprovalAnswerRequest, options?: { signal?: AbortSignal }): Promise<T.Approval[]> =>
-        this.call<T.Approval[]>("/api/v1/user/approval/answer", a, options),
-    },
-  };
-
   readonly attachment = {
     /** Kept once by its bytes: the same file again is the same attachment. */
     create: (a: T.AttachmentUpload, options?: { signal?: AbortSignal }): Promise<T.Attachment> =>

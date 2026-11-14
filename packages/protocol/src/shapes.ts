@@ -309,22 +309,6 @@ export type {
   SessionPlay,
   SessionPlayView,
 } from "./game/shapes";
-export type { AnswerPairingRequest, LanPaired, LanPairing, LanPairRequest, LanStatus, SetOpenRequest } from "./lan/shapes";
-export {
-  type Approval,
-  type ApprovalAnswerRequest,
-  type ApprovalCollected,
-  type ApprovalCollectRequest,
-  type ApprovalCreated,
-  type ApprovalCreateRequest,
-  deviceKeyCookie,
-  type UserDevice,
-  type UserLogin,
-  type UserLoginRequest,
-  type UserPasswordRequest,
-  type UserStatus,
-  type UserUpdateRequest,
-} from "./user/shapes";
 export { type Attachment, attachmentMax, attachmentPath, type AttachmentUpload } from "./attachment/shapes";
 export {
   type ConnectorID,

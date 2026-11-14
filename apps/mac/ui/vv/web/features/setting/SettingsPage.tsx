@@ -13,10 +13,8 @@ import { Icon } from "../../ui/Icon";
 import type { IconName } from "../../ui/icons";
 import { Splitter, usePaneWidth } from "../../ui/Splitter";
 import { ConnectorsPage } from "../connector";
-import { LanPage } from "../lan";
 import { MossAccounts, ProviderPage } from "../provider";
 import { SkillsPage } from "../runtime";
-import { Account, Approvals, Devices } from "../user";
 import { VoiceForm } from "../voice";
 import { AboutPage } from "./AboutPage";
 import { AppearancePage } from "./AppearancePage";
@@ -52,7 +50,6 @@ const sections: readonly Section[] = [
   { id: "dictation", group: "voice", icon: "record", label: t("web.setting.nav.dictation"), words: t("web.setting.words.dictation") },
   { id: "github", group: "connect", icon: "terminal", label: "GitHub", words: t("web.setting.words.github") },
   { id: "chat", group: "connect", icon: "chat", label: t("web.setting.nav.chat"), words: t("web.setting.words.chat") },
-  { id: "devices", group: "connect", icon: "devices", label: t("web.setting.nav.devices"), words: t("web.setting.words.devices") },
   { id: "about", group: "about", icon: "info", label: t("web.setting.nav.about"), words: t("web.setting.words.about") },
 ];
 
@@ -122,17 +119,8 @@ export function SettingsPage(props: { rest: string }) {
             <GitHub />
           </Page>
         );
-      case "chat":
-        return <ConnectorsPage id={id()} />;
       default:
-        return (
-          <Page title={t("web.setting.nav.devices")}>
-            <Account />
-            <LanPage />
-            <Approvals />
-            <Devices />
-          </Page>
-        );
+        return <ConnectorsPage id={id()} />;
     }
   };
   return (

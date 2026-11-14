@@ -340,39 +340,6 @@ GitHub 的检测：gh 装没装、登没登录
 | `connector.logout` | 退出一个连接器的登录 | `/api/v1/connector/logout` | ✓ |   |   |   |
 | `connector.channel.set` | 设连接器的消息进哪个频道 | `/api/v1/connector/channel/set` | ✓ |   |   |   |
 
-## lan
-
-连接到本机：开关、配对、设备
-
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
-|---|---|---|---|---|---|---|
-| `lan.get` | 看「连接到本机」开没开、地址和配对码 | `/api/v1/lan/get` | ✓ |   |   |   |
-| `lan.update` | 打开或关上「连接到本机」 | `/api/v1/lan/update` | ✓ |   |   |   |
-| `lan.pairing.start` | 开始配对，给出配对码 | `/api/v1/lan/pairing/start` | ✓ |   |   |   |
-| `lan.pairing.stop` | 停止配对 | `/api/v1/lan/pairing/stop` | ✓ |   |   |   |
-| `lan.pairing.previewStop` | 试停配对：说会怎样，不真停 | `/api/v1/lan/pairing/previewStop` | ✓ |   |   |   |
-| `lan.pairing.answer` | 放行或拒绝来配对的设备 | `/api/v1/lan/pairing/answer` | ✓ |   |   |   |
-| `lan.pair` | 用配对码把这台设备配上 | `/api/v1/lan/pair` | ✓ | ✓ |   |   |
-
-## user
-
-
-
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
-|---|---|---|---|---|---|---|
-| `user.get` | 看用户叫什么、设没设密码、这个请求是从哪台设备来的 | `/api/v1/user/get` | ✓ | ✓ |   |   |
-| `user.update` | 改用户的名字 | `/api/v1/user/update` | ✓ |   |   |   |
-| `user.password.set` | 设密码（只能在跑着 VibeValley 的那台电脑上） | `/api/v1/user/password/set` | ✓ |   |   |   |
-| `user.login` | 用密码登录，给这台设备一把钥匙 | `/api/v1/user/login` | ✓ | ✓ |   |   |
-| `user.logout` | 退出：收回这台设备的钥匙 | `/api/v1/user/logout` | ✓ | ✓ |   |   |
-| `user.device.list` | 列出用户的设备：配对来的和登录来的 | `/api/v1/user/device/list` | ✓ |   |   |   |
-| `user.device.delete` | 收回一台设备的钥匙 | `/api/v1/user/device/delete` | ✓ |   |   |   |
-| `user.device.previewDelete` | 试收回一台设备：说会怎样，不真收回 | `/api/v1/user/device/previewDelete` | ✓ |   |   |   |
-| `user.approval.create` | 请求登录这台设备：拿到确认码，等你在页面上同意 | `/api/v1/user/approval/create` | ✓ | ✓ |   |   |
-| `user.approval.collect` | 取回同意后的钥匙；还在等时什么都不给 | `/api/v1/user/approval/collect` | ✓ | ✓ |   |   |
-| `user.approval.list` | 列出等着你同意的登录请求 | `/api/v1/user/approval/list` | ✓ |   |   |   |
-| `user.approval.answer` | 同意或拒绝一个登录请求 | `/api/v1/user/approval/answer` | ✓ |   |   |   |
-
 ## attachment
 
 

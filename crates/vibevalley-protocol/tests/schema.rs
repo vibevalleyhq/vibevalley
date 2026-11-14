@@ -30,6 +30,6 @@ fn every_generated_type_round_trips_its_schemas_samples() {
         }
     }
     assert!(failures.is_empty(), "{} of {values} samples failed:\n{}", failures.len(), failures.join("\n"));
-    assert!(types > 500, "only {types} types sampled");
+    assert!(types > 450, "only {types} types sampled");
     eprintln!("{types} types, {values} samples");
 }

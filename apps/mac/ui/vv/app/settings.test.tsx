@@ -1,7 +1,6 @@
 // The settings sections ported after round 3, on the bridge with fakeHost
 // playing the Rust side (fixtures/settings.ts): model providers, MOSS
-// accounts, the call, MOSS Live and dictation forms, the chat apps and the
-// devices page (account, LAN pairing, sign-in requests, devices), /approve.
+// accounts, the call, MOSS Live and dictation forms, the chat apps.
 import "../polyfill";
 import { expect, open, test } from "nsh/test";
 
@@ -99,30 +98,6 @@ test("chat apps: WeChat connected to a channel, Feishu waiting on its code, QQ a
   await app.press("id:connector-login");
   await fake.pump(app);
   expect(fake.calls.find((c) => c.op === "connector.login")?.payload).toEqual({ id: "qq", appId: "102000001", secret: "secret" });
-});
-
-test("devices: the account, the LAN listener pairing with its code, a sign-in request, the devices", async () => {
-  const { app, fake } = await start("/settings/devices");
-  expect(app.count("id:account")).toBe(1);
-  expect(app.value("id:account-name")).toBe("小满");
-  expect(app.count("id:lan")).toBe(1);
-  expect(app.count("id:pairing")).toBe(1);
-  expect(app.count("id:pairing-qr")).toBe(1);
-  await app.press("id:pairing-copy");
-  expect(app.clipboard()).toBe("http://192.168.1.10:7317/pair?code=4821");
-  expect(app.count("id:approvals")).toBe(1);
-  expect(app.count("id:approval-KX7-29Q")).toBe(1);
-  expect(app.count("id:devices")).toBe(1);
-  expect(app.count("id:device-d-iphone")).toBe(1);
-  await app.press("id:approval-allow");
-  await fake.pump(app);
-  expect(fake.calls.find((c) => c.op === "user.approval.answer")?.payload).toEqual({ id: "a1", allow: true });
-});
-
-test("/approve shows the request its link names", async () => {
-  const { app } = await start("/approve?code=KX7-29Q");
-  expect(app.count("id:approve-page")).toBe(1);
-  expect(app.count("id:approval-KX7-29Q")).toBe(1);
 });
 
 test("narrow: the settings list over the section", async () => {

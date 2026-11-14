@@ -14,7 +14,6 @@ pub mod endpoints;
 pub mod game;
 pub mod inbox;
 pub mod issue;
-pub mod lan;
 pub mod media;
 pub mod memory;
 pub mod orchestrator;
@@ -25,7 +24,6 @@ pub mod repo;
 pub mod runtime;
 pub mod session;
 pub mod setting;
-pub mod user;
 pub mod voice;
 
 pub use agent::*;
@@ -40,7 +38,6 @@ pub use endpoints::*;
 pub use game::*;
 pub use inbox::*;
 pub use issue::*;
-pub use lan::*;
 pub use media::*;
 pub use memory::*;
 pub use orchestrator::*;
@@ -50,7 +47,6 @@ pub use repo::*;
 pub use runtime::*;
 pub use session::*;
 pub use setting::*;
-pub use user::*;
 pub use voice::*;
 
 /// Every module's TypeScript, in the order of the files.
@@ -67,7 +63,6 @@ pub(crate) fn ts_modules(cfg: &ts_rs::Config) -> Vec<crate::typescript::Module> 
         game::ts_module(cfg),
         inbox::ts_module(cfg),
         issue::ts_module(cfg),
-        lan::ts_module(cfg),
         media::ts_module(cfg),
         memory::ts_module(cfg),
         orchestrator::ts_module(cfg),
@@ -77,7 +72,6 @@ pub(crate) fn ts_modules(cfg: &ts_rs::Config) -> Vec<crate::typescript::Module> 
         runtime::ts_module(cfg),
         session::ts_module(cfg),
         setting::ts_module(cfg),
-        user::ts_module(cfg),
         voice::ts_module(cfg),
     ]
 }

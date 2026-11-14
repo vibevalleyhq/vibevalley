@@ -23,7 +23,6 @@ import { ReposPage } from "../features/repo";
 import { sortRepos } from "../features/repo/repos";
 import { RuntimesPage } from "../features/runtime";
 import { SettingsPage } from "../features/setting";
-import { ApprovePage } from "../features/user";
 import { ready, useRepos } from "../infra/query";
 import { Link, Navigate, Outlet, route, type RouteDefinition, type SearchCheck, Routes, useParams } from "../infra/router";
 import type { RouterHistory } from "../infra/router/history";
@@ -133,7 +132,6 @@ const routes: readonly RouteDefinition[] = [
       page("/issues", "issues", (rest) => <IssuesPage rest={rest()} />, issueSearch),
       page("/chat", "chat", () => <ChatPage />),
       page("/settings", "settings", (rest) => <SettingsPage rest={rest()} />),
-      page("/approve", "settings", () => <ApprovePage />),
       page("/orchestrator", "agents", (rest) => <OrchestratorPage rest={rest()} />),
       page("/agents", "agents", (rest) => <AgentsRoute rest={rest()} />),
       page("/runtimes", "runtimes", (rest) => <RuntimesPage rest={rest()} />),
