@@ -1,56 +1,70 @@
-//! `setting.*`: the farm's settings file (`<home>/settings.json`), its
-//! keys shown by hint only, the voice's settings over their defaults, and
-//! each feature's readiness. Ported from VibeValley
-//! `platform/setting/{setting,voice,readiness,memorySources,provider,prompts}.ts`.
-//!
-//! The file is kept as the TypeScript server wrote it (camelCase JSON, keys
-//! as plain strings, mode 0600).
+//! `setting.*`: the farm's settings file (`<home>/settings.json`), read once
+//! into `Stored` and written whole on each change; keys are `Secret`s,
+//! shown by hint only; the voice's settings over their defaults; and each
+//! feature's readiness.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use serde_json::{Map, Value, json};
+use serde::{Deserialize, Serialize};
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ApiError, BizCode, SettingsStatus, SettingsUpdate, Validation, ops};
+use vibevalley_protocol::{
+    AgoraAppID, ApiError, Area, BizCode, Dictation, DictationVia, Feature, JsNumber, KeySource, KeyStatus, Language, LitFalse, LitTrue, Locale, MemorySource,
+    MemorySourceKind, Missing, Readiness, SettingsStatus, SettingsUpdate, SettingsUpdateVoice, SpacePaths, Validation, VoiceASR, VoiceASRAres, VoiceAnswer,
+    VoiceAnswerOrchestrator, VoiceSettings, VoiceTTS, VoiceTTSMinimax, VoiceTTSMinimaxModel, ops,
+};
 
 use crate::Hub;
+use crate::modules::provider::{Providers, Use};
 
 const SILENCE_MS: (i64, i64) = (200, 2000);
 const INTERRUPT_MS: (i64, i64) = (80, 1000);
 const IDLE_SECONDS: (i64, i64) = (10, 600);
-const KEY_FIELDS: [&str; 7] = [
-    "deepseekApiKey",
-    "agoraAppId",
-    "agoraAppCertificate",
-    "asrKey",
-    "llmKey",
-    "ttsKey",
-    "dictationKey",
-];
-const VOICE_FIELDS: [&str; 11] = [
-    "area",
-    "language",
-    "asr",
-    "answer",
-    "tts",
-    "persona",
-    "greeting",
-    "failureMessage",
-    "silenceMs",
-    "interruptMs",
-    "idleSeconds",
-];
-const USES: [&str; 9] = [
-    "dictation",
-    "image",
-    "understanding",
-    "speech",
-    "live",
-    "speakers",
-    "voiceDesign",
-    "transcription",
-    "vision",
-];
+
+/// A key or token: never printed, shown by its last four characters.
+#[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Secret(String);
+
+impl Secret {
+    pub fn new(s: impl Into<String>) -> Secret {
+        Secret(s.into())
+    }
+
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn hint(&self) -> String {
+        let tail: String = self.0.chars().rev().take(4).collect::<Vec<_>>().into_iter().rev().collect();
+        format!("…{tail}")
+    }
+
+    pub fn status(&self, source: KeySource) -> KeyStatus {
+        if self.is_empty() {
+            KeyStatus { source: None, hint: None }
+        } else {
+            KeyStatus {
+                source: Some(source),
+                hint: Some(self.hint()),
+            }
+        }
+    }
+}
+
+impl std::fmt::Debug for Secret {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_empty() {
+            f.write_str("Secret(none)")
+        } else {
+            write!(f, "Secret({})", self.hint())
+        }
+    }
+}
 
 /// What the server was started with: where the farm lives, and keys given
 /// outside the settings file (`ServerConfig`).
@@ -67,15 +81,78 @@ pub struct SettingConfig {
     pub voice_id: String,
 }
 
+/// Dictation's own address, kept while MOSS is chosen.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredDictation {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    via: Option<DictationVia>,
+    #[serde(default)]
+    url: String,
+    #[serde(default)]
+    model: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredSource {
+    kind: MemorySourceKind,
+    #[serde(default)]
+    url: String,
+    #[serde(default, skip_serializing_if = "is_false")]
+    enabled: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    read: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    write: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    everything: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    user: Option<String>,
+    #[serde(default, skip_serializing_if = "Secret::is_empty")]
+    key: Secret,
+}
+
+fn is_false(b: &bool) -> bool {
+    !*b
+}
+
+/// `settings.json` as stored.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Stored {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    locale: Option<Locale>,
+    #[serde(default, skip_serializing_if = "Secret::is_empty")]
+    deepseek_api_key: Secret,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    agora_app_id: String,
+    #[serde(default, skip_serializing_if = "Secret::is_empty")]
+    agora_app_certificate: Secret,
+    #[serde(default, skip_serializing_if = "Secret::is_empty")]
+    asr_key: Secret,
+    #[serde(default, skip_serializing_if = "Secret::is_empty")]
+    llm_key: Secret,
+    #[serde(default, skip_serializing_if = "Secret::is_empty")]
+    tts_key: Secret,
+    #[serde(default, skip_serializing_if = "Secret::is_empty")]
+    dictation_key: Secret,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dictation: Option<StoredDictation>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    memory_sources: Vec<StoredSource>,
+    /// The voice's settings that differ from its defaults.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    voice: Option<SettingsUpdateVoice>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    providers: Option<Providers>,
+}
+
 pub struct Setting {
     config: SettingConfig,
     file: PathBuf,
-    /// settings.json as stored; one save at a time.
-    stored: Mutex<Value>,
-}
-
-fn s(v: &Value) -> &str {
-    v.as_str().unwrap_or("")
+    /// One save at a time.
+    stored: Mutex<Stored>,
 }
 
 fn has_space(s: &str) -> bool {
@@ -92,19 +169,6 @@ fn agora_id(s: &str) -> bool {
     s.len() == 32 && s.chars().all(|c| c.is_ascii_hexdigit())
 }
 
-pub fn key_hint(key: &str) -> String {
-    let tail: String = key.chars().rev().take(4).collect::<Vec<_>>().into_iter().rev().collect();
-    format!("…{tail}")
-}
-
-fn key_status(value: &str, source: &str) -> Value {
-    if value.is_empty() {
-        json!({ "source": null })
-    } else {
-        json!({ "source": source, "hint": key_hint(value) })
-    }
-}
-
 fn users_language() -> &'static str {
     if vibevalley_i18n::locale() == "en" { "英文（English）" } else { "中文" }
 }
@@ -119,30 +183,35 @@ fn persona() -> String {
 }
 
 /// `voiceProblem`: what is wrong with a voice update, or "".
-fn voice_problem(v: &Value) -> String {
-    let field = |o: &Value, k: &str| s(&o[k]).trim().to_string();
-    if v["asr"]["vendor"] == "microsoft" && field(&v["asr"], "region").is_empty() {
+fn voice_problem(v: &SettingsUpdateVoice) -> String {
+    if let Some(VoiceASR::Microsoft(m)) = &v.asr
+        && m.region.trim().is_empty()
+    {
         return t("server.setting.voice.region", &[]);
     }
-    let answer = &v["answer"];
-    if (answer["vendor"] == "deepseek" || answer["vendor"] == "openai") && field(answer, "model").is_empty() {
-        return t("server.setting.voice.model", &[]);
+    match &v.answer {
+        Some(VoiceAnswer::Deepseek(a)) if a.model.trim().is_empty() => return t("server.setting.voice.model", &[]),
+        Some(VoiceAnswer::Openai(a)) if a.model.trim().is_empty() => return t("server.setting.voice.model", &[]),
+        Some(VoiceAnswer::Openai(a)) if !http_url(a.url.trim()) => return t("server.setting.voice.url", &[]),
+        _ => {}
     }
-    if answer["vendor"] == "openai" && !http_url(&field(answer, "url")) {
-        return t("server.setting.voice.url", &[]);
+    match &v.tts {
+        Some(VoiceTTS::Minimax(m)) if m.voice_id.trim().is_empty() => return t("server.setting.voice.voiceId", &[]),
+        Some(VoiceTTS::Microsoft(m)) if m.region.trim().is_empty() || m.voice_name.trim().is_empty() => {
+            return t("server.setting.voice.microsoft", &[]);
+        }
+        _ => {}
     }
-    let tts = &v["tts"];
-    if tts["vendor"] == "minimax" && field(tts, "voiceId").is_empty() {
-        return t("server.setting.voice.voiceId", &[]);
-    }
-    if tts["vendor"] == "microsoft" && (field(tts, "region").is_empty() || field(tts, "voiceName").is_empty()) {
-        return t("server.setting.voice.microsoft", &[]);
-    }
-    if v.get("persona").is_some_and(|p| s(p).trim().is_empty()) {
+    if v.persona.as_deref().is_some_and(|p| p.trim().is_empty()) {
         return t("server.setting.voice.persona", &[]);
     }
-    for (key, (min, max)) in [("silenceMs", SILENCE_MS), ("interruptMs", INTERRUPT_MS), ("idleSeconds", IDLE_SECONDS)] {
-        if let Some(n) = v[key].as_f64()
+    let ranged = [
+        ("silenceMs", v.silence_ms.map(|n| n as f64), SILENCE_MS),
+        ("interruptMs", v.interrupt_ms.map(|n| n as f64), INTERRUPT_MS),
+        ("idleSeconds", v.idle_seconds.map(|n| n.0), IDLE_SECONDS),
+    ];
+    for (key, n, (min, max)) in ranged {
+        if let Some(n) = n
             && (n < min as f64 || n > max as f64)
         {
             return t(
@@ -158,88 +227,98 @@ fn voice_problem(v: &Value) -> String {
     String::new()
 }
 
-/// `memorySourcesProblem`.
-fn memory_sources_problem(sources: &[Value]) -> String {
-    let mut seen: Vec<&str> = Vec::new();
-    for m in sources {
-        let kind = s(&m["kind"]);
-        if seen.contains(&kind) {
-            return t("server.setting.memory.twice", &[("kind", kind.into())]);
+/// `settingsProblem`: empty strings clear and are always fine.
+pub fn settings_problem(u: &SettingsUpdate) -> String {
+    let trimmed = |k: &Option<String>| k.as_deref().unwrap_or("").trim().to_string();
+    let deepseek = trimmed(&u.deepseek_api_key);
+    if !deepseek.is_empty() && (has_space(&deepseek) || deepseek.chars().count() < 8) {
+        return t("server.setting.deepseekKey", &[]);
+    }
+    let app_id = trimmed(&u.agora_app_id);
+    if !app_id.is_empty() && !agora_id(&app_id) {
+        return t("server.setting.agoraId", &[]);
+    }
+    let certificate = trimmed(&u.agora_app_certificate);
+    if !certificate.is_empty() && !agora_id(&certificate) {
+        return t("server.setting.agoraCertificate", &[]);
+    }
+    if [&u.asr_key, &u.llm_key, &u.tts_key, &u.dictation_key].iter().any(|k| has_space(&trimmed(k))) {
+        return t("server.setting.voiceKeySpace", &[]);
+    }
+    if let Some(d) = &u.dictation
+        && d.via == DictationVia::Own
+        && !d.url.trim().is_empty()
+    {
+        if !http_url(d.url.trim()) {
+            return t("server.setting.dictationUrl", &[]);
         }
-        seen.push(kind);
-        let url = s(&m["url"]).trim();
-        if m["enabled"] == true && url.is_empty() {
+        if d.model.trim().is_empty() {
+            return t("server.setting.dictationModel", &[]);
+        }
+    }
+    let mut seen = Vec::new();
+    for m in u.memory_sources.iter().flatten() {
+        if seen.contains(&m.kind) {
+            return t("server.setting.memory.twice", &[("kind", m.kind.as_str().into())]);
+        }
+        seen.push(m.kind);
+        let url = m.url.trim();
+        if m.enabled && url.is_empty() {
             return t("server.setting.memory.noUrl", &[]);
         }
         if !url.is_empty() && !http_url(url) {
             return t("server.setting.memory.url", &[]);
         }
-        if m.get("key").is_some_and(|k| has_space(s(k).trim())) {
+        if m.key.as_deref().is_some_and(|k| has_space(k.trim())) {
             return t("server.setting.memory.keySpace", &[]);
         }
     }
-    String::new()
+    u.voice.as_ref().map(voice_problem).unwrap_or_default()
 }
 
-/// `settingsProblem`: empty strings clear and are always fine.
-pub fn settings_problem(u: &Value) -> String {
-    let trimmed = |k: &str| s(&u[k]).trim().to_string();
-    let deepseek = trimmed("deepseekApiKey");
-    if !deepseek.is_empty() && (has_space(&deepseek) || deepseek.chars().count() < 8) {
-        return t("server.setting.deepseekKey", &[]);
+/// The voice: its defaults with what is set laid over them.
+fn voice_over(d: VoiceSettings, o: &SettingsUpdateVoice) -> VoiceSettings {
+    VoiceSettings {
+        area: o.area.unwrap_or(d.area),
+        language: o.language.unwrap_or(d.language),
+        asr: o.asr.clone().unwrap_or(d.asr),
+        answer: o.answer.clone().unwrap_or(d.answer),
+        tts: o.tts.clone().unwrap_or(d.tts),
+        persona: o.persona.clone().unwrap_or(d.persona),
+        greeting: o.greeting.clone().unwrap_or(d.greeting),
+        failure_message: o.failure_message.clone().unwrap_or(d.failure_message),
+        silence_ms: o.silence_ms.unwrap_or(d.silence_ms),
+        interrupt_ms: o.interrupt_ms.unwrap_or(d.interrupt_ms),
+        idle_seconds: o.idle_seconds.unwrap_or(d.idle_seconds),
     }
-    let app_id = trimmed("agoraAppId");
-    if !app_id.is_empty() && !agora_id(&app_id) {
-        return t("server.setting.agoraId", &[]);
-    }
-    let certificate = trimmed("agoraAppCertificate");
-    if !certificate.is_empty() && !agora_id(&certificate) {
-        return t("server.setting.agoraCertificate", &[]);
-    }
-    if ["asrKey", "llmKey", "ttsKey", "dictationKey"].iter().any(|k| has_space(&trimmed(k))) {
-        return t("server.setting.voiceKeySpace", &[]);
-    }
-    let d = &u["dictation"];
-    if d["via"] == "own" && !s(&d["url"]).trim().is_empty() {
-        if !http_url(s(&d["url"]).trim()) {
-            return t("server.setting.dictationUrl", &[]);
-        }
-        if s(&d["model"]).trim().is_empty() {
-            return t("server.setting.dictationModel", &[]);
-        }
-    }
-    let sources = memory_sources_problem(u["memorySources"].as_array().map(Vec::as_slice).unwrap_or(&[]));
-    if !sources.is_empty() {
-        return sources;
-    }
-    if u["voice"].is_object() { voice_problem(&u["voice"]) } else { String::new() }
 }
 
-fn empty_providers() -> Value {
-    let mut p = json!({ "revision": 0, "connections": [] });
-    for u in USES {
-        p[u] = Value::Null;
+/// What of `v` differs from `d`.
+fn voice_overrides(v: VoiceSettings, d: &VoiceSettings) -> SettingsUpdateVoice {
+    fn differs<T: PartialEq>(v: T, d: &T) -> Option<T> {
+        (v != *d).then_some(v)
     }
-    p
+    SettingsUpdateVoice {
+        area: differs(v.area, &d.area),
+        language: differs(v.language, &d.language),
+        asr: differs(v.asr, &d.asr),
+        answer: differs(v.answer, &d.answer),
+        tts: differs(v.tts, &d.tts),
+        persona: differs(v.persona, &d.persona),
+        greeting: differs(v.greeting, &d.greeting),
+        failure_message: differs(v.failure_message, &d.failure_message),
+        silence_ms: differs(v.silence_ms, &d.silence_ms),
+        interrupt_ms: differs(v.interrupt_ms, &d.interrupt_ms),
+        idle_seconds: differs(v.idle_seconds, &d.idle_seconds),
+    }
 }
 
-/// `bindingOf`: the readiness of one MOSS use.
-fn moss_use(providers: &Value, use_: &str) -> Value {
-    let lacks = |missing: &str| json!({ "ready": false, "missing": missing });
-    let connections = providers["connections"].as_array().cloned().unwrap_or_default();
-    if connections.is_empty() {
-        return lacks("mossAccount");
-    }
-    let binding = &providers[use_];
-    let connection = connections.iter().find(|c| !binding.is_null() && c["id"] == binding["connection"]);
-    let Some(connection) = connection else { return lacks("binding") };
-    if connection["enabled"] != true {
-        return lacks("mossOff");
-    }
-    if s(&connection["key"]).is_empty() {
-        return lacks("mossKey");
-    }
-    json!({ "ready": true })
+fn ready() -> Readiness {
+    Readiness::True { ready: LitTrue }
+}
+
+fn lacks(missing: Missing) -> Readiness {
+    Readiness::False { ready: LitFalse, missing }
 }
 
 impl Setting {
@@ -248,16 +327,13 @@ impl Setting {
     pub fn open(config: SettingConfig) -> Arc<Setting> {
         let file = config.home.join("settings.json");
         let stored = match std::fs::read_to_string(&file) {
-            Ok(text) => match serde_json::from_str::<Value>(&text) {
-                Ok(v) if v.is_object() => v,
-                _ => {
-                    let _ = std::fs::rename(&file, file.with_extension("json.bad"));
-                    json!({})
-                }
-            },
-            Err(_) => json!({}),
+            Ok(text) => serde_json::from_str::<Stored>(&text).unwrap_or_else(|_| {
+                let _ = std::fs::rename(&file, file.with_extension("json.bad"));
+                Stored::default()
+            }),
+            Err(_) => Stored::default(),
         };
-        vibevalley_i18n::set_locale(stored["locale"].as_str().unwrap_or("zh"));
+        vibevalley_i18n::set_locale(stored.locale.unwrap_or(Locale::Zh).as_str());
         Arc::new(Setting {
             config,
             file,
@@ -265,51 +341,41 @@ impl Setting {
         })
     }
 
-    fn stored(&self) -> Value {
+    fn stored(&self) -> Stored {
         self.stored.lock().unwrap_or_else(|e| e.into_inner()).clone()
     }
 
     /// The voice's defaults, in the farm's language as it is now.
-    pub fn voice_defaults(&self) -> Value {
-        let tts = if self.config.voice_id.is_empty() {
-            json!({ "vendor": "minimax", "model": "speech_2_6_turbo", "voiceId": "Chinese (Mandarin)_Gentle_Youth" })
+    pub fn voice_defaults(&self) -> VoiceSettings {
+        let voice_id = if self.config.voice_id.is_empty() {
+            "Chinese (Mandarin)_Gentle_Youth"
         } else {
-            json!({ "vendor": "minimax", "model": "speech_2_6_turbo", "voiceId": self.config.voice_id })
+            &self.config.voice_id
         };
-        json!({
-            "area": "US",
-            "language": if vibevalley_i18n::locale() == "zh" { "zh-CN" } else { "en-US" },
-            "asr": { "vendor": "ares" },
-            "answer": { "vendor": "orchestrator" },
-            "tts": tts,
-            "persona": persona(),
-            "greeting": t("shared.greeting", &[]),
-            "failureMessage": t("server.setting.defaults.failureMessage", &[]),
-            "silenceMs": 480,
-            "interruptMs": 160,
-            "idleSeconds": 30,
-        })
-    }
-
-    fn voice_of(&self, stored: &Value) -> Value {
-        let mut voice = self.voice_defaults();
-        if let Some(over) = stored["voice"].as_object() {
-            for (k, v) in over {
-                if !v.is_null() {
-                    voice[k] = v.clone();
-                }
-            }
+        VoiceSettings {
+            area: Area::US,
+            language: if vibevalley_i18n::locale() == "zh" { Language::ZhCN } else { Language::EnUS },
+            asr: VoiceASR::Ares(VoiceASRAres {}),
+            answer: VoiceAnswer::Orchestrator(VoiceAnswerOrchestrator {}),
+            tts: VoiceTTS::Minimax(VoiceTTSMinimax {
+                model: VoiceTTSMinimaxModel::Speech26Turbo,
+                voice_id: voice_id.into(),
+            }),
+            persona: persona(),
+            greeting: t("shared.greeting", &[]),
+            failure_message: t("server.setting.defaults.failureMessage", &[]),
+            silence_ms: 480,
+            interrupt_ms: 160,
+            idle_seconds: JsNumber(30.0),
         }
-        voice
     }
 
     /// A key from the settings file, else from the server's start.
-    fn pick(saved: &Value, given: &str) -> Option<(String, &'static str)> {
-        let saved = s(saved);
+    fn pick(saved: &Secret, given: &str) -> Option<(Secret, KeySource)> {
         if !saved.is_empty() {
-            Some((saved.to_string(), "settings"))
+            Some((saved.clone(), KeySource::Settings))
         } else if !given.is_empty() {
-            Some((given.to_string(), "config"))
+            Some((Secret::new(given), KeySource::Config))
         } else {
             None
         }
@@ -317,212 +383,193 @@ impl Setting {
 
     /// The DeepSeek key the orchestrator calls with.
     pub fn deepseek_api_key(&self) -> Option<String> {
-        Self::pick(&self.stored()["deepseekApiKey"], &self.config.deepseek_api_key).map(|k| k.0)
+        Self::pick(&self.stored().deepseek_api_key, &self.config.deepseek_api_key).map(|k| k.0.expose().to_string())
     }
 
-    /// The MOSS providers (`ProviderSettings`, keys as plain strings).
-    pub fn providers(&self) -> Value {
-        let p = self.stored()["providers"].clone();
-        if p.is_object() { p } else { empty_providers() }
+    /// The MOSS providers.
+    pub fn providers(&self) -> Providers {
+        self.stored().providers.unwrap_or_default()
     }
 
     pub fn status(&self) -> SettingsStatus {
         let st = self.stored();
         let c = &self.config;
-        let deepseek = Self::pick(&st["deepseekApiKey"], &c.deepseek_api_key);
-        let app_id = Self::pick(&st["agoraAppId"], &c.agora_app_id);
-        let certificate = Self::pick(&st["agoraAppCertificate"], &c.agora_app_certificate);
-        let picked = |k: &Option<(String, &str)>| match k {
-            Some((v, from)) => key_status(v, from),
-            None => json!({ "source": null }),
+        let deepseek = Self::pick(&st.deepseek_api_key, &c.deepseek_api_key);
+        let app_id = Self::pick(&Secret::new(st.agora_app_id.clone()), &c.agora_app_id);
+        let certificate = Self::pick(&st.agora_app_certificate, &c.agora_app_certificate);
+        let picked = |k: &Option<(Secret, KeySource)>| match k {
+            Some((v, from)) => v.status(*from),
+            None => KeyStatus { source: None, hint: None },
         };
-        let providers = self.providers();
-        let voice = self.voice_of(&st);
-        let moss = |u: &str| moss_use(&providers, u);
-        let dictation_via = st["dictation"]["via"].as_str().unwrap_or("moss").to_string();
-        let dictation_url = s(&st["dictation"]["url"]).to_string();
-        let lacks = |m: &str| json!({ "ready": false, "missing": m });
-        let ready = json!({ "ready": true });
-        let readiness = json!({
-            "orchestrator": if deepseek.is_some() { ready.clone() } else { lacks("deepseekKey") },
-            "image": moss("image"),
-            "understanding": moss("understanding"),
-            "speech": moss("speech"),
-            "speakers": moss("speakers"),
-            "voiceDesign": moss("voiceDesign"),
-            "transcription": moss("transcription"),
-            "dictation": if dictation_via == "own" {
-                if dictation_url.is_empty() { lacks("dictationUrl") } else { ready.clone() }
-            } else { moss("dictation") },
-            "live": moss("live"),
-            "vision": moss("vision"),
-            "call": if voice["answer"]["vendor"] == "moss" { moss("live") }
-                else if app_id.is_some() && certificate.is_some() { ready.clone() } else { lacks("agora") },
-        });
-        let memory_sources: Vec<Value> = st["memorySources"]
-            .as_array()
-            .cloned()
-            .unwrap_or_default()
-            .into_iter()
-            .map(|m| {
-                let mut out = json!({
-                    "kind": m["kind"],
-                    "url": m["url"],
-                    "enabled": m["enabled"] == true,
-                    "read": m["read"] == true,
-                    "write": m["write"] == true,
-                    "everything": m["everything"] == true,
-                    "key": key_status(s(&m["key"]), "settings"),
-                });
-                if let Some(user) = m["user"].as_str() {
-                    out["user"] = user.into();
-                }
-                out
+        let providers = st.providers.clone().unwrap_or_default();
+        let voice = voice_over(self.voice_defaults(), &st.voice.clone().unwrap_or_default());
+        let stored_dictation = st.dictation.clone().unwrap_or_default();
+        let dictation = Dictation {
+            via: stored_dictation.via.unwrap_or(DictationVia::Moss),
+            url: stored_dictation.url,
+            model: stored_dictation.model,
+        };
+        let moss = |u| providers.readiness(u);
+        let readiness = [
+            (Feature::Orchestrator, if deepseek.is_some() { ready() } else { lacks(Missing::DeepseekKey) }),
+            (Feature::Image, moss(Use::Image)),
+            (Feature::Understanding, moss(Use::Understanding)),
+            (Feature::Speech, moss(Use::Speech)),
+            (Feature::Speakers, moss(Use::Speakers)),
+            (Feature::VoiceDesign, moss(Use::VoiceDesign)),
+            (Feature::Transcription, moss(Use::Transcription)),
+            (
+                Feature::Dictation,
+                match dictation.via {
+                    DictationVia::Own if dictation.url.is_empty() => lacks(Missing::DictationUrl),
+                    DictationVia::Own => ready(),
+                    DictationVia::Moss => moss(Use::Dictation),
+                },
+            ),
+            (Feature::Live, moss(Use::Live)),
+            (Feature::Vision, moss(Use::Vision)),
+            (
+                Feature::Call,
+                if matches!(voice.answer, VoiceAnswer::Moss(_)) {
+                    moss(Use::Live)
+                } else if app_id.is_some() && certificate.is_some() {
+                    ready()
+                } else {
+                    lacks(Missing::Agora)
+                },
+            ),
+        ]
+        .into_iter()
+        .collect();
+        let memory_sources = st
+            .memory_sources
+            .iter()
+            .map(|m| MemorySource {
+                kind: m.kind,
+                url: m.url.clone(),
+                enabled: m.enabled,
+                read: m.read,
+                write: m.write,
+                everything: m.everything,
+                user: m.user.clone(),
+                key: m.key.status(KeySource::Settings),
             })
             .collect();
         let path = |p: PathBuf| p.to_string_lossy().into_owned();
-        let status = json!({
-            "file": path(self.file.clone()),
-            "home": path(c.home.clone()),
-            "paths": {
-                "repos": path(c.work_root.join("repos")),
-                "worktrees": path(c.work_root.join("worktrees")),
-                "pkm": path(c.work_root.join("pkm")),
+        SettingsStatus {
+            file: path(self.file.clone()),
+            home: path(c.home.clone()),
+            paths: SpacePaths {
+                repos: path(c.work_root.join("repos")),
+                worktrees: path(c.work_root.join("worktrees")),
+                pkm: path(c.work_root.join("pkm")),
             },
-            "version": c.version,
-            "locale": st["locale"].as_str().unwrap_or("zh"),
-            "deepseekApiKey": picked(&deepseek),
-            "agoraAppId": match &app_id { Some((v, from)) => json!({ "source": from, "value": v }), None => json!({ "source": null }) },
-            "agoraAppCertificate": picked(&certificate),
-            "voice": voice,
-            "voiceDefaults": self.voice_defaults(),
-            "asrKey": key_status(s(&st["asrKey"]), "settings"),
-            "llmKey": key_status(s(&st["llmKey"]), "settings"),
-            "ttsKey": key_status(s(&st["ttsKey"]), "settings"),
-            "dictation": { "via": dictation_via, "url": dictation_url, "model": s(&st["dictation"]["model"]) },
-            "dictationKey": key_status(s(&st["dictationKey"]), "settings"),
-            "readiness": readiness,
-            "memorySources": memory_sources,
-        });
-        serde_json::from_value(status).expect("the settings status is a SettingsStatus")
+            version: c.version.clone(),
+            locale: st.locale.unwrap_or(Locale::Zh),
+            deepseek_api_key: picked(&deepseek),
+            agora_app_id: match &app_id {
+                Some((v, from)) => AgoraAppID {
+                    source: Some(*from),
+                    value: Some(v.expose().to_string()),
+                },
+                None => AgoraAppID { source: None, value: None },
+            },
+            agora_app_certificate: picked(&certificate),
+            voice,
+            voice_defaults: self.voice_defaults(),
+            asr_key: st.asr_key.status(KeySource::Settings),
+            llm_key: st.llm_key.status(KeySource::Settings),
+            tts_key: st.tts_key.status(KeySource::Settings),
+            dictation,
+            dictation_key: st.dictation_key.status(KeySource::Settings),
+            readiness,
+            memory_sources,
+        }
     }
 
     pub fn validate(&self, u: &SettingsUpdate) -> Validation {
-        Validation {
-            problem: settings_problem(&serde_json::to_value(u).unwrap_or_default()),
-        }
+        Validation { problem: settings_problem(u) }
     }
 
     /// A key missing from the update is kept, an empty one cleared; nothing
     /// is saved when something cannot be right.
     pub fn save(&self, u: &SettingsUpdate) -> Result<SettingsStatus, ApiError> {
-        let update = serde_json::to_value(u).unwrap_or_default();
-        let problem = settings_problem(&update);
+        let problem = settings_problem(u);
         if !problem.is_empty() {
             return Err(ApiError::new(BizCode::SettingRefused, problem));
         }
         let mut guard = self.stored.lock().unwrap_or_else(|e| e.into_inner());
-        let mut next = guard.as_object().cloned().unwrap_or_default();
-        for key in KEY_FIELDS {
-            if let Some(given) = update[key].as_str() {
-                next.insert(key.into(), given.trim().into());
+        let mut next = guard.clone();
+        let keys = [
+            (&u.deepseek_api_key, &mut next.deepseek_api_key),
+            (&u.agora_app_certificate, &mut next.agora_app_certificate),
+            (&u.asr_key, &mut next.asr_key),
+            (&u.llm_key, &mut next.llm_key),
+            (&u.tts_key, &mut next.tts_key),
+            (&u.dictation_key, &mut next.dictation_key),
+        ];
+        for (given, slot) in keys {
+            if let Some(given) = given {
+                *slot = Secret::new(given.trim());
             }
         }
-        if let Some(locale) = update["locale"].as_str() {
-            if locale == "zh" {
-                next.remove("locale");
-            } else {
-                next.insert("locale".into(), locale.into());
-            }
+        if let Some(id) = &u.agora_app_id {
+            next.agora_app_id = id.trim().to_string();
         }
-        if let Some(d) = update["dictation"].as_object() {
-            let mut out = Map::new();
-            if d["via"] == "own" {
-                out.insert("via".into(), "own".into());
-            }
-            out.insert("url".into(), s(&d["url"]).trim().trim_end_matches('/').into());
-            out.insert("model".into(), s(&d["model"]).trim().into());
-            let empty = !out.contains_key("via") && out["url"] == "" && out["model"] == "";
-            if empty {
-                next.remove("dictation");
-            } else {
-                next.insert("dictation".into(), Value::Object(out));
-            }
+        if let Some(locale) = u.locale {
+            next.locale = (locale != Locale::Zh).then_some(locale);
         }
-        if let Some(given) = update["memorySources"].as_array() {
-            let saved = next.get("memorySources").and_then(Value::as_array).cloned().unwrap_or_default();
-            let sources: Vec<Value> = given
+        if let Some(d) = &u.dictation {
+            let kept = StoredDictation {
+                via: (d.via == DictationVia::Own).then_some(DictationVia::Own),
+                url: d.url.trim().trim_end_matches('/').to_string(),
+                model: d.model.trim().to_string(),
+            };
+            next.dictation = (kept != StoredDictation::default()).then_some(kept);
+        }
+        if let Some(given) = &u.memory_sources {
+            let saved = std::mem::take(&mut next.memory_sources);
+            next.memory_sources = given
                 .iter()
-                .map(|m| {
-                    let key = match m["key"].as_str() {
-                        Some(k) => k.trim().to_string(),
-                        None => saved
-                            .iter()
-                            .find(|c| c["kind"] == m["kind"])
-                            .map(|c| s(&c["key"]).to_string())
-                            .unwrap_or_default(),
-                    };
-                    let mut out = json!({ "kind": m["kind"], "url": s(&m["url"]).trim() });
-                    for flag in ["enabled", "read", "write", "everything"] {
-                        if m[flag] == true {
-                            out[flag] = true.into();
-                        }
-                    }
-                    if !s(&m["user"]).trim().is_empty() {
-                        out["user"] = s(&m["user"]).trim().into();
-                    }
-                    if !key.is_empty() {
-                        out["key"] = key.into();
-                    }
-                    out
+                .map(|m| StoredSource {
+                    kind: m.kind,
+                    url: m.url.trim().to_string(),
+                    enabled: m.enabled,
+                    read: m.read,
+                    write: m.write,
+                    everything: m.everything == Some(true),
+                    user: m.user.as_deref().map(str::trim).filter(|u| !u.is_empty()).map(String::from),
+                    key: match &m.key {
+                        Some(k) => Secret::new(k.trim()),
+                        None => saved.iter().find(|c| c.kind == m.kind).map(|c| c.key.clone()).unwrap_or_default(),
+                    },
                 })
                 .collect();
-            if sources.is_empty() {
-                next.remove("memorySources");
-            } else {
-                next.insert("memorySources".into(), sources.into());
-            }
         }
-        if update["voice"].is_object() {
+        if let Some(v) = &u.voice {
             let defaults = self.voice_defaults();
-            let voice = self.voice_of(&json!({ "voice": update["voice"] }));
-            let overrides: Map<String, Value> = VOICE_FIELDS
-                .iter()
-                .filter(|k| voice[**k] != defaults[**k])
-                .map(|k| (k.to_string(), voice[*k].clone()))
-                .collect();
-            if overrides.is_empty() {
-                next.remove("voice");
-            } else {
-                next.insert("voice".into(), Value::Object(overrides));
-            }
+            let overrides = voice_overrides(voice_over(defaults.clone(), v), &defaults);
+            next.voice = (overrides != SettingsUpdateVoice::default()).then_some(overrides);
         }
-        next.retain(|_, v| !v.is_null() && *v != "");
-        let next = Value::Object(next);
         self.persist(&next)?;
-        vibevalley_i18n::set_locale(next["locale"].as_str().unwrap_or("zh"));
+        vibevalley_i18n::set_locale(next.locale.unwrap_or(Locale::Zh).as_str());
         *guard = next;
         drop(guard);
         Ok(self.status())
     }
 
     /// Changes the providers under the settings' lock (`updateProviders`).
-    pub fn update_providers(&self, change: impl FnOnce(Value) -> Result<Value, ApiError>) -> Result<Value, ApiError> {
+    pub fn update_providers(&self, change: impl FnOnce(&Providers) -> Result<Providers, ApiError>) -> Result<Providers, ApiError> {
         let mut guard = self.stored.lock().unwrap_or_else(|e| e.into_inner());
-        let current = if guard["providers"].is_object() {
-            guard["providers"].clone()
-        } else {
-            empty_providers()
-        };
-        let providers = change(current)?;
+        let providers = change(&guard.providers.clone().unwrap_or_default())?;
         let mut next = guard.clone();
-        next["providers"] = providers.clone();
+        next.providers = Some(providers.clone());
         self.persist(&next)?;
         *guard = next;
         Ok(providers)
     }
 
-    fn persist(&self, next: &Value) -> Result<(), ApiError> {
+    fn persist(&self, next: &Stored) -> Result<(), ApiError> {
         let text = serde_json::to_string_pretty(next).unwrap_or_default() + "\n";
         write_private(&self.file, &text).map_err(|e| {
             ApiError::new(

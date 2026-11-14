@@ -7,13 +7,15 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use serde_json::{Value, json};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, BizCode, ProviderModel, ProviderModelListing, ProviderStatus, ProviderUpdate, ProviderVoiceListing, ProviderVoiceListingVoices, ops,
+    ApiError, BizCode, KeySource, LitFalse, LitTrue, Missing, ProviderBinding, ProviderConnection, ProviderConnectionAdapter, ProviderModel,
+    ProviderModelListing, ProviderStatus, ProviderUpdate, ProviderVoiceListing, ProviderVoiceListingVoices, Readiness, ops,
 };
 
-use super::setting::{Setting, key_hint};
+use super::setting::{Secret, Setting};
 use crate::Hub;
 
 const MOSS: &str = "https://api.mosi.cn/v1";
@@ -44,68 +46,209 @@ pub const UNDERSTANDING_MODELS: [&str; 2] = ["moss-vl-1.0", "moss-vl-1.0-2026-07
 pub const VISION_MODELS: [&str; 2] = ["moss-vl-realtime-1.0", "moss-vl-realtime-1.0-2026-09-09"];
 pub const VOICE_DESIGN_MODELS: [&str; 2] = ["moss-voice-generator-1.0", "moss-voice-generator-1.0-2026-07-22"];
 
-const USES: [&str; 9] = [
-    "dictation",
-    "image",
-    "understanding",
-    "speech",
-    "live",
-    "speakers",
-    "voiceDesign",
-    "transcription",
-    "vision",
-];
+/// What a MOSS account is bound to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Use {
+    Dictation,
+    Image,
+    Understanding,
+    Speech,
+    Live,
+    Speakers,
+    VoiceDesign,
+    Transcription,
+    Vision,
+}
+
+impl Use {
+    pub const ALL: [Use; 9] = [
+        Use::Dictation,
+        Use::Image,
+        Use::Understanding,
+        Use::Speech,
+        Use::Live,
+        Use::Speakers,
+        Use::VoiceDesign,
+        Use::Transcription,
+        Use::Vision,
+    ];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Use::Dictation => "dictation",
+            Use::Image => "image",
+            Use::Understanding => "understanding",
+            Use::Speech => "speech",
+            Use::Live => "live",
+            Use::Speakers => "speakers",
+            Use::VoiceDesign => "voiceDesign",
+            Use::Transcription => "transcription",
+            Use::Vision => "vision",
+        }
+    }
+
+    pub fn models(self) -> &'static [&'static str] {
+        match self {
+            Use::Dictation | Use::Transcription => &TRANSCRIPTION_MODELS,
+            Use::Image => &IMAGE_MODELS,
+            Use::Understanding => &UNDERSTANDING_MODELS,
+            Use::Speech => &SPEECH_MODELS,
+            Use::Live => &LIVE_MODELS,
+            Use::Speakers => &SPEAKERS_MODELS,
+            Use::VoiceDesign => &VOICE_DESIGN_MODELS,
+            Use::Vision => &VISION_MODELS,
+        }
+    }
+
+    /// The refusal for a model this use does not run.
+    fn wrong_model(self) -> ApiError {
+        match self {
+            Use::Dictation => refuse("server.provider.model"),
+            Use::Image => refuse("server.provider.imageModel"),
+            Use::Understanding => refuse("server.provider.understandingModel"),
+            Use::Speech => refuse("server.provider.speechModel"),
+            _ => {
+                let capability = t(&format!("server.provider.use.{}", self.name()), &[]);
+                ApiError::new(
+                    BizCode::ProviderRefused,
+                    t("server.provider.capabilityModel", &[("capability", capability.into())]),
+                )
+            }
+        }
+    }
+}
+
+/// A MOSS account as `settings.json` keeps it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Connection {
+    pub id: String,
+    pub name: String,
+    pub adapter: ProviderConnectionAdapter,
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub key: Secret,
+}
+
+/// The MOSS accounts and what each use is bound to (`ProviderSettings`).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Providers {
+    #[serde(default)]
+    pub revision: i64,
+    #[serde(default)]
+    pub connections: Vec<Connection>,
+    pub dictation: Option<ProviderBinding>,
+    pub image: Option<ProviderBinding>,
+    pub understanding: Option<ProviderBinding>,
+    pub speech: Option<ProviderBinding>,
+    pub live: Option<ProviderBinding>,
+    pub speakers: Option<ProviderBinding>,
+    pub voice_design: Option<ProviderBinding>,
+    pub transcription: Option<ProviderBinding>,
+    pub vision: Option<ProviderBinding>,
+}
+
+/// One use's account: the connection, its model and key.
+#[derive(Debug, Clone)]
+pub struct Account {
+    pub connection: String,
+    pub revision: i64,
+    pub model: String,
+    pub key: Secret,
+}
+
+impl Providers {
+    pub fn binding(&self, u: Use) -> Option<&ProviderBinding> {
+        match u {
+            Use::Dictation => self.dictation.as_ref(),
+            Use::Image => self.image.as_ref(),
+            Use::Understanding => self.understanding.as_ref(),
+            Use::Speech => self.speech.as_ref(),
+            Use::Live => self.live.as_ref(),
+            Use::Speakers => self.speakers.as_ref(),
+            Use::VoiceDesign => self.voice_design.as_ref(),
+            Use::Transcription => self.transcription.as_ref(),
+            Use::Vision => self.vision.as_ref(),
+        }
+    }
+
+    /// `boundConnection`: the connection named, on and with a key.
+    fn usable(&self, id: &str) -> Option<&Connection> {
+        self.connections.iter().find(|c| c.id == id && c.enabled && !c.key.is_empty())
+    }
+
+    /// The account bound to `u`, ready to call.
+    pub fn account(&self, u: Use) -> Option<Account> {
+        let b = self.binding(u)?;
+        let c = self.usable(&b.connection)?;
+        Some(Account {
+            connection: c.id.clone(),
+            revision: self.revision,
+            model: b.model.clone(),
+            key: c.key.clone(),
+        })
+    }
+
+    /// `bindingOf`: whether `u` can run, and what it lacks.
+    pub fn readiness(&self, u: Use) -> Readiness {
+        let lacks = |missing| Readiness::False { ready: LitFalse, missing };
+        if self.connections.is_empty() {
+            return lacks(Missing::MossAccount);
+        }
+        let Some(c) = self.binding(u).and_then(|b| self.connections.iter().find(|c| c.id == b.connection)) else {
+            return lacks(Missing::Binding);
+        };
+        if !c.enabled {
+            return lacks(Missing::MossOff);
+        }
+        if c.key.is_empty() {
+            return lacks(Missing::MossKey);
+        }
+        Readiness::True { ready: LitTrue }
+    }
+
+    /// `providerStatus`: the providers with each key as a hint.
+    pub fn status(&self) -> ProviderStatus {
+        let models = |m: &[&str]| m.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        ProviderStatus {
+            revision: self.revision,
+            connections: self
+                .connections
+                .iter()
+                .map(|c| ProviderConnection {
+                    id: c.id.clone(),
+                    name: c.name.clone(),
+                    adapter: c.adapter,
+                    enabled: c.enabled,
+                    key: c.key.status(KeySource::Settings),
+                })
+                .collect(),
+            dictation: self.dictation.clone(),
+            image: self.image.clone(),
+            live: self.live.clone(),
+            live_models: models(&LIVE_MODELS),
+            speakers: self.speakers.clone(),
+            speakers_models: models(&SPEAKERS_MODELS),
+            voice_design: self.voice_design.clone(),
+            voice_design_models: models(&VOICE_DESIGN_MODELS),
+            transcription: self.transcription.clone(),
+            transcription_models: models(&TRANSCRIPTION_MODELS),
+            vision: self.vision.clone(),
+            vision_models: models(&VISION_MODELS),
+            dictation_models: models(&TRANSCRIPTION_MODELS),
+            image_models: models(&IMAGE_MODELS),
+            understanding: self.understanding.clone(),
+            understanding_models: models(&UNDERSTANDING_MODELS),
+            speech: self.speech.clone(),
+            speech_models: models(&SPEECH_MODELS),
+        }
+    }
+}
 
 fn refuse(key: &str) -> ApiError {
     ApiError::new(BizCode::ProviderRefused, t(key, &[]))
-}
-
-fn s(v: &Value) -> &str {
-    v.as_str().unwrap_or("")
-}
-
-/// `providerStatus`: the providers with each key as a hint.
-pub fn status_of(p: &Value) -> ProviderStatus {
-    let connections: Vec<Value> = p["connections"]
-        .as_array()
-        .cloned()
-        .unwrap_or_default()
-        .into_iter()
-        .map(|mut c| {
-            let key = s(&c["key"]).to_string();
-            c["key"] = if key.is_empty() {
-                json!({ "source": null })
-            } else {
-                json!({ "source": "settings", "hint": key_hint(&key) })
-            };
-            c
-        })
-        .collect();
-    let mut out = json!({
-        "revision": p["revision"].as_i64().unwrap_or(0),
-        "connections": connections,
-        "liveModels": LIVE_MODELS,
-        "speakersModels": SPEAKERS_MODELS,
-        "voiceDesignModels": VOICE_DESIGN_MODELS,
-        "transcriptionModels": TRANSCRIPTION_MODELS,
-        "visionModels": VISION_MODELS,
-        "dictationModels": TRANSCRIPTION_MODELS,
-        "imageModels": IMAGE_MODELS,
-        "understandingModels": UNDERSTANDING_MODELS,
-        "speechModels": SPEECH_MODELS,
-    });
-    for u in USES {
-        out[u] = if p[u].is_object() { p[u].clone() } else { Value::Null };
-    }
-    serde_json::from_value(out).expect("the providers' status is a ProviderStatus")
-}
-
-/// `boundConnection`: the connection named, on and with a key.
-fn bound_connection<'a>(p: &'a Value, id: &str) -> Option<&'a Value> {
-    p["connections"]
-        .as_array()?
-        .iter()
-        .find(|c| c["id"] == id && c["enabled"] == true && !s(&c["key"]).is_empty())
 }
 
 fn good_connection_id(id: &str) -> bool {
@@ -114,9 +257,8 @@ fn good_connection_id(id: &str) -> bool {
 
 /// `connectionsOver`: the update laid over the current providers; refused
 /// when it cannot be right.
-pub fn connections_over(current: &Value, update: &ProviderUpdate) -> Result<Value, ApiError> {
-    let revision = current["revision"].as_i64().unwrap_or(0);
-    if update.revision != revision {
+pub fn connections_over(current: &Providers, update: &ProviderUpdate) -> Result<Providers, ApiError> {
+    if update.revision != current.revision {
         return Err(refuse("server.provider.changed"));
     }
     if update.connections.len() > 32 {
@@ -132,70 +274,56 @@ pub fn connections_over(current: &Value, update: &ProviderUpdate) -> Result<Valu
         if name.is_empty() || name.encode_utf16().count() > 80 {
             return Err(refuse("server.provider.name"));
         }
-        let kept = current["connections"]
-            .as_array()
-            .and_then(|cs| cs.iter().find(|c| c["id"] == input.id.as_str()))
-            .map(|c| s(&c["key"]).to_string());
         let key = match &input.key {
-            None => kept.unwrap_or_default(),
-            Some(None) => String::new(),
-            Some(Some(k)) => k.trim().to_string(),
+            None => current.connections.iter().find(|c| c.id == input.id).map(|c| c.key.clone()).unwrap_or_default(),
+            Some(None) => Secret::default(),
+            Some(Some(k)) => Secret::new(k.trim()),
         };
         let given_empty = matches!(&input.key, Some(Some(_))) && key.is_empty();
-        if given_empty || key.chars().any(char::is_whitespace) || key.encode_utf16().count() > 4096 {
+        if given_empty || key.expose().chars().any(char::is_whitespace) || key.expose().encode_utf16().count() > 4096 {
             return Err(refuse("server.provider.key"));
         }
-        connections.push(json!({
-            "id": input.id, "name": name, "adapter": input.adapter, "enabled": input.enabled, "key": key,
-        }));
+        connections.push(Connection {
+            id: input.id.clone(),
+            name: name.into(),
+            adapter: input.adapter,
+            enabled: input.enabled,
+            key,
+        });
     }
-    let u = serde_json::to_value(update).unwrap_or_default();
-    let mut next = json!({ "revision": revision + 1, "connections": connections });
-    for use_ in USES {
-        next[use_] = u[use_].clone();
-    }
-    for use_ in USES {
-        let b = &next[use_];
-        if b.is_object() && bound_connection(&next, s(&b["connection"])).is_none() {
+    let next = Providers {
+        revision: current.revision + 1,
+        connections,
+        dictation: update.dictation.clone(),
+        image: update.image.clone(),
+        understanding: update.understanding.clone(),
+        speech: update.speech.clone(),
+        live: update.live.clone(),
+        speakers: update.speakers.clone(),
+        voice_design: update.voice_design.clone(),
+        transcription: update.transcription.clone(),
+        vision: update.vision.clone(),
+    };
+    for u in Use::ALL {
+        if let Some(b) = next.binding(u)
+            && next.usable(&b.connection).is_none()
+        {
             return Err(refuse("server.provider.bound"));
         }
     }
-    let model_in = |use_: &str, models: &[&str]| {
-        let b = &next[use_];
-        !b.is_object() || models.contains(&s(&b["model"]))
-    };
-    if !model_in("dictation", &TRANSCRIPTION_MODELS) {
-        return Err(refuse("server.provider.model"));
-    }
-    if !model_in("image", &IMAGE_MODELS) {
-        return Err(refuse("server.provider.imageModel"));
-    }
-    if !model_in("understanding", &UNDERSTANDING_MODELS) {
-        return Err(refuse("server.provider.understandingModel"));
-    }
-    if !model_in("speech", &SPEECH_MODELS) {
-        return Err(refuse("server.provider.speechModel"));
-    }
-    for (use_, models) in [
-        ("live", &LIVE_MODELS[..]),
-        ("speakers", &SPEAKERS_MODELS[..]),
-        ("voiceDesign", &VOICE_DESIGN_MODELS[..]),
-        ("transcription", &TRANSCRIPTION_MODELS[..]),
-        ("vision", &VISION_MODELS[..]),
-    ] {
-        if !model_in(use_, models) {
-            let capability = t(&format!("server.provider.use.{use_}"), &[]);
-            return Err(ApiError::new(
-                BizCode::ProviderRefused,
-                t("server.provider.capabilityModel", &[("capability", capability.into())]),
-            ));
+    for u in Use::ALL {
+        if let Some(b) = next.binding(u)
+            && !u.models().contains(&b.model.as_str())
+        {
+            return Err(u.wrong_model());
         }
     }
     Ok(next)
 }
 
 /// A GET to MOSS: the parsed 2xx body, else its failure in the user's words (`refusal`).
-fn moss_get(fetch: &dyn Fetch, key: &str, url: &str, query: &[(&str, String)], timeout: Duration) -> Result<Value, ApiError> {
+fn moss_get(fetch: &dyn Fetch, key: &Secret, url: &str, query: &[(&str, String)], timeout: Duration) -> Result<Value, ApiError> {
+    let key = key.expose();
     if key.trim().is_empty() || key.chars().any(char::is_whitespace) {
         return Err(refuse("server.provider.noKey"));
     }
@@ -244,26 +372,26 @@ impl Provider {
     }
 
     pub fn status(&self) -> ProviderStatus {
-        status_of(&self.setting.providers())
+        self.setting.providers().status()
     }
 
     pub fn update(&self, input: &ProviderUpdate) -> Result<ProviderStatus, ApiError> {
-        let next = self.setting.update_providers(|current| connections_over(&current, input))?;
-        Ok(status_of(&next))
+        let next = self.setting.update_providers(|current| connections_over(current, input))?;
+        Ok(next.status())
     }
 
     /// The bound connection's key at `revision`, else refused.
-    fn key_at(&self, connection: &str, revision: i64) -> Result<String, ApiError> {
+    fn key_at(&self, connection: &str, revision: i64) -> Result<Secret, ApiError> {
         let p = self.setting.providers();
-        if p["revision"].as_i64().unwrap_or(0) != revision {
+        if p.revision != revision {
             return Err(refuse("server.provider.changed"));
         }
-        let c = bound_connection(&p, connection).ok_or_else(|| refuse("server.provider.noKey"))?;
-        Ok(s(&c["key"]).to_string())
+        let c = p.usable(connection).ok_or_else(|| refuse("server.provider.noKey"))?;
+        Ok(c.key.clone())
     }
 
     fn still_at(&self, revision: i64) -> Result<(), ApiError> {
-        if self.setting.providers()["revision"].as_i64().unwrap_or(0) != revision {
+        if self.setting.providers().revision != revision {
             return Err(refuse("server.provider.changed"));
         }
         Ok(())

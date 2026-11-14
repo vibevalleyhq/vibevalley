@@ -23,6 +23,7 @@ use super::machine::{Machine, OtherJobs};
 use super::vendor::{self, Account, Fetch, Moss, Outcome, Request, Task};
 use crate::modules::attachment::{ATTACHMENT_MAX, Attachments, open_db};
 use crate::modules::media::inputs::Inputs;
+use crate::modules::provider::Use;
 use crate::modules::setting::Setting;
 use crate::now;
 
@@ -227,24 +228,17 @@ impl Audio {
 
     /// The speech account as the settings bind it now.
     fn account(&self) -> Result<Account, ApiError> {
-        let p = self.setting.providers();
-        let binding = &p["speech"];
-        let id = binding["connection"].as_str().unwrap_or("");
-        let model = binding["model"].as_str().unwrap_or("");
-        let c = p["connections"]
-            .as_array()
-            .and_then(|a| {
-                a.iter()
-                    .find(|c| c["id"] == id && c["enabled"] == true && !c["key"].as_str().unwrap_or("").is_empty())
-            })
+        let a = self
+            .setting
+            .providers()
+            .account(Use::Speech)
             .ok_or_else(|| ApiError::new(BizCode::ProviderRefused, t("server.provider.speechUnbound", &[])))?;
-        let key = c["key"].as_str().unwrap_or("").to_string();
         Ok(Account {
-            connection: id.into(),
-            revision: p["revision"].as_i64().unwrap_or(0),
-            model: model.into(),
-            fingerprint: vendor::fingerprint(&key),
-            key,
+            fingerprint: vendor::fingerprint(a.key.expose()),
+            key: a.key.expose().to_string(),
+            connection: a.connection,
+            revision: a.revision,
+            model: a.model,
         })
     }
 

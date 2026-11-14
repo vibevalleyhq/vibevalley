@@ -117,16 +117,17 @@ fn a_voice_vendors_key_is_a_hint_and_readiness_follows_the_providers() {
     assert_eq!(after["ttsKey"], json!({ "source": "settings", "hint": "…9f3a" }));
     assert!(!after.to_string().contains("azure-speech-key"));
     setting
-        .update_providers(|mut p| {
+        .update_providers(|p| {
+            let mut p = serde_json::to_value(p).unwrap();
             p["revision"] = 1.into();
             p["connections"] = json!([{ "id": "moss", "name": "MOSS", "adapter": "moss", "enabled": true, "key": "test-private-key" }]);
             p["live"] = json!({ "connection": "moss", "model": "moss-live-1.0" });
-            Ok(p)
+            Ok(serde_json::from_value(p).unwrap())
         })
         .unwrap();
     let ready = serde_json::to_value(setting.status()).unwrap();
     assert_eq!(ready["readiness"]["live"], json!({ "ready": true }));
     assert_eq!(ready["readiness"]["image"], json!({ "ready": false, "missing": "binding" }));
     assert!(!ready.to_string().contains("test-private-key"));
-    assert_eq!(setting.providers()["revision"], 1);
+    assert_eq!(setting.providers().revision, 1);
 }

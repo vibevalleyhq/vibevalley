@@ -60,7 +60,7 @@ fn invalid_connection_changes_are_refused() {
     ];
     for (i, (k, v)) in cases.into_iter().enumerate() {
         let u = update(|u| u[k] = v);
-        let e = connections_over(&empty(), &u).expect_err(&format!("case {i}"));
+        let e = connections_over(&Default::default(), &u).expect_err(&format!("case {i}"));
         assert_eq!(e.biz_code, BizCode::ProviderRefused, "case {i}");
         assert!(!e.message.contains("test-key"));
     }
@@ -69,7 +69,7 @@ fn invalid_connection_changes_are_refused() {
 #[test]
 fn an_unconfigured_connection_is_saved_without_a_default() {
     let u = update(|u| u["connections"] = json!([{ "id": "moss", "name": " MOSS ", "adapter": "moss", "enabled": true }]));
-    let saved = connections_over(&empty(), &u).unwrap();
+    let saved = serde_json::to_value(connections_over(&Default::default(), &u).unwrap()).unwrap();
     assert_eq!(
         saved["connections"],
         json!([{ "id": "moss", "name": "MOSS", "adapter": "moss", "enabled": true, "key": "" }])
@@ -115,7 +115,7 @@ fn updates_keep_the_key_and_follow_revisions() {
         work_root: home.path().into(),
         ..Default::default()
     });
-    assert_eq!(reopened.providers()["connections"][0]["key"], "test-key");
+    assert_eq!(serde_json::to_value(reopened.providers()).unwrap()["connections"][0]["key"], "test-key");
     let _ = Arc::strong_count(&setting);
     // Model discovery refuses an old revision before any call.
     assert_eq!(p.models("moss", 0).unwrap_err().biz_code, BizCode::ProviderRefused);

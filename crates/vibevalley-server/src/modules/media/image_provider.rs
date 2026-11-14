@@ -1,7 +1,8 @@
 //! MOSS image request preparation and cancelable execution. Secrets and signed
 //! URLs never enter errors. Download DNS is pinned to checked public addresses.
 use super::{inputs::refused, png};
-use crate::modules::{provider::IMAGE_MODELS, setting::Setting};
+use crate::modules::provider::{IMAGE_MODELS, Use};
+use crate::modules::setting::Setting;
 use serde_json::{Value, json};
 use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
 use vibevalley_protocol::{ApiError, BizCode, MediaImageFormat, MediaImageRequest, MediaImageUsage};
@@ -127,23 +128,20 @@ pub fn body(r: &MediaImageRequest, model: &str) -> Result<Value, ApiError> {
 }
 impl ImageBackend for Moss {
     fn prepare(&self, r: &MediaImageRequest) -> Result<Prepared, ApiError> {
-        let p = self.setting.providers();
-        let binding = &p["image"];
-        let id = text(&binding["connection"]);
-        let model = text(&binding["model"]);
-        let c = p["connections"]
-            .as_array()
-            .and_then(|a| a.iter().find(|c| c["id"] == id && c["enabled"] == true && !text(&c["key"]).is_empty()))
+        let a = self
+            .setting
+            .providers()
+            .account(Use::Image)
             .ok_or_else(|| ApiError::new(BizCode::ProviderRefused, vibevalley_i18n::t("server.provider.imageUnbound", &[])))?;
-        if c["adapter"] != "moss" || !IMAGE_MODELS.contains(&model) {
+        if !IMAGE_MODELS.contains(&a.model.as_str()) {
             return Err(ApiError::new(BizCode::ProviderRefused, vibevalley_i18n::t("server.provider.imageModel", &[])));
         }
         Ok(Prepared {
-            connection: id.into(),
-            revision: p["revision"].as_i64().unwrap_or(0),
-            model: model.into(),
-            body: body(r, model)?,
-            key: text(&c["key"]).into(),
+            body: body(r, &a.model)?,
+            connection: a.connection,
+            revision: a.revision,
+            model: a.model,
+            key: a.key.expose().to_string(),
         })
     }
     fn generate<'a>(&'a self, p: Prepared) -> Work<'a, Generated> {
