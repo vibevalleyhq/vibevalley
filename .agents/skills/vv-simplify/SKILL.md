@@ -1,6 +1,6 @@
 ---
 name: vv-simplify
-description: 在 VibeValley 里找可以简化的地方：删掉以后什么都不少的代码、只是转手的一层、几份重复的帮手、只给测试开的选项、兼容旧数据的兜底、手写了 `@vibevalley/async` 已经有的东西、多余的注释；每一处核实过、带证据，排好序列给用户，用户点了哪几处再改。用在：用户说「看看哪里能简化」「找找冗余」「这块是不是写复杂了」「simplify」；做完一块功能想收一收；评审时觉得一块代码比它做的事复杂。默认只列清单，不动代码。
+description: 在 VibeValley 里找可以简化的地方：删掉以后什么都不少的代码、只是转手的一层、几份重复的帮手、只给测试开的选项、兼容旧数据的兜底、手写了已经有的东西、多余的注释；每一处核实过、带证据，排好序列给用户，用户点了哪几处再改。用在：用户说「看看哪里能简化」「找找冗余」「这块是不是写复杂了」「simplify」；做完一块功能想收一收；评审时觉得一块代码比它做的事复杂。默认只列清单，不动代码。
 ---
 
 # 找可以简化的地方
@@ -24,7 +24,7 @@ description: 在 VibeValley 里找可以简化的地方：删掉以后什么都�
 3. **只转手的一层**：一个函数或模块只是把参数原样递给另一个。删掉它试试，复杂度是消失了，还是挪到了每个调用方？消失了才算。
 4. **重复的帮手**：几个模块各写一份做同一件事的（以前的十份 `db` 帮手就是这样收成一个的）。收到拥有它的那个模块，别的用它的。
 5. **只给测试开的口子**：服务的 `options` 里只有测试才传的选项（以前的 `now`、`patrolNow`），换成测试已经有的接缝（服务端的集成测试起真的服务端，`crates/vibevalley-server/tests/`；页面的测试时钟）。
-6. **手写了 `@vibevalley/async` 已经有的**：自己写的重试循环（`retry`、`exponential`）、自己管的一组后台 Promise 或按键的定时器（`TaskGroup` 的 `run`、`keyed`）、自己拼的超时（`withTimeout`）、手写解析 JSON 再 `as`（Zod 的 `jsonString`）。Rust 里同理：手取 `serde_json::Value` 的字段换成 serde 结构体。照仓库里已有的写法，不引进新的。
+6. **手写了已经有的**：TS 里先查[共用的原语](docs/reference/primitives.md)；手写解析 JSON 再 `as` 的换成 Zod 的 `jsonString`。Rust 里手取 `serde_json::Value` 的字段换成 serde 结构体。照仓库里已有的写法，不引进新的。
 7. **状态多存了一份**：页面或服务端在核心状态以外另存了帮工、工单的状态（AGENTS.md「核心状态只有一份」）。
 8. **封闭联合的长 `if`/`else`**：换成穷尽的 `switch` 或 `Record<X, …>`，加新成员时编不过。
 9. **多余的注释**：复述代码、写历史、写概述的（[docs/style/code.md](docs/style/code.md)「不建议写」）；整块清的话交给 [vv-comments](.agents/skills/vv-comments/SKILL.md)。
