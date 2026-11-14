@@ -5,6 +5,7 @@
 //! VibeValley's words and codes.
 
 mod board;
+pub(crate) mod db;
 mod edits;
 mod family;
 mod refine;
@@ -355,7 +356,7 @@ fn take_over(board: &Board, item: &Issue, to: IssueStatus, agent: &str) -> Resul
         .map_err(|e| api(board, e))
 }
 
-fn changes_of(board: &Board, item: &Issue) -> Result<Changes, ApiError> {
+pub(crate) fn changes_of(board: &Board, item: &Issue) -> Result<Changes, ApiError> {
     // A parent is worked through its children: their merges are its changes.
     let has_children = board.read(|s| s.issues.iter().any(|i| i.parent.as_deref() == Some(item.id.as_str())));
     if item.repo.is_none() || !(item.was_sent() || has_children) {
@@ -502,49 +503,14 @@ pub fn install_on(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Agents>>) {
     let profiles = names.clone();
     hub.on::<ops::IssueCreate>(move |ctx, req| {
         keys.once(req.request_key.as_deref(), || {
-            let agent = req.agent.clone().unwrap_or_default();
-            let agent = match &profiles {
-                Some(agents) => agents.agent_key(&agent),
-                None => agent,
-            };
-            let on_duty = profiles.as_ref().is_some_and(|a| a.profiles.is_orchestrator(&agent));
-            let new = NewIssue {
-                title: req.title.clone(),
-                description: req.description.clone().unwrap_or_default(),
-                criteria: req.criteria.clone().unwrap_or_default(),
-                repo: req.repo.as_deref().map(str::trim).filter(|r| !r.is_empty()).map(PathBuf::from),
-                agent,
-                // An issue for the orchestrator asks for an answer; any other a change (lifecycle.ts `create`).
-                deliver: req.deliver.unwrap_or(if on_duty {
-                    vibevalley_protocol::Deliverable::Answer
-                } else {
-                    vibevalley_protocol::Deliverable::Change
-                }),
-                priority: req.priority.unwrap_or_default(),
-                parent: req.parent.clone(),
-                blocked_by: req.blocked_by.clone().unwrap_or_default(),
-                constraints: req.constraints.clone(),
-                cron: None,
-            };
-            let issue = b.create(new).map_err(|e| api(&b, e))?;
+            let issue = create(&b, profiles.as_deref(), &req)?;
             applied(ctx.hub, issue)
         })
     });
 
     let b = board.clone();
     hub.on::<ops::IssueUpdate>(move |ctx, input| {
-        let upd = IssueUpdate {
-            title: input.title,
-            description: input.description,
-            repo: input.repo,
-            agent: input.agent,
-            priority: input.priority,
-            criteria: input.criteria,
-            deliver: input.deliver,
-            before: input.before,
-        };
-        let id = get(&b, &input.id)?.id;
-        let issue = b.edit(&id, &upd).map_err(|e| api(&b, e))?;
+        let issue = update(&b, input)?;
         applied(ctx.hub, issue)
     });
 
@@ -574,26 +540,7 @@ pub fn install_on(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Agents>>) {
 
     let b = board.clone();
     let keys = Arc::new(RequestKeys::default());
-    hub.on::<ops::IssueStatusUpdate>(move |ctx, input| {
-        keys.once(input.request_key.as_deref(), || {
-            let mut item = get(&b, &input.id)?;
-            if let Some(edit) = &input.edit {
-                item = b.edit(&item.id, edit).map_err(|e| api(&b, e))?;
-            }
-            if let Some(agent) = &input.agent {
-                take_over(&b, &item, input.status, agent)?;
-                item = get(&b, &item.id)?;
-            }
-            let settled = settle(&item, input.status, input.text.as_deref().unwrap_or(""))?;
-            let words = (!settled.said.is_empty()).then_some(settled.said.as_str());
-            if settled.mv == Move::Round && words.is_some() && item.stage.state == IssueStageKind::Reviewing {
-                b.review(&item.id, false, &findings_of(&settled.said), "").map_err(|e| api(&b, e))?;
-            } else {
-                b.move_to(&item.id, input.status, words).map_err(|e| api(&b, e))?;
-            }
-            applied(ctx.hub, get(&b, &item.id)?)
-        })
-    });
+    hub.on::<ops::IssueStatusUpdate>(move |ctx, input| keys.once(input.request_key.as_deref(), || applied(ctx.hub, status(&b, &input)?)));
 
     let b = board.clone();
     let names = names.clone();
@@ -621,20 +568,7 @@ pub fn install_on(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Agents>>) {
     });
 
     let b = board.clone();
-    hub.on::<ops::IssueRefine>(move |_, input| {
-        let mut item = get(&b, &input.id)?;
-        if let Some(edit) = &input.edit {
-            item = b.edit(&item.id, edit).map_err(|e| api(&b, e))?;
-        }
-        if item.status != IssueStatus::Backlog {
-            return Err(refused("server.issue.refinement.onlyBacklog", &[]).with_next(next_steps(&item)));
-        }
-        if let Some(r) = &item.refining {
-            return Err(refused("server.issue.refinement.drafting", &[("name", r.name.clone().into())]));
-        }
-        b.refine(&item.id, input.text.as_deref().unwrap_or("")).map_err(|e| api(&b, e))?;
-        get(&b, &item.id)
-    });
+    hub.on::<ops::IssueRefine>(move |_, input| refine(&b, None, &input));
 
     let b = board.clone();
     hub.on::<ops::IssueSplit>(move |_, input| split(&b, &input.id, &input.tasks));
@@ -705,35 +639,7 @@ pub fn install_conversation(hub: &Hub, board: Board, chat: Arc<crate::modules::c
     hub.on::<ops::IssueConversationGet>(move |_, input| Ok(c.issue_thread_id(&get(&b, &input.id)?.id)));
     // refinement.ts `draft`: the issue's thread is opened, the user's words go in it, and what was said there is the
     // draft's discussion.
-    hub.on::<ops::IssueRefine>(move |_, input| {
-        let mut item = get(&board, &input.id)?;
-        if let Some(edit) = &input.edit {
-            item = board.edit(&item.id, edit).map_err(|e| api(&board, e))?;
-        }
-        if item.status != IssueStatus::Backlog {
-            return Err(refused("server.issue.refinement.onlyBacklog", &[]).with_next(next_steps(&item)));
-        }
-        if let Some(r) = &item.refining {
-            return Err(refused("server.issue.refinement.drafting", &[("name", r.name.clone().into())]));
-        }
-        let said = input.text.as_deref().unwrap_or("").trim().to_string();
-        let thread = chat.issue_thread(&item.id, &item.title, None)?;
-        let discussion = chat
-            .history(&thread, None, Some(40))?
-            .into_iter()
-            .map(|m| m.text)
-            .collect::<Vec<_>>()
-            .join("\n\n");
-        if !said.is_empty() {
-            chat.say(crate::modules::channel::Saying {
-                text: said.clone(),
-                channel: Some(thread),
-                ..Default::default()
-            })?;
-        }
-        board.refine_with(&item.id, &said, &discussion).map_err(|e| api(&board, e))?;
-        get(&board, &item.id)
-    });
+    hub.on::<ops::IssueRefine>(move |_, input| refine(&board, Some(&chat), &input));
 }
 
 fn edit_rewords(edit: &IssueUpdate) -> bool {
@@ -766,4 +672,103 @@ fn apply_preview_edit(item: &mut Issue, edit: &IssueUpdate) {
     if let Some(v) = edit.deliver {
         item.deliver = v;
     }
+}
+
+pub(crate) fn create(board: &Board, profiles: Option<&Agents>, req: &vibevalley_protocol::IssueRequest) -> Result<Issue, ApiError> {
+    let agent = req.agent.clone().unwrap_or_default();
+    let agent = match profiles {
+        Some(agents) => agents.agent_key(&agent),
+        None => agent,
+    };
+    let on_duty = profiles.is_some_and(|a| a.profiles.is_orchestrator(&agent));
+    let new = NewIssue {
+        title: req.title.clone(),
+        description: req.description.clone().unwrap_or_default(),
+        criteria: req.criteria.clone().unwrap_or_default(),
+        repo: req.repo.as_deref().map(str::trim).filter(|r| !r.is_empty()).map(PathBuf::from),
+        agent,
+        // An issue for the orchestrator asks for an answer; any other a change (lifecycle.ts `create`).
+        deliver: req.deliver.unwrap_or(if on_duty {
+            vibevalley_protocol::Deliverable::Answer
+        } else {
+            vibevalley_protocol::Deliverable::Change
+        }),
+        priority: req.priority.unwrap_or_default(),
+        parent: req.parent.clone(),
+        blocked_by: req.blocked_by.clone().unwrap_or_default(),
+        constraints: req.constraints.clone(),
+        cron: None,
+    };
+    let issue = board.create(new).map_err(|e| api(board, e))?;
+    Ok(issue)
+}
+
+pub(crate) fn update(board: &Board, input: vibevalley_protocol::IssueUpdateInput) -> Result<Issue, ApiError> {
+    let upd = IssueUpdate {
+        title: input.title,
+        description: input.description,
+        repo: input.repo,
+        agent: input.agent,
+        priority: input.priority,
+        criteria: input.criteria,
+        deliver: input.deliver,
+        before: input.before,
+    };
+    let id = get(board, &input.id)?.id;
+    let issue = board.edit(&id, &upd).map_err(|e| api(board, e))?;
+    Ok(issue)
+}
+
+pub(crate) fn status(board: &Board, input: &vibevalley_protocol::IssueStatusUpdateInput) -> Result<Issue, ApiError> {
+    let mut item = get(board, &input.id)?;
+    if let Some(edit) = &input.edit {
+        item = board.edit(&item.id, edit).map_err(|e| api(board, e))?;
+    }
+    if let Some(agent) = &input.agent {
+        take_over(board, &item, input.status, agent)?;
+        item = get(board, &item.id)?;
+    }
+    let settled = settle(&item, input.status, input.text.as_deref().unwrap_or(""))?;
+    let words = (!settled.said.is_empty()).then_some(settled.said.as_str());
+    if settled.mv == Move::Round && words.is_some() && item.stage.state == IssueStageKind::Reviewing {
+        board.review(&item.id, false, &findings_of(&settled.said), "").map_err(|e| api(board, e))?;
+    } else {
+        board.move_to(&item.id, input.status, words).map_err(|e| api(board, e))?;
+    }
+    get(board, &item.id)
+}
+
+pub(crate) fn refine(board: &Board, chat: Option<&crate::modules::channel::Chat>, input: &vibevalley_protocol::IssueRefineInput) -> Result<Issue, ApiError> {
+    let mut item = get(board, &input.id)?;
+    if let Some(edit) = &input.edit {
+        item = board.edit(&item.id, edit).map_err(|e| api(board, e))?;
+    }
+    if item.status != IssueStatus::Backlog {
+        return Err(refused("server.issue.refinement.onlyBacklog", &[]).with_next(next_steps(&item)));
+    }
+    if let Some(r) = &item.refining {
+        return Err(refused("server.issue.refinement.drafting", &[("name", r.name.clone().into())]));
+    }
+    let said = input.text.as_deref().unwrap_or("").trim().to_string();
+    let discussion = if let Some(chat) = chat {
+        let thread = chat.issue_thread(&item.id, &item.title, None)?;
+        let discussion = chat
+            .history(&thread, None, Some(40))?
+            .into_iter()
+            .map(|m| m.text)
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        if !said.is_empty() {
+            chat.say(crate::modules::channel::Saying {
+                text: said.clone(),
+                channel: Some(thread),
+                ..Default::default()
+            })?;
+        }
+        discussion
+    } else {
+        String::new()
+    };
+    board.refine_with(&item.id, &said, &discussion).map_err(|e| api(board, e))?;
+    get(board, &item.id)
 }

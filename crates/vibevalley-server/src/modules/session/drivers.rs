@@ -5,7 +5,7 @@
 use std::sync::Arc;
 
 use vibevalley_oar::{Installation, Registry, Runtime};
-use vibevalley_protocol::{Deliverable, Issue, IssueReportMemory};
+use vibevalley_protocol::{Deliverable, Issue};
 
 use crate::modules::ledger::{BoardError, Result};
 
@@ -61,8 +61,6 @@ pub trait Drivers: Send + Sync {
             "You are @{id}, talking with the user in {channel}. Your own folder is {cwd}; write files only there. Your last answer of a round is posted in the channel."
         )
     }
-    /// What a helper's report asks it to remember.
-    fn remember(&self, _agent: &str, _session: &str, _repo: &str, _memories: &[IssueReportMemory]) {}
 }
 
 /// Where a helper works an issue, for its rules.

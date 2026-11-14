@@ -16,7 +16,6 @@ use vibevalley_oar::{
 use vibevalley_protocol::{Issue, IssueStageKind as StageKind};
 use vibevalley_server::modules::issue::Board;
 use vibevalley_server::modules::ledger::BoardConfig;
-use vibevalley_store::Store;
 
 /// What a hook sees of a turn.
 #[derive(Debug, Clone)]
@@ -229,7 +228,7 @@ pub fn repo(dir: &Path, name: &str) -> PathBuf {
 pub struct World {
     pub dir: tempfile::TempDir,
     pub board: Board,
-    pub store: Arc<Store>,
+    pub store: PathBuf,
     pub registry: Arc<Registry>,
 }
 
@@ -246,10 +245,10 @@ pub fn world(runtimes: Vec<Arc<dyn Runtime>>, tune: impl FnOnce(&mut BoardConfig
         registry.register(r);
     }
     let registry = Arc::new(registry);
-    let store = Arc::new(Store::open(&dir.path().join("state.db")).unwrap());
+    let store = dir.path().join("server.db");
     let mut config = config(dir.path());
     tune(&mut config);
-    let board = Board::open(store.clone(), registry.clone(), config).unwrap();
+    let board = Board::open(&store, registry.clone(), config).unwrap();
     World { dir, board, store, registry }
 }
 

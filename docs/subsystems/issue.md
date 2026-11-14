@@ -37,7 +37,7 @@
 |---|---|
 | `crates/vibevalley-server/src/modules/issue/board.rs` | `Board`：建单、挪状态（`move_to`）、对帮工说话（`tell`）、叫停、排队（`refresh_queue`）、改动（`changes`）、交付（`complete`）与取消；帮工交给 `Sessions`，worktree 与合并交给 `Workplace` |
 | `crates/vibevalley-server/src/modules/issue/edits.rs`、`family.rs`、`refine.rs` | 改字段、删单、验收（`edit`、`remove`、`review`）；拆单与子工单合进父分支（`split`、`join_children`）；起草（`refine`）和读回草稿 |
-| `crates/vibevalley-server/src/modules/ledger.rs` | 工单板唯一的写入口 `Ledger`：先存进 `state.db`（`vibevalley-store`）再经 `Facts` 折进核心状态；已有工单的变化只能是一个 `IssueChange`（入队、重开、交付、取消、冲突、汇报、起草……），由 `IssueChange::fold` 一处写 |
+| `crates/vibevalley-server/src/modules/ledger.rs` | 工单板唯一的写入口 `Ledger`：一批事实先在 `server.db` 的事务里存好，再经 `Facts` 折进核心状态；写失败时整批回滚且不修改核心状态；已有工单的变化只能是一个 `IssueChange`（入队、重开、交付、取消、冲突、汇报、起草……），由 `IssueChange::fold` 一处写 |
 | `crates/vibevalley-server/src/modules/session/sessions.rs`、`runs.rs` | 帮工与每一轮：见 [帮工](docs/subsystems/session.md) |
 | `crates/vibevalley-server/src/modules/workplace/mod.rs`、`check.rs` | worktree、合并、冲突与分支清理；合进主分支前跑 `.vibevalley/check`、子工单合进父分支前跑它的检查，失败给末尾 40 行：见 [仓库](docs/subsystems/repo.md) |
 | `crates/vibevalley-core/src/status.rs`、`moves.rs` | 状态派生、展示阶段与可执行动作；合法挪动（`status_move`） |
@@ -105,6 +105,8 @@ Rust 版没有 TS 版的蓄水池（`issue_input`）、订阅与触发表：观�
 详情显式展示当前需求、验收条件、交付结果和讨论记录。讨论使用 Channel 的工单串，换人、重试、退回不更换历史来源；`issue.conversation.get` 查询持久化的串位置，消息分页读取并订阅更新。执行轨迹只在展开时加载，不进入讨论消息。
 
 PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，消息以工单和 URL 构成的 `sendKey` 持久化去重，提交与轮询串行。完成后的 PR 状态继续更新，但不触发工作区清理。完成按钮统一表达验收，实际交付行为由服务端按 `deliver` 判定。
+
+建单、改字段、挪状态、起草和看改动的规则由 `modules/issue` 的带类型函数提供；HTTP 端点和助手工具调用同一份函数，工具不经 Hub 再调工单接口。
 
 ## 和谁打交道
 

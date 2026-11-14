@@ -125,6 +125,34 @@ impl Memories {
         }
     }
 
+    pub fn observe_sessions(self: &Arc<Self>, sessions: &crate::modules::session::Sessions) {
+        let memories = self.clone();
+        sessions.on_news(move |news| {
+            if let crate::modules::session::News::Remember {
+                agent,
+                session,
+                repo,
+                memories: notes,
+            } = news
+            {
+                for m in notes {
+                    let note = Note {
+                        agent: agent.clone(),
+                        text: m.text.clone(),
+                        repo: match m.scope {
+                            vibevalley_protocol::IssueReportMemoryScope::Repo => repo.clone(),
+                            vibevalley_protocol::IssueReportMemoryScope::All => String::new(),
+                        },
+                        by: By::Session(session.clone()),
+                    };
+                    if let Err(e) = memories.write(&note) {
+                        eprintln!("memory: {session}'s report note was not kept: {}", e.message);
+                    }
+                }
+            }
+        });
+    }
+
     /// An agent's own memories, newest first.
     pub fn list(&self, agent: &str) -> Result<Vec<m::Memory>, ApiError> {
         let db = lock(&self.db);

@@ -215,7 +215,6 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     let registry = config.registry.clone().unwrap_or_else(|| Arc::new(runtimes(&setting, &config.home)));
     let agents = Agents::open(&hub, &config.home, &config.starters, registry.clone(), config.probe_runtimes).map_err(|e| failed("the profiles")(&e))?;
     modules::agent::install(&hub, agents.clone());
-    let store = Arc::new(vibevalley_store::Store::open(&config.home.join("state.db")).map_err(|e| failed("the store")(&e))?);
     let board_config = BoardConfig {
         worktrees_dir: config.work_root.join("worktrees"),
         data_dir: config.home.join("issues"),
@@ -230,11 +229,16 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     modules::memory::install(&hub, memories.clone());
     agents.attach_memories(&memories);
     let trajectories = modules::session::Trajectories::open(&config.home, &hub);
-    let facts = Arc::new(modules::session::Logged {
-        hub: hub.clone(),
-        trajectories: trajectories.clone(),
-    });
-    let board = Board::open_with(store, agents.clone(), board_config, facts).map_err(|e| failed("the board")(&e))?;
+    let board = Board::open_with(&config.home.join("server.db"), agents.clone(), board_config, hub.clone(), |sessions| {
+        let trajectories = trajectories.clone();
+        sessions.on_news(move |news| {
+            if let modules::session::News::Step { session, cwd, step } = news {
+                trajectories.step(session, cwd, step.clone());
+            }
+        });
+        memories.observe_sessions(sessions);
+    })
+    .map_err(|e| failed("the board")(&e))?;
     board.refresh_queue().map_err(|e| failed("the queue")(&e))?;
     modules::issue::install_on(&hub, board.clone(), Some(agents.clone()));
     modules::session::install(&hub, board.clone(), trajectories.clone());

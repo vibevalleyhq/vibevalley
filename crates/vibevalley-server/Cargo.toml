@@ -17,7 +17,6 @@ vibevalley-i18n = { version = "0.1.0", path = "../vibevalley-i18n" }
 vibevalley-memory = { version = "0.1.0", path = "../vibevalley-memory" }
 vibevalley-protocol = { version = "0.1.0", path = "../vibevalley-protocol" }
 vibevalley-server-api = { version = "0.1.0", path = "../vibevalley-server-api" }
-vibevalley-store = { version = "0.1.0", path = "../vibevalley-store" }
 flume = "0.12.0"
 include_dir = "0.7.4"
 jiff = "0.2.43"

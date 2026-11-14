@@ -330,11 +330,11 @@ fn a_restart_marks_a_working_session_interrupted_and_it_goes_on() {
     let working = wait_stage(&w.board, "1", StageKind::Working);
     let session_id = working.latest_session_id().unwrap().clone();
     // Another process cannot take the board while this one holds it.
-    let busy = Board::open(w.store.clone(), w.registry.clone(), config(w.dir.path()));
+    let busy = Board::open(&w.store, w.registry.clone(), config(w.dir.path()));
     assert!(matches!(busy, Err(BoardError::Busy(_))));
     w.board.close();
 
-    let board = Board::open(w.store.clone(), w.registry.clone(), config(w.dir.path())).unwrap();
+    let board = Board::open(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
     let issue = board.issue("1").unwrap();
     assert_eq!(issue.stage.stuck, Some(StuckReason::Interrupted));
     let session = board.session(&session_id).unwrap();
@@ -359,7 +359,7 @@ fn a_lost_worktree_cancels_its_issue_on_open() {
     let worktree = w.board.session(issue.latest_session_id().unwrap()).unwrap().worktree.unwrap();
     w.board.close();
     std::fs::remove_dir_all(&worktree).unwrap();
-    let board = Board::open(w.store.clone(), w.registry.clone(), config(w.dir.path())).unwrap();
+    let board = Board::open(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
     let lost = board.issue("1").unwrap();
     assert_eq!((lost.status, lost.canceled), (IssueStatus::Canceled, Some(IssueCanceled::Lost)));
     assert!(board.frame().state.sessions.is_empty());

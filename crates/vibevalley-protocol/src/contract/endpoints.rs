@@ -507,7 +507,7 @@ pub const ENDPOINTS: &[Endpoint] = &[
         op: "issue.refine",
         module: "issue",
         about: &["id"],
-        can: &[Caller::User, Caller::Remote],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator],
         dry_run: None,
         input: Some("IssueRefineInput"),
         result: Some("Issue"),

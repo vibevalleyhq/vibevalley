@@ -2,12 +2,10 @@
 //! per round a session works, with what set it off and how it ended. The
 //! timeline and `issue.run.list` read them.
 
-use vibevalley_protocol::{Millis, Outcome, Run, RunTrigger, RunTriggerKind, Spent};
+use vibevalley_protocol::{Outcome, Run, RunTrigger, RunTriggerKind, Spent};
 
 use super::sessions::Sessions;
 use crate::modules::ledger::{Result, Step, now};
-
-const RUN: &str = "issue-run";
 
 pub fn trigger_of(kind: RunTriggerKind, message: Option<String>) -> RunTrigger {
     let message = message.map(|m| m.trim().to_string()).filter(|m| !m.is_empty());
@@ -38,43 +36,29 @@ impl Sessions {
             summary: String::new(),
             spent: None,
         };
-        self.0.ledger.store().put_doc(RUN, &id, &serde_json::to_value(&run).unwrap_or_default())?;
+        self.0.ledger.database(|db| super::db::put_run(db, &run))?;
         self.set_extra(session, |e| e.run = Some(id.clone()))?;
-        self.0.ledger.log(session, Step::RunStarted { run: id });
+        self.record(session, Step::RunStarted { run: id });
         Ok(())
     }
 
     /// The open round of `session`, if any, ends with `outcome`.
     pub fn end_run(&self, session: &str, outcome: Outcome, summary: &str, spent: Option<Spent>) -> Result<()> {
         let Some(id) = self.extra(session).run else { return Ok(()) };
-        if let Some(mut run) = self.0.ledger.store().doc(RUN, &id)?.and_then(|v| serde_json::from_value::<Run>(v).ok()) {
+        if let Some(mut run) = self.0.ledger.database(|db| super::db::run(db, &id))? {
             run.ended_at = Some(now());
             run.outcome = Some(outcome);
             run.summary = summary.to_string();
             run.spent = spent;
-            self.0.ledger.store().put_doc(RUN, &id, &serde_json::to_value(&run).unwrap_or_default())?;
+            self.0.ledger.database(|db| super::db::put_run(db, &run))?;
         }
         self.set_extra(session, |e| e.run = None)?;
-        self.0.ledger.log(session, Step::RunEnded { run: id, outcome });
+        self.record(session, Step::RunEnded { run: id, outcome });
         Ok(())
     }
 
     /// The issue's runs, oldest first.
     pub fn runs(&self, issue: &str) -> Result<Vec<Run>> {
-        let mut runs: Vec<Run> = self
-            .0
-            .ledger
-            .store()
-            .docs(RUN)?
-            .into_iter()
-            .filter_map(|(_, v)| serde_json::from_value::<Run>(v).ok())
-            .filter(|r| r.issue.as_deref() == Some(issue))
-            .collect();
-        runs.sort_by_key(|r| (r.started_at, run_number(&r.id)));
-        Ok(runs)
+        self.0.ledger.database(|db| super::db::runs(db, issue))
     }
-}
-
-fn run_number(id: &str) -> Millis {
-    id.trim_start_matches('r').parse().unwrap_or(0)
 }
