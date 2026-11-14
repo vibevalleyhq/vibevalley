@@ -6,7 +6,7 @@
 
 ## 状态和用语
 
-每个取值在界面上叫什么，以词典 [shared.json](packages/i18n/locales/zh/shared.json)（英文在 `packages/i18n/locales/en/shared.json`）为准，前后端共用，这里不抄（[话放在哪](docs/subsystems/foundation.md#话放在哪)）。种地隐喻词仅用于像素农场与游戏模块，由 `scripts/docs/stale-names.ts` 检查；固定术语（问题、验收意见、改动、子工单、空位）见[用语表](docs/README.md#用语)。
+每个取值在界面上叫什么，以词典 [shared.json](crates/vibevalley-i18n/locales/zh/shared.json)（英文在 `crates/vibevalley-i18n/locales/en/shared.json`）为准，前后端共用，这里不抄（[话放在哪](docs/subsystems/foundation.md#话放在哪)）。种地隐喻词仅用于像素农场与游戏模块，由 `scripts/docs/stale-names.ts` 检查；固定术语（问题、验收意见、改动、子工单、空位）见[用语表](docs/README.md#用语)。
 
 | 层级 | 字段 | 取值 | 来源 |
 |---|---|---|---|

@@ -19,7 +19,7 @@
 | `crates/vibevalley-server/src/lib.rs` | `Hub`：持有 `Core`、按操作名注册处理函数（`Hub::on`）和订阅（`Hub::on_subscription`），`Hub::apply` 施加事实，按 `STATE_EVERY_MS` 出帧，`live` 事件 |
 | `crates/vibevalley-server/src/start.rs` | `start`：按序打开设置、档案、仓库、工单板、频道、媒体、助手、观察层，注册所有端点 |
 | `crates/vibevalley-server/src/main.rs` | 二进制 `vibevalley-server`：`--web`、`--ready-json`，读环境变量，写 `server.json` |
-| `crates/vibevalley-protocol/src/generated/` | `SpaceState`、`Fact`、`StateFrame`、`LiveEvent` 与接口表 `ENDPOINTS`（`endpoints.rs`），由 `packages/protocol` 的 zod 生成（`crates/vibevalley-protocol/gen/run.sh`） |
+| `crates/vibevalley-protocol/src/contract/` | `SpaceState`、`Fact`、`StateFrame`、`LiveEvent` 与接口表 `ENDPOINTS`（`endpoints.rs`），手写的源头，TS 由它生成 |
 | `crates/vibevalley-protocol/src/envelope.rs` | 全信封、`BizCode`、`ApiError` |
 | `crates/vibevalley-http/src/lib.rs` | axum 路由：命令接口、`/state`、`/live`、订阅流、工单观察流、附件、网页 Artifact、`/mcp`；来源校验 `from_the_farm`；`media.rs` 媒体输入与语音流 |
 | `crates/vibevalley-cli/src/` | 命令行 `vibevalley`：`main.rs` 入口与全局参数、`farm.rs` 找服务端、`commands/` 按领域的子命令 |

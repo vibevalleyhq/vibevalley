@@ -34,6 +34,7 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 | R2 设置 | `settings.json` 一次读成 `Stored`，MOSS 账户是 `Providers`/`Connection`，钥匙是 `Secret`（打印只出提示）；`provider.rs` 与 `setting.rs` 不再传 `Value`。工单板存储改表、工具不再绕 hub 调本服务，并进 R4 |
 | R3 媒体 | `media/jobs.rs` 一个任务机：存储、准入（8 个）、按种类的槽位（图片 1、语音 8）、取消、重下、释放、重启接续写一次；图片与语音在上面，去掉 `OtherJobs`。多人对话、音色设计、克隆、转写、理解按 `Ask` 加一个变体即可，暂不做 |
 | R6 命令行（第一步） | `crates/vibevalley-cli`（二进制 `vibevalley`，clap builder，说明按农场语言取 `cli.*` 词典）：issue（含 `--watch`、`watch`）、channel、repo、agent、session、runtime、memory、cron、artifact、pkm、worker、doctor；失败一行 JSON、退出码同 TS；`crates/vibevalley-home` 收家目录约定；`act_command` 进 `vibevalley-core::rules`。Rust 集成测试 7 个过（含 TS 版整份跑时失败的 watch）。`app`、`auth`、`chat` 不搬：桌面版、远程登录随删，`chat` 日后在 Rust 上做 |
+| R5 数据源（契约、词典） | 契约以 `crates/vibevalley-protocol/src/contract/`（原 `generated/`，改手写）为准，派生 `ts_rs::TS`；`typescript.rs` 写出 `packages/protocol/src/<概念>/shapes.gen.ts`（类型、`XValues`、品牌 id，带标签的联合成员带上自己的标签）与 `endpoints.gen.ts`；`tests/typescript.rs` 查生成物最新（`vp run protocol:ts` 写）、查 id 字段都标了品牌；翻转时旧的 465 个 TS 形状与生成物逐个互相可赋值。`gen/`（`gen.ts`、`prepare.sh`、`run.sh`）删了，`protocol:rust:check` 改名 `protocol:check`（加 `vp run goldens` 重写 artifact、pkm 的 golden）；`golden/` 的样例冻结成数据。词典挪到 `crates/vibevalley-i18n/locales/`（与 `same.json`），`catalogs.ts` 仍由 `i18n:gen` 写；`i18n check` 也数 Rust 与 `apps/mac` 里的用处。仍手写的 TS，随页面删：`schema.ts` 的 zod（页面、桌面、手机壳在边界解码，`satisfies Codec` 对着生成的类型，`schema.test.ts` 对键）、`api.ts` 的端点表（带 zod 的入参、出参；`api.test.ts` 对着 `endpoints.gen.ts`）、`rules/`、`client.ts`、`stream.ts`、`host.ts`；各 `shapes.ts` 只剩常量与路径（`dayMs`、`pathOf`…）、没有 Rust 类型的 `AgentIssueLevelValues`、`CronWhenKindValues`、`MediaAudioKindValues`，与 TS 专有的 `ServerReady`、`HtmlShellCommand`、`VoiceFix`。没翻的：`native.rs` 的原生端点类型不出 TS |
 | 闸 1 | 删了 `apps/server`、`apps/cli`、`packages/agent`；桌面版、页面 e2e、验收沙箱（`verify-server.ts`）都起 Rust 的 `vibevalley-server`（`VIBEVALLEY_SERVER_BIN` 或 cargo 的 debug 构建），桌面版打包带两个 Rust 二进制；`prompts.json`、投影 golden 归 Rust，不再从 TS 生成；只管 TS 服务端的审计删了（服务调用路径、schema 审计、protocol-namespace、单数服务、数据库门、同步文件）；CI 的 server 检查改为等 rust 任务。建工单或派活时仓库还不是 git 的会被建起来（同 TS）。桌面版测试 5/5，核心 e2e 过 |
 | 对照 | web e2e 在 Rust 上 243 个过约 207 个（失败的是媒体其余种类、语音、手机/局域网，及 4 个在 TS 上同样失败的）；CLI 测试 22 个过 21 个 |
 
@@ -71,7 +72,7 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 - `crates/vibevalley-cli`（clap），照现在的命令一条一个操作，经 HTTP 调服务端，类型直接用 `vibevalley-protocol`；家目录约定（`packages/home`）并进 Rust 的一处，服务端、命令行、原生应用共用。
 - `apps/cli` 的测试改成 Rust 集成测试，起真的 `vibevalley-server`；之后删 `apps/cli`。
 
-包的去向：`agent`、`ai`、`provider` 随闸 1 删；`bridge`、`engine`、`base-ui`、`stories`、`async`、`testkit`、`home` 随页面、桌面、手机壳与 TS 命令行删；`protocol`、`i18n` 只剩生成物；`pkm`、`artifact` 挪进 `apps/mac/ui`；`health`、`tsrs` 看页面剩下的 TS 还需不需要再定。
+包的去向：`agent`、`ai`、`provider` 随闸 1 删；`bridge`、`engine`、`base-ui`、`stories`、`async`、`testkit`、`home` 随页面、桌面、手机壳与 TS 命令行删；`protocol` 的类型、`i18n` 的目录已是生成物（R5），`protocol` 手写的 zod、端点表、`rules/` 与客户端随页面删，之后只剩生成物与 `t`、`format`；`pkm`、`artifact` 挪进 `apps/mac/ui`；`health`、`tsrs` 看页面剩下的 TS 还需不需要再定。
 
 ### 砍掉的（不复刻，或简化）
 

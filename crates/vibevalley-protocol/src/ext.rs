@@ -1,7 +1,7 @@
 //! Hand-written helpers on the generated types, and the constants of
 //! `common/shapes.ts` and the server's core.
 
-use crate::generated::*;
+use crate::contract::*;
 
 /// Unix milliseconds.
 pub type Millis = i64;

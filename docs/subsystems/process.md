@@ -37,7 +37,7 @@
 - **静态门禁按语言分**：Rust 靠类型、clippy（`-D warnings`）和测试（`rust:check`）；TS 靠严格的 TypeScript（tsrs）、oxlint 插件（`vp check`）和语法树棘轮（`practice-audit.ts`）。TS 服务端专用的审计（服务调用路径、schema 审计、协议导出面）随它删了；Rust 上对应的约束要写成类型、clippy 规则或测试。零命中规则直接报错，存量债务按区域进棘轮只减不增。
 - **逃生口按区棘轮，只减不增**：`packages/health` 统计类型逃生口（`x!`、`as T`、lint disable）与错误逃生口并比对 `scripts/audit/health.ratchet.json`；增加报错，减少也要求下调棘轮。
 - **死代码零容忍，回归测试受保护**：`vp run deadcode` 拦截未使用导出与依赖。修改或删除 `regression: ` 测试，或 `fix/` 分支未补回归测试，须在 PR 正文 `## Regression` 说明（`scripts/release/regression.ts` 检查）。
-- **命名一致**：展示名用 `VibeValley`；中文名取词典的 `web.opening.name`（`packages/i18n/locales/zh/web.json`，开屏用它），不在代码里另写；代码、目录、环境变量 `VIBEVALLEY_*` 和分支前缀 `vibevalley/` 统一用小写 `vibevalley`。
+- **命名一致**：展示名用 `VibeValley`；中文名取词典的 `web.opening.name`（`crates/vibevalley-i18n/locales/zh/web.json`，开屏用它），不在代码里另写；代码、目录、环境变量 `VIBEVALLEY_*` 和分支前缀 `vibevalley/` 统一用小写 `vibevalley`。
 
 ## 怎么走
 

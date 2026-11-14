@@ -88,7 +88,7 @@ test/               Playwright：组件（stories-fixtures.ts）、真实集成�
   or each keeps its own copy of a word; it does not make one feature reach into the other. The skins read features; no
   feature or piece knows a skin: a workbench page that shows a piece of a skin takes it as a prop, and `app/` passes
   it in (`ReposSkin`, from `farm/map`). Why: docs/subsystems/app.md, 为什么这样.
-- **Words** are in `packages/i18n/locales/{zh,en}/web.<feature>.json`, read as `t("web.<feature>.…")`, following the glossary (docs/README.md#用语);
+- **Words** are in `crates/vibevalley-i18n/locales/{zh,en}/web.<feature>.json`, read as `t("web.<feature>.…")`, following the glossary (docs/README.md#用语);
   farm words only in the skins and `ui/pixel`.
 - **Icons come in two sets.** The workbench's are reicon's line icons, one picture to a meaning in `src/ui/icons.ts`
   (`<Icon name="issues" />` takes only names from that table). The pixel skins (`farm`, `tree`, `ui/pixel`) draw theirs

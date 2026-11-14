@@ -86,12 +86,13 @@ export default defineConfig({
       // Files, exports and dependencies nothing uses (knip.ts says what runs; scripts/audit/deadcode.ts says what to do).
       deadcode: "vpx scripts/audit/deadcode.ts",
       "desktop:test": { command: "vp run --filter @vibevalley/desktop e2e", cache: false },
-      // The Rust workspace (crates/, apps/mac): format, clippy, tests. protocol:rust:check regenerates the wire types from
-      // packages/protocol and the artifact and pkm goldens from their TS engines, and fails when they differ from what is committed.
+      // The Rust workspace (crates/, apps/mac): format, clippy, tests. protocol:check fails when packages/protocol's
+      // shapes.gen.ts differ from the Rust contract (vp run protocol:ts writes them), or the artifact and pkm goldens from
+      // their TS engines (vp run goldens).
       "rust:check": { command: "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace", cache: false },
-      "protocol:rust:check": {
+      "protocol:check": {
         command:
-          "sh crates/vibevalley-protocol/gen/run.sh && git diff --exit-code -- crates/vibevalley-protocol/src/generated crates/vibevalley-artifact crates/vibevalley-pkm/golden",
+          "cargo test -p vibevalley-protocol --test typescript && vp run goldens && git diff --exit-code -- crates/vibevalley-artifact crates/vibevalley-pkm/golden",
         cache: false,
       },
       // The native views: nsh's own type check, then a bundle.
@@ -107,7 +108,17 @@ export default defineConfig({
   fmt: {
     printWidth: 160,
     // Generated files and data keep their source format; docs keep their compact tables.
-    ignorePatterns: ["**/*.md", "apps/server/db/generated/**", "**/testdata/**", "assets/**", ".agents/**", "design/**", "crates/**", "apps/mac/ui/build/**"],
+    ignorePatterns: [
+      "**/*.md",
+      "**/*.gen.ts",
+      "apps/server/db/generated/**",
+      "**/testdata/**",
+      "assets/**",
+      ".agents/**",
+      "design/**",
+      "crates/**",
+      "apps/mac/ui/build/**",
+    ],
     // Imports from farthest to nearest: Node, packages, the workspace's own, this app's #/, then the same folder.
     sortImports: {
       customGroups: [{ groupName: "workspace", elementNamePattern: ["@vibevalley/**"] }],
@@ -296,7 +307,7 @@ export default defineConfig({
         rules: { "vibevalley/no-test-sleep": "off" },
       },
       {
-        // What the shipped code says to the owner is in the catalogs (packages/i18n/locales, read as t("key");
+        // What the shipped code says to the owner is in the catalogs (crates/vibevalley-i18n/locales, read as t("key");
         // scripts/audit/oxlint-plugin.ts, no-cjk-literal): Chinese is written only there, in what is said to models, and in the tests.
         files: ["apps/*/src/**", "packages/*/src/**", "apps/mobile/App.tsx"],
         rules: { "vibevalley/no-cjk-literal": "error" },

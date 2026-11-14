@@ -176,7 +176,7 @@ function DesignForm(props: { status: ProviderStatus | undefined }) {
       <If when={binding()} else={<Quiet>{t("web.audio.configure")}</Quiet>}>
         {(b) => <Text class="text-xs text-muted">{`${b().connection} · ${b().model}`}</Text>}
       </If>
-      <Field label={t("web.audio.description")}>
+      <Field label={t("web.audio.instructions")}>
         <TextArea testID="audio-design-description" rows={3} value={description()} onInput={(e) => description.set(e.currentTarget.value)} />
       </Field>
       <Field label={t("web.audio.text")}>

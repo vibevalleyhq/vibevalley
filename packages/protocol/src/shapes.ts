@@ -434,4 +434,4 @@ export {
   type MediaSpeakersRequest,
   type MediaTranscriptionRequest,
   type MediaVoiceDesignRequest,
-} from "./media/audio-shapes";
+} from "./media/shapes";

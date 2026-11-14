@@ -1,7 +1,7 @@
-//! Every generated type against wire values built from VibeValley's own zod
-//! schema for it (`golden/schema/*.json`, written by `gen/gen.ts`, each
-//! accepted by the schema's `safeParse`): read into the Rust type and
-//! written back, the JSON must be the same.
+//! Every contract type against wire values built from the zod schema it had
+//! when the contract was TypeScript (`golden/schema/*.json`, each accepted by
+//! the schema's `safeParse`): read into the Rust type and written back, the
+//! JSON must be the same.
 
 use serde_json::Value;
 

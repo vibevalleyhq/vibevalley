@@ -1,5 +1,5 @@
 // Writes vibevalley-artifact's goldens and its shell words from packages/artifact
-// (vp run protocol:rust runs it on crates/vibevalley-protocol/gen/prepare.sh's copy).
+// (vp run goldens; vp run protocol:check holds them to it).
 
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";

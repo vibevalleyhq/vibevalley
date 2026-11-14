@@ -73,7 +73,7 @@
 
 - **进门一次解析**：HTTP、命令行、工具参数、配置、落盘 JSON 与厂商响应在边界经 serde 一步解成结构体和 enum：端点的入参是契约的类型（`Hub::on::<O>`，[lib.rs](crates/vibevalley-server/src/lib.rs)）；模型给的工具参数经 [tool/mod.rs](crates/vibevalley-server/src/modules/tool/mod.rs) 的 `args` 宽松解析一次（数字字符串、`null` 当缺省写在这一处）再成参数结构体；`settings.json` 在 [setting.rs](crates/vibevalley-server/src/modules/setting.rs) 一次读成 `Stored`。格式错误当场失败，不兜底成默认值。
 - **密钥是 `Secret`**：钥匙和 token 包进 `Secret`（[setting.rs](crates/vibevalley-server/src/modules/setting.rs)），`Debug` 只出提示，取原文要显式 `expose()`。
-- **契约一份**：线上的形状现在以 `packages/protocol` 的 Zod 为源，生成 Rust 的 [generated](crates/vibevalley-protocol/src/generated/mod.rs) 类型；页面在 SSE（[stream.ts](packages/protocol/src/stream.ts)）与 HTTP 客户端（[client.ts](packages/protocol/src/client.ts)）按同一份 Schema 解码。闭合词集是 enum，不重复内联字面量。
+- **契约一份**：线上的形状以 Rust 的 [contract](crates/vibevalley-protocol/src/contract/mod.rs) 类型为源，TS 类型由它生成；页面在 SSE（[stream.ts](packages/protocol/src/stream.ts)）与 HTTP 客户端（[client.ts](packages/protocol/src/client.ts)）按同一份 Schema 解码。闭合词集是 enum，不重复内联字面量。
 - **未解析引用与主键分离**：用户、命令行或模型传入的名称、编号与地址（如 `#41`、频道名、`vv://`）按引用建模，在所属模块的入口一次解析成 id；模块内部与存储层只传已解析的 id。
 - **存储区分「缺省」与「损坏」**：可空列读成 `Option`，非空的损坏立即报错，不静默吞成缺省；只有外部不可信的载荷才容错。
 

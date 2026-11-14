@@ -22,7 +22,7 @@
 | `scripts/{gen,audit,docs,release}/` | 工程脚本：`gen/`（生成物写出）、`audit/`（语法树、lint、棘轮）、`docs/`（Note、链接、术语与旧名检查）、`release/`（打包与发版验证） |
 | `crates/vibevalley-server/src/lib.rs`、`crates/vibevalley-server/src/start.rs` | `Hub`（状态、端点表、事实）与按序打开各模块的 `start` |
 | `crates/vibevalley-server/src/modules/` | 按概念的模块：每个对外一个类型（`Chat`、`Agents`、`Repos`、`Memories`…），在 `Hub` 上注册自己的端点 |
-| `crates/vibevalley-protocol/src/generated/`、`crates/vibevalley-protocol/gen/run.sh` | 线上类型：由 `packages/protocol` 的 zod 生成（`gen/gen.ts`），`vp run protocol:rust:check` 查最新 |
+| `crates/vibevalley-protocol/src/contract/`、`crates/vibevalley-protocol/tests/typescript.rs` | 线上类型：手写的 Rust 是源头，`ts-rs` 写出 `packages/protocol` 的 `*.gen.ts`（`vp run protocol:ts`），`vp run protocol:check` 查最新 |
 | `crates/vibevalley-core/src/` | 双端都跑的规则的 Rust 版：`reduce`、出帧、状态派生、收件箱、依赖 |
 | `crates/vibevalley-store/src/lib.rs` | `state.db`（SQLite）：工单板的工单、会话与布局 |
 | `crates/vibevalley-home/src/lib.rs` | 家目录约定：在哪、`server.json`、语言；服务端、命令行、原生应用共用 |
@@ -57,7 +57,7 @@
 
 ### 契约、规则和数据库
 
-- **契约现在以 zod 为源，生成 Rust**：`packages/protocol/src/<概念>/` 的 zod 是数据源，`crates/vibevalley-protocol/gen/run.sh` 写出 `src/generated/`，`protocol:rust:check` 查最新；按计划（Note 的 R5）会翻转为 Rust 为源、生成 TS。
+- **契约以 Rust 为源，生成 TS**：`crates/vibevalley-protocol/src/contract/` 的类型是数据源，`vp run protocol:ts` 写出 `packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`，`cargo test` 里的 `tests/typescript.rs` 查最新；页面还在用的 zod Schema 与 `api.ts` 仍手写，由 `schema.test.ts`、`api.test.ts` 对着生成物查，随页面删除。词典在 `crates/vibevalley-i18n/locales/`，`vp run i18n:gen` 写出 TS 目录。
 - **生成文件不手改**：`crates/vibevalley-protocol/src/generated/`、`packages/protocol/src/client.ts`、[capabilities.md](docs/reference/capabilities.md) 由脚本生成并有检查。
 - **SQLite，两个库**：工单板的 `state.db` 在 `vibevalley-store`；频道、记性、笔记、Artifact、媒体等各模块的表在 `server.db`，每个模块在自己的 `db.rs` 或模块文件里 `create table if not exists`。时间存整数毫秒。
 - **内部不留兼容**：改表直接改建表语句，不写迁移；TS 版的 PGlite/Postgres 数据不迁过来。

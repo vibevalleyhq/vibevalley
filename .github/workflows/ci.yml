@@ -155,7 +155,7 @@ jobs:
           key: cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           restore-keys: cargo-${{ runner.os }}-${{ runner.arch }}-
       - run: vp run nsh:install
-      - run: vp run protocol:rust:check
+      - run: vp run protocol:check
       - run: vp run rust:check
       - run: vp run mac:check
       - name: Save cargo cache

@@ -1,4 +1,4 @@
-// Written by `vpx scripts/gen/i18n.ts gen` from packages/i18n/locales: do not edit.
+// Written by `vpx scripts/gen/i18n.ts gen` from crates/vibevalley-i18n/locales: do not edit.
 
 /** Each language's catalogs by namespace. */
 export const catalogs = {
@@ -1121,6 +1121,8 @@ export const catalogs = {
       acceptSubmittedPr: "验收已提交的 PR/MR，保留未合入的分支和未提交的改动",
       prDelivered: "已交付 PR/MR：{url}",
       confirmedRequirements: "已确认并派发：{title}\n\n{description}\n\n验收标准：\n{criteria}",
+      notFound: "没有工单 {id}",
+      wordsRequired: "要说点什么：话不能是空的",
     },
     "server.lan": {
       notUp: "VibeValley 还没起来",
@@ -5875,6 +5877,8 @@ export const catalogs = {
       acceptSubmittedPr: "Accept the submitted PR/MR and retain the unmerged branch and uncommitted changes",
       prDelivered: "Delivered PR/MR: {url}",
       confirmedRequirements: "Confirmed and dispatched: {title}\n\n{description}\n\nAcceptance criteria:\n{criteria}",
+      notFound: "No issue {id}",
+      wordsRequired: "Say something: the words cannot be empty",
     },
     "server.lan": {
       notUp: "VibeValley is not up yet",
@@ -10602,6 +10606,7 @@ export interface Messages {
   "server.issue.noRepo": undefined;
   "server.issue.noStatus": { readonly to: string | number };
   "server.issue.noTitle": undefined;
+  "server.issue.notFound": { readonly id: string | number };
   "server.issue.notRecorded": { readonly name: string | number; readonly why: string | number };
   "server.issue.notStarted": undefined;
   "server.issue.nothingToAccept": undefined;
@@ -10671,6 +10676,7 @@ export interface Messages {
   "server.issue.verification.failed": { readonly check: string | number; readonly output: string | number };
   "server.issue.verification.frozen": { readonly files: string | number };
   "server.issue.waitingDispatch": undefined;
+  "server.issue.wordsRequired": undefined;
   "server.issue.workKept": { readonly n: string | number; readonly refused: string | number };
   "server.lan.anotherAsking": undefined;
   "server.lan.badGateway": undefined;

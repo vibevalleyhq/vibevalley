@@ -1,6 +1,6 @@
-//! Values written by VibeValley's own code (`golden/gen.ts`: its samples,
-//! its `reduce` and `frameOf`, each checked by its zod schema) read into the
-//! Rust types and written back must be the same JSON.
+//! Values VibeValley's TypeScript wrote before the contract moved here (its
+//! samples, its `reduce` and `frameOf`, each checked by its zod schema), read
+//! into the Rust types and written back, must be the same JSON.
 
 use std::collections::BTreeMap;
 
