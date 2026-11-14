@@ -706,9 +706,7 @@ impl Board {
     pub fn create(&self, new: NewIssue) -> Result<Issue> {
         let _work = lock(&self.work);
         let repo = match &new.repo {
-            Some(path) => {
-                Some(self.ensure_repo(self.repo_dir(&path.to_string_lossy()))?)
-            }
+            Some(path) => Some(self.ensure_repo(self.repo_dir(&path.to_string_lossy()))?),
             None => None,
         };
         if !new.agent.trim().is_empty() {
