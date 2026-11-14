@@ -6,8 +6,8 @@ import { newId } from "#/base/ids.ts";
 import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Account } from "#/modules/provider/provider.ts";
-import { FileFailure } from "#/modules/provider/vendors.ts";
+import type { Account } from "#/platform/provider/provider.ts";
+import { FileFailure } from "#/platform/provider/vendors.ts";
 import * as q from "#db/media_remote_file.sql.ts";
 
 import type { Inputs } from "./inputs.ts";

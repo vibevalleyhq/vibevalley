@@ -9,7 +9,6 @@ import type { Endpoint } from "./endpoint";
 import { type GameHandlers, gameEndpoints } from "./game/api";
 import { actCommand, type IssueHandlers, issueEndpoints } from "./issue/api";
 import { type LanHandlers, lanEndpoints } from "./lan/api";
-import { type LibraryHandlers, libraryEndpoints } from "./library/api";
 import { type MediaHandlers, mediaEndpoints } from "./media/api";
 import { type MemoryHandlers, memoryEndpoints } from "./memory/api";
 import { type OrchestratorHandlers, orchestratorEndpoints } from "./orchestrator/api";
@@ -34,7 +33,6 @@ export type { GameHandlers } from "./game/api";
 export type { IssueHandlers } from "./issue/api";
 export type { LanHandlers } from "./lan/api";
 export type { AttachmentHandlers } from "./attachment/api";
-export type { LibraryHandlers } from "./library/api";
 export type { UserHandlers } from "./user/api";
 export type { MemoryHandlers } from "./memory/api";
 export type { OrchestratorHandlers } from "./orchestrator/api";
@@ -70,7 +68,6 @@ export interface Handlers
     ConnectorHandlers,
     LanHandlers,
     UserHandlers,
-    LibraryHandlers,
     AttachmentHandlers {}
 
 export const endpoints: readonly Endpoint[] = [
@@ -94,6 +91,5 @@ export const endpoints: readonly Endpoint[] = [
   ...connectorEndpoints,
   ...lanEndpoints,
   ...userEndpoints,
-  ...libraryEndpoints,
   ...attachmentEndpoints,
 ];

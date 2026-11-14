@@ -23,7 +23,7 @@
 | `packages/async/` | 打断、后台任务、队列、广播、锁、重试与超时：服务端和各个包共用的异步原语 |
 | `scripts/audit/practice-audit.ts`、`service-paths.ts`、`protocol-surface.ts`、`schema-audit.ts` | 全仓语法树实践棘轮、服务调用矩阵与扇入检查、根协议导出面棘轮、SQL 枚举 / 品牌主键 / `Secret` / `BizCode` 注册表边界审计 |
 | `apps/server/src/{base,infra,core}/` | 服务端纯地基、外部系统适配与核心状态投影底座 |
-| `apps/server/src/modules/<概念>/`、`gateway/`、`modules.ts`、`services.ts` | 纵向领域模块、对外协议与出帧网关、10 层归属表与服务组装 |
+| `apps/server/src/platform/<概念>/`、`modules/<概念>/`、`gateway/`、`modules.ts`、`services.ts` | 底座原语（设置、用户、附件、厂商）、纵向领域模块、对外协议与出帧网关、11 层归属表与服务组装 |
 | `packages/protocol/src/<概念>/` | 按概念划分的 `shapes.ts`、`schema.ts`（Zod）、`api.ts` |
 | `packages/protocol/src/rules/` | 服务端与页面共用的纯函数规则 |
 | `packages/protocol/src/client.ts` | 由 `scripts/gen/api-client.ts` 生成的 HTTP 客户端 `VibeValleyApi` |
@@ -41,7 +41,7 @@
 - **单一语言与运行器**：全仓使用 TypeScript，开发与测试用 `vpx` 直接运行源码，桌面版服务端用 `vp pack` 打包为 `dist/main.mjs`。
 - **依赖版本集中**：所有应用（含 `apps/site`）与共享包使用根 workspace 和同一份锁文件。版本集中在 `pnpm-workspace.yaml` 的 catalog 中，各包写 `catalog:` 或具名 catalog，由 `scripts/audit/catalog.test.ts` 检查。Expo 的版本放在 `expo`；不保留应用自己的 workspace 或锁文件。
 - **开启全局虚拟存储**：`enableGlobalVirtualStore` 让新 worktree 直接硬链全局包，几秒内完成安装。
-- **跨包统一的二级目录语法**：超过 8 个生产文件的子包，`src/` 根目录仅放包入口与装配清单（`index.ts`、`main.ts`、`worker.ts`、`App.tsx`、`services.ts`、`modules.ts`），实现统一归入标准二级目录：`base/`（零 I/O 纯函数与数据结构，由 `vibevalley/subpackage-layers` 静态守住纯度）、`infra/`（外部系统与 SDK 适配）、`state/`（客户端状态中间层）、`ui/`（通用组件与样式令牌；跨模块业务展示件放 `ui/domain/`）、纵向能力域目录（`server` 的 `modules/<概念>/` 与 `gateway/`、`web` 的 `features/<概念>/`、`cli` 的 `commands/`、库包的能力子目录）以及 `testing/`。Electron 沙箱桥独立放入 `apps/desktop/src/preload/`，禁止导入主进程或 Node I/O 模块；`≤ 8` 个文件的微型单职责包保持 `src/` 扁平。
+- **跨包统一的二级目录语法**：超过 8 个生产文件的子包，`src/` 根目录仅放包入口与装配清单（`index.ts`、`main.ts`、`worker.ts`、`App.tsx`、`services.ts`、`modules.ts`），实现统一归入标准二级目录：`base/`（零 I/O 纯函数与数据结构，由 `vibevalley/subpackage-layers` 静态守住纯度）、`infra/`（外部系统与 SDK 适配）、`state/`（客户端状态中间层）、`ui/`（通用组件与样式令牌；跨模块业务展示件放 `ui/domain/`）、纵向能力域目录（`server` 的 `platform/<概念>/`、`modules/<概念>/` 与 `gateway/`、`web` 的 `features/<概念>/`、`cli` 的 `commands/`、库包的能力子目录）以及 `testing/`。Electron 沙箱桥独立放入 `apps/desktop/src/preload/`，禁止导入主进程或 Node I/O 模块；`≤ 8` 个文件的微型单职责包保持 `src/` 扁平。
 - **跨包走包名，包内跨目录走 `#/`**：跨包导入应写 `@vibevalley/*`，`apps/server`、`apps/web` 与 `apps/cli` 跨目录导入写 `#/` 和 `#db/`（由 `no-cross-package-path` 与 `parent-import` 规则检查）。
 - **包导出分离类型与源码**：`packages/*` 的代码导出将 `types` 指向 `dist/*.d.ts`（`vp run packages:build` 生成，`scripts/audit/built-types.ts` 检查），`default` 指向源码；`.css` 导出直接指向 `src/` 下存在的样式表，不伪造类型声明。
 - **严格可选属性**：开启 `exactOptionalPropertyTypes`，对外对象用 `omitUndefined` 清理未定义键（[代码风格](docs/style/code.md#没有值)）。
@@ -53,9 +53,9 @@
 - **10 个有序模块单向依赖**：模块顺序定义在 `apps/server/src/modules.ts`。下层不得 import 上层，不得直接读 `core.state()` 中其他模块的数据（`apps/server/src/modules.test.ts` 检查）。
 - **门禁共享一次源码分析**：`modules.test.ts` 在第一次检查内读取生产文件并用 `@vibevalley/testkit/source` 的 `analyzeSource` 各解析一次，依赖方向、表所有权与状态读取复用结果；同路径不同源码不共用缓存。读取和解析时间计入测试，提速按完整运行耗时与解析次数验证。
 - **单数概念名，拒绝单调用方顶层服务**：目录、表名和服务名均用单数概念词，协议同名类型统一写为 `T.Issue`（由 `singular-service` 与 `protocol-namespace` 规则检查）；仅有一个模块调用的内部设施留在调用方模块内（由 `scripts/audit/service-paths.ts` 扇入检查守住）。
-- **组装与启动分两阶段**：`services.ts` 的 `buildModules` 照模块次序一行一个 `await makeX({ … })` 建到工单和定时任务，`makeFarm` 接着建后面的，每个服务的依赖在调用处按名字写明（没有分层的阶段类型，也不把「下面的全部」交给上面），拼成 `Farm` 并完成订阅，再按次序调各模块的 `boot()`；`Farm` 是 `AsyncDisposable`，关的时候倒着调各服务的 `close()`，一个失败不挡别的，建到一半失败也照此关掉已建的。测试的 `testing/world.ts` 用同一个 `buildModules` 建到工单（`moduleWorld`），再加 Inbox、工具和 `/mcp`（`world`）。HTTP 监听就绪后才将地址注入 `Session` 和 `Lan`。
+- **组装与启动分两阶段**：`services.ts` 的 `buildModules` 照模块次序一行一个 `await makeX({ … })` 建到观察层，`makeFarm` 接着建后面的，每个服务的依赖在调用处按名字写明（没有分层的阶段类型，也不把「下面的全部」交给上面），拼成 `Farm` 并完成订阅，再按次序调各模块的 `boot()`；`Farm` 是 `AsyncDisposable`，关的时候倒着调各服务的 `close()`，一个失败不挡别的，建到一半失败也照此关掉已建的。测试的 `testing/world.ts` 用同一个 `buildModules` 建到观察层（`moduleWorld`），再加工具和 `/mcp`（`world`）。HTTP 监听就绪后才将地址注入 `Session` 和 `Lan`。
 - **操作与发言主体统一用协议 `Actor`**：HTTP 与连接器入口构造 `user`（`base/actor.ts`），助手运行构造 `agent`（带 `role: "orchestrator"` 与 `forUser`），`/mcp` 构造 `agent`（带 `role: "worker"` 与会话 id），定时、巡查与 GitHub 轮询构造 `system`。协议消息、服务端 `Trigger` 与信箱共用同一个 `T.Actor`；落库列统一存 `ActorKind`（`user`、`agent`、`system`）与可选 `AgentRole`。
-- **模块之间的路径与服务扇入记成表**：`scripts/audit/service-paths.ts` 按语法树、照名字声明的类型（`deps.agent.list()`、从 `deps` 解构出来的 `agent`）读出哪个模块用了别的模块服务的哪个成员（存在 `scripts/audit/service-paths.json`）并校验顶层服务扇入；`vp run paths:check` 与 `docs:verify` 一并检查，多一条路或新增单调用方顶层服务即失败。一件事一条路：往频道写话只有 `Channel.post`（[频道](docs/subsystems/channel.md#模型和不变量)），触发到帮工只有 `Session.route`（[帮工](docs/subsystems/session.md#对外的门)）。
+- **模块之间的路径与服务扇入记成表**：`scripts/audit/service-paths.ts` 按语法树、照名字声明的类型（`deps.agent.list()`、从 `deps` 解构出来的 `agent`）读出哪个模块用了别的模块服务的哪个成员（存在 `scripts/audit/service-paths.json`；网关里只转发的 `http` 处理和 `tool` 工具不算业务边，只计扇入）并校验顶层服务扇入；`vp run paths:check` 与 `docs:verify` 一并检查，多一条路或新增单调用方顶层服务即失败。一件事一条路：往频道写话只有 `Channel.post`（[频道](docs/subsystems/channel.md#模型和不变量)），触发到帮工只有 `Session.route`（[帮工](docs/subsystems/session.md#对外的门)）。
 - **单实例家目录租约**：`infra/lease.ts` 在 `$VIBEVALLEY_HOME/.vibevalley.lock` 写入进程 pid；若旧进程仍在运行则拒绝启动，已退出则接管。
 
 ### 异步、资源与错误
@@ -94,7 +94,7 @@
 | 层 | 入口 | 真实部分 | 替身端口 | 预算 | 位置 |
 |---|---|---|---|---|---|
 | 规则 | 纯函数 | 被测代码 | 无 | 20ms | 不碰库、进程、网络的 `*.test.ts` |
-| 模块 | 模块服务接口 | 当前及下层模块、内存库、真 git | `scriptedRuntime`、照脚本回答的 DeepSeek、假聊天/声网 | 300ms | `apps/server/src/modules/<模块>/*.test.ts`、`gateway/<门>/*.test.ts` |
+| 模块 | 模块服务接口 | 当前及下层模块、内存库、真 git | `scriptedRuntime`、照脚本回答的 DeepSeek、假聊天/声网 | 300ms | `apps/server/src/{platform,modules}/<模块>/*.test.ts`、`gateway/<门>/*.test.ts` |
 | 流程 | `flows/farm.ts` | 全部服务端模块与真 git | 同上 | 2s | `apps/server/src/flows/*.test.ts` |
 | 浏览器组件 | 组件 DOM 与 owner | Chromium、Solid、真实组件 | 故事数据，无服务端 | 3s | `apps/web/test/stories.spec.ts` |
 | 页面 | HTTP 与 SSE | 真服务端进程 + Chromium | 脚本化帮工、无外部密钥 | 3s | `apps/web/test/projects.ts` 的 integration 项目 |

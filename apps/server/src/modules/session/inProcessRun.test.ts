@@ -53,25 +53,31 @@ const records = async (farm: Farm) => {
   const trajectories = makeTrajectories(farm.config.home, () => {}, { clock: wallTime, log: keptLog() });
   const persisted = recording({ db: farm.db, clock: wallTime });
   const finished: RunFinished[] = [];
+  /** The issues each run took, as the store tells them (IssueStarted): the one it started on, and those linked after. */
+  const took: (readonly [string, string])[] = [];
   let current = () => "";
   const store: RunStore = {
     ...persisted,
+    start: async (id, session, issue, trigger) => {
+      await persisted.start(id, session, issue, trigger);
+      if (issue) took.push([id, issue]);
+    },
+    link: (run, issue) => void took.push([run, issue]),
     finished: (run) => void finished.push(run),
     consumed: () => {},
     register: (_session, read) => {
       current = read;
     },
   };
-  return { store, finished, journal: await trajectories.openLog("orchestrator"), currentRun: () => current() };
+  return { store, finished, took, journal: await trajectories.openLog("orchestrator"), currentRun: () => current() };
 };
 
 describe("the orchestrator's runs", () => {
   test("one loop is one run; its inputs' issues are all linked; failures and stops are said", async () => {
     await using farm = await world();
-    const sessions = farm.inside;
     await issue(farm, "i1");
     await issue(farm, "i2");
-    const { store, finished, journal, currentRun } = await records(farm);
+    const { store, finished, took, journal, currentRun } = await records(farm);
     const x = makeInProcessRun("orchestrator", journal, (tool) => ({ text: tool, action: "other", tool }), store);
 
     await x.observe(user("看看工单"), { issue: "i1", by: { kind: "issue", channel: "general", message: "m1" }, heard: ["m1"] });
@@ -83,8 +89,14 @@ describe("the orchestrator's runs", () => {
     await x.observe(end());
     expect(currentRun()).toBe("");
     expect(finished).toHaveLength(1);
-    expect(finished).toEqual([{ id: expect.any(String), issues: ["i1", "i2"], outcome: "completed" }]);
-    const runs = await sessions.issueRuns("i2");
+    expect(finished).toEqual([{ id: expect.any(String), outcome: "completed" }]);
+    expect(took).toEqual([
+      [finished[0]!.id, "i1"],
+      [finished[0]!.id, "i2"],
+    ]);
+    // The issues keep what they are told (issue/intake.ts ranOn): the run is one of each issue's.
+    for (const [run, issue] of took) await farm.intake.ranOn(run, issue);
+    const runs = await farm.intake.runsOf("i2");
     expect(runs[0]?.triggeredBy).toEqual({ kind: "issue", channel: "general", message: "m1" });
     expect(runs.map((r) => [r.issue, r.outcome, r.summary, r.heard])).toEqual([["i1", "completed", "看完了", ["m1"]]]);
     expect(journal.events().map((e) => e.type)).toEqual([
@@ -110,7 +122,7 @@ describe("the orchestrator's runs", () => {
     expect(finished.at(-1)!.outcome).toBe("interrupted");
 
     const failed = await x.failedStart({ by: { kind: "issue" }, issue: "i1" }, "派不出去的", "钥匙没填");
-    expect((await sessions.issueRuns("i1")).find((r) => r.id === failed)?.outcome).toBe("failed");
+    expect((await farm.intake.runsOf("i1")).find((r) => r.id === failed)?.outcome).toBe("failed");
   });
 
   test("close changes execution only when its effect runs", async () => {

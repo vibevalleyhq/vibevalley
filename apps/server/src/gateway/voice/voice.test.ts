@@ -10,10 +10,10 @@ import { sessionId, issueId } from "@vibevalley/protocol/schema";
 import recorded from "#/gateway/voice/testdata/voice-requests.json" with { type: "json" };
 import type { Time } from "#/infra/time.ts";
 import { makeOrchestrator, type Orchestrator } from "#/modules/orchestrator/orchestrator.ts";
-import { makeProvider, type Provider } from "#/modules/provider/provider.ts";
 import { NotAnswered } from "#/modules/session/host.ts";
-import type { Setting } from "#/modules/setting/setting.ts";
-import { defaultVoice } from "#/modules/setting/voice.ts";
+import { makeProvider, type Provider } from "#/platform/provider/provider.ts";
+import type { Setting } from "#/platform/setting/setting.ts";
+import { defaultVoice } from "#/platform/setting/voice.ts";
 import { nextTurn, testConfig, until } from "#/testing/layers.ts";
 import { type World, world } from "#/testing/world.ts";
 
@@ -242,8 +242,8 @@ const farm = async (
   };
   const w = await world({ config });
   try {
-    await w.inbox.boot();
-    const orchestrator = await makeOrchestrator(w);
+    await w.watch.boot();
+    const orchestrator = await makeOrchestrator({ ...w, tools: w.tool });
     w.closes.push(() => orchestrator.close());
     const provider =
       options.fetch || options.clock ? await makeProvider({ ...w, fetch: options.fetch ?? w.fetch, clock: options.clock ?? w.clock }) : w.provider;

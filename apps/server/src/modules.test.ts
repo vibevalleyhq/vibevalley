@@ -5,7 +5,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { analyzeSource, type Edge } from "@vibevalley/testkit/source";
 
-import { conceptOf, containers, moduleOf, modules, outside } from "./modules.ts";
+import { conceptOf, containers, moduleOf, modules, outside, unitOf } from "./modules.ts";
 
 const src = import.meta.dirname;
 const pending: Readonly<Record<string, string>> = {};
@@ -29,10 +29,7 @@ const users: Readonly<Record<string, string>> = {
   connectors: "Gateway",
   machines: "Agent Sessions",
 };
-const reads: Readonly<Record<string, string>> = {
-  "modules/session/mailbox.ts -> issues":
-    "Tier 1 issue reservoir checks the issue's stage and assigned agent synchronously without keeping a second copy of the board",
-};
+const reads: Readonly<Record<string, string>> = {};
 
 const localEdges = (file: string, edges: readonly Edge[]) =>
   edges.flatMap(({ from: spec }) =>
@@ -44,7 +41,7 @@ const depsOf = (text: string) =>
   [...text.matchAll(/interface \w*Deps\b[^{]*\{([^}]*)\}/gu)].flatMap((m) => [...(m[1] ?? "").matchAll(/readonly (\w+)\??:/gu)].map((k) => k[1] ?? ""));
 
 /** The unit a deps key names: the module or gateway of that name. */
-const unitOfKey = (key: string) => [`modules/${key}`, `gateway/${key}`].find((unit) => moduleOf(unit) !== undefined);
+const unitOfKey = (key: string) => containers.map((c) => `${c}/${key}`).find((unit) => moduleOf(unit) !== undefined);
 
 function inspect(file: string, unread: string) {
   // A service reads the core state off its deps as well as off a const it took from them: both are core.state().
@@ -64,29 +61,25 @@ const sources = () =>
     .filter((file) => !file.endsWith(".test.ts") && !outside.includes(rel(file).split("/")[0]!))
     .map((file) => inspect(file, readFileSync(file, "utf8"))));
 
-const foreignReads: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
-  session: { "channel.sql.ts": ["defaultID", "topPlace", "unreadOf"], "channel_member.sql.ts": ["membersOf"], "issue.sql.ts": ["issueExists"] },
-  inbox: { "channel_message.sql.ts": ["messageByID", "notificationReceipt", "userReadReports"] },
-};
+const foreignReads: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {};
 const folders = containers.flatMap((c) => readdirSync(join(src, c)).filter((name) => statSync(join(src, c, name)).isDirectory()));
 const tableModule = (name: string) => {
   const table = name.replace(/\.sql\.ts$/u, "");
   return folders.find((module) => table === module || table.startsWith(`${module}_`));
 };
-const foreignQueries = (file: string, edges: readonly Edge[]) => {
+const foreignQueries = (file: string, edges: readonly Edge[], named: typeof foreignReads = foreignReads) => {
   const module = conceptOf(rel(file));
   return edges.flatMap((edge) => {
     if (!edge.from.startsWith("#db/")) return [];
     const name = edge.from.split("/").at(-1) ?? "";
     if (name === "types.ts" || tableModule(name) === module) return [];
-    const allowed = foreignReads[module]?.[name] ?? [];
+    const allowed = named[module]?.[name] ?? [];
     return edge.names.filter((symbol) => !allowed.includes(symbol)).map((symbol) => `${name}:${symbol}`);
   });
 };
 
 /** The deliveries' machinery inside session: other modules reach it through mailbox.ts's types and session.ts. */
 const deliveryFiles = new Set([
-  "modules/session/brakes.ts",
   "modules/session/deliveries.ts",
   "modules/session/pump.ts",
   "modules/session/routing.ts",
@@ -112,8 +105,22 @@ const mailboxLeaks = (source: ReturnType<typeof inspect>) => {
   return privateImports;
 };
 
+/** What a file of the chat leans on beyond the platform and the chat itself: another business module, or another's table. */
+const chatLeaks = (source: ReturnType<typeof inspect>) => [
+  ...source.local.filter((to) => unitOf(to) !== "modules/channel" && moduleOf(to)?.name !== "Platform"),
+  ...source.edges.filter((edge) => edge.from.startsWith("#db/") && tableModule(edge.from.split("/").at(-1) ?? "") !== "channel").map((edge) => edge.from),
+];
+
+/** What a file of the sessions leans on of the chat or the issues (or the watch over both): their code, or their tables. */
+const sessionLeaks = (source: ReturnType<typeof inspect>) => [
+  ...source.local.filter((to) => ["modules/channel", "modules/issue", "modules/watch"].includes(unitOf(to))),
+  ...source.edges
+    .filter((edge) => edge.from.startsWith("#db/") && ["channel", "issue"].includes(tableModule(edge.from.split("/").at(-1) ?? "") ?? ""))
+    .map((edge) => edge.from),
+];
+
 describe("the modules", () => {
-  it("hold every folder and file under src, with domain slices under modules/ and protocol doors under gateway/", () => {
+  it("hold every folder and file under src, with primitives under platform/, domain slices under modules/ and protocol doors under gateway/", () => {
     const tops = readdirSync(src).filter((f) => statSync(join(src, f)).isDirectory() || (f.endsWith(".ts") && !f.endsWith(".test.ts")));
     const unownedTops = tops.filter((t) => !outside.includes(t) && !(containers as readonly string[]).includes(t) && moduleOf(t) === undefined);
     const unownedUnits = containers.flatMap((c) =>
@@ -123,7 +130,7 @@ describe("the modules", () => {
     );
     expect(
       [...unownedTops, ...unownedUnits],
-      "a folder or file under src/ belongs to no module, so nothing says what it may import. Fix: place domain concepts under src/modules/<concept> and ingress adapters under src/gateway/<adapter>, and register the unit in modules.ts. See apps/server/src/modules.ts",
+      "a folder or file under src/ belongs to no module, so nothing says what it may import. Fix: place platform primitives under src/platform/<concept>, domain concepts under src/modules/<concept> and ingress adapters under src/gateway/<adapter>, and register the unit in modules.ts. See apps/server/src/modules.ts",
     ).toEqual([]);
   });
 
@@ -173,7 +180,12 @@ describe("the modules", () => {
   it("regression: namespace imports and foreign writes cannot hide behind a read projection", () => {
     const file = join(src, "modules/session/mailbox.ts");
     const queries = (text: string) => foreignQueries(file, inspect(file, text).edges);
-    expect(queries('import { topPlace as route } from "#db/channel.sql.ts";')).toEqual([]);
+    // A read named for the module passes under another name; none is named today.
+    expect(
+      foreignQueries(file, inspect(file, 'import { issueExists as known } from "#db/issue.sql.ts";').edges, { session: { "issue.sql.ts": ["issueExists"] } }),
+    ).toEqual([]);
+    expect(queries('import { issueExists as known } from "#db/issue.sql.ts";')).toEqual(["issue.sql.ts:issueExists"]);
+    expect(queries('import { topPlace as route } from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:topPlace"]);
     expect(queries('import * as q from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:*"]);
     expect(queries('import { renameChannel } from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:renameChannel"]);
     expect(queries('export * from "#db/issue_assignment.sql.ts";')).toEqual(["issue_assignment.sql.ts:*"]);
@@ -181,6 +193,59 @@ describe("the modules", () => {
     expect(foreignQueries(github, inspect(github, 'import { recordTrigger } from "#db/session_trigger.sql.ts";').edges)).toEqual([
       "session_trigger.sql.ts:recordTrigger",
     ]);
+  });
+
+  it("keep the chat on the platform alone: modules/channel imports no other business module, its tests included", () => {
+    const tests = files(join(src, "modules/channel"))
+      .filter((file) => file.endsWith(".test.ts"))
+      .map((file) => inspect(file, readFileSync(file, "utf8")));
+    const found = [...sources().filter(({ from }) => from.startsWith("modules/channel/")), ...tests].flatMap((source) =>
+      chatLeaks(source).map((to) => `${source.from} -> ${to}`),
+    );
+    expect(
+      found,
+      "the chat imports a business module (or another module's table), so it leans on the layers above it again. Fix: pass the fact in as data (a seat, an observer's answer), or move the code that needs that module into modules/watch. See docs/subsystems/channel.md",
+    ).toEqual([]);
+  });
+
+  it("regression: the chat's check sees a business import, a re-export and another module's table, and lets the platform through", () => {
+    const file = join(src, "modules/channel/writing.ts");
+    const leaks = (text: string) => chatLeaks(inspect(file, text));
+    expect(leaks('import type { Session } from "#/modules/session/session.ts";')).toEqual(["modules/session/session.ts"]);
+    expect(leaks('export { profileId } from "../watch/watch.ts";')).toEqual(["modules/watch/watch.ts"]);
+    expect(leaks('import type { Agent } from "#/modules/agent/agent.ts";')).toEqual(["modules/agent/agent.ts"]);
+    expect(leaks('import * as qd from "#db/session_delivery.sql.ts";')).toEqual(["#db/session_delivery.sql.ts"]);
+    expect(
+      leaks(
+        'import type { Db } from "#/infra/db.ts";\nimport type { Attachment } from "#/platform/attachment/attachment.ts";\nimport { metaOf } from "./meta.ts";\nimport * as qm from "#db/channel_message.sql.ts";',
+      ),
+    ).toEqual([]);
+  });
+
+  it("keep the sessions off the chat and the issues: modules/session imports neither, nor their tables, its tests included", () => {
+    const tests = files(join(src, "modules/session"))
+      .filter((file) => file.endsWith(".test.ts"))
+      .map((file) => inspect(file, readFileSync(file, "utf8")));
+    const found = [...sources().filter(({ from }) => from.startsWith("modules/session/")), ...tests].flatMap((source) =>
+      sessionLeaks(source).map((to) => `${source.from} -> ${to}`),
+    );
+    expect(
+      found,
+      "the sessions import the chat or the issues (or one of their tables), so the agent's execution leans on what sits above it. Fix: have the layer above hand the fact down as data (a hearer, a view the watch or the issues give), or move the test to the module it is about. See docs/subsystems/session.md",
+    ).toEqual([]);
+  });
+
+  it("regression: the sessions' check sees the chat, the issues, the watch and their tables, and lets the platform through", () => {
+    const file = join(src, "modules/session/mailbox.ts");
+    const leaks = (text: string) => sessionLeaks(inspect(file, text));
+    expect(leaks('import type { Channel } from "#/modules/channel/channel.ts";')).toEqual(["modules/channel/channel.ts"]);
+    expect(leaks('export { conflictOf } from "../issue/status.ts";')).toEqual(["modules/issue/status.ts"]);
+    expect(leaks('import { brakes } from "#/modules/watch/brakes.ts";')).toEqual(["modules/watch/brakes.ts"]);
+    expect(leaks('import { issueExists } from "#db/issue.sql.ts";')).toEqual(["#db/issue.sql.ts"]);
+    expect(leaks('import * as q from "#db/channel_message.sql.ts";')).toEqual(["#db/channel_message.sql.ts"]);
+    expect(
+      leaks('import type { Db } from "#/infra/db.ts";\nimport * as qd from "#db/session_delivery.sql.ts";\nimport { Repo } from "#/modules/repo/repo.ts";'),
+    ).toEqual([]);
   });
 
   it("keep base pure: it imports nothing else under src", () => {
@@ -229,13 +294,16 @@ describe("the modules", () => {
     ).toEqual([]);
   });
 
-  it("reach a session module's inside only from tests", () => {
+  it("reach a session module's inside and an issues module's intake only from tests", () => {
     const found = sources()
-      .filter(({ from, file }) => from !== "modules/session/session.ts" && /\binsideOf\b/u.test(readFileSync(file, "utf8")))
+      .filter(
+        ({ from, file }) =>
+          from !== "modules/session/session.ts" && from !== "modules/issue/issue.ts" && /\b(insideOf|intakeOf)\b/u.test(readFileSync(file, "utf8")),
+      )
       .map(({ from }) => from);
     expect(
       found,
-      "a module reaches past Session into its parts (insideOf), so the narrow interface does not hold. Fix: use a member of Session, or add the one the module needs. See docs/subsystems/session.md",
+      "a module reaches past Session or Issue into their parts (insideOf, intakeOf), so the narrow interface does not hold. Fix: use a member of Session or Issue, or add the one the module needs. See docs/subsystems/session.md",
     ).toEqual([]);
   });
 

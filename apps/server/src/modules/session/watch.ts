@@ -9,15 +9,15 @@ import type { Core } from "#/core/core.ts";
 import type { ServerConfig } from "#/infra/config.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
+import type { Agent } from "#/modules/agent/agent.ts";
 import type { Memory } from "#/modules/memory/memory.ts";
-import type { Runtime } from "#/modules/runtime/runtime.ts";
 
 import { type Execution, type StartFailure } from "./executor.ts";
 import { type Journal } from "./journal.ts";
 import type { Machine } from "./machine.ts";
 import { reactionTo, phaseFact, type Op, since } from "./reaction.ts";
 import type { Hand, SessionRegistry } from "./registry.ts";
-import { handsToUser, readReport } from "./report.ts";
+import { readReport, restsAfter, settlesFirst } from "./report.ts";
 import type { LaunchActivity } from "./signals.ts";
 
 export interface WatchDeps {
@@ -26,7 +26,7 @@ export interface WatchDeps {
   readonly log: Logger;
   readonly core: Core;
   readonly memory: Memory;
-  readonly runtime: Runtime;
+  readonly agent: Agent;
   readonly machine: Machine;
 }
 
@@ -34,7 +34,7 @@ export interface WatchDeps {
 export function makeWatch(r: SessionRegistry, deps: WatchDeps) {
   const { config, core, clock, log } = deps;
   const memories = deps.memory;
-  const runtimes = deps.runtime;
+  const runtimes = deps.agent;
   const machines = deps.machine;
   const executor = machines.executions(machines.here());
   const { fire, signal, launchOf, save, startRun, inputChanged, endRun } = r;
@@ -118,7 +118,7 @@ export function makeWatch(r: SessionRegistry, deps: WatchDeps) {
   };
 
   const applyReport = (h: Hand, report: SubagentReport, completedBefore: number) => {
-    if (report.outcome.kind === "completed" && !handsToUser(h.report) && (executor.find(h.id)?.pendingTasks ?? 0) > 0) {
+    if (settlesFirst(report.outcome.kind === "completed", h.report, executor.find(h.id)?.pendingTasks ?? 0)) {
       h.settling = { report, completedBefore };
       const channel = core.session(h.id)?.channel;
       apply({
@@ -139,7 +139,7 @@ export function makeWatch(r: SessionRegistry, deps: WatchDeps) {
     if (!session) return;
     const read = readReport(report.outcome, report.text);
     const declared = h.report;
-    const canRest = read.outcome === "completed" && session.issue !== undefined && !handsToUser(declared);
+    const canRest = restsAfter(read.outcome === "completed", session.issue !== undefined, declared);
     h.report = undefined;
     const summary = declared?.summary.trim() || read.summary;
     const spent = session.spent ? since(session.spent, h.tracking.runFrom) : undefined;

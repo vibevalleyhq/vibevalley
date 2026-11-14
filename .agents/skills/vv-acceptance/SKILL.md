@@ -18,7 +18,7 @@ description: 改完 VibeValley 的代码之后，在真的程序上验收、拿�
 | `media`、生图协议、结果下载、助手媒体工具、素材库 `/library` 页 | [media.md](.agents/skills/vv-acceptance/references/media.md) | 隔离程序的生成、落盘、预览、发布与 Artifact 引用真的接通；费用和未知结果边界不变 |
 | `apps/mobile/**`、`packages/protocol/src/host.ts`、`apps/server/src/gateway/lan`、页面里调宿主的地方 | [mobile.md](.agents/skills/vv-acceptance/references/mobile.md) | 安卓模拟器上的真应用配对、经「连接到本机」打开页面、桥让手机弹通知、重开直接回农场 |
 | `apps/desktop/src/infra/update.ts`、`releases.ts`、`apps/desktop/scripts/package.ts`、`.github/workflows/release.yml` | [desktop-update.md](.agents/skills/vv-acceptance/references/desktop-update.md) | 打包的应用查到新版、核对、退出时换上，SHA-512 不对时不换 |
-| 助手的提示、`apps/server/src/modules/tool` 的工具描述、`packages/agent` 拼提示和压缩的办法；加了助手的样例 | [orchestrator-evals.md](.agents/skills/vv-acceptance/references/orchestrator-evals.md) | 用真模型重放每个样例 5 次，以前修好的错没回来，新的修好了 |
+| 助手的提示、`apps/server/src/gateway/tool` 的工具描述、`packages/agent` 拼提示和压缩的办法；加了助手的样例 | [orchestrator-evals.md](.agents/skills/vv-acceptance/references/orchestrator-evals.md) | 用真模型重放每个样例 5 次，以前修好的错没回来，新的修好了 |
 
 一次改动碰了几块，就读几份，在同一个沙箱子命令里一起做（造数据、调接口、截图）。
 

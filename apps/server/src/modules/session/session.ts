@@ -9,30 +9,20 @@ import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import type { Memory } from "#/modules/memory/memory.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
-import { RepoError, type WorkplaceCleanup, type WorkplaceRelease } from "#/modules/repo/workplace.ts";
-import type { Runtime } from "#/modules/runtime/runtime.ts";
+import type { WorkplaceCleanup, WorkplaceRelease } from "#/modules/repo/workplace.ts";
 
-import type { Accepted, ChannelHearers, ChannelRouteResult, Envelope } from "./envelope.ts";
-import { makeGitHubPoller } from "./github.ts";
+import type { AgentWakes, ChatView, Delivery, Envelope, Readiness } from "./envelope.ts";
 import type { AgentHost, HostOptions } from "./host.ts";
-import { type ChildChecks, type IssueRecord, type Landing, makeLanding } from "./landing.ts";
-import { HireRefused, type Lifecycle, makeLifecycle, type SessionNews, type SessionOptions } from "./lifecycle.ts";
+import { type Lifecycle, makeLifecycle, type SessionNews, type SessionOptions } from "./lifecycle.ts";
 import { type Machine, makeMachine } from "./machine.ts";
-import { type DeliveryNews, type Dispatch, type HireArrival, type HiredReceipt, type Mailbox, makeMailbox, type QueuedInput } from "./mailbox.ts";
-import type { SourceEvent, TriggerInput, TriggerResource } from "./payload.ts";
+import { type DeliveryNews, type HireArrival, type HiredReceipt, type Mailbox, makeMailbox } from "./mailbox.ts";
+import type { TriggerInput, TriggerResource } from "./payload.ts";
 import { summaryOf } from "./report.ts";
 import type { Trigger } from "./shapes.ts";
 
-export type { Accepted, ChildChecks, IssueRecord, QueuedInput, SessionOptions };
+export type { SessionOptions };
 export type { Hired, HireOptions, RunFinished, RunStore, SessionNews } from "./lifecycle.ts";
 export { DeliveryRefused, HireRefused, newsOf, NotRecorded, NotTakenIn, NotWorkFile, runOf } from "./lifecycle.ts";
-
-/** A hire: the helper, its brief and where it works, and the inputs it starts with. parent: the issue in that repo
- * whose branch its branch forks from; that issue's checkout is made first. */
-export type HireOrder = HireArrival & { readonly parent?: number };
-
-/** Who hears a routed trigger: a channel's hearers, or one session. */
-export type Audience = ChannelHearers | { readonly session: string };
 
 /** A session as this process has it now. */
 export interface Live {
@@ -52,49 +42,37 @@ export interface Live {
 /** An agent profile doing a piece of work: what triggers it and its deliveries, the sessions and their runs, their
  * workplaces, and the executions on the machine they run on. Refusals are ApiErrors unless a member says otherwise. */
 export interface Session {
-  /** A trigger already recorded, routed to who hears it (its audience when given). */
-  readonly route: (trigger: Trigger, to?: Audience) => Promise<ChannelRouteResult>;
+  /** A trigger already recorded, delivered to the sessions the layer above picked (each woken), then kept as routed:
+   * where scope says when it went to no one (payload.ts deliveryScope), else where it is delivered. */
+  readonly route: (trigger: Trigger, to: readonly Delivery[], scope?: string) => Promise<void>;
   /** A trigger recorded in the caller's transaction; route it after. */
   readonly recordTrigger: (input: TriggerInput) => Promise<Trigger>;
-  /** A dispatch held for the issue's next helper: recorded in the caller's transaction, routed once it commits. */
-  readonly queueDispatch: (dispatch: Dispatch) => Promise<void>;
-  /** A source's event recorded as a trigger and routed; the farm's own echo is neither. */
-  readonly receive: (event: SourceEvent) => Promise<Accepted>;
-  /** A helper hired with its first inputs; throws HireRefused (also when the parent's checkout cannot be made). */
-  readonly hireWith: (order: HireOrder) => Promise<HiredReceipt>;
+  /** A helper hired with its first inputs; throws HireRefused. */
+  readonly hireWith: (order: HireArrival) => Promise<HiredReceipt>;
   /** A channel message's envelope taken back from every delivery that still waits on it. */
   readonly withdrawEnvelope: (envelope: string) => Promise<void>;
-  /** A session's open deliveries dropped: it left. */
-  readonly withdrawDeliveries: (session: string, why: string) => Promise<void>;
-  /** An issue's dispatches recorded before `at` taken back; in its own transaction. */
-  readonly withdrawDispatches: (issue: string, at: number) => Promise<void>;
-  /** A helper says an input is not its to take; the orchestrator is told why. */
-  readonly decline: (session: string, envelope: string, reason: string) => Promise<void>;
+  /** The chat the deliveries read their places from (the default channel, a place's orchestrator, a participant's unread),
+   * told by the layer above the sessions; until then, an empty one. */
+  readonly useChat: (view: ChatView) => void;
+  /** Which of a session's waiting inputs may be handed to it now, told by the issues above the sessions; until then, all. */
+  readonly useReadiness: (ready: Readiness) => void;
+  /** A session's pending inputs kept from waking it, or let wake it again (and it is woken): the wake breaker's call. */
+  readonly holdWakes: (session: string, held: boolean) => Promise<void>;
+  /** What agents' words woke since the user last spoke, as the deliveries kept it. */
+  readonly agentWakes: () => Promise<AgentWakes>;
   /** An orchestrator's host gives back an input it did not take. */
   readonly handBack: (session: string, envelope: string) => Promise<void>;
   /** A session's running turn stopped; true when the stop was taken. */
   readonly stop: (session: string) => Promise<boolean>;
   /** The helper let go; true when it was there. Work "discard" resets its branch once the runtime stops writing. */
   readonly dismiss: (session: string, work?: "keep" | "discard", closed?: "dismissed" | "completed") => Promise<boolean>;
-  /** The issue's work merged into main, or submitted as its pull request (one is open, or its repo goes by pull
-   * requests): from its helper's workplace, which then lets go; from the issue's own checkout when no helper holds it
-   * and fromCheckout. Throws NotTakenIn when the helper's work does not go in (the helper stays). */
-  readonly merge: Landing["merge"];
-  /** The helper's work submitted as the issue's pull request while it stays; read gives the issue under the helper's
-   * workplace lock (refused when it is closed). Throws MergeFailure. */
-  readonly submitPullRequest: Landing["submitPullRequest"];
-  /** Each followed pull request's state read; one merged or closed is kept, or finishes its issue. */
-  readonly refreshPullRequests: Landing["refreshPullRequests"];
-  /** The open pull requests of the issues on the board followed on GitHub: failed or finished CI, new reviews and
-   * comments taken in. */
-  readonly pollGitHub: (onBoard: readonly T.Issue[]) => Promise<void>;
-  /** A child's work checked and merged into its parent's branch, then its helper lets go; undefined when it waits.
-   * Throws NotTakenIn when the work does not go in. */
-  readonly mergeChild: Landing["mergeChild"];
-  /** The issue's work: in its helper's workplace while one holds it, else on its branch. Throws RepoError. */
-  readonly changesOf: Landing["changesOf"];
-  /** Whether the session's work still conflicts with base. */
-  readonly conflictOf: Landing["conflictOf"];
+  /** The helper's work taken in by use under its workplace lock, then the helper lets go (it stays when use gives a
+   * pull request). Throws NotTakenIn when use fails (the helper stays), ApiError when it cannot hand over now. */
+  readonly handOver: Lifecycle["handOver"];
+  /** use run on the session's workplace under its lock. */
+  readonly withWorkplace: Lifecycle["withWorkplace"];
+  /** use run on the session's workplace under its lock once its execution rests; refused while it works. */
+  readonly withIdleWorkplace: Lifecycle["withIdleWorkplace"];
   /** A session's branch reset to main while it stays. */
   readonly discardWork: (session: string) => Promise<void>;
   /** An issue's checkout let go once no helper is on it. */
@@ -108,16 +86,13 @@ export interface Session {
   readonly get: (session: string) => Promise<T.Session | undefined>;
   /** The sessions, the ended too; every agent's when none is given. */
   readonly list: (agent?: string) => Promise<T.Session[]>;
-  readonly runsOf: (issue: string) => Promise<T.Run[]>;
   /** Undefined when the session is unknown; one run's when given. */
   readonly eventsOf: (session: string, run?: string) => Promise<T.SessionEvent[] | undefined>;
   readonly trigger: (id: string) => Promise<TriggerResource | undefined>;
-  readonly triggersOf: (issue: string) => Promise<readonly Trigger[]>;
-  /** Every queued trigger: dispatches first, then routed order. */
-  readonly queuedTriggers: () => Promise<readonly QueuedInput[]>;
-  /** The issue a trigger belongs to. */
-  readonly ownerOf: (trigger: string) => Promise<string | undefined>;
   readonly isRouted: (trigger: string) => Promise<boolean>;
+  /** Each trigger recorded and not routed but the chat's (the watch reads those again), in order, with its source's data:
+   * what a restart or a failed route left for the layer above to route again. */
+  readonly unrouted: (consume: (trigger: Trigger, data: unknown) => Promise<void>) => Promise<void>;
   /** How many deliveries a message still waits in. */
   readonly waitingOn: (envelope: string) => Promise<number>;
   /** What an orchestrator has not read yet. */
@@ -126,10 +101,6 @@ export interface Session {
   readonly report: (id: string, report: T.IssueReport) => Promise<void>;
   /** Rejects `..` segments and symlinks escaping the session's working directory; throws NotWorkFile. */
   readonly workFile: (id: string, path: string, max: number) => Promise<{ readonly name: string; readonly bytes: Uint8Array }>;
-  /** The threads whose words reach the issue's helper. */
-  readonly subscribe: (issue: string, threads: readonly string[]) => Promise<void>;
-  /** Each cron trigger recorded and not routed, in order. */
-  readonly replayCronTriggers: (consume: (trigger: Trigger, data: unknown) => Promise<void>) => Promise<void>;
   /** Everything the sessions tell, subscribed before it returns: nothing told after is missed. */
   readonly news: () => Subscription<SessionNews>;
   /** What the deliveries tell, subscribed before it returns. */
@@ -139,11 +110,9 @@ export interface Session {
   readonly setAddress: (address: string) => void;
   /** An in-process agent's host; the caller owns it and closes it (`await using`). Throws NotRecorded. */
   readonly host: <R>(options: HostOptions<R>) => Promise<AgentHost<R>>;
-  /** At startup, after the modules below it started: the sessions back. */
-  readonly boot: () => Promise<void>;
-  /** At startup, after the channels restored their threads: the open deliveries restored, what was left routed, who
+  /** At startup, after the modules below it started: the sessions back, then their open deliveries restored and who
    * waits woken. */
-  readonly wake: () => Promise<void>;
+  readonly boot: () => Promise<void>;
   /** The deliveries stop, then the sessions save what a restart needs, then every execution is let go. */
   readonly close: () => Promise<void>;
 }
@@ -155,6 +124,8 @@ export type Inside = Session &
   Omit<Machine, "close"> & {
     readonly restore: Lifecycle["restore"];
     readonly restoreDeliveries: Mailbox["restore"];
+    /** The deliveries' part of boot alone: restored, what was left routed, who waits woken. */
+    readonly bootDeliveries: Mailbox["boot"];
   };
 
 const insides = new WeakMap<Session, Inside>();
@@ -166,54 +137,24 @@ export function insideOf(session: Session): Inside {
   return inside;
 }
 
-/** A source's event recorded as a trigger and routed; the farm's own echo is neither. */
-const receiving =
-  (mailbox: Pick<Mailbox, "record" | "route">) =>
-  async (event: SourceEvent): Promise<Accepted> => {
-    const trigger = await mailbox.record(event);
-    if (trigger === undefined) return { heldNotice: "" };
-    return { ...(await mailbox.route(trigger)), trigger };
-  };
-
 /** The door over the parts: what makeSession returns, and what a test that plays the sessions builds over its own. */
-export function sessionOver(parts: {
-  readonly lifecycle: Lifecycle;
-  readonly mailbox: Mailbox;
-  readonly repo: Pick<Repo, "checkout">;
-  readonly landing: Landing;
-  readonly pollGitHub: (onBoard: readonly T.Issue[]) => Promise<void>;
-  readonly close: () => Promise<void>;
-}): Session {
-  const { lifecycle, mailbox, repo, landing, close } = parts;
+export function sessionOver(parts: { readonly lifecycle: Lifecycle; readonly mailbox: Mailbox; readonly close: () => Promise<void> }): Session {
+  const { lifecycle, mailbox, close } = parts;
   return {
     route: mailbox.route,
     recordTrigger: mailbox.recordTrigger,
-    receive: receiving(mailbox),
-    queueDispatch: mailbox.queueDispatch,
-    hireWith: async ({ parent, ...order }) => {
-      if (parent !== undefined)
-        try {
-          await repo.checkout({ repo: order.where, issue: parent, worktree: true, base: "" });
-        } catch (e) {
-          if (e instanceof RepoError) throw new HireRefused(e.message, undefined, { cause: e });
-          throw e;
-        }
-      return mailbox.hireWith(order);
-    },
+    hireWith: mailbox.hireWith,
     withdrawEnvelope: mailbox.withdrawEnvelope,
-    withdrawDeliveries: mailbox.withdrawDeliveries,
-    withdrawDispatches: mailbox.withdrawDispatches,
-    decline: mailbox.decline,
+    useChat: mailbox.useChat,
+    useReadiness: mailbox.useReadiness,
+    holdWakes: mailbox.holdWakes,
+    agentWakes: mailbox.agentWakes,
     handBack: mailbox.handBack,
     stop: lifecycle.stop,
     dismiss: lifecycle.dismiss,
-    merge: landing.merge,
-    submitPullRequest: landing.submitPullRequest,
-    refreshPullRequests: landing.refreshPullRequests,
-    pollGitHub: parts.pollGitHub,
-    mergeChild: landing.mergeChild,
-    changesOf: landing.changesOf,
-    conflictOf: landing.conflictOf,
+    handOver: lifecycle.handOver,
+    withWorkplace: lifecycle.withWorkplace,
+    withIdleWorkplace: lifecycle.withIdleWorkplace,
     discardWork: lifecycle.discardWork,
     clearWorkplace: lifecycle.clearWorkplace,
     hired: lifecycle.hired,
@@ -234,26 +175,23 @@ export function sessionOver(parts: {
     room: lifecycle.noRoom,
     get: lifecycle.get,
     list: (agent) => lifecycle.list(agent ?? ""),
-    runsOf: lifecycle.issueRuns,
     eventsOf: lifecycle.events,
     trigger: mailbox.readTrigger,
-    triggersOf: mailbox.triggersOf,
-    queuedTriggers: mailbox.queuedTriggers,
-    ownerOf: mailbox.ownerOf,
     isRouted: mailbox.isRouted,
+    unrouted: mailbox.unrouted,
     waitingOn: mailbox.waitingOn,
     digest: mailbox.orchestratorDigest,
     report: lifecycle.report,
     workFile: lifecycle.workFile,
-    subscribe: mailbox.subscribe,
-    replayCronTriggers: mailbox.replayCronTriggers,
     news: lifecycle.news,
     deliveries: mailbox.news,
     who: lifecycle.who,
     setAddress: lifecycle.setAddress,
     host: lifecycle.host,
-    boot: lifecycle.boot,
-    wake: mailbox.boot,
+    boot: async () => {
+      await lifecycle.boot();
+      await mailbox.boot();
+    },
     close,
   };
 }
@@ -267,7 +205,6 @@ export interface SessionDeps {
   readonly agent: Agent;
   readonly memory: Memory;
   readonly repo: Repo;
-  readonly runtime: Runtime;
 }
 
 export async function makeSession(deps: SessionDeps, options: SessionOptions = {}): Promise<Session> {
@@ -291,16 +228,7 @@ export async function makeSession(deps: SessionDeps, options: SessionOptions = {
     const mailbox = await makeMailbox({ ...deps, session: lifecycle });
     closes.push(mailbox.close);
 
-    const landing = makeLanding({ core: deps.core, log: deps.log, repo: deps.repo, lifecycle });
-    const gitHub = makeGitHubPoller({
-      db: deps.db,
-      repo: deps.repo,
-      clock: deps.clock,
-      log: deps.log,
-      receive: receiving(mailbox),
-      knownGitHubEvents: mailbox.knownGitHubEvents,
-    });
-    const session = sessionOver({ lifecycle, mailbox, repo: deps.repo, landing, pollGitHub: gitHub.pollOpen, close });
+    const session = sessionOver({ lifecycle, mailbox, close });
     insides.set(session, {
       ...lifecycle,
       ...mailbox,
@@ -309,6 +237,7 @@ export async function makeSession(deps: SessionDeps, options: SessionOptions = {
       executions: machine.executions,
       restore: lifecycle.restore,
       restoreDeliveries: mailbox.restore,
+      bootDeliveries: mailbox.boot,
     });
     return session;
   } catch (e) {

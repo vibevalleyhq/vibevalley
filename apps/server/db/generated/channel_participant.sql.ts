@@ -5,22 +5,34 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, Words_channel_participant_kind, Words_channel_participant_role } from "./types.js"
+import { rowOf, Words_channel_participant_kind } from "./types.js"
 
 export interface UpsertParticipantParams {
   readonly ["id"]: string
   readonly ["kind"]: Words_channel_participant_kind
-  readonly ["role"]: Words_channel_participant_role | null
   readonly ["name"]: string
   readonly ["agent_id"]: string | null
-  readonly ["runtime"]: string | null
+  readonly ["home_id"]: string | null
   readonly ["joined_at"]: number
 }
 
-export const UpsertParticipantSql = "-- name: UpsertParticipant :exec\ninsert into channel_participant (id, kind, role, name, agent_id, runtime, joined_at)\nvalues ($1, $2, $3, $4, $5, $6, $7)\non conflict (id) do update set role = excluded.role, name = excluded.name, agent_id = excluded.agent_id, runtime = excluded.runtime, left_at = null;"
+export const UpsertParticipantSql = "-- name: UpsertParticipant :exec\n-- home_id none keeps the home it had.\ninsert into channel_participant (id, kind, name, agent_id, home_id, joined_at)\nvalues ($1, $2, $3, $4, $5, $6)\non conflict (id) do update set name = excluded.name, agent_id = excluded.agent_id,\n  home_id = coalesce(excluded.home_id, channel_participant.home_id), left_at = null;"
 
 export async function upsertParticipant(sql: Sql, params: UpsertParticipantParams): Promise<number> {
-  return sql.exec(UpsertParticipantSql, [params["id"], params["kind"], params["role"], params["name"], params["agent_id"], params["runtime"], params["joined_at"]])
+  return sql.exec(UpsertParticipantSql, [params["id"], params["kind"], params["name"], params["agent_id"], params["home_id"], params["joined_at"]])
+}
+
+export interface AddParticipantParams {
+  readonly ["id"]: string
+  readonly ["kind"]: Words_channel_participant_kind
+  readonly ["name"]: string
+  readonly ["joined_at"]: number
+}
+
+export const AddParticipantSql = "-- name: AddParticipant :exec\n-- One already there keeps its seat as it is.\ninsert into channel_participant (id, kind, name, joined_at) values ($1, $2, $3, $4)\non conflict (id) do nothing;"
+
+export async function addParticipant(sql: Sql, params: AddParticipantParams): Promise<number> {
+  return sql.exec(AddParticipantSql, [params["id"], params["kind"], params["name"], params["joined_at"]])
 }
 
 export interface ParticipantLeftParams {
@@ -41,16 +53,15 @@ export interface ParticipantsParams {
 export const ParticipantsResult = z.object({
   ["id"]: z.string(),
   ["kind"]: Words_channel_participant_kind,
-  ["role"]: Words_channel_participant_role.nullable(),
   ["name"]: z.string(),
   ["agent_id"]: z.string().nullable(),
-  ["runtime"]: z.string().nullable(),
+  ["home_id"]: z.string().nullable(),
   ["joined_at"]: z.number(),
   ["left_at"]: z.number().nullable(),
 })
 export type ParticipantsResult = z.infer<typeof ParticipantsResult>
 
-export const ParticipantsSql = "-- name: Participants :many\n-- bound: a row per participant: the user, the orchestrators, profiles and the sessions hired.\nselect id, kind, role, name, agent_id, runtime, joined_at, left_at from channel_participant order by joined_at, seq;"
+export const ParticipantsSql = "-- name: Participants :many\n-- bound: a row per participant: the user, the assistants, profiles and the sessions hired.\nselect id, kind, name, agent_id, home_id, joined_at, left_at from channel_participant order by joined_at, seq;"
 
 export async function participants(sql: Sql): Promise<ParticipantsResult[]> {
   const rows = await sql.query(ParticipantsSql, [])

@@ -1,35 +1,35 @@
+import type { Tool as LoopTool } from "@vibevalley/agent/core/tool";
 import { selfTools } from "@vibevalley/agent/self";
 import { Semaphore, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime, userId } from "@vibevalley/protocol";
 
-import { orchestrator } from "#/base/actor.ts";
+import { type Caller, orchestrator } from "#/base/actor.ts";
 import { serverFile } from "#/base/assets.ts";
 import { head } from "#/base/clip.ts";
 import { BizCode, refuseIn } from "#/base/errors.ts";
 import { usersLanguage } from "#/base/prompts.ts";
 import { agentHome, reposDir, type ServerConfig } from "#/infra/config.ts";
-import type { Logger } from "#/infra/log.ts";
+import { bestEffort, type Logger } from "#/infra/log.ts";
 import { localeMinute, type Time } from "#/infra/time.ts";
-import { type Agent, noDeepSeekKey } from "#/modules/agent/agent.ts";
+import type { Agent } from "#/modules/agent/agent.ts";
+import { defaultModel } from "#/modules/agent/durable.ts";
+import { runtimeLabel } from "#/modules/agent/presets.ts";
+import { noDeepSeekKey } from "#/modules/agent/profile.ts";
 import { traitsOf } from "#/modules/agent/prompts.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
-import type { Cron } from "#/modules/cron/cron.ts";
-import { nextRun } from "#/modules/cron/when.ts";
+import type { Issue } from "#/modules/issue/issue.ts";
+import { nextRun } from "#/modules/issue/when.ts";
 import type { Pkm } from "#/modules/pkm/pkm.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
-import { defaultModel } from "#/modules/runtime/durable.ts";
-import { runtimeLabel } from "#/modules/runtime/presets.ts";
-import type { Runtime } from "#/modules/runtime/runtime.ts";
 import type { Handed, Picked } from "#/modules/session/envelope.ts";
 import { type AgentHost, SubmitRefused } from "#/modules/session/host.ts";
+import type { ToolStart } from "#/modules/session/reaction.ts";
 import type { Session } from "#/modules/session/session.ts";
-import { answers as toolAnswers, channelLine } from "#/modules/tool/prompts.ts";
-import type { Tool } from "#/modules/tool/tool.ts";
 
 import type { Answer } from "./openai.ts";
-import { agentPrompt, identityNote, lineWords, situationWords, systemPrompt, voiceNote } from "./prompts.ts";
+import { agentPrompt, channelLine, identityNote, lineWords, pkmHitLine, situationWords, systemPrompt, voiceNote } from "./prompts.ts";
 import { makeResponses } from "./response.ts";
 import { deepseekModel, intake, orchestratorEnvelopeLines, quotaText, situationDelta, type Source } from "./situation.ts";
 
@@ -92,24 +92,33 @@ export interface OrchestratorOptions {
   readonly listen?: boolean;
 }
 
+/** The farm's tools as the orchestrator holds them. gateway/tool serves them and reaches every module, the orchestrator
+ * among them, so they are built after the modules and handed in at assembly (services.ts), like Core's Projection. */
+export interface OrchestratorTools {
+  /** Its tools, in the order its prompt has always listed them: the order is part of the prompt's prefix. */
+  readonly orchestrator: (who: () => Caller) => LoopTool[];
+  /** How a tool call reads in its trajectory: its label and the first naming argument. */
+  readonly start: (name: string, args: unknown) => ToolStart;
+  readonly sessionLine: (session: T.Session) => string;
+}
+
 export interface OrchestratorDeps {
   readonly clock: Time;
   readonly log: Logger;
   readonly config: ServerConfig;
   readonly agent: Agent;
-  readonly runtime: Runtime;
   readonly repo: Repo;
   readonly pkm: Pkm;
   readonly session: Session;
   readonly channel: Channel;
-  readonly cron: Cron;
-  readonly tool: Tool;
+  readonly issue: Issue;
+  readonly tools: OrchestratorTools;
 }
 
 export async function makeOrchestrator(deps: OrchestratorDeps, options: OrchestratorOptions = {}): Promise<Orchestrator> {
-  const { clock, config, agent: store, runtime: runtimes, repo: repos, pkm: notes, session: run, channel: chat, cron, tool } = deps;
+  const { clock, config, agent: store, repo: repos, pkm: notes, session: run, channel: chat, issue: issues, tools: tool } = deps;
   const log = deps.log.child("orchestrator");
-  const responses = makeResponses(run, chat, clock);
+  const responses = makeResponses(run, issues, chat, clock);
   const tasks = new TaskGroup({ name: "orchestrator", onError: (task, e) => log.error(`vibevalley: the orchestrator's ${task} failed`, e) });
 
   const toolsFor = (id: string) => (current: () => HostContext) =>
@@ -139,7 +148,7 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
       const modelOf = () => deepseekModel(store.agent(id)?.model.trim() ?? "", defaultModel);
       const wakeSoon = (withinMs: number) => {
         const by = clock.now() + withinMs;
-        return cron.list().some((s) => {
+        return issues.crons().some((s) => {
           const next = nextRun(s);
           return next !== undefined && (s.agent || chat.orchestratorIn(s.channel)) === id && next <= by;
         });
@@ -152,7 +161,8 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
         first: { channel: chat.defaultChannel(), envelope: "", source: "user" },
         quiet: () => false,
         say: async (r, text, runId) => {
-          await chat.post({ _tag: "Run", from: id, channel: r.channel, text: text, run: runId });
+          // A run's words are best kept, never a reason the run fails; nothing said is nothing written.
+          if (text.trim()) await bestEffort(log, "a run's words", () => chat.post({ from: id, channel: r.channel, text: text, run: runId }));
         },
         channel: (r) => r.channel,
         fresh: () => {
@@ -170,7 +180,7 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
   const agentLines = async () => {
     const lines: string[] = [];
     for (const a of store.agents()) {
-      const assessed = await runtimes.assess(a);
+      const assessed = await store.assess(a);
       const p = assessed.agent;
       let line = situationWords.agent(p.name, p.id, runtimeLabel(p.runtime), traitsOf(p));
       if (p.enabled && assessed.blocking.length === 0) line += situationWords.quota(quotaText(assessed.info));
@@ -220,7 +230,7 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
   const recall = async (source: Source, line: string) => {
     if (source !== "user" || line.trim().length < 4) return "";
     const hits = await notes.search({ text: head(line, 200), limit: notesRecalled });
-    return situationWords.recalled(hits.map(toolAnswers.pkm.hit));
+    return situationWords.recalled(hits.map(pkmHitLine));
   };
 
   const pickedNote = (picked: Pick) => {
@@ -294,7 +304,7 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
         const words = e.why === noDeepSeekKey() ? t("server.orchestrator.noKey") : t("server.orchestrator.cannotStart", { why: e.why });
         const again = me.cannot.get(n.channel) === words;
         me.cannot.set(n.channel, words);
-        if (!again) await chat.post({ _tag: "Run", from: me.id, channel: n.channel, text: words, run: e.run });
+        if (!again) await bestEffort(log, "a run's words", () => chat.post({ from: me.id, channel: n.channel, text: words, run: e.run }));
         taken = false;
       }
     } catch (e) {

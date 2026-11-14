@@ -29,7 +29,7 @@ import { newId } from "#/base/ids.ts";
 import { type Core } from "#/core/core.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import { type DeepSeekModel, type Durable, durableTool, entryMessage, messageText, type ModelMessage } from "#/modules/runtime/durable.ts";
+import { type DeepSeekModel, type Durable, durableTool, entryMessage, messageText, type ModelMessage } from "#/modules/agent/durable.ts";
 
 import { makeInProcessRun, NotRecorded, RunBusy, type RunEvent, type RunInput } from "./inProcessRun.ts";
 import type { Journal } from "./journal.ts";

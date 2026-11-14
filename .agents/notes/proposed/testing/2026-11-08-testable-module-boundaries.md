@@ -9,7 +9,7 @@ Status: proposed
 | 位置 | 缺口 | 后果 |
 |---|---|---|
 | `packages/testkit/src/until.ts` | `waitFor` 每轮先裸 `await get()` 再检查 `deadline`；`get()` 自身挂起时期限永远不检查 | 只能等整条 vitest 用例超时退出，报错不说在等什么；同文件的 `within(p, ms, what)` 未被 `waitFor` 复用 |
-| `apps/server/src/modules/channel/channel.test.ts`、`apps/server/src/modules/repo/repo.test.ts` | `channel.test.ts` 直接穿透引用 `#/modules/session/mailbox.ts` 与 `history.ts` 搭测试环境；`repo.test.ts` 每次测合并门禁都在新 worktree 下拉起真实 `.vibevalley/check` shell 子进程 | 模块单测与相邻模块的内部实现或外部子进程强绑定，边界重构易碎且耗时偏高 |
+| `apps/server/src/modules/watch/watch.test.ts`（原 `channel/channel.test.ts`）、`apps/server/src/modules/repo/repo.test.ts` | `watch.test.ts` 直接穿透引用 `#/modules/session/mailbox.ts` 与 `history.ts` 搭测试环境；`repo.test.ts` 每次测合并门禁都在新 worktree 下拉起真实 `.vibevalley/check` shell 子进程 | 模块单测与相邻模块的内部实现或外部子进程强绑定，边界重构易碎且耗时偏高 |
 | 根目录 `vite.config.ts` | `vibevalley/no-wall-clock` 对 `apps/server/src/**/*.test.ts`、`packages/*/src/**/*.test.ts`、`apps/server/src/testing/**`、`packages/*/src/testing/**` 整块关掉 | 夹具里的默认时间随手读墙钟而不随测试时钟推进，规则在测试里形同虚设 |
 | `scripts/audit/practice.ratchet.json` | 仍保留 `turn-as-absence`（`apps/server: 1`、`packages/bridge: 1`）与 `duplicated-setup`（`apps/server: 3`）存量豁免 | 事件循环单轮等待充当否定断言边界，重复大对象夹具散落多处 |
 

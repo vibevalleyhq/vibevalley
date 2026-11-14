@@ -31,9 +31,9 @@ const saveAfterMs = 300;
 
 export interface RunStore {
   readonly start: (id: string, session: string, issue: string, trigger: T.RunTrigger) => Promise<void>;
-  readonly link: (run: string, issue: string) => Promise<void>;
+  /** The run took an input of issue (told as IssueStarted). */
+  readonly link: (run: string, issue: string) => void;
   readonly heard: (run: string, heard: readonly string[]) => Promise<void>;
-  readonly issues: (run: string) => Promise<T.IssueId[]>;
   readonly unended: (session: string) => Promise<{ readonly id: string; readonly startedAt: number } | undefined>;
   readonly finish: (id: string, outcome: T.Outcome, summary: string, spent?: T.Spent) => Promise<void>;
   readonly finished: (r: RunFinished) => void;
@@ -253,7 +253,7 @@ export async function makeRegistry(deps: RegistryDeps) {
         if (session) await qs.keepSessionState(db.sql, sessionState(session));
         await qs.clearPendingReport(db.sql, { id: h.id });
       });
-      if (issue) tell({ _tag: "RunFinished", id, issues: [issue], outcome });
+      if (issue) tell({ _tag: "RunFinished", id, issue, outcome });
     });
   };
 
@@ -285,12 +285,9 @@ export async function makeRegistry(deps: RegistryDeps) {
     ...runs,
     start: async (id, session, issue, trigger) => {
       await runs.start(id, session, issue, trigger);
-      if (issue) tell({ _tag: "IssueStarted", issue });
+      if (issue) tell({ _tag: "IssueStarted", issue, run: id });
     },
-    link: async (run, issue) => {
-      await runs.link(run, issue);
-      tell({ _tag: "IssueStarted", issue });
-    },
+    link: (run, issue) => tell({ _tag: "IssueStarted", issue, run }),
     finished: (r) => tell({ _tag: "RunFinished", ...r }),
     consumed: (c) => tell({ _tag: "Consumed", ...c }),
     register: (session, current) => void executions.set(session, current),

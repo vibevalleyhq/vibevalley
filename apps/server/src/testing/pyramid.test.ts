@@ -41,12 +41,12 @@ describe("the test pyramid", () => {
   it("follows imports to the seam a file reaches", () => {
     expect(reach("src/modules/orchestrator/orchestrator.test.ts")).toEqual([
       "src/modules/orchestrator/orchestrator.test.ts",
-      "src/modules/runtime/durable.ts",
+      "src/modules/agent/durable.ts",
       "@earendil-works/pi-durable/env/node",
     ]);
-    expect(reach("src/modules/runtime/vibevalley.ts")).toEqual([
-      "src/modules/runtime/vibevalley.ts",
-      "src/modules/runtime/durable.ts",
+    expect(reach("src/modules/agent/vibevalley.ts")).toEqual([
+      "src/modules/agent/vibevalley.ts",
+      "src/modules/agent/durable.ts",
       "@earendil-works/pi-durable/env/node",
     ]);
   });

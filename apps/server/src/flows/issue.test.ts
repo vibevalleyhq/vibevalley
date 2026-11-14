@@ -278,10 +278,9 @@ describe("an issue", () => {
     const w = watch(fw);
     const issue = fw.issue;
     const issues = testIssues(issue);
-    const sessions = fw.inside;
-    const crons = fw.cron;
+    const crons = fw.issue;
     await fw.agent.save({ ...lab(), enabled: true });
-    const made = await crons.add(
+    const made = await crons.addCron(
       {
         name: "巡检",
         text: "看一眼",
@@ -291,14 +290,13 @@ describe("an issue", () => {
       },
       user,
     );
-    const mailbox = fw.inside;
     const due = async () => {
       clock.adjust(5 * 60_000 + 1);
-      await crons.tick();
-      await mailbox.replay();
+      await crons.tickCrons();
+      await fw.intake.replay();
     };
     const ofCron = async () => withCron(await issues.list(), made.id);
-    const runs = async () => sessions.issueRuns((await ofCron()).id);
+    const runs = async () => fw.intake.runsOf((await ofCron()).id);
     await due();
     await w.nextReport();
     const first = await ofCron();
@@ -312,7 +310,7 @@ describe("an issue", () => {
     const runs2 = await runs();
     expect(runs2).toHaveLength(1);
     const sql = sqlOf(fw.db);
-    const held = await sql.unsafe<{ state: string }>("select state from session_issue_input where issue_id = $1 and state = 'held'", [first.id]);
+    const held = await sql.unsafe<{ state: string }>("select state from issue_input where issue_id = $1 and state = 'held'", [first.id]);
     expect(held).toHaveLength(1);
 
     await issues.setStatus(first.id, "done", "", "", user);
@@ -482,7 +480,7 @@ describe("an issue", () => {
     const issue3 = await issues.get(issue.id);
     const running = latestSessionIdOf(issue3);
     if (running === undefined) throw new Error("the issue has no execution session");
-    const thread = (await chat.threadOfSession(running))!;
+    const thread = (await chat.homeOf(running))!;
     await until(
       () => saidIn(thread).some((m) => m.from === "user" && m.text === "接着修：这一单必败。看一下报错，修好再跑一遍测试"),
       "the cure said once, by the server",
@@ -619,7 +617,7 @@ describe("an issue", () => {
     await issues.setStatus(garbled.id, "todo", "", "", user);
     const running = latestSessionIdOf(stuck);
     if (running === undefined) throw new Error("the issue has no execution session");
-    const thread = (await chat.threadOfSession(running))!;
+    const thread = (await chat.homeOf(running))!;
     await until(
       () => saidIn(thread).some((m) => m.from === "user" && m.text.startsWith("接着修：上一轮交回的结论读不出来（没有通过 issue_report")),
       "what was wrong with it, said",
@@ -749,7 +747,6 @@ describe("an issue", () => {
     const f = farm({ usage: () => usage });
     await using fw = await f.open();
     const issues = fw.issue;
-    const runtimes = fw.runtime;
     const agents = fw.agent;
     const hire = () =>
       issues.hire(lab(), "随便做点什么", "money").then(
@@ -767,13 +764,13 @@ describe("an issue", () => {
       available: true,
       balances: [{ currency: "CNY", amount: 0 }],
     };
-    await runtimes.refresh("pi");
+    await agents.refreshRuntime("pi");
     const hired = await hire();
     expect(hired).toMatch(/余额用完了/u);
 
     usage = null;
-    runtimes.spend("pi", 1.2);
-    await runtimes.update("pi", { ...settings, dailyBudget: 1 });
+    agents.spend("pi", 1.2);
+    await agents.updateRuntime("pi", { ...settings, dailyBudget: 1 });
     const hired2 = await hire();
     expect(hired2).toMatch(/每日预算 ¥1\.00/u);
 
@@ -787,7 +784,7 @@ describe("an issue", () => {
         { label: "Codex · 1 week", usedPercent: 100, resetsAt: resets },
       ],
     };
-    await runtimes.update("pi", settings);
+    await agents.updateRuntime("pi", settings);
     const hired3 = await hire();
     expect(hired3).toMatch(/额度用完了（Codex · 1 week），10 月 14 日 08:00重置/u);
 
@@ -796,7 +793,7 @@ describe("an issue", () => {
       subscription: "pro",
       windows: [{ label: "Codex · 1 week", usedPercent: 99, resetsAt: resets }],
     };
-    await runtimes.refresh("pi");
+    await agents.refreshRuntime("pi");
     const hired4 = await hire();
     expect(hired4).toBe("");
   });

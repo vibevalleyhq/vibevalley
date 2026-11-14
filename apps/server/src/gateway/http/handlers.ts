@@ -10,7 +10,6 @@ import { cronHandlers } from "#/gateway/http/handlers/cron.ts";
 import { gameHandlers } from "#/gateway/http/handlers/game.ts";
 import { issueHandlers } from "#/gateway/http/handlers/issue.ts";
 import { lanHandlers } from "#/gateway/http/handlers/lan.ts";
-import { libraryHandlers } from "#/gateway/http/handlers/library.ts";
 import { mediaHandlers } from "#/gateway/http/handlers/media.ts";
 import { memoryHandlers } from "#/gateway/http/handlers/memory.ts";
 import { orchestratorHandlers } from "#/gateway/http/handlers/orchestrator.ts";
@@ -41,7 +40,6 @@ export type HandlersDeps = Parameters<typeof coreHandlers>[0] &
   Parameters<typeof runtimeHandlers>[0] &
   Parameters<typeof sessionHandlers>[0] &
   Parameters<typeof artifactHandlers>[0] &
-  Parameters<typeof libraryHandlers>[0] &
   Parameters<typeof attachmentHandlers>[0] &
   Parameters<typeof pkmHandlers>[0] &
   Parameters<typeof cronHandlers>[0] &
@@ -67,7 +65,6 @@ export function handlers(deps: HandlersDeps): Handlers {
     ...runtimeHandlers(deps),
     ...sessionHandlers(deps),
     ...artifactHandlers(deps),
-    ...libraryHandlers(deps),
     ...attachmentHandlers(deps),
     ...pkmHandlers(deps),
     ...cronHandlers(deps),

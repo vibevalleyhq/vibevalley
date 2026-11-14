@@ -15,18 +15,18 @@ CREATE FUNCTION term_query(words text[], prefix boolean) RETURNS tsquery LANGUAG
 
 CREATE TABLE channel_participant (
   id         text primary key,
-  -- Direct-talk helper seats use id = profile:<agent> with runtime = null; hired sessions set runtime.
   kind       text not null check (kind in ('user', 'agent', 'system')),
-  role       text check (role in ('orchestrator', 'worker')),
   name       text not null,
+  -- The profile an agent's seat speaks for (a helper's: a session, or a profile's seat in its direct channel); none for
+  -- an assistant, a profile speaking as itself.
   agent_id   text,
-  runtime    text,
+  -- Where an empty target means for it: the place the layers above gave it (its thread, its direct channel); none is the default channel.
+  home_id    text,
   joined_at  double precision not null,
   left_at    double precision,
   -- The order they joined in, for those who joined at the same millisecond (numbered by channel_participant_seq).
   seq        integer not null default 0,
-  check ((kind = 'agent') = (role is not null)),
-  check ((role = 'worker') = (agent_id is not null))
+  check (kind = 'agent' or agent_id is null)
 );
 CREATE TABLE channel (
   id            text primary key,
@@ -206,6 +206,27 @@ CREATE TABLE channel_read_cursor (
   updated_at       double precision not null,
   primary key (participant_id, channel_id)
 );
+-- What a participant took in without reading it in the chat: a message handed to it, marked when it was taken (the
+-- layers above say when). A participant's unread and unseen leave these out.
+CREATE TABLE channel_seen (
+  participant_id  text not null references channel_participant (id),
+  message_id      text not null references channel_message (id) on delete cascade,
+  seen_at         double precision not null,
+  primary key (participant_id, message_id)
+);
+-- What happened in the chat, numbered in the order it was committed: the layers above read it after a cursor of their own.
+CREATE TABLE channel_event (
+  seq         integer generated always as identity primary key,
+  kind        text not null check (kind in ('posted', 'removed')),
+  channel_id  text not null,
+  message_id  text not null,
+  at          double precision not null
+);
+-- How far a reader of channel_event has handled it.
+CREATE TABLE watch_cursor (
+  name  text primary key,
+  seq   integer not null
+);
 CREATE TABLE session_trigger (
   id text primary key,
   seq integer not null default 0, -- the order they were recorded in (session_trigger_seq)
@@ -221,12 +242,21 @@ CREATE TABLE session_trigger (
          (routed_at is not null and routing_scope is not null and routing_position is not null)),
   unique (source, source_key)
 );
-CREATE TABLE session_github_cursor (
+CREATE TABLE issue_github_cursor (
   repo text not null,
   pr_number integer not null,
   check_fingerprint text not null default '',
   check_revision integer not null default 0,
   primary key (repo, pr_number)
+);
+-- A pull request's reviews and comments taken in, with the bot round each counted against.
+CREATE TABLE issue_github_event (
+  repo text not null,
+  pr_number integer not null,
+  key text not null,
+  bot_round_key text,
+  bot_round integer,
+  primary key (repo, pr_number, key)
 );
 
 CREATE TABLE issue (
@@ -340,31 +370,35 @@ CREATE TABLE session_delivery (
   check ((held_by is null) or wakes),
   check ((state = 'handed') = (launch is not null) or state in ('consumed', 'dropped'))
 );
-CREATE TABLE session_subscription (
+-- The threads whose words go to an issue (issue/intake.ts): one issue per thread.
+CREATE TABLE issue_subscription (
   thread_key text primary key,
   issue_id text not null references issue(id) on delete cascade
 );
-CREATE INDEX session_subscription_by_issue on session_subscription(issue_id);
-CREATE TABLE session_issue_input (
+CREATE INDEX issue_subscription_by_issue on issue_subscription(issue_id);
+-- An issue's inputs (issue/intake.ts): held while the issue cannot take them, forwarded to its session, or returned.
+CREATE TABLE issue_input (
   trigger_id text primary key references session_trigger(id) on delete cascade,
+  -- The order they were taken in: a dispatch is taken when it is queued, before its trigger is routed.
+  position integer generated always as identity,
   issue_id text not null references issue(id) on delete cascade,
   state text not null default 'held' check (state in ('held', 'forwarded', 'returned')),
   session_id text references session(id) on delete set null,
   reason text,
   created_at double precision not null
 );
-CREATE INDEX session_issue_input_by_issue on session_issue_input(issue_id, state, created_at);
+CREATE INDEX issue_input_by_issue on issue_input(issue_id, state, created_at);
 -- At most one held input per issue: a newer hold replaces the older one.
-CREATE FUNCTION session_issue_input_one_held() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION issue_input_one_held() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-  DELETE FROM session_issue_input WHERE issue_id = NEW.issue_id AND trigger_id <> NEW.trigger_id AND state = 'held'
+  DELETE FROM issue_input WHERE issue_id = NEW.issue_id AND trigger_id <> NEW.trigger_id AND state = 'held'
     AND EXISTS (SELECT 1 FROM session_trigger t WHERE t.id = NEW.trigger_id AND t.source = 'cron');
   RETURN NEW;
 END $$;
-CREATE TRIGGER session_issue_input_one_held BEFORE INSERT ON session_issue_input
-  FOR EACH ROW WHEN (NEW.state = 'held' AND NEW.reason = 'human') EXECUTE FUNCTION session_issue_input_one_held();
-CREATE TRIGGER session_issue_input_one_held_again BEFORE UPDATE OF state ON session_issue_input
-  FOR EACH ROW WHEN (NEW.state = 'held' AND NEW.reason = 'human') EXECUTE FUNCTION session_issue_input_one_held();
+CREATE TRIGGER issue_input_one_held BEFORE INSERT ON issue_input
+  FOR EACH ROW WHEN (NEW.state = 'held' AND NEW.reason = 'human') EXECUTE FUNCTION issue_input_one_held();
+CREATE TRIGGER issue_input_one_held_again BEFORE UPDATE OF state ON issue_input
+  FOR EACH ROW WHEN (NEW.state = 'held' AND NEW.reason = 'human') EXECUTE FUNCTION issue_input_one_held();
 
 CREATE INDEX session_trigger_route_order on session_trigger (routing_scope, routing_position) where routed_at is not null;
 CREATE INDEX session_delivery_scope_position on session_delivery (scope, position);
@@ -380,7 +414,7 @@ CREATE TABLE session_run (
   summary      text,
   spent        text
 );
-CREATE TABLE cron (
+CREATE TABLE issue_cron (
   id          text primary key,
   name        text not null,
   body        text not null,
@@ -392,7 +426,7 @@ CREATE TABLE cron (
   enabled     boolean not null default true,
   created_at  double precision not null,
   last_run    double precision,
-  -- Who set it, and whether it waits for the user to say yes (cron/rules.go's needsOK): a waiting one stays off
+  -- Who set it, and whether it waits for the user to say yes (issue/when.ts's needsOK): a waiting one stays off
   -- until the user turns it on, which clears pending.
   set_by      text not null default 'user' check (set_by in ('user', 'agent', 'system')),
   pending     boolean not null default false
@@ -501,13 +535,14 @@ CREATE UNIQUE INDEX channel_message_send_key on channel_message (sender_id, send
 CREATE INDEX session_delivery_open on session_delivery (session_id, envelope_id) where state in ('pending', 'handed');
 CREATE INDEX session_run_by_issue on session_run (issue, started_at);
 CREATE INDEX session_run_by_session on session_run (session, started_at);
-CREATE TABLE session_run_issue (
+-- The runs that took an issue's inputs (issue/intake.ts), as the sessions told it: an in-process agent's one run can take several.
+CREATE TABLE issue_run (
   run text not null references session_run(id) on delete cascade,
   issue text not null references issue(id) on delete cascade,
   primary key (run, issue)
 );
-CREATE INDEX session_run_issue_by_issue on session_run_issue(issue, run);
-CREATE TABLE runtime_todo (
+CREATE INDEX issue_run_by_issue on issue_run(issue, run);
+CREATE TABLE agent_todo (
   graph text not null,
   keeper text not null,
   id text not null,
@@ -523,7 +558,7 @@ CREATE TABLE runtime_todo (
   finished_at double precision,
   primary key (graph, id)
 );
-CREATE INDEX runtime_todo_by_keeper on runtime_todo (keeper, finished_at);
+CREATE INDEX agent_todo_by_keeper on agent_todo (keeper, finished_at);
 -- Artifacts (artifact/artifact.ts). A blocks one's blocks are a flat list, nested by parent_id and ordered by
 -- (order_key, id); every change is an op, and a batch of ops is one artifact_change with the artifact's next seq.
 CREATE TABLE artifact (
@@ -621,12 +656,14 @@ CREATE INDEX artifact_suggestion_open on artifact_suggestion (artifact_id, statu
 CREATE INDEX artifact_suggestion_by_block on artifact_suggestion (block_id);
 
 CREATE INDEX channel_by_parent on channel (parent_id) where parent_id is not null;
+CREATE INDEX channel_event_by_message on channel_event (message_id);
 CREATE INDEX channel_member_by_participant on channel_member (participant_id);
 CREATE INDEX channel_read_cursor_by_channel on channel_read_cursor (channel_id);
+CREATE INDEX channel_seen_by_message on channel_seen (message_id);
 CREATE INDEX session_delivery_by_message on session_delivery (message_id);
-CREATE INDEX session_issue_input_by_session on session_issue_input (session_id) where session_id is not null;
+CREATE INDEX issue_input_by_session on issue_input (session_id) where session_id is not null;
 CREATE INDEX session_delivery_by_channel on session_delivery (channel_id) where channel_id is not null;
-CREATE INDEX cron_by_channel on cron (channel_id);
+CREATE INDEX issue_cron_by_channel on issue_cron (channel_id);
 CREATE INDEX connector_account_by_channel on connector_account (channel_id) where channel_id is not null;
 CREATE INDEX connector_inbound_by_message on connector_inbound (message_id) where message_id is not null;
 CREATE INDEX connector_outbox_by_message on connector_outbox (message_id);
@@ -641,7 +678,7 @@ select scope, position from session_delivery
 where payload_json::jsonb -> 'trigger' -> 'actor' ->> 'kind' = 'user'
   and envelope_id <> payload_json::jsonb -> 'trigger' ->> 'id';
 
-CREATE TABLE runtime_spend (
+CREATE TABLE agent_spend (
   day text NOT NULL,
   runtime text NOT NULL,
   cny double precision NOT NULL CHECK (cny >= 0 AND cny < 'Infinity'::double precision),

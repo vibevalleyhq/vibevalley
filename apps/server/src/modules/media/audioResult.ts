@@ -10,7 +10,7 @@ import { ApiError, BizCode, refuseIn } from "#/base/errors.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import { type PublicFetch, publicHttps } from "#/infra/publicHttp.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Attachment } from "#/modules/attachment/attachment.ts";
+import type { Attachment } from "#/platform/attachment/attachment.ts";
 
 import { audioResultMax, type StagedAudioResult } from "./input.ts";
 import { bodyChunks, inTime } from "./job.ts";

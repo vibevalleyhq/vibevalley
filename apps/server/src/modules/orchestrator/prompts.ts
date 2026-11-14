@@ -1,3 +1,5 @@
+import type * as T from "@vibevalley/protocol";
+
 /** Who an orchestrator other than the default one is, after the prompt every orchestrator shares. */
 export const identityNote = (name: string, persona: string) =>
   `\n\n你是助手「${name}」：农场里还有别的助手，用户把一些频道交给你照看，或者在私聊里直接找你。` + (persona.trim() ? "\n\n" + persona.trim() : "");
@@ -120,3 +122,10 @@ export const lineWords = {
 
 /** What a farm tool answers in an eval's replay when the case recorded nothing for the call it got (evals.ts). */
 export const noResult = "（评测里没有这个工具的结果）";
+
+/** A channel as the orchestrator's situation and the channel_list tool show it. */
+export const channelLine = (c: { readonly name: string; readonly default?: boolean; readonly description?: string; readonly repo?: string }) =>
+  "#" + c.name + (c.default === true ? "（默认）" : "") + (c.description ? "：" + c.description : "") + (c.repo ? "（默认仓库 " + c.repo + "）" : "");
+
+/** A note search hit as the orchestrator's recall and the pkm_search tool show it. */
+export const pkmHitLine = (h: T.PkmSearchHit) => `- 〔${h.block}〕《${h.pageTitle}》${h.path ? h.path + " › " : ""}${h.marker ? h.marker + " " : ""}${h.plain}`;

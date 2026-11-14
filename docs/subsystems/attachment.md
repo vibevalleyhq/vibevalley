@@ -1,6 +1,6 @@
 # 附件
 
-农场留下的一份文件（`Attachment`，`apps/server/src/modules/attachment/attachment.ts`）：按内容的 SHA-256 存一次，有名字、媒体类型和大小。它不属于哪个用它的地方：消息带着附件的 id（界面叫「附件」），媒体任务的结果和输入是附件，网页 Artifact 的每一稿是一个附件，素材库的一条是一个附件加它的来路（界面叫「素材」）。农场只有这一处存文件的字节。
+农场留下的一份文件（`Attachment`，`apps/server/src/platform/attachment/attachment.ts`）：按内容的 SHA-256 存一次，有名字、媒体类型和大小。它不属于哪个用它的地方：消息带着附件的 id（界面叫「附件」），媒体任务的结果和输入是附件，网页 Artifact 的每一稿是一个附件，素材库的一条是一个附件加它的来路（界面叫「素材」）。农场只有这一处存文件的字节。
 
 ## 管什么，不管什么
 
@@ -14,8 +14,8 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/modules/attachment/attachment.ts` | 服务 `Attachment`：`attach`（上传）、`keep`（这里做出来的字节）、`keepStaged`（写在 `staging` 下、写的人已算好哈希的大文件）、`get`、`of`（一组 id 的附件，缺一个就是 Missing）、`pathOf` |
-| `apps/server/src/modules/attachment/storage.ts` | 模块内部的本机字节存储（`makeStorage`）：按键原子写入（`put`、`putStream`）、`scratch` 暂存与 `adopt` 收纳、流与本机路径读取 |
+| `apps/server/src/platform/attachment/attachment.ts` | 服务 `Attachment`：`attach`（上传）、`keep`（这里做出来的字节）、`keepStaged`（写在 `staging` 下、写的人已算好哈希的大文件）、`get`、`of`（一组 id 的附件，缺一个就是 Missing）、`pathOf` |
+| `apps/server/src/platform/attachment/storage.ts` | 模块内部的本机字节存储（`makeStorage`）：按键原子写入（`put`、`putStream`）、`scratch` 暂存与 `adopt` 收纳、流与本机路径读取 |
 | `apps/server/src/gateway/http/handlers/attachment.ts`、`apps/server/src/gateway/http/api.ts` | `attachment.create`；`GET /api/v1/attachment/<id>` |
 | `packages/protocol/src/attachment/` | `Attachment`、`AttachmentUpload`、`attachmentPath`、`attachmentMax` |
 | `apps/server/db/queries/attachment.sql` | 表 `attachment` 的查询 |
@@ -46,6 +46,6 @@
 
 ## 怎么验证
 
-- `apps/server/src/modules/attachment/storage.test.ts`：同一个键写两次只有一份，读回的字节和类型，删除，流式写入整份发布，取消的写入在键下和暂存里都不留东西。
+- `apps/server/src/platform/attachment/storage.test.ts`：同一个键写两次只有一份，读回的字节和类型，删除，流式写入整份发布，取消的写入在键下和暂存里都不留东西。
 - `apps/server/src/gateway/http/attachment.test.ts`：读回的类型、`inline` 与下载、沙箱头、不存在和越界的 id、超限拒绝。
-- `apps/server/src/modules/channel/channel.test.ts`、`apps/server/src/modules/media/inputs.test.ts`、`apps/server/src/modules/artifact/artifact.test.ts`：带附件的消息、同一字节去重、经附件写进存储的媒体输入和网页稿。
+- `apps/server/src/modules/watch/watch.test.ts`、`apps/server/src/modules/media/inputs.test.ts`、`apps/server/src/modules/artifact/artifact.test.ts`：带附件的消息、同一字节去重、经附件写进存储的媒体输入和网页稿。

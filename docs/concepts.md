@@ -64,7 +64,7 @@ Host（~/.vibevalley：密钥、农机、全局模板）
 | Artifact | `Artifact`（正文 `blocks` 或 `html`） | 留下来要人看的一篇：一起一块一块写的块 Artifact，或交上来一稿一稿换的网页 |
 | 笔记 | `Pkm`（`PkmPage`、`PkmBlock`） | 用户的大纲知识库：按 PARA 文件夹与日记组织的 Markdown 页面 |
 | 定时任务 | `Cron` | 一张工单的一种触发：一个定时任务一张工单，派给一个档案或助手，每次到点是它的一次 run |
-| Inbox | `InboxItem` | 要你处理的事，从核心状态现算 |
+| Inbox | `InboxItem` | 要你处理的事，从核心状态现算（[观察层的收件箱](docs/subsystems/watch.md#收件箱)） |
 | 记忆 | `Memory` | 一个档案记得的事 |
 | 技能 | `Skill` | 档案能带的技能 |
 

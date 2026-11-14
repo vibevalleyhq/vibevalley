@@ -3,6 +3,7 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { newId } from "#/base/ids.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
+import type { Issue } from "#/modules/issue/issue.ts";
 import { Caller } from "#/modules/session/host.ts";
 import type { Session } from "#/modules/session/session.ts";
 
@@ -10,7 +11,8 @@ import type { Answer } from "./openai.ts";
 import { orchestratorModel } from "./situation.ts";
 
 /** The live API/phone responses, from opening a port to dropping it once its words are read. */
-export const makeResponses = (sessions: Session, channel: Channel, clock: Clock) => {
+/** A brief is recorded with the sessions and routed by the issues' intake, to the orchestrator it names. */
+export const makeResponses = (sessions: Pick<Session, "recordTrigger">, issues: Pick<Issue, "route">, channel: Channel, clock: Clock) => {
   const responses = new Map<string, Caller>();
   let latestResponse = "";
 
@@ -57,10 +59,10 @@ export const makeResponses = (sessions: Session, channel: Channel, clock: Clock)
         const response = open(true);
         try {
           try {
-            await channel.user({
+            await channel.say({
               source: "voice",
               text,
-              envelope: newId(),
+              sendKey: newId(),
               responsePort: response.id,
               voiceMode: on === "phone" ? "conversation" : "api",
             });
@@ -82,7 +84,7 @@ export const makeResponses = (sessions: Session, channel: Channel, clock: Clock)
     const response = open(false);
     try {
       try {
-        await sessions.receive({
+        const trigger = await sessions.recordTrigger({
           source: "workbench",
           key: newId(),
           actor: { kind: "system", id: "system" },
@@ -93,6 +95,7 @@ export const makeResponses = (sessions: Session, channel: Channel, clock: Clock)
           meta: { ingressRecipient: defaultOrchestrator, responsePort: response.id },
           at: clock.now(),
         });
+        await issues.route(trigger);
       } catch (e) {
         // Not taken in: the reader below gets the failure as NotAnswered.
         response.caller.fail(e);

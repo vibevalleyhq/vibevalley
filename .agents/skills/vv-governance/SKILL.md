@@ -31,7 +31,7 @@ agent 照着已有的代码抄、走最短的路，写在文字里的规矩会�
 
 | 病 | 问 | 怎么查 |
 |---|---|---|
-| 局部缝合 | 同一段逻辑是不是抄了第二份？加一个渠道、工具、runtime 时，有没有把超时、重试、清理又写一遍？ | 搜这段逻辑的关键调用；看扩展点（`apps/server/src/gateway/connector/` 下各聊天软件的 adapter、`apps/server/src/modules/tool/`）有没有自己的 `AbortSignal.timeout`、`sleep`、重试循环 |
+| 局部缝合 | 同一段逻辑是不是抄了第二份？加一个渠道、工具、runtime 时，有没有把超时、重试、清理又写一遍？ | 搜这段逻辑的关键调用；看扩展点（`apps/server/src/gateway/connector/` 下各聊天软件的 adapter、`apps/server/src/gateway/tool/`）有没有自己的 `AbortSignal.timeout`、`sleep`、重试循环 |
 | 只加不删 | 换了新写法，旧的删了没有？ | `vp run deadcode`；搜旧函数名；内部不留兼容：不留旧路、不写兜底 |
 | 绕开约束 | 有没有 `as`、`as unknown as`、`!`、关 lint 的注释、空的 `catch`、`.catch(() => undefined)`？测试的断言是不是改松了？ | `vp run health:verify`（逃生口的棘轮）；diff 里的测试改动；`regression: ` 开头的测试被动了要在 `## Regression` 里点名 |
 | 温室假设 | 循环里有没有逐个查库、逐个起 git？流是不是假设一次到一整行？写盘是不是每来一点就写一次？ | 读循环体；`docs/subsystems/foundation.md`「贵的东西归拥有它的模块管」；测试里有没有大一点的数据 |

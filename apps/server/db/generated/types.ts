@@ -8,6 +8,12 @@ export function rowOf<A>(query: string, schema: z.ZodType<A>, row: unknown): A {
   return got.data
 }
 
+export const Words_agent_todo_executor = z.enum(["self","subagent"])
+export type Words_agent_todo_executor = z.infer<typeof Words_agent_todo_executor>
+
+export const Words_agent_todo_state = z.enum(["waiting","working","done","failed","skipped"])
+export type Words_agent_todo_state = z.infer<typeof Words_agent_todo_state>
+
 export const Words_artifact_block_revision_kind = z.enum(["normal","conflict"])
 export type Words_artifact_block_revision_kind = z.infer<typeof Words_artifact_block_revision_kind>
 
@@ -19,6 +25,9 @@ export type Words_artifact_body = z.infer<typeof Words_artifact_body>
 
 export const Words_artifact_suggestion_status = z.enum(["open","accepted","rejected"])
 export type Words_artifact_suggestion_status = z.infer<typeof Words_artifact_suggestion_status>
+
+export const Words_channel_event_kind = z.enum(["posted","removed"])
+export type Words_channel_event_kind = z.infer<typeof Words_channel_event_kind>
 
 export const Words_channel_member_reason = z.enum(["user","replied","mentioned","manual"])
 export type Words_channel_member_reason = z.infer<typeof Words_channel_member_reason>
@@ -35,9 +44,6 @@ export type Words_channel_notify = z.infer<typeof Words_channel_notify>
 export const Words_channel_participant_kind = z.enum(["user","agent","system"])
 export type Words_channel_participant_kind = z.infer<typeof Words_channel_participant_kind>
 
-export const Words_channel_participant_role = z.enum(["orchestrator","worker"])
-export type Words_channel_participant_role = z.infer<typeof Words_channel_participant_role>
-
 export const Words_channel_subject_kind = z.enum(["issue","talk"])
 export type Words_channel_subject_kind = z.infer<typeof Words_channel_subject_kind>
 
@@ -47,17 +53,20 @@ export type Words_channel_type = z.infer<typeof Words_channel_type>
 export const Words_connector_account_connector = z.enum(["weixin","feishu","qq"])
 export type Words_connector_account_connector = z.infer<typeof Words_connector_account_connector>
 
-export const Words_cron_set_by = z.enum(["user","agent","system"])
-export type Words_cron_set_by = z.infer<typeof Words_cron_set_by>
-
 export const Words_issue_canceled = z.enum(["dismissed","lost"])
 export type Words_issue_canceled = z.infer<typeof Words_issue_canceled>
+
+export const Words_issue_cron_set_by = z.enum(["user","agent","system"])
+export type Words_issue_cron_set_by = z.infer<typeof Words_issue_cron_set_by>
 
 export const Words_issue_deliver = z.enum(["change","branch","answer","pull_request"])
 export type Words_issue_deliver = z.infer<typeof Words_issue_deliver>
 
 export const Words_issue_delivered = z.enum(["merged","merged_into_parent","pull_request","submitted","kept","none"])
 export type Words_issue_delivered = z.infer<typeof Words_issue_delivered>
+
+export const Words_issue_input_state = z.enum(["held","forwarded","returned"])
+export type Words_issue_input_state = z.infer<typeof Words_issue_input_state>
 
 export const Words_issue_mandate_strength = z.enum(["explicit","inferred"])
 export type Words_issue_mandate_strength = z.infer<typeof Words_issue_mandate_strength>
@@ -98,12 +107,6 @@ export type Words_memory_kind = z.infer<typeof Words_memory_kind>
 export const Words_pkm_comment_status = z.enum(["open","suggested","accepted","rejected"])
 export type Words_pkm_comment_status = z.infer<typeof Words_pkm_comment_status>
 
-export const Words_runtime_todo_executor = z.enum(["self","subagent"])
-export type Words_runtime_todo_executor = z.infer<typeof Words_runtime_todo_executor>
-
-export const Words_runtime_todo_state = z.enum(["waiting","working","done","failed","skipped"])
-export type Words_runtime_todo_state = z.infer<typeof Words_runtime_todo_state>
-
 export const Words_session_closed = z.enum(["merged","completed","dismissed","lost"])
 export type Words_session_closed = z.infer<typeof Words_session_closed>
 
@@ -118,9 +121,6 @@ export type Words_session_delivery_state = z.infer<typeof Words_session_delivery
 
 export const Words_session_delivery_urgency = z.enum(["interrupt","steer","queue","digest"])
 export type Words_session_delivery_urgency = z.infer<typeof Words_session_delivery_urgency>
-
-export const Words_session_issue_input_state = z.enum(["held","forwarded","returned"])
-export type Words_session_issue_input_state = z.infer<typeof Words_session_issue_input_state>
 
 export const Words_session_role = z.enum(["orchestrator","worker"])
 export type Words_session_role = z.infer<typeof Words_session_role>

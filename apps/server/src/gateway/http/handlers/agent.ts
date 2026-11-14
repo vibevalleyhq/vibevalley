@@ -1,10 +1,9 @@
 import type { AgentHandlers } from "@vibevalley/protocol/api";
 
 import type { Agent } from "#/modules/agent/agent.ts";
-import type { Runtime } from "#/modules/runtime/runtime.ts";
 
-export function agentHandlers(deps: { readonly agent: Agent; readonly runtime: Runtime }): AgentHandlers {
-  const { agent: agents, runtime: runtimes } = deps;
+export function agentHandlers(deps: { readonly agent: Agent }): AgentHandlers {
+  const { agent: agents } = deps;
   return {
     "agent.list": async () => agents.all(),
     "agent.create": (body) => agents.create(body),
@@ -24,7 +23,7 @@ export function agentHandlers(deps: { readonly agent: Agent; readonly runtime: R
     "skill.previewDelete": ({ id }) => agents.previewRemoveSkill(id),
     "agent.validate": async (body) => {
       const out = [];
-      for (const agent of body.agents) out.push({ id: agent.id, problems: await runtimes.problemsOf(agent) });
+      for (const agent of body.agents) out.push({ id: agent.id, problems: await agents.problemsOf(agent) });
       return out;
     },
   };

@@ -64,7 +64,6 @@ for (const submittedReport of [false, true]) {
     try {
       const issues = fw.issue;
       const sessions = fw.inside;
-      const mailbox = fw.inside;
       const sql = sqlOf(fw.db);
       await fw.agent.save(lab());
       git(config.workRoot, "init", "--bare", bare);
@@ -100,7 +99,7 @@ for (const submittedReport of [false, true]) {
         at: 1,
         meta: { kind: "ci" as const, failed: true },
       });
-      const ci = (await mailbox.accept(event("fix-first-ci")))!;
+      const ci = (await fw.intake.receive(event("fix-first-ci"))).trigger!;
       await until(() => inputs.length === 2, "CI automatically woke the helper");
       expect(inputs[1]).toContain("fix-first-ci");
       await await_(
@@ -112,8 +111,8 @@ for (const submittedReport of [false, true]) {
       reviewed.resolve();
       await until(() => sessions.sessionOf(id)?.phase._tag === "done", "explicit handoff");
       expect((await issues.get(issue.id)).stage.state).toBe("reviewing");
-      const held = (await mailbox.accept(event("after-handoff-ci")))!;
-      expect((await sql<{ state: string }>`select state from session_issue_input where trigger_id = ${held.id}`)[0]?.state).toBe("held");
+      const held = (await fw.intake.receive(event("after-handoff-ci"))).trigger!;
+      expect((await sql<{ state: string }>`select state from issue_input where trigger_id = ${held.id}`)[0]?.state).toBe("held");
       expect(inputs).toHaveLength(2);
     } finally {
       first.resolve();

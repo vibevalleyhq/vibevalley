@@ -3,10 +3,10 @@ import { expect, test } from "vite-plus/test";
 import { BizCode } from "@vibevalley/protocol/api";
 
 import { keptLog } from "#/infra/log.ts";
-import { makeAttachment } from "#/modules/attachment/attachment.ts";
 import { png } from "#/modules/media/testdata/png.ts";
-import { makeProvider } from "#/modules/provider/provider.ts";
-import { makeSetting } from "#/modules/setting/setting.ts";
+import { makeAttachment } from "#/platform/attachment/attachment.ts";
+import { makeProvider } from "#/platform/provider/provider.ts";
+import { makeSetting } from "#/platform/setting/setting.ts";
 import { testConfig, testDb } from "#/testing/layers.ts";
 import * as q from "#db/media_remote_file.sql.ts";
 

@@ -82,6 +82,3 @@ returning session_id;
 -- Who a message is still waiting to be handed to.
 select session_id from session_delivery where message_id = sqlc.arg(message_id) and state in ('pending', 'handed');
 
--- name: LastUserRoutes :many
--- bound: one user epoch per routing scope, including returned deliveries.
-select scope, max(position)::int as position from session_user_route group by scope;

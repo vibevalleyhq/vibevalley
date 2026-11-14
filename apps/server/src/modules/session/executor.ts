@@ -13,8 +13,9 @@ import { BizCode, messageOf, refuseIn } from "#/base/errors.ts";
 import { reposDir, type ServerConfig } from "#/infra/config.ts";
 import type { Logger } from "#/infra/log.ts";
 import { gauge } from "#/infra/metrics.ts";
-import { loopbackEnvironment, observeToolConnections } from "#/modules/runtime/access.ts";
-import { probeInstallation, type Runtime } from "#/modules/runtime/runtime.ts";
+import { loopbackEnvironment, observeToolConnections } from "#/modules/agent/access.ts";
+import type { Agent } from "#/modules/agent/agent.ts";
+import { probeInstallation } from "#/modules/agent/runtime.ts";
 
 const refused = refuseIn(BizCode.SessionRefused);
 
@@ -152,7 +153,7 @@ const view = (allocation: Allocation): Execution => {
 
 export interface ExecutorDeps {
   readonly config: ServerConfig;
-  readonly runtime: Runtime;
+  readonly agent: Agent;
   readonly clock: Clock;
   readonly log: Logger;
 }
@@ -165,7 +166,7 @@ export function makeExecutor(deps: ExecutorDeps): Executions & { readonly closeA
     NO_PROXY: process.env.NO_PROXY ?? "",
     no_proxy: process.env.no_proxy ?? "",
   };
-  const runtimes = deps.runtime;
+  const runtimes = deps.agent;
   const tasks = new TaskGroup({ name: "executor", onError: (task, e) => log.warn(`${task} failed`, e) });
   const allocations = new Map<string, Allocation>();
 
@@ -276,7 +277,7 @@ export function makeExecutor(deps: ExecutorDeps): Executions & { readonly closeA
       const id = owner.id;
       const prior = allocations.get(id);
       if (prior) return { refused: failureOf(prior.phase) ?? t("server.session.life.notReturned"), retained: true };
-      let r: Awaited<ReturnType<Runtime["resolve"]>>;
+      let r: Awaited<ReturnType<Agent["resolve"]>>;
       try {
         r = await runtimes.resolve(agent);
       } catch (e) {

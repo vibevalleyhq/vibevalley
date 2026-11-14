@@ -8,12 +8,12 @@ import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import { issueBranch, type Repo } from "#/modules/repo/repo.ts";
 import { RepoError } from "#/modules/repo/workplace.ts";
-import type { Runtime } from "#/modules/runtime/runtime.ts";
 import { conflictBrief } from "#/modules/session/briefing.ts";
 import type { Session } from "#/modules/session/session.ts";
 
 import { answerCureWords, cureWords, findingsOf, resumeWords } from "./brief.ts";
 import type { IssueDispatch } from "./dispatch.ts";
+import type { IssueLanding } from "./landing.ts";
 import type { IssueLifecycle } from "./lifecycle.ts";
 import { type Move, nextSteps, statusMove } from "./moves.ts";
 import { nullText } from "./rows.ts";
@@ -29,9 +29,9 @@ export interface StatusOptions {
 export interface SettleDeps {
   readonly agent: Agent;
   readonly repo: Repo;
-  readonly runtime: Runtime;
   readonly session: Session;
   readonly clock: Time;
+  readonly landing: Pick<IssueLanding, "changesOf">;
 }
 
 /** A status move settled before anything changes: what it is, the words it goes with, who takes the issue on. */
@@ -46,8 +46,9 @@ export interface SettledMove {
 }
 
 export function issueSettling(r: IssueLifecycle, d: Pick<IssueDispatch, "readyOf">, deps: SettleDeps) {
-  const { agent: store, repo: repos, runtime: runtimes, session: sessions, clock } = deps;
-  const { unsent, changesOf } = r;
+  const { agent: store, repo: repos, session: sessions, clock } = deps;
+  const { changesOf } = deps.landing;
+  const { unsent } = r;
   const { readyOf } = d;
   /** The commits on the issue's branch that the main branch does not have. */
   const commitsOf = async (issue: T.Issue) => {
@@ -68,7 +69,7 @@ export function issueSettling(r: IssueLifecycle, d: Pick<IssueDispatch, "readyOf
     if (to !== "todo") throw refused(t("server.issue.handOverOnTodo"));
     if (issue.status === "in_progress" && issue.stage.state === "working") throw refused(t("server.issue.stopFirst", { n: issue.number }));
     if (!a.enabled) throw refused(t("server.issue.disabled", { name: a.name }));
-    for (const i of await runtimes.problemsOf(a)) if (i.level === "error") throw refused(t("server.issue.cannotSend", { name: a.name, why: i.text }));
+    for (const i of await store.problemsOf(a)) if (i.level === "error") throw refused(t("server.issue.cannotSend", { name: a.name, why: i.text }));
     return a;
   };
 

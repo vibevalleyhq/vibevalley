@@ -64,7 +64,7 @@ describe("a refined issue", () => {
     const messages = await chat.history(thread);
     expect(messages.filter((m) => m.actor.kind === "user").map((m) => m.text)).toEqual(["只讨论桌面端，不做移动端", "看板拖卡", "用 8797"]);
     expect(messages.some((m) => m.text.includes("看板拖卡改用 8797"))).toBe(true);
-    const runs = await sessions.issueRuns(issue.id);
+    const runs = await fw.intake.runsOf(issue.id);
     expect(runs).toHaveLength(2);
     expect(runs.every((run) => run.triggeredBy.kind === "refine")).toBe(true);
     const latest = runs.at(-1);
@@ -105,7 +105,7 @@ describe("a refined issue", () => {
     expect([issue.status, sessionIdsOf(issue).length]).toEqual(["backlog", 0]);
     await until(() => !drafting(core), "the refiner left");
     await refinementLeftNothing(f.config.workRoot, issue);
-    const runs = await sessions.issueRuns(issue.id);
+    const runs = await fw.intake.runsOf(issue.id);
     expect(runs.map((r) => r.triggeredBy.kind)).toEqual(["refine"]);
     const inState = () => core.state().issues.find((x) => x.id === issue.id)!;
     await until(() => inState().refining === undefined && inState().moves.includes("todo") && inState().criteria.length === 1, "the core state has its draft");

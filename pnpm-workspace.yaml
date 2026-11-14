@@ -121,7 +121,7 @@ peerDependencyRules:
     vite: "*"
     vitest: "*"
     # oar's own pi-durable runtime is written against 1.4 and is not used: the server's runtime/durable.ts runs
-    # pi-durable 1.5 itself (apps/server/src/modules/runtime/durable.ts). Drop these once oar's peer reaches 1.5.
+    # pi-durable 1.5 itself (apps/server/src/modules/agent/durable.ts). Drop these once oar's peer reaches 1.5.
     "@botiverse/oar>@earendil-works/pi-durable": "1.5.2"
     "@botiverse/oar>@earendil-works/chord": "1.5.2"
 

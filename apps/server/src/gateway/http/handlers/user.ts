@@ -2,7 +2,7 @@ import type { UserHandlers } from "@vibevalley/protocol/api";
 
 import { requestHeaders } from "#/gateway/http/api.ts";
 import { deviceHeader, fromHeader, outsideHeader } from "#/gateway/lan/lan.ts";
-import type { Caller, User } from "#/modules/user/user.ts";
+import type { Caller, User } from "#/platform/user/user.ts";
 
 // Only the gate says a request came from outside, and which device: it drops both headers from what it is handed.
 const caller = (): Caller => {

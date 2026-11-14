@@ -54,13 +54,13 @@ describe("a talk with a helper profile", () => {
     const sql = sqlOf(fw.db);
     const { in: saidIn } = fw.said;
     await fw.agent.save(lab());
-    const dm = await channels.direct("lab");
-    const direct2 = await channels.direct("lab");
+    const dm = await fw.watch.direct("lab");
+    const direct2 = await fw.watch.direct("lab");
     expect(direct2).toBe(dm);
     const channel = channelOf(core.state().chat, dm);
     expect([channel?.type, channel?.peer, channel?.subjectKind, channel?.subjectId]).toEqual(["direct", "profile:lab", null, undefined]);
     const answers = () => saidIn(dm).filter((m) => m.kind === "report").length;
-    await channels.post({ _tag: "User", text: "你好，记得这段对话", channel: dm, sendKey: "" });
+    await channels.say({ text: "你好，记得这段对话", channel: dm, sendKey: "" });
     await until(() => answers() === 1, "the first answer");
     const first = sessions.hired().find((s) => s.channel === dm);
     expect(first).toMatchObject({ agent: "lab", channel: dm });
@@ -69,7 +69,7 @@ describe("a talk with a helper profile", () => {
     clock.adjust(10 * 60_000);
     await until(() => disposed === 1, "the idle execution suspended");
     expect(sessions.hired().find((s) => s.channel === dm)?.id).toBe(first?.id);
-    await channels.post({ _tag: "User", text: "接着聊", channel: dm, sendKey: "" });
+    await channels.say({ text: "接着聊", channel: dm, sendKey: "" });
     await until(() => answers() === 2, "the resumed answer");
     expect(
       sessions
@@ -120,10 +120,10 @@ describe("a talk with a helper profile", () => {
     const sql = sqlOf(fw.db);
     const said = fw.said.in;
     await fw.agent.save(lab());
-    const dm = await channels.direct("lab");
-    await channels.post({ _tag: "User", text: "第一句", channel: dm, sendKey: "" });
+    const dm = await fw.watch.direct("lab");
+    await channels.say({ text: "第一句", channel: dm, sendKey: "" });
     await opening.promise;
-    await channels.post({ _tag: "User", text: "启动中的第二句", channel: dm, sendKey: "" });
+    await channels.say({ text: "启动中的第二句", channel: dm, sendKey: "" });
     opened.resolve();
     await until(() => sessions.hired().some((s) => s.channel === dm), "the context registered");
     releaseFirst.resolve();
@@ -169,8 +169,8 @@ describe("a talk with a helper profile", () => {
       const sessions = fw.inside;
       const said = fw.said.in;
       await fw.agent.save(lab());
-      const dm = await channels.direct("lab");
-      await channels.post({ _tag: "User", text: "重启之前", channel: dm, sendKey: "" });
+      const dm = await fw.watch.direct("lab");
+      await channels.say({ text: "重启之前", channel: dm, sendKey: "" });
       await until(() => said(dm).some((m) => m.kind === "report"), "the first report");
       const sql = sqlOf(fw.db);
       await waitFor(
@@ -190,12 +190,12 @@ describe("a talk with a helper profile", () => {
       const channels = fw.channel;
       const sessions = fw.inside;
       const said = fw.said.in;
-      await channels.boot();
-      const direct2 = await channels.direct("lab");
+      await fw.watch.boot();
+      const direct2 = await fw.watch.direct("lab");
       expect(direct2).toBe(first.dm);
       expect(sessions.hired().find((s) => s.channel === first.dm)?.id).toBe(first.session);
       expect(fw.core.state().plays?.[first.session]?.station).toBe(0);
-      await channels.post({ _tag: "User", text: "重启之后", channel: first.dm, sendKey: "" });
+      await channels.say({ text: "重启之后", channel: first.dm, sendKey: "" });
       await until(() => said(first.dm).some((m) => m.kind === "report"), "the answer after restart");
       expect(resumes[1]).toBeTruthy();
       expect(inputs[1]).toContain("重启之后");
@@ -228,13 +228,13 @@ describe("a talk with a helper profile", () => {
     const sql = sqlOf(fw.db);
     await agents.save(lab());
     await agents.save({ ...lab(), id: "lab2", name: "Lab Two" });
-    const existing = await channels.direct("lab");
-    const starting = await channels.direct("lab2");
-    await channels.post({ _tag: "User", text: "B first", channel: existing, sendKey: "" });
+    const existing = await fw.watch.direct("lab");
+    const starting = await fw.watch.direct("lab2");
+    await channels.say({ text: "B first", channel: existing, sendKey: "" });
     await until(() => said(existing).filter((m) => m.kind === "report").length === 1, "the existing conversation ready");
-    await channels.post({ _tag: "User", text: "A first", channel: starting, sendKey: "" });
+    await channels.say({ text: "A first", channel: starting, sendKey: "" });
     await opening.promise;
-    const delivery = channels.post({ _tag: "User", text: "B next", channel: existing, sendKey: "" });
+    const delivery = channels.say({ text: "B next", channel: existing, sendKey: "" });
     await until(() => said(existing).some((m) => m.text === "B next"), "the followup committed under the channel lock");
     releaseOpening.resolve();
     await within(delivery, 3_000, "the followup delivery");

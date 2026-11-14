@@ -17,8 +17,8 @@
 | 位置 | 职责 |
 |---|---|
 | `apps/server/src/infra/config.ts` | `ServerConfig`、`defaults`、`loadConfig`、`serverAddress`、`dbDir`、`reposDir`、`worktreesDir`、`pkmDir` |
-| `apps/server/src/modules/provider/provider.ts` | [AI 服务](docs/subsystems/provider.md)：连接与用途规则、模型目录；私有配置仍由 Setting 保存 |
-| `apps/server/src/modules/setting/` | `setting.ts`、`provider.ts`（`bindingOf`）、`readiness.ts`、`memorySources.ts`、`voice.ts` |
+| `apps/server/src/platform/provider/provider.ts` | [AI 服务](docs/subsystems/provider.md)：连接与用途规则、模型目录；私有配置仍由 Setting 保存 |
+| `apps/server/src/platform/setting/` | `setting.ts`、`provider.ts`（`bindingOf`）、`readiness.ts`、`memorySources.ts`、`voice.ts` |
 | `apps/server/src/base/redact.ts` | 日志与出站文本密钥脱敏（`redact`、`redactOutput`） |
 | `apps/web/src/features/setting/` | 工作台设置页（`SettingsPage.tsx`、`SettingsForm.tsx`、`Readiness.tsx`） |
 
@@ -77,7 +77,7 @@
 ## 和谁打交道
 
 - **全部服务端模块**：注入 `ServerConfig` 读取静态参数。
-- **助手、农机、语音与记性（`orchestrator`、`runtime`、`voice`、`memory`）**：注入 `Setting` 实时获取最新密钥、语音与记忆来源。
+- **助手、农机、语音与记性（`orchestrator`、`agent`、`voice`、`memory`）**：注入 `Setting` 实时获取最新密钥、语音与记忆来源。
 
 ### 供应商配置
 
@@ -91,5 +91,5 @@ Setting 在 `settings.json.providers` 保存供应商私有配置，普通设置
 
 ## 怎么验证
 
-- `apps/server/src/infra/config.test.ts`、`apps/server/src/modules/setting/*.test.ts`：配置优先级、非法值拦截、密钥掩码测试。
+- `apps/server/src/infra/config.test.ts`、`apps/server/src/platform/setting/*.test.ts`：配置优先级、非法值拦截、密钥掩码测试。
 - `apps/server/src/base/base.test.ts`、`apps/web/test/settings.spec.ts`：密钥脱敏与设置页端到端测试。

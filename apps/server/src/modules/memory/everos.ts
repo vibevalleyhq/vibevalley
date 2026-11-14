@@ -9,7 +9,7 @@ import type { MemoryKind } from "@vibevalley/protocol";
 import { clip } from "#/base/clip.ts";
 import { newId } from "#/base/ids.ts";
 import { redact, type RedactedString, redactedHead } from "#/base/redact.ts";
-import type { MemorySourceConfig } from "#/modules/setting/memorySources.ts";
+import type { MemorySourceConfig } from "#/platform/setting/memorySources.ts";
 
 import { everosWords, recallWords } from "./prompts.ts";
 import { recallCount, type MemoryScope } from "./recall.ts";

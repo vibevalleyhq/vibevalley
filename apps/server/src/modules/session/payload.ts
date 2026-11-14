@@ -77,13 +77,6 @@ export interface TriggerResource {
   readonly payload: { readonly text: string; readonly data: unknown };
 }
 
-export interface KnownGitHubEvent {
-  readonly key: string;
-  readonly routed: boolean;
-  readonly botRoundKey?: string;
-  readonly botRound?: number;
-}
-
 export const deliveryScope = (channel: string, issue?: string) => (issue ? `issue:${issue}` : `channel:${channel}`);
 
 export function triggerPayload(trigger: Trigger, issue?: string, note?: string): DeliveryPayload {

@@ -200,7 +200,7 @@ const echoing = (w: World) => {
     for await (const n of news)
       if (n._tag === "Handed")
         for (const message of n.messages)
-          await w.channel.post({ _tag: "Run", from: defaultOrchestrator, channel: n.channel, text: "收到：**" + message.text + "**", run: "" });
+          await w.channel.post({ from: defaultOrchestrator, channel: n.channel, text: "收到：**" + message.text + "**", run: "" });
   })();
   return async () => {
     news.close();
@@ -324,7 +324,7 @@ describe("the chat apps", () => {
     const chat = f.world.channel;
     await weixinConnected(f, script);
     const channel = chat.defaultChannel();
-    await chat.post({ _tag: "Run", from: defaultOrchestrator, channel: channel, text: "已经接下来了", run: "" });
+    await chat.post({ from: defaultOrchestrator, channel: channel, text: "已经接下来了", run: "" });
     await waitFor(statusOf(f, "weixin"), (status) => status.pending === 1, "the handoff waiting outside");
     const [message] = await chat.history(channel);
     await chat.markRead(channel, message!.number);
@@ -365,7 +365,7 @@ describe("the chat apps", () => {
     expect(setChannelFailure).toMatchObject({
       reason: expect.stringContaining("没有叫"),
     });
-    await chat.post({ _tag: "Run", from: defaultOrchestrator, channel: chat.defaultChannel(), text: "默认频道里的话", run: "" });
+    await chat.post({ from: defaultOrchestrator, channel: chat.defaultChannel(), text: "默认频道里的话", run: "" });
     script.weixinIn.push(wx(user, "打卡页怎么样了", "ctx-c"));
     expect(await nth(script, "weixin", 0, "the answer in WeChat")).toEqual({
       app: "weixin",
@@ -616,8 +616,8 @@ describe("the chat apps", () => {
         await using f = await farm(first, config);
         const chat = f.world.channel;
         await weixinConnected(f, first);
-        const parent = (await chat.post({ _tag: "User", text: "这个话题", sendKey: "" })).message;
-        const written = await chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "旧的答复", target: `#general:${parent.number}`, anyway: true });
+        const parent = (await chat.say({ text: "这个话题", sendKey: "" })).message;
+        const written = await chat.speak({ from: defaultOrchestrator, text: "旧的答复", target: `#general:${parent.number}`, anyway: true });
         thread = written.message!.channel;
         await nth(first, "weixin", 0, "the original answer sent");
         await statusIs(f, "weixin", (s) => s.pending === 0, "the external identity saved");
@@ -628,7 +628,7 @@ describe("the chat apps", () => {
         );
         const ext = sent[0]?.["ext_id"];
         answered = typeof ext === "string" ? ext : "";
-        for (let i = 0; i < 301; i++) await chat.post({ _tag: "Notice", channel: chat.defaultChannel(), text: `动静 ${i}`, code: "history" });
+        for (let i = 0; i < 301; i++) await chat.notice({ channel: chat.defaultChannel(), text: `动静 ${i}`, code: "history" });
         await reply(f, first, "继续这个话题", 1);
       }
       const second = new Script();
@@ -650,17 +650,15 @@ describe("the chat apps", () => {
         await weixinConnected(f, first);
         const linked = await chat.openChannel("linked", "", "");
         await f.connector.setChannel("weixin", "linked");
-        const parent = (await chat.post({ _tag: "User", text: "旧话题", channel: linked.id, sendKey: "" })).message;
-        thread = (await chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "旧的答复", target: `#linked:${parent.number}`, anyway: true })).message!
-          .channel;
+        const parent = (await chat.say({ text: "旧话题", channel: linked.id, sendKey: "" })).message;
+        thread = (await chat.speak({ from: defaultOrchestrator, text: "旧的答复", target: `#linked:${parent.number}`, anyway: true })).message!.channel;
         await nth(first, "weixin", 0, "the old answer sent");
         await statusIs(f, "weixin", (s) => s.pending === 0, "the old answer saved");
         for (let i = 0; i < 100; i++) {
-          const other = (await chat.post({ _tag: "User", text: `其他话题 ${i}`, sendKey: "" })).message;
-          const fresh = (await chat.post({ _tag: "Agent", from: defaultOrchestrator, text: "其他答复", target: `#general:${other.number}`, anyway: true }))
-            .message!.channel;
-          await chat.post({ _tag: "Notice", channel: fresh, text: "第一条动静", code: "history" });
-          await chat.post({ _tag: "Notice", channel: fresh, text: "第二条动静", code: "history" });
+          const other = (await chat.say({ text: `其他话题 ${i}`, sendKey: "" })).message;
+          const fresh = (await chat.speak({ from: defaultOrchestrator, text: "其他答复", target: `#general:${other.number}`, anyway: true })).message!.channel;
+          await chat.notice({ channel: fresh, text: "第一条动静", code: "history" });
+          await chat.notice({ channel: fresh, text: "第二条动静", code: "history" });
         }
         expect(chat.now()?.channels.some((c) => c.id === thread)).toBe(false);
       }
@@ -669,7 +667,7 @@ describe("the chat apps", () => {
       const chat = f.world.channel;
       expect(chat.now()?.channels.some((c) => c.id === thread)).toBe(false);
       await qqPaired(f, second);
-      await chat.post({ _tag: "Run", from: defaultOrchestrator, channel: thread, text: "在旧串里继续答复", run: "" });
+      await chat.post({ from: defaultOrchestrator, channel: thread, text: "在旧串里继续答复", run: "" });
       expect((await nth(second, "weixin", 0, "the old thread's new answer sent")).text).toBe("【助手 · 在工单串里】\n在旧串里继续答复");
       expect(second.by("weixin")).toHaveLength(1);
       expect(second.by("qq").map((m) => m.text)).toEqual(["配对好了：以后在这里说的话，就是你在默认频道里说的。"]);
@@ -730,7 +728,7 @@ describe("the chat apps", () => {
     await reaches(f, "qq", "pairing");
     await sql.query(`select 1`);
     await refuse(sql, "fail_outbox", "before update on connector_outbox", "", "disk failure");
-    const { message } = await f.world.channel.post({ _tag: "User", text: "pending", sendKey: "" });
+    const { message } = await f.world.channel.say({ text: "pending", sendKey: "" });
     await sql.exec(`insert into connector_outbox (id, connector, message_id, body, created_at) values ('pending-test', 'qq', $1, 'pending', 1)`, [message.id]);
     const status: ConnectorStatus = await c.logout("qq");
     expect(status.state).toBe("pairing");

@@ -166,9 +166,9 @@ describe("the database", () => {
 
 /** Where a failed query is told or retried rather than a defect (a `catch` that tells SqlError apart), and why. */
 const catching: Readonly<Record<string, string>> = {
-  "modules/channel/store.ts": "a direct context whose initial delivery cannot be kept is refused as NotRecorded before its events are attached",
+  "modules/watch/watch.ts": "a direct context whose initial delivery cannot be kept is refused as NotRecorded before its events are attached",
   "gateway/connector/connector.ts": "a bridge write that fails is shown on the connector's status and tried again",
-  "modules/cron/cron.ts": "a cron's run that is not kept is logged, and the next due cron goes on",
+  "modules/issue/cron.ts": "a cron's run that is not kept is logged, and the next due cron goes on",
   "modules/game/game.ts": "a ledger entry that is not kept is logged, and the farm goes on",
   "modules/issue/assignment.ts": "an assignment write inside an issue transaction hands its database failure up to the caller's refusal",
   "modules/issue/store.ts": "an execution write inside an issue transaction hands its database failure up to the caller's refusal",

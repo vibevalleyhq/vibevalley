@@ -6,7 +6,7 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| `SpaceState` 的折叠（`apply`、`reduce`）、前后状态对 `Transition` 与序号 `seq` | 事实何时发出、各表如何持久化（[工单](docs/subsystems/issue.md)、[帮工](docs/subsystems/session.md)、[频道](docs/subsystems/channel.md)、[定时任务](docs/subsystems/cron.md)） |
+| `SpaceState` 的折叠（`apply`、`reduce`）、前后状态对 `Transition` 与序号 `seq` | 事实何时发出、各表如何持久化（[工单](docs/subsystems/issue.md)、[帮工](docs/subsystems/session.md)、[频道](docs/subsystems/channel.md)、[定时任务](docs/subsystems/issue.md#定时任务)） |
 | 派生帧 `StateFrame`（`frameOf`）与单次特效计算（`effectsOf`） | 地块画面规则与游戏账本计算（[游戏](docs/subsystems/game.md)、[农场的皮](docs/subsystems/farm.md)） |
 | 全部路由：SSE 流（`/api/v1/state`、`/events`、`/live`、工单观察流、订阅流）和其余 `GET`、`PUT` 路由 | 订阅里频道和 Artifact 的事件内容（[频道](docs/subsystems/channel.md)、[Artifact](docs/subsystems/artifact.md)）、工单观察流的内容（[工单](docs/subsystems/issue.md#观察执行)）、帮工 `/mcp` 的工具、语音线路的协议（[语音](docs/subsystems/voice.md)） |
 | 接口表 `endpoints`、权限 `can`、幂等键 `requestKey`、试跑 `dryRun` 与 CLI 映射 | 各接口业务实现、「连接到本机」配对鉴权（[连接到本机](docs/subsystems/lan.md)）、模型工具（[助手](docs/subsystems/orchestrator.md)） |
@@ -88,13 +88,13 @@ SSE 以外的路由：
 
 1. `gateway/http/app.ts` 先绑定 HTTP 端口；配置为 `port: 0` 时在这里得到真实端口，再用它组装服务，恢复的会话和 `lan` 转发不会拿到 `:0`。
 2. `Core` 从空状态启动；各模块在构造阶段从数据库加载工单、频道、定时任务和在场会话并施加初始事实。
-3. `services.ts` 按模块顺序调各模块的 `boot()`：Repo 第一次看 GitHub、Session 接回或放走停机时在场的会话（`vibevalley` 农机上答到一半的帮工接着答）、Channel 恢复会话串、Session 恢复投递并叫醒（`wake`）、Media、Issue 和 Cron 补跑、Inbox 开始巡查、Game 开始统计 commit。助手在构造时续接被重启打断的回合。
+3. `services.ts` 按模块顺序调各模块的 `boot()`，每个一次：Repo 第一次看 GitHub、Session 接回或放走停机时在场的会话（`vibevalley` 农机上答到一半的帮工接着答）再恢复投递并叫醒、Media、Issue 和 Cron 补跑、Watch 恢复会话串并按游标读完漏读的频道事件再开始巡查、Game 开始统计 commit。助手在构造时续接被重启打断的回合。
 4. 写出 `server.json` 与就绪收据。
 
 ## 和谁打交道
 
 - **施加事实的模块**：`issue`、`session`、`channel`、`media`、`connector`、`cron`、`voice`、`game`。
-- **订阅事实的模块**：`game`、`inbox`、`issue`、`channel`、`media`。
+- **订阅事实的模块**：`game`、`watch`（收件箱）、`issue`、`channel`、`media`。
 - **外部客户端**：`apps/web`、`apps/cli` 与经 `lan` 放行的配对设备。
 
 ## 为什么这样

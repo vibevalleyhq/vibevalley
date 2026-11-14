@@ -1,70 +1,7 @@
-import { z } from "zod";
-
 import type * as T from "@vibevalley/protocol";
-import { defaultOrchestrator, userId } from "@vibevalley/protocol";
-import { type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
-import { storedJsonOrUndefined, valueOf } from "#/base/json.ts";
-
-import { type Trigger, type TriggerContext, VoiceModeValues } from "./shapes.ts";
-
-const IngressSourceValues = ["issue", "cron", "patrol", "connector", "voice", "github"] as const;
-
-export interface Meta {
-  run?: string;
-  mentions?: string[];
-  session?: T.SessionId;
-  outcome?: T.Outcome;
-  spent?: T.Spent;
-  code?: string;
-  /** Spoken on a voice call: already heard by the orchestrator, so do not wake again. */
-  spoken?: boolean;
-  attachments?: T.Attachment[];
-  embeds?: T.Embed[];
-  artifact?: T.ArtifactCard;
-  blocks?: readonly T.QuotedBlock[];
-  picked?: Picked;
-  ingressSource?: "issue" | "cron" | "patrol" | "connector" | "voice" | "github";
-  ingressRecipient?: string;
-  issue?: T.IssueId;
-  trigger?: T.RunTrigger;
-  responsePort?: string;
-  voiceMode?: "dictated" | "conversation" | "api";
-}
-
-const MetaSchema = z.object({
-  run: z.exactOptional(z.string()),
-  mentions: z.exactOptional(z.array(z.string())),
-  session: z.exactOptional(S.SessionId),
-  outcome: z.exactOptional(S.Outcome),
-  spent: z.exactOptional(S.Spent),
-  code: z.exactOptional(z.string()),
-  spoken: z.exactOptional(z.boolean()),
-  attachments: z.exactOptional(z.array(S.Attachment)),
-  embeds: z.exactOptional(z.array(S.Embed)),
-  artifact: z.exactOptional(S.ArtifactCard),
-  blocks: z.exactOptional(z.array(S.QuotedBlock)),
-  picked: z.exactOptional(z.object({ agent: z.exactOptional(z.string()), repo: z.exactOptional(z.string()) })),
-  ingressSource: z.exactOptional(z.enum(IngressSourceValues)),
-  ingressRecipient: z.exactOptional(z.string()),
-  issue: z.exactOptional(S.IssueId),
-  trigger: z.exactOptional(S.RunTrigger),
-  responsePort: z.exactOptional(z.string()),
-  voiceMode: z.exactOptional(z.enum(VoiceModeValues)),
-}) satisfies z.ZodType<Meta, Wire<Meta>>;
-
-const decodeMetaText = storedJsonOrUndefined(MetaSchema, "channel_message.meta");
-const decodeMetaValue = valueOf(MetaSchema, "channel_message.meta");
-export const metaOf = (raw: unknown): Meta => (raw == null ? {} : typeof raw === "string" ? (decodeMetaText(raw) ?? {}) : decodeMetaValue(raw));
-
-/** Omits empty strings, false, and empty arrays to match Go omitempty snapshots. */
-export const metaText = (m: Meta | undefined) =>
-  m === undefined
-    ? null
-    : JSON.stringify(
-        Object.fromEntries(Object.entries(m).filter(([, v]) => v !== undefined && v !== "" && v !== false && !(Array.isArray(v) && v.length === 0))),
-      );
+import { type Trigger, type TriggerContext } from "./shapes.ts";
 
 export const actorOfParticipant = (kind: T.ActorKind, role: T.AgentRole | null, id: string, name?: string): T.Actor =>
   kind === "agent"
@@ -72,33 +9,6 @@ export const actorOfParticipant = (kind: T.ActorKind, role: T.AgentRole | null, 
     : { kind, id, ...(name !== undefined ? { name } : {}) };
 
 export const channelType = (type: string): T.ChannelType => S.ChannelType.safeParse(type).data ?? "channel";
-
-export const envelopeMore = (
-  row: { readonly meta: string | null; readonly reply_number: number | null; readonly edited_at?: number | null; readonly deleted_at?: number | null },
-  filesAt: (id: string) => string,
-) => {
-  const meta = metaOf(row.meta);
-  const files = meta.attachments ?? [];
-  return {
-    ...(row.reply_number !== null ? { replyTo: row.reply_number } : {}),
-    ...(row.edited_at != null && row.edited_at !== 0 ? { edited: true } : {}),
-    ...(row.deleted_at != null && row.deleted_at !== 0 ? { deleted: true } : {}),
-    ...(files.length > 0 ? { attachments: files.map((f) => ({ name: f.name, path: filesAt(f.id) })) } : {}),
-    ...(meta.artifact && (row.deleted_at == null || row.deleted_at === 0)
-      ? { artifact: { id: meta.artifact.id, title: meta.artifact.title, version: meta.artifact.version } }
-      : {}),
-    ...(meta.blocks && meta.blocks.length > 0 && (row.deleted_at == null || row.deleted_at === 0) ? { blocks: meta.blocks } : {}),
-    ...(meta.picked ? { picked: meta.picked } : {}),
-    ...(meta.responsePort ? { responsePort: meta.responsePort } : {}),
-    ...(meta.voiceMode ? { voiceMode: meta.voiceMode } : {}),
-  };
-};
-
-export function targetOf(c: Pick<T.Channel, "type" | "rootNumber" | "name">, channelName: string): string {
-  if (c.type === "direct") return "@" + userId;
-  if (c.type === "thread" && c.rootNumber !== undefined) return "#" + channelName + ":" + c.rootNumber;
-  return "#" + (c.name ?? channelName);
-}
 
 export interface Picked {
   readonly agent?: string;
@@ -123,29 +33,24 @@ export interface UnreadRow {
 
 export const summaryChannels = 20;
 
-/** The channels a participant has unread words in, as a wake-up and an inbox list them: the first summaryChannels of
- * the unread rows (channel.sql's unreadOf), in their order. */
-export const unreadSummaryOf = (
-  rows: readonly {
-    readonly type: string;
-    readonly root_number: number | null;
-    readonly channel_name: string;
-    readonly unread: number;
-    readonly mentions_you: boolean;
-    readonly latest_sender_name: string | null;
-  }[],
-): UnreadRow[] =>
-  rows.slice(0, summaryChannels).map((row) => ({
-    target: targetOf({ type: channelType(row.type), ...(row.root_number !== null ? { rootNumber: row.root_number } : {}) }, row.channel_name || ""),
-    unread: row.unread,
-    mentionsYou: row.mentions_you,
-    ...(row.latest_sender_name ? { latest: row.latest_sender_name } : {}),
-  }));
+/** What the mailbox reads of the chat, told by the layer above it (the watch): the default channel, and a participant's
+ * unread (`channel`: the one it is in), newest first. */
+export interface ChatView {
+  readonly defaultChannel: () => string;
+  readonly unreadOf: (participant: string, channel: string) => Promise<readonly UnreadRow[]>;
+}
 
-/** Identical text from the same sender and channel within this window is treated as a retry. */
-export const retryWindowMs = 60_000;
+/** A session's input waiting to be handed to it, as the layer above judges it: the issue it is for (its own, or the
+ * session's), whether the user said it, and whether it is still pending (not handed yet). */
+export interface WaitingInput {
+  readonly issue?: string;
+  readonly fromUser: boolean;
+  readonly pending: boolean;
+}
 
-export const heldShown = 3;
+/** Which of a session's waiting inputs may be handed to it now, one answer per input, as the layer above decides (the
+ * issues); until told, all of them. */
+export type Readiness = (inputs: readonly WaitingInput[]) => readonly boolean[];
 
 type StoredMessageKind = "chat" | "dispatch" | "report" | "notice";
 
@@ -170,50 +75,60 @@ export interface ChannelEnvelopeRow {
   readonly channel_name: string | null;
 }
 
-/** Direct channel peer if orchestrator; otherwise defaultOrchestrator if a member, first orchestrator member, or defaultOrchestrator. */
-export const orchestratorIn = (place: {
-  readonly top: { readonly type: string; readonly peer_id: string | null } | undefined;
-  readonly members: readonly string[];
-  readonly isOrchestrator: (agent: string) => boolean;
-}): string => {
-  const { top, members, isOrchestrator } = place;
-  if (top?.type === "direct") return top.peer_id !== null && isOrchestrator(top.peer_id) ? top.peer_id : defaultOrchestrator;
-  if (members.includes(defaultOrchestrator)) return defaultOrchestrator;
-  return members.find(isOrchestrator) ?? defaultOrchestrator;
-};
+/** Why a delivery reaches its session. */
+export type DeliveryReason = "mention" | "everyone" | "own_thread" | "member" | "channel" | "direct" | "addressed";
+/** Which brake held a delivery back from waking its session (watch/brakes.ts). */
+export type HeldBy = "hop_limit" | "cooldown" | "wake_breaker";
+/** What a delivery is to its session: how urgent it is follows from this (routing.ts urgencyOf). */
+export type DeliveryEvent = "stop" | "conversation" | "mention" | "assignment" | "review" | "ci_failed" | "report_attention" | "report_progress" | "ambient";
 
-export interface ChannelAudience {
-  readonly from: string;
-  readonly actor: T.Actor;
-  readonly kind: T.MessageKind;
-  readonly mentions: readonly string[];
-  readonly channel: Pick<T.Channel, "type" | "peer">;
-  readonly orchestrator: string;
-  readonly channelMembers: readonly string[];
-  readonly orchestrators: readonly string[];
-  readonly threadOwner?: string;
-  readonly sessions: readonly string[];
-  readonly present?: readonly string[] | null;
-  readonly members: readonly string[];
-  readonly outcome?: T.Outcome;
-  readonly spoken?: boolean;
+/** How a delivery reaches a busy session: stop it, steer its turn, wait for the next, or wait to be read with the rest. */
+export type Urgency = "interrupt" | "steer" | "queue" | "digest";
+
+/** A session that hears a routed trigger, as the layer above worked it out: why, whether it wakes, what held it back. */
+export interface Hearer {
+  readonly session: string;
+  readonly reason: DeliveryReason;
+  readonly wakes: boolean;
+  readonly heldBy?: HeldBy;
+  readonly role: T.AgentRole;
+  readonly event: DeliveryEvent;
 }
 
-export interface ChannelHearers {
-  readonly row: ChannelEnvelopeRow;
-  readonly audience: ChannelAudience;
-  readonly addressed?: string;
-  readonly roles: Readonly<Record<string, T.AgentRole>>;
-  readonly outcome?: T.Outcome;
+/** A session a routed trigger is delivered to, as the layer above picked it (Session.route). */
+export interface Delivery {
+  readonly session: string;
+  /** Why, whether it wakes and what held it back, as the watch heard it; else addressed, waking unless a digest. */
+  readonly heard?: Pick<Hearer, "reason" | "wakes" | "heldBy">;
+  /** What the session is (its profile's role when not given) and what the delivery is to it: its urgency follows. */
+  readonly role?: T.AgentRole;
+  readonly event?: DeliveryEvent;
+  readonly urgency?: Urgency;
+  /** The issue it is for: where it counts (payload.ts deliveryScope), and what the run that takes it took. */
+  readonly issue?: string;
+  /** The session it went to before: that delivery is dropped as reassigned. */
+  readonly previous?: string;
+  /** Its own id when not the trigger's: an input handed back goes to another session as a second delivery. */
+  readonly id?: string;
+  /** Said to the session with it. */
+  readonly note?: string;
+  /** Read in the routing transaction: false leaves this one out. */
+  readonly prepare?: () => Promise<boolean>;
+  /** Written in the routing transaction, with the delivery. */
+  readonly commit?: () => Promise<void>;
 }
 
-export interface ChannelRouteResult {
-  readonly heldNotice: string;
-}
-
-/** A source's event taken in: its trigger (none for the farm's own echo) and what its routing said. */
-export interface Accepted extends ChannelRouteResult {
+/** A source's event taken in: its trigger (none for the farm's own echo). */
+export interface Accepted {
   readonly trigger?: Trigger;
+}
+
+/** The wakes of agents' words since the user last spoke, as the deliveries kept them: what the brakes start from. */
+export interface AgentWakes {
+  /** Per routing scope (payload.ts deliveryScope), the deliveries that woke a session since the user's newest there. */
+  readonly scopes: readonly { readonly scope: string; readonly n: number }[];
+  /** Per session, when an agent's words last woke it. */
+  readonly sessions: readonly { readonly session: string; readonly at: number }[];
 }
 
 export interface Handed {

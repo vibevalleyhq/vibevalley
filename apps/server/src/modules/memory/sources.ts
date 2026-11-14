@@ -5,7 +5,7 @@ import { omitUndefined } from "@vibevalley/protocol/rules";
 
 import { messageOf } from "#/base/errors.ts";
 import type { Logger } from "#/infra/log.ts";
-import type { MemorySourceConfig } from "#/modules/setting/memorySources.ts";
+import type { MemorySourceConfig } from "#/platform/setting/memorySources.ts";
 
 import type { FinishedRun, MemoryStore, Note, RecallCue } from "./memory.ts";
 import {

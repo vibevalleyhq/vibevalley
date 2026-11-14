@@ -3,9 +3,9 @@ import { expect, test } from "vite-plus/test";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { orchestrator, worker } from "#/base/actor.ts";
+import { messageText } from "#/modules/agent/durable.ts";
 import { png } from "#/modules/media/testdata/png.ts";
-import type { Provider } from "#/modules/provider/provider.ts";
-import { messageText } from "#/modules/runtime/durable.ts";
+import type { Provider } from "#/platform/provider/provider.ts";
 import { until, waitFor } from "#/testing/layers.ts";
 import { answer, scriptedLLM, toolCall } from "#/testing/model.ts";
 
@@ -37,7 +37,7 @@ test("the orchestrator creates an attributed image and reads its local attachmen
   await using fw = await mediaFarm(llm);
   await configure(fw);
   const chat = fw.channel;
-  await chat.say("Generate one image", {}, undefined, "");
+  await chat.say({ text: "Generate one image", sendKey: "" });
   const jobs = await waitFor(
     () => fw.media.list(),
     (jobs) => jobs.some((job) => job.id === id && job.phase === "ready"),
@@ -49,7 +49,7 @@ test("the orchestrator creates an attributed image and reads its local attachmen
   expect(job?.usage).toEqual({ images: 1, width: 256, height: 256 });
   expect(job?.attachment?.id).toMatch(/^[a-f0-9]{64}$/u);
   await until(() => requests.length >= 2, "submission acknowledged");
-  await chat.say("Read the saved image", {}, undefined, "");
+  await chat.say({ text: "Read the saved image", sendKey: "" });
   await until(() => requests.length >= 4, "image tools answered");
   const results = requests.flatMap((request) => request.messages.filter((message) => message.role === "toolResult").map(messageText)).join("\n");
   expect(results).toContain(job?.attachment?.id);
@@ -69,14 +69,14 @@ test("unknown outcomes reach the model without usage guesses, while autonomous a
   await configure(fw);
   const chat = fw.channel;
   const media = fw.media;
-  await chat.say("Generate one image", {}, undefined, "");
+  await chat.say({ text: "Generate one image", sendKey: "" });
   await waitFor(
     () => media.list(),
     (jobs) => jobs.some((job) => job.id === "unknown" && job.phase === "unknown"),
     "ambiguous submission",
   );
   await until(() => requests.length >= 2, "submission acknowledged");
-  await chat.say("Check without submitting again", {}, undefined, "");
+  await chat.say({ text: "Check without submitting again", sendKey: "" });
   await until(() => requests.length >= 4, "unknown outcome reported");
   const results = requests
     .at(-1)
@@ -114,28 +114,28 @@ test("the orchestrator retries only a download and cancels a separate pending ge
   await configure(fw);
   const chat = fw.channel;
   const media = fw.media;
-  await chat.say("Generate one image", {}, undefined, "");
+  await chat.say({ text: "Generate one image", sendKey: "" });
   await waitFor(
     () => media.list(),
     (jobs) => jobs.some((job) => job.id === "retry" && job.phase === "download_failed"),
     "download failed",
   );
   await until(() => requests.length >= 2, "submission acknowledged");
-  await chat.say("Retry only its download", {}, undefined, "");
+  await chat.say({ text: "Retry only its download", sendKey: "" });
   await waitFor(
     () => media.get("retry"),
     (job) => job.phase === "ready",
     "tool retried download",
   );
   await until(() => requests.length >= 4, "retry acknowledged");
-  await chat.say("Generate another image", {}, undefined, "");
+  await chat.say({ text: "Generate another image", sendKey: "" });
   await waitFor(
     () => media.list(),
     (jobs) => jobs.some((job) => job.id === "cancel" && job.phase === "generating"),
     "generation started",
   );
   await until(() => requests.length >= 6, "second submission acknowledged");
-  await chat.say("Cancel waiting for that image", {}, undefined, "");
+  await chat.say({ text: "Cancel waiting for that image", sendKey: "" });
   await waitFor(
     () => media.get("cancel"),
     (job) => job.phase === "canceled",
@@ -183,7 +183,7 @@ test("the orchestrator executes a frozen user approval through its trusted chann
   });
   expect((await media.get(id)).phase).toBe("authorized");
   const chat = fw.channel;
-  await chat.say("Execute the authorized understanding task", {}, channel, "");
+  await chat.say({ text: "Execute the authorized understanding task", channel: channel, sendKey: "" });
   const job = await waitFor(
     () => media.get(id),
     (job) => job.kind === "understanding" && job.cleanup === "done",
@@ -195,7 +195,7 @@ test("the orchestrator executes a frozen user approval through its trusted chann
     result: { text: "Offline understanding of image input." },
   });
   await until(() => requests.length >= 2, "delegated submission acknowledged");
-  await chat.say("Read the understanding result", {}, channel, "");
+  await chat.say({ text: "Read the understanding result", channel: channel, sendKey: "" });
   await until(() => requests.length >= 4, "understanding result read by orchestrator");
   const returned = requests
     .at(-1)
@@ -231,7 +231,7 @@ test("the orchestrator synthesizes speech with trusted provenance and reads the 
     speech: { connection: "images", model: "moss-tts-1.5-flash" },
   });
   const chat = fw.channel;
-  await chat.say("Generate the requested speech", {}, undefined, "");
+  await chat.say({ text: "Generate the requested speech", sendKey: "" });
   const jobs = await waitFor(
     () => fw.media.list(),
     (jobs) => jobs.some((job) => job.id === id && job.phase === "ready"),
@@ -245,7 +245,7 @@ test("the orchestrator synthesizes speech with trusted provenance and reads the 
   });
   if (job?.kind !== "speech" || !job.attachment) throw new Error("Expected saved speech");
   await until(() => requests.length >= 2, "speech submission acknowledged");
-  await chat.say("Read the saved speech", {}, undefined, "");
+  await chat.say({ text: "Read the saved speech", sendKey: "" });
   await until(() => requests.length >= 4, "speech result read by orchestrator");
   const returned = requests
     .at(-1)

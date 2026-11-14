@@ -32,22 +32,6 @@ export async function removeMember(sql: Sql, params: RemoveMemberParams): Promis
   return sql.exec(RemoveMemberSql, [params["at"], params["channel_id"], params["participant_id"]])
 }
 
-export interface MembersOfParams {
-  readonly ["channel_id"]: string
-}
-
-export const MembersOfResult = z.object({
-  ["participant_id"]: z.string(),
-})
-export type MembersOfResult = z.infer<typeof MembersOfResult>
-
-export const MembersOfSql = "-- name: MembersOf :many\n-- bound: a row per member of one place.\nselect participant_id from channel_member where channel_id = $1 and left_at is null order by participant_id;"
-
-export async function membersOf(sql: Sql, params: MembersOfParams): Promise<MembersOfResult[]> {
-  const rows = await sql.query(MembersOfSql, [params["channel_id"]])
-  return rows.map((row) => rowOf("MembersOf", MembersOfResult, row))
-}
-
 export interface AllMembersParams {
 
 }

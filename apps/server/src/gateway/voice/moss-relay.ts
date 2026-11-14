@@ -2,7 +2,7 @@ import type { RawData, WebSocket } from "ws";
 
 import { type Clock, systemClock } from "@vibevalley/async";
 
-import type { RealtimeEvents, RealtimeLink } from "#/modules/provider/vendors.ts";
+import type { RealtimeEvents, RealtimeLink } from "#/platform/provider/vendors.ts";
 
 /** The upstream line of a bound account: opening it, and taking the key out of what comes back. */
 export interface MossLine {

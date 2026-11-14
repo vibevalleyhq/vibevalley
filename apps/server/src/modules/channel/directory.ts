@@ -6,17 +6,17 @@ import { newId } from "#/base/ids.ts";
 import type { Core } from "#/core/core.ts";
 import type { Db } from "#/infra/db.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Agent } from "#/modules/agent/agent.ts";
 import * as qc from "#db/channel.sql.ts";
 
 import { type ChannelService, infoOf, notifyOf, optional, theRow } from "./contracts.ts";
-import { type ChannelHub, profileId, threadTitleMax } from "./hub.ts";
+import { type ChannelHub, threadTitleMax } from "./hub.ts";
 import { channelNameProblem } from "./mentions.ts";
 
 const refused = refuseIn(BizCode.ChannelRefused);
 
 type DirectoryMethods = Pick<
   ChannelService,
+  | "guardRemoval"
   | "channels"
   | "openChannel"
   | "updateChannel"
@@ -25,7 +25,7 @@ type DirectoryMethods = Pick<
   | "removeChannel"
   | "setNotify"
   | "orchestratorIn"
-  | "direct"
+  | "createDirect"
   | "notifyOf"
   | "markUnread"
   | "makeDefault"
@@ -38,54 +38,30 @@ export interface ChannelDirectoryDeps {
   readonly clock: Time;
   readonly db: Db;
   readonly core: Core;
-  readonly agent: Agent;
 }
 
 export function channelDirectory(deps: ChannelDirectoryDeps, r: ChannelHub): DirectoryMethods {
-  const { core, agent: agents, db, clock } = deps;
-  const { store, orchestratorInRow, channelOfSession, hired, targetOfChannel, publishChannel, publishUserMentions } = r;
+  const { core, db, clock } = deps;
+  const { store, isOrchestratorSeat, orchestratorInRow, targetOfChannel, publishChannel, publishUserMentions } = r;
+  const guards: ((channel: string) => Promise<readonly string[]>)[] = [];
 
   /** A channel nothing points at any more; refused with what still does. */
   const removable = async (id: string) => {
     const row = store.channel(id);
     if (!row || row.type !== "channel") throw missing(t("server.channel.noChannel", { id }), [lookIn.channel]);
     if (row.is_default) throw refused(t("server.channel.defaultStays"));
-    if (hired().some((h) => channelOfSession(h) === id)) throw refused(t("server.channel.inUse", { why: t("server.channel.helpersThere") }));
-    const used = theRow(await qc.channelInUse(db.sql, { id }), "ChannelInUse");
-    const why = [
-      used.crons != null && used.crons !== 0 ? t("server.channel.cronsThere", { n: used.crons }) : "",
-      used.connectors != null && used.connectors !== 0 ? t("server.channel.connectorsThere") : "",
-      used.queued != null && used.queued !== 0 ? t("server.channel.queuedThere", { n: used.queued }) : "",
-      used.issue_threads != null && used.issue_threads !== 0 ? t("server.channel.issuesThere", { n: used.issue_threads }) : "",
-    ].filter(Boolean);
+    const topics = theRow(await qc.topicThreadsIn(db.sql, { id }), "TopicThreadsIn").n ?? 0;
+    const why = [...(await Promise.all(guards.map((guard) => guard(id)))).flat(), ...(topics !== 0 ? [t("server.channel.issuesThere", { n: topics })] : [])];
     if (why.length > 0) throw refused(t("server.channel.inUse", { why: list(why) }));
     const threads = store.threadsOf(id);
     const said = (row.last_number ?? 0) + threads.reduce((n, thread) => n + thread.reply_count, 0);
     return { target: targetOfChannel(row), threads: threads.length, said };
   };
 
-  const openDirect = (agent: { readonly id: string; readonly name: string }) =>
-    store.locked(async () => {
-      const mine = agents.isOrchestrator(agent.id);
-      const peer = mine ? agent.id : profileId(agent.id);
-      if (mine) await store.seat(agent.id);
-      else {
-        await store.upsertParticipant({
-          id: peer,
-          kind: "agent",
-          role: "worker",
-          name: agent.name,
-          agent_id: agent.id,
-          runtime: null,
-          joined_at: clock.now(),
-        });
-      }
-      const { id, created } = await store.openDirectRow(peer);
-      if (created) await publishChannel(id);
-      return id;
-    });
-
   return {
+    guardRemoval: (guard) => {
+      guards.push(guard);
+    },
     channels: async () => store.channels().map(infoOf),
     openChannel: (name, description, repo) =>
       store.locked(async () => {
@@ -129,11 +105,11 @@ export function channelDirectory(deps: ChannelDirectoryDeps, r: ChannelHub): Dir
         const category = upd.category !== undefined ? optional(upd.category) : row.category;
         // Only an orchestrator is put in a channel: a helper is hired into a place, not seated in one.
         const wanted = upd.members === undefined ? undefined : [...new Set(upd.members.map((m) => m.trim()).filter((m) => m !== ""))];
-        const notOne = wanted?.find((m) => !agents.isOrchestrator(m));
+        const notOne = wanted?.find((m) => !isOrchestratorSeat(m));
         if (notOne !== undefined) throw refused(t("server.channel.notOrchestrator", { id: notOne }));
         const had = store.membersOf(id);
         const joining = wanted === undefined ? [] : wanted.filter((m) => !had.includes(m));
-        const leaving = wanted === undefined ? [] : had.filter((m) => agents.isOrchestrator(m) && !wanted.includes(m));
+        const leaving = wanted === undefined ? [] : had.filter((m) => isOrchestratorSeat(m) && !wanted.includes(m));
         // Placed before another channel: every channel but the default gets its place again, in order.
         const order =
           upd.before === undefined
@@ -181,12 +157,13 @@ export function channelDirectory(deps: ChannelDirectoryDeps, r: ChannelHub): Dir
         await publishUserMentions();
       }),
     orchestratorIn: (channel) => orchestratorInRow(store.channel(channel)),
-    direct: async (ref) => {
-      const name = ref.trim();
-      const agent = agents.named(name) ?? agents.agent(name) ?? agents.orchestrators().find((o) => o.name === name);
-      if (!agent) throw missing(t("server.channel.noProfileNamed", { key: ref }), [lookIn.agent]);
-      return openDirect(agent);
-    },
+    createDirect: (peer) =>
+      store.locked(async () => {
+        if (store.participant(peer)?.kind !== "agent") throw missing(t("server.channel.noProfileNamed", { key: peer }), [lookIn.agent]);
+        const { id, created } = await store.openDirectRow(peer);
+        if (created) await publishChannel(id);
+        return id;
+      }),
     notifyOf: (id) => {
       const c = store.channel(id);
       const top = c?.parent_id ? store.channel(c.parent_id) : undefined;

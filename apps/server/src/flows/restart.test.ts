@@ -11,9 +11,9 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 
 import { keptLog } from "#/infra/log.ts";
+import { entryMessage, messageText } from "#/modules/agent/durable.ts";
+import { helperInstructions, helperKey, vibevalleyRuntimeOf } from "#/modules/agent/vibevalley.ts";
 import { makeOrchestrator } from "#/modules/orchestrator/orchestrator.ts";
-import { entryMessage, messageText } from "#/modules/runtime/durable.ts";
-import { helperInstructions, helperKey, vibevalleyRuntimeOf } from "#/modules/runtime/vibevalley.ts";
 import { starter, testConfig } from "#/testing/layers.ts";
 import { answer, lastUser, type Request, scriptedLLM, type Step } from "#/testing/model.ts";
 import { sqlOf } from "#/testing/sql.ts";
@@ -37,10 +37,9 @@ test("the assistant cut off mid-answer by a restart finishes it once the farm is
     const below = await world({ config });
     try {
       below.deepseek.use(llm);
-      const orchestrator = await makeOrchestrator(below);
+      const orchestrator = await makeOrchestrator({ ...below, tools: below.tool });
       below.closes.push(() => orchestrator.close());
       await below.inside.boot();
-      await below.inside.wake();
       return below;
     } catch (e) {
       await below.close();
@@ -51,7 +50,7 @@ test("the assistant cut off mid-answer by a restart finishes it once the farm is
   const before = scriptedLLM([answer(words, { hangAfter: 3 })]);
   {
     await using farm = await open(before.llm);
-    await farm.channel.say("地里怎么样", {}, undefined, "");
+    await farm.channel.say({ text: "地里怎么样", sendKey: "" });
     // The answer has begun to show: the model is in the middle of it when the farm stops.
     await until(() => {
       const phase = farm.core.session(defaultOrchestrator)?.phase;
@@ -98,10 +97,9 @@ test("regression: the assistant and a helper both cut off mid-answer go on once 
       const script = scriptedLLM(steps);
       asked = script.requests;
       below.deepseek.use(script.llm);
-      const orchestrator = await makeOrchestrator(below);
+      const orchestrator = await makeOrchestrator({ ...below, tools: below.tool });
       below.closes.push(() => orchestrator.close());
       await below.inside.boot();
-      await below.inside.wake();
       return below;
     } catch (e) {
       await below.close();
@@ -115,7 +113,7 @@ test("regression: the assistant and a helper both cut off mid-answer go on once 
   let helper = "";
   try {
     await using farm = await open([both(true), both(true)]);
-    const runtime = vibevalleyRuntimeOf({ durable: farm.runtime.durable, helpers: farm.runtime.helpers, owner, log: keptLog() });
+    const runtime = vibevalleyRuntimeOf({ durable: farm.agent.durable, helpers: farm.agent.helpers, owner, log: keptLog() });
     const session = await runtime.session(
       { kind: "available", via: "bundled" },
       { cwd: helperCwd, appendSystemPrompt: "你是后端老周。", env: { FARM_TOKEN: "t0k" } },
@@ -124,7 +122,7 @@ test("regression: the assistant and a helper both cut off mid-answer go on once 
     const told: Event[] = [];
     session.events((e) => told.push(e), { cursor: { sessionId: session.id, afterSeq: -1 } });
     await session.prompt(helperAsk);
-    await farm.channel.say("地里怎么样", {}, undefined, "");
+    await farm.channel.say({ text: "地里怎么样", sendKey: "" });
     await until(() => told.some((e) => e.kind === "text_delta"), "the helper's answer under way");
     await until(() => {
       const phase = farm.core.session(defaultOrchestrator)?.phase;
@@ -137,7 +135,7 @@ test("regression: the assistant and a helper both cut off mid-answer go on once 
   // Back: the assistant's restart runs every conversation left mid-answer, the helper's too, before its session is
   // opened again.
   await using farm = await open([both(false), both(false)]);
-  const durable = farm.runtime.durable;
+  const durable = farm.agent.durable;
   await until(() => said(farm)().length > 0, "the assistant's answer after the restart");
   expect(said(farm)()).toEqual([words]);
   const conversation = await durable.existing(helperKey(helper));
@@ -161,14 +159,13 @@ test("a helper on the farm's own runtime cut off mid-answer by a restart finishe
   const config = testConfig({ db: "", patrol: { heartbeatMinutes: 0 } });
   const helperWords = "数过了，三块地";
   const profile = { ...starter("lab"), runtime: "vibevalley", effort: "" };
-  /** The farm on the same home each time: its sessions back, then their deliveries. */
+  /** The farm on the same home each time: its sessions and their deliveries back, then the watch. */
   const open = async (llm: ReturnType<typeof scriptedLLM>["llm"], repos: readonly string[] = []) => {
     const below = await world({ config, ownRuntime: true, repos });
     try {
       below.deepseek.use(llm);
       await below.session.boot();
-      await below.channel.boot();
-      await below.session.wake();
+      await below.watch.boot();
       return below;
     } catch (e) {
       await below.close();

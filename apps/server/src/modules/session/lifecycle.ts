@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { dayMs, maxRunning } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { sessionId } from "@vibevalley/protocol/schema";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { worker as sessionActor } from "#/base/actor.ts";
 import { BizCode, errnoOf, messageOf, refuseIn } from "#/base/errors.ts";
@@ -16,17 +16,16 @@ import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
+import { goOn, helperKey, vibevalleyRuntime } from "#/modules/agent/vibevalley.ts";
 import type { Memory } from "#/modules/memory/memory.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
 import { type Merged, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "#/modules/repo/workplace.ts";
-import type { Runtime } from "#/modules/runtime/runtime.ts";
-import { goOn, helperKey, vibevalleyRuntime } from "#/modules/runtime/vibevalley.ts";
 import * as qs from "#db/session.sql.ts";
 import * as qr from "#db/session_run.sql.ts";
 
 import { sessionName, type Settle, whoMakesRoom, withRecall } from "./briefing.ts";
 import { handStack } from "./hands.ts";
-import { endedSession, heardOf, pendingReportOf, placeOf, restoredSession, runOf, sessionState } from "./history.ts";
+import { endedSession, heardOf, pendingReportOf, placeOf, restoredSession, sessionState } from "./history.ts";
 import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
 import { NotRecorded } from "./inProcessRun.ts";
 import { makeLaunch, NotTakenIn, reasonText } from "./launch.ts";
@@ -96,7 +95,8 @@ export interface HireOptions {
 interface SendOptions extends Omit<HireOptions, "issue"> {
   readonly envelopeIds?: readonly string[];
   readonly context:
-    | { readonly kind: "issue"; readonly issue: Pick<T.Issue, "id" | "number"> & { readonly mandate?: T.IssueMandate } }
+    /** source: the trigger the work came from, which its brief points the helper to. */
+    | { readonly kind: "issue"; readonly issue: { readonly id: string; readonly number: number; readonly source?: string } }
     | { readonly kind: "channel"; readonly channel: string };
 }
 
@@ -133,7 +133,6 @@ export interface Lifecycle {
   /** Pass `""` for all agents. */
   readonly list: (agent: string) => Promise<T.Session[]>;
   readonly get: (id: string) => Promise<T.Session | undefined>;
-  readonly issueRuns: (issue: string) => Promise<T.Run[]>;
   readonly events: (id: string, run?: string) => Promise<T.SessionEvent[] | undefined>;
   /** Everything Session tells, subscribed before it returns: nothing told after is missed. */
   readonly news: () => Subscription<SessionNews>;
@@ -160,7 +159,6 @@ export interface LifecycleDeps {
   readonly memory: Memory;
   readonly repo: Repo;
   readonly machine: Machine;
-  readonly runtime: Runtime;
 }
 
 export interface SessionOptions {
@@ -270,8 +268,7 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
   const finishInterrupted = (run: string) =>
     bestEffort(log, `vibevalley: run ${run}`, async () => {
       await runs.finish(run, "interrupted", t("server.session.log.restarted"));
-      const linked = await runs.issues(run);
-      tell({ _tag: "RunFinished", id: run, issues: linked, outcome: "interrupted" });
+      tell({ _tag: "RunFinished", id: run, outcome: "interrupted" });
     });
 
   /** A helper on VibeValley's own runtime that was answering when the farm stopped is opened again on its conversation,
@@ -300,13 +297,13 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
     // pi-durable keeps a conversation's run under way across a restart; the other runtimes cannot take a turn up again.
     const goingOn = new Set<string>();
     for (const row of kept)
-      if (!isOnDuty(row) && row.runtime === vibevalleyRuntime && row.oar_session && (await deps.runtime.durable.busy(helperKey(row.oar_session))))
+      if (!isOnDuty(row) && row.runtime === vibevalleyRuntime && row.oar_session && (await deps.agent.durable.busy(helperKey(row.oar_session))))
         goingOn.add(row.id);
     const openRun = new Map<string, string>();
     for (const row of await qr.openRuns(db.sql)) {
       if (goingOn.has(row.session)) openRun.set(row.session, row.id);
       // Its durable conversation goes on with it: its host ends it once the answer comes.
-      else if (!(await deps.runtime.durable.busy(row.session))) await finishInterrupted(row.id);
+      else if (!(await deps.agent.durable.busy(row.session))) await finishInterrupted(row.id);
     }
     // Continue numbering past the highest historical session id so trajectory files are never reused.
     hired = Math.max(
@@ -557,12 +554,12 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
           phase: { _tag: "working", since: hiredAt, doing: { action: "none", label: "" } },
           ...(channel ? { channel } : {}),
           refining: issue ? (opt.refining ?? false) : false,
-          ...(issue ? { issue: issue.id } : {}),
+          ...(issue ? { issue: issueId(issue.id) } : {}),
           ...(place.branch ? { branch: place.branch, worktree: place.cwd } : {}),
           machine: machines.here().id,
         };
         const initialText = initial.map((input) => `${input.id}\n${input.card.summary}\n${input.card.readUri}`).join("\n\n");
-        const source = issue?.mandate?.originTriggerId;
+        const source = issue?.source;
         const prompt = [brief, source ? sourceBrief(source) : "", initialText].filter(Boolean).join("\n\n");
         const opened = await open(agent, session, h, place, withRecall(recall, prompt), "");
         if (!opened.execution) {
@@ -754,13 +751,13 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
       core,
       clock,
       log,
-      durable: deps.runtime.durable,
+      durable: deps.agent.durable,
     });
   };
 
   const close = async () => {
     // A helper answering on VibeValley's own runtime is let go with its run under way: restore goes on with it.
-    deps.runtime.durable.leave();
+    deps.agent.durable.leave();
     moves.close();
     await tasks.close();
     await cli?.close();
@@ -795,7 +792,6 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
       if (row === undefined || row.ended_at === null) return undefined;
       return endedSession(row, await qr.runsOfSession(db.sql, { session: id }));
     },
-    issueRuns: async (issue) => (await qr.runsOfIssue(db.sql, { issue_id: issue })).map(runOf),
     events: (id, run) => trajectories.events(id, run),
     sessionOf: (id) => core.session(id),
     hired: () => core.state().sessions.filter(isHired),

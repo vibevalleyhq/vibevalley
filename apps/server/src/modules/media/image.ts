@@ -13,10 +13,10 @@ import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { PublicFetch } from "#/infra/publicHttp.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Attachment } from "#/modules/attachment/attachment.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
-import type { Provider } from "#/modules/provider/provider.ts";
-import { ImageFailure } from "#/modules/provider/vendors.ts";
+import type { Attachment } from "#/platform/attachment/attachment.ts";
+import type { Provider } from "#/platform/provider/provider.ts";
+import { ImageFailure } from "#/platform/provider/vendors.ts";
 import * as q from "#db/media_job.sql.ts";
 
 import { downloadImage } from "./download.ts";
@@ -94,7 +94,6 @@ export function makeImage(deps: ImageDeps, machine: Machine) {
     const attachment = decodeAttachment(row.attachment);
     const request = decodeRequest(row.request);
     await channel.post({
-      _tag: "Announce",
       from: source.agent,
       channel: source.channel,
       text: t("server.media.imageMade", { prompt: head(request.prompt, 80) }),

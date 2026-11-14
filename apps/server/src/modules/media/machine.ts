@@ -7,8 +7,8 @@ import type { Core } from "#/core/core.ts";
 import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Account, Provider } from "#/modules/provider/provider.ts";
-import { AudioFailure, type AudioTask } from "#/modules/provider/vendors.ts";
+import type { Account, Provider } from "#/platform/provider/provider.ts";
+import { AudioFailure, type AudioTask } from "#/platform/provider/vendors.ts";
 import * as q from "#db/media_job.sql.ts";
 
 import { jobsOf, type MediaJobPhase, mediaJobPhases, type Row } from "./job.ts";

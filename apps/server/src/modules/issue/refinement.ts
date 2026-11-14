@@ -12,10 +12,9 @@ import { questionsFromText } from "#/base/questions.ts";
 import type { Core } from "#/core/core.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
+import { chooseAgent } from "#/modules/agent/presets.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { WorkplaceRelease } from "#/modules/repo/workplace.ts";
-import { chooseAgent } from "#/modules/runtime/presets.ts";
-import type { Runtime } from "#/modules/runtime/runtime.ts";
 import { type Hired, type HireOptions, HireRefused, type Session } from "#/modules/session/session.ts";
 
 import { splitBrief } from "./brief.ts";
@@ -29,7 +28,6 @@ interface RefinementDeps {
   readonly core: Core;
   readonly log: Logger;
   readonly store: Agent;
-  readonly runtimes: Runtime;
   readonly sessions: Session;
   readonly chat: Channel;
   readonly get: (ref: string) => Promise<T.Issue>;
@@ -43,12 +41,12 @@ interface RefinementDeps {
 }
 
 export function refinement(d: RefinementDeps) {
-  const { core, log, store, runtimes, sessions, chat, get, unsent, hire, lastAssigneeIn, saveEdit, saveRefinement } = d;
+  const { core, log, store, sessions, chat, get, unsent, hire, lastAssigneeIn, saveEdit, saveRefinement } = d;
   /** One draft starts at a time: two clicks do not send two sessions. */
   const drafting = new Semaphore(1);
 
   const refiner = async (issue: T.Issue) => {
-    const candidates = await runtimes.candidates();
+    const candidates = await store.candidates();
     let named = "";
     const agent = assignedAgentOf(issue);
     if (agent) {
@@ -93,7 +91,7 @@ export function refinement(d: RefinementDeps) {
       const thread = await chat.issueThread(item.id, item.title, channel || undefined);
       const history = await chat.history(thread, undefined, 40);
       const brief = refinementBrief(item, said, where, history.map((message) => message.text).join("\n\n"));
-      if (said) await chat.post({ _tag: "User", text: said, channel: thread, sendKey: "" });
+      if (said) await chat.say({ text: said, channel: thread, sendKey: "" });
       await beforeRefinement(item, said, chosen.id, where);
       // A draft cut short (a restart) may have left the worktree as its refiner had it: each draft starts from main.
       const kept = where ? await sessions.clearWorkplace(item.id, where, item.number) : { kept: false };
@@ -113,9 +111,9 @@ export function refinement(d: RefinementDeps) {
     if (h?.refining !== true || !h.issue) return;
     const id = h.issue;
     const said = sessions.live(f.id).lastText;
-    const thread = await chat.threadOfSession(f.id);
+    const thread = await chat.homeOf(f.id);
     const tell = async (text: string) => {
-      if (thread) await chat.post({ _tag: "Notice", channel: thread, text: text, code: "issue_refinement" });
+      if (thread) await chat.notice({ channel: thread, text: text, code: "issue_refinement" });
       else core.notice("warn", text);
     };
     if (f.outcome === "completed") {

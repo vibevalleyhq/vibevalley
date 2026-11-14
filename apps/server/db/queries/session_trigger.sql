@@ -10,20 +10,12 @@ on conflict do nothing;
 select trigger_json, payload_json from session_trigger where id = sqlc.arg(id);
 
 -- name: UnroutedTriggers :many
-select t.id, t.seq, t.trigger_json from session_trigger t
+-- bound: a page; the chat's messages are not here (the watch reads them again from its own cursor).
+select t.id, t.seq, t.trigger_json, t.payload_json from session_trigger t
 where t.seq > sqlc.arg(after)
-  and t.source <> 'cron'
   and t.payload_json::jsonb -> 'data' ->> 'kind' is distinct from 'channel_message'
   and t.routed_at is null
 order by t.seq limit 1000;
-
--- name: KnownGitHubEvents :many
--- bound: accepted event identities for one pull request.
-select source_key, (trigger_json::jsonb -> 'meta' ->> 'botRoundKey')::text? as bot_round_key,
-       (routed_at is not null)::bool as routed,
-       (trigger_json::jsonb -> 'meta' ->> 'botRound')::int? as bot_round
-from session_trigger where source = 'github' and trigger_json::jsonb -> 'meta' ->> 'repo' = sqlc.arg(repo)::text
-  and (trigger_json::jsonb -> 'meta' ->> 'pr')::int = sqlc.arg(pr_number)::int;
 
 -- name: MarkRouted :one
 update session_trigger set
@@ -36,19 +28,3 @@ returning routing_position as position, routing_scope as scope,
 
 -- name: IsRouted :one
 select exists (select 1 from session_trigger where id = sqlc.arg(envelope_id) and routed_at is not null)::bool as routed;
-
--- name: RetireIssueDispatches :exec
--- A session started on the issue: the assignment's own dispatch is not a second brief for it.
-update session_trigger set
-  routing_position = coalesce(routing_position, (select coalesce(max(id), 0) + 1 from session_order)),
-  routing_scope = coalesce(routing_scope, 'issue:' || sqlc.arg(issue_id)::text),
-  routed_at = coalesce(routed_at, sqlc.arg(at))
-where routed_at is null
-  and trigger_json::jsonb -> 'meta' -> 'dispatch' = 'true'
-  and trigger_json::jsonb -> 'meta' ->> 'issue' = sqlc.arg(issue_id);
-
-
--- name: UnroutedCronTriggers :many
-select id, seq, trigger_json, payload_json from session_trigger
-where source = 'cron' and routed_at is null and seq > sqlc.arg(after)
-order by seq limit 1000;

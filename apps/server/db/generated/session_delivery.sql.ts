@@ -248,20 +248,3 @@ export async function waitingOn(sql: Sql, params: WaitingOnParams): Promise<Wait
   const rows = await sql.query(WaitingOnSql, [params["message_id"]])
   return rows.map((row) => rowOf("WaitingOn", WaitingOnResult, row))
 }
-
-export interface LastUserRoutesParams {
-
-}
-
-export const LastUserRoutesResult = z.object({
-  ["scope"]: z.string().nullable(),
-  ["position"]: z.number().int(),
-})
-export type LastUserRoutesResult = z.infer<typeof LastUserRoutesResult>
-
-export const LastUserRoutesSql = "-- name: LastUserRoutes :many\n-- bound: one user epoch per routing scope, including returned deliveries.\nselect scope, max(position)::int as position from session_user_route group by scope;"
-
-export async function lastUserRoutes(sql: Sql): Promise<LastUserRoutesResult[]> {
-  const rows = await sql.query(LastUserRoutesSql, [])
-  return rows.map((row) => rowOf("LastUserRoutes", LastUserRoutesResult, row))
-}

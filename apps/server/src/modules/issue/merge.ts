@@ -6,11 +6,11 @@ import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { ApiError, BizCode, refuseIn } from "#/base/errors.ts";
 import type { Core } from "#/core/core.ts";
-import type { Channel } from "#/modules/channel/channel.ts";
-import { MergeFailure } from "#/modules/repo/workplace.ts";
-import { type ChildChecks, type IssueRecord, NotTakenIn, type Session } from "#/modules/session/session.ts";
+import { type CheckoutChecks, MergeFailure } from "#/modules/repo/workplace.ts";
+import { NotTakenIn, type Session } from "#/modules/session/session.ts";
 
 import { acceptanceAncestors } from "./dependencies.ts";
+import type { IssueLanding } from "./landing.ts";
 import { statusMove } from "./moves.ts";
 
 const refused = refuseIn(BizCode.IssueRefused);
@@ -18,40 +18,18 @@ const refused = refuseIn(BizCode.IssueRefused);
 interface MergeDeps {
   readonly core: Core;
   readonly sessions: Session;
-  readonly chat: Channel;
+  /** Words for a session, said where it works (issue.ts sayTo). */
+  readonly tell: (from: string, session: string, text: string) => Promise<void>;
+  readonly landing: IssueLanding;
   readonly get: (ref: string) => Promise<T.Issue>;
   readonly list: () => Promise<T.Issue[]>;
   readonly setConflict: (id: string, conflict: T.Conflict | undefined) => Promise<void>;
-  readonly savePullRequest: (id: string, pr: T.PullRequest) => Promise<void>;
-  readonly finishPullRequest: (issue: T.Issue, state: T.PullRequestState) => Promise<void>;
 }
 
 export function merging(d: MergeDeps) {
-  const { core, sessions, chat, get, list, setConflict, savePullRequest } = d;
+  const { core, sessions, tell, landing, get, list, setConflict } = d;
   /** Merges by pull request and the poll of their states, one at a time. */
   const prLock = new Semaphore(1);
-
-  const record: IssueRecord = {
-    conflict: setConflict,
-    pullRequestSubmitted: async (issue, pr) => {
-      let thread: string;
-      try {
-        thread = await chat.issueThread(issue.id, issue.title);
-      } catch (e) {
-        throw e instanceof ApiError ? MergeFailure.error(e.message) : e;
-      }
-      await chat.post({
-        _tag: "Notice",
-        channel: thread,
-        text: t("server.issue.prDelivered", { url: pr.url }),
-        code: "issue_pr_delivery",
-        sendKey: `issue-pr:${issue.id}:${pr.url}`,
-      });
-      await savePullRequest(issue.id, pr);
-    },
-    pullRequestState: savePullRequest,
-    pullRequestFinished: d.finishPullRequest,
-  };
 
   const notTaken = async (id: string, n: NotTakenIn) => {
     const issue = sessions.live(id).session?.issue;
@@ -60,7 +38,7 @@ export function merging(d: MergeDeps) {
     if (n.fix) {
       let untold = "";
       try {
-        await chat.post({ _tag: "Tell", from: userId, session: id, text: n.fix, sendKey: "" });
+        await tell(userId, id, n.fix);
       } catch (e) {
         if (!(e instanceof ApiError)) throw e;
         untold = t("server.issue.merge.tellFailed", { why: e.message });
@@ -82,7 +60,7 @@ export function merging(d: MergeDeps) {
       // A parent's children merged into its branch: it goes from its own checkout once its helper is gone.
       const fromCheckout = (await list()).some((child) => child.parent === issue.id);
       try {
-        return await sessions.merge(issue, fromCheckout, record);
+        return await landing.merge(issue, fromCheckout);
       } catch (e) {
         const last = latestSessionIdOf(issue);
         if (e instanceof NotTakenIn && last !== undefined) throw await notTaken(last, e);
@@ -92,14 +70,14 @@ export function merging(d: MergeDeps) {
 
   const refreshPullRequests = (): Promise<void> =>
     prLock.with(async () => {
-      const followed = (await list()).map((issue) => ({ issue, finishes: issue.deliver !== "pull_request" && issue.closedAt === undefined }));
-      await sessions.refreshPullRequests(followed, record);
+      const followed = (await list()).map((issue) => ({ issue, finishes: finishesWithPullRequest(issue) }));
+      await landing.refreshPullRequests(followed);
     });
 
   const submit = (id: string, session: string, summary?: string): Promise<string> =>
     prLock.with(async () => {
       try {
-        return await sessions.submitPullRequest(
+        return await landing.submitPullRequest(
           session,
           async () => {
             const issue = await get(id);
@@ -107,7 +85,6 @@ export function merging(d: MergeDeps) {
             return issue;
           },
           summary,
-          record,
         );
       } catch (error) {
         if (error instanceof MergeFailure) throw refused(error.message);
@@ -118,9 +95,13 @@ export function merging(d: MergeDeps) {
   return { merge, refreshPullRequests, submit };
 }
 
+/** A followed pull request's end finishes its issue: one still open that delivers by merging (one that delivers the
+ * pull request itself is done already, and a closed one only keeps the state). */
+export const finishesWithPullRequest = (issue: Pick<T.Issue, "deliver" | "closedAt">) => issue.deliver !== "pull_request" && issue.closedAt === undefined;
+
 /** What a child's work must pass before it merges into its parent: its own check, the acceptance ancestors' frozen
  * files, and (the last of its siblings) their checks. */
-export function childChecks(child: T.Issue, all: readonly T.Issue[]): ChildChecks {
+export function childChecks(child: T.Issue, all: readonly T.Issue[]): CheckoutChecks {
   const constraints = child.constraints;
   const inherited = acceptanceAncestors(child, all);
   if (constraints?.acceptance === true) return { acceptance: true, check: constraints.check ?? "" };

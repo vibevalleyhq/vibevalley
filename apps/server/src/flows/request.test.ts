@@ -49,7 +49,7 @@ describe("a request the page may send again", () => {
     const statusUpdateFailure = await failure(h["issue.status.update"]({ id: made.id, status: "canceled" }));
     expect(statusUpdateFailure).toMatchObject({ name: "ApiError", bizCode: BizCode.IssueRefused });
 
-    const said = (await fw.channel.post({ _tag: "User", text: "开个串", sendKey: "" })).message;
+    const said = (await fw.channel.say({ text: "开个串", sendKey: "" })).message;
     const thread = await h["channel.thread.create"]({ id: said.id, requestKey: "thread-1" });
     const threadCreate = await h["channel.thread.create"]({ id: said.id, requestKey: "thread-1" });
     expect(threadCreate).toBe(thread);
@@ -85,7 +85,7 @@ describe("a request the page may send again", () => {
     const f = farm();
     await using fw = await withDoors(f);
     const h = fw.h;
-    const said = (await fw.channel.post({ _tag: "User", text: "点个赞", sendKey: "" })).message;
+    const said = (await fw.channel.say({ text: "点个赞", sendKey: "" })).message;
     const liked = await h["channel.reaction.set"]({ id: said.id, emoji: "👍", on: true });
     const again = await h["channel.reaction.set"]({ id: said.id, emoji: "👍", on: true });
     expect([again.reactions, again.revision]).toEqual([liked.reactions, liked.revision]);

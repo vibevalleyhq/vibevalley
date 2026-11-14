@@ -107,7 +107,7 @@ describe("mcp", () => {
     const id = got.session.id;
     await until(() => tokens.length > 0, "the session's token");
     const thread = await waitFor(
-      () => chat.threadOfSession(id),
+      () => chat.homeOf(id),
       (t) => t !== undefined,
       "the session's thread",
     );
@@ -140,7 +140,7 @@ describe("mcp", () => {
       "resource_read",
       "session_list",
     ]);
-    const extra = (await chat.post({ _tag: "User", text: "顺手做另一件事", channel: thread, sendKey: "extra" })).message;
+    const extra = (await chat.say({ text: "顺手做另一件事", channel: thread, sendKey: "extra" })).message;
     const mailbox = farm.inside;
     await waitFor(
       () => mailbox.deliveriesOf(id).find((row) => row.envelope_id === extra.id)?.channel_id,
@@ -243,7 +243,7 @@ describe("mcp", () => {
     const id = got.session.id;
     await until(() => tokens.length > 0, "the session's token");
     const thread = await waitFor(
-      () => chat.threadOfSession(id),
+      () => chat.homeOf(id),
       (t) => t !== undefined,
       "the session's thread",
     );
@@ -318,8 +318,8 @@ describe("mcp", () => {
         channel: chat.defaultChannel(),
       },
     );
-    const direct = await chat.direct("lab");
-    await chat.post({ _tag: "User", text: "在这里做一份", channel: direct, sendKey: "" });
+    const direct = await farm.watch.direct("lab");
+    await chat.say({ text: "在这里做一份", channel: direct, sendKey: "" });
     await until(() => tokens.length > 0, "the channel context's token");
     const c = client(mcp, tokens[0]!);
     await c.init();

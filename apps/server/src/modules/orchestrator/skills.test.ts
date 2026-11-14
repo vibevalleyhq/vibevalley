@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 
 import { describe, expect, it } from "vite-plus/test";
 
-import { toolName } from "#/modules/tool/schemas.ts";
+import { toolName } from "#/gateway/tool/schemas.ts";
 
 import { orchestratorSkills } from "./orchestrator.ts";
 

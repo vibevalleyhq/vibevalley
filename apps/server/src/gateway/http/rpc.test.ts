@@ -41,11 +41,11 @@ describe("the subscriptions", () => {
     await using served = await app(testConfig(), 0, undefined, quietApp);
     const chat = served.farm.channel;
     const general = chat.defaultChannel();
-    for (const text of ["早", "在吗"]) await chat.post({ _tag: "User", text: text, sendKey: "" });
+    for (const text of ["早", "在吗"]) await chat.say({ text: text, sendKey: "" });
     const first = (await chat.history(general)).find((m) => m.text === "早")!;
     const base = `http://${served.address}`;
     const following = take(base + subscriptionUrl("channel.follow", { id: general, after: first.revision }), 2);
-    await chat.post({ _tag: "User", text: "看看进度", sendKey: "" });
+    await chat.say({ text: "看看进度", sendKey: "" });
     const got = await following;
     expect(got.map((e) => (e._tag === "Message" ? e.message.text : e._tag))).toEqual(["在吗", "看看进度"]);
     const refused = await fetch(base + subscriptionUrl("channel.follow", { id: "no-such-channel", after: 0 }));

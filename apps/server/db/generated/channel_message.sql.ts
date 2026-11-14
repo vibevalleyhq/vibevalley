@@ -5,7 +5,7 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, Words_channel_message_kind, Words_channel_participant_kind, Words_channel_participant_role, Words_channel_subject_kind, Words_channel_type } from "./types.js"
+import { rowOf, Words_channel_message_kind, Words_channel_participant_kind, Words_channel_type } from "./types.js"
 
 export interface InsertMessageParams {
   readonly ["id"]: string
@@ -65,12 +65,11 @@ export const MessageByIDResult = z.object({
   ["reactions"]: z.string().nullable(),
   ["sender_name"]: z.string(),
   ["sender_kind"]: Words_channel_participant_kind,
-  ["sender_role"]: Words_channel_participant_role.nullable(),
   ["sender_agent"]: z.string().nullable(),
 })
 export type MessageByIDResult = z.infer<typeof MessageByIDResult>
 
-export const MessageByIDSql = "-- name: MessageByID :one\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.id = $1;"
+export const MessageByIDSql = "-- name: MessageByID :one\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.id = $1;"
 
 export async function messageByID(sql: Sql, params: MessageByIDParams): Promise<MessageByIDResult | undefined> {
   const [row] = await sql.query(MessageByIDSql, [params["id"]])
@@ -100,12 +99,11 @@ export const MessageBySendKeyResult = z.object({
   ["reactions"]: z.string().nullable(),
   ["sender_name"]: z.string(),
   ["sender_kind"]: Words_channel_participant_kind,
-  ["sender_role"]: Words_channel_participant_role.nullable(),
   ["sender_agent"]: z.string().nullable(),
 })
 export type MessageBySendKeyResult = z.infer<typeof MessageBySendKeyResult>
 
-export const MessageBySendKeySql = "-- name: MessageBySendKey :one\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.sender_id = $1 and m.send_key = $2;"
+export const MessageBySendKeySql = "-- name: MessageBySendKey :one\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.sender_id = $1 and m.send_key = $2;"
 
 export async function messageBySendKey(sql: Sql, params: MessageBySendKeyParams): Promise<MessageBySendKeyResult | undefined> {
   const [row] = await sql.query(MessageBySendKeySql, [params["sender_id"], params["send_key"]])
@@ -134,7 +132,6 @@ export const UserMentionsResult = z.object({
   ["reactions"]: z.string().nullable(),
   ["sender_name"]: z.string(),
   ["sender_kind"]: Words_channel_participant_kind,
-  ["sender_role"]: Words_channel_participant_role.nullable(),
   ["sender_agent"]: z.string().nullable(),
   ["channel_type"]: Words_channel_type,
   ["root_number"]: z.number().int().nullable(),
@@ -143,7 +140,7 @@ export const UserMentionsResult = z.object({
 })
 export type UserMentionsResult = z.infer<typeof UserMentionsResult>
 
-export const UserMentionsSql = "-- name: UserMentions :many\n-- bound: only the user's unread mentions; reading or replying in the channel completes them.\n-- The user's unresolved mentions, independently of the history window. Reading or replying in that channel completes them.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent,\n       c.type as channel_type, c.root_number, coalesce(c.parent_id, c.id)::text as top_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_mention n\njoin channel_message m on m.id = n.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nleft join channel_read_cursor r on r.participant_id = 'user' and r.channel_id = c.id\nwhere n.target_id = 'user' and m.sender_id <> 'user'\n  and m.number > coalesce(r.read_number, 0)\n  and not exists (select 1 from channel_message reply where reply.channel_id = c.id and reply.sender_id = 'user' and reply.number > m.number)\norder by m.id;"
+export const UserMentionsSql = "-- name: UserMentions :many\n-- bound: only the user's unread mentions; reading or replying in the channel completes them.\n-- The user's unresolved mentions, independently of the history window. Reading or replying in that channel completes them.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,\n       c.type as channel_type, c.root_number, coalesce(c.parent_id, c.id)::text as top_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_mention n\njoin channel_message m on m.id = n.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nleft join channel_read_cursor r on r.participant_id = 'user' and r.channel_id = c.id\nwhere n.target_id = 'user' and m.sender_id <> 'user'\n  and m.number > coalesce(r.read_number, 0)\n  and not exists (select 1 from channel_message reply where reply.channel_id = c.id and reply.sender_id = 'user' and reply.number > m.number)\norder by m.id;"
 
 export async function userMentions(sql: Sql): Promise<UserMentionsResult[]> {
   const rows = await sql.query(UserMentionsSql, [])
@@ -174,12 +171,11 @@ export const MessagesBeforeResult = z.object({
   ["reactions"]: z.string().nullable(),
   ["sender_name"]: z.string(),
   ["sender_kind"]: Words_channel_participant_kind,
-  ["sender_role"]: Words_channel_participant_role.nullable(),
   ["sender_agent"]: z.string().nullable(),
 })
 export type MessagesBeforeResult = z.infer<typeof MessagesBeforeResult>
 
-export const MessagesBeforeSql = "-- name: MessagesBefore :many\n-- Newest first.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number < $2 order by m.number desc limit $3::int;"
+export const MessagesBeforeSql = "-- name: MessagesBefore :many\n-- Newest first.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number < $2 order by m.number desc limit $3::int;"
 
 export async function messagesBefore(sql: Sql, params: MessagesBeforeParams): Promise<MessagesBeforeResult[]> {
   const rows = await sql.query(MessagesBeforeSql, [params["channel_id"], params["number"], params["n"]])
@@ -210,52 +206,15 @@ export const MessagesAfterResult = z.object({
   ["reactions"]: z.string().nullable(),
   ["sender_name"]: z.string(),
   ["sender_kind"]: Words_channel_participant_kind,
-  ["sender_role"]: Words_channel_participant_role.nullable(),
   ["sender_agent"]: z.string().nullable(),
 })
 export type MessagesAfterResult = z.infer<typeof MessagesAfterResult>
 
-export const MessagesAfterSql = "-- name: MessagesAfter :many\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number > $2 order by m.number limit $3::int;"
+export const MessagesAfterSql = "-- name: MessagesAfter :many\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number > $2 order by m.number limit $3::int;"
 
 export async function messagesAfter(sql: Sql, params: MessagesAfterParams): Promise<MessagesAfterResult[]> {
   const rows = await sql.query(MessagesAfterSql, [params["channel_id"], params["number"], params["n"]])
   return rows.map((row) => rowOf("MessagesAfter", MessagesAfterResult, row))
-}
-
-export interface MissingDirectDeliveriesParams {
-  readonly ["channel_id"]: string
-  readonly ["after_number"]: number
-  readonly ["recipient_id"]: string
-}
-
-export const MissingDirectDeliveriesResult = z.object({
-  ["id"]: z.string(),
-  ["channel_id"]: z.string(),
-  ["number"]: z.number().int(),
-  ["sender_id"]: z.string(),
-  ["kind"]: Words_channel_message_kind,
-  ["body"]: z.string(),
-  ["meta"]: z.string().nullable(),
-  ["send_key"]: z.string().nullable(),
-  ["created_at"]: z.number(),
-  ["revision"]: z.number().int(),
-  ["reply_number"]: z.number().int().nullable(),
-  ["edited_at"]: z.number().nullable(),
-  ["deleted_at"]: z.number().nullable(),
-  ["pinned_at"]: z.number().nullable(),
-  ["reactions"]: z.string().nullable(),
-  ["sender_name"]: z.string(),
-  ["sender_kind"]: Words_channel_participant_kind,
-  ["sender_role"]: Words_channel_participant_role.nullable(),
-  ["sender_agent"]: z.string().nullable(),
-})
-export type MissingDirectDeliveriesResult = z.infer<typeof MissingDirectDeliveriesResult>
-
-export const MissingDirectDeliveriesSql = "-- name: MissingDirectDeliveries :many\n-- bound: user messages committed after a direct session's startup snapshot, without a delivery to that session.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent\nfrom channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number > $2\n  and m.sender_id = 'user' and m.kind = 'chat' and m.deleted_at is null\n  and not exists (select 1 from session_delivery d where d.session_id = $3 and d.message_id = m.id)\norder by m.number;"
-
-export async function missingDirectDeliveries(sql: Sql, params: MissingDirectDeliveriesParams): Promise<MissingDirectDeliveriesResult[]> {
-  const rows = await sql.query(MissingDirectDeliveriesSql, [params["channel_id"], params["after_number"], params["recipient_id"]])
-  return rows.map((row) => rowOf("MissingDirectDeliveries", MissingDirectDeliveriesResult, row))
 }
 
 export interface RecentReportsParams {
@@ -280,12 +239,11 @@ export const RecentReportsResult = z.object({
   ["reactions"]: z.string().nullable(),
   ["sender_name"]: z.string(),
   ["sender_kind"]: Words_channel_participant_kind,
-  ["sender_role"]: Words_channel_participant_role.nullable(),
   ["sender_agent"]: z.string().nullable(),
 })
 export type RecentReportsResult = z.infer<typeof RecentReportsResult>
 
-export const RecentReportsSql = "-- name: RecentReports :many\n-- Newest first: the turn reports anywhere on the farm, for its log.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.kind = 'report' order by m.id desc limit $1::int;"
+export const RecentReportsSql = "-- name: RecentReports :many\n-- Newest first: the turn reports anywhere on the farm, for its log.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.kind = 'report' order by m.id desc limit $1::int;"
 
 export async function recentReports(sql: Sql, params: RecentReportsParams): Promise<RecentReportsResult[]> {
   const rows = await sql.query(RecentReportsSql, [params["n"]])
@@ -315,12 +273,11 @@ export const ReportsAfterResult = z.object({
   ["reactions"]: z.string().nullable(),
   ["sender_name"]: z.string(),
   ["sender_kind"]: Words_channel_participant_kind,
-  ["sender_role"]: Words_channel_participant_role.nullable(),
   ["sender_agent"]: z.string().nullable(),
 })
 export type ReportsAfterResult = z.infer<typeof ReportsAfterResult>
 
-export const ReportsAfterSql = "-- name: ReportsAfter :many\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.kind = 'report' and m.id > $1 order by m.id limit $2::int;"
+export const ReportsAfterSql = "-- name: ReportsAfter :many\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.kind = 'report' and m.id > $1 order by m.id limit $2::int;"
 
 export async function reportsAfter(sql: Sql, params: ReportsAfterParams): Promise<ReportsAfterResult[]> {
   const rows = await sql.query(ReportsAfterSql, [params["after"], params["n"]])
@@ -395,22 +352,23 @@ export async function latestNumber(sql: Sql, params: LatestNumberParams): Promis
   return row === undefined ? undefined : rowOf("LatestNumber", LatestNumberResult, row)
 }
 
-export interface CalledByParams {
+export interface CallersOfParams {
   readonly ["speaker"]: string
   readonly ["channel"]: string
   readonly ["before"]: string
+  readonly ["n"]: number
 }
 
-export const CalledByResult = z.object({
+export const CallersOfResult = z.object({
   ["sender_id"]: z.string(),
 })
-export type CalledByResult = z.infer<typeof CalledByResult>
+export type CallersOfResult = z.infer<typeof CallersOfResult>
 
-export const CalledBySql = "-- name: CalledBy :one\n-- The session who last @-ed the speaker here since the speaker last spoke.\nselect m.sender_id\nfrom channel_message m\njoin channel_mention n on n.message_id = m.id and n.target_id = $1\njoin channel_participant p on p.id = m.sender_id and p.role = 'worker' and p.runtime is not null\nwhere m.channel_id = $2 and m.sender_id <> $1 and m.id < $3\n  and m.id > coalesce((select max(s.id) from channel_message s where s.channel_id = $2 and s.sender_id = $1 and s.id < $3), '')\norder by m.id desc\nlimit 1;"
+export const CallersOfSql = "-- name: CallersOf :many\n-- bound: at most n, who @-ed the speaker here since the speaker last spoke, before a message: newest first.\nselect m.sender_id\nfrom channel_message m\njoin channel_mention n on n.message_id = m.id and n.target_id = $1\nwhere m.channel_id = $2 and m.sender_id <> $1 and m.id < $3\n  and m.id > coalesce((select max(s.id) from channel_message s where s.channel_id = $2 and s.sender_id = $1 and s.id < $3), '')\norder by m.id desc\nlimit $4::int;"
 
-export async function calledBy(sql: Sql, params: CalledByParams): Promise<CalledByResult | undefined> {
-  const [row] = await sql.query(CalledBySql, [params["speaker"], params["channel"], params["before"]])
-  return row === undefined ? undefined : rowOf("CalledBy", CalledByResult, row)
+export async function callersOf(sql: Sql, params: CallersOfParams): Promise<CallersOfResult[]> {
+  const rows = await sql.query(CallersOfSql, [params["speaker"], params["channel"], params["before"], params["n"]])
+  return rows.map((row) => rowOf("CallersOf", CallersOfResult, row))
 }
 
 export interface UnseenInParams {
@@ -423,27 +381,28 @@ export const UnseenInResult = z.object({
 })
 export type UnseenInResult = z.infer<typeof UnseenInResult>
 
-export const UnseenInSql = "-- name: UnseenIn :many\n-- bound: one participant's unread in one channel; the read cursor moves past them.\n-- Oldest first, so a partial read can advance the cursor without skipping messages.\nselect m.id from channel_message m\nwhere m.channel_id = $1 and m.sender_id <> $2\n  and m.number > coalesce((select read_number from channel_read_cursor where participant_id = $2 and channel_id = $1), 0)\n  and not exists (select 1 from session_delivery d where d.session_id = $2 and d.message_id = m.id and d.consumed_at is not null)\norder by m.number;"
+export const UnseenInSql = "-- name: UnseenIn :many\n-- bound: one participant's unread in one channel; the read cursor moves past them.\n-- Oldest first, so a partial read can advance the cursor without skipping messages.\nselect m.id from channel_message m\nwhere m.channel_id = $1 and m.sender_id <> $2\n  and m.number > coalesce((select read_number from channel_read_cursor where participant_id = $2 and channel_id = $1), 0)\n  and not exists (select 1 from channel_seen s where s.participant_id = $2 and s.message_id = m.id)\norder by m.number;"
 
 export async function unseenIn(sql: Sql, params: UnseenInParams): Promise<UnseenInResult[]> {
   const rows = await sql.query(UnseenInSql, [params["channel"], params["participant"]])
   return rows.map((row) => rowOf("UnseenIn", UnseenInResult, row))
 }
 
-export interface HoldNoticeSinceUserParams {
+export interface NoticeSinceUserParams {
   readonly ["channel"]: string
+  readonly ["code"]: string
 }
 
-export const HoldNoticeSinceUserResult = z.object({
+export const NoticeSinceUserResult = z.object({
   ["n"]: z.number().int(),
 })
-export type HoldNoticeSinceUserResult = z.infer<typeof HoldNoticeSinceUserResult>
+export type NoticeSinceUserResult = z.infer<typeof NoticeSinceUserResult>
 
-export const HoldNoticeSinceUserSql = "-- name: HoldNoticeSinceUser :one\nselect count(*)::int as n from channel_message m\nwhere m.channel_id = $1 and m.sender_id = 'system' and (m.meta::jsonb ->> 'code') = 'hop_limit'\n  and m.id > coalesce((select max(u.id) from channel_message u where u.channel_id = $1 and u.sender_id = 'user'), '');"
+export const NoticeSinceUserSql = "-- name: NoticeSinceUser :one\n-- The farm's notices with a code in a place since the user last spoke there.\nselect count(*)::int as n from channel_message m\nwhere m.channel_id = $1 and m.sender_id = 'system' and (m.meta::jsonb ->> 'code') = $2::text\n  and m.id > coalesce((select max(u.id) from channel_message u where u.channel_id = $1 and u.sender_id = 'user'), '');"
 
-export async function holdNoticeSinceUser(sql: Sql, params: HoldNoticeSinceUserParams): Promise<HoldNoticeSinceUserResult | undefined> {
-  const [row] = await sql.query(HoldNoticeSinceUserSql, [params["channel"]])
-  return row === undefined ? undefined : rowOf("HoldNoticeSinceUser", HoldNoticeSinceUserResult, row)
+export async function noticeSinceUser(sql: Sql, params: NoticeSinceUserParams): Promise<NoticeSinceUserResult | undefined> {
+  const [row] = await sql.query(NoticeSinceUserSql, [params["channel"], params["code"]])
+  return row === undefined ? undefined : rowOf("NoticeSinceUser", NoticeSinceUserResult, row)
 }
 
 export interface MessageByNumberParams {
@@ -469,12 +428,11 @@ export const MessageByNumberResult = z.object({
   ["reactions"]: z.string().nullable(),
   ["sender_name"]: z.string(),
   ["sender_kind"]: Words_channel_participant_kind,
-  ["sender_role"]: Words_channel_participant_role.nullable(),
   ["sender_agent"]: z.string().nullable(),
 })
 export type MessageByNumberResult = z.infer<typeof MessageByNumberResult>
 
-export const MessageByNumberSql = "-- name: MessageByNumber :one\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number = $2;"
+export const MessageByNumberSql = "-- name: MessageByNumber :one\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number = $2;"
 
 export async function messageByNumber(sql: Sql, params: MessageByNumberParams): Promise<MessageByNumberResult | undefined> {
   const [row] = await sql.query(MessageByNumberSql, [params["channel_id"], params["number"]])
@@ -505,12 +463,11 @@ export const MessagesChangedAfterResult = z.object({
   ["reactions"]: z.string().nullable(),
   ["sender_name"]: z.string(),
   ["sender_kind"]: Words_channel_participant_kind,
-  ["sender_role"]: Words_channel_participant_role.nullable(),
   ["sender_agent"]: z.string().nullable(),
 })
 export type MessagesChangedAfterResult = z.infer<typeof MessagesChangedAfterResult>
 
-export const MessagesChangedAfterSql = "-- name: MessagesChangedAfter :many\n-- What changed in a channel after a revision, in the order it changed: a follower's catch-up.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.revision > $2 order by m.revision limit $3::int;"
+export const MessagesChangedAfterSql = "-- name: MessagesChangedAfter :many\n-- What changed in a channel after a revision, in the order it changed: a follower's catch-up.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.revision > $2 order by m.revision limit $3::int;"
 
 export async function messagesChangedAfter(sql: Sql, params: MessagesChangedAfterParams): Promise<MessagesChangedAfterResult[]> {
   const rows = await sql.query(MessagesChangedAfterSql, [params["channel_id"], params["revision"], params["n"]])
@@ -588,12 +545,11 @@ export const PinnedInResult = z.object({
   ["reactions"]: z.string().nullable(),
   ["sender_name"]: z.string(),
   ["sender_kind"]: Words_channel_participant_kind,
-  ["sender_role"]: Words_channel_participant_role.nullable(),
   ["sender_agent"]: z.string().nullable(),
 })
 export type PinnedInResult = z.infer<typeof PinnedInResult>
 
-export const PinnedInSql = "-- name: PinnedIn :many\n-- bound: one channel's pins, each one pinned by hand.\n-- Newest pinned first.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.pinned_at is not null order by m.pinned_at desc;"
+export const PinnedInSql = "-- name: PinnedIn :many\n-- bound: one channel's pins, each one pinned by hand.\n-- Newest pinned first.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.pinned_at is not null order by m.pinned_at desc;"
 
 export async function pinnedIn(sql: Sql, params: PinnedInParams): Promise<PinnedInResult[]> {
   const rows = await sql.query(PinnedInSql, [params["channel_id"]])
@@ -630,7 +586,6 @@ export const SearchMessagesResult = z.object({
   ["reactions"]: z.string().nullable(),
   ["sender_name"]: z.string(),
   ["sender_kind"]: Words_channel_participant_kind,
-  ["sender_role"]: Words_channel_participant_role.nullable(),
   ["sender_agent"]: z.string().nullable(),
   ["channel_type"]: Words_channel_type,
   ["root_number"]: z.number().int().nullable(),
@@ -639,7 +594,7 @@ export const SearchMessagesResult = z.object({
 })
 export type SearchMessagesResult = z.infer<typeof SearchMessagesResult>
 
-export const SearchMessagesSql = "-- name: SearchMessages :many\n-- Newest first: messages with these words, anywhere on the farm or in one channel and its threads.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent,\n       c.type as channel_type, c.root_number, coalesce(c.parent_id, c.id)::text as top_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_message m\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nwhere m.deleted_at is null and m.kind <> 'notice'\n  and ($1::text = '' or strpos(lower(m.body), lower($1)) > 0)\n  and ($2::text = '' or c.id = $2 or c.parent_id = $2)\n  and ($3::text = '' or m.sender_id = $3 or lower(p.name) = lower($3))\n  and (not $4::boolean or strpos(coalesce(m.meta, ''), '\"attachments\"') > 0)\n  and (not $5::boolean or strpos(coalesce(m.meta, ''), '\"type\":\"image/') > 0)\n  and (not $6::boolean or strpos(m.body, 'http://') > 0 or strpos(m.body, 'https://') > 0)\n  and m.created_at >= $7::float8 and m.created_at < $8::float8\norder by m.id desc limit $9::int;"
+export const SearchMessagesSql = "-- name: SearchMessages :many\n-- Newest first: messages with these words, anywhere on the farm or in one channel and its threads.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,\n       c.type as channel_type, c.root_number, coalesce(c.parent_id, c.id)::text as top_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_message m\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nwhere m.deleted_at is null and m.kind <> 'notice'\n  and ($1::text = '' or strpos(lower(m.body), lower($1)) > 0)\n  and ($2::text = '' or c.id = $2 or c.parent_id = $2)\n  and ($3::text = '' or m.sender_id = $3 or lower(p.name) = lower($3))\n  and (not $4::boolean or strpos(coalesce(m.meta, ''), '\"attachments\"') > 0)\n  and (not $5::boolean or strpos(coalesce(m.meta, ''), '\"type\":\"image/') > 0)\n  and (not $6::boolean or strpos(m.body, 'http://') > 0 or strpos(m.body, 'https://') > 0)\n  and m.created_at >= $7::float8 and m.created_at < $8::float8\norder by m.id desc limit $9::int;"
 
 export async function searchMessages(sql: Sql, params: SearchMessagesParams): Promise<SearchMessagesResult[]> {
   const rows = await sql.query(SearchMessagesSql, [params["text"], params["channel"], params["sender"], params["has_file"], params["has_image"], params["has_link"], params["after"], params["before"], params["n"]])
@@ -711,38 +666,4 @@ export const UserReadReportsSql = "-- name: UserReadReports :many\n-- bound: the
 export async function userReadReports(sql: Sql): Promise<UserReadReportsResult[]> {
   const rows = await sql.query(UserReadReportsSql, [])
   return rows.map((row) => rowOf("UserReadReports", UserReadReportsResult, row))
-}
-
-export interface UnroutedChannelMessagesParams {
-  readonly ["after_channel"]: string
-  readonly ["after_number"]: number
-}
-
-export const UnroutedChannelMessagesResult = z.object({
-  ["envelope_id"]: z.string(),
-  ["number"]: z.number().int(),
-  ["channel_id"]: z.string(),
-  ["sender_id"]: z.string(),
-  ["kind"]: Words_channel_message_kind,
-  ["body"]: z.string(),
-  ["meta"]: z.string().nullable(),
-  ["reply_number"]: z.number().int().nullable(),
-  ["created_at"]: z.number(),
-  ["name"]: z.string(),
-  ["sender_kind"]: Words_channel_participant_kind,
-  ["sender_role"]: Words_channel_participant_role.nullable(),
-  ["channel_type"]: Words_channel_type,
-  ["root_id"]: z.string().nullable(),
-  ["root_number"]: z.number().int().nullable(),
-  ["subject_kind"]: Words_channel_subject_kind.nullable(),
-  ["subject_id"]: z.string().nullable(),
-  ["channel_name"]: z.string(),
-})
-export type UnroutedChannelMessagesResult = z.infer<typeof UnroutedChannelMessagesResult>
-
-export const UnroutedChannelMessagesSql = "-- name: UnroutedChannelMessages :many\nselect m.id as envelope_id, m.number, m.channel_id, m.sender_id, m.kind, m.body, m.meta, m.reply_number, m.created_at,\n       p.name, p.kind as sender_kind, p.role as sender_role, c.type as channel_type, c.root_id, c.root_number, c.subject_kind, c.subject_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_message m\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nleft join session_trigger r on r.id = m.id\nwhere r.routed_at is null and m.deleted_at is null\n  and (m.channel_id, m.number) > ($1::text, $2::int)\norder by m.channel_id, m.number\nlimit 1000;"
-
-export async function unroutedChannelMessages(sql: Sql, params: UnroutedChannelMessagesParams): Promise<UnroutedChannelMessagesResult[]> {
-  const rows = await sql.query(UnroutedChannelMessagesSql, [params["after_channel"], params["after_number"]])
-  return rows.map((row) => rowOf("UnroutedChannelMessages", UnroutedChannelMessagesResult, row))
 }

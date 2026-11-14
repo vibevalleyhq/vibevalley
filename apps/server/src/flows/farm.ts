@@ -28,10 +28,8 @@ async function flowWorld(options: WorldOptions): Promise<FlowWorld> {
     below.closes.push(() => game.close());
     // services.ts's startup order, for what is in it.
     await below.session.boot();
-    await below.channel.boot();
-    await below.session.wake();
     await below.media.boot();
-    await below.inbox.boot();
+    await below.watch.boot();
     return { ...below, game };
   } catch (e) {
     await below.close();
@@ -117,7 +115,7 @@ export async function mediaFarm(llm: ScriptedModel) {
   const w = await world({ config: testConfig({ patrol: { heartbeatMinutes: 0 } }), network: network() });
   try {
     w.deepseek.use(llm);
-    const orchestrator = await makeOrchestrator(w);
+    const orchestrator = await makeOrchestrator({ ...w, tools: w.tool });
     w.closes.push(() => orchestrator.close());
     return { ...w, orchestrator };
   } catch (e) {

@@ -4,8 +4,9 @@ import type { ServerConfig } from "#/infra/config.ts";
 import { type Db, openDb } from "#/infra/db.ts";
 import { keptLog } from "#/infra/log.ts";
 import { type Time, wallTime } from "#/infra/time.ts";
-import { type Agent, makeAgent } from "#/modules/agent/agent.ts";
-import { makeSetting, type Setting } from "#/modules/setting/setting.ts";
+import type { Agent } from "#/modules/agent/agent.ts";
+import { makeSetting, type Setting } from "#/platform/setting/setting.ts";
+import { testAgent } from "#/testing/agent.ts";
 
 import { makeMemory, type Memory, type MemoryOptions } from "./memory.ts";
 
@@ -29,7 +30,7 @@ export async function memoryWorld(
   const log = keptLog("memory-test");
   const db = await openDb(config, log, clock);
   const setting = await makeSetting({ config, clock, log });
-  const agent = await makeAgent({ config, clock, log });
+  const agent = await testAgent({ config, clock, log, db, setting });
   const fetch =
     options.fetch ??
     (() => {

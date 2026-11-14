@@ -325,7 +325,7 @@ export function catalogOf(filename: string): string {
   const folders = rest
     .split("/")
     .slice(0, -1)
-    .filter((f) => f !== "features" && f !== "modules" && f !== "gateway");
+    .filter((f) => f !== "features" && f !== "platform" && f !== "modules" && f !== "gateway");
   for (let n = folders.length; n > 0; n--) {
     const name = [host, ...folders.slice(0, n)].join(".");
     if (existsSync(resolve(repo, "packages/i18n/locales/zh", `${name}.json`))) return name;
@@ -872,10 +872,10 @@ const lastWord = (name: string) => /[A-Z][a-z0-9]*$/u.exec(name)?.[0] ?? name;
 const looksPlural = (name: string) => name.endsWith("s") && !singularInS.has(lastWord(name));
 const pascal = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
 
-/** The folder of a server module's service file (apps/server/src/{core,modules/x,gateway/x}/x.ts), or undefined. */
+/** The folder of a server module's service file (apps/server/src/{core,platform/x,modules/x,gateway/x}/x.ts), or undefined. */
 const serviceFolderOf = (filename: string): string | undefined => {
-  const [, folder, file] = /\/apps\/server\/src\/(?:modules\/|gateway\/)?([^/]+)\/([^/]+)\.ts$/u.exec(filename.replaceAll("\\", "/")) ?? [];
-  const inModules = /\/apps\/server\/src\/(?:modules|gateway)\/[^/]+\/[^/]+\.ts$/u.test(filename.replaceAll("\\", "/"));
+  const [, folder, file] = /\/apps\/server\/src\/(?:platform\/|modules\/|gateway\/)?([^/]+)\/([^/]+)\.ts$/u.exec(filename.replaceAll("\\", "/")) ?? [];
+  const inModules = /\/apps\/server\/src\/(?:platform|modules|gateway)\/[^/]+\/[^/]+\.ts$/u.test(filename.replaceAll("\\", "/"));
   return folder !== undefined && folder === file && (inModules || folder === "core") ? folder : undefined;
 };
 const singularOf = (word: string) => word.replace(/(ies|s)$/u, (e) => (e === "ies" ? "y" : ""));
@@ -928,7 +928,7 @@ const singularService = defineRule({
 
 /** The server's services, read once when the plugin loads. */
 const serviceNames = new Set(
-  globSync("apps/server/src/{core,modules/*,gateway/*}/*.ts", { cwd: repo })
+  globSync("apps/server/src/{core,platform/*,modules/*,gateway/*}/*.ts", { cwd: repo })
     .filter((f) => {
       const parts = f.split("/");
       return parts.at(-1)?.slice(0, -3) === parts.at(-2);
@@ -966,6 +966,7 @@ const nonBaseFolders = new Set([
   "ui",
   "state",
   "features",
+  "platform",
   "modules",
   "gateway",
   "commands",

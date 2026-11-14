@@ -5,9 +5,11 @@ import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { type SourceEvent } from "#/modules/session/mailbox.ts";
 import { committedDelivery } from "#/testing/deliveries.ts";
+import { testConfig } from "#/testing/layers.ts";
+import { sqlOf } from "#/testing/sql.ts";
 import { testIssues } from "#/testing/world.ts";
 
-import { farm, lab, until } from "./farm.ts";
+import { farm, type FlowWorld, lab, until } from "./farm.ts";
 
 const signal = (key: string, kind: "user" | "agent" = "agent", threads: readonly string[] = [], at = 0): SourceEvent => ({
   source: "channel",
@@ -25,7 +27,7 @@ test("regression: concurrent mailbox writes and restoration leave every committe
   const mailbox = fw.inside;
   const channel = fw.channel.defaultChannel();
   const recorded = [];
-  for (let n = 0; n < 12; n++) recorded.push(await mailbox.record(signal(`concurrent-${n}`)));
+  for (let n = 0; n < 12; n++) recorded.push(await mailbox.recordTrigger(signal(`concurrent-${n}`)));
   const inputs = recorded.filter((input) => input !== undefined);
   const writes = inputs.map((trigger) =>
     committedDelivery(fw.db, {
@@ -57,24 +59,34 @@ test("regression: concurrent mailbox writes and restoration leave every committe
 });
 
 test("regression: independent input hops survive restore and only a new user receipt resets them", async () => {
-  const f = farm();
-  await using fw = await f.open();
-  const mailbox = fw.inside;
-  const accept = (key: string, kind: "user" | "agent" = "agent") => mailbox.accept(signal(key, kind));
-  for (const n of [1, 2, 3, 4, 5]) await accept(`before-user-${n}`);
-  const rows = () => mailbox.deliveriesOf(defaultOrchestrator);
-  expect(rows().map((row) => row.held_by)).toEqual([null, null, null, null, "hop_limit"]);
-  await mailbox.restoreDeliveries();
-  const blocked = (await accept("after-restore"))!;
-  expect(rows().find((row) => row.envelope_id === blocked.id)?.held_by).toBe("hop_limit");
-  await accept("user-receipt", "user");
-  const next = (await accept("after-user-1"))!;
-  expect(rows().find((row) => row.envelope_id === next.id)?.held_by).toBeNull();
-  await accept("user-receipt", "user");
-  await mailbox.restoreDeliveries();
-  for (const n of [2, 3, 4]) await accept(`after-user-${n}`);
-  const capped = (await accept("after-user-5"))!;
-  expect(rows().find((row) => row.envelope_id === capped.id)?.held_by).toBe("hop_limit");
+  // The hops are the watch's (watch/brakes.ts): an agent's words in a place wake the orchestrator, the user's start the
+  // count over, and a restart reads them back from the deliveries kept.
+  const f = farm({ config: testConfig({ db: "" }) });
+  const held = async (fw: FlowWorld, id: string) =>
+    (await sqlOf(fw.db).unsafe(`select held_by from session_delivery where session_id = $1 and envelope_id = $2`, [defaultOrchestrator, id]))[0]?.["held_by"] ??
+    null;
+  const call = async (fw: FlowWorld, text: string) => (await fw.channel.speak({ from: "w90", text: `@助手 ${text}`, anyway: true })).message!.id;
+  const userSays = (fw: FlowWorld, sendKey: string) => fw.channel.say({ text: "听我说", sendKey });
+  {
+    await using fw = await f.open();
+    await fw.channel.seat({ id: "w90", name: "别处的帮工", agent: "lab" });
+    const before: unknown[] = [];
+    for (const n of [1, 2, 3, 4, 5]) before.push(await held(fw, await call(fw, `before-user-${n}`)));
+    expect(before).toEqual([null, null, null, null, "hop_limit"]);
+  }
+  {
+    await using fw = await f.open();
+    expect(await held(fw, await call(fw, "after-restore"))).toBe("hop_limit");
+    await userSays(fw, "user-receipt");
+    expect(await held(fw, await call(fw, "after-user-1"))).toBeNull();
+    // The same send again is the same message: no new receipt, the count goes on.
+    expect((await userSays(fw, "user-receipt")).again).toBe(true);
+  }
+  {
+    await using fw = await f.open();
+    for (const n of [2, 3, 4]) expect(await held(fw, await call(fw, `after-user-${n}`))).toBeNull();
+    expect(await held(fw, await call(fw, "after-user-5"))).toBe("hop_limit");
+  }
 });
 
 test("regression: queued triggers enter the first model request in receipt order despite source clock changes", async () => {
@@ -96,7 +108,7 @@ test("regression: queued triggers enter the first model request in receipt order
   const issue = await issues.add({ title: "work", agent: "lab", repo: "fifo" });
   const markers = ["FIFO_FIRST_CARD", "FIFO_SECOND_CARD", "FIFO_THIRD_CARD"];
   for (const [index, text] of markers.entries())
-    await mailbox.record({
+    await mailbox.recordTrigger({
       source: "github",
       key: text,
       actor: { kind: "system", id: "checks" },
@@ -106,7 +118,7 @@ test("regression: queued triggers enter the first model request in receipt order
       at: [500, 1, 500][index]!,
       meta: { kind: "ci", failed: true },
     });
-  await mailbox.replay();
+  await fw.intake.replay();
   await issues.start(issue.id, "");
   await until(() => inputs.length === 1, "the queued batch in the initial request");
   const positions = markers.map((marker) => inputs[0]!.indexOf(marker));
@@ -115,6 +127,7 @@ test("regression: queued triggers enter the first model request in receipt order
 });
 
 test("regression: an independent agent wake restores cooldown using receipt time rather than the source clock", async () => {
+  // The cooldown is the watch's: it reads the time a delivery was kept (the restart's agentWakes), never a trigger's own.
   const gate = Promise.withResolvers<void>();
   const turns: string[] = [];
   let steers = (): readonly string[] => [];
@@ -138,26 +151,33 @@ test("regression: an independent agent wake restores cooldown using receipt time
     const issue = await issues.add({ title: "work", agent: "lab", repo: "cooldown" });
     const started = await issues.start(issue.id, "");
     const threads = [`issue:${issue.id}`];
-    const first = (await mailbox.accept(signal("first-wake", "agent", threads)))!;
+    const thread = await fw.channel.issueThread(issue.id, issue.title);
+    const { target } = await fw.channel.addressOf(thread);
+    await fw.channel.seat({ id: "w90", name: "别处的帮工", agent: "lab" });
+    const call = async (text: string) => (await fw.channel.speak({ from: "w90", text: `@${started.session!} ${text}`, target, anyway: true })).message!;
+    const first = await call("first-wake");
     expect(mailbox.deliveriesOf(started.session!).find((row) => row.envelope_id === first.id)?.held_by).toBeNull();
     await until(
       () => steers().some((text) => text.includes("first-wake")) && !mailbox.deliveriesOf(started.session!).some((row) => row.envelope_id === first.id),
       "the first agent input consumed",
     );
-    await mailbox.restoreDeliveries();
-    const second = (await mailbox.accept(signal("future-source-clock", "agent", threads, 9_000_000_000_000)))!;
+    // Startup again: the brakes start from what the deliveries kept.
+    await fw.watch.boot();
+    const second = await call("future-source-clock");
     expect(mailbox.deliveriesOf(started.session!).find((row) => row.envelope_id === second.id)?.held_by).toBe("cooldown");
-    const queued = (await mailbox.accept({
-      source: "github",
-      key: "queued-ci",
-      actor: { kind: "system", id: "checks" },
-      addressed: "thread_owner",
-      threads,
-      text: "queued-ci",
-      at: 0,
-      meta: { kind: "ci", failed: true },
-    }))!;
-    await mailbox.accept(signal("user-authorized-wave", "user", threads));
+    const queued = (
+      await fw.intake.receive({
+        source: "github",
+        key: "queued-ci",
+        actor: { kind: "system", id: "checks" },
+        addressed: "thread_owner",
+        threads,
+        text: "queued-ci",
+        at: 0,
+        meta: { kind: "ci", failed: true },
+      })
+    ).trigger!;
+    await fw.channel.say({ text: "user-authorized-wave", channel: thread, sendKey: "" });
     await until(() => !mailbox.deliveriesOf(started.session!).some((row) => row.envelope_id === second.id), "the held card consumed with a user steer");
     expect(steers().some((text) => text.includes("future-source-clock") && text.includes("user-authorized-wave"))).toBe(true);
     expect(steers().some((text) => text.includes("queued-ci"))).toBe(false);
@@ -165,7 +185,7 @@ test("regression: an independent agent wake restores cooldown using receipt time
     const sessions = fw.inside;
     gate.resolve();
     await until(() => sessions.sessionOf(started.session!)?.phase._tag === "done", "the original turn ended");
-    await mailbox.accept(signal("user-next-run", "user", threads));
+    await fw.channel.say({ text: "user-next-run", channel: thread, sendKey: "" });
     await until(() => turns.length === 2, "a new turn takes the queued input");
     expect(turns[1]).toContain("queued-ci");
   } finally {

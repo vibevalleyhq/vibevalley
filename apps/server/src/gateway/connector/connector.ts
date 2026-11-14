@@ -10,7 +10,8 @@ import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
-import type { Inbox } from "#/modules/inbox/inbox.ts";
+import type { Watch } from "#/modules/watch/watch.ts";
+import * as accountQ from "#db/connector_account.sql.ts";
 import * as inboundQ from "#db/connector_inbound.sql.ts";
 import * as outboxQ from "#db/connector_outbox.sql.ts";
 
@@ -48,7 +49,7 @@ export interface ConnectorDeps {
   readonly fetch: typeof fetch;
   readonly core: Core;
   readonly channel: Channel;
-  readonly inbox: Inbox;
+  readonly watch: Watch;
 }
 
 /** The database's own failures (a statement refused, a row that does not read) are a bridge's failure: its status says them. */
@@ -57,9 +58,10 @@ const asBridgeError = (e: unknown): unknown =>
 
 export async function makeConnector(deps: ConnectorDeps, options: ConnectorOptions = {}): Promise<Connector> {
   // The farm's own waits and times (a pause, a retry, when a message went out) on the service's clock.
-  const { clock, db, core, inbox } = deps;
+  const { clock, db, core, watch } = deps;
   const chat = deps.channel;
   const log = deps.log.child("connector");
+  chat.guardRemoval(async (id) => (((await accountQ.accountsIn(db.sql, { channel_id: id }))?.n ?? 0) !== 0 ? [t("server.channel.connectorsThere")] : []));
   const retryFirst = options.retryFirstMs ?? 30_000;
   const retryMost = options.retryMostMs ?? 30 * 60_000;
   // The bridges' tasks (each account's generation, the status said to the core) belong to this service.
@@ -79,7 +81,7 @@ export async function makeConnector(deps: ConnectorDeps, options: ConnectorOptio
     }
   };
   let closing = false;
-  const env = { clock, sql: db.sql, log, chat, core, inbox, retryFirst, retryMost, tasks, tried, inTx, isClosing: () => closing };
+  const env = { clock, sql: db.sql, log, chat, core, watch, retryFirst, retryMost, tasks, tried, inTx, isClosing: () => closing };
 
   const adapters = [
     weixinAdapter(options.weixin ?? new WeixinClient(deps.fetch, baseUrl, clock, log)),
@@ -103,14 +105,14 @@ export async function makeConnector(deps: ConnectorDeps, options: ConnectorOptio
         sub.close();
       }
     });
-  each("inbox changes", inbox.externalChanges(), () => {
+  each("inbox changes", watch.externalChanges(), () => {
     for (const bridge of bridges) bridge.changed();
   });
   const bridge = (id: ConnectorID) => bridges.find((b) => b.id === id);
 
   // What the user hears off the farm (the inbox says what) goes out on every app the user has, each checking it is
   // its user's channel.
-  each("to the user", inbox.toUser(), (m) => Promise.all(bridges.map((b) => b.offer(m))));
+  each("to the user", watch.toUser(), (m) => Promise.all(bridges.map((b) => b.offer(m))));
   for (const b of bridges) if (b.hasAccount()) tasks.run(`${b.id} resume`, () => b.resume());
   // What came in and went out is kept for a while for replies to point at, then dropped, once at start and daily.
   tasks.run("prune", async (signal) => {

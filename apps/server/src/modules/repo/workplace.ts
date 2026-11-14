@@ -31,6 +31,13 @@ export interface Merged {
   readonly warning?: string;
 }
 
+/** What a checkout's work must pass before it merges into base. An acceptance check must fail on the work (it is the
+ * test the rest make pass), and the files the work touched are frozen for them; otherwise the checks must pass, and the
+ * frozen files stay untouched. */
+export type CheckoutChecks =
+  | { readonly acceptance: true; readonly check: string }
+  | { readonly acceptance: false; readonly frozen: readonly string[]; readonly checks: readonly string[] };
+
 export type MergeFailureKind = "conflict" | "check" | "error";
 
 /** Work that did not merge: a conflict (with the base and its files), a failed check, or anything else. */

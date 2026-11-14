@@ -196,7 +196,6 @@ const storedEnums: readonly StoredEnum[] = [
   { column: "channel.subject_kind", protocol: "SubjectKindValues", values: T.SubjectKindValues },
   { column: "channel.notify", protocol: "NotifyValues", values: T.NotifyValues },
   { column: "channel_participant.kind", protocol: "ActorKindValues", values: T.ActorKindValues },
-  { column: "channel_participant.role", protocol: "AgentRoleValues", values: T.AgentRoleValues },
   { column: "channel_message.kind", protocol: "MessageKindValues", values: T.MessageKindValues },
   { column: "issue.mandate_strength", protocol: "MandateStrengthValues", values: T.MandateStrengthValues },
   { column: "issue.priority", protocol: "PriorityValues", values: T.PriorityValues },
@@ -207,7 +206,7 @@ const storedEnums: readonly StoredEnum[] = [
   { column: "session.closed", protocol: "SessionCloseValues", values: T.SessionCloseValues },
   { column: "session_run.outcome", protocol: "OutcomeValues", values: T.OutcomeValues },
   { column: "session_delivery.source", protocol: "TriggerSourceValues", values: TriggerSourceValues },
-  { column: "cron.set_by", protocol: "ActorKindValues", values: T.ActorKindValues },
+  { column: "issue_cron.set_by", protocol: "ActorKindValues", values: T.ActorKindValues },
   { column: "memory.kind", protocol: "MemoryKindValues", values: T.MemoryKindValues },
   { column: "memory.author", protocol: "ActorKindValues", values: T.ActorKindValues },
   { column: "connector_account.connector", protocol: "ConnectorIDValues", values: T.ConnectorIDValues },
@@ -299,7 +298,7 @@ export function reviewSchemaSources(sources: ReadonlyMap<string, string>): Findi
     if (path === secretPath) findings.push(...auditSecretClass(source, path));
     if (!path.startsWith("packages/protocol/") && !source.includes("z.lazy("))
       addMatches("subpackage-dual-shape", /\bconst\s+\w+\s*:\s*z\s*\.\s*Zod\w*<\w+>\s*=/gu);
-    if (path === "apps/server/src/modules/tool/schemas.ts")
+    if (path === "apps/server/src/gateway/tool/schemas.ts")
       addMatches(
         "tool-downgrade",
         /\b(?:priority|status|deliver|tier|afterBlock|parentId)\s*:\s*(?:z\s*\.\s*(?:exactOptional|optional)\s*\(\s*)?z\s*\.\s*string\s*\(/gu,

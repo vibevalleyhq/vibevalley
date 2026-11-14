@@ -8,7 +8,7 @@ import { BizCode } from "@vibevalley/protocol/api";
 import { latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { user } from "#/base/actor.ts";
-import { inbox } from "#/modules/inbox/items.ts";
+import { inbox } from "#/modules/watch/items.ts";
 import { gitSync } from "#/testing/git.ts";
 import { refuse } from "#/testing/refuse.ts";
 import { sqlOf } from "#/testing/sql.ts";
@@ -155,7 +155,7 @@ test("regression: a failed split commits no child, assignment, queue entry or pa
   expect(fw.inside.hired()).toEqual([]);
   const unsafe2 = await sql.unsafe("select * from session_trigger where trigger_json::jsonb -> 'meta' -> 'dispatch' = 'true'::jsonb");
   expect(unsafe2).toHaveLength(0);
-  const unsafe3 = await sql.unsafe("select * from session_issue_input");
+  const unsafe3 = await sql.unsafe("select * from issue_input");
   expect(unsafe3).toHaveLength(0);
   const unsafe4 = await sql.unsafe("select * from issue_assignment");
   expect(unsafe4).toHaveLength(1);

@@ -71,31 +71,6 @@ export async function openRuns(sql: Sql): Promise<OpenRunsResult[]> {
   return rows.map((row) => rowOf("OpenRuns", OpenRunsResult, row))
 }
 
-export interface RunsOfIssueParams {
-  readonly ["issue_id"]: string
-}
-
-export const RunsOfIssueResult = z.object({
-  ["id"]: z.string(),
-  ["session"]: z.string(),
-  ["issue"]: z.string().nullable(),
-  ["triggered_by"]: z.string(),
-  ["heard"]: z.string().nullable(),
-  ["started_at"]: z.number(),
-  ["ended_at"]: z.number().nullable(),
-  ["outcome"]: Words_session_run_outcome.nullable(),
-  ["summary"]: z.string().nullable(),
-  ["spent"]: z.string().nullable(),
-})
-export type RunsOfIssueResult = z.infer<typeof RunsOfIssueResult>
-
-export const RunsOfIssueSql = "-- name: RunsOfIssue :many\n-- bound: one issue's runs.\nselect * from session_run\nwhere session_run.issue = $1 or session_run.id in (select run from session_run_issue where session_run_issue.issue = $1)\norder by started_at, id;"
-
-export async function runsOfIssue(sql: Sql, params: RunsOfIssueParams): Promise<RunsOfIssueResult[]> {
-  const rows = await sql.query(RunsOfIssueSql, [params["issue_id"]])
-  return rows.map((row) => rowOf("RunsOfIssue", RunsOfIssueResult, row))
-}
-
 export interface RunsOfSessionParams {
   readonly ["session"]: string
 }

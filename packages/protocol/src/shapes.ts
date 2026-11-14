@@ -126,6 +126,7 @@ export {
   type SessionView,
   type ToolAction,
   type ToolConnection,
+  type Machine,
 } from "./session/shapes";
 export {
   type Channel,
@@ -324,18 +325,6 @@ export {
   type UserStatus,
   type UserUpdateRequest,
 } from "./user/shapes";
-export {
-  type LibraryAddRequest,
-  type LibraryFileKind,
-  LibraryFileKindValues,
-  type LibraryItem,
-  type LibraryListRequest,
-  type LibraryOrigin,
-  type LibraryOriginKind,
-  LibraryOriginKindValues,
-  type LibrarySort,
-  LibrarySortValues,
-} from "./library/shapes";
 export { type Attachment, attachmentMax, attachmentPath, type AttachmentUpload } from "./attachment/shapes";
 export {
   type ConnectorID,
@@ -346,7 +335,6 @@ export {
   type ConnectorStatus,
   type VerifyRequest,
 } from "./connector/shapes";
-export type { Machine } from "./machine/shapes";
 export {
   type AgoraGrant,
   type Area,
@@ -424,6 +412,16 @@ export {
   type MediaUnderstandingPhase,
   MediaUnderstandingPhaseValues,
   type MediaUnderstandingRequest,
+  type LibraryAddRequest,
+  type LibraryFileKind,
+  LibraryFileKindValues,
+  type LibraryItem,
+  type LibraryListRequest,
+  type LibraryOrigin,
+  type LibraryOriginKind,
+  LibraryOriginKindValues,
+  type LibrarySort,
+  LibrarySortValues,
 } from "./media/shapes";
 export {
   type MediaAudioAccountRequest,

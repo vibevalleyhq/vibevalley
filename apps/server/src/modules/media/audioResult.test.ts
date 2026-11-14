@@ -8,8 +8,8 @@ import { BizCode } from "@vibevalley/protocol/api";
 import { keptLog } from "#/infra/log.ts";
 import type { PublicFetch } from "#/infra/publicHttp.ts";
 import { type Time, wallTime } from "#/infra/time.ts";
-import { makeAttachment } from "#/modules/attachment/attachment.ts";
 import { mp3, wav } from "#/modules/media/testdata/audio.ts";
+import { makeAttachment } from "#/platform/attachment/attachment.ts";
 import { testConfig, testDb } from "#/testing/layers.ts";
 
 import { saveAudioResult } from "./audioResult.ts";

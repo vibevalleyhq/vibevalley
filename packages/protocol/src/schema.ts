@@ -159,7 +159,6 @@ export {
   UserStatus,
   UserUpdateRequest,
 } from "./user/schema";
-export { LibraryAddRequest, LibraryItem, LibraryItems, LibraryListRequest, LibraryOrigin } from "./library/schema";
 export { Attachment, AttachmentUpload } from "./attachment/schema";
 export { ConnectorLogin, ConnectorsChannelRequest, ConnectorStatus, VerifyRequest } from "./connector/schema";
 export { AgoraGrant, Dictated, DictateRequest, SettingsUpdateVoice, VoiceCall, VoiceCallStart, VoiceGrantRenew, VoiceHeard, VoiceSaid } from "./voice/schema";
@@ -184,5 +183,10 @@ export {
   MediaAudioUsage,
   MediaInputReference,
   MediaSource,
+  LibraryAddRequest,
+  LibraryItem,
+  LibraryItems,
+  LibraryListRequest,
+  LibraryOrigin,
 } from "./media/schema";
 export { MediaAudioRequest, MediaAudioResult, MediaSpeakersRequest, MediaVoiceDesignRequest } from "./media/audio-schema";

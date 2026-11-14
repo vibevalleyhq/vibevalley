@@ -63,7 +63,7 @@
 
 三者不必拆成三个服务。只有职责可独立命名且能降低耦合时才提取，保留在原业务模块内；不新建一个收集所有规则的技术层。
 
-以定时任务为例，[到期计算](apps/server/src/modules/cron/when.ts)与[服务执行](apps/server/src/modules/cron/cron.ts)应分别承担日期决定和持久化、投递责任。测试直接调用 tick 能验证一次执行，不能单独证明周期驱动已接好；测试拨钟能验证调度，不能替代事务失败与恢复测试。
+以定时任务为例，[到期计算](apps/server/src/modules/issue/when.ts)与[服务执行](apps/server/src/modules/issue/cron.ts)应分别承担日期决定和持久化、投递责任。测试直接调用 tick 能验证一次执行，不能单独证明周期驱动已接好；测试拨钟能验证调度，不能替代事务失败与恢复测试。
 
 提取纯决定时，应保留「读取、判断、提交」的并发边界。把判断挪到锁外可能引入过期快照；函数变纯不代表整个流程变正确。
 
@@ -71,7 +71,7 @@
 
 让不变量住进类型，在系统入口一次性完成解析（Parse, don't validate），不在业务内部散落防御性判断或裸字符串约定：
 
-- **进门一次解析，门内靠铸造函数构造**：HTTP、CLI、工具参数、配置、落盘 JSON 与外部响应在边界经 Zod（`z.object`、`.check`、`.transform`、`jsonString`）一步窄化为带约束的领域值（如 [tool/schemas.ts](apps/server/src/modules/tool/schemas.ts) 将状态别名直接解码为 `S.IssueStatus`）；配置由 [config.ts](apps/server/src/infra/config.ts) 的键表一次解出，数字不放行 `NaN` / `Infinity`，格式错误当场失败、不兜底成默认值。门内造品牌主键用协议的铸造函数（`issueId(s)`），不写 `as` 断言；含密钥的值是 `Secret`（`toJSON` 抛错、打印成 `[secret]`），落盘的经 `z.codec` 解进来（[schema-audit.ts](scripts/audit/schema-audit.ts) 检查）。
+- **进门一次解析，门内靠铸造函数构造**：HTTP、CLI、工具参数、配置、落盘 JSON 与外部响应在边界经 Zod（`z.object`、`.check`、`.transform`、`jsonString`）一步窄化为带约束的领域值（如 [tool/schemas.ts](apps/server/src/gateway/tool/schemas.ts) 将状态别名直接解码为 `S.IssueStatus`）；配置由 [config.ts](apps/server/src/infra/config.ts) 的键表一次解出，数字不放行 `NaN` / `Infinity`，格式错误当场失败、不兜底成默认值。门内造品牌主键用协议的铸造函数（`issueId(s)`），不写 `as` 断言；含密钥的值是 `Secret`（`toJSON` 抛错、打印成 `[secret]`），落盘的经 `z.codec` 解进来（[schema-audit.ts](scripts/audit/schema-audit.ts) 检查）。
 - **全栈共用 Zod 契约，边界一律 Fail-Fast**：前后端均直接运行在同一份 Zod 契约之上（SSE 流经 [stream.ts](packages/protocol/src/stream.ts) 解码，HTTP 客户端 [client.ts](packages/protocol/src/client.ts) 按 `Endpoint.result` 与 `ApiError` 信封解码，SQL 查询的每一行经生成的结果 Schema 解码，工具与配置进门窄化）。边界外进来的值直接 `X.parse`、不符即错（要自己处理错的用 `safeParse`，JSON 文本用 `jsonOf`）；不在内部散落防御性守卫。`packages/protocol` 通过 `satisfies Codec<T.X>`（[codec.ts](packages/protocol/src/codec.ts)）锁死形状与解码器，其余模块直接用 `z.infer<typeof X>` 派生编译期类型；闭合词集统一导出 `XValues`，Schema 写 `z.enum(T.XValues)`，不重复内联字面量。
 - **未解析引用与品牌主键分离**：持久实体主键使用品牌标称类型（如 `IssueId`、`SessionId`、`ChannelId`、`AgentId`），不应跨概念混传同为 `string` 的 ID。用户、CLI 或模型传入的名称、编号与地址（如 `#41`、频道名、`vv://`）按引用建模，在所属服务的入口（如 `Issue.idOf`、`Channel.placeOf`、`Agent.named`）一次性解析为品牌主键；服务内部与存储层只传递已解析的品牌主键。
 - **存储解码区分「缺省」与「损坏」**：库表 `CHECK` 枚举由 [pg-generate.ts](apps/server/scripts/pg-generate.ts) 生成字面量联合并经 [schema-audit.ts](scripts/audit/schema-audit.ts) 与协议枚举对账。服务端自有表的可空 JSON 列统一用 `storedJsonOrUndefined(Schema, "表.列")`（`null` 归 `undefined`，非空损坏立即抛 `Inconsistent` fail-fast），非空 JSON 列用 `jsonOf(Schema, "表.列")`，不用 `jsonOrNone` 把数据损坏静默吞成缺省；仅外部不可信 CLI / Webhook 载荷才用 `jsonOrNone` 容错。

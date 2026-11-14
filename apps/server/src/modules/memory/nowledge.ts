@@ -10,7 +10,7 @@ import type * as T from "@vibevalley/protocol";
 
 import { head, clip } from "#/base/clip.ts";
 import { redact, type RedactedString, redactedHead } from "#/base/redact.ts";
-import type { MemorySourceConfig } from "#/modules/setting/memorySources.ts";
+import type { MemorySourceConfig } from "#/platform/setting/memorySources.ts";
 
 import { recallWords } from "./prompts.ts";
 import { recallCount, type MemoryScope } from "./recall.ts";

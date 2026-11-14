@@ -4,15 +4,13 @@ import type { ToolResult } from "@vibevalley/agent/core/tool";
 import type { Clock } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type { Outcome, RunTrigger, Spent } from "@vibevalley/protocol";
-import { issueId } from "@vibevalley/protocol/schema";
 
 import { Inconsistent } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { jsonText } from "#/base/json.ts";
 import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
-import { messageText } from "#/modules/runtime/durable.ts";
+import { messageText } from "#/modules/agent/durable.ts";
 import * as qr from "#db/session_run.sql.ts";
-import * as qi from "#db/session_run_issue.sql.ts";
 
 import type { Journal } from "./journal.ts";
 import type { ToolStart } from "./reaction.ts";
@@ -82,10 +80,9 @@ export function makeInProcessRun(session: string, journal: Journal, toolStart: (
   const finish = async () => {
     if (!run) return;
     ending = true;
-    const issues = await store.issues(run);
     await store.finish(run, outcome, summary);
     journal.runEnded(run, outcome);
-    const done = { id: run, issues, outcome };
+    const done = { id: run, outcome };
     run = "";
     ending = false;
     store.finished(done);
@@ -94,7 +91,7 @@ export function makeInProcessRun(session: string, journal: Journal, toolStart: (
   const begin = async (input: RunInput) => {
     if (ending) await finish();
     if (run) {
-      if (input.issue) await store.link(run, input.issue);
+      if (input.issue) store.link(run, input.issue);
       return;
     }
     const given = !input.issue && !input.by.kind && resuming ? resuming : input;
@@ -102,7 +99,6 @@ export function makeInProcessRun(session: string, journal: Journal, toolStart: (
     const by: RunTrigger = given.by.kind ? given.by : { kind: "runtime" };
     const id = newId();
     await store.start(id, session, given.issue ?? "", by);
-    if (given.issue) await store.link(id, given.issue);
     run = id;
     outcome = "completed";
     summary = "";
@@ -218,13 +214,9 @@ export function recording(deps: { readonly db: Db; readonly clock: Clock }) {
     start: async (id: string, session: string, issue: string, trigger: RunTrigger, at = clock.now()) => {
       await tried(() => qr.startRun(db.sql, { id, session, issue: issue || null, triggered_by: jsonText(trigger), started_at: at }));
     },
-    link: async (run: string, issue: string) => {
-      await tried(() => qi.linkRunIssue(db.sql, { run, issue }));
-    },
     heard: async (id: string, heard: readonly string[]) => {
       await tried(() => qr.heardInRun(db.sql, { heard: jsonText(heard), id }));
     },
-    issues: async (run: string) => (await tried(() => qi.runIssues(db.sql, { run }))).map((row) => issueId(row.issue)),
     /** The session's run not ended yet: at most one, left open by a restart. */
     unended: async (session: string) => {
       const row = (await tried(() => qr.openRuns(db.sql))).findLast((r) => r.session === session);

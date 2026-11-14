@@ -11,6 +11,31 @@ import { testIssues } from "#/testing/world.ts";
 import { await_, farm, lab, until } from "./farm.ts";
 
 describe("an issue's thread", () => {
+  test("an agent's words to an issue's session are said where it works, a recorded trigger delivered to it", async () => {
+    // Issue.comment by an agent: once the watch's tell, now said in the session's home and routed (and braked) there.
+    const f = farm();
+    await using fw = await f.open();
+    await fw.agent.save(lab());
+    const issues = testIssues(fw.issue);
+    const issue = await issues.add({ title: "看看", repo: "told", agent: "lab" });
+    const started = await issues.start(issue.id, "");
+    const session = started.session!;
+    const thread = (await await_(
+      () => fw.channel.homeOf(session),
+      (id) => id !== undefined,
+      "its thread",
+    ))!;
+    const orchestrator = fw.channel.orchestratorIn(thread);
+    const receipt = await fw.issue.comment(issue.id, "直接说给它", "told", { kind: "agent", id: orchestrator, role: "orchestrator" });
+    expect(receipt.worker?.id).toBe(session);
+    const said = (await fw.channel.history(thread)).find((m) => m.text === "直接说给它")!;
+    expect(said.from).toBe(orchestrator);
+    expect(await fw.session.trigger(said.id)).toBeDefined();
+    // Delivered to its session (which takes it once its issue is not waiting on the user).
+    const [delivery] = await sqlOf(fw.db).unsafe(`select reason, held_by from session_delivery where session_id = $1 and envelope_id = $2`, [session, said.id]);
+    expect(delivery).toMatchObject({ reason: "own_thread", held_by: null });
+  });
+
   test("regression: closing an issue releases an unconsumed followup through the mailbox", async () => {
     const f = farm({
       runtime: scriptedRuntime({
@@ -30,11 +55,11 @@ describe("an issue's thread", () => {
     const issue = await issues.add({ title: "还在处理", repo: "release-input", agent: "lab" });
     const started = await issues.start(issue.id, "");
     const thread = (await await_(
-      () => chat.threadOfSession(started.session!),
+      () => chat.homeOf(started.session!),
       (id) => id !== undefined,
       "the issue thread",
     ))!;
-    const followup = (await chat.post({ _tag: "User", text: "这条还没处理", channel: thread, sendKey: "release-on-close" })).message;
+    const followup = (await chat.say({ text: "这条还没处理", channel: thread, sendKey: "release-on-close" })).message;
     await await_(
       () => Promise.resolve(mailbox.deliveriesOf(started.session!).find((row) => row.envelope_id === followup.id)?.channel_id),
       (id) => id === thread,
@@ -76,7 +101,7 @@ describe("an issue's thread", () => {
     await issues.start(issue.id, "");
     await until(() => inputs.length > 0, "the queued input delivered with the first assignment");
     expect(inputs[0]).toContain("先记下验收要求");
-    const followup = (await channels.post({ _tag: "User", text: "另一个需求", channel: thread, sendKey: "handback-source" })).message;
+    const followup = (await channels.say({ text: "另一个需求", channel: thread, sendKey: "handback-source" })).message;
     const session = sessions.hired()[0]!;
     const mailbox = fw.inside;
     await await_(
@@ -84,8 +109,8 @@ describe("an issue's thread", () => {
       (channel) => channel === thread,
       "the followup owned by the session",
     );
-    await fw.inside.decline(session.id, followup.id, "超出当前范围");
-    await fw.inside.decline(session.id, followup.id, "超出当前范围");
+    await fw.intake.decline(session.id, followup.id, "超出当前范围");
+    await fw.intake.decline(session.id, followup.id, "超出当前范围");
     const returned = mailbox.deliveriesOf(channels.orchestratorIn(thread)).filter((row) => row.envelope_id === `returned:${issue.id}:${followup.id}`);
     expect(returned).toHaveLength(1);
     expect(returned[0]!.payload.trigger.id).toBe(followup.id);
@@ -111,7 +136,7 @@ describe("an issue's thread", () => {
     expect(first).toBeDefined();
     const thread = await await_(
       async () => {
-        const id = await channels.threadOfSession(first);
+        const id = await channels.homeOf(first);
         return id ? channelOf(core.state().chat, id) : undefined;
       },
       (c): c is T.Channel => c !== undefined,
@@ -121,7 +146,7 @@ describe("an issue's thread", () => {
     const inThread = (): T.ChatMessage[] => saidIn(thread!.id);
     const reportsBy = (session: string) => inThread().filter((m) => m.kind === "report" && m.from === session).length;
     await until(() => reportsBy(first) === 1, "the first session's report");
-    await channels.post({ _tag: "User", text: "把输出改成中文", channel: thread!.id, sendKey: "" });
+    await channels.say({ text: "把输出改成中文", channel: thread!.id, sendKey: "" });
     await until(() => reportsBy(first) === 2, "the person's words wake the first session");
 
     await sessions.dismiss(first);
@@ -130,24 +155,24 @@ describe("an issue's thread", () => {
       (i) => i.closedAt !== undefined,
       "cancelled",
     );
-    const kept = await channels.post({ _tag: "User", text: "先记一下：时区用东八区", channel: thread!.id, sendKey: "" });
+    const kept = await channels.say({ text: "先记一下：时区用东八区", channel: thread!.id, sendKey: "" });
     const woken = await sql<{
       n: number;
     }>`select count(*) as n from session_delivery where message_id = ${kept.message.id} and session_id = ${first}`;
     expect(woken[0]!.n).toBe(0);
-    const rows = await sql`select trigger_id from session_issue_input where trigger_id = ${kept.message.id} and state = 'returned'`;
+    const rows = await sql`select trigger_id from issue_input where trigger_id = ${kept.message.id} and state = 'returned'`;
     expect(rows).toHaveLength(1);
 
     const setStatus2 = await issues.setStatus(issue.id, "todo", "接着做", "", user);
     const second = latestSessionIdOf(setStatus2);
     if (second === undefined) throw new Error("the issue has no reopened session");
     await until(() => reportsBy(second) === 1, "the second session's report in the same thread");
-    const threadOfSession2 = await channels.threadOfSession(second);
+    const threadOfSession2 = await channels.homeOf(second);
     expect(threadOfSession2).toBe(thread!.id);
     const handed = inThread().find((m) => m.kind === "dispatch" && m.session === second);
     expect(handed?.text).toContain("@" + second);
     expect(handed?.text).toContain("第 2 次");
-    await channels.post({ _tag: "User", text: "时区记得改", channel: thread!.id, sendKey: "" });
+    await channels.say({ text: "时区记得改", channel: thread!.id, sendKey: "" });
     await until(() => reportsBy(second) === 2, "the person's words wake the second session");
     expect(reportsBy(first)).toBe(2);
 
@@ -173,7 +198,7 @@ describe("an issue's thread", () => {
     const issues = testIssues(issue2);
     const channels = fw.channel;
     const sessions = fw.inside;
-    const inbox = fw.inbox;
+    const inbox = fw.watch;
     const { in: saidIn } = fw.said;
     await fw.agent.save(lab());
     const issue = await issues.add({
@@ -183,7 +208,7 @@ describe("an issue's thread", () => {
     });
     const sent = await issues.start(issue.id, "");
     const thread = (await await_(
-      () => channels.threadOfSession(sent.session!),
+      () => channels.homeOf(sent.session!),
       (id) => id !== undefined,
       "the issue's thread",
     ))!;
@@ -216,7 +241,7 @@ describe("an issue's thread", () => {
       "the question seen",
     );
 
-    await channels.post({ _tag: "User", text: "用 8797", channel: thread, sendKey: "" });
+    await channels.say({ text: "用 8797", channel: thread, sendKey: "" });
     await await_(
       () => inbox.handoffState(question.id),
       (state) => state === undefined,
@@ -226,7 +251,7 @@ describe("an issue's thread", () => {
     await await_(get, (i) => i.status === "in_review", "handed back");
     await issues.review(issue.id, { pass: true });
     expect((await get()).reviewedAt).toBeDefined();
-    await channels.post({ _tag: "User", text: "标题再短一点", channel: thread, sendKey: "" });
+    await channels.say({ text: "标题再短一点", channel: thread, sendKey: "" });
     await await_(get, (i) => i.reviewedAt === undefined, "another round voids the pass");
 
     const said = () => saidIn(thread).filter((m) => m.from === "user" && m.text === "顺手把注释删掉").length;

@@ -143,6 +143,7 @@
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
+| `testAgent` | `agent.ts` | The agent module on its own: no runtime unless options give one, nothing probed in the background, no network. Its |
 | `span` | `artifact.ts` |  |
 | `bold` | `artifact.ts` |  |
 | `para` | `artifact.ts` |  |
@@ -194,7 +195,7 @@
 | `helper` | `worker.ts` | The helper every flow hires: what it does is in the words of its brief (the part after the reminders). draft-only drafts. |
 | `installedOnly` | `worker.ts` | A probe that finds every runtime given, bundled, and no other. |
 | `quietApp` | `world.ts` | For a test that builds the whole app (http/app.ts): nothing of this machine's is asked in the background, and the |
-| `moduleWorld` | `world.ts` | Core domain services below Inbox/Tool/Mcp for module tests: services.ts's buildModules, with the test's runtimes, repos and network. |
+| `moduleWorld` | `world.ts` | Core domain services below Tool/Mcp for module tests: services.ts's buildModules, with the test's runtimes, repos and network. |
 | `world` | `world.ts` |  |
 | `testIssues` | `world.ts` | Issues a test adds are ones the user sent, so their mandate is explicit. |
 

@@ -44,7 +44,7 @@ describe("the library", () => {
     await using farm = await world();
     const { media, channel: chat, core } = farm;
     const said = await farm.attachment.attach(file("note.txt", "打卡规则"));
-    const { message } = await chat.post({ _tag: "User", text: "看这个", sendKey: "k1", attachments: [said.id] });
+    const { message } = await chat.say({ text: "看这个", sendKey: "k1", attachments: [said.id] });
     const uploaded = await waitFor(
       () => media.libraryItems({ origin: "uploaded" }),
       (items) => items.length === 1,
@@ -64,7 +64,7 @@ describe("the library", () => {
     expect(generated[0]).toMatchObject({ attachment: made, origin: { kind: "generated", job: "job-1", jobKind: "image" } });
 
     // The same file said again is the same item, its first origin kept.
-    await chat.post({ _tag: "User", text: "再看一次", sendKey: "k2", attachments: [made.id] });
+    await chat.say({ text: "再看一次", sendKey: "k2", attachments: [made.id] });
     const all = await waitFor(
       () => media.libraryItems({}),
       (items) => items[0]?.attachment.id === made.id && items[0].lastAt > items[0].addedAt,

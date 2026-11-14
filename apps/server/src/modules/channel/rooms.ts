@@ -176,7 +176,9 @@ export class ChatModel {
   /** Preserves original `kind` and `joined_at` when an existing participant rejoins. */
   joined(p: Omit<ParticipantRow, "left_at">) {
     const held = this.people.get(p.id);
-    this.people.set(p.id, held ? { ...held, role: p.role, name: p.name, agent_id: p.agent_id, runtime: p.runtime, left_at: null } : { ...p, left_at: null });
+    // A home of none keeps the one it had, as the upsert does.
+    const home_id = p.home_id ?? held?.home_id ?? null;
+    this.people.set(p.id, held ? { ...held, name: p.name, agent_id: p.agent_id, home_id, left_at: null } : { ...p, home_id, left_at: null });
   }
 
   left(id: string, at: number) {

@@ -10,7 +10,7 @@ import type { Db } from "#/infra/db.ts";
 import { keptLog } from "#/infra/log.ts";
 import type { PublicFetch } from "#/infra/publicHttp.ts";
 import type { Time } from "#/infra/time.ts";
-import { makeProvider } from "#/modules/provider/provider.ts";
+import { makeProvider } from "#/platform/provider/provider.ts";
 import { testConfig } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 

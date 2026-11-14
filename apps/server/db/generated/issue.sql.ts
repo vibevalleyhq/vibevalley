@@ -47,7 +47,7 @@ export const ListIssuesResult = z.object({
 })
 export type ListIssuesResult = z.infer<typeof ListIssuesResult>
 
-export const ListIssuesSql = "-- name: ListIssues :many\n-- bound: every issue, as the core holds them.\nselect issue.*, latest_run.started_at::float8 as run_started_at, latest_run.ended_at as run_ended_at,\n       latest_run.outcome as run_outcome\nfrom issue left join session_run latest_run on latest_run.id = (\n  select r.id from session_run r\n  where (r.issue = issue.id or exists (select 1 from session_run_issue l where l.run = r.id and l.issue = issue.id))\n    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment\n      where a.issue = issue.id and e.executor = r.session)\n  order by r.started_at desc, r.id desc limit 1\n) order by issue.rank, issue.created_at, issue.id;"
+export const ListIssuesSql = "-- name: ListIssues :many\n-- bound: every issue, as the core holds them.\nselect issue.*, latest_run.started_at::float8 as run_started_at, latest_run.ended_at as run_ended_at,\n       latest_run.outcome as run_outcome\nfrom issue left join session_run latest_run on latest_run.id = (\n  select r.id from session_run r\n  where (r.issue = issue.id or exists (select 1 from issue_run l where l.run = r.id and l.issue = issue.id))\n    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment\n      where a.issue = issue.id and e.executor = r.session)\n  order by r.started_at desc, r.id desc limit 1\n) order by issue.rank, issue.created_at, issue.id;"
 
 export async function listIssues(sql: Sql): Promise<ListIssuesResult[]> {
   const rows = await sql.query(ListIssuesSql, [])
@@ -94,7 +94,7 @@ export const GetIssueResult = z.object({
 })
 export type GetIssueResult = z.infer<typeof GetIssueResult>
 
-export const GetIssueSql = "-- name: GetIssue :one\nselect issue.*, latest_run.started_at::float8 as run_started_at, latest_run.ended_at as run_ended_at,\n       latest_run.outcome as run_outcome\nfrom issue left join session_run latest_run on latest_run.id = (\n  select r.id from session_run r\n  where (r.issue = issue.id or exists (select 1 from session_run_issue l where l.run = r.id and l.issue = issue.id))\n    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment\n      where a.issue = issue.id and e.executor = r.session)\n  order by r.started_at desc, r.id desc limit 1\n) where issue.id = $1;"
+export const GetIssueSql = "-- name: GetIssue :one\nselect issue.*, latest_run.started_at::float8 as run_started_at, latest_run.ended_at as run_ended_at,\n       latest_run.outcome as run_outcome\nfrom issue left join session_run latest_run on latest_run.id = (\n  select r.id from session_run r\n  where (r.issue = issue.id or exists (select 1 from issue_run l where l.run = r.id and l.issue = issue.id))\n    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment\n      where a.issue = issue.id and e.executor = r.session)\n  order by r.started_at desc, r.id desc limit 1\n) where issue.id = $1;"
 
 export async function getIssue(sql: Sql, params: GetIssueParams): Promise<GetIssueResult | undefined> {
   const [row] = await sql.query(GetIssueSql, [params["id"]])
@@ -110,7 +110,7 @@ export const IssueExistsResult = z.object({
 })
 export type IssueExistsResult = z.infer<typeof IssueExistsResult>
 
-export const IssueExistsSql = "-- name: IssueExists :one\n-- Whether an issue is there at all, for Mailbox routing before the core fact reaches it.\nselect id from issue where id = $1;"
+export const IssueExistsSql = "-- name: IssueExists :one\n-- Whether an issue is there at all, for the intake's routing before the core fact reaches it (issue/intake.ts).\nselect id from issue where id = $1;"
 
 export async function issueExists(sql: Sql, params: IssueExistsParams): Promise<IssueExistsResult | undefined> {
   const [row] = await sql.query(IssueExistsSql, [params["id"]])
@@ -157,7 +157,7 @@ export const IssueByNumberResult = z.object({
 })
 export type IssueByNumberResult = z.infer<typeof IssueByNumberResult>
 
-export const IssueByNumberSql = "-- name: IssueByNumber :one\nselect issue.*, latest_run.started_at::float8 as run_started_at, latest_run.ended_at as run_ended_at,\n       latest_run.outcome as run_outcome\nfrom issue left join session_run latest_run on latest_run.id = (\n  select r.id from session_run r\n  where (r.issue = issue.id or exists (select 1 from session_run_issue l where l.run = r.id and l.issue = issue.id))\n    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment\n      where a.issue = issue.id and e.executor = r.session)\n  order by r.started_at desc, r.id desc limit 1\n) where issue.number = $1;"
+export const IssueByNumberSql = "-- name: IssueByNumber :one\nselect issue.*, latest_run.started_at::float8 as run_started_at, latest_run.ended_at as run_ended_at,\n       latest_run.outcome as run_outcome\nfrom issue left join session_run latest_run on latest_run.id = (\n  select r.id from session_run r\n  where (r.issue = issue.id or exists (select 1 from issue_run l where l.run = r.id and l.issue = issue.id))\n    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment\n      where a.issue = issue.id and e.executor = r.session)\n  order by r.started_at desc, r.id desc limit 1\n) where issue.number = $1;"
 
 export async function issueByNumber(sql: Sql, params: IssueByNumberParams): Promise<IssueByNumberResult | undefined> {
   const [row] = await sql.query(IssueByNumberSql, [params["number"]])
@@ -401,7 +401,7 @@ export const KeptIssuesResult = z.object({
 })
 export type KeptIssuesResult = z.infer<typeof KeptIssuesResult>
 
-export const KeptIssuesSql = "-- name: KeptIssues :many\n-- What the core state keeps: the open issues and the latest closed ones, each with its sub-issues.\nwith latest as (select id from issue where parent is null and closed_at is not null order by closed_at desc limit $1::int)\nselect issue.*, latest_run.started_at::float8 as run_started_at, latest_run.ended_at as run_ended_at,\n       latest_run.outcome as run_outcome\nfrom issue left join session_run latest_run on latest_run.id = (\n  select r.id from session_run r\n  where (r.issue = issue.id or exists (select 1 from session_run_issue l where l.run = r.id and l.issue = issue.id))\n    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment\n      where a.issue = issue.id and e.executor = r.session)\n  order by r.started_at desc, r.id desc limit 1\n)\nwhere issue.closed_at is null or issue.id in (select id from latest) or issue.parent in (select id from latest)\n   or issue.parent in (select id from issue where closed_at is null);"
+export const KeptIssuesSql = "-- name: KeptIssues :many\n-- What the core state keeps: the open issues and the latest closed ones, each with its sub-issues.\nwith latest as (select id from issue where parent is null and closed_at is not null order by closed_at desc limit $1::int)\nselect issue.*, latest_run.started_at::float8 as run_started_at, latest_run.ended_at as run_ended_at,\n       latest_run.outcome as run_outcome\nfrom issue left join session_run latest_run on latest_run.id = (\n  select r.id from session_run r\n  where (r.issue = issue.id or exists (select 1 from issue_run l where l.run = r.id and l.issue = issue.id))\n    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment\n      where a.issue = issue.id and e.executor = r.session)\n  order by r.started_at desc, r.id desc limit 1\n)\nwhere issue.closed_at is null or issue.id in (select id from latest) or issue.parent in (select id from latest)\n   or issue.parent in (select id from issue where closed_at is null);"
 
 export async function keptIssues(sql: Sql, params: KeptIssuesParams): Promise<KeptIssuesResult[]> {
   const rows = await sql.query(KeptIssuesSql, [params["closed"]])
@@ -448,7 +448,7 @@ export const FamilyResult = z.object({
 })
 export type FamilyResult = z.infer<typeof FamilyResult>
 
-export const FamilySql = "-- name: Family :many\n-- bound: one issue and its sub-issues.\n-- An issue and its sub-issues.\nselect issue.*, latest_run.started_at::float8 as run_started_at, latest_run.ended_at as run_ended_at,\n       latest_run.outcome as run_outcome\nfrom issue left join session_run latest_run on latest_run.id = (\n  select r.id from session_run r\n  where (r.issue = issue.id or exists (select 1 from session_run_issue l where l.run = r.id and l.issue = issue.id))\n    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment\n      where a.issue = issue.id and e.executor = r.session)\n  order by r.started_at desc, r.id desc limit 1\n) where issue.id = $1 or issue.parent = $1;"
+export const FamilySql = "-- name: Family :many\n-- bound: one issue and its sub-issues.\n-- An issue and its sub-issues.\nselect issue.*, latest_run.started_at::float8 as run_started_at, latest_run.ended_at as run_ended_at,\n       latest_run.outcome as run_outcome\nfrom issue left join session_run latest_run on latest_run.id = (\n  select r.id from session_run r\n  where (r.issue = issue.id or exists (select 1 from issue_run l where l.run = r.id and l.issue = issue.id))\n    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment\n      where a.issue = issue.id and e.executor = r.session)\n  order by r.started_at desc, r.id desc limit 1\n) where issue.id = $1 or issue.parent = $1;"
 
 export async function family(sql: Sql, params: FamilyParams): Promise<FamilyResult[]> {
   const rows = await sql.query(FamilySql, [params["id"]])
@@ -495,7 +495,7 @@ export const LatestOfCronResult = z.object({
 })
 export type LatestOfCronResult = z.infer<typeof LatestOfCronResult>
 
-export const LatestOfCronSql = "-- name: LatestOfCron :one\n-- A cron's issue: the one it made last.\nselect issue.*, latest_run.started_at::float8 as run_started_at, latest_run.ended_at as run_ended_at,\n       latest_run.outcome as run_outcome\nfrom issue left join session_run latest_run on latest_run.id = (\n  select r.id from session_run r\n  where (r.issue = issue.id or exists (select 1 from session_run_issue l where l.run = r.id and l.issue = issue.id))\n    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment\n      where a.issue = issue.id and e.executor = r.session)\n  order by r.started_at desc, r.id desc limit 1\n) where issue.cron = $1 order by issue.created_at desc, issue.id desc limit 1;"
+export const LatestOfCronSql = "-- name: LatestOfCron :one\n-- A cron's issue: the one it made last.\nselect issue.*, latest_run.started_at::float8 as run_started_at, latest_run.ended_at as run_ended_at,\n       latest_run.outcome as run_outcome\nfrom issue left join session_run latest_run on latest_run.id = (\n  select r.id from session_run r\n  where (r.issue = issue.id or exists (select 1 from issue_run l where l.run = r.id and l.issue = issue.id))\n    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment\n      where a.issue = issue.id and e.executor = r.session)\n  order by r.started_at desc, r.id desc limit 1\n) where issue.cron = $1 order by issue.created_at desc, issue.id desc limit 1;"
 
 export async function latestOfCron(sql: Sql, params: LatestOfCronParams): Promise<LatestOfCronResult | undefined> {
   const [row] = await sql.query(LatestOfCronSql, [params["cron"]])

@@ -11,7 +11,7 @@ import { wallTime } from "#/infra/time.ts";
 import { gitInEnv, gitSync, reposDir, repo, write } from "#/testing/git.ts";
 import { testConfig, untilGot as until } from "#/testing/layers.ts";
 
-import { activityOf, countsOf, type GitHubRun, makeRepo, type Repo, type RepoHooks, repoProblem, tokeiArgs } from "./repo.ts";
+import { activityOf, changedFiles, countsOf, type GitHubRun, makeRepo, type Repo, type RepoHooks, repoProblem, runCheck, tokeiArgs } from "./repo.ts";
 import { MergeFailure } from "./workplace.ts";
 
 /** gh is not installed. */
@@ -122,7 +122,7 @@ describe("repos", () => {
       expect(branchChanges2).toBeUndefined();
       const branchMerged = await p.mergeBranch("task", "vibevalley/task-1");
       expect(branchMerged).toMatch(/1 个提交合进了 task 的 main/u);
-      const outcome = await p.run(join(root, "task"), "cat a.txt && exit 3");
+      const outcome = await runCheck(join(root, "task"), "cat a.txt && exit 3");
       expect(outcome).toEqual({
         ok: false,
         output: "a",
@@ -214,7 +214,7 @@ describe("repos", () => {
       gitSync(third.cwd, "add", ".");
       gitSync(third.cwd, "commit", "-qm", "w3");
       await p.mergeInto(third, "vibevalley/task-1");
-      const changedFiles2 = await p.changedFiles(mine.cwd, "vibevalley/task-1");
+      const changedFiles2 = await changedFiles(mine.cwd, "vibevalley/task-1");
       expect(changedFiles2).toEqual(["a.txt", "b.txt", "c.txt", "new.txt"]);
     });
   });

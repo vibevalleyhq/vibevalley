@@ -176,6 +176,20 @@ export class VibeValleyApi {
     },
   };
 
+  readonly library = {
+    item: {
+      /** Newest first. */
+      list: (a: T.LibraryListRequest, options?: { signal?: AbortSignal }): Promise<T.LibraryItem[]> =>
+        this.call<T.LibraryItem[]>("/api/v1/library/item/list", a, options),
+      add: (a: T.LibraryAddRequest, options?: { signal?: AbortSignal }): Promise<T.LibraryItem> =>
+        this.call<T.LibraryItem>("/api/v1/library/item/add", a, options),
+      /** Only the item goes: a message that has the file still opens it. */
+      delete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/library/item/delete", a, options),
+      previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
+        this.call<T.Preview>("/api/v1/library/item/previewDelete", a, options),
+    },
+  };
+
   readonly channel = {
     create: (a: T.ChannelRequest, options?: { signal?: AbortSignal }): Promise<string> => this.call<string>("/api/v1/channel/create", a, options),
     update: (a: { id: string } & T.ChannelUpdate, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/channel/update", a, options),
@@ -635,20 +649,6 @@ export class VibeValleyApi {
       list: (options?: { signal?: AbortSignal }): Promise<T.Approval[]> => this.call<T.Approval[]>("/api/v1/user/approval/list", undefined, options),
       answer: (a: T.ApprovalAnswerRequest, options?: { signal?: AbortSignal }): Promise<T.Approval[]> =>
         this.call<T.Approval[]>("/api/v1/user/approval/answer", a, options),
-    },
-  };
-
-  readonly library = {
-    item: {
-      /** Newest first. */
-      list: (a: T.LibraryListRequest, options?: { signal?: AbortSignal }): Promise<T.LibraryItem[]> =>
-        this.call<T.LibraryItem[]>("/api/v1/library/item/list", a, options),
-      add: (a: T.LibraryAddRequest, options?: { signal?: AbortSignal }): Promise<T.LibraryItem> =>
-        this.call<T.LibraryItem>("/api/v1/library/item/add", a, options),
-      /** Only the item goes: a message that has the file still opens it. */
-      delete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("/api/v1/library/item/delete", a, options),
-      previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
-        this.call<T.Preview>("/api/v1/library/item/previewDelete", a, options),
     },
   };
 

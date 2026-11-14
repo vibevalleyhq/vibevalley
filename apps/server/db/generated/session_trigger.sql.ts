@@ -47,34 +47,15 @@ export const UnroutedTriggersResult = z.object({
   ["id"]: z.string(),
   ["seq"]: z.number().int(),
   ["trigger_json"]: z.string(),
+  ["payload_json"]: z.string(),
 })
 export type UnroutedTriggersResult = z.infer<typeof UnroutedTriggersResult>
 
-export const UnroutedTriggersSql = "-- name: UnroutedTriggers :many\nselect t.id, t.seq, t.trigger_json from session_trigger t\nwhere t.seq > $1\n  and t.source <> 'cron'\n  and t.payload_json::jsonb -> 'data' ->> 'kind' is distinct from 'channel_message'\n  and t.routed_at is null\norder by t.seq limit 1000;"
+export const UnroutedTriggersSql = "-- name: UnroutedTriggers :many\n-- bound: a page; the chat's messages are not here (the watch reads them again from its own cursor).\nselect t.id, t.seq, t.trigger_json, t.payload_json from session_trigger t\nwhere t.seq > $1\n  and t.payload_json::jsonb -> 'data' ->> 'kind' is distinct from 'channel_message'\n  and t.routed_at is null\norder by t.seq limit 1000;"
 
 export async function unroutedTriggers(sql: Sql, params: UnroutedTriggersParams): Promise<UnroutedTriggersResult[]> {
   const rows = await sql.query(UnroutedTriggersSql, [params["after"]])
   return rows.map((row) => rowOf("UnroutedTriggers", UnroutedTriggersResult, row))
-}
-
-export interface KnownGitHubEventsParams {
-  readonly ["repo"]: string
-  readonly ["pr_number"]: number
-}
-
-export const KnownGitHubEventsResult = z.object({
-  ["source_key"]: z.string(),
-  ["bot_round_key"]: z.string().nullable(),
-  ["routed"]: z.boolean(),
-  ["bot_round"]: z.number().int().nullable(),
-})
-export type KnownGitHubEventsResult = z.infer<typeof KnownGitHubEventsResult>
-
-export const KnownGitHubEventsSql = "-- name: KnownGitHubEvents :many\n-- bound: accepted event identities for one pull request.\nselect source_key, (trigger_json::jsonb -> 'meta' ->> 'botRoundKey')::text as bot_round_key,\n       (routed_at is not null)::bool as routed,\n       (trigger_json::jsonb -> 'meta' ->> 'botRound')::int as bot_round\nfrom session_trigger where source = 'github' and trigger_json::jsonb -> 'meta' ->> 'repo' = $1::text\n  and (trigger_json::jsonb -> 'meta' ->> 'pr')::int = $2::int;"
-
-export async function knownGitHubEvents(sql: Sql, params: KnownGitHubEventsParams): Promise<KnownGitHubEventsResult[]> {
-  const rows = await sql.query(KnownGitHubEventsSql, [params["repo"], params["pr_number"]])
-  return rows.map((row) => rowOf("KnownGitHubEvents", KnownGitHubEventsResult, row))
 }
 
 export interface MarkRoutedParams {
@@ -111,34 +92,4 @@ export const IsRoutedSql = "-- name: IsRouted :one\nselect exists (select 1 from
 export async function isRouted(sql: Sql, params: IsRoutedParams): Promise<IsRoutedResult | undefined> {
   const [row] = await sql.query(IsRoutedSql, [params["envelope_id"]])
   return row === undefined ? undefined : rowOf("IsRouted", IsRoutedResult, row)
-}
-
-export interface RetireIssueDispatchesParams {
-  readonly ["issue_id"]: string
-  readonly ["at"]: number
-}
-
-export const RetireIssueDispatchesSql = "-- name: RetireIssueDispatches :exec\n-- A session started on the issue: the assignment's own dispatch is not a second brief for it.\nupdate session_trigger set\n  routing_position = coalesce(routing_position, (select coalesce(max(id), 0) + 1 from session_order)),\n  routing_scope = coalesce(routing_scope, 'issue:' || $1::text),\n  routed_at = coalesce(routed_at, $2)\nwhere routed_at is null\n  and trigger_json::jsonb -> 'meta' -> 'dispatch' = 'true'\n  and trigger_json::jsonb -> 'meta' ->> 'issue' = $1;"
-
-export async function retireIssueDispatches(sql: Sql, params: RetireIssueDispatchesParams): Promise<number> {
-  return sql.exec(RetireIssueDispatchesSql, [params["issue_id"], params["at"]])
-}
-
-export interface UnroutedCronTriggersParams {
-  readonly ["after"]: number
-}
-
-export const UnroutedCronTriggersResult = z.object({
-  ["id"]: z.string(),
-  ["seq"]: z.number().int(),
-  ["trigger_json"]: z.string(),
-  ["payload_json"]: z.string(),
-})
-export type UnroutedCronTriggersResult = z.infer<typeof UnroutedCronTriggersResult>
-
-export const UnroutedCronTriggersSql = "-- name: UnroutedCronTriggers :many\nselect id, seq, trigger_json, payload_json from session_trigger\nwhere source = 'cron' and routed_at is null and seq > $1\norder by seq limit 1000;"
-
-export async function unroutedCronTriggers(sql: Sql, params: UnroutedCronTriggersParams): Promise<UnroutedCronTriggersResult[]> {
-  const rows = await sql.query(UnroutedCronTriggersSql, [params["after"]])
-  return rows.map((row) => rowOf("UnroutedCronTriggers", UnroutedCronTriggersResult, row))
 }

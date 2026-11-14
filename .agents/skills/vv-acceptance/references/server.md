@@ -54,7 +54,7 @@
 
 ### 真实帮工的 CLI 与连接观测
 
-仅在用户已授权真实农机验收时执行；需要本机 Codex 登录，会消耗模型额度。普通规则先跑服务端的 `src/modules/runtime/access.test.ts`、`src/modules/session/worker.test.ts`、`src/flows/worker-cli.test.ts`、`src/modules/issue/watch.test.ts`，以及 CLI 的 `src/commands/issue-watch*.test.ts`、`src/worker.test.ts`。在各包目录运行 `env -u OAR_SUBAGENT_DEPTH vp test run <文件>`，根目录的测试配置只收集 scripts。
+仅在用户已授权真实农机验收时执行；需要本机 Codex 登录，会消耗模型额度。普通规则先跑服务端的 `src/modules/agent/access.test.ts`、`src/modules/session/worker.test.ts`、`src/flows/worker-cli.test.ts`、`src/modules/issue/watch.test.ts`，以及 CLI 的 `src/commands/issue-watch*.test.ts`、`src/worker.test.ts`。在各包目录运行 `env -u OAR_SUBAGENT_DEPTH vp test run <文件>`，根目录的测试配置只收集 scripts。
 
 1. 把下列脚本存到独立临时证据目录的 `worker.sh`。它只创建沙箱项目，凭证文件只写入假令牌，不读取真实令牌。
 

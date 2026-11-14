@@ -30,15 +30,15 @@ test("regression: a consumed trigger can be handed back once without losing its 
   await fw.agent.save(lab());
   const issue = await issues.add({ title: "work", repo: "handback-trigger", agent: "lab" });
   const started = await issues.start(issue.id, "");
-  const trigger = (await mailbox.accept(event(issue.id, "beyond-original-scope")))!;
+  const trigger = (await fw.intake.receive(event(issue.id, "beyond-original-scope"))).trigger!;
   const receipt = await sql`select routed_at, routing_scope, routing_position from session_trigger where id = ${trigger.id}`;
   await await_(
     () => sql<{ state: string }>`select state from session_delivery where session_id = ${started.session!} and envelope_id = ${trigger.id}`,
     (rows) => rows[0]?.state === "consumed",
     "the original input consumed",
   );
-  await mailbox.decline(started.session!, trigger.id, "another work item");
-  await mailbox.decline(started.session!, trigger.id, "duplicate retry");
+  await fw.intake.decline(started.session!, trigger.id, "another work item");
+  await fw.intake.decline(started.session!, trigger.id, "duplicate retry");
   const returned = mailbox.deliveriesOf(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id);
   expect(returned).toHaveLength(1);
   expect(returned[0]!.envelope_id).not.toBe(trigger.id);
@@ -48,7 +48,7 @@ test("regression: a consumed trigger can be handed back once without losing its 
   expect(
     (await sql<{ state: string }>`select state from session_delivery where session_id = ${started.session!} and envelope_id = ${trigger.id}`)[0]?.state,
   ).toBe("consumed");
-  expect((await sql<{ state: string }>`select state from session_issue_input where trigger_id = ${trigger.id}`)[0]?.state).toBe("returned");
+  expect((await sql<{ state: string }>`select state from issue_input where trigger_id = ${trigger.id}`)[0]?.state).toBe("returned");
   const rows2 = await sql`select routed_at, routing_scope, routing_position from session_trigger where id = ${trigger.id}`;
   expect(rows2).toEqual(receipt);
   await mailbox.restoreDeliveries();
@@ -67,15 +67,15 @@ test("regression: closing an unassigned issue returns its held user input withou
   const sql = sqlOf(fw.db);
   const issue = await issues.add({ title: "waiting", repo: "unassigned-return" });
   const source = event(issue.id, "unread-user-followup");
-  const trigger = (await mailbox.accept(source))!;
+  const trigger = (await fw.intake.receive(source)).trigger!;
   await service.setStatus(issue.id, "canceled", "", "", user);
   await await_(
     () => Promise.resolve(mailbox.deliveriesOf(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)),
     (rows) => rows.length === 1,
     "held input returned on cancel",
   );
-  await mailbox.accept(source);
+  await fw.intake.receive(source);
   expect(mailbox.deliveriesOf(defaultOrchestrator).filter((row) => row.payload.trigger.id === trigger.id)).toHaveLength(1);
-  expect((await sql<{ state: string }>`select state from session_issue_input where trigger_id = ${trigger.id}`)[0]?.state).toBe("returned");
+  expect((await sql<{ state: string }>`select state from issue_input where trigger_id = ${trigger.id}`)[0]?.state).toBe("returned");
   expect((await chat.history(chat.defaultChannel())).some((message) => message.text.includes(source.text))).toBe(false);
 });

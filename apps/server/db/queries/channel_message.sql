@@ -11,16 +11,16 @@ returning number;
 update channel_message set meta = sqlc.narg(meta) where id = sqlc.arg(id);
 
 -- name: MessageByID :one
-select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.id = sqlc.arg(id);
+select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.id = sqlc.arg(id);
 
 -- name: MessageBySendKey :one
-select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.sender_id = sqlc.arg(sender_id) and m.send_key = sqlc.arg(send_key);
+select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.sender_id = sqlc.arg(sender_id) and m.send_key = sqlc.arg(send_key);
 
 -- name: UserMentions :many
 -- bound: only the user's unread mentions; reading or replying in the channel completes them.
 -- The user's unresolved mentions, independently of the history window. Reading or replying in that channel completes them.
 select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,
-       p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent,
+       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,
        c.type as channel_type, c.root_number, coalesce(c.parent_id, c.id)::text as top_id,
        coalesce(ch.name, c.name, '')::text as channel_name
 from channel_mention n
@@ -36,30 +36,20 @@ order by m.id;
 
 -- name: MessagesBefore :many
 -- Newest first.
-select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
+select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
 where m.channel_id = sqlc.arg(channel_id) and m.number < sqlc.arg(number) order by m.number desc limit sqlc.arg(n)::int;
 
 -- name: MessagesAfter :many
-select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
+select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
 where m.channel_id = sqlc.arg(channel_id) and m.number > sqlc.arg(number) order by m.number limit sqlc.arg(n)::int;
-
--- name: MissingDirectDeliveries :many
--- bound: user messages committed after a direct session's startup snapshot, without a delivery to that session.
-select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,
-       p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent
-from channel_message m join channel_participant p on p.id = m.sender_id
-where m.channel_id = sqlc.arg(channel_id) and m.number > sqlc.arg(after_number)
-  and m.sender_id = 'user' and m.kind = 'chat' and m.deleted_at is null
-  and not exists (select 1 from session_delivery d where d.session_id = sqlc.arg(recipient_id) and d.message_id = m.id)
-order by m.number;
 
 -- name: RecentReports :many
 -- Newest first: the turn reports anywhere on the farm, for its log.
-select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
+select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
 where m.kind = 'report' order by m.id desc limit sqlc.arg(n)::int;
 
 -- name: ReportsAfter :many
-select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
+select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
 where m.kind = 'report' and m.id > sqlc.arg(after) order by m.id limit sqlc.arg(n)::int;
 
 -- name: RecentDuplicate :one
@@ -78,16 +68,15 @@ where channel_id = sqlc.arg(channel_id) and number > sqlc.arg(read_number) and s
 -- name: LatestNumber :one
 select coalesce(max(number), 0)::int as n from channel_message where channel_id = sqlc.arg(channel_id);
 
--- name: CalledBy :one
--- The session who last @-ed the speaker here since the speaker last spoke.
+-- name: CallersOf :many
+-- bound: at most n, who @-ed the speaker here since the speaker last spoke, before a message: newest first.
 select m.sender_id
 from channel_message m
 join channel_mention n on n.message_id = m.id and n.target_id = sqlc.arg(speaker)
-join channel_participant p on p.id = m.sender_id and p.role = 'worker' and p.runtime is not null
 where m.channel_id = sqlc.arg(channel) and m.sender_id <> sqlc.arg(speaker) and m.id < sqlc.arg(before)
   and m.id > coalesce((select max(s.id) from channel_message s where s.channel_id = sqlc.arg(channel) and s.sender_id = sqlc.arg(speaker) and s.id < sqlc.arg(before)), '')
 order by m.id desc
-limit 1;
+limit sqlc.arg(n)::int;
 
 -- name: UnseenIn :many
 -- bound: one participant's unread in one channel; the read cursor moves past them.
@@ -95,21 +84,22 @@ limit 1;
 select m.id from channel_message m
 where m.channel_id = sqlc.arg(channel) and m.sender_id <> sqlc.arg(participant)
   and m.number > coalesce((select read_number from channel_read_cursor where participant_id = sqlc.arg(participant) and channel_id = sqlc.arg(channel)), 0)
-  and not exists (select 1 from session_delivery d where d.session_id = sqlc.arg(participant) and d.message_id = m.id and d.consumed_at is not null)
+  and not exists (select 1 from channel_seen s where s.participant_id = sqlc.arg(participant) and s.message_id = m.id)
 order by m.number;
 
--- name: HoldNoticeSinceUser :one
+-- name: NoticeSinceUser :one
+-- The farm's notices with a code in a place since the user last spoke there.
 select count(*)::int as n from channel_message m
-where m.channel_id = sqlc.arg(channel) and m.sender_id = 'system' and (m.meta::jsonb ->> 'code') = 'hop_limit'
+where m.channel_id = sqlc.arg(channel) and m.sender_id = 'system' and (m.meta::jsonb ->> 'code') = sqlc.arg(code)::text
   and m.id > coalesce((select max(u.id) from channel_message u where u.channel_id = sqlc.arg(channel) and u.sender_id = 'user'), '');
 
 -- name: MessageByNumber :one
-select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
+select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
 where m.channel_id = sqlc.arg(channel_id) and m.number = sqlc.arg(number);
 
 -- name: MessagesChangedAfter :many
 -- What changed in a channel after a revision, in the order it changed: a follower's catch-up.
-select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
+select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
 where m.channel_id = sqlc.arg(channel_id) and m.revision > sqlc.arg(revision) order by m.revision limit sqlc.arg(n)::int;
 
 -- name: EditMessage :exec
@@ -128,13 +118,13 @@ update channel_message set pinned_at = sqlc.narg(pinned_at), revision = sqlc.arg
 -- name: PinnedIn :many
 -- bound: one channel's pins, each one pinned by hand.
 -- Newest pinned first.
-select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
+select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
 where m.channel_id = sqlc.arg(channel_id) and m.pinned_at is not null order by m.pinned_at desc;
 
 -- name: SearchMessages :many
 -- Newest first: messages with these words, anywhere on the farm or in one channel and its threads.
 select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,
-       p.name as sender_name, p.kind as sender_kind, p.role as sender_role, p.agent_id as sender_agent,
+       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,
        c.type as channel_type, c.root_number, coalesce(c.parent_id, c.id)::text as top_id,
        coalesce(ch.name, c.name, '')::text as channel_name
 from channel_message m
@@ -178,17 +168,3 @@ from channel_message m
 join channel_read_cursor r on r.channel_id = m.channel_id and r.participant_id = 'user' and r.read_number >= m.number
 where m.kind = 'report' and m.deleted_at is null
   and not exists (select 1 from channel_message n where n.channel_id = m.channel_id and n.sender_id = m.sender_id and n.kind = 'report' and n.number > m.number);
-
--- name: UnroutedChannelMessages :many
-select m.id as envelope_id, m.number, m.channel_id, m.sender_id, m.kind, m.body, m.meta, m.reply_number, m.created_at,
-       p.name, p.kind as sender_kind, p.role as sender_role, c.type as channel_type, c.root_id, c.root_number, c.subject_kind, c.subject_id,
-       coalesce(ch.name, c.name, '')::text as channel_name
-from channel_message m
-join channel_participant p on p.id = m.sender_id
-join channel c on c.id = m.channel_id
-left join channel ch on ch.id = c.parent_id
-left join session_trigger r on r.id = m.id
-where r.routed_at is null and m.deleted_at is null
-  and (m.channel_id, m.number) > (sqlc.arg(after_channel)::text, sqlc.arg(after_number)::int)
-order by m.channel_id, m.number
-limit 1000;

@@ -3,7 +3,7 @@ import { access, mkdir, readdir, readFile, realpath, rm, writeFile } from "node:
 import { dirname, join, resolve } from "node:path";
 
 import { isAbort, Semaphore, TaskGroup } from "@vibevalley/async";
-import { t } from "@vibevalley/i18n";
+import { list as listText, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { maxRunning } from "@vibevalley/protocol";
 import { githubRepository, slice } from "@vibevalley/protocol/rules";
@@ -19,10 +19,11 @@ import { GitError, gitWith, reason, run } from "./git.ts";
 import { cloneTimeoutMs, githubOrigin, type GitHubRun, makeRepoGitHub, probeGitHub, runGitHub } from "./github.ts";
 import { runGitLab } from "./hosting.ts";
 import { publisher, type PublishNetwork } from "./publish.ts";
-import { type GitHubPullSnapshot, makeGithubSnapshot } from "./pullSnapshot.ts";
+import { actionsJobOf, type GitHubPullSnapshot, makeGithubSnapshot } from "./pullSnapshot.ts";
 import { asFarm, repository } from "./repository.ts";
 import { activityOf, contributionsOf, countsOf, lexists, secondsOf, tokeiArgs, yearDays } from "./stats.ts";
 import {
+  type CheckoutChecks,
   type Merged,
   MergeFailure,
   type RepoFolder,
@@ -101,6 +102,53 @@ const cleanupMerged = async (place: Workplace, path: string, branch: string, sig
 
 export const issueBranch = (n: number) => `vibevalley/issue-${n}`;
 
+/** A command run in cwd by sh, with the time a check is given: whether it exited 0, and the end of what it said. */
+export const runCheck = async (cwd: string, command: string, signal?: AbortSignal): Promise<{ readonly ok: boolean; readonly output: string }> => {
+  const r = await run("sh", ["-c", command], { cwd, timeoutMs: runTimeoutMs, ...(signal === undefined ? {} : { signal }) });
+  let output = (r.stdout + r.stderr).trimEnd();
+  if (output.length > runOutput) output = "…" + slice(output, -runOutput);
+  return { ok: r.code === 0, output };
+};
+
+/** The files the work at cwd touched since it forked from baseBranch: committed, uncommitted and untracked. */
+export const changedFiles = (cwd: string, baseBranch: string): Promise<string[]> =>
+  repoErrors(async () => {
+    const { git } = gitWith();
+    const fork = await git(cwd, "merge-base", baseBranch, "HEAD");
+    const changed = await git(cwd, "diff", "--name-only", "--no-renames", fork);
+    const added = await git(cwd, "ls-files", "--others", "--exclude-standard");
+    return [...new Set(`${changed}\n${added}`.split("\n").filter((f) => f !== ""))].toSorted();
+  });
+
+/** The frozen files of an acceptance check (what the work touched); none otherwise. Throws MergeFailure. */
+const verifyCheckout = async (place: Workplace, base: string, checks: CheckoutChecks): Promise<readonly string[] | undefined> => {
+  const changed = async () => {
+    try {
+      return await changedFiles(place.cwd, base);
+    } catch (error) {
+      if (error instanceof RepoError) throw MergeFailure.error(error.message);
+      throw error;
+    }
+  };
+  if (checks.acceptance) {
+    if (!checks.check) throw MergeFailure.failedCheck(t("server.issue.verification.acceptanceNeedsCheck"));
+    if ((await runCheck(place.cwd, checks.check)).ok) throw MergeFailure.failedCheck(t("server.issue.verification.acceptancePassed", { check: checks.check }));
+    return changed();
+  }
+  const frozen = new Set(checks.frozen);
+  const checkFrozen = async () => {
+    const touched = (await changed()).filter((file) => frozen.has(file));
+    if (touched.length > 0) throw MergeFailure.failedCheck(t("server.issue.verification.frozen", { files: listText(touched) }));
+  };
+  if (frozen.size > 0) await checkFrozen();
+  for (const check of checks.checks) {
+    const result = await runCheck(place.cwd, check);
+    if (!result.ok) throw MergeFailure.failedCheck(t("server.issue.verification.failed", { check, output: result.output }));
+  }
+  if (frozen.size > 0) await checkFrozen();
+  return undefined;
+};
+
 const noTokei = () => t("server.repo.noTokei");
 
 /** Whether path is there; a failure other than its absence is not one to answer for. */
@@ -150,13 +198,14 @@ export interface Repo {
   readonly clearCheckout: (repo: string, issue: number, work?: WorkplaceCleanup) => Promise<WorkplaceRelease>;
   readonly changes: (place: Workplace) => Promise<T.Changes>;
   readonly branchChanges: (repo: string, branch: string) => Promise<T.Changes | undefined>;
-  readonly changedFiles: (cwd: string, baseBranch: string) => Promise<string[]>;
   readonly conflict: (place: Workplace, baseBranch?: string) => Promise<T.Conflict | undefined>;
   readonly merge: (place: Workplace, signal?: AbortSignal) => Promise<Merged>;
   readonly mergeInto: (place: Workplace, target: string, targetCwd?: string, signal?: AbortSignal) => Promise<Merged>;
   readonly mergeBranch: (repo: string, branch: string, signal?: AbortSignal) => Promise<string>;
   readonly openBranch: (repo: string, branch: string, from?: string) => Promise<void>;
-  readonly run: (cwd: string, command: string, signal?: AbortSignal) => Promise<{ readonly ok: boolean; readonly output: string }>;
+  /** The checks the checkout's work must pass against base (the branch it merges into); the files an acceptance check
+   * freezes. Throws MergeFailure. */
+  readonly verifyCheckout: (place: Workplace, base: string, checks: CheckoutChecks) => Promise<readonly string[] | undefined>;
   readonly houseRules: () => Promise<string>;
   readonly githubStatus: () => T.GitHubStatus;
   readonly refreshGitHub: () => Promise<T.GitHubStatus>;
@@ -165,8 +214,8 @@ export interface Repo {
   readonly submitPullRequest: (place: Workplace, issue: T.Issue, conclusion: string, signal?: AbortSignal) => Promise<T.PullRequest>;
   readonly pullRequestState: (name: string, n: number) => Promise<T.PullRequestState>;
   readonly githubSnapshot: (name: string, n: number) => Promise<GitHubPullSnapshot>;
-  readonly githubRequest: GitHubRun;
-  readonly githubRemote: (name: string) => Promise<string>;
+  /** The last lines of the failed Actions job a check's URL points at; "" when it is not one or GitHub does not say. */
+  readonly failedJobLog: (name: string, checkUrl: string) => Promise<string>;
   readonly resolveReviewThread: (name: string, thread: string) => Promise<void>;
   readonly finishPullRequest: (name: string, n: number) => Promise<Merged>;
   /** As the server starts: a first look at GitHub, in the background; the page asks again with github.refresh. */
@@ -424,8 +473,26 @@ export async function makeRepo(deps: RepoDeps, hooks: RepoHooks = {}): Promise<R
     issueWorkplace,
     syncMain,
   });
-  const { capability: _capability, ...githubMethods } = github;
-  const githubSnapshot = makeGithubSnapshot(gh, github.githubRemote);
+  const { capability: _capability, githubRemote, ...githubMethods } = github;
+  const githubSnapshot = makeGithubSnapshot(gh, githubRemote);
+
+  const failedJobLog = async (name: string, checkUrl: string) => {
+    const job = actionsJobOf(checkUrl);
+    if (!job) return "";
+    let remote: string;
+    try {
+      remote = await githubRemote(name);
+    } catch (e) {
+      // No GitHub remote: the check is told without its log.
+      if (!(e instanceof RepoError)) throw e;
+      log.debug(`no GitHub remote for ${name}: ${e.message}`);
+      return "";
+    }
+    if (!remote) return "";
+    const said = await gh("run", "view", "--job", job, "--log-failed", "--repo", remote);
+    if (!said.ok) return "";
+    return said.out.trim().split("\n").slice(-40).join("\n").slice(-4000);
+  };
 
   const create = (req: T.NewRepo, signal?: AbortSignal): Promise<RepoFolder> =>
     serially(
@@ -744,14 +811,6 @@ export async function makeRepo(deps: RepoDeps, hooks: RepoHooks = {}): Promise<R
       if (!present) return undefined;
       return describe(repo, "", branch);
     },
-    changedFiles: (cwd, baseBranch) =>
-      repoErrors(async () => {
-        const { git } = gitWith();
-        const fork = await git(cwd, "merge-base", baseBranch, "HEAD");
-        const changed = await git(cwd, "diff", "--name-only", "--no-renames", fork);
-        const added = await git(cwd, "ls-files", "--others", "--exclude-standard");
-        return [...new Set(`${changed}\n${added}`.split("\n").filter((f) => f !== ""))].toSorted();
-      }),
     conflict: async (place, baseBranch = "") => {
       if (!place.branch) return undefined;
       const at = repository(join(root, place.repo));
@@ -768,12 +827,7 @@ export async function makeRepo(deps: RepoDeps, hooks: RepoHooks = {}): Promise<R
         const path = await ensure(repo);
         await repoErrors(() => gitWith().git(path, "branch", branch, from || "HEAD"));
       }),
-    run: async (cwd, command, signal) => {
-      const r = await run("sh", ["-c", command], { cwd, timeoutMs: runTimeoutMs, ...(signal === undefined ? {} : { signal }) });
-      let output = (r.stdout + r.stderr).trimEnd();
-      if (output.length > runOutput) output = "…" + slice(output, -runOutput);
-      return { ok: r.code === 0, output };
-    },
+    verifyCheckout,
     houseRules: async () => {
       try {
         return await readFile(join(resolve(config.workRoot), "AGENTS.md"), "utf8");
@@ -783,6 +837,7 @@ export async function makeRepo(deps: RepoDeps, hooks: RepoHooks = {}): Promise<R
       }
     },
     ...githubMethods,
+    failedJobLog,
     boot: () => {
       tasks.run("refreshGitHub", () => github.refreshGitHub());
       return Promise.resolve();
