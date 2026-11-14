@@ -15,7 +15,6 @@
     "health": "vpx packages/health/src/cli.ts --config scripts/audit/health.config.ts",
     "health:write": "vpx packages/health/src/cli.ts --config scripts/audit/health.config.ts --write",
     "practice:write": "vpx scripts/audit/practice-audit.ts --write",
-    "paths:write": "vpx scripts/audit/service-paths.ts --write",
     "protocol:rust": "sh crates/vibevalley-protocol/gen/run.sh",
     "nsh:install": "cargo install nsh-cli --version 0.5.0 --locked --root .tools"
   },

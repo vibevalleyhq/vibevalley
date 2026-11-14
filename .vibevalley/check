@@ -6,10 +6,12 @@ main=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || printf '
 main=${main#origin/}
 base=$(git merge-base "$main" HEAD)
 changed=$(git diff --name-only --no-renames "$base")
-server=false
+rust=false
+packages=false
 web=false
 while IFS= read -r path; do
-    case "$path" in apps/server/*|packages/protocol/*) server=true ;; esac
+    case "$path" in crates/*|apps/mac/*|Cargo.*) rust=true ;; esac
+    case "$path" in packages/*) packages=true ;; esac
     case "$path" in apps/web/*|apps/desktop/*|packages/*) web=true ;; esac
 done <<PATHS
 $changed
@@ -25,8 +27,11 @@ done
 # The same checks AGENTS.md asks for, narrowest first: a fresh worktree may not have installed yet.
 vp install --frozen-lockfile
 vp check --deny-warnings
-if "$server"; then
-    vp run server:check
+if "$rust"; then
+    vp run rust:check
+fi
+if "$packages"; then
+    vp run packages:check
 fi
 if "$web"; then
     vp run web:check

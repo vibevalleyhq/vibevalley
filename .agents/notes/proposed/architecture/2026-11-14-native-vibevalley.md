@@ -4,12 +4,12 @@ Status: proposed
 
 ## Problem
 
-VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web`）+ Electron 壳（`apps/desktop`）+ Expo 手机壳（`apps/mobile`）。用户在 `~/epona` 里把它原生改写了大半（冻结于 `fbc43d4`），已经迁进本仓库：Rust 库在 `crates/vibevalley-*`，原生应用在 `apps/mac`（GPUI 窗口 + nsh TSX 页面）。
+VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web`）+ Electron 壳（`apps/desktop`）+ Expo 手机壳（`apps/mobile`）。用户在另一个仓库里把它原生改写了大半（冻结于 `fbc43d4`），已经迁进本仓库：Rust 库在 `crates/vibevalley-*`，原生应用在 `apps/mac`（GPUI 窗口 + nsh TSX 页面）。
 
 迁进来以后看到两个问题：
 
 - **Rust 服务端是照 TS 逐行搬的，没用上 Rust。**工具按字符串匹配 op、参数靠 `p["id"].as_str()` 手取；设置和 provider 配置全是 `serde_json::Value`（`vibevalley-server` 里约 200 处）；`vibevalley-issues/src/lib.rs` 一个 `Board` 两千多行，揉着工单、会话、工作目录、合并、起草、私聊；媒体是"图片任务机 + 其他种类打补丁"。
-- **追求逐项复刻 TS 太慢。**每补一处都要先读一遍 TS 再照搬，还常发现 epona "看着做了其实没做"（厂商调用层从没编译过、简报是另一套英文措辞、私聊帮工缺失）。
+- **追求逐项复刻 TS 太慢。**每补一处都要先读一遍 TS 再照搬，还常发现那份改写"看着做了其实没做"（厂商调用层从没编译过、简报是另一套英文措辞、私聊帮工缺失）。
 
 用户的决定（2026-11-14）：Rust 服务端为准；激进重构，速度优先；允许暂时回退；不需要完整复刻 oar / pi-ai 的功能。终态仍是全原生，删掉 `apps/desktop`、`apps/server`、`apps/web`、`apps/mobile`；命令行也改用 Rust 写；数据源（契约、对用户说的话、工具说明、提示）在 Rust 定义，codegen 到要用的地方，借此收掉不必要的包。所有改动合成一个 PR，分段写成提交。
 
@@ -101,7 +101,7 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 
 ## Acceptance criteria
 
-- 仓库里没有 `apps/desktop`、`apps/server`、`apps/web`、`apps/mobile`，没有 Electron、Expo、PixiJS；`epona` 这个词不出现（`stale-names.ts` 查）。
+- 仓库里没有 `apps/desktop`、`apps/server`、`apps/web`、`apps/mobile`，没有 Electron、Expo、PixiJS；旧改写仓库的名字不出现（`stale-names.ts` 查）。
 - `vibevalley-server` 门内没有 `serde_json::Value` 的业务传递（只在进出边界）；没有按 op 字符串分支的工具分发；没有 `Board` 这样的跨领域大对象。
 - 契约、词典、工具说明与提示以 Rust 为准，TS 由它生成，检查保证最新；`packages/` 下只剩生成物或页面专用的包。
 - 命令行是 Rust 的 `vibevalley-cli`，没有 `apps/cli`。
