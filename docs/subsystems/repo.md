@@ -84,4 +84,4 @@
 - `crates/vibevalley-git/src/tests.rs`：git 封装、冲突预检与无检出合入。
 - `crates/vibevalley-server/tests/issue_board.rs`：合并、冲突、检查失败退回、留分支。
 - `crates/vibevalley-server/tests/publish.rs`：发布已有分支的预览、推送、拒绝与只许用户发布。
-- `apps/web/test/repos.spec.ts`：工作台仓库新建与群岛地图。
+- `apps/mac/src/pixel/tests.rs` 的 `map_draws_an_island_per_repo`：群岛地图一个仓库一座岛。

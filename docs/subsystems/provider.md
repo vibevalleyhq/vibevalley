@@ -19,7 +19,7 @@ DeepSeek（助手的对话模型）的钥匙在设置里，不是连接。
 | `crates/vibevalley-server/src/modules/provider.rs` | `Provider`：`status`、`update`（`connections_over` 把更新叠到当前配置上，不对就拒）、`models`、`voices`；`Use` 是九个用途的闭集，各带自己的模型列表；`Providers::account` 给用的地方一个账号（连接、revision、模型、钥匙） |
 | `crates/vibevalley-server/src/modules/media/vendor.rs` | MOSS 的 HTTP 调用（生图、语音、文件、理解），响应进门即解码 |
 | `packages/protocol/src/provider/` | 公共形状和接口（Rust 类型由它生成） |
-| `apps/web/src/features/provider/` | `/settings/providers` 的连接与默认用途表单 |
+| `apps/mac/ui/vv/web/features/provider/` | `/settings/providers` 的连接与默认用途表单 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`provider.*`）。
 
@@ -43,4 +43,3 @@ DeepSeek（助手的对话模型）的钥匙在设置里，不是连接。
 
 - `crates/vibevalley-server/tests/provider.rs`：不对的连接修改被拒、没配好的连接不当默认、保留钥匙、跟着 revision 走。
 - `crates/vibevalley-server/tests/setting.rs`：语音厂商的钥匙只给提示，就绪状态跟着连接走。
-- `apps/web/test/providers.spec.ts`：隔离服务端上的表单保存、刷新、钥匙脱敏、冲突草稿与解绑。

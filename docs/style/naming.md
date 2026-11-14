@@ -77,11 +77,11 @@
 | 什么 | 形状 | 例子 |
 |---|---|---|
 | 服务端的模块 | 单数，概念的词 | `crates/vibevalley-server/src/modules/issue/`、`channel/` |
-| 页面的 feature | 和服务端的模块同名 | `apps/web/src/features/issue` |
-| 包 | `@vibevalley/<文件夹>`（`scripts/audit/catalog.test.ts` 查） | `packages/health` 是 `@vibevalley/health` |
+| 页面的 feature | 和服务端的模块同名 | `apps/mac/ui/vv/web/features/issue` |
+| 包 | `@vibevalley/<文件夹>`（`scripts/audit/catalog.test.ts` 查） | `packages/testkit` 是 `@vibevalley/testkit` |
 | 组件 | 大驼峰，一个组件一个文件 | `Board.tsx`、`IssueDetail.tsx` |
 | 其他文件 | 小驼峰 | `moves.ts`、`pageTests.test.ts` |
-| 测试和故事 | 挨着被测的文件 | `moves.test.ts`、`Board.stories.tsx` |
+| 测试 | 挨着被测的文件 | `outline.test.ts` |
 | 服务端模块对外的结构体 | 按它管的东西叫，不叫 `XService`、`XManager` | `Agents`、`Chat`、`Crons`、`Repos` |
 | 带牌子的 id（页面） | `XId` | `IssueId`、`SessionId` |
 | 一组固定的取值 | 成员表 `XValues`，类型从它推；要每种都处理时用 `Record<X, …>` | `IssueStatusValues` |
@@ -96,7 +96,7 @@
 | 接口的动词 | 先用这几个：`list`、`get`、`create`、`update`、`delete`、`previewDelete`、`set`、`toggle`、`start`、`stop`；别的动作用它在领域里的词 | `channel.markRead`、`issue.refine` |
 | 表 | `<模块>` 或 `<模块>_<概念>`，单数；索引以表名开头 | `channel_message`、`media_job` |
 | 词典的键 | `<宿主>.<模块>.…`，两边都说的在 `shared` | `web.issue.boardLabels.lane.todo`、`server.connector.qqKeys` |
-| 页面测试的标记 | `data-testid` 说它是什么，小写加连字符；状态写成属性 | `issue-card`、`desk-status`；`data-state` |
+| 页面测试的标记 | `testID` 说它是什么，小写加连字符 | `route-missing`、`native-workspace` |
 | 分支 | `<类>/<主题>`，主题是英文小写加连字符 | `chore/repo-health` |
 
 ## 现有的双关

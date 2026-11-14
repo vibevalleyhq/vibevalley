@@ -41,19 +41,17 @@
 | `same` | `same.ts` |  |
 | `stageWantsUser` | `stage.ts` | Questions the user for something: the page leads with it, the board flags it. |
 
-## `apps/web/src/base`
+## `apps/mac/ui/vv/web/base`
 
 页面的纯地基
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
-| `autofocus` | `dom.tsx` | A ref that focuses its element once it is on the page: what React's autoFocus does on mount. |
 | `useNow` | `dom.tsx` | The time, a new reading every `ms`: for "3m ago" that keeps up without anything else changing. |
 | `Keyed` | `dom.tsx` | Rebuilds its children whenever `key` changes, as a React key does: their state starts over. |
 | `aria` | `dom.tsx` | aria-expanded, aria-pressed, aria-selected: "true" or "false", as a boolean false would drop the attribute. |
 | `useViewport` | `dom.tsx` | The window's size, following it as it is resized. |
 | `createSettled` | `dom.tsx` | The value once it has stopped changing for `ms`: what is asked of the server while someone types. |
-| `useClickAway` | `dom.tsx` | Closes a popup when the pointer goes down outside `box` while `open`: a menu folds when you click elsewhere. |
 | `variant` | `dom.tsx` |  |
 | `createExternal` | `external.ts` | A store outside Solid (subscribe, get) as an accessor. it notifies when `get` returns a different value. |
 | `ago` | `format.ts` |  |
@@ -84,7 +82,7 @@
 | `useTimeout` | `timer.ts` | A timeout to set from a handler: setting it again replaces the one waiting, and the reactive owner's end clears it. |
 | `typedMarks` | `typedMarks.ts` | The text with the marks just typed before the caret as the syntax they stand for. undefined when there are none. |
 
-## `apps/web/src/infra`
+## `apps/mac/ui/vv/web/infra`
 
 页面对外的地基：服务端、宿主、浏览器
 
@@ -102,6 +100,14 @@
 | `newSendKey` | `api.ts` | A client's key for one send: a retry with the same key is the same message, said once. |
 | `createRequestKey` | `api.ts` | The request key of one thing the user may send again (a form's create, a button's). a new one after. |
 | `attachmentData` | `attachment.ts` | A file's bytes as attachment.create takes them: base64. |
+| `fileUrl` | `attachmentFile.ts` |  |
+| `useAttachmentFile` | `attachmentFile.ts` | Where the server keeps the file (path, type), once it said. |
+| `useAttachmentUrl` | `attachmentFile.ts` | The file's `file:` URL once the server said where it is. |
+| `openAttachment` | `attachmentFile.ts` | Opens the attachment in the system's app for its kind (VibeValley opens it in a browser tab). |
+| `playAudio` | `attachmentFile.ts` | Plays a sound file through the host (nsh has no audio on GPUI); one at a time, host.stopAudio stops it. |
+| `bridged` | `bridged.ts` |  |
+| `useBridge` | `bridged.ts` |  |
+| `fixtureTransport` | `fixtures.ts` | `subscriptions`: the events each subscription (by name) sends at once; it then stays open, as a quiet stream would. |
 | `useForm` | `form.ts` |  |
 | `createForm` | `form/form.ts` |  |
 | `formIssues` | `form/issues.ts` | Zod's issues as the form tells them; read with `reportInput`, so a missing key is told apart from a wrong type. The |
@@ -112,24 +118,22 @@
 | `immutable` | `form/paths.ts` |  |
 | `frames` | `frame.ts` |  |
 | `FramesContext` | `frame.ts` |  |
-| `createFrames` | `frame.ts` | The stream above as a store: each frame reconciles in by id, so only what changed updates. |
-| `useFrames` | `frame.ts` |  |
+| `createFrames` | `frame.ts` | The frames above as a reactive object: each read follows the newest frame. |
+| `useFrames` | `frame.ts` | The nearest provided frames, else the app's one stream. |
 | `useCore` | `frame.ts` | The folded state. undefined until the first frame. |
 | `orchestratorSession` | `frame.ts` |  |
 | `orchestratorMood` | `frame.ts` |  |
-| `rawFrame` | `frame.ts` | The frame as the stream sent it: a new object each time, for code that compares the one before with the one after (sounds, the canvas, the host's notices). |
-| `subscribeLive` | `frame.ts` | Listens to the live stream (/api/v1/live). returns how to stop. |
+| `rawFrame` | `frame.ts` | The frame as it came: a new object each time. |
+| `subscribeLive` | `frame.ts` | Listens to the live events; returns how to stop. |
 | `reconnectDelayMs` | `gateway.ts` | The wait before connecting again after a connection could not be opened: 500 ms, growing by half each time, at most 5 s. |
-| `subscribe` | `gateway.ts` | Each event of one subscription (its `subscriptionUrl`, each event decoded with its `event` Schema) until stop() is |
+| `subscribe` | `gateway.ts` | Each event of one subscription (each decoded with its `event` Schema) until stop() is called, or until it ends: the |
 | `followChannel` | `gateway.ts` | What is said in a channel after the message numbered after, then from now on. |
 | `followReports` | `gateway.ts` | The farm's reports after the one with this id (the newest when absent), then each from now on. |
 | `followArtifact` | `gateway.ts` | A blocks artifact's changes after this seq, then each batch from now on. |
 | `followSuggestions` | `gateway.ts` | An artifact's suggestions as they now are, then the whole list after each change. |
 | `currentHost` | `host.ts` |  |
-| `nextLocalMidnight` | `local-day.ts` |  |
-| `localDay` | `local-day.ts` |  |
-| `uploadMediaInput` | `media.ts` |  |
-| `reveal` | `opening.ts` |  |
+| `nextLocalMidnight` | `localDay.ts` |  |
+| `localDay` | `localDay.ts` |  |
 | `retryRead` | `query.ts` |  |
 | `refetchOnRelink` | `query.ts` |  |
 | `cursorsQuery` | `query.ts` |  |
@@ -151,11 +155,12 @@
 | `createQueryClient` | `query/cache.ts` |  |
 | `QueryDecodeError` | `query/schema.ts` | A response that is not in the query's shape. Carries none of the issues: they can contain credentials. |
 | `queryDecoder` | `query/schema.ts` |  |
-| `useQueryClient` | `query/solid.tsx` |  |
+| `useQueryClient` | `query/solid.tsx` | The client of the nearest QueryProvider, else one for the whole app. |
 | `QueryProvider` | `query/solid.tsx` |  |
 | `useQuery` | `query/solid.tsx` |  |
 | `ready` | `query/solid.tsx` |  |
 | `fixOf` | `readiness.ts` | What a feature lacks, in words, and the settings page that fixes it (SettingsStatus.readiness says what lacks). |
+| `appHistory` | `router/context.tsx` | The one history of the app's page, for code outside the tree (the host's "open this route"). |
 | `useRouter` | `router/context.tsx` |  |
 | `Router` | `router/context.tsx` |  |
 | `useLocation` | `router/context.tsx` |  |
@@ -169,6 +174,7 @@
 | `memoryHistory` | `router/history.ts` |  |
 | `updateSearch` | `router/history.ts` |  |
 | `Link` | `router/link.tsx` |  |
+| `useActive` | `router/link.tsx` | Whether `href` is the place shown now (or above it, unless `end`). |
 | `NavLink` | `router/link.tsx` |  |
 | `Navigate` | `router/link.tsx` |  |
 | `pathSegments` | `router/matching.ts` |  |
@@ -185,15 +191,17 @@
 | `search` | `router/search.ts` |  |
 | `useSaveSettings` | `settings.ts` | Saves, and the settings the server answers with are the cached ones from then on. |
 | `useUpdates` | `settings.ts` | The desktop's own update as it is now and as it changes (Host.update); undefined where the host is not updated from |
-| `answer` | `storyApi.ts` | What the server answers while this story is open, by the path after /api/v1/ ("issue/diff/get"). Unanswered calls fail as a server that is not there would. |
-| `fakeFetch` | `storyApi.ts` |  |
 | `useTable` | `table.ts` |  |
 | `defineColumns` | `table/model.ts` |  |
 | `createTable` | `table/model.ts` |  |
-| `testFrames` | `testing.ts` |  |
-| `frameAt` | `testing.ts` | An empty farm's frame at this seq. |
+| `offline` | `transport.ts` | No server: every call fails as an unreachable one would, no frame comes. |
+| `transport` | `transport.ts` |  |
+| `setTransport` | `transport.ts` | Swaps the transport (at start-up: the bridge, or a story's fixtures). |
+| `onTransportChange` | `transport.ts` |  |
+| `opOf` | `transport.ts` | `/api/v1/issue/status/update` → `issue.status.update`. |
+| `transportFetch` | `transport.ts` | A `fetch` for VibeValley's API client: the call goes through the |
 
-## `apps/web/src/state`
+## `apps/mac/ui/vv/web/state`
 
 页面的中间层：意图、存下的选择、原子
 
@@ -238,8 +246,6 @@
 | `storedAtom` | `stored.ts` | A choice's atom, for a registry of the caller's (the tests); the page's are made by defineStored. |
 | `defineStored` | `stored.ts` | A choice kept on this machine, read and set as the page's value; `name` is unique across the page. |
 | `orFallback` | `stored.ts` | A field of a stored struct that reads as `fallback` when it is missing or does not decode, so one bad field does not throw away the others. |
-| `testRegistry` | `testing.ts` |  |
-| `deferred` | `testing.ts` | A promise the test settles. |
 
 ## `packages/testkit/src`
 

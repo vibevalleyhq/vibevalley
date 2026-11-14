@@ -1,6 +1,6 @@
 # 观察层
 
-`Watch`（`modules/watch`）站在频道、帮工和工单之上，按事件驱动 agent：读频道提交的事件，算出谁听见、过三道刹车、交给 `Session` 投递；给帮工开串、拉起私聊帮工、贴汇报、记看过和 👀；它也是用户的收件箱（`Inbox`，农场里画成手机来电）和巡查。频道只管说话，帮工只管干活，两边都不认识对方，中间的规矩都在这里。
+`Watch`（`modules/watch`）站在频道、帮工和工单之上，按事件驱动 agent：读频道提交的事件，算出谁听见、过三道刹车、交给 `Session` 投递；给帮工开串、拉起私聊帮工、贴汇报、记看过和 👀；它也是用户的收件箱（`Inbox`）和巡查。频道只管说话，帮工只管干活，两边都不认识对方，中间的规矩都在这里。
 
 ## 管什么，不管什么
 
@@ -9,7 +9,7 @@
 | 按自己的游标（`watch_cursor`）读频道的 `channel_event`，每个事件路由一次，开机接着读 | 消息、席位、未读与看过的存储（[频道](docs/subsystems/channel.md)） |
 | 谁听见一句话（`who_hears`）、三道刹车（`brakes`）、把听众的话经 `Board::tell` 交给工单的帮工 | 一句话是不是工单的、蓄水池（[工单](docs/subsystems/issue.md#蓄水池和路由)）；投递行、四档紧急度、叫醒与重投（[帮工](docs/subsystems/session.md)） |
 | 给助手和档案排席位、开私聊（`direct`）、帮工的串和「家」、贴汇报、看过的标记与 👀、熔断与跳数通知 | 工单的状态机、派活与交付（[工单](docs/subsystems/issue.md)） |
-| 用户的收件箱：从 `SpaceState` 现算要用户处理的事（`inbox`）、刚来的（`fresh_of`）、巡查（`patrol_step`） | 手机来电、系统通知、托盘和电话播报的画法（[农场的皮](docs/subsystems/farm.md)、[客户端](docs/subsystems/app.md)） |
+| 用户的收件箱：从 `SpaceState` 现算要用户处理的事（`inbox`）、刚来的（`fresh_of`）、巡查（`patrol_step`） | 系统通知和托盘摘要怎么给出去（[客户端](docs/subsystems/app.md)） |
 
 ## 在哪
 

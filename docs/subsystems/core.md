@@ -91,7 +91,7 @@ SSE 以外的路由：
 
 - **施加事实的模块**：工单板（`modules/issue` 与 `modules/session`，经 `modules/ledger.rs`）、`channel`、`media`、`cron`、`game`、`agent`。
 - **订阅事实的模块**：`game`、`watch`（收件箱）、`issue`、`channel`、`media`。
-- **外部客户端**：`apps/web`、`apps/mac`、命令行 `vibevalley`。
+- **外部客户端**：`apps/mac`（进程内经桥）、命令行 `vibevalley`（HTTP）。
 
 ## 为什么这样
 

@@ -21,7 +21,7 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档产�
 | `crates/vibevalley-artifact/src/` | 服务端跑的那份引擎：块操作 `Page`（`ops.rs`）、Markdown 互转（`markdown.rs`）、HTML 检查与划词改字（`html.rs`）、外壳（`shell.rs`）；和 `packages/artifact` 用同一份 golden 测例 |
 | `packages/protocol/src/rules/order.ts`、`display.ts` | 前后端共用的分数顺序键 `keyBetween` 与沙箱常量 `htmlSandbox` |
 | 表 `artifact`、`artifact_version`、`artifact_block`、`artifact_block_revision`、`artifact_change`、`artifact_suggestion` | Artifact、HTML 版本、块、块修订、操作批次与改写建议表 |
-| `apps/web/src/features/artifact/` | `ArtifactsPage.tsx`、`ArtifactCanvas.tsx`、`BlocksView.tsx` 及消费 `@vibevalley/artifact` 的薄层适配 |
+| `apps/mac/ui/vv/web/features/artifact/` | `ArtifactsPage.tsx`、`ArtifactCanvas.tsx`、`BlocksView.tsx` 及消费 `@vibevalley/artifact` 的薄层适配 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`artifact.*` 及 `GET /api/v1/artifact/<id>/<version>`）。
 
@@ -62,7 +62,6 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档产�
 
 - **频道（`channel`）**：调用 `channel.post({ _tag: "Announce" })` 发 Artifact 卡片；在消息中记录被引用的块快照。
 - **工具（`tool`、`mcp`）**：向助手和帮工暴露 `artifact_*` 工具，自动绑定会话工单与档案身份。
-- **「连接到本机」（`lan`）**：放行配对设备访问 `GET /api/v1/artifact/<id>/<version>`。
 
 ## 为什么这样
 
@@ -80,7 +79,7 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档产�
 
 ## 怎么验证
 
-- `crates/vibevalley-artifact/tests/golden.rs`：块操作、Markdown 往返、HTML 检查与划词改字对着 `packages/artifact` 写出的 golden（`vp run protocol:rust:check` 重写并比对）。
+- `crates/vibevalley-artifact/tests/golden.rs`：块操作、Markdown 往返、HTML 检查与划词改字对着 `packages/artifact` 写出的 golden（`vp run protocol:check` 重写并比对）。
 - `crates/vibevalley-server/tests/artifact.rs`：HTML 与 Markdown 交稿的版本和拒绝、划词改字与删除、块一起写（`batchId` 幂等、`baseRev` 冲突、建议）、消息引用块。
-- `apps/web/test/artifact.spec.ts`、`artifact-blocks.spec.ts`：浏览器沙箱隔离、划词改字、块编辑与建议接受端到端测试。
-- `packages/artifact/src/artifact.test.ts`：外壳消息只认约定里的形状、主题变量和运行时接在页面后面；`apps/web/test/slides.spec.ts`：幻灯片按控件、缩略图和键盘翻页，演讲者视图互相跟着翻、显示备注，打印时一页一张。
+- `apps/mac/ui/vv/app/artifacts.test.tsx`：Artifact 页在样例数据上的页面测试（`nsh/test`）。
+- `packages/artifact/src/artifact.test.ts`：外壳消息只认约定里的形状、主题变量和运行时接在页面后面。

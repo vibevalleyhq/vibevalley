@@ -6,12 +6,12 @@
 flowchart LR
   subgraph Clients[客户端]
     MAC[原生应用 apps/mac<br/>GPUI + nsh TSX]
-    WEB[页面 apps/web<br/>Solid 2 + PixiJS（待删）]
     CLI[命令行 vibevalley]
   end
 
-  subgraph Server[vibevalley-server · 127.0.0.1:8787]
-    HTTP[vibevalley-http<br/>/api/v1、SSE、/mcp]
+  subgraph Server[服务端 vibevalley-server · 在应用的进程里，或单独跑]
+    BRIDGE[vibevalley-bridge<br/>进程内的桥]
+    HTTP[vibevalley-http · 127.0.0.1<br/>/api/v1、SSE、/mcp]
     HUB[Hub<br/>核心状态 SpaceState]
     FM[助手<br/>自研 agent + 工具]
     CHAT[频道<br/>群聊 · SQLite]
@@ -25,9 +25,11 @@ flowchart LR
   AGENTS[(本机农机<br/>claude、codex、ACP……)]
   DS[(DeepSeek)]
 
-  MAC & WEB & CLI -->|命令：HTTP POST| HTTP
-  HUB -->|折好的帧：SSE /api/v1/state| MAC & WEB
-  HTTP --> HUB
+  MAC -->|命令：call| BRIDGE
+  CLI -->|命令：HTTP POST| HTTP
+  HUB -->|折好的帧| BRIDGE -->|frame:state| MAC
+  HUB -->|SSE /api/v1/state| CLI
+  BRIDGE & HTTP --> HUB
   HTTP --> CHAT & FM & TK & PRJ & RT
   CHAT --> WATCH
   WATCH --> TK & FM
@@ -42,22 +44,22 @@ flowchart LR
 
 系统交互走两条线：
 
-- **命令**：原生应用、页面和命令行通过 HTTP `POST /api/v1/<路径>` 调接口（接口表是 `vibevalley-protocol` 的 `ENDPOINTS`，由 `packages/protocol/src/api.ts` 生成）。帮工通过服务端的 `/mcp` 调工具（[频道](docs/subsystems/channel.md)）。
-- **状态**：服务端持有唯一的核心状态 `SpaceState`。状态每变一次产生一条事实（`Fact`），客户端只收折好的帧 `GET /api/v1/state`。
+- **命令**：接口表是 `vibevalley-protocol` 的 `ENDPOINTS`（`crates/vibevalley-protocol/src/contract/endpoints.rs`）。原生应用的页面经进程内的桥按操作名调（[客户端](docs/subsystems/app.md#桥)），命令行经 HTTP `POST /api/v1/<路径>` 调；两条路进的是同一个 `Hub`。帮工通过服务端的 `/mcp` 调工具（[频道](docs/subsystems/channel.md)）。
+- **状态**：服务端持有唯一的核心状态 `SpaceState`。状态每变一次产生一条事实（`Fact`），客户端只收折好的帧：桥上的 `frame:state`，HTTP 上的 `GET /api/v1/state`。
 
-语音通话（Agora）、外部聊天接入和「连接到本机」随原生改写砍掉了（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
+只支持 macOS，只在本机：没有浏览器页面、手机壳和从别的设备进来的门（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
 
 ## 分层
 
 仓库目录结构见根目录 [AGENTS.md](AGENTS.md#目录)。
 
-- **契约（`packages/protocol` → `crates/vibevalley-protocol`）**：服务端与客户端唯一的共享契约。现在以 `packages/protocol` 的 zod 为源：每个概念一个目录 `src/<概念>/`（`shapes.ts`、`schema.ts`、`api.ts`），`crates/vibevalley-protocol/gen` 从它生成 `src/generated/` 的 Rust 类型和接口表（`vp run protocol:rust`）。计划里这会翻转成 Rust 为源（R5）。
+- **契约（`crates/vibevalley-protocol` → `packages/protocol`）**：服务端与客户端唯一的共享契约，以 Rust 为源：`src/contract/` 一个概念一个文件，`typescript.rs` 写出 `packages/protocol/src/<概念>/shapes.gen.ts` 与 `endpoints.gen.ts`（`vp run protocol:ts`）；页面在边界解码用的 Zod（`schema.ts`）和带入参出参的端点表（`api.ts`）是手写的，由测试对着生成物查（[契约](docs/subsystems/foundation.md#契约规则和数据库)）。
 - **规则（`crates/vibevalley-core`）**：只读状态的纯函数：`reduce`、`frame_of`、工单的状态与阶段和可做的动作、收件箱、巡查、简报和起草、农场的画面（[核心状态](docs/subsystems/core.md)）。
 - **服务（`crates/vibevalley-server`）**：`src/lib.rs` 的 `Hub` 持有核心状态和接口表，模块用 `Hub::on` 按接口挂处理函数、只经 `Hub::apply` 改状态。`src/modules/` 一个概念一个模块（`mod.rs` 列全），`src/start.rs` 照依赖次序打开它们：设置、游戏、AI 服务、档案和农机、仓库、记性、轨迹、工单板（`modules/issue` 的 `Board`，帮工在 `modules/session`，worktree 与合并在 `modules/workplace`，都经 `modules/ledger.rs` 写）、定时任务、附件、媒体、频道、Artifact、笔记、工具和 `/mcp`、助手、观察层。
-- **门（`crates/vibevalley-http`）**：按接口表挂路由，SSE 给 `/state`、`/live`、`/events`，`/mcp` 交给服务端的工具；原生应用的页面也可以经 `crates/vibevalley-bridge` 在进程内调同一个 `Server`（`crates/vibevalley-server-api`）。
+- **门（`crates/vibevalley-http`、`crates/vibevalley-bridge`）**：HTTP 门按接口表挂路由，SSE 给 `/state`、`/live`、`/events`，`/mcp` 交给服务端的工具；桥让原生应用的页面在进程内调同一个 `Server`（`crates/vibevalley-server-api`）。
 - **农机（`crates/vibevalley-oar`、`crates/vibevalley-agent`）**：oar 的 Rust 实现驱动 Claude Code、Codex、ACP 与测试用的 scripted；自研 agent 只接 DeepSeek（[自研 agent](docs/subsystems/brain.md)）。
 - **存储（SQLite + 文件）**：模块各自在家目录的 `server.db` 建表（`create table if not exists`），工单板用 `vibevalley-store` 的 `state.db`；没有迁移，形状变了直接改。
-- **客户端（`apps/mac`、`apps/web`、`apps/desktop`、`crates/vibevalley-cli`）**：原生应用是终态；页面与 Electron 壳等 `apps/mac` 覆盖每个路由后删（[客户端](docs/subsystems/app.md)）。
+- **客户端（`apps/mac`、`crates/vibevalley-cli`）**：原生应用带着服务端，工作台是 nsh 跑的 TSX，像素场景由 Rust 画（[客户端](docs/subsystems/app.md)、[农场的皮](docs/subsystems/farm.md)）；命令行经 `server.json` 找到运行中的服务端。
 
 ## 核心状态
 
@@ -68,11 +70,11 @@ flowchart LR
 
 ## 事件流和接口
 
-命令走 `POST /api/v1/<路径>`，状态、事件和订阅走 SSE；全部路由、流、权限 `can` 和错误信封见[核心状态和接口](docs/subsystems/core.md)，每个接口的权限见生成的[能力表](docs/reference/capabilities.md)。服务端只听 `127.0.0.1`。
+HTTP 门上命令走 `POST /api/v1/<路径>`，状态、事件和订阅走 SSE；全部路由、流、权限 `can` 和错误信封见[核心状态和接口](docs/subsystems/core.md)，每个接口的权限见生成的[能力表](docs/reference/capabilities.md)。服务端只听 `127.0.0.1`。
 
 ## 存了什么
 
-数据分两层：Host（`$VIBEVALLEY_HOME`，默认 `~/.vibevalley`）和 Space（`$VIBEVALLEY_WORK_ROOT`，默认 `~/vibevalley-dev`），各放什么见[概念](docs/concepts.md#host-和-space)。
+数据分两层：Host（`$VIBEVALLEY_HOME`，默认 `~/.vibevalley`）和 Space（单独跑的服务端是 `$VIBEVALLEY_WORK_ROOT`，默认 `~/vibevalley-dev`；原生应用里的服务端用家目录），各放什么见[概念](docs/concepts.md#host-和-space)。
 
 Host：
 
@@ -91,11 +93,11 @@ Host：
 | `agent/<档案 id>/` | 助手的对话 `conversation.jsonl` 和 `MEMORY.md` |
 | `attachments/` | 附件，按 SHA-256 存一份 |
 
-Space `$VIBEVALLEY_WORK_ROOT`（默认 `~/vibevalley-dev`）下：
+Space 下：
 - `repos/`：仓库的 git 仓库。
 - `worktrees/`：工单分支的 git worktree。
 - `pkm/`：笔记库（PARA 目录与日记 Markdown，可通过 `pkm.root` 改到别处，[笔记](docs/subsystems/pkm.md)）。
 
 ## 配置
 
-配置的来源、优先级、校验和配置键说明见[设置和配置](docs/subsystems/setting.md#模型和不变量)。启动流程见[客户端](docs/subsystems/app.md)。
+配置的来源、优先级、校验和配置键说明见[设置和配置](docs/subsystems/setting.md#模型和不变量)。启动流程见[客户端](docs/subsystems/app.md#怎么走)。原生应用外壳自己的项目、布局和设置另存在 `~/Library/Application Support/VibeValley/state.db`。

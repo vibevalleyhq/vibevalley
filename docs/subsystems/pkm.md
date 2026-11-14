@@ -21,7 +21,7 @@
 | `crates/vibevalley-cli/src/commands/pkm.rs` | `vibevalley pkm ...` |
 | `packages/protocol/src/pkm/`、`packages/pkm/src/outline.ts` | 笔记契约与前后端共用的 `applyBlockOps`、`flatBlocks`、`slugOf` |
 | `$VIBEVALLEY_WORK_ROOT/pkm/` | 默认笔记根目录（`00_Inbox`–`04_Archives`、`journals/`、`.pkm/snapshots/`） |
-| `apps/web/src/features/pkm/` | 工作台笔记页、大纲编辑器组件（消费 `@vibevalley/pkm`） |
+| `apps/mac/ui/vv/web/features/pkm/` | 工作台笔记页、大纲编辑器组件（消费 `@vibevalley/pkm`） |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`pkm.*`），CLI 命令为 `vibevalley pkm ...`。
 
@@ -70,4 +70,5 @@
 
 - `packages/pkm/src/outline.test.ts`、`crates/vibevalley-pkm/src/tests.rs`：大纲无损往返、按需 `id::`、反链展开（Rust 一侧对着 golden）。
 - `crates/vibevalley-server/tests/pkm.rs`：建页与挪页、读外部编辑器写的、按操作改块保留 id 并撤销、闪念进今天的日记。
-- `apps/web/src/features/pkm/*.test.ts`、`apps/web/test/pkm.spec.ts`：键盘大纲编辑、多块选择与拖拽、搜索跳转与日记视图测试。
+- `packages/pkm/src/pkm.test.ts`：编辑、选择与日记视图的纯函数。
+- `apps/mac/ui/vv/app/notes.test.tsx`、`apps/mac/ui/vv/app/pkm.test.ts`：笔记页在样例数据上的页面测试（`nsh/test`）。

@@ -11,14 +11,14 @@
 | 概念 | 农场里 | 页面 | 协议 | HTTP |
 |---|---|---|---|---|
 | Host | — | — | 服务端 `ServerConfig` 的 `home`（`$VIBEVALLEY_HOME`，不进协议） | — |
-| 空间 | 大地图 | `/repos` 的「全部」（`farm/map/RepoMap.tsx`） | `SpaceState`；目录是服务端 `ServerConfig` 的 `work_root` | `/api/v1/state`、`/api/v1/events` |
+| 空间 | 大地图（`apps/mac/src/pixel/farm/islands.rs`） | `/repos` | `SpaceState`；目录是服务端 `ServerConfig` 的 `work_root` | `/api/v1/state`、`/api/v1/events` |
 | 仓库 | 大地图上的一座岛 | `/repos/:repo`（`features/repo`） | `RepoSummary`、`RepoActivity`、`RepoLanguages` | `/api/v1/repo/…` |
 | 助手 | 田头的助手 | `/orchestrator`、`/orchestrator/<档案 id>`（`features/orchestrator`） | `SpaceState.sessions`（`role: "orchestrator"`）、`Channel.orchestrator` | `/api/v1/channel/message/send`、`/api/v1/orchestrator/…` |
 | 档案、技能 | 小动物、技能书 | `/agents`（`features/agent`）、`/settings/skills`（`features/runtime/SkillsPage.tsx`） | `Agent`、`AgentTemplate`、`Skill` | `/api/v1/agent/…`、`/api/v1/skill/…` |
 | 农机 | 农具 | `/runtimes`（`features/runtime`） | `RuntimeInfo`、`RuntimeSettings` | `/api/v1/runtime/…` |
-| 工单、父子工单 | 图纸桌卡片、一块地 | `/issues`（`features/issue`、`FamilyDetail.tsx`）、地块详情（`farm/issue/IssueView.tsx`） | `Issue`（`assignments`、`parent`、`blockedBy`）、`Changes`、`Landing` | `/api/v1/issue/…` |
-| 帮工、一轮 | 地里干活的小动物、一季庄稼 | 地块详情、`features/session/WorkLog.tsx`、`Trajectory.tsx` | `Session`、`Run`、`RunTrigger`、`SessionEvent` | `/api/v1/session/…`、`/api/v1/issue/run/list` |
-| 频道、私聊、工单串 | 田头、频道、工单串 | 田头窗（`farm/chat`）、`/chat`（`features/channel`） | `Channel`（`type`：`channel`、`direct`、`thread`）、`ChatMessage`（`actor: Actor`）、`Attachment` | `/api/v1/channel/…`、`/api/v1/attachment/…` |
+| 工单、父子工单 | 图纸桌卡片、一块地 | `/issues`（`features/issue`、`FamilyDetail.tsx`） | `Issue`（`assignments`、`parent`、`blockedBy`）、`Changes`、`Landing` | `/api/v1/issue/…` |
+| 帮工、一轮 | 地里干活的小动物、一季庄稼 | `features/session/WorkLog.tsx`、`Trajectory.tsx` | `Session`、`Run`、`RunTrigger`、`SessionEvent` | `/api/v1/session/…`、`/api/v1/issue/run/list` |
+| 频道、私聊、工单串 | 田头、频道、工单串 | `/chat`（`features/channel`） | `Channel`（`type`：`channel`、`direct`、`thread`）、`ChatMessage`（`actor: Actor`）、`Attachment` | `/api/v1/channel/…`、`/api/v1/attachment/…` |
 | Artifact | — | `/artifacts`（`features/artifact`） | `Artifact`、`Block`、`Suggestion` | `/api/v1/artifact/…` |
 | 笔记 | — | `/pkm`（`features/pkm`） | `PkmPage`、`PkmBlock` | `/api/v1/pkm/…` |
 | 记性 | 记性 | 档案页与助手页（`features/memory/Memory.tsx`） | `Memory`、`MemoryList` | `/api/v1/memory/…` |

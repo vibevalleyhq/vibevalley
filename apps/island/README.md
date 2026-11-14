@@ -1,8 +1,8 @@
 # apps/island
 
 The island at the notch: a native macOS helper (Swift, AppKit, SwiftUI) that shows the issues in flight beside the
-camera and opens one on a click. The desktop app starts it and feeds it (`apps/desktop/src/infra/island.ts`); why it is a
-helper of its own and how it is placed: [the client](docs/subsystems/app.md).
+camera and opens one on a click. It is a program of its own: whatever starts it writes glances to its stdin and reads
+the issue to open from its stdout. The native app (`apps/mac`) does not start it ([the client](docs/subsystems/app.md)).
 
 ```
 Sources/IslandCore/Messages.swift   the lines the app and the island exchange: {"glance": …} in, {"open": "<issue>"} out
@@ -12,14 +12,12 @@ Sources/VibeValleyIsland/Island.swift the panel, the hover that opens it, the ro
 Tests/IslandCoreTests/              the messages and the placement (Swift Testing)
 ```
 
-The shapes in `Messages.swift` are `Glance` and `IslandRow` in `apps/desktop/src/infra/island.ts`: change both together.
-
 ```bash
 vp run --filter @vibevalley/island test           # swift test; macOS only, run on the owner's Mac (CI does not run the island)
-swift build -c release --package-path apps/island # what apps/desktop scripts/build.ts runs; the app finds .build/release/VibeValleyIsland
+swift build -c release --package-path apps/island # builds .build/release/VibeValleyIsland
 ```
 
-To see how it looks without the desktop app or screen recording, give it a glance and `--snapshot`: it draws the island
+To see how it looks without an app feeding it or screen recording, give it a glance and `--snapshot`: it draws the island
 closed and open into that folder (it must exist) (`closed.png`, `open.png`) and writes where the panel would go (`frames.txt`).
 
 ```bash

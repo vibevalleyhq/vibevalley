@@ -1,6 +1,6 @@
 # 代码风格
 
-TypeScript 的页面（`apps/web`）、宿主（`apps/desktop`、`apps/mobile`、`apps/mac/ui`）、共用包和它们的测试照这一篇写；Rust（`crates/`、`apps/mac`）的格式与 lint 交给 `cargo fmt` 和 clippy（`vp run rust:check`），叫法、注释与「没有值」的道理一样（Rust 里没有就是 `Option`）。格式交给工具，本篇管工具管不到的：用什么叫法、注释写什么；名字怎么起见 [naming.md](docs/style/naming.md)。
+TypeScript 的页面（`apps/mac/ui`）、官网、共用包和它们的测试照这一篇写；Rust（`crates/`、`apps/mac`）的格式与 lint 交给 `cargo fmt` 和 clippy（`vp run rust:check`），叫法、注释与「没有值」的道理一样（Rust 里没有就是 `Option`）。格式交给工具，本篇管工具管不到的：用什么叫法、注释写什么；名字怎么起见 [naming.md](docs/style/naming.md)。
 
 ## 格式
 
@@ -13,7 +13,7 @@ TypeScript 的页面（`apps/web`）、宿主（`apps/desktop`、`apps/mobile`�
 ## 叫法
 
 - 代码、接口和服务端的文档用实际的概念：`Issue`、`Session`、`Repo`（[概念](docs/concepts.md)）。不用旧叫法 ticket，也不用网页时代的名字。
-- 对用户说的话写进词典（`packages/i18n/locales`），中英各一份，代码里写 `t("key")`；对模型说的写进 `prompts.ts`，用中文（[话放在哪](docs/subsystems/foundation.md#话放在哪)）。用农场的叫法（[用语表](docs/README.md#用语)）。
+- 对用户说的话写进词典（`crates/vibevalley-i18n/locales`），中英各一份，代码里写 `t("key")`；对模型说的写进 `crates/vibevalley-server/assets`，用中文（[话放在哪](docs/subsystems/foundation.md#话放在哪)）。用农场的叫法（[用语表](docs/README.md#用语)）。
 - 注释用英文。
 
 ## 没有值
@@ -25,24 +25,24 @@ TypeScript 的页面（`apps/web`）、宿主（`apps/desktop`、`apps/mobile`�
 | 必有的字段，给默认值 | 没有和「空」是一回事：列表 `[]`、表 `{}`、开关 `false`、说给人看的字 `""` | `mentions: []`、`description: ""`、`problem: ""`（`xProblem` 没问题就是 `""`） |
 | `x?: T`（不写） | 没有本身就是一种情况：没跑过就没有 `lastRun`，没连到别处就没有 `repo`、`channel`；请求里不写就是不改；宿主没有这项本事就没有 `notify` | `lastRun?: LastRun`、`IssueUpdate.title?` |
 | `x: T \| undefined` | 内存里会被清空的状态（类的字段、一次运行的记录）；查找没找到 | `sess: OarSession \| undefined`、`Map.get` |
-| `null` | 只在外面说 `null` 的地方：DOM 和浏览器的接口、JSX 什么都不画；线上只有「问过、没答案」用它，和「答了、是空」分开 | `models: ModelEntry[] \| null`（农机没列出来） |
+| `null` | 只在外面说 `null` 的地方：宿主给的接口、JSX 什么都不画；线上只有「问过、没答案」用它，和「答了、是空」分开 | `models: ModelEntry[] \| null`（农机没列出来） |
 
 - 不写 `T | null | undefined`：外面来的 `null` 在进门的那一处换成 `undefined`（可空列用 `?? undefined`；存储照[进门解码](docs/style/module-design.md#类型驱动与进门解码)），里面只认一种。
 - 读必有的字段不写 `?? []`、`?.`：类型说它在，它就在。从外面读进来（老的存档、外面库的返回）类型说不准的，在读进来的那一处补齐，不在用的地方兜。
 - 必有的字放 `""` 以后，「没有就用别的」写 `||`，不写 `??`：`n.conclusion || "做完了"`。数字和布尔不这样：`0`、`false` 是值，写 `??`（lint 的 `prefer-nullish-coalescing` 查）。
-- 条件里只放布尔和字符串（`""` 是没有）：数字写 `n > 0`、`n !== 0`，可能没有的布尔写 `=== true`，可能没有的对象直接判（lint 的 `strict-boolean-expressions` 查）。比较函数一层层比，写 `or(…)`（`apps/web/src/base/search.ts`），不写 `a - b || …`。
+- 条件里只放布尔和字符串（`""` 是没有）：数字写 `n > 0`、`n !== 0`，可能没有的布尔写 `=== true`，可能没有的对象直接判（lint 的 `strict-boolean-expressions` 查）。比较函数一层层比，写 `or(…)`（`apps/mac/ui/vv/web/base/search.ts`），不写 `a - b || …`。
 - 给人看的话只在帧上：核心形状（`Session`、`Cron`、`Doing`）只有事实，帧用视图形状（`SessionView`、`CronView`、`SpaceView`）带上必有的说法；读说法的函数收视图形状，只读事实的收核心形状（视图形状能当核心形状用）。
 - 闭合的一组词在 Rust 里是 enum（serde 进门就解成它），在页面是联合：从字符串认一个词用 `isOneOf`，按 `_tag`、`kind` 取联合里的一种用 `variant`，都不写 `as`。
 
 ## 检查管着的写法
 
-- 检查失败时说的话写三样：错在哪、为什么；`Fix:` 该怎么写（能照抄的一行，规则算得出的就算出来，比如 `parent-import` 给出 `#/…` 的写法、`no-cjk-literal` 给出该进哪个词典）；`See` 仓库里的一个文件。agent 读到的只有这句话，只说「不许」它就自己猜，猜的常常是绕过去。lint 规则经 `scripts/audit/oxlint-plugin.ts` 的 `says` 写，`no-restricted-imports` 的话在 `vite.config.ts` 的 `refused` 里写一次，`scripts/audit/oxlint-plugin.test.ts` 查格式和 `See` 的文件在不在；结构测试的 `expect(…, "<同样的三样>")`、脚本的报错照同一个格式写。能机械改对的给出自动修复（`vp check --fix`）。
+- 检查失败时说的话写三样：错在哪、为什么；`Fix:` 该怎么写（能照抄的一行，规则算得出的就算出来，比如 `no-cross-package-path` 给出该写的包名、`no-cjk-literal` 给出该进哪个词典）；`See` 仓库里的一个文件。agent 读到的只有这句话，只说「不许」它就自己猜，猜的常常是绕过去。lint 规则经 `scripts/audit/oxlint-plugin.ts` 的 `says` 写，`no-restricted-imports` 的话在 `vite.config.ts` 的 `refused` 里写一次，`scripts/audit/oxlint-plugin.test.ts` 查格式和 `See` 的文件在不在；结构测试的 `expect(…, "<同样的三样>")`、脚本的报错照同一个格式写。能机械改对的给出自动修复（`vp check --fix`）。
 
-- 不写收窄的 `as`：外面来的值用 Schema 或类型守卫读，DOM 的值用 `instanceof`；确实只能断言的（库的类型缺口、自己写出又读回的文件），在那一行写 `// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- <为什么成立>`。测试、故事和样例不查：断言错了，读它的断言会失败。
-- 全局的属性是两个世界之间的契约（页面和它的壳、测试和它起的程序）：在门里声明一次（`declare global`、`interface Window`），之后按名字带着类型读写。门只有三个：`packages/protocol/src/host.ts`（宿主）、`apps/desktop/src/infra/probe.ts`（桌面测试读的探针，只在 `VIBEVALLEY_DESKTOP_PROBE=1` 时有）、`apps/web/test/marks.ts`（页面测试自己埋的点）；转型 `window`、`globalThis`，`Object.assign` 到它们上，门外的 `declare global`，lint 的 `vibevalley/global-doors` 拦。
+- 不写收窄的 `as`：外面来的值用 Schema 或类型守卫读，DOM 的值用 `instanceof`；确实只能断言的（库的类型缺口、自己写出又读回的文件），在那一行写 `// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- <为什么成立>`。测试和样例不查：断言错了，读它的断言会失败。
+- 全局的属性是两个世界之间的契约（页面和它的壳、测试和它起的程序）：在门里声明一次（`declare global`、`interface Window`），之后按名字带着类型读写。门只有一个：`packages/protocol/src/host.ts`（宿主）；转型 `window`、`globalThis`，`Object.assign` 到它们上，门外的 `declare global`，lint 的 `vibevalley/global-doors` 拦。
 - 正则都带 `u`：中文和 emoji 按码点算，`.`、`[^x]` 不会切开一个字。
 - 不就地排序、倒序：`toSorted`、`toReversed`，帧和核心状态是共享的。
-- 循环里的 `await`：彼此无关的改成 `Promise.all`；一步要等上一步的（轮询、分页的游标、一个会话的轮次、按次序的批）在那一行写明为什么。Playwright 的测试不查：一页只能一步步点。
+- 循环里的 `await`：彼此无关的改成 `Promise.all`；一步要等上一步的（轮询、分页的游标、一个会话的轮次、按次序的批）在那一行写明为什么。
 
 ## 注释
 

@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-`/tree` 页面（`apps/web/src/tree/`）目前展示的是静态演示数据（`src/tree/mock.ts`），尚未连接服务端的 `memory` 表与 EverOS 接口，点击「播种」也未真正写入技能书。
+记忆树（`/tree`，`apps/mac/src/pixel/tree.rs`）目前展示的是静态演示数据（`mock_memories`），尚未连接服务端的 `memory` 表与 EverOS 接口，点击「播种」也未真正写入技能书。
 
 ## Proposal
 

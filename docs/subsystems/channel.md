@@ -94,4 +94,4 @@
 
 - `crates/vibevalley-server/tests/channel.rs`：频道、私聊、串、消息与订阅经端点走一遍。
 - `crates/vibevalley-server/tests/watch.rs`：写话等路由、交给帮工。
-- `apps/web/test/chat.spec.ts`、`chat-messages.spec.ts`、`chat-rest.spec.ts`、`channel-follow.spec.ts`：聊天界面与实时订阅端到端（页面对着 Rust 服务端跑）。
+- `apps/mac/ui/vv/app/chat.test.tsx`：聊天页在样例数据上的页面测试（`nsh/test`）。
