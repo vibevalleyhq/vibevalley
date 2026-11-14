@@ -1,46 +1,45 @@
 ---
 name: vv-acceptance
-description: 改完 VibeValley 的代码之后，在真的程序上验收、拿到证据再汇报：起一个和用户的数据隔开的服务端，看接口和 /api/v1/state（apps/server/**、apps/server/db、packages/protocol）、截页面的图（apps/web/**）、在模拟器上走手机壳的配对（apps/mobile/**、packages/protocol/src/host.ts、apps/server/src/gateway/lan）、在真的打包上走桌面版的自己更新（apps/desktop/src/infra/update.ts、apps/desktop/scripts/package.ts）、用真模型重放助手的评测（助手的提示、工具描述、packages/agent，花钱，先问用户）。用在：用户说「验证一下」「验收」「跑起来看看」「截个图」「手机上看看」「跑一下助手的评测」；改了接口、服务、表结构、开机流程、页面、手机壳、桌面的更新之后，说「做完了」之前，即使用户没开口；写 PR 的 Checks 要附证据时。只改了纯函数、测试已经覆盖的，或只改了注释和文档，跑测试就够。
+description: 改完 VibeValley 的代码之后，在真的程序上验收、拿到证据再汇报：起一个和用户的数据隔开的 Rust 服务端，用 Rust 命令行看接口和 /api/v1/state（crates/vibevalley-server、crates/vibevalley-issues、crates/vibevalley-cli、packages/protocol）、截页面的图（apps/web/**）、验媒体任务（crates/vibevalley-server/src/modules/media）、在真的打包上走桌面版的自己更新（apps/desktop/src/infra/update.ts、apps/desktop/scripts/package.ts）。用在：用户说「验证一下」「验收」「跑起来看看」「截个图」；改了接口、服务、表结构、开机流程、页面、桌面的更新之后，说「做完了」之前，即使用户没开口；写 PR 的 Checks 要附证据时。只改了纯函数、测试已经覆盖的，或只改了注释和文档，跑测试就够。
 ---
 
 # 验收
 
-测试和检查之后的那一段：程序真的起来、接口真的返回、页面真的画出来、手机真的配上。测试用假的帮工、假的模型，证明不了这些；用户看的是证据，不是「测试过了」这句话。
+测试和检查之后的那一段：程序真的起来、接口真的返回、页面真的画出来。测试用假的帮工、假的模型，证明不了这些；用户看的是证据，不是「测试过了」这句话。
 
-每一块的做法在 `references/` 下的一份分册里：先照下表找到要读的那份，只读用得上的，验一个接口不用带上模拟器和花钱的步骤。下面的「准备」「步骤」「证据」「出错时」「收拾」是各块共同的部分，分册里写它自己多出来的。
+每一块的做法在 `references/` 下的一份分册里：先照下表找到要读的那份，只读用得上的，验一个接口不用带上截图和真实厂商的步骤。下面的「准备」「步骤」「证据」「出错时」「收拾」是各块共同的部分，分册里写它自己多出来的。
 
 ## 什么时候用
 
 | 改了什么 | 读哪份 | 证明什么 |
 |---|---|---|
-| `apps/server/src/**`、`apps/server/db`、`packages/protocol` 的接口或形状；开机的流程 | [server.md](.agents/skills/vv-acceptance/references/server.md) | 隔开的服务端起得来，接口和 `/api/v1/state` 里有这次的改动；工单能派、交回、完成 |
+| `crates/vibevalley-server`、`crates/vibevalley-issues`、`crates/vibevalley-core`、`crates/vibevalley-cli`、`packages/protocol` 的接口或形状；开机的流程 | [server.md](.agents/skills/vv-acceptance/references/server.md) | 隔开的服务端起得来，接口和 `/api/v1/state` 里有这次的改动；工单能派、交回、完成 |
 | `apps/web/src/**`、`assets` 的画面、组件、贴图 | [page.md](.agents/skills/vv-acceptance/references/page.md) | 对着真的服务端，页面画出来是对的（截图） |
 | `media`、生图协议、结果下载、助手媒体工具、素材库 `/library` 页 | [media.md](.agents/skills/vv-acceptance/references/media.md) | 隔离程序的生成、落盘、预览、发布与 Artifact 引用真的接通；费用和未知结果边界不变 |
-| `apps/mobile/**`、`packages/protocol/src/host.ts`、`apps/server/src/gateway/lan`、页面里调宿主的地方 | [mobile.md](.agents/skills/vv-acceptance/references/mobile.md) | 安卓模拟器上的真应用配对、经「连接到本机」打开页面、桥让手机弹通知、重开直接回农场 |
 | `apps/desktop/src/infra/update.ts`、`releases.ts`、`apps/desktop/scripts/package.ts`、`.github/workflows/release.yml` | [desktop-update.md](.agents/skills/vv-acceptance/references/desktop-update.md) | 打包的应用查到新版、核对、退出时换上，SHA-512 不对时不换 |
-| 助手的提示、`apps/server/src/gateway/tool` 的工具描述、`packages/agent` 拼提示和压缩的办法；加了助手的样例 | [orchestrator-evals.md](.agents/skills/vv-acceptance/references/orchestrator-evals.md) | 用真模型重放每个样例 5 次，以前修好的错没回来，新的修好了 |
 
 一次改动碰了几块，就读几份，在同一个沙箱子命令里一起做（造数据、调接口、截图）。
 
 不用它：只改了纯函数、单元测试已经覆盖的；只改了注释和文档。
 
-**助手的评测连网、花钱：跑之前先问用户。** 没问、没钥匙时只做那份分册里离线的部分，汇报里写明在线的那半没跑。默认不派真的帮工（要本机登录的农机或钥匙）；用户明确授权验证真实帮工 CLI 时，按服务端分册的「真实帮工的 CLI 与连接观测」执行。普通派活使用沙箱的 `--scripted-helper`（[server.md](.agents/skills/vv-acceptance/references/server.md)）。
+**连网、花钱的（真模型、真实厂商）跑之前先问用户。** 没问、没钥匙时只做离线的部分，汇报里写明在线的那半没跑。助手用真模型重放的评测随 TS 服务端删了，Rust 上还没有：改了助手的提示（`crates/vibevalley-core/src/prompts.rs`）或工具说明（`assets/tools/`）只能跑 `cargo test -p vibevalley-server --test orchestrator`，汇报里写明没用真模型验。默认不派真的帮工（要本机登录的农机或钥匙）；用户明确授权验证真实帮工 CLI 时，按服务端分册的「真实帮工的 CLI 与连接观测」执行。普通派活使用沙箱的 `--scripted-helper`（[server.md](.agents/skills/vv-acceptance/references/server.md)）。
 
 ## 准备
 
-1. 先跑和改动有关的最窄的检查：服务端 `vp run server:check`，页面和手机壳 `vp run web:check`（它也构建出 `apps/web/dist`）。
-2. 照分册的「准备」做它要的事（生成代码、构建、起模拟器、钥匙）。
+1. 先跑和改动有关的最窄的检查：服务端和命令行 `vp run rust:check`，页面 `vp run web:check`（它也构建出 `apps/web/dist`）。
+2. `cargo build -p vibevalley-server -p vibevalley-cli`：沙箱用构建好的二进制，不替你构建。
+3. 照分册的「准备」做它要的事（构建、钥匙）。
 
 ## 步骤
 
 1. 照上表选出分册，读它。
-2. 除了助手的评测，都用同一个沙箱，在仓库根目录跑：
+2. 都用同一个沙箱，在仓库根目录跑：
 
    ```bash
    vpx scripts/release/verify-server.ts [--scripted-helper] -- <这一轮的子命令>
    ```
 
-   它用服务端的 `vpx` 从 `apps/server` 起服务端，临时的家目录和工作目录、回环地址的空闲端口，环境里去掉一切钥匙，不碰 `~/.vibevalley`，也不占用户的 8787；`apps/web/dist` 在的话一起提供页面。子命令拿到 `VIBEVALLEY_SERVER`（服务端的地址）和 `VIBEVALLEY_VERIFY_CLI`（连着它的命令行，`help` 列出全部接口）。每次调用是一个新农场，要的数据在同一个子命令里造。
+   它起 `${CARGO_TARGET_DIR:-target}/debug/vibevalley-server`（`VIBEVALLEY_SERVER_BIN` 可指定别的），临时的家目录和工作目录、回环地址的空闲端口，环境里去掉一切钥匙，不碰 `~/.vibevalley`，也不占用户的 8787；`apps/web/dist` 在的话一起提供页面。子命令拿到 `VIBEVALLEY_SERVER`（服务端的地址）和 `VIBEVALLEY_VERIFY_CLI`（连着它的 Rust 命令行 `vibevalley`，`--help` 列出全部命令）。每次调用是一个新农场，要的数据在同一个子命令里造。
 
 3. 照分册的「步骤」写子命令、跑。
 4. 读脚本打印的证据目录：`command.stdout.log`、`command.stderr.log`、`server.stdout.log`、`server.stderr.log`，核对结果。只有启动成功的 `health.json` 不能证明改动生效。
@@ -50,17 +49,17 @@ description: 改完 VibeValley 的代码之后，在真的程序上验收、拿�
 说「验收过了」时，附上：
 
 - 执行的命令和打印的证据目录；`result.json` 的 `code` 是 0、`stopped` 是 true。
-- 分册「证据」一节要的东西：接口的 JSON、截图、模拟器的那几行、评测的表。
+- 分册「证据」一节要的东西：接口的 JSON、截图。
 - 日志里的错误和对它们的结论。
 
 ## 出错时
 
-- **服务端起不来或健康检查超时**：看 `server.stdout.log`、`server.stderr.log`（类型错误、表结构对不上、端口）。脚本已经停掉它起的进程。
+- **服务端起不来或健康检查超时**：看 `server.stdout.log`、`server.stderr.log`（二进制不在、表结构对不上、端口）。脚本已经停掉它起的进程。
 - **子命令失败**：看 `command.stderr.log` 和 `command.stdout.log`；脚本不会把非零退出码改成成功。
 - **清理失败**：看 `result.json` 的 `cleanupErrors`；`stopped` 为 false 时临时目录会留着，不要当成已收拾。
-- **接口或形状对不上**：跑 `vp run server:check` 和 `vp run web:check`；服务端每次从源码起，没有旧的构建。
+- **接口或形状对不上**：跑 `vp run protocol:rust:check`、`vp run rust:check` 和 `vp run web:check`；确认二进制是改完以后构建的。
 - 各块自己的失败在分册的「出错时」。
 
 ## 收拾
 
-沙箱脚本自己停掉服务端、删掉临时的 `home`、`work`，证据日志留在打印的临时目录，交付后可删。截图（`apps/web/.screens/`、`apps/mobile/.screens/`）不进 git。模拟器照 [mobile.md](.agents/skills/vv-acceptance/references/mobile.md) 停。
+沙箱脚本自己停掉服务端、删掉临时的 `home`、`work`，证据日志留在打印的临时目录，交付后可删。截图（`apps/web/.screens/`）不进 git。

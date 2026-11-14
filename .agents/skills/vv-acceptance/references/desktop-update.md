@@ -37,7 +37,7 @@
 
 ## 出错时
 
-- **服务端起不来**（`waitForURL` 超时，窗口停在加载条上，地址里有 `problem=`）：读 JSON 里 `work` 目录下 `run-*/home/logs/desktop-server.log`。依赖对不上多半是打包的服务端没有照锁文件装。
+- **服务端起不来**（`waitForURL` 超时，窗口停在加载条上，地址里有 `problem=`）：读 JSON 里 `work` 目录下 `run-*/home/logs/desktop-server.log`。多半是打包时没带上 Rust 的 `vibevalley-server` 二进制或它是旧的。
 - **`update` 不是 `ready`**：`text` 是「关于」那一行的原话；`manual` 是应用放的地方不能写（看 `work` 目录的权限），`failed` 后面是原因。
 - **`afterUpdate` 还是 0.0.1**：换的脚本是 Electron 的 user-data 里 updates 下的 swap.sh；旧的应用留在同一处的 previous.app。
 

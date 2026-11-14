@@ -1,6 +1,6 @@
 # 代码风格
 
-服务端（`apps/server`）、页面（`apps/web`）、宿主（`apps/desktop`、`apps/mobile`）、共用包和它们的测试都照这一篇写。格式交给工具，本篇管工具管不到的：用什么叫法、注释写什么；名字怎么起见 [naming.md](docs/style/naming.md)。
+TypeScript 的页面（`apps/web`）、宿主（`apps/desktop`、`apps/mobile`、`apps/mac/ui`）、共用包和它们的测试照这一篇写；Rust（`crates/`、`apps/mac`）的格式与 lint 交给 `cargo fmt` 和 clippy（`vp run rust:check`），叫法、注释与「没有值」的道理一样（Rust 里没有就是 `Option`）。格式交给工具，本篇管工具管不到的：用什么叫法、注释写什么；名字怎么起见 [naming.md](docs/style/naming.md)。
 
 ## 格式
 
@@ -25,14 +25,14 @@
 | 必有的字段，给默认值 | 没有和「空」是一回事：列表 `[]`、表 `{}`、开关 `false`、说给人看的字 `""` | `mentions: []`、`description: ""`、`problem: ""`（`xProblem` 没问题就是 `""`） |
 | `x?: T`（不写） | 没有本身就是一种情况：没跑过就没有 `lastRun`，没连到别处就没有 `repo`、`channel`；请求里不写就是不改；宿主没有这项本事就没有 `notify` | `lastRun?: LastRun`、`IssueUpdate.title?` |
 | `x: T \| undefined` | 内存里会被清空的状态（类的字段、一次运行的记录）；查找没找到 | `sess: OarSession \| undefined`、`Map.get` |
-| `null` | 只在外面说 `null` 的地方：库表的列（`db/generated`）、DOM 和浏览器的接口、JSX 什么都不画；线上只有「问过、没答案」用它，和「答了、是空」分开 | `models: ModelEntry[] \| null`（农机没列出来） |
+| `null` | 只在外面说 `null` 的地方：DOM 和浏览器的接口、JSX 什么都不画；线上只有「问过、没答案」用它，和「答了、是空」分开 | `models: ModelEntry[] \| null`（农机没列出来） |
 
-- 不写 `T | null | undefined`：外面来的 `null` 在进门的那一处换成 `undefined`（可空列用 `?? undefined`；自有表的可空 JSON 列照[存储解码](docs/style/module-design.md#类型驱动与进门解码)用 `storedJsonOrUndefined`），里面只认一种。
+- 不写 `T | null | undefined`：外面来的 `null` 在进门的那一处换成 `undefined`（可空列用 `?? undefined`；存储照[进门解码](docs/style/module-design.md#类型驱动与进门解码)），里面只认一种。
 - 读必有的字段不写 `?? []`、`?.`：类型说它在，它就在。从外面读进来（老的存档、外面库的返回）类型说不准的，在读进来的那一处补齐，不在用的地方兜。
 - 必有的字放 `""` 以后，「没有就用别的」写 `||`，不写 `??`：`n.conclusion || "做完了"`。数字和布尔不这样：`0`、`false` 是值，写 `??`（lint 的 `prefer-nullish-coalescing` 查）。
-- 条件里只放布尔和字符串（`""` 是没有）：数字写 `n > 0`、`n !== 0`，可能没有的布尔写 `=== true`，可能没有的对象直接判（lint 的 `strict-boolean-expressions` 查）。比较函数一层层比，写 `or(…)`（`apps/server/src/base/order.ts`、`apps/web/src/base/search.ts`），不写 `a - b || …`。
+- 条件里只放布尔和字符串（`""` 是没有）：数字写 `n > 0`、`n !== 0`，可能没有的布尔写 `=== true`，可能没有的对象直接判（lint 的 `strict-boolean-expressions` 查）。比较函数一层层比，写 `or(…)`（`apps/web/src/base/search.ts`），不写 `a - b || …`。
 - 给人看的话只在帧上：核心形状（`Session`、`Cron`、`Doing`）只有事实，帧用视图形状（`SessionView`、`CronView`、`SpaceView`）带上必有的说法；读说法的函数收视图形状，只读事实的收核心形状（视图形状能当核心形状用）。
-- 闭合的一组词在库里是带 `check (列 in (…))` 的 `text` 列（`schema.test.ts` 查），`scripts/pg-generate.ts` 生成的查询读出来就是词的联合；从字符串认一个词用 `isOneOf`，按 `_tag`、`kind` 取联合里的一种用 `variant`（页面），都不写 `as`。
+- 闭合的一组词在 Rust 里是 enum（serde 进门就解成它），在页面是联合：从字符串认一个词用 `isOneOf`，按 `_tag`、`kind` 取联合里的一种用 `variant`，都不写 `as`。
 
 ## 检查管着的写法
 

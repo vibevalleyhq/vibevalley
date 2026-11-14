@@ -4,22 +4,23 @@
 
 ## 什么时候用
 
-改了 `apps/server/src/modules/media`、音频协议、下载与附件、理解授权、助手的媒体工具、素材库 `/library` 页（生成 `?make=`、理解 `?understand=<附件 id>`），或 MOSS Live／Vision 的实时视觉、播放与资源回收。模型列表能查、用途能绑定，不等于生成能用。
+改了 `crates/vibevalley-server/src/modules/media`、音频协议、下载与附件、理解授权、助手的媒体工具、素材库 `/library` 页（生成 `?make=`、理解 `?understand=<附件 id>`），或 MOSS Live／Vision 的实时视觉、播放与资源回收。模型列表能查、用途能绑定，不等于生成能用。Rust 服务端现在只有图片与语音任务；多人对话、音色设计、克隆、转写、理解与实时语音没有搬（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)「砍掉的」），对应的页面用例会失败，不算这次的退步。
 
 ## 准备
 
-- 不使用用户的家目录、钥匙或媒体。下面的 Playwright 自己起隔离的服务端；`VIBEVALLEY_TEST_RUNTIMES=1` 下 `apps/server/src/testing/network.ts` 只替换 MOSS 的厂商请求和结果下载，任务、库、文件、状态流、频道和 Artifact 都走真的模块。不手工拼成功帧。
+- 不使用用户的家目录、钥匙或媒体。下面的 Playwright 自己起隔离的服务端；`VIBEVALLEY_TEST_RUNTIMES=1` 下 [testing.rs](crates/vibevalley-server/src/testing.rs) 的 `OfflineImages` 只替换 MOSS 的生图请求和结果下载，任务、库、文件、状态流、频道和 Artifact 都走真的模块。不手工拼成功帧。
 - 证据分三类：协议离线、隔离程序、真实厂商。替身给的是确定的 PNG 和合成音调，不证明账号权限、模型质量或实际费用。
 
 ## 步骤
 
-1. 在 `apps/server` 跑定点测试：
+1. 跑定点测试：
 
    ```bash
-   vp test src/modules/media src/gateway/http/media.test.ts src/infra/publicHttp.test.ts src/infra/files.test.ts src/infra/db.test.ts src/flows/media.test.ts
+   cargo test -p vibevalley-server --test media_jobs --test media_inputs --test library --test publish
+   cargo test -p vibevalley-http
    ```
 
-2. 跑 `vp run server:check`、`vp run web:check`。
+2. 跑 `vp run rust:check`、`vp run web:check`。
 3. 在根目录跑浏览器用例，开发版再跑一遍（不应有 Solid 响应式警告）：
 
    ```bash
@@ -30,7 +31,6 @@
 
 4. 读截图 `apps/web/.screens/{media,understanding,speech}-*-{light,dark}-{1280,390}.png`：没有横向溢出，费用未知、取消、截断的含义看得清，结果和动作都在图里，没被页头遮住（截图步骤见[页面分册](.agents/skills/vv-acceptance/references/page.md)）。
 5. 改了接口时，照[服务端分册](.agents/skills/vv-acceptance/references/server.md)用 `verify-server.ts -- <脚本>`（理解和语音加 `--scripted-helper`）在隔离程序上走一遍：脚本自己生成 PNG，`media.input.create` 后向 `/api/v1/media/input/:id/content` PUT 二进制，再走要验的那条接口到 `ready`，接一次 `/api/v1/state` 核对状态流里没有钥匙和签名 URL。
-6. 改了 Live／Vision 或宿主：`moss.spec.ts` 的虚拟生命周期用例禁用 Worker，只证明替身协议；真实 Worker／Worklet 播放、摄像头／屏幕、Electron 和手机的入口要在真的宿主上看（[宿主边界](docs/subsystems/voice.md)），没走通的列为未验收。
 
 ## 真实厂商
 
