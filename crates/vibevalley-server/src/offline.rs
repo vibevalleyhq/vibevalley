@@ -249,6 +249,15 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
             .find(|p| p.0 == "name")
             .map(|p| String::from_utf8_lossy(&p.2).to_string())
             .unwrap_or_default();
+        if name.contains("[clone:hold]") {
+            return never(&req);
+        }
+        if name.contains("[clone:unknown]") {
+            return empty(503);
+        }
+        if name.contains("[clone:rejected]") {
+            return empty(422);
+        }
         let mut s = lock(state);
         let n = next(&mut s);
         let voice = json!({ "id": format!("voice-cloned-{n}"), "object": "audio.voice", "name": name, "created_at": 1 });
@@ -258,12 +267,23 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
     if let Some(id) = path.strip_prefix(&format!("{MOSS}/audio/tasks/"))
         && r.method == "GET"
     {
-        let s = lock(state);
+        let mut s = lock(state);
         let Some(task) = s.tasks.get(id).filter(|t| t["account"] == auth.as_str()) else {
             return json_response(404, &json!({ "error": { "code": "task_not_found" } }));
         };
         let mut out = task.clone();
+        // A task marked pending is still at work the first time it is asked about.
+        if let Some(left) = s
+            .tasks
+            .get_mut(id)
+            .and_then(|t| t.get_mut("pending"))
+            .filter(|p| p.as_i64().is_some_and(|n| n > 0))
+        {
+            *left = json!(left.as_i64().unwrap_or(1) - 1);
+            out["status"] = json!("PROCESSING");
+        }
         if let Some(o) = out.as_object_mut() {
+            o.remove("pending");
             o.remove("account");
             o.insert("id".into(), json!(id));
             o.insert("created_at".into(), json!(1));
@@ -314,6 +334,7 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
             id.clone(),
             json!({
                 "account": auth, "object": "audio.transcription",
+                "pending": if auth == "Bearer test-audio-pending" { 1 } else { 0 },
                 "status": if auth == "Bearer test-audio-failure" { "FAILED" } else { "SUCCESS" },
                 "text": "First synthetic speaker. Second synthetic speaker.",
                 "segments": [
@@ -363,7 +384,7 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
         );
         s.tasks.insert(
             id.clone(),
-            json!({ "account": auth, "object": if speakers { "audio.speech" } else { "audio.voice_generation" }, "status": "SUCCESS", "url": url, "response_format": format, "content_type": kind }),
+            json!({ "account": auth, "object": if speakers { "audio.speech" } else { "audio.voice_generation" }, "pending": if text.contains("[audio:pending]") { 1 } else { 0 }, "status": "SUCCESS", "url": url, "response_format": format, "content_type": kind }),
         );
         return json_response(200, &json!({ "task_id": id }));
     }
@@ -488,7 +509,7 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
             id.clone(),
             File {
                 purpose: purpose.clone(),
-                fail_once: false,
+                fail_once: auth == "Bearer test-audio-cleanup-failure",
             },
         );
         return json_response(
