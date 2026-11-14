@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn main() {
+    build_audio();
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
     let repo = manifest.join("../..").canonicalize().unwrap();
     let ui = manifest.join("ui");
@@ -108,4 +109,38 @@ fn watch(dir: &Path) {
             println!("cargo:rerun-if-changed={}", path.display());
         }
     }
+}
+
+fn build_audio() {
+    let out = PathBuf::from(std::env::var("OUT_DIR").unwrap());
+    let object = out.join("audio.o");
+    let archive = out.join("libvibevalley_audio.a");
+    println!("cargo:rerun-if-changed=src/audio.m");
+    let status = Command::new("/usr/bin/clang")
+        .args([
+            "-fobjc-arc",
+            "-fblocks",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-Wno-unused-parameter",
+            "-c",
+            "src/audio.m",
+            "-o",
+        ])
+        .arg(&object)
+        .status()
+        .expect("compile the AVFoundation audio adapter");
+    assert!(status.success(), "the AVFoundation audio adapter did not compile");
+    let status = Command::new("/usr/bin/ar")
+        .arg("rcs")
+        .arg(&archive)
+        .arg(&object)
+        .status()
+        .expect("archive the audio adapter");
+    assert!(status.success(), "the audio adapter was not archived");
+    println!("cargo:rustc-link-search=native={}", out.display());
+    println!("cargo:rustc-link-lib=static=vibevalley_audio");
+    println!("cargo:rustc-link-lib=framework=AVFoundation");
+    println!("cargo:rustc-link-lib=framework=Foundation");
 }

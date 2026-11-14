@@ -1,5 +1,5 @@
 use serde_json::{Value, json};
-use std::{io::Cursor, sync::Arc};
+use std::{io::Cursor, path::Path, sync::Arc};
 use vibevalley_protocol::{ApiError, BizCode, Caller, MediaInputPhase, MediaInputRequest};
 use vibevalley_server::{
     Hub,
@@ -258,4 +258,23 @@ fn failed_promotion_keeps_hash_and_refuses_changed_retry() {
     changed[23] = 1;
     assert!(inputs.upload(&r.id, Cursor::new(changed)).is_err());
     assert_eq!(inputs.upload(&r.id, Cursor::new(png())).unwrap().phase, MediaInputPhase::Ready);
+}
+
+#[test]
+fn regression_native_media_paths_stream_validated_files_and_refuse_other_callers() {
+    let (dir, inputs, _, hub) = setup();
+    let file = dir.path().join("sample.png");
+    std::fs::write(&file, png()).unwrap();
+    let reserved = inputs.create(&request()).unwrap();
+    for caller in [Caller::Orchestrator, Caller::Remote] {
+        assert_ne!(hub.call_as(caller, "media.input.uploadFile", json!({"id":reserved.id,"path":file})).biz_code, 0);
+    }
+    assert!(inputs.upload_file(&reserved.id, Path::new("relative.png")).is_err());
+    assert!(inputs.upload_file(&reserved.id, dir.path()).is_err());
+    let ready = ok(&hub, "media.input.uploadFile", json!({"id":reserved.id,"path":file}));
+    assert_eq!(ready["phase"], "ready");
+    let stored = ok(&hub, "media.input.file", json!({"id":reserved.id}));
+    assert_eq!(std::fs::read(stored["path"].as_str().unwrap()).unwrap(), png());
+    std::fs::write(stored["path"].as_str().unwrap(), b"changed").unwrap();
+    assert_ne!(hub.call_as(Caller::User, "media.input.file", json!({"id":reserved.id})).biz_code, 0);
 }

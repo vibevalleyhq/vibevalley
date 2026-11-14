@@ -7,6 +7,24 @@ use crate::wire::{Caller, Endpoint, Op};
 
 pub const NATIVE_ENDPOINTS: &[Endpoint] = &[
     Endpoint {
+        op: "media.input.file",
+        module: "media",
+        about: &[],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("MediaInputFileInput"),
+        result: Some("AttachmentFile"),
+    },
+    Endpoint {
+        op: "media.input.uploadFile",
+        module: "media",
+        about: &[],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("MediaInputUploadFileInput"),
+        result: Some("MediaInput"),
+    },
+    Endpoint {
         op: "attachment.file",
         module: "attachment",
         about: &[],
@@ -69,8 +87,35 @@ pub struct ArtifactPage {
     pub headers: std::collections::BTreeMap<String, String>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct MediaInputFileInput {
+    pub id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct MediaInputUploadFileInput {
+    pub id: String,
+    pub path: String,
+}
+
 pub mod native_ops {
     use super::*;
+
+    pub struct MediaInputFile;
+    impl Op for MediaInputFile {
+        const NAME: &'static str = "media.input.file";
+        type Input = MediaInputFileInput;
+        type Result = super::AttachmentFile;
+    }
+
+    pub struct MediaInputUploadFile;
+    impl Op for MediaInputUploadFile {
+        const NAME: &'static str = "media.input.uploadFile";
+        type Input = MediaInputUploadFileInput;
+        type Result = crate::MediaInput;
+    }
 
     /// A kept attachment's file: its absolute path and media type.
     pub struct AttachmentFile;

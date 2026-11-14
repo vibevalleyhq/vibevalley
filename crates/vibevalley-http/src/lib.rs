@@ -241,6 +241,9 @@ async fn command(State(server): State<Shared>, uri: axum::http::Uri, headers: He
     }
     let path = uri.path().strip_prefix("/api/v1/").unwrap_or_default();
     let op = path.trim_matches('/').replace('/', ".");
+    if vibevalley_protocol::NATIVE_ENDPOINTS.iter().any(|endpoint| endpoint.op == op) {
+        return refuse(BizCode::RouteNotFound, "this operation is only available in the native app");
+    }
     let payload = if body.is_empty() {
         Value::Object(Default::default())
     } else {

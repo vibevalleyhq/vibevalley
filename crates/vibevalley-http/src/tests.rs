@@ -205,3 +205,14 @@ fn ops_shaped_like_get_routes_still_reach_the_server() {
         assert_eq!(fake.calls().last().unwrap(), &(op.to_string(), json!({ "a": 1 })), "{path}");
     }
 }
+
+#[test]
+fn regression_native_file_operations_never_reach_the_server_over_http() {
+    let (fake, listener) = start();
+    for endpoint in vibevalley_protocol::NATIVE_ENDPOINTS {
+        let path = endpoint.op.replace('.', "/");
+        let (status, _) = post(&format!("{}/api/v1/{path}", listener.url()), json!({"id":"input","path":"/tmp/private"}));
+        assert_eq!(status, 404, "{}", endpoint.op);
+    }
+    assert!(fake.calls().is_empty());
+}

@@ -4,7 +4,7 @@
 // tests and stories) it is the plain browser host.
 import { host } from "nsh";
 
-import { type Host } from "@vibevalley/protocol/host";
+import { CommandLineState, type Host } from "@vibevalley/protocol/host";
 
 import { hostApi, type Envelope } from "../../../bridge";
 
@@ -13,8 +13,19 @@ const done = async (pending: Promise<Envelope>) => {
   if (e.bizCode !== 0) throw new Error(e.message);
 };
 
+const commandLineState = async (pending: Promise<Envelope>) => {
+  const e = await pending;
+  if (e.bizCode !== 0) throw new Error(e.message);
+  return CommandLineState.parse(e.data);
+};
+
 const desktop: Host = {
   name: "desktop",
+  commandLine: {
+    state: () => commandLineState(hostApi.cliState()),
+    install: () => commandLineState(hostApi.cliInstall()),
+    remove: () => commandLineState(hostApi.cliRemove()),
+  },
   notify: (notice) => done(hostApi.notify(notice)),
   tray: (summary) => done(hostApi.tray(summary)),
   locale: (locale) => void hostApi.locale(locale),

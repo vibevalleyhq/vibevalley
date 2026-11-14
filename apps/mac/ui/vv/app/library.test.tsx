@@ -9,8 +9,8 @@ import { boundProvider } from "../fixtures/library";
 import { responses, state } from "../fixtures/workbench";
 import { fakeHost } from "./fakeHost";
 
-async function start(route: string) {
-  const fake = fakeHost({ state, responses: { ...responses, "provider.get": boundProvider } }, { route });
+async function start(route: string, extra: Record<string, unknown> = {}, frame = state) {
+  const fake = fakeHost({ state: frame, responses: { ...responses, "provider.get": boundProvider, ...extra } }, { route });
   const app = await open("./main.tsx", { width: 1400, height: 900, colorScheme: "light", platform: "macos", host: fake.options });
   for (let i = 0; i < 4; i++) await fake.pump(app);
   return { app, fake };
@@ -102,22 +102,77 @@ test("audio: the four forms, a dialogue's failed download retried, a transcript 
   expect(app.enabled("id:audio-submit")).toBe(false);
 });
 
-test("transcription: the picked recording is kept as an attachment, taken as the input, and sent once consent is given", async () => {
-  const { app, fake } = await start("/library?make=audio");
-  app.onPick(() => [{ name: "standup.m4a", type: "audio/mp4", data: new Uint8Array([1, 2, 3]) }]);
+test("regression: transcription streams a local file into media storage before sending the consented job", async () => {
+  const input = {
+    id: "in-audio",
+    kind: "audio",
+    name: "standup.m4a",
+    mime: "audio/mp4",
+    size: 40_000_000,
+    phase: "ready",
+    hash: "recording",
+    createdAt: 1,
+    expiresAt: 99_999_999_999_999,
+    canDelete: true,
+  };
+  const { app, fake } = await start("/library?make=audio", {
+    "host.pickFile": { path: "/tmp/standup.m4a", name: "standup.m4a", type: "audio/mp4", size: 40_000_000 },
+    "media.input.create": { ...input, phase: "reserved" },
+    "media.input.uploadFile": input,
+  });
   await app.press("id:audio-mode-transcription");
   await app.press("id:audio-file");
+  await fake.pump(app);
   expect(app.count("id:audio-file-name")).toBe(1);
   await app.press("id:audio-consent");
   await app.press("id:audio-submit");
   for (let i = 0; i < 4; i++) await fake.pump(app);
-  expect(payloadOf(fake, "attachment.create").name).toBe("standup.m4a");
-  expect(payloadOf(fake, "media.input.adopt")).toEqual({ attachment: "a9" });
+  expect(payloadOf(fake, "media.input.create")).toEqual({ kind: "audio", name: "standup.m4a", mime: "audio/mp4", size: 40_000_000 });
+  expect(payloadOf(fake, "media.input.uploadFile")).toEqual({ id: "in-audio", path: "/tmp/standup.m4a" });
+  expect(fake.calls.some((c) => c.op === "attachment.create")).toBe(false);
   const sent = payloadOf(fake, "media.transcription.create");
-  expect(sent.input).toBe("in-poster");
+  expect(sent.input).toBe("in-audio");
   expect(sent.allowUpload).toBe(true);
   expect(sent.diarize).toBe(true);
   expect(app.count("id:audio-request")).toBe(1);
+});
+
+test("regression: a large speech result plays and saves its local input file without attachment bytes", async () => {
+  const frame = {
+    ...state,
+    state: {
+      ...state.state,
+      media: state.state.media.map((job) =>
+        job.kind === "speech"
+          ? {
+              ...job,
+              attachment: undefined,
+              resultInput: { id: "large", kind: "audio" as const, name: "large.wav", mime: "audio/wav", size: 40_000_000, hash: "large" },
+            }
+          : job,
+      ),
+    },
+  };
+  const file = { path: "/tmp/large.wav", type: "audio/wav", name: "large.wav" };
+  const { app, fake } = await start("/library?make=speech", { "media.input.file": file, "host.playAudio": null, "host.saveFile": { saved: true } }, frame);
+  await app.press("id:speech-play");
+  await fake.pump(app);
+  expect(payloadOf(fake, "host.playAudio")).toEqual({ path: file.path, position: 0 });
+  await app.press("id:speech-save");
+  await fake.pump(app);
+  expect(payloadOf(fake, "host.saveFile")).toEqual({ path: file.path, name: file.name });
+});
+
+test("regression: a transcript timestamp starts the source file at that offset", async () => {
+  const file = { path: "/tmp/standup.m4a", type: "audio/mp4", name: "standup.m4a" };
+  const { app, fake } = await start("/library?make=audio", { "media.input.file": file, "host.playAudio": null });
+  const job = state.state.media.find((j) => j.kind === "transcription");
+  if (job?.kind !== "transcription" || job.result?.kind !== "transcription") throw new Error("transcription fixture missing");
+  const segment = job.result.segments[1];
+  await app.press(`id:audio-seek-${segment.start}`);
+  await fake.pump(app);
+  expect(payloadOf(fake, "media.input.file")).toEqual({ id: "in-standup" });
+  expect(payloadOf(fake, "host.playAudio")).toEqual({ path: file.path, position: segment.start });
 });
 
 test("understanding a kept picture: consent first, then its bytes taken as the input and the request sent", async () => {

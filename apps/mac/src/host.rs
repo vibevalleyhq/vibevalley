@@ -3,7 +3,6 @@
 use std::path::Path;
 use std::process::Command;
 
-use gpui_kit::Window;
 use serde_json::Value;
 
 /// AppleScript string literal for `text`.
@@ -20,12 +19,6 @@ pub fn notify(title: &str, body: &str) -> Result<(), String> {
     } else {
         Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
     }
-}
-
-/// Shows `path` in Finder. Blocking.
-fn player() -> &'static std::sync::Mutex<Option<std::process::Child>> {
-    static PLAYER: std::sync::OnceLock<std::sync::Mutex<Option<std::process::Child>>> = std::sync::OnceLock::new();
-    PLAYER.get_or_init(Default::default)
 }
 
 /// The largest base64 sound `play_audio_data` takes (2 MB).
@@ -67,6 +60,24 @@ pub fn read_file(path: &Path) -> Result<Value, String> {
         return Err(format!("{} is larger than 50 MB", path.display()));
     }
     let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    let info = file_info(path)?;
+    Ok(serde_json::json!({ "data": base64::engine::general_purpose::STANDARD.encode(&bytes), "type": info.kind, "name": info.name }))
+}
+
+#[derive(serde::Serialize)]
+pub struct LocalFile {
+    path: std::path::PathBuf,
+    name: String,
+    #[serde(rename = "type")]
+    kind: &'static str,
+    size: u64,
+}
+
+pub fn file_info(path: &Path) -> Result<LocalFile, String> {
+    let metadata = std::fs::metadata(path).map_err(|e| e.to_string())?;
+    if !path.is_absolute() || !metadata.is_file() {
+        return Err("a local file must be an absolute path to a regular file".into());
+    }
     let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
     let kind = match ext.as_str() {
@@ -87,28 +98,35 @@ pub fn read_file(path: &Path) -> Result<Value, String> {
         "webm" => "video/webm",
         "mp3" => "audio/mpeg",
         "m4a" => "audio/mp4",
+        "flac" => "audio/flac",
+        "aac" => "audio/aac",
+        "ogg" | "opus" => "audio/ogg",
         "wav" => "audio/wav",
         "zip" => "application/zip",
         _ => "application/octet-stream",
     };
-    Ok(serde_json::json!({ "data": base64::engine::general_purpose::STANDARD.encode(&bytes), "type": kind, "name": name }))
+    Ok(LocalFile {
+        path: path.to_path_buf(),
+        name,
+        kind,
+        size: metadata.len(),
+    })
 }
 
-/// Plays a local sound file with the system's `afplay`, stopping what was
-/// playing: nsh's GPUI platform has no audio backend (`AudioPlayer` is
-/// silent in the app).
-pub fn play_audio(path: &Path) -> Result<(), String> {
-    stop_audio();
-    let child = Command::new("/usr/bin/afplay").arg(path).spawn().map_err(|e| e.to_string())?;
-    *player().lock().unwrap_or_else(|e| e.into_inner()) = Some(child);
+pub fn copy_file(source: &Path, target: &Path) -> Result<(), String> {
+    file_info(source)?;
+    if !target.is_absolute() {
+        return Err("save destination must be absolute".into());
+    }
+    if source == target || matches!((source.canonicalize(), target.canonicalize()), (Ok(a), Ok(b)) if a == b) {
+        return Err("source and destination are the same file".into());
+    }
+    std::fs::copy(source, target).map_err(|e| e.to_string())?;
     Ok(())
 }
 
-pub fn stop_audio() {
-    if let Some(mut child) = player().lock().unwrap_or_else(|e| e.into_inner()).take() {
-        let _ = child.kill();
-        let _ = child.wait();
-    }
+pub fn play_audio(path: &Path) -> Result<(), String> {
+    crate::audio::play(path, 0.0)
 }
 
 /// Opens `path` in its default app.
@@ -157,17 +175,6 @@ pub fn set_app_icon() {
     }
     #[allow(deprecated)]
     app.activateIgnoringOtherApps(true);
-}
-
-/// GPUI has no status-bar item: the tray summary's title goes into the
-/// window title instead.
-pub fn set_tray(summary: &Value, window: &mut Window) {
-    let title = summary["title"].as_str().unwrap_or_default();
-    window.set_window_title(&if title.is_empty() {
-        "VibeValley".to_string()
-    } else {
-        format!("VibeValley — {title}")
-    });
 }
 
 #[cfg(test)]

@@ -22,18 +22,24 @@ pub struct BridgeHub(pub vibevalley_bridge::Hub);
 
 impl gpui_kit::Global for BridgeHub {}
 
+pub struct ServerStartup(pub flume::Receiver<Result<(), String>>);
+impl gpui_kit::Global for ServerStartup {}
+
 impl BridgeHub {
     /// The real server under VibeValley's own data folder, started off the UI
     /// thread. `VIBEVALLEY_FAKE_SERVER=<dir>` serves fixtures instead
     /// (`state.json`, `responses.json`) for tests and debug scripts;
     /// `VIBEVALLEY_HOME=<dir>` moves the real one.
     pub fn install(cx: &mut App) {
+        let (ready, startup) = flume::bounded(1);
+        cx.set_global(ServerStartup(startup));
         let server: std::sync::Arc<dyn vibevalley_bridge::Server> = match std::env::var_os("VIBEVALLEY_FAKE_SERVER") {
-            Some(dir) => std::sync::Arc::new(vibevalley_bridge::fake::FakeServer::from_dir(std::path::Path::new(&dir)).unwrap_or_else(|e| {
-                eprintln!("VIBEVALLEY_FAKE_SERVER: {e}");
-                vibevalley_bridge::fake::FakeServer::new()
-            })),
-            None => std::sync::Arc::new(late::LateServer::spawn(|| {
+            Some(dir) => {
+                let fake = vibevalley_bridge::fake::FakeServer::from_dir(std::path::Path::new(&dir));
+                let _ = ready.send(fake.as_ref().map(|_| ()).map_err(ToString::to_string));
+                std::sync::Arc::new(fake.unwrap_or_else(|_| vibevalley_bridge::fake::FakeServer::new()))
+            }
+            None => std::sync::Arc::new(late::LateServer::spawn(move || {
                 let home = server_home();
                 match vibevalley_server::start(crate::serving::config(&home, crate::serving::work_root())) {
                     Ok(started) => {
@@ -43,19 +49,26 @@ impl BridgeHub {
                             Ok(listener) => {
                                 started.board.sessions().set_mcp_url(format!("{}/mcp", listener.url()));
                                 match vibevalley_server::home::announce(&home, &listener.url()) {
-                                    Ok(announced) => std::mem::forget(announced),
-                                    Err(e) => eprintln!("server.json: {e}"),
+                                    Ok(announced) => {
+                                        std::mem::forget(announced);
+                                        let _ = ready.send(Ok(()));
+                                    }
+                                    Err(e) => {
+                                        let _ = ready.send(Err(format!("server.json: {e}")));
+                                    }
                                 }
                                 std::mem::forget(listener);
                             }
-                            Err(e) => eprintln!("vibevalley http: {e}"),
+                            Err(e) => {
+                                let _ = ready.send(Err(format!("vibevalley http: {e}")));
+                            }
                         }
                         // The board, profiles and settings live as long as the app.
                         std::mem::forget(started);
                         hub
                     }
                     Err(e) => {
-                        eprintln!("vibevalley server: {e}");
+                        let _ = ready.send(Err(format!("vibevalley server: {e}")));
                         std::sync::Arc::new(vibevalley_bridge::fake::FakeServer::new())
                     }
                 }

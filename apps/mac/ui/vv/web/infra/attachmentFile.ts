@@ -4,6 +4,9 @@
 // A refusal (a file gone) leaves the tiles with their icons.
 import { z } from "zod";
 
+import * as S from "@vibevalley/protocol/schema";
+
+import { api } from "./api";
 import { defineQuery, ready, useQuery } from "./query";
 import { transport } from "./transport";
 
@@ -29,7 +32,7 @@ export const fileUrl = (path: string) => `file://${encodeURI(path)}`;
 
 /** Where the server keeps the file (path, type), once it said. */
 export function useAttachmentFile(id: () => string) {
-  const query = useQuery(() => attachmentFileQuery(id()));
+  const query = useQuery(() => attachmentFileQuery(id()), { enabled: () => id() !== "" });
   return () => ready(query, undefined);
 }
 
@@ -49,4 +52,37 @@ export async function openAttachment(id: string) {
 }
 
 /** Plays a sound file through the host (nsh has no audio on GPUI); one at a time, host.stopAudio stops it. */
-export const playAudio = (path: string) => data<void>("host.playAudio", { path });
+export const playAudio = (path: string, position = 0) => data<void>("host.playAudio", { path, position });
+export const saveFile = (path: string, name?: string) => data<{ saved: boolean }>("host.saveFile", { path, name });
+
+const LocalFile = z.object({ path: z.string(), name: z.string(), type: z.string(), size: z.number().int().nonnegative() });
+export type LocalFile = z.infer<typeof LocalFile>;
+export const pickFile = async () => LocalFile.nullable().parse(await data<unknown>("host.pickFile", {}));
+
+export async function uploadAudio(file: LocalFile) {
+  const reserved = await api.media.input.create({ kind: "audio", name: file.name, mime: file.type, size: file.size });
+  try {
+    return S.MediaInput.parse(await data<unknown>("media.input.uploadFile", { id: reserved.id, path: file.path }));
+  } catch (error) {
+    await api.media.input.delete({ id: reserved.id });
+    throw error;
+  }
+}
+
+export async function playInput(id: string, position = 0) {
+  const file = AttachmentFile.parse(await data<unknown>("media.input.file", { id }));
+  await playAudio(file.path, position);
+}
+
+const inputFileQuery = defineQuery({
+  schema: AttachmentFile,
+  key: (id: string) => ["media", "input", "file", id],
+  fetch: (id: string) => data<unknown>("media.input.file", { id }),
+  staleTime: Infinity,
+  retry: 0,
+});
+
+export function useInputFile(id: () => string) {
+  const query = useQuery(() => inputFileQuery(id()), { enabled: () => id() !== "" });
+  return () => ready(query, undefined);
+}

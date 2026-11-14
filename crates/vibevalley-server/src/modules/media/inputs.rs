@@ -16,7 +16,7 @@ use std::{
     time::{Duration, Instant},
 };
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ApiError, AttachmentFile, BizCode, MediaInput, MediaInputKind, MediaInputPhase, MediaInputRequest, Preview, ops};
+use vibevalley_protocol::{ApiError, AttachmentFile, BizCode, MediaInput, MediaInputKind, MediaInputPhase, MediaInputRequest, Preview, native_ops, ops};
 
 const LIFETIME: i64 = 86_400_000;
 const QUOTA: i64 = 2 * 1024 * 1024 * 1024;
@@ -343,6 +343,17 @@ impl Inputs {
         })?;
         self.upload(&r.id, std::fs::File::open(self.files.path_of(id)).map_err(storage)?)
     }
+    pub fn upload_file(&self, id: &str, path: &Path) -> Result<MediaInput, ApiError> {
+        if !path.is_absolute() || !std::fs::metadata(path).map_err(storage)?.is_file() {
+            return Err(refused("inputInvalid"));
+        }
+        let file = std::fs::File::open(path).map_err(storage)?;
+        let metadata = file.metadata().map_err(storage)?;
+        if !metadata.is_file() || metadata.len() != self.get(id)?.size as u64 {
+            return Err(refused("inputInvalid"));
+        }
+        self.upload(id, file)
+    }
     pub fn content(&self, id: &str) -> Result<AttachmentFile, ApiError> {
         let r = self.get(id)?;
         if r.phase != MediaInputPhase::Ready || (r.can_delete && r.expires_at <= now()) {
@@ -414,6 +425,15 @@ fn remove_dir(path: &Path) -> Result<(), ApiError> {
 }
 pub fn install(hub: &Hub, inputs: Arc<Inputs>) {
     hub.attach_media_inputs(inputs.clone());
+    hub.on::<native_ops::MediaInputFile>({
+        let i = inputs.clone();
+        move |_, r| i.content(&r.id)
+    });
+    hub.on::<native_ops::MediaInputUploadFile>({
+        let i = inputs.clone();
+        move |_, r| i.upload_file(&r.id, Path::new(&r.path))
+    });
+
     hub.on::<ops::MediaInputCreate>({
         let i = inputs.clone();
         move |_, r| i.create(&r)

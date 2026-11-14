@@ -280,7 +280,7 @@ function SpeechJobCard(props: { job: MediaSpeechJob }) {
         </If>
         <ResultAudio
           attachment={props.job.attachment?.id}
-          held={props.job.resultInput !== null}
+          input={props.job.resultInput?.id}
           pcm={props.job.format === "pcm"}
           prefix="speech"
           save={t("web.media.speech.save")}

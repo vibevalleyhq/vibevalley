@@ -8,8 +8,8 @@ import { t } from "@vibevalley/i18n";
 import type { MediaSource, MediaSpeechJob } from "@vibevalley/protocol";
 
 import { api } from "../../infra/api";
-import { openAttachment, playAudio, useAttachmentFile } from "../../infra/attachmentFile";
-import type { Act } from "../../ui/act";
+import { playAudio, saveFile, useAttachmentFile, useInputFile } from "../../infra/attachmentFile";
+import { createAct, type Act } from "../../ui/act";
 import { Button } from "../../ui/Button";
 import { ConfirmButton } from "../../ui/ConfirmButton";
 import { Quiet } from "../../ui/layout";
@@ -72,34 +72,24 @@ export function AudioUsageLine(props: { usage: MediaSpeechJob["usage"]; testid: 
   );
 }
 
-/**
- * A job's sound: played by the host and opened in the system's app, both from the attachment's file. A result kept only
- * as a media input has no file the app can reach, and raw PCM is not a sound file: those say so instead.
- */
-export function ResultAudio(props: { attachment: string | undefined; pcm: boolean; held: boolean; prefix: string; save: string }) {
-  const disk = useAttachmentFile(() => props.attachment ?? "");
+export function ResultAudio(props: { attachment: string | undefined; input?: string; pcm: boolean; prefix: string; save: string }) {
+  const attached = useAttachmentFile(() => props.attachment ?? "");
+  const input = useInputFile(() => props.input ?? "");
+  const disk = () => (props.attachment ? attached() : props.input ? input() : undefined);
+  const act = createAct();
   return (
-    <If
-      when={props.attachment}
-      else={
-        <If when={props.held}>
-          <Quiet>{t("web.audio.playbackUnsupported")}</Quiet>
-        </If>
-      }
-    >
-      {(id) => (
+    <If when={disk()}>
+      {(file) => (
         <View class="flex-row flex-wrap items-center gap-2">
           <If when={props.pcm}>
             <Quiet>{t("web.media.speech.downloadOnly")}</Quiet>
           </If>
-          <If when={props.pcm ? undefined : disk()?.path}>
-            {(path) => (
-              <Button testID={`${props.prefix}-play`} icon="play" onPress={() => void playAudio(path())}>
-                {t("web.library.kind.audio")}
-              </Button>
-            )}
+          <If when={!props.pcm}>
+            <Button testID={`${props.prefix}-play`} icon="play" disabled={act.busy()} onPress={() => void act.run(() => playAudio(file().path))}>
+              {t("web.library.kind.audio")}
+            </Button>
           </If>
-          <Button testID={`${props.prefix}-save`} onPress={() => void openAttachment(id())}>
+          <Button testID={`${props.prefix}-save`} disabled={act.busy()} onPress={() => void act.run(() => saveFile(file().path, file().name))}>
             {props.save}
           </Button>
         </View>
