@@ -1,7 +1,4 @@
-// Ported from VibeValley apps/web/src/features/media/SpeechPanel.tsx. Not
-// here: Flash live playback (FlashPlayer). It plays PCM as it arrives, which
-// neither nsh nor the host can: the execution is offered and says so.
-import { signal, Text, View } from "nsh";
+import { cleanup, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { MediaAudioFormatValues, type MediaAudioFormat, type MediaSpeechJob, type MediaSpeechRequest, type ProviderVoiceRequest } from "@vibevalley/protocol";
@@ -18,6 +15,7 @@ import { Card, Quiet } from "../../ui/layout";
 import { AudioMetadataLine, AudioUsageLine, JobActions, Refusal, ResultAudio, SourceLine } from "./JobFacts";
 import { publicationKey } from "./publication";
 import { ReleaseAssets } from "./ReleaseAssets";
+import { playSpeech } from "./stream";
 
 const voicesQuery = defineQuery({
   schema: S.ProviderVoiceListing,
@@ -57,6 +55,16 @@ export function SpeechPanel() {
   const submitted = signal<{ request: MediaSpeechRequest; model: string; name: string } | undefined>(undefined);
   const error = signal<string | undefined>(undefined);
   const act = createAct((e) => error.set(e));
+  let stopStream: (() => void) | undefined;
+  const live = signal(false);
+  const draining = signal(false);
+  const stop = () => {
+    stopStream?.();
+    stopStream = undefined;
+    live.set(false);
+    draining.set(false);
+  };
+  cleanup(stop);
   const jobs = () => core()?.media?.filter((job): job is MediaSpeechJob => job.kind === "speech") ?? [];
 
   const submit = () => {
@@ -66,14 +74,14 @@ export function SpeechPanel() {
     const configuration = status();
     const binding = configuration?.speech;
     const chosen = voice();
-    if (!configuration || !binding || !chosen || !text().trim() || execution() === "streaming") return;
+    if (!configuration || !binding || !chosen || !text().trim()) return;
     const request: MediaSpeechRequest = {
       id: crypto.randomUUID(),
       text: text(),
       voice: chosen.id,
-      format: format(),
+      format: execution() === "streaming" ? "pcm" : format(),
       asynchronous: execution() === "asynchronous",
-      streaming: false,
+      streaming: execution() === "streaming",
       connection: binding.connection,
       revision: configuration.revision,
     };
@@ -82,7 +90,22 @@ export function SpeechPanel() {
       model: binding.model,
       name: configuration.connections.find((item) => item.id === binding.connection)?.name ?? binding.connection,
     });
-    return act.run(() => api.media.speech.create(request));
+    return act.run(async () => {
+      const job = await api.media.speech.create(request);
+      if (request.streaming) {
+        stop();
+        live.set(true);
+        stopStream = playSpeech(
+          job.id,
+          (state) => draining.set(state === "done"),
+          (why) => {
+            error.set(why);
+            live.set(false);
+          },
+        );
+      }
+      return job;
+    });
   };
 
   return (
@@ -182,8 +205,8 @@ export function SpeechPanel() {
           </Field>
         </View>
         <If when={execution() === "streaming"}>
-          <Text testID="speech-flash-unsupported" class="text-sm text-muted">
-            {t("web.audio.flashUnsupported")}
+          <Text testID="speech-flash-notice" class="text-sm text-muted">
+            {t("web.audio.flashNotice")}
           </Text>
         </If>
         <If when={submitted()}>
@@ -210,11 +233,19 @@ export function SpeechPanel() {
           <Button
             testID="speech-generate"
             tone="primary"
-            disabled={act.busy() || (!submitted() && (!status()?.speech || !voice() || !text().trim() || execution() === "streaming"))}
+            disabled={act.busy() || (!submitted() && (!status()?.speech || !voice() || !text().trim()))}
             onPress={() => void submit()}
           >
-            {submitted() ? t("web.media.resubmit") : t("web.media.speech.submit")}
+            {submitted() ? t("web.media.resubmit") : execution() === "streaming" ? t("web.audio.flashStart") : t("web.media.speech.submit")}
           </Button>
+          <If when={live()}>
+            <Button testID="speech-flash-stop" onPress={stop}>
+              {t("web.audio.flashStop")}
+            </Button>
+            <If when={draining()}>
+              <Text class="text-sm text-muted">{t("web.audio.flashDraining")}</Text>
+            </If>
+          </If>
           <If when={submitted()}>
             <ConfirmButton
               testid="speech-new"
@@ -222,6 +253,7 @@ export function SpeechPanel() {
               question={t("web.media.newAsk")}
               disabled={act.busy()}
               onConfirm={() => {
+                stop();
                 submitted.set(undefined);
                 error.set(undefined);
               }}

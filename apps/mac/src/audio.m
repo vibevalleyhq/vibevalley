@@ -98,8 +98,8 @@ bool vv_pcm_append(const unsigned char *bytes, size_t length, char *error, size_
         if (length % (channels * 2) != 0) { failure(error, capacity, @"PCM chunk contains a partial sample frame"); return; }
         NSUInteger frames = length / (channels * 2);
         if (frames == 0) { ok = true; return; }
-        // Bound pending playback to ten seconds; the caller must apply backpressure.
-        if (frames + queuedFrames > pcmFormat.sampleRate * 10) { failure(error, capacity, @"PCM playback queue is full"); return; }
+        // Bound pending playback to five seconds; the caller must apply backpressure.
+        if (frames + queuedFrames > pcmFormat.sampleRate * 5) { failure(error, capacity, @"PCM playback queue is full"); return; }
         AVAudioPCMBuffer *buffer = [[AVAudioPCMBuffer alloc] initWithPCMFormat:pcmFormat frameCapacity:(AVAudioFrameCount)frames];
         buffer.frameLength = (AVAudioFrameCount)frames;
         for (NSUInteger frame = 0; frame < frames; frame++) {

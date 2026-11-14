@@ -72,12 +72,47 @@ test("speech: a voice of the account, the text, the request kept for a retry; a 
   expect(fake.calls.map((c) => c.op)).toContain("host.playAudio");
 });
 
-test("flash live playback is offered and says it cannot play here", async () => {
-  const { app } = await start("/library?make=speech");
+test("regression: Flash streams PCM only after explicit generation and stops with its subscription", async () => {
+  const { app, fake } = await start("/library?make=speech", { "host.pcmStart": null, "host.pcmAppend": null, "host.stopAudio": null });
   await app.press("等待生成结果");
   await app.press("Flash 实时播放");
-  expect(app.count("id:speech-flash-unsupported")).toBe(1);
-  expect(app.enabled("id:speech-generate")).toBe(false);
+  expect(app.count("id:speech-flash-notice")).toBe(1);
+  await app.press("选择账号音色");
+  await app.press("暖声 · voice-warm");
+  await app.type("id:speech-text", "收工了");
+  expect(fake.subscriptions.size).toBe(0);
+  await app.press("id:speech-generate");
+  await fake.pump(app);
+  expect(payloadOf(fake, "media.speech.create").streaming).toBe(true);
+  const stream = [...fake.subscriptions.values()].find((s) => s.name === "media.speech.stream");
+  expect(stream?.payload).toEqual({ id: "job-speech" });
+  await fake.emit(app, "media.speech.stream", { type: "format", sampleRate: 24000, channels: 1, bitDepth: 16 });
+  await fake.pump(app);
+  expect(payloadOf(fake, "host.pcmStart")).toEqual({ sampleRate: 24000, channels: 1 });
+  await fake.emit(app, "media.speech.stream", { type: "audio", sequence: 0, audio: "AAAAAA==" });
+  await fake.pump(app);
+  expect(payloadOf(fake, "host.pcmAppend")).toEqual({ data: "AAAAAA==" });
+  await app.press("id:speech-flash-stop");
+  await fake.pump(app);
+  expect([...fake.subscriptions.values()].some((s) => s.name === "media.speech.stream")).toBe(false);
+  expect(fake.calls.some((c) => c.op === "host.stopAudio")).toBe(true);
+});
+
+test("regression: Flash refuses out-of-order PCM without playing it", async () => {
+  const { app, fake } = await start("/library?make=speech", { "host.pcmStart": null, "host.pcmAppend": null, "host.stopAudio": null });
+  await app.press("等待生成结果");
+  await app.press("Flash 实时播放");
+  await app.press("选择账号音色");
+  await app.press("暖声 · voice-warm");
+  await app.type("id:speech-text", "收工了");
+  await app.press("id:speech-generate");
+  await fake.pump(app);
+  await fake.emit(app, "media.speech.stream", { type: "format", sampleRate: 24000, channels: 1, bitDepth: 16 });
+  await fake.pump(app);
+  await fake.emit(app, "media.speech.stream", { type: "audio", sequence: 2, audio: "AAAAAA==" });
+  await fake.pump(app);
+  expect(fake.calls.some((c) => c.op === "host.pcmAppend")).toBe(false);
+  expect([...fake.subscriptions.values()].some((s) => s.name === "media.speech.stream")).toBe(false);
 });
 
 test("audio: the four forms, a dialogue's failed download retried, a transcript with its timeline", async () => {
