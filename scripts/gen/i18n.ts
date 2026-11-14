@@ -83,11 +83,18 @@ function gen() {
 }
 
 const sources = () =>
-  execFileSync("git", ["ls-files", "-co", "--exclude-standard", "--", "apps", "packages", "scripts/gen/capabilities.ts"], { cwd: root, encoding: "utf8" })
+  execFileSync("git", ["ls-files", "-co", "--exclude-standard", "--", "apps", "packages", "crates", "scripts/gen/capabilities.ts"], {
+    cwd: root,
+    encoding: "utf8",
+  })
     .split("\n")
     .filter(
       (f) =>
-        (/^(apps|packages)\/[^/]+\/(src|scripts)\/.*\.tsx?$/u.test(f) || /^apps\/[^/]+\/vite\.config\.ts$/u.test(f) || f === "scripts/gen/capabilities.ts") &&
+        (/^(apps|packages)\/[^/]+\/(src|scripts)\/.*\.tsx?$/u.test(f) ||
+          /^apps\/[^/]+\/vite\.config\.ts$/u.test(f) ||
+          // The server and the command line are Rust: their t("key") are the catalogs' server.* and cli.* keys.
+          /^(crates\/[^/]+|apps\/mac)\/src\/.*\.rs$/u.test(f) ||
+          f === "scripts/gen/capabilities.ts") &&
         !f.endsWith("packages/i18n/src/catalogs.ts") &&
         existsSync(join(root, f)),
     );
@@ -109,6 +116,12 @@ function scan(): Use[] {
   }
   return uses;
 }
+
+/** The Rust server's and command line's catalogs (server.*, cli.*, and shared.*, which the server said too): the TS server they were written for is gone, and the
+ * Rust port does not say all of them yet. Their unused keys, and keys a .rs file names that are missing, are listed by
+ * `check --rust` and do not fail the check until the catalogs move into vibevalley-i18n (the native Note's R5). */
+const rustOwned = (key: string) => key.startsWith("server.") || key.startsWith("cli.") || key.startsWith("shared.");
+const rustWarnings: string[] = [];
 
 function check(): string[] {
   const problems: string[] = [];
@@ -136,8 +149,9 @@ function check(): string[] {
   for (const file of sources())
     for (const m of readFileSync(join(root, file), "utf8").matchAll(/"([a-z][\w.-]*\.[\w.$/-]+)"/gu)) if (zh.has(m[1]!)) used.add(m[1]!);
   const prefixes = uses.filter((u) => u.prefix).map((u) => u.key);
-  for (const u of uses) if (!u.prefix && !zh.has(u.key)) problems.push(`${u.file}:${u.line}: ${u.key} is not in the catalogs`);
-  for (const k of zh.keys()) if (!used.has(k) && !prefixes.some((p) => k.startsWith(p))) problems.push(`unused: ${k}`);
+  for (const u of uses)
+    if (!u.prefix && !zh.has(u.key)) (u.file.endsWith(".rs") ? rustWarnings : problems).push(`${u.file}:${u.line}: ${u.key} is not in the catalogs`);
+  for (const k of zh.keys()) if (!used.has(k) && !prefixes.some((p) => k.startsWith(p))) (rustOwned(k) ? rustWarnings : problems).push(`unused: ${k}`);
   const glossary = readGlossary(readFileSync(join(root, "docs/README.md"), "utf8"));
   for (const locale of locales) problems.push(...wordProblems(glossary, locale, messages(locale)));
   if (!existsSync(catalogsFile) || readFileSync(catalogsFile, "utf8") !== formatted(generated()))
@@ -482,6 +496,9 @@ switch (command) {
   case "check": {
     const problems = check();
     for (const p of problems) console.log(p);
+    if (rest.includes("--rust")) for (const w of rustWarnings) console.log(`rust: ${w}`);
+    else if (rustWarnings.length > 0)
+      console.log(`i18n: ${rustWarnings.length} server.*/cli.* keys unused or missing on the Rust side (vpx scripts/gen/i18n.ts check --rust)`);
     console.log(problems.length > 0 ? `i18n: ${problems.length} problems` : `i18n: ${messages("zh").size} messages ok`);
     if (problems.length > 0) process.exit(1);
     break;

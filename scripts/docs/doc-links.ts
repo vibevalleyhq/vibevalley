@@ -7,7 +7,7 @@ const root = resolve(import.meta.dirname, "../..");
 const LINK = /\]\(([^)\s]+)\)/gu;
 
 /** A path with a folder and a source file's extension; files in the user's home (`orchestrator/orchestrator.jsonl`) have none of these. */
-const CODE_PATH = /`((?:\.\.?\/)*[\w-][\w.-]*\/[\w./-]+\.(?:ts|tsx|css|swift|sql|json|yaml|sh|py|gz))`/gu;
+const CODE_PATH = /`((?:\.\.?\/)*[\w-][\w.-]*\/[\w./-]+\.(?:ts|tsx|css|swift|sql|json|yaml|sh|py|gz|rs|toml))`/gu;
 
 /** A script a command block runs (`vpx scripts/release/verify-server.ts …`): from the root, or from inside a package. */
 const RUN_PATH = /\bvpx\s+((?:[\w-][\w.-]*\/)+[\w.-]+\.ts)\b/gu;

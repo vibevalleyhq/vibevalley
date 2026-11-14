@@ -446,10 +446,12 @@ const RULES: readonly Rule[] = [
 const userWords = (source: string) => source.startsWith("packages/i18n/locales/") || source === "apps/web/test/english.spec.ts";
 const han = /\p{Script=Han}/u;
 
-/** Where a catalog's words are said: web.farm.phone is apps/web/src/farm/phone's, web.setting apps/web/src/features/ setting's, shared both sides'. */
+/** Where a catalog's words are said: web.farm.phone is apps/web/src/farm/phone's, web.setting apps/web/src/features/ setting's, server.game the Rust server's game module's, shared both sides'. */
 function placeOf(ns: string): string {
   if (ns === "shared") return "packages/i18n/locales/shared.json";
   const [host, ...parts] = ns.split(".");
+  // The server is Rust now: its catalogs are the native port's words, which only the rules naming `dirs` reach.
+  if (host === "server") return `crates/vibevalley-server/src/modules/${[...parts, "words.rs"].join("/")}`;
   if (parts.length > 0) {
     for (const container of ["features", "modules", "gateway"]) {
       const candidate = `apps/${host}/src/${container}/${parts[0]}`;

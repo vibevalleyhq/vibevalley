@@ -442,7 +442,7 @@ impl TabLook for gpui_kit::Stateful<gpui_kit::Div> {
 mod name_tests {
     #[test]
     fn a_shells_own_title_is_not_a_name() {
-        assert!(super::is_default_title("lucasay@Caos-MacBook-Pro:~/epona"));
+        assert!(super::is_default_title("lucasay@Caos-MacBook-Pro:~/farm"));
         assert!(super::is_default_title("me@host"));
         assert!(!super::is_default_title("vim notes.md"));
         assert!(!super::is_default_title("@team"));

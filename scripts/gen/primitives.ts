@@ -9,9 +9,6 @@ const out = join(root, "docs/reference/primitives.md");
 /** The folders, in the order the page shows them, with what each is for. */
 export const folders: readonly { readonly dir: string; readonly what: string }[] = [
   { dir: "packages/protocol/src/rules", what: "规则：服务端和页面都跑的纯函数" },
-  { dir: "apps/server/src/base", what: "服务端的纯地基：id、JSON、文字、脱敏" },
-  { dir: "apps/server/src/infra", what: "服务端对外的地基：配置、库、文件、时间、日志" },
-  { dir: "apps/server/src/testing", what: "服务端测试的农场：世界、git、帮工、时钟" },
   { dir: "apps/web/src/base", what: "页面的纯地基" },
   { dir: "apps/web/src/infra", what: "页面对外的地基：服务端、宿主、浏览器" },
   { dir: "apps/web/src/state", what: "页面的中间层：意图、存下的选择、原子" },

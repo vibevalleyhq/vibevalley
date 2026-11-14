@@ -53,7 +53,6 @@ export default defineConfig({
         "vpx scripts/docs/doc-links.ts",
         "vpx scripts/docs/stale-names.ts",
         "vpx scripts/docs/glossary.ts",
-        "vpx scripts/audit/protocol-surface.ts --check",
         "vpx scripts/gen/i18n.ts check",
         "vpx scripts/gen/capabilities.ts --check",
         "vpx scripts/gen/api-client.ts --check",
