@@ -127,7 +127,7 @@ impl Store {
     /// Connected again: what was kept of the account before goes, what waited is retired.
     pub fn connect(&self, id: ConnectorID, keys: &Secret, user: &str, pair_code: Option<&str>, at: i64, retired: &str) -> Kept<()> {
         let mut db = self.db();
-        let tx = db.transaction()?;
+        let tx = writing(&mut db)?;
         tx.execute(
             "insert into connector_account (connector, secrets, user_id, pair_code, connected_at) values (?1, ?2, ?3, ?4, ?5)
              on conflict (connector) do update set secrets = excluded.secrets, user_id = excluded.user_id, pair_code = excluded.pair_code,
@@ -140,7 +140,7 @@ impl Store {
 
     pub fn disconnect(&self, id: ConnectorID, retired: &str) -> Kept<()> {
         let mut db = self.db();
-        let tx = db.transaction()?;
+        let tx = writing(&mut db)?;
         tx.execute("delete from connector_account where connector = ?1", [id.as_str()])?;
         forget(&tx, id, retired)?;
         Ok(tx.commit()?)
@@ -157,7 +157,7 @@ impl Store {
     /// The user paired by `m`: it is the account's user from now on, and `m` is settled.
     pub fn paired(&self, id: ConnectorID, m: &Inbound, at: i64) -> Kept<()> {
         let mut db = self.db();
-        let tx = db.transaction()?;
+        let tx = writing(&mut db)?;
         tx.execute(
             "update connector_account set user_id = ?2, pair_code = null, reply_context = ?3, last_inbound = ?4 where connector = ?1",
             params![id.as_str(), m.from, Some(&m.reply).filter(|r| !r.is_empty()), at],
@@ -195,7 +195,7 @@ impl Store {
     /// Keeps what the app handed over, each once, and how far it read; false when the account is gone.
     pub fn accept(&self, id: ConnectorID, messages: &[Inbound], cursor: &str, at: i64) -> Kept<bool> {
         let mut db = self.db();
-        let tx = db.transaction()?;
+        let tx = writing(&mut db)?;
         let there: i64 = tx.query_row("select count(*) from connector_account where connector = ?1", [id.as_str()], |r| r.get(0))?;
         if there == 0 {
             return Ok(false);
@@ -241,7 +241,7 @@ impl Store {
 
     pub fn add_outgoing(&self, id: ConnectorID, message: &str, pieces: &[String], at: i64) -> Kept<()> {
         let mut db = self.db();
-        let tx = db.transaction()?;
+        let tx = writing(&mut db)?;
         for piece in pieces {
             tx.execute(
                 "insert into connector_outbox (connector, message_id, body, created_at) values (?1, ?2, ?3, ?4)",
@@ -284,7 +284,7 @@ impl Store {
 
     pub fn sent(&self, rows: &[i64], at: i64, ext: &str) -> Kept<()> {
         let mut db = self.db();
-        let tx = db.transaction()?;
+        let tx = writing(&mut db)?;
         for seq in rows {
             tx.execute(
                 "update connector_outbox set state = 'sent', sent_at = ?2, ext_id = ?3, error = null where seq = ?1",
@@ -327,6 +327,12 @@ impl Store {
         db.execute("delete from connector_outbox where state <> 'pending' and created_at < ?1", [before])?;
         Ok(())
     }
+}
+
+/// A write transaction from its start: one that reads first and writes later is refused, not made to wait, when
+/// another module's connection wrote in between.
+fn writing(db: &mut Connection) -> rusqlite::Result<rusqlite::Transaction<'_>> {
+    db.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
 }
 
 fn forget(tx: &rusqlite::Transaction<'_>, id: ConnectorID, retired: &str) -> rusqlite::Result<()> {
