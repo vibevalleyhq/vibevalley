@@ -220,6 +220,17 @@ mod tests {
     use super::*;
 
     #[test]
+    fn regression_farm_fixture_is_a_complete_state_frame() {
+        let frame: vibevalley_protocol::StateFrame = serde_json::from_str(include_str!("../fixtures/farm/state.json")).unwrap();
+        for issue in &frame.state.issues {
+            if issue.status == vibevalley_protocol::IssueStatus::InProgress {
+                let session = issue.latest_session_id().expect("a working issue has a worker execution");
+                assert!(frame.state.sessions.iter().any(|worker| &worker.id == session));
+            }
+        }
+    }
+
+    #[test]
     fn canned_answers_and_driving_calls() {
         let fake = FakeServer::new();
         assert_eq!(fake.call("issue.list", json!({})).biz_code, 100005);

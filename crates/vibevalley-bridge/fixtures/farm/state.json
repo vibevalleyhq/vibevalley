@@ -21,10 +21,12 @@
       "action": "read_file",
       "label": "read_file",
       "actionText": "read_file"
-     }
+     },
+     "since": 1794499940000
     },
     "issue": "i-101",
-    "refining": false
+    "refining": false,
+    "phaseText": "正在干活"
    },
    {
     "id": "s-cmd",
@@ -43,10 +45,12 @@
       "action": "run_command",
       "label": "run_command",
       "actionText": "run_command"
-     }
+     },
+     "since": 1794499880000
     },
     "issue": "i-102",
-    "refining": false
+    "refining": false,
+    "phaseText": "正在干活"
    },
    {
     "id": "s-edit",
@@ -65,10 +69,12 @@
       "action": "edit_file",
       "label": "edit_file",
       "actionText": "edit_file"
-     }
+     },
+     "since": 1794499820000
     },
     "issue": "i-103",
-    "refining": false
+    "refining": false,
+    "phaseText": "正在干活"
    },
    {
     "id": "s-ask",
@@ -87,10 +93,12 @@
       "action": "wait",
       "label": "wait",
       "actionText": "wait"
-     }
+     },
+     "since": 1794499760000
     },
     "issue": "i-104",
-    "refining": false
+    "refining": false,
+    "phaseText": "正在干活"
    },
    {
     "id": "s-ripe",
@@ -104,11 +112,16 @@
     "hiredAt": 1794499700000,
     "runs": 1,
     "phase": {
-     "_tag": "done",
-     "at": 1794500000000
+     "_tag": "done"
     },
     "issue": "i-105",
-    "refining": false
+    "refining": false,
+    "phaseText": "交回了",
+    "lastRun": {
+     "outcome": "completed",
+     "summary": "Completed the work",
+     "at": 1794500000000
+    }
    },
    {
     "id": "s-stuck",
@@ -122,12 +135,16 @@
     "hiredAt": 1794499640000,
     "runs": 1,
     "phase": {
-     "_tag": "failed",
-     "at": 1794500000000,
-     "reason": "tests failed"
+     "_tag": "failed"
     },
     "issue": "i-106",
-    "refining": false
+    "refining": false,
+    "phaseText": "卡住了",
+    "lastRun": {
+     "outcome": "failed",
+     "summary": "tests failed",
+     "at": 1794500000000
+    }
    },
    {
     "id": "s-queue",
@@ -146,10 +163,12 @@
       "action": "web",
       "label": "web",
       "actionText": "web"
-     }
+     },
+     "since": 1794499580000
     },
     "issue": "i-107",
-    "refining": false
+    "refining": false,
+    "phaseText": "正在干活"
    }
   ],
   "issues": [
@@ -158,56 +177,315 @@
     "number": 101,
     "title": "Issue 101",
     "repo": "vibevalley",
-    "status": "doing",
-    "priority": "normal"
+    "status": "in_progress",
+    "priority": "medium",
+    "description": "",
+    "mandate": {
+     "strength": "explicit",
+     "maxBotReviewRounds": 3,
+     "autoSubmitPr": false
+    },
+    "createdAt": 1794499940000,
+    "assignments": [
+     {
+      "id": "assignment-i-101",
+      "issue": "i-101",
+      "agent": "agent-owl",
+      "assignedAt": 1794499940000,
+      "executions": [
+       {
+        "kind": "worker",
+        "session": "s-read",
+        "startedAt": 1794499940000
+       }
+      ]
+     }
+    ],
+    "blockedBy": [],
+    "moves": [
+     "done",
+     "canceled"
+    ],
+    "deliver": "change",
+    "findings": [],
+    "questions": [],
+    "criteria": [],
+    "checks": [],
+    "stage": {
+     "state": "working",
+     "since": 1794499940000,
+     "acts": []
+    }
    },
    {
     "id": "i-102",
     "number": 102,
     "title": "Issue 102",
     "repo": "vibevalley",
-    "status": "doing",
-    "priority": "normal"
+    "status": "in_progress",
+    "priority": "medium",
+    "description": "",
+    "mandate": {
+     "strength": "explicit",
+     "maxBotReviewRounds": 3,
+     "autoSubmitPr": false
+    },
+    "createdAt": 1794499880000,
+    "assignments": [
+     {
+      "id": "assignment-i-102",
+      "issue": "i-102",
+      "agent": "agent-bear",
+      "assignedAt": 1794499880000,
+      "executions": [
+       {
+        "kind": "worker",
+        "session": "s-cmd",
+        "startedAt": 1794499880000
+       }
+      ]
+     }
+    ],
+    "blockedBy": [],
+    "moves": [
+     "done",
+     "canceled"
+    ],
+    "deliver": "change",
+    "findings": [],
+    "questions": [],
+    "criteria": [],
+    "checks": [],
+    "stage": {
+     "state": "working",
+     "since": 1794499880000,
+     "acts": []
+    }
    },
    {
     "id": "i-103",
     "number": 103,
     "title": "Issue 103",
     "repo": "vibevalley",
-    "status": "doing",
-    "priority": "normal"
+    "status": "in_progress",
+    "priority": "medium",
+    "description": "",
+    "mandate": {
+     "strength": "explicit",
+     "maxBotReviewRounds": 3,
+     "autoSubmitPr": false
+    },
+    "createdAt": 1794499820000,
+    "assignments": [
+     {
+      "id": "assignment-i-103",
+      "issue": "i-103",
+      "agent": "agent-fox",
+      "assignedAt": 1794499820000,
+      "executions": [
+       {
+        "kind": "worker",
+        "session": "s-edit",
+        "startedAt": 1794499820000
+       }
+      ]
+     }
+    ],
+    "blockedBy": [],
+    "moves": [
+     "done",
+     "canceled"
+    ],
+    "deliver": "change",
+    "findings": [],
+    "questions": [],
+    "criteria": [],
+    "checks": [],
+    "stage": {
+     "state": "working",
+     "since": 1794499820000,
+     "acts": []
+    }
    },
    {
     "id": "i-104",
     "number": 104,
     "title": "Issue 104",
     "repo": "vibevalley",
-    "status": "doing",
-    "priority": "normal"
+    "status": "in_progress",
+    "priority": "medium",
+    "description": "",
+    "mandate": {
+     "strength": "explicit",
+     "maxBotReviewRounds": 3,
+     "autoSubmitPr": false
+    },
+    "createdAt": 1794499760000,
+    "assignments": [
+     {
+      "id": "assignment-i-104",
+      "issue": "i-104",
+      "agent": "agent-cat",
+      "assignedAt": 1794499760000,
+      "executions": [
+       {
+        "kind": "worker",
+        "session": "s-ask",
+        "startedAt": 1794499760000
+       }
+      ]
+     }
+    ],
+    "blockedBy": [],
+    "moves": [
+     "done",
+     "canceled"
+    ],
+    "deliver": "change",
+    "findings": [],
+    "questions": [],
+    "criteria": [],
+    "checks": [],
+    "stage": {
+     "state": "working",
+     "since": 1794499760000,
+     "acts": []
+    }
    },
    {
     "id": "i-105",
     "number": 105,
     "title": "Issue 105",
     "repo": "vibevalley",
-    "status": "doing",
-    "priority": "normal"
+    "status": "in_review",
+    "priority": "medium",
+    "description": "",
+    "mandate": {
+     "strength": "explicit",
+     "maxBotReviewRounds": 3,
+     "autoSubmitPr": false
+    },
+    "createdAt": 1794499700000,
+    "assignments": [
+     {
+      "id": "assignment-i-105",
+      "issue": "i-105",
+      "agent": "agent-rabbit",
+      "assignedAt": 1794499700000,
+      "executions": [
+       {
+        "kind": "worker",
+        "session": "s-ripe",
+        "startedAt": 1794499700000
+       }
+      ]
+     }
+    ],
+    "blockedBy": [],
+    "moves": [
+     "done",
+     "canceled"
+    ],
+    "deliver": "change",
+    "findings": [],
+    "questions": [],
+    "criteria": [],
+    "checks": [],
+    "stage": {
+     "state": "reviewing",
+     "since": 1794499700000,
+     "acts": []
+    }
    },
    {
     "id": "i-106",
     "number": 106,
     "title": "Issue 106",
     "repo": "notes",
-    "status": "doing",
-    "priority": "normal"
+    "status": "in_progress",
+    "priority": "medium",
+    "description": "",
+    "mandate": {
+     "strength": "explicit",
+     "maxBotReviewRounds": 3,
+     "autoSubmitPr": false
+    },
+    "createdAt": 1794499640000,
+    "assignments": [
+     {
+      "id": "assignment-i-106",
+      "issue": "i-106",
+      "agent": "agent-raccoon",
+      "assignedAt": 1794499640000,
+      "executions": [
+       {
+        "kind": "worker",
+        "session": "s-stuck",
+        "startedAt": 1794499640000
+       }
+      ]
+     }
+    ],
+    "blockedBy": [],
+    "moves": [
+     "done",
+     "canceled"
+    ],
+    "deliver": "change",
+    "findings": [],
+    "questions": [],
+    "criteria": [],
+    "checks": [],
+    "stage": {
+     "state": "stuck",
+     "since": 1794499640000,
+     "acts": []
+    }
    },
    {
     "id": "i-107",
     "number": 107,
     "title": "Issue 107",
     "repo": "vibevalley",
-    "status": "doing",
-    "priority": "normal"
+    "status": "in_progress",
+    "priority": "medium",
+    "description": "",
+    "mandate": {
+     "strength": "explicit",
+     "maxBotReviewRounds": 3,
+     "autoSubmitPr": false
+    },
+    "createdAt": 1794499580000,
+    "assignments": [
+     {
+      "id": "assignment-i-107",
+      "issue": "i-107",
+      "agent": "agent-hedgehog",
+      "assignedAt": 1794499580000,
+      "executions": [
+       {
+        "kind": "worker",
+        "session": "s-queue",
+        "startedAt": 1794499580000
+       }
+      ]
+     }
+    ],
+    "blockedBy": [],
+    "moves": [
+     "done",
+     "canceled"
+    ],
+    "deliver": "change",
+    "findings": [],
+    "questions": [],
+    "criteria": [],
+    "checks": [],
+    "stage": {
+     "state": "working",
+     "since": 1794499580000,
+     "acts": []
+    }
    },
    {
     "id": "i-108",
@@ -216,7 +494,30 @@
     "repo": "vibevalley",
     "status": "todo",
     "queuedAt": 1794499999000,
-    "priority": "normal"
+    "priority": "medium",
+    "description": "",
+    "mandate": {
+     "strength": "explicit",
+     "maxBotReviewRounds": 3,
+     "autoSubmitPr": false
+    },
+    "createdAt": 1794499999000,
+    "assignments": [],
+    "blockedBy": [],
+    "moves": [
+     "backlog",
+     "canceled"
+    ],
+    "deliver": "change",
+    "findings": [],
+    "questions": [],
+    "criteria": [],
+    "checks": [],
+    "stage": {
+     "state": "queued",
+     "since": 1794499999000,
+     "acts": []
+    }
    }
   ],
   "crons": [],
