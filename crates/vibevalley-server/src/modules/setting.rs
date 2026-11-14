@@ -386,6 +386,39 @@ impl Setting {
         Self::pick(&self.stored().deepseek_api_key, &self.config.deepseek_api_key).map(|k| k.0.expose().to_string())
     }
 
+    /// The voice's settings as a call reads them at its start.
+    pub fn voice(&self) -> VoiceSettings {
+        voice_over(self.voice_defaults(), &self.stored().voice.unwrap_or_default())
+    }
+
+    /// Agora's App ID and App Certificate, when both are there.
+    pub fn agora(&self) -> Option<(String, Secret)> {
+        let st = self.stored();
+        let (id, _) = Self::pick(&Secret::new(st.agora_app_id), &self.config.agora_app_id)?;
+        let (certificate, _) = Self::pick(&st.agora_app_certificate, &self.config.agora_app_certificate)?;
+        Some((id.expose().to_string(), certificate))
+    }
+
+    /// The keys of a call's own vendors: recognition, the model, speech.
+    pub fn voice_keys(&self) -> (Secret, Secret, Secret) {
+        let st = self.stored();
+        (st.asr_key, st.llm_key, st.tts_key)
+    }
+
+    /// Where dictation goes, and the key of the user's own address.
+    pub fn dictation(&self) -> (Dictation, Secret) {
+        let st = self.stored();
+        let d = st.dictation.unwrap_or_default();
+        (
+            Dictation {
+                via: d.via.unwrap_or(DictationVia::Moss),
+                url: d.url,
+                model: d.model,
+            },
+            st.dictation_key,
+        )
+    }
+
     /// The MOSS providers.
     pub fn providers(&self) -> Providers {
         self.stored().providers.unwrap_or_default()
