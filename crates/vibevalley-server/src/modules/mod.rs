@@ -7,6 +7,7 @@ pub mod agent;
 pub mod artifact;
 pub mod attachment;
 pub mod channel;
+pub mod connector;
 pub mod core;
 pub mod cron;
 pub mod game;

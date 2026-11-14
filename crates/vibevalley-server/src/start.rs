@@ -56,6 +56,8 @@ pub struct ServerConfig {
     pub pkm_root: Option<PathBuf>,
     /// Rescans the vault when a file in it changes (VibeValley's own).
     pub watch_pkm: bool,
+    /// How the chat apps are reached and paced; tests point it at local stubs.
+    pub connector: modules::connector::Options,
 }
 
 impl ServerConfig {
@@ -82,6 +84,7 @@ impl ServerConfig {
             orchestrator_listens: true,
             pkm_root: None,
             watch_pkm: true,
+            connector: modules::connector::Options::default(),
         }
     }
 }
@@ -117,6 +120,8 @@ pub struct Started {
     pub library: Arc<modules::library::Library>,
     /// `vv://` reads for the orchestrator's and the helpers' `resource_read`.
     pub resources: Arc<modules::mcp::Resources>,
+    /// The chat apps tied to channels.
+    pub connectors: Arc<modules::connector::Connectors>,
 }
 
 impl Started {
@@ -125,6 +130,7 @@ impl Started {
     /// board's agents stop and its lock is released. The hub stays usable
     /// for reads; it serves nothing that needs the board afterwards.
     pub fn close(&self) {
+        self.connectors.close();
         self.crons.close();
         self.orchestrator.close();
         self.agents.fleet.close();
@@ -302,6 +308,9 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         crons.attach_orchestrator(o);
     }
     let watch = modules::watch::Watch::start_with(&hub, chat.clone(), board.clone(), agents.clone(), listening);
+    let connectors =
+        modules::connector::Connectors::open(&config.home, &hub, chat.clone(), config.connector.clone()).map_err(|e| failed("the connectors")(&e.message))?;
+    modules::connector::install(&hub, connectors.clone());
     Ok(Started {
         hub,
         setting,
@@ -322,5 +331,6 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         resources,
         media_inputs,
         media,
+        connectors,
     })
 }
