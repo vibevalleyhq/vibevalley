@@ -13,7 +13,7 @@ export const contractKinds: readonly { readonly kind: string; readonly is: (path
   { kind: "schema", is: (p) => p === "apps/server/db/migrations/0001_schema.up.sql" || p.startsWith("apps/server/db/queries/") },
 ];
 
-/** The area a path is in: an app's or package's folder, its module under apps/server/src or apps/web/src/features. */
+/** The area a path is in: an app's or package's folder, its module under crates/vibevalley-server/src/modules or the pages' features. */
 export function areaOf(path: string): string {
   const parts = path.split("/");
   if (parts[0] === "apps" && parts[1] === "server" && parts[2] === "src" && parts.length > 4) return `server/${parts[3]}`;

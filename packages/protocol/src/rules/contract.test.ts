@@ -8,7 +8,7 @@ import { edgesOf, exportsOf } from "@vibevalley/testkit/source";
 const root = join(import.meta.dirname, "../../../..");
 const here = import.meta.dirname;
 /** What runs beside the server: the page and the shells around it. */
-const outside = ["apps/web/src", "apps/web/test", "apps/mobile/src", "apps/desktop/src", "packages/artifact/src", "packages/engine/src", "packages/pkm/src"];
+const outside = ["apps/mac/ui/vv", "apps/mac/ui/components", "apps/mac/ui/surfaces", "packages/artifact/src", "packages/pkm/src"];
 
 function files(dir: string): string[] {
   let names: string[];
@@ -45,13 +45,13 @@ test("every rule here is one the page uses", () => {
   }
   expect(
     unused,
-    "packages/protocol/src/rules holds only what the page and the server both run. Fix: a rule only the server runs moves into the module that owns it in apps/server/src, and its conclusion goes into the frame. See docs/subsystems/foundation.md",
+    "packages/protocol/src/rules holds only what the page and the server both run. Fix: a rule only the server runs lives in its module under crates/vibevalley-server/src/modules, and its conclusion goes into the frame. See docs/subsystems/foundation.md",
   ).toEqual([]);
 });
 
 test("an HTML artifact's sandbox is written once, here", () => {
   // A page test says what the browser got in its own words: it may not import the rule it checks.
-  const copies = [...outside.filter((d) => !d.endsWith("/test")), "apps/server/src"]
+  const copies = outside
     .flatMap((d) => files(join(root, d)))
     .filter((p) => !p.endsWith(".test.ts") && /allow-(?:scripts|popups|same-origin)/u.test(readFileSync(p, "utf8")));
   expect(

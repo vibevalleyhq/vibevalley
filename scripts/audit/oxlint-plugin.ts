@@ -3,8 +3,6 @@ import { dirname, resolve } from "node:path";
 
 import { definePlugin, defineRule, type ESTree, type Context, type Scope } from "vite-plus/lint/plugins";
 
-import { classAdvice, hexColor, offClassTokens, offTokens, tokenAdvice, type ClassKind, type TokenKind } from "./design-tokens.ts";
-
 /** Diagnostics include a replacement rather than only a prohibition; the named See path is checked by tests. */
 export const says = (wrong: string, fix: string, see: string) => `${wrong}. Fix: ${fix}. See ${see}`;
 
@@ -31,35 +29,12 @@ const clockCall = (node: ESTree.Node, context: Context): string | undefined => {
 };
 const timerCalls = new Set(["setTimeout", "setInterval"]);
 
-const noWallClock = defineRule({
-  meta: {
-    messages: {
-      wallClock: says(
-        "this reads or waits on the wall clock, which a test's clock cannot move",
-        "read and wait through the clock the module was handed: `deps.clock.now()`, `await deps.clock.sleep(ms, signal)`, `withTimeout(…, { clock })` (@vibevalley/async); only infra/time.ts touches the real one",
-        "packages/async/src/clock.ts",
-      ),
-    },
-  },
-  create(context) {
-    return {
-      CallExpression(node) {
-        const name = clockCall(node.callee, context);
-        if (name === "Date.now" || timerCalls.has(name ?? "")) context.report({ node, messageId: "wallClock" });
-      },
-      NewExpression(node) {
-        if (clockCall(node.callee, context) === "Date" && node.arguments.length === 0) context.report({ node, messageId: "wallClock" });
-      },
-    };
-  },
-});
-
 const noTestSleep = defineRule({
   meta: {
     messages: {
       sleep: says(
         "a test that waits a set time guesses how long the work takes: slow when it is quick, flaky when it is slow",
-        "wait for the thing itself: `until(() => …)`, `untilGot`, `waitFor` or `whenState` for work in the background, `vi.advanceTimersByTimeAsync(ms)` under fake timers or a test clock through a window, `gate()` to hold a fake until the test lets it go, `aTurn` before checking nothing happened",
+        "wait for the thing itself: `until(() => …)`, `untilGot` or `waitFor` for work in the background, `vi.advanceTimersByTimeAsync(ms)` under fake timers, `gate()` to hold a fake until the test lets it go, `nextTurn` before checking nothing happened",
         "packages/testkit/src/until.ts",
       ),
     },
@@ -96,133 +71,6 @@ const noCommentDivider = defineRule({
   },
 });
 
-const textArg = new Set(["getByText", "getByLabel", "getByPlaceholder", "getByTitle", "getByAltText", "toHaveText", "toContainText"]);
-
-/** Options that name the words: getByRole's name, filter's and locator's hasText. */
-const textOption = new Set(["name", "hasText", "hasNotText"]);
-
-type ObjectProperty = { type: string; key?: { type: string; name?: string }; value?: Parameters<typeof chineseLiteral>[0] };
-
-const chineseLiteral = (node: { type: string; value?: unknown; regex?: { pattern: string }; quasis?: { value: { raw: string } }[] } | undefined) =>
-  !!node &&
-  ((node.type === "Literal" && typeof node.value === "string" && han.test(node.value)) ||
-    (node.type === "Literal" && node.regex !== undefined && han.test(node.regex.pattern)) ||
-    (node.type === "TemplateLiteral" && (node.quasis ?? []).some((q) => han.test(q.value.raw))));
-
-const noCopySelector = defineRule({
-  meta: {
-    messages: {
-      copy: says(
-        "a page test that finds or checks the interface's words breaks on every rewording; the words are the catalogs' to check",
-        'find it by `getByTestId("…")` or a state attribute (`[data-state=…]`) and add the data-testid to the component if it has none; data the test made itself goes in a constant in fixtures.ts',
-        "apps/web/test/fixtures.ts",
-      ),
-    },
-  },
-  create(context) {
-    return {
-      CallExpression(node) {
-        const c = node.callee;
-        if (c.type !== "MemberExpression" || c.property.type !== "Identifier") return;
-        const name = c.property.name;
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- oxlint's ESTree node, typed loosely by its plugin API
-        const [first] = node.arguments as unknown as Parameters<typeof chineseLiteral>[0][];
-        if (textArg.has(name) && chineseLiteral(first)) context.report({ node, messageId: "copy" });
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- oxlint's ESTree node, typed loosely by its plugin API
-        for (const arg of node.arguments as unknown as { type: string; properties?: ObjectProperty[] }[])
-          if (arg.type === "ObjectExpression")
-            for (const p of arg.properties ?? [])
-              if (p.type === "Property" && p.key?.type === "Identifier" && textOption.has(p.key.name ?? "") && chineseLiteral(p.value))
-                context.report({ node, messageId: "copy" });
-      },
-    };
-  },
-});
-
-function styleKey(node: ESTree.Node): string | undefined {
-  return node.type === "Identifier" ? node.name : node.type === "Literal" && typeof node.value === "string" ? node.value : undefined;
-}
-
-function jsxStyleValues(
-  node: ESTree.Node,
-  property: string | undefined,
-  inspect: (item: { node: ESTree.Node; property: string | undefined; value: string }) => void,
-) {
-  switch (node.type) {
-    case "ObjectExpression":
-      for (const entry of node.properties) {
-        if (entry.type === "Property") jsxStyleValues(entry.value, styleKey(entry.key) ?? property, inspect);
-      }
-      break;
-    case "ConditionalExpression":
-      jsxStyleValues(node.consequent, property, inspect);
-      jsxStyleValues(node.alternate, property, inspect);
-      break;
-    case "LogicalExpression":
-      jsxStyleValues(node.left, property, inspect);
-      jsxStyleValues(node.right, property, inspect);
-      break;
-    case "TSAsExpression":
-    case "TSSatisfiesExpression":
-    case "TSNonNullExpression":
-    case "ParenthesizedExpression":
-      jsxStyleValues(node.expression, property, inspect);
-      break;
-    case "Literal":
-      if (typeof node.value === "string") inspect({ node, property, value: node.value });
-      break;
-    case "TemplateLiteral":
-      inspect({ node, property, value: node.quasis.map((q) => q.value.cooked ?? q.value.raw).join("${}") });
-      for (const expression of node.expressions) jsxStyleValues(expression, property, inspect);
-      break;
-    default:
-      break;
-  }
-}
-
-/** Every string in the file read as Tailwind reads it, as possible classes (scripts/audit/design-tokens.ts, offClassTokens). */
-function classStrings(inspect: (node: ESTree.Node, found: { token: string; kind: ClassKind }) => void) {
-  return {
-    Literal(node: ESTree.StringLiteral | ESTree.Node) {
-      if (node.type === "Literal" && typeof node.value === "string") for (const found of offClassTokens(node.value)) inspect(node, found);
-    },
-    TemplateLiteral(node: ESTree.TemplateLiteral) {
-      for (const quasi of node.quasis) for (const found of offClassTokens(quasi.value.cooked ?? quasi.value.raw)) inspect(node, found);
-    },
-  };
-}
-
-const noHexColor = defineRule({
-  meta: {
-    messages: {
-      hex: says(
-        "a colour written into a style stays as it is when the theme changes (设置 › 外观)",
-        "use a host palette reference such as var(--color-ok-soft) or var(--color-ink); a new purpose gets a name in style.css, in both themes",
-        "apps/web/src/style.css",
-      ),
-      hexClass: says(
-        "`{{token}}` writes a colour into a class, and it stays as it is when the theme changes (设置 › 外观)",
-        `use ${classAdvice.hex}`,
-        "apps/web/src/style.css",
-      ),
-    },
-  },
-  create(context) {
-    const check = ({ node, property, value }: { node: ESTree.Node; property: string | undefined; value: string | number }) => {
-      if (typeof value === "string" && hexColor(property, value)) context.report({ node, messageId: "hex" });
-    };
-    return {
-      ...classStrings((node, { token, kind }) => {
-        if (kind === "hex") context.report({ node, messageId: "hexClass", data: { token } });
-      }),
-      JSXAttribute(node) {
-        if (node.name.type !== "JSXIdentifier" || node.name.name !== "style" || node.value?.type !== "JSXExpressionContainer") return;
-        jsxStyleValues(node.value.expression, undefined, check);
-      },
-    };
-  },
-});
-
 /** A style object every value of which is written out: nothing in it is worked out at run time. */
 function fixedStyle(node: ESTree.Node): boolean {
   if (node.type === "Literal") return typeof node.value === "string";
@@ -241,13 +89,13 @@ const styleAttrs = defineRule({
     messages: {
       classAttr: says(
         "`{{attr}}` is not how Solid 2 takes classes, so the element gets none",
-        "write `class`: a string, an array or `cx(...)` from ui/cx.ts (Tailwind utilities, vv-tailwind)",
-        "apps/web/src/ui/cx.ts",
+        "write `class`: a string, or an array whose false entries are left out (Tailwind utilities, vv-tailwind)",
+        "apps/site/src/ui/ui.tsx",
       ),
       fixedStyle: says(
         "a `style` with only written-out values is a class that skips the tokens and the lint on them",
         "write the Tailwind utilities in `class` (vv-tailwind); `style` is for a value worked out at run time, such as a width in percent",
-        "apps/web/src/ui/cx.ts",
+        "apps/site/src/ui/ui.tsx",
       ),
     },
   },
@@ -267,70 +115,22 @@ const styleAttrs = defineRule({
   },
 });
 
-const designTokens = defineRule({
-  meta: {
-    messages: {
-      ...Object.fromEntries(
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- tokenAdvice has one key per TokenKind and no more
-        (Object.keys(tokenAdvice) as TokenKind[]).map((kind) => [
-          kind,
-          says(`this ${kind} is off the workbench's ladder, so it matches nothing beside it`, `use ${tokenAdvice[kind]}`, "docs/style/design.md"),
-        ]),
-      ),
-      ...Object.fromEntries(
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- classAdvice has one key per ClassKind and no more
-        (Object.keys(classAdvice) as ClassKind[])
-          .filter((kind) => kind !== "hex")
-          .map((kind) => [
-            `${kind}Class`,
-            says(
-              `\`{{token}}\` puts a ${kind} off the workbench's ladder into a class, so it matches nothing beside it`,
-              `use ${classAdvice[kind]}`,
-              ".agents/skills/vv-tailwind/SKILL.md",
-            ),
-          ]),
-      ),
-    },
-  },
-  create(context) {
-    return {
-      ...classStrings((node, { token, kind }) => {
-        if (kind !== "hex") context.report({ node, messageId: `${kind}Class`, data: { token } });
-      }),
-      // A value worked out at run time goes in `style`; one written out there is held to the same ladders.
-      JSXAttribute(node) {
-        if (node.name.type !== "JSXIdentifier" || node.name.name !== "style" || node.value?.type !== "JSXExpressionContainer") return;
-        jsxStyleValues(node.value.expression, undefined, ({ node: value, property, value: text }) => {
-          if (property === undefined || text.includes("${}")) return;
-          const kind = offTokens(
-            property.replace(/-([a-z])/gu, (_, c: string) => c.toUpperCase()),
-            text,
-          );
-          if (kind) context.report({ node: value, messageId: kind });
-        });
-      },
-    };
-  },
-});
-
 // Chinese punctuation too: a word joined to its neighbor with 「：」 or 「、」 in code reads as Chinese in an English farm.
 const han = /[\p{Script=Han}、，。：；（）！？「」【】〔〕]/u;
 
-/** The catalog a file's words belong in. */
+/** The catalog a file's words belong in: the native app's pages have one per feature, everything else shares one. */
 export function catalogOf(filename: string): string {
-  const at = /\/apps\/(server|web|desktop|mobile|cli)\/(?:src\/)?(.*)$/u.exec(filename.replaceAll("\\", "/"));
-  const host = at?.[1];
-  const rest = at?.[2];
-  if (host === undefined || rest === undefined) return "shared";
+  const rest = /\/apps\/mac\/ui\/vv\/web\/(.*)$/u.exec(filename.replaceAll("\\", "/"))?.[1];
+  if (rest === undefined) return "shared";
   const folders = rest
     .split("/")
     .slice(0, -1)
-    .filter((f) => f !== "features" && f !== "platform" && f !== "modules" && f !== "gateway");
+    .filter((f) => f !== "features");
   for (let n = folders.length; n > 0; n--) {
-    const name = [host, ...folders.slice(0, n)].join(".");
+    const name = ["web", ...folders.slice(0, n)].join(".");
     if (existsSync(resolve(repo, "crates/vibevalley-i18n/locales/zh", `${name}.json`))) return name;
   }
-  return host;
+  return "web";
 }
 
 const noCjkLiteral = defineRule({
@@ -338,7 +138,7 @@ const noCjkLiteral = defineRule({
     messages: {
       cjk: says(
         "words written in code are not translated: an English farm would show them in Chinese",
-        'for the owner, add a key to crates/vibevalley-i18n/locales/zh/{{catalog}}.json and en/{{catalog}}.json, run `vp run i18n:gen`, and write `t("{{catalog}}.<key>")`; for a model, put it in this module\'s prompts.ts',
+        'add a key to crates/vibevalley-i18n/locales/zh/{{catalog}}.json and en/{{catalog}}.json, run `vp run i18n:gen`, and write `t("{{catalog}}.<key>")`',
         "packages/i18n/README.md",
       ),
     },
@@ -347,7 +147,7 @@ const noCjkLiteral = defineRule({
     const data = { catalog: catalogOf(context.filename) };
     return {
       // Read as written: a character spelled as a \u escape is a code point on purpose (a keystroke an input method
-      // types, base/typedMarks.ts), not words.
+      // types), not words.
       Literal(node) {
         if (typeof node.value === "string" && han.test(node.raw ?? node.value)) context.report({ node, messageId: "cjk", data });
       },
@@ -361,46 +161,7 @@ const noCjkLiteral = defineRule({
   },
 });
 
-const nativeTypes = new Set(["checkbox", "radio", "range"]);
-
-const nativeControl = defineRule({
-  meta: {
-    messages: {
-      native: says(
-        "a native chooser is drawn by the system: it looks different on every machine and stays light in the dark theme",
-        "`Select` from ui/Field.tsx for a <select>, ui/Checkbox.tsx for a checkbox, base-ui's `RadioGroup` and `Slider` for radio and range",
-        "apps/web/src/ui/Field.tsx",
-      ),
-    },
-  },
-  create(context) {
-    return {
-      JSXOpeningElement(node) {
-        if (node.name.type !== "JSXIdentifier") return;
-        const tag = node.name.name;
-        const type = node.attributes.find((a) => a.type === "JSXAttribute" && a.name.type === "JSXIdentifier" && a.name.name === "type");
-        const value = type?.type === "JSXAttribute" && type.value?.type === "Literal" ? type.value.value : undefined;
-        if (tag === "select" || (tag === "input" && typeof value === "string" && nativeTypes.has(value))) context.report({ node, messageId: "native" });
-      },
-    };
-  },
-});
-
-// The page's layers, in order; a file may import from its own unit or one before it.
-const pageLayers = ["base", "infra", "state", "ui", "ui/domain", "ui/pixel", "features", "skin", "app", "root"] as const;
-
-function pageUnit(path: string): { layer: (typeof pageLayers)[number]; unit: string } {
-  const parts = path.split("/");
-  if (parts.length === 1) return { layer: "root", unit: "" };
-  if (parts[0] === "ui" && parts[1] === "domain" && parts.length > 2) return { layer: "ui/domain", unit: "ui/domain" };
-  if (parts[0] === "ui" && parts[1] === "pixel" && parts.length > 2) return { layer: "ui/pixel", unit: "ui/pixel" };
-  if (parts[0] === "features") return { layer: "features", unit: `features/${parts[1]}` };
-  if (parts[0] === "farm" || parts[0] === "tree") return { layer: "skin", unit: parts[0] };
-  const layer = pageLayers.find((l) => l === parts[0]);
-  return { layer: layer ?? "root", unit: parts[0]! };
-}
-
-/** Both paths are relative to the page's src. */
+/** Both paths are relative to the package's src. */
 function joinPath(from: string, spec: string) {
   const out = from.split("/").slice(0, -1);
   for (const part of spec.split("/")) {
@@ -408,71 +169,6 @@ function joinPath(from: string, spec: string) {
     else if (part !== ".") out.push(part);
   }
   return out.join("/");
-}
-
-const pageLayersRule = defineRule({
-  meta: {
-    messages: {
-      layer: says(
-        "{{from}} is before {{to}} in the page's layers (base, infra, state, ui, ui/domain, ui/pixel, features, farm and tree, app), and a layer imports only its own and those before it",
-        "move what both need down into a layer before {{from}} (a pure function to base, a talk with the outside to infra, a component to ui), or have {{to}} pass it in as a prop",
-        "apps/web/README.md",
-      ),
-      index: says(
-        "a file inside another feature is its own business, free to change",
-        'import it from its index ("#/{{unit}}/index.ts"), and export it there if it is meant to be shared',
-        "apps/web/README.md",
-      ),
-      sibling: says(
-        "one feature does not import another's files, nor a skin another skin's: each is its own unit",
-        "move what both need down into base or ui",
-        "apps/web/README.md",
-      ),
-    },
-  },
-  create(context) {
-    const at = context.filename.replaceAll("\\", "/").split("/apps/web/src/")[1];
-    if (at === undefined) return {};
-    const from = pageUnit(at);
-    type Verdict = { messageId: "layer" | "index" | "sibling"; data: Record<string, string> };
-    const verdict = (spec: unknown): Verdict | undefined => {
-      if (typeof spec !== "string" || !(spec.startsWith(".") || spec.startsWith("#/"))) return;
-      // A file is the same unit whether or not its import names its extension.
-      const target = (spec.startsWith("#/") ? spec.slice(2) : joinPath(at, spec)).replace(/\.tsx?$/u, "");
-      if (target.startsWith("..")) return;
-      const to = pageUnit(target);
-      if (to.unit === from.unit) return;
-      const a = pageLayers.indexOf(from.layer);
-      const b = pageLayers.indexOf(to.layer);
-      const data = { from: from.unit || "the page's root", to: to.unit || "the page's root", unit: to.unit };
-      if (b > a) return { messageId: "layer", data };
-      if (b === a && from.layer !== "features") return { messageId: "sibling", data };
-      if (to.layer === "features" && target !== to.unit && target !== `${to.unit}/index`) return { messageId: "index", data };
-      return undefined;
-    };
-    const check = (node: NonNullable<Parameters<typeof context.report>[0]["node"]>, spec: unknown) => {
-      const v = verdict(spec);
-      if (v) context.report({ node, ...v });
-    };
-    return {
-      ImportDeclaration: (node) => check(node, node.source.value),
-      ExportNamedDeclaration: (node) => check(node, node.source?.value),
-      ExportAllDeclaration: (node) => check(node, node.source.value),
-    };
-  },
-});
-
-const functionTypes = new Set(["FunctionExpression", "ArrowFunctionExpression", "FunctionDeclaration"]);
-
-/** The function an await belongs to (the nearest one around it), whether it is async, and what it is passed to. */
-function ownerOf(node: { parent?: unknown }): { fn: object; async: boolean; parent: unknown } | undefined {
-  let at: unknown = node.parent;
-  while (typeof at === "object" && at !== null) {
-    const parent = "parent" in at ? at.parent : undefined;
-    if ("type" in at && typeof at.type === "string" && functionTypes.has(at.type)) return { fn: at, async: "async" in at && at.async === true, parent };
-    at = parent;
-  }
-  return undefined;
 }
 
 const oneAbsent = defineRule({
@@ -547,33 +243,12 @@ const globalDoors = defineRule({
   },
 });
 
-const droppedTimer = defineRule({
-  meta: {
-    messages: {
-      dropped: says(
-        "a timer whose handle is dropped cannot be cleared, so it still fires after the part that set it is gone",
-        "`useTimeout()` or `useInterval(fn, ms)` from `#/base/timer.ts` in a component; in a Solid effect, keep the handle and return `() => clearTimeout(t)`; a store that lives as long as the page keeps the handle too, or says why it need not with a disable comment",
-        "apps/web/src/base/timer.ts",
-      ),
-    },
-  },
-  create(context) {
-    return {
-      CallExpression(node) {
-        const c = node.callee;
-        if (c.type !== "Identifier" || (c.name !== "setTimeout" && c.name !== "setInterval")) return;
-        if (node.parent.type === "ExpressionStatement") context.report({ node, messageId: "dropped" });
-      },
-    };
-  },
-});
-
 const childProcessDoor = defineRule({
   meta: {
     messages: {
       spawn: says(
         "a process started here is one more place that must kill its whole group on a timeout and keep what it printed, which the doors already do",
-        "git through `apps/server/src/modules/repo/git.ts` (tests: `gitSync`, `gitIn` in `apps/server/src/testing/git.ts`), a helper's command through `runtime/dsh.ts`; a new kind of process gets its own door, added to the list in vite.config.ts",
+        "start it from a script (scripts/, or the package's own scripts/); a process shipped code must start gets one door file, excluded by name from this rule in vite.config.ts",
         "docs/subsystems/foundation.md",
       ),
     },
@@ -584,193 +259,6 @@ const childProcessDoor = defineRule({
         if ((node.source.value === "node:child_process" || node.source.value === "child_process") && node.importKind !== "type")
           context.report({ node, messageId: "spawn" });
       },
-    };
-  },
-});
-
-const solidStores = new Set(["createSignal", "createStore"]);
-
-const pageStore = defineRule({
-  meta: {
-    messages: {
-      store: says(
-        "`{{call}}` outside any function is a store of the page's kept by hand: plain code cannot hear it, a test cannot reset it, and it is a second way of keeping what the page keeps in atoms",
-        "make it an atom of the page's: `const x = defineAtom(initial)` (state/atom.ts), read `x.get()` (it follows in Solid), write `x.set(v)` or `x.update(f)`; a choice kept on this machine is `defineStored(name, schema, fallback)` (state/stored.ts); a value one component owns is made in that component",
-        "apps/web/src/state/atom.ts",
-      ),
-    },
-  },
-  create(context) {
-    return {
-      CallExpression(node) {
-        const c = node.callee;
-        if (c.type !== "Identifier" || !solidStores.has(c.name) || ownerOf(node)) return;
-        context.report({ node, messageId: "store", data: { call: c.name } });
-      },
-    };
-  },
-});
-
-const storages = new Set(["localStorage", "sessionStorage"]);
-
-const storedDoor = defineRule({
-  meta: {
-    messages: {
-      storage: says(
-        "`{{name}}` reached by hand: what it reads is not decoded, a storage that throws (a private window, a full one) breaks the page, the key is outside the page's namespace, and no other reader hears the change",
-        "keep the choice with `defineStored(name, schema, fallback)` (state/stored.ts) and read and set it like any page value; a struct whose fields fall back one by one uses `orFallback`",
-        "apps/web/src/state/stored.ts",
-      ),
-    },
-  },
-  create(context) {
-    const file = context.filename.replaceAll("\\", "/");
-    if (file.endsWith("/apps/web/src/state/stored.ts")) return {};
-    return {
-      Identifier(node) {
-        if (!storages.has(node.name)) return;
-        const parent = node.parent;
-        // User objects can have storage-like property names without accessing browser storage.
-        if (parent?.type === "MemberExpression" && parent.property === node && !parent.computed) {
-          const owner = parent.object;
-          if (!(owner.type === "Identifier" && (owner.name === "window" || owner.name === "globalThis" || owner.name === "self"))) return;
-        }
-        if (parent?.type === "Property" && parent.key === node && !parent.computed) return;
-        context.report({ node, messageId: "storage", data: { name: node.name } });
-      },
-    };
-  },
-});
-
-/** The client's methods that only read: everything else changes something on the server. */
-const readVerbs = new Set(["list", "get", "search", "recall", "validate"]);
-
-function apiVerb(callee: ESTree.Node): string | undefined {
-  if (callee.type !== "MemberExpression" || callee.property.type !== "Identifier") return undefined;
-  let at: ESTree.Node = callee.object;
-  while (at.type === "MemberExpression") at = at.object;
-  return at.type === "Identifier" && at.name === "api" ? callee.property.name : undefined;
-}
-
-const isActionOf = (call: unknown, fn: object): boolean => {
-  if (typeof call !== "object" || call === null || !("type" in call) || call.type !== "CallExpression") return false;
-  if (!("arguments" in call) || !Array.isArray(call.arguments) || !call.arguments.includes(fn) || !("callee" in call)) return false;
-  const callee = call.callee;
-  if (typeof callee !== "object" || callee === null || !("type" in callee) || callee.type !== "MemberExpression" || !("property" in callee)) return false;
-  const property = callee.property;
-  return typeof property === "object" && property !== null && "name" in property && (property.name === "run" || property.name === "attempt");
-};
-
-function insideAction(node: { parent?: unknown }): boolean {
-  for (let owner = ownerOf(node); owner; owner = ownerOf(owner.fn)) if (isActionOf(owner.parent, owner.fn)) return true;
-  return false;
-}
-
-const actDoor = defineRule({
-  meta: {
-    messages: {
-      act: says(
-        "`api.{{call}}` changes something on the server straight from a component: it has no busy, no refusal in the error tone, and goes out while the state stream is lost",
-        "hand it to an Act (`const act = createAct()` from ui/act.ts, `createPixelAct()` in a skin; `act.run(() => api.{{call}}(…))`, or `act.attempt(…)` for an explicit receipt), or, when the page shows the change before the server has it, send it through an intent defined in the feature's .ts (`defineIntent`, state/intent.ts) with an overlay of its own",
-        "apps/web/src/ui/act.ts",
-      ),
-    },
-  },
-  create(context) {
-    return {
-      CallExpression(node) {
-        const verb = apiVerb(node.callee);
-        if (verb === undefined || readVerbs.has(verb) || verb.startsWith("preview") || insideAction(node)) return;
-        context.report({
-          node,
-          messageId: "act",
-          data: {
-            call: context.sourceCode
-              .getText(node.callee)
-              .replaceAll(/\s+/gu, "")
-              .replace(/^api\./u, ""),
-          },
-        });
-      },
-    };
-  },
-});
-
-const failureTone = defineRule({
-  meta: {
-    messages: {
-      tone: says(
-        "a refusal said in the plain tone reads like news, and the owner misses that it did not happen",
-        'give the workbench\'s toast the error tone (`toast(reasonOf(e), "bad")`), the pixel one the error type (`toasts.add({ type: ToastType.error, … })`); or run the call through an Act (ui/act.ts), which says refusals so',
-        "apps/web/src/ui/act.ts",
-      ),
-    },
-  },
-  create(context) {
-    const saysReason = (n: ESTree.Node | undefined) => n !== undefined && /\breasonOf\(/u.test(context.sourceCode.getText(n));
-    return {
-      CallExpression(node) {
-        const c = node.callee;
-        const [first, second] = node.arguments;
-        if (c.type === "Identifier" && c.name === "toast") {
-          if (saysReason(first) && !(second?.type === "Literal" && second.value === "bad")) context.report({ node, messageId: "tone" });
-          return;
-        }
-        const pixel =
-          c.type === "MemberExpression" &&
-          c.object.type === "Identifier" &&
-          c.object.name === "toasts" &&
-          c.property.type === "Identifier" &&
-          c.property.name === "add";
-        if (!pixel || first?.type !== "ObjectExpression" || !saysReason(first)) return;
-        const type = first.properties.find((p) => p.type === "Property" && p.key.type === "Identifier" && p.key.name === "type");
-        const error = type?.type === "Property" && /^(?:ToastType\.error|"error")$/u.test(context.sourceCode.getText(type.value));
-        if (!error) context.report({ node, messageId: "tone" });
-      },
-    };
-  },
-});
-
-/** A subpath import names its file (package.json imports map exactly): the target with the extension it has on disk, or its folder's index. */
-function withExtension(filename: string, spec: string, target: string) {
-  if (/\.[cm]?[jt]sx?$/u.test(spec)) return target;
-  const base = resolve(dirname(filename), spec);
-  const found = [".ts", ".tsx", "/index.ts", "/index.tsx"].find((ext) => existsSync(base + ext));
-  return found === undefined ? target : target + found;
-}
-
-const parentImportRule = defineRule({
-  meta: {
-    messages: {
-      parent: says(
-        "an import that climbs out of its folder reads differently from every file and changes when the file moves",
-        "write it as `{{alias}}` (vp check --fix does it)",
-        "apps/{{app}}/package.json",
-      ),
-    },
-    fixable: "code",
-  },
-  create(context) {
-    const [, app, at] = /\/apps\/(web|server|cli)\/src\/(.+)$/u.exec(context.filename.replaceAll("\\", "/")) ?? [];
-    if (app === undefined || at === undefined) return {};
-    // The string itself is replaced, quotes kept, so the fix is the same for every kind of import.
-    const check = (source: { type: string; value?: unknown; range: [number, number] } | null | undefined) => {
-      if (source?.type !== "Literal" || typeof source.value !== "string" || !source.value.startsWith("../")) return;
-      const spec = source.value;
-      const ups = spec.split("/").filter((p) => p === "..").length;
-      // Out of src: the server's generated queries are #db/ (its package.json imports); nothing else is reached.
-      const out = ups >= at.split("/").length;
-      const generated = /^(?:\.\.\/)+db\/generated\/(.+)$/u.exec(spec)?.[1];
-      if (out && (app !== "server" || generated === undefined)) return;
-      const alias = out ? `#db/${generated}` : `#/${withExtension(context.filename, spec, joinPath(at, spec))}`;
-      const [start, end] = source.range;
-      context.report({ node: source, messageId: "parent", data: { alias, app }, fix: (fixer) => fixer.replaceTextRange([start + 1, end - 1], alias) });
-    };
-    return {
-      ImportDeclaration: (node) => check(node.source),
-      ImportExpression: (node) => check(node.source),
-      ExportNamedDeclaration: (node) => check(node.source),
-      ExportAllDeclaration: (node) => check(node.source),
     };
   },
 });
@@ -817,25 +305,8 @@ const noCrossPackagePath = defineRule({
   },
 });
 
-const hostIoModules = new Set(["node:fs", "node:fs/promises", "node:child_process", "node:net", "node:http", "node:https", "electron"]);
-const nonBaseFolders = new Set([
-  "infra",
-  "ui",
-  "state",
-  "features",
-  "platform",
-  "modules",
-  "gateway",
-  "commands",
-  "screens",
-  "sections",
-  "preload",
-  "brain",
-  "tools",
-  "llm",
-  "realtime",
-  "primitives",
-]);
+const hostIoModules = new Set(["node:fs", "node:fs/promises", "node:child_process", "node:net", "node:http", "node:https"]);
+const nonBaseFolders = new Set(["infra", "ui", "state", "features", "sections"]);
 
 const subpackageLayersRule = defineRule({
   meta: {
@@ -850,49 +321,26 @@ const subpackageLayersRule = defineRule({
         "move the shared pure definition down into src/base, or move this caller up into {{target}}",
         "docs/style/module-design.md",
       ),
-      preloadLeak: says(
-        "the Electron preload bridge runs in a sandboxed renderer context and cannot import {{source}}",
-        "keep preload limited to electron's contextBridge/ipcRenderer, @vibevalley/* contracts, and ../base/* pure helpers",
-        "docs/subsystems/app.md",
-      ),
     },
   },
   create(context) {
     const normalized = context.filename.replaceAll("\\", "/");
     if (/\.(?:test|spec|stories)\.tsx?$/u.test(normalized)) return {};
-    const match = /\/(apps|packages)\/([^/]+)\/src\/(.+)$/u.exec(normalized);
+    const match = /\/(?:apps|packages)\/[^/]+\/src\/(.+)$/u.exec(normalized);
     if (!match) return {};
-    const [, kind, pkg, at] = match;
-    const top = at?.split("/")[0];
-    if (top !== "base" && !(kind === "apps" && pkg === "desktop" && top === "preload")) return {};
+    const at = match[1];
+    if (at?.split("/")[0] !== "base") return {};
 
     const checkSpec = (node: NonNullable<Parameters<typeof context.report>[0]["node"]>, spec: unknown) => {
       if (typeof spec !== "string" || at === undefined) return;
-      if (top === "base") {
-        if (hostIoModules.has(spec)) {
-          context.report({ node, messageId: "baseIo", data: { source: spec } });
-          return;
-        }
-        if (spec.startsWith(".") || spec.startsWith("#/")) {
-          const target = spec.startsWith("#/") ? spec.slice(2) : joinPath(at, spec);
-          const targetTop = target.split("/")[0] ?? "";
-          if (nonBaseFolders.has(targetTop)) {
-            context.report({ node, messageId: "baseUpward", data: { target: `src/${targetTop}` } });
-          }
-        }
-        return;
-      }
-      // apps/desktop/src/preload/**
-      if (hostIoModules.has(spec) && spec !== "electron") {
-        context.report({ node, messageId: "preloadLeak", data: { source: spec } });
+      if (hostIoModules.has(spec)) {
+        context.report({ node, messageId: "baseIo", data: { source: spec } });
         return;
       }
       if (spec.startsWith(".") || spec.startsWith("#/")) {
         const target = spec.startsWith("#/") ? spec.slice(2) : joinPath(at, spec);
         const targetTop = target.split("/")[0] ?? "";
-        if (targetTop !== "preload" && targetTop !== "base") {
-          context.report({ node, messageId: "preloadLeak", data: { source: spec } });
-        }
+        if (nonBaseFolders.has(targetTop)) context.report({ node, messageId: "baseUpward", data: { target: `src/${targetTop}` } });
       }
     };
 
@@ -908,26 +356,14 @@ const subpackageLayersRule = defineRule({
 export default definePlugin({
   meta: { name: "vibevalley" },
   rules: {
-    "no-wall-clock": noWallClock,
     "no-test-sleep": noTestSleep,
     "no-comment-divider": noCommentDivider,
     "no-cjk-literal": noCjkLiteral,
-    "no-hex-color": noHexColor,
     "style-attrs": styleAttrs,
-    "no-copy-selector": noCopySelector,
-    "design-tokens": designTokens,
-    "page-layers": pageLayersRule,
     "subpackage-layers": subpackageLayersRule,
-    "parent-import": parentImportRule,
     "no-cross-package-path": noCrossPackagePath,
     "child-process-door": childProcessDoor,
-    "dropped-timer": droppedTimer,
-    "page-store": pageStore,
-    "stored-door": storedDoor,
-    "act-door": actDoor,
-    "failure-tone": failureTone,
     "one-absent": oneAbsent,
     "global-doors": globalDoors,
-    "native-control": nativeControl,
   },
 });

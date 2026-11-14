@@ -1,4 +1,4 @@
-import { newer } from "@vibevalley/desktop/releases";
+import { newer } from "./releases.ts";
 
 export type Stage = "alpha" | "beta" | "final";
 

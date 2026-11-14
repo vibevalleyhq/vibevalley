@@ -4,11 +4,11 @@ packages:
   - packages/*
   - apps/mac/ui
 
-# Every version the workspace's packages use, written once: their package.json say "catalog:" (or "catalog:expo"). With
-# catalogMode strict, pnpm add puts a new version here and writes "catalog:" there; scripts/catalog.test.ts refuses a
-# version written by hand. vite is Vite+'s core everywhere: overrides below point every vite and vitest at these.
-# The root and apps/web also name vite themselves, though they import only vite-plus: that is what gives vitest's
-# @vitest/mocker and @vitest/browser (at the root) and the page's Solid plugin and its vitefu a vite for their peer.
+# Every version the workspace's packages use, written once: their package.json say "catalog:". With catalogMode strict,
+# pnpm add puts a new version here and writes "catalog:" there; scripts/audit/catalog.test.ts refuses a version written
+# by hand. vite is Vite+'s core everywhere: overrides below point every vite and vitest at these.
+# The root and apps/site also name vite themselves, though they import only vite-plus: that is what gives vitest's
+# @vitest/mocker and @vitest/browser (at the root) and the site's Solid plugin and its vitefu a vite for their peer.
 # Without it pnpm leaves those peers unresolved (the lockfile shows them losing @voidzero-dev/vite-plus-core).
 catalogMode: strict
 
@@ -18,42 +18,16 @@ catalog:
   opentype.js: "^2.0.0"
   sharp: "0.35.5"
   subset-font: "^2.9.0"
-  "@ai-sdk/provider": "4.0.36"
-  ai: "7.0.164"
-  "@formatjs/intl-getcanonicallocales": "3.3.0"
-  "@formatjs/intl-locale": "5.4.2"
-  "@formatjs/intl-pluralrules": "7.0.2"
-  base64-js: "1.5.1"
-  "@axe-core/playwright": "^4.14.0"
-  "@floating-ui/dom": "^1.8.0"
   "@playwright/test": "^1.64.1"
   "@solidjs/vite-plugin": "3.0.0-next.56"
   "@solidjs/web": "2.0.0-rc.21"
   "@types/node": "^26.6.6"
-  "@vitest/browser-playwright": "5.1.0"
-  agora-agents: "2.13.0"
-  agora-rtc-sdk-ng: "4.24.9"
-  agora-token: "2.0.7"
-  axe-core: "^4.14.0"
-  electron: "^45.2.1"
-  electron-builder: "^26.18.0"
-  esbuild: "^0.28.2"
-  eslint-plugin-solid: "0.18.1"
-  hast-util-to-dom: "^4.0.1"
-  pixi.js: "^8.22.0"
-  playwright: "^1.64.1"
-  react-native-agora: "^4.6.4"
   reicon: "1.2.5"
-  remark-gfm: "^4.0.1"
-  remark-parse: "^11.0.0"
-  remark-rehype: "^11.1.2"
   pinyin-pro: "3.29.5"
   pele: ^1.13.0
-  shiki: ^4.6.0
   solid-js: "2.0.0-rc.21"
   tsrs: "0.21.0-ts7.1.0-beta"
   typescript: "^7.0.2"
-  unified: "^11.0.5"
   uqr: "^0.1.3"
   vite: "npm:@voidzero-dev/vite-plus-core@1.5.0"
   vite-plus: "1.5.0"
@@ -61,27 +35,9 @@ catalog:
   yaml: "^2.9.1"
   knip: 6.44.1
   parse5: 8.1.0
-  undici: "8.12.3"
   zod: ^4.6.7
   "@tailwindcss/vite": ^4.3.5
   tailwindcss: ^4.3.5
-
-# What the Expo SDK pins for apps/mobile, moved together when the SDK moves: `vp exec expo install --check` in apps/mobile
-# says to what (its --fix would write the versions into package.json instead).
-catalogs:
-  expo:
-    "@types/react": "~19.3.0"
-    expo: "~58.0.23"
-    expo-build-properties: "~58.0.12"
-    expo-camera: "~58.0.14"
-    expo-linking: "~58.0.16"
-    expo-notifications: "~58.1.8"
-    expo-secure-store: "~58.0.2"
-    expo-status-bar: "~58.0.4"
-    react: "19.3.0"
-    react-native: "0.88.1"
-    react-native-safe-area-context: "~5.11.1"
-    react-native-webview: "14.0.1"
 
 overrides:
   # The website uses only Motion's DOM entry, not its optional React adapters.
@@ -89,10 +45,6 @@ overrides:
   "motion>react-dom": "-"
   "framer-motion>react": "-"
   "framer-motion>react-dom": "-"
-  "react-native-agora@4.6.4>base64-js": "catalog:"
-  # One undici 8 for the server and its dependencies (oar, pi-ai, openai): two copies would install those once for each,
-  # tens of MB more in the app. Electron's build tools keep their undici 6 and 7.
-  "undici@8": 8.12.3
   vite@*: "catalog:"
   vitest@*: "catalog:"
   # oxlint's type-aware lint and type check on tsrs instead of tsgolint (packages/tsrs/README.md).
@@ -107,13 +59,9 @@ peerDependencyRules:
     vite: "*"
     vitest: "*"
 
-# Install scripts: esbuild fetches its binary in its; the others have never been run and are not needed. (Electron has
-# none: it downloads its binary the first time it runs.)
+# Install scripts: esbuild fetches its binary in its.
 allowBuilds:
   esbuild: true
-  "@google/genai": false
-  electron-winstaller: false
-  protobufjs: false
 
 # The packages' files live once, in pnpm's global virtual store (~/Library/pnpm/store/…/links), and every checkout's
 # node_modules only links to them: a helper's worktree installs in a few seconds and holds tens of files, not tens of
@@ -121,19 +69,7 @@ allowBuilds:
 enableGlobalVirtualStore: true
 
 packageExtensions:
-  # Agora imports this at runtime from its React Native entry, but does not declare it.
-  "react-native-agora@4.6.4":
-    dependencies:
-      base64-js: "*"
   # @solidjs/web's jsx.d.ts imports csstype's CSSProperties: without it every style={{…}} is a type error.
   "@solidjs/web":
     dependencies:
       csstype: "^3.2.3"
-  # expo-camera's types import React's: without it CameraView is not a JSX component.
-  expo-camera:
-    dependencies:
-      "@types/react": "~19.3.0"
-
-# Releases newer than pnpm's minimumReleaseAge (a day) that the catalog takes on purpose; drop each once it is older.
-minimumReleaseAgeExclude:
-  - "@botiverse/oar@0.101.0"
