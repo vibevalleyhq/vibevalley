@@ -35,7 +35,7 @@ impl BridgeHub {
             })),
             None => std::sync::Arc::new(late::LateServer::spawn(|| {
                 let home = server_home();
-                match vibevalley_server::start(vibevalley_server::ServerConfig::under(home.clone())) {
+                match vibevalley_server::start(crate::serving::config(&home, crate::serving::work_root())) {
                     Ok(started) => {
                         let hub: std::sync::Arc<dyn vibevalley_bridge::Server> = started.hub.clone();
                         // The loopback API: the CLI finds it through server.json, the helpers' MCP door is on it.
