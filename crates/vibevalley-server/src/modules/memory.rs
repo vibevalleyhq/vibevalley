@@ -19,9 +19,8 @@ use vibevalley_protocol::{
     RecallPreview, ops,
 };
 
-use crate::base::RequestKeys;
+use crate::base::{RequestKeys, open_db};
 use crate::modules::agent::Agents;
-use crate::modules::attachment::open_db;
 use crate::{Hub, lock, now};
 
 /// Fading marks the ones that would go if this many more were kept.

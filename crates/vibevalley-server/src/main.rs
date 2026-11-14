@@ -1,26 +1,20 @@
-//! `vibevalley-server`: the farm's server on its own, as `apps/server`'s
-//! main.ts ran it. `--web <dir>` serves the built page at `/`;
-//! `--ready-json` prints `{"url","pid"}` once it listens. The environment
-//! says the rest: `VIBEVALLEY_HOME`, `VIBEVALLEY_WORK_ROOT`,
-//! `VIBEVALLEY_PORT` (0: any), `VIBEVALLEY_AGENT_STARTERS` (template ids),
-//! `VIBEVALLEY_VOICE_LINE_URL` (your own tunnel to the voice line),
-//! and `VIBEVALLEY_TEST_RUNTIMES=1` for the page's tests' stand-in agent.
-
-use std::path::PathBuf;
-use std::sync::Arc;
+//! `vibevalley-server`: the farm's server on its own. `--ready-json`
+//! prints `{"url","pid"}` once it listens. The environment configures the
+//! rest via [`vibevalley_server::ServerConfig::from_env`]: `VIBEVALLEY_HOME`,
+//! `VIBEVALLEY_WORK_ROOT`, `VIBEVALLEY_PORT` (0: any), `DEEPSEEK_API_KEY`,
+//! `AGORA_APP_ID`, `AGORA_APP_CERTIFICATE`, `VIBEVALLEY_VOICE_ID`,
+//! `VIBEVALLEY_GIT_EMAILS`, `VIBEVALLEY_PKM_ROOT`, `VIBEVALLEY_AGENT_STARTERS`,
+//! `VIBEVALLEY_VOICE_LINE_URL`, and `VIBEVALLEY_TEST_RUNTIMES=1`.
 
 struct Flags {
-    web: Option<PathBuf>,
     ready_json: bool,
 }
 
 fn flags() -> Result<Flags, String> {
-    let mut f = Flags { web: None, ready_json: false };
-    let mut args = std::env::args().skip(1);
-    while let Some(a) = args.next() {
+    let mut f = Flags { ready_json: false };
+    for a in std::env::args().skip(1) {
         match a.as_str() {
             "--ready-json" => f.ready_json = true,
-            "--web" => f.web = Some(PathBuf::from(args.next().ok_or("--web needs a folder")?)).filter(|p| !p.as_os_str().is_empty()),
             other => return Err(format!("unknown flag {other}")),
         }
     }
@@ -41,36 +35,14 @@ fn main() {
 fn run() -> Result<(), String> {
     let flags = flags()?;
     let home = vibevalley_server::home::home();
-    let user = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("/"));
-    let work_root = env("VIBEVALLEY_WORK_ROOT").map(PathBuf::from).unwrap_or_else(|| user.join("vibevalley-dev"));
     let port: u16 = match env("VIBEVALLEY_PORT") {
         Some(p) => p.parse().map_err(|_| format!("VIBEVALLEY_PORT is not a port: {p}"))?,
         None => 8787,
     };
-    let testing = env("VIBEVALLEY_TEST_RUNTIMES").as_deref() == Some("1");
-    let mut config = vibevalley_server::ServerConfig {
-        work_root,
-        starters: env("VIBEVALLEY_AGENT_STARTERS")
-            .map(|s| s.split(',').map(str::trim).filter(|s| !s.is_empty()).map(String::from).collect())
-            .unwrap_or_default(),
-        ..vibevalley_server::ServerConfig::under(home.clone())
-    };
-    // The user's own tunnel to the voice line, instead of a cloudflared quick tunnel.
-    config.voice_line.url = env("VIBEVALLEY_VOICE_LINE_URL").unwrap_or_default();
-    if testing {
-        let mut registry = vibevalley_oar::Registry::new();
-        registry.register(vibevalley_server::testing::helper());
-        config.registry = Some(Arc::new(registry));
-        config.probe_runtimes = false;
-        config.link_previews = false;
-        config.offline_media = true;
-    }
-    for dir in [config.work_root.join("repos"), config.work_root.join("worktrees"), config.work_root.join("pkm")] {
-        std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    }
+    let config = vibevalley_server::ServerConfig::from_env(home.clone(), env!("CARGO_PKG_VERSION"));
     let started = vibevalley_server::start(config).map_err(|e| e.to_string())?;
     let addr = format!("127.0.0.1:{port}").parse().map_err(|e| format!("{e}"))?;
-    let listener = vibevalley_http::serve_with(started.hub.clone(), addr, flags.web).map_err(|e| format!("listening on {addr}: {e}"))?;
+    let listener = vibevalley_http::serve(started.hub.clone(), addr).map_err(|e| format!("listening on {addr}: {e}"))?;
     let url = listener.url();
     started.board.sessions().set_mcp_url(format!("{url}/mcp"));
     let announced = vibevalley_server::home::announce(&home, &url).map_err(|e| format!("server.json: {e}"))?;

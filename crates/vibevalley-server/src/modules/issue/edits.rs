@@ -181,7 +181,7 @@ impl Board {
 
 /// The issue's current assignment ends and `agent` (none when empty) takes
 /// it on, unless it is the one it has.
-fn assign(issue: &mut Issue, agent: &str, at: i64) {
+pub(super) fn assign(issue: &mut Issue, agent: &str, at: i64) {
     let current = issue.assignments.iter().rposition(|a| a.ended_at.is_none());
     if current.is_some_and(|c| issue.assignments[c].agent == agent) || (current.is_none() && agent.is_empty()) {
         return;
@@ -203,6 +203,72 @@ fn assign(issue: &mut Issue, agent: &str, at: i64) {
 }
 
 impl Board {
+    pub fn hand_over_and_move(&self, reference: &str, agent: &str, words: Option<&str>, findings: &[String]) -> Result<vibevalley_core::Move> {
+        let _work = lock(&self.0.work);
+        let issue = self.stored(reference)?;
+        let agent = agent.trim();
+        self.0.drivers.check(agent)?;
+        let words = words.map(str::trim).filter(|w| !w.is_empty()).map(String::from);
+        if issue.delivered == Some(vibevalley_protocol::Landing::MergedIntoParent) {
+            return Err(BoardError::Refused(vibevalley_core::Refusal::InGraph));
+        }
+        let mv = if issue.status == IssueStatus::Todo {
+            vibevalley_core::Move::Start
+        } else {
+            vibevalley_core::status_move(&issue, IssueStatus::Todo).map_err(BoardError::Refused)?
+        };
+        let mut send_words = match mv {
+            vibevalley_core::Move::Start => words,
+            vibevalley_core::Move::Round | vibevalley_core::Move::Reopen => {
+                let required = mv == vibevalley_core::Move::Reopen || issue.stage.state == vibevalley_protocol::IssueStageKind::Reviewing;
+                match words {
+                    Some(w) => Some(w),
+                    None if required => return Err(BoardError::WordsRequired),
+                    None => Some(super::board::default_words(&issue)),
+                }
+            }
+            _ => {
+                return Err(BoardError::Refused(vibevalley_core::Refusal::Cannot {
+                    from: issue.status,
+                    to: IssueStatus::Todo,
+                }));
+            }
+        };
+        if mv == vibevalley_core::Move::Round && issue.stage.state == vibevalley_protocol::IssueStageKind::Reviewing {
+            let fresh = vibevalley_core::refine::kept(findings);
+            let text = send_words.as_deref().unwrap_or("");
+            if fresh.is_empty() && text.is_empty() {
+                return Err(refused("server.issue.failNeedsFindings", &[]));
+            }
+            let at = now();
+            let mut all = issue.findings.clone();
+            for f in fresh {
+                all.push(Finding {
+                    id: format!("f{}", self.0.ledger.next("finding", 0)?),
+                    text: f,
+                    at,
+                    resolved: false,
+                });
+            }
+            send_words = Some(failed_text(&all, if findings.is_empty() { text } else { "" }));
+            self.change(&issue.id, IssueChange::Failed { findings: all })?;
+        }
+        if let Some(s) = self.on_board(&issue) {
+            self.0.sessions.dismiss(&s.id, Leave::KeepBranch)?;
+        }
+        self.change(&issue.id, IssueChange::Assigned(agent.to_string()))?;
+        let kind = if mv == vibevalley_core::Move::Start {
+            self.change(&issue.id, IssueChange::Queued)?;
+            vibevalley_protocol::RunTriggerKind::Issue
+        } else {
+            self.change(&issue.id, IssueChange::Reopened)?;
+            vibevalley_protocol::RunTriggerKind::Comment
+        };
+        self.send(&issue.id, send_words, kind)?;
+        self.refresh_queue_locked();
+        Ok(mv)
+    }
+
     /// Why one more session cannot start on `issue` now (`noRoom`), or ""
     /// when there is room. Its own session does not count against it.
     pub fn no_room(&self, issue: &Issue) -> String {

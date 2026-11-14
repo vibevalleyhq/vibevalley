@@ -16,7 +16,8 @@
 
 pub mod hearers;
 
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Condvar, Mutex, Weak};
 use std::thread::ThreadId;
 use std::time::Duration;
 
@@ -65,7 +66,7 @@ enum News {
 }
 
 pub struct Watch {
-    hub: Arc<Hub>,
+    hub: Weak<Hub>,
     chat: Arc<Chat>,
     board: Board,
     agents: Arc<Agents>,
@@ -74,6 +75,9 @@ pub struct Watch {
     /// The newest event handled; writes wait on it.
     handled: Mutex<i64>,
     moved: Condvar,
+    closed: AtomicBool,
+    stop: Mutex<Option<flume::Sender<()>>>,
+    threads: Mutex<Vec<std::thread::JoinHandle<()>>>,
     router: Mutex<Option<ThreadId>>,
     orchestrator: Option<Arc<Orchestrator>>,
 }
@@ -97,7 +101,7 @@ fn head(s: &str, n: usize) -> String {
 }
 
 fn kind_of(kind: &str) -> MessageKind {
-    serde_json::from_value(serde_json::Value::from(kind)).unwrap_or(MessageKind::Chat)
+    MessageKind::ALL.into_iter().find(|k| k.as_str() == kind).unwrap_or(MessageKind::Chat)
 }
 
 /// `wakeInput` without the chat tools' line: VibeValley's sessions answer in
@@ -121,9 +125,10 @@ impl Watch {
 
     /// `start`, handing what wakes an orchestrator to `orchestrator`.
     pub fn start_with(hub: &Arc<Hub>, chat: Arc<Chat>, board: Board, agents: Arc<Agents>, orchestrator: Option<Arc<Orchestrator>>) -> Arc<Watch> {
+        let (stop_tx, stop_rx) = flume::bounded::<()>(0);
         let watch = Arc::new(Watch {
             orchestrator,
-            hub: hub.clone(),
+            hub: Arc::downgrade(hub),
             chat: chat.clone(),
             board,
             agents,
@@ -131,17 +136,24 @@ impl Watch {
             opening: Mutex::new(()),
             handled: Mutex::new(0),
             moved: Condvar::new(),
+            closed: AtomicBool::new(false),
+            stop: Mutex::new(Some(stop_tx)),
+            threads: Mutex::new(Vec::new()),
             router: Mutex::new(None),
         });
         let events = chat.committed();
         let through = watch.boot();
         *lock(&watch.handled) = through;
         {
-            let w = watch.clone();
+            let w = Arc::downgrade(&watch);
+            let stop_rx = stop_rx.clone();
             let thread = std::thread::Builder::new()
                 .name("vibevalley-watch-chat".into())
                 .spawn(move || {
-                    for told in events.iter() {
+                    loop {
+                        let told = flume::Selector::new().recv(&events, |r| r.ok()).recv(&stop_rx, |_| None).wait();
+                        let Some(told) = told else { return };
+                        let Some(w) = w.upgrade() else { return };
                         let seq = match &told {
                             Told::Posted(c) => c.event.seq,
                             Told::Removed(e) => e.seq,
@@ -154,24 +166,33 @@ impl Watch {
                 })
                 .expect("the watch's thread");
             *lock(&watch.router) = Some(thread.thread().id());
+            lock(&watch.threads).push(thread);
         }
         {
-            let w = watch.clone();
+            let w = Arc::downgrade(&watch);
             chat.await_reader(move |seq| {
-                w.wait_for(seq);
+                if let Some(w) = w.upgrade() {
+                    w.wait_for(seq);
+                }
                 Ok(())
             });
         }
         {
-            let h = hub.clone();
+            let h = Arc::downgrade(hub);
             chat.guard_removal(move |id| {
-                let there = h.read(|s| s.sessions.iter().any(|x| x.channel.as_deref() == Some(id)));
+                let there = h
+                    .upgrade()
+                    .is_some_and(|h| h.read(|s| s.sessions.iter().any(|x| x.channel.as_deref() == Some(id))));
                 if there { vec![t("server.channel.helpersThere", &[])] } else { vec![] }
             });
         }
         {
-            let w = watch.clone();
-            chat.ensure_seated(move |who| w.ensure_session_seated(who));
+            let w = Arc::downgrade(&watch);
+            chat.ensure_seated(move |who| {
+                if let Some(w) = w.upgrade() {
+                    w.ensure_session_seated(who);
+                }
+            });
         }
         let (tx, rx) = flume::unbounded::<News>();
         hub.watch(Arc::new(move |_, tr: &Transition| {
@@ -189,19 +210,40 @@ impl Watch {
             let _ = tx.send(news);
         }));
         {
-            let w = watch.clone();
-            std::thread::Builder::new()
+            let w = Arc::downgrade(&watch);
+            let thread = std::thread::Builder::new()
                 .name("vibevalley-watch-news".into())
                 .spawn(move || {
-                    w.open_threads();
-                    for news in rx.iter() {
+                    if let Some(w) = w.upgrade() {
+                        w.open_threads();
+                    } else {
+                        return;
+                    }
+                    loop {
+                        let news = flume::Selector::new().recv(&rx, |r| r.ok()).recv(&stop_rx, |_| None).wait();
+                        let Some(news) = news else { return };
+                        let Some(w) = w.upgrade() else { return };
                         w.on_news(news);
                     }
                 })
                 .expect("the watch's news thread");
+            lock(&watch.threads).push(thread);
         }
         watch.install(hub);
         watch
+    }
+
+    pub fn close(&self) {
+        self.closed.store(true, Ordering::Relaxed);
+        let _ = lock(&self.stop).take();
+        self.moved.notify_all();
+        let handles: Vec<_> = lock(&self.threads).drain(..).collect();
+        let me = std::thread::current().id();
+        for handle in handles {
+            if handle.thread().id() != me {
+                let _ = handle.join();
+            }
+        }
     }
 
     fn install(self: &Arc<Watch>, hub: &Hub) {
@@ -233,9 +275,11 @@ impl Watch {
                 t("server.issue.wordsRequired", &[]),
             ));
         }
-        let channel = item
-            .latest_session_id()
-            .and_then(|s| self.hub.read(|st| st.sessions.iter().find(|x| &x.id == s).and_then(|x| x.channel.clone())));
+        let channel = item.latest_session_id().and_then(|s| {
+            self.hub
+                .upgrade()?
+                .read(|st| st.sessions.iter().find(|x| &x.id == s).and_then(|x| x.channel.clone()))
+        });
         let thread = self.chat.issue_thread(&item.id, &item.title, channel.as_deref())?;
         self.chat.say(Saying {
             text: text.into(),
@@ -262,15 +306,15 @@ impl Watch {
     }
 
     fn wait_for(&self, seq: i64) {
-        if *lock(&self.router) == Some(std::thread::current().id()) {
+        if *lock(&self.router) == Some(std::thread::current().id()) || self.closed.load(Ordering::Relaxed) {
             return;
         }
         let handled = lock(&self.handled);
         let (_handled, timeout) = self
             .moved
-            .wait_timeout_while(handled, READER_WAIT, |h| *h < seq)
+            .wait_timeout_while(handled, READER_WAIT, |h| *h < seq && !self.closed.load(Ordering::Relaxed))
             .unwrap_or_else(|e| e.into_inner());
-        if timeout.timed_out() {
+        if timeout.timed_out() && !self.closed.load(Ordering::Relaxed) {
             eprintln!("vibevalley-server: watch: event {seq} not routed in time");
         }
     }
@@ -331,7 +375,10 @@ impl Watch {
 
     /// The helpers on the farm (`isHired`): an orchestrator is on duty, not hired.
     fn hired(&self) -> Vec<Session> {
-        self.hub.read(|s| s.sessions.iter().filter(|h| h.role == AgentRole::Worker).cloned().collect())
+        self.hub
+            .upgrade()
+            .map(|h| h.read(|s| s.sessions.iter().filter(|h| h.role == AgentRole::Worker).cloned().collect()))
+            .unwrap_or_default()
     }
 
     fn orchestrators(&self) -> Vec<String> {
@@ -583,7 +630,11 @@ impl Watch {
                 }
             }
             // A refusal is the route's answer: the message is kept and passed.
-            Err(e) => self.hub.notice(NoticeLevel::Warn, e.to_string()),
+            Err(e) => {
+                if let Some(hub) = self.hub.upgrade() {
+                    hub.notice(NoticeLevel::Warn, e.to_string());
+                }
+            }
         }
     }
 

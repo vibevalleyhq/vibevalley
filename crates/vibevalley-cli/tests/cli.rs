@@ -58,7 +58,7 @@ fn farm() -> Farm {
         ..vibevalley_server::ServerConfig::under(dir.path().join("home"))
     })
     .unwrap();
-    let listener = vibevalley_http::serve_with(started.hub.clone(), "127.0.0.1:0".parse().unwrap(), None).unwrap();
+    let listener = vibevalley_http::serve(started.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
     let url = listener.url();
     started.board.sessions().set_mcp_url(format!("{url}/mcp"));
     Farm {

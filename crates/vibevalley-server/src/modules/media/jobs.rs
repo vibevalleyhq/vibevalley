@@ -32,7 +32,8 @@ use super::remote::{RemoteFile, RemoteState};
 use super::understanding::Authorization;
 use super::vendor::{self, Account, Fetch, Moss, Outcome, Request, Task, TaskKind};
 use crate::Hub;
-use crate::modules::attachment::{ATTACHMENT_MAX, Attachments, open_db};
+use crate::base::open_db;
+use crate::modules::attachment::{ATTACHMENT_MAX, Attachments};
 use crate::modules::channel::{Chat, Made, Posting};
 use crate::modules::media::inputs::Inputs;
 use crate::modules::provider::Use;
@@ -1607,6 +1608,13 @@ pub fn install(hub: &Hub, jobs: Arc<Jobs>) {
     hub.on::<ops::MediaUnderstandingCreate>(move |_, r| j.understanding(r));
     let j = jobs.clone();
     hub.on::<ops::MediaUnderstandingAuthorize>(move |_, r| j.authorize_understanding(r));
+    let j = jobs.clone();
+    hub.on::<ops::MediaUnderstandingStart>(move |ctx, r| {
+        if ctx.caller != Caller::Orchestrator {
+            return Err(refused("authorizationRequired"));
+        }
+        j.start_understanding_by_id(&r.id)
+    });
     let j = jobs.clone();
     hub.on::<ops::MediaUnderstandingPreviewCleanup>(move |_, r| j.preview_understanding_cleanup(&r.id));
     let j = jobs.clone();

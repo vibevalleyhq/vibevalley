@@ -44,8 +44,10 @@ impl BridgeHub {
                 match vibevalley_server::start(crate::serving::config(&home, crate::serving::work_root())) {
                     Ok(started) => {
                         let hub: std::sync::Arc<dyn vibevalley_bridge::Server> = started.hub.clone();
+                        let port: u16 = std::env::var("VIBEVALLEY_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(0);
+                        let addr = format!("127.0.0.1:{port}").parse().expect("an address");
                         // The loopback API: the CLI finds it through server.json, the helpers' MCP door is on it.
-                        let (listener, announced) = match vibevalley_http::serve(started.hub.clone(), "127.0.0.1:0".parse().expect("an address")) {
+                        let (listener, announced) = match vibevalley_http::serve(started.hub.clone(), addr) {
                             Ok(listener) => {
                                 started.board.sessions().set_mcp_url(format!("{}/mcp", listener.url()));
                                 match vibevalley_server::home::announce(&home, &listener.url()) {

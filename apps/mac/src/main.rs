@@ -21,7 +21,7 @@ use gpui_kit::{AppContext as _, Bounds, TitlebarOptions, WindowBounds, WindowOpt
 
 fn main() {
     update::enter_bundle();
-    serving::install_tls();
+    vibevalley_server::install_tls();
     gpui_kit::application().run(|cx| {
         gpui_kit::init(cx);
         host::set_app_icon();

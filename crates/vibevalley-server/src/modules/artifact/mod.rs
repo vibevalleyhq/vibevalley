@@ -25,9 +25,9 @@ use vibevalley_protocol::{
 pub use blocks::spans_of;
 use db::ArtifactRow;
 
-use crate::base::{LookIn, missing};
+use crate::base::{LookIn, missing, open_db};
 use crate::modules::agent::Agents;
-use crate::modules::attachment::{Attachments, open_db};
+use crate::modules::attachment::Attachments;
 use crate::modules::channel::{Chat, Made, Posting};
 use crate::{Hub, lock, now};
 
@@ -100,6 +100,8 @@ pub struct Artifacts {
     suggestion_changes: Mutex<Vec<flume::Sender<SuggestionsNow>>>,
     demo_on: AtomicBool,
     closed: AtomicBool,
+    stop: Mutex<Option<flume::Sender<()>>>,
+    prune_thread: Mutex<Option<std::thread::JoinHandle<()>>>,
     /// The demo's tick, 1 s (`demoTickMs`); tests shorten it.
     demo_tick_ms: std::sync::atomic::AtomicU64,
 }
@@ -110,6 +112,7 @@ impl Artifacts {
     pub fn open(home: &std::path::Path, files: Arc<Attachments>, chat: Arc<Chat>) -> Result<Arc<Artifacts>, ApiError> {
         let conn = open_db(home).map_err(q)?;
         conn.execute_batch(db::SCHEMA).map_err(q)?;
+        let (stop_tx, stop_rx) = flume::bounded::<()>(0);
         let me = Arc::new(Artifacts {
             db: Mutex::new(conn),
             rows: Mutex::default(),
@@ -120,9 +123,13 @@ impl Artifacts {
             suggestion_changes: Mutex::default(),
             demo_on: AtomicBool::new(false),
             closed: AtomicBool::new(false),
+            stop: Mutex::new(Some(stop_tx)),
+            prune_thread: Mutex::new(None),
             demo_tick_ms: std::sync::atomic::AtomicU64::new(blocks::DEMO_TICK_MS),
         });
-        prune_daily(Arc::downgrade(&me));
+        if let Some(handle) = prune_daily(Arc::downgrade(&me), stop_rx) {
+            *lock(&me.prune_thread) = Some(handle);
+        }
         Ok(me)
     }
 
@@ -134,6 +141,12 @@ impl Artifacts {
     /// Stops the demo and the prune.
     pub fn close(&self) {
         self.closed.store(true, Ordering::Relaxed);
+        let _ = lock(&self.stop).take();
+        if let Some(handle) = lock(&self.prune_thread).take()
+            && handle.thread().id() != std::thread::current().id()
+        {
+            let _ = handle.join();
+        }
     }
 
     fn db(&self) -> MutexGuard<'_, Connection> {
@@ -612,29 +625,28 @@ fn display_of(s: &str) -> Option<ArtifactDisplay> {
     ArtifactDisplay::ALL.into_iter().find(|d| d.as_str() == s)
 }
 
-fn prune_daily(me: Weak<Artifacts>) {
-    let _ = std::thread::Builder::new().name("vibevalley-artifact-prune".into()).spawn(move || {
-        loop {
-            {
-                let Some(a) = me.upgrade() else { return };
-                if a.closed.load(Ordering::Relaxed) {
+fn prune_daily(me: Weak<Artifacts>, stop_rx: flume::Receiver<()>) -> Option<std::thread::JoinHandle<()>> {
+    std::thread::Builder::new()
+        .name("vibevalley-artifact-prune".into())
+        .spawn(move || {
+            let day = std::time::Duration::from_millis(blocks::DAY_MS as u64);
+            loop {
+                {
+                    let Some(a) = me.upgrade() else { return };
+                    if a.closed.load(Ordering::Relaxed) {
+                        return;
+                    }
+                    let before = now() - blocks::KEPT_DAYS * blocks::DAY_MS;
+                    if let Err(e) = db::prune(&a.db(), before) {
+                        eprintln!("vibevalley-server: artifact.prune failed: {e}");
+                    }
+                }
+                if !matches!(stop_rx.recv_timeout(day), Err(flume::RecvTimeoutError::Timeout)) {
                     return;
                 }
-                let before = now() - blocks::KEPT_DAYS * blocks::DAY_MS;
-                if let Err(e) = db::prune(&a.db(), before) {
-                    eprintln!("vibevalley-server: artifact.prune failed: {e}");
-                }
             }
-            // Checked every minute so a dropped module lets the thread go.
-            for _ in 0..(blocks::DAY_MS / 60_000) {
-                std::thread::sleep(std::time::Duration::from_secs(60));
-                match me.upgrade() {
-                    Some(a) if !a.closed.load(Ordering::Relaxed) => {}
-                    _ => return,
-                }
-            }
-        }
-    });
+        })
+        .ok()
 }
 
 /// `idOf`: an issue by number (refused when there is none), by session, or

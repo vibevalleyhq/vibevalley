@@ -248,7 +248,7 @@ pub fn update(f: &Farm, _: &Who, a: UpdateArgs) -> Result<String, String> {
         };
         req.agent = Some(profile.id);
     }
-    Ok(match crate::modules::issue::update(&f.board, req).map_err(|e| e.message) {
+    Ok(match crate::modules::issue::update(&f.board, Some(&f.agents), req).map_err(|e| e.message) {
         Ok(done) => format!("改好了：{}", words::slice_from(&words::issue_line(&done, &f.who_of(&done), now()), 2)),
         Err(why) => format!("没改：{why}"),
     })
@@ -284,7 +284,7 @@ pub fn status(f: &Farm, who: &Who, a: StatusArgs) -> Result<String, String> {
         Ok(None) => {}
         Err(why) => return Ok(format!("没挪：{why}")),
     }
-    Ok(match crate::modules::issue::status(&f.board, &req).map_err(|e| e.message) {
+    Ok(match crate::modules::issue::status(&f.board, Some(&f.agents), &req).map_err(|e| e.message) {
         Ok(done) if to == IssueStatus::Done && done.status == IssueStatus::Done => format!("#{} {}", done.number, words::closed(&done)),
         Ok(done) => format!("挪好了：{}", words::slice_from(&words::issue_line(&done, &f.who_of(&done), now()), 2)),
         Err(why) => format!("没挪：{why}"),
@@ -387,6 +387,7 @@ pub fn create(f: &Farm, who: &Who, a: CreateArgs) -> Result<String, String> {
     }
     if let Err(why) = crate::modules::issue::status(
         &f.board,
+        Some(&f.agents),
         &vibevalley_protocol::IssueStatusUpdateInput {
             id: item.id.clone(),
             status: IssueStatus::Todo,
@@ -449,12 +450,25 @@ pub struct Task {
 
 #[derive(Deserialize)]
 pub struct SplitArgs {
+    title: Option<String>,
     #[serde(default)]
     tasks: Vec<Task>,
 }
 
 pub fn split(f: &Farm, who: &Who, a: SplitArgs) -> Result<String, String> {
-    let (_, issue) = helper_issue(f, who)?;
+    let (_, mut issue) = helper_issue(f, who)?;
+    if let Some(title) = given(&a.title) {
+        issue = f
+            .board
+            .edit(
+                &issue.id,
+                &vibevalley_protocol::IssueUpdate {
+                    title: Some(title.into()),
+                    ..Default::default()
+                },
+            )
+            .map_err(|e| e.to_string())?;
+    }
     let drafts = a
         .tasks
         .into_iter()
@@ -506,10 +520,6 @@ pub fn report(f: &Farm, who: &Who, a: ReportArgs) -> Result<String, String> {
     };
     f.board.sessions().report(&me.id, &report).map_err(|e| e.to_string())?;
     Ok("报告已记录；现在用简短正文说明结果。".into())
-}
-
-pub fn handback(_: &Farm, _: &Who, _: Nothing) -> Result<String, String> {
-    Err("这里没有交给你的输入卡片可退回；有问题写进 issue_report.questions，或在工单串里 @助手。".into())
 }
 
 #[derive(Deserialize)]

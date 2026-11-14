@@ -68,6 +68,9 @@ pub struct Fleet {
     probing: Mutex<HashSet<String>>,
     reads: AtomicU64,
     closed: AtomicBool,
+    stop: Mutex<Option<flume::Sender<()>>>,
+    stop_rx: flume::Receiver<()>,
+    usage_thread: Mutex<Option<std::thread::JoinHandle<()>>>,
 }
 
 /// Runs `f` on its own thread; none when it takes longer than `limit`.
@@ -113,6 +116,7 @@ impl Fleet {
     /// The fleet over `registry`. With `background`, every runtime is
     /// probed now, off the caller's thread.
     pub fn new(registry: Arc<Registry>, profiles: Arc<Profiles>, hub: &Arc<Hub>, background: bool) -> Arc<Fleet> {
+        let (stop_tx, stop_rx) = flume::bounded::<()>(0);
         let fleet = Arc::new(Fleet {
             registry,
             profiles,
@@ -121,15 +125,20 @@ impl Fleet {
             probing: Mutex::default(),
             reads: AtomicU64::new(0),
             closed: AtomicBool::new(false),
+            stop: Mutex::new(Some(stop_tx)),
+            stop_rx: stop_rx.clone(),
+            usage_thread: Mutex::new(None),
         });
         if background {
             for id in fleet.ids() {
                 fleet.probe_later(&id);
             }
             let f = Arc::downgrade(&fleet);
-            let _ = std::thread::Builder::new().name("vibevalley-runtime-usage".into()).spawn(move || {
+            if let Ok(handle) = std::thread::Builder::new().name("vibevalley-runtime-usage".into()).spawn(move || {
                 loop {
-                    std::thread::sleep(USAGE_EVERY);
+                    if !matches!(stop_rx.recv_timeout(USAGE_EVERY), Err(flume::RecvTimeoutError::Timeout)) {
+                        return;
+                    }
                     let Some(fleet) = f.upgrade() else { return };
                     if fleet.closed.load(Ordering::Relaxed) {
                         return;
@@ -138,7 +147,9 @@ impl Fleet {
                         fleet.refresh_usage(&id);
                     }
                 }
-            });
+            }) {
+                *lock(&fleet.usage_thread) = Some(handle);
+            }
             let f = Arc::downgrade(&fleet);
             hub.watch(Arc::new(move |_, tr| {
                 let vibevalley_protocol::Fact::SessionReported(r) = &tr.fact else { return };
@@ -158,12 +169,16 @@ impl Fleet {
         if self.closed.load(Ordering::Relaxed) || !lock(&self.probing).insert(key.clone()) {
             return;
         }
-        let fleet = self.clone();
+        let fleet = Arc::downgrade(self);
+        let stop_rx = self.stop_rx.clone();
         let id = id.to_string();
         let _ = std::thread::Builder::new().name(format!("vibevalley-usage-{id}")).spawn(move || {
-            std::thread::sleep(USAGE_AFTER_RUN);
+            let stopped = !matches!(stop_rx.recv_timeout(USAGE_AFTER_RUN), Err(flume::RecvTimeoutError::Timeout));
+            let Some(fleet) = fleet.upgrade() else { return };
             lock(&fleet.probing).remove(&key);
-            fleet.refresh_usage(&id);
+            if !stopped {
+                fleet.refresh_usage(&id);
+            }
         });
     }
 
@@ -195,6 +210,12 @@ impl Fleet {
     /// Stops answering with new probes (`close`).
     pub fn close(&self) {
         self.closed.store(true, Ordering::Relaxed);
+        let _ = lock(&self.stop).take();
+        if let Some(handle) = lock(&self.usage_thread).take()
+            && handle.thread().id() != std::thread::current().id()
+        {
+            let _ = handle.join();
+        }
     }
 
     /// The registry's runtime for a wire id.

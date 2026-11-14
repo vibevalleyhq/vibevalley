@@ -213,6 +213,12 @@ impl Orchestrator {
         home.join("agent").join(id).join("conversation.jsonl")
     }
 
+    pub fn ensure_open(&self) {
+        for a in self.farm.agents.profiles.orchestrators() {
+            self.keep_on_duty(&a);
+        }
+    }
+
     /// `keepOnDuty`: an orchestrator's standing session in the state.
     fn keep_on_duty(&self, a: &vibevalley_protocol::Agent) {
         let Some(hub) = self.hub() else { return };
@@ -879,7 +885,11 @@ impl<'a> Run<'a> {
 
 /// `orchestrator.open`, `orchestrator.stop`.
 pub fn install(hub: &Hub, o: Arc<Orchestrator>) {
-    hub.on::<ops::OrchestratorOpen>(|_, ()| Ok(()));
+    let opened = o.clone();
+    hub.on::<ops::OrchestratorOpen>(move |_, ()| {
+        opened.ensure_open();
+        Ok(())
+    });
     let stopped = o.clone();
     hub.on::<ops::OrchestratorStop>(move |_, input| {
         stopped.stop(input.agent.as_deref());

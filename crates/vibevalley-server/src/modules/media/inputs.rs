@@ -1,11 +1,7 @@
 //! Input reservations, uploads and job pins (`media/inputs.ts`). The mutex
 //! protects admission and pins, never a streaming read or attachment write.
 use super::validate;
-use crate::{
-    Hub,
-    modules::attachment::{Attachments, open_db},
-    now,
-};
+use crate::{Hub, base::open_db, modules::attachment::Attachments, now};
 use rusqlite::{Connection, OptionalExtension, params};
 use sha2::{Digest, Sha256};
 use std::{

@@ -204,6 +204,17 @@ impl Jobs {
         shown(&self.found(id)?)
     }
 
+    pub fn start_understanding_by_id(&self, id: &str) -> Result<MediaUnderstandingJob, ApiError> {
+        let r = self.found(id)?;
+        let channel = r
+            .authorization
+            .as_ref()
+            .map(|a| a.channel.clone())
+            .ok_or_else(|| refused("authorizationRequired"))?;
+        let agent = self.chat.orchestrator_in(&channel);
+        self.start_understanding(id, &agent, &channel)
+    }
+
     /// An understanding job's run, from `uploading`.
     pub(super) fn understand(self: &Arc<Self>, r: &Record, request: &MediaUnderstandingRequest, account: &Account, stop: &Stop) {
         let id = r.id();

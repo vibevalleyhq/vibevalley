@@ -34,6 +34,11 @@ pub mod testing;
 
 pub use start::{ServerConfig, StartError, Started, start};
 
+/// Installs the process-wide `ring` TLS provider once (`reqwest` and `tokio-tungstenite`).
+pub fn install_tls() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+}
+
 /// Unix milliseconds now.
 pub fn now() -> Millis {
     std::time::SystemTime::now()
@@ -78,6 +83,7 @@ pub type Watcher = Arc<dyn Fn(&Hub, &Transition) + Send + Sync>;
 #[derive(Default)]
 struct Streams {
     states: Vec<flume::Sender<Value>>,
+    frames: Vec<flume::Sender<Arc<StateFrame>>>,
     live: Vec<flume::Sender<LiveEvent>>,
 }
 
@@ -229,6 +235,20 @@ impl Hub {
         self.handlers.read().unwrap_or_else(|e| e.into_inner()).contains_key(op)
     }
 
+    /// Whether some module opens subscription `name`.
+    pub fn answers_subscription(&self, name: &str) -> bool {
+        self.openers.read().unwrap_or_else(|e| e.into_inner()).contains_key(name)
+    }
+
+    /// Typed frames as they are folded, with the current frame first.
+    pub fn state_frames(&self) -> flume::Receiver<Arc<StateFrame>> {
+        let (tx, rx) = flume::unbounded();
+        let mut streams = lock(&self.streams);
+        let _ = tx.send(Arc::new(self.frame()));
+        streams.frames.push(tx);
+        rx
+    }
+
     /// One endpoint as `caller` (`serve` in `gateway/http/api.ts`): the
     /// input decoded by the endpoint's type (`InvalidInput` when it does not
     /// fit), the void envelope for an endpoint with no result, else `data`
@@ -309,9 +329,14 @@ fn frames(hub: std::sync::Weak<Hub>, kicked: flume::Receiver<Vec<GameEffect>>) {
         std::thread::sleep(Duration::from_millis(STATE_EVERY_MS));
         effects.extend(kicked.drain().flatten());
         let Some(hub) = hub.upgrade() else { return };
-        let frame = lock(&hub.core).frame(effects);
-        let Ok(value) = serde_json::to_value(&frame) else { continue };
-        lock(&hub.streams).states.retain(|tx| tx.send(value.clone()).is_ok());
+        let frame = Arc::new(lock(&hub.core).frame(effects));
+        let mut streams = lock(&hub.streams);
+        streams.frames.retain(|tx| tx.send(frame.clone()).is_ok());
+        if !streams.states.is_empty()
+            && let Ok(value) = serde_json::to_value(&*frame)
+        {
+            streams.states.retain(|tx| tx.send(value.clone()).is_ok());
+        }
     }
 }
 
@@ -327,6 +352,29 @@ impl modules::ledger::Facts for Hub {
 
     fn frame(&self) -> StateFrame {
         Hub::frame(self)
+    }
+}
+
+impl modules::ledger::Facts for std::sync::Weak<Hub> {
+    fn apply(&self, facts: Vec<Fact>) -> Applied {
+        match self.upgrade() {
+            Some(hub) => Hub::apply(&hub, facts),
+            None => Core::default().apply(facts),
+        }
+    }
+
+    fn read(&self, f: &mut dyn FnMut(&SpaceState)) {
+        match self.upgrade() {
+            Some(hub) => f(lock(&hub.core).state()),
+            None => f(&vibevalley_core::empty_space_state()),
+        }
+    }
+
+    fn frame(&self) -> StateFrame {
+        match self.upgrade() {
+            Some(hub) => Hub::frame(&hub),
+            None => Core::default().frame(vec![]),
+        }
     }
 }
 

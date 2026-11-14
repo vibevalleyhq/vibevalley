@@ -15,14 +15,14 @@ use std::time::Duration;
 use rusqlite::{Connection, OptionalExtension, Row, params};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    Actor, ApiError, Attachment, BizCode, Fact, LibraryAddRequest, LibraryItem, LibraryListRequest, LibraryOrigin, LibraryOriginFetchedFrom, MessageKind,
-    Preview, ops,
+    Actor, ApiError, Attachment, BizCode, Fact, JobKind, LibraryAddRequest, LibraryItem, LibraryListRequest, LibraryOrigin, LibraryOriginFetchedFrom,
+    MediaAudioJob, MediaJob, MediaPhase, MessageKind, Preview, ops,
 };
 
-use crate::base::{LookIn, missing};
-use crate::modules::attachment::{ATTACHMENT_MAX, Attachments, open_db};
+use crate::base::{LookIn, missing, open_db};
+use crate::modules::attachment::{ATTACHMENT_MAX, Attachments};
 use crate::public_http::{public_https, public_v4};
-use crate::{Hub, now};
+use crate::{Hub, lock, now};
 
 const LIST_MAX: i64 = 500;
 const DOWNLOAD: Duration = Duration::from_secs(60);
@@ -134,13 +134,29 @@ fn item_of(r: &Row) -> rusqlite::Result<LibraryItem> {
 pub struct Library {
     db: Mutex<Connection>,
     files: Arc<Attachments>,
+    stop: Mutex<Option<flume::Sender<()>>>,
+    thread: Mutex<Option<std::thread::JoinHandle<()>>>,
 }
 
 impl Library {
     pub fn open(home: &Path, files: Arc<Attachments>) -> Result<Arc<Library>, ApiError> {
         let conn = open_db(home).map_err(db_failed)?;
         conn.execute_batch(SCHEMA).map_err(db_failed)?;
-        Ok(Arc::new(Library { db: Mutex::new(conn), files }))
+        Ok(Arc::new(Library {
+            db: Mutex::new(conn),
+            files,
+            stop: Mutex::new(None),
+            thread: Mutex::new(None),
+        }))
+    }
+
+    pub fn close(&self) {
+        let _ = lock(&self.stop).take();
+        if let Some(handle) = lock(&self.thread).take()
+            && handle.thread().id() != std::thread::current().id()
+        {
+            let _ = handle.join();
+        }
     }
 
     fn db(&self) -> MutexGuard<'_, Connection> {
@@ -168,15 +184,11 @@ impl Library {
     }
 
     /// What a ready media job made, once per job.
-    fn record_made(&self, jobs: &[serde_json::Value]) -> Result<(), ApiError> {
+    fn record_made(&self, jobs: &[MediaJob]) -> Result<(), ApiError> {
         for job in jobs {
-            let (Some(id), Some(kind), Some(attachment)) = (job["id"].as_str(), job.get("kind"), job.get("attachment").and_then(|a| a["id"].as_str())) else {
+            let Some((id, job_kind, attachment, updated_at)) = ready_made(job) else {
                 continue;
             };
-            if job["phase"].as_str() != Some("ready") {
-                continue;
-            }
-            let Ok(job_kind) = serde_json::from_value(kind.clone()) else { continue };
             let origin = LibraryOrigin::Generated { job: id.into(), job_kind };
             let mut db = self.db();
             let seen: bool = db
@@ -192,12 +204,7 @@ impl Library {
             if inserted != 0 {
                 tx.execute(
                     "insert into media_library_item (attachment_id,kind,origin,added_at,last_at) values (?1,?2,?3,?4,?4) on conflict(attachment_id) do nothing",
-                    params![
-                        attachment,
-                        origin_kind(&origin),
-                        serde_json::to_string(&origin).expect("JSON"),
-                        job["updatedAt"].as_i64().unwrap_or_else(now)
-                    ],
+                    params![attachment, origin_kind(&origin), serde_json::to_string(&origin).expect("JSON"), updated_at],
                 )
                 .map_err(db_failed)?;
             }
@@ -408,8 +415,44 @@ fn work_file(dir: Option<&Path>, path: &str) -> Result<(Vec<u8>, String), ApiErr
     Ok((bytes, name))
 }
 
+fn ready_made(job: &MediaJob) -> Option<(&str, JobKind, &str, i64)> {
+    match job {
+        MediaJob::MediaImageJob(j) if j.phase == MediaPhase::Ready => Some((&j.id, JobKind::Image, &j.attachment.as_ref()?.id, j.updated_at)),
+        MediaJob::MediaSpeechJob(j) if j.phase == MediaPhase::Ready => Some((&j.id, JobKind::Speech, &j.attachment.as_ref()?.id, j.updated_at)),
+        MediaJob::MediaAudioJob(MediaAudioJob::Speakers {
+            id,
+            phase: MediaPhase::Ready,
+            attachment: Some(a),
+            updated_at,
+            ..
+        }) => Some((id, JobKind::Speakers, &a.id, *updated_at)),
+        MediaJob::MediaAudioJob(MediaAudioJob::VoiceDesign {
+            id,
+            phase: MediaPhase::Ready,
+            attachment: Some(a),
+            updated_at,
+            ..
+        }) => Some((id, JobKind::VoiceDesign, &a.id, *updated_at)),
+        MediaJob::MediaAudioJob(MediaAudioJob::Clone {
+            id,
+            phase: MediaPhase::Ready,
+            attachment: Some(a),
+            updated_at,
+            ..
+        }) => Some((id, JobKind::Clone, &a.id, *updated_at)),
+        MediaJob::MediaAudioJob(MediaAudioJob::Transcription {
+            id,
+            phase: MediaPhase::Ready,
+            attachment: Some(a),
+            updated_at,
+            ..
+        }) => Some((id, JobKind::Transcription, &a.id, *updated_at)),
+        MediaJob::MediaImageJob(_) | MediaJob::MediaUnderstandingJob(_) | MediaJob::MediaSpeechJob(_) | MediaJob::MediaAudioJob(_) => None,
+    }
+}
+
 enum Heard {
-    Made(Vec<serde_json::Value>),
+    Made(Vec<MediaJob>),
     Said(Box<vibevalley_protocol::ChatMessage>),
 }
 
@@ -426,17 +469,21 @@ pub fn install(hub: &Hub, library: Arc<Library>) {
     hub.on::<ops::LibraryItemPreviewDelete>(move |_, r| l.preview_remove(&r.id));
 
     let (tx, rx) = flume::unbounded::<Heard>();
+    let (stop_tx, stop_rx) = flume::bounded::<()>(0);
+    *lock(&library.stop) = Some(stop_tx);
     hub.watch(Arc::new(move |_, tr| {
         let heard = match &tr.fact {
-            Fact::MediaChanged(m) => Heard::Made(m.jobs.iter().filter_map(|j| serde_json::to_value(j).ok()).collect()),
+            Fact::MediaChanged(m) => Heard::Made(m.jobs.clone()),
             Fact::MessageChanged(m) => Heard::Said(Box::new(m.message.clone())),
             _ => return,
         };
         let _ = tx.send(heard);
     }));
     let weak = Arc::downgrade(&library);
-    let _ = std::thread::Builder::new().name("vibevalley-library".into()).spawn(move || {
-        for heard in rx.iter() {
+    if let Ok(handle) = std::thread::Builder::new().name("vibevalley-library".into()).spawn(move || {
+        loop {
+            let heard = flume::Selector::new().recv(&rx, |r| r.ok()).recv(&stop_rx, |_| None).wait();
+            let Some(heard) = heard else { return };
             let Some(l) = weak.upgrade() else { return };
             let done = match heard {
                 Heard::Made(jobs) => l.record_made(&jobs),
@@ -446,5 +493,7 @@ pub fn install(hub: &Hub, library: Arc<Library>) {
                 eprintln!("vibevalley-server: library: recording: {}", e.message);
             }
         }
-    });
+    }) {
+        *lock(&library.thread) = Some(handle);
+    }
 }

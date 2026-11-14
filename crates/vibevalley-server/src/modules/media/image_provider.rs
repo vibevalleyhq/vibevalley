@@ -34,6 +34,7 @@ pub struct Moss {
 }
 impl Moss {
     pub fn new(setting: Arc<Setting>) -> Self {
+        crate::install_tls();
         Self { setting }
     }
 }

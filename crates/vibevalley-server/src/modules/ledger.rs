@@ -12,7 +12,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use crate::modules::{attachment::open_db_at, issue::db as issue_db, session::db as session_db};
+use crate::base::open_db_at;
+use crate::modules::{issue::db as issue_db, session::db as session_db};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use vibevalley_core::{Applied, Core, Refusal};
@@ -315,14 +316,19 @@ impl IssueChange {
                     t.answer = answer;
                 }
             }
-            IssueChange::Assigned(agent) => t.assignments.push(Assignment {
-                id: format!("{}-a{}", t.id, t.assignments.len() + 1),
-                issue: t.id.clone(),
-                agent,
-                assigned_at: at,
-                ended_at: None,
-                executions: vec![],
-            }),
+            IssueChange::Assigned(agent) => {
+                if let Some(c) = t.assignments.iter_mut().rev().find(|a| a.ended_at.is_none()) {
+                    c.ended_at = Some(at);
+                }
+                t.assignments.push(Assignment {
+                    id: format!("{}-a{}", t.id, t.assignments.len() + 1),
+                    issue: t.id.clone(),
+                    agent,
+                    assigned_at: at,
+                    ended_at: None,
+                    executions: vec![],
+                });
+            }
             IssueChange::Started { session, worker } => {
                 t.queued_at = None;
                 if worker

@@ -5,10 +5,15 @@ use vibevalley_protocol::{Health, ops};
 use crate::Hub;
 
 pub fn install(hub: &Hub) {
-    hub.on::<ops::ServerHealthGet>(|_, ()| {
+    install_version(hub, env!("CARGO_PKG_VERSION"));
+}
+
+pub fn install_version(hub: &Hub, version: &str) {
+    let version = version.to_string();
+    hub.on::<ops::ServerHealthGet>(move |_, ()| {
         Ok(Health {
             ok: true,
-            version: env!("CARGO_PKG_VERSION").to_string(),
+            version: version.clone(),
         })
     });
 }

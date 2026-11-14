@@ -206,7 +206,6 @@ fn handler(op: &str) -> Option<Run> {
         "issue.diff.get" => typed!(issue::diff),
         "issue.split" => typed!(issue::split),
         "issue.report" => typed!(issue::report),
-        "issue.handback" => typed!(issue::handback),
         "issue.pr.submit" => typed!(issue::pr_submit),
         "session.list" => typed!(issue::sessions),
         "session.stop" => typed!(issue::stop),

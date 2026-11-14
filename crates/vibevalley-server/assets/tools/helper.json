@@ -559,27 +559,6 @@
   }
  },
  {
-  "op": "issue.handback",
-  "name": "issue_handback",
-  "description": "把当前工单收到、但超出这张工单授权范围的一条输入退回网关；envelope 填输入卡片的 ID，reason 说明为什么应重新分流。",
-  "parameters": {
-   "additionalProperties": true,
-   "properties": {
-    "envelope": {
-     "type": "string"
-    },
-    "reason": {
-     "type": "string"
-    }
-   },
-   "required": [
-    "envelope",
-    "reason"
-   ],
-   "type": "object"
-  }
- },
- {
   "op": "issue.pr.submit",
   "name": "issue_pr_submit",
   "description": "在当前工单获用户明确授权、仓库启用 PR 且本地检查通过后，在本轮运行中推送分支并开立或更新 PR。summary 可填写这次实际改动，作为 PR 说明。它不会合并主分支或结束当前会话。",

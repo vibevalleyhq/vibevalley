@@ -46,6 +46,8 @@ pub struct Crons {
     chat: std::sync::OnceLock<Weak<crate::modules::channel::Chat>>,
     orchestrator: std::sync::OnceLock<Weak<crate::modules::orchestrator::Orchestrator>>,
     closed: std::sync::atomic::AtomicBool,
+    stop: Mutex<Option<flume::Sender<()>>>,
+    thread: Mutex<Option<std::thread::JoinHandle<()>>>,
 }
 
 impl Crons {
@@ -73,12 +75,20 @@ impl Crons {
             chat: Default::default(),
             orchestrator: Default::default(),
             closed: Default::default(),
+            stop: Mutex::new(None),
+            thread: Mutex::new(None),
         })
     }
 
     /// Stops the ticker.
     pub fn close(&self) {
         self.closed.store(true, std::sync::atomic::Ordering::Relaxed);
+        let _ = lock(&self.stop).take();
+        if let Some(handle) = lock(&self.thread).take()
+            && handle.thread().id() != std::thread::current().id()
+        {
+            let _ = handle.join();
+        }
     }
 
     /// The chat a cron's channel is found in.
@@ -338,8 +348,13 @@ pub fn install(hub: &Arc<Hub>, crons: Arc<Crons>, tick: bool) {
     hub.on::<ops::CronList>(move |_, ()| Ok(c.list()));
     let c = crons.clone();
     hub.on::<ops::CronUpdate>(move |_, input| {
-        if let Some(enabled) = input.enabled {
-            c.set_enabled(&input.id, enabled)?;
+        match input.enabled {
+            Some(enabled) => {
+                c.set_enabled(&input.id, enabled)?;
+            }
+            None => {
+                c.find(&input.id)?;
+            }
         }
         Ok(())
     });
@@ -348,8 +363,10 @@ pub fn install(hub: &Arc<Hub>, crons: Arc<Crons>, tick: bool) {
     let c = crons.clone();
     hub.on::<ops::CronPreviewDelete>(move |_, input| c.preview_remove(&input.id));
     if tick {
+        let (stop_tx, stop_rx) = flume::bounded::<()>(0);
+        *lock(&crons.stop) = Some(stop_tx);
         let weak = Arc::downgrade(&crons);
-        let _ = std::thread::Builder::new().name("vibevalley-cron".into()).spawn(move || {
+        if let Ok(handle) = std::thread::Builder::new().name("vibevalley-cron".into()).spawn(move || {
             loop {
                 let Some(c) = weak.upgrade() else { return };
                 if c.hub.strong_count() == 0 || c.closed.load(std::sync::atomic::Ordering::Relaxed) {
@@ -357,8 +374,12 @@ pub fn install(hub: &Arc<Hub>, crons: Arc<Crons>, tick: bool) {
                 }
                 c.tick();
                 drop(c);
-                std::thread::sleep(TICK);
+                if !matches!(stop_rx.recv_timeout(TICK), Err(flume::RecvTimeoutError::Timeout)) {
+                    return;
+                }
             }
-        });
+        }) {
+            *lock(&crons.thread) = Some(handle);
+        }
     }
 }

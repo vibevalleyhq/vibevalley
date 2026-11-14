@@ -197,6 +197,7 @@ fn ops_shaped_like_get_routes_still_reach_the_server() {
         ("issue/watch/x", "issue.watch.x"),
         ("subscribe/thing", "subscribe.thing"),
         ("state", "state"),
+        ("events", "events"),
     ] {
         fake.respond(op, json!({ "ok": op }));
         let (status, body) = post(&format!("{}/api/v1/{path}", l.url()), json!({ "a": 1 }));
@@ -215,4 +216,34 @@ fn regression_native_file_operations_never_reach_the_server_over_http() {
         assert_eq!(status, 404, "{}", endpoint.op);
     }
     assert!(fake.calls().is_empty());
+}
+
+#[test]
+fn events_aliases_live_sse_stream() {
+    struct LiveOnly(flume::Receiver<vibevalley_protocol::LiveEvent>);
+    impl Server for LiveOnly {
+        fn call(&self, _: &str, _: Value) -> Envelope {
+            Envelope::void()
+        }
+        fn state(&self) -> flume::Receiver<Value> {
+            flume::unbounded().1
+        }
+        fn live(&self) -> flume::Receiver<vibevalley_protocol::LiveEvent> {
+            self.0.clone()
+        }
+        fn subscribe(&self, _: &str, _: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+            Err(Envelope::failure(&ApiError::new(BizCode::RouteNotFound, "no subscription")))
+        }
+        fn unsubscribe(&self, _: u64) {}
+    }
+    let (tx, rx) = flume::unbounded();
+    let listener = serve(Arc::new(LiveOnly(rx)), "127.0.0.1:0".parse().unwrap()).unwrap();
+    tx.send(vibevalley_protocol::LiveEvent::Notice(vibevalley_protocol::LiveEventNotice {
+        level: vibevalley_protocol::NoticeLevel::Info,
+        text: "ready".into(),
+        at: 1,
+    }))
+    .unwrap();
+    let event = first_event(&format!("{}/api/v1/events", listener.url()));
+    assert_eq!(event["text"], "ready");
 }

@@ -532,7 +532,7 @@ impl Pkm {
     /// The vault at `root` (VibeValley `pkmDir`), its tables in
     /// `<home>/server.db`.
     pub fn open(home: &Path, root: &Path) -> Result<Arc<Pkm>, ApiError> {
-        let conn = crate::modules::attachment::open_db(home).map_err(db_failed)?;
+        let conn = crate::base::open_db(home).map_err(db_failed)?;
         conn.execute_batch(db::SCHEMA).map_err(db_failed)?;
         Ok(Arc::new(Pkm {
             root: root.to_path_buf(),

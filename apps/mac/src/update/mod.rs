@@ -106,15 +106,21 @@ fn writable(dir: &Path) -> bool {
     made
 }
 
+pub fn bundle_version() -> String {
+    let exe = std::env::current_exe().ok();
+    exe.as_deref()
+        .and_then(Path::to_str)
+        .and_then(releases::bundle_of)
+        .and_then(|b| std::fs::read_to_string(Path::new(b).join("Contents/Info.plist")).ok())
+        .and_then(|xml| releases::plist_version(&xml).map(str::to_string))
+        .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string())
+}
+
 impl Updater {
     fn from_env() -> Updater {
         let exe = std::env::current_exe().ok();
         let bundle = exe.as_deref().and_then(Path::to_str).and_then(releases::bundle_of).map(PathBuf::from);
-        let version = bundle
-            .as_ref()
-            .and_then(|b| std::fs::read_to_string(b.join("Contents/Info.plist")).ok())
-            .and_then(|xml| releases::plist_version(&xml).map(str::to_string))
-            .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string());
+        let version = bundle_version();
         let asked = std::env::var("VIBEVALLEY_UPDATE_FEED").ok();
         Updater {
             feed: feed_of(asked.as_deref(), bundle.is_some(), &version),

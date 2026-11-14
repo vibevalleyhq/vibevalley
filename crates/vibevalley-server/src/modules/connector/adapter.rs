@@ -136,8 +136,7 @@ pub trait App: Send + Sync {
 }
 
 fn runtime() -> tokio::runtime::Runtime {
-    // reqwest and the WebSockets take the process's TLS provider; the first to ask installs it, a second install is refused.
-    let _ = rustls::crypto::ring::default_provider().install_default();
+    crate::install_tls();
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

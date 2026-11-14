@@ -29,9 +29,9 @@ use vibevalley_protocol::{
 use self::db::{ChannelRow, EventRow, MsgRow, ParticipantRow};
 use self::model::ChatModel;
 use self::words::{ChatTarget, Has, Nameable};
-use crate::base::{LookIn, RequestKeys, internal, missing, refused as refuse};
+use crate::base::{LookIn, RequestKeys, internal, missing, open_db, refused as refuse};
 use crate::modules::agent::Agents;
-use crate::modules::attachment::{Attachments, open_db};
+use crate::modules::attachment::Attachments;
 use crate::{Hub, Sink, lock, now};
 
 /// The channel a new farm opens with.

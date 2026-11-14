@@ -66,6 +66,18 @@ pub struct ServerConfig {
 }
 
 impl ServerConfig {
+    /// The space: `VIBEVALLEY_WORK_ROOT`, else `~/vibevalley-dev`.
+    pub fn work_root_from(said: Option<std::ffi::OsString>, user_home: Option<std::ffi::OsString>) -> PathBuf {
+        if let Some(root) = said.filter(|v| !v.is_empty()) {
+            return PathBuf::from(root);
+        }
+        user_home.map(PathBuf::from).unwrap_or_else(|| PathBuf::from("/")).join("vibevalley-dev")
+    }
+
+    pub fn default_work_root() -> PathBuf {
+        Self::work_root_from(std::env::var_os("VIBEVALLEY_WORK_ROOT"), std::env::var_os("HOME"))
+    }
+
     /// A farm whose home and work root are both `dir`.
     pub fn under(dir: impl Into<PathBuf>) -> ServerConfig {
         let dir = dir.into();
@@ -94,6 +106,41 @@ impl ServerConfig {
             connector: modules::connector::Options::default(),
         }
     }
+
+    /// Reads the process environment (`VIBEVALLEY_*`, `DEEPSEEK_API_KEY`,
+    /// `AGORA_*`) so standalone `vibevalley-server` and `vibevalley-mac` share
+    /// one configuration path.
+    pub fn from_env(home: impl Into<PathBuf>, version: impl Into<String>) -> ServerConfig {
+        let env_str = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
+        let csv = |name: &str| -> Vec<String> {
+            env_str(name)
+                .map(|s| s.split(',').map(str::trim).filter(|s| !s.is_empty()).map(String::from).collect())
+                .unwrap_or_default()
+        };
+        let home = home.into();
+        let mut config = ServerConfig {
+            work_root: Self::default_work_root(),
+            version: version.into(),
+            deepseek_api_key: env_str("DEEPSEEK_API_KEY").unwrap_or_default(),
+            agora_app_id: env_str("AGORA_APP_ID").unwrap_or_default(),
+            agora_app_certificate: env_str("AGORA_APP_CERTIFICATE").unwrap_or_default(),
+            voice_id: env_str("VIBEVALLEY_VOICE_ID").unwrap_or_default(),
+            starters: csv("VIBEVALLEY_AGENT_STARTERS"),
+            git_emails: csv("VIBEVALLEY_GIT_EMAILS"),
+            pkm_root: env_str("VIBEVALLEY_PKM_ROOT").map(PathBuf::from),
+            ..Self::under(home)
+        };
+        config.voice_line.url = env_str("VIBEVALLEY_VOICE_LINE_URL").unwrap_or_default();
+        if env_str("VIBEVALLEY_TEST_RUNTIMES").as_deref() == Some("1") {
+            let mut registry = Registry::new();
+            registry.register(crate::testing::helper());
+            config.registry = Some(Arc::new(registry));
+            config.probe_runtimes = false;
+            config.link_previews = false;
+            config.offline_media = true;
+        }
+        config
+    }
 }
 
 /// The started server. The hub is what the bridge and the HTTP adapter
@@ -113,6 +160,8 @@ pub struct Started {
     pub watch: Arc<modules::watch::Watch>,
     /// The assistants: what the chat and the crons say to them.
     pub orchestrator: Arc<modules::orchestrator::Orchestrator>,
+    /// Session trajectories on disk and in memory.
+    pub trajectories: Arc<modules::session::Trajectories>,
     /// What the agents remember.
     pub memories: Arc<modules::memory::Memories>,
     /// Pages the user and the agents make.
@@ -144,13 +193,17 @@ impl Started {
         self.connectors.close();
         self.crons.close();
         self.voice.close();
+        self.watch.close();
         self.orchestrator.close();
         self.agents.fleet.close();
         self.artifacts.close();
         self.pkm.close();
         self.media.close();
         self.media_inputs.close();
+        self.library.close();
+        self.game.close();
         self.board.close();
+        self.trajectories.close();
     }
 }
 
@@ -188,10 +241,19 @@ fn runtimes(setting: &Arc<Setting>, home: &std::path::Path) -> Registry {
 /// Builds the whole server. Blocking (opens files); call it off the UI
 /// thread.
 pub fn start(config: ServerConfig) -> Result<Started, StartError> {
+    crate::install_tls();
     std::fs::create_dir_all(&config.home).map_err(|e| failed("the home")(&e))?;
     std::fs::create_dir_all(&config.work_root).map_err(|e| failed("the work root")(&e))?;
+    let pkm_root = config
+        .pkm_root
+        .clone()
+        .filter(|r| !r.as_os_str().is_empty())
+        .unwrap_or_else(|| config.work_root.join("pkm"));
+    for dir in [config.work_root.join("repos"), config.work_root.join("worktrees"), pkm_root.clone()] {
+        std::fs::create_dir_all(&dir).map_err(|e| failed("the work root")(&e))?;
+    }
     let hub = Hub::new(vibevalley_core::empty_space_state());
-    modules::install(&hub);
+    modules::core::install_version(&hub, &config.version);
     let setting = Setting::open(SettingConfig {
         home: config.home.clone(),
         work_root: config.work_root.clone(),
@@ -232,15 +294,21 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     modules::memory::install(&hub, memories.clone());
     agents.attach_memories(&memories);
     let trajectories = modules::session::Trajectories::open(&config.home, &hub);
-    let board = Board::open_with(&config.home.join("server.db"), agents.clone(), board_config, hub.clone(), |sessions| {
-        let trajectories = trajectories.clone();
-        sessions.on_news(move |news| {
-            if let modules::session::News::Step { session, cwd, step } = news {
-                trajectories.step(session, cwd, step.clone());
-            }
-        });
-        memories.observe_sessions(sessions);
-    })
+    let board = Board::open_with(
+        &config.home.join("server.db"),
+        agents.clone(),
+        board_config,
+        Arc::new(Arc::downgrade(&hub)),
+        |sessions| {
+            let trajectories = trajectories.clone();
+            sessions.on_news(move |news| {
+                if let modules::session::News::Step { session, cwd, step } = news {
+                    trajectories.step(session, cwd, step.clone());
+                }
+            });
+            memories.observe_sessions(sessions);
+        },
+    )
     .map_err(|e| failed("the board")(&e))?;
     board.refresh_queue().map_err(|e| failed("the queue")(&e))?;
     modules::issue::install_on(&hub, board.clone(), Some(agents.clone()));
@@ -286,11 +354,6 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         let a = Arc::downgrade(&artifacts);
         chat.set_quoter(Arc::new(move |refs| a.upgrade().map(|a| a.quote(refs)).unwrap_or_default()));
     }
-    let pkm_root = config
-        .pkm_root
-        .clone()
-        .filter(|r| !r.as_os_str().is_empty())
-        .unwrap_or_else(|| config.work_root.join("pkm"));
     let pkm = modules::pkm::Pkm::open(&config.home, &pkm_root).map_err(|e| failed("the notes")(&e.message))?;
     modules::pkm::install(&hub, pkm.clone());
     if config.watch_pkm {
@@ -319,7 +382,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         hub: Arc::downgrade(&hub),
         farm: farm.clone(),
         home: config.home.clone(),
-        trajectories,
+        trajectories: trajectories.clone(),
         key: Arc::new(move || key.deepseek_api_key()),
         client: config.model_client.clone(),
     });
@@ -356,6 +419,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         chat,
         watch,
         orchestrator,
+        trajectories,
         memories,
         artifacts,
         pkm,

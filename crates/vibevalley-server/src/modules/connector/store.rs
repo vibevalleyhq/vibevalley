@@ -9,7 +9,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use vibevalley_protocol::ConnectorID;
 
 use super::adapter::Inbound;
-use crate::modules::attachment::open_db;
+use crate::base::open_db;
 use crate::modules::setting::Secret;
 
 const SCHEMA: &str = "

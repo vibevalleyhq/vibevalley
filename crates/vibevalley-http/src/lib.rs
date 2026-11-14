@@ -5,8 +5,9 @@
 //! Same wire as VibeValley's `apps/server/src/gateway/http`:
 //! - `POST /api/v1/<op with . as />` with a JSON body → the envelope, HTTP
 //!   status from the business code's `bizCodeMeta`;
-//! - `GET /api/v1/state` and `/api/v1/live` as server-sent events, one
-//!   `data:` line per frame or event, `: ping` every 20 s;
+//! - `GET /api/v1/state` and `/api/v1/live` (`/api/v1/events`) as
+//!   server-sent events, one `data:` line per frame or event, `: ping`
+//!   every 20 s;
 //! - `GET /api/v1/subscribe/<name>?payload=<JSON>`: a refusal before the
 //!   first event is a plain JSON error, then events;
 //! - `GET /api/v1/issue/watch/<id>`: the `issue.watch` subscription; an
@@ -70,12 +71,6 @@ impl Drop for Listener {
 /// its own. Only loopback addresses are accepted: this is not a network
 /// service.
 pub fn serve(server: Shared, addr: SocketAddr) -> std::io::Result<Listener> {
-    serve_with(server, addr, None)
-}
-
-/// `serve`, with the page's built files (`--web`) at `/`: a path that is no
-/// file is the page's own route and gets its `index.html`.
-pub fn serve_with(server: Shared, addr: SocketAddr, web: Option<std::path::PathBuf>) -> std::io::Result<Listener> {
     if !addr.ip().is_loopback() {
         return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "loopback addresses only"));
     }
@@ -90,11 +85,7 @@ pub fn serve_with(server: Shared, addr: SocketAddr, web: Option<std::path::PathB
             let Ok(listener) = tokio::net::TcpListener::from_std(std_listener) else {
                 return;
             };
-            let app = match web {
-                Some(dir) => router(server).fallback(move |uri: axum::http::Uri| page(dir.clone(), uri)),
-                None => router(server),
-            };
-            let _ = axum::serve(listener, app)
+            let _ = axum::serve(listener, router(server))
                 .with_graceful_shutdown(async {
                     let _ = stop_rx.await;
                 })
@@ -114,6 +105,7 @@ pub fn router(server: Shared) -> Router {
         // attachment/create, artifact/block/list): those go to `command`.
         .route("/api/v1/state", get(state).post(command))
         .route("/api/v1/live", get(live).post(command))
+        .route("/api/v1/events", get(live).post(command))
         .route("/api/v1/subscribe/{name}", get(subscribe).post(command))
         .route("/api/v1/issue/watch/{id}", get(issue_watch).post(command))
         .route("/api/v1/attachment/{id}", get(attachment).post(command))
@@ -163,40 +155,6 @@ async fn not_found() -> Response {
 
 async fn not_allowed() -> Response {
     refuse(BizCode::MethodNotAllowed, "use POST")
-}
-
-/// The built page: its files as they are; any other path without an
-/// extension is one of its routes and gets `index.html`, with the farm's
-/// locale on `<html>` (it is read again each time: assets carry their hash).
-async fn page(dir: std::path::PathBuf, uri: axum::http::Uri) -> Response {
-    let path = uri.path();
-    if path.starts_with("/api/") {
-        return refuse(BizCode::RouteNotFound, "no such route");
-    }
-    let clean: std::path::PathBuf = path.split('/').filter(|p| !p.is_empty() && *p != "." && *p != "..").collect();
-    let file = dir.join(&clean);
-    let is_index = clean.as_os_str().is_empty() || clean == std::path::Path::new("index.html");
-    if !is_index && tokio::fs::metadata(&file).await.is_ok_and(|m| m.is_file()) {
-        let kind = mime_guess::from_path(&file).first_or_octet_stream().to_string();
-        return match tokio::fs::read(&file).await {
-            Ok(bytes) => ([("content-type", kind)], bytes).into_response(),
-            Err(_) => refuse(BizCode::RouteNotFound, "no such file"),
-        };
-    }
-    if !is_index && clean.extension().is_some() {
-        return refuse(BizCode::RouteNotFound, "no such file");
-    }
-    let Ok(html) = tokio::fs::read_to_string(dir.join("index.html")).await else {
-        return refuse(BizCode::RouteNotFound, "no page");
-    };
-    let locale = vibevalley_i18n::locale();
-    let lang = if locale == "en" { "en" } else { "zh-Hans" };
-    let tag = html.find("<html").and_then(|at| html[at..].find('>').map(|end| (at, at + end)));
-    let html = match tag {
-        Some((at, end)) => format!("{}<html lang=\"{lang}\" data-locale=\"{locale}\">{}", &html[..at], &html[end + 1..]),
-        None => html,
-    };
-    ([("content-type", "text/html; charset=utf-8"), ("cache-control", "no-cache")], html).into_response()
 }
 
 /// A helper's MCP messages (streamable HTTP, answered as plain JSON): one

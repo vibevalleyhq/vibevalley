@@ -1,8 +1,28 @@
-//! Shared refusals (`base/errors.ts`): what is missing and where to look for
-//! the ones that are there.
+//! Shared refusals (`base/errors.ts`), idempotent request keys, and the
+//! server's shared SQLite door (`server.db`).
 
+use std::path::Path;
+use std::time::Duration;
+
+use rusqlite::Connection;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, BizCode, Next};
+
+/// Opens a SQLite database with the server's busy timeout, WAL journal,
+/// `NORMAL` sync and foreign keys.
+pub fn open_db_at(path: &Path) -> rusqlite::Result<Connection> {
+    let conn = Connection::open(path)?;
+    conn.busy_timeout(Duration::from_secs(5))?;
+    conn.pragma_update(None, "journal_mode", "WAL")?;
+    conn.pragma_update(None, "synchronous", "NORMAL")?;
+    conn.pragma_update(None, "foreign_keys", "ON")?;
+    Ok(conn)
+}
+
+/// Opens `<home>/server.db`, shared by the server's SQLite-backed modules.
+pub fn open_db(home: &Path) -> rusqlite::Result<Connection> {
+    open_db_at(&home.join("server.db"))
+}
 
 /// `lookIn`: a hint listing the ones there are, and the code a miss gets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

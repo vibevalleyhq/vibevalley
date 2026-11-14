@@ -29,6 +29,7 @@ pub struct Game {
     wanted: Mutex<Option<(i64, i64)>>,
     /// Asks the counting thread for a count soon.
     soon: Mutex<Option<flume::Sender<()>>>,
+    thread: Mutex<Option<std::thread::JoinHandle<()>>>,
     asked: std::sync::atomic::AtomicU64,
 }
 
@@ -57,6 +58,7 @@ impl Game {
             folded: Mutex::new(folded),
             wanted: Mutex::new(None),
             soon: Mutex::new(None),
+            thread: Mutex::new(None),
             asked: Default::default(),
         });
         for e in hub.read(catch_up) {
@@ -121,8 +123,14 @@ impl Game {
             loop {
                 match rx.recv_deadline(next) {
                     Ok(()) => {
-                        std::thread::sleep(COUNT_AFTER_RUN);
-                        while rx.try_recv().is_ok() {}
+                        let debounce = std::time::Instant::now() + COUNT_AFTER_RUN;
+                        loop {
+                            match rx.recv_deadline(debounce) {
+                                Ok(()) => continue,
+                                Err(flume::RecvTimeoutError::Timeout) => break,
+                                Err(flume::RecvTimeoutError::Disconnected) => return,
+                            }
+                        }
                     }
                     Err(flume::RecvTimeoutError::Timeout) => next = std::time::Instant::now() + COUNT_EVERY,
                     Err(flume::RecvTimeoutError::Disconnected) => return,
@@ -132,8 +140,18 @@ impl Game {
                 }
             }
         });
-        if let Err(e) = spawned {
-            eprintln!("vibevalley-server: game: the counting thread: {e}");
+        match spawned {
+            Ok(handle) => *lock(&self.thread) = Some(handle),
+            Err(e) => eprintln!("vibevalley-server: game: the counting thread: {e}"),
+        }
+    }
+
+    pub fn close(&self) {
+        let _ = lock(&self.soon).take();
+        if let Some(handle) = lock(&self.thread).take()
+            && handle.thread().id() != std::thread::current().id()
+        {
+            let _ = handle.join();
         }
     }
 

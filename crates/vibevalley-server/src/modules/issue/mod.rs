@@ -325,33 +325,12 @@ fn move_lines(board: &Board, item: &Issue, s: &Settled, name: Option<String>) ->
     }
 }
 
-/// `issue.status.update`'s `agent`: the profile that takes the issue on.
-/// Before it is sent the assignment just changes; handing a sent issue
-/// over to another profile is not in VibeValley yet.
-fn take_over(board: &Board, item: &Issue, to: IssueStatus, agent: &str) -> Result<(), ApiError> {
+fn resolve_agent(profiles: Option<&Agents>, agent: &str) -> String {
     let agent = agent.trim();
-    if agent.is_empty() || item.assigned_agent() == Some(agent) {
-        return Ok(());
+    match profiles {
+        Some(agents) if !agent.is_empty() => agents.agent_key(agent),
+        _ => agent.to_string(),
     }
-    if to != IssueStatus::Todo {
-        return Err(refused("server.issue.handOverOnTodo", &[]));
-    }
-    if item.was_sent() {
-        return Err(ApiError::new(
-            BizCode::ServiceUnavailable,
-            "handing a sent issue over to another profile is not served by VibeValley yet",
-        ));
-    }
-    board
-        .edit(
-            &item.id,
-            &IssueUpdate {
-                agent: Some(agent.into()),
-                ..Default::default()
-            },
-        )
-        .map(|_| ())
-        .map_err(|e| api(board, e))
 }
 
 pub(crate) fn changes_of(board: &Board, item: &Issue) -> Result<Changes, ApiError> {
@@ -457,9 +436,21 @@ pub(crate) fn comment(board: &Board, id: &str, text: &str) -> Result<(), ApiErro
     board.tell(&item.id, text).map_err(|e| api(board, e))
 }
 
-fn split(board: &Board, id: &str, tasks: &[vibevalley_protocol::IssueChildDraft]) -> Result<String, ApiError> {
-    let parent = get(board, id)?;
-    let drafts = tasks
+fn split(board: &Board, input: &vibevalley_protocol::IssueSplitInput) -> Result<String, ApiError> {
+    let mut parent = get(board, &input.id)?;
+    if let Some(title) = input.title.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+        parent = board
+            .edit(
+                &parent.id,
+                &IssueUpdate {
+                    title: Some(title.into()),
+                    ..Default::default()
+                },
+            )
+            .map_err(|e| api(board, e))?;
+    }
+    let drafts = input
+        .tasks
         .iter()
         .map(|d| ChildDraft {
             id: d.id.clone(),
@@ -507,8 +498,9 @@ pub fn install_on(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Agents>>) {
     });
 
     let b = board.clone();
+    let profiles = names.clone();
     hub.on::<ops::IssueUpdate>(move |ctx, input| {
-        let issue = update(&b, input)?;
+        let issue = update(&b, profiles.as_deref(), input)?;
         Ok(applied(ctx.hub, issue))
     });
 
@@ -538,7 +530,10 @@ pub fn install_on(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Agents>>) {
 
     let b = board.clone();
     let keys = Arc::new(RequestKeys::default());
-    hub.on::<ops::IssueStatusUpdate>(move |ctx, input| keys.once(input.request_key.as_deref(), || Ok(applied(ctx.hub, status(&b, &input)?))));
+    let profiles = names.clone();
+    hub.on::<ops::IssueStatusUpdate>(move |ctx, input| {
+        keys.once(input.request_key.as_deref(), || Ok(applied(ctx.hub, status(&b, profiles.as_deref(), &input)?)))
+    });
 
     let b = board.clone();
     let names = names.clone();
@@ -549,6 +544,29 @@ pub fn install_on(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Agents>>) {
                 return Err(refused("server.issue.started", &[]));
             }
             apply_preview_edit(&mut item, edit);
+        }
+        if let Some(raw_agent) = &input.agent {
+            let agent = resolve_agent(names.as_deref(), raw_agent);
+            if !agent.is_empty() && item.assigned_agent() != Some(agent.as_str()) {
+                if input.status != IssueStatus::Todo {
+                    return Err(refused("server.issue.handOverOnTodo", &[]));
+                }
+                if let Some(agents) = names.as_deref()
+                    && agents.profiles.agent(&agent).is_none()
+                {
+                    return Err(refused("server.issue.profileGone", &[("id", agent.into())]));
+                }
+                edits::assign(&mut item, &agent, 0);
+                if item.status == IssueStatus::Todo {
+                    let settled = Settled {
+                        mv: Move::Start,
+                        said: input.text.as_deref().unwrap_or("").trim().to_string(),
+                    };
+                    return Ok(Preview {
+                        does: moves_words(&b, names.as_deref(), &item, &settled)?,
+                    });
+                }
+            }
         }
         let settled = settle(&item, input.status, input.text.as_deref().unwrap_or(""))?;
         Ok(Preview {
@@ -569,7 +587,7 @@ pub fn install_on(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Agents>>) {
     hub.on::<ops::IssueRefine>(move |_, input| refine(&b, None, &input));
 
     let b = board.clone();
-    hub.on::<ops::IssueSplit>(move |_, input| split(&b, &input.id, &input.tasks));
+    hub.on::<ops::IssueSplit>(move |_, input| split(&b, &input));
 
     let b = board.clone();
     hub.on::<ops::IssueTimelineGet>(move |_, input| {
@@ -704,12 +722,12 @@ pub(crate) fn create(board: &Board, profiles: Option<&Agents>, req: &vibevalley_
     Ok(issue)
 }
 
-pub(crate) fn update(board: &Board, input: vibevalley_protocol::IssueUpdateInput) -> Result<Issue, ApiError> {
+pub(crate) fn update(board: &Board, profiles: Option<&Agents>, input: vibevalley_protocol::IssueUpdateInput) -> Result<Issue, ApiError> {
     let upd = IssueUpdate {
         title: input.title,
         description: input.description,
         repo: input.repo,
-        agent: input.agent,
+        agent: input.agent.map(|a| resolve_agent(profiles, &a)),
         priority: input.priority,
         criteria: input.criteria,
         deliver: input.deliver,
@@ -720,14 +738,44 @@ pub(crate) fn update(board: &Board, input: vibevalley_protocol::IssueUpdateInput
     Ok(issue)
 }
 
-pub(crate) fn status(board: &Board, input: &vibevalley_protocol::IssueStatusUpdateInput) -> Result<Issue, ApiError> {
+pub(crate) fn status(board: &Board, profiles: Option<&Agents>, input: &vibevalley_protocol::IssueStatusUpdateInput) -> Result<Issue, ApiError> {
     let mut item = get(board, &input.id)?;
-    if let Some(edit) = &input.edit {
-        item = board.edit(&item.id, edit).map_err(|e| api(board, e))?;
+    if let Some(mut edit) = input.edit.clone() {
+        edit.agent = edit.agent.map(|a| resolve_agent(profiles, &a));
+        item = board.edit(&item.id, &edit).map_err(|e| api(board, e))?;
     }
-    if let Some(agent) = &input.agent {
-        take_over(board, &item, input.status, agent)?;
-        item = get(board, &item.id)?;
+    if let Some(raw_agent) = &input.agent {
+        let agent = resolve_agent(profiles, raw_agent);
+        if !agent.is_empty() && item.assigned_agent() != Some(agent.as_str()) {
+            if input.status != IssueStatus::Todo {
+                return Err(refused("server.issue.handOverOnTodo", &[]));
+            }
+            if item.was_sent() {
+                let raw_text = input.text.as_deref().unwrap_or("");
+                let said = if item.status == IssueStatus::Todo {
+                    raw_text.trim().to_string()
+                } else {
+                    settle(&item, input.status, raw_text)?.said
+                };
+                let words = (!said.is_empty()).then_some(said.as_str());
+                let findings = if item.stage.state == IssueStageKind::Reviewing && !said.is_empty() {
+                    findings_of(&said)
+                } else {
+                    vec![]
+                };
+                board.hand_over_and_move(&item.id, &agent, words, &findings).map_err(|e| api(board, e))?;
+                return get(board, &item.id);
+            }
+            item = board
+                .edit(
+                    &item.id,
+                    &IssueUpdate {
+                        agent: Some(agent),
+                        ..Default::default()
+                    },
+                )
+                .map_err(|e| api(board, e))?;
+        }
     }
     let settled = settle(&item, input.status, input.text.as_deref().unwrap_or(""))?;
     let words = (!settled.said.is_empty()).then_some(settled.said.as_str());

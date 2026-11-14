@@ -71,7 +71,7 @@ pub fn install(hub: &Arc<Hub>, board: Board, trajectories: Arc<Trajectories>) {
             .issue(&input.id)
             .ok_or_else(|| missing(t("server.issue.issueRef", &[("ref", input.id.clone().into())]), LookIn::Issue))?;
         let live = hub.live();
-        let states = hub.state();
+        let states = hub.state_frames();
         let tr = tr.clone();
         let hub = me.clone();
         std::thread::Builder::new()
@@ -105,7 +105,7 @@ const HISTORY: usize = 241;
 fn watch_issue(
     initial: Issue,
     hub: &std::sync::Weak<Hub>,
-    states: flume::Receiver<serde_json::Value>,
+    states: flume::Receiver<Arc<vibevalley_protocol::StateFrame>>,
     live: flume::Receiver<LiveEvent>,
     trajectories: &Trajectories,
     sink: Sink,

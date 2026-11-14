@@ -345,6 +345,8 @@ pub struct Trajectories {
     dir: PathBuf,
     open: Mutex<HashMap<String, Journal>>,
     hub: Weak<Hub>,
+    stop: Mutex<Option<flume::Sender<()>>>,
+    thread: Mutex<Option<std::thread::JoinHandle<()>>>,
 }
 
 fn write_out(file: &Path, body: String) {
@@ -371,23 +373,28 @@ impl Trajectories {
     pub fn open(home: &Path, hub: &Arc<Hub>) -> Arc<Trajectories> {
         let dir = home.join("events");
         let _ = std::fs::create_dir_all(&dir);
+        let (stop_tx, stop_rx) = flume::bounded::<()>(0);
         let t = Arc::new(Trajectories {
             dir,
             open: Mutex::default(),
             hub: Arc::downgrade(hub),
+            stop: Mutex::new(Some(stop_tx)),
+            thread: Mutex::new(None),
         });
         let weak = Arc::downgrade(&t);
-        let _ = std::thread::Builder::new().name("vibevalley-journal".into()).spawn(move || {
+        if let Ok(handle) = std::thread::Builder::new().name("vibevalley-journal".into()).spawn(move || {
             loop {
-                std::thread::sleep(Duration::from_millis(100));
+                let stopped = !matches!(stop_rx.recv_timeout(Duration::from_millis(100)), Err(flume::RecvTimeoutError::Timeout));
                 let Some(t) = weak.upgrade() else { return };
-                if t.hub.strong_count() == 0 {
-                    t.close();
+                if stopped || t.hub.strong_count() == 0 {
+                    t.finish_all();
                     return;
                 }
                 t.flush(false);
             }
-        });
+        }) {
+            *lock(&t.thread) = Some(handle);
+        }
         t
     }
 
@@ -459,12 +466,22 @@ impl Trajectories {
         write_out(&self.file_of(id), j.body());
     }
 
-    /// Seals and writes out every log still open.
-    pub fn close(&self) {
+    fn finish_all(&self) {
         let ids: Vec<String> = lock(&self.open).keys().cloned().collect();
         for id in ids {
             self.finish(&id);
         }
+    }
+
+    /// Seals and writes out every log still open.
+    pub fn close(&self) {
+        let _ = lock(&self.stop).take();
+        if let Some(handle) = lock(&self.thread).take()
+            && handle.thread().id() != std::thread::current().id()
+        {
+            let _ = handle.join();
+        }
+        self.finish_all();
     }
 
     /// The open log of `id` (taken up from disk), for writing to it.
