@@ -240,14 +240,11 @@ fn handler(op: &str) -> Option<Run> {
         "memory.create" => typed!(memory::create),
         "pkm.search" | "pkm.page.get" | "pkm.capture" | "pkm.comment.suggest" => notes::pkm,
         "media.image.create" => notes::image,
-        "media.job.get"
-        | "media.job.list"
-        | "media.job.cancel"
-        | "media.job.download"
-        | "media.understanding.start"
-        | "media.speech.create"
-        | "media.dialogue.create"
-        | "media.voiceDesign.create" => notes::jobs,
+        "media.speech.create" => notes::speech,
+        "media.dialogue.create" => notes::dialogue,
+        "media.voiceDesign.create" => notes::voice_design,
+        "media.understanding.start" => notes::understand,
+        "media.job.get" | "media.job.list" | "media.job.cancel" | "media.job.download" => notes::jobs,
         "library.item.list" => typed!(notes::library_list),
         "library.item.add" => typed!(notes::library_add),
         "artifact.list" => typed!(notes::artifact_list),
