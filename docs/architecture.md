@@ -74,7 +74,7 @@ HTTP 门上命令走 `POST /api/v1/<路径>`，状态、事件和订阅走 SSE�
 
 ## 存了什么
 
-数据分两层：Host（`$VIBEVALLEY_HOME`，默认 `~/.vibevalley`）和 Space（单独跑的服务端是 `$VIBEVALLEY_WORK_ROOT`，默认 `~/vibevalley-dev`；原生应用里的服务端用家目录），各放什么见[概念](docs/concepts.md#host-和-space)。
+数据分两层：Host（`$VIBEVALLEY_HOME`，默认 `~/.vibevalley`）和 Space（`$VIBEVALLEY_WORK_ROOT`，默认 `~/vibevalley-dev`，原生应用与独立服务端遵循同一约定），各放什么见[概念](docs/concepts.md#host-和-space)。
 
 Host：
 
