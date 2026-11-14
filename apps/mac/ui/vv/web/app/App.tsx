@@ -1,7 +1,7 @@
 // Ported from VibeValley apps/web/src/app/App.tsx: the same route table.
 // The farm, the map and the memory tree are drawn by the GPUI app (docs/vibevalley-port.md
 // § Architecture 5), so /farm asks the shell for them.
-import { Text, untracked, View, type JSX } from "nsh";
+import { effect, Text, untracked, View, type JSX } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
@@ -51,8 +51,10 @@ const lastFarm = defineStored("farm.repo", z.string().nullable(), null);
 
 /** The farm is the app's own GPU-painted view: this page asks the shell for it (`openFarm`, the pixel:farm pane). */
 function Farm(props: { repo: string }) {
-  if (props.repo) lastFarm.set(props.repo);
-  act({ type: "openFarm", repo: props.repo });
+  effect(() => {
+    if (props.repo) lastFarm.set(props.repo);
+    act({ type: "openFarm", repo: props.repo });
+  });
   return (
     <View testID="farm" class="flex-1 items-center justify-center bg-page p-6">
       <Text class="text-sm text-muted">{t("web.base.farm")}</Text>
@@ -91,7 +93,7 @@ function RepoFarm() {
 
 /** The memory tree is the app's GPU-painted view too (`openTree`, the pixel:tree pane). */
 function Tree() {
-  act({ type: "openTree" });
+  effect(() => act({ type: "openTree" }));
   return (
     <View testID="tree" class="flex-1 items-center justify-center bg-page p-6">
       <Text class="text-sm text-muted">{t("web.tree.sky")}</Text>

@@ -31,6 +31,19 @@ use crate::viewer::FileViewer;
 gpui_kit::actions!(
     shell,
     [
+        OpenAbout,
+        OpenSettings,
+        Hide,
+        HideOthers,
+        ShowAll,
+        EditUndo,
+        EditRedo,
+        EditCut,
+        EditCopy,
+        EditPaste,
+        EditSelectAll,
+        ToggleFullScreen,
+        CloseWindow,
         ActivateProject1,
         ActivateProject2,
         ActivateProject3,
@@ -60,46 +73,91 @@ gpui_kit::actions!(
     ]
 );
 
-pub fn bind_keys(cx: &mut gpui_kit::App) {
-    use gpui_kit::{Menu, MenuItem};
+pub fn update_menus(cx: &mut gpui_kit::App) {
+    use gpui_kit::{Menu, MenuItem, OsAction, SystemMenuType};
     use vibevalley_i18n::t;
+    let app = [("app", "VibeValley".into())];
     cx.set_menus(vec![
-        Menu::new("VibeValley").items([MenuItem::action(t("desktop.quit", &[]), Quit)]),
+        Menu::new("VibeValley").items([
+            MenuItem::action(t("desktop.menu.about", &app), OpenAbout),
+            MenuItem::separator(),
+            MenuItem::action(t("desktop.menu.settings", &[]), OpenSettings),
+            MenuItem::separator(),
+            MenuItem::os_submenu("Services", SystemMenuType::Services),
+            MenuItem::separator(),
+            MenuItem::action(t("desktop.menu.hide", &app), Hide),
+            MenuItem::action(t("desktop.menu.hideOthers", &[]), HideOthers),
+            MenuItem::action(t("desktop.menu.unhide", &[]), ShowAll),
+            MenuItem::separator(),
+            MenuItem::action(t("desktop.menu.quit", &app), Quit),
+        ]),
+        Menu::new(t("desktop.menu.edit", &[])).items([
+            MenuItem::os_action(t("desktop.menu.undo", &[]), EditUndo, OsAction::Undo),
+            MenuItem::os_action(t("desktop.menu.redo", &[]), EditRedo, OsAction::Redo),
+            MenuItem::separator(),
+            MenuItem::os_action(t("desktop.menu.cut", &[]), EditCut, OsAction::Cut),
+            MenuItem::os_action(t("desktop.menu.copy", &[]), EditCopy, OsAction::Copy),
+            MenuItem::os_action(t("desktop.menu.paste", &[]), EditPaste, OsAction::Paste),
+            MenuItem::os_action(t("desktop.menu.selectAll", &[]), EditSelectAll, OsAction::SelectAll),
+        ]),
         Menu::new(t("desktop.menu.view", &[])).items([
+            MenuItem::action(t("desktop.menu.toggleSidebar", &[]), ToggleSidebar),
+            MenuItem::action(t("desktop.menu.toggleTheme", &[]), ToggleTheme),
+            MenuItem::separator(),
+            MenuItem::action(t("desktop.menu.resetZoom", &[]), ZoomReset),
             MenuItem::action(t("desktop.menu.zoomIn", &[]), ZoomIn),
             MenuItem::action(t("desktop.menu.zoomOut", &[]), ZoomOut),
-            MenuItem::action(t("desktop.menu.resetZoom", &[]), ZoomReset),
+            MenuItem::separator(),
+            MenuItem::action(t("desktop.menu.fullScreen", &[]), ToggleFullScreen),
         ]),
-        Menu::new(t("desktop.menu.window", &[])).items([MenuItem::action(t("desktop.menu.close", &[]), CloseTab)]),
+        Menu::new(t("desktop.menu.window", &[])).items([
+            MenuItem::action(t("desktop.menu.close", &[]), CloseWindow),
+            MenuItem::action(t("desktop.menu.closeTab", &[]), CloseTab),
+        ]),
     ]);
+}
 
+pub fn bind_keys(cx: &mut gpui_kit::App) {
     cx.bind_keys([
-        KeyBinding::new("cmd-1", ActivateProject1, Some("Shell")),
-        KeyBinding::new("cmd-2", ActivateProject2, Some("Shell")),
-        KeyBinding::new("cmd-3", ActivateProject3, Some("Shell")),
-        KeyBinding::new("cmd-4", ActivateProject4, Some("Shell")),
-        KeyBinding::new("cmd-5", ActivateProject5, Some("Shell")),
-        KeyBinding::new("cmd-6", ActivateProject6, Some("Shell")),
-        KeyBinding::new("cmd-7", ActivateProject7, Some("Shell")),
-        KeyBinding::new("cmd-8", ActivateProject8, Some("Shell")),
-        KeyBinding::new("cmd-9", ActivateProject9, Some("Shell")),
-        KeyBinding::new("cmd-b", ToggleSidebar, Some("Shell")),
+        // Attached to no element so keyboard presses pass through to focused views, while NSMenu shows key equivalents.
+        KeyBinding::new("cmd-z", EditUndo, Some("EditMenu")),
+        KeyBinding::new("cmd-shift-z", EditRedo, Some("EditMenu")),
+        KeyBinding::new("cmd-x", EditCut, Some("EditMenu")),
+        KeyBinding::new("cmd-c", EditCopy, Some("EditMenu")),
+        KeyBinding::new("cmd-v", EditPaste, Some("EditMenu")),
+        KeyBinding::new("cmd-a", EditSelectAll, Some("EditMenu")),
+        KeyBinding::new("cmd-,", OpenSettings, Some("Shell")),
+        KeyBinding::new("cmd-h", Hide, Some("Shell")),
+        KeyBinding::new("cmd-alt-h", HideOthers, Some("Shell")),
+        KeyBinding::new("cmd-w", CloseWindow, Some("Shell")),
         KeyBinding::new("cmd-=", ZoomIn, Some("Shell")),
         KeyBinding::new("cmd-+", ZoomIn, Some("Shell")),
         KeyBinding::new("cmd--", ZoomOut, Some("Shell")),
         KeyBinding::new("cmd-0", ZoomReset, Some("Shell")),
-        KeyBinding::new("cmd-p", GoToFile, Some("Shell")),
-        KeyBinding::new("cmd-shift-p", CommandPalette, Some("Shell")),
-        KeyBinding::new("cmd-shift-f", SearchProject, Some("Shell")),
-        KeyBinding::new("cmd-t", NewTerminal, Some("Shell")),
-        KeyBinding::new("cmd-w", CloseTab, Some("Shell")),
-        KeyBinding::new("cmd-d", SplitRight, Some("Shell")),
-        KeyBinding::new("cmd-shift-d", SplitDown, Some("Shell")),
-        KeyBinding::new("cmd-shift-]", NextTab, Some("Shell")),
-        KeyBinding::new("cmd-shift-[", PrevTab, Some("Shell")),
-        KeyBinding::new("cmd-`", FocusNextGroup, Some("Shell")),
-        KeyBinding::new("escape", ClosePalette, Some("Palette")),
+        KeyBinding::new("ctrl-cmd-f", ToggleFullScreen, Some("Shell")),
         KeyBinding::new("cmd-q", Quit, Some("Shell")),
+        // Workspace-only keys: active only inside `/workspace`, never stealing shortcuts from workbench text inputs.
+        KeyBinding::new("cmd-1", ActivateProject1, Some("Workspace")),
+        KeyBinding::new("cmd-2", ActivateProject2, Some("Workspace")),
+        KeyBinding::new("cmd-3", ActivateProject3, Some("Workspace")),
+        KeyBinding::new("cmd-4", ActivateProject4, Some("Workspace")),
+        KeyBinding::new("cmd-5", ActivateProject5, Some("Workspace")),
+        KeyBinding::new("cmd-6", ActivateProject6, Some("Workspace")),
+        KeyBinding::new("cmd-7", ActivateProject7, Some("Workspace")),
+        KeyBinding::new("cmd-8", ActivateProject8, Some("Workspace")),
+        KeyBinding::new("cmd-9", ActivateProject9, Some("Workspace")),
+        KeyBinding::new("cmd-b", ToggleSidebar, Some("Workspace")),
+        KeyBinding::new("cmd-p", GoToFile, Some("Workspace")),
+        KeyBinding::new("cmd-shift-p", CommandPalette, Some("Workspace")),
+        KeyBinding::new("cmd-shift-f", SearchProject, Some("Workspace")),
+        KeyBinding::new("cmd-t", NewTerminal, Some("Workspace")),
+        KeyBinding::new("cmd-w", CloseTab, Some("Workspace")),
+        KeyBinding::new("cmd-d", SplitRight, Some("Workspace")),
+        KeyBinding::new("cmd-shift-d", SplitDown, Some("Workspace")),
+        KeyBinding::new("cmd-shift-]", NextTab, Some("Workspace")),
+        KeyBinding::new("cmd-shift-[", PrevTab, Some("Workspace")),
+        KeyBinding::new("cmd-`", FocusNextGroup, Some("Workspace")),
+        KeyBinding::new("escape", ClosePalette, Some("Palette")),
         // Terminal-only keys: outside a terminal Cmd+C/V belong to the focused view.
         KeyBinding::new("cmd-c", crate::terminal::Copy, Some("Terminal")),
         KeyBinding::new("cmd-v", crate::terminal::Paste, Some("Terminal")),
@@ -108,6 +166,7 @@ pub fn bind_keys(cx: &mut gpui_kit::App) {
         KeyBinding::new("shift-pagedown", crate::terminal::ScrollPageDown, Some("Terminal")),
         KeyBinding::new("shift-end", crate::terminal::ScrollToBottom, Some("Terminal")),
     ]);
+    update_menus(cx);
 }
 
 const SETTINGS_KEY: &str = crate::theme::SETTINGS_KEY;
@@ -148,6 +207,21 @@ pub struct GitSummary {
     pub worktrees: Vec<vibevalley_git::Worktree>,
 }
 
+pub struct TerminalSlot {
+    pub view: Entity<TerminalView>,
+    _sub: Subscription,
+}
+
+pub struct PaneSlot {
+    pub entity: PaneEntity,
+    _sub: Subscription,
+}
+
+pub struct PixelSlot {
+    pub view: Entity<crate::pixel::view::PixelView>,
+    _sub: Subscription,
+}
+
 pub struct Shell {
     pub store: Option<Arc<Store>>,
     pub ws: Workspace<TermSession>,
@@ -161,13 +235,13 @@ pub struct Shell {
     /// Every project's branch and worktrees, read for the sidebar whether or
     /// not the project was opened (its full view is built on first open).
     pub git_summaries: HashMap<ProjectId, GitSummary>,
-    pub terminals: HashMap<String, Entity<TerminalView>>,
-    pub panes: HashMap<(ProjectId, TabId), PaneEntity>,
+    pub terminals: HashMap<String, TerminalSlot>,
+    pub panes: HashMap<(ProjectId, TabId), PaneSlot>,
     pub sidebar: Entity<HostedView>,
     pub inspector: Entity<HostedView>,
     pub workbench: Entity<HostedView>,
     pub native_workspace: bool,
-    pub native_pixel: Option<Entity<crate::pixel::view::PixelView>>,
+    pub native_pixel: Option<PixelSlot>,
     pub global_rail_width: f32,
     pub palette: Option<Palette>,
     pub panel: Panel,
@@ -235,29 +309,47 @@ impl Shell {
             crate::speech_audio::stop(None);
             crate::audio::stop_queued();
             let jobs = this.ws.save_jobs();
-            let store = this.store.clone();
+            let mut ws = std::mem::take(&mut this.ws);
+            this.projects.clear();
+            this.terminals.clear();
+            this.panes.clear();
+            let store = this.store.take();
             async move {
-                if let Some(store) = store {
-                    let done = std::thread::spawn(move || {
+                let done = std::thread::spawn(move || {
+                    if let Some(store) = store {
                         for job in jobs {
                             if let Err(e) = job.run(&*store) {
                                 eprintln!("save on quit: {e}");
                             }
                         }
-                    });
-                    let _ = done.join();
-                }
+                    }
+                    ws.shutdown_all_and_wait();
+                    crate::serving::shutdown();
+                });
+                let _ = done.join();
             }
         });
+        let appearance_sub = cx.observe_window_appearance(window, |this, _, cx| {
+            if Ui::get(cx).settings.theme == ThemeChoice::System {
+                let settings = Ui::get(cx).settings.clone();
+                Ui::apply(settings, cx);
+                this.theme_changed(cx);
+            }
+        });
+        let startup_rx = cx.try_global::<crate::hosted::ServerStartup>().map(|s| s.0.clone());
+        let already_settled = startup_rx.as_ref().and_then(|rx| rx.borrow().clone());
         let mut shell = Shell {
             store: None,
             ws: Workspace::new(),
             loaded: false,
-            server_ready: false,
+            server_ready: matches!(already_settled, Some(Ok(()))),
             island: None,
-            launch: (std::env::var_os("VIBEVALLEY_NO_OPENING").is_none())
+            launch: (std::env::var_os("VIBEVALLEY_NO_OPENING").is_none() && already_settled.is_none())
                 .then(|| cx.new(|cx| crate::pixel::view::PixelView::new("opening:launch", json!({}), cx))),
-            load_error: None,
+            load_error: match &already_settled {
+                Some(Err(e)) => Some(e.clone()),
+                _ => None,
+            },
             projects: HashMap::new(),
             git_summaries: HashMap::new(),
             terminals: HashMap::new(),
@@ -286,11 +378,18 @@ impl Shell {
             save_pending: false,
             fs_tx,
             git_refresh_pending: BTreeSet::new(),
-            _subs: vec![sub, inspector_sub, workbench_sub, quit],
+            _subs: vec![sub, inspector_sub, workbench_sub, quit, appearance_sub],
         };
-        if let Some(startup) = cx.try_global::<crate::hosted::ServerStartup>().map(|s| s.0.clone()) {
+        if already_settled.is_none()
+            && let Some(mut startup) = startup_rx
+        {
             cx.spawn(async move |this, cx| {
-                let result = startup.recv_async().await.unwrap_or_else(|_| Err("the server startup channel closed".into()));
+                while startup.borrow().is_none() {
+                    if startup.changed().await.is_err() {
+                        break;
+                    }
+                }
+                let result = startup.borrow().clone().unwrap_or_else(|| Err("the server startup channel closed".into()));
                 let _ = this.update(cx, |shell, cx| {
                     match result {
                         Ok(()) => {
@@ -376,6 +475,7 @@ impl Shell {
 
     fn load(&mut self, cx: &mut Context<Self>) {
         let cwd = std::env::current_dir().ok();
+        let work_root = crate::serving::work_root();
         let path = std::env::var_os("VIBEVALLEY_STORE").map(PathBuf::from).unwrap_or_else(Store::default_path);
         Self::bg(
             cx,
@@ -385,10 +485,13 @@ impl Shell {
                 }
                 let store = Store::open(&path).map_err(|e| e.to_string())?;
                 let mut projects = load_all(&store).map_err(|e| e.to_string())?;
-                if projects.is_empty()
-                    && let Some(cwd) = cwd
-                {
-                    projects.push(load_project(&store, &cwd).map_err(|e| e.to_string())?);
+                if projects.is_empty() {
+                    let initial = cwd
+                        .filter(|dir| dir != Path::new("/") && Repo::discover(dir).ok().flatten().is_some())
+                        .or_else(|| first_workspace_repo(&work_root));
+                    if let Some(dir) = initial {
+                        projects.push(load_project(&store, &dir).map_err(|e| e.to_string())?);
+                    }
                 }
                 let settings: Settings = vibevalley_workspace::persist::load_setting(&store, SETTINGS_KEY);
                 let active: Option<ProjectId> = store.setting(ACTIVE_KEY).ok().flatten().and_then(|v| v.as_i64());
@@ -396,12 +499,17 @@ impl Shell {
             },
             |this, result, cx| match result {
                 Ok((store, projects, settings, active)) => {
-                    let theme_changed = settings.theme != Ui::get(cx).settings.theme;
+                    let was_dark = Ui::get(cx).colors.dark;
+                    let was_ui_size = Ui::get(cx).settings.ui_font_size;
                     this.sidebar_width = settings.sidebar_width;
                     this.sidebar_visible = settings.sidebar_visible;
+                    let ui_size = settings.ui_font_size;
                     Ui::apply(settings, cx);
-                    if theme_changed {
+                    if Ui::get(cx).colors.dark != was_dark {
                         this.theme_changed(cx);
+                    }
+                    if (ui_size - was_ui_size).abs() > 0.01 {
+                        this.apply_ui_font_size(cx);
                     }
                     for p in projects {
                         let id = this.ws.open(p);
@@ -767,7 +875,7 @@ impl Shell {
         }
         for ((p, _), pane) in &self.panes {
             if *p == id
-                && let PaneEntity::File(viewer) = pane
+                && let PaneEntity::File(viewer) = &pane.entity
             {
                 let path = viewer.read(cx).path().to_path_buf();
                 if files.contains(&path) {
@@ -791,7 +899,7 @@ impl Shell {
     fn reload_diffs(&mut self, id: ProjectId, cx: &mut Context<Self>) {
         for ((p, _), pane) in &self.panes {
             if *p == id
-                && let PaneEntity::Diff(view) = pane
+                && let PaneEntity::Diff(view) = &pane.entity
             {
                 view.update(cx, |v, cx| v.reload(cx));
             }
@@ -851,7 +959,7 @@ impl Shell {
                         let title = names.get(&t.id).cloned().unwrap_or_else(|| crate::panes::tab_title(self, t, cx));
                         let (kind, running, running_agent, running_label, attention) = match &t.kind {
                             PaneKind::Terminal { terminal_id } => {
-                                let status = self.terminals.get(terminal_id).and_then(|v| v.read(cx).running_status());
+                                let status = self.terminals.get(terminal_id).and_then(|v| v.view.read(cx).running_status());
                                 let att = p.terminal(terminal_id).is_some_and(|e| e.attention);
                                 (
                                     "terminal",
@@ -918,6 +1026,9 @@ impl Shell {
             }
             Action::GlobalRoute { path } => {
                 self.native_workspace = path == "/workspace";
+                if self.native_workspace {
+                    self.ensure_default_workspace_project(cx);
+                }
                 if !path.starts_with("/farm") && path != "/tree" {
                     self.native_pixel = None;
                 }
@@ -1043,9 +1154,15 @@ impl Shell {
         let cwd = if cwd.is_dir() {
             let cleaned: PathBuf = cwd.components().collect();
             let norm = if cleaned.as_os_str().is_empty() { cwd } else { cleaned };
-            if (self.ws.projects().iter().any(|p| p.root() == norm) || norm.join(".git").exists())
-                && let Some(id) = self.ensure_project_at(&norm, cx)
-            {
+            let target = self
+                .ws
+                .projects()
+                .iter()
+                .find(|p| p.root() == norm)
+                .map(|p| p.id())
+                .or_else(|| Repo::discover(&norm).ok().flatten().and_then(|repo| self.ensure_project_at(repo.root(), cx)))
+                .or_else(|| self.ws.active().is_none().then(|| self.ensure_project_at(&norm, cx)).flatten());
+            if let Some(id) = target {
                 self.ws.activate(id);
                 self.ensure_project_view(id, cx);
             }
@@ -1054,15 +1171,16 @@ impl Shell {
             self.ws.active().map(|p| p.root().to_path_buf())?
         };
         let mut spec = SpawnSpec::shell(cwd);
+        spec.title = title.filter(|t| !t.trim().is_empty());
         if let Some(command) = command.filter(|c| !c.trim().is_empty()) {
             let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
             spec.program = Some(shell.clone());
             spec.args = vec!["-lc".into(), format!("{command}; exec {shell} -l")];
         }
-        let _ = title;
         let has_command = spec.program.is_some();
+        let has_title = spec.title.is_some();
         let project = self.ws.active_mut()?;
-        let unspawned = (!has_command && spec.cwd == project.root())
+        let unspawned = (!has_command && !has_title && spec.cwd == project.root())
             .then(|| {
                 project.layout.tabs().find_map(|t| match &t.kind {
                     PaneKind::Terminal { terminal_id } if !self.terminals.contains_key(terminal_id) => Some(terminal_id.clone()),
@@ -1071,8 +1189,8 @@ impl Shell {
             })
             .flatten();
         let id = unspawned.unwrap_or_else(|| project.new_terminal_tab().0);
-        let view = self.make_terminal(&id, spec, cx);
-        self.terminals.insert(id.clone(), view);
+        let slot = self.make_terminal(&id, spec, cx);
+        self.terminals.insert(id.clone(), slot);
         self.layout_changed(window, cx);
         Some(id)
     }
@@ -1149,7 +1267,8 @@ impl Shell {
                         match op.as_str() {
                             "host.cliInstall" => cli.install(),
                             "host.cliRemove" => cli.remove(),
-                            _ => Ok(cli.state()),
+                            _ if cli.available() => Ok(cli.state()),
+                            _ => Err("the CLI is not installed beside the app".into()),
                         }
                     },
                     move |_, result, _| {
@@ -1162,6 +1281,7 @@ impl Shell {
                 return;
             }
             "host.font" => {
+                let was_ui = Ui::get(cx).settings.ui_font_size;
                 let mut settings = Ui::get(cx).settings.clone();
                 if let Some(family) = payload["monoFont"].as_str().map(str::trim).filter(|s| !s.is_empty()) {
                     settings.mono_font = family.to_string();
@@ -1176,6 +1296,9 @@ impl Shell {
                 let term_size = settings.terminal_font_size;
                 let ui_size = settings.ui_font_size;
                 Ui::apply(settings, cx);
+                if (ui_size - was_ui).abs() > 0.01 {
+                    self.apply_ui_font_size(cx);
+                }
                 self.save_settings(cx);
                 cx.notify();
                 Envelope::ok(json!({
@@ -1205,10 +1328,17 @@ impl Shell {
                 }
                 Err(error) => refusal(BizCode::InvalidInput, error.to_string()),
             },
-            "host.locale" => {
-                self.locale = payload.as_str().map(str::to_string);
-                Envelope::void()
-            }
+            "host.locale" => match payload.as_str() {
+                Some(loc @ ("zh" | "en")) => {
+                    vibevalley_i18n::set_locale(loc);
+                    update_menus(cx);
+                    crate::tray::refresh();
+                    self.notify_locale(loc, cx);
+                    self.locale = Some(loc.to_string());
+                    Envelope::void()
+                }
+                _ => refusal(BizCode::InvalidInput, "locale is zh or en"),
+            },
             "host.reveal" => match payload.as_str() {
                 Some(path) if path.starts_with('/') => {
                     let path = PathBuf::from(path);
@@ -1218,20 +1348,22 @@ impl Shell {
                 _ => refusal(BizCode::InvalidInput, "reveal takes an absolute path"),
             },
             "host.theme" => {
-                let want = match payload.as_str() {
-                    Some("light") => Some(false),
-                    Some("dark") => Some(true),
-                    Some("system") => Some(matches!(
-                        window.appearance(),
-                        gpui_kit::WindowAppearance::Dark | gpui_kit::WindowAppearance::VibrantDark
-                    )),
+                let choice = match payload.as_str() {
+                    Some("light") => Some(ThemeChoice::Light),
+                    Some("dark") => Some(ThemeChoice::Dark),
+                    Some("system") => Some(ThemeChoice::System),
                     _ => None,
                 };
-                match want {
-                    Some(dark) => {
-                        if dark != Ui::get(cx).colors.dark {
-                            self.toggle_theme(cx);
+                match choice {
+                    Some(choice) => {
+                        let was_dark = Ui::get(cx).colors.dark;
+                        let mut settings = Ui::get(cx).settings.clone();
+                        settings.theme = choice;
+                        Ui::apply(settings, cx);
+                        if Ui::get(cx).colors.dark != was_dark {
+                            self.theme_changed(cx);
                         }
+                        self.save_settings(cx);
                         Envelope::void()
                     }
                     None => refusal(BizCode::InvalidInput, "theme is light, dark or system"),
@@ -1618,6 +1750,7 @@ impl Shell {
     fn show_workspace(&mut self, cx: &mut Context<Self>) {
         self.native_workspace = true;
         self.native_pixel = None;
+        self.ensure_default_workspace_project(cx);
         self.workbench.update(cx, |v, cx| v.navigate("/workspace", cx));
         cx.notify();
     }
@@ -1630,9 +1763,8 @@ impl Shell {
         let sub = cx.subscribe_in(&view, window, |this, _, event: &crate::pixel::view::PixelEvent, window, cx| {
             this.on_pixel_event(event.clone(), window, cx)
         });
-        self._subs.push(sub);
         self.native_workspace = false;
-        self.native_pixel = Some(view);
+        self.native_pixel = Some(PixelSlot { view, _sub: sub });
         cx.notify();
     }
 
@@ -1667,7 +1799,7 @@ impl Shell {
             pv.tree.selected = Some(path);
         }
         self.ensure_panes(window, cx);
-        if let (Some(line), Some(PaneEntity::File(v))) = (line, self.panes.get(&(pid, tab))) {
+        if let (Some(line), Some(PaneEntity::File(v))) = (line, self.panes.get(&(pid, tab)).map(|s| &s.entity)) {
             v.update(cx, |v, cx| v.scroll_to_line(line, cx));
         }
         self.push_sidebar(cx);
@@ -1679,8 +1811,8 @@ impl Shell {
         let Some(project) = self.ws.active_mut() else { return };
         let (id, _) = project.new_terminal_tab();
         if let Some(spec) = spec {
-            let view = self.make_terminal(&id, spec, cx);
-            self.terminals.insert(id, view);
+            let slot = self.make_terminal(&id, spec, cx);
+            self.terminals.insert(id, slot);
         }
         self.layout_changed(window, cx);
     }
@@ -1696,6 +1828,7 @@ impl Shell {
             args: vec!["-lc".into(), format!("${{EDITOR:-vi}} {quoted}; exec {shell} -l")],
             env: Vec::new(),
             history: None,
+            title: None,
         };
         self.new_terminal(Some(spec), window, cx);
     }
@@ -1741,8 +1874,8 @@ impl Shell {
         let Some(project) = self.ws.active() else { return };
         let Some(tab) = project.layout.active_tab() else { return };
         let handle = match &tab.kind {
-            PaneKind::Terminal { terminal_id } => self.terminals.get(terminal_id).map(|t| t.read(cx).focus_handle(cx)),
-            _ => self.panes.get(&(project.id(), tab.id)).map(|p| p.focus_handle(cx)),
+            PaneKind::Terminal { terminal_id } => self.terminals.get(terminal_id).map(|t| t.view.read(cx).focus_handle(cx)),
+            _ => self.panes.get(&(project.id(), tab.id)).map(|p| p.entity.focus_handle(cx)),
         };
         window.focus(&handle.unwrap_or_else(|| self.focus.clone()), cx);
     }
@@ -1773,11 +1906,12 @@ impl Shell {
                             args: Vec::new(),
                             env: Vec::new(),
                             history: Some(saved.scrollback).filter(|s| !s.trim().is_empty()),
+                            title: saved.title.clone(),
                         },
                         None => SpawnSpec::shell(root.clone()),
                     };
-                    let view = self.make_terminal(&terminal_id, spec, cx);
-                    self.terminals.insert(terminal_id, view);
+                    let slot = self.make_terminal(&terminal_id, spec, cx);
+                    self.terminals.insert(terminal_id, slot);
                 }
                 kind => {
                     if self.panes.contains_key(&(pid, tab)) {
@@ -1790,8 +1924,9 @@ impl Shell {
         }
     }
 
-    fn make_terminal(&mut self, id: &str, spec: SpawnSpec, cx: &mut Context<Self>) -> Entity<TerminalView> {
+    fn make_terminal(&mut self, id: &str, spec: SpawnSpec, cx: &mut Context<Self>) -> TerminalSlot {
         let cwd = spec.cwd.clone();
+        let initial_title = spec.title.clone();
         let view = cx.new(|cx| TerminalView::new(spec, cx));
         let tid = id.to_string();
         let sub = cx.subscribe(&view, move |this: &mut Shell, view, event: &TerminalEvent, cx| {
@@ -1802,7 +1937,7 @@ impl Shell {
             match event {
                 TerminalEvent::Spawned => {
                     if let Some(session) = view.read(cx).session() {
-                        project.attach_terminal(&tid, session.clone(), cwd.clone(), None);
+                        project.attach_terminal(&tid, session.clone(), cwd.clone(), initial_title.clone());
                     }
                 }
                 TerminalEvent::TitleChanged => {
@@ -1826,11 +1961,10 @@ impl Shell {
             this.push_sidebar(cx);
             cx.notify();
         });
-        self._subs.push(sub);
-        view
+        TerminalSlot { view, _sub: sub }
     }
 
-    fn make_pane(&mut self, pid: ProjectId, root: &Path, kind: PaneKind, window: &mut Window, cx: &mut Context<Self>) -> PaneEntity {
+    fn make_pane(&mut self, pid: ProjectId, root: &Path, kind: PaneKind, window: &mut Window, cx: &mut Context<Self>) -> PaneSlot {
         let dark = Ui::get(cx).colors.dark;
         match kind {
             PaneKind::File { path } => {
@@ -1852,8 +1986,10 @@ impl Shell {
                         );
                     }
                 });
-                self._subs.push(sub);
-                PaneEntity::File(view)
+                PaneSlot {
+                    entity: PaneEntity::File(view),
+                    _sub: sub,
+                }
             }
             PaneKind::Diff { spec, path, repo } => {
                 let repo = repo.unwrap_or_else(|| root.to_path_buf());
@@ -1861,19 +1997,24 @@ impl Shell {
                 let sub = cx.subscribe(&view, move |this: &mut Shell, _, _: &crate::diff::DiffChanged, cx| {
                     this.refresh_git(pid, cx);
                 });
-                self._subs.push(sub);
-                PaneEntity::Diff(view)
+                PaneSlot {
+                    entity: PaneEntity::Diff(view),
+                    _sub: sub,
+                }
             }
             PaneKind::Hosted { module, props } => {
                 let mut params = props.as_object().cloned().unwrap_or_default();
                 params.insert("module".into(), json!(module));
                 let doc = (module == "markdown").then(|| props["path"].as_str().map(PathBuf::from)).flatten();
                 let view = cx.new(|cx| HostedView::new(&module, params, dark, window, cx));
-                self.subscribe_hosted(&view, doc.clone(), window, cx);
+                let sub = self.subscribe_hosted(&view, doc.clone(), window, cx);
                 if let Some(path) = doc {
                     self.push_doc(&view, path, cx);
                 }
-                PaneEntity::Hosted(view)
+                PaneSlot {
+                    entity: PaneEntity::Hosted(view),
+                    _sub: sub,
+                }
             }
             PaneKind::Pixel { scene, mut props } => {
                 if !props.is_object() {
@@ -1886,15 +2027,17 @@ impl Shell {
                 let sub = cx.subscribe_in(&view, window, |this, _, event: &crate::pixel::view::PixelEvent, window, cx| {
                     this.on_pixel_event(event.clone(), window, cx)
                 });
-                self._subs.push(sub);
-                PaneEntity::Pixel(view)
+                PaneSlot {
+                    entity: PaneEntity::Pixel(view),
+                    _sub: sub,
+                }
             }
             PaneKind::Terminal { .. } => unreachable!("terminals are kept in Shell::terminals"),
         }
     }
 
-    fn subscribe_hosted(&mut self, view: &Entity<HostedView>, doc: Option<PathBuf>, window: &mut Window, cx: &mut Context<Self>) {
-        let sub = cx.subscribe_in(view, window, move |this, view, event: &HostedEvent, window, cx| match event {
+    fn subscribe_hosted(&mut self, view: &Entity<HostedView>, doc: Option<PathBuf>, window: &mut Window, cx: &mut Context<Self>) -> Subscription {
+        cx.subscribe_in(view, window, move |this, view, event: &HostedEvent, window, cx| match event {
             HostedEvent::Action(a) => this.on_action(a.clone(), window, cx),
             HostedEvent::HostCall { op, payload, reply } => this.host_call(op, payload.clone(), reply.clone(), window, cx),
             HostedEvent::Ready => {
@@ -1902,8 +2045,7 @@ impl Shell {
                     this.push_doc(view, path.clone(), cx);
                 }
             }
-        });
-        self._subs.push(sub);
+        })
     }
 
     fn push_doc(&mut self, view: &Entity<HostedView>, path: PathBuf, cx: &mut Context<Self>) {
@@ -1984,36 +2126,93 @@ impl Shell {
 
     pub fn adjust_font_size(&mut self, delta: f32, cx: &mut Context<Self>) {
         let mut settings = Ui::get(cx).settings.clone();
-        settings.terminal_font_size = (settings.terminal_font_size + delta).clamp(9.0, 32.0);
-        Ui::apply(settings, cx);
+        if self.native_workspace {
+            settings.terminal_font_size = (settings.terminal_font_size + delta).clamp(9.0, 32.0);
+            Ui::apply(settings, cx);
+        } else {
+            settings.ui_font_size = (settings.ui_font_size + delta).clamp(10.0, 24.0);
+            Ui::apply(settings, cx);
+            self.apply_ui_font_size(cx);
+        }
         self.save_settings(cx);
         cx.notify();
     }
 
     pub fn reset_font_size(&mut self, cx: &mut Context<Self>) {
         let mut settings = Ui::get(cx).settings.clone();
-        settings.terminal_font_size = 13.0;
-        Ui::apply(settings, cx);
+        if self.native_workspace {
+            settings.terminal_font_size = 13.0;
+            Ui::apply(settings, cx);
+        } else {
+            settings.ui_font_size = 13.0;
+            Ui::apply(settings, cx);
+            self.apply_ui_font_size(cx);
+        }
         self.save_settings(cx);
         cx.notify();
     }
 
     pub fn toggle_theme(&mut self, cx: &mut Context<Self>) {
         let mut settings = Ui::get(cx).settings.clone();
-        settings.theme = match settings.theme {
-            ThemeChoice::Dark => ThemeChoice::Light,
-            ThemeChoice::Light => ThemeChoice::Dark,
-        };
+        settings.theme = if Ui::get(cx).colors.dark { ThemeChoice::Light } else { ThemeChoice::Dark };
         Ui::apply(settings, cx);
         self.theme_changed(cx);
         self.save_settings(cx);
+    }
+
+    fn apply_ui_font_size(&mut self, cx: &mut Context<Self>) {
+        let size = Ui::get(cx).settings.ui_font_size;
+        self.sidebar.update(cx, |v, cx| v.set_ui_font_size(size, cx));
+        self.inspector.update(cx, |v, cx| v.set_ui_font_size(size, cx));
+        self.workbench.update(cx, |v, cx| v.set_ui_font_size(size, cx));
+        if let Some(p) = &self.palette {
+            p.view.update(cx, |v, cx| v.set_ui_font_size(size, cx));
+        }
+        for pane in self.panes.values() {
+            if let PaneEntity::Hosted(view) = &pane.entity {
+                view.update(cx, |v, cx| v.set_ui_font_size(size, cx));
+            }
+        }
+    }
+
+    fn notify_locale(&mut self, locale: &str, cx: &mut Context<Self>) {
+        self.sidebar.update(cx, |v, cx| v.set_locale(locale, cx));
+        self.inspector.update(cx, |v, cx| v.set_locale(locale, cx));
+        self.workbench.update(cx, |v, cx| v.set_locale(locale, cx));
+        if let Some(p) = &self.palette {
+            p.view.update(cx, |v, cx| v.set_locale(locale, cx));
+        }
+        for pane in self.panes.values() {
+            if let PaneEntity::Hosted(view) = &pane.entity {
+                view.update(cx, |v, cx| v.set_locale(locale, cx));
+            }
+        }
+    }
+
+    fn ensure_default_workspace_project(&mut self, cx: &mut Context<Self>) {
+        if !self.loaded || !self.ws.projects().is_empty() {
+            return;
+        }
+        let work_root = crate::serving::work_root();
+        let candidate = first_workspace_repo(&work_root).or_else(|| {
+            let _ = std::fs::create_dir_all(&work_root);
+            work_root.is_dir().then_some(work_root)
+        });
+        if let Some(dir) = candidate
+            && let Some(id) = self.ensure_project_at(&dir, cx)
+        {
+            self.ws.activate(id);
+            self.ensure_project_view(id, cx);
+            self.refresh_summaries(cx);
+            self.push_sidebar(cx);
+        }
     }
 
     /// Tells every open terminal and hosted view about the new theme.
     fn theme_changed(&mut self, cx: &mut Context<Self>) {
         let dark = Ui::get(cx).colors.dark;
         for t in self.terminals.values() {
-            t.update(cx, |t, cx| t.apply_theme(cx));
+            t.view.update(cx, |t, cx| t.apply_theme(cx));
         }
         self.sidebar.update(cx, |v, cx| v.set_dark(dark, cx));
         self.inspector.update(cx, |v, cx| v.set_dark(dark, cx));
@@ -2022,7 +2221,7 @@ impl Shell {
             p.view.update(cx, |v, cx| v.set_dark(dark, cx));
         }
         for pane in self.panes.values() {
-            if let PaneEntity::Hosted(view) = pane {
+            if let PaneEntity::Hosted(view) = &pane.entity {
                 view.update(cx, |v, cx| v.set_dark(dark, cx));
             }
         }
@@ -2057,6 +2256,25 @@ impl Shell {
         if self.dragging_split.take().is_some() {
             self.schedule_save(cx);
         }
+    }
+}
+
+impl Drop for Shell {
+    fn drop(&mut self) {
+        if self.ws.projects().is_empty() {
+            return;
+        }
+        let jobs = self.ws.save_jobs();
+        let mut ws = std::mem::take(&mut self.ws);
+        let store = self.store.take();
+        std::thread::spawn(move || {
+            if let Some(store) = store {
+                for job in jobs {
+                    let _ = job.run(&*store);
+                }
+            }
+            ws.shutdown_all_and_wait();
+        });
     }
 }
 
@@ -2106,6 +2324,41 @@ impl Render for Shell {
             .text_color(colors.text)
             .key_context("Shell")
             .track_focus(&self.focus)
+            .on_action(cx.listener(|s, _: &OpenAbout, _, cx| {
+                s.native_workspace = false;
+                s.native_pixel = None;
+                s.workbench.update(cx, |v, cx| v.navigate("/settings/about", cx));
+                cx.notify();
+            }))
+            .on_action(cx.listener(|s, _: &OpenSettings, _, cx| {
+                s.native_workspace = false;
+                s.native_pixel = None;
+                s.workbench.update(cx, |v, cx| v.navigate("/settings", cx));
+                cx.notify();
+            }))
+            .on_action(cx.listener(|_, _: &Hide, _, cx| cx.hide()))
+            .on_action(cx.listener(|_, _: &HideOthers, _, cx| cx.hide_other_apps()))
+            .on_action(cx.listener(|_, _: &ShowAll, _, cx| cx.unhide_other_apps()))
+            .on_action(cx.listener(|_, _: &EditUndo, w, cx| {
+                w.dispatch_keystroke(gpui_kit::Keystroke::parse("cmd-z").expect("keystroke"), cx);
+            }))
+            .on_action(cx.listener(|_, _: &EditRedo, w, cx| {
+                w.dispatch_keystroke(gpui_kit::Keystroke::parse("cmd-shift-z").expect("keystroke"), cx);
+            }))
+            .on_action(cx.listener(|_, _: &EditCut, w, cx| {
+                w.dispatch_keystroke(gpui_kit::Keystroke::parse("cmd-x").expect("keystroke"), cx);
+            }))
+            .on_action(cx.listener(|_, _: &EditCopy, w, cx| {
+                w.dispatch_keystroke(gpui_kit::Keystroke::parse("cmd-c").expect("keystroke"), cx);
+            }))
+            .on_action(cx.listener(|_, _: &EditPaste, w, cx| {
+                w.dispatch_keystroke(gpui_kit::Keystroke::parse("cmd-v").expect("keystroke"), cx);
+            }))
+            .on_action(cx.listener(|_, _: &EditSelectAll, w, cx| {
+                w.dispatch_keystroke(gpui_kit::Keystroke::parse("cmd-a").expect("keystroke"), cx);
+            }))
+            .on_action(cx.listener(|_, _: &ToggleFullScreen, w, _| w.toggle_fullscreen()))
+            .on_action(cx.listener(|_, _: &CloseWindow, w, _| w.remove_window()))
             .on_action(cx.listener(|s, _: &ActivateProject1, w, cx| s.activate_index(0, w, cx)))
             .on_action(cx.listener(|s, _: &ActivateProject2, w, cx| s.activate_index(1, w, cx)))
             .on_action(cx.listener(|s, _: &ActivateProject3, w, cx| s.activate_index(2, w, cx)))
@@ -2152,6 +2405,8 @@ impl Render for Shell {
             .children(self.native_workspace.then(|| {
                 let inspector_w: Pixels = px(self.inspector_width);
                 div()
+                    .id("workspace")
+                    .key_context("Workspace")
                     .absolute()
                     .top_0()
                     .bottom_0()
@@ -2190,14 +2445,28 @@ impl Render for Shell {
                             .then(|| div().w(inspector_w).h_full().flex_none().child(self.inspector.clone())),
                     )
             }))
-            .children(
-                self.native_pixel
-                    .clone()
-                    .map(|view| div().absolute().top_0().bottom_0().right_0().left(px(self.global_rail_width)).child(view)),
-            )
+            .children(self.native_pixel.as_ref().map(|slot| {
+                div()
+                    .absolute()
+                    .top_0()
+                    .bottom_0()
+                    .right_0()
+                    .left(px(self.global_rail_width))
+                    .child(slot.view.clone())
+            }))
             .children(palette)
             .children(launch)
     }
+}
+
+fn first_workspace_repo(work_root: &Path) -> Option<PathBuf> {
+    let entries = std::fs::read_dir(work_root).ok()?;
+    let mut dirs: Vec<PathBuf> = entries.filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.is_dir()).collect();
+    dirs.sort();
+    dirs.iter()
+        .find(|p| Repo::discover(p).ok().flatten().is_some())
+        .cloned()
+        .or_else(|| dirs.into_iter().next())
 }
 
 /// `%XX` escapes of a `file:` URL's path decoded (spaces, CJK names).

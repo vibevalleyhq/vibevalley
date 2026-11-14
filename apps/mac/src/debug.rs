@@ -55,8 +55,8 @@ pub fn dump(shell: &Shell, cx: &App) -> Value {
                     let mut v = json!({ "id": t.id, "kind": serde_json::to_value(&t.kind).unwrap_or(Value::Null), "title": tab_title(shell, t, cx) });
                     match &t.kind {
                         PaneKind::Terminal { terminal_id } => {
-                            if let Some(view) = shell.terminals.get(terminal_id) {
-                                let view = view.read(cx);
+                            if let Some(slot) = shell.terminals.get(terminal_id) {
+                                let view = slot.view.read(cx);
                                 v["spawned"] = json!(view.session().is_some());
                                 v["exited"] = json!(view.has_exited());
                                 v["grid"] = json!(view.snapshot().map(|s| grid_text(&s)).unwrap_or_default());
@@ -65,7 +65,7 @@ pub fn dump(shell: &Shell, cx: &App) -> Value {
                             }
                             v["registered"] = json!(p.terminal(terminal_id).is_some());
                         }
-                        _ => match shell.panes.get(&(p.id(), t.id)) {
+                        _ => match shell.panes.get(&(p.id(), t.id)).map(|s| &s.entity) {
                             Some(PaneEntity::File(f)) => v["viewer"] = json!({ "status": f.read(cx).status(), "reloads": f.read(cx).reloads() }),
                             Some(PaneEntity::Diff(d)) => v["diff"] = json!(d.read(cx).summary()),
                             Some(PaneEntity::Hosted(view)) => v["hosted"] = view.read(cx).debug_state(),
@@ -105,7 +105,7 @@ pub fn dump(shell: &Shell, cx: &App) -> Value {
         "projects": projects,
         "sidebar": shell.sidebar.read(cx).debug_state(),
         "workbench": shell.workbench.read(cx).debug_state(),
-        "pixel": shell.native_pixel.as_ref().map(|v| v.read(cx).debug_state()),
+        "pixel": shell.native_pixel.as_ref().map(|s| s.view.read(cx).debug_state()),
         "palette": shell.palette.as_ref().map(|p| json!({
             "open": p.open, "mode": p.mode.name(), "query": p.query, "view": p.view.read(cx).debug_state(),
         })),
@@ -308,12 +308,12 @@ fn shot(_: &mut Window, path: &str) {
 
 fn active_pixel(s: &Shell, cx: &App) -> Option<Entity<crate::pixel::view::PixelView>> {
     let _ = cx;
-    if let Some(view) = &s.native_pixel {
-        return Some(view.clone());
+    if let Some(slot) = &s.native_pixel {
+        return Some(slot.view.clone());
     }
     let project = s.ws.active()?;
     let tab = project.layout.active_tab()?;
-    match s.panes.get(&(project.id(), tab.id)) {
+    match s.panes.get(&(project.id(), tab.id)).map(|p| &p.entity) {
         Some(PaneEntity::Pixel(v)) => Some(v.clone()),
         _ => None,
     }
@@ -327,15 +327,15 @@ fn dump_pixels(
     cx: &mut App,
 ) -> Vec<(PathBuf, crate::pixel::draw::DrawList, Option<std::sync::Arc<crate::pixel::atlas::Atlas>>)> {
     let mut out = Vec::new();
-    if let Some(view) = &shell.native_pixel {
-        view.update(cx, |v, _| v.draw_unpainted());
-        let v = view.read(cx);
+    if let Some(slot) = &shell.native_pixel {
+        slot.view.update(cx, |v, _| v.draw_unpainted());
+        let v = slot.view.read(cx);
         if let Some((list, atlas)) = v.snapshot() {
             out.push((path.with_extension(format!("{}-native.png", v.kind)), list, atlas));
         }
     }
     for ((_, tab), pane) in &shell.panes {
-        if let PaneEntity::Pixel(view) = pane {
+        if let PaneEntity::Pixel(view) = &pane.entity {
             view.update(cx, |v, _| v.draw_unpainted());
             let v = view.read(cx);
             if let Some((list, atlas)) = v.snapshot() {
@@ -383,7 +383,7 @@ fn run(s: &mut Shell, cmd: &str, window: &mut Window, cx: &mut gpui_kit::Context
                 return;
             };
             if let Some(t) = s.terminals.get(&terminal_id) {
-                t.read(cx).send_line(arg);
+                t.view.read(cx).send_line(arg);
             }
         }
         // `hosted:<module>[ <props JSON>]`

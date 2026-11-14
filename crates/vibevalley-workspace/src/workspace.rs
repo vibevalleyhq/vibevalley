@@ -20,6 +20,9 @@ pub trait TerminalHandle: Clone + Send + 'static {
     fn scrollback_text(&self, max_lines: usize) -> String;
     fn is_alive(&self) -> bool;
     fn kill(&self);
+    fn shutdown_and_wait(&self) {
+        self.kill();
+    }
 }
 
 impl TerminalHandle for vibevalley_terminal::TermSession {
@@ -34,6 +37,9 @@ impl TerminalHandle for vibevalley_terminal::TermSession {
     }
     fn kill(&self) {
         vibevalley_terminal::TermSession::kill(self)
+    }
+    fn shutdown_and_wait(&self) {
+        vibevalley_terminal::TermSession::shutdown_and_wait(self, std::time::Duration::from_secs(2))
     }
 }
 
@@ -331,6 +337,17 @@ impl<T: TerminalHandle> Workspace<T> {
             for entry in project.terminals.values() {
                 entry.handle.kill();
             }
+        }
+    }
+
+    pub fn shutdown_all_and_wait(&mut self) {
+        let handles: Vec<T> = self
+            .projects
+            .iter_mut()
+            .flat_map(|project| std::mem::take(&mut project.terminals).into_values().map(|entry| entry.handle))
+            .collect();
+        for handle in handles {
+            handle.shutdown_and_wait();
         }
     }
 }

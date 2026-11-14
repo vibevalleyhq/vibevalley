@@ -1,8 +1,5 @@
 // Ported from VibeValley apps/web/src/features/setting/AppearancePage.tsx.
-// The theme is the page's colour scheme here (nsh's setColorScheme) and is
-// told to the host, as state/prefs.ts's apply does on the web; the scale is
-// kept as a choice but nothing zooms by it yet (the workbench zoom is a gap
-// of the shell, docs/handoff/views.md).
+// Theme and interface scale sync with both nsh and the GPUI host (`hostApi.font`, `Host.theme`).
 import { host, setColorScheme, signal } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -57,6 +54,11 @@ export function AppearancePage() {
           availableFonts.set(merged);
         }
         if (typeof env.data.terminalFontSize === "number") termSize.set(Math.round(env.data.terminalFontSize));
+        if (typeof env.data.uiFontSize === "number") {
+          const pct = Math.round((env.data.uiFontSize / 13) * 100);
+          const closest = ScaleValues.reduce((best, cur) => (Math.abs(cur - pct) < Math.abs(best - pct) ? cur : best));
+          setScale(closest);
+        }
       }
     });
   }

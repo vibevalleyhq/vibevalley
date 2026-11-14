@@ -193,7 +193,7 @@ pub fn numbered_titles<'a>(shell: &Shell, tabs: impl Iterator<Item = &'a Tab>, c
 }
 
 /// `user@host`, `user@host:~/dir` and the like.
-fn is_default_title(title: &str) -> bool {
+pub(crate) fn is_default_title(title: &str) -> bool {
     let first = title.split_whitespace().next().unwrap_or("");
     first.contains('@') && !first.starts_with('@') && first.split('@').next().is_some_and(|u| !u.is_empty() && !u.contains('/'))
 }
@@ -208,7 +208,11 @@ fn shell_name() -> String {
 
 pub fn tab_title(shell: &Shell, tab: &Tab, cx: &App) -> String {
     match &tab.kind {
-        PaneKind::Terminal { terminal_id } => shell.terminals.get(terminal_id).map(|t| terminal_name(t.read(cx))).unwrap_or_else(shell_name),
+        PaneKind::Terminal { terminal_id } => shell
+            .terminals
+            .get(terminal_id)
+            .map(|t| terminal_name(t.view.read(cx)))
+            .unwrap_or_else(shell_name),
         PaneKind::File { path } => path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
         PaneKind::Diff { spec, path, .. } => {
             let what = match spec {
@@ -390,11 +394,11 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
             kind: PaneKind::Terminal { terminal_id },
             ..
         }) => match shell.terminals.get(terminal_id) {
-            Some(t) => t.clone().into_any_element(),
+            Some(t) => t.view.clone().into_any_element(),
             None => div().into_any_element(),
         },
         Some(tab) => match shell.panes.get(&(pid, tab.id)) {
-            Some(p) => p.element(),
+            Some(p) => p.entity.element(),
             None => div().into_any_element(),
         },
         None => div().into_any_element(),

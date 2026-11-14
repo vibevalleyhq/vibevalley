@@ -46,6 +46,7 @@ type WorktreeGroup = {
 };
 
 type RepoNode = {
+  projectId?: number;
   name: string;
   path: string;
   branch?: string | null;
@@ -317,6 +318,7 @@ export function Sidebar() {
       const repoActive = allGroups.some((g) => g.active);
 
       return {
+        projectId: mainProj?.id,
         name: root.name,
         path: root.path,
         branch: mainProj?.branch,
@@ -476,6 +478,15 @@ export function Sidebar() {
                       >
                         <Text style={{ fontSize: 14, color: p().muted }}>＋</Text>
                       </Button>
+                      {repo.projectId !== undefined && !repo.vibevalley ? (
+                        <Button
+                          onPress={() => act({ type: "close_project", id: repo.projectId! })}
+                          accessibilityLabel={`关闭文件夹：${repo.name}`}
+                          style={{ width: 20, height: 20, borderRadius: 4, alignItems: "center", justifyContent: "center" }}
+                        >
+                          <Text style={{ fontSize: 12, color: p().muted }}>×</Text>
+                        </Button>
+                      ) : null}
                     </View>
 
                     {/* Default case: no extra worktrees -> render terminal tabs directly under Repo */}

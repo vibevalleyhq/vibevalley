@@ -1,21 +1,76 @@
 use std::cell::RefCell;
 
-use objc2::{AnyThread, MainThreadOnly, rc::Retained, sel};
-use objc2_app_kit::{NSApplication, NSImage, NSMenu, NSMenuItem, NSStatusBar, NSStatusItem};
-use objc2_foundation::{MainThreadMarker, NSSize, NSString};
+use gpui_kit::App;
+use objc2::{AnyThread, DefinedClass as _, MainThreadOnly, rc::Retained, runtime::AnyObject, sel};
+use objc2_app_kit::{NSImage, NSMenu, NSMenuItem, NSStatusBar, NSStatusItem};
+use objc2_foundation::{MainThreadMarker, NSObject, NSSize, NSString};
 use serde::Deserialize;
 use vibevalley_i18n::t;
 
-#[derive(Deserialize)]
+#[derive(Clone, Default, Deserialize)]
 pub struct Summary {
     pub title: String,
     pub lines: Vec<String>,
 }
 
-thread_local! { static ITEM: RefCell<Option<Retained<NSStatusItem>>> = const { RefCell::new(None) }; }
+enum TrayEvent {
+    Open,
+    Quit,
+}
 
-pub fn install() {
+struct TrayTargetIvars {
+    tx: flume::Sender<TrayEvent>,
+}
+
+objc2::define_class!(
+    #[unsafe(super(NSObject))]
+    #[thread_kind = MainThreadOnly]
+    #[ivars = TrayTargetIvars]
+    struct TrayTarget;
+
+    impl TrayTarget {
+        #[unsafe(method(openApp:))]
+        fn open_app(&self, _sender: Option<&AnyObject>) {
+            let _ = self.ivars().tx.send(TrayEvent::Open);
+        }
+
+        #[unsafe(method(quitApp:))]
+        fn quit_app(&self, _sender: Option<&AnyObject>) {
+            let _ = self.ivars().tx.send(TrayEvent::Quit);
+        }
+    }
+);
+
+impl TrayTarget {
+    fn new(mtm: MainThreadMarker, tx: flume::Sender<TrayEvent>) -> Retained<Self> {
+        let this = mtm.alloc::<Self>().set_ivars(TrayTargetIvars { tx });
+        unsafe { objc2::msg_send![super(this), init] }
+    }
+}
+
+struct InstalledTray {
+    item: Retained<NSStatusItem>,
+    target: Retained<TrayTarget>,
+    summary: Summary,
+}
+
+thread_local! { static TRAY: RefCell<Option<InstalledTray>> = const { RefCell::new(None) }; }
+
+pub fn install(cx: &mut App) {
     let Some(mtm) = MainThreadMarker::new() else { return };
+    let (tx, rx) = flume::unbounded();
+    cx.spawn(async move |cx| {
+        while let Ok(event) = rx.recv_async().await {
+            cx.update(|cx| match event {
+                TrayEvent::Open => {
+                    crate::ensure_main_window(cx);
+                    cx.activate(true);
+                }
+                TrayEvent::Quit => cx.quit(),
+            });
+        }
+    })
+    .detach();
     let item = NSStatusBar::systemStatusBar().statusItemWithLength(-1.0);
     if let Some(button) = item.button(mtm) {
         let path = crate::pixel::assets_dir().join("pixel/app-sprout.png");
@@ -26,42 +81,54 @@ pub fn install() {
             button.setTitle(&NSString::from_str("VibeValley"));
         }
     }
-    ITEM.with(|slot| *slot.borrow_mut() = Some(item));
-    update(&Summary {
-        title: String::new(),
-        lines: vec![],
+    let target = TrayTarget::new(mtm, tx);
+    TRAY.with(|slot| {
+        *slot.borrow_mut() = Some(InstalledTray {
+            item,
+            target,
+            summary: Summary::default(),
+        });
     });
+    refresh();
 }
 
 pub fn update(summary: &Summary) {
+    TRAY.with(|slot| {
+        if let Some(tray) = slot.borrow_mut().as_mut() {
+            tray.summary = summary.clone();
+        }
+    });
+    refresh();
+}
+
+pub fn refresh() {
     let Some(mtm) = MainThreadMarker::new() else { return };
-    ITEM.with(|slot| {
-        let item = slot.borrow();
-        let Some(item) = item.as_ref() else { return };
-        if let Some(button) = item.button(mtm) {
-            button.setToolTip(Some(&NSString::from_str(&summary.title)));
+    TRAY.with(|slot| {
+        let borrow = slot.borrow();
+        let Some(tray) = borrow.as_ref() else { return };
+        if let Some(button) = tray.item.button(mtm) {
+            button.setToolTip(Some(&NSString::from_str(&tray.summary.title)));
         }
         let menu = NSMenu::initWithTitle(NSMenu::alloc(mtm), &NSString::from_str("VibeValley"));
         menu.setAutoenablesItems(false);
-        for line in summary.lines.iter().take(12) {
+        for line in tray.summary.lines.iter().take(12) {
             let row = NSMenuItem::new(mtm);
             row.setTitle(&NSString::from_str(line));
             row.setEnabled(false);
             menu.addItem(&row);
         }
-        if !summary.lines.is_empty() {
+        if !tray.summary.lines.is_empty() {
             menu.addItem(&NSMenuItem::separatorItem(mtm));
         }
-        let app = NSApplication::sharedApplication(mtm);
-        for (key, action) in [("desktop.open", sel!(arrangeInFront:)), ("desktop.quit", sel!(terminate:))] {
+        for (key, action) in [("desktop.open", sel!(openApp:)), ("desktop.quit", sel!(quitApp:))] {
             let row = NSMenuItem::new(mtm);
             row.setTitle(&NSString::from_str(&t(key, &[])));
             unsafe {
-                row.setTarget(Some(&app));
+                row.setTarget(Some(&tray.target));
                 row.setAction(Some(action));
             }
             menu.addItem(&row);
         }
-        item.setMenu(Some(&menu));
+        tray.item.setMenu(Some(&menu));
     });
 }

@@ -12,6 +12,7 @@ pub enum ThemeChoice {
     #[default]
     Dark,
     Light,
+    System,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -274,11 +275,13 @@ pub struct Ui {
 impl Global for Ui {}
 
 impl Ui {
-    pub fn new(settings: Settings) -> Self {
-        let colors = match settings.theme {
-            ThemeChoice::Dark => Palette::dark(),
-            ThemeChoice::Light => Palette::light(),
+    pub fn new(settings: Settings, system_dark: bool) -> Self {
+        let dark = match settings.theme {
+            ThemeChoice::Dark => true,
+            ThemeChoice::Light => false,
+            ThemeChoice::System => system_dark,
         };
+        let colors = if dark { Palette::dark() } else { Palette::light() };
         Ui { settings, colors, epoch: 0 }
     }
 
@@ -292,8 +295,18 @@ impl Ui {
 
     /// Applies new settings everywhere, including the component library.
     pub fn apply(settings: Settings, cx: &mut App) {
+        let appearance_override = match settings.theme {
+            ThemeChoice::Dark => Some(gpui_kit::WindowAppearance::Dark),
+            ThemeChoice::Light => Some(gpui_kit::WindowAppearance::Light),
+            ThemeChoice::System => None,
+        };
+        cx.set_window_appearance(appearance_override);
+        let system_dark = matches!(
+            cx.window_appearance(),
+            gpui_kit::WindowAppearance::Dark | gpui_kit::WindowAppearance::VibrantDark
+        );
         let epoch = cx.try_global::<Ui>().map_or(0, |ui| ui.epoch + 1);
-        let mut ui = Ui::new(settings);
+        let mut ui = Ui::new(settings, system_dark);
         ui.epoch = epoch;
         let mode = if ui.colors.dark {
             gpui_kit::component::ThemeMode::Dark

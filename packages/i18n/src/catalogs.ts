@@ -483,7 +483,31 @@ export const catalogs = {
       quit: "退出",
       waiting: "{n} 等你",
       working: "{n} 在干",
-      menu: { view: "显示", resetZoom: "实际大小", zoomIn: "放大", zoomOut: "缩小", window: "窗口", close: "关闭窗口" },
+      menu: {
+        about: "关于 {app}",
+        settings: "设置…",
+        hide: "隐藏 {app}",
+        hideOthers: "隐藏其他",
+        unhide: "全部显示",
+        quit: "退出 {app}",
+        edit: "编辑",
+        undo: "撤销",
+        redo: "重做",
+        cut: "剪切",
+        copy: "拷贝",
+        paste: "粘贴",
+        selectAll: "全选",
+        view: "显示",
+        toggleSidebar: "切换侧边栏",
+        toggleTheme: "切换主题",
+        resetZoom: "实际大小",
+        zoomIn: "放大",
+        zoomOut: "缩小",
+        fullScreen: "进入全屏幕",
+        window: "窗口",
+        close: "关闭窗口",
+        closeTab: "关闭标签页",
+      },
     },
     server: {
       lookIn: {
@@ -1650,6 +1674,7 @@ export const catalogs = {
       rail: "工作台",
       farm: "回农场",
       farmShort: "农场",
+      update: "更新",
       working: "开工中 · {n} 个在干活",
       off: "没开工",
       chips: { drop: "去掉 {v}", valueOf: "{k} 的值", removeKey: "删除 {k}", remove: "删除", name: "变量名", value: "变量的值", valueHint: "值", add: "添加" },
@@ -1773,6 +1798,7 @@ export const catalogs = {
         longMore: "展开全文",
         longLess: "收起",
       },
+      updateReady: "{next} 已下好，去「关于」重启",
       intent: { timedOut: "等了太久没回音，可以重试", offline: "没连上农场，这一下没发出去" },
     },
     "web.catalog": {
@@ -3176,6 +3202,33 @@ export const catalogs = {
         copy: "复制路径",
         copied: "路径复制好了",
         reveal: "在访达里显示",
+        update: "更新",
+        updateHint: "桌面版从 GitHub 上的发布自己更新",
+        upToDate: "已是最新",
+        checking: "正在查有没有新版本…",
+        downloading: "正在下载 {next}（{percent}%）",
+        ready: "{next} 已下好，退出时装上",
+        readyNewFarm: "{next} 已下好：它会从新的数据开始，旧的留在一边",
+        manual: {
+          diskImage: "{next} 要手动装：应用还在安装盘里运行，先拖进「应用程序」",
+          translocated: "{next} 要手动装：macOS 把应用挪到了临时的地方运行，先拖进「应用程序」再打开",
+          readOnly: "{next} 要手动装：应用所在的文件夹不能写",
+          noBuild: "{next} 没有这台 Mac 的版本",
+        },
+        failed: "没查成：{why}",
+        check: "检查更新",
+        restart: "重启更新",
+        restartQuestion: "重启到新版本？",
+        workingQuestion: "{n} 个帮工在干活，重启会打断它们。现在重启？",
+        newFarmQuestion: "新版本从新的数据开始，旧的留在家目录里。现在重启？",
+        download: "去下载",
+        cli: "命令行",
+        cliHint: "装上以后，在终端里用 {command} 读写这个农场，本机的 agent 也能用",
+        cliReady: "在终端里用 {command}；本机的 agent 也能用它读写这个农场",
+        cliNotOnPath: '已经装到 {link}，但 ~/.local/bin 不在 PATH 里：在 ~/.zshrc 里加一行 export PATH="$HOME/.local/bin:$PATH"',
+        cliTaken: "{link} 已经有别的文件，没有换掉：先挪开它再装",
+        cliInstall: "安装",
+        cliRemove: "移除",
       },
       missing: {
         deepseekKey: "还没填 DeepSeek 的钥匙",
@@ -3924,7 +3977,31 @@ export const catalogs = {
       quit: "Quit",
       waiting: "{n} for you",
       working: "{n} working",
-      menu: { view: "View", resetZoom: "Actual Size", zoomIn: "Zoom In", zoomOut: "Zoom Out", window: "Window", close: "Close Window" },
+      menu: {
+        about: "About {app}",
+        settings: "Settings…",
+        hide: "Hide {app}",
+        hideOthers: "Hide Others",
+        unhide: "Show All",
+        quit: "Quit {app}",
+        edit: "Edit",
+        undo: "Undo",
+        redo: "Redo",
+        cut: "Cut",
+        copy: "Copy",
+        paste: "Paste",
+        selectAll: "Select All",
+        view: "View",
+        toggleSidebar: "Toggle Sidebar",
+        toggleTheme: "Toggle Theme",
+        resetZoom: "Actual Size",
+        zoomIn: "Zoom In",
+        zoomOut: "Zoom Out",
+        fullScreen: "Toggle Full Screen",
+        window: "Window",
+        close: "Close Window",
+        closeTab: "Close Tab",
+      },
     },
     server: {
       lookIn: {
@@ -5156,6 +5233,7 @@ export const catalogs = {
       rail: "Workbench",
       farm: "Back to the farm",
       farmShort: "Farm",
+      update: "Update",
       working: "Open · {n} working",
       off: "Not open",
       chips: {
@@ -5294,6 +5372,7 @@ export const catalogs = {
         longMore: "Show all",
         longLess: "Show less",
       },
+      updateReady: "{next} is ready: restart from About",
       intent: { timedOut: "No answer in time; try again", offline: "Not connected to the farm, so this was not sent" },
     },
     "web.catalog": {
@@ -6780,6 +6859,33 @@ export const catalogs = {
         copy: "Copy the path",
         copied: "Path copied",
         reveal: "Show in Finder",
+        update: "Updates",
+        updateHint: "The desktop app updates itself from the releases on GitHub",
+        upToDate: "Up to date",
+        checking: "Looking for a new version…",
+        downloading: "Downloading {next} ({percent}%)",
+        ready: "{next} is ready and goes in when you quit",
+        readyNewFarm: "{next} is ready: it starts from fresh data and keeps the old aside",
+        manual: {
+          diskImage: "{next} needs installing by hand: the app runs from its disk image; drag it to Applications first",
+          translocated: "{next} needs installing by hand: macOS runs the app from a temporary place; drag it to Applications and open it again",
+          readOnly: "{next} needs installing by hand: the app's folder cannot be written",
+          noBuild: "{next} has no build for this Mac",
+        },
+        failed: "Could not check: {why}",
+        check: "Check for updates",
+        restart: "Restart to update",
+        restartQuestion: "Restart into the new version?",
+        workingQuestion: "{n} helpers are working; restarting cuts them off. Restart now?",
+        newFarmQuestion: "The new version starts from fresh data; the old stays in the home folder. Restart now?",
+        download: "Download",
+        cli: "Command line",
+        cliHint: "Once installed, {command} reads and writes this farm from a terminal, for agents on this Mac too",
+        cliReady: "Use {command} in a terminal; agents on this Mac can read and write this farm with it",
+        cliNotOnPath: 'Installed at {link}, but ~/.local/bin is not on your PATH: add export PATH="$HOME/.local/bin:$PATH" to ~/.zshrc',
+        cliTaken: "{link} is another program's file and was not replaced: move it away, then install",
+        cliInstall: "Install",
+        cliRemove: "Remove",
       },
       missing: {
         deepseekKey: "No DeepSeek key yet",
@@ -7435,8 +7541,25 @@ export interface Messages {
   "cli.worker.pr": undefined;
   "cli.worker.read": undefined;
   "cli.worker.report": undefined;
+  "desktop.menu.about": { readonly app: string | number };
   "desktop.menu.close": undefined;
+  "desktop.menu.closeTab": undefined;
+  "desktop.menu.copy": undefined;
+  "desktop.menu.cut": undefined;
+  "desktop.menu.edit": undefined;
+  "desktop.menu.fullScreen": undefined;
+  "desktop.menu.hide": { readonly app: string | number };
+  "desktop.menu.hideOthers": undefined;
+  "desktop.menu.paste": undefined;
+  "desktop.menu.quit": { readonly app: string | number };
+  "desktop.menu.redo": undefined;
   "desktop.menu.resetZoom": undefined;
+  "desktop.menu.selectAll": undefined;
+  "desktop.menu.settings": undefined;
+  "desktop.menu.toggleSidebar": undefined;
+  "desktop.menu.toggleTheme": undefined;
+  "desktop.menu.undo": undefined;
+  "desktop.menu.unhide": undefined;
   "desktop.menu.view": undefined;
   "desktop.menu.window": undefined;
   "desktop.menu.zoomIn": undefined;
@@ -8726,6 +8849,8 @@ export interface Messages {
   "web.base.time.yesterday": undefined;
   "web.base.toasts": undefined;
   "web.base.unreachable": undefined;
+  "web.base.update": undefined;
+  "web.base.updateReady": { readonly next: string | number };
   "web.base.user": undefined;
   "web.base.working": { readonly n: string | number };
   "web.base.write": undefined;
@@ -10099,20 +10224,45 @@ export interface Messages {
   "web.session.trajectory.want": undefined;
   "web.session.trajectory.wantHint": undefined;
   "web.session.trajectory.wrong": undefined;
+  "web.setting.about.check": undefined;
+  "web.setting.about.checking": undefined;
+  "web.setting.about.cli": undefined;
+  "web.setting.about.cliHint": { readonly command: string | number };
+  "web.setting.about.cliInstall": undefined;
+  "web.setting.about.cliNotOnPath": { readonly link: string | number };
+  "web.setting.about.cliReady": { readonly command: string | number };
+  "web.setting.about.cliRemove": undefined;
+  "web.setting.about.cliTaken": { readonly link: string | number };
   "web.setting.about.copied": undefined;
   "web.setting.about.copy": undefined;
+  "web.setting.about.download": undefined;
+  "web.setting.about.downloading": { readonly next: string | number; readonly percent: string | number };
+  "web.setting.about.failed": { readonly why: string | number };
   "web.setting.about.files": undefined;
   "web.setting.about.home": undefined;
   "web.setting.about.homeHint": undefined;
+  "web.setting.about.manual.diskImage": { readonly next: string | number };
+  "web.setting.about.manual.noBuild": { readonly next: string | number };
+  "web.setting.about.manual.readOnly": { readonly next: string | number };
+  "web.setting.about.manual.translocated": { readonly next: string | number };
+  "web.setting.about.newFarmQuestion": undefined;
   "web.setting.about.pkm": undefined;
   "web.setting.about.pkmHint": undefined;
+  "web.setting.about.ready": { readonly next: string | number };
+  "web.setting.about.readyNewFarm": { readonly next: string | number };
   "web.setting.about.repos": undefined;
   "web.setting.about.reposHint": undefined;
+  "web.setting.about.restart": undefined;
+  "web.setting.about.restartQuestion": undefined;
   "web.setting.about.reveal": undefined;
   "web.setting.about.settings": undefined;
   "web.setting.about.settingsHint": undefined;
+  "web.setting.about.upToDate": undefined;
+  "web.setting.about.update": undefined;
+  "web.setting.about.updateHint": undefined;
   "web.setting.about.version": undefined;
   "web.setting.about.versionHint": undefined;
+  "web.setting.about.workingQuestion": { readonly n: string | number };
   "web.setting.about.worktrees": undefined;
   "web.setting.about.worktreesHint": undefined;
   "web.setting.accounts.intro": undefined;

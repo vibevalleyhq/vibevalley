@@ -1,7 +1,4 @@
-// Ported from VibeValley apps/web/src/features/setting/AboutPage.tsx. Not
-// here: UpdateRow and CommandLineRow (UpdateRow.tsx): VibeValley's updates and
-// its command line are the app's, not the hosted page's (docs/vibevalley-port.md:
-// updates and command-line install are not done).
+// Ported from VibeValley apps/web/src/features/setting/AboutPage.tsx.
 import { Clipboard, Text } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -9,11 +6,13 @@ import { t } from "@vibevalley/i18n";
 import { reasonOf } from "../../infra/api";
 import { currentHost } from "../../infra/host";
 import { ready, useSettings } from "../../infra/query";
+import { useUpdates } from "../../infra/settings";
 import { SettingRow, SettingsGroup, SettingsPage } from "../../ui/domain/settings";
 import { IconButton } from "../../ui/IconButton";
 import { Quiet } from "../../ui/layout";
 import { Tip } from "../../ui/Tip";
 import { toast } from "../../ui/toasts";
+import { CommandLineRow, UpdateRow, useCommandLine } from "./UpdateRow";
 
 function PathRow(props: { label: string; hint: string; path: string; last?: boolean }) {
   const reveal = currentHost().reveal;
@@ -39,6 +38,8 @@ function PathRow(props: { label: string; hint: string; path: string; last?: bool
 
 export function AboutPage() {
   const settings = useSettings();
+  const updates = useUpdates();
+  const cli = useCommandLine();
   return (
     <SettingsPage title={t("web.setting.nav.about")}>
       <If
@@ -48,11 +49,13 @@ export function AboutPage() {
         {(s) => (
           <>
             <SettingsGroup>
-              <SettingRow label={t("web.setting.about.version")} hint={t("web.setting.about.versionHint")} last>
+              <SettingRow label={t("web.setting.about.version")} hint={t("web.setting.about.versionHint")} last={!updates() && !cli.state()}>
                 <Text testID="about-version" class="font-mono text-sm text-ink">
                   {s().version}
                 </Text>
               </SettingRow>
+              <UpdateRow state={updates} last={!cli.state()} />
+              <CommandLineRow state={cli.state} onInstall={cli.install} onRemove={cli.remove} last />
             </SettingsGroup>
             <SettingsGroup title={t("web.setting.about.files")}>
               <Each

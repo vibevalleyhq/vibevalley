@@ -241,6 +241,7 @@ pub struct TermSession {
 
 struct Inner {
     tx: flume::Sender<Msg>,
+    done: flume::Receiver<()>,
     shared: Arc<Shared>,
 }
 
@@ -255,6 +256,7 @@ impl TermSession {
     /// session thread; it must be cheap and must not block.
     pub fn spawn(opts: SpawnOptions, on_event: impl Fn(TermEvent) + Send + 'static) -> Result<TermSession> {
         let (tx, rx) = flume::unbounded();
+        let (done_tx, done) = flume::bounded(1);
         let (pty, master_fd) = pty::spawn(&opts, tx.clone())?;
         let shared = Arc::new(Shared::new(opts.size, master_fd, pty.pid));
         let (ready_tx, ready_rx) = flume::bounded(1);
@@ -262,6 +264,7 @@ impl TermSession {
         std::thread::Builder::new()
             .name("vibevalley-terminal".to_string())
             .spawn(move || {
+                let _done = done_tx;
                 session::run(opts, pty, thread_shared, rx, Box::new(on_event), ready_tx);
             })
             .map_err(|e| TermError::Spawn(e.to_string()))?;
@@ -269,7 +272,7 @@ impl TermSession {
             .recv()
             .map_err(|_| TermError::Backend("session thread stopped during startup".into()))??;
         Ok(TermSession {
-            inner: Arc::new(Inner { tx, shared }),
+            inner: Arc::new(Inner { tx, done, shared }),
         })
     }
 
@@ -278,6 +281,7 @@ impl TermSession {
     /// output above the new shell's prompt.
     pub fn spawn_with_history(opts: SpawnOptions, history: &str, on_event: impl Fn(TermEvent) + Send + 'static) -> Result<TermSession> {
         let (tx, rx) = flume::unbounded();
+        let (done_tx, done) = flume::bounded(1);
         let (pty, master_fd) = pty::spawn(&opts, tx.clone())?;
         let shared = Arc::new(Shared::new(opts.size, master_fd, pty.pid));
         let (ready_tx, ready_rx) = flume::bounded(1);
@@ -286,6 +290,7 @@ impl TermSession {
         std::thread::Builder::new()
             .name("vibevalley-terminal".to_string())
             .spawn(move || {
+                let _done = done_tx;
                 session::run_with_history(opts, &history, pty, thread_shared, rx, Box::new(on_event), ready_tx);
             })
             .map_err(|e| TermError::Spawn(e.to_string()))?;
@@ -293,7 +298,7 @@ impl TermSession {
             .recv()
             .map_err(|_| TermError::Backend("session thread stopped during startup".into()))??;
         Ok(TermSession {
-            inner: Arc::new(Inner { tx, shared }),
+            inner: Arc::new(Inner { tx, done, shared }),
         })
     }
 
@@ -416,5 +421,49 @@ impl TermSession {
 
     pub fn kill(&self) {
         self.post(Msg::Kill);
+    }
+
+    /// Stops the session thread, reaps its PTY child, and waits up to `timeout`
+    /// for teardown to finish.
+    pub fn shutdown_and_wait(&self, timeout: std::time::Duration) {
+        self.post(Msg::Shutdown);
+        let _ = self.inner.done.recv_timeout(timeout);
+    }
+}
+
+#[cfg(test)]
+mod shutdown_tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn shutdown_and_wait_reaps_child_and_marks_session_stopped() {
+        let session = TermSession::spawn(
+            SpawnOptions {
+                cwd: std::env::temp_dir(),
+                program: Some("/bin/sh".into()),
+                args: vec!["-c".into(), "sleep 30".into()],
+                env: Vec::new(),
+                size: TermSize {
+                    cols: 80,
+                    rows: 24,
+                    cell_width_px: 8,
+                    cell_height_px: 16,
+                },
+                scrollback_lines: 100,
+                theme: Theme {
+                    foreground: Rgb(220, 220, 220),
+                    background: Rgb(20, 20, 20),
+                    cursor: Rgb(255, 255, 255),
+                    selection: Rgb(60, 80, 120),
+                    ansi: [Rgb(0, 0, 0); 16],
+                },
+            },
+            |_| {},
+        )
+        .expect("spawn sleep session");
+        assert!(session.is_alive());
+        session.shutdown_and_wait(Duration::from_secs(3));
+        assert!(!session.is_alive());
     }
 }

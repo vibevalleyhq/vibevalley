@@ -42,6 +42,7 @@
   "rail": "工作台",
   "farm": "回农场",
   "farmShort": "农场",
+  "update": "更新",
   "working": "开工中 · {n} 个在干活",
   "off": "没开工",
   "chips": {
@@ -228,6 +229,7 @@
     "longMore": "展开全文",
     "longLess": "收起"
   },
+  "updateReady": "{next} 已下好，去「关于」重启",
   "intent": {
     "timedOut": "等了太久没回音，可以重试",
     "offline": "没连上农场，这一下没发出去"

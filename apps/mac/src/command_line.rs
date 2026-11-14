@@ -36,6 +36,10 @@ impl CommandLine {
         std::fs::read_link(&self.link).is_ok_and(|target| target == self.binary)
     }
 
+    pub fn available(&self) -> bool {
+        self.binary.is_file() || self.owns_link()
+    }
+
     pub fn state(&self) -> State {
         let installed = self.owns_link();
         let taken = !installed && std::fs::symlink_metadata(&self.link).is_ok();

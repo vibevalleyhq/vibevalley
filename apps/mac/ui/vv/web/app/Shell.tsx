@@ -1,18 +1,20 @@
 // Ported from VibeValley apps/web/src/app/Shell.tsx: the rail of places,
 // the desk over a page, the page, and the quick switcher on Ctrl/⌘K (nsh's
 // keymap for base/shortcuts.ts's window listener), the notes search and the
-// shortcut sheet. Not here: the update slot (VibeValley's updates are the app's); the workbench zoom.
+// shortcut sheet.
 // The orchestrator's pixel face at the rail's top is the farm's icon while
 // the art is not installed.
 import { host, keymap, Scroll, Text, View, windowSize, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
+import { variant } from "../base/dom";
 import { QuickSwitcher, switcher } from "../features/channel";
 import { waitingOnUser } from "../features/inbox";
 import { NotesSearch } from "../features/pkm";
 import { useCore, useFrames } from "../infra/frame";
 import { Link as A, NavLink, useLocation, useMatches } from "../infra/router";
+import { useUpdates } from "../infra/settings";
 import { OrchestratorFace } from "../ui/domain/Face";
 import { Icon } from "../ui/Icon";
 import type { IconName } from "../ui/icons";
@@ -68,6 +70,11 @@ const railGroups = ["work", "setup", "reference"] as const;
 function Rail(props: { here?: Place | undefined; farm: boolean }) {
   const pixelDir = usePixelDir();
   const frames = useFrames();
+  const updates = useUpdates();
+  const ready = () => {
+    const s = updates();
+    return s ? variant(s, "_tag", "ready") : undefined;
+  };
   const waiting = () => waitingOnUser(frames.frame?.inbox ?? []);
   const settings = settingsPlace;
   const atSettings = () => props.here === settings;
@@ -148,6 +155,17 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
         </View>
       </Scroll>
       <View class="items-center gap-1 pt-2 pb-3">
+        <If when={ready()}>
+          {(r) => (
+            <Slot
+              to="/settings/about"
+              place="update"
+              label={t("web.base.updateReady", { next: r().next })}
+              name={t("web.base.update")}
+              icon={railIcon("update", () => false)}
+            />
+          )}
+        </If>
         <Slot
           to={settings.path}
           place={settings.id}

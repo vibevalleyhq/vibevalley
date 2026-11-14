@@ -26,6 +26,7 @@ gpui_kit::actions!(terminal, [Copy, Paste, Clear, ScrollPageUp, ScrollPageDown, 
 #[derive(Debug, Clone)]
 pub struct SpawnSpec {
     pub cwd: PathBuf,
+    pub title: Option<String>,
     pub program: Option<String>,
     pub args: Vec<String>,
     pub env: Vec<(String, String)>,
@@ -37,6 +38,7 @@ impl SpawnSpec {
     pub fn shell(cwd: PathBuf) -> Self {
         SpawnSpec {
             cwd,
+            title: None,
             program: None,
             args: Vec::new(),
             env: Vec::new(),
@@ -137,6 +139,7 @@ impl TerminalView {
         })
         .detach();
 
+        let initial_title = spec.title.as_deref().map(str::trim).filter(|t| !t.is_empty()).map(str::to_string);
         TerminalView {
             state: State::Unsized,
             spec,
@@ -146,7 +149,7 @@ impl TerminalView {
             row_cache: Rc::default(),
             blink_on: true,
             focused: false,
-            title: None,
+            title: initial_title,
             running_command: None,
             last_running: None,
             exited: false,
@@ -346,7 +349,11 @@ impl TerminalView {
                 cx.notify();
             }
             TermEvent::TitleChanged(title) => {
-                self.title = Some(title).filter(|t| !t.trim().is_empty());
+                let next = Some(title).filter(|t| !t.trim().is_empty());
+                if next.as_deref().is_some_and(crate::panes::is_default_title) && self.spec.title.as_deref().is_some_and(|t| !t.trim().is_empty()) {
+                    return;
+                }
+                self.title = next.or_else(|| self.spec.title.clone().filter(|t| !t.trim().is_empty()));
                 self.last_running = self.running_status();
                 cx.emit(TerminalEvent::TitleChanged);
             }

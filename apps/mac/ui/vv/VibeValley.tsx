@@ -15,8 +15,9 @@ export function VibeValley() {
   useBridge();
   const route = host.params.route;
   if (typeof route === "string" && route !== "/") appHistory.navigate(route, { replace: true });
-  // The shell can move the page: `route:<path>` from Rust.
-  host.on("route", (to) => typeof to === "string" && appHistory.navigate(to));
+  // The shell can move the page (`route:<path>`) or change its language (`locale:<loc>`) from Rust.
+  cleanup(host.on("route", (to) => typeof to === "string" && appHistory.navigate(to)));
+  cleanup(host.on("locale", (loc) => (loc === "en" || loc === "zh") && setLocale(loc)));
   if (host.params.globalShell === true) {
     const changed = () => host.post("action", { type: "global_route", path: appHistory.read().pathname });
     cleanup(appHistory.subscribe(changed));

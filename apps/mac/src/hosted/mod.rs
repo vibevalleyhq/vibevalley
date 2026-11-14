@@ -22,7 +22,7 @@ pub struct BridgeHub(pub vibevalley_bridge::Hub);
 
 impl gpui_kit::Global for BridgeHub {}
 
-pub struct ServerStartup(pub flume::Receiver<Result<(), String>>);
+pub struct ServerStartup(pub tokio::sync::watch::Receiver<Option<Result<(), String>>>);
 impl gpui_kit::Global for ServerStartup {}
 
 impl BridgeHub {
@@ -31,12 +31,12 @@ impl BridgeHub {
     /// (`state.json`, `responses.json`) for tests and debug scripts;
     /// `VIBEVALLEY_HOME=<dir>` moves the real one.
     pub fn install(cx: &mut App) {
-        let (ready, startup) = flume::bounded(1);
+        let (ready, startup) = tokio::sync::watch::channel(None);
         cx.set_global(ServerStartup(startup));
         let server: std::sync::Arc<dyn vibevalley_bridge::Server> = match std::env::var_os("VIBEVALLEY_FAKE_SERVER") {
             Some(dir) => {
                 let fake = vibevalley_bridge::fake::FakeServer::from_dir(std::path::Path::new(&dir));
-                let _ = ready.send(fake.as_ref().map(|_| ()).map_err(ToString::to_string));
+                let _ = ready.send_replace(Some(fake.as_ref().map(|_| ()).map_err(ToString::to_string)));
                 std::sync::Arc::new(fake.unwrap_or_else(|_| vibevalley_bridge::fake::FakeServer::new()))
             }
             None => std::sync::Arc::new(late::LateServer::spawn(move || {
@@ -52,17 +52,17 @@ impl BridgeHub {
                                 started.board.sessions().set_mcp_url(format!("{}/mcp", listener.url()));
                                 match vibevalley_server::home::announce(&home, &listener.url()) {
                                     Ok(announced) => {
-                                        let _ = ready.send(Ok(()));
+                                        let _ = ready.send_replace(Some(Ok(())));
                                         (Some(listener), Some(announced))
                                     }
                                     Err(e) => {
-                                        let _ = ready.send(Err(format!("server.json: {e}")));
+                                        let _ = ready.send_replace(Some(Err(format!("server.json: {e}"))));
                                         (Some(listener), None)
                                     }
                                 }
                             }
                             Err(e) => {
-                                let _ = ready.send(Err(format!("vibevalley http: {e}")));
+                                let _ = ready.send_replace(Some(Err(format!("vibevalley http: {e}"))));
                                 (None, None)
                             }
                         };
@@ -70,7 +70,7 @@ impl BridgeHub {
                         hub
                     }
                     Err(e) => {
-                        let _ = ready.send(Err(format!("vibevalley server: {e}")));
+                        let _ = ready.send_replace(Some(Err(format!("vibevalley server: {e}"))));
                         std::sync::Arc::new(vibevalley_bridge::fake::FakeServer::new())
                     }
                 }
@@ -121,8 +121,9 @@ fn capabilities_from(raw: &str) -> String {
     let mut caps: Value = serde_json::from_str(raw).unwrap_or_else(|_| json!({}));
     let assets = crate::pixel::assets_dir();
     let home = server_home();
+    let work_root = crate::serving::work_root();
     let _ = std::fs::create_dir_all(&home);
-    let roots = [assets.join("pixel"), assets.join("cursors"), home];
+    let roots = [assets.join("pixel"), assets.join("cursors"), home, work_root];
     if !caps["fs"].is_object() {
         caps["fs"] = json!({ "read": [], "write": [] });
     }
@@ -216,12 +217,18 @@ impl HostedView {
         let name = view.to_string();
         let hub = cx.try_global::<BridgeHub>().map(|h| h.0.clone());
         let mut client = None;
+        let ui_font_size = cx.try_global::<crate::theme::Ui>().map(|ui| ui.settings.ui_font_size).unwrap_or(13.0);
         let app = cx.new(|cx| {
             let app = AppView::new(options, window, cx);
             app.set_appearance(if dark { Appearance::Dark } else { Appearance::Light }, cx);
+            let scale = ui_font_size / 13.0;
+            if (scale - 1.0).abs() > 0.01 {
+                app.set_font_scale(Some(scale), cx);
+            }
             let host = app.host();
             let mut params = params;
             params.insert("view".into(), json!(name));
+            params.entry("locale").or_insert_with(|| json!(vibevalley_i18n::locale()));
             let pixel_dir = crate::pixel::assets_dir().join("pixel");
             let has_pixel_dir = pixel_dir.join("sprites.json").is_file();
             if has_pixel_dir {
@@ -325,6 +332,16 @@ impl HostedView {
     pub fn set_dark(&self, dark: bool, cx: &mut App) {
         self.app
             .update(cx, |app, cx| app.set_appearance(if dark { Appearance::Dark } else { Appearance::Light }, cx));
+    }
+
+    pub fn set_locale(&self, locale: &str, cx: &App) {
+        let _ = self.app.read(cx).host().send("locale", json!(locale));
+    }
+
+    pub fn set_ui_font_size(&self, size: f32, cx: &mut App) {
+        let scale = size / 13.0;
+        let scale = ((scale - 1.0).abs() > 0.01).then_some(scale);
+        self.app.update(cx, |app, cx| app.set_font_scale(scale, cx));
     }
 
     /// For the debug dump: what was sent and what the view applied.

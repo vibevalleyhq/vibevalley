@@ -42,6 +42,7 @@
   "rail": "Workbench",
   "farm": "Back to the farm",
   "farmShort": "Farm",
+  "update": "Update",
   "working": "Open · {n} working",
   "off": "Not open",
   "chips": {
@@ -228,6 +229,7 @@
     "longMore": "Show all",
     "longLess": "Show less"
   },
+  "updateReady": "{next} is ready: restart from About",
   "intent": {
     "timedOut": "No answer in time; try again",
     "offline": "Not connected to the farm, so this was not sent"

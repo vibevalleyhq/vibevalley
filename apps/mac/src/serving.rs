@@ -79,30 +79,38 @@ impl OpeningPhase {
 
 pub struct Running {
     started: vibevalley_server::Started,
-    _listener: Option<vibevalley_http::Listener>,
-    _announced: Option<vibevalley_server::home::Announced>,
+    listener: Option<vibevalley_http::Listener>,
+    announced: Option<vibevalley_server::home::Announced>,
 }
 
-static RUNNING: std::sync::OnceLock<Running> = std::sync::OnceLock::new();
+static RUNNING: std::sync::Mutex<Option<Running>> = std::sync::Mutex::new(None);
+
+fn lock_running() -> std::sync::MutexGuard<'static, Option<Running>> {
+    RUNNING.lock().unwrap_or_else(|e| e.into_inner())
+}
 
 pub fn set_running(started: vibevalley_server::Started, listener: Option<vibevalley_http::Listener>, announced: Option<vibevalley_server::home::Announced>) {
-    let _ = RUNNING.set(Running {
-        started,
-        _listener: listener,
-        _announced: announced,
-    });
+    *lock_running() = Some(Running { started, listener, announced });
+}
+
+/// Removes `server.json`, stops the loopback HTTP listener, and closes background workers.
+pub fn shutdown() {
+    let Some(running) = lock_running().take() else { return };
+    drop(running.announced);
+    drop(running.listener);
+    running.started.close();
 }
 
 pub fn voice() -> Result<std::sync::Arc<vibevalley_server::modules::voice::Voice>, String> {
-    RUNNING
-        .get()
+    lock_running()
+        .as_ref()
         .map(|r| r.started.voice.clone())
         .ok_or_else(|| "the voice service is not ready".into())
 }
 
 pub fn speech() -> Result<vibevalley_server_api::media::SharedSpeechStreams, String> {
-    RUNNING
-        .get()
+    lock_running()
+        .as_ref()
         .map(|r| -> vibevalley_server_api::media::SharedSpeechStreams { r.started.media.clone() })
         .ok_or_else(|| "the speech service is not ready".into())
 }
