@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
+#[cfg(feature = "ts-gen")]
 use ts_rs::TS;
 
 #[allow(unused_imports)]
@@ -13,8 +14,9 @@ use super::*;
 use crate::wire::*;
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct OrchestratorEvalRequest {
     /// The orchestrator whose log it is, by its profile id; the default one when none is given.
@@ -24,8 +26,9 @@ pub struct OrchestratorEvalRequest {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct OrchestratorEval {
     pub id: String,
@@ -33,13 +36,15 @@ pub struct OrchestratorEval {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct OrchestratorStopInput {
     pub agent: Option<String>,
 }
 
+#[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "orchestrator";
     types: [OrchestratorEvalRequest,

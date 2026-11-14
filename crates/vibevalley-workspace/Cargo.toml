@@ -5,7 +5,6 @@ edition = "2024"
 
 [dependencies]
 vibevalley-oar = { version = "0.1.0", path = "../vibevalley-oar" }
-vibevalley-files = { version = "0.1.0", path = "../vibevalley-files" }
 vibevalley-git = { version = "0.1.0", path = "../vibevalley-git" }
 vibevalley-store = { version = "0.1.0", path = "../vibevalley-store" }
 vibevalley-terminal = { version = "0.1.0", path = "../vibevalley-terminal" }

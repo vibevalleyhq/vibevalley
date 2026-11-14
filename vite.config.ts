@@ -48,7 +48,7 @@ export default defineConfig({
       "rust:check": { command: "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace", cache: false },
       "protocol:check": {
         command:
-          "cargo test -p vibevalley-protocol --test typescript && vp run goldens && git diff --exit-code -- crates/vibevalley-artifact/assets/shell.json crates/vibevalley-artifact/tests/golden 'crates/vibevalley-pkm/golden/*.json'",
+          "cargo test -p vibevalley-protocol --features ts-gen --test typescript && vp run goldens && git diff --exit-code -- crates/vibevalley-artifact/assets/shell.json crates/vibevalley-artifact/tests/golden 'crates/vibevalley-pkm/golden/*.json'",
         cache: false,
       },
       // The native views: nsh's own type check, then a bundle.

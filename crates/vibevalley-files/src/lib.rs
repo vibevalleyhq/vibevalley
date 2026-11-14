@@ -9,6 +9,7 @@ use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 mod fuzzy;
+#[cfg(feature = "highlight")]
 mod highlight;
 mod load;
 mod search;
@@ -195,9 +196,29 @@ impl Language {
 
     /// Canonical names of the languages `highlight` supports.
     pub fn supported() -> &'static [&'static str] {
-        highlight::SUPPORTED
+        SUPPORTED
     }
 }
+
+pub(crate) const SUPPORTED: &[&str] = &[
+    "rust",
+    "typescript",
+    "tsx",
+    "javascript",
+    "json",
+    "toml",
+    "yaml",
+    "markdown",
+    "python",
+    "go",
+    "bash",
+    "html",
+    "css",
+    "c",
+    "cpp",
+    "zig",
+    "swift",
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HighlightKind {
@@ -229,6 +250,7 @@ pub struct HighlightSpan {
 /// Highlight spans for each line of `text` (one inner `Vec` per line, spans
 /// sorted and non-overlapping). Unknown languages yield empty lines. Lines
 /// are those of `str::lines`, so spans never cover a line terminator.
+#[cfg(feature = "highlight")]
 pub fn highlight(text: &str, language: &Language) -> Vec<Vec<HighlightSpan>> {
     highlight::highlight(text, &language.0)
 }

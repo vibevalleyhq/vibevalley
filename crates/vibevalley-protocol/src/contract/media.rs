@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
+#[cfg(feature = "ts-gen")]
 use ts_rs::TS;
 
 #[allow(unused_imports)]
@@ -18,7 +19,8 @@ pub type VoiceId = String;
 
 pub type SpeakerId = String;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum MediaAudioFormat {
     #[serde(rename = "wav")]
     Wav,
@@ -58,8 +60,9 @@ impl MediaAudioFormat {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaAudioAccountRequest {
     pub id: Id,
@@ -68,8 +71,9 @@ pub struct MediaAudioAccountRequest {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaSpeakersRequestSpeakers {
     pub id: SpeakerId,
@@ -77,8 +81,9 @@ pub struct MediaSpeakersRequestSpeakers {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaSpeakersRequestSegments {
     pub speaker: SpeakerId,
@@ -86,8 +91,9 @@ pub struct MediaSpeakersRequestSegments {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaSpeakersRequest {
     pub id: Id,
@@ -99,8 +105,9 @@ pub struct MediaSpeakersRequest {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaVoiceDesignRequest {
     pub id: Id,
@@ -112,8 +119,9 @@ pub struct MediaVoiceDesignRequest {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaCloneRequest {
     pub id: Id,
@@ -125,8 +133,9 @@ pub struct MediaCloneRequest {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaTranscriptionRequest {
     pub id: Id,
@@ -140,8 +149,9 @@ pub struct MediaTranscriptionRequest {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(tag = "kind")]
 pub enum MediaAudioRequest {
     #[serde(rename = "speakers", rename_all = "camelCase")]
@@ -185,8 +195,9 @@ pub enum MediaAudioRequest {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaAudioVoice {
     pub id: String,
@@ -195,8 +206,9 @@ pub struct MediaAudioVoice {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaAudioSegment {
     pub speaker: String,
@@ -206,8 +218,9 @@ pub struct MediaAudioSegment {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(tag = "kind")]
 pub enum MediaAudioResult {
     #[serde(rename = "clone", rename_all = "camelCase")]
@@ -217,8 +230,9 @@ pub enum MediaAudioResult {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(tag = "kind")]
 pub enum MediaSource {
     #[serde(rename = "user")]
@@ -227,7 +241,8 @@ pub enum MediaSource {
     Orchestrator { agent: String, channel: String },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum MediaPhase {
     #[serde(rename = "queued")]
     Queued,
@@ -274,7 +289,8 @@ impl MediaPhase {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum MediaAudioMetadataSource {
     #[serde(rename = "file")]
     File,
@@ -295,8 +311,9 @@ impl MediaAudioMetadataSource {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaAudioMetadata {
     pub source: MediaAudioMetadataSource,
@@ -307,8 +324,9 @@ pub struct MediaAudioMetadata {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaAudioUsage {
     pub input_characters: Option<i64>,
@@ -318,7 +336,8 @@ pub struct MediaAudioUsage {
     pub input_audio_seconds: Option<JsNumber>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum MediaInputKind {
     #[serde(rename = "image")]
     Image,
@@ -342,8 +361,9 @@ impl MediaInputKind {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaInputReference {
     pub id: String,
@@ -355,8 +375,9 @@ pub struct MediaInputReference {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(tag = "kind")]
 pub enum MediaAudioJob {
     #[serde(rename = "speakers", rename_all = "camelCase")]
@@ -371,25 +392,25 @@ pub enum MediaAudioJob {
         phase_text: String,
         problem: String,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         format: Option<MediaAudioFormat>,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         content_type: Option<String>,
         metadata: Option<MediaAudioMetadata>,
         usage: Option<MediaAudioUsage>,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         input: Option<MediaInputReference>,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         result_input: Option<MediaInputReference>,
         attachment: Option<Attachment>,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         preview_input: Option<String>,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         result: Option<MediaAudioResult>,
         can_cancel: bool,
         can_retry_download: bool,
@@ -412,25 +433,25 @@ pub enum MediaAudioJob {
         phase_text: String,
         problem: String,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         format: Option<MediaAudioFormat>,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         content_type: Option<String>,
         metadata: Option<MediaAudioMetadata>,
         usage: Option<MediaAudioUsage>,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         input: Option<MediaInputReference>,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         result_input: Option<MediaInputReference>,
         attachment: Option<Attachment>,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         preview_input: Option<String>,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         result: Option<MediaAudioResult>,
         can_cancel: bool,
         can_retry_download: bool,
@@ -453,25 +474,25 @@ pub enum MediaAudioJob {
         phase_text: String,
         problem: String,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         format: Option<MediaAudioFormat>,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         content_type: Option<String>,
         metadata: Option<MediaAudioMetadata>,
         usage: Option<MediaAudioUsage>,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         input: Option<MediaInputReference>,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         result_input: Option<MediaInputReference>,
         attachment: Option<Attachment>,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         preview_input: Option<String>,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         result: Option<MediaAudioResult>,
         can_cancel: bool,
         can_retry_download: bool,
@@ -494,25 +515,25 @@ pub enum MediaAudioJob {
         phase_text: String,
         problem: String,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         format: Option<MediaAudioFormat>,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         content_type: Option<String>,
         metadata: Option<MediaAudioMetadata>,
         usage: Option<MediaAudioUsage>,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         input: Option<MediaInputReference>,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         result_input: Option<MediaInputReference>,
         attachment: Option<Attachment>,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         preview_input: Option<String>,
         #[serialize_always]
-        #[ts(optional = false)]
+        #[cfg_attr(feature = "ts-gen", ts(optional = false))]
         result: Option<MediaAudioResult>,
         can_cancel: bool,
         can_retry_download: bool,
@@ -528,8 +549,9 @@ pub enum MediaAudioJob {
 pub type InputName = String;
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaInputRequest {
     pub kind: MediaInputKind,
@@ -538,7 +560,8 @@ pub struct MediaInputRequest {
     pub size: i64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum MediaInputPhase {
     #[serde(rename = "reserved")]
     Reserved,
@@ -574,8 +597,9 @@ impl MediaInputPhase {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaInput {
     pub id: String,
@@ -585,14 +609,15 @@ pub struct MediaInput {
     pub size: i64,
     pub phase: MediaInputPhase,
     #[serialize_always]
-    #[ts(optional = false)]
+    #[cfg_attr(feature = "ts-gen", ts(optional = false))]
     pub hash: Option<String>,
     pub created_at: i64,
     pub expires_at: i64,
     pub can_delete: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum MediaImageFormat {
     #[serde(rename = "text")]
     Text,
@@ -613,8 +638,9 @@ impl MediaImageFormat {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaImageRequest {
     pub id: String,
@@ -631,8 +657,9 @@ pub struct MediaImageRequest {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaImageUsage {
     pub images: i64,
@@ -640,7 +667,8 @@ pub struct MediaImageUsage {
     pub height: i64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum MediaImageJobKind {
     #[serde(rename = "image")]
     Image,
@@ -658,8 +686,9 @@ impl MediaImageJobKind {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaImageJob {
     pub kind: MediaImageJobKind,
@@ -681,8 +710,9 @@ pub struct MediaImageJob {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaUnderstandingRequest {
     pub id: String,
@@ -695,8 +725,9 @@ pub struct MediaUnderstandingRequest {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaUnderstandingAuthorizationRequest {
     pub id: String,
@@ -710,8 +741,9 @@ pub struct MediaUnderstandingAuthorizationRequest {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaUnderstandingAuthorization {
     pub channel: String,
@@ -720,7 +752,8 @@ pub struct MediaUnderstandingAuthorization {
 
 pub type Tokens = i64;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum MediaUnderstandingStatus {
     #[serde(rename = "completed")]
     Completed,
@@ -740,7 +773,8 @@ impl MediaUnderstandingStatus {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum MediaUnderstandingResultIncompleteReason {
     #[serde(rename = "max_output_tokens")]
     MaxOutputTokens,
@@ -758,8 +792,9 @@ impl MediaUnderstandingResultIncompleteReason {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaUnderstandingResultUsage {
     pub input_tokens: Tokens,
@@ -768,20 +803,22 @@ pub struct MediaUnderstandingResultUsage {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaUnderstandingResult {
     pub model: String,
     pub text: String,
     pub status: MediaUnderstandingStatus,
     #[serialize_always]
-    #[ts(optional = false)]
+    #[cfg_attr(feature = "ts-gen", ts(optional = false))]
     pub incomplete_reason: Option<MediaUnderstandingResultIncompleteReason>,
     pub usage: MediaUnderstandingResultUsage,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum MediaUnderstandingJobKind {
     #[serde(rename = "understanding")]
     Understanding,
@@ -798,7 +835,8 @@ impl MediaUnderstandingJobKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum MediaUnderstandingPhase {
     #[serde(rename = "authorized")]
     Authorized,
@@ -849,7 +887,8 @@ impl MediaUnderstandingPhase {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum MediaCleanup {
     #[serde(rename = "pending")]
     Pending,
@@ -885,8 +924,9 @@ impl MediaCleanup {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaUnderstandingJob {
     pub kind: MediaUnderstandingJobKind,
@@ -898,13 +938,13 @@ pub struct MediaUnderstandingJob {
     pub revision: i64,
     pub source: MediaSource,
     #[serialize_always]
-    #[ts(optional = false)]
+    #[cfg_attr(feature = "ts-gen", ts(optional = false))]
     pub authorization: Option<MediaUnderstandingAuthorization>,
     pub phase: MediaUnderstandingPhase,
     pub phase_text: String,
     pub problem: String,
     #[serialize_always]
-    #[ts(optional = false)]
+    #[cfg_attr(feature = "ts-gen", ts(optional = false))]
     pub result: Option<MediaUnderstandingResult>,
     pub cleanup: MediaCleanup,
     pub cleanup_text: String,
@@ -916,8 +956,9 @@ pub struct MediaUnderstandingJob {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(tag = "type")]
 pub enum MediaSpeechEvent {
     #[serde(rename = "format", rename_all = "camelCase")]
@@ -925,7 +966,7 @@ pub enum MediaSpeechEvent {
         sample_rate: i64,
         channels: i64,
         /// Always 16.
-        #[ts(type = "16")]
+        #[cfg_attr(feature = "ts-gen", ts(type = "16"))]
         bit_depth: i64,
     },
     #[serde(rename = "audio", rename_all = "camelCase")]
@@ -937,8 +978,9 @@ pub enum MediaSpeechEvent {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaSpeechRequest {
     pub id: String,
@@ -951,7 +993,8 @@ pub struct MediaSpeechRequest {
     pub revision: i64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum MediaSpeechJobKind {
     #[serde(rename = "speech")]
     Speech,
@@ -969,8 +1012,9 @@ impl MediaSpeechJobKind {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaSpeechJob {
     pub kind: MediaSpeechJobKind,
@@ -992,7 +1036,7 @@ pub struct MediaSpeechJob {
     pub problem: String,
     pub attachment: Option<Attachment>,
     #[serialize_always]
-    #[ts(optional = false)]
+    #[cfg_attr(feature = "ts-gen", ts(optional = false))]
     pub result_input: Option<MediaInputReference>,
     pub can_cancel: bool,
     pub can_retry_download: bool,
@@ -1001,8 +1045,9 @@ pub struct MediaSpeechJob {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(untagged)]
 pub enum MediaJob {
     MediaImageJob(MediaImageJob),
@@ -1012,23 +1057,26 @@ pub enum MediaJob {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaJobRequest {
     pub id: String,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct FactMediaChanged {
     pub at: i64,
     pub jobs: Vec<MediaJob>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum JobKind {
     #[serde(rename = "image")]
     Image,
@@ -1072,8 +1120,9 @@ impl JobKind {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(untagged)]
 pub enum LibraryOriginFetchedFrom {
     Url { url: String },
@@ -1082,8 +1131,9 @@ pub enum LibraryOriginFetchedFrom {
 
 /// Duplicate bytes only advance lastAt without overwriting origin.
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(tag = "kind")]
 pub enum LibraryOrigin {
     #[serde(rename = "generated", rename_all = "camelCase")]
@@ -1091,21 +1141,22 @@ pub enum LibraryOrigin {
     #[serde(rename = "uploaded", rename_all = "camelCase")]
     Uploaded {
         channel: Option<String>,
-        #[ts(as = "Option<crate::typescript::MessageId>")]
+        #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::MessageId>"))]
         message: Option<MessageId>,
     },
     #[serde(rename = "fetched", rename_all = "camelCase")]
     Fetched {
         agent: String,
-        #[ts(as = "Option<crate::typescript::SessionId>")]
+        #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::SessionId>"))]
         session: Option<SessionId>,
         from: LibraryOriginFetchedFrom,
     },
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryItem {
     pub attachment: Attachment,
@@ -1116,7 +1167,8 @@ pub struct LibraryItem {
 
 pub type LibraryItems = Vec<LibraryItem>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum LibraryOriginKind {
     #[serde(rename = "generated")]
     Generated,
@@ -1139,7 +1191,8 @@ impl LibraryOriginKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum LibraryFileKind {
     #[serde(rename = "image")]
     Image,
@@ -1165,7 +1218,8 @@ impl LibraryFileKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum LibrarySort {
     #[serde(rename = "recent")]
     Recent,
@@ -1189,8 +1243,9 @@ impl LibrarySort {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryListRequest {
     pub origin: Option<LibraryOriginKind>,
@@ -1201,8 +1256,9 @@ pub struct LibraryListRequest {
 
 /// Exactly one of attachment, url, or path must be set.
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryAddRequest {
     pub attachment: Option<String>,
@@ -1212,21 +1268,24 @@ pub struct LibraryAddRequest {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaInputAdoptInput {
     pub attachment: String,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryItemDeleteInput {
     pub id: String,
 }
 
+#[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "media";
     types: [MediaAudioFormat,

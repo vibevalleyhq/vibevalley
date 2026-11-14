@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
+#[cfg(feature = "ts-gen")]
 use ts_rs::TS;
 
 #[allow(unused_imports)]
@@ -13,8 +14,9 @@ use super::*;
 use crate::wire::*;
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MemorySourceInfo {
     pub name: String,
@@ -26,7 +28,8 @@ pub struct MemorySourceInfo {
     pub transcripts: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum MemorySourceKind {
     #[serde(rename = "nowledge")]
     Nowledge,
@@ -47,8 +50,9 @@ impl MemorySourceKind {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MemorySource {
     pub kind: MemorySourceKind,
@@ -62,8 +66,9 @@ pub struct MemorySource {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct SpacePaths {
     pub repos: String,
@@ -72,7 +77,8 @@ pub struct SpacePaths {
     pub pkm: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum Missing {
     #[serde(rename = "deepseekKey")]
     DeepseekKey,
@@ -116,15 +122,17 @@ impl Missing {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(untagged)]
 pub enum Readiness {
     True { ready: LitTrue },
     False { ready: LitFalse, missing: Missing },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum Feature {
     #[serde(rename = "orchestrator")]
     Orchestrator,
@@ -184,8 +192,9 @@ impl Feature {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsStatus {
     pub file: String,
@@ -204,14 +213,15 @@ pub struct SettingsStatus {
     pub dictation: Dictation,
     pub dictation_key: KeyStatus,
     /// Local configuration check only; does not probe remote endpoints.
-    #[ts(type = "Record<Feature, Readiness>")]
+    #[cfg_attr(feature = "ts-gen", ts(type = "Record<Feature, Readiness>"))]
     pub readiness: BTreeMap<Feature, Readiness>,
     pub memory_sources: Vec<MemorySource>,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct MemorySourceUpdate {
     pub kind: MemorySourceKind,
@@ -225,8 +235,9 @@ pub struct MemorySourceUpdate {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsUpdate {
     pub locale: Option<Locale>,
@@ -242,6 +253,7 @@ pub struct SettingsUpdate {
     pub memory_sources: Option<Vec<MemorySourceUpdate>>,
 }
 
+#[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "setting";
     types: [MemorySourceInfo,

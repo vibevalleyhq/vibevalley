@@ -53,14 +53,14 @@ fn every_id_field_is_branded_in_typescript() {
             let Some((_, ty)) = t.split_once(": ") else { continue };
             let is_field = !t.starts_with("//") && !t.starts_with("pub type") && !t.starts_with('"') && t.ends_with(',');
             let names_id = ty.split(|c: char| !c.is_alphanumeric()).any(|w| IDS.contains(&w));
-            if is_field && names_id && !(i > 0 && lines[i - 1].contains("#[ts(as = \"")) {
+            if is_field && names_id && !(i > 0 && lines[i - 1].contains("ts(as = \"")) {
                 bare.push(format!("{}:{}: {t}", path.file_name().unwrap().to_string_lossy(), i + 1));
             }
         }
     }
     assert!(
         bare.is_empty(),
-        "these fields hold an id but are a plain string in TypeScript:\n{}\nFix: put #[ts(as = \"crate::typescript::<Id>\")] (with the field's Option/Vec) above each.",
+        "these fields hold an id but are a plain string in TypeScript:\n{}\nFix: put #[cfg_attr(feature = \"ts-gen\", ts(as = \"crate::typescript::<Id>\"))] (with the field's Option/Vec) above each.",
         bare.join("\n")
     );
 }

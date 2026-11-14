@@ -32,6 +32,7 @@ impl<'de> Deserialize<'de> for JsNumber {
     }
 }
 
+#[cfg(feature = "ts-gen")]
 impl ts_rs::TS for JsNumber {
     type WithoutGenerics = Self;
     type OptionInnerType = Self;
@@ -85,6 +86,7 @@ macro_rules! literal_bool {
             }
         }
 
+        #[cfg(feature = "ts-gen")]
         impl ts_rs::TS for $name {
             type WithoutGenerics = Self;
             type OptionInnerType = Self;

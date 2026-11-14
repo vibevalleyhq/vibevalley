@@ -1,12 +1,10 @@
 //! The issue endpoints over the hub, the board's facts in the hub's state:
 //! VibeValley's payloads in, its envelopes and frames out.
 
-mod support;
-
 use std::sync::Arc;
 
+use crate::support::*;
 use serde_json::{Value, json};
-use support::*;
 use vibevalley_core::empty_space_state;
 use vibevalley_server::modules::issue::Board;
 use vibevalley_server::{Hub, Server, modules};

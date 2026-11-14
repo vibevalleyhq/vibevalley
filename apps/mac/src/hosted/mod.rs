@@ -136,7 +136,10 @@ fn capabilities_from(raw: &str) -> String {
     caps.to_string()
 }
 
+#[cfg(not(debug_assertions))]
 const BUNDLE_JS: &str = include_str!(concat!(env!("OUT_DIR"), "/ui/bundle.js"));
+#[cfg(debug_assertions)]
+const BUNDLE_JS: &str = "throw new Error('VibeValley UI bundle missing on disk: run vp run mac:check.');\n";
 const CAPABILITIES: &str = include_str!(concat!(env!("OUT_DIR"), "/ui/capabilities.json"));
 
 fn dev_ui_build_dir() -> Option<std::path::PathBuf> {

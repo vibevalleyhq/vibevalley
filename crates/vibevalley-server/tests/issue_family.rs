@@ -1,11 +1,9 @@
 //! Parent and child issues, splits and drafts. The acceptance test is
 //! translated from VibeValley `apps/server/src/flows/acceptance.test.ts`.
 
-mod support;
-
 use std::path::Path;
 
-use support::*;
+use crate::support::*;
 use vibevalley_oar::scripted::{Script, Step};
 use vibevalley_protocol::{IssueConstraints, IssueStageKind as StageKind, IssueStatus, Landing};
 use vibevalley_server::modules::issue::{ChildDraft, NewIssue};

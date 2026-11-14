@@ -2,13 +2,11 @@
 //! runtime (no quota). Each turn's hook plays the agent: it writes and
 //! commits files in the worktree and writes the report.
 
-mod support;
-
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
-use support::*;
+use crate::support::*;
 use vibevalley_core::Move;
 use vibevalley_oar::scripted::{Script, Step};
 use vibevalley_oar::{PermissionMode, Runtime, StopReason};

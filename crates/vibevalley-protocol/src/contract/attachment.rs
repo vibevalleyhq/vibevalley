@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
+#[cfg(feature = "ts-gen")]
 use ts_rs::TS;
 
 #[allow(unused_imports)]
@@ -15,8 +16,9 @@ use crate::wire::*;
 /// A file kept by the farm: id is the sha256 of its bytes, served at attachmentPath. A message says it as an attachment,
 /// a media job's result is one, a library item is one with where it came from.
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct Attachment {
     pub id: String,
@@ -28,8 +30,9 @@ pub struct Attachment {
 
 /// At most attachmentMax bytes, as base64.
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct AttachmentUpload {
     pub name: String,
@@ -37,6 +40,7 @@ pub struct AttachmentUpload {
     pub data: String,
 }
 
+#[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "attachment";
     types: [Attachment,

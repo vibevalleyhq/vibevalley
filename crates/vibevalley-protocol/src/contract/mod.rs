@@ -19,7 +19,6 @@ pub mod memory;
 pub mod orchestrator;
 pub mod pkm;
 pub mod provider;
-pub mod registry;
 pub mod repo;
 pub mod runtime;
 pub mod session;
@@ -50,6 +49,7 @@ pub use setting::*;
 pub use voice::*;
 
 /// Every module's TypeScript, in the order of the files.
+#[cfg(feature = "ts-gen")]
 pub(crate) fn ts_modules(cfg: &ts_rs::Config) -> Vec<crate::typescript::Module> {
     vec![
         agent::ts_module(cfg),

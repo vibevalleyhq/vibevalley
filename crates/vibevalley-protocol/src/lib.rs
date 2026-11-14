@@ -13,6 +13,7 @@ pub mod contract;
 pub mod envelope;
 mod ext;
 mod native;
+#[cfg(feature = "ts-gen")]
 pub mod typescript;
 pub mod wire;
 

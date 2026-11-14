@@ -16,7 +16,8 @@ const { values } = parseArgs({
     "notary-profile": { type: "string" },
   },
 });
-const run = (command: string, args: string[], cwd = root) => execFileSync(command, args, { cwd, stdio: "inherit" });
+const run = (command: string, args: string[], cwd = root, env?: NodeJS.ProcessEnv) =>
+  execFileSync(command, args, { cwd, stdio: "inherit", env: env ? { ...process.env, ...env } : process.env });
 const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 if (process.platform !== "darwin") throw new Error("package:mac requires macOS");
 let tag = "";
@@ -39,7 +40,12 @@ const resources = join(app, "Contents/Resources");
 const target = resolve(root, process.env.CARGO_TARGET_DIR ?? "target", profile);
 if (!values["skip-build"]) {
   run("vp", ["run", "mac:check"]);
-  run("cargo", ["build", "--locked", ...(profile === "release" ? ["--release"] : []), "-p", "vibevalley-mac", "-p", "vibevalley-cli"]);
+  run(
+    "cargo",
+    ["build", "--locked", ...(profile === "release" ? ["--release"] : []), "-p", "vibevalley-mac", "-p", "vibevalley-cli"],
+    root,
+    profile === "release" ? { LIBGHOSTTY_VT_SYS_OPTIMIZE: "ReleaseFast" } : undefined,
+  );
   run("swift", ["build", "-c", "release", "--package-path", "apps/island"]);
 }
 for (const file of [

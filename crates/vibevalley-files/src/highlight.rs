@@ -2,27 +2,7 @@ use std::sync::OnceLock;
 
 use tree_sitter_highlight::{HighlightConfiguration, HighlightEvent, Highlighter};
 
-use crate::{HighlightKind, HighlightSpan};
-
-pub(crate) const SUPPORTED: &[&str] = &[
-    "rust",
-    "typescript",
-    "tsx",
-    "javascript",
-    "json",
-    "toml",
-    "yaml",
-    "markdown",
-    "python",
-    "go",
-    "bash",
-    "html",
-    "css",
-    "c",
-    "cpp",
-    "zig",
-    "swift",
-];
+use crate::{HighlightKind, HighlightSpan, SUPPORTED};
 
 /// Reached only through injection (the inline half of the markdown grammar).
 const MARKDOWN_INLINE: &str = "markdown_inline";

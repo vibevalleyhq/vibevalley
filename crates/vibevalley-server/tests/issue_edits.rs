@@ -1,10 +1,8 @@
 //! Editing, deleting, reviewing, and the runs a timeline is made of.
 
-mod support;
-
 use std::path::Path;
 
-use support::*;
+use crate::support::*;
 use vibevalley_protocol::{IssueStageKind as StageKind, IssueStatus, IssueUpdate, MilestoneKind, Outcome, RunTriggerKind};
 use vibevalley_server::modules::issue::NewIssue;
 use vibevalley_server::modules::ledger::BoardError;

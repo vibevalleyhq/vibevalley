@@ -27,7 +27,6 @@ fn main() {
     // In debug builds, `hosted::bundle()` loads `ui/build/` straight from disk so
     // editing TSX files never recompiles or relinks `vibevalley-mac`.
     if !release && ui_build.join("bundle.js").is_file() && ui_build.join("capabilities.json").is_file() {
-        let _ = std::fs::copy(ui_build.join("bundle.js"), out.join("bundle.js"));
         let _ = std::fs::copy(ui_build.join("capabilities.json"), out.join("capabilities.json"));
         return;
     }
@@ -39,7 +38,6 @@ fn main() {
         match result {
             Ok(o) if o.status.success() => {
                 if !release {
-                    let _ = std::fs::copy(target_dir.join("bundle.js"), out.join("bundle.js"));
                     let _ = std::fs::copy(target_dir.join("capabilities.json"), out.join("capabilities.json"));
                 }
                 Some(())

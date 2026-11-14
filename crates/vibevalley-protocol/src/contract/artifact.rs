@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
+#[cfg(feature = "ts-gen")]
 use ts_rs::TS;
 
 #[allow(unused_imports)]
@@ -12,7 +13,8 @@ use super::*;
 #[allow(unused_imports)]
 use crate::wire::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum ArtifactBody {
     #[serde(rename = "blocks")]
     Blocks,
@@ -32,7 +34,8 @@ impl ArtifactBody {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum ArtifactDisplay {
     #[serde(rename = "page")]
     Page,
@@ -56,11 +59,12 @@ impl ArtifactDisplay {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactCard {
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub id: ArtifactId,
     pub title: String,
     pub body: ArtifactBody,
@@ -72,13 +76,14 @@ pub struct ArtifactCard {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct QuotedBlock {
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub artifact_id: ArtifactId,
-    #[ts(as = "crate::typescript::BlockId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::BlockId"))]
     pub block_id: BlockId,
     pub rev: i64,
     pub title: String,
@@ -89,18 +94,20 @@ pub struct QuotedBlock {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BlockRef {
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub artifact_id: ArtifactId,
-    #[ts(as = "crate::typescript::BlockId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::BlockId"))]
     pub block_id: BlockId,
     pub rev: i64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum ArtifactKind {
     #[serde(rename = "html")]
     Html,
@@ -121,8 +128,9 @@ impl ArtifactKind {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactVersion {
     pub version: i64,
@@ -136,8 +144,9 @@ pub struct ArtifactVersion {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactSaid {
     pub channel: String,
@@ -145,11 +154,12 @@ pub struct ArtifactSaid {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct Artifact {
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub id: ArtifactId,
     pub title: String,
     pub body: ArtifactBody,
@@ -157,7 +167,7 @@ pub struct Artifact {
     pub display: Option<ArtifactDisplay>,
     pub channel: Option<String>,
     pub said: Option<ArtifactSaid>,
-    #[ts(as = "Option<crate::typescript::IssueId>")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::IssueId>"))]
     pub issue: Option<IssueId>,
     pub by: String,
     pub by_name: String,
@@ -173,8 +183,9 @@ pub struct Artifact {
 
 /// Omit content to create an unannounced empty blocks artifact.
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactRequest {
     pub title: String,
@@ -188,17 +199,19 @@ pub struct ArtifactRequest {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactVersionRequest {
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub id: ArtifactId,
     pub content: String,
     pub note: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum HtmlAnchorKind {
     #[serde(rename = "text")]
     Text,
@@ -217,8 +230,9 @@ impl HtmlAnchorKind {
 
 /// W3C Web Annotation TextQuoteSelector over text nodes outside <script> and <style>.
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct HtmlAnchor {
     pub kind: HtmlAnchorKind,
@@ -228,11 +242,12 @@ pub struct HtmlAnchor {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactHtmlEdit {
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub id: ArtifactId,
     pub version: i64,
     pub anchor: HtmlAnchor,
@@ -240,11 +255,12 @@ pub struct ArtifactHtmlEdit {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactUpdateRequest {
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub id: ArtifactId,
     pub title: Option<String>,
     pub display: Option<ArtifactDisplay>,
@@ -257,8 +273,9 @@ pub type ShellTime = JsNumber;
 pub type ShellWords = Vec<String>;
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(tag = "vibevalley")]
 pub enum HtmlShellMessage {
     #[serde(rename = "selection", rename_all = "camelCase")]
@@ -276,8 +293,9 @@ pub enum HtmlShellMessage {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactListRequest {
     pub channel: Option<String>,
@@ -285,18 +303,20 @@ pub struct ArtifactListRequest {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactReadRequest {
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub id: ArtifactId,
     pub version: Option<i64>,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactContent {
     pub version: i64,
@@ -304,8 +324,9 @@ pub struct ArtifactContent {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct SpanMarks {
     pub bold: Option<bool>,
@@ -316,8 +337,9 @@ pub struct SpanMarks {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct TextSpan {
     pub t: String,
@@ -325,8 +347,9 @@ pub struct TextSpan {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BlockAttrs {
     pub level: Option<i64>,
@@ -336,12 +359,13 @@ pub struct BlockAttrs {
     pub width: Option<i64>,
     pub height: Option<i64>,
     pub alt: Option<String>,
-    #[ts(as = "Option<crate::typescript::IssueId>")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::IssueId>"))]
     pub issue_id: Option<IssueId>,
     pub memory_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum BlockType {
     #[serde(rename = "paragraph")]
     Paragraph,
@@ -401,13 +425,14 @@ impl BlockType {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BlockInput {
-    #[ts(as = "crate::typescript::BlockId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::BlockId"))]
     pub id: BlockId,
-    #[ts(as = "Option<crate::typescript::BlockId>")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::BlockId>"))]
     pub parent_id: Option<BlockId>,
     pub order_key: String,
     pub r#type: BlockType,
@@ -416,19 +441,20 @@ pub struct BlockInput {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct Block {
-    #[ts(as = "crate::typescript::BlockId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::BlockId"))]
     pub id: BlockId,
-    #[ts(as = "Option<crate::typescript::BlockId>")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::BlockId>"))]
     pub parent_id: Option<BlockId>,
     pub order_key: String,
     pub r#type: BlockType,
     pub attrs: BlockAttrs,
     pub text: Vec<TextSpan>,
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub artifact_id: ArtifactId,
     pub rev: i64,
     pub deleted: Option<bool>,
@@ -437,8 +463,9 @@ pub struct Block {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BlockSnapshot {
     pub artifact: Artifact,
@@ -446,90 +473,99 @@ pub struct BlockSnapshot {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactMarkdown {
     pub markdown: String,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BlockOpInsertBlock {
     pub block: BlockInput,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BlockOpUpdateText {
-    #[ts(as = "crate::typescript::BlockId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::BlockId"))]
     pub block_id: BlockId,
     pub base_rev: i64,
     pub text: Vec<TextSpan>,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BlockOpSetAttrs {
-    #[ts(as = "crate::typescript::BlockId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::BlockId"))]
     pub block_id: BlockId,
     pub attrs: BlockAttrs,
     pub unset: Option<Vec<String>>,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BlockOpSetType {
-    #[ts(as = "crate::typescript::BlockId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::BlockId"))]
     pub block_id: BlockId,
     pub r#type: BlockType,
     pub attrs: BlockAttrs,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BlockOpMoveBlock {
-    #[ts(as = "crate::typescript::BlockId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::BlockId"))]
     pub block_id: BlockId,
-    #[ts(as = "Option<crate::typescript::BlockId>")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::BlockId>"))]
     pub parent_id: Option<BlockId>,
     pub order_key: String,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BlockOpDeleteBlock {
-    #[ts(as = "crate::typescript::BlockId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::BlockId"))]
     pub block_id: BlockId,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BlockOpRestoreBlock {
-    #[ts(as = "crate::typescript::BlockId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::BlockId"))]
     pub block_id: BlockId,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BlockOpSplitBlock {
-    #[ts(as = "crate::typescript::BlockId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::BlockId"))]
     pub block_id: BlockId,
     pub base_rev: i64,
     pub offset: i64,
@@ -537,19 +573,21 @@ pub struct BlockOpSplitBlock {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BlockOpMergeBlocks {
-    #[ts(as = "crate::typescript::BlockId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::BlockId"))]
     pub target_id: BlockId,
-    #[ts(as = "crate::typescript::BlockId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::BlockId"))]
     pub source_id: BlockId,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(tag = "op")]
 pub enum BlockOp {
     #[serde(rename = "insert_block")]
@@ -573,8 +611,9 @@ pub enum BlockOp {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BlockSubmit {
     pub batch_id: String,
@@ -582,7 +621,8 @@ pub struct BlockSubmit {
     pub ops: Vec<BlockOp>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum BlockOpStatus {
     #[serde(rename = "applied")]
     Applied,
@@ -618,8 +658,9 @@ impl BlockOpStatus {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BlockCreate {
     pub r#type: Option<String>,
@@ -629,20 +670,21 @@ pub struct BlockCreate {
     pub language: Option<String>,
     pub text: String,
     /// "" inserts first; omit appends at the end.
-    #[ts(as = "Option<crate::typescript::BlockId>")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::BlockId>"))]
     pub after_block: Option<BlockId>,
     /// Omit inserts at the top level.
-    #[ts(as = "Option<crate::typescript::BlockId>")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::BlockId>"))]
     pub parent_id: Option<BlockId>,
 }
 
 /// Conflicts when text is changed against a stale baseRev.
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BlockUpdate {
-    #[ts(as = "crate::typescript::BlockId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::BlockId"))]
     pub block: BlockId,
     pub base_rev: i64,
     /// Full replacement text, not a delta.
@@ -654,34 +696,37 @@ pub struct BlockUpdate {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BlockDelete {
-    #[ts(as = "crate::typescript::BlockId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::BlockId"))]
     pub block: BlockId,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BlockOpResult {
     pub status: BlockOpStatus,
-    #[ts(as = "crate::typescript::BlockId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::BlockId"))]
     pub block_id: BlockId,
     pub rev: Option<i64>,
     pub text: Option<Vec<TextSpan>>,
     pub yours: Option<Vec<TextSpan>>,
     pub reason: Option<String>,
     /// Populated when an agent edit to a user-authored block was diverted into a suggestion.
-    #[ts(as = "Option<crate::typescript::SuggestionId>")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::SuggestionId>"))]
     pub suggestion: Option<SuggestionId>,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BlockAck {
     pub batch_id: String,
@@ -692,8 +737,9 @@ pub struct BlockAck {
 
 /// Reset is sent when the client falls too far behind the batch log.
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(tag = "_tag")]
 pub enum ArtifactEvent {
     #[serde(rename = "Blocks", rename_all = "camelCase")]
@@ -702,7 +748,8 @@ pub enum ArtifactEvent {
     Reset {},
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum SuggestionStatus {
     #[serde(rename = "open")]
     Open,
@@ -727,8 +774,9 @@ impl SuggestionStatus {
 
 /// At least one field must be set.
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct SuggestionChange {
     pub text: Option<Vec<TextSpan>>,
@@ -739,15 +787,16 @@ pub struct SuggestionChange {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct Suggestion {
-    #[ts(as = "crate::typescript::SuggestionId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::SuggestionId"))]
     pub id: SuggestionId,
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub artifact_id: ArtifactId,
-    #[ts(as = "crate::typescript::BlockId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::BlockId"))]
     pub block_id: BlockId,
     pub author: String,
     pub base_rev: i64,
@@ -759,17 +808,19 @@ pub struct Suggestion {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct SuggestionCreate {
-    #[ts(as = "crate::typescript::BlockId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::BlockId"))]
     pub block: BlockId,
     pub base_rev: i64,
     pub change: SuggestionChange,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum SuggestionEventKind {
     #[serde(rename = "Suggestions")]
     Suggestions,
@@ -787,8 +838,9 @@ impl SuggestionEventKind {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct SuggestionEvent {
     #[serde(rename = "_tag")]
@@ -797,38 +849,42 @@ pub struct SuggestionEvent {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactGetInput {
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub id: ArtifactId,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactDeleteInput {
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub id: ArtifactId,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactBlockListInput {
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub id: ArtifactId,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactSubmitInput {
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub id: ArtifactId,
     pub batch_id: String,
     pub last_seq: i64,
@@ -836,31 +892,33 @@ pub struct ArtifactSubmitInput {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactBlockCreateInput {
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub id: ArtifactId,
     pub r#type: Option<String>,
     pub level: Option<i64>,
     pub checked: Option<bool>,
     pub language: Option<String>,
     pub text: String,
-    #[ts(as = "Option<crate::typescript::BlockId>")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::BlockId>"))]
     pub after_block: Option<BlockId>,
-    #[ts(as = "Option<crate::typescript::BlockId>")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::BlockId>"))]
     pub parent_id: Option<BlockId>,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactBlockUpdateInput {
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub id: ArtifactId,
-    #[ts(as = "crate::typescript::BlockId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::BlockId"))]
     pub block: BlockId,
     pub base_rev: i64,
     pub text: Option<String>,
@@ -871,67 +929,74 @@ pub struct ArtifactBlockUpdateInput {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactBlockDeleteInput {
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub id: ArtifactId,
-    #[ts(as = "crate::typescript::BlockId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::BlockId"))]
     pub block: BlockId,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactSuggestionListInput {
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub id: ArtifactId,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactSuggestionCreateInput {
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub id: ArtifactId,
-    #[ts(as = "crate::typescript::BlockId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::BlockId"))]
     pub block: BlockId,
     pub base_rev: i64,
     pub change: SuggestionChange,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactSuggestionAcceptInput {
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub id: ArtifactId,
-    #[ts(as = "crate::typescript::SuggestionId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::SuggestionId"))]
     pub suggestion: SuggestionId,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactMarkdownGetInput {
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub id: ArtifactId,
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(optional_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactDemoInput {
-    #[ts(as = "crate::typescript::ArtifactId")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub id: ArtifactId,
 }
 
+#[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "artifact";
     types: [ArtifactBody,
