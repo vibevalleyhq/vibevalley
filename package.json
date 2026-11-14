@@ -25,7 +25,6 @@
     "@vibevalley/health": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
-    "@vibevalley/server": "workspace:*",
     "@vibevalley/testkit": "workspace:*",
     "eslint-plugin-solid": "catalog:",
     "knip": "catalog:",

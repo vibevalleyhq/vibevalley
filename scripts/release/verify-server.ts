@@ -5,6 +5,8 @@ import { join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { inspect } from "node:util";
 
+import { z } from "zod";
+
 import { pathOf } from "@vibevalley/protocol";
 
 export interface VerificationResult {
@@ -13,12 +15,13 @@ export interface VerificationResult {
   address: string;
 }
 
-/** Every built-in template but the default orchestrator's (apps/server/src/modules/agent/templates/index.json). */
+/** Every built-in template but the default orchestrator's (crates/vibevalley-server/assets/agent/templates/index.json). */
 const errorCode = (error: unknown): unknown => (typeof error === "object" && error !== null && "code" in error ? error.code : undefined);
 
 const starters = () =>
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the starters' index, a list of names
-  (JSON.parse(readFileSync(join(import.meta.dirname, "../..", "apps", "server", "src", "modules", "agent", "templates", "index.json"), "utf8")) as string[])
+  z
+    .array(z.string())
+    .parse(JSON.parse(readFileSync(join(import.meta.dirname, "../..", "crates", "vibevalley-server", "assets", "agent", "templates", "index.json"), "utf8")))
     .filter((id) => id !== "orchestrator")
     .join(",");
 
@@ -72,12 +75,11 @@ export async function runVerification(command: string[] = [], options: Verificat
   const binaries = join(evidence, "bin");
   for (const path of [home, work, binaries]) mkdirSync(path);
   const env: Record<string, string> = { ...isolatedEnvironment(home, work), ...(options.scriptedHelper === true ? { VIBEVALLEY_TEST_RUNTIMES: "1" } : {}) };
-  const serverDir = join(root, "apps", "server");
-  // The command line from any folder, on the command line's own vpx (its #/ imports are its package.json's).
+  // The Rust workspace's binaries (cargo build -p vibevalley-server -p vibevalley-cli); VIBEVALLEY_SERVER_BIN names another server.
+  const built = join(process.env.CARGO_TARGET_DIR ?? join(root, "target"), "debug");
+  const serverBin = process.env.VIBEVALLEY_SERVER_BIN ?? join(built, "vibevalley-server");
   const cli = join(binaries, "vv");
-  const cliDir = join(root, "apps", "cli");
-  const vpx = [join(cliDir, "node_modules", ".bin", "vpx"), join(cliDir, "src", "main.ts")];
-  writeFileSync(cli, `#!/bin/sh\nexec ${vpx.map((a) => JSON.stringify(a)).join(" ")} "$@"\n`, { mode: 0o755 });
+  writeFileSync(cli, `#!/bin/sh\nexec ${JSON.stringify(join(built, "vibevalley"))} "$@"\n`, { mode: 0o755 });
   const log = join(evidence, "server.stdout.log");
   /** A child in a process group of its own; exited settles with its exit code. */
   interface Child {
@@ -141,19 +143,15 @@ export async function runVerification(command: string[] = [], options: Verificat
   };
   try {
     if (interrupted) throw new Error("verification interrupted before startup");
-    // vpx execs node in its own process, so the receipt's pid is the child's. it logs to stdout.
+    // The receipt's pid is the server's own.
     const web = join(root, "apps", "web", "dist");
     const serverErr = openSync(join(evidence, "server.stderr.log"), "w");
-    const spawned = spawn(
-      join(serverDir, "node_modules", ".bin", "vpx"),
-      ["src/main.ts", "--ready-json", ...(existsSync(join(web, "index.html")) ? ["--web", web] : [])],
-      {
-        cwd: serverDir,
-        env,
-        detached: true,
-        stdio: ["ignore", "pipe", serverErr],
-      },
-    );
+    const spawned = spawn(serverBin, ["--ready-json", ...(existsSync(join(web, "index.html")) ? ["--web", web] : [])], {
+      cwd: evidence,
+      env,
+      detached: true,
+      stdio: ["ignore", "pipe", serverErr],
+    });
     closeSync(serverErr);
     const running = own(spawned);
     owned.add(running);

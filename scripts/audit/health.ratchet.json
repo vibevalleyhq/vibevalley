@@ -1,11 +1,4 @@
 {
-  "apps/cli": {
-    "nonNull": 0,
-    "doubleCast": 0,
-    "cast": 1,
-    "lintOff": 1,
-    "swallowed": 2
-  },
   "apps/desktop": {
     "nonNull": 0,
     "doubleCast": 0,
@@ -27,13 +20,6 @@
     "lintOff": 2,
     "swallowed": 1
   },
-  "apps/server": {
-    "nonNull": 0,
-    "doubleCast": 0,
-    "cast": 0,
-    "lintOff": 0,
-    "swallowed": 0
-  },
   "apps/site": {
     "nonNull": 0,
     "doubleCast": 0,
@@ -46,13 +32,6 @@
     "doubleCast": 0,
     "cast": 1,
     "lintOff": 1,
-    "swallowed": 0
-  },
-  "packages/agent": {
-    "nonNull": 0,
-    "doubleCast": 0,
-    "cast": 1,
-    "lintOff": 3,
     "swallowed": 0
   },
   "packages/ai": {
@@ -147,76 +126,6 @@
     "swallowed": 0
   },
   "packages/testkit": {
-    "nonNull": 0,
-    "doubleCast": 0,
-    "cast": 0,
-    "lintOff": 0,
-    "swallowed": 0
-  },
-  "server: Agent Sessions": {
-    "nonNull": 0,
-    "doubleCast": 0,
-    "cast": 1,
-    "lintOff": 1,
-    "swallowed": 1
-  },
-  "server: Agents": {
-    "nonNull": 1,
-    "doubleCast": 1,
-    "cast": 2,
-    "lintOff": 4,
-    "swallowed": 1
-  },
-  "server: Collaboration": {
-    "nonNull": 0,
-    "doubleCast": 0,
-    "cast": 0,
-    "lintOff": 0,
-    "swallowed": 10
-  },
-  "server: Gamification": {
-    "nonNull": 0,
-    "doubleCast": 0,
-    "cast": 0,
-    "lintOff": 0,
-    "swallowed": 0
-  },
-  "server: Gateway": {
-    "nonNull": 0,
-    "doubleCast": 0,
-    "cast": 2,
-    "lintOff": 2,
-    "swallowed": 4
-  },
-  "server: Issues": {
-    "nonNull": 0,
-    "doubleCast": 0,
-    "cast": 0,
-    "lintOff": 0,
-    "swallowed": 0
-  },
-  "server: Orchestrator": {
-    "nonNull": 0,
-    "doubleCast": 0,
-    "cast": 0,
-    "lintOff": 0,
-    "swallowed": 0
-  },
-  "server: Platform": {
-    "nonNull": 0,
-    "doubleCast": 1,
-    "cast": 5,
-    "lintOff": 10,
-    "swallowed": 4
-  },
-  "server: Source Control": {
-    "nonNull": 0,
-    "doubleCast": 0,
-    "cast": 0,
-    "lintOff": 0,
-    "swallowed": 1
-  },
-  "server: Watch": {
     "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,

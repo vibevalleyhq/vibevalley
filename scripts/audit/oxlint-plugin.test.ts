@@ -237,35 +237,6 @@ tester.run("no-cross-package-path", rule("no-cross-package-path"), {
   ],
 });
 
-tester.run("db-door", rule("db-door"), {
-  valid: [
-    { code: 'import { getIssue } from "#/db/generated/issue.sql.ts";', filename: "/repo/apps/server/src/modules/issue/issue.ts" },
-    { code: 'import { type Db, SqlError } from "#/infra/db.ts";', filename: "/repo/apps/server/src/modules/session/session.ts" },
-    { code: 'import { PGlite } from "@electric-sql/pglite";\nimport pg from "pg";', filename: "/repo/apps/server/src/infra/db.ts" },
-    { code: 'import { pgliteSomething } from "pglite-adjacent";', filename: "/repo/apps/server/src/modules/issue/issue.ts" },
-  ],
-  invalid: [
-    { code: 'import pg from "pg";', filename: "/repo/apps/server/src/modules/issue/issue.ts", errors: [{ messageId: "driver", data: { source: "pg" } }] },
-    { code: 'import type { PoolClient } from "pg";', filename: "/repo/apps/server/src/modules/memory/store.ts", errors: [{ messageId: "driver" }] },
-    { code: 'import { PGlite } from "@electric-sql/pglite";', filename: "/repo/apps/server/src/infra/baseline.ts", errors: [{ messageId: "driver" }] },
-    {
-      code: 'import { vector } from "@electric-sql/pglite/vector";',
-      filename: "/repo/apps/server/src/modules/memory/memory.ts",
-      errors: [{ messageId: "driver" }],
-    },
-    { code: 'export * from "pg";', filename: "/repo/apps/server/src/base/sql.ts", errors: [{ messageId: "driver" }] },
-    { code: 'const pg = await import("pg");', filename: "/repo/apps/server/src/main.ts", errors: [{ messageId: "driver" }] },
-  ],
-});
-
-tester.run("sync-fs", rule("sync-fs"), {
-  valid: ['import { readFile } from "node:fs/promises";', 'import { join } from "node:path";', 'import { constants } from "node:fs";'],
-  invalid: [
-    { code: 'import { readFileSync, writeFileSync } from "node:fs";', errors: [{ messageId: "sync" }, { messageId: "sync" }] },
-    { code: 'import { existsSync } from "fs";', errors: [{ messageId: "sync" }] },
-  ],
-});
-
 tester.run("dropped-timer", rule("dropped-timer"), {
   valid: [
     "const t = setTimeout(f, 10); onCleanup(() => clearTimeout(t));",
@@ -374,57 +345,6 @@ tester.run("global-doors", rule("global-doors"), {
     { code: "Object.assign(globalThis, { vibevalleyNotices: notices })", errors: [{ messageId: "assign" }] },
     { code: "Object.defineProperty(window, 'x', { value: 1 })", errors: [{ messageId: "assign" }] },
     { code: "declare global { interface Window { x?: number } }\nexport {};", filename: "a.ts", errors: [{ messageId: "declare" }] },
-  ],
-});
-
-const server = "/repo/apps/server/src/a.ts";
-
-tester.run("singular-service", rule("singular-service"), {
-  valid: [
-    { code: "export interface Issue {}\nexport async function makeIssue() {}", filename: "/repo/apps/server/src/modules/issue/issue.ts" },
-    { code: "export type Channel = {};\nexport async function makeChannel() {}", filename: "/repo/apps/server/src/modules/channel/channel.ts" },
-    { code: "export interface Core {}\nexport function makeCore() {}", filename: "/repo/apps/server/src/core/core.ts" },
-    { code: "export interface Lan {}\nexport async function makeLan() {}", filename: "/repo/apps/server/src/gateway/lan/lan.ts" },
-    { code: "export interface Progress {}\nexport async function makeProgress() {}", filename: "/repo/apps/server/src/modules/progress/progress.ts" },
-    { code: "export function makeSources() {}", filename: "/repo/apps/server/src/modules/memory/sources.ts" },
-    { code: "export function makeThings() {}", filename: "/repo/apps/server/src/infra/infra.ts" },
-  ],
-  invalid: [
-    {
-      code: "export interface Issues {}\nexport async function makeIssues() {}",
-      filename: "/repo/apps/server/src/modules/issues/issues.ts",
-      errors: [{ messageId: "plural", data: { folder: "issues", singular: "issue", Singular: "Issue" } }],
-    },
-    {
-      code: "export interface Memory {}\nexport async function makeMemories() {}",
-      filename: "/repo/apps/server/src/modules/memory/memory.ts",
-      errors: [{ messageId: "factory", data: { name: "makeMemories", folder: "memory", Service: "Memory" } }],
-    },
-    {
-      code: "export async function makeGame() {}",
-      filename: "/repo/apps/server/src/modules/game/game.ts",
-      errors: [{ messageId: "missing", data: { folder: "game", Service: "Game" } }],
-    },
-  ],
-});
-
-tester.run("protocol-namespace", rule("protocol-namespace"), {
-  valid: [
-    { code: 'import type * as T from "@vibevalley/protocol";', filename: server },
-    { code: 'import { type IssueStatus, userId } from "@vibevalley/protocol";', filename: server },
-    { code: 'import { Issue } from "#/issue/issue.ts";', filename: server },
-    { code: 'import * as S from "@vibevalley/protocol/schema";', filename: server },
-  ],
-  invalid: [
-    { code: 'import type { Issue } from "@vibevalley/protocol";', filename: server, errors: [{ messageId: "named", data: { name: "Issue" } }] },
-    {
-      code: 'import { type Session as Run, userId, type Channel } from "@vibevalley/protocol";',
-      filename: server,
-      errors: [
-        { messageId: "named", data: { name: "Session" } },
-        { messageId: "named", data: { name: "Channel" } },
-      ],
-    },
   ],
 });
 

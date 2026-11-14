@@ -707,8 +707,7 @@ impl Board {
         let _work = lock(&self.work);
         let repo = match &new.repo {
             Some(path) => {
-                let dir = self.repo_dir(&path.to_string_lossy());
-                Some(Repo::discover(&dir)?.ok_or(BoardError::NotARepo(dir))?)
+                Some(self.ensure_repo(self.repo_dir(&path.to_string_lossy()))?)
             }
             None => None,
         };
@@ -1027,11 +1026,32 @@ impl Board {
     fn main_repo(&self, issue: &Issue) -> Result<Option<Repo>> {
         match &issue.repo {
             None => Ok(None),
-            Some(repo) => {
-                let dir = self.repo_dir(repo);
-                Ok(Some(Repo::discover(&dir)?.ok_or(BoardError::NotARepo(dir))?))
-            }
+            Some(repo) => Ok(Some(self.ensure_repo(self.repo_dir(repo))?)),
         }
+    }
+
+    /// The repo at `dir`; a folder under the work root that is not one yet (or not there) becomes one, with a first empty commit.
+    fn ensure_repo(&self, dir: PathBuf) -> Result<Repo> {
+        if let Some(repo) = Repo::discover(&dir)? {
+            return Ok(repo);
+        }
+        let ours = self.config.repos_dir.as_ref().is_some_and(|root| dir.starts_with(root));
+        if !ours {
+            return Err(BoardError::NotARepo(dir));
+        }
+        std::fs::create_dir_all(&dir).map_err(|e| BoardError::Other(format!("{}: {e}", dir.display())))?;
+        let git = |args: &[&str]| {
+            std::process::Command::new("git")
+                .arg("-C")
+                .arg(&dir)
+                .args(["-c", "user.name=vibevalley", "-c", "user.email=vibevalley@localhost"])
+                .args(args)
+                .output()
+                .map_err(|e| BoardError::Other(e.to_string()))
+        };
+        git(&["init", "-q", "-b", "main"])?;
+        git(&["commit", "-q", "--allow-empty", "-m", "Start"])?;
+        Repo::discover(&dir)?.ok_or(BoardError::NotARepo(dir))
     }
 
     /// Where an issue's `repo` is: a bare name under `repos_dir`, else the

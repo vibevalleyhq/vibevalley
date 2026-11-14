@@ -12,7 +12,7 @@ export const followSavedLocale = (home: string) => setLocale(savedLocale(home));
 interface AppPaths {
   /** The farm's home (VIBEVALLEY_HOME): settings.json, the database, the logs. */
   readonly home: string;
-  /** apps/server, or the packaged app's copy (its bundle in dist/ and its node_modules). */
+  /** The folder the server runs in: the repository, or the packaged app's server folder. */
   readonly server: string;
   /** What runs the server (server.ts ServerFiles). */
   readonly command: readonly [string, ...string[]];
@@ -44,9 +44,11 @@ export function appPaths(): AppPaths {
   const web = app.isPackaged ? join(process.resourcesPath, "web") : join(repo, "web", "dist");
   return {
     home,
-    server: app.isPackaged ? join(process.resourcesPath, "server") : join(repo, "server"),
-    // vpx reads the server's tsconfig, whose paths are its @/ imports, from the folder it runs in.
-    command: app.isPackaged ? [process.execPath, "dist/main.mjs"] : [join(repo, "server", "node_modules", ".bin", "vpx"), "src/main.ts"],
+    server: app.isPackaged ? join(process.resourcesPath, "server") : join(repo, ".."),
+    // The Rust server (crates/vibevalley-server); from the repository, cargo's debug build unless VIBEVALLEY_SERVER_BIN names one.
+    command: app.isPackaged
+      ? [join(process.resourcesPath, "server", "vibevalley-server")]
+      : [process.env.VIBEVALLEY_SERVER_BIN ?? join(process.env.CARGO_TARGET_DIR ?? join(repo, "..", "target"), "debug", "vibevalley-server")],
     web,
     island: app.isPackaged ? join(process.resourcesPath, "island", "VibeValleyIsland") : join(repo, "island", ".build", "release", "VibeValleyIsland"),
     log: join(home, "logs", "desktop-server.log"),

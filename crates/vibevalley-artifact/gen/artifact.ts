@@ -13,7 +13,7 @@ const A = await import(`${VV}/packages/artifact/src/index.ts`);
 const H = await import(`${VV}/packages/artifact/src/html.ts`);
 const Sh = await import(`${VV}/packages/artifact/src/shell.ts`);
 const { keyBetween } = await import(`${VV}/packages/protocol/src/rules/index.ts`);
-const { sample } = await import(`${VV}/apps/server/src/testing/artifact.ts`);
+const { sample } = await import("./sample.ts");
 
 const golden = join(out, "tests/golden");
 mkdirSync(golden, { recursive: true });

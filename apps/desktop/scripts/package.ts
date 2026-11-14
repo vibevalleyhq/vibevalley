@@ -1,13 +1,11 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { build, Platform } from "electron-builder";
 
 import { t } from "@vibevalley/i18n";
-import { serverFiles } from "@vibevalley/server/assets";
-import { baselineHash } from "@vibevalley/server/baseline";
 
 import { channelOf, channels } from "../src/base/channel.ts";
 import { isVersion, type Release, stageOf } from "../src/base/releases.ts";
@@ -16,7 +14,6 @@ const desktop = join(import.meta.dirname, "..");
 const repo = join(desktop, "../..");
 const stage = join(desktop, "dist/stage");
 const server = join(stage, "server");
-const cli = join(stage, "cli");
 
 const sh = (cwd: string, cmd: string, ...args: string[]) => execFileSync(cmd, args, { cwd, stdio: "inherit" });
 sh(repo, "vp", "run", "--filter", "@vibevalley/web", "build");
@@ -28,24 +25,11 @@ sh(island, "swift", "build", "-c", "release");
 const islandBinary = join(execFileSync("swift", ["build", "-c", "release", "--show-bin-path"], { cwd: island, encoding: "utf8" }).trim(), "VibeValleyIsland");
 
 rmSync(stage, { recursive: true, force: true });
-// Everything at the versions the lockfile pins, the workspace packages copied in.
-sh(repo, "pnpm", "--filter", "@vibevalley/server", "deploy", "--prod", server);
-// The server is its bundle: src/main.ts and the workspace packages in one module, the other dependencies left as they are.
-sh(join(repo, "apps/server"), "vp", "pack", "--out-dir", join(server, "dist"));
-// Of what pnpm deployed beside it only those dependencies and the files the server reads stay.
-const assets = join(stage, "assets");
-for (const path of serverFiles) cpSync(join(server, path), join(assets, path), { recursive: true });
-for (const name of readdirSync(server))
-  if (!["dist", "node_modules", "package.json"].includes(name)) rmSync(join(server, name), { recursive: true, force: true });
-cpSync(assets, server, { recursive: true });
-rmSync(assets, { recursive: true, force: true });
-rmSync(join(server, "node_modules", "@vibevalley"), { recursive: true, force: true });
-// The command line is one standalone bundle: it loads none of the server.
-sh(join(repo, "apps/cli"), "vp", "pack", "--out-dir", join(cli, "dist"));
-// Nor what only an editor reads: the dependencies' source maps and type declarations, a third of the server's files.
-const devOnly = /\.(?:js|mjs|cjs|ts|mts|cts)\.map$|\.d\.(?:ts|mts|cts)$/u;
-for (const name of readdirSync(join(server, "node_modules", ".pnpm"), { recursive: true, encoding: "utf8" }))
-  if (devOnly.test(name)) rmSync(join(server, "node_modules", ".pnpm", name), { force: true });
+// The server and the command line are the Rust workspace's binaries (crates/vibevalley-server, crates/vibevalley-cli).
+const target = process.env.CARGO_TARGET_DIR ?? join(repo, "target");
+sh(repo, "cargo", "build", "--release", "-p", "vibevalley-server", "-p", "vibevalley-cli");
+mkdirSync(server, { recursive: true });
+for (const bin of ["vibevalley-server", "vibevalley"]) cpSync(join(target, "release", bin), join(server, bin));
 
 // The version is the tag the release is built from (v0.2.0, v0.3.0-beta.1). between tags, 0.0.0, which no release is older than.
 const git = (...args: string[]) => execFileSync("git", args, { cwd: repo, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
@@ -72,8 +56,7 @@ done
 resources=\${here%/*}/..
 export VIBEVALLEY_HOME="\${VIBEVALLEY_HOME:-$HOME/.vibevalley${channel.suffix}}"
 export VIBEVALLEY_APP="$resources/../.."
-export VIBEVALLEY_CHAT="$resources/server/dist/chat.mjs"
-ELECTRON_RUN_AS_NODE=1 exec "$resources/../MacOS/${channel.name}" "$resources/cli/dist/main.mjs" "$@"
+exec "$resources/server/vibevalley" "$@"
 `,
   { mode: 0o755 },
 );
@@ -90,12 +73,8 @@ await build({
       { from: join(repo, "apps/web/dist"), to: "web" },
       { from: islandBinary, to: "island/VibeValleyIsland" },
       { from: join(stage, "bin"), to: "bin" },
-      { from: cli, to: "cli" },
+      { from: server, to: "server" },
     ],
-    // extraResources leaves out every node_modules; the server needs its own, so it is copied in whole.
-    afterPack: async (ctx) => {
-      cpSync(server, join(ctx.appOutDir, `${ctx.packager.appInfo.productFilename}.app/Contents/Resources/server`), { recursive: true, verbatimSymlinks: true });
-    },
     mac: {
       category: "public.app-category.developer-tools",
       icon: join(desktop, "resources/icon.icns"),
@@ -112,7 +91,7 @@ await build({
   },
 });
 
-// What the release says about itself: its build for this Mac, the merged pull requests since the tag before, and the baseline its server makes a database from.
+// What the release says about itself: its build for this Mac and the merged pull requests since the tag before.
 const arch = process.arch;
 const zip = `VibeValley-${version}-${arch}.zip`;
 // A release's notes are everything since the release before it, its alphas and betas included; a prerelease's, since the
@@ -133,7 +112,7 @@ const notes =
 const release: Release = {
   version,
   notes,
-  schema: baselineHash(),
+  schema: "native",
   page: `https://github.com/vibevalleyhq/vibevalley/releases/tag/v${version}`,
   builds: [
     {

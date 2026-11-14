@@ -15,9 +15,13 @@ import type { DesktopProbe } from "../src/infra/probe";
 
 // The server and the agents it runs read keys from the environment.
 const secret = /KEY|TOKEN|SECRET|CERTIFICATE|PASSWORD|^AGORA_|^VIBEVALLEY_|^GIT_CONFIG_/u;
-/** Every built-in template but the default orchestrator's (apps/server/src/modules/agent/templates/index.json). */
+/** Every built-in template but the default orchestrator's (crates/vibevalley-server/assets/agent/templates/index.json). */
 const starters = () =>
-  (JSON.parse(readFileSync(join(import.meta.dirname, "..", "..", "server", "src", "modules", "agent", "templates", "index.json"), "utf8")) as string[])
+  (
+    JSON.parse(
+      readFileSync(join(import.meta.dirname, "..", "..", "..", "crates", "vibevalley-server", "assets", "agent", "templates", "index.json"), "utf8"),
+    ) as string[]
+  )
     .filter((id) => id !== "orchestrator")
     .join(",");
 const cleanEnv = () => ({
@@ -372,7 +376,7 @@ test("the island follows the issues in flight and opens one", async () => {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "vibevalley-desktop-")));
   const app = await electron.launch({
     args: [`--user-data-dir=${join(dir, "electron")}`, join(import.meta.dirname, "..")],
-    // The server's pi is the scripted helper (apps/server src/testing/worker.ts): an issue can really be worked.
+    // The server's pi is the scripted helper (crates/vibevalley-server/src/testing.rs): an issue can really be worked.
     env: {
       ...cleanEnv(),
       HOME: dir,

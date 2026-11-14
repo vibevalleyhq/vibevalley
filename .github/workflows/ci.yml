@@ -76,8 +76,9 @@ jobs:
       - run: vp run scripts:test
       - run: vp run health:verify
       - run: vp run deadcode
+      # The TS packages' tests (the native views and the generators use them).
+      - run: vp run --filter @vibevalley/protocol --filter @vibevalley/async --filter @vibevalley/home --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/provider --filter @vibevalley/pkm --filter @vibevalley/artifact test
 
-      # The server's tests in three parts at once; the types are the check job's (vp check covers every package).
       - name: Save Vite Task cache
         if: success()
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -85,57 +86,15 @@ jobs:
           path: node_modules/.vite/task-cache
           key: ${{ steps.vite-task-cache.outputs.cache-primary-key }}
 
-  server-tests:
-    name: server ${{ matrix.shard }}/3
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3]
-    steps:
-      # No job pushes, so the token is not left in the checkout's git config.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { persist-credentials: false }
-      # The Node of .node-version, Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
-      # @v1 lags behind (no cache-toolchain).
-      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
-        with: { node-version-file: .node-version, cache: true, cache-toolchain: true }
-      # Vite Task's results from earlier runs (after install, which may touch node_modules): a task whose inputs did not
-      # change replays. The key has this job (and shard) so jobs do not take each other's; each run saves a new entry.
-      - name: Restore Vite Task cache
-        id: vite-task-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: node_modules/.vite/task-cache
-          key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ matrix.shard }}-
-      - run: git config --global user.name ci && git config --global user.email ci@example.com
-      # server:check's parts, spread over the shards: db/generated is current (scripts/pg-generate.ts, on PGlite), the
-      # packages' tests on the first, the server's tests on each.
-      - if: matrix.shard == 1
-        run: vp run --filter @vibevalley/server db:check
-      - if: matrix.shard == 1
-        run: vp run --filter @vibevalley/protocol --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent --filter @vibevalley/provider --filter @vibevalley/cli test
-      # The test task with the shard as its argument: cached per shard.
-      - run: vp run --filter @vibevalley/server test --shard=${{ matrix.shard }}/3
-
-      # The one check main requires for the server: it passes only when every part did.
-      - name: Save Vite Task cache
-        if: success()
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: node_modules/.vite/task-cache
-          key: ${{ steps.vite-task-cache.outputs.cache-primary-key }}
-
+  # The check main requires for the server: the server and the command line are the Rust workspace's (the rust job).
   server:
     name: server
-    needs: server-tests
+    needs: rust
     if: always()
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
     steps:
-      - run: test "${{ needs.server-tests.result }}" = success
+      - run: test "${{ needs.rust.result }}" = success
 
   web:
     name: web
@@ -171,38 +130,6 @@ jobs:
           path: node_modules/.vite/task-cache
           key: ${{ steps.vite-task-cache.outputs.cache-primary-key }}
 
-  desktop:
-    name: desktop
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      # No job pushes, so the token is not left in the checkout's git config.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { persist-credentials: false }
-      # The Node of .node-version, Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
-      # @v1 lags behind (no cache-toolchain).
-      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
-        with: { node-version-file: .node-version, cache: true, cache-toolchain: true }
-      # Vite Task's results from earlier runs (after install, which may touch node_modules): a task whose inputs did not
-      # change replays. The key has this job (and shard) so jobs do not take each other's; each run saves a new entry.
-      - name: Restore Vite Task cache
-        id: vite-task-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: node_modules/.vite/task-cache
-          key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ matrix.shard }}-
-      - run: xvfb-run -a vp run desktop:test
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: failure()
-        with: { name: desktop-test-results, path: apps/desktop/test-results, retention-days: 7 }
-      - name: Save Vite Task cache
-        if: success()
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: node_modules/.vite/task-cache
-          key: ${{ steps.vite-task-cache.outputs.cache-primary-key }}
-
   rust:
     name: rust
     # The native app is macOS only (GPUI on Metal); the server crates build there too.
@@ -212,7 +139,7 @@ jobs:
       # No job pushes, so the token is not left in the checkout's git config.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
-      # The Node of .node-version and vp install: the protocol generator imports packages/protocol and apps/server.
+      # The Node of .node-version and vp install: the protocol generator imports packages/protocol.
       - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
         with: { node-version-file: .node-version, cache: true, cache-toolchain: true }
       # rustup reads rust-toolchain.toml; libghostty-vt builds with Zig.

@@ -34,6 +34,7 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 | R2 设置 | `settings.json` 一次读成 `Stored`，MOSS 账户是 `Providers`/`Connection`，钥匙是 `Secret`（打印只出提示）；`provider.rs` 与 `setting.rs` 不再传 `Value`。工单板存储改表、工具不再绕 hub 调本服务，并进 R4 |
 | R3 媒体 | `media/jobs.rs` 一个任务机：存储、准入（8 个）、按种类的槽位（图片 1、语音 8）、取消、重下、释放、重启接续写一次；图片与语音在上面，去掉 `OtherJobs`。多人对话、音色设计、克隆、转写、理解按 `Ask` 加一个变体即可，暂不做 |
 | R6 命令行（第一步） | `crates/vibevalley-cli`（二进制 `vibevalley`，clap builder，说明按农场语言取 `cli.*` 词典）：issue（含 `--watch`、`watch`）、channel、repo、agent、session、runtime、memory、cron、artifact、pkm、worker、doctor；失败一行 JSON、退出码同 TS；`crates/vibevalley-home` 收家目录约定；`act_command` 进 `vibevalley-core::rules`。Rust 集成测试 7 个过（含 TS 版整份跑时失败的 watch）。`app`、`auth`、`chat` 不搬：桌面版、远程登录随删，`chat` 日后在 Rust 上做 |
+| 闸 1 | 删了 `apps/server`、`apps/cli`、`packages/agent`；桌面版、页面 e2e、验收沙箱（`verify-server.ts`）都起 Rust 的 `vibevalley-server`（`VIBEVALLEY_SERVER_BIN` 或 cargo 的 debug 构建），桌面版打包带两个 Rust 二进制；`prompts.json`、投影 golden 归 Rust，不再从 TS 生成；只管 TS 服务端的审计删了（服务调用路径、schema 审计、protocol-namespace、单数服务、数据库门、同步文件）；CI 的 server 检查改为等 rust 任务。建工单或派活时仓库还不是 git 的会被建起来（同 TS）。桌面版测试 5/5，核心 e2e 过 |
 | 对照 | web e2e 在 Rust 上 243 个过约 207 个（失败的是媒体其余种类、语音、手机/局域网，及 4 个在 TS 上同样失败的）；CLI 测试 22 个过 21 个 |
 
 ### 重构（按顺序）
@@ -83,7 +84,8 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 
 ### 闸与删除
 
-1. R1–R3 完成后，web e2e 除媒体其余种类、语音、手机/局域网外全绿，CLI 测试全绿：删 `apps/server`、`packages/agent`、`packages/ai`、`packages/provider`，Electron 改带 Rust 服务端过渡。
+1. ~~R1–R3 完成后删 `apps/server`、`apps/cli`、`packages/agent`，Electron 改带 Rust 服务端过渡~~（已做）。`packages/ai`、`packages/provider` 只剩页面的语音在用，随页面删。
+   - 欠着：文档里约 420 处代码路径还指着 TS 服务端（`docs:verify` 红）；`deadcode` 报 `packages/` 里约 140 个没人用的导出（生成器经动态路径用到一部分，随 R5 变成生成物时清）。
 2. R4–R6 完成，`apps/mac` 覆盖 `apps/web` 每个路由（截图对过）：删 `apps/desktop`、`apps/web`、`apps/mobile` 与只为它们存在的包；`AGENTS.md`、`docs/architecture.md`、`docs/subsystems/*`、vv-acceptance 改写成 Rust 与原生的现状。
 3. 打包、签名公证、自动更新、带起灵动岛在 `apps/mac` 上补齐后，发版。
 

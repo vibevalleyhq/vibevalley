@@ -58,7 +58,7 @@ export async function shellPath(
 }
 
 export interface ServerFiles {
-  /** apps/server, or the packaged app's copy: the folder the server runs in. */
+  /** The folder the server runs in. */
   server: string;
   /** What runs it, before its own flags: the executable and its arguments. */
   command: readonly [string, ...string[]];

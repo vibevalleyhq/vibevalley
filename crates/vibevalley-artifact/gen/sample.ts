@@ -1,21 +1,4 @@
-import type { Block, TextSpan } from "@vibevalley/protocol";
-import { artifactId, blockId } from "@vibevalley/protocol/schema";
-
-export const span = (t: string): TextSpan => ({ t, marks: {} });
-export const bold = (t: string): TextSpan => ({ t, marks: { bold: true } });
-export const para = (id: string, key: string, text: string): Block => ({
-  id: blockId(id),
-  artifactId: artifactId("d"),
-  orderKey: key,
-  type: "paragraph",
-  attrs: {},
-  text: [span(text)],
-  rev: 1,
-  updatedBy: "user",
-  updated: 0,
-});
-
-/** Every kind of block, and inline marks, as the export writes them. */
+// The markdown the artifact goldens are written from: every kind of block, and inline marks.
 export const sample =
   "# 周报：VibeValley 🌾\n" +
   "\n" +

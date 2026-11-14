@@ -14,12 +14,12 @@ export const refused = {
   agentWords: says(
     "the agent says nothing to the owner: the server words what it did",
     "return a value or throw an Error subclass, and let apps/server turn it into words with t()",
-    "packages/agent/README.md",
+    "packages/ai/README.md",
   ),
   agentContract: says(
     "the agent knows nothing of the farm's contract, so it runs without the farm",
     "take what it needs as a parameter or an interface in packages/agent, and let apps/server fit the farm's shapes to it",
-    "packages/agent/README.md",
+    "packages/ai/README.md",
   ),
   packageToApp: says(
     "a package does not reach into an app: apps depend on packages, never back",
@@ -27,11 +27,6 @@ export const refused = {
     "docs/architecture.md",
   ),
   aiToAgent: says("packages/ai (voice and transcription) knows nothing of the agent", "move what ai needs down into packages/ai", "packages/ai/README.md"),
-  coreToBrain: says(
-    "the agent's core (a tool and its schema) does not import the rest of the agent, which is built on it",
-    "move what core needs into packages/agent/src/core, or pass it in",
-    "packages/agent/README.md",
-  ),
   react: says(
     "the page is Solid 2; a React import resolves only because apps/mobile installs React",
     "use solid-js, and the Solid version of the library",
@@ -59,7 +54,6 @@ export default defineConfig({
         "vpx scripts/docs/stale-names.ts",
         "vpx scripts/docs/glossary.ts",
         "vpx scripts/audit/protocol-surface.ts --check",
-        "vpx scripts/audit/service-paths.ts --check",
         "vpx scripts/gen/i18n.ts check",
         "vpx scripts/gen/capabilities.ts --check",
         "vpx scripts/gen/api-client.ts --check",
@@ -72,14 +66,11 @@ export default defineConfig({
       // every check builds them first. Cached, so a package nobody changed is not built again; vp install runs it too.
       "packages:build": ["vp run --filter './packages/*' build", "vpx scripts/audit/built-types.ts"],
       "names:verify": "vpx scripts/docs/stale-names.ts",
-      // db:check is a script: it reads db/migrations and db/queries through PGlite.
-      "server:check": [
+      // The TS packages the native views and the generators still use; the server and the command line are Rust (rust:check).
+      "packages:check": [
         "vp run packages:build",
         "vp check",
-        "vp run --filter @vibevalley/protocol --filter @vibevalley/async --filter @vibevalley/home --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent --filter @vibevalley/provider --filter @vibevalley/pkm --filter @vibevalley/artifact test",
-        "vp run --filter @vibevalley/server db:check",
-        "vp run --filter @vibevalley/server test",
-        "vp run --filter @vibevalley/cli test",
+        "vp run --filter @vibevalley/protocol --filter @vibevalley/async --filter @vibevalley/home --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/provider --filter @vibevalley/pkm --filter @vibevalley/artifact test",
       ],
       "web:check": ["vp run packages:build", "vp check", "vp run web:test"],
       // web:check without its vp check: CI's web job runs this one, and its check job runs vp check.
@@ -93,24 +84,21 @@ export default defineConfig({
       // The test and async practices the review lists (scripts/audit/practice-audit.ts): the findings may only go down
       // (scripts/audit/practice.ratchet.json).
       "practice:check": "vpx scripts/audit/practice-audit.ts --check",
-      // Which server module uses which member of another module's service (scripts/audit/service-paths.ts): a new path fails until
-      // it is written down on purpose (scripts/audit/service-paths.json).
-      "paths:check": "vpx scripts/audit/service-paths.ts --check",
       // Files, exports and dependencies nothing uses (knip.ts says what runs; scripts/audit/deadcode.ts says what to do).
       deadcode: "vpx scripts/audit/deadcode.ts",
       "desktop:test": { command: "vp run --filter @vibevalley/desktop e2e", cache: false },
-      // The Rust workspace (crates/, apps/mac): format, clippy, tests. protocol:rust:check regenerates the wire types and
-      // goldens from packages/protocol and apps/server and fails when they differ from what is committed.
+      // The Rust workspace (crates/, apps/mac): format, clippy, tests. protocol:rust:check regenerates the wire types from
+      // packages/protocol and the artifact and pkm goldens from their TS engines, and fails when they differ from what is committed.
       "rust:check": { command: "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace", cache: false },
       "protocol:rust:check": {
         command:
-          "sh crates/vibevalley-protocol/gen/run.sh && git diff --exit-code -- crates/vibevalley-protocol/src/generated crates/vibevalley-protocol/golden crates/vibevalley-server/assets/orchestrator crates/vibevalley-artifact crates/vibevalley-pkm/golden",
+          "sh crates/vibevalley-protocol/gen/run.sh && git diff --exit-code -- crates/vibevalley-protocol/src/generated crates/vibevalley-artifact crates/vibevalley-pkm/golden",
         cache: false,
       },
       // The native views: nsh's own type check, then a bundle.
       "mac:check": { command: "cd apps/mac/ui && ../../../.tools/bin/nsh check && ../../../.tools/bin/nsh build App.tsx -o build", cache: false },
       // What a beta and a release must pass before scripts/release/release.ts tags them (alphas are tagged on CI being green).
-      "release:verify": ["vp run server:check", "vp run web:check", "vp run docs:verify", "vp run desktop:test"],
+      "release:verify": ["vp run rust:check", "vp run packages:check", "vp run web:check", "vp run docs:verify", "vp run desktop:test"],
     },
   },
   // scripts/'s own tests; each package has its vite.config.ts with its own.
@@ -342,7 +330,7 @@ export default defineConfig({
       },
       {
         // The voice package knows nothing of the agent, and neither knows the farm: no app, no owner's words, no
-        // contract with the page (the later override for packages/agent replaces this one there).
+        // contract with the page ().
         files: ["packages/ai/src/**"],
         rules: {
           "no-restricted-imports": [
@@ -386,38 +374,6 @@ export default defineConfig({
                     "packages/provider/README.md",
                   ),
                 },
-              ],
-            },
-          ],
-        },
-      },
-      {
-        files: ["packages/agent/src/**"],
-        rules: {
-          "no-restricted-imports": [
-            "error",
-            {
-              paths: [
-                { name: "bun:test", message: refused.bunTest },
-                { name: "@vibevalley/i18n", message: refused.agentWords },
-                { name: "@vibevalley/protocol", message: refused.agentContract },
-              ],
-              patterns: [{ group: ["**/apps/**", "@vibevalley/server", "@vibevalley/server/*"], message: refused.packageToApp }],
-            },
-          ],
-        },
-      },
-      {
-        // A tool and its schema stand alone: the agent's own tools are built on core, never the other way.
-        files: ["packages/agent/src/core/**"],
-        rules: {
-          "no-restricted-imports": [
-            "error",
-            {
-              paths: [{ name: "bun:test", message: refused.bunTest }],
-              patterns: [
-                { group: ["**/apps/**", "@vibevalley/server", "@vibevalley/server/*"], message: refused.packageToApp },
-                { group: ["../*"], message: refused.coreToBrain },
               ],
             },
           ],
@@ -487,18 +443,6 @@ export default defineConfig({
         rules: { "vibevalley/one-absent": "off" },
       },
       {
-        // A server module's service is its folder's singular word: `export interface Issue` and `makeIssue` in
-        // modules/issue/issue.ts (scripts/audit/oxlint-plugin.ts, singular-service).
-        files: ["apps/server/src/**"],
-        rules: { "vibevalley/singular-service": "error" },
-      },
-      {
-        // A protocol shape named like a service is read as T.X, so the service keeps the name (scripts/audit/oxlint-plugin.ts, protocol-namespace).
-        files: ["apps/server/src/**", "apps/cli/src/**"],
-        excludeFiles: ["apps/server/src/**/*.test.ts", "apps/cli/src/**/*.test.ts", "apps/cli/src/testing/**", "apps/server/src/testing/**"],
-        rules: { "vibevalley/protocol-namespace": "error" },
-      },
-      {
         // A value the page keeps for its life is an atom of the page's, not a signal made outside any function (scripts/audit/oxlint-plugin.ts, page-store).
         files: ["apps/web/src/features/**", "apps/web/src/farm/**", "apps/web/src/ui/**"],
         excludeFiles: ["apps/web/src/**/*.test.ts"],
@@ -519,27 +463,6 @@ export default defineConfig({
         // A refusal is said in the error tone (scripts/audit/oxlint-plugin.ts, failure-tone).
         files: ["apps/web/src/**"],
         rules: { "vibevalley/failure-tone": "error" },
-      },
-      {
-        // Only infra/db.ts imports the database's drivers (pg, PGlite); the rest reaches it through Db (scripts/audit/oxlint-plugin.ts, db-door).
-        files: ["apps/server/src/**"],
-        excludeFiles: ["apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
-        rules: { "vibevalley/db-door": "error" },
-      },
-      {
-        // The server and the agent read and write files off the event loop (scripts/audit/oxlint-plugin.ts, sync-fs). Before the
-        // services are up a sync call is fine: the home's lock, the database's folder and baseline, the locale the CLI
-        // starts in; and the evals' cases are read by a tool, not the server.
-        files: ["apps/server/src/**", "apps/cli/src/**", "packages/agent/src/**"],
-        excludeFiles: [
-          "**/*.test.ts",
-          "apps/server/src/testing/**",
-          "apps/server/src/infra/lease.ts",
-          "apps/server/src/infra/db.ts",
-          "apps/server/src/infra/baseline.ts",
-          "apps/server/src/platform/setting/setting.ts",
-        ],
-        rules: { "vibevalley/sync-fs": "error" },
       },
       {
         // A page timer keeps its handle, to be cleared when its part goes (scripts/audit/oxlint-plugin.ts, dropped-timer).

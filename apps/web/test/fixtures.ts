@@ -21,10 +21,15 @@ const secret = /KEY|TOKEN|SECRET|CERTIFICATE|PASSWORD|^AGORA_|^VIBEVALLEY_|^GIT_
 const cleanEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !secret.test(k)));
 
 /** Every built-in template but the default orchestrator's (apps/server/src/modules/agent/templates/index.json). */
+const repo = join(import.meta.dirname, "..", "..", "..");
+
 const starters = () =>
-  (JSON.parse(readFileSync(join(import.meta.dirname, "..", "..", "server", "src", "modules", "agent", "templates", "index.json"), "utf8")) as string[])
+  (JSON.parse(readFileSync(join(repo, "crates", "vibevalley-server", "assets", "agent", "templates", "index.json"), "utf8")) as string[])
     .filter((id) => id !== "orchestrator")
     .join(",");
+
+/** The Rust server (crates/vibevalley-server): VIBEVALLEY_SERVER_BIN, else cargo's debug build. */
+const serverBin = () => process.env.VIBEVALLEY_SERVER_BIN ?? join(process.env.CARGO_TARGET_DIR ?? join(repo, "target"), "debug", "vibevalley-server");
 
 export const test = base.extend<{ api: VibeValleyApi }, { server: Server; farm: string }>({
   // Files that set their own (test.use({ farm: "…" })) run in workers of their own, on a server no other file has used.
@@ -50,17 +55,7 @@ export const test = base.extend<{ api: VibeValleyApi }, { server: Server; farm: 
         VIBEVALLEY_AGENT_STARTERS: starters(),
       };
       const args = ["--ready-json", "--web", join(out, "dist")];
-      const server = join(import.meta.dirname, "..", "..", "server");
-      // vpx runs the source as `vp run start` does; it becomes the server's own process (exec), so stopping it stops it.
-      // VIBEVALLEY_SERVER_BIN runs the Rust server (crates/vibevalley-server) on the same flags instead.
-      const rust = process.env.VIBEVALLEY_SERVER_BIN;
-      const child: ChildProcess = rust
-        ? spawn(rust, args, { cwd: dir, env, stdio: ["ignore", "pipe", "inherit"] })
-        : spawn(join(server, "node_modules", ".bin", "vpx"), ["src/main.ts", ...args], {
-            cwd: server,
-            env,
-            stdio: ["ignore", "pipe", "inherit"],
-          });
+      const child: ChildProcess = spawn(serverBin(), args, { cwd: dir, env, stdio: ["ignore", "pipe", "inherit"] });
       const url = await new Promise<string>((resolve, reject) => {
         child.once("exit", (code) => reject(new Error(`server exited (${code})`)));
         createInterface({ input: child.stdout! }).on("line", (line) => {

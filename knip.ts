@@ -18,18 +18,6 @@ const config: KnipConfig = {
       entry: ["scripts/*/*.ts"],
       project: ["scripts/**/*.ts"],
     },
-    "apps/server": {
-      // main.ts runs through vpx (`vp run start`, the desktop app and the e2e), which knip does not read in a script; it
-      // is the pack block's entry (knip finds the chat's src/chat/main.ts there itself).
-      entry: ["scripts/*.ts", "src/main.ts"],
-      project: ["src/**/*.ts", "scripts/**/*.ts"],
-    },
-    "apps/cli": {
-      // main.ts runs through vpx (`vp run start`, the acceptance sandbox) and is the pack block's entry.
-      // Session launches worker.ts directly; the desktop package includes its standalone worker.mjs bundle.
-      entry: ["src/main.ts", "src/worker.ts"],
-      project: ["src/**/*.ts"],
-    },
     "apps/web": {
       entry: ["index.html", "stories.html", "src/stories.tsx", "vite.stories.config.ts", "test/**/*.ts"],
       project: ["src/**/*.{ts,tsx}", "test/**/*.ts"],
@@ -73,7 +61,8 @@ const config: KnipConfig = {
   // Programs on the machine, not packages: Xcode's swift, macOS's plutil and ditto, and the voice line's tunnel.
   ignoreBinaries: ["swift", "plutil", "ditto", "cloudflared"],
   // Swift, with its own tools.
-  ignoreWorkspaces: ["apps/island"],
+  // apps/mac/ui is bundled by nsh from App.tsx and its stories, which knip does not read.
+  ignoreWorkspaces: ["apps/island", "apps/mac/ui"],
 };
 
 export default config;
