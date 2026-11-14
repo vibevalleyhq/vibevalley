@@ -1,95 +1,65 @@
 # 设置和配置
 
-服务端的运行参数与凭据来自两类入口：
-- **静态配置（`ServerConfig`）**：开机时从默认值、`vibevalley.yaml` 和环境变量一次性加载，运行期只读。
-- **动态设置（`Setting`）**：用户在工作台 `/settings` 保存的密钥、语言、语音与记忆来源，以 `0600` 权限存于 `$VIBEVALLEY_HOME/settings.json`，保存即生效。
+服务端的运行参数与钥匙来自两处：
+- **启动配置（`ServerConfig`）**：二进制 `vibevalley-server` 开机时从命令行参数和环境变量读一次，运行期只读。
+- **设置（`Setting`）**：用户在工作台 `/settings` 保存的钥匙、语言、语音、记忆来源和 AI 服务，以 `0600` 权限存在 `$VIBEVALLEY_HOME/settings.json`，保存即生效。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
-| `ServerConfig` 的加载优先级、类型转换、开机校验与配置键定义 | 各农机自身的配置文件（如 `pi` 的 `models.json`） |
-| `settings.json` 的原子读写、格式校验、密钥优先级（设置 > 配置）与末四位掩码 | 语音通话与记忆来源的业务实现（[语音](docs/subsystems/voice.md)、[记性](docs/subsystems/memory.md)） |
-| 全局日志与出站文本的密钥脱敏（`base/redact.ts`） | 档案、技能书与农机并发设置（存于 `config.json`，归[档案和农机](docs/subsystems/agent.md)） |
+| 启动配置的来源和默认值 | 各农机自己的配置文件（如 `pi` 的 `models.json`） |
+| `settings.json` 的原子读写、校验、钥匙优先级（设置 > 启动配置）与末四位提示 | 记忆来源的业务（[记性](docs/subsystems/memory.md)） |
+| 每个功能的就绪状态（`SettingsStatus.readiness`） | 连接与用途的规则（[AI 服务](docs/subsystems/provider.md)）；档案、技能与农机（`config.json`，[档案和农机](docs/subsystems/agent.md)） |
 
 ## 在哪
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/infra/config.ts` | `ServerConfig`、`defaults`、`loadConfig`、`serverAddress`、`dbDir`、`reposDir`、`worktreesDir`、`pkmDir` |
-| `apps/server/src/platform/provider/provider.ts` | [AI 服务](docs/subsystems/provider.md)：连接与用途规则、模型目录；私有配置仍由 Setting 保存 |
-| `apps/server/src/platform/setting/` | `setting.ts`、`provider.ts`（`bindingOf`）、`readiness.ts`、`memorySources.ts`、`voice.ts` |
-| `apps/server/src/base/redact.ts` | 日志与出站文本密钥脱敏（`redact`、`redactOutput`） |
-| `apps/web/src/features/setting/` | 工作台设置页（`SettingsPage.tsx`、`SettingsForm.tsx`、`Readiness.tsx`） |
+| `crates/vibevalley-server/src/main.rs` | 读参数（`--web`、`--ready-json`）和环境变量，组装 `ServerConfig`，只听 `127.0.0.1` |
+| `crates/vibevalley-server/src/start.rs` | `ServerConfig`（家目录、空间根、钥匙、内置模板、测试开关）与开机组装 |
+| `crates/vibevalley-server/src/modules/setting.rs` | `Setting`：`settings.json` 读成 `Stored`；`Secret`；`status`、`validate`、`save`；语音默认值与差异；就绪状态 |
+| `crates/vibevalley-home/src/lib.rs` | 家目录在哪（`VIBEVALLEY_HOME`，默认 `~/.vibevalley`）、`server.json`、保存的语言 |
+| `apps/web/src/features/setting/` | 工作台设置页 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`setting.get`、`setting.validate`、`setting.update`）。
 
 ## 模型和不变量
 
-### 静态配置（`ServerConfig`）
+### 启动配置
 
-- **优先级与命名**：
-  - 优先级固定为 `环境变量 > vibevalley.yaml > defaults()`。
-  - 环境变量名由配置键加 `VIBEVALLEY_` 前缀并将 `.` 换为 `_` 得出。
-  - 额外支持直接读取 `DEEPSEEK_API_KEY`、`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`；家目录由 `VIBEVALLEY_HOME` 指定（默认 `~/.vibevalley`）。
-- **错误配置拒绝开机**：配置文件不存在、数字解析失败或端口越界时，`loadConfig` 直接报错退出，不静默回退默认值。
-- **配置键清单**：
-
-| 配置键 | 用途 | 默认值 |
+| 来源 | 用途 | 默认值 |
 |---|---|---|
-| `work_root` | 空间：仓库（`repos/`）、工单 `worktrees/` 与笔记 `pkm/` 的根目录 | `~/vibevalley-dev` |
-| `db` | PGlite 的数据目录（设为 `memory` 则使用内存库；配了 `database.url` 时不用） | `$VIBEVALLEY_HOME/db` |
-| `database.url` | 一个 Postgres（`postgres://…`）：库放在那里；可能带密码，按密钥读 | 空：用 PGlite |
-| `port` | 主 HTTP 与 `/mcp` 监听端口（仅绑定 `127.0.0.1`，`0` 为随机端口） | `8787` |
-| `web` | 在 `/` 托管的前端静态产物目录（也可由 `--web` 指定） | 无 |
-| `agent.model` / `agent.starters` | CLI 对话默认模型、新农场自动安装的内置模板 ID 列表 | 空 / 空 |
-| `deepseek.api_key` | DeepSeek API Key（`DEEPSEEK_API_KEY`） | 空 |
-| `agora.app_id` / `agora.app_certificate` | 声网 RTC 凭据（`AGORA_APP_ID` / `AGORA_APP_CERTIFICATE`） | 空 |
-| `voice.id` / `voice.line.port` / `voice.line.url` | 默认音色、语音线路端口与固定公网隧道地址 | 默认音色 / `8788` / 空 |
-| `lan.port` | 「连接到本机」局域网监听端口 | `8790` |
-| `git_emails` / `tokei` | 计入用户经验的额外 git 邮箱列表、tokei 命令路径 | 空 / `tokei` |
-| `cny_per_usd` | 美元单价折算人民币汇率 | `7.2` |
-| `patrol.heartbeat_minutes` / `cron.tick_ms` | Inbox 巡查间隔（分钟，`0` 关闭）、定时任务检查间隔（毫秒） | `10` / `20000` |
-| `session.stall_seconds` / `session.trajectory_days` | 帮工静默告警秒数、离场后轨迹保留天数（`0` 永久保留） | `240` / `30` |
-| `repo.max_sessions` / `repo.check_timeout_seconds` | 单仓库并发帮工上限、`.vibevalley/check` 超时秒数 | `3` / `1200` |
-| `github.pr_repos` / `github.pr_poll_seconds` | 完成时走 PR 的仓库名列表、开放 PR 轮询间隔秒数 | `[]` / `180` |
-| `chat.notice_batch_ms` / `chat.retry_wake_ms` | 忙时提示合并毫秒数、唤醒失败重试间隔毫秒数 | `3000` / `3000` |
-| `otlp.url` / `pkm.root` | OpenTelemetry 收集器地址、笔记库根目录（空：`<work_root>/pkm`） | 空 / 空 |
+| `VIBEVALLEY_HOME` | 家目录：`settings.json`、`config.json`、`server.db`、`server.json`、附件 | `~/.vibevalley` |
+| `VIBEVALLEY_WORK_ROOT` | 空间：`repos/`、`worktrees/`、`pkm/` 的根，开机时建好 | `~/vibevalley-dev` |
+| `VIBEVALLEY_PORT` | 主 HTTP 与 `/mcp` 的端口（只绑 `127.0.0.1`，`0` 随机）；不是端口就拒绝开机 | `8787` |
+| `VIBEVALLEY_AGENT_STARTERS` | 新农场装在助手旁边的内置模板 ID，逗号分隔 | 空 |
+| `VIBEVALLEY_TEST_RUNTIMES=1` | 页面测试用：只有替身农机、媒体离线、不探测农机、不抓链接预览 | 关 |
+| `--web <目录>` | 在 `/` 提供构建好的页面 | 无 |
+| `--ready-json` | 开始监听后打印一行 `{"url","pid"}` | 关 |
 
-### 动态设置（`Setting`）与脱敏
+TS 版的 `vibevalley.yaml` 和其余配置键（Postgres、声网、巡查间隔、PR 轮询、OTLP 等）Rust 不读；对应的值写在代码里或已砍掉。
 
-- **设置优先于配置，按需实时读取**：`deepseekApiKey()` 与 `agora()` 优先取 `settings.json`，为空时回退 `ServerConfig`，保存后立即生效。
-- **暴露当前空间的实际路径**：`SettingsStatus.paths` 给出 `repos`、`worktrees` 与 `pkm` 的绝对路径，关于页逐行显示。
-- **密钥在内存里为 `Secret`，不出服务端，损坏文件保留备份**：
-  - `settings.json` 在磁盘上是普通字符串，读进内存经 `StoredKey`（Zod 的 `z.codec`）封成 `Secret`（启动配置的钥匙由 `infra/config.ts` 同样封好），`JSON.stringify` 会抛错、日志里打印成 `[secret]`，只在发请求处 `reveal()` 取明文；`setting.get` 仅返回来源 `settings`/`config` 与末四位提示（`…xxxx`）。
-  - `settings.json` 以 `0600` 权限经临时文件原子改名写入；启动时若文件损坏，改名为 `settings.json.unreadable-<毫秒>` 备份并从空设置启动。
-- **每个功能的准备状态由服务端统一计算（`SettingsStatus.readiness`）**：
-  - `setting/readiness.ts`（复用 `setting/provider.ts` 的 `bindingOf`）为 11 项功能（`orchestrator`、`image`、`understanding`、`speech`、`speakers`、`voiceDesign`、`transcription`、`dictation`、`live`、`vision`、`call`）给出 `{ ready: true }` 或 `{ ready: false, missing }`。
-  - 页面钥匙集中在 `/settings/accounts`（「账号与钥匙」：DeepSeek、MOSS 连接与模型、声网），各功能页只绑账号模型并在顶部用 `Readiness` 指路；输入框 `/imagegen` 在生图未就绪时直接打开对应设置，不发给助手。
-- **语音设置只存差异**：`settings.json` 的 `voice` 字段仅保存与 `defaultVoice()` 不同的覆盖项。
-- **统一输出脱敏（`redact`）**：所有日志与外部记忆出站文本均经 `base/redact.ts` 将私钥、`sk-*`、`ghp_*`、JWT、`hb_*` 及敏感键值对替换为 `[redacted]`。
+### 设置与钥匙
+
+- **设置优先于启动配置**：DeepSeek 钥匙先取 `settings.json`，空的才用 `ServerConfig` 给的，保存后立刻生效。
+- **钥匙在内存里是 `Secret`**：`settings.json` 一次读成 `Stored`，钥匙封成 `Secret`，`Debug` 只出提示，只在真正发请求处 `expose()`；`setting.get` 只给来源（`settings`/`config`）和末四位。
+- **原子写、坏文件留底**：经临时文件改名写入，权限 `0600`；读不懂的文件改名为 `settings.json.bad`，从空设置开始。
+- **就绪状态由服务端算一份**：`status` 为每个功能（助手、生图、理解、语音、对白、音色设计、转写、听写、Live、Vision、电话）给出就绪或缺什么；连接的部分问 `Providers::readiness`。
+- **空间路径**：`SettingsStatus.paths` 给出 `repos`、`worktrees`、`pkm` 的绝对路径。
+- **语音设置只存差异**：`voice` 只存和默认值不同的项。
 
 ## 怎么走
 
-1. **启动加载**：`loadConfig` 解析环境变量与 `vibevalley.yaml` 生成 `ServerConfig`；`Setting` 读取并校验 `settings.json`。
-2. **校验与保存**：前端实时调用 `setting.validate` 检查格式；保存时调用 `setting.update`（`can` 只有 `user`）原子写盘。
-
-## 和谁打交道
-
-- **全部服务端模块**：注入 `ServerConfig` 读取静态参数。
-- **助手、农机、语音与记性（`orchestrator`、`agent`、`voice`、`memory`）**：注入 `Setting` 实时获取最新密钥、语音与记忆来源。
-
-### 供应商配置
-
-Setting 在 `settings.json.providers` 保存供应商私有配置，普通设置与供应商修改共用一把锁，完整覆盖读、写盘与内存替换。`SettingsStatus.readiness` 给出各功能的就绪与缺项；连接及脱敏凭据经 Provider 接口读取。版本冲突、用途引用和密钥更新语义见 [AI 服务](docs/subsystems/provider.md)。
+1. **开机**：`main.rs` 组装 `ServerConfig`；`Setting::open` 读 `settings.json` 并按它设好语言。
+2. **校验与保存**：页面调 `setting.validate` 查格式；保存调 `setting.update`（`can` 只有 `user`），整份原子写盘。
 
 ## 为什么这样
 
-- **静态配置与动态设置分离，两类钥匙内存统一 `Secret`**：`vibevalley.yaml` 只在启动时读一次（`loadConfig`），`settings.json` 在运行期由界面原子更新（`StoredKey`），互不覆盖且明文不进日志。
-- **准备状态由服务端算一份，钥匙放一页**：连接启用、凭据与用途绑定规则只在 `bindingOf` 和 `readiness.ts` 写一次，避免页面再推一份或等发出去才报错；三家钥匙收在「账号与钥匙」一页，避免四处翻找。
-- **单一 `ServerConfig` 入口与统一 `redact` 出口**：禁止业务模块直接读 `process.env`；日志与外部记忆共用同一套脱敏规则，防止密钥外泄。
+- **启动配置与设置分开**：启动配置只在开机读一次，设置在运行期由界面原子更新，互不覆盖；两类钥匙在内存里都是 `Secret`，明文不进日志。
+- **就绪状态由服务端算**：绑定规则只写一处，页面不再推一份，也不等发出去才报错。
 
 ## 怎么验证
 
-- `apps/server/src/infra/config.test.ts`、`apps/server/src/platform/setting/*.test.ts`：配置优先级、非法值拦截、密钥掩码测试。
-- `apps/server/src/base/base.test.ts`、`apps/web/test/settings.spec.ts`：密钥脱敏与设置页端到端测试。
+- `crates/vibevalley-server/tests/setting.rs`：这里存的钥匙压过启动配置且只显示末四位、有一项不对整份不存、语音只存差异、语音厂商的钥匙只给提示且就绪跟着连接走。
+- `apps/web/test/settings.spec.ts`：设置页端到端。

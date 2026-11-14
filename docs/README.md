@@ -7,35 +7,35 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 文档 | 讲什么 |
 |---|---|
 | [guide.md](docs/guide.md) | 教程：派第一张工单，看着它干，完成它，处理冲突和失败，管住花费，用语音 |
-| [development.md](docs/development.md) | 教程：本机跑起来，检查和测试，改形状、规则和表，打包 |
+| [development.md](docs/development.md) | 教程：本机跑起来（Rust 服务端、原生应用），检查和测试，改形状、规则和表，打包 |
 | [concepts.md](docs/concepts.md) | 概念：实际是什么，农场怎么画它们 |
-| [architecture.md](docs/architecture.md) | 架构：分层、核心状态、事件流、接口和存储。改 `apps/`、`packages/` 之前读 |
+| [architecture.md](docs/architecture.md) | 架构：分层、核心状态、事件流、接口和存储。改 `crates/`、`apps/`、`packages/` 之前读 |
 
 子系统（`subsystems/`，从架构的角度写一个子系统沉淀下来的样子，[怎么写](docs/subsystems/README.md)）：
 
 | 文档 | 内容 |
 |---|---|
 | [issue.md](docs/subsystems/issue.md) | 工单：一块地：工单的模型、状态和派活、验收、完成与 PR 跟进、定时任务 |
-| [session.md](docs/subsystems/session.md) | 帮工：触发去重、谁该听到、三道刹车、投递和叫醒、工单蓄水池，Session 和 Run、工作目录、机器执行器、规矩和汇报、事件日志、额度和上限、重启后接着答 |
+| [session.md](docs/subsystems/session.md) | 帮工：Session 和 Run、工作目录、经 oar 开会话、`/mcp`、规矩和汇报、轨迹、额度和上限 |
 | [repo.md](docs/subsystems/repo.md) | 仓库：工作目录、worktree、检查、GitHub 检测与 PR 快照、地契 |
 | [artifact.md](docs/subsystems/artifact.md) | Artifact：用户和帮工一起写的块、交上来的网页；按块存按 op 改，网页按版本存、隔离着看，带卡片说出来 |
 | [pkm.md](docs/subsystems/pkm.md) | 笔记：用户的 Logseq 式大纲页面，按 PARA 分文件夹；文件是真相，读进内存再写回，块引用、反链、搜索、闪念、剪藏、改写和撤销 |
-| [channel.md](docs/subsystems/channel.md) | 频道：默认频道、私聊、消息和事件、工单串、连接器 |
-| [watch.md](docs/subsystems/watch.md) | 观察层：按游标读频道的事件、谁听见、三道刹车、帮工的串和回执；收件箱：要你处理的事、刚来的、巡查，经通话、手机、系统通知送到用户 |
-| [brain.md](docs/subsystems/brain.md) | VibeValley 自己的 agent：模型请求、循环、对话文件、提示开头、压缩、技能、记性、帮手、自己的任务，四种用法 |
+| [channel.md](docs/subsystems/channel.md) | 频道：默认频道、私聊、消息和事件、工单串 |
+| [watch.md](docs/subsystems/watch.md) | 观察层：按游标读频道的事件、谁听见、刹车、帮工的串和回执；收件箱：要你处理的事、刚来的、巡查 |
+| [brain.md](docs/subsystems/brain.md) | VibeValley 自己的 agent（`vibevalley-agent`）：模型请求、循环、对话文件、压缩、工具、技能、记性、自己的任务 |
 | [orchestrator.md](docs/subsystems/orchestrator.md) | 助手：收什么话、现状、工具与 `vv://` 资源读取、谁能让它合并、巡查、评测 |
 | [memory.md](docs/subsystems/memory.md) | 记性：想起、记下、主动查、外面的来源 |
-| [voice.md](docs/subsystems/voice.md) | 语音：通话（Agora ConvoAI）、听写、语音助手 |
-| [lan.md](docs/subsystems/lan.md) | 「连接到本机」：从外面进农场的唯一一道门，按钥匙的来路放行 |
+| [voice.md](docs/subsystems/voice.md) | 语音：通话和听写随原生改写砍掉了，剩下的是语音合成任务 |
+| [lan.md](docs/subsystems/lan.md) | 「连接到本机」：随手机壳砍掉了，Rust 服务端只回「关着」 |
 | [attachment.md](docs/subsystems/attachment.md) | 附件：农场留下的一份文件，按 SHA-256 内容寻址落盘存一次；消息、媒体结果和素材库都引用它 |
-| [user.md](docs/subsystems/user.md) | 用户和设备：一个用户、名字和密码、每台设备一把钥匙、密码和确认码登录、收回和久不用作废 |
+| [user.md](docs/subsystems/user.md) | 用户和设备：远程登录与设备钥匙随「连接到本机」砍掉了 |
 | [setting.md](docs/subsystems/setting.md) | 设置：settings.json、配置和环境变量、钥匙和打码 |
 | [provider.md](docs/subsystems/provider.md) | AI 服务：供应商连接、模型目录、默认用途、凭据与配置版本 |
-| [media.md](docs/subsystems/media.md) | 媒体和素材库：生图、语音、理解、转写任务与本机输入，独立下载与安全校验；生成的、你上传的、帮工拿回来的文件，一份文件一张卡，记着来路 |
+| [media.md](docs/subsystems/media.md) | 媒体和素材库：一个任务机上的生图与语音任务、本机输入、独立下载与安全校验；素材库一份文件一张卡，记着来路 |
 | [game.md](docs/subsystems/game.md) | 游戏：账本、金币和成就、等级、空地和特效 |
 | [core.md](docs/subsystems/core.md) | 核心状态：一份状态只因事实而变、SSE 流和全部路由、接口和能力表、重启 |
-| [foundation.md](docs/subsystems/foundation.md) | 地基：一个仓库、一块业务一个服务（工厂加接口）、异步原语、Zod 的形状和规则、Postgres 查询生成器、表结构、测试 |
-| [app.md](docs/subsystems/app.md) | 客户端：一份 Solid 页面、问服务端、宿主接口、Electron 的桌面版和打包 |
+| [foundation.md](docs/subsystems/foundation.md) | 地基：Cargo 与 pnpm 工作区、深模块、边界一次解码的类型、契约的生成、SQLite 存储、测试分层 |
+| [app.md](docs/subsystems/app.md) | 客户端：原生应用 `apps/mac`、过渡期的 Solid 页面和 Electron 桌面版、问服务端、打包 |
 | [farm.md](docs/subsystems/farm.md) | 农场的皮：像素村、地里长什么、走路、手机、音效、图鉴 |
 | [agent.md](docs/subsystems/agent.md) | 档案和农机：档案和它的角色、种子、农机的探测和清单、技能书 |
 | [process.md](docs/subsystems/process.md) | 工程流程：文档分层、Note 和子系统、检查、skill、写作规范、素材流水线 |
@@ -48,7 +48,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [concept-map.md](docs/reference/concept-map.md) | 概念在各层的名字：农场里、界面、协议、HTTP、服务端、存储、oar |
 | [capabilities.md](docs/reference/capabilities.md) | 每个接口谁能调：用户、「连接到本机」、助手；`scripts/gen/capabilities.ts` 写出 |
 | [farm-ui.md](docs/reference/farm-ui.md) | 界面清单、角色、轨迹和精力瓶 |
-| [primitives.md](docs/reference/primitives.md) | 各地基文件夹导出的共用原语和一句话说明；写帮手之前先查；`scripts/gen/primitives.ts` 写出 |
+| [primitives.md](docs/reference/primitives.md) | TS 地基文件夹导出的共用原语和一句话说明；写帮手之前先查；`scripts/gen/primitives.ts` 写出 |
 
 怎么写（`style/`）：
 
@@ -69,14 +69,14 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 助手 | assistant | orchestrator（角色是 `orchestrator` 的档案） | 管家（指这个角色时）、manager、工头（指助手时）、主 agent |
 | 帮工 | helper | Session（[concepts](docs/concepts.md#session-和-oar-会话)） | 工人、子 agent、worker、执行（指帮工时） |
 | 在场 | here | `Session.hired`（核心状态里雇来的会话） | 地里 |
-| 一轮 | a round of work | `Run`（`session_run` 表） | 一次干活、turn（指一轮时） |
+| 一轮 | a round of work | `Run` | 一次干活、turn（指一轮时） |
 | 档案 | profile | agent（`Agent`） | 帮工档案、角色（指档案时） |
 | 农机 | machine | runtime（`RuntimeInfo`） | harness、引擎、runtime（中文界面） |
 | 工单 | ticket | issue（`Issue`） | job、ticket |
 | Artifact | artifact | artifact（`Artifact`，正文 `blocks` 或 `html`） | 稿子、草稿（指 Artifact 时）、产出、文档（指 Artifact 时）、doc（指 Artifact 时） |
 | 笔记 | notes | pkm（`Pkm`，一页 `PkmPage`，一块 `PkmBlock`） |  |
 | 仓库 | repo | repo（`RepoSummary`） | 一块地 |
-| 空间 | space | `SpaceState`；目录是 `ServerConfig` 的 `workRoot` | 世界、全图 |
+| 空间 | space | `SpaceState`；目录是 `work_root`（`VIBEVALLEY_WORK_ROOT`） | 世界、全图 |
 | 宿主 | host | `ServerConfig.home`（`$VIBEVALLEY_HOME`） |  |
 | 空位 | spot | `ServerConfig.repo.maxSessions`（配置 `repo.max_sessions`）、`Session.room`；每台农机另有 `maxWorking` | 并发位、空地 |
 | 档案模板 | profile template | `AgentTemplate`（`agent.template.*`） | 种子、预设 |
@@ -88,7 +88,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 改动 | changes | `Changes`（`issue.diff.get`） | 差异、PR 详情、收成清单 |
 | 完成 | complete | 动作 `complete`；工单挪到 `done`（已完成） | 收获、合并（指完成时：合并只是交付的一种） |
 | 取消 | cancel | 动作 `close`；工单挪到 `canceled`（已取消） | 收工（指取消时：那是帮工离开） |
-| 关上 | closed | `isClosed`：`done` 或 `canceled` |  |
+| 关上 | closed | `is_closed`：`done` 或 `canceled` |  |
 | 聊清楚、安排活、完成 | talk it through, get it worked, finish | 工单的 `backlog`；`todo`、`in_progress`；`in_review` 到 `done` |  |
 | 验收 | review; pass, send back | `Issue.review`（`issue.review`；打回是带话挪回待办，`reject`） | 审核 |
 | 验收意见 | review note | finding（`Issue.findings`） | 草（农场的皮里用） |
@@ -98,22 +98,22 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 记性 | memory | memory（`Memory`） | 记忆库 |
 | 技能 | skill | skill（`Skill`） | 插件（指技能时） |
 | 人设 | persona | `persona.md`、`PersonaMode` |  |
-| 帮手 | subagent | subagent（`agent_todo.executor` 的 `subagent`） |  |
-| 自己的任务 | todo | `Todo`（`agent_todo` 表，工具 `todo_add`、`todo_update`、`todo_list`） |  |
+| 帮手 | subagent | subagent（Rust 的自研 agent 还没有） |  |
+| 自己的任务 | todo | `Todo`（工具 `todo_add`、`todo_update`、`todo_list`） |  |
 | 父工单 | parent issue | `Issue`（有子工单） | 计划图、TaskGraph |
 | 子工单 | child issue | `Issue`（带 `parent`、`blockedBy`；拆单输入为 `IssueChildDraft`） | Task、步骤状态机 |
 | 派活 | dispatch | hire（`Issue.hire`、事实 `FactSessionChanged`） |  |
 | 派工关联 | assignment | `Assignment`（`issue_assignment`） |  |
-| 执行器 | executor | `Executions`（`executor.ts`） |  |
-| 起草 | refine | refine（`IssueRefinement`、`issue.refine`） |  |
+| 执行器 | executor | `Drivers`（档案经 oar 开会话） |  |
+| 起草 | refine | refine（`refine`、`refinement_brief`） |  |
 | 用户 | user | user（`User`、`userId`） | 主人、owner |
-| 田头 | the farm chat | 默认频道（`Channel.defaultChannel`） | 群（指默认频道时） |
+| 田头 | the farm chat | 默认频道（`default_channel`） | 群（指默认频道时） |
 | 私聊 | direct message | direct | 私信 |
 | 和帮工私聊 | talk | `Channel.direct`、`Session.channel` |  |
 | 频道 | channel | channel（`Channel`） | 群（指频道时）、群聊 |
 | 串 | thread | thread | 子频道 |
 | 附件 | attachment | `Attachment`（`attachment` 表） |  |
-| 素材库 | library | `Media` 的 `libraryItems` 等（`media_library_item` 表） | 媒体（指这一页时） |
+| 素材库 | library | `Library`（`media_library_item` 表） | 媒体（指这一页时） |
 | 工作目录 | working folder | `Workplace`（`workdir`） | 工作区 |
 | 定时任务 | scheduled task | cron（`Cron`） | 定时（指定时任务时）、schedule（指定时任务时）、recurrence |
 | Inbox | inbox | `InboxItem`（`StateFrame.inbox`，服务是 `Inbox`） | 通知（指 Inbox 时）、来电（农场的皮里用） |
@@ -121,13 +121,12 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 巡查 | patrol | `patrolStep`（`Inbox.patrol`） |  |
 | 通话 | call | `VoiceCall`（`voice.call.*`） |  |
 | 听写 | dictation | dictation（`Dictation`） |  |
-| 连接器 | connector | `Connector` |  |
 | 花费 | spending | `Spent`、`RuntimeQuota` |  |
 | 连接到本机 | connect to this machine | lan | 远程模式 |
 
 ### 农场的皮
 
-农场把上面的东西画成种地。这些词只在农场的画面（`apps/web/src/farm`）和游戏（`apps/server/src/modules/game`、账本、成就）里用，工单的状态、动作、拒绝、提醒、工具和助手的话都不用；代码由 `scripts/docs/stale-names.ts` 查，词典由 `vpx scripts/gen/i18n.ts check` 查（皮的命名空间除外）。地长什么样见[农场的皮](docs/subsystems/farm.md)。
+农场把上面的东西画成种地。这些词只在农场的画面（`apps/web/src/farm`）和游戏（`crates/vibevalley-server/src/modules/game.rs`、账本、成就）里用，工单的状态、动作、拒绝、提醒、工具和助手的话都不用；代码由 `scripts/docs/stale-names.ts` 查，词典由 `vpx scripts/gen/i18n.ts check` 查（皮的命名空间除外）。地长什么样见[农场的皮](docs/subsystems/farm.md)。
 
 | 农场里 | English | 实际是 | 代码里 |
 |---|---|---|---|
@@ -147,7 +146,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 来电 | call | Inbox 里的一件 | `InboxItem` |
 | 农具 | tools | 农机 | `RuntimeInfo` |
 | 技能书 | skill book | 技能 | `Skill` |
-| 账本 | ledger | 值得记的事；金币、连胜、成就由它折出来 | `LedgerEntry`（`game_ledger` 表） |
+| 账本 | ledger | 值得记的事；金币、连胜、成就由它折出来 | `LedgerEntry`（家目录的 `ledger.jsonl`） |
 | 成就 | achievement | 从账本折出来的里程碑 | `Achievement` |
 | 等级 | level | 一共提交了多少次 | `CommitCount`、`FarmView.level` |
 | 农场 | the farm | 这张皮本身（`/` 的像素农场）；说系统时是 VibeValley | |

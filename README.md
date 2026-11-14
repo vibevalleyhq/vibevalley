@@ -27,25 +27,25 @@
 
 ```mermaid
 flowchart LR
-  you([你]) -- 打字 / 语音 / 微信 --> app[工作台和农场<br/>桌面版、浏览器、手机]
+  you([你]) -- 打字 --> app[工作台和农场<br/>原生应用、桌面版、浏览器]
   app -- HTTP 命令 --> server
   server -- SSE：折好的核心状态 --> app
-  subgraph server[TypeScript 服务端 127.0.0.1]
-    manager[助手<br/>pi-durable]
-    chat[田头和工单<br/>Postgres / PGlite]
+  subgraph server[Rust 服务端 127.0.0.1]
+    manager[助手<br/>自研 agent]
+    chat[田头和工单<br/>SQLite]
     site[核心状态<br/>只由事实改变]
-    sessions[帮工<br/>oar · pi-durable]
+    sessions[帮工<br/>oar]
   end
   manager --> sessions
   sessions -- 会话事件 --> site
-  sessions --> rt[本机的农机<br/>pi · Claude Code · Codex …]
+  sessions --> rt[本机的农机<br/>Claude Code · Codex · ACP …]
   rt --> repo[(你的项目<br/>项目目录或工单的 worktree)]
 ```
 
-- **一个服务端进程**（`apps/server`，TypeScript，Node 24）：助手、帮工、田头、工单和交付、Artifact 和笔记、语音、连接器都在里面；数据在 Postgres（没配就是家目录里的 PGlite），助手和帮工的对话在 pi-durable 的 `durable.db`。
+- **一个服务端进程**（`crates/vibevalley-server`，Rust）：助手、帮工、田头、工单和交付、Artifact 和笔记、媒体都在里面；数据在家目录的 SQLite 和文件里。仓库正在改成全原生（[计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)），语音、外部聊天接入和手机壳暂时砍掉了。
 - **核心状态只有一份**：农场上的一切是一个值，只因「事实」而变（雇了一个帮工、开始一轮、跑了一条命令……）。服务端用纯函数把事实折进状态，页面只读折好的结果。
-- **一份页面，三个宿主**（`apps/web`，Solid 2 + Tailwind）：`/` 是工作台，`/farm` 是像素农场；桌面版（Electron）加上通知、菜单栏、灵动岛和语音快捷键，手机壳（Expo）扫码配对后打开同一个页面。
-- **契约只写一次**：接口和形状按概念写在 `packages/protocol`（Zod），服务端、页面和命令行用同一份，两边对不上就编不过。
+- **客户端**：原生应用 `apps/mac`（GPUI + nsh 跑的 TSX）是终态；过渡期还有 Solid 页面 `apps/web`（`/` 是工作台，`/farm` 是像素农场）和带着它的 Electron 桌面版。
+- **契约只写一次**：接口和形状按概念写在 `packages/protocol`（Zod），Rust 类型由它生成，服务端、页面和命令行用同一份。
 
 更多见 [docs/architecture.md](docs/architecture.md)。
 
@@ -56,11 +56,10 @@ flowchart LR
 
 ### 需要
 
-- macOS（Apple 芯片）。macOS 应用是主要的形态；单独跑的服务端用浏览器打开；手机壳（iOS、Android）要自己构建（[apps/mobile](apps/mobile/README.md)）。
-- 至少一个装好并登录的编码 agent：[pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent)、[Claude Code](https://docs.anthropic.com/en/docs/claude-code)、[Codex](https://github.com/openai/codex)。VibeValley 也自带一个农机，只要 DeepSeek 的钥匙。
+- macOS（Apple 芯片）。macOS 应用是主要的形态；单独跑的服务端用浏览器打开。
+- 至少一个装好并登录的编码 agent：[Claude Code](https://docs.anthropic.com/en/docs/claude-code)、[Codex](https://github.com/openai/codex) 或一个 ACP 农机。VibeValley 也自带一个农机，只要 DeepSeek 的钥匙。
 - 一把 [DeepSeek](https://platform.deepseek.com/) 的 API 钥匙，助手要用。
-- 构建要 [Vite+](https://viteplus.dev)（`vp`）：它照 `.node-version` 装 Node 24，带着 pnpm。
-- 可选：[Agora](https://www.agora.io/) 的凭据（用来语音），以及微信、飞书或 QQ 的机器人（从外面派活）。
+- 构建要 Rust（照 `rust-toolchain.toml`）和 [Vite+](https://viteplus.dev)（`vp`）：它照 `.node-version` 装 Node 24，带着 pnpm。
 
 ### 打一个 macOS 应用
 
@@ -79,10 +78,10 @@ open apps/desktop/dist/mac-arm64/VibeValley.app
 
 ```bash
 vp install && vp run --filter @vibevalley/web build      # 页面
-vp run --filter @vibevalley/server start --web ../web/dist   # 服务端，127.0.0.1:8787，浏览器打开它
+cargo run -p vibevalley-server -- --web apps/web/dist     # 服务端，127.0.0.1:8787，浏览器打开它
 ```
 
-数据同样在 `~/.vibevalley`（`VIBEVALLEY_HOME`）。钥匙在「设置」里填，存在 `$VIBEVALLEY_HOME/settings.json`；也可以写进 `$VIBEVALLEY_HOME/vibevalley.yaml`（或 `--config` 给的文件）和相应的环境变量。设置里的钥匙优先，详见[设置和配置](docs/subsystems/setting.md)。
+数据同样在 `~/.vibevalley`（`VIBEVALLEY_HOME`）。钥匙在「设置」里填，存在 `$VIBEVALLEY_HOME/settings.json`，详见[设置和配置](docs/subsystems/setting.md)。
 
 ### 第一次打开
 
@@ -96,12 +95,12 @@ vp run --filter @vibevalley/server start --web ../web/dist   # 服务端，127.0
 ## 目录
 
 ```
-apps/server/       TypeScript 服务端（Hono、Zod、Postgres / PGlite）：src/ 按概念分的服务（工单、帮工、信箱、项目、频道、Artifact、笔记、助手、连接器、游戏……），db/ 表结构和查询
-apps/cli/          命令行（vibevalley）：照领域模型一条命令一个操作，经 VibeValleyApi 调服务端
-apps/web/          页面（Solid 2）：农场、像素村、田头、工单、Artifact、笔记、配置页、语音；服务端在 / 提供
-apps/desktop/      Electron 壳：带着服务端起来，打开它的页面；package:mac 打成 macOS 应用
+crates/            Rust：服务端（vibevalley-server）、命令行（vibevalley-cli）、核心规则、工单板、oar、自研 agent、契约类型……
+apps/mac/          原生应用（GPUI + nsh TSX）
+apps/web/          页面（Solid 2）：农场、像素村、田头、工单、Artifact、笔记、配置页；服务端在 / 提供（过渡期）
+apps/desktop/      Electron 壳：带着 Rust 服务端起来，打开它的页面；package:mac 打成 macOS 应用（过渡期）
 apps/site/         官网 vibevalley.dev（Solid 2 静态生成）
-packages/protocol/ 形状、接口、几处共用的规则和宿主接口的唯一来源，服务端、命令行、页面和两个壳都 import 它
+packages/protocol/ 形状、接口、几处共用的规则和宿主接口的唯一来源（Zod），Rust 类型由它生成
 design/            像素素材的生图提示词、脚本和切图规则（原图和效果图在单独的仓库 vibevalley-art）
 docs/              文档：现在怎么用、怎么开发、各部分怎么工作
 .agents/notes/     Agent Notes：每个设计决策为什么这样做、放弃了什么
@@ -117,9 +116,8 @@ docs/              文档：现在怎么用、怎么开发、各部分怎么工�
 ## 致谢
 
 - [oar](https://github.com/botiverse/oar)（botiverse，Apache-2.0）：驱动编码 agent 的运行时。田头的频道、工单串和外部渠道参照了 botiverse 的 Raft。
-- [pi-durable 和 pi-ai](https://github.com/earendil-works/pi)（Earendil）：助手和帮工跑在上面，断在半路的一轮重启后接着做。
-- [Hono](https://hono.dev/)、[Zod](https://zod.dev/)、[PGlite](https://pglite.dev/)、[Solid](https://www.solidjs.com/)、[Tailwind CSS](https://tailwindcss.com/) 和 [Electron](https://www.electronjs.org/)：服务端的接口、契约、数据库、页面、样式和桌面版。
-- [Agora Conversational AI](https://www.agora.io/)：语音助手；服务端照它的官方示例 [agent-quickstart-nextjs](https://github.com/AgoraIO-Conversational-AI/agent-quickstart-nextjs)（MIT）改写。
+- [pi-durable 和 pi-ai](https://github.com/earendil-works/pi)（Earendil）：自研 agent 的循环和持久照它们的做法写。
+- [GPUI](https://www.gpui.rs/)、[Zod](https://zod.dev/)、[SQLite](https://sqlite.org/)、[Solid](https://www.solidjs.com/)、[Tailwind CSS](https://tailwindcss.com/) 和 [Electron](https://www.electronjs.org/)：原生应用、契约、数据库、页面、样式和桌面版。
 - [DeepSeek](https://www.deepseek.com/)：助手用的模型。
 - [Fusion Pixel Font](https://github.com/TakWolf/fusion-pixel-font)（OFL）：像素字体。
 - [Hugeicons](https://hugeicons.com/)（MIT）、[LobeHub Icons](https://github.com/lobehub/lobe-icons)（MIT）：像素图标和农机 logo 照它们的形状重画。

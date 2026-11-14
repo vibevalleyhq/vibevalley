@@ -27,10 +27,10 @@
 | `./agora/server` | 声网 SDK 客户端、RTC token 和协议错误 |
 | `./agora/captions` | 声网字幕包解码与分片；浏览器可用 |
 
-对话模型（DeepSeek）不在这里：助手和帮工经 pi-ai 的 DeepSeek provider 问它（[模型边界](docs/subsystems/brain.md#模型边界)）。
+对话模型（DeepSeek）不在这里：助手和帮工经 pi-ai 的 DeepSeek provider 问它（[模型边界](docs/subsystems/brain.md)）。
 
 每个协议固定官方端点，只提交一次：不重试、不跟随重定向、不下载结果 URL、不轮询异步任务；超时、响应体上限和本地输入上限写在各自的 `src/` 文件里，不当成厂商的限制。错误区分未提交、明确拒绝和结果未知；缺失的时长、采样率、用量不猜。调用者要先存下结果 URL 或任务 ID，再单独下载或查询，下载失败不重新提交生成。用途绑定、输入存储、任务、授权和克隆样本的寿命归服务端的 [Media](docs/subsystems/media.md) 和 [AI 服务](docs/subsystems/provider.md)。
 
-浏览器只导入纯协议子路径，不导入服务端工厂。`ask_orchestrator`、页面中继、设置到厂商配置的组装及 RTC 设备由应用负责。实时内核的保留边界见 [语音](docs/subsystems/voice.md#为什么这样)。
+浏览器只导入纯协议子路径，不导入服务端工厂。`ask_orchestrator`、页面中继、设置到厂商配置的组装及 RTC 设备由应用负责。实时内核的保留边界见 [语音](docs/subsystems/voice.md)。
 
-检查：`vp run --filter @vibevalley/provider test`；参与 `packages:build` 和 `server:check`。服务端 voice 测试检查经 Core 的真实转写接线和声网通话生命周期。
+检查：`vp run --filter @vibevalley/provider test`；参与 `packages:build` 和 `packages:check`。只剩页面的语音在用，随页面删。

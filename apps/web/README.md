@@ -1,8 +1,8 @@
 # apps/web
 
 The page, in Solid 2 (`solid-js`, `@solidjs/web`, pinned to one RC): the workbench every host shows (Electron in
-`apps/desktop`, a browser, the phone's WebView). The server serves it at `/` (`vp run start --web ../web/dist` in
-`apps/server`), so the page and the API share one origin.
+`apps/desktop`, a browser, the phone's WebView). The Rust server serves it at `/` (`cargo run -p vibevalley-server -- --web apps/web/dist`), so the page and the API share
+one origin. `apps/mac` replaces it at a later gate.
 
 ```
 src/main.tsx        sends an unpaired remote browser to /pair, then renders App
