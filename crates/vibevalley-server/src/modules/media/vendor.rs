@@ -8,6 +8,10 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
+use vibevalley_protocol::{
+    JsNumber, MediaAudioSegment, MediaAudioVoice, MediaInputKind, MediaSpeakersRequestSegments, MediaSpeakersRequestSpeakers, MediaUnderstandingResult,
+    MediaUnderstandingResultIncompleteReason, MediaUnderstandingResultUsage, MediaUnderstandingStatus,
+};
 
 use super::Stop;
 
@@ -263,22 +267,48 @@ pub struct Generated {
     pub usage: Option<Value>,
 }
 
+/// What a vendor task makes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TaskKind {
+    Speech,
+    VoiceGeneration,
+    Transcription,
+}
+
 /// `AudioTask`.
 #[derive(Debug, Clone)]
 pub enum Task {
-    Waiting(&'static str),
-    Failed(&'static str),
-    Audio(&'static str, Generated),
-    Transcription { text: String, segments: Vec<Value>, usage: Option<Value> },
+    Waiting,
+    Failed,
+    Audio(TaskKind, Generated),
+    Transcription {
+        text: String,
+        segments: Vec<MediaAudioSegment>,
+        usage: Option<Value>,
+    },
 }
 
-impl Task {
-    pub fn kind(&self) -> &'static str {
-        match self {
-            Task::Waiting(k) | Task::Failed(k) | Task::Audio(k, _) => k,
-            Task::Transcription { .. } => "transcription",
-        }
+/// Whether MOSS took an uploaded file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Uploaded {
+    Ready,
+    Rejected,
+    Unknown,
+}
+
+/// One transcript segment as MOSS says it, or nothing when it is malformed.
+fn segment_of(s: &Value) -> Option<MediaAudioSegment> {
+    let (start, end) = (s["start"].as_f64()?, s["end"].as_f64()?);
+    let speaker = s["speaker"].as_str().filter(|p| code_points(p, 1, 256))?;
+    if start < 0.0 || end < start {
+        return None;
     }
+    Some(MediaAudioSegment {
+        speaker: speaker.into(),
+        text: s["text"].as_str()?.into(),
+        start: JsNumber(start),
+        end: JsNumber(end),
+    })
 }
 
 /// `SpeechEvent`.
@@ -295,8 +325,15 @@ pub enum SpeechEvent {
 pub enum TranscriptionEvent {
     TaskCreated(String),
     Delta(String),
-    Segment { index: i64, segment: Value, usage: Option<Value> },
-    Done { text: String, usage: Option<Value> },
+    Segment {
+        index: i64,
+        segment: MediaAudioSegment,
+        usage: Option<Value>,
+    },
+    Done {
+        text: String,
+        usage: Option<Value>,
+    },
 }
 
 /// The vendor, reached through `fetch`.
@@ -534,32 +571,22 @@ impl Moss {
         }
         let r = self.call(key, "GET", &format!("/audio/tasks/{id}"), None, Duration::from_secs(30), true)?;
         let kind = match r["object"].as_str() {
-            Some("audio.speech") => "speech",
-            Some("audio.voice_generation") => "voiceGeneration",
-            Some("audio.transcription") => "transcription",
+            Some("audio.speech") => TaskKind::Speech,
+            Some("audio.voice_generation") => TaskKind::VoiceGeneration,
+            Some("audio.transcription") => TaskKind::Transcription,
             _ => return Err(invalid_response()),
         };
         if r["id"] != id || !r["created_at"].is_i64() || r["updated_at"].as_i64() < r["created_at"].as_i64() {
             return Err(invalid_response());
         }
         match r["status"].as_str() {
-            Some("PENDING" | "PROCESSING") => Ok(Task::Waiting(kind)),
-            Some("FAILED") => Ok(Task::Failed(kind)),
-            Some("SUCCESS") if kind == "transcription" => {
+            Some("PENDING" | "PROCESSING") => Ok(Task::Waiting),
+            Some("FAILED") => Ok(Task::Failed),
+            Some("SUCCESS") if kind == TaskKind::Transcription => {
                 let text = r["text"].as_str().ok_or_else(invalid_response)?.to_string();
                 let segments = match &r["segments"] {
                     Value::Null => vec![],
-                    Value::Array(a) if a.len() <= 10000 => {
-                        for s in a {
-                            let (st, en) = (s["start"].as_f64().unwrap_or(-1.0), s["end"].as_f64().unwrap_or(-1.0));
-                            if !s["speaker"].as_str().is_some_and(|p| code_points(p, 1, 256)) || !s["text"].is_string() || st < 0.0 || en < st {
-                                return Err(invalid_response());
-                            }
-                        }
-                        a.iter()
-                            .map(|s| json!({ "speaker": s["speaker"], "text": s["text"], "start": s["start"], "end": s["end"] }))
-                            .collect()
-                    }
+                    Value::Array(a) if a.len() <= 10000 => a.iter().map(segment_of).collect::<Option<Vec<_>>>().ok_or_else(invalid_response)?,
                     _ => return Err(invalid_response()),
                 };
                 let usage = if r["usage"].is_null() {
@@ -690,21 +717,20 @@ impl Moss {
     // ----- several voices, designed voices, transcription -----
 
     /// `prepareMossSpeakers`.
-    pub fn prepare_speakers(model: &str, speakers: &Value, segments: &Value, format: &str) -> Result<Value, VendorError> {
-        let sp = speakers.as_array().filter(|a| (1..=100).contains(&a.len())).ok_or_else(invalid_input)?;
-        let sg = segments.as_array().filter(|a| (1..=1000).contains(&a.len())).ok_or_else(invalid_input)?;
+    pub fn prepare_speakers(model: &str, sp: &[MediaSpeakersRequestSpeakers], sg: &[MediaSpeakersRequestSegments], format: &str) -> Result<Value, VendorError> {
+        if !(1..=100).contains(&sp.len()) || !(1..=1000).contains(&sg.len()) {
+            return Err(invalid_input());
+        }
         let mut ids = std::collections::HashSet::new();
         for s in sp {
-            let id = s["id"].as_str().unwrap_or("");
-            if !text_ok(id, 256) || !s["voice"].as_str().is_some_and(audio_id) || !ids.insert(id) {
+            if !text_ok(&s.id, 256) || !audio_id(&s.voice) || !ids.insert(s.id.as_str()) {
                 return Err(invalid_input());
             }
         }
         let mut count = 0;
         for s in sg {
-            let text = s["text"].as_str().unwrap_or("");
-            count += text.chars().count();
-            if !ids.contains(s["speaker"].as_str().unwrap_or("")) || !text_ok(text, 10000) || count > 10000 {
+            count += s.text.chars().count();
+            if !ids.contains(s.speaker.as_str()) || !text_ok(&s.text, 10000) || count > 10000 {
                 return Err(invalid_input());
             }
         }
@@ -713,8 +739,8 @@ impl Moss {
         }
         Ok(json!({
             "model": model,
-            "speakers": sp.iter().map(|s| json!({ "id": s["id"], "voice_id": s["voice"] })).collect::<Vec<_>>(),
-            "segments": sg.iter().map(|s| json!({ "speaker": s["speaker"], "text": s["text"] })).collect::<Vec<_>>(),
+            "speakers": sp.iter().map(|s| json!({ "id": s.id, "voice_id": s.voice })).collect::<Vec<_>>(),
+            "segments": sg.iter().map(|s| json!({ "speaker": s.speaker, "text": s.text })).collect::<Vec<_>>(),
             "response_format": format,
             "delivery_method": "url",
             "async": true,
@@ -753,6 +779,11 @@ impl Moss {
         Ok(b)
     }
 
+    /// Whether the model a transcription body names answers as a stream.
+    pub fn streams_transcripts(body: &Value) -> bool {
+        body["model"].as_str().is_some_and(|m| m.starts_with("moss-transcribe-diarize-pro"))
+    }
+
     /// `streamMossTranscription`.
     pub fn transcription_stream(
         &self,
@@ -761,7 +792,7 @@ impl Moss {
         stop: &Stop,
         on: &mut dyn FnMut(TranscriptionEvent) -> Result<(), String>,
     ) -> Result<(), StreamError> {
-        if !body["model"].as_str().is_some_and(|m| m.starts_with("moss-transcribe-diarize-pro")) {
+        if !Self::streams_transcripts(body) {
             return Err(StreamError::Vendor(invalid_input()));
         }
         let mut b = body.clone();
@@ -819,12 +850,8 @@ impl Moss {
                     TranscriptionEvent::Delta(d.into())
                 }
                 "transcript.segment.done" => {
-                    let text = v["text"].as_str().ok_or_else(bad)?;
-                    let (st, en) = (v["start"].as_f64().unwrap_or(-1.0), v["end"].as_f64().unwrap_or(-1.0));
-                    if !v["content_index"].is_i64() || !v["speaker"].as_str().is_some_and(|s| code_points(s, 1, 256)) || st < 0.0 || en < st {
-                        return Err(bad());
-                    }
-                    seg_len += text.encode_utf16().count();
+                    let segment = segment_of(&v).filter(|_| v["content_index"].is_i64()).ok_or_else(bad)?;
+                    seg_len += segment.text.encode_utf16().count();
                     segs += 1;
                     if segs > 10000 || seg_len > 1 << 20 {
                         return Err(too_large());
@@ -832,7 +859,7 @@ impl Moss {
                     let usage = if v["session_usage"].is_null() { None } else { usage_of(&v["session_usage"]) };
                     TranscriptionEvent::Segment {
                         index: v["content_index"].as_i64().unwrap_or(0),
-                        segment: json!({ "speaker": v["speaker"], "text": text, "start": v["start"], "end": v["end"] }),
+                        segment,
                         usage,
                     }
                 }
@@ -855,10 +882,10 @@ impl Moss {
 
     // ----- understanding -----
 
-    /// `prepareMossUnderstanding`: `media` is `[(kind, file id)]`.
-    pub fn prepare_understanding(model: &str, text: &str, media: &[(String, String)], max_tokens: i64) -> Result<Value, VendorError> {
-        let images = media.iter().all(|(k, _)| k == "image") && (1..=5).contains(&media.len());
-        let video = media.len() == 1 && media[0].0 == "video";
+    /// `prepareMossUnderstanding`: `media` is `[(kind, file id)]`, one video or up to five images.
+    pub fn prepare_understanding(model: &str, text: &str, media: &[(MediaInputKind, String)], max_tokens: i64) -> Result<Value, VendorError> {
+        let images = media.iter().all(|(k, _)| *k == MediaInputKind::Image) && (1..=5).contains(&media.len());
+        let video = media.len() == 1 && media[0].0 == MediaInputKind::Video;
         if !super::super::provider::UNDERSTANDING_MODELS.contains(&model)
             || !text_ok(text, 64000)
             || !(images || video)
@@ -869,13 +896,13 @@ impl Moss {
         }
         let mut content = vec![json!({ "type": "input_text", "text": text })];
         for (kind, id) in media {
-            content.push(json!({ "type": if kind == "image" { "input_image" } else { "input_video" }, "file_id": id }));
+            content.push(json!({ "type": if *kind == MediaInputKind::Image { "input_image" } else { "input_video" }, "file_id": id }));
         }
         Ok(json!({ "model": model, "input": [{ "role": "user", "content": content }], "max_output_tokens": max_tokens }))
     }
 
-    /// `understandMossMedia`: the answer as `MediaUnderstandingResult`.
-    pub fn understand(&self, key: &str, body: &Value) -> Result<Value, VendorError> {
+    /// `understandMossMedia`.
+    pub fn understand(&self, key: &str, body: &Value) -> Result<MediaUnderstandingResult, VendorError> {
         let mut r = self.send(
             key,
             "POST",
@@ -895,10 +922,11 @@ impl Moss {
             });
         }
         let v: Value = serde_json::from_slice(&raw).map_err(|_| invalid_response())?;
-        let status = v["status"]
-            .as_str()
-            .filter(|s| *s == "completed" || *s == "incomplete")
-            .ok_or_else(invalid_response)?;
+        let status = match v["status"].as_str() {
+            Some("completed") => MediaUnderstandingStatus::Completed,
+            Some("incomplete") => MediaUnderstandingStatus::Incomplete,
+            _ => return Err(invalid_response()),
+        };
         let output = v["output"].as_array().filter(|o| !o.is_empty()).ok_or_else(invalid_response)?;
         let mut texts = vec![];
         for item in output {
@@ -916,21 +944,24 @@ impl Moss {
             return Err(invalid_response());
         };
         let model = v["model"].as_str().filter(|m| !m.is_empty()).ok_or_else(invalid_response)?;
-        let incomplete = (status == "incomplete" && v["incomplete_details"]["reason"] == "max_output_tokens").then_some("max_output_tokens");
-        Ok(json!({
-            "model": model,
-            "text": texts.join("\n"),
-            "status": status,
-            "incompleteReason": incomplete,
-            "usage": { "inputTokens": i, "outputTokens": o, "totalTokens": t },
-        }))
+        let cut = status == MediaUnderstandingStatus::Incomplete && v["incomplete_details"]["reason"] == "max_output_tokens";
+        Ok(MediaUnderstandingResult {
+            model: model.into(),
+            text: texts.join("\n"),
+            status,
+            incomplete_reason: cut.then_some(MediaUnderstandingResultIncompleteReason::MaxOutputTokens),
+            usage: MediaUnderstandingResultUsage {
+                input_tokens: i,
+                output_tokens: o,
+                total_tokens: t,
+            },
+        })
     }
 
     // ----- files and voices -----
 
-    /// `uploadMossFile`: the file's id and whether MOSS took it
-    /// (`ready`, `rejected` or `unknown`).
-    pub fn upload(&self, key: &str, file: std::fs::File, size: i64, filename: &str, purpose: &str) -> Result<(String, &'static str), VendorError> {
+    /// `uploadMossFile`: the file's id and whether MOSS took it.
+    pub fn upload(&self, key: &str, file: std::fs::File, size: i64, filename: &str, purpose: &str) -> Result<(String, Uploaded), VendorError> {
         if !(1..=512_000_000).contains(&size) || !code_points(filename, 1, 256) {
             return Err(invalid_input());
         }
@@ -954,9 +985,9 @@ impl Moss {
             return Err(invalid_response());
         }
         let state = match r["status"].as_str() {
-            Some("processed" | "active") => "ready",
-            Some("failed") => "rejected",
-            _ => "unknown",
+            Some("processed" | "active") => Uploaded::Ready,
+            Some("failed") => Uploaded::Rejected,
+            _ => Uploaded::Unknown,
         };
         Ok((id.into(), state))
     }
@@ -975,8 +1006,8 @@ impl Moss {
         }
     }
 
-    /// `createMossVoice`: the cloned voice as `MediaAudioVoice`.
-    pub fn clone_voice(&self, key: &str, audio: Vec<u8>, filename: &str, name: Option<&str>) -> Result<Value, VendorError> {
+    /// `createMossVoice`: the cloned voice.
+    pub fn clone_voice(&self, key: &str, audio: Vec<u8>, filename: &str, name: Option<&str>) -> Result<MediaAudioVoice, VendorError> {
         let mut parts = vec![Part {
             name: "audio_sample".into(),
             filename: Some(filename.into()),
@@ -993,7 +1024,11 @@ impl Moss {
         }
         let r = self.call(key, "POST", "/audio/voices", Some(multipart(parts)), Duration::from_secs(300), true)?;
         match (r["id"].as_str().filter(|i| audio_id(i)), r["name"].as_str(), r["created_at"].as_i64()) {
-            (Some(id), Some(n), Some(at)) => Ok(json!({ "id": id, "name": n, "createdAtSeconds": at })),
+            (Some(id), Some(n), Some(at)) => Ok(MediaAudioVoice {
+                id: id.into(),
+                name: n.into(),
+                created_at_seconds: JsNumber(at as f64),
+            }),
             _ => Err(invalid_response()),
         }
     }

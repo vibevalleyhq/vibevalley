@@ -3,7 +3,9 @@
 //! kind's waiting jobs oldest first while the kind has a free slot (images
 //! one at a time), and does cancel, download again, release and picking up
 //! after a restart once for all kinds. A kind says only how its job is made
-//! (`generate`), fetched (`download`) and shown (`Record::view`).
+//! (`generate`), fetched (`download`) and shown (`Record::view`); the audio
+//! kinds are in `audio.rs`, understanding in `understanding.rs`, and what a
+//! job uploads to the vendor in `remote.rs`.
 //!
 //! Credentials stay in memory (`Held`) until the job runs; they never reach
 //! the job database. Each run is a thread of its own; vendor calls block.
@@ -18,13 +20,17 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, Attachment, BizCode, Caller, Fact, MediaAudioFormat, MediaImageJob, MediaImageJobKind, MediaImageRequest, MediaInputKind, MediaInputReference,
-    MediaInputRequest, MediaJob, MediaPhase, MediaSource, MediaSpeechJob, MediaSpeechJobKind, MediaSpeechRequest, Preview, ops,
+    ApiError, Attachment, BizCode, Caller, Fact, JsNumber, MediaAudioFormat, MediaAudioMetadata, MediaAudioMetadataSource, MediaAudioResult, MediaCleanup,
+    MediaCloneRequest, MediaImageJob, MediaImageJobKind, MediaImageRequest, MediaInputKind, MediaInputReference, MediaInputRequest, MediaJob, MediaPhase,
+    MediaSource, MediaSpeakersRequest, MediaSpeechJob, MediaSpeechJobKind, MediaSpeechRequest, MediaTranscriptionRequest, MediaUnderstandingPhase,
+    MediaUnderstandingRequest, MediaUnderstandingResult, MediaVoiceDesignRequest, Preview, ops,
 };
 
 use super::Stop;
 use super::image_provider::{Failure, ImageBackend, Prepared, Work};
-use super::vendor::{self, Account, Fetch, Moss, Outcome, Request, Task};
+use super::remote::{RemoteFile, RemoteState};
+use super::understanding::Authorization;
+use super::vendor::{self, Account, Fetch, Moss, Outcome, Request, Task, TaskKind};
 use crate::Hub;
 use crate::modules::attachment::{ATTACHMENT_MAX, Attachments, open_db};
 use crate::modules::channel::{Chat, Made, Posting};
@@ -44,7 +50,7 @@ const POLLS: usize = 600;
 const DOWNLOAD_TIME: Duration = Duration::from_secs(300);
 const ACTIVE: &str = "('queued','generating','downloading','authorized','uploading')";
 
-fn refused(key: &str) -> ApiError {
+pub(super) fn refused(key: &str) -> ApiError {
     ApiError::new(BizCode::MediaRefused, t(&format!("server.media.{key}"), &[]))
 }
 
@@ -52,23 +58,136 @@ fn storage(e: impl std::fmt::Display) -> ApiError {
     ApiError::new(BizCode::InternalError, format!("media job storage: {e}"))
 }
 
-fn active(p: MediaPhase) -> bool {
-    matches!(p, MediaPhase::Queued | MediaPhase::Generating | MediaPhase::Downloading)
+/// A request id: 1 to 80 letters, digits, `_` or `-`.
+pub(super) fn id_ok(id: &str) -> bool {
+    (1..=80).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+}
+
+/// Where a job is. The kinds share these; each shows the ones it reaches.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(super) enum Phase {
+    /// Waiting for the orchestrator the user allowed to start it.
+    Authorized,
+    Queued,
+    Uploading,
+    Generating,
+    Downloading,
+    Ready,
+    /// Answered, but cut at the output limit.
+    Incomplete,
+    Failed,
+    Unknown,
+    Canceled,
+    DownloadFailed,
+}
+
+impl Phase {
+    pub(super) const ALL: [Phase; 11] = [
+        Phase::Authorized,
+        Phase::Queued,
+        Phase::Uploading,
+        Phase::Generating,
+        Phase::Downloading,
+        Phase::Ready,
+        Phase::Incomplete,
+        Phase::Failed,
+        Phase::Unknown,
+        Phase::Canceled,
+        Phase::DownloadFailed,
+    ];
+    /// No work is left in these.
+    pub(super) const ENDED: [Phase; 6] = [
+        Phase::Ready,
+        Phase::Incomplete,
+        Phase::Failed,
+        Phase::Unknown,
+        Phase::Canceled,
+        Phase::DownloadFailed,
+    ];
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Phase::Authorized => "authorized",
+            Phase::Queued => "queued",
+            Phase::Uploading => "uploading",
+            Phase::Generating => "generating",
+            Phase::Downloading => "downloading",
+            Phase::Ready => "ready",
+            Phase::Incomplete => "incomplete",
+            Phase::Failed => "failed",
+            Phase::Unknown => "unknown",
+            Phase::Canceled => "canceled",
+            Phase::DownloadFailed => "download_failed",
+        }
+    }
+
+    /// As the kinds that generate and download say it.
+    pub(super) fn shown(self) -> MediaPhase {
+        match self {
+            Phase::Authorized | Phase::Queued => MediaPhase::Queued,
+            Phase::Uploading | Phase::Generating => MediaPhase::Generating,
+            Phase::Downloading => MediaPhase::Downloading,
+            Phase::Ready | Phase::Incomplete => MediaPhase::Ready,
+            Phase::Failed => MediaPhase::Failed,
+            Phase::Unknown => MediaPhase::Unknown,
+            Phase::Canceled => MediaPhase::Canceled,
+            Phase::DownloadFailed => MediaPhase::DownloadFailed,
+        }
+    }
+
+    /// As understanding says it.
+    pub(super) fn understanding(self) -> MediaUnderstandingPhase {
+        match self {
+            Phase::Authorized => MediaUnderstandingPhase::Authorized,
+            Phase::Queued => MediaUnderstandingPhase::Queued,
+            Phase::Uploading => MediaUnderstandingPhase::Uploading,
+            Phase::Generating | Phase::Downloading => MediaUnderstandingPhase::Generating,
+            Phase::Ready => MediaUnderstandingPhase::Ready,
+            Phase::Incomplete => MediaUnderstandingPhase::Incomplete,
+            Phase::Failed | Phase::DownloadFailed => MediaUnderstandingPhase::Failed,
+            Phase::Unknown => MediaUnderstandingPhase::Unknown,
+            Phase::Canceled => MediaUnderstandingPhase::Canceled,
+        }
+    }
+}
+
+pub(super) fn active(p: Phase) -> bool {
+    matches!(p, Phase::Authorized | Phase::Queued | Phase::Uploading | Phase::Generating | Phase::Downloading)
+}
+
+/// What a kind says when its job goes wrong: keys under `server.media`.
+pub(super) struct Words {
+    rejected: &'static str,
+    unknown: &'static str,
+    paused: &'static str,
+    no_resume: &'static str,
+    account_changed: &'static str,
 }
 
 /// What a job was asked to make.
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "request", rename_all = "camelCase")]
-enum Ask {
+pub(super) enum Ask {
     Image(MediaImageRequest),
     Speech(MediaSpeechRequest),
+    Speakers(MediaSpeakersRequest),
+    VoiceDesign(MediaVoiceDesignRequest),
+    Clone(MediaCloneRequest),
+    Transcription(MediaTranscriptionRequest),
+    Understanding(MediaUnderstandingRequest),
 }
 
 impl Ask {
-    fn id(&self) -> &str {
+    pub(super) fn id(&self) -> &str {
         match self {
             Ask::Image(r) => &r.id,
             Ask::Speech(r) => &r.id,
+            Ask::Speakers(r) => &r.id,
+            Ask::VoiceDesign(r) => &r.id,
+            Ask::Clone(r) => &r.id,
+            Ask::Transcription(r) => &r.id,
+            Ask::Understanding(r) => &r.id,
         }
     }
 
@@ -76,6 +195,11 @@ impl Ask {
         match self {
             Ask::Image(_) => "image",
             Ask::Speech(_) => "speech",
+            Ask::Speakers(_) => "speakers",
+            Ask::VoiceDesign(_) => "voiceDesign",
+            Ask::Clone(_) => "clone",
+            Ask::Transcription(_) => "transcription",
+            Ask::Understanding(_) => "understanding",
         }
     }
 
@@ -83,48 +207,143 @@ impl Ask {
     fn slots(&self) -> usize {
         match self {
             Ask::Image(_) => 1,
-            Ask::Speech(_) => 8,
+            _ => 8,
+        }
+    }
+
+    /// The vendor answers it as a stream, which is never asked for twice.
+    pub(super) fn streamed(&self) -> bool {
+        match self {
+            Ask::Speech(r) => r.streaming == Some(true),
+            Ask::Transcription(r) => r.streaming == Some(true),
+            _ => false,
+        }
+    }
+
+    /// What its vendor task makes, when it is followed as one.
+    fn task(&self) -> Option<TaskKind> {
+        match self {
+            Ask::Speech(_) | Ask::Speakers(_) => Some(TaskKind::Speech),
+            Ask::VoiceDesign(_) => Some(TaskKind::VoiceGeneration),
+            Ask::Transcription(_) => Some(TaskKind::Transcription),
+            Ask::Image(_) | Ask::Clone(_) | Ask::Understanding(_) => None,
+        }
+    }
+
+    /// The audio format asked for, when the result is audio to download.
+    fn audio(&self) -> Option<MediaAudioFormat> {
+        match self {
+            Ask::Speech(r) => Some(r.format),
+            Ask::Speakers(r) => Some(r.format),
+            Ask::VoiceDesign(r) => Some(r.format),
+            Ask::Image(_) | Ask::Clone(_) | Ask::Transcription(_) | Ask::Understanding(_) => None,
+        }
+    }
+
+    /// Several voices, a designed or cloned voice, a transcript: the kinds shown as `MediaAudioJob`.
+    pub(super) fn is_audio(&self) -> bool {
+        matches!(self, Ask::Speakers(_) | Ask::VoiceDesign(_) | Ask::Clone(_) | Ask::Transcription(_))
+    }
+
+    fn words(&self) -> Words {
+        match self {
+            Ask::Image(_) => Words {
+                rejected: "rejected",
+                unknown: "unknown",
+                paused: "unknown",
+                no_resume: "noDownload",
+                account_changed: "remoteAccountChanged",
+            },
+            Ask::Speech(_) => Words {
+                rejected: "speechRejected",
+                unknown: "speechUnknown",
+                paused: "speechPollPaused",
+                no_resume: "speechNoResume",
+                account_changed: "remoteAccountChanged",
+            },
+            Ask::Speakers(_) | Ask::VoiceDesign(_) | Ask::Clone(_) | Ask::Transcription(_) => Words {
+                rejected: "audioRejected",
+                unknown: "audioUnknown",
+                paused: "audioPollingPaused",
+                no_resume: "audioPollingPaused",
+                account_changed: "audioAccountChanged",
+            },
+            Ask::Understanding(_) => Words {
+                rejected: "understandingRejected",
+                unknown: "understandingUnknown",
+                paused: "understandingUnknown",
+                no_resume: "noDownload",
+                account_changed: "consentChanged",
+            },
         }
     }
 }
 
 /// What a waiting job runs with, in memory only.
-enum Held {
+pub(super) enum Held {
     Image(Prepared),
-    Speech { account: Account, body: Value },
+    Speech {
+        account: Account,
+        body: Value,
+    },
+    /// The kinds that build their request when they run.
+    Account(Account),
 }
 
 /// A job as it is kept.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct Record {
-    ask: Ask,
-    source: MediaSource,
-    model: String,
-    connection: String,
-    revision: i64,
+pub(super) struct Record {
+    pub(super) ask: Ask,
+    pub(super) source: MediaSource,
+    pub(super) model: String,
+    pub(super) connection: String,
+    pub(super) revision: i64,
     #[serde(default)]
-    fingerprint: String,
-    phase: MediaPhase,
+    pub(super) fingerprint: String,
+    pub(super) phase: Phase,
     #[serde(default)]
-    problem: String,
-    remote_task: Option<String>,
+    pub(super) problem: String,
+    pub(super) remote_task: Option<String>,
     /// Where the result waits at the vendor.
-    url: Option<String>,
-    usage: Option<Value>,
-    metadata: Option<Value>,
-    result_format: Option<MediaAudioFormat>,
-    content_type: Option<String>,
-    attachment: Option<Attachment>,
-    result_input: Option<MediaInputReference>,
+    pub(super) url: Option<String>,
+    pub(super) usage: Option<Value>,
+    pub(super) metadata: Option<MediaAudioMetadata>,
+    pub(super) result_format: Option<MediaAudioFormat>,
+    pub(super) content_type: Option<String>,
+    pub(super) attachment: Option<Attachment>,
+    pub(super) result_input: Option<MediaInputReference>,
     #[serde(default)]
-    released: bool,
-    created_at: i64,
-    updated_at: i64,
+    pub(super) released: bool,
+    /// The audio a clone or a transcript reads.
+    #[serde(default)]
+    pub(super) input: Option<MediaInputReference>,
+    /// The images or the video understanding reads.
+    #[serde(default)]
+    pub(super) inputs: Vec<MediaInputReference>,
+    /// A short designed voice kept as an input too, to clone from.
+    #[serde(default)]
+    pub(super) preview_input: Option<String>,
+    /// The cloned voice or the transcript.
+    #[serde(default)]
+    pub(super) made: Option<MediaAudioResult>,
+    #[serde(default)]
+    pub(super) understood: Option<MediaUnderstandingResult>,
+    /// The user's leave for an orchestrator to start it.
+    #[serde(default)]
+    pub(super) authorization: Option<Authorization>,
+    /// What the job sent to the vendor.
+    #[serde(default)]
+    pub(super) remote: Vec<RemoteFile>,
+    /// Whether understanding's uploads and inputs were let go.
+    #[serde(default)]
+    pub(super) cleanup: Option<MediaCleanup>,
+    pub(super) created_at: i64,
+    pub(super) updated_at: i64,
 }
 
 impl Record {
-    fn new(ask: Ask, source: MediaSource, connection: String, revision: i64, model: String, fingerprint: String) -> Record {
+    pub(super) fn new(ask: Ask, source: MediaSource, connection: String, revision: i64, model: String, fingerprint: String) -> Record {
         let at = now();
         Record {
             ask,
@@ -133,7 +352,7 @@ impl Record {
             connection,
             revision,
             fingerprint,
-            phase: MediaPhase::Queued,
+            phase: Phase::Queued,
             problem: String::new(),
             remote_task: None,
             url: None,
@@ -144,35 +363,59 @@ impl Record {
             attachment: None,
             result_input: None,
             released: false,
+            input: None,
+            inputs: vec![],
+            preview_input: None,
+            made: None,
+            understood: None,
+            authorization: None,
+            remote: vec![],
+            cleanup: None,
             created_at: at,
             updated_at: at,
         }
     }
 
-    fn id(&self) -> &str {
+    pub(super) fn id(&self) -> &str {
         self.ask.id()
     }
 
-    fn can_retry_download(&self) -> bool {
-        !self.released && self.url.is_some() && matches!(self.phase, MediaPhase::DownloadFailed | MediaPhase::Canceled)
+    pub(super) fn can_retry_download(&self) -> bool {
+        !self.released && self.url.is_some() && matches!(self.phase, Phase::DownloadFailed | Phase::Canceled)
     }
 
-    fn can_resume(&self) -> bool {
-        let Ask::Speech(r) = &self.ask else { return false };
-        !self.released
-            && r.streaming != Some(true)
+    /// A known vendor task can be asked again: never a stream, and nothing came of it yet.
+    pub(super) fn can_resume(&self) -> bool {
+        self.ask.task().is_some()
+            && !self.released
+            && !self.ask.streamed()
             && self.remote_task.is_some()
-            && matches!(self.phase, MediaPhase::Unknown | MediaPhase::Canceled)
+            && matches!(self.phase, Phase::Unknown | Phase::Canceled)
             && self.url.is_none()
+            && self.made.is_none()
     }
 
-    fn can_release(&self) -> bool {
-        matches!(self.ask, Ask::Speech(_)) && !active(self.phase) && !self.released
+    /// Audio kept here can be let go; an image is a library item, understanding keeps nothing.
+    fn releasable(&self) -> bool {
+        !matches!(self.ask, Ask::Image(_) | Ask::Understanding(_))
+    }
+
+    pub(super) fn can_release(&self) -> bool {
+        self.releasable() && !active(self.phase) && !self.released
+    }
+
+    pub(super) fn phase_text(&self) -> String {
+        t(&format!("server.media.phase.{}", self.phase.shown().as_str()), &[])
     }
 
     fn view(&self) -> MediaJob {
-        let phase_text = t(&format!("server.media.phase.{}", self.phase.as_str()), &[]);
+        let phase_text = self.phase_text();
         match &self.ask {
+            Ask::Speakers(_) | Ask::VoiceDesign(_) | Ask::Clone(_) | Ask::Transcription(_) => match self.audio_view() {
+                Some(job) => MediaJob::MediaAudioJob(job),
+                None => unreachable!("an audio job's view"),
+            },
+            Ask::Understanding(request) => MediaJob::MediaUnderstandingJob(self.understanding_view(request)),
             Ask::Image(r) => MediaJob::MediaImageJob(MediaImageJob {
                 kind: MediaImageJobKind::Image,
                 id: r.id.clone(),
@@ -182,7 +425,7 @@ impl Record {
                 revision: self.revision,
                 source: self.source.clone(),
                 usage: self.usage.clone().and_then(|u| serde_json::from_value(u).ok()),
-                phase: self.phase,
+                phase: self.phase.shown(),
                 phase_text,
                 problem: self.problem.clone(),
                 attachment: self.attachment.clone(),
@@ -202,11 +445,11 @@ impl Record {
                 voice: r.voice.clone(),
                 format: self.result_format.unwrap_or(r.format),
                 content_type: self.content_type.clone(),
-                metadata: self.metadata.clone().and_then(|m| serde_json::from_value(m).ok()),
+                metadata: self.metadata.clone(),
                 usage: self.usage.clone().and_then(|u| serde_json::from_value(u).ok()),
                 can_resume: Some(self.can_resume()),
                 can_release: self.can_release(),
-                phase: self.phase,
+                phase: self.phase.shown(),
                 phase_text,
                 problem: self.problem.clone(),
                 attachment: self.attachment.clone(),
@@ -221,7 +464,7 @@ impl Record {
 }
 
 /// A result kept: as an attachment or a pinned input, and what the file said of itself.
-type Kept = (Option<Attachment>, Option<MediaInputReference>, Option<Value>);
+type Kept = (Option<Attachment>, Option<MediaInputReference>, Option<MediaAudioMetadata>);
 
 /// Where generated audio is fetched from: the vendor's public address, never with credentials.
 pub type Download = Arc<dyn Fetch>;
@@ -258,17 +501,21 @@ pub struct Jobs {
     runs: Mutex<HashMap<String, Running>>,
     /// One schedule at a time, so a waiting job starts once.
     scheduling: Mutex<()>,
+    /// One cleanup at the vendor at a time.
+    pub(super) cleaning: Mutex<()>,
     images: Arc<dyn ImageBackend>,
-    moss: Moss,
+    pub(super) moss: Moss,
     download: Download,
     setting: Arc<Setting>,
     files: Arc<Attachments>,
-    inputs: Arc<Inputs>,
-    chat: Arc<Chat>,
+    pub(super) inputs: Arc<Inputs>,
+    pub(super) chat: Arc<Chat>,
     hub: Weak<Hub>,
     closed: AtomicBool,
     me: OnceLock<Weak<Jobs>>,
     streams: Mutex<HashMap<String, Stream>>,
+    /// Dropped at close, which ends the minute's sweep.
+    sweeping: Mutex<Option<flume::Sender<()>>>,
 }
 
 impl Jobs {
@@ -284,6 +531,7 @@ impl Jobs {
             held: Mutex::default(),
             runs: Mutex::default(),
             scheduling: Mutex::default(),
+            cleaning: Mutex::default(),
             images: p.images,
             moss: Moss { fetch: p.vendor },
             download: p.download,
@@ -295,6 +543,7 @@ impl Jobs {
             closed: AtomicBool::new(false),
             me: OnceLock::new(),
             streams: Mutex::default(),
+            sweeping: Mutex::default(),
         });
         let _ = jobs.me.set(Arc::downgrade(&jobs));
         jobs.pick_up()?;
@@ -303,7 +552,25 @@ impl Jobs {
         }
         jobs.publish();
         jobs.schedule();
+        jobs.sweep_each_minute()?;
         Ok(jobs)
+    }
+
+    /// Approvals no orchestrator used in time are ended every minute, until close.
+    fn sweep_each_minute(self: &Arc<Self>) -> Result<(), ApiError> {
+        let (stop, stopped) = flume::bounded::<()>(1);
+        *self.sweeping.lock().unwrap_or_else(|e| e.into_inner()) = Some(stop);
+        let me = Arc::downgrade(self);
+        std::thread::Builder::new()
+            .name("media-job-sweep".into())
+            .spawn(move || {
+                while matches!(stopped.recv_timeout(Duration::from_secs(60)), Err(flume::RecvTimeoutError::Timeout)) {
+                    let Some(jobs) = me.upgrade() else { break };
+                    jobs.expire_approvals();
+                }
+            })
+            .map_err(storage)?;
+        Ok(())
     }
 
     fn db(&self) -> MutexGuard<'_, Connection> {
@@ -322,11 +589,11 @@ impl Jobs {
         Ok(data.and_then(|s| serde_json::from_str(&s).ok()))
     }
 
-    fn found(&self, id: &str) -> Result<Record, ApiError> {
+    pub(super) fn found(&self, id: &str) -> Result<Record, ApiError> {
         Self::read(&self.db(), id)?.ok_or_else(|| refused("missing"))
     }
 
-    fn rows(&self, sql: &str) -> Result<Vec<Record>, ApiError> {
+    pub(super) fn rows(&self, sql: &str) -> Result<Vec<Record>, ApiError> {
         let db = self.db();
         let mut q = db.prepare(sql).map_err(storage)?;
         let rows: Vec<String> = q.query_map([], |r| r.get::<_, String>(0)).map_err(storage)?.filter_map(Result::ok).collect();
@@ -369,7 +636,7 @@ impl Jobs {
     }
 
     /// The job moves only from one of `before`, and not once the machine closed; false when it had moved on.
-    fn change(&self, id: &str, before: &[MediaPhase], patch: impl FnOnce(&mut Record)) -> Result<bool, ApiError> {
+    pub(super) fn change(&self, id: &str, before: &[Phase], patch: impl FnOnce(&mut Record)) -> Result<bool, ApiError> {
         if self.closed.load(Ordering::SeqCst) {
             return Ok(false);
         }
@@ -386,15 +653,28 @@ impl Jobs {
         Ok(true)
     }
 
-    fn open_for_work(&self) -> Result<(), ApiError> {
+    /// Something about the job written down, wherever it is.
+    pub(super) fn note(&self, id: &str, patch: impl FnOnce(&mut Record)) -> Result<bool, ApiError> {
+        self.change(id, &Phase::ALL, patch)
+    }
+
+    pub(super) fn open_for_work(&self) -> Result<(), ApiError> {
         if self.closed.load(Ordering::SeqCst) {
             return Err(ApiError::new(BizCode::ServiceUnavailable, "media closed"));
         }
         Ok(())
     }
 
+    /// The job already under this ask's id, refused when it was asked otherwise.
+    pub(super) fn known(&self, ask: &Ask, alike: impl FnOnce(&Record) -> bool) -> Result<Option<Record>, ApiError> {
+        match Self::read(&self.db(), ask.id())? {
+            Some(old) if old.ask != *ask || !alike(&old) => Err(refused("reusedId")),
+            old => Ok(old),
+        }
+    }
+
     /// A new job admitted under its id once: the same ask again is the job it made.
-    fn admit(&self, mut r: Record, held: Held) -> Result<Record, ApiError> {
+    pub(super) fn admit(&self, mut r: Record, held: Option<Held>) -> Result<Record, ApiError> {
         self.open_for_work()?;
         {
             let db = self.db();
@@ -412,10 +692,16 @@ impl Jobs {
             }
             Self::save(&db, &mut r)?;
         }
-        self.held.lock().unwrap_or_else(|e| e.into_inner()).insert(r.id().to_string(), held);
+        if let Some(held) = held {
+            self.hold(r.id(), held);
+        }
         self.publish();
         self.schedule();
         Ok(r)
+    }
+
+    pub(super) fn hold(&self, id: &str, held: Held) {
+        self.held.lock().unwrap_or_else(|e| e.into_inner()).insert(id.to_string(), held);
     }
 
     /// An image; orchestrators must have the user's word first (their tool checks it).
@@ -444,32 +730,39 @@ impl Jobs {
             prepared.model.clone(),
             String::new(),
         );
-        self.admit(r, Held::Image(prepared)).map(|r| image_view(&r))
+        self.admit(r, Some(Held::Image(prepared))).map(|r| image_view(&r))
     }
 
-    /// The speech account as the settings bind it now.
-    fn account(&self) -> Result<Account, ApiError> {
-        let a = self
-            .setting
+    /// The account `u` is bound to in the settings now.
+    pub(super) fn bound(&self, u: Use) -> Result<Account, ApiError> {
+        let unbound = || {
+            let words = match u {
+                Use::Speech => t("server.provider.speechUnbound", &[]),
+                Use::Understanding => t("server.provider.understandingUnbound", &[]),
+                _ => {
+                    let capability = t(&format!("server.provider.use.{}", u.name()), &[]);
+                    t("server.provider.capabilityUnbound", &[("capability", capability.into())])
+                }
+            };
+            ApiError::new(BizCode::ProviderRefused, words)
+        };
+        self.setting.providers().account(u).map(keyed).ok_or_else(unbound)
+    }
+
+    /// A connection's account whatever it is bound to (a clone asks no model).
+    pub(super) fn on_connection(&self, connection: &str) -> Option<Account> {
+        self.setting.providers().account_on(connection, "").map(keyed)
+    }
+
+    /// The account a job was asked with: its own connection, refused when the key changed since.
+    pub(super) fn account_of(&self, r: &Record) -> Result<Account, ApiError> {
+        self.setting
             .providers()
-            .account(Use::Speech)
-            .ok_or_else(|| ApiError::new(BizCode::ProviderRefused, t("server.provider.speechUnbound", &[])))?;
-        Ok(Account {
-            fingerprint: vendor::fingerprint(a.key.expose()),
-            key: a.key.expose().to_string(),
-            connection: a.connection,
-            revision: a.revision,
-            model: a.model,
-        })
-    }
-
-    /// The account a job was asked with, refused when its key changed since.
-    fn account_of(&self, r: &Record) -> Result<Account, ApiError> {
-        let a = self.account()?;
-        if a.connection != r.connection || a.fingerprint != r.fingerprint {
-            return Err(refused("remoteAccountChanged"));
-        }
-        Ok(a)
+            .account_on(&r.connection, &r.model)
+            .map(keyed)
+            .filter(|a| a.fingerprint == r.fingerprint)
+            .map(|a| Account { revision: r.revision, ..a })
+            .ok_or_else(|| refused(r.ask.words().account_changed))
     }
 
     pub fn speech(&self, request: MediaSpeechRequest, source: MediaSource) -> Result<MediaSpeechJob, ApiError> {
@@ -488,7 +781,7 @@ impl Jobs {
             }
             return Ok(speech_view(&old));
         }
-        let account = self.account()?;
+        let account = self.bound(Use::Speech)?;
         if request.connection != account.connection || request.revision != account.revision {
             return Err(refused("speechChanged"));
         }
@@ -508,11 +801,11 @@ impl Jobs {
             account.model.clone(),
             account.fingerprint.clone(),
         );
-        self.admit(r, Held::Speech { account, body }).map(|r| speech_view(&r))
+        self.admit(r, Some(Held::Speech { account, body })).map(|r| speech_view(&r))
     }
 
     /// Starts what can run now: each kind's oldest waiting job while the kind has a free slot.
-    fn schedule(&self) {
+    pub(super) fn schedule(&self) {
         if self.closed.load(Ordering::SeqCst) {
             return;
         }
@@ -524,8 +817,8 @@ impl Jobs {
         };
         for r in waiting {
             let ready = match r.phase {
-                MediaPhase::Queued | MediaPhase::Downloading => true,
-                MediaPhase::Generating => r.remote_task.is_some(),
+                Phase::Queued | Phase::Downloading => true,
+                Phase::Generating => r.remote_task.is_some(),
                 _ => false,
             };
             let mut runs = self.runs();
@@ -563,20 +856,38 @@ impl Jobs {
     fn work(self: &Arc<Self>, id: &str, stop: &Stop) {
         let Ok(r) = self.found(id) else { return };
         match r.phase {
-            MediaPhase::Queued => self.generate(r, stop),
-            MediaPhase::Downloading => self.download(id, stop),
-            MediaPhase::Generating if r.remote_task.is_some() => self.poll(id, stop),
+            Phase::Queued => self.generate(r, stop),
+            Phase::Downloading => self.download(id, stop),
+            Phase::Generating if r.remote_task.is_some() => self.poll(id, stop),
             _ => {}
+        }
+        self.settle(id);
+    }
+
+    /// After a run or a cancel, an audio job lets go of what it sent to the vendor.
+    fn settle(&self, id: &str) {
+        if self.closed.load(Ordering::SeqCst) {
+            return;
+        }
+        if self.found(id).is_ok_and(|r| r.ask.is_audio()) {
+            self.tidy_audio(id);
         }
     }
 
     fn generate(self: &Arc<Self>, r: Record, stop: &Stop) {
         let id = r.id().to_string();
         let held = self.held.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
-        if !matches!(self.change(&id, &[MediaPhase::Queued], |r| r.phase = MediaPhase::Generating), Ok(true)) {
+        let first = if matches!(r.ask, Ask::Understanding(_)) {
+            Phase::Uploading
+        } else {
+            Phase::Generating
+        };
+        if !matches!(self.change(&id, &[Phase::Queued], |r| r.phase = first), Ok(true)) {
             return;
         }
         match (held, &r.ask) {
+            (Some(Held::Account(account)), Ask::Understanding(request)) => self.understand(&r, request, &account, stop),
+            (Some(Held::Account(account)), ask) if ask.is_audio() => self.generate_audio(&r, &account, stop),
             (Some(Held::Image(prepared)), Ask::Image(_)) => self.generate_image(&id, prepared, stop),
             (Some(Held::Speech { account, body }), Ask::Speech(request)) => {
                 if request.streaming == Some(true) {
@@ -584,9 +895,7 @@ impl Jobs {
                 } else if request.asynchronous == Some(true) {
                     match self.moss.speech_task(&account.key, &body) {
                         Ok(task) => {
-                            let _ = self.change(&id, &[MediaPhase::Generating, MediaPhase::Canceled, MediaPhase::Unknown], |r| {
-                                r.remote_task = Some(task)
-                            });
+                            let _ = self.change(&id, &[Phase::Generating, Phase::Canceled, Phase::Unknown], |r| r.remote_task = Some(task));
                             self.poll(&id, stop);
                         }
                         Err(e) => self.failed(&id, e.outcome),
@@ -612,10 +921,10 @@ impl Jobs {
             return;
         };
         let moved = match result {
-            Ok(g) => self.change(id, &[MediaPhase::Generating], |r| {
+            Ok(g) => self.change(id, &[Phase::Generating], |r| {
                 r.url = Some(g.url);
                 r.usage = serde_json::to_value(g.usage).ok();
-                r.phase = MediaPhase::Downloading;
+                r.phase = Phase::Downloading;
             }),
             Err(e) => {
                 self.failed(
@@ -634,30 +943,40 @@ impl Jobs {
         }
     }
 
-    fn failed(&self, id: &str, outcome: Outcome) {
+    /// The vendor refused it, or nothing says what came of it; what was never sent counts as refused.
+    pub(super) fn failed(&self, id: &str, outcome: Outcome) {
         let Ok(r) = self.found(id) else { return };
-        let speech = matches!(r.ask, Ask::Speech(_));
-        let (phase, key) = match (outcome == Outcome::Rejected, speech) {
-            (true, true) => (MediaPhase::Failed, "speechRejected"),
-            (false, true) => (MediaPhase::Unknown, "speechUnknown"),
-            (true, false) => (MediaPhase::Failed, "rejected"),
-            (false, false) => (MediaPhase::Unknown, "unknown"),
+        let words = r.ask.words();
+        let (phase, key) = match outcome {
+            Outcome::Rejected | Outcome::NotSubmitted => (Phase::Failed, words.rejected),
+            Outcome::Unknown => (Phase::Unknown, words.unknown),
         };
-        let _ = self.change(id, &[MediaPhase::Generating], |r| {
+        let _ = self.change(id, &[Phase::Generating], |r| {
             r.phase = phase;
             r.problem = t(&format!("server.media.{key}"), &[]);
         });
     }
 
+    /// A vendor task asked for and followed; its id is kept even when the job was stopped meanwhile.
+    pub(super) fn follow(self: &Arc<Self>, id: &str, key: &str, path: &str, body: &Value, stop: &Stop) {
+        match self.moss.submit(key, path, body) {
+            Ok(task) => {
+                let _ = self.change(id, &[Phase::Generating, Phase::Canceled, Phase::Unknown], |r| r.remote_task = Some(task));
+                self.poll(id, stop);
+            }
+            Err(e) => self.failed(id, e.outcome),
+        }
+    }
+
     /// The vendor made it: where to fetch it, then fetching.
     fn made(&self, id: &str, g: vendor::Generated) -> bool {
         matches!(
-            self.change(id, &[MediaPhase::Generating], |r| {
+            self.change(id, &[Phase::Generating], |r| {
                 r.url = Some(g.url);
-                r.result_format = serde_json::from_value(Value::String(g.format)).ok();
+                r.result_format = MediaAudioFormat::ALL.into_iter().find(|f| f.as_str() == g.format);
                 r.content_type = Some(g.content_type);
                 r.usage = g.usage;
-                r.phase = MediaPhase::Downloading;
+                r.phase = Phase::Downloading;
                 r.problem.clear();
             }),
             Ok(true)
@@ -671,17 +990,26 @@ impl Jobs {
                 return;
             }
             let Ok(r) = self.found(id) else { return };
-            let (Some(task), MediaPhase::Generating) = (r.remote_task.clone(), r.phase) else {
+            let (Some(task), Phase::Generating) = (r.remote_task.clone(), r.phase) else {
                 return;
             };
             let Ok(account) = self.account_of(&r) else { break };
             match self.moss.task(&account.key, &task) {
-                Ok(Task::Waiting(_)) => {}
-                Ok(Task::Failed(_)) => return self.failed(id, Outcome::Rejected),
-                Ok(Task::Audio("speech", g)) => {
+                Ok(Task::Waiting) => {}
+                Ok(Task::Failed) => return self.failed(id, Outcome::Rejected),
+                Ok(Task::Audio(kind, g)) if r.ask.task() == Some(kind) => {
                     if self.made(id, g) {
                         self.download(id, stop);
                     }
+                    return;
+                }
+                Ok(Task::Transcription { text, segments, usage }) if r.ask.task() == Some(TaskKind::Transcription) => {
+                    let _ = self.change(id, &[Phase::Generating], |r| {
+                        r.made = Some(MediaAudioResult::Transcription { text, segments });
+                        r.usage = usage;
+                        r.phase = Phase::Ready;
+                        r.problem.clear();
+                    });
                     return;
                 }
                 Ok(_) => return self.failed(id, Outcome::Unknown),
@@ -696,16 +1024,16 @@ impl Jobs {
                 std::thread::sleep(Duration::from_millis(50));
             }
         }
-        let _ = self.change(id, &[MediaPhase::Generating], |r| {
-            r.phase = MediaPhase::Unknown;
-            r.problem = t("server.media.speechPollPaused", &[]);
+        let _ = self.change(id, &[Phase::Generating], |r| {
+            r.phase = Phase::Unknown;
+            r.problem = t(&format!("server.media.{}", r.ask.words().paused), &[]);
         });
     }
 
     /// The result fetched, checked and kept; anything off is a failed download.
     fn download(self: &Arc<Self>, id: &str, stop: &Stop) {
         let Ok(r) = self.found(id) else { return };
-        let (Some(url), MediaPhase::Downloading) = (r.url.clone(), r.phase) else {
+        let (Some(url), Phase::Downloading) = (r.url.clone(), r.phase) else {
             return;
         };
         let (kept, failed_key) = match &r.ask {
@@ -723,29 +1051,34 @@ impl Jobs {
                 };
                 (kept, "downloadFailed")
             }
-            Ask::Speech(request) => (
-                self.fetch_audio(&url, r.result_format.unwrap_or(request.format), id, stop),
-                "speechDownloadFailed",
-            ),
+            ask => match ask.audio() {
+                Some(asked) => (self.fetch_audio(&url, r.result_format.unwrap_or(asked), id, stop), "speechDownloadFailed"),
+                None => return,
+            },
         };
         if stop.aborted() {
             return;
         }
+        let preview = match (&r.ask, &kept) {
+            (Ask::VoiceDesign(_), Ok((Some(attachment), _, Some(metadata)))) => self.preview(&r, attachment, metadata),
+            _ => None,
+        };
         let moved = match kept {
-            Ok((attachment, input, metadata)) => self.change(id, &[MediaPhase::Downloading], |r| {
+            Ok((attachment, input, metadata)) => self.change(id, &[Phase::Downloading], |r| {
                 if metadata.is_some() {
                     r.metadata = metadata;
                 }
                 r.attachment = attachment;
                 r.result_input = input;
+                r.preview_input = preview;
                 r.url = None;
-                r.phase = MediaPhase::Ready;
+                r.phase = Phase::Ready;
                 r.problem.clear();
             }),
             Err(why) => {
                 eprintln!("media {id}: {why}");
-                self.change(id, &[MediaPhase::Downloading], |r| {
-                    r.phase = MediaPhase::DownloadFailed;
+                self.change(id, &[Phase::Downloading], |r| {
+                    r.phase = Phase::DownloadFailed;
                     r.problem = t(&format!("server.media.{failed_key}"), &[]);
                 })
             }
@@ -788,15 +1121,27 @@ impl Jobs {
         }
         let name = format!("moss-{id}.{}", format.as_str());
         let facts = super::validate::audio_facts(bytes.clone(), &kind).map_err(|e| e.message)?;
-        let metadata = json!({
-            "source": "file",
-            "sampleRate": facts.sample_rate,
-            "duration": facts.seconds,
-            "channels": facts.channels,
-            "bitDepth": facts.bits,
-        });
+        let metadata = MediaAudioMetadata {
+            source: MediaAudioMetadataSource::File,
+            sample_rate: Some(JsNumber(facts.sample_rate.into())),
+            duration: Some(JsNumber(facts.seconds)),
+            channels: Some(facts.channels as i64),
+            bit_depth: facts.bits.map(i64::from),
+        };
         let (attachment, input) = self.keep_bytes(id, bytes, &name, &kind)?;
         Ok((attachment, input, Some(metadata)))
+    }
+
+    /// A short designed voice kept as an input of the job too, to clone from or hear again.
+    fn preview(&self, r: &Record, attachment: &Attachment, metadata: &MediaAudioMetadata) -> Option<String> {
+        let short = metadata.duration.is_some_and(|d| d.0 <= 30.0) && attachment.size <= 10_000_000;
+        let cloneable = matches!(r.result_format, Some(MediaAudioFormat::Wav | MediaAudioFormat::Mp3 | MediaAudioFormat::Flac));
+        if !short || !cloneable {
+            return None;
+        }
+        let input = self.inputs.adopt(&attachment.id).ok()?;
+        self.inputs.pin(std::slice::from_ref(&input.id), r.id(), |_| Ok(())).ok()?;
+        Some(input.id)
     }
 
     /// Bytes kept for a job: an attachment, or past an attachment's size a pinned input released with the job.
@@ -860,7 +1205,7 @@ impl Jobs {
         let streamed = self.moss.speech_stream(&account.key, body, stop, &mut |event| {
             match event {
                 vendor::SpeechEvent::TaskCreated(task) => {
-                    let _ = self.change(id, &[MediaPhase::Generating, MediaPhase::Canceled], |r| r.remote_task = Some(task));
+                    let _ = self.change(id, &[Phase::Generating, Phase::Canceled], |r| r.remote_task = Some(task));
                 }
                 vendor::SpeechEvent::Created {
                     sample_rate,
@@ -911,15 +1256,15 @@ impl Jobs {
         match (streamed, saved) {
             (_, Some(Ok(()))) if !stop.aborted() || complete => {
                 if complete {
-                    let _ = self.change(id, &[MediaPhase::Ready], |r| r.usage = usage.take());
+                    let _ = self.change(id, &[Phase::Ready], |r| r.usage = usage.take());
                     self.emit(id, json!({ "type": "done" }), stop);
                 } else {
                     self.emit(id, json!({ "type": "failed" }), stop);
                 }
             }
             (Err(_), _) | (_, Some(Err(_))) | (_, None) => {
-                let _ = self.change(id, &[MediaPhase::Generating], |r| {
-                    r.phase = MediaPhase::Unknown;
+                let _ = self.change(id, &[Phase::Generating], |r| {
+                    r.phase = Phase::Unknown;
                     r.problem = t("server.media.speechUnknown", &[]);
                 });
                 self.emit(id, json!({ "type": "failed" }), stop);
@@ -962,10 +1307,17 @@ impl Jobs {
             (true, Some(d)) => d,
             _ => length as f64 / (rate as f64 * block as f64),
         };
-        let metadata = json!({
-            "source": if complete && duration.is_some() { "provider" } else { "file" },
-            "sampleRate": rate, "channels": channels, "bitDepth": 16, "duration": seconds,
-        });
+        let metadata = MediaAudioMetadata {
+            source: if complete && duration.is_some() {
+                MediaAudioMetadataSource::Provider
+            } else {
+                MediaAudioMetadataSource::File
+            },
+            sample_rate: Some(JsNumber(rate as f64)),
+            duration: Some(JsNumber(seconds)),
+            channels: Some(channels),
+            bit_depth: Some(16),
+        };
         let patch = |r: &mut Record| {
             r.attachment = attachment.clone();
             r.result_input = input.clone();
@@ -974,27 +1326,26 @@ impl Jobs {
             r.metadata = Some(metadata.clone());
         };
         let moved = self
-            .change(id, &[MediaPhase::Generating], |r| {
+            .change(id, &[Phase::Generating], |r| {
                 patch(r);
                 if complete {
-                    r.phase = MediaPhase::Ready;
+                    r.phase = Phase::Ready;
                     r.problem.clear();
                 } else {
-                    r.phase = MediaPhase::Unknown;
+                    r.phase = Phase::Unknown;
                     r.problem = t("server.media.speechPartial", &[]);
                 }
             })
             .map_err(|e| e.message)?;
         if !moved {
-            self.change(id, &[MediaPhase::Canceled], patch).map_err(|e| e.message)?;
+            self.change(id, &[Phase::Canceled], patch).map_err(|e| e.message)?;
         }
         Ok(())
     }
 
     /// A ready image the orchestrator asked for, posted once to its channel.
     fn post_back(&self, r: &Record) {
-        let (Ask::Image(request), MediaPhase::Ready, MediaSource::Orchestrator { agent, channel }, Some(attachment)) =
-            (&r.ask, r.phase, &r.source, &r.attachment)
+        let (Ask::Image(request), Phase::Ready, MediaSource::Orchestrator { agent, channel }, Some(attachment)) = (&r.ask, r.phase, &r.source, &r.attachment)
         else {
             return;
         };
@@ -1013,20 +1364,31 @@ impl Jobs {
         }
     }
 
-    /// Jobs a restart left: a known vendor task is asked again, a download fetched again, the rest given up.
+    /// Jobs a restart left: a known vendor task is asked again (never a stream), a download fetched again, the rest
+    /// given up. What never started lets go of its inputs; an upload cut short may or may not be at the vendor.
     fn pick_up(&self) -> Result<(), ApiError> {
         for r in self.rows(&format!("select data from media_job where phase in {ACTIVE}"))? {
+            let id = r.id();
+            self.note(id, |r| {
+                for file in r.remote.iter_mut().filter(|f| f.state == RemoteState::Uploading) {
+                    file.state = RemoteState::Unknown;
+                }
+            })?;
             match (r.phase, &r.remote_task) {
-                (MediaPhase::Downloading, _) | (MediaPhase::Generating, Some(_)) => {}
+                (Phase::Downloading, _) => {}
+                (Phase::Generating, Some(_)) if !r.ask.streamed() => {}
                 (phase, _) => {
-                    self.change(r.id(), &[phase], |r| {
-                        r.phase = if phase == MediaPhase::Queued {
-                            MediaPhase::Canceled
-                        } else {
-                            MediaPhase::Unknown
-                        };
+                    let unsent = matches!(phase, Phase::Queued | Phase::Authorized);
+                    self.change(id, &[phase], |r| {
+                        r.phase = if unsent { Phase::Canceled } else { Phase::Unknown };
                         r.problem = t("server.media.restarted", &[]);
+                        if unsent && r.cleanup.is_some() {
+                            r.cleanup = Some(MediaCleanup::Done);
+                        }
                     })?;
+                    if unsent {
+                        self.inputs.release(id)?;
+                    }
                 }
             }
         }
@@ -1050,13 +1412,22 @@ impl Jobs {
     pub fn cancel(&self, id: &str) -> Result<MediaJob, ApiError> {
         let r = self.found(id)?;
         if active(r.phase) {
-            self.change(id, &[r.phase], |r| {
-                r.phase = MediaPhase::Canceled;
+            // Understanding that sent nothing has nothing to clean and no use for its inputs.
+            let unsent = matches!(r.ask, Ask::Understanding(_)) && matches!(r.phase, Phase::Authorized | Phase::Queued);
+            let moved = self.change(id, &[r.phase], |r| {
+                r.phase = Phase::Canceled;
                 r.problem = t("server.media.canceled", &[]);
+                if unsent {
+                    r.cleanup = Some(MediaCleanup::Done);
+                }
             })?;
+            if moved && unsent {
+                self.inputs.release(id)?;
+            }
             self.held.lock().unwrap_or_else(|e| e.into_inner()).remove(id);
             self.stop_run(id);
             self.schedule();
+            self.settle(id);
         }
         self.get(id)
     }
@@ -1064,7 +1435,7 @@ impl Jobs {
     pub fn retry_download(&self, id: &str) -> Result<MediaJob, ApiError> {
         self.open_for_work()?;
         let r = self.found(id)?;
-        if matches!(r.phase, MediaPhase::Ready | MediaPhase::Downloading) {
+        if matches!(r.phase, Phase::Ready | Phase::Downloading) {
             return Ok(r.view());
         }
         if !r.can_retry_download() {
@@ -1078,7 +1449,7 @@ impl Jobs {
             return Err(refused("busy"));
         }
         self.change(id, &[r.phase], |r| {
-            r.phase = MediaPhase::Downloading;
+            r.phase = Phase::Downloading;
             r.problem.clear();
         })?;
         self.schedule();
@@ -1086,26 +1457,33 @@ impl Jobs {
     }
 
     /// `resume`: only the known vendor task is asked again, never a new one.
-    pub fn resume(&self, id: &str) -> Result<MediaSpeechJob, ApiError> {
-        let r = self.found(id)?;
-        if r.phase == MediaPhase::Ready || active(r.phase) {
-            return Ok(speech_view(&r));
+    pub(super) fn resumed(&self, r: Record) -> Result<Record, ApiError> {
+        if r.phase == Phase::Ready || active(r.phase) {
+            return Ok(r);
         }
         if !r.can_resume() {
-            return Err(refused("speechNoResume"));
+            return Err(refused(r.ask.words().no_resume));
         }
         self.account_of(&r)?;
-        self.change(id, &[r.phase], |r| {
-            r.phase = MediaPhase::Generating;
+        self.change(r.id(), &[r.phase], |r| {
+            r.phase = Phase::Generating;
             r.problem.clear();
         })?;
         self.schedule();
-        Ok(speech_view(&self.found(id)?))
+        self.found(r.id())
+    }
+
+    pub fn resume(&self, id: &str) -> Result<MediaSpeechJob, ApiError> {
+        let r = self.found(id)?;
+        if !matches!(r.ask, Ask::Speech(_)) {
+            return Err(refused("missing"));
+        }
+        Ok(speech_view(&self.resumed(r)?))
     }
 
     pub fn preview_release(&self, id: &str) -> Result<Preview, ApiError> {
         let r = self.found(id)?;
-        if active(r.phase) || matches!(r.ask, Ask::Image(_)) {
+        if active(r.phase) || !r.releasable() {
             return Err(refused("releaseUnavailable"));
         }
         let does = if r.can_release() {
@@ -1123,18 +1501,20 @@ impl Jobs {
     /// The job's kept result let go; the job itself stays.
     pub fn release(&self, id: &str) -> Result<MediaJob, ApiError> {
         let r = self.found(id)?;
-        if active(r.phase) || matches!(r.ask, Ask::Image(_)) {
+        if active(r.phase) || !r.releasable() {
             return Err(refused("releaseUnavailable"));
         }
         if !r.released {
             self.inputs.release(id)?;
-            if let Some(input) = &r.result_input {
-                let _ = self.inputs.delete(&input.id);
+            // The inputs the job made for itself go; the one the user gave stays theirs.
+            for input in r.result_input.iter().map(|i| &i.id).chain(&r.preview_input) {
+                let _ = self.inputs.delete(input);
             }
             self.change(id, &[r.phase], |r| {
                 r.released = true;
                 r.attachment = None;
                 r.result_input = None;
+                r.preview_input = None;
                 r.url = None;
             })?;
         }
@@ -1143,11 +1523,23 @@ impl Jobs {
 
     /// Stops every run; what was running is picked up at the next start.
     pub fn close(&self) {
+        self.sweeping.lock().unwrap_or_else(|e| e.into_inner()).take();
         self.closed.store(true, Ordering::SeqCst);
         for run in self.runs().values() {
             run.stop.abort();
         }
         self.runs().clear();
+    }
+}
+
+/// A settings account with its key out and fingerprinted, as the vendor calls take it.
+fn keyed(a: crate::modules::provider::Account) -> Account {
+    Account {
+        fingerprint: vendor::fingerprint(a.key.expose()),
+        key: a.key.expose().to_string(),
+        connection: a.connection,
+        revision: a.revision,
+        model: a.model,
     }
 }
 
@@ -1192,6 +1584,34 @@ pub fn install(hub: &Hub, jobs: Arc<Jobs>) {
     let j = jobs.clone();
     hub.on::<ops::MediaSpeechResume>(move |_, r| j.resume(&r.id));
     let j = jobs.clone();
+    hub.on::<ops::MediaDialogueCreate>(move |ctx, r| {
+        user_only(ctx.caller)?;
+        j.speakers(r, MediaSource::User {})
+    });
+    let j = jobs.clone();
+    hub.on::<ops::MediaVoiceDesignCreate>(move |ctx, r| {
+        user_only(ctx.caller)?;
+        j.voice_design(r, MediaSource::User {})
+    });
+    let j = jobs.clone();
+    hub.on::<ops::MediaCloneCreate>(move |_, r| j.clone_voice(r));
+    let j = jobs.clone();
+    hub.on::<ops::MediaTranscriptionCreate>(move |_, r| j.transcription(r));
+    let j = jobs.clone();
+    hub.on::<ops::MediaAudioResume>(move |_, r| j.audio_resume(&r.id));
+    let j = jobs.clone();
+    hub.on::<ops::MediaAudioPreviewCleanup>(move |_, r| j.preview_audio_cleanup(&r.id));
+    let j = jobs.clone();
+    hub.on::<ops::MediaAudioCleanup>(move |_, r| j.audio_cleanup(&r.id));
+    let j = jobs.clone();
+    hub.on::<ops::MediaUnderstandingCreate>(move |_, r| j.understanding(r));
+    let j = jobs.clone();
+    hub.on::<ops::MediaUnderstandingAuthorize>(move |_, r| j.authorize_understanding(r));
+    let j = jobs.clone();
+    hub.on::<ops::MediaUnderstandingPreviewCleanup>(move |_, r| j.preview_understanding_cleanup(&r.id));
+    let j = jobs.clone();
+    hub.on::<ops::MediaUnderstandingCleanup>(move |_, r| j.understanding_cleanup(&r.id));
+    let j = jobs.clone();
     hub.on::<ops::MediaJobList>(move |_, _| j.list());
     let j = jobs.clone();
     hub.on::<ops::MediaJobGet>(move |_, r| j.get(&r.id));
@@ -1222,8 +1642,8 @@ impl vibevalley_server_api::media::SpeechStreams for Jobs {
             gone: Box::new(move || {
                 let Some(me) = me.upgrade() else { return };
                 me.streams.lock().unwrap_or_else(|e| e.into_inner()).remove(&job);
-                let _ = me.change(&job, &[MediaPhase::Queued, MediaPhase::Generating], |r| {
-                    r.phase = MediaPhase::Canceled;
+                let _ = me.change(&job, &[Phase::Queued, Phase::Generating], |r| {
+                    r.phase = Phase::Canceled;
                     r.problem = t("server.media.canceled", &[]);
                 });
                 me.stop_run(&job);
