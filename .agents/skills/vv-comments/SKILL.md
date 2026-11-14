@@ -46,7 +46,7 @@ vpx scripts/audit/comment-review.ts --all apps/mac/ui/vv/web/features/issue
 
 ## 4. 改完
 
-- `vp check --fix`，再 `vp check`。只删、改了注释，不用跑测试；改了名字或类型，跑和那块有关的最窄的检查（`vp run rust:check`、`vp run web:check`）。
+- `vp check --fix`，再 `vp check`。只删、改了注释，不用跑测试；改了名字或类型，跑和那块有关的最窄的检查（`vp run rust:check`、`vp run packages:check`、`vp run mac:check`）。
 - 再跑一次第 2 节的命令：改写的注释是新加的，会再审一遍；模型每次判的不一样，`--all` 的第二轮还会在第一轮留下的里报出新的，照第 3 节核实。第二轮还报的、你已经判过要留的，不再改，不来回拉锯。
 - 清一块已有的注释是机械改动：和同一批工作放在一个 PR 里，自成一个提交，一块一个；用户要求分开才单开 PR（[vv-pr](.agents/skills/vv-pr/SKILL.md) 第 1 节）。提交的标题说改完以后的样子（`Issue module comments say only what the code cannot`）。
 
