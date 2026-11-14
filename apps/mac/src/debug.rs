@@ -169,6 +169,14 @@ pub fn start(shell: Entity<Shell>, window: WindowHandle<gpui_kit::base::Root>, c
                         cx.background_executor().timer(Duration::from_millis(ms.parse().unwrap_or(500))).await;
                         continue;
                     }
+                    if cmd == "wait_update" {
+                        let deadline = std::time::Instant::now() + Duration::from_secs(120);
+                        while !crate::update::ready() && std::time::Instant::now() < deadline {
+                            cx.background_executor().timer(Duration::from_millis(100)).await;
+                        }
+                        eprintln!("debug script: update ready={}", crate::update::ready());
+                        continue;
+                    }
                     let cmd = cmd.to_string();
                     // Through the untyped handle: the typed one leases the root view, which `draw` renders.
                     let _ = cx.update_window(window.into(), |_, window, cx| {

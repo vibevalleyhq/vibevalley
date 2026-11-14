@@ -4,7 +4,7 @@
 // tests and stories) it is the plain browser host.
 import { host } from "nsh";
 
-import { CommandLineState, type Host } from "@vibevalley/protocol/host";
+import { CommandLineState, type Host, UpdateState } from "@vibevalley/protocol/host";
 
 import { hostApi, type Envelope } from "../../../bridge";
 
@@ -32,6 +32,27 @@ const desktop: Host = {
   reveal: (path) => void hostApi.reveal(path),
   theme: (theme) => void hostApi.theme(theme),
   opening: (opening) => done(hostApi.opening(opening)),
+  update: {
+    watch: (listener) => {
+      let stopped = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const poll = async () => {
+        const response = await hostApi.updateState();
+        if (stopped) return;
+        const decoded = UpdateState.safeParse(response.data);
+        if (response.bizCode === 0 && decoded.success) listener(decoded.data);
+        else listener({ _tag: "failed", version: "", why: response.bizCode !== 0 ? response.message : (decoded.error?.message ?? "Invalid update state") });
+        timer = setTimeout(() => void poll(), 1_000);
+      };
+      void poll();
+      return () => {
+        stopped = true;
+        if (timer !== undefined) clearTimeout(timer);
+      };
+    },
+    check: () => done(hostApi.updateCheck()),
+    install: () => done(hostApi.updateInstall()),
+  },
 };
 
 const browser: Host = { name: "browser" };

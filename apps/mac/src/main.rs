@@ -12,11 +12,13 @@ mod shell;
 mod terminal;
 mod theme;
 mod tray;
+mod update;
 mod viewer;
 
 use gpui_kit::{AppContext as _, Bounds, TitlebarOptions, WindowBounds, WindowOptions, point, px, size};
 
 fn main() {
+    update::enter_bundle();
     serving::install_tls();
     gpui_kit::application().run(|cx| {
         gpui_kit::init(cx);
@@ -25,6 +27,7 @@ fn main() {
         theme::Ui::apply(theme::Settings::default(), cx);
         shell::bind_keys(cx);
         hosted::BridgeHub::install(cx);
+        update::install(cx);
         if !pixel::element::load_font(cx) {
             eprintln!("pixel font not found under the repo's assets/");
         }

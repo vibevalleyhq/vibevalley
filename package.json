@@ -12,7 +12,9 @@
     "i18n:gen": "vpx scripts/gen/i18n.ts gen",
     "protocol:ts": "VIBEVALLEY_WRITE_TS=1 cargo test -p vibevalley-protocol --test typescript",
     "goldens": "vpx crates/vibevalley-artifact/gen/artifact.ts $PWD crates/vibevalley-artifact && vpx crates/vibevalley-pkm/golden/gen.ts crates/vibevalley-pkm/golden && vpx crates/vibevalley-pkm/golden/graph.ts crates/vibevalley-pkm/golden",
-    "nsh:install": "cargo install nsh-cli --version 0.5.0 --locked --root .tools"
+    "nsh:install": "cargo install nsh-cli --version 0.5.0 --locked --root .tools",
+    "package:mac": "vpx scripts/release/package.ts",
+    "update-check": "vpx scripts/release/update-check.ts"
   },
   "devDependencies": {
     "@types/node": "catalog:",

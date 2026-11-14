@@ -1231,6 +1231,9 @@ impl Shell {
     /// (packages/protocol/src/host.ts) and VibeValley's terminal.
     pub fn host_call(&mut self, op: &str, payload: Value, reply: crate::hosted::Replier, window: &mut Window, cx: &mut Context<Self>) {
         use vibevalley_bridge::{BizCode, Envelope, refusal};
+        if op.starts_with("host.update") {
+            return crate::update::host_call(op, reply, cx);
+        }
         let text = |k: &str| payload[k].as_str().unwrap_or_default().to_string();
         let envelope = match op {
             "host.info" => {
@@ -1258,14 +1261,14 @@ impl Shell {
                 fonts.dedup();
                 Envelope::ok(json!({
                     "name": "desktop",
-                    "version": env!("CARGO_PKG_VERSION"),
+                    "version": crate::update::version(),
                     "titleBar": { "top": 28, "left": 68 },
                     "terminal": true,
                     "monoFont": settings.mono_font,
                     "monoFonts": fonts,
                     "terminalFontSize": settings.terminal_font_size,
                     "uiFontSize": settings.ui_font_size,
-                    "capabilities": ["notify", "tray", "locale", "reveal", "theme", "font", "opening", "openTerminal", "openUrl", "openFile", "pixelDir", "playAudio", "readFile", "commandLine", "seekAudio", "pcm", "pickFile", "saveFile"],
+                    "capabilities": ["notify", "tray", "locale", "reveal", "theme", "font", "opening", "openTerminal", "openUrl", "openFile", "pixelDir", "playAudio", "readFile", "commandLine", "seekAudio", "pcm", "pickFile", "saveFile", "update"],
                 }))
             }
             "host.cliState" | "host.cliInstall" | "host.cliRemove" => {

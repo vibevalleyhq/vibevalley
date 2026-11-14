@@ -29,7 +29,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 
 - **三阶段**：`alpha` 自用，功能可变、数据可能重建；`beta` 冻结功能只修缺陷，修复先进 `main` 再 cherry-pick 到 `release/x.y`；`final` 与最后一个 beta 使用同一份代码。
 - **发布脚本**（`scripts/release/release.ts`）：校验工作区干净、分支与 origin 一致，由已有 tag 推算下一版本号（`scripts/release/release-plan.ts`）；beta 与正式版先跑 `vp run release:verify`，确认后打 tag 推送。
-- **打包**：`apps/mac` 的签名、公证、`.dmg` 和自动更新还没做（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)「剩下的」）。
+- **打包**：`vp run package:mac` 构建原生应用、命令行、灵动岛和页面，写出 `apps/mac/dist` 下的 `.app`、`.dmg`、`.zip` 和 `release.json`。本地默认 ad-hoc 签名；`--sign <Developer ID>` 指定签名身份，`--notary-profile <配置名>` 提交公证并装订票据。`--version` 指定版本，未指定时取当前版本标签，无标签是 `0.0.0`。两个包的更新验收见[应用验收](.agents/skills/vv-acceptance/references/app.md#打包和更新)。
 
 ## 检查和测试
 

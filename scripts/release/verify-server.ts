@@ -83,14 +83,22 @@ export async function runVerification(command: string[] = [], options: Verificat
   const log = join(evidence, "server.stdout.log");
   /** A child in a process group of its own; exited settles with its exit code. */
   interface Child {
-    pid: number;
+    pid: number | undefined;
     exited: Promise<number>;
     exitCode: () => number | null;
     process: ChildProcess;
   }
   const own = (p: ChildProcess): Child => {
-    const exited = new Promise<number>((done) => p.once("exit", (status, sig) => done(status ?? (sig ? 128 : 1))));
-    return { pid: p.pid!, exited, exitCode: () => p.exitCode, process: p };
+    let failed = false;
+    const exited = new Promise<number>((done) => {
+      p.once("exit", (status, sig) => done(status ?? (sig ? 128 : 1)));
+      p.once("error", (error) => {
+        failed = true;
+        writeFileSync(join(evidence, "spawn-error.log"), String(error));
+        done(1);
+      });
+    });
+    return { pid: p.pid, exited, exitCode: () => (failed ? 1 : p.exitCode), process: p };
   };
   const owned = new Set<Child>();
   let serverOutputDone: Promise<void> | undefined;
@@ -99,6 +107,7 @@ export async function runVerification(command: string[] = [], options: Verificat
   let address = "";
   let code = 1;
   const signal = (child: Child, signal: "SIGTERM" | "SIGKILL") => {
+    if (child.pid === undefined) return true;
     try {
       process.kill(-child.pid, signal);
       return true;
@@ -109,6 +118,7 @@ export async function runVerification(command: string[] = [], options: Verificat
     }
   };
   const alive = (child: Child) => {
+    if (child.pid === undefined) return false;
     try {
       process.kill(-child.pid, 0);
       return true;
@@ -144,9 +154,8 @@ export async function runVerification(command: string[] = [], options: Verificat
   try {
     if (interrupted) throw new Error("verification interrupted before startup");
     // The receipt's pid is the server's own.
-    const web = join(root, "apps", "web", "dist");
     const serverErr = openSync(join(evidence, "server.stderr.log"), "w");
-    const spawned = spawn(serverBin, ["--ready-json", ...(existsSync(join(web, "index.html")) ? ["--web", web] : [])], {
+    const spawned = spawn(serverBin, ["--ready-json"], {
       cwd: evidence,
       env,
       detached: true,
@@ -167,7 +176,7 @@ export async function runVerification(command: string[] = [], options: Verificat
           while ((end = pending.indexOf("\n")) >= 0) {
             const line = pending.slice(0, end);
             pending = pending.slice(end + 1);
-            const announced = readyAddress(line, running.pid);
+            const announced = readyAddress(line, running.pid ?? -1);
             if (!address && announced) {
               address = announced;
               writeFileSync(join(evidence, "ready.json"), line + "\n");
