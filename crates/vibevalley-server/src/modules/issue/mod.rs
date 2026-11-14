@@ -181,7 +181,7 @@ fn settle(item: &Issue, to: IssueStatus, text: &str) -> Result<Settled, ApiError
     if mv == Move::Round && said.is_empty() && item.stage.stuck == Some(StuckReason::Quiet) {
         return Err(refused("server.issue.roundNeedsWords", &[]));
     }
-    if mv == Move::Complete && item.deliver == vibevalley_protocol::Deliverable::PullRequest {
+    if mv == Move::Complete && item.deliver == vibevalley_protocol::Deliverable::PullRequest && item.pull_request.is_none() {
         return Err(refused("server.issue.deliveryNeedsPr", &[]));
     }
     Ok(Settled { mv, said })
@@ -282,7 +282,11 @@ fn move_lines(board: &Board, item: &Issue, s: &Settled, name: Option<String>) ->
                     t("server.issue.does.helperLeaves", &[("helper", helper().into())]),
                 ];
             }
-            if item.deliver == vibevalley_protocol::Deliverable::Branch {
+            if matches!(
+                item.deliver,
+                vibevalley_protocol::Deliverable::Branch | vibevalley_protocol::Deliverable::PullRequest
+            ) || vibevalley_core::pr::goes_by_pull_request(item, false)
+            {
                 return vec![
                     t("server.issue.does.completeKept", &[("n", n.into()), ("commits", commits.into())]),
                     t("server.issue.does.helperLeaves", &[("helper", helper().into())]),
@@ -717,6 +721,7 @@ pub(crate) fn create(board: &Board, profiles: Option<&Agents>, req: &vibevalley_
         blocked_by: req.blocked_by.clone().unwrap_or_default(),
         constraints: req.constraints.clone(),
         cron: None,
+        auto_submit_pr: req.auto_submit_pr == Some(true),
     };
     let issue = board.create(new).map_err(|e| api(board, e))?;
     Ok(issue)

@@ -1,8 +1,7 @@
 //! Pull-request rules, pure parts only. Ported from VibeValley
 //! `apps/server/src/modules/issue/landing.ts` (`landingRouteOf`,
 //! `goesByPullRequest`), `merge.ts` (`finishesWithPullRequest`) and
-//! `github.ts` (`checksVerdict`). VibeValley has no GitHub runner yet: nothing
-//! submits or polls pull requests.
+//! `github.ts` (`checksVerdict`).
 
 use serde::{Deserialize, Serialize};
 

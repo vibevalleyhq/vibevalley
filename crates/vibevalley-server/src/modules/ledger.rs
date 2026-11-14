@@ -19,8 +19,8 @@ use serde::{Deserialize, Serialize};
 use vibevalley_core::{Applied, Core, Refusal};
 use vibevalley_oar::PermissionMode;
 use vibevalley_protocol::{
-    Assignment, Conflict, CriterionCheck, Execution, Fact, Finding, Issue, IssueAnswer, IssueCanceled, Landing, LastRun, Millis, Outcome, Phase, Question,
-    Session, SpaceState, StateFrame as Frame,
+    Assignment, Conflict, CriterionCheck, Execution, Fact, Finding, Issue, IssueAnswer, IssueCanceled, Landing, LastRun, Millis, Outcome, Phase, PullRequest,
+    Question, Session, SpaceState, StateFrame as Frame,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -224,6 +224,8 @@ pub enum IssueChange {
     },
     /// Assigned to `agent` when nobody was (the drafter).
     Assigned(String),
+    /// A pull (or merge) request opened or updated for the issue's branch.
+    PullRequest(PullRequest),
     /// A session started working it: it leaves the queue, and a new worker
     /// is its current assignment's newest execution.
     Started { session: String, worker: bool },
@@ -232,6 +234,7 @@ pub enum IssueChange {
 impl IssueChange {
     pub fn fold(self, t: &mut Issue, at: Millis) {
         match self {
+            IssueChange::PullRequest(pr) => t.pull_request = Some(pr),
             IssueChange::Queued => t.queued_at = Some(at),
             IssueChange::Unqueued => t.queued_at = None,
             IssueChange::Reopened => {

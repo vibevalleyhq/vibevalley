@@ -9,8 +9,12 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicBool, Ordering},
+};
 
+use serde::Deserialize;
 use serde_json::Value;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
@@ -293,6 +297,8 @@ pub struct Repos {
     capabilities: Mutex<HashMap<String, PullRequestCapability>>,
     /// One change at a time per repo name; names being made are not listed.
     pending: Mutex<std::collections::HashSet<String>>,
+    closed: AtomicBool,
+    probe: Mutex<Option<std::thread::JoinHandle<()>>>,
 }
 
 impl Repos {
@@ -307,7 +313,28 @@ impl Repos {
             github: Mutex::default(),
             capabilities: Mutex::default(),
             pending: Mutex::default(),
+            closed: AtomicBool::new(false),
+            probe: Mutex::default(),
         }))
+    }
+
+    pub fn probe_in_background(self: &Arc<Repos>) {
+        let weak = Arc::downgrade(self);
+        if let Ok(handle) = std::thread::Builder::new().name("vibevalley-github-probe".into()).spawn(move || {
+            let Some(repos) = weak.upgrade() else { return };
+            if !repos.closed.load(Ordering::Relaxed) {
+                repos.refresh_github();
+            }
+        }) {
+            *self.probe.lock().unwrap_or_else(|e| e.into_inner()) = Some(handle);
+        }
+    }
+
+    pub fn close(&self) {
+        self.closed.store(true, Ordering::Relaxed);
+        if let Some(handle) = self.probe.lock().unwrap_or_else(|e| e.into_inner()).take() {
+            let _ = handle.join();
+        }
     }
 
     pub fn root(&self) -> &Path {
@@ -523,9 +550,18 @@ impl Repos {
 
     /// `refreshGitHub`: gh probed again, and each repo's pull requests.
     pub fn refresh_github(&self) -> GitHubStatus {
+        #[derive(Deserialize)]
+        struct ViewerPermission {
+            #[serde(rename = "viewerPermission")]
+            viewer_permission: Option<String>,
+        }
+
         let probed = probe_github();
         let mut next = HashMap::new();
         for p in self.list() {
+            if self.closed.load(Ordering::Relaxed) {
+                break;
+            }
             let mut c = PullRequestCapability {
                 available: false,
                 reason: probed.reason.clone(),
@@ -540,9 +576,7 @@ impl Repos {
                 } else {
                     let view = gh(&["repo", "view", &repo, "--json", "viewerPermission"]);
                     let permission = if view.ok {
-                        serde_json::from_str::<Value>(&view.out)
-                            .ok()
-                            .and_then(|v| v["viewerPermission"].as_str().map(str::to_string))
+                        serde_json::from_str::<ViewerPermission>(&view.out).ok().and_then(|v| v.viewer_permission)
                     } else {
                         None
                     };

@@ -13,7 +13,9 @@ use std::time::Duration;
 
 use serde_json::Value;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ApiError, BizCode, BranchCheck, BranchPublication, BranchPublicationState, Caller, PublishPlatform, SubmitBranch, ops};
+use vibevalley_protocol::{
+    ApiError, BizCode, BranchCheck, BranchPublication, BranchPublicationState, Caller, PublishPlatform, PullRequest, PullRequestState, SubmitBranch, ops,
+};
 
 use crate::Hub;
 use crate::base::refused as refuse;
@@ -563,12 +565,38 @@ impl Publisher {
     }
 }
 
+/// Extracts the protocol `PullRequest` when a branch publication pushed and
+/// opened or reused a hosted pull/merge request.
+pub fn pull_request_of(pubbed: &BranchPublication) -> Option<PullRequest> {
+    let (true, Some(number), Some(url)) = (pubbed.pushed, pubbed.number, pubbed.url.as_ref()) else {
+        return None;
+    };
+    let state = match pubbed.state.unwrap_or(BranchPublicationState::Open) {
+        BranchPublicationState::Open => PullRequestState::Open,
+    };
+    Some(PullRequest {
+        url: url.clone(),
+        number,
+        state,
+    })
+}
+
 /// `repo.pr.submit`, for the user only.
 pub fn install(hub: &Hub, publisher: Arc<Publisher>) {
+    install_with_board(hub, publisher, None);
+}
+
+pub fn install_with_board(hub: &Hub, publisher: Arc<Publisher>, board: Option<crate::modules::issue::Board>) {
     hub.on::<ops::RepoPrSubmit>(move |ctx, req| {
         if ctx.caller != Caller::User {
             return Err(refuse(BizCode::RepoRefused, t("server.repo.publish.userOnly", &[])));
         }
-        publisher.submit(&req)
+        let out = publisher.submit(&req)?;
+        if let (Some(board), Some(pr)) = (&board, pull_request_of(&out))
+            && let Some(issue) = board.open_issue_for_branch(&req.cwd, &req.branch)
+        {
+            let _ = board.record_pull_request(&issue.id, pr);
+        }
+        Ok(out)
     });
 }

@@ -37,6 +37,11 @@ pub struct ServerConfig {
     pub registry: Option<Arc<Registry>>,
     /// Probe every runtime at start, in the background.
     pub probe_runtimes: bool,
+    /// Override whether `gh` and repository PR capabilities are probed at boot
+    /// (`None` follows `probe_runtimes`).
+    pub probe_github: Option<bool>,
+    /// Optional hosted-branch publisher override (offline tests).
+    pub publisher: Option<Arc<modules::publish::Publisher>>,
     /// Runs due crons every 20 s (`tickCrons`).
     pub tick_crons: bool,
     /// Reads link previews for chat messages off the web.
@@ -92,6 +97,8 @@ impl ServerConfig {
             starters: vec![],
             registry: None,
             probe_runtimes: true,
+            probe_github: None,
+            publisher: None,
             tick_crons: true,
             link_previews: true,
             git_emails: vec![],
@@ -196,6 +203,7 @@ impl Started {
         self.watch.close();
         self.orchestrator.close();
         self.agents.fleet.close();
+        self.repos.close();
         self.artifacts.close();
         self.pkm.close();
         self.media.close();
@@ -287,9 +295,11 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     };
     let repos = modules::repo::Repos::open(&config.work_root, board_config.per_repo).map_err(|e| failed("the repos")(&e))?;
     modules::repo::install(&hub, repos.clone());
+    if config.probe_github.unwrap_or(config.probe_runtimes) {
+        repos.probe_in_background();
+    }
     game.count_commits(repos.clone(), config.git_emails.clone());
-    let publisher = Arc::new(modules::publish::Publisher::default());
-    modules::publish::install(&hub, publisher.clone());
+    let publisher = config.publisher.clone().unwrap_or_else(|| Arc::new(modules::publish::Publisher::default()));
     let memories = modules::memory::Memories::open(&config.home, agents.clone()).map_err(|e| failed("the memory")(&e.message))?;
     modules::memory::install(&hub, memories.clone());
     agents.attach_memories(&memories);
@@ -310,6 +320,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         },
     )
     .map_err(|e| failed("the board")(&e))?;
+    modules::publish::install_with_board(&hub, publisher.clone(), Some(board.clone()));
     board.refresh_queue().map_err(|e| failed("the queue")(&e))?;
     modules::issue::install_on(&hub, board.clone(), Some(agents.clone()));
     modules::session::install(&hub, board.clone(), trajectories.clone());

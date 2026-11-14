@@ -50,6 +50,9 @@ pub struct NewIssue {
     /// The cron that keeps it (`Issue.cron`).
     #[serde(default)]
     pub cron: Option<String>,
+    /// Explicit user mandate allowing the helper to open a PR itself.
+    #[serde(default)]
+    pub auto_submit_pr: bool,
 }
 
 /// What became of a request to send an issue.
@@ -306,6 +309,9 @@ impl Board {
         issue.blocked_by = blocked_by;
         issue.constraints = new.constraints;
         issue.cron = new.cron;
+        if new.auto_submit_pr {
+            issue.mandate = vibevalley_protocol::IssueMandate::explicit("", true);
+        }
         let agent = new.agent.trim().to_string();
         let agent = if agent.is_empty() { parent_agent.unwrap_or_default() } else { agent };
         if !agent.is_empty() {
@@ -562,6 +568,67 @@ impl Board {
 
     // ----- delivering -----
 
+    /// Records a pull (or merge) request opened or updated for `reference`.
+    /// When a followed PR merges on an issue that finishes with its PR, the
+    /// issue completes as `Landing::PullRequest`.
+    pub fn record_pull_request(&self, reference: &str, pr: vibevalley_protocol::PullRequest) -> Result<Issue> {
+        let _work = lock(&self.0.work);
+        let issue = self.stored(reference)?;
+        let merged = pr.state == vibevalley_protocol::PullRequestState::Merged;
+        let updated = self.change(&issue.id, IssueChange::PullRequest(pr))?;
+        if merged && vibevalley_core::pr::finishes_with_pull_request(&updated) {
+            if let Some(s) = self.on_board(&updated) {
+                self.0.sessions.dismiss(&s.id, Leave::KeepBranch)?;
+            } else if let Some(main) = self.0.workplaces.main_repo(updated.repo.as_deref())? {
+                self.0.workplaces.clear_checkout(&main, updated.number)?;
+            }
+            let done = self.change(&updated.id, IssueChange::Delivered(vibevalley_protocol::Landing::PullRequest))?;
+            let _ = self.take_words(&updated.id);
+            self.refresh_queue_locked();
+            return Ok(done);
+        }
+        Ok(updated)
+    }
+
+    /// Finds an open issue whose worktree or `vibevalley/issue-<n>` branch
+    /// matches a published branch in `cwd`.
+    pub fn open_issue_for_branch(&self, cwd: &str, branch: &str) -> Option<Issue> {
+        let cwd_canon = std::fs::canonicalize(cwd).ok();
+        let repo_root = vibevalley_git::Repo::discover(std::path::Path::new(cwd))
+            .ok()
+            .flatten()
+            .and_then(|r| std::fs::canonicalize(r.root()).ok());
+        let state = self.state();
+        state.issues.into_iter().find(|issue| {
+            if issue.status.is_closed() {
+                return false;
+            }
+            let session = issue.latest_session_id().and_then(|id| state.sessions.iter().find(|s| s.id == *id));
+            if let Some(wt) = session.and_then(|s| s.worktree.as_deref()) {
+                let wt_canon = std::fs::canonicalize(wt).ok();
+                if (wt == cwd || (wt_canon.is_some() && wt_canon == cwd_canon))
+                    && (session.and_then(|s| s.branch.as_deref()) == Some(branch) || crate::modules::workplace::issue_branch(issue.number) == branch)
+                {
+                    return true;
+                }
+            }
+            if crate::modules::workplace::issue_branch(issue.number) != branch {
+                return false;
+            }
+            match (&issue.repo, &repo_root) {
+                (Some(repo), Some(root)) => self
+                    .0
+                    .workplaces
+                    .main_repo(Some(repo.as_str()))
+                    .ok()
+                    .flatten()
+                    .and_then(|m| std::fs::canonicalize(m.root()).ok())
+                    .is_some_and(|m| &m == root),
+                _ => false,
+            }
+        })
+    }
+
     /// The issue's work as it stands.
     pub fn changes(&self, reference: &str) -> Result<Changes> {
         let issue = self.stored(reference)?;
@@ -595,12 +662,19 @@ impl Board {
     fn complete(&self, issue: &Issue) -> Result<()> {
         let session = self.on_board(issue);
         let wp = &self.0.workplaces;
-        if issue.deliver == Deliverable::PullRequest {
-            return Err(BoardError::Other("pull requests are not delivered by VibeValley yet".into()));
+        if issue.deliver == Deliverable::PullRequest && issue.pull_request.is_none() {
+            return Err(BoardError::Other(vibevalley_i18n::t("server.issue.deliveryNeedsPr", &[])));
         }
         let main = wp.main_repo(issue.repo.as_deref())?;
+        let pr_merged = issue.deliver == Deliverable::Change
+            && issue
+                .pull_request
+                .as_ref()
+                .is_some_and(|pr| pr.state == vibevalley_protocol::PullRequestState::Merged);
         let landing = match &main {
             _ if issue.deliver == Deliverable::Answer => vibevalley_protocol::Landing::None,
+            _ if issue.deliver == Deliverable::PullRequest => vibevalley_protocol::Landing::Submitted,
+            _ if pr_merged => vibevalley_protocol::Landing::PullRequest,
             None => vibevalley_protocol::Landing::None,
             Some(main) => {
                 let has_children = self.state().issues.iter().any(|t| t.parent.as_ref() == Some(&issue.id));
@@ -630,7 +704,10 @@ impl Board {
             }
         };
         if let Some(s) = &session {
-            let leave = if issue.deliver == Deliverable::Branch {
+            let leave = if matches!(issue.deliver, Deliverable::Branch | Deliverable::PullRequest)
+                || pr_merged
+                || vibevalley_core::pr::goes_by_pull_request(issue, false)
+            {
                 Leave::KeepBranch
             } else {
                 Leave::Discard

@@ -224,3 +224,177 @@ fn only_the_user_publishes() {
     let codes = [vibevalley_protocol::BizCode::Forbidden.code(), vibevalley_protocol::BizCode::RepoRefused.code()];
     assert!(codes.contains(&e.biz_code), "{}", e.message);
 }
+
+#[test]
+fn pull_request_issue_mandates_records_and_completes_cleanly() {
+    use std::time::{Duration, Instant};
+    use vibevalley_oar::{Registry, scripted::ScriptedRuntime};
+    use vibevalley_protocol::{Landing, PullRequest, PullRequestState};
+    use vibevalley_server::{Server, ServerConfig, start};
+
+    vibevalley_i18n::set_locale("en");
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().canonicalize().unwrap();
+    let bare = root.join("remote.git");
+    git(&root, &["init", "-q", "--bare", "-b", "main", bare.to_str().unwrap()]);
+
+    let gh: HostRun = Arc::new(|args: &[String]| {
+        let out = match (args[0].as_str(), args.get(1).map(String::as_str)) {
+            ("repo", Some("view")) => r#"{"defaultBranchRef":{"name":"main"}}"#.to_string(),
+            ("pr", Some("list")) => "[]".to_string(),
+            ("pr", Some("create")) => "https://github.com/acme/farm/pull/7\n".to_string(),
+            _ => String::new(),
+        };
+        Answer { ok: true, out, missing: false }
+    });
+    let glab: HostRun = Arc::new(|_: &[String]| Answer {
+        ok: false,
+        out: String::new(),
+        missing: true,
+    });
+    let publisher = Arc::new(Publisher::new(gh, glab, Arc::new(Local(bare.clone()))));
+
+    let mut registry = Registry::new();
+    registry.register(Arc::new(ScriptedRuntime::demo()));
+
+    let started = start(ServerConfig {
+        registry: Some(Arc::new(registry)),
+        publisher: Some(publisher),
+        probe_runtimes: false,
+        tick_crons: false,
+        link_previews: false,
+        offline_media: true,
+        orchestrator_listens: false,
+        watch_pkm: false,
+        ..ServerConfig::under(&root)
+    })
+    .unwrap();
+
+    let repo_dir = root.join("repos/farm");
+    std::fs::create_dir_all(&repo_dir).unwrap();
+    git(&repo_dir, &["init", "-q", "-b", "main"]);
+    git(&repo_dir, &["config", "user.email", "me@farm.test"]);
+    git(&repo_dir, &["config", "user.name", "me"]);
+    std::fs::write(repo_dir.join("a.txt"), "one\n").unwrap();
+    git(&repo_dir, &["add", "."]);
+    git(&repo_dir, &["commit", "-q", "-m", "first"]);
+    git(&repo_dir, &["push", "-q", bare.to_str().unwrap(), "main"]);
+    git(&repo_dir, &["remote", "add", "origin", "https://github.com/acme/farm.git"]);
+
+    let mut coder = started.agents.profiles.install_template("reviewer").unwrap();
+    coder.runtime = "scripted".into();
+    coder.name = "Coder".into();
+    let coder = started.agents.profiles.save(coder).unwrap();
+    let agent_id = coder.id.as_str();
+
+    let created = started
+        .hub
+        .call(
+            "issue.create",
+            json!({
+                "title": "Open PR for feature",
+                "repo": "farm",
+                "agent": agent_id,
+                "deliver": "pull_request",
+                "autoSubmitPr": true
+            }),
+        )
+        .data
+        .unwrap();
+    let issue_id = created["id"].as_str().unwrap().to_string();
+    assert_eq!(created["mandate"]["autoSubmitPr"], true);
+    assert_eq!(created["mandate"]["strength"], "explicit");
+
+    assert_eq!(
+        started.hub.call("issue.status.update", json!({ "id": &issue_id, "status": "todo" })).biz_code,
+        0
+    );
+
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let worktree = loop {
+        let state = started.hub.state_now();
+        let issue = state.issues.iter().find(|i| i.id == issue_id).unwrap();
+        if issue.status == vibevalley_protocol::IssueStatus::InReview {
+            let sid = issue.latest_session_id().unwrap();
+            let session = state.sessions.iter().find(|s| s.id == *sid).unwrap();
+            break PathBuf::from(session.worktree.clone().unwrap());
+        }
+        assert!(Instant::now() < deadline, "timed out waiting for InReview");
+        std::thread::sleep(Duration::from_millis(20));
+    };
+
+    // Completing before a PR is recorded is refused.
+    let refused = started.hub.call("issue.status.update", json!({ "id": &issue_id, "status": "done" }));
+    assert_ne!(refused.biz_code, 0);
+
+    // Commit a change on the issue's worktree branch and publish it via repo.pr.submit.
+    git(&worktree, &["config", "user.email", "helper@farm.test"]);
+    git(&worktree, &["config", "user.name", "helper"]);
+    std::fs::write(worktree.join("a.txt"), "two\n").unwrap();
+    git(&worktree, &["commit", "-q", "-am", "feat: two"]);
+    let sha = git(&worktree, &["rev-parse", "HEAD"]);
+    let branch = git(&worktree, &["rev-parse", "--abbrev-ref", "HEAD"]);
+
+    let pubbed = started.hub.call(
+        "repo.pr.submit",
+        json!({
+            "cwd": worktree.display().to_string(),
+            "branch": branch,
+            "sha": sha,
+            "base": "main",
+            "title": "feat: two",
+            "body": "## What changed"
+        }),
+    );
+    assert_eq!(pubbed.biz_code, 0, "{}", pubbed.message);
+
+    let recorded = started.board.issue(&issue_id).unwrap();
+    assert_eq!(
+        recorded.pull_request,
+        Some(PullRequest {
+            url: "https://github.com/acme/farm/pull/7".into(),
+            number: 7,
+            state: PullRequestState::Open,
+        })
+    );
+
+    // Preview and complete now succeed with Landing::Submitted and keep the PR branch.
+    let preview = started.hub.call("issue.status.previewUpdate", json!({ "id": &issue_id, "status": "done" }));
+    assert_eq!(preview.biz_code, 0, "{}", preview.message);
+
+    let done = started.hub.call("issue.status.update", json!({ "id": &issue_id, "status": "done" }));
+    assert_eq!(done.biz_code, 0, "{}", done.message);
+    let finished = started.board.issue(&issue_id).unwrap();
+    assert_eq!(finished.delivered, Some(Landing::Submitted));
+    assert_eq!(git(&repo_dir, &["rev-parse", &format!("refs/heads/{branch}")]), sha);
+
+    // A change-delivering issue whose followed PR merges finishes automatically with Landing::PullRequest.
+    let change_issue = started
+        .hub
+        .call(
+            "issue.create",
+            json!({
+                "title": "Follow merged PR",
+                "repo": "farm",
+                "agent": agent_id,
+                "deliver": "change"
+            }),
+        )
+        .data
+        .unwrap();
+    let change_id = change_issue["id"].as_str().unwrap();
+    let merged = started
+        .board
+        .record_pull_request(
+            change_id,
+            PullRequest {
+                url: "https://github.com/acme/farm/pull/8".into(),
+                number: 8,
+                state: PullRequestState::Merged,
+            },
+        )
+        .unwrap();
+    assert_eq!(merged.delivered, Some(Landing::PullRequest));
+
+    started.close();
+}

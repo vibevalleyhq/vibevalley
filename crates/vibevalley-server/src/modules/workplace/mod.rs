@@ -295,7 +295,7 @@ impl Workplace {
     pub fn land(&self, main: &Repo, issue: &OnDisk, deliver: Deliverable, base: impl FnOnce() -> Result<String>, has_children: bool) -> Result<Landed> {
         let branch = issue_branch(issue.number);
         match deliver {
-            Deliverable::PullRequest => Err(BoardError::Other("pull requests are not delivered by VibeValley yet".into())),
+            Deliverable::PullRequest => Ok(Landed::Landed(Landing::Submitted)),
             Deliverable::Answer => Ok(Landed::Landed(Landing::None)),
             Deliverable::Branch => {
                 let base = base()?;

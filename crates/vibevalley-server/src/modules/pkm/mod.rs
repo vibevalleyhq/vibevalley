@@ -1078,6 +1078,9 @@ impl Pkm {
             wrote.map_err(|e| refused(e.to_string()))?;
         }
         db::drop_change(&g.db, last.seq).map_err(db_failed)?;
+        g.pages
+            .retain(|p| p.file != last.after_file && last.before_file.as_deref() != Some(p.file.as_str()));
+        g.unindexed(&last.page)?;
         g.rescan()?;
         Ok(PkmUndo {
             undone: true,
