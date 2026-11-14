@@ -33,10 +33,6 @@ pub fn pos(name: &'static str, help: &str) -> Arg {
     Arg::new(name).required(true).help(word(help))
 }
 
-pub fn pos_or(name: &'static str, default: &'static str, help: &str) -> Arg {
-    Arg::new(name).default_value(default).help(word(help))
-}
-
 /// One or more words, joined by a space.
 pub fn words(name: &'static str, help: &str) -> Arg {
     Arg::new(name).required(true).num_args(1..).help(word(help))

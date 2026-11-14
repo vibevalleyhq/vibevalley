@@ -52,12 +52,12 @@
 
 4. 页面也改了的，再照 [app.md](.agents/skills/vv-acceptance/references/app.md) 起应用截图。
 
-### 真实帮工的 CLI
+### 真实帮工的 MCP
 
 仅在用户已授权真实农机验收时执行；需要本机登录的 Codex 或 Claude Code，会消耗模型额度。先跑最低层的测试：`cargo test -p vibevalley-server --test session --test mcp`、`cargo test -p vibevalley-cli`。
 
-1. 子命令里建仓库和用真农机的档案（`vv repo create acceptance`、`vv agent create acceptance --runtime codex`），建一张只让帮工跑 `vv --worker-access-file <它的凭证> worker doctor` 再 `worker report` 的工单，派出去，`vv issue watch 1 --jsonl` 看到交回。
-2. 非法凭证（`vv --worker-access-file <假凭证> worker doctor`）退出码非零，stderr 不回显凭证的细节。
+1. 子命令里建仓库和用真农机的档案（`vv repo create acceptance`、`vv agent create acceptance --runtime codex`），建一张只让帮工经 `vibevalley` MCP 调 `session_list` 再调 `issue_report` 交回的工单，派出去，`vv issue watch 1 --jsonl` 看到工具调用与交回。
+2. 非法 Bearer 令牌请求 `POST /mcp` 被拒（401/403 或 JSON-RPC 鉴权错误），响应不回显有效凭证。
 3. 不带 `--scripted-helper` 执行：`env -u OAR_SUBAGENT_DEPTH vpx scripts/release/verify-server.ts -- sh <证据目录>/worker.sh`，保存命令、HEAD、stdout、stderr 和退出码。健康检查、agent 自述或单独的退出码不能替代工单的轨迹与状态。
 
 ## 证据

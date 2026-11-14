@@ -6,7 +6,7 @@ use vibevalley_protocol::{
     PkmCaptureRequest, PkmJournalRequest, PkmMarker, PkmPage, PkmPageRef, PkmPageRequest, PkmRadarGetInput, PkmSearchRequest, PkmSourceUpdate, PkmTier, ops,
 };
 
-use crate::farm::{Ctx, Done, Failure, exit, line, out, stdin_text};
+use crate::farm::{Ctx, Done, Failure, exit, line, no_dry_run, stdin_text};
 use crate::tree::{arg, choice, cmd, get, group, int, joined, maybe_words, number, pos, text};
 
 fn tier_flag() -> clap::Arg {
@@ -122,6 +122,9 @@ pub fn command() -> Command {
 pub fn run(ctx: &Ctx, m: &ArgMatches) -> Done {
     match m.subcommand() {
         Some(("capture", m)) => {
+            if ctx.dry_run {
+                return Err(no_dry_run("pkm capture"));
+            }
             let written = ctx.ask::<ops::PkmCapture>(&PkmCaptureRequest {
                 text: words_or_stdin(m),
                 page: get(m, "page"),
@@ -173,6 +176,9 @@ pub fn run(ctx: &Ctx, m: &ArgMatches) -> Done {
         }
         Some(("journal", m)) => {
             let Some(("show", m)) = m.subcommand() else { return Ok(()) };
+            if ctx.dry_run {
+                return Err(no_dry_run("pkm journal show"));
+            }
             let day = get(m, "day").unwrap_or_else(|| jiff::Zoned::now().strftime("%Y-%m-%d").to_string());
             let page = ctx.ask::<ops::PkmJournalOpen>(&PkmJournalRequest { day })?;
             ctx.show(&page, outline);
@@ -213,6 +219,9 @@ fn page(ctx: &Ctx, m: &ArgMatches) -> Done {
             Ok(())
         }
         Some(("save", m)) => {
+            if ctx.dry_run {
+                return Err(no_dry_run("pkm page save"));
+            }
             let markdown = words_or_stdin(m);
             let request = PkmPageRequest {
                 title: arg(m, "title"),
@@ -229,6 +238,9 @@ fn page(ctx: &Ctx, m: &ArgMatches) -> Done {
 
 /// The page's file in `$VISUAL` or `$EDITOR` (vi without either), written back when the editor closes.
 fn edit(ctx: &Ctx, page: &str) -> Done {
+    if ctx.dry_run {
+        return Err(no_dry_run("pkm page edit"));
+    }
     let source = ctx.ask::<ops::PkmSourceGet>(&PkmPageRef { page: page.into() })?;
     let file_failure = |e: std::io::Error| Failure::new(exit::OTHER, "File", e.to_string());
     let dir = std::env::temp_dir().join(format!("vibevalley-{}", std::process::id()));
@@ -265,7 +277,8 @@ fn edit(ctx: &Ctx, page: &str) -> Done {
     }
     let edited = std::fs::read_to_string(&file).map_err(file_failure)?;
     if edited == source.markdown {
-        out(&t("cli.pkm.unchanged", &[("page", source.title.clone().into())]));
+        let current = ctx.ask::<ops::PkmPageGet>(&PkmPageRef { page: source.page })?;
+        ctx.show(&current.page, |p| t("cli.pkm.unchanged", &[("page", p.title.clone().into())]));
         return Ok(());
     }
     let update = PkmSourceUpdate {
@@ -274,8 +287,8 @@ fn edit(ctx: &Ctx, page: &str) -> Done {
         updated: source.updated,
     };
     match ctx.ask::<ops::PkmSourceUpdate>(&update) {
-        Ok(_) => {
-            out(&t("cli.pkm.saved", &[("page", source.title.into())]));
+        Ok(saved) => {
+            ctx.show(&saved, |p| t("cli.pkm.saved", &[("page", p.title.clone().into())]));
             Ok(())
         }
         Err(mut f) if f.tag == "Refused" => {

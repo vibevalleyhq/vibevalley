@@ -87,6 +87,7 @@ fn cli(home: &std::path::Path, args: &[&str], env: &[(&str, &str)]) -> Ran {
         .args(args)
         .env("VIBEVALLEY_HOME", home)
         .env_remove("VIBEVALLEY_SERVER")
+        .env_remove("DEEPSEEK_API_KEY")
         .envs(env.iter().copied())
         .output()
         .unwrap();
@@ -104,8 +105,8 @@ impl Farm {
     }
 
     fn run(&self, args: &[&str]) -> Ran {
-        let mut all = args.to_vec();
-        all.extend(["--server", &self.url]);
+        let mut all = vec!["--server", &self.url];
+        all.extend_from_slice(args);
         cli(&self.home(), &all, &[])
     }
 }
@@ -121,6 +122,7 @@ const COMMANDS: &[&str] = &[
     "channel message list",
     "channel message search",
     "channel message send",
+    "chat",
     "cron create",
     "cron delete",
     "cron edit",
@@ -155,9 +157,13 @@ const COMMANDS: &[&str] = &[
     "repo pr submit",
     "runtime list",
     "runtime refresh",
+    "session events",
     "session list",
     "session show",
     "session stop",
+    "setting get",
+    "setting update",
+    "setting validate",
 ];
 
 #[test]
@@ -307,6 +313,106 @@ fn watch_returns_for_questions_while_the_issue_remains_in_progress() {
     let handed_back = f.run(&["issue", "show", &n]).out;
     assert!(handed_back.lines().nth(1).unwrap().starts_with("in_review"), "{handed_back}");
     assert!(f.run(&["issue", "diff", &n]).out.contains("clock.ts"));
+    let sessions: Value = serde_json::from_str(&f.run(&["session", "list", "--format", "json"]).out).unwrap();
+    let sid = sessions
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["role"] == "worker")
+        .and_then(|s| s["id"].as_str())
+        .unwrap()
+        .to_string();
+    let events_text = f.run(&["session", "events", &sid]).out;
+    assert!(!events_text.is_empty(), "expected trajectory events for {sid}");
+    let events_json: Value = serde_json::from_str(&f.run(&["session", "events", &sid, "--format", "json"]).out).unwrap();
+    assert!(!events_json.as_array().unwrap().is_empty());
     assert_eq!(f.run(&["issue", "review", &n, "--pass"]).code, 0);
     assert!(f.run(&["issue", "status", &n, "done"]).out.starts_with(&format!("#{n}  done")));
+    let observed = f.run(&["issue", "watch", &format!("#{n}"), "--jsonl"]);
+    assert_eq!(observed.code, 0, "{:?}", observed.failure);
+    assert!(observed.out.lines().any(|l| l.contains("\"kind\":\"state\"")), "{}", observed.out);
+}
+
+#[test]
+fn cron_at_agent_default_pkm_dry_run_and_doctor_setting_chat_work() {
+    let f = farm();
+
+    // cron create --at parses local datetime and refuses invalid timestamps
+    let once = f.run(&["cron", "create", "once-check", "检查一次", "--at", "2099-11-05T09:00", "--format", "json"]);
+    assert_eq!(once.code, 0, "{:?}", once.failure);
+    let once_json: Value = serde_json::from_str(&once.out).unwrap();
+    assert_eq!(once_json["when"]["kind"], "once");
+    assert!(once_json["when"]["at"].as_i64().unwrap_or(0) > 0, "{once_json}");
+    let bad_at = f.run(&["cron", "create", "bad-check", "检查一次", "--at", "bogus"]);
+    assert_eq!((bad_at.code, bad_at.tag()), (2, "InvalidValue"));
+
+    // agent create defaults to the built-in vibevalley runtime
+    let owl: Value = serde_json::from_str(&f.run(&["agent", "create", "owl", "--format", "json"]).out).unwrap();
+    assert_eq!(owl["runtime"], "vibevalley");
+
+    // pkm commands without dry-run refuse --dry-run without touching disk, and pkm page edit honors --format json
+    for args in [
+        &["pkm", "capture", "不应写入", "--dry-run"][..],
+        &["pkm", "journal", "show", "--dry-run"][..],
+        &["pkm", "page", "save", "--dry-run", "读书", "--", "- 条目"][..],
+        &["pkm", "page", "edit", "读书", "--dry-run"][..],
+    ] {
+        let ran = f.run(args);
+        assert_eq!((args, ran.code, ran.tag()), (args, 2, "NoDryRun"));
+    }
+    assert_eq!(f.run(&["pkm", "page", "list"]).out, "");
+    assert_eq!(f.run(&["pkm", "page", "save", "读书", "--", "- 置身事内"]).code, 0);
+    let edited = cli(
+        &f.home(),
+        &["pkm", "page", "edit", "读书", "--format", "json", "--server", &f.url],
+        &[("EDITOR", "true")],
+    );
+    assert_eq!(edited.code, 0, "{:?}", edited.failure);
+    let edited_json: Value = serde_json::from_str(&edited.out).unwrap();
+    assert_eq!(edited_json["title"], "读书");
+
+    // setting get, validate, update, and doctor (--format text vs --format json)
+    let bad_key = f.run(&["setting", "validate", "--deepseek-key", "bad"]);
+    assert_eq!((bad_key.code, bad_key.tag()), (3, "Refused"));
+    assert_eq!(f.run(&["setting", "validate", "--deepseek-key", "sk-valid12345"]).code, 0);
+    assert_eq!(f.run(&["setting", "update", "--locale", "en", "--deepseek-key", "sk-valid12345"]).code, 0);
+    let st: Value = serde_json::from_str(&f.run(&["setting", "get", "--format", "json"]).out).unwrap();
+    assert_eq!(st["locale"], "en");
+    assert_eq!(st["deepseekApiKey"]["source"], "settings");
+
+    assert_eq!(f.run(&["runtime", "refresh", "pi"]).code, 0);
+    let doc_text = f.run(&["doctor"]);
+    assert_eq!(doc_text.code, 0, "{:?}", doc_text.failure);
+    assert!(doc_text.out.contains("server  ok"), "{}", doc_text.out);
+    assert!(doc_text.out.contains("model  ok  settings"), "{}", doc_text.out);
+    let doc_json: Value = serde_json::from_str(&f.run(&["doctor", "--format", "json"]).out).unwrap();
+    assert_eq!(doc_json.as_array().unwrap().len(), 4);
+
+    // local chat via scripted runtime and VibeValleyRuntime key check from <home>/settings.json
+    let no_key_home = tempfile::tempdir().unwrap();
+    let refused_chat = cli(no_key_home.path(), &["chat", "hello"], &[]);
+    assert_eq!((refused_chat.code, refused_chat.tag()), (3, "Refused"));
+    assert!(
+        refused_chat.failure.as_ref().unwrap()["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("no DeepSeek API key")
+    );
+    std::fs::write(no_key_home.path().join("settings.json"), r#"{"deepseekApiKey":"sk-valid12345"}"#).unwrap();
+    let missing_session = cli(no_key_home.path(), &["chat", "hello", "--resume", "vv-missing"], &[]);
+    assert_eq!((missing_session.code, missing_session.tag()), (3, "Refused"));
+    assert!(
+        missing_session.failure.as_ref().unwrap()["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("session_not_found")
+    );
+
+    let scripted_text = cli(no_key_home.path(), &["chat", "hello", "--runtime", "scripted"], &[]);
+    assert_eq!(scripted_text.code, 0, "{:?}", scripted_text.failure);
+    assert!(!scripted_text.out.is_empty());
+    let scripted_json: Value =
+        serde_json::from_str(&cli(no_key_home.path(), &["chat", "hello", "--runtime", "scripted", "--format", "json"], &[]).out).unwrap();
+    assert_eq!(scripted_json["runtime"], "scripted");
+    assert_eq!(scripted_json["reason"], "Completed");
 }

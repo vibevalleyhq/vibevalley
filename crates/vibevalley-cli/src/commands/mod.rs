@@ -1,10 +1,11 @@
 //! The command tree and where each command runs.
 
+mod chat;
 mod doctor;
 mod farm;
 mod issue;
 mod pkm;
-mod worker;
+mod setting;
 
 use clap::{ArgMatches, Command};
 use vibevalley_i18n::t;
@@ -25,7 +26,6 @@ pub fn tree() -> Command {
                 .global(true),
             flag("dry-run", "cli.flag.dryRun").global(true),
             choice("format", ["text", "json"], "cli.flag.format").global(true),
-            text("worker-access-file", "").hide(true).global(true),
         ])
         .subcommands([
             issue::command(),
@@ -38,7 +38,8 @@ pub fn tree() -> Command {
             farm::cron(),
             farm::artifact(),
             pkm::command(),
-            worker::command(),
+            setting::command(),
+            chat::command(),
             doctor::command(),
         ])
 }
@@ -56,7 +57,8 @@ pub fn run(ctx: &Ctx, m: &ArgMatches) -> Done {
         "cron" => farm::run_cron(ctx, sub),
         "artifact" => farm::run_artifact(ctx, sub),
         "pkm" => pkm::run(ctx, sub),
-        "worker" => worker::run(ctx, sub),
+        "setting" => setting::run(ctx, sub),
+        "chat" => chat::run(ctx, sub),
         "doctor" => doctor::run(ctx),
         _ => Ok(()),
     }

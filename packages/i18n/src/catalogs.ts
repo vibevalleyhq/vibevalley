@@ -10,7 +10,7 @@ export const catalogs = {
         effort: "思考的力度",
         server: "服务端的地址；不填用 VIBEVALLEY_SERVER，再没有是这台电脑上开着的那个（家目录的 server.json），都没有是 {fallback}",
         dryRun: "只说会做什么，不动手（会删、会合、会关、会让帮工走的命令）",
-        format: "md 是给人读的 Markdown（默认），json 是接口的答复",
+        format: "text 是给人读的行（默认），json 是接口的答复",
         capturePage: "记到这一页的末尾（标题、slug 或别名）；不填是今天的日记",
         day: "哪一天的日记，YYYY-MM-DD；不填是今天",
         agent: "档案：id 或名字",
@@ -49,9 +49,23 @@ export const catalogs = {
         duty: "职责说明",
         follow: "交回后继续观察新一轮",
         jsonl: "输出独立的版本化 JSONL 事件流",
+        run: "只看这一轮的事件",
+        locale: "界面语言（zh 或 en）",
+        deepseekKey: "DeepSeek API 密钥（空字符串表示清空）",
+        agoraAppId: "声网 App ID",
+        agoraCertificate: "声网 App Certificate",
+        asrKey: "语音识别密钥",
+        llmKey: "语音对话模型密钥",
+        ttsKey: "语音合成密钥",
+        dictationKey: "听写密钥",
+        cwd: "编码会话的工作目录",
+        resume: "按会话编号继续之前的会话",
+        plan: "只读计划模式",
+        orchestrator: "在频道里和助手说话，不走本机农机",
       },
       command: {
-        doctor: "一条命令看清这台电脑上的农场：找到的是哪个、连不连得上、桌面版、农机、模型的 key、连接到本机",
+        doctor: "检查这台电脑上的 VibeValley：家目录、服务端、农机和模型密钥",
+        chat: "和本机农机或频道里的助手对话",
         pkm: {
           capture: "记一句话进今天的日记（--page 记到那一页）；不给字就读标准输入，多行按缩进拆成块",
           radar: "要看一眼的：收件箱、搁着的仓库、过期的",
@@ -83,9 +97,9 @@ export const catalogs = {
         memory: { create: "给一份档案记一条记性", delete: "删掉档案的一条记性", list: "列出一份档案的记性", search: "搜记性；不指定档案就搜全部" },
         repo: { list: "列出仓库", create: "新建仓库（--repo 从 GitHub 克隆）" },
         runtime: { list: "列出农机：装没装、版本", refresh: "重新探测一台农机：装了新的或升了版本以后" },
-        session: { list: "列出帮工：id、名字、档案、在做什么", show: "看一个帮工", stop: "停下帮工这一轮" },
+        session: { list: "列出帮工：id、名字、档案、在做什么", show: "看一个帮工", events: "读一个帮工的轨迹事件", stop: "停下帮工这一轮" },
       },
-      next: { help: "看这条命令怎么写", startServer: "先起服务端（vp run --filter @vibevalley/server start），或用 --server 指到在跑的那个" },
+      next: { help: "看这条命令怎么写", startServer: "先打开 VibeValley 或起服务端（cargo run -p vibevalley-server），或用 --server 指到在跑的那个" },
       failure: { unreachable: "连不上 {base}：{why}", gone: "工单 #{n} 不在了：被删掉了", noDryRun: "{command} 没有试跑：去掉 --dry-run 才会做" },
       op: {
         user: {
@@ -387,7 +401,12 @@ export const catalogs = {
         agentName: "档案的名字",
       },
       channel: { sent: "发到了 {channel}" },
-      cron: { when: "什么时候跑：--every、--daily、--cron、--at 正好给一个", deleted: "删掉了定时任务 {cron}", edited: "改好了定时任务 {cron}" },
+      cron: {
+        when: "什么时候跑：--every、--daily、--cron、--at 正好给一个",
+        invalidAt: "读不出 --at「{at}」：请写时间戳，比如 2026-11-05T09:00 或 2026-11-05T09:00:00Z",
+        deleted: "删掉了定时任务 {cron}",
+        edited: "改好了定时任务 {cron}",
+      },
       example: {
         agentList: { about: "看有哪些档案能派活" },
         artifactList: { about: "一张工单的 Artifact" },
@@ -405,12 +424,18 @@ export const catalogs = {
         runtimeList: { about: "看装了哪些农机" },
         sessionList: { about: "看在干活的帮工" },
         sessionShow: { about: "看帮工 w3" },
+        sessionEvents: { about: "看帮工 w3 的轨迹" },
         sessionStop: { about: "停下 w3 这一轮" },
+        settingGet: { about: "查看当前设置与功能就绪状态" },
+        settingUpdate: { about: "把界面语言切成英文" },
+        settingValidate: { about: "检查设置改动是否能通过" },
+        chatLocal: { run: "vibevalley chat '讲讲 Cargo.toml'", about: "和默认农机跑一轮对话" },
+        chatOrchestrator: { run: "vibevalley chat --orchestrator '现在有哪些在等我？'", about: "在 #general 里问助手并等回复" },
         issue: { comment: { run: "vibevalley issue comment 12 用 8797", about: "回答 12 号在问的，或者捎一句话给它的帮工" } },
         doctor: { about: "看这台电脑上的农场好不好" },
         artifactRead: { about: "读 a1 的正文" },
         channelMessageList: { about: "读 #general 最近十条" },
-        channelMessageSearch: { run: "vibevalley channel message search 端口", about: "Find “端口” in every channel" },
+        channelMessageSearch: { run: "vibevalley channel message search 端口", about: "在全部频道里找「端口」" },
         channelMessageSend: { run: "vibevalley channel message send general '@w3 先看看登录页'", about: "在 #general 里叫 w3 先看看登录页" },
         cronCreate: { run: "vibevalley cron create 早上看看 看看昨天的改动 --daily 09:00", about: "每天早上九点让助手看看昨天的改动" },
         cronDelete: { about: "先试删，看会删掉什么" },
@@ -436,7 +461,7 @@ export const catalogs = {
         pkmSearch: { run: "vibevalley pkm search 置身事内", about: "在笔记里找「置身事内」" },
         repoCreate: { about: "从 GitHub 克隆一个仓库" },
         runtimeRefresh: { about: "装了新的 Claude Code 以后重新探测" },
-        pkmPageSave: { run: 'vibevalley pkm page save 读书 "- 置身事内"', about: "新建或更新「读书」这一页" },
+        pkmPageSave: { run: 'vibevalley pkm page save 读书 -- "- 置身事内"', about: "新建或更新「读书」这一页" },
         agentCreate: { about: "新建一份用 Claude Code 的档案" },
         agentDelete: { about: "先试删，看会删掉什么" },
         issueObserve: { about: "以 JSONL 跟随工单执行" },
@@ -466,17 +491,8 @@ export const catalogs = {
       "repo.publish": "将已有分支发布为 GitHub PR 或 GitLab MR",
       "repo.check": "仓库检查：{check}",
       "repo.preview": "预览：将 {branch} 的 {sha} 发布到 {base}；尚未运行检查",
-      worker: {
-        about: "以当前帮工会话交活、提交 PR 或读取上下文",
-        failed: "帮工接入失败：检查会话凭证、服务连接和操作授权",
-        report:
-          "交回当前会话的报告。JSON 必填 summary（字符串）；可选 prSubmit（布尔，默认 false；true 需用户明确授权）、questions（question 字符串、options 字符串数组）、checks（criterion 从 0 开始、result 为 met/unmet/unsure、proof 字符串）、remember（text 字符串、scope 为 repo/all）、answer（conclusion 字符串，evidence/next/unsure 字符串数组）。省略的数组默认空。不接受切换会话身份；报告绑定凭证文件的会话。",
-        pr: "提交当前会话的 PR，须获用户明确授权。JSON 可选 summary 字符串。",
-        context: "读取当前工单串。JSON 可选 id（频道或串）、before（消息号）、limit（数量）、unread（布尔）。",
-        read: "读取上下文资源。JSON 必填 uri（vv:// 资源地址）。 可选 offset、limit（整数）。",
-        doctor: "通过认证调用只读 session_list，验证凭证与工具通路；不代表编码 agent 已加载可选 MCP。JSON 默认为空对象。",
-        json: "工具输入的 JSON 对象；参数格式见本命令说明。",
-      },
+      setting: { nothingGiven: "至少给一个要改的设置项", valid: "设置校验通过" },
+      chat: { session: "会话 {session}（输入 /exit 或按 Ctrl-D 退出）" },
     },
     desktop: {
       open: "打开 VibeValley",
@@ -3421,7 +3437,7 @@ export const catalogs = {
         effort: "How hard to think",
         server: "The server's address; VIBEVALLEY_SERVER when empty, else the one running on this machine (the home's server.json), else {fallback}",
         dryRun: "Only say what it would do, without doing it (commands that delete, merge, close or send a helper away)",
-        format: "md: Markdown to read (the default); json: the endpoint's answer",
+        format: "text: lines to read (the default); json: the endpoint's answer",
         capturePage: "At the end of this page (its title, slug or an alias); none: today's journal",
         day: "Which day's journal, YYYY-MM-DD; none: today",
         agent: "A profile: its id or name",
@@ -3460,9 +3476,23 @@ export const catalogs = {
         duty: "What the profile does",
         follow: "Keep observing after handoff",
         jsonl: "Write the versioned JSONL event stream",
+        run: "Only events from this round",
+        locale: "Display language (zh or en)",
+        deepseekKey: "DeepSeek API key (empty string clears)",
+        agoraAppId: "Agora App ID",
+        agoraCertificate: "Agora App Certificate",
+        asrKey: "Speech recognition key",
+        llmKey: "Voice dialogue model key",
+        ttsKey: "Speech synthesis key",
+        dictationKey: "Dictation key",
+        cwd: "Working folder for the coding session",
+        resume: "Resume an earlier session by id",
+        plan: "Read-only planning mode",
+        orchestrator: "Talk with the assistant in a channel instead of a local machine",
       },
       command: {
-        doctor: "See this machine's farm at once: which one was found, whether it answers, the desktop app, runtimes, the model's key, the LAN listener",
+        doctor: "Check this computer's VibeValley setup: home folder, server, machines and model key",
+        chat: "Talk with a local coding machine or the assistant",
         pkm: {
           capture: "Note something in today's journal (--page: on that page); no words reads stdin, lines split into blocks by indentation",
           radar: "What wants a look: the inbox, repos left alone, what is overdue",
@@ -3513,11 +3543,16 @@ export const catalogs = {
         },
         repo: { list: "List repos", create: "Make a repo (--repo clones it from GitHub)" },
         runtime: { list: "List the runtimes: installed or not, their versions", refresh: "Look for a runtime again, after installing or upgrading it" },
-        session: { list: "List helpers: id, name, profile, what it is doing", show: "Show a helper", stop: "Stop a helper's round" },
+        session: {
+          list: "List helpers: id, name, profile, what it is doing",
+          show: "Show a helper",
+          events: "Read a helper's trajectory events",
+          stop: "Stop a helper's round",
+        },
       },
       next: {
         help: "See how this command is written",
-        startServer: "Start the server first (vp run --filter @vibevalley/server start), or point --server at one that runs",
+        startServer: "Open VibeValley or start the server first (cargo run -p vibevalley-server), or point --server at one that runs",
       },
       failure: {
         unreachable: "Cannot reach {base}: {why}",
@@ -3866,6 +3901,7 @@ export const catalogs = {
       channel: { sent: "Sent to {channel}" },
       cron: {
         when: "When to run: give exactly one of --every, --daily, --cron, --at",
+        invalidAt: 'Cannot read --at "{at}": give a timestamp such as 2026-11-05T09:00 or 2026-11-05T09:00:00Z',
         deleted: "Deleted the scheduled task {cron}",
         edited: "Changed the scheduled task {cron}",
       },
@@ -3886,7 +3922,13 @@ export const catalogs = {
         runtimeList: { about: "Which runtimes are installed" },
         sessionList: { about: "The helpers at work" },
         sessionShow: { about: "Helper w3" },
+        sessionEvents: { about: "Helper w3's trajectory" },
         sessionStop: { about: "Stop w3's round" },
+        settingGet: { about: "Show current settings and feature readiness" },
+        settingUpdate: { about: "Switch the display language to English" },
+        settingValidate: { about: "Check whether a change would be accepted" },
+        chatLocal: { run: "vibevalley chat 'explain Cargo.toml'", about: "Run one round with the default coding machine" },
+        chatOrchestrator: { run: "vibevalley chat --orchestrator 'what is waiting on me?'", about: "Ask the assistant in #general and wait for its answer" },
         issue: { comment: { run: "vibevalley issue comment 12 'use 8797'", about: "Answer what #12 asks, or pass a word to its helper" } },
         doctor: { about: "How this machine's farm is" },
         artifactRead: { about: "Read a1's words" },
@@ -3929,7 +3971,7 @@ export const catalogs = {
         pkmSearch: { run: "vibevalley pkm search 'reading list'", about: "Find “reading list” in the notes" },
         repoCreate: { about: "Clone a repo from GitHub" },
         runtimeRefresh: { about: "Look again after installing a new Claude Code" },
-        pkmPageSave: { run: 'vibevalley pkm page save Reading "- bulbs"', about: "Create or update the Reading page" },
+        pkmPageSave: { run: 'vibevalley pkm page save Reading -- "- bulbs"', about: "Create or update the Reading page" },
         agentCreate: { about: "Create a profile on Claude Code" },
         agentDelete: { about: "Try it first: what it would delete" },
         issueObserve: { about: "Follow execution as JSONL" },
@@ -3959,18 +4001,8 @@ export const catalogs = {
       "repo.publish": "Publish an existing branch as a GitHub PR or GitLab MR",
       "repo.check": "Repository check: {check}",
       "repo.preview": "Preview: publish {branch} at {sha} into {base}; checks have not run",
-      worker: {
-        about: "Report, submit a PR or read context as the current helper session",
-        failed: "Helper access failed: check session credentials, connectivity and operation authorization",
-        report:
-          "Report as the current session. JSON requires summary (string). Optional: prSubmit (boolean, default false; true needs explicit user authorization), questions (question string, options string array), checks (criterion zero-based number, result met/unmet/unsure, proof string), remember (text string, scope repo/all), answer (conclusion string, evidence/next/unsure string arrays). Omitted arrays default to empty. Credentials bind identity; arguments cannot select another session.",
-        pr: "Submit the current session PR with explicit user authorization. JSON accepts optional summary string.",
-        context: "Read the current issue thread. Optional JSON fields: id (channel/thread), before (message number), limit (count), unread (boolean).",
-        read: "Read a context resource. JSON requires uri (vv:// resource address). Optional offset and limit (integers).",
-        doctor:
-          "Authenticate a read-only session_list call to check credentials and tool access; this does not prove the coding agent loaded optional MCP. JSON defaults to an empty object.",
-        json: "Tool input as a JSON object; see the command description for fields.",
-      },
+      setting: { nothingGiven: "Give at least one setting flag to update", valid: "Settings are valid" },
+      chat: { session: "Session {session} (/exit or Ctrl-D to leave)" },
     },
     desktop: {
       open: "Open VibeValley",
@@ -7109,6 +7141,7 @@ export interface Messages {
   "cli.arg.status": undefined;
   "cli.arg.title": undefined;
   "cli.channel.sent": { readonly channel: string | number };
+  "cli.chat.session": { readonly session: string | number };
   "cli.command.agent.create": undefined;
   "cli.command.agent.delete": undefined;
   "cli.command.agent.list": undefined;
@@ -7119,6 +7152,7 @@ export interface Messages {
   "cli.command.channel.messageList": undefined;
   "cli.command.channel.messageSearch": undefined;
   "cli.command.channel.messageSend": undefined;
+  "cli.command.chat": undefined;
   "cli.command.cron.create": undefined;
   "cli.command.cron.delete": undefined;
   "cli.command.cron.edit": undefined;
@@ -7152,11 +7186,13 @@ export interface Messages {
   "cli.command.repo.list": undefined;
   "cli.command.runtime.list": undefined;
   "cli.command.runtime.refresh": undefined;
+  "cli.command.session.events": undefined;
   "cli.command.session.list": undefined;
   "cli.command.session.show": undefined;
   "cli.command.session.stop": undefined;
   "cli.cron.deleted": { readonly cron: string | number };
   "cli.cron.edited": { readonly cron: string | number };
+  "cli.cron.invalidAt": { readonly at: string | number };
   "cli.cron.when": undefined;
   "cli.doctor.installRuntime": undefined;
   "cli.doctor.noModelKey": undefined;
@@ -7176,6 +7212,10 @@ export interface Messages {
   "cli.example.channelMessageSearch.run": undefined;
   "cli.example.channelMessageSend.about": undefined;
   "cli.example.channelMessageSend.run": undefined;
+  "cli.example.chatLocal.about": undefined;
+  "cli.example.chatLocal.run": undefined;
+  "cli.example.chatOrchestrator.about": undefined;
+  "cli.example.chatOrchestrator.run": undefined;
   "cli.example.cronCreate.about": undefined;
   "cli.example.cronCreate.run": undefined;
   "cli.example.cronDelete.about": undefined;
@@ -7227,13 +7267,20 @@ export interface Messages {
   "cli.example.repoList.about": undefined;
   "cli.example.runtimeList.about": undefined;
   "cli.example.runtimeRefresh.about": undefined;
+  "cli.example.sessionEvents.about": undefined;
   "cli.example.sessionList.about": undefined;
   "cli.example.sessionShow.about": undefined;
   "cli.example.sessionStop.about": undefined;
+  "cli.example.settingGet.about": undefined;
+  "cli.example.settingUpdate.about": undefined;
+  "cli.example.settingValidate.about": undefined;
   "cli.failure.gone": { readonly n: string | number };
   "cli.failure.noDryRun": { readonly command: string | number };
   "cli.failure.unreachable": { readonly base: string | number; readonly why: string | number };
   "cli.flag.agent": undefined;
+  "cli.flag.agoraAppId": undefined;
+  "cli.flag.agoraCertificate": undefined;
+  "cli.flag.asrKey": undefined;
   "cli.flag.at": undefined;
   "cli.flag.before": undefined;
   "cli.flag.capturePage": undefined;
@@ -7242,9 +7289,12 @@ export interface Messages {
   "cli.flag.criteria": undefined;
   "cli.flag.criterion": undefined;
   "cli.flag.cronExpr": undefined;
+  "cli.flag.cwd": undefined;
   "cli.flag.daily": undefined;
   "cli.flag.day": undefined;
+  "cli.flag.deepseekKey": undefined;
   "cli.flag.description": undefined;
+  "cli.flag.dictationKey": undefined;
   "cli.flag.dryRun": undefined;
   "cli.flag.duty": undefined;
   "cli.flag.effort": undefined;
@@ -7260,14 +7310,20 @@ export interface Messages {
   "cli.flag.jsonl": undefined;
   "cli.flag.key": undefined;
   "cli.flag.limit": undefined;
+  "cli.flag.llmKey": undefined;
+  "cli.flag.locale": undefined;
   "cli.flag.marker": undefined;
   "cli.flag.model": undefined;
+  "cli.flag.orchestrator": undefined;
   "cli.flag.pass": undefined;
+  "cli.flag.plan": undefined;
   "cli.flag.priority": undefined;
   "cli.flag.reply": undefined;
   "cli.flag.repo": undefined;
+  "cli.flag.resume": undefined;
   "cli.flag.reviewComment": undefined;
   "cli.flag.role": undefined;
+  "cli.flag.run": undefined;
   "cli.flag.runtime": undefined;
   "cli.flag.server": { readonly fallback: string | number };
   "cli.flag.statusComment": undefined;
@@ -7275,6 +7331,7 @@ export interface Messages {
   "cli.flag.tier": undefined;
   "cli.flag.timeout": undefined;
   "cli.flag.title": undefined;
+  "cli.flag.ttsKey": undefined;
   "cli.flag.wantsUser": undefined;
   "cli.group.agent.about": undefined;
   "cli.group.artifact.about": undefined;
@@ -7533,14 +7590,8 @@ export interface Messages {
   "cli.repo.preview": { readonly base: string | number; readonly branch: string | number; readonly sha: string | number };
   "cli.repo.publish": undefined;
   "cli.session.stopped": { readonly session: string | number };
-  "cli.worker.about": undefined;
-  "cli.worker.context": undefined;
-  "cli.worker.doctor": undefined;
-  "cli.worker.failed": undefined;
-  "cli.worker.json": undefined;
-  "cli.worker.pr": undefined;
-  "cli.worker.read": undefined;
-  "cli.worker.report": undefined;
+  "cli.setting.nothingGiven": undefined;
+  "cli.setting.valid": undefined;
   "desktop.menu.about": { readonly app: string | number };
   "desktop.menu.close": undefined;
   "desktop.menu.closeTab": undefined;

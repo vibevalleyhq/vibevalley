@@ -3,10 +3,11 @@
 use clap::{ArgMatches, Command};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    Agent, AgentDeleteInput, AgentRole, Artifact, ArtifactGetInput, ArtifactListRequest, ArtifactReadRequest, Channel, ChannelMessageListInput, ChatMessage,
-    Cron, CronDeleteInput, CronRequest, CronUpdateInput, CronWhen, CronWhenDaily, CronWhenEvery, CronWhenExpr, CronWhenOnce, Memory, MemoryCreateInput,
-    MemoryDeleteInput, MemoryListInput, MemorySearchInput, MessageSearch, NewRepo, RepoSummary, RuntimeInfo, RuntimeRefreshInput, SayRequest, Session,
-    SessionGetInput, SessionListInput, SessionStopInput, SubmitBranch, ops,
+    Agent, AgentDeleteInput, AgentRole, Artifact, ArtifactGetInput, ArtifactListRequest, ArtifactReadRequest, Build, Channel, ChannelMessageListInput,
+    ChatMessage, Cron, CronDeleteInput, CronRequest, CronUpdateInput, CronWhen, CronWhenDaily, CronWhenEvery, CronWhenExpr, CronWhenOnce, Head, Look, Memory,
+    MemoryCreateInput, MemoryDeleteInput, MemoryListInput, MemorySearchInput, MessageSearch, NewRepo, OrchestratorLook, Outfit, PersonaMode, Phase,
+    RepoSummary, RuntimeInfo, RuntimeRefreshInput, SayRequest, Session, SessionEvent, SessionEventListInput, SessionGetInput, SessionListInput,
+    SessionStopInput, Species, SubmitBranch, ops,
 };
 
 use crate::farm::{Ctx, Done, Failure, issue_ref, line, one_line};
@@ -226,7 +227,7 @@ pub fn agent() -> Command {
             )
             .args([
                 pos("name", "cli.arg.agentName"),
-                text("runtime", "cli.flag.runtime").default_value("pi"),
+                text("runtime", "cli.flag.runtime").default_value("vibevalley"),
                 choice("role", AgentRole::ALL.iter().map(|r| r.as_str()), "cli.flag.role").default_value("worker"),
                 text("duty", "cli.flag.duty").default_value(""),
                 text("model", "cli.flag.model").default_value(""),
@@ -250,14 +251,42 @@ pub fn run_agent(ctx: &Ctx, m: &ArgMatches) -> Done {
             Ok(())
         }
         Some(("create", m)) => {
-            let mut profile: Agent = serde_json::from_value(serde_json::json!({
-                "id": "", "name": arg(m, "name"), "role": arg(m, "role"), "duty": arg(m, "duty"), "enabled": true,
-                "runtime": arg(m, "runtime"), "model": arg(m, "model"), "effort": arg(m, "effort"), "persona": "", "personaMode": "append",
-                "skills": [], "mcpServers": [], "disallowedTools": [], "env": {}, "workdir": "", "worktree": true, "tags": [],
-                "look": { "orchestrator": null, "species": "fox", "outfit": "farmer", "build": "biped", "head": "rounded", "body": "", "trim": "", "hat": "", "eye": "" },
-            }))
-            .map_err(|e| Failure::usage("InvalidValue", e.to_string()))?;
-            profile.name = arg(m, "name");
+            let role = AgentRole::ALL
+                .iter()
+                .copied()
+                .find(|r| r.as_str() == arg(m, "role"))
+                .unwrap_or(AgentRole::Worker);
+            let profile = Agent {
+                id: String::new(),
+                name: arg(m, "name"),
+                role,
+                duty: arg(m, "duty"),
+                enabled: true,
+                runtime: arg(m, "runtime"),
+                model: arg(m, "model"),
+                effort: arg(m, "effort"),
+                persona: String::new(),
+                persona_mode: PersonaMode::Append,
+                skills: vec![],
+                mcp_servers: vec![],
+                disallowed_tools: vec![],
+                env: Default::default(),
+                workdir: String::new(),
+                worktree: true,
+                tags: vec![],
+                look: Look {
+                    orchestrator: (role == AgentRole::Orchestrator).then_some(OrchestratorLook::Farmer),
+                    species: (role == AgentRole::Worker).then_some(Species::Fox),
+                    outfit: (role == AgentRole::Worker).then_some(Outfit::Farmer),
+                    build: Build::Biped,
+                    head: Head::Rounded,
+                    body: String::new(),
+                    trim: String::new(),
+                    hat: String::new(),
+                    eye: String::new(),
+                },
+                from: None,
+            };
             ctx.change::<ops::AgentCreate>("agent create", None, &profile, agent_line)
         }
         Some(("delete", m)) => {
@@ -272,17 +301,35 @@ pub fn run_agent(ctx: &Ctx, m: &ArgMatches) -> Done {
 
 // session
 
-fn phase_tag(p: &vibevalley_protocol::Phase) -> String {
-    serde_json::to_value(p)
-        .ok()
-        .and_then(|v| v["_tag"].as_str().map(String::from))
-        .unwrap_or_default()
+fn phase_tag(p: &Phase) -> &'static str {
+    match p {
+        Phase::Working(_) => "working",
+        Phase::Done(_) => "done",
+        Phase::Failed(_) => "failed",
+        Phase::Resting(_) => "resting",
+        Phase::Closed(_) => "closed",
+    }
 }
 
 fn session_line(s: &Session) -> String {
     let issue = s.issue.as_ref().map(|i| format!("issue {i}")).unwrap_or_default();
     let repo = s.repo.as_ref().map(|r| format!("[{r}]")).unwrap_or_default();
-    line(&[&s.id, &s.name, &format!("@{}", s.agent), phase_tag(&s.phase).as_str(), &issue, &repo])
+    line(&[&s.id, &s.name, &format!("@{}", s.agent), phase_tag(&s.phase), &issue, &repo])
+}
+
+fn session_event_line(e: &SessionEvent) -> String {
+    let tool = e.tool.as_deref().or_else(|| e.action.map(|a| a.as_str())).unwrap_or("");
+    let detail = [&e.text, e.input.as_deref().unwrap_or(""), e.output.as_deref().unwrap_or("")]
+        .into_iter()
+        .map(one_line)
+        .find(|s| !s.is_empty())
+        .unwrap_or_default();
+    let ok = match e.ok {
+        Some(true) => "ok",
+        Some(false) => "fail",
+        None => "",
+    };
+    line(&[&e.seq.to_string(), e.r#type.as_str(), tool, &detail, ok])
 }
 
 pub fn session() -> Command {
@@ -302,6 +349,12 @@ pub fn session() -> Command {
                 &[("vibevalley session show w3", "cli.example.sessionShow.about")],
             )
             .arg(pos("session", "cli.arg.session")),
+            cmd(
+                "events",
+                "cli.command.session.events",
+                &[("vibevalley session events w3", "cli.example.sessionEvents.about")],
+            )
+            .args([pos("session", "cli.arg.session"), text("run", "cli.flag.run"), int("limit", "cli.flag.limit")]),
             cmd(
                 "stop",
                 "cli.command.session.stop",
@@ -332,6 +385,20 @@ pub fn run_session(ctx: &Ctx, m: &ArgMatches) -> Done {
                 .collect::<Vec<_>>()
                 .join("\n")
             });
+            Ok(())
+        }
+        Some(("events", m)) => {
+            let mut events = ctx.ask::<ops::SessionEventList>(&SessionEventListInput {
+                id: arg(m, "session"),
+                run: get(m, "run"),
+            })?;
+            if let Some(limit) = number(m, "limit").map(|n| n.max(0) as usize)
+                && events.len() > limit
+            {
+                let start = events.len() - limit;
+                events.drain(..start);
+            }
+            ctx.show(&events, |es| es.iter().map(session_event_line).collect::<Vec<_>>().join("\n"));
             Ok(())
         }
         Some(("stop", m)) => {
@@ -540,31 +607,48 @@ pub fn cron() -> Command {
     )
 }
 
+fn parse_at(raw: &str) -> Result<i64, Failure> {
+    if let Ok(ts) = raw.parse::<jiff::Timestamp>() {
+        return Ok(ts.as_millisecond());
+    }
+    if let Ok(zoned) = raw.parse::<jiff::Zoned>() {
+        return Ok(zoned.timestamp().as_millisecond());
+    }
+    if let Ok(dt) = raw.parse::<jiff::civil::DateTime>()
+        && let Ok(zoned) = dt.to_zoned(jiff::tz::TimeZone::system())
+    {
+        return Ok(zoned.timestamp().as_millisecond());
+    }
+    Err(Failure::usage("InvalidValue", t("cli.cron.invalidAt", &[("at", raw.to_string().into())])))
+}
+
 /// When, from the one flag given of `--every`, `--daily`, `--cron`, `--at`.
 fn when_of(m: &ArgMatches) -> Result<CronWhen, Failure> {
-    let mut given = vec![];
-    if let Some(minutes) = number(m, "every") {
-        given.push(CronWhen::Every(CronWhenEvery { minutes }));
+    let every = number(m, "every");
+    let daily = get(m, "daily");
+    let expr = get(m, "cron");
+    let at = get(m, "at");
+    let count = usize::from(every.is_some()) + usize::from(daily.is_some()) + usize::from(expr.is_some()) + usize::from(at.is_some());
+    if count != 1 {
+        let mut f = Failure::usage("InvalidValue", t("cli.cron.when", &[]));
+        f.next = vec![vibevalley_protocol::Next {
+            say: t("cli.next.help", &[]),
+            run: Some(vec!["cron".into(), "create".into(), "--help".into()]),
+        }];
+        return Err(f);
     }
-    if let Some(time) = get(m, "daily") {
-        given.push(CronWhen::Daily(CronWhenDaily { time }));
+    if let Some(minutes) = every {
+        return Ok(CronWhen::Every(CronWhenEvery { minutes }));
     }
-    if let Some(expr) = get(m, "cron") {
-        given.push(CronWhen::Cron(CronWhenExpr { expr }));
+    if let Some(time) = daily {
+        return Ok(CronWhen::Daily(CronWhenDaily { time }));
     }
-    if let Some(at) = get(m, "at") {
-        let at = at.parse::<jiff::Timestamp>().map(|t| t.as_millisecond()).unwrap_or(0);
-        given.push(CronWhen::Once(CronWhenOnce { at }));
+    if let Some(expr) = expr {
+        return Ok(CronWhen::Cron(CronWhenExpr { expr }));
     }
-    if given.len() == 1 {
-        return Ok(given.remove(0));
-    }
-    let mut f = Failure::usage("InvalidValue", t("cli.cron.when", &[]));
-    f.next = vec![vibevalley_protocol::Next {
-        say: t("cli.next.help", &[]),
-        run: Some(vec!["cron".into(), "create".into(), "--help".into()]),
-    }];
-    Err(f)
+    Ok(CronWhen::Once(CronWhenOnce {
+        at: parse_at(&at.unwrap_or_default())?,
+    }))
 }
 
 pub fn run_cron(ctx: &Ctx, m: &ArgMatches) -> Done {

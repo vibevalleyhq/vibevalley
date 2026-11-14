@@ -144,8 +144,6 @@ pub struct Ctx {
     pub server: String,
     pub dry_run: bool,
     pub format: Format,
-    /// `--worker-access-file`, else `VIBEVALLEY_WORKER_ACCESS_FILE`.
-    pub worker_access_file: String,
 }
 
 pub const FALLBACK_SERVER: &str = "http://127.0.0.1:8787";
@@ -207,7 +205,7 @@ impl Ctx {
     pub fn change<O: Op>(&self, name: &str, preview: Option<&str>, input: &O::Input, said: impl FnOnce(&O::Result) -> String) -> Result<(), Failure> {
         if self.dry_run {
             let Some(op) = preview else {
-                return Err(Failure::usage("NoDryRun", t("cli.failure.noDryRun", &[("command", name.into())])));
+                return Err(no_dry_run(name));
             };
             let p: Preview = serde_json::from_value(self.ask_raw(op, &serde_json::to_value(input).unwrap_or(Value::Null))?)
                 .map_err(|e| Failure::new(exit::OTHER, "Server", e.to_string()))?;
@@ -276,6 +274,23 @@ impl Ctx {
 /// `#12` or `12`: the issue's number as the server takes it.
 pub fn issue_ref(said: &str) -> String {
     said.trim_start_matches('#').to_string()
+}
+
+pub fn no_dry_run(name: &str) -> Failure {
+    Failure::usage("NoDryRun", t("cli.failure.noDryRun", &[("command", name.into())]))
+}
+
+/// Percent-encodes one URL path segment.
+pub fn url_segment(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len());
+    for b in raw.bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
+            out.push(char::from(b));
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
 }
 
 /// What stdin holds, or nothing when it cannot be read.

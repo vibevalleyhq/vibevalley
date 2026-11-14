@@ -62,6 +62,12 @@ pub fn saved_locale(home: &Path) -> &'static str {
     if said.is_some_and(|v| v["locale"] == "en") { "en" } else { "zh" }
 }
 
+/// The DeepSeek API key `settings.json` keeps, when non-empty.
+pub fn saved_deepseek_key(home: &Path) -> Option<String> {
+    let said: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(home.join("settings.json")).ok()?).ok()?;
+    said["deepseekApiKey"].as_str().map(str::trim).filter(|k| !k.is_empty()).map(String::from)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -92,5 +98,15 @@ mod tests {
         assert_eq!(saved_locale(dir.path()), "en");
         std::fs::write(dir.path().join("settings.json"), "{").unwrap();
         assert_eq!(saved_locale(dir.path()), "zh");
+    }
+
+    #[test]
+    fn the_saved_deepseek_key_trims_and_skips_blanks() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(saved_deepseek_key(dir.path()), None);
+        std::fs::write(dir.path().join("settings.json"), r#"{"deepseekApiKey":"   "}"#).unwrap();
+        assert_eq!(saved_deepseek_key(dir.path()), None);
+        std::fs::write(dir.path().join("settings.json"), r#"{"deepseekApiKey":" sk-test-1234 "}"#).unwrap();
+        assert_eq!(saved_deepseek_key(dir.path()).as_deref(), Some("sk-test-1234"));
     }
 }

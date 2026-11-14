@@ -17,10 +17,10 @@ ureq = { version = "3.5.2", features = ["json"] }
 vibevalley-core = { path = "../vibevalley-core" }
 vibevalley-home = { path = "../vibevalley-home" }
 vibevalley-i18n = { path = "../vibevalley-i18n" }
+vibevalley-oar = { path = "../vibevalley-oar" }
 vibevalley-protocol = { path = "../vibevalley-protocol" }
 
 [dev-dependencies]
 tempfile = "3.27.0"
 vibevalley-server = { path = "../vibevalley-server" }
-vibevalley-oar = { path = "../vibevalley-oar" }
 vibevalley-http = { path = "../vibevalley-http" }

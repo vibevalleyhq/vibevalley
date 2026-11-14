@@ -37,13 +37,19 @@ pub struct VibeValleyRuntime {
 }
 
 impl VibeValleyRuntime {
-    /// Reads `DEEPSEEK_API_KEY`; conversations under the user's data dir.
+    /// Reads `DEEPSEEK_API_KEY` or `<home>/settings.json`; conversations under `<home>/conversations`.
     pub fn from_env() -> VibeValleyRuntime {
-        let dir = std::env::var_os("HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(std::env::temp_dir)
-            .join("Library/Application Support/VibeValley/conversations");
-        VibeValleyRuntime::new(Arc::new(|| std::env::var("DEEPSEEK_API_KEY").ok()), dir)
+        let dir = vibevalley_home::home().join("conversations");
+        VibeValleyRuntime::new(
+            Arc::new(|| {
+                std::env::var("DEEPSEEK_API_KEY")
+                    .ok()
+                    .map(|k| k.trim().to_string())
+                    .filter(|k| !k.is_empty())
+                    .or_else(|| vibevalley_home::saved_deepseek_key(&vibevalley_home::home()))
+            }),
+            dir,
+        )
     }
 
     pub fn new(key: KeySource, dir: PathBuf) -> VibeValleyRuntime {

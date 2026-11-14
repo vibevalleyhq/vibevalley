@@ -60,9 +60,6 @@ fn run(args: impl IntoIterator<Item = std::ffi::OsString>) -> i32 {
         } else {
             Format::Text
         },
-        worker_access_file: tree::get(&matches, "worker-access-file")
-            .or_else(|| std::env::var("VIBEVALLEY_WORKER_ACCESS_FILE").ok())
-            .unwrap_or_default(),
     };
     match commands::run(&ctx, &matches) {
         Ok(()) => exit::OK,

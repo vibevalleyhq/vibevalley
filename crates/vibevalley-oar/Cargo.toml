@@ -7,6 +7,7 @@ edition = "2024"
 agent-client-protocol = "5.2.0"
 base64 = "0.23.1"
 vibevalley-agent = { version = "0.1.0", path = "../vibevalley-agent" }
+vibevalley-home = { path = "../vibevalley-home" }
 flume = "0.12.0"
 futures = "0.3.34"
 jiff = "0.2.43"

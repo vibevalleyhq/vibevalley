@@ -10,7 +10,7 @@ use vibevalley_protocol::{
     IssueReviewInput, IssueStageKind, IssueStatus, IssueStatusUpdateInput, IssueTimelineGetInput, IssueUpdateInput, IssueWatch, Priority, ops,
 };
 
-use crate::farm::{Ctx, Done, Failure, Format, decode_failure, exit, issue_ref, line, out, stdin_text};
+use crate::farm::{Ctx, Done, Failure, Format, decode_failure, exit, issue_ref, line, out, stdin_text, url_segment};
 use crate::tree::{all, arg, choice, cmd, flag, get, group, int, joined, many, number, on, pos, pos_choice, text, words};
 
 fn statuses() -> impl Iterator<Item = &'static str> {
@@ -31,10 +31,40 @@ fn agent_of(i: &Issue) -> Option<&str> {
 
 /// The issue a change answered with.
 fn applied(a: &vibevalley_protocol::AppliedIssue) -> Issue {
-    serde_json::to_value(a)
-        .ok()
-        .and_then(|v| serde_json::from_value(v).ok())
-        .unwrap_or_else(|| serde_json::from_value(serde_json::json!({})).expect("an issue"))
+    Issue {
+        constraints: a.constraints.clone(),
+        id: a.id.clone(),
+        number: a.number,
+        title: a.title.clone(),
+        description: a.description.clone(),
+        mandate: a.mandate.clone(),
+        conflict: a.conflict.clone(),
+        repo: a.repo.clone(),
+        assignments: a.assignments.clone(),
+        priority: a.priority,
+        rank: a.rank,
+        created_at: a.created_at,
+        queued_at: a.queued_at,
+        closed_at: a.closed_at,
+        delivered: a.delivered,
+        canceled: a.canceled,
+        parent: a.parent.clone(),
+        blocked_by: a.blocked_by.clone(),
+        cron: a.cron.clone(),
+        status: a.status,
+        moves: a.moves.clone(),
+        pull_request: a.pull_request.clone(),
+        deliver: a.deliver,
+        reviewed_at: a.reviewed_at,
+        findings: a.findings.clone(),
+        questions: a.questions.clone(),
+        criteria: a.criteria.clone(),
+        checks: a.checks.clone(),
+        refining: a.refining.clone(),
+        last_run: a.last_run.clone(),
+        answer: a.answer.clone(),
+        stage: a.stage.clone(),
+    }
 }
 
 /// One line an issue: its number first, then its status, title, whose it is and where.
@@ -455,8 +485,9 @@ fn observe(ctx: &Ctx, id: &str, follow: bool, jsonl: bool) -> Done {
     let mut seen: std::collections::HashMap<String, std::collections::HashMap<i64, i64>> = Default::default();
     let mut previous = String::new();
     let mut gaps: std::collections::HashMap<String, String> = Default::default();
+    let encoded = url_segment(id);
     loop {
-        let watched = ctx.events(&format!("/api/v1/issue/watch/{id}"), None, |data| {
+        let watched = ctx.events(&format!("/api/v1/issue/watch/{encoded}"), None, |data| {
             let row: IssueWatch = serde_json::from_str(data).map_err(|e| Failure::new(exit::OTHER, "WatchProtocol", e.to_string()))?;
             let rows = match row {
                 IssueWatch::History { session, events } => events

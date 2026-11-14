@@ -5,7 +5,7 @@
     "effort": "思考的力度",
     "server": "服务端的地址；不填用 VIBEVALLEY_SERVER，再没有是这台电脑上开着的那个（家目录的 server.json），都没有是 {fallback}",
     "dryRun": "只说会做什么，不动手（会删、会合、会关、会让帮工走的命令）",
-    "format": "md 是给人读的 Markdown（默认），json 是接口的答复",
+    "format": "text 是给人读的行（默认），json 是接口的答复",
     "capturePage": "记到这一页的末尾（标题、slug 或别名）；不填是今天的日记",
     "day": "哪一天的日记，YYYY-MM-DD；不填是今天",
     "agent": "档案：id 或名字",
@@ -43,10 +43,24 @@
     "role": "档案角色",
     "duty": "职责说明",
     "follow": "交回后继续观察新一轮",
-    "jsonl": "输出独立的版本化 JSONL 事件流"
+    "jsonl": "输出独立的版本化 JSONL 事件流",
+    "run": "只看这一轮的事件",
+    "locale": "界面语言（zh 或 en）",
+    "deepseekKey": "DeepSeek API 密钥（空字符串表示清空）",
+    "agoraAppId": "声网 App ID",
+    "agoraCertificate": "声网 App Certificate",
+    "asrKey": "语音识别密钥",
+    "llmKey": "语音对话模型密钥",
+    "ttsKey": "语音合成密钥",
+    "dictationKey": "听写密钥",
+    "cwd": "编码会话的工作目录",
+    "resume": "按会话编号继续之前的会话",
+    "plan": "只读计划模式",
+    "orchestrator": "在频道里和助手说话，不走本机农机"
   },
   "command": {
-    "doctor": "一条命令看清这台电脑上的农场：找到的是哪个、连不连得上、桌面版、农机、模型的 key、连接到本机",
+    "doctor": "检查这台电脑上的 VibeValley：家目录、服务端、农机和模型密钥",
+    "chat": "和本机农机或频道里的助手对话",
     "pkm": {
       "capture": "记一句话进今天的日记（--page 记到那一页）；不给字就读标准输入，多行按缩进拆成块",
       "radar": "要看一眼的：收件箱、搁着的仓库、过期的",
@@ -110,12 +124,13 @@
     "session": {
       "list": "列出帮工：id、名字、档案、在做什么",
       "show": "看一个帮工",
+      "events": "读一个帮工的轨迹事件",
       "stop": "停下帮工这一轮"
     }
   },
   "next": {
     "help": "看这条命令怎么写",
-    "startServer": "先起服务端（vp run --filter @vibevalley/server start），或用 --server 指到在跑的那个"
+    "startServer": "先打开 VibeValley 或起服务端（cargo run -p vibevalley-server），或用 --server 指到在跑的那个"
   },
   "failure": {
     "unreachable": "连不上 {base}：{why}",
@@ -613,6 +628,7 @@
   },
   "cron": {
     "when": "什么时候跑：--every、--daily、--cron、--at 正好给一个",
+    "invalidAt": "读不出 --at「{at}」：请写时间戳，比如 2026-11-05T09:00 或 2026-11-05T09:00:00Z",
     "deleted": "删掉了定时任务 {cron}",
     "edited": "改好了定时任务 {cron}"
   },
@@ -667,8 +683,28 @@
     "sessionShow": {
       "about": "看帮工 w3"
     },
+    "sessionEvents": {
+      "about": "看帮工 w3 的轨迹"
+    },
     "sessionStop": {
       "about": "停下 w3 这一轮"
+    },
+    "settingGet": {
+      "about": "查看当前设置与功能就绪状态"
+    },
+    "settingUpdate": {
+      "about": "把界面语言切成英文"
+    },
+    "settingValidate": {
+      "about": "检查设置改动是否能通过"
+    },
+    "chatLocal": {
+      "run": "vibevalley chat '讲讲 Cargo.toml'",
+      "about": "和默认农机跑一轮对话"
+    },
+    "chatOrchestrator": {
+      "run": "vibevalley chat --orchestrator '现在有哪些在等我？'",
+      "about": "在 #general 里问助手并等回复"
     },
     "issue": {
       "comment": {
@@ -687,7 +723,7 @@
     },
     "channelMessageSearch": {
       "run": "vibevalley channel message search 端口",
-      "about": "Find “端口” in every channel"
+      "about": "在全部频道里找「端口」"
     },
     "channelMessageSend": {
       "run": "vibevalley channel message send general '@w3 先看看登录页'",
@@ -775,7 +811,7 @@
       "about": "装了新的 Claude Code 以后重新探测"
     },
     "pkmPageSave": {
-      "run": "vibevalley pkm page save 读书 \"- 置身事内\"",
+      "run": "vibevalley pkm page save 读书 -- \"- 置身事内\"",
       "about": "新建或更新「读书」这一页"
     },
     "agentCreate": {
@@ -819,14 +855,11 @@
   "repo.publish": "将已有分支发布为 GitHub PR 或 GitLab MR",
   "repo.check": "仓库检查：{check}",
   "repo.preview": "预览：将 {branch} 的 {sha} 发布到 {base}；尚未运行检查",
-  "worker": {
-    "about": "以当前帮工会话交活、提交 PR 或读取上下文",
-    "failed": "帮工接入失败：检查会话凭证、服务连接和操作授权",
-    "report": "交回当前会话的报告。JSON 必填 summary（字符串）；可选 prSubmit（布尔，默认 false；true 需用户明确授权）、questions（question 字符串、options 字符串数组）、checks（criterion 从 0 开始、result 为 met/unmet/unsure、proof 字符串）、remember（text 字符串、scope 为 repo/all）、answer（conclusion 字符串，evidence/next/unsure 字符串数组）。省略的数组默认空。不接受切换会话身份；报告绑定凭证文件的会话。",
-    "pr": "提交当前会话的 PR，须获用户明确授权。JSON 可选 summary 字符串。",
-    "context": "读取当前工单串。JSON 可选 id（频道或串）、before（消息号）、limit（数量）、unread（布尔）。",
-    "read": "读取上下文资源。JSON 必填 uri（vv:// 资源地址）。 可选 offset、limit（整数）。",
-    "doctor": "通过认证调用只读 session_list，验证凭证与工具通路；不代表编码 agent 已加载可选 MCP。JSON 默认为空对象。",
-    "json": "工具输入的 JSON 对象；参数格式见本命令说明。"
+  "setting": {
+    "nothingGiven": "至少给一个要改的设置项",
+    "valid": "设置校验通过"
+  },
+  "chat": {
+    "session": "会话 {session}（输入 /exit 或按 Ctrl-D 退出）"
   }
 }

@@ -5,7 +5,7 @@
     "effort": "How hard to think",
     "server": "The server's address; VIBEVALLEY_SERVER when empty, else the one running on this machine (the home's server.json), else {fallback}",
     "dryRun": "Only say what it would do, without doing it (commands that delete, merge, close or send a helper away)",
-    "format": "md: Markdown to read (the default); json: the endpoint's answer",
+    "format": "text: lines to read (the default); json: the endpoint's answer",
     "capturePage": "At the end of this page (its title, slug or an alias); none: today's journal",
     "day": "Which day's journal, YYYY-MM-DD; none: today",
     "agent": "A profile: its id or name",
@@ -43,10 +43,24 @@
     "role": "The profile's role",
     "duty": "What the profile does",
     "follow": "Keep observing after handoff",
-    "jsonl": "Write the versioned JSONL event stream"
+    "jsonl": "Write the versioned JSONL event stream",
+    "run": "Only events from this round",
+    "locale": "Display language (zh or en)",
+    "deepseekKey": "DeepSeek API key (empty string clears)",
+    "agoraAppId": "Agora App ID",
+    "agoraCertificate": "Agora App Certificate",
+    "asrKey": "Speech recognition key",
+    "llmKey": "Voice dialogue model key",
+    "ttsKey": "Speech synthesis key",
+    "dictationKey": "Dictation key",
+    "cwd": "Working folder for the coding session",
+    "resume": "Resume an earlier session by id",
+    "plan": "Read-only planning mode",
+    "orchestrator": "Talk with the assistant in a channel instead of a local machine"
   },
   "command": {
-    "doctor": "See this machine's farm at once: which one was found, whether it answers, the desktop app, runtimes, the model's key, the LAN listener",
+    "doctor": "Check this computer's VibeValley setup: home folder, server, machines and model key",
+    "chat": "Talk with a local coding machine or the assistant",
     "pkm": {
       "capture": "Note something in today's journal (--page: on that page); no words reads stdin, lines split into blocks by indentation",
       "radar": "What wants a look: the inbox, repos left alone, what is overdue",
@@ -110,12 +124,13 @@
     "session": {
       "list": "List helpers: id, name, profile, what it is doing",
       "show": "Show a helper",
+      "events": "Read a helper's trajectory events",
       "stop": "Stop a helper's round"
     }
   },
   "next": {
     "help": "See how this command is written",
-    "startServer": "Start the server first (vp run --filter @vibevalley/server start), or point --server at one that runs"
+    "startServer": "Open VibeValley or start the server first (cargo run -p vibevalley-server), or point --server at one that runs"
   },
   "failure": {
     "unreachable": "Cannot reach {base}: {why}",
@@ -613,6 +628,7 @@
   },
   "cron": {
     "when": "When to run: give exactly one of --every, --daily, --cron, --at",
+    "invalidAt": "Cannot read --at \"{at}\": give a timestamp such as 2026-11-05T09:00 or 2026-11-05T09:00:00Z",
     "deleted": "Deleted the scheduled task {cron}",
     "edited": "Changed the scheduled task {cron}"
   },
@@ -667,8 +683,28 @@
     "sessionShow": {
       "about": "Helper w3"
     },
+    "sessionEvents": {
+      "about": "Helper w3's trajectory"
+    },
     "sessionStop": {
       "about": "Stop w3's round"
+    },
+    "settingGet": {
+      "about": "Show current settings and feature readiness"
+    },
+    "settingUpdate": {
+      "about": "Switch the display language to English"
+    },
+    "settingValidate": {
+      "about": "Check whether a change would be accepted"
+    },
+    "chatLocal": {
+      "run": "vibevalley chat 'explain Cargo.toml'",
+      "about": "Run one round with the default coding machine"
+    },
+    "chatOrchestrator": {
+      "run": "vibevalley chat --orchestrator 'what is waiting on me?'",
+      "about": "Ask the assistant in #general and wait for its answer"
     },
     "issue": {
       "comment": {
@@ -775,7 +811,7 @@
       "about": "Look again after installing a new Claude Code"
     },
     "pkmPageSave": {
-      "run": "vibevalley pkm page save Reading \"- bulbs\"",
+      "run": "vibevalley pkm page save Reading -- \"- bulbs\"",
       "about": "Create or update the Reading page"
     },
     "agentCreate": {
@@ -819,14 +855,11 @@
   "repo.publish": "Publish an existing branch as a GitHub PR or GitLab MR",
   "repo.check": "Repository check: {check}",
   "repo.preview": "Preview: publish {branch} at {sha} into {base}; checks have not run",
-  "worker": {
-    "about": "Report, submit a PR or read context as the current helper session",
-    "failed": "Helper access failed: check session credentials, connectivity and operation authorization",
-    "report": "Report as the current session. JSON requires summary (string). Optional: prSubmit (boolean, default false; true needs explicit user authorization), questions (question string, options string array), checks (criterion zero-based number, result met/unmet/unsure, proof string), remember (text string, scope repo/all), answer (conclusion string, evidence/next/unsure string arrays). Omitted arrays default to empty. Credentials bind identity; arguments cannot select another session.",
-    "pr": "Submit the current session PR with explicit user authorization. JSON accepts optional summary string.",
-    "context": "Read the current issue thread. Optional JSON fields: id (channel/thread), before (message number), limit (count), unread (boolean).",
-    "read": "Read a context resource. JSON requires uri (vv:// resource address). Optional offset and limit (integers).",
-    "doctor": "Authenticate a read-only session_list call to check credentials and tool access; this does not prove the coding agent loaded optional MCP. JSON defaults to an empty object.",
-    "json": "Tool input as a JSON object; see the command description for fields."
+  "setting": {
+    "nothingGiven": "Give at least one setting flag to update",
+    "valid": "Settings are valid"
+  },
+  "chat": {
+    "session": "Session {session} (/exit or Ctrl-D to leave)"
   }
 }
