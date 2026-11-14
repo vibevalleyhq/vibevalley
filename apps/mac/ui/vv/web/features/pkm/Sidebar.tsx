@@ -1,7 +1,7 @@
 // Ported from VibeValley apps/web/src/features/pkm/Sidebar.tsx: find, today,
 // the radar (inbox, stale pages, overdue blocks), the pages by tier, each
 // tier folding. The list's fading edges are not ported (no mask images).
-import { Scroll, Text, View } from "nsh";
+import { Scroll, Text, View, type ViewRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { PkmPageSummary, PkmTier } from "@vibevalley/protocol";
@@ -30,6 +30,7 @@ export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPa
       else next.add(tier);
       return next;
     });
+  let inbox: ViewRef | undefined;
   return (
     <View class="min-h-0 flex-1 gap-4">
       <View
@@ -46,13 +47,13 @@ export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPa
           <Icon name="calendar" size={14} tone={props.slug === undefined ? "ink" : "faint"} />
           <Text class="flex-1 text-sm text-ink">{t("web.pkm.list.today")}</Text>
         </Link>
-        <Radar />
+        <Radar onInbox={() => inbox?.reveal({ vertical: "nearest" })} />
       </View>
       <If when={props.error}>{(e) => <Text class="px-2 text-xs text-berry">{reasonOf(e())}</Text>}</If>
       <Scroll testID="pkm-list" class="-mx-2 min-h-0 flex-1" contentClass="gap-4 px-2 pb-2">
         <Each of={tierOrder.filter((tier) => tier !== "journal" && listed(tier).length > 0)}>
           {(tier) => (
-            <View testID={`pkm-tier-${tier()}`} class="gap-px">
+            <View ref={(r) => tier() === "inbox" && (inbox = r)} testID={`pkm-tier-${tier()}`} class="gap-px">
               <View
                 role="button"
                 accessibilityState={{ expanded: !shut().has(tier()) }}
@@ -111,7 +112,7 @@ function Look(props: { icon: IconName; label: string; n: number; open?: boolean 
   );
 }
 
-function Radar() {
+function Radar(props: { onInbox: () => void }) {
   const radar = usePkmRadar();
   const [which, setWhich] = createSignal<"stale" | "overdue">();
   const flip = (to: "stale" | "overdue") => setWhich((was) => (was === to ? undefined : to));
@@ -120,7 +121,7 @@ function Radar() {
       {(r) => (
         <View testID="pkm-radar" class="gap-px">
           <If when={r().inbox > 0}>
-            <Look icon="inbox" label={t("web.pkm.radar.inbox")} n={r().inbox} testid="pkm-radar-inbox" click={() => undefined} />
+            <Look icon="inbox" label={t("web.pkm.radar.inbox")} n={r().inbox} testid="pkm-radar-inbox" click={() => props.onInbox()} />
           </If>
           <If when={r().stale.length > 0}>
             <Look

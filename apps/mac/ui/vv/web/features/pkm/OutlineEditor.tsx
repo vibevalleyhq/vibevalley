@@ -10,10 +10,11 @@
 // line, the box's ends, nothing typed), so elsewhere the input moves the
 // caret itself; Backspace at the start is read from onKeyPress (the input
 // deletes nothing there). Pastes are reported, a multi-line one becomes
-// blocks. Not ported: the phone toolbar (Toolbar), dragging rows by the
-// bullet (HTML drag and drop).
-import { effect, keymap, signal, Text, untracked, View, type JSX } from "nsh";
-import type { InputRef } from "nsh";
+// blocks. A row is dragged by its bullet as a pan gesture (nsh has no HTML
+// drag and drop): OutlineView measures the rows and says where it would
+// land. Not ported: the phone toolbar (Toolbar).
+import { effect, keymap, PanResponder, signal, Text, untracked, View, type JSX } from "nsh";
+import type { InputRef, ViewRef } from "nsh";
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -47,6 +48,7 @@ import {
   saved,
   type Shut,
 } from "./editing";
+import type { DropAt } from "./selection";
 
 export interface Writing {
   readonly block: string;
@@ -90,10 +92,24 @@ export function Row(props: {
   /** shift: picking up to it instead of writing in it. */
   onOpen: (at: number | "end", shift: boolean) => void;
   onMarker: (marker: PkmMarker | undefined) => void;
-  /** The row's view, to scroll to it. */
-  onRef?: (ref: { reveal: (o?: { vertical?: "start" | "center" | "end" | "nearest" }) => void } | undefined) => void;
+  /** The row's view, to scroll to it and to measure it under a drag. */
+  onRef?: (ref: ViewRef | undefined) => void;
+  /** Where the blocks being dragged would land on this row. */
+  dropping: DropAt | undefined;
+  /** This row is among the ones being dragged. */
+  dragged: boolean;
+  /** The bullet's drag, in window points; `end(false)` is a drag taken away. */
+  drag: { start: (x: number, y: number) => void; move: (x: number, y: number) => void; end: (dropped: boolean) => void };
   children: JSX.Element;
 }) {
+  const pan = PanResponder.create({
+    // A press folds the block; only a move of a few points starts a drag.
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) + Math.abs(g.dy) > 4,
+    onPanResponderGrant: (_, g) => props.drag.start(g.x0, g.y0),
+    onPanResponderMove: (_, g) => props.drag.move(g.moveX, g.moveY),
+    onPanResponderRelease: () => props.drag.end(true),
+    onPanResponderTerminate: () => props.drag.end(false),
+  });
   const done = () => props.block.marker === "DONE" || props.block.marker === "CANCELED";
   const look = () => (props.block.marker ? markerLook[props.block.marker] : undefined);
   return (
@@ -102,22 +118,32 @@ export function Row(props: {
       testID="pkm-block"
       accessibilityLabel={props.block.id}
       accessibilityState={{ selected: props.picked }}
-      class="group flex-row items-start gap-1 rounded-sm py-px"
+      class={`group flex-row items-start gap-1 rounded-sm py-px ${props.dragged ? "opacity-40" : ""}`}
       style={{
         paddingLeft: props.block.depth * indentPx,
         ...(props.picked ? { backgroundColor: tone("selected") } : props.lit ? { backgroundColor: mix("wheat", 0.2) } : {}),
       }}
     >
+      <If when={props.dropping}>
+        {(at) => (
+          <View
+            testID={`pkm-drop-${at()}`}
+            class={`absolute right-0 h-0.5 rounded-full bg-water ${at() === "before" ? "-top-px" : "-bottom-px"}`}
+            style={{ left: (props.block.depth + (at() === "inside" ? 2 : 1)) * indentPx, pointerEvents: "none" }}
+          />
+        )}
+      </If>
       <Each of={Array.from({ length: props.block.depth }, (_, i) => i)}>
         {(i) => <View class="absolute inset-y-0 border-l border-line" style={{ left: i() * indentPx + 9 }} />}
       </Each>
       <View
+        {...pan.panHandlers}
         role="button"
         accessibilityLabel={props.folded ? t("web.pkm.page.expand") : t("web.pkm.page.collapse")}
         accessibilityState={props.parent ? { expanded: !props.folded } : undefined}
-        disabled={!props.parent}
         testID="pkm-bullet"
-        onPress={() => props.onToggle()}
+        // A leaf's bullet folds nothing, and is still what the row is dragged by.
+        onPress={() => props.parent && props.onToggle()}
         class="mt-1 h-4 w-4 shrink-0 items-center justify-center rounded-xs hover:bg-hover"
       >
         <View
