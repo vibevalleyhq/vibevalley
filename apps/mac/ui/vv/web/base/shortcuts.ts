@@ -3,7 +3,7 @@ type ShortcutPlace = "everywhere" | "composer" | "lists" | "issues" | "pictures"
 
 export const shortcutPlaces: readonly ShortcutPlace[] = ["everywhere", "composer", "lists", "issues", "pictures", "library", "farm", "desktop"];
 
-/** A key as the sheet shows it: mod is ⌘ on a Mac and Ctrl elsewhere. */
+/** A key as the sheet shows it. */
 export type Key = "mod" | "shift" | "alt" | "enter" | "esc" | "up" | "down" | "left" | "right" | "space" | "tab" | (string & {});
 
 export interface Shortcut {
@@ -37,44 +37,19 @@ export const shortcuts = [
   { id: "voice", place: "desktop", keys: ["alt", "shift", "space"] },
 ] as const satisfies readonly Shortcut[];
 
-const mac = () => /Mac|iPhone|iPad/u.test(navigator.platform);
-
-const glyphs: Record<string, () => string> = {
-  mod: () => (mac() ? "⌘" : "Ctrl"),
-  shift: () => "⇧",
-  alt: () => (mac() ? "⌥" : "Alt"),
-  enter: () => "↵",
-  esc: () => "Esc",
-  up: () => "↑",
-  down: () => "↓",
-  left: () => "←",
-  right: () => "→",
-  space: () => "Space",
-  tab: () => "Tab",
+const glyphs: Record<string, string> = {
+  mod: "⌘",
+  shift: "⇧",
+  alt: "⌥",
+  enter: "↵",
+  esc: "Esc",
+  up: "↑",
+  down: "↓",
+  left: "←",
+  right: "→",
+  space: "Space",
+  tab: "Tab",
 };
 
 /** A key's cap on the sheet. */
-export const keyCap = (key: Key) => glyphs[key]?.() ?? key;
-
-// A field's keys are its own: a letter there is typed, not a shortcut.
-export const inField = () => {
-  const el = document.activeElement;
-  return (
-    el instanceof HTMLInputElement ||
-    el instanceof HTMLTextAreaElement ||
-    el instanceof HTMLSelectElement ||
-    (el instanceof HTMLElement && el.isContentEditable)
-  );
-};
-
-/** The chords matched here (mod+K, ?, C): the rest are each place's own. */
-export function pressed(e: KeyboardEvent, id: "switcher" | "sheet" | "newIssue") {
-  switch (id) {
-    case "newIssue":
-      return !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "c";
-    case "switcher":
-      return (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k";
-    case "sheet":
-      return e.key === "?" && !e.metaKey && !e.ctrlKey && !e.altKey;
-  }
-}
+export const keyCap = (key: Key) => glyphs[key] ?? key;

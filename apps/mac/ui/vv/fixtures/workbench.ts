@@ -9,6 +9,7 @@ import { responses as agentsResponses } from "./agents";
 import { responses as artifactsResponses } from "./artifacts";
 import { chatState, crons, responses as chatResponses } from "./chat";
 import { responses as issuesResponses } from "./issues";
+import { mediaJobs, responses as libraryResponses } from "./library";
 import { responses as memoryResponses } from "./memory";
 import { responses as pixelResponses } from "./pixel";
 import { responses as pkmResponses } from "./pkm";
@@ -38,7 +39,17 @@ export const sessions = [w, r, d];
 
 export const state: StateFrame = {
   seq: 1,
-  state: { call: "live", callReason: "", sessions, issues, crons, chat: chatState, connectors, machines: [] } as unknown as StateFrame["state"],
+  state: {
+    call: "live",
+    callReason: "",
+    sessions,
+    issues,
+    crons,
+    chat: chatState,
+    connectors,
+    media: mediaJobs,
+    machines: [],
+  } as unknown as StateFrame["state"],
   inbox: [],
   effects: [],
   view: { level: { level: 3, xp: 40, need: 300 }, plots: {}, plays: {}, achievements: [] },
@@ -69,4 +80,5 @@ export const responses: Record<string, unknown> = {
   ...pixelResponses,
   ...pkmResponses,
   ...artifactsResponses,
+  ...libraryResponses,
 };

@@ -1,8 +1,7 @@
 // Ported from VibeValley apps/web/src/app/Shell.tsx: the rail of places,
 // the desk over a page, the page, and the quick switcher on Ctrl/⌘K (nsh's
-// keymap for base/shortcuts.ts's window listener), the notes search. Not
-// here yet: the shortcut sheet;
-// the update slot (VibeValley's updates are the app's); the workbench zoom.
+// keymap for base/shortcuts.ts's window listener), the notes search and the
+// shortcut sheet. Not here: the update slot (VibeValley's updates are the app's); the workbench zoom.
 // The orchestrator's pixel face at the rail's top is the farm's icon while
 // the art is not installed.
 import { host, keymap, Scroll, Text, View, windowSize, type JSX } from "nsh";

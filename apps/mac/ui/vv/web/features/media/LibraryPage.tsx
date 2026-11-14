@@ -289,7 +289,7 @@ export function LibraryPage() {
               placeholder={t("web.library.search")}
               accessibilityLabel={t("web.library.search")}
               value={text()}
-              onInput={(e) => text.set(e.currentTarget.value)}
+              onInput={(v) => text.set(v)}
               class="w-56 pl-8"
             />
           </View>

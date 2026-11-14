@@ -11,11 +11,11 @@
         "agent": "laozhou",
         "runtime": "claude",
         "brief": "",
-        "hiredAt": 1794573195364,
+        "hiredAt": 1794643561541,
         "runs": 2,
         "phase": {
           "_tag": "working",
-          "since": 1794575535364,
+          "since": 1794645901541,
           "doing": {
             "action": "edit_file",
             "label": "改 session.ts",
@@ -36,7 +36,7 @@
         "agent": "xiaolin",
         "runtime": "claude",
         "brief": "",
-        "hiredAt": 1794573195364,
+        "hiredAt": 1794643561541,
         "runs": 2,
         "phase": {
           "_tag": "resting"
@@ -46,7 +46,7 @@
         "lastRun": {
           "outcome": "completed",
           "summary": "登录过期回到登录页，加了两条测试。",
-          "at": 1794575235364
+          "at": 1794645601541
         }
       },
       {
@@ -56,7 +56,7 @@
         "agent": "laozhou",
         "runtime": "claude",
         "brief": "",
-        "hiredAt": 1794557715364,
+        "hiredAt": 1794628081541,
         "runs": 2,
         "phase": {
           "_tag": "done"
@@ -72,7 +72,7 @@
         "title": "写一句话就能起草工单",
         "priority": "medium",
         "status": "backlog",
-        "createdAt": 1794529095364,
+        "createdAt": 1794599461541,
         "assignments": [],
         "mandate": {
           "strength": "explicit",
@@ -98,13 +98,13 @@
         "title": "看板拖拽的手感",
         "priority": "high",
         "status": "todo",
-        "createdAt": 1794526875364,
+        "createdAt": 1794597241541,
         "assignments": [
           {
             "id": "a22",
             "issue": "i22",
             "agent": "laozhou",
-            "assignedAt": 1794526875364,
+            "assignedAt": 1794597241541,
             "executions": []
           }
         ],
@@ -126,7 +126,7 @@
           "acts": []
         },
         "repo": "vibevalley",
-        "queuedAt": 1794575415364
+        "queuedAt": 1794645781541
       },
       {
         "id": "i23",
@@ -134,7 +134,7 @@
         "title": "灵动岛的动画",
         "priority": "low",
         "status": "todo",
-        "createdAt": 1794524655364,
+        "createdAt": 1794595021541,
         "assignments": [],
         "mandate": {
           "strength": "explicit",
@@ -160,13 +160,13 @@
         "title": "首页的加载条",
         "priority": "medium",
         "status": "todo",
-        "createdAt": 1794522435364,
+        "createdAt": 1794592801541,
         "assignments": [
           {
             "id": "a24",
             "issue": "i24",
             "agent": "xiaolin",
-            "assignedAt": 1794522435364,
+            "assignedAt": 1794592801541,
             "executions": []
           }
         ],
@@ -195,18 +195,18 @@
         "title": "修好登录",
         "priority": "urgent",
         "status": "in_progress",
-        "createdAt": 1794535755364,
+        "createdAt": 1794606121541,
         "assignments": [
           {
             "id": "a18",
             "issue": "i18",
             "agent": "laozhou",
-            "assignedAt": 1794535755364,
+            "assignedAt": 1794606121541,
             "executions": [
               {
                 "kind": "worker",
                 "session": "w1",
-                "startedAt": 1794574515364
+                "startedAt": 1794644881541
               }
             ]
           }
@@ -236,18 +236,18 @@
         "title": "补齐看板的测试",
         "priority": "medium",
         "status": "in_review",
-        "createdAt": 1794537975364,
+        "createdAt": 1794608341541,
         "assignments": [
           {
             "id": "a17",
             "issue": "i17",
             "agent": "xiaolin",
-            "assignedAt": 1794537975364,
+            "assignedAt": 1794608341541,
             "executions": [
               {
                 "kind": "worker",
                 "session": "w2",
-                "startedAt": 1794574515364
+                "startedAt": 1794644881541
               }
             ]
           }
@@ -277,18 +277,18 @@
         "title": "设置按用途分组",
         "priority": "medium",
         "status": "done",
-        "createdAt": 1794549075364,
+        "createdAt": 1794619441541,
         "assignments": [
           {
             "id": "a12",
             "issue": "i12",
             "agent": "laozhou",
-            "assignedAt": 1794549075364,
+            "assignedAt": 1794619441541,
             "executions": [
               {
                 "kind": "worker",
                 "session": "w3",
-                "startedAt": 1794574515364
+                "startedAt": 1794644881541
               }
             ]
           }
@@ -311,7 +311,7 @@
           "acts": []
         },
         "repo": "vibevalley",
-        "closedAt": 1794568515364,
+        "closedAt": 1794638881541,
         "delivered": "merged"
       }
     ],
@@ -327,8 +327,8 @@
         },
         "tz": "Asia/Shanghai",
         "enabled": true,
-        "created": 1793970915364,
-        "lastRun": 1794489315364,
+        "created": 1794041281542,
+        "lastRun": 1794559681542,
         "by": "user",
         "pending": false,
         "whenText": "每天 09:30",
@@ -348,7 +348,7 @@
           "subjectKind": null,
           "replies": 0,
           "title": "general",
-          "at": 1794572115364,
+          "at": 1794642481542,
           "repo": "vibevalley",
           "lastNumber": 11,
           "read": 8,
@@ -357,7 +357,7 @@
             "from": "orchestrator",
             "name": "助手",
             "text": "记下了：周五之前。",
-            "at": 1794573915364
+            "at": 1794644281542
           }
         },
         {
@@ -371,7 +371,7 @@
           "subjectKind": null,
           "replies": 0,
           "title": "设计",
-          "at": 1794572115364,
+          "at": 1794642481542,
           "unread": 2,
           "lastNumber": 4,
           "read": 2
@@ -387,7 +387,7 @@
           "subjectKind": null,
           "replies": 0,
           "title": "发版",
-          "at": 1794572115364
+          "at": 1794642481542
         },
         {
           "id": "t-login",
@@ -400,7 +400,7 @@
           "subjectKind": "issue",
           "replies": 4,
           "title": "修好登录",
-          "at": 1794572115364,
+          "at": 1794642481542,
           "parent": "general",
           "root": "m2",
           "rootNumber": 2,
@@ -411,7 +411,7 @@
             "from": "w1",
             "name": "老周",
             "text": "先看 session.ts。",
-            "at": 1794575115364
+            "at": 1794645481542
           }
         },
         {
@@ -425,7 +425,7 @@
           "subjectKind": null,
           "replies": 0,
           "title": "小林",
-          "at": 1794572115364,
+          "at": 1794642481542,
           "peer": "xiaolin"
         }
       ],
@@ -439,8 +439,8 @@
         "pairCode": "",
         "user": "用户",
         "channel": "general",
-        "since": 1794316515364,
-        "lastInbound": 1794574995364,
+        "since": 1794386881542,
+        "lastInbound": 1794645361542,
         "pending": 2,
         "error": ""
       },
@@ -451,6 +451,255 @@
         "pairCode": "",
         "pending": 0,
         "error": ""
+      }
+    ],
+    "media": [
+      {
+        "kind": "image",
+        "id": "job-image",
+        "prompt": "田头的一张海报，像素风",
+        "model": "moss-image-1",
+        "connection": "moss-main",
+        "revision": 3,
+        "source": {
+          "kind": "user"
+        },
+        "usage": {
+          "images": 1,
+          "width": 1024,
+          "height": 1024
+        },
+        "phase": "ready",
+        "phaseText": "已生成",
+        "problem": "",
+        "attachment": {
+          "id": "lib-poster",
+          "name": "海报.png",
+          "type": "image/png",
+          "size": 482113
+        },
+        "canCancel": false,
+        "canRetryDownload": false,
+        "createdAt": 1794644281542,
+        "updatedAt": 1794644301542
+      },
+      {
+        "kind": "image",
+        "id": "job-image-waiting",
+        "prompt": "一头在田里的牛",
+        "model": "moss-image-1",
+        "connection": "moss-main",
+        "revision": 3,
+        "source": {
+          "kind": "orchestrator",
+          "agent": "orchestrator",
+          "channel": "general"
+        },
+        "phase": "generating",
+        "phaseText": "生成中",
+        "problem": "",
+        "canCancel": true,
+        "canRetryDownload": false,
+        "createdAt": 1794646021542,
+        "updatedAt": 1794646041542
+      },
+      {
+        "kind": "speech",
+        "id": "job-speech",
+        "prompt": "今天的活都干完了。",
+        "model": "moss-tts-1.5-flash",
+        "connection": "moss-main",
+        "revision": 3,
+        "source": {
+          "kind": "user"
+        },
+        "voice": "voice-warm",
+        "format": "wav",
+        "contentType": "audio/wav",
+        "metadata": {
+          "source": "file",
+          "sampleRate": 24000,
+          "duration": 2.4,
+          "channels": 1,
+          "bitDepth": 16
+        },
+        "usage": {
+          "inputCharacters": 9
+        },
+        "canResume": false,
+        "canRelease": true,
+        "phase": "ready",
+        "phaseText": "已生成",
+        "problem": "",
+        "attachment": {
+          "id": "lib-speech",
+          "name": "speech.wav",
+          "type": "audio/wav",
+          "size": 115244
+        },
+        "resultInput": null,
+        "canCancel": false,
+        "canRetryDownload": false,
+        "createdAt": 1794645361542,
+        "updatedAt": 1794645381542
+      },
+      {
+        "model": "moss-speakers",
+        "connection": "moss-main",
+        "revision": 3,
+        "source": {
+          "kind": "user"
+        },
+        "problem": "结果没取回来，可以只重试下载。",
+        "contentType": null,
+        "input": null,
+        "resultInput": null,
+        "previewInput": null,
+        "result": null,
+        "canCancel": false,
+        "canRetryDownload": true,
+        "canResume": false,
+        "canCleanup": false,
+        "canRelease": false,
+        "kind": "speakers",
+        "id": "job-dialogue",
+        "prompt": "host: 早。\nguest: 早，开工吧。",
+        "phase": "download_failed",
+        "phaseText": "下载失败",
+        "format": "mp3",
+        "request": {
+          "id": "job-dialogue",
+          "connection": "moss-main",
+          "revision": 3,
+          "speakers": [
+            {
+              "id": "host",
+              "voice": "voice-warm"
+            },
+            {
+              "id": "guest",
+              "voice": "voice-bright"
+            }
+          ],
+          "segments": [
+            {
+              "speaker": "host",
+              "text": "早。"
+            },
+            {
+              "speaker": "guest",
+              "text": "早，开工吧。"
+            }
+          ],
+          "format": "mp3"
+        },
+        "createdAt": 1794644881542,
+        "updatedAt": 1794644901542
+      },
+      {
+        "model": "moss-transcribe-diarize-pro",
+        "connection": "moss-main",
+        "revision": 3,
+        "source": {
+          "kind": "user"
+        },
+        "problem": "",
+        "contentType": null,
+        "input": {
+          "id": "in-standup",
+          "kind": "audio",
+          "name": "周会录音.m4a",
+          "mime": "audio/mp4",
+          "size": 3204882,
+          "hash": "lib-standup"
+        },
+        "resultInput": null,
+        "previewInput": null,
+        "result": {
+          "kind": "transcription",
+          "text": "看板能拖了。下周做灵动岛。",
+          "segments": [
+            {
+              "speaker": "A",
+              "text": "看板能拖了。",
+              "start": 0.4,
+              "end": 2.1
+            },
+            {
+              "speaker": "",
+              "text": "下周做灵动岛。",
+              "start": 2.6,
+              "end": 4.9
+            }
+          ]
+        },
+        "canCancel": false,
+        "canRetryDownload": false,
+        "canResume": false,
+        "canCleanup": true,
+        "canRelease": false,
+        "kind": "transcription",
+        "id": "job-transcript",
+        "prompt": "周会录音.m4a",
+        "phase": "ready",
+        "phaseText": "已转写",
+        "format": null,
+        "usage": {
+          "inputAudioSeconds": 61
+        },
+        "request": {
+          "id": "job-transcript",
+          "connection": "moss-main",
+          "revision": 3,
+          "input": "in-standup",
+          "allowUpload": true,
+          "diarize": true
+        },
+        "createdAt": 1794643381542,
+        "updatedAt": 1794643401542
+      },
+      {
+        "kind": "understanding",
+        "id": "job-understand",
+        "prompt": "这张海报上写了什么？",
+        "inputs": [
+          {
+            "id": "in-poster",
+            "kind": "image",
+            "name": "海报.png",
+            "mime": "image/png",
+            "size": 482113,
+            "hash": "lib-poster"
+          }
+        ],
+        "model": "moss-vl",
+        "connection": "moss-main",
+        "revision": 3,
+        "source": {
+          "kind": "user"
+        },
+        "authorization": null,
+        "phase": "ready",
+        "phaseText": "已理解",
+        "problem": "",
+        "result": {
+          "model": "moss-vl",
+          "text": "海报上是一片像素风的田，写着「开工」。",
+          "status": "completed",
+          "incompleteReason": null,
+          "usage": {
+            "inputTokens": 812,
+            "outputTokens": 24,
+            "totalTokens": 836
+          }
+        },
+        "cleanup": "done",
+        "cleanupText": "远端文件已清理",
+        "canCancel": false,
+        "canCleanup": false,
+        "canRetryDownload": false,
+        "createdAt": 1794644581542,
+        "updatedAt": 1794644601542
       }
     ],
     "machines": []

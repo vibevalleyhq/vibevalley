@@ -124,7 +124,7 @@ export function Inspector(props: {
                   {(src) => <Image src={src()} style={{ width: 240, height: 180, objectFit: "contain" }} />}
                 </If>
               </View>
-              <If when={kind() === "audio" && diskFile()?.path}>
+              <If when={kind() === "audio" ? diskFile()?.path : undefined}>
                 {(path) => (
                   <Button icon="play" onPress={() => void playAudio(path())}>
                     {t("web.library.kind.audio")}
