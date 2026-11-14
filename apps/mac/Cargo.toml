@@ -20,6 +20,7 @@ image = { version = "0.25.10", default-features = false, features = ["png", "jpe
 nsh-engine = { version = "0.5.0", default-features = false }
 nsh-platform-gpui = "0.5.0"
 objc2 = "0.6.5"
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std"] }
 objc2-app-kit = { version = "0.3.2", features = ["NSApplication", "NSImage"] }
 objc2-foundation = { version = "0.3.2", features = ["NSString"] }
 serde = { version = "1.0.229", features = ["derive"] }
@@ -36,4 +37,6 @@ nsh-dev = ["nsh-platform-gpui/dev"]
 shot = ["gpui-kit/test-support"]
 
 [dev-dependencies]
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider"] }
 tempfile = "3.27.0"
+tokio = { version = "1", features = ["rt", "net", "time"] }
