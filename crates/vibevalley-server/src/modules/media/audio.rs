@@ -124,7 +124,19 @@ pub struct Audio {
     closed: AtomicBool,
     /// Itself, for the work a hub call starts.
     me: std::sync::OnceLock<Weak<Audio>>,
+    /// Streamed jobs' events waiting for (or read by) their page.
+    streams: Mutex<HashMap<String, Stream>>,
 }
+
+/// One streamed job's events: at most 16 waiting, the vendor read no faster than the page takes them.
+struct Stream {
+    tx: flume::Sender<Value>,
+    rx: flume::Receiver<Value>,
+    claimed: bool,
+}
+
+/// The largest streamed speech kept (`128 MiB` of PCM).
+const STREAM_MAX: usize = 128 * 1024 * 1024 - 44;
 
 impl Audio {
     pub fn open(
@@ -148,6 +160,7 @@ impl Audio {
             runs: Mutex::new(HashMap::new()),
             closed: AtomicBool::new(false),
             me: std::sync::OnceLock::new(),
+            streams: Mutex::new(HashMap::new()),
         });
         let _ = audio.me.set(Arc::downgrade(&audio));
         machine.attach_others(audio.clone());
@@ -249,7 +262,11 @@ impl Audio {
         if self.closed.load(Ordering::SeqCst) {
             return Err(ApiError::new(BizCode::ServiceUnavailable, "media closed"));
         }
-        if request.streaming == Some(true) {
+        let streaming = request.streaming == Some(true);
+        if streaming && (!matches!(source, MediaSource::User {}) || request.asynchronous == Some(true) || request.format != MediaAudioFormat::Pcm) {
+            return Err(refused("speechInvalid"));
+        }
+        if streaming && self.streams.lock().unwrap_or_else(|e| e.into_inner()).len() >= 8 {
             return Err(refused("speechInvalid"));
         }
         let db = self.db();
@@ -298,6 +315,13 @@ impl Audio {
         };
         self.save(&db, &mut r)?;
         drop(db);
+        if streaming {
+            let (tx, rx) = flume::bounded(16);
+            self.streams
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .insert(request.id.clone(), Stream { tx, rx, claimed: false });
+        }
         self.publish();
         let me = self.clone();
         let job = request.id.clone();
@@ -330,7 +354,11 @@ impl Audio {
         if !matches!(self.change(id, &[MediaPhase::Queued], |r| r.phase = MediaPhase::Generating), Ok(true)) {
             return;
         }
-        let asynchronous = self.found(id).map(|r| r.request.asynchronous == Some(true)).unwrap_or(false);
+        let Ok(request) = self.found(id).map(|r| r.request) else { return };
+        if request.streaming == Some(true) {
+            return self.receive(id, &account, &body, stop);
+        }
+        let asynchronous = request.asynchronous == Some(true);
         if asynchronous {
             match self.moss.speech_task(&account.key, &body) {
                 Ok(task) => {
@@ -352,6 +380,168 @@ impl Audio {
             Ok(_) => {}
             Err(e) => self.failed(id, e.outcome),
         }
+    }
+
+    /// One event to the job's page, waiting while it is behind; false once the page or the job is gone.
+    fn emit(&self, id: &str, event: Value, stop: &Stop) -> bool {
+        let Some(tx) = self.streams.lock().unwrap_or_else(|e| e.into_inner()).get(id).map(|s| s.tx.clone()) else {
+            return false;
+        };
+        let mut event = Some(event);
+        while let Some(e) = event.take() {
+            if stop.aborted() {
+                return false;
+            }
+            match tx.send_timeout(e, Duration::from_millis(100)) {
+                Ok(()) => return true,
+                Err(flume::SendTimeoutError::Timeout(e)) => event = Some(e),
+                Err(flume::SendTimeoutError::Disconnected(_)) => return false,
+            }
+        }
+        false
+    }
+
+    /// `receiveSpeechStream`: the vendor's PCM relayed to the page as it comes and kept whole (or as much as came) as a WAV.
+    fn receive(self: &Arc<Self>, id: &str, account: &Account, body: &Value, stop: &Stop) {
+        let mut pcm: Vec<u8> = Vec::new();
+        let mut pending: Vec<u8> = Vec::new();
+        let mut sequence = 0i64;
+        let mut format: Option<(i64, i64)> = None;
+        let mut usage: Option<Value> = None;
+        let mut duration: Option<f64> = None;
+        let mut complete = false;
+        let streamed = self.moss.speech_stream(&account.key, body, stop, &mut |event| {
+            match event {
+                vendor::SpeechEvent::TaskCreated(task) => {
+                    let _ = self.change(id, &[MediaPhase::Generating, MediaPhase::Canceled], |r| r.remote_task = Some(task));
+                }
+                vendor::SpeechEvent::Created {
+                    sample_rate,
+                    channels,
+                    bit_depth,
+                } => {
+                    if bit_depth != 16 {
+                        return Err("bit depth".into());
+                    }
+                    format = Some((sample_rate, channels));
+                    self.emit(
+                        id,
+                        serde_json::json!({ "type": "format", "sampleRate": sample_rate, "channels": channels, "bitDepth": 16 }),
+                        stop,
+                    );
+                }
+                vendor::SpeechEvent::Delta(audio) => {
+                    let Some((_, channels)) = format else {
+                        return Err("audio before its format".into());
+                    };
+                    if pcm.len() + audio.len() > STREAM_MAX {
+                        return Err("too long".into());
+                    }
+                    let block = channels as usize * 2;
+                    pcm.extend_from_slice(&audio);
+                    pending.extend_from_slice(&audio);
+                    let available = pending.len() - pending.len() % block;
+                    let step = 32768 / block * block;
+                    for part in pending[..available].chunks(step) {
+                        let audio = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, part);
+                        self.emit(id, serde_json::json!({ "type": "audio", "sequence": sequence, "audio": audio }), stop);
+                        sequence += 1;
+                    }
+                    pending.drain(..available);
+                }
+                vendor::SpeechEvent::Done { usage: u, duration: d } => {
+                    if pcm.is_empty() || !pending.is_empty() {
+                        return Err("an incomplete end".into());
+                    }
+                    usage = u;
+                    duration = d;
+                    complete = true;
+                }
+            }
+            Ok(())
+        });
+        let saved = format.map(|(rate, channels)| self.keep_stream(id, &pcm, rate, channels, complete, duration));
+        match (streamed, saved) {
+            (_, Some(Ok(()))) if !stop.aborted() || complete => {
+                if complete {
+                    let _ = self.change(id, &[MediaPhase::Ready], |r| r.usage = usage.take());
+                    self.emit(id, serde_json::json!({ "type": "done" }), stop);
+                } else {
+                    self.emit(id, serde_json::json!({ "type": "failed" }), stop);
+                }
+            }
+            (Err(_), _) | (_, Some(Err(_))) | (_, None) => {
+                let _ = self.change(id, &[MediaPhase::Generating], |r| {
+                    r.phase = MediaPhase::Unknown;
+                    r.problem = t("server.media.speechUnknown", &[]);
+                });
+                self.emit(id, serde_json::json!({ "type": "failed" }), stop);
+            }
+            _ => {}
+        }
+        // A finished stream's events stay a minute for a page that comes late.
+        let me = self.clone();
+        let job = id.to_string();
+        let _ = std::thread::Builder::new().name(format!("speech-end-{id}")).spawn(move || {
+            std::thread::sleep(Duration::from_secs(60));
+            me.streams.lock().unwrap_or_else(|e| e.into_inner()).remove(&job);
+        });
+    }
+
+    /// What came of a stream, kept as a WAV: ready when complete, else unknown with what came.
+    fn keep_stream(&self, id: &str, pcm: &[u8], rate: i64, channels: i64, complete: bool, duration: Option<f64>) -> Result<(), String> {
+        let block = channels as usize * 2;
+        let length = pcm.len() - pcm.len() % block;
+        if length == 0 {
+            return Err("nothing came".into());
+        }
+        let mut wav = Vec::with_capacity(44 + length);
+        wav.extend_from_slice(b"RIFF");
+        wav.extend_from_slice(&((36 + length) as u32).to_le_bytes());
+        wav.extend_from_slice(b"WAVEfmt ");
+        wav.extend_from_slice(&16u32.to_le_bytes());
+        wav.extend_from_slice(&1u16.to_le_bytes());
+        wav.extend_from_slice(&(channels as u16).to_le_bytes());
+        wav.extend_from_slice(&(rate as u32).to_le_bytes());
+        wav.extend_from_slice(&((rate as usize * block) as u32).to_le_bytes());
+        wav.extend_from_slice(&(block as u16).to_le_bytes());
+        wav.extend_from_slice(&16u16.to_le_bytes());
+        wav.extend_from_slice(b"data");
+        wav.extend_from_slice(&(length as u32).to_le_bytes());
+        wav.extend_from_slice(&pcm[..length]);
+        let name = format!("moss-{id}{}.wav", if complete { "" } else { "-partial" });
+        let (attachment, input) = self.keep_bytes(id, wav, &name, "audio/wav")?;
+        let seconds = match (complete, duration) {
+            (true, Some(d)) => d,
+            _ => length as f64 / (rate as f64 * block as f64),
+        };
+        let metadata = serde_json::json!({
+            "source": if complete && duration.is_some() { "provider" } else { "file" },
+            "sampleRate": rate, "channels": channels, "bitDepth": 16, "duration": seconds,
+        });
+        let patch = |r: &mut Record| {
+            r.attachment = attachment.clone();
+            r.result_input = input.clone();
+            r.result_format = Some(MediaAudioFormat::Wav);
+            r.content_type = Some("audio/wav".into());
+            r.metadata = Some(metadata.clone());
+        };
+        let moved = self
+            .change(id, &[MediaPhase::Generating], |r| {
+                patch(r);
+                if complete {
+                    r.phase = MediaPhase::Ready;
+                    r.problem.clear();
+                } else {
+                    r.phase = MediaPhase::Unknown;
+                    r.problem = t("server.media.speechPartial", &[]);
+                }
+            })
+            .map_err(|e| e.message)?;
+        if !moved {
+            self.change(id, &[MediaPhase::Canceled], patch).map_err(|e| e.message)?;
+        }
+        Ok(())
     }
 
     fn failed(&self, id: &str, outcome: Outcome) {
@@ -493,17 +683,22 @@ impl Audio {
             "channels": facts.channels,
             "bitDepth": facts.bits,
         }));
+        let (attachment, input) = self.keep_bytes(id, bytes, &name, &kind)?;
+        Ok((attachment, input, metadata))
+    }
+
+    /// Bytes kept for a job: an attachment, or past an attachment's size a pinned input released with the job.
+    fn keep_bytes(&self, id: &str, bytes: Vec<u8>, name: &str, kind: &str) -> Result<(Option<Attachment>, Option<MediaInputReference>), String> {
         if bytes.len() <= ATTACHMENT_MAX {
-            let a = self.files.keep(&bytes, &name, &kind).map_err(|e| e.message)?;
-            return Ok((Some(a), None, metadata));
+            let a = self.files.keep(&bytes, name, kind).map_err(|e| e.message)?;
+            return Ok((Some(a), None));
         }
-        // Past an attachment's size: a pinned input, released with the job.
         let input = self
             .inputs
             .create(&MediaInputRequest {
                 kind: MediaInputKind::Audio,
-                name: serde_json::from_value(Value::String(name)).map_err(|e| e.to_string())?,
-                mime: kind,
+                name: serde_json::from_value(Value::String(name.to_string())).map_err(|e| e.to_string())?,
+                mime: kind.to_string(),
                 size: bytes.len() as i64,
             })
             .map_err(|e| e.message)?;
@@ -519,7 +714,6 @@ impl Audio {
                 size: input.size,
                 hash: input.hash.unwrap_or_default(),
             }),
-            metadata,
         ))
     }
 
@@ -723,4 +917,34 @@ pub fn install(hub: &crate::Hub, audio: Arc<Audio>) {
         let a = audio.clone();
         move |_, r| a.resume(&r.id)
     });
+}
+
+impl vibevalley_server_api::media::SpeechStreams for Audio {
+    fn claim(&self, id: &str) -> Result<vibevalley_server_api::media::SpeechClaim, ApiError> {
+        let events = {
+            let mut streams = self.streams.lock().unwrap_or_else(|e| e.into_inner());
+            let Some(s) = streams.get_mut(id).filter(|s| !s.claimed) else {
+                return Err(refused("speechStreamUnavailable"));
+            };
+            s.claimed = true;
+            s.rx.clone()
+        };
+        let me = self.me.get().cloned().unwrap_or_default();
+        let job = id.to_string();
+        Ok(vibevalley_server_api::media::SpeechClaim {
+            events,
+            // The page gone: its job is canceled and its work stopped (a finished one is left as it is).
+            gone: Box::new(move || {
+                let Some(me) = me.upgrade() else { return };
+                me.streams.lock().unwrap_or_else(|e| e.into_inner()).remove(&job);
+                let _ = me.change(&job, &[MediaPhase::Queued, MediaPhase::Generating], |r| {
+                    r.phase = MediaPhase::Canceled;
+                    r.problem = t("server.media.canceled", &[]);
+                });
+                if let Some(stop) = me.runs.lock().unwrap_or_else(|e| e.into_inner()).remove(&job) {
+                    stop.abort();
+                }
+            }),
+        })
+    }
 }

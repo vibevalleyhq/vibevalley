@@ -212,3 +212,44 @@ mod tests {
         }
     }
 }
+
+/// Calls `gone` when the response body is dropped: the page went away.
+struct Gone(Option<Box<dyn FnOnce() + Send>>);
+
+impl Drop for Gone {
+    fn drop(&mut self) {
+        if let Some(f) = self.0.take() {
+            f();
+        }
+    }
+}
+
+/// A streamed speech job's events as NDJSON, one line each, for the one page that claims them.
+pub async fn speech(State(server): State<Shared>, Path(id): Path<String>, headers: HeaderMap) -> Response {
+    if !from_the_farm(&headers) {
+        return refuse(BizCode::Forbidden, "forbidden");
+    }
+    let Some(streams) = server.speech_streams() else {
+        return refuse(BizCode::ServiceUnavailable, "no speech here");
+    };
+    let claim = match tokio::task::spawn_blocking(move || streams.claim(&id)).await {
+        Ok(Ok(c)) => c,
+        Ok(Err(e)) => return reply(Envelope::failure(&e)),
+        Err(_) => return refuse(BizCode::InternalError, "speech stream"),
+    };
+    let gone = Gone(Some(claim.gone));
+    let lines = claim.events.into_stream().map(move |event| {
+        let _keep = &gone;
+        Ok::<_, std::convert::Infallible>(axum::body::Bytes::from(format!("{event}\n")))
+    });
+    (
+        [
+            ("content-type", "application/x-ndjson"),
+            ("cache-control", "no-store"),
+            ("x-accel-buffering", "no"),
+            ("x-content-type-options", "nosniff"),
+        ],
+        axum::body::Body::from_stream(lines),
+    )
+        .into_response()
+}

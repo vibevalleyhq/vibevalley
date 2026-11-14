@@ -119,6 +119,7 @@ pub fn router(server: Shared) -> Router {
         .route("/api/v1/attachment/{id}", get(attachment).post(command))
         .route("/api/v1/artifact/{id}/{version}", get(artifact_page).post(command))
         .route("/api/v1/media/input/{id}/content", get(media::content).put(media::upload).post(command))
+        .route("/api/v1/media/speech/{id}/stream", get(media::speech).post(command))
         .route("/api/v1/{*path}", post(command).get(not_allowed))
         .route("/mcp", post(mcp).get(not_allowed))
         .fallback(not_found)

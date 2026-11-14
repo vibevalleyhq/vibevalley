@@ -93,6 +93,7 @@ pub struct Hub {
     next_id: AtomicU64,
     media_inputs: RwLock<Option<vibevalley_server_api::media::SharedMediaInputs>>,
     mcp: RwLock<Option<vibevalley_server_api::SharedMcp>>,
+    speech: RwLock<Option<vibevalley_server_api::media::SharedSpeechStreams>>,
     /// Each fold's effects, for the frame thread.
     kicks: flume::Sender<Vec<GameEffect>>,
 }
@@ -102,6 +103,11 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl Hub {
+    /// Streamed speech (`modules::media::audio::Audio`).
+    pub fn attach_speech_streams(&self, streams: vibevalley_server_api::media::SharedSpeechStreams) {
+        *self.speech.write().unwrap_or_else(|e| e.into_inner()) = Some(streams);
+    }
+
     /// The helpers' MCP door (`modules::mcp::Door`).
     pub fn attach_mcp(&self, door: vibevalley_server_api::SharedMcp) {
         *self.mcp.write().unwrap_or_else(|e| e.into_inner()) = Some(door);
@@ -125,6 +131,7 @@ impl Hub {
             next_id: AtomicU64::new(1),
             media_inputs: RwLock::new(None),
             mcp: RwLock::new(None),
+            speech: RwLock::new(None),
             kicks,
         });
         let weak = Arc::downgrade(&hub);
@@ -324,6 +331,9 @@ impl vibevalley_issues::Facts for Hub {
 }
 
 impl Server for Hub {
+    fn speech_streams(&self) -> Option<vibevalley_server_api::media::SharedSpeechStreams> {
+        self.speech.read().unwrap_or_else(|e| e.into_inner()).clone()
+    }
     fn mcp(&self) -> Option<vibevalley_server_api::SharedMcp> {
         self.mcp.read().unwrap_or_else(|e| e.into_inner()).clone()
     }

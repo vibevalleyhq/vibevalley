@@ -260,6 +260,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     )
     .map_err(|e| failed("audio jobs")(&e.message))?;
     modules::media::audio::install(&hub, audio.clone());
+    hub.attach_speech_streams(audio.clone());
     modules::channel::install(&hub, chat.clone(), agents.clone(), Some(game.clone()));
     crons.attach_chat(&chat);
     let artifacts = modules::artifact::Artifacts::open(&config.home, attachments.clone(), chat.clone()).map_err(|e| failed("the artifacts")(&e.message))?;

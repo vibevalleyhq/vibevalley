@@ -34,6 +34,10 @@ pub trait Server: Send + Sync {
     fn media_inputs(&self) -> Option<media::SharedMediaInputs> {
         None
     }
+    /// Streamed speech for the page, when the server runs it.
+    fn speech_streams(&self) -> Option<media::SharedSpeechStreams> {
+        None
+    }
     /// The helpers' MCP door, when the server has one.
     fn mcp(&self) -> Option<SharedMcp> {
         None
