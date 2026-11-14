@@ -19,7 +19,9 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 |---|---|
 | `apps/mac/src/main.rs`、`shell.rs`、`panes.rs` | 开窗口；根视图 `Shell`：项目、每个项目的分栏布局、侧栏、命令面板、快捷键（`bind_keys`） |
 | `apps/mac/src/hosted/` | 托管视图：一个视图一个 nsh 引擎，跑同一份 TSX 包；`bridge.rs` 是页面发回来的动作（`Action`），`frames.rs` 是外壳推给侧栏和面板的帧，`late.rs` 让服务端在后台线程起来 |
-| `apps/mac/src/host.rs` | 宿主能力的原生一半：系统通知、Finder 里显示、`open`、`afplay` 播放、读文件 |
+| `apps/mac/src/host.rs` | 宿主能力的原生一半：系统通知、Finder 里显示、`open`、本地文件选择与另存、读文件 |
+| `apps/mac/src/audio.rs`、`audio.m` | AVFoundation 文件播放、跳播与有界 PCM 队列；宿主音频命令按桥的接收顺序执行 |
+| `apps/mac/src/command_line.rs`、`tray.rs`、`island.rs` | 命令行符号链接、菜单栏摘要、灵动岛进程与工单摘要 |
 | `apps/mac/src/terminal/`、`viewer.rs`、`diff.rs` | 终端（`crates/vibevalley-terminal`）、文件查看、diff |
 | `apps/mac/src/pixel/` | 像素场景：农场、地图、记忆树、开场、图鉴（[农场的皮](docs/subsystems/farm.md)） |
 | `apps/mac/src/theme.rs`、`apps/mac/ui/tokens.ts` | 外壳的主题和设置；两边的值一样 |
@@ -31,13 +33,13 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 | `crates/vibevalley-bridge/` | 桥的 Rust 一半：`Hub` 把一个 `Server` 分给多个视图；`fake::FakeServer` 用样例状态和写好的回答顶替服务端 |
 | `crates/vibevalley-workspace/`、`crates/vibevalley-store/` | 项目、布局、终端和 agent 任务的模型，和它们存的库 |
 | `packages/protocol/src/host.ts` | `Host` 接口：页面能向宿主要的东西 |
-| `apps/island/` | 刘海上的灵动岛（Swift）：一个单独的小程序，stdin 收工单摘要，stdout 说点了哪一行（[apps/island/README.md](apps/island/README.md)）；`apps/mac` 不带起它 |
+| `apps/island/` | 刘海上的灵动岛（Swift）：一个单独的小程序，stdin 收工单摘要，stdout 说点了哪一行（[apps/island/README.md](apps/island/README.md)）；`apps/mac` 从包内带起它，退出时关闭 |
 
 ## 模型和不变量
 
 ### 进程和服务端
 
-- **服务端在应用的进程里**：`BridgeHub::install` 在后台线程调 `vibevalley_server::start`，家目录是 `$VIBEVALLEY_HOME`（默认 `~/.vibevalley`），工作目录同它（`ServerConfig::under`）；起来之前的调用由 `LateServer` 接住。起不来时页面连的是空的替身，窗口照常打开。
+- **服务端在应用的进程里**：`BridgeHub::install` 在后台线程调 `vibevalley_server::start`，家目录是 `$VIBEVALLEY_HOME`（默认 `~/.vibevalley`），工作目录是 `$VIBEVALLEY_WORK_ROOT`，默认 `~/vibevalley-dev`；起来之前的调用由 `LateServer` 接住。开场等待服务端、HTTP 地址公告和项目加载都成功；失败停在失败画面。
 - **同一个服务端另开一道本机的 HTTP 门**：`vibevalley_http::serve` 绑 `127.0.0.1` 的空闲端口，地址写进家目录的 `server.json`；命令行据此找到它，帮工的 `/mcp` 也在这道门上。
 - **一个服务端只有一个用户**：门只听 `127.0.0.1`，本机来的请求就是用户，没有登录、设备和配对。
 - **外壳自己的数据另存一个库**：项目、布局、外壳的设置在 `~/Library/Application Support/VibeValley/state.db`（`VIBEVALLEY_STORE` 改位置），和服务端的家目录分开。
@@ -69,7 +71,10 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 ### 宿主
 
 - **宿主接口封闭，缺的能力就是没有**：页面经 `infra/host.ts` 的 `currentHost()` 看能力在不在，不按宿主的名字分支；没有宿主时（无头的测试和故事）是只有名字的那一个。
-- **外壳答的能力以 `host.info` 报的为准**（`apps/mac/src/shell.rs` 的 `host_call`）：通知、托盘摘要、语言、Finder 里显示、主题、字体和字号、开场、开终端、打开网址和文件、像素图的目录、播放声音、读文件。
+- **外壳答的能力以 `host.info` 报的为准**（`apps/mac/src/shell.rs` 的 `host_call`）：通知、托盘摘要、语言、Finder 里显示、主题、字体和字号、开场、开终端、打开网址和文件、像素图的目录、播放声音、跳播、PCM 流、读文件、选择文件、另存和安装命令行。
+- **命令行安装只管理自己的链接**：把包内 `Contents/MacOS/vibevalley` 链到 `~/.local/bin/vibevalley`，不覆盖已有文件或其他安装的链接；页面显示 PATH 是否包含这个目录。
+- **音频有序、有界**：文件经 AVFoundation 播放，跳播的秒数应有限且非负；PCM 是 16-bit little-endian、8–192 kHz 的单声道或双声道。宿主命令按接收顺序执行后回包，PCM 待播放队列最多十秒，满了明确拒绝。
+- **媒体文件留在本机**：音频选择返回路径与元数据，`media.input.uploadFile` 沿媒体输入的大小、容器、内容与额度校验流式写入；`media.input.file` 读回已校验的输入路径。原生文件接口不经 HTTP 暴露。大结果播放和另存直接读取本地路径，不把整份文件搬进页面。
 - **像素场景归外壳画**：`/farm`、`/farm/<仓库>` 和 `/tree` 的页面只发 `openFarm`、`openTree`，外壳在同一个位置换上像素视图；像素视图要去工作台的某一页时发 `PixelEvent::Route`，要开终端时发 `PixelEvent::Terminal`。
 
 ## 怎么走

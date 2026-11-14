@@ -157,11 +157,18 @@ export const hostApi = {
   /** VibeValley's built pixel art: the folder with sprites.json and its PNGs. */
   pixelDir: () => call<{ path: string }>("host.pixelDir", {}),
   /** Plays a local sound file (nsh's AudioPlayer is silent in the app); stops the last one. */
-  playAudio: (path: string) => call<void>("host.playAudio", { path }),
+  playAudio: (path: string, position = 0) => call<void>("host.playAudio", { path, position }),
+  seekAudio: (position: number) => call<void>("host.seekAudio", { position }),
+  audioState: () => call<{ position: number; duration: number; playing: boolean }>("host.audioState"),
+  pcmStart: (sampleRate: number, channels = 1) => call<void>("host.pcmStart", { sampleRate, channels }),
+  pcmAppend: (data: string) => call<void>("host.pcmAppend", { data }),
   /** Plays a sound made in the view (base64, e.g. a synthesised WAV of at most 2 MB). */
   playAudioData: (data: string, type = "audio/wav") => call<void>("host.playAudio", { data, type }),
   /** A dropped file's bytes (an absolute path or a file: URL; at most 50 MB). */
   readFile: (path: string) => call<{ data: string; type: string; name: string }>("host.readFile", { path }),
+  cliState: () => call<import("@vibevalley/protocol/host").CommandLineState>("host.cliState"),
+  cliInstall: () => call<import("@vibevalley/protocol/host").CommandLineState>("host.cliInstall"),
+  cliRemove: () => call<import("@vibevalley/protocol/host").CommandLineState>("host.cliRemove"),
   stopAudio: () => call<void>("host.stopAudio", {}),
 };
 

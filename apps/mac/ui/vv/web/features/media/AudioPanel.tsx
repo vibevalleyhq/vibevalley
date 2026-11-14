@@ -1,11 +1,4 @@
-// Ported from VibeValley apps/web/src/features/media/AudioPanel.tsx:
-// multi-speaker dialogue, voice design, voice cloning and transcription.
-// A sample is picked with the system's picker and kept as an attachment,
-// which the server takes as the input (media.input.adopt): the bridge
-// carries no upload of its own. A transcript is copied instead of
-// downloaded, and its timeline does not seek: the host plays a file from its
-// start only.
-import { cleanup, Clipboard, Picker, signal, Text, View } from "nsh";
+import { cleanup, Clipboard, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import {
@@ -26,7 +19,7 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { useTimeout } from "../../base/timer";
 import { api, reasonOf } from "../../infra/api";
-import { attachmentData } from "../../infra/attachment";
+import { type LocalFile, pickFile, playInput, uploadAudio } from "../../infra/attachmentFile";
 import { useCore } from "../../infra/frame";
 import { defineQuery, providerQuery, ready, useQuery } from "../../infra/query";
 import { createAct } from "../../ui/act";
@@ -64,8 +57,6 @@ const titleOf = (kind: AudioMode) => {
 };
 
 const speakerId = (typed: string) => typed.replace(/[^a-zA-Z0-9_-]/gu, "").slice(0, 256);
-const sampleExtensions = ["wav", "mp3", "m4a", "flac"];
-const audioExtensions = [...sampleExtensions, "aac", "ogg", "opus", "webm", "mp4"];
 
 export function AudioPanel() {
   const core = useCore();
@@ -497,8 +488,8 @@ function DesignForm(props: { status: ProviderStatus | undefined }) {
 function UploadForm(props: { kind: "clone" | "transcription"; status: ProviderStatus | undefined }) {
   const account = signal("");
   const connection = () => (props.kind === "transcription" ? (props.status?.transcription?.connection ?? "") : account());
-  const selected = signal<{ file: File; input?: MediaInput } | undefined>(undefined);
-  const consent = signal<{ connection: string; revision: number; file: File } | undefined>(undefined);
+  const selected = signal<{ file: LocalFile; input?: MediaInput } | undefined>(undefined);
+  const consent = signal<{ connection: string; revision: number; file: LocalFile } | undefined>(undefined);
   const approved = () => {
     const approval = consent();
     return Boolean(approval && approval.file === selected()?.file && approval.connection === connection() && approval.revision === props.status?.revision);
@@ -516,10 +507,8 @@ function UploadForm(props: { kind: "clone" | "transcription"; status: ProviderSt
   const disabled = () => act.busy() || Boolean(submitted());
 
   const choose = async () => {
-    const [picked] = await Picker.pickFiles({
-      filters: [{ name: t("web.audio.input"), extensions: props.kind === "clone" ? sampleExtensions : audioExtensions }],
-    });
-    selected.set(picked ? { file: picked.file } : undefined);
+    const picked = await act.run(pickFile);
+    selected.set(picked ? { file: picked } : undefined);
     consent.set(undefined);
   };
 
@@ -546,13 +535,8 @@ function UploadForm(props: { kind: "clone" | "transcription"; status: ProviderSt
         if (!configuration || !chosen || !chosenConnection || !allowed) return;
         let input = chosen.input;
         if (input === undefined) {
-          const kept = await api.attachment.create({
-            name: chosen.file.name === "" ? "audio" : chosen.file.name,
-            type: chosen.file.type === "" ? "application/octet-stream" : chosen.file.type,
-            data: await attachmentData(chosen.file),
-          });
+          input = await uploadAudio(chosen.file);
           controller.signal.throwIfAborted();
-          input = await api.media.input.adopt({ attachment: kept.id }, { signal: controller.signal });
           selected.set({ file: chosen.file, input });
         }
         const base = { id: crypto.randomUUID(), input: input.id, connection: chosenConnection, revision: configuration.revision };
@@ -774,7 +758,7 @@ function AudioJobCard(props: { job: MediaAudioJob }) {
         </If>
         <ResultAudio
           attachment={props.job.attachment?.id}
-          held={props.job.resultInput !== null}
+          input={props.job.resultInput?.id}
           pcm={props.job.format === "pcm"}
           prefix="audio-result"
           save={t("web.audio.downloadAudio")}
@@ -821,7 +805,16 @@ function AudioJobCard(props: { job: MediaAudioJob }) {
                   <Each of={result().segments}>
                     {(segment) => (
                       <View class="min-w-0 gap-1">
-                        <Text class="font-mono text-xs text-muted">{`${audioTimestamp(segment().start)} – ${audioTimestamp(segment().end)}`}</Text>
+                        <Button
+                          testID={`audio-seek-${segment().start}`}
+                          disabled={!props.job.input}
+                          onPress={() => {
+                            const input = props.job.input;
+                            if (input) void act.run(() => playInput(input.id, segment().start));
+                          }}
+                        >
+                          {`${audioTimestamp(segment().start)} – ${audioTimestamp(segment().end)}`}
+                        </Button>
                         <Text class="text-xs font-medium text-ink">{segment().speaker || t("web.audio.unknownSpeaker")}</Text>
                         <Text class="text-sm text-ink">{segment().text}</Text>
                       </View>

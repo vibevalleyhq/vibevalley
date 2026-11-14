@@ -90,3 +90,33 @@ mod tests {
         assert!(status.is_ok(), "{status:?}");
     }
 }
+
+#[derive(serde::Deserialize)]
+pub struct Opening {
+    pub phase: OpeningPhase,
+    pub progress: f32,
+}
+
+#[derive(serde::Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum OpeningPhase {
+    Connecting,
+    Reading,
+    Loading,
+    Ready,
+    Waiting,
+    Failed,
+}
+
+impl OpeningPhase {
+    pub fn pixel(&self) -> crate::pixel::opening::Phase {
+        use crate::pixel::opening::Phase;
+        match self {
+            Self::Connecting | Self::Waiting => Phase::Connecting,
+            Self::Reading => Phase::Reading,
+            Self::Loading => Phase::Loading,
+            Self::Ready => Phase::Ready,
+            Self::Failed => Phase::Failed,
+        }
+    }
+}

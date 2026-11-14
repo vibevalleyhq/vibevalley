@@ -61,6 +61,18 @@ gpui_kit::actions!(
 );
 
 pub fn bind_keys(cx: &mut gpui_kit::App) {
+    use gpui_kit::{Menu, MenuItem};
+    use vibevalley_i18n::t;
+    cx.set_menus(vec![
+        Menu::new("VibeValley").items([MenuItem::action(t("desktop.quit", &[]), Quit)]),
+        Menu::new(t("desktop.menu.view", &[])).items([
+            MenuItem::action(t("desktop.menu.zoomIn", &[]), ZoomIn),
+            MenuItem::action(t("desktop.menu.zoomOut", &[]), ZoomOut),
+            MenuItem::action(t("desktop.menu.resetZoom", &[]), ZoomReset),
+        ]),
+        Menu::new(t("desktop.menu.window", &[])).items([MenuItem::action(t("desktop.menu.close", &[]), CloseTab)]),
+    ]);
+
     cx.bind_keys([
         KeyBinding::new("cmd-1", ActivateProject1, Some("Shell")),
         KeyBinding::new("cmd-2", ActivateProject2, Some("Shell")),
@@ -166,6 +178,8 @@ pub struct Shell {
     pub store: Option<Arc<Store>>,
     pub ws: Workspace<TermSession>,
     pub loaded: bool,
+    server_ready: bool,
+    island: Option<crate::island::Island>,
     /// VibeValley's opening over the window until the projects are in (`VIBEVALLEY_NO_OPENING=1` skips it).
     pub launch: Option<Entity<crate::pixel::view::PixelView>>,
     pub load_error: Option<String>,
@@ -244,6 +258,8 @@ impl Shell {
         })
         .detach();
         let quit = cx.on_app_quit(|this: &mut Shell, _| {
+            this.island = None;
+            crate::audio::stop_queued();
             let jobs = this.ws.save_jobs();
             let store = this.store.clone();
             async move {
@@ -263,6 +279,8 @@ impl Shell {
             store: None,
             ws: Workspace::new(),
             loaded: false,
+            server_ready: false,
+            island: None,
             launch: (std::env::var_os("VIBEVALLEY_NO_OPENING").is_none())
                 .then(|| cx.new(|cx| crate::pixel::view::PixelView::new("opening:launch", json!({}), cx))),
             load_error: None,
@@ -298,6 +316,73 @@ impl Shell {
             git_refresh_pending: BTreeSet::new(),
             _subs: vec![sub, inspector_sub, workbench_sub, quit],
         };
+        if let Some(startup) = cx.try_global::<crate::hosted::ServerStartup>().map(|s| s.0.clone()) {
+            cx.spawn(async move |this, cx| {
+                let result = startup.recv_async().await.unwrap_or_else(|_| Err("the server startup channel closed".into()));
+                let _ = this.update(cx, |shell, cx| {
+                    match result {
+                        Ok(()) => {
+                            shell.server_ready = true;
+                            shell.finish_opening(true, cx);
+                        }
+                        Err(error) => {
+                            eprintln!("{error}");
+                            shell.load_error = Some(error);
+                            shell.finish_opening(false, cx);
+                        }
+                    }
+                    cx.notify();
+                });
+            })
+            .detach();
+        }
+        match crate::island::Island::start() {
+            Ok(Some((island, opened))) => {
+                shell.island = Some(island);
+                let frames = cx.global::<crate::hosted::BridgeHub>().0.server().state();
+                cx.spawn(async move |this, cx| {
+                    while let Ok(value) = frames.recv_async().await {
+                        let frame = match serde_json::from_value::<vibevalley_protocol::StateFrame>(value) {
+                            Ok(frame) => frame,
+                            Err(error) => {
+                                eprintln!("island frame: {error}");
+                                continue;
+                            }
+                        };
+                        if this
+                            .update(cx, |shell, _| {
+                                if let Some(island) = &shell.island {
+                                    island.show(&crate::island::glance(&frame));
+                                }
+                            })
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                })
+                .detach();
+                cx.spawn(async move |this, cx| {
+                    while let Ok(issue) = opened.recv_async().await {
+                        if this
+                            .update(cx, |shell, cx| {
+                                shell.native_workspace = false;
+                                shell.native_pixel = None;
+                                shell.workbench.update(cx, |view, cx| view.navigate(&format!("/issues/{issue}"), cx));
+                                cx.activate(true);
+                                cx.notify();
+                            })
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                })
+                .detach();
+            }
+            Ok(None) => {}
+            Err(error) => eprintln!("island: {error}"),
+        }
         shell.load(cx);
         shell
     }
@@ -389,6 +474,9 @@ impl Shell {
     /// The opening says it is there (or failed), then gives way after a moment.
     fn finish_opening(&mut self, ok: bool, cx: &mut Context<Self>) {
         let Some(opening) = self.launch.clone() else { return };
+        if ok && (!self.loaded || !self.server_ready || self.load_error.is_some()) {
+            return;
+        }
         opening.update(cx, |v, _| {
             v.set_phase(
                 if ok {
@@ -1177,8 +1265,29 @@ impl Shell {
                     "monoFonts": fonts,
                     "terminalFontSize": settings.terminal_font_size,
                     "uiFontSize": settings.ui_font_size,
-                    "capabilities": ["notify", "tray", "locale", "reveal", "theme", "font", "opening", "openTerminal", "openUrl", "openFile", "pixelDir", "playAudio", "readFile"],
+                    "capabilities": ["notify", "tray", "locale", "reveal", "theme", "font", "opening", "openTerminal", "openUrl", "openFile", "pixelDir", "playAudio", "readFile", "commandLine", "seekAudio", "pcm", "pickFile", "saveFile"],
                 }))
+            }
+            "host.cliState" | "host.cliInstall" | "host.cliRemove" => {
+                let op = op.to_string();
+                Self::bg(
+                    cx,
+                    move || {
+                        let cli = crate::command_line::CommandLine::current()?;
+                        match op.as_str() {
+                            "host.cliInstall" => cli.install(),
+                            "host.cliRemove" => cli.remove(),
+                            _ => Ok(cli.state()),
+                        }
+                    },
+                    move |_, result, _| {
+                        reply.send(match result {
+                            Ok(state) => Envelope::ok(json!(state)),
+                            Err(error) => refusal(BizCode::Refused, error),
+                        })
+                    },
+                );
+                return;
             }
             "host.font" => {
                 let mut settings = Ui::get(cx).settings.clone();
@@ -1216,11 +1325,14 @@ impl Shell {
                 );
                 Envelope::void()
             }
-            "host.tray" => {
-                self.tray = Some(payload.clone());
-                crate::host::set_tray(&payload, window);
-                Envelope::void()
-            }
+            "host.tray" => match serde_json::from_value::<crate::tray::Summary>(payload.clone()) {
+                Ok(summary) => {
+                    crate::tray::update(&summary);
+                    self.tray = Some(payload.clone());
+                    Envelope::void()
+                }
+                Err(error) => refusal(BizCode::InvalidInput, error.to_string()),
+            },
             "host.locale" => {
                 self.locale = payload.as_str().map(str::to_string);
                 Envelope::void()
@@ -1253,10 +1365,20 @@ impl Shell {
                     None => refusal(BizCode::InvalidInput, "theme is light, dark or system"),
                 }
             }
-            "host.opening" => {
-                self.opening = Some(payload.clone());
-                Envelope::void()
-            }
+            "host.opening" => match serde_json::from_value::<crate::serving::Opening>(payload.clone()) {
+                Ok(state) => {
+                    if let Some(opening) = &self.launch {
+                        opening.update(cx, |view, _| view.set_phase(state.phase.pixel(), state.progress.clamp(0.0, 100.0)));
+                    }
+                    self.opening = Some(payload.clone());
+                    if state.phase == crate::serving::OpeningPhase::Ready {
+                        self.finish_opening(true, cx);
+                    }
+                    cx.notify();
+                    Envelope::void()
+                }
+                Err(error) => refusal(BizCode::InvalidInput, error.to_string()),
+            },
             "host.openTerminal" => {
                 let cwd = PathBuf::from(text("cwd"));
                 let title = payload["title"].as_str().map(str::to_string);
@@ -1292,40 +1414,89 @@ impl Shell {
                 }
                 _ => refusal(BizCode::InvalidInput, "openFile takes the absolute path of an existing file"),
             },
-            // `{ path }` of a sound file, or `{ data: base64, type }` of a
-            // sound made in the view (the farm's synthesised sounds).
-            "host.playAudio" => match (payload["path"].as_str(), payload["data"].as_str()) {
-                (Some(path), _) if path.starts_with('/') && std::path::Path::new(path).is_file() => {
-                    let path = PathBuf::from(path);
-                    Self::bg(
-                        cx,
-                        move || crate::host::play_audio(&path),
-                        |_, r, _| {
-                            if let Err(e) = r {
-                                eprintln!("play: {e}");
-                            }
+            "host.pickFile" => {
+                let chosen = cx.prompt_for_paths(PathPromptOptions {
+                    files: true,
+                    directories: false,
+                    multiple: false,
+                    prompt: None,
+                });
+                cx.spawn(async move |_, cx| {
+                    let result = match chosen.await {
+                        Ok(Ok(Some(paths))) => match paths.into_iter().next() {
+                            Some(path) => cx.background_spawn(async move { crate::host::file_info(&path) }).await.map(Some),
+                            None => Ok(None),
                         },
-                    );
-                    Envelope::void()
+                        Ok(Ok(None)) => Ok(None),
+                        Ok(Err(error)) => Err(error.to_string()),
+                        Err(error) => Err(error.to_string()),
+                    };
+                    reply.send(match result {
+                        Ok(file) => Envelope::ok(json!(file)),
+                        Err(error) => refusal(BizCode::Refused, error),
+                    });
+                })
+                .detach();
+                return;
+            }
+            "host.saveFile" => {
+                let source = PathBuf::from(text("path"));
+                if !source.is_absolute() || !source.is_file() {
+                    reply.send(refusal(BizCode::InvalidInput, "saveFile requires an absolute path to a regular file"));
+                    return;
                 }
-                (None, Some(data)) if data.len() <= crate::host::MAX_SOUND_BASE64 => {
-                    let (data, kind) = (data.to_string(), text("type"));
-                    Self::bg(
-                        cx,
-                        move || crate::host::play_audio_data(&data, &kind),
-                        |_, r, _| {
-                            if let Err(e) = r {
-                                eprintln!("play: {e}");
-                            }
-                        },
-                    );
-                    Envelope::void()
-                }
-                _ => refusal(
-                    BizCode::InvalidInput,
-                    "playAudio takes { path } of a sound file or { data, type } of at most 2 MB",
-                ),
-            },
+                let name = payload["name"]
+                    .as_str()
+                    .filter(|n| !n.is_empty() && !n.contains('/') && !n.contains('\\'))
+                    .or_else(|| source.file_name().and_then(|s| s.to_str()));
+                let directory = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
+                let chosen = cx.prompt_for_new_path(&directory, name);
+                cx.spawn(async move |_, cx| {
+                    let result = match chosen.await {
+                        Ok(Ok(Some(target))) => cx.background_spawn(async move { crate::host::copy_file(&source, &target).map(|_| true) }).await,
+                        Ok(Ok(None)) => Ok(false),
+                        Ok(Err(error)) => Err(error.to_string()),
+                        Err(error) => Err(error.to_string()),
+                    };
+                    reply.send(match result {
+                        Ok(saved) => Envelope::ok(json!({"saved": saved})),
+                        Err(error) => refusal(BizCode::Refused, error),
+                    });
+                })
+                .detach();
+                return;
+            }
+            "host.playAudio" => {
+                let seconds = payload["position"].as_f64().unwrap_or(0.0);
+                let path = payload["path"].as_str().map(PathBuf::from);
+                let data = payload["data"].as_str().map(str::to_string);
+                let kind = text("type");
+                crate::audio::dispatch(reply, move || match (path, data) {
+                    (Some(path), None) => crate::audio::play(&path, seconds),
+                    (None, Some(data)) if data.len() <= crate::host::MAX_SOUND_BASE64 && seconds == 0.0 => crate::host::play_audio_data(&data, &kind),
+                    _ => Err("playAudio requires one file path or at most 2 MB of encoded sound".into()),
+                });
+                return;
+            }
+            "host.seekAudio" => {
+                let seconds = payload["position"].as_f64().unwrap_or(f64::NAN);
+                crate::audio::dispatch(reply, move || crate::audio::seek(seconds));
+                return;
+            }
+            "host.audioState" => {
+                crate::audio::dispatch(reply, || Ok(crate::audio::state()));
+                return;
+            }
+            "host.pcmStart" => {
+                let format = serde_json::from_value::<crate::audio::PcmFormat>(payload.clone());
+                crate::audio::dispatch(reply, move || crate::audio::start_pcm(format.map_err(|e| e.to_string())?));
+                return;
+            }
+            "host.pcmAppend" => {
+                let data = text("data");
+                crate::audio::dispatch(reply, move || crate::audio::append_pcm(&data));
+                return;
+            }
             // A file the user dropped on a view: nsh gives views file: URLs
             // and no way to read them.
             "host.readFile" => {
@@ -1350,8 +1521,11 @@ impl Shell {
                 }
             }
             "host.stopAudio" => {
-                Self::bg(cx, crate::host::stop_audio, |_, _, _| {});
-                Envelope::void()
+                crate::audio::dispatch(reply, || {
+                    crate::audio::stop();
+                    Ok(())
+                });
+                return;
             }
             // VibeValley's built pixel art: sprites.json and its PNGs.
             "host.pixelDir" => {

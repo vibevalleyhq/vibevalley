@@ -1,13 +1,17 @@
+mod audio;
+mod command_line;
 mod debug;
 mod diff;
 mod host;
 mod hosted;
+mod island;
 mod panes;
 mod pixel;
 mod serving;
 mod shell;
 mod terminal;
 mod theme;
+mod tray;
 mod viewer;
 
 use gpui_kit::{AppContext as _, Bounds, TitlebarOptions, WindowBounds, WindowOptions, point, px, size};
@@ -17,6 +21,7 @@ fn main() {
     gpui_kit::application().run(|cx| {
         gpui_kit::init(cx);
         host::set_app_icon();
+        tray::install();
         theme::Ui::apply(theme::Settings::default(), cx);
         shell::bind_keys(cx);
         hosted::BridgeHub::install(cx);
