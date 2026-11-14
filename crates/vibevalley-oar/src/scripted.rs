@@ -26,8 +26,8 @@ use serde_json::json;
 use crate::core::{CoreSession, Driver, SessionCore, check_cwd, render_text};
 use crate::record::{self, Recorder};
 use crate::{
-    AgentError, Capabilities, ContentBlock, EventKind, FileChangeKind, Installation, ModelInfo, PermissionDecision, Result, Runtime, Session, SessionOptions,
-    StopReason, Usage,
+    AgentError, Capabilities, ContentBlock, EventKind, FileChangeKind, Installation, McpServer, ModelInfo, PermissionDecision, Result, Runtime, Session,
+    SessionOptions, StopReason, Usage,
 };
 
 #[derive(Debug, Clone)]
@@ -77,6 +77,8 @@ pub struct TurnAsk {
     pub turn: usize,
     pub cwd: PathBuf,
     pub append_system_prompt: Option<String>,
+    /// The MCP servers the session was opened with: a stand-in agent calls their tools as a real one would.
+    pub mcp_servers: Vec<McpServer>,
 }
 
 /// A turn computed when it is asked (tests' stand-in agents): its steps, or
@@ -270,7 +272,7 @@ struct ScriptedDriver {
     core: Arc<SessionCore>,
     script: Script,
     /// The session's folder and appended system prompt, for computed turns.
-    opened: (PathBuf, Option<String>),
+    opened: (PathBuf, Option<String>, Vec<McpServer>),
     turn_index: AtomicUsize,
     current: Mutex<Option<Arc<TurnControl>>>,
     answers: flume::Sender<PermissionDecision>,
@@ -378,6 +380,7 @@ impl Driver for ScriptedDriver {
                         turn: index,
                         cwd: opened.0.clone(),
                         append_system_prompt: opened.1.clone(),
+                        mcp_servers: opened.2.clone(),
                     }) {
                         Ok(steps) => steps,
                         Err(message) => {
@@ -478,7 +481,7 @@ impl Runtime for ScriptedRuntime {
         let driver = ScriptedDriver {
             core: core.clone(),
             script: self.script.clone(),
-            opened: (opts.cwd.clone(), opts.append_system_prompt.clone()),
+            opened: (opts.cwd.clone(), opts.append_system_prompt.clone(), opts.mcp_servers.clone()),
             turn_index: AtomicUsize::new(0),
             current: Mutex::new(None),
             answers,

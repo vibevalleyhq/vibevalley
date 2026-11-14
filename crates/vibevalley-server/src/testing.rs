@@ -211,6 +211,7 @@ mod tests {
             turn: 0,
             cwd: cwd.to_path_buf(),
             append_system_prompt: None,
+            mcp_servers: vec![],
         }
     }
 
