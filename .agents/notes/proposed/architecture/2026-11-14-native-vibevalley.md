@@ -11,7 +11,7 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 - **Rust 服务端是照 TS 逐行搬的，没用上 Rust。**工具按字符串匹配 op、参数靠 `p["id"].as_str()` 手取；设置和 provider 配置全是 `serde_json::Value`（`vibevalley-server` 里约 200 处）；`vibevalley-issues/src/lib.rs` 一个 `Board` 两千多行，揉着工单、会话、工作目录、合并、起草、私聊；媒体是"图片任务机 + 其他种类打补丁"。
 - **追求逐项复刻 TS 太慢。**每补一处都要先读一遍 TS 再照搬，还常发现 epona "看着做了其实没做"（厂商调用层从没编译过、简报是另一套英文措辞、私聊帮工缺失）。
 
-用户的决定（2026-11-14）：Rust 服务端为准；激进重构，速度优先；允许暂时回退；不需要完整复刻 oar / pi-ai 的功能。终态仍是全原生，删掉 `apps/desktop`、`apps/server`、`apps/web`、`apps/mobile`。所有改动合成一个 PR，分段写成提交。
+用户的决定（2026-11-14）：Rust 服务端为准；激进重构，速度优先；允许暂时回退；不需要完整复刻 oar / pi-ai 的功能。终态仍是全原生，删掉 `apps/desktop`、`apps/server`、`apps/web`、`apps/mobile`；命令行也改用 Rust 写；数据源（契约、对用户说的话、工具说明、提示）在 Rust 定义，codegen 到要用的地方，借此收掉不必要的包。所有改动合成一个 PR，分段写成提交。
 
 ## Proposal
 
@@ -58,9 +58,18 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 - 每个迁移是一个带类型的命令，状态变化只经事实；去掉散落的 `self.update(|t| ...)`。
 - 会话的轨迹、报告、记性经事实流出，watch、频道、游戏只订阅。
 
-**R5 契约翻转**
-- `apps/server` 删除后，`packages/protocol` 的 zod 不再是源头：Rust 类型为准，用 `specta` 或 `ts-rs` 生成 TS 类型给 `apps/mac/ui` 和 `apps/cli`；删掉 `gen/gen.ts`、`gen/golden.ts` 与 projection golden。
-- 改契约只改 Rust 一处，生成物由检查保证最新。
+**R5 数据源在 Rust，codegen 到各处**
+- 契约：`vibevalley-protocol` 的 Rust 类型为准（`ts-rs` 或 `specta`），生成 TS 类型给 `apps/mac/ui`；删掉 zod、`gen/gen.ts`、`gen/golden.ts` 与 projection golden，`packages/protocol` 只剩生成物（或并进 `apps/mac/ui`）。
+- 对用户说的话：词典归 `vibevalley-i18n`，生成 TS 的键与目录给页面；`packages/i18n` 只剩生成物。
+- 工具说明与提示：已在 `assets/`（R1），`gen/orchestrator.ts` 删掉，`prompts.json` 直接归 Rust。
+- 只有页面用的纯逻辑（`packages/pkm`、`packages/artifact` 的编辑器状态机）挪进 `apps/mac/ui`；规则与 Rust 的 `vibevalley-pkm`、`vibevalley-artifact` 共用一份测例（golden）。
+- 改数据源只改 Rust 一处，生成物由检查保证最新。
+
+**R6 命令行用 Rust**
+- `crates/vibevalley-cli`（clap），照现在的命令一条一个操作，经 HTTP 调服务端，类型直接用 `vibevalley-protocol`；家目录约定（`packages/home`）并进 Rust 的一处，服务端、命令行、原生应用共用。
+- `apps/cli` 的测试改成 Rust 集成测试，起真的 `vibevalley-server`；之后删 `apps/cli`。
+
+包的去向：`agent`、`ai`、`provider` 随闸 1 删；`bridge`、`engine`、`base-ui`、`stories`、`async`、`testkit`、`home` 随页面、桌面、手机壳与 TS 命令行删；`protocol`、`i18n` 只剩生成物；`pkm`、`artifact` 挪进 `apps/mac/ui`；`health`、`tsrs` 看页面剩下的 TS 还需不需要再定。
 
 ### 砍掉的（不复刻，或简化）
 
@@ -74,7 +83,7 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 ### 闸与删除
 
 1. R1–R3 完成后，web e2e 除媒体其余种类、语音、手机/局域网外全绿，CLI 测试全绿：删 `apps/server`、`packages/agent`、`packages/ai`、`packages/provider`，Electron 改带 Rust 服务端过渡。
-2. R4、R5 完成，`apps/mac` 覆盖 `apps/web` 每个路由（截图对过）：删 `apps/desktop`、`apps/web`、`apps/mobile` 与只为它们存在的包；`AGENTS.md`、`docs/architecture.md`、`docs/subsystems/*`、vv-acceptance 改写成 Rust 与原生的现状。
+2. R4–R6 完成，`apps/mac` 覆盖 `apps/web` 每个路由（截图对过）：删 `apps/desktop`、`apps/web`、`apps/mobile` 与只为它们存在的包；`AGENTS.md`、`docs/architecture.md`、`docs/subsystems/*`、vv-acceptance 改写成 Rust 与原生的现状。
 3. 打包、签名公证、自动更新、带起灵动岛在 `apps/mac` 上补齐后，发版。
 
 ## Alternatives considered
@@ -91,7 +100,8 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 
 - 仓库里没有 `apps/desktop`、`apps/server`、`apps/web`、`apps/mobile`，没有 Electron、Expo、PixiJS；`epona` 这个词不出现（`stale-names.ts` 查）。
 - `vibevalley-server` 门内没有 `serde_json::Value` 的业务传递（只在进出边界）；没有按 op 字符串分支的工具分发；没有 `Board` 这样的跨领域大对象。
-- 契约以 Rust 为准，TS 类型由它生成，检查保证最新。
+- 契约、词典、工具说明与提示以 Rust 为准，TS 由它生成，检查保证最新；`packages/` 下只剩生成物或页面专用的包。
+- 命令行是 Rust 的 `vibevalley-cli`，没有 `apps/cli`。
 - 只有一个服务端；`apps/cli` 的测试与 `doctor` 对着它通过；`apps/mac` 打出签名公证的包，能自动更新。
 - 「砍掉的」里每一项要么在文档里写明不做，要么已在 Rust 上实现。
 
