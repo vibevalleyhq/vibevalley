@@ -59,8 +59,15 @@ cpSync(join(target, "vibevalley"), join(macos, "vibevalley"));
 cpSync(join(root, "apps/island/.build/release/VibeValleyIsland"), join(macos, "VibeValleyIsland"));
 cpSync(join(root, "assets"), join(resources, "assets"), { recursive: true, dereference: true });
 cpSync(join(root, "apps/mac/ui/build"), join(resources, "ui"), { recursive: true });
-const sign = (path: string) => run("codesign", ["--force", "--sign", identity, ...(identity === "-" ? [] : ["--options", "runtime", "--timestamp"]), path]);
-for (const bin of ["vibevalley", "VibeValleyIsland", "vibevalley-mac"]) sign(join(macos, bin));
+const sign = (path: string, microphone = false) =>
+  run("codesign", [
+    "--force",
+    "--sign",
+    identity,
+    ...(identity === "-" ? [] : ["--options", "runtime", "--timestamp", ...(microphone ? ["--entitlements", join(root, "apps/mac/entitlements.plist")] : [])]),
+    path,
+  ]);
+for (const bin of ["vibevalley", "VibeValleyIsland", "vibevalley-mac"]) sign(join(macos, bin), bin === "vibevalley-mac");
 writeFileSync(
   join(app, "Contents/Info.plist"),
   `<?xml version="1.0" encoding="UTF-8"?>
@@ -78,7 +85,7 @@ writeFileSync(
 <key>NSMicrophoneUsageDescription</key><string>VibeValley uses the microphone for voice conversations and dictation.</string>
 </dict></plist>\n`,
 );
-sign(app);
+sign(app, true);
 run("codesign", ["--verify", "--deep", "--strict", app]);
 const arch = process.arch === "arm64" ? "arm64" : "x64";
 const name = `VibeValley-${version}-${arch}`;
