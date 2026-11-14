@@ -243,7 +243,7 @@ fn image_request_refinements_prevent_submission() {
 #[test]
 fn orchestrator_image_tool_requires_user_intent_and_posts_once_to_its_channel() {
     use std::sync::Mutex;
-    use vibevalley_server::modules::orchestrator::tools::{Farm, Route, farm_tools};
+    use vibevalley_server::modules::tool::{Farm, Route, held};
     let dir = tempfile::tempdir().unwrap();
     let backend = Backend::new("ok");
     let s = start(dir.path(), backend);
@@ -258,13 +258,16 @@ fn orchestrator_image_tool_requires_user_intent_and_posts_once_to_its_channel() 
         repos: s.repos.clone(),
         crons: s.crons.clone(),
         resources: s.resources.clone(),
+        pkm: s.pkm.clone(),
+        artifacts: s.artifacts.clone(),
+        library: s.library.clone(),
     });
     let route = Arc::new(Mutex::new(Route {
         agent: "orchestrator".into(),
         channel: channel.clone(),
         ..Route::default()
     }));
-    let tools = farm_tools(&farm, &route);
+    let tools = held(&farm, &route);
     let tool = tools.iter().find(|t| t.spec().name == "media_image_create").unwrap();
     assert!(tool.execute(&request("asked")).is_error);
     assert_eq!(ok(&s, "media.job.list", Value::Null), json!([]));

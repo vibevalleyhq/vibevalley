@@ -39,18 +39,6 @@ pub struct Workplaces {
 pub static PROMPTS: LazyLock<Prompts> =
     LazyLock::new(|| serde_json::from_str(include_str!("../../../assets/orchestrator/prompts.json")).expect("prompts.json"));
 
-/// One of `tools.json`: a tool as the model sees it.
-#[derive(Deserialize, Clone)]
-pub struct ToolWords {
-    pub op: String,
-    pub name: String,
-    pub description: String,
-    pub parameters: serde_json::Value,
-}
-
-pub static TOOLS: LazyLock<Vec<ToolWords>> =
-    LazyLock::new(|| serde_json::from_str(include_str!("../../../assets/orchestrator/tools.json")).expect("tools.json"));
-
 /// A wire enum as its string.
 pub fn wire<T: serde::Serialize>(v: &T) -> String {
     serde_json::to_value(v).ok().and_then(|v| v.as_str().map(str::to_string)).unwrap_or_default()

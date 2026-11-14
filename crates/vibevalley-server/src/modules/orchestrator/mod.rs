@@ -10,7 +10,6 @@
 //! turn (VibeValley steers the user's words into the turn under way; the
 //! brain has no steering).
 
-pub mod tools;
 pub mod words;
 
 use std::collections::{HashMap, VecDeque};
@@ -20,20 +19,17 @@ use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak};
 
 use vibevalley_agent::{Brain, BrainEvent, Conversation, ModelClient, OpenAiClient, TurnOutcome, kit};
 use vibevalley_i18n::t;
-use vibevalley_issues::{Board, Step};
+use vibevalley_issues::Step;
 use vibevalley_protocol::{
     AgentRole, Doing, Fact, FactSessionChanged, FactSessionPhaseChanged, NoticeLevel, ORCHESTRATOR_RUNTIME, Outcome, Phase, PhaseResting, PhaseWorking,
     Session, SessionAction, ops,
 };
 
-use self::tools::{Farm, Route, farm_tools};
 use self::words::Source;
 use crate::Hub;
-use crate::modules::agent::Agents;
-use crate::modules::channel::{Chat, Picked, Posting};
-use crate::modules::cron::Crons;
-use crate::modules::repo::Repos;
+use crate::modules::channel::{Picked, Posting};
 use crate::modules::session::Trajectories;
+use crate::modules::tool::{Farm, Route, held};
 use crate::now;
 
 const DEFAULT_MODEL: &str = "deepseek-flash";
@@ -92,17 +88,9 @@ pub struct Orchestrator {
 
 /// What the orchestrator is made with.
 pub struct Parts {
-    pub media: Arc<crate::modules::media::machine::Machine>,
-    pub hub: Arc<Hub>,
+    pub farm: Arc<Farm>,
     pub home: PathBuf,
-    pub board: Board,
-    pub chat: Arc<Chat>,
-    pub agents: Arc<Agents>,
-    pub repos: Arc<Repos>,
-    pub crons: Arc<Crons>,
     pub trajectories: Arc<Trajectories>,
-    pub memories: Arc<crate::modules::memory::Memories>,
-    pub resources: Arc<crate::modules::mcp::Resources>,
     /// The DeepSeek key, read at each turn.
     pub key: Arc<dyn Fn() -> Option<String> + Send + Sync>,
     /// Talks to this model instead of DeepSeek (tests).
@@ -111,19 +99,8 @@ pub struct Parts {
 
 impl Orchestrator {
     pub fn open(p: Parts) -> Arc<Orchestrator> {
-        let farm = Arc::new(Farm {
-            media: p.media,
-            hub: Arc::downgrade(&p.hub),
-            board: p.board,
-            chat: p.chat,
-            agents: p.agents,
-            repos: p.repos,
-            crons: p.crons,
-            memories: p.memories,
-            resources: p.resources,
-        });
         let o = Arc::new(Orchestrator {
-            farm,
+            farm: p.farm,
             home: p.home,
             trajectories: p.trajectories,
             key: p.key,
@@ -327,7 +304,7 @@ impl Orchestrator {
         }
         let memory = self.farm.memories.port(&me.id, crate::modules::memory::By::Orchestrator);
         let mut brain = Brain::new(self.client(), model, self.system_prompt(&me.id, &home, memory.as_ref()));
-        brain.tools = farm_tools(&self.farm, &me.route);
+        brain.tools = held(&self.farm, &me.route);
         let dirs = vec![skills_dir];
         brain.tools.push(Box::new(kit::LoadSkill {
             skills: Box::new(move || kit::scan_skills(&dirs)),

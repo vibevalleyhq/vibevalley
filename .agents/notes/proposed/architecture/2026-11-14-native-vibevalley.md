@@ -30,6 +30,7 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 | 迁入 | crates 与 `apps/mac` 改名迁入；生成器读仓库内的 `packages/protocol` 与 `apps/server`；页面直接引用 workspace 包；`apps/web/public` 移到根 `assets/`；`rust:check`、`protocol:rust:check`、`mac:check` 与 macOS CI job |
 | 服务端补齐 | `/mcp` 帮工门与 `issue_report`；独立的 `vibevalley-server` 二进制（`--web`、`--ready-json`）与测试用替身 agent `pi`；私聊帮工；起草讨论串；验收标准结果；已离开的会话进历史；父工单的改动；离线 MOSS；图片、语音（含流式）任务 |
 | 原生界面 | 侧栏按主仓库归并 worktree、只列真实终端、终端命名去重；终端字体回退；连接状态点移到头像 |
+| R1 工具 | `modules/tool`：助手和帮工共用一套工具，每个工具一个参数结构体，宽松解析写一处（`tool::args`），按调用者（`Who`）分支；`/mcp` 与助手的循环都从它取；工具说明在 `assets/tools/`，以 Rust 为准，不再从 TS 生成；助手的语音、多人对话、音色设计、理解工具接到任务端点 |
 | 对照 | web e2e 在 Rust 上 243 个过约 207 个（失败的是媒体其余种类、语音、手机/局域网，及 4 个在 TS 上同样失败的）；CLI 测试 22 个过 21 个 |
 
 ### 重构（按顺序）

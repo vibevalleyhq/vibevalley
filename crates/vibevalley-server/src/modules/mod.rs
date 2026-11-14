@@ -23,6 +23,7 @@ pub mod publish;
 pub mod repo;
 pub mod session;
 pub mod setting;
+pub mod tool;
 pub mod watch;
 
 /// Every module this build serves.
