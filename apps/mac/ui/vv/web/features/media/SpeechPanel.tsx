@@ -97,7 +97,10 @@ export function SpeechPanel() {
         live.set(true);
         stopStream = playSpeech(
           job.id,
-          (state) => draining.set(state === "done"),
+          (state) => {
+            draining.set(state === "done");
+            if (state === "finished") live.set(false);
+          },
           (why) => {
             error.set(why);
             live.set(false);

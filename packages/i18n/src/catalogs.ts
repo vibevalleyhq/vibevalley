@@ -4541,6 +4541,9 @@ export const catalogs = {
         tryIt: "试音",
         notInChat: "说的话不进田头",
         debug: "调试：线路质量与线路上的消息",
+        nativeCall: "MOSS Live 通话",
+        nativeNotice:
+          "先在通话设置中选择 MOSS Live 接话并保存。开始后采集麦克风，音频发送到已配置的 MOSS 账号，可能产生费用；双方最终字幕记进田头。离开本页会挂断。",
       },
     },
   },
@@ -9379,6 +9382,9 @@ export const catalogs = {
         tryIt: "Try it",
         notInChat: "Nothing goes to the chat",
         debug: "Debugging: line quality and messages on the line",
+        nativeCall: "MOSS Live call",
+        nativeNotice:
+          "Choose MOSS Live as the call answer provider and save the configuration first. Starting captures your microphone and sends audio to the configured MOSS account; charges may apply. Final transcripts are recorded in the chat. Leaving this page hangs up.",
       },
     },
   },
@@ -13807,6 +13813,8 @@ export interface Messages {
   "web.voice.moss.intro": undefined;
   "web.voice.moss.localOnly": undefined;
   "web.voice.moss.mute": undefined;
+  "web.voice.moss.nativeCall": undefined;
+  "web.voice.moss.nativeNotice": undefined;
   "web.voice.moss.notInChat": undefined;
   "web.voice.moss.nothingSaid": undefined;
   "web.voice.moss.persona": undefined;

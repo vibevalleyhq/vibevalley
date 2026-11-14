@@ -1569,36 +1569,7 @@ fn until_stopped<T>(stop: &Stop, work: Work<'_, T>) -> Option<Result<T, Failure>
     if stop.aborted() { None } else { result }
 }
 
-fn relay_speech(claim: vibevalley_server_api::media::SpeechClaim, sink: crate::Sink) {
-    loop {
-        let event = flume::Selector::new().recv(&sink.stop, |_| None).recv(&claim.events, Result::ok).wait();
-        let Some(event) = event else { break };
-        if !sink.send(&event) {
-            break;
-        }
-    }
-    (claim.gone)();
-}
-
-struct SpeechStream;
-impl vibevalley_protocol::Subscription for SpeechStream {
-    const NAME: &'static str = "media.speech.stream";
-    type Payload = vibevalley_protocol::MediaJobRequest;
-    type Event = vibevalley_protocol::MediaSpeechEvent;
-}
-
 pub fn install(hub: &Hub, jobs: Arc<Jobs>) {
-    let j = jobs.clone();
-    hub.on_subscription::<SpeechStream>(move |_, input, sink| {
-        use vibevalley_server_api::media::SpeechStreams as _;
-        let claim = j.claim(&input.id)?;
-        std::thread::Builder::new()
-            .name("speech-playback".into())
-            .spawn(move || relay_speech(claim, sink))
-            .map_err(crate::base::internal)?;
-        Ok(())
-    });
-
     let user_only = |caller: Caller| if caller == Caller::User { Ok(()) } else { Err(refused("userRequired")) };
     let j = jobs.clone();
     hub.on::<ops::MediaImageCreate>(move |ctx, r| {
@@ -1678,30 +1649,5 @@ impl vibevalley_server_api::media::SpeechStreams for Jobs {
                 me.stop_run(&job);
             }),
         })
-    }
-}
-
-#[cfg(test)]
-mod stream_tests {
-    use super::*;
-    #[test]
-    fn regression_speech_subscription_forwards_events_and_releases_its_claim_on_stop() {
-        let (events, stream) = flume::unbounded();
-        let (out, received) = flume::unbounded();
-        let (stop, stopped) = flume::bounded(1);
-        let (gone, released) = flume::bounded(1);
-        let claim = vibevalley_server_api::media::SpeechClaim {
-            events: stream,
-            gone: Box::new(move || {
-                gone.send(()).unwrap();
-            }),
-        };
-        let worker = std::thread::spawn(move || relay_speech(claim, crate::Sink { events: out, stop: stopped }));
-        events.send(json!({"type":"audio","sequence":0,"audio":"AAAA"})).unwrap();
-        assert_eq!(received.recv_timeout(Duration::from_secs(5)).unwrap()["sequence"], 0);
-        drop(stop);
-        released.recv_timeout(Duration::from_secs(5)).unwrap();
-        worker.join().unwrap();
-        assert!(events.is_disconnected());
     }
 }

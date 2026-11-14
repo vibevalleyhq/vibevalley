@@ -10,7 +10,6 @@ export const subscriptionPath = "/api/v1/subscribe";
 
 /** Each subscription's payload and the Schema of each event it then sends, by name. */
 export const subscriptions = {
-  "media.speech.stream": { payload: z.object({ id: z.string() }), event: S.MediaSpeechEvent },
   /** What changed in a channel after the revision after, then each change from now on, each the message as it now is. */
   "channel.follow": { payload: z.object({ id: z.string(), after: z.number() }), event: S.ChannelEvent },
   /** The turn reports in any channel after the one with this id (by message id, which sorts by time), or the newest

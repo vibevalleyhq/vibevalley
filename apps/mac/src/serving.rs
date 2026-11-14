@@ -120,3 +120,21 @@ impl OpeningPhase {
         }
     }
 }
+
+static VOICE: std::sync::OnceLock<std::sync::Arc<vibevalley_server::modules::voice::Voice>> = std::sync::OnceLock::new();
+
+pub fn set_voice(voice: std::sync::Arc<vibevalley_server::modules::voice::Voice>) {
+    let _ = VOICE.set(voice);
+}
+
+pub fn voice() -> Result<std::sync::Arc<vibevalley_server::modules::voice::Voice>, String> {
+    VOICE.get().cloned().ok_or_else(|| "the voice service is not ready".into())
+}
+
+static SPEECH: std::sync::OnceLock<vibevalley_server_api::media::SharedSpeechStreams> = std::sync::OnceLock::new();
+pub fn set_speech(speech: vibevalley_server_api::media::SharedSpeechStreams) {
+    let _ = SPEECH.set(speech);
+}
+pub fn speech() -> Result<vibevalley_server_api::media::SharedSpeechStreams, String> {
+    SPEECH.get().cloned().ok_or_else(|| "the speech service is not ready".into())
+}

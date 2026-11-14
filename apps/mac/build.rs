@@ -117,7 +117,13 @@ fn build_audio() {
     let object = out.join("audio.o");
     let archive = out.join("libvibevalley_audio.a");
     println!("cargo:rerun-if-changed=src/audio.m");
+    let arch = match std::env::var("CARGO_CFG_TARGET_ARCH").as_deref() {
+        Ok("aarch64") => "arm64",
+        Ok("x86_64") => "x86_64",
+        other => panic!("unsupported macOS architecture: {other:?}"),
+    };
     let status = Command::new("/usr/bin/clang")
+        .args(["-arch", arch])
         .args([
             "-fobjc-arc",
             "-fblocks",

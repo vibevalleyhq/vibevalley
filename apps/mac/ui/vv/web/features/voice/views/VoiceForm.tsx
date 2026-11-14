@@ -1,9 +1,3 @@
-// Ported from VibeValley apps/web/src/features/voice/views/VoiceForm.tsx: the
-// call's line (area, listening, who answers), MOSS Live's checks, dictation,
-// and Agora's credentials on the accounts page; or the voice agent's part.
-// Only the settings: the call itself, MOSS Live and dictation (Agora RTC,
-// the microphone) are not ported. The SaveBar sits under the fields; the
-// outer page scrolls them.
 import { signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -36,6 +30,7 @@ import { TextLink } from "../../../ui/TextLink";
 import { Hint } from "../../../ui/Tip";
 import { toast } from "../../../ui/toasts";
 import { MossVerify } from "./MossVerify";
+import { NativeCall } from "./NativeCall";
 import {
   answerLabel,
   answerStart,
@@ -220,6 +215,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
               <TextLink href="/settings/providers">{t("web.provider.manage")}</TextLink>
               <MossVerify />
             </View>
+            <NativeCall />
           </If>
           <If when={props.view === "accounts"}>
             <Card
