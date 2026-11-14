@@ -181,3 +181,16 @@ test("files dropped on the pane: the host reads them, they upload as attachment.
   expect(fake.calls.find((c) => c.op === "host.readFile")?.payload).toEqual({ path: "file:///Users/farmer/notes.txt" });
   expect(fake.calls.find((c) => c.op === "attachment.create")?.payload).toEqual({ name: "notes.txt", type: "text/plain", data: "aGVsbG8=" });
 });
+
+test("a channel dragged onto another is placed before it, in its group", async () => {
+  const fake = fakeHost({ state, responses: { ...responses, "channel.update": null } }, { route: "/chat" });
+  const app = await open("./main.tsx", { width: 1200, height: 720, colorScheme: "light", platform: "macos", host: fake.options });
+  await fake.pump(app);
+  await fake.pump(app);
+  await app.dragAndHold("id:channel-row-release", { x: 0, y: -26 });
+  expect(app.count("id:channel-drop-before")).toBe(1);
+  await app.drop();
+  await fake.pump(app);
+  expect(fake.calls.find((c) => c.op === "channel.update")?.payload).toEqual({ id: "release", before: "design", category: "产品" });
+  expect(app.count("id:channel-drop-before")).toBe(0);
+});

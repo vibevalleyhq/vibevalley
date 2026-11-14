@@ -79,10 +79,20 @@ export function AudioUsageLine(props: { usage: MediaSpeechJob["usage"]; testid: 
 export function ResultAudio(props: { attachment: string | undefined; pcm: boolean; held: boolean; prefix: string; save: string }) {
   const disk = useAttachmentFile(() => props.attachment ?? "");
   return (
-    <If when={props.attachment} else={<If when={props.held}>{<Quiet>{t("web.audio.playbackUnsupported")}</Quiet>}</If>}>
+    <If
+      when={props.attachment}
+      else={
+        <If when={props.held}>
+          <Quiet>{t("web.audio.playbackUnsupported")}</Quiet>
+        </If>
+      }
+    >
       {(id) => (
         <View class="flex-row flex-wrap items-center gap-2">
-          <If when={props.pcm ? undefined : disk()?.path} else={<Quiet>{t("web.media.speech.downloadOnly")}</Quiet>}>
+          <If when={props.pcm}>
+            <Quiet>{t("web.media.speech.downloadOnly")}</Quiet>
+          </If>
+          <If when={props.pcm ? undefined : disk()?.path}>
             {(path) => (
               <Button testID={`${props.prefix}-play`} icon="play" onPress={() => void playAudio(path())}>
                 {t("web.library.kind.audio")}

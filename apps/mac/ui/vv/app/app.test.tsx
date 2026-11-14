@@ -83,3 +83,12 @@ test("/farm goes to the repo worked in most recently and asks the shell for its 
   expect(treeApp.count("id:tree")).toBe(1);
   expect(tree.acts).toContainEqual({ type: "openTree" });
 });
+
+test("? opens the shortcut sheet: every place with its keys", async () => {
+  const { app } = await start();
+  expect(app.count("id:shortcut-place")).toBe(0);
+  await app.keyboard.press("shift+/");
+  expect(app.count("id:shortcuts")).toBe(1);
+  expect(app.count("id:shortcut-place")).toBe(8);
+  expect(app.texts()).toContain("⌘");
+});
