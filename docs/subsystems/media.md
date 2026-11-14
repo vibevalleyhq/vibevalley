@@ -29,7 +29,7 @@ TS 版的其余种类（图片／视频理解、多人对白、音色设计与�
 | `crates/vibevalley-server/src/modules/tool/notes.rs` | 助手与帮工的 `media_*`、`library_item_*` 工具 |
 | `crates/vibevalley-server/src/offline.rs` | 页面测试用的离线 MOSS 与下载 |
 | `packages/protocol/src/media/` | 媒体任务、输入与素材库的形状和接口（Rust 类型由它生成） |
-| `apps/web/src/features/media/` | `/library`：筛选栏、缩略图、详情栏、工具条、上传、键盘和「生成」对话框；排法、计数、筛选和键盘落点在 `items.ts` 纯函数 |
+| `apps/mac/ui/vv/web/features/media/` | `/library`：筛选栏、缩略图、详情栏、工具条、上传、键盘和「生成」对话框；排法、计数、筛选和键盘落点在 `items.ts` 纯函数 |
 
 接口权限见[接口清单](docs/reference/capabilities.md)（`media.*`、`library.*`）。生图、语音及任务读取对 `user` 与 `orchestrator` 开放，帮工没有生成权限；助手只有承接用户输入的一轮才能生成，自主巡查不能生成。
 

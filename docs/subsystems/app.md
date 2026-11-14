@@ -1,122 +1,110 @@
 # 客户端
 
-VibeValley 现在有两种界面：一份 Solid 2 页面（`apps/web`），由 Rust 服务端（`vibevalley-server --web`）在 `/` 提供，共用于桌面壳、浏览器和手机壳；和正在替代它的原生应用 `apps/mac`（GPUI 窗口加 `apps/mac/ui` 的 nsh TSX 页面，`crates/vibevalley-workspace`、`crates/vibevalley-terminal` 管工作区和终端）。原生应用覆盖页面每个路由后，页面、桌面壳和手机壳一起删（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。下面主要说页面这边。页面只读服务端推送的 `StateFrame` 与查询接口，经 `VibeValleyApi` 发命令，经 `@vibevalley/protocol/host` 注入宿主能力。
+VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibevalley-mac`）：GPUI 的窗口，里面带着服务端；工作台的页面是 nsh 跑的 TSX（`apps/mac/ui`），像素农场、地图、记忆树、开场和图鉴由 Rust 直接画（`apps/mac/src/pixel`）。页面只读服务端推来的 `StateFrame` 与查询接口，经进程内的桥发命令，不经 HTTP。没有浏览器页面、Electron 桌面版和手机壳，只支持 macOS（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
-| 状态流连接、心跳超时重连与断线提示 | `StateFrame` 的折叠与拼装（[核心状态](docs/subsystems/core.md)） |
-| 页面单向分层、Atom 状态中间层、乐观意图（`Intent`）与本地存储 | 协议形状与接口定义（[地基](docs/subsystems/foundation.md)） |
-| 工作台路由、外框、浅色/深色主题与组件故事查看器（`packages/stories`） | 像素农场画布玩法（[农场的皮](docs/subsystems/farm.md)）与各页细节（[界面清单](docs/reference/farm-ui.md)） |
-| 宿主契约（`host.ts`）：通知、托盘、快捷键、原生通话与标题栏避让 | 「连接到本机」与语音（Rust 服务端没有，[连接到本机](docs/subsystems/lan.md)、[语音](docs/subsystems/voice.md)） |
-| 桌面壳：Rust 服务端子进程管理、灵动岛（`apps/island`）、四发布渠道隔离、打包与自更新 | 服务端内部启动（[地基](docs/subsystems/foundation.md)） |
-| 手机壳：WebView 容器（配对随「连接到本机」砍掉，Rust 服务端上连不上） | |
-
-包级说明见 [apps/web/README.md](apps/web/README.md)、[apps/web/src/farm/README.md](apps/web/src/farm/README.md) 和 [apps/mobile/README.md](apps/mobile/README.md)。
+| 窗口外壳：项目栏、侧栏（文件、源码管理、agent）、分栏和标签页、终端、文件和 diff 查看、命令面板、主题和字号 | `StateFrame` 的折叠与拼装（[核心状态](docs/subsystems/core.md)） |
+| 在进程里起服务端，放出本机回环的 HTTP 门，写 `server.json` | 服务端内部的组装（[地基](docs/subsystems/foundation.md)） |
+| 页面和服务端之间的桥：调用、状态帧、事件、订阅 | 协议形状与接口定义（[地基](docs/subsystems/foundation.md#契约规则和数据库)） |
+| 工作台：路由、外框、页面的分层、乐观意图与本机存下的选择、浅色和深色主题 | 各页的细节（[界面清单](docs/reference/farm-ui.md)）、界面怎么做（[界面](docs/style/design.md)） |
+| 宿主能力（`host.*`）：通知、主题、语言、打开文件和网址、终端、播放声音 | 像素场景画什么（[农场的皮](docs/subsystems/farm.md)） |
+|  | 命令行（`crates/vibevalley-cli`，[开发](docs/development.md#只用命令行派一个活)） |
 
 ## 在哪
 
 | 位置 | 职责 |
 |---|---|
-| `apps/web/src/base/` | 纯工具层：格式化、排序、拼音搜索（`search.ts`）、中文标点转换（`typedMarks.ts`）、快捷键 |
-| `apps/web/src/infra/` | 外部通信层：`frame.ts`（状态流和窄流）、`gateway.ts`（订阅流）、`query.ts`、`host.ts`、`router.ts` |
-| `apps/web/src/state/` | 状态中间层：`atom.ts`（`AtomRegistry`）、`intent.ts`（乐观意图）、`stored.ts`（`localStorage` 门面）、`prefs.ts` |
-| `apps/web/src/ui/`、`ui/domain/`、`ui/pixel/` | 基于 `@vibevalley/base-ui` 的无样式组件封装、线条图标（`icons.ts`）、跨模块业务展示件与像素通用组件 |
-| `apps/web/src/features/<概念>/` | 按概念划分的业务模块，跨 feature 仅经 `index.ts` 导入且无环（`src/layers.test.ts` 检查） |
-| `apps/web/src/farm/`、`tree/` | 像素农场与记忆树皮肤层 |
-| `apps/web/src/app/` | 顶层路由表（`App.tsx`）、侧栏导航（`places.ts`）与外框（`Shell.tsx`） |
-| `packages/stories/`、`apps/web/src/stories.tsx` | 按「设计体系 / 组件 / 交互 / 界面」四层组织的组件故事查看器 |
-| `packages/protocol/src/host.ts` | `Host` 接口、`desktopBridge`、`mobileBridge` 与 `desktopControl` 契约 |
-| `apps/desktop/src/`、`apps/island/` | Electron 主进程（`main.ts`、`infra/server.ts` 起 Rust 的 `vibevalley-server`、`base/channel.ts`、`infra/update.ts`）与 macOS 原生灵动岛 |
-| `apps/mac/src/`、`apps/mac/ui/` | 原生应用：GPUI 外壳（`main.rs`、`shell.rs`、`panes.rs`、`terminal/`）与 nsh TSX 页面（`App.tsx`、`surfaces/`、`components/`） |
-| `apps/mobile/src/` | Expo 手机壳（`infra/farm.ts`、`screens/PairScreen.tsx`、`screens/FarmScreen.tsx`、`infra/rtc.ts`） |
+| `apps/mac/src/main.rs`、`shell.rs`、`panes.rs` | 开窗口；根视图 `Shell`：项目、每个项目的分栏布局、侧栏、命令面板、快捷键（`bind_keys`） |
+| `apps/mac/src/hosted/` | 托管视图：一个视图一个 nsh 引擎，跑同一份 TSX 包；`bridge.rs` 是页面发回来的动作（`Action`），`frames.rs` 是外壳推给侧栏和面板的帧，`late.rs` 让服务端在后台线程起来 |
+| `apps/mac/src/host.rs` | 宿主能力的原生一半：系统通知、Finder 里显示、`open`、`afplay` 播放、读文件 |
+| `apps/mac/src/terminal/`、`viewer.rs`、`diff.rs` | 终端（`crates/vibevalley-terminal`）、文件查看、diff |
+| `apps/mac/src/pixel/` | 像素场景：农场、地图、记忆树、开场、图鉴（[农场的皮](docs/subsystems/farm.md)） |
+| `apps/mac/src/theme.rs`、`apps/mac/ui/tokens.ts` | 外壳的主题和设置；两边的值一样 |
+| `apps/mac/src/debug.rs` | 不看屏幕检查应用的两个入口：状态转储和脚本（[验收](.agents/skills/vv-acceptance/references/app.md)） |
+| `apps/mac/ui/App.tsx`、`bridge.ts`、`surfaces/`、`components/` | TSX 包的入口（按 `host.params.view` 挑视图）、桥的页面一半、外壳的面（侧栏、命令面板、agent 窗格、Markdown 窗格）和它们的零件 |
+| `apps/mac/ui/vv/VibeValley.tsx`、`vv/web/` | 工作台：`app/`（路由表 `App.tsx`、导航 `places.ts`、外框 `Shell.tsx`）、`features/<概念>/`、`ui/`、`state/`、`infra/`、`base/` |
+| `apps/mac/ui/vv/solid.ts`、`solidweb.ts`、`polyfill.ts` | 工作台的页面沿用 Solid 的写法；这三个文件在 nsh 的响应式上给出它们用到的那部分 |
+| `apps/mac/ui/vv/theme.json`、`apps/mac/ui/nsh.json` | 工作台的令牌：颜色（浅色、深色各一套）、字号、圆角、缓动、阴影（[界面](docs/style/design.md#令牌)） |
+| `crates/vibevalley-bridge/` | 桥的 Rust 一半：`Hub` 把一个 `Server` 分给多个视图；`fake::FakeServer` 用样例状态和写好的回答顶替服务端 |
+| `crates/vibevalley-workspace/`、`crates/vibevalley-store/` | 项目、布局、终端和 agent 任务的模型，和它们存的库 |
+| `packages/protocol/src/host.ts` | `Host` 接口：页面能向宿主要的东西 |
+| `apps/island/` | 刘海上的灵动岛（Swift）：一个单独的小程序，stdin 收工单摘要，stdout 说点了哪一行（[apps/island/README.md](apps/island/README.md)）；`apps/mac` 不带起它 |
 
 ## 模型和不变量
 
+### 进程和服务端
+
+- **服务端在应用的进程里**：`BridgeHub::install` 在后台线程调 `vibevalley_server::start`，家目录是 `$VIBEVALLEY_HOME`（默认 `~/.vibevalley`），工作目录同它（`ServerConfig::under`）；起来之前的调用由 `LateServer` 接住。起不来时页面连的是空的替身，窗口照常打开。
+- **同一个服务端另开一道本机的 HTTP 门**：`vibevalley_http::serve` 绑 `127.0.0.1` 的空闲端口，地址写进家目录的 `server.json`；命令行据此找到它，帮工的 `/mcp` 也在这道门上。
+- **一个服务端只有一个用户**：门只听 `127.0.0.1`，本机来的请求就是用户，没有登录、设备和配对。
+- **外壳自己的数据另存一个库**：项目、布局、外壳的设置在 `~/Library/Application Support/VibeValley/state.db`（`VIBEVALLEY_STORE` 改位置），和服务端的家目录分开。
+
+### 桥
+
+页面经 nsh 的 `host.post("action", …)` 发动作，Rust 经 `HostChannel` 的事件回（`crates/vibevalley-bridge/src/lib.rs` 开头的表）：
+
+| 页面（`apps/mac/ui/bridge.ts`） | 动作 | 回来的事件 |
+|---|---|---|
+| `call(op, payload)` | `call` | `reply:<id>`，契约的信封 `{ bizCode, message, data?, error? }` |
+| `frame("state")` | `watch` | `frame:state`，每帧一个 `StateFrame` |
+| `frame("live")`、`onLive(fn)` | `watch` | `frame:live`，每个事件一个 `LiveEvent` |
+| `subscribe(name, payload, on, ended)` | `subscribe`、`unsubscribe` | `sub:<id>`，每个事件一次，结束一次 |
+| `hostApi.<名字>` | `call`，`op` 是 `host.<名字>` | 外壳的 `Shell::host_call` 答 |
+
+- **`call` 不抛**：失败是 `bizCode` 非 0 的信封；没有宿主或超时回 `ServiceUnavailable`。
+- **工作台的请求只经 `Transport`**（`apps/mac/ui/vv/web/infra/transport.ts`）：应用里是桥（`bridged.ts` 的 `useBridge()`），测试和故事换成自己的（`infra/fixtures.ts`）；页面的代码不直接碰 `host`。
+
 ### 页面状态与数据流
 
-- **页面只读 `StateFrame`，心跳超时主动重连**：`infra/frame.ts` 维护唯一 `/api/v1/state` 连接并按 id `reconcile` 进 Solid store；45 秒无数据或心跳即重连，断线时直接显示未连接。
-- **Atom 是唯一状态中间层**：跨组件状态 `defineAtom`、本地存储 `defineStored` 和乐观意图 `defineIntent` 统一建在 `state/` 的 `AtomRegistry` 上（由 `vibevalley/*-door` 规则检查）。
-- **乐观意图（`Intent`）按阶段联合建模，等帧 `seq` 追上后结算**：
-  - `Intent` 为按 `phase` 区分的判别联合（`IntentAt`），写操作带 `requestKey` 或 `sendKey` 叠加到当前帧上，等到 `frame.seq >= reply.seq` 或频道出现对应消息时才结算。
-  - `VibeValleyApi` 自动解包 `{ bizCode, message, data?, error? }` 信封；错误经 `infra/api.ts` 的 `faultOf` 转为结构化 `UiFault`（携带六位 `bizCode`、语义 `tag`、`reason`、`next`、`settings` 以及由 `bizCodeMeta` 决定的 `retryable`），只挂在失败或降级分支上；组件内禁止绕过 `act.run` 直接调写接口（`vibevalley/act-door` 检查）。
-- **一次性读取走 `infra/query.ts`**：自有 Query client 管缓存与失效，结果先经 Schema 解码，状态流重连时自动 `refetchOnRelink`。会话轨迹经 `features/session/runs.ts` 的 `SessionLogs` 先订直播流、再读快照并按 `seq` 与 `revision` 合并。
-- **颜色收进语义调色板**：浅色/深色主题通过 `<html data-theme>` 切换，只用 `style.css` 语义色变量（`vibevalley/no-hex-color` 检查）；像素皮固定 `data-theme="light"`。
-- **样式是元素上的 Tailwind v4 class**（[vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)）：令牌在 `style.css` 的 `@theme`，class 名就是令牌名；零件对外收 `class`，被调用方改的样子做成变体属性。`vibevalley/style-attrs` 拦 `className` / `classList` 和只写死值的 `style`，`vibevalley/design-tokens` 拦 class 里绕过令牌的任意值。动态几何坐标、Canvas 数据、Motion 动画与 Shiki 语法高亮等外部计算值通过原生对象 `style` 保持单一所有者，且 `vibevalley/no-hex-color` 同时拦截 class 与 JSX 内联 `style` 中的硬编码十六进制色值。
-- **全局 CSS 仅保留非 JSX 边界**：`style.css` 按 `@layer theme, base, components, utilities` 声明层序，仅承载重置（`reset.css`）、字体与令牌、桌面拖拽区（`[data-window-drag]`）以及消毒后富文本 DOM 后代（`Markdown.css`、`PxMarkdown.css` 与 `richText.ts` 代码块/图表）；故事宿主（`src/stories.css`）另导入 `@vibevalley/stories/style.css` 的填满画布规则，并用 `@source` 让 Tailwind 也扫查看器自己的 class。
+- **页面只读 `StateFrame`**：`infra/frame.ts` 从 `Transport` 收帧，交出最新的整帧；按 id 的列表用 `Each` 保住行。
+- **状态中间层是 `state/`**：跨组件的状态 `defineAtom`（`atom.ts`）、本机存下的选择 `defineStored`（`stored.ts`、`prefs.ts`）、乐观意图 `defineIntent`（`intent.ts`）。
+- **乐观意图等帧 `seq` 追上后结算**：`Intent` 是按 `phase` 区分的判别联合；写操作带 `requestKey` 或 `sendKey` 叠在当前帧上，等到 `frame.seq >= reply.seq` 或频道出现对应消息才结算。
+- **错误是结构化的 `UiFault`**：`infra/api.ts` 的 `faultOf` 从信封里取出六位 `bizCode`、`reason`、`next`、`settings` 和由 `bizCodeMeta` 决定的 `retryable`，只挂在失败或降级的分支上。
+- **一次性读取走 `infra/query.ts`**：自有的 Query client 管缓存与失效，结果先经 Schema 解码。会话轨迹经 `features/session/runs.ts` 的 `SessionLogs` 先订直播流、再读快照并按 `seq` 与 `revision` 合并。
+- **按概念分 feature**：`features/<概念>/` 的名字和服务端的模块、契约的文件夹一样；路由表、导航和设置的分区以代码为准，这里不抄。
 
-### 宿主与多端
+### 宿主
 
-- **宿主接口封闭，缺省能力为 `null`**：页面通过 `currentHost()` 检测能力是否存在，不分支判断宿主类型。跨进程调用经 `@vibevalley/bridge` 按 Schema 校验。
-- **只从本机打开**：Rust 服务端只听 `127.0.0.1`，没有登录和配对（[用户和设备](docs/subsystems/user.md)）；页面的 `/login`、`/pair` 与手机壳的配对在它上面用不了，随页面和手机壳删。
-
-### 发布渠道
-
-桌面版按构建版本拆分为四个独立渠道（`apps/desktop/src/base/channel.ts`），可同机并排运行：
-
-| 渠道 | 版本形态 | 应用名 / Bundle ID | 家目录 | 工作目录 | CLI 命令 |
-|---|---|---|---|---|---|
-| 正式版（`stable`） | `v0.4.0` | VibeValley / `dev.vibevalley.app` | `~/.vibevalley` | `~/vibevalley` | `vibevalley` |
-| Beta（`beta`） | `v0.4.0-beta.1` | VibeValley Beta / `dev.vibevalley.app.beta` | `~/.vibevalley-beta` | `~/vibevalley-beta` | `vibevalley-beta` |
-| Alpha（`alpha`） | `v0.4.0-alpha.1` | VibeValley Alpha / `dev.vibevalley.app.alpha` | `~/.vibevalley-alpha` | `~/vibevalley-alpha` | `vibevalley-alpha` |
-| 开发（`dev`） | `0.0.0` / 源码 | VibeValley Dev / `dev.vibevalley.app.dev` | `~/.vibevalley-dev` | `~/vibevalley-dev` | `cargo run -p vibevalley-cli --` |
-
-- **渠道独立隔离，机器级资源抢占**：各渠道有独立的单实例锁、家目录、工作目录和相隔 10 的默认端口；全局快捷键与灵动岛归先启动的渠道持有（`apps/desktop/src/infra/machine.ts`）。
-- **发版阶段与表结构锁死**：
-  - `alpha` 在 `main` 打 tag；首个 `beta` 从 `main` 切出 `release/X.Y` 分支。
-  - 同一条 `X.Y` 线的后续 `beta` 与 `stable` 必须保持 `db.schema` 与 `beta.1` 一致（`vp run release:verify` 检查），且 `stable` 与最后一个 `beta` 指向同一提交。
-- **桌面端内置 CLI 与控制 socket**：应用内「关于」页可将 `Contents/Resources/bin/<命令>` 软链到 `~/.local/bin`。主进程监听 `$VIBEVALLEY_HOME/desktop.sock`（`0600`），供 `vibevalley app status|open|quit|restart|update` 控制桌面端。
+- **宿主接口封闭，缺的能力就是没有**：页面经 `infra/host.ts` 的 `currentHost()` 看能力在不在，不按宿主的名字分支；没有宿主时（无头的测试和故事）是只有名字的那一个。
+- **外壳答的能力以 `host.info` 报的为准**（`apps/mac/src/shell.rs` 的 `host_call`）：通知、托盘摘要、语言、Finder 里显示、主题、字体和字号、开场、开终端、打开网址和文件、像素图的目录、播放声音、读文件。
+- **像素场景归外壳画**：`/farm`、`/farm/<仓库>` 和 `/tree` 的页面只发 `openFarm`、`openTree`，外壳在同一个位置换上像素视图；像素视图要去工作台的某一页时发 `PixelEvent::Route`，要开终端时发 `PixelEvent::Terminal`。
 
 ## 怎么走
 
-**桌面端启动与退出**
+**打开**
 
-1. Electron 获取本渠道单实例锁，在同一个窗口上方用沙箱化的 `WebContentsView` 展示静态加载页 `opening.html`，文档和字体加载后显示窗口。它与浏览器首屏共用三张无字开机场景（`public/brand/opening-*.webp`），按本机时间选择：5–10 点晨光山谷、10–18 点门口迎宾、其余时间夜间灯火。品牌名、加载状态和失败原因由页面单独绘制，品牌名取词典的 `web.opening.name`。
-2. 读取缓存的登录 shell `PATH`，并发启动 Rust 服务端子进程 `vibevalley-server`（传入 `VIBEVALLEY_PORT=0 --ready-json --web <页面目录>`）。
-3. 等待服务端 stdout 输出 JSON 就绪收据（限时 40 秒），在开屏下面加载它的网页，不替换开屏文档。网页通过 `Host.opening` 上报真实阶段，隐藏自己的内联开屏；场景、字体和进度保留到同一次退场。服务启动失败时在原开屏展示原因与日志路径，不重新加载。整页刷新重新开屏，应用内导航不重播。
-4. 启动 `VibeValleyIsland` 子进程，主进程订阅 `/api/v1/state` 将工单摘要推给灵动岛 stdin，点击条目经 stdout 打开对应工单。
-5. 退出时先向服务端发 `SIGTERM` 等待落盘（限时 8 秒，超时 `SIGKILL`），关闭灵动岛并释放快捷键。
+1. `main.rs` 开窗口，建 `Shell`；`Shell` 先盖上开场的像素画（`opening:launch`，`VIBEVALLEY_NO_OPENING=1` 跳过），同时在后台读项目和设置、起服务端。
+2. 项目读进来后开场说「好了」，约 0.9 秒后让开；读不进来时开场停在失败上，说原因。
+3. 工作台的视图以 `route` 和 `globalShell` 两个参数打开，路由变了发 `global_route` 告诉外壳。
 
-品牌名、像素进度条、芽叶精灵与状态文字集中在底部。等待真实进度时，显示进度从 3% 平滑前进，模拟部分最多到 90%；真实阶段超过它后接着前进，始终不后退。模拟值只用于显示，不改写真实进度或就绪状态。10%、30%、50%、70% 是启动阶段的权重，不是耗时比例；图片完成数推进 50–70%，画布的资源比例推进 70–95%，全部就绪才到 100%。失败或超时立即停止模拟，不假报完成。精灵跟随进度显示认真、期待和开心，超时或失败显示困惑。减少动效时停止循环和精灵位移，只低频更新进度。
+**构建 TSX 包**
 
-开机图在工作台取得首帧和首批查询后退场，最多等待 2 秒；农场另等画布画好或报错，最多再等 15 秒。画布经 `data-opening` 与 `data-opening-progress` 声明等待、失败和资源比例，开屏不导入农场模块。超时、画布失败或活跃的初始查询失败都不报完成，交回页面自身的等待或错误状态；订阅、观察器和计时器在等待结束或根作用域取消时释放。桌面原生开屏退场或窗口关闭时移除并关闭自己的 `webContents`，不替换主网页及其宿主桥。查询活动与失败通过根作用域的 Query client 读取，不另建全局缓存。完成跳跃与 240 毫秒退场同时发生，不额外停留。没有「开始／继续」菜单，第一次打开同样直接进入应用。
-
-**工作台路由**
-
-- 路由表在 `apps/web/src/app/App.tsx`，导航栏的条目在 `apps/web/src/app/places.ts`，设置的分区在 `apps/web/src/features/setting/SettingsPage.tsx`；以代码为准，这里不抄。农场保留侧栏，不显示工作台页头；`/tree` 和 `/pair` 在外框 `Shell` 之外。
-- `infra/router.ts` 提供 Router、对象路由表与 Outlet。共同布局跨页面保留，参数变化保留页面实例，需要重建的农场按仓库显式设 key。应用布局读 route meta，不自行拆 URL。匹配、History、参数与查询字符串的约定见 [Router](apps/web/src/infra/router/README.md)。
-- URL 查询字段只经 Router 更新；工单筛选由 Schema 读写，不再由 Atom 另存。未知页面、非法站内编码和不满足 Codec 的参数显示错误页，不默默跳到可写页面。
-- 无样式的 Query、Router、Form、Table 归 `infra`，数据契约使用 Zod；视觉绑定归 `ui`。Form 管编辑版本、校验与明确的提交收据；Table 消费已解码的领域行，不拥有请求。字段、生命周期和受控状态的契约见 [页面基础设施](apps/web/src/infra/README.md)。
-
-**打包与自更新**
-
-1. `vp run package:mac` 构建页面与桌面壳，用 `cargo build --release` 打出 `vibevalley-server` 与命令行 `vibevalley` 两个二进制放进应用，产出 `.dmg`、`.zip` 与 `release.json`。
-2. 打包应用启动时及每 4 小时检查同渠道最新 Release，下载 `.zip` 并校验大小、SHA-512 与 `Info.plist` 版本。
-3. 若新版本 `dbSchema` 与本地一致，退出或点「重启更新」时自动替换 `.app`；若 `dbSchema` 变化，仅在「关于」页由用户确认后替换。
-4. 点「重启更新」后，窗口盖上开场的农场画面（`opening.html`），按步说：停下帮工、存好农场，再换上新版本；新版本打开时还是这幅画面。换不上时画面留着，说原因并给出 Release 页的链接「去下载最新版」。
+1. `apps/mac/build.rs` 用 nsh 的命令行（`NSH_BIN`、仓库的 `.tools/bin/nsh` 或 `PATH` 里的）把 `apps/mac/ui/App.tsx` 打成一个包。
+2. 调试构建从磁盘读 `apps/mac/ui/build/`，改 TSX 不用重新编译 Rust；发布构建（或设了 `VIBEVALLEY_EMBED_UI`）把包嵌进二进制。
+3. 没有 nsh 时构建照样过，应用里的视图说包没打出来。
 
 ## 和谁打交道
 
-- **服务端（`crates/vibevalley-http/src/lib.rs`）**：通过 `--ready-json` 交接监听地址，在 `/` 提供静态页，在 `/api/v1/*` 提供接口与流。
-- **宿主桥（`@vibevalley/bridge`）**：连接页面与 Electron 主进程、Expo 原生壳及 CLI 控制通道。
+- **服务端（`crates/vibevalley-server`、`crates/vibevalley-server-api`）**：进程内经 `Server` 调接口、读帧和事件；同一个 `Hub` 也挂在 HTTP 门上。
+- **命令行（`crates/vibevalley-cli`）**：经 `server.json` 找到应用里的服务端。
 
 ## 为什么这样
 
-- **一份 Solid 2 页面服务三个宿主**：UI 与纯函数规则只写一遍，按 id `reconcile` 细粒度更新，避免高频帧触发整树重渲染。
-- **状态中间层收拢到 `state/atom.ts` 的 Atom，意图按帧 `seq` 结算**：消除「请求返回先弹回旧状态、下一帧再跳过去」的闪烁。
-- **样式用 Tailwind v4，不用编译期求值的样式库**：编译期求值的样式库限制要到构建才报、构建慢、样式名按位置起，还要一整套自己的 lint 和 skill；Tailwind 是 agent 最熟的写法，令牌在 `@theme` 一处。没选 CSS Modules（回到给样式起名的老问题）或 vanilla-extract（同样构建期求值）。
-- **按概念分 feature，单向分层且出口显式**：跨 feature 只走 `index.ts` 并禁止成环；像素农场作为皮肤层放在 `features` 之上。
-- **四渠道完全隔离并自带 CLI**：正式版与开发版/测试版可同机并排运行，互不争抢库，用户无需另装 Node 即可使用 CLI。
+- **服务端在进程里，页面走桥**：少一个进程和一层序列化之外的网络；HTTP 门只为命令行和帮工的 `/mcp` 留着。
+- **工作台用 TSX，像素场景用 Rust**：工作台是表单、列表和文字，沿用页面的写法和契约的 TS 类型最省；像素场景要逐像素对齐和每帧重画，直接画成 `DrawList`，同一份还能在 CPU 上画成 PNG 来查。
+- **状态中间层收在 `state/`，意图按帧 `seq` 结算**：消除「请求返回先弹回旧状态、下一帧再跳过去」的闪烁。
+- **只做 macOS，只在本机**：浏览器、手机和另一台电脑进来的门连同登录一起去掉，主监听不用再分本机和外面。
 
 ## 还没做的
 
-- 手机竖屏专属版面：[手机竖屏版面](.agents/notes/proposed/feature/2026-10-09-mobile-layout.md)。
-- 页面关闭时的移动推送、Windows 桌面版、macOS Developer ID 签名与公证。
+签名、公证、打包和自动更新，以及还没搬过来的页面和宿主能力，见[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)的「剩下的」。
 
 ## 怎么验证
 
-- `vp run web:check`、`vp test run apps/web/src/layers.test.ts apps/web/src/stories.test.ts`：页面类型、Tailwind 的编译、令牌/门禁规则（`vibevalley/style-attrs`、`vibevalley/no-hex-color`、`vibevalley/design-tokens`）、分层方向与故事覆盖测试。
-- `vp run --filter @vibevalley/web e2e`（`apps/web/test/*.spec.ts`）：各页面 Playwright 端到端与 axe 无障碍测试。
-- `vp run mac:check`：原生页面的 nsh 类型检查与打包；`vp run rust:check` 含 `apps/mac` 与工作区、终端 crate 的测试。
-- `vp run desktop:test`、`apps/desktop/src/base/releases.test.ts`、`vp run --filter @vibevalley/desktop update-check`：桌面端启动、灵动岛、渠道版本与自更新测试。
+- `vp run rust:check`：`apps/mac` 和它用的 crate 的格式、clippy 与测试（`apps/mac/src/pixel/tests.rs` 用真的素材和替身服务端的样例画每个场景）。
+- `vp run mac:check`：`apps/mac/ui` 的 nsh 类型检查与打包。
+- `apps/mac/ui/vv/app/*.test.tsx`、`apps/mac/ui/components/*.test.tsx`：`nsh/test` 写的页面测试和截图，用样例的 `Transport`。
+- 在真的应用上：照 [验收的应用分册](.agents/skills/vv-acceptance/references/app.md)，用 `VIBEVALLEY_DEBUG_SCRIPT` 走一遍并截图。

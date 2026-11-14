@@ -18,7 +18,7 @@
 代码注释中的 `screen n` 对应以下编号：
 
 1. **农场主界面**：左上为助手、农场卡（等级、金币、经验）和「工作台」；右上为地图、频道、精力瓶和菜单；正下为工具栏；左下为手机和帮工栏（田头在手机内）。单仓库农场（`/farm/<仓库>`）立有仓库牌，仅展示该仓库帮工，点牌返回地图。按住 ⌥ 显示院内设施名称。
-2. **工单详情**（点地块或看板卡片）：农场为居中弹窗（`apps/web/src/farm/issue/IssueView.tsx`），工作台为独立页（`/issues/<id>`，`apps/web/src/features/issue/views/IssueDetail.tsx`），共用 `apps/web/src/features/issue/model/overview.ts`（基于服务端 `Issue.stage`，[工单](docs/subsystems/issue.md)「给用户看的状态」）。从上到下依次展示：
+2. **工单详情**（点地块或看板卡片）：农场为居中弹窗（`apps/web/src/farm/issue/IssueView.tsx`），工作台为独立页（`/issues/<id>`，`apps/mac/ui/vv/web/features/issue/views/IssueDetail.tsx`），共用 `apps/mac/ui/vv/web/features/issue/model/overview.ts`（基于服务端 `Issue.stage`，[工单](docs/subsystems/issue.md)「给用户看的状态」）。从上到下依次展示：
    - **这是什么**：`#号`、单行短标题（`shortTitle`）、仓库与优先级。
    - **现在怎样**：当前阶段、等待或运行耗时、帮工、轮次与花费（卡住标红）。
    - **要你做的**：仅在需用户操作时出现，只放一个主按钮（回答问题、验收通过/收获、打回、恢复卡住、重开）。
@@ -49,18 +49,18 @@
 17. **助手和宠物**（左上角助手头像）：更换默认助手外观（存档案）与宠物（存本机偏好）；点院内助手展开手机对话。
 18. **图纸桌**（院内图纸桌）：直接打开工作台工单页（`/issues`）。
 19. **地图**（`/repos` 的「全部」，[截图](docs/images/map.png)）：每个仓库对应一座小岛，岛上地块对应进行中工单与空位（`RepoSummary.maxSessions`），院门外种子袋代表排队工单。
-20. **设置**（`/settings/<分区>`）：左栏是搜索框与分组导航（分区见 `apps/web/src/features/setting/SettingsPage.tsx`），右栏按卡片展示设置项（`SettingsGroup`、`SettingRow`、`KeyRow`），标明农场级或本机级生效范围。
+20. **设置**（`/settings/<分区>`）：左栏是搜索框与分组导航（分区见 `apps/mac/ui/vv/web/features/setting/SettingsPage.tsx`），右栏按卡片展示设置项（`SettingsGroup`、`SettingRow`、`KeyRow`），标明农场级或本机级生效范围。
 21. **开机加载**：场景图、单独绘制的品牌名和加载状态，准备好后直接进入农场；时段与退场条件见[客户端](docs/subsystems/app.md#怎么走)。
 22. **助手页**（`/orchestrator` 与 `/orchestrator/<档案 id>`）：分「记性」「轨迹」（支持标记「这一轮做错了」）与默认助手专属的「声音」三个页签（[助手](docs/subsystems/orchestrator.md)、[语音](docs/subsystems/voice.md)）。
 
-**工作台外壳**（`apps/web/src/app/Shell.tsx`）：最左为安静的导航栏，条目见 `apps/web/src/app/places.ts`，路由见 `apps/web/src/app/App.tsx`。
+**工作台外壳**（`apps/mac/ui/vv/web/app/Shell.tsx`）：最左为安静的导航栏，条目见 `apps/mac/ui/vv/web/app/places.ts`，路由见 `apps/mac/ui/vv/web/app/App.tsx`。
 
 ## 轨迹
 
-助手页与帮工档案页共用 `apps/web/src/features/session/Trajectory.tsx`（先读日志快照再合并直播事件）：
+助手页与帮工档案页共用 `apps/mac/ui/vv/web/features/session/Trajectory.tsx`（先读日志快照再合并直播事件）：
 
 - **一步一行**：展示轮次、时间、彩色类型标签与内容摘要；工具行格式为 `做了什么 {参数} → 结果`（失败标红），点击展开全文与工具输入输出。
-- **顶部瀑布条**：分收到、模型、工具三道按耗时排列（跳过轮间空闲），点击片段定位到对应行（计算规则见 `apps/web/src/features/session/runs.ts`）。
+- **顶部瀑布条**：分收到、模型、工具三道按耗时排列（跳过轮间空闲），点击片段定位到对应行（计算规则见 `apps/mac/ui/vv/web/features/session/runs.ts`）。
 - **底部合计与搜索**：汇总轮数、步数、模型与工具耗时及 token 用量（含缓存命中）；右上搜索框按标签、正文与工具输入输出过滤。
 
 ## 精力瓶与计分

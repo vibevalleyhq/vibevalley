@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-工单详情（`apps/web/src/features/issue/views/IssueDetail.tsx`）把一件事的经过拆在四块里，各有标题，各自取数：
+工单详情（`apps/mac/ui/vv/web/features/issue/views/IssueDetail.tsx`）把一件事的经过拆在四块里，各有标题，各自取数：
 
 | 块 | 取数 | 内容 |
 |---|---|---|

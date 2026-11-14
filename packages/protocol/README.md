@@ -19,7 +19,7 @@ Schemas, `api.ts`, the rules and the client stay hand-written here until the pag
 ## The host
 
 Every host gives the whole `Host`; a capability it lacks is null, and the page draws by that, never by asking which host
-it is in. The page finds its host in `apps/web/src/infra/host.ts` (`currentHost()`: the desktop preload's, the phone's built
+it is in. The page finds its host in `apps/mac/ui/vv/web/infra/host.ts` (`currentHost()`: the desktop preload's, the phone's built
 over the bridge, `browserHost` otherwise).
 
 | Member | Desktop (`apps/desktop`) | Phone (`apps/mobile`) | Browser |

@@ -15,7 +15,7 @@ Status: proposed
 
 - `User` 往上给一个名字的流（`names`，改名时发），`Channel` 订阅它，更新用户参与者的名字；历史消息照旧按参与者显示，所以改名后旧消息也显示新名字。没设名字时照旧用词典里的默认叫法。
 - 助手的系统提示写上「用户叫 X」（`orchestrator/prompts.ts`），帮工的提示里提到用户的地方也用这个名字；没设名字就不写。
-- 页面上用户自己的头像写名字的第一个字（`apps/web/src/ui/domain/Face.tsx` 的 `UserFace`）。
+- 页面上用户自己的头像写名字的第一个字（`apps/mac/ui/vv/web/ui/domain/Face.tsx` 的 `UserFace`）。
 
 **帮工能改名。**
 

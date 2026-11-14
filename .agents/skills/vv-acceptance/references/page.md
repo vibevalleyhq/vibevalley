@@ -4,11 +4,11 @@
 
 ## 什么时候用
 
-- 改了 `apps/web/src/features`、`apps/web/src/farm`、`apps/web/src/tree`、`apps/web/src/ui`、`apps/web/src/app` 的画面。
+- 改了 `apps/mac/ui/vv/web/features`、`apps/web/src/farm`、`apps/web/src/tree`、`apps/mac/ui/vv/web/ui`、`apps/mac/ui/vv/web/app` 的画面。
 - 改了 `assets` 的贴图、字体、指针。
 - 改了形状，想看服务端的新字段在页面上画出来。
 
-不用它：只改了 `apps/web/src/infra`、`apps/web/src/state` 或 feature 里的请求、测试已经覆盖的；只改了测试。
+不用它：只改了 `apps/mac/ui/vv/web/infra`、`apps/mac/ui/vv/web/state` 或 feature 里的请求、测试已经覆盖的；只改了测试。
 
 ## 准备
 

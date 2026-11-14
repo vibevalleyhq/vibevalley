@@ -20,7 +20,7 @@
 | `crates/vibevalley-server/src/start.rs` | `ServerConfig`（家目录、空间根、钥匙、内置模板、测试开关）与开机组装 |
 | `crates/vibevalley-server/src/modules/setting.rs` | `Setting`：`settings.json` 读成 `Stored`；`Secret`；`status`、`validate`、`save`；语音默认值与差异；就绪状态 |
 | `crates/vibevalley-home/src/lib.rs` | 家目录在哪（`VIBEVALLEY_HOME`，默认 `~/.vibevalley`）、`server.json`、保存的语言 |
-| `apps/web/src/features/setting/` | 工作台设置页 |
+| `apps/mac/ui/vv/web/features/setting/` | 工作台设置页 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`setting.get`、`setting.validate`、`setting.update`）。
 

@@ -11,7 +11,7 @@ description: 在 VibeValley 的页面（apps/web）和官网（apps/site）里�
 
 1. [界面怎么做](docs/style/design.md)：挑哪一档令牌、原子组件的样子、交之前的自查。
 2. `apps/web/src/style.css`：`@theme static`（先用 `--color-*: initial` 这些清掉 Tailwind 自带的，再写其余令牌：字、行高、粗细、圆角、缓动、容器宽度、像素皮的颜色）、紧跟其后的 `@theme inline`（跟着主题换的颜色和两档阴影；必须在清空之后，放在前面会被 `initial` 抹掉，`bg-page` 这些就不生成）、`@theme` 里的 `--animate-*` 和关键帧、`@utility`（`scroll-fade-x/y`、`pixel-*`）。
-3. 换过的零件照着抄：[Button](apps/web/src/ui/Button.tsx)（变体表、按下、禁用）、[Tag](apps/web/src/ui/Tag.tsx)（`Dot` 的动态尺寸）、[Icon](apps/web/src/ui/Icon.tsx)（零件的不变量压过调用方）。
+3. 换过的零件照着抄：[Button](apps/mac/ui/vv/web/ui/Button.tsx)（变体表、按下、禁用）、[Tag](apps/mac/ui/vv/web/ui/Tag.tsx)（`Dot` 的动态尺寸）、[Icon](apps/mac/ui/vv/web/ui/Icon.tsx)（零件的不变量压过调用方）。
 
 ## 令牌：class 名就是令牌名
 
@@ -100,7 +100,7 @@ description: 在 VibeValley 的页面（apps/web）和官网（apps/site）里�
 
 ## 零件收调用方的样式
 
-- 零件收 `class?: JSX.ClassValue | undefined`（Solid 自己的类型，render prop 展开的 `{...p}` 才对得上），接在自己的 class 后面：`class={["inline-flex h-7 …", tones[props.tone], props.class]}`（Solid 的 `class` 收字符串、数组、`{ "x": on }`）；要一个字符串（交给 base-ui 的 `class`、拼给别的零件）时用 [`cx()`](apps/web/src/ui/cx.ts)。
+- 零件收 `class?: JSX.ClassValue | undefined`（Solid 自己的类型，render prop 展开的 `{...p}` 才对得上），接在自己的 class 后面：`class={["inline-flex h-7 …", tones[props.tone], props.class]}`（Solid 的 `class` 收字符串、数组、`{ "x": on }`）；要一个字符串（交给 base-ui 的 `class`、拼给别的零件）时用 [`cx()`](apps/mac/ui/vv/web/ui/cx.ts)。
 - `cx` 只拼接，不判冲突：同一个属性的两个 utility（`px-2` 和 `px-4`）谁赢看 Tailwind 的样式表顺序，不看谁在后面。所以调用方的 `class` 只补零件没设的（位置、宽度、外边距、`grow`）；要改零件已经设了的（颜色、高度、内边距），给零件加一个变体 prop。
 - 零件的不变量要压过调用方时（`Icon` 的对号永远是绿的）用重要修饰 `text-leaf!`，只在这里用。
 

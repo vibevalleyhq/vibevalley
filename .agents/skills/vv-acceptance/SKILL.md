@@ -14,7 +14,7 @@ description: 改完 VibeValley 的代码之后，在真的程序上验收、拿�
 | 改了什么 | 读哪份 | 证明什么 |
 |---|---|---|
 | `crates/vibevalley-server`、`crates/vibevalley-issues`、`crates/vibevalley-core`、`crates/vibevalley-cli`、`packages/protocol` 的接口或形状；开机的流程 | [server.md](.agents/skills/vv-acceptance/references/server.md) | 隔开的服务端起得来，接口和 `/api/v1/state` 里有这次的改动；工单能派、交回、完成 |
-| `apps/web/src/**`、`assets` 的画面、组件、贴图 | [page.md](.agents/skills/vv-acceptance/references/page.md) | 对着真的服务端，页面画出来是对的（截图） |
+| `apps/mac/ui/vv/web/**`、`assets` 的画面、组件、贴图 | [page.md](.agents/skills/vv-acceptance/references/page.md) | 对着真的服务端，页面画出来是对的（截图） |
 | `media`、生图协议、结果下载、助手媒体工具、素材库 `/library` 页 | [media.md](.agents/skills/vv-acceptance/references/media.md) | 隔离程序的生成、落盘、预览、发布与 Artifact 引用真的接通；费用和未知结果边界不变 |
 | `apps/desktop/src/infra/update.ts`、`releases.ts`、`apps/desktop/scripts/package.ts`、`.github/workflows/release.yml` | [desktop-update.md](.agents/skills/vv-acceptance/references/desktop-update.md) | 打包的应用查到新版、核对、退出时换上，SHA-512 不对时不换 |
 

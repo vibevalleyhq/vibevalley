@@ -19,7 +19,7 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张干净的
 
 | | 工作台 | 像素皮（农场、记忆树、`ui/pixel`） |
 |---|---|---|
-| 在哪 | `apps/web/src/ui`、`features/*`、`app` | `farm`、`tree`、`ui/pixel` |
+| 在哪 | `apps/mac/ui/vv/web/ui`、`features/*`、`app` | `farm`、`tree`、`ui/pixel` |
 | 字 | 系统的中文字体（`--font-sans`），13px 正文 | FusionPixel（`--font-pixel`），只在 12、24px 清楚 |
 | 图标 | reicon 的线条图标（`ui/Icon.tsx` 的 `<Icon name>`），跟着字的颜色 | `public/pixel` 的贴图（`SpriteIcon`） |
 | 线和影 | 1px 的 `--color-line`，`--shadow-raise`、`--shadow-float` | 2px 的树皮色框，`--shadow-px` 和 `pixel-window`、`pixel-frame`（style.css 的 `@utility`） |

@@ -17,7 +17,7 @@ description: 去掉 VibeValley 代码里没价值的注释：用 scripts/audit/c
 
 ```bash
 vpx scripts/audit/comment-review.ts --dry-run                          # 这个分支新加的
-vpx scripts/audit/comment-review.ts --all apps/web/src/features/issue --dry-run   # 一块已有的
+vpx scripts/audit/comment-review.ts --all apps/mac/ui/vv/web/features/issue --dry-run   # 一块已有的
 ```
 
 花钱的量级：一个模块一两百条注释、十次以内的请求，一分钱上下。新加的直接跑；`--all` 超过 500 条，先把条数告诉用户再跑。
@@ -26,7 +26,7 @@ vpx scripts/audit/comment-review.ts --all apps/web/src/features/issue --dry-run 
 
 ```bash
 vpx scripts/audit/comment-review.ts                                    # 要 DEEPSEEK_API_KEY
-vpx scripts/audit/comment-review.ts --all apps/web/src/features/issue
+vpx scripts/audit/comment-review.ts --all apps/mac/ui/vv/web/features/issue
 ```
 
 每条不该留的打三行：`文件:行  delete|rewrite  <对上的规矩那一行>: <理由>`、注释原文、`rewrite` 的话 `→ 改好的写法`。判 `keep` 的不打。有不该留的退出码 1；模型漏答或答得不成格式，脚本报错退出，重跑一次，还错就看报错。

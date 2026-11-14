@@ -21,7 +21,7 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档产�
 | `crates/vibevalley-artifact/src/` | 服务端跑的那份引擎：块操作 `Page`（`ops.rs`）、Markdown 互转（`markdown.rs`）、HTML 检查与划词改字（`html.rs`）、外壳（`shell.rs`）；和 `packages/artifact` 用同一份 golden 测例 |
 | `packages/protocol/src/rules/order.ts`、`display.ts` | 前后端共用的分数顺序键 `keyBetween` 与沙箱常量 `htmlSandbox` |
 | 表 `artifact`、`artifact_version`、`artifact_block`、`artifact_block_revision`、`artifact_change`、`artifact_suggestion` | Artifact、HTML 版本、块、块修订、操作批次与改写建议表 |
-| `apps/web/src/features/artifact/` | `ArtifactsPage.tsx`、`ArtifactCanvas.tsx`、`BlocksView.tsx` 及消费 `@vibevalley/artifact` 的薄层适配 |
+| `apps/mac/ui/vv/web/features/artifact/` | `ArtifactsPage.tsx`、`ArtifactCanvas.tsx`、`BlocksView.tsx` 及消费 `@vibevalley/artifact` 的薄层适配 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`artifact.*` 及 `GET /api/v1/artifact/<id>/<version>`）。
 
