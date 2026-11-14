@@ -61,6 +61,8 @@ pub struct ServerConfig {
     pub watch_pkm: bool,
     /// Where the voice line listens and how Agora reaches it.
     pub voice_line: modules::voice::LineConfig,
+    /// How the chat apps are reached and paced; tests point it at local stubs.
+    pub connector: modules::connector::Options,
 }
 
 impl ServerConfig {
@@ -89,6 +91,7 @@ impl ServerConfig {
             pkm_root: None,
             watch_pkm: true,
             voice_line: Default::default(),
+            connector: modules::connector::Options::default(),
         }
     }
 }
@@ -126,6 +129,8 @@ pub struct Started {
     pub resources: Arc<modules::mcp::Resources>,
     /// Dictation, grants and calls.
     pub voice: Arc<modules::voice::Voice>,
+    /// The chat apps tied to channels.
+    pub connectors: Arc<modules::connector::Connectors>,
 }
 
 impl Started {
@@ -134,6 +139,7 @@ impl Started {
     /// board's agents stop and its lock is released. The hub stays usable
     /// for reads; it serves nothing that needs the board afterwards.
     pub fn close(&self) {
+        self.connectors.close();
         self.crons.close();
         self.voice.close();
         self.orchestrator.close();
@@ -326,6 +332,9 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         pause: None,
     });
     modules::voice::install(&hub, voice.clone());
+    let connectors =
+        modules::connector::Connectors::open(&config.home, &hub, chat.clone(), config.connector.clone()).map_err(|e| failed("the connectors")(&e.message))?;
+    modules::connector::install(&hub, connectors.clone());
     Ok(Started {
         hub,
         setting,
@@ -347,5 +356,6 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         media_inputs,
         media,
         voice,
+        connectors,
     })
 }
