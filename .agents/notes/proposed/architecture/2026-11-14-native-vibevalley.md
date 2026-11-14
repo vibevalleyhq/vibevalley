@@ -34,12 +34,15 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 | 原生界面 | 侧栏按主仓库归并 worktree、只列真实终端、终端命名去重；终端字体回退；连接状态点移到头像 |
 | R1 工具 | `modules/tool`：助手和帮工共用一套工具，每个工具一个参数结构体，宽松解析写一处（`tool::args`），按调用者（`Who`）分支；`/mcp` 与助手的循环都从它取；工具说明在 `assets/tools/`，以 Rust 为准，不再从 TS 生成；助手的语音、多人对话、音色设计、理解工具接到任务端点 |
 | R2 设置 | `settings.json` 一次读成 `Stored`，MOSS 账户是 `Providers`/`Connection`，钥匙是 `Secret`（打印只出提示）；`provider.rs` 与 `setting.rs` 不再传 `Value`。工单板存储改表、工具不再绕 hub 调本服务，并进 R4 |
-| R3 媒体 | `media/jobs.rs` 一个任务机：存储、准入（8 个）、按种类的槽位（图片 1、语音 8）、取消、重下、释放、重启接续写一次；图片与语音在上面，去掉 `OtherJobs`。多人对话、音色设计、克隆、转写、理解按 `Ask` 加一个变体即可，暂不做 |
+| R3 媒体 | `media/jobs.rs` 一个任务机：存储、准入（8 个）、按种类的槽位（图片 1、语音 8）、取消、重下、释放、重启接续写一次；图片与语音在上面，去掉 `OtherJobs`。多人对话、音色设计、克隆、转写、理解后来也加在上面（见「服务端补齐（第二批）」） |
 | R6 命令行（第一步） | `crates/vibevalley-cli`（二进制 `vibevalley`，clap builder，说明按农场语言取 `cli.*` 词典）：issue（含 `--watch`、`watch`）、channel、repo、agent、session、runtime、memory、cron、artifact、pkm、worker、doctor；失败一行 JSON、退出码同 TS；`crates/vibevalley-home` 收家目录约定；`act_command` 进 `vibevalley-core::rules`。Rust 集成测试 7 个过（含 TS 版整份跑时失败的 watch）。`app`、`auth`、`chat` 不搬：桌面版、远程登录随删，`chat` 日后在 Rust 上做 |
 | R5 数据源（契约、词典） | 契约以 `crates/vibevalley-protocol/src/contract/`（原 `generated/`，改手写）为准，派生 `ts_rs::TS`；`typescript.rs` 写出 `packages/protocol/src/<概念>/shapes.gen.ts`（类型、`XValues`、品牌 id，带标签的联合成员带上自己的标签）与 `endpoints.gen.ts`；`tests/typescript.rs` 查生成物最新（`vp run protocol:ts` 写）、查 id 字段都标了品牌；翻转时旧的 465 个 TS 形状与生成物逐个互相可赋值。`gen/`（`gen.ts`、`prepare.sh`、`run.sh`）删了，`protocol:rust:check` 改名 `protocol:check`（加 `vp run goldens` 重写 artifact、pkm 的 golden）；`golden/` 的样例冻结成数据。词典挪到 `crates/vibevalley-i18n/locales/`（与 `same.json`），`catalogs.ts` 仍由 `i18n:gen` 写；`i18n check` 也数 Rust 与 `apps/mac` 里的用处。仍手写的 TS，随页面删：`schema.ts` 的 zod（页面、桌面、手机壳在边界解码，`satisfies Codec` 对着生成的类型，`schema.test.ts` 对键）、`api.ts` 的端点表（带 zod 的入参、出参；`api.test.ts` 对着 `endpoints.gen.ts`）、`rules/`、`client.ts`、`stream.ts`、`host.ts`；各 `shapes.ts` 只剩常量与路径（`dayMs`、`pathOf`…）、没有 Rust 类型的 `AgentIssueLevelValues`、`CronWhenKindValues`、`MediaAudioKindValues`，与 TS 专有的 `ServerReady`、`HtmlShellCommand`、`VoiceFix`。没翻的：`native.rs` 的原生端点类型不出 TS |
 | R4 拆 `Board`（第一步） | `vibevalley-issues` 并进服务端，拆成三个模块：`modules/issue`（`Board`：建单、挪状态、带话、排队、交付与取消、改字段、验收、拆单与合进父分支、起草）、`modules/session`（`Sessions`：雇帮工、每一轮、私聊、插话、叫停、放走、帮工的 `/mcp` 钥匙）、`modules/workplace`（`Workplace`：确保仓库、worktree 与 base、改动、交付合并、冲突、子工单合入、分支清理，不读工单板的状态）。写只经 `modules/ledger.rs`：已有工单的变化是带类型的 `IssueChange`，一处 `fold`；一轮的汇报由会话写成 `IssueChange::Reported`。工具的列工单、验收、带话、叫停直接调模块，不再绕 hub。合回本分支后 `cargo test --workspace` 470 个过。欠的三处见「剩下的」第 2 步 |
 | 闸 1 | 删了 `apps/server`、`apps/cli`、`packages/agent`；桌面版、页面 e2e、验收沙箱（`verify-server.ts`）都起 Rust 的 `vibevalley-server`（`VIBEVALLEY_SERVER_BIN` 或 cargo 的 debug 构建），桌面版打包带两个 Rust 二进制；`prompts.json`、投影 golden 归 Rust，不再从 TS 生成；只管 TS 服务端的审计删了（服务调用路径、schema 审计、protocol-namespace、单数服务、数据库门、同步文件）；CI 的 server 检查改为等 rust 任务。建工单或派活时仓库还不是 git 的会被建起来（同 TS）。桌面版测试 5/5，核心 e2e 过 |
 | 对照（删页面前的最后一次） | web e2e 在 Rust 上 243 个过约 207 个（失败的是媒体其余种类、语音、手机/局域网，及 4 个在 TS 上同样失败的）；CLI 测试 22 个过 21 个 |
+| 删页面和两个壳 | 删了 `apps/web`、`apps/desktop`、`apps/mobile` 与包 `ai`、`provider`、`engine`、`base-ui`、`stories`、`async`、`home`、`health`；`lan` 与 `user`（局域网监听、配对、远程登录，19 个操作、22 个类型）从契约、服务端、页面、词典里拿掉；只对它们生效的 lint 规则 12 条、`practice`/`health` 棘轮、web 的 CI job 一并删，`main` 要求的 `web`、`desktop` 两个检查改为跟着 rust job |
+| 服务端补齐（第二批） | 契约里 Rust 没答的操作全部补上：`media` 的克隆、转写、音频接续与清理、理解（9 个，另补上原来只有工具没有处理的多人对话与音色设计）；`voice` 的听写、声网授权与续期、通话的起停与收发、MOSS 校验（9 个，含声网 token 算法与通话线路）；`connector` 的 5 个操作与微信、飞书、QQ 三个适配器；`orchestrator.eval.create`。都只对着离线替身测过，没连过真的厂商。合回后 `vibevalley-server` 与 `vibevalley-protocol` 的测试 217 个过 |
+| 原生页面 | `nsh check` 从 29 个类型错误到 0；图片、语音、音频（重写）、理解四个面板做完，笔记按圆点拖动与雷达跳转、频道拖动排序搬了过来；路由里没有「未移植」的页了。`nsh test` 192 个过（无头，不出图） |
 | 合入 `main` | `main` 上的 TS 版停在标签 `ts-final`（`14076df66`，正交领域的最后一批）；它比本分支的基点多出来的只有 TS 服务端和描述它的文档，本分支都已删或改写，所以合并时整棵树取本分支的 |
 
 ### 重构（按顺序）
@@ -82,10 +85,10 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 
 - **oar**：只保留 Claude Code、Codex、通用 ACP 与测试用 scripted；不做运行时的 skills / MCP / tools 清单、额度与花费的逐厂商细节、记录回放的完整格式。
 - **pi-ai / pi-durable**：自研 agent 只接 DeepSeek（OpenAI 兼容接口），不做多厂商路由、价格表与对话持久化的完整语义；压缩用最简单的截断摘要。
-- **语音（声网 RTC）**：不在 TS 删除的闸里；先删，日后按需在 Rust 上重做。
+- **语音（声网 RTC）**：服务端已在 Rust 上重做（`modules/voice`）。原生页面跑在 nsh 里，没有浏览器的 WebRTC：一通真的电话还要宿主接声网的原生 SDK（或 MOSS Live 的 WebSocket 与音频），要它提供什么写在 [语音](docs/subsystems/voice.md)。没搬的：通话中途的收件箱播报、声网的区域切换、助手的话按 token 流式送出（改成按句）。
 - **外部聊天接入（微信、飞书、QQ）**：已在 Rust 上重做（`modules/connector`）。没搬的：汇报按工单阶段决定还推不推（只看用户读没读、后面有没有新话）、待发条数的内存缓存、落盘的坏收件行兜底（收件按列存，不会有）；飞书长连接的帧是照它 SDK 的协议手写的，只对着本地替身测过，没连过真的飞书。
-- **手机壳与「连接到本机」**：随 `apps/mobile` 删除，`lan.*` 与远程登录相关的 `user.*` 一并删除。
-- **媒体其余种类**：多人对话、音色设计、克隆、转写、理解暂不做（vendor 调用已有），要时在 `Ask` 里加。
+- **手机壳与「连接到本机」**：已随 `apps/mobile` 删除，`lan.*` 与 `user.*`（账号、设备、授权）整个删除。
+- **媒体其余种类**：已做（见上）。简化的：厂商文件记在任务自己的行上，没有单独的表；清理失败不在开机时重试，由用户再点一次；任务轮询固定 3 秒，没有退避。页面上没有的：Flash 边生成边播、转写时间线的跳播、超过 25 MiB 结果的播放与另存（nsh 和宿主还没有对应的能力）。
 - **命令行的 `app`、`auth`、`chat`**：随桌面版、远程登录删；终端里和自研 agent 对话日后在 Rust 上做。
 
 ### 对上指什么
@@ -105,16 +108,15 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 
 ### 剩下的（按顺序）
 
-1. **删页面和两个壳。**删 `apps/web`、`apps/desktop`、`apps/mobile`，服务端的 `lan` 与远程登录相关的 `user.*`，以及只为它们存在的东西：
-   - 包：`bridge`、`engine`、`base-ui`、`stories`、`async`、`testkit`、`home`、`ai`、`provider`、`health`；`packages/protocol` 里手写的 zod（`schema.ts`）、端点表（`api.ts`）、`client.ts`、`stream.ts`、`host.ts`，`rules/` 里页面不用的；`pkm`、`artifact` 挪进 `apps/mac/ui`。
-   - 检查：`web:check`、`web:test`、`desktop:test`、`packages:check` 里对应的部分、`practice:check`、`health:verify`，根 `vite.config.ts` 里只对这些目录生效的 lint 配置，CI 的 web、desktop 两个 job。
-   - 脚本：`package:mac`、`release`、`update-check` 里 Electron 的部分（第 4 步在 `apps/mac` 上重做）。
-   - 文档：`docs/subsystems/app.md`、`lan.md`、`user.md`、`voice.md` 等写明原生版没有的部分；删 [服务端和机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)，多机以后在 Rust 上重新提。
+1. **删页面和两个壳的收尾。**主体已做（见「已完成」）。还剩：
+   - `packages/` 里页面删掉后没人用的导出约 400 个（`vp run deadcode` 报，`packages/protocol` 占多数）和 4 条原生页面不用的规则（`roomLeft`、`phaseText`、`farmOf`、`plotKeyOf`）；`host.ts` 里没有宿主答的 `desktopBridge`、`mobileBridge`。
+   - 词典里没人用的键约 890 个：`desktop.*` 删；`web.farm`（568 个）、`web.tree`、`web.opening` 等农场补齐（第 3 步）时用得上的先留，补齐后再清。
+   - 还指着已删目录的配置：`.vibevalley/check`、`release.yml`、`scripts/release/release.ts`（比对 TS 的表结构）、`verify-server.ts`（找 `apps/web/dist`）、`scripts/gen/capabilities.ts` 的「连进来的设备」一列。前三个归第 4 步。
 2. **R4 欠的三处。**存储从 `vibevalley-store` 的 JSON 文档改成表（工单、会话、各轮、计数、待带的话），和 `server.db` 合成一个库；建单、挪状态、改字段、起草、看改动的工具直接调模块，不经 hub；轨迹与记性由会话发事实，`Facts::log`、`Drivers::remember` 的直接调用改成订阅。做完加一个用脚本化农机走完主线第 2 到第 6 步的集成测试。
 3. **原生界面补齐。**
-   - 页面（`apps/mac/ui`）：助手的记性页、工单里的 artifact、素材库与生成面板、看板拖动、笔记的拖动和雷达跳转、快捷键表。
+   - 页面（`apps/mac/ui`）：已补齐（见「已完成」）；剩宿主缺能力的三处（见「砍掉的」媒体一条）。
    - 农场（`apps/mac/src/pixel`）：工具栏、面板、田头聊天、帮工外观；夜间遮罩和树 HUD 两个已知缺陷。
-   - 宿主：菜单栏图标、开场、安装命令行、带起灵动岛。
+   - 宿主：菜单栏图标、开场、安装命令行、带起灵动岛；通话要的声网原生 SDK 或 MOSS Live 的音频；媒体输入的文件路径、能跳播的 `host.playAudio`、PCM 播放。
 4. **打包。**签名公证、`.dmg`/`.zip`/`release.json`、原生版到原生版的自动更新；`package:mac`、`release`、`update-check` 走 Rust 的包。
 5. **验收，合入。**走完[对上指什么](#对上指什么)，截图和命令输出附在 PR 的 Checks 里；squash 合进 `main`。
 
