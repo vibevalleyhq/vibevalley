@@ -7,8 +7,6 @@ use std::path::{Path, PathBuf};
 use serde_json::{Value, json};
 use vibevalley_files::{Entry, EntryKind, FuzzyMatch, SearchHit};
 use vibevalley_git::{Branch, Change, Commit, Status, Worktree};
-use vibevalley_workspace::transcript::{Entry as TranscriptEntry, Item};
-use vibevalley_workspace::{PendingPermission, TaskInfo, TaskPhase};
 
 pub struct RailProject<'a> {
     pub id: i64,
@@ -271,7 +269,6 @@ pub const COMMANDS: &[(&str, &str, &str, Option<&str>)] = &[
     ("palette.search", "Search in Project…", "Navigate", Some("mod+shift+f")),
     ("panel.files", "Show Files", "View", None),
     ("panel.git", "Show Source Control", "View", None),
-    ("panel.agents", "Show Agents", "View", None),
     ("git.diff", "Open Changes", "Source Control", None),
     ("git.diff_staged", "Open Staged Changes", "Source Control", None),
     ("project.add", "Add Project…", "Projects", None),
@@ -320,128 +317,6 @@ pub fn search_hits(root: &Path, hits: &[SearchHit]) -> Vec<Value> {
             })
         })
         .collect()
-}
-
-/// A task phase as the views' three status forms plus "needs you".
-pub fn phase_tone(phase: TaskPhase) -> (&'static str, &'static str) {
-    match phase {
-        TaskPhase::Preparing => ("running", "Preparing"),
-        TaskPhase::Running => ("running", "Running"),
-        TaskPhase::WaitingPermission => ("alert", "Needs permission"),
-        TaskPhase::WaitingReply => ("alert", "Waiting for you"),
-        TaskPhase::Idle => ("idle", "Idle"),
-        TaskPhase::Review => ("alert", "Review"),
-        TaskPhase::Merged => ("done", "Merged"),
-        TaskPhase::Ended => ("done", "Ended"),
-        TaskPhase::Failed => ("failed", "Failed"),
-    }
-}
-
-pub fn tasks(list: &[TaskInfo], selected: Option<&str>) -> Value {
-    let items: Vec<Value> = list
-        .iter()
-        .map(|t| {
-            let (tone, label) = phase_tone(t.phase);
-            json!({
-                "id": t.id, "title": t.title, "runtime": t.runtime_id, "tone": tone, "label": label,
-                "branch": t.branch, "error": t.error, "updatedMs": t.updated_ms, "createdMs": t.created_ms,
-                "live": t.phase.is_live(),
-            })
-        })
-        .collect();
-    json!({ "tasks": items, "selected": selected })
-}
-
-/// Decisions for `DecisionInbox`: permission requests and tasks in review.
-pub fn inbox(pending: &[PendingPermission], list: &[TaskInfo]) -> Value {
-    let mut entries: Vec<Value> = pending
-        .iter()
-        .map(|p| {
-            json!({
-                "id": format!("perm:{}:{}", p.task_id, p.request_id),
-                "kind": "permission",
-                "source": p.task_title,
-                "title": format!("{} wants to run {}", p.task_title, p.tool),
-                "detail": if p.summary.is_empty() { p.input.to_string() } else { p.summary.clone() },
-                "primary": "Allow",
-                "secondary": "Deny",
-                "atMs": p.at_ms,
-            })
-        })
-        .collect();
-    entries.extend(list.iter().filter(|t| t.phase == TaskPhase::Review).map(|t| {
-        json!({
-            "id": format!("review:{}", t.id),
-            "kind": "review",
-            "source": t.title,
-            "title": format!("{} is ready for review", t.title),
-            "detail": t.branch.as_ref().map(|b| format!("branch {b}")),
-            "primary": "Complete",
-            "secondary": "Send back",
-            "atMs": t.updated_ms,
-        })
-    }));
-    json!({ "entries": entries })
-}
-
-/// A transcript as display blocks: messages, tool calls paired with their
-/// results (`ToolCall` objects for `ToolCallCard`), and runs of consecutive
-/// calls folded into groups.
-pub fn transcript(entries: &[TranscriptEntry], running: bool) -> Value {
-    let mut blocks: Vec<Value> = Vec::new();
-    let mut results: HashMap<&str, (&TranscriptEntry, bool, &str)> = HashMap::new();
-    for e in entries {
-        if let Item::ToolResult { id, ok, output } = &e.item {
-            results.insert(id.as_str(), (e, *ok, output.as_str()));
-        }
-    }
-    for e in entries {
-        let block = match &e.item {
-            Item::User(text) => json!({ "kind": "user", "text": text }),
-            Item::Assistant(text) => json!({ "kind": "assistant", "text": text }),
-            Item::Thinking(text) => json!({ "kind": "thinking", "text": text }),
-            Item::ToolCall { id, name, input } => {
-                let result = results.get(id.as_str());
-                let status = match result {
-                    Some((_, true, _)) => "done",
-                    Some((_, false, _)) => "failed",
-                    None if running => "running",
-                    None => "done",
-                };
-                let call = json!({
-                    "id": id, "name": name,
-                    "summary": input.lines().next().unwrap_or(""),
-                    "status": status,
-                    "startedMs": e.at_ms,
-                    "endedMs": result.map(|r| r.0.at_ms),
-                    "input": input,
-                    "output": result.filter(|r| r.1).map(|r| r.2),
-                    "error": result.filter(|r| !r.1).map(|r| r.2),
-                    "retryable": false,
-                });
-                if let Some(last) = blocks.last_mut()
-                    && last["kind"] == "tools"
-                {
-                    last["calls"].as_array_mut().expect("calls").push(call);
-                    continue;
-                }
-                json!({ "kind": "tools", "calls": [call] })
-            }
-            Item::ToolResult { .. } => continue,
-            Item::FileChanged { path, .. } => json!({ "kind": "note", "text": format!("changed {}", path.display()) }),
-            Item::PermissionAsked { tool, summary, .. } => {
-                json!({ "kind": "note", "text": format!("asked to run {tool}: {summary}") })
-            }
-            Item::PermissionAnswered { decision, .. } => json!({ "kind": "note", "text": format!("answered {decision:?}") }),
-            Item::Question(text) => json!({ "kind": "question", "text": text }),
-            Item::TurnEnd { .. } => json!({ "kind": "turn_end" }),
-            Item::Error(text) => json!({ "kind": "error", "text": text }),
-            Item::Ended => json!({ "kind": "note", "text": "session ended" }),
-        };
-        blocks.push(block);
-    }
-    let waiting_first_call = running && !matches!(blocks.last().map(|b| &b["kind"]), Some(k) if k == "tools");
-    json!({ "blocks": blocks, "running": running, "thinking": waiting_first_call })
 }
 
 #[cfg(test)]
@@ -608,70 +483,5 @@ mod tests {
         assert_eq!(v[0]["label"], "tree.rs");
         assert_eq!(v[0]["detail"], "src/ui");
         assert_eq!(v[0]["id"], "file:src/ui/tree.rs");
-    }
-
-    #[test]
-    fn transcript_pairs_calls_and_groups_runs() {
-        let e = |at, item| TranscriptEntry {
-            agent_path: vec![],
-            at_ms: at,
-            item,
-        };
-        let entries = vec![
-            e(1, Item::User("do it".into())),
-            e(
-                2,
-                Item::ToolCall {
-                    id: "t1".into(),
-                    name: "Bash".into(),
-                    input: "ls".into(),
-                },
-            ),
-            e(
-                3,
-                Item::ToolResult {
-                    id: "t1".into(),
-                    ok: true,
-                    output: "a\nb".into(),
-                },
-            ),
-            e(
-                4,
-                Item::ToolCall {
-                    id: "t2".into(),
-                    name: "Read".into(),
-                    input: "x.rs".into(),
-                },
-            ),
-            e(
-                5,
-                Item::ToolResult {
-                    id: "t2".into(),
-                    ok: false,
-                    output: "no such file".into(),
-                },
-            ),
-            e(6, Item::Assistant("done".into())),
-            e(
-                7,
-                Item::ToolCall {
-                    id: "t3".into(),
-                    name: "Bash".into(),
-                    input: "make".into(),
-                },
-            ),
-        ];
-        let v = transcript(&entries, true);
-        let blocks = v["blocks"].as_array().unwrap();
-        assert_eq!(blocks.len(), 4);
-        assert_eq!(blocks[1]["calls"].as_array().unwrap().len(), 2);
-        assert_eq!(blocks[1]["calls"][0]["status"], "done");
-        assert_eq!(blocks[1]["calls"][0]["endedMs"], 3);
-        assert_eq!(blocks[1]["calls"][1]["status"], "failed");
-        assert_eq!(blocks[1]["calls"][1]["error"], "no such file");
-        assert_eq!(blocks[3]["calls"][0]["status"], "running");
-        assert_eq!(v["thinking"], false);
-        let v = transcript(&entries[..1], true);
-        assert_eq!(v["thinking"], true);
     }
 }

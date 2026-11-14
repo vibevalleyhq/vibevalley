@@ -1,14 +1,12 @@
 // The workspace sidebar (`host.params.contextual === true`):
 //   Left tree: Open Repos -> (Worktree groups when >1, else flat) -> Terminal Tabs
 //              (highlighting tabs where codex/claude/opencode is running).
-//   Right inspector (`host.params.role === "inspector"`): Files, Git changes, Agents.
+//   Right inspector (`host.params.role === "inspector"`): Files and Git changes.
 import { effect, host, Image, Scroll, signal, Text, View } from "nsh";
 import { Button } from "nsh/base";
 
 import { act, call, frame, frameRev, hostApi } from "../bridge";
-import type { Decision } from "../components/DecisionInbox";
 import { radius, tok, type as ty } from "../tokens";
-import { AgentsPanel, type AgentsFrame } from "./AgentsPanel";
 import { FileTree, type FilesFrame } from "./FileTree";
 import { GitPanel, type GitFrame, type GitTab } from "./GitPanel";
 import { ProjectRail, type RailFrame, type RailProject, type RailTab } from "./ProjectRail";
@@ -75,8 +73,6 @@ export function Sidebar() {
   const rail = frame<RailFrame>("rail");
   const files = frame<FilesFrame>("files");
   const git = frame<GitFrame>("git");
-  const agents = frame<AgentsFrame>("agents");
-  const inbox = frame<{ entries: Decision[] }>("inbox");
   const vvState = frame<VvStateFrame>("state");
   const vvRev = frameRev("state");
   const vvRepos = signal<VvRepo[]>([]);
@@ -173,7 +169,6 @@ export function Sidebar() {
         </View>
         {panel() === "files" ? <FileTree frame={files()} /> : null}
         {panel() === "git" ? <GitPanel frame={git()} tab={gitTab()} /> : null}
-        {panel() === "agents" ? <AgentsPanel agents={agents()} inbox={inbox()} /> : null}
       </View>
     );
   }
@@ -186,7 +181,6 @@ export function Sidebar() {
         <View style={{ flex: 1 }}>
           {panel() === "files" ? <FileTree frame={files()} /> : null}
           {panel() === "git" ? <GitPanel frame={git()} /> : null}
-          {panel() === "agents" ? <AgentsPanel agents={agents()} inbox={inbox()} /> : null}
         </View>
       </View>
     );

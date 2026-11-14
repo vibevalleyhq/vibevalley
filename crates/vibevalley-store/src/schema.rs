@@ -25,20 +25,6 @@ pub(crate) const MIGRATIONS: &[&str] = &["
         scrollback TEXT NOT NULL,
         PRIMARY KEY (project_id, id)
     );
-    CREATE TABLE agent_sessions (
-        id TEXT PRIMARY KEY,
-        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-        runtime_id TEXT NOT NULL,
-        session_id TEXT,
-        title TEXT NOT NULL,
-        status TEXT NOT NULL,
-        worktree_path TEXT,
-        branch TEXT,
-        record_path TEXT,
-        created_ms INTEGER NOT NULL,
-        updated_ms INTEGER NOT NULL
-    );
-    CREATE INDEX agent_sessions_by_project ON agent_sessions(project_id, created_ms);
     CREATE TABLE settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL

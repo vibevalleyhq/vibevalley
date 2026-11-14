@@ -6,22 +6,6 @@ fn store() -> Store {
     Store::open_in_memory().unwrap()
 }
 
-fn session(id: &str, project_id: ProjectId, created_ms: i64) -> AgentSessionRow {
-    AgentSessionRow {
-        id: id.into(),
-        project_id,
-        runtime_id: "claude".into(),
-        session_id: None,
-        title: format!("task {id}"),
-        status: "running".into(),
-        worktree_path: Some(PathBuf::from("/tmp/wt 一/x")),
-        branch: Some("vibevalley/task".into()),
-        record_path: None,
-        created_ms,
-        updated_ms: created_ms,
-    }
-}
-
 fn terminal(id: &str, project_id: ProjectId) -> SavedTerminal {
     SavedTerminal {
         id: id.into(),
@@ -91,7 +75,6 @@ fn missing_project_is_not_found() {
     assert!(matches!(s.project(99), Err(StoreError::NotFound)));
     assert!(matches!(s.set_layout(99, &json!({})), Err(StoreError::NotFound)));
     assert!(matches!(s.set_terminals(99, &[]), Err(StoreError::NotFound)));
-    assert!(matches!(s.upsert_agent_session(&session("a", 99, 1)), Err(StoreError::NotFound)));
     assert_eq!(s.layout(99).unwrap(), None);
     assert!(s.terminals(99).unwrap().is_empty());
 }
@@ -156,36 +139,6 @@ fn terminals_are_replaced_and_keep_order() {
 }
 
 #[test]
-fn agent_sessions_upsert_list_delete() {
-    let s = store();
-    let p = s.add_project(Path::new("/w/a")).unwrap();
-    let q = s.add_project(Path::new("/w/b")).unwrap();
-
-    s.upsert_agent_session(&session("old", p.id, 100)).unwrap();
-    s.upsert_agent_session(&session("new", p.id, 300)).unwrap();
-    s.upsert_agent_session(&session("other", q.id, 200)).unwrap();
-
-    let ids = |rows: Vec<AgentSessionRow>| rows.into_iter().map(|r| r.id).collect::<Vec<_>>();
-    assert_eq!(ids(s.agent_sessions(None).unwrap()), ["new", "other", "old"]);
-    assert_eq!(ids(s.agent_sessions(Some(p.id)).unwrap()), ["new", "old"]);
-    assert_eq!(ids(s.agent_sessions(Some(q.id)).unwrap()), ["other"]);
-
-    let mut updated = session("old", p.id, 100);
-    updated.status = "done".into();
-    updated.session_id = Some("sess-1".into());
-    updated.record_path = Some(PathBuf::from("/records/old.jsonl"));
-    updated.updated_ms = 999;
-    s.upsert_agent_session(&updated).unwrap();
-    assert_eq!(s.agent_session("old").unwrap(), Some(updated));
-    assert_eq!(s.agent_sessions(None).unwrap().len(), 3);
-
-    s.delete_agent_session("old").unwrap();
-    s.delete_agent_session("never-existed").unwrap();
-    assert_eq!(s.agent_session("old").unwrap(), None);
-    assert_eq!(ids(s.agent_sessions(Some(p.id)).unwrap()), ["new"]);
-}
-
-#[test]
 fn removing_a_project_removes_everything_it_owns() {
     let s = store();
     let p = s.add_project(Path::new("/w/a")).unwrap();
@@ -193,7 +146,6 @@ fn removing_a_project_removes_everything_it_owns() {
     for id in [p.id, keep.id] {
         s.set_layout(id, &json!({"id": id})).unwrap();
         s.set_terminals(id, &[terminal("t", id)]).unwrap();
-        s.upsert_agent_session(&session(&format!("s{id}"), id, 1)).unwrap();
     }
 
     s.remove_project(p.id).unwrap();
@@ -201,9 +153,8 @@ fn removing_a_project_removes_everything_it_owns() {
     assert_eq!(s.projects().unwrap(), vec![keep.clone()]);
     assert_eq!(s.layout(p.id).unwrap(), None);
     assert!(s.terminals(p.id).unwrap().is_empty());
-    assert!(s.agent_sessions(Some(p.id)).unwrap().is_empty());
     let conn = s.conn.lock().unwrap();
-    for table in ["layouts", "terminals", "agent_sessions"] {
+    for table in ["layouts", "terminals"] {
         let n: i64 = conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get(0)).unwrap();
         assert_eq!(n, 1, "{table}");
     }
@@ -237,8 +188,8 @@ fn concurrent_use_from_many_threads() {
             let s = s.clone();
             std::thread::spawn(move || {
                 for i in 0..50 {
-                    s.upsert_agent_session(&session(&format!("{t}-{i}"), p.id, i)).unwrap();
-                    s.set_setting(&format!("k{t}"), &json!(i)).unwrap();
+                    s.set_layout(p.id, &json!({"t": t, "i": i})).unwrap();
+                    s.set_setting(&format!("k{t}-{i}"), &json!(i)).unwrap();
                     s.projects().unwrap();
                 }
             })
@@ -247,7 +198,7 @@ fn concurrent_use_from_many_threads() {
     for h in handles {
         h.join().unwrap();
     }
-    assert_eq!(s.agent_sessions(None).unwrap().len(), 400);
+    assert_eq!(s.setting("k7-49").unwrap(), Some(json!(49)));
 }
 
 #[test]
@@ -261,7 +212,6 @@ fn on_disk_reopen_keeps_data_and_migrations_are_idempotent() {
         let layout = json!({"tabs": [1, 2, 3]});
         s.set_layout(p.id, &layout).unwrap();
         s.set_terminals(p.id, &[terminal("t1", p.id), terminal("t2", p.id)]).unwrap();
-        s.upsert_agent_session(&session("s1", p.id, 5)).unwrap();
         s.set_setting("k", &json!([true, null])).unwrap();
         let mode: String = s.conn.lock().unwrap().query_row("PRAGMA journal_mode", [], |r| r.get(0)).unwrap();
         assert_eq!(mode, "wal");
@@ -279,7 +229,6 @@ fn on_disk_reopen_keeps_data_and_migrations_are_idempotent() {
         assert_eq!(s.projects().unwrap(), vec![project.clone()]);
         assert_eq!(s.layout(project.id).unwrap(), Some(layout.clone()));
         assert_eq!(s.terminals(project.id).unwrap(), vec![terminal("t1", project.id), terminal("t2", project.id)]);
-        assert_eq!(s.agent_sessions(None).unwrap(), vec![session("s1", project.id, 5)]);
         assert_eq!(s.setting("k").unwrap(), Some(json!([true, null])));
     }
 }

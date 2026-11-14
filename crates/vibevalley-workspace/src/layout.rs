@@ -50,9 +50,6 @@ pub enum PaneKind {
         /// Repository root when it is not the project's own (a task worktree).
         repo: Option<PathBuf>,
     },
-    Agent {
-        task_id: String,
-    },
     /// A view supplied by an embedded view runtime rather than drawn by the
     /// app itself. `module` names it; `props` is passed through untouched.
     Hosted {
@@ -626,7 +623,15 @@ mod tests {
         l.add_tab(None, term("a"));
         let g1 = l.focused;
         let (g2, _) = l.split(g1, Axis::Horizontal, file("README.md")).unwrap();
-        l.split(g2, Axis::Vertical, PaneKind::Agent { task_id: "t1".into() }).unwrap();
+        l.split(
+            g2,
+            Axis::Vertical,
+            PaneKind::Pixel {
+                scene: "farm".into(),
+                props: serde_json::json!({}),
+            },
+        )
+        .unwrap();
         l.add_tab(
             None,
             PaneKind::Diff {

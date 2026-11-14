@@ -469,7 +469,7 @@ mod tests {
         let group = project.layout.focused;
         project
             .layout
-            .split(group, crate::layout::Axis::Horizontal, PaneKind::Agent { task_id: "t".into() });
+            .split(group, crate::layout::Axis::Horizontal, PaneKind::File { path: "Cargo.toml".into() });
         let layout_before = project.layout.clone();
         for job in ws.save_jobs() {
             job.run(&store).unwrap();

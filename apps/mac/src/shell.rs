@@ -18,11 +18,11 @@ use vibevalley_files::{FileIndex, FsChange, SearchOptions, Watcher};
 use vibevalley_git::{Branch, Commit, Repo, Status, Worktree};
 use vibevalley_store::{ProjectId, Store};
 use vibevalley_terminal::TermSession;
-use vibevalley_workspace::{Axis, PaneKind, TabId, TaskManager, TaskPhase, TaskSpec, Workspace, load_all, load_project};
+use vibevalley_workspace::{Axis, PaneKind, TabId, Workspace, load_all, load_project};
 
 use crate::diff::DiffView;
 use crate::hosted::frames::{self, PaletteMode, RailProject, TreeState};
-use crate::hosted::{Action, Choice, HostedEvent, HostedView, Panel};
+use crate::hosted::{Action, HostedEvent, HostedView, Panel};
 use crate::panes::{PaneEntity, SplitBounds};
 use crate::terminal::{SpawnSpec, TerminalEvent, TerminalView};
 use crate::theme::{Settings, ThemeChoice, Ui};
@@ -173,8 +173,6 @@ pub struct Shell {
     pub panel: Panel,
     pub inspector_open: bool,
     pub inspector_width: f32,
-    pub tasks: Option<TaskManager>,
-    pub selected_task: Option<String>,
     pub sidebar_width: f32,
     pub sidebar_visible: bool,
     /// Last `host.tray` summary, `host.locale` and `host.opening` from the views.
@@ -274,8 +272,6 @@ impl Shell {
             panel: Panel::Files,
             inspector_open: true,
             inspector_width: 280.0,
-            tasks: None,
-            selected_task: None,
             sidebar_width: Ui::get(cx).settings.sidebar_width,
             sidebar_visible: Ui::get(cx).settings.sidebar_visible,
             tray: None,
@@ -425,7 +421,6 @@ impl Shell {
                     if let Some(id) = active {
                         this.ws.activate(id);
                     }
-                    this.start_tasks(store.clone(), cx);
                     this.store = Some(store);
                     this.loaded = true;
                     if let Some(id) = this.ws.active_id() {
@@ -472,30 +467,6 @@ impl Shell {
                 s.launch = None;
                 cx.notify();
             });
-        })
-        .detach();
-    }
-
-    fn start_tasks(&mut self, store: Arc<Store>, cx: &mut Context<Self>) {
-        let (manager, rx) = TaskManager::new(
-            vibevalley_oar::default_runtimes(),
-            store,
-            Arc::new(vibevalley_workspace::git::SystemGit),
-            Default::default(),
-        );
-        self.tasks = Some(manager.clone());
-        cx.spawn(async move |this, cx| {
-            while let Ok(event) = rx.recv_async().await {
-                let alive = this.update(cx, |s, cx| {
-                    if let vibevalley_workspace::TaskEvent::Transcript { task_id, .. } = &event {
-                        s.push_transcript(task_id, cx);
-                    }
-                    s.push_agents(cx);
-                });
-                if alive.is_err() {
-                    break;
-                }
-            }
         })
         .detach();
     }
@@ -657,19 +628,6 @@ impl Shell {
         );
         self.load_dirs(id, cx);
         self.refresh_git(id, cx);
-        if let Some(tasks) = self.tasks.clone() {
-            let history_root = root.clone();
-            Self::bg(
-                cx,
-                move || tasks.load_history(id, &history_root),
-                |s, r, cx| {
-                    if let Err(e) = r {
-                        eprintln!("agent history: {e}");
-                    }
-                    s.push_agents(cx);
-                },
-            );
-        }
         let index_root = root.clone();
         Self::bg(
             cx,
@@ -905,7 +863,6 @@ impl Shell {
                             }
                             PaneKind::File { .. } => ("file", false, None, None, false),
                             PaneKind::Diff { .. } => ("diff", false, None, None, false),
-                            PaneKind::Agent { .. } => ("agent", false, None, None, false),
                             PaneKind::Hosted { .. } => ("hosted", false, None, None, false),
                             PaneKind::Pixel { .. } => ("pixel", false, None, None, false),
                         };
@@ -948,51 +905,6 @@ impl Shell {
             v.push("files", files, cx);
             v.push("git", git, cx);
         });
-        self.push_agents(cx);
-    }
-
-    pub fn push_agents(&mut self, cx: &mut Context<Self>) {
-        let Some(tasks) = &self.tasks else { return };
-        let project = self.ws.active_id();
-        let list = tasks.tasks(project);
-        let pending = tasks.pending_permissions();
-        let runtimes: Vec<Value> = tasks.runtimes().iter().map(|r| json!({ "id": r.id, "name": r.display_name })).collect();
-        let mut agents = frames::tasks(&list, self.selected_task.as_deref());
-        agents["runtimes"] = Value::Array(runtimes);
-        agents["counts"] = {
-            let c = tasks.counts(project);
-            json!({ "running": c.running, "waiting": c.waiting, "review": c.review, "failed": c.failed })
-        };
-        let inbox = frames::inbox(&pending, &list);
-        self.sidebar.update(cx, |v, cx| {
-            v.push("agents", agents.clone(), cx);
-            v.push("inbox", inbox.clone(), cx);
-        });
-        self.inspector.update(cx, |v, cx| {
-            v.push("agents", agents, cx);
-            v.push("inbox", inbox, cx);
-        });
-    }
-
-    fn push_transcript(&mut self, task_id: &str, cx: &mut Context<Self>) {
-        let Some(tasks) = &self.tasks else { return };
-        let running = tasks
-            .task(task_id)
-            .is_some_and(|t| matches!(t.phase, TaskPhase::Running | TaskPhase::Preparing));
-        let (entries, _) = tasks.transcript(task_id, 0);
-        let mut frame = frames::transcript(&entries, running);
-        if let Some(t) = tasks.task(task_id) {
-            let (tone, label) = frames::phase_tone(t.phase);
-            frame["task"] = json!({ "id": t.id, "title": t.title, "tone": tone, "label": label, "createdMs": t.created_ms });
-        }
-        for ((_, _), pane) in &self.panes {
-            if let PaneEntity::Hosted { view, task: Some(t), .. } = pane
-                && t == task_id
-            {
-                let frame = frame.clone();
-                view.update(cx, |v, cx| v.push("transcript", frame, cx));
-            }
-        }
     }
 
     // ---- actions from hosted views --------------------------------------
@@ -1115,26 +1027,6 @@ impl Shell {
                 self.run_search(regex, case_sensitive, cx);
             }
             Action::OpenHit { path, line } => self.open_file(path, Some(line), window, cx),
-            Action::Decide { id, choice } => self.decide(&id, choice, cx),
-            Action::CreateTask { prompt, runtime } => self.create_task(prompt, runtime, window, cx),
-            Action::SelectTask { id } => {
-                self.selected_task = Some(id.clone());
-                self.open_pane(PaneKind::Agent { task_id: id.clone() }, window, cx);
-                self.push_transcript(&id, cx);
-                self.push_agents(cx);
-            }
-            Action::PromptTask { id, text } => {
-                if let Some(t) = &self.tasks
-                    && let Err(e) = t.prompt(&id, &text)
-                {
-                    eprintln!("prompt task {id}: {e}");
-                }
-            }
-            Action::AbortTask { id } => {
-                if let Some(t) = &self.tasks {
-                    let _ = t.abort(&id);
-                }
-            }
         }
     }
 
@@ -1559,61 +1451,6 @@ impl Shell {
         );
     }
 
-    fn decide(&mut self, id: &str, choice: Choice, cx: &mut Context<Self>) {
-        let Some(tasks) = self.tasks.clone() else { return };
-        if let Some(rest) = id.strip_prefix("perm:")
-            && let Some((task, request)) = rest.split_once(':')
-        {
-            let decision = match choice {
-                Choice::Primary => vibevalley_oar::PermissionDecision::AllowOnce,
-                Choice::Secondary => vibevalley_oar::PermissionDecision::Deny { message: None },
-            };
-            if let Err(e) = tasks.respond_permission(task, request, decision) {
-                eprintln!("permission {id}: {e}");
-            }
-        } else if let Some(task) = id.strip_prefix("review:") {
-            let task = task.to_string();
-            match choice {
-                Choice::Primary => Self::bg(
-                    cx,
-                    move || tasks.merge(&task, true),
-                    |s, r, cx| {
-                        if let Err(e) = r {
-                            eprintln!("merge: {e}");
-                        }
-                        s.push_agents(cx);
-                    },
-                ),
-                Choice::Secondary => {
-                    let _ = tasks.prompt(&task, "The review sent this back: keep working on it.");
-                }
-            }
-        }
-        self.push_agents(cx);
-    }
-
-    fn create_task(&mut self, prompt: String, runtime: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
-        let (Some(tasks), Some(project)) = (self.tasks.clone(), self.ws.active()) else {
-            return;
-        };
-        let title: String = prompt.lines().next().unwrap_or("Task").chars().take(60).collect();
-        let spec = TaskSpec {
-            project_id: project.id(),
-            project_root: project.root().to_path_buf(),
-            title,
-            prompt,
-            runtime_id: runtime.unwrap_or_else(|| "scripted".into()),
-            model: None,
-            permission_mode: Default::default(),
-            isolate: project.root().join(".git").exists(),
-        };
-        let id = tasks.create(spec);
-        self.selected_task = Some(id.clone());
-        self.open_pane(PaneKind::Agent { task_id: id.clone() }, window, cx);
-        self.push_transcript(&id, cx);
-        self.push_agents(cx);
-    }
-
     // ---- palette --------------------------------------------------------
 
     pub fn open_palette(&mut self, mode: PaletteMode, window: &mut Window, cx: &mut Context<Self>) {
@@ -1754,13 +1591,9 @@ impl Shell {
             "pane.close" => self.close_active_tab(window, cx),
             "palette.files" => self.open_palette(PaletteMode::Files, window, cx),
             "palette.search" => self.open_palette(PaletteMode::Search, window, cx),
-            "panel.files" | "panel.git" | "panel.agents" => {
+            "panel.files" | "panel.git" => {
                 self.show_workspace(cx);
-                self.panel = match id {
-                    "panel.git" => Panel::Git,
-                    "panel.agents" => Panel::Agents,
-                    _ => Panel::Files,
-                };
+                self.panel = if id == "panel.git" { Panel::Git } else { Panel::Files };
                 self.inspector_open = true;
                 self.push_sidebar(cx);
                 cx.notify();
@@ -2031,28 +1864,16 @@ impl Shell {
                 self._subs.push(sub);
                 PaneEntity::Diff(view)
             }
-            PaneKind::Agent { task_id } => {
-                let mut params = Map::new();
-                params.insert("taskId".into(), json!(task_id));
-                let view = cx.new(|cx| HostedView::new("agent", params, dark, window, cx));
-                self.subscribe_hosted(&view, Some(task_id.clone()), None, window, cx);
-                let pane = PaneEntity::Hosted {
-                    view,
-                    task: Some(task_id.clone()),
-                };
-                cx.defer_in(window, move |this, _, cx| this.push_transcript(&task_id, cx));
-                pane
-            }
             PaneKind::Hosted { module, props } => {
                 let mut params = props.as_object().cloned().unwrap_or_default();
                 params.insert("module".into(), json!(module));
                 let doc = (module == "markdown").then(|| props["path"].as_str().map(PathBuf::from)).flatten();
                 let view = cx.new(|cx| HostedView::new(&module, params, dark, window, cx));
-                self.subscribe_hosted(&view, None, doc.clone(), window, cx);
-                if let Some(path) = doc.clone() {
+                self.subscribe_hosted(&view, doc.clone(), window, cx);
+                if let Some(path) = doc {
                     self.push_doc(&view, path, cx);
                 }
-                PaneEntity::Hosted { view, task: None }
+                PaneEntity::Hosted(view)
             }
             PaneKind::Pixel { scene, mut props } => {
                 if !props.is_object() {
@@ -2072,14 +1893,11 @@ impl Shell {
         }
     }
 
-    fn subscribe_hosted(&mut self, view: &Entity<HostedView>, task: Option<String>, doc: Option<PathBuf>, window: &mut Window, cx: &mut Context<Self>) {
+    fn subscribe_hosted(&mut self, view: &Entity<HostedView>, doc: Option<PathBuf>, window: &mut Window, cx: &mut Context<Self>) {
         let sub = cx.subscribe_in(view, window, move |this, view, event: &HostedEvent, window, cx| match event {
             HostedEvent::Action(a) => this.on_action(a.clone(), window, cx),
             HostedEvent::HostCall { op, payload, reply } => this.host_call(op, payload.clone(), reply.clone(), window, cx),
             HostedEvent::Ready => {
-                if let Some(t) = &task {
-                    this.push_transcript(t, cx);
-                }
                 if let Some(path) = &doc {
                     this.push_doc(view, path.clone(), cx);
                 }
@@ -2204,7 +2022,7 @@ impl Shell {
             p.view.update(cx, |v, cx| v.set_dark(dark, cx));
         }
         for pane in self.panes.values() {
-            if let PaneEntity::Hosted { view, .. } = pane {
+            if let PaneEntity::Hosted(view) = pane {
                 view.update(cx, |v, cx| v.set_dark(dark, cx));
             }
         }

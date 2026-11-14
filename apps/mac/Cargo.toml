@@ -8,7 +8,6 @@ vibevalley-server-api = { version = "0.1.0", path = "../../crates/vibevalley-ser
 base64 = "0.23.1"
 vibevalley-i18n = { version = "0.1.0", path = "../../crates/vibevalley-i18n" }
 vibevalley-protocol = { version = "0.1.0", path = "../../crates/vibevalley-protocol" }
-vibevalley-oar = { version = "0.1.0", path = "../../crates/vibevalley-oar" }
 vibevalley-bridge = { version = "0.1.0", path = "../../crates/vibevalley-bridge" }
 vibevalley-files = { version = "0.1.0", path = "../../crates/vibevalley-files", features = ["highlight"] }
 vibevalley-git = { version = "0.1.0", path = "../../crates/vibevalley-git" }

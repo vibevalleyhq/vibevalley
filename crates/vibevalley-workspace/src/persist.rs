@@ -4,7 +4,7 @@
 use std::path::Path;
 
 use serde_json::Value;
-use vibevalley_store::{AgentSessionRow, Project, ProjectId, Result, SavedTerminal};
+use vibevalley_store::{Project, ProjectId, Result, SavedTerminal};
 
 pub trait Persistence: Send + Sync {
     fn projects(&self) -> Result<Vec<Project>>;
@@ -17,9 +17,6 @@ pub trait Persistence: Send + Sync {
     fn set_layout(&self, id: ProjectId, layout: &Value) -> Result<()>;
     fn terminals(&self, id: ProjectId) -> Result<Vec<SavedTerminal>>;
     fn set_terminals(&self, id: ProjectId, terminals: &[SavedTerminal]) -> Result<()>;
-    fn agent_sessions(&self, project: Option<ProjectId>) -> Result<Vec<AgentSessionRow>>;
-    fn upsert_agent_session(&self, row: &AgentSessionRow) -> Result<()>;
-    fn delete_agent_session(&self, id: &str) -> Result<()>;
     fn setting(&self, key: &str) -> Result<Option<Value>>;
     fn set_setting(&self, key: &str, value: &Value) -> Result<()>;
 }
@@ -54,15 +51,6 @@ impl Persistence for vibevalley_store::Store {
     }
     fn set_terminals(&self, id: ProjectId, terminals: &[SavedTerminal]) -> Result<()> {
         vibevalley_store::Store::set_terminals(self, id, terminals)
-    }
-    fn agent_sessions(&self, project: Option<ProjectId>) -> Result<Vec<AgentSessionRow>> {
-        vibevalley_store::Store::agent_sessions(self, project)
-    }
-    fn upsert_agent_session(&self, row: &AgentSessionRow) -> Result<()> {
-        vibevalley_store::Store::upsert_agent_session(self, row)
-    }
-    fn delete_agent_session(&self, id: &str) -> Result<()> {
-        vibevalley_store::Store::delete_agent_session(self, id)
     }
     fn setting(&self, key: &str) -> Result<Option<Value>> {
         vibevalley_store::Store::setting(self, key)

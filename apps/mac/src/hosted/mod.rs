@@ -12,7 +12,7 @@ use gpui_kit::{
 use nsh_platform_gpui::{App as NshApp, AppOptions, AppView, Appearance, Bundle};
 use serde_json::{Map, Value, json};
 
-pub use bridge::{Action, Choice, Outbox, Panel};
+pub use bridge::{Action, Outbox, Panel};
 
 mod late;
 

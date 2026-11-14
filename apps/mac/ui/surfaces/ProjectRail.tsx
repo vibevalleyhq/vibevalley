@@ -43,7 +43,6 @@ export type RailFrame = { projects: RailProject[]; panel: string; inspectorOpen?
 const panels = [
   { id: "files", glyph: "▤", label: "Files" },
   { id: "git", glyph: "⑂", label: "Source Control" },
-  { id: "agents", glyph: "✦", label: "Agents" },
 ];
 
 export function ProjectRail(props: { frame: RailFrame | null }) {

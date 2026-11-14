@@ -49,17 +49,9 @@ impl Outbox {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum Choice {
-    Primary,
-    Secondary,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "snake_case")]
 pub enum Panel {
     Files,
     Git,
-    Agents,
 }
 
 impl Panel {
@@ -67,7 +59,6 @@ impl Panel {
         match self {
             Panel::Files => "files",
             Panel::Git => "git",
-            Panel::Agents => "agents",
         }
     }
 }
@@ -197,25 +188,6 @@ pub enum Action {
         path: PathBuf,
         line: u32,
     },
-
-    Decide {
-        id: String,
-        choice: Choice,
-    },
-    CreateTask {
-        prompt: String,
-        runtime: Option<String>,
-    },
-    SelectTask {
-        id: String,
-    },
-    PromptTask {
-        id: String,
-        text: String,
-    },
-    AbortTask {
-        id: String,
-    },
 }
 
 pub fn parse_action(value: &Value) -> Result<Action, String> {
@@ -270,13 +242,6 @@ mod tests {
             parse_action(&json!({"type": "stage", "paths": ["a.rs", "b/c.rs"]})).unwrap(),
             Action::Stage {
                 paths: vec!["a.rs".into(), "b/c.rs".into()]
-            }
-        );
-        assert_eq!(
-            parse_action(&json!({"type": "decide", "id": "x", "choice": "secondary"})).unwrap(),
-            Action::Decide {
-                id: "x".into(),
-                choice: Choice::Secondary
             }
         );
         assert_eq!(

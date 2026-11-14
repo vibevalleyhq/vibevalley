@@ -1,9 +1,6 @@
 //! Persistent app state in one SQLite file: projects, per-project layout,
-//! terminal restore data, the agent-session index, and settings. Source files
-//! never go in here. `Store` is `Send + Sync`; calls block briefly.
-//!
-//! CONTRACT: the items in this file are the public API other crates compile
-//! against. The owner may add items; do not rename or remove existing ones.
+//! terminal restore data, and settings. Source files never go in here.
+//! `Store` is `Send + Sync`; calls block briefly.
 
 use std::path::{Path, PathBuf};
 
@@ -50,24 +47,6 @@ pub struct SavedTerminal {
     pub cwd: PathBuf,
     pub title: Option<String>,
     pub scrollback: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AgentSessionRow {
-    /// VibeValley's own id for the task.
-    pub id: String,
-    pub project_id: ProjectId,
-    pub runtime_id: String,
-    /// The runtime's session id, used to resume.
-    pub session_id: Option<String>,
-    pub title: String,
-    /// Free-form status string owned by the workspace layer.
-    pub status: String,
-    pub worktree_path: Option<PathBuf>,
-    pub branch: Option<String>,
-    pub record_path: Option<PathBuf>,
-    pub created_ms: i64,
-    pub updated_ms: i64,
 }
 
 pub struct Store {
@@ -120,25 +99,6 @@ fn project_from_row(row: &Row<'_>) -> rusqlite::Result<Project> {
 }
 
 const PROJECT_COLS: &str = "id, path, name, position, last_opened_ms";
-
-const SESSION_COLS: &str = "id, project_id, runtime_id, session_id, title, status, \
-     worktree_path, branch, record_path, created_ms, updated_ms";
-
-fn session_from_row(row: &Row<'_>) -> rusqlite::Result<AgentSessionRow> {
-    Ok(AgentSessionRow {
-        id: row.get(0)?,
-        project_id: row.get(1)?,
-        runtime_id: row.get(2)?,
-        session_id: row.get(3)?,
-        title: row.get(4)?,
-        status: row.get(5)?,
-        worktree_path: row.get::<_, Option<String>>(6)?.map(PathBuf::from),
-        branch: row.get(7)?,
-        record_path: row.get::<_, Option<String>>(8)?.map(PathBuf::from),
-        created_ms: row.get(9)?,
-        updated_ms: row.get(10)?,
-    })
-}
 
 fn require_project(conn: &Connection, id: ProjectId) -> Result<()> {
     let found: Option<i64> = conn.query_row("SELECT 1 FROM projects WHERE id = ?1", [id], |r| r.get(0)).optional()?;
@@ -223,8 +183,7 @@ impl Store {
         Ok(project)
     }
 
-    /// Also removes the project's layout, saved terminals and agent-session
-    /// rows.
+    /// Also removes the project's layout and saved terminals.
     pub fn remove_project(&self, id: ProjectId) -> Result<()> {
         let mut conn = self.lock();
         let tx = conn.transaction()?;
@@ -232,7 +191,6 @@ impl Store {
         // guarantee does not hinge on the foreign_keys pragma.
         tx.execute("DELETE FROM layouts WHERE project_id = ?1", [id])?;
         tx.execute("DELETE FROM terminals WHERE project_id = ?1", [id])?;
-        tx.execute("DELETE FROM agent_sessions WHERE project_id = ?1", [id])?;
         let rows = tx.execute("DELETE FROM projects WHERE id = ?1", [id])?;
         changed(rows)?;
         tx.commit()?;
@@ -343,68 +301,6 @@ impl Store {
             }
         }
         tx.commit()?;
-        Ok(())
-    }
-
-    /// Newest first. `project` = `None` lists across all projects.
-    pub fn agent_sessions(&self, project: Option<ProjectId>) -> Result<Vec<AgentSessionRow>> {
-        let conn = self.lock();
-        let mut stmt = conn.prepare_cached(&format!(
-            "SELECT {SESSION_COLS} FROM agent_sessions
-             WHERE ?1 IS NULL OR project_id = ?1
-             ORDER BY created_ms DESC, rowid DESC"
-        ))?;
-        let rows = stmt.query_map([project], session_from_row)?;
-        Ok(rows.collect::<rusqlite::Result<_>>()?)
-    }
-
-    pub fn agent_session(&self, id: &str) -> Result<Option<AgentSessionRow>> {
-        let conn = self.lock();
-        Ok(conn
-            .query_row(&format!("SELECT {SESSION_COLS} FROM agent_sessions WHERE id = ?1"), [id], session_from_row)
-            .optional()?)
-    }
-
-    /// `NotFound` when the row's project does not exist.
-    pub fn upsert_agent_session(&self, row: &AgentSessionRow) -> Result<()> {
-        let conn = self.lock();
-        require_project(&conn, row.project_id)?;
-        conn.execute(
-            "INSERT INTO agent_sessions (id, project_id, runtime_id, session_id, title, status,
-                 worktree_path, branch, record_path, created_ms, updated_ms)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
-             ON CONFLICT(id) DO UPDATE SET
-                 project_id = excluded.project_id,
-                 runtime_id = excluded.runtime_id,
-                 session_id = excluded.session_id,
-                 title = excluded.title,
-                 status = excluded.status,
-                 worktree_path = excluded.worktree_path,
-                 branch = excluded.branch,
-                 record_path = excluded.record_path,
-                 created_ms = excluded.created_ms,
-                 updated_ms = excluded.updated_ms",
-            params![
-                row.id,
-                row.project_id,
-                row.runtime_id,
-                row.session_id,
-                row.title,
-                row.status,
-                row.worktree_path.as_deref().map(path_text),
-                row.branch,
-                row.record_path.as_deref().map(path_text),
-                row.created_ms,
-                row.updated_ms
-            ],
-        )?;
-        Ok(())
-    }
-
-    /// Deleting an id that does not exist is not an error.
-    pub fn delete_agent_session(&self, id: &str) -> Result<()> {
-        let conn = self.lock();
-        conn.execute("DELETE FROM agent_sessions WHERE id = ?1", [id])?;
         Ok(())
     }
 

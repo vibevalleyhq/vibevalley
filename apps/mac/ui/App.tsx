@@ -3,7 +3,6 @@
 import { host, mount, Text, View, type Component } from "nsh";
 
 import { viewName } from "./bridge";
-import { AgentPane } from "./surfaces/AgentPane";
 import { BridgeProbe } from "./surfaces/BridgeProbe";
 import { MarkdownPane } from "./surfaces/MarkdownPane";
 import { Palette } from "./surfaces/Palette";
@@ -22,7 +21,6 @@ function Unknown() {
 const views: Record<string, Component> = {
   sidebar: Sidebar,
   palette: Palette,
-  agent: AgentPane,
   markdown: MarkdownPane,
   probe: BridgeProbe,
   // The shell opens it as `vv`; `vibevalley` is the name the views use.

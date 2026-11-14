@@ -171,7 +171,3 @@ export function act(action: Action): void {
 export function viewName(): string {
   return String(host.params.view ?? "stories");
 }
-
-export function param<T>(name: string, fallback: T): T {
-  return (host.params[name] as T | undefined) ?? fallback;
-}

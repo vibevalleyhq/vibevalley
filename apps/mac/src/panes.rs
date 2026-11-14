@@ -22,7 +22,7 @@ use crate::viewer::FileViewer;
 pub enum PaneEntity {
     File(Entity<FileViewer>),
     Diff(Entity<DiffView>),
-    Hosted { view: Entity<HostedView>, task: Option<String> },
+    Hosted(Entity<HostedView>),
     Pixel(Entity<PixelView>),
 }
 
@@ -31,7 +31,7 @@ impl PaneEntity {
         match self {
             PaneEntity::File(v) => v.read(cx).focus_handle(cx),
             PaneEntity::Diff(v) => v.read(cx).focus_handle(cx),
-            PaneEntity::Hosted { view, .. } => view.read(cx).focus_handle(cx),
+            PaneEntity::Hosted(view) => view.read(cx).focus_handle(cx),
             PaneEntity::Pixel(v) => v.read(cx).focus_handle(cx),
         }
     }
@@ -40,7 +40,7 @@ impl PaneEntity {
         match self {
             PaneEntity::File(v) => v.clone().into_any_element(),
             PaneEntity::Diff(v) => v.clone().into_any_element(),
-            PaneEntity::Hosted { view, .. } => view.clone().into_any_element(),
+            PaneEntity::Hosted(view) => view.clone().into_any_element(),
             PaneEntity::Pixel(v) => v.clone().into_any_element(),
         }
     }
@@ -223,12 +223,6 @@ pub fn tab_title(shell: &Shell, tab: &Tab, cx: &App) -> String {
                 None => what,
             }
         }
-        PaneKind::Agent { task_id } => shell
-            .tasks
-            .as_ref()
-            .and_then(|t| t.task(task_id))
-            .map(|t| t.title)
-            .unwrap_or_else(|| "Agent".into()),
         PaneKind::Hosted { module, props } => match props.get("path").and_then(|p| p.as_str()) {
             Some(path) => format!("{} ({module})", path.rsplit('/').next().unwrap_or(path)),
             None => module.clone(),

@@ -68,7 +68,7 @@ pub fn dump(shell: &Shell, cx: &App) -> Value {
                         _ => match shell.panes.get(&(p.id(), t.id)) {
                             Some(PaneEntity::File(f)) => v["viewer"] = json!({ "status": f.read(cx).status(), "reloads": f.read(cx).reloads() }),
                             Some(PaneEntity::Diff(d)) => v["diff"] = json!(d.read(cx).summary()),
-                            Some(PaneEntity::Hosted { view, .. }) => v["hosted"] = view.read(cx).debug_state(),
+                            Some(PaneEntity::Hosted(view)) => v["hosted"] = view.read(cx).debug_state(),
                             Some(PaneEntity::Pixel(view)) => v["pixel"] = view.read(cx).debug_state(),
                             None => {}
                         },
@@ -109,9 +109,6 @@ pub fn dump(shell: &Shell, cx: &App) -> Value {
         "palette": shell.palette.as_ref().map(|p| json!({
             "open": p.open, "mode": p.mode.name(), "query": p.query, "view": p.view.read(cx).debug_state(),
         })),
-        "tasks": shell.tasks.as_ref().map(|t| t.tasks(None).iter().map(|t| json!({
-            "id": t.id, "title": t.title, "phase": format!("{:?}", t.phase), "runtime": t.runtime_id,
-        })).collect::<Vec<_>>()),
         "live_terminal_views": shell.terminals.len(),
         "bridge_probe": shell.probe,
         "tray": shell.tray,
