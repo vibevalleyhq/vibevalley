@@ -3,6 +3,8 @@
 
 use crate::Hub;
 
+pub(crate) mod column;
+
 pub mod agent;
 pub mod artifact;
 pub mod attachment;

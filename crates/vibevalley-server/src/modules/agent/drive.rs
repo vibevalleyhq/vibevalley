@@ -4,7 +4,7 @@
 
 use vibevalley_i18n::t;
 use vibevalley_oar::McpServer;
-use vibevalley_protocol::{Agent, ApiError, BizCode, Deliverable, Issue, IssueReportMemory, IssueReportMemoryScope, MCPServer, Next, PersonaMode, Skill};
+use vibevalley_protocol::{Agent, ApiError, BizCode, Deliverable, Issue, MCPServer, Next, PersonaMode, Skill};
 
 use super::Agents;
 use crate::base::LookIn;
@@ -130,25 +130,6 @@ impl Drivers for Agents {
             .replace("{id}", id);
         let language = crate::modules::orchestrator::words::users_language();
         if language != "中文" { rules.replace("中文", &language) } else { rules }
-    }
-
-    fn remember(&self, agent: &str, session: &str, repo: &str, memories: &[IssueReportMemory]) {
-        let Some(store) = self.memories() else { return };
-        for m in memories {
-            let repo = match m.scope {
-                IssueReportMemoryScope::Repo => repo.to_string(),
-                IssueReportMemoryScope::All => String::new(),
-            };
-            let note = crate::modules::memory::Note {
-                agent: agent.to_string(),
-                text: m.text.clone(),
-                repo,
-                by: crate::modules::memory::By::Session(session.to_string()),
-            };
-            if let Err(e) = store.write(&note) {
-                eprintln!("memory: {session}'s report note was not kept: {}", e.message);
-            }
-        }
     }
 
     /// VibeValley keeps whatever is written; it is refused when sent.

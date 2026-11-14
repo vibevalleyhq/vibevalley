@@ -33,7 +33,7 @@ impl Sessions {
                 let phase = Phase::working(now(), SessionAction::Thinking, "");
                 self.0.ledger.apply(vec![self.phase_changed(session.id.clone(), phase)])?;
                 let words = self.with_recall(&session, words.to_string());
-                self.0.ledger.log(&session.id, Step::Asked { text: words.clone() });
+                self.record(&session.id, Step::Asked { text: words.clone() });
                 live.prompt(text(&words))?;
                 return Ok(session.id);
             }
@@ -89,7 +89,7 @@ impl Sessions {
         session.phase = Phase::working(now(), SessionAction::Thinking, "");
         self.go_live(agent.clone(), session.clone(), None)?;
         let prompt = self.with_recall(&session, prompt);
-        self.0.ledger.log(&session.id, Step::Asked { text: prompt.clone() });
+        self.record(&session.id, Step::Asked { text: prompt.clone() });
         agent.prompt(text(&prompt)).map_err(BoardError::from)?;
         Ok(session.id)
     }

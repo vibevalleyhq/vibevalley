@@ -6,17 +6,18 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use vibevalley_core::Applied;
 use vibevalley_core::rules::{session_ids_of, stage_wants_user};
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ApiError, Fact, Issue, IssueGetInput, IssueStageKind, IssueWatch, LiveEvent, SessionId, SpaceState, StateFrame, Subscription, ops};
+use vibevalley_protocol::{ApiError, Issue, IssueGetInput, IssueStageKind, IssueWatch, LiveEvent, SessionId, Subscription, ops};
 
 use crate::base::{LookIn, missing};
 use crate::modules::issue::Board;
-use crate::modules::ledger::{Facts, Step};
 use crate::{Hub, Server, Sink};
 
+pub(crate) mod db;
 mod drivers;
+mod news;
+pub use news::News;
 pub mod journal;
 mod report;
 mod runs;
@@ -28,34 +29,6 @@ pub use journal::{Journal, Trajectories};
 pub use report::{ANSWER_ONLY, Report, ReportQuestion, ReportStatus};
 pub use runs::trigger_of;
 pub use sessions::{DraftEnd, Hire, Rounds, Sessions};
-
-/// The board's facts go into the hub, its sessions' steps into their logs.
-pub struct Logged {
-    pub hub: Arc<Hub>,
-    pub trajectories: Arc<Trajectories>,
-}
-
-impl Facts for Logged {
-    fn apply(&self, facts: Vec<Fact>) -> Applied {
-        self.hub.apply(facts)
-    }
-
-    fn read(&self, f: &mut dyn FnMut(&SpaceState)) {
-        self.hub.read(|s| f(s))
-    }
-
-    fn frame(&self) -> StateFrame {
-        self.hub.frame()
-    }
-
-    fn log(&self, session: &str, step: Step) {
-        let cwd = self
-            .hub
-            .read(|s| s.sessions.iter().find(|x| x.id == session).and_then(|x| x.worktree.clone()))
-            .unwrap_or_default();
-        self.trajectories.step(session, &cwd, step);
-    }
-}
 
 fn helper_ref(id: &str) -> ApiError {
     missing(t("server.helperRef", &[("id", id.into())]), LookIn::Session)

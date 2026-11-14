@@ -151,7 +151,7 @@ export const issueEndpoints: readonly Endpoint[] = [
     about: ["id"],
     input: input({ id: z.string() }, S.IssueRefineRequest),
     result: S.Issue,
-    can: ["user", "remote"],
+    can: ["user", "remote", "orchestrator"],
   },
 ];
 

@@ -174,7 +174,7 @@
 | `issue.previewDelete` | 试删一张工单：说会删掉什么，不真删 | `/api/v1/issue/previewDelete` | ✓ | ✓ |   |   |
 | `issue.status.update` | 挪工单的状态：派活、再来一轮、完成或取消 | `/api/v1/issue/status/update` | ✓ | ✓ | ✓ |   |
 | `issue.status.previewUpdate` | 试挪工单的状态：说会发生什么，不动手 | `/api/v1/issue/status/previewUpdate` | ✓ | ✓ | ✓ |   |
-| `issue.refine` | 让一个帮工读代码，把备选的工单起草好 | `/api/v1/issue/refine` | ✓ | ✓ |   |   |
+| `issue.refine` | 让一个帮工读代码，把备选的工单起草好 | `/api/v1/issue/refine` | ✓ | ✓ | ✓ |   |
 
 ## session
 

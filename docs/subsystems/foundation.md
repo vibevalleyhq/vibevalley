@@ -24,7 +24,7 @@
 | `crates/vibevalley-server/src/modules/` | 按概念的模块：每个对外一个类型（`Chat`、`Agents`、`Repos`、`Memories`…），在 `Hub` 上注册自己的端点 |
 | `crates/vibevalley-protocol/src/contract/`、`crates/vibevalley-protocol/tests/typescript.rs` | 线上类型：手写的 Rust 是源头，`ts-rs` 写出 `packages/protocol` 的 `*.gen.ts`（`vp run protocol:ts`），`vp run protocol:check` 查最新 |
 | `crates/vibevalley-core/src/` | 双端都跑的规则的 Rust 版：`reduce`、出帧、状态派生、收件箱、依赖 |
-| `crates/vibevalley-store/src/lib.rs` | `state.db`（SQLite）：工单板的工单、会话与布局 |
+| `crates/vibevalley-store/src/lib.rs` | 原生应用外壳的 `state.db`（SQLite）：项目、终端与布局 |
 | `crates/vibevalley-home/src/lib.rs` | 家目录约定：在哪、`server.json`、语言；服务端、命令行、原生应用共用 |
 | `crates/vibevalley-i18n/src/lib.rs`、`crates/vibevalley-i18n/locales/` | 消息格式与词典；词典构建时编进去 |
 | `crates/vibevalley-server/src/testing.rs` | 测试和验收沙箱用的替身农机 `pi`（`VIBEVALLEY_TEST_RUNTIMES=1`） |
@@ -59,7 +59,7 @@
 
 - **契约以 Rust 为源，生成 TS**：`crates/vibevalley-protocol/src/contract/` 的类型是数据源，`vp run protocol:ts` 写出 `packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`，`cargo test` 里的 `tests/typescript.rs` 查最新；页面在边界解码用的 Zod Schema 与 `api.ts` 手写，由 `schema.test.ts`、`api.test.ts` 对着生成物查。词典在 `crates/vibevalley-i18n/locales/`，`vp run i18n:gen` 写出 TS 目录。
 - **生成文件不手改**：`packages/protocol` 的 `*.gen.ts`、`packages/protocol/src/client.ts`、`packages/i18n/src/catalogs.ts`、[capabilities.md](docs/reference/capabilities.md) 由脚本生成并有检查。
-- **SQLite，两个库**：工单板的 `state.db` 在 `vibevalley-store`；频道、记性、笔记、Artifact、媒体等各模块的表在 `server.db`，每个模块在自己的 `db.rs` 或模块文件里 `create table if not exists`。时间存整数毫秒。
+- **服务端共用一个 SQLite 库**：工单、会话、每轮、频道、记性、笔记、Artifact、媒体等各模块的表在 `server.db`，每个模块在自己的 `db.rs` 或模块文件里 `create table if not exists`。时间存整数毫秒。`vibevalley-store` 只供原生外壳保存项目、终端与布局。
 - **内部不留兼容**：改表直接改建表语句，不写迁移。
 
 ### 测试金字塔

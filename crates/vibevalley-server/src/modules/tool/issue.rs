@@ -1,16 +1,16 @@
 //! Issues and the helpers on them.
 
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::Value;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    Caller, Changes, CriterionCheck, Deliverable, Issue, IssueAnswer, IssueFilter, IssueReportMemory, IssueReviewInput, IssueStatus, IssueTimeline,
-    MandateStrength, SubmitBranch,
+    Caller, CriterionCheck, Deliverable, Issue, IssueAnswer, IssueFilter, IssueReportMemory, IssueReviewInput, IssueStatus, IssueTimeline, MandateStrength,
+    SubmitBranch,
 };
 
 use super::{Farm, Who, given};
 use crate::modules::issue::ChildDraft;
-use crate::modules::orchestrator::words::{self, wire};
+use crate::modules::orchestrator::words;
 use crate::modules::session::{Report, ReportQuestion, ReportStatus};
 use crate::now;
 
@@ -98,12 +98,9 @@ pub fn diff(f: &Farm, _: &Who, a: IdArgs) -> Result<String, String> {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
-    Ok(match f.call(Caller::Orchestrator, "issue.diff.get", json!({ "id": item.id })) {
-        Ok(v) => match serde_json::from_value::<Changes>(v) {
-            Ok(c) => words::changes_text(&c),
-            Err(e) => format!("看不了改动：{e}"),
-        },
-        Err(why) => format!("看不了改动：{why}"),
+    Ok(match crate::modules::issue::changes_of(&f.board, &item) {
+        Ok(changes) => words::changes_text(&changes),
+        Err(why) => format!("看不了改动：{}", why.message),
     })
 }
 
@@ -227,29 +224,26 @@ pub fn update(f: &Farm, _: &Who, a: UpdateArgs) -> Result<String, String> {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
-    let mut req = json!({ "id": item.id });
-    for (k, v) in [("title", &a.title), ("description", &a.description), ("repo", &a.repo)] {
-        if let Some(v) = v {
-            req[k] = json!(v);
-        }
-    }
-    if let Some(c) = &a.criteria {
-        req["criteria"] = json!(c);
-    }
-    if let Some(d) = a.deliver {
-        req["deliver"] = json!(d);
-    }
+    let mut req = vibevalley_protocol::IssueUpdateInput {
+        id: item.id.clone(),
+        title: a.title,
+        description: a.description,
+        repo: a.repo,
+        criteria: a.criteria,
+        deliver: a.deliver,
+        ..Default::default()
+    };
     if let Some(pr) = given(&a.priority) {
         let pr = words::priority_named(pr).ok_or(PRIORITIES)?;
-        req["priority"] = json!(wire(&pr));
+        req.priority = Some(pr);
     }
     if let Some(name) = given(&a.agent) {
         let Some(profile) = f.agents.profiles.named(name) else {
             return Ok(words::no_profile_named(name));
         };
-        req["agent"] = json!(profile.id);
+        req.agent = Some(profile.id);
     }
-    Ok(match f.call(Caller::Orchestrator, "issue.update", req).and_then(|_| f.issue(&item.id)) {
+    Ok(match crate::modules::issue::update(&f.board, req).map_err(|e| e.message) {
         Ok(done) => format!("改好了：{}", words::slice_from(&words::issue_line(&done, &f.who_of(&done), now()), 2)),
         Err(why) => format!("没改：{why}"),
     })
@@ -271,17 +265,21 @@ pub fn status(f: &Farm, who: &Who, a: StatusArgs) -> Result<String, String> {
         Err(why) => return Ok(why),
     };
     let to = words::status_named(&a.status).ok_or_else(|| format!("Expected one of: {}", words::STATUS_WORDS))?;
-    let mut req = json!({ "id": item.id, "status": wire(&to) });
-    if let Some(text) = given(&a.text) {
-        req["text"] = json!(text);
-    }
+    let mut req = vibevalley_protocol::IssueStatusUpdateInput {
+        id: item.id.clone(),
+        status: to,
+        text: given(&a.text).map(String::from),
+        agent: None,
+        edit: None,
+        request_key: None,
+    };
     let needed = to == IssueStatus::Todo && item.status == IssueStatus::Backlog && item.assigned_agent().is_none();
     match chosen(f, who, given(&a.agent), &format!("{}\n{}", item.title, item.description), needed) {
-        Ok(Some(agent)) => req["agent"] = json!(agent),
+        Ok(Some(agent)) => req.agent = Some(agent),
         Ok(None) => {}
         Err(why) => return Ok(format!("没挪：{why}")),
     }
-    Ok(match f.call(Caller::Orchestrator, "issue.status.update", req).and_then(|_| f.issue(&item.id)) {
+    Ok(match crate::modules::issue::status(&f.board, &req).map_err(|e| e.message) {
         Ok(done) if to == IssueStatus::Done && done.status == IssueStatus::Done => format!("#{} {}", done.number, words::closed(&done)),
         Ok(done) => format!("挪好了：{}", words::slice_from(&words::issue_line(&done, &f.who_of(&done), now()), 2)),
         Err(why) => format!("没挪：{why}"),
@@ -325,44 +323,34 @@ pub fn create(f: &Farm, who: &Who, a: CreateArgs) -> Result<String, String> {
             None => return Ok(format!("没有 {name} 这个频道：先用 channel_list 看看有哪些，或者用 channel_create 开一个。")),
         }
     }
-    let mut req = json!({ "title": a.title });
-    if let Some(v) = &a.description {
-        req["description"] = json!(v);
-    }
-    if let Some(v) = a.deliver {
-        req["deliver"] = json!(v);
-    }
-    if let Some(v) = &a.parent {
-        req["parent"] = json!(v);
-    }
-    if let Some(v) = &a.blocked_by {
-        req["blockedBy"] = json!(v);
-    }
-    if let Some(v) = a.auto_submit_pr {
-        req["autoSubmitPr"] = json!(v);
-    }
+    let mut req = vibevalley_protocol::IssueRequest {
+        title: a.title.clone(),
+        description: a.description.clone(),
+        deliver: a.deliver,
+        parent: a.parent,
+        blocked_by: a.blocked_by,
+        auto_submit_pr: a.auto_submit_pr,
+        ..Default::default()
+    };
     match given(&a.repo) {
-        Some(r) => req["repo"] = json!(r),
-        None if !channel.repo.is_empty() => req["repo"] = json!(channel.repo),
+        Some(r) => req.repo = Some(r.into()),
+        None if !channel.repo.is_empty() => req.repo = Some(channel.repo.clone()),
         None if a.start => return Ok(format!("没记：#{} 没有默认仓库：填上 repo。", channel.name)),
         None => {}
     }
     if let Some(pr) = given(&a.priority) {
         match words::priority_named(pr) {
-            Some(pr) => req["priority"] = json!(wire(&pr)),
+            Some(pr) => req.priority = Some(pr),
             None => return Ok(PRIORITIES.into()),
         }
     }
     let brief = format!("{}\n{}", a.title, a.description.clone().unwrap_or_default());
     match chosen(f, who, given(&a.agent), &brief, a.start) {
-        Ok(Some(agent)) => req["agent"] = json!(agent),
+        Ok(Some(agent)) => req.agent = Some(agent),
         Ok(None) => {}
         Err(why) => return Ok(format!("没记：{why}")),
     }
-    let item = match f.call(Caller::Orchestrator, "issue.create", req).and_then(|v| {
-        let id = v["issue"]["id"].as_str().or_else(|| v["id"].as_str()).unwrap_or("").to_string();
-        f.issue(&id)
-    }) {
+    let item = match crate::modules::issue::create(&f.board, Some(&f.agents), &req).map_err(|e| e.message) {
         Ok(i) => i,
         Err(why) => return Ok(format!("没记下：{why}")),
     };
@@ -373,15 +361,38 @@ pub fn create(f: &Farm, who: &Who, a: CreateArgs) -> Result<String, String> {
     };
     let noted = format!("记下了：#{}「{}」{answer}", item.number, vibevalley_core::rules::short_title(&item.title));
     if a.draft {
-        return Ok(match f.call(Caller::Orchestrator, "issue.refine", json!({ "id": item.id })) {
-            Ok(_) => format!("{noted}，在备选里，帮工在起草"),
-            Err(why) => format!("{noted}，在备选里；起草没开始：{why}"),
-        });
+        return Ok(
+            match crate::modules::issue::refine(
+                &f.board,
+                Some(&f.chat),
+                &vibevalley_protocol::IssueRefineInput {
+                    id: item.id.clone(),
+                    ..Default::default()
+                },
+            )
+            .map_err(|e| e.message)
+            {
+                Ok(_) => format!("{noted}，在备选里，帮工在起草"),
+                Err(why) => format!("{noted}，在备选里；起草没开始：{why}"),
+            },
+        );
     }
     if !a.start {
         return Ok(format!("{noted}，在备选里，没开工"));
     }
-    if let Err(why) = f.call(Caller::Orchestrator, "issue.status.update", json!({ "id": item.id, "status": "todo" })) {
+    if let Err(why) = crate::modules::issue::status(
+        &f.board,
+        &vibevalley_protocol::IssueStatusUpdateInput {
+            id: item.id.clone(),
+            status: IssueStatus::Todo,
+            text: None,
+            agent: None,
+            edit: None,
+            request_key: None,
+        },
+    )
+    .map_err(|e| e.message)
+    {
         return Ok(format!(
             "{noted}，在备选里；没开工：{why}。要再开工用 issue_status_update 挪到待办，不要再建一张"
         ));

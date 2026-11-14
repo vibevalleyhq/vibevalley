@@ -20,7 +20,6 @@ use vibevalley_protocol::{
     Assignment, Deliverable, Fact, Issue, IssueCanceled, IssueConstraints, IssueStageKind as StageKind, IssueStatus, Priority, Run, RunTriggerKind, Session,
     SpaceState, StateFrame as Frame, StuckReason,
 };
-use vibevalley_store::Store;
 
 use crate::modules::ledger::{BoardConfig, BoardError, Facts, IssueChange, Ledger, LocalFacts, Result, Undelivered, find, io, lock, now};
 use crate::modules::session::{DraftEnd, Drivers, Hire, Rounds, RuntimeDrivers, Sessions, trigger_of};
@@ -63,9 +62,6 @@ pub enum Sent {
     Queued { blocked_by: Vec<String> },
 }
 
-/// Words for an issue not sent yet, waiting for its next round.
-const WORDS: &str = "issue-words";
-
 #[derive(Clone)]
 pub struct Board(pub(super) Arc<Inner>);
 
@@ -101,24 +97,24 @@ impl Rounds for Heard {
 impl Board {
     /// The board as stored, without taking it: for reading while another
     /// process holds it. Working sessions show as they were last stored.
-    pub fn snapshot(store: &Store) -> Result<Frame> {
-        Ledger::snapshot(store)
+    pub fn snapshot(path: &std::path::Path) -> Result<Frame> {
+        Ledger::snapshot(path)
     }
 
     /// Takes the board and loads it, standing alone with an agent named by
     /// its runtime id. See [`Board::open_with`].
-    pub fn open(store: Arc<Store>, registry: Arc<Registry>, config: BoardConfig) -> Result<Board> {
-        Board::open_on(store, registry, config, Arc::new(LocalFacts::default()))
+    pub fn open(path: &std::path::Path, registry: Arc<Registry>, config: BoardConfig) -> Result<Board> {
+        Board::open_on(path, registry, config, Arc::new(LocalFacts::default()))
     }
 
     /// `open`, with the board's issues and sessions in `facts` (the server's
     /// state).
-    pub fn open_on(store: Arc<Store>, registry: Arc<Registry>, config: BoardConfig, facts: Arc<dyn Facts>) -> Result<Board> {
+    pub fn open_on(path: &std::path::Path, registry: Arc<Registry>, config: BoardConfig, facts: Arc<dyn Facts>) -> Result<Board> {
         let drivers = Arc::new(RuntimeDrivers {
             registry,
             model: config.model.clone(),
         });
-        Board::open_with(store, drivers, config, facts)
+        Board::open_with(path, drivers, config, facts, |_| {})
     }
 
     /// Takes the board and loads it into `facts`, issues' agents run by
@@ -126,7 +122,13 @@ impl Board {
     /// was interrupted: its run is over and it rests until the next words.
     /// A session whose worktree is gone leaves, and its open issue is
     /// canceled as lost. Call `refresh_queue` afterwards to send what waits.
-    pub fn open_with(store: Arc<Store>, drivers: Arc<dyn Drivers>, config: BoardConfig, facts: Arc<dyn Facts>) -> Result<Board> {
+    pub fn open_with(
+        path: &std::path::Path,
+        drivers: Arc<dyn Drivers>,
+        config: BoardConfig,
+        facts: Arc<dyn Facts>,
+        observe: impl FnOnce(&Sessions),
+    ) -> Result<Board> {
         std::fs::create_dir_all(config.data_dir.join("reports")).map_err(io)?;
         std::fs::create_dir_all(config.data_dir.join("records")).map_err(io)?;
         let lock_path = config.data_dir.join("board.lock");
@@ -141,7 +143,7 @@ impl Board {
             std::thread::sleep(Duration::from_millis(50));
         }
         let config = Arc::new(config);
-        let (ledger, opened) = Ledger::open(store, facts)?;
+        let (ledger, opened) = Ledger::open(path, facts)?;
         let ledger = Arc::new(ledger);
         let workplaces = Arc::new(Workplace::new(config.worktrees_dir.clone(), config.repos_dir.clone(), config.data_dir.clone()));
         let sessions = Sessions::new(ledger.clone(), drivers.clone(), workplaces.clone(), config.clone())?;
@@ -154,6 +156,7 @@ impl Board {
             work: Mutex::new(()),
             lock: Mutex::new(Some(file)),
         }));
+        observe(&board.0.sessions);
         board.0.sessions.on_rounds(Box::new(Heard(Arc::downgrade(&board.0))));
         board.0.sessions.interrupted(&opened.interrupted)?;
         {
@@ -473,17 +476,11 @@ impl Board {
     }
 
     pub(super) fn keep_words(&self, id: &str, words: &str) -> Result<()> {
-        let store = self.0.ledger.store();
-        let mut kept: Vec<String> = store.doc(WORDS, id)?.and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default();
-        kept.push(words.to_string());
-        store.put_doc(WORDS, id, &serde_json::to_value(kept).unwrap_or_default())?;
-        Ok(())
+        self.0.ledger.database(|db| super::db::keep_words(db, id, words, now()))
     }
 
     pub(super) fn take_words(&self, id: &str) -> Result<Option<String>> {
-        let store = self.0.ledger.store();
-        let kept: Vec<String> = store.doc(WORDS, id)?.and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default();
-        store.delete_doc(WORDS, id)?;
+        let kept = self.0.ledger.database(|db| super::db::take_words(db, id))?;
         Ok((!kept.is_empty()).then(|| kept.join("\n\n")))
     }
 

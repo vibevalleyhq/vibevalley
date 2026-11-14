@@ -1,5 +1,5 @@
 //! The board's one write path. Issues and sessions are stored in
-//! `vibevalley-store`, then folded into the state as facts (`Facts`: the
+//! SQLite tables in `server.db`, then folded into the state as facts (`Facts`: the
 //! hub's `Core`, or a [`LocalFacts`] standing alone), and every subscriber
 //! gets the new frame. The issue and session modules change an existing
 //! issue only by an [`IssueChange`]; a new or edited issue and every session
@@ -12,6 +12,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use crate::modules::{issue::db as issue_db, session::db as session_db};
+use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use vibevalley_core::{Applied, Core, Refusal};
 use vibevalley_oar::PermissionMode;
@@ -19,7 +21,6 @@ use vibevalley_protocol::{
     Assignment, Conflict, CriterionCheck, Execution, Fact, Finding, Issue, IssueAnswer, IssueCanceled, Landing, LastRun, Millis, Outcome, Phase, Question,
     Session, SpaceState, StateFrame as Frame,
 };
-use vibevalley_store::Store;
 
 #[derive(Debug, thiserror::Error)]
 pub enum BoardError {
@@ -42,7 +43,7 @@ pub enum BoardError {
     #[error("git: {0}")]
     Git(#[from] vibevalley_git::GitError),
     #[error("store: {0}")]
-    Store(#[from] vibevalley_store::StoreError),
+    Store(#[from] rusqlite::Error),
     #[error("{0}")]
     Other(String),
     /// A refusal already worded for the endpoint (from a `Drivers`).
@@ -147,9 +148,6 @@ pub trait Facts: Send + Sync {
     /// Calls `f` once with the state now.
     fn read(&self, f: &mut dyn FnMut(&SpaceState));
     fn frame(&self) -> Frame;
-    /// One step of a session's work, in order, for its work log (the
-    /// journal). Must not call back into the board.
-    fn log(&self, _session: &str, _step: Step) {}
 }
 
 /// What a session's work log is told.
@@ -344,12 +342,6 @@ impl IssueChange {
     }
 }
 
-const ISSUE: &str = "issue";
-const SESSION: &str = "issue-session";
-/// Sessions that left, as they were when they did: an issue's history still names them.
-const PAST_SESSION: &str = "issue-session-past";
-const COUNTERS: (&str, &str) = ("issue-board", "counters");
-
 /// What opening found that the board must still settle.
 #[derive(Default)]
 pub struct Opened {
@@ -362,7 +354,7 @@ pub struct Opened {
 }
 
 pub struct Ledger {
-    store: Arc<Store>,
+    db: Mutex<Connection>,
     facts: Arc<dyn Facts>,
     /// Held across every apply and every read-modify-apply of an issue.
     write: Mutex<()>,
@@ -370,10 +362,17 @@ pub struct Ledger {
     subscribers: Mutex<Vec<(flume::Sender<Frame>, flume::Receiver<Frame>)>>,
 }
 
-fn load(store: &Store) -> Result<(Vec<Session>, Vec<Issue>)> {
-    let sessions = store.docs(SESSION)?.into_iter().filter_map(|(_, v)| serde_json::from_value(v).ok()).collect();
-    let issues = store.docs(ISSUE)?.into_iter().filter_map(|(_, v)| serde_json::from_value(v).ok()).collect();
-    Ok((sessions, issues))
+fn database(path: &Path) -> Result<Connection> {
+    let db = Connection::open(path)?;
+    db.busy_timeout(Duration::from_secs(5))?;
+    db.pragma_update(None, "journal_mode", "WAL")?;
+    db.execute_batch(issue_db::SCHEMA)?;
+    db.execute_batch(session_db::SCHEMA)?;
+    Ok(db)
+}
+
+fn load(db: &Connection) -> Result<(Vec<Session>, Vec<Issue>)> {
+    Ok((session_db::all(db)?, issue_db::all(db)?))
 }
 
 fn loaded(sessions: Vec<Session>, issues: Vec<Issue>) -> Vec<Fact> {
@@ -383,15 +382,11 @@ fn loaded(sessions: Vec<Session>, issues: Vec<Issue>) -> Vec<Fact> {
     facts
 }
 
-fn put<T: Serialize>(store: &Store, kind: &str, id: &str, value: &T) -> Result<()> {
-    Ok(store.put_doc(kind, id, &serde_json::to_value(value).unwrap_or_default())?)
-}
-
 impl Ledger {
     /// The board as stored, without taking it: for reading while another
     /// process holds it.
-    pub fn snapshot(store: &Store) -> Result<Frame> {
-        let (sessions, issues) = load(store)?;
+    pub fn snapshot(path: &Path) -> Result<Frame> {
+        let (sessions, issues) = load(&database(path)?)?;
         let facts = LocalFacts::default();
         facts.apply(loaded(sessions, issues));
         Ok(facts.frame())
@@ -400,13 +395,14 @@ impl Ledger {
     /// Loads what is stored into `facts`. A working session was interrupted:
     /// it rests now, its run counted. A session whose worktree is gone is
     /// dropped and its issue listed as lost.
-    pub fn open(store: Arc<Store>, facts: Arc<dyn Facts>) -> Result<(Ledger, Opened)> {
-        let (stored, issues) = load(&store)?;
+    pub fn open(path: &Path, facts: Arc<dyn Facts>) -> Result<(Ledger, Opened)> {
+        let db = database(path)?;
+        let (stored, issues) = load(&db)?;
         let mut sessions = Vec::new();
         let mut opened = Opened::default();
         for mut session in stored {
             if session.worktree.as_deref().is_some_and(|w| !Path::new(w).exists()) {
-                store.delete_doc(SESSION, &session.id)?;
+                session_db::put(&db, &session, true)?;
                 opened.lost.extend(session.issue.clone());
                 continue;
             }
@@ -424,13 +420,13 @@ impl Ledger {
                     spent: None,
                     answer: None,
                 });
-                put(&store, SESSION, &session.id, &session)?;
+                session_db::put(&db, &session, false)?;
             }
             sessions.push(session);
         }
         facts.apply(loaded(sessions, issues));
         let ledger = Ledger {
-            store,
+            db: Mutex::new(db),
             facts,
             write: Mutex::new(()),
             subscribers: Mutex::new(Vec::new()),
@@ -438,10 +434,8 @@ impl Ledger {
         Ok((ledger, opened))
     }
 
-    /// The store, for the documents a module keeps of its own (a session's
-    /// extras and runs, an issue's waiting words).
-    pub(crate) fn store(&self) -> &Store {
-        &self.store
+    pub(crate) fn database<R>(&self, query: impl FnOnce(&Connection) -> rusqlite::Result<R>) -> Result<R> {
+        Ok(query(&lock(&self.db))?)
     }
 
     pub fn frame(&self) -> Frame {
@@ -475,8 +469,7 @@ impl Ledger {
 
     /// A session that left the board, as it was when it did.
     pub fn past_session(&self, id: &str) -> Option<Session> {
-        let value = self.store.doc(PAST_SESSION, id).ok()??;
-        serde_json::from_value(value).ok()
+        self.database(|db| session_db::past(db, id)).ok().flatten()
     }
 
     /// The newest frame after every change; a receiver that falls behind
@@ -486,11 +479,6 @@ impl Ledger {
         let _ = tx.try_send(self.facts.frame());
         lock(&self.subscribers).push((tx, rx.clone()));
         rx
-    }
-
-    /// One step of a session's work, for its log.
-    pub fn log(&self, session: &str, step: Step) {
-        self.facts.log(session, step);
     }
 
     /// Stores `facts`, folds them in as one commit and tells the subscribers.
@@ -520,39 +508,40 @@ impl Ledger {
     }
 
     fn apply_locked(&self, facts: Vec<Fact>) -> Result<()> {
-        // Stored first, then published.
-        for fact in &facts {
-            match fact {
-                Fact::IssueChanged(vibevalley_protocol::FactIssueChanged { issue, .. }) => put(&self.store, ISSUE, &issue.id, issue)?,
-                Fact::IssueRemoved(vibevalley_protocol::FactIssueRemoved { id, .. }) => self.store.delete_doc(ISSUE, id)?,
-                Fact::SessionLeft(vibevalley_protocol::FactSessionLeft { id, closed, .. }) => {
-                    if let Some(mut past) = self.session(id) {
-                        if let Some(closed) = closed {
-                            past.phase = Phase::Closed(vibevalley_protocol::PhaseClosed { at: now(), closed: *closed });
+        let mut prospective = self.state();
+        {
+            let mut db = lock(&self.db);
+            let tx = db.transaction()?;
+            for fact in &facts {
+                match fact {
+                    Fact::IssueChanged(vibevalley_protocol::FactIssueChanged { issue, .. }) => issue_db::put(&tx, issue)?,
+                    Fact::IssueRemoved(vibevalley_protocol::FactIssueRemoved { id, .. }) => issue_db::remove(&tx, id)?,
+                    Fact::SessionLeft(vibevalley_protocol::FactSessionLeft { id, closed, at, .. }) => {
+                        if let Some(mut past) = prospective.sessions.iter().find(|s| &s.id == id).cloned() {
+                            if let Some(closed) = closed {
+                                past.phase = Phase::Closed(vibevalley_protocol::PhaseClosed { at: *at, closed: *closed });
+                            }
+                            session_db::put(&tx, &past, true)?;
                         }
-                        put(&self.store, PAST_SESSION, id, &past)?;
                     }
-                    self.store.delete_doc(SESSION, id)?
+                    _ => {}
                 }
-                _ => {}
+                vibevalley_core::reduce(&mut prospective, fact);
+                let id = match fact {
+                    Fact::SessionChanged(vibevalley_protocol::FactSessionChanged { session, .. }) => Some(&session.id),
+                    Fact::SessionPhaseChanged(vibevalley_protocol::FactSessionPhaseChanged { id, .. })
+                    | Fact::SessionReported(vibevalley_protocol::FactSessionReported { id, .. }) => Some(id),
+                    _ => None,
+                };
+                if let Some(id) = id
+                    && let Some(session) = prospective.sessions.iter().find(|s| &s.id == id)
+                {
+                    session_db::put(&tx, session, false)?;
+                }
             }
+            tx.commit()?;
         }
         let applied = self.facts.apply(facts);
-        // Sessions are stored as the core holds them: phase and last run
-        // come from several facts.
-        for fact in applied.transitions.iter().map(|t| &t.fact) {
-            let id = match fact {
-                Fact::SessionChanged(vibevalley_protocol::FactSessionChanged { session, .. }) => Some(&session.id),
-                Fact::SessionPhaseChanged(vibevalley_protocol::FactSessionPhaseChanged { id, .. })
-                | Fact::SessionReported(vibevalley_protocol::FactSessionReported { id, .. }) => Some(id),
-                _ => None,
-            };
-            if let Some(id) = id
-                && let Some(s) = self.session(id)
-            {
-                put(&self.store, SESSION, id, &s)?;
-            }
-        }
         let mut subscribers = lock(&self.subscribers);
         if !applied.transitions.is_empty() && !subscribers.is_empty() {
             let frame = self.facts.frame();
@@ -567,10 +556,12 @@ impl Ledger {
     /// The next number of `counter`, above `at_least`.
     pub fn next(&self, counter: &str, at_least: i64) -> Result<i64> {
         let _write = lock(&self.write);
-        let mut counters = self.store.doc(COUNTERS.0, COUNTERS.1)?.unwrap_or_else(|| serde_json::json!({}));
-        let n = counters[counter].as_i64().unwrap_or(0).max(at_least) + 1;
-        counters[counter] = n.into();
-        self.store.put_doc(COUNTERS.0, COUNTERS.1, &counters)?;
-        Ok(n)
+        self.database(|db| {
+            if counter == "issue" {
+                issue_db::next_number(db, at_least)
+            } else {
+                session_db::next(db, counter, at_least)
+            }
+        })
     }
 }

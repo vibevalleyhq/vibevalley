@@ -12054,7 +12054,6 @@ dependencies = [
  "vibevalley-pkm",
  "vibevalley-protocol",
  "vibevalley-server-api",
- "vibevalley-store",
 ]
 
 [[package]]

@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use vibevalley_agent::{ChatRequest, Completion, Delta, FinishReason, Message, ModelClient, Role, ToolCall, Usage};
 use vibevalley_oar::scripted::{Script, ScriptedRuntime, Step};
 use vibevalley_oar::{McpServer, Registry};
-use vibevalley_protocol::{IssueStageKind, IssueStatus};
+use vibevalley_protocol::{BizCode, Caller, IssueStageKind, IssueStatus};
 use vibevalley_server::{Server, ServerConfig, Started};
 
 struct Model(Mutex<VecDeque<Completion>>);
@@ -84,7 +84,7 @@ fn config(home: &Path, model: Arc<Model>) -> ServerConfig {
             "name": "issue_report", "arguments": { "summary": format!("committed {file}"), "remember": [{ "text": "The mainline uses real git", "scope": "all" }] }
         }})).map_err(|e| e.to_string())?;
         let reply: Value = response.body_mut().read_json().map_err(|e| e.to_string())?;
-        if reply["result"]["isError"] == true { return Err(reply.to_string()); }
+        if reply.get("error").is_some() || !reply["result"].is_object() || reply["result"]["isError"] == true { return Err(reply.to_string()); }
         Ok(vec![Step::text(format!("committed {file}"))])
     })))));
     ServerConfig {
@@ -122,6 +122,24 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     let worker = server.board.session(&session).unwrap();
     assert!(Path::new(worker.worktree.as_ref().unwrap()).starts_with(dir.path().join("worktrees")));
     let thread = until(&server, "issue thread", || server.chat.issue_thread_id(&id));
+    until(&server, "report in issue thread", || {
+        server
+            .chat
+            .history(&thread, None, None)
+            .unwrap()
+            .iter()
+            .any(|m| m.text.contains("committed round-1.txt"))
+            .then_some(())
+    });
+    until(&server, "report memory stored", || {
+        server
+            .memories
+            .list(&worker.agent)
+            .unwrap()
+            .iter()
+            .any(|m| m.text == "The mainline uses real git")
+            .then_some(())
+    });
     call(
         &url,
         "channel.message.send",
@@ -141,6 +159,15 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     assert_eq!(server.board.issue(&id).unwrap().status, IssueStatus::Done);
     assert!(dir.path().join("repos/demo/round-2.txt").exists());
     assert!(git(&dir.path().join("repos/demo"), &["log", "--oneline", "main"]).contains("round-2.txt"));
+
+    let draft = call(&url, "issue.create", json!({ "title": "Draft permissions", "repo": "demo", "agent": "Worker" }));
+    let denied = server.hub.call_as(Caller::Session, "issue.refine", json!({ "id": draft["id"] }));
+    assert_eq!(denied.biz_code, BizCode::Forbidden.code());
+    let allowed = server.hub.call_as(Caller::Orchestrator, "issue.refine", json!({ "id": draft["id"] }));
+    assert_eq!(allowed.biz_code, 0, "{allowed:?}");
+    until(&server, "assistant draft finished", || {
+        server.board.issue(draft["id"].as_str().unwrap()).filter(|i| i.refining.is_none())
+    });
 
     model.0.lock().unwrap().extend([
         answer(Some(ToolCall {
@@ -189,6 +216,14 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     let reopened = vibevalley_server::start(config(dir.path(), model)).unwrap();
     assert_eq!(reopened.board.issue(&id).unwrap().status, IssueStatus::Done);
     assert_eq!(reopened.board.runs(&id).unwrap().len(), 2);
+    assert!(
+        reopened
+            .memories
+            .list(&worker.agent)
+            .unwrap()
+            .iter()
+            .any(|m| m.text == "The mainline uses real git")
+    );
     assert!(reopened.board.past_session(&session).is_some());
     assert!(
         reopened

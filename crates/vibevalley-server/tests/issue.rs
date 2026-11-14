@@ -18,7 +18,7 @@ fn call(hub: &Hub, op: &str, payload: Value) -> Value {
 fn served(w: &World) -> Arc<Hub> {
     let hub = Hub::new(empty_space_state());
     modules::install(&hub);
-    let board = Board::open_on(w.store.clone(), w.registry.clone(), config(w.dir.path()), hub.clone()).unwrap();
+    let board = Board::open_on(&w.store, w.registry.clone(), config(w.dir.path()), hub.clone()).unwrap();
     modules::issue::install(&hub, board);
     hub
 }

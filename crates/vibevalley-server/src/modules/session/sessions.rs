@@ -23,15 +23,13 @@ use crate::modules::workplace::{Leave, Leaving, Workplace};
 /// runtime's own session to resume, and the branch its work forked from.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct Extra {
+pub(crate) struct Extra {
     pub agent_session: Option<String>,
     pub base: Option<String>,
     /// The run going on now, until its round ends.
     #[serde(default)]
     pub run: Option<String>,
 }
-
-const SESSION_EXTRA: &str = "issue-session-extra";
 
 /// A session this process is driving. `generation` tells a pump whether
 /// the session it reads is still the one on the board.
@@ -112,18 +110,14 @@ pub(super) struct Inner {
     extras: Mutex<HashMap<String, Extra>>,
     door: Mutex<Door>,
     rounds: OnceLock<Box<dyn Rounds>>,
+    pub(super) listeners: Mutex<Vec<super::news::Listener>>,
     /// Held while a direct talk finds or hires its session.
     pub talking: Mutex<()>,
 }
 
 impl Sessions {
     pub fn new(ledger: Arc<Ledger>, drivers: Arc<dyn Drivers>, workplaces: Arc<Workplace>, config: Arc<BoardConfig>) -> Result<Sessions> {
-        let extras = ledger
-            .store()
-            .docs(SESSION_EXTRA)?
-            .into_iter()
-            .filter_map(|(id, v)| Some((id, serde_json::from_value(v).ok()?)))
-            .collect();
+        let extras = ledger.database(super::db::extras)?;
         Ok(Sessions(Arc::new(Inner {
             ledger,
             drivers,
@@ -134,6 +128,7 @@ impl Sessions {
             extras: Mutex::new(extras),
             door: Mutex::new(Door::default()),
             rounds: OnceLock::new(),
+            listeners: Mutex::new(Vec::new()),
             talking: Mutex::new(()),
         })))
     }
@@ -228,8 +223,7 @@ impl Sessions {
         let mut extras = lock(&self.0.extras);
         let extra = extras.entry(session.to_string()).or_default();
         change(extra);
-        let value = serde_json::to_value(&*extra).unwrap_or_default();
-        self.0.ledger.store().put_doc(SESSION_EXTRA, session, &value)?;
+        self.0.ledger.database(|db| super::db::put_extra(db, session, extra))?;
         Ok(())
     }
 
@@ -317,7 +311,7 @@ impl Sessions {
         self.go_live(agent.clone(), session.clone(), Some((issue.id.as_str(), started)))?;
         self.begin_run(&session.id, &issue.id, trigger)?;
         let prompt = self.with_recall(&session, prompt);
-        self.0.ledger.log(&session.id, Step::Asked { text: prompt.clone() });
+        self.record(&session.id, Step::Asked { text: prompt.clone() });
         if let Err(e) = agent.prompt(text(&prompt)) {
             let _ = self.dismiss(&session.id, Leave::Keep);
             return Err(e.into());
@@ -371,7 +365,7 @@ impl Sessions {
                 self.0.ledger.apply(vec![self.phase_changed(session.id.clone(), phase)])?;
                 self.begin_run(&session.id, &issue.id, trigger)?;
                 let words = self.with_recall(session, words);
-                self.0.ledger.log(&session.id, Step::Asked { text: words.clone() });
+                self.record(&session.id, Step::Asked { text: words.clone() });
                 agent.prompt(text(&words))?;
                 self.0.ledger.change(&issue.id, IssueChange::Unqueued)?;
                 Ok(session.id.clone())
@@ -393,7 +387,7 @@ impl Sessions {
             return None;
         }
         let agent = lock(&self.0.live).get(&session.id).map(|l| l.agent.clone())?;
-        self.0.ledger.log(&session.id, Step::Asked { text: words.to_string() });
+        self.record(&session.id, Step::Asked { text: words.to_string() });
         Some(match agent.steer(text(words)) {
             Ok(()) => Ok(()),
             Err(_) => agent.queue(text(words)).map_err(BoardError::from),
@@ -439,7 +433,7 @@ impl Sessions {
             self.0.ledger.apply(vec![Fact::session_left(now(), session_id, None)])?;
         }
         lock(&self.0.extras).remove(session_id);
-        self.0.ledger.store().delete_doc(SESSION_EXTRA, session_id)?;
+        self.0.ledger.database(|db| super::db::remove_extra(db, session_id))?;
         Ok(())
     }
 
@@ -475,7 +469,7 @@ impl Sessions {
             }
             last_event = Instant::now();
             self.set_quiet(session_id, None);
-            self.0.ledger.log(session_id, Step::Agent(event.clone()));
+            self.record(session_id, Step::Agent(event.clone()));
             let root = event.agent_path.is_empty();
             match event.kind {
                 EventKind::TurnStarted { .. } if root => {
@@ -596,9 +590,12 @@ impl Sessions {
         };
         let _ = self.0.ledger.change_with(&issue.id, change, |fact| vec![fact, reported]);
         if let Some(r) = report.as_ref().filter(|r| !r.remember.is_empty()) {
-            self.0
-                .drivers
-                .remember(&session.agent, session_id, session.repo.as_deref().unwrap_or(""), &r.remember);
+            self.announce(super::News::Remember {
+                agent: session.agent.clone(),
+                session: session_id.to_string(),
+                repo: session.repo.clone().unwrap_or_default(),
+                memories: r.remember.clone(),
+            });
         }
     }
 }
