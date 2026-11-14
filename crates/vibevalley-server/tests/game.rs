@@ -3,7 +3,7 @@
 use serde_json::json;
 use vibevalley_core::empty_space_state;
 use vibevalley_core::progress::harvest_coins;
-use vibevalley_protocol::{Caller, CommitCount, Fact, FactProgressChanged};
+use vibevalley_protocol::{Caller, CommitCount, Fact, FactProgressChanged, LedgerEntry, LedgerEntryHarvested};
 use vibevalley_server::Hub;
 use vibevalley_server::modules::game::Game;
 
@@ -23,7 +23,16 @@ fn the_ledger_folds_back_through_a_restart_and_skips_what_it_cannot_read() {
         let hub = Hub::new(empty_space_state());
         let game = Game::open(home.path(), &hub);
         vibevalley_server::modules::game::install(&hub, game.clone());
-        game.record(json!({ "kind": "harvested", "session": "w1", "agent": "lab", "repo": "demo", "runtime": "pi", "commits": 1, "runs": 1 }));
+        game.record(LedgerEntry::Harvested(LedgerEntryHarvested {
+            at: 0,
+            session: "w1".into(),
+            agent: Some("lab".into()),
+            repo: "demo".into(),
+            runtime: "pi".into(),
+            commits: 1,
+            cny: None,
+            runs: 1,
+        }));
         let p = hub.read(|s| s.progress.clone()).unwrap();
         assert!(p.coins >= 35);
         assert_eq!(p.counts.get("harvests"), Some(&1));

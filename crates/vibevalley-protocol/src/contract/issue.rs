@@ -769,6 +769,46 @@ pub struct AppliedIssue {
     pub seq: i64,
 }
 
+impl AppliedIssue {
+    pub fn from_issue(issue: Issue, seq: i64) -> Self {
+        Self {
+            constraints: issue.constraints,
+            id: issue.id,
+            number: issue.number,
+            title: issue.title,
+            description: issue.description,
+            mandate: issue.mandate,
+            conflict: issue.conflict,
+            repo: issue.repo,
+            assignments: issue.assignments,
+            priority: issue.priority,
+            rank: issue.rank,
+            created_at: issue.created_at,
+            queued_at: issue.queued_at,
+            closed_at: issue.closed_at,
+            delivered: issue.delivered,
+            canceled: issue.canceled,
+            parent: issue.parent,
+            blocked_by: issue.blocked_by,
+            cron: issue.cron,
+            status: issue.status,
+            moves: issue.moves,
+            pull_request: issue.pull_request,
+            deliver: issue.deliver,
+            reviewed_at: issue.reviewed_at,
+            findings: issue.findings,
+            questions: issue.questions,
+            criteria: issue.criteria,
+            checks: issue.checks,
+            refining: issue.refining,
+            last_run: issue.last_run,
+            answer: issue.answer,
+            stage: issue.stage,
+            seq,
+        }
+    }
+}
+
 #[skip_serializing_none]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]

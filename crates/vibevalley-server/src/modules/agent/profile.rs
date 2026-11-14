@@ -18,6 +18,7 @@ use vibevalley_protocol::{
 
 use super::presets::default_settings;
 use crate::base::{LookIn, missing};
+use crate::lock;
 
 static BUILT_IN: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/assets/agent");
 
@@ -390,10 +391,6 @@ pub struct Profiles {
     file: PathBuf,
     stored: Mutex<Stored>,
     keeps: Mutex<Vec<Keep>>,
-}
-
-fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 impl Profiles {

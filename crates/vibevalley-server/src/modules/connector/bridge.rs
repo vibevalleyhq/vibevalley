@@ -3,7 +3,7 @@
 //! what goes out, both ended before the account is replaced.
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak};
+use std::sync::{Arc, Condvar, Mutex, Weak};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -16,7 +16,7 @@ use super::adapter::{App, AppFailed, FailedKind, Inbound, LoginIo, Progress, Rec
 use super::digest::{DIGEST_OVER, digest, is_pairing, short_id, split_text, user_line};
 use super::store::{Account, Store, StoreFailed};
 use crate::modules::channel::{Chat, Saying};
-use crate::{Hub, now};
+use crate::{Hub, lock, now};
 
 /// WeChat's official client rests this long too.
 const STALE_PAUSE_MS: i64 = 60 * 60_000;
@@ -100,10 +100,6 @@ pub struct Bridge {
     commands: Mutex<Option<Generation>>,
     wake: (flume::Sender<()>, flume::Receiver<()>),
     told: Mutex<Option<ConnectorStatus>>,
-}
-
-fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 fn paused(a: &Account, at: i64) -> bool {

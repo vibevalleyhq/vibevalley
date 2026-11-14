@@ -54,6 +54,24 @@ pub enum Choice {
     Secondary,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Panel {
+    Files,
+    Git,
+    Agents,
+}
+
+impl Panel {
+    pub fn name(self) -> &'static str {
+        match self {
+            Panel::Files => "files",
+            Panel::Git => "git",
+            Panel::Agents => "agents",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Action {
@@ -120,7 +138,7 @@ pub enum Action {
         id: i64,
     },
     ShowPanel {
-        panel: String,
+        panel: Panel,
     },
 
     ExpandDir {
@@ -273,6 +291,11 @@ mod tests {
             parse_action(&json!({"type": "applied", "topic": "rail", "rev": 4})).unwrap(),
             Action::Applied { topic: "rail".into(), rev: 4 }
         );
+        assert_eq!(
+            parse_action(&json!({"type": "show_panel", "panel": "git"})).unwrap(),
+            Action::ShowPanel { panel: Panel::Git }
+        );
+        assert!(parse_action(&json!({"type": "show_panel", "panel": "unknown"})).is_err());
     }
 
     #[test]

@@ -32,7 +32,7 @@ use self::words::{ChatTarget, Has, Nameable};
 use crate::base::{LookIn, RequestKeys, internal, missing, refused as refuse};
 use crate::modules::agent::Agents;
 use crate::modules::attachment::{Attachments, open_db};
-use crate::{Hub, Sink, now};
+use crate::{Hub, Sink, lock, now};
 
 /// The channel a new farm opens with.
 const FIRST_CHANNEL: &str = "general";
@@ -430,6 +430,7 @@ pub struct Note {
     pub meta: Meta,
     pub topic: Option<ThreadSubject>,
     pub member: Option<String>,
+    pub seat: Option<Seat>,
 }
 
 /// An agent's words in the chat.
@@ -1043,6 +1044,8 @@ impl Inner {
     }
 }
 
+type Seater = Arc<dyn Fn(&str) + Send + Sync>;
+
 /// The chat.
 pub struct Chat {
     hub: Weak<Hub>,
@@ -1054,6 +1057,7 @@ pub struct Chat {
     user_reads: Mutex<Vec<flume::Sender<(String, i64, i64)>>>,
     readers: RwLock<Vec<Reader>>,
     guards: RwLock<Vec<Guard>>,
+    seaters: RwLock<Vec<Seater>>,
     /// Link previews are read off the web; tests turn it off.
     embeds: bool,
     /// The blocks a message quotes, as they are now (the artifact module's).
@@ -1062,10 +1066,6 @@ pub struct Chat {
 
 /// Snapshots of quoted artifact blocks (`quoteBlocks`).
 pub type Quoter = Arc<dyn Fn(&[vibevalley_protocol::BlockRef]) -> Vec<QuotedBlock> + Send + Sync>;
-
-fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
-}
 
 fn publish<T: Clone>(to: &Mutex<Vec<flume::Sender<T>>>, value: &T) {
     lock(to).retain(|tx| tx.send(value.clone()).is_ok());
@@ -1121,6 +1121,7 @@ impl Chat {
             user_reads: Mutex::default(),
             readers: RwLock::default(),
             guards: RwLock::default(),
+            seaters: RwLock::default(),
             embeds,
             quoter: RwLock::default(),
         });
@@ -1472,6 +1473,7 @@ impl Chat {
     /// message; newer words it has not seen are shown instead (held); a
     /// channel right after reading a thread elsewhere is confirmed once.
     pub fn speak(&self, s: Speaking) -> Result<Spoken, ApiError> {
+        self.prepare_seat(&s.from);
         let event;
         let spoken = {
             let mut inner = self.locked();
@@ -1613,7 +1615,10 @@ impl Chat {
     pub fn note(&self, n: Note) -> Result<String, ApiError> {
         let written = {
             let mut inner = self.locked();
-            self.write(
+            if let Some(seat) = &n.seat {
+                tx(&mut inner, |me| me.seat(seat))?;
+            }
+            let written = self.write(
                 &mut inner,
                 Write {
                     meta: Some(n.meta),
@@ -1621,7 +1626,18 @@ impl Chat {
                     member: n.member,
                     ..Write::new(&n.channel, &n.from, n.kind, &n.text)
                 },
-            )?
+            )?;
+            if let Some(mut seat) = n.seat {
+                if seat.home.is_none() && !written.thread.is_empty() {
+                    seat.home = Some(written.thread.clone());
+                }
+                let at = now();
+                tx(&mut inner, |me| {
+                    me.seat(&seat)?;
+                    me.set_read(&seat.id, &n.channel, written.row.number, at)
+                })?;
+            }
+            written
         };
         self.handled(written.event.as_ref())?;
         Ok(written.thread)
@@ -1902,6 +1918,7 @@ impl Chat {
     /// `read`: an agent reads a place; a read of the newest moves its
     /// cursor.
     pub fn read(&self, who: &str, opt: ReadOptions) -> Result<ReadResult, ApiError> {
+        self.prepare_seat(who);
         let mut inner = self.locked();
         let (channel, opened) = inner.resolve_target(who, opt.target.as_deref().unwrap_or(""))?;
         if let Some(thread) = opened {
@@ -1948,6 +1965,7 @@ impl Chat {
 
     /// `unread`: a hint for the one asking; a failure is none, logged.
     pub fn unread(&self, who: &str, channel: Option<&str>) -> Vec<ChannelUnread> {
+        self.prepare_seat(who);
         let inner = self.locked();
         inner.unread_of(who, channel).unwrap_or_else(|e| {
             eprintln!("vibevalley-server: chat: unread of {who}: {}", e.message);
@@ -2059,6 +2077,20 @@ impl Chat {
     /// A reader the chat's writes wait on (a notice does not).
     pub fn await_reader(&self, reader: impl Fn(i64) -> Result<(), ApiError> + Send + Sync + 'static) {
         self.readers.write().unwrap_or_else(|e| e.into_inner()).push(Arc::new(reader));
+    }
+
+    /// Ensures a session's thread is opened and seated before it speaks or reads.
+    pub fn ensure_seated(&self, seater: impl Fn(&str) + Send + Sync + 'static) {
+        self.seaters.write().unwrap_or_else(|e| e.into_inner()).push(Arc::new(seater));
+    }
+
+    fn prepare_seat(&self, who: &str) {
+        if who == USER_ID || who == DEFAULT_ORCHESTRATOR || who == "system" || self.home_of(who).is_some() {
+            return;
+        }
+        for f in self.seaters.read().unwrap_or_else(|e| e.into_inner()).iter() {
+            f(who);
+        }
     }
 
     /// Seats an agent under the name it goes by now.

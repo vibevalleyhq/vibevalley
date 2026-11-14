@@ -12,7 +12,7 @@ use vibevalley_i18n::t;
 use vibevalley_protocol::{Outcome, SessionEvent, SessionEventType, ToolAction};
 
 use crate::modules::ledger::Step;
-use crate::{Hub, now};
+use crate::{Hub, lock, now};
 
 const KEEP_EVENTS: usize = 240;
 const TEXT_MAX: usize = 6000;
@@ -345,10 +345,6 @@ pub struct Trajectories {
     dir: PathBuf,
     open: Mutex<HashMap<String, Journal>>,
     hub: Weak<Hub>,
-}
-
-fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 fn write_out(file: &Path, body: String) {

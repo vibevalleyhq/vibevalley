@@ -42,7 +42,7 @@ use agent_client_protocol::{Agent, Client, Lines, UntypedMessage};
 use base64::Engine;
 use serde_json::{Value, json};
 
-use crate::core::{CoreSession, Driver, SessionCore, absolute, check_cwd, file_as_text, rejected, rejection};
+use crate::core::{CoreSession, Driver, SessionCore, absolute, check_cwd, file_as_text, lock, rejected, rejection};
 use crate::process::{LineChild, Spawn, find_binary, run_capture};
 use crate::record::{self, Recorder};
 use crate::{
@@ -143,10 +143,6 @@ pub fn builtin_agents() -> Vec<AcpAgentSpec> {
 
 fn str_of<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
-}
-
-fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(|p| p.into_inner())
 }
 
 fn content_text(value: &Value) -> Option<String> {

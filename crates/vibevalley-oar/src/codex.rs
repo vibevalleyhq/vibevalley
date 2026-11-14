@@ -24,7 +24,7 @@ use std::time::Duration;
 
 use serde_json::{Value, json};
 
-use crate::core::{CoreSession, Driver, SessionCore, absolute, check_cwd, file_as_text, rejected, rejection};
+use crate::core::{CoreSession, Driver, SessionCore, absolute, check_cwd, file_as_text, lock, rejected, rejection};
 use crate::process::{LineChild, LoginCheck, Spawn, probe_installation_with, require_binary};
 use crate::record::{self, Recorder};
 use crate::{
@@ -46,10 +46,6 @@ impl CodexRuntime {
 
 fn str_of<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
-}
-
-fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(|p| p.into_inner())
 }
 
 /// `codex login status` exits non-zero and says "Not logged in" otherwise.

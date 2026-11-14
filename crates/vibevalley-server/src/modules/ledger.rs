@@ -9,10 +9,10 @@
 //! share them: the board's config, its error, and its counters.
 
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
-use crate::modules::{issue::db as issue_db, session::db as session_db};
+use crate::modules::{attachment::open_db_at, issue::db as issue_db, session::db as session_db};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use vibevalley_core::{Applied, Core, Refusal};
@@ -122,16 +122,10 @@ impl BoardConfig {
     }
 }
 
-pub(crate) fn now() -> Millis {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as Millis).unwrap_or(0)
-}
+pub(crate) use crate::{lock, now};
 
 pub(crate) fn io(e: std::io::Error) -> BoardError {
     BoardError::Other(e.to_string())
-}
-
-pub(crate) fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 /// By id, number or `#number`.
@@ -363,9 +357,7 @@ pub struct Ledger {
 }
 
 fn database(path: &Path) -> Result<Connection> {
-    let db = Connection::open(path)?;
-    db.busy_timeout(Duration::from_secs(5))?;
-    db.pragma_update(None, "journal_mode", "WAL")?;
+    let db = open_db_at(path)?;
     db.execute_batch(issue_db::SCHEMA)?;
     db.execute_batch(session_db::SCHEMA)?;
     Ok(db)

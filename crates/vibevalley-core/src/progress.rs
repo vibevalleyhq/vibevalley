@@ -1,14 +1,13 @@
 //! The farm's ledger folded into `Progress` (VibeValley
 //! `modules/game/progress.ts`): coins, the streak, counts toward each
-//! achievement, and the entries each fact makes. An entry is the ledger's
-//! JSON (`LedgerEntry`: `kind`, `at` and its fields).
+//! achievement, and the typed `LedgerEntry` values each fact makes.
 
 use std::collections::BTreeMap;
 
-use serde_json::{Value, json};
 use vibevalley_protocol::{
-    AgentTally, DEFAULT_ORCHESTRATOR, EVERYONE, Fact, Issue, JsNumber, Outcome, Progress, ProgressNews, ProgressTitle, Session, SessionClose, SpaceState,
-    USER_ID, Unlock,
+    AchievementCategory, Actor, AgentRole, AgentTally, CallState, DEFAULT_ORCHESTRATOR, EVERYONE, Fact, Issue, IssueStatus, JsNumber, Landing, LedgerEntry,
+    LedgerEntryCalled, LedgerEntryConflicted, LedgerEntryFailed, LedgerEntryFamily, LedgerEntryHandoff, LedgerEntryHarvested, LedgerEntryHired,
+    LedgerEntryLevel, LedgerEntryMoment, LedgerEntryTold, Outcome, Progress, ProgressNews, ProgressTitle, Session, SessionClose, SpaceState, USER_ID, Unlock,
 };
 
 use crate::deps::{DagNode, dag_layers};
@@ -97,29 +96,44 @@ fn at_least(counts: &mut BTreeMap<String, i64>, id: &str, value: i64) {
     }
 }
 
-fn s<'a>(e: &'a Value, k: &str) -> &'a str {
-    e[k].as_str().unwrap_or("")
-}
-
-fn n(e: &Value, k: &str) -> i64 {
-    e[k].as_i64().or_else(|| e[k].as_f64().map(|f| f as i64)).unwrap_or(0)
-}
-
-fn tallied(p: &mut Progress, e: &Value) {
-    let kind = s(e, "kind");
-    let agent = s(e, "agent");
-    if !matches!(kind, "hired" | "harvested" | "failed") || agent.is_empty() {
-        return;
-    }
-    let t = p.agents.entry(agent.to_string()).or_insert(AgentTally {
+fn tally_of<'a>(p: &'a mut Progress, agent: Option<&str>) -> Option<&'a mut AgentTally> {
+    let agent = agent.filter(|a| !a.is_empty())?;
+    Some(p.agents.entry(agent.to_string()).or_insert(AgentTally {
         hired: 0,
         harvested: 0,
         failed: 0,
-    });
-    match kind {
-        "hired" => t.hired += 1,
-        "harvested" => t.harvested += 1,
-        _ => t.failed += 1,
+    }))
+}
+
+fn tallied(p: &mut Progress, entry: &LedgerEntry) {
+    match entry {
+        LedgerEntry::Hired(e) => {
+            if let Some(t) = tally_of(p, e.agent.as_deref()) {
+                t.hired += 1;
+            }
+        }
+        LedgerEntry::Harvested(e) => {
+            if let Some(t) = tally_of(p, e.agent.as_deref()) {
+                t.harvested += 1;
+            }
+        }
+        LedgerEntry::Failed(e) => {
+            if let Some(t) = tally_of(p, e.agent.as_deref()) {
+                t.failed += 1;
+            }
+        }
+        LedgerEntry::Conflicted(_)
+        | LedgerEntry::Told(_)
+        | LedgerEntry::Reviewed(_)
+        | LedgerEntry::Family(_)
+        | LedgerEntry::Handoff(_)
+        | LedgerEntry::Called(_)
+        | LedgerEntry::Opened(_)
+        | LedgerEntry::Split(_)
+        | LedgerEntry::Voice(_)
+        | LedgerEntry::Busy6(_)
+        | LedgerEntry::Level(_)
+        | LedgerEntry::Titled(_) => {}
     }
 }
 
@@ -134,40 +148,39 @@ fn local_parts(at: i64) -> (i64, i64) {
 }
 
 /// One entry folded in (`progressStep`), and the news it makes.
-pub fn progress_step(folded: &Folded, entry: &Value) -> (Folded, ProgressNews) {
+pub fn progress_step(folded: &Folded, entry: &LedgerEntry) -> (Folded, ProgressNews) {
     let mut p = folded.progress.clone();
     let mut seen = folded.seen.clone();
     let mut counts = p.counts.clone();
     let mut coins = 0;
     let mut session = None;
-    let at = n(entry, "at");
-    match s(entry, "kind") {
-        "harvested" => {
+    let at = entry.at();
+    match entry {
+        LedgerEntry::Harvested(e) => {
             let streak = p.streak + 1;
             p.streak = streak;
             p.best_streak = p.best_streak.max(streak);
-            coins += harvest_coins(n(entry, "commits"), streak);
-            let id = s(entry, "session");
-            session = Some(id.to_string());
-            let told = seen.told.iter().any(|x| x == id);
-            let failed = seen.failed.iter().any(|x| x == id);
+            coins += harvest_coins(e.commits, streak);
+            session = Some(e.session.clone());
+            let told = seen.told.iter().any(|x| x == &e.session);
+            let failed = seen.failed.iter().any(|x| x == &e.session);
             bump(&mut counts, "harvests", 1);
-            if n(entry, "runs") <= 1 && !told && !failed {
+            if e.runs <= 1 && !told && !failed {
                 bump(&mut counts, "first_try", 1);
             }
-            if seen.conflicted.iter().any(|x| x == id) {
+            if seen.conflicted.iter().any(|x| x == &e.session) {
                 bump(&mut counts, "untangle", 1);
             }
             if failed {
                 bump(&mut counts, "comeback", 1);
             }
-            if entry["cny"].as_f64().is_some_and(|c| c < CHEAP_CNY) {
+            if e.cny.is_some_and(|c| c.0 < CHEAP_CNY) {
                 bump(&mut counts, "thrifty", 1);
             }
-            if seen.reviewed.iter().any(|x| x == id) {
+            if seen.reviewed.iter().any(|x| x == &e.session) {
                 at_least(&mut counts, "s_review", 1);
             }
-            added(&mut seen.runtimes, s(entry, "runtime"));
+            added(&mut seen.runtimes, &e.runtime);
             counts.insert("every_machine".into(), seen.runtimes.len() as i64);
             let (hour, week_day) = local_parts(at);
             if hour < 5 {
@@ -177,44 +190,47 @@ pub fn progress_step(folded: &Folded, entry: &Value) -> (Folded, ProgressNews) {
                 at_least(&mut counts, "weekend", 1);
             }
         }
-        "failed" => {
+        LedgerEntry::Failed(e) => {
             p.streak = 0;
-            added(&mut seen.failed, s(entry, "session"));
+            added(&mut seen.failed, &e.session);
         }
-        "conflicted" => added(&mut seen.conflicted, s(entry, "session")),
-        "told" => {
-            added(&mut seen.told, s(entry, "session"));
+        LedgerEntry::Conflicted(e) => added(&mut seen.conflicted, &e.session),
+        LedgerEntry::Told(e) => {
+            added(&mut seen.told, &e.session);
             at_least(&mut counts, "s_tell", 1);
         }
-        "reviewed" => added(&mut seen.reviewed, s(entry, "session")),
-        "family" => {
-            coins += task_coins(n(entry, "merged"));
-            at_least(&mut counts, "big_graph", n(entry, "merged"));
-            if entry["parallel"].as_bool() == Some(true) {
+        LedgerEntry::Reviewed(e) => added(&mut seen.reviewed, &e.session),
+        LedgerEntry::Family(e) => {
+            coins += task_coins(e.merged);
+            at_least(&mut counts, "big_graph", e.merged);
+            if e.parallel {
                 bump(&mut counts, "parallel_graph", 1);
             }
         }
-        "handoff" => bump(&mut counts, "handoff", 1),
-        "called" => at_least(&mut counts, "s_call", 1),
-        "hired" => at_least(&mut counts, "s_hire", 1),
-        "opened" => at_least(&mut counts, "s_open", 1),
-        "split" => at_least(&mut counts, "s_split", 1),
-        "voice" => at_least(&mut counts, "s_voice", 1),
-        "busy6" => at_least(&mut counts, "full_house", 1),
-        "level" => at_least(&mut counts, "farm_level", n(entry, "level")),
-        "titled" => {
+        LedgerEntry::Handoff(_) => bump(&mut counts, "handoff", 1),
+        LedgerEntry::Called(_) => at_least(&mut counts, "s_call", 1),
+        LedgerEntry::Hired(_) => at_least(&mut counts, "s_hire", 1),
+        LedgerEntry::Opened(_) => at_least(&mut counts, "s_open", 1),
+        LedgerEntry::Split(_) => at_least(&mut counts, "s_split", 1),
+        LedgerEntry::Voice(_) => at_least(&mut counts, "s_voice", 1),
+        LedgerEntry::Busy6(_) => at_least(&mut counts, "full_house", 1),
+        LedgerEntry::Level(e) => at_least(&mut counts, "farm_level", e.level),
+        LedgerEntry::Titled(e) => {
             // Only a tier reached can be worn, and not a starter task's.
             p.title = None;
-            let tier = n(entry, "tier");
-            let worn = (tier != 0).then(|| achievements().iter().find(|a| a.id == s(entry, "achievement"))).flatten();
+            let tier = e.tier.unwrap_or(0);
+            let worn = e
+                .achievement
+                .as_deref()
+                .filter(|_| tier != 0)
+                .and_then(|id| achievements().iter().find(|a| a.id == id));
             if let Some(a) = worn
-                && a.category.as_str() != "starter"
+                && a.category != AchievementCategory::Starter
                 && tier_of(&p, &a.id) >= tier
             {
                 p.title = Some(ProgressTitle { id: a.id.clone(), tier });
             }
         }
-        _ => {}
     }
     at_least(&mut counts, "steady", p.best_streak);
 
@@ -243,7 +259,7 @@ pub fn progress_step(folded: &Folded, entry: &Value) -> (Folded, ProgressNews) {
     (Folded { progress: p, seen }, news)
 }
 
-pub fn progress_fold(entries: &[Value]) -> Folded {
+pub fn progress_fold(entries: &[LedgerEntry]) -> Folded {
     entries.iter().fold(Folded::default(), |f, e| progress_step(&f, e).0)
 }
 
@@ -255,10 +271,10 @@ fn working(state: &SpaceState) -> usize {
     state.sessions.iter().filter(|h| is_hired(h.role) && h.phase.is_working()).count()
 }
 
-fn family_entry(id: &str, children: &[&Issue]) -> Value {
+fn family_entry(id: &str, children: &[&Issue]) -> LedgerEntry {
     let merged: Vec<&str> = children
         .iter()
-        .filter(|i| i.delivered.map(|d| d.as_str()) == Some("merged_into_parent"))
+        .filter(|i| i.delivered == Some(Landing::MergedIntoParent))
         .map(|i| i.id.as_str())
         .collect();
     let nodes: Vec<DagNode> = children
@@ -271,31 +287,40 @@ fn family_entry(id: &str, children: &[&Issue]) -> Value {
     let parallel = dag_layers(&nodes)
         .iter()
         .any(|layer| layer.iter().filter(|id| merged.contains(&id.as_str())).count() >= 2);
-    json!({ "kind": "family", "issue": id, "merged": merged.len(), "parallel": parallel })
+    LedgerEntry::Family(LedgerEntryFamily {
+        at: 0,
+        issue: id.to_string(),
+        merged: merged.len() as i64,
+        parallel,
+    })
 }
 
-/// The entries a fact makes (`entriesFor`), without their time.
-pub fn entries_for(before: &SpaceState, fact: &Fact, after: &SpaceState) -> Vec<Value> {
+/// The entries a fact makes (`entriesFor`), before `Game::record` stamps `at`.
+pub fn entries_for(before: &SpaceState, fact: &Fact, after: &SpaceState) -> Vec<LedgerEntry> {
     let mut out = Vec::new();
     match fact {
         Fact::SessionReported(f) => {
             let h = session_of(after, &f.id).or_else(|| session_of(before, &f.id));
             if !h.is_some_and(|h| is_on_duty(h.role)) && f.outcome == Outcome::Failed {
-                let mut e = json!({ "kind": "failed", "session": f.id });
-                if let Some(h) = h.filter(|h| !h.agent.is_empty()) {
-                    e["agent"] = h.agent.clone().into();
-                }
-                out.push(e);
+                out.push(LedgerEntry::Failed(LedgerEntryFailed {
+                    at: 0,
+                    session: f.id.clone(),
+                    agent: h.map(|h| h.agent.clone()).filter(|a| !a.is_empty()),
+                }));
             }
         }
         Fact::CallChanged(f) => {
-            if f.state.as_str() == "live" {
-                out.push(json!({ "kind": "opened" }));
+            if f.state == CallState::Live {
+                out.push(LedgerEntry::Opened(LedgerEntryMoment { at: 0 }));
             }
         }
         Fact::SessionChanged(f) => {
             if is_hired(f.session.role) {
-                out.push(json!({ "kind": "hired", "session": f.session.id, "agent": f.session.agent }));
+                out.push(LedgerEntry::Hired(LedgerEntryHired {
+                    at: 0,
+                    session: f.session.id.clone(),
+                    agent: (!f.session.agent.is_empty()).then(|| f.session.agent.clone()),
+                }));
             }
         }
         Fact::IssueChanged(f) => {
@@ -306,46 +331,46 @@ pub fn entries_for(before: &SpaceState, fact: &Fact, after: &SpaceState) -> Vec<
                 && let Some(session) = session
                 && (previous.is_none_or(|p| p.conflict.is_none() || p.latest_session_id() != Some(session)))
             {
-                out.push(json!({ "kind": "conflicted", "session": session }));
+                out.push(LedgerEntry::Conflicted(LedgerEntryConflicted {
+                    at: 0,
+                    session: session.to_string(),
+                }));
             }
             if let Some(parent) = &issue.parent
                 && !before.issues.iter().any(|i| i.parent.as_ref() == Some(parent))
             {
-                out.push(json!({ "kind": "split" }));
+                out.push(LedgerEntry::Split(LedgerEntryMoment { at: 0 }));
             }
             let children: Vec<&Issue> = after.issues.iter().filter(|i| i.parent.as_ref() == Some(&issue.id)).collect();
-            let was_done = previous.is_some_and(|p| p.status.as_str() == "done");
-            if issue.status.as_str() == "done" && !was_done && !children.is_empty() {
+            let was_done = previous.is_some_and(|p| p.status == IssueStatus::Done);
+            if issue.status == IssueStatus::Done && !was_done && !children.is_empty() {
                 out.push(family_entry(&issue.id, &children));
             }
         }
         Fact::SessionLeft(f) => {
             if let Some(h) = session_of(before, &f.id)
                 && f.closed == Some(SessionClose::Merged)
-                && f.merged.is_some_and(|m| m > 0)
+                && let Some(commits) = f.merged.filter(|m| *m > 0)
             {
-                let mut e = json!({
-                    "kind": "harvested",
-                    "session": f.id,
-                    "agent": h.agent,
-                    "repo": h.repo.clone().unwrap_or_default(),
-                    "runtime": h.runtime,
-                    "commits": f.merged,
-                    "runs": h.runs,
-                });
-                if let Some(cny) = h.spent.as_ref().and_then(|s| s.cny) {
-                    e["cny"] = serde_json::to_value(cny).unwrap_or_default();
-                }
-                out.push(e);
+                out.push(LedgerEntry::Harvested(LedgerEntryHarvested {
+                    at: 0,
+                    session: f.id.clone(),
+                    agent: (!h.agent.is_empty()).then(|| h.agent.clone()),
+                    repo: h.repo.clone().unwrap_or_default(),
+                    runtime: h.runtime.clone(),
+                    commits,
+                    cny: h.spent.as_ref().and_then(|s| s.cny),
+                    runs: h.runs,
+                }));
             }
         }
         Fact::MessageChanged(f) => {
             let actor = &f.message.actor;
-            if matches!(actor, vibevalley_protocol::Actor::User { .. }) {
+            if matches!(actor, Actor::User { .. }) {
                 if let Some(thread) = &f.thread
                     && let Some(h) = session_on_issue(before, thread)
                 {
-                    out.push(json!({ "kind": "told", "session": h.id }));
+                    out.push(LedgerEntry::Told(LedgerEntryTold { at: 0, session: h.id.clone() }));
                 }
                 for named in &f.message.mentions {
                     if named != DEFAULT_ORCHESTRATOR
@@ -353,13 +378,17 @@ pub fn entries_for(before: &SpaceState, fact: &Fact, after: &SpaceState) -> Vec<
                         && named != EVERYONE
                         && let Some(h) = session_of(before, named)
                     {
-                        out.push(json!({ "kind": "called", "session": h.id }));
+                        out.push(LedgerEntry::Called(LedgerEntryCalled { at: 0, session: h.id.clone() }));
                     }
                 }
-            } else if crate::rules::actor_role_of(actor).map(|r| r.as_str()) == Some("worker")
+            } else if crate::rules::actor_role_of(actor) == Some(AgentRole::Worker)
                 && let Some(answers) = &f.answers
             {
-                out.push(json!({ "kind": "handoff", "session": answers, "to": f.message.from }));
+                out.push(LedgerEntry::Handoff(LedgerEntryHandoff {
+                    at: 0,
+                    session: answers.clone(),
+                    to: f.message.from.clone(),
+                }));
             }
         }
         Fact::ProgressChanged(f) => {
@@ -367,24 +396,35 @@ pub fn entries_for(before: &SpaceState, fact: &Fact, after: &SpaceState) -> Vec<
                 let (level, _) = level_for_commits(commits.total);
                 let (was, _) = level_for_commits(before.commits.as_ref().map(|c| c.total).unwrap_or(0));
                 if level > was {
-                    out.push(json!({ "kind": "level", "level": level }));
+                    out.push(LedgerEntry::Level(LedgerEntryLevel { at: 0, level }));
                 }
             }
         }
-        _ => {}
+        Fact::MediaChanged(_)
+        | Fact::ChannelChanged(_)
+        | Fact::ChannelRemoved(_)
+        | Fact::UserMentionsChanged(_)
+        | Fact::SessionPhaseChanged(_)
+        | Fact::SessionToolChanged(_)
+        | Fact::SessionToolsReset(_)
+        | Fact::IssueRemoved(_)
+        | Fact::CronChanged(_)
+        | Fact::CronRemoved(_)
+        | Fact::MachineChanged(_)
+        | Fact::ConnectorChanged(_) => {}
     }
     if working(before) < FULL_HOUSE && working(after) >= FULL_HOUSE {
-        out.push(json!({ "kind": "busy6" }));
+        out.push(LedgerEntry::Busy6(LedgerEntryMoment { at: 0 }));
     }
     out
 }
 
 /// A farm level the ledger has not told yet (`catchUp`).
-pub fn catch_up(state: &SpaceState) -> Vec<Value> {
+pub fn catch_up(state: &SpaceState) -> Vec<LedgerEntry> {
     let (level, _) = level_for_commits(state.commits.as_ref().map(|c| c.total).unwrap_or(0));
     let known = state.progress.as_ref().and_then(|p| p.counts.get("farm_level").copied()).unwrap_or(1);
     if level > known {
-        vec![json!({ "kind": "level", "level": level })]
+        vec![LedgerEntry::Level(LedgerEntryLevel { at: 0, level })]
     } else {
         vec![]
     }

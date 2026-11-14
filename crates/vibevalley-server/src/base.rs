@@ -15,7 +15,6 @@ pub enum LookIn {
     Skill,
     Template,
     Cron,
-    Device,
     Channel,
     Artifact,
     Library,
@@ -33,7 +32,6 @@ impl LookIn {
             LookIn::Skill => ("skill", BizCode::AgentNotFound, None),
             LookIn::Template => ("template", BizCode::AgentNotFound, None),
             LookIn::Cron => ("cron", BizCode::CronNotFound, Some(["cron", "list"])),
-            LookIn::Device => ("device", BizCode::UserNotFound, None),
             LookIn::Channel => ("channel", BizCode::ChannelNotFound, Some(["channel", "list"])),
             LookIn::Artifact => ("artifact", BizCode::ArtifactNotFound, Some(["artifact", "list"])),
             LookIn::Library => ("library", BizCode::LibraryNotFound, None),
@@ -99,7 +97,7 @@ impl<T: Clone> RequestKeys<T> {
             ));
         }
         // Held while working: a duplicate waits for the first answer.
-        let mut seen = self.seen.lock().unwrap_or_else(|e| e.into_inner());
+        let mut seen = crate::lock(&self.seen);
         if let Some((expires, done)) = seen.1.get(key)
             && *expires > crate::now()
         {

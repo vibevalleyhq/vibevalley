@@ -137,7 +137,9 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
         json!({ "name": "channel_message_send", "arguments": { "text": "收到，开工。" } }),
     );
     assert_eq!(said["result"]["isError"], false, "{said}");
-    assert!(text_of(&said).starts_with("发出去了："), "{said}");
+    assert!(text_of(&said).starts_with("发出去了：#general:1"), "{said}");
+    let unread = rpc(&door, &token, 41, "tools/call", json!({ "name": "channel_unread_list", "arguments": {} }));
+    assert_eq!(text_of(&unread), "没有没读的消息。", "{unread}");
 
     let remembered = rpc(
         &door,

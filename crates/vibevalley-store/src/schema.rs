@@ -4,8 +4,7 @@ use crate::{Result, StoreError};
 
 /// One entry per schema version; `user_version` counts how many have run.
 /// Append only: never edit an entry that has shipped.
-pub(crate) const MIGRATIONS: &[&str] = &[
-    "
+pub(crate) const MIGRATIONS: &[&str] = &["
     CREATE TABLE projects (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         path TEXT NOT NULL UNIQUE,
@@ -44,17 +43,7 @@ pub(crate) const MIGRATIONS: &[&str] = &[
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
     );
-",
-    "
-    CREATE TABLE docs (
-        kind TEXT NOT NULL,
-        id TEXT NOT NULL,
-        json TEXT NOT NULL,
-        updated_ms INTEGER NOT NULL,
-        PRIMARY KEY (kind, id)
-    );
-",
-];
+"];
 
 pub(crate) fn migrate(conn: &mut Connection) -> Result<()> {
     let current: i64 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;

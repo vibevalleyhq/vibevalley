@@ -1,10 +1,9 @@
 //! Issues and the helpers on them.
 
 use serde::Deserialize;
-use serde_json::Value;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    Caller, CriterionCheck, Deliverable, Issue, IssueAnswer, IssueFilter, IssueReportMemory, IssueReviewInput, IssueStatus, IssueTimeline, MandateStrength,
+    CriterionCheck, Deliverable, Issue, IssueAnswer, IssueFilter, IssueReportMemory, IssueReviewInput, IssueStatus, IssueTimeline, MandateStrength,
     SubmitBranch,
 };
 
@@ -105,12 +104,19 @@ pub fn diff(f: &Farm, _: &Who, a: IdArgs) -> Result<String, String> {
 }
 
 #[derive(Deserialize)]
+#[serde(untagged)]
+enum OneOrMany {
+    One(String),
+    Many(Vec<String>),
+}
+
+#[derive(Deserialize)]
 pub struct ReviewArgs {
     #[serde(default)]
     id: String,
     #[serde(default)]
     pass: bool,
-    findings: Option<Value>,
+    findings: Option<OneOrMany>,
     text: Option<String>,
 }
 
@@ -119,11 +125,10 @@ pub fn review(f: &Farm, _: &Who, a: ReviewArgs) -> Result<String, String> {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
-    let findings = match a.findings {
-        None | Some(Value::Null) => None,
-        Some(Value::String(one)) => Some(vec![one]),
-        Some(v) => Some(serde_json::from_value::<Vec<String>>(v).map_err(|e| format!("findings: {e}"))?),
-    };
+    let findings = a.findings.map(|f| match f {
+        OneOrMany::One(one) => vec![one],
+        OneOrMany::Many(many) => many,
+    });
     let input = IssueReviewInput {
         id: item.id,
         pass: a.pass,
@@ -552,8 +557,8 @@ fn submit(f: &Farm, who: &Who, summary: Option<&str>) -> Result<String, String> 
         body,
         dry_run: None,
     };
-    let data = f.call(Caller::User, "repo.pr.submit", serde_json::to_value(&req).map_err(|e| e.to_string())?)?;
-    Ok(data["url"].as_str().or(data["branch"].as_str()).unwrap_or("").to_string())
+    let data = f.publisher.submit(&req).map_err(|e| e.message)?;
+    Ok(data.url.unwrap_or(data.branch))
 }
 
 /// The PR title (first line, a leading `#` dropped) and body a helper wrote.

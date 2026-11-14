@@ -16,7 +16,7 @@
 
 pub mod hearers;
 
-use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread::ThreadId;
 use std::time::Duration;
 
@@ -32,7 +32,7 @@ use crate::modules::agent::Agents;
 use crate::modules::channel::{Chat, Committed, Meta, Note, Noticing, Saying, Seat, ThreadSubject, Told, actor_of, meta_of, profile_id};
 use crate::modules::issue::Board;
 use crate::modules::orchestrator::{Input, Orchestrator, words::Source};
-use crate::now;
+use crate::{lock, now};
 
 /// What a participant says by reacting when a message that wakes it is handed to it.
 const HANDED_EMOJI: &str = "👀";
@@ -70,15 +70,12 @@ pub struct Watch {
     board: Board,
     agents: Arc<Agents>,
     state: Mutex<State>,
+    opening: Mutex<()>,
     /// The newest event handled; writes wait on it.
     handled: Mutex<i64>,
     moved: Condvar,
     router: Mutex<Option<ThreadId>>,
     orchestrator: Option<Arc<Orchestrator>>,
-}
-
-fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 fn warn(what: &str, e: &ApiError) {
@@ -131,6 +128,7 @@ impl Watch {
             board,
             agents,
             state: Mutex::default(),
+            opening: Mutex::new(()),
             handled: Mutex::new(0),
             moved: Condvar::new(),
             router: Mutex::new(None),
@@ -170,6 +168,10 @@ impl Watch {
                 let there = h.read(|s| s.sessions.iter().any(|x| x.channel.as_deref() == Some(id)));
                 if there { vec![t("server.channel.helpersThere", &[])] } else { vec![] }
             });
+        }
+        {
+            let w = watch.clone();
+            chat.ensure_seated(move |who| w.ensure_session_seated(who));
         }
         let (tx, rx) = flume::unbounded::<News>();
         hub.watch(Arc::new(move |_, tr: &Transition| {
@@ -634,10 +636,26 @@ impl Watch {
     }
 
     fn open_threads(&self) {
+        let _guard = lock(&self.opening);
         for h in self.hired() {
             if let Err(e) = self.open_thread(&h) {
                 warn(&format!("{}'s thread", h.id), &e);
             }
+        }
+    }
+
+    fn ensure_session_seated(&self, id: &str) {
+        if *lock(&self.router) == Some(std::thread::current().id()) {
+            return;
+        }
+        let Some(h) = self.hired().into_iter().find(|h| h.id == id) else {
+            return;
+        };
+        let _guard = lock(&self.opening);
+        if self.chat.home_of(id).is_none()
+            && let Err(e) = self.open_thread(&h)
+        {
+            warn(&format!("{id}'s thread"), &e);
         }
     }
 
@@ -651,7 +669,6 @@ impl Watch {
     }
 
     fn open_thread(&self, h: &Session) -> Result<(), ApiError> {
-        self.seat(h, None)?;
         if let Some(direct) = self.direct_of_session(h) {
             return self.handed_on(h, &direct);
         }
@@ -663,7 +680,6 @@ impl Watch {
             return self.handed_on(h, &thread);
         }
         let channel = self.channel_of_session(h);
-        self.chat.read_up_to(&h.id, &channel, self.chat.latest(&channel)?)?;
         let what = if h.refining {
             t("server.channel.dispatch.draft", &[])
         } else {
@@ -688,7 +704,7 @@ impl Watch {
                 ("what", what.into()),
             ],
         );
-        let thread = self.chat.note(Note {
+        self.chat.note(Note {
             channel: channel.clone(),
             from: self.chat.orchestrator_in(&channel),
             kind: MessageKind::Dispatch,
@@ -699,10 +715,13 @@ impl Watch {
             },
             topic: Some(ThreadSubject { kind, id, owner: h.id.clone() }),
             member: None,
+            seat: Some(Seat {
+                id: h.id.clone(),
+                name: h.name.clone(),
+                agent: Some(h.agent.clone()),
+                home: None,
+            }),
         })?;
-        if !thread.is_empty() {
-            self.seat(h, Some(thread))?;
-        }
         Ok(())
     }
 
@@ -740,6 +759,7 @@ impl Watch {
             },
             topic: None,
             member: Some(h.id.clone()),
+            seat: None,
         })?;
         Ok(())
     }
@@ -790,6 +810,7 @@ impl Watch {
             meta,
             topic: None,
             member: None,
+            seat: None,
         })?;
         Ok(())
     }

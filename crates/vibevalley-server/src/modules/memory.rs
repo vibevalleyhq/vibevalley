@@ -9,27 +9,24 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 
 use rusqlite::{Connection, params};
 use vibevalley_i18n::t;
 use vibevalley_memory as m;
 use vibevalley_protocol::{
-    ApiError, BizCode, Fact, Memory, MemoryFound, MemoryList, MemoryScope, MemorySearch, MemorySourceInfo, Outcome, Preview, RecallPreview, ops,
+    ActorKind, ApiError, BizCode, Fact, Memory, MemoryFound, MemoryKind, MemoryList, MemoryScope, MemorySearch, MemorySourceInfo, Outcome, Preview,
+    RecallPreview, ops,
 };
 
-use crate::Hub;
 use crate::base::RequestKeys;
 use crate::modules::agent::Agents;
-use crate::now;
+use crate::modules::attachment::open_db;
+use crate::{Hub, lock, now};
 
 /// Fading marks the ones that would go if this many more were kept.
 const FADING_SOON: usize = 10;
 pub const LOCAL: &str = "local";
-
-fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
-}
 
 fn db_failed(e: rusqlite::Error) -> ApiError {
     ApiError::new(BizCode::MemoryRefused, format!("{}: {e}", t("server.memory.dbFailed", &[])))
@@ -74,13 +71,32 @@ pub struct Memories {
 }
 
 fn to_wire(x: m::Memory) -> Memory {
-    serde_json::from_value(serde_json::to_value(x).expect("JSON")).expect("the same wire shape")
+    Memory {
+        id: x.id,
+        agent: x.agent,
+        kind: match x.kind {
+            m::MemoryKind::Note => MemoryKind::Note,
+            m::MemoryKind::Issue => MemoryKind::Issue,
+        },
+        text: x.text,
+        author: match x.author {
+            m::ActorKind::User => ActorKind::User,
+            m::ActorKind::Agent => ActorKind::Agent,
+            m::ActorKind::System => ActorKind::System,
+        },
+        repo: x.repo,
+        session: x.session,
+        at: x.at,
+        recalled: x.recalled,
+        recalled_at: x.recalled_at,
+        fading: x.fading,
+        source: x.source,
+    }
 }
 
 impl Memories {
     pub fn open(home: &Path, agents: Arc<Agents>) -> Result<Arc<Memories>, ApiError> {
-        let db = Connection::open(home.join("server.db")).map_err(db_failed)?;
-        db.busy_timeout(std::time::Duration::from_secs(5)).map_err(db_failed)?;
+        let db = open_db(home).map_err(db_failed)?;
         db.execute_batch(
             "create table if not exists memory (
                 id text primary key,

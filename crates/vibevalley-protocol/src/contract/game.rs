@@ -629,6 +629,43 @@ pub enum LedgerEntry {
     Titled(LedgerEntryTitled),
 }
 
+impl LedgerEntry {
+    pub fn at(&self) -> i64 {
+        match self {
+            LedgerEntry::Harvested(e) => e.at,
+            LedgerEntry::Failed(e) => e.at,
+            LedgerEntry::Conflicted(e) => e.at,
+            LedgerEntry::Told(e) => e.at,
+            LedgerEntry::Reviewed(e) => e.at,
+            LedgerEntry::Family(e) => e.at,
+            LedgerEntry::Handoff(e) => e.at,
+            LedgerEntry::Called(e) => e.at,
+            LedgerEntry::Hired(e) => e.at,
+            LedgerEntry::Opened(e) | LedgerEntry::Split(e) | LedgerEntry::Voice(e) | LedgerEntry::Busy6(e) => e.at,
+            LedgerEntry::Level(e) => e.at,
+            LedgerEntry::Titled(e) => e.at,
+        }
+    }
+
+    pub fn with_at(mut self, at: i64) -> Self {
+        match &mut self {
+            LedgerEntry::Harvested(e) => e.at = at,
+            LedgerEntry::Failed(e) => e.at = at,
+            LedgerEntry::Conflicted(e) => e.at = at,
+            LedgerEntry::Told(e) => e.at = at,
+            LedgerEntry::Reviewed(e) => e.at = at,
+            LedgerEntry::Family(e) => e.at = at,
+            LedgerEntry::Handoff(e) => e.at = at,
+            LedgerEntry::Called(e) => e.at = at,
+            LedgerEntry::Hired(e) => e.at = at,
+            LedgerEntry::Opened(e) | LedgerEntry::Split(e) | LedgerEntry::Voice(e) | LedgerEntry::Busy6(e) => e.at = at,
+            LedgerEntry::Level(e) => e.at = at,
+            LedgerEntry::Titled(e) => e.at = at,
+        }
+        self
+    }
+}
+
 #[skip_serializing_none]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]

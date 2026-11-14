@@ -70,10 +70,8 @@ fn get(board: &Board, reference: &str) -> Result<Issue, ApiError> {
     board.issue(reference).ok_or_else(|| api(board, BoardError::NoIssue(reference.to_string())))
 }
 
-fn applied(hub: &Hub, issue: Issue) -> Result<AppliedIssue, ApiError> {
-    let mut v = serde_json::to_value(issue).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
-    v["seq"] = hub.seq().into();
-    serde_json::from_value(v).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))
+fn applied(hub: &Hub, issue: Issue) -> AppliedIssue {
+    AppliedIssue::from_issue(issue, hub.seq())
 }
 
 /// `requestKeys`: a retry with the same key gets the first answer for
@@ -504,14 +502,14 @@ pub fn install_on(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Agents>>) {
     hub.on::<ops::IssueCreate>(move |ctx, req| {
         keys.once(req.request_key.as_deref(), || {
             let issue = create(&b, profiles.as_deref(), &req)?;
-            applied(ctx.hub, issue)
+            Ok(applied(ctx.hub, issue))
         })
     });
 
     let b = board.clone();
     hub.on::<ops::IssueUpdate>(move |ctx, input| {
         let issue = update(&b, input)?;
-        applied(ctx.hub, issue)
+        Ok(applied(ctx.hub, issue))
     });
 
     let b = board.clone();
@@ -540,7 +538,7 @@ pub fn install_on(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Agents>>) {
 
     let b = board.clone();
     let keys = Arc::new(RequestKeys::default());
-    hub.on::<ops::IssueStatusUpdate>(move |ctx, input| keys.once(input.request_key.as_deref(), || applied(ctx.hub, status(&b, &input)?)));
+    hub.on::<ops::IssueStatusUpdate>(move |ctx, input| keys.once(input.request_key.as_deref(), || Ok(applied(ctx.hub, status(&b, &input)?))));
 
     let b = board.clone();
     let names = names.clone();
@@ -626,7 +624,10 @@ pub fn install_reviewed(hub: &Hub, board: Board, game: Arc<crate::modules::game:
             && let Some(session) = item.latest_session_id()
             && board.read(|s| s.sessions.iter().any(|h| &h.id == session))
         {
-            game.record(serde_json::json!({ "kind": "reviewed", "session": session }));
+            game.record(vibevalley_protocol::LedgerEntry::Reviewed(vibevalley_protocol::LedgerEntryReviewed {
+                at: 0,
+                session: session.clone(),
+            }));
         }
         Ok(changes)
     });

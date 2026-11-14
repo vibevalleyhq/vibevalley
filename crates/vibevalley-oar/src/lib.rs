@@ -451,7 +451,6 @@ pub fn default_runtimes() -> Registry {
 }
 
 /// Reads a JSONL record file written through `SessionOptions::record_to`.
-/// Also reads `oar-voyage/3` logs written by oar itself (lossy; see `record`).
 pub fn read_record(path: &std::path::Path) -> Result<Vec<Event>> {
     record::read_record_with_header(path).map(|(_, events)| events)
 }

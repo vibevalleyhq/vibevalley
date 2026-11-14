@@ -127,6 +127,8 @@ pub struct Started {
     pub library: Arc<modules::library::Library>,
     /// `vv://` reads for the orchestrator's and the helpers' `resource_read`.
     pub resources: Arc<modules::mcp::Resources>,
+    /// What the orchestrator's and the helpers' tools reach.
+    pub farm: Arc<modules::tool::Farm>,
     /// Dictation, grants and calls.
     pub voice: Arc<modules::voice::Voice>,
     /// The chat apps tied to channels.
@@ -224,7 +226,8 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     let repos = modules::repo::Repos::open(&config.work_root, board_config.per_repo).map_err(|e| failed("the repos")(&e))?;
     modules::repo::install(&hub, repos.clone());
     game.count_commits(repos.clone(), config.git_emails.clone());
-    modules::publish::install(&hub, Arc::new(modules::publish::Publisher::default()));
+    let publisher = Arc::new(modules::publish::Publisher::default());
+    modules::publish::install(&hub, publisher.clone());
     let memories = modules::memory::Memories::open(&config.home, agents.clone()).map_err(|e| failed("the memory")(&e.message))?;
     modules::memory::install(&hub, memories.clone());
     agents.attach_memories(&memories);
@@ -295,11 +298,11 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     }
     let resources = modules::mcp::Resources::new(board.clone(), chat.clone(), trajectories.clone());
     let farm = Arc::new(modules::tool::Farm {
-        hub: Arc::downgrade(&hub),
         board: board.clone(),
         chat: chat.clone(),
         agents: agents.clone(),
         repos: repos.clone(),
+        publisher,
         crons: crons.clone(),
         memories: memories.clone(),
         media: media.clone(),
@@ -313,6 +316,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     modules::issue::install_reviewed(&hub, board.clone(), game.clone());
     let key = setting.clone();
     let orchestrator = modules::orchestrator::Orchestrator::open(modules::orchestrator::Parts {
+        hub: Arc::downgrade(&hub),
         farm: farm.clone(),
         home: config.home.clone(),
         trajectories,
@@ -357,6 +361,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         pkm,
         library,
         resources,
+        farm,
         media_inputs,
         media,
         voice,

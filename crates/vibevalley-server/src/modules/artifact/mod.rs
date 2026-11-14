@@ -25,19 +25,14 @@ use vibevalley_protocol::{
 pub use blocks::spans_of;
 use db::ArtifactRow;
 
-use crate::Hub;
 use crate::base::{LookIn, missing};
 use crate::modules::agent::Agents;
 use crate::modules::attachment::{Attachments, open_db};
 use crate::modules::channel::{Chat, Made, Posting};
-use crate::now;
+use crate::{Hub, lock, now};
 
 /// How many the farm-wide list shows.
 const LISTED_MAX: i64 = 200;
-
-fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
-}
 
 fn refused(text: impl Into<String>) -> ApiError {
     ApiError::new(BizCode::ArtifactRefused, text.into())

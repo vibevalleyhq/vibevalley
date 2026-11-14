@@ -428,44 +428,4 @@ impl Store {
         )?;
         Ok(())
     }
-
-    /// Stores a JSON document under `(kind, id)`, replacing any earlier one.
-    /// Used by owners whose records are owned elsewhere as typed values
-    /// (the issue workflow keeps its issues and sessions here).
-    pub fn put_doc(&self, kind: &str, id: &str, value: &serde_json::Value) -> Result<()> {
-        let conn = self.lock();
-        conn.execute(
-            "INSERT INTO docs (kind, id, json, updated_ms) VALUES (?1, ?2, ?3, ?4)
-             ON CONFLICT(kind, id) DO UPDATE SET json = excluded.json, updated_ms = excluded.updated_ms",
-            params![kind, id, serde_json::to_string(value)?, now_ms()],
-        )?;
-        Ok(())
-    }
-
-    pub fn doc(&self, kind: &str, id: &str) -> Result<Option<serde_json::Value>> {
-        let conn = self.lock();
-        let json: Option<String> = conn
-            .query_row("SELECT json FROM docs WHERE kind = ?1 AND id = ?2", params![kind, id], |r| r.get(0))
-            .optional()?;
-        json.map(|j| serde_json::from_str(&j).map_err(StoreError::from)).transpose()
-    }
-
-    /// Every document of a kind, oldest write first.
-    pub fn docs(&self, kind: &str) -> Result<Vec<(String, serde_json::Value)>> {
-        let conn = self.lock();
-        let mut stmt = conn.prepare_cached("SELECT id, json FROM docs WHERE kind = ?1 ORDER BY updated_ms, id")?;
-        let rows = stmt.query_map([kind], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
-        let mut out = Vec::new();
-        for row in rows {
-            let (id, json) = row?;
-            out.push((id, serde_json::from_str(&json)?));
-        }
-        Ok(out)
-    }
-
-    pub fn delete_doc(&self, kind: &str, id: &str) -> Result<()> {
-        let conn = self.lock();
-        conn.execute("DELETE FROM docs WHERE kind = ?1 AND id = ?2", params![kind, id])?;
-        Ok(())
-    }
 }

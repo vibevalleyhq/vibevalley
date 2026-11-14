@@ -11,11 +11,10 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, Weak};
 
-use serde_json::{Value, json};
 use vibevalley_core::progress::{Folded, catch_up, entries_for, progress_fold, progress_step};
-use vibevalley_protocol::{Fact, FactProgressChanged, FactProgressChangedStation, LedgerEntry, ops};
+use vibevalley_protocol::{Fact, FactProgressChanged, FactProgressChangedStation, LedgerEntry, LedgerEntryTitled, ops};
 
-use crate::{Hub, now};
+use crate::{Hub, lock, now};
 
 const COUNT_EVERY: std::time::Duration = std::time::Duration::from_secs(120);
 const COUNT_AFTER_RUN: std::time::Duration = std::time::Duration::from_secs(15);
@@ -33,17 +32,10 @@ pub struct Game {
     asked: std::sync::atomic::AtomicU64,
 }
 
-fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
-}
-
 /// The ledger's entries that still read as a `LedgerEntry`.
-fn read_ledger(file: &Path) -> Vec<Value> {
+fn read_ledger(file: &Path) -> Vec<LedgerEntry> {
     let Ok(body) = std::fs::read_to_string(file) else { return vec![] };
-    body.lines()
-        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
-        .filter(|v| serde_json::from_value::<LedgerEntry>(v.clone()).is_ok())
-        .collect()
+    body.lines().filter_map(|line| serde_json::from_str::<LedgerEntry>(line).ok()).collect()
 }
 
 impl Game {
@@ -172,18 +164,16 @@ impl Game {
 
     /// Keeps one entry (stamped now) and folds it in; one that is not kept
     /// is left out, and the farm goes on.
-    pub fn record(&self, mut entry: Value) {
-        entry["at"] = now().into();
-        if serde_json::from_value::<LedgerEntry>(entry.clone()).is_err() {
-            return;
-        }
+    pub fn record(&self, entry: LedgerEntry) {
+        let entry = entry.with_at(now());
+        let Ok(line) = serde_json::to_string(&entry) else { return };
         let fact = {
             let mut folded = lock(&self.folded);
             let kept = std::fs::OpenOptions::new()
                 .create(true)
                 .append(true)
                 .open(&self.file)
-                .and_then(|mut f| writeln!(f, "{entry}"));
+                .and_then(|mut f| writeln!(f, "{line}"));
             if kept.is_err() {
                 return;
             }
@@ -206,14 +196,11 @@ impl Game {
 
     /// The title the user wears; none of either is the plain title.
     pub fn choose_title(&self, achievement: Option<String>, tier: Option<i64>) {
-        let mut e = json!({ "kind": "titled" });
-        if let Some(a) = achievement.filter(|a| !a.is_empty()) {
-            e["achievement"] = a.into();
-        }
-        if let Some(t) = tier.filter(|t| *t != 0) {
-            e["tier"] = t.into();
-        }
-        self.record(e);
+        self.record(LedgerEntry::Titled(LedgerEntryTitled {
+            at: 0,
+            achievement: achievement.filter(|a| !a.is_empty()),
+            tier: tier.filter(|t| *t != 0),
+        }));
     }
 
     /// The next session hired within ten seconds goes to `station`.

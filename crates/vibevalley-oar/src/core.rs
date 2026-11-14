@@ -37,6 +37,10 @@ pub(crate) fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
 }
 
+pub(crate) fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 /// Derives `SessionStatus` from events, one at a time. The same fold backs
 /// `Session::status()`, so a status rebuilt from a record matches the live one.
 ///
@@ -198,7 +202,7 @@ impl SessionCore {
         state.next_seq += 1;
         state.fold.apply(&event);
         if let Some(recorder) = state.recorder.as_mut()
-            && recorder.write(&self.session_id, &event).is_err()
+            && recorder.write(&event).is_err()
         {
             // A full disk must not take the session down with it.
             state.recorder = None;

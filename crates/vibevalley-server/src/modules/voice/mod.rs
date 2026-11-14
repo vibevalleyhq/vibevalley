@@ -16,7 +16,7 @@ pub mod token;
 
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use vibevalley_i18n::t;
@@ -33,7 +33,7 @@ use crate::modules::media::vendor::Fetch;
 use crate::modules::orchestrator::Orchestrator;
 use crate::modules::provider::Use;
 use crate::modules::setting::{Secret, Setting};
-use crate::{Hub, now};
+use crate::{Hub, lock, now};
 
 /// How long a turn of the orchestrator is waited for before a call gives up on it.
 const ANSWER_WAIT: Duration = Duration::from_secs(120);
@@ -45,10 +45,6 @@ const MOSS_PIECE_MAX: usize = 16_000;
 /// The tool calls one MOSS session may make, and at once.
 const MOSS_TOOL_CALLS: usize = 64;
 const MOSS_TOOLS_AT_ONCE: usize = 4;
-
-fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
-}
 
 /// Where the voice line listens and how the outside reaches it.
 #[derive(Clone, Default)]

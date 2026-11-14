@@ -243,31 +243,17 @@ fn image_request_refinements_prevent_submission() {
 #[test]
 fn orchestrator_image_tool_requires_user_intent_and_posts_once_to_its_channel() {
     use std::sync::Mutex;
-    use vibevalley_server::modules::tool::{Farm, Route, held};
+    use vibevalley_server::modules::tool::{Route, held};
     let dir = tempfile::tempdir().unwrap();
     let backend = Backend::new("ok");
     let s = start(dir.path(), backend);
     let channel = s.chat.default_channel();
-    let farm = Arc::new(Farm {
-        media: s.media.clone(),
-        memories: s.memories.clone(),
-        hub: Arc::downgrade(&s.hub),
-        board: s.board.clone(),
-        chat: s.chat.clone(),
-        agents: s.agents.clone(),
-        repos: s.repos.clone(),
-        crons: s.crons.clone(),
-        resources: s.resources.clone(),
-        pkm: s.pkm.clone(),
-        artifacts: s.artifacts.clone(),
-        library: s.library.clone(),
-    });
     let route = Arc::new(Mutex::new(Route {
         agent: "orchestrator".into(),
         channel: channel.clone(),
         ..Route::default()
     }));
-    let tools = held(&farm, &route);
+    let tools = held(&s.farm, &route);
     let tool = tools.iter().find(|t| t.spec().name == "media_image_create").unwrap();
     assert!(tool.execute(&request("asked")).is_error);
     assert_eq!(ok(&s, "media.job.list", Value::Null), json!([]));

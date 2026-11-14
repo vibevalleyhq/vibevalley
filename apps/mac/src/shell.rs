@@ -22,7 +22,7 @@ use vibevalley_workspace::{Axis, PaneKind, TabId, TaskManager, TaskPhase, TaskSp
 
 use crate::diff::DiffView;
 use crate::hosted::frames::{self, PaletteMode, RailProject, TreeState};
-use crate::hosted::{Action, Choice, HostedEvent, HostedView};
+use crate::hosted::{Action, Choice, HostedEvent, HostedView, Panel};
 use crate::panes::{PaneEntity, SplitBounds};
 use crate::terminal::{SpawnSpec, TerminalEvent, TerminalView};
 use crate::theme::{Settings, ThemeChoice, Ui};
@@ -114,32 +114,6 @@ const SETTINGS_KEY: &str = crate::theme::SETTINGS_KEY;
 const ACTIVE_KEY: &str = "app.active_project";
 const SIDEBAR_MIN: f32 = 180.0;
 const SIDEBAR_MAX: f32 = 560.0;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Panel {
-    Files,
-    Git,
-    Agents,
-}
-
-impl Panel {
-    fn name(self) -> &'static str {
-        match self {
-            Panel::Files => "files",
-            Panel::Git => "git",
-            Panel::Agents => "agents",
-        }
-    }
-
-    fn parse(s: &str) -> Option<Panel> {
-        Some(match s {
-            "files" => Panel::Files,
-            "git" => Panel::Git,
-            "agents" => Panel::Agents,
-            _ => return None,
-        })
-    }
-}
 
 type GitSnapshot = (Repo, Status, Vec<Branch>, Vec<Worktree>, Vec<Commit>);
 
@@ -1066,12 +1040,10 @@ impl Shell {
             Action::AddProject => self.add_project(window, cx),
             Action::CloseProject { id } => self.close_project(id, cx),
             Action::ShowPanel { panel } => {
-                if let Some(p) = Panel::parse(&panel) {
-                    self.panel = p;
-                    self.inspector_open = true;
-                    self.push_sidebar(cx);
-                    cx.notify();
-                }
+                self.panel = panel;
+                self.inspector_open = true;
+                self.push_sidebar(cx);
+                cx.notify();
             }
             Action::ExpandDir { path } => {
                 if let Some(id) = active
@@ -1784,7 +1756,11 @@ impl Shell {
             "palette.search" => self.open_palette(PaletteMode::Search, window, cx),
             "panel.files" | "panel.git" | "panel.agents" => {
                 self.show_workspace(cx);
-                self.panel = Panel::parse(&id[6..]).unwrap_or(Panel::Files);
+                self.panel = match id {
+                    "panel.git" => Panel::Git,
+                    "panel.agents" => Panel::Agents,
+                    _ => Panel::Files,
+                };
                 self.inspector_open = true;
                 self.push_sidebar(cx);
                 cx.notify();

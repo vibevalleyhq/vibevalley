@@ -24,7 +24,9 @@ pub mod rules;
 pub mod status;
 pub mod text;
 
-pub use crate::core::{Applied, Core, Transition, cron_view, empty_space_state, frame_of, reduce, session_view};
+pub use crate::core::{
+    Applied, Core, Transition, cron_from_rules, cron_request_to_rules, cron_to_rules, cron_view, empty_space_state, frame_of, reduce, session_view,
+};
 pub use crate::deps::{
     CheckoutChecks, DagNode, DagProblem, acceptance_ancestors, blocked_issues, child_checks, dag_id_valid, dag_layers, dag_problems, dependency_problems,
     work_constraints,

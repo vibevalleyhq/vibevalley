@@ -9,22 +9,19 @@ use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use vibevalley_i18n::t;
 
 use super::agora::{CallLine, ORCHESTRATOR_MODEL, Pause};
+use crate::lock;
 use crate::modules::media::vendor::{Fetch, Request};
 use crate::modules::setting::Secret;
 
 const BODY_MAX: usize = 1024 * 1024;
 const HEAD_MAX: usize = 64 * 1024;
-
-fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
-}
 
 /// A tunnel's public address and how to close it.
 pub struct Tunnel {

@@ -21,7 +21,7 @@ use vibevalley_protocol::{
 
 use super::presets::{Candidate, agent_problems, choose_agent, money_stop, preset_of, quota_of, runtime_ids, runtime_label, session_options, support_of};
 use super::profile::Profiles;
-use crate::{Hub, now};
+use crate::{Hub, lock, now};
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -68,10 +68,6 @@ pub struct Fleet {
     probing: Mutex<HashSet<String>>,
     reads: AtomicU64,
     closed: AtomicBool,
-}
-
-fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 /// Runs `f` on its own thread; none when it takes longer than `limit`.

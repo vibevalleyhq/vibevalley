@@ -18,7 +18,7 @@ use std::time::Duration;
 use base64::Engine;
 use serde_json::{Value, json};
 
-use crate::core::{CoreSession, Driver, SessionCore, absolute, check_cwd, file_as_text, rejected, rejection};
+use crate::core::{CoreSession, Driver, SessionCore, absolute, check_cwd, file_as_text, lock, rejected, rejection};
 use crate::process::{LineChild, LoginCheck, Spawn, probe_installation_with, require_binary};
 use crate::record::{self, Recorder};
 use crate::{
@@ -458,10 +458,6 @@ struct Shared {
     abort_killed: AtomicBool,
     turns_finished: AtomicU64,
     cwd: PathBuf,
-}
-
-fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(|p| p.into_inner())
 }
 
 impl Shared {

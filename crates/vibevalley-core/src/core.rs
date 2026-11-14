@@ -342,18 +342,108 @@ pub fn session_view(h: &Session, conflict: Option<&Conflict>) -> SessionView {
     }
 }
 
+fn when_to_rules(when: &vibevalley_protocol::CronWhen) -> vibevalley_cron::CronWhen {
+    match when {
+        vibevalley_protocol::CronWhen::Once(w) => vibevalley_cron::CronWhen::Once { at: w.at },
+        vibevalley_protocol::CronWhen::Every(w) => vibevalley_cron::CronWhen::Every { minutes: w.minutes as f64 },
+        vibevalley_protocol::CronWhen::Daily(w) => vibevalley_cron::CronWhen::Daily { time: w.time.clone() },
+        vibevalley_protocol::CronWhen::Weekly(w) => vibevalley_cron::CronWhen::Weekly {
+            days: w.days.clone(),
+            time: w.time.clone(),
+        },
+        vibevalley_protocol::CronWhen::Cron(w) => vibevalley_cron::CronWhen::Cron { expr: w.expr.clone() },
+    }
+}
+
+fn when_from_rules(when: vibevalley_cron::CronWhen) -> vibevalley_protocol::CronWhen {
+    match when {
+        vibevalley_cron::CronWhen::Once { at } => vibevalley_protocol::CronWhen::Once(vibevalley_protocol::CronWhenOnce { at }),
+        vibevalley_cron::CronWhen::Every { minutes } => vibevalley_protocol::CronWhen::Every(vibevalley_protocol::CronWhenEvery { minutes: minutes as i64 }),
+        vibevalley_cron::CronWhen::Daily { time } => vibevalley_protocol::CronWhen::Daily(vibevalley_protocol::CronWhenDaily { time }),
+        vibevalley_cron::CronWhen::Weekly { days, time } => vibevalley_protocol::CronWhen::Weekly(vibevalley_protocol::CronWhenWeekly { days, time }),
+        vibevalley_cron::CronWhen::Cron { expr } => vibevalley_protocol::CronWhen::Cron(vibevalley_protocol::CronWhenExpr { expr }),
+    }
+}
+
+pub fn cron_to_rules(c: &Cron) -> vibevalley_cron::Cron {
+    vibevalley_cron::Cron {
+        id: c.id.clone(),
+        name: c.name.clone(),
+        text: c.text.clone(),
+        channel: c.channel.clone(),
+        agent: c.agent.clone(),
+        repo: c.repo.clone(),
+        when: when_to_rules(&c.when),
+        tz: c.tz.clone(),
+        enabled: c.enabled,
+        created: c.created,
+        last_run: c.last_run,
+        by: match c.by {
+            vibevalley_protocol::ActorKind::User => vibevalley_cron::ActorKind::User,
+            vibevalley_protocol::ActorKind::Agent => vibevalley_cron::ActorKind::Agent,
+            vibevalley_protocol::ActorKind::System => vibevalley_cron::ActorKind::System,
+        },
+        pending: c.pending,
+    }
+}
+
+pub fn cron_from_rules(c: vibevalley_cron::Cron) -> Cron {
+    Cron {
+        id: c.id,
+        name: c.name,
+        text: c.text,
+        channel: c.channel,
+        agent: c.agent,
+        repo: c.repo,
+        when: when_from_rules(c.when),
+        tz: c.tz,
+        enabled: c.enabled,
+        created: c.created,
+        last_run: c.last_run,
+        by: match c.by {
+            vibevalley_cron::ActorKind::User => vibevalley_protocol::ActorKind::User,
+            vibevalley_cron::ActorKind::Agent => vibevalley_protocol::ActorKind::Agent,
+            vibevalley_cron::ActorKind::System => vibevalley_protocol::ActorKind::System,
+        },
+        pending: c.pending,
+    }
+}
+
+pub fn cron_request_to_rules(r: &vibevalley_protocol::CronRequest) -> vibevalley_cron::CronRequest {
+    vibevalley_cron::CronRequest {
+        name: r.name.clone(),
+        text: r.text.clone(),
+        channel: r.channel.clone(),
+        agent: r.agent.clone(),
+        repo: r.repo.clone(),
+        when: when_to_rules(&r.when),
+        tz: r.tz.clone(),
+    }
+}
+
 /// A cron with its words (`whenText`, `nextText` of `issue/when.ts`, in
 /// `vibevalley-cron`).
 pub fn cron_view(c: &Cron) -> CronView {
-    let words = serde_json::to_value(c)
-        .ok()
-        .and_then(|v| serde_json::from_value::<vibevalley_cron::Cron>(v).ok())
-        .map(|ec| (vibevalley_cron::when_text(&ec.when, &ec.tz), vibevalley_cron::next_text(&ec)))
-        .unwrap_or_default();
-    let mut v = serde_json::to_value(c).expect("a cron is JSON");
-    v["whenText"] = words.0.into();
-    v["nextText"] = words.1.into();
-    serde_json::from_value(v).expect("a cron and its words are a CronView")
+    let ec = cron_to_rules(c);
+    let when_text = vibevalley_cron::when_text(&ec.when, &ec.tz);
+    let next_text = vibevalley_cron::next_text(&ec);
+    CronView {
+        id: c.id.clone(),
+        name: c.name.clone(),
+        text: c.text.clone(),
+        channel: c.channel.clone(),
+        agent: c.agent.clone(),
+        repo: c.repo.clone(),
+        when: c.when.clone(),
+        tz: c.tz.clone(),
+        enabled: c.enabled,
+        created: c.created,
+        last_run: c.last_run,
+        by: c.by,
+        pending: c.pending,
+        when_text,
+        next_text,
+    }
 }
 
 fn with_words(state: &SpaceState) -> SpaceView {

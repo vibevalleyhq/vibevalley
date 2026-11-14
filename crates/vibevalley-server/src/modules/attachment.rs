@@ -24,13 +24,18 @@ pub struct Attachments {
     db: Mutex<Connection>,
 }
 
-/// The server's own database: one file every module's tables share.
-pub fn open_db(home: &Path) -> rusqlite::Result<Connection> {
-    let conn = Connection::open(home.join("server.db"))?;
+/// Opens a SQLite database with the server's busy timeout, WAL journal and foreign keys.
+pub fn open_db_at(path: &Path) -> rusqlite::Result<Connection> {
+    let conn = Connection::open(path)?;
     conn.busy_timeout(std::time::Duration::from_secs(5))?;
     conn.pragma_update(None, "journal_mode", "WAL")?;
     conn.pragma_update(None, "foreign_keys", "ON")?;
     Ok(conn)
+}
+
+/// The server's own database: one file every module's tables share.
+pub fn open_db(home: &Path) -> rusqlite::Result<Connection> {
+    open_db_at(&home.join("server.db"))
 }
 
 fn refused(text: String) -> ApiError {
@@ -62,7 +67,7 @@ impl Attachments {
     }
 
     fn db(&self) -> std::sync::MutexGuard<'_, Connection> {
-        self.db.lock().unwrap_or_else(|e| e.into_inner())
+        crate::lock(&self.db)
     }
 
     /// `attach`: an upload, as base64, kept.

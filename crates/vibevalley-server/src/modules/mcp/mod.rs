@@ -11,7 +11,7 @@ use vibevalley_server_api::Mcp;
 
 use crate::modules::tool::{self, Farm, Tool, Who};
 
-pub use resource::Resources;
+pub use resource::{ResourceReadArgs, Resources};
 
 const UNKNOWN_CALLER: &str = "没认出你是谁：这些工具只给帮工用";
 const PROTOCOL: &str = "2025-06-18";

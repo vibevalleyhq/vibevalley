@@ -495,7 +495,6 @@ export const catalogs = {
         skill: "列出技能，找它的 id",
         template: "列出模板，找它的 id",
         cron: "列出定时任务，找它的 id",
-        device: "看连着的设备，找它的 id",
         channel: "列出频道，找它的 id",
         graph: "列出计划，找它的 id",
         memories: "列出它的记性，找那一条的 id",
@@ -3937,7 +3936,6 @@ export const catalogs = {
         skill: "List the skills and find its id",
         template: "List the templates and find its id",
         cron: "List the scheduled tasks and find its id",
-        device: "See the connected devices and find its id",
         channel: "List the channels and find its id",
         graph: "List the plans and find its id",
         memories: "List its memories and find that one's id",
@@ -7851,7 +7849,6 @@ export interface Messages {
   "server.lookIn.artifact": undefined;
   "server.lookIn.channel": undefined;
   "server.lookIn.cron": undefined;
-  "server.lookIn.device": undefined;
   "server.lookIn.graph": undefined;
   "server.lookIn.issue": undefined;
   "server.lookIn.library": undefined;

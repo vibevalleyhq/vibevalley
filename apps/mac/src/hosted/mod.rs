@@ -12,7 +12,7 @@ use gpui_kit::{
 use nsh_platform_gpui::{App as NshApp, AppOptions, AppView, Appearance, Bundle};
 use serde_json::{Map, Value, json};
 
-pub use bridge::{Action, Choice, Outbox};
+pub use bridge::{Action, Choice, Outbox, Panel};
 
 mod late;
 
@@ -43,30 +43,28 @@ impl BridgeHub {
                 let home = server_home();
                 match vibevalley_server::start(crate::serving::config(&home, crate::serving::work_root())) {
                     Ok(started) => {
-                        crate::serving::set_voice(started.voice.clone());
-                        crate::serving::set_speech(started.media.clone());
                         let hub: std::sync::Arc<dyn vibevalley_bridge::Server> = started.hub.clone();
                         // The loopback API: the CLI finds it through server.json, the helpers' MCP door is on it.
-                        match vibevalley_http::serve(started.hub.clone(), "127.0.0.1:0".parse().expect("an address")) {
+                        let (listener, announced) = match vibevalley_http::serve(started.hub.clone(), "127.0.0.1:0".parse().expect("an address")) {
                             Ok(listener) => {
                                 started.board.sessions().set_mcp_url(format!("{}/mcp", listener.url()));
                                 match vibevalley_server::home::announce(&home, &listener.url()) {
                                     Ok(announced) => {
-                                        std::mem::forget(announced);
                                         let _ = ready.send(Ok(()));
+                                        (Some(listener), Some(announced))
                                     }
                                     Err(e) => {
                                         let _ = ready.send(Err(format!("server.json: {e}")));
+                                        (Some(listener), None)
                                     }
                                 }
-                                std::mem::forget(listener);
                             }
                             Err(e) => {
                                 let _ = ready.send(Err(format!("vibevalley http: {e}")));
+                                (None, None)
                             }
-                        }
-                        // The board, profiles and settings live as long as the app.
-                        std::mem::forget(started);
+                        };
+                        crate::serving::set_running(started, listener, announced);
                         hub
                     }
                     Err(e) => {

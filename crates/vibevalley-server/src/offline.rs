@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 use base64::Engine;
 use serde_json::{Value, json};
 
+use crate::lock;
 use crate::modules::media::vendor::{Fetch, FetchError, Request, Response};
 
 const MOSS: &str = "https://api.mosi.cn/v1";
@@ -42,10 +43,6 @@ pub fn network() -> (Arc<dyn Fetch>, Arc<dyn Fetch>) {
     let vendor: Arc<dyn Fetch> = Arc::new(move |r: Request| answer(&s, r));
     let download: Arc<dyn Fetch> = Arc::new(move |r: Request| serve(&state, r));
     (vendor, download)
-}
-
-fn lock(s: &Mutex<State>) -> std::sync::MutexGuard<'_, State> {
-    s.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 fn json_response(status: u16, v: &Value) -> Result<Response, FetchError> {

@@ -18,17 +18,13 @@ use vibevalley_protocol::{ActorKind, ApiError, BizCode, Cron, CronRequest, Fact,
 use crate::base::{LookIn, missing};
 use crate::modules::agent::Agents;
 use crate::modules::issue::{Board, NewIssue};
-use crate::{Hub, now};
+use crate::{Hub, lock, now};
 
 pub const DEFAULT_CHANNEL: &str = "general";
 const TICK: Duration = Duration::from_secs(20);
 
 fn refused(text: String) -> ApiError {
     ApiError::new(BizCode::CronRefused, text)
-}
-
-fn to_rules<T: serde::Serialize, R: serde::de::DeserializeOwned>(v: &T) -> R {
-    serde_json::from_value(serde_json::to_value(v).expect("JSON")).expect("the same wire shape")
 }
 
 /// `$TZ` when it names a zone, else the system's.
@@ -50,10 +46,6 @@ pub struct Crons {
     chat: std::sync::OnceLock<Weak<crate::modules::channel::Chat>>,
     orchestrator: std::sync::OnceLock<Weak<crate::modules::orchestrator::Orchestrator>>,
     closed: std::sync::atomic::AtomicBool,
-}
-
-fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 impl Crons {
@@ -138,7 +130,7 @@ impl Crons {
     pub fn add(&self, req: CronRequest, by: ActorKind) -> Result<Cron, ApiError> {
         let _l = lock(&self.lock);
         let at = now();
-        let rules: vibevalley_cron::CronRequest = to_rules(&req);
+        let rules = vibevalley_core::cron_request_to_rules(&req);
         let problem = vibevalley_cron::cron_problem(&rules, at);
         if !problem.is_empty() {
             return Err(refused(problem));
@@ -229,7 +221,7 @@ impl Crons {
 
     pub fn preview_remove(&self, id: &str) -> Result<Preview, ApiError> {
         let was = self.find(id)?;
-        let rules: vibevalley_cron::Cron = to_rules(&was);
+        let rules = vibevalley_core::cron_to_rules(&was);
         Ok(Preview {
             does: vec![t(
                 "server.cron.removeWhen",
@@ -246,10 +238,10 @@ impl Crons {
         let _l = lock(&self.lock);
         let at = now();
         let all = self.list();
-        let rules: Vec<vibevalley_cron::Cron> = all.iter().map(to_rules).collect();
+        let rules: Vec<vibevalley_cron::Cron> = all.iter().map(vibevalley_core::cron_to_rules).collect();
         for due in vibevalley_cron::due_crons(&rules, at) {
             let missed = vibevalley_cron::is_missed(due, at);
-            let after: Cron = to_rules(&vibevalley_cron::after_run(due, at));
+            let after = vibevalley_core::cron_from_rules(vibevalley_cron::after_run(due, at));
             if let Err(e) = self.put(after.clone()) {
                 // Not kept: due again at the next tick.
                 if let Some(hub) = self.hub() {

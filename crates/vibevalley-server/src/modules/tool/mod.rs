@@ -10,19 +10,19 @@ mod memory;
 mod notes;
 mod plan;
 
-use std::sync::{Arc, LazyLock, Mutex, Weak};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
-use vibevalley_protocol::{Caller, Issue, Session};
+use vibevalley_protocol::{Issue, Session};
 
-use crate::Hub;
 use crate::modules::agent::Agents;
 use crate::modules::channel::Chat;
 use crate::modules::cron::Crons;
 use crate::modules::issue::Board;
 use crate::modules::orchestrator::words;
+use crate::modules::publish::Publisher;
 use crate::modules::repo::Repos;
 
 /// A tool as the model sees it.
@@ -62,11 +62,11 @@ pub enum Who {
 
 /// What the tools reach.
 pub struct Farm {
-    pub hub: Weak<Hub>,
     pub board: Board,
     pub chat: Arc<Chat>,
     pub agents: Arc<Agents>,
     pub repos: Arc<Repos>,
+    pub publisher: Arc<Publisher>,
     pub crons: Arc<Crons>,
     pub memories: Arc<crate::modules::memory::Memories>,
     pub media: Arc<crate::modules::media::jobs::Jobs>,
@@ -77,13 +77,6 @@ pub struct Farm {
 }
 
 impl Farm {
-    /// An endpoint as the hub serves it to `caller`: its data, or the refusal's words.
-    fn call(&self, caller: Caller, op: &str, payload: Value) -> Result<Value, String> {
-        let hub = self.hub.upgrade().ok_or("the farm is closing")?;
-        let e = hub.call_as(caller, op, payload);
-        if e.biz_code == 0 { Ok(e.data.unwrap_or(Value::Null)) } else { Err(e.message) }
-    }
-
     /// An issue by id, `#n`, number, or the id or name of a helper on it.
     fn issue(&self, key: &str) -> Result<Issue, String> {
         let key = key.trim();
@@ -111,11 +104,6 @@ impl Farm {
             Some(a) => self.agents.profiles.agent(a).map(|p| p.name).unwrap_or_default(),
             None => String::new(),
         }
-    }
-
-    /// A hub endpoint's data as JSON text for the model.
-    fn endpoint(&self, caller: Caller, op: &str, payload: Value) -> Result<String, String> {
-        serde_json::to_string(&self.call(caller, op, payload)?).map_err(|e| e.to_string())
     }
 
     fn number_of(&self, session: &Session) -> Option<i64> {
@@ -232,25 +220,32 @@ fn handler(op: &str) -> Option<Run> {
         "cron.create" => typed!(plan::cron_create),
         "cron.list" => typed!(plan::cron_list),
         "cron.delete" => typed!(plan::cron_delete),
-        "resource.read" => |farm: &Farm, who: &Who, _: &Words, raw: &Value| match who {
-            Who::Helper(me) => farm.resources.read(Some(me), raw),
-            Who::Orchestrator(_) => farm.resources.read(None, raw),
-        },
+        "resource.read" => typed!(notes::resource_read),
         "memory.search" => typed!(memory::search),
         "memory.create" => typed!(memory::create),
-        "pkm.search" | "pkm.page.get" | "pkm.capture" | "pkm.comment.suggest" => notes::pkm,
-        "media.image.create" => notes::image,
-        "media.speech.create" => notes::speech,
-        "media.dialogue.create" => notes::dialogue,
-        "media.voiceDesign.create" => notes::voice_design,
-        "media.understanding.start" => notes::understand,
-        "media.job.get" | "media.job.list" | "media.job.cancel" | "media.job.download" => notes::jobs,
+        "pkm.search" => typed!(notes::pkm_search),
+        "pkm.page.get" => typed!(notes::pkm_page),
+        "pkm.capture" => typed!(notes::pkm_capture),
+        "pkm.comment.suggest" => typed!(notes::pkm_suggest),
+        "media.image.create" => typed!(notes::image),
+        "media.speech.create" => typed!(notes::speech),
+        "media.dialogue.create" => typed!(notes::dialogue),
+        "media.voiceDesign.create" => typed!(notes::voice_design),
+        "media.understanding.start" => typed!(notes::understand),
+        "media.job.get" => typed!(notes::job_get),
+        "media.job.list" => typed!(notes::job_list),
+        "media.job.cancel" => typed!(notes::job_cancel),
+        "media.job.download" => typed!(notes::job_download),
         "library.item.list" => typed!(notes::library_list),
         "library.item.add" => typed!(notes::library_add),
         "artifact.list" => typed!(notes::artifact_list),
-        "artifact.get" | "artifact.content.get" => notes::artifact_read,
-        "artifact.create" | "artifact.version.create" => notes::artifact_write,
-        "artifact.block.create" | "artifact.block.update" | "artifact.block.delete" => notes::block,
+        "artifact.get" => typed!(notes::artifact_get),
+        "artifact.content.get" => typed!(notes::artifact_content),
+        "artifact.create" => typed!(notes::artifact_create),
+        "artifact.version.create" => typed!(notes::artifact_version),
+        "artifact.block.create" => typed!(notes::block_create),
+        "artifact.block.update" => typed!(notes::block_update),
+        "artifact.block.delete" => typed!(notes::block_delete),
         _ => return None,
     })
 }

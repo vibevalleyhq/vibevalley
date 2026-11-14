@@ -6,12 +6,21 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
 
+use serde::Deserialize;
 use serde_json::{Value, json};
 use vibevalley_protocol::{AgentRole, Issue, Session};
 
+use crate::lock;
 use crate::modules::channel::Chat;
 use crate::modules::issue::Board;
 use crate::modules::session::Trajectories;
+
+#[derive(Deserialize)]
+pub struct ResourceReadArgs {
+    pub uri: String,
+    pub offset: Option<i64>,
+    pub limit: Option<i64>,
+}
 
 const DEFAULT_LIMIT: usize = 4000;
 const MAX_LIMIT: usize = 16000;
@@ -121,28 +130,29 @@ impl Resources {
     }
 
     /// One page as `resource_read` answers it (JSON text), or the refusal.
-    /// `reader` is a session id; `None` reads as the orchestrator.
-    pub fn read(&self, reader: Option<&Session>, args: &Value) -> Result<String, String> {
-        let uri = args["uri"].as_str().unwrap_or("").trim().to_string();
+    /// `reader` is a session; `None` reads as the orchestrator.
+    pub fn read(&self, reader: Option<&Session>, args: &ResourceReadArgs) -> Result<String, String> {
+        let uri = args.uri.trim().to_string();
         let r = parse(&uri).ok_or_else(|| invalid_uri(&uri))?;
-        let offset = match &args["offset"] {
-            Value::Null => 0,
-            v => v.as_i64().filter(|o| *o >= 0).ok_or("offset 不能小于 0。")? as usize,
+        let offset = match args.offset {
+            None => 0,
+            Some(o) if o >= 0 => o as usize,
+            Some(_) => return Err("offset 不能小于 0。".into()),
         };
         let orchestrator = reader.is_none_or(|s| s.role == AgentRole::Orchestrator);
         let key = format!("{}:{uri}", reader.map(|s| s.id.as_str()).unwrap_or("orchestrator"));
         let text: Vec<u16> = if offset == 0 {
             let loaded = self.load(r, reader, orchestrator, &uri)?;
             let units: Vec<u16> = loaded.encode_utf16().collect();
-            if !self.cache.lock().unwrap_or_else(|e| e.into_inner()).put(key, units.clone()) {
+            if !lock(&self.cache).put(key, units.clone()) {
                 return Err(SNAPSHOT_TOO_LARGE.into());
             }
             units
         } else {
-            let cache = self.cache.lock().unwrap_or_else(|e| e.into_inner());
+            let cache = lock(&self.cache);
             cache.texts.get(&key).cloned().ok_or(SNAPSHOT_MISSING)?
         };
-        let limit = args["limit"].as_i64().unwrap_or(DEFAULT_LIMIT as i64).clamp(1, MAX_LIMIT as i64) as usize;
+        let limit = args.limit.unwrap_or(DEFAULT_LIMIT as i64).clamp(1, MAX_LIMIT as i64) as usize;
         let start = offset.min(text.len());
         let end = (offset + limit).min(text.len());
         let mut page = json!({

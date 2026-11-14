@@ -141,27 +141,13 @@ fn understanding(id: &str, revision: i64, input: &str, prompt: &str) -> Value {
 }
 type Tools = (Vec<Box<dyn vibevalley_agent::Tool>>, Arc<Mutex<vibevalley_server::modules::tool::Route>>);
 fn tools(s: &vibevalley_server::Started, channel: &str) -> Tools {
-    use vibevalley_server::modules::tool::{Farm, Route, held};
-    let farm = Arc::new(Farm {
-        media: s.media.clone(),
-        memories: s.memories.clone(),
-        hub: Arc::downgrade(&s.hub),
-        board: s.board.clone(),
-        chat: s.chat.clone(),
-        agents: s.agents.clone(),
-        repos: s.repos.clone(),
-        crons: s.crons.clone(),
-        resources: s.resources.clone(),
-        pkm: s.pkm.clone(),
-        artifacts: s.artifacts.clone(),
-        library: s.library.clone(),
-    });
+    use vibevalley_server::modules::tool::{Route, held};
     let route = Arc::new(Mutex::new(Route {
         agent: "orchestrator".into(),
         channel: channel.into(),
         ..Route::default()
     }));
-    (held(&farm, &route), route)
+    (held(&s.farm, &route), route)
 }
 
 #[test]

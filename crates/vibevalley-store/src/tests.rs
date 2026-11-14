@@ -294,19 +294,3 @@ fn refuses_a_database_from_a_newer_build() {
     drop(conn);
     assert!(matches!(Store::open(&path), Err(StoreError::Db(_))));
 }
-
-#[test]
-fn docs_round_trip_by_kind_and_replace_in_place() {
-    let store = Store::open_in_memory().unwrap();
-    store.put_doc("issue", "a", &serde_json::json!({"n": 1})).unwrap();
-    store.put_doc("issue", "b", &serde_json::json!({"n": 2})).unwrap();
-    store.put_doc("session", "a", &serde_json::json!({"s": true})).unwrap();
-    store.put_doc("issue", "a", &serde_json::json!({"n": 3})).unwrap();
-    assert_eq!(store.doc("issue", "a").unwrap(), Some(serde_json::json!({"n": 3})));
-    let issues = store.docs("issue").unwrap();
-    assert_eq!(issues.len(), 2);
-    assert!(issues.iter().any(|(id, v)| id == "b" && v["n"] == 2));
-    store.delete_doc("issue", "a").unwrap();
-    assert_eq!(store.doc("issue", "a").unwrap(), None);
-    assert_eq!(store.docs("session").unwrap().len(), 1);
-}

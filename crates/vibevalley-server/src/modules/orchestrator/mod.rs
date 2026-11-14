@@ -15,7 +15,7 @@ pub mod words;
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak};
+use std::sync::{Arc, Condvar, Mutex, Weak};
 
 use vibevalley_agent::{Brain, BrainEvent, Conversation, Entry, Message, ModelClient, OpenAiClient, Tool, TurnOutcome, kit};
 use vibevalley_i18n::t;
@@ -31,16 +31,12 @@ use crate::modules::channel::{Picked, Posting};
 use crate::modules::ledger::Step;
 use crate::modules::session::Trajectories;
 use crate::modules::tool::{Farm, Route, held};
-use crate::now;
+use crate::{lock, now};
 
 const DEFAULT_MODEL: &str = "deepseek-flash";
 /// `quotaLow`: a runtime with less left than this is nearly used up.
 const QUOTA_LOW: f64 = 15.0;
 const SKILLS: include_dir::Dir = include_dir::include_dir!("$CARGO_MANIFEST_DIR/assets/orchestrator/skills");
-
-fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
-}
 
 /// One input to an orchestrator (`Handed`).
 #[derive(Debug, Clone)]
@@ -112,6 +108,7 @@ struct Instance {
 }
 
 pub struct Orchestrator {
+    hub: Weak<Hub>,
     farm: Arc<Farm>,
     home: PathBuf,
     trajectories: Arc<Trajectories>,
@@ -164,6 +161,7 @@ fn message_of_turn(entry: &Entry) -> Option<Option<Message>> {
 
 /// What the orchestrator is made with.
 pub struct Parts {
+    pub hub: Weak<Hub>,
     pub farm: Arc<Farm>,
     pub home: PathBuf,
     pub trajectories: Arc<Trajectories>,
@@ -176,6 +174,7 @@ pub struct Parts {
 impl Orchestrator {
     pub fn open(p: Parts) -> Arc<Orchestrator> {
         let o = Arc::new(Orchestrator {
+            hub: p.hub,
             farm: p.farm,
             home: p.home,
             trajectories: p.trajectories,
@@ -207,7 +206,7 @@ impl Orchestrator {
     }
 
     fn hub(&self) -> Option<Arc<Hub>> {
-        self.farm.hub.upgrade()
+        self.hub.upgrade()
     }
 
     fn conversation_file(home: &std::path::Path, id: &str) -> PathBuf {

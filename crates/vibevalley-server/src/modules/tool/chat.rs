@@ -1,8 +1,7 @@
 //! Channels and threads.
 
 use serde::Deserialize;
-use serde_json::json;
-use vibevalley_protocol::Caller;
+use vibevalley_protocol::ChannelUpdate;
 
 use super::{Farm, Who, given};
 use crate::modules::channel::{ReadOptions, Speaking, Spoken};
@@ -154,14 +153,19 @@ pub fn update(f: &Farm, _: &Who, a: UpdateArgs) -> Result<String, String> {
         .channel_by_name(id)
         .or_else(|| f.chat.channels().into_iter().find(|c| c.id == id))
         .ok_or_else(|| format!("没有 {id} 这个频道"))?;
-    let mut req = json!({ "id": c.id });
-    if let Some(v) = a.description {
-        req["description"] = json!(v);
-    }
-    if let Some(v) = a.repo {
-        req["repo"] = json!(v);
-    }
-    f.call(Caller::Orchestrator, "channel.update", req)?;
+    f.chat
+        .update_channel(
+            &c.id,
+            ChannelUpdate {
+                description: a.description,
+                repo: a.repo,
+                name: None,
+                category: None,
+                before: None,
+                members: None,
+            },
+        )
+        .map_err(|e| e.message)?;
     Ok(format!("改好了 #{}。", c.name))
 }
 
