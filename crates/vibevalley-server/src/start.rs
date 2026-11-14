@@ -56,6 +56,8 @@ pub struct ServerConfig {
     pub pkm_root: Option<PathBuf>,
     /// Rescans the vault when a file in it changes (VibeValley's own).
     pub watch_pkm: bool,
+    /// Where the voice line listens and how Agora reaches it.
+    pub voice_line: modules::voice::LineConfig,
 }
 
 impl ServerConfig {
@@ -82,6 +84,7 @@ impl ServerConfig {
             orchestrator_listens: true,
             pkm_root: None,
             watch_pkm: true,
+            voice_line: Default::default(),
         }
     }
 }
@@ -117,6 +120,8 @@ pub struct Started {
     pub library: Arc<modules::library::Library>,
     /// `vv://` reads for the orchestrator's and the helpers' `resource_read`.
     pub resources: Arc<modules::mcp::Resources>,
+    /// Dictation, grants and calls.
+    pub voice: Arc<modules::voice::Voice>,
 }
 
 impl Started {
@@ -126,6 +131,7 @@ impl Started {
     /// for reads; it serves nothing that needs the board afterwards.
     pub fn close(&self) {
         self.crons.close();
+        self.voice.close();
         self.orchestrator.close();
         self.agents.fleet.close();
         self.artifacts.close();
@@ -193,6 +199,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         (Arc::new(modules::media::vendor::Ureq), Arc::new(modules::media::vendor::Ureq))
     };
     modules::provider::install(&hub, Arc::new(modules::provider::Provider::new(setting.clone(), vendor.clone())));
+    let voice_fetch = vendor.clone();
     let registry = config.registry.clone().unwrap_or_else(|| Arc::new(runtimes(&setting, &config.home)));
     let agents = Agents::open(&hub, &config.home, &config.starters, registry.clone(), config.probe_runtimes).map_err(|e| failed("the profiles")(&e))?;
     modules::agent::install(&hub, agents.clone());
@@ -302,6 +309,17 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         crons.attach_orchestrator(o);
     }
     let watch = modules::watch::Watch::start_with(&hub, chat.clone(), board.clone(), agents.clone(), listening);
+    let voice = modules::voice::Voice::open(modules::voice::Parts {
+        hub: Arc::downgrade(&hub),
+        setting: setting.clone(),
+        chat: chat.clone(),
+        orchestrator: orchestrator.clone(),
+        fetch: voice_fetch,
+        realtime: None,
+        line: config.voice_line.clone(),
+        pause: None,
+    });
+    modules::voice::install(&hub, voice.clone());
     Ok(Started {
         hub,
         setting,
@@ -322,5 +340,6 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         resources,
         media_inputs,
         media,
+        voice,
     })
 }

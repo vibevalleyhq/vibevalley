@@ -25,6 +25,7 @@ pub mod repo;
 pub mod session;
 pub mod setting;
 pub mod tool;
+pub mod voice;
 pub mod watch;
 pub mod workplace;
 
