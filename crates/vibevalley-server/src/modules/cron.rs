@@ -292,6 +292,7 @@ impl Crons {
             user: false,
             picked: None,
             messages: vec![],
+            port: None,
         };
         if o.hear(input) { Ok(()) } else { Err(unserved()) }
     }

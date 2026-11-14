@@ -3,6 +3,7 @@
 //! `--ready-json` prints `{"url","pid"}` once it listens. The environment
 //! says the rest: `VIBEVALLEY_HOME`, `VIBEVALLEY_WORK_ROOT`,
 //! `VIBEVALLEY_PORT` (0: any), `VIBEVALLEY_AGENT_STARTERS` (template ids),
+//! `VIBEVALLEY_VOICE_LINE_URL` (your own tunnel to the voice line),
 //! and `VIBEVALLEY_TEST_RUNTIMES=1` for the page's tests' stand-in agent.
 
 use std::path::PathBuf;
@@ -54,6 +55,8 @@ fn run() -> Result<(), String> {
             .unwrap_or_default(),
         ..vibevalley_server::ServerConfig::under(home.clone())
     };
+    // The user's own tunnel to the voice line, instead of a cloudflared quick tunnel.
+    config.voice_line.url = env("VIBEVALLEY_VOICE_LINE_URL").unwrap_or_default();
     if testing {
         let mut registry = vibevalley_oar::Registry::new();
         registry.register(vibevalley_server::testing::helper());

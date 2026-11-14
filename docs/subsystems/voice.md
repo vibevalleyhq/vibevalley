@@ -1,18 +1,44 @@
 # 语音
 
-TS 服务端的语音（声网 ConvoAI 电话、听写、MOSS Live 与 Vision 的本机中继、通话内播报）随 TS 服务端删了，Rust 服务端没有 `voice.*` 接口（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)「砍掉的」）。日后按需在 Rust 上重做。
+听写、通话的凭据、通话本身，在 Rust 服务端的 `crates/vibevalley-server/src/modules/voice/`，接口是 `voice.*` 九个。服务端不碰音频：进声网的 RTC 频道、连 MOSS Live 的 socket、采集和播放，都是宿主（原生应用，和服务端同一个进程）的事。
 
-## 还在的
+## 在哪
 
 | 位置 | 是什么 |
 |---|---|
-| `crates/vibevalley-server/src/modules/setting.rs` | `settings.json` 里的语音设置：默认值、校验（`settings_problem`）、只存和默认不同的部分；页面还能读写，Rust 不用它们拨电话 |
-| `crates/vibevalley-server/src/modules/media/jobs.rs`、`crates/vibevalley-server/src/modules/media/vendor.rs` | 文字转语音是一种[媒体任务](docs/subsystems/media.md)（含流式），走 MOSS 的音频接口 |
-| `crates/vibevalley-server/src/offline.rs` | 测试用的离线 MOSS：音频、文件和下载 |
-| [`packages/ai/`](packages/ai/README.md)、[`packages/provider/`](packages/provider/README.md) | 页面的听写、MOSS Live 播放对账和声网 SDK；只剩页面在用，随页面删 |
+| `voice/mod.rs` | `Voice`：凭据（`grant`、`renew`）、通话（`start`、`stop`、`heard`、`said`、`speak`）、听写、验 MOSS 的 Key，和给宿主的 `moss_line` |
+| `voice/token.rs` | 声网的 AccessToken2（RTC 加 RTM）：给客户端的凭据、帮它接话的 agent 的令牌、每次 REST 调用的 `Authorization` 都是它 |
+| `voice/agora.rs` | 声网 Conversational AI 的 REST：按语音设置拼出 join 的请求（三家厂商和各自的 preset），speak、leave，408、429、5xx 再试两次 |
+| `voice/line.rs` | 语音线路：只听 127.0.0.1、只有一个接口 `POST /llm/<id>/chat/completions`、每通电话一把钥匙的监听，和通到它的隧道（cloudflared，或 `VIBEVALLEY_VOICE_LINE_URL`） |
+| `voice/moss.rs` | MOSS Live 的文字帧：`ask_orchestrator` 这个工具、会话设置、旁白、验 Key |
+| `voice/dictation.rs` | 听写：检查录音，发到 OpenAI 形状的 `/audio/transcriptions`（默认 MOSS，或用户自己的地址） |
+| `voice/prompts.rs` | 通话里对模型说的话 |
+| `modules/orchestrator/mod.rs` 的 `answer`、`brief` | 助手这一轮的话除了写进群聊，也交给等着它的那通电话（`Reply`） |
+| `modules/setting.rs` | `settings.json` 里的语音设置、声网凭据和各家的 Key |
 
-## 重做时守住的
+## 一通电话
 
-- **密钥不进页面**：页面连本机服务端的中继，服务端握手时注入厂商 Key，回传的帧里抹掉。
-- **主监听不上公网**：要让外部语音平台回调时，单开一个只放一个接口、每通一钥的监听，不暴露主端口。
-- **一段听写绑定发起的输入框**：切换焦点不写错地方，卸载时取消在途转写。
+1. `voice.grant.create`：按语音设置里「想」的那一家，发一份凭据。声网：`{ appId, channel, uid, token }`，`token` 一小时；MOSS：`appId` 和 `token` 都是 `"moss"`，只用来认这通电话。
+2. 宿主拿凭据进频道（声网），或向 `Voice::moss_line()` 要线路（MOSS）。
+3. `voice.call.start { channel, uid, about? }`：声网这边请 agent 进同一个频道，只听这个 `uid`；回 `agentId`。`about` 是响铃的缘由：不说问候语，助手先开口说它。
+4. 通话里：自带模型接话的电话（声网托管的模型、DeepSeek、自己的模型、MOSS），宿主把字幕经 `voice.call.hear`（用户说的）和 `voice.call.say`（模型说的）交回来，记进群聊，标成说出来的话；问候语不记。助手接话的电话走语音线路，两边的话线路上已经记了，`hear` 不再记一遍。`voice.hear` 是不带 `agentId` 的 `hear`，只在恰好有一通电话时管用。
+5. 凭据快过期时 `voice.grant.renew { channel, uid }`，用发凭据时的那份声网凭据重签。
+6. `voice.call.stop { agentId }`：请 agent 离开，收回这通电话的线路钥匙。
+
+助手接话（默认）时，声网的云要能找到助手：服务端在第一通电话时开语音线路和隧道，把这通电话自己的地址和钥匙写进 join 请求的 `llm`；声网每听完一句，就照 OpenAI 的格式问一次，用户的话进群聊，助手这一轮的话流回去。
+
+MOSS Live 的电话没有声网：宿主照 `MossLine` 给的地址和 Key 连上 MOSS，先发 `session_update()`（人设、开场和工具），把 `outgoing` 里的帧原样发出去，把 MOSS 说的每个文字帧交给 `heard()`。模型调 `ask_orchestrator` 时服务端去问助手，把回答放进 `outgoing`。`MossLine` 丢掉（socket 断了），这通电话就结束。
+
+## 守住的
+
+- **密钥不进页面**：声网的 App Certificate、各家的 Key、MOSS 的 Key 都只在服务端和宿主进程里；页面拿到的只有这通电话的凭据。
+- **主监听不上公网**：隧道只通到语音线路的端口；线路只认路径上的电话号和它的钥匙，其余一律 401 或 404。
+- **凭据跟着电话**：发凭据时的声网凭据一直用到这通电话结束，中途改设置不影响它；没用上的凭据一小时后作废，一份凭据只开一通电话。
+- **验 Key 不开会话**：`voice.moss.verify` 只带着 Key 问一次 MOSS 的实时地址，不采集也不发送音频。
+- **测试离线**：厂商经 `Fetch` 注入，隧道和重试的等待也能换掉（`crates/vibevalley-server/tests/voice.rs`）；令牌对着 `agora-token` 算出的值，join 请求对着 `tests/fixtures/voice-requests.json` 里 SDK 发过的请求。
+
+## 没做的
+
+- 通话中有事等用户时主动播报（TS 的 inbox news）：Rust 的 watch 还没有这条消息流。`Voice::speak` 在，接上就能用。
+- MOSS Live 和 Vision 的 socket 中继：页面跑在 nsh 里，没有浏览器的 WebSocket 和音频，socket 归宿主。
+- 隧道在最后一通电话之后留十分钟再关：现在开了就留到服务端退出。

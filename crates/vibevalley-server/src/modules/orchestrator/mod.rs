@@ -56,6 +56,40 @@ pub struct Input {
     pub picked: Option<Picked>,
     /// The messages it carries.
     pub messages: Vec<String>,
+    /// The live answer waiting for this turn's words (`Orchestrator::answer`, `brief`).
+    pub port: Option<String>,
+}
+
+/// A live answer (VibeValley `response.ts`): the turn's words as they are
+/// said, ending with the turn. Dropped, it stops waiting.
+pub struct Reply {
+    id: String,
+    words: flume::Receiver<String>,
+    orchestrator: Weak<Orchestrator>,
+}
+
+impl Reply {
+    /// The next words, none once the turn is over or nothing came in `wait`.
+    pub fn next(&self, wait: std::time::Duration) -> Option<String> {
+        self.words.recv_timeout(wait).ok()
+    }
+
+    /// Everything said until the turn ends, or what came within `wait` of each other.
+    pub fn whole(&self, wait: std::time::Duration) -> String {
+        let mut said = vec![];
+        while let Some(words) = self.next(wait) {
+            said.push(words);
+        }
+        said.join("\n").trim().to_string()
+    }
+}
+
+impl Drop for Reply {
+    fn drop(&mut self) {
+        if let Some(o) = self.orchestrator.upgrade() {
+            lock(&o.ports).remove(&self.id);
+        }
+    }
 }
 
 /// Messages heard but not woken for: shown with the next input (`digest`).
@@ -84,6 +118,8 @@ pub struct Orchestrator {
     key: Arc<dyn Fn() -> Option<String> + Send + Sync>,
     client: Option<Arc<dyn ModelClient>>,
     instances: Mutex<HashMap<String, Arc<Instance>>>,
+    /// The live answers not yet taken by a turn.
+    ports: Mutex<HashMap<String, flume::Sender<String>>>,
     closed: AtomicBool,
 }
 
@@ -146,6 +182,7 @@ impl Orchestrator {
             key: p.key,
             client: p.client,
             instances: Default::default(),
+            ports: Default::default(),
             closed: AtomicBool::new(false),
         });
         for a in o.farm.agents.profiles.orchestrators() {
@@ -262,6 +299,50 @@ impl Orchestrator {
         lock(&me.queue).push_back(input);
         me.more.notify_all();
         true
+    }
+
+    fn open_port(self: &Arc<Self>) -> Reply {
+        let id = uuid::Uuid::new_v4().to_string();
+        let (tx, words) = flume::unbounded();
+        lock(&self.ports).insert(id.clone(), tx);
+        Reply {
+            id,
+            words,
+            orchestrator: Arc::downgrade(self),
+        }
+    }
+
+    /// `answerer("phone")`: the user's spoken words go into the chat as any
+    /// of theirs do, and the turn they wake is answered here as well.
+    pub fn answer(self: &Arc<Self>, text: &str) -> Result<Reply, vibevalley_protocol::ApiError> {
+        let reply = self.open_port();
+        self.farm.chat.say(crate::modules::channel::Saying {
+            text: text.into(),
+            send_key: uuid::Uuid::new_v4().to_string(),
+            source: Some("voice".into()),
+            response_port: Some(reply.id.clone()),
+            voice_mode: Some("conversation".into()),
+            ..Default::default()
+        })?;
+        Ok(reply)
+    }
+
+    /// `brief`: a line from a call (what to tell the user, a question its
+    /// model passes on) put to the default orchestrator; none when it
+    /// cannot take it.
+    pub fn brief(self: &Arc<Self>, line: String) -> Option<Reply> {
+        let reply = self.open_port();
+        self.hear(Input {
+            agent: None,
+            channel: self.farm.chat.default_channel(),
+            source: Source::Call,
+            line,
+            user: false,
+            picked: None,
+            messages: vec![],
+            port: Some(reply.id.clone()),
+        })
+        .then_some(reply)
     }
 
     /// Words it heard that did not wake it: shown with its next input.
@@ -583,6 +664,11 @@ impl Orchestrator {
                 .unwrap_or_default(),
             user: batch.iter().any(|i| i.user),
         };
+        // Taken now: a turn that cannot start ends them unanswered.
+        let ports: Vec<flume::Sender<String>> = {
+            let mut open = lock(&self.ports);
+            batch.iter().filter_map(|i| i.port.as_ref().and_then(|p| open.remove(p))).collect()
+        };
         *lock(&me.route) = route.clone();
         let cannot = |why: String| {
             // The round is still in its log, failed: what it was told can be read and judged there.
@@ -622,6 +708,7 @@ impl Orchestrator {
         *lock(&me.abort) = Some(conv.abort_handle());
         let text = self.input_of(me, &batch);
         let mut run = Run::new(self, me, &route);
+        run.ports = ports;
         run.asked(&text);
         let outcome = conv.send(&text, &mut |e| run.on(e));
         run.finish(outcome);
@@ -639,6 +726,8 @@ struct Run<'a> {
     run: String,
     said: String,
     calls: u64,
+    /// The live answers this turn's words also go to, read out as they are.
+    ports: Vec<flume::Sender<String>>,
 }
 
 impl<'a> Run<'a> {
@@ -651,6 +740,7 @@ impl<'a> Run<'a> {
             run,
             said: String::new(),
             calls: 0,
+            ports: vec![],
         };
         r.step(Step::RunStarted { run: r.run.clone() });
         r.phase(Some(SessionAction::Thinking));
@@ -708,6 +798,9 @@ impl<'a> Run<'a> {
         if text.trim().is_empty() {
             return;
         }
+        for port in &self.ports {
+            let _ = port.send(text.clone());
+        }
         if let Err(e) = self.o.farm.chat.post(Posting {
             from: self.me.id.clone(),
             channel: self.route.channel.clone(),
@@ -715,7 +808,7 @@ impl<'a> Run<'a> {
             run: Some(self.run.clone()),
             send_key: String::new(),
             made: None,
-            spoken: false,
+            spoken: !self.ports.is_empty(),
         }) && let Some(hub) = self.o.hub()
         {
             hub.notice(NoticeLevel::Warn, e.message);

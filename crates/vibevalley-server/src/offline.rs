@@ -271,6 +271,14 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
         }
         return json_response(200, &out);
     }
+    // Dictation: one recording as a form, answered whole.
+    if path == format!("{MOSS}/audio/transcriptions") && r.method == "POST" && form {
+        return json_response(200, &json!({ "text": "Synthetic dictation." }));
+    }
+    // A keyed plain request to the realtime address: the key is let in, the socket is not opened.
+    if path == format!("{MOSS}/realtime") && r.method == "GET" {
+        return empty(if auth == "Bearer test-live-refused" { 401 } else { 426 });
+    }
     if path == format!("{MOSS}/audio/transcriptions") && r.method == "POST" && !form {
         let file = input["file_id"].as_str().unwrap_or("");
         let mut s = lock(state);
