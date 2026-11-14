@@ -11941,6 +11941,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
  "flume 0.12.0",
+ "futures-util",
  "gpui-kit",
  "image",
  "nsh-engine",
@@ -11955,6 +11956,7 @@ dependencies = [
  "smallvec",
  "tempfile",
  "tokio",
+ "tokio-tungstenite",
  "unicode-segmentation",
  "unicode-width",
  "vibevalley-bridge",
@@ -11965,6 +11967,7 @@ dependencies = [
  "vibevalley-oar",
  "vibevalley-protocol",
  "vibevalley-server",
+ "vibevalley-server-api",
  "vibevalley-store",
  "vibevalley-terminal",
  "vibevalley-workspace",

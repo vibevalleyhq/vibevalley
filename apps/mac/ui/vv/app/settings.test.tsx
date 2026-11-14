@@ -7,8 +7,8 @@ import { expect, open, test } from "nsh/test";
 import { responses, state } from "../fixtures/workbench";
 import { fakeHost } from "./fakeHost";
 
-async function start(route: string, width = 1200) {
-  const fake = fakeHost({ state, responses }, { route });
+async function start(route: string, width = 1200, extra: Record<string, unknown> = {}) {
+  const fake = fakeHost({ state, responses: { ...responses, ...extra } }, { route });
   const app = await open("./main.tsx", { width, height: 800, colorScheme: "light", platform: "macos", host: fake.options });
   await fake.pump(app);
   await fake.pump(app);
@@ -104,4 +104,19 @@ test("narrow: the settings list over the section", async () => {
   const { app } = await start("/settings/chat", 560);
   expect(app.count("id:settings-nav")).toBe(1);
   expect(app.count("id:connectors")).toBe(1);
+});
+
+test("regression: leaving MOSS while start is pending cancels that owner before and after its late reply", async () => {
+  const connecting = { phase: "connecting", muted: false, problem: null, heard: "", said: "" };
+  const idle = { ...connecting, phase: "idle" };
+  const { app, fake } = await start("/settings/moss", 1200, { "host.voiceStart": connecting, "host.voiceStop": idle, "host.voiceState": connecting });
+  await app.press("id:native-call-start");
+  const started = fake.calls.find((c) => c.op === "host.voiceStart")?.payload as { id: string };
+  expect(typeof started.id).toBe("string");
+  await app.press("id:place-issues");
+  expect(fake.calls.filter((c) => c.op === "host.voiceStop").length).toBe(1);
+  await fake.pump(app);
+  const stopped = fake.calls.filter((c) => c.op === "host.voiceStop");
+  expect(stopped.length).toBe(2);
+  expect(stopped.every((c) => (c.payload as { id: string }).id === started.id)).toBe(true);
 });

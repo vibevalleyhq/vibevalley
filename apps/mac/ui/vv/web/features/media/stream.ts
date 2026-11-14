@@ -1,84 +1,60 @@
-import { t } from "@vibevalley/i18n";
-import { subscriptions } from "@vibevalley/protocol/rpc";
+import { z } from "zod";
 
 import { transport } from "../../infra/transport";
 
-export function playSpeech(id: string, changed: (state: "playing" | "done") => void, failed: (error: string) => void) {
+const Playback = z.object({ phase: z.enum(["idle", "playing", "draining", "stopping"]), problem: z.string().nullable() });
+
+export function playSpeech(id: string, changed: (state: "playing" | "done" | "finished") => void, failed: (error: string) => void) {
   const bridge = transport();
   let stopped = false;
-  let done = false;
-  let formatted = false;
-  let sequence = 0;
-  let queued = 0;
-  let chain = Promise.resolve();
-  let unsubscribe: (() => void) | undefined;
-  const call = async (op: string, payload: unknown) => {
-    const reply = await bridge.call(op, payload);
+  let polling = false;
+  let timer: ReturnType<typeof setInterval> | undefined;
+  const call = async (op: string, payload: Record<string, unknown>) => {
+    const reply = await bridge.call(op, { ...payload, id });
     if (reply.bizCode !== 0) throw new Error(reply.message);
+    return Playback.parse(reply.data);
   };
+  const problem = (error: unknown) => failed(error instanceof Error ? error.message : String(error));
   const stop = () => {
     if (stopped) return;
     stopped = true;
-    unsubscribe?.();
-    void call("host.stopAudio", {}).catch((error: unknown) => failed(error instanceof Error ? error.message : String(error)));
+    clearInterval(timer);
+    void call("host.speechStop", {}).catch(problem);
   };
-  const fail = (error: unknown) => {
-    if (stopped) return;
-    stop();
-    failed(error instanceof Error ? error.message : String(error));
-  };
-  if (!bridge.subscribe) {
-    failed(t("web.audio.flashUnsupported"));
-    return stop;
-  }
-  unsubscribe = bridge.subscribe(
-    "media.speech.stream",
-    { id },
-    (raw) => {
+  const poll = async () => {
+    if (polling || stopped) return;
+    polling = true;
+    try {
+      const state = await call("host.speechState", {});
       if (stopped) return;
-      const event = subscriptions["media.speech.stream"].event.safeParse(raw);
-      if (!event.success) {
-        fail(t("web.audio.flashInvalid"));
+      if (state.problem) {
+        clearInterval(timer);
+        failed(state.problem);
+      } else if (state.phase === "idle") {
+        clearInterval(timer);
+        changed("finished");
+      } else if (state.phase === "draining") changed("done");
+    } catch (error) {
+      stop();
+      problem(error);
+    } finally {
+      polling = false;
+    }
+  };
+  void call("host.speechStart", { id })
+    .then(async () => {
+      if (stopped) {
+        await call("host.speechStop", {});
         return;
       }
-      const item = event.data;
-      const size = item.type === "audio" ? item.audio.length : 0;
-      queued += size;
-      if (queued > 2 << 20) {
-        fail(t("web.audio.flashInvalid"));
-        return;
+      changed("playing");
+      timer = setInterval(() => void poll(), 100);
+    })
+    .catch((error: unknown) => {
+      if (!stopped) {
+        stopped = true;
+        problem(error);
       }
-      chain = chain
-        .then(async () => {
-          queued -= size;
-          if (stopped) return;
-          if (done) throw new Error(t("web.audio.flashInvalid"));
-          switch (item.type) {
-            case "format":
-              if (formatted || item.bitDepth !== 16) throw new Error(t("web.audio.flashInvalid"));
-              await call("host.pcmStart", { sampleRate: item.sampleRate, channels: item.channels });
-              formatted = true;
-              changed("playing");
-              break;
-            case "audio":
-              if (!formatted || item.sequence !== sequence++) throw new Error(t("web.audio.flashInvalid"));
-              await call("host.pcmAppend", { data: item.audio });
-              break;
-            case "done":
-              done = true;
-              changed("done");
-              break;
-            case "failed":
-              throw new Error(t("web.audio.flashInvalid"));
-          }
-        })
-        .catch(fail);
-    },
-    (why) => {
-      void chain.then(() => {
-        if (!stopped && !done) fail(why?.message ?? t("web.audio.flashInvalid"));
-      });
-    },
-  );
+    });
   return stop;
 }

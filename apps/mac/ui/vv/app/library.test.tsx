@@ -5,7 +5,7 @@
 import "../polyfill";
 import { expect, open, test } from "nsh/test";
 
-import { boundProvider } from "../fixtures/library";
+import { boundProvider, mediaJobs } from "../fixtures/library";
 import { responses, state } from "../fixtures/workbench";
 import { fakeHost } from "./fakeHost";
 
@@ -72,47 +72,26 @@ test("speech: a voice of the account, the text, the request kept for a retry; a 
   expect(fake.calls.map((c) => c.op)).toContain("host.playAudio");
 });
 
-test("regression: Flash streams PCM only after explicit generation and stops with its subscription", async () => {
-  const { app, fake } = await start("/library?make=speech", { "host.pcmStart": null, "host.pcmAppend": null, "host.stopAudio": null });
+test("regression: Flash playback starts only after explicit generation and stops through its host owner", async () => {
+  const { app, fake } = await start("/library?make=speech", {
+    "host.speechStart": { phase: "playing", problem: null },
+    "host.speechState": { phase: "playing", problem: null },
+    "host.speechStop": { phase: "idle", problem: null },
+  });
   await app.press("等待生成结果");
   await app.press("Flash 实时播放");
   expect(app.count("id:speech-flash-notice")).toBe(1);
   await app.press("选择账号音色");
   await app.press("暖声 · voice-warm");
   await app.type("id:speech-text", "收工了");
-  expect(fake.subscriptions.size).toBe(0);
+  expect(fake.calls.some((c) => c.op === "host.speechStart")).toBe(false);
   await app.press("id:speech-generate");
   await fake.pump(app);
   expect(payloadOf(fake, "media.speech.create").streaming).toBe(true);
-  const stream = [...fake.subscriptions.values()].find((s) => s.name === "media.speech.stream");
-  expect(stream?.payload).toEqual({ id: "job-speech" });
-  await fake.emit(app, "media.speech.stream", { type: "format", sampleRate: 24000, channels: 1, bitDepth: 16 });
-  await fake.pump(app);
-  expect(payloadOf(fake, "host.pcmStart")).toEqual({ sampleRate: 24000, channels: 1 });
-  await fake.emit(app, "media.speech.stream", { type: "audio", sequence: 0, audio: "AAAAAA==" });
-  await fake.pump(app);
-  expect(payloadOf(fake, "host.pcmAppend")).toEqual({ data: "AAAAAA==" });
+  expect(payloadOf(fake, "host.speechStart")).toEqual({ id: "job-speech" });
   await app.press("id:speech-flash-stop");
   await fake.pump(app);
-  expect([...fake.subscriptions.values()].some((s) => s.name === "media.speech.stream")).toBe(false);
-  expect(fake.calls.some((c) => c.op === "host.stopAudio")).toBe(true);
-});
-
-test("regression: Flash refuses out-of-order PCM without playing it", async () => {
-  const { app, fake } = await start("/library?make=speech", { "host.pcmStart": null, "host.pcmAppend": null, "host.stopAudio": null });
-  await app.press("等待生成结果");
-  await app.press("Flash 实时播放");
-  await app.press("选择账号音色");
-  await app.press("暖声 · voice-warm");
-  await app.type("id:speech-text", "收工了");
-  await app.press("id:speech-generate");
-  await fake.pump(app);
-  await fake.emit(app, "media.speech.stream", { type: "format", sampleRate: 24000, channels: 1, bitDepth: 16 });
-  await fake.pump(app);
-  await fake.emit(app, "media.speech.stream", { type: "audio", sequence: 2, audio: "AAAAAA==" });
-  await fake.pump(app);
-  expect(fake.calls.some((c) => c.op === "host.pcmAppend")).toBe(false);
-  expect([...fake.subscriptions.values()].some((s) => s.name === "media.speech.stream")).toBe(false);
+  expect(fake.calls.some((c) => c.op === "host.speechStop")).toBe(true);
 });
 
 test("audio: the four forms, a dialogue's failed download retried, a transcript with its timeline", async () => {
@@ -177,7 +156,7 @@ test("regression: a large speech result plays and saves its local input file wit
     ...state,
     state: {
       ...state.state,
-      media: state.state.media.map((job) =>
+      media: mediaJobs.map((job) =>
         job.kind === "speech"
           ? {
               ...job,
@@ -201,7 +180,7 @@ test("regression: a large speech result plays and saves its local input file wit
 test("regression: a transcript timestamp starts the source file at that offset", async () => {
   const file = { path: "/tmp/standup.m4a", type: "audio/mp4", name: "standup.m4a" };
   const { app, fake } = await start("/library?make=audio", { "media.input.file": file, "host.playAudio": null });
-  const job = state.state.media.find((j) => j.kind === "transcription");
+  const job = mediaJobs.find((j) => j.kind === "transcription");
   if (job?.kind !== "transcription" || job.result?.kind !== "transcription") throw new Error("transcription fixture missing");
   const segment = job.result.segments[1];
   await app.press(`id:audio-seek-${segment.start}`);

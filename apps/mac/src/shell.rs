@@ -259,6 +259,8 @@ impl Shell {
         .detach();
         let quit = cx.on_app_quit(|this: &mut Shell, _| {
             this.island = None;
+            crate::live_voice::stop(None);
+            crate::speech_audio::stop(None);
             crate::audio::stop_queued();
             let jobs = this.ws.save_jobs();
             let store = this.store.clone();
@@ -1265,7 +1267,7 @@ impl Shell {
                     "monoFonts": fonts,
                     "terminalFontSize": settings.terminal_font_size,
                     "uiFontSize": settings.ui_font_size,
-                    "capabilities": ["notify", "tray", "locale", "reveal", "theme", "font", "opening", "openTerminal", "openUrl", "openFile", "pixelDir", "playAudio", "readFile", "commandLine", "seekAudio", "pcm", "pickFile", "saveFile"],
+                    "capabilities": ["notify", "tray", "locale", "reveal", "theme", "font", "opening", "openTerminal", "openUrl", "openFile", "pixelDir", "playAudio", "readFile", "commandLine", "seekAudio", "pcm", "pickFile", "saveFile", "mossVoice"],
                 }))
             }
             "host.cliState" | "host.cliInstall" | "host.cliRemove" => {
@@ -1466,6 +1468,22 @@ impl Shell {
                 .detach();
                 return;
             }
+            "host.speechState" => Envelope::ok(json!(crate::speech_audio::state(&text("id")))),
+            "host.speechStart" => match crate::serving::speech().and_then(|speech| crate::speech_audio::start(speech, &text("id"))) {
+                Ok(state) => Envelope::ok(json!(state)),
+                Err(error) => refusal(BizCode::Refused, error),
+            },
+            "host.speechStop" => Envelope::ok(json!(crate::speech_audio::stop(Some(&text("id"))))),
+            "host.voiceState" => Envelope::ok(json!(crate::live_voice::state(&text("id")))),
+            "host.voiceStart" => match crate::serving::voice().and_then(|voice| crate::live_voice::start(voice, text("id"))) {
+                Ok(state) => Envelope::ok(json!(state)),
+                Err(error) => refusal(BizCode::Refused, error),
+            },
+            "host.voiceStop" => Envelope::ok(json!(crate::live_voice::stop(Some(&text("id"))))),
+            "host.voiceMute" => match payload["muted"].as_bool() {
+                Some(muted) => Envelope::ok(json!(crate::live_voice::mute(&text("id"), muted))),
+                None => refusal(BizCode::InvalidInput, "voiceMute requires a boolean muted value"),
+            },
             "host.playAudio" => {
                 let seconds = payload["position"].as_f64().unwrap_or(0.0);
                 let path = payload["path"].as_str().map(PathBuf::from);

@@ -229,6 +229,8 @@
     },
     "tryIt": "Try it",
     "notInChat": "Nothing goes to the chat",
-    "debug": "Debugging: line quality and messages on the line"
+    "debug": "Debugging: line quality and messages on the line",
+    "nativeCall": "MOSS Live call",
+    "nativeNotice": "Choose MOSS Live as the call answer provider and save the configuration first. Starting captures your microphone and sends audio to the configured MOSS account; charges may apply. Final transcripts are recorded in the chat. Leaving this page hangs up."
   }
 }

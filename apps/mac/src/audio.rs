@@ -22,15 +22,48 @@ fn worker() -> &'static flume::Sender<AudioWork> {
     })
 }
 
+static CALL_RESERVED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub struct CallAudio;
+impl Drop for CallAudio {
+    fn drop(&mut self) {
+        capture_stop();
+        stop();
+        CALL_RESERVED.store(false, std::sync::atomic::Ordering::Release);
+    }
+}
+
+pub fn reserve_for_call() -> Result<CallAudio, String> {
+    use std::sync::atomic::Ordering;
+    if CALL_RESERVED.swap(true, Ordering::AcqRel) {
+        return Err("audio is already reserved by a call".into());
+    }
+    let lease = CallAudio;
+    let (sent, received) = flume::bounded(1);
+    worker()
+        .send(Box::new(move || {
+            let _ = sent.send(());
+        }))
+        .map_err(|_| "audio worker stopped")?;
+    received.recv().map_err(|_| "audio worker stopped")?;
+    Ok(lease)
+}
+
 pub fn dispatch<T: Serialize + 'static>(reply: crate::hosted::Replier, run: impl FnOnce() -> Result<T, String> + Send + 'static) {
     use vibevalley_bridge::{BizCode, Envelope, refusal};
     let answer = reply.clone();
     if worker()
         .try_send(Box::new(move || {
-            answer.send(match run() {
-                Ok(value) => Envelope::ok(serde_json::json!(value)),
-                Err(error) => refusal(BizCode::InvalidInput, error),
-            })
+            answer.send(
+                match if CALL_RESERVED.load(std::sync::atomic::Ordering::Acquire) {
+                    Err("audio is reserved by the voice call".into())
+                } else {
+                    run()
+                } {
+                    Ok(value) => Envelope::ok(serde_json::json!(value)),
+                    Err(error) => refusal(BizCode::InvalidInput, error),
+                },
+            )
         }))
         .is_err()
     {
@@ -48,10 +81,14 @@ pub fn stop_queued() {
 unsafe extern "C" {
     fn vv_audio_play(path: *const c_char, position: f64, error: *mut c_char, capacity: usize) -> bool;
     fn vv_audio_seek(position: f64, error: *mut c_char, capacity: usize) -> bool;
-    fn vv_audio_state(position: *mut f64, duration: *mut f64, playing: *mut bool);
+    fn vv_audio_state(position: *mut f64, duration: *mut f64, playing: *mut bool, queued: *mut f64);
     fn vv_audio_stop();
     fn vv_pcm_start(rate: f64, channels: u32, error: *mut c_char, capacity: usize) -> bool;
     fn vv_pcm_append(bytes: *const u8, length: usize, error: *mut c_char, capacity: usize) -> bool;
+    fn vv_pcm_completed() -> u64;
+    fn vv_capture_start(error: *mut c_char, capacity: usize) -> bool;
+    fn vv_capture_read(bytes: *mut u8, capacity: usize) -> isize;
+    fn vv_capture_stop();
 }
 
 #[derive(Debug, Serialize)]
@@ -60,6 +97,7 @@ pub struct Playback {
     position: f64,
     duration: f64,
     playing: bool,
+    pub queued_seconds: f64,
 }
 
 #[derive(Deserialize)]
@@ -114,8 +152,9 @@ pub fn state() -> Playback {
         position: 0.0,
         duration: 0.0,
         playing: false,
+        queued_seconds: 0.0,
     };
-    unsafe { vv_audio_state(&mut state.position, &mut state.duration, &mut state.playing) };
+    unsafe { vv_audio_state(&mut state.position, &mut state.duration, &mut state.playing, &mut state.queued_seconds) };
     state
 }
 
@@ -134,6 +173,32 @@ pub fn append_pcm(data: &str) -> Result<(), String> {
     }
     let bytes = base64::engine::general_purpose::STANDARD.decode(data).map_err(|e| e.to_string())?;
     call(|error, capacity| unsafe { vv_pcm_append(bytes.as_ptr(), bytes.len(), error, capacity) })
+}
+
+pub fn append_bytes(bytes: &[u8]) -> Result<(), String> {
+    call(|error, capacity| unsafe { vv_pcm_append(bytes.as_ptr(), bytes.len(), error, capacity) })
+}
+
+pub fn completed_frames() -> u64 {
+    unsafe { vv_pcm_completed() }
+}
+
+pub fn capture_start() -> Result<(), String> {
+    call(|error, capacity| unsafe { vv_capture_start(error, capacity) })
+}
+
+pub fn capture_read() -> Result<Vec<u8>, String> {
+    let mut bytes = vec![0; 640 * 10];
+    let read = unsafe { vv_capture_read(bytes.as_mut_ptr(), bytes.len()) };
+    if read < 0 {
+        return Err("microphone audio overflowed or its format changed".into());
+    }
+    bytes.truncate(read as usize);
+    Ok(bytes)
+}
+
+pub fn capture_stop() {
+    unsafe { vv_capture_stop() };
 }
 
 #[cfg(test)]
