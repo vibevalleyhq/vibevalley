@@ -16,6 +16,7 @@ use super::catalog::CatalogScene;
 use super::draw::DrawList;
 use super::element::{SpriteCache, framing, paint};
 use super::farm::frame::Frame;
+use super::farm::hud::{self, Action, Panel};
 use super::farm::islands::{MapHit, MapScene, RepoSummary};
 use super::farm::scene::{FarmScene, FarmTap, FarmTool};
 use super::level::{Point as ArtPoint, pt};
@@ -23,6 +24,8 @@ use super::opening::OpeningScene;
 use super::sky::Framing;
 use super::tree::TreeScene;
 use crate::hosted::BridgeHub;
+use vibevalley_i18n::t;
+use vibevalley_protocol::{ActWords, IssueAction};
 
 /// What a scene asks the shell for.
 #[derive(Debug, Clone)]
@@ -75,6 +78,7 @@ pub struct PixelView {
     pub unpainted_draws: u64,
     /// A phase set before the scene loaded.
     pending_phase: Option<(super::opening::Phase, f32)>,
+    command_pending: bool,
 }
 
 impl EventEmitter<PixelEvent> for PixelView {}
@@ -139,6 +143,7 @@ impl PixelView {
             taps: Vec::new(),
             unpainted_draws: 0,
             pending_phase: None,
+            command_pending: false,
         }
     }
 
@@ -188,13 +193,21 @@ impl PixelView {
         cx.spawn(async move |this, cx| {
             let envelope = task.await;
             let _ = this.update(cx, |v, cx| {
-                let data = serde_json::to_value(&envelope).ok().and_then(|e| e.get("data").cloned()).unwrap_or(Value::Null);
-                if let (Scene::Farm(f), Some(arr)) = (&mut v.scene, data.as_array()) {
-                    for item in arr {
-                        let Some(id) = item["id"].as_str() else { continue };
-                        let species = item["look"]["species"].as_str().unwrap_or("bear");
-                        let outfit = item["look"]["outfit"].as_str().unwrap_or("farmer");
-                        f.agent_looks.insert(id.to_string(), (species.to_string(), outfit.to_string()));
+                if let Scene::Farm(f) = &mut v.scene {
+                    match envelope.error() {
+                        Some(e) => f.show_toast(e.message),
+                        None => match serde_json::from_value::<Vec<vibevalley_protocol::Agent>>(envelope.data.unwrap_or(Value::Null)) {
+                            Ok(agents) => {
+                                f.agent_looks.clear();
+                                for agent in agents {
+                                    if let Some(species) = agent.look.species {
+                                        let outfit = agent.look.outfit.map(|o| o.as_str()).unwrap_or("farmer");
+                                        f.agent_looks.insert(agent.id, (species.as_str().into(), outfit.into()));
+                                    }
+                                }
+                            }
+                            Err(e) => f.show_toast(e.to_string()),
+                        },
                     }
                 }
                 cx.notify();
@@ -235,99 +248,40 @@ impl PixelView {
         .detach();
     }
 
-    fn hud_point(&self, at: Point<Pixels>) -> Option<(f32, f32, f32, f32)> {
-        let (bounds, f) = self.placed.get()?;
-        let hx = f32::from(at.x - bounds.origin.x) - f.bx.x;
-        let hy = f32::from(at.y - bounds.origin.y) - f.bx.y;
-        Some((hx, hy, f.bx.w, f.bx.h))
+    fn hud_point(&self, at: Point<Pixels>) -> Option<(f32, f32)> {
+        let (bounds, _) = self.placed.get()?;
+        Some((f32::from(at.x - bounds.origin.x), f32::from(at.y - bounds.origin.y)))
     }
 
-    fn tap_farm_hud(&mut self, hx: f32, hy: f32, view_w: f32, view_h: f32, cx: &mut Context<Self>) -> bool {
+    fn tap_farm_hud(&mut self, x: f32, y: f32, cx: &mut Context<Self>) -> bool {
         let Scene::Farm(f) = &mut self.scene else { return false };
-        // Top HUD navigation cards
-        let top_buttons: [(&str, f32, f32); 6] = [
-            ("workbench", 216.0, 76.0),
-            ("map", 298.0, 76.0),
-            ("tree", 380.0, 76.0),
-            ("chat", 462.0, 64.0),
-            ("ledger", 532.0, 64.0),
-            ("phone", 602.0, 64.0),
-        ];
-        if (12.0..=46.0).contains(&hy) {
-            for (action, bx, bw) in top_buttons {
-                if hx >= bx && hx <= bx + bw {
-                    match action {
-                        "workbench" => cx.emit(PixelEvent::Route("/issues".into())),
-                        "map" => cx.emit(PixelEvent::Pixel {
-                            scene: "map".into(),
-                            props: json!({}),
-                        }),
-                        "tree" => cx.emit(PixelEvent::Route("/tree".into())),
-                        "chat" => cx.emit(PixelEvent::Route("/chat".into())),
-                        "ledger" => f.panel_open = !f.panel_open,
-                        "phone" => f.phone_open = !f.phone_open,
-                        _ => {}
-                    }
-                    cx.notify();
-                    return true;
-                }
+        let Some(action) = hud::hit(f, x, y) else { return false };
+        self.taps.push(format!("{action:?}"));
+        match action {
+            Action::Route(route) => cx.emit(PixelEvent::Route(route)),
+            Action::Map => cx.emit(PixelEvent::Pixel {
+                scene: "map".into(),
+                props: json!({}),
+            }),
+            Action::Tree => cx.emit(PixelEvent::Pixel {
+                scene: "tree".into(),
+                props: json!({}),
+            }),
+            Action::Panel(panel) => {
+                f.panel = Some(panel);
+                f.panel_page = 0;
+                self.fetch_agents(cx);
             }
+            Action::Close => f.panel = None,
+            Action::Page(by) => hud::page(f, by),
+            Action::Phone => f.phone_open = !f.phone_open,
+            Action::RestartSnake => f.snake = super::farm::snake::SnakeGame::new(),
+            Action::Tool(tool) => f.tool = tool,
+            Action::Clock(tod) => f.clock.set_time_of_day(tod),
+            Action::Block => {}
         }
-        if f.phone_open {
-            let pw = 216.0;
-            let ph = 224.0;
-            let px = 12.0;
-            let py = (view_h - ph - 12.0).max(80.0);
-            if hx >= px && hx <= px + pw && hy >= py && hy <= py + ph {
-                if hy <= py + 24.0 && hx >= px + pw - 28.0 {
-                    f.phone_open = false;
-                } else if f.snake.over {
-                    f.snake = super::farm::scene::SnakeGame::new();
-                }
-                cx.notify();
-                return true;
-            }
-        }
-        // Bottom 6-slot Tool Hotbar
-        let slot_w = 48.0;
-        let slot_h = 38.0;
-        let slot_gap = 4.0;
-        let total_w = 6.0 * slot_w + 5.0 * slot_gap;
-        let start_x = (view_w - total_w) / 2.0;
-        let bar_y = (view_h - slot_h - 12.0).max(60.0);
-        if hy >= bar_y && hy <= bar_y + slot_h && hx >= start_x && hx <= start_x + total_w {
-            let idx = ((hx - start_x) / (slot_w + slot_gap)).floor() as usize;
-            if let Some(tool) = FarmTool::from_index(idx) {
-                f.tool = tool;
-                cx.notify();
-                return true;
-            }
-        }
-        // Ledger / Clock modal overlay
-        if f.panel_open {
-            let pw = 280.0;
-            let ph = 166.0;
-            let px = (view_w - pw) / 2.0;
-            let py = ((view_h - ph) / 2.0).max(64.0);
-            if hx >= px && hx <= px + pw && hy >= py && hy <= py + ph {
-                if hy <= py + 32.0 && hx >= px + pw - 32.0 {
-                    f.panel_open = false;
-                    cx.notify();
-                    return true;
-                }
-                for (idx, tod) in [0.30f32, 0.50, 0.76, 0.92].iter().enumerate() {
-                    let bx = px + 14.0 + idx as f32 * 64.0;
-                    let by = py + 126.0;
-                    if hx >= bx && hx <= bx + 56.0 && hy >= by && hy <= by + 24.0 {
-                        f.clock.set_time_of_day(*tod);
-                        cx.notify();
-                        return true;
-                    }
-                }
-                return true;
-            }
-        }
-        false
+        cx.notify();
+        true
     }
 
     fn art_point(&self, at: Point<Pixels>) -> Option<ArtPoint> {
@@ -397,53 +351,26 @@ impl PixelView {
             FarmTap::Plot {
                 bed, session: Some(id), issue, ..
             } => {
-                let tool = f.tool;
-                match tool {
-                    FarmTool::Weed => {
-                        f.play_bed_fx(bed, 0x9be564);
-                        f.show_toast("已清理田间杂草");
+                let route = issue.as_ref().map(|i| format!("/issues/{i}")).unwrap_or_else(|| format!("/sessions/{id}"));
+                let action = issue
+                    .as_ref()
+                    .and_then(|id| f.frame.state.issues.iter().find(|i| &i.id == id))
+                    .and_then(|i| i.stage.as_ref())
+                    .and_then(|stage| f.tool.action(stage))
+                    .cloned();
+                match (action, issue) {
+                    (
+                        Some(IssueAction::Move {
+                            status,
+                            words: ActWords::None | ActWords::Optional,
+                            ..
+                        }),
+                        Some(issue),
+                    ) => {
+                        self.command("issue.status.update", json!({ "id": issue, "status": status }), bed, cx);
                     }
-                    FarmTool::Water => {
-                        f.play_bed_fx(bed, 0x5bc0eb);
-                        cx.emit(PixelEvent::Route(match issue {
-                            Some(i) => format!("/issues/{i}"),
-                            None => format!("/sessions/{id}"),
-                        }));
-                    }
-                    FarmTool::Harvest => {
-                        f.play_bed_fx(bed, 0xffd166);
-                        cx.emit(PixelEvent::Route(match issue {
-                            Some(i) => format!("/issues/{i}"),
-                            None => format!("/sessions/{id}"),
-                        }));
-                    }
-                    FarmTool::Shovel => {
-                        f.play_bed_fx(bed, 0x8d5b4c);
-                        cx.emit(PixelEvent::Route(match issue {
-                            Some(i) => format!("/issues/{i}"),
-                            None => format!("/sessions/{id}"),
-                        }));
-                    }
-                    FarmTool::Bug => {
-                        f.play_bed_fx(bed, 0x9be564);
-                        if let Some(issue_id) = issue.clone() {
-                            let server = cx.global::<BridgeHub>().0.server().clone();
-                            cx.background_executor()
-                                .spawn(async move {
-                                    let _ = server.call("issue.status.update", json!({ "id": issue_id, "status": "working" }));
-                                })
-                                .detach();
-                            f.show_toast("已除虫并重新唤醒帮工");
-                        } else {
-                            cx.emit(PixelEvent::Route(format!("/sessions/{id}")));
-                        }
-                    }
-                    _ => {
-                        cx.emit(PixelEvent::Route(match issue {
-                            Some(i) => format!("/issues/{i}"),
-                            None => format!("/sessions/{id}"),
-                        }));
-                    }
+                    (Some(IssueAction::Stop { .. }), _) => self.command("session.stop", json!({ "id": id }), bed, cx),
+                    _ => cx.emit(PixelEvent::Route(route)),
                 }
             }
             FarmTap::Plot { bed, session: None, .. } if bed < 6 => {
@@ -454,15 +381,82 @@ impl PixelView {
                 cx.emit(PixelEvent::Route(route));
             }
             FarmTap::Spot { opens, .. } => match opens {
-                "panel:achievements" | "panel:log" | "panel:shop" | "panel:warehouse" => {
-                    f.panel_open = !f.panel_open;
+                "panel:graphs" | "panel:achievements" => {
+                    f.panel = Some(Panel::Achievements);
+                    f.panel_page = 0;
+                    self.fetch_achievements(cx);
                 }
-                "chat" => cx.emit(PixelEvent::Route("/chat".into())),
+                "panel:log" => {
+                    f.panel = Some(Panel::Log);
+                    f.panel_page = 0;
+                }
+                "panel:shop" => {
+                    f.panel = Some(Panel::Shop);
+                    f.panel_page = 0;
+                }
+                "panel:warehouse" => {
+                    f.panel = Some(Panel::Warehouse);
+                    f.panel_page = 0;
+                }
+                "chat" => {
+                    f.panel = Some(Panel::Chat);
+                    f.panel_page = 0;
+                }
                 other => cx.emit(PixelEvent::Route(other.to_string())),
             },
             _ => {}
         }
         cx.notify();
+    }
+
+    fn command(&mut self, op: &'static str, payload: Value, bed: usize, cx: &mut Context<Self>) {
+        if self.command_pending {
+            return;
+        }
+        self.command_pending = true;
+        if let Scene::Farm(f) = &mut self.scene {
+            f.show_toast(t("web.farm.native.pending", &[]));
+        }
+        let server = cx.global::<BridgeHub>().0.server().clone();
+        let task = cx.background_executor().spawn(async move { server.call(op, payload) });
+        cx.spawn(async move |this, cx| {
+            let reply = task.await;
+            let _ = this.update(cx, |v, cx| {
+                v.command_pending = false;
+                if let Scene::Farm(f) = &mut v.scene {
+                    match reply.error() {
+                        Some(error) => f.show_toast(error.message),
+                        None => {
+                            f.show_toast(t("web.farm.native.accepted", &[]));
+                            f.play_bed_fx(bed, 0x9be564);
+                        }
+                    }
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    fn fetch_achievements(&mut self, cx: &mut Context<Self>) {
+        let server = cx.global::<BridgeHub>().0.server().clone();
+        let task = cx.background_executor().spawn(async move { server.call("game.achievement.list", json!({})) });
+        cx.spawn(async move |this, cx| {
+            let reply = task.await;
+            let _ = this.update(cx, |v, cx| {
+                if let Scene::Farm(f) = &mut v.scene {
+                    match reply.error() {
+                        Some(e) => f.show_toast(e.message),
+                        None => match serde_json::from_value(reply.data.unwrap_or(Value::Null)) {
+                            Ok(items) => f.achievements = items,
+                            Err(e) => f.show_toast(e.to_string()),
+                        },
+                    }
+                }
+                cx.notify();
+            });
+        })
+        .detach();
     }
 
     pub fn set_phase(&mut self, phase: super::opening::Phase, progress: f32) {
@@ -537,8 +531,14 @@ impl PixelView {
             .get()
             .map(|(b, _)| f32::from(b.size.width) / f32::from(b.size.height).max(1.0))
             .unwrap_or(1.5);
+        let view = self
+            .placed
+            .get()
+            .map(|(b, _)| (f32::from(b.size.width), f32::from(b.size.height)))
+            .unwrap_or((768.0, 512.0));
         match &mut self.scene {
             Scene::Farm(f) => {
+                f.view_size = view;
                 f.tick(dt);
                 Some(f.draw(scale))
             }
@@ -547,6 +547,7 @@ impl PixelView {
                 Some(m.draw(aspect))
             }
             Scene::Tree(t) => {
+                t.view_size = view;
                 t.tick(dt);
                 Some(t.draw())
             }
@@ -593,7 +594,7 @@ impl Render for PixelView {
         let list = self.draw();
         self.last_list = list.clone();
         let message = match &self.scene {
-            Scene::Loading => Some("载入中…".to_string()),
+            Scene::Loading => Some(t("web.farm.native.loading", &[])),
             Scene::Failed(e) => Some(e.clone()),
             _ => None,
         };
@@ -639,14 +640,14 @@ impl Render for PixelView {
                         cx.notify();
                     }
                     "space" | "enter" if f.phone_open && f.snake.over => {
-                        f.snake = super::farm::scene::SnakeGame::new();
+                        f.snake = super::farm::snake::SnakeGame::new();
                         cx.notify();
                     }
                     "escape" => {
                         if f.phone_open {
                             f.phone_open = false;
-                        } else if f.panel_open {
-                            f.panel_open = false;
+                        } else if f.panel.is_some() {
+                            f.panel = None;
                         } else {
                             f.tool = FarmTool::Hand;
                         }
@@ -664,8 +665,8 @@ impl Render for PixelView {
                 MouseButton::Left,
                 cx.listener(|v, e: &MouseDownEvent, window, cx| {
                     window.focus(&v.focus, cx);
-                    if let Some((hx, hy, vw, vh)) = v.hud_point(e.position)
-                        && v.tap_farm_hud(hx, hy, vw, vh, cx)
+                    if let Some((hx, hy)) = v.hud_point(e.position)
+                        && v.tap_farm_hud(hx, hy, cx)
                     {
                         return;
                     }
@@ -677,6 +678,11 @@ impl Render for PixelView {
             .on_mouse_down(
                 MouseButton::Right,
                 cx.listener(|v, e: &MouseDownEvent, _, cx| {
+                    if let (Scene::Farm(f), Some((x, y))) = (&v.scene, v.hud_point(e.position))
+                        && hud::hit(f, x, y).is_some()
+                    {
+                        return;
+                    }
                     if let Some(p) = v.art_point(e.position) {
                         v.tap(p, true, cx);
                     }

@@ -2994,6 +2994,41 @@ export const catalogs = {
         clear: "清空",
         copy: "复制 .jsonl",
       },
+      native: {
+        ledger: "账本与时间",
+        achievements: "任务与成就",
+        log: "农场日志",
+        warehouse: "仓库里的工单",
+        shop: "小摊",
+        chat: "田头",
+        workbench: "工作台",
+        map: "群岛",
+        tree: "记忆树",
+        phone: "像素手机",
+        noMessages: "还没有消息",
+        empty: "这里还没有记录",
+        progress: "Lv.{level} · 经验 {xp}/{need}",
+        coins: "金币 {coins}",
+        workers: "在田帮工 {count} 名",
+        dawn: "清晨",
+        noon: "正午",
+        dusk: "黄昏",
+        night: "夜晚",
+        previous: "上一页",
+        next: "下一页 · {page}/{pages}",
+        score: "得分 {score}",
+        restart: "点击或按空格重开",
+        steer: "方向键 / WASD 控制",
+        pending: "正在发送…",
+        accepted: "已收到",
+        close: "关闭",
+        loading: "载入中…",
+        treeCounts: "叶 {leaves} · 果 {fruits} · 种 {seeds}",
+        treeGrowth: "{rounds} 轮 · 长到 {growth}%",
+        leaf: "叶片记忆",
+        fruit: "果实原则",
+        seed: "种子习惯",
+      },
     },
     "web.farm.map": {
       finding: "在找……",
@@ -7693,6 +7728,41 @@ export const catalogs = {
         clear: "Clear",
         copy: "Copy .jsonl",
       },
+      native: {
+        ledger: "Ledger & clock",
+        achievements: "Achievements",
+        log: "Farm log",
+        warehouse: "Stored issues",
+        shop: "Shop",
+        chat: "Chat",
+        workbench: "Workbench",
+        map: "Islands",
+        tree: "Memory tree",
+        phone: "Pixel phone",
+        noMessages: "No messages yet",
+        empty: "No records yet",
+        progress: "Lv.{level} · XP {xp}/{need}",
+        coins: "Coins {coins}",
+        workers: "Helpers here: {count}",
+        dawn: "Dawn",
+        noon: "Noon",
+        dusk: "Dusk",
+        night: "Night",
+        previous: "Previous",
+        next: "Next · {page}/{pages}",
+        score: "Score {score}",
+        restart: "Click or Space to restart",
+        steer: "Arrow keys / WASD",
+        pending: "Sending…",
+        accepted: "Accepted",
+        close: "Close",
+        loading: "Loading…",
+        treeCounts: "Leaves {leaves} · Fruits {fruits} · Seeds {seeds}",
+        treeGrowth: "{rounds} rounds · {growth}% grown",
+        leaf: "Memory",
+        fruit: "Principle",
+        seed: "Habit",
+      },
     },
     "web.farm.map": {
       finding: "Looking…",
@@ -12121,6 +12191,39 @@ export interface Messages {
   "web.farm.menu.soundOff": undefined;
   "web.farm.menu.soundOn": undefined;
   "web.farm.menu.yard": undefined;
+  "web.farm.native.accepted": undefined;
+  "web.farm.native.achievements": undefined;
+  "web.farm.native.chat": undefined;
+  "web.farm.native.close": undefined;
+  "web.farm.native.coins": { readonly coins: string | number };
+  "web.farm.native.dawn": undefined;
+  "web.farm.native.dusk": undefined;
+  "web.farm.native.empty": undefined;
+  "web.farm.native.fruit": undefined;
+  "web.farm.native.leaf": undefined;
+  "web.farm.native.ledger": undefined;
+  "web.farm.native.loading": undefined;
+  "web.farm.native.log": undefined;
+  "web.farm.native.map": undefined;
+  "web.farm.native.next": { readonly page: string | number; readonly pages: string | number };
+  "web.farm.native.night": undefined;
+  "web.farm.native.noMessages": undefined;
+  "web.farm.native.noon": undefined;
+  "web.farm.native.pending": undefined;
+  "web.farm.native.phone": undefined;
+  "web.farm.native.previous": undefined;
+  "web.farm.native.progress": { readonly level: string | number; readonly need: string | number; readonly xp: string | number };
+  "web.farm.native.restart": undefined;
+  "web.farm.native.score": { readonly score: string | number };
+  "web.farm.native.seed": undefined;
+  "web.farm.native.shop": undefined;
+  "web.farm.native.steer": undefined;
+  "web.farm.native.tree": undefined;
+  "web.farm.native.treeCounts": { readonly fruits: string | number; readonly leaves: string | number; readonly seeds: string | number };
+  "web.farm.native.treeGrowth": { readonly growth: string | number; readonly rounds: string | number };
+  "web.farm.native.warehouse": undefined;
+  "web.farm.native.workbench": undefined;
+  "web.farm.native.workers": { readonly count: string | number };
   "web.farm.notNow": undefined;
   "web.farm.orchestrator": undefined;
   "web.farm.overlay.bare": { readonly plot: string | number };

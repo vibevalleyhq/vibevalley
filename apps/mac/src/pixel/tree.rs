@@ -11,6 +11,7 @@ use image::{Rgba, RgbaImage};
 use super::atlas::Atlas;
 use super::draw::{DrawList, HudOp, Op, rgba};
 use super::sky::DayClock;
+use vibevalley_i18n::t;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
@@ -451,6 +452,7 @@ pub struct TreeScene {
     pub texts: std::collections::HashMap<String, String>,
     pub selected: Option<(String, String)>,
     pub rounds: f32,
+    pub view_size: (f32, f32),
     pub clock: DayClock,
     t: f32,
     layer: Option<(u32, Arc<RgbaImage>)>,
@@ -465,6 +467,7 @@ impl TreeScene {
             texts: std::collections::HashMap::new(),
             selected: None,
             rounds: 140.0,
+            view_size: (768.0, 512.0),
             clock: DayClock {
                 tod: 0.7,
                 ..DayClock::default()
@@ -475,9 +478,7 @@ impl TreeScene {
     }
 
     pub fn set_memories(&mut self, rows: Vec<(String, Kind, String)>) {
-        if rows.is_empty() {
-            return;
-        }
+        self.selected = None;
         self.memories.clear();
         self.texts.clear();
         for (id, kind, text) in rows {
@@ -507,16 +508,12 @@ impl TreeScene {
         }
         if let Some((_, placed)) = best {
             let kind_label = match placed.memory.kind {
-                Kind::Leaf => "叶片记忆",
-                Kind::Fruit => "果实原则",
-                Kind::Seed => "种子习惯",
+                Kind::Leaf => "web.farm.native.leaf",
+                Kind::Fruit => "web.farm.native.fruit",
+                Kind::Seed => "web.farm.native.seed",
             };
-            let text = self
-                .texts
-                .get(&placed.memory.id)
-                .cloned()
-                .unwrap_or_else(|| format!("{} ({}): 在协作中沉淀下来的经验与偏好。", kind_label, placed.memory.id));
-            self.selected = Some((kind_label.to_string(), text));
+            let text = self.texts.get(&placed.memory.id).cloned().unwrap_or_else(|| placed.memory.id.clone());
+            self.selected = Some((t(kind_label, &[]), text));
         } else {
             self.selected = None;
         }
@@ -587,33 +584,60 @@ impl TreeScene {
         let fruits = self.memories.iter().filter(|m| m.kind == Kind::Fruit).count();
         let seeds = self.memories.iter().filter(|m| m.kind == Kind::Seed).count();
         let ink = rgba(0x3b2a1a, 1.0);
-        let counts = format!("叶 {leaves} · 果 {fruits} · 种 {seeds}");
-        let rounds = format!("{} 轮 · 长到 {}%", self.rounds, (self.growth() * 100.0).round());
-        let w = (110.0 + text_width(&counts, 12.0).max(text_width(&rounds, 12.0)) + 20.0).max(246.0);
+        list.hud_view = true;
+        let width = (self.view_size.0 - 24.0).clamp(1.0, 420.0);
+        let counts = t(
+            "web.farm.native.treeCounts",
+            &[
+                ("leaves", (leaves as i64).into()),
+                ("fruits", (fruits as i64).into()),
+                ("seeds", (seeds as i64).into()),
+            ],
+        );
+        let rounds = t(
+            "web.farm.native.treeGrowth",
+            &[
+                ("rounds", (self.rounds as f64).into()),
+                ("growth", (self.growth() as f64 * 100.0).round().into()),
+            ],
+        );
         list.hud.push(HudOp::Rect {
             x: 12.0,
             y: 12.0,
-            w,
-            h: 46.0,
-            color: rgba(0xfdf6e3, 0.92),
+            w: width,
+            h: 72.0,
+            color: rgba(0xfdf6e3, 0.96),
             border: Some(ink),
         });
-        list.text(22.0, 16.0, "记忆树", 24.0, ink);
-        list.text(110.0, 18.0, counts, 12.0, ink);
-        list.text(110.0, 36.0, rounds, 12.0, ink);
+        for (i, line) in [t("web.farm.native.tree", &[]), counts, rounds].into_iter().enumerate() {
+            list.hud.push(HudOp::TextIn {
+                x: 22.0,
+                y: 20.0 + i as f32 * 20.0,
+                w: (width - 20.0).max(1.0),
+                text: line,
+                size: 12.0,
+                color: ink,
+            });
+        }
         if let Some((kind_label, text)) = &self.selected {
-            let snippet: String = text.chars().take(38).collect();
-            let cw = (24.0 + text_width(&snippet, 12.0)).max(240.0);
             list.hud.push(HudOp::Rect {
                 x: 12.0,
-                y: 66.0,
-                w: cw,
-                h: 44.0,
-                color: rgba(0xfdf6e3, 0.95),
+                y: 92.0,
+                w: width,
+                h: 48.0,
+                color: rgba(0xfdf6e3, 0.96),
                 border: Some(ink),
             });
-            list.text(20.0, 72.0, kind_label.clone(), 12.0, rgba(0x4f8a2c, 1.0));
-            list.text(20.0, 90.0, snippet, 12.0, ink);
+            for (i, line) in [kind_label, text].iter().enumerate() {
+                list.hud.push(HudOp::TextIn {
+                    x: 22.0,
+                    y: 100.0 + i as f32 * 20.0,
+                    w: (width - 20.0).max(1.0),
+                    text: line.to_string(),
+                    size: 12.0,
+                    color: ink,
+                });
+            }
         }
         list
     }
@@ -625,12 +649,6 @@ impl TreeScene {
             "clumps": grown.clumps.len(), "leaves": grown.leaves.len(), "fruits": grown.fruits.len(), "seeds": grown.seeds.len(),
         })
     }
-}
-
-/// A width the panel's text fits in: wide (CJK) characters take 1.1x the
-/// size, the rest about 0.72 of it. An overestimate, never a measurement.
-fn text_width(text: &str, size: f32) -> f32 {
-    text.chars().map(|c| if (c as u32) >= 0x2e80 { size * 1.1 } else { size * 0.72 }).sum()
 }
 
 #[cfg(test)]
@@ -647,7 +665,6 @@ mod tests {
         assert_eq!(young.segments.len(), 1, "a sprout has only its trunk");
         assert_eq!(old.segments.len(), genes.len());
         assert!(old.seeds.len() == 6 && young.seeds.is_empty());
-        assert!(super::text_width("叶 12 · 果 3 · 种 6", 12.0) > 120.0);
         assert_eq!(growth_of(600.0), 1.0);
         // hash01 is FNV-1a as VibeValley's.
         assert!((0.0..1.0).contains(&hash01("leaf-1")));

@@ -16,7 +16,7 @@ use image::RgbaImage;
 use smallvec::SmallVec;
 
 use super::atlas::Atlas;
-use super::draw::{Color, DrawList, HudOp, Op, glow_image, resample};
+use super::draw::{Color, DrawList, HudOp, Op, glow_image, resample, shade, shade_color};
 use super::sky::{FARM_CUT, Framing, frame_whole};
 
 pub const PIXEL_FONT: &str = "Fusion Pixel 12px Prop zh-Hans";
@@ -55,6 +55,8 @@ pub struct SpriteCache {
     /// Pictures made per frame (Op::Image): dropped once a paint does not use them.
     dynamic: HashMap<Key, bool>,
     device_scale: f32,
+    /// The light the lit pictures were shaded with; they are remade when it changes.
+    light: Option<[u8; 3]>,
     /// Pictures made this frame, for the dump.
     pub made: usize,
     pub last_paint_ms: f32,
@@ -79,7 +81,7 @@ impl SpriteCache {
         Some(render)
     }
 
-    fn reset(&mut self, device_scale: f32, window: &mut Window) {
+    fn reset(&mut self, device_scale: f32, light: Option<[u8; 3]>, window: &mut Window) {
         if self.device_scale != device_scale {
             for (_, img) in self.images.drain() {
                 let _ = window.drop_image(img);
@@ -87,12 +89,25 @@ impl SpriteCache {
             self.dynamic.clear();
             self.device_scale = device_scale;
         }
+        if self.light != light {
+            let old: Vec<Key> = self.images.keys().filter(|k| k.name.starts_with(LIT)).cloned().collect();
+            for k in old {
+                self.dynamic.remove(&k);
+                if let Some(img) = self.images.remove(&k) {
+                    let _ = window.drop_image(img);
+                }
+            }
+            self.light = light;
+        }
     }
 
     pub fn len(&self) -> usize {
         self.images.len()
     }
 }
+
+/// Starts the cache name of a picture shaded by the sky's light.
+const LIT: &str = "lit:";
 
 /// How `list` sits in `bounds`: the farm's whole-pixel framing.
 pub fn framing(list: &DrawList, bounds: Bounds<Pixels>) -> Framing {
@@ -118,18 +133,24 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
     cache.made = 0;
     let s = f.scale;
     let device = s * window.scale_factor();
-    cache.reset(device, window);
-    window.paint_quad(fill(
-        bounds,
-        hsla([list.background[0] * 0.7, list.background[1] * 0.7, list.background[2] * 0.7, 1.0]),
-    ));
+    cache.reset(device, list.light.map(|l| l.map(|c| (c.clamp(0.0, 1.0) * 255.0).round() as u8)), window);
+    let background = shade_color(list.background, list.light);
+    window.paint_quad(fill(bounds, hsla([background[0] * 0.7, background[1] * 0.7, background[2] * 0.7, 1.0])));
     let origin = bounds.origin + point(px(f.bx.x), px(f.bx.y));
     let at = |x: f32, y: f32| origin + point(px(x * s), px(y * s));
     let dev = |v: f32| (v * device).round().max(1.0) as u32;
     window.with_content_mask(Some(gpui_kit::ContentMask { bounds }), |window| {
         let pic = Bounds::new(at(0.0, 0.0), size(px(list.width * s), px(list.height * s)));
-        window.paint_quad(fill(pic, hsla(list.background)));
-        for op in &list.ops {
+        window.paint_quad(fill(pic, hsla(background)));
+        for (index, op) in list.ops.iter().enumerate() {
+            let light = list.light_on(index);
+            let lit = |name: &str| if light.is_some() { format!("{LIT}{name}") } else { name.to_string() };
+            let shaded = |mut img: RgbaImage| {
+                if let Some(l) = light {
+                    shade(&mut img, l);
+                }
+                img
+            };
             match op {
                 Op::Sprite { name, x, y, flip, alpha } => {
                     let Some(atlas) = atlas else { continue };
@@ -140,13 +161,13 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
                     }
                     let (w, h) = (dev(info.w), dev(info.h));
                     let key = Key {
-                        name: name.clone(),
+                        name: lit(name),
                         flip: *flip,
                         alpha: a,
                         w,
                         h,
                     };
-                    let img = cache.get(key, || atlas.image(name).map(|src| resample(&src, w, h, *flip, a as f32 / 8.0)));
+                    let img = cache.get(key, || atlas.image(name).map(|src| shaded(resample(&src, w, h, *flip, a as f32 / 8.0))));
                     if let Some(img) = img {
                         let b = Bounds::new(at(*x, *y), size(px(w as f32 / window.scale_factor()), px(h as f32 / window.scale_factor())));
                         let _ = window.paint_image(b, b, Corners::default(), img, 0, false);
@@ -159,21 +180,21 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
                     }
                     let (dw, dh) = (dev(*w), dev(*h));
                     let k = Key {
-                        name: key.clone(),
+                        name: lit(key),
                         flip: false,
                         alpha: a,
                         w: dw,
                         h: dh,
                     };
                     cache.dynamic.insert(k.clone(), true);
-                    let img = cache.get(k, || Some(resample(image, dw, dh, false, a as f32 / 8.0)));
+                    let img = cache.get(k, || Some(shaded(resample(image, dw, dh, false, a as f32 / 8.0))));
                     if let Some(img) = img {
                         let b = Bounds::new(at(*x, *y), size(px(dw as f32 / window.scale_factor()), px(dh as f32 / window.scale_factor())));
                         let _ = window.paint_image(b, b, Corners::default(), img, 0, false);
                     }
                 }
                 Op::Rect { x, y, w, h, color } => {
-                    window.paint_quad(fill(Bounds::new(at(*x, *y), size(px(w * s), px(h * s))), hsla(*color)));
+                    window.paint_quad(fill(Bounds::new(at(*x, *y), size(px(w * s), px(h * s))), hsla(shade_color(*color, light))));
                 }
                 Op::Glow { x, y, r, color } => {
                     let step = (color[3].clamp(0.0, 1.0) * 16.0).round() as u8;
@@ -202,13 +223,15 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
         }
         let hud_origin = if list.hud_center {
             bounds.origin + point(bounds.size.width / 2.0, bounds.size.height)
+        } else if list.hud_view {
+            bounds.origin
         } else {
             origin
         };
-        for (key, image, x, y, w, h) in &list.hud_images {
+        let mut picture = |key: &str, image: &RgbaImage, x: f32, y: f32, w: f32, h: f32, window: &mut Window| {
             let (dw, dh) = ((w * window.scale_factor()).round() as u32, (h * window.scale_factor()).round() as u32);
             let k = Key {
-                name: key.clone(),
+                name: key.to_string(),
                 flip: false,
                 alpha: 8,
                 w: dw,
@@ -216,13 +239,44 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
             };
             cache.dynamic.insert(k.clone(), true);
             if let Some(img) = cache.get(k, || Some(resample(image, dw, dh, false, 1.0))) {
-                let b = Bounds::new(hud_origin + point(px(*x), px(*y)), size(px(*w), px(*h)));
+                let b = Bounds::new(hud_origin + point(px(x), px(y)), size(px(w), px(h)));
                 let _ = window.paint_image(b, b, Corners::default(), img, 0, false);
             }
+        };
+        for (key, image, x, y, w, h) in &list.hud_images {
+            picture(key, image, *x, *y, *w, *h, window);
         }
+        let shape = |text: &str, font_size: f32, color: Color, window: &mut Window| {
+            let font = Font {
+                family: PIXEL_FONT.into(),
+                features: FontFeatures::default(),
+                fallbacks: None,
+                weight: FontWeight::NORMAL,
+                style: FontStyle::Normal,
+            };
+            let run = TextRun {
+                len: text.len(),
+                font,
+                color: hsla(color),
+                background_color: None,
+                underline: None,
+                strikethrough: None,
+            };
+            window
+                .text_system()
+                .shape_line(SharedString::from(text.to_string()), px(font_size), &[run], None)
+        };
         let labels = super::farm::islands::label_ops(list, s);
+        let mut clip: Option<Bounds<Pixels>> = None;
         for op in list.hud.iter().chain(labels.iter()) {
-            match op {
+            if let HudOp::Clip(c) = op {
+                clip = c.map(|[x, y, w, h]| Bounds::new(hud_origin + point(px(x), px(y)), size(px(w), px(h))).intersect(&bounds));
+                continue;
+            }
+            let mask = gpui_kit::ContentMask {
+                bounds: clip.unwrap_or(bounds),
+            };
+            window.with_content_mask(Some(mask), |window| match op {
                 HudOp::Rect { x, y, w, h, color, border } => {
                     let b = Bounds::new(hud_origin + point(px(*x), px(*y)), size(px(*w), px(*h)));
                     window.paint_quad(fill(b, hsla(*color)));
@@ -237,25 +291,42 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
                     size: font_size,
                     color,
                 } => {
-                    let font = Font {
-                        family: PIXEL_FONT.into(),
-                        features: FontFeatures::default(),
-                        fallbacks: None,
-                        weight: FontWeight::NORMAL,
-                        style: FontStyle::Normal,
-                    };
-                    let run = TextRun {
-                        len: text.len(),
-                        font,
-                        color: hsla(*color),
-                        background_color: None,
-                        underline: None,
-                        strikethrough: None,
-                    };
-                    let line = window.text_system().shape_line(SharedString::from(text.clone()), px(*font_size), &[run], None);
+                    let line = shape(text, *font_size, *color, window);
                     let _ = line.paint(hud_origin + point(px(*x), px(*y)), px(font_size * 1.25), TextAlign::Left, None, window, cx);
                 }
-            }
+                HudOp::TextIn {
+                    x,
+                    y,
+                    w,
+                    text,
+                    size: font_size,
+                    color,
+                } => {
+                    let mut line = shape(text, *font_size, *color, window);
+                    if f32::from(line.width) > *w {
+                        let ends: Vec<usize> = text.char_indices().map(|(i, _)| i).collect();
+                        let (mut lo, mut hi) = (0, ends.len());
+                        while lo < hi {
+                            let mid = (lo + hi) / 2;
+                            let candidate = shape(&format!("{}…", &text[..ends[mid]]), *font_size, *color, window);
+                            if f32::from(candidate.width) <= *w {
+                                lo = mid + 1;
+                            } else {
+                                hi = mid;
+                            }
+                        }
+                        let end = if lo == 0 { 0 } else { ends[lo - 1] };
+                        line = shape(&format!("{}…", &text[..end]), *font_size, *color, window);
+                    }
+                    let at = hud_origin + point(px(*x), px(*y));
+                    let text_bounds = Bounds::new(at, size(px(w.max(0.0)), px(font_size * 1.25))).intersect(&mask.bounds);
+                    window.with_content_mask(Some(gpui_kit::ContentMask { bounds: text_bounds }), |window| {
+                        let _ = line.paint(at, px(font_size * 1.25), TextAlign::Left, None, window, cx);
+                    });
+                }
+                HudOp::Image { key, image, x, y, w, h } => picture(key, image, *x, *y, *w, *h, window),
+                HudOp::Clip(_) => {}
+            });
         }
     });
     let stale: Vec<Key> = cache.dynamic.iter().filter(|(_, used)| !**used).map(|(k, _)| k.clone()).collect();

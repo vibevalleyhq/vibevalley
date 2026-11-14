@@ -57,6 +57,7 @@ pub struct SpaceView {
     pub sessions: Vec<Session>,
     pub issues: Vec<Issue>,
     pub progress: Option<Progress>,
+    pub chat: vibevalley_protocol::Chat,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -113,6 +114,7 @@ pub struct Issue {
     pub repo: Option<String>,
     pub status: String,
     pub queued_at: Option<f64>,
+    pub stage: Option<vibevalley_protocol::IssueStage>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -128,6 +130,7 @@ pub struct FarmView {
     pub level: FarmLevel,
     pub plots: HashMap<String, PlotView>,
     pub plays: HashMap<String, Play>,
+    pub achievements: Vec<vibevalley_protocol::AchievementStanding>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

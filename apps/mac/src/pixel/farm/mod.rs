@@ -2,6 +2,9 @@
 //! to where their work is.
 
 pub mod frame;
+pub mod hud;
 pub mod islands;
 pub mod scene;
 pub mod world;
+
+pub mod snake;
