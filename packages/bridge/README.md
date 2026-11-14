@@ -1,8 +1,8 @@
 # @vibevalley/bridge
 
-Calls between the page and the program around it (the desktop's Electron main, the phone's React Native shell), written
-once as a contract and carried over any link ([the client](docs/subsystems/app.md)).
-The contracts themselves are in `packages/protocol/src/host.ts`; the links are each host's own.
+Calls between a page and the program around it, written once as a contract and carried over any link. The contracts
+written with it are in `packages/protocol/src/host.ts`. The native app does not carry them: its views reach Rust over
+nsh's host channel (`apps/mac/ui/bridge.ts`, [the client](docs/subsystems/app.md#桥)).
 
 | Where | What |
 |---|---|

@@ -32,7 +32,7 @@ Status: proposed
 
 - 在设置里改名字：频道里用户发过的、新发的消息都显示新名字；助手下一轮的提示里有这个名字（测试读提示）；没设名字时照旧。
 - 改一个帮工的名字：频道、帮工列表、轨迹页都显示新名字；同档案的别的帮工不变；重启后还在。
-- 测试：`user.test.ts`（名字的流）、`channel.test.ts`（参与者跟着改）、`session.test.ts`（`session.update` 只改一个）、页面的 Playwright 走一遍改名。
+- 测试：`user.test.ts`（名字的流）、`channel.test.ts`（参与者跟着改）、`session.test.ts`（`session.update` 只改一个）、页面测试走一遍改名。
 - 文档：`user.md`、`session.md`、`channel.md`。
 
 ## Risks

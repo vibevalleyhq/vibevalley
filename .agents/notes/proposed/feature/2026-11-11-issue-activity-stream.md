@@ -36,7 +36,7 @@ Status: proposed
 ## 共享约定
 
 - 事件行的图标走 `ui/icons.ts` 的名字，一种 `MilestoneKind` 一个，写成 `Record<MilestoneKind, IconName>`，加新种类时编不过。
-- 页面的 `data-testid`：活动 `issue-activity`，消息行沿用 `issue-message`，事件行沿用 `milestone`（`data-kind`、新加 `data-run`）。现有 Playwright 测试按这些找元素，改名就要一起改。
+- 页面的 `data-testid`：活动 `issue-activity`，消息行沿用 `issue-message`，事件行沿用 `milestone`（`data-kind`、新加 `data-run`）。现有页面测试按这些找元素，改名就要一起改。
 
 ## Alternatives considered
 
