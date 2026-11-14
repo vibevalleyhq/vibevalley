@@ -9,11 +9,11 @@ import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import type { Memory } from "#/modules/memory/memory.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
-import { RepoError, type WorkplaceCleanup, type WorkplaceRelease } from "#/modules/repo/workplace.ts";
+import type { WorkplaceCleanup, WorkplaceRelease } from "#/modules/repo/workplace.ts";
 
 import type { AgentWakes, ChatView, Delivery, Envelope, Readiness } from "./envelope.ts";
 import type { AgentHost, HostOptions } from "./host.ts";
-import { HireRefused, type Lifecycle, makeLifecycle, type SessionNews, type SessionOptions } from "./lifecycle.ts";
+import { type Lifecycle, makeLifecycle, type SessionNews, type SessionOptions } from "./lifecycle.ts";
 import { type Machine, makeMachine } from "./machine.ts";
 import { type DeliveryNews, type HireArrival, type HiredReceipt, type Mailbox, makeMailbox } from "./mailbox.ts";
 import type { TriggerInput, TriggerResource } from "./payload.ts";
@@ -23,10 +23,6 @@ import type { Trigger } from "./shapes.ts";
 export type { SessionOptions };
 export type { Hired, HireOptions, RunFinished, RunStore, SessionNews } from "./lifecycle.ts";
 export { DeliveryRefused, HireRefused, newsOf, NotRecorded, NotTakenIn, NotWorkFile, runOf } from "./lifecycle.ts";
-
-/** A hire: the helper, its brief and where it works, and the inputs it starts with. parent: the issue in that repo
- * whose branch its branch forks from; that issue's checkout is made first. */
-export type HireOrder = HireArrival & { readonly parent?: number };
 
 /** A session as this process has it now. */
 export interface Live {
@@ -51,12 +47,10 @@ export interface Session {
   readonly route: (trigger: Trigger, to: readonly Delivery[], scope?: string) => Promise<void>;
   /** A trigger recorded in the caller's transaction; route it after. */
   readonly recordTrigger: (input: TriggerInput) => Promise<Trigger>;
-  /** A helper hired with its first inputs; throws HireRefused (also when the parent's checkout cannot be made). */
-  readonly hireWith: (order: HireOrder) => Promise<HiredReceipt>;
+  /** A helper hired with its first inputs; throws HireRefused. */
+  readonly hireWith: (order: HireArrival) => Promise<HiredReceipt>;
   /** A channel message's envelope taken back from every delivery that still waits on it. */
   readonly withdrawEnvelope: (envelope: string) => Promise<void>;
-  /** A session's open deliveries dropped: it left. */
-  readonly withdrawDeliveries: (session: string, why: string) => Promise<void>;
   /** The chat the deliveries read their places from (the default channel, a place's orchestrator, a participant's unread),
    * told by the layer above the sessions; until then, an empty one. */
   readonly useChat: (view: ChatView) => void;
@@ -144,28 +138,13 @@ export function insideOf(session: Session): Inside {
 }
 
 /** The door over the parts: what makeSession returns, and what a test that plays the sessions builds over its own. */
-export function sessionOver(parts: {
-  readonly lifecycle: Lifecycle;
-  readonly mailbox: Mailbox;
-  readonly repo: Pick<Repo, "checkout">;
-  readonly close: () => Promise<void>;
-}): Session {
-  const { lifecycle, mailbox, repo, close } = parts;
+export function sessionOver(parts: { readonly lifecycle: Lifecycle; readonly mailbox: Mailbox; readonly close: () => Promise<void> }): Session {
+  const { lifecycle, mailbox, close } = parts;
   return {
     route: mailbox.route,
     recordTrigger: mailbox.recordTrigger,
-    hireWith: async ({ parent, ...order }) => {
-      if (parent !== undefined)
-        try {
-          await repo.checkout({ repo: order.where, issue: parent, worktree: true, base: "" });
-        } catch (e) {
-          if (e instanceof RepoError) throw new HireRefused(e.message, undefined, { cause: e });
-          throw e;
-        }
-      return mailbox.hireWith(order);
-    },
+    hireWith: mailbox.hireWith,
     withdrawEnvelope: mailbox.withdrawEnvelope,
-    withdrawDeliveries: mailbox.withdrawDeliveries,
     useChat: mailbox.useChat,
     useReadiness: mailbox.useReadiness,
     holdWakes: mailbox.holdWakes,
@@ -249,7 +228,7 @@ export async function makeSession(deps: SessionDeps, options: SessionOptions = {
     const mailbox = await makeMailbox({ ...deps, session: lifecycle });
     closes.push(mailbox.close);
 
-    const session = sessionOver({ lifecycle, mailbox, repo: deps.repo, close });
+    const session = sessionOver({ lifecycle, mailbox, close });
     insides.set(session, {
       ...lifecycle,
       ...mailbox,

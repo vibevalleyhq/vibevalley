@@ -15,7 +15,7 @@ import { channelType, type Delivery } from "./envelope.ts";
 import { type Lifecycle, NotRecorded } from "./lifecycle.ts";
 import type { InsertDelivery, TalkRow } from "./mailbox.ts";
 import { deliveryScope, triggerPayload } from "./payload.ts";
-import { triggerEvent, urgencyOf } from "./routing.ts";
+import { deliveryDraftOf, urgencyOf } from "./routing.ts";
 import * as S from "./schema.ts";
 import type { Trigger } from "./shapes.ts";
 
@@ -74,35 +74,9 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
       const at = clock.now();
       const entries: { input: Delivery; row: DeliveryDraft }[] = [];
       for (const input of inputs) {
-        const destination = trigger.replyChannel ?? sessions.sessionOf(input.session)?.channel ?? (await defaultChannel());
-        const urgency =
-          input.urgency ??
-          urgencyOf({
-            source: trigger.source,
-            actor: trigger.actor.kind,
-            recipient: input.role ?? agents.agent(input.session)?.role ?? "worker",
-            event: input.event ?? triggerEvent(trigger),
-            canSteer: true,
-          });
-        const delivery = input.heard ?? { reason: "addressed" as const, wakes: urgency !== "digest" };
-        entries.push({
-          input,
-          row: {
-            envelope_id: input.id ?? trigger.id,
-            scope: deliveryScope(destination, input.issue),
-            message_id: trigger.meta.channelMessageId ?? null,
-            channel_id: destination,
-            source: trigger.source,
-            urgency,
-            reason: delivery.reason,
-            wakes: delivery.wakes,
-            held_by: delivery.heldBy ?? null,
-            state: "pending",
-            launch: null,
-            created_at: at,
-            payload: triggerPayload(trigger, input.issue, input.note),
-          },
-        });
+        const channel = sessions.sessionOf(input.session)?.channel ?? (await defaultChannel());
+        const role = input.role ?? agents.agent(input.session)?.role ?? "worker";
+        entries.push({ input, row: deliveryDraftOf(trigger, input, { channel, role, at }) });
       }
       await db.tx(async () => {
         const committed: ({ input: Delivery; row: DeliveryDraft; added: qd.InsertDeliveryResult[] } | undefined)[] = [];

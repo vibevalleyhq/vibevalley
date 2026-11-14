@@ -1,7 +1,7 @@
 import { expect, test } from "vite-plus/test";
 
 import { testDb } from "#/testing/layers.ts";
-import { issueInputs, pendingIssueInputs } from "#db/issue_input.sql.ts";
+import { inputsOfIssue, pendingIssueInputs } from "#db/issue_input.sql.ts";
 
 test("regression: reassignment selects unread inputs without loading consumed history", async () => {
   await using db = await testDb();
@@ -34,6 +34,6 @@ test("regression: reassignment selects unread inputs without loading consumed hi
   expect(selected4).toEqual(["2006"]);
   const selected5 = await selected(null, true);
   expect(selected5).toEqual(["2001", "2002", "2003", "2004", "2005", "2006", "2007"]);
-  const issueInputs2 = await issueInputs(db.sql, { issue_id: "work" });
+  const issueInputs2 = await inputsOfIssue(db.sql, { issue_id: "work" });
   expect(issueInputs2).toHaveLength(2007);
 });

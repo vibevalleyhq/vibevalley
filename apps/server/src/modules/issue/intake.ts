@@ -332,8 +332,8 @@ export function issueIntake(deps: IntakeDeps): Intake {
     withdrawDispatches: async (issue) => {
       await qi.retireQueuedDispatches(db.sql, { issue_id: issue });
     },
-    queued: async () => (await qi.queuedInputs(db.sql)).map((row) => ({ issue: row.issue_id, trigger: readTrigger(row.trigger_json) })),
-    inputsOf: async (issue) => (await qi.issueInputs(db.sql, { issue_id: issue })).map((row) => readTrigger(row.trigger_json)),
+    queued: async () => (await qi.inputsOfQueuedIssues(db.sql)).map((row) => ({ issue: row.issue_id, trigger: readTrigger(row.trigger_json) })),
+    inputsOf: async (issue) => (await qi.inputsOfIssue(db.sql, { issue_id: issue })).map((row) => readTrigger(row.trigger_json)),
     ownerOf: async (trigger) => (await qi.existingIssueInput(db.sql, { trigger_id: trigger }))?.issue_id,
     forwarded: (issue, session, inputs) =>
       db.tx(async () => {

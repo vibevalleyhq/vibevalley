@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { dayMs, maxRunning } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { sessionId } from "@vibevalley/protocol/schema";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { worker as sessionActor } from "#/base/actor.ts";
 import { BizCode, errnoOf, messageOf, refuseIn } from "#/base/errors.ts";
@@ -95,7 +95,8 @@ export interface HireOptions {
 interface SendOptions extends Omit<HireOptions, "issue"> {
   readonly envelopeIds?: readonly string[];
   readonly context:
-    | { readonly kind: "issue"; readonly issue: Pick<T.Issue, "id" | "number"> & { readonly mandate?: T.IssueMandate } }
+    /** source: the trigger the work came from, which its brief points the helper to. */
+    | { readonly kind: "issue"; readonly issue: { readonly id: string; readonly number: number; readonly source?: string } }
     | { readonly kind: "channel"; readonly channel: string };
 }
 
@@ -553,12 +554,12 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
           phase: { _tag: "working", since: hiredAt, doing: { action: "none", label: "" } },
           ...(channel ? { channel } : {}),
           refining: issue ? (opt.refining ?? false) : false,
-          ...(issue ? { issue: issue.id } : {}),
+          ...(issue ? { issue: issueId(issue.id) } : {}),
           ...(place.branch ? { branch: place.branch, worktree: place.cwd } : {}),
           machine: machines.here().id,
         };
         const initialText = initial.map((input) => `${input.id}\n${input.card.summary}\n${input.card.readUri}`).join("\n\n");
-        const source = issue?.mandate?.originTriggerId;
+        const source = issue?.source;
         const prompt = [brief, source ? sourceBrief(source) : "", initialText].filter(Boolean).join("\n\n");
         const opened = await open(agent, session, h, place, withRecall(recall, prompt), "");
         if (!opened.execution) {

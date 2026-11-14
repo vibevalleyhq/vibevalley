@@ -80,13 +80,13 @@
 
 **帮工的串和回执**
 
-1. `Session.news` 的 `Hired`：给帮工排席位，工单没有串就发派活消息、在它下面开串，有串就在串里发接手通知；帮工的「家」记成那个串。`Left`：帮工离席，撤回它没收的投递，清它的跳数和熔断。`Reported`：把它这一轮的结论贴进串（叫停的不贴）。
+1. `Session.news` 的 `Hired`：给帮工排席位，工单没有串就发派活消息、在它下面开串，有串就在串里发接手通知；帮工的「家」记成那个串。`Left`：帮工离席，清它的跳数和熔断（它没收的投递由信箱自己放下）。`Reported`：把它这一轮的结论贴进串（叫停的不贴）。
 2. `Session.deliveries` 的 `Consumed`：先记看过（`Channel.markSeen`），再贴 👀；`EmptyWake`：数熔断。
 
 ## 和谁打交道
 
 - **频道（`channel`）**：读事件（`committed`、`events`、`committedOf`）、等写话（`awaitReader`）、排席位（`seat`）、开串和私聊、贴汇报（`note`）、通知（`notice`）、看过与回应、回执（`userReceipt`、`userReadReports`）；登记删频道的理由（在那里的帮工）。
-- **帮工（`session`）**：`recordTrigger`、`isRouted`、`hireWith`、`withdrawEnvelope`、`withdrawDeliveries`、`holdWakes`、`agentWakes`、`waitingOn`、`hired`、`live`；订阅 `news`、`deliveries`；建好时经 `Session.useChat` 给信箱一个只读的 `ChatView`（默认频道、未读）。
+- **帮工（`session`）**：`recordTrigger`、`isRouted`、`hireWith`、`withdrawEnvelope`、`holdWakes`、`agentWakes`、`waitingOn`、`hired`、`live`；订阅 `news`、`deliveries`；建好时经 `Session.useChat` 给信箱一个只读的 `ChatView`（默认频道、未读）。
 - **工单（`issue`）**：`route`（带着刹车定下的听众；工单的入口：是工单的进蓄水池，不是的投给听众），收件箱读看板（`onBoard`）。工单不调观察层：工单的话说进帮工的家或工单串，由观察层路由。
 - **语音、连接器（`voice`、`connector`）**：`Voice` 订阅 `inboxNews`；`Connector` 订阅 `toUser`、`externalChanges`，外推前问 `handoffState`。
 - **接口（`http`）**：`channel.direct.create` 是 `direct`，`channel.message.previewDelete` 是 `previewRemove`（加上还在等的投递数）。

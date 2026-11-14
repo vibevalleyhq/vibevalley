@@ -93,8 +93,6 @@ export interface Mailbox {
   readonly handBack: (session: string, envelope: string) => Promise<void>;
   /** A channel message's envelope taken back from every delivery that still waits on it. */
   readonly withdrawEnvelope: (envelope: string) => Promise<void>;
-  /** A session's open deliveries dropped: it left. */
-  readonly withdrawDeliveries: (session: string, why: string) => Promise<void>;
   /** The chat the mailbox reads its places from, told by the layer above it; until then, an empty one. */
   readonly useChat: (view: ChatView) => void;
   /** Which waiting inputs may be handed now, told by the layer above it; until then, all. */
@@ -306,6 +304,9 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
         return bestEffort(log, `mailbox: input consumed by ${news.session}`, () => pumpLocked(() => pump.consumed(news)));
       case "Returned":
         return bestEffort(log, `mailbox: input returned by ${news.session}`, () => pumpLocked(() => pump.returned(news)));
+      case "Left":
+        // What was for it goes with it: a session that left takes no more inputs.
+        return bestEffort(log, `mailbox: ${news.left.id} left`, () => writtenLocked(() => dropSession(news.left.id, "left")));
       case "Spoke":
       case "Ended":
       case "HandedOff":
@@ -345,7 +346,6 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
     restore,
     news: () => newsHub.subscribe(),
     handBack,
-    withdrawDeliveries: (session, why) => writtenLocked(() => dropSession(session, why)),
     withdrawEnvelope: (envelope) =>
       writtenLocked(() =>
         db.tx(async () => {

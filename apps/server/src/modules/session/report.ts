@@ -13,6 +13,15 @@ const summaryMax = 160;
 export const handsToUser = (report: IssueReport | undefined) =>
   report !== undefined && (!report.prSubmit || report.questions.length > 0 || report.checks.some((check) => check.result !== "met"));
 
+/** A turn that completed while background tasks still run, and that does not hand the work to the user, waits for
+ * them (settling) before it is reported. */
+export const settlesFirst = (completed: boolean, declared: IssueReport | undefined, pendingTasks: number) =>
+  completed && !handsToUser(declared) && pendingTasks > 0;
+
+/** A completed turn on an issue that does not hand the work to the user (a pull request in flight) rests: it waits on
+ * outside events, not on the user. */
+export const restsAfter = (completed: boolean, onIssue: boolean, declared: IssueReport | undefined) => completed && onIssue && !handsToUser(declared);
+
 export function failureText(f: FailedTurn): string {
   const advice = failureAdvice(f.failure);
   const next = advice.userAction

@@ -18,7 +18,7 @@ select d.state, d.dropped_why from session_delivery d where d.session_id = sqlc.
 select (d.payload_json::jsonb -> 'trigger' ->> 'id')::text as trigger_id
 from session_delivery d where d.session_id = sqlc.arg(session_id) and d.envelope_id = sqlc.arg(envelope_id);
 
--- name: IssueInputs :many
+-- name: InputsOfIssue :many
 -- bound: live input ownership for one issue; consumption remains in session_delivery.
 select m.trigger_id, m.issue_id, m.state, m.session_id, m.reason, t.trigger_json
 from issue_input m join session_trigger t on t.id = m.trigger_id
@@ -52,7 +52,7 @@ where trigger_id = sqlc.arg(trigger_id) and state <> 'returned';
 update issue_input set state = 'returned', reason = sqlc.arg(reason)
 where trigger_id = sqlc.arg(trigger_id) and state <> 'returned';
 
--- name: QueuedInputs :many
+-- name: InputsOfQueuedIssues :many
 -- bound: non-returned inputs for open queued issues.
 select m.issue_id, t.trigger_json
 from issue_input m join session_trigger t on t.id = m.trigger_id

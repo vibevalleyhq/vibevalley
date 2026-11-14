@@ -73,11 +73,11 @@ export async function deliveredTrigger(sql: Sql, params: DeliveredTriggerParams)
   return row === undefined ? undefined : rowOf("DeliveredTrigger", DeliveredTriggerResult, row)
 }
 
-export interface IssueInputsParams {
+export interface InputsOfIssueParams {
   readonly ["issue_id"]: string
 }
 
-export const IssueInputsResult = z.object({
+export const InputsOfIssueResult = z.object({
   ["trigger_id"]: z.string(),
   ["issue_id"]: z.string(),
   ["state"]: Words_issue_input_state,
@@ -85,13 +85,13 @@ export const IssueInputsResult = z.object({
   ["reason"]: z.string().nullable(),
   ["trigger_json"]: z.string(),
 })
-export type IssueInputsResult = z.infer<typeof IssueInputsResult>
+export type InputsOfIssueResult = z.infer<typeof InputsOfIssueResult>
 
-export const IssueInputsSql = "-- name: IssueInputs :many\n-- bound: live input ownership for one issue; consumption remains in session_delivery.\nselect m.trigger_id, m.issue_id, m.state, m.session_id, m.reason, t.trigger_json\nfrom issue_input m join session_trigger t on t.id = m.trigger_id\nwhere m.issue_id = $1 and m.state <> 'returned' order by m.position;"
+export const InputsOfIssueSql = "-- name: InputsOfIssue :many\n-- bound: live input ownership for one issue; consumption remains in session_delivery.\nselect m.trigger_id, m.issue_id, m.state, m.session_id, m.reason, t.trigger_json\nfrom issue_input m join session_trigger t on t.id = m.trigger_id\nwhere m.issue_id = $1 and m.state <> 'returned' order by m.position;"
 
-export async function issueInputs(sql: Sql, params: IssueInputsParams): Promise<IssueInputsResult[]> {
-  const rows = await sql.query(IssueInputsSql, [params["issue_id"]])
-  return rows.map((row) => rowOf("IssueInputs", IssueInputsResult, row))
+export async function inputsOfIssue(sql: Sql, params: InputsOfIssueParams): Promise<InputsOfIssueResult[]> {
+  const rows = await sql.query(InputsOfIssueSql, [params["issue_id"]])
+  return rows.map((row) => rowOf("InputsOfIssue", InputsOfIssueResult, row))
 }
 
 export interface PendingIssueInputsParams {
@@ -150,21 +150,21 @@ export async function returnIssueInput(sql: Sql, params: ReturnIssueInputParams)
   return sql.exec(ReturnIssueInputSql, [params["reason"], params["trigger_id"]])
 }
 
-export interface QueuedInputsParams {
+export interface InputsOfQueuedIssuesParams {
 
 }
 
-export const QueuedInputsResult = z.object({
+export const InputsOfQueuedIssuesResult = z.object({
   ["issue_id"]: z.string(),
   ["trigger_json"]: z.string(),
 })
-export type QueuedInputsResult = z.infer<typeof QueuedInputsResult>
+export type InputsOfQueuedIssuesResult = z.infer<typeof InputsOfQueuedIssuesResult>
 
-export const QueuedInputsSql = "-- name: QueuedInputs :many\n-- bound: non-returned inputs for open queued issues.\nselect m.issue_id, t.trigger_json\nfrom issue_input m join session_trigger t on t.id = m.trigger_id\njoin issue i on i.id = m.issue_id\nwhere i.queued_at is not null and i.closed_at is null and m.state <> 'returned'\norder by m.issue_id, (t.trigger_json::jsonb -> 'meta' -> 'dispatch' = 'true') desc nulls last, m.position;"
+export const InputsOfQueuedIssuesSql = "-- name: InputsOfQueuedIssues :many\n-- bound: non-returned inputs for open queued issues.\nselect m.issue_id, t.trigger_json\nfrom issue_input m join session_trigger t on t.id = m.trigger_id\njoin issue i on i.id = m.issue_id\nwhere i.queued_at is not null and i.closed_at is null and m.state <> 'returned'\norder by m.issue_id, (t.trigger_json::jsonb -> 'meta' -> 'dispatch' = 'true') desc nulls last, m.position;"
 
-export async function queuedInputs(sql: Sql): Promise<QueuedInputsResult[]> {
-  const rows = await sql.query(QueuedInputsSql, [])
-  return rows.map((row) => rowOf("QueuedInputs", QueuedInputsResult, row))
+export async function inputsOfQueuedIssues(sql: Sql): Promise<InputsOfQueuedIssuesResult[]> {
+  const rows = await sql.query(InputsOfQueuedIssuesSql, [])
+  return rows.map((row) => rowOf("InputsOfQueuedIssues", InputsOfQueuedIssuesResult, row))
 }
 
 export interface SupersedeDispatchParams {

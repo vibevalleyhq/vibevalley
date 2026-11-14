@@ -401,7 +401,6 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
       // A session's seat: a helper's that is not a profile's seat in its direct channel.
       if (!p.agent || p.id === profileId(p.agent) || p.left || on.has(p.id)) continue;
       await chat.leave(p.id);
-      await sessions.withdrawDeliveries(p.id, "left");
     }
   };
 

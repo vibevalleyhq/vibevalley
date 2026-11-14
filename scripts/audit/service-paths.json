@@ -158,7 +158,6 @@
   "Session.who": ["mcp"],
   "Session.withIdleWorkplace": ["issue"],
   "Session.withWorkplace": ["issue"],
-  "Session.withdrawDeliveries": ["watch"],
   "Session.withdrawEnvelope": ["watch"],
   "Session.workFile": ["media"],
   "Setting.agora": ["voice"],

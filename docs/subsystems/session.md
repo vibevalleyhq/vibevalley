@@ -22,10 +22,10 @@
 |---|---|
 | `apps/server/src/modules/session/session.ts` | 对外唯一的 `Session` 服务：把下面三部分组装起来，只露出别的模块要的几样（见[对外的门](#对外的门)）；`insideOf` 只给测试 |
 | `lifecycle.ts`、`hands.ts`、`registry.ts`、`history.ts`、`launch.ts`、`watch.ts`、`signals.ts` | 会话：招人、带话、叫停、交接、离场、重启恢复；`HandRoster`（在场 `Hand`、`/mcp` 令牌与 `hand.access -> admission` 锁序）；运行登记；事件跟踪与 `settling` 收尾 |
-| `mailbox.ts`、`triggers.ts`、`work.ts`、`pump.ts`、`routing.ts`、`deliveries.ts` | 信箱：触发器幂等写入、没路由的触发交给上层重放（`unrouted`）、投递写入、空闲叫醒与忙时攒批插话、紧急度（`urgencyOf`，纯函数）、熔断拦住的会话、未终结投递缓存 |
+| `mailbox.ts`、`triggers.ts`、`work.ts`、`pump.ts`、`routing.ts`、`deliveries.ts` | 信箱：触发器幂等写入、没路由的触发交给上层重放（`unrouted`）、投递写入、空闲叫醒与忙时攒批插话、紧急度和投递行（`urgencyOf`、`deliveryDraftOf`，纯函数）、熔断拦住的会话、未终结投递缓存 |
 | `shapes.ts`、`schema.ts`、`payload.ts`、`envelope.ts`、`prompts.ts` | 共享契约：`Trigger`、`Envelope` 与编码、来源载荷、上层交来的听众（`Hearer`）和收件会话（`Delivery`）、聊天的行（`ChannelEnvelopeRow`）、信箱读聊天的 `ChatView`、哪些输入能交的 `Readiness`、刹车的起点 `AgentWakes`、对模型说的话；不读写数据库，别的模块可以直接用 |
 | `machine.ts`、`executor.ts`、`link.ts` | 机器登记（今天只有服务端自己这台）、经链路暴露的 `Executions`（oar `Subagents` 启停、投递、中断与静默检测） |
-| `reaction.ts`、`report.ts`、`briefing.ts`、`roster.ts` | 事件映射、汇报解析、容量检查与任务说明拼装、在场会话查找的纯函数 |
+| `reaction.ts`、`report.ts`、`briefing.ts`、`roster.ts` | 事件映射、汇报解析与一轮结束时先等后台任务还是歇下（`settlesFirst`、`restsAfter`）、容量检查与任务说明拼装、在场会话查找的纯函数 |
 | `journal.ts`、`host.ts`、`inProcessRun.ts` | 轨迹日志文件读写、进程内 `AgentHost`（投递被拒抛 `SubmitRefused`）与 `InProcessRun`（`Run` 的落库） |
 | `worker.ts`、`shell.ts` | 帮工 CLI 的凭证文件与认证探测（[帮工 CLI 接入](docs/subsystems/session.md#帮工-cli-接入)）、私聊的上下文目录 |
 | `apps/server/src/modules/agent/` | 农机注册探测、价格表、额度与每日花费记账、VibeValley 自己的农机（`vibevalley.ts`） |
@@ -57,7 +57,7 @@
 | 成员 | 做什么 | 谁用 |
 |---|---|---|
 | `route`、`recordTrigger`、`hireWith` | 一件活到了：把已记下的触发投给上层定下的会话（`Delivery`：听众、换人时前一个会话、退回时的另一封信，`prepare`、`commit` 在投递的事务里跑），记下路由回执（没投给谁时记在上层给的 `scope`）；在调用方的事务里记下触发，提交后再路由；腾位置、开帮工（子工单的先建好父工单的检出）、在同一事务里跑调用方的 `hiring`，带着它的头几件输入 | 工单（含定时任务、跟 PR 和路由）、观察层、助手 |
-| `withdrawEnvelope`、`withdrawDeliveries` | 拿回来：一封信、一个会话的未投递 | 观察层 |
+| `withdrawEnvelope` | 拿回来一封信（它的消息删了）；一个会话离场时（`Left`）信箱自己放下它没收的投递 | 观察层 |
 | `holdWakes`、`agentWakes` | 熔断拦住一个会话的叫醒（放开时叫醒它）；开机时刹车的起点：一处自用户上次说话起 agent 叫醒了几次、每个会话最近一次被 agent 叫醒 | 观察层 |
 | `useChat`、`useReadiness` | 上层交下来的：聊天的默认频道和未读（`ChatView`，观察层给，之前是空的）；一个会话等着的输入哪些现在能交（`Readiness`，工单给：关了的工单的不交，工单在等用户时只交用户的话；之前全交） | 观察层、工单 |
 | `stop`、`dismiss` | 叫停一个会话正在跑的一轮；放走一个帮工（`discard` 时等农机不再写了再重置分支） | 工单、接口 |
@@ -148,7 +148,7 @@
 ## 和谁打交道
 
 - **工单（`issue`，含定时任务）**：用的成员 `service-paths.json` 逐个记着：派活（`hireWith`、`room`）、叫停放走（`stop`、`dismiss`）、借工作目录交付（`handOver`、`withWorkplace`、`withIdleWorkplace`）、工作目录（`discardWork`、`clearWorkplace`）、记下并投递触发（`recordTrigger`、`route`、`isRouted`、`unrouted`）、在场与查询（`hired`、`live`、`get`、`list`）、`news`，和建好时交给信箱的 `useReadiness`；订阅 `news` 的 `Reported`、`Left`、`IssueStarted`（记下哪一轮拿了这张工单的输入）、`RunFinished` 更新工单状态、问题与冲突。
-- **观察层（`watch`）**：频道不调 `Session`。`Watch` 按自己的游标读频道提交的事件，算听众、过刹车，记下并路由消息（`recordTrigger`、`route`，再读时先问 `isRouted`）、开私聊帮工（`hireWith`）、撤回（`withdrawEnvelope`、`withdrawDeliveries`）、熔断（`holdWakes`）、开机读刹车的起点（`agentWakes`）、读在场会话（`hired`、`live`）和还在等的投递（`waitingOn`），订阅 `news` 的 `Hired`、`Left`、`Reported`、`Spoke` 管工单串、汇报和熔断计数，`deliveries` 的 `Consumed` 先在聊天里记看过（`Channel.markSeen`）再加 👀、`EmptyWake` 数熔断。会话不读聊天的表：信箱要的默认频道和一个参与者别处的未读，由 `Watch` 建好时经 `Session.useChat` 交给它一个 `ChatView`（背后是 `Channel.defaultChannel`、`unread`），之前是空的。`modules/session` 下的文件（测试也算）不 import 频道、工单、观察层，也不读它们的表（`modules.test.ts`）。
+- **观察层（`watch`）**：频道不调 `Session`。`Watch` 按自己的游标读频道提交的事件，算听众、过刹车，记下并路由消息（`recordTrigger`、`route`，再读时先问 `isRouted`）、开私聊帮工（`hireWith`）、撤回删了的消息（`withdrawEnvelope`）、熔断（`holdWakes`）、开机读刹车的起点（`agentWakes`）、读在场会话（`hired`、`live`）和还在等的投递（`waitingOn`），订阅 `news` 的 `Hired`、`Left`、`Reported`、`Spoke` 管工单串、汇报和熔断计数，`deliveries` 的 `Consumed` 先在聊天里记看过（`Channel.markSeen`）再加 👀、`EmptyWake` 数熔断。会话不读聊天的表：信箱要的默认频道和一个参与者别处的未读，由 `Watch` 建好时经 `Session.useChat` 交给它一个 `ChatView`（背后是 `Channel.defaultChannel`、`unread`），之前是空的。`modules/session` 下的文件（测试也算）不 import 频道、工单、观察层，也不读它们的表（`modules.test.ts`）。
 - **仓库、档案（含农机）与记性（`repo`、`agent`、`memory`）**：`Repo.checkout`、`releaseCheckout`、`resetCheckout`、`clearCheckout` 给帮工开、放、重置、清工单的检出，`houseRules`、`limit`、`usesPullRequests` 拼任务说明和算容量；合并、提 PR、检查与 GitHub 都是工单经仓库带类型的操作做的；`Agent` 的农机探测与计费（`resolve`、`quote`、`spend`、`usageSoon`）、pi-durable 的 `Harness`（`Agent.durable`）；每轮前后召回与写入记忆。
 - **助手（`orchestrator`）**：经 `host` 创建进程内 `AgentHost`，共用 `session` 与 `session_run`；收 `deliveries` 的 `Handed`、`digest` 的摘要，退回用 `handBack`。
 
@@ -157,6 +157,7 @@
 - **一件活的触发、投递、执行和工作目录放在一个模块**：信箱和会话各记着同一件活的一半状态（投递和执行），分开时任何一边收窄都得把另一半往外递；合起来以后别的模块只认一扇门，投递和执行之间的往来留在模块里。
 - **交付在工单，本模块只借出工作目录**：交付要的决定（要不要合、从哪合、子工单过哪些检查、PR 结了算不算完）和它写下的（冲突、PR、结局、冻结的文件）都是工单的；本模块只管工作目录在谁手里，给出 `handOver`、`withWorkplace`、`withIdleWorkplace` 三扇门，git 和 GitHub 由工单经仓库带类型的操作（`verifyCheckout`、`merge`、`mergeInto`、`submitPullRequest`、`failedJobLog`…）去做。曾把合并、提 PR 和跟 PR 的编排放在本模块，工单的记录经 `IssueRecord` 回调写回：下层回调上层，本模块的门也更宽（交付 7 个成员）。
 - **蓄水池、订阅和派活的队列在工单，本模块只投递**：一句话是不是工单的、工单能不能收、该给哪个会话，都看工单的状态；放在本模块时信箱得读看板（`IssueView`），还在同一个事务里写工单的蓄水池。现在工单决定投给谁，经 `route` 交下来；要和投递一起提交的（蓄水池记下转给了谁、退回了）放在 `Delivery` 的 `prepare`、`commit` 里，在投递的事务里跑，本模块不知道它们写的是什么。
+- **会话上还记着工单（`T.Session` 的 `issue`、`refining`），不是一个带 `kind` 的 `scope`**：本模块还按「这个帮工在不在做一张工单」分支：开工单的检出还是上下文目录、给哪套规矩（要不要 `issue_report`）、只收做工单的帮工的汇报、腾位置时放走还是休眠、一轮做完不交给用户时歇下（`restsAfter`）、`discardWork`。把这两个字段换成 `scope: { kind, id }` 只是把同一个分支藏进标签；要拿掉，得先把这些换成开工时上层给的、执行上的选项（工作目录是哪种、要不要交汇报、腾位置时怎么办）。工单的状态（`status`、`stage`、授权）本模块已经不读。
 - **一个成员答一个问题，不用标签把几件事并成一个**：曾把 `receive`、`withdraw`、`workplace`、`read` 做成带标签的大成员，成员数是少了，面却一样宽，路径表（`service-paths.json`）也看不出模块用的是哪一样（[一个名字只答一个问题](docs/style/naming.md)）。现在每件事一个名字，门窄靠的是只留别的模块真在用的成员：路径表里没人用的就删。
 - **用执行器隔离进程资源，用纯函数表达领域规则**：防止启动中断或关闭失败时泄漏子进程或重用脏目录；事件映射与汇报解析保持纯函数以便快速单测。
 - **区分 `Session`、`Run`、进程连接 `launch` 与 oar 会话**：`Session` 代表跨轮次工作现场，`Run` 记单轮触发与花费，内存 `launch`（`${id}#n`）标识一次底层连接以便重连时退回未确认投递，底层 oar 会话可随时替换而不丢工单归属。
@@ -172,7 +173,7 @@
 
 ## 怎么验证
 
-- `apps/server/src/modules/session/report.test.ts`、`journal.test.ts`、`inProcessRun.test.ts`：汇报解析、轨迹版本追加与进程内 `Run`。
+- `apps/server/src/modules/session/report.test.ts`、`urgency.test.ts`、`journal.test.ts`、`inProcessRun.test.ts`：汇报解析与一轮结束时等不等、歇不歇，紧急度与投递行，轨迹版本追加与进程内 `Run`。
 - `executor.test.ts`、`access.test.ts`、`session.test.ts`、`apps/server/src/flows/work.test.ts`：执行器生命周期、派工、带话、静默告警、容量上限、合并交接与重启恢复。
 - `triggers.test.ts`、`source.test.ts`、`deliveries.test.ts`、`apps/server/src/flows/ingress.test.ts`、`mailbox-order.test.ts`、`returns.test.ts`：`(source, key)` 幂等、投递顺序、按给定的 `held_by` 写投递、工单蓄水（在工单）、换人退回与重启重放；刹车本身见[观察层](docs/subsystems/watch.md#怎么验证)，来源游标与触发器共同回滚在 `apps/server/src/modules/issue/github.test.ts`。
 - `apps/server/src/flows/pull_request.test.ts`、`pr-follow.test.ts`、`parent-pr.test.ts`、`split.test.ts`、`acceptance.test.ts`、`dependencies.test.ts`：经本模块交接的交付、跟 PR、子工单合入父分支（编排在工单）。

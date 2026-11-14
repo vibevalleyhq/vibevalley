@@ -1,7 +1,7 @@
 import type { Event } from "@botiverse/oar";
 import { describe, expect, it } from "vite-plus/test";
 
-import type { Doing, Session } from "@vibevalley/protocol";
+import type { Doing, IssueReport, Session } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { clip } from "#/base/clip.ts";
@@ -11,7 +11,7 @@ import { MergeFailure } from "#/modules/repo/workplace.ts";
 import { briefBreak, conflictBrief, noRoom, notTakenIn, sessionName, whoMakesRoom, withRecall } from "./briefing.ts";
 import { recallHead } from "./prompts.ts";
 import { reactionTo, type ReactionContext, near, since, type Tracking } from "./reaction.ts";
-import { readReport, summaryOf } from "./report.ts";
+import { readReport, restsAfter, settlesFirst, summaryOf } from "./report.ts";
 import { shellCommand } from "./shell.ts";
 const ev = (body: object): Event => ({ sessionId: "s", agentPath: [], seq: 0, receivedAt: 0, ...body }) as unknown as Event;
 const ctx: ReactionContext = { id: sessionId("w1"), runtime: "pi", cwd: "/work/clock-in" };
@@ -286,4 +286,32 @@ it("makes room with whoever has been idle longest", () => {
   // Hired first but worked last: the one hired later, idle since it came, goes.
   const worked = { ...s("early", 1, "resting"), lastRun: { outcome: "completed", summary: "", at: 9 } } as Session;
   expect(whoMakesRoom([worked, s("late", 5, "resting")], 2)?.id).toBe("late");
+});
+
+describe("a turn's end", () => {
+  const report = (more: Partial<IssueReport> = {}): IssueReport => ({
+    summary: "done",
+    questions: [],
+    checks: [],
+    remember: [],
+    prSubmit: true,
+    ...more,
+  });
+
+  it("waits for background tasks first only when it completed, does not hand the work over, and some still run", () => {
+    expect(settlesFirst(true, undefined, 1)).toBe(true);
+    expect(settlesFirst(true, report(), 1)).toBe(true);
+    expect(settlesFirst(true, report(), 0)).toBe(false);
+    expect(settlesFirst(false, undefined, 1)).toBe(false);
+    expect(settlesFirst(true, report({ prSubmit: false }), 1)).toBe(false);
+  });
+
+  it("rests when it completed on an issue without handing the work to the user", () => {
+    expect(restsAfter(true, true, report())).toBe(true);
+    expect(restsAfter(true, true, undefined)).toBe(true);
+    expect(restsAfter(true, false, report())).toBe(false);
+    expect(restsAfter(false, true, report())).toBe(false);
+    expect(restsAfter(true, true, report({ questions: [{ question: "which?", options: ["a", "b"] }] }))).toBe(false);
+    expect(restsAfter(true, true, report({ checks: [{ criterion: 0, result: "unsure", proof: "" }] }))).toBe(false);
+  });
 });

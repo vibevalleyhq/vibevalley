@@ -102,13 +102,29 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
     const { issue: _issue, hiring: _hiring, ...sending } = opt;
     const hiredIssue = issue;
     try {
+      if (parent)
+        try {
+          await repos.checkout({ repo: where, issue: parent.number, worktree: true, base: "" });
+        } catch (e) {
+          if (e instanceof RepoError) throw new HireRefused(e.message, undefined, { cause: e });
+          throw e;
+        }
       const received = await sessions.hireWith({
         agent,
         brief: [brief, constraints].filter(Boolean).join("\n\n"),
         where,
-        // The child's branch forks from the parent's.
-        ...(parent ? { parent: parent.number } : {}),
-        options: { ...sending, ...(base ? { base, worktree: true } : {}), context: { kind: "issue", issue: hiredIssue } },
+        options: {
+          ...sending,
+          ...(base ? { base, worktree: true } : {}),
+          context: {
+            kind: "issue",
+            issue: {
+              id: hiredIssue.id,
+              number: hiredIssue.number,
+              ...(hiredIssue.mandate.originTriggerId ? { source: hiredIssue.mandate.originTriggerId } : {}),
+            },
+          },
+        },
         envelopes: { _tag: "Queued", triggers: opt.inputs ?? [] },
         hiring: async (w) => {
           if (opt.refining !== true) await recordHiredStart(hiredIssue.id, w);
