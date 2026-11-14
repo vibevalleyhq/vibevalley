@@ -5,8 +5,9 @@ mod support;
 use std::path::Path;
 
 use support::*;
-use vibevalley_issues::{BoardError, NewIssue};
 use vibevalley_protocol::{IssueStageKind as StageKind, IssueStatus, IssueUpdate, MilestoneKind, Outcome, RunTriggerKind};
+use vibevalley_server::modules::issue::NewIssue;
+use vibevalley_server::modules::ledger::BoardError;
 
 fn new(title: &str, repo: Option<&Path>) -> NewIssue {
     NewIssue {

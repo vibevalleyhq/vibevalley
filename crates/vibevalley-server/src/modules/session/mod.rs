@@ -9,15 +9,25 @@ use std::sync::Arc;
 use vibevalley_core::Applied;
 use vibevalley_core::rules::{session_ids_of, stage_wants_user};
 use vibevalley_i18n::t;
-use vibevalley_issues::{Board, Facts, Step};
 use vibevalley_protocol::{ApiError, Fact, Issue, IssueGetInput, IssueStageKind, IssueWatch, LiveEvent, SessionId, SpaceState, StateFrame, Subscription, ops};
 
 use crate::base::{LookIn, missing};
+use crate::modules::issue::Board;
+use crate::modules::ledger::{Facts, Step};
 use crate::{Hub, Server, Sink};
 
+mod drivers;
 pub mod journal;
+mod report;
+mod runs;
+mod sessions;
+mod talk;
 
+pub use drivers::{Drive, Drivers, HelperPlace, Persona, RuntimeDrivers};
 pub use journal::{Journal, Trajectories};
+pub use report::{ANSWER_ONLY, Report, ReportQuestion, ReportStatus};
+pub use runs::trigger_of;
+pub use sessions::{DraftEnd, Hire, Rounds, Sessions};
 
 /// The board's facts go into the hub, its sessions' steps into their logs.
 pub struct Logged {
@@ -78,19 +88,7 @@ pub fn install(hub: &Arc<Hub>, board: Board, trajectories: Arc<Trajectories>) {
     let tr = trajectories.clone();
     hub.on::<ops::SessionEventList>(move |_, input| Ok(tr.events(&input.id, input.run.as_deref()).unwrap_or_default()));
     let b = board.clone();
-    hub.on::<ops::SessionStop>(move |ctx, input| {
-        let session = ctx.hub.read(|s| s.sessions.iter().find(|x| x.id == input.id).cloned());
-        let Some(session) = session.filter(|s| b.is_live(&s.id)) else {
-            return Err(helper_ref(&input.id));
-        };
-        if session.phase.is_working()
-            && let Some(issue) = &session.issue
-        {
-            // A stop that is not taken is not a refusal (VibeValley logs it).
-            let _ = b.stop(issue);
-        }
-        Ok(())
-    });
+    hub.on::<ops::SessionStop>(move |_, input| stop(&b, &input.id));
 
     let b = board.clone();
     let tr = trajectories;
@@ -109,6 +107,20 @@ pub fn install(hub: &Arc<Hub>, board: Board, trajectories: Arc<Trajectories>) {
             .map_err(crate::base::internal)?;
         Ok(())
     });
+}
+
+/// `session.stop`: the working round of a helper this process drives stops.
+pub(crate) fn stop(board: &Board, id: &str) -> Result<(), ApiError> {
+    let Some(session) = board.session(id).filter(|s| board.sessions().is_live(&s.id)) else {
+        return Err(helper_ref(id));
+    };
+    if session.phase.is_working()
+        && let Some(issue) = &session.issue
+    {
+        // A stop that is not taken is not a refusal.
+        let _ = board.stop(issue);
+    }
+    Ok(())
 }
 
 const SHOWN_SESSIONS: usize = 8;

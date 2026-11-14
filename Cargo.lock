@@ -11936,24 +11936,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "vibevalley-issues"
-version = "0.1.0"
-dependencies = [
- "flume 0.12.0",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.21",
- "uuid",
- "vibevalley-core",
- "vibevalley-git",
- "vibevalley-i18n",
- "vibevalley-oar",
- "vibevalley-protocol",
- "vibevalley-store",
-]
-
-[[package]]
 name = "vibevalley-mac"
 version = "0.1.0"
 dependencies = [
@@ -12050,6 +12032,7 @@ dependencies = [
  "sha2 0.11.1",
  "symphonia",
  "tempfile",
+ "thiserror 2.0.21",
  "tokio",
  "ureq",
  "url",
@@ -12063,7 +12046,6 @@ dependencies = [
  "vibevalley-home",
  "vibevalley-http",
  "vibevalley-i18n",
- "vibevalley-issues",
  "vibevalley-memory",
  "vibevalley-oar",
  "vibevalley-pkm",

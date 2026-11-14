@@ -9,12 +9,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use vibevalley_issues::{Board, BoardConfig};
 use vibevalley_oar::scripted::{Script, ScriptedRuntime, Step};
 use vibevalley_oar::{
     Capabilities, ContentBlock, Event, Installation, ModelInfo, PermissionDecision, Registry, Runtime, Session, SessionOptions, SessionStatus,
 };
 use vibevalley_protocol::{Issue, IssueStageKind as StageKind};
+use vibevalley_server::modules::issue::Board;
+use vibevalley_server::modules::ledger::BoardConfig;
 use vibevalley_store::Store;
 
 /// What a hook sees of a turn.
@@ -98,7 +99,7 @@ impl Runtime for HookRuntime {
         Ok(vec![])
     }
     fn open(&self, opts: SessionOptions) -> vibevalley_oar::Result<Arc<dyn Session>> {
-        // Where `Board::report` keeps this session's report: beside its record, by the same name.
+        // Where `Sessions::report` keeps this session's report: beside its record, by the same name.
         let record = opts.record_to.clone().expect("the board records every session");
         let report = record
             .parent()

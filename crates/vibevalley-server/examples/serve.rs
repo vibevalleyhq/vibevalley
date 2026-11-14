@@ -13,7 +13,7 @@ fn main() {
     let home = config.home.clone();
     let started = vibevalley_server::start(config).expect("the server");
     let listener = vibevalley_http::serve(started.hub.clone(), "127.0.0.1:0".parse().unwrap()).expect("listen");
-    started.board.set_mcp_url(format!("{}/mcp", listener.url()));
+    started.board.sessions().set_mcp_url(format!("{}/mcp", listener.url()));
     let _announced = vibevalley_server::home::announce(&home, &listener.url()).expect("server.json");
     println!("{}", listener.url());
     std::thread::park();

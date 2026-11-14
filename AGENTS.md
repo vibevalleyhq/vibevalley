@@ -6,12 +6,12 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 
 ```
 crates/vibevalley-server/  服务端（二进制 vibevalley-server）：src/modules 按单数概念分深模块（agent、artifact、attachment、channel、cron、game、issue、
-                           library、media、memory、mcp、orchestrator、pkm、provider、publish、repo、session、setting、tool、watch），lib.rs 组装 Hub，
+                           ledger、library、media、memory、mcp、orchestrator、pkm、provider、publish、repo、session、setting、tool、watch、workplace；
+                           工单板拆成 issue（状态与交付）、session（帮工和每一轮）、workplace（worktree 与合并），都只经 ledger 写），lib.rs 组装 Hub，
                            start.rs 起服务，main.rs 读参数和环境；assets/ 是工具说明（tools/）、助手和帮工的提示
 crates/vibevalley-http/    HTTP 门（/api/v1、SSE、/mcp）：照契约的接口表把请求交给服务端
 crates/vibevalley-server-api/  服务端对页面和 HTTP 门的接口（Server trait）
 crates/vibevalley-core/    核心状态与规则：reduce、frame、工单的状态和阶段、收件箱、巡查、农场的画面、简报和起草
-crates/vibevalley-issues/  工单板 Board：工作流状态、每一轮、worktree、合并、私聊和汇报（R4 要拆成 issue、session、workplace）
 crates/vibevalley-protocol/  契约的 Rust 类型：src/generated 由 gen/ 从 packages/protocol 的 zod 生成（vp run protocol:rust），不手改
 crates/vibevalley-oar/     oar 的 Rust 实现：Claude Code、Codex、ACP 和测试用的 scripted 农机
 crates/vibevalley-agent/   VibeValley 自己的 agent：模型请求（DeepSeek）、工具、对话循环和压缩

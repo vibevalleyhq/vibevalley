@@ -15,13 +15,13 @@ use std::sync::{Arc, LazyLock, Mutex, Weak};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
-use vibevalley_issues::Board;
 use vibevalley_protocol::{Caller, Issue, Session};
 
 use crate::Hub;
 use crate::modules::agent::Agents;
 use crate::modules::channel::Chat;
 use crate::modules::cron::Crons;
+use crate::modules::issue::Board;
 use crate::modules::orchestrator::words;
 use crate::modules::repo::Repos;
 

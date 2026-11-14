@@ -4,10 +4,11 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use vibevalley_issues::{Board, BoardConfig};
 use vibevalley_oar::Registry;
 
 use crate::Hub;
+use crate::modules::issue::Board;
+use crate::modules::ledger::BoardConfig;
 use crate::modules::{
     self,
     agent::Agents,

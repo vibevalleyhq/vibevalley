@@ -69,7 +69,7 @@
 | 层 | 入口 | 位置 |
 |---|---|---|
 | 规则 | 纯函数 | 各 crate 的 `#[cfg(test)]` 与 `src/tests.rs`（如 `crates/vibevalley-core/src/tests.rs`） |
-| 模块 | 模块的类型、真 git、脚本农机（`vibevalley-oar` 的 `scripted`）、脚本模型 | `crates/vibevalley-issues/tests/board.rs`、`crates/vibevalley-server/tests/*.rs` |
+| 模块 | 模块的类型、真 git、脚本农机（`vibevalley-oar` 的 `scripted`）、脚本模型 | `crates/vibevalley-server/tests/issue_board.rs`、`crates/vibevalley-server/tests/*.rs` |
 | 服务端整体 | 起真的 `vibevalley-server`、经 HTTP | `crates/vibevalley-server/tests/start.rs`、`crates/vibevalley-cli/tests/cli.rs` |
 | 页面 | 真服务端进程 + Chromium | `apps/web/test/`（对着 Rust 服务端） |
 | 宿主 | Electron | `apps/desktop/test` |

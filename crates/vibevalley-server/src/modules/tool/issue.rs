@@ -3,13 +3,15 @@
 use serde::Deserialize;
 use serde_json::{Value, json};
 use vibevalley_i18n::t;
-use vibevalley_issues::{ChildDraft, Report, ReportQuestion, ReportStatus};
 use vibevalley_protocol::{
-    Caller, Changes, CriterionCheck, Deliverable, Issue, IssueAnswer, IssueReportMemory, IssueStatus, IssueTimeline, MandateStrength, SubmitBranch,
+    Caller, Changes, CriterionCheck, Deliverable, Issue, IssueAnswer, IssueFilter, IssueReportMemory, IssueReviewInput, IssueStatus, IssueTimeline,
+    MandateStrength, SubmitBranch,
 };
 
 use super::{Farm, Who, given};
+use crate::modules::issue::ChildDraft;
 use crate::modules::orchestrator::words::{self, wire};
+use crate::modules::session::{Report, ReportQuestion, ReportStatus};
 use crate::now;
 
 const PRIORITIES: &str = "Expected one of: 紧急, 高, 普通, 中, 低, urgent, high, medium, low";
@@ -26,24 +28,19 @@ pub struct ListArgs {
 }
 
 pub fn list(f: &Farm, _: &Who, a: ListArgs) -> Result<String, String> {
-    let mut filter = json!({});
-    if let Some(v) = given(&a.text) {
-        filter["text"] = json!(v);
-    }
-    if let Some(v) = given(&a.repo) {
-        filter["repo"] = json!(v);
-    }
-    if let Some(v) = a.closed {
-        filter["closed"] = json!(v);
-    }
-    if let Some(v) = a.wants_user {
-        filter["wantsUser"] = json!(v);
-    }
-    if let Some(st) = given(&a.status) {
-        let st = words::status_named(st).ok_or_else(|| format!("Expected one of: {}", words::STATUS_WORDS))?;
-        filter["status"] = json!(wire(&st));
-    }
-    let found: Vec<Issue> = serde_json::from_value(f.call(Caller::Orchestrator, "issue.list", filter)?).map_err(|e| e.to_string())?;
+    let status = match given(&a.status) {
+        Some(st) => Some(words::status_named(st).ok_or_else(|| format!("Expected one of: {}", words::STATUS_WORDS))?),
+        None => None,
+    };
+    let filter = IssueFilter {
+        status,
+        text: given(&a.text).map(String::from),
+        repo: given(&a.repo).map(String::from),
+        limit: None,
+        closed: a.closed,
+        wants_user: a.wants_user,
+    };
+    let found: Vec<Issue> = f.board.read(|s| vibevalley_core::pick_issues(&s.issues, &filter, now()));
     if found.is_empty() {
         return Ok(if a.wants_user == Some(true) {
             "没有在等用户的工单。"
@@ -125,27 +122,26 @@ pub fn review(f: &Farm, _: &Who, a: ReviewArgs) -> Result<String, String> {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
-    let mut req = json!({ "id": item.id, "pass": a.pass });
-    if let Some(v) = a.findings {
-        req["findings"] = v;
-    }
-    if let Some(v) = a.text {
-        req["text"] = json!(v);
-    }
-    Ok(
-        match f
-            .call(Caller::Orchestrator, "issue.review", req)
-            .and_then(|v| serde_json::from_value::<Issue>(v).map_err(|e| e.to_string()))
-        {
-            Ok(done) if a.pass => format!("#{} 验收过了，等用户点完成", done.number),
-            Ok(done) => format!(
-                "#{} 没过验收，{} 处要修，已经交回给帮工",
-                done.number,
-                done.findings.iter().filter(|x| !x.resolved).count()
-            ),
-            Err(why) => why,
-        },
-    )
+    let findings = match a.findings {
+        None | Some(Value::Null) => None,
+        Some(Value::String(one)) => Some(vec![one]),
+        Some(v) => Some(serde_json::from_value::<Vec<String>>(v).map_err(|e| format!("findings: {e}"))?),
+    };
+    let input = IssueReviewInput {
+        id: item.id,
+        pass: a.pass,
+        findings,
+        text: a.text,
+    };
+    Ok(match crate::modules::issue::review(&f.board, input).map_err(|e| e.message) {
+        Ok(done) if a.pass => format!("#{} 验收过了，等用户点完成", done.number),
+        Ok(done) => format!(
+            "#{} 没过验收，{} 处要修，已经交回给帮工",
+            done.number,
+            done.findings.iter().filter(|x| !x.resolved).count()
+        ),
+        Err(why) => why,
+    })
 }
 
 #[derive(Deserialize)]
@@ -161,15 +157,13 @@ pub fn comment(f: &Farm, _: &Who, a: CommentArgs) -> Result<String, String> {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
-    Ok(
-        match f.call(Caller::Orchestrator, "issue.comment.create", json!({ "id": item.id, "text": a.text })) {
-            Ok(_) => match f.worker_of(&item) {
-                Some(w) => format!("已经在 #{} 的工单串里跟 {} 说了", item.number, w.name),
-                None => words::nobody_on(item.number),
-            },
-            Err(why) => format!("没带到：{why}"),
+    Ok(match crate::modules::issue::comment(&f.board, &item.id, &a.text) {
+        Ok(_) => match f.worker_of(&item) {
+            Some(w) => format!("已经在 #{} 的工单串里跟 {} 说了", item.number, w.name),
+            None => words::nobody_on(item.number),
         },
-    )
+        Err(why) => format!("没带到：{}", why.message),
+    })
 }
 
 pub fn stop(f: &Farm, _: &Who, a: IdArgs) -> Result<String, String> {
@@ -180,9 +174,9 @@ pub fn stop(f: &Farm, _: &Who, a: IdArgs) -> Result<String, String> {
     let Some(w) = f.worker_of(&item) else {
         return Ok(words::nobody_on(item.number));
     };
-    Ok(match f.call(Caller::Orchestrator, "session.stop", json!({ "id": w.id })) {
-        Ok(_) => format!("#{} 这一轮叫停了", item.number),
-        Err(why) => why,
+    Ok(match crate::modules::session::stop(&f.board, &w.id) {
+        Ok(()) => format!("#{} 这一轮叫停了", item.number),
+        Err(why) => why.message,
     })
 }
 
@@ -494,7 +488,7 @@ pub fn report(f: &Farm, who: &Who, a: ReportArgs) -> Result<String, String> {
         checks: a.checks,
         remember: a.remember,
     };
-    f.board.report(&me.id, &report).map_err(|e| e.to_string())?;
+    f.board.sessions().report(&me.id, &report).map_err(|e| e.to_string())?;
     Ok("报告已记录；现在用简短正文说明结果。".into())
 }
 
@@ -542,7 +536,7 @@ fn submit(f: &Farm, who: &Who, summary: Option<&str>) -> Result<String, String> 
         cwd,
         branch,
         sha,
-        base: f.board.base_branch(&me.id).unwrap_or_else(|| "main".into()),
+        base: f.board.sessions().base_branch(&me.id).unwrap_or_else(|| "main".into()),
         title,
         body,
         dry_run: None,

@@ -1,14 +1,15 @@
 //! What the user changes on an issue besides moving it: its fields
 //! (`issue.update`), deleting it, and the verdict on what was handed back
-//! (`issue.review`). Ported from VibeValley `modules/issue/issue.ts`
-//! (`edit`, `remove`, `review`) and `lifecycle.ts` (`saveEdit`, `place`).
+//! (`issue.review`).
 
 use vibevalley_core::brief::{failed_text, issue_words};
 use vibevalley_git::Repo;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{Assignment, Fact, Finding, Issue, IssueStatus, IssueUpdate};
 
-use crate::{Board, BoardError, Result, Workplace, git, lock, now};
+use super::board::Board;
+use crate::modules::ledger::{BoardError, IssueChange, Result, lock, now};
+use crate::modules::workplace::Leave;
 
 const RANK_STEP: i64 = 1024;
 const RANK_BOUND: i64 = 2_000_000_000;
@@ -23,7 +24,7 @@ impl Board {
     /// sent. An empty `agent` leaves it unassigned; `before` places it on
     /// the board before that issue ("" last).
     pub fn edit(&self, reference: &str, upd: &IssueUpdate) -> Result<Issue> {
-        let _work = lock(&self.work);
+        let _work = lock(&self.0.work);
         let was = self.stored(reference)?;
         let while_open = upd.description.is_none() && upd.repo.is_none() && upd.agent.is_none() && upd.criteria.is_none() && upd.before.is_none();
         if while_open {
@@ -42,13 +43,13 @@ impl Board {
             None => was.repo.clone(),
             Some("") => None,
             Some(path) => {
-                let dir = self.repo_dir(path);
+                let dir = self.0.workplaces.repo_dir(path);
                 let found = Repo::discover(&dir)?.ok_or(BoardError::NotARepo(dir))?;
-                Some(self.repo_ref(found.root()))
+                Some(self.0.workplaces.repo_ref(found.root()))
             }
         };
         if let Some(agent) = upd.agent.as_deref().map(str::trim).filter(|a| !a.is_empty()) {
-            self.drivers.check(agent)?;
+            self.0.drivers.check(agent)?;
         }
         let at = now();
         let mut issue = was.clone();
@@ -82,7 +83,7 @@ impl Board {
             }
             merged.push(f);
         }
-        self.apply(merged)?;
+        self.0.ledger.apply(merged)?;
         self.stored(&was.id)
     }
 
@@ -125,28 +126,24 @@ impl Board {
     /// Deletes an issue never sent: a draft being written goes home, its
     /// checkout is cleared.
     pub fn remove(&self, reference: &str) -> Result<()> {
-        let _work = lock(&self.work);
+        let _work = lock(&self.0.work);
         let issue = self.stored(reference)?;
         if issue.executions().next().is_some() {
             return Err(refused("server.issue.started", &[]));
         }
         if let Some(r) = &issue.refining {
-            self.dismiss(&r.session, Workplace::Discard)?;
+            self.0.sessions.dismiss(&r.session, Leave::Discard)?;
         }
-        if let Some(main) = self.main_repo(&issue)? {
-            let name = main.root().file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-            git::remove_worktree(&main, &self.config.worktrees_dir.join(format!("{name}.{}", issue.number)))?;
-            let into = Self::main_branch(&main)?;
-            if git::has_unmerged(main.root(), &crate::issue_branch(issue.number), &into).unwrap_or(false) {
-                return Err(refused(
-                    "server.issue.cannotDelete",
-                    &[("n", issue.number.into()), ("why", t("server.issue.does.cleanWorktree", &[]).into())],
-                ));
-            }
-            git::delete_branch(main.root(), &crate::issue_branch(issue.number))?;
+        if let Some(main) = self.0.workplaces.main_repo(issue.repo.as_deref())?
+            && !self.0.workplaces.discard(&main, issue.number)?
+        {
+            return Err(refused(
+                "server.issue.cannotDelete",
+                &[("n", issue.number.into()), ("why", t("server.issue.does.cleanWorktree", &[]).into())],
+            ));
         }
         let _ = self.take_words(&issue.id);
-        self.apply(vec![Fact::issue_removed(now(), issue.id.clone())])
+        self.0.ledger.apply(vec![Fact::issue_removed(now(), issue.id.clone())])
     }
 
     /// The verdict on what was handed back: a pass marks it reviewed (the
@@ -158,12 +155,7 @@ impl Board {
             return Err(refused("server.issue.nothingToAccept", &[]));
         }
         if pass {
-            return self.update(&issue.id, |i| {
-                i.reviewed_at = Some(now());
-                for f in &mut i.findings {
-                    f.resolved = true;
-                }
-            });
+            return self.change(&issue.id, IssueChange::Reviewed);
         }
         let fresh = vibevalley_core::refine::kept(findings);
         let text = text.trim();
@@ -174,17 +166,14 @@ impl Board {
         let mut all = issue.findings.clone();
         for f in fresh {
             all.push(Finding {
-                id: format!("f{}", self.next("finding", 0)?),
+                id: format!("f{}", self.0.ledger.next("finding", 0)?),
                 text: f,
                 at,
                 resolved: false,
             });
         }
         let words = failed_text(&all, text);
-        self.update(&issue.id, |i| {
-            i.findings = all;
-            i.reviewed_at = None;
-        })?;
+        self.change(&issue.id, IssueChange::Failed { findings: all })?;
         self.tell(&issue.id, &words)?;
         self.stored(&issue.id)
     }
@@ -219,14 +208,15 @@ impl Board {
     pub fn no_room(&self, issue: &Issue) -> String {
         let except = issue.latest_session_id().cloned().unwrap_or_default();
         let repo = issue.repo.clone().unwrap_or_default();
-        let room = self.read(|s| vibevalley_core::rules::room_left(&s.sessions, &repo, self.config.space_limit, self.config.per_repo, &except));
+        let config = &self.0.config;
+        let room = self.read(|s| vibevalley_core::rules::room_left(&s.sessions, &repo, config.space_limit, config.per_repo, &except));
         if room.farm == 0 {
-            return t("server.session.noRoom.farm", &[("max", self.config.space_limit.into())]);
+            return t("server.session.noRoom.farm", &[("max", config.space_limit.into())]);
         }
         if room.repo == Some(0) {
             return t(
                 "server.session.noRoom.repo",
-                &[("repo", repo.into()), ("on", room.in_repo.into()), ("max", self.config.per_repo.into())],
+                &[("repo", repo.into()), ("on", room.in_repo.into()), ("max", config.per_repo.into())],
             );
         }
         String::new()

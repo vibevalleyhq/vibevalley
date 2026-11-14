@@ -4,7 +4,7 @@
 //! to the sessions, opens their issue threads, and posts their reports and
 //! the farm's receipts (👀, the hop limit, the wake breaker).
 //!
-//! In VibeValley the board (`vibevalley-issues`) runs the sessions, so a delivery
+//! The issue board runs the sessions (`modules::issue`, `modules::session`), so a delivery
 //! that wakes a session is words told to its issue (`Board::tell`): it
 //! steers a working turn or starts the next round. One that does not wake
 //! waits, in memory, and goes with the next that does.
@@ -22,7 +22,6 @@ use std::time::Duration;
 
 use vibevalley_core::Transition;
 use vibevalley_i18n::t;
-use vibevalley_issues::Board;
 use vibevalley_protocol::{
     Actor, AgentRole, ApiError, ChannelType, Fact, FactSessionReported, MessageKind, NoticeLevel, Outcome, Preview, Session, SubjectKind, USER_ID, ops,
 };
@@ -31,6 +30,7 @@ use self::hearers::{Audience, BrakeInput, HeldBy, Reach, Recipient, WakeBreaker,
 use crate::Hub;
 use crate::modules::agent::Agents;
 use crate::modules::channel::{Chat, Committed, Meta, Note, Noticing, Saying, Seat, ThreadSubject, Told, actor_of, meta_of, profile_id};
+use crate::modules::issue::Board;
 use crate::modules::orchestrator::{Input, Orchestrator, words::Source};
 use crate::now;
 
@@ -600,7 +600,7 @@ impl Watch {
         }
         let why = match self.agents.profiles.agent(agent) {
             Some(a) if !a.enabled => t("server.channel.profileDisabled", &[("name", a.name.into())]),
-            _ => match self.board.talk(agent, &c.row.channel_id, &c.row.body) {
+            _ => match self.board.sessions().talk(agent, &c.row.channel_id, &c.row.body) {
                 Ok(_) => return,
                 Err(e) => e.to_string(),
             },

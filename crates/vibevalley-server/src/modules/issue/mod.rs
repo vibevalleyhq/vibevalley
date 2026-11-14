@@ -1,7 +1,16 @@
-//! The `issue.*` endpoints on the board (`vibevalley-issues`). Ported from
-//! VibeValley `gateway/http/handlers/issue.ts` and the parts of
-//! `modules/issue/issue.ts`, `settle.ts` and `moves.ts` (`nextSteps`) the
-//! board does not do itself. Refusals carry VibeValley's words and codes.
+//! Issues: the board (`board.rs`: create, move, tell, queue, deliver,
+//! close; `edits.rs`: fields, delete, review; `family.rs`: split and join;
+//! `refine.rs`: drafting) and the `issue.*` endpoints on it, with the parts
+//! of settling and `nextSteps` the board does not do itself. Refusals carry
+//! VibeValley's words and codes.
+
+mod board;
+mod edits;
+mod family;
+mod refine;
+
+pub use board::{Board, NewIssue, Sent};
+pub use family::{ChildDraft, MAX_CHILDREN};
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -11,14 +20,14 @@ use vibevalley_core::Move;
 use vibevalley_core::brief::{findings_of, milestones_of, resume_words};
 use vibevalley_core::rules::short_title;
 use vibevalley_i18n::{Params, t};
-use vibevalley_issues::{Board, BoardError, ChildDraft, NewIssue, Undelivered};
 use vibevalley_protocol::{
-    ActWords, ApiError, Applied, AppliedIssue, BizCode, ChangedFile, Changes, Commit, Issue, IssueAction, IssueHistory, IssueStageKind, IssueStatus,
-    IssueUpdate, Next, Preview, StuckReason, UncommittedItem, ops,
+    ActWords, ApiError, Applied, AppliedIssue, BizCode, ChangedFile, Changes, Commit, Issue, IssueAction, IssueHistory, IssueReviewInput, IssueStageKind,
+    IssueStatus, IssueUpdate, Next, Preview, StuckReason, UncommittedItem, ops,
 };
 
 use crate::base::LookIn;
 use crate::modules::agent::Agents;
+use crate::modules::ledger::{BoardError, Undelivered};
 use crate::{Hub, now};
 
 const REQUEST_KEY_MAX: usize = 64;
@@ -429,6 +438,26 @@ fn patch_of(d: &vibevalley_git::FileDiff, path: &str) -> String {
     out
 }
 
+/// `issue.review`: the verdict on what was handed back.
+pub(crate) fn review(board: &Board, input: IssueReviewInput) -> Result<Issue, ApiError> {
+    let item = get(board, &input.id)?;
+    if item.status != IssueStatus::InReview {
+        return Err(refused("server.issue.nothingToAccept", &[]).with_next(next_steps(&item)));
+    }
+    board
+        .review(&item.id, input.pass, &input.findings.unwrap_or_default(), input.text.as_deref().unwrap_or(""))
+        .map_err(|e| api(board, e))
+}
+
+/// `issue.comment.create`: words to the issue's helper.
+pub(crate) fn comment(board: &Board, id: &str, text: &str) -> Result<(), ApiError> {
+    let item = get(board, id)?;
+    if item.status.is_closed() {
+        return Err(refused("server.issue.closedReopen", &[]));
+    }
+    board.tell(&item.id, text).map_err(|e| api(board, e))
+}
+
 fn split(board: &Board, id: &str, tasks: &[vibevalley_protocol::IssueChildDraft]) -> Result<String, ApiError> {
     let parent = get(board, id)?;
     let drafts = tasks
@@ -583,22 +612,11 @@ pub fn install_on(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Agents>>) {
     });
 
     let b = board.clone();
-    hub.on::<ops::IssueReview>(move |_, input| {
-        let item = get(&b, &input.id)?;
-        if item.status != IssueStatus::InReview {
-            return Err(refused("server.issue.nothingToAccept", &[]).with_next(next_steps(&item)));
-        }
-        b.review(&item.id, input.pass, &input.findings.unwrap_or_default(), input.text.as_deref().unwrap_or(""))
-            .map_err(|e| api(&b, e))
-    });
+    hub.on::<ops::IssueReview>(move |_, input| review(&b, input));
 
     let b = board.clone();
     hub.on::<ops::IssueCommentCreate>(move |ctx, input| {
-        let item = get(&b, &input.id)?;
-        if item.status.is_closed() {
-            return Err(refused("server.issue.closedReopen", &[]));
-        }
-        b.tell(&item.id, &input.text).map_err(|e| api(&b, e))?;
+        comment(&b, &input.id, &input.text)?;
         Ok(Applied { seq: ctx.hub.seq() })
     });
 

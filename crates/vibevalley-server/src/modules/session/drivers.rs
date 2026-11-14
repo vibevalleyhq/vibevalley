@@ -7,7 +7,7 @@ use std::sync::Arc;
 use vibevalley_oar::{Installation, Registry, Runtime};
 use vibevalley_protocol::{Deliverable, Issue, IssueReportMemory};
 
-use crate::{BoardError, Result};
+use crate::modules::ledger::{BoardError, Result};
 
 /// Where a profile's persona goes (VibeValley `personaMode`).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -53,7 +53,7 @@ pub trait Drivers: Send + Sync {
     }
     /// The rules a helper works an issue by (its appended system prompt).
     fn rules(&self, _place: &HelperPlace, deliver: Deliverable) -> String {
-        crate::report::instructions(deliver)
+        super::report::instructions(deliver)
     }
     /// The rules a helper talks by in a channel, with no issue.
     fn talk_rules(&self, cwd: &str, channel: &str, id: &str) -> String {

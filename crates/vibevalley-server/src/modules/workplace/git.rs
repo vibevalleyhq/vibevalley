@@ -6,7 +6,7 @@ use std::process::Command;
 
 use vibevalley_git::Repo;
 
-use crate::{BoardError, Result};
+use crate::modules::ledger::{BoardError, Result};
 
 fn git(root: &Path, args: &[&str]) -> Result<std::process::Output> {
     Command::new("git")

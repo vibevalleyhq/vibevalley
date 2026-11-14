@@ -19,7 +19,6 @@ use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak};
 
 use vibevalley_agent::{Brain, BrainEvent, Conversation, ModelClient, OpenAiClient, TurnOutcome, kit};
 use vibevalley_i18n::t;
-use vibevalley_issues::Step;
 use vibevalley_protocol::{
     AgentRole, Doing, Fact, FactSessionChanged, FactSessionPhaseChanged, NoticeLevel, ORCHESTRATOR_RUNTIME, Outcome, Phase, PhaseResting, PhaseWorking,
     Session, SessionAction, ops,
@@ -28,6 +27,7 @@ use vibevalley_protocol::{
 use self::words::Source;
 use crate::Hub;
 use crate::modules::channel::{Picked, Posting};
+use crate::modules::ledger::Step;
 use crate::modules::session::Trajectories;
 use crate::modules::tool::{Farm, Route, held};
 use crate::now;

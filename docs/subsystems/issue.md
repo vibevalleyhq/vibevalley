@@ -35,14 +35,14 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/vibevalley-issues/src/lib.rs` | `Board`：建单、挪状态（`move_to`）、对帮工说话（`tell`）、叫停、排队（`refresh_queue`）、改动（`changes`）、拆单（`split`）、起草（`refine`）、交付与合并；在工单自己的 worktree 里经 `vibevalley-oar` 跑帮工，存进 `state.db`（`vibevalley-store`） |
-| `crates/vibevalley-issues/src/edits.rs` | 改字段、删单、验收（`edit`、`remove`、`review`） |
-| `crates/vibevalley-issues/src/report.rs`、`runs.rs` | 一轮末尾的 `issue_report`；每张工单的各轮（`runs`） |
-| `crates/vibevalley-issues/src/check.rs` | 合进主分支前跑 `.vibevalley/check`、子工单合进父分支前跑它的检查，失败给末尾 40 行 |
-| `crates/vibevalley-issues/src/talk.rs` | 私聊帮工：没有工单的会话，在自己的目录里一轮一轮答 |
+| `crates/vibevalley-server/src/modules/issue/board.rs` | `Board`：建单、挪状态（`move_to`）、对帮工说话（`tell`）、叫停、排队（`refresh_queue`）、改动（`changes`）、交付（`complete`）与取消；帮工交给 `Sessions`，worktree 与合并交给 `Workplace` |
+| `crates/vibevalley-server/src/modules/issue/edits.rs`、`family.rs`、`refine.rs` | 改字段、删单、验收（`edit`、`remove`、`review`）；拆单与子工单合进父分支（`split`、`join_children`）；起草（`refine`）和读回草稿 |
+| `crates/vibevalley-server/src/modules/ledger.rs` | 工单板唯一的写入口 `Ledger`：先存进 `state.db`（`vibevalley-store`）再经 `Facts` 折进核心状态；已有工单的变化只能是一个 `IssueChange`（入队、重开、交付、取消、冲突、汇报、起草……），由 `IssueChange::fold` 一处写 |
+| `crates/vibevalley-server/src/modules/session/sessions.rs`、`runs.rs` | 帮工与每一轮：见 [帮工](docs/subsystems/session.md) |
+| `crates/vibevalley-server/src/modules/workplace/mod.rs`、`check.rs` | worktree、合并、冲突与分支清理；合进主分支前跑 `.vibevalley/check`、子工单合进父分支前跑它的检查，失败给末尾 40 行：见 [仓库](docs/subsystems/repo.md) |
 | `crates/vibevalley-core/src/status.rs`、`moves.rs` | 状态派生、展示阶段与可执行动作；合法挪动（`status_move`） |
 | `crates/vibevalley-core/src/deps.rs`、`refine.rs`、`brief.rs`、`pr.rs` | 父子依赖与 DAG、子工单要过的检查；起草的提示与读回；对帮工说的话；PR 的纯规则 |
-| `crates/vibevalley-server/src/modules/issue.rs` | `issue.*` 端点：解码入参、调 `Board`、带 `requestKey` 的幂等与拒绝的话 |
+| `crates/vibevalley-server/src/modules/issue/mod.rs` | `issue.*` 端点：解码入参、调 `Board`、带 `requestKey` 的幂等与拒绝的话 |
 | `crates/vibevalley-server/src/modules/cron.rs`、`crates/vibevalley-cron/src/lib.rs` | 定时任务：增删改与到期（存 `<家目录>/crons.json`）；时间规格与 `next_run` |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`issue.*`），CLI 命令为 `vibevalley issue ...`。
@@ -52,7 +52,7 @@
 - **生命周期统一走 `setStatus` 状态机**：用户只能将工单移至 `backlog`、`todo`、`done`、`canceled`；`in_progress` 与 `in_review` 从在场会话实时派生。
 - **核心状态保留活跃与近期工单**：全量工单存 `issue` 表；`SpaceState.issues` 保留未关工单及最近关闭的 50 张工单（含子工单，`keepClosedIssues`）。
 - **写操作收敛为「挪状态」与「说话」，建单与留言规则内聚在 `Issue`**：流转调 `issue.status.update`，评论调 `issue.comment.create`。`Board::create` 收拢仓库推导、父单继承与派发；端点和工具只做解码与格式化。
-- **看板挪一张工单只写一行**：`edit`（`edits.rs`）在相邻两张未派发工单的 `rank` 之间取中值（排在两端时加减 1024），一次 `UPDATE`、一次发布；间距用完或超出 ±2,000,000,000 时才在一个事务里按 1024 的步长重排全部未派发工单。
+- **看板挪一张工单只写一行**：`edit`（`issue/edits.rs`）在相邻两张未派发工单的 `rank` 之间取中值（排在两端时加减 1024），一次 `UPDATE`、一次发布；间距用完或超出 ±2,000,000,000 时才在一个事务里按 1024 的步长重排全部未派发工单。
 - **引用解析统一在服务内完成**：接口支持传入 `#41`、`41`、工单 UUID 或曾执行该工单的 `Session` ID。
 - **先建工单身份，再派帮工**：即时派活先写 `issue` 表拿编号再开 `Session`，启动失败且工作区干净时撤回新单，已有改动则保留现场。
 - **授权边界 `Mandate`**：工单绑定不可变的 `originTriggerId`，助手建单附言硬限 30 词；仅当 `autoSubmitPr` 为真时允许自动提 PR，`maxBotReviewRounds` 限制自动响应评审轮数。
@@ -92,7 +92,7 @@
    - 进仓库锁复核分支未变：子工单合入父分支记 `merged_into_parent`；普通工单本地合入主分支记 `merged`，或推送分支创建/更新 PR。
 5. **要求合入的 PR 轮询结清（Rust 版还没有）**：每 `github.pr_poll_seconds` 秒轮询开放 PR；合并后记 `delivered: pull_request` 并清理 worktree，关闭未合则记 `canceled: dismissed`。
 
-交付由 `Board` 在工单的锁里做：帮工在场时等它歇下，跑检查与合并，冲突和子工单冻结的文件直接写在工单上；失败时帮工留着，工单记下冲突、把要改的话带给帮工。子工单的检查由 `check.rs` 跑：验收子工单的检查要先失败、它改的文件冻结；其余的检查要过、冻结的文件不许动；然后合进父工单的分支。
+交付由 `Board` 在工单的锁里做：帮工在场时等它歇下，跑检查与合并，冲突和子工单冻结的文件直接写在工单上；失败时帮工留着，工单记下冲突、把要改的话带给帮工。子工单的检查由 `workplace/check.rs` 跑：验收子工单的检查要先失败、它改的文件冻结；其余的检查要过、冻结的文件不许动；然后合进父工单的分支。
 
 **跟 PR**：Rust 版还没做（不轮询 PR、CI 与评审）。
 
@@ -108,7 +108,7 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 ## 和谁打交道
 
-- **帮工（oar 和档案）**：`Board` 经 `Drivers`（`crates/vibevalley-issues/src/drivers.rs`，服务端给的是 `crates/vibevalley-server/src/modules/agent/drive.rs`）把指派的档案变成农机和参数，在 worktree 里跑一轮；轨迹由 `crates/vibevalley-server/src/modules/session/journal.rs` 记。
+- **帮工（oar 和档案）**：`Sessions` 经 `Drivers`（`crates/vibevalley-server/src/modules/session/drivers.rs`，服务端给的是 `crates/vibevalley-server/src/modules/agent/drive.rs`）把指派的档案变成农机和参数，在 worktree 里跑一轮；轨迹由 `crates/vibevalley-server/src/modules/session/journal.rs` 记。
 - **观察层、助手、工具**：观察层把频道里的话 `tell` 给工单；助手和帮工的工单工具在 `crates/vibevalley-server/src/modules/tool/issue.rs`。
 - **仓库（`vibevalley-git`）**：改动、冲突预检、合并、分支。
 
@@ -126,9 +126,9 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 ## 怎么验证
 
-- `crates/vibevalley-issues/tests/board.rs`：从待办到合并、失败与修、提问、中断续上、取消、排队与空位、按仓库的上限、重启接续、冲突、检查失败退回、调研单、留分支、没动静。
-- `crates/vibevalley-issues/tests/family.rs`：父子拆单、验收子工单与冻结文件、起草。
-- `crates/vibevalley-issues/tests/edits.rs`：改字段、排位与删单。
+- `crates/vibevalley-server/tests/issue_board.rs`：从待办到合并、失败与修、提问、中断续上、取消、排队与空位、按仓库的上限、重启接续、冲突、检查失败退回、调研单、留分支、没动静。
+- `crates/vibevalley-server/tests/issue_family.rs`：父子拆单、验收子工单与冻结文件、起草。
+- `crates/vibevalley-server/tests/issue_edits.rs`：改字段、排位与删单。
 - `crates/vibevalley-server/tests/issue.rs`、`crates/vibevalley-server/tests/cron.rs`：经端点走一张工单；定时任务的增删、拒绝与到期。
 - `crates/vibevalley-core/src/tests.rs`：状态派生、挪动与依赖的纯函数。
 - `apps/web/test/issues.spec.ts`、`apps/web/test/farm-actions.spec.ts`：工作台看板与农场工单操作端到端（对着 Rust 服务端）。

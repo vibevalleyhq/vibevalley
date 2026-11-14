@@ -1,6 +1,6 @@
 # 帮工
 
-帮工是「一个档案（`Agent`）干一件活」：会话（`Session`）和它的每一轮（`Run`）、工作目录、农机的执行和轨迹。Rust 版里这些在工单板（`vibevalley-issues` 的 `Board`）里跑，服务端的 `modules/session` 只给 `session.*` 端点、轨迹和工单观察流。
+帮工是「一个档案（`Agent`）干一件活」：会话（`Session`）和它的每一轮（`Run`）、工作目录、农机的执行和轨迹。Rust 版里这些在服务端的 `modules/session`：`Sessions` 雇帮工、跑每一轮、私聊、带话和叫停，另有 `session.*` 端点、轨迹和工单观察流；它由工单板（`modules/issue` 的 `Board`）叫来，一轮的汇报经 `Ledger` 写回工单，起草的一轮和每轮之后的排队交回工单板（`Rounds`）。
 - 处理工单时画成地里的小动物，处理私聊时关联频道；外部农机经 `vibevalley-oar` 驱动（Claude Code、Codex、ACP 与测试用的 scripted），VibeValley 自己的 agent 是 oar 里的 `vibevalley` 农机。
 - 一次触发到一次汇报是一轮 `Run`；一个 `Session` 可跨越多次 `Run` 与重启。
 
@@ -17,10 +17,10 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/vibevalley-issues/src/lib.rs` | `Board`：开会话、带话（`tell`，在干活的经 oar `steer` 插进这一轮）、叫停（`stop`）、结算一轮、静默检测、重启时把在干活的会话记成打断；并发上限在 `BoardConfig`（`space_limit` 6、`per_repo` 3、`quiet_after` 240 秒） |
-| `crates/vibevalley-issues/src/report.rs`、`runs.rs` | 一轮末尾的结构化汇报；每张工单的各轮 |
-| `crates/vibevalley-issues/src/talk.rs` | 私聊帮工：没有工单的会话，在自己的目录里一轮一轮答，答的话由观察层贴进私聊 |
-| `crates/vibevalley-issues/src/drivers.rs`、`crates/vibevalley-server/src/modules/agent/drive.rs` | 把工单指派的档案变成农机和启动参数（规矩、人设、记性、MCP） |
+| `crates/vibevalley-server/src/modules/session/sessions.rs` | `Sessions`：雇帮工（`hire`）、下一轮（`next_round`）、插话（`steer`，在干活的经 oar `steer` 插进这一轮）、叫停（`stop`）、放走（`dismiss`，worktree 交给 `Workplace` 收拾）、把农机的事件读成事实、结算一轮、静默检测、帮工的 `/mcp` 钥匙；重启时把在干活的会话记成打断；并发上限在 `BoardConfig`（`ledger.rs`：`space_limit` 6、`per_repo` 3、`quiet_after` 240 秒），由工单板数 |
+| `crates/vibevalley-server/src/modules/session/report.rs`、`runs.rs` | 一轮末尾的结构化汇报；每张工单的各轮 |
+| `crates/vibevalley-server/src/modules/session/talk.rs` | 私聊帮工：没有工单的会话，在自己的目录里一轮一轮答，答的话由观察层贴进私聊 |
+| `crates/vibevalley-server/src/modules/session/drivers.rs`、`crates/vibevalley-server/src/modules/agent/drive.rs` | 把工单指派的档案变成农机和启动参数（规矩、人设、记性、MCP） |
 | `crates/vibevalley-server/src/modules/session/journal.rs` | 轨迹：每个会话的步骤存 `<家目录>/events/<id>.json`，变化时每 300 毫秒推一次、每 1.5 秒落盘 |
 | `crates/vibevalley-server/src/modules/session/mod.rs` | `session.*` 端点和 `issue.watch` 订阅流 |
 | `crates/vibevalley-server/src/modules/mcp/mod.rs` | 帮工的 `/mcp` 门：JSON-RPC，令牌由工单板开帮工时签发（`Board::who` 认人），工具是农场的帮工工具（[工具](docs/subsystems/orchestrator.md)） |
@@ -57,7 +57,7 @@
 
 ## 怎么验证
 
-- `crates/vibevalley-issues/tests/board.rs`：开工、提问、失败、打断与续上、排队与上限、重启、静默、权限放行。
+- `crates/vibevalley-server/tests/issue_board.rs`：开工、提问、失败、打断与续上、排队与上限、重启、静默、权限放行。
 - `crates/vibevalley-server/tests/session.rs`：轨迹的流式步骤、子 agent 的步骤、落盘读回、工单的观察流。
 - `crates/vibevalley-server/tests/mcp.rs`：`/mcp` 帮工门。
 - `crates/vibevalley-oar/src/tests.rs`、`crates/vibevalley-oar/tests/live.rs`：各家农机的适配（`live.rs` 要装了的农机）。
