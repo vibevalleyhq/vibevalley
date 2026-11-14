@@ -8,7 +8,7 @@
 
 | 病 | 机理 | 处境 | 在哪 |
 |---|---|---|---|
-| 局部缝合 | 提炼要改没加载的文件，模型只在局部补，同一段控制流抄好几份 | 已有、以后做 | 工具只有一套（`crates/vibevalley-server/src/modules/tool/mod.rs`，宽松解析写一处），媒体各种类共用一个任务机（`modules/media/jobs.rs`）；外部聊天接入随 TS 服务端删了；收拢见提案「扩展点高阶骨架」 |
+| 局部缝合 | 提炼要改没加载的文件，模型只在局部补，同一段控制流抄好几份 | 已有、以后做 | 工具只有一套（`crates/vibevalley-server/src/modules/tool/mod.rs`，宽松解析写一处），媒体各种类共用一个任务机（`modules/media/jobs.rs`）；收拢见提案「扩展点高阶骨架」 |
 | 只加不删 | 不确定旧导出还有没有人用，只加新的 | 已有、已做 | 「内部不留兼容」（`AGENTS.md`）；`vp run deadcode`（`knip.ts`、`scripts/audit/deadcode.ts`），CI 零容忍 |
 | 绕开约束 | 类型或测试挡路时 `as any`、空 `catch`、改断言 | 已有、已做 | `no-explicit-any`、`no-unsafe-*`；`regression: ` 测试删改要点名（`scripts/release/regression.ts`）；帮工的验收先红、合入时冻结（[工单](docs/subsystems/issue.md#模型和不变量)） |
 | 温室假设 | 默认内存无限、网络秒回，N+1、每个字重写一次盘 | 已有、已做、以后做 | 贵的东西归拥有它的模块；流按任意切片测见提案 |
@@ -25,7 +25,7 @@
 | 4. 契约和验收测试只读 | 改写 | 不锁目录，让改动被看见：`regression: ` 测试点名、生成的文件由 `docs:verify`、`protocol:check` 查 |
 | 5. 功能和抽象拆成两张单，3:1 | 改写 | 重构自成提交，和同一批功能放一个 PR（[vv-pr](.agents/skills/vv-pr/SKILL.md) 第 1 节）；清哪里由 `vp run deadcode` 和 [vv-simplify](.agents/skills/vv-simplify/SKILL.md) 定，不按比例 |
 | 6. 跨 5 个以上文件写 codemod | 改写 | 做法写在 [SKILL.md](.agents/skills/vv-governance/SKILL.md#5-一次改很多文件)；漏改由 `vp check` 和 `scripts/docs/stale-names.ts` 兜底 |
-| 7. 测确定的 I/O 次数，不测毫秒 | 已做 | TS 服务端的 `dbQueries`、`gitRuns` 断言随它删了，Rust 上待补；分层耗时预算只报不挡 |
+| 7. 测确定的 I/O 次数，不测毫秒 | 已做 | Rust 上没有数 I/O 次数的断言；分层耗时预算只报不挡 |
 | 8. 判别联合加穷尽检查，禁 `default` | 已有、改写 | `switch-exhaustiveness-check`；`default` 允许，要说明其余的有意不管；成员表用 `Record<X, …>` |
 | 9. 需求不明先挂起提问 | 改写 | [SKILL.md](.agents/skills/vv-governance/SKILL.md#3-写计划前问清边界) 的四类边界；产品里帮工照工单的「先问清楚」问用户 |
 | 10. 修 3 次就删光重生成，模块 300 行内 | 不做（现在） | 行数上限教 agent 切文件凑数；按接口重写的条件见提案 |
@@ -47,7 +47,7 @@
 | 3.2 内存假实现和属性测试 | 已有、以后做 | 假的只在端口上（oar 的 scripted 运行时、替身农机 `pi`），git 和库用真的（[地基](docs/subsystems/foundation.md)）；`reduce` 的属性测试见提案 |
 | 3.3 确定性混沌和启动对账 | 已有、以后做 | 开机接回帮工（`crates/vibevalley-server/src/modules/session`），`crates/vibevalley-server/tests` 覆盖重启；流按任意切片测见提案 |
 | 3.4 历史存档的黄金快照 | 不做 | 内部不留兼容，旧库开机时挪开；对外 HTTP 的 v1 例外 |
-| 3.5 故障胶囊和自愈飞轮 | 已有、以后做 | `crates/vibevalley-server/src/modules/session/journal.rs` 记轨迹（助手评测随 TS 服务端删了）；`regression: ` 测试受门禁保护 |
+| 3.5 故障胶囊和自愈飞轮 | 已有、以后做 | `crates/vibevalley-server/src/modules/session/journal.rs` 记轨迹；`regression: ` 测试受门禁保护 |
 | 4.1 3+1 播种除草 | 改写 | 同铁律 5；jscpd 不做 |
 | 4.2 代数归约的重构指令 | 改写 | [SKILL.md](.agents/skills/vv-governance/SKILL.md#4-做一张纯重构的单)：行数不设门槛，没变少或变简单就不合 |
 | 4.3 跨文件重构用 codemod | 改写 | 同铁律 6；脚本出错就把碰过的文件从 `origin/main` 恢复重来 |
