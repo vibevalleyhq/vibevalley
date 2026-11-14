@@ -550,6 +550,7 @@ impl Watch {
             user: from_user,
             picked: meta.picked.clone(),
             messages: vec![c.row.id.clone()],
+            port: meta.response_port.clone(),
         };
         if o.hear(input)
             && let Err(e) = self.chat.react(&c.row.id, &d.recipient, HANDED_EMOJI, true)

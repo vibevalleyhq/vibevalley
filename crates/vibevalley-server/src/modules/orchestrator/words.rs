@@ -79,6 +79,8 @@ pub enum Source {
     Issue,
     Cron,
     Patrol,
+    /// A call under way: what to tell the user on it, or what its model passes on.
+    Call,
 }
 
 impl Source {
@@ -90,6 +92,7 @@ impl Source {
             Source::Issue => "[来源：工单]\n",
             Source::Cron => "[来源：定时]\n",
             Source::Patrol => "[来源：巡查]\n",
+            Source::Call => "[来源：通话]\n",
         }
     }
     /// `intake[source].now`: whether it goes into the turn under way.
