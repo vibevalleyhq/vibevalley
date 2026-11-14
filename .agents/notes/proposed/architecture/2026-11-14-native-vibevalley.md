@@ -13,6 +13,8 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 
 用户的决定（2026-11-14）：Rust 服务端为准；激进重构，速度优先；允许暂时回退；不需要完整复刻 oar / pi-ai 的功能。终态仍是全原生，删掉 `apps/desktop`、`apps/server`、`apps/web`、`apps/mobile`；命令行也改用 Rust 写；数据源（契约、对用户说的话、工具说明、提示）在 Rust 定义，codegen 到要用的地方，借此收掉不必要的包。所有改动合成一个 PR，分段写成提交。
 
+同一天稍后又定了三条：只做 macOS；不走渐进迁移，页面和两个壳现在就删，不等原生界面逐个路由对过；验收是在 `apps/mac` 上把[主线](#对上指什么)走通，结果对上就行。
+
 ## Proposal
 
 ### 原则
@@ -21,7 +23,7 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 - **速度优先，回退可接受。**一处 TS 行为如果照搬成本高、价值低，就砍掉或简化，在本 Note 的「砍掉的」里记一行，不阻塞进度。
 - **边界解码一次，门内全是类型。**HTTP、文件、厂商响应、模型给的工具参数，各在进门处解码成结构体和 enum；门内不传 `Value`，不按字符串分支。
 - **深模块。**每个模块对外一个窄接口；不靠一个带 `kind` 的入口复用多种操作（沿用 [模块设计](docs/style/module-design.md) 的规矩）。
-- **每段可回退。**每个重构段一组提交，`rust:check` 全绿、web e2e 核心部分不退步才进下一段。
+- **每段一组提交。**每段做完 `rust:check` 全绿才进下一段。页面的 e2e 和桌面版测试随页面、桌面壳一起删，之后的安全网是 Rust 的集成测试和 `apps/mac` 上的主线。
 
 ### 已完成（截至 2026-11-14，分支 `refactor/native-vibevalley`）
 
@@ -35,8 +37,10 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 | R3 媒体 | `media/jobs.rs` 一个任务机：存储、准入（8 个）、按种类的槽位（图片 1、语音 8）、取消、重下、释放、重启接续写一次；图片与语音在上面，去掉 `OtherJobs`。多人对话、音色设计、克隆、转写、理解按 `Ask` 加一个变体即可，暂不做 |
 | R6 命令行（第一步） | `crates/vibevalley-cli`（二进制 `vibevalley`，clap builder，说明按农场语言取 `cli.*` 词典）：issue（含 `--watch`、`watch`）、channel、repo、agent、session、runtime、memory、cron、artifact、pkm、worker、doctor；失败一行 JSON、退出码同 TS；`crates/vibevalley-home` 收家目录约定；`act_command` 进 `vibevalley-core::rules`。Rust 集成测试 7 个过（含 TS 版整份跑时失败的 watch）。`app`、`auth`、`chat` 不搬：桌面版、远程登录随删，`chat` 日后在 Rust 上做 |
 | R5 数据源（契约、词典） | 契约以 `crates/vibevalley-protocol/src/contract/`（原 `generated/`，改手写）为准，派生 `ts_rs::TS`；`typescript.rs` 写出 `packages/protocol/src/<概念>/shapes.gen.ts`（类型、`XValues`、品牌 id，带标签的联合成员带上自己的标签）与 `endpoints.gen.ts`；`tests/typescript.rs` 查生成物最新（`vp run protocol:ts` 写）、查 id 字段都标了品牌；翻转时旧的 465 个 TS 形状与生成物逐个互相可赋值。`gen/`（`gen.ts`、`prepare.sh`、`run.sh`）删了，`protocol:rust:check` 改名 `protocol:check`（加 `vp run goldens` 重写 artifact、pkm 的 golden）；`golden/` 的样例冻结成数据。词典挪到 `crates/vibevalley-i18n/locales/`（与 `same.json`），`catalogs.ts` 仍由 `i18n:gen` 写；`i18n check` 也数 Rust 与 `apps/mac` 里的用处。仍手写的 TS，随页面删：`schema.ts` 的 zod（页面、桌面、手机壳在边界解码，`satisfies Codec` 对着生成的类型，`schema.test.ts` 对键）、`api.ts` 的端点表（带 zod 的入参、出参；`api.test.ts` 对着 `endpoints.gen.ts`）、`rules/`、`client.ts`、`stream.ts`、`host.ts`；各 `shapes.ts` 只剩常量与路径（`dayMs`、`pathOf`…）、没有 Rust 类型的 `AgentIssueLevelValues`、`CronWhenKindValues`、`MediaAudioKindValues`，与 TS 专有的 `ServerReady`、`HtmlShellCommand`、`VoiceFix`。没翻的：`native.rs` 的原生端点类型不出 TS |
+| R4 拆 `Board`（第一步） | `vibevalley-issues` 并进服务端，拆成三个模块：`modules/issue`（`Board`：建单、挪状态、带话、排队、交付与取消、改字段、验收、拆单与合进父分支、起草）、`modules/session`（`Sessions`：雇帮工、每一轮、私聊、插话、叫停、放走、帮工的 `/mcp` 钥匙）、`modules/workplace`（`Workplace`：确保仓库、worktree 与 base、改动、交付合并、冲突、子工单合入、分支清理，不读工单板的状态）。写只经 `modules/ledger.rs`：已有工单的变化是带类型的 `IssueChange`，一处 `fold`；一轮的汇报由会话写成 `IssueChange::Reported`。工具的列工单、验收、带话、叫停直接调模块，不再绕 hub。合回本分支后 `cargo test --workspace` 470 个过。欠的三处见「剩下的」第 2 步 |
 | 闸 1 | 删了 `apps/server`、`apps/cli`、`packages/agent`；桌面版、页面 e2e、验收沙箱（`verify-server.ts`）都起 Rust 的 `vibevalley-server`（`VIBEVALLEY_SERVER_BIN` 或 cargo 的 debug 构建），桌面版打包带两个 Rust 二进制；`prompts.json`、投影 golden 归 Rust，不再从 TS 生成；只管 TS 服务端的审计删了（服务调用路径、schema 审计、protocol-namespace、单数服务、数据库门、同步文件）；CI 的 server 检查改为等 rust 任务。建工单或派活时仓库还不是 git 的会被建起来（同 TS）。桌面版测试 5/5，核心 e2e 过 |
-| 对照 | web e2e 在 Rust 上 243 个过约 207 个（失败的是媒体其余种类、语音、手机/局域网，及 4 个在 TS 上同样失败的）；CLI 测试 22 个过 21 个 |
+| 对照（删页面前的最后一次） | web e2e 在 Rust 上 243 个过约 207 个（失败的是媒体其余种类、语音、手机/局域网，及 4 个在 TS 上同样失败的）；CLI 测试 22 个过 21 个 |
+| 合入 `main` | `main` 上的 TS 版停在标签 `ts-final`（`14076df66`，正交领域的最后一批）；它比本分支的基点多出来的只有 TS 服务端和描述它的文档，本分支都已删或改写，所以合并时整棵树取本分支的 |
 
 ### 重构（按顺序）
 
@@ -72,7 +76,7 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 - `crates/vibevalley-cli`（clap），照现在的命令一条一个操作，经 HTTP 调服务端，类型直接用 `vibevalley-protocol`；家目录约定（`packages/home`）并进 Rust 的一处，服务端、命令行、原生应用共用。
 - `apps/cli` 的测试改成 Rust 集成测试，起真的 `vibevalley-server`；之后删 `apps/cli`。
 
-包的去向：`agent`、`ai`、`provider` 随闸 1 删；`bridge`、`engine`、`base-ui`、`stories`、`async`、`testkit`、`home` 随页面、桌面、手机壳与 TS 命令行删；`protocol` 的类型、`i18n` 的目录已是生成物（R5），`protocol` 手写的 zod、端点表、`rules/` 与客户端随页面删，之后只剩生成物与 `t`、`format`；`pkm`、`artifact` 挪进 `apps/mac/ui`；`health`、`tsrs` 看页面剩下的 TS 还需不需要再定。
+包的去向见「剩下的」第 1 步；`tsrs` 留着，`vp check` 给剩下的 TS（`apps/mac/ui`、`apps/site`、`scripts/`）做带类型的 lint 要用它。
 
 ### 砍掉的（不复刻，或简化）
 
@@ -83,12 +87,37 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 - **媒体其余种类**：多人对话、音色设计、克隆、转写、理解暂不做（vendor 调用已有），要时在 `Ask` 里加。
 - **命令行的 `app`、`auth`、`chat`**：随桌面版、远程登录删；终端里和自研 agent 对话日后在 Rust 上做。
 
-### 闸与删除
+### 对上指什么
 
-1. ~~R1–R3 完成后删 `apps/server`、`apps/cli`、`packages/agent`，Electron 改带 Rust 服务端过渡~~（已做）。`packages/ai`、`packages/provider` 只剩页面的语音在用，随页面删。
-   - 欠着：文档里约 420 处代码路径还指着 TS 服务端（`docs:verify` 红）；`deadcode` 报 `packages/` 里约 140 个没人用的导出（生成器经动态路径用到一部分，随 R5 变成生成物时清）。
-2. R4–R6 完成，`apps/mac` 覆盖 `apps/web` 每个路由（截图对过）：删 `apps/desktop`、`apps/web`、`apps/mobile` 与只为它们存在的包；`AGENTS.md`、`docs/architecture.md`、`docs/subsystems/*`、vv-acceptance 改写成 Rust 与原生的现状。
-3. 打包、签名公证、自动更新、带起灵动岛在 `apps/mac` 上补齐后，发版。
+合入前在 `apps/mac` 签名的包上，从空的家目录走通：
+
+1. 走完开场，配好一台农机（Claude Code 或 Codex）和助手的模型。
+2. 建一个仓库，建一张工单，派给一个档案。
+3. 帮工在工单的 worktree 里干活；工单页看得到每一轮的轨迹；帮工经 `/mcp` 在工单串里汇报。
+4. 用户在工单串里追问，帮工接着干；用户看改动，合进主分支。
+5. 在田头对助手说一句话，助手建工单并派出去。
+6. 定时任务到点建一张工单。
+7. 命令行 `vibevalley doctor`、`issue list`、`issue create`、`channel` 发一句话，对着运行中的应用通过。
+8. 退出再打开，在做的工单、会话和聊天都接得上。
+
+页面：工作台的每个路由在 `apps/mac` 有对应页，两种主题各截一张；农场能进、能看见帮工在地上干活。不要求和 TS 版像素一致，也不要求和它逐行为一致。
+
+### 剩下的（按顺序）
+
+1. **删页面和两个壳。**删 `apps/web`、`apps/desktop`、`apps/mobile`，服务端的 `lan` 与远程登录相关的 `user.*`，以及只为它们存在的东西：
+   - 包：`bridge`、`engine`、`base-ui`、`stories`、`async`、`testkit`、`home`、`ai`、`provider`、`health`；`packages/protocol` 里手写的 zod（`schema.ts`）、端点表（`api.ts`）、`client.ts`、`stream.ts`、`host.ts`，`rules/` 里页面不用的；`pkm`、`artifact` 挪进 `apps/mac/ui`。
+   - 检查：`web:check`、`web:test`、`desktop:test`、`packages:check` 里对应的部分、`practice:check`、`health:verify`，根 `vite.config.ts` 里只对这些目录生效的 lint 配置，CI 的 web、desktop 两个 job。
+   - 脚本：`package:mac`、`release`、`update-check` 里 Electron 的部分（第 4 步在 `apps/mac` 上重做）。
+   - 文档：`docs/subsystems/app.md`、`lan.md`、`user.md`、`voice.md` 等写明原生版没有的部分；删 [服务端和机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)，多机以后在 Rust 上重新提。
+2. **R4 欠的三处。**存储从 `vibevalley-store` 的 JSON 文档改成表（工单、会话、各轮、计数、待带的话），和 `server.db` 合成一个库；建单、挪状态、改字段、起草、看改动的工具直接调模块，不经 hub；轨迹与记性由会话发事实，`Facts::log`、`Drivers::remember` 的直接调用改成订阅。做完加一个用脚本化农机走完主线第 2 到第 6 步的集成测试。
+3. **原生界面补齐。**
+   - 页面（`apps/mac/ui`）：助手的记性页、工单里的 artifact、素材库与生成面板、看板拖动、笔记的拖动和雷达跳转、快捷键表。
+   - 农场（`apps/mac/src/pixel`）：工具栏、面板、田头聊天、帮工外观；夜间遮罩和树 HUD 两个已知缺陷。
+   - 宿主：菜单栏图标、开场、安装命令行、带起灵动岛。
+4. **打包。**签名公证、`.dmg`/`.zip`/`release.json`、原生版到原生版的自动更新；`package:mac`、`release`、`update-check` 走 Rust 的包。
+5. **验收，合入。**走完[对上指什么](#对上指什么)，截图和命令输出附在 PR 的 Checks 里；squash 合进 `main`。
+
+停下的条件：主线第 1 到第 4 条在 `apps/mac` 上走不通，并且原因在 nsh、gpui-kit 或 libghostty-vt 里而不在本仓库的代码里，就停下来报告用户，不绕过去。
 
 ## Alternatives considered
 
@@ -98,6 +127,8 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 
 **现在就把契约翻转成 Rust 为准**：TS 服务端还在跑 e2e 对照，它需要 zod 契约；等 `apps/server` 删掉再翻转，只翻一次。
 
+**先留着页面和两个壳跑 e2e，`apps/mac` 逐个路由对过再删（本 Note 上一版的闸 2）**：留着它们，Rust 服务端就要一直答旧页面要的每个操作（手机配对、语音、连接器的页面也在内），「砍掉的」砍不干净，手写的 zod 和端点表也删不掉。用户选了速度：现在就删，从删掉到原生界面补齐之间没有能日用的应用，兜底是 `main`（`ts-final`）和上一个 Electron 包。
+
 **保留 `OtherJobs`，按种类各写各的任务机**：每种都要重写排队、取消、恢复、释放，正是现在重复与不一致的来源。
 
 ## Acceptance criteria
@@ -106,14 +137,15 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 - `vibevalley-server` 门内没有 `serde_json::Value` 的业务传递（只在进出边界）；没有按 op 字符串分支的工具分发；没有 `Board` 这样的跨领域大对象。
 - 契约、词典、工具说明与提示以 Rust 为准，TS 由它生成，检查保证最新；`packages/` 下只剩生成物或页面专用的包。
 - 命令行是 Rust 的 `vibevalley-cli`，没有 `apps/cli`。
-- 只有一个服务端；`apps/cli` 的测试与 `doctor` 对着它通过；`apps/mac` 打出签名公证的包，能自动更新。
+- 只有一个服务端；命令行的集成测试与 `doctor` 对着它通过；`apps/mac` 打出签名公证的包，能自动更新。
+- [对上指什么](#对上指什么)的主线八条在那个包上从空家目录走通，页面的截图齐全，证据附在 PR 的 Checks 里。
 - 「砍掉的」里每一项要么在文档里写明不做，要么已在 Rust 上实现。
 
 ## Risks
 
-- **重构期间回退**：允许，但核心 e2e（工单、会话、频道、助手、笔记、artifact）退步就停下修；媒体其余种类与语音按砍掉的处理。
-- **用户已有数据**：TS 服务端在 PGlite/Postgres，Rust 用 SQLite；照「内部不留兼容」不迁移，已发版用户升级后从空开始。发版前要用户确认。
-- **与 [服务端和机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md) 冲突**：那篇的外部 Postgres 与多机长连接不在本计划内；删 `apps/server` 前要决定在 Rust 上重做还是删掉那篇。
+- **重构期间回退**：允许。页面的 e2e 删掉以后，主线以外的错要到使用中才发现；主线由第 2 步的集成测试和合入前的验收守住。媒体其余种类与语音按砍掉的处理。
+- **中间没有能日用的应用**：第 1 步删掉页面和 Electron 壳以后，到第 3 步原生界面补齐之前，这个分支上没有完整可用的应用；分支拖得越久，`main` 上的修复越要手工对到 Rust。
+- **已发版的用户**：TS 服务端在 PGlite/Postgres，Rust 用 SQLite；照「内部不留兼容」不迁移，升级后从空开始，Electron 版也不会自动更新到原生版。发版说明里要写明，并保留上一个 Electron 包的下载。
 - **nsh、gpui-kit、libghostty-vt 都是 0.x**：升级可能要跟着改；nsh 能解析 workspace 包已验证。
 - **只支持 macOS**：删掉页面与手机壳后，Windows、Linux、手机与浏览器都用不了。
 - **仓库护栏**：TS 的 AST 与 lint 审计对 Rust 不适用；R1–R4 里每段都要把对应的约束写成 clippy 规则、类型或测试，不能只靠文字。
