@@ -25,7 +25,7 @@ use vibevalley_protocol::{
 pub use vibevalley_server_api::{Server, refusal};
 
 pub mod base;
-pub mod home;
+pub use vibevalley_home as home;
 pub mod modules;
 pub mod offline;
 mod public_http;

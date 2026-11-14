@@ -104,16 +104,6 @@ impl RequestKeys {
     }
 }
 
-/// `actCommand`: the CLI command that does one of an issue's acts.
-fn act_command(issue: &Issue, a: &IssueAction, session: Option<&str>) -> Option<(Vec<String>, ActWords)> {
-    let n = issue.number.to_string();
-    match a {
-        IssueAction::Move { status, words, .. } => Some((vec!["issue".into(), "status".into(), n, status.as_str().into()], *words)),
-        IssueAction::Say { .. } => Some((vec!["issue".into(), "comment".into(), n], ActWords::Required)),
-        IssueAction::Stop { .. } => session.map(|s| (vec!["session".into(), "stop".into(), s.into()], ActWords::None)),
-    }
-}
-
 /// `nextSteps`: what the user can do with the issue, as words and commands.
 pub fn next_steps(item: &Issue) -> Vec<Next> {
     let n = item.number.to_string();
@@ -124,7 +114,7 @@ pub fn next_steps(item: &Issue) -> Vec<Next> {
         .iter()
         .filter_map(|a| {
             let label = t(&format!("shared.act.{}", a.act().as_str()), &[]);
-            let (run, words) = act_command(item, a, session)?;
+            let (run, words) = vibevalley_core::rules::act_command(item, a, session)?;
             if words == ActWords::Required {
                 let tail = if matches!(a, IssueAction::Move { .. }) {
                     vec!["--comment", "…"]

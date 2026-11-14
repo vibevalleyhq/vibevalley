@@ -1,4 +1,5 @@
 {
+  "about": "VibeValley's command line: one command is one operation of the server's, <resource> [<sub-resource>] <verb>",
   "flag": {
     "prompt": "Ask once and leave, without a conversation",
     "model": "The model",
@@ -450,15 +451,25 @@
         "cleanup": "Clean known remote files without repeating understanding",
         "previewCleanup": "Preview remote cleanup and local retention release without changing either"
       },
-      "image": { "create": "Create an image task without resubmitting the same request ID" },
+      "image": {
+        "create": "Create an image task without resubmitting the same request ID"
+      },
       "speech": {
         "create": "Create single-speaker speech and download it locally without repeating the same request ID",
         "resume": "Resume polling the same known speech task without resubmitting it"
       },
-      "dialogue": { "create": "Create a dialogue using the selected account's voices" },
-      "voiceDesign": { "create": "Design a synthetic voice preview without saving a reusable voice" },
-      "clone": { "create": "Clone an explicitly authorized local voice sample" },
-      "transcription": { "create": "Transcribe an approved audio input with optional speaker labels" },
+      "dialogue": {
+        "create": "Create a dialogue using the selected account's voices"
+      },
+      "voiceDesign": {
+        "create": "Design a synthetic voice preview without saving a reusable voice"
+      },
+      "clone": {
+        "create": "Clone an explicitly authorized local voice sample"
+      },
+      "transcription": {
+        "create": "Transcribe an approved audio input with optional speaker labels"
+      },
       "audio": {
         "resume": "Resume the same known audio task without submitting another generation",
         "previewCleanup": "Preview cleanup of known remote audio files without changing them",
@@ -474,7 +485,9 @@
       }
     },
     "provider": {
-      "voice": { "list": "Read one page of voices from the selected MOSS account without generating audio" },
+      "voice": {
+        "list": "Read one page of voices from the selected MOSS account without generating audio"
+      },
       "get": "Read provider connections and default uses with masked credentials",
       "update": "Save provider connections and default uses at the expected revision",
       "model": {

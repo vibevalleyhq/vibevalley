@@ -1,4 +1,4 @@
-// Embeds the server and shared dictionaries of packages/i18n/locales/<lang>/.
+// Embeds the server, command line and shared dictionaries of packages/i18n/locales/<lang>/.
 use std::fmt::Write;
 
 fn main() {
@@ -10,7 +10,7 @@ fn main() {
         for file in std::fs::read_dir(lang.path()).unwrap().flatten() {
             let path = file.path();
             let stem = path.file_stem().unwrap().to_string_lossy();
-            if path.extension().is_some_and(|e| e == "json") && (stem == "shared" || stem == "server" || stem.starts_with("server.")) {
+            if path.extension().is_some_and(|e| e == "json") && (stem == "shared" || stem == "cli" || stem == "server" || stem.starts_with("server.")) {
                 entries.push((
                     lang.file_name().to_string_lossy().into_owned(),
                     path.file_stem().unwrap().to_string_lossy().into_owned(),

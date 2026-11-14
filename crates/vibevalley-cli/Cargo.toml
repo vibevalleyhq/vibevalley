@@ -1,0 +1,26 @@
+[package]
+name = "vibevalley-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "vibevalley"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.6.7", features = ["string"] }
+jiff = "0.2.43"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+ureq = { version = "3.5.2", features = ["json"] }
+vibevalley-core = { path = "../vibevalley-core" }
+vibevalley-home = { path = "../vibevalley-home" }
+vibevalley-i18n = { path = "../vibevalley-i18n" }
+vibevalley-protocol = { path = "../vibevalley-protocol" }
+
+[dev-dependencies]
+tempfile = "3.27.0"
+vibevalley-server = { path = "../vibevalley-server" }
+vibevalley-oar = { path = "../vibevalley-oar" }
+vibevalley-http = { path = "../vibevalley-http" }

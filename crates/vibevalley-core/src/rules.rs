@@ -426,6 +426,22 @@ pub fn github_repository(input: &str) -> Option<(String, String)> {
     Some((name, url))
 }
 
+/// `actCommand`: the CLI command that does one of an issue's acts.
+pub fn act_command(
+    issue: &vibevalley_protocol::Issue,
+    a: &vibevalley_protocol::IssueAction,
+    session: Option<&str>,
+) -> Option<(Vec<String>, vibevalley_protocol::ActWords)> {
+    let n = issue.number.to_string();
+    match a {
+        vibevalley_protocol::IssueAction::Move { status, words, .. } => Some((vec!["issue".into(), "status".into(), n, status.as_str().into()], *words)),
+        vibevalley_protocol::IssueAction::Say { .. } => Some((vec!["issue".into(), "comment".into(), n], vibevalley_protocol::ActWords::Required)),
+        vibevalley_protocol::IssueAction::Stop { .. } => {
+            session.map(|s| (vec!["session".into(), "stop".into(), s.into()], vibevalley_protocol::ActWords::None))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

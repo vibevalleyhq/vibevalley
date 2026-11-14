@@ -33,6 +33,7 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 | R1 工具 | `modules/tool`：助手和帮工共用一套工具，每个工具一个参数结构体，宽松解析写一处（`tool::args`），按调用者（`Who`）分支；`/mcp` 与助手的循环都从它取；工具说明在 `assets/tools/`，以 Rust 为准，不再从 TS 生成；助手的语音、多人对话、音色设计、理解工具接到任务端点 |
 | R2 设置 | `settings.json` 一次读成 `Stored`，MOSS 账户是 `Providers`/`Connection`，钥匙是 `Secret`（打印只出提示）；`provider.rs` 与 `setting.rs` 不再传 `Value`。工单板存储改表、工具不再绕 hub 调本服务，并进 R4 |
 | R3 媒体 | `media/jobs.rs` 一个任务机：存储、准入（8 个）、按种类的槽位（图片 1、语音 8）、取消、重下、释放、重启接续写一次；图片与语音在上面，去掉 `OtherJobs`。多人对话、音色设计、克隆、转写、理解按 `Ask` 加一个变体即可，暂不做 |
+| R6 命令行（第一步） | `crates/vibevalley-cli`（二进制 `vibevalley`，clap builder，说明按农场语言取 `cli.*` 词典）：issue（含 `--watch`、`watch`）、channel、repo、agent、session、runtime、memory、cron、artifact、pkm、worker、doctor；失败一行 JSON、退出码同 TS；`crates/vibevalley-home` 收家目录约定；`act_command` 进 `vibevalley-core::rules`。Rust 集成测试 7 个过（含 TS 版整份跑时失败的 watch）。`app`、`auth`、`chat` 不搬：桌面版、远程登录随删，`chat` 日后在 Rust 上做 |
 | 对照 | web e2e 在 Rust 上 243 个过约 207 个（失败的是媒体其余种类、语音、手机/局域网，及 4 个在 TS 上同样失败的）；CLI 测试 22 个过 21 个 |
 
 ### 重构（按顺序）
@@ -78,7 +79,7 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 - **语音（声网 RTC）与外部聊天接入（微信、飞书、QQ）**：不在 TS 删除的闸里；先删，日后按需在 Rust 上重做。
 - **手机壳与「连接到本机」**：随 `apps/mobile` 删除，`lan.*` 与远程登录相关的 `user.*` 一并删除。
 - **媒体其余种类**：多人对话、音色设计、克隆、转写、理解暂不做（vendor 调用已有），要时在 `Ask` 里加。
-- **一个 CLI 测试**：`CLI watch returns for questions` 只在整份文件跑时多出一轮，暂不追。
+- **命令行的 `app`、`auth`、`chat`**：随桌面版、远程登录删；终端里和自研 agent 对话日后在 Rust 上做。
 
 ### 闸与删除
 
