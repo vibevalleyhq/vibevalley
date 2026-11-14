@@ -114,3 +114,17 @@ test("the quick switcher finds a note by its title and offers to search the note
   await fake.pump(app);
   await app.waitUntil(() => app.count("id:pkm-page") === 1);
 });
+
+test("a block dragged by its bullet onto the row above goes before it; the radar's inbox count jumps to the inbox", async () => {
+  const { app, fake } = await start("/pkm/rust-笔记");
+  expect(app.count("id:pkm-block")).toBe(2);
+  await app.dragAndHold("id:pkm-bullet >> nth=1", { x: 0, y: -30 });
+  expect(app.count("id:pkm-drop-before")).toBe(1);
+  await app.drop();
+  await app.waitUntil(() => applied(fake).some((o) => o.op === "move_to"));
+  const moved = applied(fake).find((o) => o.op === "move_to") as { op: string; at?: string };
+  expect(moved.at).toBe("before");
+  expect(app.count("id:pkm-drop-before")).toBe(0);
+  await app.press("id:pkm-radar-inbox");
+  expect(app.count("id:pkm-tier-inbox")).toBe(1);
+});

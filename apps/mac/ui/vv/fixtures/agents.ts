@@ -236,8 +236,8 @@ export const skills: Skill[] = [
 export const repos: RepoSummary[] = [
   { name: "vibevalley", path: "/Users/farmer/code/vibevalley", git: true, last: now - 3 * hour, maxSessions: 3, pullRequest: { available: true, reason: "" } },
   {
-    name: "vibevalley",
-    path: "/Users/farmer/code/vibevalley",
+    name: "site",
+    path: "/Users/farmer/code/site",
     git: true,
     last: now - 5 * day,
     maxSessions: 2,

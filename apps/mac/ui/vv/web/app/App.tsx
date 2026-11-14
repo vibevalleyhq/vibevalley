@@ -1,6 +1,5 @@
 // Ported from VibeValley apps/web/src/app/App.tsx: the same route table.
-// Pages not ported yet show their place and say so (NotYet); the farm, the
-// map and the memory tree are drawn by the GPUI app (docs/vibevalley-port.md
+// The farm, the map and the memory tree are drawn by the GPUI app (docs/vibevalley-port.md
 // § Architecture 5), so /farm asks the shell for them.
 import { Text, untracked, View, type JSX } from "nsh";
 import { z } from "zod";

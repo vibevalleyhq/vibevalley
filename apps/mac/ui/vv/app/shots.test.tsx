@@ -19,6 +19,11 @@ const shots: { name: string; route: string; scheme: "light" | "dark"; width: num
   { name: "notes-page-dark", route: "/pkm/vibevalley-原生移植", scheme: "dark", width: 1100 },
   { name: "notes-narrow", route: "/pkm/vibevalley-原生移植", scheme: "light", width: 600 },
   { name: "catalog-sounds-dark", route: "/catalog/sounds", scheme: "dark", width: 800 },
+  { name: "library-light", route: "/library", scheme: "light", width: 1400 },
+  { name: "library-dark", route: "/library", scheme: "dark", width: 1400 },
+  { name: "library-make-image", route: "/library?make=image", scheme: "light", width: 1400 },
+  { name: "library-make-speech", route: "/library?make=speech", scheme: "dark", width: 1400 },
+  { name: "library-make-audio", route: "/library?make=audio", scheme: "light", width: 1400 },
 ];
 
 for (const s of shots) {

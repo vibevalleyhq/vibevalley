@@ -1,8 +1,9 @@
 // Ported from VibeValley apps/web/src/features/channel/views/ChannelSidebar.tsx.
-// Not here: reordering channels by dragging a row onto another (HTML drag
-// and drop; nsh has pan gestures, to come with the board's drag); the
-// direct picker is nsh/base's Popover rather than an absolutely placed list.
-import { keymap, Scroll, signal, Text, untracked, View, type JSX } from "nsh";
+// A channel is reordered by dragging its row onto another as a pan gesture
+// (nsh has no HTML drag and drop): the rows are measured as the drag starts.
+// The direct picker is nsh/base's Popover rather than an absolutely placed
+// list.
+import { cleanup, keymap, PanResponder, Scroll, signal, Text, untracked, View, type JSX, type ViewRef } from "nsh";
 import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -73,7 +74,11 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
     router.navigate(chatPath(c));
     props.onPick();
   };
-  const row = (c: Channel) => <ChannelRow channel={c} here={c.id === props.channel?.id} unread={unreadUnder(chat(), c)} onClick={() => go(c)} />;
+  const act = createAct();
+  const reorder = createReorder((id, onto) => void act.run(() => api.channel.update({ id, before: onto.id, category: onto.category })));
+  const row = (c: Channel) => (
+    <ChannelRow channel={c} here={c.id === props.channel?.id} unread={unreadUnder(chat(), c)} onClick={() => go(c)} reorder={reorder} />
+  );
   return (
     <View accessibilityLabel={t("web.channel.side")} testID="channels-side" class="w-full flex-1 border-r border-line bg-side">
       <View class="h-16.5 shrink-0 flex-row items-center gap-2 border-b border-line px-5">
@@ -226,17 +231,82 @@ function Section(props: { title: string; item: string; count: number; action?: J
   );
 }
 
-function ChannelRow(props: { channel: Channel; here: boolean; unread: number; onClick?: () => void }) {
+/** A channel's row being dragged onto another: dropped there, it is placed before it, in its group. */
+function createReorder(place: (id: string, onto: Channel) => void) {
+  const dragged = signal<string | undefined>(undefined);
+  const over = signal<string | undefined>(undefined);
+  const rows = new Map<string, { ref: ViewRef; channel: () => Channel }>();
+  let rects: [Channel, { y: number; h: number }][] = [];
+  // The pointer moves on while the rows are measured: where it is by then is what counts.
+  let pointer = 0;
+  const takes = (c: Channel) => c.type === "channel" && !c.default;
+  const look = () => {
+    const id = dragged();
+    over.set(rects.find(([c, r]) => c.id !== id && takes(c) && pointer >= r.y && pointer <= r.y + r.h)?.[0].id);
+  };
+  return {
+    dragged,
+    over,
+    takes,
+    row: (id: string, ref: ViewRef, channel: () => Channel) => {
+      rows.set(id, { ref, channel });
+      cleanup(() => rows.get(id)?.ref === ref && rows.delete(id));
+    },
+    start: (id: string, y: number) => {
+      dragged.set(id);
+      pointer = y;
+      rects = [];
+      void Promise.all(
+        [...rows.values()].map(async (row) => {
+          const m = await row.ref.measure();
+          return m ? ([row.channel(), { y: m.pagePosition.y, h: m.bounds.size.height }] as [Channel, { y: number; h: number }]) : undefined;
+        }),
+      ).then((measured) => {
+        if (dragged() !== id) return;
+        rects = measured.filter((r) => r !== undefined);
+        look();
+      });
+    },
+    move: (y: number) => {
+      pointer = y;
+      look();
+    },
+    end: (dropped: boolean) => {
+      const id = dragged();
+      const onto = rects.find(([c]) => c.id === over())?.[0];
+      dragged.set(undefined);
+      over.set(undefined);
+      if (dropped && id !== undefined && onto) place(id, onto);
+    },
+  };
+}
+
+function ChannelRow(props: { channel: Channel; here: boolean; unread: number; onClick?: () => void; reorder: ReturnType<typeof createReorder> }) {
   const quiet = () => props.channel.notify === "none";
+  const movable = () => props.reorder.takes(props.channel);
+  const pan = PanResponder.create({
+    // A press opens the channel; only a move of a few points starts a drag.
+    onMoveShouldSetPanResponder: (_, g) => movable() && Math.abs(g.dx) + Math.abs(g.dy) > 4,
+    onPanResponderGrant: (_, g) => props.reorder.start(props.channel.id, g.y0),
+    onPanResponderMove: (_, g) => props.reorder.move(g.moveY),
+    onPanResponderRelease: () => props.reorder.end(true),
+    onPanResponderTerminate: () => props.reorder.end(false),
+  });
   return (
     <View
+      {...pan.panHandlers}
+      ref={(r) => props.reorder.row(props.channel.id, r, () => props.channel)}
+      tooltip={movable() ? <Bubble text={t("web.channel.manage.drag")} /> : undefined}
       role="button"
       testID={`channel-row-${props.channel.id}`}
       accessibilityLabel={channelName(props.channel)}
       accessibilityState={{ selected: props.here }}
       onPress={() => props.onClick?.()}
-      class={`flex-row items-center gap-2 rounded-md px-2.5 py-1 ${props.here ? "bg-selected" : "hover:bg-hover"}`}
+      class={`flex-row items-center gap-2 rounded-md px-2.5 py-1 ${props.here ? "bg-selected" : "hover:bg-hover"} ${props.reorder.dragged() === props.channel.id ? "opacity-40" : ""}`}
     >
+      <If when={props.reorder.over() === props.channel.id}>
+        <View testID="channel-drop-before" class="absolute inset-x-0 top-0 h-0.5 rounded-full bg-accent" style={{ pointerEvents: "none" }} />
+      </If>
       <Text class="text-sm text-faint">{markOf(props.channel)}</Text>
       <Text
         class={`min-w-0 flex-1 truncate text-sm ${props.here || props.unread > 0 ? "font-semibold" : ""} ${quiet() && !props.here ? "text-muted" : "text-ink"}`}

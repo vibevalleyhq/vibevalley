@@ -2040,6 +2040,9 @@ export const catalogs = {
       partialTranscript: "部分转写——并非完整结果。",
       savePartialTranscript: "将部分转写保存为 Artifact",
       downloadPartialTranscript: "下载部分转写",
+      chooseFile: "选一个音频文件",
+      copyTranscript: "复制转写",
+      copyPartialTranscript: "复制部分转写",
       usageAudioSeconds: "输入音频：{value} 秒",
       input: "音频文件",
       transcribe: "开始转写",
@@ -6679,6 +6682,9 @@ export const catalogs = {
       partialTranscript: "Partial transcript — not a completed result.",
       savePartialTranscript: "Save partial transcript as artifact",
       downloadPartialTranscript: "Download partial transcript",
+      chooseFile: "Choose an audio file",
+      copyTranscript: "Copy transcript",
+      copyPartialTranscript: "Copy partial transcript",
       usageAudioSeconds: "Input audio: {value} s",
       input: "Audio file",
       transcribe: "Start transcription",
@@ -11192,6 +11198,7 @@ export interface Messages {
   "web.audio.addTurn": undefined;
   "web.audio.check": undefined;
   "web.audio.chooseAccount": undefined;
+  "web.audio.chooseFile": undefined;
   "web.audio.chooseVoice": undefined;
   "web.audio.cleanup": undefined;
   "web.audio.cleanupAsk": undefined;
@@ -11201,6 +11208,8 @@ export interface Messages {
   "web.audio.cloneTitle": undefined;
   "web.audio.configure": undefined;
   "web.audio.consent": undefined;
+  "web.audio.copyPartialTranscript": undefined;
+  "web.audio.copyTranscript": undefined;
   "web.audio.designHint": undefined;
   "web.audio.designTitle": undefined;
   "web.audio.dialogue": undefined;

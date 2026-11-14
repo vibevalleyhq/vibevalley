@@ -5,8 +5,10 @@
 // the picked ones (selection.ts pickAction) as keymap bindings held while
 // blocks are picked, ⌘C/⌘X copying them as an outline through nsh's
 // Clipboard. ?b= scrolls to its block (the row's reveal) and lights it.
-// Not ported: dragging rows (see OutlineEditor's header), the phone toolbar.
-import { Clipboard, effect, keymap, Text, untracked, View } from "nsh";
+// Rows are dragged by their bullet: where every row is is measured as the
+// drag starts, and the row under the pointer says where the blocks would
+// land (selection.ts dropAt, dropOps). Not ported: the phone toolbar.
+import { Clipboard, effect, keymap, Text, untracked, View, type ViewRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { PkmBlock, PkmBlockOp, PkmPageSummary, PkmPageView } from "@vibevalley/protocol";
@@ -18,12 +20,12 @@ import { toast } from "../../ui/toasts";
 import { mix } from "../../ui/tone";
 import type { Around, EditAction, Focus, Keys } from "./editing";
 import { hasChildren, visibleBlocks } from "./outline";
-import { Editor, newId, Row } from "./OutlineEditor";
-import { outlineText, pickAction, type Picked, pickedIds, stepped } from "./selection";
+import { Editor, indentPx, newId, Row } from "./OutlineEditor";
+import { type DropAt, dropAt, dropOps, outlineText, pickAction, type Picked, pickedIds, stepped } from "./selection";
 import { pkmPageQuery, refreshVault } from "./vault";
 import { PageWriter, pageServer } from "./writer";
 
-type Reveal = { reveal: (o?: { vertical?: "start" | "center" | "end" | "nearest" }) => void };
+type Rect = { x: number; y: number; w: number; h: number };
 
 const keys = (key: string, mods: Partial<Omit<Keys, "key">> = {}): Keys => ({ key, shiftKey: false, altKey: false, metaKey: false, ctrlKey: false, ...mods });
 
@@ -45,7 +47,7 @@ export function Outline(props: { view: PkmPageView; pages: readonly PkmPageSumma
   const [picked, setPicked] = createSignal<Picked>();
   const [lit, setLit] = createSignal<string>();
   const unlight = useTimeout();
-  const rows = new Map<string, Reveal>();
+  const rows = new Map<string, ViewRef>();
   const editing = () => focus()?.block;
   createEffect(
     () => editing() !== undefined,
@@ -170,6 +172,49 @@ export function Outline(props: { view: PkmPageView; pages: readonly PkmPageSumma
       { when: "notEditing" },
     );
   });
+  const [dragged, setDragged] = createSignal<readonly string[]>([]);
+  const [dropping, setDropping] = createSignal<{ readonly target: string; readonly at: DropAt }>();
+  let rects: [PkmBlock, Rect][] = [];
+  const drag = (id: string) => ({
+    start: (x: number, y: number) => {
+      const ids = untracked(pickedNow).has(id) ? [...untracked(pickedNow)] : [id];
+      setFocus(undefined);
+      setDragged(ids);
+      pointer = { x, y };
+      rects = [];
+      void Promise.all(
+        untracked(shown).map(async (b) => {
+          const m = await rows.get(b.id)?.measure();
+          return m ? ([b, { x: m.pagePosition.x, y: m.pagePosition.y, w: m.bounds.size.width, h: m.bounds.size.height }] as [PkmBlock, Rect]) : undefined;
+        }),
+      ).then((measured) => {
+        if (untracked(dragged) !== ids) return;
+        rects = measured.filter((r) => r !== undefined);
+        over();
+      });
+    },
+    move: (x: number, y: number) => {
+      pointer = { x, y };
+      over();
+    },
+    end: (dropped: boolean) => {
+      const d = untracked(dropping);
+      const ids = untracked(dragged);
+      setDragged([]);
+      setDropping(undefined);
+      if (dropped && d) run(dropOps(blocks(), ids, d.target, d.at));
+    },
+  });
+  // The pointer moves on while the rows are measured: where it is by then is what counts.
+  let pointer = { x: 0, y: 0 };
+  const over = () => {
+    const { x, y } = pointer;
+    const hit = rects.find(([, r]) => y >= r.y && y <= r.y + r.h);
+    if (!hit) return setDropping(undefined);
+    const [row, box] = hit;
+    const at = dropAt((y - box.y) / box.h, x - box.x - row.depth * indentPx - indentPx);
+    setDropping(dropOps(blocks(), untracked(dragged), row.id, at).length > 0 ? { target: row.id, at } : undefined);
+  };
   // The last empty block is written in, so that a click there twice does not leave empty ones behind.
   const writeOn = () => {
     const end = shown().at(-1);
@@ -217,6 +262,9 @@ export function Outline(props: { view: PkmPageView; pages: readonly PkmPageSumma
             onOpen={(at, shift) => open(b().id, at, shift)}
             onMarker={(marker) => run([marker ? { op: "set_marker", block: b().id, marker } : { op: "set_marker", block: b().id }])}
             onRef={(r) => (r ? rows.set(b().id, r) : rows.delete(b().id))}
+            dropping={dropping()?.target === b().id ? dropping()?.at : undefined}
+            dragged={dragged().includes(b().id)}
+            drag={drag(b().id)}
           >
             <Editor
               block={b()}

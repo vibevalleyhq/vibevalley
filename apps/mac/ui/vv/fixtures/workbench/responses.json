@@ -7,7 +7,7 @@
         "title": "写一句话就能起草工单",
         "priority": "medium",
         "status": "backlog",
-        "createdAt": 1794529095364,
+        "createdAt": 1794599805614,
         "assignments": [],
         "mandate": {
           "strength": "explicit",
@@ -37,13 +37,13 @@
         "title": "看板拖拽的手感",
         "priority": "high",
         "status": "todo",
-        "createdAt": 1794526875364,
+        "createdAt": 1794597585614,
         "assignments": [
           {
             "id": "a22",
             "issue": "i22",
             "agent": "laozhou",
-            "assignedAt": 1794526875364,
+            "assignedAt": 1794597585614,
             "executions": []
           }
         ],
@@ -65,7 +65,7 @@
           "acts": []
         },
         "repo": "vibevalley",
-        "queuedAt": 1794575415364
+        "queuedAt": 1794646125614
       },
       "sessions": [],
       "missingSessions": []
@@ -77,7 +77,7 @@
         "title": "灵动岛的动画",
         "priority": "low",
         "status": "todo",
-        "createdAt": 1794524655364,
+        "createdAt": 1794595365614,
         "assignments": [],
         "mandate": {
           "strength": "explicit",
@@ -107,13 +107,13 @@
         "title": "首页的加载条",
         "priority": "medium",
         "status": "todo",
-        "createdAt": 1794522435364,
+        "createdAt": 1794593145614,
         "assignments": [
           {
             "id": "a24",
             "issue": "i24",
             "agent": "xiaolin",
-            "assignedAt": 1794522435364,
+            "assignedAt": 1794593145614,
             "executions": []
           }
         ],
@@ -146,18 +146,18 @@
         "title": "修好登录",
         "priority": "urgent",
         "status": "in_progress",
-        "createdAt": 1794535755364,
+        "createdAt": 1794606465614,
         "assignments": [
           {
             "id": "a18",
             "issue": "i18",
             "agent": "laozhou",
-            "assignedAt": 1794535755364,
+            "assignedAt": 1794606465614,
             "executions": [
               {
                 "kind": "worker",
                 "session": "w1",
-                "startedAt": 1794574515364
+                "startedAt": 1794645225614
               }
             ]
           }
@@ -189,11 +189,11 @@
           "agent": "laozhou",
           "runtime": "claude",
           "brief": "",
-          "hiredAt": 1794573195364,
+          "hiredAt": 1794643905614,
           "runs": 2,
           "phase": {
             "_tag": "working",
-            "since": 1794575535364,
+            "since": 1794646245614,
             "doing": {
               "action": "edit_file",
               "label": "改 session.ts",
@@ -217,18 +217,18 @@
         "title": "补齐看板的测试",
         "priority": "medium",
         "status": "in_review",
-        "createdAt": 1794537975364,
+        "createdAt": 1794608685614,
         "assignments": [
           {
             "id": "a17",
             "issue": "i17",
             "agent": "xiaolin",
-            "assignedAt": 1794537975364,
+            "assignedAt": 1794608685614,
             "executions": [
               {
                 "kind": "worker",
                 "session": "w2",
-                "startedAt": 1794574515364
+                "startedAt": 1794645225614
               }
             ]
           }
@@ -260,7 +260,7 @@
           "agent": "xiaolin",
           "runtime": "claude",
           "brief": "",
-          "hiredAt": 1794573195364,
+          "hiredAt": 1794643905614,
           "runs": 2,
           "phase": {
             "_tag": "resting"
@@ -270,7 +270,7 @@
           "lastRun": {
             "outcome": "completed",
             "summary": "登录过期回到登录页，加了两条测试。",
-            "at": 1794575235364
+            "at": 1794645945614
           }
         }
       ],
@@ -283,18 +283,18 @@
         "title": "设置按用途分组",
         "priority": "medium",
         "status": "done",
-        "createdAt": 1794549075364,
+        "createdAt": 1794619785614,
         "assignments": [
           {
             "id": "a12",
             "issue": "i12",
             "agent": "laozhou",
-            "assignedAt": 1794549075364,
+            "assignedAt": 1794619785614,
             "executions": [
               {
                 "kind": "worker",
                 "session": "w3",
-                "startedAt": 1794574515364
+                "startedAt": 1794645225614
               }
             ]
           }
@@ -317,7 +317,7 @@
           "acts": []
         },
         "repo": "vibevalley",
-        "closedAt": 1794568515364,
+        "closedAt": 1794639225614,
         "delivered": "merged"
       },
       "sessions": [
@@ -328,7 +328,7 @@
           "agent": "laozhou",
           "runtime": "claude",
           "brief": "",
-          "hiredAt": 1794557715364,
+          "hiredAt": 1794628425614,
           "runs": 2,
           "phase": {
             "_tag": "done"
@@ -565,7 +565,7 @@
       "name": "vibevalley",
       "path": "/Users/farmer/code/vibevalley",
       "git": true,
-      "last": 1794564915341,
+      "last": 1794635625614,
       "maxSessions": 3,
       "pullRequest": {
         "available": true,
@@ -573,10 +573,10 @@
       }
     },
     {
-      "name": "vibevalley",
-      "path": "/Users/farmer/code/vibevalley",
+      "name": "site",
+      "path": "/Users/farmer/code/site",
       "git": true,
-      "last": 1794143715341,
+      "last": 1794214425614,
       "maxSessions": 2,
       "pullRequest": {
         "available": false,
@@ -636,12 +636,12 @@
           {
             "label": "5 小时",
             "usedPercent": 38,
-            "resetsAt": 1794582915341
+            "resetsAt": 1794653625614
           },
           {
             "label": "本周",
             "usedPercent": 61,
-            "resetsAt": 1794755715341
+            "resetsAt": 1794826425614
           }
         ]
       },
@@ -688,7 +688,7 @@
         "defaultEffort": "medium",
         "env": {}
       },
-      "checkedAt": 1794575595341,
+      "checkedAt": 1794646305614,
       "id": "claude",
       "preset": {
         "id": "claude",
@@ -742,7 +742,7 @@
           {
             "label": "5 小时",
             "usedPercent": 94,
-            "resetsAt": 1794576915341
+            "resetsAt": 1794647625614
           }
         ]
       },
@@ -763,7 +763,7 @@
         "defaultEffort": "",
         "env": {}
       },
-      "checkedAt": 1794575595341,
+      "checkedAt": 1794646305614,
       "id": "codex",
       "preset": {
         "id": "codex",
@@ -809,7 +809,7 @@
         "defaultEffort": "",
         "env": {}
       },
-      "checkedAt": 1794575595341,
+      "checkedAt": 1794646305614,
       "id": "opencode",
       "preset": {
         "id": "opencode",
@@ -865,7 +865,7 @@
         "env": {},
         "dailyBudget": 5
       },
-      "checkedAt": 1794575595341,
+      "checkedAt": 1794646305614,
       "id": "vibevalley",
       "preset": {
         "id": "vibevalley",
@@ -897,12 +897,12 @@
       {
         "hash": "a1b2c3d",
         "subject": "Send an expired session back to the sign-in page",
-        "at": 1794575175364
+        "at": 1794645885614
       },
       {
         "hash": "e4f5a6b",
         "subject": "Test the expiry on both sides of the boundary",
-        "at": 1794575475364
+        "at": 1794646185614
       }
     ],
     "files": [
@@ -930,24 +930,24 @@
   "issue.timeline.get": {
     "milestones": [
       {
-        "at": 1794575355364,
+        "at": 1794646065614,
         "kind": "reported",
         "who": "老周",
         "text": "过期回到登录页，登录页说明原因，加了两条测试。"
       },
       {
-        "at": 1794575175364,
+        "at": 1794645885614,
         "kind": "told",
         "text": "再补一条跨过期限的测试。"
       },
       {
-        "at": 1794574515364,
+        "at": 1794645225614,
         "kind": "started",
         "who": "老周",
         "text": "开始做了"
       },
       {
-        "at": 1794573315364,
+        "at": 1794644025614,
         "kind": "opened",
         "text": "写下这张工单"
       }
@@ -965,8 +965,8 @@
         "kind": "issue"
       },
       "heard": [],
-      "startedAt": 1794574515364,
-      "endedAt": 1794574875364,
+      "startedAt": 1794645225614,
+      "endedAt": 1794645585614,
       "outcome": "completed",
       "summary": "过期回到登录页，加了两条测试。"
     },
@@ -978,8 +978,8 @@
         "message": "再补一条跨过期限的测试。"
       },
       "heard": ["再补一条跨过期限的测试。"],
-      "startedAt": 1794575175364,
-      "endedAt": 1794575355364,
+      "startedAt": 1794645885614,
+      "endedAt": 1794646065614,
       "outcome": "completed",
       "summary": "补了跨过期限的测试。"
     }
@@ -989,7 +989,7 @@
     {
       "seq": 1,
       "revision": 1,
-      "time": 1794575175364,
+      "time": 1794645885615,
       "type": "run/start",
       "text": "",
       "run": "run-1"
@@ -997,7 +997,7 @@
     {
       "seq": 2,
       "revision": 1,
-      "time": 1794575175364,
+      "time": 1794645885615,
       "type": "user/message",
       "text": "修好登录过期：过期就回到登录页，说清楚为什么。",
       "run": "run-1"
@@ -1005,7 +1005,7 @@
     {
       "seq": 3,
       "revision": 1,
-      "time": 1794575176364,
+      "time": 1794645886615,
       "type": "memory/recalled",
       "text": "这个仓库的测试用 vp test；会话的有效期在 session.ts。",
       "run": "run-1"
@@ -1013,7 +1013,7 @@
     {
       "seq": 4,
       "revision": 1,
-      "time": 1794575177364,
+      "time": 1794645887615,
       "type": "assistant/thinking",
       "text": "先看 session.ts 怎么判断过期，再找登录页。",
       "run": "run-1"
@@ -1021,7 +1021,7 @@
     {
       "seq": 5,
       "revision": 1,
-      "time": 1794575179364,
+      "time": 1794645889615,
       "type": "tool/call",
       "text": "",
       "action": "read_file",
@@ -1033,7 +1033,7 @@
     {
       "seq": 6,
       "revision": 1,
-      "time": 1794575180364,
+      "time": 1794645890615,
       "type": "tool/result",
       "text": "",
       "call": 5,
@@ -1044,7 +1044,7 @@
     {
       "seq": 7,
       "revision": 1,
-      "time": 1794575183364,
+      "time": 1794645893615,
       "type": "tool/call",
       "text": "",
       "action": "edit_file",
@@ -1056,7 +1056,7 @@
     {
       "seq": 8,
       "revision": 1,
-      "time": 1794575185364,
+      "time": 1794645895615,
       "type": "tool/result",
       "text": "",
       "call": 7,
@@ -1067,7 +1067,7 @@
     {
       "seq": 9,
       "revision": 1,
-      "time": 1794575189364,
+      "time": 1794645899615,
       "type": "tool/call",
       "text": "",
       "action": "run_command",
@@ -1079,7 +1079,7 @@
     {
       "seq": 10,
       "revision": 1,
-      "time": 1794575210364,
+      "time": 1794645920615,
       "type": "tool/result",
       "text": "",
       "call": 9,
@@ -1090,7 +1090,7 @@
     {
       "seq": 11,
       "revision": 1,
-      "time": 1794575212364,
+      "time": 1794645922615,
       "type": "llm/retry",
       "text": "模型忙，2 秒后再试（第 1 次）",
       "run": "run-1"
@@ -1098,7 +1098,7 @@
     {
       "seq": 12,
       "revision": 1,
-      "time": 1794575217364,
+      "time": 1794645927615,
       "type": "tool/call",
       "text": "",
       "action": "edit_file",
@@ -1110,7 +1110,7 @@
     {
       "seq": 13,
       "revision": 1,
-      "time": 1794575218364,
+      "time": 1794645928615,
       "type": "tool/result",
       "text": "",
       "call": 12,
@@ -1121,7 +1121,7 @@
     {
       "seq": 14,
       "revision": 1,
-      "time": 1794575220364,
+      "time": 1794645930615,
       "type": "tool/call",
       "text": "",
       "action": "run_command",
@@ -1133,7 +1133,7 @@
     {
       "seq": 15,
       "revision": 1,
-      "time": 1794575238364,
+      "time": 1794645948615,
       "type": "tool/result",
       "text": "",
       "call": 14,
@@ -1144,7 +1144,7 @@
     {
       "seq": 16,
       "revision": 1,
-      "time": 1794575239364,
+      "time": 1794645949615,
       "type": "llm/usage",
       "text": "",
       "tokens": {
@@ -1157,7 +1157,7 @@
     {
       "seq": 17,
       "revision": 1,
-      "time": 1794575241364,
+      "time": 1794645951615,
       "type": "assistant/message",
       "text": "改好了：过期回到登录页，登录页说「登录过期了」。加了两条测试，都过了。",
       "run": "run-1"
@@ -1165,7 +1165,7 @@
     {
       "seq": 18,
       "revision": 1,
-      "time": 1794575241364,
+      "time": 1794645951615,
       "type": "run/end",
       "text": "",
       "run": "run-1"
@@ -1173,7 +1173,7 @@
     {
       "seq": 19,
       "revision": 1,
-      "time": 1794575475364,
+      "time": 1794646185615,
       "type": "run/start",
       "text": "",
       "run": "run-2"
@@ -1181,7 +1181,7 @@
     {
       "seq": 20,
       "revision": 1,
-      "time": 1794575475364,
+      "time": 1794646185615,
       "type": "user/message",
       "text": "再补一条跨过期限的测试。",
       "run": "run-2"
@@ -1189,7 +1189,7 @@
     {
       "seq": 21,
       "revision": 1,
-      "time": 1794575477364,
+      "time": 1794646187615,
       "type": "assistant/thinking",
       "text": "在过期前一秒和后一秒各测一次。",
       "run": "run-2"
@@ -1197,7 +1197,7 @@
     {
       "seq": 22,
       "revision": 1,
-      "time": 1794575481364,
+      "time": 1794646191615,
       "type": "tool/call",
       "text": "",
       "action": "run_command",
@@ -1215,11 +1215,11 @@
       "agent": "laozhou",
       "runtime": "claude",
       "brief": "设置页按用途分组",
-      "hiredAt": 1794573195364,
+      "hiredAt": 1794643905614,
       "runs": 2,
       "phase": {
         "_tag": "working",
-        "since": 1794575475364,
+        "since": 1794646185614,
         "doing": {
           "action": "edit_file",
           "label": "改 session.ts",
@@ -1239,11 +1239,11 @@
       "agent": "laozhou",
       "runtime": "claude",
       "brief": "修好登录过期",
-      "hiredAt": 1794573195364,
+      "hiredAt": 1794643905614,
       "runs": 3,
       "phase": {
         "_tag": "closed",
-        "at": 1794575415364,
+        "at": 1794646125614,
         "closed": "merged"
       },
       "refining": false,
@@ -1254,7 +1254,7 @@
       "lastRun": {
         "outcome": "completed",
         "summary": "过期回到登录页，登录页说明原因，加了两条测试。",
-        "at": 1794575355364
+        "at": 1794646065614
       }
     }
   ],
@@ -1297,7 +1297,7 @@
   ],
   "repo.language.list": {
     "repo": "vibevalley",
-    "at": 1794575115341,
+    "at": 1794645825614,
     "languages": [
       {
         "name": "TypeScript",
@@ -1345,967 +1345,955 @@
   },
   "repo.activity.get": {
     "repo": "vibevalley",
-    "at": 1794575115341,
+    "at": 1794645825614,
     "days": [
       {
         "day": "2026-11-13",
-        "commits": 3
+        "commits": 1
       },
       {
         "day": "2026-11-12",
-        "commits": 1
+        "commits": 6
       },
       {
         "day": "2026-11-11",
-        "commits": 6
-      },
-      {
-        "day": "2026-11-10",
         "commits": 4
       },
       {
-        "day": "2026-11-08",
-        "commits": 2
-      },
-      {
-        "day": "2026-11-06",
-        "commits": 8
-      },
-      {
-        "day": "2026-11-05",
-        "commits": 4
-      },
-      {
-        "day": "2026-11-04",
-        "commits": 2
-      },
-      {
-        "day": "2026-11-03",
-        "commits": 7
-      },
-      {
-        "day": "2026-11-02",
-        "commits": 3
-      },
-      {
-        "day": "2026-11-01",
-        "commits": 7
-      },
-      {
-        "day": "2026-10-31",
-        "commits": 3
-      },
-      {
-        "day": "2026-10-30",
-        "commits": 4
-      },
-      {
-        "day": "2026-10-28",
+        "day": "2026-11-09",
         "commits": 5
       },
       {
-        "day": "2026-10-27",
-        "commits": 3
+        "day": "2026-11-07",
+        "commits": 5
       },
       {
-        "day": "2026-10-26",
-        "commits": 8
+        "day": "2026-11-06",
+        "commits": 4
       },
       {
-        "day": "2026-10-25",
-        "commits": 1
+        "day": "2026-11-05",
+        "commits": 2
       },
       {
-        "day": "2026-10-24",
-        "commits": 8
-      },
-      {
-        "day": "2026-10-23",
+        "day": "2026-11-04",
         "commits": 7
       },
       {
-        "day": "2026-10-22",
+        "day": "2026-11-03",
         "commits": 3
       },
       {
-        "day": "2026-10-21",
+        "day": "2026-11-02",
         "commits": 1
       },
       {
-        "day": "2026-10-20",
+        "day": "2026-11-01",
+        "commits": 3
+      },
+      {
+        "day": "2026-10-31",
+        "commits": 1
+      },
+      {
+        "day": "2026-10-29",
+        "commits": 5
+      },
+      {
+        "day": "2026-10-28",
+        "commits": 3
+      },
+      {
+        "day": "2026-10-27",
+        "commits": 8
+      },
+      {
+        "day": "2026-10-26",
+        "commits": 4
+      },
+      {
+        "day": "2026-10-25",
+        "commits": 8
+      },
+      {
+        "day": "2026-10-24",
+        "commits": 4
+      },
+      {
+        "day": "2026-10-23",
+        "commits": 3
+      },
+      {
+        "day": "2026-10-22",
+        "commits": 1
+      },
+      {
+        "day": "2026-10-21",
         "commits": 6
       },
       {
-        "day": "2026-10-19",
+        "day": "2026-10-20",
         "commits": 4
       },
       {
         "day": "2026-10-18",
-        "commits": 6
-      },
-      {
-        "day": "2026-10-17",
         "commits": 2
       },
       {
         "day": "2026-10-16",
-        "commits": 3
-      },
-      {
-        "day": "2026-10-15",
         "commits": 8
       },
       {
-        "day": "2026-10-14",
+        "day": "2026-10-15",
         "commits": 4
       },
       {
-        "day": "2026-10-13",
+        "day": "2026-10-14",
         "commits": 2
       },
       {
+        "day": "2026-10-13",
+        "commits": 7
+      },
+      {
         "day": "2026-10-12",
+        "commits": 3
+      },
+      {
+        "day": "2026-10-11",
         "commits": 7
       },
       {
         "day": "2026-10-10",
-        "commits": 7
+        "commits": 3
       },
       {
         "day": "2026-10-09",
-        "commits": 6
+        "commits": 4
       },
       {
-        "day": "2026-10-08",
-        "commits": 4
+        "day": "2026-10-07",
+        "commits": 5
       },
       {
         "day": "2026-10-06",
-        "commits": 5
+        "commits": 3
       },
       {
         "day": "2026-10-05",
-        "commits": 3
-      },
-      {
-        "day": "2026-10-04",
-        "commits": 5
-      },
-      {
-        "day": "2026-10-03",
-        "commits": 1
-      },
-      {
-        "day": "2026-10-02",
-        "commits": 2
-      },
-      {
-        "day": "2026-10-01",
-        "commits": 7
-      },
-      {
-        "day": "2026-09-30",
-        "commits": 3
-      },
-      {
-        "day": "2026-09-29",
-        "commits": 1
-      },
-      {
-        "day": "2026-09-28",
-        "commits": 6
-      },
-      {
-        "day": "2026-09-27",
-        "commits": 1
-      },
-      {
-        "day": "2026-09-26",
-        "commits": 6
-      },
-      {
-        "day": "2026-09-25",
-        "commits": 5
-      },
-      {
-        "day": "2026-09-24",
-        "commits": 3
-      },
-      {
-        "day": "2026-09-23",
         "commits": 8
       },
       {
-        "day": "2026-09-22",
-        "commits": 4
-      },
-      {
-        "day": "2026-09-21",
-        "commits": 2
-      },
-      {
-        "day": "2026-09-20",
-        "commits": 4
-      },
-      {
-        "day": "2026-09-18",
+        "day": "2026-10-04",
         "commits": 1
       },
       {
-        "day": "2026-09-17",
+        "day": "2026-10-03",
+        "commits": 8
+      },
+      {
+        "day": "2026-10-02",
+        "commits": 7
+      },
+      {
+        "day": "2026-10-01",
+        "commits": 3
+      },
+      {
+        "day": "2026-09-30",
+        "commits": 1
+      },
+      {
+        "day": "2026-09-29",
         "commits": 6
       },
       {
-        "day": "2026-09-16",
+        "day": "2026-09-28",
         "commits": 4
       },
       {
+        "day": "2026-09-27",
+        "commits": 6
+      },
+      {
+        "day": "2026-09-26",
+        "commits": 2
+      },
+      {
+        "day": "2026-09-25",
+        "commits": 3
+      },
+      {
+        "day": "2026-09-24",
+        "commits": 8
+      },
+      {
+        "day": "2026-09-23",
+        "commits": 4
+      },
+      {
+        "day": "2026-09-22",
+        "commits": 2
+      },
+      {
+        "day": "2026-09-21",
+        "commits": 7
+      },
+      {
+        "day": "2026-09-19",
+        "commits": 7
+      },
+      {
+        "day": "2026-09-18",
+        "commits": 6
+      },
+      {
+        "day": "2026-09-17",
+        "commits": 4
+      },
+      {
+        "day": "2026-09-15",
+        "commits": 5
+      },
+      {
         "day": "2026-09-14",
+        "commits": 3
+      },
+      {
+        "day": "2026-09-13",
         "commits": 5
       },
       {
         "day": "2026-09-12",
-        "commits": 5
+        "commits": 1
       },
       {
         "day": "2026-09-11",
-        "commits": 4
-      },
-      {
-        "day": "2026-09-10",
         "commits": 2
       },
       {
-        "day": "2026-09-09",
+        "day": "2026-09-10",
         "commits": 7
       },
       {
-        "day": "2026-09-08",
+        "day": "2026-09-09",
         "commits": 3
+      },
+      {
+        "day": "2026-09-08",
+        "commits": 1
       },
       {
         "day": "2026-09-07",
-        "commits": 1
+        "commits": 6
       },
       {
         "day": "2026-09-06",
-        "commits": 3
-      },
-      {
-        "day": "2026-09-05",
         "commits": 1
       },
       {
-        "day": "2026-09-03",
+        "day": "2026-09-05",
+        "commits": 6
+      },
+      {
+        "day": "2026-09-04",
         "commits": 5
       },
       {
-        "day": "2026-09-02",
+        "day": "2026-09-03",
         "commits": 3
       },
       {
-        "day": "2026-09-01",
+        "day": "2026-09-02",
         "commits": 8
       },
       {
-        "day": "2026-08-31",
+        "day": "2026-09-01",
         "commits": 4
       },
       {
-        "day": "2026-08-30",
-        "commits": 8
+        "day": "2026-08-31",
+        "commits": 2
       },
       {
-        "day": "2026-08-29",
+        "day": "2026-08-30",
         "commits": 4
       },
       {
         "day": "2026-08-28",
-        "commits": 3
+        "commits": 1
       },
       {
         "day": "2026-08-27",
-        "commits": 1
+        "commits": 6
       },
       {
         "day": "2026-08-26",
-        "commits": 6
-      },
-      {
-        "day": "2026-08-25",
         "commits": 4
       },
       {
-        "day": "2026-08-23",
-        "commits": 2
-      },
-      {
-        "day": "2026-08-21",
-        "commits": 8
-      },
-      {
-        "day": "2026-08-20",
-        "commits": 4
-      },
-      {
-        "day": "2026-08-19",
-        "commits": 2
-      },
-      {
-        "day": "2026-08-18",
-        "commits": 7
-      },
-      {
-        "day": "2026-08-17",
-        "commits": 3
-      },
-      {
-        "day": "2026-08-16",
-        "commits": 7
-      },
-      {
-        "day": "2026-08-15",
-        "commits": 3
-      },
-      {
-        "day": "2026-08-14",
-        "commits": 4
-      },
-      {
-        "day": "2026-08-12",
+        "day": "2026-08-24",
         "commits": 5
       },
       {
-        "day": "2026-08-11",
-        "commits": 3
+        "day": "2026-08-22",
+        "commits": 5
       },
       {
-        "day": "2026-08-10",
-        "commits": 8
+        "day": "2026-08-21",
+        "commits": 4
       },
       {
-        "day": "2026-08-09",
-        "commits": 1
+        "day": "2026-08-20",
+        "commits": 2
       },
       {
-        "day": "2026-08-08",
-        "commits": 8
-      },
-      {
-        "day": "2026-08-07",
+        "day": "2026-08-19",
         "commits": 7
       },
       {
-        "day": "2026-08-06",
+        "day": "2026-08-18",
         "commits": 3
       },
       {
-        "day": "2026-08-05",
+        "day": "2026-08-17",
         "commits": 1
       },
       {
-        "day": "2026-08-04",
+        "day": "2026-08-16",
+        "commits": 3
+      },
+      {
+        "day": "2026-08-15",
+        "commits": 1
+      },
+      {
+        "day": "2026-08-13",
+        "commits": 5
+      },
+      {
+        "day": "2026-08-12",
+        "commits": 3
+      },
+      {
+        "day": "2026-08-11",
+        "commits": 8
+      },
+      {
+        "day": "2026-08-10",
+        "commits": 4
+      },
+      {
+        "day": "2026-08-09",
+        "commits": 8
+      },
+      {
+        "day": "2026-08-08",
+        "commits": 4
+      },
+      {
+        "day": "2026-08-07",
+        "commits": 3
+      },
+      {
+        "day": "2026-08-06",
+        "commits": 1
+      },
+      {
+        "day": "2026-08-05",
         "commits": 6
       },
       {
-        "day": "2026-08-03",
+        "day": "2026-08-04",
         "commits": 4
       },
       {
         "day": "2026-08-02",
-        "commits": 6
-      },
-      {
-        "day": "2026-08-01",
         "commits": 2
       },
       {
         "day": "2026-07-31",
-        "commits": 3
-      },
-      {
-        "day": "2026-07-30",
         "commits": 8
       },
       {
-        "day": "2026-07-29",
+        "day": "2026-07-30",
         "commits": 4
       },
       {
-        "day": "2026-07-28",
+        "day": "2026-07-29",
         "commits": 2
       },
       {
+        "day": "2026-07-28",
+        "commits": 7
+      },
+      {
         "day": "2026-07-27",
+        "commits": 3
+      },
+      {
+        "day": "2026-07-26",
         "commits": 7
       },
       {
         "day": "2026-07-25",
-        "commits": 7
-      },
-      {
-        "day": "2026-07-24",
-        "commits": 6
-      },
-      {
-        "day": "2026-07-23",
-        "commits": 4
-      },
-      {
-        "day": "2026-07-21",
-        "commits": 5
-      },
-      {
-        "day": "2026-07-20",
         "commits": 3
       },
       {
-        "day": "2026-07-19",
-        "commits": 5
-      },
-      {
-        "day": "2026-07-18",
-        "commits": 1
-      },
-      {
-        "day": "2026-07-17",
-        "commits": 2
-      },
-      {
-        "day": "2026-07-16",
-        "commits": 7
-      },
-      {
-        "day": "2026-06-16",
-        "commits": 8
-      },
-      {
-        "day": "2026-06-15",
+        "day": "2026-07-24",
         "commits": 4
       },
       {
-        "day": "2026-06-14",
+        "day": "2026-07-22",
+        "commits": 5
+      },
+      {
+        "day": "2026-07-21",
+        "commits": 3
+      },
+      {
+        "day": "2026-07-20",
         "commits": 8
       },
       {
-        "day": "2026-06-13",
+        "day": "2026-07-19",
+        "commits": 1
+      },
+      {
+        "day": "2026-07-18",
+        "commits": 8
+      },
+      {
+        "day": "2026-07-17",
+        "commits": 7
+      },
+      {
+        "day": "2026-06-17",
+        "commits": 8
+      },
+      {
+        "day": "2026-06-16",
+        "commits": 4
+      },
+      {
+        "day": "2026-06-15",
+        "commits": 2
+      },
+      {
+        "day": "2026-06-14",
         "commits": 4
       },
       {
         "day": "2026-06-12",
-        "commits": 3
+        "commits": 1
       },
       {
         "day": "2026-06-11",
-        "commits": 1
+        "commits": 6
       },
       {
         "day": "2026-06-10",
-        "commits": 6
-      },
-      {
-        "day": "2026-06-09",
         "commits": 4
       },
       {
-        "day": "2026-06-07",
-        "commits": 2
-      },
-      {
-        "day": "2026-06-05",
-        "commits": 8
-      },
-      {
-        "day": "2026-06-04",
-        "commits": 4
-      },
-      {
-        "day": "2026-06-03",
-        "commits": 2
-      },
-      {
-        "day": "2026-06-02",
-        "commits": 7
-      },
-      {
-        "day": "2026-06-01",
-        "commits": 3
-      },
-      {
-        "day": "2026-05-31",
-        "commits": 7
-      },
-      {
-        "day": "2026-05-30",
-        "commits": 3
-      },
-      {
-        "day": "2026-05-29",
-        "commits": 4
-      },
-      {
-        "day": "2026-05-27",
+        "day": "2026-06-08",
         "commits": 5
       },
       {
-        "day": "2026-05-26",
-        "commits": 3
+        "day": "2026-06-06",
+        "commits": 5
       },
       {
-        "day": "2026-05-25",
-        "commits": 8
+        "day": "2026-06-05",
+        "commits": 4
       },
       {
-        "day": "2026-05-24",
-        "commits": 1
+        "day": "2026-06-04",
+        "commits": 2
       },
       {
-        "day": "2026-05-23",
-        "commits": 8
-      },
-      {
-        "day": "2026-05-22",
+        "day": "2026-06-03",
         "commits": 7
       },
       {
-        "day": "2026-05-21",
+        "day": "2026-06-02",
         "commits": 3
       },
       {
-        "day": "2026-05-20",
+        "day": "2026-06-01",
         "commits": 1
       },
       {
-        "day": "2026-05-19",
+        "day": "2026-05-31",
+        "commits": 3
+      },
+      {
+        "day": "2026-05-30",
+        "commits": 1
+      },
+      {
+        "day": "2026-05-28",
+        "commits": 5
+      },
+      {
+        "day": "2026-05-27",
+        "commits": 3
+      },
+      {
+        "day": "2026-05-26",
+        "commits": 8
+      },
+      {
+        "day": "2026-05-25",
+        "commits": 4
+      },
+      {
+        "day": "2026-05-24",
+        "commits": 8
+      },
+      {
+        "day": "2026-05-23",
+        "commits": 4
+      },
+      {
+        "day": "2026-05-22",
+        "commits": 3
+      },
+      {
+        "day": "2026-05-21",
+        "commits": 1
+      },
+      {
+        "day": "2026-05-20",
         "commits": 6
       },
       {
-        "day": "2026-05-18",
+        "day": "2026-05-19",
         "commits": 4
       },
       {
         "day": "2026-05-17",
-        "commits": 6
-      },
-      {
-        "day": "2026-05-16",
         "commits": 2
       },
       {
         "day": "2026-05-15",
-        "commits": 3
-      },
-      {
-        "day": "2026-05-14",
         "commits": 8
       },
       {
-        "day": "2026-05-13",
+        "day": "2026-05-14",
         "commits": 4
       },
       {
-        "day": "2026-05-12",
+        "day": "2026-05-13",
         "commits": 2
       },
       {
+        "day": "2026-05-12",
+        "commits": 7
+      },
+      {
         "day": "2026-05-11",
+        "commits": 3
+      },
+      {
+        "day": "2026-05-10",
         "commits": 7
       },
       {
         "day": "2026-05-09",
-        "commits": 7
+        "commits": 3
       },
       {
         "day": "2026-05-08",
-        "commits": 6
+        "commits": 4
       },
       {
-        "day": "2026-05-07",
-        "commits": 4
+        "day": "2026-05-06",
+        "commits": 5
       },
       {
         "day": "2026-05-05",
-        "commits": 5
+        "commits": 3
       },
       {
         "day": "2026-05-04",
-        "commits": 3
-      },
-      {
-        "day": "2026-05-03",
-        "commits": 5
-      },
-      {
-        "day": "2026-05-02",
-        "commits": 1
-      },
-      {
-        "day": "2026-05-01",
-        "commits": 2
-      },
-      {
-        "day": "2026-04-30",
-        "commits": 7
-      },
-      {
-        "day": "2026-04-29",
-        "commits": 3
-      },
-      {
-        "day": "2026-04-28",
-        "commits": 1
-      },
-      {
-        "day": "2026-04-27",
-        "commits": 6
-      },
-      {
-        "day": "2026-04-26",
-        "commits": 1
-      },
-      {
-        "day": "2026-04-25",
-        "commits": 6
-      },
-      {
-        "day": "2026-04-24",
-        "commits": 5
-      },
-      {
-        "day": "2026-04-23",
-        "commits": 3
-      },
-      {
-        "day": "2026-04-22",
         "commits": 8
       },
       {
-        "day": "2026-04-21",
-        "commits": 4
-      },
-      {
-        "day": "2026-04-20",
-        "commits": 2
-      },
-      {
-        "day": "2026-04-19",
-        "commits": 4
-      },
-      {
-        "day": "2026-04-17",
+        "day": "2026-05-03",
         "commits": 1
       },
       {
-        "day": "2026-04-16",
+        "day": "2026-05-02",
+        "commits": 8
+      },
+      {
+        "day": "2026-05-01",
+        "commits": 7
+      },
+      {
+        "day": "2026-04-30",
+        "commits": 3
+      },
+      {
+        "day": "2026-04-29",
+        "commits": 1
+      },
+      {
+        "day": "2026-04-28",
         "commits": 6
       },
       {
-        "day": "2026-04-15",
+        "day": "2026-04-27",
         "commits": 4
       },
       {
+        "day": "2026-04-26",
+        "commits": 6
+      },
+      {
+        "day": "2026-04-25",
+        "commits": 2
+      },
+      {
+        "day": "2026-04-24",
+        "commits": 3
+      },
+      {
+        "day": "2026-04-23",
+        "commits": 8
+      },
+      {
+        "day": "2026-04-22",
+        "commits": 4
+      },
+      {
+        "day": "2026-04-21",
+        "commits": 2
+      },
+      {
+        "day": "2026-04-20",
+        "commits": 7
+      },
+      {
+        "day": "2026-04-18",
+        "commits": 7
+      },
+      {
+        "day": "2026-04-17",
+        "commits": 6
+      },
+      {
+        "day": "2026-04-16",
+        "commits": 4
+      },
+      {
+        "day": "2026-04-14",
+        "commits": 5
+      },
+      {
         "day": "2026-04-13",
+        "commits": 3
+      },
+      {
+        "day": "2026-04-12",
         "commits": 5
       },
       {
         "day": "2026-04-11",
-        "commits": 5
+        "commits": 1
       },
       {
         "day": "2026-04-10",
-        "commits": 4
-      },
-      {
-        "day": "2026-04-09",
         "commits": 2
       },
       {
-        "day": "2026-04-08",
+        "day": "2026-04-09",
         "commits": 7
       },
       {
-        "day": "2026-04-07",
+        "day": "2026-04-08",
         "commits": 3
+      },
+      {
+        "day": "2026-04-07",
+        "commits": 1
       },
       {
         "day": "2026-04-06",
-        "commits": 1
+        "commits": 6
       },
       {
         "day": "2026-04-05",
-        "commits": 3
-      },
-      {
-        "day": "2026-04-04",
         "commits": 1
       },
       {
-        "day": "2026-04-02",
+        "day": "2026-04-04",
+        "commits": 6
+      },
+      {
+        "day": "2026-04-03",
         "commits": 5
       },
       {
-        "day": "2026-04-01",
+        "day": "2026-04-02",
         "commits": 3
       },
       {
-        "day": "2026-03-31",
+        "day": "2026-04-01",
         "commits": 8
       },
       {
-        "day": "2026-03-30",
+        "day": "2026-03-31",
         "commits": 4
       },
       {
-        "day": "2026-03-29",
-        "commits": 8
+        "day": "2026-03-30",
+        "commits": 2
       },
       {
-        "day": "2026-03-28",
+        "day": "2026-03-29",
         "commits": 4
       },
       {
         "day": "2026-03-27",
-        "commits": 3
+        "commits": 1
       },
       {
         "day": "2026-03-26",
-        "commits": 1
+        "commits": 6
       },
       {
         "day": "2026-03-25",
-        "commits": 6
-      },
-      {
-        "day": "2026-03-24",
         "commits": 4
       },
       {
-        "day": "2026-03-22",
-        "commits": 2
-      },
-      {
-        "day": "2026-03-20",
-        "commits": 8
-      },
-      {
-        "day": "2026-03-19",
-        "commits": 4
-      },
-      {
-        "day": "2026-03-18",
-        "commits": 2
-      },
-      {
-        "day": "2026-03-17",
-        "commits": 7
-      },
-      {
-        "day": "2026-03-16",
-        "commits": 3
-      },
-      {
-        "day": "2026-03-15",
-        "commits": 7
-      },
-      {
-        "day": "2026-03-14",
-        "commits": 3
-      },
-      {
-        "day": "2026-03-13",
-        "commits": 4
-      },
-      {
-        "day": "2026-03-11",
+        "day": "2026-03-23",
         "commits": 5
       },
       {
-        "day": "2026-03-10",
-        "commits": 3
+        "day": "2026-03-21",
+        "commits": 5
       },
       {
-        "day": "2026-03-09",
-        "commits": 8
+        "day": "2026-03-20",
+        "commits": 4
       },
       {
-        "day": "2026-03-08",
-        "commits": 1
+        "day": "2026-03-19",
+        "commits": 2
       },
       {
-        "day": "2026-03-07",
-        "commits": 8
-      },
-      {
-        "day": "2026-03-06",
+        "day": "2026-03-18",
         "commits": 7
       },
       {
-        "day": "2026-03-05",
+        "day": "2026-03-17",
         "commits": 3
       },
       {
-        "day": "2026-03-04",
+        "day": "2026-03-16",
         "commits": 1
       },
       {
-        "day": "2026-03-03",
+        "day": "2026-03-15",
+        "commits": 3
+      },
+      {
+        "day": "2026-03-14",
+        "commits": 1
+      },
+      {
+        "day": "2026-03-12",
+        "commits": 5
+      },
+      {
+        "day": "2026-03-11",
+        "commits": 3
+      },
+      {
+        "day": "2026-03-10",
+        "commits": 8
+      },
+      {
+        "day": "2026-03-09",
+        "commits": 4
+      },
+      {
+        "day": "2026-03-08",
+        "commits": 8
+      },
+      {
+        "day": "2026-03-07",
+        "commits": 4
+      },
+      {
+        "day": "2026-03-06",
+        "commits": 3
+      },
+      {
+        "day": "2026-03-05",
+        "commits": 1
+      },
+      {
+        "day": "2026-03-04",
         "commits": 6
       },
       {
-        "day": "2026-03-02",
+        "day": "2026-03-03",
         "commits": 4
       },
       {
         "day": "2026-03-01",
-        "commits": 6
-      },
-      {
-        "day": "2026-02-28",
         "commits": 2
       },
       {
         "day": "2026-02-27",
-        "commits": 3
-      },
-      {
-        "day": "2026-02-26",
         "commits": 8
       },
       {
-        "day": "2026-02-25",
+        "day": "2026-02-26",
         "commits": 4
       },
       {
-        "day": "2026-02-24",
+        "day": "2026-02-25",
         "commits": 2
       },
       {
+        "day": "2026-02-24",
+        "commits": 7
+      },
+      {
         "day": "2026-02-23",
+        "commits": 3
+      },
+      {
+        "day": "2026-02-22",
         "commits": 7
       },
       {
         "day": "2026-02-21",
-        "commits": 7
+        "commits": 3
       },
       {
         "day": "2026-02-20",
-        "commits": 6
+        "commits": 4
       },
       {
-        "day": "2026-02-19",
-        "commits": 4
+        "day": "2026-02-18",
+        "commits": 5
       },
       {
         "day": "2026-02-17",
-        "commits": 5
+        "commits": 3
       },
       {
         "day": "2026-02-16",
-        "commits": 3
-      },
-      {
-        "day": "2026-02-15",
-        "commits": 5
-      },
-      {
-        "day": "2026-02-14",
-        "commits": 1
-      },
-      {
-        "day": "2026-02-13",
-        "commits": 2
-      },
-      {
-        "day": "2026-02-12",
-        "commits": 7
-      },
-      {
-        "day": "2026-02-11",
-        "commits": 3
-      },
-      {
-        "day": "2026-02-10",
-        "commits": 1
-      },
-      {
-        "day": "2026-02-09",
-        "commits": 6
-      },
-      {
-        "day": "2026-02-08",
-        "commits": 1
-      },
-      {
-        "day": "2026-02-07",
-        "commits": 6
-      },
-      {
-        "day": "2026-02-06",
-        "commits": 5
-      },
-      {
-        "day": "2026-02-05",
-        "commits": 3
-      },
-      {
-        "day": "2026-02-04",
         "commits": 8
       },
       {
-        "day": "2026-02-03",
-        "commits": 4
-      },
-      {
-        "day": "2026-02-02",
-        "commits": 2
-      },
-      {
-        "day": "2026-02-01",
-        "commits": 4
-      },
-      {
-        "day": "2026-01-30",
+        "day": "2026-02-15",
         "commits": 1
       },
       {
-        "day": "2026-01-29",
+        "day": "2026-02-14",
+        "commits": 8
+      },
+      {
+        "day": "2026-02-13",
+        "commits": 7
+      },
+      {
+        "day": "2026-02-12",
+        "commits": 3
+      },
+      {
+        "day": "2026-02-11",
+        "commits": 1
+      },
+      {
+        "day": "2026-02-10",
         "commits": 6
       },
       {
-        "day": "2026-01-28",
+        "day": "2026-02-09",
         "commits": 4
       },
       {
+        "day": "2026-02-08",
+        "commits": 6
+      },
+      {
+        "day": "2026-02-07",
+        "commits": 2
+      },
+      {
+        "day": "2026-02-06",
+        "commits": 3
+      },
+      {
+        "day": "2026-02-05",
+        "commits": 8
+      },
+      {
+        "day": "2026-02-04",
+        "commits": 4
+      },
+      {
+        "day": "2026-02-03",
+        "commits": 2
+      },
+      {
+        "day": "2026-02-02",
+        "commits": 7
+      },
+      {
+        "day": "2026-01-31",
+        "commits": 7
+      },
+      {
+        "day": "2026-01-30",
+        "commits": 6
+      },
+      {
+        "day": "2026-01-29",
+        "commits": 4
+      },
+      {
+        "day": "2026-01-27",
+        "commits": 5
+      },
+      {
         "day": "2026-01-26",
+        "commits": 3
+      },
+      {
+        "day": "2026-01-25",
         "commits": 5
       },
       {
         "day": "2026-01-24",
-        "commits": 5
-      },
-      {
-        "day": "2026-01-23",
-        "commits": 4
-      },
-      {
-        "day": "2026-01-22",
-        "commits": 2
-      },
-      {
-        "day": "2026-01-21",
-        "commits": 7
-      },
-      {
-        "day": "2026-01-20",
-        "commits": 3
-      },
-      {
-        "day": "2026-01-19",
         "commits": 1
       },
       {
-        "day": "2026-01-18",
+        "day": "2026-01-23",
+        "commits": 2
+      },
+      {
+        "day": "2026-01-22",
+        "commits": 7
+      },
+      {
+        "day": "2026-01-21",
         "commits": 3
+      },
+      {
+        "day": "2026-01-20",
+        "commits": 1
+      },
+      {
+        "day": "2026-01-19",
+        "commits": 6
       }
     ],
     "authors": [
@@ -2322,9 +2310,9 @@
         "commits": 129
       }
     ],
-    "total": 1030,
-    "first": 1758287715341,
-    "last": 1794564915341
+    "total": 1012,
+    "first": 1758358425614,
+    "last": 1794635625614
   },
   "channel.message.list": [
     {
@@ -2340,7 +2328,7 @@
       "name": "用户",
       "kind": "chat",
       "text": "登录过期的问题谁来修？",
-      "at": 1794573375364,
+      "at": 1794644085615,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2363,7 +2351,7 @@
       "name": "助手",
       "kind": "chat",
       "text": "派给老周了，在工单 #18 里。",
-      "at": 1794573435364,
+      "at": 1794644145615,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2386,7 +2374,7 @@
       "name": "助手",
       "kind": "chat",
       "text": "他说半小时左右。",
-      "at": 1794573495364,
+      "at": 1794644205615,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2409,7 +2397,7 @@
       "name": "老周",
       "kind": "chat",
       "text": "收到，先看 session.ts。",
-      "at": 1794573555364,
+      "at": 1794644265615,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2441,7 +2429,7 @@
       "name": "老周",
       "kind": "report",
       "text": "改好了：过期回到登录页，加了两条测试。",
-      "at": 1794573615364,
+      "at": 1794644325615,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2470,7 +2458,7 @@
       "name": "老周",
       "kind": "report",
       "text": "测试起不来：缺一个环境变量。",
-      "at": 1794573675364,
+      "at": 1794644385615,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2497,7 +2485,7 @@
       "name": "用户",
       "kind": "chat",
       "text": "设计稿和录屏在这，参考 https://example.com/design",
-      "at": 1794573735364,
+      "at": 1794644445615,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2562,7 +2550,7 @@
       "name": "老周",
       "kind": "chat",
       "text": "## 改了什么\n\n- `session.ts`：过期判断\n- `Login.tsx`：提示文案",
-      "at": 1794573795364,
+      "at": 1794644505615,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2585,14 +2573,14 @@
       "name": "用户",
       "kind": "chat",
       "text": "周五之前合进去。",
-      "at": 1794573855364,
+      "at": 1794644565615,
       "revision": 1,
       "mentions": [],
       "spoken": false,
       "reactions": [],
       "attachments": [],
       "embeds": [],
-      "edited": 1794575595364,
+      "edited": 1794646305615,
       "outcome": null
     },
     {
@@ -2609,14 +2597,14 @@
       "name": "助手",
       "kind": "chat",
       "text": "记下了：周五之前。",
-      "at": 1794573915364,
+      "at": 1794644625615,
       "revision": 1,
       "mentions": [],
       "spoken": false,
       "reactions": [],
       "attachments": [],
       "embeds": [],
-      "pinned": 1794575655364,
+      "pinned": 1794646365615,
       "outcome": null
     },
     {
@@ -2633,7 +2621,7 @@
       "name": "老周",
       "kind": "chat",
       "text": "（这条删了）",
-      "at": 1794573975364,
+      "at": 1794644685615,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2641,7 +2629,7 @@
       "attachments": [],
       "embeds": [],
       "agent": "laozhou",
-      "deleted": 1794575655364,
+      "deleted": 1794646365615,
       "outcome": null
     }
   ],
@@ -2660,14 +2648,14 @@
       "name": "助手",
       "kind": "chat",
       "text": "记下了：周五之前。",
-      "at": 1794573915364,
+      "at": 1794644625615,
       "revision": 1,
       "mentions": [],
       "spoken": false,
       "reactions": [],
       "attachments": [],
       "embeds": [],
-      "pinned": 1794575655364,
+      "pinned": 1794646365615,
       "outcome": null
     }
   ],
@@ -2938,7 +2926,7 @@
     "loggedIn": true,
     "account": "lucas",
     "reason": "",
-    "checkedAt": 1794575715364
+    "checkedAt": 1794646425615
   },
   "github.refresh": {
     "installed": true,
@@ -2946,7 +2934,7 @@
     "loggedIn": true,
     "account": "lucas",
     "reason": "",
-    "checkedAt": 1794575715364
+    "checkedAt": 1794646425615
   },
   "attachment.file": {
     "path": "/Users/farmer/.vibevalley/attachments/login.png",
@@ -3100,14 +3088,14 @@
       "id": "d-iphone",
       "name": "iPhone",
       "came": "paired",
-      "addedAt": 1793798115364,
-      "lastSeen": 1794573315364
+      "addedAt": 1793868825615,
+      "lastSeen": 1794644025615
     },
     {
       "id": "d-ipad",
       "name": "iPad",
       "came": "login",
-      "addedAt": 1794402915364
+      "addedAt": 1794473625615
     }
   ],
   "user.approval.list": [
@@ -3116,8 +3104,8 @@
       "code": "KX7-29Q",
       "name": "MacBook Air",
       "from": "192.168.1.23",
-      "askedAt": 1794575595364,
-      "expiresAt": 1794576195364
+      "askedAt": 1794646305615,
+      "expiresAt": 1794646905615
     }
   ],
   "user.approval.answer": [],
@@ -3129,7 +3117,7 @@
     "pairing": {
       "code": "4821",
       "link": "http://192.168.1.10:7317/pair?code=4821",
-      "expiresAt": 1794575955364
+      "expiresAt": 1794646665615
     }
   },
   "lan.update": {
@@ -3140,7 +3128,7 @@
     "pairing": {
       "code": "4821",
       "link": "http://192.168.1.10:7317/pair?code=4821",
-      "expiresAt": 1794575955364
+      "expiresAt": 1794646665615
     }
   },
   "lan.pairing.start": {
@@ -3151,7 +3139,7 @@
     "pairing": {
       "code": "4821",
       "link": "http://192.168.1.10:7317/pair?code=4821",
-      "expiresAt": 1794575955364
+      "expiresAt": 1794646665615
     }
   },
   "lan.pairing.stop": {
@@ -3179,7 +3167,7 @@
         "author": "agent",
         "repo": "vibevalley",
         "session": "w3",
-        "at": 1794557715364,
+        "at": 1794628425615,
         "recalled": 0,
         "fading": false
       },
@@ -3190,9 +3178,9 @@
         "text": "这个仓库的测试用 vp test；不要开 next dev。",
         "author": "user",
         "repo": "vibevalley",
-        "at": 1794316515364,
+        "at": 1794387225615,
         "recalled": 4,
-        "recalledAt": 1794489315364,
+        "recalledAt": 1794560025615,
         "fading": false
       },
       {
@@ -3203,7 +3191,7 @@
         "author": "agent",
         "session": "w1",
         "repo": "vibevalley",
-        "at": 1793538915364,
+        "at": 1793609625615,
         "recalled": 0,
         "fading": true
       },
@@ -3213,9 +3201,9 @@
         "kind": "note",
         "text": "提交信息写中文，一句话说清改了什么。",
         "author": "user",
-        "at": 1792847715364,
+        "at": 1792918425615,
         "recalled": 9,
-        "recalledAt": 1794568515364,
+        "recalledAt": 1794639225615,
         "fading": false
       },
       {
@@ -3226,7 +3214,7 @@
         "author": "system",
         "repo": "vibevalley",
         "source": "nowledge",
-        "at": 1794057315364,
+        "at": 1794128025615,
         "recalled": 1,
         "fading": false
       }
@@ -3264,14 +3252,14 @@
     "text": "这个仓库的测试用 vp test；不要开 next dev。",
     "author": "user",
     "repo": "vibevalley",
-    "at": 1794316515364,
+    "at": 1794387225615,
     "recalled": 4,
-    "recalledAt": 1794489315364,
+    "recalledAt": 1794560025615,
     "fading": false
   },
   "memory.delete": null,
   "host.pixelDir": {
-    "path": "/Users/lucasay/vibevalley/apps/mac/assets/vv/pixel"
+    "path": "/Users/lucasay/orca/projects/vibevalley-native-ui/assets/pixel"
   },
   "pkm.page.list": {
     "root": "~/notes",
@@ -3282,7 +3270,7 @@
         "tier": "project",
         "file": "projects/vibevalley-原生移植.md",
         "tldr": "把 VibeValley 的每一页搬到 nsh 上，看起来和原来一样。",
-        "updated": 1794575715364,
+        "updated": 1794646425615,
         "open": 3
       },
       {
@@ -3291,7 +3279,7 @@
         "tier": "area",
         "file": "areas/健康.md",
         "tldr": "",
-        "updated": 1794572115364,
+        "updated": 1794642825615,
         "open": 1
       },
       {
@@ -3300,7 +3288,7 @@
         "tier": "area",
         "file": "areas/工作.md",
         "tldr": "",
-        "updated": 1794568515364,
+        "updated": 1794639225615,
         "open": 0
       },
       {
@@ -3309,7 +3297,7 @@
         "tier": "resource",
         "file": "resources/rust-笔记.md",
         "tldr": "",
-        "updated": 1794564915364,
+        "updated": 1794635625615,
         "open": 0
       },
       {
@@ -3318,7 +3306,7 @@
         "tier": "inbox",
         "file": "inboxs/想到的.md",
         "tldr": "",
-        "updated": 1794561315364,
+        "updated": 1794632025615,
         "open": 1
       },
       {
@@ -3327,8 +3315,18 @@
         "tier": "archive",
         "file": "archives/旧的网页壳.md",
         "tldr": "",
-        "updated": 1794557715364,
+        "updated": 1794628425615,
         "open": 0
+      },
+      {
+        "slug": "journal-2026-11-14",
+        "title": "2026_11_14",
+        "tier": "journal",
+        "file": "journals/journal-2026-11-14.md",
+        "tldr": "",
+        "updated": 1794624825615,
+        "open": 1,
+        "day": "2026-11-14"
       },
       {
         "slug": "journal-2026-11-13",
@@ -3336,29 +3334,19 @@
         "tier": "journal",
         "file": "journals/journal-2026-11-13.md",
         "tldr": "",
-        "updated": 1794554115364,
-        "open": 1,
+        "updated": 1794621225615,
+        "open": 0,
         "day": "2026-11-13"
       },
       {
-        "slug": "journal-2026-11-12",
-        "title": "2026_11_12",
+        "slug": "journal-2026-11-11",
+        "title": "2026_11_11",
         "tier": "journal",
-        "file": "journals/journal-2026-11-12.md",
+        "file": "journals/journal-2026-11-11.md",
         "tldr": "",
-        "updated": 1794550515364,
+        "updated": 1794617625615,
         "open": 0,
-        "day": "2026-11-12"
-      },
-      {
-        "slug": "journal-2026-11-10",
-        "title": "2026_11_10",
-        "tier": "journal",
-        "file": "journals/journal-2026-11-10.md",
-        "tldr": "",
-        "updated": 1794546915364,
-        "open": 0,
-        "day": "2026-11-10"
+        "day": "2026-11-11"
       }
     ]
   },
@@ -3370,11 +3358,11 @@
       "file": "projects/vibevalley-原生移植.md",
       "props": {
         "status": "active",
-        "deadline": "2026-11-25",
+        "deadline": "2026-11-26",
         "area": "[[工作]]",
         "tags": "vibevalley, nsh",
         "owner": "lucas",
-        "started": "2026-10-24"
+        "started": "2026-10-25"
       },
       "tldr": "把 VibeValley 的每一页搬到 nsh 上，看起来和原来一样。",
       "blocks": [
@@ -3439,7 +3427,7 @@
           "depth": 1,
           "body": "素材库和 Artifact 页",
           "props": {
-            "deadline": "2026-11-16"
+            "deadline": "2026-11-17"
           },
           "path": "## 这周",
           "parent": "vibevalley-原生移植-3",
@@ -3495,7 +3483,7 @@
           "parent": "vibevalley-原生移植-10"
         }
       ],
-      "updated": 1794575715364
+      "updated": 1794646425615
     },
     "transclusions": [
       {
@@ -3511,9 +3499,9 @@
       "projects": [],
       "journals": [
         {
-          "block": "journal-2026-11-13-22",
-          "page": "journal-2026-11-13",
-          "pageTitle": "2026_11_13",
+          "block": "journal-2026-11-14-22",
+          "page": "journal-2026-11-14",
+          "pageTitle": "2026_11_14",
           "tier": "journal",
           "path": "",
           "body": "早上看了 [[VibeValley 原生移植]] 的进度"
@@ -3532,52 +3520,52 @@
         "body": "说清楚是重写，不是包一层网页。",
         "status": "suggested",
         "suggested": "VibeValley 整个搬进 VibeValley，页面用 nsh 重写，服务端换成 Rust",
-        "created": 1794568515364
+        "created": 1794639225615
       }
     ]
   },
   "pkm.journal.open": {
-    "slug": "journal-2026-11-13",
-    "title": "2026_11_13",
+    "slug": "journal-2026-11-14",
+    "title": "2026_11_14",
     "tier": "journal",
-    "file": "journals/journal-2026-11-13.md",
+    "file": "journals/journal-2026-11-14.md",
     "props": {},
     "tldr": "",
     "blocks": [
       {
-        "id": "journal-2026-11-13-22",
+        "id": "journal-2026-11-14-22",
         "depth": 0,
         "body": "早上看了 [[VibeValley 原生移植]] 的进度",
         "props": {},
         "path": ""
       },
       {
-        "id": "journal-2026-11-13-23",
+        "id": "journal-2026-11-14-23",
         "depth": 0,
         "body": "下午",
         "props": {},
         "path": ""
       },
       {
-        "id": "journal-2026-11-13-24",
+        "id": "journal-2026-11-14-24",
         "depth": 1,
         "body": "大纲的选中和复制",
         "props": {},
         "path": "下午",
-        "parent": "journal-2026-11-13-23",
+        "parent": "journal-2026-11-14-23",
         "marker": "TODO"
       },
       {
-        "id": "journal-2026-11-13-25",
+        "id": "journal-2026-11-14-25",
         "depth": 1,
         "body": "日历",
         "props": {},
         "path": "下午",
-        "parent": "journal-2026-11-13-23",
+        "parent": "journal-2026-11-14-23",
         "marker": "DONE"
       }
     ],
-    "updated": 1794554115364
+    "updated": 1794624825615
   },
   "pkm.block.apply": null,
   "pkm.page.move": null,
@@ -3602,7 +3590,7 @@
         "page": "vibevalley-原生移植",
         "body": "素材库和 Artifact 页",
         "plain": "素材库和 Artifact 页",
-        "deadline": "2026-11-11"
+        "deadline": "2026-11-12"
       }
     ]
   },
@@ -3627,8 +3615,8 @@
       "version": 0,
       "seq": 4,
       "versions": [],
-      "at": 1794570315342,
-      "updated": 1794575355342
+      "at": 1794641025615,
+      "updated": 1794646065615
     },
     {
       "id": "art-login",
@@ -3652,7 +3640,7 @@
           "note": "第一版",
           "by": "w1",
           "byName": "老周",
-          "at": 1794572715342,
+          "at": 1794643425615,
           "channel": "general",
           "number": 2
         },
@@ -3662,13 +3650,13 @@
           "note": "多一条测试",
           "by": "w1",
           "byName": "老周",
-          "at": 1794574515342,
+          "at": 1794645225615,
           "channel": "general",
           "number": 4
         }
       ],
-      "at": 1794572715342,
-      "updated": 1794574515342
+      "at": 1794643425615,
+      "updated": 1794645225615
     },
     {
       "id": "art-deck",
@@ -3687,12 +3675,12 @@
           "note": "周会用",
           "by": "orchestrator",
           "byName": "助手",
-          "at": 1794564915342,
+          "at": 1794635625615,
           "channel": "general"
         }
       ],
-      "at": 1794564915342,
-      "updated": 1794564915342
+      "at": 1794635625615,
+      "updated": 1794635625615
     },
     {
       "id": "art-mine",
@@ -3703,8 +3691,8 @@
       "version": 0,
       "seq": 1,
       "versions": [],
-      "at": 1794482115342,
-      "updated": 1794485715342
+      "at": 1794552825615,
+      "updated": 1794556425615
     }
   ],
   "artifact.get": {
@@ -3722,8 +3710,8 @@
     "version": 0,
     "seq": 4,
     "versions": [],
-    "at": 1794570315342,
-    "updated": 1794575355342
+    "at": 1794641025615,
+    "updated": 1794646065615
   },
   "artifact.content.get": {
     "version": 2,
@@ -3745,8 +3733,8 @@
       "version": 0,
       "seq": 4,
       "versions": [],
-      "at": 1794570315342,
-      "updated": 1794575355342
+      "at": 1794641025615,
+      "updated": 1794646065615
     },
     "blocks": [
       {
@@ -3765,7 +3753,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1794575655342
+        "updated": 1794646365615
       },
       {
         "id": "art-plan-b2",
@@ -3781,7 +3769,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1794575595342
+        "updated": 1794646305615
       },
       {
         "id": "art-plan-b3",
@@ -3799,7 +3787,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1794575535342
+        "updated": 1794646245615
       },
       {
         "id": "art-plan-b4",
@@ -3815,7 +3803,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1794575475342
+        "updated": 1794646185615
       },
       {
         "id": "art-plan-b5",
@@ -3837,7 +3825,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1794575415342
+        "updated": 1794646125615
       },
       {
         "id": "art-plan-b6",
@@ -3853,7 +3841,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "user",
-        "updated": 1794575355342
+        "updated": 1794646065615
       },
       {
         "id": "art-plan-b7",
@@ -3871,7 +3859,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1794575295342
+        "updated": 1794646005615
       },
       {
         "id": "art-plan-b8",
@@ -3889,7 +3877,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1794575235342
+        "updated": 1794645945615
       },
       {
         "id": "art-plan-b9",
@@ -3907,7 +3895,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1794575175342
+        "updated": 1794645885615
       },
       {
         "id": "art-plan-b10",
@@ -3923,7 +3911,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "user",
-        "updated": 1794575115342
+        "updated": 1794645825615
       }
     ]
   },
@@ -3943,8 +3931,8 @@
     "version": 0,
     "seq": 0,
     "versions": [],
-    "at": 1794482115342,
-    "updated": 1794485715342
+    "at": 1794552825615,
+    "updated": 1794556425615
   },
   "artifact.update": {
     "id": "art-plan",
@@ -3961,8 +3949,8 @@
     "version": 0,
     "seq": 4,
     "versions": [],
-    "at": 1794570315342,
-    "updated": 1794575355342
+    "at": 1794641025615,
+    "updated": 1794646065615
   },
   "artifact.delete": null,
   "artifact.html.edit": {
@@ -3987,7 +3975,7 @@
         "note": "第一版",
         "by": "w1",
         "byName": "老周",
-        "at": 1794572715342,
+        "at": 1794643425615,
         "channel": "general",
         "number": 2
       },
@@ -3997,13 +3985,359 @@
         "note": "多一条测试",
         "by": "w1",
         "byName": "老周",
-        "at": 1794574515342,
+        "at": 1794645225615,
         "channel": "general",
         "number": 4
       }
     ],
-    "at": 1794572715342,
-    "updated": 1794574515342
+    "at": 1794643425615,
+    "updated": 1794645225615
   },
-  "artifact.demo": null
+  "artifact.demo": null,
+  "library.item.add": {
+    "attachment": {
+      "id": "lib-poster",
+      "name": "海报.png",
+      "type": "image/png",
+      "size": 482113
+    },
+    "origin": {
+      "kind": "generated",
+      "job": "job-image",
+      "jobKind": "image"
+    },
+    "addedAt": 1794644625615,
+    "lastAt": 1794644625615
+  },
+  "library.item.delete": null,
+  "provider.voice.list": {
+    "connection": "moss-main",
+    "revision": 3,
+    "voices": [
+      {
+        "id": "voice-warm",
+        "name": "暖声",
+        "createdAtSeconds": 1790000000
+      },
+      {
+        "id": "voice-bright",
+        "name": "亮声",
+        "createdAtSeconds": 1790000100
+      }
+    ],
+    "hasMore": false,
+    "nextCursor": null
+  },
+  "media.image.create": {
+    "kind": "image",
+    "id": "job-image",
+    "prompt": "田头的一张海报，像素风",
+    "model": "moss-image-1",
+    "connection": "moss-main",
+    "revision": 3,
+    "source": {
+      "kind": "user"
+    },
+    "usage": {
+      "images": 1,
+      "width": 1024,
+      "height": 1024
+    },
+    "phase": "ready",
+    "phaseText": "已生成",
+    "problem": "",
+    "attachment": {
+      "id": "lib-poster",
+      "name": "海报.png",
+      "type": "image/png",
+      "size": 482113
+    },
+    "canCancel": false,
+    "canRetryDownload": false,
+    "createdAt": 1794644625615,
+    "updatedAt": 1794644645615
+  },
+  "media.speech.create": {
+    "kind": "speech",
+    "id": "job-speech",
+    "prompt": "今天的活都干完了。",
+    "model": "moss-tts-1.5-flash",
+    "connection": "moss-main",
+    "revision": 3,
+    "source": {
+      "kind": "user"
+    },
+    "voice": "voice-warm",
+    "format": "wav",
+    "contentType": "audio/wav",
+    "metadata": {
+      "source": "file",
+      "sampleRate": 24000,
+      "duration": 2.4,
+      "channels": 1,
+      "bitDepth": 16
+    },
+    "usage": {
+      "inputCharacters": 9
+    },
+    "canResume": false,
+    "canRelease": true,
+    "phase": "ready",
+    "phaseText": "已生成",
+    "problem": "",
+    "attachment": {
+      "id": "lib-speech",
+      "name": "speech.wav",
+      "type": "audio/wav",
+      "size": 115244
+    },
+    "resultInput": null,
+    "canCancel": false,
+    "canRetryDownload": false,
+    "createdAt": 1794645705615,
+    "updatedAt": 1794645725615
+  },
+  "media.dialogue.create": {
+    "model": "moss-speakers",
+    "connection": "moss-main",
+    "revision": 3,
+    "source": {
+      "kind": "user"
+    },
+    "problem": "结果没取回来，可以只重试下载。",
+    "contentType": null,
+    "input": null,
+    "resultInput": null,
+    "previewInput": null,
+    "result": null,
+    "canCancel": false,
+    "canRetryDownload": true,
+    "canResume": false,
+    "canCleanup": false,
+    "canRelease": false,
+    "kind": "speakers",
+    "id": "job-dialogue",
+    "prompt": "host: 早。\nguest: 早，开工吧。",
+    "phase": "download_failed",
+    "phaseText": "下载失败",
+    "format": "mp3",
+    "request": {
+      "id": "job-dialogue",
+      "connection": "moss-main",
+      "revision": 3,
+      "speakers": [
+        {
+          "id": "host",
+          "voice": "voice-warm"
+        },
+        {
+          "id": "guest",
+          "voice": "voice-bright"
+        }
+      ],
+      "segments": [
+        {
+          "speaker": "host",
+          "text": "早。"
+        },
+        {
+          "speaker": "guest",
+          "text": "早，开工吧。"
+        }
+      ],
+      "format": "mp3"
+    },
+    "createdAt": 1794645225615,
+    "updatedAt": 1794645245615
+  },
+  "media.job.download": {
+    "model": "moss-speakers",
+    "connection": "moss-main",
+    "revision": 3,
+    "source": {
+      "kind": "user"
+    },
+    "problem": "结果没取回来，可以只重试下载。",
+    "contentType": null,
+    "input": null,
+    "resultInput": null,
+    "previewInput": null,
+    "result": null,
+    "canCancel": false,
+    "canRetryDownload": true,
+    "canResume": false,
+    "canCleanup": false,
+    "canRelease": false,
+    "kind": "speakers",
+    "id": "job-dialogue",
+    "prompt": "host: 早。\nguest: 早，开工吧。",
+    "phase": "download_failed",
+    "phaseText": "下载失败",
+    "format": "mp3",
+    "request": {
+      "id": "job-dialogue",
+      "connection": "moss-main",
+      "revision": 3,
+      "speakers": [
+        {
+          "id": "host",
+          "voice": "voice-warm"
+        },
+        {
+          "id": "guest",
+          "voice": "voice-bright"
+        }
+      ],
+      "segments": [
+        {
+          "speaker": "host",
+          "text": "早。"
+        },
+        {
+          "speaker": "guest",
+          "text": "早，开工吧。"
+        }
+      ],
+      "format": "mp3"
+    },
+    "createdAt": 1794645225615,
+    "updatedAt": 1794645245615
+  },
+  "media.job.cancel": {
+    "kind": "image",
+    "id": "job-image-waiting",
+    "prompt": "一头在田里的牛",
+    "model": "moss-image-1",
+    "connection": "moss-main",
+    "revision": 3,
+    "source": {
+      "kind": "orchestrator",
+      "agent": "orchestrator",
+      "channel": "general"
+    },
+    "phase": "generating",
+    "phaseText": "生成中",
+    "problem": "",
+    "canCancel": true,
+    "canRetryDownload": false,
+    "createdAt": 1794646365615,
+    "updatedAt": 1794646385615
+  },
+  "media.input.adopt": {
+    "id": "in-poster",
+    "kind": "image",
+    "name": "海报.png",
+    "mime": "image/png",
+    "size": 482113,
+    "phase": "ready",
+    "hash": "lib-poster",
+    "createdAt": 1794646425615,
+    "expiresAt": 1794650025615,
+    "canDelete": true
+  },
+  "media.understanding.create": {
+    "kind": "understanding",
+    "id": "job-understand",
+    "prompt": "这张海报上写了什么？",
+    "inputs": [
+      {
+        "id": "in-poster",
+        "kind": "image",
+        "name": "海报.png",
+        "mime": "image/png",
+        "size": 482113,
+        "hash": "lib-poster"
+      }
+    ],
+    "model": "moss-vl",
+    "connection": "moss-main",
+    "revision": 3,
+    "source": {
+      "kind": "user"
+    },
+    "authorization": null,
+    "phase": "ready",
+    "phaseText": "已理解",
+    "problem": "",
+    "result": {
+      "model": "moss-vl",
+      "text": "海报上是一片像素风的田，写着「开工」。",
+      "status": "completed",
+      "incompleteReason": null,
+      "usage": {
+        "inputTokens": 812,
+        "outputTokens": 24,
+        "totalTokens": 836
+      }
+    },
+    "cleanup": "done",
+    "cleanupText": "远端文件已清理",
+    "canCancel": false,
+    "canCleanup": false,
+    "canRetryDownload": false,
+    "createdAt": 1794644925615,
+    "updatedAt": 1794644945615
+  },
+  "media.transcription.create": {
+    "model": "moss-transcribe-diarize-pro",
+    "connection": "moss-main",
+    "revision": 3,
+    "source": {
+      "kind": "user"
+    },
+    "problem": "",
+    "contentType": null,
+    "input": {
+      "id": "in-standup",
+      "kind": "audio",
+      "name": "周会录音.m4a",
+      "mime": "audio/mp4",
+      "size": 3204882,
+      "hash": "lib-standup"
+    },
+    "resultInput": null,
+    "previewInput": null,
+    "result": {
+      "kind": "transcription",
+      "text": "看板能拖了。下周做灵动岛。",
+      "segments": [
+        {
+          "speaker": "A",
+          "text": "看板能拖了。",
+          "start": 0.4,
+          "end": 2.1
+        },
+        {
+          "speaker": "",
+          "text": "下周做灵动岛。",
+          "start": 2.6,
+          "end": 4.9
+        }
+      ]
+    },
+    "canCancel": false,
+    "canRetryDownload": false,
+    "canResume": false,
+    "canCleanup": true,
+    "canRelease": false,
+    "kind": "transcription",
+    "id": "job-transcript",
+    "prompt": "周会录音.m4a",
+    "phase": "ready",
+    "phaseText": "已转写",
+    "format": null,
+    "usage": {
+      "inputAudioSeconds": 61
+    },
+    "request": {
+      "id": "job-transcript",
+      "connection": "moss-main",
+      "revision": 3,
+      "input": "in-standup",
+      "allowUpload": true,
+      "diarize": true
+    },
+    "createdAt": 1794643725615,
+    "updatedAt": 1794643745615
+  }
 }

@@ -15,8 +15,12 @@ import { ConfirmButton } from "../../ui/ConfirmButton";
 import { Field, Select, TextArea, TextInput } from "../../ui/Field";
 import { Card, Quiet } from "../../ui/layout";
 import { Readiness } from "../setting";
+import { JobActions, Refusal, SourceLine } from "./JobFacts";
 import { publicationKey } from "./publication";
-import { ReleaseAssets } from "./ReleaseAssets";
+
+// The browser's number inputs took nothing else; a text input takes what these let through.
+const digits = (typed: string) => typed.replace(/\D/gu, "");
+const decimal = (typed: string) => typed.replace(/[^\d.]/gu, "").replace(/(\..*)\./gu, "$1");
 
 export function ImagePanel() {
   const state = useCore();
@@ -27,6 +31,11 @@ export function ImagePanel() {
   const height = signal(1024);
   const enhance = signal(false);
   const watermark = signal(true);
+  const advanced = signal(false);
+  const seed = signal("");
+  const steps = signal("");
+  const guidance = signal("");
+  const negative = signal("");
   const submitted = signal<MediaImageRequest | undefined>(undefined);
   const error = signal<string | undefined>(undefined);
   const act = createAct((e) => error.set(e));
@@ -40,6 +49,10 @@ export function ImagePanel() {
       height: height(),
       enhance: enhance(),
       watermark: watermark(),
+      ...(seed() !== "" ? { seed: Number(seed()) } : {}),
+      ...(steps() !== "" ? { steps: Number(steps()) } : {}),
+      ...(guidance() !== "" ? { guidance: Number(guidance()) } : {}),
+      ...(negative() !== "" ? { negativePrompt: negative() } : {}),
     };
     submitted.set(input);
     return act.run(() => api.media.image.create(input));
@@ -64,29 +77,18 @@ export function ImagePanel() {
             />
           </Field>
           <Field label={t("web.media.prompt")}>
-            <TextArea
-              testID="media-prompt"
-              accessibilityLabel={t("web.media.prompt")}
-              rows={4}
-              value={prompt()}
-              onInput={(e) => prompt.set(e.currentTarget.value)}
-            />
+            <TextArea testID="media-prompt" accessibilityLabel={t("web.media.prompt")} rows={4} value={prompt()} onInput={(v) => prompt.set(v)} />
           </Field>
           <View class="grid grid-cols-2 gap-3">
             <Field label={t("web.media.width")}>
-              <TextInput
-                testID="media-width"
-                accessibilityLabel={t("web.media.width")}
-                value={String(width())}
-                onInput={(e) => width.set(Number(e.currentTarget.value) || 1024)}
-              />
+              <TextInput testID="media-width" accessibilityLabel={t("web.media.width")} value={String(width())} onInput={(v) => width.set(Number(v) || 1024)} />
             </Field>
             <Field label={t("web.media.height")}>
               <TextInput
                 testID="media-height"
                 accessibilityLabel={t("web.media.height")}
                 value={String(height())}
-                onInput={(e) => height.set(Number(e.currentTarget.value) || 1024)}
+                onInput={(v) => height.set(Number(v) || 1024)}
               />
             </Field>
           </View>
@@ -101,6 +103,29 @@ export function ImagePanel() {
             </View>
           </View>
         </View>
+        <View class="flex-row">
+          <Button testID="media-advanced" tone="quiet" icon={advanced() ? "collapse" : "expand"} onPress={() => advanced.set(!advanced())}>
+            {t("web.media.advanced")}
+          </Button>
+        </View>
+        <If when={advanced()}>
+          <View class="min-w-0 gap-3">
+            <View class="grid grid-cols-3 gap-3">
+              <Field label={t("web.media.seed")}>
+                <TextInput testID="media-seed" accessibilityLabel={t("web.media.seed")} value={seed()} onInput={(v) => seed.set(digits(v))} />
+              </Field>
+              <Field label={t("web.media.steps")}>
+                <TextInput testID="media-steps" accessibilityLabel={t("web.media.steps")} value={steps()} onInput={(v) => steps.set(digits(v))} />
+              </Field>
+              <Field label={t("web.media.guidance")}>
+                <TextInput testID="media-guidance" accessibilityLabel={t("web.media.guidance")} value={guidance()} onInput={(v) => guidance.set(decimal(v))} />
+              </Field>
+            </View>
+            <Field label={t("web.media.negative")}>
+              <TextArea testID="media-negative" accessibilityLabel={t("web.media.negative")} rows={2} value={negative()} onInput={(v) => negative.set(v)} />
+            </Field>
+          </View>
+        </If>
         <If when={submitted()}>
           <Text class="text-xs text-muted">{t("web.media.pending")}</Text>
         </If>
@@ -122,13 +147,7 @@ export function ImagePanel() {
             />
           </If>
         </View>
-        <If when={error()}>
-          {(why) => (
-            <Text role="alert" testID="media-error" class="text-sm text-berry">
-              {why()}
-            </Text>
-          )}
-        </If>
+        <Refusal error={error()} testid="media-error" />
       </Card>
       <Text class="text-base font-semibold text-ink">{t("web.media.history")}</Text>
       <If when={images().length > 0} else={<Quiet>{t("web.media.empty")}</Quiet>}>
@@ -164,6 +183,10 @@ function JobCard(props: { job: MediaImageJob }) {
     <Card title={props.job.phaseText}>
       <View testID="media-job" class="min-w-0 gap-3">
         <Text class="text-xs text-muted">{`${props.job.model} · ${props.job.id}`}</Text>
+        <SourceLine source={props.job.source} testid="media-source" />
+        <Text testID="media-usage" class="text-xs text-muted">
+          {props.job.usage ? t("web.media.usage", props.job.usage) : t("web.media.usageUnknown")}
+        </Text>
         <Text class="text-sm text-ink">{props.job.prompt}</Text>
         <If when={props.job.problem}>{(prob) => <Text class="text-sm text-muted">{prob()}</Text>}</If>
         <If when={props.job.attachment}>
@@ -193,10 +216,8 @@ function JobCard(props: { job: MediaImageJob }) {
             </>
           )}
         </If>
-        <If when={props.job.canRelease}>
-          <ReleaseAssets id={props.job.id} />
-        </If>
-        <If when={error()}>{(why) => <Text class="text-sm text-berry">{why()}</Text>}</If>
+        <JobActions job={props.job} act={act} prefix="media" />
+        <Refusal error={error()} />
       </View>
     </Card>
   );
