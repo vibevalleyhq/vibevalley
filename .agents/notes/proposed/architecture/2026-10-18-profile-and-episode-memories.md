@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-`memory` 表（[记性](docs/subsystems/memory.md)，[0001_schema.up.sql](apps/server/db/migrations/0001_schema.up.sql)）已经有 `scope`（`user` / `agent`）、`title`、`importance`（0–3）和 `replaced_by` 列，召回的查询（[memory.sql](apps/server/db/queries/memory.sql)）也只读 `replaced_by is null` 的行。还缺三样：
+`memory` 表（[记性](docs/subsystems/memory.md)，`0001_schema.up.sql`（TS 服务端，已删；Rust 的表在 [memory.rs](crates/vibevalley-server/src/modules/memory.rs)，还没有这几列））已经有 `scope`（`user` / `agent`）、`title`、`importance`（0–3）和 `replaced_by` 列，召回的查询（`memory.sql`）也只读 `replaced_by is null` 的行。还缺三样：
 
 | 缺项 | 现状 | 问题 |
 |---|---|---|
@@ -21,7 +21,7 @@ Status: proposed
 
 1. **表结构**：`0001_schema.up.sql` 里 `memory.kind` 的 `check` 加入 `profile`、`episode`。
 2. **用户画像（`profile`）**：助手开始和压缩后按 `importance` 降序读取（上限 100 条 / 4000 字）拼入系统提示；帮工首轮拼入输入开头。
-3. **干活经过（`episode`）**：收工时写入工单标题、说明、汇报与改动文件（上限 4000 字）。助手的对话由 pi-durable 压缩（[durable.ts](apps/server/src/modules/agent/durable.ts) 的 `compaction` 设置）；[host.ts](apps/server/src/modules/session/host.ts) 读到 `pi.compaction` 条目时，把这次压掉的摘要写成一条 `episode`。`episode` 只给 `memory_search` 检索摘录，不进开工自动召回。
+3. **干活经过（`episode`）**：收工时写入工单标题、说明、汇报与改动文件（上限 4000 字）。助手的对话由 pi-durable 压缩（`durable.ts` 的 `compaction` 设置（Rust 的对话与压缩在 [conversation.rs](crates/vibevalley-agent/src/conversation.rs)））；`host.ts` 读到 `pi.compaction` 条目时，把这次压掉的摘要写成一条 `episode`。`episode` 只给 `memory_search` 检索摘录，不进开工自动召回。
 4. **相似取代（`replaced_by`）**：新写入的 `note` 与已有条目重合度 ≥ `0.8` 时，同一事务插入新行并把旧行 `replaced_by` 指向新行；旧行不再召回，保留 30 天供界面对比。
 
 ## Alternatives considered
