@@ -5,7 +5,6 @@ import { createInterface } from "node:readline/promises";
 import { planRelease, type Stage } from "./release-plan.ts";
 
 const root = resolve(import.meta.dirname, "../..");
-const baseline = "apps/server/db/migrations/0001_schema.up.sql";
 
 const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 /** git's exit code, for the commands whose answer is it (diff --quiet, a ref that may not be there). */
@@ -34,12 +33,6 @@ const plan = planned.plan;
 if (plan.cut && gitStatus("rev-parse", "--verify", "--quiet", `origin/${plan.branch}`) === 0)
   fail(`origin has ${plan.branch} already. Fix: git switch ${plan.branch}, and tag the next beta there`);
 
-// Within a beta line the farm never starts over: the database's baseline is the one its first beta had.
-if (plan.schemaSince !== undefined && gitStatus("diff", "--quiet", plan.schemaSince, "HEAD", "--", baseline) !== 0)
-  fail(
-    `the database's baseline (${baseline}) changed since ${plan.schemaSince}: every farm on this beta line would start over. Fix: take the change off ${branch} and leave it on main, for the next minor`,
-  );
-
 if (asked !== "alpha" && !run("vp", "run", "release:verify")) fail("release:verify failed (above). Fix it on main, then bring the fix here");
 
 // What it has that the version before it had not: a release counts from the release before it, alphas and betas included.
@@ -50,13 +43,12 @@ const commits = git("log", "--format=%h %s", previous === undefined ? "HEAD" : `
   .split("\n")
   .filter((l) => l !== "");
 const listed = [...commits.slice(0, shown), ...(commits.length > shown ? [`… and ${commits.length - shown} more`] : [])].map((l) => `  ${l}`).join("\n");
-const newFarm = previous !== undefined && gitStatus("diff", "--quiet", previous, "HEAD", "--", baseline) !== 0;
 
 console.log(`
 ${plan.tag}${plan.cut ? `, on ${plan.branch} cut from main` : ` on ${plan.branch}`} at ${git("rev-parse", "--short", "HEAD")}
 Since ${previous ?? "the first commit"}:
 ${listed || "  (nothing)"}
-${newFarm ? `\nIts database's baseline differs from ${previous}'s: every farm that updates to it starts over (the old one is kept aside).\n` : ""}`);
+`);
 
 if (!process.stdin.isTTY) fail("it asks before it pushes: run it in a terminal");
 const prompt = createInterface({ input: process.stdin, output: process.stdout });

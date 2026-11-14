@@ -56,6 +56,7 @@ fn main() {
         }
     });
     if built.is_none() {
+        assert!(!release, "release builds require a working nsh UI bundle; install nsh and rebuild");
         println!("cargo:warning=hosted views not bundled; install the nsh CLI (see build.rs)");
         std::fs::write(
             out.join("bundle.js"),

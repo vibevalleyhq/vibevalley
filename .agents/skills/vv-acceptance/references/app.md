@@ -86,3 +86,12 @@
 ## 收拾
 
 脚本最后 `quit`；删掉临时目录。截图不进 git。
+
+## 打包和更新
+
+1. 跑 `vp run package:mac -- --version 0.0.1 --out /tmp/vv-package-old` 和 `vp run package:mac -- --version 0.0.2 --out /tmp/vv-package-new --skip-build`。默认使用本地 ad-hoc 签名，不上传或公证；发布包才显式传 `--sign` 和 `--notary-profile`。
+2. 跑 `vp run update-check -- --from /tmp/vv-package-old/VibeValley.app --to /tmp/vv-package-new/release.json`。脚本复制旧包到临时目录，用本机 HTTP 提供新清单和 ZIP，以隔离家目录运行旧包，等它校验并在退出后替换，再启动新包。
+3. 核对打印的证据目录：`result.json` 的 `ok`、`restarted`、`signatureVerified` 均为 true，`before`、`after` 是两个版本；`app.log` 含 ready 状态，`dump.json` 的 `loaded` 是 true、`load_error` 为空。
+4. 检查新旧输出目录都含 `.app`、`.dmg`、`.zip`、`release.json`。用 `codesign --verify --deep --strict <app>` 验签；ad-hoc 验签不代表 Developer ID 或公证通过。
+
+脚本不改 `/Applications`，失败也保留证据；日志中出现 hash、signature 或 archive 错误时先查清单和包，不跳过校验。交付后可删两个输出目录和打印的临时目录。

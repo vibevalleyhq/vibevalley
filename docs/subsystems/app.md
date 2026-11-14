@@ -84,7 +84,15 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 
 1. `apps/mac/build.rs` 用 nsh 的命令行（`NSH_BIN`、仓库的 `.tools/bin/nsh` 或 `PATH` 里的）把 `apps/mac/ui/App.tsx` 打成一个包。
 2. 调试构建从磁盘读 `apps/mac/ui/build/`，改 TSX 不用重新编译 Rust；发布构建（或设了 `VIBEVALLEY_EMBED_UI`）把包嵌进二进制。
-3. 没有 nsh 时构建照样过，应用里的视图说包没打出来。
+3. 没有 nsh 时调试构建仍可通过，应用里的视图报缺包；发布构建直接失败。
+
+### 打包和更新
+
+`scripts/release/package.ts` 将应用、命令行和灵动岛放进 `.app/Contents/MacOS`，素材与页面包放进 `Contents/Resources`。应用从自身包定位资源，不依赖构建仓库的位置；`release.json` 记录版本、架构、ZIP 文件名、字节数和 SHA-512。
+
+`apps/mac/src/update` 只在打包版本上启动更新检查，启动时和每四小时各检查一次。稳定版读最新正式版，alpha、beta 各读同阶段最新版本；仓库运行和 `0.0.0` 不自动检查。`VIBEVALLEY_UPDATE_FEED=off` 关闭检查，指定清单 URL 可验证本地更新。
+
+更新包的大小、哈希、归档路径、版本和签名全部通过后才进入 ready；Developer ID 应用只接受同一团队签名。DMG、系统转移位置或不可写目录要求手工安装。更新先复制到应用旁边，退出后由独立进程替换；移动新包失败时恢复原包。页面的立即安装会重启，普通退出只替换；原包保留在同目录的 `.VibeValley-previous-<pid>.app`。更新不移动或迁移用户数据。
 
 ## 和谁打交道
 
@@ -100,7 +108,7 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 
 ## 还没做的
 
-签名、公证、打包和自动更新，以及还没搬过来的页面和宿主能力，见[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)的「剩下的」。
+还没搬过来的页面和宿主能力，见[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)的「剩下的」。
 
 ## 怎么验证
 

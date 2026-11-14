@@ -94,3 +94,15 @@ test("with the scripted helper, an issue goes out, comes back and is completed t
     rmSync(result.evidence, { recursive: true, force: true });
   }
 }, 120_000);
+
+test("regression: a missing validation executable reports failure and releases the sandbox", async () => {
+  const result = await runVerification(["/nonexistent/vibevalley-validation-command"]);
+  try {
+    expect(result.code).toBe(1);
+    expect(readFileSync(join(result.evidence, "spawn-error.log"), "utf8")).toContain("ENOENT");
+    expect(JSON.parse(readFileSync(join(result.evidence, "result.json"), "utf8"))).toMatchObject({ stopped: true });
+    expect(existsSync(join(result.evidence, "home"))).toBe(false);
+  } finally {
+    rmSync(result.evidence, { recursive: true, force: true });
+  }
+}, 60_000);

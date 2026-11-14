@@ -8,11 +8,11 @@ base=$(git merge-base "$main" HEAD)
 changed=$(git diff --name-only --no-renames "$base")
 rust=false
 packages=false
-web=false
+mac=false
 while IFS= read -r path; do
     case "$path" in crates/*|apps/mac/*|Cargo.*) rust=true ;; esac
     case "$path" in packages/*) packages=true ;; esac
-    case "$path" in apps/web/*|apps/desktop/*|packages/*) web=true ;; esac
+    case "$path" in apps/mac/ui/*|packages/*) mac=true ;; esac
 done <<PATHS
 $changed
 PATHS
@@ -33,8 +33,8 @@ fi
 if "$packages"; then
     vp run packages:check
 fi
-if "$web"; then
-    vp run web:check
+if "$mac"; then
+    vp run mac:check
 fi
 # Docs, the notes' catalog and our primitives drift with any change, not only a docs one.
 vp run docs:verify

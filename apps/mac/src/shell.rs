@@ -1143,6 +1143,9 @@ impl Shell {
     /// (packages/protocol/src/host.ts) and VibeValley's terminal.
     pub fn host_call(&mut self, op: &str, payload: Value, reply: crate::hosted::Replier, window: &mut Window, cx: &mut Context<Self>) {
         use vibevalley_bridge::{BizCode, Envelope, refusal};
+        if op.starts_with("host.update") {
+            return crate::update::host_call(op, reply, cx);
+        }
         let text = |k: &str| payload[k].as_str().unwrap_or_default().to_string();
         let envelope = match op {
             "host.info" => {
@@ -1177,7 +1180,7 @@ impl Shell {
                     "monoFonts": fonts,
                     "terminalFontSize": settings.terminal_font_size,
                     "uiFontSize": settings.ui_font_size,
-                    "capabilities": ["notify", "tray", "locale", "reveal", "theme", "font", "opening", "openTerminal", "openUrl", "openFile", "pixelDir", "playAudio", "readFile"],
+                    "capabilities": ["notify", "tray", "locale", "reveal", "theme", "font", "opening", "openTerminal", "openUrl", "openFile", "pixelDir", "playAudio", "readFile", "update"],
                 }))
             }
             "host.font" => {
