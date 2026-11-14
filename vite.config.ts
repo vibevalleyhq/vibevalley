@@ -15,7 +15,7 @@ export default defineConfig({
   // result. What writes files (api:client, protocol:ts…) stays a package.json script.
   run: {
     tasks: {
-      "scripts:test": "vp test run",
+      "scripts:test": { command: "vp test run", cache: false },
       "docs:verify": [
         "vpx scripts/docs/agent-notes.ts",
         "vpx scripts/docs/skills.ts",
