@@ -281,7 +281,7 @@ const RULES: readonly Rule[] = [
     name: "a word list for an issue's or a session's state outside the protocol's rules",
     pattern:
       /(?<!Partial<)Record<(Outcome|StuckReason|IssueStatus|IssueStageKind|IssueAct|Landing|IssueCanceled|Deliverable|SessionClose|Priority), string>|\bcompleted: "做完|\binterrupted: "(叫停|被叫停|停下)/u,
-    says: "the shared catalog's words (packages/i18n/locales/*/shared.json: status, attention, stuck, act, outcome, delivered, canceled, deliverable, priority): say a sentence with them, do not keep another list",
+    says: "the shared catalog's words (crates/vibevalley-i18n/locales/*/shared.json: status, attention, stuck, act, outcome, delivered, canceled, deliverable, priority): say a sentence with them, do not keep another list",
     except: /^packages\/protocol\/src\/rules\//u,
   },
 
@@ -443,12 +443,12 @@ const RULES: readonly Rule[] = [
 ];
 
 // A catalog (and the test that reads the English page) says what the user reads, in the glossary's English column (docs/README.md glossary.
-const userWords = (source: string) => source.startsWith("packages/i18n/locales/") || source === "apps/web/test/english.spec.ts";
+const userWords = (source: string) => source.startsWith("crates/vibevalley-i18n/locales/") || source === "apps/web/test/english.spec.ts";
 const han = /\p{Script=Han}/u;
 
 /** Where a catalog's words are said: web.farm.phone is apps/web/src/farm/phone's, web.setting apps/web/src/features/ setting's, shared both sides'. */
 function placeOf(ns: string): string {
-  if (ns === "shared") return "packages/i18n/locales/shared.json";
+  if (ns === "shared") return "crates/vibevalley-i18n/locales/shared.json";
   const [host, ...parts] = ns.split(".");
   if (parts.length > 0) {
     for (const container of ["features", "modules", "gateway"]) {
@@ -462,7 +462,7 @@ function placeOf(ns: string): string {
 export function staleNamesIn(source: string, text: string): string[] {
   const hits: string[] = [];
   const lines = text.split("\n");
-  const file = source.startsWith("packages/i18n/locales/") ? placeOf(source.split("/").pop()!.slice(0, -".json".length)) : source;
+  const file = source.startsWith("crates/vibevalley-i18n/locales/") ? placeOf(source.split("/").pop()!.slice(0, -".json".length)) : source;
   for (const [i, line] of lines.entries()) {
     for (const rule of RULES) {
       if (!(rule.dirs ?? TS_DIRS).some((dir) => file.startsWith(dir + "/"))) continue;
@@ -475,7 +475,7 @@ export function staleNamesIn(source: string, text: string): string[] {
 }
 
 if (import.meta.main) {
-  const catalogs = globSync("packages/i18n/locales/*/*.json", { cwd: root }).toSorted();
+  const catalogs = globSync("crates/vibevalley-i18n/locales/*/*.json", { cwd: root }).toSorted();
   const files = DIRS.flatMap((dir) =>
     globSync(`${dir}/**/*.{ts,tsx,rs}`, { cwd: root, exclude: (f) => f.includes("node_modules") || f.endsWith("/build") }),
   ).toSorted();

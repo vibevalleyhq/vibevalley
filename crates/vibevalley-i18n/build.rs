@@ -1,8 +1,8 @@
-// Embeds the server, command line and shared dictionaries of packages/i18n/locales/<lang>/.
+// Embeds the server, command line and shared dictionaries of locales/<lang>/.
 use std::fmt::Write;
 
 fn main() {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packages/i18n/locales");
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("locales");
     println!("cargo:rerun-if-changed={}", dir.display());
     let mut out = String::from("pub(crate) static CATALOGS: &[(&str, &str, &str)] = &[\n");
     let mut entries = vec![];

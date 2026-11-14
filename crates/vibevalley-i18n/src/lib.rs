@@ -1,7 +1,7 @@
 //! VibeValley's dictionaries and message format, for text the Rust side
 //! writes (inbox words, phase texts, refusals, cron texts). Port of
 //! `packages/i18n/src/{index,format}.ts`; the dictionaries are
-//! `packages/i18n/locales`, embedded at build time.
+//! `locales/`, embedded at build time.
 //!
 //! `t("server.cron.when.daily", &[("time", "09:00".into())])`
 

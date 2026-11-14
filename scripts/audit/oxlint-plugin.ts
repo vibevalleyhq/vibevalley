@@ -328,7 +328,7 @@ export function catalogOf(filename: string): string {
     .filter((f) => f !== "features" && f !== "platform" && f !== "modules" && f !== "gateway");
   for (let n = folders.length; n > 0; n--) {
     const name = [host, ...folders.slice(0, n)].join(".");
-    if (existsSync(resolve(repo, "packages/i18n/locales/zh", `${name}.json`))) return name;
+    if (existsSync(resolve(repo, "crates/vibevalley-i18n/locales/zh", `${name}.json`))) return name;
   }
   return host;
 }
@@ -338,7 +338,7 @@ const noCjkLiteral = defineRule({
     messages: {
       cjk: says(
         "words written in code are not translated: an English farm would show them in Chinese",
-        'for the owner, add a key to packages/i18n/locales/zh/{{catalog}}.json and en/{{catalog}}.json, run `vp run i18n:gen`, and write `t("{{catalog}}.<key>")`; for a model, put it in this module\'s prompts.ts',
+        'for the owner, add a key to crates/vibevalley-i18n/locales/zh/{{catalog}}.json and en/{{catalog}}.json, run `vp run i18n:gen`, and write `t("{{catalog}}.<key>")`; for a model, put it in this module\'s prompts.ts',
         "packages/i18n/README.md",
       ),
     },

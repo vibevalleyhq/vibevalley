@@ -1,9 +1,10 @@
-// Written by `vpx scripts/gen/i18n.ts gen` from packages/i18n/locales: do not edit.
+// Written by `vpx scripts/gen/i18n.ts gen` from crates/vibevalley-i18n/locales: do not edit.
 
 /** Each language's catalogs by namespace. */
 export const catalogs = {
   zh: {
     cli: {
+      about: "VibeValley 的命令行：一条命令是服务端的一个操作，<资源> [<子资源>] <动作>",
       flag: {
         prompt: "问一句就走，不进对话",
         model: "模型",
@@ -4656,6 +4657,7 @@ export const catalogs = {
   },
   en: {
     cli: {
+      about: "VibeValley's command line: one command is one operation of the server's, <resource> [<sub-resource>] <verb>",
       flag: {
         prompt: "Ask once and leave, without a conversation",
         model: "The model",
@@ -9617,6 +9619,7 @@ export const catalogs = {
 
 /** Every key, and the params its zh message names (undefined: none). */
 export interface Messages {
+  "cli.about": undefined;
   "cli.agent.deleted": { readonly agent: string | number };
   "cli.arg.agent": undefined;
   "cli.arg.agentName": undefined;

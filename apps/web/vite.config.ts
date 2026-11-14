@@ -28,7 +28,7 @@ const openingKeys = {
   download: "web.opening.download",
 } as const;
 const openingWords = () => {
-  const locales = join(import.meta.dirname, "../../packages/i18n/locales");
+  const locales = join(import.meta.dirname, "../../crates/vibevalley-i18n/locales");
   const words: Record<string, Record<string, string>> = {};
   for (const locale of readdirSync(locales)) {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the locales' own files, checked by scripts/gen/i18n.ts
