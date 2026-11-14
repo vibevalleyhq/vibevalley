@@ -54,11 +54,13 @@ mkdirSync(out, { recursive: true });
 rmSync(app, { recursive: true, force: true });
 mkdirSync(macos, { recursive: true });
 mkdirSync(resources, { recursive: true });
-cpSync(join(target, "vibevalley-mac"), join(macos, "VibeValley"));
+cpSync(join(target, "vibevalley-mac"), join(macos, "vibevalley-mac"));
 cpSync(join(target, "vibevalley"), join(macos, "vibevalley"));
 cpSync(join(root, "apps/island/.build/release/VibeValleyIsland"), join(macos, "VibeValleyIsland"));
 cpSync(join(root, "assets"), join(resources, "assets"), { recursive: true, dereference: true });
 cpSync(join(root, "apps/mac/ui/build"), join(resources, "ui"), { recursive: true });
+const sign = (path: string) => run("codesign", ["--force", "--sign", identity, ...(identity === "-" ? [] : ["--options", "runtime", "--timestamp"]), path]);
+for (const bin of ["vibevalley", "VibeValleyIsland", "vibevalley-mac"]) sign(join(macos, bin));
 writeFileSync(
   join(app, "Contents/Info.plist"),
   `<?xml version="1.0" encoding="UTF-8"?>
@@ -66,7 +68,7 @@ writeFileSync(
 <plist version="1.0"><dict>
 <key>CFBundleIdentifier</key><string>dev.vibevalley.app</string>
 <key>CFBundleName</key><string>VibeValley</string>
-<key>CFBundleExecutable</key><string>VibeValley</string>
+<key>CFBundleExecutable</key><string>vibevalley-mac</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>VibeValleyVersion</key><string>${version}</string>
 <key>CFBundleShortVersionString</key><string>${version.split("-")[0]}</string>
@@ -76,8 +78,6 @@ writeFileSync(
 <key>NSMicrophoneUsageDescription</key><string>VibeValley uses the microphone for voice conversations and dictation.</string>
 </dict></plist>\n`,
 );
-const sign = (path: string) => run("codesign", ["--force", "--sign", identity, ...(identity === "-" ? [] : ["--options", "runtime", "--timestamp"]), path]);
-for (const bin of ["vibevalley", "VibeValleyIsland", "VibeValley"]) sign(join(macos, bin));
 sign(app);
 run("codesign", ["--verify", "--deep", "--strict", app]);
 const arch = process.arch === "arm64" ? "arm64" : "x64";

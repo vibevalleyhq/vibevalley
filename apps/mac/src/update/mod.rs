@@ -266,6 +266,10 @@ fn updater() -> &'static Arc<Updater> {
     UPDATER.get_or_init(|| Arc::new(Updater::from_env()))
 }
 
+pub fn version() -> &'static str {
+    &updater().version
+}
+
 pub fn enter_bundle() {
     let exe = std::env::current_exe().ok();
     let Some(bundle) = exe.as_deref().and_then(Path::to_str).and_then(releases::bundle_of) else {
@@ -330,6 +334,39 @@ pub fn host_call(op: &str, reply: crate::hosted::Replier, cx: &mut App) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn regression_a_failed_replacement_restores_the_previous_bundle() {
+        use std::os::unix::fs::PermissionsExt as _;
+        let dir = tempfile::tempdir().unwrap();
+        let current = dir.path().join("VibeValley.app");
+        let next = dir.path().join("next.app");
+        let old = dir.path().join("previous.app");
+        std::fs::create_dir(&current).unwrap();
+        std::fs::create_dir(&next).unwrap();
+        std::fs::write(current.join("version"), "old").unwrap();
+        std::fs::write(next.join("version"), "new").unwrap();
+        let mv = dir.path().join("mv");
+        std::fs::write(&mv, "#!/bin/sh\ncase \"$1\" in */next.app) exit 1;; esac\nexec /bin/mv \"$@\"\n").unwrap();
+        std::fs::set_permissions(&mv, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let mut finished = std::process::Command::new("/usr/bin/true").spawn().unwrap();
+        let pid = finished.id();
+        finished.wait().unwrap();
+        let status = std::process::Command::new("/bin/sh")
+            .args(["-c", SWAP_SCRIPT, "swap"])
+            .arg(pid.to_string())
+            .arg(&current)
+            .arg(&next)
+            .arg(&old)
+            .arg("0")
+            .env("PATH", dir.path())
+            .status()
+            .unwrap();
+        assert!(!status.success());
+        assert_eq!(std::fs::read_to_string(current.join("version")).unwrap(), "old");
+        assert_eq!(std::fs::read_to_string(next.join("version")).unwrap(), "new");
+        assert!(!old.exists());
+    }
 
     #[test]
     fn only_a_packaged_tagged_app_asks_and_within_its_own_stage() {

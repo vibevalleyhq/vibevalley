@@ -9,19 +9,23 @@ use super::releases::{self, Build};
 
 const CURL: &str = "/usr/bin/curl";
 
+fn transfer(url: &str) -> Command {
+    let local = url
+        .strip_prefix("http://")
+        .and_then(|rest| rest.split('/').next())
+        .and_then(|authority| authority.parse::<std::net::SocketAddr>().ok())
+        .is_some_and(|address| address.ip().is_loopback());
+    let mut command = Command::new(CURL);
+    command.args(["--proto", if local { "=http" } else { "=https" }, "--proto-redir", "=https"]);
+    if local {
+        command.args(["--max-redirs", "0"]);
+    }
+    command
+}
+
 pub fn text(url: &str) -> Result<(u16, String), String> {
-    let out = Command::new(CURL)
-        .args([
-            "-sSL",
-            "--proto",
-            "=https,http",
-            "--connect-timeout",
-            "20",
-            "--max-time",
-            "60",
-            "--max-filesize",
-            "1048576",
-        ])
+    let out = transfer(url)
+        .args(["-sSL", "--connect-timeout", "20", "--max-time", "60", "--max-filesize", "1048576"])
         .args(["-H", "accept: application/json, application/vnd.github+json", "-w", "\n%{http_code}", "--"])
         .arg(url)
         .stdin(Stdio::null())
@@ -36,10 +40,10 @@ pub fn text(url: &str) -> Result<(u16, String), String> {
 }
 
 fn download(url: &str, to: &Path, size: u64, mut percent: impl FnMut(u8)) -> Result<(), String> {
-    let mut child = Command::new(CURL)
+    let mut child = transfer(url)
         .arg("--max-filesize")
         .arg(size.to_string())
-        .args(["-fsSL", "--proto", "=https,http", "--connect-timeout", "20", "--max-time", "1800", "-o"])
+        .args(["-fsSL", "--connect-timeout", "20", "--max-time", "1800", "-o"])
         .arg(to)
         .arg("--")
         .arg(url)
@@ -160,6 +164,24 @@ pub fn staged_app(url: &str, build: &Build, version: &str, bundle: &Path, folder
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn regression_plain_http_is_only_allowed_for_a_loopback_feed_without_redirects() {
+        use std::io::Write as _;
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut connection, _) = listener.accept().unwrap();
+            let mut request = [0u8; 2048];
+            assert!(connection.read(&mut request).unwrap() > 0);
+            connection
+                .write_all(b"HTTP/1.1 302 Found\r\nLocation: http://example.invalid/release.json\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                .unwrap();
+        });
+        assert!(text(&format!("http://{address}/release.json")).is_err());
+        server.join().unwrap();
+        assert!(text("http://example.invalid/release.json").is_err());
+    }
 
     #[test]
     fn a_files_size_and_sha512_are_measured() {

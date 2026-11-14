@@ -1173,7 +1173,7 @@ impl Shell {
                 fonts.dedup();
                 Envelope::ok(json!({
                     "name": "desktop",
-                    "version": env!("CARGO_PKG_VERSION"),
+                    "version": crate::update::version(),
                     "titleBar": { "top": 28, "left": 68 },
                     "terminal": true,
                     "monoFont": settings.mono_font,

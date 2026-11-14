@@ -10,6 +10,8 @@ import { parseArgs } from "node:util";
 
 import { z } from "zod";
 
+import { pathOf } from "@vibevalley/protocol";
+
 const { values } = parseArgs({ options: { from: { type: "string" }, to: { type: "string" } } });
 if (!values.from || !values.to) throw new Error("update-check --from <old/VibeValley.app> --to <new/release.json>");
 const source = resolve(values.from);
@@ -64,15 +66,15 @@ Object.assign(env, {
 });
 let child: ChildProcess | undefined;
 let log = "";
-async function launch(timeout: number) {
-  child = spawn(join(app, "Contents/MacOS/VibeValley"), [], { cwd: join(dir, "work"), env, stdio: ["ignore", "pipe", "pipe"] });
+async function launch(timeout: number, checkHealth = false) {
+  child = spawn(join(app, "Contents/MacOS/vibevalley-mac"), [], { cwd: join(dir, "work"), env, stdio: ["ignore", "pipe", "pipe"] });
   child.stdout?.on("data", (b: Buffer) => {
     log += b.toString();
   });
   child.stderr?.on("data", (b: Buffer) => {
     log += b.toString();
   });
-  await new Promise<void>((accept, reject) => {
+  const exited = new Promise<void>((accept, reject) => {
     const timer = setTimeout(() => {
       child?.kill("SIGKILL");
       reject(new Error("Packaged app did not exit before deadline"));
@@ -87,6 +89,34 @@ async function launch(timeout: number) {
       else reject(new Error(`Packaged app exited ${code}/${signal}`));
     });
   });
+  const healthy = async () => {
+    if (!checkHealth) return;
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
+      try {
+        const receipt = z.object({ pid: z.number(), url: z.url() }).parse(JSON.parse(await readFile(join(dir, "home/server.json"), "utf8")));
+        if (receipt.pid === child?.pid && new URL(receipt.url).hostname === "127.0.0.1") {
+          const response = await fetch(receipt.url + pathOf("server.health.get"), {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: "{}",
+            signal: AbortSignal.timeout(1000),
+          });
+          const health = z.object({ data: z.object({ ok: z.literal(true) }) }).safeParse(await response.json());
+          if (response.ok && health.success) {
+            await writeFile(join(dir, "health.json"), JSON.stringify({ ...health.data, pid: receipt.pid, url: receipt.url }));
+            return;
+          }
+        }
+      } catch {
+        /* The new process has not announced its server yet. */
+      }
+      if (child?.exitCode !== null) throw new Error("Updated app exited before its server became healthy");
+      await delay(100);
+    }
+    throw new Error("Updated app server never became healthy");
+  };
+  await Promise.all([exited, healthy()]);
 }
 try {
   await launch(150_000);
@@ -106,17 +136,32 @@ try {
   execFileSync("codesign", ["--verify", "--deep", "--strict", app]);
   await writeFile(
     steps,
-    [{ shell: 'hosted:vv {"route":"/issues"}' }, { shell: "wait:1500" }, { shell: "quit" }].map((step) => JSON.stringify(step)).join("\n") + "\n",
+    [{ shell: 'hosted:vv {"route":"/issues"}' }, { shell: "wait:5000" }, { shell: "quit" }].map((step) => JSON.stringify(step)).join("\n") + "\n",
   );
   env.VIBEVALLEY_UPDATE_FEED = "off";
-  await launch(30_000);
+  await launch(30_000, true);
+  const view = z.object({
+    view: z.string(),
+    ready: z.boolean(),
+    errors: z.array(z.string()),
+    applied: z.array(z.object({ topic: z.string(), rev: z.number() })),
+  });
   const dump = z
-    .object({ loaded: z.boolean(), load_error: z.string().nullish() })
-    .loose()
+    .object({ loaded: z.boolean(), load_error: z.string().nullish(), workbench: view, sidebar: view })
     .parse(JSON.parse(await readFile(join(dir, "dump.json"), "utf8")));
   if (!dump.loaded || dump.load_error != null) throw new Error("The updated app did not load its workspace");
+  if (
+    !dump.workbench.ready ||
+    dump.workbench.errors.length > 0 ||
+    dump.sidebar.errors.length > 0 ||
+    !dump.workbench.applied.some((frame) => frame.topic === "state")
+  )
+    throw new Error("The updated workspace did not apply a state frame without errors");
   await stat(join(app, "Contents/Resources/ui/bundle.js"));
-  await writeFile(join(dir, "result.json"), JSON.stringify({ ok: true, before, after, restarted: true, signatureVerified: true, evidence: dir }, null, 2));
+  await writeFile(
+    join(dir, "result.json"),
+    JSON.stringify({ ok: true, before, after, restarted: true, serverHealthy: true, signatureVerified: true, evidence: dir }, null, 2),
+  );
   console.log(`Update and restart passed: ${before} -> ${after}\nEvidence: ${dir}`);
 } finally {
   if (child && child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");

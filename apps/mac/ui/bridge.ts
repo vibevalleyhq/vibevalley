@@ -141,6 +141,9 @@ export const hostApi = {
       uiFontSize?: number;
       capabilities: string[];
     }>("host.info"),
+  updateState: () => call<unknown>("host.updateState", null, { timeoutMs: 5_000 }),
+  updateCheck: () => call<void>("host.updateCheck"),
+  updateInstall: () => call<void>("host.updateInstall"),
   font: (font: { monoFont?: string; terminalFontSize?: number; uiFontSize?: number }) =>
     call<{ monoFont: string; terminalFontSize: number; uiFontSize: number }>("host.font", font),
   notify: (notice: { title: string; body: string }) => call<void>("host.notify", notice),
