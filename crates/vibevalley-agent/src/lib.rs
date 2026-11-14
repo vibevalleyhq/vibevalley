@@ -10,7 +10,7 @@ pub mod model;
 pub mod price;
 pub mod tool;
 
-pub use conversation::{Brain, BrainEvent, Conversation, Entry, TurnOutcome};
+pub use conversation::{Brain, BrainEvent, Conversation, Entry, TurnOutcome, read_entries};
 pub use model::{ChatRequest, Completion, Delta, FinishReason, Message, ModelClient, OpenAiClient, Role, ToolCall, ToolSpec, Usage};
 pub use tool::{Tool, ToolOutput, Workspace, coding_tools};
 

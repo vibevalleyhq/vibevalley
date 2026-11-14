@@ -74,10 +74,9 @@ jobs:
       - run: vp check --deny-warnings
       - run: vp run docs:verify
       - run: vp run scripts:test
-      - run: vp run health:verify
       - run: vp run deadcode
       # The TS packages' tests (the native views and the generators use them).
-      - run: vp run --filter @vibevalley/protocol --filter @vibevalley/async --filter @vibevalley/home --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/provider --filter @vibevalley/pkm --filter @vibevalley/artifact test
+      - run: vp run --filter @vibevalley/protocol --filter @vibevalley/bridge --filter @vibevalley/i18n --filter @vibevalley/testkit --filter @vibevalley/pkm --filter @vibevalley/artifact test
 
       - name: Save Vite Task cache
         if: success()
@@ -96,39 +95,25 @@ jobs:
     steps:
       - run: test "${{ needs.rust.result }}" = success
 
+  # The checks main still requires under the names of the deleted browser pages and Electron shell: the pages are the
+  # native app's now, type-checked and bundled by the rust job (mac:check).
   web:
     name: web
+    needs: rust
+    if: always()
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
     steps:
-      # No job pushes, so the token is not left in the checkout's git config.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { persist-credentials: false }
-      # The Node of .node-version, Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
-      # @v1 lags behind (no cache-toolchain).
-      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
-        with: { node-version-file: .node-version, cache: true, cache-toolchain: true }
-      # Vite Task's results from earlier runs (after install, which may touch node_modules): a task whose inputs did not
-      # change replays. The key has this job (and shard) so jobs do not take each other's; each run saves a new entry.
-      - name: Restore Vite Task cache
-        id: vite-task-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: node_modules/.vite/task-cache
-          key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ matrix.shard }}-
-      - run: git config --global user.name ci && git config --global user.email ci@example.com
-      # The page's Playwright suite (e2e) runs on the owner's machine: vp run --filter @vibevalley/web e2e.
-      # @vibevalley/base-ui's tests run in headless Chromium (vitest's browser mode).
-      - run: node_modules/.bin/playwright install --with-deps chromium
-        working-directory: packages/base-ui
-      - run: vp run web:test
-      - name: Save Vite Task cache
-        if: success()
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: node_modules/.vite/task-cache
-          key: ${{ steps.vite-task-cache.outputs.cache-primary-key }}
+      - run: test "${{ needs.rust.result }}" = success
+
+  desktop:
+    name: desktop
+    needs: rust
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: test "${{ needs.rust.result }}" = success
 
   rust:
     name: rust

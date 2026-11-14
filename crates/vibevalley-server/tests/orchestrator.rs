@@ -160,6 +160,34 @@ fn the_orchestrator_hears_the_user_and_records_an_issue() {
     let events = user("session.event.list", json!({ "id": "orchestrator" }));
     assert!(events.to_string().contains("issue_create"), "{events}");
 
+    // The user marks that answer wrong: the turn is kept as a case to replay.
+    let asked = events
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["type"] == "user/message")
+        .unwrap_or_else(|| panic!("{events}"));
+    let said = events.as_array().unwrap().iter().find(|e| e["type"] != "user/message").unwrap();
+    let marked = user("orchestrator.eval.create", json!({ "on": asked["seq"], "want": " 应该先看一眼地里 " }));
+    let file = std::path::PathBuf::from(marked["file"].as_str().unwrap());
+    assert_eq!(file, dir.path().join("evals").join(format!("{}.json", marked["id"].as_str().unwrap())));
+    let case: Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+    assert_eq!(case["want"], "应该先看一眼地里");
+    assert!(case["input"].as_str().unwrap().ends_with("用户说：帮我在 demo 里把 README 写了"), "{case}");
+    assert!(case["tools"].as_array().unwrap().iter().any(|t| t == "issue_create"), "{case}");
+    assert_eq!(case["did"].as_array().unwrap().last().unwrap()["content"], "记下了 #1，在备选里。", "{case}");
+    assert_eq!(case["before"], json!([]), "the first turn has nothing before it");
+    let refusal = |p: Value| hub.call_as(Caller::User, "orchestrator.eval.create", p).biz_code;
+    assert_eq!(
+        refusal(json!({ "on": 9999, "want": "x" })),
+        vibevalley_protocol::BizCode::SessionNotFound.code()
+    );
+    assert_eq!(
+        refusal(json!({ "on": asked["seq"], "want": "  " })),
+        vibevalley_protocol::BizCode::Refused.code()
+    );
+    assert_eq!(refusal(json!({ "on": said["seq"], "want": "x" })), vibevalley_protocol::BizCode::Refused.code());
+
     // A cron for no profile: said in #general, handed to the orchestrator.
     let at = vibevalley_server::now() + 300;
     user(

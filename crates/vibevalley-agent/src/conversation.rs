@@ -406,7 +406,8 @@ fn output_text(output: &ToolOutput) -> String {
     }
 }
 
-fn read_entries(path: &Path) -> Result<Vec<Entry>> {
+/// The transcript stored at `path`, oldest first; empty when there is none.
+pub fn read_entries(path: &Path) -> Result<Vec<Entry>> {
     let Ok(file) = File::open(path) else { return Ok(Vec::new()) };
     let mut out = Vec::new();
     for line in BufReader::new(file).lines() {
