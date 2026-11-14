@@ -378,7 +378,7 @@ impl Orchestrator {
             .iter()
             .enumerate()
             .filter(|(_, e)| matches!(e, Entry::TurnStarted { input } if input.contains(&asked.text)));
-        let Some((at, Entry::TurnStarted { input })) = turns.clone().nth(nth).or_else(|| turns.last()) else {
+        let Some((at, Entry::TurnStarted { input })) = turns.clone().nth(nth).or_else(|| turns.clone().next_back()) else {
             return Err(refused(
                 BizCode::Refused,
                 t("server.session.host.notInConversation", &[("on", on.into()), ("label", label.into())]),
