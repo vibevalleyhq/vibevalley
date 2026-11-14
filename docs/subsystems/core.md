@@ -43,7 +43,7 @@
 | 路径 | 编码 Schema | 初始消息 | 后续推送 | 消费者 |
 |---|---|---|---|---|
 | `GET /api/v1/state` | `StateFrame` | 首帧 `StateFrame` | 200ms 窗口合并后的 `StateFrame` | 页面、`issue show --watch` |
-| `GET /api/v1/live` | `LiveEvent` | 无 | `SessionEvent`、`Notice`、`Runtime` | 页面 |
+| `GET /api/v1/live`（别名 `/api/v1/events`） | `LiveEvent` | 无 | `SessionEvent`、`Notice`、`Runtime` | 页面 |
 | `GET /api/v1/issue/watch/:id` | `IssueWatch` | 工单状态与保留的轨迹 | 状态、轨迹和缺口（[观察执行](docs/subsystems/issue.md#观察执行)） | `issue watch` |
 | `GET /api/v1/subscribe/<名字>?payload=<JSON>` | 各订阅的 `event`（`packages/protocol/src/rpc.ts` 定义） | 补齐 `after` 之后的变化 | 之后的每次变化 | 页面：`channel.follow`、`channel.reports`、`artifact.follow`、`artifact.suggestion.follow` |
 
@@ -55,9 +55,8 @@ SSE 以外的路由：
 - `PUT`、`GET /api/v1/media/input/<id>/content`：上传和读取媒体输入；`GET /api/v1/media/speech/<id>/stream`：合成语音的流（[媒体](docs/subsystems/media.md)）。
 - `/mcp`：帮工的工具（[频道](docs/subsystems/channel.md)）。
 
-- **客户端拥有连接的完整生命周期**：`packages/protocol/src/stream.ts` 在坏帧、回调抛错、HTTP 拒绝、取消和静默超时退出时中止请求并释放 reader；清理失败不覆盖原始错误。重连不留下旧连接。
+- **客户端拥有流与订阅的生命周期**：原生页面经 `crates/vibevalley-bridge` 直接收发 `StateFrame`、`LiveEvent` 与订阅事件，视图关闭或取消订阅时立即释放 `Subscription`；命令行的 `sse_events`（`crates/vibevalley-cli/src/farm.rs`）在 HTTP SSE 上按空行分帧解码，坏帧、HTTP 拒绝或退出时立即释放连接。
 - **心跳**：每条 SSE 连接（含工单观察流和订阅流）每 20 秒发 `: ping` 心跳；订阅方断开时释放源订阅。
-- **客户端分帧**：`packages/protocol/src/stream.ts` 的 `readStream` 接受 LF 和 CRLF 空行分隔的事件；换行和空行可跨网络 chunk。完整帧经该流已有的 Schema 解码后按顺序回调一次；取消、静默超时或坏帧会终止读取。
 - **写接口返回 `seq` 对齐画面帧**：工单写接口（`issue.create`、`issue.update`、`issue.status.update`、`issue.comment.create`）在 `Hub::apply` 后返回当前 `seq`，页面以 `frame.seq >= reply.seq` 作为意图结算条件。
 
 ### HTTP 接口与命令行

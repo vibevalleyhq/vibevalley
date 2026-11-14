@@ -50,7 +50,7 @@
 
 ### 异步、资源与错误
 
-- **边界解码一次，门内全是类型**：HTTP 的入参经 `decode`（`crates/vibevalley-server/src/lib.rs`，serde）按端点的类型解成结构体，解不开当场拒绝；文件、厂商响应、模型给的工具参数各在进门处解成结构体和 enum。门内不传 `serde_json::Value`，不按字符串分支（还有存量，见 Note 的 R2、R4）。
+- **边界解码一次，门内全是类型**：HTTP 的入参经 `decode`（`crates/vibevalley-server/src/lib.rs`，serde）按端点的类型解成结构体，解不开当场拒绝；文件、厂商响应、模型给的工具参数各在进门处解成结构体和 enum。门内不传 `serde_json::Value`，不按字符串分支。
 - **钥匙是 `Secret`**：`settings.json` 里的钥匙读成 `Secret`（`crates/vibevalley-server/src/modules/setting.rs`），打印只出提示。
 - **拒绝带 `BizCode`**：对调用方的拒绝是 `ApiError`（带 `bizCode` 与 `next`），网关写成全信封；模块内部可分辨的失败是 `thiserror` 的 enum；预期的结果（合进去或冲突）返回 enum，不当错误。
 - **普通线程，不进异步运行时**：模块的方法都是阻塞的，后台的活是 `std::thread` 加 `flume` 通道；只有 HTTP（axum）在 tokio 上，经 `vibevalley-server-api` 的 `Server` trait 调进来。

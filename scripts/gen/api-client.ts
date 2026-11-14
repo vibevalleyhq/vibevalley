@@ -54,7 +54,7 @@ function method(e: (typeof endpoints)[number], indent: string): string {
       indent
     : "";
   const input = e.input === undefined ? "undefined" : "a";
-  return `${indent}${doc}${name}: (${args ? args + ", " : ""}options?: { signal?: AbortSignal }): Promise<${sig.result}> => this.call<${sig.result}>(${JSON.stringify(pathOf(e.op))}, ${input}, options),`;
+  return `${indent}${doc}${name}: (${args ? args + ", " : ""}options?: { signal?: AbortSignal }): Promise<${sig.result}> => this.call<${sig.result}>(${JSON.stringify(e.op)}, ${JSON.stringify(pathOf(e.op))}, ${input}, options),`;
 }
 
 // module → its own ops and its nouns' (issue.create, issue.status.update).
@@ -123,47 +123,38 @@ for (const e of endpoints) {
 
 const isObject = (u: unknown): u is Record<string, unknown> => typeof u === "object" && u !== null;
 
-/** The server's HTTP API, one object per module and noun, a method per op: \`api.issue.status.update({ id, status })\`. */
+export type VibeValleyCaller = (op: string, input: unknown, options?: { signal?: AbortSignal }) => Promise<unknown>;
+
+const abortError = (signal: AbortSignal): Error =>
+  signal.reason instanceof Error ? signal.reason : new DOMException("The operation was aborted.", "AbortError");
+
+/** The server's HTTP or bridge API, one object per module and noun, a method per op: \`api.issue.status.update({ id, status })\`. */
 export class VibeValleyApi {
   /** The server's address; empty is the page's own origin, which serves it. */
   readonly base: string;
   private readonly fetcher: (url: string, init: RequestInit) => Promise<Response>;
+  private readonly caller: VibeValleyCaller | undefined;
   /** A device key to send as a Bearer token: the command line's, signed in to a server through its gate. */
   private readonly key: string | undefined;
 
-  constructor(base = "", fetcher: (url: string, init: RequestInit) => Promise<Response> = (url, init) => fetch(url, init), key?: string) {
+  constructor(
+    base = "",
+    fetcher: (url: string, init: RequestInit) => Promise<Response> = (url, init) => fetch(url, init),
+    key?: string,
+    caller?: VibeValleyCaller,
+  ) {
     this.base = base;
     this.fetcher = fetcher;
     this.key = key;
+    this.caller = caller;
+  }
+
+  /** Calls endpoints directly via an in-process envelope transport without HTTP or JSON round-trips. */
+  static over(caller: VibeValleyCaller): VibeValleyApi {
+    return new VibeValleyApi("", undefined, undefined, caller);
   }
 ${[...groups].map(groupText).join("")}
-  /** R is the answer api.ts gives the path; each method above names it. */
-  private async call<R>(path: string, input: unknown, options?: { signal?: AbortSignal }): Promise<R> {
-    const headers: Record<string, string> = this.key === undefined ? {} : { authorization: "Bearer " + this.key };
-    const res = await this.fetcher(this.base + path, {
-      ...(input === undefined
-        ? { method: "POST", headers }
-        : { method: "POST", headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify(input) }),
-      ...options,
-    });
-    const text = await res.text();
-    if (!res.ok) {
-      let parsed: unknown;
-      try {
-        parsed = text === "" ? undefined : JSON.parse(text);
-      } catch {
-        parsed = undefined;
-      }
-      const env = decodeApiError(parsed);
-      if (env) {
-        const meta = bizCodeMeta[env.bizCode];
-        throw new VibeValleyApiError(res.status, meta.kind, env.message, env.error, text, env.bizCode);
-      }
-      const j = isObject(parsed) ? parsed : {};
-      const reason = typeof j.message === "string" && j.message !== "" ? j.message : text.trim() || t("shared.serverAnswered", { status: res.status });
-      throw new VibeValleyApiError(res.status, undefined, reason, undefined, text);
-    }
-    const raw: unknown = text === "" ? undefined : JSON.parse(text);
+  private decodeEnvelope(path: string, raw: unknown, text?: string): unknown {
     const entry = resultDecoders.get(path);
     const checked = entry ? entry.envelope.safeParse(raw) : undefined;
     if (checked && !checked.success) {
@@ -172,9 +163,68 @@ ${[...groups].map(groupText).join("")}
         const meta = bizCodeMeta[env.bizCode];
         throw new VibeValleyApiError(meta.status, meta.kind, env.message, env.error, text, env.bizCode);
       }
+      if (text === undefined && isObject(raw) && typeof raw.bizCode === "number" && raw.bizCode !== 0) {
+        const reason = typeof raw.message === "string" && raw.message !== "" ? raw.message : t("shared.serverAnswered", { status: 500 });
+        throw new VibeValleyApiError(500, undefined, reason);
+      }
       throw new Error(\`\${path}: a response not in its shape: \${checked.error.message}\`);
     }
-    const value = checked && entry?.hasData === true && isObject(checked.data) ? checked.data.data : undefined;
+    return checked && entry?.hasData === true && isObject(checked.data) ? checked.data.data : undefined;
+  }
+
+  /** R is the answer api.ts gives the path; each method above names it. */
+  private async call<R>(op: string, path: string, input: unknown, options?: { signal?: AbortSignal }): Promise<R> {
+    let value: unknown;
+    if (this.caller !== undefined) {
+      const signal = options?.signal;
+      if (signal?.aborted === true) throw abortError(signal);
+      const pending = this.caller(op, input, options);
+      const raw =
+        signal === undefined
+          ? await pending
+          : await new Promise<unknown>((resolve, reject) => {
+              const onAbort = () => reject(abortError(signal));
+              signal.addEventListener("abort", onAbort, { once: true });
+              pending.then(
+                (v) => {
+                  signal.removeEventListener("abort", onAbort);
+                  resolve(v);
+                },
+                (e: unknown) => {
+                  signal.removeEventListener("abort", onAbort);
+                  reject(e);
+                },
+              );
+            });
+      value = this.decodeEnvelope(path, raw);
+    } else {
+      const headers: Record<string, string> = this.key === undefined ? {} : { authorization: "Bearer " + this.key };
+      const res = await this.fetcher(this.base + path, {
+        ...(input === undefined
+          ? { method: "POST", headers }
+          : { method: "POST", headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify(input) }),
+        ...options,
+      });
+      const text = await res.text();
+      if (!res.ok) {
+        let parsed: unknown;
+        try {
+          parsed = text === "" ? undefined : JSON.parse(text);
+        } catch {
+          parsed = undefined;
+        }
+        const env = decodeApiError(parsed);
+        if (env) {
+          const meta = bizCodeMeta[env.bizCode];
+          throw new VibeValleyApiError(res.status, meta.kind, env.message, env.error, text, env.bizCode);
+        }
+        const j = isObject(parsed) ? parsed : {};
+        const reason = typeof j.message === "string" && j.message !== "" ? j.message : text.trim() || t("shared.serverAnswered", { status: res.status });
+        throw new VibeValleyApiError(res.status, undefined, reason, undefined, text);
+      }
+      const raw: unknown = text === "" ? undefined : JSON.parse(text);
+      value = this.decodeEnvelope(path, raw, text);
+    }
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- checked above with the endpoint's own result Schema from api.ts
     return value as R;
   }

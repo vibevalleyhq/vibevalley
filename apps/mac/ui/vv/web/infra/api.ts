@@ -3,7 +3,7 @@ import { VibeValleyApi, VibeValleyApiError } from "@vibevalley/protocol";
 import { type ApiErrorKind, bizCodeMeta, type BizErrorCode, type Next, type VoiceFix } from "@vibevalley/protocol/api";
 
 import { messageOf } from "../base/format";
-import { transportFetch } from "./transport";
+import { transport } from "./transport";
 
 /** The server could not be reached at all. */
 export class ApiConnectionError extends Error {
@@ -22,10 +22,10 @@ export interface UiFault {
   readonly retryable: boolean;
 }
 
-/** The page is served by the server it talks to: the same origin. */
-export const api = new VibeValleyApi("", async (url, init) => {
+/** Calls the in-process Rust server directly through the current bridge transport. */
+export const api = VibeValleyApi.over(async (op, input) => {
   try {
-    return await transportFetch(url, init);
+    return await transport().call(op, input);
   } catch (error) {
     if (error instanceof TypeError) throw new ApiConnectionError(error);
     throw error;

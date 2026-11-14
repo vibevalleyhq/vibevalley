@@ -76,7 +76,7 @@ jobs:
       - run: vp test run --exclude scripts/release/verify-server.test.ts
       - run: vp run deadcode
       # The TS packages' tests (the native views and the generators use them).
-      - run: vp run --filter @vibevalley/protocol --filter @vibevalley/bridge --filter @vibevalley/i18n --filter @vibevalley/testkit --filter @vibevalley/pkm --filter @vibevalley/artifact test
+      - run: vp run --filter @vibevalley/protocol --filter @vibevalley/i18n --filter @vibevalley/testkit --filter @vibevalley/pkm --filter @vibevalley/artifact test
 
       - name: Save Vite Task cache
         if: success()

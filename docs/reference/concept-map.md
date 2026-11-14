@@ -35,8 +35,8 @@
 | 助手 | `Orchestrator`（`orchestrator/mod.rs`） | `agent/<档案 id>/conversation.jsonl` | 不经 oar：跑在 `crates/vibevalley-agent` 的对话循环上（[VibeValley 自己的 agent](docs/subsystems/brain.md)） |
 | 档案、技能 | `Agents`（`agent/profile.rs`、`presets.rs`） | `config.json`、`agent-templates/` | — |
 | 农机 | `Agents` 的农机部分（`agent/runtime.rs`；接口仍是 `runtime.*`） | `config.json` 农机设置 | `Runtime`、`Registry` |
-| 工单、父子工单 | `Board`（`crates/vibevalley-server/src/modules/issue/board.rs`），接口在 `issue/mod.rs` | `state.db`、`issues/` | — |
-| 帮工、一轮 | `Sessions`（`session/sessions.rs`）与 `runs.rs`，农机经 `drivers.rs` 开会话；轨迹在 `session/journal.rs` | `state.db`、`events/` | 一个帮工是一个 oar `Session`，一轮对应一个 turn |
+| 工单、父子工单 | `Board`（`crates/vibevalley-server/src/modules/issue/board.rs`），接口在 `issue/mod.rs` | `server.db`、`issues/` | — |
+| 帮工、一轮 | `Sessions`（`session/sessions.rs`）与 `runs.rs`，农机经 `drivers.rs` 开会话；轨迹在 `session/journal.rs` | `server.db`、`events/` | 一个帮工是一个 oar `Session`，一轮对应一个 turn |
 | 频道、附件 | `Chat`（`channel/mod.rs`）、`Attachments`（`attachment.rs`）；谁听见与投递在 `Watch`（`watch/mod.rs`） | `server.db` 的 `channel*`、`attachment`、`watch_cursor` 表 | 投递成帮工会话里的一段话 |
 | Artifact | `Artifacts`（`artifact/mod.rs`） | `server.db` 的 `artifact*` 表 | — |
 | 笔记 | `Pkm`（`pkm/mod.rs`） | `pkm/` 下的 Markdown 页面、`pkm_comment`、`pkm_change` 表 | — |

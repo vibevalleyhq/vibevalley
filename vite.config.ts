@@ -38,7 +38,7 @@ export default defineConfig({
       "packages:check": [
         "vp run packages:build",
         "vp check",
-        "vp run --filter @vibevalley/protocol --filter @vibevalley/bridge --filter @vibevalley/i18n --filter @vibevalley/testkit --filter @vibevalley/pkm --filter @vibevalley/artifact test",
+        "vp run --filter @vibevalley/protocol --filter @vibevalley/i18n --filter @vibevalley/testkit --filter @vibevalley/pkm --filter @vibevalley/artifact test",
       ],
       // Files, exports and dependencies nothing uses (knip.ts says what runs; scripts/audit/deadcode.ts says what to do).
       deadcode: "vpx scripts/audit/deadcode.ts",

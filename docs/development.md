@@ -14,9 +14,9 @@ cargo run -p vibevalley-server               # 只跑服务端：监听 127.0.0.
 cargo run -p vibevalley-cli -- doctor        # 命令行，对着运行中的服务端
 ```
 
-- **目录**：设置与数据在 `~/.vibevalley`（`VIBEVALLEY_HOME`）；单独跑的服务端让帮工在 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）下干活，仓库在 `repos/`，worktree 在 `worktrees/`，原生应用里的服务端把这两个目录放在家目录下（[客户端](docs/subsystems/app.md#进程和服务端)、[设置和配置](docs/subsystems/setting.md#模型和不变量)）。
+- **目录**：设置与数据在 `~/.vibevalley`（`VIBEVALLEY_HOME`）；原生应用与单独跑的服务端都让帮工默认在 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）下干活，仓库在 `repos/`，worktree 在 `worktrees/`（[客户端](docs/subsystems/app.md#进程和服务端)、[设置和配置](docs/subsystems/setting.md#模型和不变量)）。
 - **重载**：服务端不自动重载，修改 `crates/` 需重新构建、重启。调试构建的应用从磁盘读 `apps/mac/ui/build/` 的页面包：改了 TSX 跑 `vp run mac:check` 重新打包，再重开应用，不用重新编译 Rust。
-- **表结构**：各模块在打开时 `create table if not exists`（家目录的 `server.db`，工单板是 `state.db`），直接改建表语句，不写增量迁移（AGENTS.md「不留兼容」）。
+- **表结构**：各模块在打开时 `create table if not exists`（家目录的 `server.db`，应用外壳是 `state.db`），直接改建表语句，不写增量迁移（AGENTS.md「不留兼容」）。
 - **不看屏幕检查应用**：`VIBEVALLEY_DEBUG_DUMP=<文件>` 每秒把外壳的状态写成 JSON，`VIBEVALLEY_DEBUG_SCRIPT=<文件>` 一行一步地驱动应用，带 `--features shot` 构建时能截图（[验收的应用分册](.agents/skills/vv-acceptance/references/app.md)）。
 
 ## 发版
@@ -73,7 +73,7 @@ CI（`.github/workflows/ci.yml`）的 `rust` job 在 macOS 上跑 `protocol:chec
 
 - **设计原则**：clap，经 HTTP 用契约的类型调服务端，不替服务端做决定。路径为 `<资源> [<子资源>] <动词>`；说明按农场的语言取 `cli.*` 词典。
 - **工单**：`issue list|show|create|edit|status|comment|review|diff|timeline|delete`。`issue show --watch` 持续订阅状态流直到 `in_review`、`done` 或 `canceled`。
-- **其余**：`channel`、`repo`、`agent`、`session`、`runtime`、`memory`、`cron`、`artifact`、`pkm`（`capture`、`search`、`radar`、`journal`、`page`）、`worker`（帮工经 MCP 之外的汇报）、`doctor`。
+- **其余**：`channel`、`repo`、`agent`、`session`（含 `events`）、`runtime`、`memory`、`cron`、`artifact`、`pkm`（`capture`、`search`、`radar`、`journal`、`page`）、`setting`（`get`、`update`、`validate`）、`chat`（本机农机编码会话，或 `--orchestrator` 在 `#general` 和助手对话）、`doctor`。
 - **输出与试跑**：默认输出单行短文本（首词为后续命令要用的 ID 或编号），`--format json` 输出协议原始结构。无试跑的写命令传 `--dry-run` 返回 `NoDryRun`（退出码 `2`）。
 - **错误与退出码**：失败时 stdout 为空，stderr 末行是一行 JSON，退出码按类（`crates/vibevalley-cli/src/farm.rs` 的 `exit`）；集成测试在 `crates/vibevalley-cli/tests/cli.rs`，起真的服务端。
 

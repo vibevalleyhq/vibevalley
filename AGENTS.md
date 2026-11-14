@@ -14,7 +14,7 @@ crates/vibevalley-server-api/  服务端对桥和 HTTP 门的接口（Server tra
 crates/vibevalley-bridge/  页面和进程内服务端之间的桥（Hub），和顶替服务端的样例（fake）
 crates/vibevalley-core/    核心状态与规则：reduce、frame_of、工单的状态和阶段、收件箱、巡查、农场的画面、简报和起草
 crates/vibevalley-protocol/  契约的源：src/contract 一个概念一个文件；typescript.rs 写出 packages/protocol 的 shapes.gen.ts 和 endpoints.gen.ts
-crates/vibevalley-oar/     oar 的 Rust 实现：Claude Code、Codex、ACP 和测试用的 scripted 农机
+crates/vibevalley-oar/     oar 的 Rust 实现：Claude Code、Codex、ACP、自研 vibevalley 和测试用的 scripted 农机
 crates/vibevalley-agent/   VibeValley 自己的 agent：模型请求（DeepSeek）、工具、对话循环和压缩
 crates/vibevalley-cli/     命令行（二进制 vibevalley，clap）：照领域模型一条命令一个操作，经 HTTP 调服务端
 crates/vibevalley-home/    家目录在磁盘上的约定：在哪、server.json、语言；服务端、命令行、原生应用共用
@@ -29,7 +29,7 @@ packages/protocol/         页面用的契约：src/<概念>/shapes.gen.ts 和 e
                            client.ts、宿主接口（host.ts）是手写的
 packages/i18n/             页面里 t("key")：src/catalogs.ts 由 i18n:gen 从 crates/vibevalley-i18n/locales 写出
 packages/pkm/、artifact/   笔记和 Artifact 在页面这边的纯逻辑；和 Rust 的同名 crate 共用 golden
-packages/bridge/、testkit/、tsrs/  宿主调用的契约写法；测试共用的；vp check 用的 TypeScript（tsrs）
+packages/testkit/、tsrs/   测试共用的；vp check 用的 TypeScript（tsrs）
 design/                    生图提示词、脚本和切图规则；原图在单独的仓库 vibevalley-art，design/art.sh 链接进来
 docs/                      当前的行为和约定；subsystems/ 是各子系统从架构角度沉淀下来的样子（docs/AGENTS.md）
 .agents/notes/             Agent Notes：具体的计划，做完沉淀进 docs/subsystems
@@ -46,7 +46,7 @@ vp install                                                      # 根目录：�
 vp run nsh:install                                              # 把 nsh 的命令行装到 .tools/bin：打 apps/mac/ui 的包、跑 mac:check 之前
 cargo run -p vibevalley-mac                                     # 原生应用，里面带着服务端；VIBEVALLEY_HOME 改家目录
 cargo run -p vibevalley-server                                  # 只跑服务端，127.0.0.1:8787；VIBEVALLEY_HOME、VIBEVALLEY_WORK_ROOT、VIBEVALLEY_PORT 改位置
-cargo run -p vibevalley-cli -- issue list                       # 命令行：issue、channel、repo、agent、session、runtime、memory、cron、artifact、pkm、worker、doctor
+cargo run -p vibevalley-cli -- issue list                       # 命令行：issue、channel、repo、agent、session、runtime、memory、cron、artifact、pkm、setting、chat、doctor
 vp run rust:check                                               # 改完 crates/ 或 apps/mac/src：cargo fmt、clippy（-D warnings）、cargo test
 vp run protocol:ts                                              # 改了 crates/vibevalley-protocol/src/contract：重写 packages/protocol 的 shapes.gen.ts 和 endpoints.gen.ts
 vp run goldens                                                  # 改了 packages/pkm、packages/artifact 的规则：重写两个 crate 的 golden

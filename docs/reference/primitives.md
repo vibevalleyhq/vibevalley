@@ -78,7 +78,7 @@
 | `useAgent` | `agents.ts` | A profile by its id, once the profiles are read; undefined for none or one gone. |
 | `useAgentProblems` | `agents.ts` |  |
 | `ApiConnectionError` | `api.ts` | The server could not be reached at all. |
-| `api` | `api.ts` | The page is served by the server it talks to: the same origin. |
+| `api` | `api.ts` | Calls the in-process Rust server directly through the current bridge transport. |
 | `reasonOf` | `api.ts` | What a refusal says, for a toast or an inline line. |
 | `faultOf` | `api.ts` | The fault a refusal or connection failure carries. |
 | `newSendKey` | `api.ts` | A client's key for one send: a retry with the same key is the same message, said once. |
@@ -168,13 +168,13 @@
 | `searchParam` | `router/search.ts` | One value of a search key, read with `schema`: a key given twice does not decode. |
 | `search` | `router/search.ts` |  |
 | `useSaveSettings` | `settings.ts` | Saves, and the settings the server answers with are the cached ones from then on. |
+| `useUpdates` | `settings.ts` | The desktop's own update as it is now and as it changes (Host.update); undefined where the host is not updated from |
 | `useTable` | `table.ts` |  |
 | `defineColumns` | `table/model.ts` |  |
 | `createTable` | `table/model.ts` |  |
 | `transport` | `transport.ts` |  |
 | `setTransport` | `transport.ts` | Swaps the transport (at start-up: the bridge, or a story's fixtures). |
 | `onTransportChange` | `transport.ts` |  |
-| `transportFetch` | `transport.ts` | A `fetch` for VibeValley's API client: the call goes through the |
 
 ## `apps/mac/ui/vv/web/state`
 

@@ -5,8 +5,8 @@
 ## 开始之前
 
 - 打开 macOS 应用（[客户端](docs/subsystems/app.md)），服务端在里面（[development.md](docs/development.md)「跑起来」）。也可以只用命令行（[只用命令行派一个活](docs/development.md#只用命令行派一个活)）。
-- 助手要 DeepSeek 的钥匙：在「设置」里填，或者本机的 pi 已经配好。帮工用本机登录好的农机（pi、Claude Code、codex……），在「农机」页启用。
-- 仓库放在空间的 `repos/` 下，一个文件夹一个；没有的助手会建。应用把它放在家目录 `~/.vibevalley` 下；单独跑的服务端默认是 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）。
+- 助手要 DeepSeek 的钥匙：在「设置」里填，或者环境变量 `DEEPSEEK_API_KEY` 已设好。帮工用本机登录好的农机（Claude Code、codex、ACP 农机……）或内置的 `vibevalley` 农机，在「农机」页启用。
+- 仓库放在空间的 `repos/` 下，一个文件夹一个；没有的助手会建。空间默认在 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）。
 
 ## 1. 派第一张工单
 
@@ -60,7 +60,7 @@
 
 ## 8. 钱和额度
 
-精力瓶是在用的农机里最紧的那个；pi 的是 DeepSeek 余额。花费在工单详情、工单看板和汇报里。「农机」页的 pi 可以设**每日预算**和**最多同时干活**：到了预算或余额用完，不再派新活，正在干的干完。
+精力瓶是在用的农机里最紧的那个；`vibevalley` 农机的是 DeepSeek 余额。花费在工单详情、工单看板和汇报里。「农机」页可以设**每日预算**和**最多同时干活**：到了预算或余额用完，不再派新活，正在干的干完。
 
 ## 9. 重启之后
 

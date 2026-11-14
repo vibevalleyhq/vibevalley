@@ -12,9 +12,7 @@
       "@vibevalley/pkm": ["../../../packages/pkm/src/index.ts"],
       "@vibevalley/pkm/*": ["../../../packages/pkm/src/*", "../../../packages/pkm/src/*/index.ts"],
       "@vibevalley/artifact": ["../../../packages/artifact/src/index.ts"],
-      "@vibevalley/artifact/*": ["../../../packages/artifact/src/*", "../../../packages/artifact/src/*/index.ts"],
-      "@vibevalley/bridge": ["../../../packages/bridge/src/index.ts"],
-      "@vibevalley/bridge/*": ["../../../packages/bridge/src/*", "../../../packages/bridge/src/*/index.ts"]
+      "@vibevalley/artifact/*": ["../../../packages/artifact/src/*", "../../../packages/artifact/src/*/index.ts"]
     },
     "allowImportingTsExtensions": true,
     "noUnusedLocals": true,

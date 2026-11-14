@@ -57,7 +57,7 @@ flowchart LR
 - **规则（`crates/vibevalley-core`）**：只读状态的纯函数：`reduce`、`frame_of`、工单的状态与阶段和可做的动作、收件箱、巡查、简报和起草、农场的画面（[核心状态](docs/subsystems/core.md)）。
 - **服务（`crates/vibevalley-server`）**：`src/lib.rs` 的 `Hub` 持有核心状态和接口表，模块用 `Hub::on` 按接口挂处理函数、只经 `Hub::apply` 改状态。`src/modules/` 一个概念一个模块（`mod.rs` 列全），`src/start.rs` 照依赖次序打开它们：设置、游戏、AI 服务、档案和农机、仓库、记性、轨迹、工单板（`modules/issue` 的 `Board`，帮工在 `modules/session`，worktree 与合并在 `modules/workplace`，都经 `modules/ledger.rs` 写）、定时任务、附件、媒体、频道、Artifact、笔记、工具和 `/mcp`、助手、观察层。
 - **门（`crates/vibevalley-http`、`crates/vibevalley-bridge`）**：HTTP 门按接口表挂路由，SSE 给 `/state`、`/live`、`/events`，`/mcp` 交给服务端的工具；桥让原生应用的页面在进程内调同一个 `Server`（`crates/vibevalley-server-api`）。
-- **农机（`crates/vibevalley-oar`、`crates/vibevalley-agent`）**：oar 的 Rust 实现驱动 Claude Code、Codex、ACP 与测试用的 scripted；自研 agent 只接 DeepSeek（[自研 agent](docs/subsystems/brain.md)）。
+- **农机（`crates/vibevalley-oar`、`crates/vibevalley-agent`）**：oar 的 Rust 实现驱动 Claude Code、Codex、ACP、自研 `vibevalley` 与测试用的 scripted；自研 agent 只接 DeepSeek（[自研 agent](docs/subsystems/brain.md)）。
 - **存储（SQLite + 文件）**：模块各自在家目录的 `server.db` 建表（`create table if not exists`），工单、会话、每轮与待带的话也在同一个库；没有迁移，形状变了直接改。
 - **客户端（`apps/mac`、`crates/vibevalley-cli`）**：原生应用带着服务端，工作台是 nsh 跑的 TSX，像素场景由 Rust 画（[客户端](docs/subsystems/app.md)、[农场的皮](docs/subsystems/farm.md)）；命令行经 `server.json` 找到运行中的服务端。
 

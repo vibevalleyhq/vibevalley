@@ -5,7 +5,6 @@
 // VibeValley's envelope, the `state` and `live` frames. Stories and tests
 // set a transport of their own (vv/web/infra/fixtures.ts).
 import type { LiveEvent, StateFrame } from "@vibevalley/protocol";
-import { bizCodeMeta, type BizErrorCode } from "@vibevalley/protocol/api";
 
 /** VibeValley's response envelope, `{ bizCode, message, data?, error? }`. */
 export interface Envelope {
@@ -51,22 +50,4 @@ export function setTransport(next: Transport): void {
 export function onTransportChange(fn: () => void): () => void {
   changed.add(fn);
   return () => void changed.delete(fn);
-}
-
-/** `/api/v1/issue/status/update` → `issue.status.update`. */
-const opOf = (path: string): string => path.replace(/^.*\/api\/v1\//, "").replaceAll("/", ".");
-
-/**
- * A `fetch` for VibeValley's API client: the call goes through the
- * transport and comes back as the HTTP response VibeValley's server would
- * have sent (its status from the envelope's bizCode).
- */
-export async function transportFetch(url: string, init: RequestInit): Promise<Response> {
-  const payload = typeof init.body === "string" && init.body !== "" ? (JSON.parse(init.body) as unknown) : undefined;
-  const envelope = await current.call(opOf(url), payload);
-  const meta = envelope.bizCode === 0 ? undefined : bizCodeMeta[envelope.bizCode as BizErrorCode];
-  return new Response(JSON.stringify(envelope), {
-    status: meta?.status ?? (envelope.bizCode === 0 ? 200 : 500),
-    headers: { "content-type": "application/json" },
-  });
 }

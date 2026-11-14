@@ -24,7 +24,7 @@ description: 在 VibeValley 里写、改、评审原生应用的页面、官网�
 
 ## 2. 打断、后台任务、资源
 
-- **长操作收 `signal?: AbortSignal`**，作为最后一个参数，往下传给 `fetch` 和读流的地方（`packages/protocol/src/stream.ts`）。被打断就让 `AbortError` 往上抛。
+- **长操作收 `signal?: AbortSignal`**，作为最后一个参数，往下传给 `fetch` 或 `VibeValleyApi` 的 `Transport` 调用。被打断就让 `AbortError` 往上抛。
 - **不放着不管的 Promise**：不要 `void someAsync()`（`no-floating-promises` 查）；拥有后台工作的对象自己记着它、关的时候中止并等它结束。
 - **资源成对**：没法交给调用方 `using` 的，用 `try { … } finally { … }`；页面里订阅和计时器在所在作用域的 `cleanup` 里放掉。
 - **不许被打断的一段**：不把 `signal` 传进去，注释写为什么。

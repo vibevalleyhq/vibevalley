@@ -22,18 +22,7 @@ export {
   userId,
   type Validation,
 } from "./common/shapes";
-export {
-  eventsPath,
-  type Health,
-  type LiveEvent,
-  livePath,
-  pathOf,
-  type ServerEvent,
-  type SpaceState,
-  type SpaceView,
-  type StateFrame,
-  statePath,
-} from "./core/shapes";
+export { type Health, type LiveEvent, pathOf, type SpaceState, type SpaceView, type StateFrame } from "./core/shapes";
 export {
   type Agent,
   type AgentProblem,

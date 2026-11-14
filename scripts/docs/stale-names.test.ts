@@ -45,3 +45,15 @@ it("regression: stale service names are rejected while the config and the Settin
   for (const line of ['import { Storage } from "#/storage/storage.ts";', "const ingress: Ingress = deps.ingress;", "worldBelowIngress()"])
     expect(staleNamesIn(source, line)).toHaveLength(1);
 });
+
+it("regression: native mac workbench UI, Rust crates, and i18n catalogs enforce glossary terms", () => {
+  expect(staleNamesIn("apps/mac/ui/vv/web/features/issue/IssueCard.tsx", 'const kind = "owner";')).toHaveLength(1);
+  expect(staleNamesIn("apps/mac/ui/vv/web/features/issue/IssueCard.tsx", "const t = '地里';")).toHaveLength(1);
+  expect(staleNamesIn("apps/mac/ui/vv/web/farm/hud/Hud.tsx", "const t = '收获';")).toEqual([]);
+  expect(staleNamesIn("crates/vibevalley-server/src/modules/issue/board.rs", 'let msg = "问主人";')).toHaveLength(1);
+  expect(staleNamesIn("crates/vibevalley-i18n/locales/zh/cli.json", '{ "help": "问管家" }')).toHaveLength(1);
+  expect(staleNamesIn("crates/vibevalley-i18n/locales/zh/server.issue.json", '{ "done": "收获了" }')).toHaveLength(1);
+  expect(staleNamesIn("crates/vibevalley-i18n/locales/zh/server.game.json", '{ "done": "收获了" }')).toEqual([]);
+  expect(staleNamesIn("crates/vibevalley-i18n/locales/zh/web.farm.hud.json", '{ "done": "收获了" }')).toEqual([]);
+  expect(staleNamesIn("crates/vibevalley-i18n/locales/zh/web.issue.json", '{ "done": "收获了" }')).toHaveLength(1);
+});

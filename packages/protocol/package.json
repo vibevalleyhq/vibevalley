@@ -29,7 +29,6 @@
     }
   },
   "dependencies": {
-    "@vibevalley/bridge": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
     "zod": "catalog:"
   },

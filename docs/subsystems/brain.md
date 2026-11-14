@@ -1,6 +1,6 @@
 # VibeValley 自己的 agent
 
-助手和 `vibevalley` 农机的帮工跑在同一个自研的 agent 上：`crates/vibevalley-agent`。它替代了 TS 版从 pi-ai（DeepSeek 接入）和 pi-durable（循环、先落盘再显示、断点续跑、压缩）拿的东西，只接 DeepSeek（OpenAI 兼容的 chat completions），不做多厂商路由（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)「砍掉的」）。终端里和它对话（TS 的 `vibevalley chat`）还没在 Rust 上做。
+助手和 `vibevalley` 农机的帮工跑在同一个自研的 agent 上：`crates/vibevalley-agent`。它替代了 TS 版从 pi-ai（DeepSeek 接入）和 pi-durable（循环、先落盘再显示、断点续跑、压缩）拿的东西，只接 DeepSeek（OpenAI 兼容的 chat completions），不做多厂商路由（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)「砍掉的」）。终端里也能经 `vibevalley chat` 直接和本机农机或助手对话。
 
 ## 管什么，不管什么
 
@@ -22,6 +22,7 @@
 | `crates/vibevalley-agent/src/price.rs` | DeepSeek 的价目表，花费按它算 |
 | `crates/vibevalley-oar/src/vibevalley.rs` | `vibevalley` 农机：照 oar 的 `Runtime` 契约，一个会话一个对话（`<会话>.jsonl`），按会话 ID 找回 |
 | `crates/vibevalley-server/src/modules/orchestrator/mod.rs` | 助手：每个助手档案一个对话（`<home>/agent/<id>/conversation.jsonl`），带农场的工具 |
+| `crates/vibevalley-cli/src/commands/chat.rs` | `vibevalley chat`：在终端直接驱动本机农机（含 `vibevalley`），或加 `--orchestrator` 在 `#general` 和助手对话 |
 
 ## 模型和不变量
 
@@ -48,7 +49,6 @@
 
 ## 还没做的
 
-- 终端里的对话（TS 的 `vibevalley chat`）。
 - 按档案 `toolsets` 分配工具、助手也能加载技能：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
 
 ## 怎么验证
