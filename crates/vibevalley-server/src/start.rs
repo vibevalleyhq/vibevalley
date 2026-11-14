@@ -47,6 +47,9 @@ pub struct ServerConfig {
     pub media_backend: Option<Arc<dyn modules::media::image_provider::ImageBackend>>,
     /// The vendors answered offline (the page's tests): `testing::OfflineImages`.
     pub offline_media: bool,
+    /// How the media vendor is reached and its results fetched, in place of the network: a test keeps one across
+    /// restarts, so the vendor remembers what it was asked.
+    pub media_network: Option<(Arc<dyn modules::media::vendor::Fetch>, Arc<dyn modules::media::vendor::Fetch>)>,
     /// The orchestrator talks to this model instead of DeepSeek (tests).
     pub model_client: Option<Arc<dyn vibevalley_agent::ModelClient>>,
     /// The orchestrator hears the farm (VibeValley `listen`); a test without
@@ -81,6 +84,7 @@ impl ServerConfig {
             model_client: None,
             media_backend: None,
             offline_media: false,
+            media_network: None,
             orchestrator_listens: true,
             pkm_root: None,
             watch_pkm: true,
@@ -193,7 +197,9 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     let game = modules::game::Game::open(&config.home, &hub);
     modules::game::install(&hub, game.clone());
     // How MOSS is reached, and its results fetched; the page's tests answer it offline.
-    let (vendor, download): (Arc<dyn modules::media::vendor::Fetch>, Arc<dyn modules::media::vendor::Fetch>) = if config.offline_media {
+    let (vendor, download): (Arc<dyn modules::media::vendor::Fetch>, Arc<dyn modules::media::vendor::Fetch>) = if let Some(network) = &config.media_network {
+        network.clone()
+    } else if config.offline_media {
         crate::offline::network()
     } else {
         (Arc::new(modules::media::vendor::Ureq), Arc::new(modules::media::vendor::Ureq))

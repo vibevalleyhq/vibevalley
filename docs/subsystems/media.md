@@ -1,8 +1,6 @@
 # 媒体与素材库
 
-媒体任务管生图和单人语音（含 Flash 流式），以及集中展示生成结果、用户上传与帮工取回文件的[素材库](#素材库)（表 `media_library_item`，页面 `/library`）。用户在[AI 服务](docs/subsystems/provider.md)绑定连接与模型；任务先落库，页面通过同一状态流观察进度；生成的表单收在 `/library` 的「生成」对话框里，完成的结果自动记入素材库。
-
-TS 版的其余种类（图片／视频理解、多人对白、音色设计与克隆、长音频转写）和它们的远端文件记录 Rust 还没做：厂商调用在 `vendor.rs` 里有，任务机上要用时加一个种类（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)「砍掉的」）。它们的接口和工具调用会失败。
+媒体任务管生图、单人语音（含 Flash 流式）、多人对白、音色设计、音色克隆、长音频转写和图片／视频理解，以及集中展示生成结果、用户上传与帮工取回文件的[素材库](#素材库)（表 `media_library_item`，页面 `/library`）。用户在[AI 服务](docs/subsystems/provider.md)绑定连接与模型；任务先落库，页面通过同一状态流观察进度；生成的表单收在 `/library` 的「生成」对话框里，完成的结果自动记入素材库。
 
 ## 管什么，不管什么
 
@@ -20,6 +18,9 @@ TS 版的其余种类（图片／视频理解、多人对白、音色设计与�
 | 位置 | 职责 |
 |---|---|
 | `crates/vibevalley-server/src/modules/media/jobs.rs` | 所有种类共用的一台任务机：表 `media_job`、收任务（八个在途）、按种类的执行槽、跑断了记未知、下载结果存成附件、跟厂商任务、取消、重取、释放、重启接续；生图与语音（含流式）两种 |
+| `crates/vibevalley-server/src/modules/media/audio.rs` | 多人对白、音色设计、音色克隆、转写：各自向厂商要什么、怎么看，转写流边收边存，结束后删厂商那份上传 |
+| `crates/vibevalley-server/src/modules/media/understanding.rs` | 图片／视频理解：上传、问一次、删上传；用户给助手的授权、到期与启动 |
+| `crates/vibevalley-server/src/modules/media/remote.rs` | 任务传给厂商的文件：发出前先记在任务上，只由原账号删除 |
 | `crates/vibevalley-server/src/modules/media/vendor.rs` | MOSS 的调用：每个请求经 `Fetch` 发出（测试替身照 MOSS 回答），不跟随重定向 |
 | `crates/vibevalley-server/src/modules/media/image_provider.rs`、`png.rs`、`validate.rs` | 生图请求的准备与可取消执行、PNG 校验、请求与格式校验 |
 | `crates/vibevalley-server/src/modules/media/inputs.rs` | 输入预留、上传、任务保留与回收 |
@@ -27,7 +28,7 @@ TS 版的其余种类（图片／视频理解、多人对白、音色设计与�
 | `crates/vibevalley-server/src/modules/library.rs` | 素材库：`list`、`add`、`remove`、`preview_remove`；听事实记下生成结果与聊天附件 |
 | `crates/vibevalley-http/src/media.rs` | 本机二进制上传（`PUT /api/v1/media/input/:id/content`）与带范围的播放、语音流 |
 | `crates/vibevalley-server/src/modules/tool/notes.rs` | 助手与帮工的 `media_*`、`library_item_*` 工具 |
-| `crates/vibevalley-server/src/offline.rs` | 页面测试用的离线 MOSS 与下载 |
+| `crates/vibevalley-server/src/offline.rs` | 测试用的离线 MOSS 与下载 |
 | `packages/protocol/src/media/` | 媒体任务、输入与素材库的形状和接口（Rust 类型由它生成） |
 | `apps/web/src/features/media/` | `/library`：筛选栏、缩略图、详情栏、工具条、上传、键盘和「生成」对话框；排法、计数、筛选和键盘落点在 `items.ts` 纯函数 |
 
@@ -37,11 +38,11 @@ TS 版的其余种类（图片／视频理解、多人对白、音色设计与�
 
 - **同一请求不重新生成**：调用者给出 1–80 位字母、数字、下划线或连字符的 ID。同一 ID、参数与调用来源返回原任务，参数或来源不同则拒绝。浏览器重试保持 ID 与参数；修改输入或再次生成须明确新建。
 - **一个 id 是一个任务**：各种任务在同一张表 `media_job`，按 `kind` 分；同一个 id 已是别种任务就拒绝。各种代码读行时只认自己的种类和自己有的阶段，别的当不是自己的。
-- **一台任务机，各种类只交不同的部分**（`jobs.rs`）：收任务（同 id 同参数是原任务，否则拒绝；八项在途上限）、改行（只从期望的阶段往下走，全在一把锁里）、一个执行槽、跑断了记未知、下载并存下结果、按三秒一次跟厂商任务（最长半小时，之后暂停）、取消、重取下载、接续、重启都只写一遍。各种类只说怎么生成（`generate`）、怎么取回（`download`）和怎么看（`Record::view`）；执行槽按种类分：生图一个，语音八个。怎么向厂商发请求在 `vendor.rs`。
+- **一台任务机，各种类只交不同的部分**（`jobs.rs`）：收任务（同 id 同参数是原任务，否则拒绝；八项在途上限）、改行（只从期望的阶段往下走，全在一把锁里）、一个执行槽、跑断了记未知、下载并存下结果、按三秒一次跟厂商任务（最长半小时，之后暂停）、取消、重取下载、接续、重启都只写一遍。各种类只说怎么生成（`generate`）、怎么取回（`download`）和怎么看（`Record::view`）；执行槽按种类分：生图一个，其余各八个。怎么向厂商发请求在 `vendor.rs`。
 - **先落库再发出**：任务保存连接 ID、配置 revision、完整模型 ID、参数和阶段；Key 只留在排队任务的内存快照。直接发起的任务不因改连接而换账号；不因浏览器断开留下未启动的排队任务。
 - **来源由服务端确认**：HTTP 入口记为用户；助手工具从执行上下文取档案、频道与用户委托，不接受模型自报身份。来源随任务落库并进入公共投影，重启保留；任务的来源频道不等于图片后来发布的目标频道。
 - **只记录厂商报告的用量**：成功响应的图片数和输出尺寸随签名 URL 一起落库，下载失败、重试和重启保留。未收到用量时省略该字段，页面明确未知不代表未计费，不猜价格或填零。
-- **有界并发**：媒体任务共用一个执行槽和八个在途名额；数据库保留历史，状态流只带最近 100 条。
+- **有界并发**：所有种类共用八个在途名额（等助手启动的理解授权也占一个）；生图一次跑一个，其余种类各至多八个；数据库保留历史，状态流只带最近 100 条。
 - **生成与下载分开**：取得签名 URL 后先存到任务私有字段，再下载。URL 不进入公共任务、帧或工具结果；保存完成后清掉 URL。失败时可单独重试下载，不再次提交生成。
 - **未知不重做**：厂商响应不完整、超时或网络错误可能已经计费，记为 `unknown`。重启取消未发出的 `queued`；没有远端任务 ID 的生成及中断的流式请求记为未知。已保存远端任务 ID 的异步任务恢复状态查询，已取得 URL 的任务恢复下载，都不重新提交生成。
 - **取消不承诺停计费**：取消改变本机状态并中断对应工作，不代表厂商停止。旧工作的取消不能中断之后明确重试的下载。
@@ -73,6 +74,22 @@ PCM WAV 的元数据警告会转入 RIFF 结构校验：容器长度、chunk 边
 Flash 流式由服务端请求厂商 SSE，从元数据与 PCM 分片生成有序音频事件；浏览器显式启动 WebAudio 播放，慢消费者的队列有界。单次流限时 5 分钟、音频不超过 128 MiB，完整帧保存成 WAV。失败或取消仍保留已收到的可保存音频，标明部分结果，不冒充完整成功；刷新读取保存的结果，不重开厂商流。停止、离开或设备故障会中断当前 Flash 流、取消原任务并释放播放资源；已保存音频的普通播放器停止不重新提交任务。
 
 异步任务先保存厂商任务 ID，再查询状态。只有状态 GET 对暂时网络、超时、429 与 5xx 做有界退避；提交 POST 不重试。轮询暂停后，`media.speech.resume` 只恢复原任务查询，`media.job.download` 只重取已有结果。恢复、清理均核对原连接与凭据指纹；改绑用途不会切换旧任务账号，换 Key 后拒绝借新凭据接续。
+
+## 多人对白、音色设计、克隆和转写
+
+四种都显示成 `MediaAudioJob`，按 `kind` 分。多人对白（`media.dialogue.create`）和音色设计（`media.voiceDesign.create`）是厂商的异步任务：先存任务 ID 再查询，结果下载成附件；助手带着用户这一轮的话也能发起。30 秒、10 MB 以内的 WAV／MP3／FLAC 设计结果另存成一个本机输入（`previewInput`），可以直接拿去克隆。
+
+克隆（`media.clone.create`）和转写（`media.transcription.create`）只有用户能发起，各读一个就绪的音频输入，任务保留这个输入。克隆的样本限 10 MB、30 秒、WAV／MP3／M4A／FLAC，一次同步请求；音色一旦建成就记下，哪怕任务这时已被取消。转写先把输入上传给厂商，再提交异步任务，或（`streaming`，仅 Pro 模型）读 SSE：每个分段、以及最多每 200 毫秒存一次，流断了保留已收到的文字，记为未知，不重新提交。
+
+任务结束（`ready`、`failed`，或没有厂商任务的 `canceled`）后删掉厂商那份上传；没有结果的任务同时放开输入，有结果的保留到用户释放任务。删除失败时任务的 `problem` 说明清理待办，`canCleanup` 为真，`media.audio.cleanup` 只重试删除（`media.audio.previewCleanup` 预览）。`media.audio.resume` 只查询已知的厂商任务，流式转写和克隆不能接续。
+
+## 图片和视频理解
+
+`media.understanding.create` 由用户发起：1–5 张图片或一个视频、一段问题和输出上限。任务依次 `uploading`（输入逐个传给厂商）、`generating`（问一次）、`ready` 或 `incomplete`（被输出上限截断），随后删掉厂商那份上传并放开输入，`cleanup` 记为 `done`。删除失败记 `blocked`，上传结果不明的文件记 `unknown` 并在 `problem` 里列出文件名；`media.understanding.cleanup` 可以再试（`previewCleanup` 预览）。失败或未知的任务保留上传和输入，等用户清理。
+
+`media.understanding.authorize` 是用户给某个频道里的助手的许可：任务停在 `authorized`，15 分钟内有效，不上传任何东西。助手带着用户这一轮的话调 `media_understanding_start`，频道对得上、连接与凭据没变才开始；到期（每分钟检查）、取消或重启都会结束这次许可并放开输入。
+
+每个传给厂商的文件发出前先记在任务上（换成不含原文件名的名字），同一任务不重传；回执丢了就是未知，不再发一次。删除只用任务原来的连接和凭据，换过 Key 就拒绝。
 
 ## 下载边界
 
@@ -125,6 +142,7 @@ Flash 流式由服务端请求厂商 SSE，从元数据与 PCM 分片生成有�
 ## 怎么验证
 
 - `crates/vibevalley-server/tests/media_jobs.rs`：同一请求不重做、下载可单独重试且记进素材库、取消放出执行槽、在途上限、重启接续下载不重新生成、已知拒绝和未知结果分开、请求校验、助手的生图工具要用户的输入且只发回一次。
+- `crates/vibevalley-server/tests/media_kinds.rs`：离线 MOSS 上的多人对白、音色设计、克隆、转写（任务与流）和理解：同一请求不重做、结果与释放、厂商失败与未知、下载单独重试、手动接续、重启后接续或记未知、厂商文件清理与重试、助手凭授权启动理解。
 - `crates/vibevalley-server/tests/media_inputs.rs`：输入经暂存放进附件、删输入不删字节、伪装文件和不对的大小被拒、保留、准入回滚、过期与重启。
 - `crates/vibevalley-server/tests/library.rs`：聊天附件和完成任务各记一次、拿掉不删文件、来源不唯一或不是公网、不是调用者能给的被拒。
 - `apps/web/test/library.spec.ts`、`apps/web/test/media.spec.ts`：真实隔离服务端（离线 MOSS）上的素材库与生图、状态流、预览、下载、频道发布与取消。

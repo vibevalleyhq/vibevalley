@@ -55,6 +55,37 @@ pub fn image(f: &Farm, who: &Who, w: &Words, raw: &Value) -> Result<String, Stri
     text(&f.media.image(read(w, raw)?, source).map_err(|e| e.message)?)
 }
 
+/// Where the orchestrator makes media from: only with the user's word in this batch.
+fn mandate(who: &Who) -> Result<MediaSource, String> {
+    match who {
+        Who::Orchestrator(here) if here.user => Ok(MediaSource::Orchestrator {
+            agent: here.agent.clone(),
+            channel: here.channel.clone(),
+        }),
+        _ => Err(vibevalley_i18n::t("server.media.userRequired", &[])),
+    }
+}
+
+pub fn speech(f: &Farm, who: &Who, w: &Words, raw: &Value) -> Result<String, String> {
+    text(&f.media.speech(read(w, raw)?, mandate(who)?).map_err(|e| e.message)?)
+}
+
+pub fn dialogue(f: &Farm, who: &Who, w: &Words, raw: &Value) -> Result<String, String> {
+    text(&f.media.speakers(read(w, raw)?, mandate(who)?).map_err(|e| e.message)?)
+}
+
+pub fn voice_design(f: &Farm, who: &Who, w: &Words, raw: &Value) -> Result<String, String> {
+    text(&f.media.voice_design(read(w, raw)?, mandate(who)?).map_err(|e| e.message)?)
+}
+
+/// Understanding the user approved for this channel, started for them.
+pub fn understand(f: &Farm, who: &Who, _: &Words, raw: &Value) -> Result<String, String> {
+    let MediaSource::Orchestrator { agent, channel } = mandate(who)? else {
+        return Err(vibevalley_i18n::t("server.media.userRequired", &[]));
+    };
+    text(&f.media.start_understanding(id_of(raw), &agent, &channel).map_err(|e| e.message)?)
+}
+
 pub fn jobs(f: &Farm, _: &Who, w: &Words, raw: &Value) -> Result<String, String> {
     f.endpoint(Caller::Orchestrator, &w.op, raw.clone())
 }

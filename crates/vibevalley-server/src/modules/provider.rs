@@ -191,6 +191,17 @@ impl Providers {
         })
     }
 
+    /// A usable connection's account, whatever is bound to it now: a job goes on with the account it was asked with.
+    pub fn account_on(&self, connection: &str, model: &str) -> Option<Account> {
+        let c = self.usable(connection)?;
+        Some(Account {
+            connection: c.id.clone(),
+            revision: self.revision,
+            model: model.into(),
+            key: c.key.clone(),
+        })
+    }
+
     /// `bindingOf`: whether `u` can run, and what it lacks.
     pub fn readiness(&self, u: Use) -> Readiness {
         let lacks = |missing| Readiness::False { ready: LitFalse, missing };
