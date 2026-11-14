@@ -9,9 +9,9 @@ use std::time::{Duration, Instant};
 
 use vibevalley_core::rules::cut;
 use vibevalley_i18n::t;
-use vibevalley_issues::Step;
 use vibevalley_protocol::{Outcome, SessionEvent, SessionEventType, ToolAction};
 
+use crate::modules::ledger::Step;
 use crate::{Hub, now};
 
 const KEEP_EVENTS: usize = 240;

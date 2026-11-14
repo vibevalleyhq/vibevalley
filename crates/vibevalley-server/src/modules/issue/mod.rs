@@ -1,7 +1,16 @@
-//! The `issue.*` endpoints on the board (`vibevalley-issues`). Ported from
-//! VibeValley `gateway/http/handlers/issue.ts` and the parts of
-//! `modules/issue/issue.ts`, `settle.ts` and `moves.ts` (`nextSteps`) the
-//! board does not do itself. Refusals carry VibeValley's words and codes.
+//! Issues: the board (`board.rs`: create, move, tell, queue, deliver,
+//! close; `edits.rs`: fields, delete, review; `family.rs`: split and join;
+//! `refine.rs`: drafting) and the `issue.*` endpoints on it, with the parts
+//! of settling and `nextSteps` the board does not do itself. Refusals carry
+//! VibeValley's words and codes.
+
+mod board;
+mod edits;
+mod family;
+mod refine;
+
+pub use board::{Board, NewIssue, Sent};
+pub use family::{ChildDraft, MAX_CHILDREN};
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -11,7 +20,6 @@ use vibevalley_core::Move;
 use vibevalley_core::brief::{findings_of, milestones_of, resume_words};
 use vibevalley_core::rules::short_title;
 use vibevalley_i18n::{Params, t};
-use vibevalley_issues::{Board, BoardError, ChildDraft, NewIssue, Undelivered};
 use vibevalley_protocol::{
     ActWords, ApiError, Applied, AppliedIssue, BizCode, ChangedFile, Changes, Commit, Issue, IssueAction, IssueHistory, IssueStageKind, IssueStatus,
     IssueUpdate, Next, Preview, StuckReason, UncommittedItem, ops,
@@ -19,6 +27,7 @@ use vibevalley_protocol::{
 
 use crate::base::LookIn;
 use crate::modules::agent::Agents;
+use crate::modules::ledger::{BoardError, Undelivered};
 use crate::{Hub, now};
 
 const REQUEST_KEY_MAX: usize = 64;

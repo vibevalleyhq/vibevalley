@@ -4,11 +4,12 @@
 
 use vibevalley_protocol::{Millis, Outcome, Run, RunTrigger, RunTriggerKind, Spent};
 
-use crate::{Board, Result, Step, now};
+use super::sessions::Sessions;
+use crate::modules::ledger::{Result, Step, now};
 
 const RUN: &str = "issue-run";
 
-pub(crate) fn trigger_of(kind: RunTriggerKind, message: Option<String>) -> RunTrigger {
+pub fn trigger_of(kind: RunTriggerKind, message: Option<String>) -> RunTrigger {
     let message = message.map(|m| m.trim().to_string()).filter(|m| !m.is_empty());
     RunTrigger {
         kind,
@@ -19,12 +20,12 @@ pub(crate) fn trigger_of(kind: RunTriggerKind, message: Option<String>) -> RunTr
     }
 }
 
-impl Board {
+impl Sessions {
     /// A round of `session` on `issue` starts now.
-    pub(crate) fn begin_run(&self, session: &str, issue: &str, trigger: RunTrigger) -> Result<()> {
+    pub(super) fn begin_run(&self, session: &str, issue: &str, trigger: RunTrigger) -> Result<()> {
         // A round still open (the agent never said it ended) ends here.
         self.end_run(session, Outcome::Interrupted, "", None)?;
-        let id = format!("r{}", self.next("run", 0)?);
+        let id = format!("r{}", self.0.ledger.next("run", 0)?);
         let run = Run {
             id: id.clone(),
             session: session.into(),
@@ -37,31 +38,33 @@ impl Board {
             summary: String::new(),
             spent: None,
         };
-        self.store.put_doc(RUN, &id, &serde_json::to_value(&run).unwrap_or_default())?;
+        self.0.ledger.store().put_doc(RUN, &id, &serde_json::to_value(&run).unwrap_or_default())?;
         self.set_extra(session, |e| e.run = Some(id.clone()))?;
-        self.facts.log(session, Step::RunStarted { run: id });
+        self.0.ledger.log(session, Step::RunStarted { run: id });
         Ok(())
     }
 
     /// The open round of `session`, if any, ends with `outcome`.
-    pub(crate) fn end_run(&self, session: &str, outcome: Outcome, summary: &str, spent: Option<Spent>) -> Result<()> {
+    pub fn end_run(&self, session: &str, outcome: Outcome, summary: &str, spent: Option<Spent>) -> Result<()> {
         let Some(id) = self.extra(session).run else { return Ok(()) };
-        if let Some(mut run) = self.store.doc(RUN, &id)?.and_then(|v| serde_json::from_value::<Run>(v).ok()) {
+        if let Some(mut run) = self.0.ledger.store().doc(RUN, &id)?.and_then(|v| serde_json::from_value::<Run>(v).ok()) {
             run.ended_at = Some(now());
             run.outcome = Some(outcome);
             run.summary = summary.to_string();
             run.spent = spent;
-            self.store.put_doc(RUN, &id, &serde_json::to_value(&run).unwrap_or_default())?;
+            self.0.ledger.store().put_doc(RUN, &id, &serde_json::to_value(&run).unwrap_or_default())?;
         }
         self.set_extra(session, |e| e.run = None)?;
-        self.facts.log(session, Step::RunEnded { run: id, outcome });
+        self.0.ledger.log(session, Step::RunEnded { run: id, outcome });
         Ok(())
     }
 
     /// The issue's runs, oldest first.
     pub fn runs(&self, issue: &str) -> Result<Vec<Run>> {
         let mut runs: Vec<Run> = self
-            .store
+            .0
+            .ledger
+            .store()
             .docs(RUN)?
             .into_iter()
             .filter_map(|(_, v)| serde_json::from_value::<Run>(v).ok())

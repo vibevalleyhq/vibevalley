@@ -7,10 +7,10 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
 
 use serde_json::{Value, json};
-use vibevalley_issues::Board;
 use vibevalley_protocol::{AgentRole, Issue, Session};
 
 use crate::modules::channel::Chat;
+use crate::modules::issue::Board;
 use crate::modules::session::Trajectories;
 
 const DEFAULT_LIMIT: usize = 4000;

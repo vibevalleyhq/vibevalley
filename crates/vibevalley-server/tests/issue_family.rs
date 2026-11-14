@@ -6,9 +6,9 @@ mod support;
 use std::path::Path;
 
 use support::*;
-use vibevalley_issues::{ChildDraft, NewIssue};
 use vibevalley_oar::scripted::{Script, Step};
 use vibevalley_protocol::{IssueConstraints, IssueStageKind as StageKind, IssueStatus, Landing};
+use vibevalley_server::modules::issue::{ChildDraft, NewIssue};
 
 fn issue(title: &str, repo: &Path) -> NewIssue {
     NewIssue {

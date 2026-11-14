@@ -78,7 +78,7 @@
 
 ## 和谁打交道
 
-- **工单板（`vibevalley-issues`）**：经 `drive.rs` 的 `Drivers` 把档案变成农机与参数，读勾选的技能拼入提示。
+- **帮工（`modules/session`）**：经 `drive.rs` 的 `Drivers` 把档案变成农机与参数，读勾选的技能拼入提示。
 - **助手与工具**：挑可派档案。
 - **hub**：推农机的 `live` 事件，发模型回退提醒。
 

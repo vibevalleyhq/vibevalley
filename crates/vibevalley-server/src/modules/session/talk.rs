@@ -8,13 +8,14 @@ use std::path::PathBuf;
 use vibevalley_oar::{SessionOptions, StopReason};
 use vibevalley_protocol::{Fact, Issue, Outcome, Phase, Session, SessionAction};
 
-use crate::drivers::Persona;
-use crate::{Board, BoardError, Live, Result, Step, io, lock, now, text};
+use super::drivers::Persona;
+use super::sessions::{Sessions, text};
+use crate::modules::ledger::{BoardError, Result, Step, io, lock, now};
 
-impl Board {
+impl Sessions {
     /// The session talking for `agent` in `channel`, still on the board.
     pub fn talker(&self, agent: &str, channel: &str) -> Option<Session> {
-        self.read(|s| {
+        self.0.ledger.read(|s| {
             s.sessions
                 .iter()
                 .filter(|h| h.issue.is_none() && h.agent == agent && h.channel.as_deref() == Some(channel))
@@ -26,14 +27,13 @@ impl Board {
     /// The user's words to `agent` in `channel`: its talking session's next
     /// round, hiring one the first time.
     pub fn talk(&self, agent: &str, channel: &str, words: &str) -> Result<String> {
-        let _work = lock(&self.work);
+        let _talking = lock(&self.0.talking);
         if let Some(session) = self.talker(agent, channel) {
-            let live = lock(&self.inner).live.get(&session.id).map(|l| l.agent.clone());
-            if let Some(live) = live {
+            if let Some(live) = self.live_agent(&session.id) {
                 let phase = Phase::working(now(), SessionAction::Thinking, "");
-                self.apply(vec![self.phase_changed(session.id.clone(), phase)])?;
+                self.0.ledger.apply(vec![self.phase_changed(session.id.clone(), phase)])?;
                 let words = self.with_recall(&session, words.to_string());
-                self.facts.log(&session.id, Step::Asked { text: words.clone() });
+                self.0.ledger.log(&session.id, Step::Asked { text: words.clone() });
                 live.prompt(text(&words))?;
                 return Ok(session.id);
             }
@@ -43,24 +43,24 @@ impl Board {
     }
 
     fn open_talk(&self, agent: &str, channel: &str, words: &str, again: Option<Session>) -> Result<String> {
-        let drive = self.drivers.drive(Some(agent), &Issue::new("", 0, words, now()))?;
+        let drive = self.0.drivers.drive(Some(agent), &Issue::new("", 0, words, now()))?;
         let mut session = match again {
             Some(s) => s,
             None => {
-                let number = self.next("session", 0)?;
+                let number = self.0.ledger.next("session", 0)?;
                 let id = format!("w{number}");
                 let mut s = Session::worker(&id, drive.name.clone(), now());
                 s.agent = drive.agent.clone();
                 s.runtime = drive.runtime_id.clone();
                 s.channel = Some(channel.to_string());
-                s.worktree = Some(self.config.data_dir.join("talk").join(&id).to_string_lossy().into_owned());
+                s.worktree = Some(self.0.config.data_dir.join("talk").join(&id).to_string_lossy().into_owned());
                 s
             }
         };
         session.brief = vibevalley_core::text::clip(words, 120);
         let cwd = PathBuf::from(session.worktree.clone().unwrap_or_default());
         std::fs::create_dir_all(&cwd).map_err(io)?;
-        let rules = self.drivers.talk_rules(&cwd.to_string_lossy(), channel, &session.id);
+        let rules = self.0.drivers.talk_rules(&cwd.to_string_lossy(), channel, &session.id);
         let (rules, prompt) = match &drive.persona {
             Some(Persona::System(persona)) => (format!("{persona}\n\n{rules}"), words.to_string()),
             Some(Persona::Prompt(persona)) => (rules, format!("{persona}\n\n---\n\n{words}")),
@@ -75,7 +75,7 @@ impl Board {
         let opts = SessionOptions {
             cwd,
             model: drive.model.clone(),
-            permission_mode: self.config.permission,
+            permission_mode: self.0.config.permission,
             append_system_prompt: Some(rules),
             env: drive.env.clone(),
             record_to: Some(self.record_path(&session.id)),
@@ -86,37 +86,16 @@ impl Board {
             ..Default::default()
         };
         let agent = drive.runtime.open(opts)?;
-        self.set_extra(&session.id, |e| e.agent_session = Some(agent.id()))?;
         session.phase = Phase::working(now(), SessionAction::Thinking, "");
-        let events = agent.events();
-        let generation = {
-            let mut inner = lock(&self.inner);
-            inner.generation += 1;
-            let generation = inner.generation;
-            inner.live.insert(
-                session.id.clone(),
-                Live {
-                    agent: agent.clone(),
-                    generation,
-                },
-            );
-            self.apply_in(&mut inner, vec![Fact::session_changed(now(), session.clone())])?;
-            generation
-        };
-        let board = self.clone();
-        let id = session.id.clone();
-        std::thread::Builder::new()
-            .name(format!("vibevalley-{id}"))
-            .spawn(move || board.pump(&id, generation, events))
-            .map_err(io)?;
+        self.go_live(agent.clone(), session.clone(), None)?;
         let prompt = self.with_recall(&session, prompt);
-        self.facts.log(&session.id, Step::Asked { text: prompt.clone() });
+        self.0.ledger.log(&session.id, Step::Asked { text: prompt.clone() });
         agent.prompt(text(&prompt)).map_err(BoardError::from)?;
         Ok(session.id)
     }
 
     /// A talking round's end: what it said, whole, as its report.
-    pub(crate) fn finish_talk(&self, session: &Session, reason: StopReason, said: &str) {
+    pub(super) fn finish_talk(&self, session: &Session, reason: StopReason, said: &str) {
         let outcome = match reason {
             StopReason::Aborted => Outcome::Interrupted,
             StopReason::Error | StopReason::MaxTurns => Outcome::Failed,
@@ -131,7 +110,7 @@ impl Board {
             "Did not finish.".into()
         };
         let runs = session.runs + 1;
-        let _ = self.apply(vec![Fact::SessionReported(vibevalley_protocol::FactSessionReported {
+        let _ = self.0.ledger.apply(vec![Fact::SessionReported(vibevalley_protocol::FactSessionReported {
             at: now(),
             id: session.id.clone(),
             run: None,

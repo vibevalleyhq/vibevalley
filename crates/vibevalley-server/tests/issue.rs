@@ -1,7 +1,6 @@
 //! The issue endpoints over the hub, the board's facts in the hub's state:
 //! VibeValley's payloads in, its envelopes and frames out.
 
-#[path = "../../vibevalley-issues/tests/support/mod.rs"]
 mod support;
 
 use std::sync::Arc;
@@ -9,7 +8,7 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 use support::*;
 use vibevalley_core::empty_space_state;
-use vibevalley_issues::Board;
+use vibevalley_server::modules::issue::Board;
 use vibevalley_server::{Hub, Server, modules};
 
 fn call(hub: &Hub, op: &str, payload: Value) -> Value {

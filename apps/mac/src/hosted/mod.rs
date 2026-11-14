@@ -41,7 +41,7 @@ impl BridgeHub {
                         // The loopback API: the CLI finds it through server.json, the helpers' MCP door is on it.
                         match vibevalley_http::serve(started.hub.clone(), "127.0.0.1:0".parse().expect("an address")) {
                             Ok(listener) => {
-                                started.board.set_mcp_url(format!("{}/mcp", listener.url()));
+                                started.board.sessions().set_mcp_url(format!("{}/mcp", listener.url()));
                                 match vibevalley_server::home::announce(&home, &listener.url()) {
                                     Ok(announced) => std::mem::forget(announced),
                                     Err(e) => eprintln!("server.json: {e}"),

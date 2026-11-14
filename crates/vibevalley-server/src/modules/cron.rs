@@ -13,11 +13,11 @@ use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 
 use vibevalley_i18n::t;
-use vibevalley_issues::{Board, NewIssue};
 use vibevalley_protocol::{ActorKind, ApiError, BizCode, Cron, CronRequest, Fact, FactCronChanged, FactCronRemoved, IssueStatus, NoticeLevel, Preview, ops};
 
 use crate::base::{LookIn, missing};
 use crate::modules::agent::Agents;
+use crate::modules::issue::{Board, NewIssue};
 use crate::{Hub, now};
 
 pub const DEFAULT_CHANNEL: &str = "general";
@@ -299,8 +299,8 @@ impl Crons {
     /// `scheduled`: the issue the cron made last, started, reopened or told;
     /// else a new one.
     fn scheduled(&self, cron: &Cron, words: &str) -> Result<(), ApiError> {
-        let fail = |e: vibevalley_issues::BoardError| match e {
-            vibevalley_issues::BoardError::Api(e) => e,
+        let fail = |e: crate::modules::ledger::BoardError| match e {
+            crate::modules::ledger::BoardError::Api(e) => e,
             e => ApiError::new(BizCode::IssueRefused, e.to_string()),
         };
         let Some(agent) = &cron.agent else { return self.to_orchestrator(cron, words) };

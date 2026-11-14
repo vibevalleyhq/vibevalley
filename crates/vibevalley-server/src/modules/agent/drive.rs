@@ -3,12 +3,13 @@
 //! with what `Fleet::resolve` says.
 
 use vibevalley_i18n::t;
-use vibevalley_issues::{BoardError, Drive, Drivers, HelperPlace, Persona};
 use vibevalley_oar::McpServer;
 use vibevalley_protocol::{Agent, ApiError, BizCode, Deliverable, Issue, IssueReportMemory, IssueReportMemoryScope, MCPServer, Next, PersonaMode, Skill};
 
 use super::Agents;
 use crate::base::LookIn;
+use crate::modules::ledger::BoardError;
+use crate::modules::session::{Drive, Drivers, HelperPlace, Persona};
 
 fn refusal(text: String, next: Vec<Next>) -> BoardError {
     BoardError::Api(ApiError::new(BizCode::IssueRefused, text).with_next(next))
@@ -116,7 +117,7 @@ impl Drivers for Agents {
             rules = rules.replace("中文", &language);
         }
         if deliver == Deliverable::Answer {
-            rules = format!("{}\n\n{rules}", vibevalley_issues::ANSWER_ONLY);
+            rules = format!("{}\n\n{rules}", crate::modules::session::ANSWER_ONLY);
         }
         rules
     }

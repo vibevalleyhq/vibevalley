@@ -12,6 +12,7 @@ pub mod cron;
 pub mod game;
 pub mod issue;
 pub mod lan;
+pub mod ledger;
 pub mod library;
 pub mod mcp;
 pub mod media;
@@ -25,6 +26,7 @@ pub mod session;
 pub mod setting;
 pub mod tool;
 pub mod watch;
+pub mod workplace;
 
 /// Every module this build serves.
 pub fn install(hub: &Hub) {

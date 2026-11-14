@@ -10,10 +10,11 @@ use std::time::Duration;
 
 use support::*;
 use vibevalley_core::Move;
-use vibevalley_issues::{Board, BoardError, NewIssue, Sent, Undelivered};
 use vibevalley_oar::scripted::{Script, Step};
 use vibevalley_oar::{PermissionMode, Runtime, StopReason};
 use vibevalley_protocol::{Deliverable, IssueCanceled, IssueStageKind as StageKind, IssueStatus, Landing, Outcome, Phase, StuckReason};
+use vibevalley_server::modules::issue::{Board, NewIssue, Sent};
+use vibevalley_server::modules::ledger::{BoardError, Undelivered};
 
 fn new(title: &str, repo: Option<&Path>) -> NewIssue {
     NewIssue {
@@ -59,7 +60,7 @@ fn an_issue_goes_from_backlog_to_merged() {
     assert_eq!(session.phase, Phase::done());
     assert_eq!(session.last_run.as_ref().unwrap().summary, "Added feature.txt");
     assert_eq!(session.branch.as_deref(), Some("vibevalley/issue-1"));
-    assert_eq!(w.board.base_branch(&session.id).as_deref(), Some("main"));
+    assert_eq!(w.board.sessions().base_branch(&session.id).as_deref(), Some("main"));
     let worktree = session.worktree.clone().unwrap();
     assert!(worktree.ends_with("worktrees/app.1"), "{worktree}");
     assert!(prompts.lock().unwrap()[0].starts_with("Add the feature"));
@@ -339,7 +340,7 @@ fn a_restart_marks_a_working_session_interrupted_and_it_goes_on() {
     let session = board.session(&session_id).unwrap();
     assert_eq!(session.phase, Phase::resting());
     assert_eq!(session.last_run.unwrap().outcome, Outcome::Interrupted);
-    assert!(!board.is_live(&session_id));
+    assert!(!board.sessions().is_live(&session_id));
     board.move_to("1", IssueStatus::Todo, None).unwrap();
     let done = wait_stage(&board, "1", StageKind::Reviewing);
     assert_eq!(done.latest_session_id(), Some(&session_id), "the same session, reopened");

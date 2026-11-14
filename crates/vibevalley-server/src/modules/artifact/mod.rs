@@ -644,7 +644,7 @@ fn prune_daily(me: Weak<Artifacts>) {
 
 /// `idOf`: an issue by number (refused when there is none), by session, or
 /// the reference as given.
-fn issue_id(board: &vibevalley_issues::Board, reference: &str) -> Result<String, ApiError> {
+fn issue_id(board: &crate::modules::issue::Board, reference: &str) -> Result<String, ApiError> {
     let r = reference.trim();
     let number = r.strip_prefix('#').unwrap_or(r);
     if !number.is_empty() && number.chars().all(|c| c.is_ascii_digit()) {
@@ -661,7 +661,7 @@ fn issue_id(board: &vibevalley_issues::Board, reference: &str) -> Result<String,
 
 /// Every `artifact.*` endpoint and subscription, as the user calls them
 /// (`gateway/http/handlers/artifact.ts`).
-pub fn install(hub: &Hub, artifacts: Arc<Artifacts>, agents: Arc<Agents>, board: vibevalley_issues::Board) {
+pub fn install(hub: &Hub, artifacts: Arc<Artifacts>, agents: Arc<Agents>, board: crate::modules::issue::Board) {
     let a = artifacts;
     hub.on::<ops::ArtifactList>({
         let (a, board) = (a.clone(), board.clone());

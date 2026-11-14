@@ -60,7 +60,7 @@ fn farm() -> Farm {
     .unwrap();
     let listener = vibevalley_http::serve_with(started.hub.clone(), "127.0.0.1:0".parse().unwrap(), None).unwrap();
     let url = listener.url();
-    started.board.set_mcp_url(format!("{url}/mcp"));
+    started.board.sessions().set_mcp_url(format!("{url}/mcp"));
     Farm {
         url,
         dir,

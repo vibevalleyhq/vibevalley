@@ -75,7 +75,7 @@ impl Door {
     }
 
     fn caller(&self, token: &str) -> Option<vibevalley_protocol::Session> {
-        self.farm.board.session(&self.farm.board.who(token)?)
+        self.farm.board.session(&self.farm.board.sessions().who(token)?)
     }
 }
 

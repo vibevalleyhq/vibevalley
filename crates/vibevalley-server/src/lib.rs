@@ -316,7 +316,7 @@ fn frames(hub: std::sync::Weak<Hub>, kicked: flume::Receiver<Vec<GameEffect>>) {
 }
 
 /// The board's facts go into the server's one state.
-impl vibevalley_issues::Facts for Hub {
+impl modules::ledger::Facts for Hub {
     fn apply(&self, facts: Vec<Fact>) -> Applied {
         Hub::apply(self, facts)
     }

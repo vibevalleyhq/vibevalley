@@ -70,7 +70,7 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
     .unwrap();
     let listener = vibevalley_http::serve(started.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
     let door = format!("{}/mcp", listener.url());
-    started.board.set_mcp_url(door.clone());
+    started.board.sessions().set_mcp_url(door.clone());
     std::fs::write(dir.path().join("AGENTS.md"), "所有仓库都用 2 个空格缩进。").unwrap();
 
     let call = |op: &str, p| started.hub.call_as(Caller::User, op, p);
@@ -111,7 +111,7 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
             _ => None,
         })
         .expect("the vibevalley door with a bearer token");
-    let session = started.board.who(&token).expect("the token names the helper");
+    let session = started.board.sessions().who(&token).expect("the token names the helper");
 
     let hello = rpc(&door, &token, 1, "initialize", json!({ "protocolVersion": "2025-06-18", "capabilities": {} }));
     assert_eq!(hello["result"]["serverInfo"]["name"], "vibevalley");
@@ -175,7 +175,7 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
         json!({ "name": "issue_report", "arguments": { "summary": "打了招呼 abc123", "remember": [{ "text": "测试用 cargo test", "scope": "all" }] } }),
     );
     assert_eq!(text_of(&reported), "报告已记录；现在用简短正文说明结果。");
-    let kept = std::fs::read_to_string(started.board.report_path(&session)).unwrap();
+    let kept = std::fs::read_to_string(started.board.sessions().report_path(&session)).unwrap();
     assert!(kept.contains("打了招呼 abc123") && kept.contains("测试用 cargo test"), "{kept}");
 
     let none = rpc(&door, &token, 9, "tools/call", json!({ "name": "no_such_tool", "arguments": {} }));

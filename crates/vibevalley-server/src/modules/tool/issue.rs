@@ -3,13 +3,14 @@
 use serde::Deserialize;
 use serde_json::{Value, json};
 use vibevalley_i18n::t;
-use vibevalley_issues::{ChildDraft, Report, ReportQuestion, ReportStatus};
 use vibevalley_protocol::{
     Caller, Changes, CriterionCheck, Deliverable, Issue, IssueAnswer, IssueReportMemory, IssueStatus, IssueTimeline, MandateStrength, SubmitBranch,
 };
 
 use super::{Farm, Who, given};
+use crate::modules::issue::ChildDraft;
 use crate::modules::orchestrator::words::{self, wire};
+use crate::modules::session::{Report, ReportQuestion, ReportStatus};
 use crate::now;
 
 const PRIORITIES: &str = "Expected one of: 紧急, 高, 普通, 中, 低, urgent, high, medium, low";
@@ -494,7 +495,7 @@ pub fn report(f: &Farm, who: &Who, a: ReportArgs) -> Result<String, String> {
         checks: a.checks,
         remember: a.remember,
     };
-    f.board.report(&me.id, &report).map_err(|e| e.to_string())?;
+    f.board.sessions().report(&me.id, &report).map_err(|e| e.to_string())?;
     Ok("报告已记录；现在用简短正文说明结果。".into())
 }
 
@@ -542,7 +543,7 @@ fn submit(f: &Farm, who: &Who, summary: Option<&str>) -> Result<String, String> 
         cwd,
         branch,
         sha,
-        base: f.board.base_branch(&me.id).unwrap_or_else(|| "main".into()),
+        base: f.board.sessions().base_branch(&me.id).unwrap_or_else(|| "main".into()),
         title,
         body,
         dry_run: None,

@@ -866,7 +866,7 @@ impl Repos {
 
 /// `repo.template.list` (`issue.templates`): the stack, the titles last
 /// sent there, and the catalog filled with its commands.
-pub fn install_templates(hub: &Hub, repos: Arc<Repos>, board: vibevalley_issues::Board, agents: Arc<super::agent::Agents>) {
+pub fn install_templates(hub: &Hub, repos: Arc<Repos>, board: super::issue::Board, agents: Arc<super::agent::Agents>) {
     hub.on::<ops::RepoTemplateList>(move |_, input| {
         let name = input.id;
         let stack = repos
