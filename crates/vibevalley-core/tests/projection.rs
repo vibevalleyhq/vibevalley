@@ -1,6 +1,6 @@
-//! VibeValley's own `reduce`, `effectsOf` and `frameOf` folded these facts
-//! (`crates/vibevalley-protocol/gen/golden.ts` writes
-//! `crates/vibevalley-protocol/golden/projection/*.json`); ours must say, after
+//! VibeValley's TypeScript `reduce`, `effectsOf` and `frameOf` folded these
+//! facts (`crates/vibevalley-protocol/golden/projection/*.json`, kept as they
+//! were written before the server moved to Rust); ours must say, after
 //! every fact, whether it changed anything, the effects it set off and the
 //! state, and frame the end state the same.
 

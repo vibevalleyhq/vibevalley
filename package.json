@@ -16,7 +16,8 @@
     "health:write": "vpx packages/health/src/cli.ts --config scripts/audit/health.config.ts --write",
     "practice:write": "vpx scripts/audit/practice-audit.ts --write",
     "paths:write": "vpx scripts/audit/service-paths.ts --write",
-    "protocol:rust": "sh crates/vibevalley-protocol/gen/run.sh",
+    "protocol:ts": "VIBEVALLEY_WRITE_TS=1 cargo test -p vibevalley-protocol --test typescript",
+    "goldens": "vpx crates/vibevalley-artifact/gen/artifact.ts $PWD crates/vibevalley-artifact && vpx crates/vibevalley-pkm/golden/gen.ts crates/vibevalley-pkm/golden && vpx crates/vibevalley-pkm/golden/graph.ts crates/vibevalley-pkm/golden",
     "nsh:install": "cargo install nsh-cli --version 0.5.0 --locked --root .tools"
   },
   "devDependencies": {

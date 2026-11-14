@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vite-plus/test";
 
 import { endpoints, fieldsOf, pathOf } from "./api";
+import { servedEndpoints } from "./endpoints.gen";
 
 // What a word may end in: s is a plural, the words that end so in the singular aside (status, and MOSS Live's name).
 const singular = (word: string) => !word.endsWith("s") || word === "status" || word === "moss";
@@ -42,5 +43,11 @@ describe("the endpoint table", () => {
       .filter((e) => e.about.some((f) => !fieldsOf(e).includes(f)))
       .map((e) => e.op);
     expect(missing).toEqual([]);
+  });
+
+  test("is the table the server serves (crates/vibevalley-protocol/src/contract/endpoints.rs)", () => {
+    const row = (e: { op: string; can: readonly string[]; about: readonly string[]; dryRun?: string }) =>
+      `${e.op} can [${e.can.join(" ")}] about [${e.about.join(" ")}]${e.dryRun ? ` dry run ${e.dryRun}` : ""}`;
+    expect(endpoints.map(row).toSorted()).toEqual(servedEndpoints.map(row).toSorted());
   });
 });

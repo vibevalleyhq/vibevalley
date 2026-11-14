@@ -3,8 +3,8 @@ import { z } from "zod";
 import { Attachment } from "../attachment/schema";
 import type { Codec } from "../codec";
 import { codePoints } from "../common/schema";
-import type * as T from "./audio-shapes";
 import { MediaAudioMetadata, MediaInputReference, MediaPhase, MediaSource, MediaAudioUsage } from "./common-schema";
+import type * as T from "./shapes";
 import { MediaAudioFormatValues } from "./shapes";
 
 const Id = z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/u);

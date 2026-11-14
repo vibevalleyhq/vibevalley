@@ -4,8 +4,8 @@ import { Attachment } from "../attachment/schema";
 import type { Codec } from "../codec";
 import { codePoints, MessageId, SessionId } from "../common/schema";
 import { MediaAudioJob } from "./audio-schema";
-import { MediaAudioKindValues } from "./audio-shapes";
 import { MediaAudioMetadata, MediaInputReference, MediaPhase, MediaSource, MediaAudioUsage } from "./common-schema";
+import { MediaAudioKindValues } from "./shapes";
 import * as T from "./shapes";
 
 export { MediaAudioMetadata, MediaInputReference, MediaSource, MediaAudioUsage } from "./common-schema";

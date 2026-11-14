@@ -32,6 +32,19 @@ impl<'de> Deserialize<'de> for JsNumber {
     }
 }
 
+impl ts_rs::TS for JsNumber {
+    type WithoutGenerics = Self;
+    type OptionInnerType = Self;
+
+    fn name(_: &ts_rs::Config) -> String {
+        "number".to_owned()
+    }
+
+    fn inline(cfg: &ts_rs::Config) -> String {
+        Self::name(cfg)
+    }
+}
+
 impl From<f64> for JsNumber {
     fn from(v: f64) -> Self {
         JsNumber(v)
@@ -71,6 +84,19 @@ macro_rules! literal_bool {
                 }
             }
         }
+
+        impl ts_rs::TS for $name {
+            type WithoutGenerics = Self;
+            type OptionInnerType = Self;
+
+            fn name(_: &ts_rs::Config) -> String {
+                stringify!($value).to_owned()
+            }
+
+            fn inline(cfg: &ts_rs::Config) -> String {
+                Self::name(cfg)
+            }
+        }
     };
 }
 
@@ -85,6 +111,17 @@ pub enum Caller {
     Remote,
     Orchestrator,
     Session,
+}
+
+impl Caller {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Caller::User => "user",
+            Caller::Remote => "remote",
+            Caller::Orchestrator => "orchestrator",
+            Caller::Session => "session",
+        }
+    }
 }
 
 /// One row of the endpoint table (`Endpoint` in `endpoint.ts`), with its
@@ -120,5 +157,5 @@ pub trait Subscription {
 
 /// The endpoint named `op`.
 pub fn endpoint(op: &str) -> Option<&'static Endpoint> {
-    crate::generated::ENDPOINTS.iter().chain(crate::NATIVE_ENDPOINTS).find(|e| e.op == op)
+    crate::contract::ENDPOINTS.iter().chain(crate::NATIVE_ENDPOINTS).find(|e| e.op == op)
 }
