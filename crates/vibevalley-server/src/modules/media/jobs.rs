@@ -1580,31 +1580,6 @@ fn relay_speech(claim: vibevalley_server_api::media::SpeechClaim, sink: crate::S
     (claim.gone)();
 }
 
-#[cfg(test)]
-mod stream_tests {
-    use super::*;
-    #[test]
-    fn regression_speech_subscription_forwards_events_and_releases_its_claim_on_stop() {
-        let (events, stream) = flume::unbounded();
-        let (out, received) = flume::unbounded();
-        let (stop, stopped) = flume::bounded(1);
-        let (gone, released) = flume::bounded(1);
-        let claim = vibevalley_server_api::media::SpeechClaim {
-            events: stream,
-            gone: Box::new(move || {
-                gone.send(()).unwrap();
-            }),
-        };
-        let worker = std::thread::spawn(move || relay_speech(claim, crate::Sink { events: out, stop: stopped }));
-        events.send(json!({"type":"audio","sequence":0,"audio":"AAAA"})).unwrap();
-        assert_eq!(received.recv_timeout(Duration::from_secs(5)).unwrap()["sequence"], 0);
-        drop(stop);
-        released.recv_timeout(Duration::from_secs(5)).unwrap();
-        worker.join().unwrap();
-        assert!(events.is_disconnected());
-    }
-}
-
 struct SpeechStream;
 impl vibevalley_protocol::Subscription for SpeechStream {
     const NAME: &'static str = "media.speech.stream";
@@ -1703,5 +1678,30 @@ impl vibevalley_server_api::media::SpeechStreams for Jobs {
                 me.stop_run(&job);
             }),
         })
+    }
+}
+
+#[cfg(test)]
+mod stream_tests {
+    use super::*;
+    #[test]
+    fn regression_speech_subscription_forwards_events_and_releases_its_claim_on_stop() {
+        let (events, stream) = flume::unbounded();
+        let (out, received) = flume::unbounded();
+        let (stop, stopped) = flume::bounded(1);
+        let (gone, released) = flume::bounded(1);
+        let claim = vibevalley_server_api::media::SpeechClaim {
+            events: stream,
+            gone: Box::new(move || {
+                gone.send(()).unwrap();
+            }),
+        };
+        let worker = std::thread::spawn(move || relay_speech(claim, crate::Sink { events: out, stop: stopped }));
+        events.send(json!({"type":"audio","sequence":0,"audio":"AAAA"})).unwrap();
+        assert_eq!(received.recv_timeout(Duration::from_secs(5)).unwrap()["sequence"], 0);
+        drop(stop);
+        released.recv_timeout(Duration::from_secs(5)).unwrap();
+        worker.join().unwrap();
+        assert!(events.is_disconnected());
     }
 }

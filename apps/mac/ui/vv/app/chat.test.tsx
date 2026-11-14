@@ -154,7 +154,7 @@ test("attachments: a picture opens in the Lightbox, a video in a player, a sound
   expect(app.count("id:attachment-bug.mov")).toBe(1);
   await app.press("id:attachment-play");
   await fake.pump(app);
-  expect(fake.calls.find((c) => c.op === "host.playAudio")?.payload).toEqual({ path: "/Users/farmer/.vibevalley/attachments/login.png" });
+  expect(fake.calls.find((c) => c.op === "host.playAudio")?.payload).toEqual({ path: "/Users/farmer/.vibevalley/attachments/login.png", position: 0 });
   await app.press("id:attachment-play");
   await fake.pump(app);
   expect(fake.calls.map((c) => c.op)).toContain("host.stopAudio");
