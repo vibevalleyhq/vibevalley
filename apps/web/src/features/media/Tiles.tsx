@@ -1,8 +1,12 @@
 import type { JSX } from "@solidjs/web";
 import { createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 
-import { attachmentPath, type LibraryItem, type MediaJob } from "@vibevalley/protocol";
+import { shellPath, type ShellTheme } from "@vibevalley/artifact/shell";
+import { t } from "@vibevalley/i18n";
+import { type Artifact, attachmentPath, type LibraryItem, type MediaJob } from "@vibevalley/protocol";
+import { htmlSandbox } from "@vibevalley/protocol/rules";
 
+import { artifactIcon, artifactSuffix, kindLabel } from "#/features/artifact/index.ts";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
 
@@ -28,6 +32,11 @@ const styles = {
   field: (height: number): JSX.CSSProperties => ({ height: `${height}px` }),
   at: (x: number, y: number): JSX.CSSProperties => ({ left: `${x}px`, top: `${y}px` }),
   tile: (width: number, height: number): JSX.CSSProperties => ({ width: `${width}px`, height: `${height + captionPx}px` }),
+  previewFrame: (width: number): JSX.CSSProperties => ({
+    width: "1280px",
+    height: "800px",
+    transform: `scale(${Math.max(0.1, width / 1280)})`,
+  }),
 };
 
 const kindIcon: Record<"audio" | "video" | "other", IconName> = { audio: "audio", video: "video", other: "file" };
@@ -276,5 +285,83 @@ function Tile(props: {
       </Switch>
       <p class={["pt-1.5 truncate text-xs", props.picked ? "text-ink" : "text-muted"]}>{file().name}</p>
     </div>
+  );
+}
+
+export function ArtifactPreview(props: { artifact: Artifact; theme: ShellTheme; fallbackWidth?: number }) {
+  const preview = useWidth();
+  return (
+    <div ref={preview.ref} class="relative aspect-[16/10] w-full overflow-hidden bg-hover">
+      <Show
+        when={props.artifact.body === "html"}
+        fallback={
+          <div class="flex h-full w-full flex-col items-center justify-center gap-1.5 text-muted">
+            <Icon name={artifactIcon(props.artifact)} size={24} />
+            <span class="text-xs font-medium">{t("web.library.blocksLabel")}</span>
+          </div>
+        }
+      >
+        <iframe
+          src={shellPath(props.artifact.id, props.artifact.version, props.artifact.display ?? "page", props.theme, { still: true })}
+          title={props.artifact.title}
+          sandbox={htmlSandbox}
+          referrerpolicy="no-referrer"
+          loading="lazy"
+          tabindex={-1}
+          class="pointer-events-none absolute top-0 left-0 border-0 origin-top-left"
+          style={styles.previewFrame(preview.width() > 0 ? preview.width() : (props.fallbackWidth ?? 240))}
+        />
+      </Show>
+    </div>
+  );
+}
+
+export function ArtifactTiles(props: {
+  artifacts: readonly Artifact[];
+  pickedId: string | undefined;
+  theme: ShellTheme;
+  onPick: (id: string) => void;
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <section aria-label={t("web.library.rail.artifacts")} class="flex flex-col gap-2">
+      <p class="text-xs font-medium text-muted">{t("web.library.rail.artifacts")}</p>
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
+        <For each={props.artifacts} keyed={(a) => a.id}>
+          {(a) => {
+            const picked = () => props.pickedId === a().id;
+            return (
+              <button
+                type="button"
+                data-testid="library-artifact-item"
+                data-key={a().id}
+                data-display={a().display ?? a().body}
+                aria-pressed={picked() ? "true" : "false"}
+                onClick={() => props.onPick(a().id)}
+                onDblClick={() => props.onOpen(a().id)}
+                class={[
+                  "flex min-w-0 flex-col overflow-hidden rounded-lg border text-start cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-focus transition-[border-color,background-color] duration-120 ease-out",
+                  picked() ? "border-accent bg-selected" : "border-line bg-page hover:bg-hover",
+                ]}
+              >
+                <ArtifactPreview artifact={a()} theme={props.theme} />
+                <div class="flex min-w-0 flex-col gap-1 p-2.5">
+                  <p class="truncate text-sm font-medium text-ink">{a().title}</p>
+                  <div class="flex flex-wrap items-center gap-1.5 text-2xs text-muted">
+                    <span data-testid="library-artifact-suffix" class="rounded-sm border border-line bg-side px-1.5 py-0.5 font-mono text-2xs text-ink">
+                      {artifactSuffix(a())}
+                    </span>
+                    <span class="truncate">{kindLabel(a())}</span>
+                    <Show when={a().body === "html"}>
+                      <span class="text-faint">· {t("web.library.inspector.versionBadge", { version: a().version })}</span>
+                    </Show>
+                  </div>
+                </div>
+              </button>
+            );
+          }}
+        </For>
+      </div>
+    </section>
   );
 }

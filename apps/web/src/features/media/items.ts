@@ -1,5 +1,16 @@
 import { t } from "@vibevalley/i18n";
-import type { LibraryFileKind, LibraryItem, LibraryOrigin, LibraryOriginKind, MediaJob, MediaUnderstandingJob } from "@vibevalley/protocol";
+import type {
+  Artifact,
+  ArtifactBody,
+  ArtifactDisplay,
+  LibraryFileKind,
+  LibraryItem,
+  LibraryOrigin,
+  LibraryOriginKind,
+  LibrarySort,
+  MediaJob,
+  MediaUnderstandingJob,
+} from "@vibevalley/protocol";
 
 export type KindFilter = LibraryFileKind | "all";
 
@@ -222,3 +233,44 @@ export const understoodText =
           : newest,
       none(),
     )?.result?.text;
+
+export type ArtifactKindFilter = "all" | "canvas" | "slides" | "dashboard" | "whiteboard" | "page";
+
+export const artifactFilterKinds: readonly Exclude<ArtifactKindFilter, "all">[] = ["canvas", "slides", "dashboard", "whiteboard", "page"];
+
+const artifactMatchesKind = (a: { readonly body: ArtifactBody; readonly display?: ArtifactDisplay | undefined }, kind: ArtifactKindFilter): boolean => {
+  if (kind === "all") return true;
+  if (kind === "page") return a.body === "blocks" || (a.display ?? "page") === "page" || a.display === "motion";
+  return a.body === "html" && a.display === kind;
+};
+
+export const shownArtifacts = (
+  all: readonly Artifact[],
+  filter: { readonly artifactKind?: ArtifactKindFilter | undefined; readonly search: string; readonly sort: LibrarySort },
+): Artifact[] => {
+  const kind = filter.artifactKind ?? "all";
+  const q = filter.search.trim().toLowerCase();
+  const filtered = all.filter((a) => {
+    if (!artifactMatchesKind(a, kind)) return false;
+    if (!q) return true;
+    return a.title.toLowerCase().includes(q) || a.byName.toLowerCase().includes(q);
+  });
+  if (filter.sort === "name") return filtered.toSorted((a, b) => a.title.localeCompare(b.title));
+  return filtered.toSorted((a, b) => b.updated - a.updated);
+};
+
+export interface ArtifactCounts {
+  readonly all: number;
+  readonly byKind: Record<Exclude<ArtifactKindFilter, "all">, number>;
+}
+
+export const artifactCountsOf = (all: readonly Artifact[]): ArtifactCounts => ({
+  all: all.length,
+  byKind: {
+    canvas: all.filter((a) => artifactMatchesKind(a, "canvas")).length,
+    slides: all.filter((a) => artifactMatchesKind(a, "slides")).length,
+    dashboard: all.filter((a) => artifactMatchesKind(a, "dashboard")).length,
+    whiteboard: all.filter((a) => artifactMatchesKind(a, "whiteboard")).length,
+    page: all.filter((a) => artifactMatchesKind(a, "page")).length,
+  },
+});

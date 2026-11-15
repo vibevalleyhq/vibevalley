@@ -13,6 +13,7 @@
     "label": "Filters",
     "where": "From",
     "kind": "Kind",
+    "artifacts": "Deliverables",
     "channels": "From channels",
     "agents": "From helpers",
     "anyWhere": "Any origin",
@@ -31,6 +32,16 @@
     "video": "Video",
     "other": "Other"
   },
+  "artifactKind": {
+    "all": "All deliverables",
+    "canvas": "Visual (.visual.html)",
+    "slides": "Slides (.slide.html)",
+    "dashboard": "Dashboard (.dashboard.html)",
+    "whiteboard": "Whiteboard (.whiteboard)",
+    "page": "Pages & docs"
+  },
+  "newArtifact": "New deliverable",
+  "blocksLabel": "Shared doc",
   "search": "Search names",
   "sortLabel": "Sort",
   "sort": {
@@ -65,6 +76,9 @@
     "from": "From",
     "added": "Added",
     "openChannel": "See it in {channel}",
+    "openWorkbench": "Open in workbench",
+    "versionBadge": "v{version}",
+    "byMaker": "By {name}",
     "selected": "{n} selected",
     "clear": "Clear selection",
     "more": "More"

@@ -6,18 +6,37 @@ import { Select } from "#/ui/Field.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
 
-import { type Counts, type KindFilter, type Names, type Where, whereKey } from "./items.ts";
+import { type ArtifactCounts, artifactFilterKinds, type ArtifactKindFilter, type Counts, type KindFilter, type Names, type Where, whereKey } from "./items.ts";
 
 const originIcons: Record<"generated" | "uploaded" | "fetched", IconName> = { generated: "generate", uploaded: "upload", fetched: "download" };
 const kindIcons: Record<KindFilter, IconName> = { all: "media", image: "image", audio: "audio", video: "video", other: "file" };
 const kinds: readonly KindFilter[] = ["all", "image", "audio", "video", "other"];
+const artifactKindIcons: Record<ArtifactKindFilter, IconName> = {
+  all: "artifacts",
+  canvas: "appearance",
+  slides: "present",
+  dashboard: "catalog",
+  whiteboard: "notes",
+  page: "web",
+};
+const artifactKinds: readonly ArtifactKindFilter[] = ["all", ...artifactFilterKinds];
 
-function Row(props: { testid: string; dataKey: string; icon: IconName; label: string; count: number; here: boolean; onPick: () => void }) {
+function Row(props: {
+  testid: string;
+  dataKey: string;
+  dataKind?: string | undefined;
+  icon: IconName;
+  label: string;
+  count: number;
+  here: boolean;
+  onPick: () => void;
+}) {
   return (
     <button
       type="button"
       data-testid={props.testid}
       data-key={props.dataKey}
+      data-kind={props.dataKind}
       aria-pressed={props.here ? "true" : "false"}
       onClick={() => props.onPick()}
       class={[
@@ -39,10 +58,14 @@ export function Rail(props: {
   names: Names;
   where: Where;
   kind: KindFilter;
+  artifactKind?: ArtifactKindFilter | undefined;
+  artifactCounts?: ArtifactCounts | undefined;
   onWhere: (where: Where) => void;
   onKind: (kind: KindFilter) => void;
+  onArtifactKind?: ((kind: ArtifactKindFilter | undefined) => void) | undefined;
 }) {
-  const here = (where: Where) => whereKey(where) === whereKey(props.where);
+  const inArtifacts = () => props.artifactKind !== undefined;
+  const here = (where: Where) => !inArtifacts() && whereKey(where) === whereKey(props.where);
   const wheres = (): readonly { readonly where: Where; readonly label: string }[] => {
     const names = props.names;
     return [
@@ -90,12 +113,31 @@ export function Rail(props: {
               icon={kindIcons[kind]}
               label={t(`web.library.kind.${kind}`)}
               count={props.counts.kind.get(kind) ?? 0}
-              here={props.kind === kind}
+              here={!inArtifacts() && props.kind === kind}
               onPick={() => props.onKind(kind)}
             />
           )}
         </For>
       </div>
+      <Show when={props.onArtifactKind !== undefined}>
+        <div role="group" aria-label={t("web.library.rail.artifacts")} class="flex max-sm:hidden shrink-0 flex-col max-sm:flex-row gap-px max-sm:gap-1">
+          <p class="block max-sm:hidden px-2 pb-1 text-xs font-medium text-faint">{t("web.library.rail.artifacts")}</p>
+          <For each={artifactKinds}>
+            {(ak) => (
+              <Row
+                testid="library-artifact-kind"
+                dataKey={ak}
+                dataKind={ak}
+                icon={artifactKindIcons[ak]}
+                label={t(`web.library.artifactKind.${ak}`)}
+                count={ak === "all" ? (props.artifactCounts?.all ?? 0) : (props.artifactCounts?.byKind[ak] ?? 0)}
+                here={props.artifactKind === ak}
+                onPick={() => props.onArtifactKind?.(ak)}
+              />
+            )}
+          </For>
+        </div>
+      </Show>
       <Show when={props.counts.channels.length > 0}>
         <div role="group" aria-label={t("web.library.rail.channels")} class="flex max-sm:hidden shrink-0 flex-col max-sm:flex-row gap-px max-sm:gap-1">
           <p class="block max-sm:hidden px-2 pb-1 text-xs font-medium text-faint">{t("web.library.rail.channels")}</p>

@@ -1,8 +1,4 @@
 {
-  "place": {
-    "label": "Artifact",
-    "hint": "你和帮工、助手留下要看的东西：一起写的 Artifact、交上来的网页，都在这里"
-  },
   "card": {
     "version": "第 {version} 稿",
     "open": "打开「{title}」"
@@ -10,7 +6,6 @@
   "page": {
     "by": "{name} 做的",
     "updated": "{when}更新",
-    "versions": "每一稿",
     "open": "在新标签页打开",
     "delete": "删掉",
     "deleteAsk": "删掉「{title}」？对话里的卡片还在。",
@@ -35,17 +30,10 @@
     },
     "rail": "这篇的旁注",
     "railShow": "打开旁注",
-    "railHide": "收起旁注"
-  },
-  "talk": {
-    "atMessage": "在对话里",
-    "reply": "回复",
-    "replyHint": "写给做它的帮工：哪里要改",
-    "send": "回复",
-    "sent": "回复了",
-    "replyVersion": "回复这一稿",
-    "sentVersion": "回复了第 {version} 稿",
-    "none": "还没在对话里说过：自己写的这篇，还没交给谁看。"
+    "railHide": "收起旁注",
+    "listShow": "展开列表",
+    "listHide": "收起列表",
+    "backToLibrary": "返回素材库"
   },
   "issue": {
     "title": "Artifact"
@@ -110,7 +98,51 @@
     "blocks": "一起写的",
     "html": "网页",
     "slides": "幻灯片",
-    "motion": "动画"
+    "motion": "动画",
+    "canvas": "画板",
+    "dashboard": "仪表盘",
+    "whiteboard": "白板"
+  },
+  "canvasEditor": {
+    "layers": "图层",
+    "palette": "主题色",
+    "paletteWorkbench": "田间工作台",
+    "paletteBrutalistRed": "粗野红黑",
+    "paletteNewsprint": "复古报刊",
+    "paletteBlueprint": "工程蓝图",
+    "flipX": "水平翻转",
+    "bringForward": "上移一层",
+    "sendBackward": "下移一层",
+    "lock": "锁定图层",
+    "unlock": "解锁图层",
+    "hide": "隐藏图层",
+    "show": "显示图层",
+    "lintClean": "排版检查通过",
+    "lintIssues": "{count} 处排版冲突",
+    "autoFix": "一键避让修复",
+    "saveChanges": "保存图层微调",
+    "resetChanges": "还原",
+    "exportSvg": "导出画板",
+    "tabInspect": "图层与属性",
+    "tabTalk": "对话",
+    "inspectorEmpty": "点选画布上的元素或下方图层，即可调整位置、效果与文字",
+    "inspectorOpen": "展开图层与属性",
+    "positionAndSize": "位置与尺寸",
+    "propX": "X",
+    "propY": "Y",
+    "propW": "宽",
+    "propH": "高",
+    "propRotate": "旋转",
+    "filter": "视觉效果",
+    "filterNone": "无效果",
+    "filterSticker": "贴纸白边",
+    "filterTorn": "撕纸边缘",
+    "filterHalftone": "半调网点",
+    "filterShadow": "立体投影",
+    "filterGrain": "胶片颗粒",
+    "textContent": "图层文字",
+    "textHint": "每行对应图层内的一段文字，修改后实时预览",
+    "lintDetails": "版式冲突详情"
   },
   "edit": {
     "title": "改字",

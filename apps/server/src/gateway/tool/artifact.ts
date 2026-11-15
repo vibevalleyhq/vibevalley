@@ -1,4 +1,4 @@
-import { artifactMax, htmlCheck } from "@vibevalley/artifact/html";
+import { artifactMax, htmlCheck, inferArtifactFromName } from "@vibevalley/artifact/html";
 import type * as T from "@vibevalley/protocol";
 import { isApiError } from "@vibevalley/protocol/api";
 import { issueScopeOf } from "@vibevalley/protocol/rules";
@@ -129,12 +129,14 @@ export function artifactTools(deps: Pick<ToolDeps, "session" | "channel" | "arti
         const issueId = p.issue ? (await findIssue(p.issue)).id : undefined;
         return refusalAnswered(async () => {
           const content = await artifactWords(c, p.content, undefined);
+          const inferredDisplay = p.kind === "html" && p.display === undefined ? inferArtifactFromName(p.title, content).display : undefined;
+          const display = p.display ?? inferredDisplay;
           const made = await artifacts.create(
             { from: c.agent, by: c.agent, ...runOf(c.agent) },
             {
               title: p.title,
               kind: p.kind,
-              ...(p.display !== undefined ? { display: p.display } : {}),
+              ...(display !== undefined ? { display } : {}),
               content,
               ...(p.note ? { note: p.note } : {}),
               channel: p.channel ?? c.here,
@@ -151,12 +153,14 @@ export function artifactTools(deps: Pick<ToolDeps, "session" | "channel" | "arti
       const c = callerOf(who);
       return refusalAnswered(async () => {
         const content = await artifactWords(c, p.content, p.file);
+        const inferredDisplay = p.kind === "html" && p.display === undefined ? inferArtifactFromName(p.file ?? p.title, content).display : undefined;
+        const display = p.display ?? inferredDisplay;
         const made = await artifacts.create(
           { from: c.session, by: c.agent, ...runOf(c.session) },
           {
             title: p.title,
             kind: p.kind,
-            ...(p.display !== undefined ? { display: p.display } : {}),
+            ...(display !== undefined ? { display } : {}),
             content,
             ...(p.note ? { note: p.note } : {}),
             ...sessionArtifactScope(c.session),

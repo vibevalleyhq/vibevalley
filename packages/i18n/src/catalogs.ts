@@ -665,7 +665,7 @@ export const catalogs = {
       noTitle: "Artifact 要有个标题",
       longTitle: "标题太长了，最多 {max} 个字",
       badKind: "认不得 {kind} 这种 Artifact，只认 {kinds}",
-      displayHtmlOnly: "只有网页 Artifact 能选怎么看（page、slides、motion）；一起写的没有这一项",
+      displayHtmlOnly: "只有网页 Artifact 能选怎么看（page、slides、motion、canvas）；一起写的没有这一项",
       empty: "Artifact 是空的",
       tooBig: "一稿最多 {mb} MB",
       missing: "没有 {id} 这份 Artifact",
@@ -759,6 +759,13 @@ export const catalogs = {
         refresh: '第 {line} 行的 <meta http-equiv="refresh"> 会把页面带走：删掉它',
         base: "第 {line} 行的 <base href>：删掉它，地址写全",
         frame: "第 {line} 行的 <{tag}>：页面里不能再嵌一个页面",
+        canvasBoardAttr: "第 {line} 行的 <vv-board> 缺少有效的正数 width 或 height。Fix: 为 <vv-board> 设置大于 0 的 width 和 height 属性",
+        canvasLayerId: "第 {line} 行的 <vv-layer> 缺少或重复使用了 id（{id}）。Fix: 为每个 <vv-layer> 指定唯一的非空 id",
+        canvasLayerBox: "第 {line} 行的图层 {id} 缺少有效的数值坐标或尺寸（x、y、w、h，且 w、h > 0）。Fix: 补全合法的 x、y、w、h 数值属性",
+        canvasAssetMissing: '第 {line} 行的图层 {id} 引用了不存在的素材 asset="{asset}"。Fix: 在 <vv-assets> 中添加 id="{asset}" 的元素或修正引用',
+        canvasInlineData: '第 {line} 行的 <vv-board> 内直接内联了超过 2KB 的 data: 数据。Fix: 把大图或 SVG 挪进 <vv-assets> 并通过 asset="..." 引用',
+        canvasOutOfBounds: "第 {line} 行的图层 {id}（{box}）超出了画板范围（{board}）。Fix: 缩小或挪回画板内，或为跨边背景加上 bleed",
+        canvasOcclusion: "第 {line} 行的图层 {id} 与 {other} 重叠了 {overlap}px，可能遮挡文字。Fix: 挪开坐标、调整尺寸或加上 allow-overlap",
       },
       edit: {
         empty: "没有选中要改的字",
@@ -768,6 +775,8 @@ export const catalogs = {
         crosses: "「{words}」跨了带格式的几段，这里只改一段里的字：少选几个字，或者交给帮工改",
         stale: "你看的是第 {version} 稿，最新的是第 {latest} 稿：在最新的一稿上改",
         note: "用户在页面上改了：「{old}」→「{new}」",
+        canvasNote: "用户在画板上微调了图层",
+        canvasNotFound: "画板源码里找不到对应的 <vv-board> 或图层 id：交给帮工改",
       },
     },
     "server.attachment": { noAttachment: "没有 {id} 这个附件：先上传，再带着它说话", emptyFile: "这个文件是空的", fileTooBig: "文件太大了：至多 {mb} MB" },
@@ -1918,12 +1927,10 @@ export const catalogs = {
       noEffortModel: "{model}没有推理强度可选。",
     },
     "web.artifact": {
-      place: { label: "Artifact", hint: "你和帮工、助手留下要看的东西：一起写的 Artifact、交上来的网页，都在这里" },
       card: { version: "第 {version} 稿", open: "打开「{title}」" },
       page: {
         by: "{name} 做的",
         updated: "{when}更新",
-        versions: "每一稿",
         open: "在新标签页打开",
         delete: "删掉",
         deleteAsk: "删掉「{title}」？对话里的卡片还在。",
@@ -1946,16 +1953,9 @@ export const catalogs = {
         rail: "这篇的旁注",
         railShow: "打开旁注",
         railHide: "收起旁注",
-      },
-      talk: {
-        atMessage: "在对话里",
-        reply: "回复",
-        replyHint: "写给做它的帮工：哪里要改",
-        send: "回复",
-        sent: "回复了",
-        replyVersion: "回复这一稿",
-        sentVersion: "回复了第 {version} 稿",
-        none: "还没在对话里说过：自己写的这篇，还没交给谁看。",
+        listShow: "展开列表",
+        listHide: "收起列表",
+        backToLibrary: "返回素材库",
       },
       issue: { title: "Artifact" },
       blocks: {
@@ -2009,7 +2009,48 @@ export const catalogs = {
         attrLanguage: "语言",
         attrs: "改属性：{attrs}",
       },
-      body: { blocks: "一起写的", html: "网页", slides: "幻灯片", motion: "动画" },
+      body: { blocks: "一起写的", html: "网页", slides: "幻灯片", motion: "动画", canvas: "画板", dashboard: "仪表盘", whiteboard: "白板" },
+      canvasEditor: {
+        layers: "图层",
+        palette: "主题色",
+        paletteWorkbench: "田间工作台",
+        paletteBrutalistRed: "粗野红黑",
+        paletteNewsprint: "复古报刊",
+        paletteBlueprint: "工程蓝图",
+        flipX: "水平翻转",
+        bringForward: "上移一层",
+        sendBackward: "下移一层",
+        lock: "锁定图层",
+        unlock: "解锁图层",
+        hide: "隐藏图层",
+        show: "显示图层",
+        lintClean: "排版检查通过",
+        lintIssues: "{count} 处排版冲突",
+        autoFix: "一键避让修复",
+        saveChanges: "保存图层微调",
+        resetChanges: "还原",
+        exportSvg: "导出画板",
+        tabInspect: "图层与属性",
+        tabTalk: "对话",
+        inspectorEmpty: "点选画布上的元素或下方图层，即可调整位置、效果与文字",
+        inspectorOpen: "展开图层与属性",
+        positionAndSize: "位置与尺寸",
+        propX: "X",
+        propY: "Y",
+        propW: "宽",
+        propH: "高",
+        propRotate: "旋转",
+        filter: "视觉效果",
+        filterNone: "无效果",
+        filterSticker: "贴纸白边",
+        filterTorn: "撕纸边缘",
+        filterHalftone: "半调网点",
+        filterShadow: "立体投影",
+        filterGrain: "胶片颗粒",
+        textContent: "图层文字",
+        textHint: "每行对应图层内的一段文字，修改后实时预览",
+        lintDetails: "版式冲突详情",
+      },
       edit: {
         title: "改字",
         hint: "选中页面里的字，就能在右边直接改掉它",
@@ -3531,9 +3572,28 @@ export const catalogs = {
       emptyHow: "生成一张图或一段语音、上传或拖进来一个文件，或者在聊天里让帮工把找到的东西放进来。",
       nothingShown: "没有符合筛选的素材。",
       drop: "松开，放进素材库",
-      rail: { label: "筛选", where: "来路", kind: "种类", channels: "来自频道", agents: "来自帮工", anyWhere: "全部来路", anyKind: "全部种类" },
+      rail: {
+        label: "筛选",
+        where: "来路",
+        kind: "种类",
+        artifacts: "作品交付",
+        channels: "来自频道",
+        agents: "来自帮工",
+        anyWhere: "全部来路",
+        anyKind: "全部种类",
+      },
       origin: { all: "全部", generated: "生成的", uploaded: "你上传的", fetched: "帮工拿回来的" },
       kind: { all: "全部", image: "图片", audio: "音频", video: "视频", other: "其它" },
+      artifactKind: {
+        all: "全部作品",
+        canvas: "视觉画板 (.visual.html)",
+        slides: "幻灯片 (.slide.html)",
+        dashboard: "仪表盘 (.dashboard.html)",
+        whiteboard: "白板 (.whiteboard)",
+        page: "网页与文档",
+      },
+      newArtifact: "新建作品",
+      blocksLabel: "协作文档",
       search: "搜索名字",
       sortLabel: "排序",
       sort: { recent: "最近", name: "名字", size: "大小" },
@@ -3564,6 +3624,9 @@ export const catalogs = {
         from: "来路",
         added: "加入",
         openChannel: "去 {channel} 看",
+        openWorkbench: "打开工作台",
+        versionBadge: "第 {version} 稿",
+        byMaker: "作者：{name}",
         selected: "已选 {n} 个",
         clear: "不选了",
         more: "更多",
@@ -5419,7 +5482,7 @@ export const catalogs = {
       noTitle: "An artifact needs a title",
       longTitle: "The title is too long: at most {max} characters",
       badKind: "No artifact of kind {kind}: only {kinds}",
-      displayHtmlOnly: "Only an html artifact is shown as a page, slides or motion; one written together has no display",
+      displayHtmlOnly: "Only an html artifact is shown as a page, slides, motion or canvas; one written together has no display",
       empty: "The artifact is empty",
       tooBig: "A version is at most {mb} MB",
       missing: "There is no artifact {id}",
@@ -5513,6 +5576,17 @@ export const catalogs = {
         refresh: 'Line {line} has a <meta http-equiv="refresh"> that takes the page away: remove it',
         base: "Line {line} has a <base href>: remove it and write addresses in full",
         frame: "Line {line}, <{tag}>: a page cannot hold another page",
+        canvasBoardAttr: "Line {line}: <vv-board> needs positive numeric width and height attributes. Fix: set positive width and height on <vv-board>",
+        canvasLayerId: 'Line {line}: <vv-layer> has missing or duplicate id "{id}". Fix: give each <vv-layer> a unique non-empty id',
+        canvasLayerBox: "Line {line}: layer {id} needs valid numeric x, y, w, h attributes (with w, h > 0). Fix: provide valid finite x, y, w, h numbers",
+        canvasAssetMissing:
+          'Line {line}: layer {id} references missing asset "{asset}". Fix: define id="{asset}" inside <vv-assets> or fix the asset attribute',
+        canvasInlineData:
+          'Line {line}: <vv-board> contains an inline data: URI over 2KB. Fix: move large images or SVGs into <vv-assets> and reference them via asset="..."',
+        canvasOutOfBounds:
+          "Line {line}: layer {id} ({box}) extends beyond the board ({board}). Fix: move or resize it inside the board, or add bleed for full-bleed backgrounds",
+        canvasOcclusion:
+          "Line {line}: layer {id} overlaps {other} by {overlap}px and may cover text. Fix: move or resize the layers apart, or add allow-overlap if intentional",
       },
       edit: {
         empty: "No words are selected to change",
@@ -5522,6 +5596,8 @@ export const catalogs = {
         crosses: '"{words}" crosses differently formatted parts; only words within one can be changed here: select fewer, or hand it to a helper',
         stale: "You are looking at version {version}; the latest is {latest}: change the latest",
         note: 'The user changed on the page: "{old}" → "{new}"',
+        canvasNote: "The user adjusted layers on the canvas",
+        canvasNotFound: "The <vv-board> or layer id is not in the page's source; hand it to a helper",
       },
     },
     "server.attachment": {
@@ -6728,12 +6804,10 @@ export const catalogs = {
       noEffortModel: "{model} has no effort levels.",
     },
     "web.artifact": {
-      place: { label: "Artifacts", hint: "What you, the helpers and the assistant leave to be read: pages written together and web pages handed in" },
       card: { version: "Version {version}", open: 'Open "{title}"' },
       page: {
         by: "Made by {name}",
         updated: "Updated {when}",
-        versions: "Versions",
         open: "Open in a new tab",
         delete: "Delete",
         deleteAsk: "Delete “{title}”? Its cards stay in the conversation.",
@@ -6756,16 +6830,9 @@ export const catalogs = {
         rail: "Beside this artifact",
         railShow: "Show the side panel",
         railHide: "Hide the side panel",
-      },
-      talk: {
-        atMessage: "In the conversation",
-        reply: "Reply",
-        replyHint: "For the helper who made it: what to change",
-        send: "Reply",
-        sent: "Replied",
-        replyVersion: "Reply to this version",
-        sentVersion: "Replied to version {version}",
-        none: "Not said in any conversation yet: you wrote this one and have not handed it to anyone.",
+        listShow: "Show list",
+        listHide: "Hide list",
+        backToLibrary: "Back to library",
       },
       issue: { title: "Artifacts" },
       blocks: {
@@ -6819,7 +6886,56 @@ export const catalogs = {
         attrLanguage: "language",
         attrs: "Change attrs: {attrs}",
       },
-      body: { blocks: "Written together", html: "Web page", slides: "Slides", motion: "Motion" },
+      body: {
+        blocks: "Written together",
+        html: "Web page",
+        slides: "Slides",
+        motion: "Motion",
+        canvas: "Canvas",
+        dashboard: "Dashboard",
+        whiteboard: "Whiteboard",
+      },
+      canvasEditor: {
+        layers: "Layers",
+        palette: "Palette",
+        paletteWorkbench: "Workbench",
+        paletteBrutalistRed: "Brutalist Red",
+        paletteNewsprint: "Newsprint",
+        paletteBlueprint: "Blueprint",
+        flipX: "Flip horizontal",
+        bringForward: "Bring forward",
+        sendBackward: "Send backward",
+        lock: "Lock layer",
+        unlock: "Unlock layer",
+        hide: "Hide layer",
+        show: "Show layer",
+        lintClean: "Layout check passed",
+        lintIssues: "{count} layout issues",
+        autoFix: "Auto-fix layout",
+        saveChanges: "Save as new version",
+        resetChanges: "Reset",
+        exportSvg: "Export poster",
+        tabInspect: "Layers & properties",
+        tabTalk: "Chat",
+        inspectorEmpty: "Select an element on the canvas or a layer below to adjust position, effect, and text",
+        inspectorOpen: "Open layers & properties",
+        positionAndSize: "Position & size",
+        propX: "X",
+        propY: "Y",
+        propW: "W",
+        propH: "H",
+        propRotate: "Rotate",
+        filter: "Effect",
+        filterNone: "None",
+        filterSticker: "Sticker cutout",
+        filterTorn: "Torn paper",
+        filterHalftone: "Halftone",
+        filterShadow: "Drop shadow",
+        filterGrain: "Film grain",
+        textContent: "Layer text",
+        textHint: "Each line maps to a text block in this layer",
+        lintDetails: "Layout issue details",
+      },
       edit: {
         title: "Change words",
         hint: "Select words in the page to change them on the right",
@@ -8434,9 +8550,28 @@ export const catalogs = {
       emptyHow: "Generate an image or speech, upload or drop in a file, or ask a helper in the chat to put what it found here.",
       nothingShown: "Nothing matches these filters.",
       drop: "Let go to put it in the library",
-      rail: { label: "Filters", where: "From", kind: "Kind", channels: "From channels", agents: "From helpers", anyWhere: "Any origin", anyKind: "Any kind" },
+      rail: {
+        label: "Filters",
+        where: "From",
+        kind: "Kind",
+        artifacts: "Deliverables",
+        channels: "From channels",
+        agents: "From helpers",
+        anyWhere: "Any origin",
+        anyKind: "Any kind",
+      },
       origin: { all: "All", generated: "Generated", uploaded: "Uploaded", fetched: "Brought back" },
       kind: { all: "All", image: "Images", audio: "Audio", video: "Video", other: "Other" },
+      artifactKind: {
+        all: "All deliverables",
+        canvas: "Visual (.visual.html)",
+        slides: "Slides (.slide.html)",
+        dashboard: "Dashboard (.dashboard.html)",
+        whiteboard: "Whiteboard (.whiteboard)",
+        page: "Pages & docs",
+      },
+      newArtifact: "New deliverable",
+      blocksLabel: "Shared doc",
       search: "Search names",
       sortLabel: "Sort",
       sort: { recent: "Recent", name: "Name", size: "Size" },
@@ -8467,6 +8602,9 @@ export const catalogs = {
         from: "From",
         added: "Added",
         openChannel: "See it in {channel}",
+        openWorkbench: "Open in workbench",
+        versionBadge: "v{version}",
+        byMaker: "By {name}",
         selected: "{n} selected",
         clear: "Clear selection",
         more: "More",
@@ -10252,6 +10390,23 @@ export interface Messages {
   "server.artifact.badBlockType": { readonly types: string | number };
   "server.artifact.badKind": { readonly kind: string | number; readonly kinds: string | number };
   "server.artifact.check.base": { readonly line: string | number };
+  "server.artifact.check.canvasAssetMissing": { readonly asset: string | number; readonly id: string | number; readonly line: string | number };
+  "server.artifact.check.canvasBoardAttr": { readonly line: string | number };
+  "server.artifact.check.canvasInlineData": { readonly line: string | number };
+  "server.artifact.check.canvasLayerBox": { readonly id: string | number; readonly line: string | number };
+  "server.artifact.check.canvasLayerId": { readonly id: string | number; readonly line: string | number };
+  "server.artifact.check.canvasOcclusion": {
+    readonly id: string | number;
+    readonly line: string | number;
+    readonly other: string | number;
+    readonly overlap: string | number;
+  };
+  "server.artifact.check.canvasOutOfBounds": {
+    readonly board: string | number;
+    readonly box: string | number;
+    readonly id: string | number;
+    readonly line: string | number;
+  };
   "server.artifact.check.font": { readonly hosts: string | number; readonly line: string | number; readonly url: string | number };
   "server.artifact.check.form": { readonly line: string | number; readonly url: string | number };
   "server.artifact.check.frame": { readonly line: string | number; readonly tag: string | number };
@@ -10277,6 +10432,8 @@ export interface Messages {
   "server.artifact.demoNotInserted": { readonly status: string | number };
   "server.artifact.demoRunning": undefined;
   "server.artifact.displayHtmlOnly": undefined;
+  "server.artifact.edit.canvasNotFound": undefined;
+  "server.artifact.edit.canvasNote": undefined;
   "server.artifact.edit.crosses": { readonly words: string | number };
   "server.artifact.edit.empty": undefined;
   "server.artifact.edit.many": { readonly n: string | number; readonly words: string | number };
@@ -11482,13 +11639,55 @@ export interface Messages {
   "web.artifact.blocks.writing": { readonly who: string | number };
   "web.artifact.blocks.wrote": { readonly who: string | number };
   "web.artifact.body.blocks": undefined;
+  "web.artifact.body.canvas": undefined;
+  "web.artifact.body.dashboard": undefined;
   "web.artifact.body.html": undefined;
   "web.artifact.body.motion": undefined;
   "web.artifact.body.slides": undefined;
+  "web.artifact.body.whiteboard": undefined;
   "web.artifact.canvas.close": undefined;
   "web.artifact.canvas.label": undefined;
   "web.artifact.canvas.openPage": undefined;
   "web.artifact.canvas.quote": undefined;
+  "web.artifact.canvasEditor.autoFix": undefined;
+  "web.artifact.canvasEditor.bringForward": undefined;
+  "web.artifact.canvasEditor.exportSvg": undefined;
+  "web.artifact.canvasEditor.filter": undefined;
+  "web.artifact.canvasEditor.filterGrain": undefined;
+  "web.artifact.canvasEditor.filterHalftone": undefined;
+  "web.artifact.canvasEditor.filterNone": undefined;
+  "web.artifact.canvasEditor.filterShadow": undefined;
+  "web.artifact.canvasEditor.filterSticker": undefined;
+  "web.artifact.canvasEditor.filterTorn": undefined;
+  "web.artifact.canvasEditor.flipX": undefined;
+  "web.artifact.canvasEditor.hide": undefined;
+  "web.artifact.canvasEditor.inspectorEmpty": undefined;
+  "web.artifact.canvasEditor.inspectorOpen": undefined;
+  "web.artifact.canvasEditor.layers": undefined;
+  "web.artifact.canvasEditor.lintClean": undefined;
+  "web.artifact.canvasEditor.lintDetails": undefined;
+  "web.artifact.canvasEditor.lintIssues": { readonly count: string | number };
+  "web.artifact.canvasEditor.lock": undefined;
+  "web.artifact.canvasEditor.palette": undefined;
+  "web.artifact.canvasEditor.paletteBlueprint": undefined;
+  "web.artifact.canvasEditor.paletteBrutalistRed": undefined;
+  "web.artifact.canvasEditor.paletteNewsprint": undefined;
+  "web.artifact.canvasEditor.paletteWorkbench": undefined;
+  "web.artifact.canvasEditor.positionAndSize": undefined;
+  "web.artifact.canvasEditor.propH": undefined;
+  "web.artifact.canvasEditor.propRotate": undefined;
+  "web.artifact.canvasEditor.propW": undefined;
+  "web.artifact.canvasEditor.propX": undefined;
+  "web.artifact.canvasEditor.propY": undefined;
+  "web.artifact.canvasEditor.resetChanges": undefined;
+  "web.artifact.canvasEditor.saveChanges": undefined;
+  "web.artifact.canvasEditor.sendBackward": undefined;
+  "web.artifact.canvasEditor.show": undefined;
+  "web.artifact.canvasEditor.tabInspect": undefined;
+  "web.artifact.canvasEditor.tabTalk": undefined;
+  "web.artifact.canvasEditor.textContent": undefined;
+  "web.artifact.canvasEditor.textHint": undefined;
+  "web.artifact.canvasEditor.unlock": undefined;
   "web.artifact.card.open": { readonly title: string | number };
   "web.artifact.card.version": { readonly version: string | number };
   "web.artifact.edit.hint": undefined;
@@ -11499,6 +11698,7 @@ export interface Messages {
   "web.artifact.edit.to": undefined;
   "web.artifact.issue.title": undefined;
   "web.artifact.page.all": undefined;
+  "web.artifact.page.backToLibrary": undefined;
   "web.artifact.page.by": { readonly name: string | number };
   "web.artifact.page.copied": undefined;
   "web.artifact.page.copyLink": undefined;
@@ -11512,6 +11712,8 @@ export interface Messages {
   "web.artifact.page.group.delivered": undefined;
   "web.artifact.page.group.mine": undefined;
   "web.artifact.page.list": undefined;
+  "web.artifact.page.listHide": undefined;
+  "web.artifact.page.listShow": undefined;
   "web.artifact.page.more": undefined;
   "web.artifact.page.new": undefined;
   "web.artifact.page.none": undefined;
@@ -11523,9 +11725,6 @@ export interface Messages {
   "web.artifact.page.title": undefined;
   "web.artifact.page.untitled": undefined;
   "web.artifact.page.updated": { readonly when: string | number };
-  "web.artifact.page.versions": undefined;
-  "web.artifact.place.hint": undefined;
-  "web.artifact.place.label": undefined;
   "web.artifact.presenter.aside": undefined;
   "web.artifact.presenter.clock": undefined;
   "web.artifact.presenter.current": undefined;
@@ -11567,14 +11766,6 @@ export interface Messages {
   "web.artifact.suggestions.types.paragraph": undefined;
   "web.artifact.suggestions.types.quote": undefined;
   "web.artifact.suggestions.types.todo": undefined;
-  "web.artifact.talk.atMessage": undefined;
-  "web.artifact.talk.none": undefined;
-  "web.artifact.talk.reply": undefined;
-  "web.artifact.talk.replyHint": undefined;
-  "web.artifact.talk.replyVersion": undefined;
-  "web.artifact.talk.send": undefined;
-  "web.artifact.talk.sent": undefined;
-  "web.artifact.talk.sentVersion": { readonly version: string | number };
   "web.audio.account": undefined;
   "web.audio.addSpeaker": undefined;
   "web.audio.addTurn": undefined;
@@ -13125,6 +13316,13 @@ export interface Messages {
   "web.lan.pair.nameHint": undefined;
   "web.lan.pair.title": undefined;
   "web.lan.pair.waiting": undefined;
+  "web.library.artifactKind.all": undefined;
+  "web.library.artifactKind.canvas": undefined;
+  "web.library.artifactKind.dashboard": undefined;
+  "web.library.artifactKind.page": undefined;
+  "web.library.artifactKind.slides": undefined;
+  "web.library.artifactKind.whiteboard": undefined;
+  "web.library.blocksLabel": undefined;
   "web.library.download": undefined;
   "web.library.drop": undefined;
   "web.library.empty": undefined;
@@ -13137,6 +13335,7 @@ export interface Messages {
   "web.library.grid": undefined;
   "web.library.hint": undefined;
   "web.library.inspector.added": undefined;
+  "web.library.inspector.byMaker": { readonly name: string | number };
   "web.library.inspector.bytes": undefined;
   "web.library.inspector.clear": undefined;
   "web.library.inspector.from": undefined;
@@ -13145,8 +13344,10 @@ export interface Messages {
   "web.library.inspector.length": undefined;
   "web.library.inspector.more": undefined;
   "web.library.inspector.openChannel": { readonly channel: string | number };
+  "web.library.inspector.openWorkbench": undefined;
   "web.library.inspector.pixels": undefined;
   "web.library.inspector.selected": { readonly n: string | number };
+  "web.library.inspector.versionBadge": { readonly version: string | number };
   "web.library.job.clone": undefined;
   "web.library.job.image": undefined;
   "web.library.job.speakers": undefined;
@@ -13165,6 +13366,7 @@ export interface Messages {
   "web.library.makeTabs.image": undefined;
   "web.library.makeTabs.speech": undefined;
   "web.library.makeTitle": undefined;
+  "web.library.newArtifact": undefined;
   "web.library.nothingShown": undefined;
   "web.library.origin.all": undefined;
   "web.library.origin.fetched": undefined;
@@ -13173,6 +13375,7 @@ export interface Messages {
   "web.library.rail.agents": undefined;
   "web.library.rail.anyKind": undefined;
   "web.library.rail.anyWhere": undefined;
+  "web.library.rail.artifacts": undefined;
   "web.library.rail.channels": undefined;
   "web.library.rail.kind": undefined;
   "web.library.rail.label": undefined;

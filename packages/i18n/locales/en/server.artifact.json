@@ -2,7 +2,7 @@
   "noTitle": "An artifact needs a title",
   "longTitle": "The title is too long: at most {max} characters",
   "badKind": "No artifact of kind {kind}: only {kinds}",
-  "displayHtmlOnly": "Only an html artifact is shown as a page, slides or motion; one written together has no display",
+  "displayHtmlOnly": "Only an html artifact is shown as a page, slides, motion or canvas; one written together has no display",
   "empty": "The artifact is empty",
   "tooBig": "A version is at most {mb} MB",
   "missing": "There is no artifact {id}",
@@ -95,7 +95,14 @@
     "form": "Line {line} submits a form to {url}: the page cannot submit forms, handle it in a script",
     "refresh": "Line {line} has a <meta http-equiv=\"refresh\"> that takes the page away: remove it",
     "base": "Line {line} has a <base href>: remove it and write addresses in full",
-    "frame": "Line {line}, <{tag}>: a page cannot hold another page"
+    "frame": "Line {line}, <{tag}>: a page cannot hold another page",
+    "canvasBoardAttr": "Line {line}: <vv-board> needs positive numeric width and height attributes. Fix: set positive width and height on <vv-board>",
+    "canvasLayerId": "Line {line}: <vv-layer> has missing or duplicate id \"{id}\". Fix: give each <vv-layer> a unique non-empty id",
+    "canvasLayerBox": "Line {line}: layer {id} needs valid numeric x, y, w, h attributes (with w, h > 0). Fix: provide valid finite x, y, w, h numbers",
+    "canvasAssetMissing": "Line {line}: layer {id} references missing asset \"{asset}\". Fix: define id=\"{asset}\" inside <vv-assets> or fix the asset attribute",
+    "canvasInlineData": "Line {line}: <vv-board> contains an inline data: URI over 2KB. Fix: move large images or SVGs into <vv-assets> and reference them via asset=\"...\"",
+    "canvasOutOfBounds": "Line {line}: layer {id} ({box}) extends beyond the board ({board}). Fix: move or resize it inside the board, or add bleed for full-bleed backgrounds",
+    "canvasOcclusion": "Line {line}: layer {id} overlaps {other} by {overlap}px and may cover text. Fix: move or resize the layers apart, or add allow-overlap if intentional"
   },
   "edit": {
     "empty": "No words are selected to change",
@@ -104,6 +111,8 @@
     "many": "\"{words}\" is in the page {n} times and which one is unclear: select a few more words, or hand it to a helper",
     "crosses": "\"{words}\" crosses differently formatted parts; only words within one can be changed here: select fewer, or hand it to a helper",
     "stale": "You are looking at version {version}; the latest is {latest}: change the latest",
-    "note": "The user changed on the page: \"{old}\" → \"{new}\""
+    "note": "The user changed on the page: \"{old}\" → \"{new}\"",
+    "canvasNote": "The user adjusted layers on the canvas",
+    "canvasNotFound": "The <vv-board> or layer id is not in the page's source; hand it to a helper"
   }
 }

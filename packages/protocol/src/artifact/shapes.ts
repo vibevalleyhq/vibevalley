@@ -21,8 +21,74 @@ export type ArtifactBody = (typeof ArtifactBodyValues)[number];
 export const ArtifactKindValues = ["html", "markdown"] as const;
 export type ArtifactKind = (typeof ArtifactKindValues)[number];
 
-export const ArtifactDisplayValues = ["page", "slides", "motion"] as const;
+export const ArtifactDisplayValues = ["page", "slides", "motion", "canvas", "dashboard", "whiteboard"] as const;
 export type ArtifactDisplay = (typeof ArtifactDisplayValues)[number];
+
+type CanvasPalette = "workbench" | "brutalist-red" | "newsprint" | "blueprint";
+type CanvasFilter = "none" | "torn-paper" | "sticker-cutout" | "halftone" | "grain" | "shadow";
+type CanvasFlip = "none" | "x" | "y" | "xy";
+
+interface HtmlLayerPatch {
+  id: string;
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+  rotate?: number;
+  z?: number;
+  opacity?: number;
+  flip?: CanvasFlip;
+  filter?: CanvasFilter;
+  locked?: boolean;
+  hidden?: boolean;
+  text?: string;
+}
+
+interface HtmlCanvasBoardPatch {
+  palette?: CanvasPalette;
+  grain?: number;
+}
+
+interface HtmlCanvasPatch {
+  board?: HtmlCanvasBoardPatch;
+  layers: HtmlLayerPatch[];
+}
+
+interface HtmlCanvasLayerInfo {
+  id: string;
+  name: string;
+  kind: "layer" | "group";
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  rotate: number;
+  z: number;
+  opacity: number;
+  flip: CanvasFlip;
+  filter: CanvasFilter;
+  locked: boolean;
+  hidden: boolean;
+  hasAsset: boolean;
+  text: string;
+}
+
+interface HtmlCanvasIssue {
+  kind: "overflow" | "collision" | "bounds";
+  layerId: string;
+  otherLayerId?: string;
+  message: string;
+}
+
+interface HtmlCanvasState {
+  width: number;
+  height: number;
+  palette: CanvasPalette;
+  grain: number;
+  selectedId: string | null;
+  layers: HtmlCanvasLayerInfo[];
+  issues: HtmlCanvasIssue[];
+}
 
 /** Served over GET because <iframe src> cannot POST. */
 const artifactPrefix = "/api/v1/artifact/";
@@ -100,8 +166,9 @@ export interface HtmlAnchor {
 export interface ArtifactHtmlEdit {
   id: ArtifactId;
   version: number;
-  anchor: HtmlAnchor;
-  text: string;
+  anchor?: HtmlAnchor;
+  text?: string;
+  canvas?: HtmlCanvasPatch;
 }
 
 export interface ArtifactUpdateRequest {
@@ -114,11 +181,28 @@ export interface ArtifactUpdateRequest {
 export type HtmlShellMessage =
   | { vibevalley: "selection"; anchor: HtmlAnchor }
   /** duration is in seconds. */
-  | { vibevalley: "ready"; display: ArtifactDisplay; pages?: number; titles?: string[]; notes?: string[]; duration?: number }
+  | {
+      vibevalley: "ready";
+      display: ArtifactDisplay;
+      pages?: number;
+      titles?: string[];
+      notes?: string[];
+      duration?: number;
+      canvas?: HtmlCanvasState;
+    }
   /** page is 0-based; time is in seconds. */
-  | { vibevalley: "at"; page?: number; time?: number };
+  | { vibevalley: "at"; page?: number; time?: number; canvas?: HtmlCanvasState };
 
-export type HtmlShellCommand = { vibevalley: "goto"; page: number } | { vibevalley: "seek"; time: number } | { vibevalley: "play" } | { vibevalley: "pause" };
+export type HtmlShellCommand =
+  | { vibevalley: "goto"; page: number }
+  | { vibevalley: "seek"; time: number }
+  | { vibevalley: "play" }
+  | { vibevalley: "pause" }
+  | { vibevalley: "selectLayer"; id: string | null }
+  | { vibevalley: "patchLayer"; patch: HtmlLayerPatch }
+  | { vibevalley: "setBoard"; board: HtmlCanvasBoardPatch }
+  | { vibevalley: "autoFix" }
+  | { vibevalley: "exportSvg" };
 
 export interface ArtifactListRequest {
   channel?: string;

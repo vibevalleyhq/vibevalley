@@ -1,4 +1,4 @@
-import { type Accessor, createSignal, onSettled } from "solid-js";
+import { type Accessor, createEffect, createSignal, onSettled } from "solid-js";
 
 import { shellMessageOf } from "@vibevalley/artifact/shell";
 import type { Artifact, HtmlShellCommand, HtmlShellMessage } from "@vibevalley/protocol";
@@ -10,8 +10,14 @@ export interface Shown {
 }
 
 /** What a frame's runtime says, followed: only messages from that frame, only the protocol's. */
-export function useShown(frame: Accessor<HTMLIFrameElement | undefined>): Accessor<Shown> {
+export function useShown(frame: Accessor<HTMLIFrameElement | undefined>, source?: Accessor<string>): Accessor<Shown> {
   const [shown, setShown] = createSignal<Shown>({});
+  createEffect(
+    () => source?.(),
+    (next, before) => {
+      if (before !== undefined && before !== next) setShown({});
+    },
+  );
   onSettled(() => {
     const heard = (e: MessageEvent) => {
       if (e.source === null || e.source !== frame()?.contentWindow) return;
@@ -33,4 +39,6 @@ export interface Controls {
   readonly version: number;
   readonly shown: Accessor<Shown>;
   readonly frame: Accessor<HTMLIFrameElement | undefined>;
+  readonly externalInspector?: boolean | undefined;
+  readonly onOpenInspector?: (() => void) | undefined;
 }

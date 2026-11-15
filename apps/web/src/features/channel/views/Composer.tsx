@@ -33,6 +33,7 @@ export interface QuotedBlockDraft {
 export function Composer(props: {
   channel: Channel | undefined;
   placeholder: string;
+  replyTo?: number | undefined;
   quoted?: readonly QuotedBlockDraft[] | undefined;
   onClearQuote?: (() => void) | undefined;
   onRemoveQuote?: ((blockId: string) => void) | undefined;
@@ -53,10 +54,10 @@ export function Composer(props: {
     says: useIntents(chatSay),
     target: () => {
       const d = draft();
-      const reply = replying();
+      const replyNumber = replying()?.number ?? props.replyTo;
       return {
         id: props.channel?.id ?? "",
-        ...(reply ? { replyTo: reply.number } : {}),
+        ...(replyNumber !== undefined ? { replyTo: replyNumber } : {}),
         ...(d.files.length > 0 ? { attachments: d.files.map((f) => f.id) } : {}),
         ...((props.quoted?.length ?? 0) > 0 ? { blocks: (props.quoted ?? []).map((q) => q.ref) } : {}),
       };
@@ -409,7 +410,7 @@ export function FileDrop(props: { channel: Channel | undefined; children: JSX.El
   const files = (e: DragEvent) => [...(e.dataTransfer?.types ?? [])].includes("Files");
   return (
     <div
-      class="relative flex min-w-0 flex-1 flex-col"
+      class="relative flex min-h-0 min-w-0 flex-1 flex-col"
       onDragOver={(e) => {
         if (!files(e) || !props.channel) return;
         e.preventDefault();

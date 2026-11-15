@@ -11,7 +11,7 @@ import { lastFarmRepo } from "#/farm/store.ts";
 import { AgentsRoute } from "#/features/agent/index.ts";
 import { ArtifactsPage, PresenterPage } from "#/features/artifact/index.ts";
 import { CatalogPage } from "#/features/catalog/index.ts";
-import { ChatPage, chatSay } from "#/features/channel/index.ts";
+import { ChannelSidePane, ChatPage } from "#/features/channel/index.ts";
 import { Follow } from "#/features/inbox/index.ts";
 import { IssuesPage, issueSearch } from "#/features/issue/index.ts";
 import { PairPage } from "#/features/lan/index.ts";
@@ -107,7 +107,7 @@ const routes: readonly RouteDefinition[] = [
       page("/repos", "repos", (rest) => <ReposPage rest={rest()} skin={repoMap} />),
       page("/catalog", "catalog", (rest) => <CatalogPage rest={rest()} />),
       page("/library", "library", () => <LibraryPage />),
-      page("/artifacts", "artifacts", (rest) => <ArtifactsPage rest={rest()} say={chatSay} />),
+      page("/artifacts", "library", (rest) => <ArtifactsPage rest={rest()} chat={(p) => <ChannelSidePane {...p} />} />),
       page("/pkm", "pkm", (rest) => <PkmPage rest={rest()} />),
     ],
   },

@@ -1,8 +1,4 @@
 {
-  "place": {
-    "label": "Artifacts",
-    "hint": "What you, the helpers and the assistant leave to be read: pages written together and web pages handed in"
-  },
   "card": {
     "version": "Version {version}",
     "open": "Open \"{title}\""
@@ -10,7 +6,6 @@
   "page": {
     "by": "Made by {name}",
     "updated": "Updated {when}",
-    "versions": "Versions",
     "open": "Open in a new tab",
     "delete": "Delete",
     "deleteAsk": "Delete “{title}”? Its cards stay in the conversation.",
@@ -35,17 +30,10 @@
     },
     "rail": "Beside this artifact",
     "railShow": "Show the side panel",
-    "railHide": "Hide the side panel"
-  },
-  "talk": {
-    "atMessage": "In the conversation",
-    "reply": "Reply",
-    "replyHint": "For the helper who made it: what to change",
-    "send": "Reply",
-    "sent": "Replied",
-    "replyVersion": "Reply to this version",
-    "sentVersion": "Replied to version {version}",
-    "none": "Not said in any conversation yet: you wrote this one and have not handed it to anyone."
+    "railHide": "Hide the side panel",
+    "listShow": "Show list",
+    "listHide": "Hide list",
+    "backToLibrary": "Back to library"
   },
   "issue": {
     "title": "Artifacts"
@@ -110,7 +98,51 @@
     "blocks": "Written together",
     "html": "Web page",
     "slides": "Slides",
-    "motion": "Motion"
+    "motion": "Motion",
+    "canvas": "Canvas",
+    "dashboard": "Dashboard",
+    "whiteboard": "Whiteboard"
+  },
+  "canvasEditor": {
+    "layers": "Layers",
+    "palette": "Palette",
+    "paletteWorkbench": "Workbench",
+    "paletteBrutalistRed": "Brutalist Red",
+    "paletteNewsprint": "Newsprint",
+    "paletteBlueprint": "Blueprint",
+    "flipX": "Flip horizontal",
+    "bringForward": "Bring forward",
+    "sendBackward": "Send backward",
+    "lock": "Lock layer",
+    "unlock": "Unlock layer",
+    "hide": "Hide layer",
+    "show": "Show layer",
+    "lintClean": "Layout check passed",
+    "lintIssues": "{count} layout issues",
+    "autoFix": "Auto-fix layout",
+    "saveChanges": "Save as new version",
+    "resetChanges": "Reset",
+    "exportSvg": "Export poster",
+    "tabInspect": "Layers & properties",
+    "tabTalk": "Chat",
+    "inspectorEmpty": "Select an element on the canvas or a layer below to adjust position, effect, and text",
+    "inspectorOpen": "Open layers & properties",
+    "positionAndSize": "Position & size",
+    "propX": "X",
+    "propY": "Y",
+    "propW": "W",
+    "propH": "H",
+    "propRotate": "Rotate",
+    "filter": "Effect",
+    "filterNone": "None",
+    "filterSticker": "Sticker cutout",
+    "filterTorn": "Torn paper",
+    "filterHalftone": "Halftone",
+    "filterShadow": "Drop shadow",
+    "filterGrain": "Film grain",
+    "textContent": "Layer text",
+    "textHint": "Each line maps to a text block in this layer",
+    "lintDetails": "Layout issue details"
   },
   "edit": {
     "title": "Change words",

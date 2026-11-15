@@ -1,4 +1,5 @@
 export { ChatPage } from "#/features/channel/views/ChatPage.tsx";
+export { ChannelSidePane } from "#/features/channel/views/ChannelPanels.tsx";
 export { QuickSwitcher, switcher } from "#/features/channel/views/QuickSwitcher.tsx";
 export {
   createChannelForm,

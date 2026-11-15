@@ -1,16 +1,26 @@
-import { createSignal, For, Show, untrack } from "solid-js";
+import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import { type Channel, type ChatMessage, type MessageHit, userId } from "@vibevalley/protocol";
 import { channelOf, defaultOf } from "@vibevalley/protocol/rules";
 
-import { aria, autofocus, useNow } from "#/base/dom.tsx";
+import { aria, autofocus, Keyed, useNow } from "#/base/dom.tsx";
 import { archiveSet, markState, notifySet, sameMessage, setMark, useMarkedChat } from "#/features/channel/model/marks.ts";
-import { chatPath, messagePath, threadOwnerOf, threadsIn, threadTitle, workbenchClock } from "#/features/channel/model/places.ts";
+import {
+  channelLabel,
+  chatPath,
+  issueThreadOf,
+  messagePath,
+  threadOwnerOf,
+  threadsIn,
+  threadTitle,
+  topsOf,
+  workbenchClock,
+} from "#/features/channel/model/places.ts";
 import { useOrchestrators } from "#/infra/agents.ts";
 import { api } from "#/infra/api.ts";
 import { orchestratorMood, useCore } from "#/infra/frame.ts";
-import { useRouter } from "#/infra/router.ts";
+import { Link as A, useRouter } from "#/infra/router.ts";
 import { useLatest } from "#/state/atom.ts";
 import { useIntents } from "#/state/intent.ts";
 import { createAct } from "#/ui/act.ts";
@@ -218,6 +228,55 @@ export function ThreadPane(props: { thread: Channel; point: number | undefined; 
         <Composer channel={props.thread} placeholder={session() ? t("web.channel.sayInThread", { name: session()?.name ?? "" }) : t("web.channel.reply")} />
       </FileDrop>
     </section>
+  );
+}
+
+export function ChannelSidePane(props: { channel?: string | undefined; issue?: string | undefined; point?: number | undefined }) {
+  const chat = useMarkedChat();
+  const shown = createMemo(() => {
+    const c = chat();
+    if (!c) return undefined;
+    if (props.channel) {
+      const found = channelOf(c, props.channel);
+      if (found) return found;
+    }
+    if (props.issue) {
+      const thread = issueThreadOf(c, props.issue);
+      if (thread) return thread;
+    }
+    return defaultOf(c) ?? topsOf(c)[0];
+  });
+  const href = () => {
+    const c = shown();
+    if (!c) return "/chat";
+    return props.point !== undefined ? messagePath(c, props.point) : chatPath(c);
+  };
+  return (
+    <Show when={shown()}>
+      {(c) => (
+        <Keyed key={c().id}>
+          {() => (
+            <section data-testid="artifact-chat-pane" data-channel={c().id} class="flex min-h-0 min-w-0 flex-1 flex-col">
+              <div class="flex shrink-0 items-center justify-between gap-2 border-b border-line px-3 py-2">
+                <A
+                  href={href()}
+                  data-testid="artifact-message"
+                  class="inline-flex min-w-0 flex-1 items-center gap-1.5 text-xs font-semibold text-ink hover:text-accent no-underline"
+                >
+                  <Icon name="chat" size={14} class="shrink-0 text-muted" />
+                  <span class="truncate">{channelLabel(c())}</span>
+                  <Icon name="open" size={12} class="ml-auto shrink-0 text-muted" />
+                </A>
+              </div>
+              <FileDrop channel={c()}>
+                <MessageList channel={c()} point={props.point} emptyText={t("web.channel.empty", { label: channelLabel(c()) })} />
+                <Composer channel={c()} replyTo={props.point} placeholder={t("web.channel.sendTo", { label: channelLabel(c()) })} />
+              </FileDrop>
+            </section>
+          )}
+        </Keyed>
+      )}
+    </Show>
   );
 }
 

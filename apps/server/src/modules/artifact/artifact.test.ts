@@ -5,6 +5,7 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { artifactMax } from "@vibevalley/artifact/html";
 import { sleep } from "@vibevalley/async";
+import { t } from "@vibevalley/i18n";
 import { userId } from "@vibevalley/protocol";
 import { BizCode } from "@vibevalley/protocol/api";
 import { artifactId } from "@vibevalley/protocol/schema";
@@ -154,5 +155,109 @@ describe("an artifact", () => {
     expect(pages().length).toBe(2);
     // Its cards stay in the conversation.
     expect((await chat.history(chat.defaultChannel())).filter((m) => m.artifact).length).toBe(3);
+  });
+
+  test("creates, updates display to, and edits canvas artifacts into version 2 while rejecting stale versions", async () => {
+    await using farm = await world();
+    const artifacts = farm.artifact;
+    const chat = farm.channel;
+    const general = chat.defaultChannel();
+    const board = [
+      '<vv-board width="1600" height="1000" palette="workbench">',
+      '  <vv-layer id="title" x="80" y="100" w="600" h="120" z="1"><h1>Harvest</h1></vv-layer>',
+      "</vv-board>",
+    ].join("\n");
+
+    const made = await artifacts.create(user, { title: "画板海报", kind: "html", display: "canvas", content: board });
+    expect(made).toMatchObject({ title: "画板海报", body: "html", display: "canvas", version: 1 });
+    expect((await chat.history(general)).at(-1)!.artifact).toMatchObject({ id: made.id, display: "canvas", version: 1 });
+
+    const plain = await artifacts.create(user, { title: "普通页", kind: "html", content: page("普通页") });
+    expect(plain.display).toBe("page");
+    const switched = await artifacts.update({ id: plain.id, display: "canvas" });
+    expect(switched.display).toBe("canvas");
+
+    const edited = await artifacts.htmlEdit(user, {
+      id: made.id,
+      version: 1,
+      canvas: {
+        board: { palette: "brutalist-red" },
+        layers: [{ id: "title", x: 120, y: 140, flip: "x", z: 3, text: "Autumn Harvest" }],
+      },
+    });
+    expect(edited.version).toBe(2);
+    expect(edited.display).toBe("canvas");
+    expect((await artifacts.content(made.id)).content).toContain('palette="brutalist-red"');
+    expect((await artifacts.content(made.id)).content).toContain("<h1>Autumn Harvest</h1>");
+    expect((await artifacts.content(made.id, 1)).content).toBe(board);
+    expect((await chat.history(general)).at(-1)!.artifact).toMatchObject({
+      id: made.id,
+      display: "canvas",
+      version: 2,
+      note: t("server.artifact.edit.canvasNote"),
+    });
+
+    const staleFailure = await artifacts
+      .htmlEdit(user, {
+        id: made.id,
+        version: 1,
+        canvas: { layers: [{ id: "title", x: 200 }] },
+      })
+      .catch((e: unknown) => e);
+    expect(staleFailure).toMatchObject({ bizCode: BizCode.ArtifactRefused });
+    expect((await artifacts.get(made.id)).version).toBe(2);
+  });
+
+  test("infers compound display suffixes and normalizes .whiteboard JSON into HTML", async () => {
+    await using farm = await world();
+    const artifacts = farm.artifact;
+
+    const slide = await artifacts.create(user, {
+      title: "quarterly.slide.html",
+      kind: "html",
+      content: "<section><h1>Q4 Review</h1></section>",
+    });
+    expect(slide.display).toBe("slides");
+
+    const dash = await artifacts.create(user, {
+      title: "ops-metrics.dashboard.html",
+      kind: "html",
+      content: '<vv-board width="1600" height="1000"><vv-layer id="kpi" x="60" y="60" w="360" h="200"><div>42</div></vv-layer></vv-board>',
+    });
+    expect(dash.display).toBe("dashboard");
+
+    const wb = await artifacts.create(user, {
+      title: "system.whiteboard",
+      kind: "html",
+      content: JSON.stringify({
+        palette: "workbench",
+        nodes: [
+          { id: "client", label: "Web UI", x: 100, y: 120, w: 240, h: 110 },
+          { id: "api", label: "Server API", x: 520, y: 120, w: 260, h: 110, tone: "accent" },
+        ],
+        edges: [{ from: "client", to: "api", label: "SSE" }],
+      }),
+    });
+    expect(wb.display).toBe("whiteboard");
+    const saved = await artifacts.content(wb.id);
+    expect(saved.content).toContain("<vv-board");
+    expect(saved.content).toContain('data-mode="whiteboard"');
+    expect(saved.content).toContain('from="client" to="api" label="SSE"');
+
+    const updated = await artifacts.version(user, {
+      id: wb.id,
+      content: JSON.stringify({
+        nodes: [
+          { id: "client", label: "Web UI", x: 120, y: 140 },
+          { id: "db", label: "PGlite", x: 520, y: 140 },
+        ],
+        edges: [{ from: "client", to: "db", style: "dashed" }],
+      }),
+      note: "updated graph",
+    });
+    expect(updated.version).toBe(2);
+    const v2 = await artifacts.content(wb.id, 2);
+    expect(v2.content).toContain('from="client" to="db" data-style="dashed"');
+    expect(v2.content).toContain("PGlite");
   });
 });

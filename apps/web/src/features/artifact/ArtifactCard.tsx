@@ -1,6 +1,7 @@
 import { Show } from "solid-js";
 import { z } from "zod";
 
+import { artifactSuffixOf } from "@vibevalley/artifact/html";
 import { t } from "@vibevalley/i18n";
 import type { ArtifactBody, ArtifactCard as Card, ArtifactDisplay, ArtifactListRequest } from "@vibevalley/protocol";
 import { artifactId } from "@vibevalley/protocol/schema";
@@ -36,11 +37,24 @@ const displayLabel: Record<ArtifactDisplay, string> = {
   page: t("web.artifact.body.html"),
   slides: t("web.artifact.body.slides"),
   motion: t("web.artifact.body.motion"),
+  canvas: t("web.artifact.body.canvas"),
+  dashboard: t("web.artifact.body.dashboard"),
+  whiteboard: t("web.artifact.body.whiteboard"),
 };
 /** What it is, as a card or a header says it: an html one by how it is shown. */
 export const kindLabel = (a: { readonly body: ArtifactBody; readonly display?: ArtifactDisplay | undefined }) =>
   a.body === "blocks" ? t("web.artifact.body.blocks") : displayLabel[a.display ?? "page"];
-export const bodyIcon: Record<ArtifactBody, IconName> = { blocks: "artifacts", html: "web" };
+export const artifactSuffix = artifactSuffixOf;
+const displayIcon: Record<ArtifactDisplay, IconName> = {
+  page: "web",
+  slides: "present",
+  motion: "video",
+  canvas: "appearance",
+  dashboard: "catalog",
+  whiteboard: "notes",
+};
+export const artifactIcon = (a: { readonly body: ArtifactBody; readonly display?: ArtifactDisplay | undefined }): IconName =>
+  a.body === "blocks" ? "artifacts" : displayIcon[a.display ?? "page"];
 
 /** The card a message announces an artifact with: the whole card opens that version. */
 export function ArtifactCard(props: { card: Card }) {
@@ -63,7 +77,7 @@ export function ArtifactCard(props: { card: Card }) {
       class="mt-1 flex w-full max-w-md items-center gap-3 rounded-lg border border-line bg-page hover:bg-hover px-3 py-2 transition-[color,background-color,border-color] ease-out duration-120"
     >
       <span class="flex w-9 h-9 shrink-0 items-center justify-center rounded-md bg-hover text-muted">
-        <Icon name={bodyIcon[props.card.body]} size={20} />
+        <Icon name={artifactIcon(props.card)} size={20} />
       </span>
       <span class="flex min-w-0 flex-col">
         <span class="truncate text-sm font-semibold">{props.card.title}</span>

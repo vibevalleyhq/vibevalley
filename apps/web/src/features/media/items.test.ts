@@ -1,9 +1,24 @@
 import { expect, test } from "vite-plus/test";
 
-import type { LibraryItem, MediaJob } from "@vibevalley/protocol";
-import { messageId, sessionId } from "@vibevalley/protocol/schema";
+import type { Artifact, LibraryItem, MediaJob } from "@vibevalley/protocol";
+import { artifactId, messageId, sessionId } from "@vibevalley/protocol/schema";
 
-import { between, countsOf, durationText, extOf, justify, kindOf, making, neighbor, originLine, shown, understoodText, whereKey } from "./items.ts";
+import {
+  artifactCountsOf,
+  between,
+  countsOf,
+  durationText,
+  extOf,
+  justify,
+  kindOf,
+  making,
+  neighbor,
+  originLine,
+  shown,
+  shownArtifacts,
+  understoodText,
+  whereKey,
+} from "./items.ts";
 
 const item = (id: string, type: string, origin: LibraryItem["origin"]): LibraryItem => ({
   attachment: { id, name: `${id}.bin`, type, size: 1 },
@@ -123,4 +138,36 @@ test("the inspector shows the newest understanding of its file", () => {
   const jobs = [understood("old", "a", 1), understood("new", "a", 2), understood("other", "b", 3)];
   expect(understoodText("a")(jobs)).toBe("new");
   expect(understoodText("c")(jobs)).toBeUndefined();
+});
+
+test("artifacts filter by display kind, search, sort, and facet counts", () => {
+  const make = (id: string, title: string, body: Artifact["body"], display?: Artifact["display"], updated = 0): Artifact => ({
+    id: artifactId(id),
+    title,
+    body,
+    ...(display === undefined ? {} : { display }),
+    by: "user",
+    byName: "农场主",
+    version: body === "html" ? 1 : 0,
+    seq: body === "blocks" ? 1 : 0,
+    versions: [],
+    at: updated,
+    updated,
+  });
+  const all = [
+    make("1", "poster.visual.html", "html", "canvas", 30),
+    make("2", "metrics.dashboard.html", "html", "dashboard", 50),
+    make("3", "flow.whiteboard", "html", "whiteboard", 40),
+    make("4", "deck.slide.html", "html", "slides", 20),
+    make("5", "notes", "blocks", undefined, 10),
+  ];
+
+  expect(artifactCountsOf(all)).toEqual({
+    all: 5,
+    byKind: { canvas: 1, slides: 1, dashboard: 1, whiteboard: 1, page: 1 },
+  });
+  expect(shownArtifacts(all, { artifactKind: "all", search: "", sort: "recent" }).map((a) => a.id)).toEqual(["2", "3", "1", "4", "5"]);
+  expect(shownArtifacts(all, { artifactKind: "whiteboard", search: "", sort: "recent" }).map((a) => a.id)).toEqual(["3"]);
+  expect(shownArtifacts(all, { artifactKind: "page", search: "", sort: "name" }).map((a) => a.id)).toEqual(["5"]);
+  expect(shownArtifacts(all, { artifactKind: "all", search: "DASH", sort: "recent" }).map((a) => a.id)).toEqual(["2"]);
 });

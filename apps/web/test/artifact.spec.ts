@@ -38,13 +38,23 @@ test("an artifact opens from its card in its own sandbox, keeps its versions and
   await versions.locator('[data-key="1"]').click();
   await expect(shown).toHaveAttribute("data-version", "1");
 
-  // A reply goes under the message that said that version.
-  await page.getByTestId("artifact-reply").fill("make the drawer wider");
-  await page.getByTestId("artifact-send").click();
+  const chatPane = page.getByTestId("artifact-chat-pane");
+  await expect(chatPane).toBeVisible();
+  await chatPane.getByTestId("composer-input").fill("make the drawer wider");
+  await chatPane.getByTestId("send").click();
   const general = (await api.channel.list()).find((c) => c.default)!;
   await expect
     .poll(async () => (await api.channel.message.list({ id: general.id })).find((m) => m.text === "make the drawer wider")?.replyTo)
     .toBe((await api.artifact.get({ id: made.id })).versions[0]!.number);
+  await expect(chatPane.getByTestId("message").filter({ hasText: "make the drawer wider" })).toBeVisible();
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => Number.isFinite(a.effect?.getComputedTiming().endTime ?? Infinity))
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
+  );
 
   const { violations } = await new AxeBuilder({ page }).exclude('[data-testid="artifact-frame"]').withTags(["wcag2a", "wcag2aa"]).analyze();
   expect(violations.map((v) => v.id)).toEqual([]);

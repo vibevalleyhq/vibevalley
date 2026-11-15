@@ -20,4 +20,14 @@ describe("the orchestrator's own skills", () => {
     expect(text).toContain(toolName("artifact.create"));
     expect(text).toMatch(/display` 填 `slides`/u);
   });
+
+  it("the canvas skill ships with the server, names the artifact tool and declarative layer tags", async () => {
+    const text = await readFile(`${orchestratorSkills}/canvas/SKILL.md`, "utf8");
+    expect(text).toMatch(/^---\nname: canvas\ndescription: \S/u);
+    expect(text).toContain(toolName("artifact.create"));
+    expect(text).toMatch(/display` 填 `canvas`/u);
+    expect(text).toContain("<vv-board>");
+    expect(text).toContain("<vv-layer>");
+    expect(text).toContain("<vv-assets>");
+  });
 });

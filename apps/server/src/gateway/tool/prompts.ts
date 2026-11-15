@@ -166,7 +166,7 @@ export const params = {
     title: "标题：用户在卡片上看到的那一行，最多 80 个字",
     kind: `html 是一整页，一稿一稿换（${htmlRules}）；markdown 读成一块一块的，用户和你都能接着改（artifact_block_create、artifact_block_update）`,
     display:
-      '网页（html）怎么看，不填是 page：page 是一整页照原样；slides 是幻灯片：每页一个顶层 <section>，版式 class 有 title、two-col、image、quote，备注写在 <aside class="notes">，工作台负责排成 16:9、翻页、放映和存成 PDF，别给 section 写 position、transform、width、height、display；颜色和字体用 --vv-ink、--vv-accent、--vv-font-sans 这类变量。一起写的（markdown）不填',
+      '网页（html）怎么看，支持按复合后缀（*.visual.html / *.slide.html / *.dashboard.html / *.whiteboard）自动识别，不填是 page：page 是一整页照原样；slides（*.slide.html）是幻灯片：每页一个顶层 <section>，版式 class 有 title、two-col、image、quote，备注写在 <aside class="notes">，工作台负责排成 16:9、翻页、放映和存成 PDF，别给 section 写 position、transform、width、height、display；颜色和字体用 --vv-ink、--vv-accent、--vv-font-sans 这类变量；canvas（*.visual.html）是分层画板/海报：顶层写 <vv-board width="1600" height="1000" palette="workbench|brutalist-red|newsprint|blueprint">，每个元素写成一个 <vv-layer id="..." name="..." x="..." y="..." w="..." h="..." z="...">（允许 bleed、allow-overlap、flip、filter），大图与 data: 图片放在 <vv-assets><img id="..." src="data:..."></vv-assets> 再用 asset="..." 引用，避免遮挡文字与越出边界；dashboard（*.dashboard.html）是仪表盘与指标看板，使用 <vv-board> 与 .vv-dash-card / .vv-dash-kpi 或卡片栅格组织；whiteboard（*.whiteboard）是结构化白板，既可写含 <vv-layer> 与 <vv-edge from="..." to="..." label="..."> 的 HTML，也可直接提交 { nodes, edges, palette } 结构化 JSON 自动归一化为可拖拽连线白板。一起写的（markdown）不填',
     content: "这一稿的全文；和 file 二选一",
     file: "你工作目录里的一个文件（相对路径），服务端去读它当这一版的全文；和 content 二选一",
     note: "这一稿改了什么，一句话；第一稿可以写这是什么",
@@ -469,10 +469,18 @@ export const answers = {
       a.body === "html"
         ? `做好了「${a.title}」第 ${a.version} 稿（id=${a.id}），已经在对话里带着卡片说了，用户在工作台点开看；用户回复那张卡片就是评论`
         : `做好了「${a.title}」（id=${a.id}），读成了一块一块的，已经在对话里带着卡片说了；要改哪一段，先用 artifact_content_get 读到块的 id 和版本，再 artifact_block_update；用户回复那张卡片就是评论`,
-    warned: (ws: readonly HtmlWarning[]) =>
-      ws.length === 0
-        ? ""
-        : `\n提醒：${ws.map((w) => `第 ${w.line} 行的脚本用了 ${w.call}`).join("；")}。页面连不了网，这部分在用户那里不会动；要用的数据直接写进页面。`,
+    warned: (ws: readonly HtmlWarning[]) => {
+      if (ws.length === 0) return "";
+      const network = ws.filter((w) => w.message === undefined);
+      const layout = ws.flatMap((w) => (w.message !== undefined ? [w.message] : []));
+      const parts: string[] = [];
+      if (network.length > 0)
+        parts.push(
+          `\n提醒：${network.map((w) => `第 ${w.line} 行的脚本用了 ${w.call}`).join("；")}。页面连不了网，这部分在用户那里不会动；要用的数据直接写进页面。`,
+        );
+      if (layout.length > 0) parts.push(`\n排版提醒：\n${layout.map((m) => `- ${m}`).join("\n")}`);
+      return parts.join("");
+    },
     versioned: (a: T.Artifact) => `「${a.title}」出了第 ${a.version} 稿（id=${a.id}），已经在第一稿说过的地方带着卡片说了`,
     none: "还没有 Artifact",
     line: (a: T.Artifact) => {

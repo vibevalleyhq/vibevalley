@@ -1,10 +1,12 @@
 import { For, Match, Show, Switch } from "solid-js";
 
+import type { ShellTheme } from "@vibevalley/artifact/shell";
 import { t } from "@vibevalley/i18n";
-import { attachmentPath, type Channel, type LibraryItem } from "@vibevalley/protocol";
+import { type Artifact, artifactPath, attachmentPath, type Channel, type LibraryItem } from "@vibevalley/protocol";
 
 import { useNow } from "#/base/dom.tsx";
 import { ago, momentText } from "#/base/format.ts";
+import { artifactSuffix, kindLabel } from "#/features/artifact/index.ts";
 import { Link } from "#/infra/router.ts";
 import { Button } from "#/ui/Button.tsx";
 import { sizeText } from "#/ui/domain/AttachmentTile.tsx";
@@ -13,7 +15,7 @@ import { IconButton } from "#/ui/IconButton.tsx";
 import { MoreMenu } from "#/ui/MoreMenu.tsx";
 
 import { durationText, extOf, kindOf, type Names, originLine } from "./items.ts";
-import type { Seen } from "./Tiles.tsx";
+import { ArtifactPreview, type Seen } from "./Tiles.tsx";
 
 export interface InspectorActions {
   readonly channels: readonly Channel[];
@@ -30,6 +32,14 @@ const download = (id: string, name: string) => {
   const a = document.createElement("a");
   a.href = attachmentPath(id);
   a.download = name;
+  a.click();
+};
+
+const downloadArtifact = (artifact: Artifact) => {
+  const a = document.createElement("a");
+  a.href = artifactPath(artifact.id, artifact.version);
+  const suffix = artifactSuffix(artifact);
+  a.download = artifact.title.toLowerCase().endsWith(suffix.toLowerCase()) ? artifact.title : `${artifact.title}${suffix}`;
   a.click();
 };
 
@@ -61,11 +71,15 @@ function Asking(props: { question: string; act: InspectorActions }) {
 /** The one file chosen, at length: a large look at it, what it is and where it came from, and what can be done with it. */
 export function Inspector(props: {
   items: readonly LibraryItem[];
+  artifact?: Artifact | undefined;
+  theme?: ShellTheme | undefined;
   seen: Seen | undefined;
   understood: string | undefined;
   names: Names;
   asking: boolean;
   act: InspectorActions;
+  onOpenArtifact?: ((id: string) => void) | undefined;
+  onClearArtifact?: (() => void) | undefined;
 }) {
   const now = useNow();
   const one = () => (props.items.length === 1 ? props.items[0] : undefined);
@@ -73,41 +87,104 @@ export function Inspector(props: {
     <aside
       aria-label={t("web.library.inspector.label")}
       data-testid="library-inspector"
-      data-count={props.items.length}
+      data-count={props.artifact ? 1 : props.items.length}
       class="[grid-area:side] flex shrink-0 flex-col gap-4 overflow-y-auto bg-page p-4 w-76 max-sm:w-auto border-l max-sm:border-l-0 border-l-line static max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-30 max-sm:max-h-[70vh] border-t-0 max-sm:border-t border-t-line rounded-tl-none max-sm:rounded-tl-xl rounded-tr-none max-sm:rounded-tr-xl shadow-none max-sm:shadow-float max-sm:[animation-name:pop-in] max-sm:motion-reduce:[animation-name:none] [animation-duration:280ms] [animation-timing-function:var(--ease-out)]"
     >
       <Show
-        when={one()}
+        when={!props.artifact ? one() : undefined}
         fallback={
-          <>
-            <div class="flex items-start gap-2">
-              <p class="min-w-0 flex-1 wrap-anywhere text-base font-semibold">{t("web.library.inspector.selected", { n: props.items.length })}</p>
-              <IconButton icon="close" label={t("web.library.inspector.clear")} testid="library-clear" onClick={() => props.act.clear()} />
-            </div>
-            <div class="flex flex-wrap gap-1">
-              <For each={props.items}>
-                {(item) => (
-                  <span class="w-12 h-12 flex items-center justify-center overflow-hidden rounded-sm bg-hover text-muted" title={item.attachment.name}>
-                    <Show when={kindOf(item.attachment.type) === "image"} fallback={<Icon name="file" size={16} />}>
-                      <img src={attachmentPath(item.attachment.id)} alt="" class="w-full h-full object-cover" />
+          <Show
+            when={props.artifact}
+            keyed
+            fallback={
+              <>
+                <div class="flex items-start gap-2">
+                  <p class="min-w-0 flex-1 wrap-anywhere text-base font-semibold">{t("web.library.inspector.selected", { n: props.items.length })}</p>
+                  <IconButton icon="close" label={t("web.library.inspector.clear")} testid="library-clear" onClick={() => props.act.clear()} />
+                </div>
+                <div class="flex flex-wrap gap-1">
+                  <For each={props.items}>
+                    {(item) => (
+                      <span class="w-12 h-12 flex items-center justify-center overflow-hidden rounded-sm bg-hover text-muted" title={item.attachment.name}>
+                        <Show when={kindOf(item.attachment.type) === "image"} fallback={<Icon name="file" size={16} />}>
+                          <img src={attachmentPath(item.attachment.id)} alt="" class="w-full h-full object-cover" />
+                        </Show>
+                      </span>
+                    )}
+                  </For>
+                </div>
+                <div class="flex items-center gap-1">
+                  <SendMenu channels={props.act.channels} send={props.act.send} />
+                  <span class="flex-1" />
+                  <MoreMenu
+                    label={t("web.library.inspector.more")}
+                    testid="library-more"
+                    items={[{ key: "remove", label: t("web.library.remove"), icon: "delete", danger: true, onSelect: () => props.act.ask() }]}
+                  />
+                </div>
+                <Show when={props.asking}>
+                  <Asking question={t("web.library.removeSome", { n: props.items.length })} act={props.act} />
+                </Show>
+              </>
+            }
+          >
+            {(artifact) => (
+              <>
+                <div class="flex items-start gap-2">
+                  <p data-testid="library-inspector-name" class="min-w-0 flex-1 wrap-anywhere text-base font-semibold">
+                    {artifact.title}
+                  </p>
+                  <IconButton
+                    icon="close"
+                    label={t("web.library.inspector.clear")}
+                    testid="library-clear"
+                    onClick={() => (props.onClearArtifact ? props.onClearArtifact() : props.act.clear())}
+                  />
+                </div>
+                <div class="overflow-hidden rounded-lg border border-line">
+                  <ArtifactPreview artifact={artifact} theme={props.theme ?? "light"} fallbackWidth={280} />
+                </div>
+                <div class="flex items-center gap-2">
+                  <Button tone="primary" icon="open" data-testid="library-open-artifact" class="flex-1" onClick={() => props.onOpenArtifact?.(artifact.id)}>
+                    {t("web.library.inspector.openWorkbench")}
+                  </Button>
+                  <Show when={artifact.body === "html"}>
+                    <IconButton icon="download" label={t("web.library.download")} testid="library-download" onClick={() => downloadArtifact(artifact)} />
+                  </Show>
+                </div>
+                <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 m-0 text-sm">
+                  <dt class="text-muted whitespace-nowrap">{t("web.library.inspector.kind")}</dt>
+                  <dd class="m-0 flex flex-wrap items-center gap-1.5 min-w-0 wrap-anywhere text-ink">
+                    <span>{kindLabel(artifact)}</span>
+                    <span data-testid="library-artifact-suffix" class="rounded-sm border border-line bg-side px-1.5 py-0.5 font-mono text-2xs text-ink">
+                      {artifactSuffix(artifact)}
+                    </span>
+                    <Show when={artifact.body === "html"}>
+                      <span class="text-xs text-muted">{t("web.library.inspector.versionBadge", { version: artifact.version })}</span>
                     </Show>
-                  </span>
-                )}
-              </For>
-            </div>
-            <div class="flex items-center gap-1">
-              <SendMenu channels={props.act.channels} send={props.act.send} />
-              <span class="flex-1" />
-              <MoreMenu
-                label={t("web.library.inspector.more")}
-                testid="library-more"
-                items={[{ key: "remove", label: t("web.library.remove"), icon: "delete", danger: true, onSelect: () => props.act.ask() }]}
-              />
-            </div>
-            <Show when={props.asking}>
-              <Asking question={t("web.library.removeSome", { n: props.items.length })} act={props.act} />
-            </Show>
-          </>
+                  </dd>
+                  <dt class="text-muted whitespace-nowrap">{t("web.library.inspector.from")}</dt>
+                  <dd class="m-0 min-w-0 wrap-anywhere text-ink">
+                    {t("web.library.inspector.byMaker", { name: artifact.byName })}
+                    <Show when={artifact.channel}>
+                      {(c) => (
+                        <>
+                          {" · "}
+                          <Link href={`/chat/${encodeURIComponent(c())}`} class="text-water no-underline hover:underline">
+                            {t("web.library.inspector.openChannel", { channel: props.names.channel(c()) })}
+                          </Link>
+                        </>
+                      )}
+                    </Show>
+                  </dd>
+                  <dt class="text-muted whitespace-nowrap">{t("web.library.inspector.added")}</dt>
+                  <dd class="m-0 min-w-0 wrap-anywhere text-ink" title={momentText(artifact.updated)}>
+                    {ago(artifact.updated, now())}
+                  </dd>
+                </dl>
+              </>
+            )}
+          </Show>
         }
       >
         {(item) => {

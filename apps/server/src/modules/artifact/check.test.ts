@@ -99,3 +99,61 @@ describe("what an HTML artifact may load", () => {
     expect(many).toContain("2");
   });
 });
+
+describe("canvas board checks through check.ts", () => {
+  it("lets through a valid <vv-board> with <vv-assets>, bleed background, and spaced layers", () => {
+    const hugeData = "data:image/png;base64," + "A".repeat(2500);
+    const board = [
+      "<!doctype html><html><body>",
+      `<vv-assets><img id="hero-img" src="${hugeData}"></vv-assets>`,
+      '<vv-board width="1600" height="1000" palette="workbench">',
+      '  <vv-layer id="bg" x="0" y="0" w="1600" h="1000" z="-1" bleed></vv-layer>',
+      '  <vv-layer id="hero" x="40" y="60" w="400" h="400" asset="hero-img"></vv-layer>',
+      '  <vv-layer id="title" x="500" y="80" w="900" h="160"><h1>Harvest</h1></vv-layer>',
+      "</vv-board>",
+      "</body></html>",
+    ].join("\n");
+    const checked = htmlCheck(board);
+    expect(checked).toEqual({ refused: [], warned: [] });
+    expect(htmlProblem(checked)).toBe("");
+  });
+
+  it("refuses a missing asset reference and >2KB inline data inside <vv-board> with htmlProblem", () => {
+    const hugeData = "data:image/png;base64," + "B".repeat(2500);
+    const page = [
+      '<vv-board width="1200" height="800">',
+      '  <vv-layer id="art" x="40" y="40" w="300" h="300" asset="missing-hero"></vv-layer>',
+      `  <vv-layer id="inline" x="400" y="40" w="300" h="300"><img src="${hugeData}"></vv-layer>`,
+      "</vv-board>",
+    ].join("\n");
+    const checked = htmlCheck(page);
+    expect(checked.refused).toEqual([
+      { kind: "canvasAssetMissing", line: 2, id: "art", asset: "missing-hero" },
+      { kind: "canvasInlineData", line: 3 },
+    ]);
+    const problem = htmlProblem(checked);
+    expect(problem).toContain("missing-hero");
+    expect(problem).toContain("<vv-assets>");
+    expect(problem).toContain("Fix:");
+  });
+
+  it("warns cleanly on out-of-bounds and overlapping canvas layers without refusing", () => {
+    const page = [
+      '<vv-board width="800" height="600">',
+      '  <vv-layer id="pic" x="60" y="60" w="300" h="200"><svg></svg></vv-layer>',
+      '  <vv-layer id="copy" x="120" y="100" w="760" h="120"><p>Overlap and bounds</p></vv-layer>',
+      "</vv-board>",
+    ].join("\n");
+    const checked = htmlCheck(page);
+    expect(checked.refused).toEqual([]);
+    expect(htmlProblem(checked)).toBe("");
+    expect(checked.warned.map((w) => [w.call, w.line])).toEqual([
+      ["canvas-bounds", 3],
+      ["canvas-occlusion", 3],
+    ]);
+    for (const w of checked.warned) {
+      expect(w.message).toContain("Fix:");
+      expect(w.message).toContain("copy");
+    }
+  });
+});

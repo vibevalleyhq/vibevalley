@@ -8,11 +8,11 @@ import { edgesOf } from "@vibevalley/testkit/source";
 const featureLayers: ReadonlyArray<{ readonly name: string; readonly features: readonly string[] }> = [
   {
     name: "Primitives",
-    features: ["artifact", "catalog", "media", "memory", "pkm", "provider", "runtime", "session", "terminal", "user", "voice"],
+    features: ["artifact", "catalog", "memory", "pkm", "provider", "runtime", "session", "terminal", "user", "voice"],
   },
   {
     name: "Domain",
-    features: ["channel", "lan", "orchestrator", "repo"],
+    features: ["channel", "lan", "media", "orchestrator", "repo"],
   },
   {
     name: "Workbench",

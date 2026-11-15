@@ -1,6 +1,6 @@
 import { expect, test } from "./fixtures";
 
-const places = ["chat", "issues", "artifacts", "agents", "runtimes", "repos", "catalog", "settings"];
+const places = ["chat", "issues", "library", "agents", "runtimes", "repos", "catalog", "settings"];
 
 test("the rail lists every place, the farm at the top, and marks where you are", async ({ page }) => {
   await page.goto("/issues");
@@ -17,11 +17,14 @@ test("the rail lists every place, the farm at the top, and marks where you are",
 test("every place opens under its own head, and the chat has none", async ({ page }) => {
   await page.goto("/issues");
   const rail = page.getByTestId("rail");
-  for (const place of ["artifacts", "agents", "runtimes", "repos", "catalog"]) {
+  for (const place of ["agents", "runtimes", "repos", "catalog"]) {
     await rail.locator(`[data-place="${place}"]`).click();
     await expect(page).toHaveURL(new RegExp(`/${place}$`, "u"));
     await expect(page.getByTestId("desk")).toHaveAttribute("data-place", place);
   }
+  await rail.locator('[data-place="library"]').click();
+  await expect(rail.locator('[data-place="library"]')).toHaveAttribute("aria-current", "page");
+  await expect(page.getByTestId("desk")).toHaveCount(0);
   await rail.locator('[data-place="chat"]').click();
   await expect(rail.locator('[data-place="chat"]')).toHaveAttribute("aria-current", "page");
   await expect(page.getByTestId("desk")).toHaveCount(0);

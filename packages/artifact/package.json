@@ -35,7 +35,8 @@
   "dependencies": {
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
-    "parse5": "catalog:"
+    "parse5": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

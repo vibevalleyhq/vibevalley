@@ -2,7 +2,7 @@
   "noTitle": "Artifact 要有个标题",
   "longTitle": "标题太长了，最多 {max} 个字",
   "badKind": "认不得 {kind} 这种 Artifact，只认 {kinds}",
-  "displayHtmlOnly": "只有网页 Artifact 能选怎么看（page、slides、motion）；一起写的没有这一项",
+  "displayHtmlOnly": "只有网页 Artifact 能选怎么看（page、slides、motion、canvas）；一起写的没有这一项",
   "empty": "Artifact 是空的",
   "tooBig": "一稿最多 {mb} MB",
   "missing": "没有 {id} 这份 Artifact",
@@ -95,7 +95,14 @@
     "form": "第 {line} 行的表单提交到 {url}：页面不能提交表单，用脚本处理它",
     "refresh": "第 {line} 行的 <meta http-equiv=\"refresh\"> 会把页面带走：删掉它",
     "base": "第 {line} 行的 <base href>：删掉它，地址写全",
-    "frame": "第 {line} 行的 <{tag}>：页面里不能再嵌一个页面"
+    "frame": "第 {line} 行的 <{tag}>：页面里不能再嵌一个页面",
+    "canvasBoardAttr": "第 {line} 行的 <vv-board> 缺少有效的正数 width 或 height。Fix: 为 <vv-board> 设置大于 0 的 width 和 height 属性",
+    "canvasLayerId": "第 {line} 行的 <vv-layer> 缺少或重复使用了 id（{id}）。Fix: 为每个 <vv-layer> 指定唯一的非空 id",
+    "canvasLayerBox": "第 {line} 行的图层 {id} 缺少有效的数值坐标或尺寸（x、y、w、h，且 w、h > 0）。Fix: 补全合法的 x、y、w、h 数值属性",
+    "canvasAssetMissing": "第 {line} 行的图层 {id} 引用了不存在的素材 asset=\"{asset}\"。Fix: 在 <vv-assets> 中添加 id=\"{asset}\" 的元素或修正引用",
+    "canvasInlineData": "第 {line} 行的 <vv-board> 内直接内联了超过 2KB 的 data: 数据。Fix: 把大图或 SVG 挪进 <vv-assets> 并通过 asset=\"...\" 引用",
+    "canvasOutOfBounds": "第 {line} 行的图层 {id}（{box}）超出了画板范围（{board}）。Fix: 缩小或挪回画板内，或为跨边背景加上 bleed",
+    "canvasOcclusion": "第 {line} 行的图层 {id} 与 {other} 重叠了 {overlap}px，可能遮挡文字。Fix: 挪开坐标、调整尺寸或加上 allow-overlap"
   },
   "edit": {
     "empty": "没有选中要改的字",
@@ -104,6 +111,8 @@
     "many": "「{words}」在页面里有 {n} 处，分不清是哪一处：多选几个字再改，或者交给帮工改",
     "crosses": "「{words}」跨了带格式的几段，这里只改一段里的字：少选几个字，或者交给帮工改",
     "stale": "你看的是第 {version} 稿，最新的是第 {latest} 稿：在最新的一稿上改",
-    "note": "用户在页面上改了：「{old}」→「{new}」"
+    "note": "用户在页面上改了：「{old}」→「{new}」",
+    "canvasNote": "用户在画板上微调了图层",
+    "canvasNotFound": "画板源码里找不到对应的 <vv-board> 或图层 id：交给帮工改"
   }
 }

@@ -2,9 +2,13 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { htmlSources } from "@vibevalley/artifact/html";
 import { setLocale } from "@vibevalley/i18n";
+import { defaultOrchestrator } from "@vibevalley/protocol";
 import { endpoints, fieldsOf } from "@vibevalley/protocol/api";
 
-import { descriptions, params, sessionDescriptions, spentText } from "./prompts.ts";
+import { orchestrator } from "#/base/actor.ts";
+import { world } from "#/testing/world.ts";
+
+import { answers, descriptions, params, sessionDescriptions, spentText } from "./prompts.ts";
 import { agentOnly, type Op, parameters, sessionParameters, toolName } from "./schemas.ts";
 import { toolStart } from "./tool.ts";
 
@@ -46,6 +50,65 @@ describe("the tools", () => {
   it("let the orchestrator and a helper say how an html artifact is shown", () => {
     for (const table of [parameters, sessionParameters]) expect(table["artifact.create"].shape).toHaveProperty("display");
     expect(params.artifact.display).toMatch(/slides/u);
+    expect(params.artifact.display).toMatch(/canvas/u);
+  });
+
+  it("formats network and canvas layout warnings separately and preserves Fix: guidance", () => {
+    expect(answers.artifact.warned([])).toBe("");
+    expect(answers.artifact.warned([{ line: 3, call: "fetch" }])).toBe(
+      "\n提醒：第 3 行的脚本用了 fetch。页面连不了网，这部分在用户那里不会动；要用的数据直接写进页面。",
+    );
+    const layoutOnly = answers.artifact.warned([
+      { line: 4, call: "canvas-occlusion", message: "第 4 行的图层 copy 与 pic 重叠了 80px，可能遮挡文字。Fix: 挪开坐标、调整尺寸或加上 allow-overlap" },
+    ]);
+    expect(layoutOnly).toContain("Fix:");
+    expect(layoutOnly).not.toContain("页面连不了网");
+    const combined = answers.artifact.warned([
+      { line: 3, call: "fetch" },
+      {
+        line: 4,
+        call: "canvas-bounds",
+        message: "第 4 行的图层 copy（100,100 800x120）超出了画板范围（800x600）。Fix: 缩小或挪回画板内，或为跨边背景加上 bleed",
+      },
+    ]);
+    expect(combined).toContain("第 3 行的脚本用了 fetch。页面连不了网");
+    expect(combined).toContain("第 4 行的图层 copy");
+    expect(combined).toContain("Fix:");
+  });
+
+  it("returns the layout warning Fix: text when artifact_create receives a canvas with an overlapping layer", async () => {
+    await using farm = await world();
+    const channels = farm.channel;
+    const caller = () => ({
+      agent: defaultOrchestrator,
+      session: "",
+      repo: "",
+      here: channels.defaultChannel(),
+      picked: "",
+      envelope: "",
+      actor: orchestrator(true),
+    });
+    const create = farm.tool.orchestrator(caller).find((item) => item.name === "artifact_create");
+    if (create === undefined) throw new Error("artifact_create is missing");
+    const result = await create.execute(
+      {
+        title: "重叠海报",
+        kind: "html",
+        display: "canvas",
+        content: [
+          '<vv-board width="1200" height="800">',
+          '  <vv-layer id="pic" x="60" y="60" w="300" h="200"><svg></svg></vv-layer>',
+          '  <vv-layer id="copy" x="120" y="100" w="400" h="120"><p>Overlap</p></vv-layer>',
+          "</vv-board>",
+        ].join("\n"),
+      },
+      { id: "call" },
+    );
+    const text = result.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("");
+    expect(text).toContain("做好了");
+    expect(text).toContain("copy");
+    expect(text).toContain("pic");
+    expect(text).toContain("Fix:");
   });
 
   it("read in the trajectory by label and what they name", () => {

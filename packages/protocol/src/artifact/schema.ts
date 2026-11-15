@@ -70,12 +70,81 @@ const HtmlAnchor = z.object({
   suffix: z.string(),
 }) satisfies Codec<T.HtmlAnchor>;
 
-export const ArtifactHtmlEdit = z.object({
-  id: ArtifactId,
-  version: z.number(),
-  anchor: HtmlAnchor,
-  text: z.string(),
-}) satisfies Codec<T.ArtifactHtmlEdit>;
+const CanvasPalette = z.enum(["workbench", "brutalist-red", "newsprint", "blueprint"]);
+const CanvasFilter = z.enum(["none", "torn-paper", "sticker-cutout", "halftone", "grain", "shadow"]);
+const CanvasFlip = z.enum(["none", "x", "y", "xy"]);
+
+const HtmlLayerPatch = z.object({
+  id: z.string().min(1).max(200),
+  x: z.exactOptional(z.number().min(-100_000).max(100_000)),
+  y: z.exactOptional(z.number().min(-100_000).max(100_000)),
+  w: z.exactOptional(z.number().gt(0).max(100_000)),
+  h: z.exactOptional(z.number().gt(0).max(100_000)),
+  rotate: z.exactOptional(z.number().min(-3600).max(3600)),
+  z: z.exactOptional(z.number().min(-100_000).max(100_000)),
+  opacity: z.exactOptional(z.number().min(0).max(1)),
+  flip: z.exactOptional(CanvasFlip),
+  filter: z.exactOptional(CanvasFilter),
+  locked: z.exactOptional(z.boolean()),
+  hidden: z.exactOptional(z.boolean()),
+  text: z.exactOptional(z.string().max(50_000)),
+});
+
+const HtmlCanvasBoardPatch = z.object({
+  palette: z.exactOptional(CanvasPalette),
+  grain: z.exactOptional(z.number().min(0).max(1)),
+});
+
+const HtmlCanvasPatch = z.object({
+  board: z.exactOptional(HtmlCanvasBoardPatch),
+  layers: z.array(HtmlLayerPatch).max(500),
+});
+
+const HtmlCanvasLayerInfo = z.object({
+  id: z.string().max(200),
+  name: z.string().max(500),
+  kind: z.enum(["layer", "group"]),
+  x: z.number().min(-100_000).max(100_000),
+  y: z.number().min(-100_000).max(100_000),
+  w: z.number().min(0).max(100_000),
+  h: z.number().min(0).max(100_000),
+  rotate: z.number().min(-3600).max(3600),
+  z: z.number().min(-100_000).max(100_000),
+  opacity: z.number().min(0).max(1),
+  flip: CanvasFlip,
+  filter: CanvasFilter,
+  locked: z.boolean(),
+  hidden: z.boolean(),
+  hasAsset: z.boolean(),
+  text: z.string().max(50_000),
+});
+
+const HtmlCanvasIssue = z.object({
+  kind: z.enum(["overflow", "collision", "bounds"]),
+  layerId: z.string().max(200),
+  otherLayerId: z.exactOptional(z.string().max(200)),
+  message: z.string().max(1000),
+});
+
+const HtmlCanvasState = z.object({
+  width: z.number().gt(0).max(100_000),
+  height: z.number().gt(0).max(100_000),
+  palette: CanvasPalette,
+  grain: z.number().min(0).max(1),
+  selectedId: z.string().max(200).nullable(),
+  layers: z.array(HtmlCanvasLayerInfo).max(500),
+  issues: z.array(HtmlCanvasIssue).max(500),
+});
+
+export const ArtifactHtmlEdit = z
+  .object({
+    id: ArtifactId,
+    version: z.number(),
+    anchor: z.exactOptional(HtmlAnchor),
+    text: z.exactOptional(z.string()),
+    canvas: z.exactOptional(HtmlCanvasPatch),
+  })
+  .refine((v) => v.canvas !== undefined || (v.anchor !== undefined && v.text !== undefined)) satisfies Codec<T.ArtifactHtmlEdit>;
 
 export const ArtifactUpdateRequest = z.object({
   id: ArtifactId,
@@ -96,8 +165,14 @@ export const HtmlShellMessage = z.discriminatedUnion("vibevalley", [
     titles: z.exactOptional(shellWords),
     notes: z.exactOptional(shellWords),
     duration: z.exactOptional(shellTime),
+    canvas: z.exactOptional(HtmlCanvasState),
   }),
-  z.object({ vibevalley: z.literal("at"), page: z.exactOptional(shellCount), time: z.exactOptional(shellTime) }),
+  z.object({
+    vibevalley: z.literal("at"),
+    page: z.exactOptional(shellCount),
+    time: z.exactOptional(shellTime),
+    canvas: z.exactOptional(HtmlCanvasState),
+  }),
 ]) satisfies Codec<T.HtmlShellMessage>;
 
 export const ArtifactListRequest = z.object({

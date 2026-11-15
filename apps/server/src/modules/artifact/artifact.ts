@@ -1,4 +1,4 @@
-import { artifactProblem, htmlCheck, htmlEdit, htmlProblem } from "@vibevalley/artifact/html";
+import { artifactProblem, canvasEdit, htmlCheck, htmlEdit, htmlProblem, inferArtifactFromName, normalizeWhiteboardContent } from "@vibevalley/artifact/html";
 import { Semaphore } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -168,12 +168,14 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
       return start(maker, title);
     }
     const kind = req.kind ?? "markdown";
-    const bytes = Buffer.from(req.content, "utf8");
-    const problem = artifactProblem({ title: req.title, kind, size: bytes.length }) || (kind === "html" ? htmlProblem(htmlCheck(req.content)) : "");
-    if (problem) throw refused(problem);
     const body: T.ArtifactBody = kind === "html" ? "html" : "blocks";
     if (body === "blocks" && req.display !== undefined) throw refused(t("server.artifact.displayHtmlOnly"));
-    const display = body === "html" ? (req.display ?? "page") : null;
+    const inferredDisplay = body === "html" && req.display === undefined ? inferArtifactFromName(req.title, req.content).display : undefined;
+    const display = body === "html" ? (req.display ?? inferredDisplay ?? "page") : null;
+    const rawContent = display === "whiteboard" ? normalizeWhiteboardContent(req.content, title) : req.content;
+    const bytes = Buffer.from(rawContent, "utf8");
+    const problem = artifactProblem({ title: req.title, kind, size: bytes.length }) || (kind === "html" ? htmlProblem(htmlCheck(rawContent)) : "");
+    if (problem) throw refused(problem);
     const channel = await chat.placeOf(maker.from, req.channel ?? "");
     const file = body === "html" ? await keep(bytes, title) : "";
     const id = S.artifactId(newId());
@@ -221,8 +223,10 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
   const version = async (maker: Maker, req: T.ArtifactVersionRequest) => {
     const row = await found(req.id);
     if (row.body !== "html") throw refused(t("server.artifact.notHtml", { title: row.title }));
-    const bytes = Buffer.from(req.content, "utf8");
-    const problem = artifactProblem({ size: bytes.length }) || htmlProblem(htmlCheck(req.content));
+    const rawContent =
+      row.display === "whiteboard" && req.content.trimStart().startsWith("{") ? normalizeWhiteboardContent(req.content, row.title) : req.content;
+    const bytes = Buffer.from(rawContent, "utf8");
+    const problem = artifactProblem({ size: bytes.length }) || htmlProblem(htmlCheck(rawContent));
     if (problem) throw refused(problem);
     const file = await keep(bytes, row.title);
     const next = row.version + 1;
@@ -305,6 +309,12 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
       // Over the latest only: a later version's changes would be lost under an edit of an older one.
       if (v.version !== row.version) throw refused(t("server.artifact.edit.stale", { version: v.version, latest: row.version }));
       const source = await pageOf(row, v);
+      if (req.canvas !== undefined) {
+        const edited = canvasEdit(source, req.canvas);
+        if (!edited.ok) throw refused(edited.why);
+        return version(maker, { id: req.id, content: edited.source, note: t("server.artifact.edit.canvasNote") });
+      }
+      if (req.anchor === undefined || req.text === undefined) throw refused(t("server.artifact.edit.empty"));
       const edited = htmlEdit(source, req.anchor, req.text);
       if (!edited.ok) throw refused(edited.why);
       const note = t("server.artifact.edit.note", { old: head(req.anchor.exact.trim(), 40), new: head(req.text.trim(), 40) });

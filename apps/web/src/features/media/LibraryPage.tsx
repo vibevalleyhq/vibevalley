@@ -1,16 +1,18 @@
-import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, onSettled, Show, untrack } from "solid-js";
 
+import { inferArtifactFromName } from "@vibevalley/artifact/html";
 import { Slider } from "@vibevalley/base-ui";
 import { t } from "@vibevalley/i18n";
-import { attachmentPath, type LibraryItem, type LibrarySort, LibrarySortValues, type MediaJob } from "@vibevalley/protocol";
+import { type Artifact, attachmentPath, type LibraryItem, type LibrarySort, LibrarySortValues, type MediaJob } from "@vibevalley/protocol";
 
 import { createSettled } from "#/base/dom.tsx";
+import { artifactHref, useArtifacts } from "#/features/artifact/index.ts";
 import { api } from "#/infra/api.ts";
 import { attachmentData } from "#/infra/attachment.ts";
 import { useCore } from "#/infra/frame.ts";
-import { ready, useAgents, useQuery } from "#/infra/query.ts";
-import { useSearchParams } from "#/infra/router.ts";
-import { prefsNow, setLibraryTile } from "#/state/prefs.ts";
+import { ready, useAgents, useQuery, useQueryClient } from "#/infra/query.ts";
+import { useRouter, useSearchParams } from "#/infra/router.ts";
+import { prefsNow, setLibraryTile, shownTheme } from "#/state/prefs.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Dialog } from "#/ui/Dialog.tsx";
@@ -24,12 +26,27 @@ import { toast } from "#/ui/toasts.ts";
 import { AudioPanel } from "./AudioPanel.tsx";
 import { ImagePanel } from "./ImagePanel.tsx";
 import { Inspector } from "./Inspector.tsx";
-import { between, countsOf, justify, type KindFilter, kindOf, making, type Names, neighbor, shown, understoodText, type Where } from "./items.ts";
+import {
+  artifactCountsOf,
+  type ArtifactKindFilter,
+  between,
+  countsOf,
+  justify,
+  type KindFilter,
+  kindOf,
+  making,
+  type Names,
+  neighbor,
+  shown,
+  shownArtifacts,
+  understoodText,
+  type Where,
+} from "./items.ts";
 import { libraryQuery } from "./listing.ts";
 import { publicationKey } from "./publication.ts";
 import { Rail } from "./Rail.tsx";
 import { SpeechPanel } from "./SpeechPanel.tsx";
-import { knows, MakingTiles, ratioOf, type Seen, tileGap, Tiles, useWidth } from "./Tiles.tsx";
+import { ArtifactTiles, knows, MakingTiles, ratioOf, type Seen, tileGap, Tiles, useWidth } from "./Tiles.tsx";
 import { UnderstandingPanel } from "./UnderstandingPanel.tsx";
 
 type Make = "image" | "speech" | "audio";
@@ -38,18 +55,24 @@ const tileMin = 96;
 const tileMax = 280;
 
 const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
+const isArtifactFile = (name: string) => /\.(?:(?:slide|slides|visual|canvas|dashboard|motion)\.html|whiteboard(?:\.json|\.html)?|doc\.md)$/iu.test(name);
 
 export function LibraryPage() {
   const core = useCore();
+  const router = useRouter();
+  const queries = useQueryClient();
   const agents = useAgents();
   const [search, setSearch] = useSearchParams();
   const [text, setText] = createSignal("");
   const typed = createSettled(text, 250);
   const [sort, setSort] = createSignal<LibrarySort>("recent");
   const items = useQuery(() => libraryQuery({ text: typed().trim(), sort: sort() }), { interval: () => 10_000, keepPrevious: true });
+  const artifacts = useArtifacts(() => ({}));
   const [where, setWhere] = createSignal<Where>({ by: "all" });
   const [kind, setKind] = createSignal<KindFilter>("all");
+  const [artifactKind, setArtifactKind] = createSignal<ArtifactKindFilter | undefined>(undefined);
   const [picked, setPicked] = createSignal<readonly string[]>([]);
+  const [pickedArtifactId, setPickedArtifactId] = createSignal<string | undefined>(undefined);
   const [anchor, setAnchor] = createSignal<string>();
   const [asking, setAsking] = createSignal(false);
   const [looking, setLooking] = createSignal<number>();
@@ -58,9 +81,18 @@ export function LibraryPage() {
   const act = createAct();
   const tile = () => Math.min(tileMax, Math.max(tileMin, prefsNow().libraryTile));
   const all = (): readonly LibraryItem[] => ready(items, undefined) ?? [];
+  const allArtifacts = (): readonly Artifact[] => ready(artifacts, undefined) ?? [];
   const jobs = (): readonly MediaJob[] => core()?.media ?? [];
   const working = () => making(jobs());
   const list = createMemo(() => shown({ items: all(), where: where(), kind: kind() }));
+  const filteredArtifacts = createMemo(() => shownArtifacts(allArtifacts(), { artifactKind: artifactKind(), search: typed(), sort: sort() }));
+  const artifactCounts = createMemo(() => artifactCountsOf(allArtifacts()));
+  const showArtifacts = () => artifactKind() !== undefined || (where().by === "all" && kind() === "all");
+  const shownArtifactList = createMemo(() => (showArtifacts() ? filteredArtifacts() : []));
+  const pickedArtifact = createMemo(() => {
+    const id = pickedArtifactId();
+    return id === undefined ? undefined : allArtifacts().find((a) => a.id === id);
+  });
   const ids = createMemo(() => list().map((item) => item.attachment.id));
   const counts = createMemo(() => countsOf({ items: all(), where: where(), kind: kind() }));
   const area = useWidth();
@@ -99,11 +131,19 @@ export function LibraryPage() {
   createEffect(
     () => ids(),
     (now) => {
-      const kept = picked().filter((id) => now.includes(id));
-      if (kept.length !== picked().length) {
+      const current = untrack(picked);
+      const kept = current.filter((id) => now.includes(id));
+      if (kept.length !== current.length) {
         setPicked(kept);
         setAsking(false);
       }
+    },
+  );
+  createEffect(
+    () => ({ status: artifacts.status(), ids: new Set<string>(allArtifacts().map((a) => a.id)) }),
+    ({ status, ids: idsNow }) => {
+      const id = untrack(pickedArtifactId);
+      if (status === "success" && id !== undefined && !idsNow.has(id)) setPickedArtifactId(undefined);
     },
   );
   const make = (): Make | undefined => {
@@ -116,33 +156,63 @@ export function LibraryPage() {
     return all().find((item) => item.attachment.id === id)?.attachment ?? { id, name: id, type: "", size: 0 };
   };
   const [picker, setPicker] = createSignal<HTMLInputElement>();
-  const upload = (files: readonly File[]) =>
-    files.length === 0
-      ? Promise.resolve()
-      : act.run(() =>
-          Promise.all(
-            files.map((file) =>
-              attachmentData(file)
-                .then((data) =>
-                  api.attachment.create({
-                    name: file.name === "" ? "file" : file.name,
-                    type: file.type === "" ? "application/octet-stream" : file.type,
-                    data,
-                  }),
-                )
-                .then((kept) => api.library.item.add({ attachment: kept.id })),
-            ),
-          ).then((added) => {
-            void items.refetch();
-            const last = added.at(-1);
-            if (last !== undefined) {
-              setPicked([last.attachment.id]);
-              setAnchor(last.attachment.id);
-            }
-          }),
-        );
+  const upload = (files: readonly File[]) => {
+    if (files.length === 0) return Promise.resolve();
+    const artifactFiles = files.filter((file) => isArtifactFile(file.name));
+    const mediaFiles = files.filter((file) => !isArtifactFile(file.name));
+    return act.run(async () => {
+      const [madeArtifacts, addedMedia] = await Promise.all([
+        Promise.all(
+          artifactFiles.map((file) =>
+            file.text().then((content) => {
+              const info = inferArtifactFromName(file.name, content);
+              return api.artifact.create({
+                title: info.title,
+                kind: info.kind,
+                ...(info.display === undefined ? {} : { display: info.display }),
+                content,
+              });
+            }),
+          ),
+        ),
+        Promise.all(
+          mediaFiles.map((file) =>
+            attachmentData(file)
+              .then((data) =>
+                api.attachment.create({
+                  name: file.name === "" ? "file" : file.name,
+                  type: file.type === "" ? "application/octet-stream" : file.type,
+                  data,
+                }),
+              )
+              .then((kept) => api.library.item.add({ attachment: kept.id })),
+          ),
+        ),
+      ]);
+      if (mediaFiles.length > 0) void items.refetch();
+      if (artifactFiles.length > 0) void queries.invalidate({ prefix: ["artifacts"] });
+      const lastMedia = addedMedia.at(-1);
+      const lastArtifact = madeArtifacts.at(-1);
+      if (lastMedia !== undefined) {
+        setPickedArtifactId(undefined);
+        setPicked([lastMedia.attachment.id]);
+        setAnchor(lastMedia.attachment.id);
+      } else if (lastArtifact !== undefined) {
+        setPicked([]);
+        setAnchor(undefined);
+        setPickedArtifactId(lastArtifact.id);
+      }
+    });
+  };
+  const pickArtifact = (id: string) => {
+    setAsking(false);
+    setPicked([]);
+    setAnchor(undefined);
+    setPickedArtifactId(id);
+  };
   const pick = (id: string, how: { readonly add: boolean; readonly range: boolean }) => {
     setAsking(false);
+    setPickedArtifactId(undefined);
     const from = anchor();
     if (how.range && from !== undefined) setPicked(between({ ids: ids(), from, to: id }));
     else if (how.add) {
@@ -202,8 +272,9 @@ export function LibraryPage() {
       setAsking(true);
       return;
     }
-    if (e.key === "Escape" && picked().length > 0) {
+    if (e.key === "Escape" && (picked().length > 0 || pickedArtifactId() !== undefined)) {
       setPicked([]);
+      setPickedArtifactId(undefined);
       setAnchor(undefined);
       setAsking(false);
     }
@@ -218,7 +289,7 @@ export function LibraryPage() {
     window.addEventListener("paste", paste);
     return () => window.removeEventListener("paste", paste);
   });
-  const empty = () => all().length === 0 && working().length === 0 && typed().trim() === "";
+  const empty = () => all().length === 0 && allArtifacts().length === 0 && working().length === 0 && typed().trim() === "";
   return (
     <div
       data-testid="library-page"
@@ -245,12 +316,27 @@ export function LibraryPage() {
         names={names}
         where={where()}
         kind={kind()}
+        artifactKind={artifactKind()}
+        artifactCounts={artifactCounts()}
         onWhere={(w) => {
+          setArtifactKind(undefined);
+          setPickedArtifactId(undefined);
           setWhere(w);
           setAsking(false);
         }}
         onKind={(k) => {
+          setArtifactKind(undefined);
+          setPickedArtifactId(undefined);
           setKind(k);
+          setAsking(false);
+        }}
+        onArtifactKind={(ak) => {
+          setArtifactKind(ak);
+          setWhere({ by: "all" });
+          setKind("all");
+          setPicked([]);
+          setPickedArtifactId(undefined);
+          setAnchor(undefined);
           setAsking(false);
         }}
       />
@@ -310,6 +396,9 @@ export function LibraryPage() {
             void upload(files);
           }}
         />
+        <Button data-testid="library-new-artifact" icon="artifacts" onClick={() => router.navigate("/artifacts")}>
+          {t("web.library.newArtifact")}
+        </Button>
         <Button data-testid="library-upload" icon="upload" disabled={act.busy()} onClick={() => picker()?.click()}>
           {act.busy() ? t("web.library.uploading") : t("web.library.upload")}
         </Button>
@@ -319,16 +408,13 @@ export function LibraryPage() {
       </div>
       <div
         ref={area.ref}
-        role={list().length > 0 ? "listbox" : undefined}
-        aria-label={t("web.library.grid")}
-        aria-multiselectable={list().length > 0 ? "true" : undefined}
-        aria-activedescendant={active() === undefined ? undefined : `library-tile-${active()}`}
         tabindex={0}
         data-testid="library-grid"
         onKeyDown={onKey}
         onClick={(e) => {
           if (e.target === e.currentTarget) {
             setPicked([]);
+            setPickedArtifactId(undefined);
             setAnchor(undefined);
             setAsking(false);
           }
@@ -362,39 +448,62 @@ export function LibraryPage() {
           <Show when={working().length > 0}>
             <MakingTiles jobs={working()} width={inner()} height={tile()} label={(job) => t(`web.library.job.${job.kind}`)} />
           </Show>
-          <Show when={list().length > 0} fallback={<Quiet>{t("web.library.nothingShown")}</Quiet>}>
-            <Tiles
-              items={list()}
-              rows={rows()}
-              picked={picked()}
-              active={active()}
-              seen={(id) => seen().get(id)}
-              onSeen={(id, s) =>
-                setSeen((was) => {
-                  const had = was.get(id);
-                  // Skip map copy and re-layout when dimensions/duration match what was already recorded.
-                  if (had !== undefined && knows({ had, learnt: s })) return was;
-                  const next = new Map(was);
-                  next.set(id, { ...had, ...s });
-                  return next;
-                })
-              }
-              onPick={(id, how) => {
-                pick(id, how);
-                document.querySelector<HTMLElement>('[data-testid="library-grid"]')?.focus({ preventScroll: true });
-              }}
-              onLook={(id) => look(id)}
+          <Show when={shownArtifactList().length > 0}>
+            <ArtifactTiles
+              artifacts={shownArtifactList()}
+              pickedId={pickedArtifactId()}
+              theme={shownTheme()}
+              onPick={pickArtifact}
+              onOpen={(id) => router.navigate(artifactHref(id))}
             />
+          </Show>
+          <Show when={artifactKind() === undefined && list().length > 0}>
+            <div
+              role="listbox"
+              aria-label={t("web.library.grid")}
+              aria-multiselectable="true"
+              aria-activedescendant={active() === undefined ? undefined : `library-tile-${active()}`}
+            >
+              <Tiles
+                items={list()}
+                rows={rows()}
+                picked={picked()}
+                active={active()}
+                seen={(id) => seen().get(id)}
+                onSeen={(id, s) =>
+                  setSeen((was) => {
+                    const had = was.get(id);
+                    // The same map back, so the grid does not re-layout.
+                    if (had !== undefined && knows({ had, learnt: s })) return was;
+                    const next = new Map(was);
+                    next.set(id, { ...had, ...s });
+                    return next;
+                  })
+                }
+                onPick={(id, how) => {
+                  pick(id, how);
+                  document.querySelector<HTMLElement>('[data-testid="library-grid"]')?.focus({ preventScroll: true });
+                }}
+                onLook={(id) => look(id)}
+              />
+            </div>
+          </Show>
+          <Show when={shownArtifactList().length === 0 && (artifactKind() !== undefined || list().length === 0)}>
+            <Quiet>{t("web.library.nothingShown")}</Quiet>
           </Show>
         </Show>
       </div>
-      <Show when={chosen().length > 0}>
+      <Show when={chosen().length > 0 || pickedArtifact() !== undefined}>
         <Inspector
           items={chosen()}
+          artifact={pickedArtifact()}
+          theme={shownTheme()}
           seen={chosen().length === 1 ? seen().get(chosen()[0]?.attachment.id ?? "") : undefined}
           understood={chosen().length === 1 ? understoodText(chosen()[0]?.attachment.id ?? "")(jobs()) : undefined}
           names={names}
           asking={asking()}
+          onOpenArtifact={(id) => router.navigate(artifactHref(id))}
+          onClearArtifact={() => setPickedArtifactId(undefined)}
           act={{
             channels: core()?.chat?.channels ?? [],
             send: (channel) => void send(channel),
@@ -405,6 +514,7 @@ export function LibraryPage() {
             keep: () => setAsking(false),
             clear: () => {
               setPicked([]);
+              setPickedArtifactId(undefined);
               setAnchor(undefined);
               setAsking(false);
             },
