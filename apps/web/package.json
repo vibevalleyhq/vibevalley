@@ -8,10 +8,10 @@
   "scripts": {
     "dev": "vp dev",
     "e2e": "playwright test",
-    "e2e:component": "playwright test --config playwright.component.config.ts",
-    "e2e:integration": "playwright test --config playwright.integration.config.ts",
-    "e2e:audit": "playwright test --config playwright.audit.config.ts",
-    "e2e:visual": "playwright test --config playwright.visual.config.ts",
+    "e2e:component": "VIBEVALLEY_WEB_SUITE=component playwright test",
+    "e2e:integration": "VIBEVALLEY_WEB_SUITE=integration playwright test",
+    "e2e:audit": "VIBEVALLEY_WEB_SUITE=audit playwright test",
+    "e2e:visual": "VIBEVALLEY_WEB_SUITE=visual playwright test",
     "e2e:dev": "VIBEVALLEY_WEB_DEV=1 playwright test",
     "stories": "vp dev --config vite.stories.config.ts"
   },

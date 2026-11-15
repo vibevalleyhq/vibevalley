@@ -7,8 +7,6 @@ export default defineConfig({
   test: { include: ["src/**/*.test.ts"], environment: "node" },
   pack: {
     entry: Object.values(pkg.exports).flatMap((e) => (typeof e === "string" ? [] : [e.default])),
-    outDir: "dist",
-    clean: true,
     fixedExtension: false,
     dts: { sourcemap: true, emitDtsOnly: true },
   },

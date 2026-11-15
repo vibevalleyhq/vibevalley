@@ -16,6 +16,21 @@ export const suites = {
 type Suite = keyof typeof suites;
 const isSuite = (name: string): name is Suite => Object.hasOwn(suites, name);
 
+export const entrySuites = {
+  all: ["component", "integration", "audit-stories", "audit-pages"],
+  component: ["component"],
+  integration: ["integration"],
+  audit: ["audit-stories", "audit-pages"],
+  visual: ["visual"],
+} as const satisfies Record<string, readonly Suite[]>;
+
+const isEntry = (entry: string): entry is keyof typeof entrySuites => Object.hasOwn(entrySuites, entry);
+
+export function suitesFor(entry = "all"): readonly Suite[] {
+  if (isEntry(entry)) return entrySuites[entry];
+  throw new Error(`Unknown browser entry "${entry}". Fix: use one of ${Object.keys(entrySuites).join(", ")}.`);
+}
+
 export function artifactsFor(names: readonly string[]) {
   return [
     ...new Set(

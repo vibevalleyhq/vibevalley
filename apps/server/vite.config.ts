@@ -17,13 +17,8 @@ export default defineConfig({
   // The packaged app's server and its terminal conversations (apps/desktop/scripts/package.ts).
   pack: {
     entry: { main: "src/main.ts", chat: "src/chat/main.ts" },
-    format: "esm",
-    platform: "node",
     target: "node24",
-    outDir: "dist",
-    clean: true,
     dts: false,
-    tsconfig: "tsconfig.json",
     deps: { alwaysBundle: [/^@vibevalley\//u] },
   },
   // The cache sees the files a run reads but not its environment: these change what the tests do.

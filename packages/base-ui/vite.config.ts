@@ -13,12 +13,6 @@ export default defineConfig({
     include: ["test/**/*.test.tsx", "test/**/*.test.ts"],
     browser: { enabled: true, headless: true, provider: playwright(), instances: [{ browser: "chromium" }] },
   },
-  pack: {
-    entry: Object.values(pkg.exports).map((e) => e.default),
-    outDir: "dist",
-    clean: true,
-    fixedExtension: false,
-    dts: { sourcemap: true, emitDtsOnly: true },
-  },
+  pack: { entry: Object.values(pkg.exports).map((e) => e.default), fixedExtension: false, dts: { sourcemap: true, emitDtsOnly: true } },
   run: { tasks: { build: { command: "vp pack", cache: { input: [{ auto: true }, "!dist/**"] } }, test: "vp test run" } },
 });
