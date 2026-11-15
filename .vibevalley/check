@@ -9,7 +9,7 @@ changed=$(git diff --name-only --no-renames "$base")
 server=false
 web=false
 while IFS= read -r path; do
-    case "$path" in apps/server/*|packages/protocol/*) server=true ;; esac
+    case "$path" in apps/server/*|apps/cli/*|packages/protocol/*|packages/async/*|packages/home/*|packages/testkit/*|packages/ai/*|packages/agent/*|packages/provider/*|packages/pkm/*|packages/artifact/*) server=true ;; esac
     case "$path" in apps/web/*|apps/desktop/*|packages/*) web=true ;; esac
 done <<PATHS
 $changed

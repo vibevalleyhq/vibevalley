@@ -1,11 +1,5 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "lib": ["ES2024", "ESNext.Disposable", "DOM"],
-    "allowImportingTsExtensions": true,
-    "types": ["node"],
-    "outDir": "dist",
-    "rootDir": "./src"
-  },
+  "compilerOptions": { "lib": ["ES2024", "ESNext.Disposable", "DOM"], "types": ["node"] },
   "include": ["src"]
 }

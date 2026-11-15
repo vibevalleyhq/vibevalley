@@ -74,6 +74,7 @@ jobs:
       - run: vp check --deny-warnings
       - run: vp run docs:verify
       - run: vp run scripts:test
+      - run: vp run practice:check
       - run: vp run health:verify
       - run: vp run deadcode
 
@@ -116,7 +117,7 @@ jobs:
       - if: matrix.shard == 1
         run: vp run --filter @vibevalley/server db:check
       - if: matrix.shard == 1
-        run: vp run --filter @vibevalley/protocol --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent --filter @vibevalley/provider --filter @vibevalley/cli test
+        run: vp run server:packages
       # The test task with the shard as its argument: cached per shard.
       - run: vp run --filter @vibevalley/server test --shard=${{ matrix.shard }}/3
 

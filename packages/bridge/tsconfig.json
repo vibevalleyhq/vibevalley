@@ -1,8 +1,4 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "lib": ["ES2023"],
-    "outDir": "dist"
-  },
   "include": ["src", "test", "vite.config.ts"]
 }
