@@ -77,7 +77,6 @@ for (const m of schemaSql.matchAll(/create table (\w+) \(([\s\S]*?)\n\);/giu)) {
   }
 }
 
-// Branded primary keys and every single-column foreign key that points at one, read from pg_constraint.
 const brandOf = new Map<string, string>();
 for (const row of (
   await pg.query<{ table_name: string; col_name: string }>(

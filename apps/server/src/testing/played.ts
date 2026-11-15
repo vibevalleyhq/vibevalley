@@ -18,7 +18,7 @@ import { DeliveryRefused, newsOf, type Session, type SessionNews, sessionOver } 
 import type { Consumed, Delivered, LaunchActivity } from "#/modules/session/signals.ts";
 import * as qsession from "#db/session.sql.ts";
 
-/** Sessions played: a turn takes its input, says it got it and reports. The slow mode is held until release (unless holds is off), the fail mode fails. */
+/** Holds turns whose input contains "慢慢做" until release() when holds is true; inputs containing "必败" fail. */
 export class FakeSessions {
   holds = true;
   stopped = false;

@@ -342,8 +342,7 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
     }
   };
 
-  // What is held is tried again after retryFirst, then twice as long after each try that fails (up to retryMost), up to
-  // maxHeldRetries per outage before parking until the next outbox wake.
+  // After maxHeldRetries per outage, held input parks until the next outbox wake.
   const maxHeldRetries = 8;
   const held = new Error("held");
   const heldTried = async (signal: AbortSignal) => {

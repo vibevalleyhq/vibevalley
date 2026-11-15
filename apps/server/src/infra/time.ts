@@ -19,7 +19,6 @@ export const wallTime: Time = {
   },
 };
 
-/** Coalesces pending timers by key: scheduling a key already waiting is dropped until it fires; `close` cancels all pending timers. */
 export function keyedLater(clock: Time) {
   const timers = new Map<string, () => void>();
   let closed = false;

@@ -11,9 +11,9 @@ export interface Attachment {
 /** The one read that is not a POST, since an <img src> can only GET. */
 export const attachmentPath = (id: string) => `/api/v1/attachment/${id}`;
 
-/** Base64-encoded bytes. */
 export interface AttachmentUpload {
   name: string;
   type: string;
+  /** Base64-encoded bytes. */
   data: string;
 }

@@ -82,7 +82,6 @@ test("the desktop app shows the live board and sends a notice", async () => {
     // On macOS the window's buttons sit over the rail's top: the rail reaches past the last of them.
     const titleBar = await page.evaluate(() => window.vibevalleyHost?.titleBar);
     if (titleBar) expect((await page.getByTestId("rail").boundingBox())?.width).toBeGreaterThan(titleBar.left);
-    // Workbench routes resize freely without snapping to the farm's 3:2 grid.
     const freeResized = await app.evaluate(({ BrowserWindow }) => {
       const w = BrowserWindow.getAllWindows()[0]!;
       w.setContentSize(1220, 700);

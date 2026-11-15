@@ -132,7 +132,7 @@
 | `publicHttps` | `publicHttp.ts` |  |
 | `publicFetch` | `publicHttp.ts` |  |
 | `wallTime` | `time.ts` | The wall clock, for code with no service to ask: a class tested on its own, the command line. |
-| `keyedLater` | `time.ts` | Coalesces pending timers by key: scheduling a key already waiting is dropped until it fires; `close` cancels all pending timers. |
+| `keyedLater` | `time.ts` |  |
 | `withinRealTime` | `time.ts` | A deadline on a real process or network call (a runtime's probe of its CLI): real time, whatever the Clock says, and it keeps nothing alive. |
 | `afterRealTime` | `time.ts` | A deadline on a real process (a command's timeout, the grace before SIGKILL): runs f after ms of real time, whatever the Clock says. |
 | `localeMinute` | `time.ts` | To the minute, in this machine's zone: what an input says the time is, so that it does not change between two requests a |
@@ -189,7 +189,7 @@
 | `lastUser` | `model.ts` |  |
 | `scriptedLLM` | `model.ts` | Each request takes the next step, its events a tick apart as a stream's; one past the script is a failed answer |
 | `network` | `network.ts` | Every vendor the media tests reach (MOSS's audio, images, files, understanding), answered offline; the public fetch |
-| `FakeSessions` | `played.ts` | Sessions played: a turn takes its input, says it got it and reports. The slow mode is held until release (unless holds is off), the fail mode fails. |
+| `FakeSessions` | `played.ts` | Holds turns whose input contains "慢慢做" until release() when holds is true; inputs containing "必败" fail. |
 | `playedSessions` | `played.ts` |  |
 | `keepPlayedSession` | `played.ts` |  |
 | `realtimeFixture` | `realtime.ts` |  |

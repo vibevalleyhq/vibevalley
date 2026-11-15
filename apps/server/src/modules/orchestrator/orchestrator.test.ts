@@ -351,7 +351,6 @@ describe("the orchestrator", () => {
   it("does not start an answer whose caller already left", async () => {
     await using f = await farm();
     const response = f.orchestrator;
-    // Closing the lazy stream before pulling `.next()` never starts a model request.
     const stream = response.answerer("api")(orchestratorModel)!("在吗")[Symbol.asyncIterator]();
     await stream.return?.();
     expect(f.requests).toHaveLength(0);

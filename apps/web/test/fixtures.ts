@@ -160,7 +160,6 @@ export async function choose(trigger: Locator, value: string) {
   await expect(trigger).toHaveAttribute("data-value", value);
 }
 
-/** Decodes an intercepted /api/v1/* response through its `{ bizCode, message, data }` envelope and schema. */
 export async function replyData<A>(response: { json(): Promise<unknown> }, schema: Parameters<typeof apiSuccessEnvelope<A, unknown>>[0]): Promise<A> {
   return apiSuccessEnvelope(schema).parse(await response.json()).data;
 }
