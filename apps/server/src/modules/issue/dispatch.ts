@@ -24,9 +24,19 @@ import type { IssueLifecycle } from "./lifecycle.ts";
 import { sourceBrief, workConstraints } from "./prompts.ts";
 import type { IssueSplitting } from "./split.ts";
 import { isClosed, assignedOnDuty } from "./status.ts";
-import type { Due } from "./when.ts";
 
 const refused = refuseIn(BizCode.IssueRefused);
+
+export interface ScheduledIssue {
+  readonly issueId?: T.IssueId;
+  readonly title: string;
+  readonly description: string;
+  readonly channel: string;
+  readonly repo?: string;
+  readonly agent?: string;
+  readonly thread: string;
+  readonly by: T.RunTrigger;
+}
 
 /** Hire options used inside the issue module, carrying the target issue and refinement mode. */
 export interface IssueHireOptions extends HireOptions {
@@ -59,7 +69,7 @@ export interface DispatchDeps {
   readonly agent: Agent;
   readonly repo: Repo;
   readonly session: Session;
-  readonly intake: Pick<Intake, "inputsOf" | "queued" | "forwarded" | "subscribe">;
+  readonly intake: Pick<Intake, "inputsOf" | "queued" | "forwarded" | "rebind" | "subscribedTo">;
   readonly channel: Channel;
   readonly log: Logger;
 }
@@ -77,7 +87,7 @@ export type IssueDispatch = ReturnType<typeof issueDispatch>;
 
 export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["joinChildren"], deps: DispatchDeps) {
   const { core, agent: store, repo: repos, session: sessions, intake, channel: chat, log } = deps;
-  const { everyIssue, get, ofCron, unsent, attemptAdd, add, remove, recordHiredStart, recordOnDutyStart, setQueued } = r;
+  const { everyIssue, get, unsent, attemptAdd, add, remove, recordHiredStart, recordOnDutyStart, setQueued } = r;
   /** One round of the queue at a time. */
   const trying = new Semaphore(1);
 
@@ -307,30 +317,34 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
     return sent.session.id;
   };
 
-  const scheduled = async (due: Due, input: Trigger) => {
-    const s = due.cron;
-    const channel = await chat.topOf(s.channel);
-    const by: T.RunTrigger = { kind: "cron", cron: s.id, message: input.id, ...(due.missed ? { missed: true } : {}) };
-    const found = await ofCron(s.id);
-    const repo = s.repo ?? (channel.repo || undefined);
+  const scheduled = async (plan: ScheduledIssue, input: Trigger) => {
+    const channel = await chat.topOf(plan.channel);
+    const candidateId = plan.issueId ?? (await intake.subscribedTo([plan.thread]))[0];
+    const existing = candidateId ? await get(candidateId).catch(noneIfRefused) : undefined;
+    const reusable = existing?.status === "canceled" ? undefined : existing;
+    const repo = plan.repo ?? (channel.repo || undefined);
     const issue =
-      found ??
+      reusable ??
       (await add(
-        { title: s.name, description: s.text, ...(repo ? { repo } : {}), agent: s.agent ?? chat.orchestratorIn(channel.id) },
+        {
+          title: plan.title,
+          description: plan.description,
+          ...(repo ? { repo } : {}),
+          agent: plan.agent ?? chat.orchestratorIn(channel.id),
+        },
         inferredMandate(input.id),
-        s.id,
       ));
-    await intake.subscribe(issue.id, [`cron:${s.id}`]);
+    await intake.rebind(issue.id, plan.thread);
     if (assignedOnDuty(issue, store.isOrchestrator)) {
-      if (!found || isClosed(issue.status) || issue.lastRun === undefined) await beginOnDuty(issue, channel.id);
+      if (!reusable || isClosed(issue.status) || issue.lastRun === undefined) await beginOnDuty(issue, channel.id);
     } else {
       const newest = latestSessionIdOf(issue);
-      if (!found || issue.status === "backlog" || issue.status === "todo" || (!isClosed(issue.status) && newest === undefined))
-        await start(issue.id, channel.id, by, undefined, [input]);
-      else if (isClosed(issue.status) || newest === undefined) await reopen(issue.id, input.card.summary, channel.id, by, undefined, [input]);
+      if (!reusable || issue.status === "backlog" || issue.status === "todo" || (!isClosed(issue.status) && newest === undefined))
+        await start(issue.id, channel.id, plan.by, undefined, [input]);
+      else if (isClosed(issue.status) || newest === undefined) await reopen(issue.id, input.card.summary, channel.id, plan.by, undefined, [input]);
     }
     return get(issue.id);
   };
 
-  return { hire, readyOf, ready, send, beginOnDuty, handOnDuty, start, refreshQueue, reopen, scheduled, ofCron };
+  return { hire, readyOf, ready, send, beginOnDuty, handOnDuty, start, refreshQueue, reopen, scheduled };
 }

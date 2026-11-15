@@ -276,7 +276,6 @@ CREATE TABLE issue (
   parent      text references issue (id) on delete cascade,
   blocked_by  text,
   constraints text,
-  cron    text,
   created_at  double precision not null,
   queued_at   double precision,
   closed_at   double precision,
@@ -390,23 +389,13 @@ CREATE TABLE issue_input (
   -- The order they were taken in: a dispatch is taken when it is queued, before its trigger is routed.
   position integer generated always as identity,
   issue_id text not null references issue(id) on delete cascade,
+  kind text not null default 'input' check (kind in ('dispatch', 'input')),
   state text not null default 'held' check (state in ('held', 'forwarded', 'returned')),
   session_id text references session(id) on delete set null,
   reason text,
   created_at double precision not null
 );
 CREATE INDEX issue_input_by_issue on issue_input(issue_id, state, created_at);
--- At most one held input per issue: a newer hold replaces the older one.
-CREATE FUNCTION issue_input_one_held() RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-  DELETE FROM issue_input WHERE issue_id = NEW.issue_id AND trigger_id <> NEW.trigger_id AND state = 'held'
-    AND EXISTS (SELECT 1 FROM session_trigger t WHERE t.id = NEW.trigger_id AND t.source = 'cron');
-  RETURN NEW;
-END $$;
-CREATE TRIGGER issue_input_one_held BEFORE INSERT ON issue_input
-  FOR EACH ROW WHEN (NEW.state = 'held' AND NEW.reason = 'human') EXECUTE FUNCTION issue_input_one_held();
-CREATE TRIGGER issue_input_one_held_again BEFORE UPDATE OF state ON issue_input
-  FOR EACH ROW WHEN (NEW.state = 'held' AND NEW.reason = 'human') EXECUTE FUNCTION issue_input_one_held();
 
 CREATE INDEX session_trigger_route_order on session_trigger (routing_scope, routing_position) where routed_at is not null;
 CREATE INDEX session_delivery_scope_position on session_delivery (scope, position);
@@ -421,19 +410,20 @@ CREATE TABLE session_run (
   summary      text,
   spent        text
 );
-CREATE TABLE issue_cron (
+CREATE TABLE cron (
   id          text primary key,
   name        text not null,
   body        text not null,
   channel_id  text not null references channel (id) on delete cascade,
   agent       text,
   repo     text,
+  issue_id    text references issue (id) on delete set null,
   spec        text not null,
   tz          text not null,
   enabled     boolean not null default true,
   created_at  double precision not null,
   last_run    double precision,
-  -- Who set it, and whether it waits for the user to say yes (issue/when.ts's needsOK): a waiting one stays off
+  -- Who set it, and whether it waits for the user to say yes (cron/when.ts's needsOK): a waiting one stays off
   -- until the user turns it on, which clears pending.
   set_by      text not null default 'user' check (set_by in ('user', 'agent', 'system')),
   pending     boolean not null default false
@@ -669,7 +659,8 @@ CREATE INDEX channel_seen_by_message on channel_seen (message_id);
 CREATE INDEX session_delivery_by_message on session_delivery (message_id);
 CREATE INDEX issue_input_by_session on issue_input (session_id) where session_id is not null;
 CREATE INDEX session_delivery_by_channel on session_delivery (channel_id) where channel_id is not null;
-CREATE INDEX issue_cron_by_channel on issue_cron (channel_id);
+CREATE INDEX cron_by_channel on cron (channel_id);
+CREATE INDEX cron_by_issue on cron (issue_id) where issue_id is not null;
 CREATE INDEX connector_account_by_channel on connector_account (channel_id) where channel_id is not null;
 CREATE INDEX connector_inbound_by_message on connector_inbound (message_id) where message_id is not null;
 CREATE INDEX connector_outbox_by_message on connector_outbox (message_id);
@@ -683,6 +674,23 @@ union all
 select d.scope, d.position from session_delivery d
 where d.actor_kind = 'user'
   and d.trigger_id is not null and d.envelope_id <> d.trigger_id;
+
+CREATE VIEW issue_latest_run AS
+select i.id as issue_id,
+       r.started_at as run_started_at,
+       r.ended_at as run_ended_at,
+       r.outcome as run_outcome
+from issue i
+join lateral (
+  select sr.started_at, sr.ended_at, sr.outcome
+  from session_run sr
+  where (exists (select 1 from session s where s.id = sr.session and s.scope_kind = 'issue' and s.scope_id = i.id)
+         or exists (select 1 from issue_run l where l.run = sr.id and l.issue = i.id))
+    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment
+      where a.issue = i.id and e.executor = sr.session)
+  order by sr.started_at desc, sr.id desc
+  limit 1
+) r on true;
 
 CREATE TABLE agent_spend (
   day text NOT NULL,

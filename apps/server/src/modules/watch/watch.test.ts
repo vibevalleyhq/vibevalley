@@ -21,7 +21,7 @@ import { keptLog, type Logger } from "#/infra/log.ts";
 import { type Time, wallTime } from "#/infra/time.ts";
 import builtIn from "#/modules/agent/templates/orchestrator/agent.json" with { type: "json" };
 import { type Channel, catchUpMax, makeChannel } from "#/modules/channel/channel.ts";
-import { cronChannelUses } from "#/modules/issue/cron.ts";
+import { cronChannelUses } from "#/modules/cron/cron.ts";
 import type { Issue } from "#/modules/issue/issue.ts";
 import type { Handed } from "#/modules/session/envelope.ts";
 import type { Mailbox } from "#/modules/session/mailbox.ts";
@@ -412,9 +412,8 @@ describe("the chat", () => {
       await f.chat.markUnread(a, said.number);
       expect([f.channel(a)?.read, f.channel(a)?.unread]).toEqual([said.number - 1, 2]);
 
-      // A cron of the issue module's, as its table has it; the crons guard the channels they point at.
       f.chat.guardRemoval(cronChannelUses({ db: f.db }));
-      await f.sql(`insert into issue_cron (id, name, body, channel_id, spec, tz, created_at) values ('r1', '看看', '看一眼', $1, '{}', 'UTC', 0)`, [a]);
+      await f.sql(`insert into cron (id, name, body, channel_id, spec, tz, created_at) values ('r1', '看看', '看一眼', $1, '{}', 'UTC', 0)`, [a]);
       const channelRemovedFailure = await failure(f.chat.removeChannel(a));
       expect(channelRemovedFailure).toMatchObject({ message: expect.stringContaining("定时任务") });
       const channelRemovedFailure2 = await failure(f.chat.removeChannel(f.chat.defaultChannel()));

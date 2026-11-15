@@ -23,7 +23,7 @@ const users: Readonly<Record<string, string>> = {
   sessions: "Agent Sessions",
   chat: "Collaboration",
   issues: "Issues",
-  crons: "Issues",
+  crons: "Scheduling",
   progress: "Gamification",
   commits: "Gamification",
   connectors: "Gateway",

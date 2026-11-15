@@ -1,7 +1,7 @@
 import type { CronHandlers } from "@vibevalley/protocol/api";
 
 import { user } from "#/base/actor.ts";
-import type { Cron } from "#/modules/issue/cron.ts";
+import type { Cron } from "#/modules/cron/cron.ts";
 
 export function cronHandlers(deps: { readonly cron: Cron }): CronHandlers {
   const crons = deps.cron;

@@ -15,11 +15,11 @@ import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { ProfileStore } from "#/modules/agent/agent.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
+import type { Issue } from "#/modules/issue/issue.ts";
 import type { Session } from "#/modules/session/session.ts";
 import type { Trigger } from "#/modules/session/shapes.ts";
-import * as q from "#db/issue_cron.sql.ts";
+import * as q from "#db/cron.sql.ts";
 
-import type { Issue } from "./issue.ts";
 import { afterRun, cronProblem, type Due, dueCrons, dueText, givenZone, isMissed, needsOK, whenText } from "./when.ts";
 
 export type { Due };
@@ -62,7 +62,7 @@ export interface CronDeps {
   readonly channel: Channel;
   readonly session: Session;
   /** Where a due cron's trigger creates or reopens its issue and enters the queue. */
-  readonly issue: Pick<Issue, "route" | "scheduled">;
+  readonly issue: Pick<Issue, "route" | "scheduled" | "useCronOfIssue" | "refreshIssue">;
 }
 
 /** $TZ when it names a zone, else the system's. */
@@ -81,6 +81,21 @@ export async function makeCron(deps: CronDeps): Promise<Cron> {
   // The ticker, the tools and the pages all change the list.
   const lock = new Semaphore(1);
   const dueHub = new Hub<Due>();
+  const issueOfCron = new Map<string, T.IssueId>();
+  const cronOfIssue = new Map<T.IssueId, string>();
+  const linkIssue = (cronId: string, issueId: T.IssueId | undefined) => {
+    const prev = issueOfCron.get(cronId);
+    if (prev !== undefined) cronOfIssue.delete(prev);
+    if (issueId !== undefined) {
+      const prevCron = cronOfIssue.get(issueId);
+      if (prevCron !== undefined) issueOfCron.delete(prevCron);
+      issueOfCron.set(cronId, issueId);
+      cronOfIssue.set(issueId, cronId);
+    } else {
+      issueOfCron.delete(cronId);
+    }
+  };
+  issues.useCronOfIssue((id) => cronOfIssue.get(id));
   chat.guardRemoval(cronChannelUses({ db }));
 
   for (const row of await q.crons(db.sql)) {
@@ -88,6 +103,7 @@ export async function makeCron(deps: CronDeps): Promise<Cron> {
     // A cron whose time or setter this code cannot read any more is left out.
     const by = S.ActorKind.safeParse(row.set_by);
     if (!when || !by.success) continue;
+    if (row.issue_id !== null) linkIssue(row.id, row.issue_id);
     const s: T.Cron = {
       id: row.id,
       name: row.name,
@@ -105,6 +121,7 @@ export async function makeCron(deps: CronDeps): Promise<Cron> {
     };
     core.apply({ type: "cronChanged", cron: s });
   }
+  for (const issueId of cronOfIssue.keys()) await issues.refreshIssue(issueId);
 
   const find = (id: string): T.Cron => {
     const s = core.state().crons.find((x) => x.id === id);
@@ -134,7 +151,31 @@ export async function makeCron(deps: CronDeps): Promise<Cron> {
   const handle = (due: Due, trigger: Trigger) =>
     bestEffort(log, `cron occurrence ${due.id}`, async () => {
       if (await sessions.isRouted(trigger.id)) return;
-      await issues.scheduled(due, trigger);
+      const s = due.cron;
+      const currentIssueId = issueOfCron.get(s.id);
+      const issue = await issues.scheduled(
+        {
+          ...(currentIssueId ? { issueId: currentIssueId } : {}),
+          title: s.name,
+          description: s.text,
+          channel: s.channel,
+          ...(s.repo ? { repo: s.repo } : {}),
+          ...(s.agent ? { agent: s.agent } : {}),
+          thread: `cron:${s.id}`,
+          by: { kind: "cron", cron: s.id, message: trigger.id, ...(due.missed ? { missed: true } : {}) },
+        },
+        trigger,
+      );
+      if (issue.id !== currentIssueId) {
+        await db.tx(async () => {
+          await q.setCronIssue(db.sql, { id: s.id, issue_id: issue.id });
+          await db.afterCommit(async () => {
+            linkIssue(s.id, issue.id);
+            if (currentIssueId !== undefined) await issues.refreshIssue(currentIssueId);
+            await issues.refreshIssue(issue.id);
+          });
+        });
+      }
       await issues.route(trigger);
     });
 
@@ -239,8 +280,15 @@ export async function makeCron(deps: CronDeps): Promise<Cron> {
     remove: (id) =>
       lock.with(async () => {
         const was = find(id);
-        await q.removeCron(db.sql, { id });
-        core.apply({ type: "cronRemoved", id });
+        const prevIssue = issueOfCron.get(id);
+        await db.tx(async () => {
+          await q.removeCron(db.sql, { id });
+          await db.afterCommit(async () => {
+            linkIssue(id, undefined);
+            core.apply({ type: "cronRemoved", id });
+            if (prevIssue !== undefined) await issues.refreshIssue(prevIssue);
+          });
+        });
         return was;
       }),
     previewRemove: async (id) => {

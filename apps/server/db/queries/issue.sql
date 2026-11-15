@@ -2,51 +2,33 @@
 
 -- name: ListIssues :many
 -- bound: every issue, as the core holds them.
-select issue.*, latest_run.started_at::session_run.started_at? as run_started_at, latest_run.ended_at as run_ended_at,
-       latest_run.outcome as run_outcome
-from issue left join session_run latest_run on latest_run.id = (
-  select r.id from session_run r
-  where (exists (select 1 from session s where s.id = r.session and s.scope_kind = 'issue' and s.scope_id = issue.id)
-         or exists (select 1 from issue_run l where l.run = r.id and l.issue = issue.id))
-    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment
-      where a.issue = issue.id and e.executor = r.session)
-  order by r.started_at desc, r.id desc limit 1
-) order by issue.rank, issue.created_at, issue.id;
+select issue.*, latest_run.run_started_at, latest_run.run_ended_at,
+       latest_run.run_outcome::session_run.outcome? as run_outcome
+from issue left join issue_latest_run latest_run on latest_run.issue_id = issue.id
+order by issue.rank, issue.created_at, issue.id;
 
 -- name: GetIssue :one
-select issue.*, latest_run.started_at::session_run.started_at? as run_started_at, latest_run.ended_at as run_ended_at,
-       latest_run.outcome as run_outcome
-from issue left join session_run latest_run on latest_run.id = (
-  select r.id from session_run r
-  where (exists (select 1 from session s where s.id = r.session and s.scope_kind = 'issue' and s.scope_id = issue.id)
-         or exists (select 1 from issue_run l where l.run = r.id and l.issue = issue.id))
-    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment
-      where a.issue = issue.id and e.executor = r.session)
-  order by r.started_at desc, r.id desc limit 1
-) where issue.id = sqlc.arg(id);
+select issue.*, latest_run.run_started_at, latest_run.run_ended_at,
+       latest_run.run_outcome::session_run.outcome? as run_outcome
+from issue left join issue_latest_run latest_run on latest_run.issue_id = issue.id
+where issue.id = sqlc.arg(id);
 
 -- name: IssueExists :one
 -- Whether an issue is there at all, for the intake's routing before the core fact reaches it (issue/intake.ts).
 select id from issue where id = sqlc.arg(id);
 
 -- name: IssueByNumber :one
-select issue.*, latest_run.started_at::session_run.started_at? as run_started_at, latest_run.ended_at as run_ended_at,
-       latest_run.outcome as run_outcome
-from issue left join session_run latest_run on latest_run.id = (
-  select r.id from session_run r
-  where (exists (select 1 from session s where s.id = r.session and s.scope_kind = 'issue' and s.scope_id = issue.id)
-         or exists (select 1 from issue_run l where l.run = r.id and l.issue = issue.id))
-    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment
-      where a.issue = issue.id and e.executor = r.session)
-  order by r.started_at desc, r.id desc limit 1
-) where issue.number = sqlc.arg(number);
+select issue.*, latest_run.run_started_at, latest_run.run_ended_at,
+       latest_run.run_outcome::session_run.outcome? as run_outcome
+from issue left join issue_latest_run latest_run on latest_run.issue_id = issue.id
+where issue.number = sqlc.arg(number);
 
 -- name: AddIssue :exec
 insert into issue (id, number, title, description, origin_trigger_id, mandate_strength, max_bot_review_rounds, auto_submit_pr,
-                   repo, priority, rank, created_at, cron, deliver, parent, blocked_by, constraints, criteria)
+                   repo, priority, rank, created_at, deliver, parent, blocked_by, constraints, criteria)
 values (sqlc.arg(id), (select coalesce(max(number), 0) + 1 from issue), sqlc.arg(title), sqlc.arg(description), sqlc.narg(origin_trigger_id),
         sqlc.arg(mandate_strength), sqlc.arg(max_bot_review_rounds), sqlc.arg(auto_submit_pr), sqlc.narg(repo), sqlc.arg(priority),
-        (select coalesce(max(rank), 0) + 1 from issue), sqlc.arg(created_at), sqlc.narg(cron), sqlc.arg(deliver), sqlc.narg(parent), sqlc.narg(blocked_by), sqlc.narg(constraints), sqlc.narg(criteria));
+        (select coalesce(max(rank), 0) + 1 from issue), sqlc.arg(created_at), sqlc.arg(deliver), sqlc.narg(parent), sqlc.narg(blocked_by), sqlc.narg(constraints), sqlc.narg(criteria));
 
 -- name: SetIssueConstraints :exec
 update issue set constraints = sqlc.narg(constraints) where issue.id = sqlc.arg(id);
@@ -100,45 +82,19 @@ update issue set closed_at = sqlc.arg(closed_at), canceled = sqlc.arg(canceled) 
 -- name: KeptIssues :many
 -- What the core state keeps: the open issues and the latest closed ones, each with its sub-issues.
 with latest as (select id from issue where parent is null and closed_at is not null order by closed_at desc limit sqlc.arg(closed)::int)
-select issue.*, latest_run.started_at::session_run.started_at? as run_started_at, latest_run.ended_at as run_ended_at,
-       latest_run.outcome as run_outcome
-from issue left join session_run latest_run on latest_run.id = (
-  select r.id from session_run r
-  where (exists (select 1 from session s where s.id = r.session and s.scope_kind = 'issue' and s.scope_id = issue.id)
-         or exists (select 1 from issue_run l where l.run = r.id and l.issue = issue.id))
-    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment
-      where a.issue = issue.id and e.executor = r.session)
-  order by r.started_at desc, r.id desc limit 1
-)
+select issue.*, latest_run.run_started_at, latest_run.run_ended_at,
+       latest_run.run_outcome::session_run.outcome? as run_outcome
+from issue left join issue_latest_run latest_run on latest_run.issue_id = issue.id
 where issue.closed_at is null or issue.id in (select id from latest) or issue.parent in (select id from latest)
    or issue.parent in (select id from issue where closed_at is null);
 
 -- name: Family :many
 -- bound: one issue and its sub-issues.
 -- An issue and its sub-issues.
-select issue.*, latest_run.started_at::session_run.started_at? as run_started_at, latest_run.ended_at as run_ended_at,
-       latest_run.outcome as run_outcome
-from issue left join session_run latest_run on latest_run.id = (
-  select r.id from session_run r
-  where (exists (select 1 from session s where s.id = r.session and s.scope_kind = 'issue' and s.scope_id = issue.id)
-         or exists (select 1 from issue_run l where l.run = r.id and l.issue = issue.id))
-    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment
-      where a.issue = issue.id and e.executor = r.session)
-  order by r.started_at desc, r.id desc limit 1
-) where issue.id = sqlc.arg(id) or issue.parent = sqlc.arg(id);
-
--- name: LatestOfCron :one
--- A cron's issue: the one it made last.
-select issue.*, latest_run.started_at::session_run.started_at? as run_started_at, latest_run.ended_at as run_ended_at,
-       latest_run.outcome as run_outcome
-from issue left join session_run latest_run on latest_run.id = (
-  select r.id from session_run r
-  where (exists (select 1 from session s where s.id = r.session and s.scope_kind = 'issue' and s.scope_id = issue.id)
-         or exists (select 1 from issue_run l where l.run = r.id and l.issue = issue.id))
-    and exists (select 1 from issue_assignment_execution e join issue_assignment a on a.id = e.assignment
-      where a.issue = issue.id and e.executor = r.session)
-  order by r.started_at desc, r.id desc limit 1
-) where issue.cron = sqlc.arg(cron) order by issue.created_at desc, issue.id desc limit 1;
+select issue.*, latest_run.run_started_at, latest_run.run_ended_at,
+       latest_run.run_outcome::session_run.outcome? as run_outcome
+from issue left join issue_latest_run latest_run on latest_run.issue_id = issue.id
+where issue.id = sqlc.arg(id) or issue.parent = sqlc.arg(id);
 
 -- name: ReopenIssue :exec
 update issue set closed_at = null, delivered = null, canceled = null, queued_at = null, checks = null where id = sqlc.arg(id);

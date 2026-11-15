@@ -8,8 +8,8 @@ import { shortTitle, stageWantsUser } from "@vibevalley/protocol/rules";
 import { head } from "#/base/clip.ts";
 import { runtimeLabel } from "#/modules/agent/presets.ts";
 import { yuan } from "#/modules/agent/quota.ts";
+import { nextText, whenText } from "#/modules/cron/when.ts";
 import { mandateNoteWordLimit } from "#/modules/issue/creation.ts";
-import { nextText, whenText } from "#/modules/issue/when.ts";
 import { phaseText } from "#/modules/session/report.ts";
 
 type Op = keyof Handlers;

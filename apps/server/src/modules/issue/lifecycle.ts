@@ -78,12 +78,16 @@ export async function issueLifecycle(deps: IssueParts) {
     return found;
   };
 
-  const ofCron = (id: string) => store.latestOfCron(id);
-
   const publish = (id: T.IssueId) =>
     bestEffort(log, `vibevalley: issue ${id} changed but could not be read back for the board`, async () => {
       core.apply({ type: "issueChanged", issue: await get(id) });
     });
+
+  const refreshBoardIssue = async (id: T.IssueId) => {
+    if (!core.state().issues.some((item) => item.id === id)) return;
+    const found = await store.byId(id);
+    if (found) core.apply({ type: "issueChanged", issue: found });
+  };
 
   /** The newest session, the one a merge, changes, comments and cancel act on; a reopen makes another. */
   const latest = async (id: string) => {
@@ -112,7 +116,7 @@ export async function issueLifecycle(deps: IssueParts) {
     return [title, description];
   };
 
-  const insert = async (req: T.IssueRequest, mandate: IssueMandate, cron?: string) => {
+  const insert = async (req: T.IssueRequest, mandate: IssueMandate) => {
     const [title, description] = issueWords(req);
     if (req.constraints?.acceptance === true && !req.constraints.check?.trim()) throw refused(t("server.issue.verification.acceptanceNeedsCheck"));
     const id = issueId(newId());
@@ -144,7 +148,6 @@ export async function issueLifecycle(deps: IssueParts) {
           },
           mandate,
           at,
-          cron,
         ),
       );
       await store.assignInTx(id, req.agent ?? (parent ? assignedAgentOf(parent) : undefined), at, () => publish(id));
@@ -153,9 +156,9 @@ export async function issueLifecycle(deps: IssueParts) {
   };
 
   /** add, with the database refusing the row told as a refusal: hire tells it to the user. */
-  const attemptAdd = async (req: T.IssueRequest, mandate: IssueMandate, cron?: string) => {
+  const attemptAdd = async (req: T.IssueRequest, mandate: IssueMandate) => {
     try {
-      return await insert(req, mandate, cron);
+      return await insert(req, mandate);
     } catch (e) {
       if (e instanceof SqlError) throw refused(causeMessage(e));
       throw e;
@@ -163,7 +166,7 @@ export async function issueLifecycle(deps: IssueParts) {
   };
 
   /** The database failing here is not the caller's to tell: it goes up as it is. */
-  const add = (req: T.IssueRequest, mandate: IssueMandate, cron?: string) => insert(req, mandate, cron);
+  const add = (req: T.IssueRequest, mandate: IssueMandate) => insert(req, mandate);
 
   const remove = async (id: T.IssueId) => {
     await store.remove(id);
@@ -501,14 +504,15 @@ export async function issueLifecycle(deps: IssueParts) {
   };
 
   return {
+    useCronOfIssue: store.useCronOfIssue,
     issueOfSession: store.issueOfSession,
     lastAssigneeIn: store.lastAssigneeIn,
     loadKept,
     everyIssue,
     idOf,
     get,
-    ofCron,
     publish,
+    refreshBoardIssue,
     unsent,
     liveSession,
     issueWords,

@@ -22,7 +22,7 @@ import type { Trigger } from "#/modules/session/shapes.ts";
 import { findingsOf, milestonesOf } from "./brief.ts";
 import { templateCatalog } from "./catalog.ts";
 import { explicitMandate, filledKinds, inferredMandate, mandateNoteFits, sentTitles } from "./creation.ts";
-import { type Dispatched, issueDispatch, type IssueHireOptions } from "./dispatch.ts";
+import { type Dispatched, issueDispatch, type IssueHireOptions, type ScheduledIssue } from "./dispatch.ts";
 import { makeGitHubPoller } from "./github.ts";
 import { readyInputs } from "./inputs.ts";
 import { type Intake, issueIntake } from "./intake.ts";
@@ -34,9 +34,8 @@ import { kept, refinement } from "./refinement.ts";
 import { issueSettling, type StatusOptions } from "./settle.ts";
 import { issueSplitting } from "./split.ts";
 import { assignedOnDuty, conflictOf, type Finding, isClosed, type IssueChildDraft, type IssueConstraints, type IssueMandate, pickIssues } from "./status.ts";
-import type { Due } from "./when.ts";
 
-export type { IssueChildDraft, IssueConstraints, IssueMandate };
+export type { IssueChildDraft, IssueConstraints, IssueMandate, ScheduledIssue };
 
 const refused = refuseIn(BizCode.IssueRefused);
 
@@ -156,8 +155,9 @@ export interface Issue {
   readonly decline: (session: string, envelope: string, reason: string) => Promise<void>;
   /** Throws HireRefused. */
   readonly hire: (agent: T.Agent, brief: string, repo: string, opt?: IssueHireOptions) => Promise<Hired>;
-  /** Creates or reopens the issue a due cron occurrence routes to, and subscribes its cron thread. */
-  readonly scheduled: (due: Due, input: Trigger) => Promise<T.Issue>;
+  readonly scheduled: (req: ScheduledIssue, input: Trigger) => Promise<T.Issue>;
+  readonly useCronOfIssue: (cronOf: (id: T.IssueId) => string | undefined) => void;
+  readonly refreshIssue: (id: T.IssueId) => Promise<void>;
   readonly refreshPullRequests: () => Promise<void>;
   readonly refreshQueue: () => Promise<void>;
   readonly submitPullRequest: (session: string, summary?: string) => Promise<string>;
@@ -774,6 +774,8 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     decline: intake.decline,
     hire,
     scheduled,
+    useCronOfIssue: r.useCronOfIssue,
+    refreshIssue: r.refreshBoardIssue,
     refreshPullRequests,
     refreshQueue,
     boot: startup,

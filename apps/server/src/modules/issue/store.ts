@@ -15,7 +15,8 @@ import { issueOrder, keepClosedIssues } from "./status.ts";
 export async function makeIssueStore(deps: { readonly core: Core; readonly db: Db }) {
   const { core, db } = deps;
   const worked = new Assignments();
-  const hydrate = issueRows(core);
+  let cronOfIssue: (id: T.IssueId) => string | undefined = () => undefined;
+  const hydrate = issueRows(core, (id) => cronOfIssue(id));
 
   await db.tx(async () => {
     const rows = await qs.allAssignments(db.sql);
@@ -26,6 +27,9 @@ export async function makeIssueStore(deps: { readonly core: Core; readonly db: D
   const issueOfRow = (row: q.GetIssueResult): T.Issue => hydrate(row, worked.of(row.id));
 
   return {
+    useCronOfIssue: (fn: (id: T.IssueId) => string | undefined) => {
+      cronOfIssue = fn;
+    },
     issueOfSession: (session: T.SessionId): T.IssueId | undefined => worked.issueOf(session),
     sessionIdsOf: (issue: T.IssueId): readonly T.SessionId[] => worked.sessionIds(issue),
     kept: async () => (await q.keptIssues(db.sql, { closed: keepClosedIssues })).map(issueOfRow),
@@ -35,10 +39,6 @@ export async function makeIssueStore(deps: { readonly core: Core; readonly db: D
       return row === undefined ? undefined : issueOfRow(row);
     },
     byNumber: async (number: number) => (await q.issueByNumber(db.sql, { number }))?.id,
-    latestOfCron: async (cron: string) => {
-      const row = await q.latestOfCron(db.sql, { cron });
-      return row === undefined ? undefined : issueOfRow(row);
-    },
     lastAssigneeIn: async (repo: string) => (await qs.lastAssigneeIn(db.sql, { repo }))?.agent,
     /** Assigns `agent` inside the current transaction and applies the index delta only after commit. */
     assignInTx: async (issue: T.IssueId, agent: string | undefined, at: number, after?: () => Promise<void>) => {

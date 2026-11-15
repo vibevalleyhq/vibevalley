@@ -1,3 +1,4 @@
+import { scriptedRuntime } from "@botiverse/oar/testing";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 
 import type * as T from "@vibevalley/protocol";
@@ -6,10 +7,10 @@ import { CronWhenWeekly } from "@vibevalley/protocol/schema";
 
 import { orchestrator, user } from "#/base/actor.ts";
 import { type ServerConfig } from "#/infra/config.ts";
-import { testConfig } from "#/testing/layers.ts";
+import { starter, testConfig } from "#/testing/layers.ts";
 import { allow, refuse } from "#/testing/refuse.ts";
 import { world } from "#/testing/world.ts";
-import * as q from "#db/issue_cron.sql.ts";
+import * as q from "#db/cron.sql.ts";
 
 import type { Cron, Due } from "./cron.ts";
 import { afterRun, dueCrons, isMissed, needsOK, nextText } from "./when.ts";
@@ -249,7 +250,7 @@ test("regression: a cron occurrence and its schedule advance commit together", a
   await refuse(f.db, "reject_cron_input", "before insert on session_trigger", "new.source = 'cron'", "rejected input");
   await adjust(2);
   await crons.tick();
-  const rows = await sql.query("select enabled, last_run from issue_cron where id = $1", [item.id]);
+  const rows = await sql.query("select enabled, last_run from cron where id = $1", [item.id]);
   expect(rows).toEqual([{ enabled: true, last_run: null }]);
   const rows2 = await sql.query("select id from session_trigger where source = 'cron'");
   expect(rows2).toEqual([]);
@@ -270,7 +271,7 @@ test("regression: a one-off cron resumes committed input after restart without a
     await refuse(f.db, "reject_cron_issue", "before insert on issue", "", "rejected issue");
     await adjust(2);
     await crons.tick();
-    const rows = await sql.query("select enabled from issue_cron");
+    const rows = await sql.query("select enabled from cron");
     expect(rows).toEqual([{ enabled: false }]);
     const rows2 = await sql.query("select routed_at from session_trigger where source = 'cron'");
     expect(rows2).toEqual([{ routed_at: null }]);
@@ -287,4 +288,38 @@ test("regression: a one-off cron resumes committed input after restart without a
     const rows2 = await sql.query("select routed_at is not null as routed from session_trigger where source = 'cron'");
     expect(rows2).toEqual([{ routed: true }]);
   }
+});
+
+test("links cron.issue_id and replaces it when the issue is canceled or deleted", async () => {
+  const config = testConfig();
+  const now = 1_800_000_000_000;
+  setTime(now);
+  const idle = scriptedRuntime({ id: "pi", turn: async () => {} });
+  await using f = await world({ config, repos: ["demo"], runtimes: [idle] });
+  await f.agent.save({ ...starter("lab"), effort: "" });
+  const item = await f.cron.add(req("patrol", "check health", { kind: "every", minutes: 5 }, { agent: "lab", repo: "demo" }), user);
+  await adjust(5 * 60_000 + 1);
+  await f.cron.tick();
+  const [row1] = await q.crons(f.db.sql);
+  expect(row1?.issue_id).toBeTruthy();
+  const firstId = row1!.issue_id!;
+  expect((await f.issue.get(firstId)).cron).toBe(item.id);
+
+  await f.issue.setStatus(firstId, "canceled", "", "", user);
+  await adjust(5 * 60_000 + 1);
+  await f.cron.tick();
+  const [row2] = await q.crons(f.db.sql);
+  expect(row2?.issue_id).toBeTruthy();
+  const secondId = row2!.issue_id!;
+  expect(secondId).not.toBe(firstId);
+  expect((await f.issue.get(firstId)).cron).toBeUndefined();
+  expect((await f.issue.get(secondId)).cron).toBe(item.id);
+
+  await f.db.sql.exec("delete from issue where id = $1", [secondId]);
+  expect((await q.crons(f.db.sql))[0]?.issue_id).toBeNull();
+  await adjust(5 * 60_000 + 1);
+  await f.cron.tick();
+  const [row3] = await q.crons(f.db.sql);
+  expect(row3?.issue_id).toBeTruthy();
+  expect(row3?.issue_id).not.toBe(secondId);
 });

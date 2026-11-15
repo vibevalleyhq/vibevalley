@@ -32,13 +32,14 @@ const column = {
   questions: storedJsonOrUndefined(z.array(S.Question), "issue.questions"),
 };
 
-export function issueRows(core: Core) {
+export function issueRows(core: Core, cronOfIssue: (id: T.IssueId) => string | undefined = () => undefined) {
   return function issueOf(row: Row, assignments: readonly T.Assignment[]): T.Issue {
     const state = core.state();
     const blockedBy = column.issueIds(row.blocked_by);
     const criteria = column.strings(row.criteria);
     const checks = column.checks(row.checks);
     const pullRequest = column.pullRequest(row.pull_request);
+    const cron = cronOfIssue(row.id);
     const lastRun =
       row.run_started_at === null
         ? undefined
@@ -73,7 +74,7 @@ export function issueRows(core: Core) {
       ...(row.canceled !== null ? { canceled: row.canceled } : {}),
       ...(row.parent !== null ? { parent: row.parent } : {}),
       blockedBy: blockedBy ?? [],
-      ...(row.cron !== null ? { cron: row.cron } : {}),
+      ...(cron !== undefined ? { cron } : {}),
       status: "backlog",
       moves: [],
       ...(pullRequest ? { pullRequest } : {}),

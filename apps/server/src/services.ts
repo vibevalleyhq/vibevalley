@@ -7,8 +7,8 @@ import { makeVoice, type Voice, type VoiceOptions } from "#/gateway/voice/voice.
 import { type Agent, type AgentOptions, makeAgent } from "#/modules/agent/agent.ts";
 import { type Artifact, makeArtifact } from "#/modules/artifact/artifact.ts";
 import { type Channel, makeChannel } from "#/modules/channel/channel.ts";
+import { type Cron, makeCron } from "#/modules/cron/cron.ts";
 import { type Game, makeGame } from "#/modules/game/game.ts";
-import { type Cron, makeCron } from "#/modules/issue/cron.ts";
 import { type Issue, makeIssue } from "#/modules/issue/issue.ts";
 import { makeMedia, type Media } from "#/modules/media/media.ts";
 import { makeMemory, type Memory, type MemoryOptions } from "#/modules/memory/memory.ts";

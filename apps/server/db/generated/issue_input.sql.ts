@@ -5,18 +5,19 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, IssueId, SessionId, Words_issue_input_state, Words_session_delivery_state } from "./types.js"
+import { rowOf, IssueId, SessionId, Words_issue_input_kind, Words_issue_input_state, Words_session_delivery_state } from "./types.js"
 
 export interface HoldIssueTriggerParams {
   readonly ["trigger_id"]: string
   readonly ["issue_id"]: IssueId
+  readonly ["kind"]: Words_issue_input_kind
   readonly ["created_at"]: number
 }
 
-export const HoldIssueTriggerSql = "-- name: HoldIssueTrigger :exec\ninsert into issue_input (trigger_id, issue_id, created_at) values ($1, $2, $3)\non conflict (trigger_id) do nothing;"
+export const HoldIssueTriggerSql = "-- name: HoldIssueTrigger :exec\ninsert into issue_input (trigger_id, issue_id, kind, created_at)\nvalues ($1, $2, $3, $4)\non conflict (trigger_id) do nothing;"
 
 export async function holdIssueTrigger(sql: Sql, params: HoldIssueTriggerParams): Promise<number> {
-  return sql.exec(HoldIssueTriggerSql, [params["trigger_id"], params["issue_id"], params["created_at"]])
+  return sql.exec(HoldIssueTriggerSql, [params["trigger_id"], params["issue_id"], params["kind"], params["created_at"]])
 }
 
 export interface ExistingIssueInputParams {
@@ -66,7 +67,7 @@ export const DeliveredTriggerResult = z.object({
 })
 export type DeliveredTriggerResult = z.infer<typeof DeliveredTriggerResult>
 
-export const DeliveredTriggerSql = "-- name: DeliveredTrigger :one\n-- The trigger a session's delivery carries: what a helper hands back names the delivery.\nselect (d.payload_json::jsonb -> 'trigger' ->> 'id')::text as trigger_id\nfrom session_delivery d where d.session_id = $1 and d.envelope_id = $2;"
+export const DeliveredTriggerSql = "-- name: DeliveredTrigger :one\n-- The trigger a session's delivery carries: what a helper hands back names the delivery.\nselect d.trigger_id::text as trigger_id\nfrom session_delivery d\nwhere d.session_id = $1 and d.envelope_id = $2 and d.trigger_id is not null;"
 
 export async function deliveredTrigger(sql: Sql, params: DeliveredTriggerParams): Promise<DeliveredTriggerResult | undefined> {
   const [row] = await sql.query(DeliveredTriggerSql, [params["session_id"], params["envelope_id"]])
@@ -110,7 +111,7 @@ export const PendingIssueInputsResult = z.object({
 })
 export type PendingIssueInputsResult = z.infer<typeof PendingIssueInputsResult>
 
-export const PendingIssueInputsSql = "-- name: PendingIssueInputs :many\n-- bound: inputs that need closing or forwarding to the issue's current recipient.\nselect m.trigger_id, m.issue_id, m.state, m.session_id, m.reason, t.trigger_json\nfrom issue_input m join session_trigger t on t.id = m.trigger_id\nleft join session_delivery d on d.session_id = m.session_id and d.envelope_id = m.trigger_id\nwhere m.issue_id = $1 and m.state <> 'returned'\n  and (\n    ($2::boolean and (t.trigger_json::jsonb -> 'actor' ->> 'kind' <> 'user' or d.state is distinct from 'consumed'))\n    or (not $2::boolean and (\n      m.state = 'held' or m.session_id is null\n      or ($3::text is not null and m.session_id <> $3\n        and (d.state is null or d.state in ('pending', 'handed') or (d.state = 'dropped' and d.dropped_why in ('left', 'reassigned'))))\n    ))\n  )\norder by m.position;"
+export const PendingIssueInputsSql = "-- name: PendingIssueInputs :many\n-- bound: inputs that need closing or forwarding to the issue's current recipient.\nselect m.trigger_id, m.issue_id, m.state, m.session_id, m.reason, t.trigger_json\nfrom issue_input m join session_trigger t on t.id = m.trigger_id\nleft join session_delivery d on d.session_id = m.session_id and d.envelope_id = m.trigger_id\nwhere m.issue_id = $1 and m.state <> 'returned'\n  and (\n    ($2::boolean and (t.actor_kind <> 'user' or d.state is distinct from 'consumed'))\n    or (not $2::boolean and (\n      m.state = 'held' or m.session_id is null\n      or ($3::text is not null and m.session_id <> $3\n        and (d.state is null or d.state in ('pending', 'handed') or (d.state = 'dropped' and d.dropped_why in ('left', 'reassigned'))))\n    ))\n  )\norder by m.position;"
 
 export async function pendingIssueInputs(sql: Sql, params: PendingIssueInputsParams): Promise<PendingIssueInputsResult[]> {
   const rows = await sql.query(PendingIssueInputsSql, [params["issue_id"], params["closing"], params["recipient"]])
@@ -160,7 +161,7 @@ export const InputsOfQueuedIssuesResult = z.object({
 })
 export type InputsOfQueuedIssuesResult = z.infer<typeof InputsOfQueuedIssuesResult>
 
-export const InputsOfQueuedIssuesSql = "-- name: InputsOfQueuedIssues :many\n-- bound: non-returned inputs for open queued issues.\nselect m.issue_id, t.trigger_json\nfrom issue_input m join session_trigger t on t.id = m.trigger_id\njoin issue i on i.id = m.issue_id\nwhere i.queued_at is not null and i.closed_at is null and m.state <> 'returned'\norder by m.issue_id, (t.trigger_json::jsonb -> 'meta' -> 'dispatch' = 'true') desc nulls last, m.position;"
+export const InputsOfQueuedIssuesSql = "-- name: InputsOfQueuedIssues :many\n-- bound: non-returned inputs for open queued issues.\nselect m.issue_id, t.trigger_json\nfrom issue_input m join session_trigger t on t.id = m.trigger_id\njoin issue i on i.id = m.issue_id\nwhere i.queued_at is not null and i.closed_at is null and m.state <> 'returned'\norder by m.issue_id, (m.kind = 'dispatch') desc, m.position;"
 
 export async function inputsOfQueuedIssues(sql: Sql): Promise<InputsOfQueuedIssuesResult[]> {
   const rows = await sql.query(InputsOfQueuedIssuesSql, [])
@@ -172,7 +173,7 @@ export interface SupersedeDispatchParams {
   readonly ["trigger_id"]: string
 }
 
-export const SupersedeDispatchSql = "-- name: SupersedeDispatch :exec\nupdate issue_input as m set state = 'returned', reason = 'superseded'\nfrom session_trigger as t\nwhere m.trigger_id = t.id and m.issue_id = $1 and m.trigger_id <> $2\n  and t.trigger_json::jsonb -> 'meta' -> 'dispatch' = 'true' and m.state <> 'returned';"
+export const SupersedeDispatchSql = "-- name: SupersedeDispatch :exec\nupdate issue_input as m set state = 'returned', reason = 'superseded'\nwhere m.issue_id = $1 and m.trigger_id <> $2\n  and m.kind = 'dispatch' and m.state <> 'returned';"
 
 export async function supersedeDispatch(sql: Sql, params: SupersedeDispatchParams): Promise<number> {
   return sql.exec(SupersedeDispatchSql, [params["issue_id"], params["trigger_id"]])
@@ -182,8 +183,19 @@ export interface RetireQueuedDispatchesParams {
   readonly ["issue_id"]: IssueId
 }
 
-export const RetireQueuedDispatchesSql = "-- name: RetireQueuedDispatches :exec\nupdate issue_input as m set state = 'returned', reason = 'unqueued'\nfrom session_trigger as t\nwhere m.trigger_id = t.id and m.issue_id = $1 and m.state = 'held'\n  and t.trigger_json::jsonb -> 'meta' -> 'dispatch' = 'true';"
+export const RetireQueuedDispatchesSql = "-- name: RetireQueuedDispatches :exec\nupdate issue_input as m set state = 'returned', reason = 'unqueued'\nwhere m.issue_id = $1 and m.state = 'held' and m.kind = 'dispatch';"
 
 export async function retireQueuedDispatches(sql: Sql, params: RetireQueuedDispatchesParams): Promise<number> {
   return sql.exec(RetireQueuedDispatchesSql, [params["issue_id"]])
+}
+
+export interface SupersedeHeldCronInputsParams {
+  readonly ["trigger_id"]: string
+  readonly ["issue_id"]: IssueId
+}
+
+export const SupersedeHeldCronInputsSql = "-- name: SupersedeHeldCronInputs :exec\ndelete from issue_input as m\nusing session_trigger as t, issue_input as cur\nwhere m.trigger_id = t.id\n  and cur.trigger_id = $1\n  and cur.state = 'held'\n  and m.issue_id = $2\n  and m.trigger_id <> $1\n  and m.position < cur.position\n  and m.state = 'held'\n  and t.source = 'cron';"
+
+export async function supersedeHeldCronInputs(sql: Sql, params: SupersedeHeldCronInputsParams): Promise<number> {
+  return sql.exec(SupersedeHeldCronInputsSql, [params["trigger_id"], params["issue_id"]])
 }

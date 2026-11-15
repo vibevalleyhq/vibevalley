@@ -24,6 +24,17 @@ export async function subscribeIssue(sql: Sql, params: SubscribeIssueParams): Pr
   return rows.map((row) => rowOf("SubscribeIssue", SubscribeIssueResult, row))
 }
 
+export interface RebindThreadParams {
+  readonly ["thread_key"]: string
+  readonly ["issue_id"]: IssueId
+}
+
+export const RebindThreadSql = "-- name: RebindThread :exec\ninsert into issue_subscription (thread_key, issue_id) values ($1, $2)\non conflict (thread_key) do update set issue_id = excluded.issue_id;"
+
+export async function rebindThread(sql: Sql, params: RebindThreadParams): Promise<number> {
+  return sql.exec(RebindThreadSql, [params["thread_key"], params["issue_id"]])
+}
+
 export interface SubscribedIssuesParams {
   readonly ["keys"]: readonly string[]
 }

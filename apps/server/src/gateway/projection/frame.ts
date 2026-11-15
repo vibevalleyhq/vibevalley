@@ -3,8 +3,8 @@ import type * as T from "@vibevalley/protocol";
 import { issueScopeOf } from "@vibevalley/protocol/rules";
 
 import type { CommitCount, Projection } from "#/core/core.ts";
+import { nextText, whenText } from "#/modules/cron/when.ts";
 import { effectsOf, reducePlay, type SessionPlay, viewOf } from "#/modules/game/view.ts";
-import { nextText, whenText } from "#/modules/issue/when.ts";
 import { phaseWords } from "#/modules/session/report.ts";
 import type { Doing } from "#/modules/session/shapes.ts";
 import { inbox } from "#/modules/watch/items.ts";

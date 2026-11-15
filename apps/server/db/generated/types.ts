@@ -76,17 +76,20 @@ export type Words_channel_type = z.infer<typeof Words_channel_type>
 export const Words_connector_account_connector = z.enum(["weixin","feishu","qq"])
 export type Words_connector_account_connector = z.infer<typeof Words_connector_account_connector>
 
+export const Words_cron_set_by = z.enum(["user","agent","system"])
+export type Words_cron_set_by = z.infer<typeof Words_cron_set_by>
+
 export const Words_issue_canceled = z.enum(["dismissed","lost"])
 export type Words_issue_canceled = z.infer<typeof Words_issue_canceled>
-
-export const Words_issue_cron_set_by = z.enum(["user","agent","system"])
-export type Words_issue_cron_set_by = z.infer<typeof Words_issue_cron_set_by>
 
 export const Words_issue_deliver = z.enum(["change","branch","answer","pull_request"])
 export type Words_issue_deliver = z.infer<typeof Words_issue_deliver>
 
 export const Words_issue_delivered = z.enum(["merged","merged_into_parent","pull_request","submitted","kept","none"])
 export type Words_issue_delivered = z.infer<typeof Words_issue_delivered>
+
+export const Words_issue_input_kind = z.enum(["dispatch","input"])
+export type Words_issue_input_kind = z.infer<typeof Words_issue_input_kind>
 
 export const Words_issue_input_state = z.enum(["held","forwarded","returned"])
 export type Words_issue_input_state = z.infer<typeof Words_issue_input_state>

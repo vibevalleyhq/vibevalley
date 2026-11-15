@@ -9,7 +9,7 @@ import type { Time } from "#/infra/time.ts";
 import type { ProfileStore } from "#/modules/agent/agent.ts";
 import type { Artifact } from "#/modules/artifact/artifact.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
-import type { Cron } from "#/modules/issue/cron.ts";
+import type { Cron } from "#/modules/cron/cron.ts";
 import type { Issue } from "#/modules/issue/issue.ts";
 import type { Media } from "#/modules/media/media.ts";
 import type { Memory } from "#/modules/memory/memory.ts";

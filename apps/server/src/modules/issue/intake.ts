@@ -67,6 +67,10 @@ export interface Intake {
   readonly receive: (event: SourceEvent) => Promise<Accepted>;
   /** The threads whose words reach the issue's helper; a thread another issue has is refused. */
   readonly subscribe: (issue: T.IssueId, threads: readonly string[]) => Promise<void>;
+  /** Claims a recurring thread for `issue`, moving ownership if a previous issue held it. */
+  readonly rebind: (issue: T.IssueId, thread: string) => Promise<void>;
+  /** The issues currently subscribed to any of `threads`. */
+  readonly subscribedTo: (threads: readonly string[]) => Promise<readonly T.IssueId[]>;
   /** A helper says an input is not its to take; the orchestrator is told why. */
   readonly decline: (session: string, envelope: string, reason: string) => Promise<void>;
   /** A dispatch held in the issue's pool for its next helper, in the caller's transaction; routed once it commits. */
@@ -175,6 +179,7 @@ export function issueIntake(deps: IntakeDeps): Intake {
       const reason = holdReasonOf(trigger, issue, recipient, human);
       if (reason) {
         await qi.holdIssueInput(db.sql, { trigger_id: trigger.id, reason });
+        if (trigger.source === "cron") await qi.supersedeHeldCronInputs(db.sql, { issue_id: id, trigger_id: trigger.id });
         continue;
       }
       if (!recipient) continue;
@@ -212,7 +217,13 @@ export function issueIntake(deps: IntakeDeps): Intake {
     if (ids.size > 1) throw refused(t("server.mailbox.ambiguous"));
     const issue = ids.values().next().value;
     if (!issue) return false;
-    await qi.holdIssueTrigger(db.sql, { issue_id: issue, trigger_id: trigger.id, created_at: clock.now() });
+    await qi.holdIssueTrigger(db.sql, {
+      issue_id: issue,
+      trigger_id: trigger.id,
+      kind: trigger.meta.dispatch === true ? "dispatch" : "input",
+      created_at: clock.now(),
+    });
+    if (trigger.source === "cron") await qi.supersedeHeldCronInputs(db.sql, { issue_id: issue, trigger_id: trigger.id });
     await sessions.route(trigger, [], deliveryScope(placeOf(trigger), issue));
     await flush(issue, trigger.actor.kind === "user");
     return true;
@@ -256,11 +267,7 @@ export function issueIntake(deps: IntakeDeps): Intake {
   };
 
   const bindIssue = (issue: T.Issue) =>
-    subscribe(issue.id, [
-      `issue:${issue.id}`,
-      ...(issue.repo && issue.pullRequest ? [`github:${issue.repo}#${issue.pullRequest.number}`] : []),
-      ...(issue.cron ? [`cron:${issue.cron}`] : []),
-    ]);
+    subscribe(issue.id, [`issue:${issue.id}`, ...(issue.repo && issue.pullRequest ? [`github:${issue.repo}#${issue.pullRequest.number}`] : [])]);
   const onFact = (fact: T.ServerEvent) =>
     bestEffort(log, "intake: issue routing", async () => {
       if (fact.type === "issueChanged") {
@@ -309,6 +316,11 @@ export function issueIntake(deps: IntakeDeps): Intake {
       return { trigger };
     },
     subscribe,
+    rebind: async (issue, thread) => {
+      if (!issueOf(issue)) throw missing(t("server.issue.issueRef", { ref: issue }), [lookIn.issue]);
+      await qs.rebindThread(db.sql, { issue_id: issue, thread_key: thread });
+    },
+    subscribedTo: async (threads) => (threads.length === 0 ? [] : (await qs.subscribedIssues(db.sql, { keys: [...threads] })).map((row) => row.issue_id)),
     decline,
     queueDispatch: async (d) => {
       const trigger = await sessions.recordTrigger({
@@ -322,7 +334,7 @@ export function issueIntake(deps: IntakeDeps): Intake {
         meta: { ingressRecipient: d.agent, issue: d.issue, trigger: d.by, dispatch: true },
         at: d.at,
       });
-      await qi.holdIssueTrigger(db.sql, { issue_id: d.issue, trigger_id: trigger.id, created_at: clock.now() });
+      await qi.holdIssueTrigger(db.sql, { issue_id: d.issue, trigger_id: trigger.id, kind: "dispatch", created_at: clock.now() });
       await qi.supersedeDispatch(db.sql, { issue_id: d.issue, trigger_id: trigger.id });
       await db.afterCommit(() => bestEffort(log, `intake: route ${trigger.id}`, () => route(trigger)));
     },
@@ -336,7 +348,12 @@ export function issueIntake(deps: IntakeDeps): Intake {
       db.tx(async () => {
         const at = clock.now();
         for (const input of inputs) {
-          await qi.holdIssueTrigger(db.sql, { trigger_id: input.id, issue_id: issue, created_at: at });
+          await qi.holdIssueTrigger(db.sql, {
+            trigger_id: input.id,
+            issue_id: issue,
+            kind: input.meta.dispatch === true ? "dispatch" : "input",
+            created_at: at,
+          });
           await qi.forwardIssueInput(db.sql, { trigger_id: input.id, session_id: session });
         }
       }),
