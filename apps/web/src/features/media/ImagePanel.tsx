@@ -3,13 +3,13 @@ import { createSignal, For, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 import { attachmentPath, type MediaImageRequest, type MediaImageJob } from "@vibevalley/protocol";
 
-import { Readiness } from "#/features/setting/index.ts";
 import { api } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
 import { Checkbox } from "#/ui/Checkbox.tsx";
 import { ConfirmButton } from "#/ui/ConfirmButton.tsx";
+import { Readiness } from "#/ui/domain/settings.tsx";
 import { Field, Select, TextArea, TextInput } from "#/ui/Field.tsx";
 import { Card, Quiet } from "#/ui/layout.tsx";
 

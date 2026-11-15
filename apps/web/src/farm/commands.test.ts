@@ -43,9 +43,8 @@ const helper: SessionView = {
   hiredAt: 0,
   runs: 1,
   phase: { _tag: "done" },
-  refining: false,
   phaseText: "",
-  issue: issueId("clock"),
+  scope: { kind: "issue", id: issueId("clock") },
 };
 
 function frame(stage: IssueStage, session: SessionView = helper): StateFrame {

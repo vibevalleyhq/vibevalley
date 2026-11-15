@@ -1,6 +1,7 @@
 import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 import { z } from "zod";
 
+import type { BlockEditor } from "@vibevalley/artifact/editor";
 import { t } from "@vibevalley/i18n";
 import { type Artifact, type ArtifactVersion, artifactPath, userId, type SayRequest } from "@vibevalley/protocol";
 
@@ -25,7 +26,6 @@ import { toast } from "#/ui/toasts.ts";
 
 import { artifactHref, bodyIcon, useArtifact, useArtifacts } from "./ArtifactCard";
 import { BlocksView } from "./BlocksView";
-import type { BlockEditor } from "./editor";
 import { HtmlFrame } from "./HtmlFrame";
 import { PageWords } from "./PageWords";
 

@@ -17,7 +17,7 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/modules/agent/agent.ts` | 对外的一个 `Agent` 服务：档案（`profile.ts`）和农机（`runtime.ts`）两部分拼成一扇门，`makeAgent` 先建档案、再建农机，关时倒过来 |
+| `apps/server/src/modules/agent/agent.ts` | 对外 `Agent` 服务：档案（`profile.ts`）和农机（`runtime.ts`）两部分拼成一扇门，并切出只看档案的 `ProfileStore` 与只看农机的 `RuntimeFleet` 窄切片，`makeAgent` 先建档案、再建农机，关时倒过来 |
 | `apps/server/src/modules/agent/profile.ts` | 读写 `$VIBEVALLEY_HOME/config.json`、副本事务 `change`、外观补齐 `withCast`、角色校验 `roleProblem` |
 | `apps/server/src/modules/agent/template.ts`、`templates/` | 内置模板与本机导入模板（`agent-templates/<id>/`）的读取、安装与更新 |
 | `apps/server/src/modules/agent/profile.ts`、`skills/<id>/SKILL.md`（`SKILL.en.md` 是英文） | VibeValley 自带的技能：随服务端打包（`base/assets.ts` 的 `serverFiles`），开机读一次 |
@@ -31,7 +31,7 @@
 
 ## 模型和不变量
 
-- **一个服务**：档案、技能、模板和农机共用 `config.json`，所以是一个 `Agent` 服务（`profile.ts` 加 `runtime.ts`），不拆两扇门；成员名各答一个问题，农机那几个带上农机（`runtimes`、`runtimeInfo`、`refreshRuntime`、`updateRuntime`），不和档案的 `agents`、`save` 混。
+- **一个服务、两个窄切片**：档案、技能、模板和农机共用 `config.json`，所以组装时是一个 `Agent` 服务（`profile.ts` 加 `runtime.ts`），不在启动与存储上拆两家；成员名各答一个问题，农机那几个带上农机（`runtimes`、`runtimeInfo`、`refreshRuntime`、`updateRuntime`），不和档案的 `agents`、`save` 混。对外另外导出 `ProfileStore`（仅档案/技能读取）和 `RuntimeFleet`（仅农机/解析/花费）两个切片：单侧调用方按切片注入，避免只用档案的模块依赖农机状态（需兼顾两侧的 `AgentHandlers`、`Orchestrator`、`Session` 生命周期、工单派发与收尾等仍收 `Agent`）。
 - **单一配置文件与副本事务**：档案、技能库和农机设置存于 `config.json`，经 `change` 在深拷贝副本上修改并写盘成功后才替换内存引用（删除技能时同事务清理档案引用）。
 - **损坏配置自动备份，绝不覆盖**：启动时若 `config.json` 损坏或不符合 Schema，改名为 `config.json.unreadable-<毫秒>` 保留并按新农场初始化；改名失败则拒绝开机。
 - **角色固定为 `orchestrator` 与 `worker`**：默认助手 `orchestrator` 不可删除或改为帮工；所有助手档案必须用 `vibevalley` 农机，派工候选只含 `worker` 档案。
@@ -81,6 +81,7 @@
 
 ## 和谁打交道
 
+- **单侧调用方（`memory`、`watch`、`session` 子部件、`gateway/http` 等）**：按职责接收 `ProfileStore` 或 `RuntimeFleet`；同时需要档案与农机预检/派发的（`issue` 的部分逻辑、`session` 生命周期、`orchestrator`、`agentHandlers`）收完整的 `Agent`。
 - **帮工与工单（`session`、`issue`）**：派活前调 `check` 与 `resolve`；`Session` 读取档案与勾选的 `Skill` 拼入提示，运行后调 `spend` 与 `usageSoon`。
 - **助手（`orchestrator`）**：调用 `Agent.candidates` 与 `Agent.choose` 获取可派档案、额度与花费。
 - **核心状态（`core`）**：经 `Core.runtime` 推农机窄事件，经 `Core.notice` 发模型回退提醒。

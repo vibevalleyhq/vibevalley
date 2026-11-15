@@ -3,9 +3,9 @@ import { createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 import { type Channel, type Notify } from "@vibevalley/protocol";
-import { omitUndefined } from "@vibevalley/protocol/rules";
 
 import { autofocus } from "#/base/dom.tsx";
+import { createChannelForm } from "#/features/channel/model/marks.ts";
 import { channelName } from "#/features/channel/model/places.ts";
 import { useOrchestrators } from "#/infra/agents.ts";
 import { api } from "#/infra/api.ts";
@@ -72,84 +72,6 @@ function Form(props: {
       </div>
     </form>
   );
-}
-
-// Making a channel or changing one, as both chat windows carry it out: the workbench's dialogs (here) and the farm's menu (farm/chat/ChannelMenu.tsx).
-/** The form for a new channel, or for the one given as it is when opened (the form edits its own copy). */
-export function createChannelForm(channel?: Channel) {
-  const was = untrack(() => ({
-    name: channel?.name ?? "",
-    description: channel?.description ?? "",
-    repo: channel?.repo ?? "",
-    category: channel?.category ?? "",
-    notify: channel?.notify ?? "all",
-    members: (channel?.members ?? []).toSorted(),
-  }));
-  const [name, setName] = createSignal(was.name);
-  const [description, setDescription] = createSignal(was.description);
-  const [repo, setRepo] = createSignal(was.repo);
-  const [category, setCategory] = createSignal(was.category);
-  const [notify, setNotify] = createSignal<Notify>(was.notify);
-  const [members, setMembers] = createSignal<readonly string[]>(was.members);
-  const [error, setError] = createSignal<string>();
-  // A refusal is said in the form, beside what it refuses, rather than in a toast.
-  const act = createAct(setError);
-  const busy = act.busy;
-
-  /** The channel's id once it went through; undefined, with the reason in error, when refused. */
-  const save = (): Promise<string | undefined> => {
-    setError(undefined);
-    // Read as the user saves: the form may change while the call waits.
-    const now = {
-      name: name().trim(),
-      description: description(),
-      repo: repo(),
-      category: category().trim(),
-      notify: notify(),
-      members: members().toSorted(),
-    };
-    return act.run(async () => {
-      if (!channel)
-        return api.channel.create(omitUndefined({ name: now.name, description: now.description.trim() || undefined, repo: now.repo.trim() || undefined }));
-      // A direct channel has only its notifications to change.
-      if (channel.type === "channel")
-        await api.channel.update({
-          id: channel.id,
-          description: now.description,
-          repo: now.repo,
-          category: now.category,
-          ...(now.name !== was.name ? { name: now.name } : {}),
-          ...(now.members.join("\n") !== was.members.join("\n") ? { members: now.members } : {}),
-        });
-      if (now.notify !== was.notify) await api.channel.notify.set({ id: channel.id, notify: now.notify });
-      return channel.id;
-    });
-  };
-
-  return {
-    name,
-    setName: (v: string) => {
-      setName(v);
-      setError(undefined);
-    },
-    description,
-    setDescription,
-    repo,
-    setRepo,
-    category,
-    setCategory,
-    notify,
-    setNotify,
-    /** The orchestrators in the channel, by profile id. */
-    members,
-    /** Puts one in the channel, or takes it out. */
-    setMember: (id: string, on: boolean) => setMembers((m) => (on ? [...new Set([...m, id])] : m.filter((x) => x !== id))),
-    busy,
-    error,
-    /** Pressing save now would be sent: not busy, and a new channel has a name. */
-    ready: () => !busy() && (channel !== undefined || name().trim() !== ""),
-    save,
-  };
 }
 
 /** onCreated gets the new channel's id. */

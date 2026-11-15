@@ -3,7 +3,7 @@ import { createSignal, For, onSettled, Show } from "solid-js";
 import { t } from "@vibevalley/i18n";
 
 import { createExternal } from "#/base/external.ts";
-import { type MossLine, mossLine, type MossSetup } from "#/features/voice/model/mossLine.ts";
+import { type MossLine, mossLine, type MossSetup } from "#/features/voice/model/moss-line.ts";
 import { canCapture, localRelayHost, type VisualSource } from "#/features/voice/model/visual-capture.ts";
 import { Button } from "#/ui/Button.tsx";
 import { TextArea } from "#/ui/Field.tsx";

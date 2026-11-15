@@ -3,30 +3,51 @@ import { createEffect, createMemo, createSignal, For, Show, untrack } from "soli
 import { t } from "@vibevalley/i18n";
 import type { Around, EditAction, Focus } from "@vibevalley/pkm/editing";
 import { type DropAt, dropAt, dropOps, outlineText, pickAction, type Picked, pickedIds, stepped } from "@vibevalley/pkm/selection";
+import { type PageServer, PageWriter } from "@vibevalley/pkm/writer";
 import type { PkmBlock, PkmBlockOp, PkmPageSummary, PkmPageView } from "@vibevalley/protocol";
 
 import { useTimeout } from "#/base/timer.ts";
+import { api, reasonOf } from "#/infra/api.ts";
 import { useQueryClient } from "#/infra/query.ts";
+import { createAct } from "#/ui/act.ts";
 import { toast } from "#/ui/toasts.ts";
 
 import { hasChildren, visibleBlocks } from "./outline";
 import { Editor, indentPx, newId, Row, Toolbar, type Writing } from "./OutlineEditor";
 import { pkmPageQuery, refreshVault } from "./vault";
-import { PageWriter, pageServer } from "./writer";
 
 /** point: a block to show and light up (?b= in the address). */
 export function Outline(props: { view: PkmPageView; pages: readonly PkmPageSummary[]; point?: string | undefined; onEditing: (on: boolean) => void }) {
   const queries = useQueryClient();
   const slug = untrack(() => props.view.page.slug);
   const [blocks, setBlocks] = createSignal<PkmBlock[]>(untrack(() => props.view.page.blocks));
-  const writer = new PageWriter(slug, untrack(blocks), pageServer, {
-    changed: (b) => setBlocks(b),
-    answered: (page) => {
-      queries.setData(pkmPageQuery(slug), (v) => (v ? { value: { ...v.value, page } } : undefined));
-      void refreshVault(queries);
+  const acting = createAct(() => {});
+  const pageServer: PageServer = {
+    apply: async (page, ops) => {
+      const result = await acting.attempt(() => api.pkm.block.apply({ page, ops: [...ops] }));
+      if (result.kind !== "accepted") throw new Error(result.message);
+      return result.receipt;
     },
-    refused: (why) => toast(t("web.pkm.page.notSaved", { why }), "bad"),
-  });
+    undo: async () => {
+      const result = await acting.attempt(() => api.pkm.undo());
+      if (result.kind !== "accepted") throw new Error(result.message);
+      return result.receipt;
+    },
+  };
+  const writer = new PageWriter(
+    slug,
+    untrack(blocks),
+    pageServer,
+    {
+      changed: (b) => setBlocks(b),
+      answered: (page) => {
+        queries.setData(pkmPageQuery(slug), (v) => (v ? { value: { ...v.value, page } } : undefined));
+        void refreshVault(queries);
+      },
+      refused: (why) => toast(t("web.pkm.page.notSaved", { why }), "bad"),
+    },
+    reasonOf,
+  );
   const [focus, setFocus] = createSignal<Focus>();
   const collapsed = createMemo<ReadonlySet<string>>(() => new Set(blocks().flatMap((b) => (b.props.collapsed === "true" ? [b.id] : []))));
   const [picked, setPicked] = createSignal<Picked>();
@@ -58,10 +79,13 @@ export function Outline(props: { view: PkmPageView; pages: readonly PkmPageSumma
   const undo = () => {
     const done = writer.undo();
     if (!done) return;
-    void done.then(async (u) => {
-      toast(u.undone ? t("web.pkm.page.undone", { what: u.what ?? "" }) : t("web.pkm.page.nothingToUndo"));
-      await queries.invalidate({ prefix: ["pkm"] });
-    });
+    void done.then(
+      async (u) => {
+        toast(u.undone ? t("web.pkm.page.undone", { what: u.what ?? "" }) : t("web.pkm.page.nothingToUndo"));
+        await queries.invalidate({ prefix: ["pkm"] });
+      },
+      (e: unknown) => toast(reasonOf(e), "bad"),
+    );
   };
   const act = (a: EditAction | undefined) => {
     if (!a) return false;

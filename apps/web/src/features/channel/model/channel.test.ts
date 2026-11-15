@@ -25,7 +25,6 @@ const orchestratorSession = (action: "thinking" | "speaking_text" | "none", chan
   brief: "",
   hiredAt: 0,
   runs: 0,
-  refining: false,
   phase: action === "none" ? { _tag: "resting" } : { _tag: "working", since, doing: { action, label: "" } },
   ...(channel ? { channel } : {}),
 });

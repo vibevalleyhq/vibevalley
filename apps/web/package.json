@@ -5,6 +5,9 @@
   "imports": {
     "#/*": "./src/*"
   },
+  "exports": {
+    "./public/title/sprites.json": "./public/title/sprites.json"
+  },
   "scripts": {
     "dev": "vp dev",
     "e2e": "playwright test",

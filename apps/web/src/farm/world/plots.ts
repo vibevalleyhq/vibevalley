@@ -1,6 +1,6 @@
 import { t } from "@vibevalley/i18n";
 import type { Crop, FarmView, PlotView, Session, SessionPlayView } from "@vibevalley/protocol";
-import { plotKeyOf } from "@vibevalley/protocol/rules";
+import { issueScopeOf, plotKeyOf } from "@vibevalley/protocol/rules";
 
 export interface Bed {
   readonly index: number;
@@ -26,7 +26,7 @@ export const bedOfStation = (station: number): Bed | undefined => (station < 0 ?
 export const isRipe = (crop: Crop) => crop === "wheat" || crop === "carrot";
 
 /** The issue a session works; every session the farm shows has one. */
-export const issueOf = (s: Session) => s.issue ?? s.id;
+export const issueOf = (s: Session) => issueScopeOf(s) ?? s.id;
 
 export const isBusy = (s: Session) => s.phase._tag === "working";
 

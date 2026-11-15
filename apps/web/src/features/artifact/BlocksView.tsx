@@ -2,11 +2,12 @@ import { type JSX, Portal } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 
 import { knownTypes, plainOf } from "@vibevalley/artifact/blocks";
+import { BlockEditor, type EditBlock } from "@vibevalley/artifact/editor";
 import { t } from "@vibevalley/i18n";
 import { type Agent, type ArtifactId, userId, type Suggestion, type TextSpan } from "@vibevalley/protocol";
 
 import { createExternal } from "#/base/external.ts";
-import { api } from "#/infra/api.ts";
+import { api, reasonOf } from "#/infra/api.ts";
 import { followArtifact, followSuggestions } from "#/infra/gateway.ts";
 import { ready, useAgents } from "#/infra/query.ts";
 import { createAct } from "#/ui/act.ts";
@@ -14,8 +15,6 @@ import { Checkbox } from "#/ui/Checkbox.tsx";
 import { hexColor, swatches } from "#/ui/domain/cast.ts";
 import { AgentFace } from "#/ui/domain/Face.tsx";
 import { Icon } from "#/ui/Icon.tsx";
-
-import { BlockEditor, type EditBlock } from "./editor";
 
 /** The user's lines on the attribution bar. */
 const userColor = "var(--color-cream-300)";
@@ -66,6 +65,7 @@ export function BlocksView(props: {
   const editor = new BlockEditor(
     api,
     untrack(() => props.id),
+    reasonOf,
   );
   untrack(() => props.onEditor)?.(editor);
   const [suggestions, setSuggestions] = createSignal<Suggestion[]>([]);

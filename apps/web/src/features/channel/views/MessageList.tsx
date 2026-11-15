@@ -3,7 +3,7 @@ import { createEffect, createMemo, createSignal, For, Show, untrack } from "soli
 
 import { t } from "@vibevalley/i18n";
 import { type ChatMessage, type Channel, type MessageHit, defaultOrchestrator, type Outcome, userId } from "@vibevalley/protocol";
-import { actorRoleOf, channelOf, plainText } from "@vibevalley/protocol/rules";
+import { actorRoleOf, channelOf, issueScopeOf, plainText } from "@vibevalley/protocol/rules";
 
 import { aria, useNow } from "#/base/dom.tsx";
 import { tookText, spentText } from "#/base/format.ts";
@@ -375,7 +375,8 @@ function Dispatch(props: { m: ChatMessage }) {
   const [open, setOpen] = createSignal(false);
   const sent = () => (core()?.sessions ?? []).find((s) => s.id === props.m.session);
   const issue = () => {
-    const id = sent()?.issue;
+    const s = sent();
+    const id = s ? issueScopeOf(s) : undefined;
     return id ? (core()?.issues ?? []).find((i) => i.id === id) : undefined;
   };
   return (

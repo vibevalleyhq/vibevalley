@@ -4,6 +4,7 @@ import { createEffect, createSignal, For, onSettled, Show, untrack } from "solid
 import { clockText } from "@vibevalley/engine/clock";
 import { t } from "@vibevalley/i18n";
 import type { Session, StateFrame } from "@vibevalley/protocol";
+import { issueScopeOf } from "@vibevalley/protocol/rules";
 
 import { aria } from "#/base/dom.tsx";
 import { createExternal } from "#/base/external.ts";
@@ -102,7 +103,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
   const [next, setNext] = createSignal(0);
   const act = createPixelAct(t("web.farm.debug.title"));
   const sessions = () => core()?.sessions ?? [];
-  const issueOf = (h: Session) => h.issue ?? h.id;
+  const issueOf = (h: Session) => issueScopeOf(h) ?? h.id;
   const everyone = (action: "stop" | "dismiss") =>
     act.run(async () => {
       await Promise.all(

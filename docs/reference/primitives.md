@@ -12,28 +12,23 @@
 | `channelOf` | `channel.ts` | A channel by its id; none when no id is given. |
 | `actorRoleOf` | `channel.ts` | The agent's role when an actor is an agent; undefined for the user or the system. |
 | `mentionLead` | `channel.ts` | What an @name may follow: anything but a Latin letter, a digit, _ or @, so a@b.com names no one while cjk@w3 does (Chinese runs on without spaces). |
-| `slice` | `cut.ts` | s.slice(start, end), a surrogate pair cut in half made U+FFFD. |
-| `cut` | `cut.ts` | s as it is when it fits in max units; else its first max units and an ellipsis. |
 | `oneLine` | `cut.ts` | Runs of white space are one space. |
 | `htmlSandbox` | `display.ts` | The <iframe>'s sandbox attribute; the server's CSP sandbox directive is the same tokens. |
 | `freshOf` | `inbox.ts` | The items of now that are news to known: undefined known is the first look, which knows them all and has no news. An id is news once. |
-| `assignmentOf` | `issues.ts` | The responsibility in force now. |
-| `assignedAgentOf` | `issues.ts` |  |
+| `issueScopeOf` | `issues.ts` | The issue a session is working on or drafting, if any. |
+| `assignedAgentOf` | `issues.ts` | The agent currently responsible for the issue, if any. |
 | `executionsOf` | `issues.ts` | Every execution, in assignment and start order. |
 | `sessionIdsOf` | `issues.ts` | The external helper contexts that executed it, in order. |
-| `latestSessionIdOf` | `issues.ts` |  |
+| `latestSessionIdOf` | `issues.ts` | The latest helper context that executed the issue, if any. |
 | `shortTitle` | `issues.ts` | One short line for a title: its first line, and of a long one, the first sentence, else up to its last pause that fits. failing those, cut. |
 | `closedText` | `issues.ts` | What its close says: done with what it delivered, or canceled and why. |
 | `omitUndefined` | `omit.ts` |  |
 | `isOneOf` | `oneOf.ts` |  |
 | `validKey` | `order.ts` |  |
 | `keyBetween` | `order.ts` | A key after a and before b; "" for a is the start, "" for b the end. |
-| `spanText` | `phase.ts` | A short span: seconds under a minute (at least one), else minutes. |
-| `isBusy` | `phase.ts` |  |
+| `isBusy` | `phase.ts` | It takes one of the places for those working at once. |
 | `roomLeft` | `phase.ts` | How many more may start working now: on the whole farm (space at once), and in the repo (perRepo at once, 0 for no limit of its own). |
-| `needOf` | `phase.ts` |  |
-| `phaseText` | `phase.ts` | phaseWords as said at now. |
-| `phaseWords` | `phase.ts` | What a session is doing in words, how long it has been quiet left as {span}. |
+| `phaseText` | `phase.ts` | The server's words for what the session is doing, how long it has been quiet filled in by the clock. |
 | `plainText` | `plain.ts` |  |
 | `farmOf` | `play.ts` | The farm a session's bed is on: each repo has its own, and the sessions without one share one. |
 | `plotKeyOf` | `play.ts` | The plot a session works, the key of `FarmView.plots`: its issue, so a reopened issue keeps its plot; one with no issue is its own. |
@@ -54,6 +49,8 @@
 | `actsForUser` | `actor.ts` | On the user's word: the user, or the orchestrator in a run the user's words are in. |
 | `serverFiles` | `assets.ts` | What the package script copies beside the bundle: every path serverFile is given lies under one of these. |
 | `serverFile` | `assets.ts` |  |
+| `slice` | `clip.ts` | s.slice(start, end), a surrogate pair cut in half made U+FFFD. |
+| `cut` | `clip.ts` | s as it is when it fits in max units; else its first max units and an ellipsis. |
 | `clip` | `clip.ts` | s on one line and trimmed, at most max units with the ellipsis. |
 | `head` | `clip.ts` | The first n UTF-16 units of s, never half a surrogate pair. |
 | `compactCard` | `clip.ts` |  |
@@ -91,6 +88,10 @@
 | `redact` | `redact.ts` |  |
 | `redactedHead` | `redact.ts` | Its first n UTF-16 units, trimmed: cut after redacting, as a secret cut first may no longer look like one. |
 | `redactOutput` | `redact.ts` | Everything the process writes to stream goes through redact first: the server's log, and what a library prints. |
+| `StreamTooLargeError` | `stream.ts` | Raised when a stream exceeds its byte limit while reading. |
+| `streamBytesUpTo` | `stream.ts` | Yields chunks from body up to maxBytes, throwing StreamTooLargeError if exceeded and canceling on early stop. |
+| `readBytesUpTo` | `stream.ts` | Reads body into a Buffer up to maxBytes, returning undefined once exceeded. |
+| `readTextUpTo` | `stream.ts` | Reads body as UTF-8 text up to maxBytes, returning undefined once exceeded. |
 
 ## `apps/server/src/infra`
 
@@ -179,6 +180,14 @@
 | `testDb` | `layers.ts` | A database of its own in memory, with the schema: closed with await using. |
 | `offlineNetwork` | `layers.ts` | The network a test farm has: loopback for its own fetch, nothing for the public one. |
 | `whenState` | `layers.ts` | What pick finds in the core state: in it now, or in the first state the core moves to where it finds something. |
+| `heldTime` | `media.ts` | A clock that moves only when the test says, from 0; each wait it passes ends in order, and what it woke gets a few turns. |
+| `minutes` | `media.ts` |  |
+| `hours` | `media.ts` |  |
+| `vendor` | `media.ts` | A vendor answering each request as answer does. |
+| `downloads` | `media.ts` | A download answering each request as answer does. |
+| `never` | `media.ts` | A request that never answers: it rejects once its signal aborts, after whatever stopping waits for. |
+| `mediaFarm` | `media.ts` | A Media of its own, with its own Provider over the vendor the test answers as, on a test farm. |
+| `memoryWorld` | `memory.ts` | clock: the farm's time (now and sleep); fetch: what the sources outside the farm are reached with (none by default). |
 | `text` | `model.ts` |  |
 | `thinking` | `model.ts` |  |
 | `toolCall` | `model.ts` |  |
@@ -275,7 +284,7 @@
 | `immutable` | `form/paths.ts` |  |
 | `frames` | `frame.ts` |  |
 | `FramesContext` | `frame.ts` |  |
-| `createFrames` | `frame.ts` | The stream above as a store: each frame reconciles in by id, so only what changed updates. |
+| `createFrames` | `frame.ts` | A frame source as a store: each frame reconciles in by id, so only what changed updates. |
 | `useFrames` | `frame.ts` |  |
 | `useCore` | `frame.ts` | The folded state. undefined until the first frame. |
 | `orchestratorSession` | `frame.ts` |  |

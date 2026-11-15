@@ -211,8 +211,7 @@ test("regression: a profile's direct chat uses a session without a hidden issue"
   expect((await api.issue.list({})).map((issue) => issue.id)).toEqual(before);
   const sessions = await api.session.list({ agent: fox.id });
   expect(sessions).toHaveLength(1);
-  expect(sessions[0]).toMatchObject({ channel: direct });
-  expect(sessions[0]?.issue).toBeUndefined();
+  expect(sessions[0]).toMatchObject({ channel: direct, scope: { kind: "channel", id: direct } });
 
   await answer.hover();
   await answer.locator('[data-testid="message-tool"][data-key="more"]').click();

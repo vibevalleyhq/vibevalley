@@ -61,7 +61,6 @@ export const sampleSession = (id: string, agent: string, phase: PhaseView, more:
   hiredAt: now - 42 * min,
   runs: 2,
   phase,
-  refining: false,
   phaseText: "",
   ...more,
 });

@@ -60,19 +60,20 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 function reconcileFrame(d: Mutable<Frames>, next: StateFrame | undefined): void {
   if (!next) d.frame = undefined;
   else if (!d.frame) d.frame = structuredClone(next);
-  else reconcile(next, "id")(d.frame);
+  // Solid's raw-to-target WeakMap is shared across plain stores: each store adopts its own copy so independent createFrames stores never alias.
+  else reconcile(structuredClone(next), "id")(d.frame);
 }
 
 export const FramesContext = createContext<Frames>();
 
-/** The stream above as a store: each frame reconciles in by id, so only what changed updates. */
-export function createFrames(): Frames {
-  const initial = frames.get();
+/** A frame source as a store: each frame reconciles in by id, so only what changed updates. */
+export function createFrames(source: FramesSource = frames): Frames {
+  const initial = source.get();
   let applied = initial.frame;
   // Initialize the store from a copy so rawFrame() keeps the stream's decoded trees untouched across subsequent reconciles.
   const [store, set] = createStore<Mutable<Frames>>(structuredClone(initial));
   const sync = () => {
-    const f = frames.get();
+    const f = source.get();
     set((d) => {
       d.link = f.link;
       d.count = f.count;
@@ -82,7 +83,7 @@ export function createFrames(): Frames {
     });
   };
   onSettled(() => {
-    const stop = frames.subscribe(sync);
+    const stop = source.subscribe(sync);
     // A frame that came between the copy above and the subscription.
     sync();
     return stop;

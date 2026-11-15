@@ -16,8 +16,8 @@
 | 位置 | 职责 |
 |---|---|
 | [`packages/pkm/`](packages/pkm/README.md) | 独立 PKM 与双链大纲纯领域包（`@vibevalley/pkm`）：Logseq 式 Markdown 解析与打印（`markdown.ts`）、PARA 目录映射（`para.ts`）、双链反链与块引用图谱（`graph.ts`）、前端大纲视图与行内切片（`view.ts`）、键盘编辑与补全状态机（`editing.ts`）、多块框选与拖拽（`selection.ts`）、日历日期（`days.ts`）与乐观写入队列（`writer.ts`） |
-| `apps/server/src/modules/pkm/pkm.ts` | 文件读写、单写锁、批注表（`pkm_comment`）与撤销表（`pkm_change`） |
-| `apps/server/src/modules/pkm/outline.ts`、`ops.ts`、`para.ts`、`graph.ts` | 服务端薄适配层：消费 `@vibevalley/pkm` 并绑定 `memory/recall.ts` 的 `termsList` 分词 |
+| `apps/server/src/modules/pkm/pkm.ts` | 文件读写、单写锁、批注表（`pkm_comment`）与撤销表（`pkm_change`），直接消费 `@vibevalley/pkm/{markdown,outline,para}` |
+| `apps/server/src/modules/pkm/graph.ts` | 服务端图谱薄适配层：消费 `@vibevalley/pkm/graph` 并绑定 `memory/recall.ts` 的 `termsList` 分词 |
 | `packages/protocol/src/pkm/`、`packages/pkm/src/outline.ts` | 笔记契约与前后端共用的 `applyBlockOps`、`flatBlocks`、`slugOf` |
 | `$VIBEVALLEY_WORK_ROOT/pkm/` | 默认笔记根目录（`00_Inbox`–`04_Archives`、`journals/`、`.pkm/snapshots/`） |
 | `apps/web/src/features/pkm/` | 工作台笔记页、大纲编辑器组件（消费 `@vibevalley/pkm`） |

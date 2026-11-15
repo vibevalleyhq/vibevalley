@@ -17,6 +17,7 @@
     "@solidjs/vite-plugin": "catalog:",
     "@types/node": "catalog:",
     "@types/opentype.js": "catalog:",
+    "@vibevalley/web": "workspace:*",
     "opentype.js": "catalog:",
     "sharp": "catalog:",
     "subset-font": "catalog:",

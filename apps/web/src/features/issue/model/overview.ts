@@ -95,7 +95,6 @@ const emptySession = (issue: Issue): Session => ({
   hiredAt: issue.createdAt,
   brief: issue.title,
   runs: 0,
-  refining: false,
 });
 
 /** `sessions` oldest first; `session` the one on the farm now, if any. */

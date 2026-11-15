@@ -83,8 +83,9 @@ test/               Playwright：组件（stories-fixtures.ts）、真实集成�
   `scripts/audit/oxlint-plugin.ts`). A file goes by what it is: pure (no server, host, browser history or storage) in `base`;
   talking to the outside in `infra`; holding the page's atoms in `state`. A `base` file that needs an `infra` one moves up, or
   what it needs moves down. A
-  feature uses another only through its `index.ts`, named exports only, and the features' graph has no cycle
-  (`src/layers.test.ts`). A piece two features both need (a word, a format, a query) goes down to the layer under both,
+  feature uses another only through its `index.ts`, named exports only, and cross-feature imports flow strictly one way
+  across `featureLayers` (`Primitives → Domain → Workbench → Settings`, checked by `src/layers.test.ts` with cycle
+  detection). A piece two features both need (a word, a format, a query) goes down to the layer under both,
   or each keeps its own copy of a word; it does not make one feature reach into the other. The skins read features; no
   feature or piece knows a skin: a workbench page that shows a piece of a skin takes it as a prop, and `app/` passes
   it in (`ReposSkin`, from `farm/map`). Why: docs/subsystems/app.md, 为什么这样.

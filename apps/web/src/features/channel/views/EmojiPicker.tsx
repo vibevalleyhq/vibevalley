@@ -2,14 +2,11 @@ import { Portal } from "@solidjs/web";
 import { For, onSettled, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import { type ChatMessage, userId } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
 
-/** What pressing an emoji on a message asks for: the user's reaction off when it is on the message now, else on. */
-export const reactionOn = (m: Pick<ChatMessage, "reactions">, emoji: string) => !(m.reactions.find((r) => r.emoji === emoji)?.by.includes(userId) ?? false);
+import { quickReactions, reactionOn } from "#/features/channel/model/marks.ts";
 
-/** What a reaction offers first; an agent can still react with any other. */
-export const quickReactions = ["👍", "❤️", "😂", "🎉", "👀", "✅", "🙏", "🤔"];
+export { quickReactions, reactionOn };
 
 // The words name the groups (words.ts emoji.groups); any other emoji is still said by typing it.
 const emojiGroups: readonly { readonly id: string; readonly emoji: readonly string[] }[] = [

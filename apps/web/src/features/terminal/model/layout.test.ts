@@ -71,8 +71,8 @@ describe("terminal layout tree", () => {
       { id: "i2", number: 9, title: "Old done work", status: "done" },
     ] as unknown as Issue[];
     const sessions = [
-      { id: "s1", repo: "demo", issue: "i1", worktree: "/worktrees/demo.12", branch: "vibevalley/issue-12" },
-      { id: "s2", repo: "demo", issue: "i2", worktree: "/worktrees/demo.9", branch: "vibevalley/issue-9" },
+      { id: "s1", repo: "demo", scope: { kind: "issue", id: "i1" }, worktree: "/worktrees/demo.12", branch: "vibevalley/issue-12" },
+      { id: "s2", repo: "demo", scope: { kind: "issue", id: "i2" }, worktree: "/worktrees/demo.9", branch: "vibevalley/issue-9" },
     ] as unknown as Session[];
 
     const groups = workspaceFoldersOf(repos, issues, sessions);

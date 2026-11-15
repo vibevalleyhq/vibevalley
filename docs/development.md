@@ -43,7 +43,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 - `vp run web:check`：`vp check`、前端规则 vitest 与页面构建；浏览器改动先跑对应的 `e2e:component`、`e2e:integration` 或 `e2e:audit`，交付节点用 `vp run --filter @vibevalley/web e2e` 做全量自动检查。各入口只构建需要的产物，真实集成用隔离服务端与临时家目录；纯截图另跑 `e2e:visual` 并看图，见 [页面命令](apps/web/README.md#commands)。
 - `vp run desktop:test`：Playwright 启动完整 Electron 应用。
 - `vp run docs:verify`：校验 Note、skill、文档链接与旧名字。
-- **这个仓库的 `.vibevalley/check` 和 `.vibevalley/setup`**：帮工交活前服务端跑工单 worktree 里的 `.vibevalley/check`（[仓库](docs/subsystems/repo.md#怎么走)）。本仓库的 check 先去掉 `VIBEVALLEY_*` 和模型钥匙等环境变量，再跑 `vp install --frozen-lockfile`、`vp check --deny-warnings`，按改动的路径跑 `server:check`、`web:check`，最后跑 `docs:verify`；新 worktree 先跑 setup：`vp install --frozen-lockfile` 和 `vp run packages:build`。
+- **这个仓库的 `.vibevalley/check` 和 `.vibevalley/setup`**：帮工交活前服务端跑工单 worktree 里的 `.vibevalley/check`（[仓库](docs/subsystems/repo.md#怎么走)）。本仓库的 check 先去掉 `VIBEVALLEY_*` 和模型钥匙等环境变量，再跑 `vp install --frozen-lockfile`、`vp check --deny-warnings`，按改动的路径跑 `server:check`、`web:check`，最后跑 `docs:verify`、`practice:check`、`health:verify` 与 `deadcode`；新 worktree 先跑 setup：`vp install --frozen-lockfile`（其 `prepare` 钩子已运行 `packages:build`）。
 
 测试不连接真实模型：服务端使用脚本化模型（`apps/server/src/testing/model.ts`），帮工使用 oar 测试 runtime。助手真模型评测（`vp run --filter @vibevalley/server evals`）消耗 DeepSeek 额度，运行前须经用户同意。
 

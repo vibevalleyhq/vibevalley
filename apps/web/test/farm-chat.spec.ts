@@ -161,9 +161,8 @@ test("a click on a helper's plot opens its issue: its state, the acts and the fo
     hiredAt: Date.now() - 600_000,
     runs: 1,
     phase: { _tag: "done" },
-    refining: false,
     phaseText: "",
-    issue: made.id,
+    scope: { kind: "issue", id: made.id },
     lastRun: { outcome: "completed", summary: "done, tests pass", at: Date.now() - 60_000 } as never,
   };
   // What the server would say of an issue handed back: it may be completed (done) or canceled.

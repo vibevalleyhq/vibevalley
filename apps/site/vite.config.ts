@@ -13,13 +13,16 @@ export default defineConfig({
     tasks: {
       assets: {
         command: "vpx scripts/prepare.ts",
-        cache: { input: [{ auto: true }, "../web/public/**", "../../docs/images/**", "!src/base/images.generated.json"] },
+        cache: { input: [{ auto: true }, "../web/public/**", "../../docs/images/**", "!src/base/images.generated.json", "!public/gen/**"] },
       },
-      check: { command: "vp test run", dependsOn: ["assets"], cache: false },
-      build: { command: "vpx scripts/build.ts", dependsOn: ["assets"], cache: false },
+      check: { command: "vp test run", dependsOn: ["assets"] },
+      build: {
+        command: "vpx scripts/build.ts",
+        dependsOn: ["assets"],
+        cache: { input: [{ auto: true }, "!dist/**", "!node_modules/**"], output: ["dist/**"] },
+      },
       "test:prerender": { command: "playwright test --config test/prerender/playwright.config.ts", cache: false },
       "test:production": { command: "playwright test --config test/production/playwright.config.ts", dependsOn: ["build"], cache: false },
-      test: "vp test run",
     },
   },
 });

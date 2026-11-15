@@ -1,11 +1,13 @@
-import { type Accessor, createEffect, createMemo } from "solid-js";
+import { type Accessor, createEffect, createMemo, createSignal, untrack } from "solid-js";
 
 import { type Channel, type Chat, type ChatMessage, type Notify, userId, type StateFrame } from "@vibevalley/protocol";
+import { omitUndefined } from "@vibevalley/protocol/rules";
 
 import { api } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
 import { defineAtom } from "#/state/atom.ts";
 import { defineIntent, type Intent, type Intents, sendReplacing, useIntents } from "#/state/intent.ts";
+import { createAct } from "#/ui/act.ts";
 
 import { type Followed, followed, useFollowed } from "./follow";
 import { newestUnread } from "./places";
@@ -231,3 +233,87 @@ export function useMarkedChat() {
 
 export const markState = <I>(intents: readonly Intent<I, unknown>[], is: (input: I) => boolean): "pending" | undefined =>
   intents.some((i) => is(i.input) && i.phase !== "failed") ? "pending" : undefined;
+
+/** What pressing an emoji on a message asks for: the user's reaction off when it is on the message now, else on. */
+export const reactionOn = (m: Pick<ChatMessage, "reactions">, emoji: string) => !(m.reactions.find((r) => r.emoji === emoji)?.by.includes(userId) ?? false);
+
+/** What a reaction offers first; an agent can still react with any other. */
+export const quickReactions = ["👍", "❤️", "😂", "🎉", "👀", "✅", "🙏", "🤔"];
+
+// Making a channel or changing one, as both chat windows carry it out: the workbench's dialogs and the farm's menu.
+/** The form for a new channel, or for the one given as it is when opened (the form edits its own copy). */
+export function createChannelForm(channel?: Channel) {
+  const was = untrack(() => ({
+    name: channel?.name ?? "",
+    description: channel?.description ?? "",
+    repo: channel?.repo ?? "",
+    category: channel?.category ?? "",
+    notify: channel?.notify ?? "all",
+    members: (channel?.members ?? []).toSorted(),
+  }));
+  const [name, setName] = createSignal(was.name);
+  const [description, setDescription] = createSignal(was.description);
+  const [repo, setRepo] = createSignal(was.repo);
+  const [category, setCategory] = createSignal(was.category);
+  const [notify, setNotify] = createSignal<Notify>(was.notify);
+  const [members, setMembers] = createSignal<readonly string[]>(was.members);
+  const [error, setError] = createSignal<string>();
+  // A refusal is said in the form, beside what it refuses, rather than in a toast.
+  const act = createAct(setError);
+  const busy = act.busy;
+
+  /** The channel's id once it went through; undefined, with the reason in error, when refused. */
+  const save = (): Promise<string | undefined> => {
+    setError(undefined);
+    // Read as the user saves: the form may change while the call waits.
+    const now = {
+      name: name().trim(),
+      description: description(),
+      repo: repo(),
+      category: category().trim(),
+      notify: notify(),
+      members: members().toSorted(),
+    };
+    return act.run(async () => {
+      if (!channel)
+        return api.channel.create(omitUndefined({ name: now.name, description: now.description.trim() || undefined, repo: now.repo.trim() || undefined }));
+      // A direct channel has only its notifications to change.
+      if (channel.type === "channel")
+        await api.channel.update({
+          id: channel.id,
+          description: now.description,
+          repo: now.repo,
+          category: now.category,
+          ...(now.name !== was.name ? { name: now.name } : {}),
+          ...(now.members.join("\n") !== was.members.join("\n") ? { members: now.members } : {}),
+        });
+      if (now.notify !== was.notify) await api.channel.notify.set({ id: channel.id, notify: now.notify });
+      return channel.id;
+    });
+  };
+
+  return {
+    name,
+    setName: (v: string) => {
+      setName(v);
+      setError(undefined);
+    },
+    description,
+    setDescription,
+    repo,
+    setRepo,
+    category,
+    setCategory,
+    notify,
+    setNotify,
+    /** The orchestrators in the channel, by profile id. */
+    members,
+    /** Puts one in the channel, or takes it out. */
+    setMember: (id: string, on: boolean) => setMembers((m) => (on ? [...new Set([...m, id])] : m.filter((x) => x !== id))),
+    busy,
+    error,
+    /** Pressing save now would be sent: not busy, and a new channel has a name. */
+    ready: () => !busy() && (channel !== undefined || name().trim() !== ""),
+    save,
+  };
+}

@@ -21,8 +21,8 @@
 |---|---|
 | `apps/server/src/modules/game/game.ts` | 账本持久化（`game_ledger`）、订阅 `Core`、commit 统计调度、称号设置与空地预约 |
 | `apps/server/src/modules/game/progress.ts` | 账本条目提取（`entriesFor`）、进度折叠纯函数（`progressFold`）与成就文案组装 |
-| `apps/server/src/modules/game/view.ts` | 等级公式（`xpToNext`）、地块映射（`plotOf`）、帧视图（`viewOf`）、特效（`effectsOf`）与地块分配（`freeStation`、`stationed`） |
-| `apps/server/src/modules/agent/seeds.json` | 内置成就定义（`achievements`） |
+| `apps/server/src/modules/game/view.ts` | 等级公式（`xpToNext`）、游玩状态折叠（`reducePlay`）、地块映射（`plotOf`）、帧视图（`viewOf`）、特效（`effectsOf`）与地块分配（`freeStation`、`stationed`） |
+| `apps/server/src/modules/game/seeds.json` | 内置成就定义（`achievements`） |
 | `apps/web/src/farm/panels/Achievements.tsx`、`apps/web/src/farm/hud/FxLayer.tsx` | 任务与成就面板、称号佩戴与画面特效层 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`game.achievement.list`、`game.title.set`）。
@@ -56,7 +56,7 @@
 
 ## 和谁打交道
 
-- **核心状态与组装层（`core`、`projection`）**：`projection` 调用 `viewOf` 与 `effectsOf` 拼帧；`Game` 订阅 `Core` 并回写 `progressChanged`。
+- **核心状态与组装层（`core`、`projection`）**：`projection` 在每个 `Core` 的投影实例内调用 `reducePlay` 维护游玩状态、用 `viewOf` 与 `effectsOf` 拼帧；`Game` 订阅 `Core` 并回写 `progressChanged`。
 - **仓库（`repo`）**：调用 `Repo.contributions` 获取 commit 计数。
 
 ## 为什么这样

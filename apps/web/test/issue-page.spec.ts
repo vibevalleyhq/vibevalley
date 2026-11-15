@@ -44,9 +44,8 @@ async function openIssue(
     hiredAt: now - 10 * minute,
     runs: 1,
     phase: { _tag: "done" },
-    refining: false,
     phaseText: "",
-    issue: made.id,
+    scope: { kind: "issue", id: made.id },
     branch: "vibevalley/1",
     ...helper,
   };

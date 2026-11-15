@@ -1,9 +1,11 @@
 import { MossEngine } from "@vibevalley/ai/realtime/moss";
-import { type MossEvent, type MossMessages, type MossPhase, type MossQos, type MossSetup, type MossTurn, noQos } from "@vibevalley/ai/realtime/moss-session";
+import { type MossEvent, type MossPhase, type MossQos, type MossSetup, type MossTurn, noQos } from "@vibevalley/ai/realtime/moss-session";
 import { t } from "@vibevalley/i18n";
 import { mossLinePath } from "@vibevalley/protocol";
 import { mossInRate, mossOutRate } from "@vibevalley/provider/moss";
 import { visionBufferedBytes, visionFrameBytes } from "@vibevalley/provider/moss/vision";
+
+import { messageOf } from "#/base/format.ts";
 
 import type { VoiceDriver } from "./contract.ts";
 import { openMossRelayBridge, type MossRelayBridge } from "./moss-worker.ts";
@@ -35,7 +37,6 @@ export class MossLine implements VoiceDriver<MossSetup, "user" | "moss"> {
   private out: { context: AudioContext; node: AudioWorkletNode } | undefined;
   private releasePendingMedia: (() => void) | undefined;
   private readonly engine: MossEngine;
-  private readonly messages: MossMessages;
   private readonly listeners = new Set<() => void>();
   private readonly visual = new VisualCapture({
     ready: () => this.phase === "live" && (this.bridge?.bufferedAmount() ?? Infinity) < visionBufferedBytes,
@@ -50,8 +51,7 @@ export class MossLine implements VoiceDriver<MossSetup, "user" | "moss"> {
     },
   });
 
-  constructor(messages: MossMessages) {
-    this.messages = messages;
+  constructor() {
     this.engine = new MossEngine({
       sendText: (json) => this.bridge?.sendText(json),
       sendBinary: (bytes) => this.bridge?.sendBinary(bytes),
@@ -144,17 +144,17 @@ export class MossLine implements VoiceDriver<MossSetup, "user" | "moss"> {
               .then((response) => response.text())
               .then(
                 (why) => {
-                  if (current()) this.stop(why || this.messages.closed());
+                  if (current()) this.stop(why || t("web.voice.moss.closed"));
                 },
                 () => {
-                  if (current()) this.stop(this.messages.closed());
+                  if (current()) this.stop(t("web.voice.moss.closed"));
                 },
               );
-          else this.stop(code === 1000 || this.phase === "ending" ? undefined : reason || this.messages.closed());
+          else this.stop(code === 1000 || this.phase === "ending" ? undefined : reason || t("web.voice.moss.closed"));
         },
       });
     } catch (error) {
-      if (current()) this.stop(this.messages.formatError(error));
+      if (current()) this.stop(messageOf(error));
     }
   }
 
@@ -198,7 +198,7 @@ export class MossLine implements VoiceDriver<MossSetup, "user" | "moss"> {
         track.addEventListener(
           "ended",
           () => {
-            if (generation === this.generation) this.stop(this.messages.noMic());
+            if (generation === this.generation) this.stop(t("web.voice.call.noMic"));
           },
           { once: true },
         );
@@ -206,8 +206,7 @@ export class MossLine implements VoiceDriver<MossSetup, "user" | "moss"> {
       this.engine.mediaOpened();
       this.bridge?.setMic(true);
     } catch (error) {
-      if (generation === this.generation)
-        this.stop(error instanceof Error && error.name === "NotAllowedError" ? this.messages.noMic() : this.messages.formatError(error));
+      if (generation === this.generation) this.stop(error instanceof Error && error.name === "NotAllowedError" ? t("web.voice.call.noMic") : messageOf(error));
     } finally {
       if (!installed) release();
       if (this.releasePendingMedia === release) this.releasePendingMedia = undefined;
@@ -277,3 +276,7 @@ export class MossLine implements VoiceDriver<MossSetup, "user" | "moss"> {
     this.engine.reset(problem);
   }
 }
+
+export type { MossQos, MossSetup };
+
+export const mossLine = new MossLine();
