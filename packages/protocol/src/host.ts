@@ -110,6 +110,96 @@ export const Opening = z.object({
   progress: z.number().min(0).max(100),
 }) satisfies Codec<Opening>;
 
+const FramingModeValues = ["farm", "free"] as const;
+type FramingMode = (typeof FramingModeValues)[number];
+const FramingMode = z.enum(FramingModeValues) satisfies Codec<FramingMode>;
+
+interface PtySpawn {
+  readonly id: string;
+  readonly cwd: string;
+  readonly cols: number;
+  readonly rows: number;
+}
+
+const PtySpawn = z.object({
+  id: z.string().min(1),
+  cwd: z.string(),
+  cols: z.number().int().min(2).max(1000),
+  rows: z.number().int().min(1).max(1000),
+}) satisfies Codec<PtySpawn>;
+
+interface PtySpawned {
+  readonly pid: number;
+}
+
+const PtySpawned = z.object({
+  pid: z.number().int(),
+}) satisfies Codec<PtySpawned>;
+
+interface PtyWrite {
+  readonly id: string;
+  /** Base64-encoded raw bytes written to the PTY master. */
+  readonly data: string;
+}
+
+const PtyWrite = z.object({
+  id: z.string().min(1),
+  data: z.string(),
+}) satisfies Codec<PtyWrite>;
+
+interface PtyResize {
+  readonly id: string;
+  readonly cols: number;
+  readonly rows: number;
+}
+
+const PtyResize = z.object({
+  id: z.string().min(1),
+  cols: z.number().int().min(2).max(1000),
+  rows: z.number().int().min(1).max(1000),
+}) satisfies Codec<PtyResize>;
+
+interface PtyInfo {
+  readonly cwd: string;
+  readonly command: string;
+}
+
+const PtyInfo = z.object({
+  cwd: z.string(),
+  command: z.string(),
+}) satisfies Codec<PtyInfo>;
+
+interface PtyData {
+  readonly id: string;
+  /** Base64-encoded raw bytes read from the PTY master. */
+  readonly data: string;
+}
+
+const PtyData = z.object({
+  id: z.string().min(1),
+  data: z.string(),
+}) satisfies Codec<PtyData>;
+
+interface PtyExit {
+  readonly id: string;
+  readonly code: number;
+}
+
+const PtyExit = z.object({
+  id: z.string().min(1),
+  code: z.number().int(),
+}) satisfies Codec<PtyExit>;
+
+interface HostTerminal {
+  readonly spawn: (input: PtySpawn) => Promise<PtySpawned>;
+  readonly write: (input: PtyWrite) => void;
+  readonly resize: (input: PtyResize) => void;
+  readonly kill: (id: string) => void;
+  readonly inspect: (id: string) => Promise<PtyInfo>;
+  readonly onData: (fn: (event: PtyData) => void) => () => void;
+  readonly onExit: (fn: (event: PtyExit) => void) => () => void;
+}
+
 export interface Host {
   readonly name: "desktop" | "mobile" | "browser";
   readonly notify?: (notice: Notice) => Promise<void>;
@@ -122,10 +212,13 @@ export interface Host {
   readonly locale?: (locale: Locale) => void;
   readonly reveal?: (path: string) => void;
   readonly theme?: (theme: ThemeChoice) => void;
+  /** Switches between 3:2 integer-scale snapping on `/farm` and free window resizing on workbench pages. */
+  readonly framing?: (mode: FramingMode) => void;
   /** Terminal phases uncover the page. */
   readonly opening?: (opening: Opening) => Promise<void>;
   readonly update?: Updates;
   readonly commandLine?: CommandLine;
+  readonly terminal?: HostTerminal;
 }
 
 export const ThemeChoiceValues = ["light", "dark", "system"] as const;
@@ -150,6 +243,7 @@ export const desktopBridge = {
   locale: call({ input: LocaleSchema, output: z.void() }),
   reveal: call({ input: z.string().regex(/^\/[^\0]*$/u), output: z.void() }),
   theme: call({ input: ThemeChoice, output: z.void() }),
+  framing: call({ input: FramingMode, output: z.void() }),
   opening: call({ input: Opening, output: z.void() }),
   updateState: call({ input: z.void(), output: UpdateState }),
   // Unbounded: blocks while downloading an update.
@@ -158,8 +252,15 @@ export const desktopBridge = {
   cliState: call({ input: z.void(), output: CommandLineState }),
   cliInstall: call({ input: z.void(), output: CommandLineState }),
   cliRemove: call({ input: z.void(), output: CommandLineState }),
+  ptySpawn: call({ input: PtySpawn, output: PtySpawned }),
+  ptyWrite: call({ input: PtyWrite, output: z.void() }),
+  ptyResize: call({ input: PtyResize, output: z.void() }),
+  ptyKill: call({ input: z.string().min(1), output: z.void() }),
+  ptyInspect: call({ input: z.string().min(1), output: PtyInfo }),
   voiceShortcut: push(z.void()),
   update: push(UpdateState),
+  ptyData: push(PtyData),
+  ptyExit: push(PtyExit),
 };
 
 const DesktopStatus = z.object({
@@ -186,6 +287,7 @@ export const desktopReach: Readonly<Record<keyof typeof desktopBridge, "control"
   locale: "page",
   reveal: "page",
   theme: "page",
+  framing: "page",
   opening: "page",
   updateState: "control",
   updateCheck: "control",
@@ -193,8 +295,15 @@ export const desktopReach: Readonly<Record<keyof typeof desktopBridge, "control"
   cliState: "page",
   cliInstall: "page",
   cliRemove: "page",
+  ptySpawn: "page",
+  ptyWrite: "page",
+  ptyResize: "page",
+  ptyKill: "page",
+  ptyInspect: "page",
   voiceShortcut: "page",
   update: "page",
+  ptyData: "page",
+  ptyExit: "page",
 };
 
 const Line = { line: z.number() };

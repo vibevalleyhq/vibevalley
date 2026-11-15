@@ -27,7 +27,21 @@ const host: Host = {
   locale: (locale) => told(main.call.locale(locale)),
   reveal: (path) => told(main.call.reveal(path)),
   theme: (theme) => told(main.call.theme(theme)),
-  ...(process.platform === "darwin" ? { titleBar } : {}),
+  framing: (mode) => told(main.call.framing(mode)),
+  ...(process.platform === "darwin"
+    ? {
+        titleBar,
+        terminal: {
+          spawn: (input) => main.call.ptySpawn(input),
+          write: (input) => told(main.call.ptyWrite(input)),
+          resize: (input) => told(main.call.ptyResize(input)),
+          kill: (id) => told(main.call.ptyKill(id)),
+          inspect: (id) => main.call.ptyInspect(id),
+          onData: (fn) => main.on("ptyData", fn),
+          onExit: (fn) => main.on("ptyExit", fn),
+        },
+      }
+    : {}),
   voiceShortcut: { accelerator: desktopVoiceShortcut, on: (fn) => main.on("voiceShortcut", fn) },
   update: {
     watch: (fn) => {

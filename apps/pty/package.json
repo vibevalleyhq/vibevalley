@@ -1,0 +1,8 @@
+{
+  "name": "@vibevalley/pty",
+  "private": true,
+  "scripts": {
+    "build": "swift build -c release",
+    "test": "swift test"
+  }
+}

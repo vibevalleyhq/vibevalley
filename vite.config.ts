@@ -550,6 +550,7 @@ export default defineConfig({
           "apps/cli/src/infra/spawn.ts",
           "apps/desktop/src/infra/island.ts",
           "apps/desktop/src/infra/server.ts",
+          "apps/desktop/src/infra/terminal.ts",
           "apps/desktop/src/infra/update.ts",
           "apps/web/test/fixtures.ts",
           "apps/web/test/global-setup.ts",

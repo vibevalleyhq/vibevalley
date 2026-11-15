@@ -14,6 +14,7 @@ import { issueMove, movedIssue } from "#/features/issue/model/moves.ts";
 import { issueState, noStepsText, stageTone } from "#/features/issue/model/overview.ts";
 import { issueSet, labeledIssue, sendLabel } from "#/features/issue/model/write.ts";
 import { createSessionEvents } from "#/features/session/index.ts";
+import { OpenTerminal } from "#/features/terminal/index.ts";
 import { useAgent } from "#/infra/agents.ts";
 import { ready } from "#/infra/query.ts";
 import { useIntents } from "#/state/intent.ts";
@@ -420,6 +421,7 @@ export function IssueDetail(props: {
                 >
                   <Icon name="copy" size={14} />
                 </button>
+                <OpenTerminal cwd={worktree()} title={`#${props.issue.number} ${props.issue.title}`} />
               </span>
             </Property>
           )}

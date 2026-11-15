@@ -21,6 +21,7 @@ apps/web/                  页面（Solid 2 + Vite）：桌面、浏览器、手
                            （apps/web/README.md）
 apps/desktop/              Electron 壳：用自己的 Node 带着服务端起来，打开它提供的页面；宿主能力经 preload 给页面
 apps/island/               刘海上的灵动岛（Swift、AppKit、SwiftUI）：桌面壳带起来的原生小程序，显示在做和等你的工单，点一行打开它
+apps/pty/                  桌面终端进程（Swift、Darwin forkpty）：桌面壳按需拉起的原生 PTY 助手，给工作台终端提供多仓库与 worktree 本地 shell（apps/pty/README.md）
 apps/mobile/               手机壳（Expo、React Native）：扫码配对，WebView 打开那台电脑「连接到本机」放出的页面；通知、锁屏不断的通话经桥给页面
 apps/site/                 官网 vibevalley.dev（Vite + Solid 2 静态生成，每个文档一个接管根）：图和像素字直接用 apps/web/public 的
 packages/protocol/         契约：一个概念一个文件夹 src/<概念>/（名字同服务端的模块），里面是形状（shapes.ts）、它们的 Zod Schema（schema.ts）、

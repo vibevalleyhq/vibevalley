@@ -2152,6 +2152,7 @@ export const catalogs = {
       place: {
         chat: { label: "聊天", hint: "频道和串" },
         issues: { label: "工单", hint: "每张工单从写下到关上" },
+        terminal: { label: "终端", hint: "仓库和工单 worktree 里的本地命令行" },
         agents: { label: "档案", hint: "档案：助手和帮工" },
         runtimes: { label: "农机", hint: "机器上的编码 agent" },
         repos: { label: "仓库", hint: "每个仓库一座岛" },
@@ -4302,6 +4303,24 @@ export const catalogs = {
       },
       readiness: { ready: "{feature}：可以用了", lacks: "{feature}：{why}", fix: "去设置" },
       accounts: { intro: "所有供应商的账号和钥匙都在这里；每个账号能用哪些模型也在这里看。每个功能用哪个账号，在「用途」里选。" },
+    },
+    "web.terminal": {
+      openIn: "在终端打开",
+      sidebar: "工作目录",
+      sidebarSplitter: "拖动调整目录栏宽度",
+      newShell: "新建终端",
+      newInFolder: "在 {name} 里新建终端",
+      splitRight: "向右分屏",
+      splitDown: "向下分屏",
+      closeTab: "关闭终端标签",
+      noRepos: "还没有仓库，也可以直接打开默认目录的终端",
+      homeFolder: "个人目录",
+      emptyTitle: "选择一个仓库或 worktree 打开终端",
+      emptyAction: "打开终端",
+      exited: "进程已退出（退出码 {code}）",
+      restart: "重新打开",
+      unavailableTitle: "终端在桌面版里运行",
+      unavailableBody: "在 macOS 桌面版打开 VibeValley，即可在每个仓库和工单 worktree 里直接运行本地 shell 与编码工具。",
     },
     "web.tree": {
       kind: { leaf: "叶", fruit: "果", seed: "种子" },
@@ -6944,6 +6963,7 @@ export const catalogs = {
       place: {
         chat: { label: "Chat", hint: "Channels and threads" },
         issues: { label: "Tickets", hint: "Every ticket from written to closed" },
+        terminal: { label: "Terminal", hint: "Local shells in repos and ticket worktrees" },
         agents: { label: "Profiles", hint: "Profiles: assistants and helpers" },
         runtimes: { label: "Machines", hint: "The coding agents on this computer" },
         repos: { label: "Repos", hint: "An island for each repo" },
@@ -9242,6 +9262,24 @@ export const catalogs = {
       accounts: {
         intro: "Every vendor's accounts and keys are here, with the models each account can use. Which account each feature uses is chosen under Uses.",
       },
+    },
+    "web.terminal": {
+      openIn: "Open in terminal",
+      sidebar: "Working folders",
+      sidebarSplitter: "Resize working folders pane",
+      newShell: "New terminal",
+      newInFolder: "New terminal in {name}",
+      splitRight: "Split right",
+      splitDown: "Split down",
+      closeTab: "Close terminal tab",
+      noRepos: "No repos yet; you can still open a shell in your home folder",
+      homeFolder: "Home folder",
+      emptyTitle: "Pick a repo or worktree to open a terminal",
+      emptyAction: "Open terminal",
+      exited: "Process exited (code {code})",
+      restart: "Reopen",
+      unavailableTitle: "Terminals run in the desktop app",
+      unavailableBody: "Open VibeValley in the macOS desktop app to run local shells and coding tools inside repos and ticket worktrees.",
     },
     "web.tree": {
       kind: { leaf: "Leaf", fruit: "Fruit", seed: "Seed" },
@@ -11717,6 +11755,8 @@ export interface Messages {
   "web.base.place.runtimes.label": undefined;
   "web.base.place.settings.hint": undefined;
   "web.base.place.settings.label": undefined;
+  "web.base.place.terminal.hint": undefined;
+  "web.base.place.terminal.label": undefined;
   "web.base.query.invalidResponse": undefined;
   "web.base.rail": undefined;
   "web.base.reading": undefined;
@@ -13920,6 +13960,22 @@ export interface Messages {
   "web.setting.words.memory": undefined;
   "web.setting.words.moss": undefined;
   "web.setting.words.skills": undefined;
+  "web.terminal.closeTab": undefined;
+  "web.terminal.emptyAction": undefined;
+  "web.terminal.emptyTitle": undefined;
+  "web.terminal.exited": { readonly code: string | number };
+  "web.terminal.homeFolder": undefined;
+  "web.terminal.newInFolder": { readonly name: string | number };
+  "web.terminal.newShell": undefined;
+  "web.terminal.noRepos": undefined;
+  "web.terminal.openIn": undefined;
+  "web.terminal.restart": undefined;
+  "web.terminal.sidebar": undefined;
+  "web.terminal.sidebarSplitter": undefined;
+  "web.terminal.splitDown": undefined;
+  "web.terminal.splitRight": undefined;
+  "web.terminal.unavailableBody": undefined;
+  "web.terminal.unavailableTitle": undefined;
   "web.tree.aboutToFall": undefined;
   "web.tree.allHelpers": undefined;
   "web.tree.allRepos": undefined;

@@ -58,7 +58,9 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   // The server needs nothing of Electron's: started here, it comes up while Electron gets ready and opens the window.
+  let loginPath = "";
   const starting = shellPath(paths.shellPath, process.env).then(async ({ path }) => {
+    if (path) loginPath = path;
     const keeper = serverKeeper(paths, serverEnvOf(currentChannel(), path ? { ...process.env, PATH: path } : process.env));
     server = keeper;
     return keeper.start(dev?.serverPort).then(
@@ -111,7 +113,13 @@ if (!app.requestSingleInstanceLock()) {
           keptPath: paths.shellPath,
         })
       : undefined,
+    pty: {
+      binary: process.platform === "darwin" ? paths.pty : undefined,
+      env: () => (loginPath ? { ...process.env, PATH: loginPath } : process.env),
+      roots: () => [homedir(), farmHome(), ...(process.env.VIBEVALLEY_WORK_ROOT ? [process.env.VIBEVALLEY_WORK_ROOT] : [])],
+    },
   });
+  app.on("will-quit", page.stopTerminals);
   // The command line's way in (`vibevalley app …`); answered at once, so `app open` and doctor's look at the app work while the server starts.
   const stopControl = serveControl(paths.home, {
     status: () => {

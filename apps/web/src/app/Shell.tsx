@@ -1,5 +1,5 @@
 import type { JSX } from "@solidjs/web";
-import { For, onSettled, Show } from "solid-js";
+import { createEffect, For, onSettled, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
@@ -8,6 +8,7 @@ import { QuickSwitcher, switcher } from "#/features/channel/index.ts";
 import { waitingOnUser } from "#/features/inbox/index.ts";
 import { NotesSearch } from "#/features/pkm/index.ts";
 import { useCore, useFrames } from "#/infra/frame.ts";
+import { currentHost } from "#/infra/host.ts";
 import { Link as A, NavLink, useMatches } from "#/infra/router.ts";
 import { useUpdates } from "#/infra/settings.ts";
 import { OrchestratorFace } from "#/ui/domain/Face.tsx";
@@ -101,7 +102,7 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
               <Show when={i() > 0}>
                 <span aria-hidden="true" class="my-1 h-px w-8 bg-on-rail/10" />
               </Show>
-              <For each={places.filter((p) => p.group === group && p.id !== "settings")}>
+              <For each={places.filter((p) => p.group === group && p.id !== "settings" && (p.id !== "terminal" || currentHost().terminal !== undefined))}>
                 {(p) => (
                   <Slot
                     to={p.path}
@@ -184,6 +185,9 @@ export function Shell(props: { children: JSX.Element }) {
   const meta = () => matches().at(-1)?.meta;
   const here = () => places.find((place) => place.id === meta()?.place);
   const inFarm = () => meta()?.skin === "farm";
+  createEffect(inFarm, (farm) => {
+    currentHost().framing?.(farm ? "farm" : "free");
+  });
   // Ctrl+K (⌘K on a Mac) anywhere in the workbench (base/shortcuts.ts).
   onSettled(() => {
     const key = (e: KeyboardEvent) => {
@@ -202,8 +206,8 @@ export function Shell(props: { children: JSX.Element }) {
       <ShortcutSheet />
       <Rail here={here()} farm={inFarm()} />
       <main class="flex min-w-0 flex-1 flex-col">
-        {/* The chat and the library draw their own one bar at the top: the place's name would be a second. */}
-        <Show when={!inFarm() && here()?.id !== "chat" && here()?.id !== "library"}>
+        {/* The chat, the library, and the terminal draw their own one bar at the top: the place's name would be a second. */}
+        <Show when={!inFarm() && here()?.id !== "chat" && here()?.id !== "library" && here()?.id !== "terminal"}>
           <Desk place={here()} />
         </Show>
         <div class="relative min-h-0 flex-1">{props.children}</div>

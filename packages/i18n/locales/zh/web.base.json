@@ -13,6 +13,10 @@
       "label": "工单",
       "hint": "每张工单从写下到关上"
     },
+    "terminal": {
+      "label": "终端",
+      "hint": "仓库和工单 worktree 里的本地命令行"
+    },
     "agents": {
       "label": "档案",
       "hint": "档案：助手和帮工"

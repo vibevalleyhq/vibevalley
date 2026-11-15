@@ -9,8 +9,8 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 | 状态流连接、心跳超时重连与断线提示 | `StateFrame` 的折叠与拼装（[核心状态](docs/subsystems/core.md)） |
 | 页面单向分层、Atom 状态中间层、乐观意图（`Intent`）与本地存储 | 协议形状与接口定义（[地基](docs/subsystems/foundation.md)） |
 | 工作台路由、外框、浅色/深色主题与组件故事查看器（`packages/stories`） | 像素农场画布玩法（[农场的皮](docs/subsystems/farm.md)）与各页细节（[界面清单](docs/reference/farm-ui.md)） |
-| 宿主契约（`host.ts`）：通知、托盘、快捷键、原生通话与标题栏避让 | 「连接到本机」服务端鉴权（[连接到本机](docs/subsystems/lan.md)）与声网令牌（[语音](docs/subsystems/voice.md)） |
-| 桌面壳：服务端子进程管理、灵动岛（`apps/island`）、四发布渠道隔离、打包与自更新 | 服务端内部启动与租约（[地基](docs/subsystems/foundation.md)） |
+| 宿主契约（`host.ts`）：通知、托盘、快捷键、原生通话、窗口比例锁定（`framing`）、桌面终端（`terminal`）与标题栏避让 | 「连接到本机」服务端鉴权（[连接到本机](docs/subsystems/lan.md)）与声网令牌（[语音](docs/subsystems/voice.md)） |
+| 桌面壳：服务端子进程管理、灵动岛（`apps/island`）、原生终端进程（`apps/pty`）、四发布渠道隔离、打包与自更新 | 服务端内部启动与租约（[地基](docs/subsystems/foundation.md)） |
 | 手机壳：扫码配对、系统钥匙串、WebView 容器与锁屏原生通话 | |
 
 包级说明见 [apps/web/README.md](apps/web/README.md)、[apps/web/src/farm/README.md](apps/web/src/farm/README.md) 和 [apps/mobile/README.md](apps/mobile/README.md)。
@@ -28,7 +28,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 | `apps/web/src/app/` | 顶层路由表（`App.tsx`）、侧栏导航（`places.ts`）与外框（`Shell.tsx`） |
 | `packages/stories/`、`apps/web/src/stories.tsx` | 按「设计体系 / 组件 / 交互 / 界面」四层组织的组件故事查看器 |
 | `packages/protocol/src/host.ts` | `Host` 接口、`desktopBridge`、`mobileBridge` 与 `desktopControl` 契约 |
-| `apps/desktop/src/`、`apps/island/` | Electron 主进程（`main.ts`、`infra/server.ts`、`base/channel.ts`、`infra/update.ts`）与 macOS 原生灵动岛 |
+| `apps/desktop/src/`、`apps/island/`、`apps/pty/` | Electron 主进程（`main.ts`、`infra/server.ts`、`infra/terminal.ts`、`base/channel.ts`、`infra/update.ts`）、macOS 原生灵动岛与原生 PTY 终端进程 |
 | `apps/mobile/src/` | Expo 手机壳（`infra/farm.ts`、`screens/PairScreen.tsx`、`screens/FarmScreen.tsx`、`infra/rtc.ts`） |
 
 ## 模型和不变量

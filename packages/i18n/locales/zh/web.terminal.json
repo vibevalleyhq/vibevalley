@@ -1,0 +1,18 @@
+{
+  "openIn": "在终端打开",
+  "sidebar": "工作目录",
+  "sidebarSplitter": "拖动调整目录栏宽度",
+  "newShell": "新建终端",
+  "newInFolder": "在 {name} 里新建终端",
+  "splitRight": "向右分屏",
+  "splitDown": "向下分屏",
+  "closeTab": "关闭终端标签",
+  "noRepos": "还没有仓库，也可以直接打开默认目录的终端",
+  "homeFolder": "个人目录",
+  "emptyTitle": "选择一个仓库或 worktree 打开终端",
+  "emptyAction": "打开终端",
+  "exited": "进程已退出（退出码 {code}）",
+  "restart": "重新打开",
+  "unavailableTitle": "终端在桌面版里运行",
+  "unavailableBody": "在 macOS 桌面版打开 VibeValley，即可在每个仓库和工单 worktree 里直接运行本地 shell 与编码工具。"
+}

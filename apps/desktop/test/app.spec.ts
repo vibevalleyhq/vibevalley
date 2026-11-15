@@ -82,15 +82,32 @@ test("the desktop app shows the live board and sends a notice", async () => {
     // On macOS the window's buttons sit over the rail's top: the rail reaches past the last of them.
     const titleBar = await page.evaluate(() => window.vibevalleyHost?.titleBar);
     if (titleBar) expect((await page.getByTestId("rail").boundingBox())?.width).toBeGreaterThan(titleBar.left);
-    // Between two whole scales the farm would have bars around it: when a resize ends, the window takes the nearest size
-    // it fills.
-    const resized = await app.evaluate(({ BrowserWindow }) => {
+    // Workbench routes resize freely without snapping to the farm's 3:2 grid.
+    const freeResized = await app.evaluate(({ BrowserWindow }) => {
       const w = BrowserWindow.getAllWindows()[0]!;
-      w.setContentSize(1220, 813);
+      w.setContentSize(1220, 700);
       w.emit("resized");
       return w.getContentSize();
     });
-    expect(resized).toEqual([1152, 768]);
+    expect(freeResized).toEqual([1220, 700]);
+
+    if (process.platform === "darwin") {
+      await api.repo.create({ name: "garden" });
+      await page.goto(server + "/repos/garden");
+      await page.getByTestId("open-terminal").click();
+      await page.waitForURL(server + "/terminal");
+      await expect(page.getByTestId("terminal-surface")).toBeVisible();
+      await page.getByTestId("terminal-split-right").click();
+      await expect(page.getByTestId("terminal-surface")).toHaveCount(2);
+      const focusedTab = await page.locator('[data-testid="terminal-group"][data-focused="true"] [data-testid="terminal-surface"]').getAttribute("data-tab");
+      expect(focusedTab).toBeTruthy();
+      await page.evaluate((id) => {
+        window.vibevalleyHost?.terminal?.write({ id: id!, data: btoa("echo VV_PTY_READY && pwd\n") });
+      }, focusedTab);
+      await expect(page.locator('[data-testid="terminal-group"][data-focused="true"]')).toContainText("VV_PTY_READY", { timeout: 10_000 });
+      await expect(page.locator('[data-testid="terminal-group"][data-focused="true"]')).toContainText("garden", { timeout: 10_000 });
+      await page.screenshot({ path: test.info().outputPath("desktop-terminal.png") });
+    }
 
     // Run from the repository it never checks: the update stays idle.
     await page.goto(server + "/settings/about");
@@ -108,6 +125,15 @@ test("the desktop app shows the live board and sends a notice", async () => {
     await page.screenshot({ path: test.info().outputPath("desktop.png") });
     await page.goto(server + "/farm/");
     await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true");
+    // Between two whole scales the farm would have bars around it: when a resize ends on /farm, the window takes the
+    // nearest 3:2 size it fills.
+    const farmResized = await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows()[0]!;
+      w.setContentSize(1220, 813);
+      w.emit("resized");
+      return w.getContentSize();
+    });
+    expect(farmResized).toEqual([1152, 768]);
     await expect(page.getByTestId("rail")).toBeVisible();
     await expect(page.getByTestId("desk")).toHaveCount(0);
     const farm = await page.getByTestId("farm").boundingBox();

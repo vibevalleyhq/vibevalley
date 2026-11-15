@@ -5,6 +5,7 @@ import type { RepoActivity, RepoLanguages, RepoSummary } from "@vibevalley/proto
 import * as S from "@vibevalley/protocol/schema";
 
 import { useNow } from "#/base/dom.tsx";
+import { OpenTerminal } from "#/features/terminal/index.ts";
 import { api } from "#/infra/api.ts";
 import { defineQuery, retryRead, ready, useRepos, useQuery } from "#/infra/query.ts";
 import { useRouter } from "#/infra/router.ts";
@@ -218,6 +219,7 @@ function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; a
           >
             <Icon name="copy" size={14} />
           </button>
+          <OpenTerminal cwd={props.repo.path} title={props.repo.name} />
         </div>
       </div>
       <div class="flex flex-col items-end gap-1">
