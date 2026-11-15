@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { Actor, ChannelType, CriterionCheck, IssueAnswer, IssueId, Question, QuotedBlock, RunTrigger, type Wire } from "@vibevalley/protocol/schema";
+import { Actor, ChannelType, CriterionCheck, IssueAnswer, IssueId, MessageId, Question, QuotedBlock, RunTrigger, type Wire } from "@vibevalley/protocol/schema";
 
 import type * as T from "./shapes.ts";
 import { GithubTriggerEventValues, IssueReportMemoryScopeValues, TriggerAddressingValues, TriggerSourceValues, VoiceModeValues } from "./shapes.ts";
@@ -74,7 +74,7 @@ const TriggerMeta = z.object({
   failed: z.exactOptional(z.boolean()),
   botRound: z.exactOptional(z.number().int()),
   botRoundKey: z.exactOptional(z.string()),
-  channelMessageId: z.exactOptional(z.string()),
+  channelMessageId: z.exactOptional(MessageId),
   inputContext: z.exactOptional(TriggerContext),
   channelType: z.exactOptional(ChannelType),
   responsePort: z.exactOptional(z.string()),

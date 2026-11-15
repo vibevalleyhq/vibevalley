@@ -26,11 +26,11 @@ export async function makeIssueStore(deps: { readonly core: Core; readonly db: D
   const issueOfRow = (row: q.GetIssueResult): T.Issue => hydrate(row, worked.of(row.id));
 
   return {
-    issueOfSession: (session: string): string | undefined => worked.issueOf(session),
-    sessionIdsOf: (issue: string): readonly T.SessionId[] => worked.sessionIds(issue),
+    issueOfSession: (session: T.SessionId): T.IssueId | undefined => worked.issueOf(session),
+    sessionIdsOf: (issue: T.IssueId): readonly T.SessionId[] => worked.sessionIds(issue),
     kept: async () => (await q.keptIssues(db.sql, { closed: keepClosedIssues })).map(issueOfRow),
     all: async () => (await q.listIssues(db.sql)).map(issueOfRow).toSorted(issueOrder),
-    byId: async (id: string) => {
+    byId: async (id: T.IssueId) => {
       const row = await q.getIssue(db.sql, { id });
       return row === undefined ? undefined : issueOfRow(row);
     },
@@ -41,7 +41,7 @@ export async function makeIssueStore(deps: { readonly core: Core; readonly db: D
     },
     lastAssigneeIn: async (repo: string) => (await qs.lastAssigneeIn(db.sql, { repo }))?.agent,
     /** Assigns `agent` inside the current transaction and applies the index delta only after commit. */
-    assignInTx: async (issue: string, agent: string | undefined, at: number, after?: () => Promise<void>) => {
+    assignInTx: async (issue: T.IssueId, agent: string | undefined, at: number, after?: () => Promise<void>) => {
       const assignment = await assignTo(db, issue, agent, at);
       await db.afterCommit(async () => {
         worked.changed(assignment.changed);
@@ -50,7 +50,7 @@ export async function makeIssueStore(deps: { readonly core: Core; readonly db: D
       return assignment.assigned;
     },
     /** Records an execution on `agent`'s active assignment inside the current transaction and applies both index deltas after commit. */
-    executeInTx: async (issue: string, agent: string, executor: string, startedAt: number, after?: () => Promise<void>) => {
+    executeInTx: async (issue: T.IssueId, agent: string, executor: T.SessionId, startedAt: number, after?: () => Promise<void>) => {
       const assignment = await assignTo(db, issue, agent, startedAt);
       if (!assignment.assigned) throw new Inconsistent("an executor's profile must own its assignment");
       let execution: qe.AddExecutionResult | undefined;
@@ -70,7 +70,7 @@ export async function makeIssueStore(deps: { readonly core: Core; readonly db: D
       });
     },
     /** Deletes `id` (and any cascaded child issues) in one transaction, pruning the in-memory index on commit without full-table reloads. */
-    remove: async (id: string) => {
+    remove: async (id: T.IssueId) => {
       await db.tx(async () => {
         const family = await q.family(db.sql, { id });
         await q.removeIssue(db.sql, { id });

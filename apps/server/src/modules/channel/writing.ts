@@ -1,7 +1,7 @@
 import { Hub, mapConcurrent, type TaskGroup } from "@vibevalley/async";
 import type * as T from "@vibevalley/protocol";
 import { everyone, userId } from "@vibevalley/protocol";
-import { sessionId } from "@vibevalley/protocol/schema";
+import { messageId, sessionId } from "@vibevalley/protocol/schema";
 
 import { Inconsistent } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
@@ -151,7 +151,7 @@ export function channelWriting(deps: ChannelWritingDeps, r: ChannelHub, tasks: T
       // The row as MessageByID would read it back: the sender's name and kind are the participant's.
       const sender = store.participant(w.from);
       if (!sender) throw new Inconsistent(`no participant ${w.from}`);
-      const id = newId();
+      const id = messageId(newId());
       const meta = metaText(w.meta);
       const created_at = clock.now();
       const { revision } = theRow(await qc.bumpRevision(db.sql, { id: w.channel }), "BumpRevision");

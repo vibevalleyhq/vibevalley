@@ -38,7 +38,10 @@ export function subscriptions(deps: SseDeps & { readonly channel: Channel; reado
       const { id, after } = contracts["channel.follow"].payload.parse(p);
       return channel.follow(id, after, signal);
     },
-    "channel.reports": (p, signal) => channel.reports(contracts["channel.reports"].payload.parse(p).after, signal),
+    "channel.reports": (p, signal) => {
+      const { after } = contracts["channel.reports"].payload.parse(p);
+      return channel.reports(after !== undefined ? S.messageId(after) : undefined, signal);
+    },
     "artifact.follow": (p, signal) => {
       const { id, after } = contracts["artifact.follow"].payload.parse(p);
       return artifact.follow(S.artifactId(id), after, signal);

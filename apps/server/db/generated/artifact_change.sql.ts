@@ -5,14 +5,14 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf } from "./types.js"
+import { rowOf, ArtifactId } from "./types.js"
 
 export interface ArtifactChangeByBatchParams {
   readonly ["batch_id"]: string
 }
 
 export const ArtifactChangeByBatchResult = z.object({
-  ["artifact_id"]: z.string(),
+  ["artifact_id"]: ArtifactId,
   ["seq"]: z.number().int(),
   ["batch_id"]: z.string(),
   ["actor"]: z.string(),
@@ -30,7 +30,7 @@ export async function artifactChangeByBatch(sql: Sql, params: ArtifactChangeByBa
 }
 
 export interface AddArtifactChangeParams {
-  readonly ["artifact_id"]: string
+  readonly ["artifact_id"]: ArtifactId
   readonly ["seq"]: number
   readonly ["batch_id"]: string
   readonly ["actor"]: string
@@ -56,13 +56,13 @@ export async function pruneArtifactChanges(sql: Sql, params: PruneArtifactChange
 }
 
 export interface ArtifactChangesAfterParams {
-  readonly ["artifact_id"]: string
+  readonly ["artifact_id"]: ArtifactId
   readonly ["seq"]: number
   readonly ["n"]: number
 }
 
 export const ArtifactChangesAfterResult = z.object({
-  ["artifact_id"]: z.string(),
+  ["artifact_id"]: ArtifactId,
   ["seq"]: z.number().int(),
   ["batch_id"]: z.string(),
   ["actor"]: z.string(),

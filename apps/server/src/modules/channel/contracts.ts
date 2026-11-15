@@ -50,7 +50,7 @@ export const theRow = <A>(row: A | undefined, query: string): A => {
 export function toMessage(row: MsgRow): T.ChatMessage {
   const meta = metaOf(row.meta);
   return {
-    id: S.messageId(row.id),
+    id: row.id,
     number: row.number,
     channel: row.channel_id,
     from: row.sender_id,
@@ -288,7 +288,7 @@ export interface ChannelEvent {
   readonly seq: number;
   readonly kind: "posted" | "removed";
   readonly channel: string;
-  readonly message: string;
+  readonly message: T.MessageId;
   readonly at: number;
 }
 
@@ -360,7 +360,9 @@ export interface ChannelService {
   readonly markRead: (channel: string, seq: number) => Promise<void>;
   /** A message as the user's notice of it stands: when the user read it (null: not yet), and whether a later message
    * there took its place (the user spoke after it, or its speaker reported again). None once it is deleted. */
-  readonly userReceipt: (id: string) => Promise<{ readonly message: T.ChatMessage; readonly readAt: number | null; readonly superseded: boolean } | undefined>;
+  readonly userReceipt: (
+    id: T.MessageId,
+  ) => Promise<{ readonly message: T.ChatMessage; readonly readAt: number | null; readonly superseded: boolean } | undefined>;
   /** Each speaker's newest report the user has read, and when the user read it. */
   readonly userReadReports: () => Promise<readonly { readonly from: string; readonly at: number; readonly readAt: number }[]>;
   /** The place an empty target means for a participant: the home the layers above gave it. */
@@ -371,7 +373,7 @@ export interface ChannelService {
   /** The events after `after`, oldest first, at most n. */
   readonly events: (after: number, n?: number) => Promise<ChannelEvent[]>;
   /** A posted message as it is now, told as when it was committed; none once it is deleted or its place is gone. */
-  readonly committedOf: (message: string) => Promise<Committed | undefined>;
+  readonly committedOf: (message: T.MessageId) => Promise<Committed | undefined>;
   /** A reader the chat's writes wait on: a message said, posted, spoken or noted, or a removal, returns once
    * `handled(seq)` has for its event (a throw fails the write; the event stays committed). A notice does not wait: it
    * wakes no one, and a reader may write one while it handles an event. */
@@ -390,7 +392,7 @@ export interface ChannelService {
   readonly place: (id: string) => Place | undefined;
   /** A message a participant took in outside the chat (handed to it): no longer unread or unseen for it. A message that
    * is not there marks nothing. */
-  readonly markSeen: (participant: string, message: string) => Promise<void>;
+  readonly markSeen: (participant: string, message: T.MessageId) => Promise<void>;
   /** Sets where a participant has read up to in a place. */
   readonly readUpTo: (participant: string, channel: string, number: number) => Promise<void>;
   /** The newest message number in a place, 0 for none. */
@@ -414,7 +416,7 @@ export interface ChannelService {
    * before any event. */
   readonly follow: (channel: string, after: number, signal?: AbortSignal) => AsyncIterable<T.ChannelEvent>;
   /** The reports after the one with id `after` (the newest ones without it), then each one from now on. */
-  readonly reports: (after?: string, signal?: AbortSignal) => AsyncIterable<T.ChannelEvent>;
+  readonly reports: (after?: T.MessageId, signal?: AbortSignal) => AsyncIterable<T.ChannelEvent>;
   readonly channels: () => Promise<Info[]>;
   readonly openChannel: (name: string, description: string, repo: string) => Promise<Info>;
   /** `description` undefined or `""` keeps existing; `repo` undefined keeps existing, `""` clears it. */

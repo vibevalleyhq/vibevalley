@@ -1,10 +1,13 @@
 import { expect, test } from "vite-plus/test";
 
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
+
 import { testDb } from "#/testing/layers.ts";
 import { inputsOfIssue, pendingIssueInputs } from "#db/issue_input.sql.ts";
 
 test("regression: reassignment selects unread inputs without loading consumed history", async () => {
   await using db = await testDb();
+  const work = issueId("work");
   const sql = (text: TemplateStringsArray) => db.sql.exec(text.join(""));
   await sql`insert into issue (id, number, description, mandate_strength, max_bot_review_rounds, auto_submit_pr, created_at)
       values ('work', 1, '', 'explicit', 3, false, 0)`;
@@ -25,7 +28,7 @@ test("regression: reassignment selects unread inputs without loading consumed hi
   await sql`update session_delivery set state = 'dropped', dropped_why = 'deleted' where envelope_id = '2005'`;
   await sql`update issue_input set state = 'held', session_id = null where trigger_id = '2006'`;
   const selected = async (recipient: string | null, closing = false) =>
-    (await pendingIssueInputs(db.sql, { issue_id: "work", recipient, closing })).map((row) => row.trigger_id);
+    (await pendingIssueInputs(db.sql, { issue_id: work, recipient: recipient ? sessionId(recipient) : null, closing })).map((row) => row.trigger_id);
   const selected2 = await selected("new");
   expect(selected2).toEqual(["2001", "2002", "2003", "2004", "2006", "2007"]);
   const selected3 = await selected("old");
@@ -34,6 +37,6 @@ test("regression: reassignment selects unread inputs without loading consumed hi
   expect(selected4).toEqual(["2006"]);
   const selected5 = await selected(null, true);
   expect(selected5).toEqual(["2001", "2002", "2003", "2004", "2005", "2006", "2007"]);
-  const issueInputs2 = await inputsOfIssue(db.sql, { issue_id: "work" });
+  const issueInputs2 = await inputsOfIssue(db.sql, { issue_id: work });
   expect(issueInputs2).toHaveLength(2007);
 });

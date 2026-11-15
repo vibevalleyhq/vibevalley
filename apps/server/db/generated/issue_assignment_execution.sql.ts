@@ -5,17 +5,17 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, Words_session_role } from "./types.js"
+import { rowOf, IssueId, SessionId, Words_session_role } from "./types.js"
 
 export interface AddExecutionParams {
   readonly ["assignment"]: string
-  readonly ["executor"]: string
+  readonly ["executor"]: SessionId
   readonly ["started_at"]: number
 }
 
 export const AddExecutionResult = z.object({
   ["assignment"]: z.string(),
-  ["executor"]: z.string(),
+  ["executor"]: SessionId,
   ["started_at"]: z.number(),
   ["role"]: Words_session_role,
 })
@@ -34,9 +34,9 @@ export interface AllExecutionsParams {
 
 export const AllExecutionsResult = z.object({
   ["assignment"]: z.string(),
-  ["executor"]: z.string(),
+  ["executor"]: SessionId,
   ["started_at"]: z.number(),
-  ["issue"]: z.string(),
+  ["issue"]: IssueId,
   ["role"]: Words_session_role,
 })
 export type AllExecutionsResult = z.infer<typeof AllExecutionsResult>

@@ -5,10 +5,10 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, Words_channel_message_kind, Words_channel_participant_kind, Words_channel_type } from "./types.js"
+import { rowOf, MessageId, Words_channel_message_kind, Words_channel_participant_kind, Words_channel_type } from "./types.js"
 
 export interface InsertMessageParams {
-  readonly ["id"]: string
+  readonly ["id"]: MessageId
   readonly ["channel"]: string
   readonly ["sender"]: string
   readonly ["kind"]: Words_channel_message_kind
@@ -34,7 +34,7 @@ export async function insertMessage(sql: Sql, params: InsertMessageParams): Prom
 
 export interface UpdateMessageMetaParams {
   readonly ["meta"]: string | null
-  readonly ["id"]: string
+  readonly ["id"]: MessageId
 }
 
 export const UpdateMessageMetaSql = "-- name: UpdateMessageMeta :exec\nupdate channel_message set meta = $1 where id = $2;"
@@ -44,11 +44,11 @@ export async function updateMessageMeta(sql: Sql, params: UpdateMessageMetaParam
 }
 
 export interface MessageByIDParams {
-  readonly ["id"]: string
+  readonly ["id"]: MessageId
 }
 
 export const MessageByIDResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: MessageId,
   ["channel_id"]: z.string(),
   ["number"]: z.number().int(),
   ["sender_id"]: z.string(),
@@ -82,7 +82,7 @@ export interface MessageBySendKeyParams {
 }
 
 export const MessageBySendKeyResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: MessageId,
   ["channel_id"]: z.string(),
   ["number"]: z.number().int(),
   ["sender_id"]: z.string(),
@@ -115,7 +115,7 @@ export interface UserMentionsParams {
 }
 
 export const UserMentionsResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: MessageId,
   ["channel_id"]: z.string(),
   ["number"]: z.number().int(),
   ["sender_id"]: z.string(),
@@ -154,7 +154,7 @@ export interface MessagesBeforeParams {
 }
 
 export const MessagesBeforeResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: MessageId,
   ["channel_id"]: z.string(),
   ["number"]: z.number().int(),
   ["sender_id"]: z.string(),
@@ -189,7 +189,7 @@ export interface MessagesAfterParams {
 }
 
 export const MessagesAfterResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: MessageId,
   ["channel_id"]: z.string(),
   ["number"]: z.number().int(),
   ["sender_id"]: z.string(),
@@ -222,7 +222,7 @@ export interface RecentReportsParams {
 }
 
 export const RecentReportsResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: MessageId,
   ["channel_id"]: z.string(),
   ["number"]: z.number().int(),
   ["sender_id"]: z.string(),
@@ -251,12 +251,12 @@ export async function recentReports(sql: Sql, params: RecentReportsParams): Prom
 }
 
 export interface ReportsAfterParams {
-  readonly ["after"]: string
+  readonly ["after"]: MessageId
   readonly ["n"]: number
 }
 
 export const ReportsAfterResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: MessageId,
   ["channel_id"]: z.string(),
   ["number"]: z.number().int(),
   ["sender_id"]: z.string(),
@@ -292,7 +292,7 @@ export interface RecentDuplicateParams {
 }
 
 export const RecentDuplicateResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: MessageId,
 })
 export type RecentDuplicateResult = z.infer<typeof RecentDuplicateResult>
 
@@ -355,7 +355,7 @@ export async function latestNumber(sql: Sql, params: LatestNumberParams): Promis
 export interface CallersOfParams {
   readonly ["speaker"]: string
   readonly ["channel"]: string
-  readonly ["before"]: string
+  readonly ["before"]: MessageId
   readonly ["n"]: number
 }
 
@@ -377,7 +377,7 @@ export interface UnseenInParams {
 }
 
 export const UnseenInResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: MessageId,
 })
 export type UnseenInResult = z.infer<typeof UnseenInResult>
 
@@ -411,7 +411,7 @@ export interface MessageByNumberParams {
 }
 
 export const MessageByNumberResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: MessageId,
   ["channel_id"]: z.string(),
   ["number"]: z.number().int(),
   ["sender_id"]: z.string(),
@@ -446,7 +446,7 @@ export interface MessagesChangedAfterParams {
 }
 
 export const MessagesChangedAfterResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: MessageId,
   ["channel_id"]: z.string(),
   ["number"]: z.number().int(),
   ["sender_id"]: z.string(),
@@ -478,7 +478,7 @@ export interface EditMessageParams {
   readonly ["body"]: string
   readonly ["at"]: number | null
   readonly ["revision"]: number
-  readonly ["id"]: string
+  readonly ["id"]: MessageId
 }
 
 export const EditMessageSql = "-- name: EditMessage :exec\nupdate channel_message set body = $1, edited_at = $2, revision = $3 where id = $4;"
@@ -490,7 +490,7 @@ export async function editMessage(sql: Sql, params: EditMessageParams): Promise<
 export interface DeleteMessageParams {
   readonly ["at"]: number | null
   readonly ["revision"]: number
-  readonly ["id"]: string
+  readonly ["id"]: MessageId
 }
 
 export const DeleteMessageSql = "-- name: DeleteMessage :exec\n-- Its words, attachments and reactions go; its number stays.\nupdate channel_message set body = '', meta = null, reactions = null, deleted_at = $1, revision = $2 where id = $3;"
@@ -502,7 +502,7 @@ export async function deleteMessage(sql: Sql, params: DeleteMessageParams): Prom
 export interface SetReactionsParams {
   readonly ["reactions"]: string | null
   readonly ["revision"]: number
-  readonly ["id"]: string
+  readonly ["id"]: MessageId
 }
 
 export const SetReactionsSql = "-- name: SetReactions :exec\nupdate channel_message set reactions = $1, revision = $2 where id = $3;"
@@ -514,7 +514,7 @@ export async function setReactions(sql: Sql, params: SetReactionsParams): Promis
 export interface SetPinnedParams {
   readonly ["pinned_at"]: number | null
   readonly ["revision"]: number
-  readonly ["id"]: string
+  readonly ["id"]: MessageId
 }
 
 export const SetPinnedSql = "-- name: SetPinned :exec\nupdate channel_message set pinned_at = $1, revision = $2 where id = $3;"
@@ -528,7 +528,7 @@ export interface PinnedInParams {
 }
 
 export const PinnedInResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: MessageId,
   ["channel_id"]: z.string(),
   ["number"]: z.number().int(),
   ["sender_id"]: z.string(),
@@ -569,7 +569,7 @@ export interface SearchMessagesParams {
 }
 
 export const SearchMessagesResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: MessageId,
   ["channel_id"]: z.string(),
   ["number"]: z.number().int(),
   ["sender_id"]: z.string(),
@@ -624,7 +624,7 @@ export async function deleteThreadMessagesIn(sql: Sql, params: DeleteThreadMessa
 export interface SetEmbedsParams {
   readonly ["meta"]: string | null
   readonly ["revision"]: number
-  readonly ["id"]: string
+  readonly ["id"]: MessageId
 }
 
 export const SetEmbedsSql = "-- name: SetEmbeds :exec\n-- The previews read for its links, once they are: a change like any other.\nupdate channel_message set meta = $1, revision = $2 where id = $3;"
@@ -634,7 +634,7 @@ export async function setEmbeds(sql: Sql, params: SetEmbedsParams): Promise<numb
 }
 
 export interface NotificationReceiptParams {
-  readonly ["id"]: string
+  readonly ["id"]: MessageId
 }
 
 export const NotificationReceiptResult = z.object({

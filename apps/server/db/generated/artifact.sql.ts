@@ -5,10 +5,10 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, Words_artifact_body } from "./types.js"
+import { rowOf, ArtifactId, MessageId, Words_artifact_body } from "./types.js"
 
 export interface AddArtifactParams {
-  readonly ["id"]: string
+  readonly ["id"]: ArtifactId
   readonly ["title"]: string
   readonly ["body"]: Words_artifact_body
   readonly ["display"]: string | null
@@ -27,16 +27,16 @@ export async function addArtifact(sql: Sql, params: AddArtifactParams): Promise<
 }
 
 export interface ArtifactParams {
-  readonly ["id"]: string
+  readonly ["id"]: ArtifactId
 }
 
 export const ArtifactResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: ArtifactId,
   ["title"]: z.string(),
   ["body"]: Words_artifact_body,
   ["display"]: z.string().nullable(),
   ["channel_id"]: z.string().nullable(),
-  ["message_id"]: z.string().nullable(),
+  ["message_id"]: MessageId.nullable(),
   ["issue"]: z.string().nullable(),
   ["by_id"]: z.string(),
   ["by_name"]: z.string(),
@@ -61,12 +61,12 @@ export interface ArtifactsInChannelParams {
 }
 
 export const ArtifactsInChannelResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: ArtifactId,
   ["title"]: z.string(),
   ["body"]: Words_artifact_body,
   ["display"]: z.string().nullable(),
   ["channel_id"]: z.string().nullable(),
-  ["message_id"]: z.string().nullable(),
+  ["message_id"]: MessageId.nullable(),
   ["issue"]: z.string().nullable(),
   ["by_id"]: z.string(),
   ["by_name"]: z.string(),
@@ -91,12 +91,12 @@ export interface ArtifactsForIssueParams {
 }
 
 export const ArtifactsForIssueResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: ArtifactId,
   ["title"]: z.string(),
   ["body"]: Words_artifact_body,
   ["display"]: z.string().nullable(),
   ["channel_id"]: z.string().nullable(),
-  ["message_id"]: z.string().nullable(),
+  ["message_id"]: MessageId.nullable(),
   ["issue"]: z.string().nullable(),
   ["by_id"]: z.string(),
   ["by_name"]: z.string(),
@@ -121,12 +121,12 @@ export interface ArtifactsParams {
 }
 
 export const ArtifactsResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: ArtifactId,
   ["title"]: z.string(),
   ["body"]: Words_artifact_body,
   ["display"]: z.string().nullable(),
   ["channel_id"]: z.string().nullable(),
-  ["message_id"]: z.string().nullable(),
+  ["message_id"]: MessageId.nullable(),
   ["issue"]: z.string().nullable(),
   ["by_id"]: z.string(),
   ["by_name"]: z.string(),
@@ -149,7 +149,7 @@ export async function artifacts(sql: Sql, params: ArtifactsParams): Promise<Arti
 export interface ArtifactVersionedParams {
   readonly ["version"]: number
   readonly ["updated_at"]: number
-  readonly ["id"]: string
+  readonly ["id"]: ArtifactId
 }
 
 export const ArtifactVersionedSql = "-- name: ArtifactVersioned :exec\nupdate artifact set version = $1, updated_at = $2 where id = $3;"
@@ -161,7 +161,7 @@ export async function artifactVersioned(sql: Sql, params: ArtifactVersionedParam
 export interface ArtifactAcceptedParams {
   readonly ["seq"]: number
   readonly ["updated_at"]: number
-  readonly ["id"]: string
+  readonly ["id"]: ArtifactId
 }
 
 export const ArtifactAcceptedSql = "-- name: ArtifactAccepted :exec\n-- A batch of a blocks artifact was taken: its seq is the batch's.\nupdate artifact set seq = $1, updated_at = $2 where id = $3;"
@@ -171,8 +171,8 @@ export async function artifactAccepted(sql: Sql, params: ArtifactAcceptedParams)
 }
 
 export interface ArtifactSaidParams {
-  readonly ["message_id"]: string | null
-  readonly ["id"]: string
+  readonly ["message_id"]: MessageId | null
+  readonly ["id"]: ArtifactId
 }
 
 export const ArtifactSaidSql = "-- name: ArtifactSaid :exec\nupdate artifact set message_id = $1 where id = $2;"
@@ -184,7 +184,7 @@ export async function artifactSaid(sql: Sql, params: ArtifactSaidParams): Promis
 export interface ArtifactRenamedParams {
   readonly ["title"]: string
   readonly ["updated_at"]: number
-  readonly ["id"]: string
+  readonly ["id"]: ArtifactId
 }
 
 export const ArtifactRenamedSql = "-- name: ArtifactRenamed :exec\nupdate artifact set title = $1, updated_at = $2 where id = $3;"
@@ -196,7 +196,7 @@ export async function artifactRenamed(sql: Sql, params: ArtifactRenamedParams): 
 export interface ArtifactShownParams {
   readonly ["display"]: string | null
   readonly ["updated_at"]: number
-  readonly ["id"]: string
+  readonly ["id"]: ArtifactId
 }
 
 export const ArtifactShownSql = "-- name: ArtifactShown :exec\nupdate artifact set display = $1, updated_at = $2 where id = $3 and body = 'html';"
@@ -206,7 +206,7 @@ export async function artifactShown(sql: Sql, params: ArtifactShownParams): Prom
 }
 
 export interface DeleteArtifactParams {
-  readonly ["id"]: string
+  readonly ["id"]: ArtifactId
 }
 
 export const DeleteArtifactSql = "-- name: DeleteArtifact :exec\ndelete from artifact where id = $1;"

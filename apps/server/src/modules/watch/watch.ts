@@ -11,7 +11,7 @@ import { Semaphore, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { userId } from "@vibevalley/protocol";
-import { messageId } from "@vibevalley/protocol/schema";
+import { messageId, sessionId } from "@vibevalley/protocol/schema";
 
 import { head } from "#/base/clip.ts";
 import { ApiError, lookIn, missing } from "#/base/errors.ts";
@@ -140,7 +140,7 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
       broken: breaker.tripped(),
     });
     const hearers: Hearer[] = braked.map((d) => ({
-      session: d.recipient,
+      session: sessionId(d.recipient),
       reason: d.reason,
       wakes: d.wakes,
       ...(d.heldBy ? { heldBy: d.heldBy } : {}),
@@ -459,7 +459,7 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
           case "Consumed":
             // Marked before anything else the news sets off, in the order taken: a session that speaks right after
             // taking its input is not held back by it.
-            await bestEffort(log, `${change.session} saw ${change.envelope}`, () => chat.markSeen(change.session, change.envelope));
+            await bestEffort(log, `${change.session} saw ${change.envelope}`, () => chat.markSeen(change.session, messageId(change.envelope)));
             await bestEffort(log, `👀 on ${change.envelope}`, () =>
               chat.react(messageId(change.envelope), change.session, handedEmoji, true).then(() => undefined),
             );
@@ -511,7 +511,7 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
     },
     previewRemove: async (id) => {
       const base = await chat.previewRemove(id);
-      const waiting = await sessions.waitingOn(id);
+      const waiting = await sessions.waitingOn(messageId(id));
       return { ...base, does: [...base.does, ...(waiting > 0 ? [t("server.channel.deletesDeliveries", { n: waiting })] : [])] };
     },
     boot: async () => {

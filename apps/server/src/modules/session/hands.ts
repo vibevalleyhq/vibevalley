@@ -38,7 +38,7 @@ export interface Hand {
   readonly stack: HandStack;
   readonly place: Workplace;
   /** Retained for run attribution even while the session is between assignments. */
-  readonly issue: string;
+  readonly issue: T.IssueId | undefined;
   readonly access: Semaphore;
   readonly journal: Journal;
   /** `""` between launches. */

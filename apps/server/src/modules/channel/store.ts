@@ -96,7 +96,7 @@ export async function makeChannelStore(deps: ChannelStoreDeps) {
     if (who === userId) await db.afterCommit(() => model.userReadTo(channel, upto));
   };
 
-  const threadFor = async (root: { id: string; number: number; channel: string }, subject: ThreadSubject) => {
+  const threadFor = async (root: { id: T.MessageId; number: number; channel: string }, subject: ThreadSubject) => {
     const existing = model.threadOfRoot(root.id);
     if (existing !== undefined && existing !== "") return existing;
     const id = newId();

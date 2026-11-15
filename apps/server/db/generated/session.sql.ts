@@ -5,10 +5,10 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, Words_session_closed, Words_session_role } from "./types.js"
+import { rowOf, SessionId, Words_session_closed, Words_session_role } from "./types.js"
 
 export interface KeepSessionParams {
-  readonly ["id"]: string
+  readonly ["id"]: SessionId
   readonly ["role"]: Words_session_role
   readonly ["agent"]: string
   readonly ["name"]: string
@@ -28,7 +28,7 @@ export async function keepSession(sql: Sql, params: KeepSessionParams): Promise<
 }
 
 export interface ForgetSessionParams {
-  readonly ["id"]: string
+  readonly ["id"]: SessionId
 }
 
 export const ForgetSessionSql = "-- name: ForgetSession :exec\ndelete from session where id = $1;"
@@ -40,7 +40,7 @@ export async function forgetSession(sql: Sql, params: ForgetSessionParams): Prom
 export interface EndSessionParams {
   readonly ["ended_at"]: number | null
   readonly ["closed"]: Words_session_closed | null
-  readonly ["id"]: string
+  readonly ["id"]: SessionId
 }
 
 export const EndSessionSql = "-- name: EndSession :exec\nupdate session set ended_at = $1, closed = $2 where id = $3;"
@@ -50,11 +50,11 @@ export async function endSession(sql: Sql, params: EndSessionParams): Promise<nu
 }
 
 export interface SessionByIDParams {
-  readonly ["id"]: string
+  readonly ["id"]: SessionId
 }
 
 export const SessionByIDResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: SessionId,
   ["role"]: Words_session_role,
   ["agent"]: z.string(),
   ["name"]: z.string(),
@@ -93,7 +93,7 @@ export interface EndedSessionsParams {
 }
 
 export const EndedSessionsResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: SessionId,
   ["role"]: Words_session_role,
   ["agent"]: z.string(),
   ["name"]: z.string(),
@@ -131,7 +131,7 @@ export interface SessionsEndedBeforeParams {
 }
 
 export const SessionsEndedBeforeResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: SessionId,
 })
 export type SessionsEndedBeforeResult = z.infer<typeof SessionsEndedBeforeResult>
 
@@ -147,7 +147,7 @@ export interface KeepHandParams {
   readonly ["oar_session"]: string | null
   readonly ["last_text"]: string | null
   readonly ["recalled"]: string | null
-  readonly ["id"]: string
+  readonly ["id"]: SessionId
 }
 
 export const KeepHandSql = "-- name: KeepHand :exec\n-- What a session on the farm needs to be taken up again after a restart: where it works (JSON), its oar session, its\n-- last words, the memories it was reminded of (JSON).\nupdate session set place = $1, oar_session = $2, last_text = $3, recalled = $4\nwhere id = $5;"
@@ -158,7 +158,7 @@ export async function keepHand(sql: Sql, params: KeepHandParams): Promise<number
 
 export interface SetPendingReportParams {
   readonly ["report"]: string | null
-  readonly ["id"]: string
+  readonly ["id"]: SessionId
 }
 
 export const SetPendingReportSql = "-- name: SetPendingReport :exec\nupdate session set pending_report = $1 where id = $2 and ended_at is null;"
@@ -168,7 +168,7 @@ export async function setPendingReport(sql: Sql, params: SetPendingReportParams)
 }
 
 export interface ClearPendingReportParams {
-  readonly ["id"]: string
+  readonly ["id"]: SessionId
 }
 
 export const ClearPendingReportSql = "-- name: ClearPendingReport :exec\nupdate session set pending_report = null where id = $1;"
@@ -198,7 +198,7 @@ export interface ActiveSessionsParams {
 }
 
 export const ActiveSessionsResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: SessionId,
   ["role"]: Words_session_role,
   ["agent"]: z.string(),
   ["name"]: z.string(),
@@ -238,7 +238,7 @@ export interface KeepSessionStateParams {
   readonly ["last_run"]: string | null
   readonly ["spent"]: string | null
   readonly ["channel"]: string | null
-  readonly ["id"]: string
+  readonly ["id"]: SessionId
 }
 
 export const KeepSessionStateSql = "-- name: KeepSessionState :exec\nupdate session set phase = $1, refining = $2, runs = $3,\n  last_run = $4, spent = $5, channel = $6\nwhere id = $7 and ended_at is null;"

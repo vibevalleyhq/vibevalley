@@ -5,14 +5,14 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, Words_session_delivery_held_by, Words_session_delivery_source, Words_session_delivery_state, Words_session_delivery_urgency } from "./types.js"
+import { rowOf, MessageId, SessionId, Words_session_delivery_held_by, Words_session_delivery_source, Words_session_delivery_state, Words_session_delivery_urgency } from "./types.js"
 
 export interface InsertDeliveryParams {
-  readonly ["session_id"]: string
+  readonly ["session_id"]: SessionId
   readonly ["envelope_id"]: string
   readonly ["scope"]: string
   readonly ["channel_id"]: string | null
-  readonly ["message_id"]: string | null
+  readonly ["message_id"]: MessageId | null
   readonly ["source"]: Words_session_delivery_source
   readonly ["urgency"]: Words_session_delivery_urgency
   readonly ["reason"]: string
@@ -37,7 +37,7 @@ export async function insertDelivery(sql: Sql, params: InsertDeliveryParams): Pr
 export interface MarkHandedParams {
   readonly ["launch"]: string | null
   readonly ["handed_at"]: number | null
-  readonly ["session_id"]: string
+  readonly ["session_id"]: SessionId
   readonly ["envelope_id"]: string
 }
 
@@ -48,7 +48,7 @@ export async function markHanded(sql: Sql, params: MarkHandedParams): Promise<nu
 }
 
 export interface DeliveryReceiptParams {
-  readonly ["session_id"]: string
+  readonly ["session_id"]: SessionId
   readonly ["envelope_id"]: string
 }
 
@@ -66,7 +66,7 @@ export async function deliveryReceipt(sql: Sql, params: DeliveryReceiptParams): 
 }
 
 export interface DeliveryPayloadParams {
-  readonly ["session_id"]: string
+  readonly ["session_id"]: SessionId
   readonly ["envelope_id"]: string
 }
 
@@ -83,7 +83,7 @@ export async function deliveryPayload(sql: Sql, params: DeliveryPayloadParams): 
 }
 
 export interface DropReassignedParams {
-  readonly ["session_id"]: string
+  readonly ["session_id"]: SessionId
   readonly ["envelope_id"]: string
 }
 
@@ -94,7 +94,7 @@ export async function dropReassigned(sql: Sql, params: DropReassignedParams): Pr
 }
 
 export interface RollbackHandedParams {
-  readonly ["session_id"]: string
+  readonly ["session_id"]: SessionId
 }
 
 export const RollbackHandedResult = z.object({
@@ -110,7 +110,7 @@ export async function rollbackHanded(sql: Sql, params: RollbackHandedParams): Pr
 }
 
 export interface RollbackOneParams {
-  readonly ["session_id"]: string
+  readonly ["session_id"]: SessionId
   readonly ["envelope_id"]: string
 }
 
@@ -132,7 +132,7 @@ export async function rollbackAll(sql: Sql): Promise<number> {
 
 export interface ConsumeDeliveryParams {
   readonly ["consumed_at"]: number | null
-  readonly ["session_id"]: string
+  readonly ["session_id"]: SessionId
   readonly ["envelope_id"]: string
 }
 
@@ -144,7 +144,7 @@ export async function consumeDelivery(sql: Sql, params: ConsumeDeliveryParams): 
 
 export interface DropOpenParams {
   readonly ["dropped_why"]: string | null
-  readonly ["session_id"]: string
+  readonly ["session_id"]: SessionId
 }
 
 export const DropOpenSql = "-- name: DropOpen :exec\nupdate session_delivery set state = 'dropped', dropped_why = $1, launch = null\nwhere session_id = $2 and state in ('pending', 'handed');"
@@ -175,7 +175,7 @@ export interface LastAgentWakesParams {
 }
 
 export const LastAgentWakesResult = z.object({
-  ["session_id"]: z.string(),
+  ["session_id"]: SessionId,
   ["at"]: z.number(),
 })
 export type LastAgentWakesResult = z.infer<typeof LastAgentWakesResult>
@@ -192,11 +192,11 @@ export interface AllOpenDeliveriesParams {
 }
 
 export const AllOpenDeliveriesResult = z.object({
-  ["session_id"]: z.string(),
+  ["session_id"]: SessionId,
   ["envelope_id"]: z.string(),
   ["position"]: z.number().int(),
   ["scope"]: z.string(),
-  ["message_id"]: z.string().nullable(),
+  ["message_id"]: MessageId.nullable(),
   ["channel_id"]: z.string(),
   ["source"]: Words_session_delivery_source,
   ["urgency"]: Words_session_delivery_urgency,
@@ -218,11 +218,11 @@ export async function allOpenDeliveries(sql: Sql): Promise<AllOpenDeliveriesResu
 }
 
 export interface DropOpenOfParams {
-  readonly ["message_id"]: string | null
+  readonly ["message_id"]: MessageId | null
 }
 
 export const DropOpenOfResult = z.object({
-  ["session_id"]: z.string(),
+  ["session_id"]: SessionId,
 })
 export type DropOpenOfResult = z.infer<typeof DropOpenOfResult>
 
@@ -234,11 +234,11 @@ export async function dropOpenOf(sql: Sql, params: DropOpenOfParams): Promise<Dr
 }
 
 export interface WaitingOnParams {
-  readonly ["message_id"]: string
+  readonly ["message_id"]: MessageId
 }
 
 export const WaitingOnResult = z.object({
-  ["session_id"]: z.string(),
+  ["session_id"]: SessionId,
 })
 export type WaitingOnResult = z.infer<typeof WaitingOnResult>
 

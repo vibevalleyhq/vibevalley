@@ -5,12 +5,12 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf } from "./types.js"
+import { rowOf, MessageId } from "./types.js"
 
 export interface AddOutboxParams {
   readonly ["id"]: string
   readonly ["connector"]: string
-  readonly ["message_id"]: string
+  readonly ["message_id"]: MessageId
   readonly ["body"]: string
   readonly ["created_at"]: number
 }
@@ -28,7 +28,7 @@ export interface PendingOutboxParams {
 export const PendingOutboxResult = z.object({
   ["id"]: z.string(),
   ["body"]: z.string(),
-  ["message_id"]: z.string(),
+  ["message_id"]: MessageId,
 })
 export type PendingOutboxResult = z.infer<typeof PendingOutboxResult>
 
@@ -40,7 +40,7 @@ export async function pendingOutbox(sql: Sql, params: PendingOutboxParams): Prom
 }
 
 export interface DropPendingOutboxForMessageParams {
-  readonly ["message_id"]: string
+  readonly ["message_id"]: MessageId
 }
 
 export const DropPendingOutboxForMessageSql = "-- name: DropPendingOutboxForMessage :exec\nupdate connector_outbox set state = 'dropped', error = 'withdrawn'\nwhere message_id = $1 and state = 'pending';"

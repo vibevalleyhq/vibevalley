@@ -5,10 +5,10 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, Words_channel_mention_resolved } from "./types.js"
+import { rowOf, MessageId, Words_channel_mention_resolved } from "./types.js"
 
 export interface InsertMentionParams {
-  readonly ["message_id"]: string
+  readonly ["message_id"]: MessageId
   readonly ["target_id"]: string
   readonly ["resolved"]: Words_channel_mention_resolved
 }

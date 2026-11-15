@@ -5,12 +5,12 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, Words_artifact_suggestion_status } from "./types.js"
+import { rowOf, ArtifactId, BlockId, SuggestionId, Words_artifact_suggestion_status } from "./types.js"
 
 export interface AddArtifactSuggestionParams {
-  readonly ["id"]: string
-  readonly ["artifact_id"]: string
-  readonly ["block_id"]: string
+  readonly ["id"]: SuggestionId
+  readonly ["artifact_id"]: ArtifactId
+  readonly ["block_id"]: BlockId
   readonly ["author"]: string
   readonly ["at_rev"]: number
   readonly ["change"]: string
@@ -24,13 +24,13 @@ export async function addArtifactSuggestion(sql: Sql, params: AddArtifactSuggest
 }
 
 export interface ArtifactSuggestionByIDParams {
-  readonly ["id"]: string
+  readonly ["id"]: SuggestionId
 }
 
 export const ArtifactSuggestionByIDResult = z.object({
-  ["id"]: z.string(),
-  ["artifact_id"]: z.string(),
-  ["block_id"]: z.string(),
+  ["id"]: SuggestionId,
+  ["artifact_id"]: ArtifactId,
+  ["block_id"]: BlockId,
   ["author"]: z.string(),
   ["at_rev"]: z.number().int(),
   ["change"]: z.string(),
@@ -49,14 +49,14 @@ export async function artifactSuggestionByID(sql: Sql, params: ArtifactSuggestio
 }
 
 export interface ArtifactSuggestionsParams {
-  readonly ["artifact_id"]: string
+  readonly ["artifact_id"]: ArtifactId
   readonly ["n"]: number
 }
 
 export const ArtifactSuggestionsResult = z.object({
-  ["id"]: z.string(),
-  ["artifact_id"]: z.string(),
-  ["block_id"]: z.string(),
+  ["id"]: SuggestionId,
+  ["artifact_id"]: ArtifactId,
+  ["block_id"]: BlockId,
   ["author"]: z.string(),
   ["at_rev"]: z.number().int(),
   ["change"]: z.string(),
@@ -78,7 +78,7 @@ export interface ResolveArtifactSuggestionParams {
   readonly ["status"]: Words_artifact_suggestion_status
   readonly ["resolved_at"]: number | null
   readonly ["resolved_by"]: string | null
-  readonly ["id"]: string
+  readonly ["id"]: SuggestionId
 }
 
 export const ResolveArtifactSuggestionSql = "-- name: ResolveArtifactSuggestion :exec\nupdate artifact_suggestion set status = $1, resolved_at = $2, resolved_by = $3\nwhere id = $4 and status = 'open';"

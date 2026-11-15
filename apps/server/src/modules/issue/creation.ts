@@ -10,7 +10,7 @@ import { assignedOnDuty, type IssueMandate } from "./status.ts";
 
 export const maxChildren = 12;
 
-export const issueRow = (id: string, req: T.IssueRequest, mandate: IssueMandate, at: number, cron?: string): AddIssueParams => ({
+export const issueRow = (id: T.IssueId, req: T.IssueRequest, mandate: IssueMandate, at: number, cron?: string): AddIssueParams => ({
   id,
   title: req.title,
   description: req.description ?? "",

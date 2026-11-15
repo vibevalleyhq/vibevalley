@@ -50,7 +50,7 @@ export interface Session {
   /** A helper hired with its first inputs; throws HireRefused. */
   readonly hireWith: (order: HireArrival) => Promise<HiredReceipt>;
   /** A channel message's envelope taken back from every delivery that still waits on it. */
-  readonly withdrawEnvelope: (envelope: string) => Promise<void>;
+  readonly withdrawEnvelope: (envelope: T.MessageId) => Promise<void>;
   /** The chat the deliveries read their places from (the default channel and a participant's unread),
    * told by the layer above the sessions; until then, an empty one. */
   readonly useChat: (view: ChatView) => void;
@@ -94,7 +94,7 @@ export interface Session {
    * what a restart or a failed route left for the layer above to route again. */
   readonly unrouted: (consume: (trigger: Trigger, data: unknown) => Promise<void>) => Promise<void>;
   /** How many deliveries a message still waits in. */
-  readonly waitingOn: (envelope: string) => Promise<number>;
+  readonly waitingOn: (envelope: T.MessageId) => Promise<number>;
   /** What an orchestrator has not read yet. */
   readonly digest: (agent: string) => Promise<Envelope[]>;
   /** A helper's report for its run's issue; refused when it has none. */

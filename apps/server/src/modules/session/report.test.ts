@@ -1,14 +1,15 @@
 import type { Event } from "@botiverse/oar";
 import { describe, expect, it } from "vite-plus/test";
 
+import type * as T from "@vibevalley/protocol";
 import type { Session } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { clip } from "#/base/clip.ts";
+import { clip, head } from "#/base/clip.ts";
 import { inCny } from "#/modules/agent/price.ts";
 import { MergeFailure } from "#/modules/repo/workplace.ts";
 
-import { briefBreak, conflictBrief, noRoom, notTakenIn, sessionName, whoMakesRoom, withRecall } from "./briefing.ts";
+import { briefBreak, conflictBrief, instructions, noRoom, notTakenIn, sessionName, whoMakesRoom, withRecall } from "./briefing.ts";
 import { recallHead } from "./prompts.ts";
 import { reactionTo, type ReactionContext, near, since, type Tracking } from "./reaction.ts";
 import { readReport, restsAfter, settlesFirst, summaryOf } from "./report.ts";
@@ -314,5 +315,42 @@ describe("a turn's end", () => {
     expect(restsAfter(false, true, report())).toBe(false);
     expect(restsAfter(true, true, report({ questions: [{ question: "which?", options: ["a", "b"] }] }))).toBe(false);
     expect(restsAfter(true, true, report({ checks: [{ criterion: 0, result: "unsure", proof: "" }] }))).toBe(false);
+  });
+
+  it("an undeclared report's summary does not parse prose markers", () => {
+    expect(summaryOf("先看看。\n\n**结论：** 改好了，测试通过。\n\n备注：无")).toContain("备注：无");
+    expect(summaryOf("做了一些事\n\n- 结论：好了")).toBe("做了一些事\n\n- 结论：好了");
+    expect(summaryOf("第一段\n\n第二段")).toBe("第一段\n\n第二段");
+    expect(head("😀abc", 1)).toBe("");
+  });
+
+  it("a helper's prompt carries only the skills ticked on its profile", () => {
+    const profile: T.Agent = {
+      id: "checker",
+      name: "审查",
+      role: "worker",
+      duty: "",
+      enabled: true,
+      runtime: "pi",
+      model: "",
+      effort: "",
+      persona: "",
+      personaMode: "append",
+      skills: ["reviewer"],
+      mcpServers: [],
+      disallowedTools: [],
+      env: {},
+      workdir: "",
+      worktree: false,
+      tags: [],
+      look: { species: null, outfit: null, orchestrator: null, build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
+    };
+    const skills: T.Skill[] = [
+      { id: "reviewer", name: "审查", description: "", body: "MUST_CHECK_DIFF", builtIn: true },
+      { id: "pages", name: "页面", description: "", body: "UNUSED_SKILL", builtIn: true },
+    ];
+    const prompt = instructions(profile, skills);
+    expect(prompt).toContain("MUST_CHECK_DIFF");
+    expect(prompt).not.toContain("UNUSED_SKILL");
   });
 });

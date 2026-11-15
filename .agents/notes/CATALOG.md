@@ -38,4 +38,4 @@
 
 ### testing
 
-- 2026-11-08 [等待器真实时间上限、模块窄替身与测试时钟门禁收窄](.agents/notes/proposed/testing/2026-11-08-testable-module-boundaries.md)
+- 2026-11-08 [仓库检查端口隔离与测试时钟门禁收窄](.agents/notes/proposed/testing/2026-11-08-testable-module-boundaries.md)

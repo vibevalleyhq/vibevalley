@@ -5,11 +5,11 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, Words_artifact_block_revision_kind } from "./types.js"
+import { rowOf, BlockId, Words_artifact_block_revision_kind } from "./types.js"
 
 export interface AddArtifactBlockRevisionParams {
   readonly ["id"]: string
-  readonly ["block_id"]: string
+  readonly ["block_id"]: BlockId
   readonly ["rev"]: number
   readonly ["spans"]: string
   readonly ["actor"]: string
@@ -24,7 +24,7 @@ export async function addArtifactBlockRevision(sql: Sql, params: AddArtifactBloc
 }
 
 export interface ArtifactBlockRevisionParams {
-  readonly ["block_id"]: string
+  readonly ["block_id"]: BlockId
   readonly ["rev"]: number
 }
 

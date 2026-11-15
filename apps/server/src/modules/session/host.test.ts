@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
 
 import { collect } from "@vibevalley/async";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 import { user } from "#/base/actor.ts";
 import builtIn from "#/modules/agent/templates/orchestrator/agent.json" with { type: "json" };
@@ -126,7 +127,7 @@ describe("AgentHost", () => {
       restored: () => ({ by: { kind: "" } }),
       toolStart: (tool) => ({ text: tool, action: "other", tool }),
     });
-    const kept = await qs.sessionByID(farm.db.sql, { id: "orchestrator" });
+    const kept = await qs.sessionByID(farm.db.sql, { id: sessionId("orchestrator") });
     expect(kept).toMatchObject({ id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: builtIn.name, ended_at: null });
     const caller = new Caller();
     const heard: string[] = [];

@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vite-plus/test";
 
+import { messageId, sessionId } from "@vibevalley/protocol/schema";
+
 import { Deliveries, type DeliveryRow } from "./deliveries.ts";
 const row = (message: string, number: number, channel = "c", position = number): DeliveryRow => ({
   envelope_id: message,
   scope: `channel:${channel}`,
   position,
-  message_id: message,
+  message_id: messageId(message),
   source: "channel",
   urgency: "queue",
   reason: "channel",
@@ -37,7 +39,7 @@ describe("the open deliveries", () => {
   it("move pending → handed, go back when a launch closes, and leave once seen", () => {
     const d = new Deliveries();
     const { payload, ...stored } = row("m2", 2);
-    d.load([{ ...stored, session_id: "w1", payload_json: JSON.stringify(payload) }]);
+    d.load([{ ...stored, session_id: sessionId("w1"), payload_json: JSON.stringify(payload) }]);
     d.inserted("w1", row("m1", 1));
     d.inserted("w1", { ...row("m1", 1), payload: row("another", 3).payload });
     expect(d.of("w1").map((r) => r.payload.trigger.card.summary)).toEqual(["话", "话"]);

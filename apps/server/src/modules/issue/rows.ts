@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import type * as T from "@vibevalley/protocol";
 import { sessionIdsOf } from "@vibevalley/protocol/rules";
-import { issueId } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
 import { jsonText, storedJsonOrUndefined } from "#/base/json.ts";
@@ -52,7 +51,7 @@ export function issueRows(core: Core) {
     const constraints = column.constraints(row.constraints);
     const conflict = column.conflict(row.conflict);
     const out: T.Issue = {
-      id: issueId(row.id),
+      id: row.id,
       number: row.number,
       title: row.title,
       ...(constraints ? { constraints } : {}),
@@ -72,7 +71,7 @@ export function issueRows(core: Core) {
       ...(row.closed_at !== null ? { closedAt: row.closed_at } : {}),
       ...(row.delivered !== null ? { delivered: row.delivered } : {}),
       ...(row.canceled !== null ? { canceled: row.canceled } : {}),
-      ...(row.parent !== null ? { parent: issueId(row.parent) } : {}),
+      ...(row.parent !== null ? { parent: row.parent } : {}),
       blockedBy: blockedBy ?? [],
       ...(row.cron !== null ? { cron: row.cron } : {}),
       status: "backlog",

@@ -5,7 +5,7 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, Words_channel_notify, Words_channel_subject_kind, Words_channel_type } from "./types.js"
+import { rowOf, MessageId, Words_channel_notify, Words_channel_subject_kind, Words_channel_type } from "./types.js"
 
 export interface DefaultIDParams {
 
@@ -84,7 +84,7 @@ export async function updateChannel(sql: Sql, params: UpdateChannelParams): Prom
 
 export interface CreateThreadParams {
   readonly ["id"]: string
-  readonly ["root_id"]: string | null
+  readonly ["root_id"]: MessageId | null
   readonly ["root_number"]: number | null
   readonly ["subject_kind"]: Words_channel_subject_kind | null
   readonly ["subject_id"]: string | null
@@ -106,7 +106,7 @@ export const AllChannelsResult = z.object({
   ["id"]: z.string(),
   ["type"]: Words_channel_type,
   ["is_default"]: z.boolean(),
-  ["root_id"]: z.string().nullable(),
+  ["root_id"]: MessageId.nullable(),
   ["root_number"]: z.number().int().nullable(),
   ["subject_kind"]: Words_channel_subject_kind.nullable(),
   ["subject_id"]: z.string().nullable(),
@@ -141,7 +141,7 @@ export const RecentChannelsResult = z.object({
   ["id"]: z.string(),
   ["type"]: Words_channel_type,
   ["is_default"]: z.boolean(),
-  ["root_id"]: z.string().nullable(),
+  ["root_id"]: MessageId.nullable(),
   ["root_number"]: z.number().int().nullable(),
   ["subject_kind"]: Words_channel_subject_kind.nullable(),
   ["subject_id"]: z.string().nullable(),
@@ -187,7 +187,7 @@ export interface UnreadOfParams {
 export const UnreadOfResult = z.object({
   ["id"]: z.string(),
   ["type"]: Words_channel_type,
-  ["root_id"]: z.string().nullable(),
+  ["root_id"]: MessageId.nullable(),
   ["root_number"]: z.number().int().nullable(),
   ["subject_kind"]: Words_channel_subject_kind.nullable(),
   ["subject_id"]: z.string().nullable(),

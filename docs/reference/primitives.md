@@ -151,6 +151,7 @@
 | `sample` | `artifact.ts` | Every kind of block, and inline marks, as the export writes them. |
 | `scriptedDeepSeek` | `deepseek.ts` |  |
 | `committedDelivery` | `deliveries.ts` | A delivery written and routed as the session module commits one, and nothing after: what a stop between commit and hand-off |
+| `allOpenDeliveries` | `deliveries.ts` |  |
 | `kinds` | `evals.ts` |  |
 | `orchestratorToolNames` | `evals.ts` | The orchestrator's tools by name, as its brain has them: the farm's and its own (no skills, subagents or crons). |
 | `problemOf` | `evals.ts` | "" when it is whole: the fields its kind reads are there. |
@@ -188,6 +189,9 @@
 | `lastUser` | `model.ts` |  |
 | `scriptedLLM` | `model.ts` | Each request takes the next step, its events a tick apart as a stream's; one past the script is a failed answer |
 | `network` | `network.ts` | Every vendor the media tests reach (MOSS's audio, images, files, understanding), answered offline; the public fetch |
+| `FakeSessions` | `played.ts` | Sessions played: a turn takes its input, says it got it and reports. The slow mode is held until release (unless holds is off), the fail mode fails. |
+| `playedSessions` | `played.ts` |  |
+| `keepPlayedSession` | `played.ts` |  |
 | `realtimeFixture` | `realtime.ts` |  |
 | `refuse` | `refuse.ts` | A trigger named name refusing the write on says (before insert on t, before update of c on t), when when holds |
 | `allow` | `refuse.ts` | The write refuse stopped goes through again. |
@@ -418,6 +422,7 @@
 | `analyzeSource` | `source.ts` |  |
 | `calls` | `source.ts` | Whether the file calls object.method(…) anywhere. |
 | `tempDir` | `temp.ts` |  |
+| `WaitTimedOut` | `until.ts` |  |
 | `waitFor` | `until.ts` | What get answers once ok holds for it. what is said if it never does (a function: read when it is given up on). |
 | `untilGot` | `until.ts` | The value get gives once it is something. |
 | `until` | `until.ts` | Once ok holds. |

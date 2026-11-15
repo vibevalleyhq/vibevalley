@@ -1,5 +1,4 @@
 import type * as T from "@vibevalley/protocol";
-import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { Inconsistent } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
@@ -11,7 +10,7 @@ import type * as qe from "#db/issue_assignment_execution.sql.ts";
 import { nullText } from "./rows.ts";
 
 /** Called in the transaction that changes responsibility. */
-export async function assignTo(db: Db, issue: string, agent: string | undefined, at: number) {
+export async function assignTo(db: Db, issue: T.IssueId, agent: string | undefined, at: number) {
   const assignedAgent = nullText(agent);
   try {
     const ended = await q.endAssignments(db.sql, { issue, agent: assignedAgent, ended_at: at });
@@ -31,14 +30,14 @@ export async function assignTo(db: Db, issue: string, agent: string | undefined,
 
 const executionOf = (row: qe.AddExecutionResult): T.Assignment["executions"][number] =>
   row.role === "worker"
-    ? { kind: "worker", session: sessionId(row.executor), startedAt: row.started_at }
+    ? { kind: "worker", session: row.executor, startedAt: row.started_at }
     : { kind: "orchestrator", session: row.executor, startedAt: row.started_at };
 
 /** Only committed relations enter or leave the index via `IssueStore` `afterCommit` hooks. */
 export class Assignments {
-  private byIssue = new Map<string, q.AddAssignmentResult[]>();
+  private byIssue = new Map<T.IssueId, q.AddAssignmentResult[]>();
   private executions = new Map<string, T.Assignment["executions"]>();
-  private issueOfSession = new Map<string, string>();
+  private issueOfSession = new Map<T.SessionId, T.IssueId>();
 
   load(rows: readonly q.AddAssignmentResult[], executions: readonly qe.AllExecutionsResult[]) {
     this.byIssue.clear();
@@ -60,7 +59,7 @@ export class Assignments {
     }
   }
 
-  executed(issue: string, row: qe.AddExecutionResult) {
+  executed(issue: T.IssueId, row: qe.AddExecutionResult) {
     const existing = this.executions.get(row.assignment) ?? [];
     if (!existing.some((e) => e.session === row.executor))
       this.executions.set(
@@ -70,7 +69,7 @@ export class Assignments {
     if (row.role === "worker") this.issueOfSession.set(row.executor, issue);
   }
 
-  removed(issues: readonly string[]) {
+  removed(issues: readonly T.IssueId[]) {
     const gone = new Set(issues);
     for (const id of gone) {
       for (const row of this.byIssue.get(id) ?? []) this.executions.delete(row.id);
@@ -79,14 +78,14 @@ export class Assignments {
     for (const [session, issue] of this.issueOfSession) if (gone.has(issue)) this.issueOfSession.delete(session);
   }
 
-  issueOf(session: string): string | undefined {
+  issueOf(session: T.SessionId): T.IssueId | undefined {
     return this.issueOfSession.get(session);
   }
 
-  of(issue: string): T.Assignment[] {
+  of(issue: T.IssueId): T.Assignment[] {
     return (this.byIssue.get(issue) ?? []).map((row) => ({
       id: row.id,
-      issue: issueId(row.issue),
+      issue: row.issue,
       agent: row.agent,
       assignedAt: row.assigned_at,
       ...(row.ended_at === null ? {} : { endedAt: row.ended_at }),
@@ -94,7 +93,7 @@ export class Assignments {
     }));
   }
 
-  sessionIds(issue: string): T.SessionId[] {
+  sessionIds(issue: T.IssueId): T.SessionId[] {
     return this.of(issue)
       .flatMap((a) => a.executions)
       .toSorted((a, b) => or(compare(a.startedAt, b.startedAt), compareText(a.session, b.session)))

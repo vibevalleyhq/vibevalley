@@ -87,7 +87,7 @@ export function issueSplitting(r: IssueLifecycle, deps: SplitDeps) {
         if (changes && changes.uncommitted.length > 0) throw refused(t("server.issue.split.commitFirst"));
       }
       const channel = (await chat.topOf(session ? (sessions.live(session).session?.channel ?? "") : "")).id;
-      await saveSplit(id, title, channel, parent.mandate, rows);
+      await saveSplit(parent.id, title, channel, parent.mandate, rows);
       return (
         t("server.issue.split.created", { n: parent.number, count: rows.length }) +
         "\n" +

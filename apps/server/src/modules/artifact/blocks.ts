@@ -62,8 +62,8 @@ interface BlockStore {
   readonly follow: (id: T.ArtifactId, after: number, signal?: AbortSignal) => AsyncIterable<T.ArtifactEvent>;
   readonly suggestions: (id: T.ArtifactId) => Promise<T.Suggestion[]>;
   readonly suggest: (id: T.ArtifactId, actor: string, req: T.SuggestionCreate) => Promise<T.Suggestion>;
-  readonly acceptSuggestion: (id: T.ArtifactId, suggestion: string, actor: string) => Promise<T.Suggestion>;
-  readonly rejectSuggestion: (id: T.ArtifactId, suggestion: string, actor: string) => Promise<T.Suggestion>;
+  readonly acceptSuggestion: (id: T.ArtifactId, suggestion: T.SuggestionId, actor: string) => Promise<T.Suggestion>;
+  readonly rejectSuggestion: (id: T.ArtifactId, suggestion: T.SuggestionId, actor: string) => Promise<T.Suggestion>;
   readonly suggestionStream: (id: T.ArtifactId, signal?: AbortSignal) => AsyncIterable<T.SuggestionEvent>;
   readonly demo: (id: T.ArtifactId, helpers: readonly T.Agent[]) => Promise<void>;
   readonly demoRunning: () => boolean;
@@ -76,8 +76,8 @@ const isAppendType = (type: string): type is T.BlockType => isOneOf(appendTypes,
 
 const blockOf = (r: qb.ArtifactBlocksResult): T.Block =>
   wire({
-    id: S.blockId(r.id),
-    artifactId: S.artifactId(r.artifact_id),
+    id: r.id,
+    artifactId: r.artifact_id,
     ...(r.parent_id !== null ? { parentId: S.blockId(r.parent_id) } : {}),
     orderKey: r.order_key,
     type: r.type,
@@ -188,7 +188,7 @@ export async function makeBlockStore(deps: BlockStoreDeps, found: (id: T.Artifac
       for (const r of p.revisions) {
         await qr.addArtifactBlockRevision(db.sql, {
           id: newId(),
-          block_id: r.block,
+          block_id: S.blockId(r.block),
           rev: r.rev,
           spans: jsonText(r.spans),
           actor,
@@ -402,9 +402,9 @@ export async function makeBlockStore(deps: BlockStoreDeps, found: (id: T.Artifac
   }
 
   const suggestionOf = (r: qs.ArtifactSuggestionByIDResult): T.Suggestion => ({
-    id: S.suggestionId(r.id),
-    artifactId: S.artifactId(r.artifact_id),
-    blockId: S.blockId(r.block_id),
+    id: r.id,
+    artifactId: r.artifact_id,
+    blockId: r.block_id,
     author: r.author,
     baseRev: r.at_rev,
     change: changeOf(r.change),
@@ -442,7 +442,7 @@ export async function makeBlockStore(deps: BlockStoreDeps, found: (id: T.Artifac
     const problem = changeProblem(req.change);
     if (problem) throw refused(problem);
     if (req.baseRev > block.rev) throw refused(t("server.artifact.suggestion.beyond", { rev: req.baseRev, now: block.rev }));
-    const id = newId();
+    const id = S.suggestionId(newId());
     await qs.addArtifactSuggestion(db.sql, {
       id,
       artifact_id: artifact,
@@ -458,7 +458,7 @@ export async function makeBlockStore(deps: BlockStoreDeps, found: (id: T.Artifac
     return suggestionOf(made);
   };
 
-  const acceptSuggestion = (artifact: T.ArtifactId, suggestion: string, actor: string) =>
+  const acceptSuggestion = (artifact: T.ArtifactId, suggestion: T.SuggestionId, actor: string) =>
     lock.with(async (): Promise<T.Suggestion> => {
       const row = await qs.artifactSuggestionByID(db.sql, { id: suggestion });
       if (!row || row.artifact_id !== artifact) throw refused(t("server.artifact.suggestion.missing", { id: suggestion }));
@@ -485,7 +485,7 @@ export async function makeBlockStore(deps: BlockStoreDeps, found: (id: T.Artifac
       return suggestionOf(updated ?? row);
     });
 
-  const rejectSuggestion = (artifact: T.ArtifactId, suggestion: string, actor: string) =>
+  const rejectSuggestion = (artifact: T.ArtifactId, suggestion: T.SuggestionId, actor: string) =>
     lock.with(async (): Promise<T.Suggestion> => {
       const row = await qs.artifactSuggestionByID(db.sql, { id: suggestion });
       if (!row || row.artifact_id !== artifact) throw refused(t("server.artifact.suggestion.missing", { id: suggestion }));

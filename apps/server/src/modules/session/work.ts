@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import type { Clock } from "@vibevalley/async";
 import type * as T from "@vibevalley/protocol";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 import { Inconsistent } from "#/base/errors.ts";
 import { jsonOf, jsonText } from "#/base/json.ts";
@@ -101,7 +102,7 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
       });
     });
 
-  const commitHanded = async (session: string, launch: string, at: number, rows: readonly DeliveryDraft[]): Promise<void> => {
+  const commitHanded = async (session: T.SessionId, launch: string, at: number, rows: readonly DeliveryDraft[]): Promise<void> => {
     try {
       await db.tx(async () => {
         const committed: { added: qd.InsertDeliveryResult[]; row: DeliveryDraft }[] = [];
@@ -143,15 +144,17 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
       await commitHanded(session.id, launch, at, rows);
     });
 
-  const hand = (session: string, envelope: string, launch: string, at: number): Promise<void> =>
-    writtenLocked(() =>
+  const hand = (rawSession: string, envelope: string, launch: string, at: number): Promise<void> => {
+    const session = sessionId(rawSession);
+    return writtenLocked(() =>
       db.tx(async () => {
         await qd.markHanded(db.sql, { session_id: session, envelope_id: envelope, launch, handed_at: at });
         await db.afterCommit(() => open.handed(session, envelope, launch));
       }),
     );
+  };
 
-  const registerTalk = (session: string, launch: string, at: number, rows: readonly TalkRow[]): Promise<void> =>
+  const registerTalk = (session: T.SessionId, launch: string, at: number, rows: readonly TalkRow[]): Promise<void> =>
     writtenLocked(async () => {
       const prepared: DeliveryDraft[] = [];
       for (const talk of rows) {

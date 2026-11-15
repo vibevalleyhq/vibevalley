@@ -76,7 +76,7 @@ export function refinement(d: RefinementDeps) {
     });
   };
 
-  const refined = (id: string, draftResult: IssueRefinement, questions: readonly T.Question[] | undefined) =>
+  const refined = (id: T.IssueId, draftResult: IssueRefinement, questions: readonly T.Question[] | undefined) =>
     saveRefinement(id, draftResult.title, refinementDescription(draftResult), kept(draftResult.criteria), questions);
 
   const draft = (id: string, word: string, channel: string): Promise<T.Issue> =>

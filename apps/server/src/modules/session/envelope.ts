@@ -57,7 +57,7 @@ export type Readiness = (inputs: readonly WaitingInput[]) => readonly boolean[];
 type StoredMessageKind = "chat" | "dispatch" | "report" | "notice";
 
 export interface ChannelEnvelopeRow {
-  readonly envelope_id: string;
+  readonly envelope_id: T.MessageId;
   readonly number: number;
   readonly channel_id: string;
   readonly sender_id: string;
@@ -89,7 +89,7 @@ export type Urgency = "interrupt" | "steer" | "queue" | "digest";
 
 /** A session that hears a routed trigger, as the layer above worked it out: why, whether it wakes, what held it back. */
 export interface Hearer {
-  readonly session: string;
+  readonly session: T.SessionId;
   readonly reason: DeliveryReason;
   readonly wakes: boolean;
   readonly heldBy?: HeldBy;
@@ -99,7 +99,7 @@ export interface Hearer {
 
 /** A session a routed trigger is delivered to, as the layer above picked it (Session.route). */
 export interface Delivery {
-  readonly session: string;
+  readonly session: T.SessionId;
   /** Why, whether it wakes and what held it back, as the watch heard it; else addressed, waking unless a digest. */
   readonly heard?: Pick<Hearer, "reason" | "wakes" | "heldBy">;
   /** What the session is (its profile's role when not given) and what the delivery is to it: its urgency follows. */
@@ -107,9 +107,9 @@ export interface Delivery {
   readonly event?: DeliveryEvent;
   readonly urgency?: Urgency;
   /** The issue it is for: where it counts (payload.ts deliveryScope), and what the run that takes it took. */
-  readonly issue?: string;
+  readonly issue?: T.IssueId;
   /** The session it went to before: that delivery is dropped as reassigned. */
-  readonly previous?: string;
+  readonly previous?: T.SessionId;
   /** Its own id when not the trigger's: an input handed back goes to another session as a second delivery. */
   readonly id?: string;
   /** Said to the session with it. */

@@ -69,7 +69,7 @@ export interface TriggerMeta {
   readonly failed?: boolean;
   readonly botRound?: number;
   readonly botRoundKey?: string;
-  readonly channelMessageId?: string;
+  readonly channelMessageId?: T.MessageId;
   readonly inputContext?: TriggerContext;
   readonly channelType?: ChannelType;
   readonly responsePort?: string;

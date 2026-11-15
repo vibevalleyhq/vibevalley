@@ -4,16 +4,14 @@ import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
 import { z } from "zod";
 
-import { Hub, systemClock, withTimeout } from "@vibevalley/async";
+import { systemClock, withTimeout } from "@vibevalley/async";
 import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import { BizCode } from "@vibevalley/protocol/api";
 import { channelOf, defaultOf, isBusy } from "@vibevalley/protocol/rules";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
-import { head } from "#/base/clip.ts";
 import { messageOf } from "#/base/errors.ts";
-import { jsonText } from "#/base/json.ts";
 import { type Core, makeCore } from "#/core/core.ts";
 import { makeFrameOf } from "#/gateway/projection/frame.ts";
 import { reduce } from "#/gateway/projection/reduce.ts";
@@ -23,104 +21,17 @@ import { keptLog, type Logger } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
 import builtIn from "#/modules/agent/templates/orchestrator/agent.json" with { type: "json" };
 import { type Channel, catchUpMax, makeChannel } from "#/modules/channel/channel.ts";
-import { effectsOf } from "#/modules/game/view.ts";
 import { issueIntake } from "#/modules/issue/intake.ts";
 import { channelUses, type Issue } from "#/modules/issue/issue.ts";
 import type { Handed } from "#/modules/session/envelope.ts";
-import { restoredSession, sessionState } from "#/modules/session/history.ts";
-import type { Lifecycle } from "#/modules/session/lifecycle.ts";
-import { type Mailbox, makeMailbox } from "#/modules/session/mailbox.ts";
-import { summaryOf } from "#/modules/session/report.ts";
-import { DeliveryRefused, newsOf, sessionOver, type SessionNews } from "#/modules/session/session.ts";
-import type { Consumed, Delivered, LaunchActivity } from "#/modules/session/signals.ts";
+import type { Mailbox } from "#/modules/session/mailbox.ts";
 import { type Attachment, makeAttachment } from "#/platform/attachment/attachment.ts";
 import { testAgent } from "#/testing/agent.ts";
 import { testConfig, until, waitFor } from "#/testing/layers.ts";
-import * as qm from "#db/channel_message.sql.ts";
-import * as qsession from "#db/session.sql.ts";
+import { FakeSessions, keepPlayedSession, playedSessions } from "#/testing/played.ts";
 
 import { wakeBreaker } from "./brakes.ts";
 import { makeWatch, type Watch } from "./watch.ts";
-
-/** Sessions played: a turn takes its input, says it got it and reports. the slow mode is held until release (unless holds is off), the fail mode fails. */
-class FakeSessions {
-  holds = true;
-  stopped = false;
-  private held = new Set<() => void>();
-  /** Lets every held turn go on. */
-  release = () => {
-    for (const go of [...this.held]) go();
-  };
-  inputs = new Map<string, string[]>();
-  steers = new Map<string, string[]>();
-  last = new Map<string, string>();
-  running = new Map<string, string>();
-  n = 0;
-  core!: Core;
-  news = new Hub<SessionNews>();
-  consumed = (c: Consumed) => this.news.publish({ _tag: "Consumed", ...c });
-
-  runsOf = (id: string) => [...(this.inputs.get(id) ?? [])];
-  steersOf = (id: string) => [...(this.steers.get(id) ?? [])];
-  private publish = (a: LaunchActivity) => this.news.publish(a);
-  private apply = (...f: Parameters<Core["apply"]>) => this.core.apply(...f);
-
-  deliver = (id: string, text: string, read: () => void = () => {}): Delivered | DeliveryRefused => {
-    if (!this.core.session(id)) return new DeliveryRefused("不在地里");
-    const launch = this.running.get(id);
-    if (launch) {
-      this.steers.set(id, [...this.steersOf(id), text]);
-      if (!text.includes("必败")) read();
-      return { kind: "steered", launch };
-    }
-    const fresh = `${id}-${++this.n}`;
-    this.running.set(id, fresh);
-    this.inputs.set(id, [...this.runsOf(id), text]);
-    const channel = this.core.session(id)?.channel;
-    this.apply({
-      type: "sessionPhaseChanged",
-      id: sessionId(id),
-      ...(channel !== undefined ? { channel } : {}),
-      phase: { _tag: "working", since: Date.now(), doing: { action: "thinking", label: "" } },
-    });
-    void this.run(id, fresh, text, read);
-    return { kind: "run", launch: fresh, woke: true };
-  };
-
-  private async run(id: string, launch: string, input: string, read: () => void) {
-    if (input.includes("慢慢做") && this.holds)
-      await new Promise<void>((go) => {
-        const done = () => {
-          this.held.delete(done);
-          go();
-        };
-        this.held.add(done);
-      });
-    if (this.stopped) return;
-    const runs = this.runsOf(id).length;
-    if (!input.includes("必败")) read();
-    if (input.includes("必败")) {
-      this.running.delete(id);
-      this.apply({
-        type: "sessionReported",
-        questions: [],
-        checks: [],
-        id: sessionId(id),
-        outcome: "failed",
-        summary: "provider said no",
-        runs,
-      });
-      this.publish({ _tag: "Ended", id, launch, outcome: "failed", spoke: false });
-      return;
-    }
-    const line = input.split("\n").find((l) => l.startsWith("[target=")) ?? head(input, 20);
-    this.last.set(id, "收到了（" + line + "）");
-    this.publish({ _tag: "Spoke", id, launch });
-    this.running.delete(id);
-    this.apply({ type: "sessionReported", questions: [], checks: [], id: sessionId(id), outcome: "completed", summary: "收到了", runs });
-    this.publish({ _tag: "Ended", id, launch, outcome: "completed", spoke: true });
-  }
-}
 
 const DeliveryRow = z.object({ envelope_id: z.string(), reason: z.string(), wakes: z.boolean(), held_by: z.string(), state: z.string() });
 
@@ -150,50 +61,15 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
   const c: ServerConfig = { ...config, chat: { noticeBatchMs: 300, retryWakeMs: 100 } };
   const clock = wallTime;
   const db = await openDb(c, log, clock);
-  const core = makeCore({ projection: { reduce, effects: effectsOf, frame: makeFrameOf() }, clock });
-  x.core = core;
+  const core = makeCore({ projection: { reduce, effects: () => [], frame: makeFrameOf() }, clock });
   const all: T.ChatMessage[] = [];
   const events = core.subscribe();
   const heardNow = () => {
     for (const e of events.drain()) if (e.type === "messageChanged") all.push(e.message);
   };
-  for (const row of await qsession.activeSessions(db.sql)) core.apply({ type: "sessionChanged", session: restoredSession(row) });
-  await qsession.keepSession(db.sql, {
-    id: defaultOrchestrator,
-    role: "orchestrator",
-    agent: defaultOrchestrator,
-    name: "助手",
-    runtime: "vibevalley",
-    brief: "",
-    repo: null,
-    issue: null,
-    channel: null,
-    hired_at: 0,
-    machine: null,
-  });
-  const played = {
-    isReachable: (id: string) => x.core.session(id) !== undefined,
-    sessionOf: (id: string) => x.core.session(id),
-    hired: () => x.core.state().sessions.filter((s) => s.role === "worker"),
-    deliver: async (id: string, text: string, input: Parameters<Lifecycle["deliver"]>[2]) => {
-      const out = x.deliver(id, text, () => x.consumed({ session: id, envelopeIds: [...input.envelopeIds] }));
-      if (out instanceof DeliveryRefused) throw out;
-      return out;
-    },
-    runOf: () => undefined,
-    lastTextOf: (id: string) => x.last.get(id) ?? "",
-    cwdOf: () => undefined,
-    news: () => x.news.subscribe(),
-  };
-  // A test double of the few members the chat and the mailbox use.
-  const lifecycle = played as unknown as Lifecycle;
   const agent = await testAgent({ config: c, clock, log, db, core });
-  const mailbox = await makeMailbox({ db, clock, log, config: c, agent, session: lifecycle });
-  const session = sessionOver({
-    lifecycle,
-    mailbox,
-    close: () => mailbox.close(),
-  });
+  const played = await playedSessions(x, { config: c, clock, log, db, core, agent });
+  const { session, mailbox } = played;
   const attachment = await makeAttachment({ config: c, clock, db });
   const chat = await makeChannel({ clock, log, fetch: offline, db, core, attachment });
   // The watch routes through the issues' intake (an issue's threads go into its pool); its inbox reads the board through
@@ -201,16 +77,8 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
   const intake = issueIntake({ config: c, clock, log, db, core, agent, session, channel: chat });
   const issue = { onBoard: () => [], route: intake.route } as unknown as Issue;
   const watch = await makeWatch({ config: c, clock, log, db, core, agent, session, channel: chat, issue });
-  const { changes: moves } = core.transitions();
-  const relay = (async () => {
-    for await (const { fact, after } of moves) {
-      if (fact.type === "sessionLeft") await qsession.endSession(db.sql, { id: fact.id, closed: fact.closed ?? "dismissed", ended_at: fact.at });
-      const n = newsOf(fact, after);
-      if (n) x.news.publish(n);
-    }
-  })();
   // services.ts's startup order: the deliveries, the issues' intake, then the watch.
-  await mailbox.boot();
+  await played.boot();
   await intake.boot();
   await watch.boot();
   const deliveries = async (recipient: string) =>
@@ -236,15 +104,10 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
     deliveries,
     deliveryOf: async (recipient, message) => (await deliveries(recipient)).find((d) => d.envelope_id === message),
     [Symbol.asyncDispose]: async () => {
-      for (const s of core.state().sessions) await qsession.keepSessionState(db.sql, sessionState(s));
-      x.stopped = true;
-      x.release();
-      moves.close();
-      await relay;
       await watch.close();
       await intake.close();
       await chat.close();
-      await mailbox.close();
+      await played.close();
       await agent.close();
       events.close();
       core.close();
@@ -253,26 +116,7 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
   };
 }
 
-const keepSession = (f: Farm, session: T.Session) =>
-  f.db.sql.exec(
-    `insert into session (id, role, agent, name, runtime, brief, repo, issue, channel, hired_at, phase, refining, runs)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) on conflict (id) do nothing`,
-    [
-      session.id,
-      session.role,
-      session.agent,
-      session.name,
-      session.runtime,
-      session.brief,
-      session.repo ?? null,
-      session.issue ?? null,
-      session.channel ?? null,
-      session.hiredAt,
-      jsonText(session.phase),
-      session.refining,
-      session.runs,
-    ],
-  );
+const keepSession = (f: Farm, session: T.Session) => keepPlayedSession(f.db, session);
 
 const hire = async (f: Farm, _x: FakeSessions, id: string, brief: string, repo: string, channel?: string, issue?: string) => {
   const session: T.Session = {
@@ -918,17 +762,10 @@ describe("the chat", () => {
     );
   });
 
-  test("an undeclared report's summary does not parse prose markers", () => {
-    expect(summaryOf("先看看。\n\n**结论：** 改好了，测试通过。\n\n备注：无")).toContain("备注：无");
-    expect(summaryOf("做了一些事\n\n- 结论：好了")).toBe("做了一些事\n\n- 结论：好了");
-    expect(summaryOf("第一段\n\n第二段")).toBe("第一段\n\n第二段");
-    expect(head("😀abc", 1)).toBe("");
-  });
-
   test("a valid JSON message meta with the wrong shape fails fast", () =>
     run(async (f) => {
       const { message } = await f.chat.say({ text: "带元数据", sendKey: "" });
-      await qm.updateMessageMeta(f.db.sql, { meta: `{"mentions":{},"spent":{"tokens":1e999}}`, id: message.id });
+      await f.sql("update channel_message set meta = $1 where id = $2", ['{"mentions":{},"spent":{"tokens":1e999}}', message.id]);
       const read = await f.chat.history(f.chat.defaultChannel()).then(
         () => "read",
         (e: unknown) => messageOf(e),

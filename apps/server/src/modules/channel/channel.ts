@@ -4,6 +4,7 @@ import { TaskGroup } from "@vibevalley/async";
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { userId } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
 
 import { BizCode, lookIn, missing, refuseIn } from "#/base/errors.ts";
 import type { Core } from "#/core/core.ts";
@@ -450,7 +451,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         seq: e.seq,
         kind: e.kind === "removed" ? "removed" : "posted",
         channel: e.channel_id,
-        message: e.message_id,
+        message: S.messageId(e.message_id),
         at: e.at,
       })),
     committedOf: (message) =>
@@ -458,7 +459,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         const row = await qm.messageByID(db.sql, { id: message });
         const e = await qe.eventOf(db.sql, { message_id: message });
         if (!row || !e || row.deleted_at !== null) return undefined;
-        return committedFrom(row, { seq: e.seq, kind: "posted", channel: e.channel_id, message: e.message_id, at: e.at });
+        return committedFrom(row, { seq: e.seq, kind: "posted", channel: e.channel_id, message: S.messageId(e.message_id), at: e.at });
       }),
     awaitReader: w.awaitReader,
     seat: (p) => store.locked(() => store.tx(() => store.seat(p))),

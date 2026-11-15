@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { Hub, Semaphore, type Subscription, TaskGroup } from "@vibevalley/async";
 import type * as T from "@vibevalley/protocol";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 import { Inconsistent } from "#/base/errors.ts";
 import { jsonOf } from "#/base/json.ts";
@@ -36,7 +37,7 @@ import { makeWorkMailbox } from "./work.ts";
 export type { SourceEvent };
 
 export interface InsertDelivery {
-  readonly session: string;
+  readonly session: T.SessionId;
   readonly row: DeliveryDraft;
 }
 
@@ -92,7 +93,7 @@ export interface Mailbox {
   readonly news: () => Subscription<DeliveryNews>;
   readonly handBack: (session: string, envelope: string) => Promise<void>;
   /** A channel message's envelope taken back from every delivery that still waits on it. */
-  readonly withdrawEnvelope: (envelope: string) => Promise<void>;
+  readonly withdrawEnvelope: (envelope: T.MessageId) => Promise<void>;
   /** The chat the mailbox reads its places from, told by the layer above it; until then, an empty one. */
   readonly useChat: (view: ChatView) => void;
   /** Which waiting inputs may be handed now, told by the layer above it; until then, all. */
@@ -101,7 +102,7 @@ export interface Mailbox {
   readonly holdWakes: (session: string, held: boolean) => Promise<void>;
   /** What agents' words woke since the user last spoke, as kept: where the brakes start from at startup. */
   readonly agentWakes: () => Promise<AgentWakes>;
-  readonly waitingOn: (envelope: string) => Promise<number>;
+  readonly waitingOn: (envelope: T.MessageId) => Promise<number>;
   readonly close: () => Promise<void>;
 }
 
@@ -193,7 +194,7 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
     return { hired: session, ...(room.evicted ? { evicted: room.evicted } : {}) };
   };
 
-  const dropSession = (session: string, why: string) =>
+  const dropSession = (session: T.SessionId, why: string) =>
     db.tx(async () => {
       await qd.dropOpen(db.sql, { session_id: session, dropped_why: why });
       await db.afterCommit(() => {
@@ -212,13 +213,15 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
       after = last.seq;
     }
   };
-  const handBack = (session: string, envelope: string) =>
-    writtenLocked(() =>
+  const handBack = (rawSession: string, envelope: string) => {
+    const session = sessionId(rawSession);
+    return writtenLocked(() =>
       db.tx(async () => {
         await qd.rollbackOne(db.sql, { session_id: session, envelope_id: envelope });
         await db.afterCommit(() => open.handedBackOne(session, envelope));
       }),
     );
+  };
 
   const handToHost = async (recipient: string, messages: readonly Envelope[], primary: DeliveryRow) => {
     const meta = primary.payload.trigger.meta;
@@ -239,24 +242,28 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
     { session: sessions, clock, log },
     {
       pending: (session) => open.of(session),
-      dropSession: (session, why) => writtenLocked(() => dropSession(session, why)),
+      dropSession: (session, why) => writtenLocked(() => dropSession(sessionId(session), why)),
       handBack,
       hand: work.hand,
-      consume: (session, envelope, at) =>
-        writtenLocked(() =>
+      consume: (rawSession, envelope, at) => {
+        const session = sessionId(rawSession);
+        return writtenLocked(() =>
           db.tx(async () => {
             await qd.consumeDelivery(db.sql, { session_id: session, envelope_id: envelope, consumed_at: at });
             await db.afterCommit(() => open.remove(session, envelope));
           }),
-        ),
-      returnHanded: (session) =>
-        writtenLocked(() =>
+        );
+      },
+      returnHanded: (rawSession) => {
+        const session = sessionId(rawSession);
+        return writtenLocked(() =>
           db.tx(async () => {
             const rows = await qd.rollbackHanded(db.sql, { session_id: session });
             await db.afterCommit(() => open.handedBack(session));
             return rows.map((row) => row.envelope_id);
           }),
-        ),
+        );
+      },
       emptyWake: (session) => newsHub.publish({ _tag: "EmptyWake", session }),
       braked: (session) => braked.has(session),
 

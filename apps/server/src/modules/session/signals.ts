@@ -41,7 +41,7 @@ export type LaunchActivity =
  * IssueStarted). */
 export interface RunFinished {
   readonly id: string;
-  readonly issue?: string;
+  readonly issue?: T.IssueId;
   readonly outcome: T.Outcome;
 }
 
@@ -70,7 +70,7 @@ export type SessionNews =
   | { readonly _tag: "Hired"; readonly session: T.Session }
   | { readonly _tag: "Reported"; readonly report: Extract<Fact, { type: "sessionReported" }>; readonly session: T.Session | undefined }
   | { readonly _tag: "Left"; readonly left: Extract<Fact, { type: "sessionLeft" }> }
-  | { readonly _tag: "IssueStarted"; readonly issue: string; readonly run: string }
+  | { readonly _tag: "IssueStarted"; readonly issue: T.IssueId; readonly run: string }
   | ({ readonly _tag: "RunFinished" } & RunFinished)
   | ({ readonly _tag: "Consumed" } & Consumed)
   | ({ readonly _tag: "Returned" } & Returned)

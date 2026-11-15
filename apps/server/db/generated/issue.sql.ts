@@ -5,14 +5,14 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, Words_issue_canceled, Words_issue_deliver, Words_issue_delivered, Words_issue_mandate_strength, Words_issue_priority, Words_session_run_outcome } from "./types.js"
+import { rowOf, IssueId, Words_issue_canceled, Words_issue_deliver, Words_issue_delivered, Words_issue_mandate_strength, Words_issue_priority, Words_session_run_outcome } from "./types.js"
 
 export interface ListIssuesParams {
 
 }
 
 export const ListIssuesResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: IssueId,
   ["number"]: z.number().int(),
   ["title"]: z.string(),
   ["description"]: z.string(),
@@ -23,7 +23,7 @@ export const ListIssuesResult = z.object({
   ["repo"]: z.string().nullable(),
   ["priority"]: Words_issue_priority,
   ["rank"]: z.number().int(),
-  ["parent"]: z.string().nullable(),
+  ["parent"]: IssueId.nullable(),
   ["blocked_by"]: z.string().nullable(),
   ["constraints"]: z.string().nullable(),
   ["cron"]: z.string().nullable(),
@@ -55,11 +55,11 @@ export async function listIssues(sql: Sql): Promise<ListIssuesResult[]> {
 }
 
 export interface GetIssueParams {
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
 }
 
 export const GetIssueResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: IssueId,
   ["number"]: z.number().int(),
   ["title"]: z.string(),
   ["description"]: z.string(),
@@ -70,7 +70,7 @@ export const GetIssueResult = z.object({
   ["repo"]: z.string().nullable(),
   ["priority"]: Words_issue_priority,
   ["rank"]: z.number().int(),
-  ["parent"]: z.string().nullable(),
+  ["parent"]: IssueId.nullable(),
   ["blocked_by"]: z.string().nullable(),
   ["constraints"]: z.string().nullable(),
   ["cron"]: z.string().nullable(),
@@ -102,11 +102,11 @@ export async function getIssue(sql: Sql, params: GetIssueParams): Promise<GetIss
 }
 
 export interface IssueExistsParams {
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
 }
 
 export const IssueExistsResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: IssueId,
 })
 export type IssueExistsResult = z.infer<typeof IssueExistsResult>
 
@@ -122,7 +122,7 @@ export interface IssueByNumberParams {
 }
 
 export const IssueByNumberResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: IssueId,
   ["number"]: z.number().int(),
   ["title"]: z.string(),
   ["description"]: z.string(),
@@ -133,7 +133,7 @@ export const IssueByNumberResult = z.object({
   ["repo"]: z.string().nullable(),
   ["priority"]: Words_issue_priority,
   ["rank"]: z.number().int(),
-  ["parent"]: z.string().nullable(),
+  ["parent"]: IssueId.nullable(),
   ["blocked_by"]: z.string().nullable(),
   ["constraints"]: z.string().nullable(),
   ["cron"]: z.string().nullable(),
@@ -165,7 +165,7 @@ export async function issueByNumber(sql: Sql, params: IssueByNumberParams): Prom
 }
 
 export interface AddIssueParams {
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
   readonly ["title"]: string
   readonly ["description"]: string
   readonly ["origin_trigger_id"]: string | null
@@ -177,7 +177,7 @@ export interface AddIssueParams {
   readonly ["created_at"]: number
   readonly ["cron"]: string | null
   readonly ["deliver"]: Words_issue_deliver
-  readonly ["parent"]: string | null
+  readonly ["parent"]: IssueId | null
   readonly ["blocked_by"]: string | null
   readonly ["constraints"]: string | null
   readonly ["criteria"]: string | null
@@ -191,7 +191,7 @@ export async function addIssue(sql: Sql, params: AddIssueParams): Promise<number
 
 export interface SetIssueConstraintsParams {
   readonly ["constraints"]: string | null
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
 }
 
 export const SetIssueConstraintsSql = "-- name: SetIssueConstraints :exec\nupdate issue set constraints = $1 where issue.id = $2;"
@@ -207,7 +207,7 @@ export interface EditIssueParams {
   readonly ["priority"]: Words_issue_priority
   readonly ["criteria"]: string | null
   readonly ["deliver"]: Words_issue_deliver
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
 }
 
 export const EditIssueSql = "-- name: EditIssue :exec\nupdate issue set title = $1, description = $2, repo = $3,\n  priority = $4, criteria = $5, deliver = $6 where issue.id = $7;"
@@ -221,7 +221,7 @@ export interface RefineIssueParams {
   readonly ["description"]: string
   readonly ["criteria"]: string | null
   readonly ["questions"]: string | null
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
 }
 
 export const RefineIssueSql = "-- name: RefineIssue :exec\n-- A draft handed back: its words, its criteria and what it asks, in one write.\nupdate issue set title = $1, description = $2, criteria = $3, questions = $4\nwhere id = $5;"
@@ -233,7 +233,7 @@ export async function refineIssue(sql: Sql, params: RefineIssueParams): Promise<
 export interface ReviewIssueParams {
   readonly ["reviewed_at"]: number | null
   readonly ["findings"]: string | null
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
 }
 
 export const ReviewIssueSql = "-- name: ReviewIssue :exec\n-- A verdict on what was handed back: passed (reviewed_at set) or not (cleared), with the weeds as they stand now.\nupdate issue set reviewed_at = $1, findings = $2 where issue.id = $3;"
@@ -244,7 +244,7 @@ export async function reviewIssue(sql: Sql, params: ReviewIssueParams): Promise<
 
 export interface SetIssueQuestionsParams {
   readonly ["questions"]: string | null
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
 }
 
 export const SetIssueQuestionsSql = "-- name: SetIssueQuestions :exec\nupdate issue set questions = $1 where issue.id = $2;"
@@ -256,7 +256,7 @@ export async function setIssueQuestions(sql: Sql, params: SetIssueQuestionsParam
 export interface SetIssueReportParams {
   readonly ["questions"]: string | null
   readonly ["checks"]: string | null
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
 }
 
 export const SetIssueReportSql = "-- name: SetIssueReport :exec\nupdate issue set questions = $1, checks = $2 where issue.id = $3;"
@@ -266,7 +266,7 @@ export async function setIssueReport(sql: Sql, params: SetIssueReportParams): Pr
 }
 
 export interface RemoveIssueParams {
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
 }
 
 export const RemoveIssueSql = "-- name: RemoveIssue :exec\ndelete from issue where id = $1;"
@@ -277,7 +277,7 @@ export async function removeIssue(sql: Sql, params: RemoveIssueParams): Promise<
 
 export interface PlaceIssueParams {
   readonly ["rank"]: number
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
 }
 
 export const PlaceIssueSql = "-- name: PlaceIssue :exec\nupdate issue set rank = $1 where issue.id = $2;"
@@ -288,11 +288,11 @@ export async function placeIssue(sql: Sql, params: PlaceIssueParams): Promise<nu
 
 export interface QueueIssueParams {
   readonly ["at"]: number | null
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
 }
 
 export const QueueIssueResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: IssueId,
 })
 export type QueueIssueResult = z.infer<typeof QueueIssueResult>
 
@@ -304,7 +304,7 @@ export async function queueIssue(sql: Sql, params: QueueIssueParams): Promise<Qu
 }
 
 export interface UnqueueIssueParams {
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
 }
 
 export const UnqueueIssueSql = "-- name: UnqueueIssue :exec\nupdate issue set queued_at = null where id = $1;"
@@ -316,7 +316,7 @@ export async function unqueueIssue(sql: Sql, params: UnqueueIssueParams): Promis
 export interface CompleteIssueParams {
   readonly ["closed_at"]: number | null
   readonly ["delivered"]: Words_issue_delivered | null
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
 }
 
 export const CompleteIssueSql = "-- name: CompleteIssue :exec\nupdate issue set closed_at = $1, delivered = $2, canceled = null where id = $3;"
@@ -328,7 +328,7 @@ export async function completeIssue(sql: Sql, params: CompleteIssueParams): Prom
 export interface CancelIssueParams {
   readonly ["closed_at"]: number | null
   readonly ["canceled"]: Words_issue_canceled | null
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
 }
 
 export const CancelIssueSql = "-- name: CancelIssue :exec\nupdate issue set closed_at = $1, canceled = $2, delivered = null where id = $3;"
@@ -340,7 +340,7 @@ export async function cancelIssue(sql: Sql, params: CancelIssueParams): Promise<
 export interface CompleteOpenIssueParams {
   readonly ["closed_at"]: number | null
   readonly ["delivered"]: Words_issue_delivered | null
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
 }
 
 export const CompleteOpenIssueSql = "-- name: CompleteOpenIssue :exec\n-- As a session leaves: only an issue still open, so a verdict written meanwhile (a pull request merged) stands.\nupdate issue set closed_at = $1, delivered = $2 where id = $3 and closed_at is null;"
@@ -352,7 +352,7 @@ export async function completeOpenIssue(sql: Sql, params: CompleteOpenIssueParam
 export interface CancelOpenIssueParams {
   readonly ["closed_at"]: number | null
   readonly ["canceled"]: Words_issue_canceled | null
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
 }
 
 export const CancelOpenIssueSql = "-- name: CancelOpenIssue :exec\nupdate issue set closed_at = $1, canceled = $2 where id = $3 and closed_at is null;"
@@ -366,7 +366,7 @@ export interface KeptIssuesParams {
 }
 
 export const KeptIssuesResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: IssueId,
   ["number"]: z.number().int(),
   ["title"]: z.string(),
   ["description"]: z.string(),
@@ -377,7 +377,7 @@ export const KeptIssuesResult = z.object({
   ["repo"]: z.string().nullable(),
   ["priority"]: Words_issue_priority,
   ["rank"]: z.number().int(),
-  ["parent"]: z.string().nullable(),
+  ["parent"]: IssueId.nullable(),
   ["blocked_by"]: z.string().nullable(),
   ["constraints"]: z.string().nullable(),
   ["cron"]: z.string().nullable(),
@@ -409,11 +409,11 @@ export async function keptIssues(sql: Sql, params: KeptIssuesParams): Promise<Ke
 }
 
 export interface FamilyParams {
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
 }
 
 export const FamilyResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: IssueId,
   ["number"]: z.number().int(),
   ["title"]: z.string(),
   ["description"]: z.string(),
@@ -424,7 +424,7 @@ export const FamilyResult = z.object({
   ["repo"]: z.string().nullable(),
   ["priority"]: Words_issue_priority,
   ["rank"]: z.number().int(),
-  ["parent"]: z.string().nullable(),
+  ["parent"]: IssueId.nullable(),
   ["blocked_by"]: z.string().nullable(),
   ["constraints"]: z.string().nullable(),
   ["cron"]: z.string().nullable(),
@@ -460,7 +460,7 @@ export interface LatestOfCronParams {
 }
 
 export const LatestOfCronResult = z.object({
-  ["id"]: z.string(),
+  ["id"]: IssueId,
   ["number"]: z.number().int(),
   ["title"]: z.string(),
   ["description"]: z.string(),
@@ -471,7 +471,7 @@ export const LatestOfCronResult = z.object({
   ["repo"]: z.string().nullable(),
   ["priority"]: Words_issue_priority,
   ["rank"]: z.number().int(),
-  ["parent"]: z.string().nullable(),
+  ["parent"]: IssueId.nullable(),
   ["blocked_by"]: z.string().nullable(),
   ["constraints"]: z.string().nullable(),
   ["cron"]: z.string().nullable(),
@@ -503,7 +503,7 @@ export async function latestOfCron(sql: Sql, params: LatestOfCronParams): Promis
 }
 
 export interface ReopenIssueParams {
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
 }
 
 export const ReopenIssueSql = "-- name: ReopenIssue :exec\nupdate issue set closed_at = null, delivered = null, canceled = null, queued_at = null, checks = null where id = $1;"
@@ -514,7 +514,7 @@ export async function reopenIssue(sql: Sql, params: ReopenIssueParams): Promise<
 
 export interface SetIssueAnswerParams {
   readonly ["answer"]: string | null
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
 }
 
 export const SetIssueAnswerSql = "-- name: SetIssueAnswer :exec\nupdate issue set answer = $1 where issue.id = $2;"
@@ -525,7 +525,7 @@ export async function setIssueAnswer(sql: Sql, params: SetIssueAnswerParams): Pr
 
 export interface SetIssuePullRequestParams {
   readonly ["pull_request"]: string | null
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
 }
 
 export const SetIssuePullRequestSql = "-- name: SetIssuePullRequest :exec\nupdate issue set pull_request = $1 where issue.id = $2;"
@@ -536,7 +536,7 @@ export async function setIssuePullRequest(sql: Sql, params: SetIssuePullRequestP
 
 export interface SetIssueConflictParams {
   readonly ["conflict"]: string | null
-  readonly ["id"]: string
+  readonly ["id"]: IssueId
 }
 
 export const SetIssueConflictSql = "-- name: SetIssueConflict :exec\nupdate issue set conflict = $1 where issue.id = $2;"

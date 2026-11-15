@@ -5,11 +5,11 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, Words_issue_input_state, Words_session_delivery_state } from "./types.js"
+import { rowOf, IssueId, SessionId, Words_issue_input_state, Words_session_delivery_state } from "./types.js"
 
 export interface HoldIssueTriggerParams {
   readonly ["trigger_id"]: string
-  readonly ["issue_id"]: string
+  readonly ["issue_id"]: IssueId
   readonly ["created_at"]: number
 }
 
@@ -24,9 +24,9 @@ export interface ExistingIssueInputParams {
 }
 
 export const ExistingIssueInputResult = z.object({
-  ["issue_id"]: z.string(),
+  ["issue_id"]: IssueId,
   ["state"]: Words_issue_input_state,
-  ["session_id"]: z.string().nullable(),
+  ["session_id"]: SessionId.nullable(),
   ["trigger_json"]: z.string(),
 })
 export type ExistingIssueInputResult = z.infer<typeof ExistingIssueInputResult>
@@ -39,7 +39,7 @@ export async function existingIssueInput(sql: Sql, params: ExistingIssueInputPar
 }
 
 export interface InputReceiptParams {
-  readonly ["session_id"]: string
+  readonly ["session_id"]: SessionId
   readonly ["trigger_id"]: string
 }
 
@@ -57,7 +57,7 @@ export async function inputReceipt(sql: Sql, params: InputReceiptParams): Promis
 }
 
 export interface DeliveredTriggerParams {
-  readonly ["session_id"]: string
+  readonly ["session_id"]: SessionId
   readonly ["envelope_id"]: string
 }
 
@@ -74,14 +74,14 @@ export async function deliveredTrigger(sql: Sql, params: DeliveredTriggerParams)
 }
 
 export interface InputsOfIssueParams {
-  readonly ["issue_id"]: string
+  readonly ["issue_id"]: IssueId
 }
 
 export const InputsOfIssueResult = z.object({
   ["trigger_id"]: z.string(),
-  ["issue_id"]: z.string(),
+  ["issue_id"]: IssueId,
   ["state"]: Words_issue_input_state,
-  ["session_id"]: z.string().nullable(),
+  ["session_id"]: SessionId.nullable(),
   ["reason"]: z.string().nullable(),
   ["trigger_json"]: z.string(),
 })
@@ -95,16 +95,16 @@ export async function inputsOfIssue(sql: Sql, params: InputsOfIssueParams): Prom
 }
 
 export interface PendingIssueInputsParams {
-  readonly ["issue_id"]: string
+  readonly ["issue_id"]: IssueId
   readonly ["closing"]: boolean
-  readonly ["recipient"]: string | null
+  readonly ["recipient"]: SessionId | null
 }
 
 export const PendingIssueInputsResult = z.object({
   ["trigger_id"]: z.string(),
-  ["issue_id"]: z.string(),
+  ["issue_id"]: IssueId,
   ["state"]: Words_issue_input_state,
-  ["session_id"]: z.string().nullable(),
+  ["session_id"]: SessionId.nullable(),
   ["reason"]: z.string().nullable(),
   ["trigger_json"]: z.string(),
 })
@@ -129,7 +129,7 @@ export async function holdIssueInput(sql: Sql, params: HoldIssueInputParams): Pr
 }
 
 export interface ForwardIssueInputParams {
-  readonly ["session_id"]: string | null
+  readonly ["session_id"]: SessionId | null
   readonly ["trigger_id"]: string
 }
 
@@ -155,7 +155,7 @@ export interface InputsOfQueuedIssuesParams {
 }
 
 export const InputsOfQueuedIssuesResult = z.object({
-  ["issue_id"]: z.string(),
+  ["issue_id"]: IssueId,
   ["trigger_json"]: z.string(),
 })
 export type InputsOfQueuedIssuesResult = z.infer<typeof InputsOfQueuedIssuesResult>
@@ -168,7 +168,7 @@ export async function inputsOfQueuedIssues(sql: Sql): Promise<InputsOfQueuedIssu
 }
 
 export interface SupersedeDispatchParams {
-  readonly ["issue_id"]: string
+  readonly ["issue_id"]: IssueId
   readonly ["trigger_id"]: string
 }
 
@@ -179,7 +179,7 @@ export async function supersedeDispatch(sql: Sql, params: SupersedeDispatchParam
 }
 
 export interface RetireQueuedDispatchesParams {
-  readonly ["issue_id"]: string
+  readonly ["issue_id"]: IssueId
 }
 
 export const RetireQueuedDispatchesSql = "-- name: RetireQueuedDispatches :exec\nupdate issue_input as m set state = 'returned', reason = 'unqueued'\nfrom session_trigger as t\nwhere m.trigger_id = t.id and m.issue_id = $1 and m.state = 'held'\n  and t.trigger_json::jsonb -> 'meta' -> 'dispatch' = 'true';"

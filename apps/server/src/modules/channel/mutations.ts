@@ -19,7 +19,7 @@ const emojiPattern = /^\S{1,16}$/u;
 
 export function messageMutations(deps: { readonly db: Db; readonly clock: Time }, said: Hub<T.ChatMessage>, publishChannel: (id: string) => Promise<void>) {
   const { db, clock } = deps;
-  const messageOf = async (id: string) => {
+  const messageOf = async (id: T.MessageId) => {
     const row = await qm.messageByID(db.sql, { id });
     if (!row) throw missing(t("server.channel.noMessageId", { id }), [lookIn.channel]);
     return row;
@@ -41,7 +41,7 @@ export function messageMutations(deps: { readonly db: Db; readonly clock: Time }
 
   /** add only adds: a reaction already there is then kept. */
   // Setting the reaction as it already is writes nothing: a retried set is no new revision for every follower.
-  const reacting = async (id: string, who: string, emoji: string, on: boolean) => {
+  const reacting = async (id: T.MessageId, who: string, emoji: string, on: boolean) => {
     const e = emoji.trim();
     if (!emojiPattern.test(e)) throw refused(t("server.channel.badEmoji"));
     const row = await messageOf(id);

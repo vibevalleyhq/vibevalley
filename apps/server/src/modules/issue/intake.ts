@@ -10,6 +10,7 @@ import { Semaphore, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { assignedAgentOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { BizCode, lookIn, missing, refuseIn } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
@@ -39,7 +40,7 @@ const readTrigger = jsonOf(S.Trigger, "issue_input.trigger_json");
 
 /** What an issue's next helper is to be told when it is sent: the issue's words, or the ones it was started with. */
 export interface Dispatch {
-  readonly issue: string;
+  readonly issue: T.IssueId;
   /** The profile that is to take it. */
   readonly agent: string;
   readonly text: string;
@@ -51,7 +52,7 @@ export interface Dispatch {
 
 /** An input waiting in a queued issue's pool. */
 export interface QueuedInput {
-  readonly issue: string;
+  readonly issue: T.IssueId;
   readonly trigger: Trigger;
 }
 
@@ -63,27 +64,27 @@ export interface Intake {
   /** A source's event recorded as a trigger and routed; the farm's own echo is neither. */
   readonly receive: (event: SourceEvent) => Promise<Accepted>;
   /** The threads whose words reach the issue's helper; a thread another issue has is refused. */
-  readonly subscribe: (issue: string, threads: readonly string[]) => Promise<void>;
+  readonly subscribe: (issue: T.IssueId, threads: readonly string[]) => Promise<void>;
   /** A helper says an input is not its to take; the orchestrator is told why. */
   readonly decline: (session: string, envelope: string, reason: string) => Promise<void>;
   /** A dispatch held in the issue's pool for its next helper, in the caller's transaction; routed once it commits. */
   readonly queueDispatch: (dispatch: Dispatch) => Promise<void>;
   /** The issue's held dispatches returned: a session started on it. In the caller's transaction. */
-  readonly withdrawDispatches: (issue: string) => Promise<void>;
+  readonly withdrawDispatches: (issue: T.IssueId) => Promise<void>;
   /** Every input of a queued issue: dispatches first, then in the order taken. */
   readonly queued: () => Promise<readonly QueuedInput[]>;
   /** An issue's inputs not returned, in the order taken. */
-  readonly inputsOf: (issue: string) => Promise<readonly Trigger[]>;
+  readonly inputsOf: (issue: T.IssueId) => Promise<readonly Trigger[]>;
   /** The issue a trigger is an input of. */
-  readonly ownerOf: (trigger: string) => Promise<string | undefined>;
+  readonly ownerOf: (trigger: string) => Promise<T.IssueId | undefined>;
   /** inputs, delivered to the session hired on the issue with them, kept as its. */
-  readonly forwarded: (issue: string, session: string, inputs: readonly Trigger[]) => Promise<void>;
+  readonly forwarded: (issue: T.IssueId, session: T.SessionId, inputs: readonly Trigger[]) => Promise<void>;
   /** The runs that took the issue's inputs. */
-  readonly runsOf: (issue: string) => Promise<T.Run[]>;
+  readonly runsOf: (issue: T.IssueId) => Promise<T.Run[]>;
   /** A run took an input of issue (Session's IssueStarted). */
-  readonly ranOn: (run: string, issue: string) => Promise<void>;
+  readonly ranOn: (run: string, issue: T.IssueId) => Promise<void>;
   /** The issues a run took: the helper's own (given) and those its run was told to have taken. */
-  readonly issuesOfRun: (run: string, issue?: string) => Promise<readonly string[]>;
+  readonly issuesOfRun: (run: string, issue?: T.IssueId) => Promise<readonly T.IssueId[]>;
   /** What a restart or a failed route left unrouted, routed again (the crons' are cron.ts's). */
   readonly replay: () => Promise<void>;
   /** At startup: what was left routed, then each issue's threads and pool as the issue stands. */
@@ -124,11 +125,11 @@ export function issueIntake(deps: IntakeDeps): Intake {
 
   /** The input goes back to the orchestrator to be routed again: its helper declined it (reason), or the issue closed
    * before its helper took the user's words in (unreadOnly). */
-  const retire = async (issue: T.Issue, trigger: Trigger, session: string | null, reason: string, unreadOnly: boolean): Promise<void> => {
+  const retire = async (issue: T.Issue, trigger: Trigger, session: T.SessionId | null, reason: string, unreadOnly: boolean): Promise<void> => {
     const recipient = orchestratorFor(trigger);
     await sessions.route(trigger, [
       {
-        session: recipient,
+        session: sessionId(recipient),
         id: `returned:${issue.id}:${trigger.id}`,
         urgency: "queue",
         ...(session ? { previous: session } : {}),
@@ -150,13 +151,13 @@ export function issueIntake(deps: IntakeDeps): Intake {
 
   /** The issue's pool as the issue stands: on to its session what may go, held what may not, and once it closed, the
    * user's words its helper did not take back to the orchestrator. human: the user just spoke there. */
-  const flush = async (id: string, human: boolean = false): Promise<void> => {
+  const flush = async (id: T.IssueId, human: boolean = false): Promise<void> => {
     const issue = issueOf(id);
     if (!issue) return;
     if (issue.status === "backlog") return;
     const assigned = assignedAgentOf(issue);
     const worker = latestSessionIdOf(issue);
-    const recipient = assigned && agents.isOrchestrator(assigned) ? assigned : worker && sessions.live(worker).reachable ? worker : undefined;
+    const recipient = assigned && agents.isOrchestrator(assigned) ? sessionId(assigned) : worker && sessions.live(worker).reachable ? worker : undefined;
     const closing = issue.status === "done" || (issue.status === "canceled" && issue.canceled !== "lost");
     const inputs = await qi.pendingIssueInputs(db.sql, { issue_id: id, recipient: recipient ?? null, closing });
     if (closing) {
@@ -189,7 +190,7 @@ export function issueIntake(deps: IntakeDeps): Intake {
       ]);
     }
   };
-  const flushIssue = (issue: string, human?: boolean) => locked(() => flush(issue, human));
+  const flushIssue = (issue: T.IssueId, human?: boolean) => locked(() => flush(issue, human));
 
   const take = async (trigger: Trigger, hearers?: readonly Hearer[]): Promise<void> => {
     const existing = await qi.existingIssueInput(db.sql, { trigger_id: trigger.id });
@@ -205,7 +206,7 @@ export function issueIntake(deps: IntakeDeps): Intake {
     const matches = await qs.subscribedIssues(db.sql, { keys: [...threads] });
     const ids = new Set(matches.map((row) => row.issue_id));
     for (const thread of threads.filter((thread) => thread.startsWith("issue:"))) {
-      const id = thread.slice(6);
+      const id = issueId(thread.slice(6));
       if (issueOf(id) || (await issueQ.issueExists(db.sql, { id })) !== undefined) ids.add(id);
     }
     if (ids.size > 1) throw refused(t("server.mailbox.ambiguous"));
@@ -223,12 +224,12 @@ export function issueIntake(deps: IntakeDeps): Intake {
           role: h.role,
           event: h.event,
         }))
-      : [{ session: orchestratorFor(trigger) }];
+      : [{ session: sessionId(orchestratorFor(trigger)) }];
     await sessions.route(trigger, to);
   };
   const route = (trigger: Trigger, hearers?: readonly Hearer[]) => locked(() => take(trigger, hearers));
 
-  const subscribe = async (issue: string, threads: readonly string[]): Promise<void> => {
+  const subscribe = async (issue: T.IssueId, threads: readonly string[]): Promise<void> => {
     if (!issueOf(issue)) throw missing(t("server.issue.issueRef", { ref: issue }), [lookIn.issue]);
     await db.tx(async () => {
       for (const thread of new Set(threads)) {
@@ -238,9 +239,10 @@ export function issueIntake(deps: IntakeDeps): Intake {
     });
   };
 
-  const decline = async (session: string, envelope: string, reason: string): Promise<void> => {
+  const decline = async (rawSession: string, envelope: string, reason: string): Promise<void> => {
     const why = reason.trim();
     if (!why) throw refused(t("server.issue.noTitle"));
+    const session = sessionId(rawSession);
     const declined = await locked(async () => {
       const delivered = await qi.deliveredTrigger(db.sql, { session_id: session, envelope_id: envelope });
       if (!delivered) return false;
@@ -272,7 +274,7 @@ export function issueIntake(deps: IntakeDeps): Intake {
         fact.channel.subjectId &&
         issueOf(fact.channel.subjectId) !== undefined
       ) {
-        await subscribe(fact.channel.subjectId, [`channel:${fact.channel.id}`]);
+        await subscribe(issueId(fact.channel.subjectId), [`channel:${fact.channel.id}`]);
       }
     });
   const { changes } = core.transitions();

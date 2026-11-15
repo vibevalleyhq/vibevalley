@@ -3,7 +3,8 @@ import type { AssistantMessage, UserMessage } from "@earendil-works/pi-ai";
 import type { ToolResult } from "@vibevalley/agent/core/tool";
 import type { Clock } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
-import type { Outcome, RunTrigger, Spent } from "@vibevalley/protocol";
+import type { IssueId, Outcome, RunTrigger, SessionId, Spent } from "@vibevalley/protocol";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { Inconsistent } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
@@ -91,14 +92,14 @@ export function makeInProcessRun(session: string, journal: Journal, toolStart: (
   const begin = async (input: RunInput) => {
     if (ending) await finish();
     if (run) {
-      if (input.issue) store.link(run, input.issue);
+      if (input.issue) store.link(run, issueId(input.issue));
       return;
     }
     const given = !input.issue && !input.by.kind && resuming ? resuming : input;
     resuming = undefined;
     const by: RunTrigger = given.by.kind ? given.by : { kind: "runtime" };
     const id = newId();
-    await store.start(id, session, given.issue ?? "", by);
+    await store.start(id, sessionId(session), given.issue ? issueId(given.issue) : undefined, by);
     run = id;
     outcome = "completed";
     summary = "";
@@ -211,8 +212,8 @@ export function recording(deps: { readonly db: Db; readonly clock: Clock }) {
   return {
     // The times are read as each is asked for, before the row is written; a caller that queues the write passes the
     // time the run started, so an input consumed meanwhile is never dated before its run.
-    start: async (id: string, session: string, issue: string, trigger: RunTrigger, at = clock.now()) => {
-      await tried(() => qr.startRun(db.sql, { id, session, issue: issue || null, triggered_by: jsonText(trigger), started_at: at }));
+    start: async (id: string, session: SessionId, issue: IssueId | undefined, trigger: RunTrigger, at = clock.now()) => {
+      await tried(() => qr.startRun(db.sql, { id, session, issue: issue ?? null, triggered_by: jsonText(trigger), started_at: at }));
     },
     heard: async (id: string, heard: readonly string[]) => {
       await tried(() => qr.heardInRun(db.sql, { heard: jsonText(heard), id }));

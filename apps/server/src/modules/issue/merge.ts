@@ -23,7 +23,7 @@ interface MergeDeps {
   readonly landing: IssueLanding;
   readonly get: (ref: string) => Promise<T.Issue>;
   readonly list: () => Promise<T.Issue[]>;
-  readonly setConflict: (id: string, conflict: T.Conflict | undefined) => Promise<void>;
+  readonly setConflict: (id: T.IssueId, conflict: T.Conflict | undefined) => Promise<void>;
 }
 
 export function merging(d: MergeDeps) {

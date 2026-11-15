@@ -2,6 +2,7 @@ import { scriptedRuntime } from "@botiverse/oar/testing";
 import { expect, test } from "vite-plus/test";
 
 import { defaultOrchestrator } from "@vibevalley/protocol";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 import { type SourceEvent } from "#/modules/session/mailbox.ts";
 import { committedDelivery } from "#/testing/deliveries.ts";
@@ -31,7 +32,7 @@ test("regression: concurrent mailbox writes and restoration leave every committe
   const inputs = recorded.filter((input) => input !== undefined);
   const writes = inputs.map((trigger) =>
     committedDelivery(fw.db, {
-      session: defaultOrchestrator,
+      session: sessionId(defaultOrchestrator),
       row: {
         envelope_id: trigger.id,
         scope: `channel:${channel}`,

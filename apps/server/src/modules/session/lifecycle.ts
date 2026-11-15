@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { dayMs, maxRunning } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { issueId, sessionId } from "@vibevalley/protocol/schema";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 import { worker as sessionActor } from "#/base/actor.ts";
 import { BizCode, errnoOf, messageOf, refuseIn } from "#/base/errors.ts";
@@ -96,7 +96,7 @@ export interface HireOptions {
 interface SendOptions extends Omit<HireOptions, "issue"> {
   readonly envelopeIds?: readonly string[];
   readonly context:
-    | { readonly kind: "issue"; readonly issue: { readonly id: string; readonly number: number } }
+    | { readonly kind: "issue"; readonly issue: { readonly id: T.IssueId; readonly number: number } }
     | { readonly kind: "channel"; readonly channel: string };
 }
 
@@ -344,7 +344,7 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
         id: session.id,
         stack,
         place: s.place,
-        issue: session.issue ?? "",
+        issue: session.issue,
         access: new Semaphore(1),
         journal,
         oarSessionId: s.oarSessionId,
@@ -488,7 +488,7 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
           id,
           stack: handScope,
           place,
-          issue: issue?.id ?? "",
+          issue: issue?.id,
           access: new Semaphore(1),
           journal,
           oarSessionId: "",
@@ -552,7 +552,7 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
           phase: { _tag: "working", since: hiredAt, doing: { action: "none", label: "" } },
           ...(channel ? { channel } : {}),
           refining: issue ? (opt.refining ?? false) : false,
-          ...(issue ? { issue: issueId(issue.id) } : {}),
+          ...(issue ? { issue: issue.id } : {}),
           ...(place.branch ? { branch: place.branch, worktree: place.cwd } : {}),
           machine: machines.here().id,
         };
@@ -707,7 +707,7 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
         if (!core.session(id)?.issue || !h.run) throw noReport();
         await flushRuns();
         try {
-          await qs.setPendingReport(db.sql, { id, report: jsonText(given) });
+          await qs.setPendingReport(db.sql, { id: h.id, report: jsonText(given) });
         } catch (e) {
           if (e instanceof SqlError) throw refused(causeMessage(e));
           throw e;
@@ -782,9 +782,10 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
       for (const row of rows) if (!out.some((s) => s.id === row.id)) out.push(endedSession(row, bySession.get(row.id) ?? []));
       return out.toSorted((a, b) => b.hiredAt - a.hiredAt);
     },
-    get: async (id) => {
-      const live = core.session(id);
+    get: async (rawId) => {
+      const live = core.session(rawId);
       if (live) return live;
+      const id = sessionId(rawId);
       const row = await qs.sessionByID(db.sql, { id });
       if (row === undefined || row.ended_at === null) return undefined;
       return endedSession(row, await qr.runsOfSession(db.sql, { session: id }));
