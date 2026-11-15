@@ -13,9 +13,6 @@ export class ToolFailed extends Error {
   constructor(message: string, cause?: unknown) {
     super(message, withCause(cause));
   }
-  static make(fields: { readonly message: string; readonly cause?: unknown }): ToolFailed {
-    return new ToolFailed(fields.message, fields.cause);
-  }
 }
 
 /** What a tool's body threw or rejected with, or the agent it started failed with, as the failed result. */
@@ -27,9 +24,6 @@ export class AgentFailed extends Error {
   readonly _tag = "AgentFailed";
   constructor(message: string, cause?: unknown) {
     super(message, withCause(cause));
-  }
-  static make(fields: { readonly message: string; readonly cause?: unknown }): AgentFailed {
-    return new AgentFailed(fields.message, fields.cause);
   }
 }
 

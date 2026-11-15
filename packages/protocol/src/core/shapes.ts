@@ -2,7 +2,7 @@ import type { Chat, FactChannelChanged, FactChannelRemoved, FactMessageChanged, 
 import type { SessionId } from "../common/shapes";
 import type { ConnectorStatus, FactConnectorChanged } from "../connector/shapes";
 import type { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/shapes";
-import type { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress, SessionPlay } from "../game/shapes";
+import type { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress } from "../game/shapes";
 import type { InboxItem } from "../inbox/shapes";
 import type { FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue } from "../issue/shapes";
 import type { MediaJob, FactMediaChanged } from "../media/shapes";
@@ -37,8 +37,6 @@ export interface SpaceState {
   media?: MediaJob[];
   /** Each orchestrator not at rest, by its profile id, as its last orchestrator fact says; one not here is idle. */
   sessions: Session[];
-  /** The farm's pixel-only station and step history, by session; no business rule reads it. */
-  plays?: Record<string, SessionPlay>;
   chat?: Chat;
   commits?: CommitCount;
   progress?: Progress;
@@ -50,7 +48,7 @@ export interface SpaceState {
   machines: Machine[];
 }
 
-export interface SpaceView extends Omit<SpaceState, "sessions" | "crons" | "plays"> {
+export interface SpaceView extends Omit<SpaceState, "sessions" | "crons"> {
   sessions: SessionView[];
   crons: CronView[];
 }

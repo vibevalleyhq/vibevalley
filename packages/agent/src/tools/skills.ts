@@ -1,11 +1,11 @@
+import { readdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { mapConcurrent } from "@vibevalley/async";
 
 import { skills as skillWords } from "../base/prompts.ts";
-import { AgentFailed, ToolFailed } from "../core/errors.ts";
-import { type AgentFs, agentFsOf } from "../infra/fs.ts";
+import { errnoOf, ToolFailed } from "../core/errors.ts";
 
 export interface SkillInfo {
   readonly name: string;
@@ -51,18 +51,18 @@ async function orNone<A>(read: () => Promise<A>, none: A): Promise<A> {
   try {
     return await read();
   } catch (e) {
-    if (e instanceof AgentFailed) return none;
+    if (errnoOf(e) !== undefined) return none;
     throw e;
   }
 }
 
 /** One folder's skills, in its order; an unreadable folder or SKILL.md is none. */
-async function skillsIn(io: AgentFs, dir: string): Promise<SkillInfo[]> {
-  const entries = await orNone<readonly string[]>(() => io.readDir(dir), []);
+async function skillsIn(dir: string): Promise<SkillInfo[]> {
+  const entries = await orNone<readonly string[]>(() => readdir(dir), []);
   const read = await mapConcurrent(entries, 16, async (entry): Promise<SkillInfo | undefined> => {
-    if (!(await orNone(async () => (await io.stat(join(dir, entry))).isDirectory, false))) return undefined;
+    if (!(await orNone(async () => (await stat(join(dir, entry))).isDirectory(), false))) return undefined;
     const path = join(dir, entry, "SKILL.md");
-    const data = await orNone<string | undefined>(() => io.readText(path), undefined);
+    const data = await orNone<string | undefined>(() => readFile(path, "utf8"), undefined);
     if (data === undefined) return undefined;
     const fm = frontMatter(data);
     return { name: fm.name || entry, description: fm.description ?? "", path };
@@ -71,9 +71,8 @@ async function skillsIn(io: AgentFs, dir: string): Promise<SkillInfo[]> {
 }
 
 /** The first of a name wins. Unreadable folders are skipped. */
-export async function scanSkills(dirs: readonly string[], fs?: AgentFs): Promise<SkillInfo[]> {
-  const io = agentFsOf(fs);
-  const groups = await Promise.all(dirs.map((dir) => skillsIn(io, dir)));
+export async function scanSkills(dirs: readonly string[]): Promise<SkillInfo[]> {
+  const groups = await Promise.all(dirs.map((dir) => skillsIn(dir)));
   const found = new Map<string, SkillInfo>();
   for (const skills of groups) for (const s of skills) if (!found.has(s.name)) found.set(s.name, s);
   // localeCompare: case folded first.
@@ -94,7 +93,7 @@ export function skillIndex(skills: readonly SkillInfo[], max = 160): string {
 }
 
 /** Throws a ToolFailed when there is no such skill or its file cannot be read. */
-export async function readSkill(skills: readonly SkillInfo[], name: string, fs?: AgentFs): Promise<string> {
+export async function readSkill(skills: readonly SkillInfo[], name: string): Promise<string> {
   const s = skills.find((x) => x.name === name);
   if (!s)
     throw new ToolFailed(
@@ -105,7 +104,7 @@ export async function readSkill(skills: readonly SkillInfo[], name: string, fs?:
     );
   let data: string;
   try {
-    data = await agentFsOf(fs).readText(s.path);
+    data = await readFile(s.path, "utf8");
   } catch (cause) {
     throw new ToolFailed(skillWords.cannotRead(s.path), cause);
   }

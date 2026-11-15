@@ -11,7 +11,7 @@
 | `./moss/server`、`./moss/live-models` | Live 显式鉴权连接、握手与稳定模型／快照目录 |
 | `./moss/image` | `prepareMossImage` 校验参数；`generateMossImage` 显式凭据提交一次生成，返回 URL，不重试、不下载 |
 | `./moss/image-models` | 已适配的生图模型与官方快照；配置选择和生图协议使用同一列表，不从账号目录猜能力 |
-| `./moss/files` | 显式凭据上传 Blob、按 ID 查询和删除、分页列出文件；不隐式重试或删除，不接收服务器路径 |
+| `./moss/files` | 显式凭据上传 Blob 和按 ID 删除文件；不隐式重试或删除，不接收服务器路径 |
 | `./moss/understanding`、`./moss/understanding-models` | Responses 协议与显式 VL 模型目录；图片组或单视频加文本，保留不完整文本和厂商 Token 用量 |
 | `./moss/speech`、`./moss/speech-models` | Flash／Pro 及官方快照、语言与格式目录；整段 URL 结果或异步 task ID，不下载、不轮询、不冒充流式 |
 | `./moss/speech-stream` | Flash SSE 的任务、实际 PCM 元数据、音频分片和完成事件；有界读取，不猜缺失参数 |

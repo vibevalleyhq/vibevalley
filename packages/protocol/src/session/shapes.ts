@@ -1,5 +1,5 @@
 import type { AgentRole } from "../agent/shapes";
-import type { IssueId, Outcome, Retry, SessionId, Spent } from "../common/shapes";
+import type { Outcome, Retry, SessionId, Spent } from "../common/shapes";
 
 export const SessionActionValues = [
   "run_command",
@@ -34,8 +34,13 @@ export interface LastRun {
   summary: string;
   at: number;
   spent?: Spent;
-  /** The conclusion it handed back in the block an answer issue asks for, when one could be read. */
-  answer?: IssueAnswer;
+}
+
+export const SessionScopeKindValues = ["issue", "draft", "channel", "duty"] as const;
+
+export interface SessionScope {
+  kind: (typeof SessionScopeKindValues)[number];
+  id: string;
 }
 
 export const ToolConnectionStatusValues = ["unknown", "starting", "ready", "failed", "cancelled"] as const;
@@ -62,8 +67,7 @@ export interface Session {
   lastRun?: LastRun;
   spent?: Spent;
   channel?: string;
-  issue?: IssueId;
-  refining: boolean;
+  scope?: SessionScope;
   toolConnections?: ToolConnection[];
   /** The machine it works on; none for an agent hosted in the server's process. */
   machine?: string;
@@ -125,14 +129,6 @@ export interface EventTokens {
   output: number;
 }
 
-/** What an answer issue concludes, as its helper hands it back. */
-export interface IssueAnswer {
-  conclusion: string;
-  evidence: string[];
-  unsure: string[];
-  next: string[];
-}
-
 /** How a session left: its work merged into the main branch, its issue completed otherwise, sent home, or its workplace lost. */
 export const SessionCloseValues = ["merged", "completed", "dismissed", "lost"] as const;
 export type SessionClose = (typeof SessionCloseValues)[number];
@@ -152,7 +148,6 @@ export interface RunTrigger {
 export interface Run {
   id: string;
   session: SessionId;
-  issue?: IssueId;
   triggeredBy: RunTrigger;
   heard: string[];
   startedAt: number;

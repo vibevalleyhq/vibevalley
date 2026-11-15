@@ -32,22 +32,17 @@ const AchievementStanding = z.object({
   next: z.exactOptional(z.number()),
 }) satisfies Codec<T.AchievementStanding>;
 
-const PlayAction = z.object({ at: z.number(), ...doingFields }) satisfies Codec<T.PlayAction>;
-
 const PlayActionView = z.object({ at: z.number(), ...doingFields, actionText: z.string() }) satisfies Codec<T.PlayActionView>;
 
-const playFields = {
+const SessionPlayView = z.object({
   station: z.number(),
   toolsThisRun: z.number(),
   counts: z.record(z.string(), z.number()),
   files: z.array(z.string()),
   commands: z.array(z.string()),
   runStartedAt: z.exactOptional(z.number()),
-};
-
-export const SessionPlay = z.object({ ...playFields, history: z.array(PlayAction) }) satisfies Codec<T.SessionPlay>;
-
-const SessionPlayView = z.object({ ...playFields, history: z.array(PlayActionView) }) satisfies Codec<T.SessionPlayView>;
+  history: z.array(PlayActionView),
+}) satisfies Codec<T.SessionPlayView>;
 
 export const CommitCount = z.object({
   total: z.number(),

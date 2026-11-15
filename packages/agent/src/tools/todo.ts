@@ -31,9 +31,6 @@ export interface Todo {
 /** A graph past this is a repo, not one piece of work: it belongs in issues. */
 const maxTodos = 30;
 
-/** Retries a subagent's task gets after its first failure. */
-const retries = 1;
-
 /** Done or skipped: what lets the tasks after it start. */
 const settled = (t: Todo) => t.state === "done" || t.state === "skipped";
 
@@ -142,27 +139,9 @@ export function text(g: readonly Todo[]): string {
   for (const t of g) {
     const mark = t.state === "waiting" ? (ready(g, t) ? words.canDo : words.waitingFor) : stateWords[t.state];
     let line = "- [" + mark + "] " + t.id + " " + t.title;
-    if (t.by === "subagent") line += words.bySubagent;
     if (t.after.length > 0 && !settled(t)) line += words.waitingOn(t.after);
     if (t.result) line += " → " + head(t.result.split(/\s+/u).filter(Boolean).join(" "), 80);
     lines.push(line);
   }
   return lines.join("\n");
 }
-
-/** A subagent takes it: waiting to working. */
-export const begin = (g: readonly Todo[], id: string) => g.map((t) => (t.id === id && t.state === "waiting" ? { ...t, state: "working" as const } : t));
-
-/** A subagent came back: done with what it said, or failed with why. A failure within retries goes back to waiting. */
-export function settle(g: readonly Todo[], id: string, result: string, failed: boolean): Todo[] {
-  return g.map((t) => {
-    if (t.id !== id || t.state !== "working") return t;
-    const said = { ...t, result: result.trim() };
-    if (!failed) return { ...said, state: "done" as const };
-    return (t.tries ?? 0) < retries ? { ...said, tries: (t.tries ?? 0) + 1, state: "waiting" as const } : { ...said, state: "failed" as const };
-  });
-}
-
-/** Subagents that stopped before coming back (the agent was stopped, or the process went): their tasks wait again. */
-export const requeue = (g: readonly Todo[], ids?: readonly string[]) =>
-  g.map((t) => (t.state === "working" && (!ids || ids.includes(t.id)) ? { ...t, state: "waiting" as const } : t));

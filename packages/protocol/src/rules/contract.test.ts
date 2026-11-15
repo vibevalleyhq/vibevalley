@@ -36,11 +36,8 @@ test("every rule here is one the page uses", () => {
       if (e.from.startsWith("./") && e.from.replace(/^\.\//u, "").replace(/\.ts$/u, "") !== f.replace(/\.ts$/u, "")) for (const n of e.names) used.add(n);
   const unused: string[] = [];
   for (const [f, body] of bodies) {
-    const own = exportsOf(f, body);
-    for (const name of own) {
-      // Or used by its own file, beside its declaration.
-      const here = [...body.matchAll(new RegExp(`\\b${name}\\b`, "gu"))].length;
-      if (!used.has(name) && here < 2) unused.push(`${f}: ${name}`);
+    for (const name of exportsOf(f, body)) {
+      if (!used.has(name)) unused.push(`${f}: ${name}`);
     }
   }
   expect(

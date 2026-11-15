@@ -2,7 +2,8 @@ import { z } from "zod";
 
 import { bounded, type ProviderHttp, send } from "../base/http.ts";
 import { codePoints, fromJson, int } from "../base/json.ts";
-import { badKey, type MossErrorFields, MossResponseTooLarge, readMossResponse, rejectedStatuses } from "./response.ts";
+import { MossError } from "./error.ts";
+import { badKey, readMossResponse, rejectedStatuses } from "./response.ts";
 
 const Id = codePoints(1, 256)
   .regex(/^[^\s\p{Cc}/\\?#]+$/u)
@@ -25,44 +26,20 @@ const Upload = z.strictObject({
     .regex(/\S/u),
   purpose: z.enum(["image", "video", "audio"]),
 });
-const Page = z.strictObject({
-  limit: z.exactOptional(int(1, 200)),
-  offset: z.exactOptional(int(0, 100000)),
-});
 
-class MossFileError extends Error {
-  override readonly name = "MossFileError";
-  readonly reason: MossErrorFields["reason"];
-  readonly outcome: MossErrorFields["outcome"];
-  declare readonly status?: number;
-
-  constructor(fields: MossErrorFields) {
-    super(`MOSS files: ${fields.reason}`);
-    this.reason = fields.reason;
-    this.outcome = fields.outcome;
-    if (fields.status !== undefined) this.status = fields.status;
-  }
-}
-
-const invalidResponse = () => new MossFileError({ reason: "InvalidResponse", outcome: "Unknown" });
-const invalidInput = () => new MossFileError({ reason: "InvalidInput", outcome: "NotSubmitted" });
+const invalidResponse = () => new MossError({ reason: "InvalidResponse", outcome: "Unknown" });
+const invalidInput = () => new MossError({ reason: "InvalidInput", outcome: "NotSubmitted" });
 
 const request = <S extends z.ZodType>(key: string, url: string, init: RequestInit, schema: S, http: ProviderHttp): Promise<z.output<S>> =>
   bounded(
     300_000,
     http,
     async (signal) => {
-      if (badKey(key)) throw new MossFileError({ reason: "Credentials", outcome: "NotSubmitted" });
+      if (badKey(key)) throw new MossError({ reason: "Credentials", outcome: "NotSubmitted" });
       const response = await send(http, url, { ...init, headers: { authorization: `Bearer ${key}`, accept: "application/json" }, redirect: "manual" }, signal);
-      let raw: string;
-      try {
-        raw = await readMossResponse(response, signal);
-      } catch (e) {
-        if (e instanceof MossResponseTooLarge) throw new MossFileError({ reason: "TooLarge", outcome: "Unknown" });
-        throw e;
-      }
+      const raw = await readMossResponse(response, signal);
       if (response.status < 200 || response.status >= 300)
-        throw new MossFileError({
+        throw new MossError({
           reason: "HttpStatus",
           status: response.status,
           outcome: rejectedStatuses.includes(response.status) ? "Rejected" : "Unknown",
@@ -72,8 +49,8 @@ const request = <S extends z.ZodType>(key: string, url: string, init: RequestIni
       return result;
     },
     {
-      timeout: () => new MossFileError({ reason: "Timeout", outcome: "Unknown" }),
-      network: () => new MossFileError({ reason: "Network", outcome: "Unknown" }),
+      timeout: () => new MossError({ reason: "Timeout", outcome: "Unknown" }),
+      network: () => new MossError({ reason: "Network", outcome: "Unknown" }),
     },
   );
 
@@ -96,13 +73,6 @@ export const uploadMossFile = async (key: string, input: unknown, http: Provider
   return result;
 };
 
-export const getMossFile = async (key: string, id: string, http: ProviderHttp): Promise<MossFile> => {
-  const checked = fileId(id);
-  const result = await request(key, `https://api.mosi.cn/v1/files/${encodeURIComponent(checked)}`, { method: "GET" }, File, http);
-  if (result.id !== checked) throw invalidResponse();
-  return result;
-};
-
 export const deleteMossFile = async (
   key: string,
   id: string,
@@ -118,16 +88,4 @@ export const deleteMossFile = async (
   );
   if (result.id !== checked) throw invalidResponse();
   return result;
-};
-
-export const listMossFiles = async (key: string, input: unknown, http: ProviderHttp): Promise<readonly MossFile[]> => {
-  const parsed = Page.safeParse(input);
-  if (!parsed.success) throw invalidInput();
-  const page = parsed.data;
-  const url = new URL("https://api.mosi.cn/v1/files");
-  url.searchParams.set("limit", String(page.limit ?? 20));
-  url.searchParams.set("offset", String(page.offset ?? 0));
-  const result = await request(key, url.href, { method: "GET" }, z.object({ object: z.literal("list"), data: z.array(File).max(200) }), http);
-  if (result.data.length > (page.limit ?? 20)) throw invalidResponse();
-  return result.data;
 };

@@ -3,9 +3,10 @@ import { z } from "zod";
 import { boundedBody, Deadline, decodeText, mediaType, type ProviderHttp, ProviderTransportError, send } from "../base/http.ts";
 import { codePoints, fromJson, int } from "../base/json.ts";
 import { SseRetry, SseTooLarge, type SseEvent, sseEvents } from "../base/sse.ts";
-import { AudioId, audioJson, AudioUsage, audioUsage, invalidAudioResponse, MossAudioError, type MossAudioUsage } from "./audio-response.ts";
+import { AudioId, audioJson, AudioUsage, audioUsage, invalidAudioResponse, type MossAudioUsage } from "./audio-response.ts";
 import type { MossTranscriptionSegment } from "./audio-tasks.ts";
-import { badKey, MossResponseTooLarge, readMossResponse, rejectedStatuses } from "./response.ts";
+import { MossError } from "./error.ts";
+import { badKey, readMossResponse, rejectedStatuses } from "./response.ts";
 import { prepareMossTranscription } from "./transcription.ts";
 
 const maxEventSize = 4 << 20;
@@ -42,12 +43,12 @@ export type MossTranscriptionEvent =
   | { readonly type: "transcript.segment.done"; readonly index: number; readonly segment: MossTranscriptionSegment; readonly usage?: MossAudioUsage }
   | { readonly type: "transcript.text.done"; readonly text: string; readonly usage?: MossAudioUsage };
 
-const tooLarge = () => new MossAudioError({ reason: "TooLarge", outcome: "Unknown" });
+const tooLarge = () => new MossError({ reason: "TooLarge", outcome: "Unknown" });
 
 async function* events(key: string, input: unknown, http: ProviderHttp, signal: AbortSignal): AsyncGenerator<MossTranscriptionEvent> {
   const request = await prepareMossTranscription(input);
-  if (!DiarizeModel.safeParse(request.model).success) throw new MossAudioError({ reason: "InvalidInput", outcome: "NotSubmitted" });
-  if (badKey(key)) throw new MossAudioError({ reason: "Credentials", outcome: "NotSubmitted" });
+  if (!DiarizeModel.safeParse(request.model).success) throw new MossError({ reason: "InvalidInput", outcome: "NotSubmitted" });
+  if (badKey(key)) throw new MossError({ reason: "Credentials", outcome: "NotSubmitted" });
   const body = audioJson({ ...request, response_format: "verbose_json", stream: true, async: false });
   const response = await send(
     http,
@@ -62,7 +63,7 @@ async function* events(key: string, input: unknown, http: ProviderHttp, signal: 
   );
   if (response.status < 200 || response.status >= 300) {
     await readMossResponse(response, signal);
-    throw new MossAudioError({
+    throw new MossError({
       reason: "HttpStatus",
       status: response.status,
       outcome: rejectedStatuses.includes(response.status) ? "Rejected" : "Unknown",
@@ -125,9 +126,9 @@ export async function* streamMossTranscription(key: string, input: unknown, http
   try {
     yield* events(key, input, http, deadline.signal);
   } catch (e) {
-    if (deadline.expired) throw new MossAudioError({ reason: "Timeout", outcome: "Unknown" });
-    if (e instanceof ProviderTransportError) throw new MossAudioError({ reason: "Network", outcome: "Unknown" });
-    if (e instanceof MossResponseTooLarge || e instanceof SseTooLarge) throw tooLarge();
+    if (deadline.expired) throw new MossError({ reason: "Timeout", outcome: "Unknown" });
+    if (e instanceof ProviderTransportError) throw new MossError({ reason: "Network", outcome: "Unknown" });
+    if (e instanceof SseTooLarge) throw tooLarge();
     if (e instanceof SseRetry) throw invalidAudioResponse();
     throw e;
   } finally {

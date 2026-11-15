@@ -37,8 +37,7 @@ const config: KnipConfig = {
       ignoreDependencies: ["tailwindcss"],
     },
     "apps/site": {
-      // scripts/images.ts reads the scene exports through Vite's ssrLoadModule.
-      entry: ["src/{App,Document}.tsx", "src/base/scene.ts", "scripts/*.ts", "test/**/*.ts", "test/prerender/fixture/{App,Document}.tsx"],
+      entry: ["src/{App,Document}.tsx", "scripts/*.ts", "test/**/*.ts", "test/prerender/fixture/{App,Document}.tsx"],
       project: ["src/**/*.{ts,tsx}", "scripts/**/*.ts", "test/**/*.{ts,tsx}"],
       // Imported by src/ui/global.css (@import "tailwindcss"), which knip does not read.
       ignoreDependencies: ["tailwindcss"],

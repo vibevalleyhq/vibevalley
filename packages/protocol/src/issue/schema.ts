@@ -3,8 +3,15 @@ import { z } from "zod";
 import type { Codec } from "../codec";
 import { IssueId, Outcome, SessionId, Spent } from "../common/schema";
 import { Conflict } from "../repo/schema";
-import { IssueAnswer, PhaseResting, Session, SessionEvent } from "../session/schema";
+import { PhaseResting, Session, SessionEvent } from "../session/schema";
 import * as T from "./shapes";
+
+export const IssueAnswer = z.object({
+  conclusion: z.string(),
+  evidence: z.array(z.string()),
+  unsure: z.array(z.string()),
+  next: z.array(z.string()),
+}) satisfies Codec<T.IssueAnswer>;
 
 const Landing = z.enum(T.LandingValues) satisfies Codec<T.Landing>;
 const IssueCanceled = z.enum(T.IssueCanceledValues) satisfies Codec<T.IssueCanceled>;

@@ -64,7 +64,6 @@ export const todoWords = {
   header: (count: number, readyCount: number) => `任务（${count} 件，${readyCount} 件可以做）：`,
   canDo: "可以做",
   waitingFor: "等着",
-  bySubagent: "（帮手做）",
   waitingOn: (ids: readonly string[]) => "（等 " + ids.join("、") + "）",
 };
 

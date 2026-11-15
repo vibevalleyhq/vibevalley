@@ -29,26 +29,19 @@ export interface AchievementStanding {
   next?: number;
 }
 
-export interface PlayAction extends Doing {
+export interface PlayActionView extends Doing {
   at: number;
-}
-
-export interface PlayActionView extends PlayAction {
   actionText: string;
 }
 
-export interface SessionPlay {
+export interface SessionPlayView {
   station: number;
-  history: PlayAction[];
+  history: PlayActionView[];
   toolsThisRun: number;
   counts: Record<string, number>;
   files: string[];
   commands: string[];
   runStartedAt?: number;
-}
-
-export interface SessionPlayView extends Omit<SessionPlay, "history"> {
-  history: PlayActionView[];
 }
 
 export interface CommitCount {

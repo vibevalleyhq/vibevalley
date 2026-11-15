@@ -38,7 +38,7 @@ export {
   RepoTemplates,
   SubmitBranch,
 } from "./repo/schema";
-export { IssueAnswer, LastRun, Phase, Run, RunTrigger, Session, SessionEvent } from "./session/schema";
+export { LastRun, Phase, Run, RunTrigger, Session, SessionEvent } from "./session/schema";
 export {
   Channel,
   ChannelEvent,
@@ -123,6 +123,7 @@ export {
   CriterionCheck,
   Finding,
   Issue,
+  IssueAnswer,
   IssueConstraints,
   IssueFilter,
   IssueHistory,

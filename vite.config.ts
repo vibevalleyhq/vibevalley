@@ -66,15 +66,14 @@ export default defineConfig({
         "vpx scripts/gen/primitives.ts --check",
       ],
       "notes:verify": "vpx scripts/docs/agent-notes.ts",
-      "site:check": { command: "vp run --filter @vibevalley/site check", cache: false },
-      "site:build": { command: "vp run --filter @vibevalley/site build", cache: false },
+      "site:check": "vp run --filter @vibevalley/site check",
+      "site:build": "vp run --filter @vibevalley/site build",
       // The types each package gives the others (its pack block, dist/): what vp check reads a workspace package by, so
       // every check builds them first. Cached, so a package nobody changed is not built again; vp install runs it too.
       "packages:build": ["vp run --filter './packages/*' build", "vpx scripts/audit/built-types.ts"],
       "names:verify": "vpx scripts/docs/stale-names.ts",
       // db:check is a script: it reads db/migrations and db/queries through PGlite.
-      "server:packages":
-        "vp run --filter @vibevalley/protocol --filter @vibevalley/async --filter @vibevalley/home --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent --filter @vibevalley/provider --filter @vibevalley/pkm --filter @vibevalley/artifact --filter @vibevalley/cli test",
+      "server:packages": "vp run --filter '@vibevalley/server^...' --filter @vibevalley/cli test",
       "server:check": [
         "vp run packages:build",
         "vp check",
@@ -85,7 +84,7 @@ export default defineConfig({
       "web:check": ["vp run packages:build", "vp check", "vp run web:test"],
       // web:check without its vp check: CI's web job runs this one, and its check job runs vp check.
       "web:test": [
-        "vp run --filter @vibevalley/bridge --filter @vibevalley/engine --filter @vibevalley/base-ui --filter @vibevalley/stories --filter @vibevalley/i18n --filter @vibevalley/mobile --filter @vibevalley/desktop --filter @vibevalley/web test",
+        "vp run --filter './packages/*' --filter '!@vibevalley/server^...' --filter '!@vibevalley/health' --filter @vibevalley/mobile --filter @vibevalley/desktop --filter @vibevalley/web test",
         "vp run --filter @vibevalley/web build",
         "vp run --filter @vibevalley/web build:stories",
       ],
@@ -98,7 +97,10 @@ export default defineConfig({
       // it is written down on purpose (scripts/audit/service-paths.json).
       "paths:check": "vpx scripts/audit/service-paths.ts --check",
       // Files, exports and dependencies nothing uses (knip.ts says what runs; scripts/audit/deadcode.ts says what to do).
-      deadcode: "vpx scripts/audit/deadcode.ts",
+      deadcode: {
+        command: "vpx scripts/audit/deadcode.ts",
+        cache: { input: [{ auto: true }, "!node_modules/.cache/**"], output: [] },
+      },
       "desktop:test": { command: "vp run --filter @vibevalley/desktop e2e", cache: false },
       // What a beta and a release must pass before scripts/release/release.ts tags them (alphas are tagged on CI being green).
       "release:verify": ["vp run server:check", "vp run web:check", "vp run docs:verify", "vp run desktop:test"],

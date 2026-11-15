@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
+import { appendFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { memory as memoryWords } from "../base/prompts.ts";
-import { type AgentFs, agentFsOf } from "../infra/fs.ts";
+import { agentFailed, errnoOf } from "../core/errors.ts";
 import { type AgentLog, consoleLog } from "../infra/log.ts";
 
 /** Cut from the top when the prompt carries it: the newest notes matter most. */
@@ -35,18 +36,18 @@ export interface MemoryPort {
   readonly rewrite: (content: string) => Promise<number>;
 }
 
-export const fileMemory = (home: string, now: () => number, fs?: AgentFs, log: AgentLog = consoleLog): MemoryPort => ({
+export const fileMemory = (home: string, now: () => number, log: AgentLog = consoleLog): MemoryPort => ({
   read: async () => {
     try {
-      const [snap, lines] = await Promise.all([readMemory(home, fs), memoryFileLines(home, fs)]);
+      const [snap, lines] = await Promise.all([readMemory(home), memoryFileLines(home)]);
       return { prompt: snap.prompt, lines };
     } catch (e) {
       log.warn(`agent: cannot read memory in ${home}:`, e);
       return { prompt: "", lines: [] };
     }
   },
-  remember: async (note) => void (await remember(home, note, now(), fs)),
-  rewrite: async (content) => (await rewriteMemory(home, content, fs)).lineCount,
+  remember: async (note) => void (await remember(home, note, now())),
+  rewrite: async (content) => (await rewriteMemory(home, content)).lineCount,
 });
 
 export const parseMemoryLines = (text: string): MemoryLine[] =>
@@ -94,32 +95,34 @@ function snapshotOf(file: string, raw: string, updatedAt: number): MemorySnapsho
   };
 }
 
-export async function readMemory(home: string, fs?: AgentFs): Promise<MemorySnapshot> {
-  const io = agentFsOf(fs);
+async function readTextIfExists(file: string): Promise<string | undefined> {
+  try {
+    return await readFile(file, "utf8");
+  } catch (e) {
+    if (errnoOf(e) === "ENOENT") return undefined;
+    throw agentFailed(e);
+  }
+}
+
+export async function readMemory(home: string): Promise<MemorySnapshot> {
   const file = memoryFile(home);
-  const text = await io.readTextIfExists(file);
+  const text = await readTextIfExists(file);
   if (text === undefined) return snapshotOf(file, "", 0);
-  const info = await io.stat(file);
-  return snapshotOf(file, text, info.mtimeMs);
+  try {
+    const info = await stat(file);
+    return snapshotOf(file, text, info.mtimeMs);
+  } catch (e) {
+    throw agentFailed(e);
+  }
 }
 
 /** MEMORY.md's lines as the model is told them: neither blank nor headings, without their bullet. */
-const memoryFileLines = async (home: string, fs?: AgentFs): Promise<string[]> =>
-  ((await agentFsOf(fs).readTextIfExists(memoryFile(home))) ?? "")
+const memoryFileLines = async (home: string): Promise<string[]> =>
+  ((await readTextIfExists(memoryFile(home))) ?? "")
     .split("\n")
     .map((l) => l.trim())
     .filter((t) => t !== "" && !t.startsWith("#"))
     .map((t) => t.replace(bulletHead, ""));
-
-export async function forgetLine(home: string, id: string, fs?: AgentFs): Promise<void> {
-  const io = agentFsOf(fs);
-  const file = memoryFile(home);
-  const text = await io.readTextIfExists(file);
-  if (text === undefined) return;
-  const lines = text.split("\n");
-  const i = lines.findIndex((l) => l.trim() !== "" && lineID(l) === id);
-  if (i >= 0) await io.writeText(file, [...lines.slice(0, i), ...lines.slice(i + 1)].join("\n"));
-}
 
 const pad = (n: number, width = 2) => String(n).padStart(width, "0");
 
@@ -130,22 +133,28 @@ function localDate(now: number): string {
 }
 
 /** now: epoch milliseconds. */
-async function remember(home: string, note: string, now: number, fs?: AgentFs): Promise<MemoryLine> {
-  const io = agentFsOf(fs);
-  await io.makeDir(home);
+async function remember(home: string, note: string, now: number): Promise<MemoryLine> {
   const date = localDate(now);
   const cleaned = note.replace(/\s*\n\s*/gu, " ").trim();
   const line = `- ${date} ${cleaned}`;
-  await io.appendText(memoryFile(home), line + "\n");
+  try {
+    await mkdir(home, { recursive: true });
+    await appendFile(memoryFile(home), line + "\n", "utf8");
+  } catch (e) {
+    throw agentFailed(e);
+  }
   return { id: lineID(line), date, text: cleaned };
 }
 
-async function rewriteMemory(home: string, text: string, fs?: AgentFs): Promise<MemorySnapshot> {
-  const io = agentFsOf(fs);
+async function rewriteMemory(home: string, text: string): Promise<MemorySnapshot> {
   const file = memoryFile(home);
-  await io.makeDir(home);
   const body = text.endsWith("\n") ? text : text + "\n";
-  await io.writeText(file, body);
-  const info = await io.stat(file);
-  return snapshotOf(file, body, info.mtimeMs);
+  try {
+    await mkdir(home, { recursive: true });
+    await writeFile(file, body, "utf8");
+    const info = await stat(file);
+    return snapshotOf(file, body, info.mtimeMs);
+  } catch (e) {
+    throw agentFailed(e);
+  }
 }
