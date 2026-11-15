@@ -179,7 +179,7 @@
     "doubleCast": 0,
     "cast": 2,
     "lintOff": 2,
-    "swallowed": 4
+    "swallowed": 3
   },
   "server: Issues": {
     "nonNull": 0,
@@ -200,7 +200,7 @@
     "doubleCast": 1,
     "cast": 5,
     "lintOff": 10,
-    "swallowed": 4
+    "swallowed": 1
   },
   "server: Source Control": {
     "nonNull": 0,
@@ -231,7 +231,7 @@
     "swallowed": 0
   },
   "web: farm": {
-    "nonNull": 3,
+    "nonNull": 0,
     "doubleCast": 0,
     "cast": 0,
     "lintOff": 3,
@@ -355,6 +355,13 @@
     "cast": 0,
     "lintOff": 0,
     "swallowed": 2
+  },
+  "web: features/terminal": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 0,
+    "lintOff": 0,
+    "swallowed": 0
   },
   "web: features/user": {
     "nonNull": 0,

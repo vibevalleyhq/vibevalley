@@ -51,8 +51,9 @@ export const jsonOrNone =
     let raw: unknown;
     try {
       raw = parsed(text);
-    } catch {
-      return undefined;
+    } catch (e) {
+      if (e instanceof SyntaxError) return undefined;
+      throw e;
     }
     const got = schema.safeParse(raw);
     return got.success ? got.data : undefined;

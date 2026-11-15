@@ -1,12 +1,7 @@
 {
-  "turn-as-absence": {
-    "apps/server": 1,
-    "packages/bridge": 1
-  },
+  "turn-as-absence": {},
   "unreleased-gate": {},
-  "duplicated-setup": {
-    "apps/server": 3
-  },
+  "duplicated-setup": {},
   "expect-in-floating-promise": {},
   "failure-without-reason": {
     "apps/desktop": 3,
@@ -18,20 +13,9 @@
     "scripts": 1
   },
   "shared-farm-in-test": {},
-  "unbounded-retry": {
-    "apps/server": 1
-  },
+  "unbounded-retry": {},
   "read-modify-write": {},
-  "swallow-without-record": {
-    "apps/cli": 1,
-    "apps/desktop": 3,
-    "apps/mobile": 4,
-    "apps/server": 8,
-    "apps/web": 6,
-    "packages/artifact": 1,
-    "packages/engine": 1,
-    "scripts": 2
-  },
+  "swallow-without-record": {},
   "cause-as-string": {},
   "loose-flags": {},
   "duplicate-error-class": {}

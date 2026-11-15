@@ -158,12 +158,8 @@ describe("AgentHost", () => {
     await Promise.all([followingNews, followingStates]);
   });
 
-  test("waits for an input build before closing, without delivering it late", async () => {
-    const config = testConfig();
-    await using farm = await world({ config });
-    const sessions = farm.inside;
-    farm.deepseek.use(scriptedLLM().llm);
-    const host = await sessions.host({
+  const makeQuietHost = (sessions: Awaited<ReturnType<typeof world>>["inside"], config: ReturnType<typeof testConfig>) =>
+    sessions.host({
       session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "助手", runtime: "vibevalley", brief: "" },
       inputType: "testInput",
       home: config.home,
@@ -179,6 +175,13 @@ describe("AgentHost", () => {
       restored: () => ({ by: { kind: "" } }),
       toolStart: (tool) => ({ text: tool, action: "other", tool }),
     });
+
+  test("waits for an input build before closing, without delivering it late", async () => {
+    const config = testConfig();
+    await using farm = await world({ config });
+    const sessions = farm.inside;
+    farm.deepseek.use(scriptedLLM().llm);
+    const host = await makeQuietHost(sessions, config);
     const building = Promise.withResolvers<void>();
     const gate = Promise.withResolvers<void>();
     const caller = new Caller();
@@ -210,22 +213,7 @@ describe("AgentHost", () => {
     await using farm = await world({ config });
     const sessions = farm.inside;
     farm.deepseek.use(scriptedLLM().llm);
-    const host = await sessions.host({
-      session: { id: "orchestrator", role: "orchestrator", agent: "orchestrator", name: "助手", runtime: "vibevalley", brief: "" },
-      inputType: "testInput",
-      home: config.home,
-      cwd: config.workRoot,
-      instructions: "",
-      model: () => "",
-      tools: () => [],
-      first: "first",
-      quiet: () => true,
-      say: async () => {},
-      channel: () => undefined,
-      fresh: () => {},
-      restored: () => ({ by: { kind: "" } }),
-      toolStart: (tool) => ({ text: tool, action: "other", tool }),
-    });
+    const host = await makeQuietHost(sessions, config);
     const building = Promise.withResolvers<void>();
     const gate = Promise.withResolvers<void>();
     try {

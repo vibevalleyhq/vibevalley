@@ -252,7 +252,8 @@ export class QQClient implements QQApi {
     );
     const decoded = async () => SendResponse.parse(await res.json());
     if (res.status < 200 || res.status > 299) {
-      const read = await decoded().catch(() => undefined);
+      // Upstream proxies answer 5xx with plain HTML; res.status is reported below when the body is not JSON.
+      const read = await decoded().catch((e: unknown) => (e instanceof Error ? undefined : Promise.reject(e)));
       throw sendFailure(res.status, t("server.connector.qq.send", { why: `${read?.code ?? res.status} ${read?.message ?? ""}`.trim() }));
     }
     let read: z.output<typeof SendResponse>;

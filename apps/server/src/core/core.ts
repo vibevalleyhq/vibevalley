@@ -1,4 +1,4 @@
-import { type Clock, Hub, Queue, type Subscription } from "@vibevalley/async";
+import { type Clock, Hub, isAbort, Queue, type Subscription } from "@vibevalley/async";
 import type * as T from "@vibevalley/protocol";
 
 import type { Logger } from "#/infra/log.ts";
@@ -219,6 +219,8 @@ export async function* bounded<A>(source: AsyncIterable<A>, name: string, log: L
   } finally {
     queue.end();
     await it.return?.();
-    await pump.catch(() => undefined);
+    await pump.catch((e: unknown) => {
+      if (!isAbort(e)) log.warn(`${name}: subscription pump failed`, e);
+    });
   }
 }

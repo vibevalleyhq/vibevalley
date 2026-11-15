@@ -152,8 +152,10 @@ export function createSynth({ volume = 0.6 }: { volume?: number } = {}): Synth {
     if (!ctx) {
       try {
         ctx = new AudioContext();
-      } catch {
-        return null;
+      } catch (e) {
+        // Headless browsers or blocked audio devices cannot open AudioContext.
+        if (e instanceof Error) return null;
+        throw e;
       }
       master = ctx.createGain();
       master.gain.value = level;

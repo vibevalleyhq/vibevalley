@@ -15,8 +15,10 @@ export function attemptCodec<T>(run: () => z.ZodSafeParseResult<T>): T | undefin
   try {
     const got = run();
     return got.success ? got.data : undefined;
-  } catch {
-    return undefined;
+  } catch (e) {
+    // Zod safeParse/safeEncode throws when a search schema uses async refinements.
+    if (e instanceof Error) return undefined;
+    throw e;
   }
 }
 
@@ -37,8 +39,9 @@ export function search<const F extends Readonly<Record<string, z.ZodType<unknown
   const read = (text: string) => {
     try {
       decodeURIComponent(text);
-    } catch {
-      return undefined;
+    } catch (e) {
+      if (e instanceof URIError) return undefined;
+      throw e;
     }
     const params = new URLSearchParams(text);
     const input = Object.fromEntries(keys.filter((key) => params.has(key)).map((key) => [key, params.getAll(key)]));

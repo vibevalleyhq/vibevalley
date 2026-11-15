@@ -46,7 +46,9 @@ export function validPng(bytes: Buffer, width: number, height: number): boolean 
     if (decoded.length !== stride * height) return false;
     for (let row = 0; row < height; row++) if ((decoded[row * stride] ?? 255) > 4) return false;
     return true;
-  } catch {
-    return false;
+  } catch (e) {
+    // Corrupt deflate stream in untrusted PNG bytes.
+    if (e instanceof Error) return false;
+    throw e;
   }
 }

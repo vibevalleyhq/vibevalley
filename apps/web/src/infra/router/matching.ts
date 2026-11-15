@@ -18,8 +18,9 @@ interface PathPattern<P extends string = string> {
 export function pathSegments(pathname: string): readonly string[] | undefined {
   try {
     return pathname.split("/").map(decodeURIComponent);
-  } catch {
-    return undefined;
+  } catch (e) {
+    if (e instanceof URIError) return undefined;
+    throw e;
   }
 }
 

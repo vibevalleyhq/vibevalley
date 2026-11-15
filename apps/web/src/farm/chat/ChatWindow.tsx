@@ -211,14 +211,16 @@ export function ChatWindow() {
           data-testid="messages"
         >
           <div class="flex flex-col gap-2">
-            <Show when={hasOlder() && shown()}>
-              <button
-                type="button"
-                onClick={() => void followed.loadOlder(shown()!.id)}
-                class="self-center px-2.5 py-0.5 font-pixel text-xs leading-[1rem] text-bark-500 hover:text-bark-800 hover:bg-cream-200"
-              >
-                {t("web.farm.chat.older")}
-              </button>
+            <Show when={hasOlder() ? shown() : undefined}>
+              {(c) => (
+                <button
+                  type="button"
+                  onClick={() => void followed.loadOlder(c().id)}
+                  class="self-center px-2.5 py-0.5 font-pixel text-xs leading-[1rem] text-bark-500 hover:text-bark-800 hover:bg-cream-200"
+                >
+                  {t("web.farm.chat.older")}
+                </button>
+              )}
             </Show>
             <Show when={parent()}>{(m) => <ParentMessage m={m()} face={<FaceOf m={m()} agents={agents()} />} />}</Show>
             <Show when={items().length === 0 && !thread()}>
@@ -244,7 +246,7 @@ export function ChatWindow() {
                   <Item
                     m={item().message}
                     thread={item().thread}
-                    first={i() === 0 || items()[i() - 1]!.message.from !== item().message.from}
+                    first={i() === 0 || items()[i() - 1]?.message.from !== item().message.from}
                     agents={agents()}
                     chatUnread={(channel) => unreadIn(channel)}
                   />
@@ -396,7 +398,10 @@ function ThreadHead(props: { thread: Channel; large: boolean; onLarge: () => voi
   const now = useNow();
   const chat = () => core()?.chat;
   const channel = () => topOf(chat(), props.thread);
-  const backTo = () => (channel()?.type === "channel" ? channel()!.id : undefined);
+  const backTo = () => {
+    const c = channel();
+    return c?.type === "channel" ? c.id : undefined;
+  };
   const session = () => threadOwnerOf(props.thread, core()?.sessions ?? []);
   const title = () => threadTitle(props.thread, core()?.issues, core()?.sessions ?? []);
   const status = () => {

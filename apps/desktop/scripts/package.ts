@@ -125,6 +125,7 @@ const previous = (() => {
   try {
     return git("describe", "--tags", "--abbrev=0", ...(stageOf(version) === "stable" ? ["--exclude", "*-*"] : []), "HEAD^");
   } catch {
+    // First release on a line with no prior matching tag.
     return undefined;
   }
 })();
