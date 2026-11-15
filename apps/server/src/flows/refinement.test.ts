@@ -14,7 +14,7 @@ import { testIssues } from "#/testing/world.ts";
 
 import { await_, farm, git, lab, mustHire, until, watch, failure } from "./farm.ts";
 
-const drafting = (core: Core) => core.state().sessions.some((h) => h.refining);
+const drafting = (core: Core) => core.state().sessions.some((h) => h.scope?.kind === "draft");
 
 const hasBranch = (repo: string, branch: string) => {
   try {

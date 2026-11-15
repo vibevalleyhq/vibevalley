@@ -7,19 +7,21 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import { ApiError, BizCode } from "@vibevalley/protocol/api";
-import { assignedAgentOf, latestSessionIdOf, sessionIdsOf } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, issueScopeOf, latestSessionIdOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { user } from "#/base/actor.ts";
-import { messageOf, reasonOf } from "#/base/errors.ts";
+import { lookIn, messageOf, reasonOf } from "#/base/errors.ts";
 import type { Core } from "#/core/core.ts";
 import { dbQueries, SqlError } from "#/infra/db.ts";
 import { gitRuns } from "#/modules/repo/git.ts";
-import { HireRefused } from "#/modules/session/session.ts";
+import { HireRefused, workSessionPolicy } from "#/modules/session/session.ts";
 import { gitIn } from "#/testing/git.ts";
 import { starter, testConfig, until, waitFor } from "#/testing/layers.ts";
 import { allow, refuse } from "#/testing/refuse.ts";
 import { testIssues, world } from "#/testing/world.ts";
+
+import { IssueCreateRefused } from "./issue.ts";
 
 const lab = (): T.Agent => ({ ...starter("lab"), effort: "" });
 
@@ -75,7 +77,6 @@ const occupied = (core: Core, runtime: string) =>
       hiredAt: 0,
       runs: 0,
       phase: { _tag: "working", since: 0, doing: { action: "thinking", label: "" } },
-      refining: false,
     },
   });
 
@@ -85,6 +86,8 @@ describe("issues", () => {
     const f = await farm();
     await using w = f.world;
     const issues = testIssues(w.issue);
+    await w.agent.save(lab());
+    await w.agent.save({ ...lab(), id: "lab2", name: "lab2" });
     const issue = await issues.add({ title: "unstarted responsibility", agent: " lab ", repo: "demo" });
     const original = (await issues.get(issue.id)).assignments;
     expect(original).toHaveLength(1);
@@ -134,6 +137,8 @@ describe("issues", () => {
     const f = await farm();
     await using w = f.world;
     const issues = testIssues(w.issue);
+    await w.agent.save(lab());
+    await w.agent.save({ ...lab(), id: "lab2", name: "lab2" });
     const issue = await issues.add({ title: "atomic responsibility", agent: "lab" });
     const before = (await issues.get(issue.id)).assignments;
     const db = w.db;
@@ -177,6 +182,8 @@ describe("issues", () => {
     const f = await farm();
     await using w = f.world;
     const issues = testIssues(w.issue);
+    await w.agent.save(lab());
+    await w.agent.save({ ...lab(), id: "lab2", name: "lab2" });
     const issue = await issues.add({ title: "concurrent responsibility", agent: "lab" });
     for (let n = 0; n < 10; n++) {
       const disposable = await issues.add({ title: "discarded" });
@@ -477,7 +484,7 @@ describe("issues", () => {
     const hired = await issues.hire({ ...lab(), worktree: true }, "keep my work", "demo");
     const first = hired.session;
     await until(() => sessions.live(first.id).session?.phase._tag === "done", "the dispatch's report");
-    const issue = await issues.get(first.issue!);
+    const issue = await issues.get(issueScopeOf(first)!);
     expect([first.branch, firstBranch]).toEqual([`vibevalley/issue-${issue.number}`, `vibevalley/issue-${issue.number}`]);
     const commit = git(first.worktree!, "rev-parse", "HEAD").trim();
     await issues.setStatus(issue.id, "canceled", "", "", user);
@@ -501,7 +508,9 @@ describe("issues", () => {
     const sessions = w.inside;
     const got = await flip(
       sessions.hire({ ...lab(), runtime: "missing-runtime", worktree: true }, "test", "demo", {
-        context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } },
+        scope: { kind: "issue", id: issueId("i1") },
+        policy: workSessionPolicy,
+        checkoutNumber: 1,
       }),
       HireRefused,
     );
@@ -562,8 +571,8 @@ describe("issues", () => {
     const sessions = w.inside;
     const core = w.core;
     const got = await Promise.allSettled([
-      sessions.hire(lab(), "test", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } } }),
-      sessions.hire(lab(), "test", "demo", { context: { kind: "issue", issue: { id: issueId("i2"), number: 2 } } }),
+      sessions.hire(lab(), "test", "demo", { scope: { kind: "issue", id: issueId("i1") }, policy: workSessionPolicy, checkoutNumber: 1 }),
+      sessions.hire(lab(), "test", "demo", { scope: { kind: "issue", id: issueId("i2") }, policy: workSessionPolicy, checkoutNumber: 2 }),
     ]);
     expect(got.filter((h) => h.status === "fulfilled").length).toBe(1);
     expect(got.filter((h) => h.status === "rejected").length).toBe(1);
@@ -606,9 +615,10 @@ describe("issues", () => {
     await until(() => sessions.live(hired.session.id).session?.phase._tag === "done", "the report");
     const repo = join(f.config.workRoot, "repos", "demo");
     renameSync(join(repo, ".git"), join(repo, ".git-hidden"));
-    expect((await flip(issues.previewStatus(hired.session.issue!, "done", ""), ApiError)).bizCode).toBe(BizCode.IssueRefused);
-    expect((await flip(issues.setStatus(hired.session.issue!, "done", "", chat.defaultChannel(), user), ApiError)).bizCode).toBe(BizCode.IssueRefused);
-    const after = await issues.get(hired.session.issue!);
+    const hiredIssue = issueScopeOf(hired.session)!;
+    expect((await flip(issues.previewStatus(hiredIssue, "done", ""), ApiError)).bizCode).toBe(BizCode.IssueRefused);
+    expect((await flip(issues.setStatus(hiredIssue, "done", "", chat.defaultChannel(), user), ApiError)).bizCode).toBe(BizCode.IssueRefused);
+    const after = await issues.get(hiredIssue);
     expect([after.status, after.delivered]).toEqual(["in_review", undefined]);
   });
 
@@ -618,7 +628,7 @@ describe("issues", () => {
     const issues = testIssues(w.issue);
     const sessions = w.inside;
     const first = await issues.hire(lab(), "first", "demo");
-    const id = first.session.issue!;
+    const id = issueScopeOf(first.session)!;
     await sessions.dismiss(first.session.id);
     const second = await issues.hire(lab(), "second", "demo", { issue: id });
     expect(second.session).toBeDefined();
@@ -718,13 +728,13 @@ describe("issues", () => {
     const core = w.core;
     const chat = w.channel;
     const sessions = w.inside;
-    const crons = w.issue;
+    const crons = w.cron;
     await w.agent.save(lab());
     const channel = await chat.openChannel("scheduled", "", "demo");
     occupied(core, "pi");
-    const sc = await crons.addCron({ name: "scheduled", text: "work", channel: channel.id, agent: "lab", when: { kind: "every", minutes: 1 } }, user);
+    const sc = await crons.add({ name: "scheduled", text: "work", channel: channel.id, agent: "lab", when: { kind: "every", minutes: 1 } }, user);
     adjust(10 * 60_000);
-    await crons.tickCrons();
+    await crons.tick();
     const issue = await waitFor(
       async () => (await issues.list()).find((item) => item.cron === sc.id),
       (item) => item?.queuedAt !== undefined,
@@ -890,13 +900,37 @@ describe("issues", () => {
         runtime: "pi",
         brief: "work",
         repo: "demo",
-        issue: fifth.id,
+        scope: { kind: "issue", id: fifth.id },
         hiredAt: 1,
         runs: 1,
         phase: { _tag: "working", since: 1, doing: { action: "thinking", label: "" } },
-        refining: false,
       },
     });
     expect((await issues.get("阿麦")).id).toBe(fifth.id);
+  });
+
+  it("regression: Issue.create validates explicit agent names identically to Issue.edit and records no bogus assignment", async () => {
+    const f = await farm();
+    await using w = f.world;
+    const issues = testIssues(w.issue);
+    await w.agent.save({ ...lab(), id: "lab2", name: "Lab Two" });
+
+    const refusedCreate = await flip(issues.create({ title: "unknown profile", agent: "nobody", by: user }), IssueCreateRefused);
+    expect(refusedCreate.reason).toBe("notRecorded");
+    expect(refusedCreate.error).toBeInstanceOf(ApiError);
+    if (!refusedCreate.error) throw new Error("expected ApiError on IssueCreateRefused");
+    expect(refusedCreate.error.bizCode).toBe(BizCode.IssueRefused);
+    expect(reasonOf(refusedCreate.error)).toContain("没有叫 nobody 的档案");
+    expect(refusedCreate.error.next).toEqual([{ say: lookIn.agent.say, run: ["agent", "list"] }]);
+    expect(await issues.list()).toEqual([]);
+
+    const blank = await issues.create({ title: "unassigned", agent: "   ", by: user });
+    expect(assignedAgentOf(blank.issue)).toBeUndefined();
+
+    const orchestratorOwned = await issues.create({ title: "for orchestrator", agent: ` ${defaultOrchestrator} `, by: user });
+    expect(assignedAgentOf(orchestratorOwned.issue)).toBe(defaultOrchestrator);
+
+    const namedProfile = await issues.create({ title: "by profile name", agent: " Lab Two ", by: user });
+    expect(assignedAgentOf(namedProfile.issue)).toBe("lab2");
   });
 });

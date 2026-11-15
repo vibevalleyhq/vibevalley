@@ -1,4 +1,4 @@
-import type { Session as RuntimeSession, SessionOptions } from "@botiverse/oar";
+import type { RefusedSessionOptions, Session as RuntimeSession, SessionOptions } from "@botiverse/oar";
 import { z } from "zod";
 
 import type * as T from "@vibevalley/protocol";
@@ -6,6 +6,16 @@ import type * as T from "@vibevalley/protocol";
 import { redact, redactedHead } from "#/base/redact.ts";
 
 export type ToolConnection = NonNullable<T.Session["toolConnections"]>[number];
+type OarMcpServer = NonNullable<SessionOptions["mcpServers"]>[number];
+
+const hasMcpCredentials = (server: OarMcpServer) => Object.keys(("type" in server ? server.headers : server.env) ?? {}).length > 0;
+
+/** Drops MCP server entries the runtime declares refused before opening a session. */
+export function allowedMcpServers(servers: SessionOptions["mcpServers"], refused: RefusedSessionOptions | undefined): SessionOptions["mcpServers"] {
+  if (!servers || servers.length === 0 || refused?.mcpServers !== undefined) return undefined;
+  const filtered = refused?.mcpServerCredentials !== undefined ? servers.filter((server) => !hasMcpCredentials(server)) : [...servers];
+  return filtered.length > 0 ? filtered : undefined;
+}
 
 export function loopbackEnvironment<Env extends SessionOptions["env"]>(
   env: Env,

@@ -2,6 +2,8 @@ import { setImmediate } from "node:timers/promises";
 
 import { describe, expect, test } from "vite-plus/test";
 
+import { demoPieces } from "@vibevalley/artifact/html";
+import { plain } from "@vibevalley/artifact/ops";
 import { abortError, mapConcurrent } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type { ArtifactId, BlockOp } from "@vibevalley/protocol";
@@ -19,8 +21,6 @@ import { testConfig, testDb, waitFor } from "#/testing/layers.ts";
 import * as qa from "#db/artifact.sql.ts";
 
 import { makeBlockStore } from "./blocks.ts";
-import { plain } from "./ops.ts";
-import { demoPieces } from "./policy.ts";
 
 /** A clock that moves only when the test says, from 0; each wait it passes ends in order, and what it woke gets a few turns. */
 function heldTime() {
@@ -118,15 +118,19 @@ const texts = (blocks: { text: { t: string }[] }[]) => blocks.map((b) => plain(b
 
 const helpers = (...list: [string, boolean][]) => list.map(([id, enabled]) => sampleAgent({ id, enabled }));
 
-const finished = (s: Service) =>
-  waitFor(
+const finished = async (s: Service, id: ArtifactId, count: number) => {
+  await waitFor(
     async () => {
       await s.adjust(1_000);
-      return s.demoRunning();
+      const list = await s.blocks(id);
+      return list.length === count && list.every((b) => b.type !== "paragraph" || b.updatedBy === "user" || b.rev === demoPieces + 1);
     },
-    (running) => !running,
+    Boolean,
     "the demo finished",
   );
+  // demoWrite sleeps 0.8s after finishing its last paragraph before clearing its running flag.
+  await s.adjust(1_000);
+};
 
 /** What p failed with: the refusal a test expects. */
 const failed = async (p: Promise<unknown>): Promise<ApiError> => {
@@ -194,8 +198,8 @@ describe("a blocks artifact", () => {
     await using s = await make();
     const id = (await s.create("t")).artifact.id;
     await submit(s, id, "1", { op: "insert_block", block: para("a", "V", "原来") });
-    const [, r] = await s.updateText(id, "lab", blockId("a"), 1, "帮工改的");
-    expect([r!.status, r!.rev]).toEqual(["applied", 2]);
+    const r = await s.submit(id, "lab", { batchId: "2", ops: [{ op: "update_text", blockId: blockId("a"), baseRev: 1, text: [span("帮工改的")] }] });
+    expect([r.results[0]!.status, r.results[0]!.rev]).toEqual(["applied", 2]);
     const ack = await submit(s, id, "3", { op: "update_text", blockId: "a", baseRev: 1, text: [span("我改的")] });
     expect([ack.results[0]!.status, plain(ack.results[0]!.yours ?? []), ack.results[0]!.rev, ack.seq]).toEqual(["conflict", "我改的", 2, 3]);
     const snap = await s.get(id);
@@ -246,7 +250,7 @@ describe("a blocks artifact", () => {
     await s.demo(id, all);
     const demoFailure = await failed(s.demo(id, all));
     expect(demoFailure).toMatchObject({ message: expect.stringContaining("演示正在写") });
-    await finished(s);
+    await finished(s, id, 1 + 3 * 4);
     const snap = await s.get(id);
     expect(snap.blocks[0]!.id).toBe("first");
     const writers = ["backend", "tester", "frontend"];
@@ -263,7 +267,7 @@ describe("a blocks artifact", () => {
     }
     expect([section, snap.blocks.length]).toEqual([2, 1 + 3 * 4]);
     await s.demo(id, all);
-    await finished(s);
+    await finished(s, id, 1 + 2 * 3 * 4);
     expect((await failed(s.demo(id, helpers(["off", false])))).bizCode).toBe(BizCode.ArtifactRefused);
     expect((await failed(s.demo(artifactId("nope"), all))).bizCode).toBe(BizCode.ArtifactNotFound);
   });
@@ -290,7 +294,7 @@ describe("a blocks artifact", () => {
       "the user taking the block over",
     );
     expect(taken).not.toBe("");
-    await finished(s);
+    await finished(s, id, 4);
     const snap = await s.get(id);
     const mine = snap.blocks.find((b) => b.id === taken)!;
     expect([plain(mine.text), mine.updatedBy]).toEqual(["用户接手了", "user"]);

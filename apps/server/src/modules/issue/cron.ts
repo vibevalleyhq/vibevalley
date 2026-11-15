@@ -13,25 +13,29 @@ import type { ServerConfig } from "#/infra/config.ts";
 import { type Db, SqlError } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Agent } from "#/modules/agent/agent.ts";
+import type { ProfileStore } from "#/modules/agent/agent.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { Session } from "#/modules/session/session.ts";
 import type { Trigger } from "#/modules/session/shapes.ts";
 import * as q from "#db/issue_cron.sql.ts";
 
-import type { Intake } from "./intake.ts";
-import { afterRun, cronProblem, dueCrons, dueText, givenZone, isMissed, needsOK, whenText } from "./when.ts";
+import type { Issue } from "./issue.ts";
+import { afterRun, cronProblem, type Due, dueCrons, dueText, givenZone, isMissed, needsOK, whenText } from "./when.ts";
+
+export type { Due };
 
 const refused = refuseIn(BizCode.CronRefused);
 
-export interface Due {
-  readonly id: string;
-  readonly cron: T.Cron;
-  readonly missed: boolean;
-}
+/** What of the crons still points at a channel, so deleting it is refused. */
+export const cronChannelUses =
+  (deps: { readonly db: Db }) =>
+  async (id: string): Promise<readonly string[]> => {
+    const crons = (await q.cronsIn(deps.db.sql, { channel_id: id }))?.n ?? 0;
+    return crons !== 0 ? [t("server.channel.cronsThere", { n: crons })] : [];
+  };
 
 /** The crons: each one, when it comes due, is a trigger for the one issue it keeps. */
-export interface IssueCron {
+export interface Cron {
   readonly list: () => T.Cron[];
   /** by is who asks, and on whose word (needsOK). */
   readonly add: (req: T.CronRequest, by: Actor) => Promise<T.Cron>;
@@ -54,13 +58,11 @@ export interface CronDeps {
   readonly log: Logger;
   readonly db: Db;
   readonly core: Core;
-  readonly agent: Agent;
+  readonly agent: ProfileStore;
   readonly channel: Channel;
   readonly session: Session;
-  /** Where a due cron's trigger goes: the pool of the issue it made, whose thread it subscribes. */
-  readonly intake: Pick<Intake, "route" | "subscribe" | "ownerOf">;
-  /** The issue a due cron's trigger goes to: the one it made last, reopened, or a new one. */
-  readonly scheduled: (due: Due, input: Trigger) => Promise<T.Issue>;
+  /** Where a due cron's trigger creates or reopens its issue and enters the queue. */
+  readonly issue: Pick<Issue, "route" | "scheduled">;
 }
 
 /** $TZ when it names a zone, else the system's. */
@@ -71,14 +73,15 @@ const localZone = (): string => {
 
 const whenOf = jsonOrNone(S.CronWhen);
 
-export async function issueCron(deps: CronDeps): Promise<IssueCron> {
-  const { core, agent: store, channel: chat, scheduled, session: sessions, intake, db, clock, config } = deps;
+export async function makeCron(deps: CronDeps): Promise<Cron> {
+  const { core, agent: store, channel: chat, issue: issues, session: sessions, db, clock, config } = deps;
   const log = deps.log.child("cron");
   const tasks = new TaskGroup({ name: "cron", onError: (task, e) => log.error(`${task} failed:`, e) });
   const now = () => clock.now();
   // The ticker, the tools and the pages all change the list.
   const lock = new Semaphore(1);
   const dueHub = new Hub<Due>();
+  chat.guardRemoval(cronChannelUses({ db }));
 
   for (const row of await q.crons(db.sql)) {
     const when = whenOf(row.spec);
@@ -130,16 +133,9 @@ export async function issueCron(deps: CronDeps): Promise<IssueCron> {
 
   const handle = (due: Due, trigger: Trigger) =>
     bestEffort(log, `cron occurrence ${due.id}`, async () => {
-      const s = due.cron;
-      const thread = `cron:${s.id}`;
-      if (!(await sessions.isRouted(trigger.id))) {
-        const issue = await scheduled(due, trigger);
-        await intake.subscribe(issue.id, [thread]);
-        await intake.route(trigger);
-      } else {
-        const issue = await intake.ownerOf(trigger.id);
-        if (issue) await intake.subscribe(issue, [thread]);
-      }
+      if (await sessions.isRouted(trigger.id)) return;
+      await issues.scheduled(due, trigger);
+      await issues.route(trigger);
     });
 
   const replay = () =>

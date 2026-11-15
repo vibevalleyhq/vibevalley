@@ -3,9 +3,9 @@ import { z } from "zod";
 import { Semaphore } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { assignedAgentOf, cut } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, issueScopeOf } from "@vibevalley/protocol/rules";
 
-import { clip } from "#/base/clip.ts";
+import { clip, cut } from "#/base/clip.ts";
 import { BizCode, lookIn, messageOf, refuseIn } from "#/base/errors.ts";
 import { lastJsonBlock, misfitField } from "#/base/json.ts";
 import { questionsFromText } from "#/base/questions.ts";
@@ -15,9 +15,10 @@ import type { Agent } from "#/modules/agent/agent.ts";
 import { chooseAgent } from "#/modules/agent/presets.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { WorkplaceRelease } from "#/modules/repo/workplace.ts";
-import { type Hired, type HireOptions, HireRefused, type Session } from "#/modules/session/session.ts";
+import { type Hired, HireRefused, type Session } from "#/modules/session/session.ts";
 
 import { splitBrief } from "./brief.ts";
+import type { IssueHireOptions } from "./dispatch.ts";
 import type { IssueLifecycle } from "./lifecycle.ts";
 import { draftMatch, refinementBrief } from "./prompts.ts";
 import { assignedOnDuty } from "./status.ts";
@@ -34,7 +35,7 @@ interface RefinementDeps {
   /** The issue while it was never sent. */
   readonly unsent: (id: string) => Promise<T.Issue>;
   /** Throws HireRefused. */
-  readonly hire: (agent: T.Agent, brief: string, repo: string, opt?: HireOptions) => Promise<Hired>;
+  readonly hire: (agent: T.Agent, brief: string, repo: string, opt?: IssueHireOptions) => Promise<Hired>;
   readonly lastAssigneeIn: IssueLifecycle["lastAssigneeIn"];
   readonly saveEdit: IssueLifecycle["saveEdit"];
   readonly saveRefinement: IssueLifecycle["saveRefinement"];
@@ -108,8 +109,8 @@ export function refinement(d: RefinementDeps) {
 
   const handedBack = async (f: { id: string; outcome: string; summary: string; questions?: readonly T.Question[] }) => {
     const h = sessions.live(f.id).session;
-    if (h?.refining !== true || !h.issue) return;
-    const id = h.issue;
+    const id = h?.scope?.kind === "draft" ? issueScopeOf(h) : undefined;
+    if (!h || !id) return;
     const said = sessions.live(f.id).lastText;
     const thread = await chat.homeOf(f.id);
     const tell = async (text: string) => {

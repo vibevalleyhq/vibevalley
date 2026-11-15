@@ -13,15 +13,15 @@ import { BizCode, messageOf, refuseIn } from "#/base/errors.ts";
 import { reposDir, type ServerConfig } from "#/infra/config.ts";
 import type { Logger } from "#/infra/log.ts";
 import { gauge } from "#/infra/metrics.ts";
-import { loopbackEnvironment, observeToolConnections } from "#/modules/agent/access.ts";
-import type { Agent } from "#/modules/agent/agent.ts";
+import { allowedMcpServers, loopbackEnvironment, observeToolConnections } from "#/modules/agent/access.ts";
+import type { RuntimeFleet } from "#/modules/agent/agent.ts";
 import { probeInstallation } from "#/modules/agent/runtime.ts";
 
 import type { ToolConnection } from "./shapes.ts";
 
 const refused = refuseIn(BizCode.SessionRefused);
 
-type ExecutionOwner = Pick<T.Session, "id" | "agent" | "runtime" | "repo" | "issue" | "channel">;
+type ExecutionOwner = Pick<T.Session, "id" | "agent" | "runtime" | "repo" | "scope" | "channel">;
 
 /** An acquired execution remains present until every runtime resource confirms disposal. */
 export interface Execution {
@@ -155,7 +155,7 @@ const view = (allocation: Allocation): Execution => {
 
 export interface ExecutorDeps {
   readonly config: ServerConfig;
-  readonly agent: Agent;
+  readonly agent: RuntimeFleet;
   readonly clock: Clock;
   readonly log: Logger;
 }
@@ -279,7 +279,7 @@ export function makeExecutor(deps: ExecutorDeps): Executions & { readonly closeA
       const id = owner.id;
       const prior = allocations.get(id);
       if (prior) return { refused: failureOf(prior.phase) ?? t("server.session.life.notReturned"), retained: true };
-      let r: Awaited<ReturnType<Agent["resolve"]>>;
+      let r: Awaited<ReturnType<RuntimeFleet["resolve"]>>;
       try {
         r = await runtimes.resolve(agent);
       } catch (e) {
@@ -288,15 +288,18 @@ export function makeExecutor(deps: ExecutorDeps): Executions & { readonly closeA
       const raced = allocations.get(id);
       if (raced) return { refused: failureOf(raced.phase) ?? t("server.session.life.notReturned"), retained: true };
       const base = r.runtime;
+      const mcpServers = allowedMcpServers(options.mcpServers, base.refusedSessionOptions);
       const resources = new Set<RuntimeSession>();
       const mine: OarRuntime = {
         ...base,
         installation: () => (r.installation ? Promise.resolve(r.installation) : probeInstallation(base, r.binPath)),
-        session: (installation, opts) =>
-          base
+        session: (installation, opts) => {
+          const { mcpServers: _, ...rest } = { ...opts, ...options };
+          const filteredServers = allowedMcpServers(options.mcpServers ?? opts.mcpServers, base.refusedSessionOptions);
+          return base
             .session(installation, {
-              ...opts,
-              ...options,
+              ...rest,
+              ...(filteredServers ? { mcpServers: filteredServers } : {}),
               env: loopbackEnvironment({ ...opts.env, ...options.env }, inherited, base.refusedSessionOptions?.env),
             })
             .then((session) => {
@@ -304,7 +307,8 @@ export function makeExecutor(deps: ExecutorDeps): Executions & { readonly closeA
               const tracked: RuntimeSession = { ...session, dispose: () => (disposing ??= Promise.resolve().then(() => session.dispose())) };
               resources.add(tracked);
               return tracked;
-            }),
+            });
+        },
       };
       const subagents = createSubagents({
         runtimes: { get: (rid) => (rid === base.id ? mine : undefined) },
@@ -320,12 +324,12 @@ export function makeExecutor(deps: ExecutorDeps): Executions & { readonly closeA
           agent: owner.agent,
           runtime: owner.runtime,
           ...(owner.repo === undefined ? {} : { repo: owner.repo }),
-          ...(owner.issue === undefined ? {} : { issue: owner.issue }),
+          ...(owner.scope === undefined ? {} : { scope: owner.scope }),
           ...(owner.channel === undefined ? {} : { channel: owner.channel }),
         },
         subagents,
         resources,
-        servers: [...new Set(options.mcpServers?.map((server) => server.name) ?? [])],
+        servers: [...new Set(mcpServers?.map((server) => server.name) ?? [])],
         sessionId: "",
         phase: { _tag: "spawning" },
       };

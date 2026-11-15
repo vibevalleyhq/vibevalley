@@ -1,15 +1,16 @@
-import type { Tool as LoopTool } from "@vibevalley/agent/core/tool";
 import { selfTools } from "@vibevalley/agent/self";
 import { Semaphore, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime, userId } from "@vibevalley/protocol";
 
-import { type Caller, orchestrator } from "#/base/actor.ts";
+import { orchestrator } from "#/base/actor.ts";
 import { serverFile } from "#/base/assets.ts";
 import { head } from "#/base/clip.ts";
 import { BizCode, refuseIn } from "#/base/errors.ts";
 import { usersLanguage } from "#/base/prompts.ts";
+import { channelLine, pkmHitLine } from "#/gateway/tool/prompts.ts";
+import type { Tool } from "#/gateway/tool/tool.ts";
 import { agentHome, reposDir, type ServerConfig } from "#/infra/config.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import { localeMinute, type Time } from "#/infra/time.ts";
@@ -19,17 +20,17 @@ import { runtimeLabel } from "#/modules/agent/presets.ts";
 import { noDeepSeekKey } from "#/modules/agent/profile.ts";
 import { traitsOf } from "#/modules/agent/prompts.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
+import type { Cron } from "#/modules/issue/cron.ts";
 import type { Issue } from "#/modules/issue/issue.ts";
 import { nextRun } from "#/modules/issue/when.ts";
 import type { Pkm } from "#/modules/pkm/pkm.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
 import type { Handed, Picked } from "#/modules/session/envelope.ts";
 import { type AgentHost, SubmitRefused } from "#/modules/session/host.ts";
-import type { ToolStart } from "#/modules/session/reaction.ts";
 import type { Session } from "#/modules/session/session.ts";
 
 import type { Answer } from "./openai.ts";
-import { agentPrompt, channelLine, identityNote, lineWords, pkmHitLine, situationWords, systemPrompt, voiceNote } from "./prompts.ts";
+import { agentPrompt, identityNote, lineWords, situationWords, systemPrompt, voiceNote } from "./prompts.ts";
 import { makeResponses } from "./response.ts";
 import { deepseekModel, intake, orchestratorEnvelopeLines, quotaText, situationDelta, type Source } from "./situation.ts";
 
@@ -40,8 +41,6 @@ const keepEvents = 1000;
 const notesShown = 8;
 const notesRecalled = 3;
 const resumeWithinMs = 30 * 60_000;
-
-export type Pick = Picked;
 
 interface HostContext {
   readonly channel: string;
@@ -92,15 +91,8 @@ export interface OrchestratorOptions {
   readonly listen?: boolean;
 }
 
-/** The farm's tools as the orchestrator holds them. gateway/tool serves them and reaches every module, the orchestrator
- * among them, so they are built after the modules and handed in at assembly (services.ts), like Core's Projection. */
-export interface OrchestratorTools {
-  /** Its tools, in the order its prompt has always listed them: the order is part of the prompt's prefix. */
-  readonly orchestrator: (who: () => Caller) => LoopTool[];
-  /** How a tool call reads in its trajectory: its label and the first naming argument. */
-  readonly start: (name: string, args: unknown) => ToolStart;
-  readonly sessionLine: (session: T.Session) => string;
-}
+/** The farm's tools as the orchestrator holds them: a narrow slice of Tool, built in the Tools layer just before Orchestrator. */
+export type OrchestratorTools = Pick<Tool, "orchestrator" | "start" | "sessionLine">;
 
 export interface OrchestratorDeps {
   readonly clock: Time;
@@ -112,11 +104,12 @@ export interface OrchestratorDeps {
   readonly session: Session;
   readonly channel: Channel;
   readonly issue: Issue;
+  readonly cron: Cron;
   readonly tools: OrchestratorTools;
 }
 
 export async function makeOrchestrator(deps: OrchestratorDeps, options: OrchestratorOptions = {}): Promise<Orchestrator> {
-  const { clock, config, agent: store, repo: repos, pkm: notes, session: run, channel: chat, issue: issues, tools: tool } = deps;
+  const { clock, config, agent: store, repo: repos, pkm: notes, session: run, channel: chat, issue: issues, cron: crons, tools: tool } = deps;
   const log = deps.log.child("orchestrator");
   const responses = makeResponses(run, issues, chat, clock);
   const tasks = new TaskGroup({ name: "orchestrator", onError: (task, e) => log.error(`vibevalley: the orchestrator's ${task} failed`, e) });
@@ -148,7 +141,7 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
       const modelOf = () => deepseekModel(store.agent(id)?.model.trim() ?? "", defaultModel);
       const wakeSoon = (withinMs: number) => {
         const by = clock.now() + withinMs;
-        return issues.crons().some((s) => {
+        return crons.list().some((s) => {
           const next = nextRun(s);
           return next !== undefined && (s.agent || chat.orchestratorIn(s.channel)) === id && next <= by;
         });
@@ -233,7 +226,7 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
     return situationWords.recalled(hits.map(pkmHitLine));
   };
 
-  const pickedNote = (picked: Pick) => {
+  const pickedNote = (picked: Picked) => {
     let note = "";
     const a = picked.agent ? store.agent(picked.agent) : undefined;
     if (a) note += lineWords.pickedAgent(a.name);
@@ -245,7 +238,7 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
   const heardInChat = async (n: Handed): Promise<void> => {
     const fromPerson = n.messages.every((m) => m.from === userId);
     const user = n.messages.some((m) => m.from === userId);
-    const picked: Pick = n.messages.findLast((m) => m.picked)?.picked ?? {};
+    const picked: Picked = n.messages.findLast((m) => m.picked)?.picked ?? {};
     const response = n.messages.findLast((message) => message.responsePort);
     const voice = n.messages.findLast((message) => message.voiceMode);
     const caller = response?.responsePort ? responses.take(response.responsePort) : undefined;

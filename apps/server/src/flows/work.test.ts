@@ -4,9 +4,10 @@ import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
 
 import type * as T from "@vibevalley/protocol";
-import { needOf } from "@vibevalley/protocol/rules";
+import { issueScopeOf } from "@vibevalley/protocol/rules";
 
 import { orchestrator, user } from "#/base/actor.ts";
+import { needOf } from "#/modules/session/report.ts";
 import { type Inside } from "#/modules/session/session.ts";
 import type { Machine } from "#/modules/session/shapes.ts";
 import type { DeliveryInput } from "#/modules/session/signals.ts";
@@ -63,7 +64,7 @@ describe("a session's work", () => {
     const hired = await issues.hire(lab(), "写打卡并提交", "clock");
     const session = mustHire(hired);
     await w.nextReport();
-    const said = await issues.setStatus(session.issue!, "done", "", "", user);
+    const said = await issues.setStatus(issueScopeOf(session)!, "done", "", "", user);
     expect(session.branch).toMatch(/^vibevalley\//u);
     expect(said).toMatchObject({ status: "done", delivered: "merged" });
     await until(() => w.notes.some((note) => /1 个提交合进了 clock 的 main/u.test(note)), "the merge notice");
@@ -82,7 +83,7 @@ describe("a session's work", () => {
     const hired = await issues.hire(lab(), "写打卡并提交", "ledger");
     const session = mustHire(hired);
     await w.nextReport();
-    await issues.setStatus(session.issue!, "done", "", "", user);
+    await issues.setStatus(issueScopeOf(session)!, "done", "", "", user);
     const entries = () =>
       sql<{
         n: number;
@@ -121,7 +122,7 @@ describe("a session's work", () => {
       const delivered2 = await sessions.deliver(session.id, "再加一句并提交", delivery({ kind: "comment" }));
       expect(delivered2).toMatchObject({ kind: "run", woke: true });
       await w.nextReport();
-      const setStatus2 = await fw.issue.setStatus(session.issue!, "done", "", "", user);
+      const setStatus2 = await fw.issue.setStatus(issueScopeOf(session)!, "done", "", "", user);
       expect(setStatus2).toMatchObject({ status: "done", delivered: "merged" });
     }
   });
@@ -244,7 +245,7 @@ describe("a session's work", () => {
     const hired = await issues.hire(lab(), "写打卡并提交", "preview");
     const session = mustHire(hired);
     await w.nextReport();
-    const changes = await issues.changes(session.issue!, orchestrator(true));
+    const changes = await issues.changes(issueScopeOf(session)!, orchestrator(true));
     await sessions.dismiss(session.id);
     expect(changes.base).toBe("main");
     expect(changes.commits.map((c) => c.subject)).toEqual(["加上打卡"]);
@@ -265,19 +266,21 @@ describe("a session's work", () => {
     const b = mustHire(hired2);
     await w.nextReport();
     await w.nextReport();
-    const setStatus2 = await issues.setStatus(a.issue!, "done", "", "", user);
+    const aIssue = issueScopeOf(a)!;
+    const bIssue = issueScopeOf(b)!;
+    const setStatus2 = await issues.setStatus(aIssue, "done", "", "", user);
     expect(setStatus2).toMatchObject({ status: "done", delivered: "merged" });
-    expect((await issues.changes(b.issue!, orchestrator(true))).conflicts).toEqual(["same.ts"]);
-    const failed = await failure(issues.setStatus(b.issue!, "done", "", "", user));
+    expect((await issues.changes(bIssue, orchestrator(true))).conflicts).toEqual(["same.ts"]);
+    const failed = await failure(issues.setStatus(bIssue, "done", "", "", user));
     expect(JSON.stringify({ ...failed, name: failed.name, message: failed.message })).toMatch(/会冲突（same\.ts）/u);
-    const stayed = await issues.get(b.issue!);
+    const stayed = await issues.get(bIssue);
     expect(stayed.conflict).toEqual({ base: "main", files: ["same.ts"] });
-    await issues.setStatus(b.issue!, "todo", "", "", user);
+    await issues.setStatus(bIssue, "todo", "", "", user);
     await w.nextReport();
     // Issue rechecks its branch after the worker reports.
     const core = fw.core;
-    await until(() => core.state().issues.find((issue) => issue.id === b.issue)?.conflict === undefined, "the conflict mark cleared");
-    const setStatus3 = await issues.setStatus(b.issue!, "done", "", "", user);
+    await until(() => core.state().issues.find((issue) => issue.id === bIssue)?.conflict === undefined, "the conflict mark cleared");
+    const setStatus3 = await issues.setStatus(bIssue, "done", "", "", user);
     expect(setStatus3).toMatchObject({ status: "done", delivered: "merged" });
     const repo = join(f.config.workRoot, "repos", "clash");
     expect(git(repo, "show", "main:same.ts")).toBe("export const v = 'A+B'");
@@ -299,12 +302,14 @@ describe("a session's work", () => {
       const second = mustHire(hired2);
       await w.nextReport();
       await w.nextReport();
-      await issues.setStatus(first.issue!, "done", "", "", user);
-      await issues.changes(second.issue!, user);
+      const firstIssue = issueScopeOf(first)!;
+      const secondIssue = issueScopeOf(second)!;
+      await issues.setStatus(firstIssue, "done", "", "", user);
+      await issues.changes(secondIssue, user);
       await fw.inside.dismiss(second.id);
-      expect((await issues.get(second.issue!)).conflict).toEqual({ base: "main", files: ["same.ts"] });
+      expect((await issues.get(secondIssue)).conflict).toEqual({ base: "main", files: ["same.ts"] });
       expect(Object.hasOwn((await fw.inside.get(second.id))!, "conflict")).toBe(false);
-      return second.issue!;
+      return secondIssue;
     })();
     {
       await using fw = await farm({ config }).open();
@@ -401,7 +406,7 @@ describe("a session's work", () => {
         expect((await sessions.deliver(session.id, "再看看", delivery(said, ["m42"]))).kind).toBe("run");
         await w.nextReport();
         const got = await await_(
-          () => fw.intake.runsOf(session.issue!),
+          () => fw.intake.runsOf(issueScopeOf(session)!),
           (r) => r.length === 2 && r[1]!.endedAt !== undefined,
           "two runs ended",
         );
@@ -409,14 +414,14 @@ describe("a session's work", () => {
         expect(got[1]!.triggeredBy).toEqual(said);
         await sessions.deliver(session.id, "发呆一会儿", delivery({ kind: "comment" }));
         await await_(
-          () => fw.intake.runsOf(session.issue!),
+          () => fw.intake.runsOf(issueScopeOf(session)!),
           (r) => r.length === 3,
           "a third run going",
         );
         expect((await sessions.deliver(session.id, "顺便看看", delivery({ kind: "comment", message: "m43" }, ["m43"]))).kind).toBe("steered");
         // A run's heard is recorded behind the steer (recordRun), so it is waited for.
         await await_(
-          () => fw.intake.runsOf(session.issue!),
+          () => fw.intake.runsOf(issueScopeOf(session)!),
           (r) => r[2]?.heard.includes("m43") === true,
           "the steered message heard",
         );
@@ -426,7 +431,7 @@ describe("a session's work", () => {
     const after = farm({ config });
     {
       await using fw = await after.open();
-      expect((await fw.intake.runsOf(session.issue!))[2]!.outcome).toBe("interrupted");
+      expect((await fw.intake.runsOf(issueScopeOf(session)!))[2]!.outcome).toBe("interrupted");
     }
   });
 
@@ -444,7 +449,7 @@ describe("a session's work", () => {
       for await (const e of subscribe2)
         if (e.type === "sessionChanged")
           found.push(
-            await issues.get(e.session.issue ?? e.session.id).then(
+            await issues.get(issueScopeOf(e.session) ?? e.session.id).then(
               () => true,
               () => false,
             ),

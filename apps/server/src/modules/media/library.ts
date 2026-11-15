@@ -5,6 +5,7 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { ApiError, BizCode, lookIn, messageOf, missing, refuseIn } from "#/base/errors.ts";
 import { jsonOf } from "#/base/json.ts";
+import { readBytesUpTo } from "#/base/stream.ts";
 import { publicHttps } from "#/infra/publicHttp.ts";
 import { NotWorkFile } from "#/modules/session/session.ts";
 import { attachmentMax } from "#/platform/attachment/attachment.ts";
@@ -128,22 +129,8 @@ export async function makeLibrary(deps: Pick<MediaDeps, "db" | "core" | "clock" 
       await response.body?.cancel();
       throw refused(t("server.library.notFetched", { url: address, why: String(response.status) }));
     }
-    let size = 0;
-    const chunks: Uint8Array[] = [];
-    const reader = response.body?.getReader();
-    if (reader !== undefined)
-      try {
-        for (let read = await reader.read(); !read.done; read = await reader.read()) {
-          const chunk: unknown = read.value;
-          if (!(chunk instanceof Uint8Array)) throw new TypeError("a response body gave something other than bytes");
-          size += chunk.byteLength;
-          if (size > attachmentMax) throw tooBig();
-          chunks.push(chunk);
-        }
-      } finally {
-        // Cut short (too big, aborted): the rest of the body is not wanted.
-        await reader.cancel().catch((e: unknown) => log.debug("library: the download's body did not cancel", e));
-      }
+    const bytes = await readBytesUpTo(response.body, attachmentMax, { signal });
+    if (bytes === undefined) throw tooBig();
     const header = response.headers.get("content-type");
     const type = header === null ? "" : (header.split(";")[0] ?? "").trim();
     const segment = lastOf(url.pathname, "/");
@@ -155,7 +142,7 @@ export async function makeLibrary(deps: Pick<MediaDeps, "db" | "core" | "clock" 
         return segment;
       }
     })();
-    return { bytes: Buffer.concat(chunks), type, name: named === "" ? url.hostname : named };
+    return { bytes, type, name: named === "" ? url.hostname : named };
   };
 
   const download = async (address: string, signal?: AbortSignal) => {

@@ -2,10 +2,9 @@ import type { FailedTurn, FailureClass, TurnOutcome } from "@botiverse/oar";
 import { failureAdvice } from "@botiverse/oar/observe";
 
 import { list, maybe, t } from "@vibevalley/i18n";
-import type { EventTokens, Question, Outcome } from "@vibevalley/protocol";
-import { slice } from "@vibevalley/protocol/rules";
+import type * as T from "@vibevalley/protocol";
 
-import { clip } from "#/base/clip.ts";
+import { clip, slice } from "#/base/clip.ts";
 import { checksFromText, questionsFromText, type CriterionCheck } from "#/base/questions.ts";
 
 import type { IssueReport } from "./shapes.ts";
@@ -20,9 +19,10 @@ export const handsToUser = (report: IssueReport | undefined) =>
 export const settlesFirst = (completed: boolean, declared: IssueReport | undefined, pendingTasks: number) =>
   completed && !handsToUser(declared) && pendingTasks > 0;
 
-/** A completed turn on an issue that does not hand the work to the user (a pull request in flight) rests: it waits on
- * outside events, not on the user. */
-export const restsAfter = (completed: boolean, onIssue: boolean, declared: IssueReport | undefined) => completed && onIssue && !handsToUser(declared);
+/** A completed turn whose policy allows resting and that does not hand work to the user rests: it waits on outside
+ * events, not on the user. */
+export const restsAfter = (completed: boolean, restAfterTurn: boolean, declared: IssueReport | undefined) =>
+  completed && restAfterTurn && !handsToUser(declared);
 
 export function failureText(f: FailedTurn): string {
   const advice = failureAdvice(f.failure);
@@ -59,16 +59,16 @@ export const summaryOf = (text: string) => conclusion(text, 80);
 /** Said out loud on the farm, not only in the report. */
 const needsYou = new Set<FailureClass>(["auth", "billing", "quota", "model_unavailable"]);
 
-const outcomeOf = (o: TurnOutcome): Outcome => (o.kind === "completed" ? "completed" : o.kind === "aborted" ? "interrupted" : "failed");
+const outcomeOf = (o: TurnOutcome): T.Outcome => (o.kind === "completed" ? "completed" : o.kind === "aborted" ? "interrupted" : "failed");
 
 interface SessionRead {
-  readonly outcome: Outcome;
+  readonly outcome: T.Outcome;
   readonly text: string;
   readonly summary: string;
   readonly failure: string;
   readonly needsYou: boolean;
   /** Explicit issue_report questions. */
-  readonly questions: Question[];
+  readonly questions: T.Question[];
   /** Explicit issue_report criterion checks. */
   readonly checks: CriterionCheck[];
 }
@@ -91,7 +91,7 @@ export function readReport(outcome: TurnOutcome, said: string): SessionRead {
   };
 }
 
-export const tokensOf = (u: { input: number; cacheRead: number; output: number }): EventTokens => ({
+export const tokensOf = (u: { input: number; cacheRead: number; output: number }): T.EventTokens => ({
   input: u.input,
   cacheRead: u.cacheRead,
   output: u.output,
@@ -101,7 +101,7 @@ export const tokensOf = (u: { input: number; cacheRead: number; output: number }
 const digits = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/gu, " ");
 
 /** changed is a prefix_changed's parts, none when the prompt's start was as before. */
-export function usageText(tokens: EventTokens, changed: readonly string[] = []): string {
+export function usageText(tokens: T.EventTokens, changed: readonly string[] = []): string {
   const prompt = tokens.cacheRead + tokens.input;
   let text =
     prompt > 0
@@ -115,4 +115,77 @@ export function usageText(tokens: EventTokens, changed: readonly string[] = []):
   // As the brain's prefix_changed names the parts.
   if (changed.length > 0) text += t("server.session.usage.changed", { parts: list(changed.map((n) => maybe(`server.session.usage.parts.${n}`) ?? n)) });
   return text;
+}
+
+const spanText = (ms: number) =>
+  ms < 60_000 ? t("shared.seconds", { n: Math.max(1, Math.round(ms / 1000)) }) : t("shared.minutes", { n: Math.round(ms / 60_000) });
+
+type Retry = NonNullable<Extract<T.Phase, { _tag: "working" }>["retry"]>;
+type Conflict = NonNullable<T.Issue["conflict"]>;
+
+export type Need =
+  | { readonly kind: "quiet"; readonly since: number }
+  | { readonly kind: "retrying"; readonly retry: Retry }
+  | { readonly kind: "conflict"; readonly conflict: Conflict }
+  | { readonly kind: "review" }
+  | { readonly kind: "fix" };
+
+export function needOf(h: T.Session, conflict?: Conflict): Need | undefined {
+  const p = h.phase;
+  switch (p._tag) {
+    case "working":
+      if (p.quietSince !== undefined) return { kind: "quiet", since: p.quietSince };
+      if (p.retry !== undefined) return { kind: "retrying", retry: p.retry };
+      return undefined;
+    case "done":
+      return conflict ? { kind: "conflict", conflict } : { kind: "review" };
+    case "failed":
+      return { kind: "fix" };
+    case "resting":
+      return conflict ? { kind: "conflict", conflict } : undefined;
+    default:
+      return undefined;
+  }
+}
+
+/** The span placeholder in phaseWords. */
+const phaseSpan = "{span}";
+
+/** phaseWords as said at now. */
+export function phaseText(h: T.Session, now: number, conflict?: Conflict): string {
+  const said = phaseWords(h, conflict);
+  const need = needOf(h, conflict);
+  return need?.kind === "quiet" ? said.replaceAll(phaseSpan, spanText(now - need.since)) : said;
+}
+
+/** What a session is doing in words, how long it has been quiet left as {span}. */
+export function phaseWords(h: T.Session, conflict?: Conflict): string {
+  const need = needOf(h, conflict);
+  const conflictWords = need?.kind === "conflict" ? t("shared.phase.conflict", { base: need.conflict.base, files: list(need.conflict.files) }) : "";
+  const p = h.phase;
+  switch (p._tag) {
+    case "working": {
+      const action = t(`shared.action.${p.doing.action}`);
+      const what = p.doing.label !== "" ? t("shared.phase.workingOn", { action, label: p.doing.label }) : t("shared.phase.working", { action });
+      if (need?.kind === "quiet") return t("shared.phase.quiet", { what, span: phaseSpan });
+      if (need?.kind === "retrying")
+        return need.retry.of != null && need.retry.of !== 0
+          ? t("shared.phase.retryingOf", { what, attempt: need.retry.attempt, of: need.retry.of })
+          : t("shared.phase.retrying", { what, attempt: need.retry.attempt });
+      return what;
+    }
+    case "done":
+      return t("shared.phase.done", { conflict: conflictWords });
+    case "failed":
+      return t("shared.phase.failed");
+    case "resting": {
+      // No last run is a session that has not finished one yet (a new orchestrator), not one that broke off.
+      const outcome = h.lastRun?.outcome;
+      return outcome === undefined
+        ? t("shared.phase.rested", { conflict: conflictWords })
+        : t("shared.phase.resting", { last: t(`shared.outcome.${outcome}`), conflict: conflictWords });
+    }
+    default:
+      return "";
+  }
 }

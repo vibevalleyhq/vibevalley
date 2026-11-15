@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { abortable, TaskGroup } from "@vibevalley/async";
+import { Queue, Semaphore, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { MediaAudioFormatValues } from "@vibevalley/protocol";
@@ -40,77 +40,40 @@ export interface SpeechDeps {
   readonly publicFetch: PublicFetch;
 }
 
-/** A streamed job's events on their way to the page: at most `capacity` waiting, an offer past that waits for the page.
- * end() lets the page read what is left; shutdown() drops it all and lets every waiting offer go. */
-class SpeechChannel {
-  readonly #items: T.MediaSpeechEvent[] = [];
-  readonly #takers: ((r: IteratorResult<T.MediaSpeechEvent>) => void)[] = [];
-  readonly #offers: (() => void)[] = [];
-  #ended = false;
-  #shut = false;
-  readonly capacity: number;
-  claimed = false;
-
-  constructor(capacity: number) {
-    this.capacity = capacity;
-  }
-
-  /** Kept, or dropped once the channel ended or was shut; waits while it is full. */
-  async offer(event: T.MediaSpeechEvent, signal?: AbortSignal): Promise<void> {
-    while (!this.#ended && !this.#shut && this.#takers.length === 0 && this.#items.length >= this.capacity) {
-      const { promise, resolve } = Promise.withResolvers<void>();
-      this.#offers.push(resolve);
-      await abortable(promise, signal);
-    }
-    this.tryOffer(event);
-  }
-
-  /** Kept unless full, ended or shut. */
-  tryOffer(event: T.MediaSpeechEvent): boolean {
-    if (this.#ended || this.#shut) return false;
-    const taker = this.#takers.shift();
-    if (taker) {
-      taker({ value: event, done: false });
-      return true;
-    }
-    if (this.#items.length >= this.capacity) return false;
-    this.#items.push(event);
-    return true;
-  }
-
-  async next(signal?: AbortSignal): Promise<IteratorResult<T.MediaSpeechEvent>> {
-    const item = this.#items.shift();
-    if (item !== undefined) {
-      this.#offers.shift()?.();
-      return { value: item, done: false };
-    }
-    if (this.#ended || this.#shut) return { value: undefined, done: true };
-    const { promise, resolve } = Promise.withResolvers<IteratorResult<T.MediaSpeechEvent>>();
-    this.#takers.push(resolve);
-    try {
-      return await abortable(promise, signal);
-    } finally {
-      const at = this.#takers.indexOf(resolve);
-      if (at >= 0) this.#takers.splice(at, 1);
-    }
-  }
-
-  end(): void {
-    this.#ended = true;
-    if (this.#items.length === 0) this.#wake();
-  }
-
-  shutdown(): void {
-    this.#shut = true;
-    this.#items.length = 0;
-    this.#wake();
-  }
-
-  #wake() {
-    for (const taker of this.#takers.splice(0)) taker({ value: undefined, done: true });
-    for (const offer of this.#offers.splice(0)) offer();
-  }
+interface SpeechSession {
+  readonly queue: Queue<T.MediaSpeechEvent>;
+  readonly slots: Semaphore;
+  claimed: boolean;
 }
+
+const speechQueueCapacity = 16;
+
+const newSpeechSession = (): SpeechSession => ({
+  queue: new Queue(),
+  slots: new Semaphore(speechQueueCapacity),
+  claimed: false,
+});
+
+const offerSpeechEvent = async (session: SpeechSession, event: T.MediaSpeechEvent, signal?: AbortSignal): Promise<void> => {
+  if (session.queue.ended) return;
+  await session.slots.take(1, signal);
+  if (session.queue.ended || !session.queue.offer(event)) session.slots.release(1);
+};
+
+const tryOfferSpeechEvent = (session: SpeechSession, event: T.MediaSpeechEvent): boolean => {
+  if (session.queue.ended || !session.slots.tryTake()) return false;
+  if (!session.queue.offer(event)) {
+    session.slots.release(1);
+    return false;
+  }
+  return true;
+};
+
+const shutSpeechSession = (session: SpeechSession): void => {
+  const dropped = session.queue.takeAll().length;
+  session.queue.end();
+  if (dropped > 0) session.slots.release(dropped);
+};
 
 const jobs = jobsOf({ kinds: ["speech"], phases: MediaPhaseValues });
 const AudioFormat = z.enum(MediaAudioFormatValues);
@@ -120,7 +83,7 @@ export function makeSpeech(deps: SpeechDeps, { inputs, machine }: Ports) {
   const { db, clock, attachment: kept, provider, publicFetch } = deps;
   const log = deps.log.child("media/speech");
   const audioStorage = { publicFetch, files: kept, log, clock };
-  const streams = new Map<string, SpeechChannel>();
+  const streams = new Map<string, SpeechSession>();
   // A finished stream's events stay a minute for a page that comes late, one timer per job.
   const streamCleanup = new TaskGroup({ name: "media.speech", onError: (task, e) => log.warn(`${task} failed`, e) });
   const corrupt = () => refused(t("server.media.corrupt"));
@@ -208,7 +171,7 @@ export function makeSpeech(deps: SpeechDeps, { inputs, machine }: Ports) {
           task: async (taskId) => {
             await machine.change(id, ["generating", "canceled"], { remote_task: taskId });
           },
-          emit: (event, within) => session.offer(event, within),
+          emit: (event, within) => offerSpeechEvent(session, event, within),
           save: async (saved: SpeechStreamSaved) => {
             const patch = {
               ...savedFields(saved),
@@ -234,12 +197,12 @@ export function makeSpeech(deps: SpeechDeps, { inputs, machine }: Ports) {
       if (signal.aborted) throw e;
       log.warn(`media: speech stream ${id} failed`, e);
       await machine.change(id, ["generating"], { phase: "unknown", problem: words.unknown });
-      session.tryOffer({ type: "failed" });
+      tryOfferSpeechEvent(session, { type: "failed" });
     } finally {
-      session.end();
+      session.queue.end();
       streamCleanup.keyed(id, async (stop) => {
         await clock.sleep(60_000, stop);
-        session.shutdown();
+        shutSpeechSession(session);
         if (streams.get(id) === session) streams.delete(id);
       });
     }
@@ -269,7 +232,7 @@ export function makeSpeech(deps: SpeechDeps, { inputs, machine }: Ports) {
     canceled: async (id) => {
       const session = streams.get(id);
       if (!session) return;
-      session.shutdown();
+      shutSpeechSession(session);
       streams.delete(id);
     },
   });
@@ -306,13 +269,14 @@ export function makeSpeech(deps: SpeechDeps, { inputs, machine }: Ports) {
       });
       try {
         for (;;) {
-          const next = await session.next(signal);
+          const next = await session.queue.next(signal);
           if (next.done === true) return;
+          session.slots.release(1);
           yield next.value;
           if (next.value.type === "done" || next.value.type === "failed") return;
         }
       } finally {
-        session.shutdown();
+        shutSpeechSession(session);
         if (streams.get(id) === session) streams.delete(id);
         await bestEffort(log, "Speech stream disconnect could not be recorded", () =>
           machine.change(id, ["queued", "generating"], { phase: "canceled", problem: t("server.media.canceled") }),
@@ -361,7 +325,7 @@ export function makeSpeech(deps: SpeechDeps, { inputs, machine }: Ports) {
             now: clock.now(),
           }),
         );
-        if (input.streaming === true) streams.set(input.id, new SpeechChannel(16));
+        if (input.streaming === true) streams.set(input.id, newSpeechSession());
         await machine.publish();
         await machine.run(input.id, (signal) => generate(input, account, synthesis, signal));
         return get(input.id);

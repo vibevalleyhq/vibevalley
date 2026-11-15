@@ -1,5 +1,6 @@
 import { withTimeout } from "@vibevalley/async";
 
+import { readBytesUpTo } from "#/base/stream.ts";
 import { type PublicFetch, publicHttps } from "#/infra/publicHttp.ts";
 import type { Time } from "#/infra/time.ts";
 import { attachmentMax } from "#/platform/attachment/attachment.ts";
@@ -14,33 +15,6 @@ export class DownloadFailed extends Error {
 }
 
 const deadlineMs = 60_000;
-
-/** Bytes of a body, given up past attachmentMax; the body is canceled when the signal aborts, so a stalled one ends. */
-async function bodyOf(response: Response, signal: AbortSignal): Promise<Buffer> {
-  if (response.body === null) return Buffer.alloc(0);
-  const reader: ReadableStreamDefaultReader<Uint8Array> = response.body.getReader();
-  const cancel = () => void reader.cancel(signal.reason).catch(() => undefined);
-  signal.addEventListener("abort", cancel, { once: true });
-  try {
-    const chunks: Uint8Array[] = [];
-    let size = 0;
-    for (;;) {
-      signal.throwIfAborted();
-      const { done, value } = await reader.read();
-      signal.throwIfAborted();
-      if (done) break;
-      size += value.byteLength;
-      if (size > attachmentMax) {
-        cancel();
-        throw new DownloadFailed();
-      }
-      chunks.push(value);
-    }
-    return Buffer.concat(chunks);
-  } finally {
-    signal.removeEventListener("abort", cancel);
-  }
-}
 
 /** A generated image's PNG from a public https address: no credentials, no redirects, checked to be the size asked for.
  * Anything else, a deadline passed included, is DownloadFailed; only the caller's own abort goes on as it is. */
@@ -67,8 +41,8 @@ export async function downloadImage(
           await response.body?.cancel().catch(() => undefined);
           throw new DownloadFailed();
         }
-        const bytes = await bodyOf(response, deadline);
-        if (!validPng(bytes, width, height)) throw new DownloadFailed();
+        const bytes = await readBytesUpTo(response.body, attachmentMax, { signal: deadline });
+        if (bytes === undefined || !validPng(bytes, width, height)) throw new DownloadFailed();
         return bytes;
       },
       deadlineMs,

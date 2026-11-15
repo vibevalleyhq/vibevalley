@@ -4,7 +4,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 
-import { defineRuntime, type InstallationSnapshot, RuntimeRegistry } from "@botiverse/oar";
+import { antigravityRuntime, defineRuntime, type InstallationSnapshot, RuntimeRegistry } from "@botiverse/oar";
 import { afterEach, describe, expect, test } from "vite-plus/test";
 
 import { reasonOf } from "@vibevalley/async";
@@ -451,14 +451,59 @@ describe("runtime", () => {
       probe: async (id) => ({
         ...(await notFound(id)),
         installation: { status: "available", via: "bundled", command: id, version: null },
+        models: [{ id: "known", name: "Known", effortLevels: ["low"], isDefault: true }],
       }),
     });
     const a = agent({ runtime: "antigravity" });
     const assessed = await r.assess(a);
-    expect(assessed.blocking.map((i) => i.field)).toEqual(["effort", "env"]);
+    expect(assessed.blocking.map((i) => i.field)).toEqual(["env", "effort"]);
     expect(usable(assessed)).toBe(false);
     expect(await r.problemsOf(a)).toEqual(assessed.problems);
     expect((await refusal(r.resolve(a))).bizCode).toBe(BizCode.RuntimeRefused);
+  });
+
+  test("antigravity allows appendSystemPrompt, supported effort, steer and credential-free mcpServers while rejecting systemPrompt, disallowedTools and credentialed mcpServers", async () => {
+    await using w = await world();
+    const r = await runtimes(w, {
+      registry: new RuntimeRegistry([fake("antigravity", { refusedSessionOptions: antigravityRuntime.refusedSessionOptions })]),
+      probe: async (id) => ({
+        ...(await notFound(id)),
+        installation: { status: "available", via: "executable", command: id, version: "1.5.0" },
+        models: [{ id: "known", name: "Known", effortLevels: ["low", "high"], isDefault: true }],
+      }),
+    });
+    const supported = await r.assess(
+      agent({
+        runtime: "antigravity",
+        persona: "keep changes minimal",
+        personaMode: "append",
+        effort: "low",
+        mcpServers: [{ type: "stdio", name: "plain", command: "npx", args: [], env: {} }],
+      }),
+    );
+    expect(supported.info!.support.steer).toBe(true);
+    expect(supported.blocking).toEqual([]);
+    expect(usable(supported)).toBe(true);
+
+    const rejected = await r.assess(
+      agent({
+        runtime: "antigravity",
+        persona: "override everything",
+        personaMode: "replace",
+        disallowedTools: ["Bash"],
+        mcpServers: [{ type: "http", name: "authed", url: "http://127.0.0.1:9999/mcp", headers: { authorization: "Bearer secret" } }],
+      }),
+    );
+    expect(rejected.blocking.map((i) => i.field)).toEqual(["persona", "mcpServers", "disallowedTools"]);
+    expect(usable(rejected)).toBe(false);
+
+    const envAuthed = await r.assess(
+      agent({
+        runtime: "antigravity",
+        mcpServers: [{ type: "stdio", name: "authed-stdio", command: "npx", args: [], env: { API_KEY: "secret" } }],
+      }),
+    );
+    expect(envAuthed.blocking.map((i) => i.field)).toEqual(["mcpServers"]);
   });
 
   test("model effort checks use the inherited effort and allow a profile override", async () => {

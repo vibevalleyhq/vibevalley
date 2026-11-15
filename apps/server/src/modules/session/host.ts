@@ -33,9 +33,9 @@ import { type DeepSeekModel, type Durable, durableTool, entryMessage, messageTex
 
 import { makeInProcessRun, NotRecorded, RunBusy, type RunEvent, type RunInput } from "./inProcessRun.ts";
 import type { Journal } from "./journal.ts";
+import type { RunStore } from "./lifecycle.ts";
 import { hostWords } from "./prompts.ts";
 import type { ToolStart } from "./reaction.ts";
-import type { RunStore } from "./registry.ts";
 import { tokensOf, usageText } from "./report.ts";
 import type { SessionIdentity } from "./signals.ts";
 

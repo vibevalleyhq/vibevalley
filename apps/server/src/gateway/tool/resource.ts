@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import type * as T from "@vibevalley/protocol";
 import { isApiError } from "@vibevalley/protocol/api";
+import { issueScopeOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
 import type { Who } from "#/base/actor.ts";
@@ -151,9 +152,10 @@ export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "s
   };
 
   const mayReadIssue = async (session: T.Session, target: T.Issue) => {
-    if (session.issue === target.id) return true;
-    if (session.issue === undefined) return false;
-    const own = await issues.get(session.issue);
+    const sessionIssue = issueScopeOf(session);
+    if (sessionIssue === target.id) return true;
+    if (sessionIssue === undefined) return false;
+    const own = await issues.get(sessionIssue);
     if (target.id === own.parent) return true;
     const all = new Map<string, T.Issue>((await issues.list()).map((item) => [item.id, item]));
     const upstream = new Set<string>();
@@ -187,7 +189,8 @@ export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "s
         }
         if (!resource) throw refuse(resourceWords.missing(uri));
         let permitted = orchestrator;
-        if (session?.issue && !permitted) permitted = (await issues.get(session.issue)).mandate.originTriggerId === ref.id;
+        const sessionIssue = session ? issueScopeOf(session) : undefined;
+        if (sessionIssue && !permitted) permitted = (await issues.get(sessionIssue)).mandate.originTriggerId === ref.id;
         if (session && !permitted) {
           const owner = await issues.ownerOf(ref.id);
           if (owner) {

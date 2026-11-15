@@ -3,14 +3,14 @@ import { createReadStream } from "node:fs";
 import { mkdir, mkdtemp, open, rm } from "node:fs/promises";
 import { join } from "node:path";
 
-import { type Clock, systemClock, timeoutError } from "@vibevalley/async";
+import { type Clock, systemClock, withTimeout } from "@vibevalley/async";
 import type * as T from "@vibevalley/protocol";
 import { MediaInputRequest } from "@vibevalley/protocol/schema";
 
 import { fileBlob } from "#/infra/files.ts";
 
 import { inspectAudio, inspectWave } from "./audioMetadata.ts";
-import { inTime, untilAborted } from "./job.ts";
+import { untilAborted } from "./job.ts";
 import { mp3Structure } from "./validateSpeechBytes.ts";
 
 /** Where staged bytes are written and removed: the disk, or what a test puts in its place. */
@@ -52,8 +52,27 @@ export class MediaInputRejected extends Error {
 const stageMs = 300_000;
 
 /** work under the staging deadline: past it, work's signal aborts, and once work has cleaned up it rejects with a TimeoutError. */
-const inStageTime = <A>(work: (signal: AbortSignal) => Promise<A>, what: string, options: StageOptions) =>
-  inTime(work, stageMs, { clock: options.clock ?? systemClock, signal: options.signal, timedOut: () => timeoutError(stageMs, what) });
+const inStageTime = async <A>(work: (signal: AbortSignal) => Promise<A>, what: string, options: StageOptions): Promise<A> => {
+  let pending: Promise<A> | undefined;
+  try {
+    return await withTimeout(
+      (within) => {
+        pending = work(within);
+        return pending;
+      },
+      stageMs,
+      {
+        clock: options.clock ?? systemClock,
+        ...(options.signal === undefined ? {} : { signal: options.signal }),
+        what,
+      },
+    );
+  } catch (e) {
+    // Wait for stagedIn's partial-directory cleanup to finish when the deadline beats work's own unwinding.
+    await pending?.catch(() => undefined);
+    throw e;
+  }
+};
 
 // Container signatures reject disguised uploads; they do not prove a codec can decode the whole file.
 const matchesContainer = (mime: string, prefix: Uint8Array) => {

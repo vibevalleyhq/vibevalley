@@ -2,6 +2,8 @@ import { AsyncLocalStorage } from "node:async_hooks";
 
 import { Hono } from "hono";
 
+import { artifactHeaders, artifactPrefix, artifactPrintHeaders } from "@vibevalley/artifact/html";
+import { shellThemeOf, withShell } from "@vibevalley/artifact/shell";
 import { type Clock, isAbort, systemClock } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import { attachmentPath } from "@vibevalley/protocol";
@@ -13,8 +15,6 @@ import { problemOf, wireJson } from "#/base/json.ts";
 import type { Logger } from "#/infra/log.ts";
 import { counter } from "#/infra/metrics.ts";
 import type { Artifact } from "#/modules/artifact/artifact.ts";
-import { artifactHeaders, artifactPrefix, artifactPrintHeaders } from "#/modules/artifact/policy.ts";
-import { shellThemeOf, withShell } from "#/modules/artifact/shell.ts";
 import { type Attachment, attachmentMax } from "#/platform/attachment/attachment.ts";
 
 import { empty, fileResponse, notFound, replyError, textUpTo } from "./respond.ts";

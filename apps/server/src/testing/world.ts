@@ -14,8 +14,7 @@ import { type Time, wallTime } from "#/infra/time.ts";
 import type { ModelAccess } from "#/modules/agent/durable.ts";
 import { registryOf } from "#/modules/agent/runtime.ts";
 import { explicitMandate } from "#/modules/issue/creation.ts";
-import type { Intake } from "#/modules/issue/intake.ts";
-import { type Issue, intakeOf } from "#/modules/issue/issue.ts";
+import { type Issue, type IssueIntake, intakeOf } from "#/modules/issue/issue.ts";
 import { type GitHubRun, type RepoHooks } from "#/modules/repo/repo.ts";
 import { type Inside, insideOf } from "#/modules/session/session.ts";
 import { type WorkerAccess, type workerAccess } from "#/modules/session/worker.ts";
@@ -102,8 +101,8 @@ export type ModuleWorld = Modules &
   AsyncDisposable & {
     /** The parts behind the session module, for the tests that drive them. */
     readonly inside: Inside;
-    /** The issues' intake (pools, subscriptions, routing), for the tests that drive it. */
-    readonly intake: Intake;
+    /** The issues' intake (pools, subscriptions, routing) and GitHub poller, for the tests that drive them. */
+    readonly intake: IssueIntake;
     readonly close: () => Promise<void>;
     /** What the test's own services close with, after the farm's closes; each is called the last added first. */
     readonly closes: Close[];
@@ -171,9 +170,9 @@ export type World = ModuleWorld & { readonly tool: Tool; readonly mcp: Mcp };
 export async function world(options: WorldOptions = {}): Promise<World> {
   const below = await moduleWorld(options);
   try {
-    const { clock, log, agent, memory, repo, session, channel, media, artifact, pkm, issue, config } = below;
+    const { clock, log, agent, memory, repo, session, channel, media, artifact, pkm, issue, cron, config } = below;
     const own = owning(below.closes);
-    const tool = own(await makeTool({ clock, log, agent, session, issue, channel, memory, media, pkm, artifact, repo }));
+    const tool = own(await makeTool({ clock, log, agent, session, issue, cron, channel, memory, media, pkm, artifact, repo }));
     const mcp = own(await makeMcp({ config, session, tool, log }, options.who ? { who: options.who } : {}));
     return { ...below, tool, mcp };
   } catch (e) {

@@ -6,16 +6,15 @@ import { abortError } from "@vibevalley/async";
 
 import type { Core } from "#/core/core.ts";
 import type { ServerConfig } from "#/infra/config.ts";
-import type { Db } from "#/infra/db.ts";
 import { keptLog } from "#/infra/log.ts";
 import type { PublicFetch } from "#/infra/publicHttp.ts";
 import type { Time } from "#/infra/time.ts";
+import { makeInputs } from "#/modules/media/inputs.ts";
+import { makeMedia } from "#/modules/media/media.ts";
 import { makeProvider } from "#/platform/provider/provider.ts";
-import { testConfig } from "#/testing/layers.ts";
-import { world } from "#/testing/world.ts";
 
-import { makeInputs } from "./inputs.ts";
-import { makeMedia } from "./media.ts";
+import { testConfig } from "./layers.ts";
+import { world } from "./world.ts";
 
 /** A clock that moves only when the test says, from 0; each wait it passes ends in order, and what it woke gets a few turns. */
 export function heldTime() {
@@ -98,20 +97,7 @@ const offline: typeof fetch = async (input) => {
   throw new Error(`no network in tests: ${String(input instanceof Request ? input.url : input)}`);
 };
 
-/** A trigger named name refusing the write on says (before insert on t, before update of c on t), when when holds
- * (a condition on NEW); the write fails with says. */
-export const refuse = async (db: Db, name: string, on: string, when = "", says = name) => {
-  await db.sql.exec(`create function ${name}() returns trigger language plpgsql as $$ begin raise exception '${says.replaceAll("'", "''")}'; end $$`);
-  await db.sql.exec(`create trigger ${name} ${on} for each row ${when ? `when (${when})` : ""} execute function ${name}()`);
-};
-
-/** The write refuse stopped goes through again. */
-export const allow = async (db: Db, name: string) => {
-  for (const row of await db.sql.query("select tgrelid::regclass::text as t from pg_trigger where tgname = $1", [name])) {
-    await db.sql.exec(`drop trigger ${name} on ${String(row["t"])}`);
-  }
-  await db.sql.exec(`drop function ${name}()`);
-};
+export { allow, refuse } from "./refuse.ts";
 
 export interface MediaFarmOptions {
   /** How the vendor answers; no network when absent. */

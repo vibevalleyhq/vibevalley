@@ -1,3 +1,4 @@
+import { artifactProblem, htmlCheck, htmlEdit, htmlProblem } from "@vibevalley/artifact/html";
 import { Semaphore } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
@@ -5,7 +6,7 @@ import { userId } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
-import { head } from "#/base/clip.ts";
+import { head, type QuotedBlock } from "#/base/clip.ts";
 import { BizCode, lookIn, missing, refuseIn } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import type { Db } from "#/infra/db.ts";
@@ -17,9 +18,6 @@ import * as qa from "#db/artifact.sql.ts";
 import * as qv from "#db/artifact_version.sql.ts";
 
 import { makeBlockStore } from "./blocks.ts";
-import { htmlCheck, htmlProblem } from "./check.ts";
-import { htmlEdit } from "./edit.ts";
-import { artifactProblem } from "./policy.ts";
 
 const refused = refuseIn(BizCode.ArtifactRefused);
 const ArtifactDisplayValues = S.Artifact.shape.display.unwrap().options;
@@ -51,6 +49,8 @@ export interface Artifact {
   /** It and its versions or blocks go; the versions' attachments stay. */
   readonly remove: (id: T.ArtifactId) => Promise<void>;
   readonly blocks: (id: T.ArtifactId) => Promise<T.BlockSnapshot>;
+  /** Snapshots the blocks quoted by the user so later edits or deletions remain visible on the message. */
+  readonly quoteBlocks: (refs: readonly T.BlockRef[] | undefined) => Promise<QuotedBlock[]>;
   readonly markdown: (id: T.ArtifactId) => Promise<string>;
   /** A batch of ops from actor (the user, or a helper's profile id): blocks.ts. */
   readonly submit: (id: T.ArtifactId, actor: string, body: Pick<T.BlockSubmit, "batchId" | "ops">) => Promise<T.BlockAck>;
@@ -339,6 +339,27 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
       const list = await blocks.blocks(id);
       const artifact = await assemble(await found(id));
       return { artifact, blocks: list };
+    },
+    quoteBlocks: async (refs) => {
+      const out: QuotedBlock[] = [];
+      for (const ref of refs ?? []) {
+        try {
+          const list = await blocks.blocks(ref.artifactId);
+          const artifact = await found(ref.artifactId);
+          const block = list.find((b) => b.id === ref.blockId);
+          out.push({
+            artifactId: ref.artifactId,
+            blockId: ref.blockId,
+            rev: ref.rev,
+            title: artifact.title,
+            ...(block ? { type: block.type, text: block.text.map((s) => s.t).join(""), nowRev: block.rev } : { deleted: true }),
+          } satisfies QuotedBlock);
+        } catch (e) {
+          // A block that cannot be read is left out of the quote: the message still goes.
+          log.warn("quoting a block failed", e);
+        }
+      }
+      return out;
     },
     markdown: blocks.markdown,
     submit: blocks.submit,

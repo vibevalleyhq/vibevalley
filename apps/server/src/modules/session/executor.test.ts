@@ -6,6 +6,8 @@ import { issueId } from "@vibevalley/protocol/schema";
 import { starter, until } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 
+import { workSessionPolicy } from "./session.ts";
+
 test("regression: cancelling a close caller leaves disposal owned by the executor", async () => {
   const { promise: disposing, resolve: entered } = Promise.withResolvers<void>();
   const { promise: gate, resolve: release } = Promise.withResolvers<void>();
@@ -42,7 +44,9 @@ test("regression: cancelling a close caller leaves disposal owned by the executo
     const agent = { ...starter("lab"), effort: "" };
     await farm.agent.save(agent);
     const { session: hired } = await sessions.hire(agent, "work", "demo", {
-      context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } },
+      scope: { kind: "issue", id: issueId("i1") },
+      policy: workSessionPolicy,
+      checkoutNumber: 1,
       hiring: async (session) => {
         expect(executor.find(session.id)?.attached).toBe(false);
         const stopped2 = await sessions.stop(session.id);
@@ -53,7 +57,7 @@ test("regression: cancelling a close caller leaves disposal owned by the executo
     const id = hired.id;
     await until(() => sessions.sessionOf(id)?.phase._tag === "working", "the active turn");
     const acquired = executor.find(id)!;
-    expect(Object.keys(acquired.owner).toSorted()).toEqual(["agent", "id", "issue", "repo", "runtime"]);
+    expect(Object.keys(acquired.owner).toSorted()).toEqual(["agent", "id", "repo", "runtime", "scope"]);
     expect(Object.keys(acquired).toSorted()).toEqual(["attached", "closing", "owner", "pendingTasks", "sessionId"]);
     const caller = new AbortController();
     const closing = executor.close(id, caller.signal).catch((e: unknown) => e);

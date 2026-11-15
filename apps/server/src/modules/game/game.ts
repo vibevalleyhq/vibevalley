@@ -44,10 +44,6 @@ export interface Game {
   readonly record: (entry: Entry) => Promise<void>;
   /** Commits on every repo, a repository with several worktrees once: "yours" by author email. */
   readonly count: () => Promise<CommitCount>;
-  /** The count and its write, serialized with run-end refreshes. */
-  readonly refresh: () => Promise<void>;
-  /** How many runs' ends asked for a count. */
-  readonly asked: () => number;
   /** The commits counted now and every two minutes, once the farm is up. */
   readonly boot: () => Promise<void>;
   readonly close: () => Promise<void>;
@@ -105,11 +101,9 @@ export async function makeGame(deps: GameDeps): Promise<Game> {
   // The ticker and a run's end both count: one at a time, so an older count never lands after a newer one.
   const counting = new Semaphore(1);
   const refresh = () => counting.with(async () => core.setCommits(await count()));
-  let asked = 0;
   let pending = false;
   // Several runs share one count.
   const soon = () => {
-    asked++;
     if (pending) return;
     pending = true;
     tasks.run("count after a run", async (signal) => {
@@ -160,8 +154,6 @@ export async function makeGame(deps: GameDeps): Promise<Game> {
     },
     record,
     count,
-    refresh,
-    asked: () => asked,
     boot: async () => {
       tasks.run("count", async (signal) => {
         while (true) {

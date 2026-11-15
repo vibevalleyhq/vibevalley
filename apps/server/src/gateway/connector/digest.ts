@@ -1,7 +1,9 @@
 import { t } from "@vibevalley/i18n";
 // What the chat apps are sent: which farm messages reach the user, as plain text, cut to what each app takes. a digest of what waited.
 import type * as T from "@vibevalley/protocol";
-import { actorRoleOf, slice } from "@vibevalley/protocol/rules";
+import { actorRoleOf } from "@vibevalley/protocol/rules";
+
+import { slice } from "#/base/clip.ts";
 
 /** In UTF-16 units; longer ones are cut. */
 export const maxChars: Record<T.ConnectorID, number> = { weixin: 1800, feishu: 4000, qq: 2000 };

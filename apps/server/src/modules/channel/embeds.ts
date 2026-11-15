@@ -3,7 +3,8 @@ import { isIP } from "node:net";
 import type { ReadableStreamDefaultReader } from "node:stream/web";
 
 import type { Embed } from "@vibevalley/protocol";
-import { cut } from "@vibevalley/protocol/rules";
+
+import { cut } from "#/base/clip.ts";
 /** At most this many links of a message get a preview. */
 const embedMax = 3;
 const timeoutMs = 3000;

@@ -3,9 +3,25 @@ import { z } from "zod";
 import { Actor, ChannelType, CriterionCheck, IssueAnswer, IssueId, MessageId, Question, QuotedBlock, RunTrigger, type Wire } from "@vibevalley/protocol/schema";
 
 import type * as T from "./shapes.ts";
-import { GithubTriggerEventValues, IssueReportMemoryScopeValues, TriggerAddressingValues, TriggerSourceValues, VoiceModeValues } from "./shapes.ts";
+import {
+  GithubTriggerEventValues,
+  IssueReportMemoryScopeValues,
+  SessionEvictActionValues,
+  SessionWorkplaceValues,
+  TriggerAddressingValues,
+  TriggerSourceValues,
+  VoiceModeValues,
+} from "./shapes.ts";
 
 type Codec<A> = z.ZodType<A, Wire<A>>;
+
+export const SessionPolicy = z.object({
+  workplace: z.enum(SessionWorkplaceValues),
+  onEvict: z.enum(SessionEvictActionValues),
+  restAfterTurn: z.boolean(),
+  idleSuspend: z.boolean(),
+  structuredReport: z.boolean(),
+}) satisfies Codec<T.SessionPolicy>;
 
 export const IssueReportMemory = z.object({
   text: z.string(),

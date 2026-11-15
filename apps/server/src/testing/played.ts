@@ -132,7 +132,9 @@ export async function playedSessions(x: FakeSessions, deps: PlayedSessionsDeps):
     runtime: "vibevalley",
     brief: "",
     repo: null,
-    issue: null,
+    scope_kind: null,
+    scope_id: null,
+    policy: null,
     channel: null,
     hired_at: 0,
     machine: null,
@@ -183,7 +185,7 @@ export async function playedSessions(x: FakeSessions, deps: PlayedSessionsDeps):
 
 export const keepPlayedSession = (db: Db, session: T.Session): Promise<number> =>
   db.sql.exec(
-    `insert into session (id, role, agent, name, runtime, brief, repo, issue, channel, hired_at, phase, refining, runs)
+    `insert into session (id, role, agent, name, runtime, brief, repo, scope_kind, scope_id, channel, hired_at, phase, runs)
      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) on conflict (id) do nothing`,
     [
       session.id,
@@ -193,11 +195,11 @@ export const keepPlayedSession = (db: Db, session: T.Session): Promise<number> =
       session.runtime,
       session.brief,
       session.repo ?? null,
-      session.issue ?? null,
+      session.scope?.kind ?? null,
+      session.scope?.id ?? null,
       session.channel ?? null,
       session.hiredAt,
       jsonText(session.phase),
-      session.refining,
       session.runs,
     ],
   );

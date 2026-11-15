@@ -2,20 +2,20 @@ import { z } from "zod";
 
 import type { Clock } from "@vibevalley/async";
 import type * as T from "@vibevalley/protocol";
-import { sessionId } from "@vibevalley/protocol/schema";
+import { messageId, sessionId } from "@vibevalley/protocol/schema";
 
 import { Inconsistent } from "#/base/errors.ts";
 import { jsonOf, jsonText } from "#/base/json.ts";
 import { type Db, SqlError, causeMessage } from "#/infra/db.ts";
-import type { Agent } from "#/modules/agent/agent.ts";
+import type { ProfileStore } from "#/modules/agent/agent.ts";
 import * as qd from "#db/session_delivery.sql.ts";
 import * as qr from "#db/session_trigger.sql.ts";
 
 import type { Deliveries, DeliveryDraft, DeliveryRow } from "./deliveries.ts";
-import { channelType, type Delivery } from "./envelope.ts";
+import type { Delivery } from "./envelope.ts";
 import { type Lifecycle, NotRecorded } from "./lifecycle.ts";
-import type { InsertDelivery, TalkRow } from "./mailbox.ts";
-import { deliveryScope, triggerPayload } from "./payload.ts";
+import type { InsertDelivery, TalkOrder } from "./mailbox.ts";
+import { deliveryScope, inputContext, triggerPayload } from "./payload.ts";
 import { deliveryDraftOf, urgencyOf } from "./routing.ts";
 import * as S from "./schema.ts";
 import type { Trigger } from "./shapes.ts";
@@ -33,7 +33,7 @@ export interface WorkDeps {
   readonly db: Db;
   readonly clock: Clock;
   readonly session: Lifecycle;
-  readonly agent: Agent;
+  readonly agent: ProfileStore;
 }
 
 /** A write that could not be kept, as NotRecorded: what a session's start stops on and reports. */
@@ -121,14 +121,14 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
     }
   };
 
-  const registerInitialInputs = (session: T.Session, launch: string, inputs: readonly Trigger[]): Promise<void> =>
+  const registerInitialInputs = (session: T.Session, launch: string, inputs: readonly Trigger[], issue?: T.IssueId): Promise<void> =>
     writtenLocked(async () => {
       const at = clock.now();
       const fallback = await defaultChannel();
       const destination = (trigger: Trigger) => trigger.replyChannel ?? session.channel ?? fallback;
       const rows: DeliveryDraft[] = inputs.map((trigger) => ({
         envelope_id: trigger.id,
-        scope: deliveryScope(destination(trigger), session.issue),
+        scope: deliveryScope(destination(trigger), issue),
         message_id: null,
         channel_id: destination(trigger),
         source: trigger.source,
@@ -139,7 +139,7 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
         state: "handed",
         launch,
         created_at: at,
-        payload: triggerPayload(trigger, session.issue),
+        payload: triggerPayload(trigger, issue),
       }));
       await commitHanded(session.id, launch, at, rows);
     });
@@ -154,12 +154,12 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
     );
   };
 
-  const registerTalk = (session: T.SessionId, launch: string, at: number, rows: readonly TalkRow[]): Promise<void> =>
+  const registerTalk = (session: T.SessionId, launch: string, at: number, rows: readonly TalkOrder[]): Promise<void> =>
     writtenLocked(async () => {
       const prepared: DeliveryDraft[] = [];
       for (const talk of rows) {
-        const recorded = await qr.triggerById(db.sql, { id: talk.row.envelope_id });
-        if (!recorded) throw new Inconsistent(`talk ${talk.row.envelope_id} has no recorded trigger`);
+        const recorded = await qr.triggerById(db.sql, { id: talk.envelope.id });
+        if (!recorded) throw new Inconsistent(`talk ${talk.envelope.id} has no recorded trigger`);
         let trigger: Trigger;
         try {
           trigger = readTrigger(recorded.trigger_json);
@@ -168,10 +168,10 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
         }
         const urgency = urgencyOf({ source: trigger.source, actor: "user", recipient: "worker", event: "conversation", canSteer: true });
         prepared.push({
-          envelope_id: talk.row.envelope_id,
-          scope: deliveryScope(talk.row.channel_id, talk.row.subject_kind === "issue" ? (talk.row.subject_id ?? undefined) : undefined),
-          message_id: talk.row.envelope_id,
-          channel_id: talk.row.channel_id,
+          envelope_id: talk.envelope.id,
+          scope: deliveryScope(talk.channel, talk.issue),
+          message_id: messageId(talk.envelope.id),
+          channel_id: talk.channel,
           source: trigger.source,
           urgency,
           reason: "direct",
@@ -182,8 +182,8 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
           created_at: at,
           payload: {
             trigger,
-            context: talk.context,
-            channelType: channelType(talk.row.channel_type),
+            context: inputContext(talk.envelope),
+            channelType: talk.channelType,
           },
         });
       }

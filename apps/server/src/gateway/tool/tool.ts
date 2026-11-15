@@ -6,9 +6,10 @@ import type { Who } from "#/base/actor.ts";
 import { head } from "#/base/clip.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Agent } from "#/modules/agent/agent.ts";
+import type { ProfileStore } from "#/modules/agent/agent.ts";
 import type { Artifact } from "#/modules/artifact/artifact.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
+import type { Cron } from "#/modules/issue/cron.ts";
 import type { Issue } from "#/modules/issue/issue.ts";
 import type { Media } from "#/modules/media/media.ts";
 import type { Memory } from "#/modules/memory/memory.ts";
@@ -44,9 +45,10 @@ export interface Tool {
 export interface ToolDeps {
   readonly clock: Time;
   readonly log: Logger;
-  readonly agent: Agent;
+  readonly agent: ProfileStore;
   readonly session: Session;
   readonly issue: Issue;
+  readonly cron: Cron;
   readonly channel: Channel;
   readonly memory: Memory;
   readonly pkm: Pkm;

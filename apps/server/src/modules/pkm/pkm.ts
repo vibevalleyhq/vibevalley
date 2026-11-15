@@ -3,7 +3,9 @@ import { join } from "node:path";
 
 import { Semaphore } from "@vibevalley/async";
 import { list, t } from "@vibevalley/i18n";
-import { flatBlocks, slugOf } from "@vibevalley/pkm";
+import { applyOps, carryIds, edgesOf, find, type Node, outlineOf, type Page, parse, print, spansOf, walk, withoutSpans } from "@vibevalley/pkm/markdown";
+import { flatBlocks, slugOf } from "@vibevalley/pkm/outline";
+import { fileNameOf, fileOf, journalTitle, journalTitleOf, ownFolder, tierFolder, titleOfFile } from "@vibevalley/pkm/para";
 import { userId } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 
@@ -37,9 +39,6 @@ import {
   type Vault,
   wireOf,
 } from "./graph.ts";
-import { applyOps } from "./ops.ts";
-import { carryIds, edgesOf, find, type Node, outlineOf, type Page, parse, print, spansOf, walk, withoutSpans } from "./outline.ts";
-import { fileNameOf, fileOf, journalTitle, journalTitleOf, ownFolder, tierFolder, titleOfFile } from "./para.ts";
 
 const refused = refuseIn(BizCode.PkmRefused);
 

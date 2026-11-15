@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 import type * as T from "@vibevalley/protocol";
-import { issueId } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
 import { jsonOf, jsonText, storedJsonOrUndefined } from "#/base/json.ts";
@@ -10,11 +9,14 @@ import type * as qs from "#db/session.sql.ts";
 import type * as qr from "#db/session_run.sql.ts";
 
 import { isOnDuty } from "./roster.ts";
-import { IssueReport as IssueReportSchema } from "./schema.ts";
+import { IssueReport as IssueReportSchema, SessionPolicy as SessionPolicySchema } from "./schema.ts";
+import { dutySessionPolicy, type SessionPolicy } from "./shapes.ts";
 
 const triggerOf = storedJsonOrUndefined(S.RunTrigger, "session_run.triggered_by");
 export const heardOf = storedJsonOrUndefined(z.array(z.string()), "session_run.heard");
 export const pendingReportOf = storedJsonOrUndefined(IssueReportSchema, "session.pending_report");
+const policyJsonOf = storedJsonOrUndefined(SessionPolicySchema, "session.policy");
+export const policyOf = (raw: string | null): SessionPolicy => policyJsonOf(raw) ?? dutySessionPolicy;
 const spentOf = storedJsonOrUndefined(S.Spent, "session_run.spent");
 const phaseOf = jsonOf(S.Phase, "session.phase");
 const lastRunOf = jsonOf(S.LastRun, "session.last_run");
@@ -23,6 +25,15 @@ export const placeOf = storedJsonOrUndefined(
   z.object({ repo: z.string(), cwd: z.string(), branch: z.exactOptional(z.string()) }) satisfies z.ZodType<Workplace>,
   "session.place",
 );
+
+const scopeOf = (kind: T.SessionScope["kind"] | null, id: string | null): T.SessionScope | undefined =>
+  kind !== null && id !== null ? { kind, id } : undefined;
+
+export const scopeRow = (scope?: T.SessionScope): { readonly scope_kind: T.SessionScope["kind"] | null; readonly scope_id: string | null } => {
+  if (!scope) return { scope_kind: null, scope_id: null };
+  const { kind, id } = scope;
+  return { scope_kind: kind, scope_id: id };
+};
 
 export function runOf(r: qr.RunsOfSessionResult): T.Run {
   const run: T.Run = {
@@ -33,7 +44,6 @@ export function runOf(r: qr.RunsOfSessionResult): T.Run {
     startedAt: r.started_at,
     summary: r.summary ?? "",
   };
-  if (r.issue !== null) run.issue = issueId(r.issue);
   if (r.ended_at !== null) run.endedAt = r.ended_at;
   if (r.outcome !== null) run.outcome = r.outcome;
   const spent = spentOf(r.spent);
@@ -44,6 +54,7 @@ export function runOf(r: qr.RunsOfSessionResult): T.Run {
 /** An ended session as the core state would have had it: its runs counted, its last one's word, what it spent in all. */
 
 export function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSessionResult[]): T.Session {
+  const scope = scopeOf(r.scope_kind, r.scope_id);
   const s: T.Session = {
     id: r.id,
     role: r.role,
@@ -54,10 +65,9 @@ export function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSe
     hiredAt: r.hired_at,
     runs: runs.length,
     phase: { _tag: "closed", at: r.ended_at ?? 0, closed: r.closed ?? "dismissed" },
-    refining: false,
     ...(r.repo !== null ? { repo: r.repo } : {}),
     ...(r.machine !== null ? { machine: r.machine } : {}),
-    ...(r.issue !== null ? { issue: issueId(r.issue) } : {}),
+    ...(scope ? { scope } : {}),
     ...(r.channel !== null ? { channel: r.channel } : {}),
   };
   let tokens = 0;
@@ -81,7 +91,6 @@ export function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSe
 export const sessionState = (s: T.Session): qs.KeepSessionStateParams => ({
   id: s.id,
   phase: jsonText(s.phase),
-  refining: s.refining,
   runs: s.runs,
   last_run: s.lastRun ? jsonText(s.lastRun) : null,
   spent: s.spent ? jsonText(s.spent) : null,
@@ -93,6 +102,7 @@ export function restoredSession(row: qs.ActiveSessionsResult): T.Session {
   const lastRun = row.last_run === null ? undefined : lastRunOf(row.last_run);
   const spent = row.spent === null ? undefined : strictSpentOf(row.spent);
   const place = row.place === null ? undefined : placeOf(row.place);
+  const scope = scopeOf(row.scope_kind, row.scope_id);
   return {
     id: row.id,
     role: row.role,
@@ -101,12 +111,11 @@ export function restoredSession(row: qs.ActiveSessionsResult): T.Session {
     runtime: row.runtime,
     brief: row.brief,
     hiredAt: row.hired_at,
-    refining: row.refining,
     runs: row.runs,
     phase: isOnDuty(row) ? { _tag: "resting" } : phase,
     ...(row.repo === null ? {} : { repo: row.repo }),
     ...(row.machine === null ? {} : { machine: row.machine }),
-    ...(row.issue === null ? {} : { issue: issueId(row.issue) }),
+    ...(scope ? { scope } : {}),
     ...(row.channel === null ? {} : { channel: row.channel }),
     ...(place?.branch ? { branch: place.branch, worktree: place.cwd } : {}),
     ...(lastRun ? { lastRun } : {}),

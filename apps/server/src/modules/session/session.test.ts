@@ -22,7 +22,7 @@ import { starter, testConfig, until, waitFor } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 
 import { watchStalls } from "./executor.ts";
-import { DeliveryRefused, HireRefused, NotRecorded } from "./session.ts";
+import { DeliveryRefused, HireRefused, NotRecorded, workSessionPolicy } from "./session.ts";
 import type { SessionNews, DeliveryInput } from "./signals.ts";
 import type { WorkerAccess } from "./worker.ts";
 const lab = (): T.Agent => ({ ...starter("lab"), effort: "" });
@@ -102,7 +102,7 @@ describe("sessions", () => {
       lab(),
       "interrupted",
       "demo",
-      { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true },
+      { scope: { kind: "issue", id: issueId("i1") }, policy: workSessionPolicy, checkoutNumber: 1, worktree: true },
       interrupt.signal,
     );
     await opening;
@@ -111,7 +111,12 @@ describe("sessions", () => {
     await sending.catch(() => undefined);
     expect(disposed).toBe(1);
     expect(sessions.noRoom("pi", "demo")).toBe("");
-    const again = await sessions.hire(lab(), "again", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true });
+    const again = await sessions.hire(lab(), "again", "demo", {
+      scope: { kind: "issue", id: issueId("i1") },
+      policy: workSessionPolicy,
+      checkoutNumber: 1,
+      worktree: true,
+    });
     expect(again.session).toBeDefined();
   });
 
@@ -137,7 +142,12 @@ describe("sessions", () => {
     const sessions = farm.inside;
     const core = farm.core;
     await farm.agent.save(lab());
-    const sent = await sessions.hire(lab(), "first run", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true });
+    const sent = await sessions.hire(lab(), "first run", "demo", {
+      scope: { kind: "issue", id: issueId("i1") },
+      policy: workSessionPolicy,
+      checkoutNumber: 1,
+      worktree: true,
+    });
     const id = sent.session.id;
     await until(() => phase(core, id) === "done", "the initial report");
     await failure(
@@ -195,7 +205,12 @@ describe("sessions", () => {
       const sessions = farm.inside;
       const core = farm.core;
       await farm.agent.save(lab());
-      const sent = await sessions.hire(lab(), "first run", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true });
+      const sent = await sessions.hire(lab(), "first run", "demo", {
+        scope: { kind: "issue", id: issueId("i1") },
+        policy: workSessionPolicy,
+        checkoutNumber: 1,
+        worktree: true,
+      });
       const id = sent.session.id;
       await until(() => phase(core, id) === "done", "the initial report");
       await failure(
@@ -240,7 +255,12 @@ describe("sessions", () => {
     try {
       const sessions = farm.inside;
       const core = farm.core;
-      const sent = await sessions.hire(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } }, worktree: true });
+      const sent = await sessions.hire(lab(), "work", "demo", {
+        scope: { kind: "issue", id: issueId("i1") },
+        policy: workSessionPolicy,
+        checkoutNumber: 1,
+        worktree: true,
+      });
       const id = sent.session.id;
       await until(() => phase(core, id) === "done", "the report");
       const before = { lastText: sessions.lastTextOf(id), cwd: sessions.cwdOf(id)! };
@@ -275,7 +295,9 @@ describe("sessions", () => {
     })();
 
     const hired = await sessions.hire(lab(), "给打卡接口加分页", "demo", {
-      context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } },
+      scope: { kind: "issue", id: issueId("i1") },
+      policy: workSessionPolicy,
+      checkoutNumber: 1,
       worktree: true,
     });
     const id = hired.session.id;
@@ -361,7 +383,7 @@ describe("sessions", () => {
     try {
       const sessions = farm.inside;
       const core = farm.core;
-      const sent = await sessions.hire(lab(), "first", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } } });
+      const sent = await sessions.hire(lab(), "first", "demo", { scope: { kind: "issue", id: issueId("i1") }, policy: workSessionPolicy, checkoutNumber: 1 });
       const id = sent.session.id;
       await until(() => phase(core, id) === "done", "the initial report");
       expect((await sessions.deliver(id, "second", delivery({ kind: "comment" }))).kind).toBe("run");
@@ -375,7 +397,9 @@ describe("sessions", () => {
           for (const deliver of pending.splice(0)) deliver();
           await until(() => phase(core, id) === "working", "the buffered turn started");
         }
-        const got = await failure(sessions.hire(lab(), "another", "demo", { context: { kind: "issue", issue: { id: issueId("i2"), number: 2 } } }));
+        const got = await failure(
+          sessions.hire(lab(), "another", "demo", { scope: { kind: "issue", id: issueId("i2") }, policy: workSessionPolicy, checkoutNumber: 2 }),
+        );
         expect([got instanceof HireRefused, got instanceof HireRefused && got.reason !== "", opens]).toEqual([true, true, 1]);
       }
       complete();
@@ -431,7 +455,9 @@ describe("sessions", () => {
     const sessions = farm.inside;
     const got = await failure(
       sessions.hire(lab(), "another", "demo", {
-        context: { kind: "issue", issue: { id: issueId("i2"), number: 2 } },
+        scope: { kind: "issue", id: issueId("i2") },
+        policy: workSessionPolicy,
+        checkoutNumber: 2,
         hiring: async () => {
           try {
             await farm.db.sql.query("select no_such_column from issue_assignment");
@@ -452,7 +478,9 @@ describe("sessions", () => {
     const sessions = farm.inside;
     const got = await failure(
       sessions.hire(lab(), "another", "demo", {
-        context: { kind: "issue", issue: { id: issueId("i2"), number: 2 } },
+        scope: { kind: "issue", id: issueId("i2") },
+        policy: workSessionPolicy,
+        checkoutNumber: 2,
         hiring: async () => {
           throw new Error("registration bug");
         },
@@ -460,7 +488,7 @@ describe("sessions", () => {
     );
     expect(got).not.toBeInstanceOf(HireRefused);
     expect(got).toMatchObject({ message: "registration bug" });
-    const next = await sessions.hire(lab(), "another", "demo", { context: { kind: "issue", issue: { id: issueId("i3"), number: 3 } } });
+    const next = await sessions.hire(lab(), "another", "demo", { scope: { kind: "issue", id: issueId("i3") }, policy: workSessionPolicy, checkoutNumber: 3 });
     expect(next.session).toBeDefined();
   });
 
@@ -489,7 +517,9 @@ describe("sessions", () => {
       using events = core.subscribe();
       const got = await failure(
         sessions.hire(lab(), "work", "demo", {
-          context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } },
+          scope: { kind: "issue", id: issueId("i1") },
+          policy: workSessionPolicy,
+          checkoutNumber: 1,
           hiring: async () => {
             throw new Error("registration bug");
           },
@@ -509,7 +539,9 @@ describe("sessions", () => {
       expect(closes).toBe(1);
       expect(sessions.noRoom("pi", "demo")).not.toBe("");
       expect(sessions.hired()).toEqual([]);
-      const next = await failure(sessions.hire(lab(), "again", "demo", { context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } } }));
+      const next = await failure(
+        sessions.hire(lab(), "again", "demo", { scope: { kind: "issue", id: issueId("i1") }, policy: workSessionPolicy, checkoutNumber: 1 }),
+      );
       expect(next).toBeInstanceOf(HireRefused);
       expect(next).toMatchObject({ name: "HireRefused", retainedWork: true });
     } finally {
@@ -543,7 +575,9 @@ test("regression: failed CLI authentication revokes the credential and starts no
     ),
   });
   const sessions = farm.inside;
-  const hired = await failure(sessions.hire(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("probe"), number: 1 } }, worktree: true }));
+  const hired = await failure(
+    sessions.hire(lab(), "work", "demo", { scope: { kind: "issue", id: issueId("probe") }, policy: workSessionPolicy, checkoutNumber: 1, worktree: true }),
+  );
   expect(hired).toBeInstanceOf(HireRefused);
   expect(hired).toMatchObject({ reason: expect.stringContaining("认证请求失败") });
   expect(started).toBe(0);
@@ -571,7 +605,12 @@ test("regression: session service shutdown revokes issued credentials", async ()
       }),
     });
     const sessions = farm.inside;
-    const result = await sessions.hire(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("scope"), number: 1 } }, worktree: true });
+    const result = await sessions.hire(lab(), "work", "demo", {
+      scope: { kind: "issue", id: issueId("scope") },
+      policy: workSessionPolicy,
+      checkoutNumber: 1,
+      worktree: true,
+    });
     expect(result.session).toBeDefined();
     expect(sessions.who(token)).not.toBe("");
     who = sessions.who;
@@ -619,7 +658,7 @@ for (const mode of ["refused", "failed", "interrupted"] as const) {
       agent,
       "work",
       "demo",
-      { context: { kind: "issue", issue: { id: issueId("probe"), number: 1 } }, worktree: true },
+      { scope: { kind: "issue", id: issueId("probe") }, policy: workSessionPolicy, checkoutNumber: 1, worktree: true },
       interrupt.signal,
     );
     if (mode === "interrupted") {
@@ -656,7 +695,12 @@ test("regression: reopening a session rotates its credential before delivering t
   });
   const sessions = farm.inside;
   await farm.agent.save(lab());
-  const result = await sessions.hire(lab(), "work", "demo", { context: { kind: "issue", issue: { id: issueId("rotation"), number: 1 } }, worktree: true });
+  const result = await sessions.hire(lab(), "work", "demo", {
+    scope: { kind: "issue", id: issueId("rotation") },
+    policy: workSessionPolicy,
+    checkoutNumber: 1,
+    worktree: true,
+  });
   const id = result.session.id;
   await until(() => sessions.sessionOf(id)?.phase._tag !== "working", "first turn ended");
   const suspend2 = await sessions.suspend(id);

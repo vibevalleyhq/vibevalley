@@ -11,10 +11,10 @@ export const isOnDuty = (who: { readonly role: T.AgentRole }): boolean => who.ro
 export const isHired = (who: { readonly role: T.AgentRole }): boolean => who.role === "worker";
 export const sessionOf = (state: T.SpaceState, id: string) => state.sessions.find((h) => h.id === id);
 
-/** The session working the issue now: the latest hired of those on it. */
-export function sessionOnIssue(state: T.SpaceState, issue: string): T.Session | undefined {
+/** The session working on this scope now: the latest hired of those on it. */
+export function sessionOnScope(state: T.SpaceState, scopeId: string): T.Session | undefined {
   let on: T.Session | undefined;
-  for (const h of state.sessions) if (h.issue === issue && (!on || h.hiredAt >= on.hiredAt)) on = h;
+  for (const h of state.sessions) if (h.scope?.id === scopeId && (!on || h.hiredAt >= on.hiredAt)) on = h;
   return on;
 }
 

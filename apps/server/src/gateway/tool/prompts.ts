@@ -1,17 +1,16 @@
+import { artifactMax, htmlSources, type HtmlWarning } from "@vibevalley/artifact/html";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { IssueStatusValues, PriorityValues } from "@vibevalley/protocol";
 import type { Handlers } from "@vibevalley/protocol/api";
-import { phaseText, shortTitle, stageWantsUser } from "@vibevalley/protocol/rules";
+import { shortTitle, stageWantsUser } from "@vibevalley/protocol/rules";
 
 import { head } from "#/base/clip.ts";
 import { runtimeLabel } from "#/modules/agent/presets.ts";
 import { yuan } from "#/modules/agent/quota.ts";
-import type { HtmlWarning } from "#/modules/artifact/check.ts";
-import { artifactMax, htmlSources } from "#/modules/artifact/policy.ts";
 import { mandateNoteWordLimit } from "#/modules/issue/creation.ts";
 import { nextText, whenText } from "#/modules/issue/when.ts";
-import { pkmHitLine } from "#/modules/orchestrator/prompts.ts";
+import { phaseText } from "#/modules/session/report.ts";
 
 type Op = keyof Handlers;
 
@@ -52,6 +51,13 @@ export function changesText(c: T.Changes): string {
   lines.push(c.conflicts.length > 0 ? "合进去会冲突：" + c.conflicts.join("、") + "。完成前要先让它解决。" : "能干净地合进去。");
   return lines.join("\n");
 }
+
+/** A channel as the orchestrator's situation and the channel_list tool show it. */
+export const channelLine = (c: { readonly name: string; readonly default?: boolean; readonly description?: string; readonly repo?: string }) =>
+  "#" + c.name + (c.default === true ? "（默认）" : "") + (c.description ? "：" + c.description : "") + (c.repo ? "（默认仓库 " + c.repo + "）" : "");
+
+/** A note search hit as the orchestrator's recall and the pkm_search tool show it. */
+export const pkmHitLine = (h: T.PkmSearchHit) => `- 〔${h.block}〕《${h.pageTitle}》${h.path ? h.path + " › " : ""}${h.marker ? h.marker + " " : ""}${h.plain}`;
 
 /** How a session reads to the orchestrator, in its situation as session_list gives it; number is its issue's. */
 export function sessionLine(h: T.Session, now: number, number?: number): string {

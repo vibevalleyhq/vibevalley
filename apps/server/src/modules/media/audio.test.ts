@@ -9,6 +9,7 @@ import { BizCode } from "@vibevalley/protocol/api";
 import type { PublicFetch } from "#/infra/publicHttp.ts";
 import { wav } from "#/modules/media/testdata/audio.ts";
 import { waitFor } from "#/testing/layers.ts";
+import { downloads, hours, mediaFarm, never, vendor } from "#/testing/media.ts";
 import * as q from "#db/media_job.sql.ts";
 
 import { audioKinds, makeAudio } from "./audio.ts";
@@ -16,7 +17,6 @@ import { makeInputs } from "./inputs.ts";
 import { newJob } from "./job.ts";
 import { makeMachine } from "./machine.ts";
 import { makeRemoteFiles } from "./remoteFiles.ts";
-import { downloads, hours, mediaFarm, never, vendor } from "./testing.ts";
 
 const notIn = (value: unknown, secret: string) => {
   expect(JSON.stringify(value)).not.toContain(secret);

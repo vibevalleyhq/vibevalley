@@ -9,7 +9,7 @@ import type { Workplace } from "#/modules/repo/workplace.ts";
 
 import type { Journal } from "./journal.ts";
 import type { Tracking } from "./reaction.ts";
-import type { IssueReport } from "./shapes.ts";
+import type { IssueReport, SessionPolicy } from "./shapes.ts";
 
 /** The platform's AsyncDisposableStack (Node 24), as far as a hand uses it: cleanups run last-added first, once. */
 export interface HandStack extends AsyncDisposable {
@@ -37,8 +37,7 @@ export interface Hand {
   /** What closes when the hand leaves (its log, its credential): disposed once, last-deferred first. */
   readonly stack: HandStack;
   readonly place: Workplace;
-  /** Retained for run attribution even while the session is between assignments. */
-  readonly issue: T.IssueId | undefined;
+  readonly policy: SessionPolicy;
   readonly access: Semaphore;
   readonly journal: Journal;
   /** `""` between launches. */

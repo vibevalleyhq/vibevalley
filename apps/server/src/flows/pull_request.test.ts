@@ -265,8 +265,8 @@ describe("a pull request", () => {
           at: 1,
           meta: { repo: "clock", pr: 7, kind: "review", botRound: 1, botRoundKey: "review-bot[bot]:review:R1" },
         });
-        await issues.pollGitHub();
-        await issues.pollGitHub();
+        await fw.intake.pollGitHub();
+        await fw.intake.pollGitHub();
         const sql = sqlOf(fw.db);
         const inputs = await sql<{ key: string; kind: string; reason: string | null }>`
             select t.source_key as key, t.trigger_json::jsonb->'meta'->>'kind' as kind, m.reason
@@ -290,16 +290,16 @@ describe("a pull request", () => {
         expect(thread.threadId).toBe("PRRT_9");
         expect(thread.comments).toHaveLength(6);
         head = "head-8";
-        await issues.pollGitHub();
+        await fw.intake.pollGitHub();
         const late = await sql<{
           round: number;
         }>`select (trigger_json::jsonb->'meta'->>'botRound')::int as round from session_trigger where source_key = 'clock#7:comment:PRRC_15'`;
         expect(late[0]?.round).toBe(1);
         expect(resolvedThreads).toEqual([]);
         conclusion = "SUCCESS";
-        await issues.pollGitHub();
+        await fw.intake.pollGitHub();
         conclusion = "FAILURE";
-        await issues.pollGitHub();
+        await fw.intake.pollGitHub();
         expect((await sql<{ n: number }>`select count(*) as n from session_trigger where trigger_json::jsonb->'meta'->>'kind' = 'ci'`)[0]?.n).toBe(4);
         expect(resolvedThreads).toEqual([]);
         const released = (

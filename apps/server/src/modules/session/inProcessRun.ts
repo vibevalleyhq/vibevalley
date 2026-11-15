@@ -3,7 +3,7 @@ import type { AssistantMessage, UserMessage } from "@earendil-works/pi-ai";
 import type { ToolResult } from "@vibevalley/agent/core/tool";
 import type { Clock } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
-import type { IssueId, Outcome, RunTrigger, SessionId, Spent } from "@vibevalley/protocol";
+import type { Outcome, RunTrigger, SessionId, Spent } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { Inconsistent } from "#/base/errors.ts";
@@ -14,8 +14,8 @@ import { messageText } from "#/modules/agent/durable.ts";
 import * as qr from "#db/session_run.sql.ts";
 
 import type { Journal } from "./journal.ts";
+import type { RunStore } from "./lifecycle.ts";
 import type { ToolStart } from "./reaction.ts";
-import type { RunStore } from "./registry.ts";
 
 /** A failed start asked while another run is still going: it is not recorded as its own run. */
 export class RunBusy extends Error {
@@ -212,8 +212,8 @@ export function recording(deps: { readonly db: Db; readonly clock: Clock }) {
   return {
     // The times are read as each is asked for, before the row is written; a caller that queues the write passes the
     // time the run started, so an input consumed meanwhile is never dated before its run.
-    start: async (id: string, session: SessionId, issue: IssueId | undefined, trigger: RunTrigger, at = clock.now()) => {
-      await tried(() => qr.startRun(db.sql, { id, session, issue: issue ?? null, triggered_by: jsonText(trigger), started_at: at }));
+    start: async (id: string, session: SessionId, trigger: RunTrigger, at = clock.now()) => {
+      await tried(() => qr.startRun(db.sql, { id, session, triggered_by: jsonText(trigger), started_at: at }));
     },
     heard: async (id: string, heard: readonly string[]) => {
       await tried(() => qr.heardInRun(db.sql, { heard: jsonText(heard), id }));

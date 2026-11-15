@@ -11,6 +11,7 @@ import { Semaphore, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { userId } from "@vibevalley/protocol";
+import { issueScopeOf } from "@vibevalley/protocol/rules";
 import { messageId, sessionId } from "@vibevalley/protocol/schema";
 
 import { head } from "#/base/clip.ts";
@@ -20,14 +21,14 @@ import type { ServerConfig } from "#/infra/config.ts";
 import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Agent } from "#/modules/agent/agent.ts";
-import type { Channel } from "#/modules/channel/channel.ts";
-import { type Committed, type Meta, messageKind, metaOf, type MsgRow, type ThreadSubject, type Told } from "#/modules/channel/contracts.ts";
+import type { ProfileStore } from "#/modules/agent/agent.ts";
+import type { Channel, ChannelWatchPort } from "#/modules/channel/channel.ts";
+import { type ChannelEvent, type Committed, type Meta, messageKind, metaOf, type MsgRow, type ThreadSubject, type Told } from "#/modules/channel/contracts.ts";
 import type { Issue } from "#/modules/issue/issue.ts";
-import { actorOfParticipant, type DeliveryEvent, type DeliveryReason, type Hearer } from "#/modules/session/envelope.ts";
+import { actorOfParticipant, type Delivery, type DeliveryEvent, type DeliveryReason } from "#/modules/session/envelope.ts";
 import { deliveryScope, inputContext } from "#/modules/session/payload.ts";
 import { envelopeLines, talkBrief } from "#/modules/session/prompts.ts";
-import { HireRefused, NotRecorded, type Session } from "#/modules/session/session.ts";
+import { channelSessionPolicy, HireRefused, NotRecorded, type Session } from "#/modules/session/session.ts";
 import type { Trigger } from "#/modules/session/shapes.ts";
 import type { SessionNews } from "#/modules/session/signals.ts";
 import * as qw from "#db/watch_cursor.sql.ts";
@@ -63,24 +64,31 @@ export interface WatchDeps {
   readonly log: Logger;
   readonly db: Db;
   readonly core: Core;
-  readonly agent: Agent;
+  readonly agent: ProfileStore;
   readonly session: Session;
   readonly channel: Channel;
   readonly issue: Issue;
 }
 
+type WatchChat = Pick<Channel, keyof ChannelWatchPort | "defaultChannel" | "guardRemoval" | "homeOf" | "notice" | "orchestratorIn" | "react" | "unread">;
+
+const healDelays = [200, 500, 1_000, 2_000, 4_000] as const;
+
 /** Keyed by `issue` when working one so reassigned sessions reuse the same issue thread. */
-const subjectOf = (h: T.Session): ThreadSubject => (h.issue ? { kind: "issue", id: h.issue, owner: h.id } : { kind: "talk", id: h.id, owner: h.id });
+const subjectOf = (h: T.Session): ThreadSubject => {
+  const issue = issueScopeOf(h);
+  return issue ? { kind: "issue", id: issue, owner: h.id } : { kind: "talk", id: h.id, owner: h.id };
+};
 
 export async function makeWatch(deps: WatchDeps): Promise<Watch> {
-  const { db, clock, agent: agents, session: sessions, channel: chat } = deps;
+  const { db, clock, agent: agents, session: sessions } = deps;
+  const chat: WatchChat = deps.channel;
   const log = deps.log.child("watch");
   const tasks = new TaskGroup({ name: "watch", onError: (task, e) => log.warn(`${task} failed`, e) });
   let closed = false;
   /** One event at a time, live or read again. */
   const turn = new Semaphore(1);
-  /** Whether the cursor follows what is handled: held until startup has read the events after it, stuck once an event
-   * failed live (it stays before that one until the next startup reads it again). */
+  /** Held until startup catches up; stuck before an unhandled event until heal or startup replays it. */
   let cursor: "held" | "moving" | "stuck" = "held";
   /** The newest event handled live, and the ones that failed (a waiting write is failed with it). */
   let handledLive = 0;
@@ -94,12 +102,16 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
   /** A direct talk being opened, by channel: the cursor stays before the event that opens it until it is open. */
   const opening = new Map<string, number>();
 
-  const advance = async () => {
-    if (cursor !== "moving") return;
-    const to = Math.min(through, ...[...opening.values()].map((seq) => seq - 1));
+  const advanceTo = async (cap: number) => {
+    const to = Math.min(cap, ...[...opening.values()].map((seq) => seq - 1));
     if (to <= kept) return;
     await qw.moveCursor(db.sql, { name: routed, seq: to });
     kept = to;
+  };
+
+  const advance = async () => {
+    if (cursor !== "moving") return;
+    await advanceTo(through);
   };
 
   const sessionOf = (id: string) => sessions.live(id).session;
@@ -107,7 +119,7 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
   /** A profile's talk with the user: the session answering in the direct channel. */
   const directOfSession = (h: T.Session) => {
     const place = h.channel ? chat.place(h.channel) : undefined;
-    return !h.issue && place?.type === "direct" && place.peer === profileId(h.agent) ? place.id : undefined;
+    return h.scope?.kind === "channel" && place?.type === "direct" && place.peer === profileId(h.agent) ? place.id : undefined;
   };
   const channelOfSession = (h: T.Session) => {
     const place = h.channel ? chat.place(h.channel) : undefined;
@@ -115,7 +127,7 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
   };
   /** The helper working the issue now: the latest hired of those on it. */
   const onIssue = (issue: string) =>
-    hired().reduce<T.Session | undefined>((on, h) => (h.issue === issue && (!on || h.hiredAt >= on.hiredAt) ? h : on), undefined);
+    hired().reduce<T.Session | undefined>((on, h) => (issueScopeOf(h) === issue && (!on || h.hiredAt >= on.hiredAt) ? h : on), undefined);
   const talkSession = (channel: string) => hired().find((h) => directOfSession(h) === channel);
   /** Who a thread's words are for, worked out now rather than kept: the session on the issue, or a talk thread's own session. */
   const ownerOf = (c: Committed): string => {
@@ -139,21 +151,25 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
       ),
       broken: breaker.tripped(),
     });
-    const hearers: Hearer[] = braked.map((d) => ({
+    const deliveries: Delivery[] = braked.map((d) => ({
       session: sessionId(d.recipient),
-      reason: d.reason,
-      wakes: d.wakes,
-      ...(d.heldBy ? { heldBy: d.heldBy } : {}),
+      heard: {
+        reason: d.reason,
+        wakes: d.wakes,
+        ...(d.heldBy ? { heldBy: d.heldBy } : {}),
+      },
       role: agents.isOrchestrator(d.recipient) ? "orchestrator" : "worker",
       event: event(d.reason),
     }));
-    await deps.issue.route(trigger, hearers);
+    const pooled = trigger.actor.kind === "user" && (await deps.issue.pool(trigger));
+    if (!pooled) await sessions.route(trigger, deliveries);
     if (trigger.actor.kind === "user") {
       reach.userSpoke(scope);
       // Spoken to by the user: the breaker lets it wake again.
-      for (const h of hearers) if (h.wakes && breaker.reset(h.session)) await sessions.holdWakes(h.session, false);
-    } else if (trigger.actor.kind === "agent") for (const h of hearers) if (h.wakes && !h.heldBy) reach.woke(scope, h.session, at);
-    return hearers.some((h) => h.heldBy === "hop_limit") ? hopLimitText(hopLimit) : undefined;
+      for (const d of deliveries) if (d.heard?.wakes === true && breaker.reset(d.session)) await sessions.holdWakes(d.session, false);
+    } else if (trigger.actor.kind === "agent")
+      for (const d of deliveries) if (d.heard?.wakes === true && d.heard.heldBy === undefined) reach.woke(scope, d.session, at);
+    return deliveries.some((d) => d.heard?.heldBy === "hop_limit") ? hopLimitText(hopLimit) : undefined;
   };
 
   /** again: read again from the events (at startup), so it may have been routed before; the hop limit's notice, if any. */
@@ -223,19 +239,26 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
     const last = ordered.at(-1);
     const user = ordered.findLast(userChat);
     if (!user) return;
-    const channelName = place.name ?? "";
     let opened: string;
     try {
       const received = await sessions.hireWith({
         agent,
         brief: talkBrief(agent.name, envelopeLines(ordered.map(chat.addressedOf))),
         where: "",
-        options: { context: { kind: "channel", channel }, trigger: { kind: "comment", channel, message: user.id } },
+        options: {
+          scope: { kind: "channel", id: channel },
+          policy: channelSessionPolicy,
+          channel,
+          trigger: { kind: "comment", channel, message: user.id },
+        },
         envelopes: {
           _tag: "Talk",
-          rows: ordered
-            .filter(userChat)
-            .map((message) => ({ row: envelopeRowOf(message, place, channelName), context: inputContext(chat.addressedOf(message)) })),
+          rows: ordered.filter(userChat).map((message) => ({
+            envelope: chat.addressedOf(message),
+            channel,
+            channelType: place.type,
+            ...(place.topic?.kind === "issue" ? { issue: place.topic.id } : {}),
+          })),
         },
         hiring: (session) => joining(session, channel),
       });
@@ -295,19 +318,64 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
     await advance();
   };
 
+  const replayEvent = async (event: ChannelEvent) => {
+    if (event.kind === "removed") return handle({ kind: "removed", event }, true);
+    // A message deleted since, or whose place is gone, has nothing left to route.
+    const posted = await chat.committedOf(event.message);
+    if (posted) await handle({ kind: "posted", posted }, true);
+  };
+
+  /** Bound to `Math.max(through, handledLive)` so live events not yet seen by `live()` still report failure to `awaitReader`. */
+  const heal = async (): Promise<boolean> => {
+    if (closed || cursor !== "stuck") return true;
+    const target = Math.max(through, handledLive);
+    try {
+      for (let from = kept; from < target;) {
+        const page = (await chat.events(from)).filter((event) => event.seq <= target);
+        const last = page.at(-1);
+        if (!last) break;
+        for (const event of page) {
+          await replayEvent(event);
+          through = Math.max(through, event.seq);
+          await advanceTo(event.seq);
+        }
+        from = last.seq;
+      }
+      cursor = "moving";
+      await advance();
+      return true;
+    } catch (e) {
+      cursor = "stuck";
+      log.warn("cursor heal", e);
+      return false;
+    }
+  };
+
+  const scheduleHeal = () => {
+    if (closed || cursor !== "stuck" || tasks.has("cursor:heal")) return;
+    tasks.keyed("cursor:heal", async (signal) => {
+      for (const delay of healDelays) {
+        await clock.sleep(delay, signal);
+        if (closed || (await turn.with(heal))) return;
+      }
+    });
+  };
+
   const seqOf = (told: Told) => (told.kind === "posted" ? told.posted.event.seq : told.event.seq);
   const live = async (told: Told) => {
     const seq = seqOf(told);
     await turn.with(async () => {
       try {
-        await handle(told, false);
+        await handle(told, seq <= through);
+        if (cursor === "stuck") await heal();
       } catch (e) {
-        // The write that made it fails with this; startup reads it again.
-        cursor = "stuck";
+        // The write that made it fails with this; the cursor stays before it until heal or startup replays it.
+        if (cursor === "moving") cursor = "stuck";
         failures.set(seq, e instanceof Error ? e : new Error(String(e)));
         log.warn(`event ${seq}`, e);
       }
       handledLive = Math.max(handledLive, seq);
+      if (cursor === "stuck") scheduleHeal();
     });
     for (const w of waiting.filter((w) => w.seq <= handledLive)) {
       waiting.splice(waiting.indexOf(w), 1);
@@ -366,7 +434,7 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
     if (thread) return handedOn(h, thread);
     const channel = channelOfSession(h);
     await chat.readUpTo(h.id, channel, await chat.latest(channel));
-    const what = h.refining ? t("server.channel.dispatch.draft") : head(h.brief.replace(/\s+/gu, " "), 80);
+    const what = h.scope?.kind === "draft" ? t("server.channel.dispatch.draft") : head(h.brief.replace(/\s+/gu, " "), 80);
     // The dispatch note is the farm's, under the name of the orchestrator in the channel.
     const opened = await chat.note({
       channel,
@@ -389,9 +457,10 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
     await chat.readUpTo(h.id, channel, await chat.latest(channel));
     // Each dispatch of the issue is in its thread but the first, which the thread hangs under: this is the one after.
     const nth = (await chat.dispatches(thread)) + 2;
-    const text = h.refining
-      ? t("server.channel.dispatch.redraft", { id: h.id, name: h.name })
-      : t("server.channel.dispatch.handedOn", { id: h.id, name: h.name, nth });
+    const text =
+      h.scope?.kind === "draft"
+        ? t("server.channel.dispatch.redraft", { id: h.id, name: h.name })
+        : t("server.channel.dispatch.handedOn", { id: h.id, name: h.name, nth });
     await chat.note({ channel: thread, from: chat.orchestratorIn(thread), kind: "dispatch", text, meta: { session: h.id }, member: h.id });
   };
 
@@ -406,7 +475,7 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
 
   const postReport = async (id: string, outcome: T.Outcome, summary: string, spent: T.Spent | undefined, run: string | undefined) => {
     const w = sessionOf(id);
-    if (!w || w.refining || outcome === "interrupted") return;
+    if (!w || w.scope?.kind === "draft" || outcome === "interrupted") return;
     const thread = await chat.homeOf(id);
     if (!thread) return;
     const said = outcome === "completed" ? sessions.live(id).summary : "";
@@ -518,19 +587,17 @@ export async function makeWatch(deps: WatchDeps): Promise<Watch> {
       const wakes = await sessions.agentWakes();
       reach.load(wakes.scopes, wakes.sessions);
       await openThreads();
+      await tasks.stop("cursor:heal");
       await turn.with(async () => {
         // Each event once, in order: one that cannot be routed is logged and passed, not tried again and again.
-        for (let from = (await qw.cursorOf(db.sql, { name: routed }))?.seq ?? 0; ;) {
+        const start = (await qw.cursorOf(db.sql, { name: routed }))?.seq ?? 0;
+        kept = start;
+        for (let from = start; ;) {
           const page = await chat.events(from);
           const last = page.at(-1);
           if (!last) break;
           for (const event of page) {
-            await bestEffort(log, `event ${event.seq}`, async () => {
-              if (event.kind === "removed") return handle({ kind: "removed", event }, true);
-              // A message deleted since, or whose place is gone, has nothing left to route.
-              const posted = await chat.committedOf(event.message);
-              if (posted) await handle({ kind: "posted", posted }, true);
-            });
+            await bestEffort(log, `event ${event.seq}`, () => replayEvent(event));
             through = Math.max(through, event.seq);
           }
           from = last.seq;

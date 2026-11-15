@@ -6,7 +6,7 @@ import { arg, command, group, opt } from "#/infra/command.ts";
 import { ask, change } from "#/infra/farm.ts";
 
 const sessionLine = (s: T.Session) =>
-  [s.id, s.name, `@${s.agent}`, s.phase._tag, s.issue === undefined ? "" : `issue ${s.issue}`, s.repo === undefined ? "" : `[${s.repo}]`]
+  [s.id, s.name, `@${s.agent}`, s.phase._tag, s.scope === undefined ? "" : `${s.scope.kind} ${s.scope.id}`, s.repo === undefined ? "" : `[${s.repo}]`]
     .filter((x) => x !== "")
     .join("  ");
 

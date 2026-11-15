@@ -7,6 +7,7 @@ import { getMimeType } from "hono/utils/mime";
 import { type ApiError, ApiErrorEnvelope } from "@vibevalley/protocol/api";
 
 import { errnoOf } from "#/base/errors.ts";
+import { readTextUpTo } from "#/base/stream.ts";
 
 /** Encodes a structured ApiError into its full JSON wire envelope with the status mapped from its BizCode. */
 export const replyError = (e: ApiError): Response => Response.json(ApiErrorEnvelope.parse(e.toEnvelope()), { status: e.status });
@@ -16,23 +17,7 @@ export const notFound = (): Response => new Response("404 page not found\n", { s
 export const empty = (status: number, headers?: Record<string, string>): Response => new Response(null, { status, ...(headers ? { headers } : {}) });
 
 /** A request's body as text, or undefined once it grows past max: what is left of it is not read. */
-export async function textUpTo(request: Request, max: number): Promise<string | undefined> {
-  if (request.body === null) return "";
-  const reader: ReadableStreamDefaultReader<Uint8Array> = request.body.getReader();
-  const parts: Uint8Array[] = [];
-  let size = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > max) {
-      await reader.cancel();
-      return undefined;
-    }
-    parts.push(value);
-  }
-  return new TextDecoder().decode(Buffer.concat(parts));
-}
+export const textUpTo = (request: Request, max: number): Promise<string | undefined> => readTextUpTo(request.body, max);
 
 export interface FileOptions {
   readonly status?: number;

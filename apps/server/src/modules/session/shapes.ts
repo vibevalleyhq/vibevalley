@@ -11,6 +11,53 @@ export type SessionClose = Extract<T.Phase, { _tag: "closed" }>["closed"];
 export type ToolConnection = NonNullable<T.Session["toolConnections"]>[number];
 export type Machine = T.SpaceState["machines"][number];
 
+export const SessionWorkplaceValues = ["checkout", "context"] as const;
+export type SessionWorkplace = (typeof SessionWorkplaceValues)[number];
+
+export const SessionEvictActionValues = ["dismiss", "suspend"] as const;
+export type SessionEvictAction = (typeof SessionEvictActionValues)[number];
+
+/** Explicit execution behavior for a session so session lifecycle stays free of domain-specific branching. */
+export interface SessionPolicy {
+  readonly workplace: SessionWorkplace;
+  readonly onEvict: SessionEvictAction;
+  readonly restAfterTurn: boolean;
+  readonly idleSuspend: boolean;
+  readonly structuredReport: boolean;
+}
+
+export const workSessionPolicy: SessionPolicy = {
+  workplace: "checkout",
+  onEvict: "dismiss",
+  restAfterTurn: true,
+  idleSuspend: false,
+  structuredReport: true,
+};
+
+export const refinementSessionPolicy: SessionPolicy = {
+  workplace: "checkout",
+  onEvict: "dismiss",
+  restAfterTurn: false,
+  idleSuspend: false,
+  structuredReport: false,
+};
+
+export const channelSessionPolicy: SessionPolicy = {
+  workplace: "context",
+  onEvict: "suspend",
+  restAfterTurn: false,
+  idleSuspend: true,
+  structuredReport: false,
+};
+
+export const dutySessionPolicy: SessionPolicy = {
+  workplace: "context",
+  onEvict: "dismiss",
+  restAfterTurn: false,
+  idleSuspend: false,
+  structuredReport: false,
+};
+
 export const IssueReportMemoryScopeValues = ["repo", "all"] as const;
 type IssueReportMemoryScope = (typeof IssueReportMemoryScopeValues)[number];
 

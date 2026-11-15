@@ -48,7 +48,9 @@ const records = async (farm: Farm) => {
     runtime: "vibevalley",
     brief: "",
     repo: null,
-    issue: null,
+    scope_kind: null,
+    scope_id: null,
+    policy: null,
     channel: null,
     hired_at: 0,
     machine: null,
@@ -62,7 +64,7 @@ const records = async (farm: Farm) => {
   const store: RunStore = {
     ...persisted,
     start: async (id, session, issue, trigger) => {
-      await persisted.start(id, session, issue, trigger);
+      await persisted.start(id, session, trigger);
       if (issue) took.push([id, issue]);
     },
     link: (run, issue) => void took.push([run, issue]),
@@ -101,7 +103,7 @@ describe("the orchestrator's runs", () => {
     for (const [run, issue] of took) await farm.intake.ranOn(run, issue);
     const runs = await farm.intake.runsOf(issueId("i2"));
     expect(runs[0]?.triggeredBy).toEqual({ kind: "issue", channel: "general", message: "m1" });
-    expect(runs.map((r) => [r.issue, r.outcome, r.summary, r.heard])).toEqual([["i1", "completed", "看完了", ["m1"]]]);
+    expect(runs.map((r) => [r.outcome, r.summary, r.heard])).toEqual([["completed", "看完了", ["m1"]]]);
     expect(journal.events().map((e) => e.type)).toEqual([
       "run/start",
       "user/message",
@@ -125,6 +127,8 @@ describe("the orchestrator's runs", () => {
     expect(finished.at(-1)!.outcome).toBe("interrupted");
 
     const failed = await x.failedStart({ by: { kind: "issue" }, issue: "i1" }, "派不出去的", "钥匙没填");
+    expect(took.at(-1)).toEqual([failed, "i1"]);
+    await farm.intake.ranOn(failed, issueId("i1"));
     expect((await farm.intake.runsOf(issueId("i1"))).find((r) => r.id === failed)?.outcome).toBe("failed");
   });
 
@@ -149,7 +153,6 @@ describe("the orchestrator's runs", () => {
       ended_at: null,
       outcome: null,
       summary: null,
-      issue: null,
       spent: null,
     } satisfies Parameters<typeof runOf>[0];
     const valid = runOf({ ...row, triggered_by: `{"kind":"issue","message":"继续"}`, heard: `["m1"]`, spent: `{"tokens":3,"cny":0.5}` });

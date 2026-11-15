@@ -7,13 +7,17 @@ import { setLocale } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime } from "@vibevalley/protocol";
 import { ApiError, BizCode } from "@vibevalley/protocol/api";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 import { serverFile, serverFiles } from "#/base/assets.ts";
 import { Inconsistent } from "#/base/errors.ts";
+import { emptySpaceState } from "#/core/core.ts";
+import { makeProjection } from "#/gateway/projection/frame.ts";
 import type { ServerConfig } from "#/infra/config.ts";
 import { keptLog } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
 import { defaultSettings } from "#/modules/agent/presets.ts";
+import { makeSetting } from "#/platform/setting/setting.ts";
 import { testConfig, starter } from "#/testing/layers.ts";
 
 import { makeProfileStore, withCast } from "./profile.ts";
@@ -102,18 +106,17 @@ describe("profiles", () => {
     expect(readFileSync(join(config.home, kept[0]!), "utf8")).toBe(raw);
   });
 
-  test("a profile whose look lacks a build and a head is filled in, and nothing is set aside", async () => {
+  test("valid profiles, skills and settings in config.json load cleanly without setting aside", async () => {
     const config = testConfig();
     const mine = { ...starter("lab"), id: "mine", name: "我的" };
-    const { build: _, head: __, ...look } = mine.look;
     const raw = JSON.stringify({
-      agents: [{ ...mine, look }],
+      agents: [mine],
       skills: [{ id: "s1", name: "tidy", description: "整理", body: "整理代码" }],
       settings: { pi: { ...defaultSettings(), defaultModel: "deepseek-chat" } },
     });
     writeFileSync(join(config.home, "config.json"), raw);
     const agents = await open(config);
-    expect(agents.agent("mine")?.look).toMatchObject({ build: "biped", head: "rounded" });
+    expect(agents.agent("mine")?.name).toBe("我的");
     expect(agents.skills().flatMap((k) => (k.builtIn === true ? [] : [k.id]))).toEqual(["s1"]);
     expect(agents.settings("pi").defaultModel).toBe("deepseek-chat");
     expect(readdirSync(config.home).filter((f) => f.startsWith("config.json.unreadable-"))).toEqual([]);
@@ -316,6 +319,80 @@ describe("the built-in skills", () => {
       const template = templates.find((t) => t.id === id);
       expect([template?.role, template?.skills]).toEqual(["worker", [id]]);
       expect((await s.installTemplate(id)).skills).toEqual([id]);
+    }
+  });
+
+  test("regression: concurrent farms keep their own zh and en locales across profiles, skills and frames", async () => {
+    const zhConfig = testConfig();
+    const enConfig = testConfig();
+    const zhSetting = await makeSetting({ config: zhConfig, clock: wallTime, log: keptLog() });
+    const enSetting = await makeSetting({ config: enConfig, clock: wallTime, log: keptLog() });
+    await zhSetting.save({ locale: "zh" });
+    await enSetting.save({ locale: "en" });
+    const zhProfiles = await makeProfileStore({ config: zhConfig, clock: wallTime, log: keptLog(), locale: zhSetting.locale });
+    const enProfiles = await makeProfileStore({ config: enConfig, clock: wallTime, log: keptLog(), locale: enSetting.locale });
+    const zhProjection = makeProjection({ locale: zhSetting.locale });
+    const enProjection = makeProjection({ locale: enSetting.locale });
+    const state: T.SpaceState = {
+      ...emptySpaceState(),
+      sessions: [
+        {
+          id: sessionId("s1"),
+          role: "worker",
+          name: "周",
+          agent: "backend",
+          runtime: "pi",
+          brief: "check",
+          hiredAt: 1,
+          runs: 1,
+          phase: { _tag: "done" },
+        },
+      ],
+      crons: [
+        {
+          id: "c1",
+          name: "tick",
+          text: "go",
+          when: { kind: "every", minutes: 5 },
+          tz: "UTC",
+          channel: "general",
+          by: "user",
+          enabled: false,
+          pending: false,
+          created: 1,
+        },
+      ],
+    };
+    try {
+      expect([zhSetting.locale(), enSetting.locale()]).toEqual(["zh", "en"]);
+      for (const k of zhProfiles.skills()) if (k.builtIn === true) expect(k.name + k.description).toMatch(han);
+      for (const k of enProfiles.skills()) if (k.builtIn === true) expect(k.name + k.description).not.toMatch(han);
+      for (const item of await zhProfiles.templates())
+        if (item.source === "builtIn") expect(JSON.stringify([item.name, item.duty, item.tags, item.persona])).toMatch(han);
+      for (const item of await enProfiles.templates())
+        if (item.source === "builtIn") expect(JSON.stringify([item.name, item.duty, item.tags, item.persona])).not.toMatch(han);
+
+      const zhFrame = zhProjection.frame(state);
+      const enFrame = enProjection.frame(state);
+      expect(zhFrame.state.sessions[0]?.phaseText).toMatch(han);
+      expect(enFrame.state.sessions[0]?.phaseText).not.toMatch(han);
+      expect(zhFrame.state.crons[0]?.whenText).toMatch(han);
+      expect(enFrame.state.crons[0]?.whenText).not.toMatch(han);
+      expect(zhFrame.inbox[0]?.words.label).toMatch(han);
+      expect(enFrame.inbox[0]?.words.label).not.toMatch(han);
+
+      await zhSetting.save({ locale: "en" });
+      await enSetting.save({ locale: "zh" });
+      for (const k of zhProfiles.skills()) if (k.builtIn === true) expect(k.name + k.description).not.toMatch(han);
+      for (const k of enProfiles.skills()) if (k.builtIn === true) expect(k.name + k.description).toMatch(han);
+      expect(zhProjection.frame(state).state.sessions[0]?.phaseText).not.toMatch(han);
+      expect(enProjection.frame(state).state.sessions[0]?.phaseText).toMatch(han);
+    } finally {
+      setLocale("zh");
+      await zhProfiles.close();
+      await enProfiles.close();
+      await zhSetting.close();
+      await enSetting.close();
     }
   });
 });

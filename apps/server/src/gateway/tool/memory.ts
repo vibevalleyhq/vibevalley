@@ -47,14 +47,14 @@ export function memoryTools(deps: Pick<ToolDeps, "agent" | "memory">) {
           answered(async () => {
             const id = profile(p.agent);
             const c = callerOf(who);
-            const m = await memory.remember({ agent: id, text: p.text, repo: p.repo ?? "", by: c.actor });
+            const m = await memory.write({ agent: id, text: p.text, repo: p.repo ?? "", by: c.actor });
             return answers.memory.rememberedFor(id, memoryWhere(m), m.id);
           }),
         )
       : sessionSchemaTool("memory.create", async (p: SessionInput<"memory.create">) => {
           const c = callerOf(who);
           if (!c.agent) throw refuse(notWorking);
-          const m = await memory.remember({ agent: c.agent, text: p.text, repo: sessionScope(c, p.repo), by: c.actor });
+          const m = await memory.write({ agent: c.agent, text: p.text, repo: sessionScope(c, p.repo), by: c.actor });
           return answers.memory.remembered(memoryWhere(m), m.id);
         });
   return { memorySearch, memoryCreate };

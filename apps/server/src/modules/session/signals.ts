@@ -37,11 +37,11 @@ export type LaunchActivity =
   | { readonly _tag: "Closed"; readonly id: string; readonly launch: string }
   | { readonly _tag: "Compacting"; readonly id: string; readonly on: boolean };
 
-/** A run ended; issue: the helper's own, when it works one (the issues an in-process agent's run took were told as
+/** A run ended; session: the worker that ran it when known (issues an in-process agent's run took were told as
  * IssueStarted). */
 export interface RunFinished {
   readonly id: string;
-  readonly issue?: T.IssueId;
+  readonly session?: T.SessionId;
   readonly outcome: T.Outcome;
 }
 

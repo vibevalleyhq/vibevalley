@@ -1,11 +1,10 @@
 import type * as T from "@vibevalley/protocol";
-import { farmOf, omitUndefined, same } from "@vibevalley/protocol/rules";
+import { omitUndefined, same } from "@vibevalley/protocol/rules";
 
 import type { Fact } from "#/core/core.ts";
 import { withChannel, withMessage, withUserMentions } from "#/modules/channel/messages.ts";
-import { emptyPlay, freeStation, playedDoing, playedRun, playOf, stationed } from "#/modules/game/view.ts";
-import { withIssue, withIssueStatuses } from "#/modules/issue/status.ts";
-import { isOnDuty, sessionOf, withSession } from "#/modules/session/roster.ts";
+import { keepsSessionResting, withIssue, withIssueStatuses, withReportedAnswer } from "#/modules/issue/status.ts";
+import { sessionOf, withSession } from "#/modules/session/roster.ts";
 import type { Machine } from "#/modules/session/shapes.ts";
 
 const ended = (outcome: T.Outcome): T.Phase => (outcome === "completed" ? { _tag: "done" } : outcome === "failed" ? { _tag: "failed" } : { _tag: "resting" });
@@ -50,7 +49,7 @@ function fold(state: T.SpaceState, f: Fact): [T.SpaceState, boolean] {
           (f.brief === undefined || f.brief === session.brief))
       )
         return [state, false];
-      const [after] = withSession(state, f.id, (h) =>
+      return withSession(state, f.id, (h) =>
         omitUndefined({
           ...h,
           phase: f.phase,
@@ -59,15 +58,6 @@ function fold(state: T.SpaceState, f: Fact): [T.SpaceState, boolean] {
           ...(f.spent ? { spent: f.spent } : {}),
         }),
       );
-      const plays = state.plays ?? {};
-      const before = playOf(plays, f.id);
-      const play =
-        f.phase._tag === "working"
-          ? session.phase._tag === "working"
-            ? playedDoing(before, { at: f.at, action: f.phase.doing.action, label: f.phase.doing.label })
-            : playedRun(before, f.at)
-          : before;
-      return [{ ...after, plays: { ...plays, [f.id]: play } }, true];
     }
     case "messageChanged": {
       const [chat, news] = withMessage(state.chat, f.message);
@@ -85,34 +75,22 @@ function fold(state: T.SpaceState, f: Fact): [T.SpaceState, boolean] {
       return same(state.chat?.userMentions, f.mentions) ? [state, false] : [{ ...state, chat: withUserMentions(state.chat, f.mentions) }, true];
     case "sessionChanged": {
       const others = state.sessions.filter((h) => h.id !== f.session.id);
-      const was = sessionOf(state, f.session.id);
-      if (isOnDuty(f.session)) return [{ ...state, sessions: [...others, f.session] }, true];
-      const plays = state.plays ?? {};
-      const play = was ? playOf(plays, f.session.id) : { ...emptyPlay(), station: freeStation(plays, others, farmOf(f.session)) };
-      return [{ ...state, sessions: [...others, f.session], plays: { ...plays, [f.session.id]: play } }, true];
+      return [{ ...state, sessions: [...others, f.session] }, true];
     }
-    case "sessionReported":
-      if (!sessionOf(state, f.id)) return [state, false];
-      return [
-        withSession(state, f.id, (x) => ({
-          ...x,
-          runs: f.runs,
-          phase:
-            f.outcome === "completed" &&
-            f.phase?._tag === "resting" &&
-            x.issue !== undefined &&
-            state.issues.some((issue) => issue.id === x.issue && issue.pullRequest?.state === "open")
-              ? f.phase
-              : ended(f.outcome),
-          lastRun: omitUndefined({ outcome: f.outcome, summary: f.summary, at: f.at, spent: f.spent, answer: f.answer }),
-        }))[0],
-        true,
-      ];
-    case "sessionLeft": {
-      const plays = { ...state.plays };
-      delete plays[f.id];
-      return [{ ...state, sessions: state.sessions.filter((h) => h.id !== f.id), plays }, true];
+    case "sessionReported": {
+      const target = sessionOf(state, f.id);
+      if (!target) return [state, false];
+      const next = withSession(state, f.id, (x) => ({
+        ...x,
+        runs: f.runs,
+        phase: f.outcome === "completed" && f.phase?._tag === "resting" && keepsSessionResting(state.issues, target) ? f.phase : ended(f.outcome),
+        lastRun: omitUndefined({ outcome: f.outcome, summary: f.summary, at: f.at, spent: f.spent }),
+      }))[0];
+      const issues = withReportedAnswer(next.issues, target, f);
+      return [issues === next.issues ? next : { ...next, issues }, true];
     }
+    case "sessionLeft":
+      return [{ ...state, sessions: state.sessions.filter((h) => h.id !== f.id) }, true];
     case "progressChanged": {
       let next = state;
       let changed = false;
@@ -123,13 +101,6 @@ function fold(state: T.SpaceState, f: Fact): [T.SpaceState, boolean] {
       if (f.progress !== undefined && !same(next.progress, f.progress)) {
         next = { ...next, progress: f.progress };
         changed = true;
-      }
-      if (f.station !== undefined) {
-        const [stationedState, moved] = stationed(next, f.station);
-        if (moved) {
-          next = stationedState;
-          changed = true;
-        }
       }
       return [next, changed];
     }

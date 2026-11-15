@@ -247,11 +247,11 @@
       "inProcess": false
     },
     "antigravity": {
-      "steer": false,
+      "steer": true,
       "refused": {
         "systemPrompt": "Antigravity ACP 没有系统提示覆盖",
-        "appendSystemPrompt": "Antigravity ACP 没有系统提示追加",
-        "effort": "Antigravity 没有推理强度通道"
+        "disallowedTools": "Antigravity ACP 没有会话级的工具黑名单",
+        "mcpServerCredentials": "Antigravity 会把带凭证的 MCP 服务器明文写进对话库，不能挂载带 headers 或 env 的 MCP"
       },
       "capabilities": ["listModels", "checkUpdate"],
       "inProcess": false

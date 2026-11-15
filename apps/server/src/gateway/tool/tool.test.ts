@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
 
+import { htmlSources } from "@vibevalley/artifact/html";
 import { setLocale } from "@vibevalley/i18n";
 import { endpoints, fieldsOf } from "@vibevalley/protocol/api";
-
-import { htmlSources } from "#/modules/artifact/policy.ts";
 
 import { descriptions, params, sessionDescriptions, spentText } from "./prompts.ts";
 import { agentOnly, type Op, parameters, sessionParameters, toolName } from "./schemas.ts";

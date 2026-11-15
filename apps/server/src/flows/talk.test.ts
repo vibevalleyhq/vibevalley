@@ -63,8 +63,7 @@ describe("a talk with a helper profile", () => {
     await channels.say({ text: "你好，记得这段对话", channel: dm, sendKey: "" });
     await until(() => answers() === 1, "the first answer");
     const first = sessions.hired().find((s) => s.channel === dm);
-    expect(first).toMatchObject({ agent: "lab", channel: dm });
-    expect(first?.issue).toBeUndefined();
+    expect(first).toMatchObject({ agent: "lab", channel: dm, scope: { kind: "channel", id: dm } });
     expect(first?.repo).toBeUndefined();
     clock.adjust(10 * 60_000);
     await until(() => disposed === 1, "the idle execution suspended");
@@ -194,7 +193,10 @@ describe("a talk with a helper profile", () => {
       const direct2 = await fw.watch.direct("lab");
       expect(direct2).toBe(first.dm);
       expect(sessions.hired().find((s) => s.channel === first.dm)?.id).toBe(first.session);
-      expect(fw.core.state().plays?.[first.session]?.station).toBe(0);
+      for await (const frame of fw.core.states()) {
+        expect(frame.view.plays[first.session]?.station).toBe(0);
+        break;
+      }
       await channels.say({ text: "重启之后", channel: first.dm, sendKey: "" });
       await until(() => said(first.dm).some((m) => m.kind === "report"), "the answer after restart");
       expect(resumes[1]).toBeTruthy();

@@ -8,14 +8,12 @@ import { sessionId } from "@vibevalley/protocol/schema";
 import type { ServerConfig } from "#/infra/config.ts";
 import type { Db } from "#/infra/db.ts";
 import type { Repo, RepoRecord } from "#/modules/repo/repo.ts";
-import { sessionOf } from "#/modules/session/roster.ts";
 import { gitSync, repo } from "#/testing/git.ts";
 import { testConfig, waitFor as until } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 import * as q from "#db/game_ledger.sql.ts";
 
 import { makeGame } from "./game.ts";
-import { playOf } from "./view.ts";
 
 /** The world with the game on it (the world has none); repo stands in for the farm's when given. */
 async function farm(config: ServerConfig = testConfig(), repoOf?: (current: Repo) => Repo) {
@@ -59,7 +57,6 @@ const helper = (id: string, phase: Session["phase"] = { _tag: "working", since: 
   hiredAt: 0,
   runs: 0,
   phase,
-  refining: false,
 });
 
 describe("the game", () => {
@@ -148,8 +145,8 @@ describe("the game", () => {
     await using f = await farm();
     const { game, core } = f;
     const stationOf = (id: string) => async () => {
-      const h = sessionOf(core.state(), id);
-      return h ? playOf(core.state().plays, id).station : -2;
+      for await (const frame of core.states()) return frame.view.plays[id]?.station ?? -2;
+      return -2;
     };
     const starting: Session["phase"] = { _tag: "working", since: 0, doing: { action: "none", label: "" } };
     game.want(4);

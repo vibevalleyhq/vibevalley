@@ -7,11 +7,11 @@ import { whenTrue } from "@vibevalley/testkit/until";
 import { user as userActor } from "#/base/actor.ts";
 import type { MemorySourceConfig } from "#/platform/setting/memorySources.ts";
 import { testConfig } from "#/testing/layers.ts";
+import { memoryWorld, type MemoryWorld } from "#/testing/memory.ts";
 
 import { type BuildSource, type FinishedRun, foundText, type Found, type Memory, type Note, type RecallCue, type SearchQuery } from "./memory.ts";
 import { localName, recallChars, recallCount, searchLimit } from "./recall.ts";
 import { mergeRecalled, type RecalledLine, type Source } from "./sources.ts";
-import { memoryWorld, type MemoryWorld } from "./testWorld.ts";
 
 class Fake {
   available = true;
@@ -137,12 +137,12 @@ describe("memory sources", () => {
       expect(got.ids).toEqual([local.id, "nowledge:m9"]);
       expect(got.lines[1]).toBe("用户要中文的提交信息");
       expect([...fake.cues[0]!.skip!]).toEqual(["m1"]);
-      expect((await m.list("lab")).map((x) => x.id)).toEqual([local.id, "nowledge:m9"]);
+      expect((await m.memoriesOf("lab")).memories.map((x) => x.id)).toEqual([local.id, "nowledge:m9"]);
       await m.forget("lab", "nowledge:m9");
       expect(fake.forgot).toEqual(["m9"]);
       await m.forget("lab", local.id);
       expect(fake.forgot).toHaveLength(1);
-      const ms = await m.list("lab");
+      const ms = (await m.memoriesOf("lab")).memories;
       expect(ms).toHaveLength(1);
     });
   });
@@ -161,7 +161,7 @@ describe("memory sources", () => {
         outcome: "completed",
       };
       await m.keep(run);
-      const ms = await m.list("lab");
+      const ms = (await m.memoriesOf("lab")).memories;
       expect(ms).toHaveLength(1);
       await until(() => fake.synced.length === 1);
       expect(fake.synced[0]!.said).toBe(run.said);
@@ -182,15 +182,15 @@ describe("memory sources", () => {
     await using w = await world(build);
     const m = w.memory;
     await save(w, { ...nowledgeOn, url: "http://down/" });
-    let sources = await m.sources();
+    let sources = (await m.memoriesOf("lab")).sources;
     expect([sources.length, sources[0]!.name, sources[0]!.on, sources[1]!.on, sources[1]!.off]).toEqual([2, localName, true, false, "no address"]);
     await save(w, nowledgeOn);
-    sources = await m.sources();
+    sources = (await m.memoriesOf("lab")).sources;
     expect([sources[1]!.on, sources[1]!.label]).toEqual([true, "Nowledge Mem"]);
-    await m.sources();
+    await m.memoriesOf("lab");
     expect(built).toBe(2);
     await save(w, { ...nowledgeOn, enabled: false });
-    sources = await m.sources();
+    sources = (await m.memoriesOf("lab")).sources;
     expect([sources[1]!.on, sources[1]!.off]).toEqual([false, "没打开"]);
   });
 
@@ -217,7 +217,7 @@ describe("memory sources", () => {
       await until(() => events.includes("old:first"));
       await m.write(user("lab", "second"));
       await save(w, { ...nowledgeOn, url: "http://new/" });
-      await m.sources();
+      await m.memoriesOf("lab");
       await until(() => events.includes("old:stop"));
       await m.write(user("lab", "third"));
       await until(() => events.includes("new:third"));
@@ -225,7 +225,7 @@ describe("memory sources", () => {
       release();
       await until(() => events.includes("old:stop"));
       expect(events).toEqual(["old:first", "old:stop", "new:third"]);
-      expect((await m.list("lab")).map((m) => m.text).toSorted()).toEqual(["first", "second", "third"]);
+      expect((await m.memoriesOf("lab")).memories.map((m) => m.text).toSorted()).toEqual(["first", "second", "third"]);
     } finally {
       release();
     }
@@ -260,7 +260,7 @@ describe("memory sources", () => {
             : operation === "search"
               ? m.search({ agent: "lab", repo: "", text: "query", kind: "", limit: 10 })
               : operation === "list"
-                ? m.list("lab")
+                ? m.memoriesOf("lab")
                 : m.forget("lab", "nowledge:n1")
         ).then(
           () => undefined,
@@ -268,7 +268,7 @@ describe("memory sources", () => {
         );
         await until(() => entered);
         await save(w, { ...nowledgeOn, url: "http://new/" });
-        await m.sources();
+        await m.memoriesOf("lab");
         await until(() => asked?.aborted === true);
         await pending;
         await until(() => stopped);
@@ -287,7 +287,7 @@ describe("memory sources", () => {
       const got = await m.recall({ agent: "lab", repo: "demo", text: "测试" });
       const local = got.ids.filter((id) => !id.includes(":"));
       expect([got.ids.length, local.length]).toEqual([recallCount, recallCount / 2]);
-      const marked = (await m.list("lab")).filter((x) => x.recalled > 0 && !x.id.includes(":"));
+      const marked = (await m.memoriesOf("lab")).memories.filter((x) => x.recalled > 0 && !x.id.includes(":"));
       expect(marked.map((x) => x.id).toSorted()).toEqual([...local].toSorted());
     });
   });

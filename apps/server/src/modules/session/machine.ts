@@ -4,7 +4,7 @@ import { hostName, type ServerConfig } from "#/infra/config.ts";
 import type { Db } from "#/infra/db.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Agent } from "#/modules/agent/agent.ts";
+import type { RuntimeFleet } from "#/modules/agent/agent.ts";
 import { addHereMachine, hereMachine } from "#db/session_machine.sql.ts";
 
 import { type Executions, makeExecutor } from "./executor.ts";
@@ -28,7 +28,7 @@ export interface MachineDeps {
   readonly log: Logger;
   readonly db: Db;
   readonly core: Core;
-  readonly agent: Agent;
+  readonly agent: RuntimeFleet;
 }
 
 export async function makeMachine(deps: MachineDeps): Promise<Machine> {

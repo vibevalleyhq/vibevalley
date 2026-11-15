@@ -1,9 +1,9 @@
 import type { RuntimeHandlers } from "@vibevalley/protocol/api";
 
 import { lookIn, orMissing } from "#/base/errors.ts";
-import type { Agent } from "#/modules/agent/agent.ts";
+import type { RuntimeFleet } from "#/modules/agent/agent.ts";
 
-export function runtimeHandlers(deps: { readonly agent: Agent }): RuntimeHandlers {
+export function runtimeHandlers(deps: { readonly agent: RuntimeFleet }): RuntimeHandlers {
   const agents = deps.agent;
   return {
     "runtime.list": () => agents.runtimes(),

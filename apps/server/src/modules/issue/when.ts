@@ -4,6 +4,12 @@ import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
 import { actsForUser, type Actor } from "#/base/actor.ts";
+
+export interface Due {
+  readonly id: string;
+  readonly cron: T.Cron;
+  readonly missed: boolean;
+}
 const weekdayKeys = ["0", "1", "2", "3", "4", "5", "6"] as const;
 /** A day of the week by its number, Sunday 0. */
 const weekday = (d: number) => t(`server.cron.weekdays.${weekdayKeys[d] ?? "0"}`);

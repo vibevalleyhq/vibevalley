@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { htmlCheck, htmlProblem } from "./check.ts";
+import { htmlCheck, htmlProblem } from "@vibevalley/artifact/html";
 
 const kinds = (html: string) => htmlCheck(html).refused.map((f) => [f.kind, f.line, "need" in f ? f.need : ""]);
 

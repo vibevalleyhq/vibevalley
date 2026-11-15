@@ -7,12 +7,12 @@ import { BizCode, endpoints } from "@vibevalley/protocol/api";
 
 import { wav } from "#/modules/media/testdata/audio.ts";
 import { waitFor } from "#/testing/layers.ts";
+import { allow, downloads, hours, mediaFarm, refuse, vendor } from "#/testing/media.ts";
 import * as input from "#db/media_input.sql.ts";
 import * as q from "#db/media_job.sql.ts";
 
 import { newJob } from "./job.ts";
 import type { Media } from "./media.ts";
-import { allow, downloads, hours, mediaFarm, refuse, vendor } from "./testing.ts";
 
 const failure = (p: Promise<unknown>) =>
   p.then(

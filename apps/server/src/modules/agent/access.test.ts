@@ -1,7 +1,7 @@
 import type { Cursor, Frame, RawEvent } from "@botiverse/oar";
 import { describe, expect, it } from "vite-plus/test";
 
-import { loopbackEnvironment, observeToolConnections, type ToolConnection } from "./access.ts";
+import { allowedMcpServers, loopbackEnvironment, observeToolConnections, type ToolConnection } from "./access.ts";
 
 describe("worker proxy bypass", () => {
   it("regression: inherited bypasses are preserved in both child variables", () => {
@@ -85,4 +85,20 @@ it("regression: runtimes that refuse env receive no injected overrides", () => {
   expect(loopbackEnvironment(undefined, { NO_PROXY: "corp" }, "unsupported")).toBeUndefined();
   const env = Object.freeze({ SOME_SETTING: "value" });
   expect(loopbackEnvironment(env, {}, "unsupported")).toBe(env);
+});
+
+it("regression: allowedMcpServers strips refused or credentialed servers before session start", () => {
+  const servers = [
+    { name: "vibevalley", type: "http" as const, url: "http://127.0.0.1:8787/mcp", headers: { authorization: "Bearer token" } },
+    { name: "plain-http", type: "http" as const, url: "http://127.0.0.1:8788/mcp", headers: {} },
+    { name: "plain-stdio", command: "npx", args: ["-y", "demo"], env: {} },
+    { name: "secret-stdio", command: "npx", args: ["-y", "secret"], env: { API_KEY: "secret" } },
+  ];
+  expect(allowedMcpServers(servers, undefined)).toEqual(servers);
+  expect(allowedMcpServers(servers, { mcpServerCredentials: "no credentials" })).toEqual([
+    { name: "plain-http", type: "http", url: "http://127.0.0.1:8788/mcp", headers: {} },
+    { name: "plain-stdio", command: "npx", args: ["-y", "demo"], env: {} },
+  ]);
+  expect(allowedMcpServers([servers[0]!], { mcpServerCredentials: "no credentials" })).toBeUndefined();
+  expect(allowedMcpServers(servers, { mcpServers: "unsupported" })).toBeUndefined();
 });

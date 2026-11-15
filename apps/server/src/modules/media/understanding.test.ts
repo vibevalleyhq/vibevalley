@@ -5,10 +5,10 @@ import { BizCode } from "@vibevalley/protocol/api";
 
 import { png } from "#/modules/media/testdata/png.ts";
 import { waitFor } from "#/testing/layers.ts";
+import { mediaFarm, minutes, never, vendor } from "#/testing/media.ts";
 import * as q from "#db/media_job.sql.ts";
 
 import { newJob } from "./job.ts";
-import { mediaFarm, minutes, never, vendor } from "./testing.ts";
 
 const notIn = (value: unknown, secret: string) => {
   expect(JSON.stringify(value)).not.toContain(secret);

@@ -90,7 +90,6 @@ describe("moves and the stage", () => {
         hiredAt: 0,
         brief: "Task",
         runs: 1,
-        refining: false,
         phase: { _tag: "done" },
         lastRun: { outcome, summary: "Result", at: 1 },
       };
@@ -114,14 +113,16 @@ describe("moves and the stage", () => {
   const session = (lastRun: "completed" | "failed" | "interrupted") =>
     ({ id: "w1", phase: { _tag: "done" }, lastRun: { outcome: lastRun, summary: "", at: 1 } }) as unknown as Session;
   const base = { status: "in_review", assignments: assigned(), questions: [], findings: [], createdAt: 0 } as unknown as Issue;
-  const answeredSession = {
-    ...session("completed"),
-    lastRun: { outcome: "completed", summary: "", at: 1, answer: { conclusion: "慢在读配置", evidence: ["clock.ts:1"], unsure: [], next: [] } },
-  } as Session;
+  const sampleAnswer = { conclusion: "慢在读配置", evidence: ["clock.ts:1"], unsure: [], next: [] };
+  const answeredIssue = {
+    ...base,
+    deliver: "answer",
+    answer: sampleAnswer,
+  } as Issue;
   it("an answer issue waits on a conclusion it can read", () => {
     const answerIssue = { ...base, deliver: "answer" } as Issue;
     expect(issueStageOf(answerIssue, session("completed"))).toMatchObject({ state: "stuck", stuck: "failed", lead: "cure" });
-    const answered = issueStageOf(answerIssue, answeredSession);
+    const answered = issueStageOf(answeredIssue, session("completed"));
     expect([answered.state, answered.lead, answered.acts.map((a) => a.act)]).toEqual(["reviewing", "acknowledge", ["acknowledge", "reject", "tell", "close"]]);
     expect(issueStageOf({ ...base, deliver: "change" }, session("completed"))).toMatchObject({ state: "reviewing", lead: "complete" });
   });
@@ -133,7 +134,7 @@ describe("moves and the stage", () => {
       [{ reviewedAt: 5 }, session("completed")],
       [{ deliver: "branch" }, session("completed")],
       [{ deliver: "answer" }, session("completed")],
-      [{ deliver: "answer" }, answeredSession],
+      [{ deliver: "answer", answer: sampleAnswer }, session("completed")],
       [{ assignments: [], deliver: "answer", lastRun: { startedAt: 1, endedAt: 2, outcome: "completed" } }, undefined],
       [{ assignments: [], deliver: "answer", lastRun: { startedAt: 1, endedAt: 2, outcome: "failed" } }, undefined],
       [{ assignments: [], deliver: "answer", lastRun: { startedAt: 1, endedAt: 2, outcome: "interrupted" } }, undefined],
@@ -157,9 +158,8 @@ describe("moves and the stage", () => {
       brief: "写打卡",
       hiredAt: 1,
       runs: 1,
-      issue: "t1",
+      scope: { kind: "issue", id: "t1" },
       phase: { _tag: "working", since: 1, doing: { action: "none", label: "" } },
-      refining: false,
     } as unknown as Session;
     const issue = {
       ...base,

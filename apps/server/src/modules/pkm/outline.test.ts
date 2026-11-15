@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { flatBlocks } from "@vibevalley/pkm";
-
-import { carryIds, edgesOf, outlineOf, parse, print, spansOf, walk } from "./outline.ts";
-import { fileOf, tierOfFile, titleOfFile } from "./para.ts";
+import { carryIds, edgesOf, outlineOf, parse, print, spansOf, walk } from "@vibevalley/pkm/markdown";
+import { flatBlocks } from "@vibevalley/pkm/outline";
+import { fileOf, tierOfFile, titleOfFile } from "@vibevalley/pkm/para";
 
 const page = [
   "title:: Cetus Core Engine",

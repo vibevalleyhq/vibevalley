@@ -1,8 +1,9 @@
 import { Semaphore } from "@vibevalley/async";
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { assignedAgentOf, closedText, cut, latestSessionIdOf } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, closedText, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
+import { cut } from "#/base/clip.ts";
 import { ApiError, BizCode, lookIn, missing, refuseIn } from "#/base/errors.ts";
 import type { Core } from "#/core/core.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
@@ -12,20 +13,26 @@ import { issueBranch, type Repo } from "#/modules/repo/repo.ts";
 import { RepoError } from "#/modules/repo/workplace.ts";
 import { conflictBrief } from "#/modules/session/briefing.ts";
 import { askedMax } from "#/modules/session/journal.ts";
-import { type Hired, type HireOptions, HireRefused, type Session } from "#/modules/session/session.ts";
+import { type Hired, type HireOptions, HireRefused, refinementSessionPolicy, type Session, workSessionPolicy } from "#/modules/session/session.ts";
 import type { Trigger } from "#/modules/session/shapes.ts";
 
 import { issueBrief } from "./brief.ts";
 import { explicitMandate, inferredMandate } from "./creation.ts";
-import type { Due } from "./cron.ts";
 import { acceptanceAncestors, blockedIssues } from "./dependencies.ts";
 import type { Intake, QueuedInput } from "./intake.ts";
 import type { IssueLifecycle } from "./lifecycle.ts";
 import { sourceBrief, workConstraints } from "./prompts.ts";
 import type { IssueSplitting } from "./split.ts";
 import { isClosed, assignedOnDuty } from "./status.ts";
+import type { Due } from "./when.ts";
 
 const refused = refuseIn(BizCode.IssueRefused);
+
+/** Hire options used inside the issue module, carrying the target issue and refinement mode. */
+export interface IssueHireOptions extends HireOptions {
+  readonly issue?: string;
+  readonly refining?: boolean;
+}
 
 /** What starting an issue came to: the session sent, or why it waits in the queue. */
 export interface Dispatched {
@@ -52,7 +59,7 @@ export interface DispatchDeps {
   readonly agent: Agent;
   readonly repo: Repo;
   readonly session: Session;
-  readonly intake: Pick<Intake, "inputsOf" | "queued" | "forwarded">;
+  readonly intake: Pick<Intake, "inputsOf" | "queued" | "forwarded" | "subscribe">;
   readonly channel: Channel;
   readonly log: Logger;
 }
@@ -75,7 +82,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
   const trying = new Semaphore(1);
 
   /** Throws HireRefused. */
-  const hire = async (agent: T.Agent, brief: string, repo: string, opt: HireOptions = {}): Promise<Hired> => {
+  const hire = async (agent: T.Agent, brief: string, repo: string, opt: IssueHireOptions = {}): Promise<Hired> => {
     if (store.isOrchestrator(agent.id)) throw new HireRefused(t("server.issue.orchestratorNotHelper"));
     if (!agent.enabled) throw new HireRefused(t("server.issue.disabled", { name: agent.name }));
     for (const i of await store.problemsOf(agent))
@@ -99,7 +106,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
       issue.constraints,
       acceptanceAncestors(issue, all).flatMap((item) => item.constraints?.frozen ?? []),
     );
-    const { issue: _issue, hiring: _hiring, ...sending } = opt;
+    const { issue: _issue, hiring: _hiring, refining: _refining, ...sending } = opt;
     const hiredIssue = issue;
     try {
       if (parent)
@@ -118,15 +125,11 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
           ...sending,
           ...(source ? { preamble: source } : {}),
           ...(base ? { base, worktree: true } : {}),
-          context: {
-            kind: "issue",
-            issue: {
-              id: hiredIssue.id,
-              number: hiredIssue.number,
-            },
-          },
+          scope: { kind: opt.refining === true ? "draft" : "issue", id: hiredIssue.id },
+          policy: opt.refining === true ? refinementSessionPolicy : workSessionPolicy,
+          checkoutNumber: hiredIssue.number,
         },
-        envelopes: { _tag: "Queued", triggers: opt.inputs ?? [] },
+        envelopes: { _tag: "Queued", triggers: opt.inputs ?? [], issue: hiredIssue.id },
         hiring: async (w) => {
           if (opt.refining !== true) await recordHiredStart(hiredIssue.id, w);
         },
@@ -145,7 +148,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
   };
 
   /** hire, its refusal told as the issue's. */
-  const hired = async (agent: T.Agent, brief: string, repo: string, opt: HireOptions) => {
+  const hired = async (agent: T.Agent, brief: string, repo: string, opt: IssueHireOptions) => {
     try {
       return await hire(agent, brief, repo, opt);
     } catch (e) {
@@ -317,6 +320,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
         inferredMandate(input.id),
         s.id,
       ));
+    await intake.subscribe(issue.id, [`cron:${s.id}`]);
     if (assignedOnDuty(issue, store.isOrchestrator)) {
       if (!found || isClosed(issue.status) || issue.lastRun === undefined) await beginOnDuty(issue, channel.id);
     } else {

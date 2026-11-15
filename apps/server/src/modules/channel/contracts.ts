@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { Subscription } from "@vibevalley/async";
+import type { Hub, Subscription } from "@vibevalley/async";
 import type * as T from "@vibevalley/protocol";
 import { userId } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
@@ -12,10 +12,14 @@ import { jsonText, storedJsonOrUndefined } from "#/base/json.ts";
 import type * as qm from "#db/channel_message.sql.ts";
 
 import { type ChannelType, type Meta, metaOf, type Picked } from "./meta.ts";
-import { type ChannelRow } from "./rooms.ts";
+import type { ChannelRow, ChannelStore, Seat, ThreadSubject } from "./store.ts";
 
 export type { ChannelType, Meta, Picked } from "./meta.ts";
 export { channelType, envelopeMore, metaOf, metaText } from "./meta.ts";
+export type { ChannelRow, Seat, ThreadSubject } from "./store.ts";
+
+/** A thread named by the message it hangs under shows this much of it. */
+export const threadTitleMax = 24;
 export type MessageKind = T.ChatMessage["kind"];
 
 export type MsgRow = qm.MessageByIDResult;
@@ -210,12 +214,6 @@ export const optional = (s: string | undefined) => {
   return text === "" ? null : text;
 };
 
-export interface ThreadSubject {
-  readonly kind: NonNullable<T.Channel["subjectKind"]>;
-  readonly id: string;
-  readonly owner: string;
-}
-
 export interface Write {
   readonly channel: string;
   readonly from: string;
@@ -229,16 +227,6 @@ export interface Write {
   readonly replyTo?: number;
   /** Advances this participant's read cursor in the same transaction. */
   readonly readBy?: string;
-}
-
-/** An agent seated to speak in the chat: an orchestrator (a profile speaking as itself, no `agent`), or a helper speaking
- * for the profile `agent` (a session, a profile's seat in its direct channel). */
-export interface Seat {
-  readonly id: string;
-  readonly name: string;
-  readonly agent?: string;
-  /** The place an empty target means for it; none keeps the one it had. */
-  readonly home?: string;
 }
 
 export interface Participant {
@@ -321,52 +309,44 @@ export interface UserRead {
   readonly at: number;
 }
 
-/** Refusals are ApiErrors (thrown). */
-export interface ChannelService {
-  /** Each read of the user's from now on. */
-  readonly userReads: () => Subscription<UserRead>;
-  readonly defaultChannel: () => string;
-  readonly makeDefault: (id: string) => Promise<void>;
-  /** The user's words in a place: the farm goes live. */
-  readonly say: (s: Saying) => Promise<{ readonly message: T.ChatMessage; readonly again: boolean }>;
-  /** An agent's words: a retry of the same words is the same message; newer words it has not seen are shown instead of
-   * sending (held), and a channel right after reading a thread elsewhere is confirmed once. */
-  readonly speak: (s: Speaking) => Promise<Spoken>;
-  /** Words written as `from` into a place; the speaker has read the place up to them. */
-  readonly post: (p: Posting) => Promise<{ readonly message: T.ChatMessage; readonly again: boolean }>;
-  /** The farm's notice; best effort, it never fails. */
-  readonly notice: (n: Noticing) => Promise<void>;
-  /** Edits do not wake participants. */
-  readonly edit: (id: T.MessageId, text: string, keep?: readonly string[]) => Promise<T.ChatMessage>;
-  /** Clears content and withdraws pending deliveries while preserving the message number. */
-  readonly remove: (id: T.MessageId) => Promise<void>;
-  readonly previewRemove: (id: T.MessageId) => Promise<T.Preview>;
-  readonly react: (id: T.MessageId, who: string, emoji: string, on: boolean) => Promise<T.ChatMessage>;
-  readonly pin: (id: T.MessageId, on: boolean) => Promise<T.ChatMessage>;
-  readonly pins: (channel: string) => Promise<T.ChatMessage[]>;
-  readonly threadUnder: (id: T.MessageId) => Promise<string>;
-  readonly openThreadAbout: (kind: NonNullable<T.Channel["subjectKind"]>, id: string, title: string, channel?: string) => Promise<string>;
-  readonly search: (text: string, channel?: string) => Promise<T.MessageHit[]>;
-  /** `""` resolves to `from`'s own session thread, or the default channel. */
-  readonly placeOf: (from: string, channel: string) => Promise<string>;
-  readonly read: (who: string, opt?: ReadOptions) => Promise<ReadResult>;
-  /** A participant's unread: in `channel` (none: the channel its home is in, or the default one) and the threads it follows. */
-  readonly unread: (who: string, channel?: string) => Promise<T.ChannelUnread[]>;
-  readonly list: () => Promise<T.Channel[]>;
-  readonly history: (channel: string, before?: number, limit?: number) => Promise<T.ChatMessage[]>;
-  /** Reads from DB because `SpaceState.chat` retains only recent channels. */
-  readonly messageLocation: (id: T.MessageId) => Promise<{ readonly channel: T.Channel; readonly top: string } | undefined>;
-  readonly envelopeResource: (id: T.MessageId) => Promise<EnvelopeResource | undefined>;
-  readonly markRead: (channel: string, seq: number) => Promise<void>;
-  /** A message as the user's notice of it stands: when the user read it (null: not yet), and whether a later message
-   * there took its place (the user spoke after it, or its speaker reported again). None once it is deleted. */
-  readonly userReceipt: (
-    id: T.MessageId,
-  ) => Promise<{ readonly message: T.ChatMessage; readonly readAt: number | null; readonly superseded: boolean } | undefined>;
-  /** Each speaker's newest report the user has read, and when the user read it. */
-  readonly userReadReports: () => Promise<readonly { readonly from: string; readonly at: number; readonly readAt: number }[]>;
-  /** The place an empty target means for a participant: the home the layers above gave it. */
-  readonly homeOf: (participant: string) => Promise<string | undefined>;
+/** The chat's shared state and the ways it is told: the store, the hubs of what was said and read, and the frames. */
+export interface ChannelHub {
+  readonly store: ChannelStore;
+  readonly said: Hub<T.ChatMessage>;
+  readonly userReadHub: Hub<UserRead>;
+  readonly isOrchestratorSeat: (id: string) => boolean;
+  readonly orchestratorSeats: () => string[];
+  readonly orchestratorInRow: (row: ChannelRow | undefined) => string;
+  readonly membersOfRow: (row: ChannelRow | undefined) => string[];
+  readonly channelTags: () => string[];
+  readonly channelIdOf: (row: ChannelRow) => string;
+  readonly directWith: (who: string, other: string) => ChannelRow | undefined;
+  readonly targetOfRow: (type: string, rootNumber: number | null, name: string | null, channelId: string | null, channelNameOf: string | null) => string;
+  readonly targetOfChannel: (row: ChannelRow) => string;
+  readonly toChannel: (row: ChannelRow, unread?: number, title?: string, last?: MsgRow) => T.Channel;
+  readonly counted: (row: ChannelRow) => Promise<T.Channel>;
+  readonly publishChannel: (id: string) => Promise<void>;
+  readonly publishUserMentions: () => Promise<void>;
+  readonly publishMessage: (row: MsgRow, answers: T.SessionId | undefined) => void;
+  readonly threadOf: (subject: ThreadSubject) => string | undefined;
+  readonly homeOf: (participant: string) => string | undefined;
+  readonly topOfRow: (row: ChannelRow | undefined) => ChannelRow | undefined;
+  readonly readUpTo: (who: string, channel: string, upto: number) => Promise<void>;
+  readonly readThrough: (who: string, channel: string, upto: number) => Promise<void>;
+  readonly change: (row: MsgRow, work: (revision: number, now: number) => Promise<unknown>) => Promise<T.ChatMessage>;
+  readonly messageOf: (id: T.MessageId) => Promise<MsgRow>;
+  readonly reacting: (id: T.MessageId, who: string, emoji: string, on: boolean) => Promise<T.ChatMessage>;
+  readonly attachmentsOf: (ids: readonly string[]) => Promise<T.Attachment[]>;
+  readonly filesAt: (id: string) => string;
+  readonly unreadOf: (who: string, inChannel?: string) => Promise<T.ChannelUnread[]>;
+  readonly addressedOf: (row: MsgRow) => AddressedMessage;
+  readonly placeOf: (row: ChannelRow) => Place;
+  readonly close: () => void;
+}
+
+/** The chat's port for the watch above it: committed events and write backpressure, participant seats and places,
+ * participant cursors, raw rows and farm notes, and user read receipts. */
+export interface ChannelWatchPort {
   /** Each event committed from now on, in the order committed: subscribed before it returns. A reader keeps its own
    * cursor and reads what it missed with `events`. */
   readonly committed: () => Subscription<Told>;
@@ -383,6 +363,8 @@ export interface ChannelService {
   /** A participant gone: in nothing, never back. */
   readonly leave: (participant: string) => Promise<void>;
   readonly participants: () => readonly Participant[];
+  /** The direct channel with a seated agent (an orchestrator, a profile's seat), made when there is none. */
+  readonly createDirect: (peer: string) => Promise<string>;
   /** Makes a participant a member of a place from its newest message on. */
   readonly addFollower: (channel: string, participant: string) => Promise<void>;
   readonly membersOf: (channel: string) => readonly string[];
@@ -408,6 +390,56 @@ export interface ChannelService {
   /** A note the farm writes for the layers above: a dispatch under the orchestrator's name, or a report; `topic` opens
    * the place's thread about it under the note, `member` follows the place from it. */
   readonly note: (n: Note) => Promise<{ readonly thread: string }>;
+  readonly previewRemove: (id: T.MessageId) => Promise<T.Preview>;
+  /** Each read of the user's from now on. */
+  readonly userReads: () => Subscription<UserRead>;
+  /** A message as the user's notice of it stands: when the user read it (null: not yet), and whether a later message
+   * there took its place (the user spoke after it, or its speaker reported again). None once it is deleted. */
+  readonly userReceipt: (
+    id: T.MessageId,
+  ) => Promise<{ readonly message: T.ChatMessage; readonly readAt: number | null; readonly superseded: boolean } | undefined>;
+  /** Each speaker's newest report the user has read, and when the user read it. */
+  readonly userReadReports: () => Promise<readonly { readonly from: string; readonly at: number; readonly readAt: number }[]>;
+  /** `"none"` on either the thread or its parent channel silences both. */
+  readonly notifyOf: (id: string) => T.Notify;
+}
+
+/** Refusals are ApiErrors (thrown). */
+export interface ChannelService extends ChannelWatchPort {
+  readonly defaultChannel: () => string;
+  readonly makeDefault: (id: string) => Promise<void>;
+  /** The user's words in a place: the farm goes live. */
+  readonly say: (s: Saying) => Promise<{ readonly message: T.ChatMessage; readonly again: boolean }>;
+  /** An agent's words: a retry of the same words is the same message; newer words it has not seen are shown instead of
+   * sending (held), and a channel right after reading a thread elsewhere is confirmed once. */
+  readonly speak: (s: Speaking) => Promise<Spoken>;
+  /** Words written as `from` into a place; the speaker has read the place up to them. */
+  readonly post: (p: Posting) => Promise<{ readonly message: T.ChatMessage; readonly again: boolean }>;
+  /** The farm's notice; best effort, it never fails. */
+  readonly notice: (n: Noticing) => Promise<void>;
+  /** Edits do not wake participants. */
+  readonly edit: (id: T.MessageId, text: string, keep?: readonly string[]) => Promise<T.ChatMessage>;
+  /** Clears content and withdraws pending deliveries while preserving the message number. */
+  readonly remove: (id: T.MessageId) => Promise<void>;
+  readonly react: (id: T.MessageId, who: string, emoji: string, on: boolean) => Promise<T.ChatMessage>;
+  readonly pin: (id: T.MessageId, on: boolean) => Promise<T.ChatMessage>;
+  readonly pins: (channel: string) => Promise<T.ChatMessage[]>;
+  readonly threadUnder: (id: T.MessageId) => Promise<string>;
+  readonly openThreadAbout: (kind: NonNullable<T.Channel["subjectKind"]>, id: string, title: string, channel?: string) => Promise<string>;
+  readonly search: (text: string, channel?: string) => Promise<T.MessageHit[]>;
+  /** `""` resolves to `from`'s own session thread, or the default channel. */
+  readonly placeOf: (from: string, channel: string) => Promise<string>;
+  readonly read: (who: string, opt?: ReadOptions) => Promise<ReadResult>;
+  /** A participant's unread: in `channel` (none: the channel its home is in, or the default one) and the threads it follows. */
+  readonly unread: (who: string, channel?: string) => Promise<T.ChannelUnread[]>;
+  readonly list: () => Promise<T.Channel[]>;
+  readonly history: (channel: string, before?: number, limit?: number) => Promise<T.ChatMessage[]>;
+  /** Reads from DB because `SpaceState.chat` retains only recent channels. */
+  readonly messageLocation: (id: T.MessageId) => Promise<{ readonly channel: T.Channel; readonly top: string } | undefined>;
+  readonly envelopeResource: (id: T.MessageId) => Promise<EnvelopeResource | undefined>;
+  readonly markRead: (channel: string, seq: number) => Promise<void>;
+  /** The place an empty target means for a participant: the home the layers above gave it. */
+  readonly homeOf: (participant: string) => Promise<string | undefined>;
   /** Refused removals: each guard says what still points at a channel (none: nothing). */
   readonly guardRemoval: (guard: (channel: string) => Promise<readonly string[]>) => void;
   readonly now: () => T.Chat | undefined;
@@ -425,10 +457,6 @@ export interface ChannelService {
   readonly removeChannel: (id: string) => Promise<void>;
   readonly previewRemoveChannel: (id: string) => Promise<T.Preview>;
   readonly setNotify: (id: string, notify: T.Notify) => Promise<void>;
-  /** `"none"` on either the thread or its parent channel silences both. */
-  readonly notifyOf: (id: string) => T.Notify;
-  /** The direct channel with a seated agent (an orchestrator, a profile's seat), made when there is none. */
-  readonly createDirect: (peer: string) => Promise<string>;
   readonly orchestratorIn: (channel: string) => string;
   readonly markUnread: (channel: string, number: number) => Promise<void>;
   /** Parent channel for a thread, or the default channel for a direct conversation. */

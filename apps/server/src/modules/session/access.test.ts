@@ -1,4 +1,4 @@
-import type { RawEvent, SessionOptions } from "@botiverse/oar";
+import { antigravityRuntime, type RawEvent, type SessionOptions } from "@botiverse/oar";
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { expect, test } from "vite-plus/test";
 
@@ -6,6 +6,8 @@ import { issueId } from "@vibevalley/protocol/schema";
 
 import { starter, until } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
+
+import { workSessionPolicy } from "./session.ts";
 
 /** Runs with no proxy bypass in the server's own environment, as a farm started without one. */
 async function withoutProxyEnvironment<A>(work: () => Promise<A>): Promise<A> {
@@ -36,7 +38,9 @@ test("regression: worker environments merge proxy bypasses without changing thei
     await using farm = await world({ runtimes: [runtime], repos: ["demo"] });
     const sessions = farm.inside;
     const sent = await sessions.hire({ ...starter("lab"), effort: "", env }, "work", "demo", {
-      context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } },
+      scope: { kind: "issue", id: issueId("i1") },
+      policy: workSessionPolicy,
+      checkoutNumber: 1,
     });
     expect(sent.session.id).toBeTruthy();
     expect(received).toMatchObject({
@@ -87,7 +91,9 @@ test("regression: early tool connection failures reach the journal and core with
       hiring: async () => {
         observing = true;
       },
-      context: { kind: "issue", issue: { id: issueId("i1"), number: 1 } },
+      scope: { kind: "issue", id: issueId("i1") },
+      policy: workSessionPolicy,
+      checkoutNumber: 1,
     });
     const id = sent.session.id;
     expect(core.session(id)).toMatchObject({ toolConnections: [{ server: "vibevalley", status: "failed", reason: "connection refused" }] });
@@ -101,5 +107,59 @@ test("regression: early tool connection failures reach the journal and core with
     await machines.executions(machines.here()).close(id);
     expect(subscribed).toBeGreaterThan(0);
     expect(released).toBe(subscribed);
+  });
+});
+
+test("regression: antigravity drops credentialed built-in mcpServers while keeping appendSystemPrompt and plain servers", () => {
+  let received: SessionOptions | undefined;
+  const base = scriptedRuntime({ id: "antigravity", turn: () => {} });
+  const runtime = {
+    ...base,
+    refusedSessionOptions: antigravityRuntime.refusedSessionOptions,
+    session: (...args: Parameters<typeof base.session>) => {
+      received = args[1];
+      return base.session(...args);
+    },
+  };
+  return withoutProxyEnvironment(async () => {
+    await using farm = await world({ runtimes: [runtime], repos: ["demo"] });
+    const sessions = farm.inside;
+    const core = farm.core;
+    const machines = farm.inside;
+    const sent = await sessions.hire(
+      {
+        ...starter("lab"),
+        runtime: "antigravity",
+        effort: "",
+        personaMode: "append",
+        mcpServers: [{ type: "stdio", name: "plain", command: "npx", args: [], env: {} }],
+      },
+      "work",
+      "demo",
+      { scope: { kind: "issue", id: issueId("i1") }, policy: workSessionPolicy, checkoutNumber: 1 },
+    );
+    expect(sent.session.id).toBeTruthy();
+    expect(received?.appendSystemPrompt).toContain("## 会话命令行");
+    expect(received?.mcpServers).toEqual([{ name: "plain", command: "npx", args: [], env: {} }]);
+    expect(core.session(sent.session.id)?.toolConnections).toEqual([{ server: "plain", status: "unknown" }]);
+    await until(() => core.session(sent.session.id)?.phase._tag === "done", "antigravity run completes without credentialed mcpServers");
+    await machines.executions(machines.here()).close(sent.session.id);
+
+    const noUserServers = await sessions.hire(
+      {
+        ...starter("lab"),
+        runtime: "antigravity",
+        effort: "",
+        personaMode: "append",
+        mcpServers: [],
+      },
+      "work",
+      "demo",
+      { scope: { kind: "issue", id: issueId("i1") }, policy: workSessionPolicy, checkoutNumber: 1 },
+    );
+    expect(received?.mcpServers).toBeUndefined();
+    expect(core.session(noUserServers.session.id)?.toolConnections).toEqual([]);
+    await until(() => core.session(noUserServers.session.id)?.phase._tag === "done", "antigravity run completes with no mcpServers");
+    await machines.executions(machines.here()).close(noUserServers.session.id);
   });
 });

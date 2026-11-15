@@ -1,6 +1,6 @@
 import { Hub, Semaphore, type Subscription, TaskGroup } from "@vibevalley/async";
 import { type ChatMessage, type InboxItem, type MessageId } from "@vibevalley/protocol";
-import { freshOf } from "@vibevalley/protocol/rules";
+import { freshOf, issueScopeOf } from "@vibevalley/protocol/rules";
 
 import type { Core } from "#/core/core.ts";
 import type { ServerConfig } from "#/infra/config.ts";
@@ -58,7 +58,8 @@ export function userInbox(
     if (receipt.superseded) return undefined;
     if (message.kind === "report") {
       const session = sessions.live(message.from).session;
-      const issue = issues.onBoard().find((item) => item.id === session?.issue);
+      const sessionIssue = session ? issueScopeOf(session) : undefined;
+      const issue = issues.onBoard().find((item) => item.id === sessionIssue);
       if (issue && !["draft", "asking", "stuck", "reviewing"].includes(issue.stage.state)) return undefined;
       if (!issue && session?.phase._tag === "working") return undefined;
     }

@@ -38,7 +38,7 @@ const reminded = (input: string): [string[], string] => {
 /** A finished turn is kept in the background. */
 const kept = (fw: { readonly memory: Memory }, agent: string, n: number) =>
   await_(
-    () => fw.memory.list(agent),
+    async () => (await fw.memory.memoriesOf(agent)).memories,
     (got) => got.length >= n,
     `${agent} remembers ${n}`,
   );
@@ -100,7 +100,7 @@ describe("memory", () => {
         .map((r) => r.join("|"))
         .toSorted(),
     );
-    const memories2 = await memories.list(first.id);
+    const memories2 = (await memories.memoriesOf(first.id)).memories;
     expect(memories2).toEqual([]);
 
     await sessions.dismiss(first.id);

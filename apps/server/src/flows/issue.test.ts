@@ -5,7 +5,7 @@ import { describe, expect, test } from "vite-plus/test";
 
 import type * as T from "@vibevalley/protocol";
 import { BizCode } from "@vibevalley/protocol/api";
-import { assignedAgentOf, executionsOf, isBusy, latestSessionIdOf, sessionIdsOf } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, executionsOf, isBusy, issueScopeOf, latestSessionIdOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { user } from "#/base/actor.ts";
@@ -65,10 +65,11 @@ describe("an issue", () => {
 
     const hired = await issues.hire(lab(), "看看打卡页", "clock");
     const looked = mustHire(hired);
+    const lookedIssue = issueScopeOf(looked)!;
     await w.nextReport();
     const before = mainLog();
-    await issues.setStatus(looked.issue!, "done", "", "", user);
-    const nothing = await closed(looked.issue!);
+    await issues.setStatus(lookedIssue, "done", "", "", user);
+    const nothing = await closed(lookedIssue);
     expect([nothing.status, nothing.delivered, nothing.canceled]).toEqual(["done", "none", undefined]);
     const gone = await left(looked.id);
     expect(gone?.phase._tag === "closed" && gone.phase.closed).toBe("completed");
@@ -76,20 +77,22 @@ describe("an issue", () => {
 
     const hired2 = await issues.hire(lab(), "写打卡并提交", "clock");
     const kept = mustHire(hired2);
+    const keptId = issueScopeOf(kept)!;
     await w.nextReport();
-    const keptIssue = await issues.get(kept.issue!);
-    await issues.edit(kept.issue!, { deliver: "branch" }, user);
-    await issues.setStatus(kept.issue!, "done", "", "", user);
-    expect((await closed(kept.issue!)).delivered).toBe("kept");
+    const keptIssue = await issues.get(keptId);
+    await issues.edit(keptId, { deliver: "branch" }, user);
+    await issues.setStatus(keptId, "done", "", "", user);
+    expect((await closed(keptId)).delivered).toBe("kept");
     await left(kept.id);
     expect(mainLog()).toBe(before);
     expect(git(repo, "branch", "--list", `vibevalley/issue-${keptIssue.number}`)).not.toBe("");
 
     const hired3 = await issues.hire(lab(), "写打卡并提交", "clock");
     const completed = mustHire(hired3);
+    const completedIssue = issueScopeOf(completed)!;
     await w.nextReport();
-    await issues.setStatus(completed.issue!, "done", "", "", user);
-    expect((await closed(completed.issue!)).delivered).toBe("merged");
+    await issues.setStatus(completedIssue, "done", "", "", user);
+    expect((await closed(completedIssue)).delivered).toBe("merged");
     expect(mainLog()).not.toBe(before);
   });
 
@@ -104,22 +107,23 @@ describe("an issue", () => {
     await fw.agent.save(lab());
     const hired = await issues.hire(lab(), "写打卡并提交", "clock-in");
     const session = mustHire(hired);
-    expect(session.issue).toBeTruthy();
+    const sessionIssue = issueScopeOf(session)!;
+    expect(sessionIssue).toBeTruthy();
     await w.nextReport();
     const setStatusFailure = await failure(issues.setStatus(session.id, "todo", "", "", user));
     refusedWith(setStatusFailure);
-    await issues.setStatus(session.issue!, "done", "", "", user);
+    await issues.setStatus(sessionIssue, "done", "", "", user);
     const ended = (await sessions.get(session.id))!;
-    expect([ended.phase._tag === "closed" && ended.phase.closed, ended.lastRun?.outcome, !!ended.lastRun?.summary, ended.runs, ended.issue]).toEqual([
+    expect([ended.phase._tag === "closed" && ended.phase.closed, ended.lastRun?.outcome, !!ended.lastRun?.summary, ended.runs, issueScopeOf(ended)]).toEqual([
       "merged",
       "completed",
       true,
       1,
-      session.issue,
+      sessionIssue,
     ]);
     const closedAs = (how: string) =>
       await_(
-        () => issues.get(session.issue!),
+        () => issues.get(sessionIssue),
         (i) => (i.delivered ?? i.canceled) === how,
         `closed as ${how}`,
       );
@@ -130,7 +134,7 @@ describe("an issue", () => {
     await w.nextReport();
     const issue = await issues.get(again);
     expect([issue.id, sessionIdsOf(issue), issue.delivered, issue.canceled, issue.closedAt]).toEqual([
-      session.issue,
+      sessionIssue,
       [session.id, again],
       undefined,
       undefined,
@@ -139,7 +143,7 @@ describe("an issue", () => {
     const reopened = (await sessions.get(again))!;
     expect(reopened.brief).toMatch(new RegExp(`^打卡还要记下时区\\n\\n（这张工单重开了，上一次是 .+（${session.id}）做的。）`, "u"));
     expect(reopened.brief).toMatch(/这张工单原来是：写打卡并提交\n它是怎么关的：已完成，合进了主分支/u);
-    const setStatusFailure2 = await failure(issues.setStatus(session.issue!, "todo", "", "", user));
+    const setStatusFailure2 = await failure(issues.setStatus(sessionIssue, "todo", "", "", user));
     refusedWith(setStatusFailure2);
     expect((await failure(issues.setStatus("w404", "todo", "", "", user))).bizCode).toBe(BizCode.IssueNotFound);
     await sessions.dismiss(again);
@@ -246,7 +250,6 @@ describe("an issue", () => {
         hiredAt: 0,
         runs: 0,
         phase: { _tag: "working", since: Date.now(), doing: { action: "none", label: "" } },
-        refining: false,
       } as T.Session,
     });
     const issue = await issues.add({ title: "等空位的活", repo: "queue", agent: "lab" });
@@ -278,9 +281,9 @@ describe("an issue", () => {
     const w = watch(fw);
     const issue = fw.issue;
     const issues = testIssues(issue);
-    const crons = fw.issue;
+    const crons = fw.cron;
     await fw.agent.save({ ...lab(), enabled: true });
-    const made = await crons.addCron(
+    const made = await crons.add(
       {
         name: "巡检",
         text: "看一眼",
@@ -292,7 +295,7 @@ describe("an issue", () => {
     );
     const due = async () => {
       clock.adjust(5 * 60_000 + 1);
-      await crons.tickCrons();
+      await crons.tick();
       await fw.intake.replay();
     };
     const ofCron = async () => withCron(await issues.list(), made.id);
@@ -392,16 +395,17 @@ describe("an issue", () => {
     git(cwd, "add", ".vibevalley/check");
     git(cwd, "commit", "-qm", "the check that fails");
     const repo = join(f.config.workRoot, "repos", "clock");
+    const helperIssue = issueScopeOf(helper)!;
     const before = git(repo, "rev-parse", "main");
-    const setStatusFailure = await failure(issues.setStatus(helper.issue!, "done", "", "", user));
+    const setStatusFailure = await failure(issues.setStatus(helperIssue, "done", "", "", user));
     refusedWith(setStatusFailure, "merge-check-failed");
-    // Not done; the helper is already told what failed (issue/merge.ts notTaken) and may be at it (in_progress).
-    expect((await issues.get(helper.issue!)).status).not.toBe("done");
+    // Not done; the helper is already told what failed (issue/landing.ts notTaken) and may be at it (in_progress).
+    expect((await issues.get(helperIssue)).status).not.toBe("done");
     await until(() => {
       const got = sessions.sessionOf(helper.id);
       return got !== undefined && sessions.lastTextOf(helper.id).includes("merge-check-failed") && !isBusy(got);
     }, "the helper hears the check's output");
-    expect((await issues.get(helper.issue!)).status).toBe("in_review");
+    expect((await issues.get(helperIssue)).status).toBe("in_review");
     expect(git(repo, "rev-parse", "main")).toBe(before);
     expect(existsSync(cwd)).toBe(true);
     git(repo, "rev-parse", "--verify", helper.branch!);
@@ -510,16 +514,17 @@ describe("an issue", () => {
     const repo = join(f.config.workRoot, "repos", "clock");
     const hired = await issues.hire(lab(), "写打卡并提交", "clock");
     const committed = mustHire(hired);
+    const committedIssue = issueScopeOf(committed)!;
     await w.nextReport();
     const before = git(repo, "log", "--format=%s", "main");
-    const merging = await issues.previewStatus(committed.issue!, "done", "");
+    const merging = await issues.previewStatus(committedIssue, "done", "");
     expect(merging.does.at(-1)).toMatch(/^合进 main（1 个提交），关成已完成，/u);
-    const keeping = await issues.previewStatus(committed.issue!, "done", "", {}, { deliver: "branch" });
+    const keeping = await issues.previewStatus(committedIssue, "done", "", {}, { deliver: "branch" });
     expect(keeping.does[0]).toMatch(/关成已完成：分支留着没合（1 个提交）$/u);
-    expect([git(repo, "log", "--format=%s", "main"), (await issues.get(committed.issue!)).status]).toEqual([before, "in_review"]);
-    await issues.setStatus(committed.issue!, "done", "", "", user);
+    expect([git(repo, "log", "--format=%s", "main"), (await issues.get(committedIssue)).status]).toEqual([before, "in_review"]);
+    await issues.setStatus(committedIssue, "done", "", "", user);
     const done = await await_(
-      () => issues.get(committed.issue!),
+      () => issues.get(committedIssue),
       (i) => i.closedAt !== undefined,
       "done",
     );
@@ -527,10 +532,11 @@ describe("an issue", () => {
 
     const hired2 = await issues.hire(lab(), "看看打卡页", "clock");
     const looked = mustHire(hired2);
+    const lookedIssue = issueScopeOf(looked)!;
     await w.nextReport();
-    expect((await issues.previewStatus(looked.issue!, "done", "")).does[0]).toMatch(/关成已完成：没有改动要合$/u);
-    expect((await issues.previewStatus(looked.issue!, "canceled", "")).does[0]).toMatch(/关成已取消$/u);
-    const previewStatusFailure = await failure(issues.previewStatus(looked.issue!, "todo", ""));
+    expect((await issues.previewStatus(lookedIssue, "done", "")).does[0]).toMatch(/关成已完成：没有改动要合$/u);
+    expect((await issues.previewStatus(lookedIssue, "canceled", "")).does[0]).toMatch(/关成已取消$/u);
+    const previewStatusFailure = await failure(issues.previewStatus(lookedIssue, "todo", ""));
     refusedWith(previewStatusFailure, "要说一句");
   });
 

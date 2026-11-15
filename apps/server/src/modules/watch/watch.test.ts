@@ -11,23 +11,24 @@ import { BizCode } from "@vibevalley/protocol/api";
 import { channelOf, defaultOf, isBusy } from "@vibevalley/protocol/rules";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
-import { messageOf } from "#/base/errors.ts";
+import { Inconsistent, messageOf } from "#/base/errors.ts";
 import { type Core, makeCore } from "#/core/core.ts";
 import { makeFrameOf } from "#/gateway/projection/frame.ts";
 import { reduce } from "#/gateway/projection/reduce.ts";
 import type { ServerConfig } from "#/infra/config.ts";
 import { type Db, dbQueries, openDb } from "#/infra/db.ts";
 import { keptLog, type Logger } from "#/infra/log.ts";
-import { wallTime } from "#/infra/time.ts";
+import { type Time, wallTime } from "#/infra/time.ts";
 import builtIn from "#/modules/agent/templates/orchestrator/agent.json" with { type: "json" };
 import { type Channel, catchUpMax, makeChannel } from "#/modules/channel/channel.ts";
-import { issueIntake } from "#/modules/issue/intake.ts";
-import { channelUses, type Issue } from "#/modules/issue/issue.ts";
+import { cronChannelUses } from "#/modules/issue/cron.ts";
+import type { Issue } from "#/modules/issue/issue.ts";
 import type { Handed } from "#/modules/session/envelope.ts";
 import type { Mailbox } from "#/modules/session/mailbox.ts";
+import type { Session } from "#/modules/session/session.ts";
 import { type Attachment, makeAttachment } from "#/platform/attachment/attachment.ts";
 import { testAgent } from "#/testing/agent.ts";
-import { testConfig, until, waitFor } from "#/testing/layers.ts";
+import { shiftedTime, testConfig, until, waitFor } from "#/testing/layers.ts";
 import { FakeSessions, keepPlayedSession, playedSessions } from "#/testing/played.ts";
 
 import { wakeBreaker } from "./brakes.ts";
@@ -43,6 +44,7 @@ interface Farm extends AsyncDisposable {
   readonly core: Core;
   readonly chat: Channel;
   readonly watch: Watch;
+  readonly session: Session;
   readonly mailbox: Mailbox;
   readonly attachment: Attachment;
   readonly db: Db;
@@ -57,9 +59,8 @@ interface Farm extends AsyncDisposable {
 
 /** The chat over played sessions: the hubs exist before the chat subscribes to them; the played sessions' own facts reach
  * the chat, and the chats start once they are back. */
-async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: Logger = keptLog("farm")): Promise<Farm> {
+async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: Logger = keptLog("farm"), clock: Time = wallTime): Promise<Farm> {
   const c: ServerConfig = { ...config, chat: { noticeBatchMs: 300, retryWakeMs: 100 } };
-  const clock = wallTime;
   const db = await openDb(c, log, clock);
   const core = makeCore({ projection: { reduce, effects: () => [], frame: makeFrameOf() }, clock });
   const all: T.ChatMessage[] = [];
@@ -72,14 +73,10 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
   const { session, mailbox } = played;
   const attachment = await makeAttachment({ config: c, clock, db });
   const chat = await makeChannel({ clock, log, fetch: offline, db, core, attachment });
-  // The watch routes through the issues' intake (an issue's threads go into its pool); its inbox reads the board through
-  // the issues, and these tests have none.
-  const intake = issueIntake({ config: c, clock, log, db, core, agent, session, channel: chat });
-  const issue = { onBoard: () => [], route: intake.route } as unknown as Issue;
+  // These tests have no issues on the board or in threads, so issue.pool always returns false.
+  const issue = { onBoard: () => [], pool: async () => false } as unknown as Issue;
   const watch = await makeWatch({ config: c, clock, log, db, core, agent, session, channel: chat, issue });
-  // services.ts's startup order: the deliveries, the issues' intake, then the watch.
   await played.boot();
-  await intake.boot();
   await watch.boot();
   const deliveries = async (recipient: string) =>
     (
@@ -92,6 +89,7 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
     core,
     chat,
     watch,
+    session,
     mailbox,
     attachment,
     db,
@@ -105,7 +103,6 @@ async function world(x: FakeSessions, config: ServerConfig = testConfig(), log: 
     deliveryOf: async (recipient, message) => (await deliveries(recipient)).find((d) => d.envelope_id === message),
     [Symbol.asyncDispose]: async () => {
       await watch.close();
-      await intake.close();
       await chat.close();
       await played.close();
       await agent.close();
@@ -131,8 +128,7 @@ const hire = async (f: Farm, _x: FakeSessions, id: string, brief: string, repo: 
     runs: 0,
     phase: { _tag: "resting" },
     ...(channel ? { channel } : {}),
-    ...(issue ? { issue: issueId(issue) } : {}),
-    refining: false,
+    ...(issue ? { scope: { kind: "issue", id: issueId(issue) } } : {}),
   };
   await keepSession(f, session);
   f.core.apply({ type: "sessionChanged", session });
@@ -169,9 +165,9 @@ const news = (f: Farm) => {
   };
 };
 
-const run = async (body: (f: Farm, x: FakeSessions) => Promise<void>, config?: ServerConfig, log?: Logger) => {
+const run = async (body: (f: Farm, x: FakeSessions) => Promise<void>, config?: ServerConfig, log?: Logger, clock?: Time) => {
   const x = new FakeSessions();
-  await using f = await world(x, config, log);
+  await using f = await world(x, config, log, clock);
   await body(f, x);
 };
 
@@ -416,8 +412,8 @@ describe("the chat", () => {
       await f.chat.markUnread(a, said.number);
       expect([f.channel(a)?.read, f.channel(a)?.unread]).toEqual([said.number - 1, 2]);
 
-      // A cron of the issue module's, as its table has it; the issues guard the channels they point at.
-      f.chat.guardRemoval(channelUses({ db: f.db, queued: async () => [] }));
+      // A cron of the issue module's, as its table has it; the crons guard the channels they point at.
+      f.chat.guardRemoval(cronChannelUses({ db: f.db }));
       await f.sql(`insert into issue_cron (id, name, body, channel_id, spec, tz, created_at) values ('r1', '看看', '看一眼', $1, '{}', 'UTC', 0)`, [a]);
       const channelRemovedFailure = await failure(f.chat.removeChannel(a));
       expect(channelRemovedFailure).toMatchObject({ message: expect.stringContaining("定时任务") });
@@ -966,24 +962,87 @@ describe("the chat", () => {
   test("the watch's cursor passes an event once it is routed, and stays before one that failed until startup reads it again", () =>
     run(async (f, x) => {
       await hire(f, x, "w1", "first", "demo");
+      const thread2 = await hire(f, x, "w2", "second", "demo");
       const cursor = async () => Number((await f.sql(`select seq from watch_cursor where name = 'channel'`))[0]?.["seq"] ?? 0);
-      const seqOf = async (id: string) => Number((await f.sql(`select seq from channel_event where message_id = $1 and kind = 'posted'`, [id]))[0]?.["seq"]);
+      const seqOf = async (id: string) =>
+        Number((await f.sql(`select seq from channel_event where message_id = $1 and kind = 'posted'`, [id]))[0]?.["seq"] ?? 0);
       const { message: first } = await f.chat.say({ text: "@w1 第一句", sendKey: "" });
       // The write returned once its event was handled: routed, and the cursor past it.
       expect(await f.deliveryOf("w1", first.id)).toBeDefined();
       expect(await cursor()).toBeGreaterThanOrEqual(await seqOf(first.id));
       await trigger(f.db, "fail_w1", "before insert on session_delivery", "new.session_id = 'w1'");
       expect(await outcome(f.chat.say({ text: "@w1 第二句", sendKey: "second" }))).toBe("Failure");
-      await drop(f.db, "fail_w1", "session_delivery");
       const [second] = await f.sql(`select id from channel_message where send_key = 'second'`);
-      const secondId = String(second!["id"]);
-      const { message: third } = await f.chat.say({ text: "@w1 第三句", sendKey: "" });
-      expect(await f.deliveryOf("w1", third.id)).toBeDefined();
+      const secondId = z.object({ id: z.string() }).parse(second).id;
+      const { message: third } = await f.chat.say({ text: "第三句", channel: thread2.id, sendKey: "" });
+      expect(await f.deliveryOf("w2", third.id)).toBeDefined();
       expect(await cursor()).toBeLessThan(await seqOf(secondId));
+      await drop(f.db, "fail_w1", "session_delivery");
       await f.watch.boot();
       expect(await f.deliveryOf("w1", secondId)).toBeDefined();
       expect(await cursor()).toBeGreaterThanOrEqual(await seqOf(third.id));
     }));
+
+  test("regression: watch self-heals a stuck cursor after a transient failure without restarting", async () => {
+    const log = keptLog("farm");
+    const clock = shiftedTime();
+    await run(
+      async (f, x) => {
+        await hire(f, x, "w1", "first", "demo");
+        const thread2 = await hire(f, x, "w2", "second", "demo");
+        const cursor = async () => Number((await f.sql(`select seq from watch_cursor where name = 'channel'`))[0]?.["seq"] ?? 0);
+        const seqOf = async (id: string) =>
+          Number((await f.sql(`select seq from channel_event where message_id = $1 and kind = 'posted'`, [id]))[0]?.["seq"] ?? 0);
+        const messageIdByKey = async (sendKey: string) => {
+          const [row] = await f.sql(`select id from channel_message where send_key = $1`, [sendKey]);
+          return z.object({ id: z.string() }).parse(row).id;
+        };
+
+        const { message: first } = await f.chat.say({ text: "@w1 第一句", sendKey: "" });
+        expect(await cursor()).toBeGreaterThanOrEqual(await seqOf(first.id));
+
+        await trigger(f.db, "fail_w1", "before insert on session_delivery", "new.session_id = 'w1'");
+        expect(await outcome(f.chat.say({ text: "@w1 第二句", sendKey: "heal-second" }))).toBe("Failure");
+        const secondId = await messageIdByKey("heal-second");
+        expect(await cursor()).toBeLessThan(await seqOf(secondId));
+
+        const { message: third } = await f.chat.say({ text: "第三句", channel: thread2.id, sendKey: "" });
+        expect(await f.deliveryOf("w2", third.id)).toBeDefined();
+        expect(await cursor()).toBeLessThan(await seqOf(secondId));
+
+        await drop(f.db, "fail_w1", "session_delivery");
+        clock.adjust(250);
+        await until(async () => (await f.deliveryOf("w1", secondId)) !== undefined, "timer-driven self-heal of second");
+        await until(async () => (await cursor()) >= (await seqOf(third.id)), "watch_cursor caught up past third");
+        expect((await f.deliveries("w1")).filter((d) => d.envelope_id === secondId)).toHaveLength(1);
+        expect((await f.deliveries("w2")).filter((d) => d.envelope_id === third.id)).toHaveLength(1);
+
+        // Exhaust all bounded heal delays while a fault persists, then verify the next live turn heals without watch.boot().
+        const healWarnings = () => log.lines.filter((l) => l.line.includes("cursor heal")).length;
+        const baseWarnings = healWarnings();
+        await trigger(f.db, "fail_w1_long", "before insert on session_delivery", "new.session_id = 'w1'");
+        expect(await outcome(f.chat.say({ text: "@w1 第四句", sendKey: "heal-fourth" }))).toBe("Failure");
+        const fourthId = await messageIdByKey("heal-fourth");
+        for (const [idx, delay] of [250, 600, 1_100, 2_100, 4_100].entries()) {
+          clock.adjust(delay);
+          await until(() => healWarnings() >= baseWarnings + idx + 1, `bounded heal attempt ${idx + 1}`);
+        }
+        clock.adjust(60_000);
+        expect(healWarnings()).toBe(baseWarnings + 5);
+        expect(await cursor()).toBeLessThan(await seqOf(fourthId));
+
+        await drop(f.db, "fail_w1_long", "session_delivery");
+        const { message: fifth } = await f.chat.say({ text: "第五句", channel: thread2.id, sendKey: "" });
+        expect(await f.deliveryOf("w1", fourthId)).toBeDefined();
+        expect(await f.deliveryOf("w2", fifth.id)).toBeDefined();
+        expect(await cursor()).toBeGreaterThanOrEqual(await seqOf(fifth.id));
+        expect((await f.deliveries("w1")).filter((d) => d.envelope_id === fourthId)).toHaveLength(1);
+      },
+      undefined,
+      log,
+      clock,
+    );
+  });
 
   test("a read receipt is written whole or not at all", () =>
     run(async (f) => {
@@ -1019,7 +1078,6 @@ describe("the chat", () => {
           hiredAt: Date.now(),
           runs: 0,
           phase: { _tag: "resting" },
-          refining: false,
         };
         await keepSession(f, first);
         f.core.apply({
@@ -1045,7 +1103,6 @@ describe("the chat", () => {
           hiredAt: Date.now(),
           runs: 0,
           phase: { _tag: "resting" },
-          refining: false,
         };
         await keepSession(f, second);
         f.core.apply({
@@ -1077,3 +1134,37 @@ test("regression: mailbox routing reads the current channel manager through thre
     const direct = f.chat.orchestratorIn(await f.chat.createDirect("manager"));
     expect([after, direct]).toEqual(["second", "manager"]);
   }));
+
+test("regression: Session.useChat and Session.useReadiness reject duplicate wiring and post-boot mutation", async () => {
+  const c = testConfig();
+  const log = keptLog("wiring");
+  const db = await openDb(c, log, wallTime);
+  const core = makeCore({ projection: { reduce, effects: () => [], frame: makeFrameOf() }, clock: wallTime });
+  const agent = await testAgent({ config: c, clock: wallTime, log, db, core });
+  const freshPlayed = () => playedSessions(new FakeSessions(), { config: c, clock: wallTime, log, db, core, agent });
+  const first = await freshPlayed();
+  try {
+    const view = { defaultChannel: () => "general", unreadOf: async () => [] };
+    const ready = (inputs: readonly unknown[]) => inputs.map(() => true);
+    first.session.useChat(view);
+    expect(() => first.session.useChat(view)).toThrow(Inconsistent);
+    first.session.useReadiness(ready);
+    expect(() => first.session.useReadiness(ready)).toThrow(Inconsistent);
+
+    const second = await freshPlayed();
+    try {
+      await second.boot();
+      expect(() => second.session.useChat(view)).toThrow(Inconsistent);
+      expect(() => second.session.useReadiness(ready)).toThrow(Inconsistent);
+      expect(() => second.mailbox.useChat(view)).toThrow(Inconsistent);
+      expect(() => second.mailbox.useReadiness(ready)).toThrow(Inconsistent);
+    } finally {
+      await second.close();
+    }
+  } finally {
+    await first.close();
+    await agent.close();
+    core.close();
+    await db.close();
+  }
+});
