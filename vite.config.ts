@@ -442,7 +442,11 @@ export default defineConfig({
         // Page tests find elements by data-testid and state attributes, not by the interface's words
         // (scripts/audit/oxlint-plugin.ts, no-copy-selector; docs/subsystems/foundation.md).
         files: ["apps/web/test/**", "apps/desktop/test/**"],
-        rules: { "vibevalley/no-copy-selector": "error" },
+        rules: { "vibevalley/no-copy-selector": "error", "vibevalley/response-door": "error" },
+      },
+      {
+        files: ["apps/web/test/fixtures.ts"],
+        rules: { "vibevalley/response-door": "off" },
       },
       {
         // Second-level directory purity across subpackages (src/base pure ground, desktop preload sandbox).

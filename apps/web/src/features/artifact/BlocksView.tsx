@@ -30,6 +30,8 @@ function authorColor(updatedBy: string, agent: Agent | undefined) {
   return trim === undefined ? userColor : hexColor(trim);
 }
 
+type BlockSnapshot = Pick<EditBlock, "id" | "rev" | "text">;
+
 /** A block as one drawing of the editor shows it; `block` is the editor's own, for its actions. */
 interface Row {
   readonly block: EditBlock;
@@ -150,10 +152,14 @@ export function BlocksView(props: {
     setWorking(undefined);
   };
 
+  const blockSnapshots = createMemo((): BlockSnapshot[] => {
+    version();
+    return editor.blocks.map((b) => ({ id: b.id, rev: b.rev, text: b.text }));
+  });
   const suggestionsList = () => (
     <SuggestionsList
       list={suggestions()}
-      blocks={editor.blocks}
+      blocks={blockSnapshots()}
       agents={agents()}
       working={working()}
       onAccept={(suggestion) => void resolve(suggestion, true)}
@@ -197,7 +203,7 @@ export function BlocksView(props: {
 
 function SuggestionsList(props: {
   list: readonly Suggestion[];
-  blocks: readonly EditBlock[];
+  blocks: readonly BlockSnapshot[];
   agents: Map<string, Agent>;
   working: string | undefined;
   onAccept: (s: Suggestion) => void;
@@ -312,7 +318,7 @@ const attrText = (attrs: object) =>
     .map(([k, v]) => `${attrName(k)} ${String(v)}`)
     .join(" / ");
 
-function SuggestionDiff(props: { suggestion: Suggestion; block: EditBlock | undefined }) {
+function SuggestionDiff(props: { suggestion: Suggestion; block: BlockSnapshot | undefined }) {
   const change = () => props.suggestion.change;
   return (
     <Show

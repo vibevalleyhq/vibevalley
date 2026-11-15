@@ -280,14 +280,19 @@ describe("the built-in skills", () => {
     expect(skillOf(s.skills(), "reviewer")?.body).toBe(reviewer.body);
   });
 
-  test("say themselves in English when the farm does", async () => {
+  test("say themselves in English when the farm switches language after boot, and Chinese again", async () => {
+    const s = await open(testConfig());
+    for (const k of s.skills()) if (k.builtIn === true) expect(k.name + k.description).toMatch(han);
     setLocale("en");
     try {
-      const s = await open(testConfig());
       for (const k of s.skills()) if (k.builtIn === true) expect(k.name + k.description).not.toMatch(han);
+      for (const item of await s.templates())
+        if (item.source === "builtIn") expect(JSON.stringify([item.name, item.duty, item.tags, item.persona])).not.toMatch(han);
     } finally {
       setLocale("zh");
     }
+    for (const k of s.skills()) if (k.builtIn === true) expect(k.name + k.description).toMatch(han);
+    await s.close();
   });
 
   test("a template ticks the ones it names, a helper's prompt carries a ticked one, and the user's own ticks stay", async () => {

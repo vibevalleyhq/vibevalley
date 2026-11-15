@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
-import { expect, test } from "./fixtures";
+import * as S from "@vibevalley/protocol/schema";
+
+import { expect, replyData, test } from "./fixtures";
 import { bindUnderstanding, libraryUnderstandingFile, localUnderstandingInput, understandingFile } from "./understanding-fixture";
 
 test.use({ farm: "understanding" });
@@ -154,7 +156,7 @@ test("user can authorize immutable input for a channel and revoke it before any 
   const approved = page.waitForResponse((response) => response.url().endsWith("/api/v1/media/understanding/authorize") && response.status() === 200);
   await page.getByTestId("understanding-submit").click();
   const response = await approved;
-  const job = await response.json();
+  const job = await replyData(response, S.MediaUnderstandingJob);
   const card = page.locator(`[data-testid="understanding-job"][data-id="${job.id}"]`);
   await expect(card).toHaveAttribute("data-phase", "authorized");
   await expect(card.getByTestId("understanding-delegate")).toBeEnabled();
